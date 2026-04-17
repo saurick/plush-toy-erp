@@ -1,7 +1,8 @@
 # 本地联调私有覆盖示例：复制为 config.local.yaml 后填写真实值，禁止把真实密码提交进仓库。
 trace:
   jaeger:
-    endpoint: 127.0.0.1:4318
+    endpoint: ""
+    # endpoint: 127.0.0.1:4318
 
 data:
   postgres:

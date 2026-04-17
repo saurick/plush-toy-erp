@@ -230,11 +230,10 @@ report_existing_paths \
   server/docs/k8s.md
 
 report_existing_paths \
-  "仓库仍包含远端一键发布脚本" \
-  "若当前项目不需要 SSH 发布 / 远端增量部署，可移除 publish/deploy/migrate 脚本；若保留，需优先替换远端目录、主机和容器名。" \
+  "仓库仍包含远端发布脚本" \
+  "若当前项目只走 docker compose，请移除 deploy/publish 这类 SSH 发布脚本，避免第二套部署主路径残留。" \
   server/deploy/compose/prod/deploy_server.sh \
-  server/deploy/compose/prod/publish_server.sh \
-  server/deploy/compose/prod/migrate_online.sh
+  server/deploy/compose/prod/publish_server.sh
 
 ADMIN_MODULE_HITS="$(
   scan_pattern 'subscription|points\.|invite_code|AdminLevel|transfer_to_admin_id|UserPoints|Subscription|user_expiry_warning_days' \
@@ -251,15 +250,15 @@ report_advisory \
   "$ADMIN_MODULE_HITS"
 
 JAEGER_HITS="$(
-  scan_pattern 'jaeger|OTLP|TraceName|traceName' \
+  scan_pattern 'jaegertracing/all-in-one|TRACE_ENDPOINT:-jaeger:4318|endpoint: jaeger:4318|JAEGER_|PROMETHEUS_SERVER_URL' \
     server/deploy/compose/prod/compose.yml \
-    server/configs/dev/config.yaml \
     server/configs/prod/config.yaml \
-    server/cmd/server/main.go
+    server/deploy/compose/prod/.env.example \
+    server/deploy/compose/prod/README.md
 )"
 report_advisory \
-  "观测链路仍默认启用 Jaeger / OTLP" \
-  "若当前项目不需要自带 Jaeger，可删除 compose 服务与 trace 配置；若保留，至少替换服务名、端口与 Prometheus 地址。" \
+  "仓库仍默认内置 tracing 存储" \
+  "若当前项目只保留最小 Compose 主路径，请移除内置 tracing 存储；需要 tracing 时再通过 TRACE_ENDPOINT 接外部 OTLP backend。" \
   "$JAEGER_HITS"
 
 echo "[project-scan] 建议执行顺序:"

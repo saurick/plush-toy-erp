@@ -24,7 +24,7 @@
 
 - 当前唯一部署真源：`/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前仓库没有初始化 `lab-ha`、Kubernetes 清单和 dashboard；未获明确需求前，不要补回第二套部署主路径
-- Compose 基线默认保留 PostgreSQL、可选 Jaeger、`/healthz`、`/readyz` 和 `depends_on: service_healthy`
+- Compose 基线默认保留 PostgreSQL、`/healthz`、`/readyz` 和 `depends_on: service_healthy`
 - 如果后续确实要引入 Kubernetes 或其他部署方式，必须先补正式文档，再落代码和脚本
 
 ## 初始化与收口

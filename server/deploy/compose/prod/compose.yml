@@ -23,31 +23,6 @@ services:
       start_period: 15s
     networks: {}
 
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: "${PROJECT_SLUG:-plush-toy-erp}-jaeger"
-    restart: always
-    ports:
-      - "${JAEGER_5775_PORT:-15775}:5775/udp"
-      - "${JAEGER_6831_PORT:-16831}:6831/udp"
-      - "${JAEGER_6832_PORT:-16832}:6832/udp"
-      - "${JAEGER_5778_PORT:-15778}:5778"
-      - "${JAEGER_UI_PORT:-16687}:16686"
-      - "${JAEGER_14268_PORT:-24268}:14268"
-      - "${JAEGER_14250_PORT:-24250}:14250"
-      - "${JAEGER_9411_PORT:-19411}:9411"
-      - "${JAEGER_OTLP_GRPC_PORT:-14317}:4317"
-      - "${JAEGER_OTLP_HTTP_PORT:-14318}:4318"
-    environment:
-      PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: true
-      METRICS_STORAGE_TYPE: prometheus
-      PROMETHEUS_SERVER_URL: "${PROMETHEUS_SERVER_URL:-http://host.docker.internal:3004}"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    mem_limit: "${JAEGER_MEM_LIMIT:-96m}"
-    mem_reservation: "${JAEGER_MEM_RESERVATION:-48m}"
-    networks: {}
-
   app-server:
     image: "${APP_IMAGE:-plush-toy-erp-server:dev}"
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-server"
@@ -55,8 +30,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      jaeger:
-        condition: service_started
     ports:
       - "${APP_HTTP_PORT:-8200}:8000"
       - "${APP_GRPC_PORT:-9200}:9000"
@@ -64,7 +37,7 @@ services:
       TZ: "${TZ:-Asia/Shanghai}"
       # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。
       POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_toy_erp?sslmode=disable}"
-      TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
+      TRACE_ENDPOINT: "${TRACE_ENDPOINT:-}"
     mem_limit: "${APP_MEM_LIMIT:-160m}"
     mem_reservation: "${APP_MEM_RESERVATION:-80m}"
     networks: {}

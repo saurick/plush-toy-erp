@@ -47,7 +47,8 @@
 
 - `traceName` 为空时，会回退到 `cmd/server/main.go` 里的默认服务名。
 - `endpoint` 为空时，服务仍能启动，只是使用本地无 exporter 的 tracer provider。
-- 当前通过 OTLP HTTP exporter 发 trace，不要求一定叫 Jaeger；如果后续改用其他 OTLP 兼容后端，只需替换 endpoint 和服务名即可。
+- 当前通过 OTLP HTTP exporter 发 trace；虽然配置名仍叫 `jaeger`，但仓库不再默认内置 Jaeger 服务。
+- 如果后续改用其他 OTLP 兼容后端，只需替换 endpoint 和服务名即可。
 
 ## `data.postgres`
 
@@ -88,19 +89,17 @@
 - `data.auth.jwtSecret`
 - `data.auth.admin.username`
 - `data.auth.admin.password`
-- `trace.jaeger.traceName`
-- `trace.jaeger.endpoint`
 
 ## 配置选择建议
 
 - 本地开发：
   - `log.debug=true`
   - `data.postgres.debug=true`
-  - `trace.jaeger.ratio=1`
+  - 只有需要观察 trace 时再填 `trace.jaeger.endpoint`
 - 生产环境：
   - `log.debug=false`
   - `data.postgres.debug=false`
-  - `trace.jaeger.ratio` 按观测成本控制
+  - 若启用 tracing，再按观测成本配置 `trace.jaeger.endpoint` 和 `trace.jaeger.ratio`
 
 ## 额外建议
 

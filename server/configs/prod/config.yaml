@@ -14,11 +14,9 @@ log:
 trace:
   jaeger:
     traceName: ""
-    # http endpoint
-    endpoint: jaeger:4318
-    # endpoint: http://jaeger:4318/v1/traces
-    # gRPC endpoint
-    # endpoint: http://jaeger:4317
+    # endpoint 留空表示默认不连 tracing backend；需要时再填外部 OTLP endpoint。
+    endpoint: ""
+    # endpoint: otel-collector:4318
     # 采集率,ratio>=1表示采集所有
     ratio: 1
 

@@ -271,7 +271,7 @@ func main() {
 		traceRatio = bc.Trace.Jaeger.Ratio
 	}
 	if v := strings.TrimSpace(os.Getenv("TRACE_ENDPOINT")); v != "" {
-		// 关键兜底：当前默认走仓库自带 jaeger，只有接外部 tracing 或排查特殊问题时才覆盖。
+		// 关键兜底：环境变量优先，便于 Compose 或宿主机在不改 YAML 的情况下接外部 OTLP backend。
 		traceEndpoint = v
 	}
 
@@ -279,14 +279,14 @@ func main() {
 	cleanupTaskGroup := taskgroup.Init()
 	defer cleanupTaskGroup()
 
-	// ===== 5. 初始化 OpenTelemetry（带兜底，不会因为没连上 Jaeger 就阻塞） =====
+	// ===== 5. 初始化 OpenTelemetry（带兜底，不会因为没连上 tracing backend 就阻塞） =====
 	tp := initTracerProvider(traceName, traceEndpoint, traceRatio, logger)
 	// 进程退出前 flush 一下（不阻塞请求，只在退出时）
 	defer func() {
 		_ = tp.ForceFlush(context.Background())
 	}()
 
-	// ===== 5.5 启动时打一个 span，方便在 Jaeger 里排查 =====
+	// ===== 5.5 启动时打一个 span，方便在 tracing backend 里排查 =====
 	{
 		tr := otel.Tracer("bootstrap")
 		ctx, span := tr.Start(context.Background(), "startup-span")
