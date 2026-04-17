@@ -76,7 +76,7 @@ echo "[qa:full] 运行 web 全量检查"
   pnpm lint
   pnpm css
 
-  # 兼容模板差异：只有定义了 test 脚本才执行前端测试。
+  # 兼容仓库差异：只有定义了 test 脚本才执行前端测试。
   if node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));process.exit(pkg.scripts&&pkg.scripts.test?0:1)"; then
     pnpm test
   else

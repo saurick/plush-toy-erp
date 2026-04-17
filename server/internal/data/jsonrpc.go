@@ -24,7 +24,7 @@ type adminAccountReader interface {
 	GetAdminByID(ctx context.Context, id int) (*biz.AdminUser, error)
 }
 
-// JsonrpcData 是 JSON-RPC 的唯一业务入口，模板默认只保留通用鉴权和账号目录能力。
+// JsonrpcData 是 JSON-RPC 的唯一业务入口，当前只保留通用鉴权和账号目录能力。
 type JsonrpcData struct {
 	data *Data
 	log  *log.Helper
@@ -37,7 +37,7 @@ type JsonrpcData struct {
 	adminReader adminAccountReader
 }
 
-// NewJsonrpcData：由 wire 注入底层 repo，再在入口层组装 usecase，保持模板的“入口聚合”风格。
+// NewJsonrpcData：由 wire 注入底层 repo，再在入口层组装 usecase，保持当前“入口聚合”风格。
 func NewJsonrpcData(
 	data *Data,
 	c *conf.Data,

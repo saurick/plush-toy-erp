@@ -1,6 +1,6 @@
 import React from 'react'
 
-// 提供中性的应用级背景和承载层，避免模板默认带入行业主题。
+// 提供中性的应用级背景和承载层，避免过早锁定行业主题。
 export default function AppShell({ children, className = '' }) {
   return (
     <div

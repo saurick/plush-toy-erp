@@ -10,7 +10,7 @@ print_help() {
   1) 安装 web/server 依赖
   2) 启用本地 Git hooks
   3) 执行一次 scripts/qa/fast.sh 快速自检
-  4) 提示派生项目执行初始化扫描
+  4) 提示执行仓库占位与默认值扫描
 
 环境变量:
   BOOTSTRAP_SKIP_INSTALL=1    跳过依赖安装
@@ -68,5 +68,5 @@ else
   echo "[bootstrap] BOOTSTRAP_SKIP_FAST_QA=1，跳过快速自检"
 fi
 
-echo "[bootstrap] 如当前仓库是由模板初始化的新项目，建议继续执行: bash $ROOT_DIR/scripts/init-project.sh"
+echo "[bootstrap] 如本轮涉及改名、默认配置替换或部署收口，建议继续执行: bash $ROOT_DIR/scripts/project-scan.sh"
 echo "[bootstrap] 完成"

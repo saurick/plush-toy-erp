@@ -182,7 +182,7 @@ func registerHealthRoutes(srv *httpx.Server, logger log.Logger, tp *sdktrace.Tra
 	srv.Handle("/readyz", newObservedHTTPHandler(logger, tp, "server.http.readyz", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		if postgres != nil {
 			if err := postgres.PingContext(ctx); err != nil {
-				// 关键兜底：模板层 readiness 只检查 Postgres 这一项通用硬依赖，避免把派生项目特有依赖预埋进来。
+				// 关键兜底：当前 readiness 只检查 Postgres 这一项通用硬依赖，避免把未来业务依赖预埋进来。
 				healthLogger.WithContext(ctx).Warnw(
 					"msg", "dependency not ready",
 					"operation", "server.http.readyz",

@@ -29,7 +29,7 @@
 
 ## 初始化与收口
 
-- 首次收口或大规模改名后，执行 `bash /Users/simon/projects/plush-toy-erp/scripts/init-project.sh --project --strict`
+- 首次收口或大规模改名后，执行 `bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict`
 - 该脚本用于扫出项目名、服务名、默认密钥、远端发布地址和首页文案残留
 - 不需要的目录、脚本和部署物默认移动到系统回收站，不做不可恢复删除
 

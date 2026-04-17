@@ -1,4 +1,4 @@
-# 首次收口说明
+# 当前项目基线
 
 本仓库当前已经完成第一轮骨架收口，目标是先把 `plush-toy-erp` 的开发与部署主路径压到最小可运行状态。
 
@@ -26,10 +26,10 @@
 ## 建议检查顺序
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/init-project.sh
+bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/bootstrap.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/doctor.sh
-bash /Users/simon/projects/plush-toy-erp/scripts/init-project.sh --project --strict
+bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 bash /Users/simon/projects/plush-toy-erp/scripts/qa/fast.sh
 ```
 

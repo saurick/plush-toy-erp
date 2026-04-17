@@ -100,7 +100,7 @@ if [ ! -f "$SERVER_DIR/Makefile" ]; then
 	exit 1
 fi
 
-# 兼容性兜底：目标主机改为显式传入，避免模板派生项目沿用过期宿主机地址。
+# 兼容性兜底：目标主机改为显式传入，避免沿用过期宿主机地址。
 if [ -z "$REMOTE_HOST" ]; then
 	echo "ERROR: 请显式设置 REMOTE_HOST，例如 export REMOTE_HOST=deploy.example.internal" >&2
 	exit 1

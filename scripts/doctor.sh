@@ -14,7 +14,7 @@ print_help() {
   - 可选命令: gitleaks / shellcheck / golangci-lint / yamllint / shfmt / govulncheck
   - hooks 路径与关键脚本存在性
   - Node 版本与版本文件（.n-node-version/.node-version/.nvmrc）一致性（仅提示）
-  - 初始化扫描脚本存在性（scripts/init-project.sh）
+  - 仓库扫描脚本存在性（scripts/project-scan.sh）
 USAGE
 }
 
@@ -104,7 +104,7 @@ echo "[doctor] 检查关键脚本存在性"
 required_files=(
   scripts/setup-git-hooks.sh
   scripts/bootstrap.sh
-  scripts/init-project.sh
+  scripts/project-scan.sh
   scripts/qa/fast.sh
   scripts/qa/full.sh
   scripts/qa/strict.sh

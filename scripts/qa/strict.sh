@@ -77,7 +77,7 @@ echo "[qa:strict] 运行 web 严格检查"
   pnpm exec eslint --max-warnings=0 --ext .js --ext .jsx src/
   pnpm exec stylelint "src/**/*.{css,scss,sass}" --max-warnings=0
 
-  # 兼容模板差异：只有定义了 test 脚本才执行前端测试。
+  # 兼容仓库差异：只有定义了 test 脚本才执行前端测试。
   if node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));process.exit(pkg.scripts&&pkg.scripts.test?0:1)"; then
     pnpm test
   else

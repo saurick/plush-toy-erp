@@ -40,7 +40,7 @@ cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
 docker compose -f compose.yml config
 
 cd /Users/simon/projects/plush-toy-erp
-bash scripts/init-project.sh --project --strict
+bash scripts/project-scan.sh --strict
 ```
 
 如改动触达发布脚本或应用运行配置，再补：

@@ -92,7 +92,7 @@ export default defineConfig(({ command, mode }) => {
       port: 5175,
       open: true,
       proxy: {
-        // 本地需与 simulator/trade 并行开发，模板 dev 后端口径固定到 8200，避免继续撞占 8000。
+        // 本地需与 simulator/trade 并行开发，dev 后端口固定到 8200，避免继续撞占 8000。
         '/rpc': {
           target: 'http://localhost:8200',
           changeOrigin: true,

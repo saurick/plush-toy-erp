@@ -7,7 +7,7 @@
 - `web/`：Vite + React 前端，保留用户登录、注册、管理员登录和后台账号目录骨架
 - `server/`：Kratos + Ent + Atlas 后端，保留 `/healthz`、`/readyz`、鉴权、错误码与 JSON-RPC 基线
 - `scripts/`：本地环境初始化、质量门禁和 Git hooks
-- `docs/`：仓库级约定、部署口径和首次收口说明
+- `docs/`：仓库级约定、部署口径和当前项目基线
 
 ## 当前边界
 
@@ -66,7 +66,7 @@ docker compose -f compose.yml up -d
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/bootstrap.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/doctor.sh
-bash /Users/simon/projects/plush-toy-erp/scripts/init-project.sh --project --strict
+bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 bash /Users/simon/projects/plush-toy-erp/scripts/qa/fast.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
 ```
@@ -85,7 +85,7 @@ pnpm style:l1
 
 - 协作约定：`/Users/simon/projects/plush-toy-erp/AGENTS.md`
 - 阅读顺序与真源：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
-- 首次收口说明：`/Users/simon/projects/plush-toy-erp/docs/project-init.md`
+- 当前项目基线：`/Users/simon/projects/plush-toy-erp/docs/project-status.md`
 - 部署口径：`/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
 - 脚本说明：`/Users/simon/projects/plush-toy-erp/scripts/README.md`
 - 后端总览：`/Users/simon/projects/plush-toy-erp/server/README.md`

@@ -25,7 +25,7 @@ pnpm build
 ## 环境变量
 
 - `VITE_BASE_URL`：前端部署基础路径
-- `VITE_APP_TITLE`：页面标题，占位值建议在派生项目初始化时替换
+- `VITE_APP_TITLE`：页面标题，应与当前项目名称保持一致
 - `VITE_ENABLE_RPC_MOCK`：是否启用本地 RPC mock
 
 环境文件：

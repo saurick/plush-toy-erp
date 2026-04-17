@@ -36,7 +36,7 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 
 ## HTTP 入口
 
-当前模板默认暴露以下 HTTP 能力：
+当前服务默认暴露以下 HTTP 能力：
 
 - `/rpc/{url}`
   - JSON-RPC HTTP 入口，支持 `GET` 和 `POST`
@@ -59,11 +59,11 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 - gRPC 服务同样承载 `Jsonrpc` 服务定义
 - 默认监听 `0.0.0.0:9000`
 
-说明：模板当前主要以 HTTP JSON-RPC 为默认入口，gRPC 更多是保留 Kratos 的统一接入能力。
+说明：当前服务主要以 HTTP JSON-RPC 为默认入口，gRPC 更多是保留 Kratos 的统一接入能力。
 
 ## 启动依赖
 
-当前模板默认把以下项目视为启动硬依赖：
+当前服务默认把以下项目视为启动硬依赖：
 
 - PostgreSQL
 
@@ -87,7 +87,7 @@ make migrate_apply
 go test ./...
 ```
 
-## 初始化新项目时建议确认
+## 后续扩展时建议确认
 
 - 是否仍保留 JSON-RPC 作为主入口
 - HTTP / gRPC 端口是否需要调整

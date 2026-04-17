@@ -1,6 +1,6 @@
 import React from 'react'
 
-// 通用内容容器：保留深色控制台质感，但去掉模板特定视觉隐喻。
+// 通用内容容器：保留深色控制台质感，避免额外视觉隐喻干扰业务页扩展。
 export default function SurfacePanel({ children, className = '' }) {
   return (
     <div

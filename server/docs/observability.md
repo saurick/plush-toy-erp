@@ -1,6 +1,6 @@
 # 可观测性与健康检查说明
 
-本文档只描述当前模板真实存在的服务端观测基线，不写理想化规范。
+本文档只描述当前仓库真实存在的服务端观测基线，不写理想化规范。
 
 ## 当前已有的基线
 
@@ -39,26 +39,20 @@
 
 ## 当前已知盲区
 
-以下点目前仍不算理想，需要派生项目按需补：
+以下点目前仍不算理想，需要后续按真实需求补：
 
 - `/readyz` 失败时虽然已有结构化日志，但响应体仍是简单文本
 - JSON-RPC 入口日志仍以文本 `Infof/Warnf` 为主，字段化程度一般
 - 当前 `request_id` 自动生成只覆盖 HTTP 链路，gRPC 和异步任务还没有统一 request id 策略
 
-## 对部署模板的影响
+## 对当前部署路径的影响
 
 ### Compose
 
-- Compose 模板当前保留 PostgreSQL `healthcheck`
+- Compose 当前保留 PostgreSQL `healthcheck`
 - 业务容器默认依赖 `/healthz`、`/readyz` 作为发布后 smoke 检查入口
 
-### Kubernetes
-
-- `startupProbe` -> `/readyz`
-- `readinessProbe` -> `/readyz`
-- `livenessProbe` -> `/healthz`
-
-## 派生项目常见补法
+## 后续常见补法
 
 - 如果项目长期跑在 Kubernetes，优先把 `readyz` 扩展到真实依赖，并为失败响应补更细的 JSON 细节
 - 如果项目依赖 Redis、MQ、OSS、第三方 API，再把这些依赖纳入 `/readyz`

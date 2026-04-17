@@ -31,11 +31,11 @@
 建议先执行：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/init-project.sh
+bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh
 ```
 
 然后再执行：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/init-project.sh --project --strict
+bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 ```

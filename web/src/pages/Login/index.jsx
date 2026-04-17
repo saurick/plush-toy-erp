@@ -123,7 +123,7 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between pt-1 text-sm text-slate-300">
                 <div>
-                  模板默认不预置普通用户。{' '}
+                  当前系统不会自动创建普通用户账号。{' '}
                   <Link
                     className="font-medium text-cyan-200 underline underline-offset-4 transition hover:text-cyan-100"
                     to="/register"

@@ -5,7 +5,7 @@
 ## 真源原则
 
 - 运行时行为的最终真源始终是代码。
-- 仓库级约定、部署边界和首次收口决策，以当前文档为索引，再分流到对应子目录文档。
+- 仓库级约定、部署边界和项目基线，以当前文档为索引，再分流到对应子目录文档。
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
 
@@ -29,21 +29,21 @@
 - `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/README.md`
 - `/Users/simon/projects/plush-toy-erp/server/docs/README.md`
 
-### 3. 首次收口、改名或默认配置清理
+### 3. 收口、改名或默认配置清理
 
 先读：
 
-- `/Users/simon/projects/plush-toy-erp/docs/project-init.md`
+- `/Users/simon/projects/plush-toy-erp/docs/project-status.md`
 - `/Users/simon/projects/plush-toy-erp/scripts/README.md`
 
 然后执行：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/init-project.sh
-bash /Users/simon/projects/plush-toy-erp/scripts/init-project.sh --project --strict
+bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh
+bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 ```
 
-## 新开对话最小交接模板
+## 新开对话最小交接格式
 
 ```text
 先读：

@@ -58,7 +58,7 @@ export default function AdminUsersPage() {
       const offset = (safePage - 1) * PAGE_SIZE
       const trimmedKeyword = (keyword || '').trim()
 
-      // 模板默认只保留搜索、查看和账号启停，业务字段留给派生项目自行扩展。
+      // 当前后台账号页先只保留搜索、查看和账号启停，后续业务字段按真实需求再扩展。
       const result = await userRpc.call('list', {
         limit: PAGE_SIZE,
         offset,
@@ -133,7 +133,8 @@ export default function AdminUsersPage() {
               账号目录
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
-              这里默认只保留账号搜索、查看和启用/禁用，适合作为后台账号页的起点。
+              当前版本先提供账号搜索、查看和启用/禁用，后续再按 ERP
+              业务补充字段和操作。
             </p>
           </div>
 
