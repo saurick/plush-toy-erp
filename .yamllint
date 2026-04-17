@@ -1,0 +1,14 @@
+extends: default
+
+ignore: |
+  .git/
+  web/node_modules/
+  web/build/
+  server/bin/
+  web/pnpm-lock.yaml
+  .playwright-cli/
+
+rules:
+  document-start: disable
+  line-length: disable
+  comments: disable

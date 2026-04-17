@@ -1,0 +1,73 @@
+syntax = "proto3";
+package kratos.api;
+
+option go_package = "server/internal/conf;conf";
+
+import "google/protobuf/duration.proto";
+
+message Bootstrap {
+  Server server = 1;
+  Data data = 2;
+  Trace trace = 3;
+  Log log = 4;
+}
+
+message Server {
+  message HTTP {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  message GRPC {
+    string network = 1;
+    string addr = 2;
+    google.protobuf.Duration timeout = 3;
+  }
+  HTTP http = 1;
+  GRPC grpc = 2;
+}
+
+message Data {
+  message Postgres {
+    string dsn = 1;
+    bool debug = 2;
+  }
+  message Etcd {
+    repeated string hosts = 1;
+  }
+  message Auth {
+    string jwtSecret = 1;
+    int32 jwtExpireSeconds = 2;
+    message Admin {
+      string username = 1;
+      string password = 2;
+    }
+    Admin admin = 3;
+  }
+
+  Postgres postgres = 1;
+  Etcd etcd = 2;
+  Auth auth = 3;
+  reserved 4;
+}
+
+message Trace {
+  message Jaeger {
+    string traceName = 1; // trace name, 因为配置公用，直接在main.go中硬编码
+    string endpoint = 2;
+    double ratio = 3;
+  }
+  Jaeger jaeger = 1;
+}
+
+message Log {
+  bool debug = 1;
+}
+
+message Notify {
+  message Telegram {
+    string apiToken = 1;
+    int64 chatId = 2;
+  }
+  Telegram telegram = 1;
+}

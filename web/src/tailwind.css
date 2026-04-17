@@ -1,0 +1,6 @@
+/* web/src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 你自己的全局样式可以写在后面 */

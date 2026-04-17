@@ -1,22 +1,10 @@
-# macOS
+.cursor/
 .DS_Store
 
-# Editor
-.idea/
-.vscode/
+web/node_modules/
+web/build/
+web/.vite-cache/
 
-# Logs
-*.log
-
-# Local env
-.env
-.env.local
-.env.*.local
-
-# Common build outputs
-dist/
-build/
-coverage/
-tmp/
-.cache/
-node_modules/
+server/bin/
+output/
+.playwright-cli/

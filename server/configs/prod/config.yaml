@@ -1,0 +1,56 @@
+# server/configs/prod/config.yaml
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 10s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 10s
+
+log:
+  debug: false
+
+# 链路追踪服务器
+trace:
+  jaeger:
+    traceName: ""
+    # http endpoint
+    endpoint: jaeger:4318
+    # endpoint: http://jaeger:4318/v1/traces
+    # gRPC endpoint
+    # endpoint: http://jaeger:4317
+    # 采集率,ratio>=1表示采集所有
+    ratio: 1
+
+# 数据相关
+data:
+  # 主数据库，保存核心数据
+  postgres:
+    # if true output sql
+    debug: false
+    # 生产环境密码由 compose 注入 POSTGRES_DSN 覆盖，仓库内仅保留脱敏占位值。
+    dsn: "postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_toy_erp?sslmode=disable"
+
+  # 缓存服务
+  # redis:
+  #   network: tcp
+  #   address: 127.0.0.1:6379
+  #   password: ""
+  #   database: 0
+  #   readTimeout: 0.2s
+  #   writeTimeout: 0.2s
+  etcd:
+    hosts:
+      - etcd:2379
+  # 认证相关
+  auth:
+    jwtSecret: "change-this-prod-jwt-secret"
+    jwtExpireSeconds: 604800 # 7 days
+    admin:
+      username: "admin"
+      password: "change-this-prod-admin-password"
+
+# notify:
+#   telegram:
+#     apiToken: "6835874767:AAHqdz2jT8B_fInZ8ff5EmUT8ndsWVzO--M"
+#     chatId: -4184591934
