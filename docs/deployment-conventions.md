@@ -11,7 +11,7 @@
 ### `server/deploy/compose/prod`
 
 - 单机或单宿主机部署入口
-- 保留 PostgreSQL、业务容器和线上迁移脚本
+- 保留 PostgreSQL、Jaeger、业务容器和线上迁移脚本
 - 所有运行时参数优先通过 `.env` 覆盖，不要直接硬改 `compose.yml`
 
 ## 单一真源规则

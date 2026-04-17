@@ -57,7 +57,6 @@ docker compose -f compose.yml up -d
 - `POSTGRES_DSN`
 - `POSTGRES_DATA_DIR`
 - `APP_IMAGE` 或本地构建镜像名
-- `TRACE_ENDPOINT`（仅在需要接外部 OTLP backend 时）
 
 详细说明见 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/README.md`。
 

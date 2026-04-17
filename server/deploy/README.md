@@ -7,7 +7,7 @@
 ### `compose/prod`
 
 - 单机或单宿主机部署入口
-- 默认包含 PostgreSQL、业务服务和基础 smoke 检查
+- 默认包含 PostgreSQL、Jaeger、业务服务和基础 smoke 检查
 - 提供迁移脚本，不再保留远端增量发布脚本
 
 关键文件：

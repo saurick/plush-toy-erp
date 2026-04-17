@@ -7,7 +7,7 @@
 - `web/` 登录、注册、管理员登录和后台账号目录骨架
 - `server/` 鉴权、错误码、JSON-RPC、`/healthz`、`/readyz`、请求链路日志与 trace 基线
 - `scripts/` 本地初始化、质量门禁和 Git hooks
-- `server/deploy/compose/prod` 这一路径的 Compose 和迁移脚本
+- `server/deploy/compose/prod` 这一路径的 Compose、Jaeger 和迁移脚本
 
 ## 本轮不初始化
 
@@ -21,7 +21,7 @@
 - ERP 的真实核心实体和业务流程
 - 首页、后台工作台和菜单结构
 - 生产环境真实密码、JWT 密钥、镜像仓库和远端主机
-- 是否需要接外部 tracing backend
+- Jaeger 保留策略和 Prometheus 指标查询地址
 
 ## 建议检查顺序
 

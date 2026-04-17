@@ -14,9 +14,11 @@ log:
 trace:
   jaeger:
     traceName: ""
-    # endpoint 留空表示默认不连 tracing backend；需要时再填外部 OTLP endpoint。
-    endpoint: ""
-    # endpoint: 127.0.0.1:4318
+    # 本机宿主机调试默认连本地 Jaeger VM IP；若本机 IP 变化，请改成当前 Jaeger OTLP HTTP 地址。
+    endpoint: 192.168.0.106:4318
+    # endpoint: http://127.0.0.1:4318/v1/traces
+    # gRPC endpoint
+    # endpoint: http://127.0.0.1:4317
     # 采集率,ratio>=1表示采集所有
     ratio: 1
 

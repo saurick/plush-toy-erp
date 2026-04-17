@@ -9,7 +9,7 @@
 - `cmd/server/main.go` 启动时会初始化全局 logger
 - `service`、`biz`、`data` 层默认都会打日志
 - HTTP 层已内置 `request_id` 过滤器，日志会自动带上 `request_id`
-- 日志会额外输出 `trace_sampled`；只有 trace 真正被采样时才输出 `trace_link_id`，供日志平台安全跳转 tracing backend
+- 日志会额外输出 `trace_sampled`；只有 trace 真正被采样时才输出 `trace_link_id`，供 Loki 安全跳转 Jaeger
 - 关键鉴权与后台账号链路已保留成功 / 失败日志
 
 ### Trace
@@ -51,7 +51,7 @@
 
 - Compose 当前保留 PostgreSQL `healthcheck`
 - 业务容器默认依赖 `/healthz`、`/readyz` 作为发布后 smoke 检查入口
-- 仓库默认不再自带 tracing 存储；需要 trace 落地时再外接 OTLP 兼容后端
+- Compose 默认同时拉起 Jaeger，便于本地和单机部署直接查看 trace
 
 ## 后续常见补法
 

@@ -23,8 +23,8 @@ func getenv(k, def string) string {
 }
 
 func main() {
-	// 默认走本机 OTLP HTTP 端口；若接了其他 collector，可通过 OTLP_ENDPOINT 覆盖。
-	endpoint := getenv("OTLP_ENDPOINT", "127.0.0.1:4318")
+	// 宿主机本地调试默认走当前 Jaeger VM 的 192 地址；线上宿主机可改成 127.0.0.1:4318。
+	endpoint := getenv("OTLP_ENDPOINT", "192.168.0.106:4318")
 	serviceName := getenv("TRACE_SERVICE_NAME", "plush-toy-erp-tracecheck")
 
 	ctx := context.Background()
@@ -56,7 +56,7 @@ func main() {
 	time.Sleep(500 * time.Millisecond)
 	span.End()
 
-	fmt.Println("trace sent, wait a few seconds then check your tracing backend")
+	fmt.Println("trace sent, wait a few seconds then check Jaeger UI")
 
 	// 等 flush
 	time.Sleep(2 * time.Second)

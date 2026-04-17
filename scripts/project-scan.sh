@@ -187,7 +187,7 @@ report_required \
   "$SECRET_HITS"
 
 DEPLOY_HITS="$(
-  scan_pattern '47\.84\.12\.211|registry\.xxxx|192\.168\.0\.106|test_database_atlas|webapp-template-pro|registry\.example\.com|deploy\.example\.com|dashboard\.example\.local|otel-collector\.observability\.svc\.cluster\.local|prometheus:9090' \
+  scan_pattern '47\.84\.12\.211|registry\.xxxx|test_database_atlas|webapp-template-pro|registry\.example\.com|deploy\.example\.com|dashboard\.example\.local|otel-collector\.observability\.svc\.cluster\.local|prometheus:9090' \
     README.md \
     web/index.html \
     web/public/index.html \
@@ -248,18 +248,6 @@ report_advisory \
   "仓库重新引入了当前基线未保留的业务模块" \
   "积分 / 订阅 / 管理员层级 / 邀请码等能力目前不在当前项目主路径；若扫描再次命中，请确认这是本项目真实需求，而不是历史残留回流。" \
   "$ADMIN_MODULE_HITS"
-
-JAEGER_HITS="$(
-  scan_pattern 'jaegertracing/all-in-one|TRACE_ENDPOINT:-jaeger:4318|endpoint: jaeger:4318|JAEGER_|PROMETHEUS_SERVER_URL' \
-    server/deploy/compose/prod/compose.yml \
-    server/configs/prod/config.yaml \
-    server/deploy/compose/prod/.env.example \
-    server/deploy/compose/prod/README.md
-)"
-report_advisory \
-  "仓库仍默认内置 tracing 存储" \
-  "若当前项目只保留最小 Compose 主路径，请移除内置 tracing 存储；需要 tracing 时再通过 TRACE_ENDPOINT 接外部 OTLP backend。" \
-  "$JAEGER_HITS"
 
 echo "[project-scan] 建议执行顺序:"
 echo "  1) 完成项目名 / 配置 / 部署方式 / 页面文案收口"

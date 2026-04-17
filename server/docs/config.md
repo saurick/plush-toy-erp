@@ -47,7 +47,10 @@
 
 - `traceName` 为空时，会回退到 `cmd/server/main.go` 里的默认服务名。
 - `endpoint` 为空时，服务仍能启动，只是使用本地无 exporter 的 tracer provider。
-- 当前通过 OTLP HTTP exporter 发 trace；虽然配置名仍叫 `jaeger`，但仓库不再默认内置 Jaeger 服务。
+- 当前通过 OTLP HTTP exporter 发 trace，仓库默认内置 Jaeger 作为 tracing 存储和查询入口。
+- 宿主机本地调试当前默认连 `192.168.0.106:4318`；若本机 Jaeger VM IP 变化，需同步改 dev 本地配置。
+- 宿主机线上进程当前默认连 `127.0.0.1:4318`。
+- Compose 里的 `app-server` 容器仍通过 `TRACE_ENDPOINT=jaeger:4318` 走容器网络，不读宿主机的 `127.0.0.1`。
 - 如果后续改用其他 OTLP 兼容后端，只需替换 endpoint 和服务名即可。
 
 ## `data.postgres`
@@ -89,17 +92,19 @@
 - `data.auth.jwtSecret`
 - `data.auth.admin.username`
 - `data.auth.admin.password`
+- `trace.jaeger.traceName`
+- `trace.jaeger.endpoint`
 
 ## 配置选择建议
 
 - 本地开发：
   - `log.debug=true`
   - `data.postgres.debug=true`
-  - 只有需要观察 trace 时再填 `trace.jaeger.endpoint`
+  - `trace.jaeger.ratio=1`
 - 生产环境：
   - `log.debug=false`
   - `data.postgres.debug=false`
-  - 若启用 tracing，再按观测成本配置 `trace.jaeger.endpoint` 和 `trace.jaeger.ratio`
+  - `trace.jaeger.ratio` 按观测成本控制
 
 ## 额外建议
 
