@@ -55,6 +55,14 @@
   - `cd /Users/simon/projects/plush-toy-erp/web && pnpm style:l1`
 - 需要验证的状态至少包括默认态、交互态、恢复态和相邻区域
 
+## Ant Design 表单实例约定
+
+- 只要未来在 `plush-toy-erp` 前端创建了 `const [form] = Form.useForm()`，同一渲染树里就必须存在对应的 `<Form form={form}>` 真正承接该实例；禁止创建 form instance 后只在按钮、`onOk`、`submit()`、`resetFields()` 或其他 helper 里使用，却没有实际绑定到 `Form`。
+- `Modal`、`Drawer`、条件渲染表单默认把“表单是否已经真实挂载”当成必查项。凡是会在 `useEffect`、打开弹窗、关闭弹窗、切换编辑态时调用 `setFieldsValue`、`resetFields`、`validateFields`、`submit` 的链路，必须保证调用发生在表单挂载之后；必要时使用 `forceRender` 或保持稳定挂载，禁止在未挂载态访问 form instance。
+- 表单拆分成父子组件时，`form` 必须作为显式 prop 透传到最终的 `<Form form={form}>`；禁止父组件 `useForm()`、子组件忽略这份实例后又自己新建一份，造成父子各拿一份 form 或出现悬空实例。若只是表单内部子组件读取当前实例，优先使用 `Form.useFormInstance()`，不要额外创建新的 `useForm`。
+- 后续新增或重构 Ant Design 表单时，至少回归 `1)` 页面默认态初次渲染，`2)` 首次打开新建/编辑弹窗，`3)` 关闭后再次打开 这三种状态，确认浏览器控制台不出现 `Instance created by \`useForm\` is not connected to any Form element` 告警；如果该表单会长期存在，默认同步补一条最小回归测试，不要只做人工点按。
+- 这类问题按运行时回归缺陷处理，不能因为“功能表面还能用”或“只是 console warning”就忽略。当前仓库还没有 `useForm` 告警的既有示例文件；未来首个 Ant Design 表单接入点必须同时沉淀最小测试或浏览器回归脚本，避免同类错误重复出现。
+
 ## 可观测性
 
 - 新增或修改服务端链路时，同时检查日志、trace 和健康检查
