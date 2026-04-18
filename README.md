@@ -2,12 +2,16 @@
 
 `plush-toy-erp` 当前是一套可直接运行的 Web + Server 单体骨架，先保留账号体系、错误码治理、健康检查、基础可观测性和 `docker compose` 发布链路，方便尽快把最小可运行链路搭起来，再继续补 ERP 的真实业务实体和页面。
 
-## 当前结构
+## 目录结构
 
-- `web/`：Vite + React 前端，保留用户登录、注册、管理员登录和后台账号目录骨架
-- `server/`：Kratos + Ent + Atlas 后端，保留 `/healthz`、`/readyz`、鉴权、错误码与 JSON-RPC 基线
-- `scripts/`：本地环境初始化、质量门禁和 Git hooks
-- `docs/`：仓库级约定、部署口径和当前项目基线
+| 路径 | 职责 |
+| --- | --- |
+| `web/` | Vite + React 前端，保留用户登录、注册、管理员登录和后台账号目录骨架，内部目录职责见 [`web/README.md`](web/README.md) |
+| `server/` | Kratos + Ent + Atlas 后端，保留 `/healthz`、`/readyz`、鉴权、错误码与 JSON-RPC 基线，内部目录职责见 [`server/README.md`](server/README.md) |
+| `scripts/` | 本地环境初始化、质量门禁和 Git hooks，详见 [`scripts/README.md`](scripts/README.md) |
+| `docs/` | 仓库级约定、部署口径和当前项目基线 |
+
+若需要查看 `web/` 或 `server/` 的内部目录，不在根 README 继续展开，以各自子目录 README 为准，避免同一份结构说明在多处漂移。
 
 ## 当前边界
 
@@ -87,6 +91,7 @@ pnpm style:l1
 - 当前项目基线：`/Users/simon/projects/plush-toy-erp/docs/project-status.md`
 - 部署口径：`/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
 - 脚本说明：`/Users/simon/projects/plush-toy-erp/scripts/README.md`
+- 前端总览：`/Users/simon/projects/plush-toy-erp/web/README.md`
 - 后端总览：`/Users/simon/projects/plush-toy-erp/server/README.md`
 - 后端专题文档：`/Users/simon/projects/plush-toy-erp/server/docs/README.md`
 - Compose 部署：`/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
