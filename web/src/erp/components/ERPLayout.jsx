@@ -13,9 +13,12 @@ import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
   bootstrapChange,
-  mobileDockItems,
-  navigationSections,
+  getMobileDockItems,
+  getNavigationSections,
+  getRoleWorkbench,
+  roleWorkbenches,
 } from '../config/seedData.mjs'
+import { useERPWorkspace } from '../context/ERPWorkspaceProvider'
 import '../styles/app.css'
 
 function NavSection({ title, items }) {
@@ -46,10 +49,10 @@ function NavSection({ title, items }) {
   )
 }
 
-function MobileNavStrip() {
+function MobileNavStrip({ items }) {
   return (
     <div className="erp-mobile-strip lg:hidden">
-      {mobileDockItems.map((item) => (
+      {items.map((item) => (
         <NavLink
           key={item.key}
           to={item.path}
@@ -69,6 +72,7 @@ export default function ERPLayout() {
   const location = useLocation()
   const admin = getCurrentUser(AUTH_SCOPE.ADMIN)
   const [loggingOut, setLoggingOut] = useState(false)
+  const { activeRole, activeRoleKey, setDesktopRoleKey } = useERPWorkspace()
 
   const authRpc = useMemo(
     () =>
@@ -78,6 +82,15 @@ export default function ERPLayout() {
         authScope: AUTH_SCOPE.ADMIN,
       }),
     []
+  )
+
+  const navigationSections = useMemo(
+    () => getNavigationSections(activeRoleKey),
+    [activeRoleKey]
+  )
+  const mobileDockItems = useMemo(
+    () => getMobileDockItems(activeRoleKey),
+    [activeRoleKey]
   )
 
   const currentEntry =
@@ -100,10 +113,19 @@ export default function ERPLayout() {
     }
   }
 
+  const handleRoleSwitch = (roleKey) => {
+    const nextRole = getRoleWorkbench(roleKey)
+    if (!nextRole) {
+      return
+    }
+    setDesktopRoleKey(nextRole.key)
+    navigate(nextRole.defaultPath)
+  }
+
   return (
     <AppShell className="px-3 py-3 sm:px-4 sm:py-4">
       <div className="mx-auto max-w-[1600px]">
-        <MobileNavStrip />
+        <MobileNavStrip items={mobileDockItems} />
 
         <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
           <aside className="hidden lg:block">
@@ -115,11 +137,10 @@ export default function ERPLayout() {
                   </div>
                   <div>
                     <div className="text-2xl font-semibold tracking-tight text-slate-50">
-                      毛绒 ERP 初始化框架
+                      毛绒 ERP 桌面后台
                     </div>
                     <div className="mt-2 text-sm leading-6 text-slate-300">
-                      参考 trade-erp
-                      的信息架构，但按本项目先收口流程、帮助中心、文档与移动端工作台。
+                      桌面端继续保持一个后台入口，当前通过角色工作台、菜单权限、首页配置和帮助中心内容区分不同角色。
                     </div>
                   </div>
                 </div>
@@ -132,8 +153,36 @@ export default function ERPLayout() {
                     {admin?.username || 'admin'}
                   </div>
                   <div className="mt-2 text-sm leading-6 text-slate-300">
-                    当前变更记录：`{bootstrapChange.slug}
-                    `。这轮先把结构和口径放稳，再接真实业务资料。
+                    当前角色：{activeRole.title}。本轮变更记录是 `
+                    {bootstrapChange.slug}`，后台体验会随角色切换同步变化。
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">
+                    切换桌面角色
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {roleWorkbenches.map((role) => {
+                      const isActive = role.key === activeRoleKey
+                      return (
+                        <button
+                          key={role.key}
+                          type="button"
+                          onClick={() => handleRoleSwitch(role.key)}
+                          className={`rounded-full border px-3 py-2 text-sm transition ${
+                            isActive
+                              ? 'bg-cyan-300/12 border-cyan-300/40 text-cyan-50'
+                              : 'border-white/10 bg-white/[0.03] text-slate-300'
+                          }`}
+                        >
+                          {role.title}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-3 text-sm leading-6 text-slate-300">
+                    {activeRole.summary}
                   </div>
                 </div>
 
@@ -171,11 +220,10 @@ export default function ERPLayout() {
                         当前页面
                       </div>
                       <div className="text-xl font-semibold text-slate-50">
-                        {currentEntry?.label || '毛绒 ERP 初始化框架'}
+                        {currentEntry?.label || activeRole.title}
                       </div>
                       <div className="text-sm leading-6 text-slate-300">
-                        {currentEntry?.description ||
-                          '本轮先把项目自己的 ERP 壳层、帮助中心、资料入口和移动端工作台放进仓库。'}
+                        {currentEntry?.description || activeRole.summary}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">

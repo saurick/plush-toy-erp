@@ -61,8 +61,8 @@ export default function HomePage() {
                   </h1>
                   <p className="text-sm leading-7 text-slate-300 sm:text-base">
                     当前项目已经切到毛绒工厂 ERP
-                    的初始化阶段：先把后台主路由、角色工作台、流程总览、帮助中心、移动端页面和资料准备清单放进仓库，再继续接合同、Excel
-                    和正式业务实体。
+                    的真源收口阶段：桌面后台继续保持一个入口，移动端按角色拆多入口和多端口，并开始根据真实
+                    PDF、Excel、报表截图收口流程、字段真源和导入映射。
                   </p>
                 </div>
               </div>
@@ -73,7 +73,7 @@ export default function HomePage() {
                     初始化范围
                   </div>
                   <div className="mt-2 text-sm leading-6 text-slate-300">
-                    已完成后台壳层、帮助中心、文档页、角色工作台与移动端预览。
+                    已完成桌面角色化入口、多移动端入口、帮助中心、文档页与资料真源页。
                   </div>
                 </div>
                 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
@@ -89,9 +89,9 @@ export default function HomePage() {
                     当前端口
                   </div>
                   <div className="mt-2 text-sm leading-6 text-slate-300">
-                    前端 `5175`，后端 `8200`，本地开发库默认
-                    `192.168.0.106:5432/plush_erp`；如果启用本项目自带 compose
-                    PostgreSQL，宿主机映射仍是 `5435`。
+                    桌面后台 `5175`；老板 `5186`、跟单 `5187`、采购 `5188`、生产
+                    `5189`、仓库 `5190`、财务 `5191`；后端统一
+                    `8200`，本地开发库默认 `192.168.0.106:5432/plush_erp`。
                   </div>
                 </div>
               </div>
@@ -104,8 +104,8 @@ export default function HomePage() {
               title={user ? `已登录：${user.username}` : '员工账号登录 / 注册'}
               description={
                 user
-                  ? '当前用户已登录，可以继续进入业务首页、个人中心或工作台。'
-                  : '普通员工账号当前只保留最小登录链路，便于后续接移动端协作动作。'
+                  ? '当前用户已登录，后续会逐步承接移动端角色动作。'
+                  : '普通员工账号当前只保留最小登录链路，移动端入口已经按角色和端口拆分。'
               }
               accentClass="border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
               actions={
@@ -141,7 +141,7 @@ export default function HomePage() {
               {user ? (
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-slate-300">
                   当前登录用户 ID：{user.id}
-                  。这轮还没单独开放员工端业务页面，后续会优先挂移动端确认动作。
+                  。这轮已经准备好多角色移动端入口，后续优先把确认动作和回填动作接进去。
                 </div>
               ) : null}
             </SessionCard>

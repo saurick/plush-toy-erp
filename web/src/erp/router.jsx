@@ -15,6 +15,12 @@ import MobileWorkbenchesPage from './pages/MobileWorkbenchesPage'
 import OperationFlowPage from './pages/OperationFlowPage'
 import RoleWorkbenchPage from './pages/RoleWorkbenchPage'
 import SourceReadinessPage from './pages/SourceReadinessPage'
+import { useERPWorkspace } from './context/ERPWorkspaceProvider'
+
+function DesktopEntryRedirect() {
+  const { activeRole } = useERPWorkspace()
+  return <Navigate to={activeRole.defaultPath} replace />
+}
 
 export default function ERPRouter() {
   return (
@@ -58,7 +64,7 @@ export default function ERPRouter() {
           </AuthGuard>
         }
       >
-        <Route index element={<Navigate to="/erp/dashboard" replace />} />
+        <Route index element={<DesktopEntryRedirect />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="flows/overview" element={<OperationFlowPage />} />
         <Route path="help-center" element={<HelpCenterPage />} />

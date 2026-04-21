@@ -5,12 +5,19 @@ import { Helmet } from 'react-helmet-async'
 import { authBus } from '@/common/auth/authBus'
 import { appAlert } from '@/common/components/modal/alertBridge'
 import ERPRouter from '@/erp/router'
+import MobileRoleRouter from '@/erp/mobile/router'
+import {
+  ERPWorkspaceProvider,
+  useERPWorkspace,
+} from '@/erp/context/ERPWorkspaceProvider'
 
 import 'normalize.css/normalize.css'
 
-const App = () => {
+function AppContent() {
   const navigate = useNavigate()
-  const appTitle = import.meta.env.VITE_APP_TITLE || 'Plush Toy ERP'
+  const { appConfig, isDesktopApp } = useERPWorkspace()
+  const appTitle =
+    appConfig.title || import.meta.env.VITE_APP_TITLE || 'Plush Toy ERP'
 
   useEffect(() => {
     return authBus.onUnauthorized(({ from, message, loginPath }) => {
@@ -41,9 +48,15 @@ const App = () => {
       <Helmet>
         <title>{appTitle}</title>
       </Helmet>
-      <ERPRouter />
+      {isDesktopApp ? <ERPRouter /> : <MobileRoleRouter />}
     </>
   )
 }
+
+const App = () => (
+  <ERPWorkspaceProvider>
+    <AppContent />
+  </ERPWorkspaceProvider>
+)
 
 export default App

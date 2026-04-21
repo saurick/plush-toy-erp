@@ -2,15 +2,17 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
 import PageHero from '../components/PageHero'
-import { roleWorkbenches } from '../config/seedData.mjs'
+import { portMatrix, roleWorkbenches } from '../config/seedData.mjs'
 
 function PhonePreview({ role }) {
+  const mobileEntry = portMatrix.find((item) => item.roleKey === role.key)
+
   return (
     <div className="erp-phone-frame">
       <div className="erp-phone-screen">
         <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-slate-400">
           <span>{role.label}</span>
-          <span>Mobile</span>
+          <span>{mobileEntry?.port || 'Mobile'}</span>
         </div>
         <div className="mt-4">
           <div className="text-lg font-semibold text-slate-50">
@@ -43,9 +45,9 @@ export default function MobileWorkbenchesPage() {
   return (
     <div className="space-y-6">
       <PageHero
-        eyebrow="移动端工作台"
-        title="角色移动端初始化"
-        description="移动端不拆第二个仓库，直接放在本项目里做响应式工作台。第一批先解决“谁在手机上要看什么、确认什么、提醒什么”，不强行做扫码、拍照识别或离线同步。"
+        eyebrow="移动端多入口"
+        title="六个角色移动端入口与端口"
+        description="移动端必须按角色拆入口、拆端口，但仍然放在同一个项目里共享 common / ui / api / 文档体系。当前先做角色任务流和真源对齐，不做扫码、拍照识别或离线同步。"
       />
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -56,6 +58,10 @@ export default function MobileWorkbenchesPage() {
                 <div className="space-y-2">
                   <div className="inline-flex rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.22em] text-cyan-100">
                     {role.label}
+                  </div>
+                  <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs uppercase tracking-[0.22em] text-slate-300">
+                    端口{' '}
+                    {portMatrix.find((item) => item.roleKey === role.key)?.port}
                   </div>
                   <div className="text-2xl font-semibold text-slate-50">
                     {role.title}
@@ -84,10 +90,10 @@ export default function MobileWorkbenchesPage() {
 
                   <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
                     <div className="text-sm font-semibold text-slate-50">
-                      暂时不做
+                      共享真源 / 边界
                     </div>
                     <div className="mt-3 space-y-2">
-                      {role.pending.map((item) => (
+                      {role.sourceRefs.map((item) => (
                         <div
                           key={item}
                           className="text-sm leading-6 text-slate-300"
@@ -99,12 +105,20 @@ export default function MobileWorkbenchesPage() {
                   </div>
                 </div>
 
-                <Link
-                  className="erp-secondary-button"
-                  to={`/erp/roles/${role.key}`}
-                >
-                  查看该角色完整工作台
-                </Link>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    className="erp-secondary-button"
+                    to={`/erp/roles/${role.key}`}
+                  >
+                    查看桌面角色工作台
+                  </Link>
+                  <Link
+                    className="erp-secondary-button"
+                    to="/erp/docs/mobile-roles"
+                  >
+                    查看角色入口说明
+                  </Link>
+                </div>
               </div>
 
               <PhonePreview role={role} />
@@ -116,9 +130,9 @@ export default function MobileWorkbenchesPage() {
       <SurfacePanel className="p-5">
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            '同一套路由在桌面和移动端复用，不拆第二个项目。',
-            '移动端先做确认、提醒、进度回填，不做复杂批量编辑。',
-            '扫码、拍照、PDA 与离线同步在资料和场景明确后再接入。',
+            '桌面后台继续只保留一个入口；移动端才按角色拆多入口、多端口。',
+            '六个移动入口都共享 8200 后端、同一套字段真源、接口层和文档体系。',
+            '扫码、拍照、PDA 与离线同步统一标记 deferred，不冒充已支持。',
           ].map((item) => (
             <div
               key={item}

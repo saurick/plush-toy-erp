@@ -1,36 +1,58 @@
 # plush-toy-erp
 
-`plush-toy-erp` 当前是一套可直接运行的毛绒工厂 ERP 初始化框架：先保留账号体系、错误码治理、健康检查、`docker compose` 发布链路，并补齐 ERP 主路由、角色工作台、流程总览、帮助中心、文档中心和移动端入口，再继续接正式合同、Excel 与业务实体。
+`plush-toy-erp` 当前是一套已经开始按真实资料收口的毛绒工厂 ERP：桌面后台继续保持一个入口，移动端按角色拆成多入口、多端口，并且开始基于真实 PDF、Excel、报表截图收口流程、字段真源、数据模型和导入映射。
 
 ## 目录结构
 
 | 路径 | 职责 |
 | --- | --- |
-| `web/` | Vite + React 前端，包含公共登录页与 `src/erp/` 初始化壳层，内部目录职责见 [`web/README.md`](web/README.md) |
-| `server/` | Kratos + Ent + Atlas 后端，保留 `/healthz`、`/readyz`、鉴权、错误码与 JSON-RPC 基线，内部目录职责见 [`server/README.md`](server/README.md) |
-| `scripts/` | 本地环境初始化、质量门禁和 Git hooks，详见 [`scripts/README.md`](scripts/README.md) |
-| `docs/` | 仓库级约定、部署口径、ERP 初始化文档与 changes 记录 |
-
-若需要查看 `web/` 或 `server/` 的内部目录，不在根 README 继续展开，以各自子目录 README 为准，避免同一份结构说明在多处漂移。
+| `web/` | Vite + React 前端，包含桌面后台统一入口和六个角色移动端入口，内部目录职责见 [`web/README.md`](web/README.md) |
+| `server/` | Kratos + Ent + Atlas 后端，当前仍保留账号、鉴权、错误码、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
+| `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
+| `docs/` | 仓库级约定、流程、数据模型、changes 和部署文档 |
 
 ## 当前边界
 
-- 当前唯一部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
-- 本仓库没有初始化 `lab-ha`、Kubernetes 清单
-- 已完成 ERP 初始化看板、流程总览、帮助中心、文档页和移动端工作台
-- 拍照扫码、正式 Excel 导入、合同打印模板和图片识别本轮明确不做
+- 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
+- 当前后端统一走 `8200`
+- 当前数据库默认命中 `192.168.0.106:5432/plush_erp`
+- 当前数据库已存在，但正式业务表尚未开始；`users / admin_users` 仍只是账号基线
+- 拍照扫码、PDA、条码枪、图片识别本轮统一标记为 deferred
 
-## 快速开始
+## 本地启动
 
-### 前端
+### 桌面后台
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm install
-pnpm start
+pnpm start:desktop
 ```
 
 默认地址：`http://localhost:5175`
+
+### 角色移动端
+
+```bash
+cd /Users/simon/projects/plush-toy-erp/web
+pnpm start:mobile:boss
+pnpm start:mobile:merchandiser
+pnpm start:mobile:purchasing
+pnpm start:mobile:production
+pnpm start:mobile:warehouse
+pnpm start:mobile:finance
+```
+
+端口矩阵：
+
+| 入口 | 端口 |
+| --- | --- |
+| 老板移动端 | `5186` |
+| 跟单移动端 | `5187` |
+| 采购移动端 | `5188` |
+| 生产移动端 | `5189` |
+| 仓库移动端 | `5190` |
+| 财务移动端 | `5191` |
 
 ### 后端
 
@@ -44,45 +66,24 @@ make run
 
 - HTTP：`8200`
 - gRPC：`9200`
-- 本地开发数据库：`192.168.0.106:5432/plush_erp`
 - PostgreSQL Compose 宿主机映射：`5435`
 
-### 本地数据库迁移
+## 当前不做
 
-```bash
-cd /Users/simon/projects/plush-toy-erp/server
-make data
-make migrate_apply
-```
+- 拍照扫码、PDA、条码枪、图片识别
+- 正式 Excel 导入落库
+- 合同打印模板和 PDF 坐标填充
+- 字段未稳定前的 Ent schema / migration
 
-## Compose 部署
-
-```bash
-cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
-cp .env.example .env
-docker compose -f compose.yml up -d
-```
-
-首次启动前至少替换：
-
-- `POSTGRES_PASSWORD`
-- `POSTGRES_DSN`
-- `POSTGRES_DATA_DIR`
-- `APP_IMAGE` 或本地构建镜像名
-
-详细说明见 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/README.md`。
-
-## 常用检查命令
+## 当前推荐检查命令
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/bootstrap.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/doctor.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/fast.sh
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
 ```
 
-前端样式或布局任务还应执行：
+前端改动后执行：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
@@ -96,24 +97,17 @@ pnpm style:l1
 
 - 协作约定：`/Users/simon/projects/plush-toy-erp/AGENTS.md`
 - 阅读顺序与真源：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
-- 当前项目基线：`/Users/simon/projects/plush-toy-erp/docs/project-status.md`
-- ERP 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
-- ERP 主流程草案：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
-- ERP 数据模型草案：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
-- 本轮 changes 记录：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
-- 部署口径：`/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
-- 脚本说明：`/Users/simon/projects/plush-toy-erp/scripts/README.md`
-- 前端总览：`/Users/simon/projects/plush-toy-erp/web/README.md`
-- 后端总览：`/Users/simon/projects/plush-toy-erp/server/README.md`
-- 后端专题文档：`/Users/simon/projects/plush-toy-erp/server/docs/README.md`
-- Compose 部署：`/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
+- 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
+- 主流程：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
+- 数据模型与导入映射：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
+- 当前 changes：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
+- 前端说明：`/Users/simon/projects/plush-toy-erp/web/README.md`
+- 后端说明：`/Users/simon/projects/plush-toy-erp/server/README.md`
 
 ## 数据库约束
 
-`server` 使用 Ent + Atlas 工作流：
+`server` 继续使用 Ent + Atlas 工作流：
 
 - 禁止手写结构性 SQL
-- schema 变更通过 `make data` 生成迁移
-- 发布依赖新 schema 的服务前，先确认目标库 migration 已落地
-
-细节见 `/Users/simon/projects/plush-toy-erp/server/internal/data/AI_DB_WORKFLOW.md`。
+- schema 变更必须通过 `make data`
+- 只有在字段关系稳定后，才开始改 `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/*.go`

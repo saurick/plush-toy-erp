@@ -1,120 +1,111 @@
 # 毛绒 ERP 初始化框架
 
-状态：in_progress
-创建日期：2026-04-20
-最后更新：2026-04-20
+状态：in_progress  
+创建日期：2026-04-20  
+最后更新：2026-04-21
 
-相关会话索引（至少填一个可复制的入口）：
-- deeplink / link：当前本地 Codex 线程
+相关会话索引：
 
-推荐续做指令：
-- 会话中断了，继续处理 `docs/changes/plush-erp-bootstrap-init.md` 这次复杂变更，按变更文档续做，并先按 `AGENTS.md` 约定收敛上下文后再实施。
+- 当前本地 Codex 线程
 
-## 1. 背景
+## 1. 本轮目标
 
-- 目标是参考 `trade-erp` 的信息架构，先初始化 `plush-toy-erp` 的项目专属 ERP 框架。
-- 用户明确说明：合同、Excel 和更多资料还没到齐；拍照扫码本轮先不做；流程、帮助中心、文档和移动端角色工作台要先放进项目。
+这一轮不再停留在初始化壳层，而是开始根据真实 PDF、Excel、报表截图内容，把毛绒工厂 ERP 的桌面后台、移动端、流程、字段真源、数据模型、导入设计和帮助中心做实。
 
 ## 2. 当前正式真源
 
-- `/Users/simon/projects/plush-toy-erp/AGENTS.md`
 - `/Users/simon/projects/plush-toy-erp/README.md`
+- `/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
 - `/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
 - `/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
-- `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/system-init.md`
-- `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/operation-playbook.md`
+- `/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
+- `/Users/simon/projects/plush-toy-erp/web/src/erp/config/seedData.mjs`
+- `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/*`
 
-## 3. 本次目标
+## 3. 本轮新增引用的真实资料
 
-- 初始化毛绒 ERP 的后台壳层、角色工作台、流程总览、帮助中心、文档页和移动端页面。
-- 把管理员登录后的默认入口切换到 ERP 主路由。
-- 收口运行口径：后端 `8200`，本地开发默认数据库改为共享 PG `192.168.0.106:5432/plush_erp`，独立 Compose 宿主机映射继续保留 `5435`。
-- 把已收到的合同、Excel、PDF 和截图先挂到资料准备页，等待后续正式接入。
+- `/Users/simon/Downloads/永绅erp/原文件/9.3加工合同-子淳.pdf`
+- `/Users/simon/Downloads/永绅erp/原文件/26029#夜樱烬色才料明细表2026-1-19.xlsx`
+- `/Users/simon/Downloads/永绅erp/原文件/26204#抱抱猴子材料明细表2026-4-10.xlsx`
+- `/Users/simon/Downloads/永绅erp/原文件/加工 成慧怡.xlsx`
+- `/Users/simon/Downloads/永绅erp/原文件/辅材、包材 成慧怡.xlsx`
+- `/Users/simon/Downloads/永绅erp/原文件/plush_factory_formal_report_v3_mobile.pdf`
+- `/Users/simon/Downloads/永绅erp/原文件/Weixin Image_20260420164444_2155_288.png`
 
-## 4. 明确不改
+## 4. 本轮已确认的关键结论
 
-- 不引入 `trade-erp` 的外贸业务表与字段联动规则。
-- 不实现拍照扫码、PDA、条码枪、图片识别。
-- 不实现正式 Excel 导入、合同打印模板与 PDF 坐标填充。
-- 不补完整权限矩阵、审批流和利润口径。
+1. 当前至少存在四层编号体系：
+   - 客户 / 订单编号
+   - 产品订单编号 / 客户订单号
+   - 款式编号（26029# / 26204#）
+   - 产品编号 / SKU（24594 / 25481 等）
+2. 当前数据库虽然已经存在 `plush_erp` 并执行过迁移，但正式业务表仍未开始，只能视为账号基线。
+3. 主料 BOM 真源来自 `材料分析明细表`，辅材 / 包材是真正独立的采购导入源。
+4. 加工合同 PDF 是业务单据 + 打印快照 + 条款快照 + 附件图样的组合，不是普通采购单替代。
+5. 桌面后台必须继续保持一个入口；移动端必须按角色拆六个入口和六个端口。
+6. 拍照扫码、PDA、条码枪、图片识别虽然在汇报材料里出现过，但本轮统一标记 deferred。
 
-## 5. 影响范围
+## 5. 本轮明确不改
 
-- 前端：`web/src/App.jsx`、`web/src/pages/*`、新增 `web/src/erp/*`
-- 后端：`server/configs/*`、`server/deploy/compose/prod/*`、`server/docs/*`、`server/Dockerfile`
-- 文档：根 `README.md`、`docs/*`、`web/README.md`、`progress.md`
-- 浏览器回归：`web/scripts/styleL1.mjs`
+- 不照搬 `trade-erp` 的外贸业务表
+- 不把未确认字段直接固化进 Ent schema
+- 不拆多个仓库
+- 不把桌面后台拆成多个站点
+- 不假装拍照扫码已经完成
 
-## 6. 风险与边界
+## 6. 实施结果
 
-- 残值风险：旧的 `/admin-menu` 与“后台说明页”若继续保留，容易被误认成真源；本轮已从路由移除并删除过期页面文件。
-- 缺值风险：更多合同和 Excel 尚未到齐，本轮只能初始化资料入口与文档，不能假装正式导入已可用。
-- 上下游门禁风险：当前还没落真实业务实体，角色工作台与流程页以静态信息架构为主。
-- 旧数据 / 测试数据风险：现有登录与管理员账号链路保留不动，仅改变管理员登录后的默认落点。
-- 打印或导出偏移风险：本轮未接打印模板，不存在模板坐标回归。
-- 本轮未覆盖盲区：正式 Excel 导入、合同打印、扫码链路、真实业务 CRUD。
+### 文档
 
-## 7. 实施方案
+- 基于真实资料重写主流程文档
+- 输出字段真源对照表
+- 输出首批正式数据模型建议
+- 输出 Excel / PDF 导入映射草案
 
-- 方案：
-  - 在现有 React + Tailwind 基础上新增 `web/src/erp/`，做项目专属 ERP 壳层。
-  - 保留现有登录与鉴权后端，只切换管理员登录后的前端主路由。
-  - 通过 `docs/` 与 `web/src/erp/docs/` 同步沉淀正式文档。
-  - 本地开发默认直连 `192.168.0.106:5432/plush_erp`；如需自带 PG，再使用 Compose 的 `5435` 映射。
-- 为什么选这个方案：
-  - 复杂度最低，且不把 `trade-erp` 的外贸业务模型硬塞到毛绒 ERP。
-  - 先把信息架构、文档与移动端入口立住，后续接真实资料更稳。
-- 不选其他方案的原因：
-  - 直接复制 `trade-erp` 全量前后端会把错误业务真源一并带进来，维护成本高。
+### 前端
 
-## 8. 验收标准
+- 桌面后台继续保持一个入口，但新增角色切换、角色默认工作台、角色过滤菜单和角色化帮助中心
+- 新增 6 个角色移动端入口与端口矩阵：
+  - 老板 `5186`
+  - 跟单 `5187`
+  - 采购 `5188`
+  - 生产 `5189`
+  - 仓库 `5190`
+  - 财务 `5191`
+- 共享层继续复用同一个 React 项目、同一个 Vite 仓库、同一个后端 `8200`
 
-- 功能结果：
-  - 管理员登录后进入 ERP 初始化看板。
-  - 能访问流程总览、帮助中心、文档页、资料准备页和移动端工作台。
-  - 首页和登录页文案已切换到毛绒 ERP 口径。
-- 文档同步：
-  - README、project-status、web README、changes slug 与新增正式文档同步更新。
-- 回归标准：
-  - `pnpm style:l1` 覆盖公共首页、管理员登录、ERP 看板、帮助中心、移动端工作台和资料准备页。
+### 数据库
 
-## 9. 验证命令
+- 本轮没有开始改 Ent schema
+- 原因：编号体系、客户主档和结算单据样本仍未稳定
+
+## 7. 影响范围
+
+- 根文档：`README.md`、`docs/plush-erp-initialization.md`、`docs/plush-erp-operation-flow.md`、`docs/plush-erp-data-model.md`
+- 前端文档：`web/README.md`、`web/src/erp/docs/*`
+- 前端配置：`web/src/erp/config/seedData.mjs`、`web/src/erp/config/docs.mjs`、`web/src/erp/config/appRegistry.mjs`
+- 前端页面：`web/src/erp/pages/*`、`web/src/erp/mobile/*`、`web/src/pages/Home/index.jsx`
+- 构建入口：`web/vite.config.mjs`、`web/vite.mobile-*.config.mjs`、`web/vite.shared.mjs`、`web/package.json`
+
+## 8. 风险与盲区
+
+- `订单编号 / 产品订单编号 / 客户订单号` 的层级关系仍待继续确认
+- `产品名称 / 款式名称 / 部件名称` 仍需要更多样本确认分层
+- 当前还没有正式结算单 / 对账单样本
+- `partner` 主档里的客户编码和供应商敏感字段还没稳定
+- 移动端虽然拆出多入口，但当前仍是前端静态 / 半静态角色页，尚未接真实接口
+
+## 9. 下一步建议
+
+1. 继续补客户订单、出货单、结算单样本。
+2. 先确认编号关系，再决定是否开始 Ent schema 与 migration。
+3. 再把桌面角色页和移动端入口逐步接到真实接口与保存链路。
+
+## 10. 验证命令
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web && pnpm lint
 cd /Users/simon/projects/plush-toy-erp/web && pnpm css
 cd /Users/simon/projects/plush-toy-erp/web && pnpm test
 cd /Users/simon/projects/plush-toy-erp/web && pnpm style:l1
-cd /Users/simon/projects/plush-toy-erp/server && go test ./...
-bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 ```
-
-## 10. 回写目标
-
-- `progress.md`
-- `/Users/simon/projects/plush-toy-erp/README.md`
-- `/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
-- `/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
-- `/Users/simon/projects/plush-toy-erp/web/README.md`
-
-## 11. 当前进展
-
-- 已完成：
-  - 新增 ERP 主路由、流程页、帮助中心、文档页、移动端工作台和资料准备页。
-  - 管理员登录后的默认入口改到 `/erp/dashboard`。
-  - 新增正式文档与 changes slug。
-- 下一步：
-  - 完成 README / project-status / web README / runtime 文档同步。
-  - 统一后端与数据库端口口径。
-  - 跑浏览器回归和最小测试。
-- 阻塞 / 风险：
-  - 真实合同模板和 Excel 还没到齐，当前只能做结构初始化，不能补正式导入或打印。
-
-## 12. 结果归档
-
-- 最终状态：in_progress
-- 实际修改文件：进行中
-- 实际执行验证：进行中
-- 未验证项：进行中
-- 后续待办：
-  - 等资料到位后补导入、打印与真实业务保存链路。

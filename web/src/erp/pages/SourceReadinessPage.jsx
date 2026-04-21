@@ -1,7 +1,11 @@
 import React from 'react'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
 import PageHero from '../components/PageHero'
-import { sourceReadiness } from '../config/seedData.mjs'
+import {
+  fieldTruthRows,
+  pendingFieldTruthRows,
+  sourceReadiness,
+} from '../config/seedData.mjs'
 
 export default function SourceReadinessPage() {
   return (
@@ -34,6 +38,16 @@ export default function SourceReadinessPage() {
                   </div>
                   <div className="mt-3 text-sm leading-6 text-slate-300">
                     {item.intendedFor}
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {item.facts.map((fact) => (
+                      <div
+                        key={fact}
+                        className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm leading-6 text-slate-200"
+                      >
+                        {fact}
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}
@@ -82,6 +96,68 @@ export default function SourceReadinessPage() {
             </div>
           </SurfacePanel>
         </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <SurfacePanel className="p-5">
+          <div className="space-y-4">
+            <div className="text-lg font-semibold text-slate-50">
+              已确认字段
+            </div>
+            <div className="grid gap-3">
+              {fieldTruthRows.map((row) => (
+                <div
+                  key={row.field}
+                  className="rounded-3xl border border-white/10 bg-white/[0.03] p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-base font-semibold text-slate-50">
+                      {row.field}
+                    </div>
+                    <div className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                      {row.stability}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-300">
+                    真源：{row.source}
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-slate-300">
+                    原始字段：{row.sourceField}
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-slate-300">
+                    目标落点：{row.target}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-200">
+                    {row.note}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SurfacePanel>
+
+        <SurfacePanel className="p-5">
+          <div className="space-y-4">
+            <div className="text-lg font-semibold text-slate-50">
+              待确认字段
+            </div>
+            <div className="space-y-2">
+              {pendingFieldTruthRows.map((row) => (
+                <div
+                  key={row.field}
+                  className="bg-amber-300/8 rounded-3xl border border-amber-300/20 p-4"
+                >
+                  <div className="text-base font-semibold text-amber-50">
+                    {row.field}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-200">
+                    {row.reason}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SurfacePanel>
       </div>
     </div>
   )

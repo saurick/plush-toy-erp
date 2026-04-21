@@ -1,51 +1,101 @@
 # web 前端说明
 
+## 当前结构
+
+当前前端不是“一个桌面站点 + 一个通用移动壳层”，而是：
+
+- 桌面后台：单入口
+- 移动端：按角色拆成六个入口
+- 仍然共享同一个 React 项目、同一个 common / ui / api / 文档层
+
 ## 目录结构（简版）
 
-| 路径          | 职责                                                                    |
-| ------------- | ----------------------------------------------------------------------- |
-| `src/common/` | 通用认证、组件、hooks、状态、常量与工具函数                             |
-| `src/erp/`    | 毛绒 ERP 初始化壳层，包含主路由、流程页、帮助中心、文档页和移动端工作台 |
-| `src/pages/`  | 公共首页、登录、注册、管理员登录与后台账号目录页面                      |
-| `src/mocks/`  | 本地 mock 与前端基线测试辅助                                            |
-| `src/assets/` | 图标等静态资源                                                          |
-| `public/`     | 静态公开资源                                                            |
-| `scripts/`    | 最小浏览器级样式回归等前端侧脚本                                        |
-| `build/`      | 构建产物，不作为日常开发真源                                            |
+| 路径          | 职责                                                                |
+| ------------- | ------------------------------------------------------------------- |
+| `src/common/` | 通用认证、组件、hooks、状态、常量与工具函数                         |
+| `src/erp/`    | 毛绒 ERP 桌面后台、移动端入口、角色工作台、流程页、帮助中心、文档页 |
+| `src/pages/`  | 公共首页、登录、注册、管理员登录                                    |
+| `scripts/`    | 浏览器级样式回归脚本                                                |
+| `build/`      | 构建产物，不作为业务真源                                            |
 
-日常开发入口优先关注 `src/`、`scripts/` 与 `public/`；`build/` 更偏本地产物，不建议当成业务实现入口。
+## 启动命令
 
-## 启动与构建
+### 桌面后台
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm install
-pnpm start
+pnpm start:desktop
 ```
+
+默认端口：`5175`
+
+### 角色移动端
+
+```bash
+cd /Users/simon/projects/plush-toy-erp/web
+pnpm start:mobile:boss
+pnpm start:mobile:merchandiser
+pnpm start:mobile:purchasing
+pnpm start:mobile:production
+pnpm start:mobile:warehouse
+pnpm start:mobile:finance
+```
+
+端口矩阵：
+
+| 入口       | 端口   | 说明                                            |
+| ---------- | ------ | ----------------------------------------------- |
+| 老板移动端 | `5186` | 交期风险、异常、待结算、本周重点                |
+| 跟单移动端 | `5187` | 客户 / 款式 / 缺资料 / 催料 / 催合同 / 交期预警 |
+| 采购移动端 | `5188` | 缺料、到料、单价确认、回签、辅材包材确认        |
+| 生产移动端 | `5189` | 今日排产、进度回填、延期原因、返工、异常        |
+| 仓库移动端 | `5190` | 收货、备料、成品入库、待出货、异常件处理        |
+| 财务移动端 | `5191` | 待对账、待付款、异常费用、结算提醒              |
+
+## 构建命令
+
+```bash
+cd /Users/simon/projects/plush-toy-erp/web
+pnpm build:desktop
+pnpm build:mobile:boss
+pnpm build:mobile:merchandiser
+pnpm build:mobile:purchasing
+pnpm build:mobile:production
+pnpm build:mobile:warehouse
+pnpm build:mobile:finance
+```
+
+说明：
+
+- 桌面后台默认输出到 `build/`
+- 移动端按入口输出到 `build/mobile-*`
+- 后续如果需要不同域名，可以直接绑定不同构建产物
+
+## 当前回归命令
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm lint
 pnpm css
 pnpm test
-pnpm playwright:install
 pnpm style:l1
-pnpm build
 ```
 
-- `pnpm style:l1` 是当前仓库最小浏览器级样式回归，会自动拉起本地 Vite 并覆盖公共首页、管理员登录、未登录访问 `/erp/dashboard` 的重定向，以及管理员登录后的 ERP 看板、帮助中心、移动端工作台和资料准备页。
-- 若本轮改动触达更复杂的后台页面、弹窗、表格或更多响应式状态，仍需在 `style:l1` 之外继续补针对性浏览器回归。
-- `pnpm test` 当前负责验证错误码常量、登录态错误分类，以及 ERP 初始化数据基线；它不替代浏览器里的样式 / box 模型验收。
+`pnpm style:l1` 当前覆盖：
 
-## 环境变量
+- 公共首页
+- 管理员登录
+- 未登录访问桌面后台的重定向
+- 桌面全局驾驶舱
+- 桌面角色工作台
+- 帮助中心
+- 移动端多入口总览
+- 资料与字段真源页
 
-- `VITE_BASE_URL`：前端部署基础路径
-- `VITE_APP_TITLE`：页面标题，应与当前项目名称保持一致
-- `VITE_ENABLE_RPC_MOCK`：是否启用本地 RPC mock
+## 当前前端边界
 
-环境文件：
-
-- `/Users/simon/projects/plush-toy-erp/web/.env.development`
-- `/Users/simon/projects/plush-toy-erp/web/.env.production`
-
-说明：当前可执行 `cd /Users/simon/projects/plush-toy-erp/web && pnpm test` 验证错误码常量与鉴权分类基线，执行 `pnpm style:l1` 验证首页与登录链路的最小浏览器级样式回归；若任务涉及更复杂页面，仍应继续补页面级回归。
+- 桌面后台继续只保留一个入口
+- 移动端按角色拆入口和端口，但不拆第二个仓库
+- 拍照扫码、PDA、条码枪、图片识别继续 deferred
+- 当前先做角色页面、文档、帮助中心和信息结构，尚未接真实业务保存链路

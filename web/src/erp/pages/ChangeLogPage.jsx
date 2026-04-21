@@ -4,22 +4,23 @@ import PageHero from '../components/PageHero'
 import { bootstrapChange } from '../config/seedData.mjs'
 
 const DONE_ITEMS = [
-  '新增毛绒 ERP 初始化看板、流程总览、帮助中心、文档页和资料准备页。',
-  '把管理员登录后的默认入口切到 ERP 壳层，不再停留在通用控制台。',
-  '在同一仓库里初始化各角色移动端工作台，不单独拆第二个移动端项目。',
-  '同步准备 changes slug、README、project-status、web README 和运行文档。',
+  '逐个读取并分析加工合同 PDF、两份材料 BOM Excel、加工汇总 Excel、辅包材采购 Excel、正式汇报 PDF 和生产订单截图。',
+  '重写毛绒工厂主流程、字段真源对照、首批正式数据模型建议和 Excel / PDF 导入映射。',
+  '桌面后台继续保持一个入口，但新增角色切换、角色默认工作台、角色过滤菜单和角色化帮助中心。',
+  '同仓库内拆出 6 个角色移动端入口和端口矩阵，保持共享 common / ui / api / 文档层。',
 ]
 
 const NOT_DONE_ITEMS = [
   '拍照扫码、PDA、条码枪与图片识别。',
-  '正式 Excel 导入、合同打印模板、PDF 定位填充。',
-  '真实业务实体、权限矩阵、审批流和利润口径。',
+  '正式 Excel 导入落库、合同打印模板、PDF 定位填充。',
+  '正式结算单 / 对账单样本不足前的完整账务实体。',
+  '未确认编号体系直接落 Ent schema。',
 ]
 
 const NEXT_ITEMS = [
-  '等更多合同 / Excel 到位后，先补字段真源和导入链路。',
-  '按角色继续把工作台接入真实后端接口与数据保存。',
-  '在移动端工作台基础上收口更细的交互与验收样本。',
+  '继续补客户订单、出货单、结算单样本，确认订单编号层级关系。',
+  '等字段稳定后再决定是否开始 Ent schema 与 migration。',
+  '把桌面角色页和移动端入口逐步接到真实接口与保存链路。',
 ]
 
 export default function ChangeLogPage() {
@@ -27,8 +28,8 @@ export default function ChangeLogPage() {
     <div className="space-y-6">
       <PageHero
         eyebrow="changes slug"
-        title="本轮初始化变更记录"
-        description="复杂任务已明确写入 changes slug，后续如果继续接合同、Excel 或移动端细节，可以直接按这份文档续做，不需要再从聊天记录里猜当前范围。"
+        title="本轮真源收口变更记录"
+        description="复杂任务继续写进 changes slug。后续如果继续接合同、Excel、移动端或 schema，只需要按这份记录续做，不需要再从聊天记录倒推当前范围。"
       />
 
       <SurfacePanel className="p-5">

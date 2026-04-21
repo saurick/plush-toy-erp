@@ -2,25 +2,29 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
 import PageHero from '../components/PageHero'
-import { documentationCards, helpCenterSections } from '../config/seedData.mjs'
+import {
+  documentationCards,
+  getHelpCenterSections,
+} from '../config/seedData.mjs'
+import { useERPWorkspace } from '../context/ERPWorkspaceProvider'
 
 export default function HelpCenterPage() {
+  const { activeRole } = useERPWorkspace()
+  const helpCenterSections = getHelpCenterSections(activeRole.key)
+
   return (
     <div className="space-y-6">
       <PageHero
         eyebrow="帮助中心"
         title="帮助中心与操作入口"
-        description="这里先解决三件事：新同事先看什么、这轮哪些能力能用、后续资料应该接到哪里。帮助中心内容与仓库文档同步维护，不把临时聊天结论当真源。"
+        description={`当前桌面角色是 ${activeRole.title}。帮助中心会随角色切换同步变化：先告诉你该看什么、当前能做什么，以及哪些扫描 / 识别能力仍然 deferred。`}
         actions={
           <>
             <Link className="erp-primary-button" to="/erp/docs/system-init">
-              先读初始化说明
+              先读系统初始化说明
             </Link>
-            <Link
-              className="erp-secondary-button"
-              to="/erp/docs/operation-playbook"
-            >
-              查看流程草案
+            <Link className="erp-secondary-button" to="/erp/docs/field-truth">
+              查看字段真源
             </Link>
           </>
         }
@@ -74,8 +78,8 @@ export default function HelpCenterPage() {
                 使用建议
               </div>
               <div className="mt-2 text-sm leading-6 text-slate-200">
-                先看“初始化说明”确认范围，再看“流程草案”理解主链路，最后结合“移动端角色初始化”决定手机端第一批页面。这样后续接合同和
-                Excel 时就不会把字段落到错误模块。
+                先看“系统初始化说明”确认桌面单入口和移动端多入口结构，再看“字段真源”避免把编号体系混掉，最后用“导入映射”决定
+                Excel / PDF 应该落哪张表。
               </div>
             </div>
           </div>

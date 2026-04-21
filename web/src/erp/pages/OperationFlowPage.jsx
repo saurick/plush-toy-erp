@@ -8,8 +8,8 @@ export default function OperationFlowPage() {
     <div className="space-y-6">
       <PageHero
         eyebrow="流程总览"
-        title="先把主流程收口，再接合同和 Excel"
-        description="trade-erp 的业务主线是报价、外销、出运和结汇；毛绒 ERP 这轮改成款式、材料、加工、排单、仓库和对账这条链。只有先把这条主路径定清楚，后续合同模板、Excel 导入和打印映射才不会落错层。"
+        title="基于真实 PDF / Excel / 截图重做主流程"
+        description="trade-erp 的业务主线是报价、外销、出运和结汇；毛绒 ERP 这轮改成客户 / 款式、材料、加工合同、生产、仓库和结算这条链。每个阶段都明确引用了当前真实资料来源，不再靠上一轮 seedData 脑补。"
       />
 
       <div className="grid gap-4">
@@ -30,6 +30,22 @@ export default function OperationFlowPage() {
                 </div>
                 <div className="text-sm leading-7 text-slate-300">
                   {phase.summary}
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold text-slate-50">
+                    当前引用资料
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {phase.sources.map((item) => (
+                      <div
+                        key={item}
+                        className="text-sm leading-6 text-slate-300"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
 

@@ -65,20 +65,33 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '毛绒玩具 ERP 初始化框架')
-      await expectText(page, '当前已经放进项目的能力')
-      await expectText(page, '角色工作台')
+      await expectHeading(page, '基于真实资料的毛绒 ERP 后台')
+      await expectText(page, '当前已按真源收口的模块')
+      await expectText(page, '桌面后台角色工作台')
+    },
+  },
+  {
+    name: 'erp-role-merchandiser',
+    path: '/erp/roles/merchandiser',
+    auth: 'admin',
+    desktopRole: 'merchandiser',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '业务跟单')
+      await expectText(page, '桌面后台默认入口')
+      await expectText(page, '字段风险提醒')
     },
   },
   {
     name: 'help-center-mobile',
     path: '/erp/help-center',
     auth: 'admin',
+    desktopRole: 'finance',
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
       await expectHeading(page, '帮助中心与操作入口')
-      await expectText(page, '先读初始化说明')
-      await expectText(page, '本轮明确不做')
+      await expectText(page, '先读这三个入口')
+      await expectText(page, '本轮明确 deferred')
     },
   },
   {
@@ -87,9 +100,9 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
-      await expectHeading(page, '角色移动端初始化')
-      await expectText(page, '直接放在本项目里做响应式工作台')
-      await expectText(page, '不强行做扫码、拍照识别或离线同步')
+      await expectHeading(page, '六个角色移动端入口与端口')
+      await expectText(page, '同一个项目里共享 common / ui / api / 文档体系')
+      await expectText(page, '扫码、拍照、PDA 与离线同步统一标记 deferred')
     },
   },
   {
@@ -217,9 +230,15 @@ async function runScenario(browser, scenario) {
 
   if (scenario.auth === 'admin') {
     const token = createMockAdminToken()
-    await page.addInitScript((mockToken) => {
-      localStorage.setItem('admin_access_token', mockToken)
-    }, token)
+    const desktopRole = scenario.desktopRole || 'boss'
+    await page.addInitScript(
+      (mockToken, nextDesktopRole) => {
+        localStorage.setItem('admin_access_token', mockToken)
+        localStorage.setItem('plush-erp.desktop-role', nextDesktopRole)
+      },
+      token,
+      desktopRole
+    )
   }
 
   page.on('console', (message) => {

@@ -6,19 +6,24 @@ import StatusPill from '../components/StatusPill'
 import {
   bootstrapChange,
   environmentCards,
+  fieldTruthRows,
   phaseFlow,
   plannedModules,
+  portMatrix,
   roleWorkbenches,
   sourceReadiness,
 } from '../config/seedData.mjs'
+import { useERPWorkspace } from '../context/ERPWorkspaceProvider'
 
 export default function DashboardPage() {
+  const { activeRole } = useERPWorkspace()
+
   return (
     <div className="space-y-6">
       <PageHero
-        eyebrow="初始化看板"
-        title="毛绒玩具 ERP 初始化框架"
-        description="这轮不复制 trade-erp 的外贸单据模型，而是先把毛绒工厂自己的流程、角色工作台、帮助中心、文档中心、移动端入口和资料准备清单放进项目。拍照扫码已经明确延后，合同与 Excel 接口先留挂点。"
+        eyebrow="全局驾驶舱"
+        title="基于真实资料的毛绒 ERP 后台"
+        description={`当前桌面角色是 ${activeRole.title}。这轮不再停留在初始化壳层，而是按真实 PDF / Excel / 截图收口流程、字段真源、角色入口和移动端多端口结构。`}
         actions={
           <>
             <Link className="erp-primary-button" to="/erp/flows/overview">
@@ -38,7 +43,7 @@ export default function DashboardPage() {
         <SurfacePanel className="p-5">
           <div className="space-y-4">
             <div className="text-lg font-semibold text-slate-50">
-              当前已经放进项目的能力
+              当前已按真源收口的模块
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               {plannedModules.map((moduleItem) => (
@@ -94,18 +99,25 @@ export default function DashboardPage() {
           <SurfacePanel className="p-5">
             <div className="space-y-3">
               <div className="text-lg font-semibold text-slate-50">
-                本轮变更记录
+                当前角色默认关注
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-                <div className="text-sm text-slate-300">
-                  已把复杂任务收口到 changes slug，便于后续继续接力。
-                </div>
-                <div className="mt-3 text-base font-semibold text-slate-50">
-                  {bootstrapChange.repoPath}
-                </div>
-                <div className="mt-2 text-sm text-slate-400">
-                  最后更新：{bootstrapChange.updatedAt}
-                </div>
+              <div className="grid gap-3">
+                {activeRole.desktopHighlights.map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-3xl border border-white/10 bg-white/[0.03] p-4"
+                  >
+                    <div className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                      {item.label}
+                    </div>
+                    <div className="mt-2 text-lg font-semibold text-slate-50">
+                      {item.value}
+                    </div>
+                    <div className="mt-2 text-sm leading-6 text-slate-300">
+                      {item.note}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </SurfacePanel>
@@ -116,7 +128,7 @@ export default function DashboardPage() {
         <SurfacePanel className="p-5">
           <div className="space-y-4">
             <div className="text-lg font-semibold text-slate-50">
-              角色工作台
+              桌面后台角色工作台
             </div>
             <div className="grid gap-3">
               {roleWorkbenches.map((role) => (
@@ -150,7 +162,7 @@ export default function DashboardPage() {
         <SurfacePanel className="p-5">
           <div className="space-y-4">
             <div className="text-lg font-semibold text-slate-50">
-              当前主流程与资料状态
+              当前主流程与字段真源提醒
             </div>
             <div className="grid gap-3">
               {phaseFlow.map((phase, index) => (
@@ -178,8 +190,87 @@ export default function DashboardPage() {
                 已收到 {sourceReadiness.received.length} 份原始资料
               </div>
               <div className="mt-2 text-sm leading-6 text-slate-200">
-                已先把资料入口放进项目，但不会在资料不全时强行补打印模板或 Excel
-                导入逻辑。待补资料会继续挂在“资料准备”页，不做隐性假设。
+                已确认字段里，最关键的是“款式编号 / 产品编号 / 产品订单编号 /
+                订单编号”
+                不是同一层级；当前继续在资料准备页保留待确认项，不把未收稳字段直接硬落
+                schema。
+              </div>
+            </div>
+          </div>
+        </SurfacePanel>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <SurfacePanel className="p-5">
+          <div className="space-y-4">
+            <div className="text-lg font-semibold text-slate-50">
+              多入口端口矩阵
+            </div>
+            <div className="grid gap-3">
+              {portMatrix.map((app) => (
+                <div
+                  key={app.id}
+                  className="rounded-3xl border border-white/10 bg-white/[0.03] p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-base font-semibold text-slate-50">
+                      {app.title}
+                    </div>
+                    <div className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs uppercase tracking-[0.22em] text-cyan-100">
+                      {app.port}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-300">
+                    {app.description}
+                  </div>
+                  <div className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
+                    {app.command}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SurfacePanel>
+
+        <SurfacePanel className="p-5">
+          <div className="space-y-4">
+            <div className="text-lg font-semibold text-slate-50">
+              已确认字段
+            </div>
+            <div className="grid gap-3">
+              {fieldTruthRows.slice(0, 6).map((row) => (
+                <div
+                  key={row.field}
+                  className="rounded-3xl border border-white/10 bg-black/20 p-4"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-base font-semibold text-slate-50">
+                      {row.field}
+                    </div>
+                    <div className="text-xs uppercase tracking-[0.22em] text-slate-400">
+                      {row.stability}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-300">
+                    真源：{row.source}
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-slate-300">
+                    拟落点：{row.target}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-200">
+                    {row.note}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="text-sm font-semibold text-slate-50">
+                本轮变更记录
+              </div>
+              <div className="mt-2 text-sm leading-6 text-slate-300">
+                复杂任务继续收口到 {bootstrapChange.repoPath}，最后更新{' '}
+                {bootstrapChange.updatedAt}。
               </div>
             </div>
           </div>
