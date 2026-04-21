@@ -5,7 +5,8 @@ trace:
 
 data:
   postgres:
-    dsn: "postgres://postgres:change-this-local-postgres-password@127.0.0.1:5435/plush_toy_erp?sslmode=disable"
+    # 若你在 DB 客户端里使用的是 zos_test_user 等其他共享账号，请把用户名和密码改成你的实际联调账号。
+    dsn: "postgres://test_user:change-this-shared-postgres-password@192.168.0.106:5432/plush_erp?sslmode=disable"
   auth:
     jwtSecret: "replace-with-local-dev-jwt-secret"
     admin:

@@ -13,13 +13,14 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-// 默认参数：本机开发 / docker-compose
-// - 本机直接连 127.0.0.1:5435
+// 默认参数：本机开发默认走共享 PG。
+// - 日常联调默认连 192.168.0.106:5432/plush_erp
 // - 在 compose 容器里跑的话，把 host 改成 postgres
 const (
-	defaultHost = "127.0.0.1"
-	defaultPort = "5435"
-	defaultDB   = "plush_toy_erp"
+	defaultHost = "192.168.0.106"
+	defaultPort = "5432"
+	defaultDB   = "plush_erp"
+	defaultUser = "test_user"
 )
 
 // 方便通过环境变量覆盖
@@ -39,11 +40,12 @@ func main() {
 	host := getenv("POSTGRES_HOST", defaultHost)
 	port := getenv("POSTGRES_PORT", defaultPort)
 	db := getenv("POSTGRES_DB", defaultDB)
+	user := getenv("POSTGRES_USER", defaultUser)
 
 	accounts := []postgresAccount{
 		{
-			Name: "postgres",
-			DSN:  buildPostgresDSN("postgres", getenv("POSTGRES_PASSWORD", "change-this-local-postgres-password"), host, port, db),
+			Name: user,
+			DSN:  buildPostgresDSN(user, getenv("POSTGRES_PASSWORD", "change-this-shared-postgres-password"), host, port, db),
 		},
 	}
 	if appUser := os.Getenv("POSTGRES_APP_USER"); appUser != "" {

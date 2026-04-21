@@ -31,9 +31,10 @@ export const environmentCards = [
     detail: '本轮统一以 8200 作为 plush ERP 的默认服务入口。',
   },
   {
-    label: '数据库宿主端口',
-    value: '5435',
-    detail: '避开 trade-erp 常用端口，作为本项目 compose 默认映射。',
+    label: '开发数据库',
+    value: '192.168.0.106:5432/plush_erp',
+    detail:
+      '本地默认直连共享 PG；若要自带 compose PostgreSQL，再使用 5435 映射。',
   },
 ]
 

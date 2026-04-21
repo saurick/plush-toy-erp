@@ -28,7 +28,7 @@ docker compose -f compose.yml up -d
 ```bash
 export PROJECT_SLUG=plush-toy-erp
 export IMAGE_NAME=plush-toy-erp-server:dev
-export POSTGRES_DSN='postgres://postgres:***@postgres:5432/plush_toy_erp?sslmode=disable'
+export POSTGRES_DSN='postgres://postgres:***@postgres:5432/plush_erp?sslmode=disable'
 export TRACE_ENDPOINT=jaeger:4318
 ```
 
@@ -40,6 +40,8 @@ export TRACE_ENDPOINT=jaeger:4318
 
 说明：
 
+- 宿主机本地开发 `make run` 默认连共享 PG `192.168.0.106:5432/plush_erp`
+- 上面的 `5435` 只代表本仓库自带 Compose 的宿主机映射口径，不是日常开发默认 DSN
 - 宿主机本地调试 `make run` 默认走 `/Users/simon/projects/plush-toy-erp/server/configs/dev/config.yaml` 里的 `192.168.0.106:4318`
 - 宿主机线上进程默认走 `server/configs/prod/config.yaml` 里的 `127.0.0.1:4318`
 - 当前 Compose 容器内默认走 `jaeger:4318`，因为容器内不能把宿主机的 `127.0.0.1` 当成 Jaeger 地址

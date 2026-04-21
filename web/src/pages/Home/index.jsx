@@ -89,8 +89,9 @@ export default function HomePage() {
                     当前端口
                   </div>
                   <div className="mt-2 text-sm leading-6 text-slate-300">
-                    前端 `5175`，后端 `8200`，数据库宿主机映射 `5435`，避免与
-                    `trade-erp` 冲突。
+                    前端 `5175`，后端 `8200`，本地开发库默认
+                    `192.168.0.106:5432/plush_erp`；如果启用本项目自带 compose
+                    PostgreSQL，宿主机映射仍是 `5435`。
                   </div>
                 </div>
               </div>

@@ -28,8 +28,8 @@ data:
   postgres:
     # if true output sql
     debug: true
-    # dev 默认连接本机 PostgreSQL；私有环境请通过 POSTGRES_DSN 或 config.local.yaml 覆盖。
-    dsn: "postgres://postgres:change-this-dev-postgres-password@127.0.0.1:5435/plush_toy_erp?sslmode=disable"
+    # dev 默认直连共享 PG `192.168.0.106:5432/plush_erp`；若你本机使用其他账号（如 zos_test_user），请通过 POSTGRES_DSN 或 config.local.yaml 覆盖。
+    dsn: "postgres://test_user:change-this-shared-postgres-password@192.168.0.106:5432/plush_erp?sslmode=disable"
 
   # 缓存服务
   # redis:

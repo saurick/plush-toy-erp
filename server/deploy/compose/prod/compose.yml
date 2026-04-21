@@ -9,7 +9,7 @@ services:
       - "${POSTGRES_PORT:-5435}:5432"
     environment:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-this-prod-postgres-password}"
-      POSTGRES_DB: "${POSTGRES_DB:-plush_toy_erp}"
+      POSTGRES_DB: "${POSTGRES_DB:-plush_erp}"
       POSTGRES_USER: "${POSTGRES_USER:-postgres}"
     mem_limit: "${POSTGRES_MEM_LIMIT:-256m}"
     mem_reservation: "${POSTGRES_MEM_RESERVATION:-128m}"
@@ -63,7 +63,7 @@ services:
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
       # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。
-      POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_toy_erp?sslmode=disable}"
+      POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
     mem_limit: "${APP_MEM_LIMIT:-160m}"
     mem_reservation: "${APP_MEM_RESERVATION:-80m}"

@@ -62,6 +62,8 @@
 
 - 这是当前仓库唯一真正运行时必需的数据依赖。
 - `debug=true` 时会输出更多 SQL 调试信息，更适合开发环境。
+- 本地开发默认 DSN 已收口到共享 PG `192.168.0.106:5432/plush_erp`。
+- 若你在数据库客户端里使用的是 `zos_test_user` 等其他账号，应该通过 `server/configs/dev/config.local.yaml` 或环境变量覆盖用户名和密码，而不是改公共仓库默认值。
 
 ## `data.etcd`
 

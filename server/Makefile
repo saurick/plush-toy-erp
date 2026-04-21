@@ -168,7 +168,7 @@ migrate_status:
 # 标记某个 migration 已应用（用于修复已手动执行但迁移状态未记录的情况）
 migrate_set:
 	@if [ -z "$$DB_URL" ]; then \
-		echo "ERROR: DB_URL is not set. Example: export DB_URL=postgres://postgres:change-this-local-postgres-password@127.0.0.1:5435/plush_toy_erp?sslmode=disable"; \
+		echo "ERROR: DB_URL is not set. Example: export DB_URL=postgres://test_user:change-this-shared-postgres-password@192.168.0.106:5432/plush_erp?sslmode=disable"; \
 		exit 1; \
 	fi
 	@if [ -z "$$MIGRATE_VERSION" ]; then \

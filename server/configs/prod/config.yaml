@@ -29,7 +29,7 @@ data:
     # if true output sql
     debug: false
     # 生产环境密码由 compose 注入 POSTGRES_DSN 覆盖，仓库内仅保留脱敏占位值。
-    dsn: "postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_toy_erp?sslmode=disable"
+    dsn: "postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable"
 
   # 缓存服务
   # redis:

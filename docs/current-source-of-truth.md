@@ -24,6 +24,7 @@
 如果任务落在 ERP 页面、流程、帮助中心或移动端，再补读：
 
 - `/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
+- `/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
 - `/Users/simon/projects/plush-toy-erp/web/README.md`
 - `/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
 
@@ -32,6 +33,7 @@
 先读：
 
 - `/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
+- `/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
 - `/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
 - `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/README.md`
 - `/Users/simon/projects/plush-toy-erp/server/docs/README.md`

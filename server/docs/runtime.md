@@ -28,6 +28,8 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 
 - HTTP：`8200`
 - gRPC：`9200`
+- 本地开发数据库：`192.168.0.106:5432/plush_erp`
+- PostgreSQL Compose 宿主机映射：`5435`
 
 配置来源：
 
