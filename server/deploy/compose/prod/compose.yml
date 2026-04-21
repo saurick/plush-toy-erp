@@ -6,7 +6,7 @@ services:
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-postgres"
     restart: always
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${POSTGRES_PORT:-5435}:5432"
     environment:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-this-prod-postgres-password}"
       POSTGRES_DB: "${POSTGRES_DB:-plush_toy_erp}"
@@ -58,8 +58,8 @@ services:
       jaeger:
         condition: service_started
     ports:
-      - "${APP_HTTP_PORT:-8200}:8000"
-      - "${APP_GRPC_PORT:-9200}:9000"
+      - "${APP_HTTP_PORT:-8200}:8200"
+      - "${APP_GRPC_PORT:-9200}:9200"
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
       # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。

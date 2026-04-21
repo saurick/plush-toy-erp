@@ -141,10 +141,10 @@ export default function AdminUsersPage() {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => navigate('/admin-menu')}
+              onClick={() => navigate('/erp/dashboard')}
               className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/[0.08]"
             >
-              返回控制台
+              返回 ERP 工作台
             </button>
             <button
               type="button"

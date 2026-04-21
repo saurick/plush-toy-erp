@@ -1,10 +1,10 @@
 # server/configs/prod/config.yaml
 server:
   http:
-    addr: 0.0.0.0:8000
+    addr: 0.0.0.0:8200
     timeout: 10s
   grpc:
-    addr: 0.0.0.0:9000
+    addr: 0.0.0.0:9200
     timeout: 10s
 
 log:

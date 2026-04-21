@@ -12,7 +12,7 @@ export default function AdminLoginPage() {
   const location = useLocation()
 
   const from =
-    (location.state?.from?.pathname || '/admin-menu') +
+    (location.state?.from?.pathname || '/erp/dashboard') +
     (location.state?.from?.search || '') +
     (location.state?.from?.hash || '')
 
@@ -72,13 +72,14 @@ export default function AdminLoginPage() {
 
         <div className="mb-4 text-center sm:mb-6">
           <div className="inline-flex rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-amber-100">
-            管理登录
+            ERP 管理登录
           </div>
           <div className="mt-4 text-xl font-semibold tracking-tight text-slate-50 sm:text-2xl">
-            管理控制台登录
+            毛绒 ERP 管理台登录
           </div>
           <div className="mt-2 text-sm leading-6 text-slate-300">
-            用于访问后台账号目录和项目说明页。默认管理员可由服务端在启动时自动创建。
+            用于访问 ERP
+            初始化看板、流程总览、帮助中心、移动端工作台和后续后台模块。默认管理员可由服务端在启动时自动创建。
           </div>
         </div>
 

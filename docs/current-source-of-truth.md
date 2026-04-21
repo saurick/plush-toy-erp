@@ -17,8 +17,15 @@
 
 - `/Users/simon/projects/plush-toy-erp/README.md`
 - `/Users/simon/projects/plush-toy-erp/AGENTS.md`
+- `/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
 - `/Users/simon/projects/plush-toy-erp/server/README.md`
 - `/Users/simon/projects/plush-toy-erp/scripts/README.md`
+
+如果任务落在 ERP 页面、流程、帮助中心或移动端，再补读：
+
+- `/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
+- `/Users/simon/projects/plush-toy-erp/web/README.md`
+- `/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
 
 ### 2. 部署、运行或配置问题
 

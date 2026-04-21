@@ -7,6 +7,9 @@
 - 阅读顺序与真源：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
 - 部署口径：`/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
 - 当前项目基线：`/Users/simon/projects/plush-toy-erp/docs/project-status.md`
+- ERP 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
+- ERP 主流程草案：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
+- 本轮 changes 记录：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
 
 ## 相关目录
 

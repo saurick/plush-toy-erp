@@ -63,13 +63,14 @@ export default function LoginPage() {
 
         <div className="mb-6 text-center sm:mb-8">
           <div className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-cyan-100">
-            用户登录
+            员工登录
           </div>
           <div className="mt-4 text-3xl font-semibold tracking-tight text-slate-50">
-            欢迎登录
+            协作账号登录
           </div>
           <div className="mt-2 text-sm leading-6 text-slate-300">
-            使用已有账号继续访问当前项目；如果是首次使用，请先注册普通用户账号。
+            使用已有账号继续访问毛绒 ERP
+            的协作入口。当前普通用户链路只保留最小登录与注册能力，后续再逐步挂接移动端动作。
           </div>
         </div>
 
@@ -123,12 +124,12 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between pt-1 text-sm text-slate-300">
                 <div>
-                  当前系统不会自动创建普通用户账号。{' '}
+                  当前系统不会自动创建普通员工账号。{' '}
                   <Link
                     className="font-medium text-cyan-200 underline underline-offset-4 transition hover:text-cyan-100"
                     to="/register"
                   >
-                    先去注册
+                    先去注册协作账号
                   </Link>
                 </div>
               </div>

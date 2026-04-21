@@ -1,23 +1,24 @@
 # plush-toy-erp
 
-`plush-toy-erp` 当前是一套可直接运行的 Web + Server 单体骨架，先保留账号体系、错误码治理、健康检查、基础可观测性和 `docker compose` 发布链路，方便尽快把最小可运行链路搭起来，再继续补 ERP 的真实业务实体和页面。
+`plush-toy-erp` 当前是一套可直接运行的毛绒工厂 ERP 初始化框架：先保留账号体系、错误码治理、健康检查、`docker compose` 发布链路，并补齐 ERP 主路由、角色工作台、流程总览、帮助中心、文档中心和移动端入口，再继续接正式合同、Excel 与业务实体。
 
 ## 目录结构
 
 | 路径 | 职责 |
 | --- | --- |
-| `web/` | Vite + React 前端，保留用户登录、注册、管理员登录和后台账号目录骨架，内部目录职责见 [`web/README.md`](web/README.md) |
+| `web/` | Vite + React 前端，包含公共登录页与 `src/erp/` 初始化壳层，内部目录职责见 [`web/README.md`](web/README.md) |
 | `server/` | Kratos + Ent + Atlas 后端，保留 `/healthz`、`/readyz`、鉴权、错误码与 JSON-RPC 基线，内部目录职责见 [`server/README.md`](server/README.md) |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks，详见 [`scripts/README.md`](scripts/README.md) |
-| `docs/` | 仓库级约定、部署口径和当前项目基线 |
+| `docs/` | 仓库级约定、部署口径、ERP 初始化文档与 changes 记录 |
 
 若需要查看 `web/` 或 `server/` 的内部目录，不在根 README 继续展开，以各自子目录 README 为准，避免同一份结构说明在多处漂移。
 
 ## 当前边界
 
 - 当前唯一部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
-- 本仓库没有初始化 `lab-ha`、Kubernetes 清单和 dashboard
-- 首页、登录/注册、后台菜单仍是通用骨架，后续需要继续替换成毛绒玩具 ERP 的业务入口和操作台
+- 本仓库没有初始化 `lab-ha`、Kubernetes 清单
+- 已完成 ERP 初始化看板、流程总览、帮助中心、文档页和移动端工作台
+- 拍照扫码、正式 Excel 导入、合同打印模板和图片识别本轮明确不做
 
 ## 快速开始
 
@@ -29,7 +30,7 @@ pnpm install
 pnpm start
 ```
 
-默认地址：`http://localhost:5173`
+默认地址：`http://localhost:5175`
 
 ### 后端
 
@@ -38,6 +39,12 @@ cd /Users/simon/projects/plush-toy-erp/server
 make init
 make run
 ```
+
+默认端口：
+
+- HTTP：`8200`
+- gRPC：`9200`
+- PostgreSQL 宿主机映射：`5435`
 
 ### 本地数据库迁移
 
@@ -89,6 +96,9 @@ pnpm style:l1
 - 协作约定：`/Users/simon/projects/plush-toy-erp/AGENTS.md`
 - 阅读顺序与真源：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
 - 当前项目基线：`/Users/simon/projects/plush-toy-erp/docs/project-status.md`
+- ERP 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
+- ERP 主流程草案：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
+- 本轮 changes 记录：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
 - 部署口径：`/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
 - 脚本说明：`/Users/simon/projects/plush-toy-erp/scripts/README.md`
 - 前端总览：`/Users/simon/projects/plush-toy-erp/web/README.md`

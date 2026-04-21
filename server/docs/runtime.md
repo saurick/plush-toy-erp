@@ -26,8 +26,8 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 
 ## 默认端口
 
-- HTTP：`8000`
-- gRPC：`9000`
+- HTTP：`8200`
+- gRPC：`9200`
 
 配置来源：
 
@@ -57,7 +57,7 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 ## gRPC 入口
 
 - gRPC 服务同样承载 `Jsonrpc` 服务定义
-- 默认监听 `0.0.0.0:9000`
+- 默认监听 `0.0.0.0:9200`
 
 说明：当前服务主要以 HTTP JSON-RPC 为默认入口，gRPC 更多是保留 Kratos 的统一接入能力。
 

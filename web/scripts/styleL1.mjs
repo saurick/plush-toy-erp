@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { Buffer } from 'node:buffer'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -23,8 +24,8 @@ const scenarios = [
     path: '/',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '清晰的账号入口，从这里开始')
-      await expectRole(page, 'link', '用户登录')
+      await expectHeading(page, '毛绒玩具 ERP 初始化底座')
+      await expectRole(page, 'link', '员工登录')
       await expectRole(page, 'link', '管理员登录')
     },
   },
@@ -33,29 +34,9 @@ const scenarios = [
     path: '/',
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
-      await expectHeading(page, '清晰的账号入口，从这里开始')
-      await expectRole(page, 'link', '用户登录')
+      await expectHeading(page, '毛绒玩具 ERP 初始化底座')
+      await expectRole(page, 'link', '员工登录')
       await expectRole(page, 'link', '管理员登录')
-    },
-  },
-  {
-    name: 'login-desktop',
-    path: '/login',
-    viewport: { width: 1280, height: 800 },
-    verify: async (page) => {
-      await expectText(page, '欢迎登录')
-      await expectRole(page, 'button', '登录')
-      await expectText(page, '使用已有账号继续访问当前项目')
-    },
-  },
-  {
-    name: 'register-mobile',
-    path: '/register',
-    viewport: { width: 390, height: 844 },
-    verify: async (page) => {
-      await expectText(page, '创建账号')
-      await expectRole(page, 'button', '注册并登录')
-      await expectText(page, '这里只保留最小注册流程')
     },
   },
   {
@@ -63,19 +44,63 @@ const scenarios = [
     path: '/admin-login',
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
-      await expectText(page, '管理控制台登录')
+      await expectText(page, '毛绒 ERP 管理台登录')
       await expectRole(page, 'button', '登录')
-      await expectText(page, '用于访问后台账号目录和项目说明页')
+      await expectText(page, '用于访问 ERP 初始化看板')
     },
   },
   {
-    name: 'admin-menu-redirect',
-    path: '/admin-menu',
+    name: 'erp-dashboard-redirect',
+    path: '/erp/dashboard',
     viewport: { width: 1280, height: 800 },
     expectPath: '/admin-login',
     verify: async (page) => {
-      await expectText(page, '管理控制台登录')
+      await expectText(page, '毛绒 ERP 管理台登录')
       await expectRole(page, 'button', '登录')
+    },
+  },
+  {
+    name: 'erp-dashboard-desktop',
+    path: '/erp/dashboard',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '毛绒玩具 ERP 初始化框架')
+      await expectText(page, '当前已经放进项目的能力')
+      await expectText(page, '角色工作台')
+    },
+  },
+  {
+    name: 'help-center-mobile',
+    path: '/erp/help-center',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectHeading(page, '帮助中心与操作入口')
+      await expectText(page, '先读初始化说明')
+      await expectText(page, '本轮明确不做')
+    },
+  },
+  {
+    name: 'mobile-workbenches-mobile',
+    path: '/erp/mobile-workbenches',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectHeading(page, '角色移动端初始化')
+      await expectText(page, '直接放在本项目里做响应式工作台')
+      await expectText(page, '不强行做扫码、拍照识别或离线同步')
+    },
+  },
+  {
+    name: 'source-readiness-desktop',
+    path: '/erp/source-readiness',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '先把已收到与待补资料列清楚')
+      await expectText(page, '9.3加工合同-子淳.pdf')
+      await expectText(page, '仍在等待的资料')
     },
   },
 ]
@@ -190,6 +215,13 @@ async function runScenario(browser, scenario) {
   const page = await browser.newPage({ viewport: scenario.viewport })
   const errors = []
 
+  if (scenario.auth === 'admin') {
+    const token = createMockAdminToken()
+    await page.addInitScript((mockToken) => {
+      localStorage.setItem('admin_access_token', mockToken)
+    }, token)
+  }
+
   page.on('console', (message) => {
     if (message.type() === 'error') {
       errors.push(`console error: ${message.text()}`)
@@ -248,6 +280,21 @@ async function expectRole(page, role, name) {
 async function expectText(page, text) {
   const locator = page.getByText(text, { exact: false })
   await locator.first().waitFor({ state: 'visible', timeout: 10_000 })
+}
+
+function createMockAdminToken() {
+  const header = encodeBase64URL({ alg: 'none', typ: 'JWT' })
+  const payload = encodeBase64URL({
+    uid: 1,
+    uname: 'style-l1-admin',
+    role: 1,
+    exp: Math.floor(Date.now() / 1000) + 3600,
+  })
+  return `${header}.${payload}.stylel1`
+}
+
+function encodeBase64URL(value) {
+  return Buffer.from(JSON.stringify(value)).toString('base64url')
 }
 
 async function assertNoHorizontalOverflow(page, scenarioName) {

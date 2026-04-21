@@ -1,0 +1,132 @@
+.erp-sidebar-panel {
+  position: sticky;
+  top: 1rem;
+}
+
+.erp-nav-link {
+  display: block;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background: rgb(255 255 255 / 0.03);
+  border-radius: 24px;
+  padding: 0.875rem 1rem;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.erp-nav-link:hover {
+  border-color: rgb(34 211 238 / 0.24);
+  background: rgb(34 211 238 / 0.08);
+  transform: translateY(-1px);
+}
+
+.erp-nav-link-active {
+  border-color: rgb(34 211 238 / 0.34);
+  background:
+    linear-gradient(135deg, rgb(34 211 238 / 0.12), rgb(168 85 247 / 0.12)),
+    rgb(255 255 255 / 0.04);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+.erp-primary-button,
+.erp-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.erp-primary-button {
+  border: 1px solid rgb(34 211 238 / 0.2);
+  background: linear-gradient(135deg, #67e8f9, #a5f3fc);
+  color: #082f49;
+}
+
+.erp-primary-button:hover {
+  background: linear-gradient(135deg, #a5f3fc, #cffafe);
+}
+
+.erp-secondary-button {
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background: rgb(255 255 255 / 0.04);
+  color: rgb(241 245 249);
+}
+
+.erp-secondary-button:hover {
+  border-color: rgb(255 255 255 / 0.18);
+  background: rgb(255 255 255 / 0.08);
+}
+
+.erp-mobile-strip {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.erp-mobile-strip-link {
+  white-space: nowrap;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.04);
+  color: rgb(226 232 240);
+  padding: 0.65rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.erp-mobile-strip-link-active {
+  border-color: rgb(34 211 238 / 0.3);
+  background: rgb(34 211 238 / 0.12);
+  color: rgb(240 249 255);
+}
+
+.erp-docs-article {
+  font-size: 0.96rem;
+  line-height: 1.8;
+}
+
+.erp-docs-article table {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+}
+
+.erp-phone-frame {
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.96), rgb(2 6 23 / 0.96)),
+    rgb(2 6 23 / 0.92);
+  border-radius: 32px;
+  padding: 0.75rem;
+  box-shadow: 0 28px 60px rgb(15 23 42 / 0.36);
+}
+
+.erp-phone-screen {
+  min-height: 32rem;
+  border-radius: 24px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background:
+    radial-gradient(circle at top, rgb(34 211 238 / 0.16), transparent 36%),
+    linear-gradient(180deg, rgb(15 23 42 / 0.96), rgb(2 6 23 / 0.96));
+  padding: 1.25rem;
+}
+
+@media (max-width: 1023px) {
+  .erp-sidebar-panel {
+    position: static;
+  }
+
+  .erp-phone-screen {
+    min-height: 28rem;
+  }
+}

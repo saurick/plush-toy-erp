@@ -100,8 +100,8 @@ COPY --from=builder /src/bin/server /app/server
 COPY --from=builder /src/configs/prod /app/configs
 COPY --from=web-builder /web/build /app/public
 
-EXPOSE 8000
-EXPOSE 9000
+EXPOSE 8200
+EXPOSE 9200
 
 # 默认用 /app/configs （里面只有 prod/config.yaml）
 CMD ["/app/server", "-conf", "/app/configs"]

@@ -37,7 +37,6 @@ function SessionCard({
 
 export default function HomePage() {
   const navigate = useNavigate()
-  // 根首页统一感知两类登录态，后续替换成业务首页时仍可复用这套入口判定。
   const user = getCurrentUser(AUTH_SCOPE.USER)
   const admin = getCurrentUser(AUTH_SCOPE.ADMIN)
 
@@ -58,10 +57,12 @@ export default function HomePage() {
                 </div>
                 <div className="max-w-2xl space-y-3">
                   <h1 className="text-3xl font-semibold tracking-tight text-slate-50 sm:text-4xl lg:text-5xl">
-                    毛绒玩具业务链路，从账号入口开始
+                    毛绒玩具 ERP 初始化底座
                   </h1>
                   <p className="text-sm leading-7 text-slate-300 sm:text-base">
-                    当前先保留用户登录、注册和管理入口，方便把基础鉴权、后台账号目录和最小工作流跑通，再继续扩展订单、库存和供应链页面。
+                    当前项目已经切到毛绒工厂 ERP
+                    的初始化阶段：先把后台主路由、角色工作台、流程总览、帮助中心、移动端页面和资料准备清单放进仓库，再继续接合同、Excel
+                    和正式业务实体。
                   </p>
                 </div>
               </div>
@@ -69,27 +70,27 @@ export default function HomePage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                   <div className="text-sm font-medium text-slate-100">
-                    用户使用
+                    初始化范围
                   </div>
                   <div className="mt-2 text-sm leading-6 text-slate-300">
-                    默认不预置账号。首次使用先注册，注册成功后会自动登录。
+                    已完成后台壳层、帮助中心、文档页、角色工作台与移动端预览。
                   </div>
                 </div>
                 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                   <div className="text-sm font-medium text-slate-100">
-                    管理后台
+                    本轮不做
                   </div>
                   <div className="mt-2 text-sm leading-6 text-slate-300">
-                    管理员使用独立登录入口，便于区分前台与后台流程。
+                    拍照扫码、PDA、正式 Excel 导入、合同打印模板和图片识别。
                   </div>
                 </div>
                 <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
                   <div className="text-sm font-medium text-slate-100">
-                    项目调整
+                    当前端口
                   </div>
                   <div className="mt-2 text-sm leading-6 text-slate-300">
-                    项目名、首页内容、后台菜单和示例文案都已经收口到当前仓库口径，后续按真实
-                    ERP 场景继续细化。
+                    前端 `5175`，后端 `8200`，数据库宿主机映射 `5435`，避免与
+                    `trade-erp` 冲突。
                   </div>
                 </div>
               </div>
@@ -99,11 +100,11 @@ export default function HomePage() {
           <div className="grid gap-6">
             <SessionCard
               badge="用户入口"
-              title={user ? `已登录：${user.username}` : '用户登录 / 注册'}
+              title={user ? `已登录：${user.username}` : '员工账号登录 / 注册'}
               description={
                 user
                   ? '当前用户已登录，可以继续进入业务首页、个人中心或工作台。'
-                  : '普通用户默认没有预置账号，首次使用请先注册；注册成功后会自动登录。'
+                  : '普通员工账号当前只保留最小登录链路，便于后续接移动端协作动作。'
               }
               accentClass="border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
               actions={
@@ -124,7 +125,7 @@ export default function HomePage() {
                       to="/login"
                       className="rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200"
                     >
-                      用户登录
+                      员工登录
                     </Link>,
                     <Link
                       key="user-register"
@@ -139,17 +140,18 @@ export default function HomePage() {
               {user ? (
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-slate-300">
                   当前登录用户 ID：{user.id}
+                  。这轮还没单独开放员工端业务页面，后续会优先挂移动端确认动作。
                 </div>
               ) : null}
             </SessionCard>
 
             <SessionCard
               badge="管理入口"
-              title={admin ? `管理员：${admin.username}` : '管理控制台'}
+              title={admin ? `管理员：${admin.username}` : 'ERP 管理台'}
               description={
                 admin
-                  ? '管理员已登录，可以继续进入后台控制台。'
-                  : '管理员通过独立入口登录，用于访问后台账号目录和后续 ERP 后台模块。'
+                  ? '管理员已登录，可以直接进入毛绒 ERP 初始化工作台。'
+                  : '管理员通过独立入口进入 ERP 主路由、流程页、帮助中心和角色工作台。'
               }
               accentClass="border-amber-300/30 bg-amber-300/10 text-amber-100"
               actions={
@@ -157,10 +159,10 @@ export default function HomePage() {
                   ? [
                     <Link
                       key="admin-console"
-                      to="/admin-menu"
+                      to="/erp/dashboard"
                       className="rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
                     >
-                      进入管理控制台
+                      进入 ERP 工作台
                     </Link>,
                     <button
                       key="admin-logout"
@@ -186,7 +188,8 @@ export default function HomePage() {
             >
               {!admin ? (
                 <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-slate-300">
-                  默认管理员账号只用于启动基线链路，进入真实环境前请替换为正式后台账号。
+                  默认管理员账号只用于启动初始化链路。进入真实环境前，请替换正式后台账号、数据库密码与
+                  JWT 密钥。
                 </div>
               ) : null}
             </SessionCard>

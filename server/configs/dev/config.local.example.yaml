@@ -5,7 +5,7 @@ trace:
 
 data:
   postgres:
-    dsn: "postgres://postgres:change-this-local-postgres-password@127.0.0.1:5432/plush_toy_erp?sslmode=disable"
+    dsn: "postgres://postgres:change-this-local-postgres-password@127.0.0.1:5435/plush_toy_erp?sslmode=disable"
   auth:
     jwtSecret: "replace-with-local-dev-jwt-secret"
     admin:

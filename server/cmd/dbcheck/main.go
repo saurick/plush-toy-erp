@@ -14,11 +14,11 @@ import (
 )
 
 // 默认参数：本机开发 / docker-compose
-// - 本机直接连 127.0.0.1:5433
+// - 本机直接连 127.0.0.1:5435
 // - 在 compose 容器里跑的话，把 host 改成 postgres
 const (
 	defaultHost = "127.0.0.1"
-	defaultPort = "5433"
+	defaultPort = "5435"
 	defaultDB   = "plush_toy_erp"
 )
 

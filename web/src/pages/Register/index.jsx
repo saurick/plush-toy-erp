@@ -67,13 +67,13 @@ export default function RegisterPage() {
 
         <div className="mb-6 text-center sm:mb-8">
           <div className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-emerald-100">
-            账号注册
+            协作账号
           </div>
           <div className="mt-4 text-3xl font-semibold tracking-tight text-slate-50">
-            创建账号
+            创建协作账号
           </div>
           <div className="mt-2 text-sm leading-6 text-slate-300">
-            这里只保留最小注册流程：用户名和密码。注册成功后会自动登录。
+            这里只保留最小注册流程：用户名和密码。注册成功后会自动登录，后续用于员工协作端和移动端动作确认。
           </div>
         </div>
 
@@ -150,7 +150,7 @@ export default function RegisterPage() {
                   className="font-medium text-emerald-200 underline underline-offset-4 transition hover:text-emerald-100"
                   to="/login"
                 >
-                  直接登录
+                  直接登录协作账号
                 </Link>
               </div>
             </div>

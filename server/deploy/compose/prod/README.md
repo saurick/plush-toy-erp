@@ -32,6 +32,12 @@ export POSTGRES_DSN='postgres://postgres:***@postgres:5432/plush_toy_erp?sslmode
 export TRACE_ENDPOINT=jaeger:4318
 ```
 
+默认宿主机端口：
+
+- PostgreSQL：`5435`
+- HTTP：`8200`
+- gRPC：`9200`
+
 说明：
 
 - 宿主机本地调试 `make run` 默认走 `/Users/simon/projects/plush-toy-erp/server/configs/dev/config.yaml` 里的 `192.168.0.106:4318`
