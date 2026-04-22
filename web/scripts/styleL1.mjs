@@ -316,6 +316,24 @@ const scenarios = [
         storageKey: '__plush_erp_processing_contract_print_draft__',
         paperSelector: '.erp-processing-contract-paper',
       })
+      const emptyAttachmentState = await page.evaluate(() => ({
+        templateAttachmentCount: document.querySelectorAll(
+          '.erp-processing-contract-attachments'
+        ).length,
+        templateAttachmentImageCount: document.querySelectorAll(
+          '.erp-processing-contract-attachments__image'
+        ).length,
+      }))
+      assert.equal(
+        emptyAttachmentState.templateAttachmentCount,
+        0,
+        '未上传时纸面不应渲染附件区'
+      )
+      assert.equal(
+        emptyAttachmentState.templateAttachmentImageCount,
+        0,
+        '未上传时纸面不应渲染附件图片'
+      )
       await page
         .locator('.erp-processing-contract-upload-bar__input')
         .first()
@@ -350,10 +368,18 @@ const scenarios = [
       await page.getByRole('button', { name: '清空' }).click()
       await expectText(page, '未上传')
       const clearedAttachmentState = await page.evaluate(() => ({
+        templateAttachmentCount: document.querySelectorAll(
+          '.erp-processing-contract-attachments'
+        ).length,
         templateAttachmentImageCount: document.querySelectorAll(
           '.erp-processing-contract-attachments__image'
         ).length,
       }))
+      assert.equal(
+        clearedAttachmentState.templateAttachmentCount,
+        0,
+        '清空附件位后不应保留附件区'
+      )
       assert.equal(
         clearedAttachmentState.templateAttachmentImageCount,
         0,
