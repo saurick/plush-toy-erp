@@ -110,6 +110,8 @@ pnpm style:l1
 - 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
 - 主流程：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
 - 数据模型与导入映射：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
+- 打印模板字段与编辑行为：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-field-behavior.md`
+- 打印模板实现原理：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-implementation.md`
 - 当前 changes：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
 - 前端说明：`/Users/simon/projects/plush-toy-erp/web/README.md`
 - 打印模板与帮助中心口径：`/Users/simon/projects/plush-toy-erp/web/src/erp/docs/print-templates.md`

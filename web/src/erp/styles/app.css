@@ -530,6 +530,10 @@
   overflow-x: auto;
 }
 
+.erp-admin-shell .erp-docs-article :where(h2, h3) {
+  scroll-margin-top: 18px;
+}
+
 .erp-help-doc-toc__header {
   display: flex;
   flex-direction: column;
@@ -562,6 +566,303 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.erp-help-doc-links--sections {
+  margin-top: 8px;
+}
+
+.erp-help-doc-links--inline {
+  gap: 0.9rem;
+}
+
+.erp-help-doc-links__section-button {
+  scroll-behavior: smooth;
+}
+
+.erp-help-doc-links__text-link {
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  transition:
+    color 160ms ease,
+    opacity 160ms ease;
+}
+
+.erp-help-doc-links__text-link:hover {
+  color: #1d4ed8;
+  opacity: 0.92;
+}
+
+.erp-help-doc-backtop.ant-btn {
+  position: fixed;
+  right: 32px;
+  bottom: 24px;
+  z-index: 40;
+  border-color: #d7e5f4;
+  background: rgb(255 255 255 / 94%);
+  color: #1d4f91;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
+}
+
+.erp-help-doc-backtop.ant-btn:hover,
+.erp-help-doc-backtop.ant-btn:focus-visible {
+  border-color: #a9c4e6;
+  background: #fff;
+  color: #173b6c;
+}
+
+.erp-flow-overview__quickstart,
+.erp-flow-overview__lane,
+.erp-flow-overview__chain-summary {
+  padding: 18px;
+  border: 1px solid #dbe7ff;
+  border-radius: 20px;
+  background:
+    radial-gradient(
+      circle at top right,
+      rgb(147 197 253 / 14%),
+      transparent 36%
+    ),
+    linear-gradient(135deg, #f8fbff 0%, #fff 58%, #f3f7ff 100%);
+}
+
+.erp-flow-overview__quickstart {
+  margin-top: 16px;
+}
+
+.erp-flow-overview__quickstart-header,
+.erp-flow-overview__chain-summary-header,
+.erp-flow-overview__lane-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.erp-flow-overview__quickstart-scroll,
+.erp-flow-overview__scroll {
+  padding-bottom: 6px;
+  margin-top: 14px;
+  overflow-x: auto;
+}
+
+.erp-flow-overview__quickstart-steps,
+.erp-flow-overview__steps {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  min-width: max-content;
+}
+
+.erp-flow-overview__quickstart-node,
+.erp-flow-overview__node {
+  width: 200px;
+  min-height: 168px;
+  padding: 18px 16px;
+  border: 1px solid #cfe0fb;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 10px 24px rgb(15 23 42 / 5%);
+}
+
+.erp-flow-overview__node {
+  width: 236px;
+  min-height: 248px;
+}
+
+.erp-flow-overview__quickstart-title,
+.erp-flow-overview__node-title,
+.erp-flow-overview__chain-card-title,
+.erp-flow-overview__legend-title,
+.erp-flow-overview__lane-title {
+  color: #1f2937;
+}
+
+.erp-flow-overview__quickstart-title,
+.erp-flow-overview__node-title {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+.erp-flow-overview__quickstart-desc,
+.erp-flow-overview__node-desc,
+.erp-flow-overview__chain-card-note,
+.erp-flow-overview__lane-summary,
+.erp-flow-overview__chain-summary-note,
+.erp-flow-overview__legend-card {
+  color: #6b7280;
+  line-height: 1.7;
+}
+
+.erp-flow-overview__quickstart-desc {
+  display: block;
+}
+
+.erp-flow-overview__quickstart-note {
+  display: block;
+  margin-top: 14px;
+}
+
+.erp-flow-overview__quickstart-connector,
+.erp-flow-overview__connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  color: #5c7ead;
+  font-size: 24px;
+}
+
+.erp-flow-overview__related-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.erp-flow-overview__chain-summary-note {
+  max-width: 900px;
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.erp-flow-overview__chain-grid,
+.erp-flow-overview__legend-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.erp-flow-overview__chain-grid {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.erp-flow-overview__legend-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.erp-flow-overview__chain-card,
+.erp-flow-overview__legend-card {
+  padding: 18px;
+  border: 1px solid #d8e5fb;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff 0%, #f9fbff 100%);
+}
+
+.erp-flow-overview__chain-card-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.erp-flow-overview__chain-path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 12px;
+}
+
+.erp-flow-overview__chain-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #cfe0fb;
+  border-radius: 999px;
+  background: #fff;
+  color: #1f3d63;
+  font-size: 14px;
+}
+
+.erp-flow-overview__chain-arrow {
+  color: #6b85ad;
+  font-size: 18px;
+}
+
+.erp-flow-overview__lane + .erp-flow-overview__lane {
+  margin-top: 18px;
+}
+
+.erp-flow-overview__lane-title {
+  font-size: 16px;
+}
+
+.erp-flow-overview__lane-summary {
+  display: block;
+  max-width: 980px;
+  margin-top: 8px;
+}
+
+.erp-flow-overview__node-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: #0f766e;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.erp-flow-overview__node-desc.ant-typography {
+  margin-bottom: 12px;
+  color: #1f2937;
+}
+
+.erp-flow-overview__node-note {
+  display: block;
+  color: #7a8596;
+  line-height: 1.7;
+}
+
+.erp-flow-overview__legend-card {
+  min-height: 132px;
+}
+
+.erp-flow-overview__legend-title {
+  display: block;
+  margin-bottom: 8px;
+}
+
+@media (width <= 900px) {
+  .erp-flow-overview__quickstart,
+  .erp-flow-overview__lane,
+  .erp-flow-overview__chain-summary {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .erp-flow-overview__quickstart-header,
+  .erp-flow-overview__chain-summary-header,
+  .erp-flow-overview__lane-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .erp-flow-overview__related-links {
+    align-items: flex-start;
+  }
+
+  .erp-help-doc-links--inline {
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: flex-start;
+  }
+
+  .erp-help-doc-backtop.ant-btn {
+    right: 16px;
+    bottom: 16px;
+  }
 }
 
 .erp-print-center-page {
@@ -1009,6 +1310,7 @@
 }
 
 .erp-print-shell {
+  position: relative;
   min-height: 100vh;
   padding: 10px 14px 14px;
   background: #f5f7fa;
@@ -1157,6 +1459,29 @@
   align-items: start;
 }
 
+.erp-print-shell--preparing::before {
+  content: attr(data-preparing-text);
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f7fa;
+  color: #434343;
+  font:
+    14px/1.6 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.erp-print-shell--preparing .erp-print-shell__toolbar,
+.erp-print-shell--preparing .erp-print-shell__formula-panel,
+.erp-print-shell--preparing .erp-print-shell__content {
+  visibility: hidden;
+}
+
 .erp-print-shell__panel {
   min-width: 0;
 }
@@ -1271,6 +1596,25 @@
   color: #262626;
 }
 
+.erp-print-shell__currency-input {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.erp-print-shell__currency-prefix {
+  color: #476454;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-print-shell__detail-editor--currency {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .erp-print-shell__field-editor--multiline,
 .erp-print-shell__detail-editor--multiline {
   min-height: 48px;
@@ -1313,6 +1657,10 @@
   display: flex;
   justify-content: center;
   min-width: 100%;
+}
+
+.erp-print-shell__stage-wrap--continued {
+  align-items: flex-start;
 }
 
 .erp-print-workspace {
@@ -1481,15 +1829,6 @@
   display: none;
 }
 
-.erp-processing-contract-export-sandbox {
-  position: fixed;
-  left: -200vw;
-  top: 0;
-  z-index: -1;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .erp-processing-contract-paper {
   width: 210mm;
   min-height: 297mm;
@@ -1500,11 +1839,6 @@
   color: #111827;
   box-shadow: 0 24px 50px rgb(15 23 42 / 18%);
   font-family: 'STSong', 'Songti SC', 'Noto Serif CJK SC', serif;
-}
-
-.erp-processing-contract-paper--export {
-  box-shadow: none;
-  border-radius: 0;
 }
 
 .erp-processing-contract-paper__header {
@@ -1572,6 +1906,18 @@
 
 .erp-processing-contract-table__row--selected td {
   background: rgb(47 143 75 / 12%);
+}
+
+.erp-processing-contract-table__cell-selected {
+  background: rgb(59 130 246 / 0.1);
+}
+
+.erp-processing-contract-table__cell-selected-anchor {
+  box-shadow: inset 0 0 0 1px rgb(37 99 235 / 0.55);
+}
+
+.erp-processing-contract-table__cell-merged {
+  background: rgb(248 250 252);
 }
 
 .erp-processing-contract-table__total td {
@@ -1643,6 +1989,51 @@
   align-items: baseline;
 }
 
+.erp-processing-contract-attachments {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7mm;
+  margin-top: 5.5mm;
+}
+
+.erp-processing-contract-attachments__item {
+  display: grid;
+  gap: 1.6mm;
+  min-width: 0;
+}
+
+.erp-processing-contract-attachments__item--attachment-1 {
+  grid-column: 1;
+}
+
+.erp-processing-contract-attachments__item--attachment-2 {
+  grid-column: 2;
+}
+
+.erp-processing-contract-attachments__frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60mm;
+  padding: 2.5mm;
+  border: 1px solid rgb(17 24 39 / 28%);
+  background: #fff;
+  overflow: hidden;
+}
+
+.erp-processing-contract-attachments__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.erp-processing-contract-attachments__caption {
+  color: #5b6677;
+  font-size: 3.3mm;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .erp-processing-contract-upload-bar {
   display: grid;
   gap: 10px;
@@ -1690,6 +2081,10 @@
 .erp-processing-contract-signature__date-value:focus {
   background: rgb(47 143 75 / 10%);
   box-shadow: inset 0 0 0 1px rgb(47 143 75 / 28%);
+}
+
+.erp-processing-contract-editable--disabled {
+  cursor: default;
 }
 
 .erp-print-table {
@@ -1967,41 +2362,47 @@
 
 .erp-material-contract-meta {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  column-gap: 10mm;
+  row-gap: 1.4mm;
   margin-bottom: 3mm;
   font-size: 4mm;
   line-height: 1.55;
 }
 
-.erp-material-contract-meta__column {
+.erp-material-contract-meta__pair {
   display: grid;
-  gap: 1.4mm;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  column-gap: 10mm;
+}
+
+.erp-material-contract-meta__cell {
   min-width: 0;
 }
 
-.erp-material-contract-meta__column--right {
+.erp-material-contract-meta__cell--left {
+  --erp-material-contract-label-width: 28mm;
+}
+
+.erp-material-contract-meta__cell--right {
+  --erp-material-contract-label-width: 21mm;
   padding-left: 3mm;
 }
 
 .erp-material-contract-meta__top-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 6mm;
-  align-items: baseline;
 }
 
 .erp-material-contract-meta__row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: var(--erp-material-contract-label-width) minmax(0, 1fr);
   gap: 1.5mm;
-  align-items: baseline;
+  align-items: start;
   min-width: 0;
 }
 
-.erp-material-contract-meta__top-row
-  .erp-material-contract-meta__row:last-child {
-  justify-self: end;
+.erp-material-contract-meta__row--top-item {
+  --erp-material-contract-label-width: 18mm;
 }
 
 .erp-material-contract-meta__label,
@@ -2087,8 +2488,17 @@
   background: rgb(59 130 246 / 0.1);
 }
 
+.erp-material-contract-table__cell-selected-anchor {
+  box-shadow: inset 0 0 0 1px rgb(37 99 235 / 0.55);
+}
+
 .erp-material-contract-table__cell-merged {
   background: rgb(248 250 252);
+}
+
+.erp-material-contract-paper--continued,
+.erp-processing-contract-paper--continued {
+  margin-bottom: 14px;
 }
 
 .erp-material-contract-paper
@@ -2219,7 +2629,7 @@
   font-weight: 700;
 }
 
-@media (max-width: 991px) {
+@media screen and (max-width: 991px) {
   .erp-admin-sider {
     display: none !important;
   }
@@ -2299,7 +2709,7 @@
   padding: 1.25rem;
 }
 
-@media (max-width: 1023px) {
+@media screen and (max-width: 1023px) {
   .erp-admin-page-head {
     flex-direction: column;
   }
@@ -2334,11 +2744,12 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-material-contract-meta {
+  .erp-material-contract-meta__pair {
     grid-template-columns: 1fr;
+    row-gap: 1.4mm;
   }
 
-  .erp-material-contract-meta__column--right {
+  .erp-material-contract-meta__cell--right {
     padding-left: 0;
   }
 
@@ -2352,7 +2763,7 @@
   }
 }
 
-@media (max-width: 767px) {
+@media screen and (max-width: 767px) {
   .erp-admin-page-head__aside {
     grid-template-columns: 1fr;
   }
@@ -2385,6 +2796,15 @@
     width: 100%;
   }
 
+  .erp-processing-contract-attachments {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-processing-contract-attachments__item--attachment-1,
+  .erp-processing-contract-attachments__item--attachment-2 {
+    grid-column: auto;
+  }
+
   .erp-material-contract-stage {
     padding: 0.5rem;
   }
@@ -2400,7 +2820,13 @@
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
   body {
+    margin: 0;
     background: white;
   }
 
@@ -2442,6 +2868,11 @@
     margin-top: 0;
   }
 
+  .erp-print-shell__stage-wrap {
+    display: block;
+    min-width: 0;
+  }
+
   .erp-print-shell__stage {
     padding: 0;
     border: 0;
@@ -2451,11 +2882,71 @@
   }
 
   .erp-material-contract-paper {
-    width: auto;
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
     box-shadow: none;
     border-radius: 0;
     border: 0;
-    padding: 0;
+    padding: 10mm 8.5mm 10mm;
+    box-sizing: border-box;
+    background: white;
+    overflow: visible;
+  }
+
+  .erp-processing-contract-paper {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    padding: 10.5mm 8.5mm 10mm;
+    box-sizing: border-box;
+    box-shadow: none;
+    border-radius: 0;
+    background: white;
+    overflow: visible;
+  }
+
+  .erp-material-contract-table,
+  .erp-processing-contract-table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .erp-material-contract-table thead,
+  .erp-processing-contract-table thead {
+    display: table-header-group;
+  }
+
+  .erp-material-contract-table tbody,
+  .erp-processing-contract-table tbody {
+    display: table-row-group;
+  }
+
+  .erp-material-contract-table tr,
+  .erp-material-contract-table th,
+  .erp-material-contract-table td,
+  .erp-material-contract-table__editable,
+  .erp-material-contract-clauses,
+  .erp-material-contract-clause-block,
+  .erp-material-contract-clause-block__item,
+  .erp-material-contract-signature,
+  .erp-material-contract-signature__block,
+  .erp-processing-contract-paper__header,
+  .erp-processing-contract-meta,
+  .erp-processing-contract-table tr,
+  .erp-processing-contract-table th,
+  .erp-processing-contract-table td,
+  .erp-processing-contract-table__cell,
+  .erp-processing-contract-clauses,
+  .erp-processing-contract-clauses__group,
+  .erp-processing-contract-clauses__item,
+  .erp-processing-contract-signature,
+  .erp-processing-contract-signature__block,
+  .erp-processing-contract-attachments,
+  .erp-processing-contract-attachments__item,
+  .erp-processing-contract-attachments__frame {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
   }
 }
 .erp-layout-loading {
@@ -2473,7 +2964,7 @@
   gap: 12px;
 }
 
-@media (max-width: 768px) {
+@media screen and (max-width: 768px) {
   .erp-permission-grid {
     grid-template-columns: 1fr;
   }

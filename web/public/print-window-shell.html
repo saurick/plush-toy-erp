@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>打印窗口加载中</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: #f5f7fa;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #475569;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="print-window-shell-status">正在准备打印模板...</div>
+    <script>
+      ;(() => {
+        const STORAGE_KEY_PREFIX = '__plush_erp_print_window_state__:'
+        const STATE_VERSION = 1
+        const STATE_DB_NAME = '__plush_erp_print_window_state_db__'
+        const STATE_DB_VERSION = 1
+        const STATE_DB_STORE_NAME = 'states'
+        const STATE_TTL_MS = 24 * 60 * 60 * 1000
+        const RESTORE_FUNCTION_NAME = 'restorePlushErpPrintWindowShell'
+        const searchParams = new URLSearchParams(window.location.search)
+        const stateID = String(searchParams.get('state') || '').trim()
+        let databasePromise = null
+
+        const setStatus = (text) => {
+          const status = document.getElementById('print-window-shell-status')
+          if (status) {
+            status.textContent = text
+          }
+        }
+
+        const normalizePayload = (payload) => {
+          const updatedAt = Number(payload?.updatedAt)
+          if (Number(payload?.version) !== STATE_VERSION) {
+            return null
+          }
+          if (
+            Number.isFinite(updatedAt) &&
+            updatedAt > 0 &&
+            Date.now() - updatedAt > STATE_TTL_MS
+          ) {
+            return null
+          }
+          return payload
+        }
+
+        const readPersistedStateFromStorage = () => {
+          if (!stateID) {
+            return null
+          }
+          try {
+            const raw = window.localStorage.getItem(
+              `${STORAGE_KEY_PREFIX}${stateID}`
+            )
+            if (!raw) {
+              return null
+            }
+            const payload = normalizePayload(JSON.parse(raw))
+            if (!payload) {
+              window.localStorage.removeItem(`${STORAGE_KEY_PREFIX}${stateID}`)
+              return null
+            }
+            return payload
+          } catch (error) {
+            return null
+          }
+        }
+
+        const openDatabase = () => {
+          if (databasePromise) {
+            return databasePromise
+          }
+          if (
+            !window.indexedDB ||
+            typeof window.indexedDB.open !== 'function'
+          ) {
+            return Promise.resolve(null)
+          }
+
+          databasePromise = new Promise((resolve) => {
+            try {
+              const request = window.indexedDB.open(
+                STATE_DB_NAME,
+                STATE_DB_VERSION
+              )
+              request.onupgradeneeded = () => {
+                const database = request.result
+                if (!database.objectStoreNames.contains(STATE_DB_STORE_NAME)) {
+                  database.createObjectStore(STATE_DB_STORE_NAME, {
+                    keyPath: 'stateID',
+                  })
+                }
+              }
+              request.onsuccess = () => resolve(request.result)
+              request.onerror = () => resolve(null)
+              request.onblocked = () => resolve(null)
+            } catch (error) {
+              resolve(null)
+            }
+          })
+
+          return databasePromise
+        }
+
+        const readPersistedStateFromIndexedDB = async () => {
+          if (!stateID) {
+            return null
+          }
+          const database = await openDatabase()
+          if (!database) {
+            return null
+          }
+
+          return new Promise((resolve) => {
+            try {
+              const transaction = database.transaction(
+                STATE_DB_STORE_NAME,
+                'readonly'
+              )
+              const request = transaction
+                .objectStore(STATE_DB_STORE_NAME)
+                .get(stateID)
+              request.onsuccess = () =>
+                resolve(normalizePayload(request.result))
+              request.onerror = () => resolve(null)
+              transaction.onabort = () => resolve(null)
+            } catch (error) {
+              resolve(null)
+            }
+          })
+        }
+
+        const readPersistedState = async () => {
+          const indexedDBPayload = await readPersistedStateFromIndexedDB()
+          if (indexedDBPayload) {
+            return indexedDBPayload
+          }
+          return readPersistedStateFromStorage()
+        }
+
+        window[RESTORE_FUNCTION_NAME] = async () => {
+          const payload = await readPersistedState()
+          const windowHTML = String(payload?.windowHTML || '').trim()
+          if (windowHTML) {
+            document.open()
+            document.write(windowHTML)
+            document.close()
+            return
+          }
+          const workspaceURL = String(payload?.workspaceURL || '').trim()
+          if (!workspaceURL) {
+            setStatus('打印窗口不存在或已过期，请返回打印中心重新打开。')
+            return
+          }
+          window.location.replace(workspaceURL)
+        }
+
+        window[RESTORE_FUNCTION_NAME]()
+      })()
+    </script>
+  </body>
+</html>

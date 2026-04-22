@@ -30,6 +30,8 @@
 
 如果任务涉及模板打印或帮助中心口径，再继续补读：
 
+- `/Users/simon/projects/plush-toy-erp/docs/erp-print-template-field-behavior.md`
+- `/Users/simon/projects/plush-toy-erp/docs/erp-print-template-implementation.md`
 - `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/print-templates.md`
 
 ### 2. 部署、运行或配置问题

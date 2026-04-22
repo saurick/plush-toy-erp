@@ -54,6 +54,19 @@ function PrintMetaGrid({ leftItems, rightItems }) {
   )
 }
 
+function MaterialContractMetaPair({ left, right }) {
+  return (
+    <div className="erp-material-contract-meta__pair">
+      <div className="erp-material-contract-meta__cell erp-material-contract-meta__cell--left">
+        {left}
+      </div>
+      <div className="erp-material-contract-meta__cell erp-material-contract-meta__cell--right">
+        {right}
+      </div>
+    </div>
+  )
+}
+
 function renderClauseItems(sectionKey, items) {
   return (Array.isArray(items) ? items : []).map((item, index) => (
     <li
@@ -90,101 +103,126 @@ function ContractTemplate({ data, kind }) {
         <div className="erp-material-contract-paper__title">合同订单</div>
 
         <section className="erp-material-contract-meta">
-          <div className="erp-material-contract-meta__column">
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                采购订单号：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.contractNo || ''}
-              </span>
-            </div>
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                供应商名称：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.supplierName || ''}
-              </span>
-            </div>
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                联系人：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.supplierContact || ''}
-              </span>
-            </div>
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                联系电话：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.supplierPhone || ''}
-              </span>
-            </div>
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                供应商地址：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.supplierAddress || ''}
-              </span>
-            </div>
-          </div>
-
-          <div className="erp-material-contract-meta__column erp-material-contract-meta__column--right">
-            <div className="erp-material-contract-meta__top-row">
+          <MaterialContractMetaPair
+            left={
               <div className="erp-material-contract-meta__row">
                 <span className="erp-material-contract-meta__label">
-                  下单日期：
+                  采购订单号：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.orderDateText || ''}
+                  {data.contractNo || ''}
                 </span>
               </div>
+            }
+            right={
+              <div className="erp-material-contract-meta__top-row">
+                <div className="erp-material-contract-meta__row erp-material-contract-meta__row--top-item">
+                  <span className="erp-material-contract-meta__label">
+                    下单日期：
+                  </span>
+                  <span className="erp-material-contract-meta__value">
+                    {data.orderDateText || ''}
+                  </span>
+                </div>
+                <div className="erp-material-contract-meta__row erp-material-contract-meta__row--top-item">
+                  <span className="erp-material-contract-meta__label">
+                    回货日期：
+                  </span>
+                  <span className="erp-material-contract-meta__value">
+                    {data.returnDateText || ''}
+                  </span>
+                </div>
+              </div>
+            }
+          />
+          <MaterialContractMetaPair
+            left={
               <div className="erp-material-contract-meta__row">
                 <span className="erp-material-contract-meta__label">
-                  回货日期：
+                  供应商名称：
                 </span>
                 <span className="erp-material-contract-meta__value">
-                  {data.returnDateText || ''}
+                  {data.supplierName || ''}
                 </span>
               </div>
-            </div>
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                订货单位：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.buyerCompany || ''}
-              </span>
-            </div>
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                订货人：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.buyerContact || ''}
-              </span>
-            </div>
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                联系电话：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.buyerPhone || ''}
-              </span>
-            </div>
-            <div className="erp-material-contract-meta__row">
-              <span className="erp-material-contract-meta__label">
-                公司地址：
-              </span>
-              <span className="erp-material-contract-meta__value">
-                {data.buyerAddress || ''}
-              </span>
-            </div>
-          </div>
+            }
+            right={
+              <div className="erp-material-contract-meta__row">
+                <span className="erp-material-contract-meta__label">
+                  订货单位：
+                </span>
+                <span className="erp-material-contract-meta__value">
+                  {data.buyerCompany || ''}
+                </span>
+              </div>
+            }
+          />
+          <MaterialContractMetaPair
+            left={
+              <div className="erp-material-contract-meta__row">
+                <span className="erp-material-contract-meta__label">
+                  联系人：
+                </span>
+                <span className="erp-material-contract-meta__value">
+                  {data.supplierContact || ''}
+                </span>
+              </div>
+            }
+            right={
+              <div className="erp-material-contract-meta__row">
+                <span className="erp-material-contract-meta__label">
+                  订货人：
+                </span>
+                <span className="erp-material-contract-meta__value">
+                  {data.buyerContact || ''}
+                </span>
+              </div>
+            }
+          />
+          <MaterialContractMetaPair
+            left={
+              <div className="erp-material-contract-meta__row">
+                <span className="erp-material-contract-meta__label">
+                  联系电话：
+                </span>
+                <span className="erp-material-contract-meta__value">
+                  {data.supplierPhone || ''}
+                </span>
+              </div>
+            }
+            right={
+              <div className="erp-material-contract-meta__row">
+                <span className="erp-material-contract-meta__label">
+                  联系电话：
+                </span>
+                <span className="erp-material-contract-meta__value">
+                  {data.buyerPhone || ''}
+                </span>
+              </div>
+            }
+          />
+          <MaterialContractMetaPair
+            left={
+              <div className="erp-material-contract-meta__row">
+                <span className="erp-material-contract-meta__label">
+                  供应商地址：
+                </span>
+                <span className="erp-material-contract-meta__value">
+                  {data.supplierAddress || ''}
+                </span>
+              </div>
+            }
+            right={
+              <div className="erp-material-contract-meta__row">
+                <span className="erp-material-contract-meta__label">
+                  公司地址：
+                </span>
+                <span className="erp-material-contract-meta__value">
+                  {data.buyerAddress || ''}
+                </span>
+              </div>
+            }
+          />
         </section>
 
         <table className="erp-material-contract-table">

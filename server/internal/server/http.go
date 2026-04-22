@@ -61,6 +61,7 @@ func NewHTTPServer(
 	v1.RegisterJsonrpcHTTPServer(srv, jsonrpcSvc)
 
 	registerHealthRoutes(srv, logger, tp, data.SQLDB())
+	registerTemplatePDFHandler(srv, logger, tp, dc)
 	registerStaticHandler(srv, logger, tp)
 
 	return srv

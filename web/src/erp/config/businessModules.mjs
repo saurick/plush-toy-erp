@@ -1,3 +1,10 @@
+import {
+  MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+  PRINT_WORKSPACE_ENTRY_SOURCE,
+  PROCESSING_CONTRACT_TEMPLATE_KEY,
+  buildPrintCenterPath,
+} from '../utils/printWorkspace.js'
+
 const docLink = (label, path) => ({ label, path })
 
 const helpLinkRegistry = Object.freeze({
@@ -243,8 +250,13 @@ const businessModules = [
       '金额公式列只作为快照口径，不在页面里假装已完成财务核算。',
     ],
     relatedLinks: [
+      docLink(
+        '采购合同模板',
+        buildPrintCenterPath(MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY, {
+          entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        })
+      ),
       helpLink('field'),
-      docLink('模板打印中心', '/erp/print-center'),
     ],
   },
   {
@@ -284,7 +296,12 @@ const businessModules = [
       '保存链路和打印回填暂未接通，本页先作为正式业务入口和真源说明页。',
     ],
     relatedLinks: [
-      docLink('模板打印中心', '/erp/print-center'),
+      docLink(
+        '加工合同模板',
+        buildPrintCenterPath(PROCESSING_CONTRACT_TEMPLATE_KEY, {
+          entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        })
+      ),
       helpLink('calculation'),
     ],
   },

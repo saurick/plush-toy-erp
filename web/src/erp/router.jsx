@@ -88,7 +88,7 @@ export default function ERPRouter() {
         />
         <Route
           path="help-center"
-          element={<Navigate to="/erp/docs/operation-guide" replace />}
+          element={<Navigate to="/erp/docs/operation-flow-overview" replace />}
         />
         <Route path="print-center" element={<PrintCenterPage />} />
         <Route

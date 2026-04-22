@@ -7,8 +7,14 @@ const PERMISSION_NAV_KEYS = [
   'print-center',
   'help-operation-flow-overview',
   'help-operation-guide',
+  'help-role-collaboration-guide',
+  'help-desktop-role-guide',
+  'help-mobile-role-guide',
   'help-field-linkage-guide',
   'help-calculation-guide',
+  'help-print-snapshot-guide',
+  'help-exception-handling-guide',
+  'help-current-boundaries',
   'permission-center',
 ]
 
@@ -16,14 +22,14 @@ const PERMISSION_ALIAS_MAP = Object.freeze({
   '/erp/flows/overview': '/erp/docs/operation-flow-overview',
   '/erp/source-readiness': '/erp/docs/field-linkage-guide',
   '/erp/mobile-workbenches': '/erp/docs/operation-guide',
-  '/erp/help-center': '/erp/docs/operation-guide',
+  '/erp/help-center': '/erp/docs/operation-flow-overview',
   '/erp/docs/system-init': '/erp/docs/operation-guide',
-  '/erp/docs/mobile-roles': '/erp/docs/operation-guide',
+  '/erp/docs/mobile-roles': '/erp/docs/mobile-role-guide',
   '/erp/docs/operation-playbook': '/erp/docs/operation-flow-overview',
   '/erp/docs/field-truth': '/erp/docs/field-linkage-guide',
   '/erp/docs/import-mapping': '/erp/docs/field-linkage-guide',
   '/erp/docs/data-model': '/erp/docs/calculation-guide',
-  '/erp/docs/print-templates': '/erp/docs/calculation-guide',
+  '/erp/docs/print-templates': '/erp/docs/print-snapshot-guide',
 })
 
 export const ERP_MENU_PERMISSION_OPTIONS = PERMISSION_NAV_KEYS.map((navKey) => {

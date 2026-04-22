@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDF 预览加载中</title>
+    <style>
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        background: #f5f7fa;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        color: #475569;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pdf-preview-shell-status">正在加载 PDF 预览...</div>
+    <script>
+      ;(() => {
+        const STORAGE_KEY_PREFIX = '__plush_erp_pdf_preview_state__'
+        const RESTORE_FUNCTION_NAME = 'restorePlushErpPdfPreviewShell'
+        const WAIT_TIMEOUT_MS = 10000
+        const POLL_INTERVAL_MS = 120
+        const searchParams = new URLSearchParams(window.location.search)
+        const stateID = String(searchParams.get('state') || '').trim()
+        const storageKey = stateID ? `${STORAGE_KEY_PREFIX}${stateID}` : ''
+        let restoreSettled = false
+        let waitTimer = 0
+        let pollTimer = 0
+
+        const setStatus = (text) => {
+          const status = document.getElementById('pdf-preview-shell-status')
+          if (status) {
+            status.textContent = text
+          }
+        }
+
+        const readPersistedHTML = () => {
+          if (!storageKey) {
+            return ''
+          }
+          try {
+            const raw = window.localStorage.getItem(storageKey)
+            if (!raw) {
+              return ''
+            }
+            const payload = JSON.parse(raw)
+            return String(payload?.html || '')
+          } catch (error) {
+            return ''
+          }
+        }
+
+        const cleanupWaiters = () => {
+          if (pollTimer) {
+            window.clearInterval(pollTimer)
+            pollTimer = 0
+          }
+          if (waitTimer) {
+            window.clearTimeout(waitTimer)
+            waitTimer = 0
+          }
+          window.removeEventListener('storage', handleStorage)
+        }
+
+        const restoreNow = () => {
+          const html = readPersistedHTML()
+          if (!html) {
+            return false
+          }
+          restoreSettled = true
+          cleanupWaiters()
+          document.open()
+          document.write(html)
+          document.close()
+          return true
+        }
+
+        const handleStorage = (event) => {
+          if (restoreSettled) {
+            return
+          }
+          if (event && event.key && event.key !== storageKey) {
+            return
+          }
+          restoreNow()
+        }
+
+        window[RESTORE_FUNCTION_NAME] = () => restoreNow()
+
+        if (!storageKey) {
+          setStatus('PDF 预览链接缺少状态参数，请返回工作台重新打开。')
+          return
+        }
+
+        if (restoreNow()) {
+          return
+        }
+
+        setStatus('正在等待 PDF 预览结果...')
+        window.addEventListener('storage', handleStorage)
+        pollTimer = window.setInterval(() => {
+          restoreNow()
+        }, POLL_INTERVAL_MS)
+        waitTimer = window.setTimeout(() => {
+          if (restoreSettled) {
+            return
+          }
+          cleanupWaiters()
+          setStatus('PDF 预览不存在或已过期，请返回工作台重新打开。')
+        }, WAIT_TIMEOUT_MS)
+      })()
+    </script>
+  </body>
+</html>

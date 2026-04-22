@@ -1,6 +1,11 @@
 import { appDefinitions } from './appRegistry.mjs'
 import { printTemplateStats } from './printTemplates.mjs'
 import {
+  PRINT_WORKSPACE_ENTRY_SOURCE,
+  PROCESSING_CONTRACT_TEMPLATE_KEY,
+  buildPrintCenterPath,
+} from '../utils/printWorkspace.js'
+import {
   helpCenterNavItems,
   plannedModules,
   sourceReadiness,
@@ -58,7 +63,12 @@ export const TASK_STATUS_META = Object.freeze({
 const modulePathRegistry = Object.freeze({
   'customer-style': '/erp/docs/field-linkage-guide',
   'bom-materials': '/erp/docs/field-linkage-guide',
-  'processing-contract': '/erp/print-center',
+  'processing-contract': buildPrintCenterPath(
+    PROCESSING_CONTRACT_TEMPLATE_KEY,
+    {
+      entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+    }
+  ),
   'production-schedule': '/erp/docs/operation-flow-overview',
   warehouse: '/erp/docs/operation-flow-overview',
   finance: '/erp/docs/calculation-guide',

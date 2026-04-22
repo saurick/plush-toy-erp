@@ -89,6 +89,22 @@ pnpm test
 pnpm style:l1
 ```
 
+如需按真实管理员登录流程验证采购合同金额编辑链路，再执行：
+
+```bash
+cd /Users/simon/projects/plush-toy-erp/server
+make run
+
+cd /Users/simon/projects/plush-toy-erp/web
+pnpm smoke:purchase-contract-real-login
+```
+
+说明：
+
+- 该烟测会真实打开管理员登录页，使用 `server/configs/dev/config.local.yaml` 或 `config.yaml` 中的管理员账号登录
+- 若本地账号不在配置文件中，可通过环境变量 `REAL_LOGIN_ADMIN_USERNAME` / `REAL_LOGIN_ADMIN_PASSWORD` 覆盖
+- 该烟测会验证：登录成功、采购合同工作台可打开、采购金额可手工修改、改单价后金额会按公式重算、在线 PDF 预览可弹出
+
 `pnpm style:l1` 当前覆盖：
 
 - 根路由到后台登录的重定向

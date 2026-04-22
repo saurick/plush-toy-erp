@@ -46,7 +46,15 @@ test('menuPermissions: 旧帮助路径统一映射到帮助中心四个入口', 
     '/erp/docs/operation-guide'
   )
   assert.equal(
+    resolveMenuPermissionKey('/erp/docs/mobile-roles'),
+    '/erp/docs/mobile-role-guide'
+  )
+  assert.equal(
     resolveMenuPermissionKey('/erp/docs/field-truth'),
     '/erp/docs/field-linkage-guide'
+  )
+  assert.equal(
+    resolveMenuPermissionKey('/erp/docs/print-templates'),
+    '/erp/docs/print-snapshot-guide'
   )
 })

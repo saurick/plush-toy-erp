@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"server/internal/conf"
+	appserver "server/internal/server"
 	"server/pkg/logger"
 	"server/pkg/taskgroup"
 
@@ -278,6 +279,7 @@ func main() {
 	// ===== 4. 初始化后台任务组 =====
 	cleanupTaskGroup := taskgroup.Init()
 	defer cleanupTaskGroup()
+	defer appserver.CleanupTemplatePDFResources()
 
 	// ===== 5. 初始化 OpenTelemetry（带兜底，不会因为没连上 Jaeger 就阻塞） =====
 	tp := initTracerProvider(traceName, traceEndpoint, traceRatio, logger)

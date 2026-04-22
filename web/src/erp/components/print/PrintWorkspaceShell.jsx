@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+
+const PRINT_WORKSPACE_PREPARING_MIN_MS = 280
 
 function normalizeSearchText(value) {
   return String(value ?? '')
@@ -15,9 +17,12 @@ export default function PrintWorkspaceShell({
   fieldRows = [],
   toolbarActions = null,
   formulaPanel = null,
+  prepareSignature = '',
+  preparingText = '正在准备打印模板...',
   children,
 }) {
   const [searchText, setSearchText] = useState('')
+  const [preparing, setPreparing] = useState(true)
 
   const filteredFieldRows = useMemo(() => {
     const normalizedQuery = normalizeSearchText(searchText)
@@ -33,8 +38,62 @@ export default function PrintWorkspaceShell({
     })
   }, [fieldRows, searchText])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      setPreparing(false)
+      return undefined
+    }
+
+    let cancelled = false
+    let timeoutID = 0
+    let firstFrame = 0
+    let secondFrame = 0
+    const startedAt = Date.now()
+
+    setPreparing(true)
+
+    const reveal = () => {
+      if (cancelled) {
+        return
+      }
+      const remainingMs =
+        PRINT_WORKSPACE_PREPARING_MIN_MS - (Date.now() - startedAt)
+      if (remainingMs > 0) {
+        timeoutID = window.setTimeout(() => {
+          if (!cancelled) {
+            setPreparing(false)
+          }
+        }, remainingMs)
+        return
+      }
+      setPreparing(false)
+    }
+
+    firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(reveal)
+    })
+
+    return () => {
+      cancelled = true
+      if (timeoutID) {
+        window.clearTimeout(timeoutID)
+      }
+      if (firstFrame) {
+        window.cancelAnimationFrame(firstFrame)
+      }
+      if (secondFrame) {
+        window.cancelAnimationFrame(secondFrame)
+      }
+    }
+  }, [prepareSignature])
+
   return (
-    <div className="erp-print-shell">
+    <div
+      className={`erp-print-shell ${
+        preparing ? 'erp-print-shell--preparing' : 'erp-print-shell--ready'
+      }`}
+      data-preparing-text={preparingText}
+    >
       <header className="erp-print-shell__toolbar">
         <div className="erp-print-shell__toolbar-copy">
           <strong>{title}</strong>

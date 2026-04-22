@@ -1,14 +1,34 @@
-import React from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
-import { Markdown } from '@/common/components/markdown'
-import HelpCenterDocLinks from '../components/HelpCenterDocLinks'
+import { extractMarkdownHeadings, Markdown } from '@/common/components/markdown'
+import HelpCenterBackToTopButton from '../components/HelpCenterBackToTopButton'
 import PageHero from '../components/PageHero'
 import { docRegistry } from '../config/docs.mjs'
 
 export default function DocumentationPage() {
   const { docKey } = useParams()
   const doc = docRegistry[docKey]
+  const articleRef = useRef(null)
+  const sectionHeadings = useMemo(
+    () => extractMarkdownHeadings(doc?.source || '', [2]),
+    [doc?.source]
+  )
+
+  useEffect(() => {
+    if (!articleRef.current || !sectionHeadings.length) {
+      return
+    }
+
+    const headingNodes = articleRef.current.querySelectorAll('h2')
+    headingNodes.forEach((node, index) => {
+      const heading = sectionHeadings[index]
+      if (!heading) {
+        return
+      }
+      node.id = heading.id
+    })
+  }, [docKey, sectionHeadings])
 
   if (!doc) {
     return (
@@ -49,13 +69,30 @@ export default function DocumentationPage() {
         }
       />
 
-      <HelpCenterDocLinks currentPath={`/erp/docs/${docKey}`} />
+      {sectionHeadings.length ? (
+        <div className="erp-help-doc-links erp-help-doc-links--sections">
+          {sectionHeadings.map((heading) => (
+            <a
+              key={heading.id}
+              className="erp-secondary-button erp-help-doc-links__section-button"
+              href={`#${heading.id}`}
+            >
+              {heading.title}
+            </a>
+          ))}
+        </div>
+      ) : null}
 
       <SurfacePanel className="p-5 sm:p-6">
-        <div className="erp-docs-article prose max-w-none prose-headings:tracking-tight">
+        <div
+          ref={articleRef}
+          className="erp-docs-article prose max-w-none prose-headings:tracking-tight"
+        >
           <Markdown source={doc.source} />
         </div>
       </SurfacePanel>
+
+      <HelpCenterBackToTopButton />
     </div>
   )
 }

@@ -5,15 +5,36 @@ import dataModelDoc from '../docs/data-model.md?raw'
 import importMappingDoc from '../docs/import-mapping.md?raw'
 import mobileRolesDoc from '../docs/mobile-roles.md?raw'
 import operationGuideDoc from '../docs/operation-guide.md?raw'
+import roleCollaborationGuideDoc from '../docs/role-collaboration-guide.md?raw'
+import desktopRoleGuideDoc from '../docs/desktop-role-guide.md?raw'
+import mobileRoleGuideDoc from '../docs/mobile-role-guide.md?raw'
 import fieldLinkageGuideDoc from '../docs/field-linkage-guide.md?raw'
 import calculationGuideDoc from '../docs/calculation-guide.md?raw'
+import printSnapshotGuideDoc from '../docs/print-snapshot-guide.md?raw'
+import exceptionHandlingGuideDoc from '../docs/exception-handling-guide.md?raw'
+import currentBoundariesDoc from '../docs/current-boundaries.md?raw'
 import printTemplatesDoc from '../docs/print-templates.md?raw'
 
 export const docRegistry = {
   'operation-guide': {
     title: 'ERP 操作教程',
-    summary: '说明桌面后台入口、移动端端口访问方式，以及当前帮助与打印主路径。',
+    summary: '说明总后台、角色剪裁后台、手机端任务端和帮助中心的使用方式。',
     source: operationGuideDoc,
+  },
+  'role-collaboration-guide': {
+    title: '角色协同链路',
+    summary: '按主链路和支线整理角色之间的交接、触发、反馈和异常回退关系。',
+    source: roleCollaborationGuideDoc,
+  },
+  'desktop-role-guide': {
+    title: '桌面端角色流程',
+    summary: '只收口老板、业务、PMC、生产经理四类桌面端角色的主链路和子链路。',
+    source: desktopRoleGuideDoc,
+  },
+  'mobile-role-guide': {
+    title: '手机端角色流程',
+    summary: '按任务分配、任务处理和处理反馈整理八类手机端角色的协同口径。',
+    source: mobileRoleGuideDoc,
   },
   'field-linkage-guide': {
     title: 'ERP 字段联动口径',
@@ -24,6 +45,21 @@ export const docRegistry = {
     title: 'ERP 计算口径',
     summary: '统一数量、金额、日期、派生字段和打印快照的当前口径。',
     source: calculationGuideDoc,
+  },
+  'print-snapshot-guide': {
+    title: '打印 / 合同 / 快照口径',
+    summary: '把采购合同、加工合同、打印冻结字段和历史快照边界单独收口。',
+    source: printSnapshotGuideDoc,
+  },
+  'exception-handling-guide': {
+    title: '异常 / 返工 / 延期处理',
+    summary: '统一异常类型、触发入口、处理人、回退规则和关闭条件。',
+    source: exceptionHandlingGuideDoc,
+  },
+  'current-boundaries': {
+    title: '当前明确不做',
+    summary: '把 deferred 能力、未落地边界和校对中的角色拆分单独说明。',
+    source: currentBoundariesDoc,
   },
   'system-init': {
     title: '系统初始化说明',

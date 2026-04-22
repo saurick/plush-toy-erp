@@ -1,3 +1,23 @@
+import {
+  applyTableCellMerge,
+  cloneDetailCellMerges,
+  findMergeAtCell,
+  findRowMergeAtLine,
+  isCellInsideSelection,
+  isMergeTopLeftCell,
+  normalizeCellSelection,
+  shiftMergesAfterDelete,
+  shiftMergesAfterInsert,
+  splitTableCellMerge,
+} from './detailCellMerge.mjs'
+
+export {
+  findMergeAtCell,
+  isCellInsideSelection,
+  isMergeTopLeftCell,
+  normalizeCellSelection,
+} from './detailCellMerge.mjs'
+
 const MATERIAL_DETAIL_COLUMNS = [
   { key: 'contractNo', label: '采购订单号', editable: true },
   { key: 'productOrderNo', label: '产品订单编号', editable: true },
@@ -9,7 +29,7 @@ const MATERIAL_DETAIL_COLUMNS = [
   { key: 'unit', label: '单位', editable: true },
   { key: 'unitPrice', label: '单价', editable: true, numeric: true },
   { key: 'quantity', label: '采购数量', editable: true, numeric: true },
-  { key: 'amount', label: '采购金额', editable: false, numeric: true },
+  { key: 'amount', label: '采购金额', editable: true, numeric: true },
   { key: 'remark', label: '备注', editable: true, multiline: true },
 ]
 
@@ -46,6 +66,19 @@ const cloneLine = (line = {}) =>
     return output
   }, {})
 
+const resolveAmountModeForColumn = (
+  columnKey,
+  { amountInputPhase = 'commit' } = {}
+) => {
+  if (columnKey === 'amount') {
+    return amountInputPhase === 'input' ? 'manual-draft' : 'manual'
+  }
+  if (columnKey === 'quantity' || columnKey === 'unitPrice') {
+    return 'recompute'
+  }
+  return 'auto'
+}
+
 const parseNumeric = (raw) => {
   const text = String(raw ?? '')
     .trim()
@@ -72,6 +105,59 @@ const formatAmountNumber = (numeric) => {
   return numeric.toFixed(2)
 }
 
+const sanitizePositiveDecimalText = (
+  raw,
+  { fractionDigits = 2, preserveTrailingDot = false } = {}
+) => {
+  const source = String(raw ?? '')
+  let normalized = ''
+  let hasDot = false
+
+  for (const char of source) {
+    if (/\d/.test(char)) {
+      normalized += char
+      continue
+    }
+    if (char === '.' && !hasDot) {
+      if (!normalized) {
+        normalized = '0'
+      }
+      normalized += '.'
+      hasDot = true
+    }
+  }
+
+  if (!normalized) {
+    return ''
+  }
+
+  const endsWithDot = normalized.endsWith('.')
+  const [rawInteger = '', rawFraction = ''] = normalized.split('.')
+  const integer = rawInteger.replace(/^0+(?=\d)/, '') || '0'
+  const fraction = rawFraction.slice(0, Math.max(0, fractionDigits))
+
+  if (!hasDot) {
+    return integer
+  }
+  if (fraction || (preserveTrailingDot && endsWithDot)) {
+    return `${integer}.${fraction}`
+  }
+  return integer
+}
+
+const normalizeAmountDraftText = (raw) =>
+  sanitizePositiveDecimalText(raw, {
+    fractionDigits: 2,
+    preserveTrailingDot: true,
+  })
+
+const normalizeAmountText = (raw) => {
+  const sanitized = sanitizePositiveDecimalText(raw, {
+    fractionDigits: 2,
+  })
+  return formatAmountNumber(parseNumeric(sanitized))
+}
+
 const computeAmountText = (quantity, unitPrice) => {
   const quantityValue = parseNumeric(quantity)
   const unitPriceValue = parseNumeric(unitPrice)
@@ -81,7 +167,10 @@ const computeAmountText = (quantity, unitPrice) => {
   return formatAmountNumber(quantityValue * unitPriceValue)
 }
 
-export const normalizeMaterialPurchaseLine = (line = {}) => {
+export const normalizeMaterialPurchaseLine = (
+  line = {},
+  { amountMode = 'auto' } = {}
+) => {
   const normalized = cloneLine(line)
   normalized.unitPrice = formatTrimmedNumber(
     parseNumeric(normalized.unitPrice),
@@ -91,22 +180,33 @@ export const normalizeMaterialPurchaseLine = (line = {}) => {
     parseNumeric(normalized.quantity),
     3
   )
-  normalized.amount = computeAmountText(
+  const computedAmount = computeAmountText(
     normalized.quantity,
     normalized.unitPrice
   )
+  const draftAmount = normalizeAmountDraftText(normalized.amount)
+  const explicitAmount = normalizeAmountText(normalized.amount)
+  if (amountMode === 'manual-draft') {
+    normalized.amount = draftAmount
+  } else if (amountMode === 'manual') {
+    normalized.amount = explicitAmount
+  } else if (amountMode === 'recompute') {
+    normalized.amount = computedAmount
+  } else {
+    normalized.amount = explicitAmount || computedAmount
+  }
   return normalized
 }
 
-const buildLineSeedFromBase = (baseLine = {}) => ({
-  contractNo: toText(baseLine.contractNo),
-  productOrderNo: toText(baseLine.productOrderNo),
-  productNo: toText(baseLine.productNo),
-  productName: toText(baseLine.productName),
+const createEmptyMaterialPurchaseLine = () => ({
+  contractNo: '',
+  productOrderNo: '',
+  productNo: '',
+  productName: '',
   materialName: '',
   vendorCode: '',
   spec: '',
-  unit: toText(baseLine.unit),
+  unit: '',
   unitPrice: '',
   quantity: '',
   amount: '',
@@ -124,20 +224,6 @@ const normalizeClauses = (rawClauses = {}) => ({
     ? rawClauses.settlement.map((item) => toText(item)).filter(Boolean)
     : [...DEFAULT_CLAUSES.settlement],
 })
-
-const normalizeMerge = (merge = {}) => ({
-  id: String(
-    merge.id ||
-      `merge_${merge.rowStart}_${merge.rowEnd}_${merge.colStart}_${merge.colEnd}`
-  ),
-  rowStart: Number(merge.rowStart) || 0,
-  rowEnd: Number(merge.rowEnd) || 0,
-  colStart: Number(merge.colStart) || 0,
-  colEnd: Number(merge.colEnd) || 0,
-})
-
-const cloneMerges = (merges = []) =>
-  (Array.isArray(merges) ? merges : []).map((merge) => normalizeMerge(merge))
 
 export const buildMaterialPurchaseContractDraft = (sample = {}) => {
   const normalizedLines = Array.isArray(sample?.lines)
@@ -163,13 +249,13 @@ export const buildMaterialPurchaseContractDraft = (sample = {}) => {
     lines:
       normalizedLines.length > 0
         ? normalizedLines
-        : [normalizeMaterialPurchaseLine(buildLineSeedFromBase(sample))],
+        : [normalizeMaterialPurchaseLine(createEmptyMaterialPurchaseLine())],
     clauses: normalizeClauses(sample.clauses),
     buyerStampVisible:
       typeof sample?.buyerStampVisible === 'boolean'
         ? sample.buyerStampVisible
         : false,
-    merges: cloneMerges(sample.merges),
+    merges: cloneDetailCellMerges(sample.merges),
   }
 }
 
@@ -202,7 +288,8 @@ export const updateMaterialPurchaseLineCell = (
   lines,
   rowIndex,
   columnKey,
-  rawValue
+  rawValue,
+  options = {}
 ) =>
   (Array.isArray(lines) ? lines : []).map((line, index) => {
     if (index !== rowIndex) {
@@ -212,7 +299,9 @@ export const updateMaterialPurchaseLineCell = (
       ...cloneLine(line),
       [columnKey]: String(rawValue ?? '').replaceAll('\r', ''),
     }
-    return normalizeMaterialPurchaseLine(nextLine)
+    return normalizeMaterialPurchaseLine(nextLine, {
+      amountMode: resolveAmountModeForColumn(columnKey, options),
+    })
   })
 
 export const updateMaterialPurchaseField = (draft, fieldKey, rawValue) => ({
@@ -239,150 +328,18 @@ export const updateMaterialPurchaseClause = (
   return safeClauses
 }
 
-export const normalizeCellSelection = (anchorCell, focusCell = anchorCell) => {
-  if (!anchorCell || !focusCell) {
-    return null
-  }
-  const rowStart = Math.min(anchorCell.rowIndex, focusCell.rowIndex)
-  const rowEnd = Math.max(anchorCell.rowIndex, focusCell.rowIndex)
-  const colStart = Math.min(anchorCell.colIndex, focusCell.colIndex)
-  const colEnd = Math.max(anchorCell.colIndex, focusCell.colIndex)
-  return { rowStart, rowEnd, colStart, colEnd }
-}
-
-export const isCellInsideSelection = (selection, rowIndex, colIndex) => {
-  if (!selection) {
-    return false
-  }
-  return (
-    rowIndex >= selection.rowStart &&
-    rowIndex <= selection.rowEnd &&
-    colIndex >= selection.colStart &&
-    colIndex <= selection.colEnd
-  )
-}
-
-export const findMergeAtCell = (merges, rowIndex, colIndex) =>
-  (Array.isArray(merges) ? merges : []).find(
-    (merge) =>
-      rowIndex >= merge.rowStart &&
-      rowIndex <= merge.rowEnd &&
-      colIndex >= merge.colStart &&
-      colIndex <= merge.colEnd
-  ) || null
-
-export const isMergeTopLeftCell = (merge, rowIndex, colIndex) =>
-  Boolean(merge) && merge.rowStart === rowIndex && merge.colStart === colIndex
-
-const rangesOverlap = (left, right) =>
-  left.rowStart <= right.rowEnd &&
-  left.rowEnd >= right.rowStart &&
-  left.colStart <= right.colEnd &&
-  left.colEnd >= right.colStart
-
-export const applyDetailCellMerge = ({
-  lines = [],
-  merges = [],
-  selection,
-}) => {
-  if (!selection) {
-    return {
-      ok: false,
-      message: '请先点“选择单元格”，再在表格里选中要合并的矩形区域。',
-    }
-  }
-  if (
-    selection.rowStart === selection.rowEnd &&
-    selection.colStart === selection.colEnd
-  ) {
-    return { ok: false, message: '至少选择 2 个单元格后才能合并。' }
-  }
-  const conflict = merges.find((merge) => rangesOverlap(merge, selection))
-  if (conflict) {
-    return {
-      ok: false,
-      message: '当前选区已命中合并单元格，请先拆分当前后再重新选择。',
-    }
-  }
-
-  const nextLines = (Array.isArray(lines) ? lines : []).map((line) =>
-    cloneLine(line)
-  )
-  for (
-    let rowIndex = selection.rowStart;
-    rowIndex <= selection.rowEnd;
-    rowIndex += 1
-  ) {
-    for (
-      let colIndex = selection.colStart;
-      colIndex <= selection.colEnd;
-      colIndex += 1
-    ) {
-      if (rowIndex === selection.rowStart && colIndex === selection.colStart) {
-        continue
-      }
-      const fieldKey = DETAIL_COLUMN_KEYS[colIndex]
-      if (fieldKey) {
-        nextLines[rowIndex][fieldKey] = ''
-      }
-    }
-    nextLines[rowIndex] = normalizeMaterialPurchaseLine(nextLines[rowIndex])
-  }
-
-  const nextMerge = normalizeMerge({
-    ...selection,
-    id: `merge_${Date.now()}_${selection.rowStart}_${selection.colStart}`,
+export const applyDetailCellMerge = ({ lines = [], merges = [], selection }) =>
+  applyTableCellMerge({
+    lines,
+    merges,
+    selection,
+    columnKeys: DETAIL_COLUMN_KEYS,
+    cloneLine,
+    normalizeLine: normalizeMaterialPurchaseLine,
   })
 
-  return {
-    ok: true,
-    lines: nextLines,
-    merges: [...cloneMerges(merges), nextMerge],
-    message: '已合并选区，按 Excel 规则仅保留左上角内容。',
-  }
-}
-
-export const splitDetailCellMerge = ({ merges, rowIndex, colIndex }) => {
-  const targetMerge = findMergeAtCell(merges, rowIndex, colIndex)
-  if (!targetMerge) {
-    return { ok: false, message: '当前单元格没有命中已合并区域。' }
-  }
-  return {
-    ok: true,
-    merges: cloneMerges(merges).filter((merge) => merge.id !== targetMerge.id),
-    message: '已拆分当前合并单元格。',
-  }
-}
-
-const shiftMergesAfterInsert = (merges, insertIndex) =>
-  cloneMerges(merges).map((merge) => {
-    if (merge.rowStart >= insertIndex) {
-      return {
-        ...merge,
-        rowStart: merge.rowStart + 1,
-        rowEnd: merge.rowEnd + 1,
-      }
-    }
-    if (merge.rowStart < insertIndex && merge.rowEnd >= insertIndex) {
-      return { ...merge, rowEnd: merge.rowEnd + 1 }
-    }
-    return merge
-  })
-
-const shiftMergesAfterDelete = (merges, deleteStart, deleteEnd) =>
-  cloneMerges(merges)
-    .filter((merge) => merge.rowEnd < deleteStart || merge.rowStart > deleteEnd)
-    .map((merge) => {
-      if (merge.rowStart > deleteEnd) {
-        const offset = deleteEnd - deleteStart + 1
-        return {
-          ...merge,
-          rowStart: merge.rowStart - offset,
-          rowEnd: merge.rowEnd - offset,
-        }
-      }
-      return merge
-    })
+export const splitDetailCellMerge = ({ merges, rowIndex, colIndex }) =>
+  splitTableCellMerge({ merges, rowIndex, colIndex })
 
 export const insertMaterialPurchaseLine = ({
   lines = [],
@@ -404,13 +361,7 @@ export const insertMaterialPurchaseLine = ({
     }
   }
 
-  const targetMerge =
-    cloneMerges(merges).find(
-      (merge) =>
-        selectedRowIndex >= merge.rowStart &&
-        selectedRowIndex <= merge.rowEnd &&
-        merge.rowEnd > merge.rowStart
-    ) || null
+  const targetMerge = findRowMergeAtLine(merges, selectedRowIndex)
   const insertIndex =
     position === 'before'
       ? targetMerge
@@ -420,13 +371,8 @@ export const insertMaterialPurchaseLine = ({
         ? targetMerge.rowEnd + 1
         : selectedRowIndex + 1
 
-  const seedIndex =
-    position === 'before'
-      ? Math.max(0, insertIndex)
-      : Math.max(0, insertIndex - 1)
-  const baseLine = safeLines[seedIndex] || safeLines[selectedRowIndex] || {}
   const nextLine = normalizeMaterialPurchaseLine(
-    buildLineSeedFromBase(baseLine)
+    createEmptyMaterialPurchaseLine()
   )
   const nextLines = [...safeLines]
   nextLines.splice(insertIndex, 0, nextLine)
@@ -453,30 +399,19 @@ export const deleteMaterialPurchaseLine = ({
     }
   }
 
-  const rowMerge = cloneMerges(merges).find(
-    (merge) =>
-      selectedRowIndex >= merge.rowStart &&
-      selectedRowIndex <= merge.rowEnd &&
-      merge.rowEnd > merge.rowStart
-  )
+  const rowMerge = findRowMergeAtLine(merges, selectedRowIndex)
   const deleteStart = rowMerge ? rowMerge.rowStart : selectedRowIndex
   const deleteEnd = rowMerge ? rowMerge.rowEnd : selectedRowIndex
   const nextLines = safeLines.filter(
     (_, index) => index < deleteStart || index > deleteEnd
   )
 
-  const fallbackLine =
-    nextLines[deleteStart - 1] ||
-    safeLines[selectedRowIndex] ||
-    safeLines[0] ||
-    {}
-
   return {
     ok: true,
     lines:
       nextLines.length > 0
         ? nextLines
-        : [normalizeMaterialPurchaseLine(buildLineSeedFromBase(fallbackLine))],
+        : [normalizeMaterialPurchaseLine(createEmptyMaterialPurchaseLine())],
     merges: shiftMergesAfterDelete(merges, deleteStart, deleteEnd),
     selectedRowIndex:
       nextLines.length === 0 ? 0 : Math.min(deleteStart, nextLines.length - 1),

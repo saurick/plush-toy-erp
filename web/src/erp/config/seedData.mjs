@@ -1466,8 +1466,28 @@ const navItemRegistry = {
     label: 'ERP 操作教程',
     path: '/erp/docs/operation-guide',
     shortLabel: '教程',
-    description:
-      '先看桌面后台怎么进入、移动端怎么访问，以及当前打印入口怎么用。',
+    description: '先看总后台、角色后台、手机端任务端和帮助中心该怎么用。',
+  },
+  'help-role-collaboration-guide': {
+    key: 'help-role-collaboration-guide',
+    label: '角色协同链路',
+    path: '/erp/docs/role-collaboration-guide',
+    shortLabel: '协同',
+    description: '查看角色之间怎么交接、怎么回退、主链路和子链路怎么分。',
+  },
+  'help-desktop-role-guide': {
+    key: 'help-desktop-role-guide',
+    label: '桌面端角色流程',
+    path: '/erp/docs/desktop-role-guide',
+    shortLabel: '桌面',
+    description: '只收口老板、业务、PMC、生产经理四类桌面端角色流程。',
+  },
+  'help-mobile-role-guide': {
+    key: 'help-mobile-role-guide',
+    label: '手机端角色流程',
+    path: '/erp/docs/mobile-role-guide',
+    shortLabel: '手机',
+    description: '按任务分配、任务处理和处理反馈整理手机端角色的流程切片。',
   },
   'help-field-linkage-guide': {
     key: 'help-field-linkage-guide',
@@ -1483,12 +1503,33 @@ const navItemRegistry = {
     shortLabel: '口径',
     description: '查看数量、金额、日期和打印快照字段的统一口径。',
   },
+  'help-print-snapshot-guide': {
+    key: 'help-print-snapshot-guide',
+    label: '打印 / 合同 / 快照口径',
+    path: '/erp/docs/print-snapshot-guide',
+    shortLabel: '打印',
+    description: '查看采购合同、加工合同、打印冻结字段和历史快照边界。',
+  },
+  'help-exception-handling-guide': {
+    key: 'help-exception-handling-guide',
+    label: '异常 / 返工 / 延期处理',
+    path: '/erp/docs/exception-handling-guide',
+    shortLabel: '异常',
+    description: '查看异常从谁发起、谁处理、回退到哪一层、怎么关闭。',
+  },
+  'help-current-boundaries': {
+    key: 'help-current-boundaries',
+    label: '当前明确不做',
+    path: '/erp/docs/current-boundaries',
+    shortLabel: '边界',
+    description: '把 deferred 能力、未落地边界和校对中的角色拆分单独说明。',
+  },
   'help-center': {
     key: 'help-center',
     label: '帮助中心首页',
     path: '/erp/help-center',
     shortLabel: '帮助',
-    description: '旧帮助中心入口，当前统一跳转到 ERP 操作教程。',
+    description: '旧帮助中心入口，当前统一跳转到 ERP 流程图总览。',
   },
   'doc-system-init': {
     key: 'doc-system-init',
@@ -1568,8 +1609,14 @@ const documentationNavKeys = [
 const helpCenterNavKeys = [
   'help-operation-flow-overview',
   'help-operation-guide',
+  'help-role-collaboration-guide',
+  'help-desktop-role-guide',
+  'help-mobile-role-guide',
   'help-field-linkage-guide',
   'help-calculation-guide',
+  'help-print-snapshot-guide',
+  'help-exception-handling-guide',
+  'help-current-boundaries',
 ]
 
 export const documentationCards = documentationNavKeys.map((navKey) => {
@@ -1614,7 +1661,7 @@ export function getNavigationSections() {
 export function getMobileDockItems() {
   return [
     navItemRegistry['help-operation-flow-overview'],
-    navItemRegistry['help-operation-guide'],
+    navItemRegistry['help-mobile-role-guide'],
     navItemRegistry['print-center'],
   ].filter(Boolean)
 }

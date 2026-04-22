@@ -2,8 +2,15 @@ import React from 'react'
 import {
   calculateProcessingContractTotals,
   padProcessingContractLines,
+  processingContractAttachmentSlots,
+  PROCESSING_CONTRACT_TABLE_COLUMNS,
   resolveProcessingLineAmount,
 } from '../../data/processingContractTemplate.mjs'
+import {
+  findMergeAtCell,
+  isCellInsideSelection,
+  isMergeTopLeftCell,
+} from '../../utils/detailCellMerge.mjs'
 
 function normalizeEditableText(value, multiline = false) {
   const rawText = String(value ?? '')
@@ -21,8 +28,12 @@ function EditableText({
   className,
   multiline = false,
   onCommit,
+  disabled = false,
 }) {
   const handleBlur = (event) => {
+    if (disabled) {
+      return
+    }
     if (typeof onCommit === 'function') {
       onCommit(normalizeEditableText(event.currentTarget.innerText, multiline))
     }
@@ -30,8 +41,8 @@ function EditableText({
 
   return (
     <Component
-      className={className}
-      contentEditable
+      className={`${className}${disabled ? ' erp-processing-contract-editable--disabled' : ''}`}
+      contentEditable={!disabled}
       suppressContentEditableWarning
       spellCheck={false}
       onBlur={handleBlur}
@@ -41,7 +52,7 @@ function EditableText({
   )
 }
 
-function ContractMetaRow({ label, value, onCommit }) {
+function ContractMetaRow({ label, value, onCommit, disabled = false }) {
   return (
     <div className="erp-processing-contract-meta__row">
       <span className="erp-processing-contract-meta__label">{label}</span>
@@ -49,6 +60,7 @@ function ContractMetaRow({ label, value, onCommit }) {
         value={value}
         className="erp-processing-contract-meta__value"
         onCommit={onCommit}
+        disabled={disabled}
       />
     </div>
   )
@@ -60,8 +72,9 @@ function ContractTableCell({
   multiline = false,
   onCommit,
   readOnly = false,
+  disabled = false,
 }) {
-  if (readOnly) {
+  if (readOnly || disabled) {
     return <span className={className}>{value || '\u00A0'}</span>
   }
 
@@ -71,24 +84,38 @@ function ContractTableCell({
       className={className}
       multiline={multiline}
       onCommit={onCommit}
+      disabled={disabled}
     />
   )
 }
 
 export default function ProcessingContractPaper({
+  paperRef = null,
   contract,
+  attachments = {},
   selectedLineIndex = null,
   lineSelectionMode = false,
+  cellSelectionMode = false,
+  mergeSelection = null,
+  activeCell = null,
   onSelectLine,
+  onSelectCell,
   onFieldChange,
   onLineFieldChange,
   onClauseChange,
 }) {
   const printableLines = padProcessingContractLines(contract?.lines)
   const totals = calculateProcessingContractTotals(contract?.lines || [])
+  const templateModesActive = lineSelectionMode || cellSelectionMode
+  const uploadedAttachments = processingContractAttachmentSlots
+    .map((slot) => ({
+      slot,
+      snapshot: attachments?.[slot.key],
+    }))
+    .filter(({ snapshot }) => Boolean(snapshot?.dataURL))
 
   return (
-    <div className="erp-processing-contract-paper">
+    <div className="erp-processing-contract-paper" ref={paperRef}>
       <header className="erp-processing-contract-paper__header">
         <div className="erp-processing-contract-paper__title">加工合同</div>
       </header>
@@ -99,26 +126,31 @@ export default function ProcessingContractPaper({
             label="合同编号："
             value={contract.contractNo}
             onCommit={(value) => onFieldChange('contractNo', value)}
+            disabled={templateModesActive}
           />
           <ContractMetaRow
             label="加工方名称："
             value={contract.supplierName}
             onCommit={(value) => onFieldChange('supplierName', value)}
+            disabled={templateModesActive}
           />
           <ContractMetaRow
             label="联系人："
             value={contract.supplierContact}
             onCommit={(value) => onFieldChange('supplierContact', value)}
+            disabled={templateModesActive}
           />
           <ContractMetaRow
             label="联系电话："
             value={contract.supplierPhone}
             onCommit={(value) => onFieldChange('supplierPhone', value)}
+            disabled={templateModesActive}
           />
           <ContractMetaRow
             label="供应商地址："
             value={contract.supplierAddress}
             onCommit={(value) => onFieldChange('supplierAddress', value)}
+            disabled={templateModesActive}
           />
         </div>
 
@@ -128,32 +160,38 @@ export default function ProcessingContractPaper({
               label="下单日期："
               value={contract.orderDateText}
               onCommit={(value) => onFieldChange('orderDateText', value)}
+              disabled={templateModesActive}
             />
             <ContractMetaRow
               label="回货日期："
               value={contract.returnDateText}
               onCommit={(value) => onFieldChange('returnDateText', value)}
+              disabled={templateModesActive}
             />
           </div>
           <ContractMetaRow
             label="委托单位："
             value={contract.buyerCompany}
             onCommit={(value) => onFieldChange('buyerCompany', value)}
+            disabled={templateModesActive}
           />
           <ContractMetaRow
             label="委托人："
             value={contract.buyerContact}
             onCommit={(value) => onFieldChange('buyerContact', value)}
+            disabled={templateModesActive}
           />
           <ContractMetaRow
             label="联系电话："
             value={contract.buyerPhone}
             onCommit={(value) => onFieldChange('buyerPhone', value)}
+            disabled={templateModesActive}
           />
           <ContractMetaRow
             label="公司地址："
             value={contract.buyerAddress}
             onCommit={(value) => onFieldChange('buyerAddress', value)}
+            disabled={templateModesActive}
           />
         </div>
       </section>
@@ -192,6 +230,7 @@ export default function ProcessingContractPaper({
         <tbody>
           {printableLines.map((line, index) => {
             const isSelected = selectedLineIndex === index
+            const isPlaceholderLine = index >= (contract?.lines?.length || 0)
             return (
               <tr
                 key={`line-${index}`}
@@ -200,121 +239,85 @@ export default function ProcessingContractPaper({
                     ? 'erp-processing-contract-table__row--selected'
                     : ''
                 }
-                onClick={() => {
-                  if (lineSelectionMode) {
+                onMouseDown={() => {
+                  if (lineSelectionMode && !isPlaceholderLine) {
                     onSelectLine(index)
                   }
                 }}
               >
-                <td>
-                  <ContractTableCell
-                    value={line.contractNo}
-                    className="erp-processing-contract-table__cell"
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'contractNo', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.productOrderNo}
-                    className="erp-processing-contract-table__cell"
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'productOrderNo', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.productNo}
-                    className="erp-processing-contract-table__cell"
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'productNo', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.productName}
-                    className="erp-processing-contract-table__cell erp-processing-contract-table__cell--multiline"
-                    multiline
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'productName', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.processName}
-                    className="erp-processing-contract-table__cell erp-processing-contract-table__cell--multiline"
-                    multiline
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'processName', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.supplierAlias}
-                    className="erp-processing-contract-table__cell"
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'supplierAlias', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.processCategory}
-                    className="erp-processing-contract-table__cell"
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'processCategory', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.unit}
-                    className="erp-processing-contract-table__cell"
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'unit', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.unitPrice}
-                    className="erp-processing-contract-table__cell"
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'unitPrice', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.quantity}
-                    className="erp-processing-contract-table__cell"
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'quantity', value)
-                    }
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={resolveProcessingLineAmount(line)}
-                    className="erp-processing-contract-table__cell"
-                    readOnly
-                  />
-                </td>
-                <td>
-                  <ContractTableCell
-                    value={line.remark}
-                    className="erp-processing-contract-table__cell erp-processing-contract-table__cell--multiline"
-                    multiline
-                    onCommit={(value) =>
-                      onLineFieldChange(index, 'remark', value)
-                    }
-                  />
-                </td>
+                {PROCESSING_CONTRACT_TABLE_COLUMNS.map((column, colIndex) => {
+                  const merge = findMergeAtCell(
+                    contract.merges,
+                    index,
+                    colIndex
+                  )
+                  if (merge && !isMergeTopLeftCell(merge, index, colIndex)) {
+                    return null
+                  }
+
+                  const isSelectionAnchor =
+                    activeCell?.rowIndex === index &&
+                    activeCell?.colIndex === colIndex
+                  const isSelectedCell = isCellInsideSelection(
+                    mergeSelection,
+                    index,
+                    colIndex
+                  )
+                  const value =
+                    column.key === 'amount'
+                      ? resolveProcessingLineAmount(line)
+                      : line[column.fieldKey]
+
+                  return (
+                    <td
+                      key={`${column.key}-${index}`}
+                      rowSpan={
+                        merge ? merge.rowEnd - merge.rowStart + 1 : undefined
+                      }
+                      colSpan={
+                        merge ? merge.colEnd - merge.colStart + 1 : undefined
+                      }
+                      className={[
+                        merge
+                          ? 'erp-processing-contract-table__cell-merged'
+                          : '',
+                        isSelectedCell
+                          ? 'erp-processing-contract-table__cell-selected'
+                          : '',
+                        isSelectionAnchor
+                          ? 'erp-processing-contract-table__cell-selected-anchor'
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      onMouseDown={(event) => {
+                        if (!cellSelectionMode || isPlaceholderLine) {
+                          return
+                        }
+                        event.preventDefault()
+                        event.stopPropagation()
+                        onSelectCell(index, colIndex)
+                      }}
+                    >
+                      <ContractTableCell
+                        value={value}
+                        className={`erp-processing-contract-table__cell${
+                          column.multiline
+                            ? ' erp-processing-contract-table__cell--multiline'
+                            : ''
+                        }`}
+                        multiline={column.multiline}
+                        onCommit={(value) =>
+                          column.fieldKey
+                            ? onLineFieldChange(index, column.fieldKey, value)
+                            : undefined
+                        }
+                        readOnly={column.readOnly}
+                        disabled={templateModesActive || isPlaceholderLine}
+                      />
+                    </td>
+                  )
+                })}
               </tr>
             )
           })}
@@ -349,6 +352,7 @@ export default function ProcessingContractPaper({
                   value={item}
                   className="erp-processing-contract-clauses__editable"
                   multiline
+                  disabled={templateModesActive}
                   onCommit={(value) => onClauseChange('delivery', index, value)}
                 />
               </li>
@@ -373,6 +377,7 @@ export default function ProcessingContractPaper({
                   value={item}
                   className="erp-processing-contract-clauses__editable"
                   multiline
+                  disabled={templateModesActive}
                   onCommit={(value) => onClauseChange('contract', index, value)}
                 />
               </li>
@@ -397,6 +402,7 @@ export default function ProcessingContractPaper({
                   value={item}
                   className="erp-processing-contract-clauses__editable"
                   multiline
+                  disabled={templateModesActive}
                   onCommit={(value) =>
                     onClauseChange('settlement', index, value)
                   }
@@ -415,6 +421,7 @@ export default function ProcessingContractPaper({
           <EditableText
             value={contract.buyerContact}
             className="erp-processing-contract-signature__value"
+            disabled={templateModesActive}
             onCommit={(value) => onFieldChange('buyerContact', value)}
           />
           <div className="erp-processing-contract-signature__date">
@@ -422,6 +429,7 @@ export default function ProcessingContractPaper({
             <EditableText
               value={contract.buyerSignDateText}
               className="erp-processing-contract-signature__date-value"
+              disabled={templateModesActive}
               onCommit={(value) => onFieldChange('buyerSignDateText', value)}
             />
           </div>
@@ -433,6 +441,7 @@ export default function ProcessingContractPaper({
           <EditableText
             value={contract.supplierName}
             className="erp-processing-contract-signature__value"
+            disabled={templateModesActive}
             onCommit={(value) => onFieldChange('supplierName', value)}
           />
           <div className="erp-processing-contract-signature__date">
@@ -440,11 +449,34 @@ export default function ProcessingContractPaper({
             <EditableText
               value={contract.supplierSignDateText}
               className="erp-processing-contract-signature__date-value"
+              disabled={templateModesActive}
               onCommit={(value) => onFieldChange('supplierSignDateText', value)}
             />
           </div>
         </div>
       </section>
+
+      {uploadedAttachments.length > 0 ? (
+        <section className="erp-processing-contract-attachments">
+          {uploadedAttachments.map(({ slot, snapshot }) => (
+            <figure
+              key={slot.key}
+              className={`erp-processing-contract-attachments__item erp-processing-contract-attachments__item--${slot.key}`}
+            >
+              <div className="erp-processing-contract-attachments__frame">
+                <img
+                  className="erp-processing-contract-attachments__image"
+                  src={snapshot.dataURL}
+                  alt={snapshot.name || slot.title}
+                />
+              </div>
+              <figcaption className="erp-processing-contract-attachments__caption">
+                {slot.title}
+              </figcaption>
+            </figure>
+          ))}
+        </section>
+      ) : null}
     </div>
   )
 }

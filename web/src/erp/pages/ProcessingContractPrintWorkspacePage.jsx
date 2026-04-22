@@ -1,43 +1,152 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Navigate, useParams } from 'react-router-dom'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import ProcessingContractPaper from '../components/print/ProcessingContractPaper.jsx'
 import PrintWorkspaceShell from '../components/print/PrintWorkspaceShell.jsx'
 import {
   PROCESSING_CONTRACT_TEMPLATE_KEY,
-  createEmptyProcessingLine,
+  createEmptyProcessingAttachment,
   createProcessingContractDraft,
+  normalizeProcessingContractAttachments,
+  normalizeProcessingLine,
   processingContractAttachmentSlots,
   resolveProcessingLineAmount,
 } from '../data/processingContractTemplate.mjs'
+import {
+  downloadPdfFromElement,
+  openPdfPreviewFromElement,
+} from '../utils/printPdf.mjs'
+import {
+  PROCESSING_CONTRACT_MAX_ROWS,
+  applyProcessingDetailCellMerge,
+  deleteProcessingContractLine,
+  splitProcessingDetailCellMerge,
+  insertProcessingContractLine,
+} from '../utils/processingContractEditor.mjs'
+import {
+  buildPrintWorkspacePath,
+  buildPrintWorkspaceDraftStorageKey,
+  PRINT_WORKSPACE_DRAFT_MODE,
+  resolvePrintWorkspaceEntrySource,
+  resolvePrintWorkspaceStateID,
+  resolvePrintWorkspaceDraftMode,
+} from '../utils/printWorkspace.js'
+import {
+  findMergeAtCell,
+  normalizeCellSelection,
+} from '../utils/detailCellMerge.mjs'
+import {
+  syncPrintPageMarginForPaper,
+  watchPrintPageMarginForPaper,
+} from '../utils/printPageMargin.mjs'
+import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSnapshot.js'
 
 const DRAFT_STORAGE_KEY = '__plush_erp_processing_contract_print_draft__'
-const ATTACHMENT_ACCEPT = 'image/*,.pdf,.svg'
+const ATTACHMENT_ACCEPT = 'image/*,.svg'
 
-function createEmptyAttachmentState() {
-  return processingContractAttachmentSlots.reduce((state, slot) => {
-    state[slot.key] = null
-    return state
-  }, {})
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('读取附件失败，请重新上传'))
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.readAsDataURL(file)
+  })
 }
 
-function loadDraft() {
+function loadImageFromDataURL(dataURL) {
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onerror = () =>
+      reject(new Error('附件图片无法识别，请换一张图片重试'))
+    image.onload = () => resolve(image)
+    image.src = dataURL
+  })
+}
+
+async function createAttachmentSnapshot(file) {
+  const fileName = String(file?.name || '').trim()
+  const fileType = String(file?.type || '').toLowerCase()
+  const isSVG =
+    fileType === 'image/svg+xml' || fileName.toLowerCase().endsWith('.svg')
+
+  if (!isSVG && !fileType.startsWith('image/')) {
+    throw new Error('纸样 / 图样附件当前只支持图片格式')
+  }
+
+  const originalDataURL = await readFileAsDataURL(file)
+  if (isSVG) {
+    return {
+      name: fileName,
+      dataURL: originalDataURL,
+      mimeType: fileType || 'image/svg+xml',
+    }
+  }
+
+  const image = await loadImageFromDataURL(originalDataURL)
+  const maxDimension = 1400
+  const scale = Math.min(
+    1,
+    maxDimension / Math.max(image.naturalWidth || 1, image.naturalHeight || 1)
+  )
+  const width = Math.max(1, Math.round((image.naturalWidth || 1) * scale))
+  const height = Math.max(1, Math.round((image.naturalHeight || 1) * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('浏览器暂不支持当前附件处理能力')
+  }
+
+  // 纸样快照会持久化到草稿并进入服务端 PDF 渲染，这里先压缩到可控尺寸。
+  context.fillStyle = '#ffffff'
+  context.fillRect(0, 0, width, height)
+  context.drawImage(image, 0, 0, width, height)
+
+  return {
+    name: fileName,
+    dataURL: canvas.toDataURL('image/jpeg', 0.86),
+    mimeType: 'image/jpeg',
+  }
+}
+
+function loadDraft({
+  forceFresh = false,
+  storageKey = DRAFT_STORAGE_KEY,
+  fallbackStorageKeys = [],
+} = {}) {
   if (typeof window === 'undefined') {
     return createProcessingContractDraft()
   }
 
+  if (forceFresh) {
+    return createProcessingContractDraft()
+  }
+
   try {
-    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY)
+    const draftStorageKeys = [storageKey, ...fallbackStorageKeys].filter(
+      Boolean
+    )
+    const raw = draftStorageKeys.reduce((matchedDraft, currentKey) => {
+      if (matchedDraft) {
+        return matchedDraft
+      }
+      return window.localStorage.getItem(currentKey) || ''
+    }, '')
     if (!raw) {
       return createProcessingContractDraft()
     }
 
     const parsed = JSON.parse(raw)
-    const { attachments: _legacyAttachments, ...rest } = parsed || {}
+    const { attachments, lines, ...rest } = parsed || {}
     return {
       ...createProcessingContractDraft(),
       ...rest,
+      lines: Array.isArray(lines)
+        ? lines.map((line) => normalizeProcessingLine(line))
+        : createProcessingContractDraft().lines,
+      attachments: normalizeProcessingContractAttachments(attachments),
     }
   } catch (error) {
     return createProcessingContractDraft()
@@ -54,80 +163,137 @@ function formatExportFileName() {
   return `processing-contract_${stamp}.pdf`
 }
 
-async function getHtml2Pdf() {
-  const moduleRef = await import('html2pdf.js')
-  return moduleRef.default || moduleRef
-}
-
-function buildExportNode(sourceNode) {
-  const clone = sourceNode.cloneNode(true)
-  clone.classList.add('erp-processing-contract-paper--export')
-  clone
-    .querySelectorAll('.erp-processing-contract-table__row--selected')
-    .forEach((element) => {
-      element.classList.remove('erp-processing-contract-table__row--selected')
-    })
-  return clone
-}
-
-async function createPdfBlob(sourceNode) {
-  const html2pdf = await getHtml2Pdf()
-  const sandbox = document.createElement('div')
-  sandbox.className = 'erp-processing-contract-export-sandbox'
-  const exportNode = buildExportNode(sourceNode)
-  sandbox.appendChild(exportNode)
-  document.body.appendChild(sandbox)
-
-  try {
-    const worker = html2pdf()
-      .set({
-        margin: 0,
-        filename: formatExportFileName(),
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-        },
-        jsPDF: {
-          unit: 'mm',
-          format: 'a4',
-          orientation: 'portrait',
-        },
-        pagebreak: { mode: ['css', 'legacy'] },
-      })
-      .from(exportNode)
-
-    const pdf = await worker.toPdf().get('pdf')
-    return pdf.output('blob')
-  } finally {
-    document.body.removeChild(sandbox)
-  }
-}
-
 export default function ProcessingContractPrintWorkspacePage() {
   const { templateKey } = useParams()
+  const [searchParams] = useSearchParams()
   const paperRef = useRef(null)
+  const stageWrapRef = useRef(null)
   const attachmentInputRefs = useRef({})
-  const [contract, setContract] = useState(() => loadDraft())
-  const [attachmentFiles, setAttachmentFiles] = useState(() =>
-    createEmptyAttachmentState()
+  const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)
+  const entrySource = resolvePrintWorkspaceEntrySource(searchParams)
+  const resetDraftOnOpen =
+    resolvePrintWorkspaceDraftMode(searchParams) ===
+    PRINT_WORKSPACE_DRAFT_MODE.FRESH
+  const draftStorageKey = workspaceStateID
+    ? buildPrintWorkspaceDraftStorageKey(
+        PROCESSING_CONTRACT_TEMPLATE_KEY,
+        workspaceStateID
+      )
+    : DRAFT_STORAGE_KEY
+  const legacyDraftStorageKeys = useMemo(
+    () => (workspaceStateID ? [DRAFT_STORAGE_KEY] : []),
+    [workspaceStateID]
+  )
+  const workspaceURL = useMemo(() => {
+    if (!workspaceStateID || typeof window === 'undefined') {
+      return ''
+    }
+
+    return new URL(
+      buildPrintWorkspacePath(PROCESSING_CONTRACT_TEMPLATE_KEY, {
+        entrySource,
+        draftMode: resetDraftOnOpen
+          ? PRINT_WORKSPACE_DRAFT_MODE.FRESH
+          : PRINT_WORKSPACE_DRAFT_MODE.RESTORE,
+        stateID: workspaceStateID,
+      }),
+      window.location.origin
+    ).toString()
+  }, [entrySource, resetDraftOnOpen, workspaceStateID])
+  const [contract, setContract] = useState(() =>
+    loadDraft({
+      forceFresh: resetDraftOnOpen,
+      storageKey: draftStorageKey,
+      fallbackStorageKeys: legacyDraftStorageKeys,
+    })
   )
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
   const [selectedLineIndex, setSelectedLineIndex] = useState(null)
+  const [cellSelectionMode, setCellSelectionMode] = useState(false)
+  const [mergeSelectionAnchor, setMergeSelectionAnchor] = useState(null)
+  const [mergeSelectionFocus, setMergeSelectionFocus] = useState(null)
+  const [activeCell, setActiveCell] = useState(null)
   const [showFormula, setShowFormula] = useState(false)
   const [busyAction, setBusyAction] = useState('')
+  const [toolbarStatus, setToolbarStatus] = useState(
+    '顶部工具栏与 trade-erp 打印壳页对齐。'
+  )
 
   useEffect(() => {
     document.title = '加工合同打印窗口'
   }, [])
 
   useEffect(() => {
-    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(contract))
-  }, [contract])
+    setContract(
+      loadDraft({
+        forceFresh: resetDraftOnOpen,
+        storageKey: draftStorageKey,
+        fallbackStorageKeys: legacyDraftStorageKeys,
+      })
+    )
+    setRowSelectionMode(false)
+    setSelectedLineIndex(null)
+    setCellSelectionMode(false)
+    setMergeSelectionAnchor(null)
+    setMergeSelectionFocus(null)
+    setActiveCell(null)
+    setShowFormula(false)
+    setBusyAction('')
+    setToolbarStatus(
+      resetDraftOnOpen
+        ? '已按菜单入口恢复默认加工合同样例。'
+        : '顶部工具栏与 trade-erp 打印壳页对齐。'
+    )
+  }, [draftStorageKey, legacyDraftStorageKeys, resetDraftOnOpen, templateKey])
+
+  useEffect(() => {
+    window.localStorage.setItem(draftStorageKey, JSON.stringify(contract))
+  }, [contract, draftStorageKey])
+
+  useEffect(() => {
+    if (!paperRef.current) {
+      return undefined
+    }
+
+    return watchPrintPageMarginForPaper(paperRef.current, {
+      stageWrapElement: stageWrapRef.current,
+      paperContinuedClass: 'erp-processing-contract-paper--continued',
+    })
+  }, [])
+
+  usePrintWorkspaceWindowSnapshot({
+    stateID: workspaceStateID,
+    templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+    workspaceURL,
+    observeNodeRef: paperRef,
+  })
 
   if (templateKey !== PROCESSING_CONTRACT_TEMPLATE_KEY) {
     return <Navigate to="/erp/print-center" replace />
+  }
+
+  const mergeSelection = normalizeCellSelection(
+    mergeSelectionAnchor,
+    mergeSelectionFocus
+  )
+  const activeMerge =
+    activeCell != null
+      ? findMergeAtCell(
+          contract.merges,
+          activeCell.rowIndex,
+          activeCell.colIndex
+        )
+      : null
+  const canApplyMerge =
+    Boolean(cellSelectionMode && mergeSelection) &&
+    (mergeSelection.rowStart !== mergeSelection.rowEnd ||
+      mergeSelection.colStart !== mergeSelection.colEnd)
+  const canSplitMerge = Boolean(cellSelectionMode && activeMerge)
+
+  const resetCellSelection = () => {
+    setMergeSelectionAnchor(null)
+    setMergeSelectionFocus(null)
+    setActiveCell(null)
   }
 
   const setField = (field, value) => {
@@ -164,65 +330,109 @@ export default function ProcessingContractPrintWorkspacePage() {
   const handleToggleRowSelectionMode = () => {
     setRowSelectionMode((current) => {
       const nextValue = !current
-      if (!nextValue) {
+      if (nextValue) {
+        setCellSelectionMode(false)
+        resetCellSelection()
+        setToolbarStatus('已进入明细行选择模式，请点击中间明细表中的目标行。')
+      } else {
         setSelectedLineIndex(null)
+        setToolbarStatus('已退出明细行选择模式。')
       }
       return nextValue
     })
   }
 
-  const handleInsertLine = (position) => {
-    setContract((current) => {
-      const nextLines = [...current.lines]
-      const baseIndex =
-        selectedLineIndex === null
-          ? nextLines.length
-          : Math.max(0, Math.min(selectedLineIndex, nextLines.length))
-      const insertIndex =
-        position === 'before'
-          ? baseIndex
-          : Math.min(baseIndex + 1, nextLines.length)
-      nextLines.splice(
-        insertIndex,
-        0,
-        createEmptyProcessingLine(current.contractNo || '')
-      )
-      setSelectedLineIndex(insertIndex)
-      return {
-        ...current,
-        lines: nextLines,
+  const handleToggleCellSelectionMode = () => {
+    setCellSelectionMode((current) => {
+      const nextValue = !current
+      if (nextValue) {
+        setRowSelectionMode(false)
+        setSelectedLineIndex(null)
+        resetCellSelection()
+        setToolbarStatus(
+          '已进入单元格选区模式，请在右侧加工明细表里依次点选起点和终点。'
+        )
+      } else {
+        resetCellSelection()
+        setToolbarStatus('已退出单元格选区模式。')
       }
+      return nextValue
     })
   }
 
-  const handleRemoveLine = () => {
-    if (selectedLineIndex === null) {
+  const handleSelectCell = (rowIndex, colIndex) => {
+    const nextCell = { rowIndex, colIndex }
+    setActiveCell(nextCell)
+    const currentSelection = normalizeCellSelection(
+      mergeSelectionAnchor,
+      mergeSelectionFocus
+    )
+    const hasExpandedSelection =
+      currentSelection &&
+      (currentSelection.rowStart !== currentSelection.rowEnd ||
+        currentSelection.colStart !== currentSelection.colEnd)
+
+    if (!mergeSelectionAnchor || hasExpandedSelection) {
+      setMergeSelectionAnchor(nextCell)
+      setMergeSelectionFocus(nextCell)
+      setToolbarStatus(
+        `已选中第 ${rowIndex + 1} 行第 ${colIndex + 1} 列，请继续点终点或直接拆分当前合并块。`
+      )
       return
     }
 
-    setContract((current) => {
-      if (current.lines.length <= 1) {
-        setSelectedLineIndex(0)
-        return {
-          ...current,
-          lines: [createEmptyProcessingLine(current.contractNo || '')],
-        }
-      }
+    setMergeSelectionFocus(nextCell)
+    const nextSelection = normalizeCellSelection(mergeSelectionAnchor, nextCell)
+    const rowCount = nextSelection.rowEnd - nextSelection.rowStart + 1
+    const colCount = nextSelection.colEnd - nextSelection.colStart + 1
+    setToolbarStatus(
+      `已选中 ${rowCount} × ${colCount} 的矩形区域，可继续合并。`
+    )
+  }
 
-      const nextLines = current.lines.filter(
-        (_, index) =>
-          index !== Math.min(selectedLineIndex, current.lines.length - 1)
-      )
-      const nextSelectedIndex = Math.max(
-        0,
-        Math.min(selectedLineIndex, nextLines.length - 1)
-      )
-      setSelectedLineIndex(nextSelectedIndex)
-      return {
-        ...current,
-        lines: nextLines,
-      }
+  const handleInsertLine = (position) => {
+    const result = insertProcessingContractLine({
+      lines: contract.lines,
+      merges: contract.merges,
+      selectedLineIndex,
+      contractNo: contract.contractNo,
+      position,
     })
+    if (!result.ok) {
+      setToolbarStatus(result.message)
+      message.warning(result.message)
+      return
+    }
+
+    setContract((current) => ({
+      ...current,
+      lines: result.lines,
+      merges: result.merges,
+    }))
+    setSelectedLineIndex(result.selectedLineIndex)
+    setToolbarStatus(result.message)
+  }
+
+  const handleRemoveLine = () => {
+    const result = deleteProcessingContractLine({
+      lines: contract.lines,
+      merges: contract.merges,
+      selectedLineIndex,
+      contractNo: contract.contractNo,
+    })
+    if (!result.ok) {
+      setToolbarStatus(result.message)
+      message.warning(result.message)
+      return
+    }
+
+    setContract((current) => ({
+      ...current,
+      lines: result.lines,
+      merges: result.merges,
+    }))
+    setSelectedLineIndex(result.selectedLineIndex)
+    setToolbarStatus(result.message)
   }
 
   const withPdfAction = async (actionKey, runner) => {
@@ -230,6 +440,10 @@ export default function ProcessingContractPrintWorkspacePage() {
       return
     }
 
+    syncPrintPageMarginForPaper(paperRef.current, {
+      stageWrapElement: stageWrapRef.current,
+      paperContinuedClass: 'erp-processing-contract-paper--continued',
+    })
     setBusyAction(actionKey)
     try {
       await runner()
@@ -242,57 +456,127 @@ export default function ProcessingContractPrintWorkspacePage() {
 
   const handlePreviewPdf = () =>
     withPdfAction('preview', async () => {
-      const blob = await createPdfBlob(paperRef.current)
-      const blobURL = URL.createObjectURL(blob)
-      const previewWindow = window.open(blobURL, '_blank')
-      if (!previewWindow) {
-        URL.revokeObjectURL(blobURL)
-        throw new Error('浏览器拦截了 PDF 预览弹窗，请允许弹窗后重试')
-      }
-      window.setTimeout(() => URL.revokeObjectURL(blobURL), 60_000)
+      await openPdfPreviewFromElement(paperRef.current, {
+        title: '加工合同 PDF 预览',
+        fileName: formatExportFileName(),
+        templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+      })
     })
 
   const handleDownloadPdf = () =>
     withPdfAction('download', async () => {
-      const blob = await createPdfBlob(paperRef.current)
-      const blobURL = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = blobURL
-      link.download = formatExportFileName()
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.setTimeout(() => URL.revokeObjectURL(blobURL), 1_000)
+      await downloadPdfFromElement(paperRef.current, {
+        title: '加工合同 PDF 预览',
+        fileName: formatExportFileName(),
+        templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+      })
     })
 
   const handlePrint = () => {
+    syncPrintPageMarginForPaper(paperRef.current, {
+      stageWrapElement: stageWrapRef.current,
+      paperContinuedClass: 'erp-processing-contract-paper--continued',
+    })
     window.print()
+  }
+
+  const handleApplyMerge = () => {
+    const result = applyProcessingDetailCellMerge({
+      lines: contract.lines,
+      merges: contract.merges,
+      selection: mergeSelection,
+    })
+    if (!result.ok) {
+      setToolbarStatus(result.message)
+      message.warning(result.message)
+      return
+    }
+
+    setContract((current) => ({
+      ...current,
+      lines: result.lines,
+      merges: result.merges,
+    }))
+    const mergedAnchor = mergeSelection
+      ? {
+          rowIndex: mergeSelection.rowStart,
+          colIndex: mergeSelection.colStart,
+        }
+      : null
+    setActiveCell(mergedAnchor)
+    setMergeSelectionAnchor(mergedAnchor)
+    setMergeSelectionFocus(mergedAnchor)
+    setToolbarStatus(result.message)
+  }
+
+  const handleSplitMerge = () => {
+    const result = splitProcessingDetailCellMerge({
+      merges: contract.merges,
+      rowIndex: activeCell?.rowIndex,
+      colIndex: activeCell?.colIndex,
+    })
+    if (!result.ok) {
+      setToolbarStatus(result.message)
+      message.warning(result.message)
+      return
+    }
+
+    setContract((current) => ({
+      ...current,
+      merges: result.merges,
+    }))
+    setToolbarStatus(result.message)
   }
 
   const handleAttachmentUploadClick = (slotKey) => {
     attachmentInputRefs.current[slotKey]?.click()
   }
 
-  const handleAttachmentFileChange = (slot, event) => {
+  const handleAttachmentFileChange = async (slot, event) => {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) {
       return
     }
 
-    setAttachmentFiles((current) => ({
+    setToolbarStatus(`正在处理${slot.title}...`)
+    try {
+      const snapshot = await createAttachmentSnapshot(file)
+      setContract((current) => ({
+        ...current,
+        attachments: {
+          ...current.attachments,
+          [slot.key]: snapshot,
+        },
+      }))
+      setToolbarStatus(`已同步${slot.title}到右侧附件位。`)
+      message.success(`已同步${slot.title}：${file.name}`)
+    } catch (error) {
+      setToolbarStatus(`上传${slot.title}失败。`)
+      message.error(getActionErrorMessage(error, `处理${slot.title}`))
+    }
+  }
+
+  const handleAttachmentClear = (slot) => {
+    setContract((current) => ({
       ...current,
-      [slot.key]: file,
+      attachments: {
+        ...current.attachments,
+        [slot.key]: createEmptyProcessingAttachment(),
+      },
     }))
-    message.success(`已选择${slot.title}：${file.name}`)
+    setToolbarStatus(`已清空${slot.title}。`)
+    message.success(`已清空${slot.title}`)
   }
 
   const resetDraft = () => {
     setContract(createProcessingContractDraft())
-    setAttachmentFiles(createEmptyAttachmentState())
     setSelectedLineIndex(null)
     setRowSelectionMode(false)
+    setCellSelectionMode(false)
+    resetCellSelection()
     setShowFormula(false)
+    setToolbarStatus('已恢复默认加工合同样例。')
     message.success('已恢复默认加工合同样例')
   }
 
@@ -413,11 +697,13 @@ export default function ProcessingContractPrintWorkspacePage() {
   const attachmentUploadBar = (
     <section className="erp-processing-contract-upload-bar">
       <div className="erp-processing-contract-upload-bar__copy">
-        纸样 / 图样附件独立上传，仅作为合同附件快照保留，不进入右侧模板或 PDF。
+        纸样 / 图样附件通过左侧按钮独立上传，会同步进入右侧页底附件位，并随 PDF
+        / 打印一起输出。
       </div>
       <div className="erp-processing-contract-upload-bar__actions">
         {processingContractAttachmentSlots.map((slot) => {
-          const selectedFile = attachmentFiles[slot.key]
+          const attachmentSnapshot = contract.attachments?.[slot.key]
+          const hasAttachment = Boolean(attachmentSnapshot?.dataURL)
           return (
             <div
               key={slot.key}
@@ -435,22 +721,33 @@ export default function ProcessingContractPrintWorkspacePage() {
               <button
                 type="button"
                 className={getToolbarButtonClassName({
-                  active: Boolean(selectedFile),
+                  active: hasAttachment,
                 })}
                 onClick={() => handleAttachmentUploadClick(slot.key)}
                 title={
-                  selectedFile
-                    ? `${slot.title}：${selectedFile.name}`
+                  hasAttachment
+                    ? `${slot.title}：${attachmentSnapshot.name}`
                     : `上传${slot.title}`
                 }
               >
                 上传{slot.title}
               </button>
+              {hasAttachment ? (
+                <button
+                  type="button"
+                  className={getToolbarButtonClassName()}
+                  onClick={() => handleAttachmentClear(slot)}
+                >
+                  清空
+                </button>
+              ) : null}
               <span
                 className="erp-processing-contract-upload-bar__status"
-                title={selectedFile?.name || slot.title}
+                title={attachmentSnapshot?.name || slot.title}
               >
-                {selectedFile ? `已选：${selectedFile.name}` : '未上传'}
+                {hasAttachment
+                  ? `已同步：${attachmentSnapshot.name}`
+                  : '未上传'}
               </span>
             </div>
           )
@@ -539,9 +836,10 @@ export default function ProcessingContractPrintWorkspacePage() {
           ? '正在生成在线 PDF...'
           : busyAction === 'download'
             ? '正在下载 PDF...'
-            : '顶部工具栏与 trade-erp 打印壳页对齐。'
+            : toolbarStatus
       }
       panelTip="提示：左侧字段与右侧加工合同固定版式双向同步，右侧表格和条款区可直接编辑，打印时仅输出右侧模板。"
+      prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       detailEditor={detailEditor}
       fieldRows={fieldRows}
       formulaPanel={
@@ -594,13 +892,38 @@ export default function ProcessingContractPrintWorkspacePage() {
             </button>
             <button
               type="button"
+              className={getToolbarButtonClassName({
+                active: cellSelectionMode,
+              })}
+              onClick={handleToggleCellSelectionMode}
+            >
+              {cellSelectionMode ? '取消选区' : '选择单元格'}
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName()}
+              onClick={handleApplyMerge}
+              disabled={!canApplyMerge}
+            >
+              合并选区
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName()}
+              onClick={handleSplitMerge}
+              disabled={!canSplitMerge}
+            >
+              拆分当前
+            </button>
+            <button
+              type="button"
               className={getToolbarButtonClassName({ active: showFormula })}
               onClick={() => setShowFormula((current) => !current)}
             >
               计算规则
             </button>
             <span className="erp-print-shell__counter">
-              加工明细行: {contract.lines.length}
+              加工明细行: {contract.lines.length}/{PROCESSING_CONTRACT_MAX_ROWS}
             </span>
           </div>
 
@@ -643,12 +966,18 @@ export default function ProcessingContractPrintWorkspacePage() {
       }
     >
       {attachmentUploadBar}
-      <div className="erp-print-shell__stage-wrap" ref={paperRef}>
+      <div className="erp-print-shell__stage-wrap" ref={stageWrapRef}>
         <ProcessingContractPaper
+          paperRef={paperRef}
           contract={contract}
+          attachments={contract.attachments}
           selectedLineIndex={selectedLineIndex}
           lineSelectionMode={rowSelectionMode}
+          cellSelectionMode={cellSelectionMode}
+          mergeSelection={mergeSelection}
+          activeCell={activeCell}
           onSelectLine={setSelectedLineIndex}
+          onSelectCell={handleSelectCell}
           onFieldChange={setField}
           onLineFieldChange={setLineField}
           onClauseChange={setClause}

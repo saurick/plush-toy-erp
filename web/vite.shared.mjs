@@ -85,6 +85,10 @@ export function createERPViteConfig(appId) {
             target: 'http://localhost:8200',
             changeOrigin: true,
           },
+          '/templates': {
+            target: 'http://localhost:8200',
+            changeOrigin: true,
+          },
         },
       },
       optimizeDeps: {

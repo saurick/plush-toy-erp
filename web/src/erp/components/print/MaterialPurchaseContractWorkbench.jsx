@@ -1,13 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Modal } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import {
+  applyDetailCellMerge,
   MATERIAL_PURCHASE_DETAIL_COLUMNS,
   MATERIAL_PURCHASE_MAX_ROWS,
   buildMaterialPurchaseContractDraft,
   computeMaterialPurchaseTotals,
   deleteMaterialPurchaseLine,
+  findMergeAtCell,
   insertMaterialPurchaseLine,
+  isCellInsideSelection,
+  isMergeTopLeftCell,
+  normalizeCellSelection,
+  splitDetailCellMerge,
   updateMaterialPurchaseClause,
   updateMaterialPurchaseField,
   updateMaterialPurchaseLineCell,
@@ -17,6 +22,12 @@ import {
   downloadPdfFromElement,
   openPdfPreviewFromElement,
 } from '../../utils/printPdf.mjs'
+import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../../utils/printWorkspace.js'
+import {
+  syncPrintPageMarginForPaper,
+  watchPrintPageMarginForPaper,
+} from '../../utils/printPageMargin.mjs'
+import usePrintWorkspaceWindowSnapshot from '../../utils/usePrintWorkspaceWindowSnapshot.js'
 
 const CLAUSE_SECTIONS = [
   { key: 'delivery', title: '一、来货要求' },
@@ -84,6 +95,19 @@ function MetaField({
   )
 }
 
+function MetaPair({ left, right }) {
+  return (
+    <div className="erp-material-contract-meta__pair">
+      <div className="erp-material-contract-meta__cell erp-material-contract-meta__cell--left">
+        {left}
+      </div>
+      <div className="erp-material-contract-meta__cell erp-material-contract-meta__cell--right">
+        {right}
+      </div>
+    </div>
+  )
+}
+
 function ClauseBlock({ title, items, onCommit, disabled = false }) {
   return (
     <section className="erp-material-contract-clause-block">
@@ -111,13 +135,22 @@ function ClauseBlock({ title, items, onCommit, disabled = false }) {
   )
 }
 
-function loadDraft(template, storageKey) {
+function loadDraft(template, storageKey, options = {}) {
+  const { forceFresh = false, fallbackStorageKeys = [] } = options
   const fallbackDraft = buildMaterialPurchaseContractDraft(template?.sample)
-  if (!storageKey || typeof window === 'undefined') {
+  if (forceFresh || !storageKey || typeof window === 'undefined') {
     return fallbackDraft
   }
   try {
-    const rawDraft = window.localStorage.getItem(storageKey)
+    const draftStorageKeys = [storageKey, ...fallbackStorageKeys].filter(
+      Boolean
+    )
+    const rawDraft = draftStorageKeys.reduce((matchedDraft, currentKey) => {
+      if (matchedDraft) {
+        return matchedDraft
+      }
+      return window.localStorage.getItem(currentKey) || ''
+    }, '')
     if (!rawDraft) {
       return fallbackDraft
     }
@@ -137,26 +170,51 @@ function loadDraft(template, storageKey) {
 export default function MaterialPurchaseContractWorkbench({
   template,
   draftStorageKey = '',
+  legacyDraftStorageKeys = [],
+  resetDraftOnOpen = false,
+  workspaceStateID = '',
+  workspaceURL = '',
 }) {
-  const [draft, setDraft] = useState(() => loadDraft(template, draftStorageKey))
+  const [draft, setDraft] = useState(() =>
+    loadDraft(template, draftStorageKey, {
+      forceFresh: resetDraftOnOpen,
+      fallbackStorageKeys: legacyDraftStorageKeys,
+    })
+  )
   const [formulaVisible, setFormulaVisible] = useState(false)
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
   const [selectedRowIndex, setSelectedRowIndex] = useState(null)
+  const [cellSelectionMode, setCellSelectionMode] = useState(false)
+  const [mergeSelectionAnchor, setMergeSelectionAnchor] = useState(null)
+  const [mergeSelectionFocus, setMergeSelectionFocus] = useState(null)
+  const [activeCell, setActiveCell] = useState(null)
   const [toolbarStatus, setToolbarStatus] = useState(
     '右侧模板已按实拍收口为纸质合同版式；仅中间采购明细区保留表格。'
   )
-  const [pdfPreviewURL, setPdfPreviewURL] = useState('')
-  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false)
   const [pdfAction, setPdfAction] = useState('')
   const paperRef = useRef(null)
+  const stageWrapRef = useRef(null)
 
   useEffect(() => {
-    setDraft(loadDraft(template, draftStorageKey))
+    setDraft(
+      loadDraft(template, draftStorageKey, {
+        forceFresh: resetDraftOnOpen,
+        fallbackStorageKeys: legacyDraftStorageKeys,
+      })
+    )
     setFormulaVisible(false)
     setRowSelectionMode(false)
     setSelectedRowIndex(null)
-    setToolbarStatus('已恢复模板样例数据。')
-  }, [draftStorageKey, template])
+    setCellSelectionMode(false)
+    setMergeSelectionAnchor(null)
+    setMergeSelectionFocus(null)
+    setActiveCell(null)
+    setToolbarStatus(
+      resetDraftOnOpen
+        ? '已按菜单入口恢复默认采购合同样例。'
+        : '已恢复模板样例数据。'
+    )
+  }, [draftStorageKey, legacyDraftStorageKeys, resetDraftOnOpen, template])
 
   useEffect(() => {
     if (!draftStorageKey || typeof window === 'undefined') {
@@ -165,23 +223,42 @@ export default function MaterialPurchaseContractWorkbench({
     window.localStorage.setItem(draftStorageKey, JSON.stringify(draft))
   }, [draft, draftStorageKey])
 
-  useEffect(
-    () => () => {
-      if (pdfPreviewURL) {
-        URL.revokeObjectURL(pdfPreviewURL)
-      }
-    },
-    [pdfPreviewURL]
-  )
+  useEffect(() => {
+    if (!paperRef.current) {
+      return undefined
+    }
+
+    return watchPrintPageMarginForPaper(paperRef.current, {
+      stageWrapElement: stageWrapRef.current,
+      paperContinuedClass: 'erp-material-contract-paper--continued',
+    })
+  }, [])
+
+  usePrintWorkspaceWindowSnapshot({
+    stateID: workspaceStateID,
+    templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    workspaceURL,
+    observeNodeRef: paperRef,
+  })
 
   const totals = useMemo(
     () => computeMaterialPurchaseTotals(draft.lines),
     [draft.lines]
   )
-  const templateModesActive = rowSelectionMode
+  const templateModesActive = rowSelectionMode || cellSelectionMode
+  const mergeSelection = normalizeCellSelection(
+    mergeSelectionAnchor,
+    mergeSelectionFocus
+  )
 
   const resetRowSelection = () => {
     setSelectedRowIndex(null)
+  }
+
+  const resetCellSelection = () => {
+    setMergeSelectionAnchor(null)
+    setMergeSelectionFocus(null)
+    setActiveCell(null)
   }
 
   const handleFieldCommit = (fieldKey, nextValue) => {
@@ -202,14 +279,15 @@ export default function MaterialPurchaseContractWorkbench({
     }))
   }
 
-  const handleLineCommit = (rowIndex, columnKey, nextValue) => {
+  const handleLineCommit = (rowIndex, columnKey, nextValue, options = {}) => {
     setDraft((currentDraft) => ({
       ...currentDraft,
       lines: updateMaterialPurchaseLineCell(
         currentDraft.lines,
         rowIndex,
         columnKey,
-        nextValue
+        nextValue,
+        options
       ),
     }))
   }
@@ -218,12 +296,111 @@ export default function MaterialPurchaseContractWorkbench({
     setRowSelectionMode((currentValue) => {
       const nextValue = !currentValue
       if (nextValue) {
+        setCellSelectionMode(false)
+        resetCellSelection()
         setToolbarStatus('已进入明细行选择模式，请点击中间明细表中的目标行。')
       } else {
+        resetRowSelection()
         setToolbarStatus('已退出明细行选择模式。')
       }
       return nextValue
     })
+  }
+
+  const handleToggleCellSelectionMode = () => {
+    setCellSelectionMode((currentValue) => {
+      const nextValue = !currentValue
+      if (nextValue) {
+        setRowSelectionMode(false)
+        resetRowSelection()
+        resetCellSelection()
+        setToolbarStatus(
+          '已进入单元格选区模式，请在右侧采购明细表里依次点选起点和终点。'
+        )
+      } else {
+        resetCellSelection()
+        setToolbarStatus('已退出单元格选区模式。')
+      }
+      return nextValue
+    })
+  }
+
+  const handleSelectCell = (rowIndex, colIndex) => {
+    const nextCell = { rowIndex, colIndex }
+    setActiveCell(nextCell)
+    const currentSelection = normalizeCellSelection(
+      mergeSelectionAnchor,
+      mergeSelectionFocus
+    )
+    const hasExpandedSelection =
+      currentSelection &&
+      (currentSelection.rowStart !== currentSelection.rowEnd ||
+        currentSelection.colStart !== currentSelection.colEnd)
+
+    if (!mergeSelectionAnchor || hasExpandedSelection) {
+      setMergeSelectionAnchor(nextCell)
+      setMergeSelectionFocus(nextCell)
+      setToolbarStatus(
+        `已选中第 ${rowIndex + 1} 行第 ${colIndex + 1} 列，请继续点终点或直接拆分当前合并块。`
+      )
+      return
+    }
+
+    setMergeSelectionFocus(nextCell)
+    const nextSelection = normalizeCellSelection(mergeSelectionAnchor, nextCell)
+    const rowCount = nextSelection.rowEnd - nextSelection.rowStart + 1
+    const colCount = nextSelection.colEnd - nextSelection.colStart + 1
+    setToolbarStatus(
+      `已选中 ${rowCount} × ${colCount} 的矩形区域，可继续合并。`
+    )
+  }
+
+  const handleApplyMerge = () => {
+    const result = applyDetailCellMerge({
+      lines: draft.lines,
+      merges: draft.merges,
+      selection: mergeSelection,
+    })
+    if (!result.ok) {
+      setToolbarStatus(result.message)
+      message.warning(result.message)
+      return
+    }
+
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      lines: result.lines,
+      merges: result.merges,
+    }))
+    const mergedAnchor = mergeSelection
+      ? {
+          rowIndex: mergeSelection.rowStart,
+          colIndex: mergeSelection.colStart,
+        }
+      : null
+    setActiveCell(mergedAnchor)
+    setMergeSelectionAnchor(mergedAnchor)
+    setMergeSelectionFocus(mergedAnchor)
+    setToolbarStatus(result.message)
+  }
+
+  const handleSplitMerge = () => {
+    const result = splitDetailCellMerge({
+      merges: draft.merges,
+      rowIndex: activeCell?.rowIndex,
+      colIndex: activeCell?.colIndex,
+    })
+    if (!result.ok) {
+      setToolbarStatus(result.message)
+      message.warning(result.message)
+      return
+    }
+
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      merges: result.merges,
+    }))
+    setToolbarStatus(result.message)
   }
 
   const handleInsertRow = (position) => {
@@ -270,18 +447,24 @@ export default function MaterialPurchaseContractWorkbench({
   const buildPdfFileName = () =>
     `${draft.contractNo || '采购合同'}-${draft.supplierName || '打印稿'}.pdf`
 
+  const syncPrintRuntimeMargin = () =>
+    syncPrintPageMarginForPaper(paperRef.current, {
+      stageWrapElement: stageWrapRef.current,
+      paperContinuedClass: 'erp-material-contract-paper--continued',
+    })
+
   const handlePreviewPDF = async () => {
     if (!paperRef.current) {
       return
     }
+    syncPrintRuntimeMargin()
     setPdfAction('preview')
     try {
-      if (pdfPreviewURL) {
-        URL.revokeObjectURL(pdfPreviewURL)
-      }
-      const { previewURL } = await openPdfPreviewFromElement(paperRef.current)
-      setPdfPreviewURL(previewURL)
-      setPdfPreviewOpen(true)
+      await openPdfPreviewFromElement(paperRef.current, {
+        title: '采购合同 PDF 预览',
+        fileName: buildPdfFileName(),
+        templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      })
       setToolbarStatus('已生成在线 PDF 预览。')
     } catch (error) {
       const errorMessage = error?.message || '生成 PDF 预览失败，请稍后重试。'
@@ -296,9 +479,14 @@ export default function MaterialPurchaseContractWorkbench({
     if (!paperRef.current) {
       return
     }
+    syncPrintRuntimeMargin()
     setPdfAction('download')
     try {
-      await downloadPdfFromElement(paperRef.current, buildPdfFileName())
+      await downloadPdfFromElement(paperRef.current, {
+        title: '采购合同 PDF 预览',
+        fileName: buildPdfFileName(),
+        templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      })
       setToolbarStatus('已开始下载 PDF。')
     } catch (error) {
       const errorMessage = error?.message || '下载 PDF 失败，请稍后重试。'
@@ -310,6 +498,7 @@ export default function MaterialPurchaseContractWorkbench({
   }
 
   const handlePrint = () => {
+    syncPrintRuntimeMargin()
     window.print()
   }
 
@@ -321,6 +510,8 @@ export default function MaterialPurchaseContractWorkbench({
     setFormulaVisible(false)
     setRowSelectionMode(false)
     resetRowSelection()
+    setCellSelectionMode(false)
+    resetCellSelection()
     setToolbarStatus('已恢复为实拍对照样例。')
   }
 
@@ -337,6 +528,16 @@ export default function MaterialPurchaseContractWorkbench({
     ]
       .filter(Boolean)
       .join(' ')
+
+  const activeMerge =
+    activeCell != null
+      ? findMergeAtCell(draft.merges, activeCell.rowIndex, activeCell.colIndex)
+      : null
+  const canApplyMerge =
+    Boolean(cellSelectionMode && mergeSelection) &&
+    (mergeSelection.rowStart !== mergeSelection.rowEnd ||
+      mergeSelection.colStart !== mergeSelection.colEnd)
+  const canSplitMerge = Boolean(cellSelectionMode && activeMerge)
 
   const fieldRows = [
     {
@@ -496,9 +697,25 @@ export default function MaterialPurchaseContractWorkbench({
                 />
               </td>
               <td>
-                <div className="erp-print-shell__detail-static">
-                  {line.amount || '-'}
-                </div>
+                <label className="erp-print-shell__currency-input">
+                  <span className="erp-print-shell__currency-prefix">¥</span>
+                  <input
+                    className="erp-print-shell__detail-editor erp-print-shell__detail-editor--currency"
+                    type="text"
+                    inputMode="decimal"
+                    value={line.amount}
+                    onChange={(event) =>
+                      handleLineCommit(index, 'amount', event.target.value, {
+                        amountInputPhase: 'input',
+                      })
+                    }
+                    onBlur={(event) =>
+                      handleLineCommit(index, 'amount', event.target.value, {
+                        amountInputPhase: 'commit',
+                      })
+                    }
+                  />
+                </label>
               </td>
               <td>
                 <textarea
@@ -522,14 +739,16 @@ export default function MaterialPurchaseContractWorkbench({
       title="采购合同"
       statusText={toolbarStatus}
       panelTip="提示：左侧字段与右侧采购合同双向同步；右侧仅中间采购明细区保留表格，合同头、条款和签字区都按纸质合同排版。"
+      prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       detailEditor={detailEditor}
       fieldRows={fieldRows}
       formulaPanel={
         formulaVisible ? (
           <>
             <strong>采购合同计算规则</strong>
-            <span>金额 = 数量 × 单价</span>
-            <span>总计 = Σ 采购金额</span>
+            <span>默认金额 = 数量 × 单价</span>
+            <span>如合同快照已有确认金额，可直接改写采购金额。</span>
+            <span>总计 = Σ 当前采购金额列</span>
             <span>单价保留 3 位小数，采购金额保留 2 位小数。</span>
           </>
         ) : null
@@ -569,6 +788,31 @@ export default function MaterialPurchaseContractWorkbench({
               onClick={handleToggleRowSelectionMode}
             >
               {rowSelectionMode ? '取消选择' : '选择明细行'}
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName({
+                active: cellSelectionMode,
+              })}
+              onClick={handleToggleCellSelectionMode}
+            >
+              {cellSelectionMode ? '取消选区' : '选择单元格'}
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName()}
+              onClick={handleApplyMerge}
+              disabled={!canApplyMerge}
+            >
+              合并选区
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName()}
+              onClick={handleSplitMerge}
+              disabled={!canSplitMerge}
+            >
+              拆分当前
             </button>
             <button
               type="button"
@@ -620,106 +864,133 @@ export default function MaterialPurchaseContractWorkbench({
         </>
       }
     >
-      <div className="erp-print-shell__stage-wrap">
+      <div className="erp-print-shell__stage-wrap" ref={stageWrapRef}>
         <div className="erp-material-contract-paper" ref={paperRef}>
           <div className="erp-material-contract-paper__title">合同订单</div>
 
           <section className="erp-material-contract-meta">
-            <div className="erp-material-contract-meta__column">
-              <MetaField
-                label="采购订单号："
-                value={draft.contractNo}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('contractNo', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-              <MetaField
-                label="供应商名称："
-                value={draft.supplierName}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('supplierName', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-              <MetaField
-                label="联系人："
-                value={draft.supplierContact}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('supplierContact', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-              <MetaField
-                label="联系电话："
-                value={draft.supplierPhone}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('supplierPhone', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-              <MetaField
-                label="供应商地址："
-                value={draft.supplierAddress}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('supplierAddress', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-            </div>
-
-            <div className="erp-material-contract-meta__column erp-material-contract-meta__column--right">
-              <div className="erp-material-contract-meta__top-row">
+            <MetaPair
+              left={
                 <MetaField
-                  label="下单日期："
-                  value={draft.orderDateText}
+                  label="采购订单号："
+                  value={draft.contractNo}
                   onCommit={(nextValue) =>
-                    handleFieldCommit('orderDateText', nextValue)
+                    handleFieldCommit('contractNo', nextValue)
                   }
                   disabled={templateModesActive}
                 />
+              }
+              right={
+                <div className="erp-material-contract-meta__top-row">
+                  <MetaField
+                    className="erp-material-contract-meta__row--top-item"
+                    label="下单日期："
+                    value={draft.orderDateText}
+                    onCommit={(nextValue) =>
+                      handleFieldCommit('orderDateText', nextValue)
+                    }
+                    disabled={templateModesActive}
+                  />
+                  <MetaField
+                    className="erp-material-contract-meta__row--top-item"
+                    label="回货日期："
+                    value={draft.returnDateText}
+                    onCommit={(nextValue) =>
+                      handleFieldCommit('returnDateText', nextValue)
+                    }
+                    disabled={templateModesActive}
+                  />
+                </div>
+              }
+            />
+            <MetaPair
+              left={
                 <MetaField
-                  label="回货日期："
-                  value={draft.returnDateText}
+                  label="供应商名称："
+                  value={draft.supplierName}
                   onCommit={(nextValue) =>
-                    handleFieldCommit('returnDateText', nextValue)
+                    handleFieldCommit('supplierName', nextValue)
                   }
                   disabled={templateModesActive}
                 />
-              </div>
-              <MetaField
-                label="订货单位："
-                value={draft.buyerCompany}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('buyerCompany', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-              <MetaField
-                label="订货人："
-                value={draft.buyerContact}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('buyerContact', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-              <MetaField
-                label="联系电话："
-                value={draft.buyerPhone}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('buyerPhone', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-              <MetaField
-                label="公司地址："
-                value={draft.buyerAddress}
-                onCommit={(nextValue) =>
-                  handleFieldCommit('buyerAddress', nextValue)
-                }
-                disabled={templateModesActive}
-              />
-            </div>
+              }
+              right={
+                <MetaField
+                  label="订货单位："
+                  value={draft.buyerCompany}
+                  onCommit={(nextValue) =>
+                    handleFieldCommit('buyerCompany', nextValue)
+                  }
+                  disabled={templateModesActive}
+                />
+              }
+            />
+            <MetaPair
+              left={
+                <MetaField
+                  label="联系人："
+                  value={draft.supplierContact}
+                  onCommit={(nextValue) =>
+                    handleFieldCommit('supplierContact', nextValue)
+                  }
+                  disabled={templateModesActive}
+                />
+              }
+              right={
+                <MetaField
+                  label="订货人："
+                  value={draft.buyerContact}
+                  onCommit={(nextValue) =>
+                    handleFieldCommit('buyerContact', nextValue)
+                  }
+                  disabled={templateModesActive}
+                />
+              }
+            />
+            <MetaPair
+              left={
+                <MetaField
+                  label="联系电话："
+                  value={draft.supplierPhone}
+                  onCommit={(nextValue) =>
+                    handleFieldCommit('supplierPhone', nextValue)
+                  }
+                  disabled={templateModesActive}
+                />
+              }
+              right={
+                <MetaField
+                  label="联系电话："
+                  value={draft.buyerPhone}
+                  onCommit={(nextValue) =>
+                    handleFieldCommit('buyerPhone', nextValue)
+                  }
+                  disabled={templateModesActive}
+                />
+              }
+            />
+            <MetaPair
+              left={
+                <MetaField
+                  label="供应商地址："
+                  value={draft.supplierAddress}
+                  onCommit={(nextValue) =>
+                    handleFieldCommit('supplierAddress', nextValue)
+                  }
+                  disabled={templateModesActive}
+                />
+              }
+              right={
+                <MetaField
+                  label="公司地址："
+                  value={draft.buyerAddress}
+                  onCommit={(nextValue) =>
+                    handleFieldCommit('buyerAddress', nextValue)
+                  }
+                  disabled={templateModesActive}
+                />
+              }
+            />
           </section>
 
           <table className="erp-material-contract-table">
@@ -764,23 +1035,75 @@ export default function MaterialPurchaseContractWorkbench({
                     )
                   }}
                 >
-                  {MATERIAL_PURCHASE_DETAIL_COLUMNS.map((column) => (
-                    <td key={`${column.key}-${rowIndex}`}>
-                      <EditableText
-                        value={line[column.key]}
-                        onCommit={(nextValue) =>
-                          handleLineCommit(rowIndex, column.key, nextValue)
+                  {MATERIAL_PURCHASE_DETAIL_COLUMNS.map((column, colIndex) => {
+                    const merge = findMergeAtCell(
+                      draft.merges,
+                      rowIndex,
+                      colIndex
+                    )
+                    if (
+                      merge &&
+                      !isMergeTopLeftCell(merge, rowIndex, colIndex)
+                    ) {
+                      return null
+                    }
+
+                    const isSelectionAnchor =
+                      activeCell?.rowIndex === rowIndex &&
+                      activeCell?.colIndex === colIndex
+                    const isSelectedCell = isCellInsideSelection(
+                      mergeSelection,
+                      rowIndex,
+                      colIndex
+                    )
+
+                    return (
+                      <td
+                        key={`${column.key}-${rowIndex}`}
+                        rowSpan={
+                          merge ? merge.rowEnd - merge.rowStart + 1 : undefined
                         }
-                        multiline={column.multiline}
-                        disabled={!column.editable || templateModesActive}
-                        className={
-                          column.multiline
-                            ? 'erp-material-contract-table__editable erp-material-contract-table__editable-multiline'
-                            : 'erp-material-contract-table__editable'
+                        colSpan={
+                          merge ? merge.colEnd - merge.colStart + 1 : undefined
                         }
-                      />
-                    </td>
-                  ))}
+                        className={[
+                          merge
+                            ? 'erp-material-contract-table__cell-merged'
+                            : '',
+                          isSelectedCell
+                            ? 'erp-material-contract-table__cell-selected'
+                            : '',
+                          isSelectionAnchor
+                            ? 'erp-material-contract-table__cell-selected-anchor'
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        onMouseDown={(event) => {
+                          if (!cellSelectionMode) {
+                            return
+                          }
+                          event.preventDefault()
+                          event.stopPropagation()
+                          handleSelectCell(rowIndex, colIndex)
+                        }}
+                      >
+                        <EditableText
+                          value={line[column.key]}
+                          onCommit={(nextValue) =>
+                            handleLineCommit(rowIndex, column.key, nextValue)
+                          }
+                          multiline={column.multiline}
+                          disabled={!column.editable || templateModesActive}
+                          className={
+                            column.multiline
+                              ? 'erp-material-contract-table__editable erp-material-contract-table__editable-multiline'
+                              : 'erp-material-contract-table__editable'
+                          }
+                        />
+                      </td>
+                    )
+                  })}
                 </tr>
               ))}
               <tr className="erp-material-contract-table__total">
@@ -867,24 +1190,6 @@ export default function MaterialPurchaseContractWorkbench({
           </div>
         </div>
       </div>
-
-      <Modal
-        open={pdfPreviewOpen}
-        title="采购合同 PDF 预览"
-        onCancel={() => setPdfPreviewOpen(false)}
-        footer={null}
-        width="90vw"
-        style={{ top: 24 }}
-        destroyOnHidden
-      >
-        {pdfPreviewURL ? (
-          <iframe
-            title="采购合同 PDF 预览"
-            src={pdfPreviewURL}
-            className="erp-material-contract-pdf-frame"
-          />
-        ) : null}
-      </Modal>
     </PrintWorkspaceShell>
   )
 }

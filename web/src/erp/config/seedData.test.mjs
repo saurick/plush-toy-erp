@@ -63,8 +63,14 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
     [
       '/erp/docs/operation-flow-overview',
       '/erp/docs/operation-guide',
+      '/erp/docs/role-collaboration-guide',
+      '/erp/docs/desktop-role-guide',
+      '/erp/docs/mobile-role-guide',
       '/erp/docs/field-linkage-guide',
       '/erp/docs/calculation-guide',
+      '/erp/docs/print-snapshot-guide',
+      '/erp/docs/exception-handling-guide',
+      '/erp/docs/current-boundaries',
     ]
   )
   assert.deepEqual(
@@ -114,6 +120,22 @@ test('businessModules: 业务页菜单按毛绒业务收口且不回退到 trade
     assert(moduleItem.relatedLinks.length > 0)
     assert(moduleItem.sourceRefs.length > 0)
   })
+
+  const accessoriesModule = businessModuleDefinitions.find(
+    (moduleItem) => moduleItem.key === 'accessories-purchase'
+  )
+  const processingModule = businessModuleDefinitions.find(
+    (moduleItem) => moduleItem.key === 'processing-contracts'
+  )
+
+  assert.equal(
+    accessoriesModule?.relatedLinks[0]?.path,
+    '/erp/print-center?source=business&template=material-purchase-contract'
+  )
+  assert.equal(
+    processingModule?.relatedLinks[0]?.path,
+    '/erp/print-center?source=business&template=processing-contract'
+  )
 })
 
 test('appRegistry: 桌面后台单入口，移动端按角色拆端口', () => {

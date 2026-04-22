@@ -83,8 +83,14 @@ const navIconRegistry = {
   'print-center': <PrinterOutlined />,
   'help-operation-flow-overview': <ApartmentOutlined />,
   'help-operation-guide': <BookOutlined />,
+  'help-role-collaboration-guide': <ApartmentOutlined />,
+  'help-desktop-role-guide': <AppstoreOutlined />,
+  'help-mobile-role-guide': <MobileOutlined />,
   'help-field-linkage-guide': <TagOutlined />,
   'help-calculation-guide': <CalculatorOutlined />,
+  'help-print-snapshot-guide': <PrinterOutlined />,
+  'help-exception-handling-guide': <AlertOutlined />,
+  'help-current-boundaries': <QuestionCircleOutlined />,
   'help-center': <QuestionCircleOutlined />,
   'doc-system-init': <BookOutlined />,
   'doc-operation-playbook': <BookOutlined />,
@@ -262,7 +268,9 @@ export default function ERPLayout() {
   )
 
   const selectedKeys = currentEntry?.path ? [currentEntry.path] : []
-  const hidePageHead = currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path
+  const hidePageHead =
+    currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path ||
+    location.pathname.startsWith('/erp/docs/')
 
   const handleNavigate = (nextPath) => {
     if (!nextPath || nextPath === location.pathname) {

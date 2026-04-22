@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Space, Tag, Typography } from 'antd'
 import { ArrowRightOutlined, PrinterOutlined } from '@ant-design/icons'
+import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -8,8 +9,12 @@ import {
   printTemplateStats,
 } from '../config/printTemplates.mjs'
 import {
+  PRINT_WORKSPACE_DRAFT_MODE,
+  PRINT_WORKSPACE_ENTRY_SOURCE,
   isSupportedPrintWorkspaceTemplate,
   openPrintWorkspaceWindow,
+  resolvePrintWorkspaceEntrySource,
+  resolvePrintWorkspaceDraftMode,
 } from '../utils/printWorkspace.js'
 
 const { Paragraph, Text, Title } = Typography
@@ -30,7 +35,33 @@ const PRINT_CENTER_OVERVIEW_ITEMS = [
 ]
 
 export default function PrintCenterPage() {
-  const [activeKey, setActiveKey] = useState(printTemplateCatalog[0]?.key || '')
+  const [searchParams] = useSearchParams()
+  const requestedTemplateKey = String(searchParams.get('template') || '').trim()
+  const requestedEntrySource = resolvePrintWorkspaceEntrySource(searchParams)
+  const requestedDraftMode =
+    requestedEntrySource === PRINT_WORKSPACE_ENTRY_SOURCE.MENU
+      ? PRINT_WORKSPACE_DRAFT_MODE.FRESH
+      : resolvePrintWorkspaceDraftMode(searchParams)
+  const [activeKey, setActiveKey] = useState(() => {
+    if (isSupportedPrintWorkspaceTemplate(requestedTemplateKey)) {
+      return requestedTemplateKey
+    }
+    return printTemplateCatalog[0]?.key || ''
+  })
+
+  useEffect(() => {
+    if (
+      requestedTemplateKey &&
+      isSupportedPrintWorkspaceTemplate(requestedTemplateKey)
+    ) {
+      setActiveKey(requestedTemplateKey)
+      return
+    }
+
+    if (!activeKey && printTemplateCatalog[0]?.key) {
+      setActiveKey(printTemplateCatalog[0].key)
+    }
+  }, [activeKey, requestedTemplateKey])
 
   const activeTemplate = useMemo(
     () =>
@@ -45,7 +76,10 @@ export default function PrintCenterPage() {
   const handleOpenEditablePrint = async () => {
     try {
       if (supportsWorkspace) {
-        openPrintWorkspaceWindow(activeTemplate.key)
+        openPrintWorkspaceWindow(activeTemplate.key, {
+          entrySource: requestedEntrySource,
+          draftMode: requestedDraftMode,
+        })
         return
       }
       window.location.assign(`/erp/print-center/${activeTemplate.key}`)

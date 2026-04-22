@@ -1,5 +1,29 @@
 export const PROCESSING_CONTRACT_TEMPLATE_KEY = 'processing-contract'
 export const PROCESSING_CONTRACT_MIN_ROWS = 5
+export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
+  { key: 'contractNo', fieldKey: 'contractNo', label: '委外加工订单号' },
+  { key: 'productOrderNo', fieldKey: 'productOrderNo', label: '产品订单编号' },
+  { key: 'productNo', fieldKey: 'productNo', label: '产品编号' },
+  {
+    key: 'productName',
+    fieldKey: 'productName',
+    label: '产品名称',
+    multiline: true,
+  },
+  {
+    key: 'processName',
+    fieldKey: 'processName',
+    label: '工序名称',
+    multiline: true,
+  },
+  { key: 'supplierAlias', fieldKey: 'supplierAlias', label: '加工厂商' },
+  { key: 'processCategory', fieldKey: 'processCategory', label: '工序类别' },
+  { key: 'unit', fieldKey: 'unit', label: '单位' },
+  { key: 'unitPrice', fieldKey: 'unitPrice', label: '单价' },
+  { key: 'quantity', fieldKey: 'quantity', label: '委托加工数量' },
+  { key: 'amount', fieldKey: null, label: '委托加工金额', readOnly: true },
+  { key: 'remark', fieldKey: 'remark', label: '备注', multiline: true },
+]
 
 const defaultClauses = {
   delivery: [
@@ -28,6 +52,21 @@ export const processingContractAttachmentSlots = [
     title: '纸样 / 图样附件位 2',
   },
 ]
+
+export function createEmptyProcessingAttachment() {
+  return {
+    name: '',
+    dataURL: '',
+    mimeType: '',
+  }
+}
+
+export function createEmptyProcessingAttachments() {
+  return processingContractAttachmentSlots.reduce((state, slot) => {
+    state[slot.key] = createEmptyProcessingAttachment()
+    return state
+  }, {})
+}
 
 const defaultLines = [
   {
@@ -81,18 +120,19 @@ export const processingContractTemplateMeta = {
     '基于“模板-材料与加工合同.xlsx”的 `B类加工合同` 工作表，并对照 `9.3加工合同-子淳.pdf` 的单页纸质合同，收口加工合同的独立打印工作台。',
   scene: '委外加工下单、加工厂回签、财务对账留档',
   layout:
-    'A4 单页固定合同版式，包含双栏合同头、加工明细表、条款区和签字区；纸样 / 图样附件改由工作台单独上传。',
+    'A4 单页固定合同版式，包含双栏合同头、加工明细表、条款区、签字区和页底两处纸样 / 图样附件位。',
   output: '在线预览 PDF / 下载 PDF / 打印',
   notes: [
     '加工合同当前和采购合同一样，统一走独立打印工作台链路；其余汇总表和报表模板继续保留静态预览。',
-    '顶部按钮和弹窗工作流对齐 trade-erp 报价单打印：先打开可编辑打印窗口，再做 PDF 预览、下载和打印。',
-    '纸样 / 图样附件通过工作台独立上传，不进入右侧合同模板或 PDF；若后续接图，应继续作为合同附件快照单独带值。',
+    '顶部按钮和弹窗工作流对齐 trade-erp 报价单打印：先打开可编辑打印窗口，再做独立 PDF 预览窗口 / 下载 PDF / 打印。',
+    '工作台上插 / 下插明细行时会新增真正空白行，不再预填合同号、产品号或其他相邻行字段。',
+    '纸样 / 图样附件通过工作台独立上传，并同步进入右侧页底附件位，随 PDF / 打印一起输出。',
   ],
   tags: ['固定版式', '合同快照', 'PDF / 打印', '可编辑窗口'],
   previewLines: [
     '合同头 / 加工商信息',
     '加工明细 / 合计',
-    '条款 / 签章 / 附件上传',
+    '条款 / 签章 / 页底附件位',
   ],
   sourceFiles: [
     '/Users/simon/Downloads/永绅erp/原文件/模板-材料与加工合同.xlsx（B类加工合同 / B类汇总表 / 加工厂商）',
@@ -102,19 +142,20 @@ export const processingContractTemplateMeta = {
     '合同编号、下单日期、回货日期、加工方名称、委托单位都属于合同头快照，不回写主数据。',
     '工序名称、工序类别、单价、委托加工数量、委托加工金额属于合同明细快照；打印态金额按数量 × 单价自动重算。',
     '来货要求、合同约定、结算方式属于正式合同正文，不应只留在帮助文档里口头说明。',
-    '纸样 / 图样附件属于附件快照层，当前通过工作台按钮单独上传，不并入合同正文或打印模板。',
+    '纸样 / 图样附件属于附件快照层，当前通过工作台上传后进入页底附件位，并随 PDF / 打印一起冻结。',
   ],
   helpNotes: [
-    '当前主链路是“打印中心 -> 可编辑打印窗口 -> 在线预览 PDF / 下载 PDF / 打印”，不再走静态预览页。',
+    '当前主链路是“打印中心 -> 可编辑打印窗口 -> 独立 PDF 预览窗口 / 下载 PDF / 打印”，不再走静态预览页。',
     '工作台壳层、顶部按钮和左右双栏布局已对齐 trade-erp 的打印工作流。',
     '合同明细支持在工作台里选行、插行、删行；适合先调明细结构，再确认 PDF 和打印观感。',
-    '纸样 / 图样附件当前通过工作台按钮单独上传；如果后续接真实业务带值，应继续从合同头快照、合同行快照和附件快照三层分别带入，不要混成一层。',
+    '加工合同明细当前最多支持 300 行，顶部计数会显示“当前行数/300”。',
+    '纸样 / 图样附件当前通过工作台按钮上传并映射到页底附件位；如果后续接真实业务带值，应继续从合同头快照、合同行快照和附件快照三层分别带入，不要混成一层。',
   ],
 }
 
-export function createEmptyProcessingLine(contractNo = '') {
+export function createEmptyProcessingLine() {
   return {
-    contractNo,
+    contractNo: '',
     productOrderNo: '',
     productNo: '',
     productName: '',
@@ -179,6 +220,25 @@ export function normalizeProcessingLine(line = {}) {
   }
 }
 
+export function normalizeProcessingAttachmentSnapshot(attachment = {}) {
+  const normalizedDataURL = normalizeText(attachment.dataURL)
+  return {
+    name: normalizeText(attachment.name),
+    dataURL: normalizedDataURL.startsWith('data:') ? normalizedDataURL : '',
+    mimeType: normalizeText(attachment.mimeType),
+  }
+}
+
+export function normalizeProcessingContractAttachments(attachments = {}) {
+  const source =
+    attachments && typeof attachments === 'object' ? attachments : {}
+
+  return processingContractAttachmentSlots.reduce((state, slot) => {
+    state[slot.key] = normalizeProcessingAttachmentSnapshot(source[slot.key])
+    return state
+  }, {})
+}
+
 export function calculateProcessingContractTotals(lines = []) {
   let totalQuantity = 0
   let totalAmount = 0
@@ -236,7 +296,9 @@ export function createProcessingContractDraft() {
     buyerAddress: '东莞茶山',
     buyerSignDateText: '2025-06-08',
     supplierSignDateText: '2025  年    月    日',
+    attachments: createEmptyProcessingAttachments(),
     lines: defaultLines.map((line) => normalizeProcessingLine(line)),
     clauses: structuredClone(defaultClauses),
+    merges: [],
   }
 }

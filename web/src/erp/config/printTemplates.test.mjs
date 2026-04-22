@@ -25,5 +25,14 @@ test('printTemplates: 首批模板均来自真实资料并保留样例数据', (
     getPrintTemplateByKey('material-purchase-contract')?.title,
     '采购合同'
   )
-  assert.equal(getPrintTemplateByKey('processing-contract')?.title, '加工合同')
+  const processingTemplate = getPrintTemplateByKey('processing-contract')
+  assert.equal(processingTemplate?.title, '加工合同')
+  assert.deepEqual(Object.keys(processingTemplate?.sample.attachments || {}), [
+    'attachment-1',
+    'attachment-2',
+  ])
+  assert.equal(
+    processingTemplate?.sample.attachments['attachment-1']?.dataURL,
+    ''
+  )
 })
