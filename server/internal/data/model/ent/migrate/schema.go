@@ -13,6 +13,8 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "username", Type: field.TypeString, Size: 64},
 		{Name: "password_hash", Type: field.TypeString},
+		{Name: "level", Type: field.TypeInt8, Default: 0},
+		{Name: "menu_permissions", Type: field.TypeString, Size: 4096, Default: ""},
 		{Name: "disabled", Type: field.TypeBool, Default: false},
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -28,6 +30,11 @@ var (
 				Name:    "adminuser_username",
 				Unique:  true,
 				Columns: []*schema.Column{AdminUsersColumns[1]},
+			},
+			{
+				Name:    "adminuser_level",
+				Unique:  false,
+				Columns: []*schema.Column{AdminUsersColumns[3]},
 			},
 		},
 	}

@@ -37,7 +37,7 @@ func InitAdminUsersIfNeeded(ctx context.Context, d *Data, cfg *conf.Data, l *log
 	// 多副本并发启动时，管理员初始化必须保持幂等，避免“先查后插”在唯一键上互相踩踏。
 	result, err := d.sqldb.ExecContext(
 		ctx,
-		"INSERT INTO admin_users (username, password_hash, disabled, created_at, updated_at) VALUES ($1, $2, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
+		"INSERT INTO admin_users (username, password_hash, level, menu_permissions, disabled, created_at, updated_at) VALUES ($1, $2, 0, '', FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
 		username,
 		string(hash),
 		now,

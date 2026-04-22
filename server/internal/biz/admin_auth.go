@@ -21,10 +21,15 @@ type AdminAuthRepo interface {
 }
 
 type AdminUser struct {
-	ID           int
-	Username     string
-	PasswordHash string
-	Disabled     bool
+	ID              int
+	Username        string
+	PasswordHash    string
+	Level           int8
+	MenuPermissions []string
+	Disabled        bool
+	LastLoginAt     *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type AdminAuthUsecase struct {

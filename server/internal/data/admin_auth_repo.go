@@ -34,17 +34,22 @@ func (r *adminAuthRepo) GetAdminByID(ctx context.Context, id int) (*biz.AdminUse
 	}
 
 	var (
-		adminID      int
-		uname        string
-		passwordHash string
-		disabled     bool
+		adminID         int
+		uname           string
+		passwordHash    string
+		level           int8
+		menuPermissions string
+		disabled        bool
+		lastLoginAt     *time.Time
+		createdAt       time.Time
+		updatedAt       time.Time
 	)
 
 	err := r.data.sqldb.QueryRowContext(
 		ctx,
-		"SELECT id, username, password_hash, disabled FROM admin_users WHERE id = $1 LIMIT 1",
+		"SELECT id, username, password_hash, level, menu_permissions, disabled, last_login_at, created_at, updated_at FROM admin_users WHERE id = $1 LIMIT 1",
 		id,
-	).Scan(&adminID, &uname, &passwordHash, &disabled)
+	).Scan(&adminID, &uname, &passwordHash, &level, &menuPermissions, &disabled, &lastLoginAt, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			l.Infof("GetAdminByID not found id=%d", id)
@@ -55,10 +60,15 @@ func (r *adminAuthRepo) GetAdminByID(ctx context.Context, id int) (*biz.AdminUse
 	}
 
 	return &biz.AdminUser{
-		ID:           adminID,
-		Username:     uname,
-		PasswordHash: passwordHash,
-		Disabled:     disabled,
+		ID:              adminID,
+		Username:        uname,
+		PasswordHash:    passwordHash,
+		Level:           level,
+		MenuPermissions: decodeMenuPermissions(menuPermissions),
+		Disabled:        disabled,
+		LastLoginAt:     lastLoginAt,
+		CreatedAt:       createdAt,
+		UpdatedAt:       updatedAt,
 	}, nil
 }
 
@@ -70,17 +80,22 @@ func (r *adminAuthRepo) GetAdminByUsername(ctx context.Context, username string)
 	}
 
 	var (
-		id           int
-		uname        string
-		passwordHash string
-		disabled     bool
+		id              int
+		uname           string
+		passwordHash    string
+		level           int8
+		menuPermissions string
+		disabled        bool
+		lastLoginAt     *time.Time
+		createdAt       time.Time
+		updatedAt       time.Time
 	)
 
 	err := r.data.sqldb.QueryRowContext(
 		ctx,
-		"SELECT id, username, password_hash, disabled FROM admin_users WHERE username = $1 LIMIT 1",
+		"SELECT id, username, password_hash, level, menu_permissions, disabled, last_login_at, created_at, updated_at FROM admin_users WHERE username = $1 LIMIT 1",
 		username,
-	).Scan(&id, &uname, &passwordHash, &disabled)
+	).Scan(&id, &uname, &passwordHash, &level, &menuPermissions, &disabled, &lastLoginAt, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			l.Infof("GetAdminByUsername not found username=%s", username)
@@ -91,10 +106,15 @@ func (r *adminAuthRepo) GetAdminByUsername(ctx context.Context, username string)
 	}
 
 	return &biz.AdminUser{
-		ID:           id,
-		Username:     uname,
-		PasswordHash: passwordHash,
-		Disabled:     disabled,
+		ID:              id,
+		Username:        uname,
+		PasswordHash:    passwordHash,
+		Level:           level,
+		MenuPermissions: decodeMenuPermissions(menuPermissions),
+		Disabled:        disabled,
+		LastLoginAt:     lastLoginAt,
+		CreatedAt:       createdAt,
+		UpdatedAt:       updatedAt,
 	}, nil
 }
 

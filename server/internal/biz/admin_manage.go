@@ -1,0 +1,345 @@
+package biz
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/crypto/bcrypt"
+)
+
+var (
+	ErrAdminNotFound     = errors.New("admin not found")
+	ErrAdminExists       = errors.New("admin already exists")
+	ErrAdminInvalidLevel = errors.New("invalid admin level")
+)
+
+type AdminCreate struct {
+	Username        string
+	PasswordHash    string
+	Level           AdminLevel
+	MenuPermissions []string
+}
+
+type AdminManageRepo interface {
+	GetAdminByID(ctx context.Context, id int) (*AdminUser, error)
+	GetAdminByUsername(ctx context.Context, username string) (*AdminUser, error)
+	ListAdmins(ctx context.Context) ([]*AdminUser, error)
+	CreateAdmin(ctx context.Context, admin *AdminCreate) (*AdminUser, error)
+	UpdateAdminMenuPermissions(ctx context.Context, id int, menuPermissions []string) error
+	SetAdminDisabled(ctx context.Context, id int, disabled bool) error
+}
+
+type AdminManageUsecase struct {
+	repo   AdminManageRepo
+	log    *log.Helper
+	tracer trace.Tracer
+}
+
+func NewAdminManageUsecase(repo AdminManageRepo, logger log.Logger, tp *tracesdk.TracerProvider) *AdminManageUsecase {
+	helper := log.NewHelper(log.With(logger, "module", "biz.admin_manage"))
+	var tr trace.Tracer
+	if tp != nil {
+		tr = tp.Tracer("biz.admin_manage")
+	} else {
+		tr = otel.Tracer("biz.admin_manage")
+	}
+	return &AdminManageUsecase{
+		repo:   repo,
+		log:    helper,
+		tracer: tr,
+	}
+}
+
+func (uc *AdminManageUsecase) Tracer() trace.Tracer {
+	if uc.tracer != nil {
+		return uc.tracer
+	}
+	return otel.Tracer("biz.admin_manage")
+}
+
+func (uc *AdminManageUsecase) requireAdmin(ctx context.Context) (*AuthClaims, error) {
+	c, ok := GetClaimsFromContext(ctx)
+	if !ok || c == nil {
+		return nil, ErrForbidden
+	}
+	if c.Role != RoleAdmin {
+		return nil, ErrForbidden
+	}
+	return c, nil
+}
+
+func (uc *AdminManageUsecase) getCurrentAdmin(ctx context.Context) (*AdminUser, error) {
+	claims, err := uc.requireAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	admin, err := uc.repo.GetAdminByID(ctx, claims.UserID)
+	if err == nil && admin != nil {
+		return admin, nil
+	}
+	if err != nil && !errors.Is(err, ErrAdminNotFound) {
+		return nil, err
+	}
+	if strings.TrimSpace(claims.Username) == "" {
+		return nil, ErrAdminNotFound
+	}
+	return uc.repo.GetAdminByUsername(ctx, claims.Username)
+}
+
+func (uc *AdminManageUsecase) requireSuperAdmin(ctx context.Context) (*AdminUser, error) {
+	admin, err := uc.getCurrentAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if admin.Disabled {
+		return nil, ErrUserDisabled
+	}
+	if AdminLevel(admin.Level) != AdminLevelSuper {
+		return nil, ErrNoPermission
+	}
+	return admin, nil
+}
+
+func (uc *AdminManageUsecase) fillEffectiveMenuPermissions(admin *AdminUser) {
+	if admin == nil {
+		return
+	}
+	admin.MenuPermissions = EffectiveAdminMenuPermissions(
+		AdminLevel(admin.Level),
+		admin.MenuPermissions,
+	)
+}
+
+func (uc *AdminManageUsecase) GetCurrent(ctx context.Context) (admin *AdminUser, err error) {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.get_current")
+	defer span.End()
+
+	admin, err = uc.getCurrentAdmin(ctx)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if admin.Disabled {
+		span.SetStatus(codes.Error, ErrUserDisabled.Error())
+		return nil, ErrUserDisabled
+	}
+
+	uc.fillEffectiveMenuPermissions(admin)
+	span.SetAttributes(
+		attribute.Int("admin.id", admin.ID),
+		attribute.Int("admin.level", int(admin.Level)),
+	)
+	span.SetStatus(codes.Ok, "OK")
+	return admin, nil
+}
+
+func (uc *AdminManageUsecase) List(ctx context.Context) (list []*AdminUser, err error) {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.list")
+	defer span.End()
+
+	operator, err := uc.getCurrentAdmin(ctx)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if operator.Disabled {
+		span.SetStatus(codes.Error, ErrUserDisabled.Error())
+		return nil, ErrUserDisabled
+	}
+
+	list, err = uc.repo.ListAdmins(ctx)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	for _, admin := range list {
+		uc.fillEffectiveMenuPermissions(admin)
+	}
+	span.SetAttributes(attribute.Int("admin_manage.count", len(list)))
+	span.SetStatus(codes.Ok, "OK")
+	return list, nil
+}
+
+func (uc *AdminManageUsecase) Create(
+	ctx context.Context,
+	username string,
+	password string,
+	level AdminLevel,
+	menuPermissions []string,
+) (created *AdminUser, err error) {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.create",
+		trace.WithAttributes(
+			attribute.String("admin.username", strings.TrimSpace(username)),
+			attribute.Int("admin.level", int(level)),
+			attribute.Int("admin.menu_permissions_count", len(menuPermissions)),
+		),
+	)
+	defer span.End()
+
+	if _, err = uc.requireSuperAdmin(ctx); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+
+	username = strings.TrimSpace(username)
+	if username == "" || password == "" {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
+	}
+	if len(password) < 6 {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
+	}
+	if level != AdminLevelSuper && level != AdminLevelStandard {
+		span.SetStatus(codes.Error, ErrAdminInvalidLevel.Error())
+		return nil, ErrAdminInvalidLevel
+	}
+
+	normalizedMenus := NormalizeAdminMenuPermissions(menuPermissions)
+	if level == AdminLevelSuper {
+		normalizedMenus = AllAdminMenuPermissions()
+	} else if len(normalizedMenus) == 0 {
+		normalizedMenus = DefaultAdminMenuPermissions()
+	}
+
+	if existing, checkErr := uc.repo.GetAdminByUsername(ctx, username); checkErr == nil && existing != nil {
+		span.SetStatus(codes.Error, ErrAdminExists.Error())
+		return nil, ErrAdminExists
+	} else if checkErr != nil && !errors.Is(checkErr, ErrAdminNotFound) && !errors.Is(checkErr, ErrBadParam) {
+		span.RecordError(checkErr)
+		span.SetStatus(codes.Error, checkErr.Error())
+		return nil, checkErr
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+
+	created, err = uc.repo.CreateAdmin(ctx, &AdminCreate{
+		Username:        username,
+		PasswordHash:    string(hash),
+		Level:           level,
+		MenuPermissions: normalizedMenus,
+	})
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	uc.fillEffectiveMenuPermissions(created)
+	span.SetStatus(codes.Ok, "OK")
+	return created, nil
+}
+
+func (uc *AdminManageUsecase) SetMenuPermissions(
+	ctx context.Context,
+	adminID int,
+	menuPermissions []string,
+) (updated *AdminUser, err error) {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.set_menu_permissions",
+		trace.WithAttributes(
+			attribute.Int("admin.id", adminID),
+			attribute.Int("admin.menu_permissions_count", len(menuPermissions)),
+		),
+	)
+	defer span.End()
+
+	if _, err = uc.requireSuperAdmin(ctx); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if adminID <= 0 {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
+	}
+
+	target, err := uc.repo.GetAdminByID(ctx, adminID)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if AdminLevel(target.Level) == AdminLevelSuper {
+		span.SetStatus(codes.Error, ErrNoPermission.Error())
+		return nil, ErrNoPermission
+	}
+
+	normalizedMenus := NormalizeAdminMenuPermissions(menuPermissions)
+	if err = uc.repo.UpdateAdminMenuPermissions(ctx, adminID, normalizedMenus); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+
+	target.MenuPermissions = normalizedMenus
+	uc.fillEffectiveMenuPermissions(target)
+	span.SetStatus(codes.Ok, "OK")
+	return target, nil
+}
+
+func (uc *AdminManageUsecase) SetDisabled(
+	ctx context.Context,
+	adminID int,
+	disabled bool,
+) (updated *AdminUser, err error) {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.set_disabled",
+		trace.WithAttributes(
+			attribute.Int("admin.id", adminID),
+			attribute.Bool("admin.disabled", disabled),
+		),
+	)
+	defer span.End()
+
+	operator, err := uc.requireSuperAdmin(ctx)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if adminID <= 0 {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
+	}
+
+	target, err := uc.repo.GetAdminByID(ctx, adminID)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if AdminLevel(target.Level) == AdminLevelSuper {
+		span.SetStatus(codes.Error, ErrNoPermission.Error())
+		return nil, ErrNoPermission
+	}
+	if operator.ID == target.ID {
+		span.SetStatus(codes.Error, ErrNoPermission.Error())
+		return nil, ErrNoPermission
+	}
+
+	if err = uc.repo.SetAdminDisabled(ctx, adminID, disabled); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+
+	target.Disabled = disabled
+	uc.fillEffectiveMenuPermissions(target)
+	span.SetStatus(codes.Ok, "OK")
+	return target, nil
+}

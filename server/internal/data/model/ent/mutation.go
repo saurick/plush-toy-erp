@@ -32,19 +32,22 @@ const (
 // AdminUserMutation represents an operation that mutates the AdminUser nodes in the graph.
 type AdminUserMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int
-	username      *string
-	password_hash *string
-	disabled      *bool
-	last_login_at *time.Time
-	created_at    *time.Time
-	updated_at    *time.Time
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*AdminUser, error)
-	predicates    []predicate.AdminUser
+	op               Op
+	typ              string
+	id               *int
+	username         *string
+	password_hash    *string
+	level            *int8
+	addlevel         *int8
+	menu_permissions *string
+	disabled         *bool
+	last_login_at    *time.Time
+	created_at       *time.Time
+	updated_at       *time.Time
+	clearedFields    map[string]struct{}
+	done             bool
+	oldValue         func(context.Context) (*AdminUser, error)
+	predicates       []predicate.AdminUser
 }
 
 var _ ent.Mutation = (*AdminUserMutation)(nil)
@@ -215,6 +218,98 @@ func (m *AdminUserMutation) OldPasswordHash(ctx context.Context) (v string, err 
 // ResetPasswordHash resets all changes to the "password_hash" field.
 func (m *AdminUserMutation) ResetPasswordHash() {
 	m.password_hash = nil
+}
+
+// SetLevel sets the "level" field.
+func (m *AdminUserMutation) SetLevel(i int8) {
+	m.level = &i
+	m.addlevel = nil
+}
+
+// Level returns the value of the "level" field in the mutation.
+func (m *AdminUserMutation) Level() (r int8, exists bool) {
+	v := m.level
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLevel returns the old "level" field's value of the AdminUser entity.
+// If the AdminUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminUserMutation) OldLevel(ctx context.Context) (v int8, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLevel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLevel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLevel: %w", err)
+	}
+	return oldValue.Level, nil
+}
+
+// AddLevel adds i to the "level" field.
+func (m *AdminUserMutation) AddLevel(i int8) {
+	if m.addlevel != nil {
+		*m.addlevel += i
+	} else {
+		m.addlevel = &i
+	}
+}
+
+// AddedLevel returns the value that was added to the "level" field in this mutation.
+func (m *AdminUserMutation) AddedLevel() (r int8, exists bool) {
+	v := m.addlevel
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLevel resets all changes to the "level" field.
+func (m *AdminUserMutation) ResetLevel() {
+	m.level = nil
+	m.addlevel = nil
+}
+
+// SetMenuPermissions sets the "menu_permissions" field.
+func (m *AdminUserMutation) SetMenuPermissions(s string) {
+	m.menu_permissions = &s
+}
+
+// MenuPermissions returns the value of the "menu_permissions" field in the mutation.
+func (m *AdminUserMutation) MenuPermissions() (r string, exists bool) {
+	v := m.menu_permissions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMenuPermissions returns the old "menu_permissions" field's value of the AdminUser entity.
+// If the AdminUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminUserMutation) OldMenuPermissions(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMenuPermissions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMenuPermissions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMenuPermissions: %w", err)
+	}
+	return oldValue.MenuPermissions, nil
+}
+
+// ResetMenuPermissions resets all changes to the "menu_permissions" field.
+func (m *AdminUserMutation) ResetMenuPermissions() {
+	m.menu_permissions = nil
 }
 
 // SetDisabled sets the "disabled" field.
@@ -408,12 +503,18 @@ func (m *AdminUserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AdminUserMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 8)
 	if m.username != nil {
 		fields = append(fields, adminuser.FieldUsername)
 	}
 	if m.password_hash != nil {
 		fields = append(fields, adminuser.FieldPasswordHash)
+	}
+	if m.level != nil {
+		fields = append(fields, adminuser.FieldLevel)
+	}
+	if m.menu_permissions != nil {
+		fields = append(fields, adminuser.FieldMenuPermissions)
 	}
 	if m.disabled != nil {
 		fields = append(fields, adminuser.FieldDisabled)
@@ -439,6 +540,10 @@ func (m *AdminUserMutation) Field(name string) (ent.Value, bool) {
 		return m.Username()
 	case adminuser.FieldPasswordHash:
 		return m.PasswordHash()
+	case adminuser.FieldLevel:
+		return m.Level()
+	case adminuser.FieldMenuPermissions:
+		return m.MenuPermissions()
 	case adminuser.FieldDisabled:
 		return m.Disabled()
 	case adminuser.FieldLastLoginAt:
@@ -460,6 +565,10 @@ func (m *AdminUserMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldUsername(ctx)
 	case adminuser.FieldPasswordHash:
 		return m.OldPasswordHash(ctx)
+	case adminuser.FieldLevel:
+		return m.OldLevel(ctx)
+	case adminuser.FieldMenuPermissions:
+		return m.OldMenuPermissions(ctx)
 	case adminuser.FieldDisabled:
 		return m.OldDisabled(ctx)
 	case adminuser.FieldLastLoginAt:
@@ -490,6 +599,20 @@ func (m *AdminUserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPasswordHash(v)
+		return nil
+	case adminuser.FieldLevel:
+		v, ok := value.(int8)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLevel(v)
+		return nil
+	case adminuser.FieldMenuPermissions:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMenuPermissions(v)
 		return nil
 	case adminuser.FieldDisabled:
 		v, ok := value.(bool)
@@ -526,13 +649,21 @@ func (m *AdminUserMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *AdminUserMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addlevel != nil {
+		fields = append(fields, adminuser.FieldLevel)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *AdminUserMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case adminuser.FieldLevel:
+		return m.AddedLevel()
+	}
 	return nil, false
 }
 
@@ -541,6 +672,13 @@ func (m *AdminUserMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *AdminUserMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case adminuser.FieldLevel:
+		v, ok := value.(int8)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLevel(v)
+		return nil
 	}
 	return fmt.Errorf("unknown AdminUser numeric field %s", name)
 }
@@ -582,6 +720,12 @@ func (m *AdminUserMutation) ResetField(name string) error {
 		return nil
 	case adminuser.FieldPasswordHash:
 		m.ResetPasswordHash()
+		return nil
+	case adminuser.FieldLevel:
+		m.ResetLevel()
+		return nil
+	case adminuser.FieldMenuPermissions:
+		m.ResetMenuPermissions()
 		return nil
 	case adminuser.FieldDisabled:
 		m.ResetDisabled()

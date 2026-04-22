@@ -6,12 +6,12 @@ import { bootstrapChange } from '../config/seedData.mjs'
 const DONE_ITEMS = [
   '逐个读取并分析加工合同 PDF、两份材料 BOM Excel、加工汇总 Excel、辅包材采购 Excel、正式汇报 PDF 和生产订单截图。',
   '重写毛绒工厂主流程、字段真源对照、首批正式数据模型建议和 Excel / PDF 导入映射。',
-  '桌面后台继续保持一个入口，但新增角色切换、角色默认工作台、角色过滤菜单和角色化帮助中心。',
-  '同仓库内拆出 6 个角色移动端入口和端口矩阵，保持共享 common / ui / api / 文档层。',
+  '桌面后台继续保持一个入口，并把导航收口成固定后台菜单，不再保留角色切换和角色工作台入口。',
+  '同仓库内拆出 6 个角色移动端端口矩阵，保持共享 common / ui / api / 文档层。',
 ]
 
 const NOT_DONE_ITEMS = [
-  '拍照扫码、PDA、条码枪与图片识别。',
+  '扩展硬件链路、PDA、条码枪与图片识别。',
   '正式 Excel 导入落库、合同打印模板、PDF 定位填充。',
   '正式结算单 / 对账单样本不足前的完整账务实体。',
   '未确认编号体系直接落 Ent schema。',
@@ -20,7 +20,7 @@ const NOT_DONE_ITEMS = [
 const NEXT_ITEMS = [
   '继续补客户订单、出货单、结算单样本，确认订单编号层级关系。',
   '等字段稳定后再决定是否开始 Ent schema 与 migration。',
-  '把桌面角色页和移动端入口逐步接到真实接口与保存链路。',
+  '把桌面后台页面和移动端端口逐步接到真实接口与保存链路。',
 ]
 
 export default function ChangeLogPage() {

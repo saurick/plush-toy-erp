@@ -12,7 +12,7 @@
 - `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/admin_user.go`
 - `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/user.go`
 
-当前这些表只够支撑账号体系，不能误当成毛绒 ERP 业务模型。
+当前这些表只够支撑账号与后台权限体系，不能误当成毛绒 ERP 业务模型。
 
 ## 为什么不能照搬 trade-erp
 

@@ -26,7 +26,7 @@ func TestInitAdminUsersIfNeededCreatesAdminOnce(t *testing.T) {
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(
-		"INSERT INTO admin_users (username, password_hash, disabled, created_at, updated_at) VALUES ($1, $2, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
+		"INSERT INTO admin_users (username, password_hash, level, menu_permissions, disabled, created_at, updated_at) VALUES ($1, $2, 0, '', FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
 	)).
 		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -50,7 +50,7 @@ func TestInitAdminUsersIfNeededSkipsWhenAdminAlreadyExists(t *testing.T) {
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(
-		"INSERT INTO admin_users (username, password_hash, disabled, created_at, updated_at) VALUES ($1, $2, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
+		"INSERT INTO admin_users (username, password_hash, level, menu_permissions, disabled, created_at, updated_at) VALUES ($1, $2, 0, '', FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
 	)).
 		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 0))

@@ -16,6 +16,14 @@ function makeJsonRpcSuccess(id, payload = {}) {
   }
 }
 
+function makeBizResult(payload = {}) {
+  return {
+    code: 0,
+    message: 'OK',
+    data: payload,
+  }
+}
+
 // 构造一个 JSON-RPC 业务错误响应（code != 0）
 function makeJsonRpcBizError(id, code, message) {
   return {
@@ -130,6 +138,36 @@ export function setupJsonRpcMockServer() {
             },
           })
         }
+      } else if (method === 'admin_login') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            user_id: 1,
+            username: params.username || 'mock-admin',
+            access_token: 'mock-admin-token',
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            token_type: 'Bearer',
+            admin_level: 0,
+            menu_permissions: [
+              '/erp/dashboard',
+              '/erp/flows/overview',
+              '/erp/source-readiness',
+              '/erp/print-center',
+              '/erp/help-center',
+              '/erp/docs/system-init',
+              '/erp/docs/operation-playbook',
+              '/erp/docs/field-truth',
+              '/erp/docs/data-model',
+              '/erp/docs/import-mapping',
+              '/erp/docs/mobile-roles',
+              '/erp/docs/print-templates',
+              '/erp/changes/current',
+              '/erp/system/permissions',
+            ],
+          }),
+          error: '',
+        }
       } else if (method === 'logout') {
         responseBody = makeJsonRpcSuccess(id, {
           logout: {
@@ -141,6 +179,92 @@ export function setupJsonRpcMockServer() {
           id,
           400,
           `unknown auth method: ${method}`
+        )
+      }
+    } else if (domain === 'admin') {
+      if (method === 'me') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            id: 1,
+            username: 'mock-admin',
+            level: 0,
+            disabled: false,
+            menu_permissions: [
+              '/erp/dashboard',
+              '/erp/flows/overview',
+              '/erp/source-readiness',
+              '/erp/print-center',
+              '/erp/help-center',
+              '/erp/docs/system-init',
+              '/erp/docs/operation-playbook',
+              '/erp/docs/field-truth',
+              '/erp/docs/data-model',
+              '/erp/docs/import-mapping',
+              '/erp/docs/mobile-roles',
+              '/erp/docs/print-templates',
+              '/erp/changes/current',
+              '/erp/system/permissions',
+            ],
+          }),
+          error: '',
+        }
+      } else if (method === 'list') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            admins: [
+              {
+                id: 1,
+                username: 'mock-admin',
+                level: 0,
+                disabled: false,
+                menu_permissions: [],
+              },
+            ],
+          }),
+          error: '',
+        }
+      } else if (
+        method === 'create' ||
+        method === 'set_permissions' ||
+        method === 'set_disabled'
+      ) {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            admin: {
+              id: Number(params.id || 2),
+              username: params.username || 'mock-created-admin',
+              level: Number(params.level || 1),
+              disabled: Boolean(params.disabled),
+              menu_permissions: Array.isArray(params.menu_permissions)
+                ? params.menu_permissions
+                : [],
+            },
+          }),
+          error: '',
+        }
+      } else if (method === 'menu_options') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            menu_options: [
+              { key: '/erp/dashboard', label: '全局驾驶舱' },
+              { key: '/erp/system/permissions', label: '权限管理' },
+            ],
+          }),
+          error: '',
+        }
+      } else {
+        responseBody = makeJsonRpcBizError(
+          id,
+          400,
+          `unknown admin method: ${method}`
         )
       }
     } else {

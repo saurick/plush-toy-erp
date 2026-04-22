@@ -21,6 +21,10 @@ type AdminUser struct {
 	Username string `json:"username,omitempty"`
 	// PasswordHash holds the value of the "password_hash" field.
 	PasswordHash string `json:"-"`
+	// 0=super,1=standard
+	Level int8 `json:"level,omitempty"`
+	// 逗号分隔菜单权限
+	MenuPermissions string `json:"menu_permissions,omitempty"`
 	// Disabled holds the value of the "disabled" field.
 	Disabled bool `json:"disabled,omitempty"`
 	// LastLoginAt holds the value of the "last_login_at" field.
@@ -39,9 +43,9 @@ func (*AdminUser) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case adminuser.FieldDisabled:
 			values[i] = new(sql.NullBool)
-		case adminuser.FieldID:
+		case adminuser.FieldID, adminuser.FieldLevel:
 			values[i] = new(sql.NullInt64)
-		case adminuser.FieldUsername, adminuser.FieldPasswordHash:
+		case adminuser.FieldUsername, adminuser.FieldPasswordHash, adminuser.FieldMenuPermissions:
 			values[i] = new(sql.NullString)
 		case adminuser.FieldLastLoginAt, adminuser.FieldCreatedAt, adminuser.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -77,6 +81,18 @@ func (_m *AdminUser) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field password_hash", values[i])
 			} else if value.Valid {
 				_m.PasswordHash = value.String
+			}
+		case adminuser.FieldLevel:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field level", values[i])
+			} else if value.Valid {
+				_m.Level = int8(value.Int64)
+			}
+		case adminuser.FieldMenuPermissions:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field menu_permissions", values[i])
+			} else if value.Valid {
+				_m.MenuPermissions = value.String
 			}
 		case adminuser.FieldDisabled:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -143,6 +159,12 @@ func (_m *AdminUser) String() string {
 	builder.WriteString(_m.Username)
 	builder.WriteString(", ")
 	builder.WriteString("password_hash=<sensitive>")
+	builder.WriteString(", ")
+	builder.WriteString("level=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Level))
+	builder.WriteString(", ")
+	builder.WriteString("menu_permissions=")
+	builder.WriteString(_m.MenuPermissions)
 	builder.WriteString(", ")
 	builder.WriteString("disabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Disabled))

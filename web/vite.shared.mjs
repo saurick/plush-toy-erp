@@ -15,10 +15,7 @@ export function createERPViteConfig(appId) {
     const isDev = mode === 'development'
 
     if (!isProd) {
-      console.log('erp app =', app.id)
-      console.log('env =', env)
-      console.log('command =', command)
-      console.log('mode =', mode)
+      console.log(`[vite] erp app=${app.id} command=${command} mode=${mode}`)
     }
 
     return {

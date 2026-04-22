@@ -30,9 +30,10 @@ type JsonrpcData struct {
 	log  *log.Helper
 	cfg  *conf.Data
 
-	authUC      *biz.AuthUsecase
-	adminAuthUC *biz.AdminAuthUsecase
-	userAdminUC *biz.UserAdminUsecase
+	authUC        *biz.AuthUsecase
+	adminAuthUC   *biz.AdminAuthUsecase
+	adminManageUC *biz.AdminManageUsecase
+	userAdminUC   *biz.UserAdminUsecase
 
 	adminReader adminAccountReader
 }
@@ -46,6 +47,7 @@ func NewJsonrpcData(
 	adminAuthRepo *adminAuthRepo,
 	tokenGenerator biz.TokenGenerator,
 	adminTokenGenerator biz.AdminTokenGenerator,
+	adminManageRepo biz.AdminManageRepo,
 	userAdminRepo biz.UserAdminRepo,
 	tracerProvider *tracesdk.TracerProvider,
 ) *JsonrpcData {
@@ -66,24 +68,29 @@ func NewJsonrpcData(
 	if adminTokenGenerator == nil {
 		panic("NewJsonrpcData: adminTokenGenerator is nil")
 	}
+	if adminManageRepo == nil {
+		panic("NewJsonrpcData: adminManageRepo is nil")
+	}
 	if tracerProvider == nil {
 		panic("NewJsonrpcData: tracerProvider is nil")
 	}
 
 	authUC := biz.NewAuthUsecase(authRepo, tokenGenerator, logger, tracerProvider)
 	adminAuthUC := biz.NewAdminAuthUsecase(adminAuthRepo, adminTokenGenerator, logger, tracerProvider)
+	adminManageUC := biz.NewAdminManageUsecase(adminManageRepo, logger, tracerProvider)
 	userAdminUC := biz.NewUserAdminUsecase(userAdminRepo, logger, tracerProvider)
 
 	helper.Info("JsonrpcData created (auth/admin auth/user admin usecases constructed inside)")
 
 	return &JsonrpcData{
-		data:        data,
-		log:         helper,
-		cfg:         c,
-		authUC:      authUC,
-		adminAuthUC: adminAuthUC,
-		userAdminUC: userAdminUC,
-		adminReader: adminAuthRepo,
+		data:          data,
+		log:           helper,
+		cfg:           c,
+		authUC:        authUC,
+		adminAuthUC:   adminAuthUC,
+		adminManageUC: adminManageUC,
+		userAdminUC:   userAdminUC,
+		adminReader:   adminAuthRepo,
 	}
 }
 
@@ -117,6 +124,8 @@ func (d *JsonrpcData) Handle(
 		return d.handleSystem(ctx, id, method, params)
 	case "auth":
 		return d.handleAuth(ctx, method, id, params)
+	case "admin":
+		return d.handleAdmin(ctx, method, id, params)
 	case "user":
 		return d.handleUser(ctx, method, id, params)
 	default:
@@ -209,12 +218,14 @@ func (d *JsonrpcData) handleAuth(
 			Code:    errcode.OK.Code,
 			Message: "登录成功",
 			Data: newDataStruct(map[string]any{
-				"user_id":      admin.ID,
-				"username":     admin.Username,
-				"access_token": token,
-				"expires_at":   expireAt.Unix(),
-				"token_type":   "Bearer",
-				"issued_at":    time.Now().Unix(),
+				"user_id":          admin.ID,
+				"username":         admin.Username,
+				"access_token":     token,
+				"expires_at":       expireAt.Unix(),
+				"token_type":       "Bearer",
+				"issued_at":        time.Now().Unix(),
+				"admin_level":      admin.Level,
+				"menu_permissions": toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
 			}),
 		}, nil
 
@@ -280,10 +291,12 @@ func (d *JsonrpcData) handleAuth(
 				Code:    errcode.OK.Code,
 				Message: errcode.OK.Message,
 				Data: newDataStruct(map[string]any{
-					"id":       admin.ID,
-					"username": admin.Username,
-					"role":     int(biz.RoleAdmin),
-					"disabled": admin.Disabled,
+					"id":               admin.ID,
+					"username":         admin.Username,
+					"role":             int(biz.RoleAdmin),
+					"disabled":         admin.Disabled,
+					"level":            admin.Level,
+					"menu_permissions": toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
 				}),
 			}, nil
 		}
@@ -395,6 +408,34 @@ func getBool(m map[string]any, key string, def bool) bool {
 		return b
 	}
 	return def
+}
+
+func getStringSlice(m map[string]any, key string) []string {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return nil
+	}
+	rawItems, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(rawItems))
+	for _, item := range rawItems {
+		text := strings.TrimSpace(getString(map[string]any{"value": item}, "value"))
+		if text == "" {
+			continue
+		}
+		out = append(out, text)
+	}
+	return out
+}
+
+func toAnySliceString(items []string) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, item)
+	}
+	return out
 }
 
 func newDataStruct(m map[string]any) *structpb.Struct {
@@ -612,6 +653,197 @@ func (d *JsonrpcData) handleUser(
 			Code:    errcode.UnknownMethod.Code,
 			Message: fmt.Sprintf("未知用户接口 method=%s", method),
 		}, nil
+	}
+}
+
+func (d *JsonrpcData) handleAdmin(
+	ctx context.Context,
+	method, id string,
+	params *structpb.Struct,
+) (string, *v1.JsonrpcResult, error) {
+	l := d.log.WithContext(ctx)
+
+	pm := map[string]any{}
+	if params != nil {
+		pm = params.AsMap()
+	}
+
+	if _, res := d.requireAdmin(ctx); res != nil {
+		l.Warnf("[admin] requireAdmin denied method=%s id=%s code=%d msg=%s", method, id, res.Code, res.Message)
+		return id, res, nil
+	}
+
+	switch method {
+	case "me":
+		admin, err := d.adminManageUC.GetCurrent(ctx)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		lastLogin := int64(0)
+		if admin.LastLoginAt != nil {
+			lastLogin = admin.LastLoginAt.Unix()
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"id":               admin.ID,
+				"username":         admin.Username,
+				"level":            admin.Level,
+				"disabled":         admin.Disabled,
+				"last_login_at":    lastLogin,
+				"created_at":       admin.CreatedAt.Unix(),
+				"updated_at":       admin.UpdatedAt.Unix(),
+				"menu_permissions": toAnySliceString(admin.MenuPermissions),
+			}),
+		}, nil
+
+	case "list":
+		admins, err := d.adminManageUC.List(ctx)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		arr := make([]any, 0, len(admins))
+		for _, admin := range admins {
+			lastLogin := int64(0)
+			if admin.LastLoginAt != nil {
+				lastLogin = admin.LastLoginAt.Unix()
+			}
+			arr = append(arr, map[string]any{
+				"id":               admin.ID,
+				"username":         admin.Username,
+				"level":            admin.Level,
+				"disabled":         admin.Disabled,
+				"last_login_at":    lastLogin,
+				"created_at":       admin.CreatedAt.Unix(),
+				"updated_at":       admin.UpdatedAt.Unix(),
+				"menu_permissions": toAnySliceString(admin.MenuPermissions),
+			})
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(map[string]any{"admins": arr}),
+		}, nil
+
+	case "create":
+		username := getString(pm, "username")
+		password := getString(pm, "password")
+		level := biz.AdminLevel(getInt(pm, "level", int(biz.AdminLevelStandard)))
+		menuPermissions := getStringSlice(pm, "menu_permissions")
+
+		admin, err := d.adminManageUC.Create(ctx, username, password, level, menuPermissions)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": map[string]any{
+					"id":               admin.ID,
+					"username":         admin.Username,
+					"level":            admin.Level,
+					"disabled":         admin.Disabled,
+					"menu_permissions": toAnySliceString(admin.MenuPermissions),
+				},
+			}),
+		}, nil
+
+	case "menu_options":
+		options := biz.AdminMenuPermissionOptions()
+		menuOptions := make([]any, 0, len(options))
+		for _, item := range options {
+			menuOptions = append(menuOptions, map[string]any{
+				"key":   item.Key,
+				"label": item.Label,
+			})
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(map[string]any{"menu_options": menuOptions}),
+		}, nil
+
+	case "set_permissions":
+		adminID := getInt(pm, "id", 0)
+		menuPermissions := getStringSlice(pm, "menu_permissions")
+		admin, err := d.adminManageUC.SetMenuPermissions(ctx, adminID, menuPermissions)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": map[string]any{
+					"id":               admin.ID,
+					"username":         admin.Username,
+					"level":            admin.Level,
+					"disabled":         admin.Disabled,
+					"menu_permissions": toAnySliceString(admin.MenuPermissions),
+				},
+			}),
+		}, nil
+
+	case "set_disabled":
+		adminID := getInt(pm, "id", 0)
+		disabled, ok := pm["disabled"].(bool)
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		admin, err := d.adminManageUC.SetDisabled(ctx, adminID, disabled)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": map[string]any{
+					"id":               admin.ID,
+					"username":         admin.Username,
+					"level":            admin.Level,
+					"disabled":         admin.Disabled,
+					"menu_permissions": toAnySliceString(admin.MenuPermissions),
+				},
+			}),
+		}, nil
+
+	default:
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.UnknownMethod.Code,
+			Message: fmt.Sprintf("未知管理员接口 method=%s", method),
+		}, nil
+	}
+}
+
+func (d *JsonrpcData) mapAdminManageError(ctx context.Context, err error) *v1.JsonrpcResult {
+	l := d.log.WithContext(ctx)
+
+	switch {
+	case errors.Is(err, biz.ErrForbidden), errors.Is(err, biz.ErrNoPermission):
+		l.Warnf("[admin] permission denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	case errors.Is(err, biz.ErrBadParam):
+		l.Warnf("[admin] invalid param err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	case errors.Is(err, biz.ErrAdminInvalidLevel):
+		l.Warnf("[admin] invalid level err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminInvalidLevel.Code, Message: errcode.AdminInvalidLevel.Message}
+	case errors.Is(err, biz.ErrAdminNotFound):
+		l.Warnf("[admin] not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminNotFound.Code, Message: errcode.AdminNotFound.Message}
+	case errors.Is(err, biz.ErrAdminExists):
+		l.Warnf("[admin] exists err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminExists.Code, Message: errcode.AdminExists.Message}
+	case errors.Is(err, biz.ErrUserDisabled):
+		l.Warnf("[admin] disabled err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminDisabled.Code, Message: errcode.AdminDisabled.Message}
+	default:
+		l.Errorf("[admin] internal err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}
 }
 

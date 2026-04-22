@@ -10,7 +10,15 @@ const TOKEN_KEYS = {
   [AUTH_SCOPE.USER]: 'user_access_token',
   [AUTH_SCOPE.ADMIN]: 'admin_access_token',
 }
-const META_KEYS = ['expires_at', 'token_type', 'user_id', 'username']
+const META_KEYS = [
+  'expires_at',
+  'token_type',
+  'user_id',
+  'username',
+  'admin_level',
+  'menu_permissions',
+]
+const JSON_META_KEYS = new Set(['menu_permissions'])
 
 function normalizeScope(scope = AUTH_SCOPE.USER) {
   return scope === AUTH_SCOPE.ADMIN ? AUTH_SCOPE.ADMIN : AUTH_SCOPE.USER
@@ -58,7 +66,10 @@ function setScopedMeta(scope, data) {
   META_KEYS.forEach((key) => {
     const value = data?.[key]
     if (value != null && value !== '') {
-      localStorage.setItem(getScopedMetaKey(scope, key), String(value))
+      const serialized = JSON_META_KEYS.has(key)
+        ? JSON.stringify(value)
+        : String(value)
+      localStorage.setItem(getScopedMetaKey(scope, key), serialized)
     } else {
       localStorage.removeItem(getScopedMetaKey(scope, key))
     }
@@ -78,6 +89,26 @@ export function persistAuth(data, scope = AUTH_SCOPE.USER) {
   const normalizedScope = normalizeScope(scope)
   setToken(String(token), normalizedScope)
   setScopedMeta(normalizedScope, data || {})
+}
+
+export function persistAuthMeta(data, scope = AUTH_SCOPE.USER) {
+  setScopedMeta(normalizeScope(scope), data || {})
+}
+
+export function getAuthMeta(scope, key) {
+  const normalizedScope = normalizeScope(scope)
+  const raw = localStorage.getItem(getScopedMetaKey(normalizedScope, key))
+  if (raw == null || raw === '') {
+    return null
+  }
+  if (JSON_META_KEYS.has(key)) {
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+  return raw
 }
 
 export function getLoginPath(scope = AUTH_SCOPE.USER) {
@@ -123,6 +154,22 @@ export function getCurrentUser(scope = AUTH_SCOPE.USER) {
   } catch {
     logout(normalizedScope)
     return null
+  }
+}
+
+export function getStoredAdminProfile() {
+  const admin = getCurrentUser(AUTH_SCOPE.ADMIN)
+  if (!admin) {
+    return null
+  }
+
+  const level = Number(getAuthMeta(AUTH_SCOPE.ADMIN, 'admin_level'))
+  const menuPermissions = getAuthMeta(AUTH_SCOPE.ADMIN, 'menu_permissions')
+
+  return {
+    ...admin,
+    level: Number.isFinite(level) ? level : null,
+    menu_permissions: Array.isArray(menuPermissions) ? menuPermissions : [],
   }
 }
 

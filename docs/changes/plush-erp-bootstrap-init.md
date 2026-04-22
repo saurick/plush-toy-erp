@@ -24,6 +24,7 @@
 
 ## 3. 本轮新增引用的真实资料
 
+- `/Users/simon/Downloads/永绅erp/原文件/模板-材料与加工合同.xlsx`
 - `/Users/simon/Downloads/永绅erp/原文件/9.3加工合同-子淳.pdf`
 - `/Users/simon/Downloads/永绅erp/原文件/26029#夜樱烬色才料明细表2026-1-19.xlsx`
 - `/Users/simon/Downloads/永绅erp/原文件/26204#抱抱猴子材料明细表2026-4-10.xlsx`
@@ -31,6 +32,7 @@
 - `/Users/simon/Downloads/永绅erp/原文件/辅材、包材 成慧怡.xlsx`
 - `/Users/simon/Downloads/永绅erp/原文件/plush_factory_formal_report_v3_mobile.pdf`
 - `/Users/simon/Downloads/永绅erp/原文件/Weixin Image_20260420164444_2155_288.png`
+- `/Users/simon/Downloads/Weixin Image_20260421153105_2272_288.jpeg`
 
 ## 4. 本轮已确认的关键结论
 
@@ -43,7 +45,8 @@
 3. 主料 BOM 真源来自 `材料分析明细表`，辅材 / 包材是真正独立的采购导入源。
 4. 加工合同 PDF 是业务单据 + 打印快照 + 条款快照 + 附件图样的组合，不是普通采购单替代。
 5. 桌面后台必须继续保持一个入口；移动端必须按角色拆六个入口和六个端口。
-6. 拍照扫码、PDA、条码枪、图片识别虽然在汇报材料里出现过，但本轮统一标记 deferred。
+6. 扩展硬件链路、PDA、条码枪、图片识别虽然在汇报材料里出现过，但本轮统一标记 deferred。
+7. `模板-材料与加工合同.xlsx` 已经足够支撑首批固定模板打印中心：辅料采购合同、委外加工合同、材料汇总、加工汇总。
 
 ## 5. 本轮明确不改
 
@@ -51,7 +54,7 @@
 - 不把未确认字段直接固化进 Ent schema
 - 不拆多个仓库
 - 不把桌面后台拆成多个站点
-- 不假装拍照扫码已经完成
+- 不假装扩展硬件链路已经完成
 
 ## 6. 实施结果
 
@@ -64,8 +67,9 @@
 
 ### 前端
 
-- 桌面后台继续保持一个入口，但新增角色切换、角色默认工作台、角色过滤菜单和角色化帮助中心
-- 新增 6 个角色移动端入口与端口矩阵：
+- 桌面后台继续保持一个入口，并收口为固定后台导航，不再保留角色切换、角色默认工作台和角色入口菜单
+- 新增统一模板打印中心；其中采购合同已升级为可编辑打印工作台，其余模板继续走固定预览 / 浏览器打印入口
+- 新增 6 个角色移动端端口矩阵：
   - 老板 `5186`
   - 跟单 `5187`
   - 采购 `5188`
@@ -83,8 +87,8 @@
 
 - 根文档：`README.md`、`docs/plush-erp-initialization.md`、`docs/plush-erp-operation-flow.md`、`docs/plush-erp-data-model.md`
 - 前端文档：`web/README.md`、`web/src/erp/docs/*`
-- 前端配置：`web/src/erp/config/seedData.mjs`、`web/src/erp/config/docs.mjs`、`web/src/erp/config/appRegistry.mjs`
-- 前端页面：`web/src/erp/pages/*`、`web/src/erp/mobile/*`、`web/src/pages/Home/index.jsx`
+- 前端配置：`web/src/erp/config/seedData.mjs`、`web/src/erp/config/docs.mjs`、`web/src/erp/config/appRegistry.mjs`、`web/src/erp/config/printTemplates.mjs`
+- 前端页面：`web/src/erp/pages/*`、`web/src/erp/mobile/*`、`web/src/erp/components/*`、`web/src/pages/Home/index.jsx`
 - 构建入口：`web/vite.config.mjs`、`web/vite.mobile-*.config.mjs`、`web/vite.shared.mjs`、`web/package.json`
 
 ## 8. 风险与盲区
@@ -93,13 +97,14 @@
 - `产品名称 / 款式名称 / 部件名称` 仍需要更多样本确认分层
 - 当前还没有正式结算单 / 对账单样本
 - `partner` 主档里的客户编码和供应商敏感字段还没稳定
-- 移动端虽然拆出多入口，但当前仍是前端静态 / 半静态角色页，尚未接真实接口
+- 移动端虽然拆出多端口，但当前仍是前端静态 / 半静态角色页，尚未接真实接口
+- 打印模板当前还是固定样例预览，尚未接真实业务记录自动带值
 
 ## 9. 下一步建议
 
 1. 继续补客户订单、出货单、结算单样本。
 2. 先确认编号关系，再决定是否开始 Ent schema 与 migration。
-3. 再把桌面角色页和移动端入口逐步接到真实接口与保存链路。
+3. 再把桌面后台页面和移动端端口逐步接到真实接口与保存链路。
 
 ## 10. 验证命令
 

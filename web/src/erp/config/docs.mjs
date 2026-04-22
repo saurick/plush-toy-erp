@@ -4,8 +4,27 @@ import fieldTruthDoc from '../docs/field-truth.md?raw'
 import dataModelDoc from '../docs/data-model.md?raw'
 import importMappingDoc from '../docs/import-mapping.md?raw'
 import mobileRolesDoc from '../docs/mobile-roles.md?raw'
+import operationGuideDoc from '../docs/operation-guide.md?raw'
+import fieldLinkageGuideDoc from '../docs/field-linkage-guide.md?raw'
+import calculationGuideDoc from '../docs/calculation-guide.md?raw'
+import printTemplatesDoc from '../docs/print-templates.md?raw'
 
 export const docRegistry = {
+  'operation-guide': {
+    title: 'ERP 操作教程',
+    summary: '说明桌面后台入口、移动端端口访问方式，以及当前帮助与打印主路径。',
+    source: operationGuideDoc,
+  },
+  'field-linkage-guide': {
+    title: 'ERP 字段联动口径',
+    summary: '收口编号体系、字段真源、导入映射和主数据 / 快照分层边界。',
+    source: fieldLinkageGuideDoc,
+  },
+  'calculation-guide': {
+    title: 'ERP 计算口径',
+    summary: '统一数量、金额、日期、派生字段和打印快照的当前口径。',
+    source: calculationGuideDoc,
+  },
   'system-init': {
     title: '系统初始化说明',
     summary: '说明本轮初始化范围、边界和后续接资料方式。',
@@ -33,8 +52,14 @@ export const docRegistry = {
     source: importMappingDoc,
   },
   'mobile-roles': {
-    title: '桌面角色化与移动端多入口',
-    summary: '明确桌面后台如何按角色区分，以及六个移动端入口分别做什么。',
+    title: '桌面单后台与移动端端口',
+    summary: '明确桌面后台为什么收口成单入口，以及六个移动端端口分别做什么。',
     source: mobileRolesDoc,
+  },
+  'print-templates': {
+    title: '模板打印与字段口径',
+    summary:
+      '按真实 Excel / PDF / 报表截图收口首批固定打印模板、快照字段和当前实现边界。',
+    source: printTemplatesDoc,
   },
 }

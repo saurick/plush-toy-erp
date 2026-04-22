@@ -1,6 +1,6 @@
 # plush-toy-erp
 
-`plush-toy-erp` 当前是一套已经开始按真实资料收口的毛绒工厂 ERP：桌面后台继续保持一个入口，移动端按角色拆成多入口、多端口，并且开始基于真实 PDF、Excel、报表截图收口流程、字段真源、数据模型和导入映射。
+`plush-toy-erp` 当前是一套已经开始按真实资料收口的毛绒工厂 ERP：桌面后台继续保持一个入口，移动端按角色拆成多端口，并且开始基于真实 PDF、Excel、报表截图收口流程、字段真源、数据模型和导入映射。
 
 ## 目录结构
 
@@ -16,8 +16,9 @@
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8200`
 - 当前数据库默认命中 `192.168.0.106:5432/plush_erp`
-- 当前数据库已存在，但正式业务表尚未开始；`users / admin_users` 仍只是账号基线
-- 拍照扫码、PDA、条码枪、图片识别本轮统一标记为 deferred
+- 当前数据库已存在，但正式业务表尚未开始；`users / admin_users` 当前只承载账号与后台权限基线
+- 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred
+- 统一模板打印中心当前只保留采购合同、加工合同两套正式模板，均已支持可编辑工作台、PDF 预览 / 下载和浏览器打印
 
 ## 本地启动
 
@@ -32,6 +33,13 @@ pnpm start:desktop
 默认地址：`http://localhost:5175`
 
 ### 角色移动端
+
+```bash
+cd /Users/simon/projects/plush-toy-erp/web
+pnpm start:mobile:all
+```
+
+或按角色单独启动：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
@@ -70,9 +78,11 @@ make run
 
 ## 当前不做
 
-- 拍照扫码、PDA、条码枪、图片识别
+- 扩展硬件链路、PDA、条码枪、图片识别
 - 正式 Excel 导入落库
-- 合同打印模板和 PDF 坐标填充
+- PDF 坐标填充
+- Excel 母版回写
+- 业务保存链路自动带值打印
 - 字段未稳定前的 Ent schema / migration
 
 ## 当前推荐检查命令
@@ -102,6 +112,7 @@ pnpm style:l1
 - 数据模型与导入映射：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
 - 当前 changes：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
 - 前端说明：`/Users/simon/projects/plush-toy-erp/web/README.md`
+- 打印模板与帮助中心口径：`/Users/simon/projects/plush-toy-erp/web/src/erp/docs/print-templates.md`
 - 后端说明：`/Users/simon/projects/plush-toy-erp/server/README.md`
 
 ## 数据库约束

@@ -1,32 +1,491 @@
-.erp-sidebar-panel {
-  position: sticky;
-  top: 1rem;
-}
-
-.erp-nav-link {
-  display: block;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  background: rgb(255 255 255 / 0.03);
-  border-radius: 24px;
-  padding: 0.875rem 1rem;
-  transition:
-    border-color 160ms ease,
-    background-color 160ms ease,
-    transform 160ms ease;
-}
-
-.erp-nav-link:hover {
-  border-color: rgb(34 211 238 / 0.24);
-  background: rgb(34 211 238 / 0.08);
-  transform: translateY(-1px);
-}
-
-.erp-nav-link-active {
-  border-color: rgb(34 211 238 / 0.34);
+.erp-admin-shell {
+  min-height: 100vh;
   background:
-    linear-gradient(135deg, rgb(34 211 238 / 0.12), rgb(168 85 247 / 0.12)),
-    rgb(255 255 255 / 0.04);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.04);
+    radial-gradient(
+      circle at top left,
+      rgb(143 188 143 / 0.16),
+      transparent 20%
+    ),
+    linear-gradient(180deg, #f4f8f3 0%, #eef4ee 100%);
+}
+
+.erp-admin-sider,
+.erp-admin-drawer .ant-drawer-body {
+  background: linear-gradient(180deg, #f7fcf7 0%, #eff6f0 100%) !important;
+}
+
+.erp-admin-sider {
+  border-right: 1px solid #d9e6da;
+  box-shadow: 10px 0 24px rgb(15 23 42 / 0.04);
+  height: 100vh !important;
+  overflow: hidden;
+}
+
+.erp-admin-shell > .ant-layout {
+  min-height: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.erp-admin-sider .ant-layout-sider-children {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.erp-admin-drawer .ant-drawer-header {
+  display: none;
+}
+
+.erp-admin-drawer .ant-drawer-body {
+  padding: 0;
+}
+
+.erp-admin-sider__body {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0;
+}
+
+.erp-admin-brand {
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid #dce8dd;
+}
+
+.erp-admin-brand__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.erp-admin-brand__logo-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #204e80 0%, #3c7cc0 100%);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.erp-admin-brand__logo-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.erp-admin-brand__logo-title {
+  color: #204160;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.erp-admin-brand__logo-subtitle {
+  color: #688272;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.erp-login-card.ant-card,
+.erp-admin-page-head,
+.erp-admin-page-head__pill,
+.erp-admin-shell .ant-card {
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.erp-admin-menu.ant-menu {
+  flex: 1;
+  border-inline-end: 0;
+  background: transparent;
+  padding: 12px 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.erp-admin-menu.ant-menu .ant-menu-item-group-title {
+  padding-inline: 12px;
+  color: #7b8c7e;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.erp-admin-menu.ant-menu .ant-menu-item {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  margin: 6px 0;
+  border-radius: 12px;
+  line-height: 1.4;
+  padding-block: 8px;
+  color: #1f2937;
+}
+
+.erp-admin-menu.ant-menu .ant-menu-item:hover {
+  background: #eef5ee;
+}
+
+.erp-admin-menu.ant-menu .ant-menu-item-selected {
+  background: #bcc8bb;
+}
+
+.erp-admin-menu.ant-menu .ant-menu-item .ant-menu-item-icon {
+  color: #1f2937;
+  margin-top: 0;
+}
+
+.erp-admin-menu.ant-menu .ant-menu-item-selected .ant-menu-item-icon {
+  color: #2f8f4b;
+}
+
+.erp-admin-sider__footer {
+  padding: 14px 16px 18px;
+  border-top: 1px solid #dce8dd;
+  background: rgb(255 255 255 / 0.45);
+}
+
+.erp-admin-sider__footer-label {
+  color: #7b8c7e;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.erp-admin-sider__footer-value {
+  margin-top: 6px;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.erp-admin-header {
+  height: auto;
+  border-bottom: 1px solid #dbe6dc;
+  background: rgb(255 255 255 / 0.88) !important;
+  backdrop-filter: blur(12px);
+  line-height: normal;
+  padding: 14px 18px;
+}
+
+.erp-admin-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.erp-admin-header__menu-button {
+  display: none;
+  margin-top: 2px;
+}
+
+.erp-admin-header__title {
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.erp-admin-content {
+  padding: 14px 16px 24px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.erp-admin-header__right,
+.erp-admin-header__left {
+  min-width: 0;
+}
+
+.erp-admin-header__meta {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.erp-admin-header__role-tag.ant-tag {
+  margin-inline-end: 0;
+  border-radius: 14px;
+  padding-inline: 10px;
+  font-size: 13px;
+  line-height: 26px;
+  font-weight: 600;
+}
+
+.erp-admin-header__user {
+  color: #6b7280;
+}
+
+.erp-admin-breadcrumb {
+  margin-bottom: 12px;
+}
+
+.erp-admin-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #dfe9e1;
+  background: rgb(255 255 255 / 0.96);
+  padding: 18px 20px;
+}
+
+.erp-admin-page-head__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.erp-admin-page-head__aside {
+  display: grid;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.erp-admin-page-head__title {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.erp-admin-page-head__summary.ant-typography {
+  margin: 6px 0 0;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.erp-admin-page-head__pill {
+  display: grid;
+  gap: 4px;
+  min-width: 160px;
+  border: 1px solid #e3ebe4;
+  background: #f8fbf8;
+  padding: 12px 14px;
+}
+
+.erp-admin-page-head__pill span {
+  color: #7b8c7e;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.erp-admin-page-head__pill strong {
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.erp-admin-outlet {
+  min-width: 0;
+}
+
+.erp-admin-shell .text-slate-50,
+.erp-admin-shell .text-slate-100 {
+  color: #1f2937;
+}
+
+.erp-admin-shell .text-slate-200,
+.erp-admin-shell .text-slate-300 {
+  color: #475569;
+}
+
+.erp-admin-shell .text-slate-400 {
+  color: #7b8c7e;
+}
+
+.erp-admin-shell .text-cyan-100,
+.erp-admin-shell .text-amber-100 {
+  color: #2f8f4b;
+}
+
+.erp-admin-shell .erp-docs-article {
+  --tw-prose-body: #475569;
+  --tw-prose-headings: #0f172a;
+  --tw-prose-links: #166534;
+  --tw-prose-bold: #0f172a;
+  --tw-prose-counters: #64748b;
+  --tw-prose-bullets: #94a3b8;
+  --tw-prose-hr: #dbe6dc;
+  --tw-prose-quotes: #1f2937;
+  --tw-prose-quote-borders: #dbe6dc;
+  --tw-prose-captions: #64748b;
+  --tw-prose-code: #0f172a;
+  --tw-prose-pre-code: #1f2937;
+  --tw-prose-pre-bg: #f3f8f3;
+  --tw-prose-th-borders: #dbe6dc;
+  --tw-prose-td-borders: #e3ebe4;
+  color: #475569;
+  font-size: 0.96rem;
+  line-height: 1.8;
+}
+
+.erp-admin-shell .erp-docs-article :where(code):not(:where(pre code)) {
+  border-radius: 6px;
+  background: #f3f8f3;
+  padding: 0.15em 0.35em;
+}
+
+.erp-admin-shell [class*='bg-white/[0.03]'],
+.erp-admin-shell [class*='bg-black/20'] {
+  background: #f8fbf8;
+}
+
+.erp-admin-shell [class*='border-white/10'],
+.erp-admin-shell [class*='border-white/12'],
+.erp-admin-shell [class*='border-cyan-300/20'],
+.erp-admin-shell [class*='border-cyan-300/40'],
+.erp-admin-shell [class*='border-amber-300/20'],
+.erp-admin-shell [class*='border-amber-300/30'] {
+  border-color: #dfe8e0;
+}
+
+.erp-admin-shell [class*='bg-cyan-300/10'],
+.erp-admin-shell [class*='bg-cyan-300/12'] {
+  background: #eef6ef;
+}
+
+.erp-admin-shell [class*='bg-amber-300/8'],
+.erp-admin-shell [class*='bg-amber-300/10'],
+.erp-admin-shell [class*='bg-amber-300/12'] {
+  background: #fff8e8;
+}
+
+.erp-login-page {
+  position: relative;
+  display: flex;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+}
+
+.erp-login-page__bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 14% 18%, rgb(32 65 96 / 0.14) 0, transparent 38%),
+    radial-gradient(
+      circle at 88% 84%,
+      rgb(47 143 75 / 0.16) 0,
+      transparent 36%
+    ),
+    linear-gradient(130deg, #eef5fa 0%, #f8fbfd 45%, #f4f8f3 100%);
+}
+
+.erp-login-card.ant-card {
+  width: 100%;
+  max-width: 620px;
+  position: relative;
+  border: 1px solid #dbe7ef;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 18px 46px rgb(15 23 42 / 0.1);
+}
+
+.erp-login-card .ant-card-body {
+  padding: 28px 32px 30px;
+}
+
+.erp-login-logo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-login-logo__mark.erp-admin-brand__logo-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  font-size: 24px;
+}
+
+.erp-login-logo__copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.erp-login-logo__title {
+  color: #204160;
+  font-size: clamp(1.45rem, 4vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.08;
+}
+
+.erp-login-card__title.ant-typography {
+  margin: 0 !important;
+}
+
+.erp-login-card .ant-form-item {
+  margin-bottom: 24px;
+}
+
+.erp-login-card .ant-form-item-label > label {
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.erp-login-card .ant-alert {
+  border-radius: 14px;
+}
+
+.erp-login-card .ant-input,
+.erp-login-card .ant-input-affix-wrapper {
+  min-height: 56px;
+  border-radius: 22px;
+  border-color: #d1d5db;
+  box-shadow: none;
+}
+
+.erp-login-card .ant-input-affix-wrapper .ant-input {
+  min-height: auto;
+}
+
+.erp-login-card .ant-input:hover,
+.erp-login-card .ant-input-affix-wrapper:hover {
+  border-color: #b6c5d3;
+}
+
+.erp-login-card .ant-input:focus,
+.erp-login-card .ant-input-focused,
+.erp-login-card .ant-input-affix-wrapper:focus,
+.erp-login-card .ant-input-affix-wrapper-focused {
+  border-color: #8fb39a;
+  box-shadow: 0 0 0 3px rgb(47 143 75 / 0.12);
+}
+
+.erp-login-card .ant-btn.ant-btn-primary {
+  min-height: 56px;
+  border-radius: 22px;
+  border-color: #2f8f4b;
+  background: #2f8f4b;
+  box-shadow: none;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.erp-login-card .ant-btn.ant-btn-primary:hover,
+.erp-login-card .ant-btn.ant-btn-primary:focus-visible {
+  border-color: #27753d;
+  background: #27753d;
 }
 
 .erp-primary-button,
@@ -45,60 +504,1779 @@
 }
 
 .erp-primary-button {
-  border: 1px solid rgb(34 211 238 / 0.2);
-  background: linear-gradient(135deg, #67e8f9, #a5f3fc);
-  color: #082f49;
+  border: 1px solid #2f8f4b;
+  background: #2f8f4b;
+  color: white;
 }
 
 .erp-primary-button:hover {
-  background: linear-gradient(135deg, #a5f3fc, #cffafe);
+  background: #24723b;
 }
 
 .erp-secondary-button {
-  border: 1px solid rgb(255 255 255 / 0.12);
-  background: rgb(255 255 255 / 0.04);
-  color: rgb(241 245 249);
+  border: 1px solid #d9e6da;
+  background: white;
+  color: #1f2937;
 }
 
 .erp-secondary-button:hover {
-  border-color: rgb(255 255 255 / 0.18);
-  background: rgb(255 255 255 / 0.08);
+  border-color: #b7ccb9;
+  background: #f7faf7;
 }
 
-.erp-mobile-strip {
-  display: flex;
-  gap: 0.75rem;
-  overflow-x: auto;
-  padding-bottom: 0.25rem;
-  margin-bottom: 1rem;
-}
-
-.erp-mobile-strip-link {
-  white-space: nowrap;
-  border: 1px solid rgb(255 255 255 / 0.1);
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.04);
-  color: rgb(226 232 240);
-  padding: 0.65rem 0.95rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.erp-mobile-strip-link-active {
-  border-color: rgb(34 211 238 / 0.3);
-  background: rgb(34 211 238 / 0.12);
-  color: rgb(240 249 255);
-}
-
-.erp-docs-article {
-  font-size: 0.96rem;
-  line-height: 1.8;
-}
-
-.erp-docs-article table {
+.erp-admin-shell .erp-docs-article table {
   display: block;
   width: 100%;
   overflow-x: auto;
+}
+
+.erp-help-doc-toc__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.erp-help-doc-toc__list {
+  margin: 1rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.erp-help-doc-toc__item {
+  color: #7b8c7e;
+}
+
+.erp-help-doc-toc__link {
+  color: #1f2937;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  transition: color 160ms ease;
+}
+
+.erp-help-doc-toc__link:hover {
+  color: #2f8f4b;
+}
+
+.erp-help-doc-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.erp-print-center-page {
+  gap: 14px;
+}
+
+.erp-print-center-hero-card .ant-card-body,
+.erp-print-center-workbench-card .ant-card-body {
+  padding: 20px;
+}
+
+.erp-print-center-hero-card {
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at top right,
+      rgb(113 170 122 / 12%),
+      transparent 34%
+    ),
+    linear-gradient(135deg, #f7fbf7 0%, #fff 58%, #f3f8f4 100%);
+}
+
+.erp-print-center-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.erp-print-center-hero-main,
+.erp-print-center-detail-copy,
+.erp-print-center-nav-panel,
+.erp-print-center-sheet-preview,
+.erp-print-center-hero-side {
+  min-width: 0;
+}
+
+.erp-print-center-eyebrow,
+.erp-print-center-detail-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: #2c7b4e;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.erp-print-center-hero-title.ant-typography,
+.erp-print-center-detail-title.ant-typography {
+  margin-bottom: 0;
+}
+
+.erp-print-center-hero-description,
+.erp-print-center-detail-summary {
+  max-width: 880px;
+  margin-bottom: 0;
+  color: #5d6c60;
+  line-height: 1.6;
+}
+
+.erp-print-center-hero-primary-action.ant-btn {
+  width: 100%;
+  height: 44px;
+  padding-inline: 22px;
+  border-radius: 14px;
+  font-weight: 600;
+  box-shadow: 0 16px 28px rgb(44 123 78 / 18%);
+}
+
+.erp-print-center-hero-action-hint {
+  color: #547062;
+  line-height: 1.6;
+}
+
+.erp-print-center-overview-card {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  margin-top: 12px;
+  margin-right: 8px;
+  padding: 0 10px;
+  border: 1px solid #dde9e0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 82%);
+}
+
+.erp-print-center-overview-label,
+.erp-print-center-info-label,
+.erp-print-center-nav-title,
+.erp-print-center-action-title {
+  color: #6f7f73;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.erp-print-center-overview-value,
+.erp-print-center-info-value,
+.erp-print-center-sheet-title,
+.erp-print-center-record-pill-value {
+  color: #223127;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.erp-print-center-overview-value {
+  font-size: 13px;
+}
+
+.erp-print-center-nav-description,
+.erp-print-center-action-hint,
+.erp-print-center-note-text,
+.erp-print-center-record-pill-label {
+  color: #6d7b70;
+  line-height: 1.6;
+}
+
+.erp-print-center-hero-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #dfeadf;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 88%);
+}
+
+.erp-print-center-hero-side-title.ant-typography {
+  margin-bottom: 0;
+}
+
+.erp-print-center-workbench {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.erp-print-center-nav-panel {
+  padding: 18px;
+  border: 1px solid #e3eee6;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f7fbf8 0%, #fff 100%);
+  overflow: hidden;
+}
+
+.erp-print-center-nav-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.erp-print-center-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-print-center-tabs .ant-tabs-tab {
+  margin: 0;
+  padding: 0;
+}
+
+.erp-print-center-tab-trigger {
+  display: block;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  appearance: none;
+}
+
+.erp-print-center-tab-trigger:focus-visible {
+  outline: 2px solid #2f8f4b;
+  outline-offset: 4px;
+  border-radius: 20px;
+}
+
+.erp-print-center-tabs .erp-print-center-tab-label {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 84px;
+  padding: 12px 14px;
+  text-align: left;
+  line-height: 1.5;
+  white-space: normal;
+  word-break: break-word;
+  border: 1px solid #dce9df;
+  border-radius: 16px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.erp-print-center-tab-index {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #edf5ef;
+  color: #5b725f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-print-center-tab-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.erp-print-center-tab-meta {
+  display: inline-flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.erp-print-center-tab-title {
+  color: #223127;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.erp-print-center-tab-note {
+  color: #718074;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.erp-print-center-tab-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 999px;
+  background: #eef4ef;
+  color: #62816c;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.erp-print-center-tab-arrow {
+  color: #6c8473;
+  font-size: 12px;
+  transition:
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.erp-print-center-tabs .ant-tabs-tab-active .erp-print-center-tab-label,
+.erp-print-center-tabs .ant-tabs-tab:hover .erp-print-center-tab-label {
+  border-color: #9fcca9;
+  background: linear-gradient(135deg, #f4fbf4 0%, #fff 100%);
+  box-shadow: 0 10px 18px rgb(52 118 72 / 10%);
+  transform: translateY(-1px);
+}
+
+.erp-print-center-tabs .ant-tabs-tab-active .erp-print-center-tab-index {
+  background: #2f8f4b;
+  color: #fff;
+}
+
+.erp-print-center-tabs .ant-tabs-tab-active .erp-print-center-tab-state {
+  background: #2f8f4b;
+  color: #fff;
+}
+
+.erp-print-center-tabs .ant-tabs-tab-active .erp-print-center-tab-arrow,
+.erp-print-center-tabs .ant-tabs-tab:hover .erp-print-center-tab-arrow {
+  color: #2f8f4b;
+  transform: translateX(2px);
+}
+
+.erp-print-center-detail-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-print-center-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #e3eee6;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fcfefd 0%, #f8fbf8 100%);
+}
+
+.erp-print-center-detail-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.erp-print-center-tag-row {
+  margin-top: 8px;
+}
+
+.erp-print-center-tag-row .ant-tag {
+  margin-inline-end: 0;
+  padding-inline: 10px;
+  border-radius: 999px;
+}
+
+.erp-print-center-sheet-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  padding: 12px;
+  border: 1px solid #dfebe2;
+  border-radius: 18px;
+  background: linear-gradient(145deg, #f4f8f4 0%, #fafcfb 100%);
+}
+
+.erp-print-center-sheet-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(190px, 100%);
+  min-height: 164px;
+  padding: 14px;
+  border: 1px solid #edf2ee;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 6px 14px rgb(45 88 58 / 6%);
+}
+
+.erp-print-center-sheet-eyebrow,
+.erp-print-center-sheet-footer {
+  color: #69806e;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.erp-print-center-sheet-lines {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.erp-print-center-sheet-line {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border-radius: 10px;
+  background: #f5f8f5;
+  color: #4f6053;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.erp-print-center-sheet-footer {
+  margin-top: auto;
+}
+
+.erp-print-center-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-print-center-info-card,
+.erp-print-center-notes-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #e4ede7;
+  border-radius: 16px;
+  background: #fdfefd;
+}
+
+.erp-print-center-record-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-print-center-record-pill {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  max-width: 100%;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #f5f8f5;
+}
+
+.erp-print-center-record-pill-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-center-note-list {
+  display: grid;
+  gap: 6px;
+}
+
+.erp-print-center-note-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: #f8faf8;
+}
+
+.erp-print-center-note-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: #2f8f4b;
+}
+
+.erp-print-shell {
+  min-height: 100vh;
+  padding: 10px 14px 14px;
+  background: #f5f7fa;
+}
+
+.erp-print-shell__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.erp-print-shell__toolbar-copy {
+  display: flex;
+  flex: 1 1 260px;
+  min-width: min(100%, 260px);
+  align-items: center;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: #262626;
+}
+
+.erp-print-shell__source-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #e6f4ea;
+  color: #1f7a3f;
+  font-size: 12px;
+}
+
+.erp-print-shell__toolbar-status {
+  font-size: 12px;
+  color: #595959;
+}
+
+.erp-print-shell__toolbar-actions {
+  display: flex;
+  flex: 999 1 720px;
+  min-width: 0;
+  align-items: flex-start;
+  align-content: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-print-shell__toolbar-group {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: center;
+  align-content: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-print-shell__button {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.erp-print-shell__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.erp-print-shell__button--ghost {
+  border: 1px solid #8c8c8c;
+  background: #fff;
+  color: #262626;
+}
+
+.erp-print-shell__button--ghost:hover:not(:disabled) {
+  border-color: #1f7a3f;
+  color: #1f7a3f;
+}
+
+.erp-print-shell__button--primary {
+  border: 1px solid #1f7a3f;
+  background: #1f7a3f;
+  color: #fff;
+}
+
+.erp-print-shell__button--primary:hover:not(:disabled) {
+  border-color: #166534;
+  background: #166534;
+}
+
+.erp-print-shell__button--active {
+  border-color: #1f7a3f;
+  background: #f6ffed;
+  color: #1f7a3f;
+}
+
+.erp-print-shell__counter {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 16px;
+  background: #fafafa;
+  font-size: 12px;
+  color: #595959;
+  white-space: nowrap;
+}
+
+.erp-print-shell__formula-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #d9e7da;
+  border-radius: 8px;
+  background: #f6faf6;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #243428;
+}
+
+.erp-print-shell__content {
+  display: grid;
+  grid-template-columns: 384px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+  align-items: start;
+}
+
+.erp-print-shell__panel {
+  min-width: 0;
+}
+
+.erp-print-shell__record-panel {
+  max-height: calc(100vh - 96px);
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.erp-print-shell__record-panel h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #262626;
+}
+
+.erp-print-shell__record-panel p {
+  margin: 8px 0 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #595959;
+}
+
+.erp-print-shell__search {
+  margin-bottom: 10px;
+}
+
+.erp-print-shell__search-input {
+  width: 100%;
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.erp-print-shell__search-input:focus {
+  outline: 1px solid #1f7a3f;
+  border-color: #1f7a3f;
+}
+
+.erp-print-shell__detail-panel {
+  margin-bottom: 10px;
+}
+
+.erp-print-shell__detail-panel h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #434343;
+}
+
+.erp-print-shell__detail-table,
+.erp-print-shell__record-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.erp-print-shell__detail-table th,
+.erp-print-shell__detail-table td,
+.erp-print-shell__record-table th,
+.erp-print-shell__record-table td {
+  border: 1px solid #d9d9d9;
+  padding: 4px 6px;
+  vertical-align: top;
+  font-size: 12px;
+}
+
+.erp-print-shell__detail-table th,
+.erp-print-shell__record-table th {
+  background: #fafafa;
+  color: #595959;
+}
+
+.erp-print-shell__detail-index-cell,
+.erp-print-shell__field-label {
+  background: #fcfcfc;
+  color: #434343;
+}
+
+.erp-print-shell__detail-index-cell {
+  width: 48px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.erp-print-shell__field-label {
+  width: 36%;
+  max-width: 36%;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.erp-print-shell__field-value {
+  width: 64%;
+  max-width: 64%;
+}
+
+.erp-print-shell__field-editor,
+.erp-print-shell__detail-editor {
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #262626;
+}
+
+.erp-print-shell__field-editor--multiline,
+.erp-print-shell__detail-editor--multiline {
+  min-height: 48px;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+.erp-print-shell__field-editor:focus,
+.erp-print-shell__detail-editor:focus {
+  outline: none;
+  border-color: #1f7a3f;
+  background: #f6ffed;
+}
+
+.erp-print-shell__detail-static,
+.erp-print-shell__field-static {
+  min-height: 28px;
+  padding: 4px 6px;
+  line-height: 1.45;
+  color: #262626;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-shell__empty-row {
+  text-align: center;
+  color: #8c8c8c;
+}
+
+.erp-print-shell__stage {
+  max-height: calc(100vh - 96px);
+  padding: 24px;
+  overflow: auto;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #d9d9d9;
+}
+
+.erp-print-shell__stage-wrap {
+  display: flex;
+  justify-content: center;
+  min-width: 100%;
+}
+
+.erp-print-workspace {
+  min-height: 100vh;
+  padding: 12px;
+  background: linear-gradient(180deg, #e4ebe8 0%, #d8e0dc 100%);
+}
+
+.erp-print-workspace__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #d7dfdb;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 16px 32px rgb(15 23 42 / 10%);
+  backdrop-filter: blur(12px);
+}
+
+.erp-print-workspace__toolbar-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  color: #223127;
+}
+
+.erp-print-workspace__toolbar-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #e9f3eb;
+  color: #2c7b4e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-print-workspace__toolbar-status {
+  color: #63786c;
+  font-size: 13px;
+}
+
+.erp-print-workspace__toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.erp-print-workspace__formula {
+  margin-top: 12px;
+}
+
+.erp-print-workspace__formula-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.erp-print-workspace__main {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+  align-items: start;
+}
+
+.erp-print-workspace__panel {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-print-workspace__panel-card .ant-card-body {
+  display: grid;
+  gap: 14px;
+}
+
+.erp-print-workspace__field-grid,
+.erp-print-workspace__detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-print-workspace__field {
+  display: grid;
+  gap: 6px;
+}
+
+.erp-print-workspace__field > span {
+  color: #5f7468;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.erp-print-workspace__field--full {
+  grid-column: 1 / -1;
+}
+
+.erp-print-workspace__detail-list,
+.erp-print-workspace__clause-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-print-workspace__detail-card {
+  padding: 12px;
+  border: 1px solid #e1e8e4;
+  border-radius: 16px;
+  background: #fafcfb;
+}
+
+.erp-print-workspace__detail-card--selected {
+  border-color: #2f8f4b;
+  box-shadow: 0 0 0 1px rgb(47 143 75 / 12%);
+}
+
+.erp-print-workspace__detail-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #223127;
+  font-weight: 600;
+}
+
+.erp-print-workspace__clause-group {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-print-workspace__clause-title {
+  color: #223127;
+  font-weight: 700;
+}
+
+.erp-print-workspace__stage {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-print-workspace__stage-note {
+  color: #617367;
+  font-size: 13px;
+}
+
+.erp-print-workspace__stage-canvas {
+  display: flex;
+  justify-content: center;
+  padding: 18px;
+  border: 1px solid #d0d9d4;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #d6ded9 0%, #cfd8d3 100%);
+  overflow: auto;
+}
+
+.erp-print-workspace__mobile-empty {
+  display: none;
+}
+
+.erp-processing-contract-export-sandbox {
+  position: fixed;
+  left: -200vw;
+  top: 0;
+  z-index: -1;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.erp-processing-contract-paper {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 10.5mm 8.5mm 10mm;
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 24px 50px rgb(15 23 42 / 18%);
+  font-family: 'STSong', 'Songti SC', 'Noto Serif CJK SC', serif;
+}
+
+.erp-processing-contract-paper--export {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.erp-processing-contract-paper__header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6mm;
+}
+
+.erp-processing-contract-paper__title {
+  font-size: 8.8mm;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.erp-processing-contract-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8mm;
+  margin-bottom: 3.5mm;
+  font-size: 4.2mm;
+  line-height: 1.55;
+}
+
+.erp-processing-contract-meta__column {
+  display: grid;
+  gap: 1.3mm;
+  min-width: 0;
+}
+
+.erp-processing-contract-meta__top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4mm;
+}
+
+.erp-processing-contract-meta__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.5mm;
+  align-items: baseline;
+}
+
+.erp-processing-contract-meta__label {
+  white-space: nowrap;
+}
+
+.erp-processing-contract-meta__value,
+.erp-processing-contract-table__cell,
+.erp-processing-contract-clauses__editable,
+.erp-processing-contract-signature__value,
+.erp-processing-contract-signature__date-value {
+  outline: none;
+}
+
+.erp-processing-contract-table__cell {
+  display: block;
+  min-height: 14mm;
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.erp-processing-contract-table__cell--multiline {
+  text-align: left;
+}
+
+.erp-processing-contract-table__row--selected td {
+  background: rgb(47 143 75 / 12%);
+}
+
+.erp-processing-contract-table__total td {
+  font-weight: 700;
+}
+
+.erp-processing-contract-clauses {
+  display: grid;
+  gap: 3mm;
+  margin-top: 3mm;
+  font-size: 3.9mm;
+  line-height: 1.62;
+}
+
+.erp-processing-contract-clauses__group ol {
+  display: grid;
+  gap: 1.3mm;
+  margin: 1.4mm 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.erp-processing-contract-clauses__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 1.2mm;
+}
+
+.erp-processing-contract-clauses__item-index {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-processing-contract-clauses__title {
+  font-weight: 700;
+}
+
+.erp-processing-contract-clauses__editable {
+  display: block;
+  min-width: 0;
+}
+
+.erp-processing-contract-signature {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12mm;
+  margin-top: 4mm;
+  font-size: 4mm;
+}
+
+.erp-processing-contract-signature__block {
+  display: grid;
+  gap: 1.8mm;
+}
+
+.erp-processing-contract-signature__label {
+  font-weight: 600;
+}
+
+.erp-processing-contract-signature__value {
+  min-height: 8mm;
+  font-size: 4.6mm;
+}
+
+.erp-processing-contract-signature__date {
+  display: flex;
+  gap: 1.4mm;
+  align-items: baseline;
+}
+
+.erp-processing-contract-upload-bar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #c7d5ca;
+  border-radius: 10px;
+  background: rgb(245 248 245 / 96%);
+}
+
+.erp-processing-contract-upload-bar__copy {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #2f4635;
+}
+
+.erp-processing-contract-upload-bar__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-processing-contract-upload-bar__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.erp-processing-contract-upload-bar__input {
+  display: none;
+}
+
+.erp-processing-contract-upload-bar__status {
+  min-width: 0;
+  font-size: 12px;
+  color: #516659;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.erp-processing-contract-meta__value:focus,
+.erp-processing-contract-table__cell:focus,
+.erp-processing-contract-clauses__editable:focus,
+.erp-processing-contract-signature__value:focus,
+.erp-processing-contract-signature__date-value:focus {
+  background: rgb(47 143 75 / 10%);
+  box-shadow: inset 0 0 0 1px rgb(47 143 75 / 28%);
+}
+
+.erp-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.82rem;
+}
+
+.erp-print-table th,
+.erp-print-table td {
+  border: 1px solid rgb(15 23 42 / 0.18);
+  padding: 0.42rem 0.36rem;
+  vertical-align: middle;
+  text-align: center;
+  word-break: break-word;
+}
+
+.erp-processing-contract-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 3.8mm;
+}
+
+.erp-processing-contract-table th,
+.erp-processing-contract-table td {
+  border: 1px solid rgb(17 24 39 / 55%);
+  padding: 1.5mm 1.2mm;
+  vertical-align: middle;
+  text-align: center;
+  word-break: break-word;
+}
+
+.erp-processing-contract-table thead th {
+  background: #f8faf8;
+  font-weight: 700;
+}
+
+.erp-print-table thead th {
+  background: rgb(241 245 249);
+  font-weight: 700;
+}
+
+.erp-print-template-card {
+  width: 100%;
+  border: 1px solid #dfe8e0;
+  background: #f8fbf8;
+  border-radius: 24px;
+  padding: 1rem;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.erp-print-template-card:hover {
+  border-color: #b7ccb9;
+  background: #f3f8f3;
+  transform: translateY(-1px);
+}
+
+.erp-print-template-card-active {
+  border-color: #b7ccb9;
+  background: linear-gradient(135deg, #eef6ef, #f9fbf9);
+}
+
+.erp-print-paper {
+  width: min(100%, 920px);
+  margin: 0 auto;
+  background: white;
+  color: #0f172a;
+  border-radius: 28px;
+  box-shadow: 0 28px 80px rgb(15 23 42 / 0.18);
+  padding: 2rem 2.25rem;
+}
+
+.erp-print-paper--landscape {
+  width: min(100%, 1180px);
+  padding: 1.5rem 1.75rem;
+}
+
+.erp-print-paper__header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.erp-print-paper__title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.erp-print-meta-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 1.2rem;
+}
+
+.erp-print-meta-grid__column {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.erp-print-meta-grid__row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.95rem;
+}
+
+.erp-print-meta-grid__label {
+  color: #475569;
+}
+
+.erp-print-meta-grid__value {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.erp-print-table__total td {
+  font-weight: 700;
+}
+
+.erp-print-table--summary {
+  font-size: 0.78rem;
+}
+
+.erp-print-table--summary .erp-print-table__subhead th {
+  background: rgb(248 250 252);
+  font-weight: 600;
+}
+
+.erp-print-table--report {
+  font-size: 0.72rem;
+}
+
+.erp-print-table__highlight {
+  background: #fde047;
+}
+
+.erp-print-clauses {
+  margin-top: 1.2rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.erp-print-clauses__title {
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.erp-print-clauses__section ol {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.erp-print-clauses__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0.4rem;
+}
+
+.erp-print-clauses__item-index {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-print-signature {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 1.6rem;
+}
+
+.erp-print-signature__block {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.erp-print-signature__label,
+.erp-print-signature__date {
+  font-size: 0.95rem;
+}
+
+.erp-print-signature__value {
+  font-size: 1.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.erp-material-contract-workbench {
+  display: grid;
+  gap: 1rem;
+}
+
+.erp-material-contract-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.erp-material-contract-toolbar__group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.erp-material-contract-toolbar__button-active {
+  box-shadow: inset 0 0 0 1px rgb(47 143 75 / 0.28);
+  background: linear-gradient(135deg, #e8f4ea, #f7fbf7);
+}
+
+.erp-material-contract-formula-panel {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid #d9e7da;
+  background: #f6faf6;
+  color: #243428;
+  border-radius: 18px;
+  padding: 0.9rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.erp-material-contract-toolbar__status {
+  min-height: 1.5rem;
+  color: #52635a;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.erp-material-contract-stage {
+  padding: 1rem;
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgb(241 245 249 / 0.88), rgb(226 232 240 / 0.92)),
+    white;
+}
+
+.erp-material-contract-paper {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 10mm 8.5mm 10mm;
+  box-sizing: border-box;
+  background-color: white;
+  border-radius: 14px;
+  box-shadow: 0 22px 58px rgb(15 23 42 / 0.12);
+  color: #111827;
+  font-family: 'SimSun', 'Songti SC', 'Noto Serif CJK SC', serif;
+}
+
+.erp-material-contract-paper--preview {
+  width: min(100%, 210mm);
+  min-height: auto;
+}
+
+.erp-material-contract-paper__title {
+  margin-bottom: 5mm;
+  text-align: center;
+  font-size: 8.6mm;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.erp-material-contract-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  column-gap: 10mm;
+  margin-bottom: 3mm;
+  font-size: 4mm;
+  line-height: 1.55;
+}
+
+.erp-material-contract-meta__column {
+  display: grid;
+  gap: 1.4mm;
+  min-width: 0;
+}
+
+.erp-material-contract-meta__column--right {
+  padding-left: 3mm;
+}
+
+.erp-material-contract-meta__top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 6mm;
+  align-items: baseline;
+}
+
+.erp-material-contract-meta__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.5mm;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.erp-material-contract-meta__top-row
+  .erp-material-contract-meta__row:last-child {
+  justify-self: end;
+}
+
+.erp-material-contract-meta__label,
+.erp-material-contract-meta__value {
+  display: inline-block;
+  min-width: 0;
+}
+
+.erp-material-contract-meta__label,
+.erp-material-contract-signature__label,
+.erp-material-contract-clause-block__index {
+  white-space: nowrap;
+}
+
+.erp-material-contract-editable {
+  min-width: 0;
+  min-height: 4.5mm;
+  white-space: pre-wrap;
+  word-break: break-word;
+  outline: none;
+}
+
+.erp-material-contract-editable:focus {
+  background: rgb(34 197 94 / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(34 197 94 / 0.14);
+}
+
+.erp-material-contract-editable-disabled {
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+
+.erp-material-contract-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-top: 2mm;
+  font-size: 3.8mm;
+}
+
+.erp-material-contract-paper .erp-material-contract-table thead th,
+.erp-material-contract-paper .erp-material-contract-table tbody td {
+  border: 1px solid rgb(17 24 39 / 55%);
+  text-align: center;
+  vertical-align: middle;
+  padding: 1.4mm 1.2mm;
+}
+
+.erp-material-contract-paper .erp-material-contract-table thead th {
+  background: white;
+  font-weight: 700;
+}
+
+.erp-material-contract-paper .erp-material-contract-table tbody td {
+  min-height: 15mm;
+  position: relative;
+}
+
+.erp-material-contract-table__editable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 12.5mm;
+  padding: 0;
+  text-align: center;
+}
+
+.erp-material-contract-table__editable-multiline {
+  min-height: 14.5mm;
+}
+
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  tr.erp-material-contract-table__row-selected
+  td {
+  background: rgb(34 197 94 / 0.08);
+}
+
+.erp-material-contract-table__cell-selected {
+  background: rgb(59 130 246 / 0.1);
+}
+
+.erp-material-contract-table__cell-merged {
+  background: rgb(248 250 252);
+}
+
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  tr.erp-material-contract-table__total
+  td {
+  min-height: auto;
+  padding: 1.2mm 1mm;
+  font-weight: 700;
+}
+
+.erp-material-contract-clauses {
+  display: grid;
+  gap: 2.2mm;
+  margin-top: 3mm;
+  font-size: 3.85mm;
+  line-height: 1.62;
+}
+
+.erp-material-contract-clause-block {
+  display: grid;
+  gap: 0.8mm;
+}
+
+.erp-material-contract-clause-block__title {
+  font-weight: 700;
+}
+
+.erp-material-contract-clause-block__list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 1.2mm;
+}
+
+.erp-material-contract-clause-block__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0.6mm;
+}
+
+.erp-material-contract-clause-block__index {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-material-contract-clause-block__value {
+  display: block;
+  min-width: 0;
+}
+
+.erp-material-contract-signature {
+  margin-top: 7mm;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18mm;
+  font-size: 4mm;
+}
+
+.erp-material-contract-signature__block {
+  display: grid;
+  gap: 3mm;
+  min-width: 0;
+}
+
+.erp-material-contract-signature__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2mm;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.erp-material-contract-signature__name {
+  min-height: 7mm;
+  font-size: 7mm;
+  letter-spacing: 0.08em;
+}
+
+.erp-material-contract-signature__date-value {
+  min-height: 4.5mm;
+}
+
+.erp-material-contract-pdf-frame {
+  width: 100%;
+  height: min(80vh, 960px);
+  border: 0;
+}
+
+.erp-summary-sheet {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.erp-summary-sheet__title {
+  text-align: center;
+  font-size: 1.55rem;
+  font-weight: 700;
+}
+
+.erp-summary-sheet__meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.erp-production-report {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.erp-production-report__company,
+.erp-production-report__title {
+  text-align: center;
+}
+
+.erp-production-report__company {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.erp-production-report__title {
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+@media (max-width: 991px) {
+  .erp-admin-sider {
+    display: none !important;
+  }
+
+  .erp-admin-header {
+    padding: 16px;
+  }
+
+  .erp-admin-header__menu-button {
+    display: inline-flex;
+  }
+
+  .erp-admin-header__meta {
+    gap: 8px;
+  }
+
+  .erp-admin-content {
+    padding: 16px;
+  }
+
+  .erp-admin-page-head__aside,
+  .erp-login-card .ant-card-body {
+    padding: 20px;
+  }
+
+  .erp-login-logo {
+    gap: 10px;
+  }
+
+  .erp-login-logo__mark.erp-admin-brand__logo-mark {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    font-size: 22px;
+  }
+
+  .erp-login-logo__title {
+    font-size: 1.2rem;
+    letter-spacing: 0.01em;
+    line-height: 1.05;
+  }
+}
+
+.erp-report-thumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 auto;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #7c2d12;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.15;
 }
 
 .erp-phone-frame {
@@ -122,11 +2300,181 @@
 }
 
 @media (max-width: 1023px) {
-  .erp-sidebar-panel {
-    position: static;
+  .erp-admin-page-head {
+    flex-direction: column;
+  }
+
+  .erp-admin-page-head__aside {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
   }
 
   .erp-phone-screen {
     min-height: 28rem;
+  }
+
+  .erp-print-shell__content {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-print-shell__record-panel,
+  .erp-print-shell__stage {
+    max-height: none;
+  }
+
+  .erp-print-paper,
+  .erp-print-paper--landscape {
+    padding: 1rem;
+    border-radius: 20px;
+  }
+
+  .erp-print-meta-grid,
+  .erp-print-signature,
+  .erp-summary-sheet__meta {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-material-contract-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-material-contract-meta__column--right {
+    padding-left: 0;
+  }
+
+  .erp-material-contract-meta__top-row {
+    grid-template-columns: 1fr;
+    row-gap: 1.4mm;
+  }
+
+  .erp-material-contract-signature {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .erp-admin-page-head__aside {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-admin-content {
+    padding: 12px;
+  }
+
+  .erp-print-shell {
+    padding: 10px;
+  }
+
+  .erp-print-shell__toolbar,
+  .erp-print-shell__record-panel,
+  .erp-print-shell__stage {
+    padding: 10px;
+  }
+
+  .erp-print-shell__toolbar-copy,
+  .erp-print-shell__toolbar-actions,
+  .erp-print-shell__toolbar-group {
+    width: 100%;
+  }
+
+  .erp-processing-contract-upload-bar__item {
+    align-items: flex-start;
+  }
+
+  .erp-processing-contract-upload-bar__status {
+    width: 100%;
+  }
+
+  .erp-material-contract-stage {
+    padding: 0.5rem;
+  }
+
+  .erp-material-contract-paper {
+    padding: 8mm 6mm 8mm;
+    border-radius: 10px;
+  }
+
+  .erp-material-contract-table {
+    font-size: 3.2mm;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .erp-print-shell__toolbar,
+  .erp-print-shell__formula-panel,
+  .erp-print-shell__panel,
+  .erp-processing-contract-upload-bar,
+  .erp-sidebar-panel,
+  .erp-mobile-strip,
+  .erp-primary-button,
+  .erp-secondary-button,
+  .erp-material-contract-toolbar,
+  .erp-material-contract-toolbar__status,
+  .erp-material-contract-formula-panel,
+  .ant-modal-root {
+    display: none;
+  }
+
+  .erp-print-paper,
+  .erp-print-paper--landscape {
+    width: auto;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+  }
+
+  .erp-material-contract-stage {
+    padding: 0;
+    background: white;
+  }
+
+  .erp-print-shell {
+    padding: 0;
+    background: white;
+  }
+
+  .erp-print-shell__content {
+    display: block;
+    margin-top: 0;
+  }
+
+  .erp-print-shell__stage {
+    padding: 0;
+    border: 0;
+    background: white;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .erp-material-contract-paper {
+    width: auto;
+    box-shadow: none;
+    border-radius: 0;
+    border: 0;
+    padding: 0;
+  }
+}
+.erp-layout-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at top, rgb(47 143 75 / 18%), transparent 40%),
+    linear-gradient(180deg, #f5f9f2 0%, #eef4eb 100%);
+}
+
+.erp-permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 768px) {
+  .erp-permission-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -2,6 +2,7 @@ import React from 'react'
 import { Link, useParams } from 'react-router-dom'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
 import { Markdown } from '@/common/components/markdown'
+import HelpCenterDocLinks from '../components/HelpCenterDocLinks'
 import PageHero from '../components/PageHero'
 import { docRegistry } from '../config/docs.mjs'
 
@@ -18,11 +19,11 @@ export default function DocumentationPage() {
             当前文档键未注册，请从帮助中心重新进入。
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link className="erp-primary-button" to="/erp/help-center">
-              返回帮助中心
+            <Link className="erp-primary-button" to="/erp/docs/operation-guide">
+              返回 ERP 操作教程
             </Link>
             <Link className="erp-secondary-button" to="/erp/dashboard">
-              返回初始化看板
+              返回任务看板
             </Link>
           </div>
         </div>
@@ -38,8 +39,8 @@ export default function DocumentationPage() {
         description={doc.summary}
         actions={
           <>
-            <Link className="erp-secondary-button" to="/erp/help-center">
-              返回帮助中心
+            <Link className="erp-secondary-button" to="/erp/print-center">
+              模板打印中心
             </Link>
             <Link className="erp-secondary-button" to="/erp/changes/current">
               查看本轮变更记录
@@ -48,8 +49,10 @@ export default function DocumentationPage() {
         }
       />
 
+      <HelpCenterDocLinks currentPath={`/erp/docs/${docKey}`} />
+
       <SurfacePanel className="p-5 sm:p-6">
-        <div className="erp-docs-article prose prose-invert max-w-none prose-headings:tracking-tight prose-p:text-slate-300 prose-a:text-cyan-200 prose-strong:text-slate-50 prose-li:text-slate-300">
+        <div className="erp-docs-article prose max-w-none prose-headings:tracking-tight">
           <Markdown source={doc.source} />
         </div>
       </SurfacePanel>

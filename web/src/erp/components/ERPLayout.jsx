@@ -1,78 +1,141 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Link,
-  NavLink,
-  Outlet,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom'
-import AppShell from '@/common/components/layout/AppShell'
-import SurfacePanel from '@/common/components/layout/SurfacePanel'
-import { AUTH_SCOPE, getCurrentUser, logout } from '@/common/auth/auth'
+  AlertOutlined,
+  ApartmentOutlined,
+  AppstoreOutlined,
+  BarsOutlined,
+  BookOutlined,
+  CalculatorOutlined,
+  DashboardOutlined,
+  FileSearchOutlined,
+  FileTextOutlined,
+  HomeOutlined,
+  InboxOutlined,
+  MenuOutlined,
+  MobileOutlined,
+  PrinterOutlined,
+  QuestionCircleOutlined,
+  ScheduleOutlined,
+  SettingOutlined,
+  ShoppingCartOutlined,
+  TagOutlined,
+  WalletOutlined,
+} from '@ant-design/icons'
+import {
+  Alert,
+  Breadcrumb,
+  Button,
+  Drawer,
+  Layout,
+  Menu,
+  Space,
+  Spin,
+  Tag,
+  Typography,
+} from 'antd'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { isAuthFailureCode } from '@/common/consts/errorCodes'
+import {
+  AUTH_SCOPE,
+  getCurrentUser,
+  getStoredAdminProfile,
+  logout,
+  persistAuthMeta,
+} from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
+import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
-  bootstrapChange,
-  getMobileDockItems,
+  normalizeMenuPermissions,
+  resolveMenuPermissionKey,
+} from '../config/menuPermissions.mjs'
+import {
   getNavigationSections,
-  getRoleWorkbench,
-  roleWorkbenches,
+  navigationItemRegistry,
 } from '../config/seedData.mjs'
-import { useERPWorkspace } from '../context/ERPWorkspaceProvider'
-import '../styles/app.css'
 
-function NavSection({ title, items }) {
-  return (
-    <div className="space-y-3">
-      <div className="px-2 text-xs uppercase tracking-[0.24em] text-slate-400">
-        {title}
-      </div>
-      <div className="space-y-2">
-        {items.map((item) => (
-          <NavLink
-            key={item.key}
-            to={item.path}
-            className={({ isActive }) =>
-              `erp-nav-link ${isActive ? 'erp-nav-link-active' : ''}`
-            }
-          >
-            <div className="text-sm font-medium text-slate-100">
-              {item.label}
-            </div>
-            <div className="mt-1 text-xs leading-5 text-slate-400">
-              {item.description}
-            </div>
-          </NavLink>
-        ))}
-      </div>
-    </div>
-  )
+const { Content, Header, Sider } = Layout
+const { Paragraph, Text } = Typography
+
+const navIconRegistry = {
+  'workspace-home': <AppstoreOutlined />,
+  'global-dashboard': <DashboardOutlined />,
+  partners: <ApartmentOutlined />,
+  products: <AppstoreOutlined />,
+  'project-orders': <ScheduleOutlined />,
+  quotations: <FileTextOutlined />,
+  'material-bom': <BarsOutlined />,
+  'accessories-purchase': <ShoppingCartOutlined />,
+  'processing-contracts': <FileTextOutlined />,
+  inbound: <InboxOutlined />,
+  inventory: <HomeOutlined />,
+  'shipping-release': <ScheduleOutlined />,
+  outbound: <FileSearchOutlined />,
+  'production-scheduling': <ScheduleOutlined />,
+  'production-progress': <DashboardOutlined />,
+  'production-exceptions': <AlertOutlined />,
+  reconciliation: <WalletOutlined />,
+  payables: <WalletOutlined />,
+  'flow-overview': <ScheduleOutlined />,
+  'source-readiness': <FileSearchOutlined />,
+  'mobile-workbenches': <MobileOutlined />,
+  'print-center': <PrinterOutlined />,
+  'help-operation-flow-overview': <ApartmentOutlined />,
+  'help-operation-guide': <BookOutlined />,
+  'help-field-linkage-guide': <TagOutlined />,
+  'help-calculation-guide': <CalculatorOutlined />,
+  'help-center': <QuestionCircleOutlined />,
+  'doc-system-init': <BookOutlined />,
+  'doc-operation-playbook': <BookOutlined />,
+  'doc-field-truth': <TagOutlined />,
+  'doc-data-model': <BarsOutlined />,
+  'doc-import-mapping': <FileTextOutlined />,
+  'doc-mobile-roles': <MobileOutlined />,
+  'doc-print-templates': <PrinterOutlined />,
+  changes: <FileTextOutlined />,
+  'permission-center': <SettingOutlined />,
 }
 
-function MobileNavStrip({ items }) {
+const DEFAULT_DESKTOP_ENTRY = {
+  label: '任务看板',
+  path: '/erp/dashboard',
+  description: '按任务状态看模块推进、资料缺口和桌面单入口边界。',
+}
+
+function buildCurrentEntry({ navigationSections, locationPath }) {
+  const items = [
+    ...navigationSections.flatMap((section) => section.items),
+    navigationItemRegistry['help-center'],
+  ].filter(Boolean)
+  const exactMatch = items.find((item) => item.path === locationPath)
+  if (exactMatch) {
+    return exactMatch
+  }
+
+  const prefixMatch = items.find((item) =>
+    locationPath.startsWith(`${item.path}/`)
+  )
+  if (prefixMatch) {
+    return prefixMatch
+  }
+
   return (
-    <div className="erp-mobile-strip lg:hidden">
-      {items.map((item) => (
-        <NavLink
-          key={item.key}
-          to={item.path}
-          className={({ isActive }) =>
-            `erp-mobile-strip-link ${isActive ? 'erp-mobile-strip-link-active' : ''}`
-          }
-        >
-          {item.shortLabel}
-        </NavLink>
-      ))}
-    </div>
+    items.find((item) => item.path === DEFAULT_DESKTOP_ENTRY.path) ||
+    DEFAULT_DESKTOP_ENTRY
   )
 }
 
 export default function ERPLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const admin = getCurrentUser(AUTH_SCOPE.ADMIN)
+  const tokenAdmin = getCurrentUser(AUTH_SCOPE.ADMIN)
   const [loggingOut, setLoggingOut] = useState(false)
-  const { activeRole, activeRoleKey, setDesktopRoleKey } = useERPWorkspace()
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [profileLoading, setProfileLoading] = useState(!getStoredAdminProfile())
+  const [adminProfile, setAdminProfile] = useState(() =>
+    getStoredAdminProfile()
+  )
 
   const authRpc = useMemo(
     () =>
@@ -83,25 +146,138 @@ export default function ERPLayout() {
       }),
     []
   )
-
-  const navigationSections = useMemo(
-    () => getNavigationSections(activeRoleKey),
-    [activeRoleKey]
+  const adminRpc = useMemo(
+    () =>
+      new JsonRpc({
+        url: 'admin',
+        basePath: ADMIN_BASE_PATH,
+        authScope: AUTH_SCOPE.ADMIN,
+      }),
+    []
   )
-  const mobileDockItems = useMemo(
-    () => getMobileDockItems(activeRoleKey),
-    [activeRoleKey]
+
+  const navigationSections = useMemo(() => getNavigationSections(), [])
+  const currentEntry = useMemo(
+    () =>
+      buildCurrentEntry({
+        navigationSections,
+        locationPath: location.pathname,
+      }),
+    [location.pathname, navigationSections]
   )
 
-  const currentEntry =
-    navigationSections
-      .flatMap((section) => section.items)
-      .find((item) => item.path === location.pathname) || null
+  const loadProfile = useCallback(async () => {
+    setProfileLoading(true)
+    try {
+      const result = await adminRpc.call('me', {})
+      const nextProfile = result?.data || null
+      if (nextProfile) {
+        persistAuthMeta(
+          {
+            user_id: nextProfile.id,
+            username: nextProfile.username,
+            admin_level: nextProfile.level,
+            menu_permissions: nextProfile.menu_permissions || [],
+          },
+          AUTH_SCOPE.ADMIN
+        )
+      }
+      setAdminProfile(nextProfile)
+    } catch (error) {
+      if (!isAuthFailureCode(error?.code)) {
+        message.error(getActionErrorMessage(error, '同步管理员权限'))
+      }
+    } finally {
+      setProfileLoading(false)
+    }
+  }, [adminRpc])
+
+  useEffect(() => {
+    loadProfile()
+  }, [loadProfile])
+
+  const isSuperAdmin = adminProfile?.level === 0
+  const allowedPermissions = useMemo(
+    () => normalizeMenuPermissions(adminProfile?.menu_permissions || []),
+    [adminProfile?.menu_permissions]
+  )
+
+  const visibleSections = useMemo(() => {
+    if (isSuperAdmin) {
+      return navigationSections
+    }
+
+    return navigationSections
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) =>
+          allowedPermissions.includes(item.path)
+        ),
+      }))
+      .filter((section) => section.items.length > 0)
+  }, [allowedPermissions, isSuperAdmin, navigationSections])
+
+  const currentPermissionKey = useMemo(
+    () => resolveMenuPermissionKey(location.pathname),
+    [location.pathname]
+  )
+
+  useEffect(() => {
+    if (profileLoading || isSuperAdmin) {
+      return
+    }
+    if (
+      !currentPermissionKey ||
+      allowedPermissions.includes(currentPermissionKey)
+    ) {
+      return
+    }
+    const fallbackPath = visibleSections[0]?.items[0]?.path || ''
+    if (fallbackPath && fallbackPath !== location.pathname) {
+      navigate(fallbackPath, { replace: true })
+    }
+  }, [
+    allowedPermissions,
+    currentPermissionKey,
+    isSuperAdmin,
+    location.pathname,
+    navigate,
+    profileLoading,
+    visibleSections,
+  ])
+
+  const menuItems = useMemo(
+    () =>
+      visibleSections.map((section) => ({
+        type: 'group',
+        key: `group-${section.title}`,
+        label: section.title,
+        children: section.items.map((item) => ({
+          key: item.path,
+          icon: navIconRegistry[item.key] || <FileTextOutlined />,
+          label: item.label,
+        })),
+      })),
+    [visibleSections]
+  )
+
+  const selectedKeys = currentEntry?.path ? [currentEntry.path] : []
+  const hidePageHead = currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path
+
+  const handleNavigate = (nextPath) => {
+    if (!nextPath || nextPath === location.pathname) {
+      setMobileNavOpen(false)
+      return
+    }
+    navigate(nextPath)
+    setMobileNavOpen(false)
+  }
 
   const handleLogout = async () => {
     if (loggingOut) {
       return
     }
+
     setLoggingOut(true)
     try {
       await authRpc.call('logout')
@@ -113,142 +289,135 @@ export default function ERPLayout() {
     }
   }
 
-  const handleRoleSwitch = (roleKey) => {
-    const nextRole = getRoleWorkbench(roleKey)
-    if (!nextRole) {
-      return
-    }
-    setDesktopRoleKey(nextRole.key)
-    navigate(nextRole.defaultPath)
+  const handleRefreshCurrentPage = () => {
+    window.location.reload()
+  }
+
+  const sideNav = (
+    <div className="erp-admin-sider__body">
+      <div className="erp-admin-brand">
+        <div className="erp-admin-brand__logo">
+          <span className="erp-admin-brand__logo-mark">P</span>
+          <div className="erp-admin-brand__logo-copy">
+            <div className="erp-admin-brand__logo-title">PLUSH ERP</div>
+            <div className="erp-admin-brand__logo-subtitle">
+              PLUSH TOY FACTORY CONSOLE
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Menu
+        mode="inline"
+        selectedKeys={selectedKeys}
+        items={menuItems}
+        onClick={({ key }) => handleNavigate(String(key || ''))}
+        className="erp-admin-menu"
+      />
+    </div>
+  )
+
+  const roleLabel = isSuperAdmin ? '超级管理员' : '普通管理员'
+  const displayUsername =
+    adminProfile?.username || tokenAdmin?.username || 'admin'
+  const noVisibleMenus = !isSuperAdmin && visibleSections.length === 0
+
+  if (profileLoading && !adminProfile) {
+    return (
+      <Layout className="erp-admin-shell">
+        <div className="erp-layout-loading">
+          <Space direction="vertical" align="center">
+            <Spin size="large" />
+            <Text type="secondary">正在同步管理员权限...</Text>
+          </Space>
+        </div>
+      </Layout>
+    )
   }
 
   return (
-    <AppShell className="px-3 py-3 sm:px-4 sm:py-4">
-      <div className="mx-auto max-w-[1600px]">
-        <MobileNavStrip items={mobileDockItems} />
+    <Layout className="erp-admin-shell">
+      <Sider width={320} className="erp-admin-sider">
+        {sideNav}
+      </Sider>
 
-        <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-          <aside className="hidden lg:block">
-            <SurfacePanel className="erp-sidebar-panel p-5">
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="inline-flex rounded-full border border-fuchsia-300/30 bg-fuchsia-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.24em] text-fuchsia-100">
-                    Plush ERP
-                  </div>
-                  <div>
-                    <div className="text-2xl font-semibold tracking-tight text-slate-50">
-                      毛绒 ERP 桌面后台
-                    </div>
-                    <div className="mt-2 text-sm leading-6 text-slate-300">
-                      桌面端继续保持一个后台入口，当前通过角色工作台、菜单权限、首页配置和帮助中心内容区分不同角色。
-                    </div>
-                  </div>
-                </div>
+      <Drawer
+        placement="left"
+        width={320}
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        className="erp-admin-drawer"
+      >
+        {sideNav}
+      </Drawer>
 
-                <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">
-                    当前管理员
-                  </div>
-                  <div className="mt-2 text-lg font-semibold text-slate-50">
-                    {admin?.username || 'admin'}
-                  </div>
-                  <div className="mt-2 text-sm leading-6 text-slate-300">
-                    当前角色：{activeRole.title}。本轮变更记录是 `
-                    {bootstrapChange.slug}`，后台体验会随角色切换同步变化。
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-xs uppercase tracking-[0.24em] text-slate-400">
-                    切换桌面角色
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {roleWorkbenches.map((role) => {
-                      const isActive = role.key === activeRoleKey
-                      return (
-                        <button
-                          key={role.key}
-                          type="button"
-                          onClick={() => handleRoleSwitch(role.key)}
-                          className={`rounded-full border px-3 py-2 text-sm transition ${
-                            isActive
-                              ? 'bg-cyan-300/12 border-cyan-300/40 text-cyan-50'
-                              : 'border-white/10 bg-white/[0.03] text-slate-300'
-                          }`}
-                        >
-                          {role.title}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <div className="mt-3 text-sm leading-6 text-slate-300">
-                    {activeRole.summary}
-                  </div>
-                </div>
-
-                {navigationSections.map((section) => (
-                  <NavSection
-                    key={section.title}
-                    title={section.title}
-                    items={section.items}
-                  />
-                ))}
-
-                <div className="grid gap-2">
-                  <Link className="erp-secondary-button" to="/">
-                    返回公共首页
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="erp-primary-button"
-                  >
-                    {loggingOut ? '退出中…' : '退出管理员登录'}
-                  </button>
-                </div>
+      <Layout>
+        <Header className="erp-admin-header">
+          <div className="erp-admin-header__row">
+            <Space align="start" size={16} className="erp-admin-header__left">
+              <Button
+                icon={<MenuOutlined />}
+                className="erp-admin-header__menu-button"
+                onClick={() => setMobileNavOpen(true)}
+              />
+              <div>
+                <div className="erp-admin-header__title">毛绒 ERP 管理后台</div>
               </div>
-            </SurfacePanel>
-          </aside>
+            </Space>
 
-          <main className="min-w-0">
-            <SurfacePanel className="p-4 sm:p-5 lg:p-6">
-              <div className="space-y-4">
-                <div className="flex flex-col gap-3 rounded-[28px] border border-white/10 bg-white/[0.03] px-4 py-4 sm:px-5">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="space-y-2">
-                      <div className="text-xs uppercase tracking-[0.24em] text-slate-400">
-                        当前页面
-                      </div>
-                      <div className="text-xl font-semibold text-slate-50">
-                        {currentEntry?.label || activeRole.title}
-                      </div>
-                      <div className="text-sm leading-6 text-slate-300">
-                        {currentEntry?.description || activeRole.summary}
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        className="erp-secondary-button"
-                        to="/erp/docs/system-init"
-                      >
-                        查看初始化说明
-                      </Link>
-                      <Link
-                        className="erp-secondary-button"
-                        to="/erp/changes/current"
-                      >
-                        查看 changes slug
-                      </Link>
-                    </div>
-                  </div>
-                </div>
-
-                <Outlet />
+            <Space size={12} wrap className="erp-admin-header__right">
+              <Button onClick={handleRefreshCurrentPage}>刷新当前页</Button>
+              <div className="erp-admin-header__meta">
+                <Tag color={isSuperAdmin ? 'gold' : 'blue'}>{roleLabel}</Tag>
+                <Text className="erp-admin-header__user">
+                  {displayUsername}
+                </Text>
+                <Button loading={loggingOut} onClick={handleLogout}>
+                  退出
+                </Button>
               </div>
-            </SurfacePanel>
-          </main>
-        </div>
-      </div>
-    </AppShell>
+            </Space>
+          </div>
+        </Header>
+
+        <Content className="erp-admin-content">
+          <div className="erp-admin-breadcrumb">
+            <Breadcrumb
+              items={[
+                { title: 'ERP' },
+                { title: currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label },
+              ]}
+            />
+          </div>
+
+          {!hidePageHead ? (
+            <div className="erp-admin-page-head">
+              <div className="erp-admin-page-head__main">
+                <div className="erp-admin-page-head__title">
+                  {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
+                </div>
+                <Paragraph className="erp-admin-page-head__summary">
+                  {currentEntry?.description ||
+                    DEFAULT_DESKTOP_ENTRY.description}
+                </Paragraph>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="erp-admin-outlet">
+            {noVisibleMenus ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="当前账号暂无后台菜单权限"
+                description="请联系超级管理员在“系统管理 / 权限管理”里为该账号分配菜单入口。"
+              />
+            ) : (
+              <Outlet />
+            )}
+          </div>
+        </Content>
+      </Layout>
+    </Layout>
   )
 }

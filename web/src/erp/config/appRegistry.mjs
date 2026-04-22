@@ -8,7 +8,7 @@ const ERP_APP_DEFINITIONS = {
     port: 5175,
     command: 'pnpm start:desktop',
     description:
-      '桌面后台保持一个入口，通过角色工作台、菜单权限、首页配置和帮助中心区分老板、跟单、采购、生产、仓库和财务。',
+      '桌面后台保持一个入口，统一承载流程、真源、打印和帮助中心；角色差异通过各自移动端端口访问。',
   },
   'mobile-boss': {
     id: 'mobile-boss',
@@ -52,7 +52,7 @@ const ERP_APP_DEFINITIONS = {
     port: 5189,
     command: 'pnpm start:mobile:production',
     description:
-      '生产移动端独立入口，聚焦今日排产、进度回填、延期原因、返工和异常；拍照扫码 deferred。',
+      '生产移动端独立入口，聚焦今日排产、进度回填、延期原因、返工和异常；扩展硬件链路 deferred。',
   },
   'mobile-warehouse': {
     id: 'mobile-warehouse',
@@ -63,7 +63,7 @@ const ERP_APP_DEFINITIONS = {
     port: 5190,
     command: 'pnpm start:mobile:warehouse',
     description:
-      '仓库移动端独立入口，聚焦收货、备料、成品入库、待出货和异常件处理；扫码 deferred。',
+      '仓库移动端独立入口，聚焦收货、备料、成品入库、待出货和异常件处理；扩展硬件链路 deferred。',
   },
   'mobile-finance': {
     id: 'mobile-finance',

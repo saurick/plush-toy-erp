@@ -1,21 +1,21 @@
 // web/src/App.jsx
 import React, { useEffect } from 'react'
+import { App as AntdApp, ConfigProvider, theme } from 'antd'
+import zhCN from 'antd/locale/zh_CN'
 import { useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { authBus } from '@/common/auth/authBus'
 import { appAlert } from '@/common/components/modal/alertBridge'
+import AntdAppBridge from '@/common/components/AntdAppBridge'
+import { getRuntimeAppDefinition } from '@/erp/config/appRegistry.mjs'
 import ERPRouter from '@/erp/router'
 import MobileRoleRouter from '@/erp/mobile/router'
-import {
-  ERPWorkspaceProvider,
-  useERPWorkspace,
-} from '@/erp/context/ERPWorkspaceProvider'
-
-import 'normalize.css/normalize.css'
+import { ERPWorkspaceProvider } from '@/erp/context/ERPWorkspaceProvider'
 
 function AppContent() {
   const navigate = useNavigate()
-  const { appConfig, isDesktopApp } = useERPWorkspace()
+  const appConfig = getRuntimeAppDefinition()
+  const isDesktopApp = appConfig.kind === 'desktop'
   const appTitle =
     appConfig.title || import.meta.env.VITE_APP_TITLE || 'Plush Toy ERP'
 
@@ -55,7 +55,23 @@ function AppContent() {
 
 const App = () => (
   <ERPWorkspaceProvider>
-    <AppContent />
+    <ConfigProvider
+      locale={zhCN}
+      theme={{
+        algorithm: theme.defaultAlgorithm,
+        token: {
+          colorPrimary: '#2f8f4b',
+          borderRadius: 10,
+          fontFamily:
+            '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
+        },
+      }}
+    >
+      <AntdApp>
+        <AntdAppBridge />
+        <AppContent />
+      </AntdApp>
+    </ConfigProvider>
   </ERPWorkspaceProvider>
 )
 

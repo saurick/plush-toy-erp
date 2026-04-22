@@ -64,6 +64,16 @@ func PasswordHash(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldPasswordHash, v))
 }
 
+// Level applies equality check predicate on the "level" field. It's identical to LevelEQ.
+func Level(v int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldLevel, v))
+}
+
+// MenuPermissions applies equality check predicate on the "menu_permissions" field. It's identical to MenuPermissionsEQ.
+func MenuPermissions(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldMenuPermissions, v))
+}
+
 // Disabled applies equality check predicate on the "disabled" field. It's identical to DisabledEQ.
 func Disabled(v bool) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldDisabled, v))
@@ -212,6 +222,111 @@ func PasswordHashEqualFold(v string) predicate.AdminUser {
 // PasswordHashContainsFold applies the ContainsFold predicate on the "password_hash" field.
 func PasswordHashContainsFold(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldContainsFold(FieldPasswordHash, v))
+}
+
+// LevelEQ applies the EQ predicate on the "level" field.
+func LevelEQ(v int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldLevel, v))
+}
+
+// LevelNEQ applies the NEQ predicate on the "level" field.
+func LevelNEQ(v int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldLevel, v))
+}
+
+// LevelIn applies the In predicate on the "level" field.
+func LevelIn(vs ...int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldLevel, vs...))
+}
+
+// LevelNotIn applies the NotIn predicate on the "level" field.
+func LevelNotIn(vs ...int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldLevel, vs...))
+}
+
+// LevelGT applies the GT predicate on the "level" field.
+func LevelGT(v int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldLevel, v))
+}
+
+// LevelGTE applies the GTE predicate on the "level" field.
+func LevelGTE(v int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldLevel, v))
+}
+
+// LevelLT applies the LT predicate on the "level" field.
+func LevelLT(v int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldLevel, v))
+}
+
+// LevelLTE applies the LTE predicate on the "level" field.
+func LevelLTE(v int8) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldLevel, v))
+}
+
+// MenuPermissionsEQ applies the EQ predicate on the "menu_permissions" field.
+func MenuPermissionsEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsNEQ applies the NEQ predicate on the "menu_permissions" field.
+func MenuPermissionsNEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsIn applies the In predicate on the "menu_permissions" field.
+func MenuPermissionsIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldMenuPermissions, vs...))
+}
+
+// MenuPermissionsNotIn applies the NotIn predicate on the "menu_permissions" field.
+func MenuPermissionsNotIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldMenuPermissions, vs...))
+}
+
+// MenuPermissionsGT applies the GT predicate on the "menu_permissions" field.
+func MenuPermissionsGT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsGTE applies the GTE predicate on the "menu_permissions" field.
+func MenuPermissionsGTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsLT applies the LT predicate on the "menu_permissions" field.
+func MenuPermissionsLT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsLTE applies the LTE predicate on the "menu_permissions" field.
+func MenuPermissionsLTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsContains applies the Contains predicate on the "menu_permissions" field.
+func MenuPermissionsContains(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContains(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsHasPrefix applies the HasPrefix predicate on the "menu_permissions" field.
+func MenuPermissionsHasPrefix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasPrefix(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsHasSuffix applies the HasSuffix predicate on the "menu_permissions" field.
+func MenuPermissionsHasSuffix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasSuffix(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsEqualFold applies the EqualFold predicate on the "menu_permissions" field.
+func MenuPermissionsEqualFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEqualFold(FieldMenuPermissions, v))
+}
+
+// MenuPermissionsContainsFold applies the ContainsFold predicate on the "menu_permissions" field.
+func MenuPermissionsContainsFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContainsFold(FieldMenuPermissions, v))
 }
 
 // DisabledEQ applies the EQ predicate on the "disabled" field.

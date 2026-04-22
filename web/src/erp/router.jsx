@@ -1,31 +1,36 @@
 import React from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AuthGuard from '@/common/auth/AuthGuard'
+import { AUTH_SCOPE, getCurrentUser } from '@/common/auth/auth'
 import AdminUsersPage from '@/pages/AdminUsers'
 import AdminLoginPage from '@/pages/AdminLogin'
-import HomePage from '@/pages/Home'
 import LoginPage from '@/pages/Login'
 import RegisterPage from '@/pages/Register'
-import ERPLayout from './components/ERPLayout'
+import ERPLayout from './components/ERPLayout.jsx'
+import { businessModuleDefinitions } from './config/businessModules.mjs'
+import BusinessModulePage from './pages/BusinessModulePage'
 import ChangeLogPage from './pages/ChangeLogPage'
 import DashboardPage from './pages/DashboardPage'
 import DocumentationPage from './pages/DocumentationPage'
-import HelpCenterPage from './pages/HelpCenterPage'
-import MobileWorkbenchesPage from './pages/MobileWorkbenchesPage'
 import OperationFlowPage from './pages/OperationFlowPage'
-import RoleWorkbenchPage from './pages/RoleWorkbenchPage'
-import SourceReadinessPage from './pages/SourceReadinessPage'
-import { useERPWorkspace } from './context/ERPWorkspaceProvider'
+import PrintCenterPage from './pages/PrintCenterPage'
+import PrintTemplatePreviewPage from './pages/PrintTemplatePreviewPage'
+import PrintWorkspacePage from './pages/PrintWorkspacePage.jsx'
+import PermissionCenterPage from './pages/PermissionCenterPage'
 
 function DesktopEntryRedirect() {
-  const { activeRole } = useERPWorkspace()
-  return <Navigate to={activeRole.defaultPath} replace />
+  return <Navigate to="/erp/dashboard" replace />
+}
+
+function RootEntryRedirect() {
+  const admin = getCurrentUser(AUTH_SCOPE.ADMIN)
+  return <Navigate to={admin ? '/erp/dashboard' : '/admin-login'} replace />
 }
 
 export default function ERPRouter() {
   return (
     <Routes>
-      <Route path="/" element={<HomePage />} />
+      <Route path="/" element={<RootEntryRedirect />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/admin-login" element={<AdminLoginPage />} />
@@ -49,7 +54,7 @@ export default function ERPRouter() {
       />
       <Route
         path="/admin-guide"
-        element={<Navigate to="/erp/help-center" replace />}
+        element={<Navigate to="/erp/docs/operation-guide" replace />}
       />
       <Route
         path="/dashboard"
@@ -66,14 +71,55 @@ export default function ERPRouter() {
       >
         <Route index element={<DesktopEntryRedirect />} />
         <Route path="dashboard" element={<DashboardPage />} />
-        <Route path="flows/overview" element={<OperationFlowPage />} />
-        <Route path="help-center" element={<HelpCenterPage />} />
-        <Route path="mobile-workbenches" element={<MobileWorkbenchesPage />} />
-        <Route path="roles/:roleKey" element={<RoleWorkbenchPage />} />
-        <Route path="source-readiness" element={<SourceReadinessPage />} />
+        {businessModuleDefinitions.map((moduleItem) => (
+          <Route
+            key={moduleItem.key}
+            path={moduleItem.route}
+            element={<BusinessModulePage moduleItem={moduleItem} />}
+          />
+        ))}
+        <Route
+          path="docs/operation-flow-overview"
+          element={<OperationFlowPage />}
+        />
+        <Route
+          path="flows/overview"
+          element={<Navigate to="/erp/docs/operation-flow-overview" replace />}
+        />
+        <Route
+          path="help-center"
+          element={<Navigate to="/erp/docs/operation-guide" replace />}
+        />
+        <Route path="print-center" element={<PrintCenterPage />} />
+        <Route
+          path="print-center/:templateKey"
+          element={<PrintTemplatePreviewPage />}
+        />
+        <Route path="system/permissions" element={<PermissionCenterPage />} />
+        <Route
+          path="mobile-workbenches"
+          element={<Navigate to="/erp/docs/operation-guide" replace />}
+        />
+        <Route
+          path="roles/:roleKey"
+          element={<Navigate to="/erp/dashboard" replace />}
+        />
+        <Route
+          path="source-readiness"
+          element={<Navigate to="/erp/docs/field-linkage-guide" replace />}
+        />
         <Route path="docs/:docKey" element={<DocumentationPage />} />
         <Route path="changes/current" element={<ChangeLogPage />} />
       </Route>
+
+      <Route
+        path="/erp/print-workspace/:templateKey"
+        element={
+          <AuthGuard requireAdmin>
+            <PrintWorkspacePage />
+          </AuthGuard>
+        }
+      />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

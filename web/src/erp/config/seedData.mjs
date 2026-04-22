@@ -1,4 +1,5 @@
 import { appDefinitions } from './appRegistry.mjs'
+import { businessNavigationSections } from './businessModules.mjs'
 
 export const STATUS_LABELS = {
   source_grounded: '已按真源收口',
@@ -9,13 +10,13 @@ export const STATUS_LABELS = {
 
 export const STATUS_STYLES = {
   source_grounded:
-    'border-emerald-300/30 bg-emerald-300/12 text-emerald-100 shadow-[0_0_0_1px_rgba(110,231,183,0.12)]',
+    'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]',
   seeded:
-    'border-cyan-300/30 bg-cyan-300/12 text-cyan-100 shadow-[0_0_0_1px_rgba(103,232,249,0.12)]',
+    'border-sky-200 bg-sky-50 text-sky-700 shadow-[0_0_0_1px_rgba(56,189,248,0.08)]',
   awaiting_confirmation:
-    'border-amber-300/30 bg-amber-300/12 text-amber-100 shadow-[0_0_0_1px_rgba(252,211,77,0.12)]',
+    'border-amber-200 bg-amber-50 text-amber-700 shadow-[0_0_0_1px_rgba(251,191,36,0.08)]',
   deferred:
-    'border-slate-300/20 bg-slate-300/10 text-slate-200 shadow-[0_0_0_1px_rgba(148,163,184,0.08)]',
+    'border-slate-200 bg-slate-50 text-slate-600 shadow-[0_0_0_1px_rgba(148,163,184,0.06)]',
 }
 
 export const bootstrapChange = {
@@ -34,7 +35,7 @@ export const environmentCards = [
     label: '桌面后台入口',
     value: '5175',
     detail:
-      '桌面后台继续保持一个入口，通过角色工作台、菜单权限、首页配置和帮助中心区分角色，不拆多个桌面前端。',
+      '桌面后台继续保持一个入口，直接承载流程、真源、打印和帮助中心，不再保留桌面角色切换与角色工作台入口。',
   },
   {
     label: '移动端端口矩阵',
@@ -89,7 +90,7 @@ export const plannedModules = [
     status: 'source_grounded',
     owner: '仓库 + 品质',
     summary:
-      '流程图已明确主辅料到仓 IQC、包装材料到仓、最终包装、成品仓和发货放行节点，扫码 / PDA 明确 deferred。',
+      '流程图已明确主辅料到仓 IQC、包装材料到仓、最终包装、成品仓和发货放行节点，扩展硬件链路 / PDA 明确 deferred。',
   },
   {
     key: 'finance',
@@ -105,23 +106,23 @@ export const plannedModules = [
     status: 'seeded',
     owner: '实施 / 产品',
     summary:
-      '本轮会把流程、字段真源、数据模型、导入映射、桌面角色化和移动端多入口全部同步到帮助中心与正式文档。',
+      '本轮会把流程、字段真源、数据模型、导入映射，以及“桌面单后台 + 移动端按端口访问”的口径同步到帮助中心与正式文档。',
+  },
+  {
+    key: 'print-center',
+    title: '模板打印中心',
+    status: 'source_grounded',
+    owner: '采购 + 跟单 + 财务',
+    summary:
+      '参照 trade-erp 的统一入口方式，已开始把辅料采购合同、委外加工合同、材料汇总、加工汇总和生产总表收口成固定打印模板。',
   },
   {
     key: 'mobile-topology',
-    title: '移动端多入口 / 多端口',
+    title: '移动端多端口',
     status: 'seeded',
     owner: '全部角色',
     summary:
-      '同一仓库内新增 6 个角色移动端入口，端口与角色绑定，便于后续按域名拆入口但继续共享 common / ui / api。',
-  },
-  {
-    key: 'photo-scan',
-    title: '拍照扫码 / PDA / 条码枪 / 图片识别',
-    status: 'deferred',
-    owner: '生产 + 仓库',
-    summary:
-      '真实资料和汇报 PDF 都提到现场扫码 / 拍照场景，但本轮统一标记 deferred，不会假装已经支持。',
+      '同一仓库内新增 6 个角色移动端端口，按端口直接访问各角色页面，但继续共享 common / ui / api。',
   },
 ]
 
@@ -192,7 +193,7 @@ export const phaseFlow = [
     title: '生产排单 / 跟进 / 延期 / 返工 / 异常',
     owner: 'PMC + 生产经理 / 厂长',
     summary:
-      '正式汇报版 PDF 第 4 页已给出主流程，第 7 页给出 PMC 与生产经理桌面 / 手机端示意。当前要先按“齐套 -> 排产 -> 延期 -> 返工 -> 异常”落页面，不去假装扫码或拍照已就位。',
+      '正式汇报版 PDF 第 4 页已给出主流程，第 7 页给出 PMC 与生产经理桌面 / 手机端示意。当前要先按“齐套 -> 排产 -> 延期 -> 返工 -> 异常”落页面，不去假装扩展硬件链路已就位。',
     outputs: ['生产单 / 排单', '进度日志', '延期原因', '返工记录', '异常中心'],
     mobileActions: ['今日排产', '进度回填', '延期原因', '返工 / 异常上报'],
     sources: [
@@ -206,7 +207,7 @@ export const phaseFlow = [
     title: '仓库收发 / 成品入库 / 待出货',
     owner: '仓库 + 品质',
     summary:
-      '材料与包装到仓、IQC、成品回仓、最终包装和仓库出货单已经在正式汇报版流程图里明确。现场扫码 / PDA 仍在 deferred，当前只落可操作的收发 / 入库 / 待出货视图。',
+      '材料与包装到仓、IQC、成品回仓、最终包装和仓库出货单已经在正式汇报版流程图里明确。扩展硬件链路 / PDA 仍在 deferred，当前只落可操作的收发 / 入库 / 待出货视图。',
     outputs: [
       '主辅料到仓记录',
       '包装材料到仓',
@@ -232,6 +233,26 @@ export const phaseFlow = [
       '9.3 加工合同 PDF：次月开始对账、每月 15 号前完成对账、次月支付货款。',
       '加工 成慧怡.xlsx：加工金额公式列。',
       '辅材、包材 成慧怡.xlsx：采购金额公式列与下单人 / 联系电话。',
+    ],
+  },
+  {
+    key: 'print-output',
+    title: '模板打印 / 对外留档',
+    owner: '跟单 + 采购 + 财务',
+    summary:
+      '合同、材料汇总、加工汇总和生产总表都已经有真实打印或报表样本，当前统一进入模板打印中心，不再散落在不同帮助文档里。',
+    outputs: [
+      '辅料采购合同',
+      '委外加工合同',
+      '材料分析汇总表',
+      '加工分析汇总表',
+      '生产订单总表',
+    ],
+    mobileActions: ['仅查看打印口径与角色边界，不在手机端编辑模板'],
+    sources: [
+      '模板-材料与加工合同.xlsx：C类辅料合同、B类加工合同、材料分析汇总表-修改、加工分析汇总表-修改。',
+      '9.3加工合同-子淳.pdf：验证委外加工合同的实际打印观感与条款区。',
+      'Weixin 生产订单总表截图：验证生产报表字段和高亮列。',
     ],
   },
 ]
@@ -433,6 +454,16 @@ export const sourceReadiness = {
     },
     {
       type: 'Excel',
+      name: '模板-材料与加工合同.xlsx',
+      intendedFor: '统一打印模板母版、汇总表口径和合同条款区。',
+      facts: [
+        '一个文件内同时包含 C类辅料合同、B类加工合同、材料分析明细 / 汇总、加工分析汇总、厂商主档候选。',
+        'C类辅料合同与 B类加工合同都通过 VLOOKUP 把汇总表和厂商资料映射进打印合同头，说明模板打印与主数据快照必须分层。',
+        '材料 / 加工汇总表保留公式缓存值和多数量带宽列，适合先做固定打印预览和口径说明。',
+      ],
+    },
+    {
+      type: 'Excel',
       name: '26029#夜樱烬色才料明细表2026-1-19.xlsx',
       intendedFor: '主料 BOM 明细、采购汇总、色卡和作业指导书拆分。',
       facts: [
@@ -474,11 +505,11 @@ export const sourceReadiness = {
     {
       type: 'PDF',
       name: 'plush_factory_formal_report_v3_mobile.pdf',
-      intendedFor: '桌面后台角色化和移动端多入口信息架构。',
+      intendedFor: '桌面单后台与移动端端口信息架构。',
       facts: [
         '第 4 页给出老板视角总览流程：审核、采购、外发、品质、包装、出货。',
         '第 5 - 7 页明确业务、老板、PMC、生产经理的桌面 + 手机端示意。',
-        '第 8 页提到扫码 / 拍照场景，但本轮统一标记 deferred。',
+        '第 8 页提到扩展硬件联动场景，但本轮统一标记 deferred。',
       ],
     },
     {
@@ -490,57 +521,24 @@ export const sourceReadiness = {
         '这是一张生产订单总表而不是简单看板图片，应视为正式字段样本。',
       ],
     },
+    {
+      type: 'JPEG',
+      name: 'Weixin Image_20260421153105_2272_288.jpeg',
+      intendedFor: '辅料采购合同实拍校对和打印观感确认。',
+      facts: [
+        '实拍图与模板母版的 C类辅料合同结构一致，说明合同头、明细表、条款区和签字区当前版式稳定。',
+        '实拍图再次确认“采购订单号 / 产品订单编号 / 产品编号 / 材料品名 / 厂商料号 / 采购数量 / 采购金额”是一张合同快照表，而不是纯主数据页面。',
+      ],
+    },
   ],
   pending: [
     '更多客户订单 / 出货单 / 仓库单据样本，用来确认订单号和客户订单号关系。',
     '更多加工合同 PDF，确认下单日期字段是否一直是当前数值格式。',
     '更多 BOM / 辅材 / 包材 Excel，确认材料类别、颜色和金额列的稳定口径。',
     '正式结算单或对账单样本，用来决定 settlement 表是否可本轮落库。',
-    '扫码 / 拍照 / PDA 真实流程样本；在拿到前继续保持 deferred。',
+    '扩展硬件链路 / PDA 真实流程样本；在拿到前继续保持 deferred。',
   ],
 }
-
-export const documentationCards = [
-  {
-    key: 'system-init',
-    title: '系统初始化与多入口说明',
-    path: '/erp/docs/system-init',
-    summary:
-      '明确桌面单入口、移动端多入口 / 多端口、共享后端和 deferred 边界。',
-  },
-  {
-    key: 'operation-playbook',
-    title: '毛绒 ERP 主流程',
-    path: '/erp/docs/operation-playbook',
-    summary: '基于正式汇报 PDF、合同、Excel 和生产总表重写主流程。',
-  },
-  {
-    key: 'field-truth',
-    title: '字段真源对照',
-    path: '/erp/docs/field-truth',
-    summary:
-      '把客户、编号体系、数量、单价、交期、图片等字段真源收口到资料级别。',
-  },
-  {
-    key: 'data-model',
-    title: '首批正式数据模型',
-    path: '/erp/docs/data-model',
-    summary:
-      '说明为什么不能照搬 trade-erp，以及本轮为什么暂不急着落 Ent schema。',
-  },
-  {
-    key: 'import-mapping',
-    title: 'Excel / PDF 导入映射',
-    path: '/erp/docs/import-mapping',
-    summary: '逐个原件列出工作表、原始表头、标准字段、目标表与清洗规则。',
-  },
-  {
-    key: 'mobile-roles',
-    title: '桌面角色化与移动端多入口',
-    path: '/erp/docs/mobile-roles',
-    summary: '说明桌面后台如何按角色区分，以及六个移动端入口分别负责什么。',
-  },
-]
 
 const roleWorkbenches = [
   {
@@ -555,6 +553,7 @@ const roleWorkbenches = [
       'global-dashboard',
       'flow-overview',
       'source-readiness',
+      'print-center',
       'mobile-workbenches',
       'help-center',
       'doc-system-init',
@@ -563,6 +562,7 @@ const roleWorkbenches = [
       'doc-data-model',
       'doc-import-mapping',
       'doc-mobile-roles',
+      'doc-print-templates',
       'changes',
     ],
     desktopFocus: [
@@ -574,9 +574,9 @@ const roleWorkbenches = [
     mobileFocus: ['交期风险', '异常订单', '未完成数量', '待结算', '本周重点'],
     desktopMenuPreview: [
       '角色首页：老板工作台',
-      '全局驾驶舱：经营总览、风险、结算提醒',
-      '流程与真源：流程总览、字段真源、数据模型、导入映射',
-      '帮助中心：老板审批口径和 deferred 说明',
+      '任务看板：经营总览、风险、结算提醒',
+      '真源与打印：资料与字段真源、模板打印中心',
+      '帮助中心：流程总览、系统初始化、数据模型、老板审批口径',
     ],
     desktopHighlights: [
       {
@@ -627,7 +627,7 @@ const roleWorkbenches = [
     helpFocus: [
       '老板审批的是订单、包装材料打单表和生产资料，不是直接改 BOM。',
       '桌面后台保留一个入口，角色差异通过菜单与首页配置控制。',
-      '扫码 / 拍照流程引用自汇报样例，但本轮明确 deferred。',
+      '扩展硬件链路引用自汇报样例，但本轮明确 deferred。',
     ],
     sourceRefs: [
       'plush_factory_formal_report_v3_mobile.pdf 第 4 - 6 页',
@@ -674,7 +674,7 @@ const roleWorkbenches = [
     ],
     mobileDeferred: [
       '不做复杂经营分析配置。',
-      '不在手机端处理扫码 / 拍照验货。',
+      '不在手机端处理硬件联动验货。',
       '不在手机端维护利润口径。',
     ],
   },
@@ -689,6 +689,7 @@ const roleWorkbenches = [
       'workspace-home',
       'flow-overview',
       'source-readiness',
+      'print-center',
       'mobile-workbenches',
       'help-center',
       'doc-system-init',
@@ -696,6 +697,7 @@ const roleWorkbenches = [
       'doc-field-truth',
       'doc-import-mapping',
       'doc-mobile-roles',
+      'doc-print-templates',
       'changes',
     ],
     desktopFocus: [
@@ -708,8 +710,8 @@ const roleWorkbenches = [
     mobileFocus: ['客户 / 款式', '缺资料', '催料', '催合同', '交期预警'],
     desktopMenuPreview: [
       '角色首页：跟单工作台',
-      '资料与流程：流程总览、资料准备、导入映射',
-      '帮助中心：编号体系、字段真源、deferred 边界',
+      '真源与打印：资料准备、模板打印中心',
+      '帮助中心：流程总览、编号体系、字段真源、deferred 边界',
     ],
     desktopHighlights: [
       {
@@ -730,7 +732,7 @@ const roleWorkbenches = [
       {
         label: '验货提醒',
         value: '2 条',
-        note: '保留客户验货提醒，但不假装已有移动拍照上传。',
+        note: '保留客户验货提醒，但不假装已有移动现场上传。',
       },
     ],
     desktopQueues: [
@@ -751,7 +753,7 @@ const roleWorkbenches = [
       },
     ],
     firstWave: ['角色首页', '款式 / 编号真源提示', '资料缺口清单', '催办入口'],
-    pending: ['客户消息同步', '完整 BOM 编辑', '拍照上传'],
+    pending: ['客户消息同步', '完整 BOM 编辑', '现场上传'],
     helpFocus: [
       '跟单先看字段真源文档，再做款式 / 合同 / 出货跟进。',
       '跟单移动端只做催办和风险确认，不做完整 BOM 录入。',
@@ -801,7 +803,7 @@ const roleWorkbenches = [
     ],
     mobileDeferred: [
       '不在手机端维护完整 BOM。',
-      '不做拍照上传和图片识别。',
+      '不做现场上传和图片识别。',
       '不拆第二套跟单后端。',
     ],
   },
@@ -816,6 +818,7 @@ const roleWorkbenches = [
       'workspace-home',
       'flow-overview',
       'source-readiness',
+      'print-center',
       'mobile-workbenches',
       'help-center',
       'doc-system-init',
@@ -823,6 +826,7 @@ const roleWorkbenches = [
       'doc-data-model',
       'doc-import-mapping',
       'doc-mobile-roles',
+      'doc-print-templates',
     ],
     desktopFocus: [
       '主料需求',
@@ -834,8 +838,8 @@ const roleWorkbenches = [
     mobileFocus: ['缺料', '到料', '单价确认', '回签', '辅材包材确认'],
     desktopMenuPreview: [
       '角色首页：采购工作台',
-      '资料准备：材料 Excel / 加工汇总 / 辅包材汇总',
-      '文档：字段真源、数据模型、导入映射',
+      '真源与打印：材料 Excel / 加工汇总 / 辅包材汇总、模板打印中心',
+      '帮助中心：字段真源、数据模型、导入映射',
     ],
     desktopHighlights: [
       {
@@ -882,11 +886,11 @@ const roleWorkbenches = [
       '加工合同节点',
       '辅包材确认入口',
     ],
-    pending: ['自动比价', '供应商绩效', '扫码到料'],
+    pending: ['自动比价', '供应商绩效', '到料硬件联动'],
     helpFocus: [
       '采购真源分三类：主料 BOM、辅包材采购、加工合同 / 加工商主档。',
       '供应商联系人和银行字段含敏感信息，本轮只停在文档设计。',
-      '扫码到料继续 deferred。',
+      '到料硬件联动继续 deferred。',
     ],
     sourceRefs: [
       '加工 成慧怡.xlsx',
@@ -928,7 +932,7 @@ const roleWorkbenches = [
     ],
     mobileDeferred: [
       '不做自动比价。',
-      '不做供应商扫码到料。',
+      '不做供应商到料硬件联动。',
       '不把银行敏感字段暴露到移动端。',
     ],
   },
@@ -943,10 +947,12 @@ const roleWorkbenches = [
       'workspace-home',
       'flow-overview',
       'source-readiness',
+      'print-center',
       'mobile-workbenches',
       'help-center',
       'doc-operation-playbook',
       'doc-mobile-roles',
+      'doc-print-templates',
     ],
     desktopFocus: [
       '今日排产',
@@ -995,17 +1001,17 @@ const roleWorkbenches = [
       {
         title: '当前边界',
         items: [
-          '拍照扫码和工时采集继续 deferred。',
+          '扩展硬件链路和工时采集继续 deferred。',
           '生产端先做进度日志，不抢跑复杂排产引擎。',
         ],
       },
     ],
     firstWave: ['角色首页', '排产卡片', '进度回填', '返工 / 异常列表'],
-    pending: ['扫码工序流转', '拍照质检', '工时采集'],
+    pending: ['工序硬件联动', '现场质检', '工时采集'],
     helpFocus: [
       'PMC 全流程跟单，生产经理负责车缝 / 手工 / 内外发决策。',
       '返工和异常要单独成日志，不继续沉到备注。',
-      '扫码与拍照来自汇报样例，但本轮不做。',
+      '扩展硬件链路来自汇报样例，但本轮不做。',
     ],
     sourceRefs: [
       'plush_factory_formal_report_v3_mobile.pdf 第 4 页 / 第 7 页',
@@ -1042,10 +1048,10 @@ const roleWorkbenches = [
     mobileTaskFlow: [
       '先看今日排产和待决策排单。',
       '在现场回填开工 / 完工 / 延期原因。',
-      '返工 / 异常直接进日志，不做拍照扫码。',
+      '返工 / 异常直接进日志，不做硬件联动回填。',
     ],
     mobileDeferred: [
-      '拍照扫码 deferred。',
+      '扩展硬件链路 deferred。',
       '不做 PDA 工时采集。',
       '不做复杂排产编辑。',
     ],
@@ -1061,10 +1067,12 @@ const roleWorkbenches = [
       'workspace-home',
       'flow-overview',
       'source-readiness',
+      'print-center',
       'mobile-workbenches',
       'help-center',
       'doc-operation-playbook',
       'doc-mobile-roles',
+      'doc-print-templates',
     ],
     desktopFocus: [
       '主辅料到仓',
@@ -1077,7 +1085,7 @@ const roleWorkbenches = [
     desktopMenuPreview: [
       '角色首页：仓库工作台',
       '收货 / 备料 / 成品入库 / 待出货',
-      '帮助中心：扫码 deferred 与现场回填边界',
+      '帮助中心：扩展硬件链路 deferred 边界',
     ],
     desktopHighlights: [
       {
@@ -1113,16 +1121,16 @@ const roleWorkbenches = [
       {
         title: '当前边界',
         items: [
-          '扫码入库 / PDA 继续 deferred。',
+          '硬件化入库 / PDA 继续 deferred。',
           '先用移动端做轻量确认，不做复杂库位策略。',
         ],
       },
     ],
     firstWave: ['角色首页', '收货 / 入库清单', '待出货清单', '异常件入口'],
-    pending: ['扫码入库', 'PDA 打包', '库位策略'],
+    pending: ['硬件化入库', 'PDA 打包', '库位策略'],
     helpFocus: [
       '包装材料存在独立支线，不能忽略。',
-      '收货、入库、待出货先按视图和日志落地，不做扫码。',
+      '收货、入库、待出货先按视图和日志落地，不做硬件化登记。',
       '发货放行是业务 + 财务 + 仓库协作节点。',
     ],
     sourceRefs: [
@@ -1164,10 +1172,10 @@ const roleWorkbenches = [
     mobileTaskFlow: [
       '先确认到仓和 IQC 结果。',
       '再处理备料、包装和成品入库。',
-      '待出货时只做确认和异常反馈，不做扫码。',
+      '待出货时只做确认和异常反馈，不做硬件化登记。',
     ],
     mobileDeferred: [
-      '扫码 deferred。',
+      '扩展硬件链路 deferred。',
       'PDA 打包 deferred。',
       '不做复杂库位调整。',
     ],
@@ -1182,12 +1190,14 @@ const roleWorkbenches = [
     allowedNavKeys: [
       'workspace-home',
       'source-readiness',
+      'print-center',
       'mobile-workbenches',
       'help-center',
       'doc-field-truth',
       'doc-data-model',
       'doc-import-mapping',
       'doc-mobile-roles',
+      'doc-print-templates',
       'changes',
     ],
     desktopFocus: [
@@ -1303,6 +1313,14 @@ export function getRoleWorkbench(roleKey) {
 
 const commonHelpSections = [
   {
+    title: '后台与移动端访问方式',
+    items: [
+      '桌面后台固定使用一个入口，不再保留角色切换、角色首页或角色入口菜单。',
+      '六个移动端角色按端口直接访问，角色差异放在各自移动端页面里体现。',
+      '桌面与移动端继续共享同一个后端 8200、同一套字段真源和同一套文档。',
+    ],
+  },
+  {
     title: '先读这三个入口',
     items: [
       '流程总览：先确认主链路是不是“客户 / 款式 -> BOM -> 加工合同 -> 生产 -> 仓库 -> 结算”。',
@@ -1311,9 +1329,17 @@ const commonHelpSections = [
     ],
   },
   {
+    title: '模板打印先分三类',
+    items: [
+      '合同类：辅料采购合同、委外加工合同，都是正式业务快照和留档单据。',
+      '汇总类：材料分析汇总表、加工分析汇总表，属于主料 / 工序分析派生打印。',
+      '报表类：生产订单总表是经营 / 生产快照视图，不要误当成主数据维护页。',
+    ],
+  },
+  {
     title: '本轮明确 deferred',
     items: [
-      '拍照扫码、条码枪、PDA、图片识别。',
+      '扩展硬件链路、条码枪、PDA、图片识别。',
       '正式票据识别、自动比价、复杂排产引擎。',
       '把未确认字段直接硬塞进 Ent schema。',
     ],
@@ -1327,7 +1353,7 @@ const roleHelpSections = {
       items: [
         '待审核、延期预警、异常订单、本周出货。',
         '高风险订单摘要和待结算提醒。',
-        '扫码 / 拍照场景只保留 deferred 说明。',
+        '扩展硬件链路只保留 deferred 说明。',
       ],
     },
   ],
@@ -1357,7 +1383,7 @@ const roleHelpSections = {
       items: [
         '今日排产、延期原因、返工和异常。',
         'PMC 与生产经理职责要分开。',
-        '拍照扫码继续 deferred。',
+        '扩展硬件链路继续 deferred。',
       ],
     },
   ],
@@ -1367,7 +1393,7 @@ const roleHelpSections = {
       items: [
         '主辅料到仓、包装材料到仓、成品入库、待出货。',
         '发货需要业务确认和财务放行。',
-        '扫码与 PDA 继续 deferred。',
+        '扩展硬件链路与 PDA 继续 deferred。',
       ],
     },
   ],
@@ -1384,7 +1410,10 @@ const roleHelpSections = {
 }
 
 export function getHelpCenterSections(roleKey) {
-  return [...commonHelpSections, ...(roleHelpSections[roleKey] || [])]
+  return [
+    ...commonHelpSections,
+    ...(roleKey ? roleHelpSections[roleKey] || [] : []),
+  ]
 }
 
 export const helpCenterSections = getHelpCenterSections('boss')
@@ -1392,10 +1421,10 @@ export const helpCenterSections = getHelpCenterSections('boss')
 const navItemRegistry = {
   'global-dashboard': {
     key: 'global-dashboard',
-    label: '全局驾驶舱',
+    label: '任务看板',
     path: '/erp/dashboard',
-    shortLabel: '总览',
-    description: '看全部角色、公用端口矩阵、资料真源和整体边界。',
+    shortLabel: '看板',
+    description: '按任务状态看模块推进、资料缺口和整体边界。',
   },
   'flow-overview': {
     key: 'flow-overview',
@@ -1413,24 +1442,60 @@ const navItemRegistry = {
   },
   'mobile-workbenches': {
     key: 'mobile-workbenches',
-    label: '移动端多入口',
+    label: '移动端端口说明',
     path: '/erp/mobile-workbenches',
-    shortLabel: '移动',
-    description: '查看 6 个角色移动端入口、端口和共享层设计。',
+    shortLabel: '端口',
+    description: '查看 6 个移动端端口、职责分工和共享层设计。',
+  },
+  'print-center': {
+    key: 'print-center',
+    label: '模板打印中心',
+    path: '/erp/print-center',
+    shortLabel: '打印',
+    description: '统一查看辅料合同、加工合同、汇总表和生产总表的固定打印模板。',
+  },
+  'help-operation-flow-overview': {
+    key: 'help-operation-flow-overview',
+    label: 'ERP 流程图总览',
+    path: '/erp/docs/operation-flow-overview',
+    shortLabel: '流程',
+    description: '按真实 PDF / Excel / 截图查看毛绒 ERP 主流程总览。',
+  },
+  'help-operation-guide': {
+    key: 'help-operation-guide',
+    label: 'ERP 操作教程',
+    path: '/erp/docs/operation-guide',
+    shortLabel: '教程',
+    description:
+      '先看桌面后台怎么进入、移动端怎么访问，以及当前打印入口怎么用。',
+  },
+  'help-field-linkage-guide': {
+    key: 'help-field-linkage-guide',
+    label: 'ERP 字段联动口径',
+    path: '/erp/docs/field-linkage-guide',
+    shortLabel: '字段',
+    description: '查看编号体系、字段真源、导入映射和上下游字段边界。',
+  },
+  'help-calculation-guide': {
+    key: 'help-calculation-guide',
+    label: 'ERP 计算口径',
+    path: '/erp/docs/calculation-guide',
+    shortLabel: '口径',
+    description: '查看数量、金额、日期和打印快照字段的统一口径。',
   },
   'help-center': {
     key: 'help-center',
-    label: '帮助中心',
+    label: '帮助中心首页',
     path: '/erp/help-center',
     shortLabel: '帮助',
-    description: '按当前角色展示先看什么、哪些 deferred、后续资料接哪里。',
+    description: '旧帮助中心入口，当前统一跳转到 ERP 操作教程。',
   },
   'doc-system-init': {
     key: 'doc-system-init',
     label: '系统初始化说明',
     path: '/erp/docs/system-init',
     shortLabel: '文档',
-    description: '桌面单入口、移动端多入口、多端口和共享后端说明。',
+    description: '桌面单后台、移动端多端口和共享后端说明。',
   },
   'doc-operation-playbook': {
     key: 'doc-operation-playbook',
@@ -1462,10 +1527,17 @@ const navItemRegistry = {
   },
   'doc-mobile-roles': {
     key: 'doc-mobile-roles',
-    label: '角色化与多入口',
+    label: '移动端端口与职责',
     path: '/erp/docs/mobile-roles',
     shortLabel: '文档',
-    description: '桌面角色化和 6 个移动端入口的职责边界。',
+    description: '桌面单后台和 6 个移动端端口的职责边界。',
+  },
+  'doc-print-templates': {
+    key: 'doc-print-templates',
+    label: '模板打印与字段口径',
+    path: '/erp/docs/print-templates',
+    shortLabel: '文档',
+    description: '确认打印模板的快照字段、源文件和当前边界。',
   },
   changes: {
     key: 'changes',
@@ -1474,62 +1546,78 @@ const navItemRegistry = {
     shortLabel: '变更',
     description: '继续把复杂任务写进 changes slug，不回退到聊天补丁。',
   },
+  'permission-center': {
+    key: 'permission-center',
+    label: '权限管理',
+    path: '/erp/system/permissions',
+    shortLabel: '权限',
+    description: '集中管理管理员账号、菜单权限和启用状态。',
+  },
 }
 
-export function getNavigationSections(roleKey) {
-  const role = getRoleWorkbench(roleKey) || roleWorkbenches[0]
-  const workspaceHome = {
-    key: 'workspace-home',
-    label: `${role.title}工作台`,
-    path: role.defaultPath,
-    shortLabel: role.label.replace(/^\S+\s/, '').slice(0, 2) || '首页',
-    description: '当前角色默认入口、待办、菜单可见性和帮助中心重点。',
+const documentationNavKeys = [
+  'doc-system-init',
+  'doc-operation-playbook',
+  'doc-field-truth',
+  'doc-data-model',
+  'doc-import-mapping',
+  'doc-mobile-roles',
+  'doc-print-templates',
+]
+
+const helpCenterNavKeys = [
+  'help-operation-flow-overview',
+  'help-operation-guide',
+  'help-field-linkage-guide',
+  'help-calculation-guide',
+]
+
+export const documentationCards = documentationNavKeys.map((navKey) => {
+  const item = navItemRegistry[navKey]
+
+  return {
+    key: item.path.replace('/erp/docs/', ''),
+    title: item.label,
+    path: item.path,
+    summary: item.description,
   }
+})
 
-  const items = role.allowedNavKeys.map((key) =>
-    key === 'workspace-home' ? workspaceHome : navItemRegistry[key]
-  )
+export const helpCenterNavItems = helpCenterNavKeys.map(
+  (navKey) => navItemRegistry[navKey]
+)
 
+export const navigationItemRegistry = navItemRegistry
+
+export function getNavigationSections() {
   return [
     {
-      title: '当前角色',
-      items: items.filter((item) =>
-        ['workspace-home', 'global-dashboard'].includes(item.key)
-      ),
+      title: '后台导航',
+      items: [navItemRegistry['global-dashboard']],
     },
     {
-      title: '流程与真源',
-      items: items.filter((item) =>
-        ['flow-overview', 'source-readiness', 'mobile-workbenches'].includes(
-          item.key
-        )
-      ),
+      title: '单据模板',
+      items: [navItemRegistry['print-center']],
+    },
+    ...businessNavigationSections,
+    {
+      title: '帮助中心',
+      items: helpCenterNavItems,
     },
     {
-      title: '帮助与文档',
-      items: items.filter(
-        (item) =>
-          ![
-            'workspace-home',
-            'global-dashboard',
-            'flow-overview',
-            'source-readiness',
-            'mobile-workbenches',
-          ].includes(item.key)
-      ),
+      title: '系统管理',
+      items: [navItemRegistry['permission-center']],
     },
-  ].filter((section) => section.items.length > 0)
+  ]
 }
 
-export function getMobileDockItems(roleKey) {
-  const sections = getNavigationSections(roleKey)
+export function getMobileDockItems() {
   return [
-    sections[0]?.items[0],
-    navItemRegistry['flow-overview'],
-    navItemRegistry['mobile-workbenches'],
-    navItemRegistry['help-center'],
+    navItemRegistry['help-operation-flow-overview'],
+    navItemRegistry['help-operation-guide'],
+    navItemRegistry['print-center'],
   ].filter(Boolean)
 }
 
-export const navigationSections = getNavigationSections('boss')
-export const mobileDockItems = getMobileDockItems('boss')
+export const navigationSections = getNavigationSections()
+export const mobileDockItems = getMobileDockItems()

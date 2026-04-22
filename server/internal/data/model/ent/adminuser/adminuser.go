@@ -17,6 +17,10 @@ const (
 	FieldUsername = "username"
 	// FieldPasswordHash holds the string denoting the password_hash field in the database.
 	FieldPasswordHash = "password_hash"
+	// FieldLevel holds the string denoting the level field in the database.
+	FieldLevel = "level"
+	// FieldMenuPermissions holds the string denoting the menu_permissions field in the database.
+	FieldMenuPermissions = "menu_permissions"
 	// FieldDisabled holds the string denoting the disabled field in the database.
 	FieldDisabled = "disabled"
 	// FieldLastLoginAt holds the string denoting the last_login_at field in the database.
@@ -34,6 +38,8 @@ var Columns = []string{
 	FieldID,
 	FieldUsername,
 	FieldPasswordHash,
+	FieldLevel,
+	FieldMenuPermissions,
 	FieldDisabled,
 	FieldLastLoginAt,
 	FieldCreatedAt,
@@ -55,6 +61,12 @@ var (
 	UsernameValidator func(string) error
 	// PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
 	PasswordHashValidator func(string) error
+	// DefaultLevel holds the default value on creation for the "level" field.
+	DefaultLevel int8
+	// DefaultMenuPermissions holds the default value on creation for the "menu_permissions" field.
+	DefaultMenuPermissions string
+	// MenuPermissionsValidator is a validator for the "menu_permissions" field. It is called by the builders before save.
+	MenuPermissionsValidator func(string) error
 	// DefaultDisabled holds the default value on creation for the "disabled" field.
 	DefaultDisabled bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -81,6 +93,16 @@ func ByUsername(opts ...sql.OrderTermOption) OrderOption {
 // ByPasswordHash orders the results by the password_hash field.
 func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPasswordHash, opts...).ToFunc()
+}
+
+// ByLevel orders the results by the level field.
+func ByLevel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLevel, opts...).ToFunc()
+}
+
+// ByMenuPermissions orders the results by the menu_permissions field.
+func ByMenuPermissions(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMenuPermissions, opts...).ToFunc()
 }
 
 // ByDisabled orders the results by the disabled field.

@@ -36,6 +36,8 @@ var ProviderSet = wire.NewSet(
 	NewAdminAuthRepo,
 	wire.Bind(new(biz.AdminAuthRepo), new(*adminAuthRepo)),
 	NewAdminTokenGenerator,
+	NewAdminManageRepo,
+	wire.Bind(new(biz.AdminManageRepo), new(*adminManageRepo)),
 
 	// user admin
 	NewUserAdminRepo,

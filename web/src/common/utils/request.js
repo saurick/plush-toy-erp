@@ -1,9 +1,9 @@
-import { message } from 'antd'
 import { makeAutoObservable } from 'mobx'
 import qs from 'qs'
 import axios from 'axios'
 import { crypto } from '@/common/stores/crypto'
 import { HttpMethod } from '@/common/consts/http'
+import { message } from '@/common/utils/antdApp'
 import { setData } from '@/common/utils/setData'
 
 const jsonHeader = { 'Content-Type': 'application/json; charset=UTF-8' }
