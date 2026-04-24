@@ -17,8 +17,9 @@ const META_KEYS = [
   'username',
   'admin_level',
   'menu_permissions',
+  'erp_preferences',
 ]
-const JSON_META_KEYS = new Set(['menu_permissions'])
+const JSON_META_KEYS = new Set(['menu_permissions', 'erp_preferences'])
 
 function normalizeScope(scope = AUTH_SCOPE.USER) {
   return scope === AUTH_SCOPE.ADMIN ? AUTH_SCOPE.ADMIN : AUTH_SCOPE.USER
@@ -165,11 +166,16 @@ export function getStoredAdminProfile() {
 
   const level = Number(getAuthMeta(AUTH_SCOPE.ADMIN, 'admin_level'))
   const menuPermissions = getAuthMeta(AUTH_SCOPE.ADMIN, 'menu_permissions')
+  const erpPreferences = getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences')
 
   return {
     ...admin,
     level: Number.isFinite(level) ? level : null,
     menu_permissions: Array.isArray(menuPermissions) ? menuPermissions : [],
+    erp_preferences:
+      erpPreferences && typeof erpPreferences === 'object'
+        ? erpPreferences
+        : { column_orders: {} },
   }
 }
 

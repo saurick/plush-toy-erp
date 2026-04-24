@@ -11,11 +11,13 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserAdminRepo interface {
 	ListUsers(ctx context.Context, limit, offset int, usernameLike string) (list []*User, total int, err error)
 	SetUserDisabled(ctx context.Context, userID int, disabled bool) error
+	UpdateUserPasswordHash(ctx context.Context, userID int, passwordHash string) error
 }
 
 type UserAdminUsecase struct {
@@ -150,5 +152,48 @@ func (uc *UserAdminUsecase) SetDisabled(ctx context.Context, userID int, disable
 
 	span.SetStatus(codes.Ok, "OK")
 	l.Infof("SetDisabled success user_id=%d disabled=%v", userID, disabled)
+	return nil
+}
+
+func (uc *UserAdminUsecase) ResetPassword(ctx context.Context, userID int, password string) error {
+	ctx, span := uc.Tracer().Start(ctx, "useradmin.reset_password",
+		trace.WithAttributes(attribute.Int("user.id", userID)),
+	)
+	defer span.End()
+
+	l := uc.log.WithContext(ctx)
+
+	admin, e := uc.requireAdmin(ctx)
+	if e != nil {
+		span.SetStatus(codes.Error, ErrForbidden.Error())
+		l.Warn("ResetPassword forbidden")
+		return ErrForbidden
+	}
+	span.SetAttributes(attribute.Int("auth.admin_uid", admin.UserID))
+
+	if userID <= 0 || len(password) < 6 {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		l.Warnf("ResetPassword bad param user_id=%d", userID)
+		return ErrBadParam
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "hash password failed")
+		l.Errorf("ResetPassword hash failed user_id=%d err=%v", userID, err)
+		return err
+	}
+
+	l.Infof("ResetPassword start user_id=%d", userID)
+	if err := uc.repo.UpdateUserPasswordHash(ctx, userID, string(hash)); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "repo.UpdateUserPasswordHash failed")
+		l.Errorf("ResetPassword repo.UpdateUserPasswordHash failed user_id=%d err=%v", userID, err)
+		return err
+	}
+
+	span.SetStatus(codes.Ok, "OK")
+	l.Infof("ResetPassword success user_id=%d", userID)
 	return nil
 }

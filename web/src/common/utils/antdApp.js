@@ -57,9 +57,48 @@ const modalBridge = createBufferedApi([
   'destroyAll',
 ])
 
+const modalConfigMethodNames = [
+  'confirm',
+  'info',
+  'success',
+  'warning',
+  'error',
+]
+
+const createCenteredModalApi = (modalApi) => {
+  if (!modalApi) {
+    return modalApi
+  }
+
+  return modalConfigMethodNames.reduce(
+    (accumulator, methodName) => {
+      const handler = modalApi[methodName]
+      accumulator[methodName] = (config = {}) => {
+        if (typeof handler !== 'function') {
+          return undefined
+        }
+
+        const normalizedConfig =
+          config && typeof config === 'object' && !Array.isArray(config)
+            ? config
+            : {}
+
+        return handler({
+          ...normalizedConfig,
+          centered: true,
+        })
+      }
+      return accumulator
+    },
+    {
+      destroyAll: (...args) => modalApi.destroyAll?.(...args),
+    }
+  )
+}
+
 export const registerAntdAppApis = ({ message, modal } = {}) => {
   messageBridge.setApi(message)
-  modalBridge.setApi(modal)
+  modalBridge.setApi(createCenteredModalApi(modal))
 }
 
 export const message = messageBridge.proxy

@@ -71,3 +71,37 @@ func TestJsonrpcData_RequireAdmin_DisabledAdminUsesAdminDisabled(t *testing.T) {
 		t.Fatalf("expected admin code=%d, got %d", errcode.AdminDisabled.Code, adminRes.Code)
 	}
 }
+
+func TestJsonrpcData_WorkflowMetadataRequiresAdminAndReturnsStates(t *testing.T) {
+	j := &JsonrpcData{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 1, Username: "admin"}},
+		workflowUC:  biz.NewWorkflowUsecase(nil),
+	}
+
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+		UserID:   1,
+		Username: "admin",
+		Role:     biz.RoleAdmin,
+	})
+
+	_, res, err := j.handleWorkflow(ctx, "metadata", "1", nil)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil {
+		t.Fatalf("expected result not nil")
+	}
+	if res.Code != errcode.OK.Code {
+		t.Fatalf("expected code=%d, got %d", errcode.OK.Code, res.Code)
+	}
+	data := res.Data.AsMap()
+	taskStates, ok := data["task_states"].([]any)
+	if !ok || len(taskStates) == 0 {
+		t.Fatalf("expected task states, got %#v", data["task_states"])
+	}
+	businessStates, ok := data["business_states"].([]any)
+	if !ok || len(businessStates) == 0 {
+		t.Fatalf("expected business states, got %#v", data["business_states"])
+	}
+}

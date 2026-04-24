@@ -15,6 +15,7 @@ import {
   MobileOutlined,
   PrinterOutlined,
   QuestionCircleOutlined,
+  ReloadOutlined,
   ScheduleOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
@@ -29,7 +30,6 @@ import {
   Layout,
   Menu,
   Space,
-  Spin,
   Tag,
   Typography,
 } from 'antd'
@@ -42,6 +42,12 @@ import {
   logout,
   persistAuthMeta,
 } from '@/common/auth/auth'
+import {
+  ERP_ADMIN_SYSTEM_NAME,
+  ERP_BRAND_MARK,
+  ERP_COMPANY_NAME,
+} from '@/common/consts/brand'
+import { Loading } from '@/common/components/loading'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -54,6 +60,7 @@ import {
   getNavigationSections,
   navigationItemRegistry,
 } from '../config/seedData.mjs'
+import { businessModuleDefinitions } from '../config/businessModules.mjs'
 
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
@@ -84,6 +91,10 @@ const navIconRegistry = {
   'help-operation-flow-overview': <ApartmentOutlined />,
   'help-operation-guide': <BookOutlined />,
   'help-role-collaboration-guide': <ApartmentOutlined />,
+  'help-role-page-document-matrix': <BarsOutlined />,
+  'help-task-document-mapping': <ScheduleOutlined />,
+  'help-workflow-status-guide': <DashboardOutlined />,
+  'help-workflow-schema-draft': <FileTextOutlined />,
   'help-desktop-role-guide': <AppstoreOutlined />,
   'help-mobile-role-guide': <MobileOutlined />,
   'help-field-linkage-guide': <TagOutlined />,
@@ -91,6 +102,11 @@ const navIconRegistry = {
   'help-print-snapshot-guide': <PrinterOutlined />,
   'help-exception-handling-guide': <AlertOutlined />,
   'help-current-boundaries': <QuestionCircleOutlined />,
+  'qa-acceptance-overview': <DashboardOutlined />,
+  'qa-business-chain-debug': <FileSearchOutlined />,
+  'qa-field-linkage-coverage': <TagOutlined />,
+  'qa-run-records': <ScheduleOutlined />,
+  'qa-reports': <FileTextOutlined />,
   'help-center': <QuestionCircleOutlined />,
   'doc-system-init': <BookOutlined />,
   'doc-operation-playbook': <BookOutlined />,
@@ -106,8 +122,13 @@ const navIconRegistry = {
 const DEFAULT_DESKTOP_ENTRY = {
   label: '任务看板',
   path: '/erp/dashboard',
-  description: '按任务状态看模块推进、资料缺口和桌面单入口边界。',
+  description: '按业务记录状态看模块进展，支持点击数字进入业务页筛选。',
 }
+const BUSINESS_MODULE_PATHS = new Set(
+  businessModuleDefinitions
+    .filter((moduleItem) => moduleItem.status !== 'awaiting_confirmation')
+    .map((moduleItem) => moduleItem.path)
+)
 
 function buildCurrentEntry({ navigationSections, locationPath }) {
   const items = [
@@ -142,6 +163,8 @@ export default function ERPLayout() {
   const [adminProfile, setAdminProfile] = useState(() =>
     getStoredAdminProfile()
   )
+  const [refreshingCurrentPage, setRefreshingCurrentPage] = useState(false)
+  const [pageRefreshHandler, setPageRefreshHandler] = useState(null)
 
   const authRpc = useMemo(
     () =>
@@ -184,6 +207,9 @@ export default function ERPLayout() {
             username: nextProfile.username,
             admin_level: nextProfile.level,
             menu_permissions: nextProfile.menu_permissions || [],
+            erp_preferences: nextProfile.erp_preferences || {
+              column_orders: {},
+            },
           },
           AUTH_SCOPE.ADMIN
         )
@@ -268,9 +294,59 @@ export default function ERPLayout() {
   )
 
   const selectedKeys = currentEntry?.path ? [currentEntry.path] : []
+  const isBusinessModulePage =
+    BUSINESS_MODULE_PATHS.has(location.pathname) ||
+    BUSINESS_MODULE_PATHS.has(currentEntry?.path)
   const hidePageHead =
+    isBusinessModulePage ||
     currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path ||
-    location.pathname.startsWith('/erp/docs/')
+    location.pathname.startsWith('/erp/docs/') ||
+    location.pathname.startsWith('/erp/qa/')
+
+  const registerPageRefresh = useCallback((handler) => {
+    if (typeof handler !== 'function') {
+      setPageRefreshHandler(null)
+      return () => {}
+    }
+
+    setPageRefreshHandler(() => handler)
+    return () => {
+      setPageRefreshHandler((current) => (current === handler ? null : current))
+    }
+  }, [])
+
+  const updateAdminERPPreferences = useCallback((erpPreferences) => {
+    const normalizedERPPreferences =
+      erpPreferences && typeof erpPreferences === 'object'
+        ? erpPreferences
+        : { column_orders: {} }
+
+    setAdminProfile((current) => {
+      if (!current) {
+        return current
+      }
+      const nextProfile = {
+        ...current,
+        erp_preferences: normalizedERPPreferences,
+      }
+      persistAuthMeta(
+        {
+          user_id: nextProfile.id,
+          username: nextProfile.username,
+          admin_level: nextProfile.level,
+          menu_permissions: nextProfile.menu_permissions || [],
+          erp_preferences: nextProfile.erp_preferences,
+        },
+        AUTH_SCOPE.ADMIN
+      )
+      return nextProfile
+    })
+  }, [])
+
+  const outletContext = useMemo(
+    () => ({ adminProfile, registerPageRefresh, updateAdminERPPreferences }),
+    [adminProfile, registerPageRefresh, updateAdminERPPreferences]
+  )
 
   const handleNavigate = (nextPath) => {
     if (!nextPath || nextPath === location.pathname) {
@@ -297,19 +373,40 @@ export default function ERPLayout() {
     }
   }
 
-  const handleRefreshCurrentPage = () => {
-    window.location.reload()
+  const handleRefreshCurrentPage = async () => {
+    if (refreshingCurrentPage) {
+      return
+    }
+
+    if (!pageRefreshHandler) {
+      window.location.reload()
+      return
+    }
+
+    setRefreshingCurrentPage(true)
+    try {
+      const refreshed = await pageRefreshHandler()
+      if (refreshed !== false) {
+        message.success('当前页面数据已刷新')
+      }
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '刷新当前页面数据'))
+    } finally {
+      setRefreshingCurrentPage(false)
+    }
   }
 
   const sideNav = (
     <div className="erp-admin-sider__body">
       <div className="erp-admin-brand">
         <div className="erp-admin-brand__logo">
-          <span className="erp-admin-brand__logo-mark">P</span>
+          <span className="erp-admin-brand__logo-mark">{ERP_BRAND_MARK}</span>
           <div className="erp-admin-brand__logo-copy">
-            <div className="erp-admin-brand__logo-title">PLUSH ERP</div>
+            <div className="erp-admin-brand__logo-title">
+              {ERP_COMPANY_NAME}
+            </div>
             <div className="erp-admin-brand__logo-subtitle">
-              PLUSH TOY FACTORY CONSOLE
+              {ERP_ADMIN_SYSTEM_NAME}
             </div>
           </div>
         </div>
@@ -332,14 +429,12 @@ export default function ERPLayout() {
 
   if (profileLoading && !adminProfile) {
     return (
-      <Layout className="erp-admin-shell">
-        <div className="erp-layout-loading">
-          <Space direction="vertical" align="center">
-            <Spin size="large" />
-            <Text type="secondary">正在同步管理员权限...</Text>
-          </Space>
-        </div>
-      </Layout>
+      <Loading
+        title="管理员权限同步中"
+        description="正在确认当前账号的菜单和访问范围，请稍候..."
+        fullscreen
+        className="loading-page--erp"
+      />
     )
   }
 
@@ -374,7 +469,13 @@ export default function ERPLayout() {
             </Space>
 
             <Space size={12} wrap className="erp-admin-header__right">
-              <Button onClick={handleRefreshCurrentPage}>刷新当前页</Button>
+              <Button
+                icon={<ReloadOutlined />}
+                loading={refreshingCurrentPage}
+                onClick={handleRefreshCurrentPage}
+              >
+                刷新当前页
+              </Button>
               <div className="erp-admin-header__meta">
                 <Tag color={isSuperAdmin ? 'gold' : 'blue'}>{roleLabel}</Tag>
                 <Text className="erp-admin-header__user">
@@ -421,7 +522,7 @@ export default function ERPLayout() {
                 description="请联系超级管理员在“系统管理 / 权限管理”里为该账号分配菜单入口。"
               />
             ) : (
-              <Outlet />
+              <Outlet context={outletContext} />
             )}
           </div>
         </Content>

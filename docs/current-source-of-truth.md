@@ -9,6 +9,12 @@
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
 
+## 当前业务保存层真源
+
+- 首版业务落盘真源是后端 Ent schema 和 Atlas migration：`workflow_tasks`、`workflow_task_events`、`workflow_business_states`、`business_records`、`business_record_items`、`business_record_events`。
+- 桌面业务页当前走通用 `business_records` 表格 / 弹窗保存，明细行落到 `business_record_items`；行金额为空且已有数量 / 单价时由前端保存转换层派生，表头数量 / 金额为空时按明细合计回写，保存和状态流转都会按单据来源写入 `workflow_business_states`；列表列顺序属于管理员 ERP 偏好，后端真源字段是 `admin_users.erp_preferences.column_orders`，浏览器 localStorage 只作为同步失败或未登录资料加载完成前的兜底。
+- `business_records` 是当前首轮通用业务记录真源，不等于所有客户、BOM、采购、库存、生产和财务专表都已经拆完；后续细分专表继续按真实样本和 Ent + Atlas 迁移推进。
+
 ## 按任务分流
 
 ### 1. 日常开发或代码修改
@@ -27,6 +33,12 @@
 - `/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
 - `/Users/simon/projects/plush-toy-erp/web/README.md`
 - `/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
+- `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/role-page-document-matrix.md`
+- `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/task-document-mapping.md`
+- `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/workflow-status-guide.md`
+- `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/workflow-schema-draft.md`
+- `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/business_record.go`
+- `/Users/simon/projects/plush-toy-erp/server/internal/data/model/schema/workflow_task.go`
 
 如果任务涉及模板打印或帮助中心口径，再继续补读：
 

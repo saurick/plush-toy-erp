@@ -29,6 +29,14 @@ function AppContent() {
       }
       const targetLoginPath = loginPath || '/login'
 
+      if (!isDesktopApp) {
+        navigate(targetLoginPath, {
+          replace: true,
+          state: { from: safeFrom },
+        })
+        return
+      }
+
       appAlert({
         title: '登录状态已失效',
         message: message || '登录已过期，请重新登录',
@@ -41,7 +49,7 @@ function AppContent() {
         },
       })
     })
-  }, [navigate])
+  }, [isDesktopApp, navigate])
 
   return (
     <>
@@ -57,10 +65,13 @@ const App = () => (
   <ERPWorkspaceProvider>
     <ConfigProvider
       locale={zhCN}
+      modal={{
+        centered: true,
+      }}
       theme={{
         algorithm: theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#2f8f4b',
+          colorPrimary: '#2b8a3e',
           borderRadius: 10,
           fontFamily:
             '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',

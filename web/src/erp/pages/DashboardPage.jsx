@@ -1,226 +1,241 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
-import SurfacePanel from '@/common/components/layout/SurfacePanel'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  TASK_STATUS,
-  TASK_STATUS_META,
-  TASK_STATUS_ORDER,
-  buildDashboardTaskRows,
-  buildDashboardTaskSummary,
-} from '../config/dashboardTasks.mjs'
+  Button,
+  Card,
+  Col,
+  Progress,
+  Row,
+  Space,
+  Spin,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { getBusinessDashboardStats } from '../api/businessRecordApi.mjs'
+import {
+  dashboardModules,
+  dashboardStatusGroups,
+} from '../config/dashboardModules.mjs'
+import {
+  buildDashboardModuleRows,
+  buildDashboardSummary,
+  normalizeDashboardModuleStats,
+} from '../utils/dashboardStats.mjs'
+import { buildBusinessModuleQuery } from '../utils/businessModuleNavigation.mjs'
 
-function DashboardMetricCard({ label, value, note, tone = 'slate' }) {
-  const toneClassMap = {
-    slate: 'text-slate-900',
-    amber: 'text-amber-700',
-    sky: 'text-sky-700',
-    emerald: 'text-emerald-700',
-  }
-
-  return (
-    <SurfacePanel className="h-full p-5">
-      <div className="space-y-2">
-        <div className="text-sm text-slate-500">{label}</div>
-        <div
-          className={`text-4xl font-semibold tracking-tight ${
-            toneClassMap[tone] || toneClassMap.slate
-          }`}
-        >
-          {value}
-        </div>
-        <div className="text-sm leading-6 text-slate-500">{note}</div>
-      </div>
-    </SurfacePanel>
-  )
-}
+const { Paragraph, Title } = Typography
 
 export default function DashboardPage() {
-  const moduleRows = buildDashboardTaskRows()
-  const summary = buildDashboardTaskSummary(moduleRows)
+  const [loading, setLoading] = useState(false)
+  const [moduleStats, setModuleStats] = useState([])
+  const mountedRef = useRef(false)
+  const navigate = useNavigate()
+  const outletContext = useOutletContext()
+
+  const loadDashboardStats = useCallback(async () => {
+    setLoading(true)
+    try {
+      const result = await getBusinessDashboardStats()
+      const modules = Array.isArray(result?.modules)
+        ? result.modules.map((item) => normalizeDashboardModuleStats(item))
+        : []
+      if (mountedRef.current) {
+        setModuleStats(modules)
+      }
+      return true
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载任务看板统计'))
+      return false
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    loadDashboardStats()
+    return () => {
+      mountedRef.current = false
+    }
+  }, [loadDashboardStats])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(loadDashboardStats)
+  }, [loadDashboardStats, outletContext])
+
+  const moduleRows = useMemo(
+    () => buildDashboardModuleRows(dashboardModules, moduleStats),
+    [moduleStats]
+  )
+  const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
+
+  const openModuleList = (record, businessStatusKeys = []) => {
+    if (!record?.path) {
+      return
+    }
+    const query = buildBusinessModuleQuery({ businessStatusKeys })
+    navigate(query ? `${record.path}?${query}` : record.path)
+  }
+
+  const renderModuleEntryButton = (label, onClick, ariaLabel, disabled) => (
+    <Button
+      type="link"
+      size="small"
+      className="erp-dashboard-link-button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      disabled={disabled}
+    >
+      {label}
+    </Button>
+  )
 
   return (
-    <div className="space-y-6">
-      <SurfacePanel className="p-6 sm:p-7">
-        <div className="space-y-3">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
-            毛绒 ERP 任务看板
-          </h1>
-          <p className="max-w-5xl text-sm leading-7 text-slate-500 sm:text-base">
-            覆盖桌面后台当前模块任务推进、资料缺口、入口落地、待确认项与风险阻塞。
-          </p>
-        </div>
-      </SurfacePanel>
+    <Space direction="vertical" size={16} className="erp-dashboard-page">
+      <Card className="erp-dashboard-card" variant="borderless">
+        <Title level={4} className="erp-dashboard-title">
+          毛绒 ERP 任务看板
+        </Title>
+        <Paragraph type="secondary" className="erp-dashboard-summary">
+          按当前业务记录聚合模块状态；模块名、记录数和状态数字都可进入对应业务列表。
+        </Paragraph>
+      </Card>
 
-      <div className="grid gap-4 xl:grid-cols-4">
-        <DashboardMetricCard
-          label="任务总数"
-          value={summary.totalTasks}
-          note="按模块推进口径统计当前桌面后台范围内的任务。"
-        />
-        <DashboardMetricCard
-          label="待处理（待处理 + 风险阻塞）"
-          value={summary.attentionCount}
-          note={`${summary.statusCount[TASK_STATUS.TODO]} 项待处理，${summary.statusCount[TASK_STATUS.BLOCKED]} 项风险阻塞。`}
-          tone="amber"
-        />
-        <DashboardMetricCard
-          label="进行中"
-          value={summary.statusCount[TASK_STATUS.IN_PROGRESS]}
-          note={`${summary.statusCount[TASK_STATUS.REVIEW]} 项仍待确认，当前主路径继续按真源推进。`}
-          tone="sky"
-        />
-        <DashboardMetricCard
-          label="已完成"
-          value={`${summary.completionRatio}%`}
-          note={`${summary.statusCount[TASK_STATUS.DONE]} 项已按真源收口或已落正式入口。`}
-          tone="emerald"
-        />
-      </div>
+      <Row gutter={[12, 12]}>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="erp-dashboard-card" variant="borderless">
+            <Statistic title="业务记录总数" value={summary.totalRecords} />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="erp-dashboard-card" variant="borderless">
+            <Statistic
+              title="推进中"
+              value={summary.activeCount}
+              valueStyle={{ color: '#1677ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="erp-dashboard-card" variant="borderless">
+            <Statistic
+              title="阻塞/取消"
+              value={summary.blockedCount}
+              valueStyle={{ color: '#d4380d' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} lg={6}>
+          <Card className="erp-dashboard-card" variant="borderless">
+            <Statistic
+              title="已完成"
+              value={summary.completionRatio}
+              suffix="%"
+              valueStyle={{ color: '#389e0d' }}
+            />
+          </Card>
+        </Col>
+      </Row>
 
-      <SurfacePanel className="p-5">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-lg font-semibold text-slate-900">
-              任务状态分布
-            </div>
-            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-500">
-              百分比按当前任务总数计算
-            </div>
-          </div>
-
-          <div className="grid gap-3 xl:grid-cols-3">
-            {TASK_STATUS_ORDER.map((status) => {
-              const meta = TASK_STATUS_META[status]
-              const count = summary.statusCount[status]
-              const percent = summary.totalTasks
-                ? Math.round((count / summary.totalTasks) * 100)
-                : 0
-
+      <Card className="erp-dashboard-card" variant="borderless">
+        <Space direction="vertical" className="erp-dashboard-block" size={8}>
+          <Title level={5} className="erp-dashboard-section-title">
+            状态分布
+          </Title>
+          <Row gutter={[12, 12]}>
+            {dashboardStatusGroups.map((group) => {
+              const count = summary.statusGroupCount[group.key] || 0
               return (
-                <div
-                  key={status}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${meta.pillClass}`}
+                <Col xs={24} md={12} lg={8} key={group.key}>
+                  <Card
+                    size="small"
+                    variant="borderless"
+                    className="erp-dashboard-status-card"
+                  >
+                    <Space
+                      direction="vertical"
+                      className="erp-dashboard-block"
+                      size={6}
                     >
-                      {status}
-                    </div>
-                    <div className={`text-sm font-semibold ${meta.valueClass}`}>
-                      {count} 项
-                    </div>
-                  </div>
-
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
-                    <div
-                      className="h-full rounded-full transition-[width] duration-300"
-                      style={{
-                        width: `${percent}%`,
-                        backgroundColor: meta.barColor,
-                      }}
-                    />
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between gap-3 text-sm text-slate-500">
-                    <span>{meta.summary}</span>
-                    <span>{percent}%</span>
-                  </div>
-                </div>
+                      <Tag>{group.title}</Tag>
+                      <Progress
+                        percent={
+                          summary.totalRecords
+                            ? Math.round((count / summary.totalRecords) * 100)
+                            : 0
+                        }
+                      />
+                    </Space>
+                  </Card>
+                </Col>
               )
             })}
-          </div>
-        </div>
-      </SurfacePanel>
+          </Row>
+        </Space>
+      </Card>
 
-      <SurfacePanel className="p-5">
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-lg font-semibold text-slate-900">
-              模块进度明细
-            </div>
-            <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-500">
-              模块标题可跳到当前最相关页面
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] border-separate border-spacing-0 text-sm">
-              <thead>
-                <tr className="bg-slate-50 text-left text-slate-500">
-                  <th className="rounded-l-2xl px-4 py-3 font-semibold">
-                    模块
-                  </th>
-                  <th className="px-4 py-3 font-semibold">任务数</th>
-                  {TASK_STATUS_ORDER.map((status, index) => (
-                    <th
-                      key={status}
-                      className={`px-4 py-3 text-center font-semibold ${
-                        index === TASK_STATUS_ORDER.length - 1
-                          ? 'rounded-r-2xl'
-                          : ''
-                      }`}
-                    >
-                      {status}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {moduleRows.map((row) => (
-                  <tr key={row.key} className="align-top">
-                    <td className="border-b border-slate-100 px-4 py-4">
-                      <div className="space-y-2">
-                        {row.path ? (
-                          <Link
-                            className="text-base font-semibold text-emerald-700 hover:text-emerald-800"
-                            to={row.path}
-                          >
-                            {row.title}
-                          </Link>
-                        ) : (
-                          <div className="text-base font-semibold text-slate-900">
-                            {row.title}
-                          </div>
-                        )}
-                        <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                          {row.owner}
-                        </div>
-                        <div className="max-w-xl text-sm leading-6 text-slate-500">
-                          {row.summary}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="border-b border-slate-100 px-4 py-4 text-base font-semibold text-slate-900">
-                      {row.total}
-                    </td>
-                    {TASK_STATUS_ORDER.map((status) => {
-                      const value = row.statusCount[status]
-                      const meta = TASK_STATUS_META[status]
-
-                      return (
-                        <td
-                          key={status}
-                          className="border-b border-slate-100 px-4 py-4 text-center"
-                        >
-                          <span
-                            className={`text-base font-semibold ${
-                              value > 0 ? meta.valueClass : 'text-slate-300'
-                            }`}
-                          >
-                            {value}
-                          </span>
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </SurfacePanel>
-    </div>
+      <Card
+        className="erp-dashboard-card erp-dashboard-table-card"
+        variant="borderless"
+      >
+        <Table
+          size="middle"
+          loading={{
+            spinning: loading,
+            indicator: <Spin size="small" />,
+          }}
+          pagination={false}
+          rowKey="key"
+          scroll={{ x: 1120 }}
+          columns={[
+            {
+              title: '模块',
+              dataIndex: 'module',
+              fixed: 'left',
+              width: 220,
+              render: (value, record) =>
+                renderModuleEntryButton(
+                  value,
+                  () => openModuleList(record),
+                  `查看${value}列表`,
+                  !record?.path
+                ),
+            },
+            {
+              title: '记录数',
+              dataIndex: 'count',
+              width: 100,
+              render: (value, record) =>
+                renderModuleEntryButton(
+                  value,
+                  () => openModuleList(record),
+                  `查看${record?.module}全部记录`,
+                  !record?.path
+                ),
+            },
+            ...dashboardStatusGroups.map((group) => ({
+              title: group.title,
+              dataIndex: ['statusGroupCounts', group.key],
+              width: 118,
+              align: 'center',
+              render: (value, record) =>
+                renderModuleEntryButton(
+                  value,
+                  () => openModuleList(record, group.statusKeys),
+                  `查看${record?.module}${group.title}`,
+                  !record?.path || Number(value) <= 0
+                ),
+            })),
+          ]}
+          dataSource={moduleRows}
+        />
+      </Card>
+    </Space>
   )
 }

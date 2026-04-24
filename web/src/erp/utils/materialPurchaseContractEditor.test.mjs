@@ -45,7 +45,7 @@ const sampleDraft = buildMaterialPurchaseContractDraft({
   ],
 })
 
-test('materialPurchaseContractEditor: 更新数量或单价时会重算金额和总计', () => {
+test('FL_material_purchase_amount__recomputes_amount_and_total_from_current_line materialPurchaseContractEditor: 更新数量或单价时会重算金额和总计', () => {
   const nextLines = updateMaterialPurchaseLineCell(
     sampleDraft.lines,
     0,
@@ -58,7 +58,7 @@ test('materialPurchaseContractEditor: 更新数量或单价时会重算金额和
   assert.equal(totals.amountText, '161.60')
 })
 
-test('materialPurchaseContractEditor: 初始化时优先保留已有采购金额快照', () => {
+test('FL_material_purchase_amount__keeps_manual_amount_snapshot materialPurchaseContractEditor: 初始化时优先保留已有采购金额快照', () => {
   const draft = buildMaterialPurchaseContractDraft({
     lines: [
       {
@@ -131,7 +131,7 @@ test('materialPurchaseContractEditor: 草稿会保留独立签字字段且默认
   assert.equal(draft.buyerStampVisible, false)
 })
 
-test('materialPurchaseContractEditor: 合并选区后会清空被覆盖单元格，拆分后可恢复独立结构', () => {
+test('FL_material_purchase_merge__clears_covered_cell_stale_value materialPurchaseContractEditor: 合并选区后会清空被覆盖单元格，拆分后可恢复独立结构', () => {
   const merged = applyDetailCellMerge({
     lines: sampleDraft.lines,
     merges: [],

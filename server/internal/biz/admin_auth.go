@@ -26,6 +26,7 @@ type AdminUser struct {
 	PasswordHash    string
 	Level           int8
 	MenuPermissions []string
+	ERPPreferences  AdminERPPreferences
 	Disabled        bool
 	LastLoginAt     *time.Time
 	CreatedAt       time.Time
@@ -33,12 +34,13 @@ type AdminUser struct {
 }
 
 type AdminAuthUsecase struct {
-	log    *log.Helper
-	logger log.Logger
-	tp     *tracesdk.TracerProvider
-	tracer trace.Tracer
-	repo   AdminAuthRepo
-	genTok AdminTokenGenerator
+	log      *log.Helper
+	logger   log.Logger
+	tp       *tracesdk.TracerProvider
+	tracer   trace.Tracer
+	repo     AdminAuthRepo
+	genTok   AdminTokenGenerator
+	smsCodes *SMSLoginCodeManager
 }
 
 func NewAdminAuthUsecase(repo AdminAuthRepo, genTok AdminTokenGenerator, logger log.Logger, tp *tracesdk.TracerProvider) *AdminAuthUsecase {
@@ -52,12 +54,13 @@ func NewAdminAuthUsecase(repo AdminAuthRepo, genTok AdminTokenGenerator, logger 
 	}
 
 	return &AdminAuthUsecase{
-		repo:   repo,
-		genTok: genTok,
-		log:    helper,
-		logger: logger,
-		tp:     tp,
-		tracer: tr,
+		repo:     repo,
+		genTok:   genTok,
+		smsCodes: NewSMSLoginCodeManager(),
+		log:      helper,
+		logger:   logger,
+		tp:       tp,
+		tracer:   tr,
 	}
 }
 
@@ -130,5 +133,110 @@ func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string
 	span.SetStatus(codes.Ok, "OK")
 	l.Infof("Login admin success admin_id=%d username=%s", admin.ID, admin.Username)
 
+	return token, expireAt, admin, nil
+}
+
+func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone string) (challenge *SMSLoginChallenge, err error) {
+	normalizedPhone, err := NormalizeLoginPhone(phone)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, span := uc.Tracer().Start(ctx, "admin_auth.request_sms_login_code",
+		trace.WithAttributes(attribute.String("admin_auth.phone_masked", maskPhone(normalizedPhone))),
+	)
+	defer span.End()
+
+	l := uc.log.WithContext(ctx)
+	admin, e := uc.repo.GetAdminByUsername(ctx, normalizedPhone)
+	if e != nil || admin == nil {
+		err = ErrUserNotFound
+		if e != nil {
+			span.RecordError(e)
+		}
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("RequestSMSLoginCode admin not found phone=%s err=%v", maskPhone(normalizedPhone), e)
+		return nil, err
+	}
+	if admin.Disabled {
+		err = ErrUserDisabled
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("RequestSMSLoginCode admin disabled admin_id=%d phone=%s", admin.ID, maskPhone(normalizedPhone))
+		return nil, err
+	}
+
+	challenge, err = uc.smsCodes.Request("admin", normalizedPhone)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		l.Warnf("RequestSMSLoginCode admin failed phone=%s err=%v", maskPhone(normalizedPhone), err)
+		return nil, err
+	}
+
+	span.SetAttributes(
+		attribute.Int("admin_auth.admin_id", admin.ID),
+		attribute.Int64("admin_auth.sms_expires_at", challenge.ExpiresAt.Unix()),
+	)
+	span.SetStatus(codes.Ok, "OK")
+	l.Infof("RequestSMSLoginCode admin success admin_id=%d phone=%s mock_delivery=%t", admin.ID, maskPhone(normalizedPhone), challenge.MockDelivery)
+	return challenge, nil
+}
+
+func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code string) (token string, expireAt time.Time, u *AdminUser, err error) {
+	normalizedPhone, err := NormalizeLoginPhone(phone)
+	if err != nil {
+		return "", time.Time{}, nil, err
+	}
+
+	ctx, span := uc.Tracer().Start(ctx, "admin_auth.sms_login",
+		trace.WithAttributes(attribute.String("admin_auth.phone_masked", maskPhone(normalizedPhone))),
+	)
+	defer span.End()
+
+	l := uc.log.WithContext(ctx)
+	admin, e := uc.repo.GetAdminByUsername(ctx, normalizedPhone)
+	if e != nil || admin == nil {
+		err = ErrUserNotFound
+		if e != nil {
+			span.RecordError(e)
+		}
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("SMSLogin admin not found phone=%s err=%v", maskPhone(normalizedPhone), e)
+		return "", time.Time{}, nil, err
+	}
+
+	span.SetAttributes(attribute.Int("admin_auth.admin_id", admin.ID))
+
+	if admin.Disabled {
+		err = ErrUserDisabled
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("SMSLogin admin disabled admin_id=%d phone=%s", admin.ID, maskPhone(normalizedPhone))
+		return "", time.Time{}, nil, err
+	}
+
+	if _, err = uc.smsCodes.Verify("admin", normalizedPhone, code); err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("SMSLogin admin verify failed admin_id=%d phone=%s err=%v", admin.ID, maskPhone(normalizedPhone), err)
+		return "", time.Time{}, nil, err
+	}
+
+	token, expireAt, e = uc.genTok(admin.ID, admin.Username, int8(RoleAdmin))
+	if e != nil {
+		err = e
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "generate token failed")
+		l.Errorf("SMSLogin admin generate token failed admin_id=%d username=%s err=%v", admin.ID, admin.Username, err)
+		return "", time.Time{}, nil, err
+	}
+
+	span.SetAttributes(attribute.Int64("admin_auth.token_expires_at", expireAt.Unix()))
+
+	if e := uc.repo.UpdateAdminLastLogin(ctx, admin.ID, time.Now()); e != nil {
+		span.RecordError(e)
+		l.Warnf("SMSLogin admin update last_login_at failed admin_id=%d err=%v", admin.ID, e)
+	}
+
+	span.SetStatus(codes.Ok, "OK")
+	l.Infof("SMSLogin admin success admin_id=%d phone=%s", admin.ID, maskPhone(normalizedPhone))
 	return token, expireAt, admin, nil
 }

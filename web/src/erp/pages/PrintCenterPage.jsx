@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Space, Tag, Typography } from 'antd'
+import { Button, Card, Space, Typography } from 'antd'
 import { ArrowRightOutlined, PrinterOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -106,9 +106,7 @@ export default function PrintCenterPage() {
               打印模板中心
             </Title>
             <Paragraph className="erp-print-center-hero-description">
-              当前只保留采购合同和加工合同两套正式打印模板，统一按 `trade-erp`
-              的编辑壳页工作流收口成独立打印窗口，直接走 PDF 预览 / 下载 /
-              打印。
+              当前只保留采购合同和加工合同两套正式打印模板；业务页可从已选记录带值打开，打印中心保留默认样例和模板核对入口。
             </Paragraph>
             {PRINT_CENTER_OVERVIEW_ITEMS.map((item) => (
               <div className="erp-print-center-overview-card" key={item.label}>
@@ -131,8 +129,7 @@ export default function PrintCenterPage() {
               {activeTemplate.title}
             </Title>
             <Text className="erp-print-center-hero-action-hint">
-              主按钮固定在这里，点击后直接打开独立打印窗口，再做 PDF
-              预览、下载和打印。
+              这里按默认样例打开独立打印窗口；需要带业务记录字段时，请从对应业务页选中记录后打印。
             </Text>
             <Button
               type="primary"
@@ -144,7 +141,7 @@ export default function PrintCenterPage() {
               打开可编辑打印窗口
             </Button>
             <Text type="secondary" className="erp-print-center-action-hint">
-              当前按默认样例字段进入，后续再接真实业务带值。
+              采购合同入口在“辅材/包材采购”，加工合同入口在“加工合同/委外下单”。
             </Text>
           </div>
         </div>
@@ -159,7 +156,7 @@ export default function PrintCenterPage() {
             <div className="erp-print-center-nav-header">
               <Text className="erp-print-center-nav-title">模板目录</Text>
               <Text className="erp-print-center-nav-description">
-                当前目录只保留采购合同和加工合同两套模板，点击左侧模板卡后直接进入对应工作台。
+                当前目录只保留采购合同和加工合同两套模板，点击左侧模板卡可切换默认样例；业务带值入口在对应业务页。
               </Text>
             </div>
             <div
@@ -205,98 +202,6 @@ export default function PrintCenterPage() {
                   </div>
                 )
               })}
-            </div>
-          </div>
-
-          <div className="erp-print-center-detail-panel">
-            <div className="erp-print-center-detail-hero">
-              <div className="erp-print-center-detail-copy">
-                <Text className="erp-print-center-detail-eyebrow">
-                  当前模板
-                </Text>
-                <div className="erp-print-center-detail-title-row">
-                  <Title level={4} className="erp-print-center-detail-title">
-                    {activeTemplate.title}
-                  </Title>
-                </div>
-                <Paragraph className="erp-print-center-detail-summary">
-                  {activeTemplate.summary}
-                </Paragraph>
-                <Space wrap size={[8, 8]} className="erp-print-center-tag-row">
-                  {activeTemplate.tags.map((tag) => (
-                    <Tag key={tag}>{tag}</Tag>
-                  ))}
-                </Space>
-              </div>
-
-              <div className="erp-print-center-sheet-preview">
-                <div className="erp-print-center-sheet-card">
-                  <Text className="erp-print-center-sheet-eyebrow">
-                    页面结构
-                  </Text>
-                  <Text className="erp-print-center-sheet-title">
-                    {activeTemplate.shortTitle}
-                  </Text>
-                  <div className="erp-print-center-sheet-lines">
-                    {activeTemplate.previewLines.map((line) => (
-                      <div key={line} className="erp-print-center-sheet-line">
-                        {line}
-                      </div>
-                    ))}
-                  </div>
-                  <Text className="erp-print-center-sheet-footer">
-                    独立工作台 / A4 打印
-                  </Text>
-                </div>
-              </div>
-            </div>
-
-            <div className="erp-print-center-info-grid">
-              <div className="erp-print-center-info-card">
-                <Text className="erp-print-center-info-label">适用场景</Text>
-                <Text className="erp-print-center-info-value">
-                  {activeTemplate.scene}
-                </Text>
-              </div>
-              <div className="erp-print-center-info-card">
-                <Text className="erp-print-center-info-label">版式特点</Text>
-                <Text className="erp-print-center-info-value">
-                  {activeTemplate.layout}
-                </Text>
-              </div>
-              <div className="erp-print-center-info-card">
-                <Text className="erp-print-center-info-label">输出方式</Text>
-                <Text className="erp-print-center-info-value">
-                  {activeTemplate.output}
-                </Text>
-              </div>
-              <div className="erp-print-center-info-card">
-                <Text className="erp-print-center-info-label">模板来源</Text>
-                <div className="erp-print-center-record-summary">
-                  {activeTemplate.sourceFiles.map((item) => (
-                    <div key={item} className="erp-print-center-record-pill">
-                      <span className="erp-print-center-record-pill-label">
-                        真源
-                      </span>
-                      <span className="erp-print-center-record-pill-value">
-                        {item}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="erp-print-center-notes-card">
-              <Text className="erp-print-center-info-label">使用提醒</Text>
-              <div className="erp-print-center-note-list">
-                {activeTemplate.notes.map((note) => (
-                  <div className="erp-print-center-note-item" key={note}>
-                    <span className="erp-print-center-note-dot" />
-                    <Text className="erp-print-center-note-text">{note}</Text>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         </div>

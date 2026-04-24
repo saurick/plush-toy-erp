@@ -25,6 +25,8 @@ type AdminUser struct {
 	Level int8 `json:"level,omitempty"`
 	// 逗号分隔菜单权限
 	MenuPermissions string `json:"menu_permissions,omitempty"`
+	// 管理员 ERP 页面偏好 JSON
+	ErpPreferences string `json:"erp_preferences,omitempty"`
 	// Disabled holds the value of the "disabled" field.
 	Disabled bool `json:"disabled,omitempty"`
 	// LastLoginAt holds the value of the "last_login_at" field.
@@ -45,7 +47,7 @@ func (*AdminUser) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case adminuser.FieldID, adminuser.FieldLevel:
 			values[i] = new(sql.NullInt64)
-		case adminuser.FieldUsername, adminuser.FieldPasswordHash, adminuser.FieldMenuPermissions:
+		case adminuser.FieldUsername, adminuser.FieldPasswordHash, adminuser.FieldMenuPermissions, adminuser.FieldErpPreferences:
 			values[i] = new(sql.NullString)
 		case adminuser.FieldLastLoginAt, adminuser.FieldCreatedAt, adminuser.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -93,6 +95,12 @@ func (_m *AdminUser) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field menu_permissions", values[i])
 			} else if value.Valid {
 				_m.MenuPermissions = value.String
+			}
+		case adminuser.FieldErpPreferences:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field erp_preferences", values[i])
+			} else if value.Valid {
+				_m.ErpPreferences = value.String
 			}
 		case adminuser.FieldDisabled:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -165,6 +173,9 @@ func (_m *AdminUser) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("menu_permissions=")
 	builder.WriteString(_m.MenuPermissions)
+	builder.WriteString(", ")
+	builder.WriteString("erp_preferences=")
+	builder.WriteString(_m.ErpPreferences)
 	builder.WriteString(", ")
 	builder.WriteString("disabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Disabled))

@@ -8,14 +8,15 @@ import {
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   createEmptyProcessingAttachment,
   createProcessingContractDraft,
+  migrateLegacyProcessingContractDraft,
   normalizeProcessingContractAttachments,
   normalizeProcessingLine,
   processingContractAttachmentSlots,
-  resolveProcessingLineAmount,
 } from '../data/processingContractTemplate.mjs'
 import {
   downloadPdfFromElement,
   openPdfPreviewFromElement,
+  warmupPdfPreviewFromElement,
 } from '../utils/printPdf.mjs'
 import {
   PROCESSING_CONTRACT_MAX_ROWS,
@@ -23,11 +24,13 @@ import {
   deleteProcessingContractLine,
   splitProcessingDetailCellMerge,
   insertProcessingContractLine,
+  updateProcessingContractLineCell,
 } from '../utils/processingContractEditor.mjs'
 import {
   buildPrintWorkspacePath,
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
+  PRINT_WORKSPACE_ENTRY_SOURCE,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
@@ -44,6 +47,7 @@ import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSna
 
 const DRAFT_STORAGE_KEY = '__plush_erp_processing_contract_print_draft__'
 const ATTACHMENT_ACCEPT = 'image/*,.svg'
+const PDF_PREVIEW_WARMUP_DELAY_MS = 450
 
 function readFileAsDataURL(file) {
   return new Promise((resolve, reject) => {
@@ -138,7 +142,7 @@ function loadDraft({
       return createProcessingContractDraft()
     }
 
-    const parsed = JSON.parse(raw)
+    const parsed = migrateLegacyProcessingContractDraft(JSON.parse(raw))
     const { attachments, lines, ...rest } = parsed || {}
     return {
       ...createProcessingContractDraft(),
@@ -163,6 +167,16 @@ function formatExportFileName() {
   return `processing-contract_${stamp}.pdf`
 }
 
+function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
+  if (resetDraftOnOpen) {
+    return '已按菜单入口恢复默认加工合同样例。'
+  }
+  if (sourceTag === '业务记录带值') {
+    return '已从业务页带入加工合同草稿，可继续核对并打印。'
+  }
+  return '顶部工具栏已接入当前打印窗口主工作流。'
+}
+
 export default function ProcessingContractPrintWorkspacePage() {
   const { templateKey } = useParams()
   const [searchParams] = useSearchParams()
@@ -171,6 +185,10 @@ export default function ProcessingContractPrintWorkspacePage() {
   const attachmentInputRefs = useRef({})
   const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)
   const entrySource = resolvePrintWorkspaceEntrySource(searchParams)
+  const sourceTag =
+    entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS
+      ? '业务记录带值'
+      : '使用默认模板'
   const resetDraftOnOpen =
     resolvePrintWorkspaceDraftMode(searchParams) ===
     PRINT_WORKSPACE_DRAFT_MODE.FRESH
@@ -215,8 +233,8 @@ export default function ProcessingContractPrintWorkspacePage() {
   const [activeCell, setActiveCell] = useState(null)
   const [showFormula, setShowFormula] = useState(false)
   const [busyAction, setBusyAction] = useState('')
-  const [toolbarStatus, setToolbarStatus] = useState(
-    '顶部工具栏与 trade-erp 打印壳页对齐。'
+  const [toolbarStatus, setToolbarStatus] = useState(() =>
+    resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag)
   )
 
   useEffect(() => {
@@ -239,12 +257,14 @@ export default function ProcessingContractPrintWorkspacePage() {
     setActiveCell(null)
     setShowFormula(false)
     setBusyAction('')
-    setToolbarStatus(
-      resetDraftOnOpen
-        ? '已按菜单入口恢复默认加工合同样例。'
-        : '顶部工具栏与 trade-erp 打印壳页对齐。'
-    )
-  }, [draftStorageKey, legacyDraftStorageKeys, resetDraftOnOpen, templateKey])
+    setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
+  }, [
+    draftStorageKey,
+    legacyDraftStorageKeys,
+    resetDraftOnOpen,
+    sourceTag,
+    templateKey,
+  ])
 
   useEffect(() => {
     window.localStorage.setItem(draftStorageKey, JSON.stringify(contract))
@@ -266,7 +286,36 @@ export default function ProcessingContractPrintWorkspacePage() {
     templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
     workspaceURL,
     observeNodeRef: paperRef,
+    suspended: busyAction !== '',
   })
+
+  useEffect(() => {
+    if (busyAction || !paperRef.current) {
+      return undefined
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      if (cancelled || !paperRef.current) {
+        return
+      }
+
+      syncPrintPageMarginForPaper(paperRef.current, {
+        stageWrapElement: stageWrapRef.current,
+        paperContinuedClass: 'erp-processing-contract-paper--continued',
+      })
+      warmupPdfPreviewFromElement(paperRef.current, {
+        title: '加工合同 PDF 预览',
+        fileName: 'processing-contract-preview.pdf',
+        templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+      }).catch(() => {})
+    }, PDF_PREVIEW_WARMUP_DELAY_MS)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [busyAction, contract])
 
   if (templateKey !== PROCESSING_CONTRACT_TEMPLATE_KEY) {
     return <Navigate to="/erp/print-center" replace />
@@ -303,10 +352,14 @@ export default function ProcessingContractPrintWorkspacePage() {
     }))
   }
 
-  const setLineField = (index, field, value) => {
+  const setLineField = (index, field, value, options = {}) => {
     setContract((current) => {
-      const nextLines = current.lines.map((line, lineIndex) =>
-        lineIndex === index ? { ...line, [field]: value } : line
+      const nextLines = updateProcessingContractLineCell(
+        current.lines,
+        index,
+        field,
+        value,
+        options
       )
       return {
         ...current,
@@ -807,9 +860,22 @@ export default function ProcessingContractPrintWorkspacePage() {
                 />
               </td>
               <td>
-                <div className="erp-print-shell__detail-static">
-                  {resolveProcessingLineAmount(line) || '-'}
-                </div>
+                <input
+                  className="erp-print-shell__detail-editor"
+                  type="text"
+                  inputMode="decimal"
+                  value={line.amount}
+                  onChange={(event) =>
+                    setLineField(index, 'amount', event.target.value, {
+                      amountInputPhase: 'input',
+                    })
+                  }
+                  onBlur={(event) =>
+                    setLineField(index, 'amount', event.target.value, {
+                      amountInputPhase: 'commit',
+                    })
+                  }
+                />
               </td>
               <td>
                 <textarea
@@ -831,6 +897,7 @@ export default function ProcessingContractPrintWorkspacePage() {
   return (
     <PrintWorkspaceShell
       title="加工合同"
+      sourceTag={sourceTag}
       statusText={
         busyAction === 'preview'
           ? '正在生成在线 PDF...'
@@ -846,11 +913,15 @@ export default function ProcessingContractPrintWorkspacePage() {
         showFormula ? (
           <>
             <strong>加工合同计算规则</strong>
-            <span>1. 委托加工金额 = 委托加工数量 × 单价。</span>
+            <span>1. 默认金额 = 委托加工数量 × 单价。</span>
             <span>
               2. 合计数量 = 所有明细数量求和；合计金额 = 所有明细金额求和。
             </span>
-            <span>3. 调整单价或数量后，右侧合同金额会自动重算。</span>
+            <span>
+              3.
+              如合同快照已有确认金额，可直接改写委托加工金额；未手工改写时会继续按数量
+              × 单价带值。
+            </span>
           </>
         ) : null
       }

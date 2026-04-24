@@ -58,7 +58,7 @@ export const printTemplateCatalog = [
       buyerSigner: '郭细云',
       supplierSigner: '',
       signDateText: '2026/2/28',
-      supplierSignDateText: '20    年    月    日',
+      supplierSignDateText: '',
       lines: [
         {
           contractNo: 'A26022832',
@@ -66,7 +66,7 @@ export const printTemplateCatalog = [
           productNo: '23145-1',
           productName: '双熊猫发箍-\n续然',
           materialName: '黑色发箍头胶套',
-          vendorCode: '卢子淳网购',
+          vendorCode: '',
           spec: '',
           unit: 'PCS',
           unitPrice: '',
@@ -80,7 +80,7 @@ export const printTemplateCatalog = [
           productNo: '23145-1',
           productName: '双熊猫发箍-\n续然',
           materialName: '黑色铁发箍包黑\n色丁布',
-          vendorCode: '卢子淳网购',
+          vendorCode: '',
           spec: '0',
           unit: 'PCS',
           unitPrice: '',

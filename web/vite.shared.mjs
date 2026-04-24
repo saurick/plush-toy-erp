@@ -42,13 +42,6 @@ export function createERPViteConfig(appId) {
             assetFileNames: 'assets/[name].[hash].[ext]',
             manualChunks(id) {
               if (id.includes('node_modules')) {
-                if (
-                  /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|antd|mobx)/.test(
-                    id
-                  )
-                ) {
-                  return 'vendors'
-                }
                 return 'vendor'
               }
             },
@@ -79,6 +72,7 @@ export function createERPViteConfig(appId) {
       server: {
         host: '0.0.0.0',
         port: app.port,
+        strictPort: true,
         open: app.kind === 'desktop',
         proxy: {
           '/rpc': {

@@ -289,3 +289,87 @@ func TestAuthUsecase_Login_TokenGenFailed(t *testing.T) {
 		t.Fatalf("expected error when token generation fails")
 	}
 }
+
+func TestNormalizeLoginPhone(t *testing.T) {
+	got, err := NormalizeLoginPhone("+86 138-0013-8000")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if got != "13800138000" {
+		t.Fatalf("unexpected phone: %s", got)
+	}
+
+	if _, err := NormalizeLoginPhone("12345"); !errors.Is(err, ErrInvalidPhoneNumber) {
+		t.Fatalf("expected ErrInvalidPhoneNumber, got %v", err)
+	}
+}
+
+func TestAuthUsecase_SMSLogin_SuccessAndCannotReuseCode(t *testing.T) {
+	repo := newMemAuthRepo()
+	hash, _ := bcrypt.GenerateFromPassword([]byte("unused"), bcrypt.DefaultCost)
+	_, _ = repo.CreateUser(context.Background(), &User{
+		Username:     "13800138000",
+		PasswordHash: string(hash),
+		Disabled:     false,
+	})
+
+	logger := log.NewStdLogger(io.Discard)
+	tp := tracesdk.NewTracerProvider()
+	uc := NewAuthUsecase(repo, func(userID int, username string, role int8) (string, time.Time, error) {
+		return "tok-sms", time.Now().Add(time.Hour), nil
+	}, logger, tp)
+
+	challenge, err := uc.RequestSMSLoginCode(context.Background(), "13800138000")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if challenge.MockCode == "" {
+		t.Fatalf("expected mock code")
+	}
+
+	token, _, u, err := uc.LoginWithSMSCode(context.Background(), "13800138000", challenge.MockCode)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if token != "tok-sms" {
+		t.Fatalf("unexpected token: %s", token)
+	}
+	if u == nil || u.Username != "13800138000" {
+		t.Fatalf("unexpected user: %+v", u)
+	}
+
+	_, _, _, err = uc.LoginWithSMSCode(context.Background(), "13800138000", challenge.MockCode)
+	if !errors.Is(err, ErrSMSCodeNotFound) {
+		t.Fatalf("expected ErrSMSCodeNotFound after code reuse, got %v", err)
+	}
+}
+
+func TestAuthUsecase_SMSLogin_InvalidCode(t *testing.T) {
+	repo := newMemAuthRepo()
+	hash, _ := bcrypt.GenerateFromPassword([]byte("unused"), bcrypt.DefaultCost)
+	_, _ = repo.CreateUser(context.Background(), &User{
+		Username:     "13800138000",
+		PasswordHash: string(hash),
+		Disabled:     false,
+	})
+
+	logger := log.NewStdLogger(io.Discard)
+	tp := tracesdk.NewTracerProvider()
+	uc := NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
+		return "", time.Time{}, nil
+	}, logger, tp)
+
+	challenge, err := uc.RequestSMSLoginCode(context.Background(), "13800138000")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+
+	wrongCode := "000000"
+	if challenge.MockCode == wrongCode {
+		wrongCode = "111111"
+	}
+	_, _, _, err = uc.LoginWithSMSCode(context.Background(), "13800138000", wrongCode)
+	if !errors.Is(err, ErrSMSCodeInvalid) {
+		t.Fatalf("expected ErrSMSCodeInvalid, got %v", err)
+	}
+}

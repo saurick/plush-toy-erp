@@ -60,6 +60,20 @@ func (_c *AdminUserCreate) SetNillableMenuPermissions(v *string) *AdminUserCreat
 	return _c
 }
 
+// SetErpPreferences sets the "erp_preferences" field.
+func (_c *AdminUserCreate) SetErpPreferences(v string) *AdminUserCreate {
+	_c.mutation.SetErpPreferences(v)
+	return _c
+}
+
+// SetNillableErpPreferences sets the "erp_preferences" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableErpPreferences(v *string) *AdminUserCreate {
+	if v != nil {
+		_c.SetErpPreferences(*v)
+	}
+	return _c
+}
+
 // SetDisabled sets the "disabled" field.
 func (_c *AdminUserCreate) SetDisabled(v bool) *AdminUserCreate {
 	_c.mutation.SetDisabled(v)
@@ -159,6 +173,10 @@ func (_c *AdminUserCreate) defaults() {
 		v := adminuser.DefaultMenuPermissions
 		_c.mutation.SetMenuPermissions(v)
 	}
+	if _, ok := _c.mutation.ErpPreferences(); !ok {
+		v := adminuser.DefaultErpPreferences
+		_c.mutation.SetErpPreferences(v)
+	}
 	if _, ok := _c.mutation.Disabled(); !ok {
 		v := adminuser.DefaultDisabled
 		_c.mutation.SetDisabled(v)
@@ -200,6 +218,14 @@ func (_c *AdminUserCreate) check() error {
 	if v, ok := _c.mutation.MenuPermissions(); ok {
 		if err := adminuser.MenuPermissionsValidator(v); err != nil {
 			return &ValidationError{Name: "menu_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.menu_permissions": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.ErpPreferences(); !ok {
+		return &ValidationError{Name: "erp_preferences", err: errors.New(`ent: missing required field "AdminUser.erp_preferences"`)}
+	}
+	if v, ok := _c.mutation.ErpPreferences(); ok {
+		if err := adminuser.ErpPreferencesValidator(v); err != nil {
+			return &ValidationError{Name: "erp_preferences", err: fmt.Errorf(`ent: validator failed for field "AdminUser.erp_preferences": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Disabled(); !ok {
@@ -252,6 +278,10 @@ func (_c *AdminUserCreate) createSpec() (*AdminUser, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.MenuPermissions(); ok {
 		_spec.SetField(adminuser.FieldMenuPermissions, field.TypeString, value)
 		_node.MenuPermissions = value
+	}
+	if value, ok := _c.mutation.ErpPreferences(); ok {
+		_spec.SetField(adminuser.FieldErpPreferences, field.TypeString, value)
+		_node.ErpPreferences = value
 	}
 	if value, ok := _c.mutation.Disabled(); ok {
 		_spec.SetField(adminuser.FieldDisabled, field.TypeBool, value)

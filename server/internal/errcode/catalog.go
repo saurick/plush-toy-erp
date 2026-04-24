@@ -31,13 +31,18 @@ var (
 	PayloadTooLarge    = Definition{Name: "PayloadTooLarge", Code: 41300, Message: "请求体过大"}
 	TemplateRenderBusy = Definition{Name: "TemplateRenderBusy", Code: 42953, Message: "当前 PDF 预览人数较多，请稍后重试"}
 
-	AuthUserNotFound    = Definition{Name: "AuthUserNotFound", Code: 10001, Message: "用户不存在"}
-	AuthInvalidPassword = Definition{Name: "AuthInvalidPassword", Code: 10002, Message: "密码错误"}
-	AuthUserDisabled    = Definition{Name: "AuthUserDisabled", Code: 10003, Message: "用户已被禁用"}
-	AuthUserExists      = Definition{Name: "AuthUserExists", Code: 10004, Message: "用户名已存在"}
-	AuthExpired         = Definition{Name: "AuthExpired", Code: 10005, Message: "登录已过期，请重新登录"}
-	AuthInvalid         = Definition{Name: "AuthInvalid", Code: 10006, Message: "登录无效，请重新登录"}
-	AdminExists         = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
+	AuthUserNotFound            = Definition{Name: "AuthUserNotFound", Code: 10001, Message: "用户不存在"}
+	AuthInvalidPassword         = Definition{Name: "AuthInvalidPassword", Code: 10002, Message: "密码错误"}
+	AuthUserDisabled            = Definition{Name: "AuthUserDisabled", Code: 10003, Message: "用户已被禁用"}
+	AuthUserExists              = Definition{Name: "AuthUserExists", Code: 10004, Message: "用户名已存在"}
+	AuthExpired                 = Definition{Name: "AuthExpired", Code: 10005, Message: "登录已过期，请重新登录"}
+	AuthInvalid                 = Definition{Name: "AuthInvalid", Code: 10006, Message: "登录无效，请重新登录"}
+	AuthInvalidPhone            = Definition{Name: "AuthInvalidPhone", Code: 10007, Message: "手机号格式不正确"}
+	AuthInvalidSMSCode          = Definition{Name: "AuthInvalidSMSCode", Code: 10008, Message: "验证码错误"}
+	AuthSMSCodeExpired          = Definition{Name: "AuthSMSCodeExpired", Code: 10009, Message: "验证码已过期，请重新获取"}
+	AuthSMSCodeTooFrequent      = Definition{Name: "AuthSMSCodeTooFrequent", Code: 10010, Message: "验证码发送过于频繁，请稍后再试"}
+	AuthSMSCodeAttemptsExceeded = Definition{Name: "AuthSMSCodeAttemptsExceeded", Code: 10011, Message: "验证码错误次数过多，请重新获取"}
+	AdminExists                 = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
 
 	Internal              = Definition{Name: "Internal", Code: 50000, Message: "服务器内部错误"}
 	AuthCurrentUserFailed = Definition{Name: "AuthCurrentUserFailed", Code: 50001, Message: "获取用户信息失败"}
@@ -69,6 +74,11 @@ var definitions = []Definition{
 	AuthUserExists,
 	AuthExpired,
 	AuthInvalid,
+	AuthInvalidPhone,
+	AuthInvalidSMSCode,
+	AuthSMSCodeExpired,
+	AuthSMSCodeTooFrequent,
+	AuthSMSCodeAttemptsExceeded,
 	AdminExists,
 	Internal,
 	AuthCurrentUserFailed,

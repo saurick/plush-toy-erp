@@ -14,8 +14,20 @@ type Tx struct {
 	config
 	// AdminUser is the client for interacting with the AdminUser builders.
 	AdminUser *AdminUserClient
+	// BusinessRecord is the client for interacting with the BusinessRecord builders.
+	BusinessRecord *BusinessRecordClient
+	// BusinessRecordEvent is the client for interacting with the BusinessRecordEvent builders.
+	BusinessRecordEvent *BusinessRecordEventClient
+	// BusinessRecordItem is the client for interacting with the BusinessRecordItem builders.
+	BusinessRecordItem *BusinessRecordItemClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// WorkflowBusinessState is the client for interacting with the WorkflowBusinessState builders.
+	WorkflowBusinessState *WorkflowBusinessStateClient
+	// WorkflowTask is the client for interacting with the WorkflowTask builders.
+	WorkflowTask *WorkflowTaskClient
+	// WorkflowTaskEvent is the client for interacting with the WorkflowTaskEvent builders.
+	WorkflowTaskEvent *WorkflowTaskEventClient
 
 	// lazily loaded.
 	client     *Client
@@ -148,7 +160,13 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.AdminUser = NewAdminUserClient(tx.config)
+	tx.BusinessRecord = NewBusinessRecordClient(tx.config)
+	tx.BusinessRecordEvent = NewBusinessRecordEventClient(tx.config)
+	tx.BusinessRecordItem = NewBusinessRecordItemClient(tx.config)
 	tx.User = NewUserClient(tx.config)
+	tx.WorkflowBusinessState = NewWorkflowBusinessStateClient(tx.config)
+	tx.WorkflowTask = NewWorkflowTaskClient(tx.config)
+	tx.WorkflowTaskEvent = NewWorkflowTaskEventClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

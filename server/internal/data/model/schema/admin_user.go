@@ -28,6 +28,10 @@ func (AdminUser) Fields() []ent.Field {
 			Default("").
 			MaxLen(4096).
 			Comment("逗号分隔菜单权限"),
+		field.String("erp_preferences").
+			Default("{}").
+			MaxLen(32768).
+			Comment("管理员 ERP 页面偏好 JSON"),
 		field.Bool("disabled").
 			Default(false),
 		field.Time("last_login_at").

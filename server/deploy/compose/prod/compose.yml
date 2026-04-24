@@ -1,5 +1,30 @@
 name: plush-toy-erp-prod
 
+x-web-app-common: &web-app-common
+  image: "${WEB_IMAGE:-plush-toy-erp-web:dev}"
+  restart: always
+  depends_on:
+    app-server:
+      condition: service_started
+  environment: &web-app-environment
+    TZ: "${TZ:-Asia/Shanghai}"
+    API_ORIGIN: "${WEB_API_ORIGIN:-http://app-server:8200}"
+    PROXY_PREFIXES: "${WEB_PROXY_PREFIXES:-/rpc,/templates}"
+    PROXY_TIMEOUT_MS: "${WEB_PROXY_TIMEOUT_MS:-30000}"
+  mem_limit: "${WEB_MEM_LIMIT:-96m}"
+  mem_reservation: "${WEB_MEM_RESERVATION:-48m}"
+  healthcheck:
+    test:
+      [
+        "CMD-SHELL",
+        "node -e \"fetch('http://127.0.0.1:' + (process.env.PORT || '5175') + '/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+      ]
+    interval: 5s
+    timeout: 3s
+    retries: 20
+    start_period: 10s
+  networks: {}
+
 services:
   postgres:
     image: postgres:18
@@ -68,3 +93,93 @@ services:
     mem_limit: "${APP_MEM_LIMIT:-160m}"
     mem_reservation: "${APP_MEM_RESERVATION:-80m}"
     networks: {}
+
+  web-desktop:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-desktop"
+    ports:
+      - "${WEB_DESKTOP_PORT:-5175}:5175"
+    environment:
+      <<: *web-app-environment
+      APP_ID: desktop
+      PORT: "5175"
+
+  web-mobile-boss:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-boss"
+    ports:
+      - "${WEB_MOBILE_BOSS_PORT:-5186}:5186"
+    environment:
+      <<: *web-app-environment
+      APP_ID: mobile-boss
+      PORT: "5186"
+
+  web-mobile-merchandiser:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-merchandiser"
+    ports:
+      - "${WEB_MOBILE_MERCHANDISER_PORT:-5187}:5187"
+    environment:
+      <<: *web-app-environment
+      APP_ID: mobile-merchandiser
+      PORT: "5187"
+
+  web-mobile-purchasing:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-purchasing"
+    ports:
+      - "${WEB_MOBILE_PURCHASING_PORT:-5188}:5188"
+    environment:
+      <<: *web-app-environment
+      APP_ID: mobile-purchasing
+      PORT: "5188"
+
+  web-mobile-production:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-production"
+    ports:
+      - "${WEB_MOBILE_PRODUCTION_PORT:-5189}:5189"
+    environment:
+      <<: *web-app-environment
+      APP_ID: mobile-production
+      PORT: "5189"
+
+  web-mobile-warehouse:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-warehouse"
+    ports:
+      - "${WEB_MOBILE_WAREHOUSE_PORT:-5190}:5190"
+    environment:
+      <<: *web-app-environment
+      APP_ID: mobile-warehouse
+      PORT: "5190"
+
+  web-mobile-finance:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-finance"
+    ports:
+      - "${WEB_MOBILE_FINANCE_PORT:-5191}:5191"
+    environment:
+      <<: *web-app-environment
+      APP_ID: mobile-finance
+      PORT: "5191"
+
+  web-mobile-pmc:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-pmc"
+    ports:
+      - "${WEB_MOBILE_PMC_PORT:-5192}:5192"
+    environment:
+      <<: *web-app-environment
+      APP_ID: mobile-pmc
+      PORT: "5192"
+
+  web-mobile-quality:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-quality"
+    ports:
+      - "${WEB_MOBILE_QUALITY_PORT:-5193}:5193"
+    environment:
+      <<: *web-app-environment
+      APP_ID: mobile-quality
+      PORT: "5193"

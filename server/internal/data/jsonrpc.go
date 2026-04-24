@@ -34,6 +34,8 @@ type JsonrpcData struct {
 	adminAuthUC   *biz.AdminAuthUsecase
 	adminManageUC *biz.AdminManageUsecase
 	userAdminUC   *biz.UserAdminUsecase
+	workflowUC    *biz.WorkflowUsecase
+	businessUC    *biz.BusinessRecordUsecase
 
 	adminReader adminAccountReader
 }
@@ -79,6 +81,8 @@ func NewJsonrpcData(
 	adminAuthUC := biz.NewAdminAuthUsecase(adminAuthRepo, adminTokenGenerator, logger, tracerProvider)
 	adminManageUC := biz.NewAdminManageUsecase(adminManageRepo, logger, tracerProvider)
 	userAdminUC := biz.NewUserAdminUsecase(userAdminRepo, logger, tracerProvider)
+	workflowUC := biz.NewWorkflowUsecase(NewWorkflowRepo(data, logger))
+	businessUC := biz.NewBusinessRecordUsecase(NewBusinessRecordRepo(data, logger))
 
 	helper.Info("JsonrpcData created (auth/admin auth/user admin usecases constructed inside)")
 
@@ -90,6 +94,8 @@ func NewJsonrpcData(
 		adminAuthUC:   adminAuthUC,
 		adminManageUC: adminManageUC,
 		userAdminUC:   userAdminUC,
+		workflowUC:    workflowUC,
+		businessUC:    businessUC,
 		adminReader:   adminAuthRepo,
 	}
 }
@@ -109,7 +115,7 @@ func (d *JsonrpcData) Handle(
 	if params == nil {
 		d.log.WithContext(ctx).Info("[jsonrpc] params=<nil>")
 	} else {
-		b, _ := json.MarshalIndent(params.AsMap(), "", "  ")
+		b, _ := json.MarshalIndent(redactRPCParams(params.AsMap()), "", "  ")
 		d.log.WithContext(ctx).Infof("[jsonrpc] params=%s", string(b))
 	}
 
@@ -128,6 +134,10 @@ func (d *JsonrpcData) Handle(
 		return d.handleAdmin(ctx, method, id, params)
 	case "user":
 		return d.handleUser(ctx, method, id, params)
+	case "workflow":
+		return d.handleWorkflow(ctx, method, id, params)
+	case "business":
+		return d.handleBusiness(ctx, method, id, params)
 	default:
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.JSONRPCUnknownURL.Code,
@@ -201,6 +211,95 @@ func (d *JsonrpcData) handleAuth(
 			}),
 		}, nil
 
+	case "send_sms_code":
+		phone := getString(pm, "phone")
+		scope, scopeErr := getAuthLoginScope(pm)
+		if scopeErr != nil {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "登录类型不合法"}, nil
+		}
+		if phone == "" {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "缺少手机号"}, nil
+		}
+
+		var (
+			challenge *biz.SMSLoginChallenge
+			err       error
+		)
+		if scope == "admin" {
+			challenge, err = d.adminAuthUC.RequestSMSLoginCode(ctx, phone)
+		} else {
+			challenge, err = d.authUC.RequestSMSLoginCode(ctx, phone)
+		}
+		if err != nil {
+			return id, d.mapAuthError(ctx, err), nil
+		}
+
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: "验证码已发送",
+			Data: newDataStruct(map[string]any{
+				"phone":         challenge.Phone,
+				"expires_at":    challenge.ExpiresAt.Unix(),
+				"resend_after":  challenge.ResendAfter.Unix(),
+				"mock_delivery": challenge.MockDelivery,
+				"mock_code":     challenge.MockCode,
+			}),
+		}, nil
+
+	case "sms_login":
+		phone := getString(pm, "phone")
+		code := getString(pm, "code")
+		scope, scopeErr := getAuthLoginScope(pm)
+		if scopeErr != nil {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "登录类型不合法"}, nil
+		}
+		if phone == "" || code == "" {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "缺少手机号或验证码"}, nil
+		}
+
+		if scope == "admin" {
+			token, expireAt, admin, err := d.adminAuthUC.LoginWithSMSCode(ctx, phone, code)
+			if err != nil {
+				return id, d.mapAuthError(ctx, err), nil
+			}
+
+			return id, &v1.JsonrpcResult{
+				Code:    errcode.OK.Code,
+				Message: "登录成功",
+				Data: newDataStruct(map[string]any{
+					"user_id":          admin.ID,
+					"username":         admin.Username,
+					"access_token":     token,
+					"expires_at":       expireAt.Unix(),
+					"token_type":       "Bearer",
+					"issued_at":        time.Now().Unix(),
+					"admin_level":      admin.Level,
+					"menu_permissions": toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+					"erp_preferences": map[string]any{
+						"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+					},
+				}),
+			}, nil
+		}
+
+		token, expireAt, user, err := d.authUC.LoginWithSMSCode(ctx, phone, code)
+		if err != nil {
+			return id, d.mapAuthError(ctx, err), nil
+		}
+
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: "登录成功",
+			Data: newDataStruct(map[string]any{
+				"user_id":      user.ID,
+				"username":     user.Username,
+				"access_token": token,
+				"expires_at":   expireAt.Unix(),
+				"token_type":   "Bearer",
+				"issued_at":    time.Now().Unix(),
+			}),
+		}, nil
+
 	case "admin_login":
 		username := getString(pm, "username")
 		password := getString(pm, "password")
@@ -226,6 +325,9 @@ func (d *JsonrpcData) handleAuth(
 				"issued_at":        time.Now().Unix(),
 				"admin_level":      admin.Level,
 				"menu_permissions": toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+				"erp_preferences": map[string]any{
+					"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+				},
 			}),
 		}, nil
 
@@ -297,6 +399,9 @@ func (d *JsonrpcData) handleAuth(
 					"disabled":         admin.Disabled,
 					"level":            admin.Level,
 					"menu_permissions": toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+					"erp_preferences": map[string]any{
+						"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+					},
 				}),
 			}, nil
 		}
@@ -360,6 +465,36 @@ func (d *JsonrpcData) mapAuthError(ctx context.Context, err error) *v1.JsonrpcRe
 			Code:    errcode.AuthUserExists.Code,
 			Message: errcode.AuthUserExists.Message,
 		}
+	case biz.ErrInvalidPhoneNumber:
+		logger.Warn("[auth] invalid phone number")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthInvalidPhone.Code,
+			Message: errcode.AuthInvalidPhone.Message,
+		}
+	case biz.ErrSMSCodeCooldown:
+		logger.Warn("[auth] sms code cooldown")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthSMSCodeTooFrequent.Code,
+			Message: errcode.AuthSMSCodeTooFrequent.Message,
+		}
+	case biz.ErrSMSCodeExpired:
+		logger.Warn("[auth] sms code expired")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthSMSCodeExpired.Code,
+			Message: errcode.AuthSMSCodeExpired.Message,
+		}
+	case biz.ErrSMSCodeInvalid, biz.ErrSMSCodeNotFound:
+		logger.Warn("[auth] sms code invalid")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthInvalidSMSCode.Code,
+			Message: errcode.AuthInvalidSMSCode.Message,
+		}
+	case biz.ErrSMSCodeAttemptsExceeded:
+		logger.Warn("[auth] sms code attempts exceeded")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthSMSCodeAttemptsExceeded.Code,
+			Message: errcode.AuthSMSCodeAttemptsExceeded.Message,
+		}
 	default:
 		logger.Errorf("[auth] internal error: %v", err)
 		return &v1.JsonrpcResult{
@@ -381,6 +516,52 @@ func getString(m map[string]any, key string) string {
 		return fmt.Sprintf("%.0f", x)
 	default:
 		return fmt.Sprintf("%v", x)
+	}
+}
+
+func redactRPCParams(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, item := range v {
+			if isSensitiveRPCParamKey(key) {
+				out[key] = "<redacted>"
+				continue
+			}
+			out[key] = redactRPCParams(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			out[i] = redactRPCParams(item)
+		}
+		return out
+	default:
+		return value
+	}
+}
+
+func isSensitiveRPCParamKey(key string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(key))
+	return strings.Contains(normalized, "password") ||
+		strings.Contains(normalized, "token") ||
+		strings.Contains(normalized, "secret") ||
+		normalized == "code" ||
+		strings.Contains(normalized, "sms_code") ||
+		strings.Contains(normalized, "captcha") ||
+		strings.Contains(normalized, "verification_code")
+}
+
+func getAuthLoginScope(m map[string]any) (string, error) {
+	scope := strings.ToLower(strings.TrimSpace(getString(m, "scope")))
+	switch scope {
+	case "", "user":
+		return "user", nil
+	case "admin":
+		return "admin", nil
+	default:
+		return "", fmt.Errorf("invalid auth scope: %s", scope)
 	}
 }
 
@@ -434,6 +615,17 @@ func toAnySliceString(items []string) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
 		out = append(out, item)
+	}
+	return out
+}
+
+func toAnyMapStringSlice(values map[string][]string) map[string]any {
+	if len(values) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(values))
+	for key, items := range values {
+		out[key] = toAnySliceString(items)
 	}
 	return out
 }
@@ -520,7 +712,7 @@ func (d *JsonrpcData) isPublic(url, method string) bool {
 	if url == "system" && (method == "ping" || method == "version") {
 		return true
 	}
-	if url == "auth" && (method == "login" || method == "admin_login" || method == "register" || method == "logout") {
+	if url == "auth" && (method == "login" || method == "admin_login" || method == "register" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
 		return true
 	}
 	return false
@@ -647,6 +839,37 @@ func (d *JsonrpcData) handleUser(
 			}),
 		}, nil
 
+	case "reset_password":
+		userID := getInt(pm, "user_id", 0)
+		password := getString(pm, "password")
+		if userID <= 0 || len(password) < 6 {
+			l.Warnf("[user] reset_password bad param id=%s operator_uid=%d user_id=%d", id, opUID, userID)
+			return id, &v1.JsonrpcResult{
+				Code:    errcode.UserInvalidParam.Code,
+				Message: errcode.UserInvalidParam.Message,
+			}, nil
+		}
+
+		l.Infof("[user] reset_password start id=%s operator_uid=%d target_uid=%d", id, opUID, userID)
+
+		if err := d.userAdminUC.ResetPassword(ctx, userID, password); err != nil {
+			l.Errorf("[user] reset_password failed id=%s operator_uid=%d target_uid=%d err=%v",
+				id, opUID, userID, err,
+			)
+			return id, d.mapUserAdminError(ctx, err), nil
+		}
+
+		l.Infof("[user] reset_password success id=%s operator_uid=%d target_uid=%d", id, opUID, userID)
+
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: "密码已重置",
+			Data: newDataStruct(map[string]any{
+				"success": true,
+				"user_id": userID,
+			}),
+		}, nil
+
 	default:
 		l.Warnf("[user] unknown method=%s id=%s operator_uid=%d", method, id, opUID)
 		return id, &v1.JsonrpcResult{
@@ -695,6 +918,9 @@ func (d *JsonrpcData) handleAdmin(
 				"created_at":       admin.CreatedAt.Unix(),
 				"updated_at":       admin.UpdatedAt.Unix(),
 				"menu_permissions": toAnySliceString(admin.MenuPermissions),
+				"erp_preferences": map[string]any{
+					"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+				},
 			}),
 		}, nil
 
@@ -787,6 +1013,23 @@ func (d *JsonrpcData) handleAdmin(
 			}),
 		}, nil
 
+	case "set_erp_column_order":
+		moduleKey := getString(pm, "module_key")
+		order := getStringSlice(pm, "order")
+		admin, err := d.adminManageUC.SetCurrentERPColumnOrder(ctx, moduleKey, order)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"erp_preferences": map[string]any{
+					"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
+				},
+			}),
+		}, nil
+
 	case "set_disabled":
 		adminID := getInt(pm, "id", 0)
 		disabled, ok := pm["disabled"].(bool)
@@ -800,6 +1043,30 @@ func (d *JsonrpcData) handleAdmin(
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": map[string]any{
+					"id":               admin.ID,
+					"username":         admin.Username,
+					"level":            admin.Level,
+					"disabled":         admin.Disabled,
+					"menu_permissions": toAnySliceString(admin.MenuPermissions),
+				},
+			}),
+		}, nil
+
+	case "reset_password":
+		adminID := getInt(pm, "id", 0)
+		password := getString(pm, "password")
+		if adminID <= 0 || len(password) < 6 {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		admin, err := d.adminManageUC.ResetPassword(ctx, adminID, password)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: "密码已重置",
 			Data: newDataStruct(map[string]any{
 				"admin": map[string]any{
 					"id":               admin.ID,

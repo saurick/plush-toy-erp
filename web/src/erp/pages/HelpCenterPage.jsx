@@ -11,14 +11,16 @@ import {
   portMatrix,
 } from '../config/seedData.mjs'
 
-const desktopUsageNotes = [
-  '桌面后台固定使用一个入口，不再提供角色切换、角色首页或角色入口菜单。',
-  '六个移动端角色按端口直接访问，端口分工写在正式文档和说明页里。',
-  '需要核对字段、打印模板或导入口径时，优先从帮助中心和正式文档进入。',
-]
-
 export default function HelpCenterPage() {
   const helpCenterSections = getHelpCenterSections()
+  const mobileAppCount = portMatrix.filter(
+    (app) => app.kind === 'mobile'
+  ).length
+  const desktopUsageNotes = [
+    '桌面后台固定使用一个入口，不再提供角色切换、角色首页或角色入口菜单。',
+    `${mobileAppCount} 个移动端角色按端口直接访问，端口分工写在正式文档和说明页里。`,
+    '需要核对字段、打印模板、状态字典或导入口径时，优先从帮助中心和正式文档进入。',
+  ]
   const headings = [
     ...helpCenterSections.map((section) => ({
       id: `help-${section.title}`,
@@ -136,8 +138,8 @@ export default function HelpCenterPage() {
                     模板打印入口
                   </div>
                   <div className="mt-2 text-sm leading-6 text-slate-300">
-                    参照 trade-erp
-                    报价单打印的工作台和弹窗方式，当前只保留采购合同、加工合同两套正式模板，并统一收口成可编辑打印窗口。
+                    当前只保留采购合同、加工合同两套正式模板，并统一收口成可编辑打印窗口、PDF
+                    预览、下载和打印链路。
                   </div>
                 </div>
                 <Link className="erp-primary-button" to="/erp/print-center">
@@ -190,7 +192,9 @@ export default function HelpCenterPage() {
                   使用建议
                 </div>
                 <div className="mt-2 text-sm leading-6 text-slate-200">
-                  先看“系统初始化说明”确认桌面单后台和移动端端口结构，再看“字段真源”避免把编号体系混掉，接着打开“模板打印中心”核对加工合同快照字段和条款区，最后用“导入映射”决定
+                  先看“系统初始化说明”确认桌面单后台和移动端端口结构，再看“字段真源”避免把编号体系混掉，再看“任务
+                  /
+                  业务状态字典”统一状态口径，接着打开“模板打印中心”核对加工合同快照字段和条款区，最后用“导入映射”决定
                   Excel / PDF 应该落哪张表。
                 </div>
               </div>

@@ -81,4 +81,8 @@ test('errorCodes: 默认文案覆盖核心鉴权错误', () => {
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.PERMISSION_DENIED],
     '权限不足'
   )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_INVALID_SMS_CODE],
+    '验证码错误'
+  )
 })

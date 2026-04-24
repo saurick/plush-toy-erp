@@ -1,22 +1,39 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AuthGuard from '@/common/auth/AuthGuard'
 import { AUTH_SCOPE, getCurrentUser } from '@/common/auth/auth'
-import AdminUsersPage from '@/pages/AdminUsers'
-import AdminLoginPage from '@/pages/AdminLogin'
-import LoginPage from '@/pages/Login'
-import RegisterPage from '@/pages/Register'
+import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
 import { businessModuleDefinitions } from './config/businessModules.mjs'
-import BusinessModulePage from './pages/BusinessModulePage'
-import ChangeLogPage from './pages/ChangeLogPage'
-import DashboardPage from './pages/DashboardPage'
-import DocumentationPage from './pages/DocumentationPage'
-import OperationFlowPage from './pages/OperationFlowPage'
-import PrintCenterPage from './pages/PrintCenterPage'
-import PrintTemplatePreviewPage from './pages/PrintTemplatePreviewPage'
-import PrintWorkspacePage from './pages/PrintWorkspacePage.jsx'
-import PermissionCenterPage from './pages/PermissionCenterPage'
+
+const activeBusinessModuleDefinitions = businessModuleDefinitions.filter(
+  (moduleItem) => moduleItem.status !== 'awaiting_confirmation'
+)
+
+const AdminUsersPage = lazy(() => import('@/pages/AdminUsers'))
+const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
+const LoginPage = lazy(() => import('@/pages/Login'))
+const RegisterPage = lazy(() => import('@/pages/Register'))
+const AcceptanceOverviewPage = lazy(
+  () => import('./pages/AcceptanceOverviewPage')
+)
+const BusinessModulePage = lazy(() => import('./pages/BusinessModulePage'))
+const BusinessChainDebugPage = lazy(
+  () => import('./pages/BusinessChainDebugPage')
+)
+const ChangeLogPage = lazy(() => import('./pages/ChangeLogPage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const DocumentationPage = lazy(() => import('./pages/DocumentationPage'))
+const FieldLinkageCoveragePage = lazy(
+  () => import('./pages/FieldLinkageCoveragePage')
+)
+const OperationFlowPage = lazy(() => import('./pages/OperationFlowPage'))
+const PrintCenterPage = lazy(() => import('./pages/PrintCenterPage'))
+const PrintTemplatePreviewPage = lazy(
+  () => import('./pages/PrintTemplatePreviewPage')
+)
+const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
+const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
 
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
@@ -27,101 +44,131 @@ function RootEntryRedirect() {
   return <Navigate to={admin ? '/erp/dashboard' : '/admin-login'} replace />
 }
 
+function RouteLoadingFallback() {
+  return (
+    <Loading
+      title="页面加载中"
+      description="正在准备当前模块和界面资源，请稍候..."
+      fullscreen
+      className="loading-page--erp"
+    />
+  )
+}
+
 export default function ERPRouter() {
   return (
-    <Routes>
-      <Route path="/" element={<RootEntryRedirect />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/admin-login" element={<AdminLoginPage />} />
+    <Suspense fallback={<RouteLoadingFallback />}>
+      <Routes>
+        <Route path="/" element={<RootEntryRedirect />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/admin-login" element={<AdminLoginPage />} />
 
-      <Route
-        path="/admin-accounts"
-        element={
-          <AuthGuard requireAdmin>
-            <AdminUsersPage />
-          </AuthGuard>
-        }
-      />
-      <Route
-        path="/admin-users"
-        element={<Navigate to="/admin-accounts" replace />}
-      />
+        <Route
+          path="/admin-accounts"
+          element={
+            <AuthGuard requireAdmin>
+              <AdminUsersPage />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/admin-users"
+          element={<Navigate to="/admin-accounts" replace />}
+        />
 
-      <Route
-        path="/admin-menu"
-        element={<Navigate to="/erp/dashboard" replace />}
-      />
-      <Route
-        path="/admin-guide"
-        element={<Navigate to="/erp/docs/operation-guide" replace />}
-      />
-      <Route
-        path="/dashboard"
-        element={<Navigate to="/erp/dashboard" replace />}
-      />
-
-      <Route
-        path="/erp"
-        element={
-          <AuthGuard requireAdmin>
-            <ERPLayout />
-          </AuthGuard>
-        }
-      >
-        <Route index element={<DesktopEntryRedirect />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-        {businessModuleDefinitions.map((moduleItem) => (
-          <Route
-            key={moduleItem.key}
-            path={moduleItem.route}
-            element={<BusinessModulePage moduleItem={moduleItem} />}
-          />
-        ))}
         <Route
-          path="docs/operation-flow-overview"
-          element={<OperationFlowPage />}
-        />
-        <Route
-          path="flows/overview"
-          element={<Navigate to="/erp/docs/operation-flow-overview" replace />}
-        />
-        <Route
-          path="help-center"
-          element={<Navigate to="/erp/docs/operation-flow-overview" replace />}
-        />
-        <Route path="print-center" element={<PrintCenterPage />} />
-        <Route
-          path="print-center/:templateKey"
-          element={<PrintTemplatePreviewPage />}
-        />
-        <Route path="system/permissions" element={<PermissionCenterPage />} />
-        <Route
-          path="mobile-workbenches"
-          element={<Navigate to="/erp/docs/operation-guide" replace />}
-        />
-        <Route
-          path="roles/:roleKey"
+          path="/admin-menu"
           element={<Navigate to="/erp/dashboard" replace />}
         />
         <Route
-          path="source-readiness"
-          element={<Navigate to="/erp/docs/field-linkage-guide" replace />}
+          path="/admin-guide"
+          element={<Navigate to="/erp/docs/operation-guide" replace />}
         />
-        <Route path="docs/:docKey" element={<DocumentationPage />} />
-        <Route path="changes/current" element={<ChangeLogPage />} />
-      </Route>
+        <Route
+          path="/dashboard"
+          element={<Navigate to="/erp/dashboard" replace />}
+        />
 
-      <Route
-        path="/erp/print-workspace/:templateKey"
-        element={
-          <AuthGuard requireAdmin>
-            <PrintWorkspacePage />
-          </AuthGuard>
-        }
-      />
+        <Route
+          path="/erp"
+          element={
+            <AuthGuard requireAdmin>
+              <ERPLayout />
+            </AuthGuard>
+          }
+        >
+          <Route index element={<DesktopEntryRedirect />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          {activeBusinessModuleDefinitions.map((moduleItem) => (
+            <Route
+              key={moduleItem.key}
+              path={moduleItem.route}
+              element={<BusinessModulePage moduleItem={moduleItem} />}
+            />
+          ))}
+          <Route
+            path="docs/operation-flow-overview"
+            element={<OperationFlowPage />}
+          />
+          <Route
+            path="flows/overview"
+            element={
+              <Navigate to="/erp/docs/operation-flow-overview" replace />
+            }
+          />
+          <Route
+            path="help-center"
+            element={
+              <Navigate to="/erp/docs/operation-flow-overview" replace />
+            }
+          />
+          <Route path="print-center" element={<PrintCenterPage />} />
+          <Route
+            path="print-center/:templateKey"
+            element={<PrintTemplatePreviewPage />}
+          />
+          <Route path="system/permissions" element={<PermissionCenterPage />} />
+          <Route
+            path="mobile-workbenches"
+            element={<Navigate to="/erp/docs/operation-guide" replace />}
+          />
+          <Route
+            path="roles/:roleKey"
+            element={<Navigate to="/erp/dashboard" replace />}
+          />
+          <Route
+            path="source-readiness"
+            element={<Navigate to="/erp/docs/field-linkage-guide" replace />}
+          />
+          <Route
+            path="qa/acceptance-overview"
+            element={<AcceptanceOverviewPage />}
+          />
+          <Route
+            path="qa/business-chain-debug"
+            element={<BusinessChainDebugPage />}
+          />
+          <Route
+            path="qa/field-linkage-coverage"
+            element={<FieldLinkageCoveragePage />}
+          />
+          <Route path="qa/:docKey" element={<DocumentationPage />} />
+          <Route path="docs/:docKey" element={<DocumentationPage />} />
+          <Route path="changes/current" element={<ChangeLogPage />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route
+          path="/erp/print-workspace/:templateKey"
+          element={
+            <AuthGuard requireAdmin>
+              <PrintWorkspacePage />
+            </AuthGuard>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   )
 }

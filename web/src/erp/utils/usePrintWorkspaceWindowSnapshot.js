@@ -5,7 +5,9 @@ import {
   syncPrintWorkspaceShellHistory,
 } from './printWorkspace.js'
 
-const SNAPSHOT_PERSIST_DELAY_MS = 160
+const SNAPSHOT_PERSIST_DELAY_MS = 320
+const SNAPSHOT_PERSIST_IDLE_TIMEOUT_MS = 1000
+const PRINT_WORKSPACE_PREPARING_TEXT = '正在准备打印模板...'
 
 function syncClonedFormState(sourceDocument, clonedDocument) {
   const sourceFields = Array.from(
@@ -59,7 +61,7 @@ function syncClonedFormState(sourceDocument, clonedDocument) {
 
 function injectWorkspaceBootstrapScript(
   sourceDocument,
-  clonedDocument,
+  clonedRoot,
   workspaceURL
 ) {
   if (!workspaceURL) {
@@ -87,22 +89,43 @@ function injectWorkspaceBootstrapScript(
 })()
 `
 
-  if (clonedDocument.head) {
-    clonedDocument.head.prepend(script)
-  } else if (clonedDocument.body) {
-    clonedDocument.body.prepend(script)
+  const clonedHead = clonedRoot?.querySelector?.('head')
+  const clonedBody = clonedRoot?.querySelector?.('body')
+
+  if (clonedHead) {
+    clonedHead.prepend(script)
+  } else if (clonedBody) {
+    clonedBody.prepend(script)
   }
 }
 
-function buildPrintWorkspaceWindowHTML(documentLike, workspaceURL) {
+function resetClonedPrintWorkspaceShellState(clonedRoot) {
+  const printShell = clonedRoot?.querySelector?.('.erp-print-shell')
+  if (!printShell) {
+    return
+  }
+
+  printShell.classList.remove('erp-print-shell--ready')
+  printShell.classList.add('erp-print-shell--preparing')
+
+  if (!printShell.getAttribute('data-preparing-text')) {
+    printShell.setAttribute(
+      'data-preparing-text',
+      PRINT_WORKSPACE_PREPARING_TEXT
+    )
+  }
+}
+
+export function buildPrintWorkspaceWindowHTML(documentLike, workspaceURL) {
   if (!documentLike?.documentElement) {
     return ''
   }
 
-  const clonedDocument = documentLike.documentElement.cloneNode(true)
-  syncClonedFormState(documentLike, clonedDocument)
-  injectWorkspaceBootstrapScript(documentLike, clonedDocument, workspaceURL)
-  return `<!doctype html>${clonedDocument.outerHTML}`
+  const clonedRoot = documentLike.documentElement.cloneNode(true)
+  resetClonedPrintWorkspaceShellState(clonedRoot)
+  syncClonedFormState(documentLike, clonedRoot)
+  injectWorkspaceBootstrapScript(documentLike, clonedRoot, workspaceURL)
+  return `<!doctype html>${clonedRoot.outerHTML}`
 }
 
 export default function usePrintWorkspaceWindowSnapshot({
@@ -110,8 +133,10 @@ export default function usePrintWorkspaceWindowSnapshot({
   templateKey = '',
   workspaceURL = '',
   observeNodeRef = null,
+  suspended = false,
 }) {
   const persistTimerRef = useRef(0)
+  const persistIdleRef = useRef(0)
 
   useEffect(() => {
     if (!stateID || typeof window === 'undefined') {
@@ -129,6 +154,7 @@ export default function usePrintWorkspaceWindowSnapshot({
     const observedNode = observeNodeRef?.current
     if (
       !stateID ||
+      suspended ||
       typeof window === 'undefined' ||
       !observedNode?.ownerDocument
     ) {
@@ -138,16 +164,23 @@ export default function usePrintWorkspaceWindowSnapshot({
     const doc = observedNode.ownerDocument
     const win = doc.defaultView || window
 
-    const clearPersistTimer = () => {
-      if (!persistTimerRef.current) {
-        return
+    const clearPersistHandles = () => {
+      if (persistTimerRef.current) {
+        win.clearTimeout(persistTimerRef.current)
+        persistTimerRef.current = 0
       }
-      win.clearTimeout(persistTimerRef.current)
-      persistTimerRef.current = 0
+      if (
+        persistIdleRef.current &&
+        typeof win.cancelIdleCallback === 'function'
+      ) {
+        win.cancelIdleCallback(persistIdleRef.current)
+        persistIdleRef.current = 0
+      }
     }
 
     const persistSnapshot = () => {
-      clearPersistTimer()
+      persistTimerRef.current = 0
+      persistIdleRef.current = 0
       const windowHTML = buildPrintWorkspaceWindowHTML(doc, workspaceURL)
       if (!windowHTML) {
         return
@@ -160,15 +193,24 @@ export default function usePrintWorkspaceWindowSnapshot({
     }
 
     const schedulePersist = (delayMs = SNAPSHOT_PERSIST_DELAY_MS) => {
-      clearPersistTimer()
-      persistTimerRef.current = win.setTimeout(persistSnapshot, delayMs)
+      clearPersistHandles()
+      persistTimerRef.current = win.setTimeout(() => {
+        persistTimerRef.current = 0
+        if (typeof win.requestIdleCallback === 'function') {
+          persistIdleRef.current = win.requestIdleCallback(persistSnapshot, {
+            timeout: SNAPSHOT_PERSIST_IDLE_TIMEOUT_MS,
+          })
+          return
+        }
+        persistSnapshot()
+      }, delayMs)
     }
 
     const mutationObserver =
       typeof win.MutationObserver === 'function'
         ? new win.MutationObserver(() => schedulePersist())
         : null
-    mutationObserver?.observe(doc.body, {
+    mutationObserver?.observe(observedNode, {
       subtree: true,
       childList: true,
       characterData: true,
@@ -190,7 +232,7 @@ export default function usePrintWorkspaceWindowSnapshot({
     schedulePersist(0)
 
     return () => {
-      clearPersistTimer()
+      clearPersistHandles()
       mutationObserver?.disconnect()
       doc.removeEventListener('input', handleInput, true)
       doc.removeEventListener('change', handleInput, true)
@@ -198,5 +240,5 @@ export default function usePrintWorkspaceWindowSnapshot({
       win.removeEventListener('pagehide', persistSnapshot)
       win.removeEventListener('beforeunload', persistSnapshot)
     }
-  }, [observeNodeRef, stateID, templateKey, workspaceURL])
+  }, [observeNodeRef, stateID, suspended, templateKey, workspaceURL])
 }

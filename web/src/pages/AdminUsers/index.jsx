@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '@/common/components/layout/AppShell'
+import { Loading } from '@/common/components/loading'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
@@ -8,6 +9,7 @@ import { AUTH_SCOPE } from '@/common/auth/auth'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 const PAGE_SIZE = 30
+const PASSWORD_MIN_LENGTH = 6
 
 function fmtTs(ts) {
   if (!ts) return '-'
@@ -45,10 +47,20 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1)
   const [searchInput, setSearchInput] = useState('')
   const [searchName, setSearchName] = useState('')
+  const [noticeMsg, setNoticeMsg] = useState('')
+  const [resetTarget, setResetTarget] = useState(null)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetPassword2, setResetPassword2] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [resetErrMsg, setResetErrMsg] = useState('')
 
   const totalPages = Math.max(1, Math.ceil((Number(total) || 0) / PAGE_SIZE))
   const hasPrev = page > 1
   const hasNext = page < totalPages
+  const showInitialLoading = loading && items.length === 0 && !errMsg
+  const resetPasswordValid =
+    resetPassword.length >= PASSWORD_MIN_LENGTH &&
+    resetPassword === resetPassword2
 
   const fetchList = async (targetPage = page, keyword = searchName) => {
     setErrMsg('')
@@ -110,6 +122,7 @@ export default function AdminUsersPage() {
 
   const setDisabled = async (userId, disabled) => {
     setErrMsg('')
+    setNoticeMsg('')
     try {
       await userRpc.call('set_disabled', {
         user_id: userId,
@@ -118,6 +131,51 @@ export default function AdminUsersPage() {
       await fetchList(page, searchName)
     } catch (e) {
       setErrMsg(getActionErrorMessage(e, '更新用户状态'))
+    }
+  }
+
+  const openResetPassword = (user) => {
+    setResetTarget(user)
+    setResetPassword('')
+    setResetPassword2('')
+    setResetErrMsg('')
+  }
+
+  const closeResetPassword = (force = false) => {
+    if (resetting && !force) return
+    setResetTarget(null)
+    setResetPassword('')
+    setResetPassword2('')
+    setResetErrMsg('')
+  }
+
+  const submitResetPassword = async (e) => {
+    e.preventDefault()
+    if (!resetTarget?.id) return
+    if (resetPassword.length < PASSWORD_MIN_LENGTH) {
+      setResetErrMsg(`新密码至少 ${PASSWORD_MIN_LENGTH} 位`)
+      return
+    }
+    if (resetPassword !== resetPassword2) {
+      setResetErrMsg('两次输入的新密码不一致')
+      return
+    }
+
+    setResetting(true)
+    setResetErrMsg('')
+    setErrMsg('')
+    setNoticeMsg('')
+    try {
+      await userRpc.call('reset_password', {
+        user_id: resetTarget.id,
+        password: resetPassword,
+      })
+      setNoticeMsg(`已重置 ${resetTarget.username} 的密码`)
+      closeResetPassword(true)
+    } catch (e) {
+      setResetErrMsg(getActionErrorMessage(e, '重置密码'))
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -162,170 +220,268 @@ export default function AdminUsersPage() {
             {errMsg}
           </div>
         ) : null}
+        {noticeMsg ? (
+          <div className="rounded-2xl border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+            {noticeMsg}
+          </div>
+        ) : null}
 
         <SurfacePanel className="p-5 sm:p-6">
-          <div className="space-y-5">
-            <div className="bg-cyan-300/8 rounded-2xl border border-cyan-300/20 px-4 py-3 text-sm leading-6 text-cyan-100/90">
-              当前页面已可直接用于查看和管理基础账号状态；如果后续需要更多业务字段，可在项目里继续补充。
-            </div>
+          {showInitialLoading ? (
+            <Loading
+              title="账号加载中"
+              description="正在同步当前用户目录和账号状态，请稍候..."
+            />
+          ) : (
+            <div className="space-y-5">
+              <div className="bg-cyan-300/8 rounded-2xl border border-cyan-300/20 px-4 py-3 text-sm leading-6 text-cyan-100/90">
+                当前页面已可直接用于查看和管理基础账号状态；如果后续需要更多业务字段，可在项目里继续补充。
+              </div>
 
-            <form
-              onSubmit={onSearch}
-              className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
-            >
-              <div className="flex-1">
-                <label className="mb-2 block text-sm text-slate-200/90">
-                  按用户名搜索
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    className="min-w-[220px] flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-slate-100 outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
-                    placeholder="输入用户名关键字"
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:bg-cyan-300/20 disabled:text-slate-400"
-                  >
-                    搜索
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClearSearch}
-                    disabled={loading}
-                    className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-400"
-                  >
-                    清空
-                  </button>
+              <form
+                onSubmit={onSearch}
+                className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between"
+              >
+                <div className="flex-1">
+                  <label className="mb-2 block text-sm text-slate-200/90">
+                    按用户名搜索
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      className="min-w-[220px] flex-1 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-slate-100 outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
+                      placeholder="输入用户名关键字"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="rounded-2xl bg-cyan-300 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:bg-cyan-300/20 disabled:text-slate-400"
+                    >
+                      搜索
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onClearSearch}
+                      disabled={loading}
+                      className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-400"
+                    >
+                      清空
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-sm text-slate-300">
+                  本页 {items.length} 条 · 共 {total} 条
+                  {searchName ? `（搜索：${searchName}）` : ''}
+                </div>
+              </form>
+
+              <div className="overflow-hidden rounded-3xl border border-white/10">
+                <div className="overflow-auto">
+                  <table className="min-w-[940px] text-left text-sm text-slate-100">
+                    <thead className="bg-white/[0.04] text-slate-300">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">ID</th>
+                        <th className="px-4 py-3 font-medium">用户名</th>
+                        <th className="px-4 py-3 font-medium">状态</th>
+                        <th className="px-4 py-3 font-medium">创建时间</th>
+                        <th className="px-4 py-3 font-medium">最近登录</th>
+                        <th className="px-4 py-3 font-medium">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-white/8 divide-y bg-black/10">
+                      {items.length > 0 ? (
+                        items.map((user) => {
+                          const disabled = !!user.disabled
+                          return (
+                            <tr key={String(user.id)} className="align-top">
+                              <td className="px-4 py-4 font-mono text-cyan-100">
+                                {user.id}
+                              </td>
+                              <td className="px-4 py-4 font-medium text-slate-50">
+                                {user.username}
+                              </td>
+                              <td className="px-4 py-4">
+                                <span
+                                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                                    disabled
+                                      ? 'bg-zinc-500/15 text-zinc-200'
+                                      : 'bg-emerald-500/15 text-emerald-200'
+                                  }`}
+                                >
+                                  {disabled ? '已禁用' : '已启用'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 text-slate-300">
+                                {fmtTs(user.created_at)}
+                              </td>
+                              <td className="px-4 py-4 text-slate-300">
+                                {fmtTs(user.last_login_at)}
+                              </td>
+                              <td className="px-4 py-4">
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setDisabled(user.id, !disabled)
+                                    }
+                                    disabled={loading}
+                                    className={`rounded-full px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                      disabled
+                                        ? 'bg-emerald-300 text-slate-950 hover:bg-emerald-200'
+                                        : 'bg-rose-300 text-slate-950 hover:bg-rose-200'
+                                    }`}
+                                  >
+                                    {disabled ? '启用账号' : '禁用账号'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openResetPassword(user)}
+                                    disabled={loading}
+                                    className="rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/15 disabled:cursor-not-allowed disabled:opacity-60"
+                                  >
+                                    重置密码
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="px-4 py-10 text-center text-sm text-slate-400"
+                          >
+                            {loading ? '加载中…' : '暂无账号数据'}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              <div className="text-sm text-slate-300">
-                本页 {items.length} 条 · 共 {total} 条
-                {searchName ? `（搜索：${searchName}）` : ''}
-              </div>
-            </form>
-
-            <div className="overflow-hidden rounded-3xl border border-white/10">
-              <div className="overflow-auto">
-                <table className="min-w-[820px] text-left text-sm text-slate-100">
-                  <thead className="bg-white/[0.04] text-slate-300">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">ID</th>
-                      <th className="px-4 py-3 font-medium">用户名</th>
-                      <th className="px-4 py-3 font-medium">状态</th>
-                      <th className="px-4 py-3 font-medium">创建时间</th>
-                      <th className="px-4 py-3 font-medium">最近登录</th>
-                      <th className="px-4 py-3 font-medium">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-white/8 divide-y bg-black/10">
-                    {items.length > 0 ? (
-                      items.map((user) => {
-                        const disabled = !!user.disabled
-                        return (
-                          <tr key={String(user.id)} className="align-top">
-                            <td className="px-4 py-4 font-mono text-cyan-100">
-                              {user.id}
-                            </td>
-                            <td className="px-4 py-4 font-medium text-slate-50">
-                              {user.username}
-                            </td>
-                            <td className="px-4 py-4">
-                              <span
-                                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                                  disabled
-                                    ? 'bg-zinc-500/15 text-zinc-200'
-                                    : 'bg-emerald-500/15 text-emerald-200'
-                                }`}
-                              >
-                                {disabled ? '已禁用' : '已启用'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4 text-slate-300">
-                              {fmtTs(user.created_at)}
-                            </td>
-                            <td className="px-4 py-4 text-slate-300">
-                              {fmtTs(user.last_login_at)}
-                            </td>
-                            <td className="px-4 py-4">
-                              <button
-                                type="button"
-                                onClick={() => setDisabled(user.id, !disabled)}
-                                disabled={loading}
-                                className={`rounded-full px-4 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                                  disabled
-                                    ? 'bg-emerald-300 text-slate-950 hover:bg-emerald-200'
-                                    : 'bg-rose-300 text-slate-950 hover:bg-rose-200'
-                                }`}
-                              >
-                                {disabled ? '启用账号' : '禁用账号'}
-                              </button>
-                            </td>
-                          </tr>
-                        )
-                      })
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="px-4 py-10 text-center text-sm text-slate-400"
-                        >
-                          {loading ? '加载中…' : '暂无账号数据'}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-slate-300">
+                  第 {page} / {totalPages} 页
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPage(1)}
+                    disabled={!hasPrev || loading}
+                    className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500"
+                  >
+                    首页
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((current) => Math.max(1, current - 1))
+                    }
+                    disabled={!hasPrev || loading}
+                    className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500"
+                  >
+                    上一页
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((current) => Math.min(totalPages, current + 1))
+                    }
+                    disabled={!hasNext || loading}
+                    className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500"
+                  >
+                    下一页
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPage(totalPages)}
+                    disabled={!hasNext || loading}
+                    className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500"
+                  >
+                    末页
+                  </button>
+                </div>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm text-slate-300">
-                第 {page} / {totalPages} 页
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPage(1)}
-                  disabled={!hasPrev || loading}
-                  className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500"
-                >
-                  首页
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={!hasPrev || loading}
-                  className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500"
-                >
-                  上一页
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPage((current) => Math.min(totalPages, current + 1))
-                  }
-                  disabled={!hasNext || loading}
-                  className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500"
-                >
-                  下一页
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage(totalPages)}
-                  disabled={!hasNext || loading}
-                  className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-500"
-                >
-                  末页
-                </button>
-              </div>
-            </div>
-          </div>
+          )}
         </SurfacePanel>
       </div>
+
+      {resetTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6">
+          <form
+            onSubmit={submitResetPassword}
+            className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 shadow-2xl shadow-black/40"
+          >
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-slate-50">重置密码</h2>
+              <p className="text-sm leading-6 text-slate-300">
+                为 {resetTarget.username}{' '}
+                设置新密码。保存后旧密码立即失效，请把新密码交给本人后提醒其尽快登录确认。
+              </p>
+            </div>
+
+            {resetErrMsg ? (
+              <div className="mt-4 rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                {resetErrMsg}
+              </div>
+            ) : null}
+
+            <div className="mt-5 space-y-4">
+              <label className="block">
+                <span className="mb-2 block text-sm text-slate-200/90">
+                  新密码
+                </span>
+                <input
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={PASSWORD_MIN_LENGTH}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-slate-100 outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
+                  placeholder={`至少 ${PASSWORD_MIN_LENGTH} 位`}
+                />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm text-slate-200/90">
+                  确认新密码
+                </span>
+                <input
+                  value={resetPassword2}
+                  onChange={(e) => setResetPassword2(e.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={PASSWORD_MIN_LENGTH}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-base text-slate-100 outline-none transition focus:border-cyan-300/50 focus:ring-2 focus:ring-cyan-300/20"
+                  placeholder="再次输入新密码"
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => closeResetPassword()}
+                disabled={resetting}
+                className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                disabled={resetting || !resetPasswordValid}
+                className="rounded-full bg-cyan-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:bg-cyan-300/20 disabled:text-slate-400"
+              >
+                {resetting ? '重置中…' : '确认重置'}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </AppShell>
   )
 }

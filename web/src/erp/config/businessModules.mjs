@@ -17,7 +17,7 @@ const helpLinkRegistry = Object.freeze({
 const helpLink = (key) => ({ ...helpLinkRegistry[key] })
 
 const businessSectionMeta = [
-  { key: 'master', title: '基础资料' },
+  { key: 'master', title: '基础资料', visibleInNavigation: false },
   { key: 'sales', title: '销售链路' },
   { key: 'purchase', title: '采购/仓储' },
   { key: 'production', title: '生产环节' },
@@ -33,11 +33,9 @@ const businessModules = [
     status: 'source_grounded',
     owner: '业务跟单 + 采购 + 财务',
     summary:
-      '复用 trade-erp 的主档入口心智，但当前口径只承接客户、加工厂和辅包材供应商三类主体，不把外贸客户字段直接照搬。',
+      '当前主档入口只承接客户、加工厂和辅包材供应商三类主体，避免把外贸客户字段直接搬进当前业务。',
     description:
       '先把客户、加工厂、辅包材供应商放进统一主档页，后续客户/款式立项、加工合同、辅包材采购和结算都从这里复用主体信息。',
-    tradeErpAdaptation:
-      '沿用 trade-erp “客户/供应商”菜单位置和主档入口，但字段语义改成毛绒工厂的客户、加工厂和辅包材供应商三类主体。',
     currentScope: [
       '统一收客户简称、供应商简称、主体类型、联系人、电话和地址。',
       '兼容客户 / 加工商 / 辅包材供应商三类主体，不再默认只有贸易客户与外贸供应商。',
@@ -71,11 +69,9 @@ const businessModules = [
     status: 'source_grounded',
     owner: '业务跟单 + 采购 + PMC',
     summary:
-      '当前产品页不再沿用 trade-erp 的单层产品口径，而是明确区分款式编号、产品编号 / SKU、产品订单编号和订单编号。',
+      '当前产品页明确区分款式编号、产品编号 / SKU、产品订单编号和订单编号，不再使用单层产品口径。',
     description:
       '产品页先承接款式、SKU、颜色款和名称快照的分层说明，作为 BOM、加工合同、生产单和仓库收发的共同产品入口。',
-    tradeErpAdaptation:
-      '保留 trade-erp “产品”独立业务页的结构，但不照搬其单层产品模型，改为毛绒业务需要的款式 / SKU / 颜色款分层。',
     currentScope: [
       '展示款式编号、产品编号 / SKU、颜色和产品名称的分层口径。',
       '明确产品页与客户/款式立项、BOM、加工合同之间的字段关系。',
@@ -109,11 +105,9 @@ const businessModules = [
     status: 'source_grounded',
     owner: '业务跟单 + 老板',
     summary:
-      '这是毛绒 ERP 对 trade-erp “外销前置订单入口”的业务化替代页，先收客户、款式、交期与资料齐套，不把它伪装成外贸外销单。',
+      '这是毛绒 ERP 的正式接单与立项入口，先收客户、款式、交期与资料齐套，不把它伪装成外贸外销单。',
     description:
       '客户/款式立项页负责接单、确认编号层级、交期、资料齐套和跟单责任人，是当前主流程的正式起点。',
-    tradeErpAdaptation:
-      '没有照搬 trade-erp 的“外销”页面名称，而是保留独立订单入口的心智，改造成毛绒工厂的客户/款式立项页。',
     currentScope: [
       '先收客户、订单编号、产品订单编号、款式编号、产品编号和交期。',
       '把缺资料、催合同、包装材料放行等前置动作集中挂在业务立项页。',
@@ -134,7 +128,7 @@ const businessModules = [
       '正式汇报版 PDF：老板审核包装材料打单表后才放行采购与生产资料。',
     ],
     boundaries: [
-      '当前只是业务页骨架，不假装已经具备完整保存链路和状态流转。',
+      '当前已接通通用业务记录保存和业务状态回写；后续再拆立项专表和审批细表。',
       '外贸“外销”相关字段不会被混入当前订单页。',
     ],
     relatedLinks: [helpLink('flow'), helpLink('operations')],
@@ -150,8 +144,6 @@ const businessModules = [
       '报价单在制造业务里可能仍然需要，但当前真源样本不足以把它定义成主流程来源单，所以先补成独立业务页入口并明确边界。',
     description:
       '报价单页先作为前置商务页面保留，用于承接客户询价、价格确认和资料评估；当前不驱动毛绒 ERP 的正式主流程。',
-    tradeErpAdaptation:
-      '复用 trade-erp “报价单”属于业务页而不是帮助文档的布局方式，但不沿用其“报价 -> 外销”主链语义。',
     currentScope: [
       '先保留一个正式业务页入口，避免后续再把报价散落在帮助文档或备注里。',
       '把“是否进入客户/款式立项”与“当前样本是否足够建正式字段”明确写清楚。',
@@ -160,7 +152,7 @@ const businessModules = [
     keyFields: [
       '客户名称 / 报价日期',
       '产品 / 款式 / 数量',
-      '单价 / 金额 / 备注（当前只保留口径，不抢跑落库）',
+      '单价 / 金额 / 备注（当前只保留口径，不进入菜单和落库模块）',
     ],
     upstream: ['客户/供应商', '产品'],
     downstream: ['客户/款式立项'],
@@ -171,7 +163,7 @@ const businessModules = [
     ],
     boundaries: [
       '本页当前是待确认业务页，不把它伪装成已经稳定的正式单据模型。',
-      '不会把 trade-erp 的 PI / 外销 / 运输条款字段原样带进来。',
+      '不会把 PI、外销、运输条款等外贸字段原样带进来。',
     ],
     relatedLinks: [helpLink('flow'), helpLink('field')],
   },
@@ -182,12 +174,9 @@ const businessModules = [
     sectionKey: 'purchase',
     status: 'source_grounded',
     owner: '跟单 + 采购',
-    summary:
-      '保留 trade-erp 独立业务页的入口方式，但当前主料 BOM 完全以材料分析明细表为真源，不让采购汇总倒灌覆盖。',
+    summary: '当前主料 BOM 完全以材料分析明细表为真源，不让采购汇总倒灌覆盖。',
     description:
       '材料 BOM 页负责承接主料明细、损耗、组装部位、加工方式和版本信息，是主料采购汇总与加工分析的上游真源。',
-    tradeErpAdaptation:
-      '没有照搬 trade-erp 的“采购合同 = 物料真源”口径，而是把 BOM 单独抬成一页，避免主料真源继续沉在 Excel 里。',
     currentScope: [
       '先收主料明细、单位用量、总用量含损耗、组装部位和加工程序。',
       '明确材料分析汇总表只是 BOM 派生层，不反向覆盖明细真源。',
@@ -207,7 +196,7 @@ const businessModules = [
       '材料分析汇总表：采购派生层，不是反向真源。',
     ],
     boundaries: [
-      '当前只补业务页骨架和字段口径，不把 Excel 导入直接写进正式表。',
+      '当前已接通通用业务记录保存；Excel 导入和 BOM 明细专表继续等样本稳定后再做。',
       '辅材 / 包材不会混到主料 BOM 页里。',
     ],
     relatedLinks: [
@@ -222,12 +211,9 @@ const businessModules = [
     sectionKey: 'purchase',
     status: 'source_grounded',
     owner: '采购',
-    summary:
-      '这是对 trade-erp 采购页的业务化拆分：辅材/包材采购保留独立页面，不再和主料 BOM 或加工合同混成一张表。',
+    summary: '辅材/包材采购保留独立页面，不再和主料 BOM 或加工合同混成一张表。',
     description:
       '辅材/包材采购页承接独立采购表里的材料品名、规格、数量、单价和下单信息，用于包装材料和辅材的下单与跟催。',
-    tradeErpAdaptation:
-      '延续 trade-erp “采购是独立业务页”的结构，但按毛绒资料拆成辅材/包材采购，与加工合同分开。',
     currentScope: [
       '展示辅材 / 包材采购清单的独立来源和字段口径。',
       '把下单人、联系电话和金额公式列挂到采购快照层。',
@@ -266,12 +252,9 @@ const businessModules = [
     sectionKey: 'purchase',
     status: 'source_grounded',
     owner: '采购 + 财务',
-    summary:
-      '借用 trade-erp “采购合同”属于核心业务页的骨架，但本项目正式承接的是委外加工合同和加工汇总，不是外贸采购合同。',
+    summary: '本项目正式承接的是委外加工合同和加工汇总，不是外贸采购合同。',
     description:
       '加工合同/委外下单页承接合同头、合同行、工序类别、单价、数量、金额、回货日期和结算条款，是委外加工和回签的主入口。',
-    tradeErpAdaptation:
-      '复用 trade-erp “采购合同”菜单层级与单据页心智，但标题、字段和打印口径全部切换到委外加工合同。',
     currentScope: [
       '先收合同编号、加工方、委托单位、工序类别、单价、数量和金额。',
       '合同 PDF 作为正式打印快照，汇总表作为历史台账 / 导入源。',
@@ -292,8 +275,8 @@ const businessModules = [
       '加工厂商资料：厂家简称、厂家全称、联系人、开票字段。',
     ],
     boundaries: [
-      '当前不把 trade-erp 的供应商采购字段和当前委外加工字段混成一个模型。',
-      '保存链路和打印回填暂未接通，本页先作为正式业务入口和真源说明页。',
+      '当前不把供应商采购字段和委外加工字段混成一个模型。',
+      '通用业务记录保存已接通；业务页已可带值打开加工合同打印草稿，合同专表继续按样本推进。',
     ],
     relatedLinks: [
       docLink(
@@ -312,12 +295,9 @@ const businessModules = [
     sectionKey: 'purchase',
     status: 'seeded',
     owner: '仓库 + 品质',
-    summary:
-      '保留 trade-erp “入库通知/检验/入库”独立业务页的节奏，但当前入口改成主辅料到仓、IQC 和成品回仓三种入库场景的统一页面。',
+    summary: '当前入口统一承接主辅料到仓、IQC 和成品回仓三种入库场景。',
     description:
       '入库通知/检验/入库页负责挂接主料、辅料、包材和成品的到仓、IQC、检验结论与允许入库节点，是库存真实增加前的检查页。',
-    tradeErpAdaptation:
-      '直接沿用 trade-erp “入库通知/检验/入库”作为独立业务页的结构，但不再只对应外贸采购到货。',
     currentScope: [
       '统一挂主料到仓、辅包材到仓、成品回仓三类入库通知。',
       '先明确仓库 + 品质 IQC 的流程位置与字段口径。',
@@ -336,7 +316,7 @@ const businessModules = [
       '正式汇报版 PDF：车缝 / 手工完成后成品回仓并检验。',
     ],
     boundaries: [
-      '当前只是首批业务页与流程口径，不代表已经接通仓储保存链路。',
+      '当前已接通通用业务记录保存；库存自动增减和扫码硬件链路继续 deferred。',
       '扩展硬件链路、PDA、条码枪继续 deferred，不在本页假装可用。',
     ],
     relatedLinks: [helpLink('flow'), helpLink('operations')],
@@ -349,11 +329,9 @@ const businessModules = [
     status: 'seeded',
     owner: '仓库',
     summary:
-      '借用 trade-erp “库存”独立查看页的结构，但当前库存口径改成主辅料、包装材料和成品仓的多类型库存，不只是一张发货库存表。',
+      '当前库存口径承接主辅料、包装材料和成品仓的多类型库存，不只是一张发货库存表。',
     description:
       '库存页负责承接允许入库后的库存快照，明确主料、辅包材、成品库存和待出货占用的查看口径。',
-    tradeErpAdaptation:
-      '保留 trade-erp “库存”必须独立成页的习惯，但库存维度改成毛绒工厂的仓库 / 货位 / 物料类型 / 成品类型。',
     currentScope: [
       '查看主料、辅材、包材和成品的库存占位与可用量。',
       '明确库存是入库、出库、待出货放行的共享中枢。',
@@ -373,7 +351,7 @@ const businessModules = [
     ],
     boundaries: [
       '当前不伪造实时库存算法，只先把页面与字段口径补齐。',
-      '不会把 trade-erp 的外销独占库存口径照搬进来。',
+      '不会把外销独占库存口径搬进当前库存模型。',
     ],
     relatedLinks: [helpLink('field'), helpLink('calculation')],
   },
@@ -385,11 +363,9 @@ const businessModules = [
     status: 'seeded',
     owner: '业务跟单 + 仓库 + 财务',
     summary:
-      '这是对 trade-erp “出运明细”业务位置的毛绒化替代页，关注的是待出货、放行和发货前检查，而不是外贸出运单。',
+      '待出货/出货放行关注的是待出货、放行和发货前检查，而不是外贸出运单。',
     description:
       '待出货/出货放行页负责在客户确认、仓库出货单和财务放行之间做发货前检查，统一看待出货数量、放行状态和发货准备。',
-    tradeErpAdaptation:
-      '保留 trade-erp “发货前必须有独立业务页”的结构，但用待出货 / 出货放行替代外贸出运明细。',
     currentScope: [
       '集中展示待出货订单、成品可发状态和发货前检查节点。',
       '把业务确认、仓库出货单和财务放行三方动作挂到同一页。',
@@ -408,7 +384,7 @@ const businessModules = [
       '生产订单总表截图：出货日期、未出货数。',
     ],
     boundaries: [
-      '当前不引入 trade-erp 的外贸运输、港口、发票号字段。',
+      '当前不引入外贸运输、港口、发票号字段。',
       '发货单、物流单等正式模板仍以后续样本为准，本页先补流程入口。',
     ],
     relatedLinks: [
@@ -423,16 +399,13 @@ const businessModules = [
     sectionKey: 'purchase',
     status: 'seeded',
     owner: '仓库',
-    summary:
-      '延续 trade-erp “出库”独立业务页的必要性，但当前出库服务的是待出货放行后的仓库发货，不和外贸出运字段耦合。',
+    summary: '当前出库服务的是待出货放行后的仓库发货，不和外贸出运字段耦合。',
     description:
       '出库页负责承接待出货放行后的真实出库动作，明确出库数量、仓位、关联订单和备注，是库存扣减的正式入口。',
-    tradeErpAdaptation:
-      '直接保留 trade-erp 的“出库”菜单位置和独立页面意义，但字段改成毛绒仓库发货链路。',
     currentScope: [
       '统一挂发货出库、备料出库和异常返还出库的主入口。',
       '为后续库存扣减、待出货闭环和成品仓核对留统一页面。',
-      '先补字段和页面，不假装已接通自动库存回滚。',
+      '通用业务记录保存已接通，但不假装已接通自动库存回滚。',
     ],
     keyFields: [
       '关联订单 / 待出货来源',
@@ -447,8 +420,8 @@ const businessModules = [
       '生产订单总表截图：未出货数需要和出库动作联动。',
     ],
     boundaries: [
-      '当前不会照搬 trade-erp 的发票号、来源外销号等字段。',
-      '库存扣减仍以后续正式保存链路为准，本页先补业务入口和口径。',
+      '当前不会照搬发票号、来源外销号等外贸字段。',
+      '库存扣减仍以后续库存专表和状态迁移为准，本页先保存出库业务记录。',
     ],
     relatedLinks: [helpLink('flow'), helpLink('calculation')],
   },
@@ -463,8 +436,6 @@ const businessModules = [
       '这是毛绒 ERP 当前最明确的业务页之一：根据正式汇报版 PDF 已能确认排单、齐套和车缝 / 手工 / 内外发决策入口。',
     description:
       '生产排单页负责承接齐套、排产、车缝 / 手工 / 内外发决策和今日排产，是生产侧的正式业务入口。',
-    tradeErpAdaptation:
-      '不是 trade-erp 原有菜单的直接照搬，而是沿用“每个主链阶段都应有独立业务页”的结构补齐毛绒生产模块。',
     currentScope: [
       '集中展示待排单订单、齐套状态和生产经理决策节点。',
       '把 PMC 与生产经理的桌面职责落成独立业务页，而不是继续停在汇报图。',
@@ -499,8 +470,6 @@ const businessModules = [
       '借助正式汇报版 PDF 和生产订单总表截图，生产进度页可以先落成真实业务页，而不是继续把“进度回填”埋在移动端口径里。',
     description:
       '生产进度页负责承接在制数量、未出货数、工序进度和进度回填，统一给桌面后台和移动端查看。',
-    tradeErpAdaptation:
-      '参考 trade-erp 的链路页拆分方式，但实际内容改成毛绒在制进度和未出货跟踪，不引入外贸状态机。',
     currentScope: [
       '先挂在制进度、生产数量、未出货数和回填动作。',
       '把桌面端总览和移动端“今日进度回填”对齐到同一页口径。',
@@ -535,8 +504,6 @@ const businessModules = [
       '当前真源已经明确返工和异常不能继续沉在备注里，所以独立补一页，避免业务问题没有固定入口。',
     description:
       '延期/返工/异常页承接延期原因、返工记录、异常任务和责任归属，是管理层、PMC 与生产协同的异常中心。',
-    tradeErpAdaptation:
-      '这是从 trade-erp “业务页必须覆盖关键风控节点”的经验抽出来的新增页，不照搬原有外贸菜单名称。',
     currentScope: [
       '集中挂延期原因、返工记录、异常件和待处理任务。',
       '给老板、PMC、生产经理提供统一异常视图。',
@@ -555,7 +522,7 @@ const businessModules = [
       '正式汇报版 PDF 第 4 页：老板视角要看延期预警与异常订单。',
     ],
     boundaries: [
-      '当前只补页面结构和正式入口，不假装已接通异常工单系统。',
+      '当前已接通通用业务记录和协同任务；复杂异常工单系统继续后续拆。',
       '不会再把异常长期放在生产备注或聊天记录里。',
     ],
     relatedLinks: [helpLink('operations'), helpLink('flow')],
@@ -568,11 +535,9 @@ const businessModules = [
     status: 'source_grounded',
     owner: '财务',
     summary:
-      '当前财务页不沿用 trade-erp “结汇”语义，而是根据加工合同和辅包材金额样本，先落对账/结算这一层更贴合工厂业务的页面。',
+      '当前财务页根据加工合同和辅包材金额样本，先落对账/结算这一层更贴合工厂业务的页面。',
     description:
       '对账/结算页承接加工费、辅包材采购金额、对账周期、异常费用和应付确认，是当前毛绒 ERP 财务链的正式入口。',
-    tradeErpAdaptation:
-      '复用 trade-erp 把财务模块单独拆页的方式，但把“结汇”改成毛绒工厂当前更真实的对账/结算入口。',
     currentScope: [
       '先挂加工费、辅包材费用、对账周期和结算提醒。',
       '把合同里的结算条款和 Excel 里的金额快照收口到同一页。',
@@ -593,7 +558,7 @@ const businessModules = [
     ],
     boundaries: [
       '当前还缺正式对账单 / 结算单样本，不假装账务模型已经完整。',
-      '不会把 trade-erp 的结汇、水单认领概念硬套进当前财务页。',
+      '不会把结汇、水单认领概念硬套进当前财务页。',
     ],
     relatedLinks: [helpLink('calculation'), helpLink('field')],
   },
@@ -604,12 +569,9 @@ const businessModules = [
     sectionKey: 'finance',
     status: 'seeded',
     owner: '财务 + 管理层',
-    summary:
-      '参考 trade-erp 财务侧“独立看提醒箱”的用法，补一页待付款/应付提醒，承接毛绒工厂当前最现实的支付关注点。',
+    summary: '待付款/应付提醒承接毛绒工厂当前最现实的支付关注点。',
     description:
       '待付款/应付提醒页负责汇总加工费、辅包材采购和异常费用的待付款提醒，作为财务移动端和管理层的跟进页。',
-    tradeErpAdaptation:
-      '没有照搬 trade-erp 的水单认领页，而是保留“财务提醒要独立成页”的结构，改造成当前业务更需要的待付款入口。',
     currentScope: [
       '集中展示待付款、付款节奏和异常费用提醒。',
       '为财务移动端“待付款 / 异常费用 / 结算提醒”补齐桌面端对应页面。',
@@ -660,10 +622,15 @@ export function getBusinessModule(moduleKey) {
 
 export function getBusinessNavigationSections() {
   return businessSectionMeta
+    .filter((section) => section.visibleInNavigation !== false)
     .map((section) => ({
       title: section.title,
       items: businessModuleDefinitions
-        .filter((moduleItem) => moduleItem.sectionKey === section.key)
+        .filter(
+          (moduleItem) =>
+            moduleItem.sectionKey === section.key &&
+            moduleItem.status !== 'awaiting_confirmation'
+        )
         .map((moduleItem) => ({
           key: moduleItem.key,
           label: moduleItem.navigationLabel,

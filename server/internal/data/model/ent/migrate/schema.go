@@ -3,6 +3,7 @@
 package migrate
 
 import (
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/dialect/sql/schema"
 	"entgo.io/ent/schema/field"
 )
@@ -15,6 +16,7 @@ var (
 		{Name: "password_hash", Type: field.TypeString},
 		{Name: "level", Type: field.TypeInt8, Default: 0},
 		{Name: "menu_permissions", Type: field.TypeString, Size: 4096, Default: ""},
+		{Name: "erp_preferences", Type: field.TypeString, Size: 32768, Default: "{}"},
 		{Name: "disabled", Type: field.TypeBool, Default: false},
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
@@ -35,6 +37,152 @@ var (
 				Name:    "adminuser_level",
 				Unique:  false,
 				Columns: []*schema.Column{AdminUsersColumns[3]},
+			},
+		},
+	}
+	// BusinessRecordsColumns holds the columns for the "business_records" table.
+	BusinessRecordsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "module_key", Type: field.TypeString, Size: 64},
+		{Name: "document_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "title", Type: field.TypeString, Size: 255},
+		{Name: "business_status_key", Type: field.TypeString, Size: 64},
+		{Name: "owner_role_key", Type: field.TypeString, Size: 32},
+		{Name: "source_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "customer_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "supplier_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "style_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "product_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "product_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "material_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "warehouse_location", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "quantity", Type: field.TypeFloat64, Nullable: true},
+		{Name: "unit", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "amount", Type: field.TypeFloat64, Nullable: true},
+		{Name: "document_date", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "due_date", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "payload", Type: field.TypeJSON, Nullable: true},
+		{Name: "row_version", Type: field.TypeInt64, Default: 1},
+		{Name: "created_by", Type: field.TypeInt, Nullable: true},
+		{Name: "updated_by", Type: field.TypeInt, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "deleted_by", Type: field.TypeInt, Nullable: true},
+		{Name: "delete_reason", Type: field.TypeString, Nullable: true, Size: 255},
+	}
+	// BusinessRecordsTable holds the schema information for the "business_records" table.
+	BusinessRecordsTable = &schema.Table{
+		Name:       "business_records",
+		Columns:    BusinessRecordsColumns,
+		PrimaryKey: []*schema.Column{BusinessRecordsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "businessrecord_module_key",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordsColumns[1]},
+			},
+			{
+				Name:    "businessrecord_module_key_business_status_key",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordsColumns[1], BusinessRecordsColumns[4]},
+			},
+			{
+				Name:    "businessrecord_module_key_owner_role_key",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordsColumns[1], BusinessRecordsColumns[5]},
+			},
+			{
+				Name:    "businessrecord_module_key_deleted_at",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordsColumns[1], BusinessRecordsColumns[25]},
+			},
+			{
+				Name:    "businessrecord_module_key_document_no",
+				Unique:  true,
+				Columns: []*schema.Column{BusinessRecordsColumns[1], BusinessRecordsColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "deleted_at IS NULL AND document_no IS NOT NULL AND document_no <> ''",
+				},
+			},
+		},
+	}
+	// BusinessRecordEventsColumns holds the columns for the "business_record_events" table.
+	BusinessRecordEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "record_id", Type: field.TypeInt, Nullable: true},
+		{Name: "module_key", Type: field.TypeString, Size: 64},
+		{Name: "action_key", Type: field.TypeString, Size: 64},
+		{Name: "from_status_key", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "to_status_key", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "actor_id", Type: field.TypeInt, Nullable: true},
+		{Name: "actor_role_key", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "payload", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// BusinessRecordEventsTable holds the schema information for the "business_record_events" table.
+	BusinessRecordEventsTable = &schema.Table{
+		Name:       "business_record_events",
+		Columns:    BusinessRecordEventsColumns,
+		PrimaryKey: []*schema.Column{BusinessRecordEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "businessrecordevent_record_id",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordEventsColumns[1]},
+			},
+			{
+				Name:    "businessrecordevent_module_key_action_key",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordEventsColumns[2], BusinessRecordEventsColumns[3]},
+			},
+			{
+				Name:    "businessrecordevent_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordEventsColumns[10]},
+			},
+		},
+	}
+	// BusinessRecordItemsColumns holds the columns for the "business_record_items" table.
+	BusinessRecordItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "record_id", Type: field.TypeInt},
+		{Name: "module_key", Type: field.TypeString, Size: 64},
+		{Name: "line_no", Type: field.TypeInt, Default: 1},
+		{Name: "item_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "material_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "spec", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "unit", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "quantity", Type: field.TypeFloat64, Nullable: true},
+		{Name: "unit_price", Type: field.TypeFloat64, Nullable: true},
+		{Name: "amount", Type: field.TypeFloat64, Nullable: true},
+		{Name: "supplier_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "warehouse_location", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "payload", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// BusinessRecordItemsTable holds the schema information for the "business_record_items" table.
+	BusinessRecordItemsTable = &schema.Table{
+		Name:       "business_record_items",
+		Columns:    BusinessRecordItemsColumns,
+		PrimaryKey: []*schema.Column{BusinessRecordItemsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "businessrecorditem_record_id",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordItemsColumns[1]},
+			},
+			{
+				Name:    "businessrecorditem_module_key",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordItemsColumns[2]},
+			},
+			{
+				Name:    "businessrecorditem_record_id_line_no",
+				Unique:  false,
+				Columns: []*schema.Column{BusinessRecordItemsColumns[1], BusinessRecordItemsColumns[3]},
 			},
 		},
 	}
@@ -61,12 +209,145 @@ var (
 			},
 		},
 	}
+	// WorkflowBusinessStatesColumns holds the columns for the "workflow_business_states" table.
+	WorkflowBusinessStatesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "source_type", Type: field.TypeString, Size: 64},
+		{Name: "source_id", Type: field.TypeInt},
+		{Name: "source_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "order_id", Type: field.TypeInt, Nullable: true},
+		{Name: "batch_id", Type: field.TypeInt, Nullable: true},
+		{Name: "business_status_key", Type: field.TypeString, Size: 64},
+		{Name: "owner_role_key", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "blocked_reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "status_changed_at", Type: field.TypeTime},
+		{Name: "payload", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// WorkflowBusinessStatesTable holds the schema information for the "workflow_business_states" table.
+	WorkflowBusinessStatesTable = &schema.Table{
+		Name:       "workflow_business_states",
+		Columns:    WorkflowBusinessStatesColumns,
+		PrimaryKey: []*schema.Column{WorkflowBusinessStatesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workflowbusinessstate_source_type_source_id",
+				Unique:  true,
+				Columns: []*schema.Column{WorkflowBusinessStatesColumns[1], WorkflowBusinessStatesColumns[2]},
+			},
+			{
+				Name:    "workflowbusinessstate_business_status_key",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowBusinessStatesColumns[6]},
+			},
+			{
+				Name:    "workflowbusinessstate_order_id_batch_id",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowBusinessStatesColumns[4], WorkflowBusinessStatesColumns[5]},
+			},
+		},
+	}
+	// WorkflowTasksColumns holds the columns for the "workflow_tasks" table.
+	WorkflowTasksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "task_code", Type: field.TypeString, Size: 64},
+		{Name: "task_group", Type: field.TypeString, Size: 32},
+		{Name: "task_name", Type: field.TypeString, Size: 128},
+		{Name: "source_type", Type: field.TypeString, Size: 64},
+		{Name: "source_id", Type: field.TypeInt},
+		{Name: "source_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "business_status_key", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "task_status_key", Type: field.TypeString, Size: 32},
+		{Name: "owner_role_key", Type: field.TypeString, Size: 32},
+		{Name: "assignee_id", Type: field.TypeInt, Nullable: true},
+		{Name: "priority", Type: field.TypeInt16, Default: 0},
+		{Name: "blocked_reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "due_at", Type: field.TypeTime, Nullable: true},
+		{Name: "started_at", Type: field.TypeTime, Nullable: true},
+		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "closed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "payload", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_by", Type: field.TypeInt, Nullable: true},
+		{Name: "updated_by", Type: field.TypeInt, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// WorkflowTasksTable holds the schema information for the "workflow_tasks" table.
+	WorkflowTasksTable = &schema.Table{
+		Name:       "workflow_tasks",
+		Columns:    WorkflowTasksColumns,
+		PrimaryKey: []*schema.Column{WorkflowTasksColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workflowtask_task_code",
+				Unique:  true,
+				Columns: []*schema.Column{WorkflowTasksColumns[1]},
+			},
+			{
+				Name:    "workflowtask_source_type_source_id",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[4], WorkflowTasksColumns[5]},
+			},
+			{
+				Name:    "workflowtask_owner_role_key_task_status_key",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[9], WorkflowTasksColumns[8]},
+			},
+			{
+				Name:    "workflowtask_due_at",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[13]},
+			},
+		},
+	}
+	// WorkflowTaskEventsColumns holds the columns for the "workflow_task_events" table.
+	WorkflowTaskEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "event_type", Type: field.TypeString, Size: 32},
+		{Name: "from_status_key", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "to_status_key", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "actor_role_key", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "actor_id", Type: field.TypeInt, Nullable: true},
+		{Name: "reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "payload", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "task_id", Type: field.TypeInt},
+	}
+	// WorkflowTaskEventsTable holds the schema information for the "workflow_task_events" table.
+	WorkflowTaskEventsTable = &schema.Table{
+		Name:       "workflow_task_events",
+		Columns:    WorkflowTaskEventsColumns,
+		PrimaryKey: []*schema.Column{WorkflowTaskEventsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "workflow_task_events_workflow_tasks_events",
+				Columns:    []*schema.Column{WorkflowTaskEventsColumns[9]},
+				RefColumns: []*schema.Column{WorkflowTasksColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "workflowtaskevent_task_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTaskEventsColumns[9], WorkflowTaskEventsColumns[8]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		AdminUsersTable,
+		BusinessRecordsTable,
+		BusinessRecordEventsTable,
+		BusinessRecordItemsTable,
 		UsersTable,
+		WorkflowBusinessStatesTable,
+		WorkflowTasksTable,
+		WorkflowTaskEventsTable,
 	}
 )
 
 func init() {
+	WorkflowTaskEventsTable.ForeignKeys[0].RefTable = WorkflowTasksTable
 }

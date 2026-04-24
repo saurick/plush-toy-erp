@@ -7,7 +7,7 @@
 ### `compose/prod`
 
 - 单机或单宿主机部署入口
-- 默认包含 PostgreSQL、Jaeger、业务服务和基础 smoke 检查
+- 默认包含 PostgreSQL、Jaeger、业务服务、前端固定端口静态服务和基础 smoke 检查
 - 提供迁移脚本，不再保留远端增量发布脚本
 
 关键文件：
@@ -23,6 +23,7 @@
 - `POSTGRES_PASSWORD`
 - `POSTGRES_DSN`
 - `APP_IMAGE`
+- `WEB_IMAGE`
 - 任何默认 JWT 密钥和管理员密码
 
 建议先执行：

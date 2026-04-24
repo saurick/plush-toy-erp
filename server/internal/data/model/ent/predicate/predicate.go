@@ -9,5 +9,23 @@ import (
 // AdminUser is the predicate function for adminuser builders.
 type AdminUser func(*sql.Selector)
 
+// BusinessRecord is the predicate function for businessrecord builders.
+type BusinessRecord func(*sql.Selector)
+
+// BusinessRecordEvent is the predicate function for businessrecordevent builders.
+type BusinessRecordEvent func(*sql.Selector)
+
+// BusinessRecordItem is the predicate function for businessrecorditem builders.
+type BusinessRecordItem func(*sql.Selector)
+
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
+
+// WorkflowBusinessState is the predicate function for workflowbusinessstate builders.
+type WorkflowBusinessState func(*sql.Selector)
+
+// WorkflowTask is the predicate function for workflowtask builders.
+type WorkflowTask func(*sql.Selector)
+
+// WorkflowTaskEvent is the predicate function for workflowtaskevent builders.
+type WorkflowTaskEvent func(*sql.Selector)

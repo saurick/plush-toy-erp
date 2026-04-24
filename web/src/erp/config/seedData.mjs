@@ -39,9 +39,9 @@ export const environmentCards = [
   },
   {
     label: '移动端端口矩阵',
-    value: '5186 - 5191',
+    value: '5186 - 5193',
     detail:
-      '老板 5186、跟单 5187、采购 5188、生产 5189、仓库 5190、财务 5191，方便后续分别绑定域名。',
+      '老板 5186、跟单 5187、采购 5188、生产 5189、仓库 5190、财务 5191、PMC 5192、品质 5193，方便后续分别绑定域名。',
   },
   {
     label: '共享后端 / 数据库',
@@ -114,7 +114,7 @@ export const plannedModules = [
     status: 'source_grounded',
     owner: '采购 + 跟单 + 财务',
     summary:
-      '参照 trade-erp 的统一入口方式，已开始把辅料采购合同、委外加工合同、材料汇总、加工汇总和生产总表收口成固定打印模板。',
+      '当前只保留辅料采购合同、委外加工合同两套正式模板；业务页负责带值打开，打印中心保留默认样例和模板核对入口。',
   },
   {
     key: 'mobile-topology',
@@ -122,7 +122,7 @@ export const plannedModules = [
     status: 'seeded',
     owner: '全部角色',
     summary:
-      '同一仓库内新增 6 个角色移动端端口，按端口直接访问各角色页面，但继续共享 common / ui / api。',
+      '同一仓库内新增 8 个角色移动端端口，按端口直接访问各角色页面，但继续共享 common / ui / api。',
   },
 ]
 
@@ -240,7 +240,7 @@ export const phaseFlow = [
     title: '模板打印 / 对外留档',
     owner: '跟单 + 采购 + 财务',
     summary:
-      '合同、材料汇总、加工汇总和生产总表都已经有真实打印或报表样本，当前统一进入模板打印中心，不再散落在不同帮助文档里。',
+      '采购合同和加工合同已经有真实打印或报表样本，当前从对应业务页带值打开，打印中心保留默认样例核对入口。',
     outputs: [
       '辅料采购合同',
       '委外加工合同',
@@ -808,6 +808,138 @@ const roleWorkbenches = [
     ],
   },
   {
+    key: 'pmc',
+    title: 'PMC',
+    label: '齐套与调度中枢',
+    summary:
+      'PMC 负责齐套判断、交期推进、异常分发和催办，不直接替代老板审批、生产执行或财务放行。',
+    defaultPath: '/erp/roles/pmc',
+    allowedNavKeys: [
+      'workspace-home',
+      'global-dashboard',
+      'flow-overview',
+      'source-readiness',
+      'print-center',
+      'mobile-workbenches',
+      'help-center',
+      'help-operation-flow-overview',
+      'help-operation-guide',
+      'help-role-collaboration-guide',
+      'help-role-page-document-matrix',
+      'help-task-document-mapping',
+      'help-workflow-status-guide',
+      'help-mobile-role-guide',
+      'help-exception-handling-guide',
+      'changes',
+    ],
+    desktopFocus: [
+      '齐套判断',
+      '排单推进',
+      '延期预警',
+      '异常分发',
+      '回货 / 到料跟催',
+    ],
+    mobileFocus: ['齐套提醒', '催办', '排单推进', '延期跟进', '异常分发'],
+    desktopMenuPreview: [
+      '角色首页：PMC 工作台',
+      '任务看板：按阻塞、即将超期和异常分发排序',
+      '帮助中心：任务 / 单据映射表、状态字典、异常处理',
+    ],
+    desktopHighlights: [
+      {
+        label: '待齐套',
+        value: '7 单',
+        note: '优先看主料、辅包材、回签和关键资料是否都齐。',
+      },
+      {
+        label: '待排单',
+        value: '4 单',
+        note: '齐套条件满足后再交给生产经理做执行决策。',
+      },
+      {
+        label: '延期预警',
+        value: '5 单',
+        note: 'PMC 先看可能失交期的批次，不等老板来追问。',
+      },
+      {
+        label: '异常分发',
+        value: '6 条',
+        note: '把异常回给采购、品质、生产或业务，不把问题压在自己名下。',
+      },
+    ],
+    desktopQueues: [
+      {
+        title: 'PMC 首页待办',
+        items: [
+          '确认当前订单是否满足可排单条件。',
+          '催采购、催回签、催回货、催资料缺口闭环。',
+          '把延期、返工和异常明确分发到责任角色。',
+        ],
+      },
+      {
+        title: '当前边界',
+        items: [
+          'PMC 不是老板审批替身，也不是生产经理执行替身。',
+          '当前不做复杂产能算法，只先把齐套和推进关系收口。',
+        ],
+      },
+    ],
+    firstWave: ['角色首页', '齐套卡片', '延期预警', '异常分发入口'],
+    pending: ['自动催办策略', '复杂排产算法', '跨批次资源平衡'],
+    helpFocus: [
+      'PMC 先看任务 / 单据映射表，不要把任务池误解成业务真源。',
+      'PMC 负责推进和分发，不直接写客户前置资料或财务结算。',
+      '阻塞原因优先挂在统一状态字典，不在各页各写一套中文状态。',
+    ],
+    sourceRefs: [
+      'plush_factory_formal_report_v3_mobile.pdf 第 4、7 页',
+      'Weixin 生产订单总表截图',
+      '任务 / 单据映射表',
+    ],
+    mobileHighlights: [
+      {
+        label: '待齐套',
+        value: '主料 / 辅包材 / 回签',
+        note: '先定位是哪一个上游环节还没满足可排条件。',
+      },
+      {
+        label: '催办',
+        value: '采购 / 品质 / 业务 / 生产',
+        note: 'PMC 手机端先做推进和提醒，不做复杂录入。',
+      },
+      {
+        label: '排单推进',
+        value: 'ready -> processing',
+        note: '任务状态和业务状态需要同时对齐。',
+      },
+      {
+        label: '异常分发',
+        value: 'blocked / rejected',
+        note: '异常必须回给责任角色，不允许留空。',
+      },
+    ],
+    mobileSections: [
+      {
+        title: '手机端看板',
+        items: ['待齐套批次', '即将延期订单', '今日催办', '待分发异常'],
+      },
+      {
+        title: '手机端快捷操作',
+        items: ['确认可排', '催采购', '催回签', '分发异常'],
+      },
+    ],
+    mobileTaskFlow: [
+      '先看哪张单还不满足 ready 条件。',
+      '再决定是继续催办还是转给生产经理排单。',
+      '遇到 blocked 或 rejected 时，立即分发到责任角色并保留原因。',
+    ],
+    mobileDeferred: [
+      '不在手机端维护复杂排产算法。',
+      '不在手机端改客户前置资料。',
+      '不把 PMC 端扩成独立业务后台。',
+    ],
+  },
+  {
     key: 'purchasing',
     title: '采购',
     label: '到料与回签',
@@ -1181,6 +1313,128 @@ const roleWorkbenches = [
     ],
   },
   {
+    key: 'quality',
+    title: '品质',
+    label: '检验与放行',
+    summary:
+      '品质负责 IQC、过程检验、返工复检和放行 / 退回结论，手机端优先承接检验反馈和异常闭环。',
+    defaultPath: '/erp/roles/quality',
+    allowedNavKeys: [
+      'workspace-home',
+      'flow-overview',
+      'source-readiness',
+      'mobile-workbenches',
+      'help-center',
+      'help-operation-flow-overview',
+      'help-role-collaboration-guide',
+      'help-task-document-mapping',
+      'help-workflow-status-guide',
+      'help-mobile-role-guide',
+      'help-exception-handling-guide',
+      'changes',
+    ],
+    desktopFocus: ['IQC', '过程检验', '返工复检', '放行 / 退回', '异常闭环'],
+    mobileFocus: ['IQC', '过程检验', '返工复检', '放行反馈', '退回反馈'],
+    desktopMenuPreview: [
+      '角色首页：品质检验工作台',
+      '异常中心：返工、复检和放行 / 退回结论',
+      '帮助中心：异常处理、状态字典和手机端角色流程',
+    ],
+    desktopHighlights: [
+      {
+        label: '待检批次',
+        value: '6 批',
+        note: '包括主辅料到仓 IQC 和成品回仓待检。',
+      },
+      {
+        label: '待复检',
+        value: '3 批',
+        note: '返工闭环后必须重新送检，不靠口头确认。',
+      },
+      {
+        label: '待放行',
+        value: '4 批',
+        note: '放行与退回都必须形成明确结论。',
+      },
+      {
+        label: '异常闭环',
+        value: '2 批',
+        note: '异常件要回写给仓库、PMC 和生产经理。',
+      },
+    ],
+    desktopQueues: [
+      {
+        title: '品质首页待办',
+        items: [
+          '确认到仓批次是否允许入库。',
+          '确认返工后是否通过复检。',
+          '把放行 / 退回结论同步给仓库、PMC 和生产。',
+        ],
+      },
+      {
+        title: '当前边界',
+        items: [
+          '当前不做图片识别、自动判级或硬件采集。',
+          '品质结论是业务事实，但不替仓库做实物流转执行。',
+        ],
+      },
+    ],
+    firstWave: ['角色首页', '待检批次列表', '返工复检入口', '放行 / 退回反馈'],
+    pending: ['缺陷代码库', '自动采样规则', '质检报表'],
+    helpFocus: [
+      '品质动作优先从入库通知 / 检验 / 入库和异常中心进入。',
+      '退回不是结束，必须保留 rejected 原因并触发返工或回退链。',
+      '放行结果要回给仓库、PMC 和业务，不单独停在品质手机端。',
+    ],
+    sourceRefs: [
+      'plush_factory_formal_report_v3_mobile.pdf 第 4 页',
+      '任务 / 单据映射表',
+      '异常 / 返工 / 延期处理',
+    ],
+    mobileHighlights: [
+      {
+        label: 'IQC',
+        value: '主辅料 / 包材 / 回货',
+        note: '到仓后先给出是否允许入库的结论。',
+      },
+      {
+        label: '过程检验',
+        value: '异常批次',
+        note: '过程异常必须回到统一异常链，不留在聊天里。',
+      },
+      {
+        label: '返工复检',
+        value: 'rejected -> processing',
+        note: '返工后重新送检，状态要重新流转。',
+      },
+      {
+        label: '放行 / 退回',
+        value: 'done / rejected',
+        note: '放行和退回都要明确记录理由。',
+      },
+    ],
+    mobileSections: [
+      {
+        title: '手机端看板',
+        items: ['待检批次', '待复检', '待放行', '异常件'],
+      },
+      {
+        title: '手机端快捷操作',
+        items: ['给出 IQC 结果', '发起退回', '确认复检通过', '同步放行'],
+      },
+    ],
+    mobileTaskFlow: [
+      '先确认当前批次属于待检、复检还是放行确认。',
+      '给出 done 或 rejected 结论时必须带上原因。',
+      '品质结论形成后，立即同步给仓库、PMC 和生产。',
+    ],
+    mobileDeferred: [
+      '不做图片识别和自动判级。',
+      '不在手机端维护复杂质量报表。',
+      '不把品质端扩成独立库存系统。',
+    ],
+  },
+  {
     key: 'finance',
     title: '财务',
     label: '对账与结算',
@@ -1316,7 +1570,7 @@ const commonHelpSections = [
     title: '后台与移动端访问方式',
     items: [
       '桌面后台固定使用一个入口，不再保留角色切换、角色首页或角色入口菜单。',
-      '六个移动端角色按端口直接访问，角色差异放在各自移动端页面里体现。',
+      '八个移动端角色按端口直接访问，角色差异放在各自移动端页面里体现。',
       '桌面与移动端继续共享同一个后端 8200、同一套字段真源和同一套文档。',
     ],
   },
@@ -1387,6 +1641,16 @@ const roleHelpSections = {
       ],
     },
   ],
+  pmc: [
+    {
+      title: 'PMC 先盯什么',
+      items: [
+        '齐套是否满足、哪张单据还卡着、哪条链路可能延期。',
+        '谁该被催办、谁该接异常、哪些批次已可排单。',
+        'PMC 负责推进和分发，不替老板审批、不替财务放行。',
+      ],
+    },
+  ],
   warehouse: [
     {
       title: '仓库先盯什么',
@@ -1394,6 +1658,16 @@ const roleHelpSections = {
         '主辅料到仓、包装材料到仓、成品入库、待出货。',
         '发货需要业务确认和财务放行。',
         '扩展硬件链路与 PDA 继续 deferred。',
+      ],
+    },
+  ],
+  quality: [
+    {
+      title: '品质先盯什么',
+      items: [
+        'IQC、过程检验、返工复检和放行 / 退回结论。',
+        '检验结果必须回写给仓库、PMC 和生产，不停留在聊天记录。',
+        '品质负责质量结论，不替仓库做入库执行，不替生产改排单。',
       ],
     },
   ],
@@ -1445,7 +1719,7 @@ const navItemRegistry = {
     label: '移动端端口说明',
     path: '/erp/mobile-workbenches',
     shortLabel: '端口',
-    description: '查看 6 个移动端端口、职责分工和共享层设计。',
+    description: '查看 8 个移动端端口、职责分工和共享层设计。',
   },
   'print-center': {
     key: 'print-center',
@@ -1474,6 +1748,37 @@ const navItemRegistry = {
     path: '/erp/docs/role-collaboration-guide',
     shortLabel: '协同',
     description: '查看角色之间怎么交接、怎么回退、主链路和子链路怎么分。',
+  },
+  'help-role-page-document-matrix': {
+    key: 'help-role-page-document-matrix',
+    label: '角色权限 / 页面 / 单据矩阵',
+    path: '/erp/docs/role-page-document-matrix',
+    shortLabel: '矩阵',
+    description: '一页查看角色边界、正式页面入口和主链路单据流转矩阵。',
+  },
+  'help-task-document-mapping': {
+    key: 'help-task-document-mapping',
+    label: '任务 / 单据映射表',
+    path: '/erp/docs/task-document-mapping',
+    shortLabel: '任务',
+    description:
+      '收口任务状态、任务来源、处理角色和完成条件，不把任务误判成业务真源。',
+  },
+  'help-workflow-status-guide': {
+    key: 'help-workflow-status-guide',
+    label: '任务 / 业务状态字典',
+    path: '/erp/docs/workflow-status-guide',
+    shortLabel: '状态',
+    description:
+      '统一任务状态、业务状态和推进阶段，供页面、任务池和后端保存链路继续对线。',
+  },
+  'help-workflow-schema-draft': {
+    key: 'help-workflow-schema-draft',
+    label: 'Workflow / Schema 草案',
+    path: '/erp/docs/workflow-schema-draft',
+    shortLabel: 'Schema',
+    description:
+      '提供任务协同层和业务状态层的表结构草案与 SQL 样例，只用于校对，不直接作为迁移真源。',
   },
   'help-desktop-role-guide': {
     key: 'help-desktop-role-guide',
@@ -1524,6 +1829,42 @@ const navItemRegistry = {
     shortLabel: '边界',
     description: '把 deferred 能力、未落地边界和校对中的角色拆分单独说明。',
   },
+  'qa-acceptance-overview': {
+    key: 'qa-acceptance-overview',
+    label: '验收结果总览',
+    path: '/erp/qa/acceptance-overview',
+    shortLabel: '验收',
+    description: '汇总当前可执行验收入口、已知盲区和下一步排查路径。',
+  },
+  'qa-business-chain-debug': {
+    key: 'qa-business-chain-debug',
+    label: '业务链路调试',
+    path: '/erp/qa/business-chain-debug',
+    shortLabel: '链路',
+    description: '按业务记录、workflow 状态和协同任务排查当前毛绒业务链路。',
+  },
+  'qa-field-linkage-coverage': {
+    key: 'qa-field-linkage-coverage',
+    label: '字段联动覆盖',
+    path: '/erp/qa/field-linkage-coverage',
+    shortLabel: '字段',
+    description: '展示字段真源、快照、残值、缺值和打印取值的 latest 覆盖状态。',
+  },
+  'qa-run-records': {
+    key: 'qa-run-records',
+    label: '运行记录',
+    path: '/erp/qa/run-records',
+    shortLabel: '记录',
+    description: '统一当前验收命令、运行产物和记录口径。',
+  },
+  'qa-reports': {
+    key: 'qa-reports',
+    label: '专项报告',
+    path: '/erp/qa/reports',
+    shortLabel: '报告',
+    description:
+      '聚合字段联动、打印快照、workflow 状态、权限边界和错误码同步等专项。',
+  },
   'help-center': {
     key: 'help-center',
     label: '帮助中心首页',
@@ -1557,7 +1898,7 @@ const navItemRegistry = {
     label: '首批正式数据模型',
     path: '/erp/docs/data-model',
     shortLabel: '文档',
-    description: '说明为什么当前不直接照搬 trade-erp，以及表设计建议。',
+    description: '说明为什么当前不能照搬旧外贸模型，以及表设计建议。',
   },
   'doc-import-mapping': {
     key: 'doc-import-mapping',
@@ -1571,7 +1912,7 @@ const navItemRegistry = {
     label: '移动端端口与职责',
     path: '/erp/docs/mobile-roles',
     shortLabel: '文档',
-    description: '桌面单后台和 6 个移动端端口的职责边界。',
+    description: '桌面单后台和 8 个移动端端口的职责边界。',
   },
   'doc-print-templates': {
     key: 'doc-print-templates',
@@ -1610,6 +1951,10 @@ const helpCenterNavKeys = [
   'help-operation-flow-overview',
   'help-operation-guide',
   'help-role-collaboration-guide',
+  'help-role-page-document-matrix',
+  'help-task-document-mapping',
+  'help-workflow-status-guide',
+  'help-workflow-schema-draft',
   'help-desktop-role-guide',
   'help-mobile-role-guide',
   'help-field-linkage-guide',
@@ -1617,6 +1962,14 @@ const helpCenterNavKeys = [
   'help-print-snapshot-guide',
   'help-exception-handling-guide',
   'help-current-boundaries',
+]
+
+const qaNavKeys = [
+  'qa-acceptance-overview',
+  'qa-business-chain-debug',
+  'qa-field-linkage-coverage',
+  'qa-run-records',
+  'qa-reports',
 ]
 
 export const documentationCards = documentationNavKeys.map((navKey) => {
@@ -1634,6 +1987,8 @@ export const helpCenterNavItems = helpCenterNavKeys.map(
   (navKey) => navItemRegistry[navKey]
 )
 
+export const qaNavItems = qaNavKeys.map((navKey) => navItemRegistry[navKey])
+
 export const navigationItemRegistry = navItemRegistry
 
 export function getNavigationSections() {
@@ -1650,6 +2005,10 @@ export function getNavigationSections() {
     {
       title: '帮助中心',
       items: helpCenterNavItems,
+    },
+    {
+      title: '开发与验收',
+      items: qaNavItems,
     },
     {
       title: '系统管理',

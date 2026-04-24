@@ -91,6 +91,20 @@ func (_u *AdminUserUpdate) SetNillableMenuPermissions(v *string) *AdminUserUpdat
 	return _u
 }
 
+// SetErpPreferences sets the "erp_preferences" field.
+func (_u *AdminUserUpdate) SetErpPreferences(v string) *AdminUserUpdate {
+	_u.mutation.SetErpPreferences(v)
+	return _u
+}
+
+// SetNillableErpPreferences sets the "erp_preferences" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillableErpPreferences(v *string) *AdminUserUpdate {
+	if v != nil {
+		_u.SetErpPreferences(*v)
+	}
+	return _u
+}
+
 // SetDisabled sets the "disabled" field.
 func (_u *AdminUserUpdate) SetDisabled(v bool) *AdminUserUpdate {
 	_u.mutation.SetDisabled(v)
@@ -189,6 +203,11 @@ func (_u *AdminUserUpdate) check() error {
 			return &ValidationError{Name: "menu_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.menu_permissions": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ErpPreferences(); ok {
+		if err := adminuser.ErpPreferencesValidator(v); err != nil {
+			return &ValidationError{Name: "erp_preferences", err: fmt.Errorf(`ent: validator failed for field "AdminUser.erp_preferences": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -218,6 +237,9 @@ func (_u *AdminUserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.MenuPermissions(); ok {
 		_spec.SetField(adminuser.FieldMenuPermissions, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ErpPreferences(); ok {
+		_spec.SetField(adminuser.FieldErpPreferences, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Disabled(); ok {
 		_spec.SetField(adminuser.FieldDisabled, field.TypeBool, value)
@@ -310,6 +332,20 @@ func (_u *AdminUserUpdateOne) SetMenuPermissions(v string) *AdminUserUpdateOne {
 func (_u *AdminUserUpdateOne) SetNillableMenuPermissions(v *string) *AdminUserUpdateOne {
 	if v != nil {
 		_u.SetMenuPermissions(*v)
+	}
+	return _u
+}
+
+// SetErpPreferences sets the "erp_preferences" field.
+func (_u *AdminUserUpdateOne) SetErpPreferences(v string) *AdminUserUpdateOne {
+	_u.mutation.SetErpPreferences(v)
+	return _u
+}
+
+// SetNillableErpPreferences sets the "erp_preferences" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillableErpPreferences(v *string) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetErpPreferences(*v)
 	}
 	return _u
 }
@@ -425,6 +461,11 @@ func (_u *AdminUserUpdateOne) check() error {
 			return &ValidationError{Name: "menu_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.menu_permissions": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ErpPreferences(); ok {
+		if err := adminuser.ErpPreferencesValidator(v); err != nil {
+			return &ValidationError{Name: "erp_preferences", err: fmt.Errorf(`ent: validator failed for field "AdminUser.erp_preferences": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -471,6 +512,9 @@ func (_u *AdminUserUpdateOne) sqlSave(ctx context.Context) (_node *AdminUser, er
 	}
 	if value, ok := _u.mutation.MenuPermissions(); ok {
 		_spec.SetField(adminuser.FieldMenuPermissions, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ErpPreferences(); ok {
+		_spec.SetField(adminuser.FieldErpPreferences, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.Disabled(); ok {
 		_spec.SetField(adminuser.FieldDisabled, field.TypeBool, value)

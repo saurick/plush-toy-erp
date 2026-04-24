@@ -1,5 +1,5 @@
 export const PROCESSING_CONTRACT_TEMPLATE_KEY = 'processing-contract'
-export const PROCESSING_CONTRACT_MIN_ROWS = 5
+export const PROCESSING_CONTRACT_DRAFT_VERSION = 2
 export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
   { key: 'contractNo', fieldKey: 'contractNo', label: '委外加工订单号' },
   { key: 'productOrderNo', fieldKey: 'productOrderNo', label: '产品订单编号' },
@@ -21,7 +21,7 @@ export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
   { key: 'unit', fieldKey: 'unit', label: '单位' },
   { key: 'unitPrice', fieldKey: 'unitPrice', label: '单价' },
   { key: 'quantity', fieldKey: 'quantity', label: '委托加工数量' },
-  { key: 'amount', fieldKey: null, label: '委托加工金额', readOnly: true },
+  { key: 'amount', fieldKey: null, label: '委托加工金额' },
   { key: 'remark', fieldKey: 'remark', label: '备注', multiline: true },
 ]
 
@@ -41,6 +41,14 @@ const defaultClauses = {
     '对完账后，次月支付货款，加工厂开具等额增值税专用发票。',
   ],
 }
+
+const LEGACY_DEFAULT_BUYER_CONTACT = '刘志强'
+const LEGACY_DEFAULT_BUYER_SIGNATURE = Object.freeze({
+  buyerCompany: '永绅',
+  buyerPhone: '13694972987',
+  buyerAddress: '东莞茶山',
+  buyerSignDateText: '2025-06-08',
+})
 
 export const processingContractAttachmentSlots = [
   {
@@ -75,7 +83,7 @@ const defaultLines = [
     productNo: '23233',
     productName: '10cm PN吊饰',
     processName: '面*1',
-    supplierAlias: '富达',
+    supplierAlias: '',
     processCategory: '电绣',
     unit: '片',
     unitPrice: '0.2',
@@ -88,7 +96,7 @@ const defaultLines = [
     productNo: '23233',
     productName: '10cm PN吊饰',
     processName: '耳*2',
-    supplierAlias: '富达',
+    supplierAlias: '',
     processCategory: '电绣',
     unit: '对',
     unitPrice: '0.1',
@@ -101,7 +109,7 @@ const defaultLines = [
     productNo: '23233',
     productName: '10cm PN吊饰',
     processName: '底*1',
-    supplierAlias: '富达',
+    supplierAlias: '',
     processCategory: '电绣',
     unit: '片',
     unitPrice: '0.15',
@@ -124,7 +132,7 @@ export const processingContractTemplateMeta = {
   output: '在线预览 PDF / 下载 PDF / 打印',
   notes: [
     '加工合同当前和采购合同一样，统一走独立打印工作台链路；其余汇总表和报表模板继续保留静态预览。',
-    '顶部按钮和弹窗工作流对齐 trade-erp 报价单打印：先打开可编辑打印窗口，再做独立 PDF 预览窗口 / 下载 PDF / 打印。',
+    '顶部按钮和弹窗工作流统一为：先打开可编辑打印窗口，再做独立 PDF 预览窗口 / 下载 PDF / 打印。',
     '工作台上插 / 下插明细行时会新增真正空白行，不再预填合同号、产品号或其他相邻行字段。',
     '纸样 / 图样附件通过工作台独立上传，并同步进入右侧页底附件位，随 PDF / 打印一起输出。',
   ],
@@ -140,13 +148,13 @@ export const processingContractTemplateMeta = {
   ],
   fieldTruth: [
     '合同编号、下单日期、回货日期、加工方名称、委托单位都属于合同头快照，不回写主数据。',
-    '工序名称、工序类别、单价、委托加工数量、委托加工金额属于合同明细快照；打印态金额按数量 × 单价自动重算。',
+    '工序名称、工序类别、单价、委托加工数量、委托加工金额属于合同明细快照；金额默认按数量 × 单价带值，但允许按合同快照手工改写。',
     '来货要求、合同约定、结算方式属于正式合同正文，不应只留在帮助文档里口头说明。',
     '纸样 / 图样附件属于附件快照层，当前通过工作台上传后进入页底附件位，并随 PDF / 打印一起冻结。',
   ],
   helpNotes: [
     '当前主链路是“打印中心 -> 可编辑打印窗口 -> 独立 PDF 预览窗口 / 下载 PDF / 打印”，不再走静态预览页。',
-    '工作台壳层、顶部按钮和左右双栏布局已对齐 trade-erp 的打印工作流。',
+    '工作台壳层、顶部按钮和左右双栏布局已收口为当前固定打印模板的主工作流。',
     '合同明细支持在工作台里选行、插行、删行；适合先调明细结构，再确认 PDF 和打印观感。',
     '加工合同明细当前最多支持 300 行，顶部计数会显示“当前行数/300”。',
     '纸样 / 图样附件当前通过工作台按钮上传并映射到页底附件位；如果后续接真实业务带值，应继续从合同头快照、合同行快照和附件快照三层分别带入，不要混成一层。',
@@ -165,6 +173,7 @@ export function createEmptyProcessingLine() {
     unit: '',
     unitPrice: '',
     quantity: '',
+    amount: '',
     remark: '',
   }
 }
@@ -195,13 +204,78 @@ export function formatTrimmedNumber(value, maximumFractionDigits = 2) {
   }).format(value)
 }
 
-export function resolveProcessingLineAmount(line = {}) {
+function sanitizePositiveDecimalText(
+  value,
+  { maximumFractionDigits = 2, preserveTrailingDot = false } = {}
+) {
+  const source = String(value ?? '')
+  let normalized = ''
+  let hasDot = false
+
+  for (const character of source) {
+    if (/\d/.test(character)) {
+      normalized += character
+      continue
+    }
+
+    if (character === '.' && !hasDot) {
+      if (!normalized) {
+        normalized = '0'
+      }
+      normalized += '.'
+      hasDot = true
+    }
+  }
+
+  if (!normalized) {
+    return ''
+  }
+
+  const endsWithDot = normalized.endsWith('.')
+  const [rawInteger = '', rawFraction = ''] = normalized.split('.')
+  const integer = rawInteger.replace(/^0+(?=\d)/, '') || '0'
+  const fraction = rawFraction.slice(0, Math.max(0, maximumFractionDigits))
+
+  if (!hasDot) {
+    return integer
+  }
+
+  if (fraction || (preserveTrailingDot && endsWithDot)) {
+    return `${integer}.${fraction}`
+  }
+
+  return integer
+}
+
+export function normalizeProcessingAmountDraft(value) {
+  return sanitizePositiveDecimalText(value, {
+    maximumFractionDigits: 2,
+    preserveTrailingDot: true,
+  })
+}
+
+export function normalizeProcessingAmountText(value) {
+  const sanitized = sanitizePositiveDecimalText(value, {
+    maximumFractionDigits: 2,
+  })
+  const numericValue = parseNumber(sanitized)
+  return numericValue === null ? '' : formatTrimmedNumber(numericValue, 2)
+}
+
+export function resolveComputedProcessingLineAmount(line = {}) {
   const quantity = parseNumber(line.quantity)
   const unitPrice = parseNumber(line.unitPrice)
   if (quantity === null || unitPrice === null) {
     return ''
   }
   return formatTrimmedNumber(quantity * unitPrice, 2)
+}
+
+export function resolveProcessingLineAmount(line = {}) {
+  return (
+    normalizeProcessingAmountText(line.amount) ||
+    resolveComputedProcessingLineAmount(line)
+  )
 }
 
 export function normalizeProcessingLine(line = {}) {
@@ -216,6 +290,7 @@ export function normalizeProcessingLine(line = {}) {
     unit: normalizeText(line.unit),
     unitPrice: normalizeText(line.unitPrice),
     quantity: normalizeText(line.quantity),
+    amount: resolveProcessingLineAmount(line),
     remark: normalizeText(line.remark),
   }
 }
@@ -237,6 +312,35 @@ export function normalizeProcessingContractAttachments(attachments = {}) {
     state[slot.key] = normalizeProcessingAttachmentSnapshot(source[slot.key])
     return state
   }, {})
+}
+
+export function migrateLegacyProcessingContractDraft(draft = {}) {
+  const source = draft && typeof draft === 'object' ? draft : {}
+  const draftVersion = Number(source.draftVersion || 0)
+  if (draftVersion >= PROCESSING_CONTRACT_DRAFT_VERSION) {
+    return source
+  }
+
+  if (normalizeText(source.buyerContact) !== LEGACY_DEFAULT_BUYER_CONTACT) {
+    return source
+  }
+
+  const matchesLegacySignature = Object.entries(
+    LEGACY_DEFAULT_BUYER_SIGNATURE
+  ).every(
+    ([field, expectedValue]) => normalizeText(source[field]) === expectedValue
+  )
+
+  if (!matchesLegacySignature) {
+    return source
+  }
+
+  // 兼容旧本地草稿：只清理历史默认样例里的甲方联系人，避免真实手填内容被误改。
+  return {
+    ...source,
+    buyerContact: '',
+    draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
+  }
 }
 
 export function calculateProcessingContractTotals(lines = []) {
@@ -267,35 +371,22 @@ export function calculateProcessingContractTotals(lines = []) {
   }
 }
 
-export function padProcessingContractLines(
-  lines = [],
-  minimumRows = PROCESSING_CONTRACT_MIN_ROWS
-) {
-  const normalizedLines = Array.isArray(lines)
-    ? lines.map((line) => normalizeProcessingLine(line))
-    : []
-  const paddedLines = [...normalizedLines]
-  while (paddedLines.length < minimumRows) {
-    paddedLines.push(createEmptyProcessingLine())
-  }
-  return paddedLines
-}
-
 export function createProcessingContractDraft() {
   return {
+    draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
     contractNo: 'B25060808',
     orderDateText: '250608',
     returnDateText: '2025-06-11',
-    supplierName: '东莞市茶山富尔达电脑绣花店',
-    supplierContact: '黄先生',
-    supplierPhone: '0769-86862121',
-    supplierAddress: '东莞市茶山镇',
+    supplierName: '',
+    supplierContact: '',
+    supplierPhone: '',
+    supplierAddress: '',
     buyerCompany: '永绅',
-    buyerContact: '刘志强',
+    buyerContact: '',
     buyerPhone: '13694972987',
     buyerAddress: '东莞茶山',
     buyerSignDateText: '2025-06-08',
-    supplierSignDateText: '2025  年    月    日',
+    supplierSignDateText: '',
     attachments: createEmptyProcessingAttachments(),
     lines: defaultLines.map((line) => normalizeProcessingLine(line)),
     clauses: structuredClone(defaultClauses),

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -16,14 +17,18 @@ import {
   Typography,
 } from 'antd'
 import { AUTH_SCOPE } from '@/common/auth/auth'
+import { Loading } from '@/common/components/loading'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
   defaultMenuPermissions,
-  ERP_MENU_PERMISSION_OPTIONS,
+  ERP_MENU_PERMISSION_GROUPS,
+  ERP_PERMISSION_PRESETS,
+  getPermissionPreset,
   getPermissionLabel,
+  matchPermissionPreset,
   normalizeMenuPermissions,
 } from '../config/menuPermissions.mjs'
 
@@ -41,8 +46,68 @@ const levelTextMap = {
 
 const TABLE_PAGE_SIZE_OPTIONS = ['8', '10', '20', '50', '100']
 const DEFAULT_TABLE_PAGE_SIZE = 8
+const PASSWORD_MIN_LENGTH = 6
+
+const permissionGroups = ERP_MENU_PERMISSION_GROUPS.map((section) => ({
+  ...section,
+  items: section.items.filter((item) => item.key !== '/erp/system/permissions'),
+})).filter((section) => section.items.length > 0)
+
+const presetOptions = ERP_PERMISSION_PRESETS.map((preset) => ({
+  label: preset.label,
+  value: preset.key,
+}))
+
+function PermissionSectionChecklist({ value = [], onChange }) {
+  const normalizedValue = normalizeMenuPermissions(value)
+
+  const handleSectionChange = (sectionKeys, nextSectionValues) => {
+    const next = normalizeMenuPermissions([
+      ...normalizedValue.filter((item) => !sectionKeys.includes(item)),
+      ...(nextSectionValues || []),
+    ])
+    onChange?.(next)
+  }
+
+  return (
+    <div className="erp-permission-checklist">
+      {permissionGroups.map((section) => {
+        const sectionKeys = section.items.map((item) => item.key)
+        const selectedKeys = normalizedValue.filter((item) =>
+          sectionKeys.includes(item)
+        )
+
+        return (
+          <section
+            className="erp-permission-checklist__section"
+            key={section.title}
+          >
+            <div className="erp-permission-checklist__header">
+              <Text strong>{section.title}</Text>
+              <Text type="secondary">
+                {selectedKeys.length}/{section.items.length}
+              </Text>
+            </div>
+            <Checkbox.Group
+              options={section.items.map((item) => ({
+                label: item.label,
+                value: item.key,
+              }))}
+              value={selectedKeys}
+              onChange={(nextValues) =>
+                handleSectionChange(sectionKeys, nextValues)
+              }
+              className="erp-permission-grid"
+            />
+          </section>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function PermissionCenterPage() {
+  const outletContext = useOutletContext()
   const adminRpc = useMemo(
     () =>
       new JsonRpc({
@@ -65,18 +130,19 @@ export default function PermissionCenterPage() {
   })
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
+  const [resetModalOpen, setResetModalOpen] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState(null)
+  const [resettingAdmin, setResettingAdmin] = useState(null)
   const [selectedPermissions, setSelectedPermissions] = useState([])
+  const [selectedPresetKey, setSelectedPresetKey] = useState('')
   const [createForm] = Form.useForm()
+  const [resetForm] = Form.useForm()
+  const createMenuPermissions = Form.useWatch('menu_permissions', createForm)
 
   const isSuperAdmin = currentAdmin?.level === ADMIN_LEVEL.SUPER
-
-  const checkboxOptions = ERP_MENU_PERMISSION_OPTIONS.filter(
-    (item) => item.key !== '/erp/system/permissions'
-  ).map((item) => ({
-    label: item.label,
-    value: item.key,
-  }))
+  const createSelectedPermissionCount = normalizeMenuPermissions(
+    createMenuPermissions || []
+  ).length
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -89,8 +155,10 @@ export default function PermissionCenterPage() {
       setAdmins(
         Array.isArray(listResult?.data?.admins) ? listResult.data.admins : []
       )
+      return true
     } catch (err) {
       message.error(getActionErrorMessage(err, '加载权限数据'))
+      return false
     } finally {
       setLoading(false)
     }
@@ -99,6 +167,10 @@ export default function PermissionCenterPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(loadData)
+  }, [loadData, outletContext])
 
   useEffect(() => {
     const totalPages = Math.max(
@@ -146,9 +218,9 @@ export default function PermissionCenterPage() {
       return
     }
     setEditingAdmin(admin)
-    setSelectedPermissions(
-      normalizeMenuPermissions(admin.menu_permissions || [])
-    )
+    const normalized = normalizeMenuPermissions(admin.menu_permissions || [])
+    setSelectedPermissions(normalized)
+    setSelectedPresetKey(matchPermissionPreset(normalized))
     setEditModalOpen(true)
   }
 
@@ -156,6 +228,22 @@ export default function PermissionCenterPage() {
     setEditModalOpen(false)
     setEditingAdmin(null)
     setSelectedPermissions([])
+    setSelectedPresetKey('')
+  }
+
+  const openResetModal = (admin) => {
+    if (!admin || admin.level === ADMIN_LEVEL.SUPER) {
+      return
+    }
+    setResettingAdmin(admin)
+    resetForm.resetFields()
+    setResetModalOpen(true)
+  }
+
+  const closeResetModal = () => {
+    setResetModalOpen(false)
+    setResettingAdmin(null)
+    resetForm.resetFields()
   }
 
   const createAdmin = async (values) => {
@@ -205,6 +293,28 @@ export default function PermissionCenterPage() {
     }
   }
 
+  const applyCreatePreset = (presetKey) => {
+    const preset = getPermissionPreset(presetKey)
+    createForm.setFieldsValue({
+      permission_preset: presetKey || undefined,
+      menu_permissions: preset?.permissions || defaultMenuPermissions(),
+    })
+  }
+
+  const applyEditPreset = (presetKey) => {
+    const preset = getPermissionPreset(presetKey)
+    setSelectedPresetKey(presetKey || '')
+    setSelectedPermissions(
+      preset?.permissions || normalizeMenuPermissions(selectedPermissions)
+    )
+  }
+
+  const handleEditPermissionsChange = (permissions) => {
+    const normalized = normalizeMenuPermissions(permissions)
+    setSelectedPermissions(normalized)
+    setSelectedPresetKey(matchPermissionPreset(normalized))
+  }
+
   const applyAdminStatus = async (admin, disabled) => {
     if (!admin?.id || admin.level === ADMIN_LEVEL.SUPER) {
       return
@@ -226,6 +336,26 @@ export default function PermissionCenterPage() {
       message.error(getActionErrorMessage(err, '更新管理员状态'))
     } finally {
       setStatusUpdatingAdminID(null)
+    }
+  }
+
+  const resetAdminPassword = async (values) => {
+    if (!resettingAdmin?.id) {
+      return
+    }
+    setSaving(true)
+    try {
+      await adminRpc.call('reset_password', {
+        id: resettingAdmin.id,
+        password: values.password,
+      })
+      message.success(`已重置管理员 ${resettingAdmin.username} 的密码`)
+      closeResetModal()
+      await loadData()
+    } catch (err) {
+      message.error(getActionErrorMessage(err, '重置管理员密码'))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -314,19 +444,28 @@ export default function PermissionCenterPage() {
     },
     {
       title: '操作',
-      width: 180,
+      width: 240,
       render: (_, record) => {
         if (record.level === ADMIN_LEVEL.SUPER) {
           return <Text type="secondary">系统保留</Text>
         }
         return (
-          <Button
-            size="small"
-            disabled={!isSuperAdmin}
-            onClick={() => openEditModal(record)}
-          >
-            编辑权限
-          </Button>
+          <Space wrap size={[8, 8]}>
+            <Button
+              size="small"
+              disabled={!isSuperAdmin}
+              onClick={() => openEditModal(record)}
+            >
+              编辑权限
+            </Button>
+            <Button
+              size="small"
+              disabled={!isSuperAdmin}
+              onClick={() => openResetModal(record)}
+            >
+              重置密码
+            </Button>
+          </Space>
         )
       },
     },
@@ -338,6 +477,15 @@ export default function PermissionCenterPage() {
     <Empty description="暂无管理员数据" />
   )
 
+  if (loading && admins.length === 0 && !currentAdmin) {
+    return (
+      <Loading
+        title="权限加载中"
+        description="正在同步管理员账号和菜单权限，请稍候..."
+      />
+    )
+  }
+
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Card variant="borderless">
@@ -345,7 +493,7 @@ export default function PermissionCenterPage() {
           权限管理
         </Title>
         <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-          管理员菜单权限默认沿用当前后台导航。超级管理员拥有全部菜单，普通管理员按勾选结果显示入口。
+          当前已补到完整页面级权限：业务页、打印中心、帮助中心和系统管理统一按菜单权限显示，并阻止直接进入未授权页面。
         </Paragraph>
       </Card>
 
@@ -366,7 +514,7 @@ export default function PermissionCenterPage() {
             wrap
           >
             <Paragraph type="secondary" style={{ margin: 0 }}>
-              新管理员默认使用当前后台的基础菜单权限；如果需要，也可以创建第二个超级管理员账号。
+              新管理员默认继承完整基础菜单；如果是固定业务角色，建议先套用下面的推荐模板再微调。
             </Paragraph>
             <Button type="primary" onClick={() => setCreateModalOpen(true)}>
               创建管理员
@@ -395,7 +543,12 @@ export default function PermissionCenterPage() {
       </Card>
 
       <Modal
-        title="创建管理员"
+        title={
+          <div className="erp-permission-modal__title">
+            <span className="erp-permission-modal__title-main">创建管理员</span>
+            <Text type="secondary">账号与默认菜单一次配置</Text>
+          </div>
+        }
         open={createModalOpen}
         onCancel={closeCreateModal}
         onOk={() => createForm.submit()}
@@ -403,6 +556,8 @@ export default function PermissionCenterPage() {
         okText="创建"
         cancelText="取消"
         centered
+        width={980}
+        className="erp-permission-modal"
         forceRender
       >
         <Form
@@ -414,56 +569,77 @@ export default function PermissionCenterPage() {
             menu_permissions: defaultMenuPermissions(),
           }}
         >
-          <Form.Item
-            label="账号"
-            name="username"
-            rules={[
-              { required: true, message: '请输入管理员账号' },
-              {
-                validator: (_, value) =>
-                  String(value || '').trim()
-                    ? Promise.resolve()
-                    : Promise.reject(new Error('请输入管理员账号')),
-              },
-            ]}
-          >
-            <Input placeholder="例如：manager02" maxLength={64} />
-          </Form.Item>
-          <Form.Item
-            label="密码"
-            name="password"
-            rules={[
-              { required: true, message: '请输入密码' },
-              { min: 6, message: '密码至少 6 位' },
-            ]}
-          >
-            <Input.Password
-              placeholder="至少 6 位"
-              autoComplete="new-password"
-            />
-          </Form.Item>
-          <Form.Item label="等级" name="level">
-            <Select
-              options={[
-                { value: ADMIN_LEVEL.STANDARD, label: '普通管理员' },
-                { value: ADMIN_LEVEL.SUPER, label: '超级管理员' },
+          <div className="erp-permission-modal__fields">
+            <Form.Item
+              label="账号"
+              name="username"
+              rules={[
+                { required: true, message: '请输入管理员账号' },
+                {
+                  validator: (_, value) =>
+                    String(value || '').trim()
+                      ? Promise.resolve()
+                      : Promise.reject(new Error('请输入管理员账号')),
+                },
               ]}
-            />
-          </Form.Item>
-          <Form.Item label="默认菜单权限" name="menu_permissions">
-            <Checkbox.Group
-              options={checkboxOptions}
-              className="erp-permission-grid"
-            />
+            >
+              <Input placeholder="例如：manager02" maxLength={64} />
+            </Form.Item>
+            <Form.Item
+              label="密码"
+              name="password"
+              rules={[
+                { required: true, message: '请输入密码' },
+                { min: 6, message: '密码至少 6 位' },
+              ]}
+            >
+              <Input.Password
+                placeholder="至少 6 位"
+                autoComplete="new-password"
+              />
+            </Form.Item>
+            <Form.Item label="等级" name="level">
+              <Select
+                options={[
+                  { value: ADMIN_LEVEL.STANDARD, label: '普通管理员' },
+                  { value: ADMIN_LEVEL.SUPER, label: '超级管理员' },
+                ]}
+              />
+            </Form.Item>
+            <Form.Item label="推荐权限模板" name="permission_preset">
+              <Select
+                allowClear
+                placeholder="可选：按老板 / PMC / 仓库 / 财务等模板先套用"
+                options={presetOptions}
+                onChange={applyCreatePreset}
+              />
+            </Form.Item>
+          </div>
+          <div className="erp-permission-modal__section-head">
+            <Text strong>默认菜单权限</Text>
+            <Text type="secondary">
+              已选 {createSelectedPermissionCount} 项
+            </Text>
+          </div>
+          <Form.Item
+            className="erp-permission-modal__permission-field"
+            name="menu_permissions"
+          >
+            <PermissionSectionChecklist />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
         title={
-          editingAdmin
-            ? `编辑 ${editingAdmin.username} 的菜单权限`
-            : '编辑菜单权限'
+          <div className="erp-permission-modal__title">
+            <span className="erp-permission-modal__title-main">
+              {editingAdmin
+                ? `编辑 ${editingAdmin.username} 的菜单权限`
+                : '编辑菜单权限'}
+            </span>
+            <Text type="secondary">修改后立即影响左侧菜单可见范围</Text>
+          </div>
         }
         open={editModalOpen}
         onCancel={closeEditModal}
@@ -472,23 +648,105 @@ export default function PermissionCenterPage() {
         okText="保存"
         cancelText="取消"
         centered
+        width={980}
+        className="erp-permission-modal"
       >
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+        <Space
+          className="erp-permission-modal__edit-stack"
+          direction="vertical"
+          size={12}
+        >
           <Alert
             type="info"
             showIcon
-            message="菜单权限只控制左侧入口显示"
-            description="当前版本不会按菜单权限额外拦截后端业务接口，但会阻止直接进入未授权页面。"
+            message="当前权限已收口到页面级"
+            description="会同时控制左侧菜单显示和未授权页面直达；但业务动作级权限、字段级权限和手机端接口级权限仍待后端继续落。"
           />
-          <Checkbox.Group
-            options={checkboxOptions}
+          <Select
+            allowClear
+            placeholder="套用推荐权限模板后可继续微调"
+            options={presetOptions}
+            value={selectedPresetKey || undefined}
+            onChange={applyEditPreset}
+          />
+          <PermissionSectionChecklist
             value={selectedPermissions}
-            onChange={(values) =>
-              setSelectedPermissions(normalizeMenuPermissions(values))
-            }
-            className="erp-permission-grid"
+            onChange={handleEditPermissionsChange}
           />
+          <Text type="secondary">
+            当前共选择 {selectedPermissions.length}{' '}
+            项页面权限，后台会按当前导航顺序保存。
+          </Text>
         </Space>
+      </Modal>
+
+      <Modal
+        title={
+          <div className="erp-permission-modal__title">
+            <span className="erp-permission-modal__title-main">
+              重置管理员密码
+            </span>
+            <Text type="secondary">
+              {resettingAdmin ? resettingAdmin.username : ''}
+            </Text>
+          </div>
+        }
+        open={resetModalOpen}
+        onCancel={closeResetModal}
+        onOk={() => resetForm.submit()}
+        confirmLoading={saving}
+        okText="确认重置"
+        cancelText="取消"
+        centered
+        width={520}
+        forceRender
+      >
+        <Form form={resetForm} layout="vertical" onFinish={resetAdminPassword}>
+          <Alert
+            type="warning"
+            showIcon
+            message="旧密码会立即失效"
+            description="保存后请把新密码交给本人，并提醒其尽快登录确认。"
+            style={{ marginBottom: 16 }}
+          />
+          <Form.Item
+            label="新密码"
+            name="password"
+            rules={[
+              { required: true, message: '请输入新密码' },
+              {
+                min: PASSWORD_MIN_LENGTH,
+                message: `密码至少 ${PASSWORD_MIN_LENGTH} 位`,
+              },
+            ]}
+          >
+            <Input.Password
+              placeholder={`至少 ${PASSWORD_MIN_LENGTH} 位`}
+              autoComplete="new-password"
+            />
+          </Form.Item>
+          <Form.Item
+            label="确认新密码"
+            name="password_confirm"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: '请再次输入新密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve()
+                  }
+                  return Promise.reject(new Error('两次输入的新密码不一致'))
+                },
+              }),
+            ]}
+          >
+            <Input.Password
+              placeholder="再次输入新密码"
+              autoComplete="new-password"
+            />
+          </Form.Item>
+        </Form>
       </Modal>
     </Space>
   )

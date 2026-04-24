@@ -12,11 +12,18 @@ import (
 	"server/internal/data/model/ent/migrate"
 
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/businessrecord"
+	"server/internal/data/model/ent/businessrecordevent"
+	"server/internal/data/model/ent/businessrecorditem"
 	"server/internal/data/model/ent/user"
+	"server/internal/data/model/ent/workflowbusinessstate"
+	"server/internal/data/model/ent/workflowtask"
+	"server/internal/data/model/ent/workflowtaskevent"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 // Client is the client that holds all ent builders.
@@ -26,8 +33,20 @@ type Client struct {
 	Schema *migrate.Schema
 	// AdminUser is the client for interacting with the AdminUser builders.
 	AdminUser *AdminUserClient
+	// BusinessRecord is the client for interacting with the BusinessRecord builders.
+	BusinessRecord *BusinessRecordClient
+	// BusinessRecordEvent is the client for interacting with the BusinessRecordEvent builders.
+	BusinessRecordEvent *BusinessRecordEventClient
+	// BusinessRecordItem is the client for interacting with the BusinessRecordItem builders.
+	BusinessRecordItem *BusinessRecordItemClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// WorkflowBusinessState is the client for interacting with the WorkflowBusinessState builders.
+	WorkflowBusinessState *WorkflowBusinessStateClient
+	// WorkflowTask is the client for interacting with the WorkflowTask builders.
+	WorkflowTask *WorkflowTaskClient
+	// WorkflowTaskEvent is the client for interacting with the WorkflowTaskEvent builders.
+	WorkflowTaskEvent *WorkflowTaskEventClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -40,7 +59,13 @@ func NewClient(opts ...Option) *Client {
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
 	c.AdminUser = NewAdminUserClient(c.config)
+	c.BusinessRecord = NewBusinessRecordClient(c.config)
+	c.BusinessRecordEvent = NewBusinessRecordEventClient(c.config)
+	c.BusinessRecordItem = NewBusinessRecordItemClient(c.config)
 	c.User = NewUserClient(c.config)
+	c.WorkflowBusinessState = NewWorkflowBusinessStateClient(c.config)
+	c.WorkflowTask = NewWorkflowTaskClient(c.config)
+	c.WorkflowTaskEvent = NewWorkflowTaskEventClient(c.config)
 }
 
 type (
@@ -131,10 +156,16 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:       ctx,
-		config:    cfg,
-		AdminUser: NewAdminUserClient(cfg),
-		User:      NewUserClient(cfg),
+		ctx:                   ctx,
+		config:                cfg,
+		AdminUser:             NewAdminUserClient(cfg),
+		BusinessRecord:        NewBusinessRecordClient(cfg),
+		BusinessRecordEvent:   NewBusinessRecordEventClient(cfg),
+		BusinessRecordItem:    NewBusinessRecordItemClient(cfg),
+		User:                  NewUserClient(cfg),
+		WorkflowBusinessState: NewWorkflowBusinessStateClient(cfg),
+		WorkflowTask:          NewWorkflowTaskClient(cfg),
+		WorkflowTaskEvent:     NewWorkflowTaskEventClient(cfg),
 	}, nil
 }
 
@@ -152,10 +183,16 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:       ctx,
-		config:    cfg,
-		AdminUser: NewAdminUserClient(cfg),
-		User:      NewUserClient(cfg),
+		ctx:                   ctx,
+		config:                cfg,
+		AdminUser:             NewAdminUserClient(cfg),
+		BusinessRecord:        NewBusinessRecordClient(cfg),
+		BusinessRecordEvent:   NewBusinessRecordEventClient(cfg),
+		BusinessRecordItem:    NewBusinessRecordItemClient(cfg),
+		User:                  NewUserClient(cfg),
+		WorkflowBusinessState: NewWorkflowBusinessStateClient(cfg),
+		WorkflowTask:          NewWorkflowTaskClient(cfg),
+		WorkflowTaskEvent:     NewWorkflowTaskEventClient(cfg),
 	}, nil
 }
 
@@ -184,15 +221,23 @@ func (c *Client) Close() error {
 // Use adds the mutation hooks to all the entity clients.
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
-	c.AdminUser.Use(hooks...)
-	c.User.Use(hooks...)
+	for _, n := range []interface{ Use(...Hook) }{
+		c.AdminUser, c.BusinessRecord, c.BusinessRecordEvent, c.BusinessRecordItem,
+		c.User, c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+	} {
+		n.Use(hooks...)
+	}
 }
 
 // Intercept adds the query interceptors to all the entity clients.
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
-	c.AdminUser.Intercept(interceptors...)
-	c.User.Intercept(interceptors...)
+	for _, n := range []interface{ Intercept(...Interceptor) }{
+		c.AdminUser, c.BusinessRecord, c.BusinessRecordEvent, c.BusinessRecordItem,
+		c.User, c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+	} {
+		n.Intercept(interceptors...)
+	}
 }
 
 // Mutate implements the ent.Mutator interface.
@@ -200,8 +245,20 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
 	case *AdminUserMutation:
 		return c.AdminUser.mutate(ctx, m)
+	case *BusinessRecordMutation:
+		return c.BusinessRecord.mutate(ctx, m)
+	case *BusinessRecordEventMutation:
+		return c.BusinessRecordEvent.mutate(ctx, m)
+	case *BusinessRecordItemMutation:
+		return c.BusinessRecordItem.mutate(ctx, m)
 	case *UserMutation:
 		return c.User.mutate(ctx, m)
+	case *WorkflowBusinessStateMutation:
+		return c.WorkflowBusinessState.mutate(ctx, m)
+	case *WorkflowTaskMutation:
+		return c.WorkflowTask.mutate(ctx, m)
+	case *WorkflowTaskEventMutation:
+		return c.WorkflowTaskEvent.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -340,6 +397,405 @@ func (c *AdminUserClient) mutate(ctx context.Context, m *AdminUserMutation) (Val
 	}
 }
 
+// BusinessRecordClient is a client for the BusinessRecord schema.
+type BusinessRecordClient struct {
+	config
+}
+
+// NewBusinessRecordClient returns a client for the BusinessRecord from the given config.
+func NewBusinessRecordClient(c config) *BusinessRecordClient {
+	return &BusinessRecordClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `businessrecord.Hooks(f(g(h())))`.
+func (c *BusinessRecordClient) Use(hooks ...Hook) {
+	c.hooks.BusinessRecord = append(c.hooks.BusinessRecord, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `businessrecord.Intercept(f(g(h())))`.
+func (c *BusinessRecordClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BusinessRecord = append(c.inters.BusinessRecord, interceptors...)
+}
+
+// Create returns a builder for creating a BusinessRecord entity.
+func (c *BusinessRecordClient) Create() *BusinessRecordCreate {
+	mutation := newBusinessRecordMutation(c.config, OpCreate)
+	return &BusinessRecordCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BusinessRecord entities.
+func (c *BusinessRecordClient) CreateBulk(builders ...*BusinessRecordCreate) *BusinessRecordCreateBulk {
+	return &BusinessRecordCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BusinessRecordClient) MapCreateBulk(slice any, setFunc func(*BusinessRecordCreate, int)) *BusinessRecordCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BusinessRecordCreateBulk{err: fmt.Errorf("calling to BusinessRecordClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BusinessRecordCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BusinessRecordCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BusinessRecord.
+func (c *BusinessRecordClient) Update() *BusinessRecordUpdate {
+	mutation := newBusinessRecordMutation(c.config, OpUpdate)
+	return &BusinessRecordUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BusinessRecordClient) UpdateOne(_m *BusinessRecord) *BusinessRecordUpdateOne {
+	mutation := newBusinessRecordMutation(c.config, OpUpdateOne, withBusinessRecord(_m))
+	return &BusinessRecordUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BusinessRecordClient) UpdateOneID(id int) *BusinessRecordUpdateOne {
+	mutation := newBusinessRecordMutation(c.config, OpUpdateOne, withBusinessRecordID(id))
+	return &BusinessRecordUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BusinessRecord.
+func (c *BusinessRecordClient) Delete() *BusinessRecordDelete {
+	mutation := newBusinessRecordMutation(c.config, OpDelete)
+	return &BusinessRecordDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BusinessRecordClient) DeleteOne(_m *BusinessRecord) *BusinessRecordDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BusinessRecordClient) DeleteOneID(id int) *BusinessRecordDeleteOne {
+	builder := c.Delete().Where(businessrecord.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BusinessRecordDeleteOne{builder}
+}
+
+// Query returns a query builder for BusinessRecord.
+func (c *BusinessRecordClient) Query() *BusinessRecordQuery {
+	return &BusinessRecordQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBusinessRecord},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BusinessRecord entity by its id.
+func (c *BusinessRecordClient) Get(ctx context.Context, id int) (*BusinessRecord, error) {
+	return c.Query().Where(businessrecord.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BusinessRecordClient) GetX(ctx context.Context, id int) *BusinessRecord {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *BusinessRecordClient) Hooks() []Hook {
+	return c.hooks.BusinessRecord
+}
+
+// Interceptors returns the client interceptors.
+func (c *BusinessRecordClient) Interceptors() []Interceptor {
+	return c.inters.BusinessRecord
+}
+
+func (c *BusinessRecordClient) mutate(ctx context.Context, m *BusinessRecordMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BusinessRecordCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BusinessRecordUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BusinessRecordUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BusinessRecordDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BusinessRecord mutation op: %q", m.Op())
+	}
+}
+
+// BusinessRecordEventClient is a client for the BusinessRecordEvent schema.
+type BusinessRecordEventClient struct {
+	config
+}
+
+// NewBusinessRecordEventClient returns a client for the BusinessRecordEvent from the given config.
+func NewBusinessRecordEventClient(c config) *BusinessRecordEventClient {
+	return &BusinessRecordEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `businessrecordevent.Hooks(f(g(h())))`.
+func (c *BusinessRecordEventClient) Use(hooks ...Hook) {
+	c.hooks.BusinessRecordEvent = append(c.hooks.BusinessRecordEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `businessrecordevent.Intercept(f(g(h())))`.
+func (c *BusinessRecordEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BusinessRecordEvent = append(c.inters.BusinessRecordEvent, interceptors...)
+}
+
+// Create returns a builder for creating a BusinessRecordEvent entity.
+func (c *BusinessRecordEventClient) Create() *BusinessRecordEventCreate {
+	mutation := newBusinessRecordEventMutation(c.config, OpCreate)
+	return &BusinessRecordEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BusinessRecordEvent entities.
+func (c *BusinessRecordEventClient) CreateBulk(builders ...*BusinessRecordEventCreate) *BusinessRecordEventCreateBulk {
+	return &BusinessRecordEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BusinessRecordEventClient) MapCreateBulk(slice any, setFunc func(*BusinessRecordEventCreate, int)) *BusinessRecordEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BusinessRecordEventCreateBulk{err: fmt.Errorf("calling to BusinessRecordEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BusinessRecordEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BusinessRecordEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BusinessRecordEvent.
+func (c *BusinessRecordEventClient) Update() *BusinessRecordEventUpdate {
+	mutation := newBusinessRecordEventMutation(c.config, OpUpdate)
+	return &BusinessRecordEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BusinessRecordEventClient) UpdateOne(_m *BusinessRecordEvent) *BusinessRecordEventUpdateOne {
+	mutation := newBusinessRecordEventMutation(c.config, OpUpdateOne, withBusinessRecordEvent(_m))
+	return &BusinessRecordEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BusinessRecordEventClient) UpdateOneID(id int) *BusinessRecordEventUpdateOne {
+	mutation := newBusinessRecordEventMutation(c.config, OpUpdateOne, withBusinessRecordEventID(id))
+	return &BusinessRecordEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BusinessRecordEvent.
+func (c *BusinessRecordEventClient) Delete() *BusinessRecordEventDelete {
+	mutation := newBusinessRecordEventMutation(c.config, OpDelete)
+	return &BusinessRecordEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BusinessRecordEventClient) DeleteOne(_m *BusinessRecordEvent) *BusinessRecordEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BusinessRecordEventClient) DeleteOneID(id int) *BusinessRecordEventDeleteOne {
+	builder := c.Delete().Where(businessrecordevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BusinessRecordEventDeleteOne{builder}
+}
+
+// Query returns a query builder for BusinessRecordEvent.
+func (c *BusinessRecordEventClient) Query() *BusinessRecordEventQuery {
+	return &BusinessRecordEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBusinessRecordEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BusinessRecordEvent entity by its id.
+func (c *BusinessRecordEventClient) Get(ctx context.Context, id int) (*BusinessRecordEvent, error) {
+	return c.Query().Where(businessrecordevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BusinessRecordEventClient) GetX(ctx context.Context, id int) *BusinessRecordEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *BusinessRecordEventClient) Hooks() []Hook {
+	return c.hooks.BusinessRecordEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *BusinessRecordEventClient) Interceptors() []Interceptor {
+	return c.inters.BusinessRecordEvent
+}
+
+func (c *BusinessRecordEventClient) mutate(ctx context.Context, m *BusinessRecordEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BusinessRecordEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BusinessRecordEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BusinessRecordEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BusinessRecordEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BusinessRecordEvent mutation op: %q", m.Op())
+	}
+}
+
+// BusinessRecordItemClient is a client for the BusinessRecordItem schema.
+type BusinessRecordItemClient struct {
+	config
+}
+
+// NewBusinessRecordItemClient returns a client for the BusinessRecordItem from the given config.
+func NewBusinessRecordItemClient(c config) *BusinessRecordItemClient {
+	return &BusinessRecordItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `businessrecorditem.Hooks(f(g(h())))`.
+func (c *BusinessRecordItemClient) Use(hooks ...Hook) {
+	c.hooks.BusinessRecordItem = append(c.hooks.BusinessRecordItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `businessrecorditem.Intercept(f(g(h())))`.
+func (c *BusinessRecordItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.BusinessRecordItem = append(c.inters.BusinessRecordItem, interceptors...)
+}
+
+// Create returns a builder for creating a BusinessRecordItem entity.
+func (c *BusinessRecordItemClient) Create() *BusinessRecordItemCreate {
+	mutation := newBusinessRecordItemMutation(c.config, OpCreate)
+	return &BusinessRecordItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of BusinessRecordItem entities.
+func (c *BusinessRecordItemClient) CreateBulk(builders ...*BusinessRecordItemCreate) *BusinessRecordItemCreateBulk {
+	return &BusinessRecordItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *BusinessRecordItemClient) MapCreateBulk(slice any, setFunc func(*BusinessRecordItemCreate, int)) *BusinessRecordItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &BusinessRecordItemCreateBulk{err: fmt.Errorf("calling to BusinessRecordItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*BusinessRecordItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &BusinessRecordItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for BusinessRecordItem.
+func (c *BusinessRecordItemClient) Update() *BusinessRecordItemUpdate {
+	mutation := newBusinessRecordItemMutation(c.config, OpUpdate)
+	return &BusinessRecordItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *BusinessRecordItemClient) UpdateOne(_m *BusinessRecordItem) *BusinessRecordItemUpdateOne {
+	mutation := newBusinessRecordItemMutation(c.config, OpUpdateOne, withBusinessRecordItem(_m))
+	return &BusinessRecordItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *BusinessRecordItemClient) UpdateOneID(id int) *BusinessRecordItemUpdateOne {
+	mutation := newBusinessRecordItemMutation(c.config, OpUpdateOne, withBusinessRecordItemID(id))
+	return &BusinessRecordItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for BusinessRecordItem.
+func (c *BusinessRecordItemClient) Delete() *BusinessRecordItemDelete {
+	mutation := newBusinessRecordItemMutation(c.config, OpDelete)
+	return &BusinessRecordItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *BusinessRecordItemClient) DeleteOne(_m *BusinessRecordItem) *BusinessRecordItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *BusinessRecordItemClient) DeleteOneID(id int) *BusinessRecordItemDeleteOne {
+	builder := c.Delete().Where(businessrecorditem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &BusinessRecordItemDeleteOne{builder}
+}
+
+// Query returns a query builder for BusinessRecordItem.
+func (c *BusinessRecordItemClient) Query() *BusinessRecordItemQuery {
+	return &BusinessRecordItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeBusinessRecordItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a BusinessRecordItem entity by its id.
+func (c *BusinessRecordItemClient) Get(ctx context.Context, id int) (*BusinessRecordItem, error) {
+	return c.Query().Where(businessrecorditem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *BusinessRecordItemClient) GetX(ctx context.Context, id int) *BusinessRecordItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *BusinessRecordItemClient) Hooks() []Hook {
+	return c.hooks.BusinessRecordItem
+}
+
+// Interceptors returns the client interceptors.
+func (c *BusinessRecordItemClient) Interceptors() []Interceptor {
+	return c.inters.BusinessRecordItem
+}
+
+func (c *BusinessRecordItemClient) mutate(ctx context.Context, m *BusinessRecordItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&BusinessRecordItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&BusinessRecordItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&BusinessRecordItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&BusinessRecordItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown BusinessRecordItem mutation op: %q", m.Op())
+	}
+}
+
 // UserClient is a client for the User schema.
 type UserClient struct {
 	config
@@ -473,12 +929,445 @@ func (c *UserClient) mutate(ctx context.Context, m *UserMutation) (Value, error)
 	}
 }
 
+// WorkflowBusinessStateClient is a client for the WorkflowBusinessState schema.
+type WorkflowBusinessStateClient struct {
+	config
+}
+
+// NewWorkflowBusinessStateClient returns a client for the WorkflowBusinessState from the given config.
+func NewWorkflowBusinessStateClient(c config) *WorkflowBusinessStateClient {
+	return &WorkflowBusinessStateClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workflowbusinessstate.Hooks(f(g(h())))`.
+func (c *WorkflowBusinessStateClient) Use(hooks ...Hook) {
+	c.hooks.WorkflowBusinessState = append(c.hooks.WorkflowBusinessState, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workflowbusinessstate.Intercept(f(g(h())))`.
+func (c *WorkflowBusinessStateClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkflowBusinessState = append(c.inters.WorkflowBusinessState, interceptors...)
+}
+
+// Create returns a builder for creating a WorkflowBusinessState entity.
+func (c *WorkflowBusinessStateClient) Create() *WorkflowBusinessStateCreate {
+	mutation := newWorkflowBusinessStateMutation(c.config, OpCreate)
+	return &WorkflowBusinessStateCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkflowBusinessState entities.
+func (c *WorkflowBusinessStateClient) CreateBulk(builders ...*WorkflowBusinessStateCreate) *WorkflowBusinessStateCreateBulk {
+	return &WorkflowBusinessStateCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkflowBusinessStateClient) MapCreateBulk(slice any, setFunc func(*WorkflowBusinessStateCreate, int)) *WorkflowBusinessStateCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkflowBusinessStateCreateBulk{err: fmt.Errorf("calling to WorkflowBusinessStateClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkflowBusinessStateCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkflowBusinessStateCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkflowBusinessState.
+func (c *WorkflowBusinessStateClient) Update() *WorkflowBusinessStateUpdate {
+	mutation := newWorkflowBusinessStateMutation(c.config, OpUpdate)
+	return &WorkflowBusinessStateUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkflowBusinessStateClient) UpdateOne(_m *WorkflowBusinessState) *WorkflowBusinessStateUpdateOne {
+	mutation := newWorkflowBusinessStateMutation(c.config, OpUpdateOne, withWorkflowBusinessState(_m))
+	return &WorkflowBusinessStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkflowBusinessStateClient) UpdateOneID(id int) *WorkflowBusinessStateUpdateOne {
+	mutation := newWorkflowBusinessStateMutation(c.config, OpUpdateOne, withWorkflowBusinessStateID(id))
+	return &WorkflowBusinessStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkflowBusinessState.
+func (c *WorkflowBusinessStateClient) Delete() *WorkflowBusinessStateDelete {
+	mutation := newWorkflowBusinessStateMutation(c.config, OpDelete)
+	return &WorkflowBusinessStateDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkflowBusinessStateClient) DeleteOne(_m *WorkflowBusinessState) *WorkflowBusinessStateDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkflowBusinessStateClient) DeleteOneID(id int) *WorkflowBusinessStateDeleteOne {
+	builder := c.Delete().Where(workflowbusinessstate.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkflowBusinessStateDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkflowBusinessState.
+func (c *WorkflowBusinessStateClient) Query() *WorkflowBusinessStateQuery {
+	return &WorkflowBusinessStateQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkflowBusinessState},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkflowBusinessState entity by its id.
+func (c *WorkflowBusinessStateClient) Get(ctx context.Context, id int) (*WorkflowBusinessState, error) {
+	return c.Query().Where(workflowbusinessstate.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkflowBusinessStateClient) GetX(ctx context.Context, id int) *WorkflowBusinessState {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WorkflowBusinessStateClient) Hooks() []Hook {
+	return c.hooks.WorkflowBusinessState
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkflowBusinessStateClient) Interceptors() []Interceptor {
+	return c.inters.WorkflowBusinessState
+}
+
+func (c *WorkflowBusinessStateClient) mutate(ctx context.Context, m *WorkflowBusinessStateMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkflowBusinessStateCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkflowBusinessStateUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkflowBusinessStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkflowBusinessStateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkflowBusinessState mutation op: %q", m.Op())
+	}
+}
+
+// WorkflowTaskClient is a client for the WorkflowTask schema.
+type WorkflowTaskClient struct {
+	config
+}
+
+// NewWorkflowTaskClient returns a client for the WorkflowTask from the given config.
+func NewWorkflowTaskClient(c config) *WorkflowTaskClient {
+	return &WorkflowTaskClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workflowtask.Hooks(f(g(h())))`.
+func (c *WorkflowTaskClient) Use(hooks ...Hook) {
+	c.hooks.WorkflowTask = append(c.hooks.WorkflowTask, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workflowtask.Intercept(f(g(h())))`.
+func (c *WorkflowTaskClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkflowTask = append(c.inters.WorkflowTask, interceptors...)
+}
+
+// Create returns a builder for creating a WorkflowTask entity.
+func (c *WorkflowTaskClient) Create() *WorkflowTaskCreate {
+	mutation := newWorkflowTaskMutation(c.config, OpCreate)
+	return &WorkflowTaskCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkflowTask entities.
+func (c *WorkflowTaskClient) CreateBulk(builders ...*WorkflowTaskCreate) *WorkflowTaskCreateBulk {
+	return &WorkflowTaskCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkflowTaskClient) MapCreateBulk(slice any, setFunc func(*WorkflowTaskCreate, int)) *WorkflowTaskCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkflowTaskCreateBulk{err: fmt.Errorf("calling to WorkflowTaskClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkflowTaskCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkflowTaskCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkflowTask.
+func (c *WorkflowTaskClient) Update() *WorkflowTaskUpdate {
+	mutation := newWorkflowTaskMutation(c.config, OpUpdate)
+	return &WorkflowTaskUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkflowTaskClient) UpdateOne(_m *WorkflowTask) *WorkflowTaskUpdateOne {
+	mutation := newWorkflowTaskMutation(c.config, OpUpdateOne, withWorkflowTask(_m))
+	return &WorkflowTaskUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkflowTaskClient) UpdateOneID(id int) *WorkflowTaskUpdateOne {
+	mutation := newWorkflowTaskMutation(c.config, OpUpdateOne, withWorkflowTaskID(id))
+	return &WorkflowTaskUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkflowTask.
+func (c *WorkflowTaskClient) Delete() *WorkflowTaskDelete {
+	mutation := newWorkflowTaskMutation(c.config, OpDelete)
+	return &WorkflowTaskDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkflowTaskClient) DeleteOne(_m *WorkflowTask) *WorkflowTaskDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkflowTaskClient) DeleteOneID(id int) *WorkflowTaskDeleteOne {
+	builder := c.Delete().Where(workflowtask.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkflowTaskDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkflowTask.
+func (c *WorkflowTaskClient) Query() *WorkflowTaskQuery {
+	return &WorkflowTaskQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkflowTask},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkflowTask entity by its id.
+func (c *WorkflowTaskClient) Get(ctx context.Context, id int) (*WorkflowTask, error) {
+	return c.Query().Where(workflowtask.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkflowTaskClient) GetX(ctx context.Context, id int) *WorkflowTask {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryEvents queries the events edge of a WorkflowTask.
+func (c *WorkflowTaskClient) QueryEvents(_m *WorkflowTask) *WorkflowTaskEventQuery {
+	query := (&WorkflowTaskEventClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(workflowtask.Table, workflowtask.FieldID, id),
+			sqlgraph.To(workflowtaskevent.Table, workflowtaskevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, workflowtask.EventsTable, workflowtask.EventsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *WorkflowTaskClient) Hooks() []Hook {
+	return c.hooks.WorkflowTask
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkflowTaskClient) Interceptors() []Interceptor {
+	return c.inters.WorkflowTask
+}
+
+func (c *WorkflowTaskClient) mutate(ctx context.Context, m *WorkflowTaskMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkflowTaskCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkflowTaskUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkflowTaskUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkflowTaskDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkflowTask mutation op: %q", m.Op())
+	}
+}
+
+// WorkflowTaskEventClient is a client for the WorkflowTaskEvent schema.
+type WorkflowTaskEventClient struct {
+	config
+}
+
+// NewWorkflowTaskEventClient returns a client for the WorkflowTaskEvent from the given config.
+func NewWorkflowTaskEventClient(c config) *WorkflowTaskEventClient {
+	return &WorkflowTaskEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `workflowtaskevent.Hooks(f(g(h())))`.
+func (c *WorkflowTaskEventClient) Use(hooks ...Hook) {
+	c.hooks.WorkflowTaskEvent = append(c.hooks.WorkflowTaskEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `workflowtaskevent.Intercept(f(g(h())))`.
+func (c *WorkflowTaskEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WorkflowTaskEvent = append(c.inters.WorkflowTaskEvent, interceptors...)
+}
+
+// Create returns a builder for creating a WorkflowTaskEvent entity.
+func (c *WorkflowTaskEventClient) Create() *WorkflowTaskEventCreate {
+	mutation := newWorkflowTaskEventMutation(c.config, OpCreate)
+	return &WorkflowTaskEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WorkflowTaskEvent entities.
+func (c *WorkflowTaskEventClient) CreateBulk(builders ...*WorkflowTaskEventCreate) *WorkflowTaskEventCreateBulk {
+	return &WorkflowTaskEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WorkflowTaskEventClient) MapCreateBulk(slice any, setFunc func(*WorkflowTaskEventCreate, int)) *WorkflowTaskEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WorkflowTaskEventCreateBulk{err: fmt.Errorf("calling to WorkflowTaskEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WorkflowTaskEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WorkflowTaskEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WorkflowTaskEvent.
+func (c *WorkflowTaskEventClient) Update() *WorkflowTaskEventUpdate {
+	mutation := newWorkflowTaskEventMutation(c.config, OpUpdate)
+	return &WorkflowTaskEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WorkflowTaskEventClient) UpdateOne(_m *WorkflowTaskEvent) *WorkflowTaskEventUpdateOne {
+	mutation := newWorkflowTaskEventMutation(c.config, OpUpdateOne, withWorkflowTaskEvent(_m))
+	return &WorkflowTaskEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WorkflowTaskEventClient) UpdateOneID(id int) *WorkflowTaskEventUpdateOne {
+	mutation := newWorkflowTaskEventMutation(c.config, OpUpdateOne, withWorkflowTaskEventID(id))
+	return &WorkflowTaskEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WorkflowTaskEvent.
+func (c *WorkflowTaskEventClient) Delete() *WorkflowTaskEventDelete {
+	mutation := newWorkflowTaskEventMutation(c.config, OpDelete)
+	return &WorkflowTaskEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WorkflowTaskEventClient) DeleteOne(_m *WorkflowTaskEvent) *WorkflowTaskEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WorkflowTaskEventClient) DeleteOneID(id int) *WorkflowTaskEventDeleteOne {
+	builder := c.Delete().Where(workflowtaskevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WorkflowTaskEventDeleteOne{builder}
+}
+
+// Query returns a query builder for WorkflowTaskEvent.
+func (c *WorkflowTaskEventClient) Query() *WorkflowTaskEventQuery {
+	return &WorkflowTaskEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWorkflowTaskEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WorkflowTaskEvent entity by its id.
+func (c *WorkflowTaskEventClient) Get(ctx context.Context, id int) (*WorkflowTaskEvent, error) {
+	return c.Query().Where(workflowtaskevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WorkflowTaskEventClient) GetX(ctx context.Context, id int) *WorkflowTaskEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTask queries the task edge of a WorkflowTaskEvent.
+func (c *WorkflowTaskEventClient) QueryTask(_m *WorkflowTaskEvent) *WorkflowTaskQuery {
+	query := (&WorkflowTaskClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(workflowtaskevent.Table, workflowtaskevent.FieldID, id),
+			sqlgraph.To(workflowtask.Table, workflowtask.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, workflowtaskevent.TaskTable, workflowtaskevent.TaskColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *WorkflowTaskEventClient) Hooks() []Hook {
+	return c.hooks.WorkflowTaskEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *WorkflowTaskEventClient) Interceptors() []Interceptor {
+	return c.inters.WorkflowTaskEvent
+}
+
+func (c *WorkflowTaskEventClient) mutate(ctx context.Context, m *WorkflowTaskEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WorkflowTaskEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WorkflowTaskEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WorkflowTaskEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WorkflowTaskEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WorkflowTaskEvent mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AdminUser, User []ent.Hook
+		AdminUser, BusinessRecord, BusinessRecordEvent, BusinessRecordItem, User,
+		WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
-		AdminUser, User []ent.Interceptor
+		AdminUser, BusinessRecord, BusinessRecordEvent, BusinessRecordItem, User,
+		WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Interceptor
 	}
 )

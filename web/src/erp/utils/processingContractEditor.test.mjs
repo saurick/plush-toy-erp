@@ -7,6 +7,7 @@ import {
   deleteProcessingContractLine,
   insertProcessingContractLine,
   splitProcessingDetailCellMerge,
+  updateProcessingContractLineCell,
 } from './processingContractEditor.mjs'
 
 const sampleLines = [
@@ -24,7 +25,7 @@ const sampleLines = [
   },
 ]
 
-test('processingContractEditor: 插入明细行后会返回新选择位置', () => {
+test('FL_processing_contract_editor__clears_blank_inserted_lines processingContractEditor: 插入明细行后会返回新选择位置', () => {
   const inserted = insertProcessingContractLine({
     lines: sampleLines,
     selectedLineIndex: 0,
@@ -65,7 +66,7 @@ test('processingContractEditor: 达到 300 行后不允许继续插入', () => {
   assert.match(inserted.message, /最多支持 300 行/)
 })
 
-test('processingContractEditor: 删除到只剩一行时会重置为空白行', () => {
+test('FL_processing_contract_editor__clears_deleted_last_line processingContractEditor: 删除到只剩一行时会重置为空白行', () => {
   const deleted = deleteProcessingContractLine({
     lines: [sampleLines[0]],
     selectedLineIndex: 0,
@@ -87,11 +88,12 @@ test('processingContractEditor: 删除到只剩一行时会重置为空白行', 
     unit: '',
     unitPrice: '',
     quantity: '',
+    amount: '',
     remark: '',
   })
 })
 
-test('processingContractEditor: 合并选区后会清空被覆盖单元格，拆分后可恢复独立结构', () => {
+test('FL_processing_contract_editor__clears_covered_cell_stale_value processingContractEditor: 合并选区后会清空被覆盖单元格，拆分后可恢复独立结构', () => {
   const merged = applyProcessingDetailCellMerge({
     lines: sampleLines,
     merges: [],
@@ -146,4 +148,68 @@ test('processingContractEditor: 插删行会同步维护纵向合并块', () => 
   assert.equal(deleted.ok, true)
   assert.equal(deleted.lines.length, 1)
   assert.equal(deleted.merges.length, 0)
+})
+
+test('FL_processing_contract_editor__recomputes_default_amount_on_quantity_change processingContractEditor: 调整数量时会同步重算默认委托加工金额', () => {
+  const nextLines = updateProcessingContractLineCell(
+    [
+      {
+        quantity: '10',
+        unitPrice: '2',
+        amount: '20',
+      },
+    ],
+    0,
+    'quantity',
+    '12'
+  )
+
+  assert.equal(nextLines[0].quantity, '12')
+  assert.equal(nextLines[0].amount, '24')
+})
+
+test('FL_processing_contract_editor__keeps_manual_amount_on_quantity_change processingContractEditor: 已手工改写的委托加工金额不会被数量变更覆盖', () => {
+  const nextLines = updateProcessingContractLineCell(
+    [
+      {
+        quantity: '10',
+        unitPrice: '2',
+        amount: '18.5',
+      },
+    ],
+    0,
+    'quantity',
+    '12'
+  )
+
+  assert.equal(nextLines[0].quantity, '12')
+  assert.equal(nextLines[0].amount, '18.5')
+})
+
+test('processingContractEditor: 委托加工金额输入态会保留用户正在输入的小数点', () => {
+  const typingLines = updateProcessingContractLineCell(
+    [
+      {
+        quantity: '10',
+        unitPrice: '2',
+        amount: '20',
+      },
+    ],
+    0,
+    'amount',
+    '12.',
+    { amountInputPhase: 'input' }
+  )
+
+  assert.equal(typingLines[0].amount, '12.')
+
+  const committedLines = updateProcessingContractLineCell(
+    typingLines,
+    0,
+    'amount',
+    '12.',
+    { amountInputPhase: 'commit' }
+  )
+
+  assert.equal(committedLines[0].amount, '12')
 })

@@ -28,6 +28,8 @@
 
 - HTTP `0.0.0.0:8200`
 - gRPC `0.0.0.0:9200`
+- `server.http.timeout=45s`，给 `/templates/render-pdf` 这类重渲染链路留出稳定完成窗口
+- `server.grpc.timeout=10s`
 
 ## `log`
 

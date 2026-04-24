@@ -6,6 +6,7 @@ import {
   buildPrintWorkspacePath,
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
+  PRINT_WORKSPACE_ENTRY_SOURCE,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
@@ -65,6 +66,11 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
       resetDraftOnOpen={resetDraftOnOpen}
       workspaceStateID={workspaceStateID}
       workspaceURL={workspaceURL}
+      sourceTag={
+        entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS
+          ? '业务记录带值'
+          : '使用默认模板'
+      }
     />
   )
 }

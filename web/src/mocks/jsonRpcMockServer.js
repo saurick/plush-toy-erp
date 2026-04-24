@@ -1,6 +1,70 @@
 // src/mocks/jsonRpcMockServer.js
 
 let originalFetch = null
+let mockWorkflowTaskID = 1
+let mockWorkflowBusinessStateID = 1
+let mockBusinessRecordID = 1
+let mockBusinessRecordItemID = 1
+const mockWorkflowTasks = []
+const mockWorkflowBusinessStates = []
+const mockBusinessRecords = []
+
+const mockTaskStates = [
+  { key: 'pending', label: '待开始', summary: '任务已创建，等待前置条件。' },
+  { key: 'ready', label: '可执行', summary: '前置条件已满足。' },
+  { key: 'processing', label: '处理中', summary: '任务正在推进。' },
+  { key: 'blocked', label: '阻塞', summary: '被缺料、缺资料或异常卡住。' },
+  { key: 'done', label: '已完成', summary: '完成条件已达到。' },
+  { key: 'rejected', label: '已退回', summary: '需要回退处理。' },
+  { key: 'cancelled', label: '已取消', summary: '任务已取消。' },
+  { key: 'closed', label: '已关闭', summary: '任务已归档。' },
+]
+
+const mockBusinessStates = [
+  {
+    key: 'project_pending',
+    label: '立项待确认',
+    summary: '客户、编号、交期正在收口。',
+  },
+  {
+    key: 'project_approved',
+    label: '立项已放行',
+    summary: '允许进入采购和生产准备。',
+  },
+  {
+    key: 'engineering_preparing',
+    label: '资料准备中',
+    summary: 'BOM 和资料正在补齐。',
+  },
+  {
+    key: 'material_preparing',
+    label: '齐套准备中',
+    summary: '主料、辅包材或委外仍在确认。',
+  },
+  { key: 'production_ready', label: '待排产', summary: '等待 PMC 排单。' },
+  {
+    key: 'production_processing',
+    label: '生产中',
+    summary: '已进入生产执行。',
+  },
+  { key: 'qc_pending', label: '待检验', summary: '等待检验确认。' },
+  {
+    key: 'warehouse_processing',
+    label: '待入库 / 待出货',
+    summary: '仓库正在处理。',
+  },
+  {
+    key: 'shipping_released',
+    label: '已放行待出库',
+    summary: '等待仓库出库。',
+  },
+  { key: 'shipped', label: '已出货', summary: '出库事实已形成。' },
+  { key: 'reconciling', label: '对账中', summary: '费用正在核对。' },
+  { key: 'settled', label: '已结算', summary: '结算已闭环。' },
+  { key: 'blocked', label: '业务阻塞', summary: '主链被异常卡住。' },
+  { key: 'cancelled', label: '业务取消', summary: '业务已取消。' },
+  { key: 'closed', label: '业务归档', summary: '业务已归档。' },
+]
 
 // 构造一个 JSON-RPC 成功响应
 function makeJsonRpcSuccess(id, payload = {}) {
@@ -21,6 +85,222 @@ function makeBizResult(payload = {}) {
     code: 0,
     message: 'OK',
     data: payload,
+  }
+}
+
+function nowUnix() {
+  return Math.floor(Date.now() / 1000)
+}
+
+function matchWorkflowFilter(item, params) {
+  return (
+    (!params.source_type || item.source_type === params.source_type) &&
+    (!params.source_id ||
+      Number(item.source_id) === Number(params.source_id)) &&
+    (!params.owner_role_key || item.owner_role_key === params.owner_role_key) &&
+    (!params.task_status_key ||
+      item.task_status_key === params.task_status_key) &&
+    (!params.business_status_key ||
+      item.business_status_key === params.business_status_key)
+  )
+}
+
+function normalizeMockDateFilterValue(value) {
+  if (value === null || value === undefined || value === '') {
+    return ''
+  }
+  const text = String(value).trim()
+  if (/^\d+$/.test(text)) {
+    const date = new Date(Number(text) * 1000)
+    if (Number.isNaN(date.getTime())) return ''
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+      2,
+      '0'
+    )}-${String(date.getDate()).padStart(2, '0')}`
+  }
+  const matched = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
+  if (matched) {
+    return `${matched[1]}-${String(Number(matched[2])).padStart(
+      2,
+      '0'
+    )}-${String(Number(matched[3])).padStart(2, '0')}`
+  }
+  const date = new Date(text)
+  if (Number.isNaN(date.getTime())) return ''
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    '0'
+  )}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function normalizeMockStringList(values) {
+  const source = Array.isArray(values) ? values : [values]
+  const seen = new Set()
+  return source
+    .flatMap((value) =>
+      String(value ?? '')
+        .split(',')
+        .map((item) => item.trim())
+    )
+    .filter((value) => {
+      if (!value || seen.has(value)) {
+        return false
+      }
+      seen.add(value)
+      return true
+    })
+}
+
+function matchBusinessRecordFilter(item, params) {
+  const keyword = String(params.keyword || '')
+    .trim()
+    .toLowerCase()
+  const businessStatusKeys = normalizeMockStringList(
+    params.business_status_keys
+  )
+  const dateFilterKey = String(params.date_filter_key || '').trim()
+  const dateRangeStart = normalizeMockDateFilterValue(params.date_range_start)
+  const dateRangeEnd = normalizeMockDateFilterValue(params.date_range_end)
+  const recordDateValue = normalizeMockDateFilterValue(item?.[dateFilterKey])
+  const startMatched = dateRangeStart
+    ? Boolean(recordDateValue) && recordDateValue >= dateRangeStart
+    : true
+  const endMatched = dateRangeEnd
+    ? Boolean(recordDateValue) && recordDateValue <= dateRangeEnd
+    : true
+  const keywordMatched =
+    !keyword ||
+    [
+      item.document_no,
+      item.title,
+      item.source_no,
+      item.customer_name,
+      item.supplier_name,
+      item.style_no,
+      item.product_no,
+      item.product_name,
+      item.material_name,
+      item.warehouse_location,
+    ]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(keyword))
+
+  return (
+    (!params.module_key || item.module_key === params.module_key) &&
+    (businessStatusKeys.length > 0
+      ? businessStatusKeys.includes(item.business_status_key)
+      : !params.business_status_key ||
+        item.business_status_key === params.business_status_key) &&
+    (!params.owner_role_key || item.owner_role_key === params.owner_role_key) &&
+    (params.deleted_only
+      ? Boolean(item.deleted_at)
+      : params.include_deleted || !item.deleted_at) &&
+    startMatched &&
+    endMatched &&
+    keywordMatched
+  )
+}
+
+function sortBusinessRecords(records, sortOrder = 'desc') {
+  const normalizedOrder = sortOrder === 'asc' ? 'asc' : 'desc'
+  return [...records].sort((left, right) => {
+    const leftCreatedAt = Number(left?.created_at || 0)
+    const rightCreatedAt = Number(right?.created_at || 0)
+    if (leftCreatedAt !== rightCreatedAt) {
+      return normalizedOrder === 'asc'
+        ? leftCreatedAt - rightCreatedAt
+        : rightCreatedAt - leftCreatedAt
+    }
+    const leftID = Number(left?.id || 0)
+    const rightID = Number(right?.id || 0)
+    return normalizedOrder === 'asc' ? leftID - rightID : rightID - leftID
+  })
+}
+
+function buildBusinessDashboardStats() {
+  const moduleStats = new Map()
+  mockBusinessRecords.forEach((record) => {
+    if (record.deleted_at) {
+      return
+    }
+    const moduleKey = String(record.module_key || '').trim()
+    const statusKey = String(record.business_status_key || '').trim()
+    if (!moduleKey || !statusKey) {
+      return
+    }
+    const stats = moduleStats.get(moduleKey) || {
+      module_key: moduleKey,
+      total: 0,
+      status_counts: {},
+    }
+    stats.total += 1
+    stats.status_counts[statusKey] =
+      Number(stats.status_counts[statusKey] || 0) + 1
+    moduleStats.set(moduleKey, stats)
+  })
+  return Array.from(moduleStats.values())
+}
+
+function makeBusinessRecord(params, existing = {}) {
+  const now = nowUnix()
+  const items = Array.isArray(params.items)
+    ? params.items.map((item, index) => ({
+        id: item.id || mockBusinessRecordItemID++,
+        record_id: existing.id || mockBusinessRecordID,
+        module_key:
+          params.module_key || existing.module_key || 'project-orders',
+        line_no: Number(item.line_no || index + 1),
+        item_name: item.item_name || '',
+        material_name: item.material_name || '',
+        spec: item.spec || '',
+        unit: item.unit || '',
+        quantity: item.quantity ?? null,
+        unit_price: item.unit_price ?? null,
+        amount: item.amount ?? null,
+        supplier_name: item.supplier_name || '',
+        warehouse_location: item.warehouse_location || '',
+        payload: item.payload || {},
+        created_at: existing.created_at || now,
+        updated_at: now,
+      }))
+    : existing.items || []
+  return {
+    id: existing.id || mockBusinessRecordID++,
+    module_key: params.module_key || existing.module_key || 'project-orders',
+    document_no:
+      params.document_no ||
+      existing.document_no ||
+      `BR${String(mockBusinessRecordID).padStart(6, '0')}`,
+    title: params.title || existing.title || '模拟业务记录',
+    business_status_key:
+      params.business_status_key ||
+      existing.business_status_key ||
+      'project_pending',
+    owner_role_key:
+      params.owner_role_key || existing.owner_role_key || 'merchandiser',
+    source_no: params.source_no || '',
+    customer_name: params.customer_name || '',
+    supplier_name: params.supplier_name || '',
+    style_no: params.style_no || '',
+    product_no: params.product_no || '',
+    product_name: params.product_name || '',
+    material_name: params.material_name || '',
+    warehouse_location: params.warehouse_location || '',
+    quantity: params.quantity ?? null,
+    unit: params.unit || '',
+    amount: params.amount ?? null,
+    document_date: params.document_date || '',
+    due_date: params.due_date || '',
+    payload: params.payload || {},
+    items,
+    row_version: Number(existing.row_version || 0) + 1,
+    created_by: existing.created_by || 1,
+    updated_by: 1,
+    created_at: existing.created_at || now,
+    updated_at: now,
+    deleted_at: existing.deleted_at || null,
+    deleted_by: existing.deleted_by || null,
+    delete_reason: existing.delete_reason || '',
   }
 }
 
@@ -230,7 +510,8 @@ export function setupJsonRpcMockServer() {
       } else if (
         method === 'create' ||
         method === 'set_permissions' ||
-        method === 'set_disabled'
+        method === 'set_disabled' ||
+        method === 'reset_password'
       ) {
         responseBody = {
           jsonrpc: '2.0',
@@ -265,6 +546,275 @@ export function setupJsonRpcMockServer() {
           id,
           400,
           `unknown admin method: ${method}`
+        )
+      }
+    } else if (domain === 'user') {
+      if (method === 'list') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            users: [
+              {
+                id: 8,
+                username: 'mock-worker',
+                disabled: false,
+                created_at: nowUnix(),
+                last_login_at: nowUnix(),
+              },
+            ],
+            total: 1,
+          }),
+          error: '',
+        }
+      } else if (method === 'set_disabled' || method === 'reset_password') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            success: true,
+            user_id: Number(params.user_id || 8),
+            disabled: Boolean(params.disabled),
+          }),
+          error: '',
+        }
+      } else {
+        responseBody = makeJsonRpcBizError(
+          id,
+          400,
+          `unknown user method: ${method}`
+        )
+      }
+    } else if (domain === 'business') {
+      if (method === 'dashboard_stats') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            modules: buildBusinessDashboardStats(),
+          }),
+          error: '',
+        }
+      } else if (method === 'list_records') {
+        const records = sortBusinessRecords(
+          mockBusinessRecords.filter((item) =>
+            matchBusinessRecordFilter(item, params)
+          ),
+          params.sort_order
+        )
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            records,
+            total: records.length,
+            limit: Number(params.limit || 50),
+            offset: Number(params.offset || 0),
+          }),
+          error: '',
+        }
+      } else if (method === 'create_record') {
+        const record = makeBusinessRecord(params)
+        mockBusinessRecords.unshift(record)
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({ record }),
+          error: '',
+        }
+      } else if (method === 'update_record') {
+        const record = mockBusinessRecords.find(
+          (item) => Number(item.id) === Number(params.id)
+        )
+        if (!record) {
+          responseBody = makeJsonRpcBizError(id, 40010, '业务记录不存在')
+        } else {
+          Object.assign(record, makeBusinessRecord(params, record))
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ record }),
+            error: '',
+          }
+        }
+      } else if (method === 'delete_records') {
+        const ids = Array.isArray(params.ids) ? params.ids.map(Number) : []
+        let affected = 0
+        mockBusinessRecords.forEach((record) => {
+          if (ids.includes(Number(record.id)) && !record.deleted_at) {
+            record.deleted_at = nowUnix()
+            record.deleted_by = 1
+            record.delete_reason = params.delete_reason || '业务页删除'
+            affected += 1
+          }
+        })
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({ affected }),
+          error: '',
+        }
+      } else if (method === 'restore_record') {
+        const record = mockBusinessRecords.find(
+          (item) => Number(item.id) === Number(params.id)
+        )
+        if (!record) {
+          responseBody = makeJsonRpcBizError(id, 40010, '业务记录不存在')
+        } else {
+          record.deleted_at = null
+          record.deleted_by = null
+          record.delete_reason = ''
+          record.updated_at = nowUnix()
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ record }),
+            error: '',
+          }
+        }
+      } else {
+        responseBody = makeJsonRpcBizError(
+          id,
+          400,
+          `unknown business method: ${method}`
+        )
+      }
+    } else if (domain === 'workflow') {
+      if (method === 'metadata') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            task_states: mockTaskStates,
+            business_states: mockBusinessStates,
+            planning_phases: [],
+          }),
+          error: '',
+        }
+      } else if (method === 'list_tasks') {
+        const tasks = mockWorkflowTasks.filter((item) =>
+          matchWorkflowFilter(item, params)
+        )
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            tasks,
+            total: tasks.length,
+            limit: Number(params.limit || 50),
+            offset: Number(params.offset || 0),
+          }),
+          error: '',
+        }
+      } else if (method === 'create_task') {
+        const task = {
+          id: mockWorkflowTaskID++,
+          task_code: params.task_code || `mock-task-${Date.now()}`,
+          task_group: params.task_group || 'mock',
+          task_name: params.task_name || '模拟任务',
+          source_type: params.source_type || 'mock',
+          source_id: Number(params.source_id || Date.now()),
+          source_no: params.source_no || '',
+          business_status_key: params.business_status_key || '',
+          task_status_key: params.task_status_key || 'pending',
+          owner_role_key: params.owner_role_key || 'merchandiser',
+          assignee_id: null,
+          priority: Number(params.priority || 0),
+          blocked_reason: params.blocked_reason || '',
+          due_at: null,
+          started_at: null,
+          completed_at: null,
+          closed_at: null,
+          payload: params.payload || {},
+          created_by: 1,
+          updated_by: 1,
+          created_at: nowUnix(),
+          updated_at: nowUnix(),
+        }
+        mockWorkflowTasks.unshift(task)
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({ task }),
+          error: '',
+        }
+      } else if (method === 'update_task_status') {
+        const task = mockWorkflowTasks.find(
+          (item) => Number(item.id) === Number(params.id)
+        )
+        if (!task) {
+          responseBody = makeJsonRpcBizError(id, 40010, '任务不存在')
+        } else {
+          task.task_status_key = params.task_status_key || task.task_status_key
+          task.business_status_key =
+            params.business_status_key || task.business_status_key
+          task.updated_at = nowUnix()
+          task.payload = params.payload || task.payload || {}
+          if (params.reason) task.blocked_reason = params.reason
+          if (task.task_status_key === 'processing' && !task.started_at) {
+            task.started_at = nowUnix()
+          }
+          if (task.task_status_key === 'done') task.completed_at = nowUnix()
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({ task }),
+            error: '',
+          }
+        }
+      } else if (method === 'list_business_states') {
+        const businessStates = mockWorkflowBusinessStates.filter((item) =>
+          matchWorkflowFilter(item, params)
+        )
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            business_states: businessStates,
+            total: businessStates.length,
+            limit: Number(params.limit || 50),
+            offset: Number(params.offset || 0),
+          }),
+          error: '',
+        }
+      } else if (method === 'upsert_business_state') {
+        let businessState = mockWorkflowBusinessStates.find(
+          (item) =>
+            item.source_type === params.source_type &&
+            Number(item.source_id) === Number(params.source_id)
+        )
+        const nextBusinessState = {
+          id: businessState?.id || mockWorkflowBusinessStateID++,
+          source_type: params.source_type || 'mock',
+          source_id: Number(params.source_id || Date.now()),
+          source_no: params.source_no || '',
+          order_id: params.order_id || null,
+          batch_id: params.batch_id || null,
+          business_status_key: params.business_status_key || 'project_pending',
+          owner_role_key: params.owner_role_key || 'merchandiser',
+          blocked_reason: params.blocked_reason || '',
+          status_changed_at: nowUnix(),
+          payload: params.payload || {},
+          created_at: businessState?.created_at || nowUnix(),
+          updated_at: nowUnix(),
+        }
+        if (businessState) {
+          Object.assign(businessState, nextBusinessState)
+        } else {
+          businessState = nextBusinessState
+          mockWorkflowBusinessStates.unshift(businessState)
+        }
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({ business_state: businessState }),
+          error: '',
+        }
+      } else {
+        responseBody = makeJsonRpcBizError(
+          id,
+          400,
+          `unknown workflow method: ${method}`
         )
       }
     } else {

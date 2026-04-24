@@ -21,6 +21,7 @@ import PrintWorkspaceShell from './PrintWorkspaceShell.jsx'
 import {
   downloadPdfFromElement,
   openPdfPreviewFromElement,
+  warmupPdfPreviewFromElement,
 } from '../../utils/printPdf.mjs'
 import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../../utils/printWorkspace.js'
 import {
@@ -34,6 +35,7 @@ const CLAUSE_SECTIONS = [
   { key: 'contract', title: '二、合同约定' },
   { key: 'settlement', title: '三、结算方式' },
 ]
+const PDF_PREVIEW_WARMUP_DELAY_MS = 450
 
 function EditableText({
   value,
@@ -167,6 +169,16 @@ function loadDraft(template, storageKey, options = {}) {
   }
 }
 
+function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
+  if (resetDraftOnOpen) {
+    return '已按菜单入口恢复默认采购合同样例。'
+  }
+  if (sourceTag === '业务记录带值') {
+    return '已从业务页带入采购合同草稿，可继续核对并打印。'
+  }
+  return '已恢复模板样例数据。'
+}
+
 export default function MaterialPurchaseContractWorkbench({
   template,
   draftStorageKey = '',
@@ -174,6 +186,7 @@ export default function MaterialPurchaseContractWorkbench({
   resetDraftOnOpen = false,
   workspaceStateID = '',
   workspaceURL = '',
+  sourceTag = '使用默认模板',
 }) {
   const [draft, setDraft] = useState(() =>
     loadDraft(template, draftStorageKey, {
@@ -188,8 +201,8 @@ export default function MaterialPurchaseContractWorkbench({
   const [mergeSelectionAnchor, setMergeSelectionAnchor] = useState(null)
   const [mergeSelectionFocus, setMergeSelectionFocus] = useState(null)
   const [activeCell, setActiveCell] = useState(null)
-  const [toolbarStatus, setToolbarStatus] = useState(
-    '右侧模板已按实拍收口为纸质合同版式；仅中间采购明细区保留表格。'
+  const [toolbarStatus, setToolbarStatus] = useState(() =>
+    resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag)
   )
   const [pdfAction, setPdfAction] = useState('')
   const paperRef = useRef(null)
@@ -209,12 +222,14 @@ export default function MaterialPurchaseContractWorkbench({
     setMergeSelectionAnchor(null)
     setMergeSelectionFocus(null)
     setActiveCell(null)
-    setToolbarStatus(
-      resetDraftOnOpen
-        ? '已按菜单入口恢复默认采购合同样例。'
-        : '已恢复模板样例数据。'
-    )
-  }, [draftStorageKey, legacyDraftStorageKeys, resetDraftOnOpen, template])
+    setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
+  }, [
+    draftStorageKey,
+    legacyDraftStorageKeys,
+    resetDraftOnOpen,
+    sourceTag,
+    template,
+  ])
 
   useEffect(() => {
     if (!draftStorageKey || typeof window === 'undefined') {
@@ -239,7 +254,36 @@ export default function MaterialPurchaseContractWorkbench({
     templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
     workspaceURL,
     observeNodeRef: paperRef,
+    suspended: pdfAction !== '',
   })
+
+  useEffect(() => {
+    if (pdfAction || !paperRef.current) {
+      return undefined
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      if (cancelled || !paperRef.current) {
+        return
+      }
+
+      syncPrintPageMarginForPaper(paperRef.current, {
+        stageWrapElement: stageWrapRef.current,
+        paperContinuedClass: 'erp-material-contract-paper--continued',
+      })
+      warmupPdfPreviewFromElement(paperRef.current, {
+        title: '采购合同 PDF 预览',
+        fileName: 'material-purchase-contract-preview.pdf',
+        templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      }).catch(() => {})
+    }, PDF_PREVIEW_WARMUP_DELAY_MS)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [draft, pdfAction])
 
   const totals = useMemo(
     () => computeMaterialPurchaseTotals(draft.lines),
@@ -737,6 +781,7 @@ export default function MaterialPurchaseContractWorkbench({
   return (
     <PrintWorkspaceShell
       title="采购合同"
+      sourceTag={sourceTag}
       statusText={toolbarStatus}
       panelTip="提示：左侧字段与右侧采购合同双向同步；右侧仅中间采购明细区保留表格，合同头、条款和签字区都按纸质合同排版。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
@@ -995,18 +1040,18 @@ export default function MaterialPurchaseContractWorkbench({
 
           <table className="erp-material-contract-table">
             <colgroup>
-              <col style={{ width: '9.5%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '8%' }} />
+              <col style={{ width: '10.5%' }} />
               <col style={{ width: '11%' }} />
-              <col style={{ width: '12.5%' }} />
-              <col style={{ width: '13%' }} />
-              <col style={{ width: '11.5%' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '6.5%' }} />
+              <col style={{ width: '7.5%' }} />
               <col style={{ width: '9%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '11.5%' }} />
+              <col style={{ width: '9.5%' }} />
+              <col style={{ width: '9.5%' }} />
+              <col style={{ width: '8.5%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '5.5%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
             </colgroup>
             <thead>
               <tr>
@@ -1109,8 +1154,12 @@ export default function MaterialPurchaseContractWorkbench({
               <tr className="erp-material-contract-table__total">
                 <td colSpan={8} />
                 <td>合计</td>
-                <td>{totals.quantityText}</td>
-                <td>{totals.amountText}</td>
+                <td className="erp-contract-table__total-value">
+                  {totals.quantityText}
+                </td>
+                <td className="erp-contract-table__total-value">
+                  {totals.amountText}
+                </td>
                 <td />
               </tr>
             </tbody>

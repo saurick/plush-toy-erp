@@ -74,6 +74,11 @@ func MenuPermissions(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldMenuPermissions, v))
 }
 
+// ErpPreferences applies equality check predicate on the "erp_preferences" field. It's identical to ErpPreferencesEQ.
+func ErpPreferences(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldErpPreferences, v))
+}
+
 // Disabled applies equality check predicate on the "disabled" field. It's identical to DisabledEQ.
 func Disabled(v bool) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldDisabled, v))
@@ -327,6 +332,71 @@ func MenuPermissionsEqualFold(v string) predicate.AdminUser {
 // MenuPermissionsContainsFold applies the ContainsFold predicate on the "menu_permissions" field.
 func MenuPermissionsContainsFold(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldContainsFold(FieldMenuPermissions, v))
+}
+
+// ErpPreferencesEQ applies the EQ predicate on the "erp_preferences" field.
+func ErpPreferencesEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldErpPreferences, v))
+}
+
+// ErpPreferencesNEQ applies the NEQ predicate on the "erp_preferences" field.
+func ErpPreferencesNEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldErpPreferences, v))
+}
+
+// ErpPreferencesIn applies the In predicate on the "erp_preferences" field.
+func ErpPreferencesIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldErpPreferences, vs...))
+}
+
+// ErpPreferencesNotIn applies the NotIn predicate on the "erp_preferences" field.
+func ErpPreferencesNotIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldErpPreferences, vs...))
+}
+
+// ErpPreferencesGT applies the GT predicate on the "erp_preferences" field.
+func ErpPreferencesGT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldErpPreferences, v))
+}
+
+// ErpPreferencesGTE applies the GTE predicate on the "erp_preferences" field.
+func ErpPreferencesGTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldErpPreferences, v))
+}
+
+// ErpPreferencesLT applies the LT predicate on the "erp_preferences" field.
+func ErpPreferencesLT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldErpPreferences, v))
+}
+
+// ErpPreferencesLTE applies the LTE predicate on the "erp_preferences" field.
+func ErpPreferencesLTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldErpPreferences, v))
+}
+
+// ErpPreferencesContains applies the Contains predicate on the "erp_preferences" field.
+func ErpPreferencesContains(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContains(FieldErpPreferences, v))
+}
+
+// ErpPreferencesHasPrefix applies the HasPrefix predicate on the "erp_preferences" field.
+func ErpPreferencesHasPrefix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasPrefix(FieldErpPreferences, v))
+}
+
+// ErpPreferencesHasSuffix applies the HasSuffix predicate on the "erp_preferences" field.
+func ErpPreferencesHasSuffix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasSuffix(FieldErpPreferences, v))
+}
+
+// ErpPreferencesEqualFold applies the EqualFold predicate on the "erp_preferences" field.
+func ErpPreferencesEqualFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEqualFold(FieldErpPreferences, v))
+}
+
+// ErpPreferencesContainsFold applies the ContainsFold predicate on the "erp_preferences" field.
+func ErpPreferencesContainsFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContainsFold(FieldErpPreferences, v))
 }
 
 // DisabledEQ applies the EQ predicate on the "disabled" field.

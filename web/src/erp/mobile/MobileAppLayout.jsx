@@ -1,62 +1,62 @@
-import React from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import React, { useMemo, useState } from 'react'
+import { Outlet, useNavigate } from 'react-router-dom'
+import { LogoutOutlined } from '@ant-design/icons'
+import { AUTH_SCOPE, logout } from '@/common/auth/auth'
 import AppShell from '@/common/components/layout/AppShell'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
-import { useERPWorkspace } from '../context/ERPWorkspaceProvider'
-import { getMobileNavItemClass, mobileTheme } from './theme'
-
-const MOBILE_NAV_ITEMS = [
-  {
-    key: 'home',
-    path: '/',
-    label: '首页',
-  },
-  {
-    key: 'tasks',
-    path: '/tasks',
-    label: '任务',
-  },
-  {
-    key: 'guide',
-    path: '/guide',
-    label: '说明',
-  },
-]
+import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
+import { JsonRpc } from '@/common/utils/jsonRpc'
+import { mobileTheme } from './theme'
 
 export default function MobileAppLayout() {
-  const { activeRole, appConfig } = useERPWorkspace()
+  const navigate = useNavigate()
+  const [loggingOut, setLoggingOut] = useState(false)
+  const authRpc = useMemo(
+    () =>
+      new JsonRpc({
+        url: 'auth',
+        basePath: ADMIN_BASE_PATH,
+        authScope: AUTH_SCOPE.ADMIN,
+      }),
+    []
+  )
+
+  const handleLogout = async () => {
+    if (loggingOut) {
+      return
+    }
+
+    setLoggingOut(true)
+    try {
+      await authRpc.call('logout')
+    } catch (error) {
+      console.warn('移动端 logout 失败', error)
+    } finally {
+      logout(AUTH_SCOPE.ADMIN)
+      navigate('/admin-login', { replace: true })
+    }
+  }
 
   return (
-    <AppShell className="px-3 py-4 sm:px-4">
-      <div className="mx-auto max-w-[540px] space-y-4">
-        <SurfacePanel className="p-5">
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className={mobileTheme.badge}>{appConfig.shortTitle}</div>
-              <div className={mobileTheme.metaBadge}>后端 8200</div>
-            </div>
-            <div>
-              <div className={mobileTheme.heroTitle}>{activeRole.title}</div>
-              <div className={mobileTheme.heroDescription}>
-                {appConfig.description}
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {MOBILE_NAV_ITEMS.map((item) => (
-                <NavLink
-                  key={item.key}
-                  to={item.path}
-                  end={item.path === '/'}
-                  className={({ isActive }) => getMobileNavItemClass(isActive)}
-                >
-                  {item.label}
-                </NavLink>
-              ))}
-            </div>
-          </div>
+    <AppShell className="px-3 py-4 sm:px-4 md:px-8">
+      <div className="mobile-app-layout mx-auto max-w-[540px] space-y-4 md:max-w-[920px]">
+        <SurfacePanel className="p-4 md:p-5">
+          <h1 className={mobileTheme.pageTitle}>待办</h1>
         </SurfacePanel>
 
         <Outlet />
+
+        <div className="flex justify-center pb-3">
+          <button
+            type="button"
+            className={mobileTheme.logoutButton}
+            onClick={handleLogout}
+            disabled={loggingOut}
+          >
+            <LogoutOutlined aria-hidden="true" />
+            <span>{loggingOut ? '退出中' : '退出登录'}</span>
+          </button>
+        </div>
       </div>
     </AppShell>
   )

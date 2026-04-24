@@ -1,6 +1,9 @@
 import {
   createEmptyProcessingLine,
+  normalizeProcessingAmountDraft,
+  normalizeProcessingAmountText,
   normalizeProcessingLine,
+  resolveComputedProcessingLineAmount,
   PROCESSING_CONTRACT_TABLE_COLUMNS,
 } from '../data/processingContractTemplate.mjs'
 import {
@@ -15,6 +18,47 @@ export const PROCESSING_CONTRACT_MAX_ROWS = 300
 const PROCESSING_DETAIL_COLUMN_KEYS = PROCESSING_CONTRACT_TABLE_COLUMNS.map(
   (column) => column.fieldKey
 )
+
+const toRawLineText = (value) => String(value ?? '').replaceAll('\r', '')
+
+export const updateProcessingContractLineCell = (
+  lines,
+  rowIndex,
+  columnKey,
+  rawValue,
+  { amountInputPhase = 'commit' } = {}
+) =>
+  (Array.isArray(lines) ? lines : []).map((line, index) => {
+    if (index !== rowIndex) {
+      return line
+    }
+
+    const nextLine = {
+      ...line,
+      [columnKey]: toRawLineText(rawValue),
+    }
+
+    if (columnKey === 'amount') {
+      nextLine.amount =
+        amountInputPhase === 'input'
+          ? normalizeProcessingAmountDraft(rawValue)
+          : normalizeProcessingAmountText(rawValue)
+      return nextLine
+    }
+
+    if (columnKey === 'quantity' || columnKey === 'unitPrice') {
+      const previousComputedAmount = resolveComputedProcessingLineAmount(line)
+      const currentAmountText = normalizeProcessingAmountText(line?.amount)
+      const nextComputedAmount = resolveComputedProcessingLineAmount(nextLine)
+
+      if (!currentAmountText || currentAmountText === previousComputedAmount) {
+        nextLine.amount = nextComputedAmount
+      }
+      return nextLine
+    }
+
+    return nextLine
+  })
 
 export const insertProcessingContractLine = ({
   lines = [],

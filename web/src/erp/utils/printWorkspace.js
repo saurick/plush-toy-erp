@@ -376,8 +376,32 @@ export function openPrintWorkspaceWindow(
   options = {}
 ) {
   const stateID = createPrintWorkspaceStateID()
+  const { initialDraft, ...workspaceOptions } = options
+  const hasInitialDraft = Object.prototype.hasOwnProperty.call(
+    options,
+    'initialDraft'
+  )
+  let initialDraftStorageKey = ''
+  if (hasInitialDraft) {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      throw new Error('浏览器无法写入打印草稿，请检查存储权限后重试')
+    }
+    try {
+      const serializedDraft = JSON.stringify(initialDraft)
+      if (!serializedDraft) {
+        throw new Error('empty draft')
+      }
+      initialDraftStorageKey = buildPrintWorkspaceDraftStorageKey(
+        templateKey,
+        stateID
+      )
+      window.localStorage.setItem(initialDraftStorageKey, serializedDraft)
+    } catch (error) {
+      throw new Error('浏览器无法写入打印草稿，请检查存储权限后重试')
+    }
+  }
   const workspaceURL = buildPrintWorkspaceURL(templateKey, {
-    ...options,
+    ...workspaceOptions,
     stateID,
   })
   const popupURL = persistPrintWorkspaceWindowState(stateID, {
@@ -389,6 +413,13 @@ export function openPrintWorkspaceWindow(
   const popup = window.open(popupURL, '_blank', 'width=1440,height=920')
 
   if (!popup) {
+    if (initialDraftStorageKey) {
+      try {
+        window.localStorage.removeItem(initialDraftStorageKey)
+      } catch (error) {
+        // 弹窗被拦截时只尽力清理本次临时草稿，不影响用户重试。
+      }
+    }
     throw new Error('浏览器拦截了弹窗，请允许弹窗后重试')
   }
 

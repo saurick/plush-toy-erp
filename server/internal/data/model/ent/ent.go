@@ -8,7 +8,13 @@ import (
 	"fmt"
 	"reflect"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/businessrecord"
+	"server/internal/data/model/ent/businessrecordevent"
+	"server/internal/data/model/ent/businessrecorditem"
 	"server/internal/data/model/ent/user"
+	"server/internal/data/model/ent/workflowbusinessstate"
+	"server/internal/data/model/ent/workflowtask"
+	"server/internal/data/model/ent/workflowtaskevent"
 	"sync"
 
 	"entgo.io/ent"
@@ -74,8 +80,14 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			adminuser.Table: adminuser.ValidColumn,
-			user.Table:      user.ValidColumn,
+			adminuser.Table:             adminuser.ValidColumn,
+			businessrecord.Table:        businessrecord.ValidColumn,
+			businessrecordevent.Table:   businessrecordevent.ValidColumn,
+			businessrecorditem.Table:    businessrecorditem.ValidColumn,
+			user.Table:                  user.ValidColumn,
+			workflowbusinessstate.Table: workflowbusinessstate.ValidColumn,
+			workflowtask.Table:          workflowtask.ValidColumn,
+			workflowtaskevent.Table:     workflowtaskevent.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

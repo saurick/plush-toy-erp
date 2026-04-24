@@ -10,6 +10,7 @@
 | `scripts/project-scan.sh` | 扫描项目名、默认密钥、部署地址和页面文案残留 | 改名后 / 配置收口后 |
 | `scripts/doctor.sh` | 检查本机依赖和 hooks 是否齐全 | 环境初始化 / 异常排查 |
 | `scripts/qa/fast.sh` | 高频快速检查 | 日常开发 |
+| `scripts/qa/erp-field-linkage.mjs` | 字段联动专项测试并刷新 latest 覆盖报告 | 改字段真源、保存转换、合同金额、打印快照后 |
 | `scripts/qa/full.sh` | 全量检查 | 提交前 / 推送前 |
 | `scripts/qa/strict.sh` | 严格检查 | 发版前 |
 | `scripts/qa/db-guard.sh` | 约束 schema 变更必须带 migration | 改数据模型后 |
@@ -27,6 +28,17 @@
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm style:l1
+```
+
+如需按真实管理员登录流程回归合同编辑与在线预览时延，再执行：
+
+```bash
+cd /Users/simon/projects/plush-toy-erp/server
+make run
+
+cd /Users/simon/projects/plush-toy-erp/web
+pnpm smoke:purchase-contract-real-login
+pnpm smoke:processing-contract-real-login
 ```
 
 ## 推荐顺序
@@ -59,6 +71,13 @@ pnpm lint
 pnpm css
 pnpm test
 pnpm style:l1
+```
+
+字段联动、残值、缺值或打印快照字段改动后额外执行：
+
+```bash
+cd /Users/simon/projects/plush-toy-erp
+node scripts/qa/erp-field-linkage.mjs
 ```
 
 ### 4. 提交前检查

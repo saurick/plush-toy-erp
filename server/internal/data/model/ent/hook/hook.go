@@ -20,6 +20,42 @@ func (f AdminUserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, e
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AdminUserMutation", m)
 }
 
+// The BusinessRecordFunc type is an adapter to allow the use of ordinary
+// function as BusinessRecord mutator.
+type BusinessRecordFunc func(context.Context, *ent.BusinessRecordMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BusinessRecordFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BusinessRecordMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BusinessRecordMutation", m)
+}
+
+// The BusinessRecordEventFunc type is an adapter to allow the use of ordinary
+// function as BusinessRecordEvent mutator.
+type BusinessRecordEventFunc func(context.Context, *ent.BusinessRecordEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BusinessRecordEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BusinessRecordEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BusinessRecordEventMutation", m)
+}
+
+// The BusinessRecordItemFunc type is an adapter to allow the use of ordinary
+// function as BusinessRecordItem mutator.
+type BusinessRecordItemFunc func(context.Context, *ent.BusinessRecordItemMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f BusinessRecordItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.BusinessRecordItemMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BusinessRecordItemMutation", m)
+}
+
 // The UserFunc type is an adapter to allow the use of ordinary
 // function as User mutator.
 type UserFunc func(context.Context, *ent.UserMutation) (ent.Value, error)
@@ -30,6 +66,42 @@ func (f UserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserMutation", m)
+}
+
+// The WorkflowBusinessStateFunc type is an adapter to allow the use of ordinary
+// function as WorkflowBusinessState mutator.
+type WorkflowBusinessStateFunc func(context.Context, *ent.WorkflowBusinessStateMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkflowBusinessStateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkflowBusinessStateMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkflowBusinessStateMutation", m)
+}
+
+// The WorkflowTaskFunc type is an adapter to allow the use of ordinary
+// function as WorkflowTask mutator.
+type WorkflowTaskFunc func(context.Context, *ent.WorkflowTaskMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkflowTaskFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkflowTaskMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkflowTaskMutation", m)
+}
+
+// The WorkflowTaskEventFunc type is an adapter to allow the use of ordinary
+// function as WorkflowTaskEvent mutator.
+type WorkflowTaskEventFunc func(context.Context, *ent.WorkflowTaskEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f WorkflowTaskEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.WorkflowTaskEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.WorkflowTaskEventMutation", m)
 }
 
 // Condition is a hook condition function.

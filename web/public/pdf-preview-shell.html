@@ -28,15 +28,21 @@
     <script>
       ;(() => {
         const STORAGE_KEY_PREFIX = '__plush_erp_pdf_preview_state__'
+        const STATE_DB_NAME = '__plush_erp_pdf_preview_state_db__'
+        const STATE_DB_VERSION = 1
+        const STATE_DB_STORE_NAME = 'states'
+        const STATE_VERSION = 1
         const RESTORE_FUNCTION_NAME = 'restorePlushErpPdfPreviewShell'
-        const WAIT_TIMEOUT_MS = 10000
-        const POLL_INTERVAL_MS = 120
+        const DEFAULT_WAIT_TIMEOUT_MS = 50000
+        const POLL_INTERVAL_MS = 80
         const searchParams = new URLSearchParams(window.location.search)
         const stateID = String(searchParams.get('state') || '').trim()
         const storageKey = stateID ? `${STORAGE_KEY_PREFIX}${stateID}` : ''
         let restoreSettled = false
+        let restoreInFlight = false
         let waitTimer = 0
         let pollTimer = 0
+        let stateDatabasePromise = null
 
         const setStatus = (text) => {
           const status = document.getElementById('pdf-preview-shell-status')
@@ -45,7 +51,100 @@
           }
         }
 
-        const readPersistedHTML = () => {
+        const readPersistedHTMLFromPayload = (payload) => {
+          if (!payload || typeof payload !== 'object') {
+            return ''
+          }
+          if (
+            payload.version != null &&
+            Number(payload.version) !== STATE_VERSION
+          ) {
+            return ''
+          }
+          return typeof payload.html === 'string' ? payload.html.trim() : ''
+        }
+
+        const openStateDatabase = () => {
+          if (stateDatabasePromise) {
+            return stateDatabasePromise
+          }
+          if (
+            !window.indexedDB ||
+            typeof window.indexedDB.open !== 'function'
+          ) {
+            return Promise.resolve(null)
+          }
+
+          stateDatabasePromise = new Promise((resolve) => {
+            try {
+              const request = window.indexedDB.open(
+                STATE_DB_NAME,
+                STATE_DB_VERSION
+              )
+              request.onupgradeneeded = () => {
+                const database = request.result
+                if (!database.objectStoreNames.contains(STATE_DB_STORE_NAME)) {
+                  database.createObjectStore(STATE_DB_STORE_NAME, {
+                    keyPath: 'stateID',
+                  })
+                }
+              }
+              request.onsuccess = () => {
+                const database = request.result
+                database.onversionchange = () => {
+                  try {
+                    database.close()
+                  } catch (error) {}
+                }
+                resolve(database)
+              }
+              request.onerror = () => resolve(null)
+              request.onblocked = () => resolve(null)
+            } catch (error) {
+              resolve(null)
+            }
+          })
+          return stateDatabasePromise
+        }
+
+        const readPersistedHTMLFromIndexedDB = async () => {
+          if (!stateID) {
+            return ''
+          }
+          const database = await openStateDatabase()
+          if (!database) {
+            return ''
+          }
+
+          return new Promise((resolve) => {
+            try {
+              const transaction = database.transaction(
+                STATE_DB_STORE_NAME,
+                'readonly'
+              )
+              const request = transaction
+                .objectStore(STATE_DB_STORE_NAME)
+                .get(stateID)
+              let settled = false
+              const finalize = (html) => {
+                if (settled) {
+                  return
+                }
+                settled = true
+                resolve(html)
+              }
+              request.onsuccess = () =>
+                finalize(readPersistedHTMLFromPayload(request.result))
+              request.onerror = () => finalize('')
+              transaction.onerror = () => finalize('')
+              transaction.onabort = () => finalize('')
+            } catch (error) {
+              resolve('')
+            }
+          })
+        }
+
+        const readPersistedHTMLFromStorage = () => {
           if (!storageKey) {
             return ''
           }
@@ -54,11 +153,18 @@
             if (!raw) {
               return ''
             }
-            const payload = JSON.parse(raw)
-            return String(payload?.html || '')
+            return readPersistedHTMLFromPayload(JSON.parse(raw))
           } catch (error) {
             return ''
           }
+        }
+
+        const readPersistedHTML = async () => {
+          const indexedDBHTML = await readPersistedHTMLFromIndexedDB()
+          if (indexedDBHTML) {
+            return indexedDBHTML
+          }
+          return readPersistedHTMLFromStorage()
         }
 
         const cleanupWaiters = () => {
@@ -73,9 +179,14 @@
           window.removeEventListener('storage', handleStorage)
         }
 
-        const restoreNow = () => {
-          const html = readPersistedHTML()
+        const restoreNow = async () => {
+          if (restoreSettled || restoreInFlight) {
+            return false
+          }
+          restoreInFlight = true
+          const html = await readPersistedHTML()
           if (!html) {
+            restoreInFlight = false
             return false
           }
           restoreSettled = true
@@ -93,24 +204,22 @@
           if (event && event.key && event.key !== storageKey) {
             return
           }
-          restoreNow()
+          void restoreNow()
         }
 
-        window[RESTORE_FUNCTION_NAME] = () => restoreNow()
+        window[RESTORE_FUNCTION_NAME] = () => {
+          void restoreNow()
+        }
 
         if (!storageKey) {
           setStatus('PDF 预览链接缺少状态参数，请返回工作台重新打开。')
           return
         }
 
-        if (restoreNow()) {
-          return
-        }
-
         setStatus('正在等待 PDF 预览结果...')
         window.addEventListener('storage', handleStorage)
         pollTimer = window.setInterval(() => {
-          restoreNow()
+          void restoreNow()
         }, POLL_INTERVAL_MS)
         waitTimer = window.setTimeout(() => {
           if (restoreSettled) {
@@ -118,7 +227,8 @@
           }
           cleanupWaiters()
           setStatus('PDF 预览不存在或已过期，请返回工作台重新打开。')
-        }, WAIT_TIMEOUT_MS)
+        }, DEFAULT_WAIT_TIMEOUT_MS)
+        void restoreNow()
       })()
     </script>
   </body>

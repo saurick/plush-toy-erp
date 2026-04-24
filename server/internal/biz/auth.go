@@ -36,9 +36,9 @@ type User struct {
 	Disabled     bool
 	// Role 只用于登录态返回与 token 生成；当前 users 表不持久化业务角色字段。
 	Role        int8
-	LastLoginAt  *time.Time
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	LastLoginAt *time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type TokenGenerator func(userID int, username string, role int8) (token string, expireAt time.Time, err error)
@@ -54,8 +54,9 @@ type AuthUsecase struct {
 	tracer trace.Tracer
 
 	// repo & token
-	repo   AuthRepo
-	genTok TokenGenerator
+	repo     AuthRepo
+	genTok   TokenGenerator
+	smsCodes *SMSLoginCodeManager
 }
 
 func NewAuthUsecase(repo AuthRepo, genTok TokenGenerator, logger log.Logger, tp *tracesdk.TracerProvider) *AuthUsecase {
@@ -70,12 +71,13 @@ func NewAuthUsecase(repo AuthRepo, genTok TokenGenerator, logger log.Logger, tp 
 	}
 
 	return &AuthUsecase{
-		repo:   repo,
-		genTok: genTok,
-		log:    helper,
-		logger: logger,
-		tp:     tp,
-		tracer: tr,
+		repo:     repo,
+		genTok:   genTok,
+		smsCodes: NewSMSLoginCodeManager(),
+		log:      helper,
+		logger:   logger,
+		tp:       tp,
+		tracer:   tr,
 	}
 }
 
@@ -248,6 +250,111 @@ func (uc *AuthUsecase) Login(ctx context.Context, username, password string) (to
 	return token, expireAt, usr, nil
 }
 
+func (uc *AuthUsecase) RequestSMSLoginCode(ctx context.Context, phone string) (challenge *SMSLoginChallenge, err error) {
+	normalizedPhone, err := NormalizeLoginPhone(phone)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, span := uc.Tracer().Start(ctx, "auth.request_sms_login_code",
+		trace.WithAttributes(attribute.String("auth.phone_masked", maskPhone(normalizedPhone))),
+	)
+	defer span.End()
+
+	l := uc.log.WithContext(ctx)
+	usr, e := uc.repo.GetUserByUsername(ctx, normalizedPhone)
+	if e != nil || usr == nil {
+		err = ErrUserNotFound
+		if e != nil {
+			span.RecordError(e)
+		}
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("RequestSMSLoginCode user not found phone=%s err=%v", maskPhone(normalizedPhone), e)
+		return nil, err
+	}
+	if usr.Disabled {
+		err = ErrUserDisabled
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("RequestSMSLoginCode user disabled user_id=%d phone=%s", usr.ID, maskPhone(normalizedPhone))
+		return nil, err
+	}
+
+	challenge, err = uc.smsCodes.Request("user", normalizedPhone)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		l.Warnf("RequestSMSLoginCode failed phone=%s err=%v", maskPhone(normalizedPhone), err)
+		return nil, err
+	}
+
+	span.SetAttributes(
+		attribute.Int("auth.user_id", usr.ID),
+		attribute.Int64("auth.sms_expires_at", challenge.ExpiresAt.Unix()),
+	)
+	span.SetStatus(codes.Ok, "OK")
+	l.Infof("RequestSMSLoginCode success user_id=%d phone=%s mock_delivery=%t", usr.ID, maskPhone(normalizedPhone), challenge.MockDelivery)
+	return challenge, nil
+}
+
+func (uc *AuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code string) (token string, expireAt time.Time, u *User, err error) {
+	normalizedPhone, err := NormalizeLoginPhone(phone)
+	if err != nil {
+		return "", time.Time{}, nil, err
+	}
+
+	ctx, span := uc.Tracer().Start(ctx, "auth.sms_login",
+		trace.WithAttributes(attribute.String("auth.phone_masked", maskPhone(normalizedPhone))),
+	)
+	defer span.End()
+
+	l := uc.log.WithContext(ctx)
+	usr, e := uc.repo.GetUserByUsername(ctx, normalizedPhone)
+	if e != nil || usr == nil {
+		err = ErrUserNotFound
+		if e != nil {
+			span.RecordError(e)
+		}
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("SMSLogin user not found phone=%s err=%v", maskPhone(normalizedPhone), e)
+		return "", time.Time{}, nil, err
+	}
+
+	span.SetAttributes(attribute.Int("auth.user_id", usr.ID))
+
+	if usr.Disabled {
+		err = ErrUserDisabled
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("SMSLogin user disabled user_id=%d phone=%s", usr.ID, maskPhone(normalizedPhone))
+		return "", time.Time{}, nil, err
+	}
+
+	if _, err = uc.smsCodes.Verify("user", normalizedPhone, code); err != nil {
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("SMSLogin verify failed user_id=%d phone=%s err=%v", usr.ID, maskPhone(normalizedPhone), err)
+		return "", time.Time{}, nil, err
+	}
+
+	token, expireAt, e = uc.genTok(usr.ID, usr.Username, usr.Role)
+	if e != nil {
+		err = e
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "generate token failed")
+		l.Errorf("SMSLogin generate token failed user_id=%d username=%s err=%v", usr.ID, usr.Username, err)
+		return "", time.Time{}, nil, err
+	}
+
+	span.SetAttributes(attribute.Int64("auth.token_expires_at", expireAt.Unix()))
+
+	if e := uc.repo.UpdateUserLastLogin(ctx, usr.ID, time.Now()); e != nil {
+		span.RecordError(e)
+		l.Warnf("SMSLogin update last_login_at failed user_id=%d err=%v", usr.ID, e)
+	}
+
+	span.SetStatus(codes.Ok, "OK")
+	l.Infof("SMSLogin success user_id=%d phone=%s", usr.ID, maskPhone(normalizedPhone))
+	return token, expireAt, usr, nil
+}
+
 // GetCurrentUser 获取当前登录用户信息（用于 auth.me 等接口）
 func (uc *AuthUsecase) GetCurrentUser(ctx context.Context, userID int) (*User, error) {
 	ctx, span := uc.Tracer().Start(ctx, "auth.get_current_user",
@@ -276,4 +383,11 @@ func (uc *AuthUsecase) GetCurrentUser(ctx context.Context, userID int) (*User, e
 
 	span.SetStatus(codes.Ok, "OK")
 	return u, nil
+}
+
+func maskPhone(phone string) string {
+	if len(phone) < 7 {
+		return "***"
+	}
+	return phone[:3] + "****" + phone[len(phone)-4:]
 }

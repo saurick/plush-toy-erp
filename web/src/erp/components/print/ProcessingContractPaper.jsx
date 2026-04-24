@@ -1,7 +1,6 @@
 import React from 'react'
 import {
   calculateProcessingContractTotals,
-  padProcessingContractLines,
   processingContractAttachmentSlots,
   PROCESSING_CONTRACT_TABLE_COLUMNS,
   resolveProcessingLineAmount,
@@ -104,7 +103,7 @@ export default function ProcessingContractPaper({
   onLineFieldChange,
   onClauseChange,
 }) {
-  const printableLines = padProcessingContractLines(contract?.lines)
+  const printableLines = Array.isArray(contract?.lines) ? contract.lines : []
   const totals = calculateProcessingContractTotals(contract?.lines || [])
   const templateModesActive = lineSelectionMode || cellSelectionMode
   const uploadedAttachments = processingContractAttachmentSlots
@@ -198,18 +197,18 @@ export default function ProcessingContractPaper({
 
       <table className="erp-processing-contract-table">
         <colgroup>
-          <col style={{ width: '9%' }} />
-          <col style={{ width: '9.5%' }} />
-          <col style={{ width: '8.5%' }} />
-          <col style={{ width: '11%' }} />
           <col style={{ width: '11.5%' }} />
-          <col style={{ width: '7%' }} />
+          <col style={{ width: '11%' }} />
           <col style={{ width: '8%' }} />
-          <col style={{ width: '5%' }} />
+          <col style={{ width: '8.5%' }} />
+          <col style={{ width: '9%' }} />
           <col style={{ width: '6.5%' }} />
           <col style={{ width: '7.5%' }} />
+          <col style={{ width: '4.5%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '9.5%' }} />
           <col style={{ width: '10%' }} />
-          <col style={{ width: '7.5%' }} />
+          <col style={{ width: '8%' }} />
         </colgroup>
         <thead>
           <tr>
@@ -310,7 +309,9 @@ export default function ProcessingContractPaper({
                         onCommit={(value) =>
                           column.fieldKey
                             ? onLineFieldChange(index, column.fieldKey, value)
-                            : undefined
+                            : column.key === 'amount'
+                              ? onLineFieldChange(index, 'amount', value)
+                              : undefined
                         }
                         readOnly={column.readOnly}
                         disabled={templateModesActive || isPlaceholderLine}
@@ -326,8 +327,12 @@ export default function ProcessingContractPaper({
             <td className="erp-processing-contract-table__total-label">合计</td>
             <td />
             <td />
-            <td>{totals.totalQuantityText || '\u00A0'}</td>
-            <td>{totals.totalAmountText || '\u00A0'}</td>
+            <td className="erp-contract-table__total-value">
+              {totals.totalQuantityText || '\u00A0'}
+            </td>
+            <td className="erp-contract-table__total-value">
+              {totals.totalAmountText || '\u00A0'}
+            </td>
             <td />
           </tr>
         </tbody>
@@ -418,12 +423,6 @@ export default function ProcessingContractPaper({
           <div className="erp-processing-contract-signature__label">
             甲方（委托方）：
           </div>
-          <EditableText
-            value={contract.buyerContact}
-            className="erp-processing-contract-signature__value"
-            disabled={templateModesActive}
-            onCommit={(value) => onFieldChange('buyerContact', value)}
-          />
           <div className="erp-processing-contract-signature__date">
             日期：
             <EditableText
@@ -438,12 +437,6 @@ export default function ProcessingContractPaper({
           <div className="erp-processing-contract-signature__label">
             乙方（受托方）：
           </div>
-          <EditableText
-            value={contract.supplierName}
-            className="erp-processing-contract-signature__value"
-            disabled={templateModesActive}
-            onCommit={(value) => onFieldChange('supplierName', value)}
-          />
           <div className="erp-processing-contract-signature__date">
             日期：
             <EditableText
@@ -463,16 +456,11 @@ export default function ProcessingContractPaper({
               key={slot.key}
               className={`erp-processing-contract-attachments__item erp-processing-contract-attachments__item--${slot.key}`}
             >
-              <div className="erp-processing-contract-attachments__frame">
-                <img
-                  className="erp-processing-contract-attachments__image"
-                  src={snapshot.dataURL}
-                  alt={snapshot.name || slot.title}
-                />
-              </div>
-              <figcaption className="erp-processing-contract-attachments__caption">
-                {slot.title}
-              </figcaption>
+              <img
+                className="erp-processing-contract-attachments__image"
+                src={snapshot.dataURL}
+                alt={snapshot.name || slot.title}
+              />
             </figure>
           ))}
         </section>

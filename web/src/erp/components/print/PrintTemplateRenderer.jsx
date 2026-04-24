@@ -267,8 +267,10 @@ function ContractTemplate({ data, kind }) {
             <tr className="erp-material-contract-table__total">
               <td colSpan={8} />
               <td>合计</td>
-              <td>{quantityText}</td>
-              <td>{amountText}</td>
+              <td className="erp-contract-table__total-value">
+                {quantityText}
+              </td>
+              <td className="erp-contract-table__total-value">{amountText}</td>
               <td />
             </tr>
           </tbody>
@@ -462,8 +464,12 @@ function ContractTemplate({ data, kind }) {
           <tr className="erp-print-table__total">
             <td colSpan={8} />
             <td>合计</td>
-            <td>{data.totalQuantity}</td>
-            <td>{data.totalAmount}</td>
+            <td className="erp-contract-table__total-value">
+              {data.totalQuantity}
+            </td>
+            <td className="erp-contract-table__total-value">
+              {data.totalAmount}
+            </td>
             <td />
           </tr>
         </tbody>

@@ -42,11 +42,13 @@ function PhonePreview({ role }) {
 }
 
 export default function MobileWorkbenchesPage() {
+  const mobileRoleCount = roleWorkbenches.length
+
   return (
     <div className="space-y-6">
       <PageHero
         eyebrow="移动端端口说明"
-        title="六个角色移动端端口与职责"
+        title={`${mobileRoleCount} 个角色移动端端口与职责`}
         description="移动端继续按角色拆端口，但访问方式直接收口到端口，不再依赖桌面后台里的角色入口。所有移动端仍然共享同一个项目、同一套 common / ui / api / 文档体系。"
       />
 
@@ -125,7 +127,7 @@ export default function MobileWorkbenchesPage() {
         <div className="grid gap-3 md:grid-cols-3">
           {[
             '桌面后台继续只保留一个入口；移动端按角色拆端口并直接访问。',
-            '六个移动入口都共享 8200 后端、同一套字段真源、接口层和文档体系。',
+            `${mobileRoleCount} 个移动入口都共享 8200 后端、同一套字段真源、接口层和文档体系。`,
             '扩展硬件链路、PDA 与离线同步统一标记 deferred，不冒充已支持。',
           ].map((item) => (
             <div

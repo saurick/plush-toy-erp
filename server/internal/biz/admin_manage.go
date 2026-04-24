@@ -33,7 +33,9 @@ type AdminManageRepo interface {
 	ListAdmins(ctx context.Context) ([]*AdminUser, error)
 	CreateAdmin(ctx context.Context, admin *AdminCreate) (*AdminUser, error)
 	UpdateAdminMenuPermissions(ctx context.Context, id int, menuPermissions []string) error
+	UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error
 	SetAdminDisabled(ctx context.Context, id int, disabled bool) error
+	UpdateAdminPasswordHash(ctx context.Context, id int, passwordHash string) error
 }
 
 type AdminManageUsecase struct {
@@ -293,6 +295,55 @@ func (uc *AdminManageUsecase) SetMenuPermissions(
 	return target, nil
 }
 
+func (uc *AdminManageUsecase) SetCurrentERPColumnOrder(
+	ctx context.Context,
+	moduleKey string,
+	order []string,
+) (admin *AdminUser, err error) {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.set_erp_column_order",
+		trace.WithAttributes(
+			attribute.String("erp.module_key", strings.TrimSpace(moduleKey)),
+			attribute.Int("erp.column_order_count", len(order)),
+		),
+	)
+	defer span.End()
+
+	moduleKey = normalizeAdminERPPreferenceModuleKey(moduleKey)
+	if moduleKey == "" {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
+	}
+	normalizedOrder := NormalizeAdminERPColumnOrder(order)
+
+	currentAdmin, err := uc.getCurrentAdmin(ctx)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if currentAdmin.Disabled {
+		span.SetStatus(codes.Error, ErrUserDisabled.Error())
+		return nil, ErrUserDisabled
+	}
+
+	if err = uc.repo.UpdateAdminERPColumnOrder(ctx, currentAdmin.ID, moduleKey, normalizedOrder); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	admin, err = uc.repo.GetAdminByID(ctx, currentAdmin.ID)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	uc.fillEffectiveMenuPermissions(admin)
+	admin.ERPPreferences = NormalizeAdminERPPreferences(admin.ERPPreferences)
+	span.SetAttributes(attribute.Int("admin.id", admin.ID))
+	span.SetStatus(codes.Ok, "OK")
+	return admin, nil
+}
+
 func (uc *AdminManageUsecase) SetDisabled(
 	ctx context.Context,
 	adminID int,
@@ -342,4 +393,59 @@ func (uc *AdminManageUsecase) SetDisabled(
 	uc.fillEffectiveMenuPermissions(target)
 	span.SetStatus(codes.Ok, "OK")
 	return target, nil
+}
+
+func (uc *AdminManageUsecase) ResetPassword(
+	ctx context.Context,
+	adminID int,
+	password string,
+) (updated *AdminUser, err error) {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.reset_password",
+		trace.WithAttributes(attribute.Int("admin.id", adminID)),
+	)
+	defer span.End()
+
+	if _, err = uc.requireSuperAdmin(ctx); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if adminID <= 0 || len(password) < 6 {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
+	}
+
+	target, err := uc.repo.GetAdminByID(ctx, adminID)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if AdminLevel(target.Level) == AdminLevelSuper {
+		span.SetStatus(codes.Error, ErrNoPermission.Error())
+		return nil, ErrNoPermission
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+
+	if err = uc.repo.UpdateAdminPasswordHash(ctx, adminID, string(hash)); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+
+	updated, err = uc.repo.GetAdminByID(ctx, adminID)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	uc.fillEffectiveMenuPermissions(updated)
+	span.SetStatus(codes.Ok, "OK")
+	return updated, nil
 }

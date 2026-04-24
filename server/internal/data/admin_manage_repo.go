@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"server/internal/biz"
@@ -36,6 +37,7 @@ func (r *adminManageRepo) toBizAdmin(a *ent.AdminUser) *biz.AdminUser {
 		PasswordHash:    a.PasswordHash,
 		Level:           a.Level,
 		MenuPermissions: decodeMenuPermissions(a.MenuPermissions),
+		ERPPreferences:  decodeAdminERPPreferences(a.ErpPreferences),
 		Disabled:        a.Disabled,
 		LastLoginAt:     a.LastLoginAt,
 		CreatedAt:       a.CreatedAt,
@@ -125,11 +127,58 @@ func (r *adminManageRepo) UpdateAdminMenuPermissions(ctx context.Context, id int
 	return nil
 }
 
+func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error {
+	if id <= 0 || strings.TrimSpace(moduleKey) == "" {
+		return biz.ErrBadParam
+	}
+	row, err := r.data.postgres.AdminUser.Query().Where(adminuser.ID(id)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrAdminNotFound
+		}
+		return err
+	}
+	preferences := decodeAdminERPPreferences(row.ErpPreferences)
+	if preferences.ColumnOrders == nil {
+		preferences.ColumnOrders = map[string][]string{}
+	}
+	normalizedOrder := biz.NormalizeAdminERPColumnOrder(order)
+	if len(normalizedOrder) == 0 {
+		delete(preferences.ColumnOrders, moduleKey)
+	} else {
+		preferences.ColumnOrders[moduleKey] = normalizedOrder
+	}
+	encoded := encodeAdminERPPreferences(preferences)
+	if encoded == row.ErpPreferences {
+		return nil
+	}
+	if _, err := r.data.postgres.AdminUser.UpdateOneID(id).SetErpPreferences(encoded).Save(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrAdminNotFound
+		}
+		return err
+	}
+	return nil
+}
+
 func (r *adminManageRepo) SetAdminDisabled(ctx context.Context, id int, disabled bool) error {
 	if id <= 0 {
 		return biz.ErrBadParam
 	}
 	if _, err := r.data.postgres.AdminUser.UpdateOneID(id).SetDisabled(disabled).Save(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrAdminNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *adminManageRepo) UpdateAdminPasswordHash(ctx context.Context, id int, passwordHash string) error {
+	if id <= 0 || strings.TrimSpace(passwordHash) == "" {
+		return biz.ErrBadParam
+	}
+	if _, err := r.data.postgres.AdminUser.UpdateOneID(id).SetPasswordHash(passwordHash).Save(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return biz.ErrAdminNotFound
 		}
@@ -147,4 +196,36 @@ func decodeMenuPermissions(raw string) []string {
 		return []string{}
 	}
 	return biz.NormalizeAdminMenuPermissions(strings.Split(raw, ","))
+}
+
+func decodeAdminERPPreferences(raw string) biz.AdminERPPreferences {
+	if strings.TrimSpace(raw) == "" {
+		return biz.AdminERPPreferences{}
+	}
+	var decoded struct {
+		ColumnOrders map[string][]string `json:"column_orders"`
+	}
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		return biz.AdminERPPreferences{}
+	}
+	return biz.NormalizeAdminERPPreferences(biz.AdminERPPreferences{
+		ColumnOrders: decoded.ColumnOrders,
+	})
+}
+
+func encodeAdminERPPreferences(preferences biz.AdminERPPreferences) string {
+	normalized := biz.NormalizeAdminERPPreferences(preferences)
+	if len(normalized.ColumnOrders) == 0 {
+		return "{}"
+	}
+	payload := struct {
+		ColumnOrders map[string][]string `json:"column_orders"`
+	}{
+		ColumnOrders: normalized.ColumnOrders,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "{}"
+	}
+	return string(encoded)
 }

@@ -1,0 +1,11 @@
+.git
+.DS_Store
+
+**/node_modules
+**/.vite-cache
+**/build
+**/dist
+**/coverage
+
+tmp
+*.log

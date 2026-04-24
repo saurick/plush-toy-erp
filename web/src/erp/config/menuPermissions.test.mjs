@@ -58,3 +58,64 @@ test('menuPermissions: 旧帮助路径统一映射到帮助中心四个入口', 
     '/erp/docs/print-snapshot-guide'
   )
 })
+
+test('menuPermissions: 包含角色权限 / 页面 / 单据矩阵入口', () => {
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/docs/role-page-document-matrix'
+    )
+  )
+})
+
+test('menuPermissions: 包含任务 / 单据映射表入口', () => {
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/docs/task-document-mapping'
+    )
+  )
+})
+
+test('menuPermissions: 包含任务 / 业务状态字典与 schema 草案入口', () => {
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/docs/workflow-status-guide'
+    )
+  )
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/docs/workflow-schema-draft'
+    )
+  )
+})
+
+test('menuPermissions: 包含开发与验收分组入口', () => {
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/qa/acceptance-overview'
+    )
+  )
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/qa/field-linkage-coverage'
+    )
+  )
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/qa/business-chain-debug'
+    )
+  )
+  assert(
+    ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/qa/run-records'
+    )
+  )
+  assert(defaultMenuPermissions().includes('/erp/qa/acceptance-overview'))
+})
+
+test('menuPermissions: 不包含待确认的报价单入口', () => {
+  assert(
+    !ERP_MENU_PERMISSION_OPTIONS.some(
+      (item) => item.key === '/erp/sales/quotations'
+    )
+  )
+})

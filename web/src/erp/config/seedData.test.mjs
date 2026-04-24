@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { dashboardModules, dashboardStatusGroups } from './dashboardModules.mjs'
+import { BUSINESS_WORKFLOW_STATES } from './workflowStatus.mjs'
 import {
-  TASK_STATUS,
-  TASK_STATUS_ORDER,
-  buildDashboardTaskRows,
-  buildDashboardTaskSummary,
-  dashboardTaskModules,
-} from './dashboardTasks.mjs'
+  buildDashboardModuleRows,
+  buildDashboardSummary,
+} from '../utils/dashboardStats.mjs'
 import {
   businessModuleDefinitions,
   getBusinessNavigationSections,
@@ -20,6 +19,7 @@ import {
   helpCenterNavItems,
   pendingFieldTruthRows,
   plannedModules,
+  qaNavItems,
   roleWorkbenches,
   sourceReadiness,
 } from './seedData.mjs'
@@ -55,8 +55,12 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
   const systemSection = navigationSections.find(
     (section) => section.title === '系统管理'
   )
+  const qaSection = navigationSections.find(
+    (section) => section.title === '开发与验收'
+  )
 
   assert(helpSection)
+  assert(qaSection)
   assert(systemSection)
   assert.deepEqual(
     helpSection.items.map((item) => item.path),
@@ -64,6 +68,10 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
       '/erp/docs/operation-flow-overview',
       '/erp/docs/operation-guide',
       '/erp/docs/role-collaboration-guide',
+      '/erp/docs/role-page-document-matrix',
+      '/erp/docs/task-document-mapping',
+      '/erp/docs/workflow-status-guide',
+      '/erp/docs/workflow-schema-draft',
       '/erp/docs/desktop-role-guide',
       '/erp/docs/mobile-role-guide',
       '/erp/docs/field-linkage-guide',
@@ -76,6 +84,20 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
   assert.deepEqual(
     helpCenterNavItems.map((item) => item.path),
     helpSection.items.map((item) => item.path)
+  )
+  assert.deepEqual(
+    qaSection.items.map((item) => item.path),
+    [
+      '/erp/qa/acceptance-overview',
+      '/erp/qa/business-chain-debug',
+      '/erp/qa/field-linkage-coverage',
+      '/erp/qa/run-records',
+      '/erp/qa/reports',
+    ]
+  )
+  assert.deepEqual(
+    qaNavItems.map((item) => item.path),
+    qaSection.items.map((item) => item.path)
   )
   assert.deepEqual(
     systemSection.items.map((item) => item.path),
@@ -97,7 +119,7 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
   assert(sourceReadiness.pending.length >= 3)
 })
 
-test('businessModules: 业务页菜单按毛绒业务收口且不回退到 trade-erp 外贸主线', () => {
+test('businessModules: 业务页菜单按毛绒业务收口且不回退到旧外贸主线', () => {
   const businessSections = getBusinessNavigationSections()
   const navLabels = businessSections.flatMap((section) =>
     section.items.map((item) => item.label)
@@ -106,15 +128,23 @@ test('businessModules: 业务页菜单按毛绒业务收口且不回退到 trade
     section.items.map((item) => item.path)
   )
 
-  assert(businessSections.length >= 5)
-  assert(navLabels.includes('客户/供应商'))
-  assert(navLabels.includes('产品'))
+  assert.equal(businessSections.length, 4)
+  assert(!navLabels.includes('客户/供应商'))
+  assert(!navLabels.includes('产品'))
+  assert(navLabels.includes('客户/款式立项'))
   assert(navLabels.includes('材料 BOM'))
   assert(navLabels.includes('加工合同/委外下单'))
   assert(navLabels.includes('对账/结算'))
   assert(!navLabels.includes('外销'))
 
   businessModuleDefinitions.forEach((moduleItem) => {
+    if (
+      moduleItem.status === 'awaiting_confirmation' ||
+      moduleItem.sectionKey === 'master'
+    ) {
+      assert(!navPaths.includes(moduleItem.path))
+      return
+    }
     assert(navPaths.includes(moduleItem.path))
     assert(moduleItem.path.startsWith('/erp/'))
     assert(moduleItem.relatedLinks.length > 0)
@@ -144,29 +174,60 @@ test('appRegistry: 桌面后台单入口，移动端按角色拆端口', () => {
 
   assert.equal(desktopApps.length, 1)
   assert.equal(desktopApps[0].port, 5175)
-  assert.equal(mobileApps.length, 6)
+  assert.equal(mobileApps.length, 8)
   assert.deepEqual(
     mobileApps.map((app) => app.port),
-    [5186, 5187, 5188, 5189, 5190, 5191]
+    [5186, 5187, 5188, 5189, 5190, 5191, 5192, 5193]
   )
 })
 
-test('dashboardTasks: 首页任务看板按模块聚合任务状态', () => {
-  assert.equal(dashboardTaskModules.length, plannedModules.length)
-
-  const rows = buildDashboardTaskRows()
-  const summary = buildDashboardTaskSummary(rows)
-
-  assert(rows.every((row) => row.total >= 3))
-  assert(rows.every((row) => row.path.startsWith('/erp/')))
-  assert.equal(
-    summary.totalTasks,
-    rows.reduce((sum, row) => sum + row.total, 0)
+test('dashboardModules: 首页任务看板按业务模块聚合状态', () => {
+  const activeBusinessModules = businessModuleDefinitions.filter(
+    (moduleItem) => moduleItem.status !== 'awaiting_confirmation'
   )
-  assert(summary.statusCount[TASK_STATUS.DONE] > 0)
-  assert(summary.statusCount[TASK_STATUS.IN_PROGRESS] > 0)
-  assert(summary.statusCount[TASK_STATUS.REVIEW] > 0)
-  assert(summary.statusCount[TASK_STATUS.BLOCKED] > 0)
-  assert(summary.statusCount[TASK_STATUS.TODO] > 0)
-  assert.deepEqual(Object.keys(summary.statusCount), [...TASK_STATUS_ORDER])
+  assert.deepEqual(
+    dashboardModules.map((item) => item.key),
+    activeBusinessModules.map((item) => item.key)
+  )
+
+  const rows = buildDashboardModuleRows(dashboardModules, [
+    {
+      module_key: 'project-orders',
+      total: 3,
+      status_counts: {
+        project_pending: 1,
+        material_preparing: 1,
+        blocked: 1,
+      },
+    },
+    {
+      module_key: 'reconciliation',
+      total: 2,
+      status_counts: {
+        reconciling: 1,
+        settled: 1,
+      },
+    },
+  ])
+  const summary = buildDashboardSummary(rows)
+
+  assert(rows.every((row) => row.path.startsWith('/erp/')))
+  assert.equal(summary.totalRecords, 5)
+  assert.equal(summary.statusGroupCount.project, 1)
+  assert.equal(summary.statusGroupCount.material, 1)
+  assert.equal(summary.statusGroupCount.blocked, 1)
+  assert.equal(summary.statusGroupCount.finance, 2)
+  assert.equal(summary.completedCount, 1)
+  assert.equal(summary.completionRatio, 20)
+})
+
+test('dashboardModules: 状态分组覆盖全部业务状态且不重复', () => {
+  const groupedStatusKeys = dashboardStatusGroups.flatMap(
+    (group) => group.statusKeys
+  )
+  assert.equal(groupedStatusKeys.length, new Set(groupedStatusKeys).size)
+  assert.deepEqual(
+    [...groupedStatusKeys].sort(),
+    BUSINESS_WORKFLOW_STATES.map((state) => state.key).sort()
+  )
 })

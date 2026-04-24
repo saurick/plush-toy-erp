@@ -21,6 +21,8 @@ const (
 	FieldLevel = "level"
 	// FieldMenuPermissions holds the string denoting the menu_permissions field in the database.
 	FieldMenuPermissions = "menu_permissions"
+	// FieldErpPreferences holds the string denoting the erp_preferences field in the database.
+	FieldErpPreferences = "erp_preferences"
 	// FieldDisabled holds the string denoting the disabled field in the database.
 	FieldDisabled = "disabled"
 	// FieldLastLoginAt holds the string denoting the last_login_at field in the database.
@@ -40,6 +42,7 @@ var Columns = []string{
 	FieldPasswordHash,
 	FieldLevel,
 	FieldMenuPermissions,
+	FieldErpPreferences,
 	FieldDisabled,
 	FieldLastLoginAt,
 	FieldCreatedAt,
@@ -67,6 +70,10 @@ var (
 	DefaultMenuPermissions string
 	// MenuPermissionsValidator is a validator for the "menu_permissions" field. It is called by the builders before save.
 	MenuPermissionsValidator func(string) error
+	// DefaultErpPreferences holds the default value on creation for the "erp_preferences" field.
+	DefaultErpPreferences string
+	// ErpPreferencesValidator is a validator for the "erp_preferences" field. It is called by the builders before save.
+	ErpPreferencesValidator func(string) error
 	// DefaultDisabled holds the default value on creation for the "disabled" field.
 	DefaultDisabled bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -103,6 +110,11 @@ func ByLevel(opts ...sql.OrderTermOption) OrderOption {
 // ByMenuPermissions orders the results by the menu_permissions field.
 func ByMenuPermissions(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMenuPermissions, opts...).ToFunc()
+}
+
+// ByErpPreferences orders the results by the erp_preferences field.
+func ByErpPreferences(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldErpPreferences, opts...).ToFunc()
 }
 
 // ByDisabled orders the results by the disabled field.

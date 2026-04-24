@@ -102,3 +102,26 @@ func (r *userAdminRepo) SetUserDisabled(ctx context.Context, userID int, disable
 	l.Infof("SetUserDisabled success user_id=%d disabled=%v", userID, disabled)
 	return nil
 }
+
+func (r *userAdminRepo) UpdateUserPasswordHash(ctx context.Context, userID int, passwordHash string) error {
+	l := r.log.WithContext(ctx)
+	l.Infof("UpdateUserPasswordHash start user_id=%d", userID)
+
+	if userID <= 0 || strings.TrimSpace(passwordHash) == "" {
+		l.Warnf("UpdateUserPasswordHash bad param user_id=%d", userID)
+		return biz.ErrBadParam
+	}
+
+	_, err := r.data.postgres.User.UpdateOneID(userID).SetPasswordHash(passwordHash).Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			l.Warnf("UpdateUserPasswordHash not found user_id=%d", userID)
+			return biz.ErrUserNotFound
+		}
+		l.Errorf("UpdateUserPasswordHash failed user_id=%d err=%v", userID, err)
+		return err
+	}
+
+	l.Infof("UpdateUserPasswordHash success user_id=%d", userID)
+	return nil
+}

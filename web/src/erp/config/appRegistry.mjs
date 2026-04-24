@@ -75,6 +75,28 @@ const ERP_APP_DEFINITIONS = {
     command: 'pnpm start:mobile:finance',
     description: '财务移动端独立入口，聚焦待对账、待付款、异常费用和结算提醒。',
   },
+  'mobile-pmc': {
+    id: 'mobile-pmc',
+    kind: 'mobile',
+    title: '毛绒 ERP PMC 移动端',
+    shortTitle: 'PMC 移动端',
+    roleKey: 'pmc',
+    port: 5192,
+    command: 'pnpm start:mobile:pmc',
+    description:
+      'PMC 移动端独立入口，聚焦齐套推进、排产推进、延期跟进、催办和异常分发。',
+  },
+  'mobile-quality': {
+    id: 'mobile-quality',
+    kind: 'mobile',
+    title: '毛绒 ERP 品质移动端',
+    shortTitle: '品质移动端',
+    roleKey: 'quality',
+    port: 5193,
+    command: 'pnpm start:mobile:quality',
+    description:
+      '品质移动端独立入口，聚焦 IQC、过程异常、返工复检和放行 / 退回反馈。',
+  },
 }
 
 export const DEFAULT_ERP_APP_ID = 'desktop'
