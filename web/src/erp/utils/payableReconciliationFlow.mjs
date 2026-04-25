@@ -484,14 +484,16 @@ export function resolvePayableReconciliationTaskBusinessStatus(
 ) {
   if (isPayableRegistrationTask(task)) {
     if (taskStatusKey === 'done') return RECONCILING_STATUS_KEY
-    if (['blocked', 'rejected'].includes(taskStatusKey))
+    if (['blocked', 'rejected'].includes(taskStatusKey)) {
       return BLOCKED_STATUS_KEY
+    }
     return task.business_status_key || INBOUND_DONE_STATUS_KEY
   }
   if (isPayableReconciliationTask(task)) {
     if (taskStatusKey === 'done') return SETTLED_STATUS_KEY
-    if (['blocked', 'rejected'].includes(taskStatusKey))
+    if (['blocked', 'rejected'].includes(taskStatusKey)) {
       return BLOCKED_STATUS_KEY
+    }
     return task.business_status_key || RECONCILING_STATUS_KEY
   }
   return null
