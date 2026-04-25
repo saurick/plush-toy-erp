@@ -2,9 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  ERP_MOBILE_ROLE_PERMISSION_OPTIONS,
   ERP_MENU_PERMISSION_OPTIONS,
   PERMISSION_CENTER_PATH,
   defaultMenuPermissions,
+  normalizeMobileRolePermissions,
   normalizeMenuPermissions,
   resolveMenuPermissionKey,
 } from './menuPermissions.mjs'
@@ -19,6 +21,21 @@ test('menuPermissions: 包含权限管理入口', () => {
 
 test('menuPermissions: 默认权限不包含权限管理', () => {
   assert(!defaultMenuPermissions().includes(PERMISSION_CENTER_PATH))
+})
+
+test('menuPermissions: 移动端角色权限只保留有效角色并保持端口顺序', () => {
+  assert(
+    ERP_MOBILE_ROLE_PERMISSION_OPTIONS.some((item) => item.key === 'purchasing')
+  )
+  assert.deepEqual(
+    normalizeMobileRolePermissions([
+      'quality',
+      'invalid',
+      'purchasing',
+      'quality',
+    ]),
+    ['purchasing', 'quality']
+  )
 })
 
 test('menuPermissions: 只保留有效权限并保持菜单顺序', () => {
@@ -118,4 +135,23 @@ test('menuPermissions: 不包含待确认的报价单入口', () => {
       (item) => item.key === '/erp/sales/quotations'
     )
   )
+})
+
+test('menuPermissions: 新增品质、应收和发票模块权限存在', () => {
+  const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
+
+  assert(permissionKeys.includes('/erp/production/quality-inspections'))
+  assert(permissionKeys.includes('/erp/finance/receivables'))
+  assert(permissionKeys.includes('/erp/finance/invoices'))
+})
+
+test('menuPermissions: 新增 v1 帮助文档入口存在', () => {
+  const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
+
+  assert(permissionKeys.includes('/erp/docs/task-flow-v1'))
+  assert(permissionKeys.includes('/erp/docs/role-permission-matrix-v1'))
+  assert(permissionKeys.includes('/erp/docs/notification-alert-v1'))
+  assert(permissionKeys.includes('/erp/docs/finance-v1'))
+  assert(permissionKeys.includes('/erp/docs/warehouse-quality-v1'))
+  assert(permissionKeys.includes('/erp/docs/log-trace-audit-v1'))
 })

@@ -33,8 +33,11 @@ const DEFAULT_BUSINESS_STATUS_BY_MODULE = Object.freeze({
   'production-scheduling': 'production_ready',
   'production-progress': 'production_processing',
   'production-exceptions': 'blocked',
+  'quality-inspections': 'qc_pending',
   reconciliation: 'reconciling',
   payables: 'reconciling',
+  receivables: 'reconciling',
+  invoices: 'reconciling',
 })
 
 const COMMON_FORM_FIELDS = Object.freeze([
@@ -472,6 +475,89 @@ const MODULE_OVERRIDES = Object.freeze({
       { key: 'due_date', label: '处理日期', width: 130 },
     ],
   },
+  'quality-inspections': {
+    itemTitle: '检验明细',
+    itemFields: [
+      {
+        key: 'item_name',
+        label: '检验项目',
+        placeholder: '外观、尺寸、针距、包装等',
+      },
+      { key: 'material_name', label: '不良项' },
+      { key: 'quantity', label: '数量', type: 'number' },
+      { key: 'unit', label: '单位' },
+      { key: 'spec', label: '备注' },
+    ],
+    formFields: [
+      { key: 'document_no', label: '检验单号', placeholder: '留空自动生成' },
+      { key: 'source_no', label: '来源单号' },
+      { key: 'title', label: '检验事项', required: true },
+      { key: 'supplier_name', label: '供应商 / 加工厂' },
+      { key: 'customer_name', label: '客户' },
+      { key: 'style_no', label: '款式编号' },
+      { key: 'product_no', label: '产品编号' },
+      { key: 'product_name', label: '产品名称' },
+      { key: 'material_name', label: '物料 / 成品' },
+      { key: 'quantity', label: '检验数量', type: 'number' },
+      { key: 'unit', label: '单位' },
+      { key: 'document_date', label: '检验日期', type: 'date' },
+      { key: 'due_date', label: '要求完成日期', type: 'date' },
+      {
+        key: 'payload.qc_type',
+        label: '检验类型',
+        options: [
+          { label: 'IQC 来料检验', value: 'iqc' },
+          { label: '委外回货检验', value: 'outsource_return' },
+          { label: '成品抽检', value: 'finished_goods' },
+          { label: '返工复检', value: 'rework_recheck' },
+        ],
+      },
+      {
+        key: 'payload.qc_result',
+        label: '检验结果',
+        options: [
+          { label: '待检', value: 'pending' },
+          { label: '合格', value: 'passed' },
+          { label: '不合格', value: 'failed' },
+          { label: '让步接收', value: 'concession' },
+        ],
+      },
+      { key: 'payload.defect_qty', label: '不良数量', type: 'number' },
+      { key: 'payload.defect_reason', label: '不良原因' },
+      {
+        key: 'payload.rework_required',
+        label: '是否返工',
+        options: [
+          { label: '否', value: 'no' },
+          { label: '是', value: 'yes' },
+        ],
+      },
+      {
+        key: 'payload.release_decision',
+        label: '放行决策',
+        options: [
+          { label: '待定', value: 'pending' },
+          { label: '放行', value: 'released' },
+          { label: '退回', value: 'returned' },
+          { label: '返工后复检', value: 'rework_recheck' },
+        ],
+      },
+    ],
+    tableColumns: [
+      { key: 'document_no', label: '检验单号', width: 150 },
+      { key: 'source_no', label: '来源单号', width: 150 },
+      { key: 'payload.qc_type', label: '检验类型', width: 140 },
+      { key: 'payload.qc_result', label: '检验结果', width: 120 },
+      { key: 'supplier_name', label: '供应商 / 加工厂', width: 160 },
+      { key: 'customer_name', label: '客户', width: 140 },
+      { key: 'product_name', label: '产品名称', width: 180 },
+      { key: 'material_name', label: '物料 / 成品', width: 180 },
+      { key: 'quantity', label: '检验数量', width: 100 },
+      { key: 'payload.defect_qty', label: '不良数量', width: 100 },
+      { key: 'payload.release_decision', label: '放行决策', width: 130 },
+      { key: 'due_date', label: '要求完成日期', width: 140 },
+    ],
+  },
   reconciliation: {
     summaryMetric: 'amount',
     itemTitle: '对账明细',
@@ -536,11 +622,163 @@ const MODULE_OVERRIDES = Object.freeze({
       { key: 'due_date', label: '到期日期', width: 130 },
     ],
   },
+  receivables: {
+    summaryMetric: 'amount',
+    itemTitle: '应收明细',
+    itemFields: [
+      {
+        key: 'item_name',
+        label: '应收事项',
+        placeholder: '出货批次、产品或费用项',
+      },
+      { key: 'quantity', label: '数量', type: 'number' },
+      { key: 'unit_price', label: '单价', type: 'number' },
+      { key: 'amount', label: '应收金额', type: 'number' },
+      { key: 'spec', label: '异常 / 结算备注' },
+    ],
+    formFields: [
+      { key: 'document_no', label: '应收单号', placeholder: '留空自动生成' },
+      { key: 'source_no', label: '来源出货 / 对账单' },
+      { key: 'title', label: '应收事项', required: true },
+      { key: 'customer_name', label: '客户', required: true },
+      { key: 'product_name', label: '产品名称' },
+      { key: 'quantity', label: '数量', type: 'number' },
+      { key: 'amount', label: '应收金额', type: 'number' },
+      { key: 'document_date', label: '登记日期', type: 'date' },
+      { key: 'due_date', label: '收款到期日期', type: 'date' },
+      { key: 'payload.tax_rate', label: '税率', type: 'number' },
+      { key: 'payload.tax_amount', label: '税额', type: 'number' },
+      {
+        key: 'payload.amount_without_tax',
+        label: '不含税金额',
+        type: 'number',
+      },
+      {
+        key: 'payload.amount_with_tax',
+        label: '含税金额',
+        type: 'number',
+      },
+      { key: 'payload.received_amount', label: '已收金额', type: 'number' },
+      {
+        key: 'payload.receivable_status',
+        label: '收款状态',
+        options: [
+          { label: '待收款', value: 'pending' },
+          { label: '部分收款', value: 'partial' },
+          { label: '已收款', value: 'received' },
+          { label: '异常', value: 'exception' },
+        ],
+      },
+      {
+        key: 'payload.invoice_status',
+        label: '开票状态',
+        options: [
+          { label: '未开票', value: 'not_invoiced' },
+          { label: '部分开票', value: 'partial' },
+          { label: '已开票', value: 'invoiced' },
+        ],
+      },
+      { key: 'payload.settlement_note', label: '结算备注' },
+    ],
+    tableColumns: [
+      { key: 'document_no', label: '应收单号', width: 150 },
+      { key: 'source_no', label: '来源单号', width: 150 },
+      { key: 'customer_name', label: '客户', width: 150 },
+      { key: 'product_name', label: '产品名称', width: 180 },
+      { key: 'quantity', label: '数量', width: 100 },
+      { key: 'amount', label: '应收金额', width: 110 },
+      { key: 'payload.received_amount', label: '已收金额', width: 110 },
+      { key: 'payload.receivable_status', label: '收款状态', width: 120 },
+      { key: 'payload.invoice_status', label: '开票状态', width: 120 },
+      { key: 'due_date', label: '收款到期日期', width: 140 },
+    ],
+  },
+  invoices: {
+    summaryMetric: 'amount',
+    itemTitle: '发票明细',
+    itemFields: [
+      {
+        key: 'item_name',
+        label: '发票项目',
+        placeholder: '货物、加工费、辅材费或服务项',
+      },
+      { key: 'quantity', label: '数量', type: 'number' },
+      { key: 'unit_price', label: '单价', type: 'number' },
+      { key: 'amount', label: '金额', type: 'number' },
+      { key: 'spec', label: '备注' },
+    ],
+    formFields: [
+      { key: 'document_no', label: '登记单号', placeholder: '留空自动生成' },
+      { key: 'source_no', label: '来源应收 / 应付 / 对账单' },
+      { key: 'title', label: '发票登记事项', required: true },
+      { key: 'customer_name', label: '客户' },
+      { key: 'supplier_name', label: '供应商 / 加工厂' },
+      { key: 'amount', label: '发票金额', type: 'number' },
+      { key: 'document_date', label: '登记日期', type: 'date' },
+      { key: 'due_date', label: '处理到期日期', type: 'date' },
+      { key: 'payload.invoice_no', label: '发票号' },
+      {
+        key: 'payload.invoice_type',
+        label: '发票类型',
+        options: [
+          { label: '增值税专用发票', value: 'vat_special' },
+          { label: '增值税普通发票', value: 'vat_normal' },
+          { label: '其他', value: 'other' },
+        ],
+      },
+      { key: 'payload.tax_rate', label: '税率', type: 'number' },
+      { key: 'payload.tax_amount', label: '税额', type: 'number' },
+      {
+        key: 'payload.amount_without_tax',
+        label: '不含税金额',
+        type: 'number',
+      },
+      {
+        key: 'payload.amount_with_tax',
+        label: '含税金额',
+        type: 'number',
+      },
+      {
+        key: 'payload.invoice_direction',
+        label: '发票方向',
+        options: [
+          { label: '销项', value: 'sales' },
+          { label: '进项', value: 'purchase' },
+        ],
+      },
+      {
+        key: 'payload.invoice_status',
+        label: '发票状态',
+        options: [
+          { label: '待开 / 待收', value: 'pending' },
+          { label: '已开票', value: 'issued' },
+          { label: '已收票', value: 'received' },
+          { label: '已作废', value: 'voided' },
+        ],
+      },
+      { key: 'payload.issue_date', label: '开票日期', type: 'date' },
+      { key: 'payload.receive_date', label: '收票日期', type: 'date' },
+    ],
+    tableColumns: [
+      { key: 'document_no', label: '登记单号', width: 150 },
+      { key: 'payload.invoice_no', label: '发票号', width: 160 },
+      { key: 'payload.invoice_direction', label: '方向', width: 90 },
+      { key: 'payload.invoice_type', label: '发票类型', width: 140 },
+      { key: 'customer_name', label: '客户', width: 150 },
+      { key: 'supplier_name', label: '供应商 / 加工厂', width: 160 },
+      { key: 'amount', label: '发票金额', width: 110 },
+      { key: 'payload.tax_amount', label: '税额', width: 100 },
+      { key: 'payload.invoice_status', label: '状态', width: 110 },
+      { key: 'payload.issue_date', label: '开票日期', width: 130 },
+      { key: 'payload.receive_date', label: '收票日期', width: 130 },
+    ],
+  },
 })
 
 export function getDefaultOwnerRole(moduleItem = {}) {
   if (moduleItem.key === 'production-progress') return 'production'
   if (moduleItem.key === 'production-exceptions') return 'production'
+  if (moduleItem.key === 'quality-inspections') return 'quality'
   return DEFAULT_OWNER_BY_SECTION[moduleItem.sectionKey] || 'merchandiser'
 }
 

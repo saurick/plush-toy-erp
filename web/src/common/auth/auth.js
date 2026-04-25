@@ -15,11 +15,17 @@ const META_KEYS = [
   'token_type',
   'user_id',
   'username',
+  'phone',
   'admin_level',
   'menu_permissions',
+  'mobile_role_permissions',
   'erp_preferences',
 ]
-const JSON_META_KEYS = new Set(['menu_permissions', 'erp_preferences'])
+const JSON_META_KEYS = new Set([
+  'menu_permissions',
+  'mobile_role_permissions',
+  'erp_preferences',
+])
 
 function normalizeScope(scope = AUTH_SCOPE.USER) {
   return scope === AUTH_SCOPE.ADMIN ? AUTH_SCOPE.ADMIN : AUTH_SCOPE.USER
@@ -164,14 +170,22 @@ export function getStoredAdminProfile() {
     return null
   }
 
-  const level = Number(getAuthMeta(AUTH_SCOPE.ADMIN, 'admin_level'))
+  const levelMeta = getAuthMeta(AUTH_SCOPE.ADMIN, 'admin_level')
+  const level = levelMeta == null ? null : Number(levelMeta)
   const menuPermissions = getAuthMeta(AUTH_SCOPE.ADMIN, 'menu_permissions')
+  const mobileRolePermissions = getAuthMeta(
+    AUTH_SCOPE.ADMIN,
+    'mobile_role_permissions'
+  )
   const erpPreferences = getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences')
 
   return {
     ...admin,
     level: Number.isFinite(level) ? level : null,
     menu_permissions: Array.isArray(menuPermissions) ? menuPermissions : [],
+    mobile_role_permissions: Array.isArray(mobileRolePermissions)
+      ? mobileRolePermissions
+      : [],
     erp_preferences:
       erpPreferences && typeof erpPreferences === 'object'
         ? erpPreferences

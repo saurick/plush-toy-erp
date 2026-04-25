@@ -29,6 +29,7 @@ import {
   DoubleRightOutlined,
   DownOutlined,
   EditOutlined,
+  ExperimentOutlined,
   ExportOutlined,
   InboxOutlined,
   LinkOutlined,
@@ -37,7 +38,7 @@ import {
   PrinterOutlined,
   ReloadOutlined,
   RollbackOutlined,
-  SearchOutlined,
+  SendOutlined,
   SettingOutlined,
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
@@ -76,7 +77,9 @@ import {
   buildBusinessRecordParams,
   buildBusinessRecordStatusUpdateParams,
   createBlankItem,
+  createBlankFieldValue,
   formatMetric,
+  getBusinessRecordFieldValue,
   summarizeRecordItems,
 } from '../utils/businessRecordForm.mjs'
 import {
@@ -106,6 +109,34 @@ import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   openPrintWorkspaceWindow,
 } from '../utils/printWorkspace.js'
+import { buildWorkflowTaskAlert } from '../utils/workflowDashboardStats.mjs'
+import {
+  ORDER_APPROVAL_STATUS_KEY,
+  ORDER_APPROVED_STATUS_KEY,
+  PROJECT_ORDER_MODULE_KEY,
+  buildBossApprovalTaskFromProjectOrder,
+  isOrderApprovalTask,
+} from '../utils/orderApprovalFlow.mjs'
+import {
+  ACCESSORIES_PURCHASE_MODULE_KEY,
+  INBOUND_MODULE_KEY,
+  IQC_PENDING_STATUS_KEY,
+  buildIqcTaskFromArrivalRecord,
+  isPurchaseIqcTask,
+} from '../utils/purchaseInboundFlow.mjs'
+import {
+  BusinessDataTable,
+  BusinessFilterPanel,
+  BusinessListToolbar,
+  BusinessPageLayout,
+  CollaborationTaskPanel,
+  DateRangeFilter,
+  PageHeaderCard,
+  SearchInput,
+  SelectFilter,
+  SelectionActionBar,
+  ToolbarButton,
+} from '../components/business-list/BusinessListLayout.jsx'
 
 const { Text } = Typography
 const DEFAULT_PAGE_SIZE = 8
@@ -157,9 +188,13 @@ const COMPACT_SUMMARY_GROUPS = Object.freeze([
     resolveLabel: (value) => roleLabelMap.get(value) || value,
   },
 ])
-const DATE_FIELDS = new Set(['document_date', 'due_date'])
 const NUMBER_FIELDS = new Set(['quantity', 'amount'])
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
+const ACTIVE_APPROVAL_TASK_STATUS_KEYS = new Set([
+  'pending',
+  'ready',
+  'processing',
+])
 const TASK_STATUS_BY_BUSINESS_STATUS = Object.freeze({
   blocked: 'blocked',
   cancelled: 'cancelled',
@@ -297,7 +332,7 @@ function summarizeCompactGroup(records, group) {
 }
 
 function createDefaultValues(moduleItem, definition) {
-  return {
+  const values = {
     document_no: '',
     title: '',
     source_no: '',
@@ -319,6 +354,11 @@ function createDefaultValues(moduleItem, definition) {
     module_key: moduleItem.key,
     items: [createBlankItem(definition)],
   }
+  ;(definition.formFields || []).forEach((field) => {
+    if (!field.key || field.key in values) return
+    values[field.key] = createBlankFieldValue(field)
+  })
+  return values
 }
 
 function formValuesFromRecord(record, moduleItem, definition) {
@@ -326,10 +366,12 @@ function formValuesFromRecord(record, moduleItem, definition) {
   Object.keys(values).forEach((key) => {
     if (key in record) {
       values[key] = record[key]
+      return
     }
-  })
-  DATE_FIELDS.forEach((key) => {
-    values[key] = record?.[key] || ''
+    const fieldValue = getBusinessRecordFieldValue(record, key)
+    if (fieldValue !== undefined) {
+      values[key] = fieldValue
+    }
   })
   values.note = record?.payload?.note || ''
   values.items =
@@ -380,6 +422,15 @@ function renderFormField(field) {
         type="date"
         onClick={openNativeDatePicker}
         style={{ cursor: 'pointer' }}
+      />
+    )
+  }
+  if (Array.isArray(field.options) && field.options.length > 0) {
+    return (
+      <Select
+        allowClear
+        options={field.options}
+        placeholder={field.placeholder || `请选择${field.label}`}
       />
     )
   }
@@ -488,6 +539,8 @@ export default function BusinessModulePage({ moduleItem }) {
   })
   const [statusReasonModalOpen, setStatusReasonModalOpen] = useState(false)
   const [pendingStatusKey, setPendingStatusKey] = useState('')
+  const [orderApprovalSubmitting, setOrderApprovalSubmitting] = useState(false)
+  const [iqcSubmitting, setIqcSubmitting] = useState(false)
   const [columnOrderModalOpen, setColumnOrderModalOpen] = useState(false)
   const [columnOrderKeys, setColumnOrderKeys] = useState(() =>
     readStoredColumnOrder(moduleItem.key, definition.tableColumns)
@@ -544,6 +597,63 @@ export default function BusinessModulePage({ moduleItem }) {
     () => getLinkedTargets(moduleItem.key, selectedRecord),
     [moduleItem.key, selectedRecord]
   )
+  const isProjectOrderModule = moduleItem.key === PROJECT_ORDER_MODULE_KEY
+  const selectedRecordTasks = useMemo(() => {
+    if (!selectedRecord) return []
+    return tasks.filter(
+      (task) =>
+        String(task.source_type || '') === moduleItem.key &&
+        String(task.source_id) === String(selectedRecord.id)
+    )
+  }, [moduleItem.key, selectedRecord, tasks])
+  const selectedOrderApprovalTasks = useMemo(
+    () => selectedRecordTasks.filter(isOrderApprovalTask),
+    [selectedRecordTasks]
+  )
+  const selectedActiveOrderApprovalTask = useMemo(
+    () =>
+      selectedOrderApprovalTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedOrderApprovalTasks]
+  )
+  const latestSelectedOrderApprovalTask = useMemo(
+    () =>
+      [...selectedOrderApprovalTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedOrderApprovalTasks]
+  )
+  const isPurchaseInboundFlowModule = [
+    ACCESSORIES_PURCHASE_MODULE_KEY,
+    INBOUND_MODULE_KEY,
+  ].includes(moduleItem.key)
+  const selectedIqcTasks = useMemo(
+    () => selectedRecordTasks.filter(isPurchaseIqcTask),
+    [selectedRecordTasks]
+  )
+  const selectedActiveIqcTask = useMemo(
+    () =>
+      selectedIqcTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedIqcTasks]
+  )
+  const latestSelectedIqcTask = useMemo(
+    () =>
+      [...selectedIqcTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedIqcTasks]
+  )
   const printTemplate = useMemo(
     () => getBusinessRecordPrintTemplate(moduleItem.key),
     [moduleItem.key]
@@ -567,6 +677,14 @@ export default function BusinessModulePage({ moduleItem }) {
   const itemSummary = useMemo(
     () => summarizeRecordItems(watchedItems, definition.itemFields),
     [definition.itemFields, watchedItems]
+  )
+  const moduleTaskAlerts = useMemo(
+    () =>
+      tasks
+        .map((task) => buildWorkflowTaskAlert(task))
+        .filter(Boolean)
+        .slice(0, 5),
+    [tasks]
   )
   const businessStatusTransitionMenuItems = useMemo(
     () =>
@@ -959,9 +1077,15 @@ export default function BusinessModulePage({ moduleItem }) {
             </Dropdown>
           </div>
         ),
-        render: (value) => {
-          if (NUMBER_FIELDS.has(column.key)) return formatMetric(value)
-          return displayValue(value)
+        render: (value, record) => {
+          const fieldValue =
+            value !== undefined
+              ? value
+              : getBusinessRecordFieldValue(record, column.key)
+          if (column.type === 'number' || NUMBER_FIELDS.has(column.key)) {
+            return formatMetric(fieldValue)
+          }
+          return displayValue(fieldValue)
         },
       }
     })
@@ -1363,6 +1487,104 @@ export default function BusinessModulePage({ moduleItem }) {
     }
   }
 
+  const submitSelectedOrderForApproval = async () => {
+    if (!selectedRecord || !isProjectOrderModule) return
+    if (selectedRecord.business_status_key === ORDER_APPROVED_STATUS_KEY) {
+      message.info('当前订单已放行，无需重复提交审批')
+      return
+    }
+    if (selectedActiveOrderApprovalTask) {
+      message.warning('已有审批任务')
+      return
+    }
+
+    const taskParams = buildBossApprovalTaskFromProjectOrder({
+      ...selectedRecord,
+      module_key: moduleItem.key,
+    })
+    if (!taskParams) {
+      message.warning('当前记录无法生成审批任务')
+      return
+    }
+
+    setOrderApprovalSubmitting(true)
+    try {
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: PROJECT_ORDER_MODULE_KEY,
+        source_id: selectedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: ORDER_APPROVAL_STATUS_KEY,
+        owner_role_key: 'boss',
+        payload: {
+          record_title: selectedRecord.title,
+          approval_required: true,
+          notification_type: 'approval_required',
+          alert_type: 'approval_pending',
+          critical_path: true,
+        },
+      })
+      message.success(`审批任务已提交：${task?.task_name || '老板审批订单'}`)
+      await loadData()
+      setSelectedRowKeys([selectedRecord.id])
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '提交审批失败，请稍后重试'))
+    } finally {
+      setOrderApprovalSubmitting(false)
+    }
+  }
+
+  const submitSelectedArrivalForIqc = async () => {
+    if (!selectedRecord || !isPurchaseInboundFlowModule) return
+    if (selectedActiveIqcTask) {
+      message.warning('已有 IQC 任务')
+      return
+    }
+
+    setIqcSubmitting(true)
+    try {
+      const statusParams = buildBusinessRecordStatusUpdateParams(
+        selectedRecord,
+        IQC_PENDING_STATUS_KEY,
+        moduleItem,
+        definition
+      )
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const taskParams = buildIqcTaskFromArrivalRecord({
+        ...savedRecord,
+        module_key: moduleItem.key,
+      })
+      if (!taskParams) {
+        message.warning('当前记录无法生成 IQC 任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: moduleItem.key,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: IQC_PENDING_STATUS_KEY,
+        owner_role_key: 'quality',
+        payload: {
+          record_title: savedRecord.title,
+          notification_type: 'task_created',
+          alert_type: 'qc_pending',
+          critical_path: true,
+        },
+      })
+      message.success(`IQC 任务已发起：${task?.task_name || 'IQC 来料检验'}`)
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '发起 IQC 失败，请稍后重试'))
+    } finally {
+      setIqcSubmitting(false)
+    }
+  }
+
   const openPrintWindowForSelectedRecord = () => {
     if (!selectedRecord || !printTemplate) return
     const initialDraft = buildBusinessRecordPrintDraft(
@@ -1429,181 +1651,163 @@ export default function BusinessModulePage({ moduleItem }) {
   }
 
   return (
-    <div className="erp-business-module-page">
-      <Card className="erp-business-module-hero">
-        <div className="erp-business-module-hero__grid">
-          <div className="erp-business-module-hero__main">
-            <div>
-              <Text type="secondary">{moduleItem.sectionTitle}</Text>
-              <h1>{moduleItem.title}</h1>
-              <p>{moduleItem.description}</p>
-            </div>
-            <div className="erp-business-module-chip-row erp-business-module-hero__tags">
-              <Tag color="green">
-                状态流程：单据保存 → 协同任务 → 业务状态回写
+    <BusinessPageLayout className="erp-business-module-page">
+      <PageHeaderCard
+        sectionTitle={moduleItem.sectionTitle}
+        title={moduleItem.title}
+        description={moduleItem.description}
+        tags={
+          <div className="erp-business-module-chip-row">
+            <Tag color="green">
+              状态流程：单据保存 → 协同任务 → 业务状态回写
+            </Tag>
+            {moduleTaskAlerts.length > 0 ? (
+              <Tag
+                color={
+                  moduleTaskAlerts.some(
+                    (alert) => alert.alert_level === 'critical'
+                  )
+                    ? 'red'
+                    : 'gold'
+                }
+              >
+                当前预警 {moduleTaskAlerts.length}：
+                {moduleTaskAlerts[0].alert_label}
+              </Tag>
+            ) : null}
+          </div>
+        }
+        stats={[
+          { key: 'total', label: '总记录', value: activeRecords.length },
+          { key: 'current', label: '当前结果', value: sortedRecords.length },
+          { key: 'selected', label: '已选记录', value: selectedRowKeys.length },
+        ]}
+        summary={
+          <>
+            <div className="erp-business-module-chip-row">
+              <Tag className="erp-business-module-summary-chip">
+                {metricKey === 'amount' ? '金额合计' : '数量合计'}{' '}
+                {formatMetric(metricTotal)}
               </Tag>
             </div>
-          </div>
-          <div className="erp-business-module-stats">
-            <div>
-              <Text type="secondary">总记录</Text>
-              <strong>{activeRecords.length}</strong>
-            </div>
-            <div>
-              <Text type="secondary">当前结果</Text>
-              <strong>{sortedRecords.length}</strong>
-            </div>
-            <div>
-              <Text type="secondary">已选记录</Text>
-              <strong>{selectedRowKeys.length}</strong>
-            </div>
-          </div>
-        </div>
-        <div className="erp-business-module-hero__footer">
-          <div className="erp-business-module-chip-row">
-            <Tag className="erp-business-module-summary-chip">
-              {metricKey === 'amount' ? '金额合计' : '数量合计'}{' '}
-              {formatMetric(metricTotal)}
-            </Tag>
-          </div>
-          {compactSummaryGroups.map((group) => (
-            <div key={group.key} className="erp-business-module-chip-row">
-              <Text type="secondary">{group.label}：</Text>
-              {group.items.map((item) => (
-                <Tag key={`${group.key}-${item.label}`}>
-                  {item.label} {item.count}
-                </Tag>
-              ))}
-              {group.hiddenCount > 0 ? (
-                <Tag className="erp-business-module-summary-chip">
-                  +{group.hiddenCount}
-                </Tag>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      </Card>
+            {compactSummaryGroups.map((group) => (
+              <div key={group.key} className="erp-business-module-chip-row">
+                <Text type="secondary">{group.label}：</Text>
+                {group.items.map((item) => (
+                  <Tag key={`${group.key}-${item.label}`}>
+                    {item.label} {item.count}
+                  </Tag>
+                ))}
+                {group.hiddenCount > 0 ? (
+                  <Tag className="erp-business-module-summary-chip">
+                    +{group.hiddenCount}
+                  </Tag>
+                ) : null}
+              </div>
+            ))}
+          </>
+        }
+      />
 
-      <Card className="erp-business-module-toolbar">
-        <div className="erp-business-module-toolbar__row">
-          <div className="erp-business-module-toolbar__filters">
-            <Input
-              allowClear
-              prefix={<SearchOutlined />}
-              placeholder="搜编号/名称/客户/合同"
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              onPressEnter={loadData}
-            />
-            <Select
-              style={{ width: '100%' }}
-              options={availableDateFilters.map((item) => ({
-                label: item.label,
-                value: item.key,
-              }))}
-              value={activeDateFilterKey || undefined}
-              onChange={setDateFilterKey}
-            />
-            <div className="erp-business-module-date-filter">
-              <span>从这天起</span>
-              <Input
-                aria-label="筛选起始日期，从这天起"
-                type="date"
-                value={dateRangeStart}
-                onChange={(event) => setDateRangeStart(event.target.value)}
-                onClick={openNativeDatePicker}
-              />
-            </div>
-            <div className="erp-business-module-date-filter">
-              <span>到这天止</span>
-              <Input
-                aria-label="筛选截止日期，到这天止"
-                type="date"
-                value={dateRangeEnd}
-                onChange={(event) => setDateRangeEnd(event.target.value)}
-                onClick={openNativeDatePicker}
-              />
-            </div>
-            <Select
-              allowClear
-              mode="multiple"
-              maxTagCount="responsive"
-              listHeight={224}
-              placement="bottomLeft"
-              classNames={{
-                popup: { root: 'erp-business-module-select-popup' },
-              }}
-              placeholder="按业务状态筛选"
-              options={STATUS_OPTIONS}
-              value={statusFilterKeys}
-              onChange={(nextValue) =>
-                setStatusFilterKeys(normalizeBusinessStatusKeys(nextValue))
-              }
-            />
-            <Select
-              style={{ width: '100%' }}
-              options={SORT_ORDER_OPTIONS}
-              value={sortOrder}
-              onChange={setSortOrder}
-            />
-          </div>
-          <div className="erp-business-module-toolbar__actions">
-            <Button icon={<ExportOutlined />} onClick={exportCurrentRecords}>
+      <BusinessFilterPanel>
+        <SearchInput
+          placeholder="搜编号/名称/客户/合同"
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          onPressEnter={loadData}
+        />
+        <DateRangeFilter
+          options={availableDateFilters.map((item) => ({
+            label: item.label,
+            value: item.key,
+          }))}
+          value={activeDateFilterKey}
+          onTypeChange={setDateFilterKey}
+          startValue={dateRangeStart}
+          endValue={dateRangeEnd}
+          onStartChange={setDateRangeStart}
+          onEndChange={setDateRangeEnd}
+          onOpenNativeDatePicker={openNativeDatePicker}
+        />
+        <SelectFilter
+          allowClear
+          mode="multiple"
+          maxTagCount="responsive"
+          listHeight={224}
+          placement="bottomLeft"
+          className="erp-business-filter-control--status"
+          classNames={{
+            popup: { root: 'erp-business-module-select-popup' },
+          }}
+          placeholder="按业务状态筛选"
+          options={STATUS_OPTIONS}
+          value={statusFilterKeys}
+          onChange={(nextValue) =>
+            setStatusFilterKeys(normalizeBusinessStatusKeys(nextValue))
+          }
+        />
+        <SelectFilter
+          className="erp-business-filter-control--sort"
+          options={SORT_ORDER_OPTIONS}
+          value={sortOrder}
+          onChange={setSortOrder}
+        />
+      </BusinessFilterPanel>
+
+      <BusinessListToolbar
+        stats={[
+          { key: 'total', label: '总记录', value: activeRecords.length },
+          { key: 'current', label: '当前结果', value: sortedRecords.length },
+          { key: 'selected', label: '已选', value: selectedRowKeys.length },
+          {
+            key: 'metric',
+            label: metricKey === 'amount' ? '金额合计' : '数量合计',
+            value: formatMetric(metricTotal),
+          },
+        ]}
+        actions={
+          <>
+            <ToolbarButton
+              icon={<ExportOutlined />}
+              onClick={exportCurrentRecords}
+            >
               导出当前结果
-            </Button>
-            <Button
+            </ToolbarButton>
+            <ToolbarButton
               icon={<SettingOutlined />}
               aria-label="列顺序"
               title="列顺序"
               onClick={() => setColumnOrderModalOpen(true)}
             >
               列顺序
-            </Button>
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              disabled={selectedRowKeys.length === 0}
-              onClick={openBatchDeleteModal}
-            >
-              批量删除
-            </Button>
-            <Button icon={<InboxOutlined />} onClick={openRecycleModal}>
+            </ToolbarButton>
+            <ToolbarButton icon={<InboxOutlined />} onClick={openRecycleModal}>
               回收站
-            </Button>
-            <Button
+            </ToolbarButton>
+            <ToolbarButton
               type="primary"
+              className="erp-business-list-toolbar__primary-action"
               icon={<PlusOutlined />}
               onClick={openCreateModal}
             >
               新建记录
-            </Button>
-          </div>
-        </div>
+            </ToolbarButton>
+          </>
+        }
+      />
 
-        <div className="erp-business-module-current-action">
-          <div className="erp-business-module-selection-block">
-            <Text strong>当前操作</Text>
-            <Tag
-              className="erp-business-module-selection-tag"
-              color={selectedRecord ? 'green' : 'default'}
-            >
-              {selectedRecordDisplayText}
-            </Tag>
-          </div>
-          <Space wrap className="erp-business-module-selection-actions">
-            {selectedRowKeys.length > 0 ? (
-              <Button
-                type="link"
-                size="small"
-                onClick={() => setSelectedRowKeys([])}
-              >
-                清空已选
-              </Button>
-            ) : null}
+      <SelectionActionBar
+        selectedCount={selectedRowKeys.length}
+        selectedLabel={selectedRecordDisplayText}
+      >
+        <Button type="link" size="small" onClick={() => setSelectedRowKeys([])}>
+          清空已选
+        </Button>
+        {selectedRecord ? (
+          <>
             <Button
               size="small"
               icon={<EditOutlined />}
-              disabled={!selectedRecord}
               onClick={openEditModal}
             >
               编辑
@@ -1612,7 +1816,6 @@ export default function BusinessModulePage({ moduleItem }) {
               <Button
                 size="small"
                 icon={<PrinterOutlined />}
-                disabled={!selectedRecord}
                 onClick={openPrintWindowForSelectedRecord}
               >
                 {printTemplate.actionLabel}
@@ -1622,10 +1825,7 @@ export default function BusinessModulePage({ moduleItem }) {
               <Button
                 size="small"
                 icon={<LinkOutlined />}
-                disabled={selectedRecordLinkedTargets.length === 0}
-                onClick={() =>
-                  selectedRecord && openLinkedTargetsForRecord(selectedRecord)
-                }
+                onClick={() => openLinkedTargetsForRecord(selectedRecord)}
               >
                 关联表格
               </Button>
@@ -1645,26 +1845,63 @@ export default function BusinessModulePage({ moduleItem }) {
                     }
                   },
                 }}
-                disabled={!selectedRecord}
                 trigger={['click']}
               >
-                <Button
-                  size="small"
-                  icon={<LinkOutlined />}
-                  disabled={!selectedRecord}
-                >
+                <Button size="small" icon={<LinkOutlined />}>
                   <span>关联表格</span>
                   <DownOutlined />
                 </Button>
               </Dropdown>
             )}
-            <Button
-              size="small"
-              disabled={!selectedRecord}
-              onClick={createTaskForSelectedRecord}
-            >
+            <Button size="small" onClick={createTaskForSelectedRecord}>
               创建协同任务
             </Button>
+            {isProjectOrderModule ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<SendOutlined />}
+                  loading={orderApprovalSubmitting}
+                  onClick={submitSelectedOrderForApproval}
+                >
+                  提交审批
+                </Button>
+                <Tag color={selectedActiveOrderApprovalTask ? 'gold' : 'blue'}>
+                  审批：
+                  {latestSelectedOrderApprovalTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedOrderApprovalTask.task_status_key
+                      ) || latestSelectedOrderApprovalTask.task_status_key
+                    : '未提交'}
+                </Tag>
+                <Tag color="geekblue">下一步：老板审批 -&gt; 工程资料</Tag>
+              </>
+            ) : null}
+            {isPurchaseInboundFlowModule ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<ExperimentOutlined />}
+                  loading={iqcSubmitting}
+                  onClick={submitSelectedArrivalForIqc}
+                >
+                  发起 IQC
+                </Button>
+                <Tag color={selectedActiveIqcTask ? 'gold' : 'blue'}>
+                  IQC：
+                  {latestSelectedIqcTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedIqcTask.task_status_key
+                      ) || latestSelectedIqcTask.task_status_key
+                    : '未发起'}
+                </Tag>
+                {latestSelectedIqcTask?.business_status_key === 'qc_failed' ||
+                latestSelectedIqcTask?.payload?.alert_type === 'qc_failed' ? (
+                  <Tag color="red">来料不良</Tag>
+                ) : null}
+                <Tag color="geekblue">下一步：品质 IQC -&gt; 仓库入库</Tag>
+              </>
+            ) : null}
             <Dropdown
               menu={{
                 items: businessStatusTransitionMenuItems,
@@ -1691,56 +1928,74 @@ export default function BusinessModulePage({ moduleItem }) {
               okText="删除"
               cancelText="取消"
               onConfirm={deleteSelectedRecord}
-              disabled={!selectedRecord}
             >
-              <Button
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                disabled={!selectedRecord}
-              >
+              <Button size="small" danger icon={<DeleteOutlined />}>
                 删除
               </Button>
             </Popconfirm>
-          </Space>
-        </div>
-      </Card>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={openBatchDeleteModal}
+            >
+              批量删除
+            </Button>
+          </>
+        ) : (
+          <>
+            <Text
+              type="secondary"
+              className="erp-business-selection-action-bar__hint"
+            >
+              多选记录可批量删除；保留 1 条后可编辑、流转和创建协同任务。
+            </Text>
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={openBatchDeleteModal}
+            >
+              批量删除
+            </Button>
+          </>
+        )}
+      </SelectionActionBar>
 
-      <Card className="erp-business-module-table-card">
-        <Table
-          loading={loading}
-          rowKey="id"
-          columns={tableColumns}
-          dataSource={sortedRecords}
-          scroll={{ x: tableScrollX }}
-          rowSelection={{
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-          }}
-          onRow={(record) => ({
-            onClick: () => setSelectedRowKeys([record.id]),
-            onDoubleClick: () => {
-              setSelectedRowKeys([record.id])
-              setEditingRecord(record)
-              form.setFieldsValue(
-                formValuesFromRecord(record, moduleItem, definition)
-              )
-              setModalOpen(true)
-            },
-          })}
-          pagination={{
-            pageSize: DEFAULT_PAGE_SIZE,
-            showSizeChanger: true,
-            pageSizeOptions: ['8', '20', '50'],
-            showTotal: (total) => `共 ${total} 条`,
-          }}
-          locale={{
-            emptyText: (
-              <Empty description="暂无业务记录，点击“新建记录”开始落盘" />
-            ),
-          }}
-        />
-      </Card>
+      <BusinessDataTable
+        loading={loading}
+        rowKey="id"
+        columns={tableColumns}
+        dataSource={sortedRecords}
+        scroll={{ x: tableScrollX }}
+        rowSelection={{
+          selectedRowKeys,
+          onChange: setSelectedRowKeys,
+        }}
+        onRow={(record) => ({
+          onClick: () => setSelectedRowKeys([record.id]),
+          onDoubleClick: () => {
+            setSelectedRowKeys([record.id])
+            setEditingRecord(record)
+            form.setFieldsValue(
+              formValuesFromRecord(record, moduleItem, definition)
+            )
+            setModalOpen(true)
+          },
+        })}
+        pagination={{
+          pageSize: DEFAULT_PAGE_SIZE,
+          showSizeChanger: true,
+          pageSizeOptions: ['8', '20', '50'],
+          showTotal: (total) => `共 ${total} 条`,
+        }}
+      />
+
+      <CollaborationTaskPanel
+        tasks={tasks}
+        taskStatusLabels={TASK_STATUS_LABELS}
+        roleLabelMap={roleLabelMap}
+      />
 
       <Modal
         className="erp-business-batch-delete-modal"
@@ -1959,45 +2214,6 @@ export default function BusinessModulePage({ moduleItem }) {
           })}
         </Space>
       </Modal>
-
-      <Card className="erp-business-module-task-card">
-        <div className="erp-business-module-task-card__head">
-          <strong>协同任务池</strong>
-          <Tag>{tasks.length} 个任务</Tag>
-        </div>
-        <div className="erp-business-module-task-list">
-          {tasks.length === 0 ? (
-            <Text type="secondary">
-              暂无协同任务，可从上方选中业务记录后创建。
-            </Text>
-          ) : (
-            tasks.slice(0, 6).map((task) => (
-              <div key={task.id} className="erp-business-module-task-item">
-                <div>
-                  <strong>{task.task_name}</strong>
-                  <span>
-                    {task.source_no || `${task.source_type} #${task.source_id}`}
-                  </span>
-                  {task.blocked_reason ? (
-                    <span className="erp-business-module-task-item__reason">
-                      阻塞原因：{task.blocked_reason}
-                    </span>
-                  ) : null}
-                </div>
-                <Tag>
-                  {roleLabelMap.get(task.owner_role_key) || task.owner_role_key}
-                </Tag>
-                <Tag
-                  color={task.task_status_key === 'blocked' ? 'red' : 'blue'}
-                >
-                  {TASK_STATUS_LABELS.get(task.task_status_key) ||
-                    task.task_status_key}
-                </Tag>
-              </div>
-            ))
-          )}
-        </div>
-      </Card>
 
       <Modal
         title={`${editingRecord ? '编辑' : '新建'}：${moduleItem.title}`}
@@ -2247,6 +2463,6 @@ export default function BusinessModulePage({ moduleItem }) {
           </Form.Item>
         </Form>
       </Modal>
-    </div>
+    </BusinessPageLayout>
   )
 }

@@ -78,9 +78,29 @@ export const BUSINESS_WORKFLOW_STATES = Object.freeze([
     summary: '待做 IQC、过程检验、返工复检或出货前质量确认。',
   },
   {
+    key: 'iqc_pending',
+    label: 'IQC 待检',
+    summary: '采购到货或入库通知已形成，等待品质做来料检验。',
+  },
+  {
+    key: 'qc_failed',
+    label: '来料不良',
+    summary: 'IQC 检验未通过，等待采购处理退货、补货或让步接收。',
+  },
+  {
     key: 'warehouse_processing',
     label: '待入库 / 待出货',
     summary: '仓库正在做回仓、入库、备货和待出货准备。',
+  },
+  {
+    key: 'warehouse_inbound_pending',
+    label: '待确认入库',
+    summary: 'IQC 已放行，等待仓库确认入库数量、库位和经手人。',
+  },
+  {
+    key: 'inbound_done',
+    label: '已入库',
+    summary: '仓库已确认入库事实；库存余额和库存流水后续按专表评审落地。',
   },
   {
     key: 'shipping_released',
@@ -128,7 +148,12 @@ const BUSINESS_STATUS_TRANSITION_KEYS = Object.freeze({
     'cancelled',
   ],
   engineering_preparing: ['material_preparing', 'blocked', 'cancelled'],
-  material_preparing: ['production_ready', 'blocked', 'cancelled'],
+  material_preparing: [
+    'iqc_pending',
+    'production_ready',
+    'blocked',
+    'cancelled',
+  ],
   production_ready: ['production_processing', 'blocked', 'cancelled'],
   production_processing: [
     'qc_pending',
@@ -142,12 +167,21 @@ const BUSINESS_STATUS_TRANSITION_KEYS = Object.freeze({
     'blocked',
     'cancelled',
   ],
+  iqc_pending: [
+    'warehouse_inbound_pending',
+    'qc_failed',
+    'blocked',
+    'cancelled',
+  ],
+  qc_failed: ['material_preparing', 'iqc_pending', 'blocked', 'cancelled'],
   warehouse_processing: [
     'shipping_released',
     'shipped',
     'blocked',
     'cancelled',
   ],
+  warehouse_inbound_pending: ['inbound_done', 'blocked', 'cancelled'],
+  inbound_done: ['material_preparing', 'production_ready', 'closed'],
   shipping_released: ['shipped', 'blocked', 'cancelled'],
   shipped: ['reconciling', 'closed'],
   reconciling: ['settled', 'blocked', 'closed'],

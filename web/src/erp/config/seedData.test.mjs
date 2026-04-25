@@ -72,6 +72,12 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
       '/erp/docs/task-document-mapping',
       '/erp/docs/workflow-status-guide',
       '/erp/docs/workflow-schema-draft',
+      '/erp/docs/task-flow-v1',
+      '/erp/docs/role-permission-matrix-v1',
+      '/erp/docs/notification-alert-v1',
+      '/erp/docs/finance-v1',
+      '/erp/docs/warehouse-quality-v1',
+      '/erp/docs/log-trace-audit-v1',
       '/erp/docs/desktop-role-guide',
       '/erp/docs/mobile-role-guide',
       '/erp/docs/field-linkage-guide',
@@ -134,7 +140,10 @@ test('businessModules: 业务页菜单按毛绒业务收口且不回退到旧外
   assert(navLabels.includes('客户/款式立项'))
   assert(navLabels.includes('材料 BOM'))
   assert(navLabels.includes('加工合同/委外下单'))
+  assert(navLabels.includes('品质检验'))
   assert(navLabels.includes('对账/结算'))
+  assert(navLabels.includes('应收/开票登记'))
+  assert(navLabels.includes('发票登记'))
   assert(!navLabels.includes('外销'))
 
   businessModuleDefinitions.forEach((moduleItem) => {

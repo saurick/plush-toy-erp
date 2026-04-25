@@ -13,16 +13,18 @@ import (
 )
 
 type stubAdminManageRepo struct {
-	adminsByID   map[int]*AdminUser
-	adminsByName map[string]*AdminUser
-	nextID       int
+	adminsByID    map[int]*AdminUser
+	adminsByName  map[string]*AdminUser
+	adminsByPhone map[string]*AdminUser
+	nextID        int
 }
 
 func newStubAdminManageRepo() *stubAdminManageRepo {
 	return &stubAdminManageRepo{
-		adminsByID:   map[int]*AdminUser{},
-		adminsByName: map[string]*AdminUser{},
-		nextID:       10,
+		adminsByID:    map[int]*AdminUser{},
+		adminsByName:  map[string]*AdminUser{},
+		adminsByPhone: map[string]*AdminUser{},
+		nextID:        10,
 	}
 }
 
@@ -32,6 +34,7 @@ func (r *stubAdminManageRepo) clone(admin *AdminUser) *AdminUser {
 	}
 	cloned := *admin
 	cloned.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
+	cloned.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
 	cloned.ERPPreferences = NormalizeAdminERPPreferences(admin.ERPPreferences)
 	return &cloned
 }
@@ -46,6 +49,14 @@ func (r *stubAdminManageRepo) GetAdminByID(_ context.Context, id int) (*AdminUse
 
 func (r *stubAdminManageRepo) GetAdminByUsername(_ context.Context, username string) (*AdminUser, error) {
 	admin, ok := r.adminsByName[username]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	return r.clone(admin), nil
+}
+
+func (r *stubAdminManageRepo) GetAdminByPhone(_ context.Context, phone string) (*AdminUser, error) {
+	admin, ok := r.adminsByPhone[phone]
 	if !ok {
 		return nil, ErrAdminNotFound
 	}
@@ -67,26 +78,47 @@ func (r *stubAdminManageRepo) CreateAdmin(_ context.Context, admin *AdminCreate)
 	r.nextID++
 	now := time.Now()
 	created := &AdminUser{
-		ID:              r.nextID,
-		Username:        admin.Username,
-		PasswordHash:    admin.PasswordHash,
-		Level:           int8(admin.Level),
-		MenuPermissions: append([]string(nil), admin.MenuPermissions...),
-		Disabled:        false,
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:                    r.nextID,
+		Username:              admin.Username,
+		Phone:                 admin.Phone,
+		PasswordHash:          admin.PasswordHash,
+		Level:                 int8(admin.Level),
+		MenuPermissions:       append([]string(nil), admin.MenuPermissions...),
+		MobileRolePermissions: append([]string(nil), admin.MobileRolePermissions...),
+		Disabled:              false,
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}
 	r.adminsByID[created.ID] = created
 	r.adminsByName[created.Username] = created
+	if created.Phone != "" {
+		r.adminsByPhone[created.Phone] = created
+	}
 	return r.clone(created), nil
 }
 
-func (r *stubAdminManageRepo) UpdateAdminMenuPermissions(_ context.Context, id int, menuPermissions []string) error {
+func (r *stubAdminManageRepo) UpdateAdminPermissions(_ context.Context, id int, menuPermissions []string, mobileRolePermissions []string) error {
 	admin, ok := r.adminsByID[id]
 	if !ok {
 		return ErrAdminNotFound
 	}
 	admin.MenuPermissions = append([]string(nil), menuPermissions...)
+	admin.MobileRolePermissions = append([]string(nil), mobileRolePermissions...)
+	return nil
+}
+
+func (r *stubAdminManageRepo) UpdateAdminPhone(_ context.Context, id int, phone string) error {
+	admin, ok := r.adminsByID[id]
+	if !ok {
+		return ErrAdminNotFound
+	}
+	if admin.Phone != "" {
+		delete(r.adminsByPhone, admin.Phone)
+	}
+	admin.Phone = phone
+	if phone != "" {
+		r.adminsByPhone[phone] = admin
+	}
 	return nil
 }
 
@@ -139,12 +171,18 @@ func TestAdminManageUsecase_CreateDefaultsMenusForStandardAdmin(t *testing.T) {
 		Role:     RoleAdmin,
 	})
 
-	created, err := uc.Create(ctx, "manager", "secret123", AdminLevelStandard, nil)
+	created, err := uc.Create(ctx, "manager", "13800138000", "secret123", AdminLevelStandard, nil, []string{"purchasing"})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 	if len(created.MenuPermissions) == 0 {
 		t.Fatalf("expected default menu permissions")
+	}
+	if created.Phone != "13800138000" {
+		t.Fatalf("expected normalized phone, got %q", created.Phone)
+	}
+	if len(created.MobileRolePermissions) != 1 || created.MobileRolePermissions[0] != "purchasing" {
+		t.Fatalf("expected purchasing mobile permission, got %#v", created.MobileRolePermissions)
 	}
 	for _, key := range created.MenuPermissions {
 		if key == "/erp/system/permissions" {
@@ -215,6 +253,57 @@ func TestAdminManageUsecase_SetPermissionsRejectsSuperAdmin(t *testing.T) {
 	_, err := uc.SetMenuPermissions(ctx, 1, []string{"/erp/help-center"})
 	if !errors.Is(err, ErrNoPermission) {
 		t.Fatalf("expected ErrNoPermission, got %v", err)
+	}
+}
+
+func TestAdminManageUsecase_SetMenuPermissionsPreservesMobileRoles(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", Level: int8(AdminLevelSuper)}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{
+		ID:                    2,
+		Username:              "manager",
+		Level:                 int8(AdminLevelStandard),
+		MobileRolePermissions: []string{"purchasing"},
+	}
+	repo.adminsByName["manager"] = repo.adminsByID[2]
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{
+		UserID:   1,
+		Username: "root",
+		Role:     RoleAdmin,
+	})
+
+	updated, err := uc.SetMenuPermissions(ctx, 2, []string{"/erp/help-center"})
+	if err != nil {
+		t.Fatalf("SetMenuPermissions() error = %v", err)
+	}
+	if len(updated.MobileRolePermissions) != 1 || updated.MobileRolePermissions[0] != "purchasing" {
+		t.Fatalf("expected mobile role permissions to be preserved, got %#v", updated.MobileRolePermissions)
+	}
+}
+
+func TestAdminManageUsecase_SetPhoneRejectsDuplicatePhone(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", Level: int8(AdminLevelSuper)}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "manager", Level: int8(AdminLevelStandard)}
+	repo.adminsByName["manager"] = repo.adminsByID[2]
+	repo.adminsByID[3] = &AdminUser{ID: 3, Username: "buyer", Phone: "13800138000", Level: int8(AdminLevelStandard)}
+	repo.adminsByName["buyer"] = repo.adminsByID[3]
+	repo.adminsByPhone["13800138000"] = repo.adminsByID[3]
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{
+		UserID:   1,
+		Username: "root",
+		Role:     RoleAdmin,
+	})
+
+	_, err := uc.SetPhone(ctx, 2, "13800138000")
+	if !errors.Is(err, ErrAdminPhoneExists) {
+		t.Fatalf("expected ErrAdminPhoneExists, got %v", err)
 	}
 }
 

@@ -127,6 +127,12 @@ pnpm style:l1
 - 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
 - 主流程：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
 - 数据模型与导入映射：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
+- 工作流主任务树 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/task-flow-v1.md`
+- 通知 / 预警 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/notification-alert-v1.md`
+- 角色权限矩阵 v1：`/Users/simon/projects/plush-toy-erp/docs/roles/role-permission-matrix-v1.md`
+- 财务 v1：`/Users/simon/projects/plush-toy-erp/docs/finance/finance-v1.md`
+- 仓库与品质 v1：`/Users/simon/projects/plush-toy-erp/docs/warehouse/warehouse-quality-v1.md`
+- 日志 / 审计 / Trace v1：`/Users/simon/projects/plush-toy-erp/docs/observability/log-trace-audit-v1.md`
 - 打印模板字段与编辑行为：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-field-behavior.md`
 - 打印模板实现原理：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-implementation.md`
 - 当前 changes：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`

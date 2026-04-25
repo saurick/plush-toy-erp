@@ -44,23 +44,25 @@ const (
 // AdminUserMutation represents an operation that mutates the AdminUser nodes in the graph.
 type AdminUserMutation struct {
 	config
-	op               Op
-	typ              string
-	id               *int
-	username         *string
-	password_hash    *string
-	level            *int8
-	addlevel         *int8
-	menu_permissions *string
-	erp_preferences  *string
-	disabled         *bool
-	last_login_at    *time.Time
-	created_at       *time.Time
-	updated_at       *time.Time
-	clearedFields    map[string]struct{}
-	done             bool
-	oldValue         func(context.Context) (*AdminUser, error)
-	predicates       []predicate.AdminUser
+	op                      Op
+	typ                     string
+	id                      *int
+	username                *string
+	phone                   *string
+	password_hash           *string
+	level                   *int8
+	addlevel                *int8
+	menu_permissions        *string
+	mobile_role_permissions *string
+	erp_preferences         *string
+	disabled                *bool
+	last_login_at           *time.Time
+	created_at              *time.Time
+	updated_at              *time.Time
+	clearedFields           map[string]struct{}
+	done                    bool
+	oldValue                func(context.Context) (*AdminUser, error)
+	predicates              []predicate.AdminUser
 }
 
 var _ ent.Mutation = (*AdminUserMutation)(nil)
@@ -197,6 +199,55 @@ func (m *AdminUserMutation) ResetUsername() {
 	m.username = nil
 }
 
+// SetPhone sets the "phone" field.
+func (m *AdminUserMutation) SetPhone(s string) {
+	m.phone = &s
+}
+
+// Phone returns the value of the "phone" field in the mutation.
+func (m *AdminUserMutation) Phone() (r string, exists bool) {
+	v := m.phone
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPhone returns the old "phone" field's value of the AdminUser entity.
+// If the AdminUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminUserMutation) OldPhone(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPhone is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPhone requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPhone: %w", err)
+	}
+	return oldValue.Phone, nil
+}
+
+// ClearPhone clears the value of the "phone" field.
+func (m *AdminUserMutation) ClearPhone() {
+	m.phone = nil
+	m.clearedFields[adminuser.FieldPhone] = struct{}{}
+}
+
+// PhoneCleared returns if the "phone" field was cleared in this mutation.
+func (m *AdminUserMutation) PhoneCleared() bool {
+	_, ok := m.clearedFields[adminuser.FieldPhone]
+	return ok
+}
+
+// ResetPhone resets all changes to the "phone" field.
+func (m *AdminUserMutation) ResetPhone() {
+	m.phone = nil
+	delete(m.clearedFields, adminuser.FieldPhone)
+}
+
 // SetPasswordHash sets the "password_hash" field.
 func (m *AdminUserMutation) SetPasswordHash(s string) {
 	m.password_hash = &s
@@ -323,6 +374,42 @@ func (m *AdminUserMutation) OldMenuPermissions(ctx context.Context) (v string, e
 // ResetMenuPermissions resets all changes to the "menu_permissions" field.
 func (m *AdminUserMutation) ResetMenuPermissions() {
 	m.menu_permissions = nil
+}
+
+// SetMobileRolePermissions sets the "mobile_role_permissions" field.
+func (m *AdminUserMutation) SetMobileRolePermissions(s string) {
+	m.mobile_role_permissions = &s
+}
+
+// MobileRolePermissions returns the value of the "mobile_role_permissions" field in the mutation.
+func (m *AdminUserMutation) MobileRolePermissions() (r string, exists bool) {
+	v := m.mobile_role_permissions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMobileRolePermissions returns the old "mobile_role_permissions" field's value of the AdminUser entity.
+// If the AdminUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminUserMutation) OldMobileRolePermissions(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMobileRolePermissions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMobileRolePermissions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMobileRolePermissions: %w", err)
+	}
+	return oldValue.MobileRolePermissions, nil
+}
+
+// ResetMobileRolePermissions resets all changes to the "mobile_role_permissions" field.
+func (m *AdminUserMutation) ResetMobileRolePermissions() {
+	m.mobile_role_permissions = nil
 }
 
 // SetErpPreferences sets the "erp_preferences" field.
@@ -552,9 +639,12 @@ func (m *AdminUserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AdminUserMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 11)
 	if m.username != nil {
 		fields = append(fields, adminuser.FieldUsername)
+	}
+	if m.phone != nil {
+		fields = append(fields, adminuser.FieldPhone)
 	}
 	if m.password_hash != nil {
 		fields = append(fields, adminuser.FieldPasswordHash)
@@ -564,6 +654,9 @@ func (m *AdminUserMutation) Fields() []string {
 	}
 	if m.menu_permissions != nil {
 		fields = append(fields, adminuser.FieldMenuPermissions)
+	}
+	if m.mobile_role_permissions != nil {
+		fields = append(fields, adminuser.FieldMobileRolePermissions)
 	}
 	if m.erp_preferences != nil {
 		fields = append(fields, adminuser.FieldErpPreferences)
@@ -590,12 +683,16 @@ func (m *AdminUserMutation) Field(name string) (ent.Value, bool) {
 	switch name {
 	case adminuser.FieldUsername:
 		return m.Username()
+	case adminuser.FieldPhone:
+		return m.Phone()
 	case adminuser.FieldPasswordHash:
 		return m.PasswordHash()
 	case adminuser.FieldLevel:
 		return m.Level()
 	case adminuser.FieldMenuPermissions:
 		return m.MenuPermissions()
+	case adminuser.FieldMobileRolePermissions:
+		return m.MobileRolePermissions()
 	case adminuser.FieldErpPreferences:
 		return m.ErpPreferences()
 	case adminuser.FieldDisabled:
@@ -617,12 +714,16 @@ func (m *AdminUserMutation) OldField(ctx context.Context, name string) (ent.Valu
 	switch name {
 	case adminuser.FieldUsername:
 		return m.OldUsername(ctx)
+	case adminuser.FieldPhone:
+		return m.OldPhone(ctx)
 	case adminuser.FieldPasswordHash:
 		return m.OldPasswordHash(ctx)
 	case adminuser.FieldLevel:
 		return m.OldLevel(ctx)
 	case adminuser.FieldMenuPermissions:
 		return m.OldMenuPermissions(ctx)
+	case adminuser.FieldMobileRolePermissions:
+		return m.OldMobileRolePermissions(ctx)
 	case adminuser.FieldErpPreferences:
 		return m.OldErpPreferences(ctx)
 	case adminuser.FieldDisabled:
@@ -649,6 +750,13 @@ func (m *AdminUserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetUsername(v)
 		return nil
+	case adminuser.FieldPhone:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPhone(v)
+		return nil
 	case adminuser.FieldPasswordHash:
 		v, ok := value.(string)
 		if !ok {
@@ -669,6 +777,13 @@ func (m *AdminUserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMenuPermissions(v)
+		return nil
+	case adminuser.FieldMobileRolePermissions:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMobileRolePermissions(v)
 		return nil
 	case adminuser.FieldErpPreferences:
 		v, ok := value.(string)
@@ -750,6 +865,9 @@ func (m *AdminUserMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *AdminUserMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(adminuser.FieldPhone) {
+		fields = append(fields, adminuser.FieldPhone)
+	}
 	if m.FieldCleared(adminuser.FieldLastLoginAt) {
 		fields = append(fields, adminuser.FieldLastLoginAt)
 	}
@@ -767,6 +885,9 @@ func (m *AdminUserMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *AdminUserMutation) ClearField(name string) error {
 	switch name {
+	case adminuser.FieldPhone:
+		m.ClearPhone()
+		return nil
 	case adminuser.FieldLastLoginAt:
 		m.ClearLastLoginAt()
 		return nil
@@ -781,6 +902,9 @@ func (m *AdminUserMutation) ResetField(name string) error {
 	case adminuser.FieldUsername:
 		m.ResetUsername()
 		return nil
+	case adminuser.FieldPhone:
+		m.ResetPhone()
+		return nil
 	case adminuser.FieldPasswordHash:
 		m.ResetPasswordHash()
 		return nil
@@ -789,6 +913,9 @@ func (m *AdminUserMutation) ResetField(name string) error {
 		return nil
 	case adminuser.FieldMenuPermissions:
 		m.ResetMenuPermissions()
+		return nil
+	case adminuser.FieldMobileRolePermissions:
+		m.ResetMobileRolePermissions()
 		return nil
 	case adminuser.FieldErpPreferences:
 		m.ResetErpPreferences()

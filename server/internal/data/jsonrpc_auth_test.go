@@ -312,7 +312,8 @@ func TestJsonrpcData_AdminSMSLogin_OK(t *testing.T) {
 	repo := newMemAdminAuthRepoForData()
 	repo.admins["13800138000"] = &biz.AdminUser{
 		ID:       1,
-		Username: "13800138000",
+		Username: "sms-admin",
+		Phone:    "13800138000",
 		Level:    int8(biz.AdminLevelSuper),
 	}
 
@@ -514,7 +515,22 @@ func (r *memAdminAuthRepoForData) GetAdminByUsername(ctx context.Context, userna
 	}
 	cp := *admin
 	cp.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
+	cp.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
 	return &cp, nil
+}
+
+func (r *memAdminAuthRepoForData) GetAdminByPhone(ctx context.Context, phone string) (*biz.AdminUser, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, admin := range r.admins {
+		if admin.Phone == phone {
+			cp := *admin
+			cp.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
+			cp.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
+			return &cp, nil
+		}
+	}
+	return nil, errors.New("not found")
 }
 
 func (r *memAdminAuthRepoForData) UpdateAdminLastLogin(ctx context.Context, id int, t time.Time) error {

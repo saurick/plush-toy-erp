@@ -16,10 +16,12 @@ import (
 )
 
 var (
-	ErrUserExists      = errors.New("user already exists")
-	ErrUserNotFound    = errors.New("user not found")
-	ErrInvalidPassword = errors.New("invalid password")
-	ErrUserDisabled    = errors.New("user disabled")
+	ErrUserExists       = errors.New("user already exists")
+	ErrUserNotFound     = errors.New("user not found")
+	ErrPhoneNotBound    = errors.New("phone not bound")
+	ErrMobileRoleDenied = errors.New("mobile role denied")
+	ErrInvalidPassword  = errors.New("invalid password")
+	ErrUserDisabled     = errors.New("user disabled")
 )
 
 type AuthRepo interface {
@@ -264,7 +266,7 @@ func (uc *AuthUsecase) RequestSMSLoginCode(ctx context.Context, phone string) (c
 	l := uc.log.WithContext(ctx)
 	usr, e := uc.repo.GetUserByUsername(ctx, normalizedPhone)
 	if e != nil || usr == nil {
-		err = ErrUserNotFound
+		err = ErrPhoneNotBound
 		if e != nil {
 			span.RecordError(e)
 		}
@@ -310,7 +312,7 @@ func (uc *AuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code string)
 	l := uc.log.WithContext(ctx)
 	usr, e := uc.repo.GetUserByUsername(ctx, normalizedPhone)
 	if e != nil || usr == nil {
-		err = ErrUserNotFound
+		err = ErrPhoneNotBound
 		if e != nil {
 			span.RecordError(e)
 		}

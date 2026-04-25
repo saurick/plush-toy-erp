@@ -33,5 +33,9 @@ export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
   [RpcErrorCode.AUTH_SMS_CODE_TOO_FREQUENT]: '验证码发送过于频繁，请稍后再试',
   [RpcErrorCode.AUTH_SMS_CODE_ATTEMPTS_EXCEEDED]:
     '验证码错误次数过多，请重新获取',
+  [RpcErrorCode.AUTH_PHONE_NOT_BOUND]: '该手机号未开通登录权限，请联系管理员',
+  [RpcErrorCode.AUTH_MOBILE_ROLE_DENIED]:
+    '该账号暂无当前角色登录权限，请联系管理员',
   [RpcErrorCode.ADMIN_EXISTS]: '管理员账号已存在',
+  [RpcErrorCode.ADMIN_PHONE_EXISTS]: '手机号已绑定其他管理员',
 })

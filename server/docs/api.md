@@ -54,11 +54,12 @@ HTTP 路由：
 - `create`
 - `menu_options`
 - `set_permissions`
+- `set_phone`
 - `set_erp_column_order`
 - `set_disabled`
 - `reset_password`
 
-用途：管理员读取当前账号资料；超级管理员创建普通管理员、调整菜单权限、启用/禁用普通管理员，以及在普通管理员忘记密码时协助重置密码。
+用途：管理员读取当前账号资料；超级管理员创建普通管理员、绑定登录手机号、调整菜单和移动端角色权限、启用/禁用普通管理员，以及在普通管理员忘记密码时协助重置密码。
 
 ## 鉴权规则
 
@@ -102,9 +103,9 @@ HTTP 路由：
 `auth.sms_login` 通过 `scope` 区分登录目标：
 
 - `scope=user` 或省略：普通协作账号短信登录
-- `scope=admin`：管理员短信登录，返回字段额外包含 `admin_level`、`menu_permissions`、`erp_preferences`
+- `scope=admin`：管理员短信登录，按 `admin_users.phone` 查找管理员，返回字段额外包含 `admin_level`、`menu_permissions`、`mobile_role_permissions`、`erp_preferences`
 
-当前账号表还没有独立手机号字段，短信登录暂以“手机号就是账号名”为主路径；后续如果增加手机号字段，应在 repo 查询层切换真源，不要在接口层补第二套账号匹配规则。
+角色移动端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`；服务端会校验该手机号已绑定管理员账号，且该管理员具备当前移动端角色权限。手机号未绑定返回 `AuthPhoneNotBound`，不返回“用户不存在”；手机号已绑定但未授权当前角色返回 `AuthMobileRoleDenied`。
 
 ### `auth.send_sms_code`
 
@@ -112,6 +113,7 @@ HTTP 路由：
 
 - `phone`：手机号，当前支持中国大陆手机号，允许 `+86`、`86` 前缀和空格 / 连字符
 - `scope`：`user` 或 `admin`，省略时按 `user`
+- `mobile_role_key`：角色移动端登录时传当前端口角色；桌面短信登录可省略
 
 返回字段：
 

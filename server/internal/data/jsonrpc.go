@@ -213,6 +213,7 @@ func (d *JsonrpcData) handleAuth(
 
 	case "send_sms_code":
 		phone := getString(pm, "phone")
+		mobileRoleKey := getString(pm, "mobile_role_key")
 		scope, scopeErr := getAuthLoginScope(pm)
 		if scopeErr != nil {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "登录类型不合法"}, nil
@@ -226,7 +227,7 @@ func (d *JsonrpcData) handleAuth(
 			err       error
 		)
 		if scope == "admin" {
-			challenge, err = d.adminAuthUC.RequestSMSLoginCode(ctx, phone)
+			challenge, err = d.adminAuthUC.RequestSMSLoginCode(ctx, phone, mobileRoleKey)
 		} else {
 			challenge, err = d.authUC.RequestSMSLoginCode(ctx, phone)
 		}
@@ -249,6 +250,7 @@ func (d *JsonrpcData) handleAuth(
 	case "sms_login":
 		phone := getString(pm, "phone")
 		code := getString(pm, "code")
+		mobileRoleKey := getString(pm, "mobile_role_key")
 		scope, scopeErr := getAuthLoginScope(pm)
 		if scopeErr != nil {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "登录类型不合法"}, nil
@@ -258,7 +260,7 @@ func (d *JsonrpcData) handleAuth(
 		}
 
 		if scope == "admin" {
-			token, expireAt, admin, err := d.adminAuthUC.LoginWithSMSCode(ctx, phone, code)
+			token, expireAt, admin, err := d.adminAuthUC.LoginWithSMSCode(ctx, phone, code, mobileRoleKey)
 			if err != nil {
 				return id, d.mapAuthError(ctx, err), nil
 			}
@@ -267,14 +269,16 @@ func (d *JsonrpcData) handleAuth(
 				Code:    errcode.OK.Code,
 				Message: "登录成功",
 				Data: newDataStruct(map[string]any{
-					"user_id":          admin.ID,
-					"username":         admin.Username,
-					"access_token":     token,
-					"expires_at":       expireAt.Unix(),
-					"token_type":       "Bearer",
-					"issued_at":        time.Now().Unix(),
-					"admin_level":      admin.Level,
-					"menu_permissions": toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+					"user_id":                 admin.ID,
+					"username":                admin.Username,
+					"phone":                   admin.Phone,
+					"access_token":            token,
+					"expires_at":              expireAt.Unix(),
+					"token_type":              "Bearer",
+					"issued_at":               time.Now().Unix(),
+					"admin_level":             admin.Level,
+					"menu_permissions":        toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+					"mobile_role_permissions": toAnySliceString(biz.EffectiveAdminMobileRolePermissions(biz.AdminLevel(admin.Level), admin.MobileRolePermissions)),
 					"erp_preferences": map[string]any{
 						"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
 					},
@@ -317,14 +321,16 @@ func (d *JsonrpcData) handleAuth(
 			Code:    errcode.OK.Code,
 			Message: "登录成功",
 			Data: newDataStruct(map[string]any{
-				"user_id":          admin.ID,
-				"username":         admin.Username,
-				"access_token":     token,
-				"expires_at":       expireAt.Unix(),
-				"token_type":       "Bearer",
-				"issued_at":        time.Now().Unix(),
-				"admin_level":      admin.Level,
-				"menu_permissions": toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+				"user_id":                 admin.ID,
+				"username":                admin.Username,
+				"phone":                   admin.Phone,
+				"access_token":            token,
+				"expires_at":              expireAt.Unix(),
+				"token_type":              "Bearer",
+				"issued_at":               time.Now().Unix(),
+				"admin_level":             admin.Level,
+				"menu_permissions":        toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+				"mobile_role_permissions": toAnySliceString(biz.EffectiveAdminMobileRolePermissions(biz.AdminLevel(admin.Level), admin.MobileRolePermissions)),
 				"erp_preferences": map[string]any{
 					"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
 				},
@@ -393,12 +399,14 @@ func (d *JsonrpcData) handleAuth(
 				Code:    errcode.OK.Code,
 				Message: errcode.OK.Message,
 				Data: newDataStruct(map[string]any{
-					"id":               admin.ID,
-					"username":         admin.Username,
-					"role":             int(biz.RoleAdmin),
-					"disabled":         admin.Disabled,
-					"level":            admin.Level,
-					"menu_permissions": toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+					"id":                      admin.ID,
+					"username":                admin.Username,
+					"phone":                   admin.Phone,
+					"role":                    int(biz.RoleAdmin),
+					"disabled":                admin.Disabled,
+					"level":                   admin.Level,
+					"menu_permissions":        toAnySliceString(biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)),
+					"mobile_role_permissions": toAnySliceString(biz.EffectiveAdminMobileRolePermissions(biz.AdminLevel(admin.Level), admin.MobileRolePermissions)),
 					"erp_preferences": map[string]any{
 						"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
 					},
@@ -446,6 +454,18 @@ func (d *JsonrpcData) mapAuthError(ctx context.Context, err error) *v1.JsonrpcRe
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthUserNotFound.Code,
 			Message: errcode.AuthUserNotFound.Message,
+		}
+	case biz.ErrPhoneNotBound:
+		logger.Warn("[auth] phone not bound")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthPhoneNotBound.Code,
+			Message: errcode.AuthPhoneNotBound.Message,
+		}
+	case biz.ErrMobileRoleDenied:
+		logger.Warn("[auth] mobile role denied")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthMobileRoleDenied.Code,
+			Message: errcode.AuthMobileRoleDenied.Message,
 		}
 	case biz.ErrInvalidPassword:
 		logger.Warn("[auth] invalid password")
@@ -910,14 +930,16 @@ func (d *JsonrpcData) handleAdmin(
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
-				"id":               admin.ID,
-				"username":         admin.Username,
-				"level":            admin.Level,
-				"disabled":         admin.Disabled,
-				"last_login_at":    lastLogin,
-				"created_at":       admin.CreatedAt.Unix(),
-				"updated_at":       admin.UpdatedAt.Unix(),
-				"menu_permissions": toAnySliceString(admin.MenuPermissions),
+				"id":                      admin.ID,
+				"username":                admin.Username,
+				"phone":                   admin.Phone,
+				"level":                   admin.Level,
+				"disabled":                admin.Disabled,
+				"last_login_at":           lastLogin,
+				"created_at":              admin.CreatedAt.Unix(),
+				"updated_at":              admin.UpdatedAt.Unix(),
+				"menu_permissions":        toAnySliceString(admin.MenuPermissions),
+				"mobile_role_permissions": toAnySliceString(admin.MobileRolePermissions),
 				"erp_preferences": map[string]any{
 					"column_orders": toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
 				},
@@ -936,14 +958,16 @@ func (d *JsonrpcData) handleAdmin(
 				lastLogin = admin.LastLoginAt.Unix()
 			}
 			arr = append(arr, map[string]any{
-				"id":               admin.ID,
-				"username":         admin.Username,
-				"level":            admin.Level,
-				"disabled":         admin.Disabled,
-				"last_login_at":    lastLogin,
-				"created_at":       admin.CreatedAt.Unix(),
-				"updated_at":       admin.UpdatedAt.Unix(),
-				"menu_permissions": toAnySliceString(admin.MenuPermissions),
+				"id":                      admin.ID,
+				"username":                admin.Username,
+				"phone":                   admin.Phone,
+				"level":                   admin.Level,
+				"disabled":                admin.Disabled,
+				"last_login_at":           lastLogin,
+				"created_at":              admin.CreatedAt.Unix(),
+				"updated_at":              admin.UpdatedAt.Unix(),
+				"menu_permissions":        toAnySliceString(admin.MenuPermissions),
+				"mobile_role_permissions": toAnySliceString(admin.MobileRolePermissions),
 			})
 		}
 		return id, &v1.JsonrpcResult{
@@ -954,11 +978,13 @@ func (d *JsonrpcData) handleAdmin(
 
 	case "create":
 		username := getString(pm, "username")
+		phone := getString(pm, "phone")
 		password := getString(pm, "password")
 		level := biz.AdminLevel(getInt(pm, "level", int(biz.AdminLevelStandard)))
 		menuPermissions := getStringSlice(pm, "menu_permissions")
+		mobileRolePermissions := getStringSlice(pm, "mobile_role_permissions")
 
-		admin, err := d.adminManageUC.Create(ctx, username, password, level, menuPermissions)
+		admin, err := d.adminManageUC.Create(ctx, username, phone, password, level, menuPermissions, mobileRolePermissions)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -968,11 +994,13 @@ func (d *JsonrpcData) handleAdmin(
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
 				"admin": map[string]any{
-					"id":               admin.ID,
-					"username":         admin.Username,
-					"level":            admin.Level,
-					"disabled":         admin.Disabled,
-					"menu_permissions": toAnySliceString(admin.MenuPermissions),
+					"id":                      admin.ID,
+					"username":                admin.Username,
+					"phone":                   admin.Phone,
+					"level":                   admin.Level,
+					"disabled":                admin.Disabled,
+					"menu_permissions":        toAnySliceString(admin.MenuPermissions),
+					"mobile_role_permissions": toAnySliceString(admin.MobileRolePermissions),
 				},
 			}),
 		}, nil
@@ -986,16 +1014,27 @@ func (d *JsonrpcData) handleAdmin(
 				"label": item.Label,
 			})
 		}
+		mobileRoleOptions := make([]any, 0, len(biz.AdminMobileRolePermissionOptions()))
+		for _, item := range biz.AdminMobileRolePermissionOptions() {
+			mobileRoleOptions = append(mobileRoleOptions, map[string]any{
+				"key":   item.Key,
+				"label": item.Label,
+			})
+		}
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
-			Data:    newDataStruct(map[string]any{"menu_options": menuOptions}),
+			Data: newDataStruct(map[string]any{
+				"menu_options":        menuOptions,
+				"mobile_role_options": mobileRoleOptions,
+			}),
 		}, nil
 
 	case "set_permissions":
 		adminID := getInt(pm, "id", 0)
 		menuPermissions := getStringSlice(pm, "menu_permissions")
-		admin, err := d.adminManageUC.SetMenuPermissions(ctx, adminID, menuPermissions)
+		mobileRolePermissions := getStringSlice(pm, "mobile_role_permissions")
+		admin, err := d.adminManageUC.SetPermissions(ctx, adminID, menuPermissions, mobileRolePermissions)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -1004,11 +1043,35 @@ func (d *JsonrpcData) handleAdmin(
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
 				"admin": map[string]any{
-					"id":               admin.ID,
-					"username":         admin.Username,
-					"level":            admin.Level,
-					"disabled":         admin.Disabled,
-					"menu_permissions": toAnySliceString(admin.MenuPermissions),
+					"id":                      admin.ID,
+					"username":                admin.Username,
+					"phone":                   admin.Phone,
+					"level":                   admin.Level,
+					"disabled":                admin.Disabled,
+					"menu_permissions":        toAnySliceString(admin.MenuPermissions),
+					"mobile_role_permissions": toAnySliceString(admin.MobileRolePermissions),
+				},
+			}),
+		}, nil
+
+	case "set_phone":
+		adminID := getInt(pm, "id", 0)
+		admin, err := d.adminManageUC.SetPhone(ctx, adminID, getString(pm, "phone"))
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": map[string]any{
+					"id":                      admin.ID,
+					"username":                admin.Username,
+					"phone":                   admin.Phone,
+					"level":                   admin.Level,
+					"disabled":                admin.Disabled,
+					"menu_permissions":        toAnySliceString(admin.MenuPermissions),
+					"mobile_role_permissions": toAnySliceString(admin.MobileRolePermissions),
 				},
 			}),
 		}, nil
@@ -1045,11 +1108,13 @@ func (d *JsonrpcData) handleAdmin(
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
 				"admin": map[string]any{
-					"id":               admin.ID,
-					"username":         admin.Username,
-					"level":            admin.Level,
-					"disabled":         admin.Disabled,
-					"menu_permissions": toAnySliceString(admin.MenuPermissions),
+					"id":                      admin.ID,
+					"username":                admin.Username,
+					"phone":                   admin.Phone,
+					"level":                   admin.Level,
+					"disabled":                admin.Disabled,
+					"menu_permissions":        toAnySliceString(admin.MenuPermissions),
+					"mobile_role_permissions": toAnySliceString(admin.MobileRolePermissions),
 				},
 			}),
 		}, nil
@@ -1069,11 +1134,13 @@ func (d *JsonrpcData) handleAdmin(
 			Message: "密码已重置",
 			Data: newDataStruct(map[string]any{
 				"admin": map[string]any{
-					"id":               admin.ID,
-					"username":         admin.Username,
-					"level":            admin.Level,
-					"disabled":         admin.Disabled,
-					"menu_permissions": toAnySliceString(admin.MenuPermissions),
+					"id":                      admin.ID,
+					"username":                admin.Username,
+					"phone":                   admin.Phone,
+					"level":                   admin.Level,
+					"disabled":                admin.Disabled,
+					"menu_permissions":        toAnySliceString(admin.MenuPermissions),
+					"mobile_role_permissions": toAnySliceString(admin.MobileRolePermissions),
 				},
 			}),
 		}, nil
@@ -1096,6 +1163,9 @@ func (d *JsonrpcData) mapAdminManageError(ctx context.Context, err error) *v1.Js
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[admin] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	case errors.Is(err, biz.ErrInvalidPhoneNumber):
+		l.Warnf("[admin] invalid phone err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AuthInvalidPhone.Code, Message: errcode.AuthInvalidPhone.Message}
 	case errors.Is(err, biz.ErrAdminInvalidLevel):
 		l.Warnf("[admin] invalid level err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.AdminInvalidLevel.Code, Message: errcode.AdminInvalidLevel.Message}
@@ -1105,6 +1175,9 @@ func (d *JsonrpcData) mapAdminManageError(ctx context.Context, err error) *v1.Js
 	case errors.Is(err, biz.ErrAdminExists):
 		l.Warnf("[admin] exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.AdminExists.Code, Message: errcode.AdminExists.Message}
+	case errors.Is(err, biz.ErrAdminPhoneExists):
+		l.Warnf("[admin] phone exists err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminPhoneExists.Code, Message: errcode.AdminPhoneExists.Message}
 	case errors.Is(err, biz.ErrUserDisabled):
 		l.Warnf("[admin] disabled err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.AdminDisabled.Code, Message: errcode.AdminDisabled.Message}

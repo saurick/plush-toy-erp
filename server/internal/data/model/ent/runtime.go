@@ -39,36 +39,46 @@ func init() {
 			return nil
 		}
 	}()
+	// adminuserDescPhone is the schema descriptor for phone field.
+	adminuserDescPhone := adminuserFields[1].Descriptor()
+	// adminuser.PhoneValidator is a validator for the "phone" field. It is called by the builders before save.
+	adminuser.PhoneValidator = adminuserDescPhone.Validators[0].(func(string) error)
 	// adminuserDescPasswordHash is the schema descriptor for password_hash field.
-	adminuserDescPasswordHash := adminuserFields[1].Descriptor()
+	adminuserDescPasswordHash := adminuserFields[2].Descriptor()
 	// adminuser.PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
 	adminuser.PasswordHashValidator = adminuserDescPasswordHash.Validators[0].(func(string) error)
 	// adminuserDescLevel is the schema descriptor for level field.
-	adminuserDescLevel := adminuserFields[2].Descriptor()
+	adminuserDescLevel := adminuserFields[3].Descriptor()
 	// adminuser.DefaultLevel holds the default value on creation for the level field.
 	adminuser.DefaultLevel = adminuserDescLevel.Default.(int8)
 	// adminuserDescMenuPermissions is the schema descriptor for menu_permissions field.
-	adminuserDescMenuPermissions := adminuserFields[3].Descriptor()
+	adminuserDescMenuPermissions := adminuserFields[4].Descriptor()
 	// adminuser.DefaultMenuPermissions holds the default value on creation for the menu_permissions field.
 	adminuser.DefaultMenuPermissions = adminuserDescMenuPermissions.Default.(string)
 	// adminuser.MenuPermissionsValidator is a validator for the "menu_permissions" field. It is called by the builders before save.
 	adminuser.MenuPermissionsValidator = adminuserDescMenuPermissions.Validators[0].(func(string) error)
+	// adminuserDescMobileRolePermissions is the schema descriptor for mobile_role_permissions field.
+	adminuserDescMobileRolePermissions := adminuserFields[5].Descriptor()
+	// adminuser.DefaultMobileRolePermissions holds the default value on creation for the mobile_role_permissions field.
+	adminuser.DefaultMobileRolePermissions = adminuserDescMobileRolePermissions.Default.(string)
+	// adminuser.MobileRolePermissionsValidator is a validator for the "mobile_role_permissions" field. It is called by the builders before save.
+	adminuser.MobileRolePermissionsValidator = adminuserDescMobileRolePermissions.Validators[0].(func(string) error)
 	// adminuserDescErpPreferences is the schema descriptor for erp_preferences field.
-	adminuserDescErpPreferences := adminuserFields[4].Descriptor()
+	adminuserDescErpPreferences := adminuserFields[6].Descriptor()
 	// adminuser.DefaultErpPreferences holds the default value on creation for the erp_preferences field.
 	adminuser.DefaultErpPreferences = adminuserDescErpPreferences.Default.(string)
 	// adminuser.ErpPreferencesValidator is a validator for the "erp_preferences" field. It is called by the builders before save.
 	adminuser.ErpPreferencesValidator = adminuserDescErpPreferences.Validators[0].(func(string) error)
 	// adminuserDescDisabled is the schema descriptor for disabled field.
-	adminuserDescDisabled := adminuserFields[5].Descriptor()
+	adminuserDescDisabled := adminuserFields[7].Descriptor()
 	// adminuser.DefaultDisabled holds the default value on creation for the disabled field.
 	adminuser.DefaultDisabled = adminuserDescDisabled.Default.(bool)
 	// adminuserDescCreatedAt is the schema descriptor for created_at field.
-	adminuserDescCreatedAt := adminuserFields[7].Descriptor()
+	adminuserDescCreatedAt := adminuserFields[9].Descriptor()
 	// adminuser.DefaultCreatedAt holds the default value on creation for the created_at field.
 	adminuser.DefaultCreatedAt = adminuserDescCreatedAt.Default.(func() time.Time)
 	// adminuserDescUpdatedAt is the schema descriptor for updated_at field.
-	adminuserDescUpdatedAt := adminuserFields[8].Descriptor()
+	adminuserDescUpdatedAt := adminuserFields[10].Descriptor()
 	// adminuser.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	adminuser.DefaultUpdatedAt = adminuserDescUpdatedAt.Default.(func() time.Time)
 	// adminuser.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

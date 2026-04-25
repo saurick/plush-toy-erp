@@ -10,6 +10,12 @@ import rolePageDocumentMatrixDoc from '../docs/role-page-document-matrix.md?raw'
 import taskDocumentMappingDoc from '../docs/task-document-mapping.md?raw'
 import workflowStatusGuideDoc from '../docs/workflow-status-guide.md?raw'
 import workflowSchemaDraftDoc from '../docs/workflow-schema-draft.md?raw'
+import taskFlowV1Doc from '../docs/task-flow-v1.md?raw'
+import rolePermissionMatrixV1Doc from '../docs/role-permission-matrix-v1.md?raw'
+import notificationAlertV1Doc from '../docs/notification-alert-v1.md?raw'
+import financeV1Doc from '../docs/finance-v1.md?raw'
+import warehouseQualityV1Doc from '../docs/warehouse-quality-v1.md?raw'
+import logTraceAuditV1Doc from '../docs/log-trace-audit-v1.md?raw'
 import desktopRoleGuideDoc from '../docs/desktop-role-guide.md?raw'
 import mobileRoleGuideDoc from '../docs/mobile-role-guide.md?raw'
 import fieldLinkageGuideDoc from '../docs/field-linkage-guide.md?raw'
@@ -58,6 +64,41 @@ export const docRegistry = {
     summary:
       '提供任务协同层和业务状态层的表结构草案与 SQL 样例，只用于校对，不直接作为迁移真源。',
     source: workflowSchemaDraftDoc,
+  },
+  'task-flow-v1': {
+    title: '工作流主任务树 v1',
+    summary:
+      '定义 T1 到 T8 的责任角色、触发事件、完成条件、关联模块、端侧、阻塞原因、超时规则和关键路径。',
+    source: taskFlowV1Doc,
+  },
+  'role-permission-matrix-v1': {
+    title: '角色权限矩阵 v1',
+    summary:
+      '明确菜单可见、数据范围、任务池、审批、催办、移动端处理和配置权限的边界。',
+    source: rolePermissionMatrixV1Doc,
+  },
+  'notification-alert-v1': {
+    title: '通知 / 预警 / 催办 / 升级 v1',
+    summary:
+      '说明站内通知、页面预警、催办事件和升级规则，外部推送暂不进入 v1。',
+    source: notificationAlertV1Doc,
+  },
+  'finance-v1': {
+    title: '财务 v1',
+    summary: '收口应收、应付、发票、对账、税额和收付款状态的当前边界。',
+    source: financeV1Doc,
+  },
+  'warehouse-quality-v1': {
+    title: '仓库与品质 v1',
+    summary:
+      '收口收货、IQC、入库、发料、出货、库存、检验、返工复检和放行边界。',
+    source: warehouseQualityV1Doc,
+  },
+  'log-trace-audit-v1': {
+    title: '日志 / 审计 / Trace v1',
+    summary:
+      '说明业务事件、任务事件、业务状态快照、操作审计和 request_id / trace_id 的分层关系。',
+    source: logTraceAuditV1Doc,
   },
   'desktop-role-guide': {
     title: '桌面端角色流程',

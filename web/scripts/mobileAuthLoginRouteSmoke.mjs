@@ -230,10 +230,46 @@ async function runMobileAuthScenario(
       return
     }
 
-    if (method !== 'admin_login') {
+    if (method === 'send_sms_code') {
+      assert.equal(
+        body.params?.mobile_role_key,
+        app.roleKey,
+        `${app.id} 获取验证码应携带当前移动端角色`
+      )
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            code: 0,
+            message: 'OK',
+            data: {
+              phone: body.params?.phone || '13800138000',
+              expires_at: Math.floor(Date.now() / 1000) + 300,
+              resend_after: Math.floor(Date.now() / 1000) + 60,
+              mock_delivery: true,
+              mock_code: '123456',
+            },
+          },
+        }),
+      })
+      return
+    }
+
+    if (method !== 'sms_login') {
       await route.fallback()
       return
     }
+
+    assert.equal(
+      body.params?.mobile_role_key,
+      app.roleKey,
+      `${app.id} 短信登录应携带当前移动端角色`
+    )
+    assert.equal(body.params?.scope, 'admin')
+    assert.equal(body.params?.code, '123456')
 
     await route.fulfill({
       status: 200,
@@ -251,6 +287,7 @@ async function runMobileAuthScenario(
             admin_level: 0,
             expires_at: Math.floor(Date.now() / 1000) + 3600,
             menu_permissions: ['/erp/dashboard'],
+            mobile_role_permissions: [app.roleKey],
           },
         },
       }),
@@ -269,7 +306,7 @@ async function runMobileAuthScenario(
       `${app.id} workflow 请求应携带当前角色 owner_role_key`
     )
 
-    if (workflowCalls === 1) {
+    if (authorization === `Bearer ${staleToken}`) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -394,19 +431,29 @@ async function runMobileAuthScenario(
 
   await waitForPath(page, '/admin-login')
   await expectText(page, '毛绒 ERP 管理后台')
+  assert.equal(
+    workflowCalls,
+    0,
+    '缺少移动端角色权限元数据的旧登录态应回到登录页，不应提前请求 workflow API'
+  )
 
-  await page.getByLabel('管理员账号').fill('mobile-admin')
-  await page.getByLabel('密码').fill('mobile-password')
+  await page.getByLabel('手机号').fill('13800138000')
+  await page.getByRole('button', { name: '获取验证码' }).click()
+  await expectText(page, '临时验证码：123456')
+  await page.getByPlaceholder('请输入验证码').fill('123456')
   await page.getByRole('button', { name: /登\s*录/ }).click()
 
   await waitForPath(page, '/tasks')
   await expectText(page, '待办')
   await expectText(page, '退出登录')
+  await expectText(page, '我的预警')
+  await expectText(page, '已超时')
+  await expectText(page, '即将超时')
+  await expectText(page, '阻塞/高优先')
   await expectText(page, '预警')
   await expectText(page, '通知')
   await expectText(page, '任务')
   await expectText(page, '进度')
-  await expectText(page, '33%')
   await expectText(page, '待处理')
   await expectText(page, '处理中')
   await expectText(page, '卡住')
@@ -422,7 +469,7 @@ async function runMobileAuthScenario(
   await expectNoText(page, 'Deferred')
 
   assert(
-    workflowCalls >= 2,
+    workflowCalls >= 1,
     `${app.id} 登录后未重新加载任务池，workflowCalls=${workflowCalls}`
   )
   assert(

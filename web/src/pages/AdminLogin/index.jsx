@@ -10,7 +10,12 @@ import {
   Typography,
 } from 'antd'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { AUTH_SCOPE, getCurrentUser, persistAuth } from '@/common/auth/auth'
+import {
+  AUTH_SCOPE,
+  getStoredAdminProfile,
+  logout,
+  persistAuth,
+} from '@/common/auth/auth'
 import {
   ERP_ADMIN_SYSTEM_NAME,
   ERP_BRAND_MARK,
@@ -19,14 +24,19 @@ import {
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { useERPWorkspace } from '@/erp/context/ERPWorkspaceProvider'
+import { hasMobileRolePermission } from '@/erp/utils/mobileRolePermissions.mjs'
 
 const { Title } = Typography
 
 export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const admin = getCurrentUser(AUTH_SCOPE.ADMIN)
-  const [loginMode, setLoginMode] = useState('password')
+  const { isMobileApp, activeRoleKey, activeRole } = useERPWorkspace()
+  const admin = getStoredAdminProfile()
+  const [loginMode, setLoginMode] = useState(() =>
+    isMobileApp ? 'sms' : 'password'
+  )
   const [smsPhone, setSmsPhone] = useState('')
   const [smsHint, setSmsHint] = useState('')
   const [requestingCode, setRequestingCode] = useState(false)
@@ -72,7 +82,10 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
     return () => window.clearInterval(timer)
   }, [smsCooldownUntil])
 
-  if (admin) {
+  const canUseCurrentMobileRole =
+    !isMobileApp || hasMobileRolePermission(admin, activeRoleKey)
+
+  if (admin && canUseCurrentMobileRole) {
     return <Navigate to={redirectTo} replace />
   }
 
@@ -87,6 +100,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       const result = await authRpc.call('send_sms_code', {
         phone: smsPhone.trim(),
         scope: 'admin',
+        mobile_role_key: isMobileApp ? activeRoleKey : '',
       })
       const data = result?.data || {}
       const resendAfter = Number(data.resend_after || 0)
@@ -120,9 +134,20 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
               phone: values.phone.trim(),
               code: values.code.trim(),
               scope: 'admin',
+              mobile_role_key: isMobileApp ? activeRoleKey : '',
             })
 
       persistAuth(result?.data, AUTH_SCOPE.ADMIN)
+      if (
+        isMobileApp &&
+        !hasMobileRolePermission(result?.data, activeRoleKey)
+      ) {
+        logout(AUTH_SCOPE.ADMIN)
+        setError(
+          `该账号暂无${activeRole?.label || '当前角色'}移动端登录权限，请联系管理员。`
+        )
+        return
+      }
       navigate(redirectTo, { replace: true })
     } catch (err) {
       setError(getActionErrorMessage(err, '登录'))
@@ -152,20 +177,22 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
           {error ? <Alert type="error" showIcon message={error} /> : null}
 
           <Form layout="vertical" onFinish={onFinish}>
-            <Form.Item>
-              <Segmented
-                block
-                value={loginMode}
-                onChange={(value) => {
-                  setLoginMode(value)
-                  setError('')
-                }}
-                options={[
-                  { label: '密码登录', value: 'password' },
-                  { label: '短信登录', value: 'sms' },
-                ]}
-              />
-            </Form.Item>
+            {isMobileApp ? null : (
+              <Form.Item>
+                <Segmented
+                  block
+                  value={loginMode}
+                  onChange={(value) => {
+                    setLoginMode(value)
+                    setError('')
+                  }}
+                  options={[
+                    { label: '密码登录', value: 'password' },
+                    { label: '短信登录', value: 'sms' },
+                  ]}
+                />
+              </Form.Item>
+            )}
 
             {loginMode === 'password' ? (
               <>

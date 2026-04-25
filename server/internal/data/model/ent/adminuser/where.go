@@ -59,6 +59,11 @@ func Username(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldUsername, v))
 }
 
+// Phone applies equality check predicate on the "phone" field. It's identical to PhoneEQ.
+func Phone(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldPhone, v))
+}
+
 // PasswordHash applies equality check predicate on the "password_hash" field. It's identical to PasswordHashEQ.
 func PasswordHash(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldPasswordHash, v))
@@ -72,6 +77,11 @@ func Level(v int8) predicate.AdminUser {
 // MenuPermissions applies equality check predicate on the "menu_permissions" field. It's identical to MenuPermissionsEQ.
 func MenuPermissions(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldEQ(FieldMenuPermissions, v))
+}
+
+// MobileRolePermissions applies equality check predicate on the "mobile_role_permissions" field. It's identical to MobileRolePermissionsEQ.
+func MobileRolePermissions(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldMobileRolePermissions, v))
 }
 
 // ErpPreferences applies equality check predicate on the "erp_preferences" field. It's identical to ErpPreferencesEQ.
@@ -162,6 +172,81 @@ func UsernameEqualFold(v string) predicate.AdminUser {
 // UsernameContainsFold applies the ContainsFold predicate on the "username" field.
 func UsernameContainsFold(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldContainsFold(FieldUsername, v))
+}
+
+// PhoneEQ applies the EQ predicate on the "phone" field.
+func PhoneEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldPhone, v))
+}
+
+// PhoneNEQ applies the NEQ predicate on the "phone" field.
+func PhoneNEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldPhone, v))
+}
+
+// PhoneIn applies the In predicate on the "phone" field.
+func PhoneIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldPhone, vs...))
+}
+
+// PhoneNotIn applies the NotIn predicate on the "phone" field.
+func PhoneNotIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldPhone, vs...))
+}
+
+// PhoneGT applies the GT predicate on the "phone" field.
+func PhoneGT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldPhone, v))
+}
+
+// PhoneGTE applies the GTE predicate on the "phone" field.
+func PhoneGTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldPhone, v))
+}
+
+// PhoneLT applies the LT predicate on the "phone" field.
+func PhoneLT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldPhone, v))
+}
+
+// PhoneLTE applies the LTE predicate on the "phone" field.
+func PhoneLTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldPhone, v))
+}
+
+// PhoneContains applies the Contains predicate on the "phone" field.
+func PhoneContains(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContains(FieldPhone, v))
+}
+
+// PhoneHasPrefix applies the HasPrefix predicate on the "phone" field.
+func PhoneHasPrefix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasPrefix(FieldPhone, v))
+}
+
+// PhoneHasSuffix applies the HasSuffix predicate on the "phone" field.
+func PhoneHasSuffix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasSuffix(FieldPhone, v))
+}
+
+// PhoneIsNil applies the IsNil predicate on the "phone" field.
+func PhoneIsNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIsNull(FieldPhone))
+}
+
+// PhoneNotNil applies the NotNil predicate on the "phone" field.
+func PhoneNotNil() predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotNull(FieldPhone))
+}
+
+// PhoneEqualFold applies the EqualFold predicate on the "phone" field.
+func PhoneEqualFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEqualFold(FieldPhone, v))
+}
+
+// PhoneContainsFold applies the ContainsFold predicate on the "phone" field.
+func PhoneContainsFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContainsFold(FieldPhone, v))
 }
 
 // PasswordHashEQ applies the EQ predicate on the "password_hash" field.
@@ -332,6 +417,71 @@ func MenuPermissionsEqualFold(v string) predicate.AdminUser {
 // MenuPermissionsContainsFold applies the ContainsFold predicate on the "menu_permissions" field.
 func MenuPermissionsContainsFold(v string) predicate.AdminUser {
 	return predicate.AdminUser(sql.FieldContainsFold(FieldMenuPermissions, v))
+}
+
+// MobileRolePermissionsEQ applies the EQ predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEQ(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsNEQ applies the NEQ predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsNEQ(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNEQ(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsIn applies the In predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldIn(FieldMobileRolePermissions, vs...))
+}
+
+// MobileRolePermissionsNotIn applies the NotIn predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsNotIn(vs ...string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldNotIn(FieldMobileRolePermissions, vs...))
+}
+
+// MobileRolePermissionsGT applies the GT predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsGT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGT(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsGTE applies the GTE predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsGTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldGTE(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsLT applies the LT predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsLT(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLT(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsLTE applies the LTE predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsLTE(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldLTE(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsContains applies the Contains predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsContains(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContains(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsHasPrefix applies the HasPrefix predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsHasPrefix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasPrefix(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsHasSuffix applies the HasSuffix predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsHasSuffix(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldHasSuffix(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsEqualFold applies the EqualFold predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsEqualFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldEqualFold(FieldMobileRolePermissions, v))
+}
+
+// MobileRolePermissionsContainsFold applies the ContainsFold predicate on the "mobile_role_permissions" field.
+func MobileRolePermissionsContainsFold(v string) predicate.AdminUser {
+	return predicate.AdminUser(sql.FieldContainsFold(FieldMobileRolePermissions, v))
 }
 
 // ErpPreferencesEQ applies the EQ predicate on the "erp_preferences" field.

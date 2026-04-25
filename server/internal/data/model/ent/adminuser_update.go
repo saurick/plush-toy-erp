@@ -42,6 +42,26 @@ func (_u *AdminUserUpdate) SetNillableUsername(v *string) *AdminUserUpdate {
 	return _u
 }
 
+// SetPhone sets the "phone" field.
+func (_u *AdminUserUpdate) SetPhone(v string) *AdminUserUpdate {
+	_u.mutation.SetPhone(v)
+	return _u
+}
+
+// SetNillablePhone sets the "phone" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillablePhone(v *string) *AdminUserUpdate {
+	if v != nil {
+		_u.SetPhone(*v)
+	}
+	return _u
+}
+
+// ClearPhone clears the value of the "phone" field.
+func (_u *AdminUserUpdate) ClearPhone() *AdminUserUpdate {
+	_u.mutation.ClearPhone()
+	return _u
+}
+
 // SetPasswordHash sets the "password_hash" field.
 func (_u *AdminUserUpdate) SetPasswordHash(v string) *AdminUserUpdate {
 	_u.mutation.SetPasswordHash(v)
@@ -87,6 +107,20 @@ func (_u *AdminUserUpdate) SetMenuPermissions(v string) *AdminUserUpdate {
 func (_u *AdminUserUpdate) SetNillableMenuPermissions(v *string) *AdminUserUpdate {
 	if v != nil {
 		_u.SetMenuPermissions(*v)
+	}
+	return _u
+}
+
+// SetMobileRolePermissions sets the "mobile_role_permissions" field.
+func (_u *AdminUserUpdate) SetMobileRolePermissions(v string) *AdminUserUpdate {
+	_u.mutation.SetMobileRolePermissions(v)
+	return _u
+}
+
+// SetNillableMobileRolePermissions sets the "mobile_role_permissions" field if the given value is not nil.
+func (_u *AdminUserUpdate) SetNillableMobileRolePermissions(v *string) *AdminUserUpdate {
+	if v != nil {
+		_u.SetMobileRolePermissions(*v)
 	}
 	return _u
 }
@@ -193,6 +227,11 @@ func (_u *AdminUserUpdate) check() error {
 			return &ValidationError{Name: "username", err: fmt.Errorf(`ent: validator failed for field "AdminUser.username": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Phone(); ok {
+		if err := adminuser.PhoneValidator(v); err != nil {
+			return &ValidationError{Name: "phone", err: fmt.Errorf(`ent: validator failed for field "AdminUser.phone": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PasswordHash(); ok {
 		if err := adminuser.PasswordHashValidator(v); err != nil {
 			return &ValidationError{Name: "password_hash", err: fmt.Errorf(`ent: validator failed for field "AdminUser.password_hash": %w`, err)}
@@ -201,6 +240,11 @@ func (_u *AdminUserUpdate) check() error {
 	if v, ok := _u.mutation.MenuPermissions(); ok {
 		if err := adminuser.MenuPermissionsValidator(v); err != nil {
 			return &ValidationError{Name: "menu_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.menu_permissions": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MobileRolePermissions(); ok {
+		if err := adminuser.MobileRolePermissionsValidator(v); err != nil {
+			return &ValidationError{Name: "mobile_role_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.mobile_role_permissions": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ErpPreferences(); ok {
@@ -226,6 +270,12 @@ func (_u *AdminUserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Username(); ok {
 		_spec.SetField(adminuser.FieldUsername, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Phone(); ok {
+		_spec.SetField(adminuser.FieldPhone, field.TypeString, value)
+	}
+	if _u.mutation.PhoneCleared() {
+		_spec.ClearField(adminuser.FieldPhone, field.TypeString)
+	}
 	if value, ok := _u.mutation.PasswordHash(); ok {
 		_spec.SetField(adminuser.FieldPasswordHash, field.TypeString, value)
 	}
@@ -237,6 +287,9 @@ func (_u *AdminUserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.MenuPermissions(); ok {
 		_spec.SetField(adminuser.FieldMenuPermissions, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MobileRolePermissions(); ok {
+		_spec.SetField(adminuser.FieldMobileRolePermissions, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.ErpPreferences(); ok {
 		_spec.SetField(adminuser.FieldErpPreferences, field.TypeString, value)
@@ -287,6 +340,26 @@ func (_u *AdminUserUpdateOne) SetNillableUsername(v *string) *AdminUserUpdateOne
 	return _u
 }
 
+// SetPhone sets the "phone" field.
+func (_u *AdminUserUpdateOne) SetPhone(v string) *AdminUserUpdateOne {
+	_u.mutation.SetPhone(v)
+	return _u
+}
+
+// SetNillablePhone sets the "phone" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillablePhone(v *string) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetPhone(*v)
+	}
+	return _u
+}
+
+// ClearPhone clears the value of the "phone" field.
+func (_u *AdminUserUpdateOne) ClearPhone() *AdminUserUpdateOne {
+	_u.mutation.ClearPhone()
+	return _u
+}
+
 // SetPasswordHash sets the "password_hash" field.
 func (_u *AdminUserUpdateOne) SetPasswordHash(v string) *AdminUserUpdateOne {
 	_u.mutation.SetPasswordHash(v)
@@ -332,6 +405,20 @@ func (_u *AdminUserUpdateOne) SetMenuPermissions(v string) *AdminUserUpdateOne {
 func (_u *AdminUserUpdateOne) SetNillableMenuPermissions(v *string) *AdminUserUpdateOne {
 	if v != nil {
 		_u.SetMenuPermissions(*v)
+	}
+	return _u
+}
+
+// SetMobileRolePermissions sets the "mobile_role_permissions" field.
+func (_u *AdminUserUpdateOne) SetMobileRolePermissions(v string) *AdminUserUpdateOne {
+	_u.mutation.SetMobileRolePermissions(v)
+	return _u
+}
+
+// SetNillableMobileRolePermissions sets the "mobile_role_permissions" field if the given value is not nil.
+func (_u *AdminUserUpdateOne) SetNillableMobileRolePermissions(v *string) *AdminUserUpdateOne {
+	if v != nil {
+		_u.SetMobileRolePermissions(*v)
 	}
 	return _u
 }
@@ -451,6 +538,11 @@ func (_u *AdminUserUpdateOne) check() error {
 			return &ValidationError{Name: "username", err: fmt.Errorf(`ent: validator failed for field "AdminUser.username": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Phone(); ok {
+		if err := adminuser.PhoneValidator(v); err != nil {
+			return &ValidationError{Name: "phone", err: fmt.Errorf(`ent: validator failed for field "AdminUser.phone": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.PasswordHash(); ok {
 		if err := adminuser.PasswordHashValidator(v); err != nil {
 			return &ValidationError{Name: "password_hash", err: fmt.Errorf(`ent: validator failed for field "AdminUser.password_hash": %w`, err)}
@@ -459,6 +551,11 @@ func (_u *AdminUserUpdateOne) check() error {
 	if v, ok := _u.mutation.MenuPermissions(); ok {
 		if err := adminuser.MenuPermissionsValidator(v); err != nil {
 			return &ValidationError{Name: "menu_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.menu_permissions": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MobileRolePermissions(); ok {
+		if err := adminuser.MobileRolePermissionsValidator(v); err != nil {
+			return &ValidationError{Name: "mobile_role_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.mobile_role_permissions": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.ErpPreferences(); ok {
@@ -501,6 +598,12 @@ func (_u *AdminUserUpdateOne) sqlSave(ctx context.Context) (_node *AdminUser, er
 	if value, ok := _u.mutation.Username(); ok {
 		_spec.SetField(adminuser.FieldUsername, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Phone(); ok {
+		_spec.SetField(adminuser.FieldPhone, field.TypeString, value)
+	}
+	if _u.mutation.PhoneCleared() {
+		_spec.ClearField(adminuser.FieldPhone, field.TypeString)
+	}
 	if value, ok := _u.mutation.PasswordHash(); ok {
 		_spec.SetField(adminuser.FieldPasswordHash, field.TypeString, value)
 	}
@@ -512,6 +615,9 @@ func (_u *AdminUserUpdateOne) sqlSave(ctx context.Context) (_node *AdminUser, er
 	}
 	if value, ok := _u.mutation.MenuPermissions(); ok {
 		_spec.SetField(adminuser.FieldMenuPermissions, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MobileRolePermissions(); ok {
+		_spec.SetField(adminuser.FieldMobileRolePermissions, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.ErpPreferences(); ok {
 		_spec.SetField(adminuser.FieldErpPreferences, field.TypeString, value)

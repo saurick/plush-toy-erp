@@ -1780,6 +1780,51 @@ const navItemRegistry = {
     description:
       '提供任务协同层和业务状态层的表结构草案与 SQL 样例，只用于校对，不直接作为迁移真源。',
   },
+  'help-task-flow-v1': {
+    key: 'help-task-flow-v1',
+    label: '工作流主任务树 v1',
+    path: '/erp/docs/task-flow-v1',
+    shortLabel: '任务树',
+    description:
+      '查看 T1 到 T8 的责任角色、触发事件、完成条件、阻塞与超时规则。',
+  },
+  'help-role-permission-matrix-v1': {
+    key: 'help-role-permission-matrix-v1',
+    label: '角色权限矩阵 v1',
+    path: '/erp/docs/role-permission-matrix-v1',
+    shortLabel: '权限',
+    description:
+      '查看菜单可见、数据范围、审批、催办、移动端处理和配置权限边界。',
+  },
+  'help-notification-alert-v1': {
+    key: 'help-notification-alert-v1',
+    label: '通知 / 预警 / 催办 / 升级 v1',
+    path: '/erp/docs/notification-alert-v1',
+    shortLabel: '预警',
+    description: '查看站内通知、页面预警、催办事件和升级规则。',
+  },
+  'help-finance-v1': {
+    key: 'help-finance-v1',
+    label: '财务 v1',
+    path: '/erp/docs/finance-v1',
+    shortLabel: '财务',
+    description: '查看应收、应付、发票、对账、税额和收付款状态的 v1 边界。',
+  },
+  'help-warehouse-quality-v1': {
+    key: 'help-warehouse-quality-v1',
+    label: '仓库与品质 v1',
+    path: '/erp/docs/warehouse-quality-v1',
+    shortLabel: '仓质',
+    description: '查看收发存、IQC、品质检验、返工复检和放行边界。',
+  },
+  'help-log-trace-audit-v1': {
+    key: 'help-log-trace-audit-v1',
+    label: '日志 / 审计 / Trace v1',
+    path: '/erp/docs/log-trace-audit-v1',
+    shortLabel: '审计',
+    description:
+      '查看业务事件、任务事件、状态快照和 trace / request_id 的分层关系。',
+  },
   'help-desktop-role-guide': {
     key: 'help-desktop-role-guide',
     label: '桌面端角色流程',
@@ -1955,6 +2000,12 @@ const helpCenterNavKeys = [
   'help-task-document-mapping',
   'help-workflow-status-guide',
   'help-workflow-schema-draft',
+  'help-task-flow-v1',
+  'help-role-permission-matrix-v1',
+  'help-notification-alert-v1',
+  'help-finance-v1',
+  'help-warehouse-quality-v1',
+  'help-log-trace-audit-v1',
   'help-desktop-role-guide',
   'help-mobile-role-guide',
   'help-field-linkage-guide',

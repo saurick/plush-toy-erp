@@ -15,12 +15,14 @@ import (
 type memAdminAuthRepo struct {
 	mu        sync.Mutex
 	admins    map[string]*AdminUser
+	phones    map[string]*AdminUser
 	lastLogin map[int]time.Time
 }
 
 func newMemAdminAuthRepo() *memAdminAuthRepo {
 	return &memAdminAuthRepo{
 		admins:    make(map[string]*AdminUser),
+		phones:    make(map[string]*AdminUser),
 		lastLogin: make(map[int]time.Time),
 	}
 }
@@ -35,6 +37,21 @@ func (r *memAdminAuthRepo) GetAdminByUsername(_ context.Context, username string
 	}
 	cp := *admin
 	cp.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
+	cp.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
+	return &cp, nil
+}
+
+func (r *memAdminAuthRepo) GetAdminByPhone(_ context.Context, phone string) (*AdminUser, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	admin := r.phones[phone]
+	if admin == nil {
+		return nil, errors.New("not found")
+	}
+	cp := *admin
+	cp.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
+	cp.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
 	return &cp, nil
 }
 
@@ -49,9 +66,11 @@ func TestAdminAuthUsecase_SMSLogin_Success(t *testing.T) {
 	repo := newMemAdminAuthRepo()
 	repo.admins["13800138000"] = &AdminUser{
 		ID:       1,
-		Username: "13800138000",
+		Username: "sms-admin",
+		Phone:    "13800138000",
 		Level:    int8(AdminLevelSuper),
 	}
+	repo.phones["13800138000"] = repo.admins["13800138000"]
 
 	logger := log.NewStdLogger(io.Discard)
 	tp := tracesdk.NewTracerProvider()
@@ -59,19 +78,19 @@ func TestAdminAuthUsecase_SMSLogin_Success(t *testing.T) {
 		return "tok-admin-sms", time.Now().Add(time.Hour), nil
 	}, logger, tp)
 
-	challenge, err := uc.RequestSMSLoginCode(context.Background(), "13800138000")
+	challenge, err := uc.RequestSMSLoginCode(context.Background(), "13800138000", "purchasing")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 
-	token, _, admin, err := uc.LoginWithSMSCode(context.Background(), "13800138000", challenge.MockCode)
+	token, _, admin, err := uc.LoginWithSMSCode(context.Background(), "13800138000", challenge.MockCode, "purchasing")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if token != "tok-admin-sms" {
 		t.Fatalf("unexpected token: %s", token)
 	}
-	if admin == nil || admin.Username != "13800138000" {
+	if admin == nil || admin.Username != "sms-admin" {
 		t.Fatalf("unexpected admin: %+v", admin)
 	}
 	if repo.lastLogin[1].IsZero() {

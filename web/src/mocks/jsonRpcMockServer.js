@@ -425,6 +425,7 @@ export function setupJsonRpcMockServer() {
           result: makeBizResult({
             user_id: 1,
             username: params.username || 'mock-admin',
+            phone: '13800138000',
             access_token: 'mock-admin-token',
             expires_at: Math.floor(Date.now() / 1000) + 3600,
             token_type: 'Bearer',
@@ -445,6 +446,48 @@ export function setupJsonRpcMockServer() {
               '/erp/changes/current',
               '/erp/system/permissions',
             ],
+            mobile_role_permissions: [
+              'boss',
+              'merchandiser',
+              'purchasing',
+              'production',
+              'warehouse',
+              'finance',
+              'pmc',
+              'quality',
+            ],
+          }),
+          error: '',
+        }
+      } else if (method === 'send_sms_code') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            phone: params.phone || '13800138000',
+            expires_at: Math.floor(Date.now() / 1000) + 300,
+            resend_after: Math.floor(Date.now() / 1000) + 60,
+            mock_delivery: true,
+            mock_code: '123456',
+          }),
+          error: '',
+        }
+      } else if (method === 'sms_login') {
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            user_id: 1,
+            username: 'mock-admin',
+            phone: params.phone || '13800138000',
+            access_token: 'mock-admin-token',
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            token_type: 'Bearer',
+            admin_level: 0,
+            menu_permissions: ['/erp/dashboard'],
+            mobile_role_permissions: params.mobile_role_key
+              ? [params.mobile_role_key]
+              : [],
           }),
           error: '',
         }
@@ -469,6 +512,7 @@ export function setupJsonRpcMockServer() {
           result: makeBizResult({
             id: 1,
             username: 'mock-admin',
+            phone: '13800138000',
             level: 0,
             disabled: false,
             menu_permissions: [
@@ -487,6 +531,16 @@ export function setupJsonRpcMockServer() {
               '/erp/changes/current',
               '/erp/system/permissions',
             ],
+            mobile_role_permissions: [
+              'boss',
+              'merchandiser',
+              'purchasing',
+              'production',
+              'warehouse',
+              'finance',
+              'pmc',
+              'quality',
+            ],
           }),
           error: '',
         }
@@ -499,9 +553,11 @@ export function setupJsonRpcMockServer() {
               {
                 id: 1,
                 username: 'mock-admin',
+                phone: '13800138000',
                 level: 0,
                 disabled: false,
                 menu_permissions: [],
+                mobile_role_permissions: [],
               },
             ],
           }),
@@ -510,6 +566,7 @@ export function setupJsonRpcMockServer() {
       } else if (
         method === 'create' ||
         method === 'set_permissions' ||
+        method === 'set_phone' ||
         method === 'set_disabled' ||
         method === 'reset_password'
       ) {
@@ -520,10 +577,16 @@ export function setupJsonRpcMockServer() {
             admin: {
               id: Number(params.id || 2),
               username: params.username || 'mock-created-admin',
+              phone: params.phone || '',
               level: Number(params.level || 1),
               disabled: Boolean(params.disabled),
               menu_permissions: Array.isArray(params.menu_permissions)
                 ? params.menu_permissions
+                : [],
+              mobile_role_permissions: Array.isArray(
+                params.mobile_role_permissions
+              )
+                ? params.mobile_role_permissions
                 : [],
             },
           }),
@@ -537,6 +600,10 @@ export function setupJsonRpcMockServer() {
             menu_options: [
               { key: '/erp/dashboard', label: '全局驾驶舱' },
               { key: '/erp/system/permissions', label: '权限管理' },
+            ],
+            mobile_role_options: [
+              { key: 'purchasing', label: '采购移动端' },
+              { key: 'warehouse', label: '仓库移动端' },
             ],
           }),
           error: '',

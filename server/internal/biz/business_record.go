@@ -27,8 +27,11 @@ var businessRecordModuleKeyOrder = []string{
 	"production-scheduling",
 	"production-progress",
 	"production-exceptions",
+	"quality-inspections",
 	"reconciliation",
 	"payables",
+	"receivables",
+	"invoices",
 }
 
 var businessRecordModulePrefixes = map[string]string{
@@ -45,8 +48,11 @@ var businessRecordModulePrefixes = map[string]string{
 	"production-scheduling": "PS",
 	"production-progress":   "PP",
 	"production-exceptions": "PX",
+	"quality-inspections":   "QC",
 	"reconciliation":        "RC",
 	"payables":              "PY",
+	"receivables":           "AR",
+	"invoices":              "INV",
 }
 
 var businessRecordModuleSet = buildBusinessRecordModuleSet()

@@ -185,16 +185,15 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '客户/款式立项')
       await expectText(page, '新建记录')
-      await expectText(page, '批量删除')
-      await assertButtonDisabled(page, '批量删除')
+      await assertTextAbsent(page, '批量删除')
       await assertBusinessModuleToolbarControlStyle(page, {
         scenarioName: 'business-module-workflow-actions',
       })
-      await expectText(page, '当前操作')
+      await expectText(page, '选中操作')
       const businessActionToolbar = page.locator(
         '.erp-business-module-current-action'
       )
-      await assertButtonDisabled(page, '关联表格')
+      await assertTextAbsent(page, '关联表格')
       await expectText(page, '协同任务池')
       await assertBusinessPageRefreshEntrypoint(page, {
         scenarioName: 'business-module-workflow-actions',
@@ -365,8 +364,10 @@ const scenarios = [
     viewport: { width: 470, height: 680 },
     verify: async (page) => {
       await expectHeading(page, '客户/款式立项')
-      await expectText(page, '从这天起')
-      await expectText(page, '到这天止')
+      await page
+        .locator('.erp-business-date-range-filter input[type="date"]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 10_000 })
       await assertBusinessModuleStatusDropdownStyle(page, {
         scenarioName: 'business-module-toolbar-mobile-dropdown',
       })
@@ -453,11 +454,9 @@ const scenarios = [
       await expectText(page, '辅料采购自动汇总')
       await expectText(page, '37.50')
       await expectText(page, '1 行')
-      await expectText(page, '从这天起')
-      await expectText(page, '到这天止')
 
       const toolbarDateInputs = page.locator(
-        '.erp-business-module-toolbar input[type="date"]'
+        '.erp-business-filter-panel input[type="date"]'
       )
       assert.equal(
         await toolbarDateInputs.count(),
@@ -1139,7 +1138,7 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '客户/供应商')
       await expectText(page, '新建记录')
-      await expectText(page, '当前操作')
+      await expectText(page, '选中操作')
       await expectText(page, '协同任务池')
     },
   },
@@ -1152,8 +1151,8 @@ const scenarios = [
       await expectHeading(page, '加工合同/委外下单')
       await expectText(page, '加工合同号')
       await expectText(page, '新建记录')
-      await expectButton(page, '打印加工合同')
-      await assertButtonDisabled(page, '打印加工合同')
+      await expectText(page, '选中操作')
+      await assertTextAbsent(page, '打印加工合同')
       await expectText(page, '协同任务池')
     },
   },
@@ -4426,45 +4425,39 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
       const element = document.querySelector(selector)
       return element ? readControlFromElement(element, selector) : null
     }
-    const dateAddons = Array.from(
-      document.querySelectorAll(
-        '.erp-business-module-toolbar .erp-business-module-date-filter > span'
-      )
-    ).map((node) => readControlFromElement(node))
     const dateControls = Array.from(
       document.querySelectorAll(
-        '.erp-business-module-toolbar .erp-business-module-date-filter'
+        '.erp-business-filter-panel .erp-business-date-range-filter'
       )
     ).map((node) => readControlFromElement(node))
     const selectControls = Array.from(
       document.querySelectorAll(
-        '.erp-business-module-toolbar__filters .ant-select-selector'
+        '.erp-business-filter-panel__grid > .ant-select .ant-select-selector'
       )
     ).map((node) => readControlFromElement(node))
     const filterControls = [
-      readControl('.erp-business-module-toolbar .ant-input-affix-wrapper'),
+      readControl('.erp-business-filter-panel .ant-input-affix-wrapper'),
       ...selectControls,
       ...dateControls,
     ].filter(Boolean)
 
     return {
       search: readControl(
-        '.erp-business-module-toolbar .ant-input-affix-wrapper'
+        '.erp-business-filter-panel .ant-input-affix-wrapper'
       ),
-      dateInput: readControl('.erp-business-module-toolbar input[type="date"]'),
+      dateInput: readControl('.erp-business-filter-panel input[type="date"]'),
       dateControl: readControl(
-        '.erp-business-module-toolbar .erp-business-module-date-filter'
+        '.erp-business-filter-panel .erp-business-date-range-filter'
       ),
+      dateInputs: Array.from(
+        document.querySelectorAll(
+          '.erp-business-filter-panel input[type="date"]'
+        )
+      ).map((node) => readControlFromElement(node)),
       dateControls,
-      dateAddon: dateAddons[0] || null,
-      dateAddons,
-      dateLabels: dateAddons.map((node) => node.text),
       selectControls,
       filterControls,
       actionButton: readControl('.erp-business-module-toolbar .ant-btn'),
-      disabledButton: readControl(
-        '.erp-business-module-toolbar .ant-btn[disabled]'
-      ),
     }
   })
 
@@ -4472,29 +4465,20 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
     metrics.search &&
       metrics.dateInput &&
       metrics.dateControl &&
-      metrics.dateAddon &&
+      metrics.dateInputs.length === 2 &&
       metrics.actionButton,
     `${scenarioName} 工具栏控件缺失: ${JSON.stringify(metrics)}`
   )
-  assert.deepEqual(
-    metrics.dateLabels,
-    ['从这天起', '到这天止'],
-    `${scenarioName} 起止日期缺少小白可读标签: ${JSON.stringify(metrics)}`
-  )
   assert.equal(
     metrics.dateControls.length,
-    2,
-    `${scenarioName} 起止日期控件数量异常: ${JSON.stringify(metrics)}`
+    1,
+    `${scenarioName} 日期范围控件应收口为一个整体: ${JSON.stringify(metrics)}`
   )
   assert(
-    Math.abs(metrics.dateControls[0].top - metrics.dateControls[1].top) <= 1,
-    `${scenarioName} 起止日期控件未保持同一行: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.dateAddons.every(
+    metrics.dateInputs.every(
       (item) => item.scrollWidth <= item.clientWidth + 1
     ),
-    `${scenarioName} 起止日期标签文字被裁切: ${JSON.stringify(metrics)}`
+    `${scenarioName} 起止日期文字出现裁切: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.filterControls.every(
@@ -4512,13 +4496,6 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
     'pointer',
     `${scenarioName} 工具栏按钮 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
   )
-  if (metrics.disabledButton) {
-    assert.equal(
-      metrics.disabledButton.cursor,
-      'pointer',
-      `${scenarioName} 禁用工具栏按钮 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
-    )
-  }
   assert.equal(
     metrics.dateControl.borderTopLeftRadius,
     metrics.search.borderTopLeftRadius,
@@ -4551,7 +4528,9 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
 }
 
 async function assertBusinessModuleStatusDropdownStyle(page, { scenarioName }) {
-  await page.locator('.erp-business-module-toolbar .ant-select').nth(1).click()
+  await page
+    .locator('.erp-business-filter-panel .erp-business-filter-control--status')
+    .click()
   const popup = page.locator(
     '.erp-business-module-select-popup:not(.ant-select-dropdown-hidden)'
   )
@@ -4591,10 +4570,10 @@ async function assertBusinessModuleStatusDropdownStyle(page, { scenarioName }) {
       '.erp-business-module-select-popup:not(.ant-select-dropdown-hidden)'
     )
     const activeSelector = document.querySelector(
-      '.erp-business-module-toolbar .ant-select-open .ant-select-selector'
+      '.erp-business-filter-panel .ant-select-open .ant-select-selector'
     )
     const internalSearchInput = document.querySelector(
-      '.erp-business-module-toolbar .ant-select-open .ant-select-selection-search-input'
+      '.erp-business-filter-panel .ant-select-open .ant-select-selection-search-input'
     )
     return {
       viewportWidth: window.innerWidth,

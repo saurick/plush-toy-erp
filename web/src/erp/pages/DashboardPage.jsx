@@ -16,6 +16,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getBusinessDashboardStats } from '../api/businessRecordApi.mjs'
+import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   dashboardModules,
   dashboardStatusGroups,
@@ -25,13 +26,15 @@ import {
   buildDashboardSummary,
   normalizeDashboardModuleStats,
 } from '../utils/dashboardStats.mjs'
+import { buildWorkflowDashboardStats } from '../utils/workflowDashboardStats.mjs'
 import { buildBusinessModuleQuery } from '../utils/businessModuleNavigation.mjs'
 
-const { Paragraph, Title } = Typography
+const { Paragraph, Text, Title } = Typography
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(false)
   const [moduleStats, setModuleStats] = useState([])
+  const [workflowTasks, setWorkflowTasks] = useState([])
   const mountedRef = useRef(false)
   const navigate = useNavigate()
   const outletContext = useOutletContext()
@@ -39,12 +42,16 @@ export default function DashboardPage() {
   const loadDashboardStats = useCallback(async () => {
     setLoading(true)
     try {
-      const result = await getBusinessDashboardStats()
+      const [result, workflowResult] = await Promise.all([
+        getBusinessDashboardStats(),
+        listWorkflowTasks({ limit: 200 }),
+      ])
       const modules = Array.isArray(result?.modules)
         ? result.modules.map((item) => normalizeDashboardModuleStats(item))
         : []
       if (mountedRef.current) {
         setModuleStats(modules)
+        setWorkflowTasks(workflowResult?.tasks || [])
       }
       return true
     } catch (error) {
@@ -74,6 +81,105 @@ export default function DashboardPage() {
     [moduleStats]
   )
   const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
+  const workflowStats = useMemo(
+    () => buildWorkflowDashboardStats(workflowTasks),
+    [workflowTasks]
+  )
+
+  const workflowMetricCards = useMemo(
+    () => [
+      { key: 'total', title: '协同任务总数', value: workflowStats.total },
+      { key: 'pending', title: '待处理任务数', value: workflowStats.pending },
+      {
+        key: 'processing',
+        title: '处理中任务数',
+        value: workflowStats.processing,
+      },
+      {
+        key: 'blocked',
+        title: '阻塞任务数',
+        value: workflowStats.blocked,
+        color: '#d4380d',
+      },
+      {
+        key: 'rejected',
+        title: '退回任务数',
+        value: workflowStats.rejected,
+        color: '#d48806',
+      },
+      {
+        key: 'overdue',
+        title: '超时任务数',
+        value: workflowStats.overdue,
+        color: '#cf1322',
+      },
+      {
+        key: 'dueSoon',
+        title: '即将到期任务数',
+        value: workflowStats.dueSoon,
+        color: '#d48806',
+      },
+      { key: 'done', title: '已完成任务数', value: workflowStats.done },
+      {
+        key: 'pmcFocus',
+        title: 'PMC 关注任务数',
+        value: workflowStats.pmcFocus,
+      },
+      {
+        key: 'bossFocus',
+        title: '老板待审批/高风险任务数',
+        value: workflowStats.bossFocus,
+      },
+      {
+        key: 'financePending',
+        title: '财务待处理任务数',
+        value: workflowStats.financePending,
+      },
+      {
+        key: 'qualityPending',
+        title: '品质待检任务数',
+        value: workflowStats.qualityPending,
+      },
+      {
+        key: 'warehousePending',
+        title: '仓库待处理任务数',
+        value: workflowStats.warehousePending,
+      },
+      {
+        key: 'todayAlerts',
+        title: '今日预警数',
+        value: workflowStats.todayAlerts,
+      },
+      {
+        key: 'criticalAlerts',
+        title: 'critical 预警数',
+        value: workflowStats.criticalAlerts,
+        color: '#cf1322',
+      },
+      {
+        key: 'warningAlerts',
+        title: 'warning 预警数',
+        value: workflowStats.warningAlerts,
+        color: '#d48806',
+      },
+    ],
+    [workflowStats]
+  )
+
+  const workflowAlertGroups = useMemo(
+    () => [
+      { key: 'overdueTasks', title: '超时任务' },
+      { key: 'blockedTasks', title: '阻塞任务' },
+      { key: 'shipmentRisk', title: '出货风险' },
+      { key: 'materialShortage', title: '欠料风险' },
+      { key: 'vendorDelay', title: '委外延期' },
+      { key: 'qcFailed', title: '质检不良' },
+      { key: 'financePending', title: '财务待处理' },
+      { key: 'approvalPending', title: '待老板审批' },
+      { key: 'pmcFocus', title: 'PMC 关注事项' },
+    ],
+    []
+  )
 
   const openModuleList = (record, businessStatusKeys = []) => {
     if (!record?.path) {
@@ -142,6 +248,82 @@ export default function DashboardPage() {
           </Card>
         </Col>
       </Row>
+
+      <Card className="erp-dashboard-card" variant="borderless">
+        <Space direction="vertical" className="erp-dashboard-block" size={12}>
+          <Title level={5} className="erp-dashboard-section-title">
+            Workflow 任务视角
+          </Title>
+          <Row gutter={[12, 12]}>
+            {workflowMetricCards.map((item) => (
+              <Col xs={12} md={8} xl={6} key={item.key}>
+                <Card
+                  size="small"
+                  variant="borderless"
+                  className="erp-dashboard-status-card"
+                >
+                  <Statistic
+                    title={item.title}
+                    value={item.value}
+                    valueStyle={item.color ? { color: item.color } : undefined}
+                  />
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Space>
+      </Card>
+
+      <Card className="erp-dashboard-card" variant="borderless">
+        <Space direction="vertical" className="erp-dashboard-block" size={12}>
+          <Title level={5} className="erp-dashboard-section-title">
+            今日预警
+          </Title>
+          <Row gutter={[12, 12]}>
+            {workflowAlertGroups.map((group) => {
+              const alerts = workflowStats.buckets?.[group.key] || []
+              return (
+                <Col xs={24} md={12} xl={8} key={group.key}>
+                  <Card
+                    size="small"
+                    variant="borderless"
+                    className="erp-dashboard-status-card"
+                  >
+                    <Space
+                      direction="vertical"
+                      className="erp-dashboard-block"
+                      size={8}
+                    >
+                      <Space>
+                        <Tag color={alerts.length > 0 ? 'red' : 'default'}>
+                          {alerts.length}
+                        </Tag>
+                        <Text strong>{group.title}</Text>
+                      </Space>
+                      {alerts.slice(0, 3).map((alert) => (
+                        <div key={`${group.key}-${alert.task_id}`}>
+                          <Text>{alert.alert_label}</Text>
+                          <Paragraph
+                            type="secondary"
+                            className="erp-dashboard-summary"
+                          >
+                            {alert.task_name} /{' '}
+                            {alert.source_no ||
+                              `${alert.source_type} #${alert.task?.source_id}`}
+                          </Paragraph>
+                        </div>
+                      ))}
+                      {alerts.length === 0 ? (
+                        <Text type="secondary">暂无</Text>
+                      ) : null}
+                    </Space>
+                  </Card>
+                </Col>
+              )
+            })}
+          </Row>
+        </Space>
+      </Card>
 
       <Card className="erp-dashboard-card" variant="borderless">
         <Space direction="vertical" className="erp-dashboard-block" size={8}>

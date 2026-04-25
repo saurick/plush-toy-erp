@@ -16,6 +16,18 @@ function itemFieldsOf(definition = {}) {
   return Array.isArray(definition.itemFields) ? definition.itemFields : []
 }
 
+function formFieldsOf(definition = {}) {
+  return Array.isArray(definition.formFields) ? definition.formFields : []
+}
+
+export function isPayloadFieldKey(key) {
+  return String(key || '').startsWith('payload.')
+}
+
+export function getPayloadFieldName(key) {
+  return isPayloadFieldKey(key) ? String(key).slice('payload.'.length) : ''
+}
+
 function itemFieldKeysOf(itemFields = []) {
   return new Set(itemFields.map((field) => field.key))
 }
@@ -55,6 +67,18 @@ export function createBlankItem(definition = {}) {
       field.type === 'number' ? null : '',
     ])
   )
+}
+
+export function createBlankFieldValue(field = {}) {
+  return field.type === 'number' ? null : ''
+}
+
+export function getBusinessRecordFieldValue(record = {}, fieldKey = '') {
+  if (isPayloadFieldKey(fieldKey)) {
+    const payloadKey = getPayloadFieldName(fieldKey)
+    return record?.payload?.[payloadKey]
+  }
+  return record?.[fieldKey]
 }
 
 export function calculateItemAmount(item = {}) {
@@ -139,6 +163,39 @@ function resolveNumberWithSummary(value, summaryValue, hasSummary) {
   return hasSummary ? summaryValue : undefined
 }
 
+function normalizeFieldValue(value, field = {}) {
+  if (field.type === 'number') return normalizeNumber(value)
+  if (field.type === 'date') return normalizeDate(value)
+  return normalizeString(value)
+}
+
+function buildPayloadFromDefinition(
+  values = {},
+  moduleItem = {},
+  definition = {}
+) {
+  const payload = {
+    note: normalizeString(values.note) || '',
+    module_title: moduleItem.title,
+    section_key: moduleItem.sectionKey,
+  }
+
+  formFieldsOf(definition).forEach((field) => {
+    const payloadKey = getPayloadFieldName(field.key)
+    if (!payloadKey) return
+    const rawValue =
+      values[field.key] !== undefined
+        ? values[field.key]
+        : values.payload?.[payloadKey]
+    const normalizedValue = normalizeFieldValue(rawValue, field)
+    if (normalizedValue !== undefined) {
+      payload[payloadKey] = normalizedValue
+    }
+  })
+
+  return payload
+}
+
 export function buildBusinessRecordParams(
   values,
   moduleItem,
@@ -180,11 +237,7 @@ export function buildBusinessRecordParams(
     business_status_key: values.business_status_key,
     owner_role_key: values.owner_role_key,
     row_version: editingRecord?.row_version,
-    payload: {
-      note: normalizeString(values.note) || '',
-      module_title: moduleItem.title,
-      section_key: moduleItem.sectionKey,
-    },
+    payload: buildPayloadFromDefinition(values, moduleItem, definition),
     items: normalizedItems,
   }
 }
@@ -208,6 +261,12 @@ export function buildBusinessRecordStatusUpdateParams(
     definition,
     record
   )
+  params.payload = {
+    ...(record.payload && typeof record.payload === 'object'
+      ? record.payload
+      : {}),
+    ...(params.payload || {}),
+  }
   const reason = normalizeString(options.reason)
   if (reason) {
     params.payload = {

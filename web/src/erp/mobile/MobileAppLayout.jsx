@@ -1,16 +1,24 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { LogoutOutlined } from '@ant-design/icons'
-import { AUTH_SCOPE, logout } from '@/common/auth/auth'
+import { AUTH_SCOPE, getStoredAdminProfile, logout } from '@/common/auth/auth'
 import AppShell from '@/common/components/layout/AppShell'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { useERPWorkspace } from '../context/ERPWorkspaceProvider'
+import { hasMobileRolePermission } from '../utils/mobileRolePermissions.mjs'
 import { mobileTheme } from './theme'
 
 export default function MobileAppLayout() {
   const navigate = useNavigate()
+  const { activeRoleKey } = useERPWorkspace()
   const [loggingOut, setLoggingOut] = useState(false)
+  const adminProfile = getStoredAdminProfile()
+  const canUseCurrentMobileRole = hasMobileRolePermission(
+    adminProfile,
+    activeRoleKey
+  )
   const authRpc = useMemo(
     () =>
       new JsonRpc({
@@ -20,6 +28,12 @@ export default function MobileAppLayout() {
       }),
     []
   )
+
+  useEffect(() => {
+    if (canUseCurrentMobileRole) return
+    logout(AUTH_SCOPE.ADMIN)
+    navigate('/admin-login', { replace: true })
+  }, [canUseCurrentMobileRole, navigate])
 
   const handleLogout = async () => {
     if (loggingOut) {
@@ -44,7 +58,7 @@ export default function MobileAppLayout() {
           <h1 className={mobileTheme.pageTitle}>待办</h1>
         </SurfacePanel>
 
-        <Outlet />
+        {canUseCurrentMobileRole ? <Outlet /> : null}
 
         <div className="flex justify-center pb-3">
           <button

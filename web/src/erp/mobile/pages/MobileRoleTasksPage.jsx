@@ -4,102 +4,93 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
 import { useERPWorkspace } from '../../context/ERPWorkspaceProvider'
 import {
+  createWorkflowTask,
   listWorkflowTasks,
   updateWorkflowTaskStatus,
+  upsertWorkflowBusinessState,
 } from '../../api/workflowApi.mjs'
 import {
-  BUSINESS_WORKFLOW_STATES,
-  TASK_WORKFLOW_STATES,
-} from '../../config/workflowStatus.mjs'
+  listBusinessRecords,
+  updateBusinessRecord,
+} from '../../api/businessRecordApi.mjs'
+import { getBusinessModule } from '../../config/businessModules.mjs'
+import { getBusinessRecordDefinition } from '../../config/businessRecordDefinitions.mjs'
+import { buildBusinessRecordStatusUpdateParams } from '../../utils/businessRecordForm.mjs'
+import {
+  buildMobileTaskListForRole,
+  buildMobileTaskSummary,
+  formatMobileTaskTime,
+} from '../../utils/mobileTaskView.mjs'
+import {
+  ENGINEERING_DATA_TASK_GROUP,
+  ORDER_APPROVAL_STATUS_KEY,
+  ORDER_APPROVED_STATUS_KEY,
+  ORDER_REVISION_TASK_GROUP,
+  PROJECT_ORDER_MODULE_KEY,
+  buildEngineeringTaskFromApprovedOrder,
+  buildRevisionTaskFromRejectedOrder,
+  isOrderApprovalTask,
+} from '../../utils/orderApprovalFlow.mjs'
+import {
+  INBOUND_DONE_STATUS_KEY,
+  IQC_PENDING_STATUS_KEY,
+  PURCHASE_QUALITY_EXCEPTION_TASK_GROUP,
+  QC_FAILED_STATUS_KEY,
+  WAREHOUSE_INBOUND_PENDING_STATUS_KEY,
+  WAREHOUSE_INBOUND_TASK_GROUP,
+  buildPurchaseQualityExceptionTask,
+  buildWarehouseInboundTaskFromIqcPass,
+  isPurchaseIqcTask,
+  isWarehouseInboundTask,
+} from '../../utils/purchaseInboundFlow.mjs'
 import { mobileTheme } from '../theme'
 
-const taskStatusLabelMap = new Map(
-  TASK_WORKFLOW_STATES.map((state) => [state.key, state.label])
-)
-const businessStatusLabelMap = new Map(
-  BUSINESS_WORKFLOW_STATES.map((state) => [state.key, state.label])
-)
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
-const WARNING_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
-const WARNING_BUSINESS_STATUS_KEYS = new Set(['blocked', 'cancelled'])
-const DUE_SOON_MS = 24 * 60 * 60 * 1000
-const CANCELLED_TASK_STATUS_KEYS = new Set(['cancelled'])
-const COMPLETED_TASK_STATUS_KEYS = new Set(['done', 'closed'])
-const PROCESSING_TASK_STATUS_KEYS = new Set(['processing'])
-const BLOCKED_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
-const PENDING_TASK_STATUS_KEYS = new Set(['pending', 'ready'])
-
-function formatTaskTime(value) {
-  if (!value) return '-'
-  const date = new Date(Number(value) * 1000)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleString()
+const PROJECT_ORDER_MODULE = getBusinessModule(PROJECT_ORDER_MODULE_KEY) || {
+  key: PROJECT_ORDER_MODULE_KEY,
+  title: '客户/款式立项',
+  sectionKey: 'sales',
 }
+const PROJECT_ORDER_DEFINITION =
+  getBusinessRecordDefinition(PROJECT_ORDER_MODULE_KEY) || {}
 
-function getTaskTimestamp(task) {
-  return Number(task?.updated_at || task?.created_at || 0)
-}
-
-function getDueAtMs(task) {
-  if (!task?.due_at) return null
-  const timestamp = Number(task.due_at)
-  if (!Number.isFinite(timestamp) || timestamp <= 0) return null
-  return timestamp * 1000
-}
-
-function getWarningLabel(task, nowMs) {
-  const dueAtMs = getDueAtMs(task)
-  if (dueAtMs && dueAtMs < nowMs) return '已超时'
-  if (dueAtMs && dueAtMs - nowMs <= DUE_SOON_MS) return '即将到期'
-  if (WARNING_TASK_STATUS_KEYS.has(task.task_status_key)) {
-    return task.task_status_key === 'rejected' ? '退回' : '阻塞'
+function resolveOrderApprovalBusinessStatus(task, taskStatusKey) {
+  if (!isOrderApprovalTask(task)) {
+    return task.business_status_key || undefined
   }
-  if (WARNING_BUSINESS_STATUS_KEYS.has(task.business_status_key)) {
-    return businessStatusLabelMap.get(task.business_status_key) || '预警'
-  }
-  if (Number(task.priority || 0) >= 3) return '优先'
-  return ''
+  if (taskStatusKey === 'done') return ORDER_APPROVED_STATUS_KEY
+  if (taskStatusKey === 'blocked') return 'blocked'
+  if (taskStatusKey === 'rejected') return ORDER_APPROVAL_STATUS_KEY
+  return task.business_status_key || ORDER_APPROVAL_STATUS_KEY
 }
 
-function isWarningTask(task, nowMs) {
-  return Boolean(getWarningLabel(task, nowMs))
-}
-
-function sortByLatest(left, right) {
-  return getTaskTimestamp(right) - getTaskTimestamp(left)
-}
-
-function getProgressSummary(tasks) {
-  const progressTasks = tasks.filter(
-    (task) => !CANCELLED_TASK_STATUS_KEYS.has(task.task_status_key)
-  )
-  const summary = progressTasks.reduce(
-    (current, task) => {
-      if (COMPLETED_TASK_STATUS_KEYS.has(task.task_status_key)) {
-        current.done += 1
-      } else if (PROCESSING_TASK_STATUS_KEYS.has(task.task_status_key)) {
-        current.processing += 1
-      } else if (BLOCKED_TASK_STATUS_KEYS.has(task.task_status_key)) {
-        current.blocked += 1
-      } else if (PENDING_TASK_STATUS_KEYS.has(task.task_status_key)) {
-        current.pending += 1
-      } else {
-        current.pending += 1
-      }
-      return current
-    },
-    {
-      total: progressTasks.length,
-      pending: 0,
-      processing: 0,
-      blocked: 0,
-      done: 0,
+function resolvePurchaseInboundBusinessStatus(task, taskStatusKey) {
+  if (isPurchaseIqcTask(task)) {
+    if (taskStatusKey === 'done') return WAREHOUSE_INBOUND_PENDING_STATUS_KEY
+    if (['blocked', 'rejected'].includes(taskStatusKey)) {
+      return QC_FAILED_STATUS_KEY
     }
-  )
+    return task.business_status_key || IQC_PENDING_STATUS_KEY
+  }
+  if (isWarehouseInboundTask(task)) {
+    if (taskStatusKey === 'done') return INBOUND_DONE_STATUS_KEY
+    return task.business_status_key || WAREHOUSE_INBOUND_PENDING_STATUS_KEY
+  }
+  return null
+}
 
-  summary.percent =
-    summary.total === 0 ? 0 : Math.round((summary.done / summary.total) * 100)
-  return summary
+function resolveMobileTaskBusinessStatus(task, taskStatusKey) {
+  return (
+    resolvePurchaseInboundBusinessStatus(task, taskStatusKey) ||
+    resolveOrderApprovalBusinessStatus(task, taskStatusKey)
+  )
+}
+
+function supportsRejectedAction(roleKey, task) {
+  return (
+    (roleKey === 'boss' && isOrderApprovalTask(task)) ||
+    (roleKey === 'quality' && isPurchaseIqcTask(task))
+  )
 }
 
 export default function MobileRoleTasksPage() {
@@ -109,31 +100,42 @@ export default function MobileRoleTasksPage() {
   const [updatingID, setUpdatingID] = useState(null)
   const [blockedReasonByTaskID, setBlockedReasonByTaskID] = useState({})
 
+  const taskViews = useMemo(
+    () => buildMobileTaskListForRole(tasks, activeRoleKey),
+    [activeRoleKey, tasks]
+  )
   const activeTasks = useMemo(
     () =>
-      tasks.filter(
+      taskViews.filter(
         (task) => !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
       ),
-    [tasks]
+    [taskViews]
   )
-  const warningTasks = useMemo(() => {
-    const nowMs = Date.now()
-    return activeTasks
-      .filter((task) => isWarningTask(task, nowMs))
-      .sort(sortByLatest)
-  }, [activeTasks])
-  const noticeTasks = useMemo(
-    () => [...activeTasks].sort(sortByLatest).slice(0, 8),
+  const warningTasks = useMemo(
+    () => activeTasks.filter((task) => task.alert_level !== 'info'),
     [activeTasks]
   )
-  const progressSummary = useMemo(() => getProgressSummary(tasks), [tasks])
+  const noticeTasks = useMemo(() => activeTasks.slice(0, 8), [activeTasks])
+  const taskSummary = useMemo(
+    () => buildMobileTaskSummary(taskViews),
+    [taskViews]
+  )
+  const progressTotal =
+    taskSummary.pending +
+    taskSummary.processing +
+    taskSummary.blockedProgress +
+    taskSummary.done
+  const progressPercent =
+    progressTotal === 0
+      ? 0
+      : Math.round((taskSummary.done / progressTotal) * 100)
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
     try {
       const data = await listWorkflowTasks({
         owner_role_key: activeRoleKey,
-        limit: 100,
+        limit: 200,
       })
       setTasks(data.tasks || [])
     } catch (error) {
@@ -149,31 +151,384 @@ export default function MobileRoleTasksPage() {
     loadTasks()
   }, [loadTasks])
 
+  const loadProjectOrderRecord = async (task) => {
+    const data = await listBusinessRecords({
+      module_key: PROJECT_ORDER_MODULE_KEY,
+      limit: 200,
+    })
+    return (
+      (data.records || []).find(
+        (record) => String(record.id) === String(task.source_id)
+      ) || null
+    )
+  }
+
+  const updateProjectOrderStatus = async (record, nextStatusKey, reason) => {
+    const params = buildBusinessRecordStatusUpdateParams(
+      record,
+      nextStatusKey,
+      PROJECT_ORDER_MODULE,
+      PROJECT_ORDER_DEFINITION,
+      { reason }
+    )
+    if (!params) return null
+    return updateBusinessRecord(params)
+  }
+
+  const loadBusinessRecordForTask = async (task) => {
+    const sourceType = String(task.source_type || '').trim()
+    if (!sourceType) return null
+    const data = await listBusinessRecords({
+      module_key: sourceType,
+      limit: 200,
+    })
+    return (
+      (data.records || []).find(
+        (record) => String(record.id) === String(task.source_id)
+      ) || null
+    )
+  }
+
+  const updateBusinessRecordStatusForTask = async (
+    task,
+    record,
+    nextStatusKey,
+    reason
+  ) => {
+    const sourceType = String(task.source_type || '').trim()
+    const moduleItem = getBusinessModule(sourceType) || {
+      key: sourceType,
+      title: sourceType,
+      sectionKey: '',
+    }
+    const definition = getBusinessRecordDefinition(sourceType) || {}
+    const params = buildBusinessRecordStatusUpdateParams(
+      record,
+      nextStatusKey,
+      moduleItem,
+      definition,
+      { reason }
+    )
+    if (!params) return null
+    return updateBusinessRecord(params)
+  }
+
+  const hasActiveTaskForSource = async (task, taskGroup) => {
+    const data = await listWorkflowTasks({
+      source_type: task.source_type,
+      source_id: task.source_id,
+      limit: 200,
+    })
+    return (data.tasks || []).some(
+      (item) =>
+        item.task_group === taskGroup &&
+        !TERMINAL_TASK_STATUS_KEYS.has(item.task_status_key)
+    )
+  }
+
+  const hasActiveProjectOrderTask = async (sourceID, taskGroup) => {
+    const data = await listWorkflowTasks({
+      source_type: PROJECT_ORDER_MODULE_KEY,
+      source_id: sourceID,
+      limit: 200,
+    })
+    return (data.tasks || []).some(
+      (item) =>
+        item.task_group === taskGroup &&
+        !TERMINAL_TASK_STATUS_KEYS.has(item.task_status_key)
+    )
+  }
+
+  const approveOrderTask = async (task, reason) => {
+    const record = await loadProjectOrderRecord(task)
+    if (!record) {
+      throw new Error('未找到对应客户/款式立项记录')
+    }
+    const savedRecord =
+      (await updateProjectOrderStatus(
+        record,
+        ORDER_APPROVED_STATUS_KEY,
+        reason || '老板审批通过'
+      )) || record
+    await upsertWorkflowBusinessState({
+      source_type: PROJECT_ORDER_MODULE_KEY,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: ORDER_APPROVED_STATUS_KEY,
+      owner_role_key: 'engineering',
+      payload: {
+        record_title: savedRecord.title,
+        approval_task_id: task.id,
+        approval_result: 'approved',
+        critical_path: true,
+      },
+    })
+    const engineeringTask = buildEngineeringTaskFromApprovedOrder({
+      ...savedRecord,
+      module_key: PROJECT_ORDER_MODULE_KEY,
+    })
+    const hasEngineeringTask = await hasActiveProjectOrderTask(
+      savedRecord.id,
+      ENGINEERING_DATA_TASK_GROUP
+    )
+    if (engineeringTask && !hasEngineeringTask) {
+      await createWorkflowTask(engineeringTask)
+    }
+  }
+
+  const rejectOrderTask = async (task, taskStatusKey, reason) => {
+    const record = await loadProjectOrderRecord(task)
+    if (!record) {
+      throw new Error('未找到对应客户/款式立项记录')
+    }
+    const nextBusinessStatusKey =
+      taskStatusKey === 'blocked' ? 'blocked' : ORDER_APPROVAL_STATUS_KEY
+    const savedRecord =
+      (await updateProjectOrderStatus(record, nextBusinessStatusKey, reason)) ||
+      record
+    await upsertWorkflowBusinessState({
+      source_type: PROJECT_ORDER_MODULE_KEY,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: nextBusinessStatusKey,
+      owner_role_key: 'merchandiser',
+      blocked_reason: reason,
+      payload: {
+        record_title: savedRecord.title,
+        approval_task_id: task.id,
+        approval_result: 'rejected',
+        rejected_reason: reason,
+        critical_path: true,
+      },
+    })
+    const revisionTask = buildRevisionTaskFromRejectedOrder(
+      {
+        ...savedRecord,
+        module_key: PROJECT_ORDER_MODULE_KEY,
+      },
+      reason
+    )
+    const hasRevisionTask = await hasActiveProjectOrderTask(
+      savedRecord.id,
+      ORDER_REVISION_TASK_GROUP
+    )
+    if (revisionTask && !hasRevisionTask) {
+      await createWorkflowTask(revisionTask)
+    }
+  }
+
+  const passIqcTask = async (task, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应采购到货或入库通知记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        WAREHOUSE_INBOUND_PENDING_STATUS_KEY,
+        reason || 'IQC 合格'
+      )) || record
+    await upsertWorkflowBusinessState({
+      source_type: task.source_type,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: WAREHOUSE_INBOUND_PENDING_STATUS_KEY,
+      owner_role_key: 'warehouse',
+      payload: {
+        record_title: savedRecord.title,
+        iqc_task_id: task.id,
+        qc_result: 'pass',
+        critical_path: true,
+      },
+    })
+    const hasWarehouseTask = await hasActiveTaskForSource(
+      task,
+      WAREHOUSE_INBOUND_TASK_GROUP
+    )
+    const warehouseTask = buildWarehouseInboundTaskFromIqcPass(
+      {
+        ...savedRecord,
+        module_key: task.source_type,
+      },
+      {
+        ...task,
+        payload: {
+          ...(task.payload || {}),
+          qc_result: 'pass',
+        },
+      }
+    )
+    if (warehouseTask && !hasWarehouseTask) {
+      await createWorkflowTask(warehouseTask)
+    }
+  }
+
+  const failIqcTask = async (task, taskStatusKey, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应采购到货或入库通知记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        QC_FAILED_STATUS_KEY,
+        reason
+      )) || record
+    await upsertWorkflowBusinessState({
+      source_type: task.source_type,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: QC_FAILED_STATUS_KEY,
+      owner_role_key: 'purchasing',
+      blocked_reason: reason,
+      payload: {
+        record_title: savedRecord.title,
+        iqc_task_id: task.id,
+        qc_result: taskStatusKey === 'rejected' ? 'rejected' : 'fail',
+        rejected_reason: reason,
+        critical_path: true,
+      },
+    })
+    const hasExceptionTask = await hasActiveTaskForSource(
+      task,
+      PURCHASE_QUALITY_EXCEPTION_TASK_GROUP
+    )
+    const exceptionTask = buildPurchaseQualityExceptionTask(
+      {
+        ...savedRecord,
+        module_key: task.source_type,
+      },
+      task,
+      reason
+    )
+    if (exceptionTask && !hasExceptionTask) {
+      await createWorkflowTask(exceptionTask)
+    }
+  }
+
+  const completeWarehouseInboundTask = async (task, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应采购到货或入库通知记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        INBOUND_DONE_STATUS_KEY,
+        reason || '仓库已确认入库'
+      )) || record
+    await upsertWorkflowBusinessState({
+      source_type: task.source_type,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: INBOUND_DONE_STATUS_KEY,
+      owner_role_key: 'warehouse',
+      payload: {
+        record_title: savedRecord.title,
+        warehouse_task_id: task.id,
+        inbound_result: 'done',
+        inventory_balance_deferred: true,
+        critical_path: true,
+      },
+    })
+  }
+
+  const runOrderApprovalFollowUp = async (task, taskStatusKey, reason = '') => {
+    if (activeRoleKey !== 'boss' || !isOrderApprovalTask(task)) return
+    if (taskStatusKey === 'done') {
+      await approveOrderTask(task, reason)
+      return
+    }
+    if (taskStatusKey === 'blocked' || taskStatusKey === 'rejected') {
+      await rejectOrderTask(task, taskStatusKey, reason)
+    }
+  }
+
+  const runPurchaseInboundFollowUp = async (
+    task,
+    taskStatusKey,
+    reason = ''
+  ) => {
+    if (activeRoleKey === 'quality' && isPurchaseIqcTask(task)) {
+      if (taskStatusKey === 'done') {
+        await passIqcTask(task, reason)
+        return
+      }
+      if (taskStatusKey === 'blocked' || taskStatusKey === 'rejected') {
+        await failIqcTask(task, taskStatusKey, reason)
+      }
+      return
+    }
+
+    if (
+      activeRoleKey === 'warehouse' &&
+      isWarehouseInboundTask(task) &&
+      taskStatusKey === 'done'
+    ) {
+      await completeWarehouseInboundTask(task, reason)
+    }
+  }
+
+  const runTaskFollowUp = async (task, taskStatusKey, reason = '') => {
+    await runOrderApprovalFollowUp(task, taskStatusKey, reason)
+    await runPurchaseInboundFollowUp(task, taskStatusKey, reason)
+  }
+
   const moveTask = async (task, taskStatusKey) => {
     const blockedReason = String(
       blockedReasonByTaskID[task.id] ?? task.blocked_reason ?? ''
     ).trim()
-    if (taskStatusKey === 'blocked' && !blockedReason) {
-      message.warning('请先填写阻塞原因')
+    const reasonRequired = ['blocked', 'rejected'].includes(taskStatusKey)
+    if (reasonRequired && !blockedReason) {
+      message.warning('请先填写阻塞或退回原因')
       return
     }
+    const nextBusinessStatusKey = resolveMobileTaskBusinessStatus(
+      task,
+      taskStatusKey
+    )
 
     setUpdatingID(task.id)
     try {
-      await updateWorkflowTaskStatus({
+      const updatedTask = await updateWorkflowTaskStatus({
         id: task.id,
         task_status_key: taskStatusKey,
-        business_status_key: task.business_status_key || undefined,
+        business_status_key: nextBusinessStatusKey,
         actor_role_key: activeRoleKey,
-        reason: taskStatusKey === 'blocked' ? blockedReason : '',
+        reason: reasonRequired ? blockedReason : '',
         payload: {
           ...(task.payload || {}),
           mobile_role_key: activeRoleKey,
+          approval_result:
+            isOrderApprovalTask(task) && taskStatusKey === 'done'
+              ? 'approved'
+              : undefined,
+          qc_result:
+            isPurchaseIqcTask(task) && taskStatusKey === 'done'
+              ? 'pass'
+              : undefined,
+          rejected_reason:
+            (isOrderApprovalTask(task) || isPurchaseIqcTask(task)) &&
+            reasonRequired
+              ? blockedReason
+              : undefined,
         },
       })
+      await runTaskFollowUp(
+        updatedTask || {
+          ...task,
+          task_status_key: taskStatusKey,
+          business_status_key: nextBusinessStatusKey,
+        },
+        taskStatusKey,
+        reasonRequired ? blockedReason : ''
+      )
       setBlockedReasonByTaskID((current) => {
         const next = { ...current }
-        if (taskStatusKey === 'blocked') {
+        if (reasonRequired) {
           next[task.id] = blockedReason
         } else {
           delete next[task.id]
@@ -198,27 +553,27 @@ export default function MobileRoleTasksPage() {
           <div className="grid grid-cols-4 gap-2 md:gap-3">
             <div className={mobileTheme.metricCard}>
               <div className={mobileTheme.metricValue}>
-                {warningTasks.length}
+                {taskSummary.alerts}
               </div>
-              <div className={mobileTheme.metricLabel}>预警</div>
+              <div className={mobileTheme.metricLabel}>我的预警</div>
             </div>
             <div className={mobileTheme.metricCard}>
               <div className={mobileTheme.metricValue}>
-                {noticeTasks.length}
+                {taskSummary.overdue}
               </div>
-              <div className={mobileTheme.metricLabel}>通知</div>
+              <div className={mobileTheme.metricLabel}>已超时</div>
             </div>
             <div className={mobileTheme.metricCard}>
               <div className={mobileTheme.metricValue}>
-                {activeTasks.length}
+                {taskSummary.dueSoon}
               </div>
-              <div className={mobileTheme.metricLabel}>任务</div>
+              <div className={mobileTheme.metricLabel}>即将超时</div>
             </div>
             <div className={mobileTheme.metricCard}>
               <div className={mobileTheme.metricValue}>
-                {progressSummary.percent}%
+                {taskSummary.blocked}/{taskSummary.highPriority}
               </div>
-              <div className={mobileTheme.metricLabel}>进度</div>
+              <div className={mobileTheme.metricLabel}>阻塞/高优先</div>
             </div>
           </div>
 
@@ -241,24 +596,24 @@ export default function MobileRoleTasksPage() {
                   <div className={mobileTheme.progressTrack}>
                     <div
                       className={mobileTheme.progressFill}
-                      style={{ width: `${progressSummary.percent}%` }}
+                      style={{ width: `${progressPercent}%` }}
                     />
                   </div>
                   <div className="mt-3 grid grid-cols-4 gap-2">
                     <div className={mobileTheme.progressStat}>
-                      <div>{progressSummary.pending}</div>
+                      <div>{taskSummary.pending}</div>
                       <span>待处理</span>
                     </div>
                     <div className={mobileTheme.progressStat}>
-                      <div>{progressSummary.processing}</div>
+                      <div>{taskSummary.processing}</div>
                       <span>处理中</span>
                     </div>
                     <div className={mobileTheme.progressStat}>
-                      <div>{progressSummary.blocked}</div>
+                      <div>{taskSummary.blockedProgress}</div>
                       <span>卡住</span>
                     </div>
                     <div className={mobileTheme.progressStat}>
-                      <div>{progressSummary.done}</div>
+                      <div>{taskSummary.done}</div>
                       <span>完成</span>
                     </div>
                   </div>
@@ -274,7 +629,7 @@ export default function MobileRoleTasksPage() {
                     {warningTasks.map((task) => (
                       <div key={task.id} className={mobileTheme.warningItem}>
                         <div className="text-sm font-semibold">
-                          {getWarningLabel(task, Date.now())}
+                          {task.alert_label || task.due_status_label}
                         </div>
                         <div className="mt-1 text-sm">{task.task_name}</div>
                         <div className="mt-1 text-xs">
@@ -299,10 +654,9 @@ export default function MobileRoleTasksPage() {
                           {task.task_name}
                         </div>
                         <div className="mt-1 text-xs text-slate-500">
-                          {taskStatusLabelMap.get(task.task_status_key) ||
-                            task.task_status_key}
+                          {task.task_status_label}
                           {' / '}
-                          {formatTaskTime(task.updated_at)}
+                          {formatMobileTaskTime(task.updated_at)}
                         </div>
                       </div>
                     ))}
@@ -328,21 +682,74 @@ export default function MobileRoleTasksPage() {
                       </div>
                       <div className={mobileTheme.highlightNote}>
                         状态：
-                        {taskStatusLabelMap.get(task.task_status_key) ||
-                          task.task_status_key}
+                        {task.task_status_label}
                         {' / '}
-                        更新：{formatTaskTime(task.updated_at)}
+                        更新：{formatMobileTaskTime(task.updated_at)}
                       </div>
                       <div className={mobileTheme.highlightNote}>
                         业务：
-                        {businessStatusLabelMap.get(task.business_status_key) ||
-                          task.business_status_key ||
-                          '-'}
+                        {task.business_status_label}
+                      </div>
+                      <div className={mobileTheme.highlightNote}>
+                        分组：{task.task_group || '-'} / 优先级：
+                        {task.priority} / 截止：{task.due_at_label}
+                      </div>
+                      {task.payload?.customer_name ||
+                      task.payload?.style_no ||
+                      task.payload?.due_date ? (
+                        <div className={mobileTheme.highlightNote}>
+                          客户/款式/交期：
+                          {task.payload?.customer_name || '-'}
+                          {' / '}
+                          {task.payload?.style_no ||
+                            task.payload?.product_name ||
+                            '-'}
+                          {' / '}
+                          {task.payload?.due_date || '-'}
+                        </div>
+                      ) : null}
+                      {task.payload?.supplier_name ||
+                      task.payload?.material_name ||
+                      task.payload?.quantity ? (
+                        <div className={mobileTheme.highlightNote}>
+                          供应/物料/数量：
+                          {task.payload?.supplier_name || '-'}
+                          {' / '}
+                          {task.payload?.material_name ||
+                            task.payload?.product_name ||
+                            '-'}
+                          {' / '}
+                          {task.payload?.quantity || '-'}
+                          {task.payload?.unit || ''}
+                        </div>
+                      ) : null}
+                      {task.payload?.qc_result ? (
+                        <div className={mobileTheme.highlightNote}>
+                          IQC 结果：{task.payload.qc_result}
+                        </div>
+                      ) : null}
+                      <div className={mobileTheme.highlightNote}>
+                        预警：
+                        {task.alert_label || task.due_status_label} / 等级：
+                        {task.alert_level}
                       </div>
                       {task.blocked_reason ? (
                         <div className={mobileTheme.warningItem}>
                           阻塞原因：{task.blocked_reason}
                         </div>
+                      ) : null}
+                      {task.complete_condition ? (
+                        <div className={mobileTheme.highlightNote}>
+                          完成条件：{task.complete_condition}
+                        </div>
+                      ) : null}
+                      {task.related_documents.length > 0 ? (
+                        <div className={mobileTheme.highlightNote}>
+                          关联单据：{task.related_documents.join(' / ')}
+                        </div>
+                      ) : null}
+                      {task.is_urged ? (
+                        <div className={mobileTheme.warningItem}>已催办</div>
                       ) : null}
                       <textarea
                         aria-label={`任务阻塞原因 ${task.id}`}
@@ -361,7 +768,13 @@ export default function MobileRoleTasksPage() {
                           }))
                         }}
                       />
-                      <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div
+                        className={`mt-3 grid gap-2 ${
+                          supportsRejectedAction(activeRoleKey, task)
+                            ? 'grid-cols-4'
+                            : 'grid-cols-3'
+                        }`}
+                      >
                         <button
                           type="button"
                           className={mobileTheme.actionButton}
@@ -378,6 +791,16 @@ export default function MobileRoleTasksPage() {
                         >
                           阻塞
                         </button>
+                        {supportsRejectedAction(activeRoleKey, task) ? (
+                          <button
+                            type="button"
+                            className={mobileTheme.actionButton}
+                            disabled={updatingID === task.id}
+                            onClick={() => moveTask(task, 'rejected')}
+                          >
+                            退回
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className={mobileTheme.actionButton}
@@ -385,6 +808,22 @@ export default function MobileRoleTasksPage() {
                           onClick={() => moveTask(task, 'done')}
                         >
                           完成
+                        </button>
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          className={mobileTheme.actionButton}
+                          disabled
+                        >
+                          催办待接入
+                        </button>
+                        <button
+                          type="button"
+                          className={mobileTheme.actionButton}
+                          disabled
+                        >
+                          查看日志待接入
                         </button>
                       </div>
                     </div>

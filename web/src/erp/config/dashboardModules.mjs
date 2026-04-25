@@ -50,6 +50,11 @@ export const dashboardModules = Object.freeze([
     path: '/erp/production/exceptions',
   },
   {
+    key: 'quality-inspections',
+    title: '品质检验',
+    path: '/erp/production/quality-inspections',
+  },
+  {
     key: 'reconciliation',
     title: '对账/结算',
     path: '/erp/finance/reconciliation',
@@ -58,6 +63,16 @@ export const dashboardModules = Object.freeze([
     key: 'payables',
     title: '待付款/应付提醒',
     path: '/erp/finance/payables',
+  },
+  {
+    key: 'receivables',
+    title: '应收/开票登记',
+    path: '/erp/finance/receivables',
+  },
+  {
+    key: 'invoices',
+    title: '发票登记',
+    path: '/erp/finance/invoices',
   },
 ])
 
@@ -79,13 +94,19 @@ export const dashboardStatusGroups = Object.freeze([
   {
     key: 'production',
     title: '生产/检验',
-    statusKeys: Object.freeze(['production_processing', 'qc_pending']),
+    statusKeys: Object.freeze([
+      'production_processing',
+      'qc_pending',
+      'iqc_pending',
+    ]),
   },
   {
     key: 'warehouse',
     title: '仓库/出货',
     statusKeys: Object.freeze([
       'warehouse_processing',
+      'warehouse_inbound_pending',
+      'inbound_done',
       'shipping_released',
       'shipped',
     ]),
@@ -98,7 +119,7 @@ export const dashboardStatusGroups = Object.freeze([
   {
     key: 'blocked',
     title: '阻塞/取消',
-    statusKeys: Object.freeze(['blocked', 'cancelled']),
+    statusKeys: Object.freeze(['blocked', 'qc_failed', 'cancelled']),
   },
   {
     key: 'closed',

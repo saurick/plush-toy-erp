@@ -134,7 +134,7 @@ test('FL_business_status_update__preserves_record_fields_and_items businessRecor
       business_status_key: 'material_preparing',
       owner_role_key: 'purchasing',
       due_date: '2026-04-30',
-      payload: { note: '保留备注' },
+      payload: { note: '保留备注', priority: 3 },
       row_version: 7,
       items: [
         {
@@ -163,8 +163,45 @@ test('FL_business_status_update__preserves_record_fields_and_items businessRecor
   assert.equal(params.amount, 88)
   assert.equal(params.due_date, '2026-04-30')
   assert.equal(params.payload.note, '保留备注')
+  assert.equal(params.payload.priority, 3)
   assert.equal(params.payload.status_reason, '资料已齐，转待排产')
   assert.equal(params.payload.status_reason_key, 'production_ready')
   assert.equal(params.row_version, 7)
   assert.equal(params.items[0].amount, 37.5)
+})
+
+test('businessRecordForm: payload 字段按定义保存，清空后不保留旧残值', () => {
+  const params = buildBusinessRecordParams(
+    {
+      title: '质检记录',
+      business_status_key: 'qc_pending',
+      owner_role_key: 'quality',
+      'payload.qc_result': 'failed',
+      'payload.defect_qty': 2,
+      'payload.defect_reason': '',
+      items: [],
+    },
+    { key: 'quality-inspections', title: '品质检验', sectionKey: 'production' },
+    {
+      formFields: [
+        { key: 'payload.qc_result', label: '检验结果' },
+        { key: 'payload.defect_qty', label: '不良数量', type: 'number' },
+        { key: 'payload.defect_reason', label: '不良原因' },
+      ],
+      itemFields: [],
+    },
+    {
+      id: 1,
+      row_version: 2,
+      payload: {
+        qc_result: 'passed',
+        defect_qty: 0,
+        defect_reason: '旧原因',
+      },
+    }
+  )
+
+  assert.equal(params.payload.qc_result, 'failed')
+  assert.equal(params.payload.defect_qty, 2)
+  assert.equal(params.payload.defect_reason, undefined)
 })

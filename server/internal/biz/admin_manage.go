@@ -17,23 +17,28 @@ import (
 var (
 	ErrAdminNotFound     = errors.New("admin not found")
 	ErrAdminExists       = errors.New("admin already exists")
+	ErrAdminPhoneExists  = errors.New("admin phone already exists")
 	ErrAdminInvalidLevel = errors.New("invalid admin level")
 )
 
 type AdminCreate struct {
-	Username        string
-	PasswordHash    string
-	Level           AdminLevel
-	MenuPermissions []string
+	Username              string
+	Phone                 string
+	PasswordHash          string
+	Level                 AdminLevel
+	MenuPermissions       []string
+	MobileRolePermissions []string
 }
 
 type AdminManageRepo interface {
 	GetAdminByID(ctx context.Context, id int) (*AdminUser, error)
 	GetAdminByUsername(ctx context.Context, username string) (*AdminUser, error)
+	GetAdminByPhone(ctx context.Context, phone string) (*AdminUser, error)
 	ListAdmins(ctx context.Context) ([]*AdminUser, error)
 	CreateAdmin(ctx context.Context, admin *AdminCreate) (*AdminUser, error)
-	UpdateAdminMenuPermissions(ctx context.Context, id int, menuPermissions []string) error
+	UpdateAdminPermissions(ctx context.Context, id int, menuPermissions []string, mobileRolePermissions []string) error
 	UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error
+	UpdateAdminPhone(ctx context.Context, id int, phone string) error
 	SetAdminDisabled(ctx context.Context, id int, disabled bool) error
 	UpdateAdminPasswordHash(ctx context.Context, id int, passwordHash string) error
 }
@@ -118,6 +123,10 @@ func (uc *AdminManageUsecase) fillEffectiveMenuPermissions(admin *AdminUser) {
 		AdminLevel(admin.Level),
 		admin.MenuPermissions,
 	)
+	admin.MobileRolePermissions = EffectiveAdminMobileRolePermissions(
+		AdminLevel(admin.Level),
+		admin.MobileRolePermissions,
+	)
 }
 
 func (uc *AdminManageUsecase) GetCurrent(ctx context.Context) (admin *AdminUser, err error) {
@@ -176,9 +185,11 @@ func (uc *AdminManageUsecase) List(ctx context.Context) (list []*AdminUser, err 
 func (uc *AdminManageUsecase) Create(
 	ctx context.Context,
 	username string,
+	phone string,
 	password string,
 	level AdminLevel,
 	menuPermissions []string,
+	mobileRolePermissions []string,
 ) (created *AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_manage.create",
 		trace.WithAttributes(
@@ -196,9 +207,18 @@ func (uc *AdminManageUsecase) Create(
 	}
 
 	username = strings.TrimSpace(username)
+	phone = strings.TrimSpace(phone)
 	if username == "" || password == "" {
 		span.SetStatus(codes.Error, ErrBadParam.Error())
 		return nil, ErrBadParam
+	}
+	normalizedPhone := ""
+	if phone != "" {
+		normalizedPhone, err = NormalizeLoginPhone(phone)
+		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
+			return nil, err
+		}
 	}
 	if len(password) < 6 {
 		span.SetStatus(codes.Error, ErrBadParam.Error())
@@ -215,6 +235,10 @@ func (uc *AdminManageUsecase) Create(
 	} else if len(normalizedMenus) == 0 {
 		normalizedMenus = DefaultAdminMenuPermissions()
 	}
+	normalizedMobileRoles := NormalizeAdminMobileRolePermissions(mobileRolePermissions)
+	if level == AdminLevelSuper {
+		normalizedMobileRoles = AllAdminMobileRolePermissions()
+	}
 
 	if existing, checkErr := uc.repo.GetAdminByUsername(ctx, username); checkErr == nil && existing != nil {
 		span.SetStatus(codes.Error, ErrAdminExists.Error())
@@ -223,6 +247,16 @@ func (uc *AdminManageUsecase) Create(
 		span.RecordError(checkErr)
 		span.SetStatus(codes.Error, checkErr.Error())
 		return nil, checkErr
+	}
+	if normalizedPhone != "" {
+		if existing, checkErr := uc.repo.GetAdminByPhone(ctx, normalizedPhone); checkErr == nil && existing != nil {
+			span.SetStatus(codes.Error, ErrAdminPhoneExists.Error())
+			return nil, ErrAdminPhoneExists
+		} else if checkErr != nil && !errors.Is(checkErr, ErrAdminNotFound) && !errors.Is(checkErr, ErrBadParam) {
+			span.RecordError(checkErr)
+			span.SetStatus(codes.Error, checkErr.Error())
+			return nil, checkErr
+		}
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -233,10 +267,12 @@ func (uc *AdminManageUsecase) Create(
 	}
 
 	created, err = uc.repo.CreateAdmin(ctx, &AdminCreate{
-		Username:        username,
-		PasswordHash:    string(hash),
-		Level:           level,
-		MenuPermissions: normalizedMenus,
+		Username:              username,
+		Phone:                 normalizedPhone,
+		PasswordHash:          string(hash),
+		Level:                 level,
+		MenuPermissions:       normalizedMenus,
+		MobileRolePermissions: normalizedMobileRoles,
 	})
 	if err != nil {
 		span.RecordError(err)
@@ -253,10 +289,20 @@ func (uc *AdminManageUsecase) SetMenuPermissions(
 	adminID int,
 	menuPermissions []string,
 ) (updated *AdminUser, err error) {
+	return uc.SetPermissions(ctx, adminID, menuPermissions, nil)
+}
+
+func (uc *AdminManageUsecase) SetPermissions(
+	ctx context.Context,
+	adminID int,
+	menuPermissions []string,
+	mobileRolePermissions []string,
+) (updated *AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_manage.set_menu_permissions",
 		trace.WithAttributes(
 			attribute.Int("admin.id", adminID),
 			attribute.Int("admin.menu_permissions_count", len(menuPermissions)),
+			attribute.Int("admin.mobile_role_permissions_count", len(mobileRolePermissions)),
 		),
 	)
 	defer span.End()
@@ -283,13 +329,78 @@ func (uc *AdminManageUsecase) SetMenuPermissions(
 	}
 
 	normalizedMenus := NormalizeAdminMenuPermissions(menuPermissions)
-	if err = uc.repo.UpdateAdminMenuPermissions(ctx, adminID, normalizedMenus); err != nil {
+	normalizedMobileRoles := NormalizeAdminMobileRolePermissions(mobileRolePermissions)
+	if mobileRolePermissions == nil {
+		normalizedMobileRoles = NormalizeAdminMobileRolePermissions(target.MobileRolePermissions)
+	}
+	if err = uc.repo.UpdateAdminPermissions(ctx, adminID, normalizedMenus, normalizedMobileRoles); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
 
 	target.MenuPermissions = normalizedMenus
+	target.MobileRolePermissions = normalizedMobileRoles
+	uc.fillEffectiveMenuPermissions(target)
+	span.SetStatus(codes.Ok, "OK")
+	return target, nil
+}
+
+func (uc *AdminManageUsecase) SetPhone(
+	ctx context.Context,
+	adminID int,
+	phone string,
+) (updated *AdminUser, err error) {
+	ctx, span := uc.Tracer().Start(ctx, "admin_manage.set_phone",
+		trace.WithAttributes(attribute.Int("admin.id", adminID)),
+	)
+	defer span.End()
+
+	if _, err = uc.requireSuperAdmin(ctx); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if adminID <= 0 {
+		span.SetStatus(codes.Error, ErrBadParam.Error())
+		return nil, ErrBadParam
+	}
+
+	target, err := uc.repo.GetAdminByID(ctx, adminID)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if AdminLevel(target.Level) == AdminLevelSuper {
+		span.SetStatus(codes.Error, ErrNoPermission.Error())
+		return nil, ErrNoPermission
+	}
+
+	normalizedPhone := ""
+	if strings.TrimSpace(phone) != "" {
+		normalizedPhone, err = NormalizeLoginPhone(phone)
+		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
+			return nil, err
+		}
+		if existing, checkErr := uc.repo.GetAdminByPhone(ctx, normalizedPhone); checkErr == nil && existing != nil && existing.ID != adminID {
+			span.SetStatus(codes.Error, ErrAdminPhoneExists.Error())
+			return nil, ErrAdminPhoneExists
+		} else if checkErr != nil && !errors.Is(checkErr, ErrAdminNotFound) && !errors.Is(checkErr, ErrBadParam) {
+			span.RecordError(checkErr)
+			span.SetStatus(codes.Error, checkErr.Error())
+			return nil, checkErr
+		}
+	}
+
+	if err = uc.repo.UpdateAdminPhone(ctx, adminID, normalizedPhone); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+
+	target.Phone = normalizedPhone
 	uc.fillEffectiveMenuPermissions(target)
 	span.SetStatus(codes.Ok, "OK")
 	return target, nil

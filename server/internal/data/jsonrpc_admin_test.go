@@ -31,6 +31,7 @@ func (r *memAdminManageRepoForData) clone(admin *biz.AdminUser) *biz.AdminUser {
 	}
 	cloned := *admin
 	cloned.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
+	cloned.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
 	cloned.ERPPreferences = biz.NormalizeAdminERPPreferences(admin.ERPPreferences)
 	return &cloned
 }
@@ -52,6 +53,15 @@ func (r *memAdminManageRepoForData) GetAdminByUsername(_ context.Context, userna
 	return nil, biz.ErrAdminNotFound
 }
 
+func (r *memAdminManageRepoForData) GetAdminByPhone(_ context.Context, phone string) (*biz.AdminUser, error) {
+	for _, admin := range r.admins {
+		if admin.Phone == phone {
+			return r.clone(admin), nil
+		}
+	}
+	return nil, biz.ErrAdminNotFound
+}
+
 func (r *memAdminManageRepoForData) ListAdmins(_ context.Context) ([]*biz.AdminUser, error) {
 	out := make([]*biz.AdminUser, 0, len(r.admins))
 	for _, admin := range r.admins {
@@ -63,24 +73,36 @@ func (r *memAdminManageRepoForData) ListAdmins(_ context.Context) ([]*biz.AdminU
 func (r *memAdminManageRepoForData) CreateAdmin(_ context.Context, admin *biz.AdminCreate) (*biz.AdminUser, error) {
 	now := time.Now()
 	created := &biz.AdminUser{
-		ID:              len(r.admins) + 1,
-		Username:        admin.Username,
-		PasswordHash:    admin.PasswordHash,
-		Level:           int8(admin.Level),
-		MenuPermissions: append([]string(nil), admin.MenuPermissions...),
-		CreatedAt:       now,
-		UpdatedAt:       now,
+		ID:                    len(r.admins) + 1,
+		Username:              admin.Username,
+		Phone:                 admin.Phone,
+		PasswordHash:          admin.PasswordHash,
+		Level:                 int8(admin.Level),
+		MenuPermissions:       append([]string(nil), admin.MenuPermissions...),
+		MobileRolePermissions: append([]string(nil), admin.MobileRolePermissions...),
+		CreatedAt:             now,
+		UpdatedAt:             now,
 	}
 	r.admins[created.ID] = created
 	return r.clone(created), nil
 }
 
-func (r *memAdminManageRepoForData) UpdateAdminMenuPermissions(_ context.Context, id int, menuPermissions []string) error {
+func (r *memAdminManageRepoForData) UpdateAdminPermissions(_ context.Context, id int, menuPermissions []string, mobileRolePermissions []string) error {
 	admin, ok := r.admins[id]
 	if !ok {
 		return biz.ErrAdminNotFound
 	}
 	admin.MenuPermissions = append([]string(nil), menuPermissions...)
+	admin.MobileRolePermissions = append([]string(nil), mobileRolePermissions...)
+	return nil
+}
+
+func (r *memAdminManageRepoForData) UpdateAdminPhone(_ context.Context, id int, phone string) error {
+	admin, ok := r.admins[id]
+	if !ok {
+		return biz.ErrAdminNotFound
+	}
+	admin.Phone = phone
 	return nil
 }
 

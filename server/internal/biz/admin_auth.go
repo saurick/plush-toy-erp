@@ -4,6 +4,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -17,20 +18,23 @@ import (
 
 type AdminAuthRepo interface {
 	GetAdminByUsername(ctx context.Context, username string) (*AdminUser, error)
+	GetAdminByPhone(ctx context.Context, phone string) (*AdminUser, error)
 	UpdateAdminLastLogin(ctx context.Context, id int, t time.Time) error
 }
 
 type AdminUser struct {
-	ID              int
-	Username        string
-	PasswordHash    string
-	Level           int8
-	MenuPermissions []string
-	ERPPreferences  AdminERPPreferences
-	Disabled        bool
-	LastLoginAt     *time.Time
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ID                    int
+	Username              string
+	Phone                 string
+	PasswordHash          string
+	Level                 int8
+	MenuPermissions       []string
+	MobileRolePermissions []string
+	ERPPreferences        AdminERPPreferences
+	Disabled              bool
+	LastLoginAt           *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type AdminAuthUsecase struct {
@@ -136,11 +140,12 @@ func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string
 	return token, expireAt, admin, nil
 }
 
-func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone string) (challenge *SMSLoginChallenge, err error) {
+func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone, mobileRoleKey string) (challenge *SMSLoginChallenge, err error) {
 	normalizedPhone, err := NormalizeLoginPhone(phone)
 	if err != nil {
 		return nil, err
 	}
+	mobileRoleKey = strings.TrimSpace(mobileRoleKey)
 
 	ctx, span := uc.Tracer().Start(ctx, "admin_auth.request_sms_login_code",
 		trace.WithAttributes(attribute.String("admin_auth.phone_masked", maskPhone(normalizedPhone))),
@@ -148,9 +153,9 @@ func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone strin
 	defer span.End()
 
 	l := uc.log.WithContext(ctx)
-	admin, e := uc.repo.GetAdminByUsername(ctx, normalizedPhone)
+	admin, e := uc.repo.GetAdminByPhone(ctx, normalizedPhone)
 	if e != nil || admin == nil {
-		err = ErrUserNotFound
+		err = ErrPhoneNotBound
 		if e != nil {
 			span.RecordError(e)
 		}
@@ -162,6 +167,12 @@ func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone strin
 		err = ErrUserDisabled
 		span.SetStatus(codes.Error, err.Error())
 		l.Infof("RequestSMSLoginCode admin disabled admin_id=%d phone=%s", admin.ID, maskPhone(normalizedPhone))
+		return nil, err
+	}
+	if !AdminHasMobileRolePermission(admin, mobileRoleKey) {
+		err = ErrMobileRoleDenied
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("RequestSMSLoginCode admin mobile role denied admin_id=%d phone=%s mobile_role_key=%s", admin.ID, maskPhone(normalizedPhone), mobileRoleKey)
 		return nil, err
 	}
 
@@ -182,11 +193,12 @@ func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone strin
 	return challenge, nil
 }
 
-func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code string) (token string, expireAt time.Time, u *AdminUser, err error) {
+func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code, mobileRoleKey string) (token string, expireAt time.Time, u *AdminUser, err error) {
 	normalizedPhone, err := NormalizeLoginPhone(phone)
 	if err != nil {
 		return "", time.Time{}, nil, err
 	}
+	mobileRoleKey = strings.TrimSpace(mobileRoleKey)
 
 	ctx, span := uc.Tracer().Start(ctx, "admin_auth.sms_login",
 		trace.WithAttributes(attribute.String("admin_auth.phone_masked", maskPhone(normalizedPhone))),
@@ -194,9 +206,9 @@ func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code st
 	defer span.End()
 
 	l := uc.log.WithContext(ctx)
-	admin, e := uc.repo.GetAdminByUsername(ctx, normalizedPhone)
+	admin, e := uc.repo.GetAdminByPhone(ctx, normalizedPhone)
 	if e != nil || admin == nil {
-		err = ErrUserNotFound
+		err = ErrPhoneNotBound
 		if e != nil {
 			span.RecordError(e)
 		}
@@ -211,6 +223,12 @@ func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code st
 		err = ErrUserDisabled
 		span.SetStatus(codes.Error, err.Error())
 		l.Infof("SMSLogin admin disabled admin_id=%d phone=%s", admin.ID, maskPhone(normalizedPhone))
+		return "", time.Time{}, nil, err
+	}
+	if !AdminHasMobileRolePermission(admin, mobileRoleKey) {
+		err = ErrMobileRoleDenied
+		span.SetStatus(codes.Error, err.Error())
+		l.Infof("SMSLogin admin mobile role denied admin_id=%d phone=%s mobile_role_key=%s", admin.ID, maskPhone(normalizedPhone), mobileRoleKey)
 		return "", time.Time{}, nil, err
 	}
 

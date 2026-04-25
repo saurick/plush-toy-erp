@@ -13,9 +13,11 @@ var (
 	AdminUsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "username", Type: field.TypeString, Size: 64},
+		{Name: "phone", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "password_hash", Type: field.TypeString},
 		{Name: "level", Type: field.TypeInt8, Default: 0},
 		{Name: "menu_permissions", Type: field.TypeString, Size: 4096, Default: ""},
+		{Name: "mobile_role_permissions", Type: field.TypeString, Size: 512, Default: ""},
 		{Name: "erp_preferences", Type: field.TypeString, Size: 32768, Default: "{}"},
 		{Name: "disabled", Type: field.TypeBool, Default: false},
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
@@ -34,9 +36,14 @@ var (
 				Columns: []*schema.Column{AdminUsersColumns[1]},
 			},
 			{
+				Name:    "adminuser_phone",
+				Unique:  true,
+				Columns: []*schema.Column{AdminUsersColumns[2]},
+			},
+			{
 				Name:    "adminuser_level",
 				Unique:  false,
-				Columns: []*schema.Column{AdminUsersColumns[3]},
+				Columns: []*schema.Column{AdminUsersColumns[4]},
 			},
 		},
 	}

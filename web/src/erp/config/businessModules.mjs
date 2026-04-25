@@ -528,6 +528,46 @@ const businessModules = [
     relatedLinks: [helpLink('operations'), helpLink('flow')],
   },
   {
+    key: 'quality-inspections',
+    title: '品质检验',
+    route: 'production/quality-inspections',
+    sectionKey: 'production',
+    status: 'seeded',
+    owner: '品质 + 仓库 + 生产经理',
+    summary:
+      '品质检验独立承接 IQC、委外回货检验、成品抽检、返工复检和放行结论，不让 PMC 或仓库代填质量事实。',
+    description:
+      '品质检验页负责记录来料、委外回货和成品的检验结果、不良原因、返工要求和放行决策，是仓库入库与出货放行前的质量事实入口。',
+    currentScope: [
+      '覆盖 IQC、委外回货检验、成品抽检、返工复检和品质放行。',
+      '记录检验类型、检验结论、不良数量、不良原因、返工要求和放行决策。',
+      '与入库、库存、生产异常和出货放行保持关联，但不替代仓库收发存事实。',
+    ],
+    keyFields: [
+      '检验单号 / 来源单号 / 检验类型',
+      '供应商 / 客户 / 款式 / 产品 / 物料',
+      '检验数量 / 不良数量 / 不良原因',
+      '返工要求 / 放行决策 / 复检结论',
+    ],
+    upstream: ['入库通知/检验/入库', '加工合同/委外下单', '生产进度'],
+    downstream: ['库存', '延期/返工/异常', '待出货/出货放行'],
+    mobileFocus: ['IQC 待检', '不良登记', '返工复检', '放行 / 退回反馈'],
+    sourceRefs: [
+      '正式汇报版 PDF：主料 / 辅料到仓后经过仓库 + 品质 IQC。',
+      '正式汇报版 PDF：委外回货和成品回仓后需要检验，再进入入库和出货放行。',
+      '生产异常口径：返工和质量异常必须形成可追踪任务，不继续沉在备注。',
+    ],
+    boundaries: [
+      '本轮不做复杂 AQL 算法，只记录当前检验事实和结论。',
+      '本轮不做图片识别、PDA、条码枪或硬件扫码。',
+      '品质只负责检验结论和放行，不代替仓库确认入库 / 出库数量。',
+    ],
+    relatedLinks: [
+      docLink('仓库与品质 v1', '/erp/docs/warehouse-quality-v1'),
+      docLink('通知 / 预警 v1', '/erp/docs/notification-alert-v1'),
+    ],
+  },
+  {
     key: 'reconciliation',
     title: '对账/结算',
     route: 'finance/reconciliation',
@@ -595,6 +635,84 @@ const businessModules = [
       '不会引入不属于当前业务的收汇 / 水单认领字段。',
     ],
     relatedLinks: [helpLink('calculation'), helpLink('operations')],
+  },
+  {
+    key: 'receivables',
+    title: '应收/开票登记',
+    route: 'finance/receivables',
+    sectionKey: 'finance',
+    status: 'seeded',
+    owner: '财务 + 业务跟单',
+    summary:
+      '应收/开票登记承接出货后的客户应收金额、收款状态、开票状态和异常金额，不进入总账或凭证。',
+    description:
+      '应收/开票登记页负责把出货后的客户应收、含税金额、不含税金额、税额、已收金额和结算备注落到通用业务记录，供财务与老板查看风险。',
+    currentScope: [
+      '覆盖出货后应收、客户应收金额、收款状态、异常金额和开票状态。',
+      '记录税率、税额、含税金额、不含税金额、已收金额和结算说明。',
+      '与待出货 / 出库、对账 / 结算和发票登记关联查看。',
+    ],
+    keyFields: [
+      '应收单号 / 来源出货单 / 客户',
+      '产品 / 数量 / 应收金额',
+      '税率 / 税额 / 含税金额 / 不含税金额',
+      '已收金额 / 收款状态 / 开票状态 / 异常备注',
+    ],
+    upstream: ['出库', '待出货/出货放行', '对账/结算'],
+    downstream: ['发票登记', '打印模板中心'],
+    mobileFocus: ['待收款提醒', '异常金额确认', '老板查看财务风险'],
+    sourceRefs: [
+      '正式汇报版 PDF：发货前需要财务放行，发货后进入结算关注。',
+      '生产订单总表截图：出货日期和未出货数是应收触发的重要业务快照。',
+      '当前财务链路：对账 / 结算和待付款已落入口，应收需要独立补齐。',
+    ],
+    boundaries: [
+      '本轮不做总账、凭证、纳税申报或多账簿。',
+      '应收登记只记录业务应收事实和状态，不伪造会计分录。',
+    ],
+    relatedLinks: [
+      docLink('财务 v1', '/erp/docs/finance-v1'),
+      docLink('角色权限矩阵 v1', '/erp/docs/role-permission-matrix-v1'),
+    ],
+  },
+  {
+    key: 'invoices',
+    title: '发票登记',
+    route: 'finance/invoices',
+    sectionKey: 'finance',
+    status: 'seeded',
+    owner: '财务',
+    summary:
+      '发票登记只登记销项和进项发票快照，包含发票号、类型、金额、税率、税额、日期和状态，不做税务申报。',
+    description:
+      '发票登记页负责维护销项发票和进项发票的登记信息，关联应收、应付、对账和采购 / 委外来源单，作为财务追踪入口。',
+    currentScope: [
+      '覆盖销项发票和进项发票登记。',
+      '记录发票号、发票类型、含税金额、不含税金额、税率、税额、开票日期和发票状态。',
+      '关联客户、供应商、来源单号、收票日期和登记备注。',
+    ],
+    keyFields: [
+      '发票号 / 发票类型 / 发票方向',
+      '客户 / 供应商 / 来源单号',
+      '含税金额 / 不含税金额 / 税率 / 税额',
+      '开票日期 / 收票日期 / 发票状态',
+    ],
+    upstream: ['应收/开票登记', '待付款/应付提醒', '对账/结算'],
+    downstream: ['打印模板中心'],
+    mobileFocus: ['待开票', '待收票', '发票异常提醒'],
+    sourceRefs: [
+      '加工厂商资料包含开票字段，但当前只作为结算对象线索，不直接建税务模型。',
+      '辅材 / 包材与加工汇总金额列为进项发票登记提供业务来源。',
+      '出货后应收为销项发票登记提供业务来源。',
+    ],
+    boundaries: [
+      '本轮不做税务申报、复杂会计科目或凭证。',
+      '发票登记是财务业务快照，不替代发票查验平台或税控系统。',
+    ],
+    relatedLinks: [
+      docLink('财务 v1', '/erp/docs/finance-v1'),
+      docLink('通知 / 预警 v1', '/erp/docs/notification-alert-v1'),
+    ],
   },
 ]
 

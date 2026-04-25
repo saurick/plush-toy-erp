@@ -18,6 +18,11 @@ func (AdminUser) Fields() []ent.Field {
 		field.String("username").
 			NotEmpty().
 			MaxLen(64),
+		field.String("phone").
+			Optional().
+			Nillable().
+			MaxLen(32).
+			Comment("管理员手机号，用于短信验证码登录"),
 		field.String("password_hash").
 			NotEmpty().
 			Sensitive(),
@@ -28,6 +33,10 @@ func (AdminUser) Fields() []ent.Field {
 			Default("").
 			MaxLen(4096).
 			Comment("逗号分隔菜单权限"),
+		field.String("mobile_role_permissions").
+			Default("").
+			MaxLen(512).
+			Comment("逗号分隔移动端角色登录权限"),
 		field.String("erp_preferences").
 			Default("{}").
 			MaxLen(32768).
@@ -49,6 +58,7 @@ func (AdminUser) Fields() []ent.Field {
 func (AdminUser) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("username").Unique(),
+		index.Fields("phone").Unique(),
 		index.Fields("level"),
 	}
 }

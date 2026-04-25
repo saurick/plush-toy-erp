@@ -32,16 +32,18 @@ func (r *adminManageRepo) toBizAdmin(a *ent.AdminUser) *biz.AdminUser {
 		return nil
 	}
 	return &biz.AdminUser{
-		ID:              a.ID,
-		Username:        a.Username,
-		PasswordHash:    a.PasswordHash,
-		Level:           a.Level,
-		MenuPermissions: decodeMenuPermissions(a.MenuPermissions),
-		ERPPreferences:  decodeAdminERPPreferences(a.ErpPreferences),
-		Disabled:        a.Disabled,
-		LastLoginAt:     a.LastLoginAt,
-		CreatedAt:       a.CreatedAt,
-		UpdatedAt:       a.UpdatedAt,
+		ID:                    a.ID,
+		Username:              a.Username,
+		Phone:                 stringValue(a.Phone),
+		PasswordHash:          a.PasswordHash,
+		Level:                 a.Level,
+		MenuPermissions:       decodeMenuPermissions(a.MenuPermissions),
+		MobileRolePermissions: decodeMobileRolePermissions(a.MobileRolePermissions),
+		ERPPreferences:        decodeAdminERPPreferences(a.ErpPreferences),
+		Disabled:              a.Disabled,
+		LastLoginAt:           a.LastLoginAt,
+		CreatedAt:             a.CreatedAt,
+		UpdatedAt:             a.UpdatedAt,
 	}
 }
 
@@ -65,6 +67,21 @@ func (r *adminManageRepo) GetAdminByUsername(ctx context.Context, username strin
 		return nil, biz.ErrBadParam
 	}
 	row, err := r.data.postgres.AdminUser.Query().Where(adminuser.Username(username)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrAdminNotFound
+		}
+		return nil, err
+	}
+	return r.toBizAdmin(row), nil
+}
+
+func (r *adminManageRepo) GetAdminByPhone(ctx context.Context, phone string) (*biz.AdminUser, error) {
+	phone = strings.TrimSpace(phone)
+	if phone == "" {
+		return nil, biz.ErrBadParam
+	}
+	row, err := r.data.postgres.AdminUser.Query().Where(adminuser.Phone(phone)).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrAdminNotFound
@@ -98,9 +115,11 @@ func (r *adminManageRepo) CreateAdmin(ctx context.Context, in *biz.AdminCreate) 
 
 	row, err := r.data.postgres.AdminUser.Create().
 		SetUsername(in.Username).
+		SetNillablePhone(stringPtrOrNil(in.Phone)).
 		SetPasswordHash(in.PasswordHash).
 		SetLevel(int8(in.Level)).
 		SetMenuPermissions(encodeMenuPermissions(in.MenuPermissions)).
+		SetMobileRolePermissions(encodeMobileRolePermissions(in.MobileRolePermissions)).
 		SetDisabled(false).
 		Save(ctx)
 	if err != nil {
@@ -112,15 +131,38 @@ func (r *adminManageRepo) CreateAdmin(ctx context.Context, in *biz.AdminCreate) 
 	return r.toBizAdmin(row), nil
 }
 
-func (r *adminManageRepo) UpdateAdminMenuPermissions(ctx context.Context, id int, menuPermissions []string) error {
+func (r *adminManageRepo) UpdateAdminPermissions(ctx context.Context, id int, menuPermissions []string, mobileRolePermissions []string) error {
 	if id <= 0 {
 		return biz.ErrBadParam
 	}
 	if _, err := r.data.postgres.AdminUser.UpdateOneID(id).
 		SetMenuPermissions(encodeMenuPermissions(menuPermissions)).
+		SetMobileRolePermissions(encodeMobileRolePermissions(mobileRolePermissions)).
 		Save(ctx); err != nil {
 		if ent.IsNotFound(err) {
 			return biz.ErrAdminNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *adminManageRepo) UpdateAdminPhone(ctx context.Context, id int, phone string) error {
+	if id <= 0 {
+		return biz.ErrBadParam
+	}
+	update := r.data.postgres.AdminUser.UpdateOneID(id)
+	if strings.TrimSpace(phone) == "" {
+		update.ClearPhone()
+	} else {
+		update.SetPhone(phone)
+	}
+	if _, err := update.Save(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrAdminNotFound
+		}
+		if ent.IsConstraintError(err) {
+			return biz.ErrAdminPhoneExists
 		}
 		return err
 	}
@@ -196,6 +238,32 @@ func decodeMenuPermissions(raw string) []string {
 		return []string{}
 	}
 	return biz.NormalizeAdminMenuPermissions(strings.Split(raw, ","))
+}
+
+func encodeMobileRolePermissions(mobileRolePermissions []string) string {
+	return strings.Join(biz.NormalizeAdminMobileRolePermissions(mobileRolePermissions), ",")
+}
+
+func decodeMobileRolePermissions(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return []string{}
+	}
+	return biz.NormalizeAdminMobileRolePermissions(strings.Split(raw, ","))
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func stringPtrOrNil(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func decodeAdminERPPreferences(raw string) biz.AdminERPPreferences {

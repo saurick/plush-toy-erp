@@ -24,11 +24,14 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
   defaultMenuPermissions,
+  ERP_MOBILE_ROLE_PERMISSION_OPTIONS,
   ERP_MENU_PERMISSION_GROUPS,
   ERP_PERMISSION_PRESETS,
+  getMobileRolePermissionLabel,
   getPermissionPreset,
   getPermissionLabel,
   matchPermissionPreset,
+  normalizeMobileRolePermissions,
   normalizeMenuPermissions,
 } from '../config/menuPermissions.mjs'
 
@@ -134,14 +137,24 @@ export default function PermissionCenterPage() {
   const [editingAdmin, setEditingAdmin] = useState(null)
   const [resettingAdmin, setResettingAdmin] = useState(null)
   const [selectedPermissions, setSelectedPermissions] = useState([])
+  const [selectedMobileRolePermissions, setSelectedMobileRolePermissions] =
+    useState([])
   const [selectedPresetKey, setSelectedPresetKey] = useState('')
+  const [editingPhone, setEditingPhone] = useState('')
   const [createForm] = Form.useForm()
   const [resetForm] = Form.useForm()
   const createMenuPermissions = Form.useWatch('menu_permissions', createForm)
+  const createMobileRolePermissions = Form.useWatch(
+    'mobile_role_permissions',
+    createForm
+  )
 
   const isSuperAdmin = currentAdmin?.level === ADMIN_LEVEL.SUPER
   const createSelectedPermissionCount = normalizeMenuPermissions(
     createMenuPermissions || []
+  ).length
+  const createSelectedMobileRoleCount = normalizeMobileRolePermissions(
+    createMobileRolePermissions || []
   ).length
 
   const loadData = useCallback(async () => {
@@ -193,6 +206,7 @@ export default function PermissionCenterPage() {
     createForm.setFieldsValue({
       level: ADMIN_LEVEL.STANDARD,
       menu_permissions: defaultMenuPermissions(),
+      mobile_role_permissions: [],
     })
   }, [createForm, createModalOpen])
 
@@ -219,8 +233,13 @@ export default function PermissionCenterPage() {
     }
     setEditingAdmin(admin)
     const normalized = normalizeMenuPermissions(admin.menu_permissions || [])
+    const mobileRoles = normalizeMobileRolePermissions(
+      admin.mobile_role_permissions || []
+    )
     setSelectedPermissions(normalized)
+    setSelectedMobileRolePermissions(mobileRoles)
     setSelectedPresetKey(matchPermissionPreset(normalized))
+    setEditingPhone(admin.phone || '')
     setEditModalOpen(true)
   }
 
@@ -228,7 +247,9 @@ export default function PermissionCenterPage() {
     setEditModalOpen(false)
     setEditingAdmin(null)
     setSelectedPermissions([])
+    setSelectedMobileRolePermissions([])
     setSelectedPresetKey('')
+    setEditingPhone('')
   }
 
   const openResetModal = (admin) => {
@@ -256,6 +277,10 @@ export default function PermissionCenterPage() {
         menu_permissions: normalizeMenuPermissions(
           values.menu_permissions || []
         ),
+        mobile_role_permissions: normalizeMobileRolePermissions(
+          values.mobile_role_permissions || []
+        ),
+        phone: String(values.phone || '').trim(),
       }
       const result = await adminRpc.call('create', payload)
       const createdAdmin = result?.data?.admin
@@ -279,9 +304,21 @@ export default function PermissionCenterPage() {
     }
     setSaving(true)
     try {
+      if (
+        String(editingPhone || '').trim() !==
+        String(editingAdmin.phone || '').trim()
+      ) {
+        await adminRpc.call('set_phone', {
+          id: editingAdmin.id,
+          phone: String(editingPhone || '').trim(),
+        })
+      }
       await adminRpc.call('set_permissions', {
         id: editingAdmin.id,
         menu_permissions: normalizeMenuPermissions(selectedPermissions),
+        mobile_role_permissions: normalizeMobileRolePermissions(
+          selectedMobileRolePermissions
+        ),
       })
       message.success('权限已更新')
       closeEditModal()
@@ -298,6 +335,7 @@ export default function PermissionCenterPage() {
     createForm.setFieldsValue({
       permission_preset: presetKey || undefined,
       menu_permissions: preset?.permissions || defaultMenuPermissions(),
+      mobile_role_permissions: preset?.mobileRolePermissions || [],
     })
   }
 
@@ -307,12 +345,22 @@ export default function PermissionCenterPage() {
     setSelectedPermissions(
       preset?.permissions || normalizeMenuPermissions(selectedPermissions)
     )
+    setSelectedMobileRolePermissions(
+      preset?.mobileRolePermissions ||
+        normalizeMobileRolePermissions(selectedMobileRolePermissions)
+    )
   }
 
   const handleEditPermissionsChange = (permissions) => {
     const normalized = normalizeMenuPermissions(permissions)
     setSelectedPermissions(normalized)
     setSelectedPresetKey(matchPermissionPreset(normalized))
+  }
+
+  const handleEditMobileRolePermissionsChange = (permissions) => {
+    setSelectedMobileRolePermissions(
+      normalizeMobileRolePermissions(permissions)
+    )
   }
 
   const applyAdminStatus = async (admin, disabled) => {
@@ -382,6 +430,12 @@ export default function PermissionCenterPage() {
       width: 180,
     },
     {
+      title: '手机号',
+      dataIndex: 'phone',
+      width: 150,
+      render: (phone) => phone || <Text type="secondary">未录入</Text>,
+    },
+    {
       title: '等级',
       dataIndex: 'level',
       width: 140,
@@ -438,6 +492,29 @@ export default function PermissionCenterPage() {
             {normalized.length > 4 ? (
               <Text type="secondary">+{normalized.length - 4}</Text>
             ) : null}
+          </Space>
+        )
+      },
+    },
+    {
+      title: '移动端',
+      dataIndex: 'mobile_role_permissions',
+      width: 220,
+      render: (_, record) => {
+        if (record.level === ADMIN_LEVEL.SUPER) {
+          return <Tag color="gold">全部移动端</Tag>
+        }
+        const normalized = normalizeMobileRolePermissions(
+          record.mobile_role_permissions || []
+        )
+        if (normalized.length === 0) {
+          return <Tag color="default">未开通</Tag>
+        }
+        return (
+          <Space wrap size={[4, 6]}>
+            {normalized.map((key) => (
+              <Tag key={key}>{getMobileRolePermissionLabel(key)}</Tag>
+            ))}
           </Space>
         )
       },
@@ -537,7 +614,7 @@ export default function PermissionCenterPage() {
             showTotal: (total) => `共 ${total} 条`,
           }}
           locale={{ emptyText }}
-          scroll={{ x: 960 }}
+          scroll={{ x: 1180 }}
           onChange={handleTableChange}
         />
       </Card>
@@ -567,6 +644,7 @@ export default function PermissionCenterPage() {
           initialValues={{
             level: ADMIN_LEVEL.STANDARD,
             menu_permissions: defaultMenuPermissions(),
+            mobile_role_permissions: [],
           }}
         >
           <div className="erp-permission-modal__fields">
@@ -584,6 +662,22 @@ export default function PermissionCenterPage() {
               ]}
             >
               <Input placeholder="例如：manager02" maxLength={64} />
+            </Form.Item>
+            <Form.Item
+              label="手机号"
+              name="phone"
+              rules={[
+                {
+                  pattern: /^1\d{10}$/,
+                  message: '请输入 11 位手机号',
+                },
+              ]}
+            >
+              <Input
+                placeholder="用于手机端短信验证码登录"
+                maxLength={11}
+                inputMode="tel"
+              />
             </Form.Item>
             <Form.Item
               label="密码"
@@ -615,6 +709,20 @@ export default function PermissionCenterPage() {
               />
             </Form.Item>
           </div>
+          <div className="erp-permission-modal__section-head">
+            <Text strong>移动端登录权限</Text>
+            <Text type="secondary">
+              已选 {createSelectedMobileRoleCount} 项
+            </Text>
+          </div>
+          <Form.Item name="mobile_role_permissions">
+            <Checkbox.Group
+              options={ERP_MOBILE_ROLE_PERMISSION_OPTIONS.map((item) => ({
+                label: item.label,
+                value: item.key,
+              }))}
+            />
+          </Form.Item>
           <div className="erp-permission-modal__section-head">
             <Text strong>默认菜单权限</Text>
             <Text type="secondary">
@@ -660,7 +768,14 @@ export default function PermissionCenterPage() {
             type="info"
             showIcon
             message="当前权限已收口到页面级"
-            description="会同时控制左侧菜单显示和未授权页面直达；但业务动作级权限、字段级权限和手机端接口级权限仍待后端继续落。"
+            description="菜单权限控制桌面后台可见范围；移动端登录权限控制对应角色手机端是否可用手机号验证码登录。"
+          />
+          <Input
+            value={editingPhone}
+            onChange={(event) => setEditingPhone(event.target.value)}
+            placeholder="手机号，用于短信验证码登录；清空则关闭手机号登录"
+            maxLength={11}
+            inputMode="tel"
           />
           <Select
             allowClear
@@ -673,9 +788,24 @@ export default function PermissionCenterPage() {
             value={selectedPermissions}
             onChange={handleEditPermissionsChange}
           />
+          <div className="erp-permission-modal__section-head">
+            <Text strong>移动端登录权限</Text>
+            <Text type="secondary">
+              已选 {selectedMobileRolePermissions.length} 项
+            </Text>
+          </div>
+          <Checkbox.Group
+            options={ERP_MOBILE_ROLE_PERMISSION_OPTIONS.map((item) => ({
+              label: item.label,
+              value: item.key,
+            }))}
+            value={selectedMobileRolePermissions}
+            onChange={handleEditMobileRolePermissionsChange}
+          />
           <Text type="secondary">
-            当前共选择 {selectedPermissions.length}{' '}
-            项页面权限，后台会按当前导航顺序保存。
+            当前共选择 {selectedPermissions.length} 项页面权限、
+            {selectedMobileRolePermissions.length}{' '}
+            项移动端权限，后台会按当前导航顺序保存。
           </Text>
         </Space>
       </Modal>

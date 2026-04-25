@@ -26,6 +26,20 @@ func (_c *AdminUserCreate) SetUsername(v string) *AdminUserCreate {
 	return _c
 }
 
+// SetPhone sets the "phone" field.
+func (_c *AdminUserCreate) SetPhone(v string) *AdminUserCreate {
+	_c.mutation.SetPhone(v)
+	return _c
+}
+
+// SetNillablePhone sets the "phone" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillablePhone(v *string) *AdminUserCreate {
+	if v != nil {
+		_c.SetPhone(*v)
+	}
+	return _c
+}
+
 // SetPasswordHash sets the "password_hash" field.
 func (_c *AdminUserCreate) SetPasswordHash(v string) *AdminUserCreate {
 	_c.mutation.SetPasswordHash(v)
@@ -56,6 +70,20 @@ func (_c *AdminUserCreate) SetMenuPermissions(v string) *AdminUserCreate {
 func (_c *AdminUserCreate) SetNillableMenuPermissions(v *string) *AdminUserCreate {
 	if v != nil {
 		_c.SetMenuPermissions(*v)
+	}
+	return _c
+}
+
+// SetMobileRolePermissions sets the "mobile_role_permissions" field.
+func (_c *AdminUserCreate) SetMobileRolePermissions(v string) *AdminUserCreate {
+	_c.mutation.SetMobileRolePermissions(v)
+	return _c
+}
+
+// SetNillableMobileRolePermissions sets the "mobile_role_permissions" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableMobileRolePermissions(v *string) *AdminUserCreate {
+	if v != nil {
+		_c.SetMobileRolePermissions(*v)
 	}
 	return _c
 }
@@ -173,6 +201,10 @@ func (_c *AdminUserCreate) defaults() {
 		v := adminuser.DefaultMenuPermissions
 		_c.mutation.SetMenuPermissions(v)
 	}
+	if _, ok := _c.mutation.MobileRolePermissions(); !ok {
+		v := adminuser.DefaultMobileRolePermissions
+		_c.mutation.SetMobileRolePermissions(v)
+	}
 	if _, ok := _c.mutation.ErpPreferences(); !ok {
 		v := adminuser.DefaultErpPreferences
 		_c.mutation.SetErpPreferences(v)
@@ -201,6 +233,11 @@ func (_c *AdminUserCreate) check() error {
 			return &ValidationError{Name: "username", err: fmt.Errorf(`ent: validator failed for field "AdminUser.username": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.Phone(); ok {
+		if err := adminuser.PhoneValidator(v); err != nil {
+			return &ValidationError{Name: "phone", err: fmt.Errorf(`ent: validator failed for field "AdminUser.phone": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.PasswordHash(); !ok {
 		return &ValidationError{Name: "password_hash", err: errors.New(`ent: missing required field "AdminUser.password_hash"`)}
 	}
@@ -218,6 +255,14 @@ func (_c *AdminUserCreate) check() error {
 	if v, ok := _c.mutation.MenuPermissions(); ok {
 		if err := adminuser.MenuPermissionsValidator(v); err != nil {
 			return &ValidationError{Name: "menu_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.menu_permissions": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.MobileRolePermissions(); !ok {
+		return &ValidationError{Name: "mobile_role_permissions", err: errors.New(`ent: missing required field "AdminUser.mobile_role_permissions"`)}
+	}
+	if v, ok := _c.mutation.MobileRolePermissions(); ok {
+		if err := adminuser.MobileRolePermissionsValidator(v); err != nil {
+			return &ValidationError{Name: "mobile_role_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.mobile_role_permissions": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.ErpPreferences(); !ok {
@@ -267,6 +312,10 @@ func (_c *AdminUserCreate) createSpec() (*AdminUser, *sqlgraph.CreateSpec) {
 		_spec.SetField(adminuser.FieldUsername, field.TypeString, value)
 		_node.Username = value
 	}
+	if value, ok := _c.mutation.Phone(); ok {
+		_spec.SetField(adminuser.FieldPhone, field.TypeString, value)
+		_node.Phone = &value
+	}
 	if value, ok := _c.mutation.PasswordHash(); ok {
 		_spec.SetField(adminuser.FieldPasswordHash, field.TypeString, value)
 		_node.PasswordHash = value
@@ -278,6 +327,10 @@ func (_c *AdminUserCreate) createSpec() (*AdminUser, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.MenuPermissions(); ok {
 		_spec.SetField(adminuser.FieldMenuPermissions, field.TypeString, value)
 		_node.MenuPermissions = value
+	}
+	if value, ok := _c.mutation.MobileRolePermissions(); ok {
+		_spec.SetField(adminuser.FieldMobileRolePermissions, field.TypeString, value)
+		_node.MobileRolePermissions = value
 	}
 	if value, ok := _c.mutation.ErpPreferences(); ok {
 		_spec.SetField(adminuser.FieldErpPreferences, field.TypeString, value)

@@ -15,12 +15,16 @@ const (
 	FieldID = "id"
 	// FieldUsername holds the string denoting the username field in the database.
 	FieldUsername = "username"
+	// FieldPhone holds the string denoting the phone field in the database.
+	FieldPhone = "phone"
 	// FieldPasswordHash holds the string denoting the password_hash field in the database.
 	FieldPasswordHash = "password_hash"
 	// FieldLevel holds the string denoting the level field in the database.
 	FieldLevel = "level"
 	// FieldMenuPermissions holds the string denoting the menu_permissions field in the database.
 	FieldMenuPermissions = "menu_permissions"
+	// FieldMobileRolePermissions holds the string denoting the mobile_role_permissions field in the database.
+	FieldMobileRolePermissions = "mobile_role_permissions"
 	// FieldErpPreferences holds the string denoting the erp_preferences field in the database.
 	FieldErpPreferences = "erp_preferences"
 	// FieldDisabled holds the string denoting the disabled field in the database.
@@ -39,9 +43,11 @@ const (
 var Columns = []string{
 	FieldID,
 	FieldUsername,
+	FieldPhone,
 	FieldPasswordHash,
 	FieldLevel,
 	FieldMenuPermissions,
+	FieldMobileRolePermissions,
 	FieldErpPreferences,
 	FieldDisabled,
 	FieldLastLoginAt,
@@ -62,6 +68,8 @@ func ValidColumn(column string) bool {
 var (
 	// UsernameValidator is a validator for the "username" field. It is called by the builders before save.
 	UsernameValidator func(string) error
+	// PhoneValidator is a validator for the "phone" field. It is called by the builders before save.
+	PhoneValidator func(string) error
 	// PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
 	PasswordHashValidator func(string) error
 	// DefaultLevel holds the default value on creation for the "level" field.
@@ -70,6 +78,10 @@ var (
 	DefaultMenuPermissions string
 	// MenuPermissionsValidator is a validator for the "menu_permissions" field. It is called by the builders before save.
 	MenuPermissionsValidator func(string) error
+	// DefaultMobileRolePermissions holds the default value on creation for the "mobile_role_permissions" field.
+	DefaultMobileRolePermissions string
+	// MobileRolePermissionsValidator is a validator for the "mobile_role_permissions" field. It is called by the builders before save.
+	MobileRolePermissionsValidator func(string) error
 	// DefaultErpPreferences holds the default value on creation for the "erp_preferences" field.
 	DefaultErpPreferences string
 	// ErpPreferencesValidator is a validator for the "erp_preferences" field. It is called by the builders before save.
@@ -97,6 +109,11 @@ func ByUsername(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUsername, opts...).ToFunc()
 }
 
+// ByPhone orders the results by the phone field.
+func ByPhone(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPhone, opts...).ToFunc()
+}
+
 // ByPasswordHash orders the results by the password_hash field.
 func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPasswordHash, opts...).ToFunc()
@@ -110,6 +127,11 @@ func ByLevel(opts ...sql.OrderTermOption) OrderOption {
 // ByMenuPermissions orders the results by the menu_permissions field.
 func ByMenuPermissions(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMenuPermissions, opts...).ToFunc()
+}
+
+// ByMobileRolePermissions orders the results by the mobile_role_permissions field.
+func ByMobileRolePermissions(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMobileRolePermissions, opts...).ToFunc()
 }
 
 // ByErpPreferences orders the results by the erp_preferences field.
