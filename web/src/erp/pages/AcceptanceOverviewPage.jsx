@@ -16,8 +16,11 @@ import HelpCenterSectionDirectory from '../components/HelpCenterSectionDirectory
 import { FIELD_LINKAGE_COVERAGE_PATH } from '../qa/fieldLinkageCatalog.mjs'
 import { BUSINESS_CHAIN_DEBUG_PATH } from '../utils/businessChainDebug.mjs'
 import {
+  BUSINESS_LOOP_COVERAGE_ROWS,
+  KNOWN_QA_BLIND_SPOTS,
   QA_REPORT_OUTPUT_HINTS,
   QA_RUNNER_COMMANDS,
+  QA_QUALITY_COMMAND_ROWS,
   QA_WORKBENCH_PATHS,
   getFieldLinkageStatusMeta,
   getQaReportStatusMeta,
@@ -30,28 +33,26 @@ const { Paragraph, Text, Title } = Typography
 
 const SECTION_HEADINGS = [
   { id: 'acceptance-overview-summary', title: '总览与当前工具页' },
+  { id: 'acceptance-overview-business-loops', title: '当前闭环覆盖' },
+  { id: 'acceptance-overview-quality-commands', title: '当前质量命令' },
   { id: 'acceptance-overview-entry-points', title: '当前入口与建议动作' },
   { id: 'acceptance-overview-blind-spots', title: '已知盲区与使用顺序' },
   { id: 'acceptance-overview-planning', title: '规划表速查' },
 ]
 
 const BUSINESS_CHAIN_HIGHLIGHTS = [
-  '业务链路调试当前只做只读排查：按业务记录、workflow 状态和协同任务聚合，不伪造一键造数能力。',
+  '业务链路调试当前覆盖 6 条 ERP v1 主干闭环，不代表所有扩展业务链路都已完成。',
+  '填入并查询只做只读排查：按业务记录、workflow 状态和协同任务聚合，不伪造一键造数能力。',
+  '协同任务调试聚焦角色任务池、移动端可见性和 workflow_task_events 留痕，不改任务和业务数据。',
   '字段快照、残值、缺值和打印取值优先进入“字段联动覆盖”，不要只看当前单个页面现象。',
   '页面结论只代表最近一次可读取的结构化产物；没有 latest 的专项仍以命令、脚本和正式文档为准。',
-]
-
-const KNOWN_BLIND_SPOTS = [
-  '当前还没有毛绒业务专用的一键调试造数或完整业务 E2E 总链路 runner。',
-  '除字段联动专项外，还没有统一的 public/qa/*.latest.json 结构化验收摘要。',
-  '打印模板可以从模板目录识别范围，但当前还没有稳定的打印专项 latest 报告可直接消费。',
-  '正式 Excel 导入落库、打印留档回写和细分业务专表全链路验收仍是 deferred。',
 ]
 
 const WORKBENCH_STEPS = [
   '先看这页，确认本轮已有哪几个验收入口和最近覆盖摘要。',
   '若问题落在字段快照、残值、缺值、打印取值，进入“字段联动覆盖”。',
-  '若问题落在业务记录状态、上下游链路、任务协同或金额 / 数量关系，进入“业务链路调试”。',
+  '若问题落在业务记录状态、上下游链路或金额 / 数量关系，进入“业务链路调试”。',
+  '若问题落在角色任务池、移动端为什么看不到任务或任务事件留痕，进入“协同任务调试”。',
   '若要直接找最近一次命令、产物和环境，进入“运行记录”。',
   '若问题已经收口成字段、打印、workflow、权限或错误码专项，进入“专项报告”。',
 ]
@@ -68,8 +69,15 @@ const MENU_RECOMMENDATIONS = [
     key: 'business-chain-debug',
     menuItem: '业务链路调试',
     decision: '保留',
-    purpose: '查某条业务链、协同任务或状态流转卡在哪',
+    purpose: '查某条业务链或业务状态流转卡在哪',
     note: '当前只读排查，不做一键造数',
+  },
+  {
+    key: 'workflow-task-debug',
+    menuItem: '协同任务调试',
+    decision: '新增',
+    purpose: '查任务是否进角色池、移动端是否可见、事件是否留痕',
+    note: '当前只读诊断，不提供修复按钮',
   },
   {
     key: 'field-linkage-coverage',
@@ -120,8 +128,22 @@ const OVERVIEW_BLUEPRINT_ROWS = [
     key: 'summary',
     section: '顶部摘要',
     question: '今天整体稳不稳',
-    display: '当前工具页、字段联动覆盖、打印模板范围、最近更新时间',
+    display: '工具页、6 条闭环覆盖、字段联动覆盖、打印模板范围、最近更新时间',
     source: '字段联动 latest、打印模板目录和专项报告',
+  },
+  {
+    key: 'business-loops',
+    section: '当前闭环覆盖',
+    question: '主业务链路已经接到哪一步',
+    display: '6 条已接入 v1 的业务闭环、承载方式、验收方式和当前盲区',
+    source: '工作流主任务树、移动端任务测试和验收记录',
+  },
+  {
+    key: 'quality-commands',
+    section: '当前质量命令',
+    question: '这轮必须跑哪些命令',
+    display: '前端 5 条主命令、Go 变更命令、diff 检查和跳过规则',
+    source: 'package scripts、server Makefile 和当前验收口径',
   },
   {
     key: 'field-linkage',
@@ -136,6 +158,14 @@ const OVERVIEW_BLUEPRINT_ROWS = [
     question: '我要排某张单据或任务，从哪里进',
     display: '固定排查说明 + 按钮“进入业务链路调试”',
     source: '业务记录、workflow 状态、协同任务查询页',
+  },
+  {
+    key: 'workflow-task-debug',
+    section: '协同任务调试卡片',
+    question: '某个角色为什么看不到任务',
+    display: '角色任务池、移动端可见性、事件轨迹和绑定关系说明',
+    source:
+      'workflow_tasks、mobileTaskQueries、mobileTaskView、workflow_task_events',
   },
   {
     key: 'print',
@@ -155,7 +185,7 @@ const OVERVIEW_BLUEPRINT_ROWS = [
     key: 'actions',
     section: '快捷动作',
     question: '我下一步该点哪',
-    display: '进入字段联动覆盖、业务链路调试、运行记录、专项报告',
+    display: '进入字段联动覆盖、业务链路调试、协同任务调试、运行记录、专项报告',
     source: '页面动作区',
   },
 ]
@@ -175,6 +205,11 @@ const FIRST_CUT_FOCUS_ROWS = [
     key: 'business-chain',
     keep: '业务链路调试卡片',
     reason: '能直接承接当前业务记录和 workflow 排查',
+  },
+  {
+    key: 'workflow-task-debug',
+    keep: '协同任务调试卡片',
+    reason: '能把角色池和移动端可见性从业务主线排查里拆出来',
   },
   {
     key: 'blind-spots',
@@ -245,6 +280,60 @@ const FIRST_CUT_FOCUS_COLUMNS = [
     title: '为什么',
     dataIndex: 'reason',
     key: 'reason',
+  },
+]
+
+const BUSINESS_LOOP_COLUMNS = [
+  {
+    title: '业务闭环',
+    dataIndex: 'chain',
+    key: 'chain',
+    width: 300,
+  },
+  {
+    title: '状态',
+    dataIndex: 'status',
+    key: 'status',
+    width: 120,
+    render: (value) => <Tag color="green">{value}</Tag>,
+  },
+  {
+    title: '承载方式',
+    dataIndex: 'carrier',
+    key: 'carrier',
+    width: 240,
+  },
+  {
+    title: '验收方式',
+    dataIndex: 'validation',
+    key: 'validation',
+    width: 260,
+  },
+  {
+    title: '当前盲区',
+    dataIndex: 'blindSpot',
+    key: 'blindSpot',
+  },
+]
+
+const QUALITY_COMMAND_COLUMNS = [
+  {
+    title: '命令',
+    dataIndex: 'command',
+    key: 'command',
+    width: 280,
+    render: (value) => <Text code>{value}</Text>,
+  },
+  {
+    title: '覆盖范围',
+    dataIndex: 'scope',
+    key: 'scope',
+    width: 260,
+  },
+  {
+    title: '执行规则',
+    dataIndex: 'rule',
+    key: 'rule',
   },
 ]
 
@@ -350,8 +439,8 @@ export default function AcceptanceOverviewPage() {
           type="secondary"
           style={{ maxWidth: 920, marginBottom: 0, marginTop: 8 }}
         >
-          这页收口当前已接入的 QA
-          工具页和可读取报告，用来先判断“这轮有没有明显红灯、下一步该点哪里”。
+          这页收口当前已接入的业务闭环、QA
+          工具页、可读取报告、质量命令和已知盲区，用来先判断“这轮有没有明显红灯、下一步该点哪里”。
         </Paragraph>
         <Space size={[8, 8]} wrap style={{ marginTop: 12 }}>
           <Tag color="green">状态总览</Tag>
@@ -376,9 +465,20 @@ export default function AcceptanceOverviewPage() {
           style={{ width: '100%', marginTop: 16 }}
         >
           <Card size="small">
-            <Statistic title="当前工具页" value={5} suffix="个" />
+            <Statistic title="当前工具页" value={6} suffix="个" />
             <Text type="secondary">
-              总览、业务链路调试、字段联动覆盖、运行记录、专项报告
+              总览、业务链路调试、协同任务调试、字段联动覆盖、运行记录、专项报告
+            </Text>
+          </Card>
+          <Card size="small">
+            <Statistic
+              title="已接入 v1 主干闭环"
+              value={BUSINESS_LOOP_COVERAGE_ROWS.length}
+              suffix="条"
+            />
+            <Text type="secondary">
+              均先复用 business_records + workflow_tasks；扩展链路仍按 deferred
+              / partial 管理。
             </Text>
           </Card>
           <Card size="small">
@@ -434,6 +534,48 @@ export default function AcceptanceOverviewPage() {
             </Space>
           </Card>
         </Space>
+      </section>
+
+      <section
+        id="acceptance-overview-business-loops"
+        className="erp-anchor-section"
+      >
+        <Card title="当前闭环覆盖">
+          <Paragraph type="secondary">
+            当前 6 条 ERP v1
+            主干闭环已经接入。这里显示的是主干功能闭环覆盖，不等于全量业务链路、后端
+            E2E 造数、行业专表或生产库人工联调已经完成。
+          </Paragraph>
+          <Table
+            size="small"
+            pagination={false}
+            columns={BUSINESS_LOOP_COLUMNS}
+            dataSource={BUSINESS_LOOP_COVERAGE_ROWS}
+            rowKey="key"
+            scroll={{ x: 1260 }}
+          />
+        </Card>
+      </section>
+
+      <section
+        id="acceptance-overview-quality-commands"
+        className="erp-anchor-section"
+      >
+        <Card title="当前质量命令">
+          <Paragraph type="secondary">
+            前端逻辑、帮助中心、验收页、菜单和移动端入口改动默认执行前 5 条；改
+            Go 才跑 server 命令；改 Ent schema 才跑 make data / make
+            migrate_status；每轮收口都跑 git diff --check。
+          </Paragraph>
+          <Table
+            size="small"
+            pagination={false}
+            columns={QUALITY_COMMAND_COLUMNS}
+            dataSource={QA_QUALITY_COMMAND_ROWS}
+            rowKey="key"
+            scroll={{ x: 980 }}
+          />
+        </Card>
       </section>
 
       <section
@@ -528,6 +670,28 @@ export default function AcceptanceOverviewPage() {
             </Space>
           </Card>
 
+          <Card title="协同任务调试">
+            <Paragraph>
+              当问题已经定位到 workflow_tasks、角色任务池、移动端是否可见或
+              workflow_task_events
+              事件留痕时，从这里排查，不和业务主线调试混在一起。
+            </Paragraph>
+            <Space size={[8, 8]} wrap>
+              <Tag color="blue">只读诊断</Tag>
+              <Tag color="geekblue">角色任务池</Tag>
+              <Tag color="purple">移动端可见性</Tag>
+              <Tag color="gold">事件轨迹</Tag>
+            </Space>
+            <Space style={{ marginTop: 16 }} wrap>
+              <Button
+                type="primary"
+                onClick={() => navigate(QA_WORKBENCH_PATHS.workflowTaskDebug)}
+              >
+                进入协同任务调试
+              </Button>
+            </Space>
+          </Card>
+
           <Card title="打印模板与合同回归">
             <Paragraph>
               打印模板范围来自当前模板目录；如果还没有打印 latest
@@ -579,7 +743,7 @@ export default function AcceptanceOverviewPage() {
             <div>
               <Text strong>已知盲区</Text>
               <Space direction="vertical" size={8} style={{ marginTop: 8 }}>
-                {KNOWN_BLIND_SPOTS.map((item) => (
+                {KNOWN_QA_BLIND_SPOTS.map((item) => (
                   <Text key={item}>{item}</Text>
                 ))}
               </Space>

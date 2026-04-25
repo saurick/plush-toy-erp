@@ -63,8 +63,15 @@ var workflowPlanningPhases = []WorkflowStateOption{
 }
 
 var (
-	workflowTaskStateSet     = buildWorkflowStateSet(workflowTaskStates)
-	workflowBusinessStateSet = buildWorkflowStateSet(workflowBusinessStates)
+	workflowTaskStateSet      = buildWorkflowStateSet(workflowTaskStates)
+	workflowBusinessStateSet  = buildWorkflowStateSet(workflowBusinessStates)
+	workflowTaskUrgeActionSet = map[string]struct{}{
+		"urge_task":        {},
+		"urge_role":        {},
+		"urge_assignee":    {},
+		"escalate_to_pmc":  {},
+		"escalate_to_boss": {},
+	}
 )
 
 func buildWorkflowStateSet(items []WorkflowStateOption) map[string]struct{} {
@@ -100,6 +107,11 @@ func IsValidWorkflowTaskState(key string) bool {
 
 func IsValidWorkflowBusinessState(key string) bool {
 	_, ok := workflowBusinessStateSet[strings.TrimSpace(key)]
+	return ok
+}
+
+func IsValidWorkflowTaskUrgeAction(action string) bool {
+	_, ok := workflowTaskUrgeActionSet[strings.TrimSpace(action)]
 	return ok
 }
 
@@ -162,6 +174,13 @@ type WorkflowTaskStatusUpdate struct {
 	Payload           map[string]any
 }
 
+type WorkflowTaskUrge struct {
+	ID      int
+	Action  string
+	Reason  string
+	Payload map[string]any
+}
+
 type WorkflowBusinessState struct {
 	ID                int
 	SourceType        string
@@ -203,6 +222,7 @@ type WorkflowRepo interface {
 	ListWorkflowTasks(ctx context.Context, filter WorkflowTaskFilter) ([]*WorkflowTask, int, error)
 	CreateWorkflowTask(ctx context.Context, in *WorkflowTaskCreate, actorID int) (*WorkflowTask, error)
 	UpdateWorkflowTaskStatus(ctx context.Context, in *WorkflowTaskStatusUpdate, actorID int, actorRoleKey string) (*WorkflowTask, error)
+	UrgeWorkflowTask(ctx context.Context, in *WorkflowTaskUrge, actorID int, actorRoleKey string) (*WorkflowTask, error)
 	ListWorkflowBusinessStates(ctx context.Context, filter WorkflowBusinessStateFilter) ([]*WorkflowBusinessState, int, error)
 	UpsertWorkflowBusinessState(ctx context.Context, in *WorkflowBusinessStateUpsert, actorID int) (*WorkflowBusinessState, error)
 }
@@ -258,6 +278,21 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		in.Payload = map[string]any{}
 	}
 	return uc.repo.UpdateWorkflowTaskStatus(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
+}
+
+func (uc *WorkflowUsecase) UrgeTask(ctx context.Context, in *WorkflowTaskUrge, actorID int, actorRoleKey string) (*WorkflowTask, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	in.Action = strings.TrimSpace(in.Action)
+	in.Reason = strings.TrimSpace(in.Reason)
+	if in.ID <= 0 || !IsValidWorkflowTaskUrgeAction(in.Action) || in.Reason == "" {
+		return nil, ErrBadParam
+	}
+	if in.Payload == nil {
+		in.Payload = map[string]any{}
+	}
+	return uc.repo.UrgeWorkflowTask(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
 }
 
 func (uc *WorkflowUsecase) ListBusinessStates(ctx context.Context, filter WorkflowBusinessStateFilter) ([]*WorkflowBusinessState, int, error) {

@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   ERP_MOBILE_ROLE_PERMISSION_OPTIONS,
+  ERP_MENU_PERMISSION_GROUPS,
   ERP_MENU_PERMISSION_OPTIONS,
   PERMISSION_CENTER_PATH,
   defaultMenuPermissions,
@@ -16,6 +17,30 @@ test('menuPermissions: 包含权限管理入口', () => {
     ERP_MENU_PERMISSION_OPTIONS.some(
       (item) => item.key === PERMISSION_CENTER_PATH
     )
+  )
+})
+
+test('menuPermissions: 权限分组顺序跟随桌面菜单顺序', () => {
+  assert.deepEqual(
+    ERP_MENU_PERMISSION_GROUPS.map((section) => section.title),
+    [
+      '看板中心',
+      '销售链路',
+      '采购/仓储',
+      '生产环节',
+      '财务环节',
+      '单据模板',
+      '系统管理',
+      '帮助中心',
+      '高级文档',
+      '开发与验收',
+    ]
+  )
+  assert.deepEqual(
+    ERP_MENU_PERMISSION_GROUPS.find(
+      (section) => section.title === '看板中心'
+    )?.items.map((item) => item.key),
+    ['/erp/dashboard', '/erp/business-dashboard']
   )
 })
 

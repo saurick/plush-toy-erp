@@ -36,6 +36,7 @@ type JsonrpcData struct {
 	userAdminUC   *biz.UserAdminUsecase
 	workflowUC    *biz.WorkflowUsecase
 	businessUC    *biz.BusinessRecordUsecase
+	debugUC       *biz.DebugUsecase
 
 	adminReader adminAccountReader
 }
@@ -83,6 +84,7 @@ func NewJsonrpcData(
 	userAdminUC := biz.NewUserAdminUsecase(userAdminRepo, logger, tracerProvider)
 	workflowUC := biz.NewWorkflowUsecase(NewWorkflowRepo(data, logger))
 	businessUC := biz.NewBusinessRecordUsecase(NewBusinessRecordRepo(data, logger))
+	debugUC := biz.NewDebugUsecase(NewDebugSeedRepo(data, logger), newDebugSafetyConfig(c))
 
 	helper.Info("JsonrpcData created (auth/admin auth/user admin usecases constructed inside)")
 
@@ -96,6 +98,7 @@ func NewJsonrpcData(
 		userAdminUC:   userAdminUC,
 		workflowUC:    workflowUC,
 		businessUC:    businessUC,
+		debugUC:       debugUC,
 		adminReader:   adminAuthRepo,
 	}
 }
@@ -138,6 +141,8 @@ func (d *JsonrpcData) Handle(
 		return d.handleWorkflow(ctx, method, id, params)
 	case "business":
 		return d.handleBusiness(ctx, method, id, params)
+	case "debug":
+		return d.handleDebug(ctx, method, id, params)
 	default:
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.JSONRPCUnknownURL.Code,

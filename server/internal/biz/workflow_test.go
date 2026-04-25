@@ -9,6 +9,7 @@ import (
 type stubWorkflowRepo struct {
 	createTaskInput  *WorkflowTaskCreate
 	updateTaskInput  *WorkflowTaskStatusUpdate
+	urgeTaskInput    *WorkflowTaskUrge
 	upsertStateInput *WorkflowBusinessStateUpsert
 	listTaskCalled   bool
 }
@@ -34,6 +35,15 @@ func (s *stubWorkflowRepo) UpdateWorkflowTaskStatus(_ context.Context, in *Workf
 		TaskStatusKey:     in.TaskStatusKey,
 		BusinessStatusKey: &in.BusinessStatusKey,
 		Payload:           in.Payload,
+	}, nil
+}
+
+func (s *stubWorkflowRepo) UrgeWorkflowTask(_ context.Context, in *WorkflowTaskUrge, _ int, _ string) (*WorkflowTask, error) {
+	s.urgeTaskInput = in
+	return &WorkflowTask{
+		ID:            in.ID,
+		TaskStatusKey: "ready",
+		Payload:       in.Payload,
 	}, nil
 }
 
@@ -263,5 +273,68 @@ func TestWorkflowUsecase_UpsertBusinessStateRejectsInvalidStatus(t *testing.T) {
 	}, 7)
 	if !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+}
+
+func TestWorkflowUsecase_UrgeTaskRejectsInvalidInput(t *testing.T) {
+	uc := NewWorkflowUsecase(&stubWorkflowRepo{})
+
+	cases := []struct {
+		name  string
+		input *WorkflowTaskUrge
+	}{
+		{name: "empty task id", input: &WorkflowTaskUrge{Action: "urge_task", Reason: "请处理"}},
+		{name: "invalid action", input: &WorkflowTaskUrge{ID: 1, Action: "comment", Reason: "请处理"}},
+		{name: "empty reason", input: &WorkflowTaskUrge{ID: 1, Action: "urge_task", Reason: "   "}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := uc.UrgeTask(context.Background(), tc.input, 7, "pmc")
+			if !errors.Is(err, ErrBadParam) {
+				t.Fatalf("expected ErrBadParam, got %v", err)
+			}
+		})
+	}
+}
+
+func TestWorkflowUsecase_UrgeTaskAcceptsSupportedActions(t *testing.T) {
+	actions := []string{
+		"urge_task",
+		"urge_role",
+		"urge_assignee",
+		"escalate_to_pmc",
+		"escalate_to_boss",
+	}
+
+	for _, action := range actions {
+		t.Run(action, func(t *testing.T) {
+			repo := &stubWorkflowRepo{}
+			uc := NewWorkflowUsecase(repo)
+			task, err := uc.UrgeTask(context.Background(), &WorkflowTaskUrge{
+				ID:      1,
+				Action:  " " + action + " ",
+				Reason:  " 请尽快处理 ",
+				Payload: nil,
+			}, 7, " pmc ")
+			if err != nil {
+				t.Fatalf("UrgeTask should accept %q, got %v", action, err)
+			}
+			if task.ID != 1 {
+				t.Fatalf("expected task id 1, got %d", task.ID)
+			}
+			if repo.urgeTaskInput == nil {
+				t.Fatalf("expected repo input")
+			}
+			if repo.urgeTaskInput.Action != action {
+				t.Fatalf("expected normalized action %q, got %q", action, repo.urgeTaskInput.Action)
+			}
+			if repo.urgeTaskInput.Reason != "请尽快处理" {
+				t.Fatalf("expected trimmed reason, got %q", repo.urgeTaskInput.Reason)
+			}
+			if repo.urgeTaskInput.Payload == nil {
+				t.Fatalf("expected payload default to empty map")
+			}
+		})
 	}
 }

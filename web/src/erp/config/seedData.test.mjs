@@ -12,11 +12,16 @@ import {
   getBusinessNavigationSections,
 } from './businessModules.mjs'
 import {
+  businessMainlineDocGroups,
   documentationCards,
   fieldTruthRows,
   getNavigationSections,
   getRoleWorkbench,
+  helpCenterAdvancedDocItems,
+  helpCenterReadingPath,
   helpCenterNavItems,
+  helpCenterPrimaryNavKeys,
+  helpCenterRoleNavGroups,
   pendingFieldTruthRows,
   plannedModules,
   qaNavItems,
@@ -58,28 +63,70 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
   const qaSection = navigationSections.find(
     (section) => section.title === '开发与验收'
   )
+  const advancedSection = navigationSections.find(
+    (section) => section.title === '高级文档'
+  )
 
   assert(helpSection)
+  assert(advancedSection)
   assert(qaSection)
   assert(systemSection)
+  assert.deepEqual(
+    navigationSections.map((section) => section.title),
+    [
+      '看板中心',
+      '销售链路',
+      '采购/仓储',
+      '生产环节',
+      '财务环节',
+      '单据模板',
+      '系统管理',
+      '帮助中心',
+      '高级文档',
+      '开发与验收',
+    ]
+  )
+  assert.deepEqual(
+    navigationSections
+      .find((section) => section.title === '看板中心')
+      ?.items.map((item) => item.path),
+    ['/erp/dashboard', '/erp/business-dashboard']
+  )
   assert.deepEqual(
     helpSection.items.map((item) => item.path),
     [
       '/erp/docs/operation-flow-overview',
       '/erp/docs/operation-guide',
       '/erp/docs/role-collaboration-guide',
+      '/erp/docs/mobile-role-guide',
+      '/erp/docs/task-flow-v1',
+      '/erp/docs/notification-alert-v1',
+      '/erp/docs/finance-v1',
+      '/erp/docs/warehouse-quality-v1',
+    ]
+  )
+  assert.deepEqual(helpCenterPrimaryNavKeys, [
+    'help-operation-flow-overview',
+    'help-operation-guide',
+    'help-role-collaboration-guide',
+    'help-mobile-role-guide',
+    'help-task-flow-v1',
+    'help-notification-alert-v1',
+    'help-finance-v1',
+    'help-warehouse-quality-v1',
+  ])
+  assert.deepEqual(
+    advancedSection.items.map((item) => item.path),
+    [
       '/erp/docs/role-page-document-matrix',
       '/erp/docs/task-document-mapping',
       '/erp/docs/workflow-status-guide',
       '/erp/docs/workflow-schema-draft',
-      '/erp/docs/task-flow-v1',
+      '/erp/docs/workflow-usecase-review',
+      '/erp/docs/industry-schema-review',
       '/erp/docs/role-permission-matrix-v1',
-      '/erp/docs/notification-alert-v1',
-      '/erp/docs/finance-v1',
-      '/erp/docs/warehouse-quality-v1',
       '/erp/docs/log-trace-audit-v1',
       '/erp/docs/desktop-role-guide',
-      '/erp/docs/mobile-role-guide',
       '/erp/docs/field-linkage-guide',
       '/erp/docs/calculation-guide',
       '/erp/docs/print-snapshot-guide',
@@ -90,6 +137,10 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
   assert.deepEqual(
     helpCenterNavItems.map((item) => item.path),
     helpSection.items.map((item) => item.path)
+  )
+  assert.deepEqual(
+    helpCenterAdvancedDocItems.map((item) => item.path),
+    advancedSection.items.map((item) => item.path)
   )
   assert.deepEqual(
     qaSection.items.map((item) => item.path),
@@ -113,7 +164,53 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
   documentationCards.forEach((card) => {
     assert(card.path.startsWith('/erp/docs/'))
   })
+  assert.equal(helpCenterNavItems.length, 8)
+  assert(
+    !helpCenterNavItems.some((item) =>
+      /debug|seed|cleanup|调试数据|清理调试/u.test(
+        `${item.label} ${item.summary || ''} ${item.path}`
+      )
+    )
+  )
+  assert.equal(helpCenterRoleNavGroups.length, 8)
+  assert.deepEqual(
+    helpCenterRoleNavGroups.map((group) => group.role),
+    ['老板', '跟单 / 业务', 'PMC', '采购', '生产', '仓库', '品质', '财务']
+  )
+  assert.equal(businessMainlineDocGroups.length, 6)
+  assert.deepEqual(
+    businessMainlineDocGroups.map((group) => group.title),
+    [
+      '订单到工程',
+      '采购到入库',
+      '委外到入库',
+      '生产到出货',
+      '出货到应收/开票',
+      '采购/委外到应付/对账',
+    ]
+  )
+  assert.deepEqual(
+    helpCenterReadingPath.map((item) => item.path),
+    [
+      '/erp/docs/operation-guide',
+      '/erp/docs/operation-flow-overview',
+      '/erp/docs/role-collaboration-guide',
+      '/erp/docs/mobile-role-guide',
+    ]
+  )
   assert(!navPaths.includes('/erp/docs/system-init'))
+  assert(
+    !helpSection.items
+      .map((item) => item.path)
+      .includes('/erp/docs/workflow-usecase-review')
+  )
+  assert(
+    !helpSection.items
+      .map((item) => item.path)
+      .includes('/erp/docs/industry-schema-review')
+  )
+  assert(navPaths.includes('/erp/docs/workflow-usecase-review'))
+  assert(navPaths.includes('/erp/docs/industry-schema-review'))
   assert(!navPaths.includes('/erp/flows/overview'))
   assert(!navPaths.includes('/erp/source-readiness'))
   assert(!navPaths.includes('/erp/mobile-workbenches'))
@@ -190,7 +287,7 @@ test('appRegistry: 桌面后台单入口，移动端按角色拆端口', () => {
   )
 })
 
-test('dashboardModules: 首页任务看板按业务模块聚合状态', () => {
+test('dashboardModules: 业务看板按业务模块聚合状态', () => {
   const activeBusinessModules = businessModuleDefinitions.filter(
     (moduleItem) => moduleItem.status !== 'awaiting_confirmation'
   )

@@ -3,7 +3,12 @@ import test from 'node:test'
 
 import { printTemplateCatalog } from '../config/printTemplates.mjs'
 import {
+  BUSINESS_CHAIN_COVERAGE_MATRIX_SUMMARY,
+  BUSINESS_LOOP_COVERAGE_ROWS,
+  KNOWN_QA_BLIND_SPOTS,
   QA_REPORT_OUTPUT_HINTS,
+  QA_QUALITY_COMMAND_ROWS,
+  QA_WORKBENCH_PATHS,
   getFieldLinkageStatusMeta,
   getQaReportStatusMeta,
   getQaWorkbenchArtifactSnapshot,
@@ -102,5 +107,73 @@ test('qaWorkbenchReports: 字段联动状态不会把缺失报告伪装成通过
       missingCases: 0,
     }),
     { color: 'green', label: '已覆盖' }
+  )
+})
+
+test('qaWorkbenchReports: 当前闭环 质量命令和盲区口径完整', () => {
+  assert.equal(
+    QA_WORKBENCH_PATHS.workflowTaskDebug,
+    '/erp/qa/workflow-task-debug'
+  )
+  assert.equal(BUSINESS_LOOP_COVERAGE_ROWS.length, 6)
+  assert.deepEqual(
+    BUSINESS_LOOP_COVERAGE_ROWS.map((item) => item.key),
+    [
+      'order_approval_engineering',
+      'purchase_iqc_inbound',
+      'outsource_return_inbound',
+      'finished_goods_shipment',
+      'shipment_receivable_invoice',
+      'payable_reconciliation',
+    ]
+  )
+  assert(
+    BUSINESS_LOOP_COVERAGE_ROWS.some((item) =>
+      item.chain.includes('出货 -> 应收登记 -> 开票登记')
+    )
+  )
+  assert(
+    BUSINESS_LOOP_COVERAGE_ROWS.some((item) =>
+      item.chain.includes('采购/委外 -> 应付登记 -> 对账')
+    )
+  )
+  assert.deepEqual(
+    QA_QUALITY_COMMAND_ROWS.map((item) => item.command),
+    [
+      'cd web && pnpm lint',
+      'cd web && pnpm css',
+      'cd web && pnpm test',
+      'cd web && pnpm style:l1',
+      'cd web && pnpm smoke:mobile-auth-login-route',
+      'cd server && go test ./...',
+      'cd server && make build',
+      'git diff --check',
+    ]
+  )
+  assert(
+    KNOWN_QA_BLIND_SPOTS.some((item) =>
+      item.includes('后端 workflow usecase 统一编排')
+    )
+  )
+  assert(
+    KNOWN_QA_BLIND_SPOTS.some((item) => item.includes('完整业务 E2E 造数'))
+  )
+})
+
+test('qaWorkbenchReports: 链路覆盖矩阵区分主干 deferred 和不做范围', () => {
+  assert.deepEqual(
+    BUSINESS_CHAIN_COVERAGE_MATRIX_SUMMARY.map((item) => item.key),
+    ['mainline-v1', 'deferred-extensions', 'out-of-scope']
+  )
+  assert.equal(
+    BUSINESS_CHAIN_COVERAGE_MATRIX_SUMMARY.find(
+      (item) => item.key === 'mainline-v1'
+    )?.count,
+    6
+  )
+  assert(
+    BUSINESS_CHAIN_COVERAGE_MATRIX_SUMMARY.find(
+      (item) => item.key === 'deferred-extensions'
+    )?.reportRule.includes('不能纳入已完成统计')
   )
 })

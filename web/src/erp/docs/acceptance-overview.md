@@ -1,76 +1,117 @@
 # 验收结果总览
 
-> 目的：把当前可执行的验收入口、可读取的结构化产物、已知盲区和下一步排查路径集中到一个研发 / 测试入口，避免把帮助中心、脚本和临时聊天结论混在一起。
+> 目的：把当前可执行的验收入口、闭环覆盖、质量命令、结构化产物、已知盲区和下一步排查路径集中到一个研发 / 测试入口，避免把帮助中心、脚本和临时聊天结论混在一起。
 
 ## 1. 当前结论
 
-- `/erp/qa/acceptance-overview` 已从 Markdown 说明页升级为 React 状态总览页。
+- `/erp/qa/acceptance-overview` 是当前项目健康度和闭环覆盖总览页，不替代具体业务页面。
 - 页面会读取字段联动 latest 报告，并用打印模板目录识别当前打印专项范围。
 - 没有稳定 latest 摘要的专项必须显示为待生成或说明边界，不能伪装成通过。
-- 业务链路调试仍然是只读排查页，不提供一键造数或链路重建。
-- 运行记录和专项报告当前仍以文档、命令和 latest 摘要为主，后续等专项产物稳定后再继续升级为状态卡片。
+- 业务链路调试已增强为安全调试场景中心和链路覆盖矩阵；填入并查询只读，重建和清空本场景样本默认等待后端安全 API。
+- 协同任务调试是只读诊断页，只解释 `workflow_tasks`、角色任务池、移动端可见性和事件留痕，不提供生产运维改数据能力。
+- 当前 6 条链路是 ERP v1 主干闭环，不是所有业务链路全量覆盖。
+- 当前闭环主要由前端 v1 编排推动，后端负责保存 `business_records`、`workflow_tasks`、`workflow_task_events` 和 `workflow_business_states`。
+- 本轮已完成 workflow usecase 统一编排评审和行业专表 schema 评审，结论是“后端 workflow usecase 可以下一轮渐进试迁，行业专表先评审 P1 草案但本轮不落表”。
+- 当前仍未迁移的原因：6 条 v1 闭环刚完成，业务字段和专表真源尚未完全冻结；直接重写 workflow usecase 或生成 Ent migration 会同时放大流程、数据和前端兼容风险。
 
-## 2. 当前总览页读取哪些来源
+## 2. 当前架构评审状态
 
-| 来源                                                   | 当前用途                         | 当前边界                               |
-| ------------------------------------------------------ | -------------------------------- | -------------------------------------- |
-| `web/public/qa/erp-field-linkage-coverage.latest.json` | 展示字段、场景和失败状态覆盖摘要 | 只代表最近一次本地字段联动专项执行结果 |
-| `web/src/erp/config/printTemplates.mjs`                | 识别当前启用的打印模板范围       | 模板存在不等于打印专项已经跑完         |
-| `/qa/erp-print.latest.json`                            | 预留打印专项 latest 摘要入口     | 当前不存在时必须显示为待生成           |
-| `web/src/erp/utils/businessChainDebug.mjs`             | 提供业务链路调试入口和排查边界   | 只读查询，不造数                       |
-| `web/src/erp/docs/qa-run-records.md` / `qa-reports.md` | 承接命令、产物、专项边界         | 当前仍是聚合说明，不替代真实执行结果   |
+| 评审项                    | 当前结论                                                           | 推荐下一步                                                                                   | 本轮边界                                                                     |
+| ------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| workflow usecase 统一编排 | 支持下一轮渐进迁入后端，不支持一次性重写 6 条闭环                  | 先试迁“老板审批通过 -> 工程资料任务”，验证后端幂等、事务、事件和业务状态一致性               | 不改后端 usecase 行为，不改 workflow API，不改前端 6 条闭环逻辑              |
+| 行业专表 Ent schema       | 暂不马上拆表；`business_records + workflow_tasks` 继续承接 v1 闭环 | 先设计 `inventory_txn / inventory_balance` 草案，再设计 AR/AP 财务专表草案，均先不 migration | 不改 Ent schema，不生成 migration，不跑 `make data` 和 `make migrate_status` |
+| 当前帮助中心入口          | 两份评审文档只放高级文档 / 管理员 / 开发验收区域                   | 普通业务用户继续从操作教程、流程总览、角色协同和 6 条业务主线进入                            | 不放普通业务用户 primary nav，避免误解成操作教程                             |
 
-## 3. 当前推荐验收顺序
+workflow usecase 评审结论：当前前端 v1 编排适合继续承接 UI 辅助、调试验收、非关键链路和频繁调整流程；任务完成后必须强一致生成下游任务、需要多入口一致、需要幂等和审计闭环的动作，应逐步迁入后端 usecase。
 
-1. 先跑前端基础检查：
+industry schema 评审结论：P0 范围继续不拆表；P1 只优先评审 `inventory_txn`、`inventory_balance`、`ar_receivable`、`ar_invoice`、`ap_payable`、`ap_reconciliation`，不马上落 Ent schema。
 
-```bash
-cd /Users/simon/projects/plush-toy-erp/web
-pnpm lint
-pnpm css
-pnpm test
-```
+## 3. 当前 v1 主干闭环覆盖
 
-2. 若改了页面、菜单、表单、打印或布局，再跑浏览器回归：
+| 业务闭环                                 | 当前状态  | 承载方式                              | 验收方式                             | 当前盲区                                                           |
+| ---------------------------------------- | --------- | ------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| 订单提交 -> 老板审批 -> 工程资料任务     | 已接入 v1 | `business_records` + `workflow_tasks` | 单元测试 + `style:l1` + 移动端 smoke | 没有后端 workflow usecase 统一编排，没有真实 E2E 造数 runner       |
+| 采购到货 -> IQC -> 入库                  | 已接入 v1 | `business_records` + `workflow_tasks` | 单元测试 + `style:l1` + 移动端 smoke | 没有真实库存流水 / 库存余额专表                                    |
+| 委外发料 -> 回货 -> 检验 -> 入库         | 已接入 v1 | `business_records` + `workflow_tasks` | 单元测试 + `style:l1` + 移动端 smoke | 没有 `outsource_order` 专表，没有真实委外成本结算专表              |
+| 成品完工 -> 成品抽检 -> 成品入库 -> 出货 | 已接入 v1 | `business_records` + `workflow_tasks` | 单元测试 + `style:l1` + 移动端 smoke | 没有 `production_order` / `shipment_order` / `inventory_txn` 专表  |
+| 出货 -> 应收登记 -> 开票登记             | 已接入 v1 | `business_records` + `workflow_tasks` | 单元测试 + `style:l1` + 移动端 smoke | 没有 `ar_receivable` / `ar_invoice` 专表，没有总账、凭证、纳税申报 |
+| 采购/委外 -> 应付登记 -> 对账            | 已接入 v1 | `business_records` + `workflow_tasks` | 单元测试 + `style:l1` + 移动端 smoke | 没有 `ap_payable` / `ap_settlement` 专表，没有付款流水             |
 
-```bash
-cd /Users/simon/projects/plush-toy-erp/web
-pnpm style:l1
-```
+这些闭环用于验证 ERP v1 主干“业务记录 -> 任务 -> 状态 -> 移动端可见性”的排查能力，不等于真实生产 E2E 已完成，也不代表扩展链路已经覆盖。
 
-3. 若改了字段联动、保存转换、合同金额、打印快照或默认样例清值，先刷新字段联动报告：
+## 4. deferred 扩展链路边界
 
-```bash
-cd /Users/simon/projects/plush-toy-erp
-node scripts/qa/erp-field-linkage.mjs
-```
+| 扩展链路                                | 当前口径                                               |
+| --------------------------------------- | ------------------------------------------------------ |
+| 工程资料 -> BOM -> 材料需求 -> 采购需求 | deferred，尚未从 BOM 自动生成材料需求和采购需求        |
+| 订单变更 / 客户变更 / 交期变更          | deferred，当前不覆盖变更审批和影响传播                 |
+| 生产排产 -> 分派 -> 生产进度            | partial，已有模块但主闭环未覆盖前置排产分派            |
+| 欠料预警 -> 采购补料                    | deferred，缺库存余额、材料需求和缺料计算真源           |
+| 仓库发料 / 委外发料 / 生产领料          | deferred，当前不覆盖领料 / 发料流水                    |
+| 库存盘点 / 库存调整 / 异常件            | deferred，缺真实库存流水和库存余额                     |
+| 返工完成 -> 重新送检                    | partial，自动重新送检规则未完整                        |
+| 出货退回 / 客诉 / 售后                  | deferred，当前只覆盖正常出货                           |
+| 收款登记 / 付款登记                     | deferred，当前不覆盖实际收付款流水                     |
+| 发票异常 / 红冲 / 作废                  | deferred，当前只覆盖开票登记                           |
+| 成本核算 / 毛利分析                     | deferred，缺完整库存成本、采购成本、委外成本和财务专表 |
+| 供应商 / 加工商绩效                     | deferred，当前没有绩效模型                             |
+| 权限审批 / 菜单权限变更审计             | deferred，当前没有权限变更审批流                       |
+| 完整通知中心 / 未读 / 外部推送          | deferred，尚未落 notifications 独立表                  |
 
-4. 若改了合同工作台、在线预览或真实登录链路，再启动后端并跑合同 smoke：
+## 5. 当前质量命令
 
-```bash
-cd /Users/simon/projects/plush-toy-erp/server
-make run
+| 命令                                           | 何时执行                         | 说明                                           |
+| ---------------------------------------------- | -------------------------------- | ---------------------------------------------- |
+| `cd web && pnpm lint`                          | 前端改动后                       | 检查 JS / React / 配置基础问题                 |
+| `cd web && pnpm css`                           | 样式或页面改动后                 | 检查 CSS 规则和样式约束                        |
+| `cd web && pnpm test`                          | 前端逻辑、配置、文档注册改动后   | 覆盖单元测试、配置测试和工具函数测试           |
+| `cd web && pnpm style:l1`                      | 页面、导航、布局、文档入口改动后 | 浏览器级页面回归，不应被端口占用失败误判为通过 |
+| `cd web && pnpm smoke:mobile-auth-login-route` | 移动端角色入口或任务可见性改动后 | 快速确认移动端登录和路由主路径                 |
+| `cd server && go test ./...`                   | 改 Go 代码后                     | 本轮若未改 Go，可跳过并说明原因                |
+| `cd server && make build`                      | 改 Go 代码或发布相关代码后       | 本轮若未改 Go，可跳过并说明原因                |
+| `git diff --check`                             | 收口前                           | 检查空白和补丁格式问题                         |
 
-cd /Users/simon/projects/plush-toy-erp/web
-pnpm smoke:purchase-contract-real-login
-pnpm smoke:processing-contract-real-login
-```
+改 Ent schema 时才需要执行 `make data` 和 `make migrate_status`。本页不写死最近 `pnpm test` 的通过数量，除非后续有结构化 latest 数据来源。
 
-5. 若改了后端、错误码、迁移、脚本或发布链路，再按影响范围执行：
+## 6. 当前总览页读取哪些来源
 
-```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/fast.sh
-bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
-```
+| 来源                                                   | 当前用途                                             | 当前边界                                    |
+| ------------------------------------------------------ | ---------------------------------------------------- | ------------------------------------------- |
+| `web/public/qa/erp-field-linkage-coverage.latest.json` | 展示字段、场景和失败状态覆盖摘要                     | 只代表最近一次本地字段联动专项执行结果      |
+| `web/src/erp/config/printTemplates.mjs`                | 识别当前启用的打印模板范围                           | 模板存在不等于打印专项已经跑完              |
+| `/qa/erp-print.latest.json`                            | 预留打印专项 latest 摘要入口                         | 当前不存在时必须显示为待生成                |
+| `web/src/erp/utils/businessChainDebug.mjs`             | 提供业务链路调试入口、6 条 v1 主干场景和扩展链路矩阵 | 写入类 debug 操作默认禁用，等待后端安全 API |
+| `web/src/erp/pages/WorkflowTaskDebugPage.jsx`          | 提供协同任务调试入口和移动端可见性诊断               | 只读诊断，不修任务数据                      |
+| `web/src/erp/docs/qa-run-records.md` / `qa-reports.md` | 承接命令、产物、专项边界                             | 当前仍是聚合说明，不替代真实执行结果        |
 
-## 4. 当前已知盲区
+## 7. 当前入口与建议动作
 
-- 还没有毛绒业务专用的一键调试造数。
-- 除字段联动专项外，还没有统一的 `public/qa/*.latest.json` 结构化验收摘要。
-- 打印模板当前能识别模板范围，但还没有稳定打印专项 latest 报告。
-- 还没有正式 Excel 导入落库、打印留档回写和细分业务专表全链路验收。
+| 入口                  | 用途                                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| 验收结果总览          | 看当前闭环覆盖、质量命令、结构化产物和已知盲区                                            |
+| 业务链路调试          | 排查 6 条 v1 主干闭环，查看 deferred 扩展链路和受保护 debug 场景操作                      |
+| 协同任务调试          | 排查 `workflow_tasks` 是否进入正确角色池、移动端是否可见、`workflow_task_events` 是否留痕 |
+| 字段联动覆盖          | 排查字段快照、残值、缺值、打印取值和导入映射口径                                          |
+| 运行记录              | 记录最近命令、环境、跳过项、失败原因和剩余风险                                            |
+| 专项报告              | 承接 workflow、权限、打印、错误码、通知预警等专项                                         |
+| Workflow usecase 评审 | 查看是否把前端 v1 编排迁入后端 usecase、迁哪些、怎么迁和怎么回滚                          |
+| 行业专表 Schema 评审  | 查看哪些业务对象值得拆 Ent 专表、P1 专表候选、一致性策略和迁移风险                        |
 
-## 5. 后续升级条件
+## 8. 当前已知盲区
+
+- 当前还没有后端 workflow usecase 统一编排，闭环主要仍是前端 v1 编排。
+- 当前 6 条链路是 v1 主干闭环，不是全量业务覆盖；BOM 材料需求、订单变更、排产分派、发料领料、库存盘点、售后退货、收付款、成本毛利等仍是 deferred 或 partial。
+- 当前还没有行业专表，例如 `production_order`、`shipment_order`、`inventory_txn`、`ar_receivable`、`ar_invoice`、`ap_payable`、`ap_settlement`、`settlement`。
+- 当前还没有真实库存流水和库存余额。
+- 当前还没有财务专表、总账、凭证、纳税申报。
+- v1 已有催办 / 升级事件留痕，仍没有 notification 独立表、收件箱、未读状态和外部推送。
+- 当前业务链路调试页用于辅助定位，不等于真实生产 E2E 已完成；当前还没有完整业务 E2E 造数 runner。
+- 当前协同任务调试页是诊断页面，不是生产运维改数据页面。
+- 当前没有真实生产数据库上的人工 E2E 点按联调记录。
+- 当前很多结果依赖单元测试、`style:l1`、移动端 smoke 和 API 调用形态覆盖。
+- 本轮评审不等于已迁移：后端 usecase 仍未统一编排，行业专表仍未创建，库存余额和财务核销仍不是当前系统能力。
+
+## 9. 后续升级条件
 
 满足下列条件后，再把更多专项接成状态卡片：
 

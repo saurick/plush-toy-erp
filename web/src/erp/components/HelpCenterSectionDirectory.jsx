@@ -11,7 +11,7 @@ export default function HelpCenterSectionDirectory({ headings = [] }) {
       <div className="erp-help-doc-toc__header">
         <div className="text-sm font-semibold text-slate-50">本页目录</div>
         <div className="text-xs leading-5 text-slate-400">
-          先看后台与移动端原则，再看模板打印和正式文档。
+          先按新手、角色和业务主线找入口，再进入高级文档。
         </div>
       </div>
       <ol className="erp-help-doc-toc__list">

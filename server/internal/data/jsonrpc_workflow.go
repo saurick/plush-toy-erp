@@ -138,6 +138,30 @@ func (d *JsonrpcData) handleWorkflow(
 			Data:    newDataStruct(map[string]any{"task": workflowTaskToMap(task)}),
 		}, nil
 
+	case "urge_task":
+		payload, ok := getWorkflowPayload(pm, "payload")
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
+		}
+		actorRoleKey := strings.TrimSpace(getString(pm, "actor_role_key"))
+		if actorRoleKey == "" {
+			actorRoleKey = "admin"
+		}
+		task, err := d.workflowUC.UrgeTask(ctx, &biz.WorkflowTaskUrge{
+			ID:      getInt(pm, "task_id", 0),
+			Action:  getString(pm, "action"),
+			Reason:  getString(pm, "reason"),
+			Payload: payload,
+		}, claims.UserID, actorRoleKey)
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: "任务催办已记录",
+			Data:    newDataStruct(map[string]any{"task": workflowTaskToMap(task)}),
+		}, nil
+
 	case "list_business_states":
 		limit := getWorkflowLimit(pm)
 		offset := getWorkflowOffset(pm)

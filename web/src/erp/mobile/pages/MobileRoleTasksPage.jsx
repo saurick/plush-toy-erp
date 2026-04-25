@@ -8,6 +8,7 @@ import {
   listWorkflowTasks,
   updateWorkflowTaskStatus,
   upsertWorkflowBusinessState,
+  urgeWorkflowTask,
 } from '../../api/workflowApi.mjs'
 import {
   listBusinessRecords,
@@ -82,6 +83,35 @@ import {
   isShipmentReleaseTask,
   resolveFinishedGoodsTaskBusinessStatus,
 } from '../../utils/finishedGoodsFlow.mjs'
+import {
+  INVOICE_REGISTRATION_TASK_GROUP,
+  RECEIVABLE_REGISTRATION_TASK_GROUP,
+  RECONCILING_STATUS_KEY as FINANCE_RECONCILING_STATUS_KEY,
+  SHIPPED_STATUS_KEY as FINANCE_SHIPPED_STATUS_KEY,
+  buildFinanceBlockedState,
+  buildInvoiceRegistrationTask,
+  buildReceivableRegistrationTask,
+  isInvoiceRegistrationTask,
+  isReceivableRegistrationTask,
+  resolveShipmentFinanceTaskBusinessStatus,
+} from '../../utils/shipmentFinanceFlow.mjs'
+import {
+  OUTSOURCE_PAYABLE_REGISTRATION_TASK_GROUP,
+  OUTSOURCE_RECONCILIATION_TASK_GROUP,
+  PURCHASE_PAYABLE_REGISTRATION_TASK_GROUP,
+  PURCHASE_RECONCILIATION_TASK_GROUP,
+  RECONCILING_STATUS_KEY as PAYABLE_RECONCILING_STATUS_KEY,
+  SETTLED_STATUS_KEY as PAYABLE_SETTLED_STATUS_KEY,
+  buildOutsourcePayableRegistrationTask,
+  buildOutsourceReconciliationTask,
+  buildPayableBlockedState,
+  buildPurchasePayableRegistrationTask,
+  buildPurchaseReconciliationTask,
+  isOutsourcePayableRegistrationTask,
+  isPayableRegistrationTask,
+  isPayableReconciliationTask,
+  resolvePayableReconciliationTaskBusinessStatus,
+} from '../../utils/payableReconciliationFlow.mjs'
 import { mobileTheme } from '../theme'
 
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
@@ -158,6 +188,8 @@ function resolveMobileTaskBusinessStatus(task, taskStatusKey) {
     resolvePurchaseInboundBusinessStatus(task, taskStatusKey) ||
     resolveOutsourceReturnBusinessStatus(task, taskStatusKey) ||
     resolveFinishedGoodsTaskBusinessStatus(task, taskStatusKey) ||
+    resolveShipmentFinanceTaskBusinessStatus(task, taskStatusKey) ||
+    resolvePayableReconciliationTaskBusinessStatus(task, taskStatusKey) ||
     resolveOrderApprovalBusinessStatus(task, taskStatusKey)
   )
 }
@@ -168,8 +200,103 @@ function supportsRejectedAction(roleKey, task) {
     (roleKey === 'quality' &&
       (isPurchaseIqcTask(task) ||
         isOutsourceReturnQcTask(task) ||
-        isFinishedGoodsQcTask(task)))
+        isFinishedGoodsQcTask(task))) ||
+    (roleKey === 'finance' &&
+      (isReceivableRegistrationTask(task) ||
+        isInvoiceRegistrationTask(task) ||
+        isPayableRegistrationTask(task) ||
+        isPayableReconciliationTask(task)))
   )
+}
+
+function canOperateTask(roleKey, task) {
+  return (
+    String(task.owner_role_key || '').trim() === String(roleKey || '').trim()
+  )
+}
+
+function isRiskTaskForUrge(task = {}) {
+  return (
+    ['blocked', 'rejected'].includes(
+      String(task.task_status_key || '').trim()
+    ) ||
+    task.due_status === 'overdue' ||
+    task.alert_level === 'critical' ||
+    task.priority >= 3 ||
+    task.payload?.critical_path === true ||
+    task.is_escalated === true
+  )
+}
+
+function resolveMobileUrgeAction(roleKey, task = {}) {
+  if (roleKey === 'boss') return 'escalate_to_boss'
+  if (
+    roleKey !== 'pmc' &&
+    ['blocked', 'rejected'].includes(String(task.task_status_key || '').trim())
+  ) {
+    return 'escalate_to_pmc'
+  }
+  return 'urge_task'
+}
+
+function canUrgeTask(roleKey, task = {}) {
+  if (
+    TERMINAL_TASK_STATUS_KEYS.has(String(task.task_status_key || '').trim())
+  ) {
+    return false
+  }
+  if (roleKey === 'pmc') return isRiskTaskForUrge(task)
+  if (roleKey === 'boss') {
+    return (
+      task.priority >= 3 ||
+      task.due_status === 'overdue' ||
+      task.alert_level === 'critical' ||
+      task.owner_role_key === 'finance' ||
+      task.is_escalated === true
+    )
+  }
+  if (roleKey === 'merchandiser') {
+    return (
+      task.owner_role_key === roleKey ||
+      task.payload?.confirm_role_key === 'merchandiser' ||
+      ['project-orders', 'shipping-release', 'outbound'].includes(
+        task.source_type
+      )
+    )
+  }
+  if (roleKey === 'production') {
+    return (
+      task.owner_role_key === roleKey ||
+      ['processing-contracts', 'production-progress'].includes(
+        task.source_type
+      ) ||
+      String(task.task_group || '').includes('rework') ||
+      String(task.task_group || '').includes('outsource')
+    )
+  }
+  if (roleKey === 'finance') {
+    return (
+      task.owner_role_key === roleKey ||
+      ['receivables', 'invoices', 'payables', 'reconciliation'].includes(
+        task.source_type
+      )
+    )
+  }
+  return (
+    task.owner_role_key === roleKey &&
+    ['blocked', 'rejected'].includes(String(task.task_status_key || '').trim())
+  )
+}
+
+function hasFinanceAmountPayload(task) {
+  const payload = task?.payload || {}
+  return [
+    'amount',
+    'tax_rate',
+    'tax_amount',
+    'amount_with_tax',
+    'amount_without_tax',
+  ].some((key) => payload[key] !== undefined && payload[key] !== '')
 }
 
 export default function MobileRoleTasksPage() {
@@ -177,7 +304,9 @@ export default function MobileRoleTasksPage() {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
   const [updatingID, setUpdatingID] = useState(null)
+  const [urgingID, setUrgingID] = useState(null)
   const [blockedReasonByTaskID, setBlockedReasonByTaskID] = useState({})
+  const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState({})
 
   const taskViews = useMemo(
     () => buildMobileTaskListForRole(tasks, activeRoleKey),
@@ -514,6 +643,46 @@ export default function MobileRoleTasksPage() {
         critical_path: true,
       },
     })
+    const payableRecord = {
+      ...savedRecord,
+      module_key: task.source_type,
+      payload: {
+        ...(savedRecord.payload || {}),
+        inbound_result: 'done',
+        payable_type: 'purchase',
+      },
+    }
+    const hasPayableTask = await hasActiveTaskForSource(
+      task,
+      PURCHASE_PAYABLE_REGISTRATION_TASK_GROUP
+    )
+    const payableTask = buildPurchasePayableRegistrationTask(
+      payableRecord,
+      task
+    )
+    let createdPayableTask = null
+    if (payableTask && !hasPayableTask) {
+      createdPayableTask = await createWorkflowTask(payableTask)
+    }
+    if (payableTask) {
+      await upsertWorkflowBusinessState({
+        source_type: task.source_type,
+        source_id: savedRecord.id,
+        source_no: savedRecord.document_no || task.source_no,
+        business_status_key: INBOUND_DONE_STATUS_KEY,
+        owner_role_key: 'finance',
+        payload: {
+          record_title: savedRecord.title,
+          warehouse_task_id: task.id,
+          payable_task_id: createdPayableTask?.id,
+          inbound_result: 'done',
+          notification_type: 'finance_pending',
+          alert_type: 'payable_pending',
+          next_module_key: 'payables',
+          payable_type: 'purchase',
+        },
+      })
+    }
   }
 
   const completeOutsourceReturnTrackingTask = async (task, reason) => {
@@ -683,6 +852,48 @@ export default function MobileRoleTasksPage() {
         outsource_processing: true,
       },
     })
+    const payableRecord = {
+      ...savedRecord,
+      module_key: task.source_type,
+      payload: {
+        ...(savedRecord.payload || {}),
+        inbound_result: 'done',
+        payable_type: 'outsource',
+        outsource_processing: true,
+      },
+    }
+    const hasPayableTask = await hasActiveTaskForSource(
+      task,
+      OUTSOURCE_PAYABLE_REGISTRATION_TASK_GROUP
+    )
+    const payableTask = buildOutsourcePayableRegistrationTask(
+      payableRecord,
+      task
+    )
+    let createdPayableTask = null
+    if (payableTask && !hasPayableTask) {
+      createdPayableTask = await createWorkflowTask(payableTask)
+    }
+    if (payableTask) {
+      await upsertWorkflowBusinessState({
+        source_type: task.source_type,
+        source_id: savedRecord.id,
+        source_no: savedRecord.document_no || task.source_no,
+        business_status_key: OUTSOURCE_INBOUND_DONE_STATUS_KEY,
+        owner_role_key: 'finance',
+        payload: {
+          record_title: savedRecord.title,
+          warehouse_task_id: task.id,
+          payable_task_id: createdPayableTask?.id,
+          inbound_result: 'done',
+          notification_type: 'finance_pending',
+          alert_type: 'payable_pending',
+          next_module_key: 'payables',
+          payable_type: 'outsource',
+          outsource_processing: true,
+        },
+      })
+    }
   }
 
   const completeOutsourceReworkTask = async (task, reason) => {
@@ -879,6 +1090,44 @@ export default function MobileRoleTasksPage() {
         finished_goods: true,
       },
     })
+    const receivableRecord = {
+      ...savedRecord,
+      module_key: task.source_type,
+      payload: {
+        ...(savedRecord.payload || {}),
+        shipment_result: FINANCE_SHIPPED_STATUS_KEY,
+        shipped: true,
+      },
+    }
+    const hasReceivableTask = await hasActiveTaskForSource(
+      task,
+      RECEIVABLE_REGISTRATION_TASK_GROUP
+    )
+    const receivableTask = buildReceivableRegistrationTask(
+      receivableRecord,
+      task
+    )
+    let createdReceivableTask = null
+    if (receivableTask && !hasReceivableTask) {
+      createdReceivableTask = await createWorkflowTask(receivableTask)
+    }
+    await upsertWorkflowBusinessState({
+      source_type: task.source_type,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: FINANCE_SHIPPED_STATUS_KEY,
+      owner_role_key: 'finance',
+      payload: {
+        record_title: savedRecord.title,
+        shipment_task_id: task.id,
+        receivable_task_id: createdReceivableTask?.id,
+        shipment_result: 'shipped',
+        notification_type: 'finance_pending',
+        alert_type: 'finance_pending',
+        critical_path: true,
+        next_module_key: 'receivables',
+      },
+    })
   }
 
   const completeFinishedGoodsReworkTask = async (task, reason) => {
@@ -907,6 +1156,206 @@ export default function MobileRoleTasksPage() {
         finished_goods: true,
       },
     })
+  }
+
+  const completeReceivableRegistrationTask = async (task, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应出货或应收登记记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        FINANCE_RECONCILING_STATUS_KEY,
+        reason || '应收登记已完成'
+      )) || record
+    await upsertWorkflowBusinessState({
+      source_type: task.source_type,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: FINANCE_RECONCILING_STATUS_KEY,
+      owner_role_key: 'finance',
+      payload: {
+        record_title: savedRecord.title,
+        receivable_task_id: task.id,
+        receivable_result: 'registered',
+        notification_type: 'finance_pending',
+        alert_type: 'invoice_pending',
+        critical_path: false,
+        next_module_key: 'invoices',
+      },
+    })
+    const hasInvoiceTask = await hasActiveTaskForSource(
+      task,
+      INVOICE_REGISTRATION_TASK_GROUP
+    )
+    const invoiceTask = buildInvoiceRegistrationTask(
+      {
+        ...savedRecord,
+        module_key: task.source_type,
+      },
+      task
+    )
+    if (invoiceTask && !hasInvoiceTask) {
+      await createWorkflowTask(invoiceTask)
+    }
+  }
+
+  const completeInvoiceRegistrationTask = async (task, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应应收或开票登记记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        FINANCE_RECONCILING_STATUS_KEY,
+        reason || '开票登记已完成，进入对账中'
+      )) || record
+    await upsertWorkflowBusinessState({
+      source_type: task.source_type,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: FINANCE_RECONCILING_STATUS_KEY,
+      owner_role_key: 'finance',
+      payload: {
+        record_title: savedRecord.title,
+        invoice_task_id: task.id,
+        invoice_result: 'registered',
+        critical_path: false,
+        next_module_key: 'reconciliation',
+      },
+    })
+  }
+
+  const completePayableRegistrationTask = async (task, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应采购、委外或应付登记记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        PAYABLE_RECONCILING_STATUS_KEY,
+        reason || '应付登记已完成，进入对账'
+      )) || record
+    await upsertWorkflowBusinessState({
+      source_type: task.source_type,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: PAYABLE_RECONCILING_STATUS_KEY,
+      owner_role_key: 'finance',
+      payload: {
+        record_title: savedRecord.title,
+        payable_task_id: task.id,
+        payable_result: 'registered',
+        notification_type: 'finance_pending',
+        alert_type: 'reconciliation_pending',
+        critical_path: false,
+        next_module_key: 'reconciliation',
+        payable_type: task.payload?.payable_type,
+      },
+    })
+
+    const isOutsource = isOutsourcePayableRegistrationTask(task)
+    const taskGroup = isOutsource
+      ? OUTSOURCE_RECONCILIATION_TASK_GROUP
+      : PURCHASE_RECONCILIATION_TASK_GROUP
+    const hasReconciliationTask = await hasActiveTaskForSource(task, taskGroup)
+    const reconciliationRecord = {
+      ...savedRecord,
+      module_key: task.source_type,
+      payload: {
+        ...(savedRecord.payload || {}),
+        payable_type: isOutsource ? 'outsource' : 'purchase',
+      },
+    }
+    const reconciliationTask = isOutsource
+      ? buildOutsourceReconciliationTask(reconciliationRecord, task)
+      : buildPurchaseReconciliationTask(reconciliationRecord, task)
+    if (reconciliationTask && !hasReconciliationTask) {
+      await createWorkflowTask(reconciliationTask)
+    }
+  }
+
+  const completePayableReconciliationTask = async (task, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应采购、委外或对账记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        PAYABLE_SETTLED_STATUS_KEY,
+        reason || '财务对账已完成'
+      )) || record
+    await upsertWorkflowBusinessState({
+      source_type: task.source_type,
+      source_id: savedRecord.id,
+      source_no: savedRecord.document_no || task.source_no,
+      business_status_key: PAYABLE_SETTLED_STATUS_KEY,
+      owner_role_key: 'finance',
+      payload: {
+        record_title: savedRecord.title,
+        reconciliation_task_id: task.id,
+        reconciliation_result: 'settled',
+        payable_type: task.payload?.payable_type,
+      },
+    })
+  }
+
+  const blockFinanceTask = async (task, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应财务登记记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        'blocked',
+        reason
+      )) || record
+    const state = buildFinanceBlockedState(
+      {
+        ...savedRecord,
+        module_key: task.source_type,
+      },
+      task,
+      reason
+    )
+    if (state) {
+      await upsertWorkflowBusinessState(state)
+    }
+  }
+
+  const blockPayableFinanceTask = async (task, reason) => {
+    const record = await loadBusinessRecordForTask(task)
+    if (!record) {
+      throw new Error('未找到对应应付或对账记录')
+    }
+    const savedRecord =
+      (await updateBusinessRecordStatusForTask(
+        task,
+        record,
+        'blocked',
+        reason
+      )) || record
+    const state = buildPayableBlockedState(
+      {
+        ...savedRecord,
+        module_key: task.source_type,
+      },
+      task,
+      reason
+    )
+    if (state) {
+      await upsertWorkflowBusinessState(state)
+    }
   }
 
   const runOrderApprovalFollowUp = async (task, taskStatusKey, reason = '') => {
@@ -1027,14 +1476,74 @@ export default function MobileRoleTasksPage() {
     }
   }
 
+  const runShipmentFinanceFollowUp = async (
+    task,
+    taskStatusKey,
+    reason = ''
+  ) => {
+    if (
+      activeRoleKey !== 'finance' ||
+      (!isReceivableRegistrationTask(task) && !isInvoiceRegistrationTask(task))
+    ) {
+      return
+    }
+
+    if (taskStatusKey === 'blocked' || taskStatusKey === 'rejected') {
+      await blockFinanceTask(task, reason)
+      return
+    }
+
+    if (isReceivableRegistrationTask(task) && taskStatusKey === 'done') {
+      await completeReceivableRegistrationTask(task, reason)
+      return
+    }
+
+    if (isInvoiceRegistrationTask(task) && taskStatusKey === 'done') {
+      await completeInvoiceRegistrationTask(task, reason)
+    }
+  }
+
+  const runPayableReconciliationFollowUp = async (
+    task,
+    taskStatusKey,
+    reason = ''
+  ) => {
+    if (
+      activeRoleKey !== 'finance' ||
+      (!isPayableRegistrationTask(task) && !isPayableReconciliationTask(task))
+    ) {
+      return
+    }
+
+    if (taskStatusKey === 'blocked' || taskStatusKey === 'rejected') {
+      await blockPayableFinanceTask(task, reason)
+      return
+    }
+
+    if (isPayableRegistrationTask(task) && taskStatusKey === 'done') {
+      await completePayableRegistrationTask(task, reason)
+      return
+    }
+
+    if (isPayableReconciliationTask(task) && taskStatusKey === 'done') {
+      await completePayableReconciliationTask(task, reason)
+    }
+  }
+
   const runTaskFollowUp = async (task, taskStatusKey, reason = '') => {
     await runOrderApprovalFollowUp(task, taskStatusKey, reason)
     await runPurchaseInboundFollowUp(task, taskStatusKey, reason)
     await runOutsourceReturnFollowUp(task, taskStatusKey, reason)
     await runFinishedGoodsFollowUp(task, taskStatusKey, reason)
+    await runShipmentFinanceFollowUp(task, taskStatusKey, reason)
+    await runPayableReconciliationFollowUp(task, taskStatusKey, reason)
   }
 
   const moveTask = async (task, taskStatusKey) => {
+    if (!canOperateTask(activeRoleKey, task)) {
+      message.warning('当前角色只能查看该任务，不能代办完成')
+      return
+    }
     const blockedReason = String(
       blockedReasonByTaskID[task.id] ?? task.blocked_reason ?? ''
     ).trim()
@@ -1074,11 +1583,31 @@ export default function MobileRoleTasksPage() {
             isShipmentReleaseTask(task) && taskStatusKey === 'done'
               ? 'shipped'
               : undefined,
+          receivable_result:
+            isReceivableRegistrationTask(task) && taskStatusKey === 'done'
+              ? 'registered'
+              : undefined,
+          invoice_result:
+            isInvoiceRegistrationTask(task) && taskStatusKey === 'done'
+              ? 'registered'
+              : undefined,
+          payable_result:
+            isPayableRegistrationTask(task) && taskStatusKey === 'done'
+              ? 'registered'
+              : undefined,
+          reconciliation_result:
+            isPayableReconciliationTask(task) && taskStatusKey === 'done'
+              ? 'settled'
+              : undefined,
           rejected_reason:
             (isOrderApprovalTask(task) ||
               isPurchaseIqcTask(task) ||
               isOutsourceReturnQcTask(task) ||
-              isFinishedGoodsQcTask(task)) &&
+              isFinishedGoodsQcTask(task) ||
+              isReceivableRegistrationTask(task) ||
+              isInvoiceRegistrationTask(task) ||
+              isPayableRegistrationTask(task) ||
+              isPayableReconciliationTask(task)) &&
             reasonRequired
               ? blockedReason
               : undefined,
@@ -1110,6 +1639,45 @@ export default function MobileRoleTasksPage() {
       )
     } finally {
       setUpdatingID(null)
+    }
+  }
+
+  const urgeTask = async (task) => {
+    if (!canUrgeTask(activeRoleKey, task)) {
+      message.warning('当前角色没有催办该任务的权限')
+      return
+    }
+    const reason = String(urgeReasonByTaskID[task.id] || '').trim()
+    if (!reason) {
+      message.warning('请先填写催办原因')
+      return
+    }
+
+    setUrgingID(task.id)
+    try {
+      await urgeWorkflowTask({
+        task_id: task.id,
+        action: resolveMobileUrgeAction(activeRoleKey, task),
+        reason,
+        actor_role_key: activeRoleKey,
+        payload: {
+          source_type: task.source_type,
+          source_id: task.source_id,
+          source_no: task.source_no,
+          mobile_role_key: activeRoleKey,
+        },
+      })
+      setUrgeReasonByTaskID((current) => {
+        const next = { ...current }
+        delete next[task.id]
+        return next
+      })
+      message.success('催办已记录')
+      await loadTasks()
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '催办失败，请稍后重试'))
+    } finally {
+      setUrgingID(null)
     }
   }
 
@@ -1295,6 +1863,25 @@ export default function MobileRoleTasksPage() {
                           IQC 结果：{task.payload.qc_result}
                         </div>
                       ) : null}
+                      {hasFinanceAmountPayload(task) ? (
+                        <div className={mobileTheme.highlightNote}>
+                          金额/税率：
+                          {task.payload?.amount || '-'}
+                          {' / '}
+                          {task.payload?.tax_rate || '-'}
+                          {' / 税额 '}
+                          {task.payload?.tax_amount || '-'}
+                          {' / 含税 '}
+                          {task.payload?.amount_with_tax || '-'}
+                          {' / 不含税 '}
+                          {task.payload?.amount_without_tax || '-'}
+                        </div>
+                      ) : null}
+                      {task.payload?.payable_type ? (
+                        <div className={mobileTheme.highlightNote}>
+                          应付类型：{task.payload.payable_type}
+                        </div>
+                      ) : null}
                       <div className={mobileTheme.highlightNote}>
                         预警：
                         {task.alert_label || task.due_status_label} / 等级：
@@ -1316,11 +1903,26 @@ export default function MobileRoleTasksPage() {
                         </div>
                       ) : null}
                       {task.is_urged ? (
-                        <div className={mobileTheme.warningItem}>已催办</div>
+                        <div className={mobileTheme.warningItem}>
+                          已催办 {task.urge_count || 1} 次
+                          {task.last_urge_reason
+                            ? ` / 最近原因：${task.last_urge_reason}`
+                            : ''}
+                          {task.last_urge_at
+                            ? ` / ${task.last_urge_at_label}`
+                            : ''}
+                        </div>
+                      ) : null}
+                      {task.is_escalated ? (
+                        <div className={mobileTheme.warningItem}>
+                          已升级：
+                          {task.escalate_target_role_key || '关注角色'}
+                        </div>
                       ) : null}
                       <textarea
                         aria-label={`任务阻塞原因 ${task.id}`}
                         className="mt-3 h-20 w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                        disabled={!canOperateTask(activeRoleKey, task)}
                         maxLength={300}
                         placeholder="阻塞原因"
                         value={
@@ -1335,6 +1937,22 @@ export default function MobileRoleTasksPage() {
                           }))
                         }}
                       />
+                      {canUrgeTask(activeRoleKey, task) ? (
+                        <textarea
+                          aria-label={`任务催办原因 ${task.id}`}
+                          className="mt-3 h-20 w-full resize-none rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                          disabled={urgingID === task.id}
+                          maxLength={300}
+                          placeholder="催办原因（必填）"
+                          value={urgeReasonByTaskID[task.id] || ''}
+                          onChange={(event) => {
+                            setUrgeReasonByTaskID((current) => ({
+                              ...current,
+                              [task.id]: event.target.value,
+                            }))
+                          }}
+                        />
+                      ) : null}
                       <div
                         className={`mt-3 grid gap-2 ${
                           supportsRejectedAction(activeRoleKey, task)
@@ -1345,7 +1963,10 @@ export default function MobileRoleTasksPage() {
                         <button
                           type="button"
                           className={mobileTheme.actionButton}
-                          disabled={updatingID === task.id}
+                          disabled={
+                            updatingID === task.id ||
+                            !canOperateTask(activeRoleKey, task)
+                          }
                           onClick={() => moveTask(task, 'processing')}
                         >
                           处理
@@ -1353,7 +1974,10 @@ export default function MobileRoleTasksPage() {
                         <button
                           type="button"
                           className={mobileTheme.actionButton}
-                          disabled={updatingID === task.id}
+                          disabled={
+                            updatingID === task.id ||
+                            !canOperateTask(activeRoleKey, task)
+                          }
                           onClick={() => moveTask(task, 'blocked')}
                         >
                           阻塞
@@ -1362,7 +1986,10 @@ export default function MobileRoleTasksPage() {
                           <button
                             type="button"
                             className={mobileTheme.actionButton}
-                            disabled={updatingID === task.id}
+                            disabled={
+                              updatingID === task.id ||
+                              !canOperateTask(activeRoleKey, task)
+                            }
                             onClick={() => moveTask(task, 'rejected')}
                           >
                             退回
@@ -1371,7 +1998,10 @@ export default function MobileRoleTasksPage() {
                         <button
                           type="button"
                           className={mobileTheme.actionButton}
-                          disabled={updatingID === task.id}
+                          disabled={
+                            updatingID === task.id ||
+                            !canOperateTask(activeRoleKey, task)
+                          }
                           onClick={() => moveTask(task, 'done')}
                         >
                           完成
@@ -1381,9 +2011,16 @@ export default function MobileRoleTasksPage() {
                         <button
                           type="button"
                           className={mobileTheme.actionButton}
-                          disabled
+                          disabled={
+                            urgingID === task.id ||
+                            !canUrgeTask(activeRoleKey, task)
+                          }
+                          onClick={() => urgeTask(task)}
                         >
-                          催办待接入
+                          {resolveMobileUrgeAction(activeRoleKey, task) ===
+                          'escalate_to_boss'
+                            ? '升级'
+                            : '催办'}
                         </button>
                         <button
                           type="button"

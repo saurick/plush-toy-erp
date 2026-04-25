@@ -551,6 +551,7 @@ const roleWorkbenches = [
     allowedNavKeys: [
       'workspace-home',
       'global-dashboard',
+      'business-dashboard',
       'flow-overview',
       'source-readiness',
       'print-center',
@@ -574,7 +575,7 @@ const roleWorkbenches = [
     mobileFocus: ['交期风险', '异常订单', '未完成数量', '待结算', '本周重点'],
     desktopMenuPreview: [
       '角色首页：老板工作台',
-      '任务看板：经营总览、风险、结算提醒',
+      '业务看板：经营总览、风险、结算提醒',
       '真源与打印：资料与字段真源、模板打印中心',
       '帮助中心：流程总览、系统初始化、数据模型、老板审批口径',
     ],
@@ -817,6 +818,7 @@ const roleWorkbenches = [
     allowedNavKeys: [
       'workspace-home',
       'global-dashboard',
+      'business-dashboard',
       'flow-overview',
       'source-readiness',
       'print-center',
@@ -1117,7 +1119,7 @@ const roleWorkbenches = [
       },
       {
         label: '品质异常',
-        value: '5 条',
+        value: '6 条',
         note: '品质异常与返工应并列展示，而不是藏在备注里。',
       },
     ],
@@ -1697,8 +1699,15 @@ const navItemRegistry = {
     key: 'global-dashboard',
     label: '任务看板',
     path: '/erp/dashboard',
-    shortLabel: '看板',
-    description: '按任务状态看模块推进、资料缺口和整体边界。',
+    shortLabel: '任务',
+    description: '按协同任务状态看待处理、处理中、阻塞、退回和超时任务。',
+  },
+  'business-dashboard': {
+    key: 'business-dashboard',
+    label: '业务看板',
+    path: '/erp/business-dashboard',
+    shortLabel: '业务',
+    description: '按业务记录、部门待处理和风险预警看整体运行状态。',
   },
   'flow-overview': {
     key: 'flow-overview',
@@ -1779,6 +1788,22 @@ const navItemRegistry = {
     shortLabel: 'Schema',
     description:
       '提供任务协同层和业务状态层的表结构草案与 SQL 样例，只用于校对，不直接作为迁移真源。',
+  },
+  'help-workflow-usecase-review': {
+    key: 'help-workflow-usecase-review',
+    label: 'Workflow usecase 评审',
+    path: '/erp/docs/workflow-usecase-review',
+    shortLabel: 'Usecase',
+    description:
+      '评审前端 v1 编排和后端 workflow usecase 的边界、迁移优先级、回滚和测试要求。',
+  },
+  'help-industry-schema-review': {
+    key: 'help-industry-schema-review',
+    label: '行业专表 Schema 评审',
+    path: '/erp/docs/industry-schema-review',
+    shortLabel: '专表',
+    description:
+      '评审 business_records 继续使用边界、行业专表候选、P1 优先评审表和迁移一致性策略。',
   },
   'help-task-flow-v1': {
     key: 'help-task-flow-v1',
@@ -1886,7 +1911,15 @@ const navItemRegistry = {
     label: '业务链路调试',
     path: '/erp/qa/business-chain-debug',
     shortLabel: '链路',
-    description: '按业务记录、workflow 状态和协同任务排查当前毛绒业务链路。',
+    description: '按 6 条 v1 主干闭环、workflow 状态和协同任务排查链路边界。',
+  },
+  'qa-workflow-task-debug': {
+    key: 'qa-workflow-task-debug',
+    label: '协同任务调试',
+    path: '/erp/qa/workflow-task-debug',
+    shortLabel: '任务',
+    description:
+      '按角色任务池、移动端可见性和 workflow_task_events 排查协同任务。',
   },
   'qa-field-linkage-coverage': {
     key: 'qa-field-linkage-coverage',
@@ -1992,22 +2025,27 @@ const documentationNavKeys = [
   'doc-print-templates',
 ]
 
-const helpCenterNavKeys = [
+export const helpCenterPrimaryNavKeys = [
   'help-operation-flow-overview',
   'help-operation-guide',
   'help-role-collaboration-guide',
+  'help-mobile-role-guide',
+  'help-task-flow-v1',
+  'help-notification-alert-v1',
+  'help-finance-v1',
+  'help-warehouse-quality-v1',
+]
+
+export const helpCenterAdvancedDocKeys = [
   'help-role-page-document-matrix',
   'help-task-document-mapping',
   'help-workflow-status-guide',
   'help-workflow-schema-draft',
-  'help-task-flow-v1',
+  'help-workflow-usecase-review',
+  'help-industry-schema-review',
   'help-role-permission-matrix-v1',
-  'help-notification-alert-v1',
-  'help-finance-v1',
-  'help-warehouse-quality-v1',
   'help-log-trace-audit-v1',
   'help-desktop-role-guide',
-  'help-mobile-role-guide',
   'help-field-linkage-guide',
   'help-calculation-guide',
   'help-print-snapshot-guide',
@@ -2023,6 +2061,10 @@ const qaNavKeys = [
   'qa-reports',
 ]
 
+export const helpCenterQaDocKeys = qaNavKeys
+
+export const helpCenterNavKeys = helpCenterPrimaryNavKeys
+
 export const documentationCards = documentationNavKeys.map((navKey) => {
   const item = navItemRegistry[navKey]
 
@@ -2034,36 +2076,296 @@ export const documentationCards = documentationNavKeys.map((navKey) => {
   }
 })
 
+export const helpCenterReadingPath = [
+  {
+    key: 'operation-guide',
+    title: '先看操作教程',
+    path: '/erp/docs/operation-guide',
+    summary: '先理解总后台、手机端任务端和帮助中心应该怎么用。',
+  },
+  {
+    key: 'operation-flow-overview',
+    title: '再看流程总览',
+    path: '/erp/docs/operation-flow-overview',
+    summary: '确认 6 条 v1 主干闭环分别从哪里开始、到哪里结束。',
+  },
+  {
+    key: 'role-collaboration-guide',
+    title: '再看角色协同',
+    path: '/erp/docs/role-collaboration-guide',
+    summary: '确认谁发起、谁处理、异常时退回给谁。',
+  },
+  {
+    key: 'mobile-role-guide',
+    title: '最后看手机端任务',
+    path: '/erp/docs/mobile-role-guide',
+    summary: '确认手机端只处理任务、阻塞、完成和反馈，不承担复杂录入。',
+  },
+]
+
+export const helpCenterRoleNavGroups = [
+  {
+    key: 'boss',
+    role: '老板',
+    mainWork: '审批、风险关注、延期和财务重点',
+    taskSource: 'boss 任务池、高优先级、延期和异常提醒',
+    recommendedEntry: 'Dashboard / 老板移动端',
+    endpointNote: '桌面看全局，手机端处理审批、关注和异常确认。',
+    docs: [navItemRegistry['help-role-collaboration-guide']],
+  },
+  {
+    key: 'merchandiser',
+    role: '跟单 / 业务',
+    mainWork: '订单、客户资料、出货准备和应收前置',
+    taskSource: '客户资料、订单交期、包装材料和出货确认任务',
+    recommendedEntry: '销售链路 / 跟单移动端',
+    endpointNote: '手机端接收补资料、催合同、交期预警和出货确认。',
+    docs: [
+      navItemRegistry['help-operation-guide'],
+      navItemRegistry['help-role-collaboration-guide'],
+    ],
+  },
+  {
+    key: 'pmc',
+    role: 'PMC',
+    mainWork: '卡点、超时、阻塞、齐套和关键路径推进',
+    taskSource: 'critical_path、blocked、overdue 和齐套推进任务',
+    recommendedEntry: 'Dashboard / PMC 移动端',
+    endpointNote: '手机端用于催办、异常分发和关键路径反馈。',
+    docs: [navItemRegistry['help-notification-alert-v1']],
+  },
+  {
+    key: 'purchasing',
+    role: '采购',
+    mainWork: '采购到货、补料、合同回签和供应商异常',
+    taskSource: '采购任务池、缺料、到货、回签和供应商异常',
+    recommendedEntry: '采购/仓储 / 采购移动端',
+    endpointNote: '手机端处理到料、补料、单价确认和供应商异常反馈。',
+    docs: [
+      navItemRegistry['help-task-flow-v1'],
+      navItemRegistry['help-warehouse-quality-v1'],
+    ],
+  },
+  {
+    key: 'production',
+    role: '生产',
+    mainWork: '排产、委外、返工和生产进度',
+    taskSource: '生产任务池、排产、延期、返工和完工送检',
+    recommendedEntry: '生产环节 / 生产移动端',
+    endpointNote: '手机端回填处理、阻塞、完成和返工原因。',
+    docs: [navItemRegistry['help-task-flow-v1']],
+  },
+  {
+    key: 'warehouse',
+    role: '仓库',
+    mainWork: '入库、出库、成品入库和库存相关状态',
+    taskSource: 'warehouse 任务池、收货、入库、出货和异常件',
+    recommendedEntry: '采购/仓储 / 仓库移动端',
+    endpointNote: '手机端处理收货、入库、待出货和异常件反馈。',
+    docs: [navItemRegistry['help-warehouse-quality-v1']],
+  },
+  {
+    key: 'quality',
+    role: '品质',
+    mainWork: 'IQC、委外回货检验、成品抽检和返工复检',
+    taskSource: 'quality 任务池、IQC、回货检验、抽检和复检',
+    recommendedEntry: '生产环节 / 品质移动端',
+    endpointNote: '手机端回填通过、退回、返工复检和放行结论。',
+    docs: [navItemRegistry['help-warehouse-quality-v1']],
+  },
+  {
+    key: 'finance',
+    role: '财务',
+    mainWork: '应收、开票、应付、对账和放行反馈',
+    taskSource: 'finance 任务池、应收登记、开票、应付和对账',
+    recommendedEntry: '财务环节 / 财务移动端',
+    endpointNote: '手机端处理对账提醒、待付款、异常费用和结算反馈。',
+    docs: [navItemRegistry['help-finance-v1']],
+  },
+]
+
+export const helpCenterBusinessMainlineGroups = [
+  {
+    key: 'order-engineering',
+    title: '订单到工程',
+    initiator: '业务 / 跟单',
+    handlers: '老板、工程、PMC',
+    nextStep: '工程资料任务',
+    exceptionOwner: '业务 / 跟单 + PMC',
+    boundary: '前端 v1 编排，工程专表后续再拆',
+    items: [
+      navItemRegistry['help-operation-flow-overview'],
+      navItemRegistry['help-role-collaboration-guide'],
+    ],
+  },
+  {
+    key: 'purchase-inbound',
+    title: '采购到入库',
+    initiator: '采购 / 仓库',
+    handlers: '品质、仓库',
+    nextStep: '入库完成',
+    exceptionOwner: '采购 + 品质 + PMC',
+    boundary: '无库存余额专表',
+    items: [
+      navItemRegistry['help-task-flow-v1'],
+      navItemRegistry['help-warehouse-quality-v1'],
+    ],
+  },
+  {
+    key: 'outsourcing-inbound',
+    title: '委外到入库',
+    initiator: '生产 / 委外',
+    handlers: '品质、仓库',
+    nextStep: '入库完成',
+    exceptionOwner: '生产 + 品质 + PMC',
+    boundary: '无委外专表',
+    items: [
+      navItemRegistry['help-task-flow-v1'],
+      navItemRegistry['help-warehouse-quality-v1'],
+    ],
+  },
+  {
+    key: 'production-shipment',
+    title: '生产到出货',
+    initiator: '生产',
+    handlers: '品质、仓库、业务',
+    nextStep: '出货完成',
+    exceptionOwner: '生产 + 仓库 + PMC',
+    boundary: '无库存流水专表',
+    items: [
+      navItemRegistry['help-task-flow-v1'],
+      navItemRegistry['help-warehouse-quality-v1'],
+    ],
+  },
+  {
+    key: 'shipment-receivable',
+    title: '出货到应收/开票',
+    initiator: '仓库 / 业务',
+    handlers: '财务',
+    nextStep: '对账中',
+    exceptionOwner: '业务 + 财务 + 老板',
+    boundary: '无财务专表',
+    items: [
+      navItemRegistry['help-finance-v1'],
+      navItemRegistry['help-notification-alert-v1'],
+    ],
+  },
+  {
+    key: 'payable-reconciliation',
+    title: '采购/委外到应付/对账',
+    initiator: '采购 / 委外',
+    handlers: '财务',
+    nextStep: '已结算',
+    exceptionOwner: '采购 + 财务 + 老板',
+    boundary: '无付款流水',
+    items: [
+      navItemRegistry['help-finance-v1'],
+      navItemRegistry['help-current-boundaries'],
+    ],
+  },
+]
+
+export const businessMainlineDocGroups = helpCenterBusinessMainlineGroups
+
+export const legacyBusinessMainlineDocGroups = [
+  {
+    key: 'business-loops',
+    title: '业务闭环主线',
+    items: [
+      navItemRegistry['help-task-flow-v1'],
+      navItemRegistry['help-notification-alert-v1'],
+      navItemRegistry['help-warehouse-quality-v1'],
+      navItemRegistry['help-finance-v1'],
+      navItemRegistry['help-log-trace-audit-v1'],
+    ],
+  },
+  {
+    key: 'roles-permissions',
+    title: '角色与权限',
+    items: [
+      navItemRegistry['help-role-permission-matrix-v1'],
+      navItemRegistry['help-desktop-role-guide'],
+      navItemRegistry['help-mobile-role-guide'],
+      navItemRegistry['help-role-collaboration-guide'],
+      navItemRegistry['help-role-page-document-matrix'],
+    ],
+  },
+  {
+    key: 'data-fields',
+    title: '数据与字段',
+    items: [
+      navItemRegistry['doc-field-truth'],
+      navItemRegistry['doc-data-model'],
+      navItemRegistry['help-field-linkage-guide'],
+      navItemRegistry['help-calculation-guide'],
+      navItemRegistry['doc-import-mapping'],
+    ],
+  },
+  {
+    key: 'print-contracts',
+    title: '打印与合同',
+    items: [
+      navItemRegistry['doc-print-templates'],
+      navItemRegistry['help-print-snapshot-guide'],
+      navItemRegistry['print-center'],
+    ],
+  },
+  {
+    key: 'development-qa',
+    title: '开发与验收',
+    items: qaNavKeys.map((navKey) => navItemRegistry[navKey]),
+  },
+]
+
 export const helpCenterNavItems = helpCenterNavKeys.map(
   (navKey) => navItemRegistry[navKey]
 )
 
+export const helpCenterPrimaryNavItems = helpCenterPrimaryNavKeys.map(
+  (navKey) => navItemRegistry[navKey]
+)
+
+export const helpCenterAdvancedDocItems = helpCenterAdvancedDocKeys.map(
+  (navKey) => navItemRegistry[navKey]
+)
+
 export const qaNavItems = qaNavKeys.map((navKey) => navItemRegistry[navKey])
+
+export const helpCenterQaDocItems = helpCenterQaDocKeys.map(
+  (navKey) => navItemRegistry[navKey]
+)
 
 export const navigationItemRegistry = navItemRegistry
 
 export function getNavigationSections() {
   return [
     {
-      title: '后台导航',
-      items: [navItemRegistry['global-dashboard']],
+      title: '看板中心',
+      items: [
+        navItemRegistry['global-dashboard'],
+        navItemRegistry['business-dashboard'],
+      ],
     },
+    ...businessNavigationSections,
     {
       title: '单据模板',
       items: [navItemRegistry['print-center']],
     },
-    ...businessNavigationSections,
+    {
+      title: '系统管理',
+      items: [navItemRegistry['permission-center']],
+    },
     {
       title: '帮助中心',
       items: helpCenterNavItems,
     },
     {
-      title: '开发与验收',
-      items: qaNavItems,
+      title: '高级文档',
+      items: helpCenterAdvancedDocItems,
     },
     {
-      title: '系统管理',
-      items: [navItemRegistry['permission-center']],
+      title: '开发与验收',
+      items: qaNavItems,
     },
   ]
 }

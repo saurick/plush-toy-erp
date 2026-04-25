@@ -5,6 +5,7 @@ import {
   buildMobileTaskListForRole,
   buildMobileTaskSummary,
   buildMobileTaskView,
+  explainMobileTaskVisibility,
   normalizeRelatedDocuments,
 } from './mobileTaskView.mjs'
 
@@ -49,6 +50,9 @@ test('mobileTaskView: alert_level / alert_label 和 payload 字段读取正确',
         complete_condition: '返工复检通过后放行',
         related_documents: ['IN000001', 'PO000001'],
         urge_count: 1,
+        last_urge_at: NOW_SEC,
+        last_urge_reason: '请今天复核',
+        last_urge_action: 'urge_task',
       },
     }),
     { nowMs: NOW_MS }
@@ -59,6 +63,10 @@ test('mobileTaskView: alert_level / alert_label 和 payload 字段读取正确',
   assert.equal(view.complete_condition, '返工复检通过后放行')
   assert.deepEqual(view.related_documents, ['IN000001', 'PO000001'])
   assert.equal(view.is_urged, true)
+  assert.equal(view.urge_count, 1)
+  assert.equal(view.last_urge_reason, '请今天复核')
+  assert.equal(view.last_urge_action, 'urge_task')
+  assert.notEqual(view.last_urge_at_label, '-')
 })
 
 test('mobileTaskView: 空 payload 不报错并提供安全默认值', () => {
@@ -409,6 +417,394 @@ test('mobileTaskView: 成品抽检 入库 出货任务按角色视角展示', ()
     merchandiserViews.find((item) => item.id === 33).complete_condition,
     /出货数量/
   )
+})
+
+test('mobileTaskView: 财务应收和开票任务按财务 PMC 老板视角展示', () => {
+  const tasks = [
+    task({
+      id: 41,
+      owner_role_key: 'finance',
+      source_type: 'outbound',
+      task_group: 'receivable_registration',
+      business_status_key: 'shipped',
+      priority: 2,
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        notification_type: 'finance_pending',
+        alert_type: 'finance_pending',
+        complete_condition: '财务确认客户、出货数量和应收金额',
+        related_documents: ['出货记录：OUT-001', '订单：SO-001'],
+        customer_name: '联调客户',
+        product_name: '小熊公仔',
+        amount: 36000,
+        tax_rate: '13%',
+        tax_amount: 4141.59,
+        amount_with_tax: 36000,
+        amount_without_tax: 31858.41,
+        critical_path: true,
+      },
+    }),
+    task({
+      id: 42,
+      owner_role_key: 'finance',
+      source_type: 'receivables',
+      task_group: 'invoice_registration',
+      business_status_key: 'reconciling',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        notification_type: 'finance_pending',
+        alert_type: 'invoice_pending',
+        complete_condition: '财务登记发票号和发票状态',
+        related_documents: ['应收登记：AR-001'],
+      },
+    }),
+    task({
+      id: 43,
+      owner_role_key: 'finance',
+      source_type: 'invoices',
+      task_group: 'invoice_registration',
+      task_status_key: 'blocked',
+      business_status_key: 'blocked',
+      blocked_reason: '客户开票资料未确认',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        notification_type: 'finance_pending',
+        alert_type: 'invoice_pending',
+      },
+    }),
+    task({
+      id: 44,
+      owner_role_key: 'finance',
+      source_type: 'receivables',
+      task_group: 'receivable_registration',
+      business_status_key: 'shipped',
+      priority: 3,
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        notification_type: 'finance_pending',
+        alert_type: 'finance_pending',
+      },
+    }),
+  ]
+
+  const financeViews = buildMobileTaskListForRole(tasks, 'finance', {
+    nowMs: NOW_MS,
+  })
+  const pmcViews = buildMobileTaskListForRole(tasks, 'pmc', { nowMs: NOW_MS })
+  const bossViews = buildMobileTaskListForRole(tasks, 'boss', { nowMs: NOW_MS })
+
+  assert.equal(
+    financeViews.some((item) => item.id === 41),
+    true
+  )
+  assert.equal(
+    financeViews.find((item) => item.id === 41).payload.amount,
+    36000
+  )
+  assert.equal(
+    financeViews.find((item) => item.id === 42).alert_label,
+    '开票待登记'
+  )
+  assert.equal(
+    pmcViews.some((item) => item.id === 41),
+    true
+  )
+  assert.equal(
+    pmcViews.some((item) => item.id === 43),
+    true
+  )
+  assert.equal(pmcViews.find((item) => item.id === 43).alert_level, 'critical')
+  assert.equal(
+    bossViews.some((item) => item.id === 44),
+    true
+  )
+  assert.equal(
+    bossViews.find((item) => item.id === 44).owner_role_key,
+    'finance'
+  )
+  assert.equal(
+    bossViews.some((item) => item.id === 42),
+    false
+  )
+})
+
+test('mobileTaskView: 财务应付和对账任务按财务 PMC 老板视角展示', () => {
+  const tasks = [
+    task({
+      id: 51,
+      owner_role_key: 'finance',
+      source_type: 'accessories-purchase',
+      task_group: 'purchase_payable_registration',
+      business_status_key: 'inbound_done',
+      priority: 2,
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        notification_type: 'finance_pending',
+        alert_type: 'payable_pending',
+        complete_condition: '财务确认供应商、采购数量和采购金额',
+        related_documents: ['采购单：AP-001', '入库记录：IN-001'],
+        supplier_name: '联调供应商',
+        material_name: 'PP 棉',
+        amount: 9600,
+        tax_rate: '13%',
+        tax_amount: 1104.42,
+        amount_with_tax: 9600,
+        amount_without_tax: 8495.58,
+        payable_type: 'purchase',
+      },
+    }),
+    task({
+      id: 52,
+      owner_role_key: 'finance',
+      source_type: 'payables',
+      task_group: 'outsource_reconciliation',
+      business_status_key: 'reconciling',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        notification_type: 'finance_pending',
+        alert_type: 'reconciliation_pending',
+        complete_condition: '财务完成加工费、扣款或差异核对',
+        related_documents: ['应付登记：AP-OUT-001'],
+        payable_type: 'outsource',
+      },
+    }),
+    task({
+      id: 53,
+      owner_role_key: 'finance',
+      source_type: 'reconciliation',
+      task_group: 'purchase_reconciliation',
+      task_status_key: 'blocked',
+      business_status_key: 'blocked',
+      blocked_reason: '供应商金额差异未确认',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        notification_type: 'finance_pending',
+        alert_type: 'reconciliation_pending',
+        payable_type: 'purchase',
+      },
+    }),
+    task({
+      id: 54,
+      owner_role_key: 'finance',
+      source_type: 'payables',
+      task_group: 'purchase_payable_registration',
+      business_status_key: 'inbound_done',
+      priority: 3,
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        notification_type: 'finance_pending',
+        alert_type: 'payable_pending',
+        payable_type: 'purchase',
+      },
+    }),
+  ]
+
+  const financeViews = buildMobileTaskListForRole(tasks, 'finance', {
+    nowMs: NOW_MS,
+  })
+  const pmcViews = buildMobileTaskListForRole(tasks, 'pmc', { nowMs: NOW_MS })
+  const bossViews = buildMobileTaskListForRole(tasks, 'boss', { nowMs: NOW_MS })
+
+  assert.equal(
+    financeViews.some((item) => item.id === 51),
+    true
+  )
+  assert.equal(
+    financeViews.find((item) => item.id === 51).payload.payable_type,
+    'purchase'
+  )
+  assert.equal(
+    financeViews.find((item) => item.id === 51).alert_label,
+    '应付待登记'
+  )
+  assert.equal(
+    financeViews.find((item) => item.id === 52).alert_label,
+    '对账待处理'
+  )
+  assert.equal(
+    pmcViews.some((item) => item.id === 53),
+    true
+  )
+  assert.equal(pmcViews.find((item) => item.id === 53).alert_level, 'critical')
+  assert.equal(
+    bossViews.some((item) => item.id === 54),
+    true
+  )
+  assert.equal(
+    bossViews.find((item) => item.id === 54).owner_role_key,
+    'finance'
+  )
+})
+
+test('mobileTaskView: 催办和升级任务进入 PMC / 老板关注', () => {
+  const tasks = [
+    task({
+      id: 61,
+      owner_role_key: 'warehouse',
+      source_type: 'shipping-release',
+      task_group: 'shipment_release',
+      payload: {
+        urged: true,
+        urge_count: 3,
+        last_urge_at: NOW_SEC,
+        last_urge_reason: '客户催交',
+        last_urge_action: 'urge_task',
+      },
+    }),
+    task({
+      id: 62,
+      owner_role_key: 'finance',
+      source_type: 'payables',
+      task_group: 'purchase_reconciliation',
+      payload: {
+        urged: true,
+        escalated: true,
+        last_urge_at: NOW_SEC,
+        last_urge_action: 'escalate_to_boss',
+        escalate_target_role_key: 'boss',
+        alert_type: 'urgent_escalation',
+        notification_type: 'urgent_escalation',
+      },
+    }),
+  ]
+
+  const pmcViews = buildMobileTaskListForRole(tasks, 'pmc', { nowMs: NOW_MS })
+  const bossViews = buildMobileTaskListForRole(tasks, 'boss', { nowMs: NOW_MS })
+
+  assert.equal(
+    pmcViews.some((item) => item.id === 61),
+    true
+  )
+  assert.equal(pmcViews.find((item) => item.id === 61).urge_count, 3)
+  assert.equal(
+    pmcViews.some((item) => item.id === 62),
+    true
+  )
+  assert.equal(
+    bossViews.some((item) => item.id === 62),
+    true
+  )
+  assert.equal(bossViews.find((item) => item.id === 62).alert_level, 'critical')
+  assert.equal(
+    bossViews.find((item) => item.id === 62).escalate_target_role_key,
+    'boss'
+  )
+})
+
+test('mobileTaskView: explainMobileTaskVisibility 解释 owner 命中和终态标记', () => {
+  const explanation = explainMobileTaskVisibility(
+    task({
+      owner_role_key: 'quality',
+      task_status_key: 'done',
+    }),
+    'quality',
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(explanation.visible, true)
+  assert.equal(explanation.terminal, true)
+  assert(
+    explanation.reasons.some((item) => item.includes('owner_role_key 命中'))
+  )
+  assert(
+    explanation.warnings.some((item) => item.includes('task_status_key 是终态'))
+  )
+})
+
+test('mobileTaskView: explainMobileTaskVisibility 解释 PMC 风险扩展命中', () => {
+  const explanation = explainMobileTaskVisibility(
+    task({
+      owner_role_key: 'purchasing',
+      task_status_key: 'blocked',
+      blocked_reason: '欠料',
+      payload: { critical_path: true },
+    }),
+    'pmc',
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(explanation.visible, true)
+  assert(
+    explanation.reasons.some((item) => item.includes('blocked / rejected'))
+  )
+  assert(explanation.reasons.some((item) => item.includes('critical_path')))
+})
+
+test('mobileTaskView: explainMobileTaskVisibility 解释老板扩展命中', () => {
+  const highPriority = explainMobileTaskVisibility(
+    task({
+      owner_role_key: 'finance',
+      source_type: 'receivables',
+      task_group: 'receivable_registration',
+      priority: 3,
+      payload: { notification_type: 'finance_pending' },
+    }),
+    'boss',
+    { nowMs: NOW_MS }
+  )
+  const financeCritical = explainMobileTaskVisibility(
+    task({
+      owner_role_key: 'finance',
+      source_type: 'receivables',
+      task_group: 'receivable_registration',
+      due_at: NOW_SEC - 60,
+      payload: { notification_type: 'finance_pending' },
+    }),
+    'boss',
+    { nowMs: NOW_MS }
+  )
+  const shipmentRisk = explainMobileTaskVisibility(
+    task({
+      owner_role_key: 'warehouse',
+      source_type: 'shipping-release',
+      task_group: 'shipment_release',
+      payload: { shipment_risk: true },
+    }),
+    'boss',
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(highPriority.visible, true)
+  assert(highPriority.reasons.some((item) => item.includes('high priority')))
+  assert.equal(financeCritical.visible, true)
+  assert(
+    financeCritical.reasons.some((item) => item.includes('finance critical'))
+  )
+  assert.equal(shipmentRisk.visible, true)
+  assert(shipmentRisk.reasons.some((item) => item.includes('shipment risk')))
+})
+
+test('mobileTaskView: explainMobileTaskVisibility 解释生产扩展和不可见原因', () => {
+  const productionVisible = explainMobileTaskVisibility(
+    task({
+      owner_role_key: 'quality',
+      source_type: 'processing-contracts',
+      task_group: 'outsource_return_tracking',
+      payload: { outsource_processing: true },
+    }),
+    'production',
+    { nowMs: NOW_MS }
+  )
+  const notVisible = explainMobileTaskVisibility(
+    task({
+      owner_role_key: 'warehouse',
+      source_type: 'inventory',
+      task_group: 'cycle_count',
+      payload: {},
+    }),
+    'boss',
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(productionVisible.visible, true)
+  assert(productionVisible.reasons.some((item) => item.includes('委外回货')))
+  assert.equal(notVisible.visible, false)
+  assert(
+    notVisible.blockers.some((item) =>
+      item.includes('owner_role_key=warehouse')
+    )
+  )
+  assert(notVisible.blockers.some((item) => item.includes('payload 缺少')))
 })
 
 test('mobileTaskView: 预警摘要统计可用于移动端顶部卡片', () => {

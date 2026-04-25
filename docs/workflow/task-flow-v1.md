@@ -71,7 +71,7 @@
 | 不合格路径 | quality 移动端点击“阻塞”或“退回”必须填写原因；状态快照进入 `qc_failed`，并创建 `outsource_rework` 给 `production` 处理返工、补做、让步接收或重新回货安排。 |
 | 入库完成条件 | warehouse 移动端完成 `outsource_warehouse_inbound` 后，业务状态更新为 `inbound_done`；当前只表示委外回货入库任务闭环。 |
 | 当前编排位置 | 本闭环 v1 继续放在前端业务页和移动端，通过现有 `create_task`、`update_task_status`、`upsert_business_state`、`update_record` API 串联，不新增 workflow API。 |
-| 当前不做 | 不新增 `outsource_order` 专表，不新增 `inventory_txn` / `inventory_balance` 专表，不写正式库存余额或库存流水，不做财务应付对账，不新增 `outsource` 移动端入口。 |
+| 当前不做 | 不新增 `outsource_order` 专表，不新增 `inventory_txn` / `inventory_balance` 专表，不写正式库存余额或库存流水，不在第三条直接做财务应付对账，由第六条成本侧财务闭环承接；不新增 `outsource` 移动端入口。 |
 | 后续评审条件 | 当委外订单字段、发料事实、回货数量、质检结论、入库数量、对账口径和历史回补规则稳定后，再评审是否拆 `outsource_order`、`inventory_txn`、`inventory_balance` Ent schema，并补 migration、库存计算和同步守卫测试。 |
 
 边界说明：当前没有独立 `outsource` 移动端入口，所以关键委外任务不能只挂到 `owner_role_key=outsource`。v1 先由 `production` 承接委外回货跟踪和返工 / 补做，payload 保留 `outsource_owner_role_key=outsource` 作为后续拆端口或专岗入口的迁移线索。
@@ -92,3 +92,38 @@
 | 后续评审条件 | 当生产完工、抽检结论、返工复检、成品入库、出货扣减、应收 / 开票和历史回补口径稳定后，再评审是否拆 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` Ent schema，并补 migration 与库存/出货计算测试。 |
 
 边界说明：本轮不让 PMC 替生产、品质、仓库或出货角色完成业务事实；不强行拆出跟单移动端的默认出货确认任务。`shipment_release` 先由仓库完成出货准备 / 出货执行确认，payload 保留 `confirm_role_key=merchandiser` 作为后续“出货 -> 应收 / 开票登记”前拆业务确认的迁移线索。
+
+## 第五条真实闭环：出货 -> 应收登记 -> 开票登记
+
+| 环节 | 当前 v1 规则 |
+| --- | --- |
+| 触发点 | `shipping-release` 或 `outbound` 记录完成出货并进入 `shipped` 后触发；若上一轮链路仍以 `production-progress` 作为 `source_type`，则通过 `shipment_release` 完成和 `payload.next_module_key=shipping-release` 兼容触发财务任务。 |
+| 责任角色 | 应收登记和开票登记都进入 `finance`；PMC 只看 blocked、overdue、critical_path 和 high priority 财务风险；老板只看 high priority、overdue 或 critical 财务关注项，不能代替财务完成。 |
+| 应收登记任务字段 | `task_group=receivable_registration`、`task_name=应收登记`、`business_status_key=shipped`、`task_status_key=ready`、`owner_role_key=finance`、`notification_type=finance_pending`、`alert_type=finance_pending`、`critical_path=true`、`payload.next_module_key=receivables`。 |
+| 应收登记完成条件 | 财务确认客户、出货数量、应收金额、税率、含税 / 不含税金额和收款状态。finance 移动端完成后，任务更新为 `done`，业务状态推进到 `reconciling`，并创建 `invoice_registration`。 |
+| 开票登记任务字段 | `task_group=invoice_registration`、`task_name=开票登记`、`business_status_key=reconciling`、`task_status_key=ready`、`owner_role_key=finance`、`notification_type=finance_pending`、`alert_type=invoice_pending`、`critical_path=false`、`payload.next_module_key=invoices`。 |
+| 开票登记完成条件 | 财务登记发票号、发票类型、税率、税额、含税金额、不含税金额和发票状态。finance 移动端完成后，任务更新为 `done`，业务状态保持 / 推进到 `reconciling`，交给后续对账链路承接。 |
+| 财务异常 / 阻塞路径 | finance 移动端点击“阻塞”或“退回”必须填写原因；任务进入 `blocked` 或 `rejected`，`workflow_business_states.blocked_reason` 记录原因，任务看板、业务看板、PMC 和老板视角按 `finance_pending` / `finance_overdue` / critical 预警展示。 |
+| 当前编排位置 | 本闭环 v1 继续放在前端业务页和移动端，通过现有 `create_task`、`update_task_status`、`upsert_business_state`、`update_record` API 串联，不新增 workflow API。 |
+| 当前不做 | 不做总账、凭证、会计科目、纳税申报；不新增 `ar_receivable` / `ar_invoice` / `settlement` / finance 专表；不自动生成真实发票文件；不让 PMC 或老板替财务确认应收和开票事实。 |
+| 后续评审条件 | 当应收金额、税率、收款状态、发票状态、对账差异、历史回补和异常处理口径稳定后，再评审是否拆 `ar_receivable`、`ar_invoice`、`settlement` Ent schema，并补 migration、对账计算和财务审计测试。 |
+
+边界说明：本轮没有新增 workflow business state。出货完成后保持 `shipped`，应收和开票待办通过 `workflow_tasks.task_group` 与 payload 表达；开票完成后进入 `reconciling`，不直接进入 `settled`，避免跳过后续对账事实。
+
+## 第六条真实闭环：采购/委外 -> 应付登记 -> 对账
+
+| 环节 | 当前 v1 规则 |
+| --- | --- |
+| 触发点 | 采购到货 -> IQC -> 入库完成，或委外发料 -> 回货 -> 检验 -> 入库完成后，业务状态进入 `inbound_done`。桌面 `accessories-purchase` / `inbound` 可发起采购应付，`processing-contracts` / `inbound` 可发起委外应付；移动端仓库完成采购或委外入库任务后会自动创建应付登记任务。 |
+| 责任角色 | 应付登记、采购对账和委外对账都进入 `finance`；PMC 只看 blocked、overdue、critical_path 和财务风险；老板只看 high priority、overdue、`finance_overdue` 或 critical 财务关注项，不能代替财务完成。 |
+| 采购应付路径 | 采购入库完成后创建 `purchase_payable_registration`，`business_status_key=inbound_done`，`owner_role_key=finance`，`payload.next_module_key=payables`，`payload.payable_type=purchase`。完成条件是财务确认供应商、采购数量、采购金额、税率、含税 / 不含税金额和应付状态。 |
+| 委外应付路径 | 委外入库完成后创建 `outsource_payable_registration`，`business_status_key=inbound_done`，`owner_role_key=finance`，`payload.next_module_key=payables`，`payload.payable_type=outsource`。完成条件是财务确认加工厂、回货数量、加工费、税率、含税 / 不含税金额和应付状态。 |
+| 采购对账路径 | finance 移动端完成 `purchase_payable_registration` 后，业务状态推进到 `reconciling`，并创建 `purchase_reconciliation`。完成条件是核对采购单、入库记录、发票 / 对账资料和金额差异。 |
+| 委外对账路径 | finance 移动端完成 `outsource_payable_registration` 后，业务状态推进到 `reconciling`，并创建 `outsource_reconciliation`。完成条件是核对加工合同、回货记录、检验结果、加工费、扣款或差异。 |
+| 对账完成条件 | finance 移动端完成 `purchase_reconciliation` 或 `outsource_reconciliation` 后，任务进入 `done`，业务状态推进到 `settled`，表示采购 / 委外成本侧财务闭环完成。 |
+| 财务异常 / 阻塞路径 | 应付登记或对账任务被 finance 标记 `blocked` / `rejected` 时必须填写原因；`workflow_business_states` 写入 `blocked_reason`，任务看板、业务看板、PMC 和老板视角按 `finance_pending` / `finance_overdue` / critical 预警展示。 |
+| 当前编排位置 | 本闭环 v1 继续放在前端业务页和移动端，通过现有 `create_task`、`update_task_status`、`upsert_business_state`、`update_record` API 串联，不新增 workflow API，不改后端 workflow usecase。 |
+| 当前不做 | 不做总账、凭证、会计科目、纳税申报、复杂成本核算或付款流水；不新增 `ap_payable` / `ap_settlement` / `settlement` / finance 专表；不让 PMC 或老板替财务确认应付和对账事实。 |
+| 后续评审条件 | 当供应商账期、加工费、税率、扣款、对账差异、付款状态和历史回补口径稳定后，再评审是否拆 `ap_payable`、`ap_settlement`、`settlement` Ent schema，并补 migration、对账计算和财务审计测试。 |
+
+边界说明：本轮没有新增 workflow business state。采购 / 委外入库完成继续复用 `inbound_done`，应付和对账待办通过 `workflow_tasks.task_group` 与 payload 表达；对账完成后进入 `settled`，当前不进入总账、凭证、付款流水或税务申报。

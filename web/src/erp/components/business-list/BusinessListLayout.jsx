@@ -13,6 +13,7 @@ import {
 } from 'antd'
 
 const { Text } = Typography
+const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
 
 function joinClassNames(...items) {
   return items.filter(Boolean).join(' ')
@@ -297,6 +298,8 @@ export function CollaborationTaskPanel({
   tasks = [],
   taskStatusLabels,
   roleLabelMap,
+  onUrgeTask,
+  urgingTaskID,
 }) {
   return (
     <Card className="erp-business-collaboration-task-panel erp-business-module-task-card">
@@ -312,31 +315,63 @@ export function CollaborationTaskPanel({
             </Text>
           </div>
         ) : (
-          tasks.slice(0, 6).map((task) => (
-            <div
-              key={task.id}
-              className="erp-business-collaboration-task-panel__item erp-business-module-task-item"
-            >
-              <div>
-                <strong>{task.task_name}</strong>
-                <span>
-                  {task.source_no || `${task.source_type} #${task.source_id}`}
-                </span>
-                {task.blocked_reason ? (
-                  <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
-                    阻塞原因：{task.blocked_reason}
+          tasks.slice(0, 6).map((task) => {
+            const payload =
+              task.payload && typeof task.payload === 'object'
+                ? task.payload
+                : {}
+            const urgeCount = Number(payload.urge_count || 0)
+            const isUrged = Boolean(
+              payload.urged === true || urgeCount > 0 || payload.last_urge_at
+            )
+            const isTerminal = TERMINAL_TASK_STATUS_KEYS.has(
+              String(task.task_status_key || '').trim()
+            )
+            return (
+              <div
+                key={task.id}
+                className="erp-business-collaboration-task-panel__item erp-business-module-task-item"
+              >
+                <div>
+                  <strong>{task.task_name}</strong>
+                  <span>
+                    {task.source_no || `${task.source_type} #${task.source_id}`}
                   </span>
+                  {task.blocked_reason ? (
+                    <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
+                      阻塞原因：{task.blocked_reason}
+                    </span>
+                  ) : null}
+                  {isUrged ? (
+                    <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
+                      已催办 {urgeCount || 1} 次
+                      {payload.last_urge_reason
+                        ? `：${payload.last_urge_reason}`
+                        : ''}
+                    </span>
+                  ) : null}
+                </div>
+                <Tag>
+                  {roleLabelMap.get(task.owner_role_key) || task.owner_role_key}
+                </Tag>
+                <Tag
+                  color={task.task_status_key === 'blocked' ? 'red' : 'blue'}
+                >
+                  {taskStatusLabels.get(task.task_status_key) ||
+                    task.task_status_key}
+                </Tag>
+                {onUrgeTask && !isTerminal ? (
+                  <Button
+                    size="small"
+                    loading={String(urgingTaskID || '') === String(task.id)}
+                    onClick={() => onUrgeTask(task)}
+                  >
+                    催办
+                  </Button>
                 ) : null}
               </div>
-              <Tag>
-                {roleLabelMap.get(task.owner_role_key) || task.owner_role_key}
-              </Tag>
-              <Tag color={task.task_status_key === 'blocked' ? 'red' : 'blue'}>
-                {taskStatusLabels.get(task.task_status_key) ||
-                  task.task_status_key}
-              </Tag>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </Card>

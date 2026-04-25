@@ -11,7 +11,10 @@ import {
   isHighPriorityWorkflowTask,
   isOutsourceReturnWorkflowTask,
   isQualityWorkflowTask,
+  isEscalatedToBossWorkflowTask,
+  isEscalatedWorkflowTask,
   isTerminalWorkflowTask,
+  isUrgedWorkflowTask,
   isWarehouseWorkflowTask,
 } from './workflowDashboardStats.mjs'
 
@@ -41,6 +44,15 @@ const WAREHOUSE_SOURCE_TYPES = new Set([
   'shipping-release',
   'outbound',
 ])
+const ROLE_EXTENDED_VISIBILITY_LABELS = Object.freeze({
+  pmc: 'PMC 扩展可见性关注 blocked / overdue / critical_path / 催办 / 升级 / 高优先级。',
+  boss: '老板扩展可见性关注高优先级、审批、出货风险、财务 critical 和升级到老板。',
+  production: '生产扩展可见性关注委外回货、成品返工和生产相关任务。',
+  merchandiser: '跟单扩展可见性关注出货、业务确认和 confirm_role_key。',
+  finance: '财务扩展可见性关注财务来源、财务通知和财务逾期。',
+  warehouse: '仓库扩展可见性关注仓储来源和仓库任务。',
+  quality: '品质扩展可见性关注质检来源、质检失败和品质任务。',
+})
 
 function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
@@ -48,6 +60,34 @@ function payloadOf(task = {}) {
 
 function normalizeSourceType(task = {}) {
   return String(task.source_type || '').trim()
+}
+
+function normalizeRoleKey(roleKey = '') {
+  return String(roleKey || '').trim()
+}
+
+function appendReason(reasons, condition, reason) {
+  if (condition) {
+    reasons.push(reason)
+  }
+}
+
+function hasVisibilityPayloadSignal(taskView = {}) {
+  const payload = payloadOf(taskView)
+  return Boolean(
+    payload.alert_type ||
+      payload.notification_type ||
+      payload.critical_path === true ||
+      payload.is_critical_path === true ||
+      payload.urged === true ||
+      payload.escalated === true ||
+      payload.outsource_processing === true ||
+      payload.finished_goods === true ||
+      payload.confirm_role_key ||
+      payload.outsource_owner_role_key ||
+      payload.shipment_risk === true ||
+      payload.finance_risk === true
+  )
 }
 
 export function formatMobileTaskTime(value) {
@@ -90,9 +130,14 @@ export function buildMobileTaskView(task = {}, options = {}) {
     alert_label: alert?.alert_label || '',
     alert_type: alert?.alert_type || '',
     notification_type: alert?.notification_type || '',
-    is_urged: Boolean(
-      payload.urged === true || payload.urge_count || payload.last_urge_at
-    ),
+    is_urged: isUrgedWorkflowTask(task),
+    urge_count: Number(payload.urge_count || 0),
+    last_urge_at: Number(payload.last_urge_at || 0),
+    last_urge_at_label: formatMobileTaskTime(payload.last_urge_at),
+    last_urge_reason: payload.last_urge_reason || '',
+    last_urge_action: payload.last_urge_action || '',
+    is_escalated: isEscalatedWorkflowTask(task),
+    escalate_target_role_key: payload.escalate_target_role_key || '',
     complete_condition: payload.complete_condition || '',
     related_documents: normalizeRelatedDocuments(payload.related_documents),
   }
@@ -104,17 +149,24 @@ function isPmcMobileVisible(taskView = {}) {
     ['blocked', 'rejected'].includes(taskView.task_status_key) ||
     taskView.due_status === 'overdue' ||
     taskView.alert_level === 'critical' ||
+    taskView.is_urged ||
+    taskView.is_escalated ||
     isHighPriorityWorkflowTask(taskView) ||
     isCriticalPathWorkflowTask(taskView)
   )
 }
 
 function isBossMobileVisible(taskView = {}) {
+  const payload = payloadOf(taskView)
   return (
     taskView.owner_role_key === 'boss' ||
     isHighPriorityWorkflowTask(taskView) ||
+    taskView.due_status === 'overdue' ||
+    isEscalatedToBossWorkflowTask(taskView) ||
     taskView.notification_type === 'approval_required' ||
     taskView.notification_type === 'shipment_risk' ||
+    payload.notification_type === 'shipment_risk' ||
+    payload.shipment_risk === true ||
     (isFinanceWorkflowTask(taskView) && taskView.alert_level === 'critical')
   )
 }
@@ -172,7 +224,7 @@ function isMerchandiserMobileVisible(taskView = {}) {
 }
 
 export function isMobileTaskVisibleForRole(taskView = {}, roleKey = '') {
-  const normalizedRoleKey = String(roleKey || '').trim()
+  const normalizedRoleKey = normalizeRoleKey(roleKey)
   if (!normalizedRoleKey) return false
   if (taskView.owner_role_key === normalizedRoleKey) return true
   if (normalizedRoleKey === 'pmc') return isPmcMobileVisible(taskView)
@@ -189,6 +241,215 @@ export function isMobileTaskVisibleForRole(taskView = {}, roleKey = '') {
     return isMerchandiserMobileVisible(taskView)
   }
   return false
+}
+
+export function explainMobileTaskVisibility(
+  task = {},
+  roleKey = '',
+  options = {}
+) {
+  const normalizedRoleKey = normalizeRoleKey(roleKey)
+  const taskView = buildMobileTaskView(task, options)
+  const payload = payloadOf(taskView)
+  const reasons = []
+  const blockers = []
+  const warnings = []
+  const checks = []
+  const terminal = isTerminalWorkflowTask(taskView)
+  const directOwnerMatch = taskView.owner_role_key === normalizedRoleKey
+  const visible = isMobileTaskVisibleForRole(taskView, normalizedRoleKey)
+
+  if (!normalizedRoleKey) {
+    blockers.push('未选择 role_key，无法判断角色移动端可见性。')
+  }
+
+  if (terminal) {
+    warnings.push(
+      'task_status_key 是终态；当前移动端规则会标记为终态并从活跃统计中排除。'
+    )
+  }
+
+  appendReason(reasons, directOwnerMatch, 'owner_role_key 命中当前角色任务池。')
+
+  if (normalizedRoleKey === 'pmc') {
+    appendReason(
+      reasons,
+      ['blocked', 'rejected'].includes(taskView.task_status_key),
+      'PMC 扩展命中 blocked / rejected 任务。'
+    )
+    appendReason(
+      reasons,
+      taskView.due_status === 'overdue',
+      'PMC 扩展命中 overdue 任务。'
+    )
+    appendReason(
+      reasons,
+      taskView.alert_level === 'critical',
+      'PMC 扩展命中 critical 预警。'
+    )
+    appendReason(reasons, taskView.is_urged, 'PMC 扩展命中已催办任务。')
+    appendReason(reasons, taskView.is_escalated, 'PMC 扩展命中已升级任务。')
+    appendReason(
+      reasons,
+      isHighPriorityWorkflowTask(taskView),
+      'PMC 扩展命中高优先级任务。'
+    )
+    appendReason(
+      reasons,
+      isCriticalPathWorkflowTask(taskView),
+      'PMC 扩展命中 critical_path 任务。'
+    )
+    checks.push('PMC 可以看风险和卡点，但不能代办事实。')
+  } else if (normalizedRoleKey === 'boss') {
+    const isShipmentRisk =
+      taskView.notification_type === 'shipment_risk' ||
+      payload.notification_type === 'shipment_risk' ||
+      payload.shipment_risk === true
+
+    appendReason(
+      reasons,
+      isHighPriorityWorkflowTask(taskView),
+      '老板扩展命中 high priority 任务。'
+    )
+    appendReason(
+      reasons,
+      taskView.due_status === 'overdue',
+      '老板扩展命中 overdue 任务。'
+    )
+    appendReason(
+      reasons,
+      isEscalatedToBossWorkflowTask(taskView),
+      '老板扩展命中升级到老板。'
+    )
+    appendReason(
+      reasons,
+      taskView.notification_type === 'approval_required',
+      '老板扩展命中审批提醒。'
+    )
+    appendReason(reasons, isShipmentRisk, '老板扩展命中 shipment risk。')
+    appendReason(
+      reasons,
+      isFinanceWorkflowTask(taskView) && taskView.alert_level === 'critical',
+      '老板扩展命中 finance critical。'
+    )
+    checks.push(
+      '老板可以看高优先级和升级关注，但不能代办财务 / 品质 / 仓库事实。'
+    )
+  } else if (normalizedRoleKey === 'production') {
+    appendReason(
+      reasons,
+      ['outsource_return_tracking', 'outsource_rework'].includes(
+        taskView.task_group
+      ),
+      'production 扩展命中委外回货 / 委外返工任务组。'
+    )
+    appendReason(
+      reasons,
+      taskView.task_group === 'finished_goods_rework',
+      'production 扩展命中成品返工任务组。'
+    )
+    appendReason(
+      reasons,
+      isOutsourceReturnWorkflowTask(taskView) &&
+        taskView.owner_role_key === 'production',
+      'production 扩展命中委外相关任务。'
+    )
+    appendReason(
+      reasons,
+      isFinishedGoodsWorkflowTask(taskView) &&
+        taskView.owner_role_key === 'production',
+      'production 扩展命中成品生产相关任务。'
+    )
+    appendReason(
+      reasons,
+      payload.outsource_owner_role_key === 'outsource',
+      'production 扩展命中 outsource_owner_role_key。'
+    )
+  } else if (normalizedRoleKey === 'finance') {
+    appendReason(
+      reasons,
+      isFinanceWorkflowTask(taskView),
+      'finance 命中财务任务。'
+    )
+  } else if (normalizedRoleKey === 'warehouse') {
+    appendReason(
+      reasons,
+      isWarehouseWorkflowTask(taskView),
+      'warehouse 命中仓库任务。'
+    )
+  } else if (normalizedRoleKey === 'quality') {
+    appendReason(
+      reasons,
+      isQualityWorkflowTask(taskView),
+      'quality 命中质检任务。'
+    )
+  } else if (normalizedRoleKey === 'merchandiser') {
+    appendReason(
+      reasons,
+      payload.confirm_role_key === 'merchandiser',
+      'merchandiser 扩展命中 confirm_role_key。'
+    )
+    appendReason(
+      reasons,
+      ['shipping-release', 'outbound'].includes(taskView.source_type),
+      'merchandiser 扩展命中出货相关 source_type。'
+    )
+  } else if (normalizedRoleKey === 'purchasing') {
+    checks.push('采购移动端当前按 owner_role_key 直查，没有额外扩展可见性。')
+  }
+
+  if (!visible && normalizedRoleKey) {
+    if (!directOwnerMatch) {
+      blockers.push(
+        `owner_role_key=${taskView.owner_role_key || '-'} 不匹配 role_key=${normalizedRoleKey}。`
+      )
+    }
+    if (!ROLE_EXTENDED_VISIBILITY_LABELS[normalizedRoleKey]) {
+      blockers.push('当前角色没有定义扩展可见性规则。')
+    } else {
+      blockers.push(ROLE_EXTENDED_VISIBILITY_LABELS[normalizedRoleKey])
+    }
+
+    if (normalizedRoleKey === 'pmc') {
+      blockers.push(
+        '未命中 blocked / overdue / critical_path / high priority / urged / escalated。'
+      )
+    }
+    if (normalizedRoleKey === 'boss') {
+      blockers.push(
+        '未命中 high priority / finance critical / shipment risk / approval_required / escalate_to_boss。'
+      )
+    }
+    if (normalizedRoleKey === 'production') {
+      blockers.push(
+        'task_group 不在生产关注范围，且 payload 未标记委外或成品生产信号。'
+      )
+    }
+    if (
+      ['finance', 'warehouse', 'quality', 'merchandiser'].includes(
+        normalizedRoleKey
+      )
+    ) {
+      blockers.push('source_type 或 task_group 不匹配该角色关注范围。')
+    }
+    if (!hasVisibilityPayloadSignal(taskView)) {
+      blockers.push(
+        'payload 缺少扩展可见性需要的 alert_type / notification_type / critical_path 等字段。'
+      )
+    }
+  }
+
+  return {
+    role_key: normalizedRoleKey,
+    visible,
+    terminal,
+    direct_owner_match: directOwnerMatch,
+    reasons,
+    blockers,
+    warnings,
+    checks,
+    task_view: taskView,
+  }
 }
 
 function latestTimestamp(taskView = {}) {
@@ -226,6 +487,8 @@ export function buildMobileTaskSummary(taskViews = []) {
       if (taskView.due_status === 'due_soon') summary.dueSoon += 1
       if (taskView.task_status_key === 'blocked') summary.blocked += 1
       if (taskView.priority >= 3) summary.highPriority += 1
+      if (taskView.is_urged) summary.urged += 1
+      if (taskView.is_escalated) summary.escalated += 1
 
       if (
         taskView.task_status_key === 'done' ||
@@ -248,6 +511,8 @@ export function buildMobileTaskSummary(taskViews = []) {
       dueSoon: 0,
       blocked: 0,
       highPriority: 0,
+      urged: 0,
+      escalated: 0,
       pending: 0,
       processing: 0,
       blockedProgress: 0,

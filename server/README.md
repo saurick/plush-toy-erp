@@ -16,6 +16,16 @@
 - `biz`：业务规约与 UseCase
 - `data`：数据库与外部依赖访问
 
+## 开发验收 debug 能力
+
+业务链路调试页调用后端 JSON-RPC `debug` 域生成和清理调试数据：
+
+- `debug.capabilities`：返回当前环境、seed / cleanup 是否允许和禁用原因
+- `debug.rebuild_business_chain_scenario`：生成带 debugRunId 标记的调试数据
+- `debug.clear_business_chain_scenario`：按 debugRunId 预览或清理调试数据
+
+这些接口默认关闭，只允许 local / dev 环境在显式开启 `ERP_DEBUG_SEED_ENABLED`、`ERP_DEBUG_CLEANUP_ENABLED`、`ERP_DEBUG_CLEANUP_SCOPE=debug_run` 后使用；后端还会校验管理员身份和业务链路调试菜单权限。
+
 ## 快速开始
 
 ```bash

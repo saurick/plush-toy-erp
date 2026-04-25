@@ -3,46 +3,79 @@ export const BUSINESS_CHAIN_DEBUG_DOC_PATH = '/erp/docs/business-chain-debug'
 
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'cancelled', 'closed'])
 
-const BUSINESS_CHAIN_DEBUG_PRESET_SCENARIO_DEFINITIONS = [
+export const BUSINESS_CHAIN_DEBUG_MAINLINE_SCENARIOS = Object.freeze([
   {
-    key: 'project-orders',
-    title: '立项到资料准备',
-    chain: '客户/款式立项 -> 材料 BOM -> 辅材/包材采购',
+    key: 'order_approval_engineering',
+    title: '订单提交 -> 老板审批 -> 工程资料任务',
+    status: '已接入 v1',
+    carrier: 'business_records + workflow_tasks',
+    validation: '单元测试 + style:l1 + 移动端 smoke',
+    blindSpot: '没有后端 workflow usecase 统一编排，没有真实 E2E 造数 runner',
+    chain: '订单提交 -> 老板审批 -> 工程资料任务',
+    queryKeywords: ['debug_order_approval_engineering'],
     expectation:
-      '能用订单编号、客户或款式查到立项记录，并继续追到同来源单号的 BOM、采购记录和协同任务。',
+      '订单审批通过后应能查到工程资料任务、业务状态快照和相关协同任务。',
   },
   {
-    key: 'processing-contracts',
-    title: '委外加工跟进',
-    chain: '客户/款式立项 -> 加工合同/委外下单 -> 入库/检验',
-    expectation:
-      '加工合同保留加工厂、委外数量、加工金额和交付日期，关联任务能看到处理、阻塞或完成状态。',
+    key: 'purchase_iqc_inbound',
+    title: '采购到货 -> IQC -> 入库',
+    status: '已接入 v1',
+    carrier: 'business_records + workflow_tasks',
+    validation: '单元测试 + style:l1 + 移动端 smoke',
+    blindSpot: '没有真实库存流水 / 库存余额专表',
+    chain: '采购到货 -> IQC -> 入库',
+    queryKeywords: ['debug_purchase_iqc_inbound'],
+    expectation: '采购到货后应能查到 IQC、品质放行和仓库入库任务。',
   },
   {
-    key: 'production-exceptions',
-    title: '生产异常闭环',
-    chain: '生产排单 -> 生产进度 -> 生产异常/返工',
-    expectation:
-      '状态流转到业务阻塞时必须能看到阻塞原因，未终止协同任务也同步到阻塞或后续处理状态。',
+    key: 'outsource_return_inbound',
+    title: '委外发料 -> 回货 -> 检验 -> 入库',
+    status: '已接入 v1',
+    carrier: 'business_records + workflow_tasks',
+    validation: '单元测试 + style:l1 + 移动端 smoke',
+    blindSpot: '没有 outsource_order 专表，没有真实委外成本结算专表',
+    chain: '委外发料 -> 回货 -> 检验 -> 入库',
+    queryKeywords: ['debug_outsource_return_inbound'],
+    expectation: '委外回货后应能查到回货检验、合格入库或不合格返工任务。',
   },
   {
-    key: 'inventory',
-    title: '仓库收发追溯',
-    chain: '入库通知/检验 -> 库存 -> 待出货 -> 出库记录',
+    key: 'finished_goods_shipment',
+    title: '成品完工 -> 成品抽检 -> 成品入库 -> 出货',
+    status: '已接入 v1',
+    carrier: 'business_records + workflow_tasks',
+    validation: '单元测试 + style:l1 + 移动端 smoke',
+    blindSpot: '没有 production_order / shipment_order / inventory_txn 专表',
+    chain: '成品完工 -> 成品抽检 -> 成品入库 -> 出货',
+    queryKeywords: ['debug_finished_goods_shipment'],
     expectation:
-      '仓库链路能按物料、成品、来源单号或仓位追到数量、位置、业务状态和仓库任务。',
+      '成品完工后应能查到成品抽检、成品入库、出货放行和出库相关任务。',
   },
   {
-    key: 'reconciliation',
-    title: '对账付款跟进',
-    chain: '加工合同/采购 -> 对账/结算 -> 待付款/应付提醒',
-    expectation:
-      '财务链路能看到供应商或加工厂、金额、对账状态、待付款任务和异常说明。',
+    key: 'shipment_receivable_invoice',
+    title: '出货 -> 应收登记 -> 开票登记',
+    status: '已接入 v1',
+    carrier: 'business_records + workflow_tasks',
+    validation: '单元测试 + style:l1 + 移动端 smoke',
+    blindSpot: '没有 ar_receivable / ar_invoice 专表，没有总账、凭证、纳税申报',
+    chain: '出货 -> 应收登记 -> 开票登记',
+    queryKeywords: ['debug_shipment_receivable_invoice'],
+    expectation: '出货后应能查到应收登记、开票登记和财务待处理任务。',
   },
-]
+  {
+    key: 'payable_reconciliation',
+    title: '采购/委外 -> 应付登记 -> 对账',
+    status: '已接入 v1',
+    carrier: 'business_records + workflow_tasks',
+    validation: '单元测试 + style:l1 + 移动端 smoke',
+    blindSpot: '没有 ap_payable / ap_settlement 专表，没有付款流水',
+    chain: '采购/委外 -> 应付登记 -> 对账',
+    queryKeywords: ['debug_payable_reconciliation'],
+    expectation: '采购或委外入库后应能查到应付登记、对账和结算状态。',
+  },
+])
 
 export const BUSINESS_CHAIN_DEBUG_PRESET_SCENARIOS =
-  BUSINESS_CHAIN_DEBUG_PRESET_SCENARIO_DEFINITIONS.map((scenario) => {
+  BUSINESS_CHAIN_DEBUG_MAINLINE_SCENARIOS.map((scenario) => {
     const key = toText(scenario.key)
     const queryKeywords = Array.isArray(scenario.queryKeywords)
       ? scenario.queryKeywords.map(toText).filter(Boolean)
@@ -53,6 +86,207 @@ export const BUSINESS_CHAIN_DEBUG_PRESET_SCENARIOS =
       queryKeywords: queryKeywords.length > 0 ? queryKeywords : [key],
     }
   })
+
+export const BUSINESS_CHAIN_DEBUG_DEFERRED_LINKS = Object.freeze([
+  {
+    key: 'engineering_bom_material_requirement',
+    title: '工程资料 -> BOM -> 材料需求 -> 采购需求',
+    status: 'deferred',
+    reason:
+      '当前已有工程资料任务和 BOM 模块，但尚未形成从 BOM 自动生成材料需求和采购需求的闭环。',
+    nextStep: '在拆 BOM / material_requirement 或稳定业务字段后补。',
+  },
+  {
+    key: 'order_change_management',
+    title: '订单变更 / 客户变更 / 交期变更',
+    status: 'deferred',
+    reason: '当前主链路覆盖订单审批，不覆盖变更审批和影响传播。',
+    nextStep: '建立变更单、影响范围、重新触发任务规则。',
+  },
+  {
+    key: 'production_scheduling_assignment',
+    title: '生产排产 -> 分派 -> 生产进度',
+    status: 'partial',
+    reason:
+      '当前已有 production-scheduling / production-progress 模块，但主闭环从成品完工后开始，不覆盖排产和分派前置链路。',
+    nextStep: '补排产任务、产能资源、工序分派。',
+  },
+  {
+    key: 'material_shortage_replenishment',
+    title: '欠料预警 -> 采购补料',
+    status: 'deferred',
+    reason: '当前有预警和采购链路，但没有库存余额 / 材料需求 / 缺料计算真源。',
+    nextStep: 'inventory_balance / material_requirement 稳定后再做。',
+  },
+  {
+    key: 'warehouse_issue_material',
+    title: '仓库发料 / 委外发料 / 生产领料',
+    status: 'deferred',
+    reason: '当前覆盖入库和出货，不覆盖领料/发料流水。',
+    nextStep: 'inventory_txn 专表评审后补。',
+  },
+  {
+    key: 'inventory_check_adjustment',
+    title: '库存盘点 / 库存调整 / 异常件',
+    status: 'deferred',
+    reason: '当前没有真实库存流水和库存余额。',
+    nextStep: 'inventory_txn / inventory_balance / adjustment_order 评审后补。',
+  },
+  {
+    key: 'rework_resubmit_qc',
+    title: '返工完成 -> 重新送检',
+    status: 'partial',
+    reason: '当前不合格会生成返工任务，但返工完成后自动重新送检规则还不完整。',
+    nextStep: '补 rework_done -> qc_pending 的重提链路。',
+  },
+  {
+    key: 'shipment_return_after_sales',
+    title: '出货退回 / 客诉 / 售后',
+    status: 'deferred',
+    reason: '当前只覆盖正常出货，不覆盖退货和客诉。',
+    nextStep: '售后/退货模块稳定后补。',
+  },
+  {
+    key: 'receipt_payment_tracking',
+    title: '收款登记 / 付款登记',
+    status: 'deferred',
+    reason: '当前覆盖应收、开票、应付、对账，不覆盖实际收付款流水。',
+    nextStep: 'receipt / payment 专表或业务记录稳定后补。',
+  },
+  {
+    key: 'invoice_exception',
+    title: '发票异常 / 红冲 / 作废',
+    status: 'deferred',
+    reason: '当前只覆盖开票登记，不覆盖税务异常处理。',
+    nextStep: '发票专表和状态机稳定后补。',
+  },
+  {
+    key: 'cost_margin_analysis',
+    title: '成本核算 / 毛利分析',
+    status: 'deferred',
+    reason: '当前没有完整库存成本、采购成本、委外成本和财务专表。',
+    nextStep: '成本快照和专表评审后补。',
+  },
+  {
+    key: 'supplier_vendor_score',
+    title: '供应商 / 加工商绩效',
+    status: 'deferred',
+    reason: '当前任务流记录了延期、不良、对账，但没有绩效模型。',
+    nextStep: '供应商评分指标稳定后补。',
+  },
+  {
+    key: 'permission_change_audit',
+    title: '权限审批 / 菜单权限变更审计',
+    status: 'deferred',
+    reason: '当前有权限配置和日志文档，但没有权限变更审批流。',
+    nextStep: '审计日志和权限变更记录稳定后补。',
+  },
+  {
+    key: 'notification_center_full',
+    title: '完整通知中心 / 未读 / 外部推送',
+    status: 'deferred',
+    reason: '当前只有任务事件、预警和催办评审，尚未落 notifications 独立表。',
+    nextStep: '评审 notification 表、recipient 表、read 状态和外部推送。',
+  },
+])
+
+export const BUSINESS_CHAIN_DEBUG_OUT_OF_SCOPE_LINKS = Object.freeze([
+  {
+    key: 'fixed_assets_consumables',
+    title: '固定资产 / 低值易耗品',
+    status: 'out_of_scope',
+  },
+  {
+    key: 'general_ledger_tax',
+    title: '总账 / 凭证 / 纳税申报',
+    status: 'out_of_scope',
+  },
+  {
+    key: 'pda_barcode_vision',
+    title: 'PDA / 条码枪 / 图片识别',
+    status: 'out_of_scope',
+  },
+  {
+    key: 'low_code_form_designer',
+    title: '复杂低代码表单设计器',
+    status: 'future',
+  },
+  {
+    key: 'arbitrary_sql_console',
+    title: '任意 SQL 控制台',
+    status: 'out_of_scope',
+  },
+])
+
+export const BUSINESS_CHAIN_DEBUG_MUTATION_GUARD = Object.freeze({
+  enabled: false,
+  reason: '需要后端安全开关后启用',
+  rebuildMethod: 'debug.rebuild_business_chain_scenario',
+  cleanupMethod: 'debug.clear_business_chain_scenario',
+})
+
+export const BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT = Object.freeze({
+  environment: 'unknown',
+  seedEnabled: false,
+  seedAllowed: false,
+  seedDisabledReason: '尚未读取后端 debug 能力状态',
+  cleanupEnabled: false,
+  cleanupAllowed: false,
+  cleanupDisabledReason: '尚未读取后端 debug 能力状态',
+  cleanupScope: 'debug_run',
+  cleanupOnlyDebugData: true,
+  requiresDebugRunId: true,
+  destructiveRemoteDenied: true,
+  supportedScenarios: [],
+})
+
+export function normalizeBusinessChainDebugCapabilities(raw = {}) {
+  const environment = toText(raw.environment) || 'unknown'
+  const seedEnabled = Boolean(raw.seedEnabled)
+  const seedAllowed = Boolean(raw.seedAllowed)
+  const cleanupEnabled = Boolean(raw.cleanupEnabled)
+  const cleanupAllowed = Boolean(raw.cleanupAllowed)
+  return {
+    environment,
+    seedEnabled,
+    seedAllowed,
+    seedDisabledReason:
+      toText(raw.seedDisabledReason) ||
+      (seedAllowed
+        ? ''
+        : BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT.seedDisabledReason),
+    cleanupEnabled,
+    cleanupAllowed,
+    cleanupDisabledReason:
+      toText(raw.cleanupDisabledReason) ||
+      (cleanupAllowed
+        ? ''
+        : BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT.cleanupDisabledReason),
+    cleanupScope:
+      toText(raw.cleanupScope) ||
+      BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT.cleanupScope,
+    cleanupOnlyDebugData: raw.cleanupOnlyDebugData !== false,
+    requiresDebugRunId: raw.requiresDebugRunId !== false,
+    destructiveRemoteDenied: raw.destructiveRemoteDenied !== false,
+    supportedScenarios: Array.isArray(raw.supportedScenarios)
+      ? raw.supportedScenarios
+      : [],
+  }
+}
+
+export function getBusinessChainDebugActionDisabledReason(
+  capabilities,
+  action
+) {
+  const normalized = normalizeBusinessChainDebugCapabilities(capabilities)
+  if (action === 'seed') {
+    return normalized.seedAllowed ? '' : normalized.seedDisabledReason
+  }
+  if (action === 'cleanup') {
+    return normalized.cleanupAllowed ? '' : normalized.cleanupDisabledReason
+  }
+  return '未知调试操作'
+}
 
 export function normalizeBusinessChainDebugQuery(query = '') {
   return toText(query)
@@ -71,6 +305,8 @@ export function createEmptyBusinessChainDebugView(query = '') {
     hasQuery: Boolean(normalizedQuery),
     records: [],
     tasks: [],
+    taskEvents: [],
+    businessStates: [],
     summary: createEmptySummary(),
   }
 }
@@ -79,6 +315,7 @@ export function buildBusinessChainDebugView({
   query = '',
   records = [],
   tasks = [],
+  taskEvents = [],
   businessStates = [],
   modules = [],
 } = {}) {
@@ -98,6 +335,7 @@ export function buildBusinessChainDebugView({
     ? records.filter((record) => !record?.deleted_at)
     : []
   const activeTasks = Array.isArray(tasks) ? tasks : []
+  const activeTaskEvents = Array.isArray(taskEvents) ? taskEvents : []
   const activeBusinessStates = Array.isArray(businessStates)
     ? businessStates
     : []
@@ -148,12 +386,41 @@ export function buildBusinessChainDebugView({
     })
     .map((task) => normalizeTaskRow(task, moduleMap.get(task.source_type)))
 
+  const matchedTaskIds = new Set(
+    taskRows.map((task) => task.id).filter(Boolean)
+  )
+  const stateRows = activeBusinessStates
+    .filter((state) => {
+      const moduleItem = moduleMap.get(state.source_type)
+      const stateMatched = matchesSearchTexts(
+        buildStateSearchTexts(state, moduleItem),
+        searchQuery
+      )
+      return stateMatched || matchedRecordKeys.has(buildStateRecordKey(state))
+    })
+    .map((state) =>
+      normalizeBusinessStateRow(state, moduleMap.get(state.source_type))
+    )
+
+  const taskEventRows = activeTaskEvents
+    .filter((event) => {
+      const taskId = Number(event?.task_id || 0)
+      const eventMatched = matchesSearchTexts(
+        buildTaskEventSearchTexts(event),
+        searchQuery
+      )
+      return eventMatched || matchedTaskIds.has(taskId)
+    })
+    .map(normalizeTaskEventRow)
+
   return {
     query: normalizedQuery,
     hasQuery: true,
     records: recordRows,
     tasks: taskRows,
-    summary: summarizeDebugRows(recordRows, taskRows),
+    taskEvents: taskEventRows,
+    businessStates: stateRows,
+    summary: summarizeDebugRows(recordRows, taskRows, stateRows, taskEventRows),
   }
 }
 
@@ -226,6 +493,7 @@ function normalizeTaskRow(task, moduleItem) {
     id: Number(task.id || 0),
     task_code: toText(task.task_code),
     task_name: toText(task.task_name),
+    task_group: toText(task.task_group),
     source_type: toText(task.source_type),
     source_id: Number(task.source_id || 0),
     source_no: toText(task.source_no),
@@ -234,16 +502,49 @@ function normalizeTaskRow(task, moduleItem) {
     business_status_key: toText(task.business_status_key),
     task_status_key: toText(task.task_status_key),
     owner_role_key: toText(task.owner_role_key),
+    due_at: Number(task.due_at || 0),
+    priority: toNumber(task.priority) ?? 0,
     blocked_reason: toText(task.blocked_reason),
     updated_at: Number(task.updated_at || 0),
   }
 }
 
-function summarizeDebugRows(records, tasks) {
+function normalizeBusinessStateRow(state, moduleItem) {
+  return {
+    key: `state:${state.id || buildStateRecordKey(state)}`,
+    id: Number(state.id || 0),
+    source_type: toText(state.source_type),
+    source_id: Number(state.source_id || 0),
+    source_no: toText(state.source_no),
+    module_title: moduleItem?.title || toText(state.source_type),
+    module_path: moduleItem?.path || '',
+    business_status_key: toText(state.business_status_key),
+    owner_role_key: toText(state.owner_role_key),
+    blocked_reason: toText(state.blocked_reason),
+    updated_at: Number(state.updated_at || state.status_changed_at || 0),
+  }
+}
+
+function normalizeTaskEventRow(event) {
+  return {
+    key: `task-event:${event.id || `${event.task_id}:${event.created_at}`}`,
+    id: Number(event.id || 0),
+    task_id: Number(event.task_id || 0),
+    event_type: toText(event.event_type),
+    from_status_key: toText(event.from_status_key),
+    to_status_key: toText(event.to_status_key),
+    reason: toText(event.reason),
+    actor_role_key: toText(event.actor_role_key),
+    created_at: Number(event.created_at || 0),
+  }
+}
+
+function summarizeDebugRows(records, tasks, states, taskEvents) {
   return {
     recordCount: records.length,
-    stateCount: records.filter((record) => record.has_state_snapshot).length,
+    stateCount: states.length,
     taskCount: tasks.length,
+    eventCount: taskEvents.length,
     activeTaskCount: tasks.filter(
       (task) => !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
     ).length,
@@ -261,6 +562,7 @@ function createEmptySummary() {
     recordCount: 0,
     stateCount: 0,
     taskCount: 0,
+    eventCount: 0,
     activeTaskCount: 0,
     blockedCount: 0,
     quantity: 0,
@@ -311,6 +613,18 @@ function buildTaskSearchTexts(task, moduleItem) {
     task?.owner_role_key,
     task?.blocked_reason,
     ...collectPayloadTexts(task?.payload),
+  ]
+}
+
+function buildTaskEventSearchTexts(event) {
+  return [
+    event?.task_id,
+    event?.event_type,
+    event?.from_status_key,
+    event?.to_status_key,
+    event?.actor_role_key,
+    event?.reason,
+    ...collectPayloadTexts(event?.payload),
   ]
 }
 

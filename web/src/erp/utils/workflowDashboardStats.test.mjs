@@ -6,6 +6,12 @@ import {
   buildWorkflowTaskAlert,
   getWorkflowTaskDueStatus,
 } from './workflowDashboardStats.mjs'
+import {
+  formatWorkflowAlertSource,
+  formatWorkflowTaskSource,
+  resolveWorkflowAlertEntryPath,
+  resolveWorkflowTaskEntryPath,
+} from './dashboardTaskDisplay.mjs'
 
 const NOW_SEC = 1_800_000_000
 const NOW_MS = NOW_SEC * 1000
@@ -23,6 +29,53 @@ function task(overrides = {}) {
     ...overrides,
   }
 }
+
+test('dashboardTaskDisplay: 看板任务来源回显不直接露出英文模块 key', () => {
+  const sourceLabel = formatWorkflowTaskSource(
+    task({
+      source_type: 'shipping-release',
+      source_id: 9,
+      source_no: '',
+    })
+  )
+  const alertSourceLabel = formatWorkflowAlertSource({
+    source_type: 'processing-contracts',
+    source_no: '',
+    task: task({ source_id: 12 }),
+  })
+
+  assert.equal(sourceLabel, '待出货/出货放行 第 9 条')
+  assert.equal(alertSourceLabel, '加工合同/委外下单 第 12 条')
+  assert(!sourceLabel.includes('shipping-release'))
+  assert(!alertSourceLabel.includes('processing-contracts'))
+})
+
+test('dashboardTaskDisplay: 看板任务导航优先进入中文业务页并带单号筛选', () => {
+  const entryPath = resolveWorkflowTaskEntryPath(
+    task({
+      source_type: 'shipping-release',
+      source_no: 'OUT-001',
+      source_id: 9,
+    })
+  )
+  const payloadEntryPath = resolveWorkflowAlertEntryPath({
+    source_type: 'project-orders',
+    source_no: 'PO-001',
+    task: task({
+      source_id: 12,
+      payload: { entry_path: '/erp/purchase/material-bom' },
+    }),
+  })
+
+  assert.equal(
+    entryPath,
+    '/erp/warehouse/shipping-release?link_keyword=OUT-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
+  )
+  assert.equal(
+    payloadEntryPath,
+    '/erp/purchase/material-bom?link_keyword=PO-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
+  )
+})
 
 test('workflowDashboardStats: 统计任务状态和 due_at 计算态', () => {
   const stats = buildWorkflowDashboardStats(
@@ -339,6 +392,61 @@ test('workflowDashboardStats: PMC 老板和财务关注事项按规则汇总', (
   assert.equal(stats.buckets.approvalPending.length, 1)
 })
 
+test('workflowDashboardStats: 催办和升级进入预警统计', () => {
+  const urgedTask = task({
+    id: 11,
+    payload: {
+      urged: true,
+      urge_count: 2,
+      last_urge_at: NOW_SEC,
+      last_urge_reason: '请今天处理',
+    },
+  })
+  const escalatedTask = task({
+    id: 12,
+    owner_role_key: 'finance',
+    payload: {
+      urged: true,
+      escalated: true,
+      last_urge_action: 'escalate_to_boss',
+      escalate_target_role_key: 'boss',
+      notification_type: 'urgent_escalation',
+      alert_type: 'urgent_escalation',
+    },
+  })
+
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(urgedTask, { nowMs: NOW_MS })?.notification_type,
+      buildWorkflowTaskAlert(urgedTask, { nowMs: NOW_MS })?.alert_type,
+      buildWorkflowTaskAlert(urgedTask, { nowMs: NOW_MS })?.alert_level,
+    ],
+    ['task_urged', 'urged_task', 'warning']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(escalatedTask, { nowMs: NOW_MS })
+        ?.notification_type,
+      buildWorkflowTaskAlert(escalatedTask, { nowMs: NOW_MS })?.alert_type,
+      buildWorkflowTaskAlert(escalatedTask, { nowMs: NOW_MS })?.alert_level,
+      buildWorkflowTaskAlert(escalatedTask, { nowMs: NOW_MS })?.alert_label,
+    ],
+    ['urgent_escalation', 'urgent_escalation', 'critical', '已升级老板']
+  )
+
+  const stats = buildWorkflowDashboardStats([urgedTask, escalatedTask], {
+    nowMs: NOW_MS,
+  })
+
+  assert.equal(stats.urged, 2)
+  assert.equal(stats.escalated, 1)
+  assert.equal(stats.buckets.urgedTasks.length, 1)
+  assert.equal(stats.buckets.escalatedTasks.length, 1)
+  assert.equal(stats.buckets.bossEscalations.length, 1)
+  assert.equal(stats.pmcFocus, 2)
+  assert.equal(stats.bossFocus, 1)
+})
+
 test('workflowDashboardStats: 委外延期和回货预警进入对应桶', () => {
   const stats = buildWorkflowDashboardStats(
     [
@@ -413,4 +521,157 @@ test('workflowDashboardStats: 成品抽检 入库 返工和待出货预警进入
   assert.equal(stats.buckets.qcFailed.length, 1)
   assert.equal(stats.buckets.shipmentPending.length, 1)
   assert.equal(stats.criticalAlerts, 1)
+})
+
+test('workflowDashboardStats: 应收 开票和财务超时进入财务预警', () => {
+  const receivableTask = task({
+    id: 41,
+    source_type: 'outbound',
+    owner_role_key: 'finance',
+    task_group: 'receivable_registration',
+    business_status_key: 'shipped',
+    payload: {
+      notification_type: 'finance_pending',
+      alert_type: 'finance_pending',
+      critical_path: true,
+    },
+  })
+  const invoiceTask = task({
+    id: 42,
+    source_type: 'receivables',
+    owner_role_key: 'finance',
+    task_group: 'invoice_registration',
+    business_status_key: 'reconciling',
+    payload: {
+      notification_type: 'finance_pending',
+      alert_type: 'invoice_pending',
+    },
+  })
+  const overdueInvoiceTask = task({
+    id: 43,
+    source_type: 'invoices',
+    owner_role_key: 'finance',
+    task_group: 'invoice_registration',
+    business_status_key: 'reconciling',
+    due_at: NOW_SEC - 60,
+    payload: {
+      notification_type: 'finance_pending',
+      alert_type: 'invoice_pending',
+    },
+  })
+
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(receivableTask, { nowMs: NOW_MS })?.alert_type,
+      buildWorkflowTaskAlert(receivableTask, { nowMs: NOW_MS })?.alert_label,
+    ],
+    ['finance_pending', '应收待登记']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(invoiceTask, { nowMs: NOW_MS })?.alert_type,
+      buildWorkflowTaskAlert(invoiceTask, { nowMs: NOW_MS })?.alert_label,
+    ],
+    ['invoice_pending', '开票待登记']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(overdueInvoiceTask, { nowMs: NOW_MS })?.alert_type,
+      buildWorkflowTaskAlert(overdueInvoiceTask, { nowMs: NOW_MS })
+        ?.alert_level,
+    ],
+    ['finance_overdue', 'critical']
+  )
+
+  const stats = buildWorkflowDashboardStats(
+    [receivableTask, invoiceTask, overdueInvoiceTask],
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(stats.financePending, 3)
+  assert.equal(stats.buckets.financePending.length, 2)
+  assert.equal(stats.buckets.invoicePending.length, 1)
+  assert.equal(stats.buckets.financeOverdue.length, 1)
+  assert.equal(stats.pmcFocus, 2)
+  assert.equal(stats.bossFocus, 1)
+})
+
+test('workflowDashboardStats: 应付 对账和财务超时进入财务预警', () => {
+  const purchasePayableTask = task({
+    id: 51,
+    source_type: 'accessories-purchase',
+    owner_role_key: 'finance',
+    task_group: 'purchase_payable_registration',
+    business_status_key: 'inbound_done',
+    payload: {
+      notification_type: 'finance_pending',
+      alert_type: 'payable_pending',
+      payable_type: 'purchase',
+    },
+  })
+  const outsourceReconciliationTask = task({
+    id: 52,
+    source_type: 'processing-contracts',
+    owner_role_key: 'finance',
+    task_group: 'outsource_reconciliation',
+    business_status_key: 'reconciling',
+    payload: {
+      notification_type: 'finance_pending',
+      alert_type: 'reconciliation_pending',
+      payable_type: 'outsource',
+    },
+  })
+  const overduePayableTask = task({
+    id: 53,
+    source_type: 'payables',
+    owner_role_key: 'finance',
+    task_group: 'purchase_payable_registration',
+    business_status_key: 'inbound_done',
+    due_at: NOW_SEC - 60,
+    payload: {
+      notification_type: 'finance_pending',
+      alert_type: 'payable_pending',
+      payable_type: 'purchase',
+    },
+  })
+
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(purchasePayableTask, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(purchasePayableTask, { nowMs: NOW_MS })
+        ?.alert_label,
+    ],
+    ['payable_pending', '应付待登记']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(outsourceReconciliationTask, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(outsourceReconciliationTask, { nowMs: NOW_MS })
+        ?.alert_label,
+    ],
+    ['reconciliation_pending', '对账待处理']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(overduePayableTask, { nowMs: NOW_MS })?.alert_type,
+      buildWorkflowTaskAlert(overduePayableTask, { nowMs: NOW_MS })
+        ?.alert_level,
+    ],
+    ['finance_overdue', 'critical']
+  )
+
+  const stats = buildWorkflowDashboardStats(
+    [purchasePayableTask, outsourceReconciliationTask, overduePayableTask],
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(stats.financePending, 3)
+  assert.equal(stats.buckets.financePending.length, 3)
+  assert.equal(stats.buckets.payablePending.length, 1)
+  assert.equal(stats.buckets.reconciliationPending.length, 1)
+  assert.equal(stats.buckets.financeOverdue.length, 1)
+  assert.equal(stats.pmcFocus, 1)
+  assert.equal(stats.bossFocus, 1)
 })

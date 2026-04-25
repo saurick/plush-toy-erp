@@ -88,6 +88,23 @@
 - 这组字段决定用户 token 签名和默认管理员初始化逻辑。
 - 必须替换仓库里的默认密钥和管理员密码。
 
+## debug seed / cleanup 环境变量
+
+业务链路调试的 seed（生成调试数据）和 cleanup（清理调试数据）不写入 `conf.proto`，当前只通过运行时环境变量开启，避免公共配置文件默认暴露写入能力：
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `ERP_DEBUG_ENV` | 为空时按 `data.postgres.debug` 推断，debug=true 视为 `dev`，否则视为 `remote` | 可显式设为 `local`、`dev`、`shared`、`remote`、`prod` |
+| `ERP_DEBUG_SEED_ENABLED` | `false` | 只有值为 `true` / `1` / `yes` / `on` 且环境为 `local` 或 `dev` 时允许生成调试数据 |
+| `ERP_DEBUG_CLEANUP_ENABLED` | `false` | 只有值为 `true` / `1` / `yes` / `on` 且环境为 `local` 或 `dev` 时允许清理调试数据 |
+| `ERP_DEBUG_CLEANUP_SCOPE` | `debug_run` | 当前只允许 `debug_run`，表示必须按 debugRunId 清理 |
+
+安全边界：
+
+- remote / prod / shared 环境默认拒绝 seed 和 destructive cleanup。
+- cleanup 必须提供 debugRunId，后端只清理带 `DBG-<debugRunId>` 前缀且 payload 中包含 debug 标记的数据。
+- 前端隐藏按钮不作为安全边界；后端仍会检查管理员身份、业务链路调试菜单权限、环境开关和 debug 标记。
+
 ## 初始化后必须改的字段
 
 以下内容不应直接进入交付项目：

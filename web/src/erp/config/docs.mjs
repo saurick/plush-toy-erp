@@ -1,4 +1,5 @@
 import systemInitDoc from '../docs/system-init.md?raw'
+import operationFlowOverviewDoc from '../docs/operation-flow-overview.md?raw'
 import operationPlaybookDoc from '../docs/operation-playbook.md?raw'
 import fieldTruthDoc from '../docs/field-truth.md?raw'
 import dataModelDoc from '../docs/data-model.md?raw'
@@ -10,6 +11,8 @@ import rolePageDocumentMatrixDoc from '../docs/role-page-document-matrix.md?raw'
 import taskDocumentMappingDoc from '../docs/task-document-mapping.md?raw'
 import workflowStatusGuideDoc from '../docs/workflow-status-guide.md?raw'
 import workflowSchemaDraftDoc from '../docs/workflow-schema-draft.md?raw'
+import workflowUsecaseReviewDoc from '../docs/workflow-usecase-review.md?raw'
+import industrySchemaReviewDoc from '../docs/industry-schema-review.md?raw'
 import taskFlowV1Doc from '../docs/task-flow-v1.md?raw'
 import rolePermissionMatrixV1Doc from '../docs/role-permission-matrix-v1.md?raw'
 import notificationAlertV1Doc from '../docs/notification-alert-v1.md?raw'
@@ -26,11 +29,17 @@ import currentBoundariesDoc from '../docs/current-boundaries.md?raw'
 import printTemplatesDoc from '../docs/print-templates.md?raw'
 import acceptanceOverviewDoc from '../docs/acceptance-overview.md?raw'
 import businessChainDebugDoc from '../docs/business-chain-debug.md?raw'
+import workflowTaskDebugDoc from '../docs/workflow-task-debug.md?raw'
 import fieldLinkageCoverageDoc from '../docs/field-linkage-coverage.md?raw'
 import qaRunRecordsDoc from '../docs/qa-run-records.md?raw'
 import qaReportsDoc from '../docs/qa-reports.md?raw'
 
 export const docRegistry = {
+  'operation-flow-overview': {
+    title: 'ERP 流程图总览',
+    summary: '用一页说明当前 6 条真实闭环、推荐阅读顺序、当前边界和排查入口。',
+    source: operationFlowOverviewDoc,
+  },
   'operation-guide': {
     title: 'ERP 操作教程',
     summary: '说明总后台、角色剪裁后台、手机端任务端和帮助中心的使用方式。',
@@ -64,6 +73,18 @@ export const docRegistry = {
     summary:
       '提供任务协同层和业务状态层的表结构草案与 SQL 样例，只用于校对，不直接作为迁移真源。',
     source: workflowSchemaDraftDoc,
+  },
+  'workflow-usecase-review': {
+    title: 'Workflow usecase 评审',
+    summary:
+      '评审前端 v1 编排和后端 workflow usecase 的边界、迁移优先级、回滚和测试要求。',
+    source: workflowUsecaseReviewDoc,
+  },
+  'industry-schema-review': {
+    title: '行业专表 Schema 评审',
+    summary:
+      '评审 business_records 继续使用边界、行业专表候选、P1 优先评审表和迁移一致性策略。',
+    source: industrySchemaReviewDoc,
   },
   'task-flow-v1': {
     title: '工作流主任务树 v1',
@@ -137,14 +158,20 @@ export const docRegistry = {
   },
   'acceptance-overview': {
     title: '验收结果总览',
-    summary: '说明验收总览页的报告来源、已知盲区和下一步排查路径。',
+    summary: '查看当前闭环覆盖、质量命令、已知盲区和下一步排查入口。',
     source: acceptanceOverviewDoc,
   },
   'business-chain-debug': {
     title: '业务链路调试',
     summary:
-      '说明当前如何按业务记录、workflow 状态和协同任务排查链路，调试页只读查询，不伪装成一键造数工具。',
+      '说明 6 条 v1 主干闭环、deferred 扩展链路和安全 debug 场景操作边界。',
     source: businessChainDebugDoc,
+  },
+  'workflow-task-debug': {
+    title: '协同任务调试',
+    summary:
+      '说明如何按 workflow_tasks、角色任务池、移动端可见性和 workflow_task_events 排查协同任务。',
+    source: workflowTaskDebugDoc,
   },
   'field-linkage-coverage': {
     title: '字段联动覆盖',
@@ -157,10 +184,21 @@ export const docRegistry = {
       '统一当前验收命令、运行产物和记录口径，后续再接结构化 latest 摘要。',
     source: qaRunRecordsDoc,
   },
+  'qa-run-records': {
+    title: '运行记录',
+    summary: '查看每轮建议执行的命令、通过 / 失败 / 跳过记录和剩余风险写法。',
+    source: qaRunRecordsDoc,
+  },
   reports: {
     title: '专项报告',
     summary:
       '聚合字段联动、打印快照、workflow 状态、权限边界和错误码同步等专项边界。',
+    source: qaReportsDoc,
+  },
+  'qa-reports': {
+    title: '专项报告',
+    summary:
+      '聚合业务闭环、字段联动、打印快照、workflow、权限、通知预警、错误码和后端 schema 专项。',
     source: qaReportsDoc,
   },
   'system-init': {

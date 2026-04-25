@@ -31,6 +31,14 @@ export const FINISHED_GOODS_TASK_GROUP_KEYS = new Set([
   'finished_goods_rework',
   'shipment_release',
 ])
+export const FINANCE_TASK_GROUP_KEYS = new Set([
+  'receivable_registration',
+  'invoice_registration',
+  'purchase_payable_registration',
+  'outsource_payable_registration',
+  'purchase_reconciliation',
+  'outsource_reconciliation',
+])
 
 function normalizeTaskStatusKey(task = {}) {
   return String(task.task_status_key || '').trim()
@@ -77,10 +85,47 @@ export function isCriticalPathWorkflowTask(task = {}) {
   return payload.critical_path === true || payload.is_critical_path === true
 }
 
+export function isUrgedWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return Boolean(
+    payload.urged === true ||
+      Number(payload.urge_count || 0) > 0 ||
+      payload.last_urge_at
+  )
+}
+
+export function isEscalatedWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  const lastAction = String(payload.last_urge_action || '').trim()
+  return Boolean(
+    payload.escalated === true ||
+      payload.alert_type === 'urgent_escalation' ||
+      ['escalate_to_pmc', 'escalate_to_boss'].includes(lastAction)
+  )
+}
+
+export function isEscalatedToBossWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(payload.escalate_target_role_key || '').trim() === 'boss' ||
+    String(payload.last_urge_action || '').trim() === 'escalate_to_boss'
+  )
+}
+
 export function isFinanceWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
   return (
     FINANCE_MODULE_KEYS.has(normalizeSourceType(task)) ||
-    String(task.owner_role_key || '').trim() === 'finance'
+    FINANCE_TASK_GROUP_KEYS.has(String(task.task_group || '').trim()) ||
+    String(task.owner_role_key || '').trim() === 'finance' ||
+    payload.notification_type === 'finance_pending' ||
+    [
+      'finance_pending',
+      'invoice_pending',
+      'payable_pending',
+      'reconciliation_pending',
+      'finance_overdue',
+    ].includes(String(payload.alert_type || '').trim())
   )
 }
 
@@ -225,6 +270,42 @@ export function isShipmentWorkflowTask(task = {}) {
   )
 }
 
+export function isReceivableRegistrationWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'receivable_registration' ||
+    payload.alert_type === 'finance_pending'
+  )
+}
+
+export function isInvoiceRegistrationWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'invoice_registration' ||
+    payload.alert_type === 'invoice_pending'
+  )
+}
+
+export function isPayableRegistrationWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    [
+      'purchase_payable_registration',
+      'outsource_payable_registration',
+    ].includes(String(task.task_group || '').trim()) ||
+    payload.alert_type === 'payable_pending'
+  )
+}
+
+export function isReconciliationPendingWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    ['purchase_reconciliation', 'outsource_reconciliation'].includes(
+      String(task.task_group || '').trim()
+    ) || payload.alert_type === 'reconciliation_pending'
+  )
+}
+
 export function isApprovalWorkflowTask(task = {}) {
   const payload = payloadOf(task)
   return (
@@ -248,6 +329,18 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     source_type: sourceType,
     source_no: task.source_no || '',
     due_status: dueStatus,
+  }
+
+  if (isEscalatedWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: 'urgent_escalation',
+      alert_type: 'urgent_escalation',
+      alert_level: 'critical',
+      alert_label: isEscalatedToBossWorkflowTask(task)
+        ? '已升级老板'
+        : '已升级 PMC',
+    }
   }
 
   if (isFinishedGoodsReworkWorkflowTask(task)) {
@@ -297,6 +390,16 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
       alert_type: 'blocked',
       alert_level: 'critical',
       alert_label: '任务阻塞',
+    }
+  }
+
+  if (isUrgedWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: 'task_urged',
+      alert_type: 'urged_task',
+      alert_level: 'warning',
+      alert_label: '已催办',
     }
   }
 
@@ -360,6 +463,16 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     }
   }
 
+  if (isFinanceWorkflowTask(task) && dueStatus === 'overdue') {
+    return {
+      ...base,
+      notification_type: 'finance_pending',
+      alert_type: 'finance_overdue',
+      alert_level: 'critical',
+      alert_label: '财务已超时',
+    }
+  }
+
   if (
     isShipmentWorkflowTask(task) &&
     (dueStatus === 'overdue' ||
@@ -372,16 +485,6 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
       alert_type: 'shipment_due',
       alert_level: dueStatus === 'normal' ? 'warning' : 'critical',
       alert_label: dueStatus === 'overdue' ? '出货已超时' : '出货风险',
-    }
-  }
-
-  if (isFinanceWorkflowTask(task) && dueStatus === 'overdue') {
-    return {
-      ...base,
-      notification_type: 'finance_pending',
-      alert_type: 'finance_overdue',
-      alert_level: 'critical',
-      alert_label: '财务已超时',
     }
   }
 
@@ -415,6 +518,46 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     }
   }
 
+  if (isReceivableRegistrationWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'finance_pending',
+      alert_type: 'finance_pending',
+      alert_level: payload.finance_risk === true ? 'critical' : 'warning',
+      alert_label: '应收待登记',
+    }
+  }
+
+  if (isInvoiceRegistrationWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'finance_pending',
+      alert_type: 'invoice_pending',
+      alert_level: payload.finance_risk === true ? 'critical' : 'warning',
+      alert_label: '开票待登记',
+    }
+  }
+
+  if (isPayableRegistrationWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'finance_pending',
+      alert_type: 'payable_pending',
+      alert_level: payload.finance_risk === true ? 'critical' : 'warning',
+      alert_label: '应付待登记',
+    }
+  }
+
+  if (isReconciliationPendingWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'finance_pending',
+      alert_type: 'reconciliation_pending',
+      alert_level: payload.finance_risk === true ? 'critical' : 'warning',
+      alert_label: '对账待处理',
+    }
+  }
+
   if (dueStatus === 'due_soon') {
     return {
       ...base,
@@ -426,6 +569,15 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
   }
 
   if (normalizeTaskStatusKey(task) === 'rejected') {
+    if (isFinanceWorkflowTask(task)) {
+      return {
+        ...base,
+        notification_type: 'finance_pending',
+        alert_type: 'finance_pending',
+        alert_level: 'warning',
+        alert_label: '财务任务退回',
+      }
+    }
     return {
       ...base,
       notification_type: 'task_rejected',
@@ -462,7 +614,7 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     return {
       ...base,
       notification_type: 'finance_pending',
-      alert_type: 'finance_overdue',
+      alert_type: 'finance_pending',
       alert_level: payload.finance_risk === true ? 'critical' : 'warning',
       alert_label: '财务待处理',
     }
@@ -486,6 +638,8 @@ function isPmcFocusTask(task = {}, alert = null) {
     getWorkflowTaskDueStatus(task) === 'overdue' ||
     isHighPriorityWorkflowTask(task) ||
     isCriticalPathWorkflowTask(task) ||
+    isUrgedWorkflowTask(task) ||
+    isEscalatedWorkflowTask(task) ||
     alert?.alert_level === 'critical'
   )
 }
@@ -494,6 +648,8 @@ function isBossFocusTask(task = {}, alert = null) {
   return (
     isApprovalWorkflowTask(task) ||
     isHighPriorityWorkflowTask(task) ||
+    getWorkflowTaskDueStatus(task) === 'overdue' ||
+    isEscalatedToBossWorkflowTask(task) ||
     alert?.notification_type === 'shipment_risk' ||
     (isFinanceWorkflowTask(task) && alert?.alert_level === 'critical')
   )
@@ -528,6 +684,8 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
         if (dueStatus === 'due_soon') accumulator.dueSoon += 1
       }
       if (isHighPriorityWorkflowTask(task)) accumulator.highPriority += 1
+      if (isUrgedWorkflowTask(task)) accumulator.urged += 1
+      if (isEscalatedWorkflowTask(task)) accumulator.escalated += 1
       return accumulator
     },
     {
@@ -542,6 +700,8 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
       closed: 0,
       cancelled: 0,
       highPriority: 0,
+      urged: 0,
+      escalated: 0,
     }
   )
 
@@ -593,7 +753,33 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
       ),
       qcFailed: alerts.filter((alert) => alert.alert_type === 'qc_failed'),
       financePending: alerts.filter((alert) =>
-        ['finance_overdue'].includes(alert.alert_type)
+        [
+          'finance_pending',
+          'payable_pending',
+          'reconciliation_pending',
+          'finance_overdue',
+        ].includes(alert.alert_type)
+      ),
+      invoicePending: alerts.filter(
+        (alert) => alert.alert_type === 'invoice_pending'
+      ),
+      payablePending: alerts.filter(
+        (alert) => alert.alert_type === 'payable_pending'
+      ),
+      reconciliationPending: alerts.filter(
+        (alert) => alert.alert_type === 'reconciliation_pending'
+      ),
+      financeOverdue: alerts.filter(
+        (alert) => alert.alert_type === 'finance_overdue'
+      ),
+      urgedTasks: alerts.filter((alert) => alert.alert_type === 'urged_task'),
+      escalatedTasks: alerts.filter(
+        (alert) => alert.alert_type === 'urgent_escalation'
+      ),
+      bossEscalations: alerts.filter(
+        (alert) =>
+          alert.alert_type === 'urgent_escalation' &&
+          isEscalatedToBossWorkflowTask(alert.task)
       ),
       approvalPending: alerts.filter(
         (alert) => alert.alert_type === 'approval_pending'

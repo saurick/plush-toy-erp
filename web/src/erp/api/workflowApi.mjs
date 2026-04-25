@@ -27,6 +27,11 @@ export async function updateWorkflowTaskStatus(params = {}) {
   return dataOf(result)?.task || null
 }
 
+export async function urgeWorkflowTask(params = {}) {
+  const result = await workflowRpc.call('urge_task', params)
+  return dataOf(result)?.task || null
+}
+
 export async function listWorkflowBusinessStates(params = {}) {
   const result = await workflowRpc.call('list_business_states', params)
   return dataOf(result)

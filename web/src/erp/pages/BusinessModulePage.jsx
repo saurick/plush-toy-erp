@@ -60,6 +60,7 @@ import {
   listWorkflowTasks,
   updateWorkflowTaskStatus,
   upsertWorkflowBusinessState,
+  urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import {
   BUSINESS_WORKFLOW_STATES,
@@ -128,6 +129,7 @@ import {
   IQC_PENDING_STATUS_KEY,
   buildIqcTaskFromArrivalRecord,
   isPurchaseIqcTask,
+  isWarehouseInboundTask,
 } from '../utils/purchaseInboundFlow.mjs'
 import {
   PROCESSING_CONTRACTS_MODULE_KEY,
@@ -140,6 +142,7 @@ import {
   isOutsourceReturnQcTask,
   isOutsourceReturnTrackingTask,
   isOutsourceReworkTask,
+  isOutsourceWarehouseInboundTask,
 } from '../utils/outsourceReturnFlow.mjs'
 import {
   PRODUCTION_PROGRESS_MODULE_KEY,
@@ -152,6 +155,37 @@ import {
   isFinishedGoodsReworkTask,
   isShipmentReleaseTask,
 } from '../utils/finishedGoodsFlow.mjs'
+import {
+  INVOICES_MODULE_KEY,
+  OUTBOUND_MODULE_KEY,
+  RECEIVABLES_MODULE_KEY,
+  RECONCILING_STATUS_KEY as FINANCE_RECONCILING_STATUS_KEY,
+  SHIPPED_STATUS_KEY as FINANCE_SHIPPED_STATUS_KEY,
+  buildInvoiceRegistrationTask,
+  buildReceivableRegistrationTask,
+  hasActiveInvoiceRegistrationTaskForRecord,
+  hasActiveReceivableRegistrationTaskForRecord,
+  isInvoiceRegistrationTask,
+  isReceivableRegistrationTask,
+} from '../utils/shipmentFinanceFlow.mjs'
+import {
+  INBOUND_DONE_STATUS_KEY as PAYABLE_INBOUND_DONE_STATUS_KEY,
+  PAYABLES_MODULE_KEY,
+  RECONCILIATION_MODULE_KEY,
+  RECONCILING_STATUS_KEY as PAYABLE_RECONCILING_STATUS_KEY,
+  buildOutsourcePayableRegistrationTask,
+  buildOutsourceReconciliationTask,
+  buildPurchasePayableRegistrationTask,
+  buildPurchaseReconciliationTask,
+  hasActivePayableRegistrationTaskForRecord,
+  hasActiveReconciliationTaskForRecord,
+  isOutsourceInboundDoneRecord,
+  isOutsourcePayableRegistrationTask,
+  isOutsourceReconciliationTask,
+  isPurchaseInboundDoneRecord,
+  isPurchasePayableRegistrationTask,
+  isPurchaseReconciliationTask,
+} from '../utils/payableReconciliationFlow.mjs'
 import {
   BusinessDataTable,
   BusinessFilterPanel,
@@ -559,6 +593,7 @@ export default function BusinessModulePage({ moduleItem }) {
   )
   const [form] = Form.useForm()
   const [statusReasonForm] = Form.useForm()
+  const [urgeReasonForm] = Form.useForm()
   const definition = useMemo(
     () => getBusinessRecordDefinition(moduleItem),
     [moduleItem]
@@ -603,6 +638,10 @@ export default function BusinessModulePage({ moduleItem }) {
     sourceCode: '',
     targets: [],
   })
+  const [urgeTaskModalState, setUrgeTaskModalState] = useState({
+    open: false,
+    task: null,
+  })
   const [statusReasonModalOpen, setStatusReasonModalOpen] = useState(false)
   const [pendingStatusKey, setPendingStatusKey] = useState('')
   const [orderApprovalSubmitting, setOrderApprovalSubmitting] = useState(false)
@@ -610,6 +649,11 @@ export default function BusinessModulePage({ moduleItem }) {
   const [outsourceReturnSubmitting, setOutsourceReturnSubmitting] =
     useState(false)
   const [finishedGoodsSubmitting, setFinishedGoodsSubmitting] = useState(false)
+  const [shipmentFinanceSubmitting, setShipmentFinanceSubmitting] =
+    useState(false)
+  const [payableReconciliationSubmitting, setPayableReconciliationSubmitting] =
+    useState(false)
+  const [urgingTaskID, setUrgingTaskID] = useState(null)
   const [columnOrderModalOpen, setColumnOrderModalOpen] = useState(false)
   const [columnOrderKeys, setColumnOrderKeys] = useState(() =>
     readStoredColumnOrder(moduleItem.key, definition.tableColumns)
@@ -723,6 +767,19 @@ export default function BusinessModulePage({ moduleItem }) {
       )[0] || null,
     [selectedIqcTasks]
   )
+  const selectedPurchaseWarehouseInboundTasks = useMemo(
+    () => selectedRecordTasks.filter(isWarehouseInboundTask),
+    [selectedRecordTasks]
+  )
+  const latestSelectedPurchaseWarehouseInboundTask = useMemo(
+    () =>
+      [...selectedPurchaseWarehouseInboundTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedPurchaseWarehouseInboundTasks]
+  )
   const isProcessingContractsModule =
     moduleItem.key === PROCESSING_CONTRACTS_MODULE_KEY
   const isInboundModule = moduleItem.key === INBOUND_MODULE_KEY
@@ -780,11 +837,24 @@ export default function BusinessModulePage({ moduleItem }) {
       ) || null,
     [selectedRecordTasks]
   )
+  const selectedOutsourceWarehouseInboundTasks = useMemo(
+    () => selectedRecordTasks.filter(isOutsourceWarehouseInboundTask),
+    [selectedRecordTasks]
+  )
+  const latestSelectedOutsourceWarehouseInboundTask = useMemo(
+    () =>
+      [...selectedOutsourceWarehouseInboundTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedOutsourceWarehouseInboundTasks]
+  )
   const isProductionProgressModule =
     moduleItem.key === PRODUCTION_PROGRESS_MODULE_KEY
   const isShippingFlowModule = [
     SHIPPING_RELEASE_MODULE_KEY,
-    'outbound',
+    OUTBOUND_MODULE_KEY,
   ].includes(moduleItem.key)
   const selectedFinishedGoodsQcTasks = useMemo(
     () => selectedRecordTasks.filter(isFinishedGoodsQcTask),
@@ -843,6 +913,174 @@ export default function BusinessModulePage({ moduleItem }) {
           task.task_status_key === 'blocked'
       ) || null,
     [selectedRecordTasks]
+  )
+  const isReceivablesModule = moduleItem.key === RECEIVABLES_MODULE_KEY
+  const isInvoicesModule = moduleItem.key === INVOICES_MODULE_KEY
+  const isShipmentFinanceActionModule =
+    isShippingFlowModule || isProductionProgressModule
+  const shouldShowShipmentFinanceAction =
+    isShippingFlowModule ||
+    (isProductionProgressModule &&
+      (selectedRecord?.business_status_key === FINANCE_SHIPPED_STATUS_KEY ||
+        latestSelectedShipmentReleaseTask))
+  const selectedReceivableRegistrationTasks = useMemo(
+    () => selectedRecordTasks.filter(isReceivableRegistrationTask),
+    [selectedRecordTasks]
+  )
+  const selectedActiveReceivableRegistrationTask = useMemo(
+    () =>
+      selectedReceivableRegistrationTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedReceivableRegistrationTasks]
+  )
+  const latestSelectedReceivableRegistrationTask = useMemo(
+    () =>
+      [...selectedReceivableRegistrationTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedReceivableRegistrationTasks]
+  )
+  const selectedInvoiceRegistrationTasks = useMemo(
+    () => selectedRecordTasks.filter(isInvoiceRegistrationTask),
+    [selectedRecordTasks]
+  )
+  const selectedActiveInvoiceRegistrationTask = useMemo(
+    () =>
+      selectedInvoiceRegistrationTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedInvoiceRegistrationTasks]
+  )
+  const latestSelectedInvoiceRegistrationTask = useMemo(
+    () =>
+      [...selectedInvoiceRegistrationTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedInvoiceRegistrationTasks]
+  )
+  const selectedFinanceRiskTask = useMemo(
+    () =>
+      selectedRecordTasks.find((task) => {
+        const alertType = String(task?.payload?.alert_type || '').trim()
+        const dueAt = Number(task?.due_at || 0)
+        const isOverdue =
+          dueAt > 0 &&
+          dueAt < Math.floor(Date.now() / 1000) &&
+          !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
+        return (
+          task.task_status_key === 'blocked' ||
+          task.task_status_key === 'rejected' ||
+          alertType === 'finance_overdue' ||
+          isOverdue
+        )
+      }) || null,
+    [selectedRecordTasks]
+  )
+  const isPayablesModule = moduleItem.key === PAYABLES_MODULE_KEY
+  const isReconciliationModule = moduleItem.key === RECONCILIATION_MODULE_KEY
+  const isPurchasePayableActionModule = [
+    ACCESSORIES_PURCHASE_MODULE_KEY,
+    INBOUND_MODULE_KEY,
+  ].includes(moduleItem.key)
+  const isOutsourcePayableActionModule = [
+    PROCESSING_CONTRACTS_MODULE_KEY,
+    INBOUND_MODULE_KEY,
+  ].includes(moduleItem.key)
+  const selectedPurchasePayableRegistrationTasks = useMemo(
+    () => selectedRecordTasks.filter(isPurchasePayableRegistrationTask),
+    [selectedRecordTasks]
+  )
+  const selectedOutsourcePayableRegistrationTasks = useMemo(
+    () => selectedRecordTasks.filter(isOutsourcePayableRegistrationTask),
+    [selectedRecordTasks]
+  )
+  const selectedPayableRegistrationTasks = useMemo(
+    () => [
+      ...selectedPurchasePayableRegistrationTasks,
+      ...selectedOutsourcePayableRegistrationTasks,
+    ],
+    [
+      selectedOutsourcePayableRegistrationTasks,
+      selectedPurchasePayableRegistrationTasks,
+    ]
+  )
+  const selectedActivePayableRegistrationTask = useMemo(
+    () =>
+      selectedPayableRegistrationTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedPayableRegistrationTasks]
+  )
+  const latestSelectedPurchasePayableRegistrationTask = useMemo(
+    () =>
+      [...selectedPurchasePayableRegistrationTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedPurchasePayableRegistrationTasks]
+  )
+  const latestSelectedOutsourcePayableRegistrationTask = useMemo(
+    () =>
+      [...selectedOutsourcePayableRegistrationTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedOutsourcePayableRegistrationTasks]
+  )
+  const latestSelectedPayableRegistrationTask = useMemo(
+    () =>
+      [...selectedPayableRegistrationTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedPayableRegistrationTasks]
+  )
+  const selectedPurchaseReconciliationTasks = useMemo(
+    () => selectedRecordTasks.filter(isPurchaseReconciliationTask),
+    [selectedRecordTasks]
+  )
+  const selectedOutsourceReconciliationTasks = useMemo(
+    () => selectedRecordTasks.filter(isOutsourceReconciliationTask),
+    [selectedRecordTasks]
+  )
+  const selectedReconciliationTasks = useMemo(
+    () => [
+      ...selectedPurchaseReconciliationTasks,
+      ...selectedOutsourceReconciliationTasks,
+    ],
+    [selectedOutsourceReconciliationTasks, selectedPurchaseReconciliationTasks]
+  )
+  const selectedActiveReconciliationTask = useMemo(
+    () =>
+      selectedReconciliationTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedReconciliationTasks]
+  )
+  const latestSelectedReconciliationTask = useMemo(
+    () =>
+      [...selectedReconciliationTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedReconciliationTasks]
   )
   const printTemplate = useMemo(
     () => getBusinessRecordPrintTemplate(moduleItem.key),
@@ -1015,6 +1253,54 @@ export default function BusinessModulePage({ moduleItem }) {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  const openUrgeTaskModal = useCallback(
+    (task) => {
+      setUrgeTaskModalState({ open: true, task })
+      urgeReasonForm.setFieldsValue({ urge_reason: '' })
+    },
+    [urgeReasonForm]
+  )
+
+  const closeUrgeTaskModal = useCallback(() => {
+    setUrgeTaskModalState({ open: false, task: null })
+    urgeReasonForm.resetFields()
+  }, [urgeReasonForm])
+
+  const submitUrgeTask = useCallback(async () => {
+    const { task } = urgeTaskModalState
+    if (!task) return
+    const values = await urgeReasonForm.validateFields()
+    const reason = String(values.urge_reason || '').trim()
+    setUrgingTaskID(task.id)
+    try {
+      await urgeWorkflowTask({
+        task_id: task.id,
+        action: 'urge_task',
+        reason,
+        actor_role_key: 'admin',
+        payload: {
+          source_type: task.source_type,
+          source_id: task.source_id,
+          source_no: task.source_no,
+          module_key: moduleItem.key,
+        },
+      })
+      message.success('催办已记录')
+      closeUrgeTaskModal()
+      await loadData()
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '催办失败，请稍后重试'))
+    } finally {
+      setUrgingTaskID(null)
+    }
+  }, [
+    closeUrgeTaskModal,
+    loadData,
+    moduleItem.key,
+    urgeReasonForm,
+    urgeTaskModalState.task,
+  ])
 
   useEffect(() => {
     setKeyword(moduleTableNavigationQuery.keyword)
@@ -1977,6 +2263,483 @@ export default function BusinessModulePage({ moduleItem }) {
     }
   }
 
+  const submitSelectedShipmentForReceivableRegistration = async () => {
+    if (!selectedRecord || !isShipmentFinanceActionModule) return
+    if (
+      selectedActiveReceivableRegistrationTask ||
+      hasActiveReceivableRegistrationTaskForRecord(tasks, {
+        ...selectedRecord,
+        module_key: moduleItem.key,
+      })
+    ) {
+      message.warning('已有应收登记任务')
+      return
+    }
+
+    const shipmentTaskDone =
+      latestSelectedShipmentReleaseTask?.task_status_key === 'done'
+    const alreadyShipped =
+      selectedRecord.business_status_key === FINANCE_SHIPPED_STATUS_KEY ||
+      selectedRecord.payload?.shipment_result === FINANCE_SHIPPED_STATUS_KEY ||
+      selectedRecord.payload?.shipped === true
+    if (!alreadyShipped && !shipmentTaskDone) {
+      message.warning('请先确认出货完成后再发起应收登记')
+      return
+    }
+
+    setShipmentFinanceSubmitting(true)
+    try {
+      const statusParams = alreadyShipped
+        ? null
+        : buildBusinessRecordStatusUpdateParams(
+            selectedRecord,
+            FINANCE_SHIPPED_STATUS_KEY,
+            moduleItem,
+            definition,
+            { reason: '出货完成后进入应收登记' }
+          )
+      if (statusParams) {
+        statusParams.payload = {
+          ...(statusParams.payload || {}),
+          shipment_result: FINANCE_SHIPPED_STATUS_KEY,
+          shipped: true,
+        }
+      }
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const taskParams = buildReceivableRegistrationTask(
+        {
+          ...savedRecord,
+          module_key: moduleItem.key,
+          payload: {
+            ...(savedRecord.payload || {}),
+            shipment_result: FINANCE_SHIPPED_STATUS_KEY,
+            shipped: true,
+          },
+        },
+        latestSelectedShipmentReleaseTask
+      )
+      if (!taskParams) {
+        message.warning('当前记录无法生成应收登记任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: moduleItem.key,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: FINANCE_SHIPPED_STATUS_KEY,
+        owner_role_key: 'finance',
+        payload: {
+          record_title: savedRecord.title,
+          shipment_task_id: latestSelectedShipmentReleaseTask?.id,
+          receivable_task_id: task?.id,
+          shipment_result: FINANCE_SHIPPED_STATUS_KEY,
+          notification_type: 'finance_pending',
+          alert_type: 'finance_pending',
+          critical_path: true,
+          next_module_key: RECEIVABLES_MODULE_KEY,
+        },
+      })
+      message.success(`应收登记已发起：${task?.task_name || '应收登记'}`)
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '发起应收登记失败，请稍后重试')
+      )
+    } finally {
+      setShipmentFinanceSubmitting(false)
+    }
+  }
+
+  const submitSelectedReceivableForInvoiceRegistration = async () => {
+    if (!selectedRecord || !isReceivablesModule) return
+    if (selectedActiveReceivableRegistrationTask) {
+      message.warning('请先完成当前应收登记任务')
+      return
+    }
+    if (
+      selectedActiveInvoiceRegistrationTask ||
+      hasActiveInvoiceRegistrationTaskForRecord(tasks, {
+        ...selectedRecord,
+        module_key: moduleItem.key,
+      })
+    ) {
+      message.warning('已有开票登记任务')
+      return
+    }
+
+    setShipmentFinanceSubmitting(true)
+    try {
+      const statusParams = buildBusinessRecordStatusUpdateParams(
+        selectedRecord,
+        FINANCE_RECONCILING_STATUS_KEY,
+        moduleItem,
+        definition,
+        { reason: '应收登记完成后进入开票登记' }
+      )
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const taskParams = buildInvoiceRegistrationTask(
+        {
+          ...savedRecord,
+          module_key: moduleItem.key,
+        },
+        latestSelectedReceivableRegistrationTask
+      )
+      if (!taskParams) {
+        message.warning('当前记录无法生成开票登记任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: moduleItem.key,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: FINANCE_RECONCILING_STATUS_KEY,
+        owner_role_key: 'finance',
+        payload: {
+          record_title: savedRecord.title,
+          receivable_task_id: latestSelectedReceivableRegistrationTask?.id,
+          invoice_task_id: task?.id,
+          receivable_result: 'registered',
+          notification_type: 'finance_pending',
+          alert_type: 'invoice_pending',
+          critical_path: false,
+          next_module_key: INVOICES_MODULE_KEY,
+        },
+      })
+      message.success(`开票登记已发起：${task?.task_name || '开票登记'}`)
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '发起开票登记失败，请稍后重试')
+      )
+    } finally {
+      setShipmentFinanceSubmitting(false)
+    }
+  }
+
+  const submitSelectedPurchaseForPayableRegistration = async () => {
+    if (!selectedRecord || !isPurchasePayableActionModule) return
+    const recordForCheck = {
+      ...selectedRecord,
+      module_key: moduleItem.key,
+      payload: {
+        ...(selectedRecord.payload || {}),
+        inbound_result:
+          selectedRecord.payload?.inbound_result ||
+          (latestSelectedPurchaseWarehouseInboundTask?.task_status_key ===
+          'done'
+            ? 'done'
+            : undefined),
+      },
+    }
+    if (
+      hasActivePayableRegistrationTaskForRecord(tasks, recordForCheck) ||
+      selectedActivePayableRegistrationTask
+    ) {
+      message.warning('已有应付登记任务')
+      return
+    }
+    if (!isPurchaseInboundDoneRecord(recordForCheck)) {
+      message.warning('请先确认采购入库完成后再发起应付登记')
+      return
+    }
+
+    setPayableReconciliationSubmitting(true)
+    try {
+      const statusParams =
+        selectedRecord.business_status_key === PAYABLE_INBOUND_DONE_STATUS_KEY
+          ? null
+          : buildBusinessRecordStatusUpdateParams(
+              selectedRecord,
+              PAYABLE_INBOUND_DONE_STATUS_KEY,
+              moduleItem,
+              definition,
+              { reason: '采购入库完成后进入应付登记' }
+            )
+      if (statusParams) {
+        statusParams.payload = {
+          ...(statusParams.payload || {}),
+          inbound_result: 'done',
+          payable_type: 'purchase',
+        }
+      }
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const payableRecord = {
+        ...savedRecord,
+        module_key: moduleItem.key,
+        payload: {
+          ...(savedRecord.payload || {}),
+          inbound_result: 'done',
+          payable_type: 'purchase',
+        },
+      }
+      const taskParams = buildPurchasePayableRegistrationTask(
+        payableRecord,
+        latestSelectedPurchaseWarehouseInboundTask
+      )
+      if (!taskParams) {
+        message.warning('当前记录无法生成采购应付登记任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: moduleItem.key,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: PAYABLE_INBOUND_DONE_STATUS_KEY,
+        owner_role_key: 'finance',
+        payload: {
+          record_title: savedRecord.title,
+          warehouse_task_id: latestSelectedPurchaseWarehouseInboundTask?.id,
+          payable_task_id: task?.id,
+          inbound_result: 'done',
+          notification_type: 'finance_pending',
+          alert_type: 'payable_pending',
+          critical_path: false,
+          next_module_key: PAYABLES_MODULE_KEY,
+          payable_type: 'purchase',
+        },
+      })
+      message.success(
+        `采购应付登记已发起：${task?.task_name || '采购应付登记'}`
+      )
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '发起采购应付登记失败，请稍后重试')
+      )
+    } finally {
+      setPayableReconciliationSubmitting(false)
+    }
+  }
+
+  const submitSelectedOutsourceForPayableRegistration = async () => {
+    if (!selectedRecord || !isOutsourcePayableActionModule) return
+    const hasCompletedOutsourceInboundTask =
+      latestSelectedOutsourceWarehouseInboundTask?.task_status_key === 'done'
+    const recordForCheck = {
+      ...selectedRecord,
+      module_key: moduleItem.key,
+      payload: {
+        ...(selectedRecord.payload || {}),
+        inbound_result:
+          selectedRecord.payload?.inbound_result ||
+          (hasCompletedOutsourceInboundTask ? 'done' : undefined),
+        outsource_processing:
+          selectedRecord.payload?.outsource_processing ||
+          (hasCompletedOutsourceInboundTask ? true : undefined),
+        payable_type: selectedRecord.payload?.payable_type,
+      },
+    }
+    if (
+      hasActivePayableRegistrationTaskForRecord(tasks, recordForCheck) ||
+      selectedActivePayableRegistrationTask
+    ) {
+      message.warning('已有应付登记任务')
+      return
+    }
+    if (!isOutsourceInboundDoneRecord(recordForCheck)) {
+      message.warning('请先确认委外入库完成后再发起应付登记')
+      return
+    }
+
+    setPayableReconciliationSubmitting(true)
+    try {
+      const statusParams =
+        selectedRecord.business_status_key === PAYABLE_INBOUND_DONE_STATUS_KEY
+          ? null
+          : buildBusinessRecordStatusUpdateParams(
+              selectedRecord,
+              PAYABLE_INBOUND_DONE_STATUS_KEY,
+              moduleItem,
+              definition,
+              { reason: '委外入库完成后进入应付登记' }
+            )
+      if (statusParams) {
+        statusParams.payload = {
+          ...(statusParams.payload || {}),
+          inbound_result: 'done',
+          outsource_processing: true,
+          payable_type: 'outsource',
+        }
+      }
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const payableRecord = {
+        ...savedRecord,
+        module_key: moduleItem.key,
+        payload: {
+          ...(savedRecord.payload || {}),
+          inbound_result: 'done',
+          outsource_processing: true,
+          payable_type: 'outsource',
+        },
+      }
+      const taskParams = buildOutsourcePayableRegistrationTask(
+        payableRecord,
+        latestSelectedOutsourceWarehouseInboundTask
+      )
+      if (!taskParams) {
+        message.warning('当前记录无法生成委外应付登记任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: moduleItem.key,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: PAYABLE_INBOUND_DONE_STATUS_KEY,
+        owner_role_key: 'finance',
+        payload: {
+          record_title: savedRecord.title,
+          warehouse_task_id: latestSelectedOutsourceWarehouseInboundTask?.id,
+          payable_task_id: task?.id,
+          inbound_result: 'done',
+          notification_type: 'finance_pending',
+          alert_type: 'payable_pending',
+          critical_path: false,
+          next_module_key: PAYABLES_MODULE_KEY,
+          outsource_processing: true,
+          payable_type: 'outsource',
+        },
+      })
+      message.success(
+        `委外应付登记已发起：${task?.task_name || '委外应付登记'}`
+      )
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '发起委外应付登记失败，请稍后重试')
+      )
+    } finally {
+      setPayableReconciliationSubmitting(false)
+    }
+  }
+
+  const submitSelectedPayableForReconciliation = async () => {
+    if (!selectedRecord || !isPayablesModule) return
+    if (selectedActivePayableRegistrationTask) {
+      message.warning('请先完成当前应付登记任务')
+      return
+    }
+    if (
+      selectedActiveReconciliationTask ||
+      hasActiveReconciliationTaskForRecord(tasks, {
+        ...selectedRecord,
+        module_key: moduleItem.key,
+      })
+    ) {
+      message.warning('已有对账任务')
+      return
+    }
+
+    const payableDone =
+      latestSelectedPayableRegistrationTask?.task_status_key === 'done'
+    const alreadyReconciling =
+      selectedRecord.business_status_key === PAYABLE_RECONCILING_STATUS_KEY ||
+      selectedRecord.payload?.payable_result === 'registered'
+    if (!payableDone && !alreadyReconciling) {
+      message.warning('请先完成应付登记后再发起对账')
+      return
+    }
+
+    const payableType =
+      latestSelectedPayableRegistrationTask?.payload?.payable_type ||
+      selectedRecord.payload?.payable_type ||
+      'purchase'
+    const isOutsource = payableType === 'outsource'
+
+    setPayableReconciliationSubmitting(true)
+    try {
+      const statusParams = alreadyReconciling
+        ? null
+        : buildBusinessRecordStatusUpdateParams(
+            selectedRecord,
+            PAYABLE_RECONCILING_STATUS_KEY,
+            moduleItem,
+            definition,
+            { reason: '应付登记完成后进入对账' }
+          )
+      if (statusParams) {
+        statusParams.payload = {
+          ...(statusParams.payload || {}),
+          payable_result: 'registered',
+          payable_type: isOutsource ? 'outsource' : 'purchase',
+        }
+      }
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const reconciliationRecord = {
+        ...savedRecord,
+        module_key: moduleItem.key,
+        payload: {
+          ...(savedRecord.payload || {}),
+          payable_result: 'registered',
+          payable_type: isOutsource ? 'outsource' : 'purchase',
+        },
+      }
+      const taskParams = isOutsource
+        ? buildOutsourceReconciliationTask(
+            reconciliationRecord,
+            latestSelectedPayableRegistrationTask
+          )
+        : buildPurchaseReconciliationTask(
+            reconciliationRecord,
+            latestSelectedPayableRegistrationTask
+          )
+      if (!taskParams) {
+        message.warning('当前记录无法生成对账任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: moduleItem.key,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: PAYABLE_RECONCILING_STATUS_KEY,
+        owner_role_key: 'finance',
+        payload: {
+          record_title: savedRecord.title,
+          payable_task_id: latestSelectedPayableRegistrationTask?.id,
+          reconciliation_task_id: task?.id,
+          payable_result: 'registered',
+          notification_type: 'finance_pending',
+          alert_type: 'reconciliation_pending',
+          critical_path: false,
+          next_module_key: RECONCILIATION_MODULE_KEY,
+          payable_type: isOutsource ? 'outsource' : 'purchase',
+        },
+      })
+      message.success(`对账任务已发起：${task?.task_name || '对账'}`)
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '发起对账任务失败，请稍后重试')
+      )
+    } finally {
+      setPayableReconciliationSubmitting(false)
+    }
+  }
+
   const openPrintWindowForSelectedRecord = () => {
     if (!selectedRecord || !printTemplate) return
     const initialDraft = buildBusinessRecordPrintDraft(
@@ -2383,8 +3146,96 @@ export default function BusinessModulePage({ moduleItem }) {
                 </Tag>
               </>
             ) : null}
-            {isShippingFlowModule ? (
+            {isPurchasePayableActionModule ? (
               <>
+                <Button
+                  size="small"
+                  icon={<SendOutlined />}
+                  loading={payableReconciliationSubmitting}
+                  onClick={submitSelectedPurchaseForPayableRegistration}
+                >
+                  发起采购应付登记
+                </Button>
+                <Tag color="cyan">
+                  采购入库：
+                  {latestSelectedPurchaseWarehouseInboundTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedPurchaseWarehouseInboundTask.task_status_key
+                      ) ||
+                      latestSelectedPurchaseWarehouseInboundTask.task_status_key
+                    : selectedRecord.business_status_key ===
+                        PAYABLE_INBOUND_DONE_STATUS_KEY
+                      ? '已入库'
+                      : '未确认'}
+                </Tag>
+                <Tag
+                  color={
+                    latestSelectedPurchasePayableRegistrationTask
+                      ? 'gold'
+                      : 'blue'
+                  }
+                >
+                  采购应付：
+                  {latestSelectedPurchasePayableRegistrationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedPurchasePayableRegistrationTask.task_status_key
+                      ) ||
+                      latestSelectedPurchasePayableRegistrationTask.task_status_key
+                    : '未发起'}
+                </Tag>
+                <Tag color="geekblue">下一步：采购应付登记 -&gt; 采购对账</Tag>
+              </>
+            ) : null}
+            {isOutsourcePayableActionModule ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<SendOutlined />}
+                  loading={payableReconciliationSubmitting}
+                  onClick={submitSelectedOutsourceForPayableRegistration}
+                >
+                  发起委外应付登记
+                </Button>
+                <Tag color="cyan">
+                  委外入库：
+                  {latestSelectedOutsourceWarehouseInboundTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedOutsourceWarehouseInboundTask.task_status_key
+                      ) ||
+                      latestSelectedOutsourceWarehouseInboundTask.task_status_key
+                    : selectedRecord.business_status_key ===
+                        PAYABLE_INBOUND_DONE_STATUS_KEY
+                      ? '已入库'
+                      : '未确认'}
+                </Tag>
+                <Tag
+                  color={
+                    latestSelectedOutsourcePayableRegistrationTask
+                      ? 'gold'
+                      : 'blue'
+                  }
+                >
+                  委外应付：
+                  {latestSelectedOutsourcePayableRegistrationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedOutsourcePayableRegistrationTask.task_status_key
+                      ) ||
+                      latestSelectedOutsourcePayableRegistrationTask.task_status_key
+                    : '未发起'}
+                </Tag>
+                <Tag color="geekblue">下一步：委外应付登记 -&gt; 委外对账</Tag>
+              </>
+            ) : null}
+            {shouldShowShipmentFinanceAction ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<SendOutlined />}
+                  loading={shipmentFinanceSubmitting}
+                  onClick={submitSelectedShipmentForReceivableRegistration}
+                >
+                  发起应收登记
+                </Button>
                 <Tag
                   color={latestSelectedShipmentReleaseTask ? 'purple' : 'blue'}
                 >
@@ -2395,8 +3246,139 @@ export default function BusinessModulePage({ moduleItem }) {
                       ) || latestSelectedShipmentReleaseTask.task_status_key
                     : '未关联'}
                 </Tag>
+                <Tag
+                  color={
+                    selectedActiveReceivableRegistrationTask ? 'gold' : 'blue'
+                  }
+                >
+                  应收：
+                  {latestSelectedReceivableRegistrationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedReceivableRegistrationTask.task_status_key
+                      ) ||
+                      latestSelectedReceivableRegistrationTask.task_status_key
+                    : '未发起'}
+                </Tag>
+                {selectedFinanceRiskTask ? (
+                  <Tag color="red">财务待处理 / 异常</Tag>
+                ) : null}
+                <Tag color="geekblue">下一步：应收登记 -&gt; 开票登记</Tag>
+              </>
+            ) : null}
+            {isReceivablesModule ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<SendOutlined />}
+                  loading={shipmentFinanceSubmitting}
+                  onClick={submitSelectedReceivableForInvoiceRegistration}
+                >
+                  发起开票登记
+                </Button>
+                <Tag
+                  color={
+                    selectedActiveReceivableRegistrationTask ? 'gold' : 'blue'
+                  }
+                >
+                  应收：
+                  {latestSelectedReceivableRegistrationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedReceivableRegistrationTask.task_status_key
+                      ) ||
+                      latestSelectedReceivableRegistrationTask.task_status_key
+                    : '未关联'}
+                </Tag>
+                <Tag
+                  color={
+                    selectedActiveInvoiceRegistrationTask ? 'gold' : 'blue'
+                  }
+                >
+                  开票：
+                  {latestSelectedInvoiceRegistrationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedInvoiceRegistrationTask.task_status_key
+                      ) || latestSelectedInvoiceRegistrationTask.task_status_key
+                    : '未发起'}
+                </Tag>
+                {selectedFinanceRiskTask ? (
+                  <Tag color="red">财务待处理 / 异常</Tag>
+                ) : null}
+                <Tag color="geekblue">下一步：开票登记 -&gt; 对账中</Tag>
+              </>
+            ) : null}
+            {isInvoicesModule ? (
+              <>
+                <Tag
+                  color={
+                    selectedActiveInvoiceRegistrationTask ? 'gold' : 'blue'
+                  }
+                >
+                  开票：
+                  {latestSelectedInvoiceRegistrationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedInvoiceRegistrationTask.task_status_key
+                      ) || latestSelectedInvoiceRegistrationTask.task_status_key
+                    : '未关联'}
+                </Tag>
+                {selectedFinanceRiskTask ? (
+                  <Tag color="red">财务待处理 / 异常</Tag>
+                ) : null}
                 <Tag color="geekblue">
-                  当前只推进出货状态，不生成应收 / 发票
+                  开票登记完成后进入对账中；当前不生成真实发票文件
+                </Tag>
+              </>
+            ) : null}
+            {isPayablesModule ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<SendOutlined />}
+                  loading={payableReconciliationSubmitting}
+                  onClick={submitSelectedPayableForReconciliation}
+                >
+                  发起对账
+                </Button>
+                <Tag
+                  color={
+                    selectedActivePayableRegistrationTask ? 'gold' : 'blue'
+                  }
+                >
+                  应付：
+                  {latestSelectedPayableRegistrationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedPayableRegistrationTask.task_status_key
+                      ) || latestSelectedPayableRegistrationTask.task_status_key
+                    : '未关联'}
+                </Tag>
+                <Tag color={selectedActiveReconciliationTask ? 'gold' : 'blue'}>
+                  对账：
+                  {latestSelectedReconciliationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedReconciliationTask.task_status_key
+                      ) || latestSelectedReconciliationTask.task_status_key
+                    : '未发起'}
+                </Tag>
+                {selectedFinanceRiskTask ? (
+                  <Tag color="red">财务待处理 / 异常</Tag>
+                ) : null}
+                <Tag color="geekblue">下一步：对账完成 -&gt; 已结算</Tag>
+              </>
+            ) : null}
+            {isReconciliationModule ? (
+              <>
+                <Tag color={selectedActiveReconciliationTask ? 'gold' : 'blue'}>
+                  对账：
+                  {latestSelectedReconciliationTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedReconciliationTask.task_status_key
+                      ) || latestSelectedReconciliationTask.task_status_key
+                    : '未关联'}
+                </Tag>
+                {selectedFinanceRiskTask ? (
+                  <Tag color="red">财务待处理 / 异常</Tag>
+                ) : null}
+                <Tag color="geekblue">
+                  对账完成后进入已结算；当前不生成凭证和付款流水
                 </Tag>
               </>
             ) : null}
@@ -2493,6 +3475,8 @@ export default function BusinessModulePage({ moduleItem }) {
         tasks={tasks}
         taskStatusLabels={TASK_STATUS_LABELS}
         roleLabelMap={roleLabelMap}
+        onUrgeTask={openUrgeTaskModal}
+        urgingTaskID={urgingTaskID}
       />
 
       <Modal
@@ -2614,6 +3598,44 @@ export default function BusinessModulePage({ moduleItem }) {
               {target.targetTitle}
             </Button>
           ))}
+        </Space>
+      </Modal>
+
+      <Modal
+        title="催办协同任务"
+        open={urgeTaskModalState.open}
+        onCancel={closeUrgeTaskModal}
+        onOk={submitUrgeTask}
+        okText="记录催办"
+        cancelText="取消"
+        confirmLoading={Boolean(urgingTaskID)}
+        centered
+        forceRender
+        destroyOnHidden
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Text type="secondary">
+            当前任务：
+            {urgeTaskModalState.task?.task_name || '-'}
+            。催办会写入任务事件，不改变任务状态。
+          </Text>
+          <Form form={urgeReasonForm} layout="vertical">
+            <Form.Item
+              name="urge_reason"
+              label="催办原因"
+              rules={[
+                { required: true, message: '请填写催办原因' },
+                { max: 300, message: '催办原因不能超过 300 字' },
+              ]}
+            >
+              <Input.TextArea
+                rows={4}
+                showCount
+                maxLength={300}
+                placeholder="说明交期、资料、异常或当前需要对方处理的事项"
+              />
+            </Form.Item>
+          </Form>
         </Space>
       </Modal>
 

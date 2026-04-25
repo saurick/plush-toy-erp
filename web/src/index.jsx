@@ -9,6 +9,11 @@ import './erp/styles/app.css'
 import App from './App'
 import { AppAlertProvider } from '@/common/components/modal/AppAlertProvider'
 
+const routerFutureFlags = {
+  v7_startTransition: true,
+  v7_relativeSplatPath: true,
+}
+
 // 只在开发环境 & 打开开关时启用 mock
 if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_RPC_MOCK === 'true') {
   (async () => {
@@ -27,7 +32,7 @@ const root = ReactDOM.createRoot(rootElement)
 root.render(
   <StrictMode>
     <HelmetProvider>
-      <Router basename={import.meta.env.BASE_URL}>
+      <Router basename={import.meta.env.BASE_URL} future={routerFutureFlags}>
         <AppAlertProvider>
           <App />
         </AppAlertProvider>

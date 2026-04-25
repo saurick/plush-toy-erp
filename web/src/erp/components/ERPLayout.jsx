@@ -68,6 +68,7 @@ const { Paragraph, Text } = Typography
 const navIconRegistry = {
   'workspace-home': <AppstoreOutlined />,
   'global-dashboard': <DashboardOutlined />,
+  'business-dashboard': <AppstoreOutlined />,
   partners: <ApartmentOutlined />,
   products: <AppstoreOutlined />,
   'project-orders': <ScheduleOutlined />,
@@ -95,6 +96,12 @@ const navIconRegistry = {
   'help-task-document-mapping': <ScheduleOutlined />,
   'help-workflow-status-guide': <DashboardOutlined />,
   'help-workflow-schema-draft': <FileTextOutlined />,
+  'help-task-flow-v1': <ScheduleOutlined />,
+  'help-role-permission-matrix-v1': <BarsOutlined />,
+  'help-notification-alert-v1': <AlertOutlined />,
+  'help-finance-v1': <WalletOutlined />,
+  'help-warehouse-quality-v1': <InboxOutlined />,
+  'help-log-trace-audit-v1': <FileSearchOutlined />,
   'help-desktop-role-guide': <AppstoreOutlined />,
   'help-mobile-role-guide': <MobileOutlined />,
   'help-field-linkage-guide': <TagOutlined />,
@@ -104,6 +111,7 @@ const navIconRegistry = {
   'help-current-boundaries': <QuestionCircleOutlined />,
   'qa-acceptance-overview': <DashboardOutlined />,
   'qa-business-chain-debug': <FileSearchOutlined />,
+  'qa-workflow-task-debug': <ScheduleOutlined />,
   'qa-field-linkage-coverage': <TagOutlined />,
   'qa-run-records': <ScheduleOutlined />,
   'qa-reports': <FileTextOutlined />,
@@ -122,7 +130,7 @@ const navIconRegistry = {
 const DEFAULT_DESKTOP_ENTRY = {
   label: '任务看板',
   path: '/erp/dashboard',
-  description: '按业务记录状态看模块进展，支持点击数字进入业务页筛选。',
+  description: '按协同任务状态看待处理、处理中、阻塞、退回和超时任务。',
 }
 const BUSINESS_MODULE_PATHS = new Set(
   businessModuleDefinitions
@@ -300,6 +308,7 @@ export default function ERPLayout() {
   const hidePageHead =
     isBusinessModulePage ||
     currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path ||
+    currentEntry?.path === '/erp/business-dashboard' ||
     location.pathname.startsWith('/erp/docs/') ||
     location.pathname.startsWith('/erp/qa/')
 

@@ -108,7 +108,7 @@ export async function loginAsAdmin(page, credentials, baseURL) {
     submitButton.click(),
   ])
 
-  await page.getByRole('heading', { name: '毛绒 ERP 任务看板' }).waitFor({
+  await page.getByRole('heading', { name: '任务看板' }).waitFor({
     state: 'visible',
     timeout: 15_000,
   })

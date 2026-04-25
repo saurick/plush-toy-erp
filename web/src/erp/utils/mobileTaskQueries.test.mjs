@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   buildMobileWorkflowTaskQueryPlan,
+  explainMobileTaskQueryPlan,
   mergeWorkflowTaskResults,
   shouldLoadAllWorkflowTasksForRole,
 } from './mobileTaskQueries.mjs'
@@ -28,6 +29,24 @@ test('mobileTaskQueries: 品质 仓库 财务 采购保持 owner_role_key 直查
     assert.deepEqual(buildMobileWorkflowTaskQueryPlan(roleKey), [
       { owner_role_key: roleKey, limit: 200 },
     ])
+  }
+})
+
+test('mobileTaskQueries: explainMobileTaskQueryPlan 返回全量和直查解释', () => {
+  for (const roleKey of ['pmc', 'boss', 'production']) {
+    const plan = explainMobileTaskQueryPlan(roleKey)
+    assert.equal(plan.strategy, 'full_list')
+    assert.equal(plan.loads_full_list, true)
+    assert.deepEqual(plan.queries, [{ limit: 200 }])
+    assert.match(plan.reason, /全量|最近 200|筛选/)
+  }
+
+  for (const roleKey of ['quality', 'warehouse', 'finance', 'purchasing']) {
+    const plan = explainMobileTaskQueryPlan(roleKey)
+    assert.equal(plan.strategy, 'owner_role_key')
+    assert.equal(plan.loads_full_list, false)
+    assert.deepEqual(plan.queries, [{ owner_role_key: roleKey, limit: 200 }])
+    assert.match(plan.reason, /owner_role_key/)
   }
 })
 

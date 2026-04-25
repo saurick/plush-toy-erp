@@ -112,14 +112,85 @@ const scenarios = [
       await expectText(page, '东莞市永绅玩具有限公司')
       await expectText(page, '超级管理员')
       await expectText(page, 'style-l1-admin')
-      await expectHeading(page, '毛绒 ERP 任务看板')
-      await expectText(page, '业务记录总数')
-      await expectText(page, '状态分布')
-      await expectText(page, '记录数')
+      await expectText(page, '看板中心')
+      await expectHeading(page, '任务看板')
+      await expectText(page, '任务处理统计')
+      await expectText(page, '待处理任务数')
+      await expectText(page, '即将到期任务数')
+      await expectText(page, '任务处理明细')
+      await expectButton(page, '去业务看板')
       await assertShellRefreshButton(page, {
         scenarioName: 'erp-dashboard-desktop',
         expectVisible: true,
       })
+      await page.evaluate(async () => {
+        const response = await fetch('/rpc/workflow', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'dashboard-task-navigation',
+            method: 'create_task',
+            params: {
+              task_code: 'style-l1-dashboard-task-navigation',
+              task_group: 'shipment_release',
+              task_name: '看板跳转测试任务',
+              source_type: 'shipping-release',
+              source_id: 9010,
+              source_no: 'OUT-DASH-NAV',
+              business_status_key: 'shipment_pending',
+              task_status_key: 'ready',
+              owner_role_key: 'warehouse',
+              payload: {
+                notification_type: 'task_created',
+                alert_type: 'shipment_pending',
+              },
+            },
+          }),
+        })
+        return response.json()
+      })
+      await page.getByRole('button', { name: /刷新当前页/ }).click()
+      await expectText(page, '看板跳转测试任务')
+      await page.getByRole('button', { name: '看板跳转测试任务' }).click()
+      await waitForPath(page, '/erp/warehouse/shipping-release')
+      await expectText(page, '待出货/出货放行')
+      await page.goBack()
+      await waitForPath(page, '/erp/dashboard')
+      await expectHeading(page, '任务看板')
+    },
+  },
+  {
+    name: 'erp-business-dashboard-desktop',
+    path: '/erp/business-dashboard',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectText(page, '东莞市永绅玩具有限公司')
+      await expectText(page, '超级管理员')
+      await expectText(page, '看板中心')
+      await expectHeading(page, '业务看板')
+      await expectText(page, '业务记录总数')
+      await expectText(page, '业务关注统计')
+      await expectText(page, '严重预警数')
+      await expectText(page, '一般预警数')
+      await expectText(page, '计划物控关注事项')
+      await expectText(page, '业务状态分布')
+      await expectText(page, '记录数')
+      await expectButton(page, '去任务看板')
+      await assertShellRefreshButton(page, {
+        scenarioName: 'erp-business-dashboard-desktop',
+        expectVisible: true,
+      })
+      await page.getByRole('button', { name: '去任务看板' }).click()
+      await waitForPath(page, '/erp/dashboard')
+      await expectHeading(page, '任务看板')
+      await page.goBack()
+      await waitForPath(page, '/erp/business-dashboard')
+      await expectHeading(page, '业务看板')
     },
   },
   {
@@ -173,8 +244,22 @@ const scenarios = [
     verify: async (page) => {
       await expectText(page, '超级管理员')
       await expectText(page, '毛绒 ERP 管理后台')
-      await expectText(page, '毛绒 ERP 任务看板')
-      await expectText(page, '状态分布')
+      await expectText(page, '任务看板')
+      await expectText(page, '任务处理统计')
+      await expectText(page, '任务处理明细')
+    },
+  },
+  {
+    name: 'erp-business-dashboard-mobile',
+    path: '/erp/business-dashboard',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectText(page, '超级管理员')
+      await expectText(page, '毛绒 ERP 管理后台')
+      await expectText(page, '业务看板')
+      await expectText(page, '业务关注统计')
+      await expectText(page, '业务状态分布')
     },
   },
   {
@@ -577,15 +662,33 @@ const scenarios = [
     },
   },
   {
+    name: 'help-center-desktop',
+    path: '/erp/help-center',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '业务操作导航')
+      await expectText(page, '新手先看')
+      await expectText(page, '按角色找工作')
+      await expectText(page, '按业务主线查')
+      await expectText(page, '手机端看不到任务怎么办？')
+      await expectText(page, '高级文档 / 管理员 / 开发验收')
+      await assertNoHorizontalOverflow(page, 'help-center-desktop-before-click')
+      await page.getByRole('link', { name: 'ERP 操作教程' }).first().click()
+      await expectHeading(page, 'ERP 操作教程')
+    },
+  },
+  {
     name: 'help-center-mobile',
-    path: '/erp/docs/operation-guide',
+    path: '/erp/help-center',
     auth: 'admin',
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
-      await expectHeading(page, 'ERP 操作教程')
-      await expectText(page, '一套总后台 + 多个角色切片')
-      await expectText(page, '角色后台和帮助中心的关系')
-      await expectText(page, '角色后台不再各写一套独立说明')
+      await expectHeading(page, '业务操作导航')
+      await expectText(page, '新手先看')
+      await expectText(page, '按角色找工作')
+      await expectText(page, '常见问题')
+      await expectText(page, '高级文档 / 管理员 / 开发验收')
     },
   },
   {
@@ -1043,8 +1146,14 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '业务链路调试')
-      await expectText(page, '只读排查入口')
-      await expectText(page, '固定排查入口')
+      await expectText(page, '安全调试中心')
+      await expectText(page, '覆盖边界')
+      await expectText(page, '链路覆盖矩阵')
+      await expectText(page, '已接入 v1 主干闭环')
+      await expectText(page, '未覆盖 / 待补扩展链路')
+      await expectText(page, '当前不做')
+      await expectText(page, '按需生成调试场景')
+      await expectText(page, '填入并查询')
       await page.evaluate(async () => {
         const callRpc = async (domain, method, params) => {
           const response = await fetch(`/rpc/${domain}`, {
@@ -1119,6 +1228,65 @@ const scenarios = [
       await expectText(page, '客户/款式立项：毛绒熊立项')
       await expectText(page, '业务阻塞')
       await expectText(page, '资料未齐，等待客户确认')
+    },
+  },
+  {
+    name: 'qa-workflow-task-debug-desktop',
+    path: '/erp/qa/workflow-task-debug',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '协同任务调试')
+      await expectText(page, 'v1 前端诊断模式')
+      await expectText(page, '移动端可见性诊断')
+      await page.evaluate(async () => {
+        const response = await fetch('/rpc/workflow', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'workflow-create-debug-task',
+            method: 'create_task',
+            params: {
+              task_code: 'style-l1-workflow-task-debug',
+              task_group: 'shipment_release',
+              task_name: '协同任务调试：出货资料确认',
+              source_type: 'shipping-release',
+              source_id: 9001,
+              source_no: 'OUT-STYLE-L1',
+              business_status_key: 'shipment_pending',
+              task_status_key: 'blocked',
+              owner_role_key: 'warehouse',
+              priority: 3,
+              blocked_reason: '客户出货资料未确认',
+              payload: {
+                notification_type: 'shipment_risk',
+                alert_type: 'shipment_due',
+                critical_path: true,
+                shipment_risk: true,
+                urge_count: 1,
+                last_urge_reason: '客户催交',
+                escalated: true,
+                escalate_target_role_key: 'boss',
+              },
+            },
+          }),
+        })
+        return response.json()
+      })
+      await page.getByRole('button', { name: '重新读取任务' }).click()
+      await expectText(page, 'OUT-STYLE-L1')
+      await expectText(page, '协同任务调试：出货资料确认')
+      await page.getByLabel('可选 source_no').fill('OUT-STYLE-L1')
+      await page.getByLabel('可选 task_group').fill('shipment_release')
+      await expectText(page, 'mobileTaskQueries 查询计划')
+      await expectText(page, 'PMC 扩展命中 critical_path 任务。')
+      await page.getByRole('button', { name: '查看事件' }).first().click()
+      await expectText(page, '任务事件接口待接入')
+      await expectText(page, '业务、任务、角色绑定关系')
     },
   },
   {
@@ -1398,6 +1566,7 @@ async function installAdminRpcMocks(page) {
     disabled: false,
     menu_permissions: [
       '/erp/dashboard',
+      '/erp/business-dashboard',
       '/erp/print-center',
       '/erp/docs/operation-flow-overview',
       '/erp/docs/operation-guide',
@@ -1430,6 +1599,7 @@ async function installAdminRpcMocks(page) {
               disabled: false,
               menu_permissions: [
                 '/erp/dashboard',
+                '/erp/business-dashboard',
                 '/erp/print-center',
                 '/erp/docs/operation-guide',
               ],
@@ -1539,6 +1709,37 @@ async function installAdminRpcMocks(page) {
     }
 
     await route.fallback()
+  })
+
+  await page.route('**/rpc/debug', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id' } = body
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data: {
+            environment: 'style-l1',
+            seedEnabled: false,
+            seedAllowed: false,
+            seedDisabledReason: '样式回归环境不执行生成调试数据',
+            cleanupEnabled: false,
+            cleanupAllowed: false,
+            cleanupDisabledReason: '样式回归环境不执行清理调试数据',
+            cleanupScope: 'debug_run',
+            cleanupOnlyDebugData: true,
+            requiresDebugRunId: true,
+            destructiveRemoteDenied: true,
+          },
+        },
+      }),
+    })
   })
 
   const workflowTasks = []
@@ -1793,6 +1994,9 @@ async function installAdminRpcMocks(page) {
           business_status_key: params.business_status_key || 'project_pending',
           task_status_key: params.task_status_key || 'ready',
           owner_role_key: params.owner_role_key || 'merchandiser',
+          assignee_id: params.assignee_id || '',
+          priority: Number(params.priority || 0),
+          due_at: params.due_at || null,
           blocked_reason: params.blocked_reason || '',
           payload: params.payload || {},
           created_at: nowUnix(),

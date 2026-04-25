@@ -18,6 +18,9 @@ const AcceptanceOverviewPage = lazy(
   () => import('./pages/AcceptanceOverviewPage')
 )
 const BusinessModulePage = lazy(() => import('./pages/BusinessModulePage'))
+const BusinessDashboardPage = lazy(
+  () => import('./pages/BusinessDashboardPage')
+)
 const BusinessChainDebugPage = lazy(
   () => import('./pages/BusinessChainDebugPage')
 )
@@ -27,6 +30,7 @@ const DocumentationPage = lazy(() => import('./pages/DocumentationPage'))
 const FieldLinkageCoveragePage = lazy(
   () => import('./pages/FieldLinkageCoveragePage')
 )
+const HelpCenterPage = lazy(() => import('./pages/HelpCenterPage'))
 const OperationFlowPage = lazy(() => import('./pages/OperationFlowPage'))
 const PrintCenterPage = lazy(() => import('./pages/PrintCenterPage'))
 const PrintTemplatePreviewPage = lazy(
@@ -34,6 +38,9 @@ const PrintTemplatePreviewPage = lazy(
 )
 const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
+const WorkflowTaskDebugPage = lazy(
+  () => import('./pages/WorkflowTaskDebugPage')
+)
 
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
@@ -100,6 +107,10 @@ export default function ERPRouter() {
         >
           <Route index element={<DesktopEntryRedirect />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route
+            path="business-dashboard"
+            element={<BusinessDashboardPage />}
+          />
           {activeBusinessModuleDefinitions.map((moduleItem) => (
             <Route
               key={moduleItem.key}
@@ -117,12 +128,7 @@ export default function ERPRouter() {
               <Navigate to="/erp/docs/operation-flow-overview" replace />
             }
           />
-          <Route
-            path="help-center"
-            element={
-              <Navigate to="/erp/docs/operation-flow-overview" replace />
-            }
-          />
+          <Route path="help-center" element={<HelpCenterPage />} />
           <Route path="print-center" element={<PrintCenterPage />} />
           <Route
             path="print-center/:templateKey"
@@ -148,6 +154,10 @@ export default function ERPRouter() {
           <Route
             path="qa/business-chain-debug"
             element={<BusinessChainDebugPage />}
+          />
+          <Route
+            path="qa/workflow-task-debug"
+            element={<WorkflowTaskDebugPage />}
           />
           <Route
             path="qa/field-linkage-coverage"

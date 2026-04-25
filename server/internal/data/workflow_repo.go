@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -192,6 +193,86 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 	return entWorkflowTaskToBiz(row), nil
 }
 
+func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTaskUrge, actorID int, actorRoleKey string) (*biz.WorkflowTask, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+
+	current, err := tx.WorkflowTask.Get(ctx, in.ID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrWorkflowTaskNotFound
+		}
+		return nil, err
+	}
+
+	now := time.Now()
+	nextPayload := copyWorkflowPayload(current.Payload)
+	for key, value := range in.Payload {
+		nextPayload[key] = value
+	}
+	urgeCount := workflowPayloadInt(nextPayload, "urge_count") + 1
+	trimmedActorRoleKey := strings.TrimSpace(actorRoleKey)
+
+	nextPayload["urged"] = true
+	nextPayload["urge_count"] = urgeCount
+	nextPayload["last_urge_at"] = now.Unix()
+	nextPayload["last_urge_reason"] = in.Reason
+	nextPayload["last_urge_action"] = in.Action
+	nextPayload["last_urge_actor_role_key"] = trimmedActorRoleKey
+	nextPayload["notification_type"] = "task_urged"
+	nextPayload["alert_type"] = "urged_task"
+
+	if targetRoleKey := workflowEscalationTarget(in.Action); targetRoleKey != "" {
+		nextPayload["escalated"] = true
+		nextPayload["escalate_target_role_key"] = targetRoleKey
+		nextPayload["notification_type"] = "urgent_escalation"
+		nextPayload["alert_type"] = "urgent_escalation"
+	}
+
+	update := tx.WorkflowTask.UpdateOneID(in.ID).SetPayload(nextPayload)
+	if actorID > 0 {
+		update.SetUpdatedBy(actorID)
+	}
+
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrWorkflowTaskNotFound
+		}
+		return nil, err
+	}
+
+	eventPayload := copyWorkflowPayload(nextPayload)
+	eventPayload["action"] = in.Action
+	eventPayload["urge_count"] = urgeCount
+
+	eventBuilder := tx.WorkflowTaskEvent.Create().
+		SetTaskID(row.ID).
+		SetEventType(in.Action).
+		SetFromStatusKey(current.TaskStatusKey).
+		SetToStatusKey(current.TaskStatusKey).
+		SetReason(in.Reason).
+		SetPayload(eventPayload)
+	if actorID > 0 {
+		eventBuilder.SetActorID(actorID)
+	}
+	if trimmedActorRoleKey != "" {
+		eventBuilder.SetActorRoleKey(trimmedActorRoleKey)
+	}
+	if _, err := eventBuilder.Save(ctx); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entWorkflowTaskToBiz(row), nil
+}
+
 func (r *workflowRepo) ListWorkflowBusinessStates(ctx context.Context, filter biz.WorkflowBusinessStateFilter) ([]*biz.WorkflowBusinessState, int, error) {
 	query := r.data.postgres.WorkflowBusinessState.Query()
 	if filter.SourceType != "" {
@@ -364,5 +445,49 @@ func rollbackEntTx(ctx context.Context, tx *ent.Tx, logger *log.Helper) {
 	}
 	if err := tx.Rollback(); err != nil && logger != nil {
 		logger.WithContext(ctx).Warnf("rollback ent tx failed err=%v", err)
+	}
+}
+
+func copyWorkflowPayload(payload map[string]any) map[string]any {
+	out := map[string]any{}
+	for key, value := range payload {
+		out[key] = value
+	}
+	return out
+}
+
+func workflowPayloadInt(payload map[string]any, key string) int {
+	raw, ok := payload[key]
+	if !ok || raw == nil {
+		return 0
+	}
+	switch value := raw.(type) {
+	case int:
+		return value
+	case int8:
+		return int(value)
+	case int16:
+		return int(value)
+	case int32:
+		return int(value)
+	case int64:
+		return int(value)
+	case float32:
+		return int(value)
+	case float64:
+		return int(value)
+	default:
+		return 0
+	}
+}
+
+func workflowEscalationTarget(action string) string {
+	switch strings.TrimSpace(action) {
+	case "escalate_to_pmc":
+		return "pmc"
+	case "escalate_to_boss":
+		return "boss"
+	default:
+		return ""
 	}
 }

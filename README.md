@@ -17,6 +17,7 @@
 - 当前后端统一走 `8200`
 - 当前数据库默认命中 `192.168.0.106:5432/plush_erp`
 - 当前数据库已存在，账号表、工作流协同表和首版通用业务记录表已通过 Ent + Atlas 落地；细分业务专表后续仍按真实样本逐步拆
+- 业务链路调试 seed / cleanup 仅作为开发验收能力接入后端 `debug` JSON-RPC 域，默认关闭，并受 `ERP_DEBUG_*` 环境变量、管理员权限、debugRunId 和 debug 数据标记保护
 - 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred
 - 模板打印当前只保留采购合同、加工合同两套正式模板；对应业务页已支持选中记录带值打开，打印中心保留默认样例和模板核对入口
 
@@ -133,6 +134,8 @@ pnpm style:l1
 - 财务 v1：`/Users/simon/projects/plush-toy-erp/docs/finance/finance-v1.md`
 - 仓库与品质 v1：`/Users/simon/projects/plush-toy-erp/docs/warehouse/warehouse-quality-v1.md`
 - 日志 / 审计 / Trace v1：`/Users/simon/projects/plush-toy-erp/docs/observability/log-trace-audit-v1.md`
+- Workflow usecase 评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/workflow-usecase-review.md`
+- 行业专表 Schema 评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/industry-schema-review.md`
 - 打印模板字段与编辑行为：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-field-behavior.md`
 - 打印模板实现原理：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-implementation.md`
 - 当前 changes：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
