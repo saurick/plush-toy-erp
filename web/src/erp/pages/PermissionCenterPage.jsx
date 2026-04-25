@@ -768,7 +768,7 @@ export default function PermissionCenterPage() {
             type="info"
             showIcon
             message="当前权限已收口到页面级"
-            description="菜单权限控制桌面后台可见范围；移动端登录权限控制对应角色手机端是否可用手机号验证码登录。"
+            description="菜单权限控制桌面后台可见范围；移动端登录权限控制对应角色手机端是否可进入任务页，手机号只用于短信验证码登录。"
           />
           <Input
             value={editingPhone}

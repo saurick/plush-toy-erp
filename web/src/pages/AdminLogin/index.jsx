@@ -34,9 +34,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const location = useLocation()
   const { isMobileApp, activeRoleKey, activeRole } = useERPWorkspace()
   const admin = getStoredAdminProfile()
-  const [loginMode, setLoginMode] = useState(() =>
-    isMobileApp ? 'sms' : 'password'
-  )
+  const [loginMode, setLoginMode] = useState('password')
   const [smsPhone, setSmsPhone] = useState('')
   const [smsHint, setSmsHint] = useState('')
   const [requestingCode, setRequestingCode] = useState(false)
@@ -177,22 +175,21 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
           {error ? <Alert type="error" showIcon message={error} /> : null}
 
           <Form layout="vertical" onFinish={onFinish}>
-            {isMobileApp ? null : (
-              <Form.Item>
-                <Segmented
-                  block
-                  value={loginMode}
-                  onChange={(value) => {
-                    setLoginMode(value)
-                    setError('')
-                  }}
-                  options={[
-                    { label: '密码登录', value: 'password' },
-                    { label: '短信登录', value: 'sms' },
-                  ]}
-                />
-              </Form.Item>
-            )}
+            <Form.Item>
+              <Segmented
+                block
+                value={loginMode}
+                onChange={(value) => {
+                  setLoginMode(value)
+                  setError('')
+                  setSmsHint('')
+                }}
+                options={[
+                  { label: '密码登录', value: 'password' },
+                  { label: '短信登录', value: 'sms' },
+                ]}
+              />
+            </Form.Item>
 
             {loginMode === 'password' ? (
               <>

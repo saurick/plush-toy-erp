@@ -107,6 +107,7 @@ export const dashboardStatusGroups = Object.freeze([
       'warehouse_processing',
       'warehouse_inbound_pending',
       'inbound_done',
+      'shipment_pending',
       'shipping_released',
       'shipped',
     ]),

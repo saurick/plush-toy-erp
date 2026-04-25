@@ -7,7 +7,9 @@ import {
   getWorkflowTaskDueStatus,
   isCriticalPathWorkflowTask,
   isFinanceWorkflowTask,
+  isFinishedGoodsWorkflowTask,
   isHighPriorityWorkflowTask,
+  isOutsourceReturnWorkflowTask,
   isQualityWorkflowTask,
   isTerminalWorkflowTask,
   isWarehouseWorkflowTask,
@@ -143,6 +145,32 @@ function isQualityMobileVisible(taskView = {}) {
   )
 }
 
+function isProductionMobileVisible(taskView = {}) {
+  const payload = payloadOf(taskView)
+  return (
+    taskView.owner_role_key === 'production' ||
+    ['outsource_return_tracking', 'outsource_rework'].includes(
+      taskView.task_group
+    ) ||
+    taskView.task_group === 'finished_goods_rework' ||
+    (isOutsourceReturnWorkflowTask(taskView) &&
+      taskView.owner_role_key === 'production') ||
+    (isFinishedGoodsWorkflowTask(taskView) &&
+      taskView.owner_role_key === 'production') ||
+    payload.outsource_owner_role_key === 'outsource'
+  )
+}
+
+function isMerchandiserMobileVisible(taskView = {}) {
+  const payload = payloadOf(taskView)
+  return (
+    taskView.owner_role_key === 'merchandiser' ||
+    payload.confirm_role_key === 'merchandiser' ||
+    taskView.source_type === 'shipping-release' ||
+    taskView.source_type === 'outbound'
+  )
+}
+
 export function isMobileTaskVisibleForRole(taskView = {}, roleKey = '') {
   const normalizedRoleKey = String(roleKey || '').trim()
   if (!normalizedRoleKey) return false
@@ -154,6 +182,12 @@ export function isMobileTaskVisibleForRole(taskView = {}, roleKey = '') {
     return isWarehouseMobileVisible(taskView)
   }
   if (normalizedRoleKey === 'quality') return isQualityMobileVisible(taskView)
+  if (normalizedRoleKey === 'production') {
+    return isProductionMobileVisible(taskView)
+  }
+  if (normalizedRoleKey === 'merchandiser') {
+    return isMerchandiserMobileVisible(taskView)
+  }
   return false
 }
 

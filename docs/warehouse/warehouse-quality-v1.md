@@ -66,3 +66,29 @@
 | 确认入库 | 仓库 | warehouse 移动端完成 `warehouse_inbound` 任务，状态进入 `inbound_done`。 |
 
 当前 v1 的 `inbound_done` 只表示业务任务闭环，不代表已经写入正式库存余额或库存流水。正式 `inventory_txn` / `inventory_balance` 需要等采购到货、委外回货、成品入库和出货扣减口径都稳定后，再评审 Ent schema、migration、库存计算和历史回补策略。
+
+## 第三条真实闭环：委外发料 -> 回货 -> 检验 -> 入库
+
+| 环节 | 责任角色 | v1 记录口径 |
+| --- | --- | --- |
+| 委外发料 / 加工中 | 生产/委外 | `processing-contracts` 记录进入 `production_processing`，桌面点击“发起委外回货跟踪”后创建 `outsource_return_tracking` 给 `production`。 |
+| 委外回货 | 生产/委外、品质 | production 移动端完成跟踪任务，表示已登记回货数量和回货日期，随后创建 `outsource_return_qc` 给 `quality`；`inbound` 委外回货通知也可以直接发起该任务。 |
+| 回货检验合格 | 品质、仓库 | quality 移动端完成 `outsource_return_qc`，状态进入 `warehouse_inbound_pending`，并创建 `outsource_warehouse_inbound` 给 `warehouse`。 |
+| 回货检验不合格 | 品质、生产/委外、PMC | quality 移动端阻塞或退回并填写不良原因，状态进入 `qc_failed`，创建 `outsource_rework` 给 `production` 处理返工、补做或让步接收安排。 |
+| 委外入库完成 | 仓库 | warehouse 移动端完成 `outsource_warehouse_inbound`，状态进入 `inbound_done`，只表示委外回货入库任务完成。 |
+
+当前 v1 不新增 `outsource_order` 专表，不新增 `inventory_txn` / `inventory_balance` 专表，不写库存余额或库存流水。库存流水和余额需要等采购到货、委外回货、成品入库、出货扣减、历史回补和对账影响都稳定后，再评审 Ent schema、migration 与库存计算口径。
+
+当前也不新增 `outsource` 移动端入口；委外回货跟踪和返工 / 补做先由 `production` 承接，payload 保留 `outsource_owner_role_key=outsource` 作为后续拆分角色入口的迁移线索。PMC 只看 blocked、overdue、critical_path 和 critical 风险，不代替品质或仓库完成业务事实。
+
+## 第四条真实闭环：成品完工 -> 成品抽检 -> 成品入库 -> 出货
+
+| 环节 | 责任角色 | v1 记录口径 |
+| --- | --- | --- |
+| 成品完工 / 待抽检 | 生产、品质 | `production-progress` 记录标注 `payload.finished=true`，或桌面点击“发起成品抽检”，创建 `finished_goods_qc` 给 `quality`，业务状态进入 `qc_pending`。 |
+| 成品抽检合格 | 品质、仓库 | quality 移动端完成 `finished_goods_qc`，payload 记录 `qc_result=pass`，状态进入 `warehouse_inbound_pending`，并创建 `finished_goods_inbound` 给 `warehouse`。 |
+| 成品抽检不合格 | 品质、生产、PMC | quality 移动端阻塞或退回并填写不良原因，状态进入 `qc_failed`，创建 `finished_goods_rework` 给 `production` 处理返工、重新抽检或让步放行。 |
+| 成品入库完成 | 仓库 | warehouse 移动端完成 `finished_goods_inbound`，状态进入 `inbound_done`，只表示成品入库任务完成，不写正式库存余额或库存流水。 |
+| 出货准备 / 出货确认 | 仓库、跟单 | 成品入库完成后创建 `shipment_release`，状态为 `shipment_pending`。warehouse 完成该任务后状态进入 `shipped`；payload 保留 `confirm_role_key=merchandiser`，后续可在应收 / 开票前拆跟单确认。 |
+
+当前 v1 不新增 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` 专表，不做库存余额和库存流水，不做应收 / 开票登记。正式库存流水、库存余额、出货扣减和应收开票需要等成品入库、出货确认、客户要求、历史回补和财务口径稳定后，再评审 Ent schema、migration 与计算测试。

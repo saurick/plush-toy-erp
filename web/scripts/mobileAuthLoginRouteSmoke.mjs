@@ -9,6 +9,7 @@ import { chromium } from 'playwright'
 import { RpcErrorCode } from '../src/common/consts/errorCodes.generated.js'
 import { appDefinitions } from '../src/erp/config/appRegistry.mjs'
 import { getRoleWorkbench } from '../src/erp/config/seedData.mjs'
+import { shouldLoadAllWorkflowTasksForRole } from '../src/erp/utils/mobileTaskQueries.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const outputDir = path.resolve(
@@ -208,6 +209,7 @@ async function runMobileAuthScenario(
   const loginToken = createMockAdminToken(`${app.roleKey}-mobile-admin`)
   let workflowCalls = 0
   let authedWorkflowCalls = 0
+  let passwordLoginCalls = 0
 
   await page.route('**/rpc/auth', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -258,6 +260,33 @@ async function runMobileAuthScenario(
       return
     }
 
+    if (method === 'admin_login') {
+      passwordLoginCalls += 1
+      assert.equal(
+        body.params?.username,
+        `${app.roleKey}-mobile-admin`,
+        `${app.id} 密码登录应提交管理员账号`
+      )
+      assert.equal(body.params?.password, 'mobile-password')
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            code: 0,
+            message: 'OK',
+            data: createMockAdminLoginData({
+              app,
+              token: loginToken,
+            }),
+          },
+        }),
+      })
+      return
+    }
+
     if (method !== 'sms_login') {
       await route.fallback()
       return
@@ -280,15 +309,10 @@ async function runMobileAuthScenario(
         result: {
           code: 0,
           message: 'OK',
-          data: {
-            access_token: loginToken,
-            token_type: 'Bearer',
-            username: `${app.roleKey}-mobile-admin`,
-            admin_level: 0,
-            expires_at: Math.floor(Date.now() / 1000) + 3600,
-            menu_permissions: ['/erp/dashboard'],
-            mobile_role_permissions: [app.roleKey],
-          },
+          data: createMockAdminLoginData({
+            app,
+            token: loginToken,
+          }),
         },
       }),
     })
@@ -300,11 +324,24 @@ async function runMobileAuthScenario(
     const { id = 'mock-id', method, params = {} } = body
     const authorization = String(route.request().headers().authorization || '')
 
-    assert.equal(
-      params.owner_role_key,
-      app.roleKey,
-      `${app.id} workflow 请求应携带当前角色 owner_role_key`
-    )
+    if (shouldLoadAllWorkflowTasksForRole(app.roleKey)) {
+      assert.equal(
+        params.owner_role_key,
+        undefined,
+        `${app.id} workflow 全量加载角色不应携带 owner_role_key`
+      )
+      assert.equal(
+        params.limit,
+        200,
+        `${app.id} workflow 全量加载应限制 200 条`
+      )
+    } else {
+      assert.equal(
+        params.owner_role_key,
+        app.roleKey,
+        `${app.id} workflow 请求应携带当前角色 owner_role_key`
+      )
+    }
 
     if (authorization === `Bearer ${staleToken}`) {
       await route.fulfill({
@@ -437,13 +474,17 @@ async function runMobileAuthScenario(
     '缺少移动端角色权限元数据的旧登录态应回到登录页，不应提前请求 workflow API'
   )
 
-  await page.getByLabel('手机号').fill('13800138000')
-  await page.getByRole('button', { name: '获取验证码' }).click()
-  await expectText(page, '临时验证码：123456')
-  await page.getByPlaceholder('请输入验证码').fill('123456')
+  await expectText(page, '密码登录')
+  await expectText(page, '短信登录')
+  await page.getByText('短信登录').click()
+  await page.getByLabel('手机号').waitFor({ state: 'visible', timeout: 10_000 })
+  await page.getByText('密码登录').click()
+  await page.getByLabel('管理员账号').fill(`${app.roleKey}-mobile-admin`)
+  await page.locator('#password').fill('mobile-password')
   await page.getByRole('button', { name: /登\s*录/ }).click()
 
   await waitForPath(page, '/tasks')
+  assert.equal(passwordLoginCalls, 1, `${app.id} 应完成一次管理员密码登录`)
   await expectText(page, '待办')
   await expectText(page, '退出登录')
   await expectText(page, '我的预警')
@@ -589,6 +630,18 @@ function createMockAdminToken(username) {
     exp: Math.floor(Date.now() / 1000) + 3600,
   }
   return `${base64UrlEncode(header)}.${base64UrlEncode(payload)}.signature`
+}
+
+function createMockAdminLoginData({ app, token }) {
+  return {
+    access_token: token,
+    token_type: 'Bearer',
+    username: `${app.roleKey}-mobile-admin`,
+    admin_level: 0,
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    menu_permissions: ['/erp/dashboard'],
+    mobile_role_permissions: [app.roleKey],
+  }
 }
 
 function base64UrlEncode(value) {

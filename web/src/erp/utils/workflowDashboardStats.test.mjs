@@ -106,6 +106,86 @@ test('workflowDashboardStats: 预警等级覆盖 blocked due_soon qc shipment pr
     owner_role_key: 'finance',
     due_at: NOW_SEC - 60,
   })
+  const outsourceReturnPending = task({
+    source_type: 'processing-contracts',
+    owner_role_key: 'production',
+    task_group: 'outsource_return_tracking',
+    payload: {
+      notification_type: 'task_created',
+      alert_type: 'outsource_return_pending',
+      outsource_processing: true,
+      critical_path: true,
+    },
+  })
+  const outsourceReturnQcPending = task({
+    source_type: 'processing-contracts',
+    owner_role_key: 'quality',
+    task_group: 'outsource_return_qc',
+    payload: {
+      notification_type: 'task_created',
+      alert_type: 'outsource_return_qc_pending',
+      outsource_processing: true,
+      critical_path: true,
+    },
+  })
+  const outsourceRework = task({
+    source_type: 'processing-contracts',
+    owner_role_key: 'production',
+    task_group: 'outsource_rework',
+    business_status_key: 'qc_failed',
+    payload: {
+      notification_type: 'qc_failed',
+      alert_type: 'qc_failed',
+      outsource_processing: true,
+      critical_path: true,
+    },
+  })
+  const finishedGoodsQcPending = task({
+    source_type: 'production-progress',
+    owner_role_key: 'quality',
+    task_group: 'finished_goods_qc',
+    payload: {
+      notification_type: 'task_created',
+      alert_type: 'finished_goods_qc_pending',
+      finished_goods: true,
+      critical_path: true,
+    },
+  })
+  const finishedGoodsInboundPending = task({
+    source_type: 'production-progress',
+    owner_role_key: 'warehouse',
+    task_group: 'finished_goods_inbound',
+    payload: {
+      notification_type: 'task_created',
+      alert_type: 'finished_goods_inbound_pending',
+      finished_goods: true,
+      critical_path: true,
+    },
+  })
+  const finishedGoodsRework = task({
+    source_type: 'production-progress',
+    owner_role_key: 'production',
+    task_group: 'finished_goods_rework',
+    business_status_key: 'qc_failed',
+    payload: {
+      notification_type: 'qc_failed',
+      alert_type: 'qc_failed',
+      finished_goods: true,
+      critical_path: true,
+    },
+  })
+  const shipmentPending = task({
+    source_type: 'production-progress',
+    owner_role_key: 'warehouse',
+    task_group: 'shipment_release',
+    business_status_key: 'shipment_pending',
+    payload: {
+      notification_type: 'task_created',
+      alert_type: 'shipment_pending',
+      finished_goods: true,
+      critical_path: true,
+    },
+  })
 
   assert.equal(
     buildWorkflowTaskAlert(blocked, { nowMs: NOW_MS })?.alert_level,
@@ -167,6 +247,65 @@ test('workflowDashboardStats: 预警等级覆盖 blocked due_soon qc shipment pr
     ],
     ['finance_overdue', 'critical']
   )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(outsourceReturnPending, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(outsourceReturnPending, { nowMs: NOW_MS })
+        ?.alert_label,
+    ],
+    ['outsource_return_pending', '委外回货待跟踪']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(outsourceReturnQcPending, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(outsourceReturnQcPending, { nowMs: NOW_MS })
+        ?.alert_label,
+    ],
+    ['outsource_return_qc_pending', '委外回货待检验']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(outsourceRework, { nowMs: NOW_MS })?.alert_type,
+      buildWorkflowTaskAlert(outsourceRework, { nowMs: NOW_MS })?.alert_level,
+    ],
+    ['qc_failed', 'critical']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(finishedGoodsQcPending, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(finishedGoodsQcPending, { nowMs: NOW_MS })
+        ?.alert_label,
+    ],
+    ['finished_goods_qc_pending', '成品抽检待处理']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(finishedGoodsInboundPending, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(finishedGoodsInboundPending, { nowMs: NOW_MS })
+        ?.alert_label,
+    ],
+    ['finished_goods_inbound_pending', '成品待入库']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(finishedGoodsRework, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(finishedGoodsRework, { nowMs: NOW_MS })
+        ?.alert_level,
+    ],
+    ['qc_failed', 'critical']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(shipmentPending, { nowMs: NOW_MS })?.alert_type,
+      buildWorkflowTaskAlert(shipmentPending, { nowMs: NOW_MS })?.alert_label,
+    ],
+    ['shipment_pending', '待出货准备']
+  )
 })
 
 test('workflowDashboardStats: PMC 老板和财务关注事项按规则汇总', () => {
@@ -198,4 +337,80 @@ test('workflowDashboardStats: PMC 老板和财务关注事项按规则汇总', (
   assert.equal(stats.financePending, 1)
   assert.equal(stats.buckets.financePending.length, 1)
   assert.equal(stats.buckets.approvalPending.length, 1)
+})
+
+test('workflowDashboardStats: 委外延期和回货预警进入对应桶', () => {
+  const stats = buildWorkflowDashboardStats(
+    [
+      task({
+        id: 21,
+        source_type: 'processing-contracts',
+        owner_role_key: 'production',
+        payload: { vendor_delay: true },
+      }),
+      task({
+        id: 22,
+        source_type: 'processing-contracts',
+        owner_role_key: 'production',
+        task_group: 'outsource_return_tracking',
+        payload: { alert_type: 'outsource_return_pending' },
+      }),
+      task({
+        id: 23,
+        source_type: 'processing-contracts',
+        owner_role_key: 'quality',
+        task_group: 'outsource_return_qc',
+        payload: { alert_type: 'outsource_return_qc_pending' },
+      }),
+    ],
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(stats.buckets.vendorDelay.length, 1)
+  assert.equal(stats.buckets.outsourceReturnPending.length, 1)
+  assert.equal(stats.buckets.outsourceReturnQcPending.length, 1)
+})
+
+test('workflowDashboardStats: 成品抽检 入库 返工和待出货预警进入对应桶', () => {
+  const stats = buildWorkflowDashboardStats(
+    [
+      task({
+        id: 31,
+        source_type: 'production-progress',
+        owner_role_key: 'quality',
+        task_group: 'finished_goods_qc',
+        payload: { alert_type: 'finished_goods_qc_pending' },
+      }),
+      task({
+        id: 32,
+        source_type: 'production-progress',
+        owner_role_key: 'warehouse',
+        task_group: 'finished_goods_inbound',
+        payload: { alert_type: 'finished_goods_inbound_pending' },
+      }),
+      task({
+        id: 33,
+        source_type: 'production-progress',
+        owner_role_key: 'production',
+        task_group: 'finished_goods_rework',
+        business_status_key: 'qc_failed',
+        payload: { alert_type: 'qc_failed', finished_goods: true },
+      }),
+      task({
+        id: 34,
+        source_type: 'production-progress',
+        owner_role_key: 'warehouse',
+        task_group: 'shipment_release',
+        business_status_key: 'shipment_pending',
+        payload: { alert_type: 'shipment_pending', critical_path: true },
+      }),
+    ],
+    { nowMs: NOW_MS }
+  )
+
+  assert.equal(stats.buckets.finishedGoodsQcPending.length, 1)
+  assert.equal(stats.buckets.finishedGoodsInboundPending.length, 1)
+  assert.equal(stats.buckets.qcFailed.length, 1)
+  assert.equal(stats.buckets.shipmentPending.length, 1)
+  assert.equal(stats.criticalAlerts, 1)
 })

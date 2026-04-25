@@ -194,6 +194,223 @@ test('mobileTaskView: 品质和仓库能看到采购到货闭环任务字段', (
   assert.equal(warehouseViews[0].payload.qc_result, 'pass')
 })
 
+test('mobileTaskView: 委外回货任务按生产 品质 仓库 PMC 视角展示', () => {
+  const tasks = [
+    task({
+      id: 21,
+      owner_role_key: 'production',
+      source_type: 'processing-contracts',
+      task_group: 'outsource_return_tracking',
+      business_status_key: 'production_processing',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        alert_type: 'outsource_return_pending',
+        complete_condition: '加工商完成回货登记',
+        related_documents: ['加工合同：PC-001'],
+        supplier_name: '联调加工厂',
+        product_name: '兔子挂件',
+        quantity: 300,
+        unit: 'pcs',
+        outsource_processing: true,
+      },
+    }),
+    task({
+      id: 22,
+      owner_role_key: 'quality',
+      source_type: 'processing-contracts',
+      task_group: 'outsource_return_qc',
+      business_status_key: 'qc_pending',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        alert_type: 'outsource_return_qc_pending',
+        complete_condition: '品质完成委外回货检验',
+        related_documents: ['回货记录：IN-001'],
+        outsource_processing: true,
+        critical_path: true,
+      },
+    }),
+    task({
+      id: 23,
+      owner_role_key: 'warehouse',
+      source_type: 'processing-contracts',
+      task_group: 'outsource_warehouse_inbound',
+      business_status_key: 'warehouse_inbound_pending',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        alert_type: 'inbound_pending',
+        complete_condition: '仓库确认委外回货入库数量、库位和经手人',
+        related_documents: ['委外回货检验结果：pass'],
+        outsource_processing: true,
+        critical_path: true,
+      },
+    }),
+    task({
+      id: 24,
+      owner_role_key: 'production',
+      source_type: 'processing-contracts',
+      task_group: 'outsource_rework',
+      business_status_key: 'qc_failed',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        alert_type: 'qc_failed',
+        notification_type: 'qc_failed',
+        complete_condition: '生产/委外负责人确认返工或补做',
+        related_documents: ['不良记录：QC-001'],
+        outsource_processing: true,
+        critical_path: true,
+      },
+    }),
+  ]
+
+  assert.deepEqual(
+    buildMobileTaskListForRole(tasks, 'production', { nowMs: NOW_MS }).map(
+      (item) => item.id
+    ),
+    [24, 21]
+  )
+
+  const qualityViews = buildMobileTaskListForRole(tasks, 'quality', {
+    nowMs: NOW_MS,
+  })
+  const warehouseViews = buildMobileTaskListForRole(tasks, 'warehouse', {
+    nowMs: NOW_MS,
+  })
+  const pmcViews = buildMobileTaskListForRole(tasks, 'pmc', { nowMs: NOW_MS })
+
+  assert.equal(
+    qualityViews.some((item) => item.id === 22),
+    true
+  )
+  assert.equal(
+    qualityViews.find((item) => item.id === 22).alert_label,
+    '委外回货待检验'
+  )
+  assert.equal(
+    warehouseViews.some((item) => item.id === 23),
+    true
+  )
+  assert.match(
+    warehouseViews.find((item) => item.id === 23).complete_condition,
+    /委外回货入库数量/
+  )
+  assert.equal(
+    pmcViews.some((item) => item.id === 24),
+    true
+  )
+  assert.equal(pmcViews.find((item) => item.id === 24).alert_level, 'critical')
+})
+
+test('mobileTaskView: 成品抽检 入库 出货任务按角色视角展示', () => {
+  const tasks = [
+    task({
+      id: 31,
+      owner_role_key: 'quality',
+      source_type: 'production-progress',
+      task_group: 'finished_goods_qc',
+      business_status_key: 'qc_pending',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        alert_type: 'finished_goods_qc_pending',
+        complete_condition: '品质完成成品抽检',
+        related_documents: ['生产进度：PP-001'],
+        finished_goods: true,
+        critical_path: true,
+      },
+    }),
+    task({
+      id: 32,
+      owner_role_key: 'warehouse',
+      source_type: 'production-progress',
+      task_group: 'finished_goods_inbound',
+      business_status_key: 'warehouse_inbound_pending',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        alert_type: 'finished_goods_inbound_pending',
+        complete_condition: '仓库确认成品入库数量、库位和经手人',
+        related_documents: ['成品抽检结果：pass'],
+        finished_goods: true,
+        critical_path: true,
+      },
+    }),
+    task({
+      id: 33,
+      owner_role_key: 'warehouse',
+      source_type: 'production-progress',
+      task_group: 'shipment_release',
+      business_status_key: 'shipment_pending',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        alert_type: 'shipment_pending',
+        complete_condition: '确认出货数量、装箱、唛头、客户要求和出货状态',
+        related_documents: ['成品入库记录：IN-001'],
+        finished_goods: true,
+        critical_path: true,
+        confirm_role_key: 'merchandiser',
+      },
+    }),
+    task({
+      id: 34,
+      owner_role_key: 'production',
+      source_type: 'production-progress',
+      task_group: 'finished_goods_rework',
+      business_status_key: 'qc_failed',
+      due_at: NOW_SEC + 3 * 24 * 60 * 60,
+      payload: {
+        alert_type: 'qc_failed',
+        notification_type: 'qc_failed',
+        complete_condition: '生产确认返工完成',
+        related_documents: ['成品抽检不良记录：QC-001'],
+        finished_goods: true,
+        critical_path: true,
+      },
+    }),
+  ]
+
+  const qualityViews = buildMobileTaskListForRole(tasks, 'quality', {
+    nowMs: NOW_MS,
+  })
+  const warehouseViews = buildMobileTaskListForRole(tasks, 'warehouse', {
+    nowMs: NOW_MS,
+  })
+  const productionViews = buildMobileTaskListForRole(tasks, 'production', {
+    nowMs: NOW_MS,
+  })
+  const pmcViews = buildMobileTaskListForRole(tasks, 'pmc', { nowMs: NOW_MS })
+  const merchandiserViews = buildMobileTaskListForRole(tasks, 'merchandiser', {
+    nowMs: NOW_MS,
+  })
+
+  assert.equal(
+    qualityViews.some((item) => item.id === 31),
+    true
+  )
+  assert.equal(
+    qualityViews.find((item) => item.id === 31).alert_label,
+    '成品抽检待处理'
+  )
+  assert.deepEqual(
+    warehouseViews.map((item) => item.id),
+    [32, 33]
+  )
+  assert.equal(
+    productionViews.some((item) => item.id === 34),
+    true
+  )
+  assert.equal(
+    pmcViews.some((item) => item.id === 34),
+    true
+  )
+  assert.equal(pmcViews.find((item) => item.id === 34).alert_level, 'critical')
+  assert.equal(
+    merchandiserViews.some((item) => item.id === 33),
+    true
+  )
+  assert.match(
+    merchandiserViews.find((item) => item.id === 33).complete_condition,
+    /出货数量/
+  )
+})
+
 test('mobileTaskView: 预警摘要统计可用于移动端顶部卡片', () => {
   const views = buildMobileTaskListForRole(
     [

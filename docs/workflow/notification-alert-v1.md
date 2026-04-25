@@ -38,6 +38,11 @@ v1 只做系统内通知和页面预警：桌面 Dashboard 预警区、桌面业
 | `shipment_due` | warning / critical | 出货任务即将到期或已超时；小于等于 1 天按 critical |
 | `material_shortage` | critical | payload 或阻塞原因明确缺料 / 欠料 |
 | `vendor_delay` | warning / critical | 委外延期；已超期按 critical |
+| `outsource_return_pending` | warning / critical | 委外发料后等待加工厂回货登记；已超期按 critical |
+| `outsource_return_qc_pending` | warning / critical | 委外回货后等待品质检验；已超期按 critical |
+| `finished_goods_qc_pending` | warning / critical | 成品完工后等待品质抽检；已超期按 critical |
+| `finished_goods_inbound_pending` | warning / critical | 成品抽检合格后等待仓库确认成品入库；已超期按 critical |
+| `shipment_pending` | warning / critical | 成品已入库或放行，等待出货准备、装箱、唛头和出货确认；已超期按 critical |
 | `qc_pending` | warning | 采购到货后等待 IQC 检验 |
 | `qc_failed` | critical | 品质检验结论为不合格 |
 | `inbound_pending` | warning | IQC 合格后等待仓库确认入库 |
@@ -60,6 +65,8 @@ v1 只做系统内通知和页面预警：桌面 Dashboard 预警区、桌面业
 | finance | `receivables`、`payables`、`invoices`、`reconciliation` |
 | warehouse | `inbound`、`outbound`、`inventory`、`shipping-release` |
 | quality | `quality-inspections`、`qc_failed`、`rework_pending` |
+| production | `production` 主责任务、委外回货跟踪、委外返工 / 补做、成品返工 |
+| merchandiser | 出货任务中 `payload.confirm_role_key=merchandiser` 的确认线索；本轮不作为默认完成人 |
 
 ## 通知状态
 
@@ -109,10 +116,34 @@ v1 只做系统内通知和页面预警：桌面 Dashboard 预警区、桌面业
 
 当前 v1 不建立独立 notifications 表，不推送外部渠道；提醒仍由 `workflow_tasks`、`workflow_task_events`、`workflow_business_states` 和前端计算共同形成。
 
+## 第三条真实闭环预警
+
+| 场景 | 通知 / 预警 | 接收人 |
+| --- | --- | --- |
+| 委外发料后待回货 | `notification_type=task_created`、`alert_type=outsource_return_pending` | production；PMC 可通过 critical_path 关注 |
+| 委外回货后待检验 | `notification_type=task_created`、`alert_type=outsource_return_qc_pending` | quality；PMC 可通过 critical_path 关注 |
+| 委外回货检验合格待入库 | `notification_type=task_created`、`alert_type=inbound_pending` | warehouse |
+| 委外回货检验不合格 | `notification_type=qc_failed`、`alert_type=qc_failed`、critical | production、PMC；品质保留检验事实 |
+| 委外回货或入库超时 | `task_due_soon` / `task_overdue`，或 `vendor_delay` / `outsource_delay` | owner_role_key 对应角色、PMC |
+
+当前不新增 `outsource` 移动端入口，委外回货跟踪和返工 / 补做先由 production 移动端承接。PMC、boss、production 移动端会按 `limit=200` 拉取任务池后由前端可见性规则过滤；quality、warehouse、finance、purchasing 继续按 `owner_role_key` 直查。不新增后端复合查询 API。
+
+## 第四条真实闭环预警
+
+| 场景 | 通知 / 预警 | 接收人 |
+| --- | --- | --- |
+| 成品完工后待抽检 | `notification_type=task_created`、`alert_type=finished_goods_qc_pending` | quality；PMC 可通过 critical_path 关注 |
+| 成品抽检合格待入库 | `notification_type=task_created`、`alert_type=finished_goods_inbound_pending` | warehouse；PMC 可通过 critical_path 关注 |
+| 成品抽检不合格 / 返工 | `notification_type=qc_failed`、`alert_type=qc_failed`、critical | production、PMC；品质保留检验事实 |
+| 成品入库后待出货 | `notification_type=task_created`、`alert_type=shipment_pending` | warehouse；跟单通过 `confirm_role_key=merchandiser` 关注 |
+| 出货准备或出货确认超时 | `task_due_soon` / `task_overdue`，或 `shipment_due` / `shipment_risk` | warehouse、merchandiser、PMC，必要时 boss |
+
+当前 v1 不做应收 / 开票登记，不新增 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` 专表。`shipment_release` 先由 warehouse 移动端完成出货准备 / 出货执行确认，后续在“出货 -> 应收 / 开票登记”前再评审是否拆跟单确认、应收登记和发票登记任务。
+
 ## 页面落点
 
 - Dashboard：今日预警、超时、阻塞、出货风险、欠料、委外延期、质检不良、财务待处理、待老板审批、PMC 关注事项。
 - 业务页：当前模块关联的 blocked / overdue / due_soon 提示；品质、仓库、出货、财务模块显示对应风险。
 - 移动端：顶部显示我的预警、已超时、即将超时、阻塞、高优先级；任务卡显示 alert_level、alert_label、due_status 和催办状态。
 
-移动端 v1 的主请求仍按 `owner_role_key` 拉取当前角色任务，避免绕过现有后端筛选和既有登录路由烟测。PMC / 老板跨角色风险池先在 Dashboard 和前端视图规则中沉淀口径；如要在移动端直接聚合跨角色 blocked / overdue / high priority，需要后续补后端复合查询 API。
+移动端 v1 的主请求策略按角色分层：quality、warehouse、finance、purchasing 继续按 `owner_role_key` 直查；PMC、老板、生产端和跟单端为了承接跨角色风险池、委外回货、成品返工和出货确认线索，先按 `limit=200` 拉取任务池，再由 `mobileTaskView` 过滤 blocked、rejected、overdue、critical_path、high priority、`confirm_role_key` 和对应角色任务。不新增后端 API。

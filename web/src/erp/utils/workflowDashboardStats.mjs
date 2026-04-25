@@ -19,6 +19,18 @@ export const WAREHOUSE_MODULE_KEYS = new Set([
   'shipping-release',
   'outbound',
 ])
+export const OUTSOURCE_RETURN_TASK_GROUP_KEYS = new Set([
+  'outsource_return_tracking',
+  'outsource_return_qc',
+  'outsource_warehouse_inbound',
+  'outsource_rework',
+])
+export const FINISHED_GOODS_TASK_GROUP_KEYS = new Set([
+  'finished_goods_qc',
+  'finished_goods_inbound',
+  'finished_goods_rework',
+  'shipment_release',
+])
 
 function normalizeTaskStatusKey(task = {}) {
   return String(task.task_status_key || '').trim()
@@ -122,6 +134,9 @@ export function isVendorDelayWorkflowTask(task = {}) {
   return (
     normalizeSourceType(task) === 'processing-contracts' &&
     (payload.outsource_delay === true ||
+      payload.vendor_delay === true ||
+      payload.alert_type === 'outsource_delay' ||
+      payload.alert_type === 'vendor_delay' ||
       textIncludesAny(task.blocked_reason || payload.blocked_reason, [
         '委外延期',
         '外发延期',
@@ -131,10 +146,80 @@ export function isVendorDelayWorkflowTask(task = {}) {
   )
 }
 
+export function isOutsourceReturnWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    OUTSOURCE_RETURN_TASK_GROUP_KEYS.has(
+      String(task.task_group || '').trim()
+    ) ||
+    payload.outsource_processing === true ||
+    payload.outsource_owner_role_key === 'outsource'
+  )
+}
+
+export function isOutsourceReworkWorkflowTask(task = {}) {
+  return String(task.task_group || '').trim() === 'outsource_rework'
+}
+
+export function isOutsourceReturnPendingWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'outsource_return_tracking' ||
+    payload.alert_type === 'outsource_return_pending'
+  )
+}
+
+export function isOutsourceReturnQcPendingWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'outsource_return_qc' ||
+    payload.alert_type === 'outsource_return_qc_pending'
+  )
+}
+
+export function isFinishedGoodsWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    FINISHED_GOODS_TASK_GROUP_KEYS.has(String(task.task_group || '').trim()) ||
+    payload.finished_goods === true
+  )
+}
+
+export function isFinishedGoodsReworkWorkflowTask(task = {}) {
+  return String(task.task_group || '').trim() === 'finished_goods_rework'
+}
+
+export function isFinishedGoodsQcPendingWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'finished_goods_qc' ||
+    payload.alert_type === 'finished_goods_qc_pending'
+  )
+}
+
+export function isFinishedGoodsInboundPendingWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'finished_goods_inbound' ||
+    payload.alert_type === 'finished_goods_inbound_pending'
+  )
+}
+
+export function isShipmentPendingWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'shipment_release' ||
+    payload.alert_type === 'shipment_pending' ||
+    String(task.business_status_key || '').trim() === 'shipment_pending'
+  )
+}
+
 export function isShipmentWorkflowTask(task = {}) {
   const payload = payloadOf(task)
   return (
     normalizeSourceType(task) === 'shipping-release' ||
+    normalizeSourceType(task) === 'outbound' ||
+    isShipmentPendingWorkflowTask(task) ||
     payload.shipment_risk === true ||
     payload.notification_type === 'shipment_risk'
   )
@@ -165,6 +250,26 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     due_status: dueStatus,
   }
 
+  if (isFinishedGoodsReworkWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: 'qc_failed',
+      alert_type: 'qc_failed',
+      alert_level: 'critical',
+      alert_label: '成品返工处理',
+    }
+  }
+
+  if (isOutsourceReworkWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: 'qc_failed',
+      alert_type: 'qc_failed',
+      alert_level: 'critical',
+      alert_label: '委外返工 / 补做',
+    }
+  }
+
   if (isQcFailedWorkflowTask(task)) {
     return {
       ...base,
@@ -185,6 +290,16 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     }
   }
 
+  if (normalizeTaskStatusKey(task) === 'blocked') {
+    return {
+      ...base,
+      notification_type: 'task_blocked',
+      alert_type: 'blocked',
+      alert_level: 'critical',
+      alert_label: '任务阻塞',
+    }
+  }
+
   if (isVendorDelayWorkflowTask(task)) {
     return {
       ...base,
@@ -195,13 +310,53 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     }
   }
 
-  if (normalizeTaskStatusKey(task) === 'blocked') {
+  if (isOutsourceReturnPendingWorkflowTask(task)) {
     return {
       ...base,
-      notification_type: 'task_blocked',
-      alert_type: 'blocked',
-      alert_level: 'critical',
-      alert_label: '任务阻塞',
+      notification_type: payload.notification_type || 'task_created',
+      alert_type: 'outsource_return_pending',
+      alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
+      alert_label: '委外回货待跟踪',
+    }
+  }
+
+  if (isOutsourceReturnQcPendingWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'task_created',
+      alert_type: 'outsource_return_qc_pending',
+      alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
+      alert_label: '委外回货待检验',
+    }
+  }
+
+  if (isFinishedGoodsQcPendingWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'task_created',
+      alert_type: 'finished_goods_qc_pending',
+      alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
+      alert_label: '成品抽检待处理',
+    }
+  }
+
+  if (isFinishedGoodsInboundPendingWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'task_created',
+      alert_type: 'finished_goods_inbound_pending',
+      alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
+      alert_label: '成品待入库',
+    }
+  }
+
+  if (isShipmentPendingWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'task_created',
+      alert_type: 'shipment_pending',
+      alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
+      alert_label: dueStatus === 'overdue' ? '出货准备已超时' : '待出货准备',
     }
   }
 
@@ -420,6 +575,21 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
       ),
       vendorDelay: alerts.filter(
         (alert) => alert.alert_type === 'vendor_delay'
+      ),
+      outsourceReturnPending: alerts.filter(
+        (alert) => alert.alert_type === 'outsource_return_pending'
+      ),
+      outsourceReturnQcPending: alerts.filter(
+        (alert) => alert.alert_type === 'outsource_return_qc_pending'
+      ),
+      finishedGoodsQcPending: alerts.filter(
+        (alert) => alert.alert_type === 'finished_goods_qc_pending'
+      ),
+      finishedGoodsInboundPending: alerts.filter(
+        (alert) => alert.alert_type === 'finished_goods_inbound_pending'
+      ),
+      shipmentPending: alerts.filter(
+        (alert) => alert.alert_type === 'shipment_pending'
       ),
       qcFailed: alerts.filter((alert) => alert.alert_type === 'qc_failed'),
       financePending: alerts.filter((alert) =>

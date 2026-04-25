@@ -33,9 +33,15 @@ export function PageHeaderCard({
   tags = null,
   stats = [],
   summary = null,
+  compact = false,
 }) {
   return (
-    <Card className="erp-business-page-header-card erp-business-module-hero">
+    <Card
+      className={joinClassNames(
+        'erp-business-page-header-card erp-business-module-hero',
+        compact ? 'erp-business-page-header-card--compact' : ''
+      )}
+    >
       <div className="erp-business-page-header-card__grid erp-business-module-hero__grid">
         <div className="erp-business-page-header-card__main erp-business-module-hero__main">
           <div>
@@ -69,11 +75,39 @@ export function PageHeaderCard({
   )
 }
 
-export function BusinessFilterPanel({ children }) {
+export function BusinessFilterPanel({
+  children,
+  actions = null,
+  summary = null,
+  compact = false,
+}) {
+  const hasAside = Boolean(actions || summary)
   return (
-    <Card className="erp-business-filter-panel erp-business-module-filter-panel">
-      <div className="erp-business-filter-panel__grid erp-business-module-toolbar__filters">
-        {children}
+    <Card
+      className={joinClassNames(
+        'erp-business-filter-panel erp-business-module-filter-panel erp-business-module-toolbar',
+        hasAside ? 'erp-business-filter-panel--with-actions' : '',
+        compact ? 'erp-business-filter-panel--compact' : ''
+      )}
+    >
+      <div className="erp-business-filter-panel__row erp-business-module-toolbar__row">
+        <div className="erp-business-filter-panel__grid erp-business-module-toolbar__filters">
+          {children}
+        </div>
+        {hasAside ? (
+          <div className="erp-business-filter-panel__aside">
+            {summary ? (
+              <div className="erp-business-filter-panel__summary">
+                {summary}
+              </div>
+            ) : null}
+            {actions ? (
+              <div className="erp-business-filter-panel__actions erp-business-module-toolbar__actions">
+                {actions}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Card>
   )
@@ -174,62 +208,56 @@ export function DateRangeFilter({
 }
 
 export function BusinessListToolbar({ stats = [], actions = null }) {
+  const hasStats = stats.length > 0
+  if (!hasStats && !actions) return null
   return (
     <Card className="erp-business-list-toolbar erp-business-module-toolbar">
       <div className="erp-business-list-toolbar__row erp-business-module-toolbar__row">
-        <div className="erp-business-list-toolbar__stats">
-          {stats.map((item) => (
-            <span
-              key={item.key || item.label}
-              className="erp-business-list-toolbar__stat"
-            >
-              <Text type="secondary">{item.label}</Text>
-              <strong>{item.value}</strong>
-            </span>
-          ))}
-        </div>
-        <div className="erp-business-list-toolbar__actions erp-business-module-toolbar__actions">
-          {actions}
-        </div>
+        {hasStats ? (
+          <div className="erp-business-list-toolbar__stats">
+            {stats.map((item) => (
+              <span
+                key={item.key || item.label}
+                className="erp-business-list-toolbar__stat"
+              >
+                <Text type="secondary">{item.label}</Text>
+                <strong>{item.value}</strong>
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {actions ? (
+          <div className="erp-business-list-toolbar__actions erp-business-module-toolbar__actions">
+            {actions}
+          </div>
+        ) : null}
       </div>
     </Card>
   )
 }
 
-export function SelectionActionBar({
-  selectedCount,
-  selectedLabel,
-  children,
-  emptyText = '请选择一条或多条记录后进行编辑、流转、删除等操作',
-}) {
+export function SelectionActionBar({ selectedCount, selectedLabel, children }) {
   const hasSelection = Number(selectedCount) > 0
+  if (!hasSelection) return null
+
   return (
-    <Card
-      className={joinClassNames(
-        'erp-business-selection-action-bar erp-business-module-current-action',
-        hasSelection ? 'erp-business-selection-action-bar--active' : ''
-      )}
-    >
+    <Card className="erp-business-selection-action-bar erp-business-module-current-action erp-business-selection-action-bar--active">
       <div className="erp-business-selection-action-bar__row">
         <div className="erp-business-selection-action-bar__copy erp-business-module-selection-block">
-          <Text strong>
-            {hasSelection ? `已选 ${selectedCount} 条` : '选中操作'}
-          </Text>
+          <Text strong>已选 {selectedCount} 条</Text>
           <Tag
             className="erp-business-selection-action-bar__tag erp-business-module-selection-tag"
-            color={hasSelection ? 'green' : 'default'}
+            color="green"
           >
-            {hasSelection ? selectedLabel : emptyText}
+            {selectedLabel || `已选择 ${selectedCount} 条记录`}
           </Tag>
         </div>
-        {hasSelection ? (
-          <Space
-            wrap
-            className="erp-business-selection-action-bar__actions erp-business-module-selection-actions"
-          >
-            {children}
-          </Space>
-        ) : null}
+        <Space
+          wrap
+          className="erp-business-selection-action-bar__actions erp-business-module-selection-actions"
+        >
+          {children}
+        </Space>
       </div>
     </Card>
   )

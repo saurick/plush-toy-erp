@@ -83,6 +83,11 @@ import {
   summarizeRecordItems,
 } from '../utils/businessRecordForm.mjs'
 import {
+  resolveBusinessRecordItemDesktopSpan,
+  resolveBusinessRecordItemRowMinWidth,
+  resolveBusinessRecordItemUnitText,
+} from '../utils/businessRecordItemLayout.mjs'
+import {
   applyModuleColumnOrder,
   buildModuleColumnOrder,
   getModuleColumnKey,
@@ -125,9 +130,31 @@ import {
   isPurchaseIqcTask,
 } from '../utils/purchaseInboundFlow.mjs'
 import {
+  PROCESSING_CONTRACTS_MODULE_KEY,
+  PRODUCTION_PROCESSING_STATUS_KEY as OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY,
+  QC_PENDING_STATUS_KEY as OUTSOURCE_QC_PENDING_STATUS_KEY,
+  buildOutsourceReturnQcTask,
+  buildOutsourceReturnTrackingTask,
+  hasActiveOutsourceReturnQcTaskForRecord,
+  hasActiveOutsourceReturnTrackingTaskForRecord,
+  isOutsourceReturnQcTask,
+  isOutsourceReturnTrackingTask,
+  isOutsourceReworkTask,
+} from '../utils/outsourceReturnFlow.mjs'
+import {
+  PRODUCTION_PROGRESS_MODULE_KEY,
+  SHIPPING_RELEASE_MODULE_KEY,
+  QC_PENDING_STATUS_KEY as FINISHED_GOODS_QC_PENDING_STATUS_KEY,
+  buildFinishedGoodsQcTask,
+  hasActiveFinishedGoodsQcTaskForRecord,
+  isFinishedGoodsInboundTask,
+  isFinishedGoodsQcTask,
+  isFinishedGoodsReworkTask,
+  isShipmentReleaseTask,
+} from '../utils/finishedGoodsFlow.mjs'
+import {
   BusinessDataTable,
   BusinessFilterPanel,
-  BusinessListToolbar,
   BusinessPageLayout,
   CollaborationTaskPanel,
   DateRangeFilter,
@@ -177,7 +204,6 @@ const ITEM_CARD_HEADER_STYLES = {
 const ITEM_CARD_BODY_STYLES = {
   padding: 16,
 }
-const ITEM_HORIZONTAL_SCROLL_SPAN_WIDTH = 64
 const CALCULATION_GUIDE_PATH = '/erp/docs/calculation-guide'
 const COMPACT_SUMMARY_GROUPS = Object.freeze([
   { key: 'customer_name', label: '客户' },
@@ -437,29 +463,69 @@ function renderFormField(field) {
   return <Input placeholder={field.placeholder || `请输入${field.label}`} />
 }
 
-function renderItemField(field) {
+function FieldWithUnitSuffix({ control, unitText, ...controlProps }) {
+  const controlStyle = control?.props?.style || {}
+  const mergedProps = {
+    ...control?.props,
+    ...controlProps,
+    style: {
+      ...controlStyle,
+      width: '100%',
+    },
+  }
+
+  if (
+    controlProps.disabled === undefined &&
+    control?.props?.disabled !== undefined
+  ) {
+    mergedProps.disabled = control.props.disabled
+  }
+
+  if (!unitText) {
+    return React.cloneElement(control, mergedProps)
+  }
+
+  const unitSuffixWidth = Math.max(56, String(unitText).length * 14 + 18)
+
+  return (
+    <Space.Compact
+      className="erp-item-field-with-unit"
+      style={{ width: '100%' }}
+    >
+      {React.cloneElement(control, mergedProps)}
+      <Input
+        value={unitText}
+        readOnly
+        tabIndex={-1}
+        aria-label={`单位 ${unitText}`}
+        className="erp-item-field-unit-suffix"
+        style={{
+          width: `${unitSuffixWidth}px`,
+          minWidth: `${unitSuffixWidth}px`,
+          flex: '0 0 auto',
+        }}
+      />
+    </Space.Compact>
+  )
+}
+
+function renderItemField(field, rowValues = {}) {
+  const unitText = resolveBusinessRecordItemUnitText(field, rowValues)
   if (field.type === 'number') {
     return (
-      <InputNumber
-        min={0}
-        style={{ width: '100%' }}
-        placeholder={field.placeholder}
+      <FieldWithUnitSuffix
+        control={
+          <InputNumber
+            min={0}
+            style={{ width: '100%' }}
+            placeholder={field.placeholder}
+          />
+        }
+        unitText={unitText}
       />
     )
   }
   return <Input placeholder={field.placeholder || field.label} />
-}
-
-function resolveBusinessRecordItemDesktopSpan() {
-  return 6
-}
-
-function resolveBusinessRecordItemRowMinWidth(fields = []) {
-  const spanBudget = fields.reduce(
-    (sum, field) => sum + resolveBusinessRecordItemDesktopSpan(field),
-    0
-  )
-  return Math.max(0, spanBudget * ITEM_HORIZONTAL_SCROLL_SPAN_WIDTH)
 }
 
 function resolveBusinessRecordFieldColProps(field) {
@@ -541,6 +607,9 @@ export default function BusinessModulePage({ moduleItem }) {
   const [pendingStatusKey, setPendingStatusKey] = useState('')
   const [orderApprovalSubmitting, setOrderApprovalSubmitting] = useState(false)
   const [iqcSubmitting, setIqcSubmitting] = useState(false)
+  const [outsourceReturnSubmitting, setOutsourceReturnSubmitting] =
+    useState(false)
+  const [finishedGoodsSubmitting, setFinishedGoodsSubmitting] = useState(false)
   const [columnOrderModalOpen, setColumnOrderModalOpen] = useState(false)
   const [columnOrderKeys, setColumnOrderKeys] = useState(() =>
     readStoredColumnOrder(moduleItem.key, definition.tableColumns)
@@ -653,6 +722,127 @@ export default function BusinessModulePage({ moduleItem }) {
           Number(left.updated_at || left.created_at || 0)
       )[0] || null,
     [selectedIqcTasks]
+  )
+  const isProcessingContractsModule =
+    moduleItem.key === PROCESSING_CONTRACTS_MODULE_KEY
+  const isInboundModule = moduleItem.key === INBOUND_MODULE_KEY
+  const selectedOutsourceReturnTrackingTasks = useMemo(
+    () => selectedRecordTasks.filter(isOutsourceReturnTrackingTask),
+    [selectedRecordTasks]
+  )
+  const selectedActiveOutsourceReturnTrackingTask = useMemo(
+    () =>
+      selectedOutsourceReturnTrackingTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedOutsourceReturnTrackingTasks]
+  )
+  const latestSelectedOutsourceReturnTrackingTask = useMemo(
+    () =>
+      [...selectedOutsourceReturnTrackingTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedOutsourceReturnTrackingTasks]
+  )
+  const selectedOutsourceReturnQcTasks = useMemo(
+    () => selectedRecordTasks.filter(isOutsourceReturnQcTask),
+    [selectedRecordTasks]
+  )
+  const selectedActiveOutsourceReturnQcTask = useMemo(
+    () =>
+      selectedOutsourceReturnQcTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedOutsourceReturnQcTasks]
+  )
+  const latestSelectedOutsourceReturnQcTask = useMemo(
+    () =>
+      [...selectedOutsourceReturnQcTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedOutsourceReturnQcTasks]
+  )
+  const selectedOutsourceRiskTask = useMemo(
+    () =>
+      selectedRecordTasks.find(
+        (task) =>
+          isOutsourceReworkTask(task) ||
+          task.business_status_key === 'qc_failed' ||
+          task.task_status_key === 'blocked'
+      ) || null,
+    [selectedRecordTasks]
+  )
+  const isProductionProgressModule =
+    moduleItem.key === PRODUCTION_PROGRESS_MODULE_KEY
+  const isShippingFlowModule = [
+    SHIPPING_RELEASE_MODULE_KEY,
+    'outbound',
+  ].includes(moduleItem.key)
+  const selectedFinishedGoodsQcTasks = useMemo(
+    () => selectedRecordTasks.filter(isFinishedGoodsQcTask),
+    [selectedRecordTasks]
+  )
+  const selectedActiveFinishedGoodsQcTask = useMemo(
+    () =>
+      selectedFinishedGoodsQcTasks.find((task) =>
+        ACTIVE_APPROVAL_TASK_STATUS_KEYS.has(
+          String(task.task_status_key || '').trim()
+        )
+      ) || null,
+    [selectedFinishedGoodsQcTasks]
+  )
+  const latestSelectedFinishedGoodsQcTask = useMemo(
+    () =>
+      [...selectedFinishedGoodsQcTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedFinishedGoodsQcTasks]
+  )
+  const selectedFinishedGoodsInboundTasks = useMemo(
+    () => selectedRecordTasks.filter(isFinishedGoodsInboundTask),
+    [selectedRecordTasks]
+  )
+  const latestSelectedFinishedGoodsInboundTask = useMemo(
+    () =>
+      [...selectedFinishedGoodsInboundTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedFinishedGoodsInboundTasks]
+  )
+  const selectedShipmentReleaseTasks = useMemo(
+    () => selectedRecordTasks.filter(isShipmentReleaseTask),
+    [selectedRecordTasks]
+  )
+  const latestSelectedShipmentReleaseTask = useMemo(
+    () =>
+      [...selectedShipmentReleaseTasks].sort(
+        (left, right) =>
+          Number(right.updated_at || right.created_at || 0) -
+          Number(left.updated_at || left.created_at || 0)
+      )[0] || null,
+    [selectedShipmentReleaseTasks]
+  )
+  const selectedFinishedGoodsRiskTask = useMemo(
+    () =>
+      selectedRecordTasks.find(
+        (task) =>
+          isFinishedGoodsReworkTask(task) ||
+          task.business_status_key === 'qc_failed' ||
+          task.task_status_key === 'blocked'
+      ) || null,
+    [selectedRecordTasks]
   )
   const printTemplate = useMemo(
     () => getBusinessRecordPrintTemplate(moduleItem.key),
@@ -1585,6 +1775,208 @@ export default function BusinessModulePage({ moduleItem }) {
     }
   }
 
+  const submitSelectedProcessingContractForOutsourceTracking = async () => {
+    if (!selectedRecord || !isProcessingContractsModule) return
+    if (
+      selectedActiveOutsourceReturnTrackingTask ||
+      hasActiveOutsourceReturnTrackingTaskForRecord(tasks, {
+        ...selectedRecord,
+        module_key: moduleItem.key,
+      })
+    ) {
+      message.warning('已有委外回货跟踪任务')
+      return
+    }
+
+    setOutsourceReturnSubmitting(true)
+    try {
+      const statusParams = buildBusinessRecordStatusUpdateParams(
+        selectedRecord,
+        OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY,
+        moduleItem,
+        definition,
+        { reason: '委外发料后进入加工中，开始跟踪回货' }
+      )
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const taskParams = buildOutsourceReturnTrackingTask({
+        ...savedRecord,
+        module_key: moduleItem.key,
+      })
+      if (!taskParams) {
+        message.warning('当前记录无法生成委外回货跟踪任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: PROCESSING_CONTRACTS_MODULE_KEY,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY,
+        owner_role_key: 'production',
+        payload: {
+          record_title: savedRecord.title,
+          notification_type: 'task_created',
+          alert_type: 'outsource_return_pending',
+          critical_path: true,
+          outsource_owner_role_key: 'outsource',
+          outsource_processing: true,
+        },
+      })
+      message.success(
+        `委外回货跟踪已发起：${task?.task_name || '跟踪委外回货'}`
+      )
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '发起委外回货跟踪失败，请稍后重试')
+      )
+    } finally {
+      setOutsourceReturnSubmitting(false)
+    }
+  }
+
+  const submitSelectedInboundForOutsourceReturnQc = async () => {
+    if (!selectedRecord || !isInboundModule) return
+    if (
+      selectedActiveOutsourceReturnQcTask ||
+      hasActiveOutsourceReturnQcTaskForRecord(tasks, {
+        ...selectedRecord,
+        module_key: moduleItem.key,
+      })
+    ) {
+      message.warning('已有委外回货检验任务')
+      return
+    }
+
+    setOutsourceReturnSubmitting(true)
+    try {
+      const statusParams = buildBusinessRecordStatusUpdateParams(
+        selectedRecord,
+        OUTSOURCE_QC_PENDING_STATUS_KEY,
+        moduleItem,
+        definition,
+        { reason: '委外回货通知进入品质检验' }
+      )
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const taskParams = buildOutsourceReturnQcTask(
+        {
+          ...savedRecord,
+          module_key: moduleItem.key,
+        },
+        null
+      )
+      if (!taskParams) {
+        message.warning('当前记录无法生成委外回货检验任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: moduleItem.key,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: OUTSOURCE_QC_PENDING_STATUS_KEY,
+        owner_role_key: 'quality',
+        payload: {
+          record_title: savedRecord.title,
+          notification_type: 'task_created',
+          alert_type: 'outsource_return_qc_pending',
+          critical_path: true,
+          outsource_processing: true,
+        },
+      })
+      message.success(
+        `委外回货检验已发起：${task?.task_name || '委外回货检验'}`
+      )
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '发起委外回货检验失败，请稍后重试')
+      )
+    } finally {
+      setOutsourceReturnSubmitting(false)
+    }
+  }
+
+  const submitSelectedProductionForFinishedGoodsQc = async () => {
+    if (!selectedRecord || !isProductionProgressModule) return
+    if (
+      selectedActiveFinishedGoodsQcTask ||
+      hasActiveFinishedGoodsQcTaskForRecord(tasks, {
+        ...selectedRecord,
+        module_key: moduleItem.key,
+      })
+    ) {
+      message.warning('已有成品抽检任务')
+      return
+    }
+
+    setFinishedGoodsSubmitting(true)
+    try {
+      const statusParams = buildBusinessRecordStatusUpdateParams(
+        selectedRecord,
+        FINISHED_GOODS_QC_PENDING_STATUS_KEY,
+        moduleItem,
+        definition,
+        { reason: '成品完工后发起品质抽检' }
+      )
+      if (statusParams) {
+        statusParams.payload = {
+          ...(statusParams.payload || {}),
+          finished: true,
+          finished_goods: true,
+        }
+      }
+      const savedRecord = statusParams
+        ? await updateBusinessRecord(statusParams)
+        : selectedRecord
+      const taskParams = buildFinishedGoodsQcTask({
+        ...savedRecord,
+        module_key: moduleItem.key,
+        payload: {
+          ...(savedRecord.payload || {}),
+          finished: true,
+        },
+      })
+      if (!taskParams) {
+        message.warning('当前记录无法生成成品抽检任务')
+        return
+      }
+
+      const task = await createWorkflowTask(taskParams)
+      await upsertWorkflowBusinessState({
+        source_type: PRODUCTION_PROGRESS_MODULE_KEY,
+        source_id: savedRecord.id,
+        source_no: taskParams.source_no,
+        business_status_key: FINISHED_GOODS_QC_PENDING_STATUS_KEY,
+        owner_role_key: 'quality',
+        payload: {
+          record_title: savedRecord.title,
+          notification_type: 'task_created',
+          alert_type: 'finished_goods_qc_pending',
+          critical_path: true,
+          finished_goods: true,
+        },
+      })
+      message.success(`成品抽检已发起：${task?.task_name || '成品抽检'}`)
+      await loadData()
+      setSelectedRowKeys([savedRecord.id])
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '发起成品抽检失败，请稍后重试')
+      )
+    } finally {
+      setFinishedGoodsSubmitting(false)
+    }
+  }
+
   const openPrintWindowForSelectedRecord = () => {
     if (!selectedRecord || !printTemplate) return
     const initialDraft = buildBusinessRecordPrintDraft(
@@ -1653,6 +2045,7 @@ export default function BusinessModulePage({ moduleItem }) {
   return (
     <BusinessPageLayout className="erp-business-module-page">
       <PageHeaderCard
+        compact
         sectionTitle={moduleItem.sectionTitle}
         title={moduleItem.title}
         description={moduleItem.description}
@@ -1683,33 +2076,66 @@ export default function BusinessModulePage({ moduleItem }) {
           { key: 'selected', label: '已选记录', value: selectedRowKeys.length },
         ]}
         summary={
-          <>
-            <div className="erp-business-module-chip-row">
-              <Tag className="erp-business-module-summary-chip">
-                {metricKey === 'amount' ? '金额合计' : '数量合计'}{' '}
-                {formatMetric(metricTotal)}
-              </Tag>
-            </div>
-            {compactSummaryGroups.map((group) => (
-              <div key={group.key} className="erp-business-module-chip-row">
-                <Text type="secondary">{group.label}：</Text>
-                {group.items.map((item) => (
-                  <Tag key={`${group.key}-${item.label}`}>
-                    {item.label} {item.count}
-                  </Tag>
-                ))}
-                {group.hiddenCount > 0 ? (
-                  <Tag className="erp-business-module-summary-chip">
-                    +{group.hiddenCount}
-                  </Tag>
-                ) : null}
-              </div>
-            ))}
-          </>
+          compactSummaryGroups.length > 0 ? (
+            <>
+              {compactSummaryGroups.map((group) => (
+                <div key={group.key} className="erp-business-module-chip-row">
+                  <Text type="secondary">{group.label}：</Text>
+                  {group.items.map((item) => (
+                    <Tag key={`${group.key}-${item.label}`}>
+                      {item.label} {item.count}
+                    </Tag>
+                  ))}
+                  {group.hiddenCount > 0 ? (
+                    <Tag className="erp-business-module-summary-chip">
+                      +{group.hiddenCount}
+                    </Tag>
+                  ) : null}
+                </div>
+              ))}
+            </>
+          ) : null
         }
       />
 
-      <BusinessFilterPanel>
+      <BusinessFilterPanel
+        compact
+        summary={
+          <Tag className="erp-business-module-summary-chip">
+            {metricKey === 'amount' ? '金额合计' : '数量合计'}{' '}
+            {formatMetric(metricTotal)}
+          </Tag>
+        }
+        actions={
+          <>
+            <ToolbarButton
+              icon={<ExportOutlined />}
+              onClick={exportCurrentRecords}
+            >
+              导出当前结果
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              aria-label="列顺序"
+              title="列顺序"
+              onClick={() => setColumnOrderModalOpen(true)}
+            >
+              列顺序
+            </ToolbarButton>
+            <ToolbarButton icon={<InboxOutlined />} onClick={openRecycleModal}>
+              回收站
+            </ToolbarButton>
+            <ToolbarButton
+              type="primary"
+              className="erp-business-list-toolbar__primary-action"
+              icon={<PlusOutlined />}
+              onClick={openCreateModal}
+            >
+              新建记录
+            </ToolbarButton>
+          </>
+        }
+      >
         <SearchInput
           placeholder="搜编号/名称/客户/合同"
           value={keyword}
@@ -1753,48 +2179,6 @@ export default function BusinessModulePage({ moduleItem }) {
           onChange={setSortOrder}
         />
       </BusinessFilterPanel>
-
-      <BusinessListToolbar
-        stats={[
-          { key: 'total', label: '总记录', value: activeRecords.length },
-          { key: 'current', label: '当前结果', value: sortedRecords.length },
-          { key: 'selected', label: '已选', value: selectedRowKeys.length },
-          {
-            key: 'metric',
-            label: metricKey === 'amount' ? '金额合计' : '数量合计',
-            value: formatMetric(metricTotal),
-          },
-        ]}
-        actions={
-          <>
-            <ToolbarButton
-              icon={<ExportOutlined />}
-              onClick={exportCurrentRecords}
-            >
-              导出当前结果
-            </ToolbarButton>
-            <ToolbarButton
-              icon={<SettingOutlined />}
-              aria-label="列顺序"
-              title="列顺序"
-              onClick={() => setColumnOrderModalOpen(true)}
-            >
-              列顺序
-            </ToolbarButton>
-            <ToolbarButton icon={<InboxOutlined />} onClick={openRecycleModal}>
-              回收站
-            </ToolbarButton>
-            <ToolbarButton
-              type="primary"
-              className="erp-business-list-toolbar__primary-action"
-              icon={<PlusOutlined />}
-              onClick={openCreateModal}
-            >
-              新建记录
-            </ToolbarButton>
-          </>
-        }
-      />
 
       <SelectionActionBar
         selectedCount={selectedRowKeys.length}
@@ -1900,6 +2284,120 @@ export default function BusinessModulePage({ moduleItem }) {
                   <Tag color="red">来料不良</Tag>
                 ) : null}
                 <Tag color="geekblue">下一步：品质 IQC -&gt; 仓库入库</Tag>
+              </>
+            ) : null}
+            {isProcessingContractsModule ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<SendOutlined />}
+                  loading={outsourceReturnSubmitting}
+                  onClick={submitSelectedProcessingContractForOutsourceTracking}
+                >
+                  发起委外回货跟踪
+                </Button>
+                <Tag
+                  color={
+                    selectedActiveOutsourceReturnTrackingTask ? 'gold' : 'blue'
+                  }
+                >
+                  委外回货：
+                  {latestSelectedOutsourceReturnTrackingTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedOutsourceReturnTrackingTask.task_status_key
+                      ) ||
+                      latestSelectedOutsourceReturnTrackingTask.task_status_key
+                    : '未发起'}
+                </Tag>
+                {selectedOutsourceRiskTask ? (
+                  <Tag color="red">委外异常 / 检验不合格</Tag>
+                ) : null}
+                <Tag color="geekblue">
+                  下一步：委外回货 -&gt; 品质检验 -&gt; 仓库入库
+                </Tag>
+              </>
+            ) : null}
+            {isProductionProgressModule ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<ExperimentOutlined />}
+                  loading={finishedGoodsSubmitting}
+                  onClick={submitSelectedProductionForFinishedGoodsQc}
+                >
+                  发起成品抽检
+                </Button>
+                <Tag
+                  color={selectedActiveFinishedGoodsQcTask ? 'gold' : 'blue'}
+                >
+                  成品抽检：
+                  {latestSelectedFinishedGoodsQcTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedFinishedGoodsQcTask.task_status_key
+                      ) || latestSelectedFinishedGoodsQcTask.task_status_key
+                    : '未发起'}
+                </Tag>
+                {latestSelectedFinishedGoodsInboundTask ? (
+                  <Tag color="cyan">
+                    成品入库：
+                    {TASK_STATUS_LABELS.get(
+                      latestSelectedFinishedGoodsInboundTask.task_status_key
+                    ) || latestSelectedFinishedGoodsInboundTask.task_status_key}
+                  </Tag>
+                ) : null}
+                {latestSelectedShipmentReleaseTask ? (
+                  <Tag color="purple">
+                    出货：
+                    {TASK_STATUS_LABELS.get(
+                      latestSelectedShipmentReleaseTask.task_status_key
+                    ) || latestSelectedShipmentReleaseTask.task_status_key}
+                  </Tag>
+                ) : null}
+                {selectedFinishedGoodsRiskTask ? (
+                  <Tag color="red">成品抽检异常 / 返工</Tag>
+                ) : null}
+                <Tag color="geekblue">
+                  下一步：成品抽检 -&gt; 成品入库 -&gt; 出货
+                </Tag>
+              </>
+            ) : null}
+            {isInboundModule ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<ExperimentOutlined />}
+                  loading={outsourceReturnSubmitting}
+                  onClick={submitSelectedInboundForOutsourceReturnQc}
+                >
+                  发起委外回货检验
+                </Button>
+                <Tag
+                  color={selectedActiveOutsourceReturnQcTask ? 'gold' : 'blue'}
+                >
+                  委外检验：
+                  {latestSelectedOutsourceReturnQcTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedOutsourceReturnQcTask.task_status_key
+                      ) || latestSelectedOutsourceReturnQcTask.task_status_key
+                    : '未发起'}
+                </Tag>
+              </>
+            ) : null}
+            {isShippingFlowModule ? (
+              <>
+                <Tag
+                  color={latestSelectedShipmentReleaseTask ? 'purple' : 'blue'}
+                >
+                  出货任务：
+                  {latestSelectedShipmentReleaseTask
+                    ? TASK_STATUS_LABELS.get(
+                        latestSelectedShipmentReleaseTask.task_status_key
+                      ) || latestSelectedShipmentReleaseTask.task_status_key
+                    : '未关联'}
+                </Tag>
+                <Tag color="geekblue">
+                  当前只推进出货状态，不生成应收 / 发票
+                </Tag>
               </>
             ) : null}
             <Dropdown
@@ -2358,34 +2856,37 @@ export default function BusinessModulePage({ moduleItem }) {
                                 )}px`,
                               }}
                             >
-                              {definition.itemFields.map((field) => (
-                                <Col
-                                  span={resolveBusinessRecordItemDesktopSpan(
-                                    field
-                                  )}
-                                  key={field.key}
-                                >
-                                  <Space
-                                    direction="vertical"
-                                    size={4}
-                                    className="erp-item-field-stack"
+                              {definition.itemFields.map((field) => {
+                                const rowValues = watchedItems?.[name] || {}
+                                return (
+                                  <Col
+                                    span={resolveBusinessRecordItemDesktopSpan(
+                                      field
+                                    )}
+                                    key={field.key}
                                   >
-                                    <Text
-                                      type="secondary"
-                                      className="erp-item-field-label"
+                                    <Space
+                                      direction="vertical"
+                                      size={4}
+                                      className="erp-item-field-stack"
                                     >
-                                      {field.label}
-                                    </Text>
-                                    <Form.Item
-                                      {...restField}
-                                      className="erp-item-field-form-item"
-                                      name={[name, field.key]}
-                                    >
-                                      {renderItemField(field)}
-                                    </Form.Item>
-                                  </Space>
-                                </Col>
-                              ))}
+                                      <Text
+                                        type="secondary"
+                                        className="erp-item-field-label"
+                                      >
+                                        {field.label}
+                                      </Text>
+                                      <Form.Item
+                                        {...restField}
+                                        className="erp-item-field-form-item"
+                                        name={[name, field.key]}
+                                      >
+                                        {renderItemField(field, rowValues)}
+                                      </Form.Item>
+                                    </Space>
+                                  </Col>
+                                )
+                              })}
                             </Row>
                           </Card>
                         ))}

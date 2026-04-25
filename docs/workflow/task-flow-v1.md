@@ -13,7 +13,7 @@
 | T1 | 订单审批 | 业务跟单、老板 | 业务提交客户 / 款式立项记录 | 老板审批通过，或退回后补齐资料再通过 | `project-orders` | 桌面、老板移动端、跟单移动端 | 客户资料缺失、编号冲突、交期未确认、审批退回 | 订单提交后 1 个工作日内未审批视为 `approval_pending` | 是 |
 | T2 | 工程资料 | 工程、跟单、PMC | T1 审批通过 | BOM、色卡、作业指导书、包装要求确认完成 | `material-bom`、`project-orders` | 桌面、跟单移动端、PMC 移动端 | BOM 未齐、色卡未确认、包装要求缺失、资料版本冲突 | 审批通过后 2 个工作日内未齐套视为 `due_soon`，超期视为 `overdue` | 是 |
 | T3 | 材料采购 | 采购、仓库、品质、PMC | 工程资料进入采购准备 | 采购单明确供应商和回货日期，到货后 IQC 通过并入库 | `material-bom`、`accessories-purchase`、`inbound`、`quality-inspections`、`inventory` | 桌面、采购移动端、仓库移动端、品质移动端、PMC 移动端 | 缺料、供应商未确认、到货延期、IQC 不合格、入库数量差异 | 到货日前 1 天为 `due_soon`，到货日后未完成为 `overdue` | 是 |
-| T4 | 委外加工 | 采购、委外、仓库、品质、财务、PMC | 生产经理或 PMC 判定需要委外 | 委外单 / 加工合同完成，发料、回货、回货检验、入库和委外对账完成 | `processing-contracts`、`outbound`、`quality-inspections`、`inbound`、`reconciliation`、`payables` | 桌面、采购移动端、仓库移动端、品质移动端、财务移动端、PMC 移动端 | 合同未回签、委外发料不足、加工厂延期、回货不良、对账差异 | 回货日前 1 天预警，回货日后未入库为 `outsource_delay` / `overdue` | 是 |
+| T4 | 委外加工 | 采购、生产/委外、仓库、品质、财务、PMC | 生产经理或 PMC 判定需要委外 | 委外单 / 加工合同完成，发料、回货、回货检验、入库和委外对账完成 | `processing-contracts`、`outbound`、`quality-inspections`、`inbound`、`reconciliation`、`payables` | 桌面、生产移动端、仓库移动端、品质移动端、财务移动端、PMC 移动端 | 合同未回签、委外发料不足、加工厂延期、回货不良、对账差异 | 回货日前 1 天预警，回货日后未入库为 `outsource_delay` / `overdue` | 是 |
 | T5 | 内部生产 | PMC、生产经理、生产工人、品质 | 齐套后进入排产 | 排产、分派、车缝、手工、包装和完工上报完成；返工必须闭环 | `production-scheduling`、`production-progress`、`production-exceptions`、`quality-inspections` | 桌面、生产移动端、PMC 移动端、品质移动端 | 齐套不足、人员或产能冲突、工序延期、返工未完成、异常未关闭 | 计划完成日前 1 天预警，计划日后未完成为 `overdue` | 是 |
 | T6 | 品质检验 | 品质、生产经理、仓库、PMC | IQC、委外回货、成品抽检或返工复检任务创建 | 检验结论明确，不良登记完成；放行、退回或返工复检结论已记录 | `quality-inspections`、`inbound`、`production-exceptions`、`shipping-release` | 桌面、品质移动端、仓库移动端、生产移动端、PMC 移动端 | 待检样品缺失、检验标准不明确、不良未判责、返工未复检 | 检验要求日期当天未完成为 `due_soon`，超期为 `overdue`；不合格为 `qc_failed` | 是 |
 | T7 | 包装出货 | 仓库、业务跟单、财务、PMC | 成品检验通过并准备出货 | 成品入库、出货通知、拣货、装箱、财务放行、出货确认完成 | `inventory`、`shipping-release`、`outbound`、`receivables` | 桌面、仓库移动端、跟单移动端、财务移动端、PMC 移动端、老板移动端 | 成品不足、财务未放行、客户信息未确认、装箱异常、出货日期风险 | 出货日前 1 天为 `shipment_due` critical；出货日后未确认为 `overdue` | 是 |
@@ -58,3 +58,37 @@
 | 后续评审条件 | 当采购到货、委外回货、成品入库和出货扣减链路都稳定后，再评审是否拆 `inventory_txn`、`inventory_balance` Ent schema，并补 migration 与库存口径测试。 |
 
 边界说明：本闭环只落地采购到货、IQC 结论、仓库确认入库的任务和业务状态闭环；不扩散到委外、成品、出货、财务、资产或复杂 WMS。
+
+## 第三条真实闭环：委外发料 -> 回货 -> 检验 -> 入库
+
+| 环节 | 当前 v1 规则 |
+| --- | --- |
+| 触发点 | 桌面 `processing-contracts` 选中加工合同 / 委外下单记录后点击“发起委外回货跟踪”，或后续由业务状态进入 `production_processing` 触发；`inbound` 可承接委外回货通知并直接发起回货检验。 |
+| 责任角色 | 委外回货跟踪和返工 / 补做任务先进入 `production` 角色池；回货检验进入 `quality`；合格后的委外入库进入 `warehouse`；PMC 只看 blocked / overdue / critical_path / high priority 风险，不作为默认完成人。 |
+| 回货跟踪任务字段 | `task_group=outsource_return_tracking`、`task_name=跟踪委外回货`、`source_type=processing-contracts`、`business_status_key=production_processing`、`task_status_key=ready`、`owner_role_key=production`、`alert_type=outsource_return_pending`、`critical_path=true`、`payload.outsource_owner_role_key=outsource`、`payload.outsource_processing=true`。 |
+| 委外回货路径 | production 移动端完成 `outsource_return_tracking` 后，业务状态进入 `qc_pending`，并自动创建 `outsource_return_qc` 品质回货检验任务；`inbound` 记录也可以直接创建同组任务，不影响 `purchase_iqc`。 |
+| 合格路径 | quality 移动端完成 `outsource_return_qc` 代表回货检验合格 / 让步接收；任务更新为 `done`，业务状态进入 `warehouse_inbound_pending`，并创建 `outsource_warehouse_inbound` 仓库入库任务。 |
+| 不合格路径 | quality 移动端点击“阻塞”或“退回”必须填写原因；状态快照进入 `qc_failed`，并创建 `outsource_rework` 给 `production` 处理返工、补做、让步接收或重新回货安排。 |
+| 入库完成条件 | warehouse 移动端完成 `outsource_warehouse_inbound` 后，业务状态更新为 `inbound_done`；当前只表示委外回货入库任务闭环。 |
+| 当前编排位置 | 本闭环 v1 继续放在前端业务页和移动端，通过现有 `create_task`、`update_task_status`、`upsert_business_state`、`update_record` API 串联，不新增 workflow API。 |
+| 当前不做 | 不新增 `outsource_order` 专表，不新增 `inventory_txn` / `inventory_balance` 专表，不写正式库存余额或库存流水，不做财务应付对账，不新增 `outsource` 移动端入口。 |
+| 后续评审条件 | 当委外订单字段、发料事实、回货数量、质检结论、入库数量、对账口径和历史回补规则稳定后，再评审是否拆 `outsource_order`、`inventory_txn`、`inventory_balance` Ent schema，并补 migration、库存计算和同步守卫测试。 |
+
+边界说明：当前没有独立 `outsource` 移动端入口，所以关键委外任务不能只挂到 `owner_role_key=outsource`。v1 先由 `production` 承接委外回货跟踪和返工 / 补做，payload 保留 `outsource_owner_role_key=outsource` 作为后续拆端口或专岗入口的迁移线索。
+
+## 第四条真实闭环：成品完工 -> 成品抽检 -> 成品入库 -> 出货
+
+| 环节 | 当前 v1 规则 |
+| --- | --- |
+| 触发点 | `production-progress` 记录进入 `production_processing` 且 payload 标注 `finished=true`，或桌面选中生产进度记录点击“发起成品抽检”。当前不新增 `production_done` 状态。 |
+| 责任角色 | 成品抽检进入 `quality`；抽检不合格返工进入 `production`；成品入库和出货放行 / 出货准备进入 `warehouse`；PMC 只看 blocked、overdue、critical_path 和 critical 风险；跟单通过 `confirm_role_key=merchandiser` 关注出货确认线索。 |
+| 成品抽检任务字段 | `task_group=finished_goods_qc`、`task_name=成品抽检`、`source_type=production-progress`、`business_status_key=qc_pending`、`task_status_key=ready`、`owner_role_key=quality`、`alert_type=finished_goods_qc_pending`、`critical_path=true`、`payload.finished_goods=true`。 |
+| 合格路径 | quality 移动端完成 `finished_goods_qc` 代表成品抽检合格、让步接收或放行；任务更新为 `done`，业务状态进入 `warehouse_inbound_pending`，并创建 `finished_goods_inbound` 给 `warehouse`。 |
+| 不合格 / 返工路径 | quality 移动端点击“阻塞”或“退回”必须填写原因；状态快照进入 `qc_failed`，并创建 `finished_goods_rework` 给 `production` 处理返工完成、重新提交成品抽检或让步放行。 |
+| 入库完成条件 | warehouse 移动端完成 `finished_goods_inbound` 后，业务状态更新为 `inbound_done`；当前只表示成品入库任务完成，不写正式库存余额或库存流水。 |
+| 出货准备 / 出货确认条件 | 成品入库完成后自动创建 `shipment_release`，`business_status_key=shipment_pending`，`owner_role_key=warehouse`，`payload.next_module_key=shipping-release`。warehouse 完成该任务后业务状态进入 `shipped`，为下一轮“出货 -> 应收 / 开票登记”准备。 |
+| 当前编排位置 | 本闭环 v1 继续放在前端业务页和移动端，通过现有 `create_task`、`update_task_status`、`upsert_business_state`、`update_record` API 串联，不新增 workflow API。 |
+| 当前不做 | 不做应收 / 开票登记，不新增 `production_order` / `shipment_order` / `inventory_txn` / `inventory_balance` 专表，不写库存余额和库存流水，不新增 PDA、条码枪或图片识别链路。 |
+| 后续评审条件 | 当生产完工、抽检结论、返工复检、成品入库、出货扣减、应收 / 开票和历史回补口径稳定后，再评审是否拆 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` Ent schema，并补 migration 与库存/出货计算测试。 |
+
+边界说明：本轮不让 PMC 替生产、品质、仓库或出货角色完成业务事实；不强行拆出跟单移动端的默认出货确认任务。`shipment_release` 先由仓库完成出货准备 / 出货执行确认，payload 保留 `confirm_role_key=merchandiser` 作为后续“出货 -> 应收 / 开票登记”前拆业务确认的迁移线索。

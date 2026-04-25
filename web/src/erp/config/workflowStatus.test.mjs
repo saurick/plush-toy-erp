@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  BUSINESS_WORKFLOW_STATES,
   getBusinessStatusTransitionOptions,
   requiresBusinessStatusReason,
 } from './workflowStatus.mjs'
@@ -19,6 +20,19 @@ test('workflowStatus: 已出货进入对账或归档，不回退生产链路', (
   assert.deepEqual(
     getBusinessStatusTransitionOptions('shipped').map((option) => option.value),
     ['reconciling', 'closed']
+  )
+})
+
+test('workflowStatus: 待出货状态前后端闭环前置可见', () => {
+  assert.equal(
+    BUSINESS_WORKFLOW_STATES.some((state) => state.key === 'shipment_pending'),
+    true
+  )
+  assert.deepEqual(
+    getBusinessStatusTransitionOptions('shipment_pending').map(
+      (option) => option.value
+    ),
+    ['shipped', 'blocked', 'cancelled']
   )
 })
 
