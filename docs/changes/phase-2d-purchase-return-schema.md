@@ -15,6 +15,8 @@ Phase 2D-A 落地采购退货最小闭环，采用 `docs/architecture/phase-2d-p
 - `20260426033346_migrate.sql`：新增 `purchase_returns / purchase_return_items`。
 - `20260426040724_migrate.sql`：将采购退货指向原采购入库单 / 行的追溯 FK 从 `ON DELETE SET NULL` 修正为 `ON DELETE NO ACTION`。
 
+Phase 2D-A 采购退货 schema 的最新加固 migration 仍是 `20260426040724_migrate.sql`。Phase 2D-B1 已在 `20260426095103_migrate.sql` 新增采购入库调整单，并把采购退货的原入库行累计上限升级为 `effective_receipt_quantity`。当前全量回归使用 `scripts/phase2d-pg.sh` 默认 apply 到仓库最新 Phase 2D migration，用于同时验证采购退货、采购入库调整和 RBAC 重构后的空库迁移一致性。
+
 ## 新增专表
 
 | 表 | 定位 | 关键约束 |
@@ -44,7 +46,7 @@ Phase 2D-A 落地采购退货最小闭环，采用 `docs/architecture/phase-2d-p
 | 过账 | `PostPurchaseReturn` 只允许 `DRAFT -> POSTED`，并在一个数据库事务内处理所有退货行。 |
 | 批次 | 行有 `lot_id` 时只扣该批次余额；`lot_id = NULL` 时只扣非批次余额。批次库存和非批次库存不能互相抵扣。 |
 | 余额 | 每条退货行写 `inventory_txns` 后同事务更新 `inventory_balances`，继续默认禁止负库存。 |
-| 原入库行额度 | 如果退货行关联 `purchase_receipt_item_id`，同一原入库行的有效已退数量加本次退货数量不得超过原入库行 `quantity`。 |
+| 原入库行额度 | 如果退货行关联 `purchase_receipt_item_id`，同一原入库行的有效已退数量加本次退货数量不得超过 `effective_receipt_quantity`。 |
 | 重复过账 | 已 `POSTED` 的退货单重复过账直接返回当前单据，不重复扣库存。 |
 | 取消 | `CancelPostedPurchaseReturn` 只允许 `POSTED -> CANCELLED`；重复取消已 `CANCELLED` 单据不重复冲正。 |
 
@@ -54,6 +56,7 @@ Phase 2D-A 落地采购退货最小闭环，采用 `docs/architecture/phase-2d-p
 - 若退货单头指定 `purchase_receipt_id`，退货行关联的原入库行必须属于该入库单。
 - `material_id / warehouse_id / unit_id / lot_id` 必须与原入库行一致，避免退错物料、仓库、单位或批次。
 - `PostPurchaseReturn` 在事务内按 `purchase_receipt_item_id` 汇总本退货单所有行，并统计其他 `POSTED` 退货行的有效已退数量；`CANCELLED` 退货不计入有效已退数量，当前已 `POSTED` 的重复过账走幂等返回，不会把自身误判为超退。
+- `effective_receipt_quantity = 原入库行 quantity + 已 POSTED 且未 CANCELLED 的 QUANTITY_INCREASE - 已 POSTED 且未 CANCELLED 的 QUANTITY_DECREASE`；`LOT_CORRECTION_* / WAREHOUSE_CORRECTION_*` 不改变总有效入库数量。
 - 无原入库行退货仍允许，累计额度规则不适用，但仍必须满足材料、仓库、单位、批次和当前库存余额校验。
 
 库存余额校验和原入库行可退数量校验是两个不同约束：前者防止当前账面库存扣成负数，后者防止已关联原入库行的退货累计超过该原入库事实；两者必须同时满足。
@@ -107,13 +110,14 @@ make phase2d_migrate_status
 make phase2d_pg_test
 ```
 
-`phase2d_pg_test` 只运行 PostgreSQL Phase 2D 集成测试，覆盖 migration 结构、check constraint、唯一约束、原入库单 / 行 FK `ON DELETE NO ACTION`、直接 SQL 删除原入库单 / 行失败且追溯 ID 保留、按原入库行累计退货不得超过原入库数量、取消退货释放可退数量、库存余额约束与原入库行额度约束同时生效、批次退货、非批次隔离、库存不足回滚、重复过账幂等、取消退货冲正、重复取消防护、采购退货单 / 行普通删除保护、过账后关键字段修改保护，以及 `source_type/source_id/source_line_id` 追溯链保留。
+`phase2d_pg_test` 只运行 PostgreSQL Phase 2D 集成测试，覆盖 migration 结构、check constraint、唯一约束、原入库单 / 行 FK `ON DELETE NO ACTION`、直接 SQL 删除原入库单 / 行失败且追溯 ID 保留、按原入库行累计退货不得超过 `effective_receipt_quantity`、取消退货释放可退数量、库存余额约束与原入库行额度约束同时生效、批次退货、非批次隔离、库存不足回滚、重复过账幂等、取消退货冲正、重复取消防护、采购退货单 / 行普通删除保护、过账后关键字段修改保护，以及 `source_type/source_id/source_line_id` 追溯链保留。
 
 ## 当前仍未做
 
 | 暂不落地 | 原因 |
 | --- | --- |
-| 入库差异 `purchase_receipt_adjustments` | Phase 2D-A 只做采购退货，不做入库后数量差异专表。 |
+| 金额差异 | Phase 2D-B1 只做采购入库后数量差异和 `lot / warehouse` 更正，不做单价、金额或应付语义。 |
+| 通用库存调整 `inventory_adjustments` | 盘点、报损、报溢等通用库存调整后续单独评审。 |
 | 来料质检 `quality_inspections` | 质检入口和批次 HOLD 规则后续单独评审。 |
 | 供应商主数据 `suppliers` | 最小退货闭环继续使用 `supplier_name` 快照。 |
 | 完整采购订单 / 采购合同 / 审批流 | 本轮只承接已入库后的退货事实，不做采购计划和订单审批。 |

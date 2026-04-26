@@ -21,6 +21,8 @@ import (
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptadjustment"
+	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -97,31 +99,33 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			adminuser.Table:             adminuser.ValidColumn,
-			adminuserrole.Table:         adminuserrole.ValidColumn,
-			bomheader.Table:             bomheader.ValidColumn,
-			bomitem.Table:               bomitem.ValidColumn,
-			businessrecord.Table:        businessrecord.ValidColumn,
-			businessrecordevent.Table:   businessrecordevent.ValidColumn,
-			businessrecorditem.Table:    businessrecorditem.ValidColumn,
-			inventorybalance.Table:      inventorybalance.ValidColumn,
-			inventorylot.Table:          inventorylot.ValidColumn,
-			inventorytxn.Table:          inventorytxn.ValidColumn,
-			material.Table:              material.ValidColumn,
-			permission.Table:            permission.ValidColumn,
-			product.Table:               product.ValidColumn,
-			purchasereceipt.Table:       purchasereceipt.ValidColumn,
-			purchasereceiptitem.Table:   purchasereceiptitem.ValidColumn,
-			purchasereturn.Table:        purchasereturn.ValidColumn,
-			purchasereturnitem.Table:    purchasereturnitem.ValidColumn,
-			role.Table:                  role.ValidColumn,
-			rolepermission.Table:        rolepermission.ValidColumn,
-			unit.Table:                  unit.ValidColumn,
-			user.Table:                  user.ValidColumn,
-			warehouse.Table:             warehouse.ValidColumn,
-			workflowbusinessstate.Table: workflowbusinessstate.ValidColumn,
-			workflowtask.Table:          workflowtask.ValidColumn,
-			workflowtaskevent.Table:     workflowtaskevent.ValidColumn,
+			adminuser.Table:                     adminuser.ValidColumn,
+			adminuserrole.Table:                 adminuserrole.ValidColumn,
+			bomheader.Table:                     bomheader.ValidColumn,
+			bomitem.Table:                       bomitem.ValidColumn,
+			businessrecord.Table:                businessrecord.ValidColumn,
+			businessrecordevent.Table:           businessrecordevent.ValidColumn,
+			businessrecorditem.Table:            businessrecorditem.ValidColumn,
+			inventorybalance.Table:              inventorybalance.ValidColumn,
+			inventorylot.Table:                  inventorylot.ValidColumn,
+			inventorytxn.Table:                  inventorytxn.ValidColumn,
+			material.Table:                      material.ValidColumn,
+			permission.Table:                    permission.ValidColumn,
+			product.Table:                       product.ValidColumn,
+			purchasereceipt.Table:               purchasereceipt.ValidColumn,
+			purchasereceiptadjustment.Table:     purchasereceiptadjustment.ValidColumn,
+			purchasereceiptadjustmentitem.Table: purchasereceiptadjustmentitem.ValidColumn,
+			purchasereceiptitem.Table:           purchasereceiptitem.ValidColumn,
+			purchasereturn.Table:                purchasereturn.ValidColumn,
+			purchasereturnitem.Table:            purchasereturnitem.ValidColumn,
+			role.Table:                          role.ValidColumn,
+			rolepermission.Table:                rolepermission.ValidColumn,
+			unit.Table:                          unit.ValidColumn,
+			user.Table:                          user.ValidColumn,
+			warehouse.Table:                     warehouse.ValidColumn,
+			workflowbusinessstate.Table:         workflowbusinessstate.ValidColumn,
+			workflowtask.Table:                  workflowtask.ValidColumn,
+			workflowtaskevent.Table:             workflowtaskevent.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

@@ -37,3 +37,25 @@ func TestBusinessRecordModuleRegistryListsFinanceAndQualityV1(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeBusinessRecordFilterAllowsPayloadDateFields(t *testing.T) {
+	filter := normalizeBusinessRecordFilter(BusinessRecordFilter{
+		DateFilterKey:  "payload.source_date",
+		DateRangeStart: "2026-04-01",
+		DateRangeEnd:   "2026-04-30",
+	})
+
+	if filter.DateFilterKey != "payload.source_date" {
+		t.Fatalf("expected payload date filter key retained, got %q", filter.DateFilterKey)
+	}
+	if filter.DateRangeStart != "2026-04-01" || filter.DateRangeEnd != "2026-04-30" {
+		t.Fatalf("expected normalized date range retained, got %q-%q", filter.DateRangeStart, filter.DateRangeEnd)
+	}
+
+	unsafeFilter := normalizeBusinessRecordFilter(BusinessRecordFilter{
+		DateFilterKey: "payload.source_date;drop",
+	})
+	if unsafeFilter.DateFilterKey != "" {
+		t.Fatalf("expected unsafe payload date filter key cleared, got %q", unsafeFilter.DateFilterKey)
+	}
+}

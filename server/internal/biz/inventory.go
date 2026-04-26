@@ -10,16 +10,18 @@ import (
 )
 
 var (
-	ErrInventoryTxnNotFound        = errors.New("inventory txn not found")
-	ErrInventoryBalanceNotFound    = errors.New("inventory balance not found")
-	ErrInventoryLotNotFound        = errors.New("inventory lot not found")
-	ErrBOMHeaderNotFound           = errors.New("bom header not found")
-	ErrPurchaseReceiptNotFound     = errors.New("purchase receipt not found")
-	ErrPurchaseReceiptItemNotFound = errors.New("purchase receipt item not found")
-	ErrPurchaseReturnNotFound      = errors.New("purchase return not found")
-	ErrPurchaseReturnItemNotFound  = errors.New("purchase return item not found")
-	ErrInventoryInsufficientStock  = errors.New("inventory insufficient stock")
-	ErrInventoryTxnAlreadyReversed = errors.New("inventory txn already reversed")
+	ErrInventoryTxnNotFound                  = errors.New("inventory txn not found")
+	ErrInventoryBalanceNotFound              = errors.New("inventory balance not found")
+	ErrInventoryLotNotFound                  = errors.New("inventory lot not found")
+	ErrBOMHeaderNotFound                     = errors.New("bom header not found")
+	ErrPurchaseReceiptNotFound               = errors.New("purchase receipt not found")
+	ErrPurchaseReceiptItemNotFound           = errors.New("purchase receipt item not found")
+	ErrPurchaseReturnNotFound                = errors.New("purchase return not found")
+	ErrPurchaseReturnItemNotFound            = errors.New("purchase return item not found")
+	ErrPurchaseReceiptAdjustmentNotFound     = errors.New("purchase receipt adjustment not found")
+	ErrPurchaseReceiptAdjustmentItemNotFound = errors.New("purchase receipt adjustment item not found")
+	ErrInventoryInsufficientStock            = errors.New("inventory insufficient stock")
+	ErrInventoryTxnAlreadyReversed           = errors.New("inventory txn already reversed")
 )
 
 const (
@@ -50,6 +52,18 @@ const (
 	PurchaseReturnStatusDraft     = "DRAFT"
 	PurchaseReturnStatusPosted    = "POSTED"
 	PurchaseReturnStatusCancelled = "CANCELLED"
+
+	PurchaseReceiptAdjustmentSourceType      = "PURCHASE_RECEIPT_ADJUSTMENT"
+	PurchaseReceiptAdjustmentStatusDraft     = "DRAFT"
+	PurchaseReceiptAdjustmentStatusPosted    = "POSTED"
+	PurchaseReceiptAdjustmentStatusCancelled = "CANCELLED"
+
+	PurchaseReceiptAdjustmentQuantityIncrease       = "QUANTITY_INCREASE"
+	PurchaseReceiptAdjustmentQuantityDecrease       = "QUANTITY_DECREASE"
+	PurchaseReceiptAdjustmentLotCorrectionOut       = "LOT_CORRECTION_OUT"
+	PurchaseReceiptAdjustmentLotCorrectionIn        = "LOT_CORRECTION_IN"
+	PurchaseReceiptAdjustmentWarehouseCorrectionOut = "WAREHOUSE_CORRECTION_OUT"
+	PurchaseReceiptAdjustmentWarehouseCorrectionIn  = "WAREHOUSE_CORRECTION_IN"
 )
 
 var (
@@ -84,6 +98,19 @@ var (
 		PurchaseReturnStatusDraft:     {},
 		PurchaseReturnStatusPosted:    {},
 		PurchaseReturnStatusCancelled: {},
+	}
+	purchaseReceiptAdjustmentStatuses = map[string]struct{}{
+		PurchaseReceiptAdjustmentStatusDraft:     {},
+		PurchaseReceiptAdjustmentStatusPosted:    {},
+		PurchaseReceiptAdjustmentStatusCancelled: {},
+	}
+	purchaseReceiptAdjustmentTypes = map[string]struct{}{
+		PurchaseReceiptAdjustmentQuantityIncrease:       {},
+		PurchaseReceiptAdjustmentQuantityDecrease:       {},
+		PurchaseReceiptAdjustmentLotCorrectionOut:       {},
+		PurchaseReceiptAdjustmentLotCorrectionIn:        {},
+		PurchaseReceiptAdjustmentWarehouseCorrectionOut: {},
+		PurchaseReceiptAdjustmentWarehouseCorrectionIn:  {},
 	}
 )
 
@@ -243,6 +270,11 @@ type InventoryRepo interface {
 	PostPurchaseReturn(ctx context.Context, returnID int) (*PurchaseReturn, error)
 	CancelPostedPurchaseReturn(ctx context.Context, returnID int) (*PurchaseReturn, error)
 	GetPurchaseReturn(ctx context.Context, id int) (*PurchaseReturn, error)
+	CreatePurchaseReceiptAdjustmentDraft(ctx context.Context, in *PurchaseReceiptAdjustmentCreate) (*PurchaseReceiptAdjustment, error)
+	AddPurchaseReceiptAdjustmentItem(ctx context.Context, in *PurchaseReceiptAdjustmentItemCreate) (*PurchaseReceiptAdjustmentItem, error)
+	PostPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*PurchaseReceiptAdjustment, error)
+	CancelPostedPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*PurchaseReceiptAdjustment, error)
+	GetPurchaseReceiptAdjustment(ctx context.Context, id int) (*PurchaseReceiptAdjustment, error)
 }
 
 type InventoryUsecase struct {

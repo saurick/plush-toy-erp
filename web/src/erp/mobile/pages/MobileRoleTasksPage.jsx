@@ -54,12 +54,9 @@ import {
   isOutsourceWarehouseInboundTask,
 } from '../../utils/outsourceReturnFlow.mjs'
 import {
-  SHIPMENT_RELEASE_TASK_GROUP,
-  INBOUND_DONE_STATUS_KEY as FINISHED_GOODS_INBOUND_DONE_STATUS_KEY,
   PRODUCTION_PROCESSING_STATUS_KEY as FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY,
   QC_FAILED_STATUS_KEY as FINISHED_GOODS_QC_FAILED_STATUS_KEY,
   SHIPPED_STATUS_KEY as FINISHED_GOODS_SHIPPED_STATUS_KEY,
-  buildShipmentReleaseTask,
   isFinishedGoodsInboundTask,
   isFinishedGoodsQcTask,
   isFinishedGoodsReworkTask,
@@ -175,6 +172,8 @@ function supportsRejectedAction(roleKey, task) {
       (isPurchaseIqcTask(task) ||
         isOutsourceReturnQcTask(task) ||
         isFinishedGoodsQcTask(task))) ||
+    (roleKey === 'warehouse' &&
+      (isWarehouseInboundTask(task) || isFinishedGoodsInboundTask(task))) ||
     (roleKey === 'finance' &&
       (isReceivableRegistrationTask(task) ||
         isInvoiceRegistrationTask(task) ||
@@ -528,49 +527,6 @@ export default function MobileRoleTasksPage() {
     })
   }
 
-  const completeFinishedGoodsInboundTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
-    if (!record) {
-      throw new Error('未找到对应生产进度或成品入库记录')
-    }
-    const savedRecord =
-      (await updateBusinessRecordStatusForTask(
-        task,
-        record,
-        FINISHED_GOODS_INBOUND_DONE_STATUS_KEY,
-        reason || '仓库已确认成品入库'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: FINISHED_GOODS_INBOUND_DONE_STATUS_KEY,
-      owner_role_key: 'warehouse',
-      payload: {
-        record_title: savedRecord.title,
-        inbound_task_id: task.id,
-        inbound_result: 'done',
-        inventory_balance_deferred: true,
-        critical_path: true,
-        finished_goods: true,
-      },
-    })
-    const hasShipmentTask = await hasActiveTaskForSource(
-      task,
-      SHIPMENT_RELEASE_TASK_GROUP
-    )
-    const shipmentTask = buildShipmentReleaseTask(
-      {
-        ...savedRecord,
-        module_key: task.source_type,
-      },
-      task
-    )
-    if (shipmentTask && !hasShipmentTask) {
-      await createWorkflowTask(shipmentTask)
-    }
-  }
-
   const completeShipmentReleaseTask = async (task, reason) => {
     const record = await loadBusinessRecordForTask(task)
     if (!record) {
@@ -902,12 +858,7 @@ export default function MobileRoleTasksPage() {
       return
     }
 
-    if (
-      activeRoleKey === 'warehouse' &&
-      isFinishedGoodsInboundTask(task) &&
-      taskStatusKey === 'done'
-    ) {
-      await completeFinishedGoodsInboundTask(task, reason)
+    if (activeRoleKey === 'warehouse' && isFinishedGoodsInboundTask(task)) {
       return
     }
 

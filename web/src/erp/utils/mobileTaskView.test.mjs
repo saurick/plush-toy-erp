@@ -194,12 +194,33 @@ test('mobileTaskView: 品质和仓库能看到采购到货闭环任务字段', (
     'warehouse',
     { nowMs: NOW_MS }
   )
+  const purchaseViews = buildMobileTaskListForRole(
+    [
+      task({
+        id: 12,
+        owner_role_key: 'purchase',
+        source_type: 'accessories-purchase',
+        task_group: 'purchase_quality_exception',
+        business_status_key: 'qc_failed',
+        task_status_key: 'blocked',
+        due_at: NOW_SEC + 3 * 24 * 60 * 60,
+        payload: {
+          complete_condition: '采购处理来料异常',
+          related_documents: ['IQC 结果：failed'],
+        },
+      }),
+    ],
+    'purchase',
+    { nowMs: NOW_MS }
+  )
 
   assert.equal(qualityViews[0].business_status_label, 'IQC 待检')
   assert.equal(qualityViews[0].complete_condition, '品质完成来料检验')
   assert.equal(qualityViews[0].payload.supplier_name, '联调供应商')
   assert.equal(warehouseViews[0].business_status_label, '待确认入库')
   assert.equal(warehouseViews[0].payload.qc_result, 'pass')
+  assert.equal(purchaseViews[0].task_group, 'purchase_quality_exception')
+  assert.equal(purchaseViews[0].complete_condition, '采购处理来料异常')
 })
 
 test('mobileTaskView: 委外回货任务按生产 品质 仓库 PMC 视角展示', () => {

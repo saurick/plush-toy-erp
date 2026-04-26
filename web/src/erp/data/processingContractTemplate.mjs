@@ -42,14 +42,6 @@ const defaultClauses = {
   ],
 }
 
-const LEGACY_DEFAULT_BUYER_CONTACT = '刘志强'
-const LEGACY_DEFAULT_BUYER_SIGNATURE = Object.freeze({
-  buyerCompany: '永绅',
-  buyerPhone: '13694972987',
-  buyerAddress: '东莞茶山',
-  buyerSignDateText: '2025-06-08',
-})
-
 export const processingContractAttachmentSlots = [
   {
     key: 'attachment-1',
@@ -312,35 +304,6 @@ export function normalizeProcessingContractAttachments(attachments = {}) {
     state[slot.key] = normalizeProcessingAttachmentSnapshot(source[slot.key])
     return state
   }, {})
-}
-
-export function migrateLegacyProcessingContractDraft(draft = {}) {
-  const source = draft && typeof draft === 'object' ? draft : {}
-  const draftVersion = Number(source.draftVersion || 0)
-  if (draftVersion >= PROCESSING_CONTRACT_DRAFT_VERSION) {
-    return source
-  }
-
-  if (normalizeText(source.buyerContact) !== LEGACY_DEFAULT_BUYER_CONTACT) {
-    return source
-  }
-
-  const matchesLegacySignature = Object.entries(
-    LEGACY_DEFAULT_BUYER_SIGNATURE
-  ).every(
-    ([field, expectedValue]) => normalizeText(source[field]) === expectedValue
-  )
-
-  if (!matchesLegacySignature) {
-    return source
-  }
-
-  // 兼容旧本地草稿：只清理历史默认样例里的甲方联系人，避免真实手填内容被误改。
-  return {
-    ...source,
-    buyerContact: '',
-    draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
-  }
 }
 
 export function calculateProcessingContractTotals(lines = []) {

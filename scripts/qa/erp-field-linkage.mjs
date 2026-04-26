@@ -23,6 +23,7 @@ const commandLabel = 'node scripts/qa/erp-field-linkage.mjs'
 const testFiles = [
   'src/erp/qa/fieldLinkageCatalog.test.mjs',
   'src/erp/utils/businessRecordForm.test.mjs',
+  'src/erp/utils/linkedNavigation.test.mjs',
   'src/erp/data/processingContractTemplate.test.mjs',
   'src/erp/utils/materialPurchaseContractEditor.test.mjs',
   'src/erp/utils/processingContractEditor.test.mjs',

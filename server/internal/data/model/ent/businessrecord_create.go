@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereturn"
 	"time"
 
@@ -390,6 +391,21 @@ func (_c *BusinessRecordCreate) AddPurchaseReturns(v ...*PurchaseReturn) *Busine
 	return _c.AddPurchaseReturnIDs(ids...)
 }
 
+// AddPurchaseReceiptAdjustmentIDs adds the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity by IDs.
+func (_c *BusinessRecordCreate) AddPurchaseReceiptAdjustmentIDs(ids ...int) *BusinessRecordCreate {
+	_c.mutation.AddPurchaseReceiptAdjustmentIDs(ids...)
+	return _c
+}
+
+// AddPurchaseReceiptAdjustments adds the "purchase_receipt_adjustments" edges to the PurchaseReceiptAdjustment entity.
+func (_c *BusinessRecordCreate) AddPurchaseReceiptAdjustments(v ...*PurchaseReceiptAdjustment) *BusinessRecordCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPurchaseReceiptAdjustmentIDs(ids...)
+}
+
 // Mutation returns the BusinessRecordMutation object of the builder.
 func (_c *BusinessRecordCreate) Mutation() *BusinessRecordMutation {
 	return _c.mutation
@@ -721,6 +737,22 @@ func (_c *BusinessRecordCreate) createSpec() (*BusinessRecord, *sqlgraph.CreateS
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PurchaseReceiptAdjustmentsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReceiptAdjustmentsTable,
+			Columns: []string{businessrecord.PurchaseReceiptAdjustmentsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustment.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

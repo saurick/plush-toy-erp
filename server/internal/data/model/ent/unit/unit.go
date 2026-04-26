@@ -40,6 +40,8 @@ const (
 	EdgePurchaseReceiptItems = "purchase_receipt_items"
 	// EdgePurchaseReturnItems holds the string denoting the purchase_return_items edge name in mutations.
 	EdgePurchaseReturnItems = "purchase_return_items"
+	// EdgePurchaseReceiptAdjustmentItems holds the string denoting the purchase_receipt_adjustment_items edge name in mutations.
+	EdgePurchaseReceiptAdjustmentItems = "purchase_receipt_adjustment_items"
 	// Table holds the table name of the unit in the database.
 	Table = "units"
 	// MaterialsTable is the table that holds the materials relation/edge.
@@ -91,6 +93,13 @@ const (
 	PurchaseReturnItemsInverseTable = "purchase_return_items"
 	// PurchaseReturnItemsColumn is the table column denoting the purchase_return_items relation/edge.
 	PurchaseReturnItemsColumn = "unit_id"
+	// PurchaseReceiptAdjustmentItemsTable is the table that holds the purchase_receipt_adjustment_items relation/edge.
+	PurchaseReceiptAdjustmentItemsTable = "purchase_receipt_adjustment_items"
+	// PurchaseReceiptAdjustmentItemsInverseTable is the table name for the PurchaseReceiptAdjustmentItem entity.
+	// It exists in this package in order to avoid circular dependency with the "purchasereceiptadjustmentitem" package.
+	PurchaseReceiptAdjustmentItemsInverseTable = "purchase_receipt_adjustment_items"
+	// PurchaseReceiptAdjustmentItemsColumn is the table column denoting the purchase_receipt_adjustment_items relation/edge.
+	PurchaseReceiptAdjustmentItemsColumn = "unit_id"
 )
 
 // Columns holds all SQL columns for unit fields.
@@ -268,6 +277,20 @@ func ByPurchaseReturnItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOpti
 		sqlgraph.OrderByNeighborTerms(s, newPurchaseReturnItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByPurchaseReceiptAdjustmentItemsCount orders the results by purchase_receipt_adjustment_items count.
+func ByPurchaseReceiptAdjustmentItemsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPurchaseReceiptAdjustmentItemsStep(), opts...)
+	}
+}
+
+// ByPurchaseReceiptAdjustmentItems orders the results by purchase_receipt_adjustment_items terms.
+func ByPurchaseReceiptAdjustmentItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseReceiptAdjustmentItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newMaterialsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -315,5 +338,12 @@ func newPurchaseReturnItemsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PurchaseReturnItemsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReturnItemsTable, PurchaseReturnItemsColumn),
+	)
+}
+func newPurchaseReceiptAdjustmentItemsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseReceiptAdjustmentItemsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReceiptAdjustmentItemsTable, PurchaseReceiptAdjustmentItemsColumn),
 	)
 }

@@ -36,6 +36,8 @@ var debugBusinessDataClearTables = []string{
 	"workflow_task_events",
 	"workflow_tasks",
 	"workflow_business_states",
+	"purchase_receipt_adjustment_items",
+	"purchase_receipt_adjustments",
 	"purchase_return_items",
 	"purchase_returns",
 	"purchase_receipt_items",

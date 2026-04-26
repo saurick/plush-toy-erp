@@ -132,5 +132,6 @@ func (BusinessRecord) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("purchase_receipts", PurchaseReceipt.Type),
 		edge.To("purchase_returns", PurchaseReturn.Type),
+		edge.To("purchase_receipt_adjustments", PurchaseReceiptAdjustment.Type),
 	}
 }

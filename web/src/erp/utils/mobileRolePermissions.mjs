@@ -17,13 +17,6 @@ function normalizeStringList(values = []) {
     : []
 }
 
-function getRoleKeyFromOption(role = {}) {
-  if (!role || typeof role !== 'object') {
-    return ''
-  }
-  return normalizeRoleKey(role.role_key || role.key || '')
-}
-
 export function hasMobileRolePermission(adminProfile, roleKey) {
   const normalizedRole = normalizeRoleKey(roleKey)
   if (!normalizedRole) {
@@ -40,8 +33,5 @@ export function hasMobileRolePermission(adminProfile, roleKey) {
   if (permissions.includes(requiredPermission)) {
     return true
   }
-  const roleKeys = normalizeStringList(
-    (adminProfile?.roles || []).map(getRoleKeyFromOption)
-  )
-  return roleKeys.includes(normalizedRole)
+  return false
 }

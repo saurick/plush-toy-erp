@@ -83,6 +83,8 @@ func (PurchaseReceipt) Edges() []ent.Edge {
 			Unique(),
 		edge.To("purchase_returns", PurchaseReturn.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("purchase_receipt_adjustments", PurchaseReceiptAdjustment.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("items", PurchaseReceiptItem.Type),
 	}
 }

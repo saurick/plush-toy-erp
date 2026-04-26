@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-04-25T16:49:12.438Z",
+  "generatedAt": "2026-04-26T11:49:29.308Z",
   "command": "node scripts/qa/erp-field-linkage.mjs",
   "runContext": {
     "repoRoot": "/Users/simon/projects/plush-toy-erp",
-    "gitCommit": "7e7485b546f386d5e7b02da0cbb949ee9ca78d8c",
-    "gitCommitShort": "7e7485b546f3",
+    "gitCommit": "20d450c93ca5a83925d969274eb20a9787c8e0bb",
+    "gitCommitShort": "20d450c93ca5",
     "gitBranch": "main",
     "gitDirty": true,
     "nodeVersion": "v24.14.0",
@@ -12,225 +12,19 @@
   },
   "summary": {
     "totalFields": 25,
-    "coveredFields": 17,
+    "coveredFields": 25,
     "partialFields": 0,
-    "missingFields": 8,
+    "missingFields": 0,
     "failingFields": 0,
-    "totalCases": 18,
-    "passedCases": 18,
+    "totalCases": 23,
+    "passedCases": 23,
     "failedCases": 0,
     "skippedCases": 0,
     "missingCases": 0,
-    "totalScenarios": 32,
-    "passedScenarios": 24
+    "totalScenarios": 46,
+    "passedScenarios": 46
   },
   "fields": [
-    {
-      "fieldKey": "productOrderNo",
-      "fieldLabel": "产品订单编号",
-      "category": "业务快照字段",
-      "risk": "P0",
-      "docLabels": ["产品订单编号"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
-      "status": "missing",
-      "layers": ["web"],
-      "passedCases": 4,
-      "totalCases": 4,
-      "passedScenarios": 0,
-      "totalScenarios": 1,
-      "scenarios": [
-        {
-          "scenarioKey": "source_snapshot_retained",
-          "scenarioLabel": "来源快照保留并随状态流转带出",
-          "status": "missing",
-          "caseIds": []
-        }
-      ],
-      "cases": [
-        {
-          "caseId": "FL_material_purchase_merge__clears_covered_cell_stale_value",
-          "title": "采购合同合并选区后会清空被覆盖单元格",
-          "fieldKeys": ["productOrderNo", "mergedCellContent"],
-          "scenarioKey": "merge_clears_covered_cells",
-          "layer": "web",
-          "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
-          "status": "pass",
-          "durationMs": 0,
-          "failureMessages": []
-        },
-        {
-          "caseId": "FL_processing_contract_editor__clears_blank_inserted_lines",
-          "title": "加工合同插入明细行会清空来源字段，避免复制旧残值",
-          "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
-          "layer": "web",
-          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
-          "status": "pass",
-          "durationMs": 1,
-          "failureMessages": []
-        },
-        {
-          "caseId": "FL_processing_contract_editor__clears_deleted_last_line",
-          "title": "加工合同删除到只剩一行时会重置为空白行",
-          "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
-          "layer": "web",
-          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
-          "status": "pass",
-          "durationMs": 0,
-          "failureMessages": []
-        },
-        {
-          "caseId": "FL_processing_contract_editor__clears_covered_cell_stale_value",
-          "title": "加工合同合并选区后会清空被覆盖单元格",
-          "fieldKeys": ["productOrderNo", "mergedCellContent"],
-          "scenarioKey": "merge_clears_covered_cells",
-          "layer": "web",
-          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
-          "status": "pass",
-          "durationMs": 12,
-          "failureMessages": []
-        }
-      ]
-    },
-    {
-      "fieldKey": "shipDate",
-      "fieldLabel": "出货日期",
-      "category": "日期快照字段",
-      "risk": "P0",
-      "docLabels": ["出货日期"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
-      "status": "missing",
-      "layers": [],
-      "passedCases": 0,
-      "totalCases": 0,
-      "passedScenarios": 0,
-      "totalScenarios": 1,
-      "scenarios": [
-        {
-          "scenarioKey": "source_snapshot_retained",
-          "scenarioLabel": "来源快照保留并随状态流转带出",
-          "status": "missing",
-          "caseIds": []
-        }
-      ],
-      "cases": []
-    },
-    {
-      "fieldKey": "orderNo",
-      "fieldLabel": "订单编号",
-      "category": "业务快照字段",
-      "risk": "P0",
-      "docLabels": ["订单编号"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
-      "status": "missing",
-      "layers": [],
-      "passedCases": 0,
-      "totalCases": 0,
-      "passedScenarios": 0,
-      "totalScenarios": 1,
-      "scenarios": [
-        {
-          "scenarioKey": "source_snapshot_retained",
-          "scenarioLabel": "来源快照保留并随状态流转带出",
-          "status": "missing",
-          "caseIds": []
-        }
-      ],
-      "cases": []
-    },
-    {
-      "fieldKey": "accessoryMaterial",
-      "fieldLabel": "辅材 / 包材字段",
-      "category": "采购快照字段",
-      "risk": "P0",
-      "docLabels": ["辅材 / 包材字段"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
-      "status": "missing",
-      "layers": [],
-      "passedCases": 0,
-      "totalCases": 0,
-      "passedScenarios": 0,
-      "totalScenarios": 1,
-      "scenarios": [
-        {
-          "scenarioKey": "source_snapshot_retained",
-          "scenarioLabel": "来源快照保留并随状态流转带出",
-          "status": "missing",
-          "caseIds": []
-        }
-      ],
-      "cases": []
-    },
-    {
-      "fieldKey": "returnDate",
-      "fieldLabel": "回货日期",
-      "category": "日期快照字段",
-      "risk": "P0",
-      "docLabels": ["回货日期"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
-      "status": "missing",
-      "layers": [],
-      "passedCases": 0,
-      "totalCases": 0,
-      "passedScenarios": 0,
-      "totalScenarios": 1,
-      "scenarios": [
-        {
-          "scenarioKey": "source_snapshot_retained",
-          "scenarioLabel": "来源快照保留并随状态流转带出",
-          "status": "missing",
-          "caseIds": []
-        }
-      ],
-      "cases": []
-    },
-    {
-      "fieldKey": "settlementTerms",
-      "fieldLabel": "结算方式 / 条款",
-      "category": "合同条款快照",
-      "risk": "P0",
-      "docLabels": ["结算方式 / 条款"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
-      "status": "missing",
-      "layers": [],
-      "passedCases": 0,
-      "totalCases": 0,
-      "passedScenarios": 0,
-      "totalScenarios": 1,
-      "scenarios": [
-        {
-          "scenarioKey": "source_snapshot_retained",
-          "scenarioLabel": "来源快照保留并随状态流转带出",
-          "status": "missing",
-          "caseIds": []
-        }
-      ],
-      "cases": []
-    },
-    {
-      "fieldKey": "styleNo",
-      "fieldLabel": "款式编号",
-      "category": "主档 / 主数据候选",
-      "risk": "P0",
-      "docLabels": ["款式编号"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
-      "status": "missing",
-      "layers": [],
-      "passedCases": 0,
-      "totalCases": 0,
-      "passedScenarios": 0,
-      "totalScenarios": 1,
-      "scenarios": [
-        {
-          "scenarioKey": "source_snapshot_retained",
-          "scenarioLabel": "来源快照保留并随状态流转带出",
-          "status": "missing",
-          "caseIds": []
-        }
-      ],
-      "cases": []
-    },
     {
       "fieldKey": "headerAmount",
       "fieldLabel": "表头金额",
@@ -410,13 +204,17 @@
       "category": "业务快照字段",
       "risk": "P0",
       "docLabels": ["产品编号 / SKU"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "source_prefill_rebuilds_from_blank",
+        "source_change_clears_prefill"
+      ],
       "status": "covered",
       "layers": ["web"],
-      "passedCases": 3,
-      "totalCases": 3,
-      "passedScenarios": 1,
-      "totalScenarios": 1,
+      "passedCases": 5,
+      "totalCases": 5,
+      "passedScenarios": 3,
+      "totalScenarios": 3,
       "scenarios": [
         {
           "scenarioKey": "source_snapshot_retained",
@@ -425,6 +223,18 @@
           "caseIds": [
             "FL_business_status_update__preserves_record_fields_and_items"
           ]
+        },
+        {
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "scenarioLabel": "新建来源带值从空白默认值重建",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__rebuilds_target_from_blank"]
+        },
+        {
+          "scenarioKey": "source_change_clears_prefill",
+          "scenarioLabel": "切换来源会清空旧来源带值",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__clears_when_source_changes"]
         }
       ],
       "cases": [
@@ -433,9 +243,16 @@
           "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
           "fieldKeys": [
             "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
             "productNo",
             "productNameColor",
             "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
             "processorContactAddress",
             "sourceNo",
             "businessStatus",
@@ -444,6 +261,42 @@
           "scenarioKey": "source_snapshot_retained",
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__rebuilds_target_from_blank",
+          "title": "业务页新建来源带值从空白默认值重建目标记录",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 18,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__clears_when_source_changes",
+          "title": "业务页新建已带值后切换来源会清空旧来源残值",
+          "fieldKeys": [
+            "customerName",
+            "productNo",
+            "productNameColor",
+            "accessoryMaterial",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_change_clears_prefill",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
           "durationMs": 0,
           "failureMessages": []
@@ -456,7 +309,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 2,
           "failureMessages": []
         },
         {
@@ -467,7 +320,132 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 2,
+          "failureMessages": []
+        }
+      ]
+    },
+    {
+      "fieldKey": "productOrderNo",
+      "fieldLabel": "产品订单编号",
+      "category": "业务快照字段",
+      "risk": "P0",
+      "docLabels": ["产品订单编号"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "source_prefill_rebuilds_from_blank"
+      ],
+      "status": "covered",
+      "layers": ["web"],
+      "passedCases": 6,
+      "totalCases": 6,
+      "passedScenarios": 2,
+      "totalScenarios": 2,
+      "scenarios": [
+        {
+          "scenarioKey": "source_snapshot_retained",
+          "scenarioLabel": "来源快照保留并随状态流转带出",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_status_update__preserves_record_fields_and_items"
+          ]
+        },
+        {
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "scenarioLabel": "新建来源带值从空白默认值重建",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__rebuilds_target_from_blank"]
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "FL_business_status_update__preserves_record_fields_and_items",
+          "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
+            "processorContactAddress",
+            "sourceNo",
+            "businessStatus",
+            "itemAmount"
+          ],
+          "scenarioKey": "source_snapshot_retained",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__rebuilds_target_from_blank",
+          "title": "业务页新建来源带值从空白默认值重建目标记录",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 18,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_material_purchase_merge__clears_covered_cell_stale_value",
+          "title": "采购合同合并选区后会清空被覆盖单元格",
+          "fieldKeys": ["productOrderNo", "mergedCellContent"],
+          "scenarioKey": "merge_clears_covered_cells",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_processing_contract_editor__clears_blank_inserted_lines",
+          "title": "加工合同插入明细行会清空来源字段，避免复制旧残值",
+          "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
+          "scenarioKey": "legacy_stale_cleared",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
+          "status": "pass",
+          "durationMs": 2,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_processing_contract_editor__clears_deleted_last_line",
+          "title": "加工合同删除到只剩一行时会重置为空白行",
+          "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
+          "scenarioKey": "legacy_stale_cleared",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
+          "status": "pass",
+          "durationMs": 2,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_processing_contract_editor__clears_covered_cell_stale_value",
+          "title": "加工合同合并选区后会清空被覆盖单元格",
+          "fieldKeys": ["productOrderNo", "mergedCellContent"],
+          "scenarioKey": "merge_clears_covered_cells",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
+          "status": "pass",
+          "durationMs": 21,
           "failureMessages": []
         }
       ]
@@ -478,11 +456,138 @@
       "category": "业务快照字段",
       "risk": "P0",
       "docLabels": ["产品名称 / 颜色"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "source_prefill_rebuilds_from_blank",
+        "source_change_clears_prefill"
+      ],
+      "status": "covered",
+      "layers": ["web"],
+      "passedCases": 5,
+      "totalCases": 5,
+      "passedScenarios": 3,
+      "totalScenarios": 3,
+      "scenarios": [
+        {
+          "scenarioKey": "source_snapshot_retained",
+          "scenarioLabel": "来源快照保留并随状态流转带出",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_status_update__preserves_record_fields_and_items"
+          ]
+        },
+        {
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "scenarioLabel": "新建来源带值从空白默认值重建",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__rebuilds_target_from_blank"]
+        },
+        {
+          "scenarioKey": "source_change_clears_prefill",
+          "scenarioLabel": "切换来源会清空旧来源带值",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__clears_when_source_changes"]
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "FL_business_status_update__preserves_record_fields_and_items",
+          "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
+            "processorContactAddress",
+            "sourceNo",
+            "businessStatus",
+            "itemAmount"
+          ],
+          "scenarioKey": "source_snapshot_retained",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__rebuilds_target_from_blank",
+          "title": "业务页新建来源带值从空白默认值重建目标记录",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 18,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__clears_when_source_changes",
+          "title": "业务页新建已带值后切换来源会清空旧来源残值",
+          "fieldKeys": [
+            "customerName",
+            "productNo",
+            "productNameColor",
+            "accessoryMaterial",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_change_clears_prefill",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 0,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_processing_contract_editor__clears_blank_inserted_lines",
+          "title": "加工合同插入明细行会清空来源字段，避免复制旧残值",
+          "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
+          "scenarioKey": "legacy_stale_cleared",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
+          "status": "pass",
+          "durationMs": 2,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_processing_contract_editor__clears_deleted_last_line",
+          "title": "加工合同删除到只剩一行时会重置为空白行",
+          "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
+          "scenarioKey": "legacy_stale_cleared",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
+          "status": "pass",
+          "durationMs": 2,
+          "failureMessages": []
+        }
+      ]
+    },
+    {
+      "fieldKey": "shipDate",
+      "fieldLabel": "出货日期",
+      "category": "日期快照字段",
+      "risk": "P0",
+      "docLabels": ["出货日期"],
       "requiredScenarioKeys": ["source_snapshot_retained"],
       "status": "covered",
       "layers": ["web"],
-      "passedCases": 3,
-      "totalCases": 3,
+      "passedCases": 1,
+      "totalCases": 1,
       "passedScenarios": 1,
       "totalScenarios": 1,
       "scenarios": [
@@ -501,9 +606,16 @@
           "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
           "fieldKeys": [
             "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
             "productNo",
             "productNameColor",
             "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
             "processorContactAddress",
             "sourceNo",
             "businessStatus",
@@ -513,29 +625,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 0,
-          "failureMessages": []
-        },
-        {
-          "caseId": "FL_processing_contract_editor__clears_blank_inserted_lines",
-          "title": "加工合同插入明细行会清空来源字段，避免复制旧残值",
-          "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
-          "layer": "web",
-          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
-          "status": "pass",
           "durationMs": 1,
-          "failureMessages": []
-        },
-        {
-          "caseId": "FL_processing_contract_editor__clears_deleted_last_line",
-          "title": "加工合同删除到只剩一行时会重置为空白行",
-          "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
-          "layer": "web",
-          "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
-          "status": "pass",
-          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -572,7 +662,252 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/printWorkspace.test.mjs",
           "status": "pass",
+          "durationMs": 103,
+          "failureMessages": []
+        }
+      ]
+    },
+    {
+      "fieldKey": "orderNo",
+      "fieldLabel": "订单编号",
+      "category": "业务快照字段",
+      "risk": "P0",
+      "docLabels": ["订单编号"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "source_prefill_rebuilds_from_blank"
+      ],
+      "status": "covered",
+      "layers": ["web"],
+      "passedCases": 2,
+      "totalCases": 2,
+      "passedScenarios": 2,
+      "totalScenarios": 2,
+      "scenarios": [
+        {
+          "scenarioKey": "source_snapshot_retained",
+          "scenarioLabel": "来源快照保留并随状态流转带出",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_status_update__preserves_record_fields_and_items"
+          ]
+        },
+        {
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "scenarioLabel": "新建来源带值从空白默认值重建",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__rebuilds_target_from_blank"]
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "FL_business_status_update__preserves_record_fields_and_items",
+          "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
+            "processorContactAddress",
+            "sourceNo",
+            "businessStatus",
+            "itemAmount"
+          ],
+          "scenarioKey": "source_snapshot_retained",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__rebuilds_target_from_blank",
+          "title": "业务页新建来源带值从空白默认值重建目标记录",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 18,
+          "failureMessages": []
+        }
+      ]
+    },
+    {
+      "fieldKey": "accessoryMaterial",
+      "fieldLabel": "辅材 / 包材字段",
+      "category": "采购快照字段",
+      "risk": "P0",
+      "docLabels": ["辅材 / 包材字段"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "legacy_stale_cleared",
+        "source_change_clears_prefill"
+      ],
+      "status": "covered",
+      "layers": ["web"],
+      "passedCases": 4,
+      "totalCases": 4,
+      "passedScenarios": 3,
+      "totalScenarios": 3,
+      "scenarios": [
+        {
+          "scenarioKey": "source_snapshot_retained",
+          "scenarioLabel": "来源快照保留并随状态流转带出",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_status_update__preserves_record_fields_and_items"
+          ]
+        },
+        {
+          "scenarioKey": "legacy_stale_cleared",
+          "scenarioLabel": "历史默认残值自动清理",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_item_payload__clears_stale_payload",
+            "FL_business_source_prefill__filters_bom_accessories"
+          ]
+        },
+        {
+          "scenarioKey": "source_change_clears_prefill",
+          "scenarioLabel": "切换来源会清空旧来源带值",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__clears_when_source_changes"]
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "FL_business_status_update__preserves_record_fields_and_items",
+          "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
+            "processorContactAddress",
+            "sourceNo",
+            "businessStatus",
+            "itemAmount"
+          ],
+          "scenarioKey": "source_snapshot_retained",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_item_payload__clears_stale_payload",
+          "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留旧残值",
+          "fieldKeys": ["mainMaterial", "accessoryMaterial"],
+          "scenarioKey": "legacy_stale_cleared",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
           "durationMs": 0,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__clears_when_source_changes",
+          "title": "业务页新建已带值后切换来源会清空旧来源残值",
+          "fieldKeys": [
+            "customerName",
+            "productNo",
+            "productNameColor",
+            "accessoryMaterial",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_change_clears_prefill",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 0,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__filters_bom_accessories",
+          "title": "BOM 来源带到辅材采购时只保留辅材和包材明细",
+          "fieldKeys": ["mainMaterial", "accessoryMaterial"],
+          "scenarioKey": "legacy_stale_cleared",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        }
+      ]
+    },
+    {
+      "fieldKey": "returnDate",
+      "fieldLabel": "回货日期",
+      "category": "日期快照字段",
+      "risk": "P0",
+      "docLabels": ["回货日期"],
+      "requiredScenarioKeys": ["source_snapshot_retained"],
+      "status": "covered",
+      "layers": ["web"],
+      "passedCases": 1,
+      "totalCases": 1,
+      "passedScenarios": 1,
+      "totalScenarios": 1,
+      "scenarios": [
+        {
+          "scenarioKey": "source_snapshot_retained",
+          "scenarioLabel": "来源快照保留并随状态流转带出",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_status_update__preserves_record_fields_and_items"
+          ]
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "FL_business_status_update__preserves_record_fields_and_items",
+          "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
+            "processorContactAddress",
+            "sourceNo",
+            "businessStatus",
+            "itemAmount"
+          ],
+          "scenarioKey": "source_snapshot_retained",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
           "failureMessages": []
         }
       ]
@@ -617,9 +952,16 @@
           "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
           "fieldKeys": [
             "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
             "productNo",
             "productNameColor",
             "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
             "processorContactAddress",
             "sourceNo",
             "businessStatus",
@@ -629,7 +971,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -662,13 +1004,17 @@
       "category": "业务快照字段",
       "risk": "P0",
       "docLabels": ["客户"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "source_prefill_rebuilds_from_blank",
+        "source_change_clears_prefill"
+      ],
       "status": "covered",
       "layers": ["web"],
-      "passedCases": 1,
-      "totalCases": 1,
-      "passedScenarios": 1,
-      "totalScenarios": 1,
+      "passedCases": 3,
+      "totalCases": 3,
+      "passedScenarios": 3,
+      "totalScenarios": 3,
       "scenarios": [
         {
           "scenarioKey": "source_snapshot_retained",
@@ -677,6 +1023,18 @@
           "caseIds": [
             "FL_business_status_update__preserves_record_fields_and_items"
           ]
+        },
+        {
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "scenarioLabel": "新建来源带值从空白默认值重建",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__rebuilds_target_from_blank"]
+        },
+        {
+          "scenarioKey": "source_change_clears_prefill",
+          "scenarioLabel": "切换来源会清空旧来源带值",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__clears_when_source_changes"]
         }
       ],
       "cases": [
@@ -685,9 +1043,16 @@
           "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
           "fieldKeys": [
             "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
             "productNo",
             "productNameColor",
             "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
             "processorContactAddress",
             "sourceNo",
             "businessStatus",
@@ -697,7 +1062,124 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__rebuilds_target_from_blank",
+          "title": "业务页新建来源带值从空白默认值重建目标记录",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 18,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__clears_when_source_changes",
+          "title": "业务页新建已带值后切换来源会清空旧来源残值",
+          "fieldKeys": [
+            "customerName",
+            "productNo",
+            "productNameColor",
+            "accessoryMaterial",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_change_clears_prefill",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
           "durationMs": 0,
+          "failureMessages": []
+        }
+      ]
+    },
+    {
+      "fieldKey": "styleNo",
+      "fieldLabel": "款式编号",
+      "category": "主档 / 主数据候选",
+      "risk": "P0",
+      "docLabels": ["款式编号"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "source_prefill_rebuilds_from_blank"
+      ],
+      "status": "covered",
+      "layers": ["web"],
+      "passedCases": 2,
+      "totalCases": 2,
+      "passedScenarios": 2,
+      "totalScenarios": 2,
+      "scenarios": [
+        {
+          "scenarioKey": "source_snapshot_retained",
+          "scenarioLabel": "来源快照保留并随状态流转带出",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_status_update__preserves_record_fields_and_items"
+          ]
+        },
+        {
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "scenarioLabel": "新建来源带值从空白默认值重建",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__rebuilds_target_from_blank"]
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "FL_business_status_update__preserves_record_fields_and_items",
+          "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
+            "processorContactAddress",
+            "sourceNo",
+            "businessStatus",
+            "itemAmount"
+          ],
+          "scenarioKey": "source_snapshot_retained",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__rebuilds_target_from_blank",
+          "title": "业务页新建来源带值从空白默认值重建目标记录",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 18,
           "failureMessages": []
         }
       ]
@@ -708,13 +1190,17 @@
       "category": "通用业务记录快照",
       "risk": "P0",
       "docLabels": ["来源单号"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "source_prefill_rebuilds_from_blank",
+        "source_change_clears_prefill"
+      ],
       "status": "covered",
       "layers": ["web"],
-      "passedCases": 1,
-      "totalCases": 1,
-      "passedScenarios": 1,
-      "totalScenarios": 1,
+      "passedCases": 3,
+      "totalCases": 3,
+      "passedScenarios": 3,
+      "totalScenarios": 3,
       "scenarios": [
         {
           "scenarioKey": "source_snapshot_retained",
@@ -723,6 +1209,18 @@
           "caseIds": [
             "FL_business_status_update__preserves_record_fields_and_items"
           ]
+        },
+        {
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "scenarioLabel": "新建来源带值从空白默认值重建",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__rebuilds_target_from_blank"]
+        },
+        {
+          "scenarioKey": "source_change_clears_prefill",
+          "scenarioLabel": "切换来源会清空旧来源带值",
+          "status": "pass",
+          "caseIds": ["FL_business_source_prefill__clears_when_source_changes"]
         }
       ],
       "cases": [
@@ -731,9 +1229,16 @@
           "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
           "fieldKeys": [
             "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
             "productNo",
             "productNameColor",
             "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
             "processorContactAddress",
             "sourceNo",
             "businessStatus",
@@ -742,6 +1247,42 @@
           "scenarioKey": "source_snapshot_retained",
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__rebuilds_target_from_blank",
+          "title": "业务页新建来源带值从空白默认值重建目标记录",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_prefill_rebuilds_from_blank",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 18,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__clears_when_source_changes",
+          "title": "业务页新建已带值后切换来源会清空旧来源残值",
+          "fieldKeys": [
+            "customerName",
+            "productNo",
+            "productNameColor",
+            "accessoryMaterial",
+            "sourceNo"
+          ],
+          "scenarioKey": "source_change_clears_prefill",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
           "durationMs": 0,
           "failureMessages": []
@@ -783,7 +1324,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 2,
           "failureMessages": []
         },
         {
@@ -816,7 +1357,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -862,7 +1403,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 2,
           "failureMessages": []
         },
         {
@@ -881,9 +1422,16 @@
           "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
           "fieldKeys": [
             "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
             "productNo",
             "productNameColor",
             "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
             "processorContactAddress",
             "sourceNo",
             "businessStatus",
@@ -893,7 +1441,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         }
       ]
@@ -944,7 +1492,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 2,
           "failureMessages": []
         },
         {
@@ -988,7 +1536,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -1049,7 +1597,7 @@
           "layer": "web",
           "testFile": "web/src/erp/data/processingContractTemplate.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1060,7 +1608,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1105,9 +1653,16 @@
           "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
           "fieldKeys": [
             "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
             "productNo",
             "productNameColor",
             "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
             "processorContactAddress",
             "sourceNo",
             "businessStatus",
@@ -1117,7 +1672,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         }
       ]
@@ -1128,13 +1683,16 @@
       "category": "BOM 真源 / 派生影响",
       "risk": "P0",
       "docLabels": ["主料物料字段"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
+      "requiredScenarioKeys": [
+        "source_snapshot_retained",
+        "legacy_stale_cleared"
+      ],
       "status": "covered",
       "layers": ["web"],
-      "passedCases": 1,
-      "totalCases": 1,
-      "passedScenarios": 1,
-      "totalScenarios": 1,
+      "passedCases": 3,
+      "totalCases": 3,
+      "passedScenarios": 2,
+      "totalScenarios": 2,
       "scenarios": [
         {
           "scenarioKey": "source_snapshot_retained",
@@ -1142,6 +1700,15 @@
           "status": "pass",
           "caseIds": [
             "FL_business_status_update__preserves_record_fields_and_items"
+          ]
+        },
+        {
+          "scenarioKey": "legacy_stale_cleared",
+          "scenarioLabel": "历史默认残值自动清理",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_item_payload__clears_stale_payload",
+            "FL_business_source_prefill__filters_bom_accessories"
           ]
         }
       ],
@@ -1151,9 +1718,16 @@
           "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
           "fieldKeys": [
             "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
             "productNo",
             "productNameColor",
             "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
             "processorContactAddress",
             "sourceNo",
             "businessStatus",
@@ -1163,33 +1737,32 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_item_payload__clears_stale_payload",
+          "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留旧残值",
+          "fieldKeys": ["mainMaterial", "accessoryMaterial"],
+          "scenarioKey": "legacy_stale_cleared",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
           "durationMs": 0,
+          "failureMessages": []
+        },
+        {
+          "caseId": "FL_business_source_prefill__filters_bom_accessories",
+          "title": "BOM 来源带到辅材采购时只保留辅材和包材明细",
+          "fieldKeys": ["mainMaterial", "accessoryMaterial"],
+          "scenarioKey": "legacy_stale_cleared",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
           "failureMessages": []
         }
       ]
-    },
-    {
-      "fieldKey": "orderDate",
-      "fieldLabel": "下单日期",
-      "category": "日期快照字段",
-      "risk": "P1",
-      "docLabels": ["下单日期"],
-      "requiredScenarioKeys": ["source_snapshot_retained"],
-      "status": "missing",
-      "layers": [],
-      "passedCases": 0,
-      "totalCases": 0,
-      "passedScenarios": 0,
-      "totalScenarios": 1,
-      "scenarios": [
-        {
-          "scenarioKey": "source_snapshot_retained",
-          "scenarioLabel": "来源快照保留并随状态流转带出",
-          "status": "missing",
-          "caseIds": []
-        }
-      ],
-      "cases": []
     },
     {
       "fieldKey": "mergedCellContent",
@@ -1224,7 +1797,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -1235,7 +1808,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 12,
+          "durationMs": 21,
           "failureMessages": []
         }
       ]
@@ -1272,6 +1845,96 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/printWorkspace.test.mjs",
           "status": "pass",
+          "durationMs": 103,
+          "failureMessages": []
+        }
+      ]
+    },
+    {
+      "fieldKey": "orderDate",
+      "fieldLabel": "下单日期",
+      "category": "日期快照字段",
+      "risk": "P1",
+      "docLabels": ["下单日期"],
+      "requiredScenarioKeys": ["source_snapshot_retained"],
+      "status": "covered",
+      "layers": ["web"],
+      "passedCases": 1,
+      "totalCases": 1,
+      "passedScenarios": 1,
+      "totalScenarios": 1,
+      "scenarios": [
+        {
+          "scenarioKey": "source_snapshot_retained",
+          "scenarioLabel": "来源快照保留并随状态流转带出",
+          "status": "pass",
+          "caseIds": [
+            "FL_business_status_update__preserves_record_fields_and_items"
+          ]
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "FL_business_status_update__preserves_record_fields_and_items",
+          "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
+          "fieldKeys": [
+            "customerName",
+            "orderNo",
+            "productOrderNo",
+            "styleNo",
+            "productNo",
+            "productNameColor",
+            "mainMaterial",
+            "accessoryMaterial",
+            "returnDate",
+            "shipDate",
+            "orderDate",
+            "processorContactAddress",
+            "sourceNo",
+            "businessStatus",
+            "itemAmount"
+          ],
+          "scenarioKey": "source_snapshot_retained",
+          "layer": "web",
+          "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+          "status": "pass",
+          "durationMs": 1,
+          "failureMessages": []
+        }
+      ]
+    },
+    {
+      "fieldKey": "settlementTerms",
+      "fieldLabel": "结算方式 / 条款",
+      "category": "合同条款快照（本轮排除）",
+      "risk": "P2",
+      "docLabels": ["结算方式 / 条款"],
+      "requiredScenarioKeys": ["contract_terms_excluded_from_business_scope"],
+      "status": "covered",
+      "layers": ["docs"],
+      "passedCases": 1,
+      "totalCases": 1,
+      "passedScenarios": 1,
+      "totalScenarios": 1,
+      "scenarios": [
+        {
+          "scenarioKey": "contract_terms_excluded_from_business_scope",
+          "scenarioLabel": "合同条款字段本轮排除在业务表单外",
+          "status": "pass",
+          "caseIds": [
+            "FL_contract_terms__excluded_from_non_contract_business_scope"
+          ]
+        }
+      ],
+      "cases": [
+        {
+          "caseId": "FL_contract_terms__excluded_from_non_contract_business_scope",
+          "title": "合同正文、条款和打印专用字段本轮不作为业务表单字段",
+          "fieldKeys": ["settlementTerms"],
+          "scenarioKey": "contract_terms_excluded_from_business_scope",
+          "layer": "docs",
+          "testFile": "web/src/erp/qa/fieldLinkageCatalog.test.mjs",
+          "status": "pass",
           "durationMs": 0,
           "failureMessages": []
         }
@@ -1287,7 +1950,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
       "status": "pass",
-      "durationMs": 1,
+      "durationMs": 2,
       "failureMessages": []
     },
     {
@@ -1328,9 +1991,16 @@
       "title": "状态流转保留原记录字段和明细，避免只传状态导致清空",
       "fieldKeys": [
         "customerName",
+        "orderNo",
+        "productOrderNo",
+        "styleNo",
         "productNo",
         "productNameColor",
         "mainMaterial",
+        "accessoryMaterial",
+        "returnDate",
+        "shipDate",
+        "orderDate",
         "processorContactAddress",
         "sourceNo",
         "businessStatus",
@@ -1340,7 +2010,76 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
       "status": "pass",
+      "durationMs": 1,
+      "failureMessages": []
+    },
+    {
+      "caseId": "FL_contract_terms__excluded_from_non_contract_business_scope",
+      "title": "合同正文、条款和打印专用字段本轮不作为业务表单字段",
+      "fieldKeys": ["settlementTerms"],
+      "scenarioKey": "contract_terms_excluded_from_business_scope",
+      "layer": "docs",
+      "testFile": "web/src/erp/qa/fieldLinkageCatalog.test.mjs",
+      "status": "pass",
       "durationMs": 0,
+      "failureMessages": []
+    },
+    {
+      "caseId": "FL_business_item_payload__clears_stale_payload",
+      "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留旧残值",
+      "fieldKeys": ["mainMaterial", "accessoryMaterial"],
+      "scenarioKey": "legacy_stale_cleared",
+      "layer": "web",
+      "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
+      "status": "pass",
+      "durationMs": 0,
+      "failureMessages": []
+    },
+    {
+      "caseId": "FL_business_source_prefill__rebuilds_target_from_blank",
+      "title": "业务页新建来源带值从空白默认值重建目标记录",
+      "fieldKeys": [
+        "customerName",
+        "orderNo",
+        "productOrderNo",
+        "styleNo",
+        "productNo",
+        "productNameColor",
+        "sourceNo"
+      ],
+      "scenarioKey": "source_prefill_rebuilds_from_blank",
+      "layer": "web",
+      "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+      "status": "pass",
+      "durationMs": 18,
+      "failureMessages": []
+    },
+    {
+      "caseId": "FL_business_source_prefill__clears_when_source_changes",
+      "title": "业务页新建已带值后切换来源会清空旧来源残值",
+      "fieldKeys": [
+        "customerName",
+        "productNo",
+        "productNameColor",
+        "accessoryMaterial",
+        "sourceNo"
+      ],
+      "scenarioKey": "source_change_clears_prefill",
+      "layer": "web",
+      "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+      "status": "pass",
+      "durationMs": 0,
+      "failureMessages": []
+    },
+    {
+      "caseId": "FL_business_source_prefill__filters_bom_accessories",
+      "title": "BOM 来源带到辅材采购时只保留辅材和包材明细",
+      "fieldKeys": ["mainMaterial", "accessoryMaterial"],
+      "scenarioKey": "legacy_stale_cleared",
+      "layer": "web",
+      "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
+      "status": "pass",
+      "durationMs": 1,
       "failureMessages": []
     },
     {
@@ -1373,7 +2112,7 @@
       "layer": "web",
       "testFile": "web/src/erp/data/processingContractTemplate.test.mjs",
       "status": "pass",
-      "durationMs": 1,
+      "durationMs": 0,
       "failureMessages": []
     },
     {
@@ -1406,7 +2145,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 0,
+      "durationMs": 1,
       "failureMessages": []
     },
     {
@@ -1417,7 +2156,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 1,
+      "durationMs": 2,
       "failureMessages": []
     },
     {
@@ -1428,7 +2167,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 0,
+      "durationMs": 2,
       "failureMessages": []
     },
     {
@@ -1439,7 +2178,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 12,
+      "durationMs": 21,
       "failureMessages": []
     },
     {
@@ -1450,7 +2189,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 1,
+      "durationMs": 0,
       "failureMessages": []
     },
     {
@@ -1472,7 +2211,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/printWorkspace.test.mjs",
       "status": "pass",
-      "durationMs": 0,
+      "durationMs": 103,
       "failureMessages": []
     },
     {

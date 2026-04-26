@@ -657,6 +657,163 @@ var (
 			},
 		},
 	}
+	// PurchaseReceiptAdjustmentsColumns holds the columns for the "purchase_receipt_adjustments" table.
+	PurchaseReceiptAdjustmentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "adjustment_no", Type: field.TypeString, Size: 64},
+		{Name: "reason", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "adjusted_at", Type: field.TypeTime},
+		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "business_record_id", Type: field.TypeInt, Nullable: true},
+		{Name: "purchase_receipt_id", Type: field.TypeInt},
+	}
+	// PurchaseReceiptAdjustmentsTable holds the schema information for the "purchase_receipt_adjustments" table.
+	PurchaseReceiptAdjustmentsTable = &schema.Table{
+		Name:       "purchase_receipt_adjustments",
+		Columns:    PurchaseReceiptAdjustmentsColumns,
+		PrimaryKey: []*schema.Column{PurchaseReceiptAdjustmentsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_receipt_adjustments_business_records_purchase_receipt_adjustments",
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentsColumns[9]},
+				RefColumns: []*schema.Column{BusinessRecordsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "purchase_receipt_adjustments_purchase_receipts_purchase_receipt_adjustments",
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentsColumns[10]},
+				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchasereceiptadjustment_adjustment_no",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[1]},
+			},
+			{
+				Name:    "purchasereceiptadjustment_purchase_receipt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[10]},
+			},
+			{
+				Name:    "purchasereceiptadjustment_business_record_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[9]},
+			},
+			{
+				Name:    "purchasereceiptadjustment_status",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[3]},
+			},
+			{
+				Name:    "purchasereceiptadjustment_adjusted_at",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[4]},
+			},
+		},
+	}
+	// PurchaseReceiptAdjustmentItemsColumns holds the columns for the "purchase_receipt_adjustment_items" table.
+	PurchaseReceiptAdjustmentItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "adjust_type", Type: field.TypeString, Size: 32},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "source_line_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "correction_group", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "material_id", Type: field.TypeInt},
+		{Name: "adjustment_id", Type: field.TypeInt},
+		{Name: "purchase_receipt_item_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// PurchaseReceiptAdjustmentItemsTable holds the schema information for the "purchase_receipt_adjustment_items" table.
+	PurchaseReceiptAdjustmentItemsTable = &schema.Table{
+		Name:       "purchase_receipt_adjustment_items",
+		Columns:    PurchaseReceiptAdjustmentItemsColumns,
+		PrimaryKey: []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_receipt_adjustment_items_inventory_lots_purchase_receipt_adjustment_items",
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[8]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_adjustment_items_materials_purchase_receipt_adjustment_items",
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[9]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_adjustment_items_purchase_receipt_adjustments_items",
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[10]},
+				RefColumns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_adjustment_items_purchase_receipt_items_purchase_receipt_adjustment_items",
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[11]},
+				RefColumns: []*schema.Column{PurchaseReceiptItemsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_adjustment_items_units_purchase_receipt_adjustment_items",
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[12]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_adjustment_items_warehouses_purchase_receipt_adjustment_items",
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[13]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchasereceiptadjustmentitem_adjustment_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[10]},
+			},
+			{
+				Name:    "purchasereceiptadjustmentitem_purchase_receipt_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[11]},
+			},
+			{
+				Name:    "purchasereceiptadjustmentitem_material_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[9]},
+			},
+			{
+				Name:    "purchasereceiptadjustmentitem_warehouse_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[13]},
+			},
+			{
+				Name:    "purchasereceiptadjustmentitem_lot_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[8]},
+			},
+			{
+				Name:    "purchasereceiptadjustmentitem_adjustment_id_source_line_no",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReceiptAdjustmentItemsColumns[10], PurchaseReceiptAdjustmentItemsColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "source_line_no IS NOT NULL AND source_line_no <> ''",
+				},
+			},
+		},
+	}
 	// PurchaseReceiptItemsColumns holds the columns for the "purchase_receipt_items" table.
 	PurchaseReceiptItemsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1175,6 +1332,8 @@ var (
 		PermissionsTable,
 		ProductsTable,
 		PurchaseReceiptsTable,
+		PurchaseReceiptAdjustmentsTable,
+		PurchaseReceiptAdjustmentItemsTable,
 		PurchaseReceiptItemsTable,
 		PurchaseReturnsTable,
 		PurchaseReturnItemsTable,
@@ -1208,6 +1367,18 @@ func init() {
 	MaterialsTable.ForeignKeys[0].RefTable = UnitsTable
 	ProductsTable.ForeignKeys[0].RefTable = UnitsTable
 	PurchaseReceiptsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
+	PurchaseReceiptAdjustmentsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
+	PurchaseReceiptAdjustmentsTable.ForeignKeys[1].RefTable = PurchaseReceiptsTable
+	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[1].RefTable = MaterialsTable
+	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptAdjustmentsTable
+	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[3].RefTable = PurchaseReceiptItemsTable
+	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[4].RefTable = UnitsTable
+	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[5].RefTable = WarehousesTable
+	PurchaseReceiptAdjustmentItemsTable.Annotation = &entsql.Annotation{}
+	PurchaseReceiptAdjustmentItemsTable.Annotation.Checks = map[string]string{
+		"purchase_receipt_adjustment_items_quantity_positive": "quantity > 0",
+	}
 	PurchaseReceiptItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	PurchaseReceiptItemsTable.ForeignKeys[1].RefTable = MaterialsTable
 	PurchaseReceiptItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptsTable

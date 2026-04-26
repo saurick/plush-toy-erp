@@ -17,6 +17,8 @@ import (
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptadjustment"
+	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -1036,6 +1038,142 @@ func init() {
 	purchasereceipt.DefaultUpdatedAt = purchasereceiptDescUpdatedAt.Default.(func() time.Time)
 	// purchasereceipt.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	purchasereceipt.UpdateDefaultUpdatedAt = purchasereceiptDescUpdatedAt.UpdateDefault.(func() time.Time)
+	purchasereceiptadjustmentHooks := schema.PurchaseReceiptAdjustment{}.Hooks()
+	purchasereceiptadjustment.Hooks[0] = purchasereceiptadjustmentHooks[0]
+	purchasereceiptadjustmentFields := schema.PurchaseReceiptAdjustment{}.Fields()
+	_ = purchasereceiptadjustmentFields
+	// purchasereceiptadjustmentDescAdjustmentNo is the schema descriptor for adjustment_no field.
+	purchasereceiptadjustmentDescAdjustmentNo := purchasereceiptadjustmentFields[0].Descriptor()
+	// purchasereceiptadjustment.AdjustmentNoValidator is a validator for the "adjustment_no" field. It is called by the builders before save.
+	purchasereceiptadjustment.AdjustmentNoValidator = func() func(string) error {
+		validators := purchasereceiptadjustmentDescAdjustmentNo.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(adjustment_no string) error {
+			for _, fn := range fns {
+				if err := fn(adjustment_no); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// purchasereceiptadjustmentDescPurchaseReceiptID is the schema descriptor for purchase_receipt_id field.
+	purchasereceiptadjustmentDescPurchaseReceiptID := purchasereceiptadjustmentFields[1].Descriptor()
+	// purchasereceiptadjustment.PurchaseReceiptIDValidator is a validator for the "purchase_receipt_id" field. It is called by the builders before save.
+	purchasereceiptadjustment.PurchaseReceiptIDValidator = purchasereceiptadjustmentDescPurchaseReceiptID.Validators[0].(func(int) error)
+	// purchasereceiptadjustmentDescBusinessRecordID is the schema descriptor for business_record_id field.
+	purchasereceiptadjustmentDescBusinessRecordID := purchasereceiptadjustmentFields[2].Descriptor()
+	// purchasereceiptadjustment.BusinessRecordIDValidator is a validator for the "business_record_id" field. It is called by the builders before save.
+	purchasereceiptadjustment.BusinessRecordIDValidator = purchasereceiptadjustmentDescBusinessRecordID.Validators[0].(func(int) error)
+	// purchasereceiptadjustmentDescReason is the schema descriptor for reason field.
+	purchasereceiptadjustmentDescReason := purchasereceiptadjustmentFields[3].Descriptor()
+	// purchasereceiptadjustment.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
+	purchasereceiptadjustment.ReasonValidator = purchasereceiptadjustmentDescReason.Validators[0].(func(string) error)
+	// purchasereceiptadjustmentDescStatus is the schema descriptor for status field.
+	purchasereceiptadjustmentDescStatus := purchasereceiptadjustmentFields[4].Descriptor()
+	// purchasereceiptadjustment.DefaultStatus holds the default value on creation for the status field.
+	purchasereceiptadjustment.DefaultStatus = purchasereceiptadjustmentDescStatus.Default.(string)
+	// purchasereceiptadjustment.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	purchasereceiptadjustment.StatusValidator = func() func(string) error {
+		validators := purchasereceiptadjustmentDescStatus.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(status string) error {
+			for _, fn := range fns {
+				if err := fn(status); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// purchasereceiptadjustmentDescNote is the schema descriptor for note field.
+	purchasereceiptadjustmentDescNote := purchasereceiptadjustmentFields[7].Descriptor()
+	// purchasereceiptadjustment.NoteValidator is a validator for the "note" field. It is called by the builders before save.
+	purchasereceiptadjustment.NoteValidator = purchasereceiptadjustmentDescNote.Validators[0].(func(string) error)
+	// purchasereceiptadjustmentDescCreatedAt is the schema descriptor for created_at field.
+	purchasereceiptadjustmentDescCreatedAt := purchasereceiptadjustmentFields[8].Descriptor()
+	// purchasereceiptadjustment.DefaultCreatedAt holds the default value on creation for the created_at field.
+	purchasereceiptadjustment.DefaultCreatedAt = purchasereceiptadjustmentDescCreatedAt.Default.(func() time.Time)
+	// purchasereceiptadjustmentDescUpdatedAt is the schema descriptor for updated_at field.
+	purchasereceiptadjustmentDescUpdatedAt := purchasereceiptadjustmentFields[9].Descriptor()
+	// purchasereceiptadjustment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	purchasereceiptadjustment.DefaultUpdatedAt = purchasereceiptadjustmentDescUpdatedAt.Default.(func() time.Time)
+	// purchasereceiptadjustment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	purchasereceiptadjustment.UpdateDefaultUpdatedAt = purchasereceiptadjustmentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	purchasereceiptadjustmentitemHooks := schema.PurchaseReceiptAdjustmentItem{}.Hooks()
+	purchasereceiptadjustmentitem.Hooks[0] = purchasereceiptadjustmentitemHooks[0]
+	purchasereceiptadjustmentitemFields := schema.PurchaseReceiptAdjustmentItem{}.Fields()
+	_ = purchasereceiptadjustmentitemFields
+	// purchasereceiptadjustmentitemDescAdjustmentID is the schema descriptor for adjustment_id field.
+	purchasereceiptadjustmentitemDescAdjustmentID := purchasereceiptadjustmentitemFields[0].Descriptor()
+	// purchasereceiptadjustmentitem.AdjustmentIDValidator is a validator for the "adjustment_id" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.AdjustmentIDValidator = purchasereceiptadjustmentitemDescAdjustmentID.Validators[0].(func(int) error)
+	// purchasereceiptadjustmentitemDescPurchaseReceiptItemID is the schema descriptor for purchase_receipt_item_id field.
+	purchasereceiptadjustmentitemDescPurchaseReceiptItemID := purchasereceiptadjustmentitemFields[1].Descriptor()
+	// purchasereceiptadjustmentitem.PurchaseReceiptItemIDValidator is a validator for the "purchase_receipt_item_id" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.PurchaseReceiptItemIDValidator = purchasereceiptadjustmentitemDescPurchaseReceiptItemID.Validators[0].(func(int) error)
+	// purchasereceiptadjustmentitemDescAdjustType is the schema descriptor for adjust_type field.
+	purchasereceiptadjustmentitemDescAdjustType := purchasereceiptadjustmentitemFields[2].Descriptor()
+	// purchasereceiptadjustmentitem.AdjustTypeValidator is a validator for the "adjust_type" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.AdjustTypeValidator = func() func(string) error {
+		validators := purchasereceiptadjustmentitemDescAdjustType.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(adjust_type string) error {
+			for _, fn := range fns {
+				if err := fn(adjust_type); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// purchasereceiptadjustmentitemDescMaterialID is the schema descriptor for material_id field.
+	purchasereceiptadjustmentitemDescMaterialID := purchasereceiptadjustmentitemFields[3].Descriptor()
+	// purchasereceiptadjustmentitem.MaterialIDValidator is a validator for the "material_id" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.MaterialIDValidator = purchasereceiptadjustmentitemDescMaterialID.Validators[0].(func(int) error)
+	// purchasereceiptadjustmentitemDescWarehouseID is the schema descriptor for warehouse_id field.
+	purchasereceiptadjustmentitemDescWarehouseID := purchasereceiptadjustmentitemFields[4].Descriptor()
+	// purchasereceiptadjustmentitem.WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.WarehouseIDValidator = purchasereceiptadjustmentitemDescWarehouseID.Validators[0].(func(int) error)
+	// purchasereceiptadjustmentitemDescUnitID is the schema descriptor for unit_id field.
+	purchasereceiptadjustmentitemDescUnitID := purchasereceiptadjustmentitemFields[5].Descriptor()
+	// purchasereceiptadjustmentitem.UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.UnitIDValidator = purchasereceiptadjustmentitemDescUnitID.Validators[0].(func(int) error)
+	// purchasereceiptadjustmentitemDescLotID is the schema descriptor for lot_id field.
+	purchasereceiptadjustmentitemDescLotID := purchasereceiptadjustmentitemFields[6].Descriptor()
+	// purchasereceiptadjustmentitem.LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.LotIDValidator = purchasereceiptadjustmentitemDescLotID.Validators[0].(func(int) error)
+	// purchasereceiptadjustmentitemDescSourceLineNo is the schema descriptor for source_line_no field.
+	purchasereceiptadjustmentitemDescSourceLineNo := purchasereceiptadjustmentitemFields[8].Descriptor()
+	// purchasereceiptadjustmentitem.SourceLineNoValidator is a validator for the "source_line_no" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.SourceLineNoValidator = purchasereceiptadjustmentitemDescSourceLineNo.Validators[0].(func(string) error)
+	// purchasereceiptadjustmentitemDescCorrectionGroup is the schema descriptor for correction_group field.
+	purchasereceiptadjustmentitemDescCorrectionGroup := purchasereceiptadjustmentitemFields[9].Descriptor()
+	// purchasereceiptadjustmentitem.CorrectionGroupValidator is a validator for the "correction_group" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.CorrectionGroupValidator = purchasereceiptadjustmentitemDescCorrectionGroup.Validators[0].(func(string) error)
+	// purchasereceiptadjustmentitemDescNote is the schema descriptor for note field.
+	purchasereceiptadjustmentitemDescNote := purchasereceiptadjustmentitemFields[10].Descriptor()
+	// purchasereceiptadjustmentitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
+	purchasereceiptadjustmentitem.NoteValidator = purchasereceiptadjustmentitemDescNote.Validators[0].(func(string) error)
+	// purchasereceiptadjustmentitemDescCreatedAt is the schema descriptor for created_at field.
+	purchasereceiptadjustmentitemDescCreatedAt := purchasereceiptadjustmentitemFields[11].Descriptor()
+	// purchasereceiptadjustmentitem.DefaultCreatedAt holds the default value on creation for the created_at field.
+	purchasereceiptadjustmentitem.DefaultCreatedAt = purchasereceiptadjustmentitemDescCreatedAt.Default.(func() time.Time)
+	// purchasereceiptadjustmentitemDescUpdatedAt is the schema descriptor for updated_at field.
+	purchasereceiptadjustmentitemDescUpdatedAt := purchasereceiptadjustmentitemFields[12].Descriptor()
+	// purchasereceiptadjustmentitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	purchasereceiptadjustmentitem.DefaultUpdatedAt = purchasereceiptadjustmentitemDescUpdatedAt.Default.(func() time.Time)
+	// purchasereceiptadjustmentitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	purchasereceiptadjustmentitem.UpdateDefaultUpdatedAt = purchasereceiptadjustmentitemDescUpdatedAt.UpdateDefault.(func() time.Time)
 	purchasereceiptitemHooks := schema.PurchaseReceiptItem{}.Hooks()
 	purchasereceiptitem.Hooks[0] = purchasereceiptitemHooks[0]
 	purchasereceiptitemFields := schema.PurchaseReceiptItem{}.Fields()

@@ -8,7 +8,6 @@ import {
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   createEmptyProcessingAttachment,
   createProcessingContractDraft,
-  migrateLegacyProcessingContractDraft,
   normalizeProcessingContractAttachments,
   normalizeProcessingLine,
   processingContractAttachmentSlots,
@@ -118,7 +117,6 @@ async function createAttachmentSnapshot(file) {
 function loadDraft({
   forceFresh = false,
   storageKey = DRAFT_STORAGE_KEY,
-  fallbackStorageKeys = [],
 } = {}) {
   if (typeof window === 'undefined') {
     return createProcessingContractDraft()
@@ -129,20 +127,12 @@ function loadDraft({
   }
 
   try {
-    const draftStorageKeys = [storageKey, ...fallbackStorageKeys].filter(
-      Boolean
-    )
-    const raw = draftStorageKeys.reduce((matchedDraft, currentKey) => {
-      if (matchedDraft) {
-        return matchedDraft
-      }
-      return window.localStorage.getItem(currentKey) || ''
-    }, '')
+    const raw = window.localStorage.getItem(storageKey) || ''
     if (!raw) {
       return createProcessingContractDraft()
     }
 
-    const parsed = migrateLegacyProcessingContractDraft(JSON.parse(raw))
+    const parsed = JSON.parse(raw)
     const { attachments, lines, ...rest } = parsed || {}
     return {
       ...createProcessingContractDraft(),
@@ -198,10 +188,6 @@ export default function ProcessingContractPrintWorkspacePage() {
         workspaceStateID
       )
     : DRAFT_STORAGE_KEY
-  const legacyDraftStorageKeys = useMemo(
-    () => (workspaceStateID ? [DRAFT_STORAGE_KEY] : []),
-    [workspaceStateID]
-  )
   const workspaceURL = useMemo(() => {
     if (!workspaceStateID || typeof window === 'undefined') {
       return ''
@@ -222,7 +208,6 @@ export default function ProcessingContractPrintWorkspacePage() {
     loadDraft({
       forceFresh: resetDraftOnOpen,
       storageKey: draftStorageKey,
-      fallbackStorageKeys: legacyDraftStorageKeys,
     })
   )
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
@@ -246,7 +231,6 @@ export default function ProcessingContractPrintWorkspacePage() {
       loadDraft({
         forceFresh: resetDraftOnOpen,
         storageKey: draftStorageKey,
-        fallbackStorageKeys: legacyDraftStorageKeys,
       })
     )
     setRowSelectionMode(false)
@@ -258,13 +242,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     setShowFormula(false)
     setBusyAction('')
     setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
-  }, [
-    draftStorageKey,
-    legacyDraftStorageKeys,
-    resetDraftOnOpen,
-    sourceTag,
-    templateKey,
-  ])
+  }, [draftStorageKey, resetDraftOnOpen, sourceTag, templateKey])
 
   useEffect(() => {
     window.localStorage.setItem(draftStorageKey, JSON.stringify(contract))

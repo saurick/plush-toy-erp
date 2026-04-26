@@ -9,6 +9,16 @@
 - 款式编号
 - 产品编号 / SKU
 
+本轮字段落点仍然是通用业务记录主路径：
+
+- 稳定表头字段继续落在 `business_records` 的显式列，例如 `document_no`、`source_no`、`style_no`、`product_no`、`product_name`、`quantity`、`amount`、`document_date`、`due_date`。
+- Excel 非合同业务字段中尚未稳定到专表的字段，落在 `business_records.payload.*` 或 `business_record_items.payload.*`，由 `businessRecordDefinitions.mjs` 作为当前页面字段定义真源。
+- 当前项目是新项目，不做旧系统数据兼容、旧草稿迁移或历史旧数据批量回补。
+- 当前没有新增 BOM、采购、加工、partner 或 attachment 专表；这些专表仍等编号、主档和附件关系稳定后再走 Ent + Atlas。
+- 明细行 payload 已纳入保存、编辑回显、状态流转、列表搜索和 payload 日期筛选；当前不实现 Excel 自动导入。
+- 关联单据跳转后的下游新建默认带值和新建弹窗里的来源手动带值由 `businessRecordSourcePrefill.mjs` 统一处理，当前只复制编号、客户、产品、数量、交期等稳定快照；BOM 到辅材/包材采购只带材料分类为辅材 / 包材的明细，切换或清空来源时从空白默认值重建，避免主料或上一个来源残留。
+- 合同正文、合同条款和打印专用字段仍在本轮排除范围内；`结算方式 / 条款` 只在字段联动覆盖报告中登记为排除项，不作为当前业务表单落点。
+
 ## 字段对照
 
 | 字段           | 当前真源                                   | 当前落点建议                                  |

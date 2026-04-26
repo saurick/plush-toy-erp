@@ -4,7 +4,6 @@ import test from 'node:test'
 import {
   PROCESSING_CONTRACT_DRAFT_VERSION,
   createProcessingContractDraft,
-  migrateLegacyProcessingContractDraft,
   normalizeProcessingLine,
   resolveProcessingLineAmount,
 } from './processingContractTemplate.mjs'
@@ -14,32 +13,6 @@ test('processingContractTemplate: 默认加工合同样例不再预填甲方联�
 
   assert.equal(draft.draftVersion, PROCESSING_CONTRACT_DRAFT_VERSION)
   assert.equal(draft.buyerContact, '')
-})
-
-test('FL_processing_contract_legacy_sample__clears_stale_buyer_contact processingContractTemplate: 旧默认样例草稿会自动清理历史甲方联系人残值', () => {
-  const migrated = migrateLegacyProcessingContractDraft({
-    buyerCompany: '永绅',
-    buyerContact: '刘志强',
-    buyerPhone: '13694972987',
-    buyerAddress: '东莞茶山',
-    buyerSignDateText: '2025-06-08',
-  })
-
-  assert.equal(migrated.draftVersion, PROCESSING_CONTRACT_DRAFT_VERSION)
-  assert.equal(migrated.buyerContact, '')
-})
-
-test('processingContractTemplate: 非旧默认样例的联系人不做兼容清理', () => {
-  const migrated = migrateLegacyProcessingContractDraft({
-    buyerCompany: '其他公司',
-    buyerContact: '刘志强',
-    buyerPhone: '13694972987',
-    buyerAddress: '东莞茶山',
-    buyerSignDateText: '2025-06-08',
-  })
-
-  assert.equal(migrated.draftVersion, undefined)
-  assert.equal(migrated.buyerContact, '刘志强')
 })
 
 test('FL_processing_contract_amount__derives_default_line_amount_snapshot processingContractTemplate: 默认金额会按数量和单价写入合同快照', () => {

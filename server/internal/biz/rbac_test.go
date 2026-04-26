@@ -2,11 +2,173 @@ package biz
 
 import "testing"
 
+func builtinRolePermissionSet(t *testing.T, roleKey string) map[string]struct{} {
+	t.Helper()
+	for _, role := range BuiltinRoles() {
+		if role.Key != roleKey {
+			continue
+		}
+		return PermissionKeySet(role.Permissions)
+	}
+	t.Fatalf("builtin role %s not found", roleKey)
+	return nil
+}
+
+func assertPermissionSetContains(t *testing.T, permissionSet map[string]struct{}, keys ...string) {
+	t.Helper()
+	for _, key := range keys {
+		if !PermissionSetHasAll(permissionSet, key) {
+			t.Fatalf("expected permission %s", key)
+		}
+	}
+}
+
+func assertPermissionSetOmits(t *testing.T, permissionSet map[string]struct{}, keys ...string) {
+	t.Helper()
+	for _, key := range keys {
+		if PermissionSetHasAny(permissionSet, key) {
+			t.Fatalf("unexpected permission %s", key)
+		}
+	}
+}
+
 func TestAdminHasPermissionSuperAdminHasAllPermissions(t *testing.T) {
 	admin := &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 
 	if !AdminHasPermission(admin, PermissionDebugBusinessClear) {
 		t.Fatalf("expected super admin to have debug clear permission")
+	}
+}
+
+func TestAdminHasPermissionDisabledAdminHasNoPermissions(t *testing.T) {
+	admin := &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true, Disabled: true}
+
+	if AdminHasPermission(admin, PermissionDebugBusinessClear) {
+		t.Fatalf("disabled admin must not have debug clear permission")
+	}
+}
+
+func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
+	tests := []struct {
+		roleKey string
+		has     []string
+		omits   []string
+	}{
+		{
+			roleKey: BossRoleKey,
+			has: []string{
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskApprove,
+				PermissionWorkflowTaskReject,
+				PermissionMobileBossAccess,
+			},
+			omits: []string{PermissionWorkflowTaskComplete, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: QualityRoleKey,
+			has: []string{
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskReject,
+				PermissionMobileQualityAccess,
+			},
+			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: WarehouseRoleKey,
+			has: []string{
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskReject,
+				PermissionMobileWarehouseAccess,
+			},
+			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: ProductionRoleKey,
+			has: []string{
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskComplete,
+				PermissionMobileProductionAccess,
+			},
+			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: PurchaseRoleKey,
+			has: []string{
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskCreate,
+				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskComplete,
+				PermissionMobilePurchaseAccess,
+			},
+			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: FinanceRoleKey,
+			has: []string{
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskReject,
+				PermissionMobileFinanceAccess,
+			},
+			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: PMCRoleKey,
+			has: []string{
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskCreate,
+				PermissionWorkflowTaskUpdate,
+				PermissionMobilePMCAccess,
+			},
+			omits: []string{PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: SalesRoleKey,
+			has: []string{
+				PermissionWorkflowTaskRead,
+				PermissionWorkflowTaskCreate,
+				PermissionWorkflowTaskUpdate,
+				PermissionWorkflowTaskComplete,
+				PermissionMobileSalesAccess,
+			},
+			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: AdminRoleKey,
+			has: []string{
+				PermissionSystemUserRead,
+				PermissionSystemRoleRead,
+				PermissionSystemPermissionManage,
+			},
+			omits: []string{PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+		},
+		{
+			roleKey: DebugOperatorRoleKey,
+			has: []string{
+				PermissionERPBusinessChainDebugRead,
+				PermissionDebugBusinessChainRead,
+				PermissionDebugBusinessChainRun,
+				PermissionDebugSeed,
+				PermissionDebugCleanup,
+				PermissionDebugBusinessClear,
+			},
+			omits: []string{PermissionWorkflowTaskRead, PermissionMobileFinanceAccess},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.roleKey, func(t *testing.T) {
+			permissionSet := builtinRolePermissionSet(t, tt.roleKey)
+			assertPermissionSetContains(t, permissionSet, tt.has...)
+			assertPermissionSetOmits(t, permissionSet, tt.omits...)
+		})
 	}
 }
 

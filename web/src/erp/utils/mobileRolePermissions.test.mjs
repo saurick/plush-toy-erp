@@ -17,7 +17,7 @@ test('mobileRolePermissions: 缺失超级管理员标识不会被误判成超级
   )
 })
 
-test('mobileRolePermissions: 移动端入口由权限码或角色控制', () => {
+test('mobileRolePermissions: 移动端入口只由权限码控制', () => {
   assert.equal(
     hasMobileRolePermission(
       { permissions: ['mobile.purchase.access'], roles: [] },
@@ -30,6 +30,34 @@ test('mobileRolePermissions: 移动端入口由权限码或角色控制', () => 
       { permissions: [], roles: [{ role_key: 'warehouse' }] },
       'warehouse'
     ),
-    true
+    false
+  )
+})
+
+test('mobileRolePermissions: 八个移动端角色入口使用独立权限码', () => {
+  const cases = [
+    ['boss', 'mobile.boss.access'],
+    ['sales', 'mobile.sales.access'],
+    ['purchase', 'mobile.purchase.access'],
+    ['production', 'mobile.production.access'],
+    ['warehouse', 'mobile.warehouse.access'],
+    ['quality', 'mobile.quality.access'],
+    ['finance', 'mobile.finance.access'],
+    ['pmc', 'mobile.pmc.access'],
+  ]
+
+  for (const [roleKey, permissionKey] of cases) {
+    assert.equal(
+      hasMobileRolePermission({ permissions: [permissionKey] }, roleKey),
+      true
+    )
+  }
+
+  assert.equal(
+    hasMobileRolePermission(
+      { permissions: ['mobile.finance.access'] },
+      'warehouse'
+    ),
+    false
   )
 })

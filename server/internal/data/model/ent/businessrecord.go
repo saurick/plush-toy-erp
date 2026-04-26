@@ -84,9 +84,11 @@ type BusinessRecordEdges struct {
 	PurchaseReceipts []*PurchaseReceipt `json:"purchase_receipts,omitempty"`
 	// PurchaseReturns holds the value of the purchase_returns edge.
 	PurchaseReturns []*PurchaseReturn `json:"purchase_returns,omitempty"`
+	// PurchaseReceiptAdjustments holds the value of the purchase_receipt_adjustments edge.
+	PurchaseReceiptAdjustments []*PurchaseReceiptAdjustment `json:"purchase_receipt_adjustments,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // PurchaseReceiptsOrErr returns the PurchaseReceipts value or an error if the edge
@@ -105,6 +107,15 @@ func (e BusinessRecordEdges) PurchaseReturnsOrErr() ([]*PurchaseReturn, error) {
 		return e.PurchaseReturns, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_returns"}
+}
+
+// PurchaseReceiptAdjustmentsOrErr returns the PurchaseReceiptAdjustments value or an error if the edge
+// was not loaded in eager-loading.
+func (e BusinessRecordEdges) PurchaseReceiptAdjustmentsOrErr() ([]*PurchaseReceiptAdjustment, error) {
+	if e.loadedTypes[2] {
+		return e.PurchaseReceiptAdjustments, nil
+	}
+	return nil, &NotLoadedError{edge: "purchase_receipt_adjustments"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -347,6 +358,11 @@ func (_m *BusinessRecord) QueryPurchaseReceipts() *PurchaseReceiptQuery {
 // QueryPurchaseReturns queries the "purchase_returns" edge of the BusinessRecord entity.
 func (_m *BusinessRecord) QueryPurchaseReturns() *PurchaseReturnQuery {
 	return NewBusinessRecordClient(_m.config).QueryPurchaseReturns(_m)
+}
+
+// QueryPurchaseReceiptAdjustments queries the "purchase_receipt_adjustments" edge of the BusinessRecord entity.
+func (_m *BusinessRecord) QueryPurchaseReceiptAdjustments() *PurchaseReceiptAdjustmentQuery {
+	return NewBusinessRecordClient(_m.config).QueryPurchaseReceiptAdjustments(_m)
 }
 
 // Update returns a builder for updating this BusinessRecord.

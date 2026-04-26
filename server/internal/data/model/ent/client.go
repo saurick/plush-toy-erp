@@ -25,6 +25,8 @@ import (
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptadjustment"
+	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -76,6 +78,10 @@ type Client struct {
 	Product *ProductClient
 	// PurchaseReceipt is the client for interacting with the PurchaseReceipt builders.
 	PurchaseReceipt *PurchaseReceiptClient
+	// PurchaseReceiptAdjustment is the client for interacting with the PurchaseReceiptAdjustment builders.
+	PurchaseReceiptAdjustment *PurchaseReceiptAdjustmentClient
+	// PurchaseReceiptAdjustmentItem is the client for interacting with the PurchaseReceiptAdjustmentItem builders.
+	PurchaseReceiptAdjustmentItem *PurchaseReceiptAdjustmentItemClient
 	// PurchaseReceiptItem is the client for interacting with the PurchaseReceiptItem builders.
 	PurchaseReceiptItem *PurchaseReceiptItemClient
 	// PurchaseReturn is the client for interacting with the PurchaseReturn builders.
@@ -123,6 +129,8 @@ func (c *Client) init() {
 	c.Permission = NewPermissionClient(c.config)
 	c.Product = NewProductClient(c.config)
 	c.PurchaseReceipt = NewPurchaseReceiptClient(c.config)
+	c.PurchaseReceiptAdjustment = NewPurchaseReceiptAdjustmentClient(c.config)
+	c.PurchaseReceiptAdjustmentItem = NewPurchaseReceiptAdjustmentItemClient(c.config)
 	c.PurchaseReceiptItem = NewPurchaseReceiptItemClient(c.config)
 	c.PurchaseReturn = NewPurchaseReturnClient(c.config)
 	c.PurchaseReturnItem = NewPurchaseReturnItemClient(c.config)
@@ -224,33 +232,35 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:                   ctx,
-		config:                cfg,
-		AdminUser:             NewAdminUserClient(cfg),
-		AdminUserRole:         NewAdminUserRoleClient(cfg),
-		BOMHeader:             NewBOMHeaderClient(cfg),
-		BOMItem:               NewBOMItemClient(cfg),
-		BusinessRecord:        NewBusinessRecordClient(cfg),
-		BusinessRecordEvent:   NewBusinessRecordEventClient(cfg),
-		BusinessRecordItem:    NewBusinessRecordItemClient(cfg),
-		InventoryBalance:      NewInventoryBalanceClient(cfg),
-		InventoryLot:          NewInventoryLotClient(cfg),
-		InventoryTxn:          NewInventoryTxnClient(cfg),
-		Material:              NewMaterialClient(cfg),
-		Permission:            NewPermissionClient(cfg),
-		Product:               NewProductClient(cfg),
-		PurchaseReceipt:       NewPurchaseReceiptClient(cfg),
-		PurchaseReceiptItem:   NewPurchaseReceiptItemClient(cfg),
-		PurchaseReturn:        NewPurchaseReturnClient(cfg),
-		PurchaseReturnItem:    NewPurchaseReturnItemClient(cfg),
-		Role:                  NewRoleClient(cfg),
-		RolePermission:        NewRolePermissionClient(cfg),
-		Unit:                  NewUnitClient(cfg),
-		User:                  NewUserClient(cfg),
-		Warehouse:             NewWarehouseClient(cfg),
-		WorkflowBusinessState: NewWorkflowBusinessStateClient(cfg),
-		WorkflowTask:          NewWorkflowTaskClient(cfg),
-		WorkflowTaskEvent:     NewWorkflowTaskEventClient(cfg),
+		ctx:                           ctx,
+		config:                        cfg,
+		AdminUser:                     NewAdminUserClient(cfg),
+		AdminUserRole:                 NewAdminUserRoleClient(cfg),
+		BOMHeader:                     NewBOMHeaderClient(cfg),
+		BOMItem:                       NewBOMItemClient(cfg),
+		BusinessRecord:                NewBusinessRecordClient(cfg),
+		BusinessRecordEvent:           NewBusinessRecordEventClient(cfg),
+		BusinessRecordItem:            NewBusinessRecordItemClient(cfg),
+		InventoryBalance:              NewInventoryBalanceClient(cfg),
+		InventoryLot:                  NewInventoryLotClient(cfg),
+		InventoryTxn:                  NewInventoryTxnClient(cfg),
+		Material:                      NewMaterialClient(cfg),
+		Permission:                    NewPermissionClient(cfg),
+		Product:                       NewProductClient(cfg),
+		PurchaseReceipt:               NewPurchaseReceiptClient(cfg),
+		PurchaseReceiptAdjustment:     NewPurchaseReceiptAdjustmentClient(cfg),
+		PurchaseReceiptAdjustmentItem: NewPurchaseReceiptAdjustmentItemClient(cfg),
+		PurchaseReceiptItem:           NewPurchaseReceiptItemClient(cfg),
+		PurchaseReturn:                NewPurchaseReturnClient(cfg),
+		PurchaseReturnItem:            NewPurchaseReturnItemClient(cfg),
+		Role:                          NewRoleClient(cfg),
+		RolePermission:                NewRolePermissionClient(cfg),
+		Unit:                          NewUnitClient(cfg),
+		User:                          NewUserClient(cfg),
+		Warehouse:                     NewWarehouseClient(cfg),
+		WorkflowBusinessState:         NewWorkflowBusinessStateClient(cfg),
+		WorkflowTask:                  NewWorkflowTaskClient(cfg),
+		WorkflowTaskEvent:             NewWorkflowTaskEventClient(cfg),
 	}, nil
 }
 
@@ -268,33 +278,35 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:                   ctx,
-		config:                cfg,
-		AdminUser:             NewAdminUserClient(cfg),
-		AdminUserRole:         NewAdminUserRoleClient(cfg),
-		BOMHeader:             NewBOMHeaderClient(cfg),
-		BOMItem:               NewBOMItemClient(cfg),
-		BusinessRecord:        NewBusinessRecordClient(cfg),
-		BusinessRecordEvent:   NewBusinessRecordEventClient(cfg),
-		BusinessRecordItem:    NewBusinessRecordItemClient(cfg),
-		InventoryBalance:      NewInventoryBalanceClient(cfg),
-		InventoryLot:          NewInventoryLotClient(cfg),
-		InventoryTxn:          NewInventoryTxnClient(cfg),
-		Material:              NewMaterialClient(cfg),
-		Permission:            NewPermissionClient(cfg),
-		Product:               NewProductClient(cfg),
-		PurchaseReceipt:       NewPurchaseReceiptClient(cfg),
-		PurchaseReceiptItem:   NewPurchaseReceiptItemClient(cfg),
-		PurchaseReturn:        NewPurchaseReturnClient(cfg),
-		PurchaseReturnItem:    NewPurchaseReturnItemClient(cfg),
-		Role:                  NewRoleClient(cfg),
-		RolePermission:        NewRolePermissionClient(cfg),
-		Unit:                  NewUnitClient(cfg),
-		User:                  NewUserClient(cfg),
-		Warehouse:             NewWarehouseClient(cfg),
-		WorkflowBusinessState: NewWorkflowBusinessStateClient(cfg),
-		WorkflowTask:          NewWorkflowTaskClient(cfg),
-		WorkflowTaskEvent:     NewWorkflowTaskEventClient(cfg),
+		ctx:                           ctx,
+		config:                        cfg,
+		AdminUser:                     NewAdminUserClient(cfg),
+		AdminUserRole:                 NewAdminUserRoleClient(cfg),
+		BOMHeader:                     NewBOMHeaderClient(cfg),
+		BOMItem:                       NewBOMItemClient(cfg),
+		BusinessRecord:                NewBusinessRecordClient(cfg),
+		BusinessRecordEvent:           NewBusinessRecordEventClient(cfg),
+		BusinessRecordItem:            NewBusinessRecordItemClient(cfg),
+		InventoryBalance:              NewInventoryBalanceClient(cfg),
+		InventoryLot:                  NewInventoryLotClient(cfg),
+		InventoryTxn:                  NewInventoryTxnClient(cfg),
+		Material:                      NewMaterialClient(cfg),
+		Permission:                    NewPermissionClient(cfg),
+		Product:                       NewProductClient(cfg),
+		PurchaseReceipt:               NewPurchaseReceiptClient(cfg),
+		PurchaseReceiptAdjustment:     NewPurchaseReceiptAdjustmentClient(cfg),
+		PurchaseReceiptAdjustmentItem: NewPurchaseReceiptAdjustmentItemClient(cfg),
+		PurchaseReceiptItem:           NewPurchaseReceiptItemClient(cfg),
+		PurchaseReturn:                NewPurchaseReturnClient(cfg),
+		PurchaseReturnItem:            NewPurchaseReturnItemClient(cfg),
+		Role:                          NewRoleClient(cfg),
+		RolePermission:                NewRolePermissionClient(cfg),
+		Unit:                          NewUnitClient(cfg),
+		User:                          NewUserClient(cfg),
+		Warehouse:                     NewWarehouseClient(cfg),
+		WorkflowBusinessState:         NewWorkflowBusinessStateClient(cfg),
+		WorkflowTask:                  NewWorkflowTaskClient(cfg),
+		WorkflowTaskEvent:             NewWorkflowTaskEventClient(cfg),
 	}, nil
 }
 
@@ -327,7 +339,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.BusinessRecord,
 		c.BusinessRecordEvent, c.BusinessRecordItem, c.InventoryBalance,
 		c.InventoryLot, c.InventoryTxn, c.Material, c.Permission, c.Product,
-		c.PurchaseReceipt, c.PurchaseReceiptItem, c.PurchaseReturn,
+		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
+		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
 		c.PurchaseReturnItem, c.Role, c.RolePermission, c.Unit, c.User, c.Warehouse,
 		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
@@ -342,7 +355,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.BusinessRecord,
 		c.BusinessRecordEvent, c.BusinessRecordItem, c.InventoryBalance,
 		c.InventoryLot, c.InventoryTxn, c.Material, c.Permission, c.Product,
-		c.PurchaseReceipt, c.PurchaseReceiptItem, c.PurchaseReturn,
+		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
+		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
 		c.PurchaseReturnItem, c.Role, c.RolePermission, c.Unit, c.User, c.Warehouse,
 		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
@@ -381,6 +395,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Product.mutate(ctx, m)
 	case *PurchaseReceiptMutation:
 		return c.PurchaseReceipt.mutate(ctx, m)
+	case *PurchaseReceiptAdjustmentMutation:
+		return c.PurchaseReceiptAdjustment.mutate(ctx, m)
+	case *PurchaseReceiptAdjustmentItemMutation:
+		return c.PurchaseReceiptAdjustmentItem.mutate(ctx, m)
 	case *PurchaseReceiptItemMutation:
 		return c.PurchaseReceiptItem.mutate(ctx, m)
 	case *PurchaseReturnMutation:
@@ -1160,6 +1178,22 @@ func (c *BusinessRecordClient) QueryPurchaseReturns(_m *BusinessRecord) *Purchas
 	return query
 }
 
+// QueryPurchaseReceiptAdjustments queries the purchase_receipt_adjustments edge of a BusinessRecord.
+func (c *BusinessRecordClient) QueryPurchaseReceiptAdjustments(_m *BusinessRecord) *PurchaseReceiptAdjustmentQuery {
+	query := (&PurchaseReceiptAdjustmentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(businessrecord.Table, businessrecord.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, businessrecord.PurchaseReceiptAdjustmentsTable, businessrecord.PurchaseReceiptAdjustmentsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *BusinessRecordClient) Hooks() []Hook {
 	return c.hooks.BusinessRecord
@@ -1804,6 +1838,22 @@ func (c *InventoryLotClient) QueryPurchaseReturnItems(_m *InventoryLot) *Purchas
 	return query
 }
 
+// QueryPurchaseReceiptAdjustmentItems queries the purchase_receipt_adjustment_items edge of a InventoryLot.
+func (c *InventoryLotClient) QueryPurchaseReceiptAdjustmentItems(_m *InventoryLot) *PurchaseReceiptAdjustmentItemQuery {
+	query := (&PurchaseReceiptAdjustmentItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorylot.Table, inventorylot.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, inventorylot.PurchaseReceiptAdjustmentItemsTable, inventorylot.PurchaseReceiptAdjustmentItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *InventoryLotClient) Hooks() []Hook {
 	hooks := c.hooks.InventoryLot
@@ -2177,6 +2227,22 @@ func (c *MaterialClient) QueryPurchaseReturnItems(_m *Material) *PurchaseReturnI
 			sqlgraph.From(material.Table, material.FieldID, id),
 			sqlgraph.To(purchasereturnitem.Table, purchasereturnitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, material.PurchaseReturnItemsTable, material.PurchaseReturnItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPurchaseReceiptAdjustmentItems queries the purchase_receipt_adjustment_items edge of a Material.
+func (c *MaterialClient) QueryPurchaseReceiptAdjustmentItems(_m *Material) *PurchaseReceiptAdjustmentItemQuery {
+	query := (&PurchaseReceiptAdjustmentItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, material.PurchaseReceiptAdjustmentItemsTable, material.PurchaseReceiptAdjustmentItemsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -2647,6 +2713,22 @@ func (c *PurchaseReceiptClient) QueryPurchaseReturns(_m *PurchaseReceipt) *Purch
 	return query
 }
 
+// QueryPurchaseReceiptAdjustments queries the purchase_receipt_adjustments edge of a PurchaseReceipt.
+func (c *PurchaseReceiptClient) QueryPurchaseReceiptAdjustments(_m *PurchaseReceipt) *PurchaseReceiptAdjustmentQuery {
+	query := (&PurchaseReceiptAdjustmentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceipt.Table, purchasereceipt.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceipt.PurchaseReceiptAdjustmentsTable, purchasereceipt.PurchaseReceiptAdjustmentsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryItems queries the items edge of a PurchaseReceipt.
 func (c *PurchaseReceiptClient) QueryItems(_m *PurchaseReceipt) *PurchaseReceiptItemQuery {
 	query := (&PurchaseReceiptItemClient{config: c.config}).Query()
@@ -2686,6 +2768,418 @@ func (c *PurchaseReceiptClient) mutate(ctx context.Context, m *PurchaseReceiptMu
 		return (&PurchaseReceiptDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown PurchaseReceipt mutation op: %q", m.Op())
+	}
+}
+
+// PurchaseReceiptAdjustmentClient is a client for the PurchaseReceiptAdjustment schema.
+type PurchaseReceiptAdjustmentClient struct {
+	config
+}
+
+// NewPurchaseReceiptAdjustmentClient returns a client for the PurchaseReceiptAdjustment from the given config.
+func NewPurchaseReceiptAdjustmentClient(c config) *PurchaseReceiptAdjustmentClient {
+	return &PurchaseReceiptAdjustmentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `purchasereceiptadjustment.Hooks(f(g(h())))`.
+func (c *PurchaseReceiptAdjustmentClient) Use(hooks ...Hook) {
+	c.hooks.PurchaseReceiptAdjustment = append(c.hooks.PurchaseReceiptAdjustment, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `purchasereceiptadjustment.Intercept(f(g(h())))`.
+func (c *PurchaseReceiptAdjustmentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PurchaseReceiptAdjustment = append(c.inters.PurchaseReceiptAdjustment, interceptors...)
+}
+
+// Create returns a builder for creating a PurchaseReceiptAdjustment entity.
+func (c *PurchaseReceiptAdjustmentClient) Create() *PurchaseReceiptAdjustmentCreate {
+	mutation := newPurchaseReceiptAdjustmentMutation(c.config, OpCreate)
+	return &PurchaseReceiptAdjustmentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PurchaseReceiptAdjustment entities.
+func (c *PurchaseReceiptAdjustmentClient) CreateBulk(builders ...*PurchaseReceiptAdjustmentCreate) *PurchaseReceiptAdjustmentCreateBulk {
+	return &PurchaseReceiptAdjustmentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PurchaseReceiptAdjustmentClient) MapCreateBulk(slice any, setFunc func(*PurchaseReceiptAdjustmentCreate, int)) *PurchaseReceiptAdjustmentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PurchaseReceiptAdjustmentCreateBulk{err: fmt.Errorf("calling to PurchaseReceiptAdjustmentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PurchaseReceiptAdjustmentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PurchaseReceiptAdjustmentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PurchaseReceiptAdjustment.
+func (c *PurchaseReceiptAdjustmentClient) Update() *PurchaseReceiptAdjustmentUpdate {
+	mutation := newPurchaseReceiptAdjustmentMutation(c.config, OpUpdate)
+	return &PurchaseReceiptAdjustmentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PurchaseReceiptAdjustmentClient) UpdateOne(_m *PurchaseReceiptAdjustment) *PurchaseReceiptAdjustmentUpdateOne {
+	mutation := newPurchaseReceiptAdjustmentMutation(c.config, OpUpdateOne, withPurchaseReceiptAdjustment(_m))
+	return &PurchaseReceiptAdjustmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PurchaseReceiptAdjustmentClient) UpdateOneID(id int) *PurchaseReceiptAdjustmentUpdateOne {
+	mutation := newPurchaseReceiptAdjustmentMutation(c.config, OpUpdateOne, withPurchaseReceiptAdjustmentID(id))
+	return &PurchaseReceiptAdjustmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PurchaseReceiptAdjustment.
+func (c *PurchaseReceiptAdjustmentClient) Delete() *PurchaseReceiptAdjustmentDelete {
+	mutation := newPurchaseReceiptAdjustmentMutation(c.config, OpDelete)
+	return &PurchaseReceiptAdjustmentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PurchaseReceiptAdjustmentClient) DeleteOne(_m *PurchaseReceiptAdjustment) *PurchaseReceiptAdjustmentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PurchaseReceiptAdjustmentClient) DeleteOneID(id int) *PurchaseReceiptAdjustmentDeleteOne {
+	builder := c.Delete().Where(purchasereceiptadjustment.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PurchaseReceiptAdjustmentDeleteOne{builder}
+}
+
+// Query returns a query builder for PurchaseReceiptAdjustment.
+func (c *PurchaseReceiptAdjustmentClient) Query() *PurchaseReceiptAdjustmentQuery {
+	return &PurchaseReceiptAdjustmentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePurchaseReceiptAdjustment},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PurchaseReceiptAdjustment entity by its id.
+func (c *PurchaseReceiptAdjustmentClient) Get(ctx context.Context, id int) (*PurchaseReceiptAdjustment, error) {
+	return c.Query().Where(purchasereceiptadjustment.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PurchaseReceiptAdjustmentClient) GetX(ctx context.Context, id int) *PurchaseReceiptAdjustment {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPurchaseReceipt queries the purchase_receipt edge of a PurchaseReceiptAdjustment.
+func (c *PurchaseReceiptAdjustmentClient) QueryPurchaseReceipt(_m *PurchaseReceiptAdjustment) *PurchaseReceiptQuery {
+	query := (&PurchaseReceiptClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID, id),
+			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustment.PurchaseReceiptTable, purchasereceiptadjustment.PurchaseReceiptColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryBusinessRecord queries the business_record edge of a PurchaseReceiptAdjustment.
+func (c *PurchaseReceiptAdjustmentClient) QueryBusinessRecord(_m *PurchaseReceiptAdjustment) *BusinessRecordQuery {
+	query := (&BusinessRecordClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID, id),
+			sqlgraph.To(businessrecord.Table, businessrecord.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustment.BusinessRecordTable, purchasereceiptadjustment.BusinessRecordColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryItems queries the items edge of a PurchaseReceiptAdjustment.
+func (c *PurchaseReceiptAdjustmentClient) QueryItems(_m *PurchaseReceiptAdjustment) *PurchaseReceiptAdjustmentItemQuery {
+	query := (&PurchaseReceiptAdjustmentItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceiptadjustment.ItemsTable, purchasereceiptadjustment.ItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PurchaseReceiptAdjustmentClient) Hooks() []Hook {
+	hooks := c.hooks.PurchaseReceiptAdjustment
+	return append(hooks[:len(hooks):len(hooks)], purchasereceiptadjustment.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *PurchaseReceiptAdjustmentClient) Interceptors() []Interceptor {
+	return c.inters.PurchaseReceiptAdjustment
+}
+
+func (c *PurchaseReceiptAdjustmentClient) mutate(ctx context.Context, m *PurchaseReceiptAdjustmentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PurchaseReceiptAdjustmentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PurchaseReceiptAdjustmentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PurchaseReceiptAdjustmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PurchaseReceiptAdjustmentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PurchaseReceiptAdjustment mutation op: %q", m.Op())
+	}
+}
+
+// PurchaseReceiptAdjustmentItemClient is a client for the PurchaseReceiptAdjustmentItem schema.
+type PurchaseReceiptAdjustmentItemClient struct {
+	config
+}
+
+// NewPurchaseReceiptAdjustmentItemClient returns a client for the PurchaseReceiptAdjustmentItem from the given config.
+func NewPurchaseReceiptAdjustmentItemClient(c config) *PurchaseReceiptAdjustmentItemClient {
+	return &PurchaseReceiptAdjustmentItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `purchasereceiptadjustmentitem.Hooks(f(g(h())))`.
+func (c *PurchaseReceiptAdjustmentItemClient) Use(hooks ...Hook) {
+	c.hooks.PurchaseReceiptAdjustmentItem = append(c.hooks.PurchaseReceiptAdjustmentItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `purchasereceiptadjustmentitem.Intercept(f(g(h())))`.
+func (c *PurchaseReceiptAdjustmentItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PurchaseReceiptAdjustmentItem = append(c.inters.PurchaseReceiptAdjustmentItem, interceptors...)
+}
+
+// Create returns a builder for creating a PurchaseReceiptAdjustmentItem entity.
+func (c *PurchaseReceiptAdjustmentItemClient) Create() *PurchaseReceiptAdjustmentItemCreate {
+	mutation := newPurchaseReceiptAdjustmentItemMutation(c.config, OpCreate)
+	return &PurchaseReceiptAdjustmentItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PurchaseReceiptAdjustmentItem entities.
+func (c *PurchaseReceiptAdjustmentItemClient) CreateBulk(builders ...*PurchaseReceiptAdjustmentItemCreate) *PurchaseReceiptAdjustmentItemCreateBulk {
+	return &PurchaseReceiptAdjustmentItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PurchaseReceiptAdjustmentItemClient) MapCreateBulk(slice any, setFunc func(*PurchaseReceiptAdjustmentItemCreate, int)) *PurchaseReceiptAdjustmentItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PurchaseReceiptAdjustmentItemCreateBulk{err: fmt.Errorf("calling to PurchaseReceiptAdjustmentItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PurchaseReceiptAdjustmentItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PurchaseReceiptAdjustmentItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) Update() *PurchaseReceiptAdjustmentItemUpdate {
+	mutation := newPurchaseReceiptAdjustmentItemMutation(c.config, OpUpdate)
+	return &PurchaseReceiptAdjustmentItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PurchaseReceiptAdjustmentItemClient) UpdateOne(_m *PurchaseReceiptAdjustmentItem) *PurchaseReceiptAdjustmentItemUpdateOne {
+	mutation := newPurchaseReceiptAdjustmentItemMutation(c.config, OpUpdateOne, withPurchaseReceiptAdjustmentItem(_m))
+	return &PurchaseReceiptAdjustmentItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PurchaseReceiptAdjustmentItemClient) UpdateOneID(id int) *PurchaseReceiptAdjustmentItemUpdateOne {
+	mutation := newPurchaseReceiptAdjustmentItemMutation(c.config, OpUpdateOne, withPurchaseReceiptAdjustmentItemID(id))
+	return &PurchaseReceiptAdjustmentItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) Delete() *PurchaseReceiptAdjustmentItemDelete {
+	mutation := newPurchaseReceiptAdjustmentItemMutation(c.config, OpDelete)
+	return &PurchaseReceiptAdjustmentItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PurchaseReceiptAdjustmentItemClient) DeleteOne(_m *PurchaseReceiptAdjustmentItem) *PurchaseReceiptAdjustmentItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PurchaseReceiptAdjustmentItemClient) DeleteOneID(id int) *PurchaseReceiptAdjustmentItemDeleteOne {
+	builder := c.Delete().Where(purchasereceiptadjustmentitem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PurchaseReceiptAdjustmentItemDeleteOne{builder}
+}
+
+// Query returns a query builder for PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) Query() *PurchaseReceiptAdjustmentItemQuery {
+	return &PurchaseReceiptAdjustmentItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePurchaseReceiptAdjustmentItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PurchaseReceiptAdjustmentItem entity by its id.
+func (c *PurchaseReceiptAdjustmentItemClient) Get(ctx context.Context, id int) (*PurchaseReceiptAdjustmentItem, error) {
+	return c.Query().Where(purchasereceiptadjustmentitem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PurchaseReceiptAdjustmentItemClient) GetX(ctx context.Context, id int) *PurchaseReceiptAdjustmentItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPurchaseReceiptAdjustment queries the purchase_receipt_adjustment edge of a PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) QueryPurchaseReceiptAdjustment(_m *PurchaseReceiptAdjustmentItem) *PurchaseReceiptAdjustmentQuery {
+	query := (&PurchaseReceiptAdjustmentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustmentitem.PurchaseReceiptAdjustmentTable, purchasereceiptadjustmentitem.PurchaseReceiptAdjustmentColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPurchaseReceiptItem queries the purchase_receipt_item edge of a PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) QueryPurchaseReceiptItem(_m *PurchaseReceiptAdjustmentItem) *PurchaseReceiptItemQuery {
+	query := (&PurchaseReceiptItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID, id),
+			sqlgraph.To(purchasereceiptitem.Table, purchasereceiptitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustmentitem.PurchaseReceiptItemTable, purchasereceiptadjustmentitem.PurchaseReceiptItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryMaterial queries the material edge of a PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) QueryMaterial(_m *PurchaseReceiptAdjustmentItem) *MaterialQuery {
+	query := (&MaterialClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID, id),
+			sqlgraph.To(material.Table, material.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustmentitem.MaterialTable, purchasereceiptadjustmentitem.MaterialColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryWarehouse queries the warehouse edge of a PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) QueryWarehouse(_m *PurchaseReceiptAdjustmentItem) *WarehouseQuery {
+	query := (&WarehouseClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID, id),
+			sqlgraph.To(warehouse.Table, warehouse.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustmentitem.WarehouseTable, purchasereceiptadjustmentitem.WarehouseColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUnit queries the unit edge of a PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) QueryUnit(_m *PurchaseReceiptAdjustmentItem) *UnitQuery {
+	query := (&UnitClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID, id),
+			sqlgraph.To(unit.Table, unit.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustmentitem.UnitTable, purchasereceiptadjustmentitem.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryInventoryLot queries the inventory_lot edge of a PurchaseReceiptAdjustmentItem.
+func (c *PurchaseReceiptAdjustmentItemClient) QueryInventoryLot(_m *PurchaseReceiptAdjustmentItem) *InventoryLotQuery {
+	query := (&InventoryLotClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID, id),
+			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustmentitem.InventoryLotTable, purchasereceiptadjustmentitem.InventoryLotColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PurchaseReceiptAdjustmentItemClient) Hooks() []Hook {
+	hooks := c.hooks.PurchaseReceiptAdjustmentItem
+	return append(hooks[:len(hooks):len(hooks)], purchasereceiptadjustmentitem.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *PurchaseReceiptAdjustmentItemClient) Interceptors() []Interceptor {
+	return c.inters.PurchaseReceiptAdjustmentItem
+}
+
+func (c *PurchaseReceiptAdjustmentItemClient) mutate(ctx context.Context, m *PurchaseReceiptAdjustmentItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PurchaseReceiptAdjustmentItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PurchaseReceiptAdjustmentItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PurchaseReceiptAdjustmentItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PurchaseReceiptAdjustmentItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PurchaseReceiptAdjustmentItem mutation op: %q", m.Op())
 	}
 }
 
@@ -2886,6 +3380,22 @@ func (c *PurchaseReceiptItemClient) QueryPurchaseReturnItems(_m *PurchaseReceipt
 			sqlgraph.From(purchasereceiptitem.Table, purchasereceiptitem.FieldID, id),
 			sqlgraph.To(purchasereturnitem.Table, purchasereturnitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceiptitem.PurchaseReturnItemsTable, purchasereceiptitem.PurchaseReturnItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPurchaseReceiptAdjustmentItems queries the purchase_receipt_adjustment_items edge of a PurchaseReceiptItem.
+func (c *PurchaseReceiptItemClient) QueryPurchaseReceiptAdjustmentItems(_m *PurchaseReceiptItem) *PurchaseReceiptAdjustmentItemQuery {
+	query := (&PurchaseReceiptAdjustmentItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptitem.Table, purchasereceiptitem.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceiptitem.PurchaseReceiptAdjustmentItemsTable, purchasereceiptitem.PurchaseReceiptAdjustmentItemsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -3817,6 +4327,22 @@ func (c *UnitClient) QueryPurchaseReturnItems(_m *Unit) *PurchaseReturnItemQuery
 	return query
 }
 
+// QueryPurchaseReceiptAdjustmentItems queries the purchase_receipt_adjustment_items edge of a Unit.
+func (c *UnitClient) QueryPurchaseReceiptAdjustmentItems(_m *Unit) *PurchaseReceiptAdjustmentItemQuery {
+	query := (&PurchaseReceiptAdjustmentItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(unit.Table, unit.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, unit.PurchaseReceiptAdjustmentItemsTable, unit.PurchaseReceiptAdjustmentItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *UnitClient) Hooks() []Hook {
 	return c.hooks.Unit
@@ -4140,6 +4666,22 @@ func (c *WarehouseClient) QueryPurchaseReturnItems(_m *Warehouse) *PurchaseRetur
 			sqlgraph.From(warehouse.Table, warehouse.FieldID, id),
 			sqlgraph.To(purchasereturnitem.Table, purchasereturnitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, warehouse.PurchaseReturnItemsTable, warehouse.PurchaseReturnItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPurchaseReceiptAdjustmentItems queries the purchase_receipt_adjustment_items edge of a Warehouse.
+func (c *WarehouseClient) QueryPurchaseReceiptAdjustmentItems(_m *Warehouse) *PurchaseReceiptAdjustmentItemQuery {
+	query := (&PurchaseReceiptAdjustmentItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(warehouse.Table, warehouse.FieldID, id),
+			sqlgraph.To(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, warehouse.PurchaseReceiptAdjustmentItemsTable, warehouse.PurchaseReceiptAdjustmentItemsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -4609,16 +5151,17 @@ type (
 		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessRecord,
 		BusinessRecordEvent, BusinessRecordItem, InventoryBalance, InventoryLot,
 		InventoryTxn, Material, Permission, Product, PurchaseReceipt,
-		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, Role, RolePermission,
-		Unit, User, Warehouse, WorkflowBusinessState, WorkflowTask,
-		WorkflowTaskEvent []ent.Hook
+		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
+		PurchaseReturn, PurchaseReturnItem, Role, RolePermission, Unit, User,
+		Warehouse, WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
 		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessRecord,
 		BusinessRecordEvent, BusinessRecordItem, InventoryBalance, InventoryLot,
 		InventoryTxn, Material, Permission, Product, PurchaseReceipt,
-		PurchaseReceiptItem, PurchaseReturn, PurchaseReturnItem, Role, RolePermission,
-		Unit, User, Warehouse, WorkflowBusinessState, WorkflowTask,
+		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
+		PurchaseReturn, PurchaseReturnItem, Role, RolePermission, Unit, User,
+		Warehouse, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Interceptor
 	}
 )

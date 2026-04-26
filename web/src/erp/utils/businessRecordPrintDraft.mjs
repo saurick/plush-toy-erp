@@ -36,6 +36,8 @@ const firstText = (...values) => {
   return matchedValue === undefined ? '' : toText(matchedValue)
 }
 
+const payloadValue = (source = {}, key = '') => source?.payload?.[key]
+
 const itemsOf = (record = {}) =>
   Array.isArray(record?.items) && record.items.length > 0 ? record.items : []
 
@@ -46,34 +48,50 @@ export function getBusinessRecordPrintTemplate(moduleKey) {
 function buildFallbackMaterialPurchaseLine(record = {}) {
   return {
     contractNo: toText(record.document_no),
-    productOrderNo: toText(record.source_no),
+    productOrderNo: firstText(
+      payloadValue(record, 'product_order_no'),
+      record.source_no
+    ),
     productNo: toText(record.product_no),
     productName: toText(record.product_name),
     materialName: firstText(record.material_name, record.title),
-    vendorCode: '',
+    vendorCode: firstText(
+      payloadValue(record, 'supplier_item_no'),
+      payloadValue(record, 'supplier_short_name')
+    ),
     spec: '',
     unit: toText(record.unit),
     unitPrice: '',
     quantity: toText(record.quantity),
     amount: toText(record.amount),
-    remark: '',
+    remark: firstText(
+      payloadValue(record, 'line_remark'),
+      payloadValue(record, 'remark')
+    ),
   }
 }
 
 function mapMaterialPurchaseItemToLine(item = {}, record = {}) {
   return {
     contractNo: toText(record.document_no),
-    productOrderNo: toText(record.source_no),
+    productOrderNo: firstText(
+      payloadValue(record, 'product_order_no'),
+      record.source_no
+    ),
     productNo: toText(record.product_no),
     productName: toText(record.product_name),
     materialName: firstText(item.material_name, record.material_name),
-    vendorCode: toText(item.supplier_name),
+    vendorCode: firstText(
+      payloadValue(item, 'supplier_item_no'),
+      payloadValue(item, 'supplier_short_name'),
+      item.supplier_name
+    ),
     spec: toText(item.spec),
     unit: firstText(item.unit, record.unit),
     unitPrice: toText(item.unit_price),
     quantity: toText(item.quantity),
     amount: toText(item.amount),
-    remark: toText(item.item_name),
+    remark: firstText(payloadValue(item, 'line_remark'), item.item_name),
   }
 }
 
@@ -91,11 +109,24 @@ function buildMaterialPurchasePrintDraft(record = {}) {
   return buildMaterialPurchaseContractDraft({
     contractNo: toText(record.document_no),
     orderDateText: toText(record.document_date),
-    returnDateText: toText(record.due_date),
+    returnDateText: firstText(
+      payloadValue(record, 'return_date'),
+      record.due_date
+    ),
     supplierName: toText(record.supplier_name),
-    supplierContact: '',
-    supplierPhone: '',
-    supplierAddress: '',
+    supplierContact: firstText(
+      payloadValue(record, 'supplier_contact'),
+      payloadValue(record, 'contact_name')
+    ),
+    supplierPhone: firstText(
+      payloadValue(record, 'supplier_phone'),
+      payloadValue(record, 'contact_phone'),
+      payloadValue(record, 'orderer_phone')
+    ),
+    supplierAddress: firstText(
+      payloadValue(record, 'supplier_address'),
+      payloadValue(record, 'address')
+    ),
     buyerCompany: baseDraft.buyerCompany,
     buyerContact: baseDraft.buyerContact,
     buyerPhone: baseDraft.buyerPhone,
@@ -114,7 +145,10 @@ function buildMaterialPurchasePrintDraft(record = {}) {
 function buildFallbackProcessingLine(record = {}) {
   return {
     contractNo: toText(record.document_no),
-    productOrderNo: toText(record.source_no),
+    productOrderNo: firstText(
+      payloadValue(record, 'product_order_no'),
+      record.source_no
+    ),
     productNo: toText(record.product_no),
     productName: toText(record.product_name),
     processName: '',
@@ -131,7 +165,10 @@ function buildFallbackProcessingLine(record = {}) {
 function mapProcessingItemToLine(item = {}, record = {}) {
   return {
     contractNo: toText(record.document_no),
-    productOrderNo: toText(record.source_no),
+    productOrderNo: firstText(
+      payloadValue(record, 'product_order_no'),
+      record.source_no
+    ),
     productNo: toText(record.product_no),
     productName: toText(record.product_name),
     processName: toText(item.item_name),
@@ -141,7 +178,10 @@ function mapProcessingItemToLine(item = {}, record = {}) {
     unitPrice: toText(item.unit_price),
     quantity: toText(item.quantity),
     amount: toText(item.amount),
-    remark: '',
+    remark: firstText(
+      payloadValue(item, 'line_remark'),
+      payloadValue(item, 'remark')
+    ),
   }
 }
 
@@ -157,11 +197,24 @@ function buildProcessingContractPrintDraft(record = {}) {
     ...baseDraft,
     contractNo: toText(record.document_no),
     orderDateText: toText(record.document_date),
-    returnDateText: toText(record.due_date),
+    returnDateText: firstText(
+      payloadValue(record, 'return_date'),
+      record.due_date
+    ),
     supplierName: toText(record.supplier_name),
-    supplierContact: '',
-    supplierPhone: '',
-    supplierAddress: '',
+    supplierContact: firstText(
+      payloadValue(record, 'supplier_contact'),
+      payloadValue(record, 'contact_name')
+    ),
+    supplierPhone: firstText(
+      payloadValue(record, 'supplier_phone'),
+      payloadValue(record, 'contact_phone'),
+      payloadValue(record, 'orderer_phone')
+    ),
+    supplierAddress: firstText(
+      payloadValue(record, 'supplier_address'),
+      payloadValue(record, 'address')
+    ),
     supplierSignDateText: '',
     attachments: createEmptyProcessingAttachments(),
     lines: lines.map((line) => normalizeProcessingLine(line)),

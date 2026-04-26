@@ -6,9 +6,13 @@
 
 权限码和内置角色真源在 `/Users/simon/projects/plush-toy-erp/server/internal/biz/rbac.go`。登录和 `auth.me` 返回当前管理员、角色、权限码和后端推导出的菜单；前端只负责按这些结果展示入口，不能把菜单隐藏当成安全边界。
 
+移动端角色入口只认 `mobile.<role>.access` 权限码，`auth.me.roles` 用于身份展示、任务归属匹配和审计语义，不能替代入口权限。
+
 `is_super_admin=true` 的账号拥有全部权限，用于初始化和紧急管理；普通管理员必须通过角色获得权限。普通管理员不能随意修改 super admin。
 
-workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作”，业务归属继续由 `owner_role_key`、`assignee_id`、`task_status_key` 判断“这条任务是不是你该处理”。`workflow.task.update` 不能绕过任务归属；boss / pmc 的查看、关注、催办能力也不等于可以替销售、采购、仓库、品质、财务完成业务事实。
+普通管理员的权限只来自未禁用角色；禁用角色不再授予权限。当前 `permissions` 表不提供独立 disabled 字段，权限停用方式是从角色权限中移除，或从 `rbac.go` 真源移除后由后端归一化丢弃，不能再用旧字段或历史权限码推导菜单、移动端入口或接口权限。
+
+workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作”，业务归属继续由 `owner_role_key`、`assignee_id`、`task_status_key` 判断“这条任务是不是你该处理”。`update_task_status` 中老板审批 `done` 要求 `workflow.task.approve`，其他 `done` 要求 `workflow.task.complete`，`rejected` 要求 `workflow.task.reject`，普通状态更新要求 `workflow.task.update`。`workflow.task.update / complete / approve / reject` 都不能绕过任务归属；boss / pmc 的查看、关注、催办能力也不等于可以替销售、采购、仓库、品质、财务完成业务事实。
 
 跟单角色如果甲方没有，不新增独立角色；业务跟进由 `sales` 或 `pmc` 承担。
 
@@ -22,6 +26,7 @@ workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作
 | 桌面入口 | `erp.dashboard.read`、`erp.print_template.read`、`erp.help_center.read`、`erp.business_chain_debug.read` | 后台菜单和页面入口 |
 | 业务记录 | `business.record.read/create/update/delete` | 通用业务记录读写删 |
 | 工作流 | `workflow.task.read/create/update/assign/approve/reject/complete` | 任务查询、创建、更新、指派、审批、驳回和完成 |
+| 采购入库 / 退货 | `purchase.receipt.read/create`、`purchase.return.read/create` | 当前为后端 usecase/repo 权限码预留；外部 JSON-RPC/API 接入时必须加对应守卫 |
 | 移动端 | `mobile.<role>.access` | 移动端角色入口，例如 `mobile.sales.access` |
 | 调试 | `debug.seed`、`debug.cleanup`、`debug.business.clear`、`debug.business_chain.run` | 开发 / 测试调试能力 |
 

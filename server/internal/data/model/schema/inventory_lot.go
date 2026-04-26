@@ -81,6 +81,8 @@ func (InventoryLot) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_return_items", PurchaseReturnItem.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("purchase_receipt_adjustment_items", PurchaseReceiptAdjustmentItem.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 

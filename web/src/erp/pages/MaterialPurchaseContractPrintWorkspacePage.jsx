@@ -29,10 +29,6 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
         workspaceStateID
       )
     : MATERIAL_PURCHASE_DRAFT_STORAGE_KEY
-  const legacyDraftStorageKeys = useMemo(
-    () => (workspaceStateID ? [MATERIAL_PURCHASE_DRAFT_STORAGE_KEY] : []),
-    [workspaceStateID]
-  )
   const workspaceURL = useMemo(() => {
     if (!workspaceStateID || typeof window === 'undefined') {
       return ''
@@ -62,7 +58,6 @@ export default function MaterialPurchaseContractPrintWorkspacePage() {
     <MaterialPurchaseContractWorkbench
       template={template}
       draftStorageKey={draftStorageKey}
-      legacyDraftStorageKeys={legacyDraftStorageKeys}
       resetDraftOnOpen={resetDraftOnOpen}
       workspaceStateID={workspaceStateID}
       workspaceURL={workspaceURL}

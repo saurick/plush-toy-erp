@@ -1896,6 +1896,29 @@ func HasPurchaseReturnsWith(preds ...predicate.PurchaseReturn) predicate.Busines
 	})
 }
 
+// HasPurchaseReceiptAdjustments applies the HasEdge predicate on the "purchase_receipt_adjustments" edge.
+func HasPurchaseReceiptAdjustments() predicate.BusinessRecord {
+	return predicate.BusinessRecord(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReceiptAdjustmentsTable, PurchaseReceiptAdjustmentsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPurchaseReceiptAdjustmentsWith applies the HasEdge predicate on the "purchase_receipt_adjustments" edge with a given conditions (other predicates).
+func HasPurchaseReceiptAdjustmentsWith(preds ...predicate.PurchaseReceiptAdjustment) predicate.BusinessRecord {
+	return predicate.BusinessRecord(func(s *sql.Selector) {
+		step := newPurchaseReceiptAdjustmentsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.BusinessRecord) predicate.BusinessRecord {
 	return predicate.BusinessRecord(sql.AndPredicates(predicates...))

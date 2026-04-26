@@ -365,8 +365,33 @@ func normalizeBusinessRecordDateFilterKey(value string) string {
 	case "document_date", "due_date", "created_at", "updated_at":
 		return text
 	default:
+		if strings.HasPrefix(text, "payload.") && isSafeBusinessRecordPayloadDateFilterKey(strings.TrimPrefix(text, "payload.")) {
+			return text
+		}
 		return ""
 	}
+}
+
+func isSafeBusinessRecordPayloadDateFilterKey(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if char >= 'a' && char <= 'z' {
+			continue
+		}
+		if char >= 'A' && char <= 'Z' {
+			continue
+		}
+		if char >= '0' && char <= '9' {
+			continue
+		}
+		if char == '_' || char == '-' {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 func normalizeBusinessRecordDateFilterValue(value string) string {

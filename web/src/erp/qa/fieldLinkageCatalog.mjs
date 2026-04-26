@@ -12,8 +12,16 @@ export const FIELD_LINKAGE_SCENARIO_CATALOG = [
     label: '来源快照保留并随状态流转带出',
   },
   {
-    key: 'legacy_stale_cleared',
-    label: '历史默认残值自动清理',
+    key: 'source_prefill_rebuilds_from_blank',
+    label: '新建来源带值从空白默认值重建',
+  },
+  {
+    key: 'source_change_clears_prefill',
+    label: '切换来源会清空旧来源带值',
+  },
+  {
+    key: 'stale_value_cleared',
+    label: '当前表单残值清理',
   },
   {
     key: 'derived_amount_recomputed',
@@ -24,8 +32,8 @@ export const FIELD_LINKAGE_SCENARIO_CATALOG = [
     label: '手工金额快照优先保留',
   },
   {
-    key: 'missing_snapshot_backfilled',
-    label: '表头缺值按明细回补',
+    key: 'header_totals_derived_from_items',
+    label: '表头数量金额按当前明细派生',
   },
   {
     key: 'merge_clears_covered_cells',
@@ -39,6 +47,10 @@ export const FIELD_LINKAGE_SCENARIO_CATALOG = [
     key: 'default_sample_clears_unverified_party',
     label: '默认样例不伪造供应商 / 加工商资料',
   },
+  {
+    key: 'contract_terms_excluded_from_business_scope',
+    label: '合同条款字段本轮排除在业务表单外',
+  },
 ]
 
 export const FIELD_LINKAGE_FIELD_CATALOG = [
@@ -48,7 +60,11 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '业务快照字段',
     risk: 'P0',
     docLabels: ['客户'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: [
+      'source_snapshot_retained',
+      'source_prefill_rebuilds_from_blank',
+      'source_change_clears_prefill',
+    ],
   },
   {
     fieldKey: 'orderNo',
@@ -56,7 +72,10 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '业务快照字段',
     risk: 'P0',
     docLabels: ['订单编号'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: [
+      'source_snapshot_retained',
+      'source_prefill_rebuilds_from_blank',
+    ],
   },
   {
     fieldKey: 'productOrderNo',
@@ -64,7 +83,10 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '业务快照字段',
     risk: 'P0',
     docLabels: ['产品订单编号'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: [
+      'source_snapshot_retained',
+      'source_prefill_rebuilds_from_blank',
+    ],
   },
   {
     fieldKey: 'styleNo',
@@ -72,7 +94,10 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '主档 / 主数据候选',
     risk: 'P0',
     docLabels: ['款式编号'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: [
+      'source_snapshot_retained',
+      'source_prefill_rebuilds_from_blank',
+    ],
   },
   {
     fieldKey: 'productNo',
@@ -80,7 +105,11 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '业务快照字段',
     risk: 'P0',
     docLabels: ['产品编号 / SKU'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: [
+      'source_snapshot_retained',
+      'source_prefill_rebuilds_from_blank',
+      'source_change_clears_prefill',
+    ],
   },
   {
     fieldKey: 'productNameColor',
@@ -88,7 +117,11 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '业务快照字段',
     risk: 'P0',
     docLabels: ['产品名称 / 颜色'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: [
+      'source_snapshot_retained',
+      'source_prefill_rebuilds_from_blank',
+      'source_change_clears_prefill',
+    ],
   },
   {
     fieldKey: 'mainMaterial',
@@ -96,7 +129,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: 'BOM 真源 / 派生影响',
     risk: 'P0',
     docLabels: ['主料物料字段'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: ['source_snapshot_retained', 'stale_value_cleared'],
   },
   {
     fieldKey: 'accessoryMaterial',
@@ -104,7 +137,11 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '采购快照字段',
     risk: 'P0',
     docLabels: ['辅材 / 包材字段'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: [
+      'source_snapshot_retained',
+      'stale_value_cleared',
+      'source_change_clears_prefill',
+    ],
   },
   {
     fieldKey: 'processorContactAddress',
@@ -112,10 +149,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '合同头快照',
     risk: 'P0',
     docLabels: ['加工方联系人 / 地址'],
-    requiredScenarioKeys: [
-      'legacy_stale_cleared',
-      'default_sample_clears_unverified_party',
-    ],
+    requiredScenarioKeys: ['default_sample_clears_unverified_party'],
   },
   {
     fieldKey: 'attachmentSnapshot',
@@ -152,10 +186,10 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
   {
     fieldKey: 'settlementTerms',
     fieldLabel: '结算方式 / 条款',
-    category: '合同条款快照',
-    risk: 'P0',
+    category: '合同条款快照（本轮排除）',
+    risk: 'P2',
     docLabels: ['结算方式 / 条款'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: ['contract_terms_excluded_from_business_scope'],
   },
   {
     fieldKey: 'sourceNo',
@@ -163,7 +197,11 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '通用业务记录快照',
     risk: 'P0',
     docLabels: ['来源单号'],
-    requiredScenarioKeys: ['source_snapshot_retained'],
+    requiredScenarioKeys: [
+      'source_snapshot_retained',
+      'source_prefill_rebuilds_from_blank',
+      'source_change_clears_prefill',
+    ],
   },
   {
     fieldKey: 'businessStatus',
@@ -181,7 +219,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     docLabels: ['数量', '明细数量'],
     requiredScenarioKeys: [
       'derived_amount_recomputed',
-      'missing_snapshot_backfilled',
+      'header_totals_derived_from_items',
     ],
   },
   {
@@ -210,7 +248,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     risk: 'P0',
     docLabels: ['表头数量'],
     requiredScenarioKeys: [
-      'missing_snapshot_backfilled',
+      'header_totals_derived_from_items',
       'manual_snapshot_retained',
     ],
   },
@@ -221,7 +259,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     risk: 'P0',
     docLabels: ['表头金额'],
     requiredScenarioKeys: [
-      'missing_snapshot_backfilled',
+      'header_totals_derived_from_items',
       'manual_snapshot_retained',
     ],
   },
@@ -284,11 +322,10 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     testFile: 'web/src/erp/utils/businessRecordForm.test.mjs',
   },
   {
-    caseId:
-      'FL_business_header_totals__backfills_missing_header_quantity_and_amount',
-    title: '业务记录表头数量和金额为空时按明细回补',
+    caseId: 'FL_business_header_totals__derives_quantity_and_amount_from_items',
+    title: '业务记录表头数量和金额为空时按当前明细派生',
     fieldKeys: ['itemQuantity', 'headerQuantity', 'headerAmount'],
-    scenarioKey: 'missing_snapshot_backfilled',
+    scenarioKey: 'header_totals_derived_from_items',
     layer: 'web',
     testFile: 'web/src/erp/utils/businessRecordForm.test.mjs',
   },
@@ -305,9 +342,16 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     title: '状态流转保留原记录字段和明细，避免只传状态导致清空',
     fieldKeys: [
       'customerName',
+      'orderNo',
+      'productOrderNo',
+      'styleNo',
       'productNo',
       'productNameColor',
       'mainMaterial',
+      'accessoryMaterial',
+      'returnDate',
+      'shipDate',
+      'orderDate',
       'processorContactAddress',
       'sourceNo',
       'businessStatus',
@@ -318,12 +362,58 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     testFile: 'web/src/erp/utils/businessRecordForm.test.mjs',
   },
   {
-    caseId: 'FL_processing_contract_legacy_sample__clears_stale_buyer_contact',
-    title: '旧默认加工合同样例会清理甲方联系人残值',
-    fieldKeys: ['processorContactAddress'],
-    scenarioKey: 'legacy_stale_cleared',
+    caseId: 'FL_contract_terms__excluded_from_non_contract_business_scope',
+    title: '合同正文、条款和打印专用字段本轮不作为业务表单字段',
+    fieldKeys: ['settlementTerms'],
+    scenarioKey: 'contract_terms_excluded_from_business_scope',
+    layer: 'docs',
+    testFile: 'web/src/erp/qa/fieldLinkageCatalog.test.mjs',
+  },
+  {
+    caseId: 'FL_business_item_payload__clears_stale_payload',
+    title: '业务记录明细 payload 按当前字段定义重建，清空后不保留当前表单残值',
+    fieldKeys: ['mainMaterial', 'accessoryMaterial'],
+    scenarioKey: 'stale_value_cleared',
     layer: 'web',
-    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+    testFile: 'web/src/erp/utils/businessRecordForm.test.mjs',
+  },
+  {
+    caseId: 'FL_business_source_prefill__rebuilds_target_from_blank',
+    title: '业务页新建来源带值从空白默认值重建目标记录',
+    fieldKeys: [
+      'customerName',
+      'orderNo',
+      'productOrderNo',
+      'styleNo',
+      'productNo',
+      'productNameColor',
+      'sourceNo',
+    ],
+    scenarioKey: 'source_prefill_rebuilds_from_blank',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/linkedNavigation.test.mjs',
+  },
+  {
+    caseId: 'FL_business_source_prefill__clears_when_source_changes',
+    title: '业务页新建已带值后切换来源会清空旧来源残值',
+    fieldKeys: [
+      'customerName',
+      'productNo',
+      'productNameColor',
+      'accessoryMaterial',
+      'sourceNo',
+    ],
+    scenarioKey: 'source_change_clears_prefill',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/linkedNavigation.test.mjs',
+  },
+  {
+    caseId: 'FL_business_source_prefill__filters_bom_accessories',
+    title: 'BOM 来源带到辅材采购时只保留辅材和包材明细',
+    fieldKeys: ['mainMaterial', 'accessoryMaterial'],
+    scenarioKey: 'stale_value_cleared',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/linkedNavigation.test.mjs',
   },
   {
     caseId:
@@ -371,7 +461,7 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     caseId: 'FL_processing_contract_editor__clears_blank_inserted_lines',
     title: '加工合同插入明细行会清空来源字段，避免复制旧残值',
     fieldKeys: ['productOrderNo', 'productNo', 'productNameColor'],
-    scenarioKey: 'legacy_stale_cleared',
+    scenarioKey: 'stale_value_cleared',
     layer: 'web',
     testFile: 'web/src/erp/utils/processingContractEditor.test.mjs',
   },
@@ -379,7 +469,7 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     caseId: 'FL_processing_contract_editor__clears_deleted_last_line',
     title: '加工合同删除到只剩一行时会重置为空白行',
     fieldKeys: ['productOrderNo', 'productNo', 'productNameColor'],
-    scenarioKey: 'legacy_stale_cleared',
+    scenarioKey: 'stale_value_cleared',
     layer: 'web',
     testFile: 'web/src/erp/utils/processingContractEditor.test.mjs',
   },

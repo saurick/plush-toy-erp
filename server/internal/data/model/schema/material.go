@@ -56,6 +56,7 @@ func (Material) Edges() []ent.Edge {
 		edge.To("bom_items", BOMItem.Type),
 		edge.To("purchase_receipt_items", PurchaseReceiptItem.Type),
 		edge.To("purchase_return_items", PurchaseReturnItem.Type),
+		edge.To("purchase_receipt_adjustment_items", PurchaseReceiptAdjustmentItem.Type),
 	}
 }
 

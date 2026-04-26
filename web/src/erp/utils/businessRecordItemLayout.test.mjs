@@ -21,15 +21,25 @@ test('businessRecordItemLayout: 条目字段按文本、数字和单位保留桌
   )
 
   assert.deepEqual(spans, {
+    'payload.material_category': 6,
     material_name: 6,
+    'payload.supplier_item_no': 6,
     spec: 5,
-    quantity: 4,
+    'payload.color': 6,
     unit: 3,
+    'payload.assembly_part': 6,
+    'payload.piece_count': 4,
+    'payload.unit_usage': 4,
+    'payload.loss_rate': 4,
+    quantity: 4,
+    'payload.process_prepare_note': 6,
+    'payload.process_type': 6,
     supplier_name: 5,
+    item_name: 6,
   })
   assert.equal(
     resolveBusinessRecordItemRowMinWidth(definition.itemFields),
-    1472
+    4928
   )
 })
 

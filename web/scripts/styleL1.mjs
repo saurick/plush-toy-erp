@@ -304,7 +304,7 @@ const scenarios = [
         name: '新建：客户/款式立项',
       })
       await createDialog
-        .getByRole('textbox', { name: '订单编号' })
+        .getByRole('textbox', { name: '订单编号', exact: true })
         .fill('STYLE-L1-001')
       await createDialog
         .getByRole('textbox', { name: '* 客户' })
@@ -315,9 +315,11 @@ const scenarios = [
           '.erp-business-record-item-grid input[placeholder="产品、颜色或款式分行"]'
         )
         .fill('浅棕色毛绒熊')
-      await page
-        .locator('.erp-business-record-item-grid .ant-input-number-input')
-        .nth(0)
+      const itemGrid = page.locator('.erp-business-record-item-grid')
+      await itemGrid
+        .locator('.erp-item-field-stack')
+        .filter({ hasText: '订单数量' })
+        .locator('.ant-input-number-input')
         .fill('2')
       await page
         .locator('.erp-business-record-item-grid input[placeholder="单位"]')
@@ -325,12 +327,14 @@ const scenarios = [
       await page
         .locator('.erp-business-record-item-grid input[aria-label="单位 pcs"]')
         .waitFor({ state: 'visible', timeout: 10_000 })
-      await page
-        .locator('.erp-business-record-item-grid .ant-input-number-input')
-        .nth(1)
+      await itemGrid
+        .locator('.erp-item-field-stack')
+        .filter({ hasText: '金额' })
+        .locator('.ant-input-number-input')
         .fill('39.8')
       await page
         .locator('.erp-business-record-item-grid input[aria-label="单位 CNY"]')
+        .first()
         .waitFor({ state: 'visible', timeout: 10_000 })
       await expectText(page, '数量合计 2')
       await expectText(page, '金额合计 39.80')
@@ -532,7 +536,7 @@ const scenarios = [
       await purchaseDialog
         .getByRole('textbox', { name: '* 供应商' })
         .fill('联调供应商')
-      await purchaseDialog.getByLabel('到料日期').fill('2026-04-28')
+      await purchaseDialog.getByLabel('回货日期').fill('2026-04-28')
       await page
         .locator(
           '.erp-business-record-item-grid input[placeholder="辅材 / 包材名称"]'
@@ -1371,7 +1375,7 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '加工合同/委外下单')
-      await expectText(page, '加工合同号')
+      await expectText(page, '委外加工订单号')
       await expectText(page, '新建记录')
       await assertBusinessSelectionActionBarHidden(page, {
         scenarioName: 'business-processing-contracts-desktop',
@@ -4490,7 +4494,10 @@ async function assertBusinessRecordModalLayout(
     const addItemButton = controls.find((control) =>
       control.className.includes('erp-business-record-form__add-item-button')
     )
-    const firstRowCols = fieldCols.slice(0, 6)
+    const headerFieldCols = fieldCols.filter(
+      (col) => !String(col.text || '').startsWith('来源带值')
+    )
+    const firstRowCols = headerFieldCols.slice(0, 6)
     const modalRect = modal?.getBoundingClientRect()
     const contentStyle = content ? window.getComputedStyle(content) : null
     const headerStyle = header ? window.getComputedStyle(header) : null
@@ -4559,6 +4566,7 @@ async function assertBusinessRecordModalLayout(
           }
         : null,
       fieldCols,
+      headerFieldCols,
       firstRowCols,
       controls,
       addItemButton,
@@ -5029,7 +5037,8 @@ function assertNoBlueFocusStyle(metrics, scenarioName) {
 }
 
 function isNeutralModalControlBorderColor(color) {
-  return String(color || '').replaceAll(' ', '') === 'rgb(217,217,217)'
+  const normalized = String(color || '').replaceAll(' ', '')
+  return normalized === 'rgb(217,217,217)' || normalized === 'rgb(191,191,191)'
 }
 
 function isTailwindFormsResetBorderColor(color) {

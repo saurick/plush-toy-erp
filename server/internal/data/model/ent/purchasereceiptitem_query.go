@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/unit"
@@ -25,16 +26,17 @@ import (
 // PurchaseReceiptItemQuery is the builder for querying PurchaseReceiptItem entities.
 type PurchaseReceiptItemQuery struct {
 	config
-	ctx                     *QueryContext
-	order                   []purchasereceiptitem.OrderOption
-	inters                  []Interceptor
-	predicates              []predicate.PurchaseReceiptItem
-	withReceipt             *PurchaseReceiptQuery
-	withMaterial            *MaterialQuery
-	withWarehouse           *WarehouseQuery
-	withUnit                *UnitQuery
-	withInventoryLot        *InventoryLotQuery
-	withPurchaseReturnItems *PurchaseReturnItemQuery
+	ctx                                *QueryContext
+	order                              []purchasereceiptitem.OrderOption
+	inters                             []Interceptor
+	predicates                         []predicate.PurchaseReceiptItem
+	withReceipt                        *PurchaseReceiptQuery
+	withMaterial                       *MaterialQuery
+	withWarehouse                      *WarehouseQuery
+	withUnit                           *UnitQuery
+	withInventoryLot                   *InventoryLotQuery
+	withPurchaseReturnItems            *PurchaseReturnItemQuery
+	withPurchaseReceiptAdjustmentItems *PurchaseReceiptAdjustmentItemQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -196,6 +198,28 @@ func (_q *PurchaseReceiptItemQuery) QueryPurchaseReturnItems() *PurchaseReturnIt
 			sqlgraph.From(purchasereceiptitem.Table, purchasereceiptitem.FieldID, selector),
 			sqlgraph.To(purchasereturnitem.Table, purchasereturnitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceiptitem.PurchaseReturnItemsTable, purchasereceiptitem.PurchaseReturnItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPurchaseReceiptAdjustmentItems chains the current query on the "purchase_receipt_adjustment_items" edge.
+func (_q *PurchaseReceiptItemQuery) QueryPurchaseReceiptAdjustmentItems() *PurchaseReceiptAdjustmentItemQuery {
+	query := (&PurchaseReceiptAdjustmentItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptitem.Table, purchasereceiptitem.FieldID, selector),
+			sqlgraph.To(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceiptitem.PurchaseReceiptAdjustmentItemsTable, purchasereceiptitem.PurchaseReceiptAdjustmentItemsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -390,17 +414,18 @@ func (_q *PurchaseReceiptItemQuery) Clone() *PurchaseReceiptItemQuery {
 		return nil
 	}
 	return &PurchaseReceiptItemQuery{
-		config:                  _q.config,
-		ctx:                     _q.ctx.Clone(),
-		order:                   append([]purchasereceiptitem.OrderOption{}, _q.order...),
-		inters:                  append([]Interceptor{}, _q.inters...),
-		predicates:              append([]predicate.PurchaseReceiptItem{}, _q.predicates...),
-		withReceipt:             _q.withReceipt.Clone(),
-		withMaterial:            _q.withMaterial.Clone(),
-		withWarehouse:           _q.withWarehouse.Clone(),
-		withUnit:                _q.withUnit.Clone(),
-		withInventoryLot:        _q.withInventoryLot.Clone(),
-		withPurchaseReturnItems: _q.withPurchaseReturnItems.Clone(),
+		config:                             _q.config,
+		ctx:                                _q.ctx.Clone(),
+		order:                              append([]purchasereceiptitem.OrderOption{}, _q.order...),
+		inters:                             append([]Interceptor{}, _q.inters...),
+		predicates:                         append([]predicate.PurchaseReceiptItem{}, _q.predicates...),
+		withReceipt:                        _q.withReceipt.Clone(),
+		withMaterial:                       _q.withMaterial.Clone(),
+		withWarehouse:                      _q.withWarehouse.Clone(),
+		withUnit:                           _q.withUnit.Clone(),
+		withInventoryLot:                   _q.withInventoryLot.Clone(),
+		withPurchaseReturnItems:            _q.withPurchaseReturnItems.Clone(),
+		withPurchaseReceiptAdjustmentItems: _q.withPurchaseReceiptAdjustmentItems.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -470,6 +495,17 @@ func (_q *PurchaseReceiptItemQuery) WithPurchaseReturnItems(opts ...func(*Purcha
 		opt(query)
 	}
 	_q.withPurchaseReturnItems = query
+	return _q
+}
+
+// WithPurchaseReceiptAdjustmentItems tells the query-builder to eager-load the nodes that are connected to
+// the "purchase_receipt_adjustment_items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *PurchaseReceiptItemQuery) WithPurchaseReceiptAdjustmentItems(opts ...func(*PurchaseReceiptAdjustmentItemQuery)) *PurchaseReceiptItemQuery {
+	query := (&PurchaseReceiptAdjustmentItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPurchaseReceiptAdjustmentItems = query
 	return _q
 }
 
@@ -551,13 +587,14 @@ func (_q *PurchaseReceiptItemQuery) sqlAll(ctx context.Context, hooks ...queryHo
 	var (
 		nodes       = []*PurchaseReceiptItem{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [7]bool{
 			_q.withReceipt != nil,
 			_q.withMaterial != nil,
 			_q.withWarehouse != nil,
 			_q.withUnit != nil,
 			_q.withInventoryLot != nil,
 			_q.withPurchaseReturnItems != nil,
+			_q.withPurchaseReceiptAdjustmentItems != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -613,6 +650,17 @@ func (_q *PurchaseReceiptItemQuery) sqlAll(ctx context.Context, hooks ...queryHo
 			func(n *PurchaseReceiptItem) { n.Edges.PurchaseReturnItems = []*PurchaseReturnItem{} },
 			func(n *PurchaseReceiptItem, e *PurchaseReturnItem) {
 				n.Edges.PurchaseReturnItems = append(n.Edges.PurchaseReturnItems, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPurchaseReceiptAdjustmentItems; query != nil {
+		if err := _q.loadPurchaseReceiptAdjustmentItems(ctx, query, nodes,
+			func(n *PurchaseReceiptItem) {
+				n.Edges.PurchaseReceiptAdjustmentItems = []*PurchaseReceiptAdjustmentItem{}
+			},
+			func(n *PurchaseReceiptItem, e *PurchaseReceiptAdjustmentItem) {
+				n.Edges.PurchaseReceiptAdjustmentItems = append(n.Edges.PurchaseReceiptAdjustmentItems, e)
 			}); err != nil {
 			return nil, err
 		}
@@ -796,6 +844,36 @@ func (_q *PurchaseReceiptItemQuery) loadPurchaseReturnItems(ctx context.Context,
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "purchase_receipt_item_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *PurchaseReceiptItemQuery) loadPurchaseReceiptAdjustmentItems(ctx context.Context, query *PurchaseReceiptAdjustmentItemQuery, nodes []*PurchaseReceiptItem, init func(*PurchaseReceiptItem), assign func(*PurchaseReceiptItem, *PurchaseReceiptAdjustmentItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*PurchaseReceiptItem)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(purchasereceiptadjustmentitem.FieldPurchaseReceiptItemID)
+	}
+	query.Where(predicate.PurchaseReceiptAdjustmentItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(purchasereceiptitem.PurchaseReceiptAdjustmentItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.PurchaseReceiptItemID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "purchase_receipt_item_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

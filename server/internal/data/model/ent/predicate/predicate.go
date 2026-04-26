@@ -48,6 +48,12 @@ type Product func(*sql.Selector)
 // PurchaseReceipt is the predicate function for purchasereceipt builders.
 type PurchaseReceipt func(*sql.Selector)
 
+// PurchaseReceiptAdjustment is the predicate function for purchasereceiptadjustment builders.
+type PurchaseReceiptAdjustment func(*sql.Selector)
+
+// PurchaseReceiptAdjustmentItem is the predicate function for purchasereceiptadjustmentitem builders.
+type PurchaseReceiptAdjustmentItem func(*sql.Selector)
+
 // PurchaseReceiptItem is the predicate function for purchasereceiptitem builders.
 type PurchaseReceiptItem func(*sql.Selector)
 

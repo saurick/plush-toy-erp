@@ -462,6 +462,29 @@ func HasPurchaseReturnItemsWith(preds ...predicate.PurchaseReturnItem) predicate
 	})
 }
 
+// HasPurchaseReceiptAdjustmentItems applies the HasEdge predicate on the "purchase_receipt_adjustment_items" edge.
+func HasPurchaseReceiptAdjustmentItems() predicate.Warehouse {
+	return predicate.Warehouse(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReceiptAdjustmentItemsTable, PurchaseReceiptAdjustmentItemsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPurchaseReceiptAdjustmentItemsWith applies the HasEdge predicate on the "purchase_receipt_adjustment_items" edge with a given conditions (other predicates).
+func HasPurchaseReceiptAdjustmentItemsWith(preds ...predicate.PurchaseReceiptAdjustmentItem) predicate.Warehouse {
+	return predicate.Warehouse(func(s *sql.Selector) {
+		step := newPurchaseReceiptAdjustmentItemsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Warehouse) predicate.Warehouse {
 	return predicate.Warehouse(sql.AndPredicates(predicates...))

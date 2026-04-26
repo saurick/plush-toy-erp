@@ -175,6 +175,8 @@ func assertProjectBusinessTablesEmpty(t *testing.T, ctx context.Context, client 
 		{"workflow_tasks", client.WorkflowTask.Query().Count},
 		{"workflow_task_events", client.WorkflowTaskEvent.Query().Count},
 		{"workflow_business_states", client.WorkflowBusinessState.Query().Count},
+		{"purchase_receipt_adjustments", client.PurchaseReceiptAdjustment.Query().Count},
+		{"purchase_receipt_adjustment_items", client.PurchaseReceiptAdjustmentItem.Query().Count},
 		{"purchase_receipts", client.PurchaseReceipt.Query().Count},
 		{"purchase_receipt_items", client.PurchaseReceiptItem.Query().Count},
 		{"inventory_balances", client.InventoryBalance.Query().Count},

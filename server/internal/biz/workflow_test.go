@@ -177,6 +177,115 @@ func TestWorkflowBusinessStatesAcceptShipmentPendingStatus(t *testing.T) {
 	t.Fatalf("expected WorkflowBusinessStates to include %q", statusKey)
 }
 
+func TestWorkflowStatusActionPermissionMapsUpdateCompleteApproveReject(t *testing.T) {
+	if got := WorkflowStatusActionPermission("processing", &WorkflowTask{TaskGroup: "generic"}); got != PermissionWorkflowTaskUpdate {
+		t.Fatalf("processing should require update, got %s", got)
+	}
+	if got := WorkflowStatusActionPermission("blocked", &WorkflowTask{TaskGroup: "generic"}); got != PermissionWorkflowTaskUpdate {
+		t.Fatalf("blocked should require update, got %s", got)
+	}
+	if got := WorkflowStatusActionPermission("done", &WorkflowTask{TaskGroup: "purchase_iqc"}); got != PermissionWorkflowTaskComplete {
+		t.Fatalf("regular done should require complete, got %s", got)
+	}
+	if got := WorkflowStatusActionPermission("rejected", &WorkflowTask{TaskGroup: "purchase_iqc"}); got != PermissionWorkflowTaskReject {
+		t.Fatalf("rejected should require reject, got %s", got)
+	}
+	if got := WorkflowStatusActionPermission("done", bossApprovalWorkflowTask()); got != PermissionWorkflowTaskApprove {
+		t.Fatalf("boss approval done should require approve, got %s", got)
+	}
+}
+
+func TestCanAdminHandleWorkflowTaskEnforcesOwnerAssigneeAndStatus(t *testing.T) {
+	assigneeID := 8
+	task := &WorkflowTask{
+		ID:            1,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  QualityRoleKey,
+	}
+	qualityAdmin := &AdminUser{
+		ID:    7,
+		Roles: []AdminRole{{Key: QualityRoleKey}},
+	}
+	financeAdmin := &AdminUser{
+		ID:    9,
+		Roles: []AdminRole{{Key: FinanceRoleKey}},
+	}
+	assignedAdmin := &AdminUser{
+		ID:    assigneeID,
+		Roles: []AdminRole{{Key: FinanceRoleKey}},
+	}
+	superAdmin := &AdminUser{
+		ID:           10,
+		IsSuperAdmin: true,
+		Roles:        []AdminRole{{Key: AdminRoleKey}},
+	}
+
+	if !CanAdminHandleWorkflowTask(qualityAdmin, task, "done") {
+		t.Fatalf("owner role should handle unassigned task")
+	}
+	if CanAdminHandleWorkflowTask(financeAdmin, task, "done") {
+		t.Fatalf("different role must not handle unassigned quality task")
+	}
+	task.AssigneeID = &assigneeID
+	if CanAdminHandleWorkflowTask(qualityAdmin, task, "done") {
+		t.Fatalf("assigned task must require assigned admin")
+	}
+	if !CanAdminHandleWorkflowTask(assignedAdmin, task, "done") {
+		t.Fatalf("assigned admin should handle assigned task")
+	}
+	if CanAdminHandleWorkflowTask(superAdmin, task, "done") {
+		t.Fatalf("super admin must not bypass assignee business boundary")
+	}
+	task.AssigneeID = nil
+	task.TaskStatusKey = "done"
+	if CanAdminHandleWorkflowTask(qualityAdmin, task, "processing") {
+		t.Fatalf("terminal current task must not be handled")
+	}
+	task.TaskStatusKey = "ready"
+	if CanAdminHandleWorkflowTask(qualityAdmin, task, "unknown") {
+		t.Fatalf("invalid next status must not be handled")
+	}
+}
+
+func TestCanAdminUrgeWorkflowTaskEnforcesBusinessBoundary(t *testing.T) {
+	assigneeID := 8
+	task := &WorkflowTask{
+		ID:            1,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  WarehouseRoleKey,
+	}
+	warehouseAdmin := &AdminUser{ID: 7, Roles: []AdminRole{{Key: WarehouseRoleKey}}}
+	qualityAdmin := &AdminUser{ID: 9, Roles: []AdminRole{{Key: QualityRoleKey}}}
+	pmcAdmin := &AdminUser{ID: 10, Roles: []AdminRole{{Key: PMCRoleKey}}}
+	bossAdmin := &AdminUser{ID: 11, Roles: []AdminRole{{Key: BossRoleKey}}}
+	superAdmin := &AdminUser{ID: 12, IsSuperAdmin: true}
+	assignedAdmin := &AdminUser{ID: assigneeID, Roles: []AdminRole{{Key: QualityRoleKey}}}
+
+	if !CanAdminUrgeWorkflowTask(warehouseAdmin, task) {
+		t.Fatalf("owner role should urge own task")
+	}
+	if CanAdminUrgeWorkflowTask(qualityAdmin, task) {
+		t.Fatalf("ordinary non-owner role must not urge unrelated task")
+	}
+	if !CanAdminUrgeWorkflowTask(pmcAdmin, task) || !CanAdminUrgeWorkflowTask(bossAdmin, task) {
+		t.Fatalf("pmc and boss should be able to urge active tasks")
+	}
+	if !CanAdminUrgeWorkflowTask(superAdmin, task) {
+		t.Fatalf("super admin should be able to urge active tasks")
+	}
+	task.AssigneeID = &assigneeID
+	if CanAdminUrgeWorkflowTask(warehouseAdmin, task) {
+		t.Fatalf("assigned task must require assignee for ordinary owner role urge")
+	}
+	if !CanAdminUrgeWorkflowTask(assignedAdmin, task) {
+		t.Fatalf("assigned admin should urge assigned task")
+	}
+	task.TaskStatusKey = "done"
+	if CanAdminUrgeWorkflowTask(pmcAdmin, task) {
+		t.Fatalf("terminal task must not be urged")
+	}
+}
+
 func TestWorkflowUsecase_AcceptsPurchaseInboundBusinessStatuses(t *testing.T) {
 	validStatuses := []string{
 		"iqc_pending",
@@ -1950,6 +2059,363 @@ func TestWorkflowUsecase_FinishedGoodsQCFailedBusinessStatusStillUsesSpecialRule
 	}
 }
 
+func TestWorkflowUsecase_FinishedGoodsInboundDoneUpsertsInboundDoneOnly(t *testing.T) {
+	task := finishedGoodsInboundWorkflowTask()
+	task.Payload["blocked_reason"] = "旧阻塞原因"
+	repo := &stubWorkflowRepo{currentTask: task}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            task.ID,
+		TaskStatusKey: "done",
+		Payload:       map[string]any{"mobile_role_key": "warehouse"},
+	}, 7, "warehouse")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.BusinessStatusKey != workflowInboundDoneStatusKey {
+		t.Fatalf("expected inbound_done, got %q", repo.updateTaskInput.BusinessStatusKey)
+	}
+	if repo.updateTaskInput.Payload["inbound_task_id"] != task.ID ||
+		repo.updateTaskInput.Payload["inbound_result"] != "done" ||
+		repo.updateTaskInput.Payload["finished_goods"] != true ||
+		repo.updateTaskInput.Payload["inventory_balance_deferred"] != true ||
+		repo.updateTaskInput.Payload["shipment_release_deferred"] != true ||
+		repo.updateTaskInput.Payload["decision"] != "done" ||
+		repo.updateTaskInput.Payload["transition_status"] != "done" {
+		t.Fatalf("expected finished goods inbound done payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected done transition to clear stale blocked_reason, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects == nil || effects.BusinessState == nil {
+		t.Fatalf("expected finished goods inbound business state side effect, got %#v", effects)
+	}
+	if effects.DerivedTask != nil {
+		t.Fatalf("finished goods inbound done must not derive downstream task, got %#v", effects.DerivedTask)
+	}
+	if effects.WorkflowRuleKey != "finished_goods_inbound_done_to_inbound_done" {
+		t.Fatalf("expected finished goods inbound done rule key, got %q", effects.WorkflowRuleKey)
+	}
+	if effects.BusinessState.BusinessStatusKey != workflowInboundDoneStatusKey ||
+		effects.BusinessState.OwnerRoleKey == nil ||
+		*effects.BusinessState.OwnerRoleKey != "warehouse" {
+		t.Fatalf("unexpected finished goods inbound business state %#v", effects.BusinessState)
+	}
+	if effects.BusinessState.Payload["inbound_task_id"] != task.ID ||
+		effects.BusinessState.Payload["inbound_result"] != "done" ||
+		effects.BusinessState.Payload["inventory_balance_deferred"] != true ||
+		effects.BusinessState.Payload["shipment_release_deferred"] != true ||
+		effects.BusinessState.Payload["decision"] != "done" {
+		t.Fatalf("expected inbound_done state payload, got %#v", effects.BusinessState.Payload)
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsInboundRepeatedDoneDoesNotDeriveDownstreamTask(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsInboundWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	for i := 0; i < 2; i++ {
+		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			ID:            1201,
+			TaskStatusKey: "done",
+			Payload:       map[string]any{},
+		}, 7, "warehouse")
+		if err != nil {
+			t.Fatalf("update #%d failed: %v", i+1, err)
+		}
+		if repo.updateTaskInput.SideEffects == nil ||
+			repo.updateTaskInput.SideEffects.DerivedTask != nil {
+			t.Fatalf("finished goods inbound done should only upsert business state")
+		}
+	}
+	if repo.derivedTaskCount != 0 {
+		t.Fatalf("expected no derived downstream task intent, got %d", repo.derivedTaskCount)
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsInboundBlockedRequiresReason(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsInboundWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1201,
+		TaskStatusKey: "blocked",
+		Payload:       map[string]any{"blocked_reason": "   "},
+	}, 7, "warehouse")
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+	if repo.updateTaskInput != nil {
+		t.Fatalf("repo update should not be called without reason")
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsInboundBlockedUpsertsBlockedState(t *testing.T) {
+	task := finishedGoodsInboundWorkflowTask()
+	task.Payload["rejected_reason"] = "旧退回原因"
+	repo := &stubWorkflowRepo{currentTask: task}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            task.ID,
+		TaskStatusKey: "blocked",
+		Payload:       map[string]any{"blocked_reason": " 库位未确认 "},
+	}, 7, "warehouse")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.Reason != "库位未确认" {
+		t.Fatalf("expected trimmed reason, got %q", repo.updateTaskInput.Reason)
+	}
+	if repo.updateTaskInput.BusinessStatusKey != workflowBlockedStatusKey {
+		t.Fatalf("expected blocked business status, got %q", repo.updateTaskInput.BusinessStatusKey)
+	}
+	if repo.updateTaskInput.Payload["decision"] != "blocked" ||
+		repo.updateTaskInput.Payload["transition_status"] != "blocked" ||
+		repo.updateTaskInput.Payload["blocked_reason"] != "库位未确认" ||
+		repo.updateTaskInput.Payload["finished_goods"] != true {
+		t.Fatalf("expected blocked decision update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["rejected_reason"]; ok {
+		t.Fatalf("expected blocked transition to clear stale rejected_reason, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects == nil || effects.BusinessState == nil {
+		t.Fatalf("expected finished goods inbound blocked business state side effect, got %#v", effects)
+	}
+	if effects.DerivedTask != nil {
+		t.Fatalf("finished goods inbound blocked must not derive downstream task, got %#v", effects.DerivedTask)
+	}
+	if effects.WorkflowRuleKey != "finished_goods_inbound_blocked_to_blocked" {
+		t.Fatalf("expected finished goods inbound blocked rule key, got %q", effects.WorkflowRuleKey)
+	}
+	if effects.BusinessState.BusinessStatusKey != workflowBlockedStatusKey ||
+		effects.BusinessState.OwnerRoleKey == nil ||
+		*effects.BusinessState.OwnerRoleKey != "warehouse" ||
+		effects.BusinessState.BlockedReason == nil ||
+		*effects.BusinessState.BlockedReason != "库位未确认" {
+		t.Fatalf("unexpected blocked business state %#v", effects.BusinessState)
+	}
+	if effects.BusinessState.Payload["decision"] != "blocked" ||
+		effects.BusinessState.Payload["transition_status"] != "blocked" ||
+		effects.BusinessState.Payload["blocked_reason"] != "库位未确认" {
+		t.Fatalf("expected blocked state payload, got %#v", effects.BusinessState.Payload)
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsInboundRejectedRequiresReason(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsInboundWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1201,
+		TaskStatusKey: "rejected",
+		Reason:        " \t ",
+		Payload:       map[string]any{},
+	}, 7, "warehouse")
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+	if repo.updateTaskInput != nil {
+		t.Fatalf("repo update should not be called without reason")
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsInboundRejectedUpsertsBlockedState(t *testing.T) {
+	task := finishedGoodsInboundWorkflowTask()
+	task.BusinessStatusKey = ptrString(workflowBlockedStatusKey)
+	task.Payload["blocked_reason"] = "旧阻塞原因"
+	repo := &stubWorkflowRepo{currentTask: task}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            task.ID,
+		TaskStatusKey: "rejected",
+		Reason:        "数量与完工单不符",
+		Payload:       map[string]any{},
+	}, 7, "warehouse")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.BusinessStatusKey != workflowBlockedStatusKey {
+		t.Fatalf("expected blocked business status, got %q", repo.updateTaskInput.BusinessStatusKey)
+	}
+	if repo.updateTaskInput.Payload["decision"] != "rejected" ||
+		repo.updateTaskInput.Payload["transition_status"] != "rejected" ||
+		repo.updateTaskInput.Payload["rejected_reason"] != "数量与完工单不符" {
+		t.Fatalf("expected rejected decision update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected rejected transition to clear stale blocked_reason, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects.BusinessState.BusinessStatusKey != workflowBlockedStatusKey ||
+		effects.BusinessState.OwnerRoleKey == nil ||
+		*effects.BusinessState.OwnerRoleKey != "warehouse" {
+		t.Fatalf("unexpected rejected business state %#v", effects.BusinessState)
+	}
+	if effects.WorkflowRuleKey != "finished_goods_inbound_rejected_to_blocked" {
+		t.Fatalf("expected finished goods inbound rejected rule key, got %q", effects.WorkflowRuleKey)
+	}
+	if effects.DerivedTask != nil {
+		t.Fatalf("finished goods inbound rejected must not derive downstream task, got %#v", effects.DerivedTask)
+	}
+	if _, ok := effects.BusinessState.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected rejected business state to omit stale blocked_reason, got %#v", effects.BusinessState.Payload)
+	}
+}
+
+func TestWorkflowUsecase_SameNameNonFinishedGoodsInboundTaskDoesNotDerive(t *testing.T) {
+	cases := []struct {
+		name string
+		task *WorkflowTask
+	}{
+		{
+			name: "wrong owner",
+			task: &WorkflowTask{
+				ID:                1301,
+				TaskGroup:         workflowFinishedGoodsInboundTaskGroup,
+				TaskName:          "成品入库",
+				SourceType:        workflowProductionProgressModuleKey,
+				SourceID:          101,
+				BusinessStatusKey: ptrString(workflowWarehouseInboundPendingKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "quality",
+				Payload:           map[string]any{"finished_goods": true},
+			},
+		},
+		{
+			name: "wrong source",
+			task: &WorkflowTask{
+				ID:                1302,
+				TaskGroup:         workflowFinishedGoodsInboundTaskGroup,
+				TaskName:          "成品入库",
+				SourceType:        workflowInboundModuleKey,
+				SourceID:          101,
+				BusinessStatusKey: ptrString(workflowWarehouseInboundPendingKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "warehouse",
+				Payload:           map[string]any{"finished_goods": true},
+			},
+		},
+		{
+			name: "missing finished goods marker",
+			task: &WorkflowTask{
+				ID:                1303,
+				TaskGroup:         workflowFinishedGoodsInboundTaskGroup,
+				TaskName:          "成品入库",
+				SourceType:        workflowProductionProgressModuleKey,
+				SourceID:          101,
+				BusinessStatusKey: ptrString(workflowWarehouseInboundPendingKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "warehouse",
+				Payload:           map[string]any{},
+			},
+		},
+		{
+			name: "settled business status",
+			task: &WorkflowTask{
+				ID:                1304,
+				TaskGroup:         workflowFinishedGoodsInboundTaskGroup,
+				TaskName:          "成品入库",
+				SourceType:        workflowProductionProgressModuleKey,
+				SourceID:          101,
+				BusinessStatusKey: ptrString(workflowInboundDoneStatusKey),
+				TaskStatusKey:     "ready",
+				OwnerRoleKey:      "warehouse",
+				Payload:           map[string]any{"finished_goods": true},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubWorkflowRepo{currentTask: tc.task}
+			uc := NewWorkflowUsecase(repo)
+
+			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+				ID:            tc.task.ID,
+				TaskStatusKey: "blocked",
+				Payload:       map[string]any{},
+			}, 7, tc.task.OwnerRoleKey)
+			if err != nil {
+				t.Fatalf("same-name non-finished-goods-inbound task should keep original behavior, got %v", err)
+			}
+			if repo.updateTaskInput == nil {
+				t.Fatalf("expected repo update")
+			}
+			if repo.updateTaskInput.SideEffects != nil {
+				t.Fatalf("same-name non-finished-goods-inbound task should not derive side effects")
+			}
+		})
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsInboundSettledBusinessStatusDoesNotTriggerSpecialRule(t *testing.T) {
+	cases := []struct {
+		name              string
+		businessStatusKey string
+	}{
+		{name: "already inbound done", businessStatusKey: workflowInboundDoneStatusKey},
+		{name: "already shipment pending", businessStatusKey: "shipment_pending"},
+		{name: "already shipment release pending legacy state", businessStatusKey: "shipment_release_pending"},
+		{name: "already shipping released", businessStatusKey: "shipping_released"},
+		{name: "already shipped", businessStatusKey: "shipped"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			task := finishedGoodsInboundWorkflowTask()
+			task.BusinessStatusKey = ptrString(tc.businessStatusKey)
+			repo := &stubWorkflowRepo{currentTask: task}
+			uc := NewWorkflowUsecase(repo)
+
+			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+				ID:            task.ID,
+				TaskStatusKey: "done",
+				Payload:       map[string]any{},
+			}, 7, "warehouse")
+			if err != nil {
+				t.Fatalf("settled finished goods inbound status should keep original behavior, got %v", err)
+			}
+			if repo.updateTaskInput == nil {
+				t.Fatalf("expected repo update")
+			}
+			if repo.updateTaskInput.SideEffects != nil {
+				t.Fatalf("settled finished goods inbound status should not trigger special side effects")
+			}
+		})
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsInboundBlockedBusinessStatusStillUsesSpecialRule(t *testing.T) {
+	task := finishedGoodsInboundWorkflowTask()
+	task.BusinessStatusKey = ptrString(workflowBlockedStatusKey)
+	repo := &stubWorkflowRepo{currentTask: task}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            task.ID,
+		TaskStatusKey: "blocked",
+		Reason:        "重复确认仍卡库位",
+		Payload:       map[string]any{},
+	}, 7, "warehouse")
+	if err != nil {
+		t.Fatalf("blocked finished goods inbound task should still use special rule, got %v", err)
+	}
+	if repo.updateTaskInput == nil || repo.updateTaskInput.SideEffects == nil {
+		t.Fatalf("expected blocked finished goods inbound task to upsert business state")
+	}
+	if repo.updateTaskInput.SideEffects.DerivedTask != nil {
+		t.Fatalf("blocked finished goods inbound task must not derive downstream task")
+	}
+	if repo.updateTaskInput.SideEffects.BusinessState.BusinessStatusKey != workflowBlockedStatusKey {
+		t.Fatalf("expected blocked business state, got %#v", repo.updateTaskInput.SideEffects.BusinessState)
+	}
+}
+
 func TestWorkflowUsecase_ListTasksRejectsInvalidStatus(t *testing.T) {
 	repo := &stubWorkflowRepo{}
 	uc := NewWorkflowUsecase(repo)
@@ -2177,6 +2643,40 @@ func finishedGoodsQCWorkflowTask() *WorkflowTask {
 			"packaging_requirement": "彩盒 12 只/箱",
 			"shipping_requirement":  "客户唛头",
 			"finished_goods":        true,
+		},
+	}
+}
+
+func finishedGoodsInboundWorkflowTask() *WorkflowTask {
+	sourceNo := "FG-IN-001"
+	statusKey := workflowWarehouseInboundPendingKey
+	return &WorkflowTask{
+		ID:                1201,
+		TaskCode:          "finished-goods-inbound-101",
+		TaskGroup:         workflowFinishedGoodsInboundTaskGroup,
+		TaskName:          "成品入库",
+		SourceType:        workflowProductionProgressModuleKey,
+		SourceID:          101,
+		SourceNo:          &sourceNo,
+		BusinessStatusKey: &statusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "warehouse",
+		Priority:          3,
+		Payload: map[string]any{
+			"record_title":               "小熊公仔入库",
+			"source_no":                  "SO-2026-101",
+			"customer_name":              "成慧怡",
+			"style_no":                   "ST-001",
+			"product_no":                 "SKU-101",
+			"product_name":               "小熊公仔",
+			"quantity":                   1200,
+			"unit":                       "只",
+			"due_date":                   "2026-04-28",
+			"shipment_date":              "2026-04-30",
+			"packaging_requirement":      "彩盒 12 只/箱",
+			"shipping_requirement":       "客户唛头",
+			"finished_goods":             true,
+			"inventory_balance_deferred": true,
 		},
 	}
 }

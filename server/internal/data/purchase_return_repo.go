@@ -13,7 +13,6 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/inventorytxn"
-	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 
 	"entgo.io/ent/dialect"
@@ -370,30 +369,15 @@ func validatePurchaseReturnReceiptItemQuantities(ctx context.Context, tx *invent
 	}
 
 	for _, receiptItemID := range receiptItemIDs {
-		receiptItem, err := tx.client.PurchaseReceiptItem.Get(ctx, receiptItemID)
-		if err != nil {
-			if ent.IsNotFound(err) {
-				return biz.ErrPurchaseReceiptItemNotFound
-			}
-			return err
-		}
-		postedItems, err := tx.client.PurchaseReturnItem.Query().
-			Where(
-				purchasereturnitem.PurchaseReceiptItemID(receiptItemID),
-				purchasereturnitem.ReturnIDNEQ(returnID),
-				purchasereturnitem.HasPurchaseReturnWith(
-					purchasereturn.Status(biz.PurchaseReturnStatusPosted),
-				),
-			).
-			All(ctx)
+		effectiveQty, err := effectivePurchaseReceiptItemQuantity(ctx, tx.client, receiptItemID, 0, decimal.Zero)
 		if err != nil {
 			return err
 		}
-		alreadyReturned := decimal.Zero
-		for _, postedItem := range postedItems {
-			alreadyReturned = alreadyReturned.Add(postedItem.Quantity)
+		alreadyReturned, err := postedPurchaseReturnQuantityByReceiptItem(ctx, tx.client, returnID, receiptItemID)
+		if err != nil {
+			return err
 		}
-		if alreadyReturned.Add(currentByReceiptItem[receiptItemID]).Cmp(receiptItem.Quantity) > 0 {
+		if alreadyReturned.Add(currentByReceiptItem[receiptItemID]).Cmp(effectiveQty) > 0 {
 			return biz.ErrBadParam
 		}
 	}

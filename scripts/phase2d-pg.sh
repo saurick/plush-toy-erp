@@ -8,7 +8,7 @@ if [ -z "$cmd" ]; then
 fi
 
 PHASE2D_DB_URL="${PHASE2D_DB_URL:-postgres://postgres:phase2a-local-password@127.0.0.1:55432/plush_erp_phase2d_test?sslmode=disable}"
-PHASE2D_MAX_MIGRATION_VERSION="${PHASE2D_MAX_MIGRATION_VERSION:-20260426040724}"
+PHASE2D_MAX_MIGRATION_VERSION="${PHASE2D_MAX_MIGRATION_VERSION:-20260426095103}"
 PHASE2D_MIGRATE_DIR=""
 
 cleanup_phase2d_migrate_dir() {
@@ -116,7 +116,7 @@ apply)
   atlas migrate apply --dir "file://${phase2d_dir}" --url "$PHASE2D_DB_URL"
   ;;
 test)
-  PHASE2D_PG_TEST=1 PHASE2D_PG_TEST_DB_URL="$PHASE2D_DB_URL" go test ./internal/data -run TestPhase2DPostgres -count=1
+  PHASE2D_PG_TEST=1 PHASE2D_PG_TEST_DB_URL="$PHASE2D_DB_URL" go test ./internal/data -run TestPhase2D -count=1
   ;;
 dropdb)
   psql "$PHASE2D_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"${PHASE2D_DB_NAME}\" WITH (FORCE)"

@@ -396,6 +396,7 @@ export function resolveFinishedGoodsTaskBusinessStatus(task, taskStatusKey) {
   }
   if (isFinishedGoodsInboundTask(task)) {
     if (taskStatusKey === 'done') return INBOUND_DONE_STATUS_KEY
+    if (['blocked', 'rejected'].includes(taskStatusKey)) return 'blocked'
     return task.business_status_key || WAREHOUSE_INBOUND_PENDING_STATUS_KEY
   }
   if (isFinishedGoodsReworkTask(task)) {

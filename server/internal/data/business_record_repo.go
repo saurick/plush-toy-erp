@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -45,6 +46,11 @@ func (r *businessRecordRepo) ListBusinessRecords(ctx context.Context, filter biz
 	} else if !filter.IncludeDeleted {
 		query = query.Where(businessrecord.DeletedAtIsNil())
 	}
+
+	if needsBusinessRecordMemoryFilter(filter) {
+		return r.listBusinessRecordsWithMemoryFilter(ctx, query, filter)
+	}
+
 	if filter.Keyword != "" {
 		query = query.Where(businessrecord.Or(
 			businessrecord.DocumentNoContainsFold(filter.Keyword),
@@ -92,6 +98,37 @@ func (r *businessRecordRepo) ListBusinessRecords(ctx context.Context, filter biz
 		out = append(out, record)
 	}
 	return out, total, nil
+}
+
+func (r *businessRecordRepo) listBusinessRecordsWithMemoryFilter(ctx context.Context, query *ent.BusinessRecordQuery, filter biz.BusinessRecordFilter) ([]*biz.BusinessRecord, int, error) {
+	query = applyBusinessRecordSort(query, filter)
+	rows, err := query.All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	itemsByRecordID, err := r.loadBusinessRecordItems(ctx, rows)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	records := make([]*biz.BusinessRecord, 0, len(rows))
+	for _, row := range rows {
+		record := entBusinessRecordToBiz(row)
+		record.Items = itemsByRecordID[row.ID]
+		if matchesBusinessRecordMemoryFilter(record, filter) {
+			records = append(records, record)
+		}
+	}
+
+	total := len(records)
+	if filter.Offset >= total {
+		return []*biz.BusinessRecord{}, total, nil
+	}
+	end := filter.Offset + filter.Limit
+	if end > total {
+		end = total
+	}
+	return records[filter.Offset:end], total, nil
 }
 
 func (r *businessRecordRepo) CountBusinessRecordsByModuleAndStatus(ctx context.Context) ([]biz.BusinessRecordModuleStatusCount, error) {
@@ -158,6 +195,189 @@ func applyBusinessRecordDateFilter(query *ent.BusinessRecordQuery, filter biz.Bu
 		}
 	}
 	return query
+}
+
+func applyBusinessRecordSort(query *ent.BusinessRecordQuery, filter biz.BusinessRecordFilter) *ent.BusinessRecordQuery {
+	if filter.SortOrder == "asc" {
+		return query.Order(ent.Asc(businessrecord.FieldCreatedAt, businessrecord.FieldID))
+	}
+	return query.Order(ent.Desc(businessrecord.FieldCreatedAt, businessrecord.FieldID))
+}
+
+func needsBusinessRecordMemoryFilter(filter biz.BusinessRecordFilter) bool {
+	if strings.TrimSpace(filter.Keyword) != "" {
+		return true
+	}
+	if filter.DateFilterKey == "" || (filter.DateRangeStart == "" && filter.DateRangeEnd == "") {
+		return false
+	}
+	return !isBusinessRecordDBDateFilter(filter.DateFilterKey)
+}
+
+func isBusinessRecordDBDateFilter(key string) bool {
+	switch key {
+	case "document_date", "due_date", "created_at", "updated_at":
+		return true
+	default:
+		return false
+	}
+}
+
+func matchesBusinessRecordMemoryFilter(record *biz.BusinessRecord, filter biz.BusinessRecordFilter) bool {
+	if filter.Keyword != "" && !businessRecordContainsKeyword(record, filter.Keyword) {
+		return false
+	}
+	if !matchesBusinessRecordDateFilter(record, filter) {
+		return false
+	}
+	return true
+}
+
+func businessRecordContainsKeyword(record *biz.BusinessRecord, keyword string) bool {
+	needle := strings.ToLower(strings.TrimSpace(keyword))
+	if needle == "" {
+		return true
+	}
+	for _, value := range []any{
+		record.DocumentNo,
+		record.Title,
+		record.BusinessStatusKey,
+		record.OwnerRoleKey,
+		record.SourceNo,
+		record.CustomerName,
+		record.SupplierName,
+		record.StyleNo,
+		record.ProductNo,
+		record.ProductName,
+		record.MaterialName,
+		record.WarehouseLocation,
+		record.Quantity,
+		record.Unit,
+		record.Amount,
+		record.DocumentDate,
+		record.DueDate,
+		record.Payload,
+	} {
+		if businessRecordValueContainsKeyword(value, needle) {
+			return true
+		}
+	}
+	for _, item := range record.Items {
+		if businessRecordValueContainsKeyword(item, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func businessRecordValueContainsKeyword(value any, needle string) bool {
+	switch item := value.(type) {
+	case nil:
+		return false
+	case *string:
+		if item == nil {
+			return false
+		}
+		return businessRecordValueContainsKeyword(*item, needle)
+	case *float64:
+		if item == nil {
+			return false
+		}
+		return businessRecordValueContainsKeyword(*item, needle)
+	case map[string]any:
+		for key, nestedValue := range item {
+			if businessRecordValueContainsKeyword(key, needle) ||
+				businessRecordValueContainsKeyword(nestedValue, needle) {
+				return true
+			}
+		}
+		return false
+	case []any:
+		for _, nestedValue := range item {
+			if businessRecordValueContainsKeyword(nestedValue, needle) {
+				return true
+			}
+		}
+		return false
+	case *biz.BusinessRecordItem:
+		return businessRecordValueContainsKeyword([]any{
+			item.ItemName,
+			item.MaterialName,
+			item.Spec,
+			item.Unit,
+			item.Quantity,
+			item.UnitPrice,
+			item.Amount,
+			item.SupplierName,
+			item.WarehouseLocation,
+			item.Payload,
+		}, needle)
+	default:
+		text := strings.ToLower(strings.TrimSpace(fmt.Sprint(item)))
+		return text != "" && strings.Contains(text, needle)
+	}
+}
+
+func matchesBusinessRecordDateFilter(record *biz.BusinessRecord, filter biz.BusinessRecordFilter) bool {
+	if filter.DateFilterKey == "" || (filter.DateRangeStart == "" && filter.DateRangeEnd == "") {
+		return true
+	}
+	dateValue := businessRecordDateFilterValue(record, filter.DateFilterKey)
+	if dateValue == "" {
+		return false
+	}
+	if filter.DateRangeStart != "" && dateValue < filter.DateRangeStart {
+		return false
+	}
+	if filter.DateRangeEnd != "" && dateValue > filter.DateRangeEnd {
+		return false
+	}
+	return true
+}
+
+func businessRecordDateFilterValue(record *biz.BusinessRecord, key string) string {
+	switch key {
+	case "document_date":
+		return comparableBusinessRecordDate(record.DocumentDate)
+	case "due_date":
+		return comparableBusinessRecordDate(record.DueDate)
+	case "created_at":
+		return record.CreatedAt.Format("2006-01-02")
+	case "updated_at":
+		return record.UpdatedAt.Format("2006-01-02")
+	default:
+		payloadKey, ok := strings.CutPrefix(key, "payload.")
+		if !ok || payloadKey == "" {
+			return ""
+		}
+		return comparableBusinessRecordDate(record.Payload[payloadKey])
+	}
+}
+
+func comparableBusinessRecordDate(value any) string {
+	switch item := value.(type) {
+	case nil:
+		return ""
+	case *string:
+		if item == nil {
+			return ""
+		}
+		return comparableBusinessRecordDate(*item)
+	case time.Time:
+		return item.Format("2006-01-02")
+	default:
+		text := strings.TrimSpace(fmt.Sprint(item))
+		if len(text) >= len("2006-01-02") {
+			candidate := text[:len("2006-01-02")]
+			if _, err := time.Parse("2006-01-02", candidate); err == nil {
+				return candidate
+			}
+		}
+		if _, err := time.Parse("2006-01-02", text); err == nil {
+			return text
+		}
+		return ""
+	}
 }
 
 func parseBusinessRecordDateStart(value string) (time.Time, bool) {

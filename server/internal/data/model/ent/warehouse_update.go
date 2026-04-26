@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/warehouse"
@@ -154,6 +155,21 @@ func (_u *WarehouseUpdate) AddPurchaseReturnItems(v ...*PurchaseReturnItem) *War
 	return _u.AddPurchaseReturnItemIDs(ids...)
 }
 
+// AddPurchaseReceiptAdjustmentItemIDs adds the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (_u *WarehouseUpdate) AddPurchaseReceiptAdjustmentItemIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.AddPurchaseReceiptAdjustmentItemIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReceiptAdjustmentItems adds the "purchase_receipt_adjustment_items" edges to the PurchaseReceiptAdjustmentItem entity.
+func (_u *WarehouseUpdate) AddPurchaseReceiptAdjustmentItems(v ...*PurchaseReceiptAdjustmentItem) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReceiptAdjustmentItemIDs(ids...)
+}
+
 // Mutation returns the WarehouseMutation object of the builder.
 func (_u *WarehouseUpdate) Mutation() *WarehouseMutation {
 	return _u.mutation
@@ -241,6 +257,27 @@ func (_u *WarehouseUpdate) RemovePurchaseReturnItems(v ...*PurchaseReturnItem) *
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseReturnItemIDs(ids...)
+}
+
+// ClearPurchaseReceiptAdjustmentItems clears all "purchase_receipt_adjustment_items" edges to the PurchaseReceiptAdjustmentItem entity.
+func (_u *WarehouseUpdate) ClearPurchaseReceiptAdjustmentItems() *WarehouseUpdate {
+	_u.mutation.ClearPurchaseReceiptAdjustmentItems()
+	return _u
+}
+
+// RemovePurchaseReceiptAdjustmentItemIDs removes the "purchase_receipt_adjustment_items" edge to PurchaseReceiptAdjustmentItem entities by IDs.
+func (_u *WarehouseUpdate) RemovePurchaseReceiptAdjustmentItemIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.RemovePurchaseReceiptAdjustmentItemIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReceiptAdjustmentItems removes "purchase_receipt_adjustment_items" edges to PurchaseReceiptAdjustmentItem entities.
+func (_u *WarehouseUpdate) RemovePurchaseReceiptAdjustmentItems(v ...*PurchaseReceiptAdjustmentItem) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReceiptAdjustmentItemIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -506,6 +543,51 @@ func (_u *WarehouseUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.PurchaseReceiptAdjustmentItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.PurchaseReceiptAdjustmentItemsTable,
+			Columns: []string{warehouse.PurchaseReceiptAdjustmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReceiptAdjustmentItemsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReceiptAdjustmentItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.PurchaseReceiptAdjustmentItemsTable,
+			Columns: []string{warehouse.PurchaseReceiptAdjustmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReceiptAdjustmentItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.PurchaseReceiptAdjustmentItemsTable,
+			Columns: []string{warehouse.PurchaseReceiptAdjustmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{warehouse.Label}
@@ -648,6 +730,21 @@ func (_u *WarehouseUpdateOne) AddPurchaseReturnItems(v ...*PurchaseReturnItem) *
 	return _u.AddPurchaseReturnItemIDs(ids...)
 }
 
+// AddPurchaseReceiptAdjustmentItemIDs adds the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (_u *WarehouseUpdateOne) AddPurchaseReceiptAdjustmentItemIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.AddPurchaseReceiptAdjustmentItemIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReceiptAdjustmentItems adds the "purchase_receipt_adjustment_items" edges to the PurchaseReceiptAdjustmentItem entity.
+func (_u *WarehouseUpdateOne) AddPurchaseReceiptAdjustmentItems(v ...*PurchaseReceiptAdjustmentItem) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReceiptAdjustmentItemIDs(ids...)
+}
+
 // Mutation returns the WarehouseMutation object of the builder.
 func (_u *WarehouseUpdateOne) Mutation() *WarehouseMutation {
 	return _u.mutation
@@ -735,6 +832,27 @@ func (_u *WarehouseUpdateOne) RemovePurchaseReturnItems(v ...*PurchaseReturnItem
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseReturnItemIDs(ids...)
+}
+
+// ClearPurchaseReceiptAdjustmentItems clears all "purchase_receipt_adjustment_items" edges to the PurchaseReceiptAdjustmentItem entity.
+func (_u *WarehouseUpdateOne) ClearPurchaseReceiptAdjustmentItems() *WarehouseUpdateOne {
+	_u.mutation.ClearPurchaseReceiptAdjustmentItems()
+	return _u
+}
+
+// RemovePurchaseReceiptAdjustmentItemIDs removes the "purchase_receipt_adjustment_items" edge to PurchaseReceiptAdjustmentItem entities by IDs.
+func (_u *WarehouseUpdateOne) RemovePurchaseReceiptAdjustmentItemIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.RemovePurchaseReceiptAdjustmentItemIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReceiptAdjustmentItems removes "purchase_receipt_adjustment_items" edges to PurchaseReceiptAdjustmentItem entities.
+func (_u *WarehouseUpdateOne) RemovePurchaseReceiptAdjustmentItems(v ...*PurchaseReceiptAdjustmentItem) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReceiptAdjustmentItemIDs(ids...)
 }
 
 // Where appends a list predicates to the WarehouseUpdate builder.
@@ -1023,6 +1141,51 @@ func (_u *WarehouseUpdateOne) sqlSave(ctx context.Context) (_node *Warehouse, er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereturnitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseReceiptAdjustmentItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.PurchaseReceiptAdjustmentItemsTable,
+			Columns: []string{warehouse.PurchaseReceiptAdjustmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReceiptAdjustmentItemsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReceiptAdjustmentItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.PurchaseReceiptAdjustmentItemsTable,
+			Columns: []string{warehouse.PurchaseReceiptAdjustmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReceiptAdjustmentItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.PurchaseReceiptAdjustmentItemsTable,
+			Columns: []string{warehouse.PurchaseReceiptAdjustmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

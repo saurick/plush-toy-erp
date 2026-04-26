@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/unit"
@@ -198,6 +199,21 @@ func (_c *UnitCreate) AddPurchaseReturnItems(v ...*PurchaseReturnItem) *UnitCrea
 		ids[i] = v[i].ID
 	}
 	return _c.AddPurchaseReturnItemIDs(ids...)
+}
+
+// AddPurchaseReceiptAdjustmentItemIDs adds the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (_c *UnitCreate) AddPurchaseReceiptAdjustmentItemIDs(ids ...int) *UnitCreate {
+	_c.mutation.AddPurchaseReceiptAdjustmentItemIDs(ids...)
+	return _c
+}
+
+// AddPurchaseReceiptAdjustmentItems adds the "purchase_receipt_adjustment_items" edges to the PurchaseReceiptAdjustmentItem entity.
+func (_c *UnitCreate) AddPurchaseReceiptAdjustmentItems(v ...*PurchaseReceiptAdjustmentItem) *UnitCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPurchaseReceiptAdjustmentItemIDs(ids...)
 }
 
 // Mutation returns the UnitMutation object of the builder.
@@ -443,6 +459,22 @@ func (_c *UnitCreate) createSpec() (*Unit, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereturnitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PurchaseReceiptAdjustmentItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.PurchaseReceiptAdjustmentItemsTable,
+			Columns: []string{unit.PurchaseReceiptAdjustmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

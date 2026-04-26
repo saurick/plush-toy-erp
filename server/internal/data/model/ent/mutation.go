@@ -21,6 +21,8 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptadjustment"
+	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -49,31 +51,33 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeAdminUser             = "AdminUser"
-	TypeAdminUserRole         = "AdminUserRole"
-	TypeBOMHeader             = "BOMHeader"
-	TypeBOMItem               = "BOMItem"
-	TypeBusinessRecord        = "BusinessRecord"
-	TypeBusinessRecordEvent   = "BusinessRecordEvent"
-	TypeBusinessRecordItem    = "BusinessRecordItem"
-	TypeInventoryBalance      = "InventoryBalance"
-	TypeInventoryLot          = "InventoryLot"
-	TypeInventoryTxn          = "InventoryTxn"
-	TypeMaterial              = "Material"
-	TypePermission            = "Permission"
-	TypeProduct               = "Product"
-	TypePurchaseReceipt       = "PurchaseReceipt"
-	TypePurchaseReceiptItem   = "PurchaseReceiptItem"
-	TypePurchaseReturn        = "PurchaseReturn"
-	TypePurchaseReturnItem    = "PurchaseReturnItem"
-	TypeRole                  = "Role"
-	TypeRolePermission        = "RolePermission"
-	TypeUnit                  = "Unit"
-	TypeUser                  = "User"
-	TypeWarehouse             = "Warehouse"
-	TypeWorkflowBusinessState = "WorkflowBusinessState"
-	TypeWorkflowTask          = "WorkflowTask"
-	TypeWorkflowTaskEvent     = "WorkflowTaskEvent"
+	TypeAdminUser                     = "AdminUser"
+	TypeAdminUserRole                 = "AdminUserRole"
+	TypeBOMHeader                     = "BOMHeader"
+	TypeBOMItem                       = "BOMItem"
+	TypeBusinessRecord                = "BusinessRecord"
+	TypeBusinessRecordEvent           = "BusinessRecordEvent"
+	TypeBusinessRecordItem            = "BusinessRecordItem"
+	TypeInventoryBalance              = "InventoryBalance"
+	TypeInventoryLot                  = "InventoryLot"
+	TypeInventoryTxn                  = "InventoryTxn"
+	TypeMaterial                      = "Material"
+	TypePermission                    = "Permission"
+	TypeProduct                       = "Product"
+	TypePurchaseReceipt               = "PurchaseReceipt"
+	TypePurchaseReceiptAdjustment     = "PurchaseReceiptAdjustment"
+	TypePurchaseReceiptAdjustmentItem = "PurchaseReceiptAdjustmentItem"
+	TypePurchaseReceiptItem           = "PurchaseReceiptItem"
+	TypePurchaseReturn                = "PurchaseReturn"
+	TypePurchaseReturnItem            = "PurchaseReturnItem"
+	TypeRole                          = "Role"
+	TypeRolePermission                = "RolePermission"
+	TypeUnit                          = "Unit"
+	TypeUser                          = "User"
+	TypeWarehouse                     = "Warehouse"
+	TypeWorkflowBusinessState         = "WorkflowBusinessState"
+	TypeWorkflowTask                  = "WorkflowTask"
+	TypeWorkflowTaskEvent             = "WorkflowTaskEvent"
 )
 
 // AdminUserMutation represents an operation that mutates the AdminUser nodes in the graph.
@@ -3235,52 +3239,55 @@ func (m *BOMItemMutation) ResetEdge(name string) error {
 // BusinessRecordMutation represents an operation that mutates the BusinessRecord nodes in the graph.
 type BusinessRecordMutation struct {
 	config
-	op                       Op
-	typ                      string
-	id                       *int
-	module_key               *string
-	document_no              *string
-	title                    *string
-	business_status_key      *string
-	owner_role_key           *string
-	source_no                *string
-	customer_name            *string
-	supplier_name            *string
-	style_no                 *string
-	product_no               *string
-	product_name             *string
-	material_name            *string
-	warehouse_location       *string
-	quantity                 *float64
-	addquantity              *float64
-	unit                     *string
-	amount                   *float64
-	addamount                *float64
-	document_date            *string
-	due_date                 *string
-	payload                  *map[string]interface{}
-	row_version              *int64
-	addrow_version           *int64
-	created_by               *int
-	addcreated_by            *int
-	updated_by               *int
-	addupdated_by            *int
-	created_at               *time.Time
-	updated_at               *time.Time
-	deleted_at               *time.Time
-	deleted_by               *int
-	adddeleted_by            *int
-	delete_reason            *string
-	clearedFields            map[string]struct{}
-	purchase_receipts        map[int]struct{}
-	removedpurchase_receipts map[int]struct{}
-	clearedpurchase_receipts bool
-	purchase_returns         map[int]struct{}
-	removedpurchase_returns  map[int]struct{}
-	clearedpurchase_returns  bool
-	done                     bool
-	oldValue                 func(context.Context) (*BusinessRecord, error)
-	predicates               []predicate.BusinessRecord
+	op                                  Op
+	typ                                 string
+	id                                  *int
+	module_key                          *string
+	document_no                         *string
+	title                               *string
+	business_status_key                 *string
+	owner_role_key                      *string
+	source_no                           *string
+	customer_name                       *string
+	supplier_name                       *string
+	style_no                            *string
+	product_no                          *string
+	product_name                        *string
+	material_name                       *string
+	warehouse_location                  *string
+	quantity                            *float64
+	addquantity                         *float64
+	unit                                *string
+	amount                              *float64
+	addamount                           *float64
+	document_date                       *string
+	due_date                            *string
+	payload                             *map[string]interface{}
+	row_version                         *int64
+	addrow_version                      *int64
+	created_by                          *int
+	addcreated_by                       *int
+	updated_by                          *int
+	addupdated_by                       *int
+	created_at                          *time.Time
+	updated_at                          *time.Time
+	deleted_at                          *time.Time
+	deleted_by                          *int
+	adddeleted_by                       *int
+	delete_reason                       *string
+	clearedFields                       map[string]struct{}
+	purchase_receipts                   map[int]struct{}
+	removedpurchase_receipts            map[int]struct{}
+	clearedpurchase_receipts            bool
+	purchase_returns                    map[int]struct{}
+	removedpurchase_returns             map[int]struct{}
+	clearedpurchase_returns             bool
+	purchase_receipt_adjustments        map[int]struct{}
+	removedpurchase_receipt_adjustments map[int]struct{}
+	clearedpurchase_receipt_adjustments bool
+	done                                bool
+	oldValue                            func(context.Context) (*BusinessRecord, error)
+	predicates                          []predicate.BusinessRecord
 }
 
 var _ ent.Mutation = (*BusinessRecordMutation)(nil)
@@ -4846,6 +4853,60 @@ func (m *BusinessRecordMutation) ResetPurchaseReturns() {
 	m.removedpurchase_returns = nil
 }
 
+// AddPurchaseReceiptAdjustmentIDs adds the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity by ids.
+func (m *BusinessRecordMutation) AddPurchaseReceiptAdjustmentIDs(ids ...int) {
+	if m.purchase_receipt_adjustments == nil {
+		m.purchase_receipt_adjustments = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.purchase_receipt_adjustments[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPurchaseReceiptAdjustments clears the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity.
+func (m *BusinessRecordMutation) ClearPurchaseReceiptAdjustments() {
+	m.clearedpurchase_receipt_adjustments = true
+}
+
+// PurchaseReceiptAdjustmentsCleared reports if the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity was cleared.
+func (m *BusinessRecordMutation) PurchaseReceiptAdjustmentsCleared() bool {
+	return m.clearedpurchase_receipt_adjustments
+}
+
+// RemovePurchaseReceiptAdjustmentIDs removes the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity by IDs.
+func (m *BusinessRecordMutation) RemovePurchaseReceiptAdjustmentIDs(ids ...int) {
+	if m.removedpurchase_receipt_adjustments == nil {
+		m.removedpurchase_receipt_adjustments = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.purchase_receipt_adjustments, ids[i])
+		m.removedpurchase_receipt_adjustments[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPurchaseReceiptAdjustments returns the removed IDs of the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity.
+func (m *BusinessRecordMutation) RemovedPurchaseReceiptAdjustmentsIDs() (ids []int) {
+	for id := range m.removedpurchase_receipt_adjustments {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PurchaseReceiptAdjustmentsIDs returns the "purchase_receipt_adjustments" edge IDs in the mutation.
+func (m *BusinessRecordMutation) PurchaseReceiptAdjustmentsIDs() (ids []int) {
+	for id := range m.purchase_receipt_adjustments {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptAdjustments resets all changes to the "purchase_receipt_adjustments" edge.
+func (m *BusinessRecordMutation) ResetPurchaseReceiptAdjustments() {
+	m.purchase_receipt_adjustments = nil
+	m.clearedpurchase_receipt_adjustments = false
+	m.removedpurchase_receipt_adjustments = nil
+}
+
 // Where appends a list predicates to the BusinessRecordMutation builder.
 func (m *BusinessRecordMutation) Where(ps ...predicate.BusinessRecord) {
 	m.predicates = append(m.predicates, ps...)
@@ -5619,12 +5680,15 @@ func (m *BusinessRecordMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *BusinessRecordMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.purchase_receipts != nil {
 		edges = append(edges, businessrecord.EdgePurchaseReceipts)
 	}
 	if m.purchase_returns != nil {
 		edges = append(edges, businessrecord.EdgePurchaseReturns)
+	}
+	if m.purchase_receipt_adjustments != nil {
+		edges = append(edges, businessrecord.EdgePurchaseReceiptAdjustments)
 	}
 	return edges
 }
@@ -5645,18 +5709,27 @@ func (m *BusinessRecordMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case businessrecord.EdgePurchaseReceiptAdjustments:
+		ids := make([]ent.Value, 0, len(m.purchase_receipt_adjustments))
+		for id := range m.purchase_receipt_adjustments {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *BusinessRecordMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.removedpurchase_receipts != nil {
 		edges = append(edges, businessrecord.EdgePurchaseReceipts)
 	}
 	if m.removedpurchase_returns != nil {
 		edges = append(edges, businessrecord.EdgePurchaseReturns)
+	}
+	if m.removedpurchase_receipt_adjustments != nil {
+		edges = append(edges, businessrecord.EdgePurchaseReceiptAdjustments)
 	}
 	return edges
 }
@@ -5677,18 +5750,27 @@ func (m *BusinessRecordMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case businessrecord.EdgePurchaseReceiptAdjustments:
+		ids := make([]ent.Value, 0, len(m.removedpurchase_receipt_adjustments))
+		for id := range m.removedpurchase_receipt_adjustments {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *BusinessRecordMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.clearedpurchase_receipts {
 		edges = append(edges, businessrecord.EdgePurchaseReceipts)
 	}
 	if m.clearedpurchase_returns {
 		edges = append(edges, businessrecord.EdgePurchaseReturns)
+	}
+	if m.clearedpurchase_receipt_adjustments {
+		edges = append(edges, businessrecord.EdgePurchaseReceiptAdjustments)
 	}
 	return edges
 }
@@ -5701,6 +5783,8 @@ func (m *BusinessRecordMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_receipts
 	case businessrecord.EdgePurchaseReturns:
 		return m.clearedpurchase_returns
+	case businessrecord.EdgePurchaseReceiptAdjustments:
+		return m.clearedpurchase_receipt_adjustments
 	}
 	return false
 }
@@ -5722,6 +5806,9 @@ func (m *BusinessRecordMutation) ResetEdge(name string) error {
 		return nil
 	case businessrecord.EdgePurchaseReturns:
 		m.ResetPurchaseReturns()
+		return nil
+	case businessrecord.EdgePurchaseReceiptAdjustments:
+		m.ResetPurchaseReceiptAdjustments()
 		return nil
 	}
 	return fmt.Errorf("unknown BusinessRecord edge %s", name)
@@ -9062,37 +9149,40 @@ func (m *InventoryBalanceMutation) ResetEdge(name string) error {
 // InventoryLotMutation represents an operation that mutates the InventoryLot nodes in the graph.
 type InventoryLotMutation struct {
 	config
-	op                            Op
-	typ                           string
-	id                            *int
-	subject_type                  *string
-	subject_id                    *int
-	addsubject_id                 *int
-	lot_no                        *string
-	supplier_lot_no               *string
-	color_no                      *string
-	dye_lot_no                    *string
-	production_lot_no             *string
-	status                        *string
-	received_at                   *time.Time
-	created_at                    *time.Time
-	updated_at                    *time.Time
-	clearedFields                 map[string]struct{}
-	inventory_txns                map[int]struct{}
-	removedinventory_txns         map[int]struct{}
-	clearedinventory_txns         bool
-	inventory_balances            map[int]struct{}
-	removedinventory_balances     map[int]struct{}
-	clearedinventory_balances     bool
-	purchase_receipt_items        map[int]struct{}
-	removedpurchase_receipt_items map[int]struct{}
-	clearedpurchase_receipt_items bool
-	purchase_return_items         map[int]struct{}
-	removedpurchase_return_items  map[int]struct{}
-	clearedpurchase_return_items  bool
-	done                          bool
-	oldValue                      func(context.Context) (*InventoryLot, error)
-	predicates                    []predicate.InventoryLot
+	op                                       Op
+	typ                                      string
+	id                                       *int
+	subject_type                             *string
+	subject_id                               *int
+	addsubject_id                            *int
+	lot_no                                   *string
+	supplier_lot_no                          *string
+	color_no                                 *string
+	dye_lot_no                               *string
+	production_lot_no                        *string
+	status                                   *string
+	received_at                              *time.Time
+	created_at                               *time.Time
+	updated_at                               *time.Time
+	clearedFields                            map[string]struct{}
+	inventory_txns                           map[int]struct{}
+	removedinventory_txns                    map[int]struct{}
+	clearedinventory_txns                    bool
+	inventory_balances                       map[int]struct{}
+	removedinventory_balances                map[int]struct{}
+	clearedinventory_balances                bool
+	purchase_receipt_items                   map[int]struct{}
+	removedpurchase_receipt_items            map[int]struct{}
+	clearedpurchase_receipt_items            bool
+	purchase_return_items                    map[int]struct{}
+	removedpurchase_return_items             map[int]struct{}
+	clearedpurchase_return_items             bool
+	purchase_receipt_adjustment_items        map[int]struct{}
+	removedpurchase_receipt_adjustment_items map[int]struct{}
+	clearedpurchase_receipt_adjustment_items bool
+	done                                     bool
+	oldValue                                 func(context.Context) (*InventoryLot, error)
+	predicates                               []predicate.InventoryLot
 }
 
 var _ ent.Mutation = (*InventoryLotMutation)(nil)
@@ -9890,6 +9980,60 @@ func (m *InventoryLotMutation) ResetPurchaseReturnItems() {
 	m.removedpurchase_return_items = nil
 }
 
+// AddPurchaseReceiptAdjustmentItemIDs adds the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by ids.
+func (m *InventoryLotMutation) AddPurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.purchase_receipt_adjustment_items == nil {
+		m.purchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.purchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPurchaseReceiptAdjustmentItems clears the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *InventoryLotMutation) ClearPurchaseReceiptAdjustmentItems() {
+	m.clearedpurchase_receipt_adjustment_items = true
+}
+
+// PurchaseReceiptAdjustmentItemsCleared reports if the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity was cleared.
+func (m *InventoryLotMutation) PurchaseReceiptAdjustmentItemsCleared() bool {
+	return m.clearedpurchase_receipt_adjustment_items
+}
+
+// RemovePurchaseReceiptAdjustmentItemIDs removes the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (m *InventoryLotMutation) RemovePurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.removedpurchase_receipt_adjustment_items == nil {
+		m.removedpurchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.purchase_receipt_adjustment_items, ids[i])
+		m.removedpurchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPurchaseReceiptAdjustmentItems returns the removed IDs of the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *InventoryLotMutation) RemovedPurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.removedpurchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PurchaseReceiptAdjustmentItemsIDs returns the "purchase_receipt_adjustment_items" edge IDs in the mutation.
+func (m *InventoryLotMutation) PurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.purchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptAdjustmentItems resets all changes to the "purchase_receipt_adjustment_items" edge.
+func (m *InventoryLotMutation) ResetPurchaseReceiptAdjustmentItems() {
+	m.purchase_receipt_adjustment_items = nil
+	m.clearedpurchase_receipt_adjustment_items = false
+	m.removedpurchase_receipt_adjustment_items = nil
+}
+
 // Where appends a list predicates to the InventoryLotMutation builder.
 func (m *InventoryLotMutation) Where(ps ...predicate.InventoryLot) {
 	m.predicates = append(m.predicates, ps...)
@@ -10241,7 +10385,7 @@ func (m *InventoryLotMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *InventoryLotMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.inventory_txns != nil {
 		edges = append(edges, inventorylot.EdgeInventoryTxns)
 	}
@@ -10253,6 +10397,9 @@ func (m *InventoryLotMutation) AddedEdges() []string {
 	}
 	if m.purchase_return_items != nil {
 		edges = append(edges, inventorylot.EdgePurchaseReturnItems)
+	}
+	if m.purchase_receipt_adjustment_items != nil {
+		edges = append(edges, inventorylot.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -10285,13 +10432,19 @@ func (m *InventoryLotMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case inventorylot.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.purchase_receipt_adjustment_items))
+		for id := range m.purchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *InventoryLotMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedinventory_txns != nil {
 		edges = append(edges, inventorylot.EdgeInventoryTxns)
 	}
@@ -10303,6 +10456,9 @@ func (m *InventoryLotMutation) RemovedEdges() []string {
 	}
 	if m.removedpurchase_return_items != nil {
 		edges = append(edges, inventorylot.EdgePurchaseReturnItems)
+	}
+	if m.removedpurchase_receipt_adjustment_items != nil {
+		edges = append(edges, inventorylot.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -10335,13 +10491,19 @@ func (m *InventoryLotMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case inventorylot.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.removedpurchase_receipt_adjustment_items))
+		for id := range m.removedpurchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *InventoryLotMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.clearedinventory_txns {
 		edges = append(edges, inventorylot.EdgeInventoryTxns)
 	}
@@ -10353,6 +10515,9 @@ func (m *InventoryLotMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_return_items {
 		edges = append(edges, inventorylot.EdgePurchaseReturnItems)
+	}
+	if m.clearedpurchase_receipt_adjustment_items {
+		edges = append(edges, inventorylot.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -10369,6 +10534,8 @@ func (m *InventoryLotMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_receipt_items
 	case inventorylot.EdgePurchaseReturnItems:
 		return m.clearedpurchase_return_items
+	case inventorylot.EdgePurchaseReceiptAdjustmentItems:
+		return m.clearedpurchase_receipt_adjustment_items
 	}
 	return false
 }
@@ -10396,6 +10563,9 @@ func (m *InventoryLotMutation) ResetEdge(name string) error {
 		return nil
 	case inventorylot.EdgePurchaseReturnItems:
 		m.ResetPurchaseReturnItems()
+		return nil
+	case inventorylot.EdgePurchaseReceiptAdjustmentItems:
+		m.ResetPurchaseReceiptAdjustmentItems()
 		return nil
 	}
 	return fmt.Errorf("unknown InventoryLot edge %s", name)
@@ -12075,32 +12245,35 @@ func (m *InventoryTxnMutation) ResetEdge(name string) error {
 // MaterialMutation represents an operation that mutates the Material nodes in the graph.
 type MaterialMutation struct {
 	config
-	op                            Op
-	typ                           string
-	id                            *int
-	code                          *string
-	name                          *string
-	category                      *string
-	spec                          *string
-	color                         *string
-	is_active                     *bool
-	created_at                    *time.Time
-	updated_at                    *time.Time
-	clearedFields                 map[string]struct{}
-	default_unit                  *int
-	cleareddefault_unit           bool
-	bom_items                     map[int]struct{}
-	removedbom_items              map[int]struct{}
-	clearedbom_items              bool
-	purchase_receipt_items        map[int]struct{}
-	removedpurchase_receipt_items map[int]struct{}
-	clearedpurchase_receipt_items bool
-	purchase_return_items         map[int]struct{}
-	removedpurchase_return_items  map[int]struct{}
-	clearedpurchase_return_items  bool
-	done                          bool
-	oldValue                      func(context.Context) (*Material, error)
-	predicates                    []predicate.Material
+	op                                       Op
+	typ                                      string
+	id                                       *int
+	code                                     *string
+	name                                     *string
+	category                                 *string
+	spec                                     *string
+	color                                    *string
+	is_active                                *bool
+	created_at                               *time.Time
+	updated_at                               *time.Time
+	clearedFields                            map[string]struct{}
+	default_unit                             *int
+	cleareddefault_unit                      bool
+	bom_items                                map[int]struct{}
+	removedbom_items                         map[int]struct{}
+	clearedbom_items                         bool
+	purchase_receipt_items                   map[int]struct{}
+	removedpurchase_receipt_items            map[int]struct{}
+	clearedpurchase_receipt_items            bool
+	purchase_return_items                    map[int]struct{}
+	removedpurchase_return_items             map[int]struct{}
+	clearedpurchase_return_items             bool
+	purchase_receipt_adjustment_items        map[int]struct{}
+	removedpurchase_receipt_adjustment_items map[int]struct{}
+	clearedpurchase_receipt_adjustment_items bool
+	done                                     bool
+	oldValue                                 func(context.Context) (*Material, error)
+	predicates                               []predicate.Material
 }
 
 var _ ent.Mutation = (*MaterialMutation)(nil)
@@ -12753,6 +12926,60 @@ func (m *MaterialMutation) ResetPurchaseReturnItems() {
 	m.removedpurchase_return_items = nil
 }
 
+// AddPurchaseReceiptAdjustmentItemIDs adds the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by ids.
+func (m *MaterialMutation) AddPurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.purchase_receipt_adjustment_items == nil {
+		m.purchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.purchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPurchaseReceiptAdjustmentItems clears the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *MaterialMutation) ClearPurchaseReceiptAdjustmentItems() {
+	m.clearedpurchase_receipt_adjustment_items = true
+}
+
+// PurchaseReceiptAdjustmentItemsCleared reports if the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity was cleared.
+func (m *MaterialMutation) PurchaseReceiptAdjustmentItemsCleared() bool {
+	return m.clearedpurchase_receipt_adjustment_items
+}
+
+// RemovePurchaseReceiptAdjustmentItemIDs removes the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (m *MaterialMutation) RemovePurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.removedpurchase_receipt_adjustment_items == nil {
+		m.removedpurchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.purchase_receipt_adjustment_items, ids[i])
+		m.removedpurchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPurchaseReceiptAdjustmentItems returns the removed IDs of the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *MaterialMutation) RemovedPurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.removedpurchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PurchaseReceiptAdjustmentItemsIDs returns the "purchase_receipt_adjustment_items" edge IDs in the mutation.
+func (m *MaterialMutation) PurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.purchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptAdjustmentItems resets all changes to the "purchase_receipt_adjustment_items" edge.
+func (m *MaterialMutation) ResetPurchaseReceiptAdjustmentItems() {
+	m.purchase_receipt_adjustment_items = nil
+	m.clearedpurchase_receipt_adjustment_items = false
+	m.removedpurchase_receipt_adjustment_items = nil
+}
+
 // Where appends a list predicates to the MaterialMutation builder.
 func (m *MaterialMutation) Where(ps ...predicate.Material) {
 	m.predicates = append(m.predicates, ps...)
@@ -13046,7 +13273,7 @@ func (m *MaterialMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *MaterialMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.default_unit != nil {
 		edges = append(edges, material.EdgeDefaultUnit)
 	}
@@ -13058,6 +13285,9 @@ func (m *MaterialMutation) AddedEdges() []string {
 	}
 	if m.purchase_return_items != nil {
 		edges = append(edges, material.EdgePurchaseReturnItems)
+	}
+	if m.purchase_receipt_adjustment_items != nil {
+		edges = append(edges, material.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -13088,13 +13318,19 @@ func (m *MaterialMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case material.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.purchase_receipt_adjustment_items))
+		for id := range m.purchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *MaterialMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedbom_items != nil {
 		edges = append(edges, material.EdgeBomItems)
 	}
@@ -13103,6 +13339,9 @@ func (m *MaterialMutation) RemovedEdges() []string {
 	}
 	if m.removedpurchase_return_items != nil {
 		edges = append(edges, material.EdgePurchaseReturnItems)
+	}
+	if m.removedpurchase_receipt_adjustment_items != nil {
+		edges = append(edges, material.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -13129,13 +13368,19 @@ func (m *MaterialMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case material.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.removedpurchase_receipt_adjustment_items))
+		for id := range m.removedpurchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *MaterialMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.cleareddefault_unit {
 		edges = append(edges, material.EdgeDefaultUnit)
 	}
@@ -13147,6 +13392,9 @@ func (m *MaterialMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_return_items {
 		edges = append(edges, material.EdgePurchaseReturnItems)
+	}
+	if m.clearedpurchase_receipt_adjustment_items {
+		edges = append(edges, material.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -13163,6 +13411,8 @@ func (m *MaterialMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_receipt_items
 	case material.EdgePurchaseReturnItems:
 		return m.clearedpurchase_return_items
+	case material.EdgePurchaseReceiptAdjustmentItems:
+		return m.clearedpurchase_receipt_adjustment_items
 	}
 	return false
 }
@@ -13193,6 +13443,9 @@ func (m *MaterialMutation) ResetEdge(name string) error {
 		return nil
 	case material.EdgePurchaseReturnItems:
 		m.ResetPurchaseReturnItems()
+		return nil
+	case material.EdgePurchaseReceiptAdjustmentItems:
+		m.ResetPurchaseReceiptAdjustmentItems()
 		return nil
 	}
 	return fmt.Errorf("unknown Material edge %s", name)
@@ -14846,29 +15099,32 @@ func (m *ProductMutation) ResetEdge(name string) error {
 // PurchaseReceiptMutation represents an operation that mutates the PurchaseReceipt nodes in the graph.
 type PurchaseReceiptMutation struct {
 	config
-	op                      Op
-	typ                     string
-	id                      *int
-	receipt_no              *string
-	supplier_name           *string
-	status                  *string
-	received_at             *time.Time
-	posted_at               *time.Time
-	note                    *string
-	created_at              *time.Time
-	updated_at              *time.Time
-	clearedFields           map[string]struct{}
-	business_record         *int
-	clearedbusiness_record  bool
-	purchase_returns        map[int]struct{}
-	removedpurchase_returns map[int]struct{}
-	clearedpurchase_returns bool
-	items                   map[int]struct{}
-	removeditems            map[int]struct{}
-	cleareditems            bool
-	done                    bool
-	oldValue                func(context.Context) (*PurchaseReceipt, error)
-	predicates              []predicate.PurchaseReceipt
+	op                                  Op
+	typ                                 string
+	id                                  *int
+	receipt_no                          *string
+	supplier_name                       *string
+	status                              *string
+	received_at                         *time.Time
+	posted_at                           *time.Time
+	note                                *string
+	created_at                          *time.Time
+	updated_at                          *time.Time
+	clearedFields                       map[string]struct{}
+	business_record                     *int
+	clearedbusiness_record              bool
+	purchase_returns                    map[int]struct{}
+	removedpurchase_returns             map[int]struct{}
+	clearedpurchase_returns             bool
+	purchase_receipt_adjustments        map[int]struct{}
+	removedpurchase_receipt_adjustments map[int]struct{}
+	clearedpurchase_receipt_adjustments bool
+	items                               map[int]struct{}
+	removeditems                        map[int]struct{}
+	cleareditems                        bool
+	done                                bool
+	oldValue                            func(context.Context) (*PurchaseReceipt, error)
+	predicates                          []predicate.PurchaseReceipt
 }
 
 var _ ent.Mutation = (*PurchaseReceiptMutation)(nil)
@@ -15413,6 +15669,60 @@ func (m *PurchaseReceiptMutation) ResetPurchaseReturns() {
 	m.removedpurchase_returns = nil
 }
 
+// AddPurchaseReceiptAdjustmentIDs adds the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity by ids.
+func (m *PurchaseReceiptMutation) AddPurchaseReceiptAdjustmentIDs(ids ...int) {
+	if m.purchase_receipt_adjustments == nil {
+		m.purchase_receipt_adjustments = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.purchase_receipt_adjustments[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPurchaseReceiptAdjustments clears the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity.
+func (m *PurchaseReceiptMutation) ClearPurchaseReceiptAdjustments() {
+	m.clearedpurchase_receipt_adjustments = true
+}
+
+// PurchaseReceiptAdjustmentsCleared reports if the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity was cleared.
+func (m *PurchaseReceiptMutation) PurchaseReceiptAdjustmentsCleared() bool {
+	return m.clearedpurchase_receipt_adjustments
+}
+
+// RemovePurchaseReceiptAdjustmentIDs removes the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity by IDs.
+func (m *PurchaseReceiptMutation) RemovePurchaseReceiptAdjustmentIDs(ids ...int) {
+	if m.removedpurchase_receipt_adjustments == nil {
+		m.removedpurchase_receipt_adjustments = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.purchase_receipt_adjustments, ids[i])
+		m.removedpurchase_receipt_adjustments[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPurchaseReceiptAdjustments returns the removed IDs of the "purchase_receipt_adjustments" edge to the PurchaseReceiptAdjustment entity.
+func (m *PurchaseReceiptMutation) RemovedPurchaseReceiptAdjustmentsIDs() (ids []int) {
+	for id := range m.removedpurchase_receipt_adjustments {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PurchaseReceiptAdjustmentsIDs returns the "purchase_receipt_adjustments" edge IDs in the mutation.
+func (m *PurchaseReceiptMutation) PurchaseReceiptAdjustmentsIDs() (ids []int) {
+	for id := range m.purchase_receipt_adjustments {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptAdjustments resets all changes to the "purchase_receipt_adjustments" edge.
+func (m *PurchaseReceiptMutation) ResetPurchaseReceiptAdjustments() {
+	m.purchase_receipt_adjustments = nil
+	m.clearedpurchase_receipt_adjustments = false
+	m.removedpurchase_receipt_adjustments = nil
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by ids.
 func (m *PurchaseReceiptMutation) AddItemIDs(ids ...int) {
 	if m.items == nil {
@@ -15760,12 +16070,15 @@ func (m *PurchaseReceiptMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PurchaseReceiptMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.business_record != nil {
 		edges = append(edges, purchasereceipt.EdgeBusinessRecord)
 	}
 	if m.purchase_returns != nil {
 		edges = append(edges, purchasereceipt.EdgePurchaseReturns)
+	}
+	if m.purchase_receipt_adjustments != nil {
+		edges = append(edges, purchasereceipt.EdgePurchaseReceiptAdjustments)
 	}
 	if m.items != nil {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -15787,6 +16100,12 @@ func (m *PurchaseReceiptMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceipt.EdgePurchaseReceiptAdjustments:
+		ids := make([]ent.Value, 0, len(m.purchase_receipt_adjustments))
+		for id := range m.purchase_receipt_adjustments {
+			ids = append(ids, id)
+		}
+		return ids
 	case purchasereceipt.EdgeItems:
 		ids := make([]ent.Value, 0, len(m.items))
 		for id := range m.items {
@@ -15799,9 +16118,12 @@ func (m *PurchaseReceiptMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PurchaseReceiptMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.removedpurchase_returns != nil {
 		edges = append(edges, purchasereceipt.EdgePurchaseReturns)
+	}
+	if m.removedpurchase_receipt_adjustments != nil {
+		edges = append(edges, purchasereceipt.EdgePurchaseReceiptAdjustments)
 	}
 	if m.removeditems != nil {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -15819,6 +16141,12 @@ func (m *PurchaseReceiptMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceipt.EdgePurchaseReceiptAdjustments:
+		ids := make([]ent.Value, 0, len(m.removedpurchase_receipt_adjustments))
+		for id := range m.removedpurchase_receipt_adjustments {
+			ids = append(ids, id)
+		}
+		return ids
 	case purchasereceipt.EdgeItems:
 		ids := make([]ent.Value, 0, len(m.removeditems))
 		for id := range m.removeditems {
@@ -15831,12 +16159,15 @@ func (m *PurchaseReceiptMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PurchaseReceiptMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.clearedbusiness_record {
 		edges = append(edges, purchasereceipt.EdgeBusinessRecord)
 	}
 	if m.clearedpurchase_returns {
 		edges = append(edges, purchasereceipt.EdgePurchaseReturns)
+	}
+	if m.clearedpurchase_receipt_adjustments {
+		edges = append(edges, purchasereceipt.EdgePurchaseReceiptAdjustments)
 	}
 	if m.cleareditems {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -15852,6 +16183,8 @@ func (m *PurchaseReceiptMutation) EdgeCleared(name string) bool {
 		return m.clearedbusiness_record
 	case purchasereceipt.EdgePurchaseReturns:
 		return m.clearedpurchase_returns
+	case purchasereceipt.EdgePurchaseReceiptAdjustments:
+		return m.clearedpurchase_receipt_adjustments
 	case purchasereceipt.EdgeItems:
 		return m.cleareditems
 	}
@@ -15879,6 +16212,9 @@ func (m *PurchaseReceiptMutation) ResetEdge(name string) error {
 	case purchasereceipt.EdgePurchaseReturns:
 		m.ResetPurchaseReturns()
 		return nil
+	case purchasereceipt.EdgePurchaseReceiptAdjustments:
+		m.ResetPurchaseReceiptAdjustments()
+		return nil
 	case purchasereceipt.EdgeItems:
 		m.ResetItems()
 		return nil
@@ -15886,37 +16222,2485 @@ func (m *PurchaseReceiptMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown PurchaseReceipt edge %s", name)
 }
 
+// PurchaseReceiptAdjustmentMutation represents an operation that mutates the PurchaseReceiptAdjustment nodes in the graph.
+type PurchaseReceiptAdjustmentMutation struct {
+	config
+	op                      Op
+	typ                     string
+	id                      *int
+	adjustment_no           *string
+	reason                  *string
+	status                  *string
+	adjusted_at             *time.Time
+	posted_at               *time.Time
+	note                    *string
+	created_at              *time.Time
+	updated_at              *time.Time
+	clearedFields           map[string]struct{}
+	purchase_receipt        *int
+	clearedpurchase_receipt bool
+	business_record         *int
+	clearedbusiness_record  bool
+	items                   map[int]struct{}
+	removeditems            map[int]struct{}
+	cleareditems            bool
+	done                    bool
+	oldValue                func(context.Context) (*PurchaseReceiptAdjustment, error)
+	predicates              []predicate.PurchaseReceiptAdjustment
+}
+
+var _ ent.Mutation = (*PurchaseReceiptAdjustmentMutation)(nil)
+
+// purchasereceiptadjustmentOption allows management of the mutation configuration using functional options.
+type purchasereceiptadjustmentOption func(*PurchaseReceiptAdjustmentMutation)
+
+// newPurchaseReceiptAdjustmentMutation creates new mutation for the PurchaseReceiptAdjustment entity.
+func newPurchaseReceiptAdjustmentMutation(c config, op Op, opts ...purchasereceiptadjustmentOption) *PurchaseReceiptAdjustmentMutation {
+	m := &PurchaseReceiptAdjustmentMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePurchaseReceiptAdjustment,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPurchaseReceiptAdjustmentID sets the ID field of the mutation.
+func withPurchaseReceiptAdjustmentID(id int) purchasereceiptadjustmentOption {
+	return func(m *PurchaseReceiptAdjustmentMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PurchaseReceiptAdjustment
+		)
+		m.oldValue = func(ctx context.Context) (*PurchaseReceiptAdjustment, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PurchaseReceiptAdjustment.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPurchaseReceiptAdjustment sets the old PurchaseReceiptAdjustment of the mutation.
+func withPurchaseReceiptAdjustment(node *PurchaseReceiptAdjustment) purchasereceiptadjustmentOption {
+	return func(m *PurchaseReceiptAdjustmentMutation) {
+		m.oldValue = func(context.Context) (*PurchaseReceiptAdjustment, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PurchaseReceiptAdjustmentMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PurchaseReceiptAdjustmentMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PurchaseReceiptAdjustmentMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PurchaseReceiptAdjustment.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetAdjustmentNo sets the "adjustment_no" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetAdjustmentNo(s string) {
+	m.adjustment_no = &s
+}
+
+// AdjustmentNo returns the value of the "adjustment_no" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) AdjustmentNo() (r string, exists bool) {
+	v := m.adjustment_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAdjustmentNo returns the old "adjustment_no" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldAdjustmentNo(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAdjustmentNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAdjustmentNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAdjustmentNo: %w", err)
+	}
+	return oldValue.AdjustmentNo, nil
+}
+
+// ResetAdjustmentNo resets all changes to the "adjustment_no" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetAdjustmentNo() {
+	m.adjustment_no = nil
+}
+
+// SetPurchaseReceiptID sets the "purchase_receipt_id" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetPurchaseReceiptID(i int) {
+	m.purchase_receipt = &i
+}
+
+// PurchaseReceiptID returns the value of the "purchase_receipt_id" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) PurchaseReceiptID() (r int, exists bool) {
+	v := m.purchase_receipt
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPurchaseReceiptID returns the old "purchase_receipt_id" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldPurchaseReceiptID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPurchaseReceiptID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPurchaseReceiptID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPurchaseReceiptID: %w", err)
+	}
+	return oldValue.PurchaseReceiptID, nil
+}
+
+// ResetPurchaseReceiptID resets all changes to the "purchase_receipt_id" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetPurchaseReceiptID() {
+	m.purchase_receipt = nil
+}
+
+// SetBusinessRecordID sets the "business_record_id" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetBusinessRecordID(i int) {
+	m.business_record = &i
+}
+
+// BusinessRecordID returns the value of the "business_record_id" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) BusinessRecordID() (r int, exists bool) {
+	v := m.business_record
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBusinessRecordID returns the old "business_record_id" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldBusinessRecordID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBusinessRecordID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBusinessRecordID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBusinessRecordID: %w", err)
+	}
+	return oldValue.BusinessRecordID, nil
+}
+
+// ClearBusinessRecordID clears the value of the "business_record_id" field.
+func (m *PurchaseReceiptAdjustmentMutation) ClearBusinessRecordID() {
+	m.business_record = nil
+	m.clearedFields[purchasereceiptadjustment.FieldBusinessRecordID] = struct{}{}
+}
+
+// BusinessRecordIDCleared returns if the "business_record_id" field was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) BusinessRecordIDCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptadjustment.FieldBusinessRecordID]
+	return ok
+}
+
+// ResetBusinessRecordID resets all changes to the "business_record_id" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetBusinessRecordID() {
+	m.business_record = nil
+	delete(m.clearedFields, purchasereceiptadjustment.FieldBusinessRecordID)
+}
+
+// SetReason sets the "reason" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetReason(s string) {
+	m.reason = &s
+}
+
+// Reason returns the value of the "reason" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) Reason() (r string, exists bool) {
+	v := m.reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReason returns the old "reason" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReason: %w", err)
+	}
+	return oldValue.Reason, nil
+}
+
+// ClearReason clears the value of the "reason" field.
+func (m *PurchaseReceiptAdjustmentMutation) ClearReason() {
+	m.reason = nil
+	m.clearedFields[purchasereceiptadjustment.FieldReason] = struct{}{}
+}
+
+// ReasonCleared returns if the "reason" field was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) ReasonCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptadjustment.FieldReason]
+	return ok
+}
+
+// ResetReason resets all changes to the "reason" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetReason() {
+	m.reason = nil
+	delete(m.clearedFields, purchasereceiptadjustment.FieldReason)
+}
+
+// SetStatus sets the "status" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetAdjustedAt sets the "adjusted_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetAdjustedAt(t time.Time) {
+	m.adjusted_at = &t
+}
+
+// AdjustedAt returns the value of the "adjusted_at" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) AdjustedAt() (r time.Time, exists bool) {
+	v := m.adjusted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAdjustedAt returns the old "adjusted_at" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldAdjustedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAdjustedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAdjustedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAdjustedAt: %w", err)
+	}
+	return oldValue.AdjustedAt, nil
+}
+
+// ResetAdjustedAt resets all changes to the "adjusted_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetAdjustedAt() {
+	m.adjusted_at = nil
+}
+
+// SetPostedAt sets the "posted_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetPostedAt(t time.Time) {
+	m.posted_at = &t
+}
+
+// PostedAt returns the value of the "posted_at" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) PostedAt() (r time.Time, exists bool) {
+	v := m.posted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPostedAt returns the old "posted_at" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldPostedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPostedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPostedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPostedAt: %w", err)
+	}
+	return oldValue.PostedAt, nil
+}
+
+// ClearPostedAt clears the value of the "posted_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) ClearPostedAt() {
+	m.posted_at = nil
+	m.clearedFields[purchasereceiptadjustment.FieldPostedAt] = struct{}{}
+}
+
+// PostedAtCleared returns if the "posted_at" field was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) PostedAtCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptadjustment.FieldPostedAt]
+	return ok
+}
+
+// ResetPostedAt resets all changes to the "posted_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetPostedAt() {
+	m.posted_at = nil
+	delete(m.clearedFields, purchasereceiptadjustment.FieldPostedAt)
+}
+
+// SetNote sets the "note" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *PurchaseReceiptAdjustmentMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[purchasereceiptadjustment.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptadjustment.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, purchasereceiptadjustment.FieldNote)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PurchaseReceiptAdjustment entity.
+// If the PurchaseReceiptAdjustment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PurchaseReceiptAdjustmentMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
+func (m *PurchaseReceiptAdjustmentMutation) ClearPurchaseReceipt() {
+	m.clearedpurchase_receipt = true
+	m.clearedFields[purchasereceiptadjustment.FieldPurchaseReceiptID] = struct{}{}
+}
+
+// PurchaseReceiptCleared reports if the "purchase_receipt" edge to the PurchaseReceipt entity was cleared.
+func (m *PurchaseReceiptAdjustmentMutation) PurchaseReceiptCleared() bool {
+	return m.clearedpurchase_receipt
+}
+
+// PurchaseReceiptIDs returns the "purchase_receipt" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PurchaseReceiptID instead. It exists only for internal usage by the builders.
+func (m *PurchaseReceiptAdjustmentMutation) PurchaseReceiptIDs() (ids []int) {
+	if id := m.purchase_receipt; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPurchaseReceipt resets all changes to the "purchase_receipt" edge.
+func (m *PurchaseReceiptAdjustmentMutation) ResetPurchaseReceipt() {
+	m.purchase_receipt = nil
+	m.clearedpurchase_receipt = false
+}
+
+// ClearBusinessRecord clears the "business_record" edge to the BusinessRecord entity.
+func (m *PurchaseReceiptAdjustmentMutation) ClearBusinessRecord() {
+	m.clearedbusiness_record = true
+	m.clearedFields[purchasereceiptadjustment.FieldBusinessRecordID] = struct{}{}
+}
+
+// BusinessRecordCleared reports if the "business_record" edge to the BusinessRecord entity was cleared.
+func (m *PurchaseReceiptAdjustmentMutation) BusinessRecordCleared() bool {
+	return m.BusinessRecordIDCleared() || m.clearedbusiness_record
+}
+
+// BusinessRecordIDs returns the "business_record" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// BusinessRecordID instead. It exists only for internal usage by the builders.
+func (m *PurchaseReceiptAdjustmentMutation) BusinessRecordIDs() (ids []int) {
+	if id := m.business_record; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetBusinessRecord resets all changes to the "business_record" edge.
+func (m *PurchaseReceiptAdjustmentMutation) ResetBusinessRecord() {
+	m.business_record = nil
+	m.clearedbusiness_record = false
+}
+
+// AddItemIDs adds the "items" edge to the PurchaseReceiptAdjustmentItem entity by ids.
+func (m *PurchaseReceiptAdjustmentMutation) AddItemIDs(ids ...int) {
+	if m.items == nil {
+		m.items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearItems clears the "items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *PurchaseReceiptAdjustmentMutation) ClearItems() {
+	m.cleareditems = true
+}
+
+// ItemsCleared reports if the "items" edge to the PurchaseReceiptAdjustmentItem entity was cleared.
+func (m *PurchaseReceiptAdjustmentMutation) ItemsCleared() bool {
+	return m.cleareditems
+}
+
+// RemoveItemIDs removes the "items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (m *PurchaseReceiptAdjustmentMutation) RemoveItemIDs(ids ...int) {
+	if m.removeditems == nil {
+		m.removeditems = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.items, ids[i])
+		m.removeditems[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedItems returns the removed IDs of the "items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *PurchaseReceiptAdjustmentMutation) RemovedItemsIDs() (ids []int) {
+	for id := range m.removeditems {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ItemsIDs returns the "items" edge IDs in the mutation.
+func (m *PurchaseReceiptAdjustmentMutation) ItemsIDs() (ids []int) {
+	for id := range m.items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetItems resets all changes to the "items" edge.
+func (m *PurchaseReceiptAdjustmentMutation) ResetItems() {
+	m.items = nil
+	m.cleareditems = false
+	m.removeditems = nil
+}
+
+// Where appends a list predicates to the PurchaseReceiptAdjustmentMutation builder.
+func (m *PurchaseReceiptAdjustmentMutation) Where(ps ...predicate.PurchaseReceiptAdjustment) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PurchaseReceiptAdjustmentMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PurchaseReceiptAdjustmentMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PurchaseReceiptAdjustment, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PurchaseReceiptAdjustmentMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PurchaseReceiptAdjustmentMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PurchaseReceiptAdjustment).
+func (m *PurchaseReceiptAdjustmentMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PurchaseReceiptAdjustmentMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.adjustment_no != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldAdjustmentNo)
+	}
+	if m.purchase_receipt != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldPurchaseReceiptID)
+	}
+	if m.business_record != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldBusinessRecordID)
+	}
+	if m.reason != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldReason)
+	}
+	if m.status != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldStatus)
+	}
+	if m.adjusted_at != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldAdjustedAt)
+	}
+	if m.posted_at != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldPostedAt)
+	}
+	if m.note != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldNote)
+	}
+	if m.created_at != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, purchasereceiptadjustment.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PurchaseReceiptAdjustmentMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case purchasereceiptadjustment.FieldAdjustmentNo:
+		return m.AdjustmentNo()
+	case purchasereceiptadjustment.FieldPurchaseReceiptID:
+		return m.PurchaseReceiptID()
+	case purchasereceiptadjustment.FieldBusinessRecordID:
+		return m.BusinessRecordID()
+	case purchasereceiptadjustment.FieldReason:
+		return m.Reason()
+	case purchasereceiptadjustment.FieldStatus:
+		return m.Status()
+	case purchasereceiptadjustment.FieldAdjustedAt:
+		return m.AdjustedAt()
+	case purchasereceiptadjustment.FieldPostedAt:
+		return m.PostedAt()
+	case purchasereceiptadjustment.FieldNote:
+		return m.Note()
+	case purchasereceiptadjustment.FieldCreatedAt:
+		return m.CreatedAt()
+	case purchasereceiptadjustment.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PurchaseReceiptAdjustmentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case purchasereceiptadjustment.FieldAdjustmentNo:
+		return m.OldAdjustmentNo(ctx)
+	case purchasereceiptadjustment.FieldPurchaseReceiptID:
+		return m.OldPurchaseReceiptID(ctx)
+	case purchasereceiptadjustment.FieldBusinessRecordID:
+		return m.OldBusinessRecordID(ctx)
+	case purchasereceiptadjustment.FieldReason:
+		return m.OldReason(ctx)
+	case purchasereceiptadjustment.FieldStatus:
+		return m.OldStatus(ctx)
+	case purchasereceiptadjustment.FieldAdjustedAt:
+		return m.OldAdjustedAt(ctx)
+	case purchasereceiptadjustment.FieldPostedAt:
+		return m.OldPostedAt(ctx)
+	case purchasereceiptadjustment.FieldNote:
+		return m.OldNote(ctx)
+	case purchasereceiptadjustment.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case purchasereceiptadjustment.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PurchaseReceiptAdjustment field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PurchaseReceiptAdjustmentMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case purchasereceiptadjustment.FieldAdjustmentNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAdjustmentNo(v)
+		return nil
+	case purchasereceiptadjustment.FieldPurchaseReceiptID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPurchaseReceiptID(v)
+		return nil
+	case purchasereceiptadjustment.FieldBusinessRecordID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBusinessRecordID(v)
+		return nil
+	case purchasereceiptadjustment.FieldReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReason(v)
+		return nil
+	case purchasereceiptadjustment.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case purchasereceiptadjustment.FieldAdjustedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAdjustedAt(v)
+		return nil
+	case purchasereceiptadjustment.FieldPostedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPostedAt(v)
+		return nil
+	case purchasereceiptadjustment.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case purchasereceiptadjustment.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case purchasereceiptadjustment.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustment field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PurchaseReceiptAdjustmentMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PurchaseReceiptAdjustmentMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustment numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PurchaseReceiptAdjustmentMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(purchasereceiptadjustment.FieldBusinessRecordID) {
+		fields = append(fields, purchasereceiptadjustment.FieldBusinessRecordID)
+	}
+	if m.FieldCleared(purchasereceiptadjustment.FieldReason) {
+		fields = append(fields, purchasereceiptadjustment.FieldReason)
+	}
+	if m.FieldCleared(purchasereceiptadjustment.FieldPostedAt) {
+		fields = append(fields, purchasereceiptadjustment.FieldPostedAt)
+	}
+	if m.FieldCleared(purchasereceiptadjustment.FieldNote) {
+		fields = append(fields, purchasereceiptadjustment.FieldNote)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PurchaseReceiptAdjustmentMutation) ClearField(name string) error {
+	switch name {
+	case purchasereceiptadjustment.FieldBusinessRecordID:
+		m.ClearBusinessRecordID()
+		return nil
+	case purchasereceiptadjustment.FieldReason:
+		m.ClearReason()
+		return nil
+	case purchasereceiptadjustment.FieldPostedAt:
+		m.ClearPostedAt()
+		return nil
+	case purchasereceiptadjustment.FieldNote:
+		m.ClearNote()
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustment nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PurchaseReceiptAdjustmentMutation) ResetField(name string) error {
+	switch name {
+	case purchasereceiptadjustment.FieldAdjustmentNo:
+		m.ResetAdjustmentNo()
+		return nil
+	case purchasereceiptadjustment.FieldPurchaseReceiptID:
+		m.ResetPurchaseReceiptID()
+		return nil
+	case purchasereceiptadjustment.FieldBusinessRecordID:
+		m.ResetBusinessRecordID()
+		return nil
+	case purchasereceiptadjustment.FieldReason:
+		m.ResetReason()
+		return nil
+	case purchasereceiptadjustment.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case purchasereceiptadjustment.FieldAdjustedAt:
+		m.ResetAdjustedAt()
+		return nil
+	case purchasereceiptadjustment.FieldPostedAt:
+		m.ResetPostedAt()
+		return nil
+	case purchasereceiptadjustment.FieldNote:
+		m.ResetNote()
+		return nil
+	case purchasereceiptadjustment.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case purchasereceiptadjustment.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustment field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) AddedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.purchase_receipt != nil {
+		edges = append(edges, purchasereceiptadjustment.EdgePurchaseReceipt)
+	}
+	if m.business_record != nil {
+		edges = append(edges, purchasereceiptadjustment.EdgeBusinessRecord)
+	}
+	if m.items != nil {
+		edges = append(edges, purchasereceiptadjustment.EdgeItems)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case purchasereceiptadjustment.EdgePurchaseReceipt:
+		if id := m.purchase_receipt; id != nil {
+			return []ent.Value{*id}
+		}
+	case purchasereceiptadjustment.EdgeBusinessRecord:
+		if id := m.business_record; id != nil {
+			return []ent.Value{*id}
+		}
+	case purchasereceiptadjustment.EdgeItems:
+		ids := make([]ent.Value, 0, len(m.items))
+		for id := range m.items {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.removeditems != nil {
+		edges = append(edges, purchasereceiptadjustment.EdgeItems)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case purchasereceiptadjustment.EdgeItems:
+		ids := make([]ent.Value, 0, len(m.removeditems))
+		for id := range m.removeditems {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 3)
+	if m.clearedpurchase_receipt {
+		edges = append(edges, purchasereceiptadjustment.EdgePurchaseReceipt)
+	}
+	if m.clearedbusiness_record {
+		edges = append(edges, purchasereceiptadjustment.EdgeBusinessRecord)
+	}
+	if m.cleareditems {
+		edges = append(edges, purchasereceiptadjustment.EdgeItems)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentMutation) EdgeCleared(name string) bool {
+	switch name {
+	case purchasereceiptadjustment.EdgePurchaseReceipt:
+		return m.clearedpurchase_receipt
+	case purchasereceiptadjustment.EdgeBusinessRecord:
+		return m.clearedbusiness_record
+	case purchasereceiptadjustment.EdgeItems:
+		return m.cleareditems
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PurchaseReceiptAdjustmentMutation) ClearEdge(name string) error {
+	switch name {
+	case purchasereceiptadjustment.EdgePurchaseReceipt:
+		m.ClearPurchaseReceipt()
+		return nil
+	case purchasereceiptadjustment.EdgeBusinessRecord:
+		m.ClearBusinessRecord()
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustment unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PurchaseReceiptAdjustmentMutation) ResetEdge(name string) error {
+	switch name {
+	case purchasereceiptadjustment.EdgePurchaseReceipt:
+		m.ResetPurchaseReceipt()
+		return nil
+	case purchasereceiptadjustment.EdgeBusinessRecord:
+		m.ResetBusinessRecord()
+		return nil
+	case purchasereceiptadjustment.EdgeItems:
+		m.ResetItems()
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustment edge %s", name)
+}
+
+// PurchaseReceiptAdjustmentItemMutation represents an operation that mutates the PurchaseReceiptAdjustmentItem nodes in the graph.
+type PurchaseReceiptAdjustmentItemMutation struct {
+	config
+	op                                 Op
+	typ                                string
+	id                                 *int
+	adjust_type                        *string
+	quantity                           *decimal.Decimal
+	source_line_no                     *string
+	correction_group                   *string
+	note                               *string
+	created_at                         *time.Time
+	updated_at                         *time.Time
+	clearedFields                      map[string]struct{}
+	purchase_receipt_adjustment        *int
+	clearedpurchase_receipt_adjustment bool
+	purchase_receipt_item              *int
+	clearedpurchase_receipt_item       bool
+	material                           *int
+	clearedmaterial                    bool
+	warehouse                          *int
+	clearedwarehouse                   bool
+	unit                               *int
+	clearedunit                        bool
+	inventory_lot                      *int
+	clearedinventory_lot               bool
+	done                               bool
+	oldValue                           func(context.Context) (*PurchaseReceiptAdjustmentItem, error)
+	predicates                         []predicate.PurchaseReceiptAdjustmentItem
+}
+
+var _ ent.Mutation = (*PurchaseReceiptAdjustmentItemMutation)(nil)
+
+// purchasereceiptadjustmentitemOption allows management of the mutation configuration using functional options.
+type purchasereceiptadjustmentitemOption func(*PurchaseReceiptAdjustmentItemMutation)
+
+// newPurchaseReceiptAdjustmentItemMutation creates new mutation for the PurchaseReceiptAdjustmentItem entity.
+func newPurchaseReceiptAdjustmentItemMutation(c config, op Op, opts ...purchasereceiptadjustmentitemOption) *PurchaseReceiptAdjustmentItemMutation {
+	m := &PurchaseReceiptAdjustmentItemMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePurchaseReceiptAdjustmentItem,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPurchaseReceiptAdjustmentItemID sets the ID field of the mutation.
+func withPurchaseReceiptAdjustmentItemID(id int) purchasereceiptadjustmentitemOption {
+	return func(m *PurchaseReceiptAdjustmentItemMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PurchaseReceiptAdjustmentItem
+		)
+		m.oldValue = func(ctx context.Context) (*PurchaseReceiptAdjustmentItem, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PurchaseReceiptAdjustmentItem.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPurchaseReceiptAdjustmentItem sets the old PurchaseReceiptAdjustmentItem of the mutation.
+func withPurchaseReceiptAdjustmentItem(node *PurchaseReceiptAdjustmentItem) purchasereceiptadjustmentitemOption {
+	return func(m *PurchaseReceiptAdjustmentItemMutation) {
+		m.oldValue = func(context.Context) (*PurchaseReceiptAdjustmentItem, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PurchaseReceiptAdjustmentItemMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PurchaseReceiptAdjustmentItemMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PurchaseReceiptAdjustmentItemMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PurchaseReceiptAdjustmentItem.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetAdjustmentID sets the "adjustment_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetAdjustmentID(i int) {
+	m.purchase_receipt_adjustment = &i
+}
+
+// AdjustmentID returns the value of the "adjustment_id" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) AdjustmentID() (r int, exists bool) {
+	v := m.purchase_receipt_adjustment
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAdjustmentID returns the old "adjustment_id" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldAdjustmentID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAdjustmentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAdjustmentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAdjustmentID: %w", err)
+	}
+	return oldValue.AdjustmentID, nil
+}
+
+// ResetAdjustmentID resets all changes to the "adjustment_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetAdjustmentID() {
+	m.purchase_receipt_adjustment = nil
+}
+
+// SetPurchaseReceiptItemID sets the "purchase_receipt_item_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetPurchaseReceiptItemID(i int) {
+	m.purchase_receipt_item = &i
+}
+
+// PurchaseReceiptItemID returns the value of the "purchase_receipt_item_id" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) PurchaseReceiptItemID() (r int, exists bool) {
+	v := m.purchase_receipt_item
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPurchaseReceiptItemID returns the old "purchase_receipt_item_id" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldPurchaseReceiptItemID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPurchaseReceiptItemID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPurchaseReceiptItemID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPurchaseReceiptItemID: %w", err)
+	}
+	return oldValue.PurchaseReceiptItemID, nil
+}
+
+// ResetPurchaseReceiptItemID resets all changes to the "purchase_receipt_item_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetPurchaseReceiptItemID() {
+	m.purchase_receipt_item = nil
+}
+
+// SetAdjustType sets the "adjust_type" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetAdjustType(s string) {
+	m.adjust_type = &s
+}
+
+// AdjustType returns the value of the "adjust_type" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) AdjustType() (r string, exists bool) {
+	v := m.adjust_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAdjustType returns the old "adjust_type" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldAdjustType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAdjustType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAdjustType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAdjustType: %w", err)
+	}
+	return oldValue.AdjustType, nil
+}
+
+// ResetAdjustType resets all changes to the "adjust_type" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetAdjustType() {
+	m.adjust_type = nil
+}
+
+// SetMaterialID sets the "material_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetMaterialID(i int) {
+	m.material = &i
+}
+
+// MaterialID returns the value of the "material_id" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) MaterialID() (r int, exists bool) {
+	v := m.material
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaterialID returns the old "material_id" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldMaterialID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaterialID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaterialID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaterialID: %w", err)
+	}
+	return oldValue.MaterialID, nil
+}
+
+// ResetMaterialID resets all changes to the "material_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetMaterialID() {
+	m.material = nil
+}
+
+// SetWarehouseID sets the "warehouse_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetWarehouseID(i int) {
+	m.warehouse = &i
+}
+
+// WarehouseID returns the value of the "warehouse_id" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) WarehouseID() (r int, exists bool) {
+	v := m.warehouse
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWarehouseID returns the old "warehouse_id" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldWarehouseID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWarehouseID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWarehouseID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWarehouseID: %w", err)
+	}
+	return oldValue.WarehouseID, nil
+}
+
+// ResetWarehouseID resets all changes to the "warehouse_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetWarehouseID() {
+	m.warehouse = nil
+}
+
+// SetUnitID sets the "unit_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetUnitID(i int) {
+	m.unit = &i
+}
+
+// UnitID returns the value of the "unit_id" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) UnitID() (r int, exists bool) {
+	v := m.unit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitID returns the old "unit_id" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldUnitID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitID: %w", err)
+	}
+	return oldValue.UnitID, nil
+}
+
+// ResetUnitID resets all changes to the "unit_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetUnitID() {
+	m.unit = nil
+}
+
+// SetLotID sets the "lot_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetLotID(i int) {
+	m.inventory_lot = &i
+}
+
+// LotID returns the value of the "lot_id" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) LotID() (r int, exists bool) {
+	v := m.inventory_lot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLotID returns the old "lot_id" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldLotID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLotID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLotID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLotID: %w", err)
+	}
+	return oldValue.LotID, nil
+}
+
+// ClearLotID clears the value of the "lot_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearLotID() {
+	m.inventory_lot = nil
+	m.clearedFields[purchasereceiptadjustmentitem.FieldLotID] = struct{}{}
+}
+
+// LotIDCleared returns if the "lot_id" field was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) LotIDCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptadjustmentitem.FieldLotID]
+	return ok
+}
+
+// ResetLotID resets all changes to the "lot_id" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetLotID() {
+	m.inventory_lot = nil
+	delete(m.clearedFields, purchasereceiptadjustmentitem.FieldLotID)
+}
+
+// SetQuantity sets the "quantity" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetQuantity(d decimal.Decimal) {
+	m.quantity = &d
+}
+
+// Quantity returns the value of the "quantity" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) Quantity() (r decimal.Decimal, exists bool) {
+	v := m.quantity
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQuantity returns the old "quantity" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldQuantity(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQuantity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQuantity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQuantity: %w", err)
+	}
+	return oldValue.Quantity, nil
+}
+
+// ResetQuantity resets all changes to the "quantity" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetQuantity() {
+	m.quantity = nil
+}
+
+// SetSourceLineNo sets the "source_line_no" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetSourceLineNo(s string) {
+	m.source_line_no = &s
+}
+
+// SourceLineNo returns the value of the "source_line_no" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) SourceLineNo() (r string, exists bool) {
+	v := m.source_line_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceLineNo returns the old "source_line_no" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldSourceLineNo(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceLineNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceLineNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceLineNo: %w", err)
+	}
+	return oldValue.SourceLineNo, nil
+}
+
+// ClearSourceLineNo clears the value of the "source_line_no" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearSourceLineNo() {
+	m.source_line_no = nil
+	m.clearedFields[purchasereceiptadjustmentitem.FieldSourceLineNo] = struct{}{}
+}
+
+// SourceLineNoCleared returns if the "source_line_no" field was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) SourceLineNoCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptadjustmentitem.FieldSourceLineNo]
+	return ok
+}
+
+// ResetSourceLineNo resets all changes to the "source_line_no" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetSourceLineNo() {
+	m.source_line_no = nil
+	delete(m.clearedFields, purchasereceiptadjustmentitem.FieldSourceLineNo)
+}
+
+// SetCorrectionGroup sets the "correction_group" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetCorrectionGroup(s string) {
+	m.correction_group = &s
+}
+
+// CorrectionGroup returns the value of the "correction_group" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) CorrectionGroup() (r string, exists bool) {
+	v := m.correction_group
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCorrectionGroup returns the old "correction_group" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldCorrectionGroup(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCorrectionGroup is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCorrectionGroup requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCorrectionGroup: %w", err)
+	}
+	return oldValue.CorrectionGroup, nil
+}
+
+// ClearCorrectionGroup clears the value of the "correction_group" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearCorrectionGroup() {
+	m.correction_group = nil
+	m.clearedFields[purchasereceiptadjustmentitem.FieldCorrectionGroup] = struct{}{}
+}
+
+// CorrectionGroupCleared returns if the "correction_group" field was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) CorrectionGroupCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptadjustmentitem.FieldCorrectionGroup]
+	return ok
+}
+
+// ResetCorrectionGroup resets all changes to the "correction_group" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetCorrectionGroup() {
+	m.correction_group = nil
+	delete(m.clearedFields, purchasereceiptadjustmentitem.FieldCorrectionGroup)
+}
+
+// SetNote sets the "note" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[purchasereceiptadjustmentitem.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptadjustmentitem.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, purchasereceiptadjustmentitem.FieldNote)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PurchaseReceiptAdjustmentItem entity.
+// If the PurchaseReceiptAdjustmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetPurchaseReceiptAdjustmentID sets the "purchase_receipt_adjustment" edge to the PurchaseReceiptAdjustment entity by id.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetPurchaseReceiptAdjustmentID(id int) {
+	m.purchase_receipt_adjustment = &id
+}
+
+// ClearPurchaseReceiptAdjustment clears the "purchase_receipt_adjustment" edge to the PurchaseReceiptAdjustment entity.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearPurchaseReceiptAdjustment() {
+	m.clearedpurchase_receipt_adjustment = true
+	m.clearedFields[purchasereceiptadjustmentitem.FieldAdjustmentID] = struct{}{}
+}
+
+// PurchaseReceiptAdjustmentCleared reports if the "purchase_receipt_adjustment" edge to the PurchaseReceiptAdjustment entity was cleared.
+func (m *PurchaseReceiptAdjustmentItemMutation) PurchaseReceiptAdjustmentCleared() bool {
+	return m.clearedpurchase_receipt_adjustment
+}
+
+// PurchaseReceiptAdjustmentID returns the "purchase_receipt_adjustment" edge ID in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) PurchaseReceiptAdjustmentID() (id int, exists bool) {
+	if m.purchase_receipt_adjustment != nil {
+		return *m.purchase_receipt_adjustment, true
+	}
+	return
+}
+
+// PurchaseReceiptAdjustmentIDs returns the "purchase_receipt_adjustment" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PurchaseReceiptAdjustmentID instead. It exists only for internal usage by the builders.
+func (m *PurchaseReceiptAdjustmentItemMutation) PurchaseReceiptAdjustmentIDs() (ids []int) {
+	if id := m.purchase_receipt_adjustment; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptAdjustment resets all changes to the "purchase_receipt_adjustment" edge.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetPurchaseReceiptAdjustment() {
+	m.purchase_receipt_adjustment = nil
+	m.clearedpurchase_receipt_adjustment = false
+}
+
+// ClearPurchaseReceiptItem clears the "purchase_receipt_item" edge to the PurchaseReceiptItem entity.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearPurchaseReceiptItem() {
+	m.clearedpurchase_receipt_item = true
+	m.clearedFields[purchasereceiptadjustmentitem.FieldPurchaseReceiptItemID] = struct{}{}
+}
+
+// PurchaseReceiptItemCleared reports if the "purchase_receipt_item" edge to the PurchaseReceiptItem entity was cleared.
+func (m *PurchaseReceiptAdjustmentItemMutation) PurchaseReceiptItemCleared() bool {
+	return m.clearedpurchase_receipt_item
+}
+
+// PurchaseReceiptItemIDs returns the "purchase_receipt_item" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PurchaseReceiptItemID instead. It exists only for internal usage by the builders.
+func (m *PurchaseReceiptAdjustmentItemMutation) PurchaseReceiptItemIDs() (ids []int) {
+	if id := m.purchase_receipt_item; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptItem resets all changes to the "purchase_receipt_item" edge.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetPurchaseReceiptItem() {
+	m.purchase_receipt_item = nil
+	m.clearedpurchase_receipt_item = false
+}
+
+// ClearMaterial clears the "material" edge to the Material entity.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearMaterial() {
+	m.clearedmaterial = true
+	m.clearedFields[purchasereceiptadjustmentitem.FieldMaterialID] = struct{}{}
+}
+
+// MaterialCleared reports if the "material" edge to the Material entity was cleared.
+func (m *PurchaseReceiptAdjustmentItemMutation) MaterialCleared() bool {
+	return m.clearedmaterial
+}
+
+// MaterialIDs returns the "material" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// MaterialID instead. It exists only for internal usage by the builders.
+func (m *PurchaseReceiptAdjustmentItemMutation) MaterialIDs() (ids []int) {
+	if id := m.material; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetMaterial resets all changes to the "material" edge.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetMaterial() {
+	m.material = nil
+	m.clearedmaterial = false
+}
+
+// ClearWarehouse clears the "warehouse" edge to the Warehouse entity.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearWarehouse() {
+	m.clearedwarehouse = true
+	m.clearedFields[purchasereceiptadjustmentitem.FieldWarehouseID] = struct{}{}
+}
+
+// WarehouseCleared reports if the "warehouse" edge to the Warehouse entity was cleared.
+func (m *PurchaseReceiptAdjustmentItemMutation) WarehouseCleared() bool {
+	return m.clearedwarehouse
+}
+
+// WarehouseIDs returns the "warehouse" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// WarehouseID instead. It exists only for internal usage by the builders.
+func (m *PurchaseReceiptAdjustmentItemMutation) WarehouseIDs() (ids []int) {
+	if id := m.warehouse; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetWarehouse resets all changes to the "warehouse" edge.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetWarehouse() {
+	m.warehouse = nil
+	m.clearedwarehouse = false
+}
+
+// ClearUnit clears the "unit" edge to the Unit entity.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearUnit() {
+	m.clearedunit = true
+	m.clearedFields[purchasereceiptadjustmentitem.FieldUnitID] = struct{}{}
+}
+
+// UnitCleared reports if the "unit" edge to the Unit entity was cleared.
+func (m *PurchaseReceiptAdjustmentItemMutation) UnitCleared() bool {
+	return m.clearedunit
+}
+
+// UnitIDs returns the "unit" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// UnitID instead. It exists only for internal usage by the builders.
+func (m *PurchaseReceiptAdjustmentItemMutation) UnitIDs() (ids []int) {
+	if id := m.unit; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetUnit resets all changes to the "unit" edge.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetUnit() {
+	m.unit = nil
+	m.clearedunit = false
+}
+
+// SetInventoryLotID sets the "inventory_lot" edge to the InventoryLot entity by id.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetInventoryLotID(id int) {
+	m.inventory_lot = &id
+}
+
+// ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearInventoryLot() {
+	m.clearedinventory_lot = true
+	m.clearedFields[purchasereceiptadjustmentitem.FieldLotID] = struct{}{}
+}
+
+// InventoryLotCleared reports if the "inventory_lot" edge to the InventoryLot entity was cleared.
+func (m *PurchaseReceiptAdjustmentItemMutation) InventoryLotCleared() bool {
+	return m.LotIDCleared() || m.clearedinventory_lot
+}
+
+// InventoryLotID returns the "inventory_lot" edge ID in the mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) InventoryLotID() (id int, exists bool) {
+	if m.inventory_lot != nil {
+		return *m.inventory_lot, true
+	}
+	return
+}
+
+// InventoryLotIDs returns the "inventory_lot" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// InventoryLotID instead. It exists only for internal usage by the builders.
+func (m *PurchaseReceiptAdjustmentItemMutation) InventoryLotIDs() (ids []int) {
+	if id := m.inventory_lot; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetInventoryLot resets all changes to the "inventory_lot" edge.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetInventoryLot() {
+	m.inventory_lot = nil
+	m.clearedinventory_lot = false
+}
+
+// Where appends a list predicates to the PurchaseReceiptAdjustmentItemMutation builder.
+func (m *PurchaseReceiptAdjustmentItemMutation) Where(ps ...predicate.PurchaseReceiptAdjustmentItem) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PurchaseReceiptAdjustmentItemMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PurchaseReceiptAdjustmentItemMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PurchaseReceiptAdjustmentItem, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PurchaseReceiptAdjustmentItemMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PurchaseReceiptAdjustmentItem).
+func (m *PurchaseReceiptAdjustmentItemMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PurchaseReceiptAdjustmentItemMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.purchase_receipt_adjustment != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldAdjustmentID)
+	}
+	if m.purchase_receipt_item != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldPurchaseReceiptItemID)
+	}
+	if m.adjust_type != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldAdjustType)
+	}
+	if m.material != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldMaterialID)
+	}
+	if m.warehouse != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldWarehouseID)
+	}
+	if m.unit != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldUnitID)
+	}
+	if m.inventory_lot != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldLotID)
+	}
+	if m.quantity != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldQuantity)
+	}
+	if m.source_line_no != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldSourceLineNo)
+	}
+	if m.correction_group != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldCorrectionGroup)
+	}
+	if m.note != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldNote)
+	}
+	if m.created_at != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PurchaseReceiptAdjustmentItemMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case purchasereceiptadjustmentitem.FieldAdjustmentID:
+		return m.AdjustmentID()
+	case purchasereceiptadjustmentitem.FieldPurchaseReceiptItemID:
+		return m.PurchaseReceiptItemID()
+	case purchasereceiptadjustmentitem.FieldAdjustType:
+		return m.AdjustType()
+	case purchasereceiptadjustmentitem.FieldMaterialID:
+		return m.MaterialID()
+	case purchasereceiptadjustmentitem.FieldWarehouseID:
+		return m.WarehouseID()
+	case purchasereceiptadjustmentitem.FieldUnitID:
+		return m.UnitID()
+	case purchasereceiptadjustmentitem.FieldLotID:
+		return m.LotID()
+	case purchasereceiptadjustmentitem.FieldQuantity:
+		return m.Quantity()
+	case purchasereceiptadjustmentitem.FieldSourceLineNo:
+		return m.SourceLineNo()
+	case purchasereceiptadjustmentitem.FieldCorrectionGroup:
+		return m.CorrectionGroup()
+	case purchasereceiptadjustmentitem.FieldNote:
+		return m.Note()
+	case purchasereceiptadjustmentitem.FieldCreatedAt:
+		return m.CreatedAt()
+	case purchasereceiptadjustmentitem.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PurchaseReceiptAdjustmentItemMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case purchasereceiptadjustmentitem.FieldAdjustmentID:
+		return m.OldAdjustmentID(ctx)
+	case purchasereceiptadjustmentitem.FieldPurchaseReceiptItemID:
+		return m.OldPurchaseReceiptItemID(ctx)
+	case purchasereceiptadjustmentitem.FieldAdjustType:
+		return m.OldAdjustType(ctx)
+	case purchasereceiptadjustmentitem.FieldMaterialID:
+		return m.OldMaterialID(ctx)
+	case purchasereceiptadjustmentitem.FieldWarehouseID:
+		return m.OldWarehouseID(ctx)
+	case purchasereceiptadjustmentitem.FieldUnitID:
+		return m.OldUnitID(ctx)
+	case purchasereceiptadjustmentitem.FieldLotID:
+		return m.OldLotID(ctx)
+	case purchasereceiptadjustmentitem.FieldQuantity:
+		return m.OldQuantity(ctx)
+	case purchasereceiptadjustmentitem.FieldSourceLineNo:
+		return m.OldSourceLineNo(ctx)
+	case purchasereceiptadjustmentitem.FieldCorrectionGroup:
+		return m.OldCorrectionGroup(ctx)
+	case purchasereceiptadjustmentitem.FieldNote:
+		return m.OldNote(ctx)
+	case purchasereceiptadjustmentitem.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case purchasereceiptadjustmentitem.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PurchaseReceiptAdjustmentItem field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PurchaseReceiptAdjustmentItemMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case purchasereceiptadjustmentitem.FieldAdjustmentID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAdjustmentID(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldPurchaseReceiptItemID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPurchaseReceiptItemID(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldAdjustType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAdjustType(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldMaterialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaterialID(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldWarehouseID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWarehouseID(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldUnitID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitID(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldLotID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLotID(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldQuantity:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQuantity(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldSourceLineNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceLineNo(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldCorrectionGroup:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCorrectionGroup(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case purchasereceiptadjustmentitem.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustmentItem field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PurchaseReceiptAdjustmentItemMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PurchaseReceiptAdjustmentItemMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustmentItem numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(purchasereceiptadjustmentitem.FieldLotID) {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldLotID)
+	}
+	if m.FieldCleared(purchasereceiptadjustmentitem.FieldSourceLineNo) {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldSourceLineNo)
+	}
+	if m.FieldCleared(purchasereceiptadjustmentitem.FieldCorrectionGroup) {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldCorrectionGroup)
+	}
+	if m.FieldCleared(purchasereceiptadjustmentitem.FieldNote) {
+		fields = append(fields, purchasereceiptadjustmentitem.FieldNote)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearField(name string) error {
+	switch name {
+	case purchasereceiptadjustmentitem.FieldLotID:
+		m.ClearLotID()
+		return nil
+	case purchasereceiptadjustmentitem.FieldSourceLineNo:
+		m.ClearSourceLineNo()
+		return nil
+	case purchasereceiptadjustmentitem.FieldCorrectionGroup:
+		m.ClearCorrectionGroup()
+		return nil
+	case purchasereceiptadjustmentitem.FieldNote:
+		m.ClearNote()
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustmentItem nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetField(name string) error {
+	switch name {
+	case purchasereceiptadjustmentitem.FieldAdjustmentID:
+		m.ResetAdjustmentID()
+		return nil
+	case purchasereceiptadjustmentitem.FieldPurchaseReceiptItemID:
+		m.ResetPurchaseReceiptItemID()
+		return nil
+	case purchasereceiptadjustmentitem.FieldAdjustType:
+		m.ResetAdjustType()
+		return nil
+	case purchasereceiptadjustmentitem.FieldMaterialID:
+		m.ResetMaterialID()
+		return nil
+	case purchasereceiptadjustmentitem.FieldWarehouseID:
+		m.ResetWarehouseID()
+		return nil
+	case purchasereceiptadjustmentitem.FieldUnitID:
+		m.ResetUnitID()
+		return nil
+	case purchasereceiptadjustmentitem.FieldLotID:
+		m.ResetLotID()
+		return nil
+	case purchasereceiptadjustmentitem.FieldQuantity:
+		m.ResetQuantity()
+		return nil
+	case purchasereceiptadjustmentitem.FieldSourceLineNo:
+		m.ResetSourceLineNo()
+		return nil
+	case purchasereceiptadjustmentitem.FieldCorrectionGroup:
+		m.ResetCorrectionGroup()
+		return nil
+	case purchasereceiptadjustmentitem.FieldNote:
+		m.ResetNote()
+		return nil
+	case purchasereceiptadjustmentitem.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case purchasereceiptadjustmentitem.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustmentItem field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) AddedEdges() []string {
+	edges := make([]string, 0, 6)
+	if m.purchase_receipt_adjustment != nil {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgePurchaseReceiptAdjustment)
+	}
+	if m.purchase_receipt_item != nil {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgePurchaseReceiptItem)
+	}
+	if m.material != nil {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgeMaterial)
+	}
+	if m.warehouse != nil {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgeWarehouse)
+	}
+	if m.unit != nil {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgeUnit)
+	}
+	if m.inventory_lot != nil {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgeInventoryLot)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case purchasereceiptadjustmentitem.EdgePurchaseReceiptAdjustment:
+		if id := m.purchase_receipt_adjustment; id != nil {
+			return []ent.Value{*id}
+		}
+	case purchasereceiptadjustmentitem.EdgePurchaseReceiptItem:
+		if id := m.purchase_receipt_item; id != nil {
+			return []ent.Value{*id}
+		}
+	case purchasereceiptadjustmentitem.EdgeMaterial:
+		if id := m.material; id != nil {
+			return []ent.Value{*id}
+		}
+	case purchasereceiptadjustmentitem.EdgeWarehouse:
+		if id := m.warehouse; id != nil {
+			return []ent.Value{*id}
+		}
+	case purchasereceiptadjustmentitem.EdgeUnit:
+		if id := m.unit; id != nil {
+			return []ent.Value{*id}
+		}
+	case purchasereceiptadjustmentitem.EdgeInventoryLot:
+		if id := m.inventory_lot; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 6)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 6)
+	if m.clearedpurchase_receipt_adjustment {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgePurchaseReceiptAdjustment)
+	}
+	if m.clearedpurchase_receipt_item {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgePurchaseReceiptItem)
+	}
+	if m.clearedmaterial {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgeMaterial)
+	}
+	if m.clearedwarehouse {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgeWarehouse)
+	}
+	if m.clearedunit {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgeUnit)
+	}
+	if m.clearedinventory_lot {
+		edges = append(edges, purchasereceiptadjustmentitem.EdgeInventoryLot)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PurchaseReceiptAdjustmentItemMutation) EdgeCleared(name string) bool {
+	switch name {
+	case purchasereceiptadjustmentitem.EdgePurchaseReceiptAdjustment:
+		return m.clearedpurchase_receipt_adjustment
+	case purchasereceiptadjustmentitem.EdgePurchaseReceiptItem:
+		return m.clearedpurchase_receipt_item
+	case purchasereceiptadjustmentitem.EdgeMaterial:
+		return m.clearedmaterial
+	case purchasereceiptadjustmentitem.EdgeWarehouse:
+		return m.clearedwarehouse
+	case purchasereceiptadjustmentitem.EdgeUnit:
+		return m.clearedunit
+	case purchasereceiptadjustmentitem.EdgeInventoryLot:
+		return m.clearedinventory_lot
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PurchaseReceiptAdjustmentItemMutation) ClearEdge(name string) error {
+	switch name {
+	case purchasereceiptadjustmentitem.EdgePurchaseReceiptAdjustment:
+		m.ClearPurchaseReceiptAdjustment()
+		return nil
+	case purchasereceiptadjustmentitem.EdgePurchaseReceiptItem:
+		m.ClearPurchaseReceiptItem()
+		return nil
+	case purchasereceiptadjustmentitem.EdgeMaterial:
+		m.ClearMaterial()
+		return nil
+	case purchasereceiptadjustmentitem.EdgeWarehouse:
+		m.ClearWarehouse()
+		return nil
+	case purchasereceiptadjustmentitem.EdgeUnit:
+		m.ClearUnit()
+		return nil
+	case purchasereceiptadjustmentitem.EdgeInventoryLot:
+		m.ClearInventoryLot()
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustmentItem unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PurchaseReceiptAdjustmentItemMutation) ResetEdge(name string) error {
+	switch name {
+	case purchasereceiptadjustmentitem.EdgePurchaseReceiptAdjustment:
+		m.ResetPurchaseReceiptAdjustment()
+		return nil
+	case purchasereceiptadjustmentitem.EdgePurchaseReceiptItem:
+		m.ResetPurchaseReceiptItem()
+		return nil
+	case purchasereceiptadjustmentitem.EdgeMaterial:
+		m.ResetMaterial()
+		return nil
+	case purchasereceiptadjustmentitem.EdgeWarehouse:
+		m.ResetWarehouse()
+		return nil
+	case purchasereceiptadjustmentitem.EdgeUnit:
+		m.ResetUnit()
+		return nil
+	case purchasereceiptadjustmentitem.EdgeInventoryLot:
+		m.ResetInventoryLot()
+		return nil
+	}
+	return fmt.Errorf("unknown PurchaseReceiptAdjustmentItem edge %s", name)
+}
+
 // PurchaseReceiptItemMutation represents an operation that mutates the PurchaseReceiptItem nodes in the graph.
 type PurchaseReceiptItemMutation struct {
 	config
-	op                           Op
-	typ                          string
-	id                           *int
-	lot_no                       *string
-	quantity                     *decimal.Decimal
-	unit_price                   *decimal.Decimal
-	amount                       *decimal.Decimal
-	source_line_no               *string
-	note                         *string
-	created_at                   *time.Time
-	updated_at                   *time.Time
-	clearedFields                map[string]struct{}
-	receipt                      *int
-	clearedreceipt               bool
-	material                     *int
-	clearedmaterial              bool
-	warehouse                    *int
-	clearedwarehouse             bool
-	unit                         *int
-	clearedunit                  bool
-	inventory_lot                *int
-	clearedinventory_lot         bool
-	purchase_return_items        map[int]struct{}
-	removedpurchase_return_items map[int]struct{}
-	clearedpurchase_return_items bool
-	done                         bool
-	oldValue                     func(context.Context) (*PurchaseReceiptItem, error)
-	predicates                   []predicate.PurchaseReceiptItem
+	op                                       Op
+	typ                                      string
+	id                                       *int
+	lot_no                                   *string
+	quantity                                 *decimal.Decimal
+	unit_price                               *decimal.Decimal
+	amount                                   *decimal.Decimal
+	source_line_no                           *string
+	note                                     *string
+	created_at                               *time.Time
+	updated_at                               *time.Time
+	clearedFields                            map[string]struct{}
+	receipt                                  *int
+	clearedreceipt                           bool
+	material                                 *int
+	clearedmaterial                          bool
+	warehouse                                *int
+	clearedwarehouse                         bool
+	unit                                     *int
+	clearedunit                              bool
+	inventory_lot                            *int
+	clearedinventory_lot                     bool
+	purchase_return_items                    map[int]struct{}
+	removedpurchase_return_items             map[int]struct{}
+	clearedpurchase_return_items             bool
+	purchase_receipt_adjustment_items        map[int]struct{}
+	removedpurchase_receipt_adjustment_items map[int]struct{}
+	clearedpurchase_receipt_adjustment_items bool
+	done                                     bool
+	oldValue                                 func(context.Context) (*PurchaseReceiptItem, error)
+	predicates                               []predicate.PurchaseReceiptItem
 }
 
 var _ ent.Mutation = (*PurchaseReceiptItemMutation)(nil)
@@ -16765,6 +19549,60 @@ func (m *PurchaseReceiptItemMutation) ResetPurchaseReturnItems() {
 	m.removedpurchase_return_items = nil
 }
 
+// AddPurchaseReceiptAdjustmentItemIDs adds the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by ids.
+func (m *PurchaseReceiptItemMutation) AddPurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.purchase_receipt_adjustment_items == nil {
+		m.purchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.purchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPurchaseReceiptAdjustmentItems clears the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *PurchaseReceiptItemMutation) ClearPurchaseReceiptAdjustmentItems() {
+	m.clearedpurchase_receipt_adjustment_items = true
+}
+
+// PurchaseReceiptAdjustmentItemsCleared reports if the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity was cleared.
+func (m *PurchaseReceiptItemMutation) PurchaseReceiptAdjustmentItemsCleared() bool {
+	return m.clearedpurchase_receipt_adjustment_items
+}
+
+// RemovePurchaseReceiptAdjustmentItemIDs removes the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (m *PurchaseReceiptItemMutation) RemovePurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.removedpurchase_receipt_adjustment_items == nil {
+		m.removedpurchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.purchase_receipt_adjustment_items, ids[i])
+		m.removedpurchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPurchaseReceiptAdjustmentItems returns the removed IDs of the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *PurchaseReceiptItemMutation) RemovedPurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.removedpurchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PurchaseReceiptAdjustmentItemsIDs returns the "purchase_receipt_adjustment_items" edge IDs in the mutation.
+func (m *PurchaseReceiptItemMutation) PurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.purchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptAdjustmentItems resets all changes to the "purchase_receipt_adjustment_items" edge.
+func (m *PurchaseReceiptItemMutation) ResetPurchaseReceiptAdjustmentItems() {
+	m.purchase_receipt_adjustment_items = nil
+	m.clearedpurchase_receipt_adjustment_items = false
+	m.removedpurchase_receipt_adjustment_items = nil
+}
+
 // Where appends a list predicates to the PurchaseReceiptItemMutation builder.
 func (m *PurchaseReceiptItemMutation) Where(ps ...predicate.PurchaseReceiptItem) {
 	m.predicates = append(m.predicates, ps...)
@@ -17144,7 +19982,7 @@ func (m *PurchaseReceiptItemMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PurchaseReceiptItemMutation) AddedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.receipt != nil {
 		edges = append(edges, purchasereceiptitem.EdgeReceipt)
 	}
@@ -17162,6 +20000,9 @@ func (m *PurchaseReceiptItemMutation) AddedEdges() []string {
 	}
 	if m.purchase_return_items != nil {
 		edges = append(edges, purchasereceiptitem.EdgePurchaseReturnItems)
+	}
+	if m.purchase_receipt_adjustment_items != nil {
+		edges = append(edges, purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -17196,15 +20037,24 @@ func (m *PurchaseReceiptItemMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.purchase_receipt_adjustment_items))
+		for id := range m.purchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PurchaseReceiptItemMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.removedpurchase_return_items != nil {
 		edges = append(edges, purchasereceiptitem.EdgePurchaseReturnItems)
+	}
+	if m.removedpurchase_receipt_adjustment_items != nil {
+		edges = append(edges, purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -17219,13 +20069,19 @@ func (m *PurchaseReceiptItemMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.removedpurchase_receipt_adjustment_items))
+		for id := range m.removedpurchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PurchaseReceiptItemMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 6)
+	edges := make([]string, 0, 7)
 	if m.clearedreceipt {
 		edges = append(edges, purchasereceiptitem.EdgeReceipt)
 	}
@@ -17243,6 +20099,9 @@ func (m *PurchaseReceiptItemMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_return_items {
 		edges = append(edges, purchasereceiptitem.EdgePurchaseReturnItems)
+	}
+	if m.clearedpurchase_receipt_adjustment_items {
+		edges = append(edges, purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -17263,6 +20122,8 @@ func (m *PurchaseReceiptItemMutation) EdgeCleared(name string) bool {
 		return m.clearedinventory_lot
 	case purchasereceiptitem.EdgePurchaseReturnItems:
 		return m.clearedpurchase_return_items
+	case purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems:
+		return m.clearedpurchase_receipt_adjustment_items
 	}
 	return false
 }
@@ -17311,6 +20172,9 @@ func (m *PurchaseReceiptItemMutation) ResetEdge(name string) error {
 		return nil
 	case purchasereceiptitem.EdgePurchaseReturnItems:
 		m.ResetPurchaseReturnItems()
+		return nil
+	case purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems:
+		m.ResetPurchaseReceiptAdjustmentItems()
 		return nil
 	}
 	return fmt.Errorf("unknown PurchaseReceiptItem edge %s", name)
@@ -21045,41 +23909,44 @@ func (m *RolePermissionMutation) ResetEdge(name string) error {
 // UnitMutation represents an operation that mutates the Unit nodes in the graph.
 type UnitMutation struct {
 	config
-	op                            Op
-	typ                           string
-	id                            *int
-	code                          *string
-	name                          *string
-	precision                     *int
-	addprecision                  *int
-	is_active                     *bool
-	created_at                    *time.Time
-	updated_at                    *time.Time
-	clearedFields                 map[string]struct{}
-	materials                     map[int]struct{}
-	removedmaterials              map[int]struct{}
-	clearedmaterials              bool
-	products                      map[int]struct{}
-	removedproducts               map[int]struct{}
-	clearedproducts               bool
-	inventory_txns                map[int]struct{}
-	removedinventory_txns         map[int]struct{}
-	clearedinventory_txns         bool
-	inventory_balances            map[int]struct{}
-	removedinventory_balances     map[int]struct{}
-	clearedinventory_balances     bool
-	bom_items                     map[int]struct{}
-	removedbom_items              map[int]struct{}
-	clearedbom_items              bool
-	purchase_receipt_items        map[int]struct{}
-	removedpurchase_receipt_items map[int]struct{}
-	clearedpurchase_receipt_items bool
-	purchase_return_items         map[int]struct{}
-	removedpurchase_return_items  map[int]struct{}
-	clearedpurchase_return_items  bool
-	done                          bool
-	oldValue                      func(context.Context) (*Unit, error)
-	predicates                    []predicate.Unit
+	op                                       Op
+	typ                                      string
+	id                                       *int
+	code                                     *string
+	name                                     *string
+	precision                                *int
+	addprecision                             *int
+	is_active                                *bool
+	created_at                               *time.Time
+	updated_at                               *time.Time
+	clearedFields                            map[string]struct{}
+	materials                                map[int]struct{}
+	removedmaterials                         map[int]struct{}
+	clearedmaterials                         bool
+	products                                 map[int]struct{}
+	removedproducts                          map[int]struct{}
+	clearedproducts                          bool
+	inventory_txns                           map[int]struct{}
+	removedinventory_txns                    map[int]struct{}
+	clearedinventory_txns                    bool
+	inventory_balances                       map[int]struct{}
+	removedinventory_balances                map[int]struct{}
+	clearedinventory_balances                bool
+	bom_items                                map[int]struct{}
+	removedbom_items                         map[int]struct{}
+	clearedbom_items                         bool
+	purchase_receipt_items                   map[int]struct{}
+	removedpurchase_receipt_items            map[int]struct{}
+	clearedpurchase_receipt_items            bool
+	purchase_return_items                    map[int]struct{}
+	removedpurchase_return_items             map[int]struct{}
+	clearedpurchase_return_items             bool
+	purchase_receipt_adjustment_items        map[int]struct{}
+	removedpurchase_receipt_adjustment_items map[int]struct{}
+	clearedpurchase_receipt_adjustment_items bool
+	done                                     bool
+	oldValue                                 func(context.Context) (*Unit, error)
+	predicates                               []predicate.Unit
 }
 
 var _ ent.Mutation = (*UnitMutation)(nil)
@@ -21794,6 +24661,60 @@ func (m *UnitMutation) ResetPurchaseReturnItems() {
 	m.removedpurchase_return_items = nil
 }
 
+// AddPurchaseReceiptAdjustmentItemIDs adds the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by ids.
+func (m *UnitMutation) AddPurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.purchase_receipt_adjustment_items == nil {
+		m.purchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.purchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPurchaseReceiptAdjustmentItems clears the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *UnitMutation) ClearPurchaseReceiptAdjustmentItems() {
+	m.clearedpurchase_receipt_adjustment_items = true
+}
+
+// PurchaseReceiptAdjustmentItemsCleared reports if the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity was cleared.
+func (m *UnitMutation) PurchaseReceiptAdjustmentItemsCleared() bool {
+	return m.clearedpurchase_receipt_adjustment_items
+}
+
+// RemovePurchaseReceiptAdjustmentItemIDs removes the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (m *UnitMutation) RemovePurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.removedpurchase_receipt_adjustment_items == nil {
+		m.removedpurchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.purchase_receipt_adjustment_items, ids[i])
+		m.removedpurchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPurchaseReceiptAdjustmentItems returns the removed IDs of the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *UnitMutation) RemovedPurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.removedpurchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PurchaseReceiptAdjustmentItemsIDs returns the "purchase_receipt_adjustment_items" edge IDs in the mutation.
+func (m *UnitMutation) PurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.purchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptAdjustmentItems resets all changes to the "purchase_receipt_adjustment_items" edge.
+func (m *UnitMutation) ResetPurchaseReceiptAdjustmentItems() {
+	m.purchase_receipt_adjustment_items = nil
+	m.clearedpurchase_receipt_adjustment_items = false
+	m.removedpurchase_receipt_adjustment_items = nil
+}
+
 // Where appends a list predicates to the UnitMutation builder.
 func (m *UnitMutation) Where(ps ...predicate.Unit) {
 	m.predicates = append(m.predicates, ps...)
@@ -22027,7 +24948,7 @@ func (m *UnitMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UnitMutation) AddedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.materials != nil {
 		edges = append(edges, unit.EdgeMaterials)
 	}
@@ -22048,6 +24969,9 @@ func (m *UnitMutation) AddedEdges() []string {
 	}
 	if m.purchase_return_items != nil {
 		edges = append(edges, unit.EdgePurchaseReturnItems)
+	}
+	if m.purchase_receipt_adjustment_items != nil {
+		edges = append(edges, unit.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -22098,13 +25022,19 @@ func (m *UnitMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case unit.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.purchase_receipt_adjustment_items))
+		for id := range m.purchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UnitMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.removedmaterials != nil {
 		edges = append(edges, unit.EdgeMaterials)
 	}
@@ -22125,6 +25055,9 @@ func (m *UnitMutation) RemovedEdges() []string {
 	}
 	if m.removedpurchase_return_items != nil {
 		edges = append(edges, unit.EdgePurchaseReturnItems)
+	}
+	if m.removedpurchase_receipt_adjustment_items != nil {
+		edges = append(edges, unit.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -22175,13 +25108,19 @@ func (m *UnitMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case unit.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.removedpurchase_receipt_adjustment_items))
+		for id := range m.removedpurchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UnitMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.clearedmaterials {
 		edges = append(edges, unit.EdgeMaterials)
 	}
@@ -22202,6 +25141,9 @@ func (m *UnitMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_return_items {
 		edges = append(edges, unit.EdgePurchaseReturnItems)
+	}
+	if m.clearedpurchase_receipt_adjustment_items {
+		edges = append(edges, unit.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -22224,6 +25166,8 @@ func (m *UnitMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_receipt_items
 	case unit.EdgePurchaseReturnItems:
 		return m.clearedpurchase_return_items
+	case unit.EdgePurchaseReceiptAdjustmentItems:
+		return m.clearedpurchase_receipt_adjustment_items
 	}
 	return false
 }
@@ -22260,6 +25204,9 @@ func (m *UnitMutation) ResetEdge(name string) error {
 		return nil
 	case unit.EdgePurchaseReturnItems:
 		m.ResetPurchaseReturnItems()
+		return nil
+	case unit.EdgePurchaseReceiptAdjustmentItems:
+		m.ResetPurchaseReceiptAdjustmentItems()
 		return nil
 	}
 	return fmt.Errorf("unknown Unit edge %s", name)
@@ -22886,31 +25833,34 @@ func (m *UserMutation) ResetEdge(name string) error {
 // WarehouseMutation represents an operation that mutates the Warehouse nodes in the graph.
 type WarehouseMutation struct {
 	config
-	op                            Op
-	typ                           string
-	id                            *int
-	code                          *string
-	name                          *string
-	_type                         *string
-	is_active                     *bool
-	created_at                    *time.Time
-	updated_at                    *time.Time
-	clearedFields                 map[string]struct{}
-	inventory_txns                map[int]struct{}
-	removedinventory_txns         map[int]struct{}
-	clearedinventory_txns         bool
-	inventory_balances            map[int]struct{}
-	removedinventory_balances     map[int]struct{}
-	clearedinventory_balances     bool
-	purchase_receipt_items        map[int]struct{}
-	removedpurchase_receipt_items map[int]struct{}
-	clearedpurchase_receipt_items bool
-	purchase_return_items         map[int]struct{}
-	removedpurchase_return_items  map[int]struct{}
-	clearedpurchase_return_items  bool
-	done                          bool
-	oldValue                      func(context.Context) (*Warehouse, error)
-	predicates                    []predicate.Warehouse
+	op                                       Op
+	typ                                      string
+	id                                       *int
+	code                                     *string
+	name                                     *string
+	_type                                    *string
+	is_active                                *bool
+	created_at                               *time.Time
+	updated_at                               *time.Time
+	clearedFields                            map[string]struct{}
+	inventory_txns                           map[int]struct{}
+	removedinventory_txns                    map[int]struct{}
+	clearedinventory_txns                    bool
+	inventory_balances                       map[int]struct{}
+	removedinventory_balances                map[int]struct{}
+	clearedinventory_balances                bool
+	purchase_receipt_items                   map[int]struct{}
+	removedpurchase_receipt_items            map[int]struct{}
+	clearedpurchase_receipt_items            bool
+	purchase_return_items                    map[int]struct{}
+	removedpurchase_return_items             map[int]struct{}
+	clearedpurchase_return_items             bool
+	purchase_receipt_adjustment_items        map[int]struct{}
+	removedpurchase_receipt_adjustment_items map[int]struct{}
+	clearedpurchase_receipt_adjustment_items bool
+	done                                     bool
+	oldValue                                 func(context.Context) (*Warehouse, error)
+	predicates                               []predicate.Warehouse
 }
 
 var _ ent.Mutation = (*WarehouseMutation)(nil)
@@ -23443,6 +26393,60 @@ func (m *WarehouseMutation) ResetPurchaseReturnItems() {
 	m.removedpurchase_return_items = nil
 }
 
+// AddPurchaseReceiptAdjustmentItemIDs adds the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by ids.
+func (m *WarehouseMutation) AddPurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.purchase_receipt_adjustment_items == nil {
+		m.purchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.purchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPurchaseReceiptAdjustmentItems clears the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *WarehouseMutation) ClearPurchaseReceiptAdjustmentItems() {
+	m.clearedpurchase_receipt_adjustment_items = true
+}
+
+// PurchaseReceiptAdjustmentItemsCleared reports if the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity was cleared.
+func (m *WarehouseMutation) PurchaseReceiptAdjustmentItemsCleared() bool {
+	return m.clearedpurchase_receipt_adjustment_items
+}
+
+// RemovePurchaseReceiptAdjustmentItemIDs removes the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
+func (m *WarehouseMutation) RemovePurchaseReceiptAdjustmentItemIDs(ids ...int) {
+	if m.removedpurchase_receipt_adjustment_items == nil {
+		m.removedpurchase_receipt_adjustment_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.purchase_receipt_adjustment_items, ids[i])
+		m.removedpurchase_receipt_adjustment_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPurchaseReceiptAdjustmentItems returns the removed IDs of the "purchase_receipt_adjustment_items" edge to the PurchaseReceiptAdjustmentItem entity.
+func (m *WarehouseMutation) RemovedPurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.removedpurchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PurchaseReceiptAdjustmentItemsIDs returns the "purchase_receipt_adjustment_items" edge IDs in the mutation.
+func (m *WarehouseMutation) PurchaseReceiptAdjustmentItemsIDs() (ids []int) {
+	for id := range m.purchase_receipt_adjustment_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptAdjustmentItems resets all changes to the "purchase_receipt_adjustment_items" edge.
+func (m *WarehouseMutation) ResetPurchaseReceiptAdjustmentItems() {
+	m.purchase_receipt_adjustment_items = nil
+	m.clearedpurchase_receipt_adjustment_items = false
+	m.removedpurchase_receipt_adjustment_items = nil
+}
+
 // Where appends a list predicates to the WarehouseMutation builder.
 func (m *WarehouseMutation) Where(ps ...predicate.Warehouse) {
 	m.predicates = append(m.predicates, ps...)
@@ -23661,7 +26665,7 @@ func (m *WarehouseMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *WarehouseMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.inventory_txns != nil {
 		edges = append(edges, warehouse.EdgeInventoryTxns)
 	}
@@ -23673,6 +26677,9 @@ func (m *WarehouseMutation) AddedEdges() []string {
 	}
 	if m.purchase_return_items != nil {
 		edges = append(edges, warehouse.EdgePurchaseReturnItems)
+	}
+	if m.purchase_receipt_adjustment_items != nil {
+		edges = append(edges, warehouse.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -23705,13 +26712,19 @@ func (m *WarehouseMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case warehouse.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.purchase_receipt_adjustment_items))
+		for id := range m.purchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *WarehouseMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedinventory_txns != nil {
 		edges = append(edges, warehouse.EdgeInventoryTxns)
 	}
@@ -23723,6 +26736,9 @@ func (m *WarehouseMutation) RemovedEdges() []string {
 	}
 	if m.removedpurchase_return_items != nil {
 		edges = append(edges, warehouse.EdgePurchaseReturnItems)
+	}
+	if m.removedpurchase_receipt_adjustment_items != nil {
+		edges = append(edges, warehouse.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -23755,13 +26771,19 @@ func (m *WarehouseMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case warehouse.EdgePurchaseReceiptAdjustmentItems:
+		ids := make([]ent.Value, 0, len(m.removedpurchase_receipt_adjustment_items))
+		for id := range m.removedpurchase_receipt_adjustment_items {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *WarehouseMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.clearedinventory_txns {
 		edges = append(edges, warehouse.EdgeInventoryTxns)
 	}
@@ -23773,6 +26795,9 @@ func (m *WarehouseMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_return_items {
 		edges = append(edges, warehouse.EdgePurchaseReturnItems)
+	}
+	if m.clearedpurchase_receipt_adjustment_items {
+		edges = append(edges, warehouse.EdgePurchaseReceiptAdjustmentItems)
 	}
 	return edges
 }
@@ -23789,6 +26814,8 @@ func (m *WarehouseMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_receipt_items
 	case warehouse.EdgePurchaseReturnItems:
 		return m.clearedpurchase_return_items
+	case warehouse.EdgePurchaseReceiptAdjustmentItems:
+		return m.clearedpurchase_receipt_adjustment_items
 	}
 	return false
 }
@@ -23816,6 +26843,9 @@ func (m *WarehouseMutation) ResetEdge(name string) error {
 		return nil
 	case warehouse.EdgePurchaseReturnItems:
 		m.ResetPurchaseReturnItems()
+		return nil
+	case warehouse.EdgePurchaseReceiptAdjustmentItems:
+		m.ResetPurchaseReceiptAdjustmentItems()
 		return nil
 	}
 	return fmt.Errorf("unknown Warehouse edge %s", name)

@@ -40,6 +40,10 @@ type Tx struct {
 	Product *ProductClient
 	// PurchaseReceipt is the client for interacting with the PurchaseReceipt builders.
 	PurchaseReceipt *PurchaseReceiptClient
+	// PurchaseReceiptAdjustment is the client for interacting with the PurchaseReceiptAdjustment builders.
+	PurchaseReceiptAdjustment *PurchaseReceiptAdjustmentClient
+	// PurchaseReceiptAdjustmentItem is the client for interacting with the PurchaseReceiptAdjustmentItem builders.
+	PurchaseReceiptAdjustmentItem *PurchaseReceiptAdjustmentItemClient
 	// PurchaseReceiptItem is the client for interacting with the PurchaseReceiptItem builders.
 	PurchaseReceiptItem *PurchaseReceiptItemClient
 	// PurchaseReturn is the client for interacting with the PurchaseReturn builders.
@@ -207,6 +211,8 @@ func (tx *Tx) init() {
 	tx.Permission = NewPermissionClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.PurchaseReceipt = NewPurchaseReceiptClient(tx.config)
+	tx.PurchaseReceiptAdjustment = NewPurchaseReceiptAdjustmentClient(tx.config)
+	tx.PurchaseReceiptAdjustmentItem = NewPurchaseReceiptAdjustmentItemClient(tx.config)
 	tx.PurchaseReceiptItem = NewPurchaseReceiptItemClient(tx.config)
 	tx.PurchaseReturn = NewPurchaseReturnClient(tx.config)
 	tx.PurchaseReturnItem = NewPurchaseReturnItemClient(tx.config)

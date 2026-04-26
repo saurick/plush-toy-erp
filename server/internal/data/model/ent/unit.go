@@ -51,9 +51,11 @@ type UnitEdges struct {
 	PurchaseReceiptItems []*PurchaseReceiptItem `json:"purchase_receipt_items,omitempty"`
 	// PurchaseReturnItems holds the value of the purchase_return_items edge.
 	PurchaseReturnItems []*PurchaseReturnItem `json:"purchase_return_items,omitempty"`
+	// PurchaseReceiptAdjustmentItems holds the value of the purchase_receipt_adjustment_items edge.
+	PurchaseReceiptAdjustmentItems []*PurchaseReceiptAdjustmentItem `json:"purchase_receipt_adjustment_items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [8]bool
 }
 
 // MaterialsOrErr returns the Materials value or an error if the edge
@@ -117,6 +119,15 @@ func (e UnitEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error) {
 		return e.PurchaseReturnItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_return_items"}
+}
+
+// PurchaseReceiptAdjustmentItemsOrErr returns the PurchaseReceiptAdjustmentItems value or an error if the edge
+// was not loaded in eager-loading.
+func (e UnitEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceiptAdjustmentItem, error) {
+	if e.loadedTypes[7] {
+		return e.PurchaseReceiptAdjustmentItems, nil
+	}
+	return nil, &NotLoadedError{edge: "purchase_receipt_adjustment_items"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -235,6 +246,11 @@ func (_m *Unit) QueryPurchaseReceiptItems() *PurchaseReceiptItemQuery {
 // QueryPurchaseReturnItems queries the "purchase_return_items" edge of the Unit entity.
 func (_m *Unit) QueryPurchaseReturnItems() *PurchaseReturnItemQuery {
 	return NewUnitClient(_m.config).QueryPurchaseReturnItems(_m)
+}
+
+// QueryPurchaseReceiptAdjustmentItems queries the "purchase_receipt_adjustment_items" edge of the Unit entity.
+func (_m *Unit) QueryPurchaseReceiptAdjustmentItems() *PurchaseReceiptAdjustmentItemQuery {
+	return NewUnitClient(_m.config).QueryPurchaseReceiptAdjustmentItems(_m)
 }
 
 // Update returns a builder for updating this Unit.

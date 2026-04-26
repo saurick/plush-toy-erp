@@ -48,11 +48,13 @@ type PurchaseReceiptEdges struct {
 	BusinessRecord *BusinessRecord `json:"business_record,omitempty"`
 	// PurchaseReturns holds the value of the purchase_returns edge.
 	PurchaseReturns []*PurchaseReturn `json:"purchase_returns,omitempty"`
+	// PurchaseReceiptAdjustments holds the value of the purchase_receipt_adjustments edge.
+	PurchaseReceiptAdjustments []*PurchaseReceiptAdjustment `json:"purchase_receipt_adjustments,omitempty"`
 	// Items holds the value of the items edge.
 	Items []*PurchaseReceiptItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // BusinessRecordOrErr returns the BusinessRecord value or an error if the edge
@@ -75,10 +77,19 @@ func (e PurchaseReceiptEdges) PurchaseReturnsOrErr() ([]*PurchaseReturn, error) 
 	return nil, &NotLoadedError{edge: "purchase_returns"}
 }
 
+// PurchaseReceiptAdjustmentsOrErr returns the PurchaseReceiptAdjustments value or an error if the edge
+// was not loaded in eager-loading.
+func (e PurchaseReceiptEdges) PurchaseReceiptAdjustmentsOrErr() ([]*PurchaseReceiptAdjustment, error) {
+	if e.loadedTypes[2] {
+		return e.PurchaseReceiptAdjustments, nil
+	}
+	return nil, &NotLoadedError{edge: "purchase_receipt_adjustments"}
+}
+
 // ItemsOrErr returns the Items value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptEdges) ItemsOrErr() ([]*PurchaseReceiptItem, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
@@ -194,6 +205,11 @@ func (_m *PurchaseReceipt) QueryBusinessRecord() *BusinessRecordQuery {
 // QueryPurchaseReturns queries the "purchase_returns" edge of the PurchaseReceipt entity.
 func (_m *PurchaseReceipt) QueryPurchaseReturns() *PurchaseReturnQuery {
 	return NewPurchaseReceiptClient(_m.config).QueryPurchaseReturns(_m)
+}
+
+// QueryPurchaseReceiptAdjustments queries the "purchase_receipt_adjustments" edge of the PurchaseReceipt entity.
+func (_m *PurchaseReceipt) QueryPurchaseReceiptAdjustments() *PurchaseReceiptAdjustmentQuery {
+	return NewPurchaseReceiptClient(_m.config).QueryPurchaseReceiptAdjustments(_m)
 }
 
 // QueryItems queries the "items" edge of the PurchaseReceipt entity.

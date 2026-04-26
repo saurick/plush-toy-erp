@@ -6,9 +6,11 @@
 
 权限码和内置角色真源在 `/Users/simon/projects/plush-toy-erp/server/internal/biz/rbac.go`。登录和 `auth.me` 返回当前管理员、角色、权限码和后端推导出的菜单；前端只负责按这些结果展示入口，不能把菜单隐藏当成安全边界。
 
+移动端角色入口只认 `mobile.<role>.access` 权限码，`auth.me.roles` 用于身份展示、任务归属匹配和审计语义，不能替代入口权限。
+
 `is_super_admin=true` 的账号拥有全部权限，用于初始化和紧急管理；普通管理员必须通过角色获得权限。普通管理员不能随意修改 super admin。
 
-workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作”，业务归属继续由 `owner_role_key`、`assignee_id`、`task_status_key` 判断“这条任务是不是你该处理”。`workflow.task.update` 不能绕过任务归属；boss / pmc 的查看、关注、催办能力也不等于可以替销售、采购、仓库、品质、财务完成业务事实。
+workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作”，业务归属继续由 `owner_role_key`、`assignee_id`、`task_status_key` 判断“这条任务是不是你该处理”。`update_task_status` 中老板审批 `done` 要求 `workflow.task.approve`，其他 `done` 要求 `workflow.task.complete`，`rejected` 要求 `workflow.task.reject`，普通状态更新要求 `workflow.task.update`。`workflow.task.update / complete / approve / reject` 都不能绕过任务归属；boss / pmc 的查看、关注、催办能力也不等于可以替销售、采购、仓库、品质、财务完成业务事实。
 
 跟单角色如果甲方没有，不新增独立角色；业务跟进由 `sales` 或 `pmc` 承担。
 

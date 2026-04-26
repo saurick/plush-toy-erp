@@ -287,6 +287,85 @@ func TestBusinessRecordRepo_ListRecordsByDateRange(t *testing.T) {
 	}
 }
 
+func TestBusinessRecordRepo_ListRecordsByPayloadAndItemPayload(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:business_record_repo_payload_filter?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewBusinessRecordRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+
+	materialName := "长毛绒"
+	quantity := 120.0
+	if _, err := repo.CreateBusinessRecord(ctx, &biz.BusinessRecordMutation{
+		ModuleKey:         "material-bom",
+		Title:             "夜樱烬色 BOM",
+		BusinessStatusKey: "engineering_preparing",
+		OwnerRoleKey:      "purchase",
+		Payload: map[string]any{
+			"source_date":      "2026-01-19",
+			"designer_name":    "成慧怡",
+			"product_order_no": "SLO26029",
+			"color_card_ref":   "色卡 A",
+		},
+		Items: []*biz.BusinessRecordItemMutation{
+			{
+				LineNo:       1,
+				MaterialName: &materialName,
+				Quantity:     &quantity,
+				Payload: map[string]any{
+					"supplier_item_no":     "YS-001",
+					"assembly_part":        "耳朵",
+					"process_prepare_note": "激光加工",
+				},
+			},
+		},
+	}, 7); err != nil {
+		t.Fatalf("create payload record failed: %v", err)
+	}
+	if _, err := repo.CreateBusinessRecord(ctx, &biz.BusinessRecordMutation{
+		ModuleKey:         "material-bom",
+		Title:             "抱抱猴子 BOM",
+		BusinessStatusKey: "engineering_preparing",
+		OwnerRoleKey:      "purchase",
+		Payload: map[string]any{
+			"source_date":      "2026-04-10",
+			"designer_name":    "成慧怡",
+			"product_order_no": "SLO26204",
+		},
+	}, 7); err != nil {
+		t.Fatalf("create second payload record failed: %v", err)
+	}
+
+	rows, total, err := repo.ListBusinessRecords(ctx, biz.BusinessRecordFilter{
+		ModuleKey: "material-bom",
+		Keyword:   "YS-001",
+		Limit:     20,
+	})
+	if err != nil {
+		t.Fatalf("list by item payload keyword failed: %v", err)
+	}
+	if total != 1 || len(rows) != 1 || rows[0].Title != "夜樱烬色 BOM" {
+		t.Fatalf("expected keyword to match item payload, total=%d rows=%v", total, rows)
+	}
+
+	rows, total, err = repo.ListBusinessRecords(ctx, biz.BusinessRecordFilter{
+		ModuleKey:      "material-bom",
+		DateFilterKey:  "payload.source_date",
+		DateRangeStart: "2026-04-01",
+		DateRangeEnd:   "2026-04-30",
+		Limit:          20,
+	})
+	if err != nil {
+		t.Fatalf("list by payload date failed: %v", err)
+	}
+	if total != 1 || len(rows) != 1 || rows[0].Title != "抱抱猴子 BOM" {
+		t.Fatalf("expected payload date filter to match April record, total=%d rows=%v", total, rows)
+	}
+}
+
 func TestBusinessRecordRepo_ListBusinessRecordsSortOrder(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:business_record_repo_sort?mode=memory&cache=shared&_fk=1")

@@ -68,19 +68,20 @@ import {
   getBusinessStatusTransitionOptions,
   requiresBusinessStatusReason,
 } from '../config/workflowStatus.mjs'
+import { businessModuleDefinitions } from '../config/businessModules.mjs'
 import {
   BUSINESS_ROLE_OPTIONS,
   getBusinessRecordDefinition,
   roleLabelMap,
 } from '../config/businessRecordDefinitions.mjs'
 import {
-  ITEM_FIELD_KEYS,
   buildBusinessRecordParams,
   buildBusinessRecordStatusUpdateParams,
   createBlankItem,
   createBlankFieldValue,
   formatMetric,
   getBusinessRecordFieldValue,
+  getBusinessRecordItemFieldValue,
   summarizeRecordItems,
 } from '../utils/businessRecordForm.mjs'
 import {
@@ -111,6 +112,13 @@ import {
   buildBusinessRecordPrintDraft,
   getBusinessRecordPrintTemplate,
 } from '../utils/businessRecordPrintDraft.mjs'
+import {
+  buildBusinessRecordSourcePrefillValues,
+  getBusinessRecordSourcePrefillModuleKeys,
+  getDefaultBusinessRecordSourcePrefillModuleKey,
+  resolveBusinessRecordSourceRecord,
+  shouldClearBusinessRecordSourcePrefill,
+} from '../utils/businessRecordSourcePrefill.mjs'
 import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   openPrintWorkspaceWindow,
@@ -210,6 +218,12 @@ const MODULE_TABLE_HEADER_ACTION_WIDTH = 24
 const MODULE_TABLE_HEADER_GAP = 6
 const MODULE_TABLE_HEADER_SAFE_PADDING = 32
 const EMPTY_COLUMN_ORDER = []
+const BUSINESS_MODULE_LABEL_BY_KEY = new Map(
+  businessModuleDefinitions.map((moduleItem) => [
+    moduleItem.key,
+    moduleItem.title,
+  ])
+)
 const STATUS_OPTIONS = BUSINESS_WORKFLOW_STATES.map((state) => ({
   label: state.label,
   value: state.key,
@@ -436,12 +450,17 @@ function formValuesFromRecord(record, moduleItem, definition) {
   values.note = record?.payload?.note || ''
   values.items =
     Array.isArray(record?.items) && record.items.length > 0
-      ? record.items.map((item) => ({
-          ...createBlankItem(definition),
-          ...Object.fromEntries(
-            ITEM_FIELD_KEYS.map((key) => [key, item?.[key] ?? ''])
-          ),
-        }))
+      ? record.items.map((item) => {
+          const blankItem = createBlankItem(definition)
+          const itemFields = definition.itemFields || []
+          itemFields.forEach((field) => {
+            const value = getBusinessRecordItemFieldValue(item, field.key)
+            if (value !== undefined) {
+              blankItem[field.key] = value
+            }
+          })
+          return blankItem
+        })
       : [createBlankItem(definition)]
   return values
 }
@@ -450,7 +469,7 @@ function downloadCSV(filename, rows, columns) {
   const header = columns.map((column) => column.label)
   const body = rows.map((row) =>
     columns.map((column) => {
-      const text = displayValue(row[column.key])
+      const text = displayValue(getBusinessRecordFieldValue(row, column.key))
       return `"${text.replaceAll('"', '""')}"`
     })
   )
@@ -491,6 +510,16 @@ function renderFormField(field) {
         allowClear
         options={field.options}
         placeholder={field.placeholder || `请选择${field.label}`}
+      />
+    )
+  }
+  if (field.type === 'textarea') {
+    return (
+      <Input.TextArea
+        rows={3}
+        showCount={Boolean(field.maxLength)}
+        maxLength={field.maxLength}
+        placeholder={field.placeholder || `请输入${field.label}`}
       />
     )
   }
@@ -556,6 +585,33 @@ function renderItemField(field, rowValues = {}) {
           />
         }
         unitText={unitText}
+      />
+    )
+  }
+  if (field.type === 'date') {
+    return (
+      <Input
+        type="date"
+        onClick={openNativeDatePicker}
+        style={{ cursor: 'pointer' }}
+      />
+    )
+  }
+  if (Array.isArray(field.options) && field.options.length > 0) {
+    return (
+      <Select
+        allowClear
+        options={field.options}
+        placeholder={field.placeholder || field.label}
+      />
+    )
+  }
+  if (field.type === 'textarea') {
+    return (
+      <Input.TextArea
+        rows={1}
+        autoSize={{ minRows: 1, maxRows: 3 }}
+        placeholder={field.placeholder || field.label}
       />
     )
   }
@@ -633,6 +689,13 @@ export default function BusinessModulePage({ moduleItem }) {
   const [batchDeleteSubmitting, setBatchDeleteSubmitting] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+  const [sourcePrefillState, setSourcePrefillState] = useState({
+    moduleKey: '',
+    keyword: '',
+    loading: false,
+    appliedModuleKey: '',
+    appliedKeyword: '',
+  })
   const [linkModalState, setLinkModalState] = useState({
     open: false,
     sourceCode: '',
@@ -684,6 +747,19 @@ export default function BusinessModulePage({ moduleItem }) {
     () => sortModuleRecords(filteredRecords, sortOrder),
     [filteredRecords, sortOrder]
   )
+  const sourcePrefillModuleOptions = useMemo(
+    () =>
+      getBusinessRecordSourcePrefillModuleKeys(moduleItem.key).map((key) => ({
+        value: key,
+        label: BUSINESS_MODULE_LABEL_BY_KEY.get(key) || key,
+      })),
+    [moduleItem.key]
+  )
+  const sourcePrefillAllowedKeys = useMemo(
+    () => new Set(sourcePrefillModuleOptions.map((option) => option.value)),
+    [sourcePrefillModuleOptions]
+  )
+  const isSourcePrefillAvailable = sourcePrefillModuleOptions.length > 0
 
   const selectedRecord = useMemo(() => {
     if (selectedRowKeys.length !== 1) {
@@ -1613,19 +1689,184 @@ export default function BusinessModulePage({ moduleItem }) {
     [tableColumns]
   )
 
-  const openCreateModal = () => {
-    setEditingRecord(null)
+  const loadLinkedSourceRecordForCreate = useCallback(async () => {
+    const { sourceKey } = moduleTableNavigationQuery
+    const sourceKeyword = moduleTableNavigationQuery.keyword
+    if (
+      !sourceKey ||
+      !sourceKeyword ||
+      !sourcePrefillAllowedKeys.has(sourceKey)
+    ) {
+      return null
+    }
+    const data = await listBusinessRecords({
+      module_key: sourceKey,
+      keyword: sourceKeyword,
+      limit: 20,
+    })
+    return resolveBusinessRecordSourceRecord(data.records, sourceKeyword)
+  }, [
+    moduleTableNavigationQuery.keyword,
+    moduleTableNavigationQuery.sourceKey,
+    sourcePrefillAllowedKeys,
+  ])
+
+  const resetCreateFormToDefaults = useCallback(() => {
     form.setFieldsValue(createDefaultValues(moduleItem, definition))
+  }, [definition, form, moduleItem])
+
+  const openCreateModal = async () => {
+    setEditingRecord(null)
+    const initialSourceModuleKey = sourcePrefillAllowedKeys.has(
+      moduleTableNavigationQuery.sourceKey
+    )
+      ? moduleTableNavigationQuery.sourceKey
+      : getDefaultBusinessRecordSourcePrefillModuleKey(moduleItem.key)
+    const initialSourceKeyword =
+      initialSourceModuleKey === moduleTableNavigationQuery.sourceKey
+        ? moduleTableNavigationQuery.keyword
+        : ''
+    const baseValues = createDefaultValues(moduleItem, definition)
+    let values = baseValues
+    let appliedModuleKey = ''
+    let appliedKeyword = ''
+    try {
+      const sourceRecord = await loadLinkedSourceRecordForCreate()
+      if (sourceRecord) {
+        values = buildBusinessRecordSourcePrefillValues({
+          baseValues,
+          sourceRecord,
+          targetModuleKey: moduleItem.key,
+          targetDefinition: definition,
+        })
+        appliedModuleKey = initialSourceModuleKey
+        appliedKeyword = initialSourceKeyword
+      }
+    } catch (error) {
+      message.warning(
+        getActionErrorMessage(error, '读取来源记录失败，已按空白记录新建')
+      )
+    }
+    setSourcePrefillState({
+      moduleKey: initialSourceModuleKey,
+      keyword: initialSourceKeyword,
+      loading: false,
+      appliedModuleKey,
+      appliedKeyword,
+    })
+    form.setFieldsValue(values)
     setModalOpen(true)
   }
 
   const openEditModal = () => {
     if (!selectedRecord) return
     setEditingRecord(selectedRecord)
+    setSourcePrefillState({
+      moduleKey: '',
+      keyword: '',
+      loading: false,
+      appliedModuleKey: '',
+      appliedKeyword: '',
+    })
     form.setFieldsValue(
       formValuesFromRecord(selectedRecord, moduleItem, definition)
     )
     setModalOpen(true)
+  }
+
+  const handleSourcePrefillModuleChange = (moduleKey) => {
+    const shouldReset = shouldClearBusinessRecordSourcePrefill({
+      appliedModuleKey: sourcePrefillState.appliedModuleKey,
+      appliedKeyword: sourcePrefillState.appliedKeyword,
+      nextModuleKey: moduleKey,
+    })
+    if (shouldReset) {
+      resetCreateFormToDefaults()
+    }
+    setSourcePrefillState({
+      moduleKey,
+      keyword: '',
+      loading: false,
+      appliedModuleKey: '',
+      appliedKeyword: '',
+    })
+  }
+
+  const handleSourcePrefillKeywordChange = (event) => {
+    const nextKeyword = event.target.value
+    const shouldReset = shouldClearBusinessRecordSourcePrefill({
+      appliedModuleKey: sourcePrefillState.appliedModuleKey,
+      appliedKeyword: sourcePrefillState.appliedKeyword,
+      nextKeyword,
+    })
+    if (shouldReset) {
+      resetCreateFormToDefaults()
+    }
+    setSourcePrefillState((current) => ({
+      ...current,
+      keyword: nextKeyword,
+      loading: false,
+      appliedModuleKey: shouldReset ? '' : current.appliedModuleKey,
+      appliedKeyword: shouldReset ? '' : current.appliedKeyword,
+    }))
+  }
+
+  const applySourcePrefill = async () => {
+    const sourceModuleKey = sourcePrefillState.moduleKey
+    const sourceKeyword = sourcePrefillState.keyword.trim()
+    if (!sourceModuleKey || !sourceKeyword) {
+      message.warning('请先选择来源模块并输入来源单号')
+      return
+    }
+    setSourcePrefillState((current) => ({ ...current, loading: true }))
+    try {
+      const data = await listBusinessRecords({
+        module_key: sourceModuleKey,
+        keyword: sourceKeyword,
+        limit: 20,
+      })
+      const sourceRecord = resolveBusinessRecordSourceRecord(
+        data.records,
+        sourceKeyword
+      )
+      if (!sourceRecord) {
+        message.warning('未找到匹配的来源记录')
+        return
+      }
+      const baseValues = createDefaultValues(moduleItem, definition)
+      const values = buildBusinessRecordSourcePrefillValues({
+        baseValues,
+        sourceRecord,
+        targetModuleKey: moduleItem.key,
+        targetDefinition: definition,
+      })
+      form.setFieldsValue(values)
+      setSourcePrefillState((current) => ({
+        ...current,
+        loading: false,
+        appliedModuleKey: sourceModuleKey,
+        appliedKeyword: sourceKeyword,
+      }))
+      message.success('已按来源记录带值')
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '读取来源记录失败，请稍后重试')
+      )
+    } finally {
+      setSourcePrefillState((current) => ({ ...current, loading: false }))
+    }
+  }
+
+  const clearSourcePrefill = () => {
+    resetCreateFormToDefaults()
+    setSourcePrefillState((current) => ({
+      ...current,
+      keyword: '',
+      loading: false,
+      appliedModuleKey: '',
+      appliedKeyword: '',
+    }))
+    message.success('已清空来源带值')
   }
 
   const saveRecord = async () => {
@@ -3658,6 +3899,12 @@ export default function BusinessModulePage({ moduleItem }) {
         width={720}
         centered
         destroyOnHidden
+        styles={{
+          body: {
+            maxHeight: 'calc(100vh - 220px)',
+            overflowY: 'auto',
+          },
+        }}
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Text type="secondary">
@@ -3754,6 +4001,54 @@ export default function BusinessModulePage({ moduleItem }) {
           className="erp-business-record-form"
         >
           <Row gutter={12}>
+            {!editingRecord && isSourcePrefillAvailable ? (
+              <Col xs={24}>
+                <Card size="small" title="来源带值">
+                  <Row gutter={[12, 12]} align="bottom">
+                    <Col xs={24} md={8}>
+                      <Form.Item label="来源模块" style={{ marginBottom: 0 }}>
+                        <Select
+                          options={sourcePrefillModuleOptions}
+                          value={sourcePrefillState.moduleKey}
+                          onChange={handleSourcePrefillModuleChange}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={10}>
+                      <Form.Item label="来源单号" style={{ marginBottom: 0 }}>
+                        <Input
+                          value={sourcePrefillState.keyword}
+                          placeholder="输入来源单号"
+                          onChange={handleSourcePrefillKeywordChange}
+                          onPressEnter={applySourcePrefill}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={6}>
+                      <Form.Item label="操作" style={{ marginBottom: 0 }}>
+                        <Space wrap>
+                          <Button
+                            type="primary"
+                            icon={<LinkOutlined />}
+                            loading={sourcePrefillState.loading}
+                            onClick={applySourcePrefill}
+                          >
+                            带值
+                          </Button>
+                          <Button
+                            icon={<RollbackOutlined />}
+                            disabled={sourcePrefillState.loading}
+                            onClick={clearSourcePrefill}
+                          >
+                            清空
+                          </Button>
+                        </Space>
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Card>
+              </Col>
+            ) : null}
             {definition.formFields.map((field) => (
               <Col
                 {...resolveBusinessRecordFieldColProps(field)}

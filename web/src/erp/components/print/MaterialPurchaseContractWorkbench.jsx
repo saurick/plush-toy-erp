@@ -138,21 +138,13 @@ function ClauseBlock({ title, items, onCommit, disabled = false }) {
 }
 
 function loadDraft(template, storageKey, options = {}) {
-  const { forceFresh = false, fallbackStorageKeys = [] } = options
+  const { forceFresh = false } = options
   const fallbackDraft = buildMaterialPurchaseContractDraft(template?.sample)
   if (forceFresh || !storageKey || typeof window === 'undefined') {
     return fallbackDraft
   }
   try {
-    const draftStorageKeys = [storageKey, ...fallbackStorageKeys].filter(
-      Boolean
-    )
-    const rawDraft = draftStorageKeys.reduce((matchedDraft, currentKey) => {
-      if (matchedDraft) {
-        return matchedDraft
-      }
-      return window.localStorage.getItem(currentKey) || ''
-    }, '')
+    const rawDraft = window.localStorage.getItem(storageKey) || ''
     if (!rawDraft) {
       return fallbackDraft
     }
@@ -182,7 +174,6 @@ function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
 export default function MaterialPurchaseContractWorkbench({
   template,
   draftStorageKey = '',
-  legacyDraftStorageKeys = [],
   resetDraftOnOpen = false,
   workspaceStateID = '',
   workspaceURL = '',
@@ -191,7 +182,6 @@ export default function MaterialPurchaseContractWorkbench({
   const [draft, setDraft] = useState(() =>
     loadDraft(template, draftStorageKey, {
       forceFresh: resetDraftOnOpen,
-      fallbackStorageKeys: legacyDraftStorageKeys,
     })
   )
   const [formulaVisible, setFormulaVisible] = useState(false)
@@ -212,7 +202,6 @@ export default function MaterialPurchaseContractWorkbench({
     setDraft(
       loadDraft(template, draftStorageKey, {
         forceFresh: resetDraftOnOpen,
-        fallbackStorageKeys: legacyDraftStorageKeys,
       })
     )
     setFormulaVisible(false)
@@ -223,13 +212,7 @@ export default function MaterialPurchaseContractWorkbench({
     setMergeSelectionFocus(null)
     setActiveCell(null)
     setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
-  }, [
-    draftStorageKey,
-    legacyDraftStorageKeys,
-    resetDraftOnOpen,
-    sourceTag,
-    template,
-  ])
+  }, [draftStorageKey, resetDraftOnOpen, sourceTag, template])
 
   useEffect(() => {
     if (!draftStorageKey || typeof window === 'undefined') {

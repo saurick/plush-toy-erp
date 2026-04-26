@@ -186,6 +186,22 @@ func CanAdminHandleWorkflowTask(admin *AdminUser, task *WorkflowTask, nextStatus
 	return AdminHasRole(admin, task.OwnerRoleKey)
 }
 
+func CanAdminUrgeWorkflowTask(admin *AdminUser, task *WorkflowTask) bool {
+	if admin == nil || admin.Disabled || task == nil {
+		return false
+	}
+	if IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
+		return false
+	}
+	if admin.IsSuperAdmin || AdminHasRole(admin, PMCRoleKey) || AdminHasRole(admin, BossRoleKey) {
+		return true
+	}
+	if task.AssigneeID != nil {
+		return *task.AssigneeID == admin.ID
+	}
+	return AdminHasRole(admin, task.OwnerRoleKey)
+}
+
 type WorkflowTask struct {
 	ID                int
 	TaskCode          string
@@ -387,6 +403,10 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		}
 	} else if isFinishedGoodsQCTask(current) {
 		if err := uc.applyFinishedGoodsQCTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isFinishedGoodsInboundTask(current) {
+		if err := uc.applyFinishedGoodsInboundTransition(current, in); err != nil {
 			return nil, err
 		}
 	}
@@ -629,6 +649,49 @@ func (uc *WorkflowUsecase) applyFinishedGoodsQCTransition(current *WorkflowTask,
 	return nil
 }
 
+func (uc *WorkflowUsecase) applyFinishedGoodsInboundTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowInboundDoneStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		in.Payload["inbound_task_id"] = current.ID
+		in.Payload["inbound_result"] = "done"
+		in.Payload["finished_goods"] = true
+		in.Payload["inventory_balance_deferred"] = true
+		in.Payload["shipment_release_deferred"] = true
+		in.Payload["critical_path"] = true
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildFinishedGoodsInboundDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	case "blocked", "rejected":
+		reason := workflowTransitionReason(in, in.TaskStatusKey)
+		if reason == "" {
+			return ErrBadParam
+		}
+		in.Reason = reason
+		in.BusinessStatusKey = workflowBlockedStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		in.Payload["inbound_task_id"] = current.ID
+		in.Payload["finished_goods"] = true
+		in.Payload["critical_path"] = true
+		in.Payload["decision"] = in.TaskStatusKey
+		in.Payload["transition_status"] = in.TaskStatusKey
+		if in.TaskStatusKey == "blocked" {
+			in.Payload["blocked_reason"] = reason
+			delete(in.Payload, "rejected_reason")
+		} else {
+			in.Payload["rejected_reason"] = reason
+			delete(in.Payload, "blocked_reason")
+		}
+		in.SideEffects = buildFinishedGoodsInboundBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
+	default:
+		return nil
+	}
+	return nil
+}
+
 func (uc *WorkflowUsecase) UrgeTask(ctx context.Context, in *WorkflowTaskUrge, actorID int, actorRoleKey string) (*WorkflowTask, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -844,6 +907,31 @@ func isFinishedGoodsQCTask(task *WorkflowTask) bool {
 	}
 	switch strings.TrimSpace(*task.BusinessStatusKey) {
 	case "", workflowQCPendingStatusKey, workflowQCFailedStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isFinishedGoodsInboundTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	if strings.TrimSpace(task.SourceType) != workflowProductionProgressModuleKey {
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowFinishedGoodsInboundTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "warehouse" {
+		return false
+	}
+	if workflowPayloadString(task.Payload, "finished_goods") != "true" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowWarehouseInboundPendingKey, workflowBlockedStatusKey:
 		return true
 	default:
 		return false
@@ -1198,6 +1286,57 @@ func buildFinishedGoodsQCReworkSideEffects(current *WorkflowTask, taskStatusKey 
 		DerivedFromTaskID:                 current.ID,
 		WorkflowRuleKey:                   workflowRuleKey,
 		RefreshExistingDerivedTaskPayload: true,
+	}
+}
+
+func buildFinishedGoodsInboundDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := "warehouse"
+	statePayload := workflowFinishedGoodsCommonPayload(current)
+	statePayload["inbound_task_id"] = current.ID
+	statePayload["inbound_result"] = "done"
+	statePayload["inventory_balance_deferred"] = true
+	statePayload["shipment_release_deferred"] = true
+	statePayload["critical_path"] = true
+	statePayload["decision"] = "done"
+	statePayload["transition_status"] = "done"
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			BusinessStatusKey: workflowInboundDoneStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			Payload:           statePayload,
+		},
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "finished_goods_inbound_done_to_inbound_done",
+	}
+}
+
+func buildFinishedGoodsInboundBlockedSideEffects(current *WorkflowTask, taskStatusKey string, reason string) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := "warehouse"
+	statePayload := workflowFinishedGoodsCommonPayload(current)
+	statePayload["inbound_task_id"] = current.ID
+	statePayload["critical_path"] = true
+	statePayload["decision"] = taskStatusKey
+	statePayload["transition_status"] = taskStatusKey
+	if taskStatusKey == "blocked" {
+		statePayload["blocked_reason"] = reason
+	} else {
+		statePayload["rejected_reason"] = reason
+	}
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			BusinessStatusKey: workflowBlockedStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			BlockedReason:     &reason,
+			Payload:           statePayload,
+		},
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "finished_goods_inbound_" + taskStatusKey + "_to_blocked",
 	}
 }
 

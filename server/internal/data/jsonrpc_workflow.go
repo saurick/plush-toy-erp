@@ -167,6 +167,17 @@ func (d *JsonrpcData) handleWorkflow(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskUpdate); res != nil {
 			return id, res, nil
 		}
+		currentTask, err := d.workflowUC.GetTask(ctx, getInt(pm, "task_id", 0))
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+		admin, adminRes := d.CurrentAdmin(ctx)
+		if adminRes != nil {
+			return id, adminRes, nil
+		}
+		if !biz.CanAdminUrgeWorkflowTask(admin, currentTask) {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
 		payload, ok := getWorkflowPayload(pm, "payload")
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil

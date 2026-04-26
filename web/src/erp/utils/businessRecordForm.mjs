@@ -11,6 +11,7 @@ export const ITEM_FIELD_KEYS = Object.freeze([
 ])
 
 export const ITEM_NUMBER_FIELDS = new Set(['quantity', 'unit_price', 'amount'])
+const ITEM_FIELD_KEY_SET = new Set(ITEM_FIELD_KEYS)
 
 function itemFieldsOf(definition = {}) {
   return Array.isArray(definition.itemFields) ? definition.itemFields : []
@@ -26,10 +27,6 @@ export function isPayloadFieldKey(key) {
 
 export function getPayloadFieldName(key) {
   return isPayloadFieldKey(key) ? String(key).slice('payload.'.length) : ''
-}
-
-function itemFieldKeysOf(itemFields = []) {
-  return new Set(itemFields.map((field) => field.key))
 }
 
 function roundAmount(value) {
@@ -81,6 +78,17 @@ export function getBusinessRecordFieldValue(record = {}, fieldKey = '') {
   return record?.[fieldKey]
 }
 
+export function getBusinessRecordItemFieldValue(item = {}, fieldKey = '') {
+  if (isPayloadFieldKey(fieldKey)) {
+    const payloadKey = getPayloadFieldName(fieldKey)
+    return item?.payload?.[payloadKey]
+  }
+  if (fieldKey in item) {
+    return item?.[fieldKey]
+  }
+  return item?.payload?.[fieldKey]
+}
+
 export function calculateItemAmount(item = {}) {
   const quantity = normalizeNumber(item.quantity)
   const unitPrice = normalizeNumber(item.unit_price)
@@ -88,14 +96,40 @@ export function calculateItemAmount(item = {}) {
   return roundAmount(quantity * unitPrice)
 }
 
-function normalizeRecordItem(item = {}, itemFieldKeys = new Set()) {
+function normalizeRecordItemPayloadValue(
+  normalized,
+  payloadKey,
+  rawValue,
+  field
+) {
+  if (!payloadKey) return
+  const normalizedValue = normalizeFieldValue(rawValue, field)
+  if (normalizedValue !== undefined) {
+    normalized.payload[payloadKey] = normalizedValue
+  }
+}
+
+function normalizeRecordItem(item = {}, itemFields = []) {
   const normalized = {
     line_no: 0,
     payload: {},
   }
 
-  ITEM_FIELD_KEYS.forEach((key) => {
-    if (!itemFieldKeys.has(key)) return
+  itemFields.forEach((field) => {
+    const { key } = field
+    if (!key) return
+    if (isPayloadFieldKey(key)) {
+      const payloadKey = getPayloadFieldName(key)
+      const rawValue =
+        item[key] !== undefined ? item[key] : item.payload?.[payloadKey]
+      normalizeRecordItemPayloadValue(normalized, payloadKey, rawValue, field)
+      return
+    }
+    if (!ITEM_FIELD_KEY_SET.has(key)) {
+      const rawValue = item[key] !== undefined ? item[key] : item.payload?.[key]
+      normalizeRecordItemPayloadValue(normalized, key, rawValue, field)
+      return
+    }
     if (key === 'amount') {
       normalized.amount =
         normalizeNumber(item.amount) ?? calculateItemAmount(item)
@@ -110,16 +144,19 @@ function normalizeRecordItem(item = {}, itemFieldKeys = new Set()) {
 }
 
 function hasRecordItemValue(item = {}) {
-  return ITEM_FIELD_KEYS.some((key) => {
+  const hasBaseValue = ITEM_FIELD_KEYS.some((key) => {
     const value = item[key]
     return value !== undefined && value !== null && value !== ''
   })
+  if (hasBaseValue) return true
+  return Object.values(item.payload || {}).some(
+    (value) => value !== undefined && value !== null && value !== ''
+  )
 }
 
 export function normalizeRecordItems(items = [], itemFields = []) {
-  const itemFieldKeys = itemFieldKeysOf(itemFields)
   return (Array.isArray(items) ? items : [])
-    .map((item) => normalizeRecordItem(item, itemFieldKeys))
+    .map((item) => normalizeRecordItem(item, itemFields))
     .filter(hasRecordItemValue)
     .map((item, index) => ({
       ...item,
