@@ -5,15 +5,19 @@ import (
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 
 	"entgo.io/ent/dialect"
+	"github.com/shopspring/decimal"
 )
 
 func (r *inventoryRepo) CreatePurchaseReturnDraft(ctx context.Context, in *biz.PurchaseReturnCreate) (*biz.PurchaseReturn, error) {
@@ -136,6 +140,11 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (*
 		if err := validatePurchaseReturnItemReferences(ctx, tx.client, purchaseReturn.PurchaseReceiptID, entPurchaseReturnItemToCreate(item)); err != nil {
 			return nil, err
 		}
+	}
+	if err := validatePurchaseReturnReceiptItemQuantities(ctx, tx, purchaseReturn.ID, items); err != nil {
+		return nil, err
+	}
+	for _, item := range items {
 		sourceID := purchaseReturn.ID
 		sourceLineID := item.ID
 		_, err = r.applyInventoryTxnAndUpdateBalanceInTx(ctx, tx, &biz.InventoryTxnCreate{
@@ -334,6 +343,97 @@ func validatePurchaseReturnItemReferences(ctx context.Context, client *ent.Clien
 		receiptItem.UnitID != in.UnitID ||
 		!sameOptionalInt(receiptItem.LotID, in.LotID) {
 		return biz.ErrBadParam
+	}
+	return nil
+}
+
+func validatePurchaseReturnReceiptItemQuantities(ctx context.Context, tx *inventoryDBTx, returnID int, items []*ent.PurchaseReturnItem) error {
+	currentByReceiptItem := make(map[int]decimal.Decimal)
+	for _, item := range items {
+		if item.PurchaseReceiptItemID == nil {
+			continue
+		}
+		receiptItemID := *item.PurchaseReceiptItemID
+		currentByReceiptItem[receiptItemID] = currentByReceiptItem[receiptItemID].Add(item.Quantity)
+	}
+	if len(currentByReceiptItem) == 0 {
+		return nil
+	}
+
+	receiptItemIDs := make([]int, 0, len(currentByReceiptItem))
+	for receiptItemID := range currentByReceiptItem {
+		receiptItemIDs = append(receiptItemIDs, receiptItemID)
+	}
+	sort.Ints(receiptItemIDs)
+	if err := lockPurchaseReceiptItems(ctx, tx, receiptItemIDs); err != nil {
+		return err
+	}
+
+	for _, receiptItemID := range receiptItemIDs {
+		receiptItem, err := tx.client.PurchaseReceiptItem.Get(ctx, receiptItemID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrPurchaseReceiptItemNotFound
+			}
+			return err
+		}
+		postedItems, err := tx.client.PurchaseReturnItem.Query().
+			Where(
+				purchasereturnitem.PurchaseReceiptItemID(receiptItemID),
+				purchasereturnitem.ReturnIDNEQ(returnID),
+				purchasereturnitem.HasPurchaseReturnWith(
+					purchasereturn.Status(biz.PurchaseReturnStatusPosted),
+				),
+			).
+			All(ctx)
+		if err != nil {
+			return err
+		}
+		alreadyReturned := decimal.Zero
+		for _, postedItem := range postedItems {
+			alreadyReturned = alreadyReturned.Add(postedItem.Quantity)
+		}
+		if alreadyReturned.Add(currentByReceiptItem[receiptItemID]).Cmp(receiptItem.Quantity) > 0 {
+			return biz.ErrBadParam
+		}
+	}
+	return nil
+}
+
+func lockPurchaseReceiptItems(ctx context.Context, tx *inventoryDBTx, receiptItemIDs []int) error {
+	if tx.dialect != dialect.Postgres || len(receiptItemIDs) == 0 {
+		return nil
+	}
+	placeholders := inventorySQLPlaceholders(tx.dialect, len(receiptItemIDs))
+	args := make([]any, 0, len(receiptItemIDs))
+	for _, id := range receiptItemIDs {
+		args = append(args, id)
+	}
+	query := fmt.Sprintf(
+		`SELECT id FROM purchase_receipt_items WHERE id IN (%s) ORDER BY id FOR UPDATE`,
+		strings.Join(placeholders, ", "),
+	)
+	rows, err := tx.sqlTx.QueryContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	locked := 0
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		locked++
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if locked != len(receiptItemIDs) {
+		return biz.ErrPurchaseReceiptItemNotFound
 	}
 	return nil
 }

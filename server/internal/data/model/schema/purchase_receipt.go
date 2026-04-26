@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -80,7 +81,8 @@ func (PurchaseReceipt) Edges() []ent.Edge {
 			Ref("purchase_receipts").
 			Field("business_record_id").
 			Unique(),
-		edge.To("purchase_returns", PurchaseReturn.Type),
+		edge.To("purchase_returns", PurchaseReturn.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("items", PurchaseReceiptItem.Type),
 	}
 }

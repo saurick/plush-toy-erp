@@ -1742,10 +1742,23 @@ func TestInventoryRepo_PurchaseReturnLotIsolationAndReceiptItemValidation(t *tes
 	if lotReceiptItem.LotID == nil {
 		t.Fatalf("expected lot receipt item lot_id")
 	}
-	nonLotReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-NOLOT-IN", fixtures, nil, mustDecimal(t, "5"))
+	nonLotReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-NOLOT-IN", fixtures, nil, mustDecimal(t, "10"))
 	nonLotReceiptItem := nonLotReceipt.Items[0]
 	if nonLotReceiptItem.LotID != nil {
 		t.Fatalf("expected non-lot receipt item lot_id nil")
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnOut,
+		Direction:      -1,
+		Quantity:       mustDecimal(t, "5"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST_NON_LOT_CONSUME",
+		IdempotencyKey: "test-non-lot-consume-before-return",
+	}); err != nil {
+		t.Fatalf("consume non-lot stock before return failed: %v", err)
 	}
 
 	mismatchReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
@@ -1854,6 +1867,174 @@ func TestInventoryRepo_PurchaseReturnLotIsolationAndReceiptItemValidation(t *tes
 		t.Fatalf("get lot balance after non-lot return failed: %v", err)
 	}
 	assertDecimalEqual(t, lotBalance.Quantity, "10")
+}
+
+func TestInventoryRepo_PurchaseReturnReceiptItemCumulativeLimit(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_purchase_return_cumulative")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	postedReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-CUM-IN-001", fixtures, stringPtr("RET-CUM-LOT-A"), mustDecimal(t, "100"))
+	receiptItem := postedReceipt.Items[0]
+	if receiptItem.LotID == nil {
+		t.Fatalf("expected cumulative receipt lot_id")
+	}
+
+	createLinkedReturn := func(returnNo string, quantity decimal.Decimal) *biz.PurchaseReturn {
+		t.Helper()
+		purchaseReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+			ReturnNo:          returnNo,
+			PurchaseReceiptID: &postedReceipt.ID,
+			SupplierName:      "累计退货供应商",
+			ReturnedAt:        time.Date(2026, 4, 26, 15, 0, 0, 0, time.UTC),
+		})
+		if err != nil {
+			t.Fatalf("create linked purchase return %s failed: %v", returnNo, err)
+		}
+		if _, err := uc.AddPurchaseReturnItem(ctx, &biz.PurchaseReturnItemCreate{
+			ReturnID:              purchaseReturn.ID,
+			PurchaseReceiptItemID: &receiptItem.ID,
+			MaterialID:            fixtures.materialID,
+			WarehouseID:           fixtures.warehouseID,
+			UnitID:                fixtures.unitID,
+			LotID:                 receiptItem.LotID,
+			Quantity:              quantity,
+		}); err != nil {
+			t.Fatalf("add linked purchase return item %s failed: %v", returnNo, err)
+		}
+		return purchaseReturn
+	}
+
+	return60 := createLinkedReturn("PR-RET-CUM-060", mustDecimal(t, "60"))
+	if _, err := uc.PostPurchaseReturn(ctx, return60.ID); err != nil {
+		t.Fatalf("post 60 cumulative return failed: %v", err)
+	}
+	balanceAfter60, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		LotID:       receiptItem.LotID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get balance after 60 return failed: %v", err)
+	}
+	assertDecimalEqual(t, balanceAfter60.Quantity, "40")
+
+	return40 := createLinkedReturn("PR-RET-CUM-040", mustDecimal(t, "40"))
+	if _, err := uc.PostPurchaseReturn(ctx, return40.ID); err != nil {
+		t.Fatalf("post 40 cumulative return failed: %v", err)
+	}
+	if _, err := uc.PostPurchaseReturn(ctx, return40.ID); err != nil {
+		t.Fatalf("repeat post 40 cumulative return should be idempotent, got %v", err)
+	}
+	outCount40, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReturnSourceType),
+			inventorytxn.SourceID(return40.ID),
+			inventorytxn.TxnType(biz.InventoryTxnOut),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count repeated cumulative return out txns failed: %v", err)
+	}
+	if outCount40 != 1 {
+		t.Fatalf("repeat post should keep one out txn, got %d", outCount40)
+	}
+
+	extraStockReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-CUM-IN-EXTRA", fixtures, stringPtr("RET-CUM-LOT-A"), mustDecimal(t, "10"))
+	assertOptionalIntEqual(t, extraStockReceipt.Items[0].LotID, *receiptItem.LotID)
+	overOriginal := createLinkedReturn("PR-RET-CUM-OVER-001", mustDecimal(t, "1"))
+	if _, err := uc.PostPurchaseReturn(ctx, overOriginal.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected cumulative over-return to be rejected even with stock available, got %v", err)
+	}
+
+	if _, err := uc.CancelPostedPurchaseReturn(ctx, return60.ID); err != nil {
+		t.Fatalf("cancel 60 cumulative return failed: %v", err)
+	}
+	releasedReturn := createLinkedReturn("PR-RET-CUM-RELEASED-060", mustDecimal(t, "60"))
+	if _, err := uc.PostPurchaseReturn(ctx, releasedReturn.ID); err != nil {
+		t.Fatalf("post return after cancellation released quantity failed: %v", err)
+	}
+
+	multiLineReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-CUM-IN-MULTI", fixtures, stringPtr("RET-CUM-LOT-MULTI"), mustDecimal(t, "100"))
+	multiLineItem := multiLineReceipt.Items[0]
+	if multiLineItem.LotID == nil {
+		t.Fatalf("expected multi-line receipt lot_id")
+	}
+	multiLineReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+		ReturnNo:          "PR-RET-CUM-MULTI",
+		PurchaseReceiptID: &multiLineReceipt.ID,
+		SupplierName:      "累计退货供应商",
+		ReturnedAt:        time.Date(2026, 4, 26, 16, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create multi-line cumulative return failed: %v", err)
+	}
+	for _, quantity := range []string{"70", "31"} {
+		if _, err := uc.AddPurchaseReturnItem(ctx, &biz.PurchaseReturnItemCreate{
+			ReturnID:              multiLineReturn.ID,
+			PurchaseReceiptItemID: &multiLineItem.ID,
+			MaterialID:            fixtures.materialID,
+			WarehouseID:           fixtures.warehouseID,
+			UnitID:                fixtures.unitID,
+			LotID:                 multiLineItem.LotID,
+			Quantity:              mustDecimal(t, quantity),
+		}); err != nil {
+			t.Fatalf("add multi-line cumulative item %s failed: %v", quantity, err)
+		}
+	}
+	if _, err := uc.PostPurchaseReturn(ctx, multiLineReturn.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected same-return multi-line over original receipt item to be rejected, got %v", err)
+	}
+
+	lowStockReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-CUM-IN-LOW-STOCK", fixtures, stringPtr("RET-CUM-LOT-LOW"), mustDecimal(t, "100"))
+	lowStockItem := lowStockReceipt.Items[0]
+	if lowStockItem.LotID == nil {
+		t.Fatalf("expected low-stock receipt lot_id")
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          lowStockItem.LotID,
+		TxnType:        biz.InventoryTxnOut,
+		Direction:      -1,
+		Quantity:       mustDecimal(t, "95"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST_LOW_STOCK_CONSUME",
+		IdempotencyKey: "test-low-stock-before-linked-return",
+	}); err != nil {
+		t.Fatalf("consume low-stock lot before linked return failed: %v", err)
+	}
+	lowStockReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+		ReturnNo:          "PR-RET-CUM-LOW-STOCK",
+		PurchaseReceiptID: &lowStockReceipt.ID,
+		SupplierName:      "累计退货供应商",
+		ReturnedAt:        time.Date(2026, 4, 26, 17, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create low-stock return failed: %v", err)
+	}
+	if _, err := uc.AddPurchaseReturnItem(ctx, &biz.PurchaseReturnItemCreate{
+		ReturnID:              lowStockReturn.ID,
+		PurchaseReceiptItemID: &lowStockItem.ID,
+		MaterialID:            fixtures.materialID,
+		WarehouseID:           fixtures.warehouseID,
+		UnitID:                fixtures.unitID,
+		LotID:                 lowStockItem.LotID,
+		Quantity:              mustDecimal(t, "10"),
+	}); err != nil {
+		t.Fatalf("add low-stock return item failed: %v", err)
+	}
+	if _, err := uc.PostPurchaseReturn(ctx, lowStockReturn.ID); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
+		t.Fatalf("expected linked return within original quantity but over current stock to be rejected, got %v", err)
+	}
 }
 
 func TestInventoryQuantityGeneratedTypeIsDecimal(t *testing.T) {

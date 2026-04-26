@@ -10,14 +10,17 @@ Phase 2D-A 落地采购退货最小闭环，采用 `docs/architecture/phase-2d-p
 - 退货过账通过 `inventory_txns.OUT -> inventory_balances` 扣减库存。
 - 取消已过账退货通过 `REVERSAL` 回补库存。
 
-本轮 migration 为 `20260426033346_migrate.sql`。
+本轮 migration 为：
+
+- `20260426033346_migrate.sql`：新增 `purchase_returns / purchase_return_items`。
+- `20260426040724_migrate.sql`：将采购退货指向原采购入库单 / 行的追溯 FK 从 `ON DELETE SET NULL` 修正为 `ON DELETE NO ACTION`。
 
 ## 新增专表
 
 | 表 | 定位 | 关键约束 |
 | --- | --- | --- |
-| `purchase_returns` | 采购退货单头，保存退货单号、可选原入库单、可选通用快照、供应商名称快照、状态和退货 / 过账时间。 | `return_no` 唯一；`status` 为 `DRAFT / POSTED / CANCELLED`；索引 `purchase_receipt_id / business_record_id / status / returned_at`。 |
-| `purchase_return_items` | 采购退货行，保存可选原入库行、材料、仓库、单位、批次、数量、单价、金额和来源行号。 | `quantity > 0`；`unit_price IS NULL OR unit_price >= 0`；`amount IS NULL OR amount >= 0`；`return_id + source_line_no` 在非空范围内唯一。 |
+| `purchase_returns` | 采购退货单头，保存退货单号、可选原入库单、可选通用快照、供应商名称快照、状态和退货 / 过账时间。 | `return_no` 唯一；`status` 为 `DRAFT / POSTED / CANCELLED`；索引 `purchase_receipt_id / business_record_id / status / returned_at`；`purchase_receipt_id -> purchase_receipts.id` 使用 `ON DELETE NO ACTION`。 |
+| `purchase_return_items` | 采购退货行，保存可选原入库行、材料、仓库、单位、批次、数量、单价、金额和来源行号。 | `quantity > 0`；`unit_price IS NULL OR unit_price >= 0`；`amount IS NULL OR amount >= 0`；`return_id + source_line_no` 在非空范围内唯一；`purchase_receipt_item_id -> purchase_receipt_items.id` 使用 `ON DELETE NO ACTION`。 |
 
 数量、单价和金额继续使用 `numeric(20,6)` / `decimal.Decimal`，不使用 float。
 
@@ -41,6 +44,7 @@ Phase 2D-A 落地采购退货最小闭环，采用 `docs/architecture/phase-2d-p
 | 过账 | `PostPurchaseReturn` 只允许 `DRAFT -> POSTED`，并在一个数据库事务内处理所有退货行。 |
 | 批次 | 行有 `lot_id` 时只扣该批次余额；`lot_id = NULL` 时只扣非批次余额。批次库存和非批次库存不能互相抵扣。 |
 | 余额 | 每条退货行写 `inventory_txns` 后同事务更新 `inventory_balances`，继续默认禁止负库存。 |
+| 原入库行额度 | 如果退货行关联 `purchase_receipt_item_id`，同一原入库行的有效已退数量加本次退货数量不得超过原入库行 `quantity`。 |
 | 重复过账 | 已 `POSTED` 的退货单重复过账直接返回当前单据，不重复扣库存。 |
 | 取消 | `CancelPostedPurchaseReturn` 只允许 `POSTED -> CANCELLED`；重复取消已 `CANCELLED` 单据不重复冲正。 |
 
@@ -49,6 +53,10 @@ Phase 2D-A 落地采购退货最小闭环，采用 `docs/architecture/phase-2d-p
 - 原入库行所属入库单必须为 `POSTED`。
 - 若退货单头指定 `purchase_receipt_id`，退货行关联的原入库行必须属于该入库单。
 - `material_id / warehouse_id / unit_id / lot_id` 必须与原入库行一致，避免退错物料、仓库、单位或批次。
+- `PostPurchaseReturn` 在事务内按 `purchase_receipt_item_id` 汇总本退货单所有行，并统计其他 `POSTED` 退货行的有效已退数量；`CANCELLED` 退货不计入有效已退数量，当前已 `POSTED` 的重复过账走幂等返回，不会把自身误判为超退。
+- 无原入库行退货仍允许，累计额度规则不适用，但仍必须满足材料、仓库、单位、批次和当前库存余额校验。
+
+库存余额校验和原入库行可退数量校验是两个不同约束：前者防止当前账面库存扣成负数，后者防止已关联原入库行的退货累计超过该原入库事实；两者必须同时满足。
 
 ## source 与幂等规则
 
@@ -69,6 +77,7 @@ Phase 2D-A 落地采购退货最小闭环，采用 `docs/architecture/phase-2d-p
 | --- | --- |
 | `purchase_returns` | Ent hook 禁止普通 `Delete / DeleteOne`。采购退货单不做业务物理删除；如需作废，使用 `CancelPostedPurchaseReturn`。 |
 | `purchase_return_items` | Ent hook 禁止普通 `Delete / DeleteOne`。退货行是 `inventory_txns.source_line_id` 的追溯来源，不能被普通删除。 |
+| 原入库单 / 行 FK | `purchase_returns.purchase_receipt_id` 和 `purchase_return_items.purchase_receipt_item_id` 使用数据库 `ON DELETE NO ACTION`。采购入库单 / 行已有 Ent hook 删除保护，但数据库 FK 也必须阻止绕过 Ent 的直接 SQL 删除破坏追溯链。 |
 | 退货单关键字段 | Ent hook 禁止普通 update 修改 `return_no`、`purchase_receipt_id`、`business_record_id`、`supplier_name`、`status`、`returned_at`、`posted_at`。状态只能通过 `PostPurchaseReturn` 或 `CancelPostedPurchaseReturn` 的明确路径变化。 |
 | 退货行关键字段 | Ent hook 禁止普通 update 修改 `return_id`、`purchase_receipt_item_id`、`material_id`、`warehouse_id`、`unit_id`、`lot_id`、`quantity`、`unit_price`、`amount`、`source_line_no`。 |
 | DRAFT 行新增 | `AddPurchaseReturnItem` 只允许给 `DRAFT` 退货单新增行。 |
@@ -98,7 +107,7 @@ make phase2d_migrate_status
 make phase2d_pg_test
 ```
 
-`phase2d_pg_test` 只运行 PostgreSQL Phase 2D 集成测试，覆盖 migration 结构、check constraint、唯一约束、批次退货、非批次隔离、库存不足回滚、重复过账幂等、取消退货冲正、重复取消防护、采购退货单 / 行普通删除保护、过账后关键字段修改保护，以及 `source_type/source_id/source_line_id` 追溯链保留。
+`phase2d_pg_test` 只运行 PostgreSQL Phase 2D 集成测试，覆盖 migration 结构、check constraint、唯一约束、原入库单 / 行 FK `ON DELETE NO ACTION`、直接 SQL 删除原入库单 / 行失败且追溯 ID 保留、按原入库行累计退货不得超过原入库数量、取消退货释放可退数量、库存余额约束与原入库行额度约束同时生效、批次退货、非批次隔离、库存不足回滚、重复过账幂等、取消退货冲正、重复取消防护、采购退货单 / 行普通删除保护、过账后关键字段修改保护，以及 `source_type/source_id/source_line_id` 追溯链保留。
 
 ## 当前仍未做
 

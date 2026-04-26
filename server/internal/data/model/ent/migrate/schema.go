@@ -713,7 +713,7 @@ var (
 				Symbol:     "purchase_returns_purchase_receipts_purchase_returns",
 				Columns:    []*schema.Column{PurchaseReturnsColumns[10]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
-				OnDelete:   schema.SetNull,
+				OnDelete:   schema.NoAction,
 			},
 		},
 		Indexes: []*schema.Index{
@@ -783,7 +783,7 @@ var (
 				Symbol:     "purchase_return_items_purchase_receipt_items_purchase_return_items",
 				Columns:    []*schema.Column{PurchaseReturnItemsColumns[10]},
 				RefColumns: []*schema.Column{PurchaseReceiptItemsColumns[0]},
-				OnDelete:   schema.SetNull,
+				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_return_items_purchase_returns_items",

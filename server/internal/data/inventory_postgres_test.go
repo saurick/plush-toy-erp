@@ -1022,6 +1022,8 @@ func TestPhase2DPostgresMigrationShape(t *testing.T) {
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_return_items", "purchase_return_items_unit_price_non_negative", "unit_price IS NULL OR unit_price >= 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_return_items", "purchase_return_items_amount_non_negative", "amount IS NULL OR amount >= 0")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "purchase_return_items", "purchase_return_items_inventory_lots_purchase_return_items", "NO ACTION")
+	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "purchase_returns", "purchase_returns_purchase_receipts_purchase_returns", "NO ACTION")
+	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "purchase_return_items", "purchase_return_items_purchase_receipt_items_purchase_return_it", "NO ACTION")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id", "lot_id IS NULL")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id_l", "lot_id IS NOT NULL")
 
@@ -1332,6 +1334,245 @@ func TestPhase2DPostgresPurchaseReturnFlow(t *testing.T) {
 	}
 }
 
+func TestPhase2DPostgresPurchaseReturnOriginFKDeleteRules(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPhase2DPostgresTestData(t)
+
+	fixtures := createPhase2DPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+	invFixtures := inventoryTestFixtures{
+		unitID:      fixtures.unitID,
+		materialID:  fixtures.materialID,
+		productID:   fixtures.productID,
+		warehouseID: fixtures.warehouseID,
+	}
+
+	headerOnlyReceipt, err := client.PurchaseReceipt.Create().
+		SetReceiptNo("PG-PRTN-FK-HEAD-" + fixtures.suffix).
+		SetSupplierName("PG退货供应商").
+		SetStatus(biz.PurchaseReceiptStatusPosted).
+		SetReceivedAt(time.Date(2026, 4, 26, 16, 0, 0, 0, time.UTC)).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create header-only receipt for return FK test failed: %v", err)
+	}
+	purchaseReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+		ReturnNo:          "PG-PRTN-FK-HEAD-RET-" + fixtures.suffix,
+		PurchaseReceiptID: &headerOnlyReceipt.ID,
+		SupplierName:      "PG退货供应商",
+		ReturnedAt:        time.Date(2026, 4, 26, 16, 10, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create return linked to header-only receipt failed: %v", err)
+	}
+	if _, err := data.sqldb.ExecContext(ctx, `DELETE FROM purchase_receipts WHERE id = $1`, headerOnlyReceipt.ID); err == nil {
+		t.Fatalf("expected direct SQL delete of purchase_receipt referenced by purchase_return to fail")
+	}
+	persistedReturn, err := client.PurchaseReturn.Get(ctx, purchaseReturn.ID)
+	if err != nil {
+		t.Fatalf("get purchase return after failed origin receipt delete failed: %v", err)
+	}
+	assertOptionalIntEqual(t, persistedReturn.PurchaseReceiptID, headerOnlyReceipt.ID)
+
+	postedReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRTN-FK-ITEM-IN-"+fixtures.suffix, invFixtures, stringPtr("PG-PRTN-FK-ITEM-LOT-"+fixtures.suffix), mustDecimal(t, "10"))
+	receiptItem := postedReceipt.Items[0]
+	if receiptItem.LotID == nil {
+		t.Fatalf("expected receipt item FK test lot_id")
+	}
+	itemReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+		ReturnNo:     "PG-PRTN-FK-ITEM-RET-" + fixtures.suffix,
+		SupplierName: "PG退货供应商",
+		ReturnedAt:   time.Date(2026, 4, 26, 16, 20, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create return for receipt item FK test failed: %v", err)
+	}
+	returnItem, err := uc.AddPurchaseReturnItem(ctx, &biz.PurchaseReturnItemCreate{
+		ReturnID:              itemReturn.ID,
+		PurchaseReceiptItemID: &receiptItem.ID,
+		MaterialID:            fixtures.materialID,
+		WarehouseID:           fixtures.warehouseID,
+		UnitID:                fixtures.unitID,
+		LotID:                 receiptItem.LotID,
+		Quantity:              mustDecimal(t, "1"),
+	})
+	if err != nil {
+		t.Fatalf("add return item linked to receipt item failed: %v", err)
+	}
+	if _, err := data.sqldb.ExecContext(ctx, `DELETE FROM purchase_receipt_items WHERE id = $1`, receiptItem.ID); err == nil {
+		t.Fatalf("expected direct SQL delete of purchase_receipt_item referenced by purchase_return_item to fail")
+	}
+	persistedReturnItem, err := client.PurchaseReturnItem.Get(ctx, returnItem.ID)
+	if err != nil {
+		t.Fatalf("get purchase return item after failed origin receipt item delete failed: %v", err)
+	}
+	assertOptionalIntEqual(t, persistedReturnItem.PurchaseReceiptItemID, receiptItem.ID)
+}
+
+func TestPhase2DPostgresPurchaseReturnReceiptItemCumulativeLimit(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPhase2DPostgresTestData(t)
+
+	fixtures := createPhase2DPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+	invFixtures := inventoryTestFixtures{
+		unitID:      fixtures.unitID,
+		materialID:  fixtures.materialID,
+		productID:   fixtures.productID,
+		warehouseID: fixtures.warehouseID,
+	}
+
+	postedReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRTN-CUM-IN-"+fixtures.suffix, invFixtures, stringPtr("PG-PRTN-CUM-LOT-"+fixtures.suffix), mustDecimal(t, "100"))
+	receiptItem := postedReceipt.Items[0]
+	if receiptItem.LotID == nil {
+		t.Fatalf("expected postgres cumulative receipt lot_id")
+	}
+	createLinkedReturn := func(returnNo string, quantity decimal.Decimal) *biz.PurchaseReturn {
+		t.Helper()
+		purchaseReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+			ReturnNo:          returnNo,
+			PurchaseReceiptID: &postedReceipt.ID,
+			SupplierName:      "PG累计退货供应商",
+			ReturnedAt:        time.Date(2026, 4, 26, 17, 0, 0, 0, time.UTC),
+		})
+		if err != nil {
+			t.Fatalf("create postgres linked return %s failed: %v", returnNo, err)
+		}
+		if _, err := uc.AddPurchaseReturnItem(ctx, &biz.PurchaseReturnItemCreate{
+			ReturnID:              purchaseReturn.ID,
+			PurchaseReceiptItemID: &receiptItem.ID,
+			MaterialID:            fixtures.materialID,
+			WarehouseID:           fixtures.warehouseID,
+			UnitID:                fixtures.unitID,
+			LotID:                 receiptItem.LotID,
+			Quantity:              quantity,
+		}); err != nil {
+			t.Fatalf("add postgres linked return item %s failed: %v", returnNo, err)
+		}
+		return purchaseReturn
+	}
+
+	return60 := createLinkedReturn("PG-PRTN-CUM-060-"+fixtures.suffix, mustDecimal(t, "60"))
+	if _, err := uc.PostPurchaseReturn(ctx, return60.ID); err != nil {
+		t.Fatalf("post postgres 60 cumulative return failed: %v", err)
+	}
+	return40 := createLinkedReturn("PG-PRTN-CUM-040-"+fixtures.suffix, mustDecimal(t, "40"))
+	if _, err := uc.PostPurchaseReturn(ctx, return40.ID); err != nil {
+		t.Fatalf("post postgres 40 cumulative return failed: %v", err)
+	}
+	if _, err := uc.PostPurchaseReturn(ctx, return40.ID); err != nil {
+		t.Fatalf("repeat postgres post 40 cumulative return should be idempotent, got %v", err)
+	}
+	outCount40, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReturnSourceType),
+			inventorytxn.SourceID(return40.ID),
+			inventorytxn.TxnType(biz.InventoryTxnOut),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count postgres repeated cumulative return out txns failed: %v", err)
+	}
+	if outCount40 != 1 {
+		t.Fatalf("repeat postgres post should keep one out txn, got %d", outCount40)
+	}
+
+	extraStockReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRTN-CUM-IN-EXTRA-"+fixtures.suffix, invFixtures, stringPtr("PG-PRTN-CUM-LOT-"+fixtures.suffix), mustDecimal(t, "10"))
+	assertOptionalIntEqual(t, extraStockReceipt.Items[0].LotID, *receiptItem.LotID)
+	overOriginal := createLinkedReturn("PG-PRTN-CUM-OVER-"+fixtures.suffix, mustDecimal(t, "1"))
+	if _, err := uc.PostPurchaseReturn(ctx, overOriginal.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected postgres cumulative over-return to be rejected even with stock available, got %v", err)
+	}
+
+	if _, err := uc.CancelPostedPurchaseReturn(ctx, return60.ID); err != nil {
+		t.Fatalf("cancel postgres 60 cumulative return failed: %v", err)
+	}
+	releasedReturn := createLinkedReturn("PG-PRTN-CUM-RELEASED-"+fixtures.suffix, mustDecimal(t, "60"))
+	if _, err := uc.PostPurchaseReturn(ctx, releasedReturn.ID); err != nil {
+		t.Fatalf("post postgres return after cancellation released quantity failed: %v", err)
+	}
+
+	multiLineReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRTN-CUM-IN-MULTI-"+fixtures.suffix, invFixtures, stringPtr("PG-PRTN-CUM-LOT-MULTI-"+fixtures.suffix), mustDecimal(t, "100"))
+	multiLineItem := multiLineReceipt.Items[0]
+	if multiLineItem.LotID == nil {
+		t.Fatalf("expected postgres multi-line receipt lot_id")
+	}
+	multiLineReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+		ReturnNo:          "PG-PRTN-CUM-MULTI-" + fixtures.suffix,
+		PurchaseReceiptID: &multiLineReceipt.ID,
+		SupplierName:      "PG累计退货供应商",
+		ReturnedAt:        time.Date(2026, 4, 26, 18, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create postgres multi-line cumulative return failed: %v", err)
+	}
+	for _, quantity := range []string{"70", "31"} {
+		if _, err := uc.AddPurchaseReturnItem(ctx, &biz.PurchaseReturnItemCreate{
+			ReturnID:              multiLineReturn.ID,
+			PurchaseReceiptItemID: &multiLineItem.ID,
+			MaterialID:            fixtures.materialID,
+			WarehouseID:           fixtures.warehouseID,
+			UnitID:                fixtures.unitID,
+			LotID:                 multiLineItem.LotID,
+			Quantity:              mustDecimal(t, quantity),
+		}); err != nil {
+			t.Fatalf("add postgres multi-line cumulative item %s failed: %v", quantity, err)
+		}
+	}
+	if _, err := uc.PostPurchaseReturn(ctx, multiLineReturn.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected postgres same-return multi-line over original receipt item to be rejected, got %v", err)
+	}
+
+	lowStockReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRTN-CUM-IN-LOW-"+fixtures.suffix, invFixtures, stringPtr("PG-PRTN-CUM-LOT-LOW-"+fixtures.suffix), mustDecimal(t, "100"))
+	lowStockItem := lowStockReceipt.Items[0]
+	if lowStockItem.LotID == nil {
+		t.Fatalf("expected postgres low-stock receipt lot_id")
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          lowStockItem.LotID,
+		TxnType:        biz.InventoryTxnOut,
+		Direction:      -1,
+		Quantity:       mustDecimal(t, "95"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "PG_TEST_LOW_STOCK_CONSUME",
+		IdempotencyKey: "pg-test-low-stock-before-linked-return-" + fixtures.suffix,
+	}); err != nil {
+		t.Fatalf("consume postgres low-stock lot before linked return failed: %v", err)
+	}
+	lowStockReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+		ReturnNo:          "PG-PRTN-CUM-LOW-STOCK-" + fixtures.suffix,
+		PurchaseReceiptID: &lowStockReceipt.ID,
+		SupplierName:      "PG累计退货供应商",
+		ReturnedAt:        time.Date(2026, 4, 26, 19, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create postgres low-stock return failed: %v", err)
+	}
+	if _, err := uc.AddPurchaseReturnItem(ctx, &biz.PurchaseReturnItemCreate{
+		ReturnID:              lowStockReturn.ID,
+		PurchaseReceiptItemID: &lowStockItem.ID,
+		MaterialID:            fixtures.materialID,
+		WarehouseID:           fixtures.warehouseID,
+		UnitID:                fixtures.unitID,
+		LotID:                 lowStockItem.LotID,
+		Quantity:              mustDecimal(t, "10"),
+	}); err != nil {
+		t.Fatalf("add postgres low-stock return item failed: %v", err)
+	}
+	if _, err := uc.PostPurchaseReturn(ctx, lowStockReturn.ID); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
+		t.Fatalf("expected postgres linked return within original quantity but over current stock to be rejected, got %v", err)
+	}
+}
+
 func TestPhase2DPostgresPurchaseReturnConcurrentLotOutbound(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPhase2DPostgresTestData(t)
@@ -1394,7 +1635,7 @@ func TestPhase2DPostgresPurchaseReturnConcurrentLotOutbound(t *testing.T) {
 		switch {
 		case err == nil:
 			successes++
-		case errors.Is(err, biz.ErrInventoryInsufficientStock):
+		case errors.Is(err, biz.ErrInventoryInsufficientStock) || errors.Is(err, biz.ErrBadParam):
 			failures++
 		default:
 			t.Fatalf("unexpected postgres concurrent return error: %v", err)

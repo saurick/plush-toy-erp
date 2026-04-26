@@ -8,6 +8,15 @@ if [ -z "$cmd" ]; then
 fi
 
 PHASE2D_DB_URL="${PHASE2D_DB_URL:-postgres://postgres:phase2a-local-password@127.0.0.1:55432/plush_erp_phase2d_test?sslmode=disable}"
+PHASE2D_MAX_MIGRATION_VERSION="${PHASE2D_MAX_MIGRATION_VERSION:-20260426040724}"
+PHASE2D_MIGRATE_DIR=""
+
+cleanup_phase2d_migrate_dir() {
+  if [ -n "$PHASE2D_MIGRATE_DIR" ] && [ -d "$PHASE2D_MIGRATE_DIR" ]; then
+    rm -rf "$PHASE2D_MIGRATE_DIR"
+  fi
+}
+trap cleanup_phase2d_migrate_dir EXIT
 
 parse_output="$(
   python3 - "$PHASE2D_DB_URL" <<'PY'
@@ -64,16 +73,47 @@ eval "$parse_output"
 echo "phase2d target host=${PHASE2D_DB_HOST} db=${PHASE2D_DB_NAME}"
 echo "phase2d target dsn=${PHASE2D_DB_SAFE_URL}"
 
+prepare_phase2d_migrate_dir() {
+  if [ -n "$PHASE2D_MIGRATE_DIR" ]; then
+    echo "$PHASE2D_MIGRATE_DIR"
+    return
+  fi
+  PHASE2D_MIGRATE_DIR="$(mktemp -d)"
+  local found_max=0
+  local source_file base version
+  for source_file in internal/data/model/migrate/*.sql; do
+    base="$(basename "$source_file")"
+    version="${base%%_*}"
+    if [[ "$version" > "$PHASE2D_MAX_MIGRATION_VERSION" ]]; then
+      continue
+    fi
+    if [ "$version" = "$PHASE2D_MAX_MIGRATION_VERSION" ]; then
+      found_max=1
+    fi
+    cp "$source_file" "$PHASE2D_MIGRATE_DIR/$base"
+  done
+  if [ "$found_max" -ne 1 ]; then
+    echo "ERROR: phase2d max migration ${PHASE2D_MAX_MIGRATION_VERSION} not found" >&2
+    exit 1
+  fi
+  atlas migrate hash --dir "file://${PHASE2D_MIGRATE_DIR}" >/dev/null
+  echo "$PHASE2D_MIGRATE_DIR"
+}
+
 case "$cmd" in
 createdb)
   psql "$PHASE2D_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_database WHERE datname = '${PHASE2D_DB_NAME}'" | grep -q 1 ||
     psql "$PHASE2D_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${PHASE2D_DB_NAME}\""
   ;;
 status)
-  atlas migrate status --dir "file://internal/data/model/migrate" --url "$PHASE2D_DB_URL"
+  phase2d_dir="$(prepare_phase2d_migrate_dir)"
+  echo "phase2d migration max_version=${PHASE2D_MAX_MIGRATION_VERSION}"
+  atlas migrate status --dir "file://${phase2d_dir}" --url "$PHASE2D_DB_URL"
   ;;
 apply)
-  atlas migrate apply --dir "file://internal/data/model/migrate" --url "$PHASE2D_DB_URL"
+  phase2d_dir="$(prepare_phase2d_migrate_dir)"
+  echo "phase2d migration max_version=${PHASE2D_MAX_MIGRATION_VERSION}"
+  atlas migrate apply --dir "file://${phase2d_dir}" --url "$PHASE2D_DB_URL"
   ;;
 test)
   PHASE2D_PG_TEST=1 PHASE2D_PG_TEST_DB_URL="$PHASE2D_DB_URL" go test ./internal/data -run TestPhase2DPostgres -count=1

@@ -124,7 +124,8 @@ func (PurchaseReceiptItem) Edges() []ent.Edge {
 			Field("lot_id").
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
-		edge.To("purchase_return_items", PurchaseReturnItem.Type),
+		edge.To("purchase_return_items", PurchaseReturnItem.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 
