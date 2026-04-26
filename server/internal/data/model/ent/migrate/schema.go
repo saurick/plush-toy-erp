@@ -1056,6 +1056,112 @@ var (
 			},
 		},
 	}
+	// QualityInspectionsColumns holds the columns for the "quality_inspections" table.
+	QualityInspectionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "inspection_no", Type: field.TypeString, Size: 64},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "result", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "original_lot_status", Type: field.TypeString, Size: 32, Default: ""},
+		{Name: "inspected_at", Type: field.TypeTime, Nullable: true},
+		{Name: "inspector_id", Type: field.TypeInt, Nullable: true},
+		{Name: "decision_note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "inventory_lot_id", Type: field.TypeInt},
+		{Name: "material_id", Type: field.TypeInt},
+		{Name: "purchase_receipt_id", Type: field.TypeInt},
+		{Name: "purchase_receipt_item_id", Type: field.TypeInt, Nullable: true},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// QualityInspectionsTable holds the schema information for the "quality_inspections" table.
+	QualityInspectionsTable = &schema.Table{
+		Name:       "quality_inspections",
+		Columns:    QualityInspectionsColumns,
+		PrimaryKey: []*schema.Column{QualityInspectionsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "quality_inspections_inventory_lots_quality_inspections",
+				Columns:    []*schema.Column{QualityInspectionsColumns[10]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "quality_inspections_materials_quality_inspections",
+				Columns:    []*schema.Column{QualityInspectionsColumns[11]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "quality_inspections_purchase_receipts_quality_inspections",
+				Columns:    []*schema.Column{QualityInspectionsColumns[12]},
+				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "quality_inspections_purchase_receipt_items_quality_inspections",
+				Columns:    []*schema.Column{QualityInspectionsColumns[13]},
+				RefColumns: []*schema.Column{PurchaseReceiptItemsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "quality_inspections_warehouses_quality_inspections",
+				Columns:    []*schema.Column{QualityInspectionsColumns[14]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "qualityinspection_inspection_no",
+				Unique:  true,
+				Columns: []*schema.Column{QualityInspectionsColumns[1]},
+			},
+			{
+				Name:    "qualityinspection_purchase_receipt_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[12]},
+			},
+			{
+				Name:    "qualityinspection_purchase_receipt_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[13]},
+			},
+			{
+				Name:    "qualityinspection_inventory_lot_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[10]},
+			},
+			{
+				Name:    "qualityinspection_material_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[11]},
+			},
+			{
+				Name:    "qualityinspection_warehouse_id",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[14]},
+			},
+			{
+				Name:    "qualityinspection_status",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[2]},
+			},
+			{
+				Name:    "qualityinspection_inspected_at",
+				Unique:  false,
+				Columns: []*schema.Column{QualityInspectionsColumns[5]},
+			},
+			{
+				Name:    "qualityinspection_inventory_lot_id_submitted",
+				Unique:  true,
+				Columns: []*schema.Column{QualityInspectionsColumns[10]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'SUBMITTED'",
+				},
+			},
+		},
+	}
 	// RolesColumns holds the columns for the "roles" table.
 	RolesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1337,6 +1443,7 @@ var (
 		PurchaseReceiptItemsTable,
 		PurchaseReturnsTable,
 		PurchaseReturnItemsTable,
+		QualityInspectionsTable,
 		RolesTable,
 		RolePermissionsTable,
 		UnitsTable,
@@ -1404,5 +1511,10 @@ func init() {
 		"purchase_return_items_quantity_positive":       "quantity > 0",
 		"purchase_return_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 	}
+	QualityInspectionsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	QualityInspectionsTable.ForeignKeys[1].RefTable = MaterialsTable
+	QualityInspectionsTable.ForeignKeys[2].RefTable = PurchaseReceiptsTable
+	QualityInspectionsTable.ForeignKeys[3].RefTable = PurchaseReceiptItemsTable
+	QualityInspectionsTable.ForeignKeys[4].RefTable = WarehousesTable
 	WorkflowTaskEventsTable.ForeignKeys[0].RefTable = WorkflowTasksTable
 }

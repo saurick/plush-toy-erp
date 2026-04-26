@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
+	"server/internal/data/model/ent/qualityinspection"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -189,6 +190,21 @@ func (_u *PurchaseReceiptUpdate) AddPurchaseReceiptAdjustments(v ...*PurchaseRec
 	return _u.AddPurchaseReceiptAdjustmentIDs(ids...)
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (_u *PurchaseReceiptUpdate) AddQualityInspectionIDs(ids ...int) *PurchaseReceiptUpdate {
+	_u.mutation.AddQualityInspectionIDs(ids...)
+	return _u
+}
+
+// AddQualityInspections adds the "quality_inspections" edges to the QualityInspection entity.
+func (_u *PurchaseReceiptUpdate) AddQualityInspections(v ...*QualityInspection) *PurchaseReceiptUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddQualityInspectionIDs(ids...)
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by IDs.
 func (_u *PurchaseReceiptUpdate) AddItemIDs(ids ...int) *PurchaseReceiptUpdate {
 	_u.mutation.AddItemIDs(ids...)
@@ -255,6 +271,27 @@ func (_u *PurchaseReceiptUpdate) RemovePurchaseReceiptAdjustments(v ...*Purchase
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseReceiptAdjustmentIDs(ids...)
+}
+
+// ClearQualityInspections clears all "quality_inspections" edges to the QualityInspection entity.
+func (_u *PurchaseReceiptUpdate) ClearQualityInspections() *PurchaseReceiptUpdate {
+	_u.mutation.ClearQualityInspections()
+	return _u
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to QualityInspection entities by IDs.
+func (_u *PurchaseReceiptUpdate) RemoveQualityInspectionIDs(ids ...int) *PurchaseReceiptUpdate {
+	_u.mutation.RemoveQualityInspectionIDs(ids...)
+	return _u
+}
+
+// RemoveQualityInspections removes "quality_inspections" edges to QualityInspection entities.
+func (_u *PurchaseReceiptUpdate) RemoveQualityInspections(v ...*QualityInspection) *PurchaseReceiptUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveQualityInspectionIDs(ids...)
 }
 
 // ClearItems clears all "items" edges to the PurchaseReceiptItem entity.
@@ -508,6 +545,51 @@ func (_u *PurchaseReceiptUpdate) sqlSave(ctx context.Context) (_node int, err er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.QualityInspectionsTable,
+			Columns: []string{purchasereceipt.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedQualityInspectionsIDs(); len(nodes) > 0 && !_u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.QualityInspectionsTable,
+			Columns: []string{purchasereceipt.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QualityInspectionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.QualityInspectionsTable,
+			Columns: []string{purchasereceipt.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.ItemsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -730,6 +812,21 @@ func (_u *PurchaseReceiptUpdateOne) AddPurchaseReceiptAdjustments(v ...*Purchase
 	return _u.AddPurchaseReceiptAdjustmentIDs(ids...)
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (_u *PurchaseReceiptUpdateOne) AddQualityInspectionIDs(ids ...int) *PurchaseReceiptUpdateOne {
+	_u.mutation.AddQualityInspectionIDs(ids...)
+	return _u
+}
+
+// AddQualityInspections adds the "quality_inspections" edges to the QualityInspection entity.
+func (_u *PurchaseReceiptUpdateOne) AddQualityInspections(v ...*QualityInspection) *PurchaseReceiptUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddQualityInspectionIDs(ids...)
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by IDs.
 func (_u *PurchaseReceiptUpdateOne) AddItemIDs(ids ...int) *PurchaseReceiptUpdateOne {
 	_u.mutation.AddItemIDs(ids...)
@@ -796,6 +893,27 @@ func (_u *PurchaseReceiptUpdateOne) RemovePurchaseReceiptAdjustments(v ...*Purch
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseReceiptAdjustmentIDs(ids...)
+}
+
+// ClearQualityInspections clears all "quality_inspections" edges to the QualityInspection entity.
+func (_u *PurchaseReceiptUpdateOne) ClearQualityInspections() *PurchaseReceiptUpdateOne {
+	_u.mutation.ClearQualityInspections()
+	return _u
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to QualityInspection entities by IDs.
+func (_u *PurchaseReceiptUpdateOne) RemoveQualityInspectionIDs(ids ...int) *PurchaseReceiptUpdateOne {
+	_u.mutation.RemoveQualityInspectionIDs(ids...)
+	return _u
+}
+
+// RemoveQualityInspections removes "quality_inspections" edges to QualityInspection entities.
+func (_u *PurchaseReceiptUpdateOne) RemoveQualityInspections(v ...*QualityInspection) *PurchaseReceiptUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveQualityInspectionIDs(ids...)
 }
 
 // ClearItems clears all "items" edges to the PurchaseReceiptItem entity.
@@ -1072,6 +1190,51 @@ func (_u *PurchaseReceiptUpdateOne) sqlSave(ctx context.Context) (_node *Purchas
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.QualityInspectionsTable,
+			Columns: []string{purchasereceipt.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedQualityInspectionsIDs(); len(nodes) > 0 && !_u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.QualityInspectionsTable,
+			Columns: []string{purchasereceipt.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QualityInspectionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.QualityInspectionsTable,
+			Columns: []string{purchasereceipt.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

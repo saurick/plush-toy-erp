@@ -329,6 +329,13 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusAllowsOwnerRoles(t *testing.T) {
 			nextStatus:  "done",
 		},
 		{
+			name:        "warehouse completes shipment release",
+			roleKey:     biz.WarehouseRoleKey,
+			permissions: []string{biz.PermissionWorkflowTaskComplete},
+			currentTask: &biz.WorkflowTask{ID: 9, TaskGroup: "shipment_release", SourceType: "shipping-release", SourceID: 9, TaskStatusKey: "ready", OwnerRoleKey: biz.WarehouseRoleKey, Payload: map[string]any{"shipment_release": true}},
+			nextStatus:  "done",
+		},
+		{
 			name:        "boss approves order approval",
 			roleKey:     biz.BossRoleKey,
 			permissions: []string{biz.PermissionWorkflowTaskApprove},
@@ -369,6 +376,80 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusAllowsOwnerRoles(t *testing.T) {
 				t.Fatalf("expected OK response, got %#v", res)
 			}
 		})
+	}
+}
+
+func TestJsonrpcData_WorkflowUpdateTaskStatusRejectsNonWarehouseShipmentRelease(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{
+		currentTask: &biz.WorkflowTask{
+			ID:            10,
+			TaskGroup:     "shipment_release",
+			SourceType:    "shipping-release",
+			SourceID:      10,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.WarehouseRoleKey,
+			Payload:       map[string]any{"shipment_release": true},
+		},
+	}
+	j := &JsonrpcData{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionWorkflowTaskComplete)},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	params, err := structpb.NewStruct(map[string]any{
+		"id":              float64(10),
+		"task_status_key": "done",
+		"actor_role_key":  biz.FinanceRoleKey,
+		"payload":         map[string]any{},
+	})
+	if err != nil {
+		t.Fatalf("build params failed: %v", err)
+	}
+
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "update_task_status", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected permission denied for non-warehouse shipment release, got %#v", res)
+	}
+}
+
+func TestJsonrpcData_WorkflowUpdateTaskStatusAllowsSuperAdminShipmentRelease(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{
+		currentTask: &biz.WorkflowTask{
+			ID:            11,
+			TaskGroup:     "shipment_release",
+			SourceType:    "shipping-release",
+			SourceID:      11,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.WarehouseRoleKey,
+			Payload:       map[string]any{"shipment_release": true},
+		},
+	}
+	admin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionWorkflowTaskComplete)
+	admin.IsSuperAdmin = true
+	j := &JsonrpcData{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: admin},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	params, err := structpb.NewStruct(map[string]any{
+		"id":              float64(11),
+		"task_status_key": "done",
+		"actor_role_key":  biz.FinanceRoleKey,
+		"payload":         map[string]any{},
+	})
+	if err != nil {
+		t.Fatalf("build params failed: %v", err)
+	}
+
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "update_task_status", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected OK for super admin shipment release, got %#v", res)
 	}
 }
 
@@ -1066,6 +1147,109 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusTriggersFinishedGoodsInboundBusines
 	for _, task := range tasks {
 		if task.TaskGroup == "shipment_release" {
 			t.Fatalf("list_tasks refresh path must not include shipment release after finished goods inbound done")
+		}
+	}
+}
+
+func TestJsonrpcData_WorkflowUpdateTaskStatusTriggersShipmentReleaseBusinessState(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:jsonrpc_workflow_shipment_release?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewWorkflowRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+	workflowUC := biz.NewWorkflowUsecase(repo)
+	j := &JsonrpcData{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskComplete)},
+		workflowUC:  workflowUC,
+	}
+	shipmentTask := createShipmentReleaseTask(t, ctx, repo, 666, map[string]any{})
+
+	adminCtx := biz.NewContextWithClaims(ctx, &biz.AuthClaims{
+		UserID:   7,
+		Username: "admin",
+		Role:     biz.RoleAdmin,
+	})
+	params, err := structpb.NewStruct(map[string]any{
+		"id":              float64(shipmentTask.ID),
+		"task_status_key": "done",
+		"actor_role_key":  "warehouse",
+		"payload": map[string]any{
+			"mobile_role_key": "warehouse",
+		},
+	})
+	if err != nil {
+		t.Fatalf("build params failed: %v", err)
+	}
+
+	_, res, err := j.handleWorkflow(adminCtx, "update_task_status", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected OK response, got %#v", res)
+	}
+	data := res.Data.AsMap()
+	resultTask, ok := data["task"].(map[string]any)
+	if !ok || resultTask["task_status_key"] != "done" {
+		t.Fatalf("expected returned done task, got %#v", data["task"])
+	}
+
+	state, err := client.WorkflowBusinessState.Query().
+		Where(workflowbusinessstate.SourceType("shipping-release"), workflowbusinessstate.SourceID(666)).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("query shipment release business state failed: %v", err)
+	}
+	if state.BusinessStatusKey != "shipping_released" ||
+		state.OwnerRoleKey == nil ||
+		*state.OwnerRoleKey != "warehouse" {
+		t.Fatalf("unexpected shipment release business state %#v", state)
+	}
+	if state.Payload["inventory_out_deferred"] != true ||
+		state.Payload["receivable_deferred"] != true ||
+		state.Payload["invoice_deferred"] != true ||
+		state.Payload["decision"] != "done" {
+		t.Fatalf("expected deferred shipping_released payload, got %#v", state.Payload)
+	}
+
+	taskCount, err := client.WorkflowTask.Query().
+		Where(workflowtask.SourceType("shipping-release"), workflowtask.SourceID(666)).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count workflow tasks failed: %v", err)
+	}
+	if taskCount != 1 {
+		t.Fatalf("shipment release JSON-RPC update must not create downstream tasks, got %d tasks", taskCount)
+	}
+	receivableCount, err := client.WorkflowTask.Query().
+		Where(
+			workflowtask.SourceType("shipping-release"),
+			workflowtask.SourceID(666),
+			workflowtask.TaskGroup("receivable_registration"),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count receivable tasks failed: %v", err)
+	}
+	if receivableCount != 0 {
+		t.Fatalf("shipment release JSON-RPC update must not derive receivable task, got %d", receivableCount)
+	}
+
+	tasks, _, err := workflowUC.ListTasks(ctx, biz.WorkflowTaskFilter{
+		SourceType: "shipping-release",
+		SourceID:   666,
+		Limit:      200,
+	})
+	if err != nil {
+		t.Fatalf("list tasks failed: %v", err)
+	}
+	for _, task := range tasks {
+		if task.TaskGroup == "receivable_registration" || task.TaskGroup == "invoice_registration" {
+			t.Fatalf("list_tasks refresh path must not include finance task after shipment release done")
 		}
 	}
 }

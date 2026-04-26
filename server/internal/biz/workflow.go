@@ -21,6 +21,7 @@ const (
 	workflowInboundModuleKey                   = "inbound"
 	workflowProcessingContractsModuleKey       = "processing-contracts"
 	workflowProductionProgressModuleKey        = "production-progress"
+	workflowShippingReleaseModuleKey           = "shipping-release"
 	workflowOrderApprovalTaskGroup             = "order_approval"
 	workflowEngineeringDataTaskGroup           = "engineering_data"
 	workflowOrderRevisionTaskGroup             = "order_revision"
@@ -33,6 +34,7 @@ const (
 	workflowFinishedGoodsQCTaskGroup           = "finished_goods_qc"
 	workflowFinishedGoodsInboundTaskGroup      = "finished_goods_inbound"
 	workflowFinishedGoodsReworkTaskGroup       = "finished_goods_rework"
+	workflowShipmentReleaseTaskGroup           = "shipment_release"
 	workflowOrderApprovalStatusKey             = "project_pending"
 	workflowOrderApprovedStatusKey             = "project_approved"
 	workflowEngineeringPreparingStatusKey      = "engineering_preparing"
@@ -41,6 +43,9 @@ const (
 	workflowQCFailedStatusKey                  = "qc_failed"
 	workflowWarehouseInboundPendingKey         = "warehouse_inbound_pending"
 	workflowInboundDoneStatusKey               = "inbound_done"
+	workflowShipmentPendingStatusKey           = "shipment_pending"
+	workflowShipmentReleasePendingStatusKey    = "shipment_release_pending"
+	workflowShippingReleasedStatusKey          = "shipping_released"
 	workflowBlockedStatusKey                   = "blocked"
 )
 
@@ -182,6 +187,9 @@ func CanAdminHandleWorkflowTask(admin *AdminUser, task *WorkflowTask, nextStatus
 	}
 	if task.AssigneeID != nil {
 		return *task.AssigneeID == admin.ID
+	}
+	if admin.IsSuperAdmin && isShipmentReleaseTask(task) {
+		return true
 	}
 	return AdminHasRole(admin, task.OwnerRoleKey)
 }
@@ -407,6 +415,10 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		}
 	} else if isFinishedGoodsInboundTask(current) {
 		if err := uc.applyFinishedGoodsInboundTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isShipmentReleaseTask(current) {
+		if err := uc.applyShipmentReleaseTransition(current, in); err != nil {
 			return nil, err
 		}
 	}
@@ -692,6 +704,50 @@ func (uc *WorkflowUsecase) applyFinishedGoodsInboundTransition(current *Workflow
 	return nil
 }
 
+func (uc *WorkflowUsecase) applyShipmentReleaseTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowShippingReleasedStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		in.Payload["shipment_release_task_id"] = current.ID
+		in.Payload["shipment_release_result"] = "done"
+		in.Payload["shipment_release_deferred_inventory"] = true
+		in.Payload["shipment_execution_required"] = true
+		in.Payload["inventory_out_deferred"] = true
+		in.Payload["receivable_deferred"] = true
+		in.Payload["invoice_deferred"] = true
+		in.Payload["critical_path"] = true
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildShipmentReleaseDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	case "blocked", "rejected":
+		reason := workflowTransitionReason(in, in.TaskStatusKey)
+		if reason == "" {
+			return ErrBadParam
+		}
+		in.Reason = reason
+		in.BusinessStatusKey = workflowBlockedStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		in.Payload["shipment_release_task_id"] = current.ID
+		in.Payload["critical_path"] = true
+		in.Payload["decision"] = in.TaskStatusKey
+		in.Payload["transition_status"] = in.TaskStatusKey
+		if in.TaskStatusKey == "blocked" {
+			in.Payload["blocked_reason"] = reason
+			delete(in.Payload, "rejected_reason")
+		} else {
+			in.Payload["rejected_reason"] = reason
+			delete(in.Payload, "blocked_reason")
+		}
+		in.SideEffects = buildShipmentReleaseBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
+	default:
+		return nil
+	}
+	return nil
+}
+
 func (uc *WorkflowUsecase) UrgeTask(ctx context.Context, in *WorkflowTaskUrge, actorID int, actorRoleKey string) (*WorkflowTask, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -932,6 +988,34 @@ func isFinishedGoodsInboundTask(task *WorkflowTask) bool {
 	}
 	switch strings.TrimSpace(*task.BusinessStatusKey) {
 	case "", workflowWarehouseInboundPendingKey, workflowBlockedStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isShipmentReleaseTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	switch strings.TrimSpace(task.SourceType) {
+	case workflowShippingReleaseModuleKey, workflowProductionProgressModuleKey, workflowInboundModuleKey:
+	default:
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowShipmentReleaseTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "warehouse" {
+		return false
+	}
+	if workflowPayloadString(task.Payload, "shipment_release") != "true" &&
+		workflowPayloadString(task.Payload, "finished_goods") != "true" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowShipmentReleasePendingStatusKey, workflowShipmentPendingStatusKey, workflowBlockedStatusKey:
 		return true
 	default:
 		return false
@@ -1337,6 +1421,60 @@ func buildFinishedGoodsInboundBlockedSideEffects(current *WorkflowTask, taskStat
 		},
 		DerivedFromTaskID: current.ID,
 		WorkflowRuleKey:   "finished_goods_inbound_" + taskStatusKey + "_to_blocked",
+	}
+}
+
+func buildShipmentReleaseDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := "warehouse"
+	statePayload := workflowShipmentReleaseCommonPayload(current)
+	statePayload["shipment_release_task_id"] = current.ID
+	statePayload["shipment_release_result"] = "done"
+	statePayload["shipment_release_deferred_inventory"] = true
+	statePayload["shipment_execution_required"] = true
+	statePayload["inventory_out_deferred"] = true
+	statePayload["receivable_deferred"] = true
+	statePayload["invoice_deferred"] = true
+	statePayload["critical_path"] = true
+	statePayload["decision"] = "done"
+	statePayload["transition_status"] = "done"
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			BusinessStatusKey: workflowShippingReleasedStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			Payload:           statePayload,
+		},
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "shipment_release_done_to_shipping_released",
+	}
+}
+
+func buildShipmentReleaseBlockedSideEffects(current *WorkflowTask, taskStatusKey string, reason string) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := "warehouse"
+	statePayload := workflowShipmentReleaseCommonPayload(current)
+	statePayload["shipment_release_task_id"] = current.ID
+	statePayload["critical_path"] = true
+	statePayload["decision"] = taskStatusKey
+	statePayload["transition_status"] = taskStatusKey
+	if taskStatusKey == "blocked" {
+		statePayload["blocked_reason"] = reason
+	} else {
+		statePayload["rejected_reason"] = reason
+	}
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			BusinessStatusKey: workflowBlockedStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			BlockedReason:     &reason,
+			Payload:           statePayload,
+		},
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "shipment_release_" + taskStatusKey + "_to_blocked",
 	}
 }
 
@@ -1747,6 +1885,26 @@ func workflowFinishedGoodsCommonPayload(current *WorkflowTask) map[string]any {
 	}
 }
 
+func workflowShipmentReleaseCommonPayload(current *WorkflowTask) map[string]any {
+	return map[string]any{
+		"record_title":          workflowShipmentReleaseRecordTitle(current),
+		"customer_name":         workflowPayloadString(current.Payload, "customer_name"),
+		"style_no":              workflowPayloadString(current.Payload, "style_no"),
+		"material_name":         workflowPayloadString(current.Payload, "material_name"),
+		"product_no":            workflowPayloadString(current.Payload, "product_no"),
+		"product_name":          workflowPayloadString(current.Payload, "product_name"),
+		"quantity":              workflowPayloadValue(current.Payload, "quantity"),
+		"unit":                  workflowPayloadString(current.Payload, "unit"),
+		"due_date":              workflowPayloadString(current.Payload, "due_date"),
+		"shipment_date":         workflowPayloadString(current.Payload, "shipment_date"),
+		"warehouse_location":    workflowPayloadString(current.Payload, "warehouse_location"),
+		"packaging_requirement": workflowPayloadString(current.Payload, "packaging_requirement"),
+		"shipping_requirement":  workflowPayloadString(current.Payload, "shipping_requirement"),
+		"finished_goods":        workflowPayloadString(current.Payload, "finished_goods") == "true",
+		"shipment_release":      true,
+	}
+}
+
 func workflowFinishedGoodsRelatedDocuments(current *WorkflowTask, options workflowFinishedGoodsRelatedDocumentOptions) []string {
 	if current == nil {
 		return nil
@@ -1877,6 +2035,25 @@ func workflowFinishedGoodsRecordTitle(task *WorkflowTask) string {
 		return title
 	}
 	return "成品抽检"
+}
+
+func workflowShipmentReleaseRecordTitle(task *WorkflowTask) string {
+	if task == nil {
+		return "出货放行"
+	}
+	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
+		return title
+	}
+	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
+		return title
+	}
+	if title := workflowPayloadString(task.Payload, "customer_name"); title != "" {
+		return title
+	}
+	if title := workflowSourceNoValue(task); title != "" {
+		return title
+	}
+	return "出货放行"
 }
 
 func workflowPayloadString(payload map[string]any, key string) string {

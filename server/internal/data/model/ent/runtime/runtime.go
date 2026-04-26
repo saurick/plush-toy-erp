@@ -22,6 +22,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
+	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/unit"
@@ -1348,6 +1349,96 @@ func init() {
 	purchasereturnitem.DefaultUpdatedAt = purchasereturnitemDescUpdatedAt.Default.(func() time.Time)
 	// purchasereturnitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	purchasereturnitem.UpdateDefaultUpdatedAt = purchasereturnitemDescUpdatedAt.UpdateDefault.(func() time.Time)
+	qualityinspectionHooks := schema.QualityInspection{}.Hooks()
+	qualityinspection.Hooks[0] = qualityinspectionHooks[0]
+	qualityinspectionFields := schema.QualityInspection{}.Fields()
+	_ = qualityinspectionFields
+	// qualityinspectionDescInspectionNo is the schema descriptor for inspection_no field.
+	qualityinspectionDescInspectionNo := qualityinspectionFields[0].Descriptor()
+	// qualityinspection.InspectionNoValidator is a validator for the "inspection_no" field. It is called by the builders before save.
+	qualityinspection.InspectionNoValidator = func() func(string) error {
+		validators := qualityinspectionDescInspectionNo.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(inspection_no string) error {
+			for _, fn := range fns {
+				if err := fn(inspection_no); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// qualityinspectionDescPurchaseReceiptID is the schema descriptor for purchase_receipt_id field.
+	qualityinspectionDescPurchaseReceiptID := qualityinspectionFields[1].Descriptor()
+	// qualityinspection.PurchaseReceiptIDValidator is a validator for the "purchase_receipt_id" field. It is called by the builders before save.
+	qualityinspection.PurchaseReceiptIDValidator = qualityinspectionDescPurchaseReceiptID.Validators[0].(func(int) error)
+	// qualityinspectionDescPurchaseReceiptItemID is the schema descriptor for purchase_receipt_item_id field.
+	qualityinspectionDescPurchaseReceiptItemID := qualityinspectionFields[2].Descriptor()
+	// qualityinspection.PurchaseReceiptItemIDValidator is a validator for the "purchase_receipt_item_id" field. It is called by the builders before save.
+	qualityinspection.PurchaseReceiptItemIDValidator = qualityinspectionDescPurchaseReceiptItemID.Validators[0].(func(int) error)
+	// qualityinspectionDescInventoryLotID is the schema descriptor for inventory_lot_id field.
+	qualityinspectionDescInventoryLotID := qualityinspectionFields[3].Descriptor()
+	// qualityinspection.InventoryLotIDValidator is a validator for the "inventory_lot_id" field. It is called by the builders before save.
+	qualityinspection.InventoryLotIDValidator = qualityinspectionDescInventoryLotID.Validators[0].(func(int) error)
+	// qualityinspectionDescMaterialID is the schema descriptor for material_id field.
+	qualityinspectionDescMaterialID := qualityinspectionFields[4].Descriptor()
+	// qualityinspection.MaterialIDValidator is a validator for the "material_id" field. It is called by the builders before save.
+	qualityinspection.MaterialIDValidator = qualityinspectionDescMaterialID.Validators[0].(func(int) error)
+	// qualityinspectionDescWarehouseID is the schema descriptor for warehouse_id field.
+	qualityinspectionDescWarehouseID := qualityinspectionFields[5].Descriptor()
+	// qualityinspection.WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
+	qualityinspection.WarehouseIDValidator = qualityinspectionDescWarehouseID.Validators[0].(func(int) error)
+	// qualityinspectionDescStatus is the schema descriptor for status field.
+	qualityinspectionDescStatus := qualityinspectionFields[6].Descriptor()
+	// qualityinspection.DefaultStatus holds the default value on creation for the status field.
+	qualityinspection.DefaultStatus = qualityinspectionDescStatus.Default.(string)
+	// qualityinspection.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	qualityinspection.StatusValidator = func() func(string) error {
+		validators := qualityinspectionDescStatus.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(status string) error {
+			for _, fn := range fns {
+				if err := fn(status); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// qualityinspectionDescResult is the schema descriptor for result field.
+	qualityinspectionDescResult := qualityinspectionFields[7].Descriptor()
+	// qualityinspection.ResultValidator is a validator for the "result" field. It is called by the builders before save.
+	qualityinspection.ResultValidator = qualityinspectionDescResult.Validators[0].(func(string) error)
+	// qualityinspectionDescOriginalLotStatus is the schema descriptor for original_lot_status field.
+	qualityinspectionDescOriginalLotStatus := qualityinspectionFields[8].Descriptor()
+	// qualityinspection.DefaultOriginalLotStatus holds the default value on creation for the original_lot_status field.
+	qualityinspection.DefaultOriginalLotStatus = qualityinspectionDescOriginalLotStatus.Default.(string)
+	// qualityinspection.OriginalLotStatusValidator is a validator for the "original_lot_status" field. It is called by the builders before save.
+	qualityinspection.OriginalLotStatusValidator = qualityinspectionDescOriginalLotStatus.Validators[0].(func(string) error)
+	// qualityinspectionDescInspectorID is the schema descriptor for inspector_id field.
+	qualityinspectionDescInspectorID := qualityinspectionFields[10].Descriptor()
+	// qualityinspection.InspectorIDValidator is a validator for the "inspector_id" field. It is called by the builders before save.
+	qualityinspection.InspectorIDValidator = qualityinspectionDescInspectorID.Validators[0].(func(int) error)
+	// qualityinspectionDescDecisionNote is the schema descriptor for decision_note field.
+	qualityinspectionDescDecisionNote := qualityinspectionFields[11].Descriptor()
+	// qualityinspection.DecisionNoteValidator is a validator for the "decision_note" field. It is called by the builders before save.
+	qualityinspection.DecisionNoteValidator = qualityinspectionDescDecisionNote.Validators[0].(func(string) error)
+	// qualityinspectionDescCreatedAt is the schema descriptor for created_at field.
+	qualityinspectionDescCreatedAt := qualityinspectionFields[12].Descriptor()
+	// qualityinspection.DefaultCreatedAt holds the default value on creation for the created_at field.
+	qualityinspection.DefaultCreatedAt = qualityinspectionDescCreatedAt.Default.(func() time.Time)
+	// qualityinspectionDescUpdatedAt is the schema descriptor for updated_at field.
+	qualityinspectionDescUpdatedAt := qualityinspectionFields[13].Descriptor()
+	// qualityinspection.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	qualityinspection.DefaultUpdatedAt = qualityinspectionDescUpdatedAt.Default.(func() time.Time)
+	// qualityinspection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	qualityinspection.UpdateDefaultUpdatedAt = qualityinspectionDescUpdatedAt.UpdateDefault.(func() time.Time)
 	roleFields := schema.Role{}.Fields()
 	_ = roleFields
 	// roleDescRoleKey is the schema descriptor for role_key field.

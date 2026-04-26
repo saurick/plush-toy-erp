@@ -997,8 +997,7 @@ export default function BusinessModulePage({ moduleItem }) {
   const shouldShowShipmentFinanceAction =
     isShippingFlowModule ||
     (isProductionProgressModule &&
-      (selectedRecord?.business_status_key === FINANCE_SHIPPED_STATUS_KEY ||
-        latestSelectedShipmentReleaseTask))
+      selectedRecord?.business_status_key === FINANCE_SHIPPED_STATUS_KEY)
   const selectedReceivableRegistrationTasks = useMemo(
     () => selectedRecordTasks.filter(isReceivableRegistrationTask),
     [selectedRecordTasks]
@@ -2517,13 +2516,11 @@ export default function BusinessModulePage({ moduleItem }) {
       return
     }
 
-    const shipmentTaskDone =
-      latestSelectedShipmentReleaseTask?.task_status_key === 'done'
     const alreadyShipped =
       selectedRecord.business_status_key === FINANCE_SHIPPED_STATUS_KEY ||
       selectedRecord.payload?.shipment_result === FINANCE_SHIPPED_STATUS_KEY ||
       selectedRecord.payload?.shipped === true
-    if (!alreadyShipped && !shipmentTaskDone) {
+    if (!alreadyShipped) {
       message.warning('请先确认出货完成后再发起应收登记')
       return
     }

@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
+	"server/internal/data/model/ent/qualityinspection"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -159,6 +160,21 @@ func (_c *PurchaseReceiptCreate) AddPurchaseReceiptAdjustments(v ...*PurchaseRec
 		ids[i] = v[i].ID
 	}
 	return _c.AddPurchaseReceiptAdjustmentIDs(ids...)
+}
+
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (_c *PurchaseReceiptCreate) AddQualityInspectionIDs(ids ...int) *PurchaseReceiptCreate {
+	_c.mutation.AddQualityInspectionIDs(ids...)
+	return _c
+}
+
+// AddQualityInspections adds the "quality_inspections" edges to the QualityInspection entity.
+func (_c *PurchaseReceiptCreate) AddQualityInspections(v ...*QualityInspection) *PurchaseReceiptCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddQualityInspectionIDs(ids...)
 }
 
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by IDs.
@@ -379,6 +395,22 @@ func (_c *PurchaseReceiptCreate) createSpec() (*PurchaseReceipt, *sqlgraph.Creat
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.QualityInspectionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.QualityInspectionsTable,
+			Columns: []string{purchasereceipt.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

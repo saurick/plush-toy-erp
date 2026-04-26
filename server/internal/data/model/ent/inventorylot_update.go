@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
+	"server/internal/data/model/ent/qualityinspection"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -277,6 +278,21 @@ func (_u *InventoryLotUpdate) AddPurchaseReceiptAdjustmentItems(v ...*PurchaseRe
 	return _u.AddPurchaseReceiptAdjustmentItemIDs(ids...)
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (_u *InventoryLotUpdate) AddQualityInspectionIDs(ids ...int) *InventoryLotUpdate {
+	_u.mutation.AddQualityInspectionIDs(ids...)
+	return _u
+}
+
+// AddQualityInspections adds the "quality_inspections" edges to the QualityInspection entity.
+func (_u *InventoryLotUpdate) AddQualityInspections(v ...*QualityInspection) *InventoryLotUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddQualityInspectionIDs(ids...)
+}
+
 // Mutation returns the InventoryLotMutation object of the builder.
 func (_u *InventoryLotUpdate) Mutation() *InventoryLotMutation {
 	return _u.mutation
@@ -385,6 +401,27 @@ func (_u *InventoryLotUpdate) RemovePurchaseReceiptAdjustmentItems(v ...*Purchas
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseReceiptAdjustmentItemIDs(ids...)
+}
+
+// ClearQualityInspections clears all "quality_inspections" edges to the QualityInspection entity.
+func (_u *InventoryLotUpdate) ClearQualityInspections() *InventoryLotUpdate {
+	_u.mutation.ClearQualityInspections()
+	return _u
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to QualityInspection entities by IDs.
+func (_u *InventoryLotUpdate) RemoveQualityInspectionIDs(ids ...int) *InventoryLotUpdate {
+	_u.mutation.RemoveQualityInspectionIDs(ids...)
+	return _u
+}
+
+// RemoveQualityInspections removes "quality_inspections" edges to QualityInspection entities.
+func (_u *InventoryLotUpdate) RemoveQualityInspections(v ...*QualityInspection) *InventoryLotUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveQualityInspectionIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -759,6 +796,51 @@ func (_u *InventoryLotUpdate) sqlSave(ctx context.Context) (_node int, err error
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.QualityInspectionsTable,
+			Columns: []string{inventorylot.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedQualityInspectionsIDs(); len(nodes) > 0 && !_u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.QualityInspectionsTable,
+			Columns: []string{inventorylot.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QualityInspectionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.QualityInspectionsTable,
+			Columns: []string{inventorylot.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{inventorylot.Label}
@@ -1023,6 +1105,21 @@ func (_u *InventoryLotUpdateOne) AddPurchaseReceiptAdjustmentItems(v ...*Purchas
 	return _u.AddPurchaseReceiptAdjustmentItemIDs(ids...)
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (_u *InventoryLotUpdateOne) AddQualityInspectionIDs(ids ...int) *InventoryLotUpdateOne {
+	_u.mutation.AddQualityInspectionIDs(ids...)
+	return _u
+}
+
+// AddQualityInspections adds the "quality_inspections" edges to the QualityInspection entity.
+func (_u *InventoryLotUpdateOne) AddQualityInspections(v ...*QualityInspection) *InventoryLotUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddQualityInspectionIDs(ids...)
+}
+
 // Mutation returns the InventoryLotMutation object of the builder.
 func (_u *InventoryLotUpdateOne) Mutation() *InventoryLotMutation {
 	return _u.mutation
@@ -1131,6 +1228,27 @@ func (_u *InventoryLotUpdateOne) RemovePurchaseReceiptAdjustmentItems(v ...*Purc
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseReceiptAdjustmentItemIDs(ids...)
+}
+
+// ClearQualityInspections clears all "quality_inspections" edges to the QualityInspection entity.
+func (_u *InventoryLotUpdateOne) ClearQualityInspections() *InventoryLotUpdateOne {
+	_u.mutation.ClearQualityInspections()
+	return _u
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to QualityInspection entities by IDs.
+func (_u *InventoryLotUpdateOne) RemoveQualityInspectionIDs(ids ...int) *InventoryLotUpdateOne {
+	_u.mutation.RemoveQualityInspectionIDs(ids...)
+	return _u
+}
+
+// RemoveQualityInspections removes "quality_inspections" edges to QualityInspection entities.
+func (_u *InventoryLotUpdateOne) RemoveQualityInspections(v ...*QualityInspection) *InventoryLotUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveQualityInspectionIDs(ids...)
 }
 
 // Where appends a list predicates to the InventoryLotUpdate builder.
@@ -1528,6 +1646,51 @@ func (_u *InventoryLotUpdateOne) sqlSave(ctx context.Context) (_node *InventoryL
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.QualityInspectionsTable,
+			Columns: []string{inventorylot.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedQualityInspectionsIDs(); len(nodes) > 0 && !_u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.QualityInspectionsTable,
+			Columns: []string{inventorylot.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QualityInspectionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.QualityInspectionsTable,
+			Columns: []string{inventorylot.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

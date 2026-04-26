@@ -50,6 +50,8 @@ type Tx struct {
 	PurchaseReturn *PurchaseReturnClient
 	// PurchaseReturnItem is the client for interacting with the PurchaseReturnItem builders.
 	PurchaseReturnItem *PurchaseReturnItemClient
+	// QualityInspection is the client for interacting with the QualityInspection builders.
+	QualityInspection *QualityInspectionClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
@@ -216,6 +218,7 @@ func (tx *Tx) init() {
 	tx.PurchaseReceiptItem = NewPurchaseReceiptItemClient(tx.config)
 	tx.PurchaseReturn = NewPurchaseReturnClient(tx.config)
 	tx.PurchaseReturnItem = NewPurchaseReturnItemClient(tx.config)
+	tx.QualityInspection = NewQualityInspectionClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
 	tx.Unit = NewUnitClient(tx.config)

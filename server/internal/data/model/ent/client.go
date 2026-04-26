@@ -30,6 +30,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
+	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/unit"
@@ -88,6 +89,8 @@ type Client struct {
 	PurchaseReturn *PurchaseReturnClient
 	// PurchaseReturnItem is the client for interacting with the PurchaseReturnItem builders.
 	PurchaseReturnItem *PurchaseReturnItemClient
+	// QualityInspection is the client for interacting with the QualityInspection builders.
+	QualityInspection *QualityInspectionClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
@@ -134,6 +137,7 @@ func (c *Client) init() {
 	c.PurchaseReceiptItem = NewPurchaseReceiptItemClient(c.config)
 	c.PurchaseReturn = NewPurchaseReturnClient(c.config)
 	c.PurchaseReturnItem = NewPurchaseReturnItemClient(c.config)
+	c.QualityInspection = NewQualityInspectionClient(c.config)
 	c.Role = NewRoleClient(c.config)
 	c.RolePermission = NewRolePermissionClient(c.config)
 	c.Unit = NewUnitClient(c.config)
@@ -253,6 +257,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PurchaseReceiptItem:           NewPurchaseReceiptItemClient(cfg),
 		PurchaseReturn:                NewPurchaseReturnClient(cfg),
 		PurchaseReturnItem:            NewPurchaseReturnItemClient(cfg),
+		QualityInspection:             NewQualityInspectionClient(cfg),
 		Role:                          NewRoleClient(cfg),
 		RolePermission:                NewRolePermissionClient(cfg),
 		Unit:                          NewUnitClient(cfg),
@@ -299,6 +304,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PurchaseReceiptItem:           NewPurchaseReceiptItemClient(cfg),
 		PurchaseReturn:                NewPurchaseReturnClient(cfg),
 		PurchaseReturnItem:            NewPurchaseReturnItemClient(cfg),
+		QualityInspection:             NewQualityInspectionClient(cfg),
 		Role:                          NewRoleClient(cfg),
 		RolePermission:                NewRolePermissionClient(cfg),
 		Unit:                          NewUnitClient(cfg),
@@ -341,8 +347,9 @@ func (c *Client) Use(hooks ...Hook) {
 		c.InventoryLot, c.InventoryTxn, c.Material, c.Permission, c.Product,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
-		c.PurchaseReturnItem, c.Role, c.RolePermission, c.Unit, c.User, c.Warehouse,
-		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission, c.Unit,
+		c.User, c.Warehouse, c.WorkflowBusinessState, c.WorkflowTask,
+		c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -357,8 +364,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.InventoryLot, c.InventoryTxn, c.Material, c.Permission, c.Product,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
-		c.PurchaseReturnItem, c.Role, c.RolePermission, c.Unit, c.User, c.Warehouse,
-		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission, c.Unit,
+		c.User, c.Warehouse, c.WorkflowBusinessState, c.WorkflowTask,
+		c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -405,6 +413,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PurchaseReturn.mutate(ctx, m)
 	case *PurchaseReturnItemMutation:
 		return c.PurchaseReturnItem.mutate(ctx, m)
+	case *QualityInspectionMutation:
+		return c.QualityInspection.mutate(ctx, m)
 	case *RoleMutation:
 		return c.Role.mutate(ctx, m)
 	case *RolePermissionMutation:
@@ -1854,6 +1864,22 @@ func (c *InventoryLotClient) QueryPurchaseReceiptAdjustmentItems(_m *InventoryLo
 	return query
 }
 
+// QueryQualityInspections queries the quality_inspections edge of a InventoryLot.
+func (c *InventoryLotClient) QueryQualityInspections(_m *InventoryLot) *QualityInspectionQuery {
+	query := (&QualityInspectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventorylot.Table, inventorylot.FieldID, id),
+			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, inventorylot.QualityInspectionsTable, inventorylot.QualityInspectionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *InventoryLotClient) Hooks() []Hook {
 	hooks := c.hooks.InventoryLot
@@ -2243,6 +2269,22 @@ func (c *MaterialClient) QueryPurchaseReceiptAdjustmentItems(_m *Material) *Purc
 			sqlgraph.From(material.Table, material.FieldID, id),
 			sqlgraph.To(purchasereceiptadjustmentitem.Table, purchasereceiptadjustmentitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, material.PurchaseReceiptAdjustmentItemsTable, material.PurchaseReceiptAdjustmentItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryQualityInspections queries the quality_inspections edge of a Material.
+func (c *MaterialClient) QueryQualityInspections(_m *Material) *QualityInspectionQuery {
+	query := (&QualityInspectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, id),
+			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, material.QualityInspectionsTable, material.QualityInspectionsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -2722,6 +2764,22 @@ func (c *PurchaseReceiptClient) QueryPurchaseReceiptAdjustments(_m *PurchaseRece
 			sqlgraph.From(purchasereceipt.Table, purchasereceipt.FieldID, id),
 			sqlgraph.To(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceipt.PurchaseReceiptAdjustmentsTable, purchasereceipt.PurchaseReceiptAdjustmentsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryQualityInspections queries the quality_inspections edge of a PurchaseReceipt.
+func (c *PurchaseReceiptClient) QueryQualityInspections(_m *PurchaseReceipt) *QualityInspectionQuery {
+	query := (&QualityInspectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceipt.Table, purchasereceipt.FieldID, id),
+			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceipt.QualityInspectionsTable, purchasereceipt.QualityInspectionsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -3403,6 +3461,22 @@ func (c *PurchaseReceiptItemClient) QueryPurchaseReceiptAdjustmentItems(_m *Purc
 	return query
 }
 
+// QueryQualityInspections queries the quality_inspections edge of a PurchaseReceiptItem.
+func (c *PurchaseReceiptItemClient) QueryQualityInspections(_m *PurchaseReceiptItem) *QualityInspectionQuery {
+	query := (&QualityInspectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptitem.Table, purchasereceiptitem.FieldID, id),
+			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceiptitem.QualityInspectionsTable, purchasereceiptitem.QualityInspectionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *PurchaseReceiptItemClient) Hooks() []Hook {
 	hooks := c.hooks.PurchaseReceiptItem
@@ -3838,6 +3912,220 @@ func (c *PurchaseReturnItemClient) mutate(ctx context.Context, m *PurchaseReturn
 		return (&PurchaseReturnItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown PurchaseReturnItem mutation op: %q", m.Op())
+	}
+}
+
+// QualityInspectionClient is a client for the QualityInspection schema.
+type QualityInspectionClient struct {
+	config
+}
+
+// NewQualityInspectionClient returns a client for the QualityInspection from the given config.
+func NewQualityInspectionClient(c config) *QualityInspectionClient {
+	return &QualityInspectionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `qualityinspection.Hooks(f(g(h())))`.
+func (c *QualityInspectionClient) Use(hooks ...Hook) {
+	c.hooks.QualityInspection = append(c.hooks.QualityInspection, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `qualityinspection.Intercept(f(g(h())))`.
+func (c *QualityInspectionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.QualityInspection = append(c.inters.QualityInspection, interceptors...)
+}
+
+// Create returns a builder for creating a QualityInspection entity.
+func (c *QualityInspectionClient) Create() *QualityInspectionCreate {
+	mutation := newQualityInspectionMutation(c.config, OpCreate)
+	return &QualityInspectionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of QualityInspection entities.
+func (c *QualityInspectionClient) CreateBulk(builders ...*QualityInspectionCreate) *QualityInspectionCreateBulk {
+	return &QualityInspectionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *QualityInspectionClient) MapCreateBulk(slice any, setFunc func(*QualityInspectionCreate, int)) *QualityInspectionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &QualityInspectionCreateBulk{err: fmt.Errorf("calling to QualityInspectionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*QualityInspectionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &QualityInspectionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for QualityInspection.
+func (c *QualityInspectionClient) Update() *QualityInspectionUpdate {
+	mutation := newQualityInspectionMutation(c.config, OpUpdate)
+	return &QualityInspectionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *QualityInspectionClient) UpdateOne(_m *QualityInspection) *QualityInspectionUpdateOne {
+	mutation := newQualityInspectionMutation(c.config, OpUpdateOne, withQualityInspection(_m))
+	return &QualityInspectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *QualityInspectionClient) UpdateOneID(id int) *QualityInspectionUpdateOne {
+	mutation := newQualityInspectionMutation(c.config, OpUpdateOne, withQualityInspectionID(id))
+	return &QualityInspectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for QualityInspection.
+func (c *QualityInspectionClient) Delete() *QualityInspectionDelete {
+	mutation := newQualityInspectionMutation(c.config, OpDelete)
+	return &QualityInspectionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *QualityInspectionClient) DeleteOne(_m *QualityInspection) *QualityInspectionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *QualityInspectionClient) DeleteOneID(id int) *QualityInspectionDeleteOne {
+	builder := c.Delete().Where(qualityinspection.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &QualityInspectionDeleteOne{builder}
+}
+
+// Query returns a query builder for QualityInspection.
+func (c *QualityInspectionClient) Query() *QualityInspectionQuery {
+	return &QualityInspectionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeQualityInspection},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a QualityInspection entity by its id.
+func (c *QualityInspectionClient) Get(ctx context.Context, id int) (*QualityInspection, error) {
+	return c.Query().Where(qualityinspection.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *QualityInspectionClient) GetX(ctx context.Context, id int) *QualityInspection {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPurchaseReceipt queries the purchase_receipt edge of a QualityInspection.
+func (c *QualityInspectionClient) QueryPurchaseReceipt(_m *QualityInspection) *PurchaseReceiptQuery {
+	query := (&PurchaseReceiptClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
+			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.PurchaseReceiptTable, qualityinspection.PurchaseReceiptColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPurchaseReceiptItem queries the purchase_receipt_item edge of a QualityInspection.
+func (c *QualityInspectionClient) QueryPurchaseReceiptItem(_m *QualityInspection) *PurchaseReceiptItemQuery {
+	query := (&PurchaseReceiptItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
+			sqlgraph.To(purchasereceiptitem.Table, purchasereceiptitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.PurchaseReceiptItemTable, qualityinspection.PurchaseReceiptItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryInventoryLot queries the inventory_lot edge of a QualityInspection.
+func (c *QualityInspectionClient) QueryInventoryLot(_m *QualityInspection) *InventoryLotQuery {
+	query := (&InventoryLotClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
+			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.InventoryLotTable, qualityinspection.InventoryLotColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryMaterial queries the material edge of a QualityInspection.
+func (c *QualityInspectionClient) QueryMaterial(_m *QualityInspection) *MaterialQuery {
+	query := (&MaterialClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
+			sqlgraph.To(material.Table, material.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.MaterialTable, qualityinspection.MaterialColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryWarehouse queries the warehouse edge of a QualityInspection.
+func (c *QualityInspectionClient) QueryWarehouse(_m *QualityInspection) *WarehouseQuery {
+	query := (&WarehouseClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
+			sqlgraph.To(warehouse.Table, warehouse.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.WarehouseTable, qualityinspection.WarehouseColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *QualityInspectionClient) Hooks() []Hook {
+	hooks := c.hooks.QualityInspection
+	return append(hooks[:len(hooks):len(hooks)], qualityinspection.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *QualityInspectionClient) Interceptors() []Interceptor {
+	return c.inters.QualityInspection
+}
+
+func (c *QualityInspectionClient) mutate(ctx context.Context, m *QualityInspectionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&QualityInspectionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&QualityInspectionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&QualityInspectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&QualityInspectionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown QualityInspection mutation op: %q", m.Op())
 	}
 }
 
@@ -4689,6 +4977,22 @@ func (c *WarehouseClient) QueryPurchaseReceiptAdjustmentItems(_m *Warehouse) *Pu
 	return query
 }
 
+// QueryQualityInspections queries the quality_inspections edge of a Warehouse.
+func (c *WarehouseClient) QueryQualityInspections(_m *Warehouse) *QualityInspectionQuery {
+	query := (&QualityInspectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(warehouse.Table, warehouse.FieldID, id),
+			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, warehouse.QualityInspectionsTable, warehouse.QualityInspectionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *WarehouseClient) Hooks() []Hook {
 	return c.hooks.Warehouse
@@ -5152,16 +5456,17 @@ type (
 		BusinessRecordEvent, BusinessRecordItem, InventoryBalance, InventoryLot,
 		InventoryTxn, Material, Permission, Product, PurchaseReceipt,
 		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
-		PurchaseReturn, PurchaseReturnItem, Role, RolePermission, Unit, User,
-		Warehouse, WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Hook
+		PurchaseReturn, PurchaseReturnItem, QualityInspection, Role, RolePermission,
+		Unit, User, Warehouse, WorkflowBusinessState, WorkflowTask,
+		WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
 		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessRecord,
 		BusinessRecordEvent, BusinessRecordItem, InventoryBalance, InventoryLot,
 		InventoryTxn, Material, Permission, Product, PurchaseReceipt,
 		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
-		PurchaseReturn, PurchaseReturnItem, Role, RolePermission, Unit, User,
-		Warehouse, WorkflowBusinessState, WorkflowTask,
+		PurchaseReturn, PurchaseReturnItem, QualityInspection, Role, RolePermission,
+		Unit, User, Warehouse, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Interceptor
 	}
 )

@@ -149,6 +149,108 @@ func TestInventoryRepo_CreateInventoryLots(t *testing.T) {
 	}
 }
 
+func TestInventoryRepo_ChangeInventoryLotStatus(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_lot_status")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	defaultLot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectMaterial, fixtures.materialID, "MAT-LOT-STATUS-DEFAULT")
+	if defaultLot.Status != biz.InventoryLotActive {
+		t.Fatalf("expected default lot status ACTIVE, got %s", defaultLot.Status)
+	}
+	holdLot, err := uc.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		LotNo:       "MAT-LOT-STATUS-HOLD",
+		Status:      biz.InventoryLotHold,
+	})
+	if err != nil {
+		t.Fatalf("create HOLD lot failed: %v", err)
+	}
+	if holdLot.Status != biz.InventoryLotHold {
+		t.Fatalf("expected HOLD lot, got %s", holdLot.Status)
+	}
+	rejectedLot, err := uc.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		LotNo:       "MAT-LOT-STATUS-REJECTED",
+		Status:      biz.InventoryLotRejected,
+	})
+	if err != nil {
+		t.Fatalf("create REJECTED lot failed: %v", err)
+	}
+	if rejectedLot.Status != biz.InventoryLotRejected {
+		t.Fatalf("expected REJECTED lot, got %s", rejectedLot.Status)
+	}
+	if _, err := uc.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		LotNo:       "MAT-LOT-STATUS-INVALID",
+		Status:      "WAITING",
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected invalid lot status to be rejected, got %v", err)
+	}
+
+	changed, err := uc.ChangeInventoryLotStatus(ctx, defaultLot.ID, biz.InventoryLotHold, "待检")
+	if err != nil {
+		t.Fatalf("change ACTIVE to HOLD failed: %v", err)
+	}
+	if changed.Status != biz.InventoryLotHold {
+		t.Fatalf("expected changed status HOLD, got %s", changed.Status)
+	}
+	changed, err = uc.ChangeInventoryLotStatus(ctx, changed.ID, biz.InventoryLotRejected, "不合格")
+	if err != nil {
+		t.Fatalf("change HOLD to REJECTED failed: %v", err)
+	}
+	if changed.Status != biz.InventoryLotRejected {
+		t.Fatalf("expected changed status REJECTED, got %s", changed.Status)
+	}
+	changed, err = uc.ChangeInventoryLotStatus(ctx, changed.ID, biz.InventoryLotActive, "让步接收")
+	if err != nil {
+		t.Fatalf("change REJECTED to ACTIVE failed: %v", err)
+	}
+	if changed.Status != biz.InventoryLotActive {
+		t.Fatalf("expected changed status ACTIVE, got %s", changed.Status)
+	}
+	if _, err := uc.ChangeInventoryLotStatus(ctx, changed.ID, "WAITING", "非法状态"); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected invalid changed status to be rejected, got %v", err)
+	}
+
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          &changed.ID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       mustDecimal(t, "1"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_lot_status",
+		IdempotencyKey: "lot-status-positive-balance",
+	}); err != nil {
+		t.Fatalf("inbound before DISABLED guard failed: %v", err)
+	}
+	if _, err := uc.ChangeInventoryLotStatus(ctx, changed.ID, biz.InventoryLotDisabled, "仍有余额"); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected DISABLED with positive balance to be rejected, got %v", err)
+	}
+	zeroLot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectMaterial, fixtures.materialID, "MAT-LOT-STATUS-ZERO")
+	disabled, err := uc.ChangeInventoryLotStatus(ctx, zeroLot.ID, biz.InventoryLotDisabled, "无余额停用")
+	if err != nil {
+		t.Fatalf("change zero-balance lot to DISABLED failed: %v", err)
+	}
+	if disabled.Status != biz.InventoryLotDisabled {
+		t.Fatalf("expected DISABLED zero-balance lot, got %s", disabled.Status)
+	}
+	if _, err := uc.ChangeInventoryLotStatus(ctx, zeroLot.ID, biz.InventoryLotActive, "停用恢复"); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected DISABLED to ACTIVE to be rejected, got %v", err)
+	}
+}
+
 func TestInventoryRepo_ApplyTxnUpdatesBalances(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_apply")
@@ -524,6 +626,185 @@ func TestInventoryRepo_ApplyTxnUpdatesLotBalances(t *testing.T) {
 	if !errors.Is(err, biz.ErrInventoryTxnAlreadyReversed) {
 		t.Fatalf("expected duplicate lot reversal to be rejected, got %v", err)
 	}
+}
+
+func TestInventoryRepo_LotStatusGuardsOrdinaryDeduction(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_lot_status_guard")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	statuses := []struct {
+		name    string
+		status  string
+		wantErr error
+	}{
+		{name: "ACTIVE", status: biz.InventoryLotActive},
+		{name: "HOLD", status: biz.InventoryLotHold, wantErr: biz.ErrInventoryLotStatusBlocked},
+		{name: "REJECTED", status: biz.InventoryLotRejected, wantErr: biz.ErrInventoryLotStatusBlocked},
+		{name: "DISABLED", status: biz.InventoryLotDisabled, wantErr: biz.ErrInventoryLotStatusBlocked},
+	}
+	for _, tc := range statuses {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			lot, err := uc.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+				SubjectType: biz.InventorySubjectMaterial,
+				SubjectID:   fixtures.materialID,
+				LotNo:       "MAT-LOT-STATUS-GUARD-" + tc.name,
+				Status:      tc.status,
+			})
+			if err != nil {
+				t.Fatalf("create %s lot failed: %v", tc.status, err)
+			}
+			if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+				SubjectType:    biz.InventorySubjectMaterial,
+				SubjectID:      fixtures.materialID,
+				WarehouseID:    fixtures.warehouseID,
+				LotID:          &lot.ID,
+				TxnType:        biz.InventoryTxnIn,
+				Direction:      1,
+				Quantity:       mustDecimal(t, "5"),
+				UnitID:         fixtures.unitID,
+				SourceType:     "test_lot_status_guard",
+				IdempotencyKey: "status-guard-in-" + tc.name,
+			}); err != nil {
+				t.Fatalf("inbound into %s lot fixture failed: %v", tc.status, err)
+			}
+			beforeCount, err := client.InventoryTxn.Query().Count(ctx)
+			if err != nil {
+				t.Fatalf("count before %s adjust-out failed: %v", tc.status, err)
+			}
+			_, err = uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+				SubjectType:    biz.InventorySubjectMaterial,
+				SubjectID:      fixtures.materialID,
+				WarehouseID:    fixtures.warehouseID,
+				LotID:          &lot.ID,
+				TxnType:        biz.InventoryTxnAdjustOut,
+				Direction:      -1,
+				Quantity:       mustDecimal(t, "1"),
+				UnitID:         fixtures.unitID,
+				SourceType:     "test_lot_status_guard",
+				IdempotencyKey: "status-guard-adjust-out-" + tc.name,
+			})
+			if tc.wantErr != nil {
+				if !errors.Is(err, tc.wantErr) {
+					t.Fatalf("expected %s adjust-out to fail with %v, got %v", tc.status, tc.wantErr, err)
+				}
+				afterCount, err := client.InventoryTxn.Query().Count(ctx)
+				if err != nil {
+					t.Fatalf("count after %s adjust-out failed: %v", tc.status, err)
+				}
+				if afterCount != beforeCount {
+					t.Fatalf("failed %s adjust-out should not create txn, before=%d after=%d", tc.status, beforeCount, afterCount)
+				}
+				balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+					SubjectType: biz.InventorySubjectMaterial,
+					SubjectID:   fixtures.materialID,
+					WarehouseID: fixtures.warehouseID,
+					LotID:       &lot.ID,
+					UnitID:      fixtures.unitID,
+				})
+				if err != nil {
+					t.Fatalf("get %s lot balance failed: %v", tc.status, err)
+				}
+				assertDecimalEqual(t, balance.Quantity, "5")
+				return
+			}
+			if err != nil {
+				t.Fatalf("expected ACTIVE adjust-out to succeed, got %v", err)
+			}
+			balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+				SubjectType: biz.InventorySubjectMaterial,
+				SubjectID:   fixtures.materialID,
+				WarehouseID: fixtures.warehouseID,
+				LotID:       &lot.ID,
+				UnitID:      fixtures.unitID,
+			})
+			if err != nil {
+				t.Fatalf("get ACTIVE lot balance failed: %v", err)
+			}
+			assertDecimalEqual(t, balance.Quantity, "4")
+		})
+	}
+
+	holdOutLot, err := uc.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		LotNo:       "MAT-LOT-STATUS-GUARD-OUT",
+		Status:      biz.InventoryLotHold,
+	})
+	if err != nil {
+		t.Fatalf("create HOLD lot for ordinary OUT failed: %v", err)
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          &holdOutLot.ID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       mustDecimal(t, "3"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_lot_status_guard",
+		IdempotencyKey: "status-guard-hold-out-in",
+	}); err != nil {
+		t.Fatalf("inbound into HOLD lot for ordinary OUT failed: %v", err)
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          &holdOutLot.ID,
+		TxnType:        biz.InventoryTxnOut,
+		Direction:      -1,
+		Quantity:       mustDecimal(t, "1"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_lot_status_guard",
+		IdempotencyKey: "status-guard-hold-ordinary-out",
+	}); !errors.Is(err, biz.ErrInventoryLotStatusBlocked) {
+		t.Fatalf("expected HOLD ordinary OUT to be blocked, got %v", err)
+	}
+
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       mustDecimal(t, "3"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_lot_status_guard",
+		IdempotencyKey: "status-guard-non-lot-in",
+	}); err != nil {
+		t.Fatalf("non-lot inbound before status boundary failed: %v", err)
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnOut,
+		Direction:      -1,
+		Quantity:       mustDecimal(t, "2"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_lot_status_guard",
+		IdempotencyKey: "status-guard-non-lot-out",
+	}); err != nil {
+		t.Fatalf("non-lot outbound should not be checked by lot status, got %v", err)
+	}
+	nonLotBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get non-lot balance after status boundary failed: %v", err)
+	}
+	assertDecimalEqual(t, nonLotBalance.Quantity, "1")
 }
 
 func TestInventoryRepo_LotBalancesHaveSeparateUniqueScopes(t *testing.T) {
@@ -2040,6 +2321,507 @@ func TestInventoryRepo_PurchaseReturnReceiptItemCumulativeLimit(t *testing.T) {
 	}
 }
 
+func TestInventoryRepo_PurchaseReturnAllowsHoldRejectedLots(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_purchase_return_lot_status")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	statuses := []struct {
+		name        string
+		status      string
+		prepare     func(t *testing.T, lotID int)
+		wantPostErr error
+	}{
+		{name: "ACTIVE", status: biz.InventoryLotActive},
+		{name: "HOLD", status: biz.InventoryLotHold, prepare: func(t *testing.T, lotID int) {
+			changeLotToStatus(t, ctx, uc, lotID, biz.InventoryLotHold)
+		}},
+		{name: "REJECTED", status: biz.InventoryLotRejected, prepare: func(t *testing.T, lotID int) {
+			changeLotToStatus(t, ctx, uc, lotID, biz.InventoryLotRejected)
+		}},
+		{name: "DISABLED", status: biz.InventoryLotDisabled, prepare: func(t *testing.T, lotID int) {
+			if _, err := client.InventoryLot.UpdateOneID(lotID).SetStatus(biz.InventoryLotDisabled).Save(ctx); err != nil {
+				t.Fatalf("force lot to DISABLED fixture failed: %v", err)
+			}
+		}, wantPostErr: biz.ErrInventoryLotStatusBlocked},
+	}
+
+	for _, tc := range statuses {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			receipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-STATUS-IN-"+tc.name, fixtures, stringPtr("PR-RET-STATUS-LOT-"+tc.name), mustDecimal(t, "5"))
+			receiptItem := receipt.Items[0]
+			if receiptItem.LotID == nil {
+				t.Fatalf("expected %s receipt lot_id", tc.name)
+			}
+			if tc.prepare != nil {
+				tc.prepare(t, *receiptItem.LotID)
+			}
+			purchaseReturn := createLinkedPurchaseReturn(t, ctx, uc, "PR-RET-STATUS-"+tc.name, receipt.ID, receiptItem, fixtures, mustDecimal(t, "2"))
+			_, err := uc.PostPurchaseReturn(ctx, purchaseReturn.ID)
+			if tc.wantPostErr != nil {
+				if !errors.Is(err, tc.wantPostErr) {
+					t.Fatalf("expected %s purchase return to fail with %v, got %v", tc.status, tc.wantPostErr, err)
+				}
+				balance, balanceErr := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+					SubjectType: biz.InventorySubjectMaterial,
+					SubjectID:   fixtures.materialID,
+					WarehouseID: fixtures.warehouseID,
+					LotID:       receiptItem.LotID,
+					UnitID:      fixtures.unitID,
+				})
+				if balanceErr != nil {
+					t.Fatalf("get %s balance after rejected return failed: %v", tc.status, balanceErr)
+				}
+				assertDecimalEqual(t, balance.Quantity, "5")
+				return
+			}
+			if err != nil {
+				t.Fatalf("expected %s purchase return to succeed, got %v", tc.status, err)
+			}
+			balance, balanceErr := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+				SubjectType: biz.InventorySubjectMaterial,
+				SubjectID:   fixtures.materialID,
+				WarehouseID: fixtures.warehouseID,
+				LotID:       receiptItem.LotID,
+				UnitID:      fixtures.unitID,
+			})
+			if balanceErr != nil {
+				t.Fatalf("get %s balance after return failed: %v", tc.status, balanceErr)
+			}
+			assertDecimalEqual(t, balance.Quantity, "3")
+		})
+	}
+
+	lowStockReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-STATUS-LOW-STOCK-IN", fixtures, stringPtr("PR-RET-STATUS-LOW-STOCK-LOT"), mustDecimal(t, "2"))
+	lowStockItem := lowStockReceipt.Items[0]
+	if lowStockItem.LotID == nil {
+		t.Fatalf("expected low-stock lot_id")
+	}
+	if _, err := uc.ChangeInventoryLotStatus(ctx, *lowStockItem.LotID, biz.InventoryLotHold, "待检低库存退货"); err != nil {
+		t.Fatalf("change low-stock lot to HOLD failed: %v", err)
+	}
+	lowStockReturn, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+		ReturnNo:     "PR-RET-STATUS-LOW-STOCK",
+		SupplierName: "状态退货供应商",
+		ReturnedAt:   time.Date(2026, 4, 26, 18, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create low-stock status return failed: %v", err)
+	}
+	if _, err := uc.AddPurchaseReturnItem(ctx, &biz.PurchaseReturnItemCreate{
+		ReturnID:    lowStockReturn.ID,
+		MaterialID:  fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+		LotID:       lowStockItem.LotID,
+		Quantity:    mustDecimal(t, "3"),
+	}); err != nil {
+		t.Fatalf("add low-stock status return item failed: %v", err)
+	}
+	if _, err := uc.PostPurchaseReturn(ctx, lowStockReturn.ID); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
+		t.Fatalf("expected HOLD return over current stock to be rejected by balance, got %v", err)
+	}
+
+	effectiveReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-STATUS-EFFECTIVE-IN", fixtures, stringPtr("PR-RET-STATUS-EFFECTIVE-LOT"), mustDecimal(t, "2"))
+	effectiveItem := effectiveReceipt.Items[0]
+	if effectiveItem.LotID == nil {
+		t.Fatalf("expected effective status lot_id")
+	}
+	extraStock := createAndPostPurchaseReceipt(t, ctx, uc, "PR-RET-STATUS-EFFECTIVE-EXTRA", fixtures, stringPtr("PR-RET-STATUS-EFFECTIVE-LOT"), mustDecimal(t, "3"))
+	assertOptionalIntEqual(t, extraStock.Items[0].LotID, *effectiveItem.LotID)
+	if _, err := uc.ChangeInventoryLotStatus(ctx, *effectiveItem.LotID, biz.InventoryLotHold, "待判有效入库上限"); err != nil {
+		t.Fatalf("change effective lot to HOLD failed: %v", err)
+	}
+	if _, err := uc.ChangeInventoryLotStatus(ctx, *effectiveItem.LotID, biz.InventoryLotRejected, "不合格有效入库上限"); err != nil {
+		t.Fatalf("change effective lot to REJECTED failed: %v", err)
+	}
+	overEffectiveReturn := createLinkedPurchaseReturn(t, ctx, uc, "PR-RET-STATUS-EFFECTIVE-OVER", effectiveReceipt.ID, effectiveItem, fixtures, mustDecimal(t, "3"))
+	if _, err := uc.PostPurchaseReturn(ctx, overEffectiveReturn.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected REJECTED linked return over effective receipt quantity to be rejected, got %v", err)
+	}
+}
+
+func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_quality_inspection_lifecycle")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	passReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-LIFE-RECEIPT-PASS", fixtures, stringPtr("QI-LIFE-LOT-PASS"), mustDecimal(t, "10"))
+	passItem := passReceipt.Items[0]
+	beforeQualityTxnCount := inventoryTxnCount(t, ctx, client)
+	draft := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-LIFE-PASS", passReceipt, fixtures)
+	if draft.Status != biz.QualityInspectionStatusDraft || draft.OriginalLotStatus != "" || draft.Result != nil || draft.InspectedAt != nil {
+		t.Fatalf("unexpected draft state: status=%s original=%q result=%v inspected_at=%v", draft.Status, draft.OriginalLotStatus, draft.Result, draft.InspectedAt)
+	}
+	assertLotStatus(t, ctx, uc, *passItem.LotID, biz.InventoryLotActive)
+	assertInventoryTxnCount(t, ctx, client, beforeQualityTxnCount)
+	if _, err := uc.CreateQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:          "QI-LIFE-PASS",
+		PurchaseReceiptID:     passReceipt.ID,
+		PurchaseReceiptItemID: &passItem.ID,
+		InventoryLotID:        *passItem.LotID,
+		MaterialID:            fixtures.materialID,
+		WarehouseID:           fixtures.warehouseID,
+	}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected inspection_no unique constraint, got %v", err)
+	}
+
+	submitted, err := uc.SubmitQualityInspection(ctx, draft.ID)
+	if err != nil {
+		t.Fatalf("submit quality inspection failed: %v", err)
+	}
+	if submitted.Status != biz.QualityInspectionStatusSubmitted || submitted.OriginalLotStatus != biz.InventoryLotActive {
+		t.Fatalf("unexpected submitted state: status=%s original=%q", submitted.Status, submitted.OriginalLotStatus)
+	}
+	assertLotStatus(t, ctx, uc, *passItem.LotID, biz.InventoryLotHold)
+	assertInventoryTxnCount(t, ctx, client, beforeQualityTxnCount)
+	if replay, err := uc.SubmitQualityInspection(ctx, draft.ID); err != nil || replay.Status != biz.QualityInspectionStatusSubmitted {
+		t.Fatalf("repeat submit should be idempotent submitted, row=%v err=%v", replay, err)
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          passItem.LotID,
+		TxnType:        biz.InventoryTxnAdjustOut,
+		Direction:      -1,
+		Quantity:       mustDecimal(t, "1"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_quality_inspection",
+		IdempotencyKey: "qi-life-hold-adjust-out",
+	}); !errors.Is(err, biz.ErrInventoryLotStatusBlocked) {
+		t.Fatalf("expected SUBMITTED HOLD lot to block ordinary adjust-out, got %v", err)
+	}
+
+	inspectedAt := time.Date(2026, 4, 26, 10, 30, 0, 0, time.UTC)
+	inspectorID := 7001
+	passed, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
+		InspectionID: draft.ID,
+		Result:       biz.QualityInspectionResultPass,
+		InspectedAt:  inspectedAt,
+		InspectorID:  &inspectorID,
+		DecisionNote: stringPtr("合格"),
+	})
+	if err != nil {
+		t.Fatalf("pass quality inspection failed: %v", err)
+	}
+	if passed.Status != biz.QualityInspectionStatusPassed ||
+		passed.Result == nil || *passed.Result != biz.QualityInspectionResultPass ||
+		passed.InspectedAt == nil || !passed.InspectedAt.Equal(inspectedAt) ||
+		passed.InspectorID == nil || *passed.InspectorID != inspectorID {
+		t.Fatalf("unexpected passed state: %+v", passed)
+	}
+	assertLotStatus(t, ctx, uc, *passItem.LotID, biz.InventoryLotActive)
+	assertInventoryTxnCount(t, ctx, client, beforeQualityTxnCount)
+	if replay, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: draft.ID}); err != nil || replay.Status != biz.QualityInspectionStatusPassed {
+		t.Fatalf("repeat pass should be idempotent passed, row=%v err=%v", replay, err)
+	}
+	if _, err := uc.CancelQualityInspection(ctx, draft.ID, nil); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected passed inspection cancel to be rejected, got %v", err)
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          passItem.LotID,
+		TxnType:        biz.InventoryTxnAdjustOut,
+		Direction:      -1,
+		Quantity:       mustDecimal(t, "1"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_quality_inspection",
+		IdempotencyKey: "qi-life-active-adjust-out",
+	}); err != nil {
+		t.Fatalf("expected PASSED ACTIVE lot to allow ordinary adjust-out, got %v", err)
+	}
+
+	rejectReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-LIFE-RECEIPT-REJECT", fixtures, stringPtr("QI-LIFE-LOT-REJECT"), mustDecimal(t, "5"))
+	rejectDraft := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-LIFE-REJECT", rejectReceipt, fixtures)
+	if _, err := uc.SubmitQualityInspection(ctx, rejectDraft.ID); err != nil {
+		t.Fatalf("submit reject fixture failed: %v", err)
+	}
+	if _, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID, DecisionNote: stringPtr("拒收")}); err != nil {
+		t.Fatalf("reject quality inspection failed: %v", err)
+	}
+	rejected, err := uc.GetQualityInspection(ctx, rejectDraft.ID)
+	if err != nil {
+		t.Fatalf("get rejected inspection failed: %v", err)
+	}
+	if rejected.Status != biz.QualityInspectionStatusRejected || rejected.Result == nil || *rejected.Result != biz.QualityInspectionResultReject {
+		t.Fatalf("unexpected rejected state: %+v", rejected)
+	}
+	rejectItem := rejectReceipt.Items[0]
+	assertLotStatus(t, ctx, uc, *rejectItem.LotID, biz.InventoryLotRejected)
+	if replay, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID}); err != nil || replay.Status != biz.QualityInspectionStatusRejected {
+		t.Fatalf("repeat reject should be idempotent rejected, row=%v err=%v", replay, err)
+	}
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectMaterial,
+		SubjectID:      fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		LotID:          rejectItem.LotID,
+		TxnType:        biz.InventoryTxnAdjustOut,
+		Direction:      -1,
+		Quantity:       mustDecimal(t, "1"),
+		UnitID:         fixtures.unitID,
+		SourceType:     "test_quality_inspection",
+		IdempotencyKey: "qi-life-rejected-adjust-out",
+	}); !errors.Is(err, biz.ErrInventoryLotStatusBlocked) {
+		t.Fatalf("expected REJECTED lot to block ordinary adjust-out, got %v", err)
+	}
+	purchaseReturn := createLinkedPurchaseReturn(t, ctx, uc, "QI-LIFE-RETURN-REJECT", rejectReceipt.ID, rejectItem, fixtures, mustDecimal(t, "1"))
+	if _, err := uc.PostPurchaseReturn(ctx, purchaseReturn.ID); err != nil {
+		t.Fatalf("expected REJECTED lot to allow purchase return out, got %v", err)
+	}
+	if _, err := uc.CancelQualityInspection(ctx, rejectDraft.ID, nil); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected rejected inspection cancel to be rejected, got %v", err)
+	}
+
+	cancelDraftReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-LIFE-RECEIPT-CANCEL-DRAFT", fixtures, stringPtr("QI-LIFE-LOT-CANCEL-DRAFT"), mustDecimal(t, "3"))
+	cancelDraft := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-LIFE-CANCEL-DRAFT", cancelDraftReceipt, fixtures)
+	cancelledDraft, err := uc.CancelQualityInspection(ctx, cancelDraft.ID, stringPtr("草稿取消"))
+	if err != nil {
+		t.Fatalf("cancel draft inspection failed: %v", err)
+	}
+	if cancelledDraft.Status != biz.QualityInspectionStatusCancelled {
+		t.Fatalf("expected cancelled draft, got %s", cancelledDraft.Status)
+	}
+	assertLotStatus(t, ctx, uc, *cancelDraftReceipt.Items[0].LotID, biz.InventoryLotActive)
+	if replay, err := uc.CancelQualityInspection(ctx, cancelDraft.ID, nil); err != nil || replay.Status != biz.QualityInspectionStatusCancelled {
+		t.Fatalf("repeat cancel should be idempotent cancelled, row=%v err=%v", replay, err)
+	}
+	if _, err := uc.SubmitQualityInspection(ctx, cancelDraft.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected cancelled inspection submit to be rejected, got %v", err)
+	}
+	if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: cancelDraft.ID}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected cancelled inspection pass to be rejected, got %v", err)
+	}
+	if _, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: cancelDraft.ID}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected cancelled inspection reject to be rejected, got %v", err)
+	}
+
+	cancelSubmittedReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-LIFE-RECEIPT-CANCEL-SUBMITTED", fixtures, stringPtr("QI-LIFE-LOT-CANCEL-SUBMITTED"), mustDecimal(t, "3"))
+	cancelSubmitted := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-LIFE-CANCEL-SUBMITTED", cancelSubmittedReceipt, fixtures)
+	if _, err := uc.SubmitQualityInspection(ctx, cancelSubmitted.ID); err != nil {
+		t.Fatalf("submit cancel fixture failed: %v", err)
+	}
+	assertLotStatus(t, ctx, uc, *cancelSubmittedReceipt.Items[0].LotID, biz.InventoryLotHold)
+	cancelledSubmitted, err := uc.CancelQualityInspection(ctx, cancelSubmitted.ID, stringPtr("提交后取消"))
+	if err != nil {
+		t.Fatalf("cancel submitted inspection failed: %v", err)
+	}
+	if cancelledSubmitted.Status != biz.QualityInspectionStatusCancelled {
+		t.Fatalf("expected submitted inspection cancelled, got %s", cancelledSubmitted.Status)
+	}
+	assertLotStatus(t, ctx, uc, *cancelSubmittedReceipt.Items[0].LotID, biz.InventoryLotActive)
+
+	holdReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-LIFE-RECEIPT-HOLD-ORIGINAL", fixtures, stringPtr("QI-LIFE-LOT-HOLD-ORIGINAL"), mustDecimal(t, "3"))
+	changeLotToStatus(t, ctx, uc, *holdReceipt.Items[0].LotID, biz.InventoryLotHold)
+	holdDraft := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-LIFE-HOLD-ORIGINAL", holdReceipt, fixtures)
+	holdSubmitted, err := uc.SubmitQualityInspection(ctx, holdDraft.ID)
+	if err != nil {
+		t.Fatalf("submit originally HOLD inspection failed: %v", err)
+	}
+	if holdSubmitted.OriginalLotStatus != biz.InventoryLotHold {
+		t.Fatalf("expected originally HOLD inspection to record HOLD, got %s", holdSubmitted.OriginalLotStatus)
+	}
+	if _, err := uc.CancelQualityInspection(ctx, holdDraft.ID, nil); err != nil {
+		t.Fatalf("cancel originally HOLD inspection failed: %v", err)
+	}
+	assertLotStatus(t, ctx, uc, *holdReceipt.Items[0].LotID, biz.InventoryLotHold)
+
+	conflictReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-LIFE-RECEIPT-CANCEL-CONFLICT", fixtures, stringPtr("QI-LIFE-LOT-CANCEL-CONFLICT"), mustDecimal(t, "3"))
+	conflictDraft := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-LIFE-CANCEL-CONFLICT", conflictReceipt, fixtures)
+	if _, err := uc.SubmitQualityInspection(ctx, conflictDraft.ID); err != nil {
+		t.Fatalf("submit cancel conflict fixture failed: %v", err)
+	}
+	forceLotStatus(t, ctx, client, *conflictReceipt.Items[0].LotID, biz.InventoryLotActive)
+	if _, err := uc.CancelQualityInspection(ctx, conflictDraft.ID, nil); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected cancel with externally changed lot status to be rejected, got %v", err)
+	}
+}
+
+func TestInventoryRepo_QualityInspectionReferenceValidation(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_quality_inspection_validation")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	validReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-VALID-RECEIPT", fixtures, stringPtr("QI-VALID-LOT"), mustDecimal(t, "5"))
+	validItem := validReceipt.Items[0]
+	if validItem.LotID == nil {
+		t.Fatalf("expected valid receipt item lot_id")
+	}
+	base := func(no string) *biz.QualityInspectionCreate {
+		return &biz.QualityInspectionCreate{
+			InspectionNo:          no,
+			PurchaseReceiptID:     validReceipt.ID,
+			PurchaseReceiptItemID: &validItem.ID,
+			InventoryLotID:        *validItem.LotID,
+			MaterialID:            fixtures.materialID,
+			WarehouseID:           fixtures.warehouseID,
+		}
+	}
+	validDraft, err := uc.CreateQualityInspectionDraft(ctx, base("QI-VALID-OK"))
+	if err != nil {
+		t.Fatalf("create valid quality inspection draft failed: %v", err)
+	}
+	if validDraft.Status != biz.QualityInspectionStatusDraft {
+		t.Fatalf("expected valid draft status DRAFT, got %s", validDraft.Status)
+	}
+
+	if _, err := uc.CreateQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:      "QI-VALID-MISSING-RECEIPT",
+		PurchaseReceiptID: 999999,
+		InventoryLotID:    *validItem.LotID,
+		MaterialID:        fixtures.materialID,
+		WarehouseID:       fixtures.warehouseID,
+	}); !errors.Is(err, biz.ErrPurchaseReceiptNotFound) {
+		t.Fatalf("expected missing receipt to fail with ErrPurchaseReceiptNotFound, got %v", err)
+	}
+	draftReceipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "QI-VALID-DRAFT-RECEIPT",
+		SupplierName: "待提交供应商",
+		ReceivedAt:   time.Date(2026, 4, 26, 9, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create non-posted receipt fixture failed: %v", err)
+	}
+	nonPosted := base("QI-VALID-NON-POSTED")
+	nonPosted.PurchaseReceiptID = draftReceipt.ID
+	if _, err := uc.CreateQualityInspectionDraft(ctx, nonPosted); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected non-posted receipt to fail with ErrBadParam, got %v", err)
+	}
+	missingItem := base("QI-VALID-MISSING-ITEM")
+	missingID := 999999
+	missingItem.PurchaseReceiptItemID = &missingID
+	if _, err := uc.CreateQualityInspectionDraft(ctx, missingItem); !errors.Is(err, biz.ErrPurchaseReceiptItemNotFound) {
+		t.Fatalf("expected missing receipt item to fail, got %v", err)
+	}
+	otherReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-VALID-OTHER-RECEIPT", fixtures, stringPtr("QI-VALID-OTHER-LOT"), mustDecimal(t, "5"))
+	itemNotBelong := base("QI-VALID-ITEM-NOT-BELONG")
+	itemNotBelong.PurchaseReceiptItemID = &otherReceipt.Items[0].ID
+	if _, err := uc.CreateQualityInspectionDraft(ctx, itemNotBelong); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected receipt item from another receipt to fail, got %v", err)
+	}
+	lotMissing := base("QI-VALID-MISSING-LOT")
+	lotMissing.InventoryLotID = 999999
+	if _, err := uc.CreateQualityInspectionDraft(ctx, lotMissing); !errors.Is(err, biz.ErrInventoryLotNotFound) {
+		t.Fatalf("expected missing lot to fail, got %v", err)
+	}
+	productLot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectProduct, fixtures.productID, "QI-VALID-PRODUCT-LOT")
+	productLotInput := base("QI-VALID-PRODUCT-LOT")
+	productLotInput.InventoryLotID = productLot.ID
+	productLotInput.PurchaseReceiptItemID = nil
+	if _, err := uc.CreateQualityInspectionDraft(ctx, productLotInput); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected product lot inspection to fail, got %v", err)
+	}
+	otherMaterial := createTestMaterial(t, ctx, client, fixtures.unitID, "MAT-QI-VALID-OTHER")
+	otherMaterialLot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectMaterial, otherMaterial.ID, "QI-VALID-OTHER-MATERIAL-LOT")
+	materialMismatch := base("QI-VALID-MATERIAL-MISMATCH")
+	materialMismatch.PurchaseReceiptItemID = nil
+	materialMismatch.InventoryLotID = otherMaterialLot.ID
+	if _, err := uc.CreateQualityInspectionDraft(ctx, materialMismatch); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected lot subject/material mismatch to fail, got %v", err)
+	}
+	itemMaterialMismatch := base("QI-VALID-ITEM-MATERIAL-MISMATCH")
+	itemMaterialMismatch.InventoryLotID = otherMaterialLot.ID
+	itemMaterialMismatch.MaterialID = otherMaterial.ID
+	if _, err := uc.CreateQualityInspectionDraft(ctx, itemMaterialMismatch); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected receipt item material mismatch to fail, got %v", err)
+	}
+	otherWarehouse := createTestWarehouse(t, ctx, client, "WH-QI-VALID-OTHER")
+	warehouseMismatch := base("QI-VALID-WAREHOUSE-MISMATCH")
+	warehouseMismatch.WarehouseID = otherWarehouse.ID
+	if _, err := uc.CreateQualityInspectionDraft(ctx, warehouseMismatch); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected receipt item warehouse mismatch to fail, got %v", err)
+	}
+	lotMismatchLot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectMaterial, fixtures.materialID, "QI-VALID-LOT-MISMATCH")
+	lotMismatch := base("QI-VALID-LOT-MISMATCH")
+	lotMismatch.InventoryLotID = lotMismatchLot.ID
+	if _, err := uc.CreateQualityInspectionDraft(ctx, lotMismatch); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected receipt item lot mismatch to fail, got %v", err)
+	}
+}
+
+func TestInventoryRepo_QualityInspectionSubmittedUniquenessAndProtection(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_quality_inspection_uniqueness")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	receipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-UNIQ-RECEIPT", fixtures, stringPtr("QI-UNIQ-LOT"), mustDecimal(t, "8"))
+	first := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-UNIQ-FIRST", receipt, fixtures)
+	second := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-UNIQ-SECOND", receipt, fixtures)
+	if _, err := uc.SubmitQualityInspection(ctx, first.ID); err != nil {
+		t.Fatalf("submit first inspection failed: %v", err)
+	}
+	if _, err := uc.SubmitQualityInspection(ctx, second.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected second submitted inspection for same lot to be rejected, got %v", err)
+	}
+	if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: first.ID}); err != nil {
+		t.Fatalf("pass first inspection failed: %v", err)
+	}
+	third := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-UNIQ-THIRD", receipt, fixtures)
+	if _, err := uc.SubmitQualityInspection(ctx, third.ID); err != nil {
+		t.Fatalf("expected historical PASSED inspection to allow new submitted inspection, got %v", err)
+	}
+	if _, err := uc.CancelQualityInspection(ctx, third.ID, nil); err != nil {
+		t.Fatalf("expected submitted third inspection to cancel, got %v", err)
+	}
+	fourth := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-UNIQ-FOURTH", receipt, fixtures)
+	if _, err := uc.SubmitQualityInspection(ctx, fourth.ID); err != nil {
+		t.Fatalf("expected historical CANCELLED inspection to allow new submitted inspection, got %v", err)
+	}
+	if _, err := uc.CancelQualityInspection(ctx, fourth.ID, nil); err != nil {
+		t.Fatalf("cancel fourth inspection failed: %v", err)
+	}
+
+	disabledReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-UNIQ-DISABLED-RECEIPT", fixtures, stringPtr("QI-UNIQ-DISABLED-LOT"), mustDecimal(t, "2"))
+	disabledDraft := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-UNIQ-DISABLED", disabledReceipt, fixtures)
+	forceLotStatus(t, ctx, client, *disabledReceipt.Items[0].LotID, biz.InventoryLotDisabled)
+	if _, err := uc.SubmitQualityInspection(ctx, disabledDraft.ID); !errors.Is(err, biz.ErrInventoryLotStatusBlocked) {
+		t.Fatalf("expected DISABLED lot submit to be rejected, got %v", err)
+	}
+	rejectedReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "QI-UNIQ-REJECTED-RECEIPT", fixtures, stringPtr("QI-UNIQ-REJECTED-LOT"), mustDecimal(t, "2"))
+	rejectedDraft := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-UNIQ-REJECTED", rejectedReceipt, fixtures)
+	changeLotToStatus(t, ctx, uc, *rejectedReceipt.Items[0].LotID, biz.InventoryLotRejected)
+	if _, err := uc.SubmitQualityInspection(ctx, rejectedDraft.ID); !errors.Is(err, biz.ErrInventoryLotStatusBlocked) {
+		t.Fatalf("expected REJECTED lot submit to be rejected, got %v", err)
+	}
+
+	if err := client.QualityInspection.DeleteOneID(first.ID).Exec(ctx); err == nil {
+		t.Fatalf("expected quality inspection delete to be rejected")
+	}
+	if _, err := client.QualityInspection.UpdateOneID(first.ID).SetStatus(biz.QualityInspectionStatusDraft).Save(ctx); err == nil {
+		t.Fatalf("expected direct status update to be rejected")
+	}
+	if _, err := client.QualityInspection.UpdateOneID(first.ID).SetInspectionNo("QI-UNIQ-FIRST-CHANGED").Save(ctx); err == nil {
+		t.Fatalf("expected direct inspection_no update to be rejected")
+	}
+	if _, err := client.QualityInspection.UpdateOneID(first.ID).SetInspectorID(9001).Save(ctx); err == nil {
+		t.Fatalf("expected direct inspector_id update on terminal inspection to be rejected")
+	}
+}
+
 func TestInventoryRepo_PurchaseReceiptAdjustmentQuantityLifecycleAndProtection(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_receipt_adjustment_lifecycle")
@@ -2835,6 +3617,214 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentCorrectionGuardsAndLotIsolation(
 	assertDecimalEqual(t, lotBalance.Quantity, "10")
 }
 
+func TestInventoryRepo_PurchaseReceiptAdjustmentLotStatusGuard(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_receipt_adjustment_lot_status")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	for _, status := range []string{biz.InventoryLotHold, biz.InventoryLotRejected} {
+		status := status
+		t.Run("quantity_decrease_"+status, func(t *testing.T) {
+			receipt := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-STATUS-QTY-"+status, fixtures, stringPtr("PRA-STATUS-QTY-LOT-"+status), mustDecimal(t, "5"))
+			item := receipt.Items[0]
+			if item.LotID == nil {
+				t.Fatalf("expected quantity status lot_id")
+			}
+			changeLotToStatus(t, ctx, uc, *item.LotID, status)
+			adjustment := createPurchaseReceiptAdjustmentDraft(t, ctx, uc, "PRA-STATUS-QTY-ADJ-"+status, receipt.ID)
+			addPurchaseReceiptAdjustmentItem(t, ctx, uc, adjustment.ID, item, biz.PurchaseReceiptAdjustmentQuantityDecrease, fixtures.warehouseID, item.LotID, mustDecimal(t, "1"), nil)
+			if _, err := uc.PostPurchaseReceiptAdjustment(ctx, adjustment.ID); !errors.Is(err, biz.ErrInventoryLotStatusBlocked) {
+				t.Fatalf("expected %s quantity decrease to be blocked by lot status, got %v", status, err)
+			}
+			assertAdjustmentTxnCount(t, ctx, client, adjustment.ID, 0)
+			balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+				SubjectType: biz.InventorySubjectMaterial,
+				SubjectID:   fixtures.materialID,
+				WarehouseID: fixtures.warehouseID,
+				LotID:       item.LotID,
+				UnitID:      fixtures.unitID,
+			})
+			if err != nil {
+				t.Fatalf("get %s balance after blocked quantity decrease failed: %v", status, err)
+			}
+			assertDecimalEqual(t, balance.Quantity, "5")
+		})
+	}
+
+	lotCorrectionReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-STATUS-LOT-CORR-IN", fixtures, stringPtr("PRA-STATUS-LOT-CORR-OLD"), mustDecimal(t, "5"))
+	lotCorrectionItem := lotCorrectionReceipt.Items[0]
+	if lotCorrectionItem.LotID == nil {
+		t.Fatalf("expected lot correction status old lot_id")
+	}
+	lotCorrectionNewLot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectMaterial, fixtures.materialID, "PRA-STATUS-LOT-CORR-NEW")
+	changeLotToStatus(t, ctx, uc, *lotCorrectionItem.LotID, biz.InventoryLotHold)
+	lotCorrection := createPurchaseReceiptAdjustmentDraft(t, ctx, uc, "PRA-STATUS-LOT-CORR", lotCorrectionReceipt.ID)
+	addPurchaseReceiptAdjustmentItem(t, ctx, uc, lotCorrection.ID, lotCorrectionItem, biz.PurchaseReceiptAdjustmentLotCorrectionOut, fixtures.warehouseID, lotCorrectionItem.LotID, mustDecimal(t, "2"), stringPtr("LOT-STATUS"))
+	addPurchaseReceiptAdjustmentItem(t, ctx, uc, lotCorrection.ID, lotCorrectionItem, biz.PurchaseReceiptAdjustmentLotCorrectionIn, fixtures.warehouseID, &lotCorrectionNewLot.ID, mustDecimal(t, "2"), stringPtr("LOT-STATUS"))
+	if _, err := uc.PostPurchaseReceiptAdjustment(ctx, lotCorrection.ID); !errors.Is(err, biz.ErrInventoryLotStatusBlocked) {
+		t.Fatalf("expected HOLD lot correction OUT to be blocked, got %v", err)
+	}
+	assertAdjustmentTxnCount(t, ctx, client, lotCorrection.ID, 0)
+	oldLotBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		LotID:       lotCorrectionItem.LotID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get old lot balance after blocked correction failed: %v", err)
+	}
+	assertDecimalEqual(t, oldLotBalance.Quantity, "5")
+	if _, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		LotID:       &lotCorrectionNewLot.ID,
+		UnitID:      fixtures.unitID,
+	}); !errors.Is(err, biz.ErrInventoryBalanceNotFound) {
+		t.Fatalf("blocked correction must not write IN-side balance, got %v", err)
+	}
+
+	warehouseCorrectionReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "PRA-STATUS-WH-CORR-IN", fixtures, stringPtr("PRA-STATUS-WH-CORR-LOT"), mustDecimal(t, "5"))
+	warehouseCorrectionItem := warehouseCorrectionReceipt.Items[0]
+	if warehouseCorrectionItem.LotID == nil {
+		t.Fatalf("expected warehouse correction status lot_id")
+	}
+	otherWarehouse := createTestWarehouse(t, ctx, client, "PRA-STATUS-WH-CORR-TO")
+	changeLotToStatus(t, ctx, uc, *warehouseCorrectionItem.LotID, biz.InventoryLotRejected)
+	warehouseCorrection := createPurchaseReceiptAdjustmentDraft(t, ctx, uc, "PRA-STATUS-WH-CORR", warehouseCorrectionReceipt.ID)
+	addPurchaseReceiptAdjustmentItem(t, ctx, uc, warehouseCorrection.ID, warehouseCorrectionItem, biz.PurchaseReceiptAdjustmentWarehouseCorrectionOut, fixtures.warehouseID, warehouseCorrectionItem.LotID, mustDecimal(t, "2"), stringPtr("WH-STATUS"))
+	addPurchaseReceiptAdjustmentItem(t, ctx, uc, warehouseCorrection.ID, warehouseCorrectionItem, biz.PurchaseReceiptAdjustmentWarehouseCorrectionIn, otherWarehouse.ID, warehouseCorrectionItem.LotID, mustDecimal(t, "2"), stringPtr("WH-STATUS"))
+	if _, err := uc.PostPurchaseReceiptAdjustment(ctx, warehouseCorrection.ID); !errors.Is(err, biz.ErrInventoryLotStatusBlocked) {
+		t.Fatalf("expected REJECTED warehouse correction OUT to be blocked, got %v", err)
+	}
+	assertAdjustmentTxnCount(t, ctx, client, warehouseCorrection.ID, 0)
+	if _, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: otherWarehouse.ID,
+		LotID:       warehouseCorrectionItem.LotID,
+		UnitID:      fixtures.unitID,
+	}); !errors.Is(err, biz.ErrInventoryBalanceNotFound) {
+		t.Fatalf("blocked warehouse correction must not write IN-side balance, got %v", err)
+	}
+}
+
+func TestInventoryRepo_ReversalIgnoresCurrentLotStatus(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_reversal_lot_status")
+
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+
+	receipt := createAndPostPurchaseReceipt(t, ctx, uc, "REV-STATUS-RECEIPT", fixtures, stringPtr("REV-STATUS-RECEIPT-LOT"), mustDecimal(t, "5"))
+	receiptItem := receipt.Items[0]
+	if receiptItem.LotID == nil {
+		t.Fatalf("expected receipt reversal lot_id")
+	}
+	changeLotToStatus(t, ctx, uc, *receiptItem.LotID, biz.InventoryLotHold)
+	if _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); err != nil {
+		t.Fatalf("cancel purchase receipt should ignore HOLD lot status, got %v", err)
+	}
+	if _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); err != nil {
+		t.Fatalf("repeat cancel purchase receipt should remain idempotent, got %v", err)
+	}
+	inboundTxn, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReceiptSourceType),
+			inventorytxn.SourceID(receipt.ID),
+			inventorytxn.SourceLineID(receiptItem.ID),
+			inventorytxn.TxnType(biz.InventoryTxnIn),
+		).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("find receipt inbound txn failed: %v", err)
+	}
+	assertReversalCount(t, ctx, client, inboundTxn.ID, 1)
+
+	returnReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "REV-STATUS-RETURN-IN", fixtures, stringPtr("REV-STATUS-RETURN-LOT"), mustDecimal(t, "5"))
+	returnItem := returnReceipt.Items[0]
+	if returnItem.LotID == nil {
+		t.Fatalf("expected return reversal lot_id")
+	}
+	purchaseReturn := createLinkedPurchaseReturn(t, ctx, uc, "REV-STATUS-RETURN", returnReceipt.ID, returnItem, fixtures, mustDecimal(t, "2"))
+	if _, err := uc.PostPurchaseReturn(ctx, purchaseReturn.ID); err != nil {
+		t.Fatalf("post return before status reversal failed: %v", err)
+	}
+	changeLotToStatus(t, ctx, uc, *returnItem.LotID, biz.InventoryLotRejected)
+	if _, err := uc.CancelPostedPurchaseReturn(ctx, purchaseReturn.ID); err != nil {
+		t.Fatalf("cancel purchase return should ignore REJECTED lot status, got %v", err)
+	}
+	if _, err := uc.CancelPostedPurchaseReturn(ctx, purchaseReturn.ID); err != nil {
+		t.Fatalf("repeat cancel purchase return should remain idempotent, got %v", err)
+	}
+	returnOutTxn, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReturnSourceType),
+			inventorytxn.SourceID(purchaseReturn.ID),
+			inventorytxn.TxnType(biz.InventoryTxnOut),
+		).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("find return outbound txn failed: %v", err)
+	}
+	assertReversalCount(t, ctx, client, returnOutTxn.ID, 1)
+
+	adjustmentReceipt := createAndPostPurchaseReceipt(t, ctx, uc, "REV-STATUS-ADJ-IN", fixtures, stringPtr("REV-STATUS-ADJ-OLD"), mustDecimal(t, "5"))
+	adjustmentItem := adjustmentReceipt.Items[0]
+	if adjustmentItem.LotID == nil {
+		t.Fatalf("expected adjustment reversal old lot_id")
+	}
+	newLot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectMaterial, fixtures.materialID, "REV-STATUS-ADJ-NEW")
+	adjustment := createPurchaseReceiptAdjustmentDraft(t, ctx, uc, "REV-STATUS-ADJ", adjustmentReceipt.ID)
+	outItem := addPurchaseReceiptAdjustmentItem(t, ctx, uc, adjustment.ID, adjustmentItem, biz.PurchaseReceiptAdjustmentLotCorrectionOut, fixtures.warehouseID, adjustmentItem.LotID, mustDecimal(t, "2"), stringPtr("REV-ADJ"))
+	inItem := addPurchaseReceiptAdjustmentItem(t, ctx, uc, adjustment.ID, adjustmentItem, biz.PurchaseReceiptAdjustmentLotCorrectionIn, fixtures.warehouseID, &newLot.ID, mustDecimal(t, "2"), stringPtr("REV-ADJ"))
+	if _, err := uc.PostPurchaseReceiptAdjustment(ctx, adjustment.ID); err != nil {
+		t.Fatalf("post adjustment before status reversal failed: %v", err)
+	}
+	changeLotToStatus(t, ctx, uc, *adjustmentItem.LotID, biz.InventoryLotHold)
+	changeLotToStatus(t, ctx, uc, newLot.ID, biz.InventoryLotRejected)
+	if _, err := uc.CancelPostedPurchaseReceiptAdjustment(ctx, adjustment.ID); err != nil {
+		t.Fatalf("cancel adjustment should ignore HOLD/REJECTED lot status, got %v", err)
+	}
+	if _, err := uc.CancelPostedPurchaseReceiptAdjustment(ctx, adjustment.ID); err != nil {
+		t.Fatalf("repeat cancel adjustment should remain idempotent, got %v", err)
+	}
+	adjustOutTxn, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReceiptAdjustmentSourceType),
+			inventorytxn.SourceID(adjustment.ID),
+			inventorytxn.SourceLineID(outItem.ID),
+			inventorytxn.TxnType(biz.InventoryTxnAdjustOut),
+		).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("find adjustment out txn failed: %v", err)
+	}
+	adjustInTxn, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReceiptAdjustmentSourceType),
+			inventorytxn.SourceID(adjustment.ID),
+			inventorytxn.SourceLineID(inItem.ID),
+			inventorytxn.TxnType(biz.InventoryTxnAdjustIn),
+		).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("find adjustment in txn failed: %v", err)
+	}
+	assertReversalCount(t, ctx, client, adjustOutTxn.ID, 1)
+	assertReversalCount(t, ctx, client, adjustInTxn.ID, 1)
+}
+
 func TestInventoryQuantityGeneratedTypeIsDecimal(t *testing.T) {
 	decimalType := reflect.TypeOf(decimal.Decimal{})
 	txnQuantity, ok := reflect.TypeOf(ent.InventoryTxn{}).FieldByName("Quantity")
@@ -3049,6 +4039,29 @@ func createLinkedPurchaseReturn(t *testing.T, ctx context.Context, uc *biz.Inven
 	return purchaseReturn
 }
 
+func createQualityInspectionDraftFromReceipt(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, inspectionNo string, receipt *biz.PurchaseReceipt, fixtures inventoryTestFixtures) *biz.QualityInspection {
+	t.Helper()
+	if len(receipt.Items) != 1 {
+		t.Fatalf("expected receipt %s to have one item, got %d", receipt.ReceiptNo, len(receipt.Items))
+	}
+	item := receipt.Items[0]
+	if item.LotID == nil {
+		t.Fatalf("expected receipt %s item lot_id", receipt.ReceiptNo)
+	}
+	inspection, err := uc.CreateQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+		InspectionNo:          inspectionNo,
+		PurchaseReceiptID:     receipt.ID,
+		PurchaseReceiptItemID: &item.ID,
+		InventoryLotID:        *item.LotID,
+		MaterialID:            fixtures.materialID,
+		WarehouseID:           fixtures.warehouseID,
+	})
+	if err != nil {
+		t.Fatalf("create quality inspection %s failed: %v", inspectionNo, err)
+	}
+	return inspection
+}
+
 func createPurchaseReceiptAdjustmentDraft(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, adjustmentNo string, receiptID int) *biz.PurchaseReceiptAdjustment {
 	t.Helper()
 	adjustment, err := uc.CreatePurchaseReceiptAdjustmentDraft(ctx, &biz.PurchaseReceiptAdjustmentCreate{
@@ -3079,6 +4092,82 @@ func addPurchaseReceiptAdjustmentItem(t *testing.T, ctx context.Context, uc *biz
 		t.Fatalf("add purchase receipt adjustment item failed: %v", err)
 	}
 	return item
+}
+
+func changeLotToStatus(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, lotID int, status string) {
+	t.Helper()
+	if status == biz.InventoryLotRejected {
+		if _, err := uc.ChangeInventoryLotStatus(ctx, lotID, biz.InventoryLotHold, "待判"); err != nil {
+			t.Fatalf("change lot %d to HOLD before REJECTED failed: %v", lotID, err)
+		}
+	}
+	if _, err := uc.ChangeInventoryLotStatus(ctx, lotID, status, "测试状态变更"); err != nil {
+		t.Fatalf("change lot %d to %s failed: %v", lotID, status, err)
+	}
+}
+
+func forceLotStatus(t *testing.T, ctx context.Context, client *ent.Client, lotID int, status string) {
+	t.Helper()
+	if _, err := client.InventoryLot.UpdateOneID(lotID).SetStatus(status).Save(ctx); err != nil {
+		t.Fatalf("force lot %d to %s failed: %v", lotID, status, err)
+	}
+}
+
+func assertLotStatus(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, lotID int, want string) {
+	t.Helper()
+	lot, err := uc.GetInventoryLot(ctx, lotID)
+	if err != nil {
+		t.Fatalf("get lot %d failed: %v", lotID, err)
+	}
+	if lot.Status != want {
+		t.Fatalf("expected lot %d status %s, got %s", lotID, want, lot.Status)
+	}
+}
+
+func inventoryTxnCount(t *testing.T, ctx context.Context, client *ent.Client) int {
+	t.Helper()
+	count, err := client.InventoryTxn.Query().Count(ctx)
+	if err != nil {
+		t.Fatalf("count inventory txns failed: %v", err)
+	}
+	return count
+}
+
+func assertInventoryTxnCount(t *testing.T, ctx context.Context, client *ent.Client, want int) {
+	t.Helper()
+	count := inventoryTxnCount(t, ctx, client)
+	if count != want {
+		t.Fatalf("expected inventory txn count %d, got %d", want, count)
+	}
+}
+
+func assertAdjustmentTxnCount(t *testing.T, ctx context.Context, client *ent.Client, adjustmentID int, want int) {
+	t.Helper()
+	count, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReceiptAdjustmentSourceType),
+			inventorytxn.SourceID(adjustmentID),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count adjustment txns failed: %v", err)
+	}
+	if count != want {
+		t.Fatalf("expected adjustment %d txn count %d, got %d", adjustmentID, want, count)
+	}
+}
+
+func assertReversalCount(t *testing.T, ctx context.Context, client *ent.Client, originalTxnID int, want int) {
+	t.Helper()
+	count, err := client.InventoryTxn.Query().
+		Where(inventorytxn.ReversalOfTxnID(originalTxnID)).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count reversals for txn %d failed: %v", originalTxnID, err)
+	}
+	if count != want {
+		t.Fatalf("expected txn %d reversal count %d, got %d", originalTxnID, want, count)
+	}
 }
 
 func stringPtr(value string) *string {

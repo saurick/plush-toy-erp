@@ -20,7 +20,9 @@ var (
 	ErrPurchaseReturnItemNotFound            = errors.New("purchase return item not found")
 	ErrPurchaseReceiptAdjustmentNotFound     = errors.New("purchase receipt adjustment not found")
 	ErrPurchaseReceiptAdjustmentItemNotFound = errors.New("purchase receipt adjustment item not found")
+	ErrQualityInspectionNotFound             = errors.New("quality inspection not found")
 	ErrInventoryInsufficientStock            = errors.New("inventory insufficient stock")
+	ErrInventoryLotStatusBlocked             = errors.New("inventory lot status blocks stock deduction")
 	ErrInventoryTxnAlreadyReversed           = errors.New("inventory txn already reversed")
 )
 
@@ -37,6 +39,8 @@ const (
 	InventoryTxnReversal    = "REVERSAL"
 
 	InventoryLotActive   = "ACTIVE"
+	InventoryLotHold     = "HOLD"
+	InventoryLotRejected = "REJECTED"
 	InventoryLotDisabled = "DISABLED"
 
 	BOMStatusDraft    = "DRAFT"
@@ -82,6 +86,8 @@ var (
 	}
 	inventoryLotStatuses = map[string]struct{}{
 		InventoryLotActive:   {},
+		InventoryLotHold:     {},
+		InventoryLotRejected: {},
 		InventoryLotDisabled: {},
 	}
 	bomStatuses = map[string]struct{}{
@@ -253,6 +259,7 @@ type InventoryTxnApplyResult struct {
 type InventoryRepo interface {
 	CreateInventoryLot(ctx context.Context, in *InventoryLotCreate) (*InventoryLot, error)
 	GetInventoryLot(ctx context.Context, id int) (*InventoryLot, error)
+	ChangeInventoryLotStatus(ctx context.Context, lotID int, newStatus string, reason string) (*InventoryLot, error)
 	CreateInventoryTxn(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxn, error)
 	ApplyInventoryTxnAndUpdateBalance(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxnApplyResult, error)
 	GetInventoryBalance(ctx context.Context, key InventoryBalanceKey) (*InventoryBalance, error)
@@ -275,6 +282,12 @@ type InventoryRepo interface {
 	PostPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*PurchaseReceiptAdjustment, error)
 	CancelPostedPurchaseReceiptAdjustment(ctx context.Context, adjustmentID int) (*PurchaseReceiptAdjustment, error)
 	GetPurchaseReceiptAdjustment(ctx context.Context, id int) (*PurchaseReceiptAdjustment, error)
+	CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error)
+	SubmitQualityInspection(ctx context.Context, inspectionID int) (*QualityInspection, error)
+	PassQualityInspection(ctx context.Context, in *QualityInspectionDecision) (*QualityInspection, error)
+	RejectQualityInspection(ctx context.Context, in *QualityInspectionDecision) (*QualityInspection, error)
+	CancelQualityInspection(ctx context.Context, inspectionID int, decisionNote *string) (*QualityInspection, error)
+	GetQualityInspection(ctx context.Context, id int) (*QualityInspection, error)
 }
 
 type InventoryUsecase struct {
@@ -301,6 +314,18 @@ func (uc *InventoryUsecase) GetInventoryLot(ctx context.Context, id int) (*Inven
 		return nil, ErrBadParam
 	}
 	return uc.repo.GetInventoryLot(ctx, id)
+}
+
+func (uc *InventoryUsecase) ChangeInventoryLotStatus(ctx context.Context, lotID int, newStatus string, reason string) (*InventoryLot, error) {
+	if uc == nil || uc.repo == nil || lotID <= 0 {
+		return nil, ErrBadParam
+	}
+	newStatus = strings.ToUpper(strings.TrimSpace(newStatus))
+	reason = strings.TrimSpace(reason)
+	if !IsValidInventoryLotStatus(newStatus) {
+		return nil, ErrBadParam
+	}
+	return uc.repo.ChangeInventoryLotStatus(ctx, lotID, newStatus, reason)
 }
 
 func (uc *InventoryUsecase) CreateInventoryTxn(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxn, error) {
@@ -466,6 +491,33 @@ func IsValidInventoryTxnType(value string) bool {
 func IsValidInventoryLotStatus(value string) bool {
 	_, ok := inventoryLotStatuses[strings.ToUpper(strings.TrimSpace(value))]
 	return ok
+}
+
+func IsInventoryLotStatusTransitionAllowed(currentStatus, newStatus string, hasPositiveBalance bool) bool {
+	currentStatus = strings.ToUpper(strings.TrimSpace(currentStatus))
+	newStatus = strings.ToUpper(strings.TrimSpace(newStatus))
+	if !IsValidInventoryLotStatus(currentStatus) || !IsValidInventoryLotStatus(newStatus) {
+		return false
+	}
+	if currentStatus == newStatus {
+		return true
+	}
+	if currentStatus == InventoryLotDisabled {
+		return false
+	}
+	if newStatus == InventoryLotDisabled {
+		return !hasPositiveBalance
+	}
+	switch currentStatus {
+	case InventoryLotActive:
+		return newStatus == InventoryLotHold
+	case InventoryLotHold:
+		return newStatus == InventoryLotActive || newStatus == InventoryLotRejected
+	case InventoryLotRejected:
+		return newStatus == InventoryLotActive || newStatus == InventoryLotHold
+	default:
+		return false
+	}
 }
 
 func IsValidBOMStatus(value string) bool {

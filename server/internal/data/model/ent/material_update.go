@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
+	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/unit"
 	"time"
 
@@ -220,6 +221,21 @@ func (_u *MaterialUpdate) AddPurchaseReceiptAdjustmentItems(v ...*PurchaseReceip
 	return _u.AddPurchaseReceiptAdjustmentItemIDs(ids...)
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (_u *MaterialUpdate) AddQualityInspectionIDs(ids ...int) *MaterialUpdate {
+	_u.mutation.AddQualityInspectionIDs(ids...)
+	return _u
+}
+
+// AddQualityInspections adds the "quality_inspections" edges to the QualityInspection entity.
+func (_u *MaterialUpdate) AddQualityInspections(v ...*QualityInspection) *MaterialUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddQualityInspectionIDs(ids...)
+}
+
 // Mutation returns the MaterialMutation object of the builder.
 func (_u *MaterialUpdate) Mutation() *MaterialMutation {
 	return _u.mutation
@@ -313,6 +329,27 @@ func (_u *MaterialUpdate) RemovePurchaseReceiptAdjustmentItems(v ...*PurchaseRec
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseReceiptAdjustmentItemIDs(ids...)
+}
+
+// ClearQualityInspections clears all "quality_inspections" edges to the QualityInspection entity.
+func (_u *MaterialUpdate) ClearQualityInspections() *MaterialUpdate {
+	_u.mutation.ClearQualityInspections()
+	return _u
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to QualityInspection entities by IDs.
+func (_u *MaterialUpdate) RemoveQualityInspectionIDs(ids ...int) *MaterialUpdate {
+	_u.mutation.RemoveQualityInspectionIDs(ids...)
+	return _u
+}
+
+// RemoveQualityInspections removes "quality_inspections" edges to QualityInspection entities.
+func (_u *MaterialUpdate) RemoveQualityInspections(v ...*QualityInspection) *MaterialUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveQualityInspectionIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -640,6 +677,51 @@ func (_u *MaterialUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.QualityInspectionsTable,
+			Columns: []string{material.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedQualityInspectionsIDs(); len(nodes) > 0 && !_u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.QualityInspectionsTable,
+			Columns: []string{material.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QualityInspectionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.QualityInspectionsTable,
+			Columns: []string{material.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{material.Label}
@@ -847,6 +929,21 @@ func (_u *MaterialUpdateOne) AddPurchaseReceiptAdjustmentItems(v ...*PurchaseRec
 	return _u.AddPurchaseReceiptAdjustmentItemIDs(ids...)
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (_u *MaterialUpdateOne) AddQualityInspectionIDs(ids ...int) *MaterialUpdateOne {
+	_u.mutation.AddQualityInspectionIDs(ids...)
+	return _u
+}
+
+// AddQualityInspections adds the "quality_inspections" edges to the QualityInspection entity.
+func (_u *MaterialUpdateOne) AddQualityInspections(v ...*QualityInspection) *MaterialUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddQualityInspectionIDs(ids...)
+}
+
 // Mutation returns the MaterialMutation object of the builder.
 func (_u *MaterialUpdateOne) Mutation() *MaterialMutation {
 	return _u.mutation
@@ -940,6 +1037,27 @@ func (_u *MaterialUpdateOne) RemovePurchaseReceiptAdjustmentItems(v ...*Purchase
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseReceiptAdjustmentItemIDs(ids...)
+}
+
+// ClearQualityInspections clears all "quality_inspections" edges to the QualityInspection entity.
+func (_u *MaterialUpdateOne) ClearQualityInspections() *MaterialUpdateOne {
+	_u.mutation.ClearQualityInspections()
+	return _u
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to QualityInspection entities by IDs.
+func (_u *MaterialUpdateOne) RemoveQualityInspectionIDs(ids ...int) *MaterialUpdateOne {
+	_u.mutation.RemoveQualityInspectionIDs(ids...)
+	return _u
+}
+
+// RemoveQualityInspections removes "quality_inspections" edges to QualityInspection entities.
+func (_u *MaterialUpdateOne) RemoveQualityInspections(v ...*QualityInspection) *MaterialUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveQualityInspectionIDs(ids...)
 }
 
 // Where appends a list predicates to the MaterialUpdate builder.
@@ -1290,6 +1408,51 @@ func (_u *MaterialUpdateOne) sqlSave(ctx context.Context) (_node *Material, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceiptadjustmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.QualityInspectionsTable,
+			Columns: []string{material.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedQualityInspectionsIDs(); len(nodes) > 0 && !_u.mutation.QualityInspectionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.QualityInspectionsTable,
+			Columns: []string{material.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.QualityInspectionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.QualityInspectionsTable,
+			Columns: []string{material.QualityInspectionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

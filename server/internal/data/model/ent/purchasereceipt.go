@@ -50,11 +50,13 @@ type PurchaseReceiptEdges struct {
 	PurchaseReturns []*PurchaseReturn `json:"purchase_returns,omitempty"`
 	// PurchaseReceiptAdjustments holds the value of the purchase_receipt_adjustments edge.
 	PurchaseReceiptAdjustments []*PurchaseReceiptAdjustment `json:"purchase_receipt_adjustments,omitempty"`
+	// QualityInspections holds the value of the quality_inspections edge.
+	QualityInspections []*QualityInspection `json:"quality_inspections,omitempty"`
 	// Items holds the value of the items edge.
 	Items []*PurchaseReceiptItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // BusinessRecordOrErr returns the BusinessRecord value or an error if the edge
@@ -86,10 +88,19 @@ func (e PurchaseReceiptEdges) PurchaseReceiptAdjustmentsOrErr() ([]*PurchaseRece
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustments"}
 }
 
+// QualityInspectionsOrErr returns the QualityInspections value or an error if the edge
+// was not loaded in eager-loading.
+func (e PurchaseReceiptEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
+	if e.loadedTypes[3] {
+		return e.QualityInspections, nil
+	}
+	return nil, &NotLoadedError{edge: "quality_inspections"}
+}
+
 // ItemsOrErr returns the Items value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptEdges) ItemsOrErr() ([]*PurchaseReceiptItem, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
@@ -210,6 +221,11 @@ func (_m *PurchaseReceipt) QueryPurchaseReturns() *PurchaseReturnQuery {
 // QueryPurchaseReceiptAdjustments queries the "purchase_receipt_adjustments" edge of the PurchaseReceipt entity.
 func (_m *PurchaseReceipt) QueryPurchaseReceiptAdjustments() *PurchaseReceiptAdjustmentQuery {
 	return NewPurchaseReceiptClient(_m.config).QueryPurchaseReceiptAdjustments(_m)
+}
+
+// QueryQualityInspections queries the "quality_inspections" edge of the PurchaseReceipt entity.
+func (_m *PurchaseReceipt) QueryQualityInspections() *QualityInspectionQuery {
+	return NewPurchaseReceiptClient(_m.config).QueryQualityInspections(_m)
 }
 
 // QueryItems queries the "items" edge of the PurchaseReceipt entity.

@@ -236,6 +236,18 @@ func (f PurchaseReturnItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PurchaseReturnItemMutation", m)
 }
 
+// The QualityInspectionFunc type is an adapter to allow the use of ordinary
+// function as QualityInspection mutator.
+type QualityInspectionFunc func(context.Context, *ent.QualityInspectionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f QualityInspectionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.QualityInspectionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.QualityInspectionMutation", m)
+}
+
 // The RoleFunc type is an adapter to allow the use of ordinary
 // function as Role mutator.
 type RoleFunc func(context.Context, *ent.RoleMutation) (ent.Value, error)

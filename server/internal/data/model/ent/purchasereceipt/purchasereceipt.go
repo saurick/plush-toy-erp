@@ -39,6 +39,8 @@ const (
 	EdgePurchaseReturns = "purchase_returns"
 	// EdgePurchaseReceiptAdjustments holds the string denoting the purchase_receipt_adjustments edge name in mutations.
 	EdgePurchaseReceiptAdjustments = "purchase_receipt_adjustments"
+	// EdgeQualityInspections holds the string denoting the quality_inspections edge name in mutations.
+	EdgeQualityInspections = "quality_inspections"
 	// EdgeItems holds the string denoting the items edge name in mutations.
 	EdgeItems = "items"
 	// Table holds the table name of the purchasereceipt in the database.
@@ -64,6 +66,13 @@ const (
 	PurchaseReceiptAdjustmentsInverseTable = "purchase_receipt_adjustments"
 	// PurchaseReceiptAdjustmentsColumn is the table column denoting the purchase_receipt_adjustments relation/edge.
 	PurchaseReceiptAdjustmentsColumn = "purchase_receipt_id"
+	// QualityInspectionsTable is the table that holds the quality_inspections relation/edge.
+	QualityInspectionsTable = "quality_inspections"
+	// QualityInspectionsInverseTable is the table name for the QualityInspection entity.
+	// It exists in this package in order to avoid circular dependency with the "qualityinspection" package.
+	QualityInspectionsInverseTable = "quality_inspections"
+	// QualityInspectionsColumn is the table column denoting the quality_inspections relation/edge.
+	QualityInspectionsColumn = "purchase_receipt_id"
 	// ItemsTable is the table that holds the items relation/edge.
 	ItemsTable = "purchase_receipt_items"
 	// ItemsInverseTable is the table name for the PurchaseReceiptItem entity.
@@ -212,6 +221,20 @@ func ByPurchaseReceiptAdjustments(term sql.OrderTerm, terms ...sql.OrderTerm) Or
 	}
 }
 
+// ByQualityInspectionsCount orders the results by quality_inspections count.
+func ByQualityInspectionsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newQualityInspectionsStep(), opts...)
+	}
+}
+
+// ByQualityInspections orders the results by quality_inspections terms.
+func ByQualityInspections(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newQualityInspectionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByItemsCount orders the results by items count.
 func ByItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -244,6 +267,13 @@ func newPurchaseReceiptAdjustmentsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PurchaseReceiptAdjustmentsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReceiptAdjustmentsTable, PurchaseReceiptAdjustmentsColumn),
+	)
+}
+func newQualityInspectionsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(QualityInspectionsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, QualityInspectionsTable, QualityInspectionsColumn),
 	)
 }
 func newItemsStep() *sqlgraph.Step {

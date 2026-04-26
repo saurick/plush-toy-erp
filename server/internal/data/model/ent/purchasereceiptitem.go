@@ -71,9 +71,11 @@ type PurchaseReceiptItemEdges struct {
 	PurchaseReturnItems []*PurchaseReturnItem `json:"purchase_return_items,omitempty"`
 	// PurchaseReceiptAdjustmentItems holds the value of the purchase_receipt_adjustment_items edge.
 	PurchaseReceiptAdjustmentItems []*PurchaseReceiptAdjustmentItem `json:"purchase_receipt_adjustment_items,omitempty"`
+	// QualityInspections holds the value of the quality_inspections edge.
+	QualityInspections []*QualityInspection `json:"quality_inspections,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [8]bool
 }
 
 // ReceiptOrErr returns the Receipt value or an error if the edge
@@ -147,6 +149,15 @@ func (e PurchaseReceiptItemEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*Purc
 		return e.PurchaseReceiptAdjustmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustment_items"}
+}
+
+// QualityInspectionsOrErr returns the QualityInspections value or an error if the edge
+// was not loaded in eager-loading.
+func (e PurchaseReceiptItemEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
+	if e.loadedTypes[7] {
+		return e.QualityInspections, nil
+	}
+	return nil, &NotLoadedError{edge: "quality_inspections"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -315,6 +326,11 @@ func (_m *PurchaseReceiptItem) QueryPurchaseReturnItems() *PurchaseReturnItemQue
 // QueryPurchaseReceiptAdjustmentItems queries the "purchase_receipt_adjustment_items" edge of the PurchaseReceiptItem entity.
 func (_m *PurchaseReceiptItem) QueryPurchaseReceiptAdjustmentItems() *PurchaseReceiptAdjustmentItemQuery {
 	return NewPurchaseReceiptItemClient(_m.config).QueryPurchaseReceiptAdjustmentItems(_m)
+}
+
+// QueryQualityInspections queries the "quality_inspections" edge of the PurchaseReceiptItem entity.
+func (_m *PurchaseReceiptItem) QueryQualityInspections() *QualityInspectionQuery {
+	return NewPurchaseReceiptItemClient(_m.config).QueryQualityInspections(_m)
 }
 
 // Update returns a builder for updating this PurchaseReceiptItem.

@@ -39,7 +39,7 @@
 | 工程任务字段 | `task_group=engineering_data`、`task_name=准备 BOM / 色卡 / 作业指导书`、`business_status_key=engineering_preparing`、`owner_role_key=engineering`、`due_at` 默认 24 小时后、`payload.next_module_key=material-bom`、`payload.entry_path=/erp/purchase/material-bom`、`critical_path=true`。 |
 | 驳回路径 | boss 移动端点击“阻塞”或“退回”时必须填写原因；任务写入 `blocked` 或 `rejected`，状态快照写 `blocked_reason`，并创建 `order_revision` 业务补资料任务给 `business`。补资料任务 payload 用 `decision / transition_status` 区分 `blocked` 和 `rejected`，同时保留对应原因。 |
 | 当前编排位置 | 老板审批任务的 `done / blocked / rejected` 派生已迁入后端 `WorkflowUsecase.UpdateTaskStatus`：boss 移动端只调用 `update_task_status` 并刷新任务列表；后端写 `workflow_task_events`、upsert `workflow_business_states`，并幂等创建工程资料或补资料任务。桌面提交审批仍通过现有 `create_task` 创建老板审批任务，不新增 workflow API、不改 Ent schema。 |
-| 后端迁移边界 | 当前已迁老板审批、IQC、采购仓库入库协同状态推进、委外回货检验、成品抽检、成品入库协同状态推进六条最小规则，不是完整 workflow engine。下游任务派生按 `source_type + source_id + task_group + owner_role_key + 非终态状态` 在应用层事务内查询后创建；采购仓库入库和成品入库不创建下游任务，只 upsert business state。暂未加 DB unique constraint；极端并发下后续仍需 DB unique constraint 或 advisory lock 加固。出货、应收、应付和对账闭环仍待后续迁入。 |
+| 后端迁移边界 | 当前已迁老板审批、IQC、采购仓库入库协同状态推进、委外回货检验、成品抽检、成品入库协同状态推进、出货放行协同状态推进七条最小规则，不是完整 workflow engine。下游任务派生按 `source_type + source_id + task_group + owner_role_key + 非终态状态` 在应用层事务内查询后创建；采购仓库入库、成品入库和出货放行不创建下游任务，只 upsert business state。暂未加 DB unique constraint；极端并发下后续仍需 DB unique constraint 或 advisory lock 加固。真实出货执行、应收、应付和对账闭环仍待后续迁入。 |
 
 边界说明：本闭环只落地订单审批到工程资料，不让 PMC 代替老板审批，不创建资产、低值易耗品、低代码表单或拖拽流程设计器，也不新增 notifications 表。预警仍由任务状态、截止时间、优先级和 payload 在前端计算；库存和财务专表不因本规则迁移而自动落地。
 
@@ -88,9 +88,9 @@
 | 不合格 / 返工路径 | quality 移动端点击“阻塞”或“退回”必须填写原因；移动端只调用 `update_task_status`，后端将状态快照推进为 `qc_failed`，并幂等创建 `finished_goods_rework` 给 `production` 处理返工完成、重新提交成品抽检或让步放行。 |
 | 入库完成条件 | warehouse 移动端完成 `finished_goods_inbound` 后只调用 `update_task_status`；后端将业务状态推进到 `inbound_done`，payload 标记 `inventory_balance_deferred=true` 和 `shipment_release_deferred=true`，当前只表示成品入库协同任务完成，不写正式库存余额或库存流水。 |
 | 入库阻塞 / 退回路径 | warehouse 移动端点击“阻塞”或“退回”必须填写原因；后端将业务状态统一推进到 `blocked`，保留 `decision`、`transition_status` 和对应原因，清理另一类原因残留。 |
-| 出货准备 / 出货确认条件 | `shipment_release` 不再由 `finished_goods_inbound done` 自动派生；`buildShipmentReleaseTask` 仅保留 seed / test / demo / 未来出货专项辅助口径。warehouse 完成既有 `shipment_release` 后仍可进入 `shipped`，但该链路本轮不迁。 |
-| 当前编排位置 | 桌面业务页仍负责发起成品抽检任务；`finished_goods_qc done / blocked / rejected` 后的成品入库 / 成品返工派生已迁入后端 `WorkflowUsecase.UpdateTaskStatus`。`finished_goods_inbound done / blocked / rejected` 后的成品入库协同状态推进也已迁入后端。出货放行、出货、应收和开票仍在前端 v1 编排或 seed/demo 辅助中，不由成品入库完成触发。 |
-| 幂等边界 | 后端只允许业务状态为空、`qc_pending` 或 `qc_failed` 的 `finished_goods_qc` 进入第五条规则；`qc_failed` 保持可进入，用于重复失败时复用未完成的 active `finished_goods_rework`，并允许上一轮返工已完成后再次创建下一轮返工任务。后端只允许业务状态为空、`warehouse_inbound_pending` 或 `blocked` 的 `finished_goods_inbound` 进入第六条规则；`blocked` 保持可进入，用于重复失败幂等保护，`inbound_done / shipment_pending / shipment_release_pending / shipped` 不再触发第六条特殊规则。 |
+| 出货放行 / 待出库条件 | `shipment_release` 不再由 `finished_goods_inbound done` 自动派生；`buildShipmentReleaseTask` 仅保留 seed / test / demo / 未来出货专项辅助口径。warehouse 完成既有 `shipment_release` 后由后端推进到 `shipping_released`，不进入 `shipped`。 |
+| 当前编排位置 | 桌面业务页仍负责发起成品抽检任务；`finished_goods_qc done / blocked / rejected` 后的成品入库 / 成品返工派生已迁入后端 `WorkflowUsecase.UpdateTaskStatus`。`finished_goods_inbound done / blocked / rejected` 后的成品入库协同状态推进、`shipment_release done / blocked / rejected` 后的出货放行协同状态推进也已迁入后端。真实出货执行、应收和开票仍待专项评审，不由成品入库或出货放行自动触发。 |
+| 幂等边界 | 后端只允许业务状态为空、`qc_pending` 或 `qc_failed` 的 `finished_goods_qc` 进入第五条规则；`qc_failed` 保持可进入，用于重复失败时复用未完成的 active `finished_goods_rework`，并允许上一轮返工已完成后再次创建下一轮返工任务。后端只允许业务状态为空、`warehouse_inbound_pending` 或 `blocked` 的 `finished_goods_inbound` 进入第六条规则；`blocked` 保持可进入，用于重复失败幂等保护，`inbound_done / shipment_pending / shipment_release_pending / shipped` 不再触发第六条特殊规则。后端只允许业务状态为空、`shipment_release_pending`、`shipment_pending` 或 `blocked` 的 `shipment_release` 进入第七条规则；`shipping_released / shipped / receivable_pending / invoice_pending` 不再触发第七条特殊规则。 |
 | 当前不做 | 不做应收 / 开票登记，不新增 `production_order` / `shipment_order` / `inventory_txn` / `inventory_balance` 专表，不写库存余额和库存流水，不创建库存批次，不派生 `shipment_release`，不新增 PDA、条码枪或图片识别链路。 |
 | 后续评审条件 | 当生产完工、抽检结论、返工复检、成品入库、库存可用量、预留冻结、出货扣减、财务放行、应收 / 开票和历史回补口径稳定后，再评审是否拆 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` Ent schema，并补 migration 与库存/出货计算测试。 |
 
@@ -100,7 +100,7 @@
 
 | 环节 | 当前 v1 规则 |
 | --- | --- |
-| 触发点 | `shipping-release` 或 `outbound` 记录完成出货并进入 `shipped` 后触发；若上一轮链路仍以 `production-progress` 作为 `source_type`，则通过 `shipment_release` 完成和 `payload.next_module_key=shipping-release` 兼容触发财务任务。 |
+| 触发点 | `shipping-release` 或 `outbound` 记录完成真实出货并进入 `shipped` 后触发；`shipment_release done` 只表示 `shipping_released`，不能作为应收 / 开票触发点。 |
 | 责任角色 | 应收登记和开票登记都进入 `finance`；PMC 只看 blocked、overdue、critical_path 和 high priority 财务风险；老板只看 high priority、overdue 或 critical 财务关注项，不能代替财务完成。 |
 | 应收登记任务字段 | `task_group=receivable_registration`、`task_name=应收登记`、`business_status_key=shipped`、`task_status_key=ready`、`owner_role_key=finance`、`notification_type=finance_pending`、`alert_type=finance_pending`、`critical_path=true`、`payload.next_module_key=receivables`。 |
 | 应收登记完成条件 | 财务确认客户、出货数量、应收金额、税率、含税 / 不含税金额和收款状态。finance 移动端完成后，任务更新为 `done`，业务状态推进到 `reconciling`，并创建 `invoice_registration`。 |

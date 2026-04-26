@@ -639,6 +639,29 @@ func HasPurchaseReceiptAdjustmentsWith(preds ...predicate.PurchaseReceiptAdjustm
 	})
 }
 
+// HasQualityInspections applies the HasEdge predicate on the "quality_inspections" edge.
+func HasQualityInspections() predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, QualityInspectionsTable, QualityInspectionsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasQualityInspectionsWith applies the HasEdge predicate on the "quality_inspections" edge with a given conditions (other predicates).
+func HasQualityInspectionsWith(preds ...predicate.QualityInspection) predicate.PurchaseReceipt {
+	return predicate.PurchaseReceipt(func(s *sql.Selector) {
+		step := newQualityInspectionsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasItems applies the HasEdge predicate on the "items" edge.
 func HasItems() predicate.PurchaseReceipt {
 	return predicate.PurchaseReceipt(func(s *sql.Selector) {

@@ -8,7 +8,7 @@ if [ -z "$cmd" ]; then
 fi
 
 PHASE2D_DB_URL="${PHASE2D_DB_URL:-postgres://postgres:phase2a-local-password@127.0.0.1:55432/plush_erp_phase2d_test?sslmode=disable}"
-PHASE2D_MAX_MIGRATION_VERSION="${PHASE2D_MAX_MIGRATION_VERSION:-20260426095103}"
+PHASE2D_MAX_MIGRATION_VERSION="${PHASE2D_MAX_MIGRATION_VERSION:-20260426142444}"
 PHASE2D_MIGRATE_DIR=""
 
 cleanup_phase2d_migrate_dir() {

@@ -56,7 +56,6 @@ import {
 import {
   PRODUCTION_PROCESSING_STATUS_KEY as FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY,
   QC_FAILED_STATUS_KEY as FINISHED_GOODS_QC_FAILED_STATUS_KEY,
-  SHIPPED_STATUS_KEY as FINISHED_GOODS_SHIPPED_STATUS_KEY,
   isFinishedGoodsInboundTask,
   isFinishedGoodsQcTask,
   isFinishedGoodsReworkTask,
@@ -65,12 +64,9 @@ import {
 } from '../../utils/finishedGoodsFlow.mjs'
 import {
   INVOICE_REGISTRATION_TASK_GROUP,
-  RECEIVABLE_REGISTRATION_TASK_GROUP,
   RECONCILING_STATUS_KEY as FINANCE_RECONCILING_STATUS_KEY,
-  SHIPPED_STATUS_KEY as FINANCE_SHIPPED_STATUS_KEY,
   buildFinanceBlockedState,
   buildInvoiceRegistrationTask,
-  buildReceivableRegistrationTask,
   isInvoiceRegistrationTask,
   isReceivableRegistrationTask,
   resolveShipmentFinanceTaskBusinessStatus,
@@ -173,7 +169,9 @@ function supportsRejectedAction(roleKey, task) {
         isOutsourceReturnQcTask(task) ||
         isFinishedGoodsQcTask(task))) ||
     (roleKey === 'warehouse' &&
-      (isWarehouseInboundTask(task) || isFinishedGoodsInboundTask(task))) ||
+      (isWarehouseInboundTask(task) ||
+        isFinishedGoodsInboundTask(task) ||
+        isShipmentReleaseTask(task))) ||
     (roleKey === 'finance' &&
       (isReceivableRegistrationTask(task) ||
         isInvoiceRegistrationTask(task) ||
@@ -527,72 +525,6 @@ export default function MobileRoleTasksPage() {
     })
   }
 
-  const completeShipmentReleaseTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
-    if (!record) {
-      throw new Error('未找到对应生产进度或出货放行记录')
-    }
-    const savedRecord =
-      (await updateBusinessRecordStatusForTask(
-        task,
-        record,
-        FINISHED_GOODS_SHIPPED_STATUS_KEY,
-        reason || '仓库已确认出货'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: FINISHED_GOODS_SHIPPED_STATUS_KEY,
-      owner_role_key: 'warehouse',
-      payload: {
-        record_title: savedRecord.title,
-        shipment_task_id: task.id,
-        shipment_result: 'shipped',
-        critical_path: true,
-        finished_goods: true,
-      },
-    })
-    const receivableRecord = {
-      ...savedRecord,
-      module_key: task.source_type,
-      payload: {
-        ...(savedRecord.payload || {}),
-        shipment_result: FINANCE_SHIPPED_STATUS_KEY,
-        shipped: true,
-      },
-    }
-    const hasReceivableTask = await hasActiveTaskForSource(
-      task,
-      RECEIVABLE_REGISTRATION_TASK_GROUP
-    )
-    const receivableTask = buildReceivableRegistrationTask(
-      receivableRecord,
-      task
-    )
-    let createdReceivableTask = null
-    if (receivableTask && !hasReceivableTask) {
-      createdReceivableTask = await createWorkflowTask(receivableTask)
-    }
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: FINANCE_SHIPPED_STATUS_KEY,
-      owner_role_key: 'finance',
-      payload: {
-        record_title: savedRecord.title,
-        shipment_task_id: task.id,
-        receivable_task_id: createdReceivableTask?.id,
-        shipment_result: 'shipped',
-        notification_type: 'finance_pending',
-        alert_type: 'finance_pending',
-        critical_path: true,
-        next_module_key: 'receivables',
-      },
-    })
-  }
-
   const completeFinishedGoodsReworkTask = async (task, reason) => {
     const record = await loadBusinessRecordForTask(task)
     if (!record) {
@@ -862,12 +794,7 @@ export default function MobileRoleTasksPage() {
       return
     }
 
-    if (
-      activeRoleKey === 'warehouse' &&
-      isShipmentReleaseTask(task) &&
-      taskStatusKey === 'done'
-    ) {
-      await completeShipmentReleaseTask(task, reason)
+    if (activeRoleKey === 'warehouse' && isShipmentReleaseTask(task)) {
       return
     }
 
@@ -981,9 +908,9 @@ export default function MobileRoleTasksPage() {
             taskStatusKey === 'done'
               ? 'pass'
               : undefined,
-          shipment_result:
+          shipment_release_result:
             isShipmentReleaseTask(task) && taskStatusKey === 'done'
-              ? 'shipped'
+              ? 'done'
               : undefined,
           receivable_result:
             isReceivableRegistrationTask(task) && taskStatusKey === 'done'
@@ -1006,6 +933,7 @@ export default function MobileRoleTasksPage() {
               isPurchaseIqcTask(task) ||
               isOutsourceReturnQcTask(task) ||
               isFinishedGoodsQcTask(task) ||
+              isShipmentReleaseTask(task) ||
               isReceivableRegistrationTask(task) ||
               isInvoiceRegistrationTask(task) ||
               isPayableRegistrationTask(task) ||

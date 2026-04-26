@@ -26,6 +26,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
+	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/unit"
@@ -70,6 +71,7 @@ const (
 	TypePurchaseReceiptItem           = "PurchaseReceiptItem"
 	TypePurchaseReturn                = "PurchaseReturn"
 	TypePurchaseReturnItem            = "PurchaseReturnItem"
+	TypeQualityInspection             = "QualityInspection"
 	TypeRole                          = "Role"
 	TypeRolePermission                = "RolePermission"
 	TypeUnit                          = "Unit"
@@ -9180,6 +9182,9 @@ type InventoryLotMutation struct {
 	purchase_receipt_adjustment_items        map[int]struct{}
 	removedpurchase_receipt_adjustment_items map[int]struct{}
 	clearedpurchase_receipt_adjustment_items bool
+	quality_inspections                      map[int]struct{}
+	removedquality_inspections               map[int]struct{}
+	clearedquality_inspections               bool
 	done                                     bool
 	oldValue                                 func(context.Context) (*InventoryLot, error)
 	predicates                               []predicate.InventoryLot
@@ -10034,6 +10039,60 @@ func (m *InventoryLotMutation) ResetPurchaseReceiptAdjustmentItems() {
 	m.removedpurchase_receipt_adjustment_items = nil
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by ids.
+func (m *InventoryLotMutation) AddQualityInspectionIDs(ids ...int) {
+	if m.quality_inspections == nil {
+		m.quality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.quality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// ClearQualityInspections clears the "quality_inspections" edge to the QualityInspection entity.
+func (m *InventoryLotMutation) ClearQualityInspections() {
+	m.clearedquality_inspections = true
+}
+
+// QualityInspectionsCleared reports if the "quality_inspections" edge to the QualityInspection entity was cleared.
+func (m *InventoryLotMutation) QualityInspectionsCleared() bool {
+	return m.clearedquality_inspections
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (m *InventoryLotMutation) RemoveQualityInspectionIDs(ids ...int) {
+	if m.removedquality_inspections == nil {
+		m.removedquality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.quality_inspections, ids[i])
+		m.removedquality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedQualityInspections returns the removed IDs of the "quality_inspections" edge to the QualityInspection entity.
+func (m *InventoryLotMutation) RemovedQualityInspectionsIDs() (ids []int) {
+	for id := range m.removedquality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// QualityInspectionsIDs returns the "quality_inspections" edge IDs in the mutation.
+func (m *InventoryLotMutation) QualityInspectionsIDs() (ids []int) {
+	for id := range m.quality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetQualityInspections resets all changes to the "quality_inspections" edge.
+func (m *InventoryLotMutation) ResetQualityInspections() {
+	m.quality_inspections = nil
+	m.clearedquality_inspections = false
+	m.removedquality_inspections = nil
+}
+
 // Where appends a list predicates to the InventoryLotMutation builder.
 func (m *InventoryLotMutation) Where(ps ...predicate.InventoryLot) {
 	m.predicates = append(m.predicates, ps...)
@@ -10385,7 +10444,7 @@ func (m *InventoryLotMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *InventoryLotMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.inventory_txns != nil {
 		edges = append(edges, inventorylot.EdgeInventoryTxns)
 	}
@@ -10400,6 +10459,9 @@ func (m *InventoryLotMutation) AddedEdges() []string {
 	}
 	if m.purchase_receipt_adjustment_items != nil {
 		edges = append(edges, inventorylot.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.quality_inspections != nil {
+		edges = append(edges, inventorylot.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -10438,13 +10500,19 @@ func (m *InventoryLotMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case inventorylot.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.quality_inspections))
+		for id := range m.quality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *InventoryLotMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.removedinventory_txns != nil {
 		edges = append(edges, inventorylot.EdgeInventoryTxns)
 	}
@@ -10459,6 +10527,9 @@ func (m *InventoryLotMutation) RemovedEdges() []string {
 	}
 	if m.removedpurchase_receipt_adjustment_items != nil {
 		edges = append(edges, inventorylot.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.removedquality_inspections != nil {
+		edges = append(edges, inventorylot.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -10497,13 +10568,19 @@ func (m *InventoryLotMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case inventorylot.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.removedquality_inspections))
+		for id := range m.removedquality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *InventoryLotMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.clearedinventory_txns {
 		edges = append(edges, inventorylot.EdgeInventoryTxns)
 	}
@@ -10518,6 +10595,9 @@ func (m *InventoryLotMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_receipt_adjustment_items {
 		edges = append(edges, inventorylot.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.clearedquality_inspections {
+		edges = append(edges, inventorylot.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -10536,6 +10616,8 @@ func (m *InventoryLotMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_return_items
 	case inventorylot.EdgePurchaseReceiptAdjustmentItems:
 		return m.clearedpurchase_receipt_adjustment_items
+	case inventorylot.EdgeQualityInspections:
+		return m.clearedquality_inspections
 	}
 	return false
 }
@@ -10566,6 +10648,9 @@ func (m *InventoryLotMutation) ResetEdge(name string) error {
 		return nil
 	case inventorylot.EdgePurchaseReceiptAdjustmentItems:
 		m.ResetPurchaseReceiptAdjustmentItems()
+		return nil
+	case inventorylot.EdgeQualityInspections:
+		m.ResetQualityInspections()
 		return nil
 	}
 	return fmt.Errorf("unknown InventoryLot edge %s", name)
@@ -12271,6 +12356,9 @@ type MaterialMutation struct {
 	purchase_receipt_adjustment_items        map[int]struct{}
 	removedpurchase_receipt_adjustment_items map[int]struct{}
 	clearedpurchase_receipt_adjustment_items bool
+	quality_inspections                      map[int]struct{}
+	removedquality_inspections               map[int]struct{}
+	clearedquality_inspections               bool
 	done                                     bool
 	oldValue                                 func(context.Context) (*Material, error)
 	predicates                               []predicate.Material
@@ -12980,6 +13068,60 @@ func (m *MaterialMutation) ResetPurchaseReceiptAdjustmentItems() {
 	m.removedpurchase_receipt_adjustment_items = nil
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by ids.
+func (m *MaterialMutation) AddQualityInspectionIDs(ids ...int) {
+	if m.quality_inspections == nil {
+		m.quality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.quality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// ClearQualityInspections clears the "quality_inspections" edge to the QualityInspection entity.
+func (m *MaterialMutation) ClearQualityInspections() {
+	m.clearedquality_inspections = true
+}
+
+// QualityInspectionsCleared reports if the "quality_inspections" edge to the QualityInspection entity was cleared.
+func (m *MaterialMutation) QualityInspectionsCleared() bool {
+	return m.clearedquality_inspections
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (m *MaterialMutation) RemoveQualityInspectionIDs(ids ...int) {
+	if m.removedquality_inspections == nil {
+		m.removedquality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.quality_inspections, ids[i])
+		m.removedquality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedQualityInspections returns the removed IDs of the "quality_inspections" edge to the QualityInspection entity.
+func (m *MaterialMutation) RemovedQualityInspectionsIDs() (ids []int) {
+	for id := range m.removedquality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// QualityInspectionsIDs returns the "quality_inspections" edge IDs in the mutation.
+func (m *MaterialMutation) QualityInspectionsIDs() (ids []int) {
+	for id := range m.quality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetQualityInspections resets all changes to the "quality_inspections" edge.
+func (m *MaterialMutation) ResetQualityInspections() {
+	m.quality_inspections = nil
+	m.clearedquality_inspections = false
+	m.removedquality_inspections = nil
+}
+
 // Where appends a list predicates to the MaterialMutation builder.
 func (m *MaterialMutation) Where(ps ...predicate.Material) {
 	m.predicates = append(m.predicates, ps...)
@@ -13273,7 +13415,7 @@ func (m *MaterialMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *MaterialMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.default_unit != nil {
 		edges = append(edges, material.EdgeDefaultUnit)
 	}
@@ -13288,6 +13430,9 @@ func (m *MaterialMutation) AddedEdges() []string {
 	}
 	if m.purchase_receipt_adjustment_items != nil {
 		edges = append(edges, material.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.quality_inspections != nil {
+		edges = append(edges, material.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -13324,13 +13469,19 @@ func (m *MaterialMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case material.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.quality_inspections))
+		for id := range m.quality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *MaterialMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.removedbom_items != nil {
 		edges = append(edges, material.EdgeBomItems)
 	}
@@ -13342,6 +13493,9 @@ func (m *MaterialMutation) RemovedEdges() []string {
 	}
 	if m.removedpurchase_receipt_adjustment_items != nil {
 		edges = append(edges, material.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.removedquality_inspections != nil {
+		edges = append(edges, material.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -13374,13 +13528,19 @@ func (m *MaterialMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case material.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.removedquality_inspections))
+		for id := range m.removedquality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *MaterialMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.cleareddefault_unit {
 		edges = append(edges, material.EdgeDefaultUnit)
 	}
@@ -13395,6 +13555,9 @@ func (m *MaterialMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_receipt_adjustment_items {
 		edges = append(edges, material.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.clearedquality_inspections {
+		edges = append(edges, material.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -13413,6 +13576,8 @@ func (m *MaterialMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_return_items
 	case material.EdgePurchaseReceiptAdjustmentItems:
 		return m.clearedpurchase_receipt_adjustment_items
+	case material.EdgeQualityInspections:
+		return m.clearedquality_inspections
 	}
 	return false
 }
@@ -13446,6 +13611,9 @@ func (m *MaterialMutation) ResetEdge(name string) error {
 		return nil
 	case material.EdgePurchaseReceiptAdjustmentItems:
 		m.ResetPurchaseReceiptAdjustmentItems()
+		return nil
+	case material.EdgeQualityInspections:
+		m.ResetQualityInspections()
 		return nil
 	}
 	return fmt.Errorf("unknown Material edge %s", name)
@@ -15119,6 +15287,9 @@ type PurchaseReceiptMutation struct {
 	purchase_receipt_adjustments        map[int]struct{}
 	removedpurchase_receipt_adjustments map[int]struct{}
 	clearedpurchase_receipt_adjustments bool
+	quality_inspections                 map[int]struct{}
+	removedquality_inspections          map[int]struct{}
+	clearedquality_inspections          bool
 	items                               map[int]struct{}
 	removeditems                        map[int]struct{}
 	cleareditems                        bool
@@ -15723,6 +15894,60 @@ func (m *PurchaseReceiptMutation) ResetPurchaseReceiptAdjustments() {
 	m.removedpurchase_receipt_adjustments = nil
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by ids.
+func (m *PurchaseReceiptMutation) AddQualityInspectionIDs(ids ...int) {
+	if m.quality_inspections == nil {
+		m.quality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.quality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// ClearQualityInspections clears the "quality_inspections" edge to the QualityInspection entity.
+func (m *PurchaseReceiptMutation) ClearQualityInspections() {
+	m.clearedquality_inspections = true
+}
+
+// QualityInspectionsCleared reports if the "quality_inspections" edge to the QualityInspection entity was cleared.
+func (m *PurchaseReceiptMutation) QualityInspectionsCleared() bool {
+	return m.clearedquality_inspections
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (m *PurchaseReceiptMutation) RemoveQualityInspectionIDs(ids ...int) {
+	if m.removedquality_inspections == nil {
+		m.removedquality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.quality_inspections, ids[i])
+		m.removedquality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedQualityInspections returns the removed IDs of the "quality_inspections" edge to the QualityInspection entity.
+func (m *PurchaseReceiptMutation) RemovedQualityInspectionsIDs() (ids []int) {
+	for id := range m.removedquality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// QualityInspectionsIDs returns the "quality_inspections" edge IDs in the mutation.
+func (m *PurchaseReceiptMutation) QualityInspectionsIDs() (ids []int) {
+	for id := range m.quality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetQualityInspections resets all changes to the "quality_inspections" edge.
+func (m *PurchaseReceiptMutation) ResetQualityInspections() {
+	m.quality_inspections = nil
+	m.clearedquality_inspections = false
+	m.removedquality_inspections = nil
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by ids.
 func (m *PurchaseReceiptMutation) AddItemIDs(ids ...int) {
 	if m.items == nil {
@@ -16070,7 +16295,7 @@ func (m *PurchaseReceiptMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PurchaseReceiptMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.business_record != nil {
 		edges = append(edges, purchasereceipt.EdgeBusinessRecord)
 	}
@@ -16079,6 +16304,9 @@ func (m *PurchaseReceiptMutation) AddedEdges() []string {
 	}
 	if m.purchase_receipt_adjustments != nil {
 		edges = append(edges, purchasereceipt.EdgePurchaseReceiptAdjustments)
+	}
+	if m.quality_inspections != nil {
+		edges = append(edges, purchasereceipt.EdgeQualityInspections)
 	}
 	if m.items != nil {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -16106,6 +16334,12 @@ func (m *PurchaseReceiptMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceipt.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.quality_inspections))
+		for id := range m.quality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	case purchasereceipt.EdgeItems:
 		ids := make([]ent.Value, 0, len(m.items))
 		for id := range m.items {
@@ -16118,12 +16352,15 @@ func (m *PurchaseReceiptMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PurchaseReceiptMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedpurchase_returns != nil {
 		edges = append(edges, purchasereceipt.EdgePurchaseReturns)
 	}
 	if m.removedpurchase_receipt_adjustments != nil {
 		edges = append(edges, purchasereceipt.EdgePurchaseReceiptAdjustments)
+	}
+	if m.removedquality_inspections != nil {
+		edges = append(edges, purchasereceipt.EdgeQualityInspections)
 	}
 	if m.removeditems != nil {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -16147,6 +16384,12 @@ func (m *PurchaseReceiptMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceipt.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.removedquality_inspections))
+		for id := range m.removedquality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	case purchasereceipt.EdgeItems:
 		ids := make([]ent.Value, 0, len(m.removeditems))
 		for id := range m.removeditems {
@@ -16159,7 +16402,7 @@ func (m *PurchaseReceiptMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PurchaseReceiptMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.clearedbusiness_record {
 		edges = append(edges, purchasereceipt.EdgeBusinessRecord)
 	}
@@ -16168,6 +16411,9 @@ func (m *PurchaseReceiptMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_receipt_adjustments {
 		edges = append(edges, purchasereceipt.EdgePurchaseReceiptAdjustments)
+	}
+	if m.clearedquality_inspections {
+		edges = append(edges, purchasereceipt.EdgeQualityInspections)
 	}
 	if m.cleareditems {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -16185,6 +16431,8 @@ func (m *PurchaseReceiptMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_returns
 	case purchasereceipt.EdgePurchaseReceiptAdjustments:
 		return m.clearedpurchase_receipt_adjustments
+	case purchasereceipt.EdgeQualityInspections:
+		return m.clearedquality_inspections
 	case purchasereceipt.EdgeItems:
 		return m.cleareditems
 	}
@@ -16214,6 +16462,9 @@ func (m *PurchaseReceiptMutation) ResetEdge(name string) error {
 		return nil
 	case purchasereceipt.EdgePurchaseReceiptAdjustments:
 		m.ResetPurchaseReceiptAdjustments()
+		return nil
+	case purchasereceipt.EdgeQualityInspections:
+		m.ResetQualityInspections()
 		return nil
 	case purchasereceipt.EdgeItems:
 		m.ResetItems()
@@ -18698,6 +18949,9 @@ type PurchaseReceiptItemMutation struct {
 	purchase_receipt_adjustment_items        map[int]struct{}
 	removedpurchase_receipt_adjustment_items map[int]struct{}
 	clearedpurchase_receipt_adjustment_items bool
+	quality_inspections                      map[int]struct{}
+	removedquality_inspections               map[int]struct{}
+	clearedquality_inspections               bool
 	done                                     bool
 	oldValue                                 func(context.Context) (*PurchaseReceiptItem, error)
 	predicates                               []predicate.PurchaseReceiptItem
@@ -19603,6 +19857,60 @@ func (m *PurchaseReceiptItemMutation) ResetPurchaseReceiptAdjustmentItems() {
 	m.removedpurchase_receipt_adjustment_items = nil
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by ids.
+func (m *PurchaseReceiptItemMutation) AddQualityInspectionIDs(ids ...int) {
+	if m.quality_inspections == nil {
+		m.quality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.quality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// ClearQualityInspections clears the "quality_inspections" edge to the QualityInspection entity.
+func (m *PurchaseReceiptItemMutation) ClearQualityInspections() {
+	m.clearedquality_inspections = true
+}
+
+// QualityInspectionsCleared reports if the "quality_inspections" edge to the QualityInspection entity was cleared.
+func (m *PurchaseReceiptItemMutation) QualityInspectionsCleared() bool {
+	return m.clearedquality_inspections
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (m *PurchaseReceiptItemMutation) RemoveQualityInspectionIDs(ids ...int) {
+	if m.removedquality_inspections == nil {
+		m.removedquality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.quality_inspections, ids[i])
+		m.removedquality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedQualityInspections returns the removed IDs of the "quality_inspections" edge to the QualityInspection entity.
+func (m *PurchaseReceiptItemMutation) RemovedQualityInspectionsIDs() (ids []int) {
+	for id := range m.removedquality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// QualityInspectionsIDs returns the "quality_inspections" edge IDs in the mutation.
+func (m *PurchaseReceiptItemMutation) QualityInspectionsIDs() (ids []int) {
+	for id := range m.quality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetQualityInspections resets all changes to the "quality_inspections" edge.
+func (m *PurchaseReceiptItemMutation) ResetQualityInspections() {
+	m.quality_inspections = nil
+	m.clearedquality_inspections = false
+	m.removedquality_inspections = nil
+}
+
 // Where appends a list predicates to the PurchaseReceiptItemMutation builder.
 func (m *PurchaseReceiptItemMutation) Where(ps ...predicate.PurchaseReceiptItem) {
 	m.predicates = append(m.predicates, ps...)
@@ -19982,7 +20290,7 @@ func (m *PurchaseReceiptItemMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PurchaseReceiptItemMutation) AddedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.receipt != nil {
 		edges = append(edges, purchasereceiptitem.EdgeReceipt)
 	}
@@ -20003,6 +20311,9 @@ func (m *PurchaseReceiptItemMutation) AddedEdges() []string {
 	}
 	if m.purchase_receipt_adjustment_items != nil {
 		edges = append(edges, purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.quality_inspections != nil {
+		edges = append(edges, purchasereceiptitem.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -20043,18 +20354,27 @@ func (m *PurchaseReceiptItemMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceiptitem.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.quality_inspections))
+		for id := range m.quality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PurchaseReceiptItemMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.removedpurchase_return_items != nil {
 		edges = append(edges, purchasereceiptitem.EdgePurchaseReturnItems)
 	}
 	if m.removedpurchase_receipt_adjustment_items != nil {
 		edges = append(edges, purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.removedquality_inspections != nil {
+		edges = append(edges, purchasereceiptitem.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -20075,13 +20395,19 @@ func (m *PurchaseReceiptItemMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceiptitem.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.removedquality_inspections))
+		for id := range m.removedquality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PurchaseReceiptItemMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.clearedreceipt {
 		edges = append(edges, purchasereceiptitem.EdgeReceipt)
 	}
@@ -20102,6 +20428,9 @@ func (m *PurchaseReceiptItemMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_receipt_adjustment_items {
 		edges = append(edges, purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.clearedquality_inspections {
+		edges = append(edges, purchasereceiptitem.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -20124,6 +20453,8 @@ func (m *PurchaseReceiptItemMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_return_items
 	case purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems:
 		return m.clearedpurchase_receipt_adjustment_items
+	case purchasereceiptitem.EdgeQualityInspections:
+		return m.clearedquality_inspections
 	}
 	return false
 }
@@ -20175,6 +20506,9 @@ func (m *PurchaseReceiptItemMutation) ResetEdge(name string) error {
 		return nil
 	case purchasereceiptitem.EdgePurchaseReceiptAdjustmentItems:
 		m.ResetPurchaseReceiptAdjustmentItems()
+		return nil
+	case purchasereceiptitem.EdgeQualityInspections:
+		m.ResetQualityInspections()
 		return nil
 	}
 	return fmt.Errorf("unknown PurchaseReceiptItem edge %s", name)
@@ -22661,6 +22995,1407 @@ func (m *PurchaseReturnItemMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown PurchaseReturnItem edge %s", name)
+}
+
+// QualityInspectionMutation represents an operation that mutates the QualityInspection nodes in the graph.
+type QualityInspectionMutation struct {
+	config
+	op                           Op
+	typ                          string
+	id                           *int
+	inspection_no                *string
+	status                       *string
+	result                       *string
+	original_lot_status          *string
+	inspected_at                 *time.Time
+	inspector_id                 *int
+	addinspector_id              *int
+	decision_note                *string
+	created_at                   *time.Time
+	updated_at                   *time.Time
+	clearedFields                map[string]struct{}
+	purchase_receipt             *int
+	clearedpurchase_receipt      bool
+	purchase_receipt_item        *int
+	clearedpurchase_receipt_item bool
+	inventory_lot                *int
+	clearedinventory_lot         bool
+	material                     *int
+	clearedmaterial              bool
+	warehouse                    *int
+	clearedwarehouse             bool
+	done                         bool
+	oldValue                     func(context.Context) (*QualityInspection, error)
+	predicates                   []predicate.QualityInspection
+}
+
+var _ ent.Mutation = (*QualityInspectionMutation)(nil)
+
+// qualityinspectionOption allows management of the mutation configuration using functional options.
+type qualityinspectionOption func(*QualityInspectionMutation)
+
+// newQualityInspectionMutation creates new mutation for the QualityInspection entity.
+func newQualityInspectionMutation(c config, op Op, opts ...qualityinspectionOption) *QualityInspectionMutation {
+	m := &QualityInspectionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeQualityInspection,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withQualityInspectionID sets the ID field of the mutation.
+func withQualityInspectionID(id int) qualityinspectionOption {
+	return func(m *QualityInspectionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *QualityInspection
+		)
+		m.oldValue = func(ctx context.Context) (*QualityInspection, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().QualityInspection.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withQualityInspection sets the old QualityInspection of the mutation.
+func withQualityInspection(node *QualityInspection) qualityinspectionOption {
+	return func(m *QualityInspectionMutation) {
+		m.oldValue = func(context.Context) (*QualityInspection, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m QualityInspectionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m QualityInspectionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *QualityInspectionMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *QualityInspectionMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().QualityInspection.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetInspectionNo sets the "inspection_no" field.
+func (m *QualityInspectionMutation) SetInspectionNo(s string) {
+	m.inspection_no = &s
+}
+
+// InspectionNo returns the value of the "inspection_no" field in the mutation.
+func (m *QualityInspectionMutation) InspectionNo() (r string, exists bool) {
+	v := m.inspection_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInspectionNo returns the old "inspection_no" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldInspectionNo(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInspectionNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInspectionNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInspectionNo: %w", err)
+	}
+	return oldValue.InspectionNo, nil
+}
+
+// ResetInspectionNo resets all changes to the "inspection_no" field.
+func (m *QualityInspectionMutation) ResetInspectionNo() {
+	m.inspection_no = nil
+}
+
+// SetPurchaseReceiptID sets the "purchase_receipt_id" field.
+func (m *QualityInspectionMutation) SetPurchaseReceiptID(i int) {
+	m.purchase_receipt = &i
+}
+
+// PurchaseReceiptID returns the value of the "purchase_receipt_id" field in the mutation.
+func (m *QualityInspectionMutation) PurchaseReceiptID() (r int, exists bool) {
+	v := m.purchase_receipt
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPurchaseReceiptID returns the old "purchase_receipt_id" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldPurchaseReceiptID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPurchaseReceiptID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPurchaseReceiptID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPurchaseReceiptID: %w", err)
+	}
+	return oldValue.PurchaseReceiptID, nil
+}
+
+// ResetPurchaseReceiptID resets all changes to the "purchase_receipt_id" field.
+func (m *QualityInspectionMutation) ResetPurchaseReceiptID() {
+	m.purchase_receipt = nil
+}
+
+// SetPurchaseReceiptItemID sets the "purchase_receipt_item_id" field.
+func (m *QualityInspectionMutation) SetPurchaseReceiptItemID(i int) {
+	m.purchase_receipt_item = &i
+}
+
+// PurchaseReceiptItemID returns the value of the "purchase_receipt_item_id" field in the mutation.
+func (m *QualityInspectionMutation) PurchaseReceiptItemID() (r int, exists bool) {
+	v := m.purchase_receipt_item
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPurchaseReceiptItemID returns the old "purchase_receipt_item_id" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldPurchaseReceiptItemID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPurchaseReceiptItemID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPurchaseReceiptItemID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPurchaseReceiptItemID: %w", err)
+	}
+	return oldValue.PurchaseReceiptItemID, nil
+}
+
+// ClearPurchaseReceiptItemID clears the value of the "purchase_receipt_item_id" field.
+func (m *QualityInspectionMutation) ClearPurchaseReceiptItemID() {
+	m.purchase_receipt_item = nil
+	m.clearedFields[qualityinspection.FieldPurchaseReceiptItemID] = struct{}{}
+}
+
+// PurchaseReceiptItemIDCleared returns if the "purchase_receipt_item_id" field was cleared in this mutation.
+func (m *QualityInspectionMutation) PurchaseReceiptItemIDCleared() bool {
+	_, ok := m.clearedFields[qualityinspection.FieldPurchaseReceiptItemID]
+	return ok
+}
+
+// ResetPurchaseReceiptItemID resets all changes to the "purchase_receipt_item_id" field.
+func (m *QualityInspectionMutation) ResetPurchaseReceiptItemID() {
+	m.purchase_receipt_item = nil
+	delete(m.clearedFields, qualityinspection.FieldPurchaseReceiptItemID)
+}
+
+// SetInventoryLotID sets the "inventory_lot_id" field.
+func (m *QualityInspectionMutation) SetInventoryLotID(i int) {
+	m.inventory_lot = &i
+}
+
+// InventoryLotID returns the value of the "inventory_lot_id" field in the mutation.
+func (m *QualityInspectionMutation) InventoryLotID() (r int, exists bool) {
+	v := m.inventory_lot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInventoryLotID returns the old "inventory_lot_id" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldInventoryLotID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInventoryLotID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInventoryLotID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInventoryLotID: %w", err)
+	}
+	return oldValue.InventoryLotID, nil
+}
+
+// ResetInventoryLotID resets all changes to the "inventory_lot_id" field.
+func (m *QualityInspectionMutation) ResetInventoryLotID() {
+	m.inventory_lot = nil
+}
+
+// SetMaterialID sets the "material_id" field.
+func (m *QualityInspectionMutation) SetMaterialID(i int) {
+	m.material = &i
+}
+
+// MaterialID returns the value of the "material_id" field in the mutation.
+func (m *QualityInspectionMutation) MaterialID() (r int, exists bool) {
+	v := m.material
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaterialID returns the old "material_id" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldMaterialID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaterialID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaterialID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaterialID: %w", err)
+	}
+	return oldValue.MaterialID, nil
+}
+
+// ResetMaterialID resets all changes to the "material_id" field.
+func (m *QualityInspectionMutation) ResetMaterialID() {
+	m.material = nil
+}
+
+// SetWarehouseID sets the "warehouse_id" field.
+func (m *QualityInspectionMutation) SetWarehouseID(i int) {
+	m.warehouse = &i
+}
+
+// WarehouseID returns the value of the "warehouse_id" field in the mutation.
+func (m *QualityInspectionMutation) WarehouseID() (r int, exists bool) {
+	v := m.warehouse
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWarehouseID returns the old "warehouse_id" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldWarehouseID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWarehouseID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWarehouseID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWarehouseID: %w", err)
+	}
+	return oldValue.WarehouseID, nil
+}
+
+// ResetWarehouseID resets all changes to the "warehouse_id" field.
+func (m *QualityInspectionMutation) ResetWarehouseID() {
+	m.warehouse = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *QualityInspectionMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *QualityInspectionMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *QualityInspectionMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetResult sets the "result" field.
+func (m *QualityInspectionMutation) SetResult(s string) {
+	m.result = &s
+}
+
+// Result returns the value of the "result" field in the mutation.
+func (m *QualityInspectionMutation) Result() (r string, exists bool) {
+	v := m.result
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResult returns the old "result" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldResult(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResult is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResult requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResult: %w", err)
+	}
+	return oldValue.Result, nil
+}
+
+// ClearResult clears the value of the "result" field.
+func (m *QualityInspectionMutation) ClearResult() {
+	m.result = nil
+	m.clearedFields[qualityinspection.FieldResult] = struct{}{}
+}
+
+// ResultCleared returns if the "result" field was cleared in this mutation.
+func (m *QualityInspectionMutation) ResultCleared() bool {
+	_, ok := m.clearedFields[qualityinspection.FieldResult]
+	return ok
+}
+
+// ResetResult resets all changes to the "result" field.
+func (m *QualityInspectionMutation) ResetResult() {
+	m.result = nil
+	delete(m.clearedFields, qualityinspection.FieldResult)
+}
+
+// SetOriginalLotStatus sets the "original_lot_status" field.
+func (m *QualityInspectionMutation) SetOriginalLotStatus(s string) {
+	m.original_lot_status = &s
+}
+
+// OriginalLotStatus returns the value of the "original_lot_status" field in the mutation.
+func (m *QualityInspectionMutation) OriginalLotStatus() (r string, exists bool) {
+	v := m.original_lot_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOriginalLotStatus returns the old "original_lot_status" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldOriginalLotStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOriginalLotStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOriginalLotStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOriginalLotStatus: %w", err)
+	}
+	return oldValue.OriginalLotStatus, nil
+}
+
+// ResetOriginalLotStatus resets all changes to the "original_lot_status" field.
+func (m *QualityInspectionMutation) ResetOriginalLotStatus() {
+	m.original_lot_status = nil
+}
+
+// SetInspectedAt sets the "inspected_at" field.
+func (m *QualityInspectionMutation) SetInspectedAt(t time.Time) {
+	m.inspected_at = &t
+}
+
+// InspectedAt returns the value of the "inspected_at" field in the mutation.
+func (m *QualityInspectionMutation) InspectedAt() (r time.Time, exists bool) {
+	v := m.inspected_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInspectedAt returns the old "inspected_at" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldInspectedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInspectedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInspectedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInspectedAt: %w", err)
+	}
+	return oldValue.InspectedAt, nil
+}
+
+// ClearInspectedAt clears the value of the "inspected_at" field.
+func (m *QualityInspectionMutation) ClearInspectedAt() {
+	m.inspected_at = nil
+	m.clearedFields[qualityinspection.FieldInspectedAt] = struct{}{}
+}
+
+// InspectedAtCleared returns if the "inspected_at" field was cleared in this mutation.
+func (m *QualityInspectionMutation) InspectedAtCleared() bool {
+	_, ok := m.clearedFields[qualityinspection.FieldInspectedAt]
+	return ok
+}
+
+// ResetInspectedAt resets all changes to the "inspected_at" field.
+func (m *QualityInspectionMutation) ResetInspectedAt() {
+	m.inspected_at = nil
+	delete(m.clearedFields, qualityinspection.FieldInspectedAt)
+}
+
+// SetInspectorID sets the "inspector_id" field.
+func (m *QualityInspectionMutation) SetInspectorID(i int) {
+	m.inspector_id = &i
+	m.addinspector_id = nil
+}
+
+// InspectorID returns the value of the "inspector_id" field in the mutation.
+func (m *QualityInspectionMutation) InspectorID() (r int, exists bool) {
+	v := m.inspector_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInspectorID returns the old "inspector_id" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldInspectorID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInspectorID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInspectorID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInspectorID: %w", err)
+	}
+	return oldValue.InspectorID, nil
+}
+
+// AddInspectorID adds i to the "inspector_id" field.
+func (m *QualityInspectionMutation) AddInspectorID(i int) {
+	if m.addinspector_id != nil {
+		*m.addinspector_id += i
+	} else {
+		m.addinspector_id = &i
+	}
+}
+
+// AddedInspectorID returns the value that was added to the "inspector_id" field in this mutation.
+func (m *QualityInspectionMutation) AddedInspectorID() (r int, exists bool) {
+	v := m.addinspector_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearInspectorID clears the value of the "inspector_id" field.
+func (m *QualityInspectionMutation) ClearInspectorID() {
+	m.inspector_id = nil
+	m.addinspector_id = nil
+	m.clearedFields[qualityinspection.FieldInspectorID] = struct{}{}
+}
+
+// InspectorIDCleared returns if the "inspector_id" field was cleared in this mutation.
+func (m *QualityInspectionMutation) InspectorIDCleared() bool {
+	_, ok := m.clearedFields[qualityinspection.FieldInspectorID]
+	return ok
+}
+
+// ResetInspectorID resets all changes to the "inspector_id" field.
+func (m *QualityInspectionMutation) ResetInspectorID() {
+	m.inspector_id = nil
+	m.addinspector_id = nil
+	delete(m.clearedFields, qualityinspection.FieldInspectorID)
+}
+
+// SetDecisionNote sets the "decision_note" field.
+func (m *QualityInspectionMutation) SetDecisionNote(s string) {
+	m.decision_note = &s
+}
+
+// DecisionNote returns the value of the "decision_note" field in the mutation.
+func (m *QualityInspectionMutation) DecisionNote() (r string, exists bool) {
+	v := m.decision_note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDecisionNote returns the old "decision_note" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldDecisionNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDecisionNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDecisionNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDecisionNote: %w", err)
+	}
+	return oldValue.DecisionNote, nil
+}
+
+// ClearDecisionNote clears the value of the "decision_note" field.
+func (m *QualityInspectionMutation) ClearDecisionNote() {
+	m.decision_note = nil
+	m.clearedFields[qualityinspection.FieldDecisionNote] = struct{}{}
+}
+
+// DecisionNoteCleared returns if the "decision_note" field was cleared in this mutation.
+func (m *QualityInspectionMutation) DecisionNoteCleared() bool {
+	_, ok := m.clearedFields[qualityinspection.FieldDecisionNote]
+	return ok
+}
+
+// ResetDecisionNote resets all changes to the "decision_note" field.
+func (m *QualityInspectionMutation) ResetDecisionNote() {
+	m.decision_note = nil
+	delete(m.clearedFields, qualityinspection.FieldDecisionNote)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *QualityInspectionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *QualityInspectionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *QualityInspectionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *QualityInspectionMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *QualityInspectionMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the QualityInspection entity.
+// If the QualityInspection object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *QualityInspectionMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *QualityInspectionMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
+func (m *QualityInspectionMutation) ClearPurchaseReceipt() {
+	m.clearedpurchase_receipt = true
+	m.clearedFields[qualityinspection.FieldPurchaseReceiptID] = struct{}{}
+}
+
+// PurchaseReceiptCleared reports if the "purchase_receipt" edge to the PurchaseReceipt entity was cleared.
+func (m *QualityInspectionMutation) PurchaseReceiptCleared() bool {
+	return m.clearedpurchase_receipt
+}
+
+// PurchaseReceiptIDs returns the "purchase_receipt" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PurchaseReceiptID instead. It exists only for internal usage by the builders.
+func (m *QualityInspectionMutation) PurchaseReceiptIDs() (ids []int) {
+	if id := m.purchase_receipt; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPurchaseReceipt resets all changes to the "purchase_receipt" edge.
+func (m *QualityInspectionMutation) ResetPurchaseReceipt() {
+	m.purchase_receipt = nil
+	m.clearedpurchase_receipt = false
+}
+
+// ClearPurchaseReceiptItem clears the "purchase_receipt_item" edge to the PurchaseReceiptItem entity.
+func (m *QualityInspectionMutation) ClearPurchaseReceiptItem() {
+	m.clearedpurchase_receipt_item = true
+	m.clearedFields[qualityinspection.FieldPurchaseReceiptItemID] = struct{}{}
+}
+
+// PurchaseReceiptItemCleared reports if the "purchase_receipt_item" edge to the PurchaseReceiptItem entity was cleared.
+func (m *QualityInspectionMutation) PurchaseReceiptItemCleared() bool {
+	return m.PurchaseReceiptItemIDCleared() || m.clearedpurchase_receipt_item
+}
+
+// PurchaseReceiptItemIDs returns the "purchase_receipt_item" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PurchaseReceiptItemID instead. It exists only for internal usage by the builders.
+func (m *QualityInspectionMutation) PurchaseReceiptItemIDs() (ids []int) {
+	if id := m.purchase_receipt_item; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPurchaseReceiptItem resets all changes to the "purchase_receipt_item" edge.
+func (m *QualityInspectionMutation) ResetPurchaseReceiptItem() {
+	m.purchase_receipt_item = nil
+	m.clearedpurchase_receipt_item = false
+}
+
+// ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
+func (m *QualityInspectionMutation) ClearInventoryLot() {
+	m.clearedinventory_lot = true
+	m.clearedFields[qualityinspection.FieldInventoryLotID] = struct{}{}
+}
+
+// InventoryLotCleared reports if the "inventory_lot" edge to the InventoryLot entity was cleared.
+func (m *QualityInspectionMutation) InventoryLotCleared() bool {
+	return m.clearedinventory_lot
+}
+
+// InventoryLotIDs returns the "inventory_lot" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// InventoryLotID instead. It exists only for internal usage by the builders.
+func (m *QualityInspectionMutation) InventoryLotIDs() (ids []int) {
+	if id := m.inventory_lot; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetInventoryLot resets all changes to the "inventory_lot" edge.
+func (m *QualityInspectionMutation) ResetInventoryLot() {
+	m.inventory_lot = nil
+	m.clearedinventory_lot = false
+}
+
+// ClearMaterial clears the "material" edge to the Material entity.
+func (m *QualityInspectionMutation) ClearMaterial() {
+	m.clearedmaterial = true
+	m.clearedFields[qualityinspection.FieldMaterialID] = struct{}{}
+}
+
+// MaterialCleared reports if the "material" edge to the Material entity was cleared.
+func (m *QualityInspectionMutation) MaterialCleared() bool {
+	return m.clearedmaterial
+}
+
+// MaterialIDs returns the "material" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// MaterialID instead. It exists only for internal usage by the builders.
+func (m *QualityInspectionMutation) MaterialIDs() (ids []int) {
+	if id := m.material; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetMaterial resets all changes to the "material" edge.
+func (m *QualityInspectionMutation) ResetMaterial() {
+	m.material = nil
+	m.clearedmaterial = false
+}
+
+// ClearWarehouse clears the "warehouse" edge to the Warehouse entity.
+func (m *QualityInspectionMutation) ClearWarehouse() {
+	m.clearedwarehouse = true
+	m.clearedFields[qualityinspection.FieldWarehouseID] = struct{}{}
+}
+
+// WarehouseCleared reports if the "warehouse" edge to the Warehouse entity was cleared.
+func (m *QualityInspectionMutation) WarehouseCleared() bool {
+	return m.clearedwarehouse
+}
+
+// WarehouseIDs returns the "warehouse" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// WarehouseID instead. It exists only for internal usage by the builders.
+func (m *QualityInspectionMutation) WarehouseIDs() (ids []int) {
+	if id := m.warehouse; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetWarehouse resets all changes to the "warehouse" edge.
+func (m *QualityInspectionMutation) ResetWarehouse() {
+	m.warehouse = nil
+	m.clearedwarehouse = false
+}
+
+// Where appends a list predicates to the QualityInspectionMutation builder.
+func (m *QualityInspectionMutation) Where(ps ...predicate.QualityInspection) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the QualityInspectionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *QualityInspectionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.QualityInspection, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *QualityInspectionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *QualityInspectionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (QualityInspection).
+func (m *QualityInspectionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *QualityInspectionMutation) Fields() []string {
+	fields := make([]string, 0, 14)
+	if m.inspection_no != nil {
+		fields = append(fields, qualityinspection.FieldInspectionNo)
+	}
+	if m.purchase_receipt != nil {
+		fields = append(fields, qualityinspection.FieldPurchaseReceiptID)
+	}
+	if m.purchase_receipt_item != nil {
+		fields = append(fields, qualityinspection.FieldPurchaseReceiptItemID)
+	}
+	if m.inventory_lot != nil {
+		fields = append(fields, qualityinspection.FieldInventoryLotID)
+	}
+	if m.material != nil {
+		fields = append(fields, qualityinspection.FieldMaterialID)
+	}
+	if m.warehouse != nil {
+		fields = append(fields, qualityinspection.FieldWarehouseID)
+	}
+	if m.status != nil {
+		fields = append(fields, qualityinspection.FieldStatus)
+	}
+	if m.result != nil {
+		fields = append(fields, qualityinspection.FieldResult)
+	}
+	if m.original_lot_status != nil {
+		fields = append(fields, qualityinspection.FieldOriginalLotStatus)
+	}
+	if m.inspected_at != nil {
+		fields = append(fields, qualityinspection.FieldInspectedAt)
+	}
+	if m.inspector_id != nil {
+		fields = append(fields, qualityinspection.FieldInspectorID)
+	}
+	if m.decision_note != nil {
+		fields = append(fields, qualityinspection.FieldDecisionNote)
+	}
+	if m.created_at != nil {
+		fields = append(fields, qualityinspection.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, qualityinspection.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *QualityInspectionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case qualityinspection.FieldInspectionNo:
+		return m.InspectionNo()
+	case qualityinspection.FieldPurchaseReceiptID:
+		return m.PurchaseReceiptID()
+	case qualityinspection.FieldPurchaseReceiptItemID:
+		return m.PurchaseReceiptItemID()
+	case qualityinspection.FieldInventoryLotID:
+		return m.InventoryLotID()
+	case qualityinspection.FieldMaterialID:
+		return m.MaterialID()
+	case qualityinspection.FieldWarehouseID:
+		return m.WarehouseID()
+	case qualityinspection.FieldStatus:
+		return m.Status()
+	case qualityinspection.FieldResult:
+		return m.Result()
+	case qualityinspection.FieldOriginalLotStatus:
+		return m.OriginalLotStatus()
+	case qualityinspection.FieldInspectedAt:
+		return m.InspectedAt()
+	case qualityinspection.FieldInspectorID:
+		return m.InspectorID()
+	case qualityinspection.FieldDecisionNote:
+		return m.DecisionNote()
+	case qualityinspection.FieldCreatedAt:
+		return m.CreatedAt()
+	case qualityinspection.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *QualityInspectionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case qualityinspection.FieldInspectionNo:
+		return m.OldInspectionNo(ctx)
+	case qualityinspection.FieldPurchaseReceiptID:
+		return m.OldPurchaseReceiptID(ctx)
+	case qualityinspection.FieldPurchaseReceiptItemID:
+		return m.OldPurchaseReceiptItemID(ctx)
+	case qualityinspection.FieldInventoryLotID:
+		return m.OldInventoryLotID(ctx)
+	case qualityinspection.FieldMaterialID:
+		return m.OldMaterialID(ctx)
+	case qualityinspection.FieldWarehouseID:
+		return m.OldWarehouseID(ctx)
+	case qualityinspection.FieldStatus:
+		return m.OldStatus(ctx)
+	case qualityinspection.FieldResult:
+		return m.OldResult(ctx)
+	case qualityinspection.FieldOriginalLotStatus:
+		return m.OldOriginalLotStatus(ctx)
+	case qualityinspection.FieldInspectedAt:
+		return m.OldInspectedAt(ctx)
+	case qualityinspection.FieldInspectorID:
+		return m.OldInspectorID(ctx)
+	case qualityinspection.FieldDecisionNote:
+		return m.OldDecisionNote(ctx)
+	case qualityinspection.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case qualityinspection.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown QualityInspection field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *QualityInspectionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case qualityinspection.FieldInspectionNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInspectionNo(v)
+		return nil
+	case qualityinspection.FieldPurchaseReceiptID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPurchaseReceiptID(v)
+		return nil
+	case qualityinspection.FieldPurchaseReceiptItemID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPurchaseReceiptItemID(v)
+		return nil
+	case qualityinspection.FieldInventoryLotID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInventoryLotID(v)
+		return nil
+	case qualityinspection.FieldMaterialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaterialID(v)
+		return nil
+	case qualityinspection.FieldWarehouseID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWarehouseID(v)
+		return nil
+	case qualityinspection.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case qualityinspection.FieldResult:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResult(v)
+		return nil
+	case qualityinspection.FieldOriginalLotStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOriginalLotStatus(v)
+		return nil
+	case qualityinspection.FieldInspectedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInspectedAt(v)
+		return nil
+	case qualityinspection.FieldInspectorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInspectorID(v)
+		return nil
+	case qualityinspection.FieldDecisionNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDecisionNote(v)
+		return nil
+	case qualityinspection.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case qualityinspection.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown QualityInspection field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *QualityInspectionMutation) AddedFields() []string {
+	var fields []string
+	if m.addinspector_id != nil {
+		fields = append(fields, qualityinspection.FieldInspectorID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *QualityInspectionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case qualityinspection.FieldInspectorID:
+		return m.AddedInspectorID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *QualityInspectionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case qualityinspection.FieldInspectorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddInspectorID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown QualityInspection numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *QualityInspectionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(qualityinspection.FieldPurchaseReceiptItemID) {
+		fields = append(fields, qualityinspection.FieldPurchaseReceiptItemID)
+	}
+	if m.FieldCleared(qualityinspection.FieldResult) {
+		fields = append(fields, qualityinspection.FieldResult)
+	}
+	if m.FieldCleared(qualityinspection.FieldInspectedAt) {
+		fields = append(fields, qualityinspection.FieldInspectedAt)
+	}
+	if m.FieldCleared(qualityinspection.FieldInspectorID) {
+		fields = append(fields, qualityinspection.FieldInspectorID)
+	}
+	if m.FieldCleared(qualityinspection.FieldDecisionNote) {
+		fields = append(fields, qualityinspection.FieldDecisionNote)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *QualityInspectionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *QualityInspectionMutation) ClearField(name string) error {
+	switch name {
+	case qualityinspection.FieldPurchaseReceiptItemID:
+		m.ClearPurchaseReceiptItemID()
+		return nil
+	case qualityinspection.FieldResult:
+		m.ClearResult()
+		return nil
+	case qualityinspection.FieldInspectedAt:
+		m.ClearInspectedAt()
+		return nil
+	case qualityinspection.FieldInspectorID:
+		m.ClearInspectorID()
+		return nil
+	case qualityinspection.FieldDecisionNote:
+		m.ClearDecisionNote()
+		return nil
+	}
+	return fmt.Errorf("unknown QualityInspection nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *QualityInspectionMutation) ResetField(name string) error {
+	switch name {
+	case qualityinspection.FieldInspectionNo:
+		m.ResetInspectionNo()
+		return nil
+	case qualityinspection.FieldPurchaseReceiptID:
+		m.ResetPurchaseReceiptID()
+		return nil
+	case qualityinspection.FieldPurchaseReceiptItemID:
+		m.ResetPurchaseReceiptItemID()
+		return nil
+	case qualityinspection.FieldInventoryLotID:
+		m.ResetInventoryLotID()
+		return nil
+	case qualityinspection.FieldMaterialID:
+		m.ResetMaterialID()
+		return nil
+	case qualityinspection.FieldWarehouseID:
+		m.ResetWarehouseID()
+		return nil
+	case qualityinspection.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case qualityinspection.FieldResult:
+		m.ResetResult()
+		return nil
+	case qualityinspection.FieldOriginalLotStatus:
+		m.ResetOriginalLotStatus()
+		return nil
+	case qualityinspection.FieldInspectedAt:
+		m.ResetInspectedAt()
+		return nil
+	case qualityinspection.FieldInspectorID:
+		m.ResetInspectorID()
+		return nil
+	case qualityinspection.FieldDecisionNote:
+		m.ResetDecisionNote()
+		return nil
+	case qualityinspection.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case qualityinspection.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown QualityInspection field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *QualityInspectionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 5)
+	if m.purchase_receipt != nil {
+		edges = append(edges, qualityinspection.EdgePurchaseReceipt)
+	}
+	if m.purchase_receipt_item != nil {
+		edges = append(edges, qualityinspection.EdgePurchaseReceiptItem)
+	}
+	if m.inventory_lot != nil {
+		edges = append(edges, qualityinspection.EdgeInventoryLot)
+	}
+	if m.material != nil {
+		edges = append(edges, qualityinspection.EdgeMaterial)
+	}
+	if m.warehouse != nil {
+		edges = append(edges, qualityinspection.EdgeWarehouse)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *QualityInspectionMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case qualityinspection.EdgePurchaseReceipt:
+		if id := m.purchase_receipt; id != nil {
+			return []ent.Value{*id}
+		}
+	case qualityinspection.EdgePurchaseReceiptItem:
+		if id := m.purchase_receipt_item; id != nil {
+			return []ent.Value{*id}
+		}
+	case qualityinspection.EdgeInventoryLot:
+		if id := m.inventory_lot; id != nil {
+			return []ent.Value{*id}
+		}
+	case qualityinspection.EdgeMaterial:
+		if id := m.material; id != nil {
+			return []ent.Value{*id}
+		}
+	case qualityinspection.EdgeWarehouse:
+		if id := m.warehouse; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *QualityInspectionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 5)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *QualityInspectionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *QualityInspectionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 5)
+	if m.clearedpurchase_receipt {
+		edges = append(edges, qualityinspection.EdgePurchaseReceipt)
+	}
+	if m.clearedpurchase_receipt_item {
+		edges = append(edges, qualityinspection.EdgePurchaseReceiptItem)
+	}
+	if m.clearedinventory_lot {
+		edges = append(edges, qualityinspection.EdgeInventoryLot)
+	}
+	if m.clearedmaterial {
+		edges = append(edges, qualityinspection.EdgeMaterial)
+	}
+	if m.clearedwarehouse {
+		edges = append(edges, qualityinspection.EdgeWarehouse)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *QualityInspectionMutation) EdgeCleared(name string) bool {
+	switch name {
+	case qualityinspection.EdgePurchaseReceipt:
+		return m.clearedpurchase_receipt
+	case qualityinspection.EdgePurchaseReceiptItem:
+		return m.clearedpurchase_receipt_item
+	case qualityinspection.EdgeInventoryLot:
+		return m.clearedinventory_lot
+	case qualityinspection.EdgeMaterial:
+		return m.clearedmaterial
+	case qualityinspection.EdgeWarehouse:
+		return m.clearedwarehouse
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *QualityInspectionMutation) ClearEdge(name string) error {
+	switch name {
+	case qualityinspection.EdgePurchaseReceipt:
+		m.ClearPurchaseReceipt()
+		return nil
+	case qualityinspection.EdgePurchaseReceiptItem:
+		m.ClearPurchaseReceiptItem()
+		return nil
+	case qualityinspection.EdgeInventoryLot:
+		m.ClearInventoryLot()
+		return nil
+	case qualityinspection.EdgeMaterial:
+		m.ClearMaterial()
+		return nil
+	case qualityinspection.EdgeWarehouse:
+		m.ClearWarehouse()
+		return nil
+	}
+	return fmt.Errorf("unknown QualityInspection unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *QualityInspectionMutation) ResetEdge(name string) error {
+	switch name {
+	case qualityinspection.EdgePurchaseReceipt:
+		m.ResetPurchaseReceipt()
+		return nil
+	case qualityinspection.EdgePurchaseReceiptItem:
+		m.ResetPurchaseReceiptItem()
+		return nil
+	case qualityinspection.EdgeInventoryLot:
+		m.ResetInventoryLot()
+		return nil
+	case qualityinspection.EdgeMaterial:
+		m.ResetMaterial()
+		return nil
+	case qualityinspection.EdgeWarehouse:
+		m.ResetWarehouse()
+		return nil
+	}
+	return fmt.Errorf("unknown QualityInspection edge %s", name)
 }
 
 // RoleMutation represents an operation that mutates the Role nodes in the graph.
@@ -25858,6 +27593,9 @@ type WarehouseMutation struct {
 	purchase_receipt_adjustment_items        map[int]struct{}
 	removedpurchase_receipt_adjustment_items map[int]struct{}
 	clearedpurchase_receipt_adjustment_items bool
+	quality_inspections                      map[int]struct{}
+	removedquality_inspections               map[int]struct{}
+	clearedquality_inspections               bool
 	done                                     bool
 	oldValue                                 func(context.Context) (*Warehouse, error)
 	predicates                               []predicate.Warehouse
@@ -26447,6 +28185,60 @@ func (m *WarehouseMutation) ResetPurchaseReceiptAdjustmentItems() {
 	m.removedpurchase_receipt_adjustment_items = nil
 }
 
+// AddQualityInspectionIDs adds the "quality_inspections" edge to the QualityInspection entity by ids.
+func (m *WarehouseMutation) AddQualityInspectionIDs(ids ...int) {
+	if m.quality_inspections == nil {
+		m.quality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.quality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// ClearQualityInspections clears the "quality_inspections" edge to the QualityInspection entity.
+func (m *WarehouseMutation) ClearQualityInspections() {
+	m.clearedquality_inspections = true
+}
+
+// QualityInspectionsCleared reports if the "quality_inspections" edge to the QualityInspection entity was cleared.
+func (m *WarehouseMutation) QualityInspectionsCleared() bool {
+	return m.clearedquality_inspections
+}
+
+// RemoveQualityInspectionIDs removes the "quality_inspections" edge to the QualityInspection entity by IDs.
+func (m *WarehouseMutation) RemoveQualityInspectionIDs(ids ...int) {
+	if m.removedquality_inspections == nil {
+		m.removedquality_inspections = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.quality_inspections, ids[i])
+		m.removedquality_inspections[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedQualityInspections returns the removed IDs of the "quality_inspections" edge to the QualityInspection entity.
+func (m *WarehouseMutation) RemovedQualityInspectionsIDs() (ids []int) {
+	for id := range m.removedquality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// QualityInspectionsIDs returns the "quality_inspections" edge IDs in the mutation.
+func (m *WarehouseMutation) QualityInspectionsIDs() (ids []int) {
+	for id := range m.quality_inspections {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetQualityInspections resets all changes to the "quality_inspections" edge.
+func (m *WarehouseMutation) ResetQualityInspections() {
+	m.quality_inspections = nil
+	m.clearedquality_inspections = false
+	m.removedquality_inspections = nil
+}
+
 // Where appends a list predicates to the WarehouseMutation builder.
 func (m *WarehouseMutation) Where(ps ...predicate.Warehouse) {
 	m.predicates = append(m.predicates, ps...)
@@ -26665,7 +28457,7 @@ func (m *WarehouseMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *WarehouseMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.inventory_txns != nil {
 		edges = append(edges, warehouse.EdgeInventoryTxns)
 	}
@@ -26680,6 +28472,9 @@ func (m *WarehouseMutation) AddedEdges() []string {
 	}
 	if m.purchase_receipt_adjustment_items != nil {
 		edges = append(edges, warehouse.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.quality_inspections != nil {
+		edges = append(edges, warehouse.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -26718,13 +28513,19 @@ func (m *WarehouseMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case warehouse.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.quality_inspections))
+		for id := range m.quality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *WarehouseMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.removedinventory_txns != nil {
 		edges = append(edges, warehouse.EdgeInventoryTxns)
 	}
@@ -26739,6 +28540,9 @@ func (m *WarehouseMutation) RemovedEdges() []string {
 	}
 	if m.removedpurchase_receipt_adjustment_items != nil {
 		edges = append(edges, warehouse.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.removedquality_inspections != nil {
+		edges = append(edges, warehouse.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -26777,13 +28581,19 @@ func (m *WarehouseMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case warehouse.EdgeQualityInspections:
+		ids := make([]ent.Value, 0, len(m.removedquality_inspections))
+		for id := range m.removedquality_inspections {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *WarehouseMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.clearedinventory_txns {
 		edges = append(edges, warehouse.EdgeInventoryTxns)
 	}
@@ -26798,6 +28608,9 @@ func (m *WarehouseMutation) ClearedEdges() []string {
 	}
 	if m.clearedpurchase_receipt_adjustment_items {
 		edges = append(edges, warehouse.EdgePurchaseReceiptAdjustmentItems)
+	}
+	if m.clearedquality_inspections {
+		edges = append(edges, warehouse.EdgeQualityInspections)
 	}
 	return edges
 }
@@ -26816,6 +28629,8 @@ func (m *WarehouseMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_return_items
 	case warehouse.EdgePurchaseReceiptAdjustmentItems:
 		return m.clearedpurchase_receipt_adjustment_items
+	case warehouse.EdgeQualityInspections:
+		return m.clearedquality_inspections
 	}
 	return false
 }
@@ -26846,6 +28661,9 @@ func (m *WarehouseMutation) ResetEdge(name string) error {
 		return nil
 	case warehouse.EdgePurchaseReceiptAdjustmentItems:
 		m.ResetPurchaseReceiptAdjustmentItems()
+		return nil
+	case warehouse.EdgeQualityInspections:
+		m.ResetQualityInspections()
 		return nil
 	}
 	return fmt.Errorf("unknown Warehouse edge %s", name)

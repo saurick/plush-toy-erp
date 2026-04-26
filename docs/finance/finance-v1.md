@@ -58,7 +58,7 @@
 
 | 环节 | 当前 v1 规则 |
 | --- | --- |
-| 触发点 | `shipment_release` 完成或业务状态进入 `shipped` 后创建 `receivable_registration`。桌面 `shipping-release` / `outbound` 可手动发起；移动端仓库完成出货任务后会自动发起。 |
+| 触发点 | 真实出货业务状态进入 `shipped` 后创建 `receivable_registration`。`shipment_release done` 只表示 `shipping_released`，不能作为应收 / 开票触发点；桌面 `shipping-release` / `outbound` 手动入口也必须基于真实 `shipped`。 |
 | 应收登记责任人 | `owner_role_key=finance`，财务移动端处理；PMC 和老板只看风险，不代办。 |
 | 应收登记完成条件 | 财务确认客户、出货数量、应收金额、税率、含税 / 不含税金额和收款状态。完成后创建 `invoice_registration`，业务状态推进到 `reconciling`。 |
 | 开票登记责任人 | `owner_role_key=finance`，继续由财务移动端处理。 |

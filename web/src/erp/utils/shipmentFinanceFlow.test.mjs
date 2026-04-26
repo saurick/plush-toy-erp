@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import { buildWorkflowTaskAlert } from './workflowDashboardStats.mjs'
@@ -18,6 +19,10 @@ import {
 
 const NOW_MS = Date.parse('2026-04-25T00:00:00Z')
 const NOW_SECONDS = Math.floor(NOW_MS / 1000)
+const businessModulePageSource = readFileSync(
+  new URL('../pages/BusinessModulePage.jsx', import.meta.url),
+  'utf8'
+)
 
 function shipmentRecord(overrides = {}) {
   return {
@@ -67,6 +72,26 @@ test('shipmentFinanceFlow: shipped 记录能生成财务应收登记任务', () 
   assert.equal(task.due_at < NOW_MS, true)
   assert.equal(task.payload.alert_type, 'finance_pending')
   assert.equal(task.payload.next_module_key, 'receivables')
+})
+
+test('shipmentFinanceFlow: shipping_released 不等同 shipped，不能生成应收任务', () => {
+  const releaseRecord = shipmentRecord({
+    business_status_key: 'shipping_released',
+    payload: {
+      shipment_release_result: 'done',
+      shipment_execution_required: true,
+    },
+  })
+
+  assert.equal(isShipmentCompletedRecord(releaseRecord), false)
+  assert.equal(
+    buildReceivableRegistrationTask(
+      releaseRecord,
+      { id: 88 },
+      { nowMs: NOW_MS }
+    ),
+    null
+  )
 })
 
 test('shipmentFinanceFlow: 应收登记完成后能生成开票登记任务', () => {
@@ -206,5 +231,18 @@ test('shipmentFinanceFlow: 已存在未完成应收或开票任务时按记录�
       record
     ),
     false
+  )
+})
+
+test('BusinessModulePage: 手动应收入口不再把 shipment_release done 当成 shipped', () => {
+  assert.equal(
+    businessModulePageSource.includes(
+      "latestSelectedShipmentReleaseTask?.task_status_key === 'done'"
+    ),
+    false
+  )
+  assert.doesNotMatch(
+    businessModulePageSource,
+    /if \(!alreadyShipped && !shipmentTaskDone\)/
   )
 })

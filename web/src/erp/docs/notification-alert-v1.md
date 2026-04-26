@@ -132,15 +132,15 @@ v1 只做系统内通知和页面预警：桌面 Dashboard 预警区、桌面业
 
 ## 第四条真实闭环预警
 
-| 场景                   | 通知 / 预警                                                                   | 接收人                                            |
-| ---------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------- |
-| 成品完工后待抽检       | `notification_type=task_created`、`alert_type=finished_goods_qc_pending`      | quality；PMC 可通过 critical_path 关注            |
-| 成品抽检合格待入库     | `notification_type=task_created`、`alert_type=finished_goods_inbound_pending` | warehouse；PMC 可通过 critical_path 关注          |
-| 成品抽检不合格 / 返工  | `notification_type=qc_failed`、`alert_type=qc_failed`、critical               | production、PMC；品质保留检验事实                 |
-| 成品入库后待出货       | `notification_type=task_created`、`alert_type=shipment_pending`               | warehouse；业务通过 `confirm_role_key=sales` 关注 |
-| 出货准备或出货确认超时 | `task_due_soon` / `task_overdue`，或 `shipment_due` / `shipment_risk`         | warehouse、sales、PMC，必要时 boss                |
+| 场景                   | 通知 / 预警                                                                                                                                                   | 接收人                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| 成品完工后待抽检       | `notification_type=task_created`、`alert_type=finished_goods_qc_pending`                                                                                      | quality；PMC 可通过 critical_path 关注   |
+| 成品抽检合格待入库     | `notification_type=task_created`、`alert_type=finished_goods_inbound_pending`                                                                                 | warehouse；PMC 可通过 critical_path 关注 |
+| 成品抽检不合格 / 返工  | `notification_type=qc_failed`、`alert_type=qc_failed`、critical                                                                                               | production、PMC；品质保留检验事实        |
+| 成品入库后出货放行     | `finished_goods_inbound done` 只写 `inbound_done`，不自动创建 `shipment_release`；既有 `shipment_release done` 由后端写 `shipping_released`，不推进 `shipped` | warehouse、sales、PMC 按实际任务关注     |
+| 出货准备或出货确认超时 | `task_due_soon` / `task_overdue`，或 `shipment_due` / `shipment_risk`                                                                                         | warehouse、sales、PMC，必要时 boss       |
 
-第四条闭环只负责把出货任务推进到 `shipped`。第五条闭环承接 `shipped` 后的应收登记和开票登记；仍不新增 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` 专表。`shipment_release` 先由 warehouse 移动端完成出货准备 / 出货执行确认，后续再评审是否拆业务确认任务。
+第四条闭环已经把成品抽检和成品入库的协同状态推进迁入后端，第七条最小规则也已把 `shipment_release done / blocked / rejected` 收口为 `shipping_released / blocked` 协同状态。第五条闭环只能承接真实 `shipped` 后的应收登记和开票登记；仍不新增 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` 专表。库存可用量、预留冻结、出货扣减和财务放行边界必须单独评审 `ShipmentUsecase / InventoryUsecase`。
 
 ## 第五条真实闭环预警
 

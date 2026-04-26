@@ -63,6 +63,9 @@ type PurchaseReturn func(*sql.Selector)
 // PurchaseReturnItem is the predicate function for purchasereturnitem builders.
 type PurchaseReturnItem func(*sql.Selector)
 
+// QualityInspection is the predicate function for qualityinspection builders.
+type QualityInspection func(*sql.Selector)
+
 // Role is the predicate function for role builders.
 type Role func(*sql.Selector)
 

@@ -15,6 +15,7 @@ export const WAREHOUSE_INBOUND_PENDING_STATUS_KEY = 'warehouse_inbound_pending'
 export const QC_FAILED_STATUS_KEY = 'qc_failed'
 export const INBOUND_DONE_STATUS_KEY = 'inbound_done'
 export const SHIPMENT_PENDING_STATUS_KEY = 'shipment_pending'
+export const SHIPPING_RELEASED_STATUS_KEY = 'shipping_released'
 export const SHIPPED_STATUS_KEY = 'shipped'
 
 const FINISHED_GOODS_SOURCE_TYPE_KEYS = new Set([
@@ -407,7 +408,8 @@ export function resolveFinishedGoodsTaskBusinessStatus(task, taskStatusKey) {
     return task.business_status_key || QC_FAILED_STATUS_KEY
   }
   if (isShipmentReleaseTask(task)) {
-    if (taskStatusKey === 'done') return SHIPPED_STATUS_KEY
+    if (taskStatusKey === 'done') return SHIPPING_RELEASED_STATUS_KEY
+    if (['blocked', 'rejected'].includes(taskStatusKey)) return 'blocked'
     return task.business_status_key || SHIPMENT_PENDING_STATUS_KEY
   }
   return null

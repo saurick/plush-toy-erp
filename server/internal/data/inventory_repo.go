@@ -73,6 +73,50 @@ func (r *inventoryRepo) GetInventoryLot(ctx context.Context, id int) (*biz.Inven
 	return entInventoryLotToBiz(row), nil
 }
 
+func (r *inventoryRepo) ChangeInventoryLotStatus(ctx context.Context, lotID int, newStatus string, reason string) (*biz.InventoryLot, error) {
+	_ = reason
+	tx, err := r.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+
+	if err := lockInventoryLot(ctx, tx, lotID); err != nil {
+		return nil, err
+	}
+	lot, err := tx.client.InventoryLot.Get(ctx, lotID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrInventoryLotNotFound
+		}
+		return nil, err
+	}
+	hasBalance, err := inventoryLotHasPositiveBalance(ctx, tx.client, lotID)
+	if err != nil {
+		return nil, err
+	}
+	if !biz.IsInventoryLotStatusTransitionAllowed(lot.Status, newStatus, hasBalance) {
+		return nil, biz.ErrBadParam
+	}
+	if lot.Status != newStatus {
+		if err := updateInventoryLotStatus(ctx, tx, lotID, newStatus); err != nil {
+			return nil, err
+		}
+		lot, err = tx.client.InventoryLot.Get(ctx, lotID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrInventoryLotNotFound
+			}
+			return nil, err
+		}
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entInventoryLotToBiz(lot), nil
+}
+
 func (r *inventoryRepo) CreateInventoryTxn(ctx context.Context, in *biz.InventoryTxnCreate) (*biz.InventoryTxn, error) {
 	existing, err := r.data.postgres.InventoryTxn.Query().
 		Where(inventorytxn.IdempotencyKey(in.IdempotencyKey)).
@@ -346,6 +390,27 @@ func validateInventoryLotForTxn(ctx context.Context, client *ent.Client, in *biz
 	if lot.SubjectType != in.SubjectType || lot.SubjectID != in.SubjectID {
 		return biz.ErrBadParam
 	}
+	if err := validateInventoryLotStatusForTxn(lot.Status, in); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateInventoryLotStatusForTxn(status string, in *biz.InventoryTxnCreate) error {
+	if in.TxnType == biz.InventoryTxnReversal || in.Direction >= 0 {
+		return nil
+	}
+	if in.SourceType == biz.PurchaseReturnSourceType && in.TxnType == biz.InventoryTxnOut {
+		switch status {
+		case biz.InventoryLotActive, biz.InventoryLotHold, biz.InventoryLotRejected:
+			return nil
+		default:
+			return biz.ErrInventoryLotStatusBlocked
+		}
+	}
+	if status != biz.InventoryLotActive {
+		return biz.ErrInventoryLotStatusBlocked
+	}
 	return nil
 }
 
@@ -398,6 +463,46 @@ func inventoryTxnAlreadyReversed(ctx context.Context, client *ent.Client, in *bi
 	return client.InventoryTxn.Query().
 		Where(inventorytxn.ReversalOfTxnID(*in.ReversalOfTxnID)).
 		Exist(ctx)
+}
+
+func inventoryLotHasPositiveBalance(ctx context.Context, client *ent.Client, lotID int) (bool, error) {
+	return client.InventoryBalance.Query().
+		Where(
+			inventorybalance.LotID(lotID),
+			inventorybalance.QuantityGT(decimal.Zero),
+		).
+		Exist(ctx)
+}
+
+func lockInventoryLot(ctx context.Context, tx *inventoryDBTx, lotID int) error {
+	if tx.dialect != dialect.Postgres {
+		return nil
+	}
+	var id int
+	if err := tx.sqlTx.QueryRowContext(ctx, `SELECT id FROM inventory_lots WHERE id = $1 FOR UPDATE`, lotID).Scan(&id); err != nil {
+		if errors.Is(err, stdsql.ErrNoRows) {
+			return biz.ErrInventoryLotNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+func updateInventoryLotStatus(ctx context.Context, tx *inventoryDBTx, lotID int, status string) error {
+	p := inventorySQLPlaceholders(tx.dialect, 3)
+	query := fmt.Sprintf(`UPDATE inventory_lots SET status = %s, updated_at = %s WHERE id = %s`, p[0], p[1], p[2])
+	result, err := tx.sqlTx.ExecContext(ctx, query, status, time.Now(), lotID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return biz.ErrInventoryLotNotFound
+	}
+	return nil
 }
 
 func upsertInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, key biz.InventoryBalanceKey, delta decimal.Decimal) error {

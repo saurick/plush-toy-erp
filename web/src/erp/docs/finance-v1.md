@@ -56,16 +56,16 @@
 
 本闭环把出货后的财务动作落在 `workflow_tasks`，不新增财务专表。出货业务事实仍由 `shipping-release` / `outbound` 或上一轮沿用的 `production-progress` 出货任务确认，财务只确认应收和开票登记事实。
 
-| 环节             | 当前 v1 规则                                                                                                                                                            |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 触发点           | `shipment_release` 完成或业务状态进入 `shipped` 后创建 `receivable_registration`。桌面 `shipping-release` / `outbound` 可手动发起；移动端仓库完成出货任务后会自动发起。 |
-| 应收登记责任人   | `owner_role_key=finance`，财务移动端处理；PMC 和老板只看风险，不代办。                                                                                                  |
-| 应收登记完成条件 | 财务确认客户、出货数量、应收金额、税率、含税 / 不含税金额和收款状态。完成后创建 `invoice_registration`，业务状态推进到 `reconciling`。                                  |
-| 开票登记责任人   | `owner_role_key=finance`，继续由财务移动端处理。                                                                                                                        |
-| 开票登记完成条件 | 财务登记发票号、发票类型、税率、税额、含税金额、不含税金额和发票状态。完成后业务状态保持 `reconciling`，交给后续对账。                                                  |
-| 财务异常 / 阻塞  | 应收或开票任务阻塞 / 退回必须填写原因；状态快照记录 `blocked_reason`；Dashboard 以 `finance_pending`、`invoice_pending` 或 `finance_overdue` 展示预警。                 |
-| 当前不做         | 不做总账、凭证、会计科目、纳税申报；不新增 `ar_receivable`、`ar_invoice`、`settlement` 或 finance 专表；不自动生成真实发票文件。                                        |
-| 后续评审条件     | 当应收金额、税率、发票状态、收款状态、对账差异和历史回补口径稳定后，再评审是否拆 `ar_receivable`、`ar_invoice`、`settlement` Ent schema。                               |
+| 环节             | 当前 v1 规则                                                                                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 触发点           | 真实出货业务状态进入 `shipped` 后创建 `receivable_registration`。`shipment_release done` 只表示 `shipping_released`，不能作为应收 / 开票触发点；桌面 `shipping-release` / `outbound` 手动入口也必须基于真实 `shipped`。 |
+| 应收登记责任人   | `owner_role_key=finance`，财务移动端处理；PMC 和老板只看风险，不代办。                                                                                                                                                  |
+| 应收登记完成条件 | 财务确认客户、出货数量、应收金额、税率、含税 / 不含税金额和收款状态。完成后创建 `invoice_registration`，业务状态推进到 `reconciling`。                                                                                  |
+| 开票登记责任人   | `owner_role_key=finance`，继续由财务移动端处理。                                                                                                                                                                        |
+| 开票登记完成条件 | 财务登记发票号、发票类型、税率、税额、含税金额、不含税金额和发票状态。完成后业务状态保持 `reconciling`，交给后续对账。                                                                                                  |
+| 财务异常 / 阻塞  | 应收或开票任务阻塞 / 退回必须填写原因；状态快照记录 `blocked_reason`；Dashboard 以 `finance_pending`、`invoice_pending` 或 `finance_overdue` 展示预警。                                                                 |
+| 当前不做         | 不做总账、凭证、会计科目、纳税申报；不新增 `ar_receivable`、`ar_invoice`、`settlement` 或 finance 专表；不自动生成真实发票文件。                                                                                        |
+| 后续评审条件     | 当应收金额、税率、发票状态、收款状态、对账差异和历史回补口径稳定后，再评审是否拆 `ar_receivable`、`ar_invoice`、`settlement` Ent schema。                                                                               |
 
 ## 第六条真实闭环：采购/委外 -> 应付登记 -> 对账
 
