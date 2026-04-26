@@ -54,16 +54,11 @@ import {
   isOutsourceWarehouseInboundTask,
 } from '../../utils/outsourceReturnFlow.mjs'
 import {
-  FINISHED_GOODS_INBOUND_TASK_GROUP,
-  FINISHED_GOODS_REWORK_TASK_GROUP,
   SHIPMENT_RELEASE_TASK_GROUP,
   INBOUND_DONE_STATUS_KEY as FINISHED_GOODS_INBOUND_DONE_STATUS_KEY,
   PRODUCTION_PROCESSING_STATUS_KEY as FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY,
   QC_FAILED_STATUS_KEY as FINISHED_GOODS_QC_FAILED_STATUS_KEY,
   SHIPPED_STATUS_KEY as FINISHED_GOODS_SHIPPED_STATUS_KEY,
-  WAREHOUSE_INBOUND_PENDING_STATUS_KEY as FINISHED_GOODS_WAREHOUSE_INBOUND_PENDING_STATUS_KEY,
-  buildFinishedGoodsInboundTask,
-  buildFinishedGoodsReworkTask,
   buildShipmentReleaseTask,
   isFinishedGoodsInboundTask,
   isFinishedGoodsQcTask,
@@ -533,103 +528,6 @@ export default function MobileRoleTasksPage() {
     })
   }
 
-  const passFinishedGoodsQcTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
-    if (!record) {
-      throw new Error('未找到对应生产进度记录')
-    }
-    const savedRecord =
-      (await updateBusinessRecordStatusForTask(
-        task,
-        record,
-        FINISHED_GOODS_WAREHOUSE_INBOUND_PENDING_STATUS_KEY,
-        reason || '成品抽检合格'
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: FINISHED_GOODS_WAREHOUSE_INBOUND_PENDING_STATUS_KEY,
-      owner_role_key: 'warehouse',
-      payload: {
-        record_title: savedRecord.title,
-        qc_task_id: task.id,
-        qc_result: 'pass',
-        notification_type: 'task_created',
-        alert_type: 'finished_goods_inbound_pending',
-        critical_path: true,
-        finished_goods: true,
-      },
-    })
-    const hasInboundTask = await hasActiveTaskForSource(
-      task,
-      FINISHED_GOODS_INBOUND_TASK_GROUP
-    )
-    const inboundTask = buildFinishedGoodsInboundTask(
-      {
-        ...savedRecord,
-        module_key: task.source_type,
-      },
-      {
-        ...task,
-        payload: {
-          ...(task.payload || {}),
-          qc_result: 'pass',
-        },
-      }
-    )
-    if (inboundTask && !hasInboundTask) {
-      await createWorkflowTask(inboundTask)
-    }
-  }
-
-  const failFinishedGoodsQcTask = async (task, taskStatusKey, reason) => {
-    const record = await loadBusinessRecordForTask(task)
-    if (!record) {
-      throw new Error('未找到对应生产进度记录')
-    }
-    const savedRecord =
-      (await updateBusinessRecordStatusForTask(
-        task,
-        record,
-        FINISHED_GOODS_QC_FAILED_STATUS_KEY,
-        reason
-      )) || record
-    await upsertWorkflowBusinessState({
-      source_type: task.source_type,
-      source_id: savedRecord.id,
-      source_no: savedRecord.document_no || task.source_no,
-      business_status_key: FINISHED_GOODS_QC_FAILED_STATUS_KEY,
-      owner_role_key: 'production',
-      blocked_reason: reason,
-      payload: {
-        record_title: savedRecord.title,
-        qc_task_id: task.id,
-        qc_result: taskStatusKey === 'rejected' ? 'rejected' : 'fail',
-        rejected_reason: reason,
-        notification_type: 'qc_failed',
-        alert_type: 'qc_failed',
-        critical_path: true,
-        finished_goods: true,
-      },
-    })
-    const hasReworkTask = await hasActiveTaskForSource(
-      task,
-      FINISHED_GOODS_REWORK_TASK_GROUP
-    )
-    const reworkTask = buildFinishedGoodsReworkTask(
-      {
-        ...savedRecord,
-        module_key: task.source_type,
-      },
-      task,
-      reason
-    )
-    if (reworkTask && !hasReworkTask) {
-      await createWorkflowTask(reworkTask)
-    }
-  }
-
   const completeFinishedGoodsInboundTask = async (task, reason) => {
     const record = await loadBusinessRecordForTask(task)
     if (!record) {
@@ -1001,13 +899,6 @@ export default function MobileRoleTasksPage() {
 
   const runFinishedGoodsFollowUp = async (task, taskStatusKey, reason = '') => {
     if (activeRoleKey === 'quality' && isFinishedGoodsQcTask(task)) {
-      if (taskStatusKey === 'done') {
-        await passFinishedGoodsQcTask(task, reason)
-        return
-      }
-      if (taskStatusKey === 'blocked' || taskStatusKey === 'rejected') {
-        await failFinishedGoodsQcTask(task, taskStatusKey, reason)
-      }
       return
     }
 

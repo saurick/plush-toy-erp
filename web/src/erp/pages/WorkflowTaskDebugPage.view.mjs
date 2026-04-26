@@ -16,8 +16,8 @@ export const WORKFLOW_TASK_DEBUG_DOC_PATH = '/erp/docs/workflow-task-debug'
 
 export const WORKFLOW_TASK_DEBUG_ROLE_OPTIONS = Object.freeze([
   { key: 'boss', label: '老板 / 管理层' },
-  { key: 'business', label: '业务' },
-  { key: 'purchasing', label: '采购' },
+  { key: 'sales', label: '业务' },
+  { key: 'purchase', label: '采购' },
   { key: 'production', label: '生产经理' },
   { key: 'warehouse', label: '仓库' },
   { key: 'finance', label: '财务' },
@@ -71,7 +71,7 @@ export const WORKFLOW_TASK_BINDING_ROWS = Object.freeze([
     object: '角色池',
     field: 'owner_role_key',
     table: 'workflow_tasks',
-    note: '决定任务进入哪个角色池；menu_permissions 只管菜单可见。',
+    note: '决定任务进入哪个角色池；RBAC 权限码只判断动作资格。',
   },
   {
     key: 'assignee',

@@ -576,6 +576,101 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusTriggersOutsourceReturnQCDerivation
 	}
 }
 
+func TestJsonrpcData_WorkflowUpdateTaskStatusTriggersFinishedGoodsQCDerivation(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:jsonrpc_workflow_finished_goods_qc?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewWorkflowRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+	workflowUC := biz.NewWorkflowUsecase(repo)
+	j := &JsonrpcData{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionWorkflowTaskComplete)},
+		workflowUC:  workflowUC,
+	}
+	qcTask := createFinishedGoodsQCTask(t, ctx, repo, 466)
+
+	adminCtx := biz.NewContextWithClaims(ctx, &biz.AuthClaims{
+		UserID:   7,
+		Username: "admin",
+		Role:     biz.RoleAdmin,
+	})
+	params, err := structpb.NewStruct(map[string]any{
+		"id":                  float64(qcTask.ID),
+		"task_status_key":     "done",
+		"business_status_key": "warehouse_inbound_pending",
+		"actor_role_key":      "quality",
+		"payload": map[string]any{
+			"qc_result": "pass",
+		},
+	})
+	if err != nil {
+		t.Fatalf("build params failed: %v", err)
+	}
+
+	_, res, err := j.handleWorkflow(adminCtx, "update_task_status", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected OK response, got %#v", res)
+	}
+	data := res.Data.AsMap()
+	resultTask, ok := data["task"].(map[string]any)
+	if !ok || resultTask["task_status_key"] != "done" {
+		t.Fatalf("expected returned done task, got %#v", data["task"])
+	}
+
+	downstreamCount, err := client.WorkflowTask.Query().
+		Where(
+			workflowtask.SourceType("production-progress"),
+			workflowtask.SourceID(466),
+			workflowtask.TaskGroup("finished_goods_inbound"),
+			workflowtask.OwnerRoleKey("warehouse"),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count finished goods inbound tasks failed: %v", err)
+	}
+	if downstreamCount != 1 {
+		t.Fatalf("expected one finished goods inbound task after JSON-RPC update, got %d", downstreamCount)
+	}
+
+	state, err := client.WorkflowBusinessState.Query().
+		Where(workflowbusinessstate.SourceType("production-progress"), workflowbusinessstate.SourceID(466)).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("query business state failed: %v", err)
+	}
+	if state.BusinessStatusKey != "warehouse_inbound_pending" ||
+		state.OwnerRoleKey == nil ||
+		*state.OwnerRoleKey != "warehouse" {
+		t.Fatalf("unexpected finished goods QC business state %#v", state)
+	}
+
+	tasks, _, err := workflowUC.ListTasks(ctx, biz.WorkflowTaskFilter{
+		SourceType: "production-progress",
+		SourceID:   466,
+		Limit:      200,
+	})
+	if err != nil {
+		t.Fatalf("list tasks failed: %v", err)
+	}
+	foundFinishedGoodsInbound := false
+	for _, task := range tasks {
+		if task.TaskGroup == "finished_goods_inbound" && task.OwnerRoleKey == "warehouse" {
+			foundFinishedGoodsInbound = true
+			break
+		}
+	}
+	if !foundFinishedGoodsInbound {
+		t.Fatalf("expected list_tasks refresh path to include derived finished goods inbound task")
+	}
+}
+
 func TestJsonrpcData_WorkflowUpdateTaskStatusKeepsAdminBoundary(t *testing.T) {
 	repo := &stubWorkflowJSONRPCRepo{}
 	j := &JsonrpcData{

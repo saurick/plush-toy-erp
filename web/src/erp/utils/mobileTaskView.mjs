@@ -53,7 +53,7 @@ const ROLE_EXTENDED_VISIBILITY_LABELS = Object.freeze({
   pmc: 'PMC 扩展可见性关注 blocked / overdue / critical_path / 催办 / 升级 / 高优先级。',
   boss: '老板扩展可见性关注高优先级、审批、出货风险、财务 critical 和升级到老板。',
   production: '生产扩展可见性关注委外回货、成品返工和生产相关任务。',
-  business: '业务扩展可见性关注出货、业务确认和 confirm_role_key。',
+  sales: '业务扩展可见性关注出货、业务确认和 confirm_role_key。',
   finance: '财务扩展可见性关注财务来源、财务通知和财务逾期。',
   warehouse: '仓库扩展可见性关注仓储来源和仓库任务。',
   quality: '品质扩展可见性关注质检来源、质检失败和品质任务。',
@@ -218,8 +218,8 @@ function isProductionMobileVisible(taskView = {}) {
 function isBusinessMobileVisible(taskView = {}) {
   const payload = payloadOf(taskView)
   return (
-    isRoleKeyMatch(taskView.owner_role_key, 'business') ||
-    isRoleKeyMatch(payload.confirm_role_key, 'business') ||
+    isRoleKeyMatch(taskView.owner_role_key, 'sales') ||
+    isRoleKeyMatch(payload.confirm_role_key, 'sales') ||
     taskView.source_type === 'shipping-release' ||
     taskView.source_type === 'outbound'
   )
@@ -239,7 +239,7 @@ export function isMobileTaskVisibleForRole(taskView = {}, roleKey = '') {
   if (normalizedRoleKey === 'production') {
     return isProductionMobileVisible(taskView)
   }
-  if (normalizedRoleKey === 'business') {
+  if (normalizedRoleKey === 'sales') {
     return isBusinessMobileVisible(taskView)
   }
   return false
@@ -388,18 +388,18 @@ export function explainMobileTaskVisibility(
       isQualityWorkflowTask(taskView),
       'quality 命中质检任务。'
     )
-  } else if (normalizedRoleKey === 'business') {
+  } else if (normalizedRoleKey === 'sales') {
     appendReason(
       reasons,
-      isRoleKeyMatch(payload.confirm_role_key, 'business'),
-      'business 扩展命中 confirm_role_key。'
+      isRoleKeyMatch(payload.confirm_role_key, 'sales'),
+      'sales 扩展命中 confirm_role_key。'
     )
     appendReason(
       reasons,
       ['shipping-release', 'outbound'].includes(taskView.source_type),
-      'business 扩展命中出货相关 source_type。'
+      'sales 扩展命中出货相关 source_type。'
     )
-  } else if (normalizedRoleKey === 'purchasing') {
+  } else if (normalizedRoleKey === 'purchase') {
     checks.push('采购移动端当前按 owner_role_key 直查，没有额外扩展可见性。')
   }
 
@@ -431,9 +431,7 @@ export function explainMobileTaskVisibility(
       )
     }
     if (
-      ['finance', 'warehouse', 'quality', 'business'].includes(
-        normalizedRoleKey
-      )
+      ['finance', 'warehouse', 'quality', 'sales'].includes(normalizedRoleKey)
     ) {
       blockers.push('source_type 或 task_group 不匹配该角色关注范围。')
     }

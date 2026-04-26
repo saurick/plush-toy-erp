@@ -20,6 +20,7 @@ const (
 	workflowAccessoriesPurchaseModuleKey       = "accessories-purchase"
 	workflowInboundModuleKey                   = "inbound"
 	workflowProcessingContractsModuleKey       = "processing-contracts"
+	workflowProductionProgressModuleKey        = "production-progress"
 	workflowOrderApprovalTaskGroup             = "order_approval"
 	workflowEngineeringDataTaskGroup           = "engineering_data"
 	workflowOrderRevisionTaskGroup             = "order_revision"
@@ -29,6 +30,9 @@ const (
 	workflowOutsourceReturnQCTaskGroup         = "outsource_return_qc"
 	workflowOutsourceWarehouseInboundTaskGroup = "outsource_warehouse_inbound"
 	workflowOutsourceReworkTaskGroup           = "outsource_rework"
+	workflowFinishedGoodsQCTaskGroup           = "finished_goods_qc"
+	workflowFinishedGoodsInboundTaskGroup      = "finished_goods_inbound"
+	workflowFinishedGoodsReworkTaskGroup       = "finished_goods_rework"
 	workflowOrderApprovalStatusKey             = "project_pending"
 	workflowOrderApprovedStatusKey             = "project_approved"
 	workflowEngineeringPreparingStatusKey      = "engineering_preparing"
@@ -243,10 +247,11 @@ type WorkflowTaskStatusUpdate struct {
 }
 
 type WorkflowTaskStatusSideEffects struct {
-	BusinessState     *WorkflowBusinessStateUpsert
-	DerivedTask       *WorkflowTaskCreate
-	DerivedFromTaskID int
-	WorkflowRuleKey   string
+	BusinessState                     *WorkflowBusinessStateUpsert
+	DerivedTask                       *WorkflowTaskCreate
+	DerivedFromTaskID                 int
+	WorkflowRuleKey                   string
+	RefreshExistingDerivedTaskPayload bool
 }
 
 type WorkflowTaskUrge struct {
@@ -378,6 +383,10 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		}
 	} else if isOutsourceReturnQCTask(current) {
 		if err := uc.applyOutsourceReturnQCTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isFinishedGoodsQCTask(current) {
+		if err := uc.applyFinishedGoodsQCTransition(current, in); err != nil {
 			return nil, err
 		}
 	}
@@ -572,6 +581,54 @@ func (uc *WorkflowUsecase) applyOutsourceReturnQCTransition(current *WorkflowTas
 	return nil
 }
 
+func (uc *WorkflowUsecase) applyFinishedGoodsQCTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowWarehouseInboundPendingKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		delete(in.Payload, "blocked_reason")
+		delete(in.Payload, "rejected_reason")
+		delete(in.Payload, "decision")
+		delete(in.Payload, "transition_status")
+		if workflowPayloadString(in.Payload, "qc_result") == "" {
+			in.Payload["qc_result"] = "pass"
+		}
+		in.Payload["qc_task_id"] = current.ID
+		in.Payload["finished_goods"] = true
+		in.Payload["alert_type"] = "finished_goods_inbound_pending"
+		in.Payload["critical_path"] = true
+		in.Payload["inventory_balance_deferred"] = true
+		in.SideEffects = buildFinishedGoodsQCDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	case "blocked", "rejected":
+		reason := workflowTransitionReason(in, in.TaskStatusKey)
+		if reason == "" {
+			return ErrBadParam
+		}
+		in.Reason = reason
+		in.BusinessStatusKey = workflowQCFailedStatusKey
+		in.Payload = mergeWorkflowPayload(current.Payload, in.Payload)
+		in.Payload["decision"] = in.TaskStatusKey
+		in.Payload["transition_status"] = in.TaskStatusKey
+		in.Payload["qc_task_id"] = current.ID
+		in.Payload["finished_goods"] = true
+		in.Payload["alert_type"] = "qc_failed"
+		in.Payload["critical_path"] = true
+		if in.TaskStatusKey == "blocked" {
+			in.Payload["qc_result"] = "blocked"
+			in.Payload["blocked_reason"] = reason
+			delete(in.Payload, "rejected_reason")
+		} else {
+			in.Payload["qc_result"] = "rejected"
+			in.Payload["rejected_reason"] = reason
+			delete(in.Payload, "blocked_reason")
+		}
+		in.SideEffects = buildFinishedGoodsQCReworkSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
+	default:
+		return nil
+	}
+	return nil
+}
+
 func (uc *WorkflowUsecase) UrgeTask(ctx context.Context, in *WorkflowTaskUrge, actorID int, actorRoleKey string) (*WorkflowTask, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -755,6 +812,31 @@ func isOutsourceReturnQCTask(task *WorkflowTask) bool {
 	}
 	if workflowPayloadString(task.Payload, "qc_type") != "outsource_return" &&
 		workflowPayloadString(task.Payload, "outsource_processing") != "true" {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return true
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case "", workflowQCPendingStatusKey, workflowQCFailedStatusKey:
+		return true
+	default:
+		return false
+	}
+}
+
+func isFinishedGoodsQCTask(task *WorkflowTask) bool {
+	if task == nil || task.SourceID <= 0 {
+		return false
+	}
+	if strings.TrimSpace(task.SourceType) != workflowProductionProgressModuleKey {
+		return false
+	}
+	if strings.TrimSpace(task.TaskGroup) != workflowFinishedGoodsQCTaskGroup ||
+		strings.TrimSpace(task.OwnerRoleKey) != "quality" {
+		return false
+	}
+	if workflowPayloadString(task.Payload, "finished_goods") != "true" {
 		return false
 	}
 	if task.BusinessStatusKey == nil {
@@ -1051,6 +1133,74 @@ func buildOutsourceReturnQCReworkSideEffects(current *WorkflowTask, taskStatusKe
 	}
 }
 
+func buildFinishedGoodsQCDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := "warehouse"
+	qcResult := workflowPayloadString(current.Payload, "qc_result")
+	if qcResult == "" {
+		qcResult = "pass"
+	}
+	statePayload := workflowFinishedGoodsCommonPayload(current)
+	statePayload["qc_task_id"] = current.ID
+	statePayload["qc_result"] = qcResult
+	statePayload["notification_type"] = "task_created"
+	statePayload["alert_type"] = "finished_goods_inbound_pending"
+	statePayload["critical_path"] = true
+	statePayload["inventory_balance_deferred"] = true
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			BusinessStatusKey: workflowWarehouseInboundPendingKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			Payload:           statePayload,
+		},
+		DerivedTask:       buildFinishedGoodsInboundTaskFromQC(current),
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "finished_goods_qc_done_to_finished_goods_inbound",
+	}
+}
+
+func buildFinishedGoodsQCReworkSideEffects(current *WorkflowTask, taskStatusKey string, reason string) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := "production"
+	qcResult := "blocked"
+	if taskStatusKey == "rejected" {
+		qcResult = "rejected"
+	}
+	statePayload := workflowFinishedGoodsCommonPayload(current)
+	statePayload["qc_task_id"] = current.ID
+	statePayload["qc_result"] = qcResult
+	statePayload["decision"] = taskStatusKey
+	statePayload["transition_status"] = taskStatusKey
+	statePayload["notification_type"] = "qc_failed"
+	statePayload["alert_type"] = "qc_failed"
+	statePayload["critical_path"] = true
+	if taskStatusKey == "blocked" {
+		statePayload["blocked_reason"] = reason
+	} else {
+		statePayload["rejected_reason"] = reason
+	}
+	workflowRuleKey := "finished_goods_qc_rejected_to_finished_goods_rework"
+	if taskStatusKey == "blocked" {
+		workflowRuleKey = "finished_goods_qc_blocked_to_finished_goods_rework"
+	}
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			BusinessStatusKey: workflowQCFailedStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			BlockedReason:     &reason,
+			Payload:           statePayload,
+		},
+		DerivedTask:                       buildFinishedGoodsReworkTaskFromQC(current, taskStatusKey, reason),
+		DerivedFromTaskID:                 current.ID,
+		WorkflowRuleKey:                   workflowRuleKey,
+		RefreshExistingDerivedTaskPayload: true,
+	}
+}
+
 func buildWarehouseInboundTaskFromPurchaseIqc(current *WorkflowTask) *WorkflowTaskCreate {
 	if current == nil || current.SourceID <= 0 {
 		return nil
@@ -1221,6 +1371,89 @@ func buildOutsourceReworkTaskFromReturnQC(current *WorkflowTask, taskStatusKey s
 	}
 }
 
+func buildFinishedGoodsInboundTaskFromQC(current *WorkflowTask) *WorkflowTaskCreate {
+	if current == nil || current.SourceID <= 0 {
+		return nil
+	}
+	businessStatusKey := workflowWarehouseInboundPendingKey
+	dueAt := time.Now().Add(4 * time.Hour)
+	priority := current.Priority
+	if priority <= 0 {
+		priority = 2
+	}
+	qcResult := workflowPayloadString(current.Payload, "qc_result")
+	if qcResult == "" {
+		qcResult = "pass"
+	}
+	payload := workflowFinishedGoodsCommonPayload(current)
+	payload["qc_task_id"] = current.ID
+	payload["qc_result"] = qcResult
+	payload["complete_condition"] = "仓库确认成品入库数量、库位和经手人"
+	payload["related_documents"] = workflowFinishedGoodsRelatedDocuments(current, workflowFinishedGoodsRelatedDocumentOptions{
+		qcResult: qcResult,
+	})
+	payload["notification_type"] = "task_created"
+	payload["alert_type"] = "finished_goods_inbound_pending"
+	payload["critical_path"] = true
+	payload["inventory_balance_deferred"] = true
+	return &WorkflowTaskCreate{
+		TaskCode:          workflowTaskCode("finished-goods-inbound", current.SourceID),
+		TaskGroup:         workflowFinishedGoodsInboundTaskGroup,
+		TaskName:          "成品入库",
+		SourceType:        workflowProductionProgressModuleKey,
+		SourceID:          current.SourceID,
+		SourceNo:          workflowTaskSourceNo(current),
+		BusinessStatusKey: &businessStatusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "warehouse",
+		Priority:          priority,
+		DueAt:             &dueAt,
+		Payload:           payload,
+	}
+}
+
+func buildFinishedGoodsReworkTaskFromQC(current *WorkflowTask, taskStatusKey string, reason string) *WorkflowTaskCreate {
+	if current == nil || current.SourceID <= 0 {
+		return nil
+	}
+	businessStatusKey := workflowQCFailedStatusKey
+	qcResult := "blocked"
+	if taskStatusKey == "rejected" {
+		qcResult = "rejected"
+	}
+	payload := workflowFinishedGoodsCommonPayload(current)
+	payload["qc_task_id"] = current.ID
+	payload["qc_result"] = qcResult
+	payload["decision"] = taskStatusKey
+	payload["transition_status"] = taskStatusKey
+	payload["complete_condition"] = "生产确认返工完成、重新提交成品抽检或让步放行处理"
+	payload["related_documents"] = workflowFinishedGoodsRelatedDocuments(current, workflowFinishedGoodsRelatedDocumentOptions{
+		qcResult: qcResult,
+		reason:   reason,
+	})
+	payload["notification_type"] = "qc_failed"
+	payload["alert_type"] = "qc_failed"
+	payload["critical_path"] = true
+	if taskStatusKey == "blocked" {
+		payload["blocked_reason"] = reason
+	} else {
+		payload["rejected_reason"] = reason
+	}
+	return &WorkflowTaskCreate{
+		TaskCode:          workflowTaskCode("finished-goods-rework", current.SourceID),
+		TaskGroup:         workflowFinishedGoodsReworkTaskGroup,
+		TaskName:          "成品返工处理",
+		SourceType:        workflowProductionProgressModuleKey,
+		SourceID:          current.SourceID,
+		SourceNo:          workflowTaskSourceNo(current),
+		BusinessStatusKey: &businessStatusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "production",
+		Priority:          3,
+		Payload:           payload,
+	}
+}
+
 type workflowOrderRelatedDocumentOptions struct {
 	includeMaterialBOM bool
 	includeArtwork     bool
@@ -1297,6 +1530,11 @@ type workflowOutsourceReturnRelatedDocumentOptions struct {
 	reason   string
 }
 
+type workflowFinishedGoodsRelatedDocumentOptions struct {
+	qcResult string
+	reason   string
+}
+
 func workflowOutsourceReturnCommonPayload(current *WorkflowTask) map[string]any {
 	return map[string]any{
 		"record_title":         workflowOutsourceReturnRecordTitle(current),
@@ -1345,6 +1583,62 @@ func workflowOutsourceReturnRelatedDocuments(current *WorkflowTask, options work
 	}
 	if options.qcResult != "" {
 		documents = append(documents, "回货检验结果："+options.qcResult)
+	}
+	if options.reason != "" {
+		documents = append(documents, "不良原因："+options.reason)
+	}
+	return documents
+}
+
+func workflowFinishedGoodsCommonPayload(current *WorkflowTask) map[string]any {
+	return map[string]any{
+		"record_title":          workflowFinishedGoodsRecordTitle(current),
+		"customer_name":         workflowPayloadString(current.Payload, "customer_name"),
+		"style_no":              workflowPayloadString(current.Payload, "style_no"),
+		"material_name":         workflowPayloadString(current.Payload, "material_name"),
+		"product_no":            workflowPayloadString(current.Payload, "product_no"),
+		"product_name":          workflowPayloadString(current.Payload, "product_name"),
+		"quantity":              workflowPayloadValue(current.Payload, "quantity"),
+		"unit":                  workflowPayloadString(current.Payload, "unit"),
+		"due_date":              workflowPayloadString(current.Payload, "due_date"),
+		"shipment_date":         workflowPayloadString(current.Payload, "shipment_date"),
+		"packaging_requirement": workflowPayloadString(current.Payload, "packaging_requirement"),
+		"shipping_requirement":  workflowPayloadString(current.Payload, "shipping_requirement"),
+		"finished_goods":        true,
+	}
+}
+
+func workflowFinishedGoodsRelatedDocuments(current *WorkflowTask, options workflowFinishedGoodsRelatedDocumentOptions) []string {
+	if current == nil {
+		return nil
+	}
+	documents := make([]string, 0, 10)
+	if sourceNo := workflowSourceNoValue(current); sourceNo != "" {
+		documents = append(documents, "生产进度："+sourceNo)
+	}
+	if sourceNo := workflowPayloadString(current.Payload, "source_no"); sourceNo != "" {
+		documents = append(documents, "订单："+sourceNo)
+	}
+	if customerName := workflowPayloadString(current.Payload, "customer_name"); customerName != "" {
+		documents = append(documents, "客户："+customerName)
+	}
+	if styleNo := workflowPayloadString(current.Payload, "style_no"); styleNo != "" {
+		documents = append(documents, "款式："+styleNo)
+	}
+	if productName := workflowPayloadString(current.Payload, "product_name"); productName != "" {
+		documents = append(documents, "产品："+productName)
+	}
+	if quantity := workflowPayloadString(current.Payload, "quantity"); quantity != "" {
+		documents = append(documents, "数量："+quantity+workflowPayloadString(current.Payload, "unit"))
+	}
+	if packagingRequirement := workflowPayloadString(current.Payload, "packaging_requirement"); packagingRequirement != "" {
+		documents = append(documents, "包装要求："+packagingRequirement)
+	}
+	if shippingRequirement := workflowPayloadString(current.Payload, "shipping_requirement"); shippingRequirement != "" {
+		documents = append(documents, "出货要求："+shippingRequirement)
+	}
+	if options.qcResult != "" {
+		documents = append(documents, "成品抽检结果："+options.qcResult)
 	}
 	if options.reason != "" {
 		documents = append(documents, "不良原因："+options.reason)
@@ -1425,6 +1719,25 @@ func workflowOutsourceReturnRecordTitle(task *WorkflowTask) string {
 		return title
 	}
 	return "委外回货检验"
+}
+
+func workflowFinishedGoodsRecordTitle(task *WorkflowTask) string {
+	if task == nil {
+		return "成品抽检"
+	}
+	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
+		return title
+	}
+	if title := workflowPayloadString(task.Payload, "product_name"); title != "" {
+		return title
+	}
+	if title := workflowPayloadString(task.Payload, "style_no"); title != "" {
+		return title
+	}
+	if title := workflowSourceNoValue(task); title != "" {
+		return title
+	}
+	return "成品抽检"
 }
 
 func workflowPayloadString(payload map[string]any, key string) string {

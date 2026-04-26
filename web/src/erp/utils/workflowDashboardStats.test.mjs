@@ -21,7 +21,7 @@ function task(overrides = {}) {
     id: overrides.id || Math.floor(Math.random() * 100000),
     task_name: overrides.task_name || '测试任务',
     task_status_key: overrides.task_status_key || 'pending',
-    owner_role_key: overrides.owner_role_key || 'business',
+    owner_role_key: overrides.owner_role_key || 'sales',
     source_type: overrides.source_type || 'project-orders',
     source_id: overrides.source_id || 1,
     priority: overrides.priority || 0,
@@ -103,7 +103,7 @@ test('workflowDashboardStats: 统计任务状态和 due_at 计算态', () => {
   assert.equal(stats.done, 1)
   assert.equal(stats.closed, 1)
   assert.equal(stats.cancelled, 1)
-  assert.equal(stats.roleDistribution.business, 9)
+  assert.equal(stats.roleDistribution.sales, 9)
 })
 
 test('workflowDashboardStats: 终态任务不产生超时预警', () => {
@@ -145,7 +145,7 @@ test('workflowDashboardStats: 预警等级覆盖 blocked due_soon qc shipment pr
   })
   const purchaseQcFailed = task({
     source_type: 'inbound',
-    owner_role_key: 'purchasing',
+    owner_role_key: 'purchase',
     business_status_key: 'qc_failed',
     payload: { notification_type: 'qc_failed', alert_type: 'qc_failed' },
   })

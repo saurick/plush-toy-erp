@@ -42,7 +42,7 @@
 | 发票异常 / 红冲 / 作废                  | deferred | 当前只覆盖开票登记，不覆盖税务异常处理。                                                                            | 发票专表和状态机稳定后补。                                |
 | 成本核算 / 毛利分析                     | deferred | 当前没有完整库存成本、采购成本、委外成本和财务专表。                                                                | 成本快照和专表评审后补。                                  |
 | 供应商 / 加工商绩效                     | deferred | 当前任务流记录了延期、不良、对账，但没有绩效模型。                                                                  | 供应商评分指标稳定后补。                                  |
-| 权限审批 / 菜单权限变更审计             | deferred | 当前有权限配置和日志文档，但没有权限变更审批流。                                                                    | 审计日志和权限变更记录稳定后补。                          |
+| 权限审批 / 角色权限变更审计             | deferred | 当前有 RBAC 配置和日志文档，但没有权限变更审批流。                                                                  | 审计日志和权限变更记录稳定后补。                          |
 | 完整通知中心 / 未读 / 外部推送          | deferred | 当前只有任务事件、预警和催办评审，尚未落 notifications 独立表。                                                     | 评审 notification 表、recipient 表、read 状态和外部推送。 |
 
 ## 4. 当前不做
@@ -65,7 +65,7 @@
 
 `生成调试数据` 已接入后端 `debug.rebuild_business_chain_scenario`：
 
-1. 只允许管理员且拥有“业务链路调试”菜单权限的账号调用。
+1. 只允许管理员且拥有 `debug.business_chain.run` 权限的账号调用。
 2. 默认面向当前 SQL 连接开启，也可通过 `ERP_DEBUG_SEED_ENABLED=false` 显式关闭。
 3. 每次生成都会返回 `scenarioKey`、`debugRunId`、`createdRecords`、`createdTasks`、`nextCheckpoints`、`cleanupToken` 和 `warnings`。
 4. 所有样本都会带 `payload.debug = true`、`payload.created_by_debug = true`、`payload.debug_run_id = 本次调试编号` 和 `payload.scenario_key = 场景 key`。
@@ -84,11 +84,11 @@
 
 `清空业务数据` 已接入后端 `debug.clear_business_data`：
 
-1. 只允许管理员且拥有“业务链路调试”菜单权限的账号调用。
+1. 只允许管理员且拥有 `debug.business.clear` 权限的账号调用。
 2. 默认面向当前 SQL 连接开启，并复用 `ERP_DEBUG_CLEANUP_ENABLED` 和 `ERP_DEBUG_CLEANUP_SCOPE=debug_run` 作为破坏性清理总开关。
 3. 会硬删除本项目当前 SQL 连接中的业务链路、采购入库、库存、BOM、物料、成品、仓库和单位业务表，包括 `business_records`、`business_record_items`、`business_record_events`、`workflow_tasks`、`workflow_task_events`、`workflow_business_states`、`purchase_receipts`、`purchase_receipt_items`、`inventory_txns`、`inventory_balances`、`inventory_lots`、`bom_headers`、`bom_items`、`materials`、`products`、`warehouses`、`units`。
 4. 不删除账号、权限、管理员列顺序、配置和数据库结构。
-5. 即使前端按钮被误打开，后端也会校验管理员身份、业务链路调试菜单权限和显式关闭开关。
+5. 即使前端按钮被误打开，后端也会校验管理员身份、`debug.business.clear` 权限和显式关闭开关。
 
 ## 6. 当前 seed 场景
 
@@ -107,7 +107,7 @@
 - 不提供页面输入 SQL 后执行。
 - 不提供全库 truncate。
 - 不提供跨账号、权限、配置和系统表的全库清空。
-- 不提供绕开管理员权限、业务链路调试菜单权限和显式关闭开关的清空入口。
+- 不提供绕开管理员身份、debug 权限码和显式关闭开关的清空入口。
 - 不绕开 `business_records`、`business_record_items`、`business_record_events`、`workflow_tasks`、`workflow_task_events` 和 `workflow_business_states`。
 
 ## 8. 移动端看不到任务时先查什么

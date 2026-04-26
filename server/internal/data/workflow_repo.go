@@ -208,7 +208,7 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 				"derived_from_task_id": effects.DerivedFromTaskID,
 				"workflow_rule_key":    effects.WorkflowRuleKey,
 			}
-			if _, _, err := ensureActiveWorkflowTaskInTx(ctx, tx, effects.DerivedTask, actorID, actorRoleKey, eventPayload); err != nil {
+			if _, _, err := ensureActiveWorkflowTaskInTx(ctx, tx, effects.DerivedTask, actorID, actorRoleKey, eventPayload, effects.RefreshExistingDerivedTaskPayload); err != nil {
 				return nil, err
 			}
 		}
@@ -482,6 +482,7 @@ func ensureActiveWorkflowTaskInTx(
 	actorID int,
 	actorRoleKey string,
 	eventPayload map[string]any,
+	refreshExistingPayload bool,
 ) (*ent.WorkflowTask, bool, error) {
 	existing, err := tx.WorkflowTask.Query().
 		Where(
@@ -497,6 +498,18 @@ func ensureActiveWorkflowTaskInTx(
 		return nil, false, err
 	}
 	if existing != nil {
+		if refreshExistingPayload {
+			update := tx.WorkflowTask.UpdateOneID(existing.ID).
+				SetPayload(in.Payload)
+			if actorID > 0 {
+				update.SetUpdatedBy(actorID)
+			}
+			updated, err := update.Save(ctx)
+			if err != nil {
+				return nil, false, err
+			}
+			return updated, false, nil
+		}
 		return existing, false, nil
 	}
 

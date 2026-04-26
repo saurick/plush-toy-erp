@@ -15,7 +15,7 @@
 | 字段联动                     | 已有统一 catalog、runner 和 latest 覆盖报告                                                                   | `fieldLinkageCatalog.mjs`、`erp-field-linkage-coverage.latest.json`                                |
 | 打印快照                     | 已有采购合同、加工合同工作台和浏览器回归                                                                      | 打印模板测试、合同 smoke、打印快照文档                                                             |
 | workflow 状态字典            | 已覆盖前后端状态字典、任务状态和业务状态测试                                                                  | `workflowStatus.mjs`、后端 workflow 状态测试                                                       |
-| 角色权限矩阵                 | 已有菜单权限剪裁和权限说明                                                                                    | 前端权限配置、角色权限矩阵文档、权限测试                                                           |
+| 角色权限矩阵                 | 已切换为标准 RBAC，菜单、移动端入口和 JSON-RPC 接口统一消费权限码                                             | 后端 RBAC 真源、权限中心、角色权限矩阵文档、权限测试                                               |
 | 通知 / 预警 / 催办           | 已有 `urge_task` API、任务事件留痕、任务 payload 快照、Dashboard 和移动端预警口径                             | 后端 workflow 测试、`workflowDashboardStats.mjs`、`mobileTaskView.mjs`、通知预警文档               |
 | 协同任务可见性 / 角色池诊断  | 已有只读诊断页，按 `workflow_tasks`、`mobileTaskQueries` 和 `mobileTaskView` 解释任务是否应该被角色移动端看到 | `WorkflowTaskDebugPage`、`mobileTaskQueries.test.mjs`、`mobileTaskView.test.mjs`、协同任务调试文档 |
 | 错误码同步                   | 已有统一错误码真源和同步脚本                                                                                  | `server/internal/errcode/catalog.go`、前端生成码表                                                 |

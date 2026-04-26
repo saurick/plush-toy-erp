@@ -1,13 +1,13 @@
 import { normalizeRoleKey } from './roleKeys.mjs'
 
-const LOAD_ALL_ROLE_KEYS = new Set(['pmc', 'boss', 'production', 'business'])
+const LOAD_ALL_ROLE_KEYS = new Set(['pmc', 'boss', 'production', 'sales'])
 
 const LOAD_ALL_ROLE_REASON = Object.freeze({
   pmc: 'PMC 需要在全量任务里筛选 blocked、overdue、critical_path、催办和升级关注项。',
   boss: '老板需要在全量任务里筛选高优先级、审批、出货风险、财务 critical 和升级关注项。',
   production:
     '生产经理需要在全量任务里筛选委外、成品返工和生产相关任务，不只看 owner_role_key。',
-  business: '业务需要在全量任务里筛选出货确认、业务确认和自己主责的任务。',
+  sales: '业务需要在全量任务里筛选出货确认、业务确认和自己主责的任务。',
 })
 
 function normalizeTaskArray(result) {

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import { buildWorkflowTaskAlert } from './workflowDashboardStats.mjs'
@@ -26,6 +27,10 @@ import {
 
 const NOW_MS = Date.parse('2026-04-25T00:00:00Z')
 const NOW_SECONDS = Math.floor(NOW_MS / 1000)
+const mobileRoleTasksPageSource = readFileSync(
+  new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
+  'utf8'
+)
 
 function productionRecord(overrides = {}) {
   return {
@@ -104,6 +109,37 @@ test('finishedGoodsFlow: 成品抽检不合格能生成生产返工任务和 cri
   assert.equal(reworkTask.payload.rejected_reason, '车缝开线')
   assert.equal(alert.alert_type, 'qc_failed')
   assert.equal(alert.alert_level, 'critical')
+})
+
+test('finishedGoodsFlow: 移动端成品抽检状态动作不再本地创建下游任务', () => {
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildFinishedGoodsInboundTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildFinishedGoodsReworkTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('passFinishedGoodsQcTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('failFinishedGoodsQcTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('FINISHED_GOODS_INBOUND_TASK_GROUP'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('FINISHED_GOODS_REWORK_TASK_GROUP'),
+    false
+  )
+  assert.match(
+    mobileRoleTasksPageSource,
+    /if \(activeRoleKey === 'quality' && isFinishedGoodsQcTask\(task\)\) {[\s\S]{0,80}return[\s\S]{0,20}}/
+  )
 })
 
 test('finishedGoodsFlow: 成品入库完成后能生成待出货任务，并在完成后进入 shipped', () => {

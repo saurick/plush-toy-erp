@@ -43,8 +43,8 @@
 
 关键边界：
 
-- `menu_permissions` 只管桌面菜单可见。
-- `owner_role_key` 决定任务池。
+- RBAC permission code 决定当前账号能不能调用某类 workflow 动作。
+- `owner_role_key` 决定任务池，不能被 `workflow.task.update` 这类动作权限绕过。
 - `assignee_id` 决定具体人。
 - PMC 可以看风险和卡点，但不能代办事实。
 - boss 可以看高优先级和升级关注，但不能代办财务、品质、仓库事实。
@@ -52,7 +52,7 @@
 ## 4. 排查移动端为什么看不到任务
 
 1. 先确认任务是否在最近 200 条 `listWorkflowTasks` 返回结果里。
-2. 看 `mobileTaskQueries`：PMC、boss、production、business 使用全量加载后过滤；quality、warehouse、finance、purchasing 按 `owner_role_key` 直查。
+2. 看 `mobileTaskQueries`：PMC、boss、production、sales 使用全量加载后过滤；quality、warehouse、finance、purchase 按 `owner_role_key` 直查。
 3. 看 `owner_role_key` 是否等于当前角色。
 4. 看 `task_status_key` 是否是 `done`、`cancelled`、`closed` 等终态。
 5. 看 `task_group` 是否属于该角色关注范围。
@@ -64,7 +64,7 @@
 | 原因                    | 判断方式                                                                                                              |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `owner_role_key` 不匹配 | 当前角色直查时不会加载该任务                                                                                          |
-| 当前角色没有扩展可见性  | 例如 purchasing 当前只看自己的 `owner_role_key`                                                                       |
+| 当前角色没有扩展可见性  | 例如 purchase 当前只看自己的 `owner_role_key`                                                                         |
 | 任务已终态              | 终态任务不会进入活跃统计；是否展示按移动端当前规则判断                                                                |
 | `task_group` 不匹配     | 生产、品质、仓库等角色的扩展判断依赖任务组或来源                                                                      |
 | 风险字段不满足          | boss / PMC 扩展需要 high priority、finance critical、shipment risk、blocked、overdue、critical_path、催办或升级等信号 |
@@ -115,8 +115,8 @@
 | finance    | 财务来源、财务通知、财务逾期                                                           |
 | quality    | 品质来源、质检失败、品质任务                                                           |
 | warehouse  | 仓储来源、仓库任务                                                                     |
-| business   | 出货来源、业务确认、业务主责                                                           |
-| purchasing | 当前按 `owner_role_key` 直查，不额外扩展                                               |
+| sales      | 出货来源、业务确认、业务主责                                                           |
+| purchase   | 当前按 `owner_role_key` 直查，不额外扩展                                               |
 
 ## 10. 当前不做
 

@@ -1323,6 +1323,383 @@ func TestWorkflowRepo_OutsourceReturnQCBlockedThenRejectedReusesActiveRework(t *
 	}
 }
 
+func TestWorkflowRepo_FinishedGoodsQCDoneCreatesInboundIdempotently(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_finished_goods_qc_done?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewWorkflowRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+	uc := biz.NewWorkflowUsecase(repo)
+
+	qcTask := createFinishedGoodsQCTask(t, ctx, repo, 4501)
+
+	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID:            qcTask.ID,
+		TaskStatusKey: "done",
+		Payload:       map[string]any{"mobile_role_key": "quality", "qc_result": "accepted"},
+	}, 8, "quality"); err != nil {
+		t.Fatalf("done update failed: %v", err)
+	}
+
+	state, err := client.WorkflowBusinessState.Query().
+		Where(workflowbusinessstate.SourceType("production-progress"), workflowbusinessstate.SourceID(4501)).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("query finished goods QC business state failed: %v", err)
+	}
+	if state.BusinessStatusKey != "warehouse_inbound_pending" ||
+		state.OwnerRoleKey == nil ||
+		*state.OwnerRoleKey != "warehouse" {
+		t.Fatalf("unexpected finished goods QC done business state %#v", state)
+	}
+	if state.Payload["qc_task_id"] != float64(qcTask.ID) && state.Payload["qc_task_id"] != qcTask.ID {
+		t.Fatalf("expected QC task id in state payload, got %#v", state.Payload)
+	}
+	if state.Payload["qc_result"] != "accepted" ||
+		state.Payload["finished_goods"] != true ||
+		state.Payload["inventory_balance_deferred"] != true ||
+		state.Payload["alert_type"] != "finished_goods_inbound_pending" {
+		t.Fatalf("expected finished goods QC state payload, got %#v", state.Payload)
+	}
+
+	downstreamTasks, err := client.WorkflowTask.Query().
+		Where(
+			workflowtask.SourceType("production-progress"),
+			workflowtask.SourceID(4501),
+			workflowtask.TaskGroup("finished_goods_inbound"),
+			workflowtask.OwnerRoleKey("warehouse"),
+		).
+		All(ctx)
+	if err != nil {
+		t.Fatalf("query finished goods inbound tasks failed: %v", err)
+	}
+	if len(downstreamTasks) != 1 {
+		t.Fatalf("expected one finished goods inbound task, got %d", len(downstreamTasks))
+	}
+	if downstreamTasks[0].Payload["qc_task_id"] != float64(qcTask.ID) && downstreamTasks[0].Payload["qc_task_id"] != qcTask.ID {
+		t.Fatalf("expected QC task id in downstream payload, got %#v", downstreamTasks[0].Payload)
+	}
+	if downstreamTasks[0].Payload["qc_result"] != "accepted" ||
+		downstreamTasks[0].Payload["finished_goods"] != true ||
+		downstreamTasks[0].Payload["inventory_balance_deferred"] != true ||
+		downstreamTasks[0].Payload["alert_type"] != "finished_goods_inbound_pending" ||
+		downstreamTasks[0].Payload["shipment_date"] != "2026-04-30" {
+		t.Fatalf("unexpected finished goods inbound payload %#v", downstreamTasks[0].Payload)
+	}
+
+	shipmentCount, err := client.WorkflowTask.Query().
+		Where(
+			workflowtask.SourceType("production-progress"),
+			workflowtask.SourceID(4501),
+			workflowtask.TaskGroup("shipment_release"),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count shipment release tasks failed: %v", err)
+	}
+	if shipmentCount != 0 {
+		t.Fatalf("finished goods QC done must not derive shipment release, got %d", shipmentCount)
+	}
+	inventoryTxnCount, err := client.InventoryTxn.Query().Count(ctx)
+	if err != nil {
+		t.Fatalf("count inventory txns failed: %v", err)
+	}
+	inventoryBalanceCount, err := client.InventoryBalance.Query().Count(ctx)
+	if err != nil {
+		t.Fatalf("count inventory balances failed: %v", err)
+	}
+	inventoryLotCount, err := client.InventoryLot.Query().Count(ctx)
+	if err != nil {
+		t.Fatalf("count inventory lots failed: %v", err)
+	}
+	if inventoryTxnCount != 0 || inventoryBalanceCount != 0 || inventoryLotCount != 0 {
+		t.Fatalf("finished goods QC must not write inventory facts, got txns=%d balances=%d lots=%d", inventoryTxnCount, inventoryBalanceCount, inventoryLotCount)
+	}
+
+	events, err := client.WorkflowTaskEvent.Query().Order(ent.Asc(workflowtaskevent.FieldID)).All(ctx)
+	if err != nil {
+		t.Fatalf("query events failed: %v", err)
+	}
+	if len(events) != 3 {
+		t.Fatalf("expected QC created + status + inbound created events, got %d", len(events))
+	}
+	if events[1].EventType != "status_changed" ||
+		events[1].FromStatusKey == nil ||
+		*events[1].FromStatusKey != "ready" ||
+		events[1].ToStatusKey == nil ||
+		*events[1].ToStatusKey != "done" {
+		t.Fatalf("expected finished goods QC status event ready -> done, got %#v", events[1])
+	}
+	if events[2].TaskID != downstreamTasks[0].ID ||
+		events[2].Payload["workflow_rule_key"] != "finished_goods_qc_done_to_finished_goods_inbound" {
+		t.Fatalf("expected inbound created event with rule payload, got %#v", events[2])
+	}
+
+	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID:            qcTask.ID,
+		TaskStatusKey: "done",
+		Payload:       map[string]any{"mobile_role_key": "quality"},
+	}, 8, "quality"); err != nil {
+		t.Fatalf("repeat done update failed: %v", err)
+	}
+	count, err := client.WorkflowTask.Query().
+		Where(
+			workflowtask.SourceType("production-progress"),
+			workflowtask.SourceID(4501),
+			workflowtask.TaskGroup("finished_goods_inbound"),
+			workflowtask.OwnerRoleKey("warehouse"),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count finished goods inbound tasks failed: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("expected idempotent finished goods inbound task count 1, got %d", count)
+	}
+}
+
+func TestWorkflowRepo_FinishedGoodsQCReworkIdempotencyAllowsNextRoundAfterDone(t *testing.T) {
+	cases := []struct {
+		status    string
+		reasonKey string
+		sourceID  int
+	}{
+		{status: "blocked", reasonKey: "blocked_reason", sourceID: 4601},
+		{status: "rejected", reasonKey: "rejected_reason", sourceID: 4602},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.status, func(t *testing.T) {
+			ctx := context.Background()
+			client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_finished_goods_qc_"+tc.status+"?mode=memory&cache=shared&_fk=1")
+			defer mustCloseEntClient(t, client)
+
+			repo := NewWorkflowRepo(
+				&Data{postgres: client},
+				log.NewStdLogger(io.Discard),
+			)
+			uc := biz.NewWorkflowUsecase(repo)
+			qcTask := createFinishedGoodsQCTask(t, ctx, repo, tc.sourceID)
+
+			reason := "成品抽检不合格"
+			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+				ID:            qcTask.ID,
+				TaskStatusKey: tc.status,
+				Reason:        reason,
+				Payload:       map[string]any{},
+			}, 8, "quality"); err != nil {
+				t.Fatalf("first %s update failed: %v", tc.status, err)
+			}
+			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+				ID:            qcTask.ID,
+				TaskStatusKey: tc.status,
+				Reason:        reason,
+				Payload:       map[string]any{},
+			}, 8, "quality"); err != nil {
+				t.Fatalf("repeat %s update failed: %v", tc.status, err)
+			}
+
+			state, err := client.WorkflowBusinessState.Query().
+				Where(workflowbusinessstate.SourceType("production-progress"), workflowbusinessstate.SourceID(tc.sourceID)).
+				Only(ctx)
+			if err != nil {
+				t.Fatalf("query finished goods rework business state failed: %v", err)
+			}
+			if state.BusinessStatusKey != "qc_failed" ||
+				state.OwnerRoleKey == nil ||
+				*state.OwnerRoleKey != "production" ||
+				state.BlockedReason == nil ||
+				*state.BlockedReason != reason {
+				t.Fatalf("unexpected finished goods rework business state %#v", state)
+			}
+			if state.Payload["decision"] != tc.status ||
+				state.Payload["transition_status"] != tc.status ||
+				state.Payload[tc.reasonKey] != reason ||
+				state.Payload["finished_goods"] != true {
+				t.Fatalf("expected decision payload on business state, got %#v", state.Payload)
+			}
+
+			reworkTasks, err := client.WorkflowTask.Query().
+				Where(
+					workflowtask.SourceType("production-progress"),
+					workflowtask.SourceID(tc.sourceID),
+					workflowtask.TaskGroup("finished_goods_rework"),
+					workflowtask.OwnerRoleKey("production"),
+				).
+				All(ctx)
+			if err != nil {
+				t.Fatalf("query finished goods rework tasks failed: %v", err)
+			}
+			if len(reworkTasks) != 1 {
+				t.Fatalf("expected one active rework task after repeated %s, got %d", tc.status, len(reworkTasks))
+			}
+			if reworkTasks[0].Payload["decision"] != tc.status ||
+				reworkTasks[0].Payload["transition_status"] != tc.status ||
+				reworkTasks[0].Payload[tc.reasonKey] != reason ||
+				reworkTasks[0].Payload["finished_goods"] != true {
+				t.Fatalf("expected decision payload on rework task, got %#v", reworkTasks[0].Payload)
+			}
+
+			createdEvents, err := client.WorkflowTaskEvent.Query().
+				Where(workflowtaskevent.TaskID(reworkTasks[0].ID), workflowtaskevent.EventType("created")).
+				All(ctx)
+			if err != nil {
+				t.Fatalf("query rework task events failed: %v", err)
+			}
+			if len(createdEvents) != 1 ||
+				createdEvents[0].Payload["workflow_rule_key"] == "" {
+				t.Fatalf("expected one rework created event with workflow rule payload, got %#v", createdEvents)
+			}
+
+			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+				ID:            reworkTasks[0].ID,
+				TaskStatusKey: "done",
+				Payload:       map[string]any{"done_by": "production"},
+			}, 9, "production"); err != nil {
+				t.Fatalf("complete rework task failed: %v", err)
+			}
+
+			if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+				ID:            qcTask.ID,
+				TaskStatusKey: tc.status,
+				Reason:        reason,
+				Payload:       map[string]any{},
+			}, 8, "quality"); err != nil {
+				t.Fatalf("next-round %s update failed: %v", tc.status, err)
+			}
+
+			count, err := client.WorkflowTask.Query().
+				Where(
+					workflowtask.SourceType("production-progress"),
+					workflowtask.SourceID(tc.sourceID),
+					workflowtask.TaskGroup("finished_goods_rework"),
+					workflowtask.OwnerRoleKey("production"),
+				).
+				Count(ctx)
+			if err != nil {
+				t.Fatalf("count rework tasks failed: %v", err)
+			}
+			if count != 2 {
+				t.Fatalf("expected completed rework to allow next round, got %d rework tasks", count)
+			}
+		})
+	}
+}
+
+func TestWorkflowRepo_FinishedGoodsQCBlockedThenRejectedReusesActiveReworkAndRefreshesPayload(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_finished_goods_qc_blocked_then_rejected?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewWorkflowRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+	uc := biz.NewWorkflowUsecase(repo)
+	qcTask := createFinishedGoodsQCTask(t, ctx, repo, 4701)
+
+	blockedReason := "车缝开线待判责"
+	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID:            qcTask.ID,
+		TaskStatusKey: "blocked",
+		Reason:        blockedReason,
+		Payload:       map[string]any{},
+	}, 8, "quality"); err != nil {
+		t.Fatalf("blocked update failed: %v", err)
+	}
+
+	reworkTasks, err := client.WorkflowTask.Query().
+		Where(
+			workflowtask.SourceType("production-progress"),
+			workflowtask.SourceID(4701),
+			workflowtask.TaskGroup("finished_goods_rework"),
+			workflowtask.OwnerRoleKey("production"),
+		).
+		All(ctx)
+	if err != nil {
+		t.Fatalf("query rework tasks failed: %v", err)
+	}
+	if len(reworkTasks) != 1 {
+		t.Fatalf("expected one rework task after blocked, got %d", len(reworkTasks))
+	}
+	reworkTaskID := reworkTasks[0].ID
+
+	rejectedReason := "复检尺寸偏差"
+	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID:            qcTask.ID,
+		TaskStatusKey: "rejected",
+		Reason:        rejectedReason,
+		Payload:       map[string]any{},
+	}, 8, "quality"); err != nil {
+		t.Fatalf("rejected update failed: %v", err)
+	}
+
+	reworkTasks, err = client.WorkflowTask.Query().
+		Where(
+			workflowtask.SourceType("production-progress"),
+			workflowtask.SourceID(4701),
+			workflowtask.TaskGroup("finished_goods_rework"),
+			workflowtask.OwnerRoleKey("production"),
+		).
+		All(ctx)
+	if err != nil {
+		t.Fatalf("query rework tasks after rejected failed: %v", err)
+	}
+	if len(reworkTasks) != 1 || reworkTasks[0].ID != reworkTaskID {
+		t.Fatalf("expected active rework task to be reused, got %#v", reworkTasks)
+	}
+	if reworkTasks[0].Payload["decision"] != "rejected" ||
+		reworkTasks[0].Payload["transition_status"] != "rejected" ||
+		reworkTasks[0].Payload["rejected_reason"] != rejectedReason {
+		t.Fatalf("expected reused active rework task to refresh rejected payload, got %#v", reworkTasks[0].Payload)
+	}
+	if _, ok := reworkTasks[0].Payload["blocked_reason"]; ok {
+		t.Fatalf("expected reused active rework task to clear blocked_reason, got %#v", reworkTasks[0].Payload)
+	}
+
+	state, err := client.WorkflowBusinessState.Query().
+		Where(workflowbusinessstate.SourceType("production-progress"), workflowbusinessstate.SourceID(4701)).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("query business state failed: %v", err)
+	}
+	if state.BusinessStatusKey != "qc_failed" ||
+		state.Payload["decision"] != "rejected" ||
+		state.Payload["transition_status"] != "rejected" ||
+		state.Payload["rejected_reason"] != rejectedReason {
+		t.Fatalf("expected latest rejected decision on business state, got %#v", state)
+	}
+	if _, ok := state.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected business state to clear blocked_reason, got %#v", state.Payload)
+	}
+
+	updatedQCTask, err := client.WorkflowTask.Get(ctx, qcTask.ID)
+	if err != nil {
+		t.Fatalf("query updated QC task failed: %v", err)
+	}
+	if updatedQCTask.TaskStatusKey != "rejected" ||
+		updatedQCTask.Payload["decision"] != "rejected" ||
+		updatedQCTask.Payload["rejected_reason"] != rejectedReason {
+		t.Fatalf("expected latest rejected decision on QC task, got %#v", updatedQCTask)
+	}
+	if _, ok := updatedQCTask.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected rejected QC task payload to clear stale blocked_reason, got %#v", updatedQCTask.Payload)
+	}
+
+	createdEvents, err := client.WorkflowTaskEvent.Query().
+		Where(workflowtaskevent.TaskID(reworkTaskID), workflowtaskevent.EventType("created")).
+		All(ctx)
+	if err != nil {
+		t.Fatalf("query rework created events failed: %v", err)
+	}
+	if len(createdEvents) != 1 {
+		t.Fatalf("expected one created event for reused active rework task, got %d", len(createdEvents))
+	}
+}
+
 func TestWorkflowRepo_UpsertWorkflowBusinessStateUpdatesExisting(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_business_state?mode=memory&cache=shared&_fk=1")
@@ -1468,4 +1845,41 @@ func TestWorkflowRepo_UrgeWorkflowTaskWritesEventAndPayload(t *testing.T) {
 	if urgeEvent.Payload["action"] != "escalate_to_boss" {
 		t.Fatalf("expected event payload action, got %#v", urgeEvent.Payload["action"])
 	}
+}
+
+func createFinishedGoodsQCTask(t *testing.T, ctx context.Context, repo *workflowRepo, sourceID int) *biz.WorkflowTask {
+	t.Helper()
+	sourceNo := "FG-QC-001"
+	statusKey := "qc_pending"
+	qcTask, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+		TaskCode:          "FINISHED-GOODS-QC-001",
+		TaskGroup:         "finished_goods_qc",
+		TaskName:          "成品抽检",
+		SourceType:        "production-progress",
+		SourceID:          sourceID,
+		SourceNo:          &sourceNo,
+		BusinessStatusKey: &statusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "quality",
+		Priority:          3,
+		Payload: map[string]any{
+			"record_title":          "小熊公仔完工",
+			"source_no":             "SO-2026-101",
+			"customer_name":         "成慧怡",
+			"style_no":              "ST-001",
+			"product_no":            "SKU-101",
+			"product_name":          "小熊公仔",
+			"quantity":              float64(1200),
+			"unit":                  "只",
+			"due_date":              "2026-04-28",
+			"shipment_date":         "2026-04-30",
+			"packaging_requirement": "彩盒 12 只/箱",
+			"shipping_requirement":  "客户唛头",
+			"finished_goods":        true,
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create finished goods QC task failed: %v", err)
+	}
+	return qcTask
 }

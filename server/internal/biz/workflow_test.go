@@ -1582,6 +1582,374 @@ func TestWorkflowUsecase_OutsourceReturnQCNonDerivedStatusKeepsOriginalBehavior(
 	}
 }
 
+func TestWorkflowUsecase_FinishedGoodsQCDoneDerivesInboundTask(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1001,
+		TaskStatusKey: "done",
+		Payload:       map[string]any{"mobile_role_key": "quality"},
+	}, 7, "quality")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.BusinessStatusKey != workflowWarehouseInboundPendingKey {
+		t.Fatalf("expected warehouse inbound pending, got %q", repo.updateTaskInput.BusinessStatusKey)
+	}
+	if repo.updateTaskInput.Payload["qc_result"] != "pass" ||
+		repo.updateTaskInput.Payload["finished_goods"] != true ||
+		repo.updateTaskInput.Payload["inventory_balance_deferred"] != true ||
+		repo.updateTaskInput.Payload["alert_type"] != "finished_goods_inbound_pending" {
+		t.Fatalf("expected finished goods QC done update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects == nil || effects.BusinessState == nil || effects.DerivedTask == nil {
+		t.Fatalf("expected finished goods QC done side effects, got %#v", effects)
+	}
+	if effects.WorkflowRuleKey != "finished_goods_qc_done_to_finished_goods_inbound" {
+		t.Fatalf("expected finished goods QC done rule key, got %q", effects.WorkflowRuleKey)
+	}
+	if effects.BusinessState.BusinessStatusKey != workflowWarehouseInboundPendingKey ||
+		effects.BusinessState.OwnerRoleKey == nil ||
+		*effects.BusinessState.OwnerRoleKey != "warehouse" {
+		t.Fatalf("unexpected finished goods QC business state %#v", effects.BusinessState)
+	}
+	task := effects.DerivedTask
+	if task.TaskGroup != workflowFinishedGoodsInboundTaskGroup ||
+		task.TaskName != "成品入库" ||
+		task.OwnerRoleKey != "warehouse" ||
+		task.TaskStatusKey != "ready" {
+		t.Fatalf("unexpected finished goods inbound task %#v", task)
+	}
+	if task.Payload["qc_task_id"] != 1001 ||
+		task.Payload["qc_result"] != "pass" ||
+		task.Payload["finished_goods"] != true ||
+		task.Payload["inventory_balance_deferred"] != true ||
+		task.Payload["alert_type"] != "finished_goods_inbound_pending" ||
+		task.Payload["customer_name"] != "成慧怡" ||
+		task.Payload["style_no"] != "ST-001" ||
+		task.Payload["shipment_date"] != "2026-04-30" {
+		t.Fatalf("expected finished goods inbound payload, got %#v", task.Payload)
+	}
+	if task.TaskGroup == "shipment_release" {
+		t.Fatalf("finished goods QC done must not derive shipment release")
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsQCDoneUsesTransitionPayloadForDownstream(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1001,
+		TaskStatusKey: "done",
+		Payload: map[string]any{
+			"qc_result": "accepted",
+			"quantity":  1180,
+		},
+	}, 7, "quality")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects == nil || effects.BusinessState == nil || effects.DerivedTask == nil {
+		t.Fatalf("expected finished goods QC done side effects, got %#v", effects)
+	}
+	if repo.updateTaskInput.Payload["qc_result"] != "accepted" ||
+		effects.BusinessState.Payload["qc_result"] != "accepted" ||
+		effects.DerivedTask.Payload["qc_result"] != "accepted" {
+		t.Fatalf("expected transition qc_result in update, state and downstream, got update=%#v state=%#v task=%#v", repo.updateTaskInput.Payload, effects.BusinessState.Payload, effects.DerivedTask.Payload)
+	}
+	if effects.DerivedTask.Payload["quantity"] != 1180 {
+		t.Fatalf("expected downstream to use transition quantity, got %#v", effects.DerivedTask.Payload)
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsQCRepeatedDoneUsesIdempotentDerivedTaskKey(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	for i := 0; i < 2; i++ {
+		_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+			ID:            1001,
+			TaskStatusKey: "done",
+			Payload:       map[string]any{},
+		}, 7, "quality")
+		if err != nil {
+			t.Fatalf("update #%d failed: %v", i+1, err)
+		}
+	}
+	if repo.derivedTaskCount != 1 {
+		t.Fatalf("expected one derived finished goods inbound task intent, got %d", repo.derivedTaskCount)
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsQCBlockedRequiresReason(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1001,
+		TaskStatusKey: "blocked",
+		Payload:       map[string]any{"blocked_reason": "   "},
+	}, 7, "quality")
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+	if repo.updateTaskInput != nil {
+		t.Fatalf("repo update should not be called without reason")
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsQCBlockedDerivesReworkTask(t *testing.T) {
+	task := finishedGoodsQCWorkflowTask()
+	task.Payload["rejected_reason"] = "旧退回原因"
+	repo := &stubWorkflowRepo{currentTask: task}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1001,
+		TaskStatusKey: "blocked",
+		Payload:       map[string]any{"blocked_reason": " 车缝开线 "},
+	}, 7, "quality")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.Reason != "车缝开线" {
+		t.Fatalf("expected trimmed reason, got %q", repo.updateTaskInput.Reason)
+	}
+	if repo.updateTaskInput.BusinessStatusKey != workflowQCFailedStatusKey {
+		t.Fatalf("expected qc_failed business status, got %q", repo.updateTaskInput.BusinessStatusKey)
+	}
+	if repo.updateTaskInput.Payload["decision"] != "blocked" ||
+		repo.updateTaskInput.Payload["transition_status"] != "blocked" ||
+		repo.updateTaskInput.Payload["blocked_reason"] != "车缝开线" ||
+		repo.updateTaskInput.Payload["qc_result"] != "blocked" ||
+		repo.updateTaskInput.Payload["finished_goods"] != true {
+		t.Fatalf("expected blocked decision update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["rejected_reason"]; ok {
+		t.Fatalf("expected blocked transition to clear stale rejected_reason, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects == nil || effects.BusinessState == nil || effects.DerivedTask == nil {
+		t.Fatalf("expected finished goods QC blocked side effects, got %#v", effects)
+	}
+	if !effects.RefreshExistingDerivedTaskPayload {
+		t.Fatalf("expected finished goods rework reuse to refresh payload")
+	}
+	if effects.WorkflowRuleKey != "finished_goods_qc_blocked_to_finished_goods_rework" {
+		t.Fatalf("expected finished goods QC blocked rule key, got %q", effects.WorkflowRuleKey)
+	}
+	if effects.BusinessState.BusinessStatusKey != workflowQCFailedStatusKey ||
+		effects.BusinessState.OwnerRoleKey == nil ||
+		*effects.BusinessState.OwnerRoleKey != "production" ||
+		effects.BusinessState.BlockedReason == nil ||
+		*effects.BusinessState.BlockedReason != "车缝开线" {
+		t.Fatalf("unexpected blocked business state %#v", effects.BusinessState)
+	}
+	if effects.BusinessState.Payload["decision"] != "blocked" ||
+		effects.BusinessState.Payload["transition_status"] != "blocked" ||
+		effects.BusinessState.Payload["blocked_reason"] != "车缝开线" {
+		t.Fatalf("expected blocked state payload, got %#v", effects.BusinessState.Payload)
+	}
+	assertFinishedGoodsReworkTask(t, effects.DerivedTask, "blocked", "车缝开线")
+	if _, ok := effects.DerivedTask.Payload["rejected_reason"]; ok {
+		t.Fatalf("expected blocked rework payload to omit stale rejected_reason, got %#v", effects.DerivedTask.Payload)
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsQCRejectedRequiresReason(t *testing.T) {
+	repo := &stubWorkflowRepo{currentTask: finishedGoodsQCWorkflowTask()}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1001,
+		TaskStatusKey: "rejected",
+		Reason:        " \t ",
+		Payload:       map[string]any{},
+	}, 7, "quality")
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+	if repo.updateTaskInput != nil {
+		t.Fatalf("repo update should not be called without reason")
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsQCRejectedDerivesReworkTask(t *testing.T) {
+	task := finishedGoodsQCWorkflowTask()
+	task.BusinessStatusKey = ptrString(workflowQCFailedStatusKey)
+	task.Payload["blocked_reason"] = "旧阻塞原因"
+	repo := &stubWorkflowRepo{currentTask: task}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1001,
+		TaskStatusKey: "rejected",
+		Reason:        "尺寸偏差",
+		Payload:       map[string]any{},
+	}, 7, "quality")
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if repo.updateTaskInput.Reason != "尺寸偏差" {
+		t.Fatalf("expected trimmed reason, got %q", repo.updateTaskInput.Reason)
+	}
+	if repo.updateTaskInput.Payload["decision"] != "rejected" ||
+		repo.updateTaskInput.Payload["transition_status"] != "rejected" ||
+		repo.updateTaskInput.Payload["rejected_reason"] != "尺寸偏差" ||
+		repo.updateTaskInput.Payload["qc_result"] != "rejected" {
+		t.Fatalf("expected rejected decision update payload, got %#v", repo.updateTaskInput.Payload)
+	}
+	if _, ok := repo.updateTaskInput.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected rejected transition to clear stale blocked_reason, got %#v", repo.updateTaskInput.Payload)
+	}
+	effects := repo.updateTaskInput.SideEffects
+	if effects.BusinessState.BusinessStatusKey != workflowQCFailedStatusKey ||
+		effects.BusinessState.OwnerRoleKey == nil ||
+		*effects.BusinessState.OwnerRoleKey != "production" {
+		t.Fatalf("unexpected rejected business state %#v", effects.BusinessState)
+	}
+	if effects.WorkflowRuleKey != "finished_goods_qc_rejected_to_finished_goods_rework" {
+		t.Fatalf("expected finished goods QC rejected rule key, got %q", effects.WorkflowRuleKey)
+	}
+	assertFinishedGoodsReworkTask(t, effects.DerivedTask, "rejected", "尺寸偏差")
+	if _, ok := effects.DerivedTask.Payload["blocked_reason"]; ok {
+		t.Fatalf("expected rejected rework payload to omit stale blocked_reason, got %#v", effects.DerivedTask.Payload)
+	}
+}
+
+func TestWorkflowUsecase_SameNameNonFinishedGoodsQCTaskDoesNotDerive(t *testing.T) {
+	cases := []struct {
+		name string
+		task *WorkflowTask
+	}{
+		{
+			name: "wrong owner",
+			task: &WorkflowTask{
+				ID:            1101,
+				TaskGroup:     workflowFinishedGoodsQCTaskGroup,
+				TaskName:      "成品抽检",
+				SourceType:    workflowProductionProgressModuleKey,
+				SourceID:      101,
+				TaskStatusKey: "ready",
+				OwnerRoleKey:  "warehouse",
+				Payload:       map[string]any{"finished_goods": true},
+			},
+		},
+		{
+			name: "wrong source",
+			task: &WorkflowTask{
+				ID:            1102,
+				TaskGroup:     workflowFinishedGoodsQCTaskGroup,
+				TaskName:      "成品抽检",
+				SourceType:    workflowInboundModuleKey,
+				SourceID:      101,
+				TaskStatusKey: "ready",
+				OwnerRoleKey:  "quality",
+				Payload:       map[string]any{"finished_goods": true},
+			},
+		},
+		{
+			name: "missing finished goods marker",
+			task: &WorkflowTask{
+				ID:            1103,
+				TaskGroup:     workflowFinishedGoodsQCTaskGroup,
+				TaskName:      "成品抽检",
+				SourceType:    workflowProductionProgressModuleKey,
+				SourceID:      101,
+				TaskStatusKey: "ready",
+				OwnerRoleKey:  "quality",
+				Payload:       map[string]any{},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubWorkflowRepo{currentTask: tc.task}
+			uc := NewWorkflowUsecase(repo)
+
+			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+				ID:            tc.task.ID,
+				TaskStatusKey: "blocked",
+				Payload:       map[string]any{},
+			}, 7, tc.task.OwnerRoleKey)
+			if err != nil {
+				t.Fatalf("same-name non-finished-goods-QC task should keep original behavior, got %v", err)
+			}
+			if repo.updateTaskInput == nil {
+				t.Fatalf("expected repo update")
+			}
+			if repo.updateTaskInput.SideEffects != nil {
+				t.Fatalf("same-name non-finished-goods-QC task should not derive side effects")
+			}
+		})
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsQCSettledBusinessStatusDoesNotTriggerSpecialRule(t *testing.T) {
+	cases := []struct {
+		name              string
+		businessStatusKey string
+	}{
+		{name: "already warehouse inbound pending", businessStatusKey: workflowWarehouseInboundPendingKey},
+		{name: "already inbound done", businessStatusKey: workflowInboundDoneStatusKey},
+		{name: "already shipped", businessStatusKey: "shipped"},
+		{name: "already blocked", businessStatusKey: workflowBlockedStatusKey},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			task := finishedGoodsQCWorkflowTask()
+			task.BusinessStatusKey = ptrString(tc.businessStatusKey)
+			repo := &stubWorkflowRepo{currentTask: task}
+			uc := NewWorkflowUsecase(repo)
+
+			_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+				ID:            task.ID,
+				TaskStatusKey: "blocked",
+				Payload:       map[string]any{},
+			}, 7, "quality")
+			if err != nil {
+				t.Fatalf("settled finished goods QC status should keep original behavior, got %v", err)
+			}
+			if repo.updateTaskInput == nil {
+				t.Fatalf("expected repo update")
+			}
+			if repo.updateTaskInput.SideEffects != nil {
+				t.Fatalf("settled finished goods QC status should not trigger special side effects")
+			}
+		})
+	}
+}
+
+func TestWorkflowUsecase_FinishedGoodsQCFailedBusinessStatusStillUsesSpecialRule(t *testing.T) {
+	task := finishedGoodsQCWorkflowTask()
+	task.BusinessStatusKey = ptrString(workflowQCFailedStatusKey)
+	repo := &stubWorkflowRepo{currentTask: task}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            task.ID,
+		TaskStatusKey: "blocked",
+		Reason:        "返工后复检仍不合格",
+		Payload:       map[string]any{},
+	}, 7, "quality")
+	if err != nil {
+		t.Fatalf("qc_failed finished goods QC task should still use special rule, got %v", err)
+	}
+	if repo.updateTaskInput == nil || repo.updateTaskInput.SideEffects == nil {
+		t.Fatalf("expected qc_failed finished goods QC task to derive side effects")
+	}
+	if repo.updateTaskInput.SideEffects.DerivedTask == nil ||
+		repo.updateTaskInput.SideEffects.DerivedTask.TaskGroup != workflowFinishedGoodsReworkTaskGroup {
+		t.Fatalf("expected finished goods rework side effect, got %#v", repo.updateTaskInput.SideEffects)
+	}
+}
+
 func TestWorkflowUsecase_ListTasksRejectsInvalidStatus(t *testing.T) {
 	repo := &stubWorkflowRepo{}
 	uc := NewWorkflowUsecase(repo)
@@ -1780,6 +2148,39 @@ func outsourceReturnQCWorkflowTask() *WorkflowTask {
 	}
 }
 
+func finishedGoodsQCWorkflowTask() *WorkflowTask {
+	sourceNo := "FG-QC-001"
+	statusKey := workflowQCPendingStatusKey
+	return &WorkflowTask{
+		ID:                1001,
+		TaskCode:          "finished-goods-qc-101",
+		TaskGroup:         workflowFinishedGoodsQCTaskGroup,
+		TaskName:          "成品抽检",
+		SourceType:        workflowProductionProgressModuleKey,
+		SourceID:          101,
+		SourceNo:          &sourceNo,
+		BusinessStatusKey: &statusKey,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      "quality",
+		Priority:          3,
+		Payload: map[string]any{
+			"record_title":          "小熊公仔完工",
+			"source_no":             "SO-2026-101",
+			"customer_name":         "成慧怡",
+			"style_no":              "ST-001",
+			"product_no":            "SKU-101",
+			"product_name":          "小熊公仔",
+			"quantity":              1200,
+			"unit":                  "只",
+			"due_date":              "2026-04-28",
+			"shipment_date":         "2026-04-30",
+			"packaging_requirement": "彩盒 12 只/箱",
+			"shipping_requirement":  "客户唛头",
+			"finished_goods":        true,
+		},
+	}
+}
+
 func ptrString(value string) *string {
 	return &value
 }
@@ -1878,6 +2279,50 @@ func assertOutsourceReworkTask(t *testing.T, task *WorkflowTaskCreate, decision 
 		task.Payload["outsource_processing"] != true ||
 		task.Payload["outsource_owner_role_key"] != "outsource" {
 		t.Fatalf("expected outsource payload markers, got %#v", task.Payload)
+	}
+	if task.Payload["notification_type"] != "qc_failed" ||
+		task.Payload["alert_type"] != "qc_failed" {
+		t.Fatalf("expected qc_failed alert payload, got %#v", task.Payload)
+	}
+}
+
+func assertFinishedGoodsReworkTask(t *testing.T, task *WorkflowTaskCreate, decision string, reason string) {
+	t.Helper()
+	if task == nil {
+		t.Fatalf("expected finished goods rework task")
+	}
+	if task.TaskGroup != workflowFinishedGoodsReworkTaskGroup ||
+		task.TaskName != "成品返工处理" ||
+		task.OwnerRoleKey != "production" ||
+		task.TaskStatusKey != "ready" {
+		t.Fatalf("unexpected finished goods rework task %#v", task)
+	}
+	if task.BusinessStatusKey == nil || *task.BusinessStatusKey != workflowQCFailedStatusKey {
+		t.Fatalf("expected qc_failed, got %#v", task.BusinessStatusKey)
+	}
+	if task.SourceType != workflowProductionProgressModuleKey || task.SourceID != 101 {
+		t.Fatalf("expected production progress source, got %s/%d", task.SourceType, task.SourceID)
+	}
+	if task.Payload["decision"] != decision || task.Payload["transition_status"] != decision {
+		t.Fatalf("expected decision %q payload, got %#v", decision, task.Payload)
+	}
+	if decision == "blocked" {
+		if task.Payload["blocked_reason"] != reason {
+			t.Fatalf("expected blocked reason %q, got %#v", reason, task.Payload["blocked_reason"])
+		}
+		if task.Payload["qc_result"] != "blocked" {
+			t.Fatalf("expected blocked qc_result, got %#v", task.Payload["qc_result"])
+		}
+	} else {
+		if task.Payload["rejected_reason"] != reason {
+			t.Fatalf("expected rejected reason %q, got %#v", reason, task.Payload["rejected_reason"])
+		}
+		if task.Payload["qc_result"] != "rejected" {
+			t.Fatalf("expected rejected qc_result, got %#v", task.Payload["qc_result"])
+		}
+	}
+	if task.Payload["finished_goods"] != true {
+		t.Fatalf("expected finished goods marker, got %#v", task.Payload)
 	}
 	if task.Payload["notification_type"] != "qc_failed" ||
 		task.Payload["alert_type"] != "qc_failed" {

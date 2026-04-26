@@ -48,10 +48,10 @@
 | 环节         | 当前 v1 规则                                                                                                                                                                                                                                    |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 触发点       | 桌面 `accessories-purchase` 或 `inbound` 选中到货 / 入库通知记录后点击“发起 IQC”。                                                                                                                                                              |
-| 责任角色     | 采购或仓库发起到货待检；IQC 任务进入 `quality`；合格后的入库任务进入 `warehouse`；不合格异常任务进入 `purchasing`，PMC 通过 critical / blocked 关注。                                                                                           |
+| 责任角色     | 采购或仓库发起到货待检；IQC 任务进入 `quality`；合格后的入库任务进入 `warehouse`；不合格异常任务进入 `purchase`，PMC 通过 critical / blocked 关注。                                                                                             |
 | IQC 任务字段 | `task_group=purchase_iqc`、`task_name=IQC 来料检验`、`business_status_key=iqc_pending`、`task_status_key=ready`、`owner_role_key=quality`、`notification_type=task_created`、`alert_type=qc_pending`、`critical_path=true`。                    |
 | 合格路径     | quality 移动端点击“完成”代表 IQC 合格；任务更新为 `done`，业务状态进入 `warehouse_inbound_pending`，并自动创建 `warehouse_inbound` 仓库确认入库任务。                                                                                           |
-| 不合格路径   | quality 移动端点击“阻塞”或“退回”必须填写原因；状态快照进入 `qc_failed`，并创建 `purchase_quality_exception` 任务给 `purchasing` 处理退货、补货、让步接收或重新到货安排。                                                                        |
+| 不合格路径   | quality 移动端点击“阻塞”或“退回”必须填写原因；状态快照进入 `qc_failed`，并创建 `purchase_quality_exception` 任务给 `purchase` 处理退货、补货、让步接收或重新到货安排。                                                                          |
 | 入库完成条件 | warehouse 移动端完成“确认入库”任务后，业务状态更新为 `inbound_done`，表示当前入库任务闭环。                                                                                                                                                     |
 | 当前编排位置 | 桌面业务页仍负责发起 IQC 任务；IQC 任务 `done / blocked / rejected` 后的业务状态和下游任务派生已迁入后端 `WorkflowUsecase.UpdateTaskStatus`。quality 移动端只调用 `update_task_status` 并刷新任务列表，不再本地创建仓库入库或来料异常处理任务。 |
 | 当前不做     | 不写库存余额，不写库存流水，不新增 `inventory_txn` / `inventory_balance` 专表，不改 Ent schema，不生成 migration，不用仓库动作替代品质检验结论。                                                                                                |
@@ -81,7 +81,7 @@
 | 环节                    | 当前 v1 规则                                                                                                                                                                                                                                                                |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 触发点                  | `production-progress` 记录进入 `production_processing` 且 payload 标注 `finished=true`，或桌面选中生产进度记录点击“发起成品抽检”。当前不新增 `production_done` 状态。                                                                                                       |
-| 责任角色                | 成品抽检进入 `quality`；抽检不合格返工进入 `production`；成品入库和出货放行 / 出货准备进入 `warehouse`；PMC 只看 blocked、overdue、critical_path 和 critical 风险；业务通过 `confirm_role_key=business` 关注出货确认线索。                                                  |
+| 责任角色                | 成品抽检进入 `quality`；抽检不合格返工进入 `production`；成品入库和出货放行 / 出货准备进入 `warehouse`；PMC 只看 blocked、overdue、critical_path 和 critical 风险；业务通过 `confirm_role_key=sales` 关注出货确认线索。                                                     |
 | 成品抽检任务字段        | `task_group=finished_goods_qc`、`task_name=成品抽检`、`source_type=production-progress`、`business_status_key=qc_pending`、`task_status_key=ready`、`owner_role_key=quality`、`alert_type=finished_goods_qc_pending`、`critical_path=true`、`payload.finished_goods=true`。 |
 | 合格路径                | quality 移动端完成 `finished_goods_qc` 代表成品抽检合格、让步接收或放行；任务更新为 `done`，业务状态进入 `warehouse_inbound_pending`，并创建 `finished_goods_inbound` 给 `warehouse`。                                                                                      |
 | 不合格 / 返工路径       | quality 移动端点击“阻塞”或“退回”必须填写原因；状态快照进入 `qc_failed`，并创建 `finished_goods_rework` 给 `production` 处理返工完成、重新提交成品抽检或让步放行。                                                                                                           |
@@ -91,7 +91,7 @@
 | 当前不做                | 不做应收 / 开票登记，不新增 `production_order` / `shipment_order` / `inventory_txn` / `inventory_balance` 专表，不写库存余额和库存流水，不新增 PDA、条码枪或图片识别链路。                                                                                                  |
 | 后续评审条件            | 当生产完工、抽检结论、返工复检、成品入库、出货扣减、应收 / 开票和历史回补口径稳定后，再评审是否拆 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` Ent schema，并补 migration 与库存/出货计算测试。                                               |
 
-边界说明：本轮不让 PMC 替生产、品质、仓库或出货角色完成业务事实；不强行拆出业务移动端的默认出货确认任务。`shipment_release` 先由仓库完成出货准备 / 出货执行确认，payload 保留 `confirm_role_key=business` 作为后续“出货 -> 应收 / 开票登记”前拆业务确认的迁移线索。
+边界说明：本轮不让 PMC 替生产、品质、仓库或出货角色完成业务事实；不强行拆出业务移动端的默认出货确认任务。`shipment_release` 先由仓库完成出货准备 / 出货执行确认，payload 保留 `confirm_role_key=sales` 作为后续“出货 -> 应收 / 开票登记”前拆业务确认的迁移线索。
 
 ## 第五条真实闭环：出货 -> 应收登记 -> 开票登记
 

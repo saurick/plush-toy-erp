@@ -768,9 +768,8 @@ export default function WorkflowTaskDebugPage() {
               业务、任务、角色绑定关系
             </div>
             <Paragraph className="!mb-0 !text-slate-600">
-              menu_permissions 只管菜单可见；owner_role_key
-              决定任务池；assignee_id 决定具体人。PMC
-              和老板可以看风险与关注项，但不能代办其他角色事实。
+              RBAC 权限码只判断动作资格；owner_role_key 决定任务池；assignee_id
+              决定具体人。PMC 和老板可以看风险与关注项，但不能代办其他角色事实。
             </Paragraph>
           </div>
           <Table
