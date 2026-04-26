@@ -459,7 +459,7 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId: 'FL_processing_contract_editor__clears_blank_inserted_lines',
-    title: '加工合同插入明细行会清空来源字段，避免复制旧残值',
+    title: '加工合同插入明细行会清空来源字段，避免复制当前行残值',
     fieldKeys: ['productOrderNo', 'productNo', 'productNameColor'],
     scenarioKey: 'stale_value_cleared',
     layer: 'web',

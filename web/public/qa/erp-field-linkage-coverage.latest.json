@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-04-26T11:49:29.308Z",
+  "generatedAt": "2026-04-26T11:53:21.565Z",
   "command": "node scripts/qa/erp-field-linkage.mjs",
   "runContext": {
     "repoRoot": "/Users/simon/projects/plush-toy-erp",
-    "gitCommit": "20d450c93ca5a83925d969274eb20a9787c8e0bb",
-    "gitCommitShort": "20d450c93ca5",
+    "gitCommit": "476becfc2f46696083a9d4103bd098806a6f828f",
+    "gitCommitShort": "476becfc2f46",
     "gitBranch": "main",
     "gitDirty": true,
     "nodeVersion": "v24.14.0",
@@ -16,13 +16,13 @@
     "partialFields": 0,
     "missingFields": 0,
     "failingFields": 0,
-    "totalCases": 23,
-    "passedCases": 23,
+    "totalCases": 22,
+    "passedCases": 22,
     "failedCases": 0,
     "skippedCases": 0,
     "missingCases": 0,
-    "totalScenarios": 46,
-    "passedScenarios": 46
+    "totalScenarios": 45,
+    "passedScenarios": 45
   },
   "fields": [
     {
@@ -32,7 +32,7 @@
       "risk": "P0",
       "docLabels": ["表头金额"],
       "requiredScenarioKeys": [
-        "missing_snapshot_backfilled",
+        "header_totals_derived_from_items",
         "manual_snapshot_retained"
       ],
       "status": "covered",
@@ -43,11 +43,11 @@
       "totalScenarios": 2,
       "scenarios": [
         {
-          "scenarioKey": "missing_snapshot_backfilled",
-          "scenarioLabel": "表头缺值按明细回补",
+          "scenarioKey": "header_totals_derived_from_items",
+          "scenarioLabel": "表头数量金额按当前明细派生",
           "status": "pass",
           "caseIds": [
-            "FL_business_header_totals__backfills_missing_header_quantity_and_amount"
+            "FL_business_header_totals__derives_quantity_and_amount_from_items"
           ]
         },
         {
@@ -59,10 +59,10 @@
       ],
       "cases": [
         {
-          "caseId": "FL_business_header_totals__backfills_missing_header_quantity_and_amount",
-          "title": "业务记录表头数量和金额为空时按明细回补",
+          "caseId": "FL_business_header_totals__derives_quantity_and_amount_from_items",
+          "title": "业务记录表头数量和金额为空时按当前明细派生",
           "fieldKeys": ["itemQuantity", "headerQuantity", "headerAmount"],
-          "scenarioKey": "missing_snapshot_backfilled",
+          "scenarioKey": "header_totals_derived_from_items",
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
@@ -89,7 +89,7 @@
       "risk": "P0",
       "docLabels": ["表头数量"],
       "requiredScenarioKeys": [
-        "missing_snapshot_backfilled",
+        "header_totals_derived_from_items",
         "manual_snapshot_retained"
       ],
       "status": "covered",
@@ -100,11 +100,11 @@
       "totalScenarios": 2,
       "scenarios": [
         {
-          "scenarioKey": "missing_snapshot_backfilled",
-          "scenarioLabel": "表头缺值按明细回补",
+          "scenarioKey": "header_totals_derived_from_items",
+          "scenarioLabel": "表头数量金额按当前明细派生",
           "status": "pass",
           "caseIds": [
-            "FL_business_header_totals__backfills_missing_header_quantity_and_amount"
+            "FL_business_header_totals__derives_quantity_and_amount_from_items"
           ]
         },
         {
@@ -116,10 +116,10 @@
       ],
       "cases": [
         {
-          "caseId": "FL_business_header_totals__backfills_missing_header_quantity_and_amount",
-          "title": "业务记录表头数量和金额为空时按明细回补",
+          "caseId": "FL_business_header_totals__derives_quantity_and_amount_from_items",
+          "title": "业务记录表头数量和金额为空时按当前明细派生",
           "fieldKeys": ["itemQuantity", "headerQuantity", "headerAmount"],
-          "scenarioKey": "missing_snapshot_backfilled",
+          "scenarioKey": "header_totals_derived_from_items",
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
@@ -182,7 +182,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -262,7 +262,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -281,7 +281,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 18,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -303,24 +303,24 @@
         },
         {
           "caseId": "FL_processing_contract_editor__clears_blank_inserted_lines",
-          "title": "加工合同插入明细行会清空来源字段，避免复制旧残值",
+          "title": "加工合同插入明细行会清空来源字段，避免复制当前行残值",
           "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
           "caseId": "FL_processing_contract_editor__clears_deleted_last_line",
           "title": "加工合同删除到只剩一行时会重置为空白行",
           "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -382,7 +382,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -401,7 +401,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 18,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -417,24 +417,24 @@
         },
         {
           "caseId": "FL_processing_contract_editor__clears_blank_inserted_lines",
-          "title": "加工合同插入明细行会清空来源字段，避免复制旧残值",
+          "title": "加工合同插入明细行会清空来源字段，避免复制当前行残值",
           "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
           "caseId": "FL_processing_contract_editor__clears_deleted_last_line",
           "title": "加工合同删除到只剩一行时会重置为空白行",
           "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -445,7 +445,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 21,
+          "durationMs": 12,
           "failureMessages": []
         }
       ]
@@ -514,7 +514,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -533,7 +533,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 18,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -555,24 +555,24 @@
         },
         {
           "caseId": "FL_processing_contract_editor__clears_blank_inserted_lines",
-          "title": "加工合同插入明细行会清空来源字段，避免复制旧残值",
+          "title": "加工合同插入明细行会清空来源字段，避免复制当前行残值",
           "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
           "caseId": "FL_processing_contract_editor__clears_deleted_last_line",
           "title": "加工合同删除到只剩一行时会重置为空白行",
           "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -625,7 +625,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -662,7 +662,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/printWorkspace.test.mjs",
           "status": "pass",
-          "durationMs": 103,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -724,7 +724,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -743,7 +743,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 18,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -756,7 +756,7 @@
       "docLabels": ["辅材 / 包材字段"],
       "requiredScenarioKeys": [
         "source_snapshot_retained",
-        "legacy_stale_cleared",
+        "stale_value_cleared",
         "source_change_clears_prefill"
       ],
       "status": "covered",
@@ -775,8 +775,8 @@
           ]
         },
         {
-          "scenarioKey": "legacy_stale_cleared",
-          "scenarioLabel": "历史默认残值自动清理",
+          "scenarioKey": "stale_value_cleared",
+          "scenarioLabel": "当前表单残值清理",
           "status": "pass",
           "caseIds": [
             "FL_business_item_payload__clears_stale_payload",
@@ -815,14 +815,14 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
           "caseId": "FL_business_item_payload__clears_stale_payload",
-          "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留旧残值",
+          "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留当前表单残值",
           "fieldKeys": ["mainMaterial", "accessoryMaterial"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
@@ -850,11 +850,11 @@
           "caseId": "FL_business_source_prefill__filters_bom_accessories",
           "title": "BOM 来源带到辅材采购时只保留辅材和包材明细",
           "fieldKeys": ["mainMaterial", "accessoryMaterial"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -907,7 +907,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -918,25 +918,14 @@
       "category": "合同头快照",
       "risk": "P0",
       "docLabels": ["加工方联系人 / 地址"],
-      "requiredScenarioKeys": [
-        "legacy_stale_cleared",
-        "default_sample_clears_unverified_party"
-      ],
+      "requiredScenarioKeys": ["default_sample_clears_unverified_party"],
       "status": "covered",
       "layers": ["web"],
-      "passedCases": 3,
-      "totalCases": 3,
-      "passedScenarios": 2,
-      "totalScenarios": 2,
+      "passedCases": 2,
+      "totalCases": 2,
+      "passedScenarios": 1,
+      "totalScenarios": 1,
       "scenarios": [
-        {
-          "scenarioKey": "legacy_stale_cleared",
-          "scenarioLabel": "历史默认残值自动清理",
-          "status": "pass",
-          "caseIds": [
-            "FL_processing_contract_legacy_sample__clears_stale_buyer_contact"
-          ]
-        },
         {
           "scenarioKey": "default_sample_clears_unverified_party",
           "scenarioLabel": "默认样例不伪造供应商 / 加工商资料",
@@ -970,17 +959,6 @@
           "scenarioKey": "source_snapshot_retained",
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
-          "status": "pass",
-          "durationMs": 1,
-          "failureMessages": []
-        },
-        {
-          "caseId": "FL_processing_contract_legacy_sample__clears_stale_buyer_contact",
-          "title": "旧默认加工合同样例会清理甲方联系人残值",
-          "fieldKeys": ["processorContactAddress"],
-          "scenarioKey": "legacy_stale_cleared",
-          "layer": "web",
-          "testFile": "web/src/erp/data/processingContractTemplate.test.mjs",
           "status": "pass",
           "durationMs": 0,
           "failureMessages": []
@@ -1062,7 +1040,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1081,7 +1059,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 18,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1160,7 +1138,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1179,7 +1157,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 18,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -1248,7 +1226,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1267,7 +1245,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 18,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1324,7 +1302,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 6,
           "failureMessages": []
         },
         {
@@ -1346,7 +1324,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1403,7 +1381,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 6,
           "failureMessages": []
         },
         {
@@ -1414,7 +1392,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -1441,7 +1419,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -1454,7 +1432,7 @@
       "docLabels": ["数量", "明细数量"],
       "requiredScenarioKeys": [
         "derived_amount_recomputed",
-        "missing_snapshot_backfilled"
+        "header_totals_derived_from_items"
       ],
       "status": "covered",
       "layers": ["web"],
@@ -1475,11 +1453,11 @@
           ]
         },
         {
-          "scenarioKey": "missing_snapshot_backfilled",
-          "scenarioLabel": "表头缺值按明细回补",
+          "scenarioKey": "header_totals_derived_from_items",
+          "scenarioLabel": "表头数量金额按当前明细派生",
           "status": "pass",
           "caseIds": [
-            "FL_business_header_totals__backfills_missing_header_quantity_and_amount"
+            "FL_business_header_totals__derives_quantity_and_amount_from_items"
           ]
         }
       ],
@@ -1492,14 +1470,14 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 6,
           "failureMessages": []
         },
         {
-          "caseId": "FL_business_header_totals__backfills_missing_header_quantity_and_amount",
-          "title": "业务记录表头数量和金额为空时按明细回补",
+          "caseId": "FL_business_header_totals__derives_quantity_and_amount_from_items",
+          "title": "业务记录表头数量和金额为空时按当前明细派生",
           "fieldKeys": ["itemQuantity", "headerQuantity", "headerAmount"],
-          "scenarioKey": "missing_snapshot_backfilled",
+          "scenarioKey": "header_totals_derived_from_items",
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
@@ -1525,7 +1503,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
@@ -1672,7 +1650,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -1685,7 +1663,7 @@
       "docLabels": ["主料物料字段"],
       "requiredScenarioKeys": [
         "source_snapshot_retained",
-        "legacy_stale_cleared"
+        "stale_value_cleared"
       ],
       "status": "covered",
       "layers": ["web"],
@@ -1703,8 +1681,8 @@
           ]
         },
         {
-          "scenarioKey": "legacy_stale_cleared",
-          "scenarioLabel": "历史默认残值自动清理",
+          "scenarioKey": "stale_value_cleared",
+          "scenarioLabel": "当前表单残值清理",
           "status": "pass",
           "caseIds": [
             "FL_business_item_payload__clears_stale_payload",
@@ -1737,14 +1715,14 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         },
         {
           "caseId": "FL_business_item_payload__clears_stale_payload",
-          "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留旧残值",
+          "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留当前表单残值",
           "fieldKeys": ["mainMaterial", "accessoryMaterial"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
@@ -1755,11 +1733,11 @@
           "caseId": "FL_business_source_prefill__filters_bom_accessories",
           "title": "BOM 来源带到辅材采购时只保留辅材和包材明细",
           "fieldKeys": ["mainMaterial", "accessoryMaterial"],
-          "scenarioKey": "legacy_stale_cleared",
+          "scenarioKey": "stale_value_cleared",
           "layer": "web",
           "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -1808,7 +1786,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 21,
+          "durationMs": 12,
           "failureMessages": []
         }
       ]
@@ -1845,7 +1823,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/printWorkspace.test.mjs",
           "status": "pass",
-          "durationMs": 103,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -1898,7 +1876,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
           "status": "pass",
-          "durationMs": 1,
+          "durationMs": 0,
           "failureMessages": []
         }
       ]
@@ -1950,7 +1928,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
       "status": "pass",
-      "durationMs": 2,
+      "durationMs": 6,
       "failureMessages": []
     },
     {
@@ -1961,14 +1939,14 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
       "status": "pass",
-      "durationMs": 0,
+      "durationMs": 1,
       "failureMessages": []
     },
     {
-      "caseId": "FL_business_header_totals__backfills_missing_header_quantity_and_amount",
-      "title": "业务记录表头数量和金额为空时按明细回补",
+      "caseId": "FL_business_header_totals__derives_quantity_and_amount_from_items",
+      "title": "业务记录表头数量和金额为空时按当前明细派生",
       "fieldKeys": ["itemQuantity", "headerQuantity", "headerAmount"],
-      "scenarioKey": "missing_snapshot_backfilled",
+      "scenarioKey": "header_totals_derived_from_items",
       "layer": "web",
       "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
       "status": "pass",
@@ -2010,7 +1988,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
       "status": "pass",
-      "durationMs": 1,
+      "durationMs": 0,
       "failureMessages": []
     },
     {
@@ -2026,9 +2004,9 @@
     },
     {
       "caseId": "FL_business_item_payload__clears_stale_payload",
-      "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留旧残值",
+      "title": "业务记录明细 payload 按当前字段定义重建，清空后不保留当前表单残值",
       "fieldKeys": ["mainMaterial", "accessoryMaterial"],
-      "scenarioKey": "legacy_stale_cleared",
+      "scenarioKey": "stale_value_cleared",
       "layer": "web",
       "testFile": "web/src/erp/utils/businessRecordForm.test.mjs",
       "status": "pass",
@@ -2051,7 +2029,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
       "status": "pass",
-      "durationMs": 18,
+      "durationMs": 0,
       "failureMessages": []
     },
     {
@@ -2075,20 +2053,9 @@
       "caseId": "FL_business_source_prefill__filters_bom_accessories",
       "title": "BOM 来源带到辅材采购时只保留辅材和包材明细",
       "fieldKeys": ["mainMaterial", "accessoryMaterial"],
-      "scenarioKey": "legacy_stale_cleared",
+      "scenarioKey": "stale_value_cleared",
       "layer": "web",
       "testFile": "web/src/erp/utils/linkedNavigation.test.mjs",
-      "status": "pass",
-      "durationMs": 1,
-      "failureMessages": []
-    },
-    {
-      "caseId": "FL_processing_contract_legacy_sample__clears_stale_buyer_contact",
-      "title": "旧默认加工合同样例会清理甲方联系人残值",
-      "fieldKeys": ["processorContactAddress"],
-      "scenarioKey": "legacy_stale_cleared",
-      "layer": "web",
-      "testFile": "web/src/erp/data/processingContractTemplate.test.mjs",
       "status": "pass",
       "durationMs": 0,
       "failureMessages": []
@@ -2123,7 +2090,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 1,
+      "durationMs": 0,
       "failureMessages": []
     },
     {
@@ -2150,24 +2117,24 @@
     },
     {
       "caseId": "FL_processing_contract_editor__clears_blank_inserted_lines",
-      "title": "加工合同插入明细行会清空来源字段，避免复制旧残值",
+      "title": "加工合同插入明细行会清空来源字段，避免复制当前行残值",
       "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-      "scenarioKey": "legacy_stale_cleared",
+      "scenarioKey": "stale_value_cleared",
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 2,
+      "durationMs": 1,
       "failureMessages": []
     },
     {
       "caseId": "FL_processing_contract_editor__clears_deleted_last_line",
       "title": "加工合同删除到只剩一行时会重置为空白行",
       "fieldKeys": ["productOrderNo", "productNo", "productNameColor"],
-      "scenarioKey": "legacy_stale_cleared",
+      "scenarioKey": "stale_value_cleared",
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 2,
+      "durationMs": 0,
       "failureMessages": []
     },
     {
@@ -2178,7 +2145,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 21,
+      "durationMs": 12,
       "failureMessages": []
     },
     {
@@ -2211,7 +2178,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/printWorkspace.test.mjs",
       "status": "pass",
-      "durationMs": 103,
+      "durationMs": 0,
       "failureMessages": []
     },
     {

@@ -201,7 +201,7 @@ test('FL_business_status_update__preserves_record_fields_and_items businessRecor
   assert.equal(params.items[0].amount, 37.5)
 })
 
-test('businessRecordForm: payload 字段按定义保存，清空后不保留旧残值', () => {
+test('businessRecordForm: payload 字段按定义保存，清空后不保留当前表单残值', () => {
   const params = buildBusinessRecordParams(
     {
       title: '质检记录',
