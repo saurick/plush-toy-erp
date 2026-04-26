@@ -16,8 +16,9 @@
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8200`
 - 当前数据库默认命中 `192.168.0.106:5432/plush_erp`
-- 当前数据库已存在，账号表、工作流协同表和首版通用业务记录表已通过 Ent + Atlas 落地；细分业务专表后续仍按真实样本逐步拆
-- 业务链路调试 seed / cleanup 仅作为开发验收能力接入后端 `debug` JSON-RPC 域，默认关闭，并受 `ERP_DEBUG_*` 环境变量、管理员权限、debugRunId 和 debug 数据标记保护
+- 当前账号表、工作流协同表和首版通用业务记录表已通过 Ent + Atlas 落地；Phase 2A 最小库存事实专表、Phase 2B 最小 BOM + 批次库存、Phase 2C 采购入库和 Phase 2D-A 采购退货 schema 已生成 migration；具体目标库是否已 apply 仍以 `make migrate_status` 为准
+- 采购、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM 当前只落最小主数据，不生成采购、生产或成本
+- 业务链路调试 seed / cleanup / 业务数据清空仅作为开发验收能力接入后端 `debug` JSON-RPC 域，默认面向当前 SQL 连接开启，可通过 `ERP_DEBUG_*` 环境变量显式关闭，并受管理员权限和业务链路调试菜单权限保护；业务数据清空按本项目当前业务表 allowlist 执行，不删除账号、权限、管理员偏好、配置和数据库结构；按 debugRunId 清理还会校验 debug 数据标记
 - 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred
 - 模板打印当前只保留采购合同、加工合同两套正式模板；对应业务页已支持选中记录带值打开，打印中心保留默认样例和模板核对入口
 
@@ -47,7 +48,7 @@ pnpm start:mobile:all
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm start:mobile:boss
-pnpm start:mobile:merchandiser
+pnpm start:mobile:business
 pnpm start:mobile:purchasing
 pnpm start:mobile:production
 pnpm start:mobile:warehouse
@@ -61,7 +62,7 @@ pnpm start:mobile:quality
 | 入口 | 端口 |
 | --- | --- |
 | 老板移动端 | `5186` |
-| 跟单移动端 | `5187` |
+| 业务移动端 | `5187` |
 | 采购移动端 | `5188` |
 | 生产移动端 | `5189` |
 | 仓库移动端 | `5190` |
@@ -78,7 +79,7 @@ cd /Users/simon/projects/plush-toy-erp
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 
-固定端口：桌面后台 `5175`，老板 `5186`，跟单 `5187`，采购 `5188`，生产 `5189`，仓库 `5190`，财务 `5191`，PMC `5192`，品质 `5193`。
+固定端口：桌面后台 `5175`，老板 `5186`，业务 `5187`，采购 `5188`，生产 `5189`，仓库 `5190`，财务 `5191`，PMC `5192`，品质 `5193`。
 
 ### 后端
 
@@ -128,6 +129,9 @@ pnpm style:l1
 - 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
 - 主流程：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
 - 数据模型与导入映射：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
+- Phase 2B BOM 与批次库存变更：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2b-bom-lot-schema.md`
+- Phase 2C 采购入库变更：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2c-purchase-receipt-schema.md`
+- Phase 2D-A 采购退货变更：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2d-purchase-return-schema.md`
 - 工作流主任务树 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/task-flow-v1.md`
 - 通知 / 预警 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/notification-alert-v1.md`
 - 角色权限矩阵 v1：`/Users/simon/projects/plush-toy-erp/docs/roles/role-permission-matrix-v1.md`

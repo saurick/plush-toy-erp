@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
@@ -11,6 +12,10 @@ import {
 
 const NOW_MS = Date.parse('2026-04-25T08:00:00')
 const NOW_SEC = Math.floor(NOW_MS / 1000)
+const mobileRoleTasksPageSource = readFileSync(
+  new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
+  'utf8'
+)
 
 function projectOrder(overrides = {}) {
   return {
@@ -25,7 +30,7 @@ function projectOrder(overrides = {}) {
     product_name: '企鹅抱枕',
     due_date: '2026-05-01',
     business_status_key: 'project_pending',
-    owner_role_key: 'merchandiser',
+    owner_role_key: 'business',
     payload: {},
     ...overrides,
   }
@@ -71,7 +76,7 @@ test('orderApprovalFlow: 老板审批通过后生成工程资料任务', () => {
   assert(task.payload.related_documents.some((item) => item.includes('BOM')))
 })
 
-test('orderApprovalFlow: 老板驳回后生成跟单补资料任务', () => {
+test('orderApprovalFlow: 老板驳回后生成业务补资料任务', () => {
   const task = buildRevisionTaskFromRejectedOrder(
     projectOrder(),
     '交期和款图缺失',
@@ -82,12 +87,46 @@ test('orderApprovalFlow: 老板驳回后生成跟单补资料任务', () => {
   assert.equal(task.task_name, '补充订单资料后重新提交')
   assert.equal(task.business_status_key, 'project_pending')
   assert.equal(task.task_status_key, 'ready')
-  assert.equal(task.owner_role_key, 'merchandiser')
+  assert.equal(task.owner_role_key, 'business')
   assert.equal(task.priority, 2)
+  assert.equal(task.payload.decision, 'rejected')
+  assert.equal(task.payload.transition_status, 'rejected')
   assert.equal(task.payload.rejected_reason, '交期和款图缺失')
   assert.equal(task.payload.notification_type, 'task_rejected')
   assert.equal(task.payload.critical_path, true)
   assert.match(task.payload.complete_condition, /补齐客户资料/)
+})
+
+test('orderApprovalFlow: 老板阻塞后补资料任务保留 blocked 决策来源', () => {
+  const task = buildRevisionTaskFromRejectedOrder(projectOrder(), '缺少款图', {
+    nowMs: NOW_MS,
+    decision: 'blocked',
+  })
+
+  assert.equal(task.task_group, 'order_revision')
+  assert.equal(task.owner_role_key, 'business')
+  assert.equal(task.payload.decision, 'blocked')
+  assert.equal(task.payload.transition_status, 'blocked')
+  assert.equal(task.payload.blocked_reason, '缺少款图')
+  assert.equal(task.payload.rejected_reason, '缺少款图')
+})
+
+test('orderApprovalFlow: 移动端老板审批不再本地创建下游任务', () => {
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildEngineeringTaskFromApprovedOrder'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildRevisionTaskFromRejectedOrder'),
+    false
+  )
+  assert.equal(mobileRoleTasksPageSource.includes('approveOrderTask'), false)
+  assert.equal(mobileRoleTasksPageSource.includes('rejectOrderTask'), false)
+  assert.equal(
+    mobileRoleTasksPageSource.includes('runOrderApprovalFollowUp'),
+    false
+  )
+  assert.match(mobileRoleTasksPageSource, /await loadTasks\(\)/)
 })
 
 test('orderApprovalFlow: due_at 使用 Unix 秒且工程任务默认 24 小时后到期', () => {

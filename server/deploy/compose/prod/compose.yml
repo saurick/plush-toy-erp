@@ -114,14 +114,14 @@ services:
       APP_ID: mobile-boss
       PORT: "5186"
 
-  web-mobile-merchandiser:
+  web-mobile-business:
     <<: *web-app-common
-    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-merchandiser"
+    container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-mobile-business"
     ports:
-      - "${WEB_MOBILE_MERCHANDISER_PORT:-5187}:5187"
+      - "${WEB_MOBILE_BUSINESS_PORT:-5187}:5187"
     environment:
       <<: *web-app-environment
-      APP_ID: mobile-merchandiser
+      APP_ID: mobile-business
       PORT: "5187"
 
   web-mobile-purchasing:

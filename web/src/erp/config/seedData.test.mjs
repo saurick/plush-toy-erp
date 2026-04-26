@@ -39,6 +39,7 @@ test('seedData: 初始化模块至少覆盖文档、移动端和打印中心', (
 
 test('seedData: 每个移动角色都有端口职责数据与兼容路由', () => {
   assert(roleWorkbenches.length >= 6)
+  assert(roleWorkbenches.some((role) => role.key === 'business'))
   roleWorkbenches.forEach((role) => {
     assert(role.desktopFocus.length > 0)
     assert(role.mobileFocus.length > 0)
@@ -46,6 +47,10 @@ test('seedData: 每个移动角色都有端口职责数据与兼容路由', () =
     assert(role.allowedNavKeys.length > 0)
     assert.equal(getRoleWorkbench(role.key)?.title, role.title)
   })
+  assert.equal(
+    appDefinitions.find((app) => app.port === 5187)?.roleKey,
+    'business'
+  )
   assert.equal(getRoleWorkbench('missing-role'), null)
 })
 
@@ -82,8 +87,8 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
       '单据模板',
       '系统管理',
       '帮助中心',
-      '高级文档',
       '开发与验收',
+      '高级文档',
     ]
   )
   assert.deepEqual(
@@ -175,7 +180,7 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
   assert.equal(helpCenterRoleNavGroups.length, 8)
   assert.deepEqual(
     helpCenterRoleNavGroups.map((group) => group.role),
-    ['老板', '跟单 / 业务', 'PMC', '采购', '生产', '仓库', '品质', '财务']
+    ['老板', '业务', 'PMC', '采购', '生产', '仓库', '品质', '财务']
   )
   assert.equal(businessMainlineDocGroups.length, 6)
   assert.deepEqual(
@@ -244,10 +249,7 @@ test('businessModules: 业务页菜单按毛绒业务收口且不回退到旧外
   assert(!navLabels.includes('外销'))
 
   businessModuleDefinitions.forEach((moduleItem) => {
-    if (
-      moduleItem.status === 'awaiting_confirmation' ||
-      moduleItem.sectionKey === 'master'
-    ) {
+    if (moduleItem.sectionKey === 'master') {
       assert(!navPaths.includes(moduleItem.path))
       return
     }
@@ -288,12 +290,9 @@ test('appRegistry: 桌面后台单入口，移动端按角色拆端口', () => {
 })
 
 test('dashboardModules: 业务看板按业务模块聚合状态', () => {
-  const activeBusinessModules = businessModuleDefinitions.filter(
-    (moduleItem) => moduleItem.status !== 'awaiting_confirmation'
-  )
   assert.deepEqual(
     dashboardModules.map((item) => item.key),
-    activeBusinessModules.map((item) => item.key)
+    businessModuleDefinitions.map((item) => item.key)
   )
 
   const rows = buildDashboardModuleRows(dashboardModules, [

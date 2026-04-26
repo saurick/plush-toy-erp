@@ -11,6 +11,7 @@ import (
 	"server/internal/biz"
 	"server/internal/conf"
 	"server/internal/data/model/ent"
+	_ "server/internal/data/model/ent/runtime"
 	entLogger "server/pkg/logger"
 
 	"entgo.io/ent/dialect"
@@ -50,10 +51,11 @@ var ProviderSet = wire.NewSet(
 
 // Data 聚合所有外部资源（DB、JsonrpcData 等）。
 type Data struct {
-	log      *log.Helper
-	postgres *ent.Client
-	sqldb    *sql.DB
-	conf     *conf.Data
+	log        *log.Helper
+	postgres   *ent.Client
+	sqldb      *sql.DB
+	sqlDialect string
+	conf       *conf.Data
 }
 
 const (
@@ -161,10 +163,11 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	}
 
 	data := &Data{
-		log:      l,
-		sqldb:    db,
-		postgres: postgresClient,
-		conf:     c,
+		log:        l,
+		sqldb:      db,
+		sqlDialect: dialect.Postgres,
+		postgres:   postgresClient,
+		conf:       c,
 	}
 
 	if err := InitAdminUsersIfNeeded(context.Background(), data, c, l); err != nil {

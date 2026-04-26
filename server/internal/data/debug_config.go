@@ -18,19 +18,17 @@ func newDebugSafetyConfigFromEnv(c *conf.Data, getenv func(string) string) biz.D
 	}
 	environment := firstNonEmptyEnv(getenv, "ERP_DEBUG_ENV", "ERP_ENV", "APP_ENV")
 	if environment == "" {
-		environment = "remote"
-		if c != nil && c.Postgres != nil && c.Postgres.Debug {
-			environment = "dev"
-		}
+		environment = "sql"
 	}
+	defaultMutationEnabled := true
 	cleanupScope := strings.TrimSpace(getenv("ERP_DEBUG_CLEANUP_SCOPE"))
 	if cleanupScope == "" {
 		cleanupScope = biz.DebugDefaultCleanupScope
 	}
 	return biz.NormalizeDebugSafetyConfig(biz.DebugSafetyConfig{
 		Environment:    environment,
-		SeedEnabled:    envBool(getenv("ERP_DEBUG_SEED_ENABLED")),
-		CleanupEnabled: envBool(getenv("ERP_DEBUG_CLEANUP_ENABLED")),
+		SeedEnabled:    envBoolDefault(getenv("ERP_DEBUG_SEED_ENABLED"), defaultMutationEnabled),
+		CleanupEnabled: envBoolDefault(getenv("ERP_DEBUG_CLEANUP_ENABLED"), defaultMutationEnabled),
 		CleanupScope:   cleanupScope,
 	})
 }
@@ -51,4 +49,11 @@ func envBool(value string) bool {
 	default:
 		return false
 	}
+}
+
+func envBoolDefault(value string, defaultValue bool) bool {
+	if strings.TrimSpace(value) == "" {
+		return defaultValue
+	}
+	return envBool(value)
 }

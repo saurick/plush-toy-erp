@@ -152,7 +152,9 @@ test('qaWorkbenchReports: 当前闭环 质量命令和盲区口径完整', () =>
   )
   assert(
     KNOWN_QA_BLIND_SPOTS.some((item) =>
-      item.includes('后端 workflow usecase 统一编排')
+      item.includes(
+        '后端 workflow usecase 只覆盖老板审批、IQC 和采购仓库入库三条最小规则'
+      )
     )
   )
   assert(

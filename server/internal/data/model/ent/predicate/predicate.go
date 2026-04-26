@@ -9,6 +9,12 @@ import (
 // AdminUser is the predicate function for adminuser builders.
 type AdminUser func(*sql.Selector)
 
+// BOMHeader is the predicate function for bomheader builders.
+type BOMHeader func(*sql.Selector)
+
+// BOMItem is the predicate function for bomitem builders.
+type BOMItem func(*sql.Selector)
+
 // BusinessRecord is the predicate function for businessrecord builders.
 type BusinessRecord func(*sql.Selector)
 
@@ -18,8 +24,41 @@ type BusinessRecordEvent func(*sql.Selector)
 // BusinessRecordItem is the predicate function for businessrecorditem builders.
 type BusinessRecordItem func(*sql.Selector)
 
+// InventoryBalance is the predicate function for inventorybalance builders.
+type InventoryBalance func(*sql.Selector)
+
+// InventoryLot is the predicate function for inventorylot builders.
+type InventoryLot func(*sql.Selector)
+
+// InventoryTxn is the predicate function for inventorytxn builders.
+type InventoryTxn func(*sql.Selector)
+
+// Material is the predicate function for material builders.
+type Material func(*sql.Selector)
+
+// Product is the predicate function for product builders.
+type Product func(*sql.Selector)
+
+// PurchaseReceipt is the predicate function for purchasereceipt builders.
+type PurchaseReceipt func(*sql.Selector)
+
+// PurchaseReceiptItem is the predicate function for purchasereceiptitem builders.
+type PurchaseReceiptItem func(*sql.Selector)
+
+// PurchaseReturn is the predicate function for purchasereturn builders.
+type PurchaseReturn func(*sql.Selector)
+
+// PurchaseReturnItem is the predicate function for purchasereturnitem builders.
+type PurchaseReturnItem func(*sql.Selector)
+
+// Unit is the predicate function for unit builders.
+type Unit func(*sql.Selector)
+
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
+
+// Warehouse is the predicate function for warehouse builders.
+type Warehouse func(*sql.Selector)
 
 // WorkflowBusinessState is the predicate function for workflowbusinessstate builders.
 type WorkflowBusinessState func(*sql.Selector)

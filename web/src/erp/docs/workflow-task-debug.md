@@ -52,7 +52,7 @@
 ## 4. 排查移动端为什么看不到任务
 
 1. 先确认任务是否在最近 200 条 `listWorkflowTasks` 返回结果里。
-2. 看 `mobileTaskQueries`：PMC、boss、production、merchandiser 使用全量加载后过滤；quality、warehouse、finance、purchasing 按 `owner_role_key` 直查。
+2. 看 `mobileTaskQueries`：PMC、boss、production、business 使用全量加载后过滤；quality、warehouse、finance、purchasing 按 `owner_role_key` 直查。
 3. 看 `owner_role_key` 是否等于当前角色。
 4. 看 `task_status_key` 是否是 `done`、`cancelled`、`closed` 等终态。
 5. 看 `task_group` 是否属于该角色关注范围。
@@ -107,16 +107,16 @@
 
 ## 9. 排查扩展可见性
 
-| 角色         | 扩展可见性口径                                                                         |
-| ------------ | -------------------------------------------------------------------------------------- |
-| PMC          | blocked、rejected、overdue、critical、critical_path、催办、升级、高优先级              |
-| boss         | high priority、approval_required、shipment_risk、finance critical、overdue、升级到老板 |
-| production   | 委外回货、委外返工、成品返工、生产相关任务                                             |
-| finance      | 财务来源、财务通知、财务逾期                                                           |
-| quality      | 品质来源、质检失败、品质任务                                                           |
-| warehouse    | 仓储来源、仓库任务                                                                     |
-| merchandiser | 出货来源、业务确认、跟单主责                                                           |
-| purchasing   | 当前按 `owner_role_key` 直查，不额外扩展                                               |
+| 角色       | 扩展可见性口径                                                                         |
+| ---------- | -------------------------------------------------------------------------------------- |
+| PMC        | blocked、rejected、overdue、critical、critical_path、催办、升级、高优先级              |
+| boss       | high priority、approval_required、shipment_risk、finance critical、overdue、升级到老板 |
+| production | 委外回货、委外返工、成品返工、生产相关任务                                             |
+| finance    | 财务来源、财务通知、财务逾期                                                           |
+| quality    | 品质来源、质检失败、品质任务                                                           |
+| warehouse  | 仓储来源、仓库任务                                                                     |
+| business   | 出货来源、业务确认、业务主责                                                           |
+| purchasing | 当前按 `owner_role_key` 直查，不额外扩展                                               |
 
 ## 10. 当前不做
 

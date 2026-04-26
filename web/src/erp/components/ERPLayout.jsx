@@ -72,7 +72,6 @@ const navIconRegistry = {
   partners: <ApartmentOutlined />,
   products: <AppstoreOutlined />,
   'project-orders': <ScheduleOutlined />,
-  quotations: <FileTextOutlined />,
   'material-bom': <BarsOutlined />,
   'accessories-purchase': <ShoppingCartOutlined />,
   'processing-contracts': <FileTextOutlined />,
@@ -133,9 +132,7 @@ const DEFAULT_DESKTOP_ENTRY = {
   description: '按协同任务状态看待处理、处理中、阻塞、退回和超时任务。',
 }
 const BUSINESS_MODULE_PATHS = new Set(
-  businessModuleDefinitions
-    .filter((moduleItem) => moduleItem.status !== 'awaiting_confirmation')
-    .map((moduleItem) => moduleItem.path)
+  businessModuleDefinitions.map((moduleItem) => moduleItem.path)
 )
 
 function buildCurrentEntry({ navigationSections, locationPath }) {

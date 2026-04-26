@@ -117,6 +117,28 @@ func (d *JsonrpcData) handleDebug(
 			Data:    newDataStruct(debugCleanupResultToMap(result)),
 		}, nil
 
+	case "clear_business_data":
+		result, err := d.debugUC.ClearBusinessData(ctx)
+		if err != nil {
+			l.Warnw(
+				"msg", "debug clear business data failed",
+				"actor_id", claims.UserID,
+				"error", err,
+			)
+			return id, d.mapDebugError(ctx, err), nil
+		}
+		l.Infow(
+			"msg", "debug clear business data succeeded",
+			"actor_id", claims.UserID,
+			"deleted_total", result.DeletedTotal,
+			"cleared_tables", result.ClearedTableNames,
+		)
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: "业务数据已清空",
+			Data:    newDataStruct(debugBusinessDataClearResultToMap(result)),
+		}, nil
+
 	default:
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.UnknownMethod.Code,
@@ -178,6 +200,16 @@ func (d *JsonrpcData) mapDebugError(ctx context.Context, err error) *v1.JsonrpcR
 		}
 		l.Warnf("[debug] cleanup disabled err=%v reason=%s", err, reason)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: reason}
+	case errors.Is(err, biz.ErrDebugBusinessDataClearDisabled):
+		reason := ""
+		if d.debugUC != nil {
+			reason = d.debugUC.Capabilities().BusinessDataClearDisabledReason
+		}
+		if reason == "" {
+			reason = "业务数据清空能力未开启"
+		}
+		l.Warnf("[debug] clear business data disabled err=%v reason=%s", err, reason)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: reason}
 	case errors.Is(err, biz.ErrDebugRunIDRequired):
 		l.Warnf("[debug] missing debugRunId err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "必须提供 debugRunId，本接口禁止无范围清理"}
@@ -214,19 +246,22 @@ func debugParamString(pm map[string]any, keys ...string) string {
 
 func debugCapabilitiesToMap(capabilities biz.DebugCapabilities) map[string]any {
 	return map[string]any{
-		"environment":             capabilities.Environment,
-		"seedEnabled":             capabilities.SeedEnabled,
-		"seedAllowed":             capabilities.SeedAllowed,
-		"seedDisabledReason":      capabilities.SeedDisabledReason,
-		"cleanupEnabled":          capabilities.CleanupEnabled,
-		"cleanupAllowed":          capabilities.CleanupAllowed,
-		"cleanupDisabledReason":   capabilities.CleanupDisabledReason,
-		"cleanupScope":            capabilities.CleanupScope,
-		"supportedScenarios":      debugScenarioSummariesToAny(capabilities.SupportedScenarios),
-		"cleanupOnlyDebugData":    true,
-		"requiresDebugRunId":      true,
-		"requiresBackendGuard":    true,
-		"destructiveRemoteDenied": true,
+		"environment":                     capabilities.Environment,
+		"seedEnabled":                     capabilities.SeedEnabled,
+		"seedAllowed":                     capabilities.SeedAllowed,
+		"seedDisabledReason":              capabilities.SeedDisabledReason,
+		"cleanupEnabled":                  capabilities.CleanupEnabled,
+		"cleanupAllowed":                  capabilities.CleanupAllowed,
+		"cleanupDisabledReason":           capabilities.CleanupDisabledReason,
+		"businessDataClearEnabled":        capabilities.BusinessDataClearEnabled,
+		"businessDataClearAllowed":        capabilities.BusinessDataClearAllowed,
+		"businessDataClearDisabledReason": capabilities.BusinessDataClearDisabledReason,
+		"cleanupScope":                    capabilities.CleanupScope,
+		"supportedScenarios":              debugScenarioSummariesToAny(capabilities.SupportedScenarios),
+		"cleanupOnlyDebugData":            true,
+		"requiresDebugRunId":              true,
+		"requiresBackendGuard":            true,
+		"destructiveRemoteDenied":         false,
 	}
 }
 
@@ -286,6 +321,27 @@ func debugCleanupResultToMap(result *biz.DebugBusinessChainCleanupResult) map[st
 		"skippedItems":          debugSkippedItemsToAny(result.SkippedItems),
 		"warnings":              toAnySliceString(result.Warnings),
 	}
+}
+
+func debugBusinessDataClearResultToMap(result *biz.DebugBusinessDataClearResult) map[string]any {
+	if result == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"deletedCounts":     toAnyMapStringInt(result.DeletedCounts),
+		"deletedTotal":      result.DeletedTotal,
+		"clearedTableNames": toAnySliceString(result.ClearedTableNames),
+		"warnings":          toAnySliceString(result.Warnings),
+		"query":             "",
+	}
+}
+
+func toAnyMapStringInt(values map[string]int) map[string]any {
+	out := make(map[string]any, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }
 
 func debugCreatedRecordsToAny(items []biz.DebugCreatedRecord) []any {

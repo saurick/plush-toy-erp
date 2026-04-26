@@ -61,11 +61,11 @@
 | 环节 | 责任角色 | v1 记录口径 |
 | --- | --- | --- |
 | 到货 / 待检 | 采购、仓库 | `accessories-purchase` 或 `inbound` 记录点击“发起 IQC”，业务状态进入 `iqc_pending`。 |
-| IQC 合格 | 品质 | quality 移动端完成 `purchase_iqc` 任务，payload 记录 `qc_result=pass`，状态进入 `warehouse_inbound_pending`。 |
-| IQC 不合格 | 品质、采购、PMC | quality 移动端阻塞或退回任务并填写原因，状态进入 `qc_failed`，生成采购异常处理任务。 |
+| IQC 合格 | 品质 | quality 移动端完成 `purchase_iqc` 任务，payload 记录 `qc_result=pass`；后端 `WorkflowUsecase.UpdateTaskStatus` 将状态推进到 `warehouse_inbound_pending` 并生成仓库入库任务。 |
+| IQC 不合格 | 品质、采购、PMC | quality 移动端阻塞或退回任务并填写原因；后端 `WorkflowUsecase.UpdateTaskStatus` 将状态推进到 `qc_failed` 并生成采购异常处理任务。 |
 | 确认入库 | 仓库 | warehouse 移动端完成 `warehouse_inbound` 任务，状态进入 `inbound_done`。 |
 
-当前 v1 的 `inbound_done` 只表示业务任务闭环，不代表已经写入正式库存余额或库存流水。正式 `inventory_txn` / `inventory_balance` 需要等采购到货、委外回货、成品入库和出货扣减口径都稳定后，再评审 Ent schema、migration、库存计算和历史回补策略。
+当前 IQC `done / blocked / rejected` 后的仓库入库 / 来料异常任务派生已进入后端 usecase，但这仍不是完整 workflow engine。当前 v1 的 `inbound_done` 只表示业务任务闭环，不代表已经写入正式库存余额或库存流水；本规则没有修改 Ent schema，也没有生成 migration。正式 `inventory_txn` / `inventory_balance` 需要等采购到货、委外回货、成品入库和出货扣减口径都稳定后，再评审 Ent schema、migration、库存计算和历史回补策略。
 
 ## 第三条真实闭环：委外发料 -> 回货 -> 检验 -> 入库
 
@@ -73,11 +73,13 @@
 | --- | --- | --- |
 | 委外发料 / 加工中 | 生产/委外 | `processing-contracts` 记录进入 `production_processing`，桌面点击“发起委外回货跟踪”后创建 `outsource_return_tracking` 给 `production`。 |
 | 委外回货 | 生产/委外、品质 | production 移动端完成跟踪任务，表示已登记回货数量和回货日期，随后创建 `outsource_return_qc` 给 `quality`；`inbound` 委外回货通知也可以直接发起该任务。 |
-| 回货检验合格 | 品质、仓库 | quality 移动端完成 `outsource_return_qc`，状态进入 `warehouse_inbound_pending`，并创建 `outsource_warehouse_inbound` 给 `warehouse`。 |
-| 回货检验不合格 | 品质、生产/委外、PMC | quality 移动端阻塞或退回并填写不良原因，状态进入 `qc_failed`，创建 `outsource_rework` 给 `production` 处理返工、补做或让步接收安排。 |
+| 回货检验合格 | 品质、仓库 | quality 移动端完成 `outsource_return_qc`，后端 `WorkflowUsecase.UpdateTaskStatus` 将状态推进到 `warehouse_inbound_pending`，并幂等创建 `outsource_warehouse_inbound` 给 `warehouse`。 |
+| 回货检验不合格 | 品质、生产/委外、PMC | quality 移动端阻塞或退回 `outsource_return_qc` 并填写不良原因，后端 `WorkflowUsecase.UpdateTaskStatus` 将状态推进到 `qc_failed`，并幂等创建 `outsource_rework` 给 `production` 处理返工、补做或让步接收安排。 |
 | 委外入库完成 | 仓库 | warehouse 移动端完成 `outsource_warehouse_inbound`，状态进入 `inbound_done`，只表示委外回货入库任务完成。 |
 
-当前 v1 不新增 `outsource_order` 专表，不新增 `inventory_txn` / `inventory_balance` 专表，不写库存余额或库存流水。库存流水和余额需要等采购到货、委外回货、成品入库、出货扣减、历史回补和对账影响都稳定后，再评审 Ent schema、migration 与库存计算口径。
+当前 `outsource_return_qc done / blocked / rejected` 后的委外入库 / 返工补做任务派生已进入后端 usecase，但这仍不是完整 workflow engine。当前 v1 不新增 `outsource_order` 专表，不写 `inventory_txns`，不更新 `inventory_balances`，不创建 `inventory_lots`，不迁委外应付。库存流水和余额需要等采购到货、委外回货、成品入库、出货扣减、历史回补和对账影响都稳定后，再单独评审 `InventoryUsecase`、Ent schema、migration 与库存计算口径。
+
+委外回货检验的后端识别只允许业务状态为空、`qc_pending` 或 `qc_failed` 的 `outsource_return_qc` 进入；`qc_failed` 保持可进入，用于重复失败时复用未完成的 active `outsource_rework`，并允许上一轮返工完成后再次创建下一轮返工 / 补做任务。
 
 当前也不新增 `outsource` 移动端入口；委外回货跟踪和返工 / 补做先由 `production` 承接，payload 保留 `outsource_owner_role_key=outsource` 作为后续拆分角色入口的迁移线索。PMC 只看 blocked、overdue、critical_path 和 critical 风险，不代替品质或仓库完成业务事实。
 
@@ -89,6 +91,6 @@
 | 成品抽检合格 | 品质、仓库 | quality 移动端完成 `finished_goods_qc`，payload 记录 `qc_result=pass`，状态进入 `warehouse_inbound_pending`，并创建 `finished_goods_inbound` 给 `warehouse`。 |
 | 成品抽检不合格 | 品质、生产、PMC | quality 移动端阻塞或退回并填写不良原因，状态进入 `qc_failed`，创建 `finished_goods_rework` 给 `production` 处理返工、重新抽检或让步放行。 |
 | 成品入库完成 | 仓库 | warehouse 移动端完成 `finished_goods_inbound`，状态进入 `inbound_done`，只表示成品入库任务完成，不写正式库存余额或库存流水。 |
-| 出货准备 / 出货确认 | 仓库、跟单 | 成品入库完成后创建 `shipment_release`，状态为 `shipment_pending`。warehouse 完成该任务后状态进入 `shipped`；payload 保留 `confirm_role_key=merchandiser`，后续可在应收 / 开票前拆跟单确认。 |
+| 出货准备 / 出货确认 | 仓库、业务 | 成品入库完成后创建 `shipment_release`，状态为 `shipment_pending`。warehouse 完成该任务后状态进入 `shipped`；payload 保留 `confirm_role_key=business`，后续可在应收 / 开票前拆业务确认。 |
 
 当前 v1 不新增 `production_order`、`shipment_order`、`inventory_txn`、`inventory_balance` 专表，不做库存余额和库存流水，不做应收 / 开票登记。正式库存流水、库存余额、出货扣减和应收开票需要等成品入库、出货确认、客户要求、历史回补和财务口径稳定后，再评审 Ent schema、migration 与计算测试。

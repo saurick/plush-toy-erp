@@ -628,6 +628,24 @@ const scenarios = [
       await expectText(page, '创建管理员')
       await expectText(page, '超级管理员')
       await expectText(page, '普通管理员')
+      const adminSearch = page.getByPlaceholder(
+        '搜索管理员账号、手机号、权限或移动端角色'
+      )
+      await adminSearch.fill('assistant')
+      await expectText(page, '命中 1/2 个管理员')
+      const filteredTableText = await page
+        .locator('.ant-table-tbody')
+        .innerText()
+      assert(
+        filteredTableText.includes('assistant-admin') &&
+          !filteredTableText.includes('style-l1-admin'),
+        `权限管理搜索结果不符合预期: ${filteredTableText}`
+      )
+      await adminSearch.fill('')
+      await expectText(page, '共 2 个管理员')
+      await assertPaginationSizeChangerFocusStyle(page, {
+        scenarioName: 'permission-center-desktop',
+      })
       await assertShellRefreshButton(page, {
         scenarioName: 'permission-center-desktop',
         expectVisible: true,
@@ -639,6 +657,9 @@ const scenarios = [
       await assertPermissionModalLayout(page, {
         scenarioName: 'permission-center-create-modal',
       })
+      await page.getByPlaceholder('搜索菜单权限名称或路径').fill('采购')
+      await expectText(page, '辅材/包材采购')
+      await expectText(page, '加工合同')
       await page
         .locator('.erp-permission-modal .ant-modal-footer button')
         .first()
@@ -713,7 +734,7 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '角色协同链路')
-      await expectText(page, '业务 / 跟单 -> 老板')
+      await expectText(page, '业务 -> 老板')
       await expectText(page, '采购 -> PMC')
       await expectText(page, '手机端和桌面端怎么衔接')
     },
@@ -1180,7 +1201,7 @@ const scenarios = [
           quantity: 2,
           amount: 39.8,
           business_status_key: 'blocked',
-          owner_role_key: 'merchandiser',
+          owner_role_key: 'business',
           payload: {
             status_reason: '资料未齐，等待客户确认',
           },
@@ -1199,7 +1220,7 @@ const scenarios = [
           source_id: record?.id,
           source_no: record?.document_no,
           business_status_key: 'blocked',
-          owner_role_key: 'merchandiser',
+          owner_role_key: 'business',
           blocked_reason: '资料未齐，等待客户确认',
           payload: {
             status_reason: '资料未齐，等待客户确认',
@@ -1214,7 +1235,7 @@ const scenarios = [
           source_no: record?.document_no,
           business_status_key: 'blocked',
           task_status_key: 'blocked',
-          owner_role_key: 'merchandiser',
+          owner_role_key: 'business',
           blocked_reason: '资料未齐，等待客户确认',
         })
       })
@@ -1854,7 +1875,7 @@ async function installAdminRpcMocks(page) {
           document_date: params.document_date || '',
           due_date: params.due_date || '',
           business_status_key: params.business_status_key || 'project_pending',
-          owner_role_key: params.owner_role_key || 'merchandiser',
+          owner_role_key: params.owner_role_key || 'business',
           payload: params.payload || {},
           items: params.items || [],
           row_version: 1,
@@ -1952,7 +1973,7 @@ async function installAdminRpcMocks(page) {
           source_id: Number(params.source_id || Date.now()),
           source_no: params.source_no || '',
           business_status_key: params.business_status_key || 'project_pending',
-          owner_role_key: params.owner_role_key || 'merchandiser',
+          owner_role_key: params.owner_role_key || 'business',
           blocked_reason: params.blocked_reason || '',
           payload: params.payload || {},
           status_changed_at: nowUnix(),
@@ -1993,7 +2014,7 @@ async function installAdminRpcMocks(page) {
           source_no: params.source_no || '',
           business_status_key: params.business_status_key || 'project_pending',
           task_status_key: params.task_status_key || 'ready',
-          owner_role_key: params.owner_role_key || 'merchandiser',
+          owner_role_key: params.owner_role_key || 'business',
           assignee_id: params.assignee_id || '',
           priority: Number(params.priority || 0),
           due_at: params.due_at || null,
@@ -4511,7 +4532,7 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
 
   assert(
     metrics.cardCount >= 1,
-    `${scenarioName} 未渲染 trade-erp 条目卡片: ${JSON.stringify(metrics)}`
+    `${scenarioName} 未渲染本项目条目卡片: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.legacyItemHeaders,
@@ -4520,7 +4541,7 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
   )
   assert(
     metrics.itemHelpVisible,
-    `${scenarioName} 缺少 trade-erp 明细帮助区: ${JSON.stringify(metrics)}`
+    `${scenarioName} 缺少本项目明细帮助区: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.addItemButtonWidth > 0 && metrics.addItemButtonWidth <= 180,
@@ -4533,11 +4554,11 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
   metrics.cards.forEach((card) => {
     assert(
       Number.parseFloat(card.borderRadius) >= 9,
-      `${scenarioName} 条目卡片圆角未对齐 trade-erp: ${JSON.stringify(metrics)}`
+      `${scenarioName} 条目卡片圆角不符合本项目样式: ${JSON.stringify(metrics)}`
     )
     assert(
       card.headMinHeight >= 40,
-      `${scenarioName} 条目卡片头部高度未对齐 trade-erp: ${JSON.stringify(metrics)}`
+      `${scenarioName} 条目卡片头部高度不符合本项目样式: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       card.bodyOverflowX,
@@ -5161,6 +5182,82 @@ async function assertBusinessModuleStatusDropdownStyle(page, { scenarioName }) {
     metrics.documentScrollWidth <= metrics.viewportWidth + 1,
     `${scenarioName} 状态筛选展开后不应产生页面横向滚动: ${JSON.stringify(metrics)}`
   )
+}
+
+async function assertPaginationSizeChangerFocusStyle(page, { scenarioName }) {
+  const sizeChanger = page
+    .locator('.ant-pagination-options .ant-select')
+    .first()
+  await sizeChanger.waitFor({ state: 'visible', timeout: 10_000 })
+  await sizeChanger.click()
+  const popup = page.locator(
+    '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
+  )
+  await popup.waitFor({ state: 'visible', timeout: 10_000 })
+  await page.waitForTimeout(150)
+
+  const metrics = await page.evaluate(() => {
+    const readElement = (element) => {
+      if (!element) return null
+      const rect = element.getBoundingClientRect()
+      const style = window.getComputedStyle(element)
+      return {
+        boxShadow: style.boxShadow,
+        borderColor: style.borderTopColor,
+        outlineStyle: style.outlineStyle,
+        ringColor: style.getPropertyValue('--tw-ring-color').trim(),
+        width: rect.width,
+        height: rect.height,
+        active: element === document.activeElement,
+      }
+    }
+    const select = document.querySelector('.ant-pagination-options .ant-select')
+    const selector = select?.querySelector('.ant-select-selector')
+    const searchInput = select?.querySelector(
+      '.ant-select-selection-search-input'
+    )
+    const dropdown = document.querySelector(
+      '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
+    )
+
+    return {
+      selector: readElement(selector),
+      searchInput: readElement(searchInput),
+      dropdown: readElement(dropdown),
+    }
+  })
+
+  assert(
+    metrics.selector && metrics.searchInput && metrics.dropdown,
+    `${scenarioName} 分页条数选择器缺少可检查节点: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.searchInput.active,
+    true,
+    `${scenarioName} 分页条数选择器内部 input 未获得焦点，无法验证焦点态: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.searchInput.boxShadow,
+    'none',
+    `${scenarioName} 分页条数选择器内部 input 暴露了 Tailwind 蓝色焦点框: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.searchInput.outlineStyle,
+    'none',
+    `${scenarioName} 分页条数选择器内部 input 暴露了浏览器 outline: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.searchInput.ringColor === 'transparent' ||
+      metrics.searchInput.ringColor === 'rgba(0, 0, 0, 0)',
+    `${scenarioName} 分页条数选择器内部 input 未清理 Tailwind ring: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.dropdown.width >= metrics.selector.width,
+    `${scenarioName} 分页条数下拉层宽度不应小于触发器: ${JSON.stringify(metrics)}`
+  )
+
+  await page.keyboard.press('Escape')
+  await popup.waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
 async function assertBusinessModuleCompactWorkspace(

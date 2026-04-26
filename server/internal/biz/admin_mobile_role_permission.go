@@ -1,7 +1,5 @@
 package biz
 
-import "strings"
-
 type AdminMobileRolePermissionOption struct {
 	Key   string
 	Label string
@@ -9,7 +7,7 @@ type AdminMobileRolePermissionOption struct {
 
 var adminMobileRolePermissionOptions = []AdminMobileRolePermissionOption{
 	{Key: "boss", Label: "老板移动端"},
-	{Key: "merchandiser", Label: "跟单移动端"},
+	{Key: BusinessRoleKey, Label: "业务移动端"},
 	{Key: "purchasing", Label: "采购移动端"},
 	{Key: "production", Label: "生产移动端"},
 	{Key: "warehouse", Label: "仓库移动端"},
@@ -47,7 +45,7 @@ func NormalizeAdminMobileRolePermissions(input []string) []string {
 
 	selected := make(map[string]struct{}, len(input))
 	for _, raw := range input {
-		key := strings.TrimSpace(raw)
+		key := NormalizeRoleKey(raw)
 		if key == "" {
 			continue
 		}

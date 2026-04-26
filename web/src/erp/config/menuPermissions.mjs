@@ -1,5 +1,6 @@
 import { getNavigationSections } from './seedData.mjs'
 import { appDefinitions } from './appRegistry.mjs'
+import { normalizeRoleKey } from '../utils/roleKeys.mjs'
 
 export const PERMISSION_CENTER_PATH = '/erp/system/permissions'
 
@@ -99,10 +100,10 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     ]),
   },
   {
-    key: 'merchandiser',
-    label: '业务 / 跟单',
+    key: 'business',
+    label: '业务',
     description: '保留立项、待出货和相关帮助文档。',
-    mobileRolePermissions: buildMobileRolePreset(['merchandiser']),
+    mobileRolePermissions: buildMobileRolePreset(['business']),
     permissions: buildPreset([
       '/erp/dashboard',
       '/erp/business-dashboard',
@@ -260,7 +261,7 @@ export const normalizeMobileRolePermissions = (permissions = []) => {
   )
   const selected = new Set()
   permissions.forEach((rawKey) => {
-    const key = String(rawKey || '').trim()
+    const key = normalizeRoleKey(rawKey)
     if (key && permissionSet.has(key)) {
       selected.add(key)
     }

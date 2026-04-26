@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
@@ -15,6 +16,10 @@ import { buildWorkflowTaskAlert } from './workflowDashboardStats.mjs'
 
 const NOW_MS = Date.parse('2026-04-25T08:00:00')
 const NOW_SEC = Math.floor(NOW_MS / 1000)
+const mobileRoleTasksPageSource = readFileSync(
+  new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
+  'utf8'
+)
 
 function arrivalRecord(overrides = {}) {
   return {
@@ -73,6 +78,15 @@ test('purchaseInboundFlow: IQC 合格能生成 warehouse 入库任务', () => {
   assert.equal(task.priority, 2)
   assert.equal(task.due_at, NOW_SEC + 4 * 60 * 60)
   assert.equal(task.payload.qc_result, 'pass')
+  assert.equal(task.payload.material_name, 'PP 棉')
+  assert.equal(task.payload.product_name, '')
+  assert.equal(task.payload.quantity, 120)
+  assert.equal(task.payload.unit, 'kg')
+  assert.equal(Object.hasOwn(task.payload, 'material_id'), false)
+  assert.equal(Object.hasOwn(task.payload, 'product_id'), false)
+  assert.equal(Object.hasOwn(task.payload, 'unit_id'), false)
+  assert.equal(Object.hasOwn(task.payload, 'warehouse_id'), false)
+  assert.equal(Object.hasOwn(task.payload, 'lot_id'), false)
   assert.match(task.payload.complete_condition, /确认入库数量/)
   assert(task.payload.related_documents.some((item) => item.includes('IQC')))
 })
@@ -100,6 +114,49 @@ test('purchaseInboundFlow: IQC 不合格能生成 purchasing 异常处理任务�
   assert.equal(task.payload.rejected_reason, '来料破包')
   assert.equal(alert?.alert_level, 'critical')
   assert.equal(alert?.alert_type, 'qc_failed')
+})
+
+test('purchaseInboundFlow: 移动端 IQC 状态动作不再本地创建下游任务', () => {
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildWarehouseInboundTaskFromIqcPass'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildPurchaseQualityExceptionTask'),
+    false
+  )
+  assert.equal(mobileRoleTasksPageSource.includes('passIqcTask'), false)
+  assert.equal(mobileRoleTasksPageSource.includes('failIqcTask'), false)
+  assert.equal(
+    mobileRoleTasksPageSource.includes('runPurchaseInboundFollowUp'),
+    false
+  )
+  assert.match(mobileRoleTasksPageSource, /await loadTasks\(\)/)
+})
+
+test('purchaseInboundFlow: 移动端采购 warehouse_inbound 状态动作交给后端', () => {
+  assert.equal(
+    mobileRoleTasksPageSource.includes('completeWarehouseInboundTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildPurchasePayableRegistrationTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes(
+      'PURCHASE_PAYABLE_REGISTRATION_TASK_GROUP'
+    ),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('runPurchaseInboundFollowUp'),
+    false
+  )
+  assert.match(
+    mobileRoleTasksPageSource,
+    /if \(isWarehouseInboundTask\(task\)\) {[\s\S]{0,220}if \(taskStatusKey === 'done'\) return INBOUND_DONE_STATUS_KEY[\s\S]{0,220}if \(\['blocked', 'rejected'\]\.includes\(taskStatusKey\)\) return 'blocked'/
+  )
 })
 
 test('purchaseInboundFlow: due_at 使用 Unix 秒，due_date 当天更紧急', () => {

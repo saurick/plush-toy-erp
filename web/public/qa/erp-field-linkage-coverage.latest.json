@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-04-24T03:01:14.573Z",
+  "generatedAt": "2026-04-25T16:49:12.438Z",
   "command": "node scripts/qa/erp-field-linkage.mjs",
   "runContext": {
     "repoRoot": "/Users/simon/projects/plush-toy-erp",
-    "gitCommit": "8e458a79e23309a1e9997bdc2cc2711d44d98307",
-    "gitCommitShort": "8e458a79e233",
+    "gitCommit": "7e7485b546f386d5e7b02da0cbb949ee9ca78d8c",
+    "gitCommitShort": "7e7485b546f3",
     "gitBranch": "main",
     "gitDirty": true,
     "nodeVersion": "v24.14.0",
@@ -66,7 +66,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -88,7 +88,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 16,
+          "durationMs": 12,
           "failureMessages": []
         }
       ]
@@ -388,7 +388,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -456,7 +456,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -524,7 +524,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 2,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -805,7 +805,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -816,7 +816,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         }
       ]
@@ -977,7 +977,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -988,7 +988,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         }
       ]
@@ -1049,7 +1049,7 @@
           "layer": "web",
           "testFile": "web/src/erp/data/processingContractTemplate.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -1060,7 +1060,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 0,
+          "durationMs": 1,
           "failureMessages": []
         },
         {
@@ -1235,7 +1235,7 @@
           "layer": "web",
           "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
           "status": "pass",
-          "durationMs": 16,
+          "durationMs": 12,
           "failureMessages": []
         }
       ]
@@ -1373,7 +1373,7 @@
       "layer": "web",
       "testFile": "web/src/erp/data/processingContractTemplate.test.mjs",
       "status": "pass",
-      "durationMs": 0,
+      "durationMs": 1,
       "failureMessages": []
     },
     {
@@ -1384,7 +1384,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/materialPurchaseContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 0,
+      "durationMs": 1,
       "failureMessages": []
     },
     {
@@ -1417,7 +1417,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 2,
+      "durationMs": 1,
       "failureMessages": []
     },
     {
@@ -1439,7 +1439,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 16,
+      "durationMs": 12,
       "failureMessages": []
     },
     {
@@ -1450,7 +1450,7 @@
       "layer": "web",
       "testFile": "web/src/erp/utils/processingContractEditor.test.mjs",
       "status": "pass",
-      "durationMs": 0,
+      "durationMs": 1,
       "failureMessages": []
     },
     {

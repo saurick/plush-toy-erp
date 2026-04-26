@@ -277,7 +277,7 @@ function makeBusinessRecord(params, existing = {}) {
       existing.business_status_key ||
       'project_pending',
     owner_role_key:
-      params.owner_role_key || existing.owner_role_key || 'merchandiser',
+      params.owner_role_key || existing.owner_role_key || 'business',
     source_no: params.source_no || '',
     customer_name: params.customer_name || '',
     supplier_name: params.supplier_name || '',
@@ -448,7 +448,7 @@ export function setupJsonRpcMockServer() {
             ],
             mobile_role_permissions: [
               'boss',
-              'merchandiser',
+              'business',
               'purchasing',
               'production',
               'warehouse',
@@ -533,7 +533,7 @@ export function setupJsonRpcMockServer() {
             ],
             mobile_role_permissions: [
               'boss',
-              'merchandiser',
+              'business',
               'purchasing',
               'production',
               'warehouse',
@@ -784,7 +784,7 @@ export function setupJsonRpcMockServer() {
           source_no: params.source_no || '',
           business_status_key: params.business_status_key || '',
           task_status_key: params.task_status_key || 'pending',
-          owner_role_key: params.owner_role_key || 'merchandiser',
+          owner_role_key: params.owner_role_key || 'business',
           assignee_id: null,
           priority: Number(params.priority || 0),
           blocked_reason: params.blocked_reason || '',
@@ -858,7 +858,7 @@ export function setupJsonRpcMockServer() {
           order_id: params.order_id || null,
           batch_id: params.batch_id || null,
           business_status_key: params.business_status_key || 'project_pending',
-          owner_role_key: params.owner_role_key || 'merchandiser',
+          owner_role_key: params.owner_role_key || 'business',
           blocked_reason: params.blocked_reason || '',
           status_changed_at: nowUnix(),
           payload: params.payload || {},

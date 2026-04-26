@@ -20,6 +20,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PageHero from '../components/PageHero'
 import { listBusinessRecords } from '../api/businessRecordApi.mjs'
 import {
+  clearBusinessChainDebugBusinessData,
   cleanupBusinessChainDebugScenario,
   getBusinessChainDebugCapabilities,
   rebuildBusinessChainDebugScenario,
@@ -54,9 +55,7 @@ import {
 const { Search } = Input
 const { Paragraph, Text } = Typography
 
-const activeBusinessModules = businessModuleDefinitions.filter(
-  (moduleItem) => moduleItem.status !== 'awaiting_confirmation'
-)
+const activeBusinessModules = businessModuleDefinitions
 const BUSINESS_STATUS_LABELS = new Map(
   BUSINESS_WORKFLOW_STATES.map((state) => [state.key, state.label])
 )
@@ -174,11 +173,15 @@ export default function BusinessChainDebugPage() {
     capabilities,
     'cleanup'
   )
+  const businessDataClearDisabledReason =
+    getBusinessChainDebugActionDisabledReason(capabilities, 'businessDataClear')
   const selectedRunId =
     seedResult?.debugRunId || cleanupPreview?.debugRunId || ''
   const canSeed = capabilities.seedAllowed && !operationLoading
   const canCleanup =
     capabilities.cleanupAllowed && Boolean(selectedRunId) && !operationLoading
+  const canClearBusinessData =
+    capabilities.businessDataClearAllowed && !operationLoading
 
   useEffect(() => {
     let cancelled = false
@@ -275,7 +278,7 @@ export default function BusinessChainDebugPage() {
       }
     } catch (error) {
       message.error(
-        getActionErrorMessage(error, '生成调试数据失败，请检查后端安全开关')
+        getActionErrorMessage(error, '生成调试数据失败，请检查权限或后端日志')
       )
     } finally {
       setOperationLoading('')
@@ -299,7 +302,7 @@ export default function BusinessChainDebugPage() {
       message.success('已预览清理范围，未修改数据')
     } catch (error) {
       message.error(
-        getActionErrorMessage(error, '预览清理范围失败，请检查后端安全开关')
+        getActionErrorMessage(error, '预览清理范围失败，请检查权限或后端日志')
       )
     } finally {
       setOperationLoading('')
@@ -318,6 +321,45 @@ export default function BusinessChainDebugPage() {
     if (selectedRunId) {
       await loadDebugView(selectedRunId)
     }
+  }
+
+  const runBusinessDataClear = async () => {
+    const result = await clearBusinessChainDebugBusinessData()
+    setSeedResult(null)
+    setCleanupPreview(null)
+    setCleanupResult(null)
+    message.success(
+      Number(result?.deletedTotal) > 0
+        ? `业务数据已清空，共删除 ${result.deletedTotal} 行`
+        : '业务数据已清空'
+    )
+    await loadDebugView('')
+  }
+
+  const handleBusinessDataClear = () => {
+    Modal.confirm({
+      title: '清空业务数据',
+      content:
+        '会硬删除本项目当前 SQL 连接中的业务链路、采购入库、库存、BOM、物料、成品、仓库和单位数据，不删除账号、权限和管理员列顺序。该操作仍要求管理员和业务链路调试菜单权限。',
+      okText: '确认清空',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        setOperationLoading('clearBusinessData')
+        try {
+          await runBusinessDataClear()
+        } catch (error) {
+          message.error(
+            getActionErrorMessage(
+              error,
+              '清空业务数据失败，请检查权限或后端日志'
+            )
+          )
+        } finally {
+          setOperationLoading('')
+        }
+      },
+    })
   }
 
   const handleCleanup = () => {
@@ -666,7 +708,7 @@ export default function BusinessChainDebugPage() {
             type="info"
             showIcon
             message="安全调试中心"
-            description="填入并查询只读取当前服务返回的数据；生成和清理调试数据必须经过后端环境开关、管理员权限、业务链路调试菜单权限和 debug 标记过滤。"
+            description="填入并查询只读取当前服务返回的数据；生成调试数据、按 debugRunId 清理调试数据和清空业务数据默认面向当前 SQL 连接开放，仍必须经过管理员权限和业务链路调试菜单权限。"
           />
           <Alert
             type="warning"
@@ -678,7 +720,7 @@ export default function BusinessChainDebugPage() {
             type="error"
             showIcon
             message="禁止危险操作"
-            description="本页不提供任意 SQL 控制台，不提供全库清空，不允许清理没有 payload.debug=true 和 scenario_key 标识的真实业务数据。"
+            description="本页不提供任意 SQL 控制台，不提供全库清空；业务数据清空只按本项目业务表 allowlist 清理业务链路、采购入库、库存、BOM、物料、成品、仓库和单位数据，不删除账号、权限和管理员偏好，可通过 ERP_DEBUG_CLEANUP_ENABLED=false 显式关闭。"
           />
           <Alert
             type="warning"
@@ -852,14 +894,13 @@ export default function BusinessChainDebugPage() {
                 按需生成调试场景
               </div>
               <Paragraph className="!mb-0 !text-slate-300">
-                生成调试数据 seed 和清理调试数据 cleanup
-                只面向开发验收；后端会按环境、权限、debugRunId 和 debug
-                标记拦截危险操作。
+                生成调试数据 seed 和清理调试数据 cleanup 面向当前 SQL
+                调试入口；后端会按权限、debugRunId 和 debug 标记拦截危险操作。
               </Paragraph>
             </div>
           </div>
 
-          <Descriptions size="small" bordered column={{ xs: 1, md: 2, xl: 4 }}>
+          <Descriptions size="small" bordered column={{ xs: 1, md: 2, xl: 5 }}>
             <Descriptions.Item label="当前环境">
               <Space size={6} wrap>
                 <Tag color="blue">{capabilities.environment}</Tag>
@@ -884,6 +925,16 @@ export default function BusinessChainDebugPage() {
                 ) : null}
               </Space>
             </Descriptions.Item>
+            <Descriptions.Item label="清空业务数据">
+              <Space size={6} wrap>
+                {statusYesNoTag(capabilities.businessDataClearAllowed)}
+                {!capabilities.businessDataClearAllowed ? (
+                  <Text type="secondary">
+                    {businessDataClearDisabledReason}
+                  </Text>
+                ) : null}
+              </Space>
+            </Descriptions.Item>
             <Descriptions.Item label="清理范围">
               <Space size={6} wrap>
                 <Text code>{capabilities.cleanupScope}</Text>
@@ -891,7 +942,7 @@ export default function BusinessChainDebugPage() {
                   <Tag color="green">只影响 debug 数据</Tag>
                 ) : null}
                 {capabilities.destructiveRemoteDenied ? (
-                  <Tag color="red">remote/prod 禁止</Tag>
+                  <Tag color="red">后端禁止破坏性操作</Tag>
                 ) : null}
               </Space>
             </Descriptions.Item>
@@ -947,6 +998,15 @@ export default function BusinessChainDebugPage() {
                   onClick={handleCleanup}
                 >
                   清理本次调试数据
+                </Button>
+                <Button
+                  danger
+                  loading={operationLoading === 'clearBusinessData'}
+                  disabled={!canClearBusinessData}
+                  title={businessDataClearDisabledReason}
+                  onClick={handleBusinessDataClear}
+                >
+                  清空业务数据
                 </Button>
               </Space>
               <Text type="secondary">

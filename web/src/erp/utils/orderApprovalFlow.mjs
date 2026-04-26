@@ -1,3 +1,5 @@
+import { BUSINESS_ROLE_KEY } from './roleKeys.mjs'
+
 export const PROJECT_ORDER_MODULE_KEY = 'project-orders'
 export const MATERIAL_BOM_MODULE_KEY = 'material-bom'
 
@@ -214,6 +216,9 @@ export function buildRevisionTaskFromRejectedOrder(
 ) {
   if (!isProjectOrderRecord(record) || !record.id) return null
   const rejectedReason = normalizeText(reason)
+  const decision = normalizeText(options.decision) || 'rejected'
+  const reasonPayload =
+    decision === 'blocked' ? { blocked_reason: rejectedReason } : {}
   return {
     task_code: taskCode('order-revision', record, options),
     task_group: ORDER_REVISION_TASK_GROUP,
@@ -221,7 +226,7 @@ export function buildRevisionTaskFromRejectedOrder(
     ...baseTaskSource(record),
     business_status_key: ORDER_APPROVAL_STATUS_KEY,
     task_status_key: 'ready',
-    owner_role_key: 'merchandiser',
+    owner_role_key: BUSINESS_ROLE_KEY,
     priority: DEFAULT_PRIORITY,
     payload: {
       record_title: resolveOrderTitle(record),
@@ -233,7 +238,10 @@ export function buildRevisionTaskFromRejectedOrder(
       related_documents: buildOrderRelatedDocuments(record, {
         includeArtwork: true,
       }),
+      decision,
+      transition_status: decision,
       rejected_reason: rejectedReason,
+      ...reasonPayload,
       notification_type: 'task_rejected',
       alert_type: 'approval_pending',
       critical_path: true,

@@ -32,8 +32,8 @@ test('menuPermissions: 权限分组顺序跟随桌面菜单顺序', () => {
       '单据模板',
       '系统管理',
       '帮助中心',
-      '高级文档',
       '开发与验收',
+      '高级文档',
     ]
   )
   assert.deepEqual(
@@ -50,16 +50,17 @@ test('menuPermissions: 默认权限不包含权限管理', () => {
 
 test('menuPermissions: 移动端角色权限只保留有效角色并保持端口顺序', () => {
   assert(
-    ERP_MOBILE_ROLE_PERMISSION_OPTIONS.some((item) => item.key === 'purchasing')
+    ERP_MOBILE_ROLE_PERMISSION_OPTIONS.some((item) => item.key === 'business')
   )
   assert.deepEqual(
     normalizeMobileRolePermissions([
       'quality',
       'invalid',
+      'business',
       'purchasing',
       'quality',
     ]),
-    ['purchasing', 'quality']
+    ['business', 'purchasing', 'quality']
   )
 })
 
@@ -152,14 +153,6 @@ test('menuPermissions: 包含开发与验收分组入口', () => {
     )
   )
   assert(defaultMenuPermissions().includes('/erp/qa/acceptance-overview'))
-})
-
-test('menuPermissions: 不包含待确认的报价单入口', () => {
-  assert(
-    !ERP_MENU_PERMISSION_OPTIONS.some(
-      (item) => item.key === '/erp/sales/quotations'
-    )
-  )
 })
 
 test('menuPermissions: 新增品质、应收和发票模块权限存在', () => {

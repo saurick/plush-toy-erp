@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
@@ -19,6 +20,10 @@ import { buildWorkflowTaskAlert } from './workflowDashboardStats.mjs'
 
 const NOW_MS = Date.parse('2026-04-25T08:00:00')
 const NOW_SEC = Math.floor(NOW_MS / 1000)
+const mobileRoleTasksPageSource = readFileSync(
+  new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
+  'utf8'
+)
 
 function processingRecord(overrides = {}) {
   return {
@@ -158,6 +163,26 @@ test('outsourceReturnFlow: 回货检验不合格能生成生产返工补做任�
   assert.equal(task.payload.rejected_reason, '车缝开线')
   assert.equal(alert?.alert_level, 'critical')
   assert.equal(alert?.alert_type, 'qc_failed')
+})
+
+test('outsourceReturnFlow: 移动端回货检验状态动作不再本地创建下游任务', () => {
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildOutsourceWarehouseInboundTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('buildOutsourceReworkTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('passOutsourceReturnQcTask'),
+    false
+  )
+  assert.equal(
+    mobileRoleTasksPageSource.includes('failOutsourceReturnQcTask'),
+    false
+  )
+  assert.match(mobileRoleTasksPageSource, /await loadTasks\(\)/)
 })
 
 test('outsourceReturnFlow: due_at 使用 Unix 秒，缺编号字段不崩溃', () => {

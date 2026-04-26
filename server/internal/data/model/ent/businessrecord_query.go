@@ -4,10 +4,13 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereturn"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -18,10 +21,12 @@ import (
 // BusinessRecordQuery is the builder for querying BusinessRecord entities.
 type BusinessRecordQuery struct {
 	config
-	ctx        *QueryContext
-	order      []businessrecord.OrderOption
-	inters     []Interceptor
-	predicates []predicate.BusinessRecord
+	ctx                  *QueryContext
+	order                []businessrecord.OrderOption
+	inters               []Interceptor
+	predicates           []predicate.BusinessRecord
+	withPurchaseReceipts *PurchaseReceiptQuery
+	withPurchaseReturns  *PurchaseReturnQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +61,50 @@ func (_q *BusinessRecordQuery) Unique(unique bool) *BusinessRecordQuery {
 func (_q *BusinessRecordQuery) Order(o ...businessrecord.OrderOption) *BusinessRecordQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryPurchaseReceipts chains the current query on the "purchase_receipts" edge.
+func (_q *BusinessRecordQuery) QueryPurchaseReceipts() *PurchaseReceiptQuery {
+	query := (&PurchaseReceiptClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(businessrecord.Table, businessrecord.FieldID, selector),
+			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, businessrecord.PurchaseReceiptsTable, businessrecord.PurchaseReceiptsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPurchaseReturns chains the current query on the "purchase_returns" edge.
+func (_q *BusinessRecordQuery) QueryPurchaseReturns() *PurchaseReturnQuery {
+	query := (&PurchaseReturnClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(businessrecord.Table, businessrecord.FieldID, selector),
+			sqlgraph.To(purchasereturn.Table, purchasereturn.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, businessrecord.PurchaseReturnsTable, businessrecord.PurchaseReturnsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first BusinessRecord entity from the query.
@@ -245,15 +294,39 @@ func (_q *BusinessRecordQuery) Clone() *BusinessRecordQuery {
 		return nil
 	}
 	return &BusinessRecordQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]businessrecord.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.BusinessRecord{}, _q.predicates...),
+		config:               _q.config,
+		ctx:                  _q.ctx.Clone(),
+		order:                append([]businessrecord.OrderOption{}, _q.order...),
+		inters:               append([]Interceptor{}, _q.inters...),
+		predicates:           append([]predicate.BusinessRecord{}, _q.predicates...),
+		withPurchaseReceipts: _q.withPurchaseReceipts.Clone(),
+		withPurchaseReturns:  _q.withPurchaseReturns.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithPurchaseReceipts tells the query-builder to eager-load the nodes that are connected to
+// the "purchase_receipts" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *BusinessRecordQuery) WithPurchaseReceipts(opts ...func(*PurchaseReceiptQuery)) *BusinessRecordQuery {
+	query := (&PurchaseReceiptClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPurchaseReceipts = query
+	return _q
+}
+
+// WithPurchaseReturns tells the query-builder to eager-load the nodes that are connected to
+// the "purchase_returns" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *BusinessRecordQuery) WithPurchaseReturns(opts ...func(*PurchaseReturnQuery)) *BusinessRecordQuery {
+	query := (&PurchaseReturnClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPurchaseReturns = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -332,8 +405,12 @@ func (_q *BusinessRecordQuery) prepareQuery(ctx context.Context) error {
 
 func (_q *BusinessRecordQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*BusinessRecord, error) {
 	var (
-		nodes = []*BusinessRecord{}
-		_spec = _q.querySpec()
+		nodes       = []*BusinessRecord{}
+		_spec       = _q.querySpec()
+		loadedTypes = [2]bool{
+			_q.withPurchaseReceipts != nil,
+			_q.withPurchaseReturns != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*BusinessRecord).scanValues(nil, columns)
@@ -341,6 +418,7 @@ func (_q *BusinessRecordQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &BusinessRecord{config: _q.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +430,92 @@ func (_q *BusinessRecordQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withPurchaseReceipts; query != nil {
+		if err := _q.loadPurchaseReceipts(ctx, query, nodes,
+			func(n *BusinessRecord) { n.Edges.PurchaseReceipts = []*PurchaseReceipt{} },
+			func(n *BusinessRecord, e *PurchaseReceipt) {
+				n.Edges.PurchaseReceipts = append(n.Edges.PurchaseReceipts, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPurchaseReturns; query != nil {
+		if err := _q.loadPurchaseReturns(ctx, query, nodes,
+			func(n *BusinessRecord) { n.Edges.PurchaseReturns = []*PurchaseReturn{} },
+			func(n *BusinessRecord, e *PurchaseReturn) {
+				n.Edges.PurchaseReturns = append(n.Edges.PurchaseReturns, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (_q *BusinessRecordQuery) loadPurchaseReceipts(ctx context.Context, query *PurchaseReceiptQuery, nodes []*BusinessRecord, init func(*BusinessRecord), assign func(*BusinessRecord, *PurchaseReceipt)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*BusinessRecord)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(purchasereceipt.FieldBusinessRecordID)
+	}
+	query.Where(predicate.PurchaseReceipt(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(businessrecord.PurchaseReceiptsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.BusinessRecordID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "business_record_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "business_record_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *BusinessRecordQuery) loadPurchaseReturns(ctx context.Context, query *PurchaseReturnQuery, nodes []*BusinessRecord, init func(*BusinessRecord), assign func(*BusinessRecord, *PurchaseReturn)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*BusinessRecord)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(purchasereturn.FieldBusinessRecordID)
+	}
+	query.Where(predicate.PurchaseReturn(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(businessrecord.PurchaseReturnsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.BusinessRecordID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "business_record_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "business_record_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
 }
 
 func (_q *BusinessRecordQuery) sqlCount(ctx context.Context) (int, error) {

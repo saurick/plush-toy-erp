@@ -315,7 +315,7 @@ func normalizeBusinessRecordFilter(filter BusinessRecordFilter) BusinessRecordFi
 	filter.ModuleKey = strings.TrimSpace(filter.ModuleKey)
 	filter.BusinessStatusKey = strings.TrimSpace(filter.BusinessStatusKey)
 	filter.BusinessStatusKeys = normalizeBusinessRecordStatusKeys(filter.BusinessStatusKeys)
-	filter.OwnerRoleKey = strings.TrimSpace(filter.OwnerRoleKey)
+	filter.OwnerRoleKey = NormalizeRoleKey(filter.OwnerRoleKey)
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.DateFilterKey = normalizeBusinessRecordDateFilterKey(filter.DateFilterKey)
 	filter.DateRangeStart = normalizeBusinessRecordDateFilterValue(filter.DateRangeStart)
@@ -385,7 +385,7 @@ func normalizeBusinessRecordMutation(in BusinessRecordMutation, requireModule bo
 	in.ModuleKey = strings.TrimSpace(in.ModuleKey)
 	in.Title = strings.TrimSpace(in.Title)
 	in.BusinessStatusKey = strings.TrimSpace(in.BusinessStatusKey)
-	in.OwnerRoleKey = strings.TrimSpace(in.OwnerRoleKey)
+	in.OwnerRoleKey = NormalizeRoleKey(in.OwnerRoleKey)
 	in.DocumentNo = normalizeOptionalString(in.DocumentNo)
 	in.SourceNo = normalizeOptionalString(in.SourceNo)
 	in.CustomerName = normalizeOptionalString(in.CustomerName)
@@ -402,7 +402,7 @@ func normalizeBusinessRecordMutation(in BusinessRecordMutation, requireModule bo
 		in.BusinessStatusKey = "project_pending"
 	}
 	if in.OwnerRoleKey == "" {
-		in.OwnerRoleKey = "merchandiser"
+		in.OwnerRoleKey = BusinessRoleKey
 	}
 	if in.Title == "" && in.DocumentNo != nil {
 		in.Title = *in.DocumentNo

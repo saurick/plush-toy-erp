@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereturn"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -538,9 +540,81 @@ func (_u *BusinessRecordUpdate) ClearDeleteReason() *BusinessRecordUpdate {
 	return _u
 }
 
+// AddPurchaseReceiptIDs adds the "purchase_receipts" edge to the PurchaseReceipt entity by IDs.
+func (_u *BusinessRecordUpdate) AddPurchaseReceiptIDs(ids ...int) *BusinessRecordUpdate {
+	_u.mutation.AddPurchaseReceiptIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReceipts adds the "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_u *BusinessRecordUpdate) AddPurchaseReceipts(v ...*PurchaseReceipt) *BusinessRecordUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReceiptIDs(ids...)
+}
+
+// AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
+func (_u *BusinessRecordUpdate) AddPurchaseReturnIDs(ids ...int) *BusinessRecordUpdate {
+	_u.mutation.AddPurchaseReturnIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReturns adds the "purchase_returns" edges to the PurchaseReturn entity.
+func (_u *BusinessRecordUpdate) AddPurchaseReturns(v ...*PurchaseReturn) *BusinessRecordUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReturnIDs(ids...)
+}
+
 // Mutation returns the BusinessRecordMutation object of the builder.
 func (_u *BusinessRecordUpdate) Mutation() *BusinessRecordMutation {
 	return _u.mutation
+}
+
+// ClearPurchaseReceipts clears all "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_u *BusinessRecordUpdate) ClearPurchaseReceipts() *BusinessRecordUpdate {
+	_u.mutation.ClearPurchaseReceipts()
+	return _u
+}
+
+// RemovePurchaseReceiptIDs removes the "purchase_receipts" edge to PurchaseReceipt entities by IDs.
+func (_u *BusinessRecordUpdate) RemovePurchaseReceiptIDs(ids ...int) *BusinessRecordUpdate {
+	_u.mutation.RemovePurchaseReceiptIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReceipts removes "purchase_receipts" edges to PurchaseReceipt entities.
+func (_u *BusinessRecordUpdate) RemovePurchaseReceipts(v ...*PurchaseReceipt) *BusinessRecordUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReceiptIDs(ids...)
+}
+
+// ClearPurchaseReturns clears all "purchase_returns" edges to the PurchaseReturn entity.
+func (_u *BusinessRecordUpdate) ClearPurchaseReturns() *BusinessRecordUpdate {
+	_u.mutation.ClearPurchaseReturns()
+	return _u
+}
+
+// RemovePurchaseReturnIDs removes the "purchase_returns" edge to PurchaseReturn entities by IDs.
+func (_u *BusinessRecordUpdate) RemovePurchaseReturnIDs(ids ...int) *BusinessRecordUpdate {
+	_u.mutation.RemovePurchaseReturnIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReturns removes "purchase_returns" edges to PurchaseReturn entities.
+func (_u *BusinessRecordUpdate) RemovePurchaseReturns(v ...*PurchaseReturn) *BusinessRecordUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReturnIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -851,6 +925,96 @@ func (_u *BusinessRecordUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if _u.mutation.DeleteReasonCleared() {
 		_spec.ClearField(businessrecord.FieldDeleteReason, field.TypeString)
+	}
+	if _u.mutation.PurchaseReceiptsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReceiptsTable,
+			Columns: []string{businessrecord.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReceiptsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReceiptsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReceiptsTable,
+			Columns: []string{businessrecord.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReceiptsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReceiptsTable,
+			Columns: []string{businessrecord.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseReturnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReturnsTable,
+			Columns: []string{businessrecord.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReturnsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReturnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReturnsTable,
+			Columns: []string{businessrecord.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReturnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReturnsTable,
+			Columns: []string{businessrecord.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -1382,9 +1546,81 @@ func (_u *BusinessRecordUpdateOne) ClearDeleteReason() *BusinessRecordUpdateOne 
 	return _u
 }
 
+// AddPurchaseReceiptIDs adds the "purchase_receipts" edge to the PurchaseReceipt entity by IDs.
+func (_u *BusinessRecordUpdateOne) AddPurchaseReceiptIDs(ids ...int) *BusinessRecordUpdateOne {
+	_u.mutation.AddPurchaseReceiptIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReceipts adds the "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_u *BusinessRecordUpdateOne) AddPurchaseReceipts(v ...*PurchaseReceipt) *BusinessRecordUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReceiptIDs(ids...)
+}
+
+// AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
+func (_u *BusinessRecordUpdateOne) AddPurchaseReturnIDs(ids ...int) *BusinessRecordUpdateOne {
+	_u.mutation.AddPurchaseReturnIDs(ids...)
+	return _u
+}
+
+// AddPurchaseReturns adds the "purchase_returns" edges to the PurchaseReturn entity.
+func (_u *BusinessRecordUpdateOne) AddPurchaseReturns(v ...*PurchaseReturn) *BusinessRecordUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseReturnIDs(ids...)
+}
+
 // Mutation returns the BusinessRecordMutation object of the builder.
 func (_u *BusinessRecordUpdateOne) Mutation() *BusinessRecordMutation {
 	return _u.mutation
+}
+
+// ClearPurchaseReceipts clears all "purchase_receipts" edges to the PurchaseReceipt entity.
+func (_u *BusinessRecordUpdateOne) ClearPurchaseReceipts() *BusinessRecordUpdateOne {
+	_u.mutation.ClearPurchaseReceipts()
+	return _u
+}
+
+// RemovePurchaseReceiptIDs removes the "purchase_receipts" edge to PurchaseReceipt entities by IDs.
+func (_u *BusinessRecordUpdateOne) RemovePurchaseReceiptIDs(ids ...int) *BusinessRecordUpdateOne {
+	_u.mutation.RemovePurchaseReceiptIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReceipts removes "purchase_receipts" edges to PurchaseReceipt entities.
+func (_u *BusinessRecordUpdateOne) RemovePurchaseReceipts(v ...*PurchaseReceipt) *BusinessRecordUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReceiptIDs(ids...)
+}
+
+// ClearPurchaseReturns clears all "purchase_returns" edges to the PurchaseReturn entity.
+func (_u *BusinessRecordUpdateOne) ClearPurchaseReturns() *BusinessRecordUpdateOne {
+	_u.mutation.ClearPurchaseReturns()
+	return _u
+}
+
+// RemovePurchaseReturnIDs removes the "purchase_returns" edge to PurchaseReturn entities by IDs.
+func (_u *BusinessRecordUpdateOne) RemovePurchaseReturnIDs(ids ...int) *BusinessRecordUpdateOne {
+	_u.mutation.RemovePurchaseReturnIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseReturns removes "purchase_returns" edges to PurchaseReturn entities.
+func (_u *BusinessRecordUpdateOne) RemovePurchaseReturns(v ...*PurchaseReturn) *BusinessRecordUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseReturnIDs(ids...)
 }
 
 // Where appends a list predicates to the BusinessRecordUpdate builder.
@@ -1725,6 +1961,96 @@ func (_u *BusinessRecordUpdateOne) sqlSave(ctx context.Context) (_node *Business
 	}
 	if _u.mutation.DeleteReasonCleared() {
 		_spec.ClearField(businessrecord.FieldDeleteReason, field.TypeString)
+	}
+	if _u.mutation.PurchaseReceiptsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReceiptsTable,
+			Columns: []string{businessrecord.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReceiptsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReceiptsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReceiptsTable,
+			Columns: []string{businessrecord.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReceiptsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReceiptsTable,
+			Columns: []string{businessrecord.PurchaseReceiptsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseReturnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReturnsTable,
+			Columns: []string{businessrecord.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseReturnsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseReturnsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReturnsTable,
+			Columns: []string{businessrecord.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseReturnsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   businessrecord.PurchaseReturnsTable,
+			Columns: []string{businessrecord.PurchaseReturnsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereturn.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &BusinessRecord{config: _u.config}
 	_spec.Assign = _node.assignValues

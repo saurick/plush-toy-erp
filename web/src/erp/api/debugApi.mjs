@@ -26,3 +26,8 @@ export async function cleanupBusinessChainDebugScenario(params = {}) {
   const result = await debugRpc.call('clear_business_chain_scenario', params)
   return dataOf(result)
 }
+
+export async function clearBusinessChainDebugBusinessData(params = {}) {
+  const result = await debugRpc.call('clear_business_data', params)
+  return dataOf(result)
+}

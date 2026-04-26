@@ -9,6 +9,7 @@ import (
 type fakeDebugRepo struct {
 	seedPlan DebugSeedPlan
 	cleanup  DebugBusinessChainCleanupInput
+	cleared  bool
 }
 
 func (r *fakeDebugRepo) SeedBusinessChainDebugData(_ context.Context, plan DebugSeedPlan, _ int) (*DebugBusinessChainSeedResult, error) {
@@ -57,6 +58,18 @@ func (r *fakeDebugRepo) CleanupBusinessChainDebugData(_ context.Context, in Debu
 	}, nil
 }
 
+func (r *fakeDebugRepo) ClearBusinessData(_ context.Context) (*DebugBusinessDataClearResult, error) {
+	r.cleared = true
+	return &DebugBusinessDataClearResult{
+		DeletedCounts: map[string]int{
+			"business_records": 2,
+			"workflow_tasks":   1,
+		},
+		DeletedTotal:      3,
+		ClearedTableNames: []string{"workflow_tasks", "business_records"},
+	}, nil
+}
+
 func TestDebugUsecase_DisabledConfigRejectsSeedAndCleanup(t *testing.T) {
 	uc := NewDebugUsecase(&fakeDebugRepo{}, DebugSafetyConfig{
 		Environment:    "dev",
@@ -80,6 +93,11 @@ func TestDebugUsecase_DisabledConfigRejectsSeedAndCleanup(t *testing.T) {
 	})
 	if !errors.Is(err, ErrDebugCleanupDisabled) {
 		t.Fatalf("expected cleanup disabled, got %v", err)
+	}
+
+	_, err = uc.ClearBusinessData(context.Background())
+	if !errors.Is(err, ErrDebugBusinessDataClearDisabled) {
+		t.Fatalf("expected business data clear disabled, got %v", err)
 	}
 }
 
@@ -124,5 +142,25 @@ func TestDebugUsecase_SeedReturnsScenarioRunRecordsAndTasks(t *testing.T) {
 	}
 	if repo.seedPlan.Records[0].Payload["debug"] != true {
 		t.Fatalf("expected debug payload marker, got %#v", repo.seedPlan.Records[0].Payload)
+	}
+}
+
+func TestDebugUsecase_ClearBusinessDataUsesCleanupGuard(t *testing.T) {
+	repo := &fakeDebugRepo{}
+	uc := NewDebugUsecase(repo, DebugSafetyConfig{
+		Environment:    "local",
+		CleanupEnabled: true,
+		CleanupScope:   DebugDefaultCleanupScope,
+	})
+
+	result, err := uc.ClearBusinessData(context.Background())
+	if err != nil {
+		t.Fatalf("clear business data failed: %v", err)
+	}
+	if !repo.cleared {
+		t.Fatalf("expected repo clear to be called")
+	}
+	if result.DeletedTotal != 3 || result.DeletedCounts["business_records"] != 2 {
+		t.Fatalf("unexpected clear result %#v", result)
 	}
 }

@@ -1,6 +1,8 @@
+import { getRoleDisplayName, normalizeRoleKey } from '../utils/roleKeys.mjs'
+
 export const BUSINESS_ROLE_OPTIONS = Object.freeze([
   { key: 'boss', label: '老板 / 管理层' },
-  { key: 'merchandiser', label: '业务 / 跟单' },
+  { key: 'business', label: '业务' },
   { key: 'purchasing', label: '采购' },
   { key: 'pmc', label: 'PMC' },
   { key: 'production', label: '生产经理' },
@@ -9,12 +11,19 @@ export const BUSINESS_ROLE_OPTIONS = Object.freeze([
   { key: 'finance', label: '财务' },
 ])
 
-export const roleLabelMap = new Map(
+const officialRoleLabelMap = new Map(
   BUSINESS_ROLE_OPTIONS.map((role) => [role.key, role.label])
 )
 
+export const roleLabelMap = Object.freeze({
+  get(roleKey) {
+    const normalized = normalizeRoleKey(roleKey)
+    return officialRoleLabelMap.get(normalized) || getRoleDisplayName(roleKey)
+  },
+})
+
 const DEFAULT_OWNER_BY_SECTION = Object.freeze({
-  sales: 'merchandiser',
+  sales: 'business',
   purchase: 'purchasing',
   production: 'pmc',
   warehouse: 'warehouse',
@@ -779,7 +788,7 @@ export function getDefaultOwnerRole(moduleItem = {}) {
   if (moduleItem.key === 'production-progress') return 'production'
   if (moduleItem.key === 'production-exceptions') return 'production'
   if (moduleItem.key === 'quality-inspections') return 'quality'
-  return DEFAULT_OWNER_BY_SECTION[moduleItem.sectionKey] || 'merchandiser'
+  return DEFAULT_OWNER_BY_SECTION[moduleItem.sectionKey] || 'business'
 }
 
 export function getDefaultBusinessStatus(moduleItem = {}) {

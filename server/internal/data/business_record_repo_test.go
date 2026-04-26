@@ -184,7 +184,7 @@ func TestBusinessRecordRepo_CountBusinessRecordsByModuleAndStatus(t *testing.T) 
 			ModuleKey:         moduleKey,
 			Title:             title,
 			BusinessStatusKey: statusKey,
-			OwnerRoleKey:      "merchandiser",
+			OwnerRoleKey:      "business",
 		}, 7)
 		if err != nil {
 			t.Fatalf("create %s failed: %v", title, err)
@@ -246,7 +246,7 @@ func TestBusinessRecordRepo_ListRecordsByDateRange(t *testing.T) {
 			ModuleKey:         "project-orders",
 			Title:             title,
 			BusinessStatusKey: "project_pending",
-			OwnerRoleKey:      "merchandiser",
+			OwnerRoleKey:      "business",
 			DocumentDate:      &documentDate,
 			DueDate:           &dueDate,
 		}, 7)
@@ -313,7 +313,7 @@ func TestBusinessRecordRepo_ListBusinessRecordsSortOrder(t *testing.T) {
 			SetDocumentNo(item.no).
 			SetTitle(item.title).
 			SetBusinessStatusKey("project_pending").
-			SetOwnerRoleKey("merchandiser").
+			SetOwnerRoleKey("business").
 			SetPayload(map[string]any{}).
 			SetCreatedAt(item.createdAt).
 			Save(ctx)

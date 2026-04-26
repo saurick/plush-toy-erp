@@ -122,3 +122,12 @@ test('businessRecordDefinitions: 新增品质和财务模块包含核心字段�
     assert(definition.itemFields.length > 0)
   })
 })
+
+test('businessRecordDefinitions: 销售链路默认主责角色是 business', () => {
+  const definition = getBusinessRecordDefinition({
+    key: 'project-orders',
+    sectionKey: 'sales',
+  })
+
+  assert.equal(definition.defaultOwnerRole, 'business')
+})

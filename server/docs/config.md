@@ -90,19 +90,20 @@
 
 ## debug seed / cleanup 环境变量
 
-业务链路调试的 seed（生成调试数据）和 cleanup（清理调试数据）不写入 `conf.proto`，当前只通过运行时环境变量开启，避免公共配置文件默认暴露写入能力：
+业务链路调试的 seed（生成调试数据）、cleanup（清理调试数据）和业务数据清空不写入 `conf.proto`，当前只通过运行时环境变量显式关闭，避免把调试写入开关固化到公共配置文件：
 
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `ERP_DEBUG_ENV` | 为空时按 `data.postgres.debug` 推断，debug=true 视为 `dev`，否则视为 `remote` | 可显式设为 `local`、`dev`、`shared`、`remote`、`prod` |
-| `ERP_DEBUG_SEED_ENABLED` | `false` | 只有值为 `true` / `1` / `yes` / `on` 且环境为 `local` 或 `dev` 时允许生成调试数据 |
-| `ERP_DEBUG_CLEANUP_ENABLED` | `false` | 只有值为 `true` / `1` / `yes` / `on` 且环境为 `local` 或 `dev` 时允许清理调试数据 |
+| `ERP_DEBUG_ENV` | `sql` | 仅用于能力面板展示，可显式设为 `local`、`dev`、`shared`、`remote`、`prod` 等环境名 |
+| `ERP_DEBUG_SEED_ENABLED` | `true` | 显式设为 `false` / `0` / `off` 可关闭生成调试数据 |
+| `ERP_DEBUG_CLEANUP_ENABLED` | `true` | 显式设为 `false` / `0` / `off` 可关闭清理调试数据和业务数据清空 |
 | `ERP_DEBUG_CLEANUP_SCOPE` | `debug_run` | 当前只允许 `debug_run`，表示必须按 debugRunId 清理 |
 
 安全边界：
 
-- remote / prod / shared 环境默认拒绝 seed 和 destructive cleanup。
+- seed、debugRunId cleanup 和业务数据清空默认面向当前 SQL 连接开启，只有显式关闭环境变量、权限不足或清理范围不匹配时拒绝。
 - cleanup 必须提供 debugRunId，后端只清理带 `DBG-<debugRunId>` 前缀且 payload 中包含 debug 标记的数据。
+- 业务数据清空不要求 debugRunId，但只会按本项目当前业务表 allowlist 清空业务链路、采购入库、库存、BOM、物料、成品、仓库和单位数据；不会删除账号、权限、管理员偏好、配置和数据库结构。
 - 前端隐藏按钮不作为安全边界；后端仍会检查管理员身份、业务链路调试菜单权限、环境开关和 debug 标记。
 
 ## 初始化后必须改的字段

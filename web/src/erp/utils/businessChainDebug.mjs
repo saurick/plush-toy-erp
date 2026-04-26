@@ -10,7 +10,7 @@ export const BUSINESS_CHAIN_DEBUG_MAINLINE_SCENARIOS = Object.freeze([
     status: '已接入 v1',
     carrier: 'business_records + workflow_tasks',
     validation: '单元测试 + style:l1 + 移动端 smoke',
-    blindSpot: '没有后端 workflow usecase 统一编排，没有真实 E2E 造数 runner',
+    blindSpot: '已接入后端最小派生规则，但没有真实 E2E 造数 runner',
     chain: '订单提交 -> 老板审批 -> 工程资料任务',
     queryKeywords: ['debug_order_approval_engineering'],
     expectation:
@@ -22,7 +22,7 @@ export const BUSINESS_CHAIN_DEBUG_MAINLINE_SCENARIOS = Object.freeze([
     status: '已接入 v1',
     carrier: 'business_records + workflow_tasks',
     validation: '单元测试 + style:l1 + 移动端 smoke',
-    blindSpot: '没有真实库存流水 / 库存余额专表',
+    blindSpot: '已有库存流水 / 库存余额专表，但当前 seed 仍不写真实库存事实',
     chain: '采购到货 -> IQC -> 入库',
     queryKeywords: ['debug_purchase_iqc_inbound'],
     expectation: '采购到货后应能查到 IQC、品质放行和仓库入库任务。',
@@ -44,7 +44,8 @@ export const BUSINESS_CHAIN_DEBUG_MAINLINE_SCENARIOS = Object.freeze([
     status: '已接入 v1',
     carrier: 'business_records + workflow_tasks',
     validation: '单元测试 + style:l1 + 移动端 smoke',
-    blindSpot: '没有 production_order / shipment_order / inventory_txn 专表',
+    blindSpot:
+      '没有 production_order / shipment_order 专表，当前 seed 不写真实库存流水',
     chain: '成品完工 -> 成品抽检 -> 成品入库 -> 出货',
     queryKeywords: ['debug_finished_goods_shipment'],
     expectation:
@@ -115,22 +116,22 @@ export const BUSINESS_CHAIN_DEBUG_DEFERRED_LINKS = Object.freeze([
     key: 'material_shortage_replenishment',
     title: '欠料预警 -> 采购补料',
     status: 'deferred',
-    reason: '当前有预警和采购链路，但没有库存余额 / 材料需求 / 缺料计算真源。',
-    nextStep: 'inventory_balance / material_requirement 稳定后再做。',
+    reason: '当前已有库存余额真源，但没有材料需求和缺料计算闭环。',
+    nextStep: 'material_requirement 和缺料计算口径稳定后再做。',
   },
   {
     key: 'warehouse_issue_material',
     title: '仓库发料 / 委外发料 / 生产领料',
     status: 'deferred',
     reason: '当前覆盖入库和出货，不覆盖领料/发料流水。',
-    nextStep: 'inventory_txn 专表评审后补。',
+    nextStep: '发料 / 领料单据和库存出库口径稳定后补。',
   },
   {
     key: 'inventory_check_adjustment',
     title: '库存盘点 / 库存调整 / 异常件',
     status: 'deferred',
-    reason: '当前没有真实库存流水和库存余额。',
-    nextStep: 'inventory_txn / inventory_balance / adjustment_order 评审后补。',
+    reason: '当前已有库存流水和余额真源，但没有盘点单、调整单和异常件流程。',
+    nextStep: 'adjustment_order 和异常件处理口径评审后补。',
   },
   {
     key: 'rework_resubmit_qc',
@@ -220,9 +221,10 @@ export const BUSINESS_CHAIN_DEBUG_OUT_OF_SCOPE_LINKS = Object.freeze([
 
 export const BUSINESS_CHAIN_DEBUG_MUTATION_GUARD = Object.freeze({
   enabled: false,
-  reason: '需要后端安全开关后启用',
+  reason: '需要后端 debug API、管理员权限和业务链路调试菜单权限',
   rebuildMethod: 'debug.rebuild_business_chain_scenario',
   cleanupMethod: 'debug.clear_business_chain_scenario',
+  clearBusinessDataMethod: 'debug.clear_business_data',
 })
 
 export const BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT = Object.freeze({
@@ -233,10 +235,13 @@ export const BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT = Object.freeze({
   cleanupEnabled: false,
   cleanupAllowed: false,
   cleanupDisabledReason: '尚未读取后端 debug 能力状态',
+  businessDataClearEnabled: false,
+  businessDataClearAllowed: false,
+  businessDataClearDisabledReason: '尚未读取后端 debug 能力状态',
   cleanupScope: 'debug_run',
   cleanupOnlyDebugData: true,
   requiresDebugRunId: true,
-  destructiveRemoteDenied: true,
+  destructiveRemoteDenied: false,
   supportedScenarios: [],
 })
 
@@ -246,6 +251,8 @@ export function normalizeBusinessChainDebugCapabilities(raw = {}) {
   const seedAllowed = Boolean(raw.seedAllowed)
   const cleanupEnabled = Boolean(raw.cleanupEnabled)
   const cleanupAllowed = Boolean(raw.cleanupAllowed)
+  const businessDataClearEnabled = Boolean(raw.businessDataClearEnabled)
+  const businessDataClearAllowed = Boolean(raw.businessDataClearAllowed)
   return {
     environment,
     seedEnabled,
@@ -262,12 +269,19 @@ export function normalizeBusinessChainDebugCapabilities(raw = {}) {
       (cleanupAllowed
         ? ''
         : BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT.cleanupDisabledReason),
+    businessDataClearEnabled,
+    businessDataClearAllowed,
+    businessDataClearDisabledReason:
+      toText(raw.businessDataClearDisabledReason) ||
+      (businessDataClearAllowed
+        ? ''
+        : BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT.businessDataClearDisabledReason),
     cleanupScope:
       toText(raw.cleanupScope) ||
       BUSINESS_CHAIN_DEBUG_CAPABILITY_DEFAULT.cleanupScope,
     cleanupOnlyDebugData: raw.cleanupOnlyDebugData !== false,
     requiresDebugRunId: raw.requiresDebugRunId !== false,
-    destructiveRemoteDenied: raw.destructiveRemoteDenied !== false,
+    destructiveRemoteDenied: Boolean(raw.destructiveRemoteDenied),
     supportedScenarios: Array.isArray(raw.supportedScenarios)
       ? raw.supportedScenarios
       : [],
@@ -284,6 +298,11 @@ export function getBusinessChainDebugActionDisabledReason(
   }
   if (action === 'cleanup') {
     return normalized.cleanupAllowed ? '' : normalized.cleanupDisabledReason
+  }
+  if (action === 'businessDataClear') {
+    return normalized.businessDataClearAllowed
+      ? ''
+      : normalized.businessDataClearDisabledReason
   }
   return '未知调试操作'
 }

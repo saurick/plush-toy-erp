@@ -31,7 +31,7 @@
 - 没改 Ent schema 可以不跑 `make data` 和 `make migrate_status`。
 - `pnpm style:l1` 如果因为端口占用失败，应释放端口后重跑；端口失败不算通过。
 - 没有结构化 latest 报告的专项只能记为未生成或待补，不要在页面上伪装成已通过。
-- 业务链路调试页的 seed（生成调试数据）/ cleanup（清理调试数据）已经接入受控后端 API；未开启环境开关或处于 remote / prod / shared 环境时，页面必须显示后端禁用原因，不能用手写 SQL 或全库清空替代。
+- 业务链路调试页的 seed（生成调试数据）/ cleanup（清理调试数据）/ 业务数据清空已经接入受控后端 API；显式关闭环境开关、权限不足或清理范围不匹配时，页面必须显示后端禁用原因，不能用手写 SQL 或全库清空替代。
 - 架构评审文档改动不等于后端行为改动；若本轮只改文档、帮助中心入口和测试，不需要跑 Go 测试、`make data` 或 `make migrate_status`，但必须在最终记录里写清楚。
 
 ## 4. 业务链路调试场景重建后的推荐命令
@@ -85,7 +85,8 @@ cd server && make build
 - `填入并查询` 是否只触发当前只读查询，不触发写操作。
 - seed（生成调试数据）是否返回 `scenarioKey`、`debugRunId`、`createdRecords`、`createdTasks`、`nextCheckpoints` 和 `warnings`。
 - cleanup（清理调试数据）是否强制要求 `debugRunId`，dryRun（只预览不执行）是否只返回影响范围。
-- local / dev 以外环境是否显示禁用原因，普通帮助中心首页是否没有新增 debug seed / cleanup 普通入口。
+- 业务数据清空是否只走 `debug.clear_business_data`，且按本项目当前业务表 allowlist 清理业务链路、采购入库、库存、BOM、物料、成品、仓库和单位数据，不影响账号、权限和管理员偏好。
+- 显式关闭环境开关或权限不足时是否显示禁用原因，普通帮助中心首页是否没有新增 debug seed / cleanup / 业务数据清空普通入口。
 - 页面和文档是否都明确说明 6 条主干闭环不是全量业务覆盖。
 
 涉及任务可见性、角色任务池、移动端任务卡或协同任务调试页改动时，至少记录：

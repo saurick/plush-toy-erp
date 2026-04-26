@@ -590,7 +590,7 @@ func entBusinessRecordToBiz(row *ent.BusinessRecord) *biz.BusinessRecord {
 		DocumentNo:        row.DocumentNo,
 		Title:             row.Title,
 		BusinessStatusKey: row.BusinessStatusKey,
-		OwnerRoleKey:      row.OwnerRoleKey,
+		OwnerRoleKey:      biz.NormalizeRoleKey(row.OwnerRoleKey),
 		SourceNo:          row.SourceNo,
 		CustomerName:      row.CustomerName,
 		SupplierName:      row.SupplierName,

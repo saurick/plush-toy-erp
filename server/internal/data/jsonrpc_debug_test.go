@@ -40,6 +40,17 @@ func (s stubDebugJSONRPCRepo) CleanupBusinessChainDebugData(_ context.Context, i
 	}, nil
 }
 
+func (s stubDebugJSONRPCRepo) ClearBusinessData(_ context.Context) (*biz.DebugBusinessDataClearResult, error) {
+	return &biz.DebugBusinessDataClearResult{
+		DeletedCounts: map[string]int{
+			"business_records": 4,
+			"workflow_tasks":   2,
+		},
+		DeletedTotal:      6,
+		ClearedTableNames: []string{"workflow_tasks", "business_records"},
+	}, nil
+}
+
 func TestJsonrpcData_DebugSeedAndCleanupDisabledByConfig(t *testing.T) {
 	j := newDebugJSONRPCTestData(biz.DebugSafetyConfig{
 		Environment:    "local",
@@ -71,6 +82,14 @@ func TestJsonrpcData_DebugSeedAndCleanupDisabledByConfig(t *testing.T) {
 	}
 	if cleanupRes == nil || cleanupRes.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("expected cleanup permission denied, got %#v", cleanupRes)
+	}
+
+	_, clearRes, err := j.handleDebug(ctx, "clear_business_data", "3", nil)
+	if err != nil {
+		t.Fatalf("clear business data api returned error: %v", err)
+	}
+	if clearRes == nil || clearRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected clear business data permission denied, got %#v", clearRes)
 	}
 }
 
@@ -117,6 +136,30 @@ func TestJsonrpcData_DebugSeedReturnsScenarioRunRecordsAndTasks(t *testing.T) {
 	}
 	if tasks, ok := data["createdTasks"].([]any); !ok || len(tasks) == 0 {
 		t.Fatalf("expected createdTasks, got %#v", data["createdTasks"])
+	}
+}
+
+func TestJsonrpcData_DebugClearBusinessDataReturnsCounts(t *testing.T) {
+	j := newDebugJSONRPCTestData(biz.DebugSafetyConfig{
+		Environment:    "local",
+		CleanupEnabled: true,
+		CleanupScope:   biz.DebugDefaultCleanupScope,
+	})
+
+	_, res, err := j.handleDebug(debugJSONRPCAdminContext(), "clear_business_data", "1", nil)
+	if err != nil {
+		t.Fatalf("clear business data api returned error: %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", res)
+	}
+	data := res.Data.AsMap()
+	if data["deletedTotal"] != float64(6) {
+		t.Fatalf("unexpected deletedTotal %#v", data)
+	}
+	counts, ok := data["deletedCounts"].(map[string]any)
+	if !ok || counts["business_records"] != float64(4) {
+		t.Fatalf("unexpected deletedCounts %#v", data["deletedCounts"])
 	}
 }
 

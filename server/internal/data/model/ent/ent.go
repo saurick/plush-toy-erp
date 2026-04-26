@@ -8,10 +8,23 @@ import (
 	"fmt"
 	"reflect"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/bomheader"
+	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/businessrecordevent"
 	"server/internal/data/model/ent/businessrecorditem"
+	"server/internal/data/model/ent/inventorybalance"
+	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchasereturn"
+	"server/internal/data/model/ent/purchasereturnitem"
+	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/user"
+	"server/internal/data/model/ent/warehouse"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
@@ -81,10 +94,23 @@ func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			adminuser.Table:             adminuser.ValidColumn,
+			bomheader.Table:             bomheader.ValidColumn,
+			bomitem.Table:               bomitem.ValidColumn,
 			businessrecord.Table:        businessrecord.ValidColumn,
 			businessrecordevent.Table:   businessrecordevent.ValidColumn,
 			businessrecorditem.Table:    businessrecorditem.ValidColumn,
+			inventorybalance.Table:      inventorybalance.ValidColumn,
+			inventorylot.Table:          inventorylot.ValidColumn,
+			inventorytxn.Table:          inventorytxn.ValidColumn,
+			material.Table:              material.ValidColumn,
+			product.Table:               product.ValidColumn,
+			purchasereceipt.Table:       purchasereceipt.ValidColumn,
+			purchasereceiptitem.Table:   purchasereceiptitem.ValidColumn,
+			purchasereturn.Table:        purchasereturn.ValidColumn,
+			purchasereturnitem.Table:    purchasereturnitem.ValidColumn,
+			unit.Table:                  unit.ValidColumn,
 			user.Table:                  user.ValidColumn,
+			warehouse.Table:             warehouse.ValidColumn,
 			workflowbusinessstate.Table: workflowbusinessstate.ValidColumn,
 			workflowtask.Table:          workflowtask.ValidColumn,
 			workflowtaskevent.Table:     workflowtaskevent.ValidColumn,

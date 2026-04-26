@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -67,8 +68,26 @@ const (
 	FieldDeletedBy = "deleted_by"
 	// FieldDeleteReason holds the string denoting the delete_reason field in the database.
 	FieldDeleteReason = "delete_reason"
+	// EdgePurchaseReceipts holds the string denoting the purchase_receipts edge name in mutations.
+	EdgePurchaseReceipts = "purchase_receipts"
+	// EdgePurchaseReturns holds the string denoting the purchase_returns edge name in mutations.
+	EdgePurchaseReturns = "purchase_returns"
 	// Table holds the table name of the businessrecord in the database.
 	Table = "business_records"
+	// PurchaseReceiptsTable is the table that holds the purchase_receipts relation/edge.
+	PurchaseReceiptsTable = "purchase_receipts"
+	// PurchaseReceiptsInverseTable is the table name for the PurchaseReceipt entity.
+	// It exists in this package in order to avoid circular dependency with the "purchasereceipt" package.
+	PurchaseReceiptsInverseTable = "purchase_receipts"
+	// PurchaseReceiptsColumn is the table column denoting the purchase_receipts relation/edge.
+	PurchaseReceiptsColumn = "business_record_id"
+	// PurchaseReturnsTable is the table that holds the purchase_returns relation/edge.
+	PurchaseReturnsTable = "purchase_returns"
+	// PurchaseReturnsInverseTable is the table name for the PurchaseReturn entity.
+	// It exists in this package in order to avoid circular dependency with the "purchasereturn" package.
+	PurchaseReturnsInverseTable = "purchase_returns"
+	// PurchaseReturnsColumn is the table column denoting the purchase_returns relation/edge.
+	PurchaseReturnsColumn = "business_record_id"
 )
 
 // Columns holds all SQL columns for businessrecord fields.
@@ -300,4 +319,46 @@ func ByDeletedBy(opts ...sql.OrderTermOption) OrderOption {
 // ByDeleteReason orders the results by the delete_reason field.
 func ByDeleteReason(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDeleteReason, opts...).ToFunc()
+}
+
+// ByPurchaseReceiptsCount orders the results by purchase_receipts count.
+func ByPurchaseReceiptsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPurchaseReceiptsStep(), opts...)
+	}
+}
+
+// ByPurchaseReceipts orders the results by purchase_receipts terms.
+func ByPurchaseReceipts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseReceiptsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByPurchaseReturnsCount orders the results by purchase_returns count.
+func ByPurchaseReturnsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPurchaseReturnsStep(), opts...)
+	}
+}
+
+// ByPurchaseReturns orders the results by purchase_returns terms.
+func ByPurchaseReturns(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseReturnsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newPurchaseReceiptsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseReceiptsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReceiptsTable, PurchaseReceiptsColumn),
+	)
+}
+func newPurchaseReturnsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseReturnsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReturnsTable, PurchaseReturnsColumn),
+	)
 }

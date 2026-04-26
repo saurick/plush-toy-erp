@@ -31,7 +31,7 @@ const businessModules = [
     route: 'master/partners',
     sectionKey: 'master',
     status: 'source_grounded',
-    owner: '业务跟单 + 采购 + 财务',
+    owner: '业务 + 采购 + 财务',
     summary:
       '当前主档入口只承接客户、加工厂和辅包材供应商三类主体，避免把外贸客户字段直接搬进当前业务。',
     description:
@@ -49,10 +49,10 @@ const businessModules = [
     ],
     upstream: ['生产订单总表截图', '加工厂商资料', '辅材/包材采购表'],
     downstream: ['客户/款式立项', '加工合同/委外下单', '对账/结算'],
-    mobileFocus: ['跟单核对客户', '采购确认供应商', '财务核对结算对象'],
+    mobileFocus: ['业务核对客户', '采购确认供应商', '财务核对结算对象'],
     sourceRefs: [
       '加工厂商资料 sheet：厂家简称、厂家全称、联系人、联系电话、地址、开票字段。',
-      '生产订单总表截图：客户、跟单业务人员与交期信息。',
+      '生产订单总表截图：客户、业务人员与交期信息。',
       '辅材、包材采购表：供应商、下单人、联系电话等业务快照。',
     ],
     boundaries: [
@@ -67,7 +67,7 @@ const businessModules = [
     route: 'master/products',
     sectionKey: 'master',
     status: 'source_grounded',
-    owner: '业务跟单 + 采购 + PMC',
+    owner: '业务 + 采购 + PMC',
     summary:
       '当前产品页明确区分款式编号、产品编号 / SKU、产品订单编号和订单编号，不再使用单层产品口径。',
     description:
@@ -85,7 +85,7 @@ const businessModules = [
     ],
     upstream: ['材料分析明细表', '加工合同 PDF', '生产订单总表截图'],
     downstream: ['材料 BOM', '加工合同/委外下单', '生产排单'],
-    mobileFocus: ['跟单核对款式', '采购确认物料归属', '生产查看颜色款'],
+    mobileFocus: ['业务核对款式', '采购确认物料归属', '生产查看颜色款'],
     sourceRefs: [
       '26029 / 26204 材料分析表：款式编号、产品名称、颜色、数量。',
       '加工合同 PDF：产品订单编号、产品编号、产品名称。',
@@ -103,18 +103,18 @@ const businessModules = [
     route: 'sales/project-orders',
     sectionKey: 'sales',
     status: 'source_grounded',
-    owner: '业务跟单 + 老板',
+    owner: '业务 + 老板',
     summary:
       '这是毛绒 ERP 的正式接单与立项入口，先收客户、款式、交期与资料齐套，不把它伪装成外贸外销单。',
     description:
-      '客户/款式立项页负责接单、确认编号层级、交期、资料齐套和跟单责任人，是当前主流程的正式起点。',
+      '客户/款式立项页负责接单、确认编号层级、交期、资料齐套和业务责任人，是当前主流程的正式起点。',
     currentScope: [
       '先收客户、订单编号、产品订单编号、款式编号、产品编号和交期。',
       '把缺资料、催合同、包装材料放行等前置动作集中挂在业务立项页。',
       '为生产、采购、仓库和移动端建立统一的订单起点。',
     ],
     keyFields: [
-      '客户 / 跟单业务员',
+      '客户 / 业务员',
       '订单编号 / 产品订单编号 / 客户订单号',
       '款式编号 / 产品编号 / 产品名称 / 颜色',
       '交期 / 出货日期 / 资料齐套状态',
@@ -134,46 +134,12 @@ const businessModules = [
     relatedLinks: [helpLink('flow'), helpLink('operations')],
   },
   {
-    key: 'quotations',
-    title: '报价单',
-    route: 'sales/quotations',
-    sectionKey: 'sales',
-    status: 'awaiting_confirmation',
-    owner: '业务跟单 + 管理层',
-    summary:
-      '报价单在制造业务里可能仍然需要，但当前真源样本不足以把它定义成主流程来源单，所以先补成独立业务页入口并明确边界。',
-    description:
-      '报价单页先作为前置商务页面保留，用于承接客户询价、价格确认和资料评估；当前不驱动毛绒 ERP 的正式主流程。',
-    currentScope: [
-      '先保留一个正式业务页入口，避免后续再把报价散落在帮助文档或备注里。',
-      '把“是否进入客户/款式立项”与“当前样本是否足够建正式字段”明确写清楚。',
-      '后续若拿到正式报价样本，可在此页继续接真实字段与模板。',
-    ],
-    keyFields: [
-      '客户名称 / 报价日期',
-      '产品 / 款式 / 数量',
-      '单价 / 金额 / 备注（当前只保留口径，不进入菜单和落库模块）',
-    ],
-    upstream: ['客户/供应商', '产品'],
-    downstream: ['客户/款式立项'],
-    mobileFocus: ['跟单前置沟通', '老板确认价格策略'],
-    sourceRefs: [
-      '当前仅有生产订单总表与合同金额线索，尚缺正式报价单原件。',
-      '正式汇报版 PDF 仍以接单、资料审核、采购和生产为主线，未把报价定义成正式主路径。',
-    ],
-    boundaries: [
-      '本页当前是待确认业务页，不把它伪装成已经稳定的正式单据模型。',
-      '不会把 PI、外销、运输条款等外贸字段原样带进来。',
-    ],
-    relatedLinks: [helpLink('flow'), helpLink('field')],
-  },
-  {
     key: 'material-bom',
     title: '材料 BOM',
     route: 'purchase/material-bom',
     sectionKey: 'purchase',
     status: 'source_grounded',
-    owner: '跟单 + 采购',
+    owner: '业务 + 采购',
     summary: '当前主料 BOM 完全以材料分析明细表为真源，不让采购汇总倒灌覆盖。',
     description:
       '材料 BOM 页负责承接主料明细、损耗、组装部位、加工方式和版本信息，是主料采购汇总与加工分析的上游真源。',
@@ -189,7 +155,7 @@ const businessModules = [
     ],
     upstream: ['客户/款式立项', '产品'],
     downstream: ['辅材/包材采购', '加工合同/委外下单', '打印模板中心'],
-    mobileFocus: ['采购看缺料', '跟单核对资料版本'],
+    mobileFocus: ['采购看缺料', '业务核对资料版本'],
     sourceRefs: [
       '26029 材料分析明细：物料名称、规格、组装部位、单位用量、总用量含损耗。',
       '26204 材料分析明细：材料类别、颜色、损耗%、加工方式。',
@@ -361,7 +327,7 @@ const businessModules = [
     route: 'warehouse/shipping-release',
     sectionKey: 'purchase',
     status: 'seeded',
-    owner: '业务跟单 + 仓库 + 财务',
+    owner: '业务 + 仓库 + 财务',
     summary:
       '待出货/出货放行关注的是待出货、放行和发货前检查，而不是外贸出运单。',
     description:
@@ -450,7 +416,7 @@ const businessModules = [
     downstream: ['生产进度', '延期/返工/异常', '入库通知/检验/入库'],
     mobileFocus: ['今日排产', '任务分派', '齐套提醒'],
     sourceRefs: [
-      '正式汇报版 PDF 第 4 页：PMC 全流程跟单，生产经理决定车缝 / 手工 / 内外发。',
+      '正式汇报版 PDF 第 4 页：PMC 全流程跟进，生产经理决定车缝 / 手工 / 内外发。',
       '正式汇报版 PDF 第 7 页：PMC 看板、生产经理看板。',
     ],
     boundaries: [
@@ -642,7 +608,7 @@ const businessModules = [
     route: 'finance/receivables',
     sectionKey: 'finance',
     status: 'seeded',
-    owner: '财务 + 业务跟单',
+    owner: '财务 + 业务',
     summary:
       '应收/开票登记承接出货后的客户应收金额、收款状态、开票状态和异常金额，不进入总账或凭证。',
     description:
@@ -744,11 +710,7 @@ export function getBusinessNavigationSections() {
     .map((section) => ({
       title: section.title,
       items: businessModuleDefinitions
-        .filter(
-          (moduleItem) =>
-            moduleItem.sectionKey === section.key &&
-            moduleItem.status !== 'awaiting_confirmation'
-        )
+        .filter((moduleItem) => moduleItem.sectionKey === section.key)
         .map((moduleItem) => ({
           key: moduleItem.key,
           label: moduleItem.navigationLabel,

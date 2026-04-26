@@ -1,3 +1,5 @@
+import { normalizeRoleKey } from './roleKeys.mjs'
+
 export const DUE_SOON_MS = 24 * 60 * 60 * 1000
 
 export const TERMINAL_TASK_STATUS_KEYS = new Set([
@@ -708,7 +710,9 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
   return {
     ...summary,
     active: activeTasks.length,
-    roleDistribution: countBy(normalizedTasks, (task) => task.owner_role_key),
+    roleDistribution: countBy(normalizedTasks, (task) =>
+      normalizeRoleKey(task.owner_role_key)
+    ),
     alerts,
     todayAlerts: alerts.length,
     criticalAlerts: alerts.filter((alert) => alert.alert_level === 'critical')

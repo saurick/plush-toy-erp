@@ -31,19 +31,7 @@ const recordSourceNo = (record) => record?.source_no
 // 当前主路径用 document_no 表示当前单据，source_no 表示上游单据快照。
 // 这里仅登记字段关系稳定的链路，避免用产品名、客户名等宽泛字段制造误跳转。
 const LINKED_TARGET_SPECS = Object.freeze({
-  quotations: [
-    {
-      targetKey: 'project-orders',
-      matchFields: ['source_no'],
-      keywordResolver: recordDocumentNo,
-    },
-  ],
   'project-orders': [
-    {
-      targetKey: 'quotations',
-      matchFields: ['document_no'],
-      keywordResolver: recordSourceNo,
-    },
     {
       targetKey: 'material-bom',
       matchFields: ['source_no'],
@@ -307,6 +295,7 @@ export const getLinkedTargets = (moduleKey, record) => {
   if (!normalizedModuleKey || !record) return []
 
   const sourceModule = moduleMap.get(normalizedModuleKey)
+
   const specs = LINKED_TARGET_SPECS[normalizedModuleKey] || []
 
   return specs

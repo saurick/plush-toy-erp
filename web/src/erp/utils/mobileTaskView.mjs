@@ -17,6 +17,11 @@ import {
   isUrgedWorkflowTask,
   isWarehouseWorkflowTask,
 } from './workflowDashboardStats.mjs'
+import {
+  isRoleKeyMatch,
+  normalizeRoleKey,
+  normalizeRolePayload,
+} from './roleKeys.mjs'
 
 const taskStatusLabelMap = new Map(
   TASK_WORKFLOW_STATES.map((state) => [state.key, state.label])
@@ -48,7 +53,7 @@ const ROLE_EXTENDED_VISIBILITY_LABELS = Object.freeze({
   pmc: 'PMC 扩展可见性关注 blocked / overdue / critical_path / 催办 / 升级 / 高优先级。',
   boss: '老板扩展可见性关注高优先级、审批、出货风险、财务 critical 和升级到老板。',
   production: '生产扩展可见性关注委外回货、成品返工和生产相关任务。',
-  merchandiser: '跟单扩展可见性关注出货、业务确认和 confirm_role_key。',
+  business: '业务扩展可见性关注出货、业务确认和 confirm_role_key。',
   finance: '财务扩展可见性关注财务来源、财务通知和财务逾期。',
   warehouse: '仓库扩展可见性关注仓储来源和仓库任务。',
   quality: '品质扩展可见性关注质检来源、质检失败和品质任务。',
@@ -60,10 +65,6 @@ function payloadOf(task = {}) {
 
 function normalizeSourceType(task = {}) {
   return String(task.source_type || '').trim()
-}
-
-function normalizeRoleKey(roleKey = '') {
-  return String(roleKey || '').trim()
 }
 
 function appendReason(reasons, condition, reason) {
@@ -105,7 +106,7 @@ export function normalizeRelatedDocuments(value) {
 
 export function buildMobileTaskView(task = {}, options = {}) {
   const nowMs = Number(options.nowMs || Date.now())
-  const payload = payloadOf(task)
+  const payload = normalizeRolePayload(payloadOf(task))
   const alert = buildWorkflowTaskAlert(task, { nowMs })
   const dueStatus = getWorkflowTaskDueStatus(task, nowMs)
   const taskStatusKey = String(task.task_status_key || '').trim()
@@ -118,6 +119,7 @@ export function buildMobileTaskView(task = {}, options = {}) {
     source_type: normalizeSourceType(task),
     source_id: task.source_id || '',
     task_group: task.task_group || '',
+    owner_role_key: normalizeRoleKey(task.owner_role_key),
     task_status_label:
       taskStatusLabelMap.get(taskStatusKey) || taskStatusKey || '-',
     business_status_label:
@@ -213,11 +215,11 @@ function isProductionMobileVisible(taskView = {}) {
   )
 }
 
-function isMerchandiserMobileVisible(taskView = {}) {
+function isBusinessMobileVisible(taskView = {}) {
   const payload = payloadOf(taskView)
   return (
-    taskView.owner_role_key === 'merchandiser' ||
-    payload.confirm_role_key === 'merchandiser' ||
+    isRoleKeyMatch(taskView.owner_role_key, 'business') ||
+    isRoleKeyMatch(payload.confirm_role_key, 'business') ||
     taskView.source_type === 'shipping-release' ||
     taskView.source_type === 'outbound'
   )
@@ -226,7 +228,7 @@ function isMerchandiserMobileVisible(taskView = {}) {
 export function isMobileTaskVisibleForRole(taskView = {}, roleKey = '') {
   const normalizedRoleKey = normalizeRoleKey(roleKey)
   if (!normalizedRoleKey) return false
-  if (taskView.owner_role_key === normalizedRoleKey) return true
+  if (isRoleKeyMatch(taskView.owner_role_key, normalizedRoleKey)) return true
   if (normalizedRoleKey === 'pmc') return isPmcMobileVisible(taskView)
   if (normalizedRoleKey === 'boss') return isBossMobileVisible(taskView)
   if (normalizedRoleKey === 'finance') return isFinanceMobileVisible(taskView)
@@ -237,8 +239,8 @@ export function isMobileTaskVisibleForRole(taskView = {}, roleKey = '') {
   if (normalizedRoleKey === 'production') {
     return isProductionMobileVisible(taskView)
   }
-  if (normalizedRoleKey === 'merchandiser') {
-    return isMerchandiserMobileVisible(taskView)
+  if (normalizedRoleKey === 'business') {
+    return isBusinessMobileVisible(taskView)
   }
   return false
 }
@@ -256,7 +258,10 @@ export function explainMobileTaskVisibility(
   const warnings = []
   const checks = []
   const terminal = isTerminalWorkflowTask(taskView)
-  const directOwnerMatch = taskView.owner_role_key === normalizedRoleKey
+  const directOwnerMatch = isRoleKeyMatch(
+    taskView.owner_role_key,
+    normalizedRoleKey
+  )
   const visible = isMobileTaskVisibleForRole(taskView, normalizedRoleKey)
 
   if (!normalizedRoleKey) {
@@ -383,16 +388,16 @@ export function explainMobileTaskVisibility(
       isQualityWorkflowTask(taskView),
       'quality 命中质检任务。'
     )
-  } else if (normalizedRoleKey === 'merchandiser') {
+  } else if (normalizedRoleKey === 'business') {
     appendReason(
       reasons,
-      payload.confirm_role_key === 'merchandiser',
-      'merchandiser 扩展命中 confirm_role_key。'
+      isRoleKeyMatch(payload.confirm_role_key, 'business'),
+      'business 扩展命中 confirm_role_key。'
     )
     appendReason(
       reasons,
       ['shipping-release', 'outbound'].includes(taskView.source_type),
-      'merchandiser 扩展命中出货相关 source_type。'
+      'business 扩展命中出货相关 source_type。'
     )
   } else if (normalizedRoleKey === 'purchasing') {
     checks.push('采购移动端当前按 owner_role_key 直查，没有额外扩展可见性。')
@@ -426,7 +431,7 @@ export function explainMobileTaskVisibility(
       )
     }
     if (
-      ['finance', 'warehouse', 'quality', 'merchandiser'].includes(
+      ['finance', 'warehouse', 'quality', 'business'].includes(
         normalizedRoleKey
       )
     ) {

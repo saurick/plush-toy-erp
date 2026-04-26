@@ -6,10 +6,6 @@ import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
 import { businessModuleDefinitions } from './config/businessModules.mjs'
 
-const activeBusinessModuleDefinitions = businessModuleDefinitions.filter(
-  (moduleItem) => moduleItem.status !== 'awaiting_confirmation'
-)
-
 const AdminUsersPage = lazy(() => import('@/pages/AdminUsers'))
 const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
 const LoginPage = lazy(() => import('@/pages/Login'))
@@ -111,7 +107,7 @@ export default function ERPRouter() {
             path="business-dashboard"
             element={<BusinessDashboardPage />}
           />
-          {activeBusinessModuleDefinitions.map((moduleItem) => (
+          {businessModuleDefinitions.map((moduleItem) => (
             <Route
               key={moduleItem.key}
               path={moduleItem.route}

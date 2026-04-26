@@ -588,7 +588,7 @@ function ProductionReportTemplate({ data }) {
     '生产数量',
     '出货日期',
     '未出货数',
-    '跟单业务人员',
+    '业务人员',
     '图片',
     '类别',
     '单价',

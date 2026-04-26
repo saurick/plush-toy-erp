@@ -9,13 +9,14 @@ import {
   isTerminalWorkflowTask,
   isUrgedWorkflowTask,
 } from '../utils/workflowDashboardStats.mjs'
+import { isRoleKeyMatch, normalizeRoleKey } from '../utils/roleKeys.mjs'
 
 export const WORKFLOW_TASK_DEBUG_PATH = '/erp/qa/workflow-task-debug'
 export const WORKFLOW_TASK_DEBUG_DOC_PATH = '/erp/docs/workflow-task-debug'
 
 export const WORKFLOW_TASK_DEBUG_ROLE_OPTIONS = Object.freeze([
   { key: 'boss', label: '老板 / 管理层' },
-  { key: 'merchandiser', label: '业务 / 跟单' },
+  { key: 'business', label: '业务' },
   { key: 'purchasing', label: '采购' },
   { key: 'production', label: '生产经理' },
   { key: 'warehouse', label: '仓库' },
@@ -215,7 +216,7 @@ export function filterWorkflowTaskDebugRows(rows = [], filters = {}) {
     }
     if (
       mergedFilters.owner_role_key &&
-      row.owner_role_key !== mergedFilters.owner_role_key
+      !isRoleKeyMatch(row.owner_role_key, mergedFilters.owner_role_key)
     ) {
       return false
     }
@@ -282,6 +283,7 @@ export function buildWorkflowTaskVisibilityDiagnostics(
   { roleKey = '', sourceNo = '', taskGroup = '', nowMs } = {}
 ) {
   const queryPlan = explainMobileTaskQueryPlan(roleKey)
+  const normalizedQueryRoleKey = normalizeRoleKey(queryPlan.role_key)
   const sourceNoQuery = toText(sourceNo).toLowerCase()
   const taskGroupQuery = toText(taskGroup).toLowerCase()
   const candidates = (Array.isArray(rows) ? rows : []).filter((row) => {
@@ -298,7 +300,7 @@ export function buildWorkflowTaskVisibilityDiagnostics(
     const explanation = explainMobileTaskVisibility(row, roleKey, { nowMs })
     const loadedByQueryPlan =
       queryPlan.strategy === 'full_list' ||
-      row.owner_role_key === queryPlan.role_key
+      isRoleKeyMatch(row.owner_role_key, normalizedQueryRoleKey)
     const queryReason = loadedByQueryPlan
       ? '任务会被当前 mobileTaskQueries 查询计划加载。'
       : '任务不会被当前 owner_role_key 直查加载，需要确认角色是否应全量加载或 owner_role_key 是否写错。'

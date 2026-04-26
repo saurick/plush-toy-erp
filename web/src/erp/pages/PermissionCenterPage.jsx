@@ -23,6 +23,11 @@ import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
+  ADMIN_STATUS_FILTERS,
+  filterAdminRecords,
+  filterPermissionGroups,
+} from '../utils/permissionCenterSearch.mjs'
+import {
   defaultMenuPermissions,
   ERP_MOBILE_ROLE_PERMISSION_OPTIONS,
   ERP_MENU_PERMISSION_GROUPS,
@@ -61,8 +66,20 @@ const presetOptions = ERP_PERMISSION_PRESETS.map((preset) => ({
   value: preset.key,
 }))
 
+const adminStatusOptions = [
+  { label: '全部状态', value: ADMIN_STATUS_FILTERS.ALL },
+  { label: '启用', value: ADMIN_STATUS_FILTERS.ENABLED },
+  { label: '禁用', value: ADMIN_STATUS_FILTERS.DISABLED },
+  { label: '超级管理员', value: ADMIN_STATUS_FILTERS.SUPER },
+]
+
 function PermissionSectionChecklist({ value = [], onChange }) {
+  const [permissionSearchKeyword, setPermissionSearchKeyword] = useState('')
   const normalizedValue = normalizeMenuPermissions(value)
+  const visiblePermissionGroups = useMemo(
+    () => filterPermissionGroups(permissionGroups, permissionSearchKeyword),
+    [permissionSearchKeyword]
+  )
 
   const handleSectionChange = (sectionKeys, nextSectionValues) => {
     const next = normalizeMenuPermissions([
@@ -73,38 +90,67 @@ function PermissionSectionChecklist({ value = [], onChange }) {
   }
 
   return (
-    <div className="erp-permission-checklist">
-      {permissionGroups.map((section) => {
-        const sectionKeys = section.items.map((item) => item.key)
-        const selectedKeys = normalizedValue.filter((item) =>
-          sectionKeys.includes(item)
-        )
+    <div className="erp-permission-checklist-shell">
+      <Input
+        allowClear
+        className="erp-permission-checklist-search"
+        value={permissionSearchKeyword}
+        placeholder="搜索菜单权限名称或路径"
+        onChange={(event) => setPermissionSearchKeyword(event.target.value)}
+      />
+      <div className="erp-permission-checklist">
+        {visiblePermissionGroups.map((section) => {
+          const originalSection =
+            permissionGroups.find((item) => item.title === section.title) ||
+            section
+          const sectionKeys = section.items.map((item) => item.key)
+          const originalSectionKeys = originalSection.items.map(
+            (item) => item.key
+          )
+          const selectedKeys = normalizedValue.filter((item) =>
+            sectionKeys.includes(item)
+          )
+          const selectedOriginalKeys = normalizedValue.filter((item) =>
+            originalSectionKeys.includes(item)
+          )
+          const hasSearchKeyword = Boolean(
+            String(permissionSearchKeyword || '').trim()
+          )
 
-        return (
-          <section
-            className="erp-permission-checklist__section"
-            key={section.title}
-          >
-            <div className="erp-permission-checklist__header">
-              <Text strong>{section.title}</Text>
-              <Text type="secondary">
-                {selectedKeys.length}/{section.items.length}
-              </Text>
-            </div>
-            <Checkbox.Group
-              options={section.items.map((item) => ({
-                label: item.label,
-                value: item.key,
-              }))}
-              value={selectedKeys}
-              onChange={(nextValues) =>
-                handleSectionChange(sectionKeys, nextValues)
-              }
-              className="erp-permission-grid"
-            />
-          </section>
-        )
-      })}
+          return (
+            <section
+              className="erp-permission-checklist__section"
+              key={section.title}
+            >
+              <div className="erp-permission-checklist__header">
+                <Text strong>{section.title}</Text>
+                <Text type="secondary">
+                  {hasSearchKeyword
+                    ? `命中 ${section.items.length}/${originalSection.items.length}，已选 ${selectedOriginalKeys.length}`
+                    : `${selectedOriginalKeys.length}/${originalSection.items.length}`}
+                </Text>
+              </div>
+              <Checkbox.Group
+                options={section.items.map((item) => ({
+                  label: item.label,
+                  value: item.key,
+                }))}
+                value={selectedKeys}
+                onChange={(nextValues) =>
+                  handleSectionChange(sectionKeys, nextValues)
+                }
+                className="erp-permission-grid"
+              />
+            </section>
+          )
+        })}
+      </div>
+      {visiblePermissionGroups.length === 0 ? (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="没有匹配的菜单权限"
+        />
+      ) : null}
     </div>
   )
 }
@@ -127,6 +173,10 @@ export default function PermissionCenterPage() {
   const [statusUpdatingAdminID, setStatusUpdatingAdminID] = useState(null)
   const [currentAdmin, setCurrentAdmin] = useState(null)
   const [admins, setAdmins] = useState([])
+  const [adminSearchKeyword, setAdminSearchKeyword] = useState('')
+  const [adminStatusFilter, setAdminStatusFilter] = useState(
+    ADMIN_STATUS_FILTERS.ALL
+  )
   const [tablePagination, setTablePagination] = useState({
     current: 1,
     pageSize: DEFAULT_TABLE_PAGE_SIZE,
@@ -156,6 +206,18 @@ export default function PermissionCenterPage() {
   const createSelectedMobileRoleCount = normalizeMobileRolePermissions(
     createMobileRolePermissions || []
   ).length
+  const filteredAdmins = useMemo(
+    () =>
+      filterAdminRecords(admins, {
+        keyword: adminSearchKeyword,
+        status: adminStatusFilter,
+      }),
+    [adminSearchKeyword, adminStatusFilter, admins]
+  )
+  const hasAdminFilter = Boolean(
+    String(adminSearchKeyword || '').trim() ||
+      adminStatusFilter !== ADMIN_STATUS_FILTERS.ALL
+  )
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -188,7 +250,7 @@ export default function PermissionCenterPage() {
   useEffect(() => {
     const totalPages = Math.max(
       1,
-      Math.ceil(admins.length / tablePagination.pageSize)
+      Math.ceil(filteredAdmins.length / tablePagination.pageSize)
     )
     if (tablePagination.current <= totalPages) {
       return
@@ -197,7 +259,7 @@ export default function PermissionCenterPage() {
       ...prev,
       current: totalPages,
     }))
-  }, [admins.length, tablePagination.current, tablePagination.pageSize])
+  }, [filteredAdmins.length, tablePagination.current, tablePagination.pageSize])
 
   useEffect(() => {
     if (!createModalOpen) {
@@ -221,6 +283,22 @@ export default function PermissionCenterPage() {
       }
     })
   }, [])
+
+  const handleAdminSearchChange = (event) => {
+    setAdminSearchKeyword(event.target.value)
+    setTablePagination((prev) => ({
+      ...prev,
+      current: 1,
+    }))
+  }
+
+  const handleAdminStatusFilterChange = (value) => {
+    setAdminStatusFilter(value || ADMIN_STATUS_FILTERS.ALL)
+    setTablePagination((prev) => ({
+      ...prev,
+      current: 1,
+    }))
+  }
 
   const closeCreateModal = () => {
     setCreateModalOpen(false)
@@ -550,6 +628,8 @@ export default function PermissionCenterPage() {
 
   const emptyText = loading ? (
     <Empty description="加载中..." />
+  ) : hasAdminFilter ? (
+    <Empty description="没有匹配的管理员" />
   ) : (
     <Empty description="暂无管理员数据" />
   )
@@ -601,10 +681,31 @@ export default function PermissionCenterPage() {
       ) : null}
 
       <Card variant="borderless">
+        <div className="erp-permission-list-toolbar">
+          <div className="erp-permission-list-toolbar__filters">
+            <Input
+              allowClear
+              className="erp-permission-list-toolbar__search"
+              value={adminSearchKeyword}
+              placeholder="搜索管理员账号、手机号、权限或移动端角色"
+              onChange={handleAdminSearchChange}
+            />
+            <Select
+              value={adminStatusFilter}
+              options={adminStatusOptions}
+              onChange={handleAdminStatusFilterChange}
+            />
+          </div>
+          <Text type="secondary">
+            {hasAdminFilter
+              ? `命中 ${filteredAdmins.length}/${admins.length} 个管理员`
+              : `共 ${admins.length} 个管理员`}
+          </Text>
+        </div>
         <Table
           rowKey="id"
           columns={columns}
-          dataSource={admins}
+          dataSource={filteredAdmins}
           loading={loading}
           pagination={{
             current: tablePagination.current,

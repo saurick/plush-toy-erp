@@ -118,11 +118,11 @@ export const QA_QUALITY_COMMAND_ROWS = Object.freeze([
 ])
 
 export const KNOWN_QA_BLIND_SPOTS = Object.freeze([
-  '当前还没有后端 workflow usecase 统一编排，闭环主要仍是前端 v1 编排。',
+  '当前后端 workflow usecase 只覆盖老板审批、IQC 和采购仓库入库三条最小规则，其他主干闭环仍主要依赖前端 v1 编排。',
   '当前 6 条链路只代表 ERP v1 主干闭环，不代表所有业务链路已经全量覆盖。',
   'BOM 材料需求、订单变更、排产分派、发料领料、库存盘点、售后退货、收付款、成本毛利等扩展链路仍是 deferred 或 partial。',
-  '当前还没有行业专表，例如 production_order / shipment_order / inventory_txn / ar_receivable / ar_invoice / ap_payable / ap_settlement / settlement。',
-  '当前还没有真实库存流水和库存余额。',
+  '当前行业专表仍不完整，例如 production_order / shipment_order / ar_receivable / ar_invoice / ap_payable / ap_settlement / settlement 尚未落地。',
+  '当前已有库存流水和库存余额真源，但 v1 调试 seed 和主干闭环仍不写真实库存事实。',
   '当前还没有财务专表、总账、凭证、纳税申报。',
   'v1 已有催办 / 升级事件留痕，仍没有 notification 独立表、收件箱、未读状态和外部推送。',
   '当前还没有完整业务 E2E 造数 runner。',

@@ -46,7 +46,7 @@ pnpm start:mobile:all
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm start:mobile:boss
-pnpm start:mobile:merchandiser
+pnpm start:mobile:business
 pnpm start:mobile:purchasing
 pnpm start:mobile:production
 pnpm start:mobile:warehouse
@@ -60,7 +60,7 @@ pnpm start:mobile:quality
 | 入口       | 端口   | 说明                                            |
 | ---------- | ------ | ----------------------------------------------- |
 | 老板移动端 | `5186` | 交期风险、异常、待结算、本周重点                |
-| 跟单移动端 | `5187` | 客户 / 款式 / 缺资料 / 催料 / 催合同 / 交期预警 |
+| 业务移动端 | `5187` | 客户 / 款式 / 缺资料 / 催料 / 催合同 / 交期预警 |
 | 采购移动端 | `5188` | 缺料、到料、单价确认、回签、辅材包材确认        |
 | 生产移动端 | `5189` | 今日排产、进度回填、延期原因、返工、异常        |
 | 仓库移动端 | `5190` | 收货、备料、成品入库、待出货、异常件处理        |
@@ -74,7 +74,7 @@ pnpm start:mobile:quality
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm build:desktop
 pnpm build:mobile:boss
-pnpm build:mobile:merchandiser
+pnpm build:mobile:business
 pnpm build:mobile:purchasing
 pnpm build:mobile:production
 pnpm build:mobile:warehouse
@@ -111,17 +111,17 @@ APP_ID=mobile-boss PORT=5186 API_ORIGIN=http://127.0.0.1:8200 pnpm serve:prod
 
 固定端口矩阵：
 
-| APP_ID                | 入口       | 构建产物                    | 生产端口 |
-| --------------------- | ---------- | --------------------------- | -------- |
-| `desktop`             | 桌面后台   | `build/`                    | `5175`   |
-| `mobile-boss`         | 老板移动端 | `build/mobile-boss`         | `5186`   |
-| `mobile-merchandiser` | 跟单移动端 | `build/mobile-merchandiser` | `5187`   |
-| `mobile-purchasing`   | 采购移动端 | `build/mobile-purchasing`   | `5188`   |
-| `mobile-production`   | 生产移动端 | `build/mobile-production`   | `5189`   |
-| `mobile-warehouse`    | 仓库移动端 | `build/mobile-warehouse`    | `5190`   |
-| `mobile-finance`      | 财务移动端 | `build/mobile-finance`      | `5191`   |
-| `mobile-pmc`          | PMC 移动端 | `build/mobile-pmc`          | `5192`   |
-| `mobile-quality`      | 品质移动端 | `build/mobile-quality`      | `5193`   |
+| APP_ID              | 入口       | 构建产物                  | 生产端口 |
+| ------------------- | ---------- | ------------------------- | -------- |
+| `desktop`           | 桌面后台   | `build/`                  | `5175`   |
+| `mobile-boss`       | 老板移动端 | `build/mobile-boss`       | `5186`   |
+| `mobile-business`   | 业务移动端 | `build/mobile-business`   | `5187`   |
+| `mobile-purchasing` | 采购移动端 | `build/mobile-purchasing` | `5188`   |
+| `mobile-production` | 生产移动端 | `build/mobile-production` | `5189`   |
+| `mobile-warehouse`  | 仓库移动端 | `build/mobile-warehouse`  | `5190`   |
+| `mobile-finance`    | 财务移动端 | `build/mobile-finance`    | `5191`   |
+| `mobile-pmc`        | PMC 移动端 | `build/mobile-pmc`        | `5192`   |
+| `mobile-quality`    | 品质移动端 | `build/mobile-quality`    | `5193`   |
 
 生产静态服务约定：
 

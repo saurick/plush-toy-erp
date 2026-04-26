@@ -1,3 +1,5 @@
+import { BUSINESS_ROLE_KEY } from './roleKeys.mjs'
+
 export const PRODUCTION_PROGRESS_MODULE_KEY = 'production-progress'
 export const INBOUND_MODULE_KEY = 'inbound'
 export const SHIPPING_RELEASE_MODULE_KEY = 'shipping-release'
@@ -323,7 +325,7 @@ export function buildShipmentReleaseTask(
       alert_type: 'shipment_pending',
       critical_path: true,
       finished_goods: true,
-      confirm_role_key: 'merchandiser',
+      confirm_role_key: BUSINESS_ROLE_KEY,
       next_module_key: SHIPPING_RELEASE_MODULE_KEY,
     },
   }

@@ -55,12 +55,9 @@ func TestDefaultAdminMenuPermissionsExcludePermissionCenter(t *testing.T) {
 	}
 }
 
-func TestAllAdminMenuPermissionsExcludeAwaitingConfirmationModules(t *testing.T) {
+func TestAllAdminMenuPermissionsExcludeMasterModules(t *testing.T) {
 	all := AllAdminMenuPermissions()
 	for _, item := range all {
-		if item == "/erp/sales/quotations" {
-			t.Fatalf("awaiting confirmation module should not appear in admin menu permissions")
-		}
 		if item == "/erp/master/partners" || item == "/erp/master/products" {
 			t.Fatalf("基础资料页不应作为主业务菜单权限项: %s", item)
 		}

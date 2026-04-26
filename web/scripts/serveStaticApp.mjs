@@ -20,10 +20,10 @@ const appDefinitions = {
     port: 5186,
     buildDir: 'build/mobile-boss',
   },
-  'mobile-merchandiser': {
-    title: '跟单移动端',
+  'mobile-business': {
+    title: '业务移动端',
     port: 5187,
-    buildDir: 'build/mobile-merchandiser',
+    buildDir: 'build/mobile-business',
   },
   'mobile-purchasing': {
     title: '采购移动端',
@@ -76,12 +76,12 @@ const contentTypes = new Map([
   ['.woff2', 'font/woff2'],
 ])
 
-const appId = process.env.APP_ID || 'desktop'
-const app = appDefinitions[appId]
+const requestedAppId = process.env.APP_ID || 'desktop'
+const app = appDefinitions[requestedAppId]
 
 if (!app) {
   console.error(
-    `未知 APP_ID=${appId}，可选值：${Object.keys(appDefinitions).join(', ')}`
+    `未知 APP_ID=${requestedAppId}，可选值：${Object.keys(appDefinitions).join(', ')}`
   )
   process.exit(1)
 }
@@ -121,7 +121,7 @@ const server = http.createServer((request, response) => {
 
 server.listen(port, host, () => {
   console.log(
-    `[web-static] ${app.title} app=${appId} root=${staticRoot} http://${host}:${port}`
+    `[web-static] ${app.title} app=${requestedAppId} root=${staticRoot} http://${host}:${port}`
   )
   if (apiOrigin) {
     console.log(

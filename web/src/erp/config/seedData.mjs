@@ -4,7 +4,6 @@ import { businessNavigationSections } from './businessModules.mjs'
 export const STATUS_LABELS = {
   source_grounded: '已按真源收口',
   seeded: '已落入口',
-  awaiting_confirmation: '待进一步确认',
   deferred: '本轮 deferred',
 }
 
@@ -13,8 +12,6 @@ export const STATUS_STYLES = {
     'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-[0_0_0_1px_rgba(52,211,153,0.08)]',
   seeded:
     'border-sky-200 bg-sky-50 text-sky-700 shadow-[0_0_0_1px_rgba(56,189,248,0.08)]',
-  awaiting_confirmation:
-    'border-amber-200 bg-amber-50 text-amber-700 shadow-[0_0_0_1px_rgba(251,191,36,0.08)]',
   deferred:
     'border-slate-200 bg-slate-50 text-slate-600 shadow-[0_0_0_1px_rgba(148,163,184,0.06)]',
 }
@@ -41,7 +38,7 @@ export const environmentCards = [
     label: '移动端端口矩阵',
     value: '5186 - 5193',
     detail:
-      '老板 5186、跟单 5187、采购 5188、生产 5189、仓库 5190、财务 5191、PMC 5192、品质 5193，方便后续分别绑定域名。',
+      '老板 5186、业务 5187、采购 5188、生产 5189、仓库 5190、财务 5191、PMC 5192、品质 5193，方便后续分别绑定域名。',
   },
   {
     label: '共享后端 / 数据库',
@@ -56,7 +53,7 @@ export const plannedModules = [
     key: 'customer-style',
     title: '客户 / 款式立项',
     status: 'source_grounded',
-    owner: '业务跟单 + 管理层',
+    owner: '业务 + 管理层',
     summary:
       '已从生产订单总表截图、材料 Excel 和加工合同中确认“客户 / 订单编号 / 产品订单编号 / 款式编号 / 产品编号”至少是四层编码，当前不能再混成一个字段。',
   },
@@ -64,7 +61,7 @@ export const plannedModules = [
     key: 'bom-materials',
     title: '材料 BOM / 主料 / 辅材 / 包材',
     status: 'source_grounded',
-    owner: '跟单 + 采购',
+    owner: '业务 + 采购',
     summary:
       '两份材料分析 Excel 已确认 BOM 明细、采购汇总、色卡和作业指导书四层资料结构；辅材 / 包材采购表已确认是独立导入源，不应混进主料明细。',
   },
@@ -112,7 +109,7 @@ export const plannedModules = [
     key: 'print-center',
     title: '模板打印中心',
     status: 'source_grounded',
-    owner: '采购 + 跟单 + 财务',
+    owner: '采购 + 业务 + 财务',
     summary:
       '当前只保留辅料采购合同、委外加工合同两套正式模板；业务页负责带值打开，打印中心保留默认样例和模板核对入口。',
   },
@@ -130,7 +127,7 @@ export const phaseFlow = [
   {
     key: 'project-order',
     title: '客户 / 款式立项',
-    owner: '业务跟单 -> 老板',
+    owner: '业务 -> 老板',
     summary:
       '从客户订单、款式编号、产品编号、产品订单编号和交期承诺开始收口。当前真源显示至少有四套编号体系，必须分别保留，不再混成单一“产品编号”。',
     outputs: [
@@ -143,7 +140,7 @@ export const phaseFlow = [
     ],
     mobileActions: ['缺资料提醒', '客户确认节点', '催合同 / 催料', '交期预警'],
     sources: [
-      'Weixin 生产订单总表截图：客户、订单编号、客户订单号、产品编号、产品名称、出货日期、跟单业务人员。',
+      'Weixin 生产订单总表截图：客户、订单编号、客户订单号、产品编号、产品名称、出货日期、业务人员。',
       '26029 / 26204 材料分析明细表：款式编号、产品名称、订单编号、数量、设计师。',
       '9.3 加工合同 PDF：产品订单编号、产品编号、产品名称、回货日期。',
     ],
@@ -151,7 +148,7 @@ export const phaseFlow = [
   {
     key: 'bom',
     title: '材料 BOM / 主料 / 辅材 / 包材',
-    owner: '跟单 + 采购',
+    owner: '业务 + 采购',
     summary:
       '主料 BOM 来自材料分析明细表，辅材 / 包材来自独立采购汇总表，色卡和作业指导书是辅助资料层。当前不能把主料、辅材、包材导入到同一张原始表里。',
     outputs: [
@@ -197,7 +194,7 @@ export const phaseFlow = [
     outputs: ['生产单 / 排单', '进度日志', '延期原因', '返工记录', '异常中心'],
     mobileActions: ['今日排产', '进度回填', '延期原因', '返工 / 异常上报'],
     sources: [
-      'plush_factory_formal_report_v3_mobile.pdf 第 4 页：PMC 全流程跟单、生产经理决定车缝 / 手工 / 内外发。',
+      'plush_factory_formal_report_v3_mobile.pdf 第 4 页：PMC 全流程跟进、生产经理决定车缝 / 手工 / 内外发。',
       'plush_factory_formal_report_v3_mobile.pdf 第 7 页：PMC 在制订单 / 待补齐资料 / 外发延期 / 异常任务，生产经理待决策排单 / 返工异常。',
       'Weixin 生产订单总表截图：订单数量、损头版、生产数量、未出货数、类别、单价。',
     ],
@@ -238,7 +235,7 @@ export const phaseFlow = [
   {
     key: 'print-output',
     title: '模板打印 / 对外留档',
-    owner: '跟单 + 采购 + 财务',
+    owner: '业务 + 采购 + 财务',
     summary:
       '采购合同和加工合同已经有真实打印或报表样本，当前从对应业务页带值打开，打印中心保留默认样例核对入口。',
     outputs: [
@@ -517,7 +514,7 @@ export const sourceReadiness = {
       name: 'Weixin Image_20260420164444_2155_288.png',
       intendedFor: '生产订单总表字段命名和桌面 / 手机端信息优先级。',
       facts: [
-        '截图已确认字段：下单日期、客户、订单编号、客户订单号、产品编号、产品名称、颜色、订单数量、损头版、生产数量、出货日期、未出货数、跟单业务人员、图片、类别、单价、备注。',
+        '截图已确认字段：下单日期、客户、订单编号、客户订单号、产品编号、产品名称、颜色、订单数量、损头版、生产数量、出货日期、未出货数、业务人员、图片、类别、单价、备注。',
         '这是一张生产订单总表而不是简单看板图片，应视为正式字段样本。',
       ],
     },
@@ -680,12 +677,12 @@ const roleWorkbenches = [
     ],
   },
   {
-    key: 'merchandiser',
-    title: '业务跟单',
+    key: 'business',
+    title: '业务',
     label: '前台总控',
     summary:
-      '跟单是客户 / 款式 / 材料 / 合同 / 交期总入口，桌面负责结构化维护，移动端负责催办和风险确认。',
-    defaultPath: '/erp/roles/merchandiser',
+      '业务是客户 / 款式 / 材料 / 合同 / 交期总入口，桌面负责结构化维护，移动端负责催办和风险确认。',
+    defaultPath: '/erp/roles/business',
     allowedNavKeys: [
       'workspace-home',
       'flow-overview',
@@ -710,7 +707,7 @@ const roleWorkbenches = [
     ],
     mobileFocus: ['客户 / 款式', '缺资料', '催料', '催合同', '交期预警'],
     desktopMenuPreview: [
-      '角色首页：跟单工作台',
+      '角色首页：业务工作台',
       '真源与打印：资料准备、模板打印中心',
       '帮助中心：流程总览、编号体系、字段真源、deferred 边界',
     ],
@@ -738,7 +735,7 @@ const roleWorkbenches = [
     ],
     desktopQueues: [
       {
-        title: '跟单首页待办',
+        title: '业务首页待办',
         items: [
           '创建包装材料打单表。',
           '补齐客户验货要求。',
@@ -756,8 +753,8 @@ const roleWorkbenches = [
     firstWave: ['角色首页', '款式 / 编号真源提示', '资料缺口清单', '催办入口'],
     pending: ['客户消息同步', '完整 BOM 编辑', '现场上传'],
     helpFocus: [
-      '跟单先看字段真源文档，再做款式 / 合同 / 出货跟进。',
-      '跟单移动端只做催办和风险确认，不做完整 BOM 录入。',
+      '业务先看字段真源文档，再做款式 / 合同 / 出货跟进。',
+      '业务移动端只做催办和风险确认，不做完整 BOM 录入。',
       '包装材料打单来自老板审批链，不是独立旁路。',
     ],
     sourceRefs: [
@@ -774,7 +771,7 @@ const roleWorkbenches = [
       {
         label: '创建动作',
         value: '包装材料打单表',
-        note: '跟单需要直接发起包装材料打单。',
+        note: '业务需要直接发起包装材料打单。',
       },
       {
         label: '催办动作',
@@ -805,7 +802,7 @@ const roleWorkbenches = [
     mobileDeferred: [
       '不在手机端维护完整 BOM。',
       '不做现场上传和图片识别。',
-      '不拆第二套跟单后端。',
+      '不拆第二套业务后端。',
     ],
   },
   {
@@ -1129,7 +1126,7 @@ const roleWorkbenches = [
         items: [
           '决定车缝 / 手工 / 内外发去向。',
           '跟踪今日排产、延期原因和返工状态。',
-          '把异常交给品质 / PMC / 跟单共同闭环。',
+          '把异常交给品质 / PMC / 业务共同闭环。',
         ],
       },
       {
@@ -1143,7 +1140,7 @@ const roleWorkbenches = [
     firstWave: ['角色首页', '排产卡片', '进度回填', '返工 / 异常列表'],
     pending: ['工序硬件联动', '现场质检', '工时采集'],
     helpFocus: [
-      'PMC 全流程跟单，生产经理负责车缝 / 手工 / 内外发决策。',
+      'PMC 全流程跟进，生产经理负责车缝 / 手工 / 内外发决策。',
       '返工和异常要单独成日志，不继续沉到备注。',
       '扩展硬件链路来自汇报样例，但本轮不做。',
     ],
@@ -1613,9 +1610,9 @@ const roleHelpSections = {
       ],
     },
   ],
-  merchandiser: [
+  business: [
     {
-      title: '跟单先盯什么',
+      title: '业务先盯什么',
       items: [
         '客户 / 款式 / 交期是否齐全。',
         '包装材料打单表、客户验货要求和出货确认。',
@@ -2114,11 +2111,11 @@ export const helpCenterRoleNavGroups = [
     docs: [navItemRegistry['help-role-collaboration-guide']],
   },
   {
-    key: 'merchandiser',
-    role: '跟单 / 业务',
+    key: 'business',
+    role: '业务',
     mainWork: '订单、客户资料、出货准备和应收前置',
     taskSource: '客户资料、订单交期、包装材料和出货确认任务',
-    recommendedEntry: '销售链路 / 跟单移动端',
+    recommendedEntry: '销售链路 / 业务移动端',
     endpointNote: '手机端接收补资料、催合同、交期预警和出货确认。',
     docs: [
       navItemRegistry['help-operation-guide'],
@@ -2188,11 +2185,11 @@ export const helpCenterBusinessMainlineGroups = [
   {
     key: 'order-engineering',
     title: '订单到工程',
-    initiator: '业务 / 跟单',
+    initiator: '业务',
     handlers: '老板、工程、PMC',
     nextStep: '工程资料任务',
-    exceptionOwner: '业务 / 跟单 + PMC',
-    boundary: '前端 v1 编排，工程专表后续再拆',
+    exceptionOwner: '业务 + PMC',
+    boundary: '老板审批派生已后端化，其余闭环仍前端 v1 编排',
     items: [
       navItemRegistry['help-operation-flow-overview'],
       navItemRegistry['help-role-collaboration-guide'],
@@ -2360,12 +2357,12 @@ export function getNavigationSections() {
       items: helpCenterNavItems,
     },
     {
-      title: '高级文档',
-      items: helpCenterAdvancedDocItems,
-    },
-    {
       title: '开发与验收',
       items: qaNavItems,
+    },
+    {
+      title: '高级文档',
+      items: helpCenterAdvancedDocItems,
     },
   ]
 }

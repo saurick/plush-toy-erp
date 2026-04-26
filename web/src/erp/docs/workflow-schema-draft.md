@@ -224,7 +224,7 @@ create index idx_business_record_events_record_id
 | `source_type` + `source_id` | 指向业务单据或业务节点，不单独发明第二套真源               |
 | `business_status_key`       | 当前任务关联的业务状态，可为空                             |
 | `task_status_key`           | 必须来自 `任务 / 业务状态字典` 的任务状态表                |
-| `owner_role_key`            | 当前责任角色，如 `merchandiser`、`pmc`、`quality`          |
+| `owner_role_key`            | 当前责任角色，如 `business`、`pmc`、`quality`              |
 | `assignee_id`               | 若未来需要精确到人，可后续接到管理员或业务用户体系         |
 | `blocked_reason`            | 仅保存当前阻塞摘要；详细历史写进事件表                     |
 | `payload`                   | 临时承接催办上下文、页面摘要和兼容字段，避免过早硬拆大量列 |

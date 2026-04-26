@@ -353,7 +353,7 @@ test('mobileTaskView: 成品抽检 入库 出货任务按角色视角展示', ()
         related_documents: ['成品入库记录：IN-001'],
         finished_goods: true,
         critical_path: true,
-        confirm_role_key: 'merchandiser',
+        confirm_role_key: 'business',
       },
     }),
     task({
@@ -384,7 +384,7 @@ test('mobileTaskView: 成品抽检 入库 出货任务按角色视角展示', ()
     nowMs: NOW_MS,
   })
   const pmcViews = buildMobileTaskListForRole(tasks, 'pmc', { nowMs: NOW_MS })
-  const merchandiserViews = buildMobileTaskListForRole(tasks, 'merchandiser', {
+  const businessViews = buildMobileTaskListForRole(tasks, 'business', {
     nowMs: NOW_MS,
   })
 
@@ -410,11 +410,11 @@ test('mobileTaskView: 成品抽检 入库 出货任务按角色视角展示', ()
   )
   assert.equal(pmcViews.find((item) => item.id === 34).alert_level, 'critical')
   assert.equal(
-    merchandiserViews.some((item) => item.id === 33),
+    businessViews.some((item) => item.id === 33),
     true
   )
   assert.match(
-    merchandiserViews.find((item) => item.id === 33).complete_condition,
+    businessViews.find((item) => item.id === 33).complete_condition,
     /出货数量/
   )
 })

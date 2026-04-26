@@ -8,6 +8,9 @@
 | --- | --- | --- |
 | `scripts/bootstrap.sh` | 安装依赖、启用 hooks、跑快速自检 | 新机器 / 首次拉仓库 |
 | `scripts/project-scan.sh` | 扫描项目名、默认密钥、部署地址和页面文案残留 | 改名后 / 配置收口后 |
+| `scripts/phase2b-pg.sh` | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口 | 验证 Phase 2B schema 和批次库存行为 |
+| `scripts/phase2c-pg.sh` | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口 | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯 |
+| `scripts/phase2d-pg.sh` | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口 | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
 | `scripts/doctor.sh` | 检查本机依赖和 hooks 是否齐全 | 环境初始化 / 异常排查 |
 | `scripts/qa/fast.sh` | 高频快速检查 | 日常开发 |
 | `scripts/qa/erp-field-linkage.mjs` | 字段联动专项测试并刷新 latest 覆盖报告 | 改字段真源、保存转换、合同金额、打印快照后 |

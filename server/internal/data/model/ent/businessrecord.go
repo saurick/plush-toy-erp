@@ -72,7 +72,39 @@ type BusinessRecord struct {
 	DeletedBy *int `json:"deleted_by,omitempty"`
 	// DeleteReason holds the value of the "delete_reason" field.
 	DeleteReason *string `json:"delete_reason,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the BusinessRecordQuery when eager-loading is set.
+	Edges        BusinessRecordEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// BusinessRecordEdges holds the relations/edges for other nodes in the graph.
+type BusinessRecordEdges struct {
+	// PurchaseReceipts holds the value of the purchase_receipts edge.
+	PurchaseReceipts []*PurchaseReceipt `json:"purchase_receipts,omitempty"`
+	// PurchaseReturns holds the value of the purchase_returns edge.
+	PurchaseReturns []*PurchaseReturn `json:"purchase_returns,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [2]bool
+}
+
+// PurchaseReceiptsOrErr returns the PurchaseReceipts value or an error if the edge
+// was not loaded in eager-loading.
+func (e BusinessRecordEdges) PurchaseReceiptsOrErr() ([]*PurchaseReceipt, error) {
+	if e.loadedTypes[0] {
+		return e.PurchaseReceipts, nil
+	}
+	return nil, &NotLoadedError{edge: "purchase_receipts"}
+}
+
+// PurchaseReturnsOrErr returns the PurchaseReturns value or an error if the edge
+// was not loaded in eager-loading.
+func (e BusinessRecordEdges) PurchaseReturnsOrErr() ([]*PurchaseReturn, error) {
+	if e.loadedTypes[1] {
+		return e.PurchaseReturns, nil
+	}
+	return nil, &NotLoadedError{edge: "purchase_returns"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -305,6 +337,16 @@ func (_m *BusinessRecord) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (_m *BusinessRecord) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
+}
+
+// QueryPurchaseReceipts queries the "purchase_receipts" edge of the BusinessRecord entity.
+func (_m *BusinessRecord) QueryPurchaseReceipts() *PurchaseReceiptQuery {
+	return NewBusinessRecordClient(_m.config).QueryPurchaseReceipts(_m)
+}
+
+// QueryPurchaseReturns queries the "purchase_returns" edge of the BusinessRecord entity.
+func (_m *BusinessRecord) QueryPurchaseReturns() *PurchaseReturnQuery {
+	return NewBusinessRecordClient(_m.config).QueryPurchaseReturns(_m)
 }
 
 // Update returns a builder for updating this BusinessRecord.

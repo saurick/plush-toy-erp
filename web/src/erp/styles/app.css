@@ -210,6 +210,15 @@
   overflow-y: auto;
 }
 
+.erp-admin-shell .ant-select-selection-search-input:focus {
+  --tw-ring-color: transparent;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  border-color: transparent;
+  box-shadow: none;
+  outline: 0;
+}
+
 .erp-admin-header__right,
 .erp-admin-header__left {
   min-width: 0;
@@ -3024,6 +3033,41 @@
   width: 100%;
 }
 
+.erp-permission-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.erp-permission-list-toolbar__filters {
+  display: flex;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-permission-list-toolbar__filters .erp-permission-list-toolbar__search {
+  width: min(420px, 100%);
+}
+
+.erp-permission-list-toolbar__filters .ant-select {
+  width: 150px;
+}
+
+.erp-permission-checklist-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-permission-checklist-search {
+  width: 100%;
+}
+
 .erp-permission-checklist {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -4001,6 +4045,15 @@
 
   .erp-permission-grid {
     grid-template-columns: 1fr;
+  }
+
+  .erp-permission-list-toolbar__filters {
+    flex-basis: 100%;
+  }
+
+  .erp-permission-list-toolbar__filters .erp-permission-list-toolbar__search,
+  .erp-permission-list-toolbar__filters .ant-select {
+    width: 100%;
   }
 
   .erp-business-page-header-card__stats {

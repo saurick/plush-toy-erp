@@ -47,6 +47,98 @@ var (
 			},
 		},
 	}
+	// BomHeadersColumns holds the columns for the "bom_headers" table.
+	BomHeadersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "version", Type: field.TypeString, Size: 64},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "effective_from", Type: field.TypeTime, Nullable: true},
+		{Name: "effective_to", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "product_id", Type: field.TypeInt},
+	}
+	// BomHeadersTable holds the schema information for the "bom_headers" table.
+	BomHeadersTable = &schema.Table{
+		Name:       "bom_headers",
+		Columns:    BomHeadersColumns,
+		PrimaryKey: []*schema.Column{BomHeadersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "bom_headers_products_bom_headers",
+				Columns:    []*schema.Column{BomHeadersColumns[8]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "bomheader_product_id_version",
+				Unique:  true,
+				Columns: []*schema.Column{BomHeadersColumns[8], BomHeadersColumns[1]},
+			},
+			{
+				Name:    "bomheader_product_id",
+				Unique:  true,
+				Columns: []*schema.Column{BomHeadersColumns[8]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 'ACTIVE'",
+				},
+			},
+			{
+				Name:    "bomheader_product_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{BomHeadersColumns[8], BomHeadersColumns[2]},
+			},
+		},
+	}
+	// BomItemsColumns holds the columns for the "bom_items" table.
+	BomItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "loss_rate", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "position", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "bom_header_id", Type: field.TypeInt},
+		{Name: "material_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+	}
+	// BomItemsTable holds the schema information for the "bom_items" table.
+	BomItemsTable = &schema.Table{
+		Name:       "bom_items",
+		Columns:    BomItemsColumns,
+		PrimaryKey: []*schema.Column{BomItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "bom_items_bom_headers_items",
+				Columns:    []*schema.Column{BomItemsColumns[7]},
+				RefColumns: []*schema.Column{BomHeadersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "bom_items_materials_bom_items",
+				Columns:    []*schema.Column{BomItemsColumns[8]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "bom_items_units_bom_items",
+				Columns:    []*schema.Column{BomItemsColumns[9]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "bomitem_bom_header_id_material_id",
+				Unique:  false,
+				Columns: []*schema.Column{BomItemsColumns[7], BomItemsColumns[8]},
+			},
+		},
+	}
 	// BusinessRecordsColumns holds the columns for the "business_records" table.
 	BusinessRecordsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -193,6 +285,584 @@ var (
 			},
 		},
 	}
+	// InventoryBalancesColumns holds the columns for the "inventory_balances" table.
+	InventoryBalancesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "subject_type", Type: field.TypeString, Size: 16},
+		{Name: "subject_id", Type: field.TypeInt},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// InventoryBalancesTable holds the schema information for the "inventory_balances" table.
+	InventoryBalancesTable = &schema.Table{
+		Name:       "inventory_balances",
+		Columns:    InventoryBalancesColumns,
+		PrimaryKey: []*schema.Column{InventoryBalancesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "inventory_balances_inventory_lots_inventory_balances",
+				Columns:    []*schema.Column{InventoryBalancesColumns[5]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "inventory_balances_units_inventory_balances",
+				Columns:    []*schema.Column{InventoryBalancesColumns[6]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "inventory_balances_warehouses_inventory_balances",
+				Columns:    []*schema.Column{InventoryBalancesColumns[7]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "inventorybalance_subject_type_subject_id_warehouse_id_unit_id",
+				Unique:  true,
+				Columns: []*schema.Column{InventoryBalancesColumns[1], InventoryBalancesColumns[2], InventoryBalancesColumns[7], InventoryBalancesColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "lot_id IS NULL",
+				},
+			},
+			{
+				Name:    "inventorybalance_subject_type_subject_id_warehouse_id_unit_id_lot_id",
+				Unique:  true,
+				Columns: []*schema.Column{InventoryBalancesColumns[1], InventoryBalancesColumns[2], InventoryBalancesColumns[7], InventoryBalancesColumns[6], InventoryBalancesColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "lot_id IS NOT NULL",
+				},
+			},
+		},
+	}
+	// InventoryLotsColumns holds the columns for the "inventory_lots" table.
+	InventoryLotsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "subject_type", Type: field.TypeString, Size: 16},
+		{Name: "subject_id", Type: field.TypeInt},
+		{Name: "lot_no", Type: field.TypeString, Size: 64},
+		{Name: "supplier_lot_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "color_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "dye_lot_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "production_lot_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "ACTIVE"},
+		{Name: "received_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// InventoryLotsTable holds the schema information for the "inventory_lots" table.
+	InventoryLotsTable = &schema.Table{
+		Name:       "inventory_lots",
+		Columns:    InventoryLotsColumns,
+		PrimaryKey: []*schema.Column{InventoryLotsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "inventorylot_subject_type_subject_id_lot_no",
+				Unique:  true,
+				Columns: []*schema.Column{InventoryLotsColumns[1], InventoryLotsColumns[2], InventoryLotsColumns[3]},
+			},
+			{
+				Name:    "inventorylot_supplier_lot_no",
+				Unique:  false,
+				Columns: []*schema.Column{InventoryLotsColumns[4]},
+			},
+			{
+				Name:    "inventorylot_color_no",
+				Unique:  false,
+				Columns: []*schema.Column{InventoryLotsColumns[5]},
+			},
+			{
+				Name:    "inventorylot_dye_lot_no",
+				Unique:  false,
+				Columns: []*schema.Column{InventoryLotsColumns[6]},
+			},
+		},
+	}
+	// InventoryTxnsColumns holds the columns for the "inventory_txns" table.
+	InventoryTxnsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "subject_type", Type: field.TypeString, Size: 16},
+		{Name: "subject_id", Type: field.TypeInt},
+		{Name: "txn_type", Type: field.TypeString, Size: 32},
+		{Name: "direction", Type: field.TypeInt},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "source_type", Type: field.TypeString, Size: 64},
+		{Name: "source_id", Type: field.TypeInt, Nullable: true},
+		{Name: "source_line_id", Type: field.TypeInt, Nullable: true},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
+		{Name: "reversal_of_txn_id", Type: field.TypeInt, Nullable: true},
+		{Name: "occurred_at", Type: field.TypeTime},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "created_by", Type: field.TypeInt, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// InventoryTxnsTable holds the schema information for the "inventory_txns" table.
+	InventoryTxnsTable = &schema.Table{
+		Name:       "inventory_txns",
+		Columns:    InventoryTxnsColumns,
+		PrimaryKey: []*schema.Column{InventoryTxnsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "inventory_txns_inventory_lots_inventory_txns",
+				Columns:    []*schema.Column{InventoryTxnsColumns[15]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "inventory_txns_units_inventory_txns",
+				Columns:    []*schema.Column{InventoryTxnsColumns[16]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "inventory_txns_warehouses_inventory_txns",
+				Columns:    []*schema.Column{InventoryTxnsColumns[17]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "inventorytxn_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{InventoryTxnsColumns[9]},
+			},
+			{
+				Name:    "inventorytxn_subject_type_subject_id_warehouse_id_lot_id_occurred_at",
+				Unique:  false,
+				Columns: []*schema.Column{InventoryTxnsColumns[1], InventoryTxnsColumns[2], InventoryTxnsColumns[17], InventoryTxnsColumns[15], InventoryTxnsColumns[11]},
+			},
+			{
+				Name:    "inventorytxn_source_type_source_id_source_line_id",
+				Unique:  false,
+				Columns: []*schema.Column{InventoryTxnsColumns[6], InventoryTxnsColumns[7], InventoryTxnsColumns[8]},
+			},
+			{
+				Name:    "inventorytxn_reversal_of_txn_id",
+				Unique:  true,
+				Columns: []*schema.Column{InventoryTxnsColumns[10]},
+			},
+		},
+	}
+	// MaterialsColumns holds the columns for the "materials" table.
+	MaterialsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "code", Type: field.TypeString, Size: 64},
+		{Name: "name", Type: field.TypeString, Size: 255},
+		{Name: "category", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "spec", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "color", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "default_unit_id", Type: field.TypeInt},
+	}
+	// MaterialsTable holds the schema information for the "materials" table.
+	MaterialsTable = &schema.Table{
+		Name:       "materials",
+		Columns:    MaterialsColumns,
+		PrimaryKey: []*schema.Column{MaterialsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "materials_units_materials",
+				Columns:    []*schema.Column{MaterialsColumns[9]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "material_code",
+				Unique:  true,
+				Columns: []*schema.Column{MaterialsColumns[1]},
+			},
+			{
+				Name:    "material_category",
+				Unique:  false,
+				Columns: []*schema.Column{MaterialsColumns[3]},
+			},
+			{
+				Name:    "material_name",
+				Unique:  false,
+				Columns: []*schema.Column{MaterialsColumns[2]},
+			},
+		},
+	}
+	// ProductsColumns holds the columns for the "products" table.
+	ProductsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "code", Type: field.TypeString, Size: 64},
+		{Name: "name", Type: field.TypeString, Size: 255},
+		{Name: "style_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "customer_style_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "default_unit_id", Type: field.TypeInt},
+	}
+	// ProductsTable holds the schema information for the "products" table.
+	ProductsTable = &schema.Table{
+		Name:       "products",
+		Columns:    ProductsColumns,
+		PrimaryKey: []*schema.Column{ProductsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "products_units_products",
+				Columns:    []*schema.Column{ProductsColumns[8]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "product_code",
+				Unique:  true,
+				Columns: []*schema.Column{ProductsColumns[1]},
+			},
+			{
+				Name:    "product_style_no",
+				Unique:  false,
+				Columns: []*schema.Column{ProductsColumns[3]},
+			},
+			{
+				Name:    "product_customer_style_no",
+				Unique:  false,
+				Columns: []*schema.Column{ProductsColumns[4]},
+			},
+			{
+				Name:    "product_name",
+				Unique:  false,
+				Columns: []*schema.Column{ProductsColumns[2]},
+			},
+		},
+	}
+	// PurchaseReceiptsColumns holds the columns for the "purchase_receipts" table.
+	PurchaseReceiptsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "receipt_no", Type: field.TypeString, Size: 64},
+		{Name: "supplier_name", Type: field.TypeString, Size: 255},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "received_at", Type: field.TypeTime},
+		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "business_record_id", Type: field.TypeInt, Nullable: true},
+	}
+	// PurchaseReceiptsTable holds the schema information for the "purchase_receipts" table.
+	PurchaseReceiptsTable = &schema.Table{
+		Name:       "purchase_receipts",
+		Columns:    PurchaseReceiptsColumns,
+		PrimaryKey: []*schema.Column{PurchaseReceiptsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_receipts_business_records_purchase_receipts",
+				Columns:    []*schema.Column{PurchaseReceiptsColumns[9]},
+				RefColumns: []*schema.Column{BusinessRecordsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchasereceipt_receipt_no",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReceiptsColumns[1]},
+			},
+			{
+				Name:    "purchasereceipt_business_record_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptsColumns[9]},
+			},
+			{
+				Name:    "purchasereceipt_supplier_name",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptsColumns[2]},
+			},
+			{
+				Name:    "purchasereceipt_status",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptsColumns[3]},
+			},
+			{
+				Name:    "purchasereceipt_received_at",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptsColumns[4]},
+			},
+		},
+	}
+	// PurchaseReceiptItemsColumns holds the columns for the "purchase_receipt_items" table.
+	PurchaseReceiptItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "lot_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "source_line_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "material_id", Type: field.TypeInt},
+		{Name: "receipt_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// PurchaseReceiptItemsTable holds the schema information for the "purchase_receipt_items" table.
+	PurchaseReceiptItemsTable = &schema.Table{
+		Name:       "purchase_receipt_items",
+		Columns:    PurchaseReceiptItemsColumns,
+		PrimaryKey: []*schema.Column{PurchaseReceiptItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_receipt_items_inventory_lots_purchase_receipt_items",
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[9]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_items_materials_purchase_receipt_items",
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[10]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_items_purchase_receipts_items",
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[11]},
+				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_items_units_purchase_receipt_items",
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[12]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_items_warehouses_purchase_receipt_items",
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[13]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchasereceiptitem_receipt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[11]},
+			},
+			{
+				Name:    "purchasereceiptitem_material_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[10]},
+			},
+			{
+				Name:    "purchasereceiptitem_warehouse_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[13]},
+			},
+			{
+				Name:    "purchasereceiptitem_lot_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[9]},
+			},
+			{
+				Name:    "purchasereceiptitem_receipt_id_source_line_no",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[11], PurchaseReceiptItemsColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "source_line_no IS NOT NULL AND source_line_no <> ''",
+				},
+			},
+		},
+	}
+	// PurchaseReturnsColumns holds the columns for the "purchase_returns" table.
+	PurchaseReturnsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "return_no", Type: field.TypeString, Size: 64},
+		{Name: "supplier_name", Type: field.TypeString, Size: 255},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "returned_at", Type: field.TypeTime},
+		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "business_record_id", Type: field.TypeInt, Nullable: true},
+		{Name: "purchase_receipt_id", Type: field.TypeInt, Nullable: true},
+	}
+	// PurchaseReturnsTable holds the schema information for the "purchase_returns" table.
+	PurchaseReturnsTable = &schema.Table{
+		Name:       "purchase_returns",
+		Columns:    PurchaseReturnsColumns,
+		PrimaryKey: []*schema.Column{PurchaseReturnsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_returns_business_records_purchase_returns",
+				Columns:    []*schema.Column{PurchaseReturnsColumns[9]},
+				RefColumns: []*schema.Column{BusinessRecordsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "purchase_returns_purchase_receipts_purchase_returns",
+				Columns:    []*schema.Column{PurchaseReturnsColumns[10]},
+				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchasereturn_return_no",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReturnsColumns[1]},
+			},
+			{
+				Name:    "purchasereturn_purchase_receipt_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnsColumns[10]},
+			},
+			{
+				Name:    "purchasereturn_business_record_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnsColumns[9]},
+			},
+			{
+				Name:    "purchasereturn_status",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnsColumns[3]},
+			},
+			{
+				Name:    "purchasereturn_returned_at",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnsColumns[4]},
+			},
+		},
+	}
+	// PurchaseReturnItemsColumns holds the columns for the "purchase_return_items" table.
+	PurchaseReturnItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "source_line_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "material_id", Type: field.TypeInt},
+		{Name: "purchase_receipt_item_id", Type: field.TypeInt, Nullable: true},
+		{Name: "return_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// PurchaseReturnItemsTable holds the schema information for the "purchase_return_items" table.
+	PurchaseReturnItemsTable = &schema.Table{
+		Name:       "purchase_return_items",
+		Columns:    PurchaseReturnItemsColumns,
+		PrimaryKey: []*schema.Column{PurchaseReturnItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_return_items_inventory_lots_purchase_return_items",
+				Columns:    []*schema.Column{PurchaseReturnItemsColumns[8]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_return_items_materials_purchase_return_items",
+				Columns:    []*schema.Column{PurchaseReturnItemsColumns[9]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_return_items_purchase_receipt_items_purchase_return_items",
+				Columns:    []*schema.Column{PurchaseReturnItemsColumns[10]},
+				RefColumns: []*schema.Column{PurchaseReceiptItemsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "purchase_return_items_purchase_returns_items",
+				Columns:    []*schema.Column{PurchaseReturnItemsColumns[11]},
+				RefColumns: []*schema.Column{PurchaseReturnsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_return_items_units_purchase_return_items",
+				Columns:    []*schema.Column{PurchaseReturnItemsColumns[12]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_return_items_warehouses_purchase_return_items",
+				Columns:    []*schema.Column{PurchaseReturnItemsColumns[13]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchasereturnitem_return_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnItemsColumns[11]},
+			},
+			{
+				Name:    "purchasereturnitem_purchase_receipt_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnItemsColumns[10]},
+			},
+			{
+				Name:    "purchasereturnitem_material_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnItemsColumns[9]},
+			},
+			{
+				Name:    "purchasereturnitem_warehouse_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnItemsColumns[13]},
+			},
+			{
+				Name:    "purchasereturnitem_lot_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReturnItemsColumns[8]},
+			},
+			{
+				Name:    "purchasereturnitem_return_id_source_line_no",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReturnItemsColumns[11], PurchaseReturnItemsColumns[4]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "source_line_no IS NOT NULL AND source_line_no <> ''",
+				},
+			},
+		},
+	}
+	// UnitsColumns holds the columns for the "units" table.
+	UnitsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "code", Type: field.TypeString, Size: 32},
+		{Name: "name", Type: field.TypeString, Size: 64},
+		{Name: "precision", Type: field.TypeInt, Default: 0},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// UnitsTable holds the schema information for the "units" table.
+	UnitsTable = &schema.Table{
+		Name:       "units",
+		Columns:    UnitsColumns,
+		PrimaryKey: []*schema.Column{UnitsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "unit_code",
+				Unique:  true,
+				Columns: []*schema.Column{UnitsColumns[1]},
+			},
+		},
+	}
 	// UsersColumns holds the columns for the "users" table.
 	UsersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -213,6 +883,34 @@ var (
 				Name:    "user_username",
 				Unique:  true,
 				Columns: []*schema.Column{UsersColumns[1]},
+			},
+		},
+	}
+	// WarehousesColumns holds the columns for the "warehouses" table.
+	WarehousesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "code", Type: field.TypeString, Size: 64},
+		{Name: "name", Type: field.TypeString, Size: 128},
+		{Name: "type", Type: field.TypeString, Size: 32},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// WarehousesTable holds the schema information for the "warehouses" table.
+	WarehousesTable = &schema.Table{
+		Name:       "warehouses",
+		Columns:    WarehousesColumns,
+		PrimaryKey: []*schema.Column{WarehousesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "warehouse_code",
+				Unique:  true,
+				Columns: []*schema.Column{WarehousesColumns[1]},
+			},
+			{
+				Name:    "warehouse_type",
+				Unique:  false,
+				Columns: []*schema.Column{WarehousesColumns[3]},
 			},
 		},
 	}
@@ -345,10 +1043,23 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		AdminUsersTable,
+		BomHeadersTable,
+		BomItemsTable,
 		BusinessRecordsTable,
 		BusinessRecordEventsTable,
 		BusinessRecordItemsTable,
+		InventoryBalancesTable,
+		InventoryLotsTable,
+		InventoryTxnsTable,
+		MaterialsTable,
+		ProductsTable,
+		PurchaseReceiptsTable,
+		PurchaseReceiptItemsTable,
+		PurchaseReturnsTable,
+		PurchaseReturnItemsTable,
+		UnitsTable,
 		UsersTable,
+		WarehousesTable,
 		WorkflowBusinessStatesTable,
 		WorkflowTasksTable,
 		WorkflowTaskEventsTable,
@@ -356,5 +1067,48 @@ var (
 )
 
 func init() {
+	BomHeadersTable.ForeignKeys[0].RefTable = ProductsTable
+	BomItemsTable.ForeignKeys[0].RefTable = BomHeadersTable
+	BomItemsTable.ForeignKeys[1].RefTable = MaterialsTable
+	BomItemsTable.ForeignKeys[2].RefTable = UnitsTable
+	BomItemsTable.Annotation = &entsql.Annotation{}
+	BomItemsTable.Annotation.Checks = map[string]string{
+		"bom_items_loss_rate_non_negative": "loss_rate >= 0",
+		"bom_items_quantity_positive":      "quantity > 0",
+	}
+	InventoryBalancesTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	InventoryBalancesTable.ForeignKeys[1].RefTable = UnitsTable
+	InventoryBalancesTable.ForeignKeys[2].RefTable = WarehousesTable
+	InventoryTxnsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	InventoryTxnsTable.ForeignKeys[1].RefTable = UnitsTable
+	InventoryTxnsTable.ForeignKeys[2].RefTable = WarehousesTable
+	MaterialsTable.ForeignKeys[0].RefTable = UnitsTable
+	ProductsTable.ForeignKeys[0].RefTable = UnitsTable
+	PurchaseReceiptsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
+	PurchaseReceiptItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	PurchaseReceiptItemsTable.ForeignKeys[1].RefTable = MaterialsTable
+	PurchaseReceiptItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptsTable
+	PurchaseReceiptItemsTable.ForeignKeys[3].RefTable = UnitsTable
+	PurchaseReceiptItemsTable.ForeignKeys[4].RefTable = WarehousesTable
+	PurchaseReceiptItemsTable.Annotation = &entsql.Annotation{}
+	PurchaseReceiptItemsTable.Annotation.Checks = map[string]string{
+		"purchase_receipt_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
+		"purchase_receipt_items_quantity_positive":       "quantity > 0",
+		"purchase_receipt_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
+	}
+	PurchaseReturnsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
+	PurchaseReturnsTable.ForeignKeys[1].RefTable = PurchaseReceiptsTable
+	PurchaseReturnItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	PurchaseReturnItemsTable.ForeignKeys[1].RefTable = MaterialsTable
+	PurchaseReturnItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptItemsTable
+	PurchaseReturnItemsTable.ForeignKeys[3].RefTable = PurchaseReturnsTable
+	PurchaseReturnItemsTable.ForeignKeys[4].RefTable = UnitsTable
+	PurchaseReturnItemsTable.ForeignKeys[5].RefTable = WarehousesTable
+	PurchaseReturnItemsTable.Annotation = &entsql.Annotation{}
+	PurchaseReturnItemsTable.Annotation.Checks = map[string]string{
+		"purchase_return_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
+		"purchase_return_items_quantity_positive":       "quantity > 0",
+		"purchase_return_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
+	}
 	WorkflowTaskEventsTable.ForeignKeys[0].RefTable = WorkflowTasksTable
 }

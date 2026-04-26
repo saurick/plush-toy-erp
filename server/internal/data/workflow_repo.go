@@ -27,6 +27,17 @@ func NewWorkflowRepo(d *Data, logger log.Logger) *workflowRepo {
 
 var _ biz.WorkflowRepo = (*workflowRepo)(nil)
 
+func (r *workflowRepo) GetWorkflowTask(ctx context.Context, id int) (*biz.WorkflowTask, error) {
+	row, err := r.data.postgres.WorkflowTask.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrWorkflowTaskNotFound
+		}
+		return nil, err
+	}
+	return entWorkflowTaskToBiz(row), nil
+}
+
 func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
 	query := r.data.postgres.WorkflowTask.Query()
 	if filter.OwnerRoleKey != "" {
@@ -184,6 +195,23 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 	}
 	if _, err := eventBuilder.Save(ctx); err != nil {
 		return nil, err
+	}
+
+	if effects := in.SideEffects; effects != nil {
+		if effects.BusinessState != nil {
+			if _, err := upsertWorkflowBusinessStateInTx(ctx, tx, effects.BusinessState); err != nil {
+				return nil, err
+			}
+		}
+		if effects.DerivedTask != nil {
+			eventPayload := map[string]any{
+				"derived_from_task_id": effects.DerivedFromTaskID,
+				"workflow_rule_key":    effects.WorkflowRuleKey,
+			}
+			if _, _, err := ensureActiveWorkflowTaskInTx(ctx, tx, effects.DerivedTask, actorID, actorRoleKey, eventPayload); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -380,6 +408,144 @@ func (r *workflowRepo) UpsertWorkflowBusinessState(ctx context.Context, in *biz.
 	return entWorkflowBusinessStateToBiz(row), nil
 }
 
+func upsertWorkflowBusinessStateInTx(ctx context.Context, tx *ent.Tx, in *biz.WorkflowBusinessStateUpsert) (*ent.WorkflowBusinessState, error) {
+	existing, err := tx.WorkflowBusinessState.Query().
+		Where(
+			workflowbusinessstate.SourceType(in.SourceType),
+			workflowbusinessstate.SourceID(in.SourceID),
+		).
+		Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, err
+	}
+
+	now := time.Now()
+	if existing == nil {
+		builder := tx.WorkflowBusinessState.Create().
+			SetSourceType(in.SourceType).
+			SetSourceID(in.SourceID).
+			SetNillableSourceNo(in.SourceNo).
+			SetNillableOrderID(in.OrderID).
+			SetNillableBatchID(in.BatchID).
+			SetBusinessStatusKey(in.BusinessStatusKey).
+			SetNillableOwnerRoleKey(in.OwnerRoleKey).
+			SetNillableBlockedReason(in.BlockedReason).
+			SetStatusChangedAt(now).
+			SetPayload(in.Payload)
+		row, err := builder.Save(ctx)
+		if err != nil {
+			if ent.IsConstraintError(err) {
+				return nil, biz.ErrWorkflowBusinessStateFound
+			}
+			return nil, err
+		}
+		return row, nil
+	}
+
+	update := tx.WorkflowBusinessState.UpdateOneID(existing.ID).
+		SetBusinessStatusKey(in.BusinessStatusKey).
+		SetStatusChangedAt(now).
+		SetPayload(in.Payload)
+	if in.SourceNo != nil {
+		update.SetSourceNo(*in.SourceNo)
+	} else {
+		update.ClearSourceNo()
+	}
+	if in.OrderID != nil {
+		update.SetOrderID(*in.OrderID)
+	} else {
+		update.ClearOrderID()
+	}
+	if in.BatchID != nil {
+		update.SetBatchID(*in.BatchID)
+	} else {
+		update.ClearBatchID()
+	}
+	if in.OwnerRoleKey != nil {
+		update.SetOwnerRoleKey(*in.OwnerRoleKey)
+	} else {
+		update.ClearOwnerRoleKey()
+	}
+	if in.BlockedReason != nil {
+		update.SetBlockedReason(*in.BlockedReason)
+	} else {
+		update.ClearBlockedReason()
+	}
+
+	return update.Save(ctx)
+}
+
+func ensureActiveWorkflowTaskInTx(
+	ctx context.Context,
+	tx *ent.Tx,
+	in *biz.WorkflowTaskCreate,
+	actorID int,
+	actorRoleKey string,
+	eventPayload map[string]any,
+) (*ent.WorkflowTask, bool, error) {
+	existing, err := tx.WorkflowTask.Query().
+		Where(
+			workflowtask.SourceType(in.SourceType),
+			workflowtask.SourceID(in.SourceID),
+			workflowtask.TaskGroup(in.TaskGroup),
+			workflowtask.OwnerRoleKey(in.OwnerRoleKey),
+			workflowtask.TaskStatusKeyNotIn("done", "closed", "cancelled"),
+		).
+		Order(ent.Asc(workflowtask.FieldID)).
+		First(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, false, err
+	}
+	if existing != nil {
+		return existing, false, nil
+	}
+
+	builder := tx.WorkflowTask.Create().
+		SetTaskCode(in.TaskCode).
+		SetTaskGroup(in.TaskGroup).
+		SetTaskName(in.TaskName).
+		SetSourceType(in.SourceType).
+		SetSourceID(in.SourceID).
+		SetNillableSourceNo(in.SourceNo).
+		SetNillableBusinessStatusKey(in.BusinessStatusKey).
+		SetTaskStatusKey(in.TaskStatusKey).
+		SetOwnerRoleKey(in.OwnerRoleKey).
+		SetNillableAssigneeID(in.AssigneeID).
+		SetPriority(in.Priority).
+		SetNillableBlockedReason(in.BlockedReason).
+		SetNillableDueAt(in.DueAt).
+		SetPayload(in.Payload)
+	if actorID > 0 {
+		builder.SetCreatedBy(actorID).SetUpdatedBy(actorID)
+	}
+	row, err := builder.Save(ctx)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			return nil, false, biz.ErrWorkflowTaskExists
+		}
+		return nil, false, err
+	}
+
+	if eventPayload == nil {
+		eventPayload = map[string]any{}
+	}
+	eventBuilder := tx.WorkflowTaskEvent.Create().
+		SetTaskID(row.ID).
+		SetEventType("created").
+		SetToStatusKey(in.TaskStatusKey).
+		SetPayload(eventPayload)
+	if actorID > 0 {
+		eventBuilder.SetActorID(actorID)
+	}
+	if strings.TrimSpace(actorRoleKey) != "" {
+		eventBuilder.SetActorRoleKey(strings.TrimSpace(actorRoleKey))
+	}
+	if _, err := eventBuilder.Save(ctx); err != nil {
+		return nil, false, err
+	}
+	return row, true, nil
+}
+
 func entWorkflowTaskToBiz(row *ent.WorkflowTask) *biz.WorkflowTask {
 	if row == nil {
 		return nil
@@ -398,7 +564,7 @@ func entWorkflowTaskToBiz(row *ent.WorkflowTask) *biz.WorkflowTask {
 		SourceNo:          row.SourceNo,
 		BusinessStatusKey: row.BusinessStatusKey,
 		TaskStatusKey:     row.TaskStatusKey,
-		OwnerRoleKey:      row.OwnerRoleKey,
+		OwnerRoleKey:      biz.NormalizeRoleKey(row.OwnerRoleKey),
 		AssigneeID:        row.AssigneeID,
 		Priority:          row.Priority,
 		BlockedReason:     row.BlockedReason,
@@ -430,7 +596,7 @@ func entWorkflowBusinessStateToBiz(row *ent.WorkflowBusinessState) *biz.Workflow
 		OrderID:           row.OrderID,
 		BatchID:           row.BatchID,
 		BusinessStatusKey: row.BusinessStatusKey,
-		OwnerRoleKey:      row.OwnerRoleKey,
+		OwnerRoleKey:      biz.NormalizeOptionalRoleKey(row.OwnerRoleKey),
 		BlockedReason:     row.BlockedReason,
 		StatusChangedAt:   row.StatusChangedAt,
 		Payload:           payload,

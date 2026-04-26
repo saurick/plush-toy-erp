@@ -18,6 +18,7 @@ require (
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jwalton/gchalk v1.3.0
 	github.com/jwalton/go-supportscolor v1.2.0
+	github.com/shopspring/decimal v1.4.0
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.38.0
 	go.opentelemetry.io/otel/sdk v1.40.0

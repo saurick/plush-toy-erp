@@ -13,12 +13,13 @@ import (
 )
 
 var (
-	ErrDebugSeedDisabled         = errors.New("debug seed disabled")
-	ErrDebugCleanupDisabled      = errors.New("debug cleanup disabled")
-	ErrDebugScenarioNotFound     = errors.New("debug scenario not found")
-	ErrDebugRunIDRequired        = errors.New("debug run id required")
-	ErrDebugCleanupScopeInvalid  = errors.New("debug cleanup scope invalid")
-	ErrDebugPayloadMarkerMissing = errors.New("debug payload marker missing")
+	ErrDebugSeedDisabled              = errors.New("debug seed disabled")
+	ErrDebugCleanupDisabled           = errors.New("debug cleanup disabled")
+	ErrDebugBusinessDataClearDisabled = errors.New("debug business data clear disabled")
+	ErrDebugScenarioNotFound          = errors.New("debug scenario not found")
+	ErrDebugRunIDRequired             = errors.New("debug run id required")
+	ErrDebugCleanupScopeInvalid       = errors.New("debug cleanup scope invalid")
+	ErrDebugPayloadMarkerMissing      = errors.New("debug payload marker missing")
 )
 
 const (
@@ -37,15 +38,18 @@ type DebugSafetyConfig struct {
 }
 
 type DebugCapabilities struct {
-	Environment           string
-	SeedEnabled           bool
-	SeedAllowed           bool
-	SeedDisabledReason    string
-	CleanupEnabled        bool
-	CleanupAllowed        bool
-	CleanupDisabledReason string
-	CleanupScope          string
-	SupportedScenarios    []DebugScenarioSummary
+	Environment                     string
+	SeedEnabled                     bool
+	SeedAllowed                     bool
+	SeedDisabledReason              string
+	CleanupEnabled                  bool
+	CleanupAllowed                  bool
+	CleanupDisabledReason           string
+	BusinessDataClearEnabled        bool
+	BusinessDataClearAllowed        bool
+	BusinessDataClearDisabledReason string
+	CleanupScope                    string
+	SupportedScenarios              []DebugScenarioSummary
 }
 
 type DebugScenarioSummary struct {
@@ -124,6 +128,13 @@ type DebugBusinessChainCleanupResult struct {
 	DeletedTaskEvents     int
 	SkippedItems          []DebugCleanupSkippedItem
 	Warnings              []string
+}
+
+type DebugBusinessDataClearResult struct {
+	DeletedCounts     map[string]int
+	DeletedTotal      int
+	ClearedTableNames []string
+	Warnings          []string
 }
 
 type DebugMatchedRecord struct {
@@ -218,6 +229,7 @@ type DebugBusinessStatePlan struct {
 type DebugRepo interface {
 	SeedBusinessChainDebugData(ctx context.Context, plan DebugSeedPlan, actorID int) (*DebugBusinessChainSeedResult, error)
 	CleanupBusinessChainDebugData(ctx context.Context, in DebugBusinessChainCleanupInput) (*DebugBusinessChainCleanupResult, error)
+	ClearBusinessData(ctx context.Context) (*DebugBusinessDataClearResult, error)
 }
 
 type DebugUsecase struct {
@@ -250,15 +262,18 @@ func (uc *DebugUsecase) Capabilities() DebugCapabilities {
 	}
 	config = NormalizeDebugSafetyConfig(config)
 	return DebugCapabilities{
-		Environment:           config.Environment,
-		SeedEnabled:           config.SeedEnabled,
-		SeedAllowed:           debugSeedAllowed(config),
-		SeedDisabledReason:    debugSeedDisabledReason(config),
-		CleanupEnabled:        config.CleanupEnabled,
-		CleanupAllowed:        debugCleanupAllowed(config),
-		CleanupDisabledReason: debugCleanupDisabledReason(config),
-		CleanupScope:          config.CleanupScope,
-		SupportedScenarios:    ListDebugScenarioSummaries(),
+		Environment:                     config.Environment,
+		SeedEnabled:                     config.SeedEnabled,
+		SeedAllowed:                     debugSeedAllowed(config),
+		SeedDisabledReason:              debugSeedDisabledReason(config),
+		CleanupEnabled:                  config.CleanupEnabled,
+		CleanupAllowed:                  debugCleanupAllowed(config),
+		CleanupDisabledReason:           debugCleanupDisabledReason(config),
+		BusinessDataClearEnabled:        config.CleanupEnabled,
+		BusinessDataClearAllowed:        debugBusinessDataClearAllowed(config),
+		BusinessDataClearDisabledReason: debugBusinessDataClearDisabledReason(config),
+		CleanupScope:                    config.CleanupScope,
+		SupportedScenarios:              ListDebugScenarioSummaries(),
 	}
 }
 
@@ -315,6 +330,17 @@ func (uc *DebugUsecase) CleanupBusinessChainScenario(ctx context.Context, in Deb
 	return uc.repo.CleanupBusinessChainDebugData(ctx, in)
 }
 
+func (uc *DebugUsecase) ClearBusinessData(ctx context.Context) (*DebugBusinessDataClearResult, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	config := NormalizeDebugSafetyConfig(uc.config)
+	if !debugBusinessDataClearAllowed(config) {
+		return nil, ErrDebugBusinessDataClearDisabled
+	}
+	return uc.repo.ClearBusinessData(ctx)
+}
+
 func ListDebugScenarioSummaries() []DebugScenarioSummary {
 	out := make([]DebugScenarioSummary, 0, len(debugBusinessChainScenarioOrder))
 	for _, key := range debugBusinessChainScenarioOrder {
@@ -354,13 +380,16 @@ func DebugDocumentPrefix(debugRunID string, scenarioKey string) (string, error) 
 }
 
 func debugSeedAllowed(config DebugSafetyConfig) bool {
-	return config.SeedEnabled && debugEnvironmentAllowsMutation(config.Environment)
+	return config.SeedEnabled
 }
 
 func debugCleanupAllowed(config DebugSafetyConfig) bool {
 	return config.CleanupEnabled &&
-		config.CleanupScope == DebugDefaultCleanupScope &&
-		debugEnvironmentAllowsMutation(config.Environment)
+		config.CleanupScope == DebugDefaultCleanupScope
+}
+
+func debugBusinessDataClearAllowed(config DebugSafetyConfig) bool {
+	return debugCleanupAllowed(config)
 }
 
 func debugSeedDisabledReason(config DebugSafetyConfig) string {
@@ -369,9 +398,6 @@ func debugSeedDisabledReason(config DebugSafetyConfig) string {
 	}
 	if !config.SeedEnabled {
 		return "后端未开启生成调试数据开关 ERP_DEBUG_SEED_ENABLED"
-	}
-	if !debugEnvironmentAllowsMutation(config.Environment) {
-		return fmt.Sprintf("当前环境 %s 不允许生成调试数据", config.Environment)
 	}
 	return "生成调试数据能力不可用"
 }
@@ -383,13 +409,23 @@ func debugCleanupDisabledReason(config DebugSafetyConfig) string {
 	if !config.CleanupEnabled {
 		return "后端未开启清理调试数据开关 ERP_DEBUG_CLEANUP_ENABLED"
 	}
-	if !debugEnvironmentAllowsMutation(config.Environment) {
-		return fmt.Sprintf("当前环境 %s 不允许清理调试数据", config.Environment)
-	}
 	if config.CleanupScope != DebugDefaultCleanupScope {
 		return fmt.Sprintf("清理范围 %s 不受支持，只允许 %s", config.CleanupScope, DebugDefaultCleanupScope)
 	}
 	return "清理调试数据能力不可用"
+}
+
+func debugBusinessDataClearDisabledReason(config DebugSafetyConfig) string {
+	if debugBusinessDataClearAllowed(config) {
+		return ""
+	}
+	if !config.CleanupEnabled {
+		return "后端未开启业务数据清空开关 ERP_DEBUG_CLEANUP_ENABLED"
+	}
+	if config.CleanupScope != DebugDefaultCleanupScope {
+		return fmt.Sprintf("清理范围 %s 不受支持，只允许 %s", config.CleanupScope, DebugDefaultCleanupScope)
+	}
+	return "业务数据清空能力不可用"
 }
 
 func normalizeDebugEnvironment(value string) string {
@@ -407,15 +443,6 @@ func normalizeDebugEnvironment(value string) string {
 		return "remote"
 	default:
 		return env
-	}
-}
-
-func debugEnvironmentAllowsMutation(environment string) bool {
-	switch normalizeDebugEnvironment(environment) {
-	case "local", "dev":
-		return true
-	default:
-		return false
 	}
 }
 
@@ -543,14 +570,14 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			{Label: "协同任务调试", Path: "/erp/qa/workflow-task-debug", Reason: "核对工程资料任务是否进入 PMC / 相关角色池"},
 		},
 		records: []debugRecordTemplate{
-			{ref: "order", moduleKey: "project-orders", title: "订单审批通过，待工程资料", statusKey: "engineering_preparing", ownerRoleKey: "merchandiser", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", quantity: 1200, unit: "只", amount: 57600, dueOffsetDays: 21},
+			{ref: "order", moduleKey: "project-orders", title: "订单审批通过，待工程资料", statusKey: "engineering_preparing", ownerRoleKey: "business", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", quantity: 1200, unit: "只", amount: 57600, dueOffsetDays: 21},
 			{ref: "bom", moduleKey: "material-bom", title: "工程资料准备中", statusKey: "engineering_preparing", ownerRoleKey: "pmc", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", materialName: "BOM / 色卡 / 包装资料", quantity: 1, unit: "套", dueOffsetDays: 3},
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "bom", suffix: "ENG", group: "engineering_material", name: "准备 BOM、色卡和包装资料", statusKey: "ready", businessStatusKey: "engineering_preparing", ownerRoleKey: "pmc", priority: 2, dueOffsetDays: 3},
 		},
 		states: []debugStateTemplate{
-			{recordRef: "order", statusKey: "engineering_preparing", ownerRoleKey: "merchandiser"},
+			{recordRef: "order", statusKey: "engineering_preparing", ownerRoleKey: "business"},
 			{recordRef: "bom", statusKey: "engineering_preparing", ownerRoleKey: "pmc"},
 		},
 	},
@@ -627,12 +654,12 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "progress", suffix: "FQC", group: "finished_goods_qc", name: "成品抽检", statusKey: "ready", businessStatusKey: "qc_pending", ownerRoleKey: "quality", priority: 2, dueOffsetDays: 1},
-			{recordRef: "shipping", suffix: "SHIP", group: "shipment_release", name: "出货放行确认", statusKey: "ready", businessStatusKey: "shipping_released", ownerRoleKey: "merchandiser", priority: 2, dueOffsetDays: 3},
+			{recordRef: "shipping", suffix: "SHIP", group: "shipment_release", name: "出货放行确认", statusKey: "ready", businessStatusKey: "shipping_released", ownerRoleKey: "business", priority: 2, dueOffsetDays: 3},
 			{recordRef: "outbound", suffix: "OUT", group: "warehouse_outbound", name: "仓库出库确认", statusKey: "pending", businessStatusKey: "shipped", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 4},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "progress", statusKey: "qc_pending", ownerRoleKey: "quality"},
-			{recordRef: "shipping", statusKey: "shipping_released", ownerRoleKey: "merchandiser"},
+			{recordRef: "shipping", statusKey: "shipping_released", ownerRoleKey: "business"},
 			{recordRef: "outbound", statusKey: "shipped", ownerRoleKey: "warehouse"},
 		},
 	},

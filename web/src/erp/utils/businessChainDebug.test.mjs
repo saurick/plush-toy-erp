@@ -111,39 +111,58 @@ test('businessChainDebug: 写入类调试操作默认受保护', () => {
     BUSINESS_CHAIN_DEBUG_MUTATION_GUARD.cleanupMethod,
     'debug.clear_business_chain_scenario'
   )
+  assert.equal(
+    BUSINESS_CHAIN_DEBUG_MUTATION_GUARD.clearBusinessDataMethod,
+    'debug.clear_business_data'
+  )
 })
 
-test('businessChainDebug: 禁用环境会保留后端禁用原因给页面展示', () => {
+test('businessChainDebug: 禁用状态会保留后端禁用原因给页面展示', () => {
   const capabilities = normalizeBusinessChainDebugCapabilities({
-    environment: 'remote',
-    seedEnabled: true,
+    environment: 'sql',
+    seedEnabled: false,
     seedAllowed: false,
-    seedDisabledReason: '当前环境 remote 不允许生成调试数据',
-    cleanupEnabled: true,
+    seedDisabledReason: '后端未开启生成调试数据开关 ERP_DEBUG_SEED_ENABLED',
+    cleanupEnabled: false,
     cleanupAllowed: false,
-    cleanupDisabledReason: '当前环境 remote 不允许清理调试数据',
+    cleanupDisabledReason:
+      '后端未开启清理调试数据开关 ERP_DEBUG_CLEANUP_ENABLED',
+    businessDataClearEnabled: false,
+    businessDataClearAllowed: false,
+    businessDataClearDisabledReason:
+      '后端未开启业务数据清空开关 ERP_DEBUG_CLEANUP_ENABLED',
   })
 
-  assert.equal(capabilities.environment, 'remote')
+  assert.equal(capabilities.environment, 'sql')
   assert.equal(
     getBusinessChainDebugActionDisabledReason(capabilities, 'seed'),
-    '当前环境 remote 不允许生成调试数据'
+    '后端未开启生成调试数据开关 ERP_DEBUG_SEED_ENABLED'
   )
   assert.equal(
     getBusinessChainDebugActionDisabledReason(capabilities, 'cleanup'),
-    '当前环境 remote 不允许清理调试数据'
+    '后端未开启清理调试数据开关 ERP_DEBUG_CLEANUP_ENABLED'
+  )
+  assert.equal(
+    getBusinessChainDebugActionDisabledReason(
+      capabilities,
+      'businessDataClear'
+    ),
+    '后端未开启业务数据清空开关 ERP_DEBUG_CLEANUP_ENABLED'
   )
   assert(pageSource.includes('seedDisabledReason'))
   assert(pageSource.includes('cleanupDisabledReason'))
+  assert(pageSource.includes('businessDataClearDisabledReason'))
 })
 
-test('businessChainDebug: 页面不接入业务写操作或危险 SQL 清理入口', () => {
+test('businessChainDebug: 业务数据清空入口只走 debug 域受控 API', () => {
   assert.equal(pageSource.includes('createBusinessRecord'), false)
   assert.equal(pageSource.includes('updateBusinessRecord'), false)
   assert.equal(pageSource.includes('deleteBusinessRecords'), false)
   assert.equal(pageSource.includes('upsertWorkflowBusinessState'), false)
   assert.equal(pageSource.includes('createWorkflowTask'), false)
-  assert.equal(pageSource.includes('清空业务 SQL 数据'), false)
+  assert.equal(pageSource.includes('debugRpc.call'), false)
+  assert.equal(pageSource.includes('clearBusinessChainDebugBusinessData'), true)
+  assert.equal(pageSource.includes('清空业务数据'), true)
 })
 
 test('businessChainDebug: 模块 key 和标题都可以命中模块查询', () => {
@@ -172,7 +191,7 @@ test('businessChainDebug: 按单据号聚合业务记录和关联任务', () => 
         quantity: 2,
         amount: 39.8,
         business_status_key: 'blocked',
-        owner_role_key: 'merchandiser',
+        owner_role_key: 'business',
         payload: { status_reason: '资料未齐，等待客户确认' },
         items: [{ item_name: '浅棕色毛绒熊' }],
         updated_at: 1777046400,
@@ -185,7 +204,7 @@ test('businessChainDebug: 按单据号聚合业务记录和关联任务', () => 
         source_id: 21,
         source_no: 'STYLE-L1-001',
         business_status_key: 'blocked',
-        owner_role_key: 'merchandiser',
+        owner_role_key: 'business',
         blocked_reason: '资料未齐，等待客户确认',
         payload: {},
       },
@@ -201,7 +220,7 @@ test('businessChainDebug: 按单据号聚合业务记录和关联任务', () => 
         source_no: 'STYLE-L1-001',
         business_status_key: 'blocked',
         task_status_key: 'blocked',
-        owner_role_key: 'merchandiser',
+        owner_role_key: 'business',
         priority: 2,
         due_at: 1777132800,
         blocked_reason: '资料未齐，等待客户确认',
@@ -214,7 +233,7 @@ test('businessChainDebug: 按单据号聚合业务记录和关联任务', () => 
         event_type: 'status_changed',
         from_status_key: 'pending',
         to_status_key: 'blocked',
-        actor_role_key: 'merchandiser',
+        actor_role_key: 'business',
         reason: '资料未齐，等待客户确认',
         created_at: 1777046500,
       },

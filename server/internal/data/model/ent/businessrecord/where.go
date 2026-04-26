@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 // ID filters vertices based on their ID field.
@@ -1847,6 +1848,52 @@ func DeleteReasonEqualFold(v string) predicate.BusinessRecord {
 // DeleteReasonContainsFold applies the ContainsFold predicate on the "delete_reason" field.
 func DeleteReasonContainsFold(v string) predicate.BusinessRecord {
 	return predicate.BusinessRecord(sql.FieldContainsFold(FieldDeleteReason, v))
+}
+
+// HasPurchaseReceipts applies the HasEdge predicate on the "purchase_receipts" edge.
+func HasPurchaseReceipts() predicate.BusinessRecord {
+	return predicate.BusinessRecord(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReceiptsTable, PurchaseReceiptsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPurchaseReceiptsWith applies the HasEdge predicate on the "purchase_receipts" edge with a given conditions (other predicates).
+func HasPurchaseReceiptsWith(preds ...predicate.PurchaseReceipt) predicate.BusinessRecord {
+	return predicate.BusinessRecord(func(s *sql.Selector) {
+		step := newPurchaseReceiptsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPurchaseReturns applies the HasEdge predicate on the "purchase_returns" edge.
+func HasPurchaseReturns() predicate.BusinessRecord {
+	return predicate.BusinessRecord(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PurchaseReturnsTable, PurchaseReturnsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPurchaseReturnsWith applies the HasEdge predicate on the "purchase_returns" edge with a given conditions (other predicates).
+func HasPurchaseReturnsWith(preds ...predicate.PurchaseReturn) predicate.BusinessRecord {
+	return predicate.BusinessRecord(func(s *sql.Selector) {
+		step := newPurchaseReturnsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

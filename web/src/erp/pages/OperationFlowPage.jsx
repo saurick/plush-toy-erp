@@ -114,7 +114,7 @@ const FLOW_LANES = [
       {
         key: 'project-order',
         title: '客户 / 款式立项',
-        description: '先收客户、订单编号、产品订单编号、交期和跟单负责人。',
+        description: '先收客户、订单编号、产品订单编号、交期和业务负责人。',
         note: '生产订单总表截图里的客户、订单编号、产品编号、出货日期是当前立项层的核心快照。',
       },
       {
@@ -271,7 +271,7 @@ export default function OperationFlowPage() {
         </Title>
         <Paragraph type="secondary" style={{ marginBottom: 0, marginTop: 8 }}>
           按“客户 / 款式立项 → 材料 / 委外准备 → 生产 / 仓库出货 → 对账 /
-          结算提醒”串起毛绒工厂主要业务链路，适合老板、跟单、采购、 PMC、
+          结算提醒”串起毛绒工厂主要业务链路，适合老板、业务、采购、 PMC、
           仓库和财务先看全景。
         </Paragraph>
         <div className="erp-flow-overview__quickstart">

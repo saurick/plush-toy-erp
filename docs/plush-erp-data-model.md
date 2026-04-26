@@ -72,7 +72,7 @@
 | `erp_bom_lines` | BOM 明细行 | 暂不建 | `bom_header_id`、`material_id`、`assembly_part`、`unit_usage`、`loss_rate`、`total_usage_snapshot`、`process_note` | `bom_header_id + line_no` | 材料分析明细表 | 备注、加工方式、共享纸样备注 |
 | `erp_processing_contract_headers` | 加工合同头 | 暂不建 | `contract_no`、`partner_id`、`client_name_snapshot`、`placed_date_raw`、`promised_return_date`、`settlement_terms_snapshot` | `contract_no` | 合同 PDF | 委托单位、委托人、联系方式、签署图样 |
 | `erp_processing_contract_lines` | 加工合同明细 | 暂不建 | `contract_header_id`、`product_order_no_snapshot`、`product_no_snapshot`、`product_name_snapshot`、`process_name`、`process_type`、`unit`、`unit_price_snapshot`、`qty`、`amount_snapshot` | `contract_header_id + line_no` | 合同 PDF、加工汇总表 | 备注、工厂名称快照 |
-| `erp_production_orders` | 生产 / 排单头 | 暂不建 | `order_no_snapshot`、`client_code_snapshot`、`ship_date_snapshot`、`merchandiser_name_snapshot`、`category_snapshot` | 当前编号体系未稳定 | 生产订单总表截图 | 颜色、图片、备注 |
+| `erp_production_orders` | 生产 / 排单头 | 暂不建 | `order_no_snapshot`、`client_code_snapshot`、`ship_date_snapshot`、`business_owner_name_snapshot`、`category_snapshot` | 当前编号体系未稳定 | 生产订单总表截图 | 颜色、图片、备注 |
 | `erp_production_progress_logs` | 进度、延期、返工、异常日志 | 暂不建 | `production_order_id`、`event_type`、`progress_status`、`reason`、`occurred_at`、`reported_by` | `production_order_id + event_no` | 正式汇报 PDF 第 7 页信息结构 | 返工 / 异常备注 |
 | `erp_inventory_moves` | 收发 / 入库 / 待出货 | 暂不建 | `move_type`、`material_or_goods_type`、`related_order_id`、`qty`、`warehouse_status` | `move_no` | 正式汇报 PDF 第 4 页流程图 | IQC 结果、出货备注 |
 | `erp_settlements` | 加工费、辅材 / 包材费用结算入口 | 暂不建 | `settlement_type`、`partner_id`、`period`、`amount_snapshot`、`status` | `settlement_no` | 合同结算条款、金额类 Excel | 对账说明、付款说明 |

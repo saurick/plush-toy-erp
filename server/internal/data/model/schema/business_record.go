@@ -5,6 +5,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 )
@@ -124,5 +125,12 @@ func (BusinessRecord) Indexes() []ent.Index {
 			Annotations(
 				entsql.IndexWhere("deleted_at IS NULL AND document_no IS NOT NULL AND document_no <> ''"),
 			),
+	}
+}
+
+func (BusinessRecord) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("purchase_receipts", PurchaseReceipt.Type),
+		edge.To("purchase_returns", PurchaseReturn.Type),
 	}
 }

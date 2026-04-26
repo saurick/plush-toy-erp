@@ -21,16 +21,16 @@ const ERP_APP_DEFINITIONS = {
     description:
       '老板移动端独立入口，聚焦交期风险、异常、待结算和本周重点，不做复杂录入。',
   },
-  'mobile-merchandiser': {
-    id: 'mobile-merchandiser',
+  'mobile-business': {
+    id: 'mobile-business',
     kind: 'mobile',
-    title: '毛绒 ERP 跟单移动端',
-    shortTitle: '跟单移动端',
-    roleKey: 'merchandiser',
+    title: '毛绒 ERP 业务移动端',
+    shortTitle: '业务移动端',
+    roleKey: 'business',
     port: 5187,
-    command: 'pnpm start:mobile:merchandiser',
+    command: 'pnpm start:mobile:business',
     description:
-      '跟单移动端独立入口，聚焦客户 / 款式 / 缺资料 / 催料 / 催合同 / 交期预警。',
+      '业务移动端独立入口，聚焦客户 / 款式 / 缺资料 / 催料 / 催合同 / 交期预警。',
   },
   'mobile-purchasing': {
     id: 'mobile-purchasing',

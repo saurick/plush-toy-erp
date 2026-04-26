@@ -14,14 +14,40 @@ type Tx struct {
 	config
 	// AdminUser is the client for interacting with the AdminUser builders.
 	AdminUser *AdminUserClient
+	// BOMHeader is the client for interacting with the BOMHeader builders.
+	BOMHeader *BOMHeaderClient
+	// BOMItem is the client for interacting with the BOMItem builders.
+	BOMItem *BOMItemClient
 	// BusinessRecord is the client for interacting with the BusinessRecord builders.
 	BusinessRecord *BusinessRecordClient
 	// BusinessRecordEvent is the client for interacting with the BusinessRecordEvent builders.
 	BusinessRecordEvent *BusinessRecordEventClient
 	// BusinessRecordItem is the client for interacting with the BusinessRecordItem builders.
 	BusinessRecordItem *BusinessRecordItemClient
+	// InventoryBalance is the client for interacting with the InventoryBalance builders.
+	InventoryBalance *InventoryBalanceClient
+	// InventoryLot is the client for interacting with the InventoryLot builders.
+	InventoryLot *InventoryLotClient
+	// InventoryTxn is the client for interacting with the InventoryTxn builders.
+	InventoryTxn *InventoryTxnClient
+	// Material is the client for interacting with the Material builders.
+	Material *MaterialClient
+	// Product is the client for interacting with the Product builders.
+	Product *ProductClient
+	// PurchaseReceipt is the client for interacting with the PurchaseReceipt builders.
+	PurchaseReceipt *PurchaseReceiptClient
+	// PurchaseReceiptItem is the client for interacting with the PurchaseReceiptItem builders.
+	PurchaseReceiptItem *PurchaseReceiptItemClient
+	// PurchaseReturn is the client for interacting with the PurchaseReturn builders.
+	PurchaseReturn *PurchaseReturnClient
+	// PurchaseReturnItem is the client for interacting with the PurchaseReturnItem builders.
+	PurchaseReturnItem *PurchaseReturnItemClient
+	// Unit is the client for interacting with the Unit builders.
+	Unit *UnitClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
+	// Warehouse is the client for interacting with the Warehouse builders.
+	Warehouse *WarehouseClient
 	// WorkflowBusinessState is the client for interacting with the WorkflowBusinessState builders.
 	WorkflowBusinessState *WorkflowBusinessStateClient
 	// WorkflowTask is the client for interacting with the WorkflowTask builders.
@@ -160,10 +186,23 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.AdminUser = NewAdminUserClient(tx.config)
+	tx.BOMHeader = NewBOMHeaderClient(tx.config)
+	tx.BOMItem = NewBOMItemClient(tx.config)
 	tx.BusinessRecord = NewBusinessRecordClient(tx.config)
 	tx.BusinessRecordEvent = NewBusinessRecordEventClient(tx.config)
 	tx.BusinessRecordItem = NewBusinessRecordItemClient(tx.config)
+	tx.InventoryBalance = NewInventoryBalanceClient(tx.config)
+	tx.InventoryLot = NewInventoryLotClient(tx.config)
+	tx.InventoryTxn = NewInventoryTxnClient(tx.config)
+	tx.Material = NewMaterialClient(tx.config)
+	tx.Product = NewProductClient(tx.config)
+	tx.PurchaseReceipt = NewPurchaseReceiptClient(tx.config)
+	tx.PurchaseReceiptItem = NewPurchaseReceiptItemClient(tx.config)
+	tx.PurchaseReturn = NewPurchaseReturnClient(tx.config)
+	tx.PurchaseReturnItem = NewPurchaseReturnItemClient(tx.config)
+	tx.Unit = NewUnitClient(tx.config)
 	tx.User = NewUserClient(tx.config)
+	tx.Warehouse = NewWarehouseClient(tx.config)
 	tx.WorkflowBusinessState = NewWorkflowBusinessStateClient(tx.config)
 	tx.WorkflowTask = NewWorkflowTaskClient(tx.config)
 	tx.WorkflowTaskEvent = NewWorkflowTaskEventClient(tx.config)

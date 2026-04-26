@@ -20,11 +20,12 @@
 
 业务链路调试页调用后端 JSON-RPC `debug` 域生成和清理调试数据：
 
-- `debug.capabilities`：返回当前环境、seed / cleanup 是否允许和禁用原因
+- `debug.capabilities`：返回当前环境、seed / cleanup / 业务数据清空是否允许和禁用原因
 - `debug.rebuild_business_chain_scenario`：生成带 debugRunId 标记的调试数据
 - `debug.clear_business_chain_scenario`：按 debugRunId 预览或清理调试数据
+- `debug.clear_business_data`：清空本项目当前 SQL 连接中的业务链路、采购入库、库存、BOM、物料、成品、仓库和单位业务表
 
-这些接口默认关闭，只允许 local / dev 环境在显式开启 `ERP_DEBUG_SEED_ENABLED`、`ERP_DEBUG_CLEANUP_ENABLED`、`ERP_DEBUG_CLEANUP_SCOPE=debug_run` 后使用；后端还会校验管理员身份和业务链路调试菜单权限。
+这些接口默认面向当前 SQL 连接开启。可用 `ERP_DEBUG_SEED_ENABLED=false` 或 `ERP_DEBUG_CLEANUP_ENABLED=false` 显式关闭写操作；清理类能力仍要求 `ERP_DEBUG_CLEANUP_SCOPE=debug_run`。业务数据清空不删除账号、权限、管理员偏好、配置和数据库结构。后端还会校验管理员身份和业务链路调试菜单权限。
 
 ## 快速开始
 
@@ -45,6 +46,42 @@ make print_db_url
 make migrate_status
 go test ./...
 make build
+```
+
+Phase 2A 库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_phase2a_test`：
+
+```bash
+make phase2a_pg_createdb
+make phase2a_migrate_status
+make phase2a_migrate_apply
+make phase2a_pg_test
+```
+
+Phase 2B BOM + 批次库存 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2b_test`：
+
+```bash
+make phase2b_pg_createdb
+make phase2b_migrate_status
+make phase2b_migrate_apply
+make phase2b_pg_test
+```
+
+Phase 2C 采购入库 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2c_test`：
+
+```bash
+make phase2c_pg_createdb
+make phase2c_migrate_status
+make phase2c_migrate_apply
+make phase2c_pg_test
+```
+
+Phase 2D-A 采购退货 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2d_test`：
+
+```bash
+make phase2d_pg_createdb
+make phase2d_migrate_status
+make phase2d_migrate_apply
+make phase2d_pg_test
 ```
 
 ## 迁移说明
