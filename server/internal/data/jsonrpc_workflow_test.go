@@ -23,6 +23,19 @@ type stubWorkflowJSONRPCRepo struct {
 	urgeActorRoleKey string
 }
 
+func workflowJSONRPCAdmin(roleKeys []string, permissionKeys ...string) *biz.AdminUser {
+	roles := make([]biz.AdminRole, 0, len(roleKeys))
+	for _, roleKey := range roleKeys {
+		roles = append(roles, biz.AdminRole{Key: biz.NormalizeRoleKey(roleKey)})
+	}
+	return &biz.AdminUser{
+		ID:          7,
+		Username:    "admin",
+		Roles:       roles,
+		Permissions: biz.NormalizePermissionKeys(permissionKeys),
+	}
+}
+
 func (s *stubWorkflowJSONRPCRepo) GetWorkflowTask(_ context.Context, id int) (*biz.WorkflowTask, error) {
 	return &biz.WorkflowTask{
 		ID:            id,
@@ -30,7 +43,7 @@ func (s *stubWorkflowJSONRPCRepo) GetWorkflowTask(_ context.Context, id int) (*b
 		SourceType:    "generic-source",
 		SourceID:      1,
 		TaskStatusKey: "ready",
-		OwnerRoleKey:  "business",
+		OwnerRoleKey:  biz.SalesRoleKey,
 		Payload:       map[string]any{},
 	}, nil
 }
@@ -80,7 +93,7 @@ func TestJsonrpcData_WorkflowUrgeTaskRecordsEventIntent(t *testing.T) {
 	repo := &stubWorkflowJSONRPCRepo{}
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
-		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin"}},
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionWorkflowTaskUpdate)},
 		workflowUC:  biz.NewWorkflowUsecase(repo),
 	}
 	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
@@ -139,7 +152,7 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusTriggersBossApprovalDerivation(t *t
 	workflowUC := biz.NewWorkflowUsecase(repo)
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
-		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin"}},
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionWorkflowTaskApprove)},
 		workflowUC:  workflowUC,
 	}
 
@@ -258,7 +271,7 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusTriggersPurchaseIQCDerivation(t *te
 	workflowUC := biz.NewWorkflowUsecase(repo)
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
-		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin"}},
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionWorkflowTaskComplete)},
 		workflowUC:  workflowUC,
 	}
 
@@ -356,7 +369,7 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusTriggersWarehouseInboundBusinessSta
 	workflowUC := biz.NewWorkflowUsecase(repo)
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
-		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin"}},
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskComplete)},
 		workflowUC:  workflowUC,
 	}
 
@@ -454,7 +467,7 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusTriggersOutsourceReturnQCDerivation
 	workflowUC := biz.NewWorkflowUsecase(repo)
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
-		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin"}},
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionWorkflowTaskComplete)},
 		workflowUC:  workflowUC,
 	}
 
@@ -567,7 +580,7 @@ func TestJsonrpcData_WorkflowUpdateTaskStatusKeepsAdminBoundary(t *testing.T) {
 	repo := &stubWorkflowJSONRPCRepo{}
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
-		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin"}},
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskComplete)},
 		workflowUC:  biz.NewWorkflowUsecase(repo),
 	}
 	params, err := structpb.NewStruct(map[string]any{

@@ -2,8 +2,10 @@ package data
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -31,20 +33,22 @@ func (r *adminManageRepo) toBizAdmin(a *ent.AdminUser) *biz.AdminUser {
 	if a == nil {
 		return nil
 	}
-	return &biz.AdminUser{
-		ID:                    a.ID,
-		Username:              a.Username,
-		Phone:                 stringValue(a.Phone),
-		PasswordHash:          a.PasswordHash,
-		Level:                 a.Level,
-		MenuPermissions:       decodeMenuPermissions(a.MenuPermissions),
-		MobileRolePermissions: decodeMobileRolePermissions(a.MobileRolePermissions),
-		ERPPreferences:        decodeAdminERPPreferences(a.ErpPreferences),
-		Disabled:              a.Disabled,
-		LastLoginAt:           a.LastLoginAt,
-		CreatedAt:             a.CreatedAt,
-		UpdatedAt:             a.UpdatedAt,
+	admin := &biz.AdminUser{
+		ID:             a.ID,
+		Username:       a.Username,
+		Phone:          stringValue(a.Phone),
+		PasswordHash:   a.PasswordHash,
+		IsSuperAdmin:   a.IsSuperAdmin,
+		ERPPreferences: decodeAdminERPPreferences(a.ErpPreferences),
+		Disabled:       a.Disabled,
+		LastLoginAt:    a.LastLoginAt,
+		CreatedAt:      a.CreatedAt,
+		UpdatedAt:      a.UpdatedAt,
 	}
+	if err := loadAdminRBAC(context.Background(), r.data.sqldb, admin); err != nil {
+		r.log.Warnf("load admin RBAC failed admin_id=%d err=%v", admin.ID, err)
+	}
+	return admin
 }
 
 func (r *adminManageRepo) GetAdminByID(ctx context.Context, id int) (*biz.AdminUser, error) {
@@ -117,9 +121,7 @@ func (r *adminManageRepo) CreateAdmin(ctx context.Context, in *biz.AdminCreate) 
 		SetUsername(in.Username).
 		SetNillablePhone(stringPtrOrNil(in.Phone)).
 		SetPasswordHash(in.PasswordHash).
-		SetLevel(int8(in.Level)).
-		SetMenuPermissions(encodeMenuPermissions(in.MenuPermissions)).
-		SetMobileRolePermissions(encodeMobileRolePermissions(in.MobileRolePermissions)).
+		SetIsSuperAdmin(false).
 		SetDisabled(false).
 		Save(ctx)
 	if err != nil {
@@ -128,22 +130,177 @@ func (r *adminManageRepo) CreateAdmin(ctx context.Context, in *biz.AdminCreate) 
 		}
 		return nil, err
 	}
-	return r.toBizAdmin(row), nil
+	if err := r.UpdateAdminRoles(ctx, row.ID, in.RoleKeys); err != nil {
+		return nil, err
+	}
+	return r.GetAdminByID(ctx, row.ID)
 }
 
-func (r *adminManageRepo) UpdateAdminPermissions(ctx context.Context, id int, menuPermissions []string, mobileRolePermissions []string) error {
+func (r *adminManageRepo) UpdateAdminRoles(ctx context.Context, id int, roleKeys []string) error {
 	if id <= 0 {
 		return biz.ErrBadParam
 	}
-	if _, err := r.data.postgres.AdminUser.UpdateOneID(id).
-		SetMenuPermissions(encodeMenuPermissions(menuPermissions)).
-		SetMobileRolePermissions(encodeMobileRolePermissions(mobileRolePermissions)).
-		Save(ctx); err != nil {
-		if ent.IsNotFound(err) {
-			return biz.ErrAdminNotFound
+	roleKeys = biz.NormalizeAdminRoleKeys(roleKeys)
+	tx, err := r.data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer rollbackSQLTx(ctx, tx, r.log)
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM admin_user_roles WHERE admin_user_id = $1", id); err != nil {
+		return err
+	}
+	for _, roleKey := range roleKeys {
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO admin_user_roles (admin_user_id, role_id, created_at)
+SELECT $1, id, $3 FROM roles WHERE role_key = $2 AND disabled = FALSE
+ON CONFLICT (admin_user_id, role_id) DO NOTHING`, id, roleKey, time.Now()); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	tx = nil
+	return nil
+}
+
+func (r *adminManageRepo) ListRoles(ctx context.Context) ([]biz.AdminRole, error) {
+	rows, err := r.data.sqldb.QueryContext(ctx, `
+SELECT id, role_key, name, description, builtin, disabled, sort_order
+FROM roles
+ORDER BY sort_order ASC, id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	out := []biz.AdminRole{}
+	for rows.Next() {
+		var item biz.AdminRole
+		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Description, &item.Builtin, &item.Disabled, &item.SortOrder); err != nil {
+			return nil, err
+		}
+		item.Key = biz.NormalizeRoleKey(item.Key)
+		item.Permissions, err = r.loadRolePermissionKeys(ctx, item.ID)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (r *adminManageRepo) loadRolePermissionKeys(ctx context.Context, roleID int) ([]string, error) {
+	rows, err := r.data.sqldb.QueryContext(ctx, `
+SELECT p.permission_key
+FROM role_permissions rp
+JOIN permissions p ON p.id = rp.permission_id
+WHERE rp.role_id = $1
+ORDER BY p.module ASC, p.permission_key ASC`, roleID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	out := []string{}
+	for rows.Next() {
+		var permissionKey string
+		if err := rows.Scan(&permissionKey); err != nil {
+			return nil, err
+		}
+		out = append(out, permissionKey)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return biz.NormalizePermissionKeys(out), nil
+}
+
+func (r *adminManageRepo) ListPermissions(ctx context.Context) ([]biz.AdminPermission, error) {
+	rows, err := r.data.sqldb.QueryContext(ctx, `
+SELECT id, permission_key, name, description, module, action, resource, builtin
+FROM permissions
+ORDER BY module ASC, permission_key ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	out := []biz.AdminPermission{}
+	for rows.Next() {
+		var item biz.AdminPermission
+		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Description, &item.Module, &item.Action, &item.Resource, &item.Builtin); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
+func (r *adminManageRepo) GetRoleByKey(ctx context.Context, roleKey string) (*biz.AdminRole, error) {
+	roleKey = biz.NormalizeRoleKey(roleKey)
+	if roleKey == "" {
+		return nil, biz.ErrBadParam
+	}
+	var item biz.AdminRole
+	err := r.data.sqldb.QueryRowContext(ctx, `
+SELECT id, role_key, name, description, builtin, disabled, sort_order
+FROM roles WHERE role_key = $1 LIMIT 1`, roleKey).Scan(&item.ID, &item.Key, &item.Name, &item.Description, &item.Builtin, &item.Disabled, &item.SortOrder)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, biz.ErrRoleNotFound
+		}
+		return nil, err
+	}
+	item.Key = biz.NormalizeRoleKey(item.Key)
+	item.Permissions, err = r.loadRolePermissionKeys(ctx, item.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *adminManageRepo) UpdateRolePermissions(ctx context.Context, roleKey string, permissionKeys []string) error {
+	roleKey = biz.NormalizeRoleKey(roleKey)
+	if roleKey == "" {
+		return biz.ErrBadParam
+	}
+	permissionKeys = biz.NormalizePermissionKeys(permissionKeys)
+	tx, err := r.data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer rollbackSQLTx(ctx, tx, r.log)
+
+	var roleID int
+	if err := tx.QueryRowContext(ctx, "SELECT id FROM roles WHERE role_key = $1 LIMIT 1", roleKey).Scan(&roleID); err != nil {
+		if err == sql.ErrNoRows {
+			return biz.ErrRoleNotFound
 		}
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM role_permissions WHERE role_id = $1", roleID); err != nil {
+		return err
+	}
+	for _, permissionKey := range permissionKeys {
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO role_permissions (role_id, permission_id, created_at)
+SELECT $1, id, $3 FROM permissions WHERE permission_key = $2
+ON CONFLICT (role_id, permission_id) DO NOTHING`, roleID, permissionKey, time.Now()); err != nil {
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	tx = nil
 	return nil
 }
 
@@ -227,28 +384,6 @@ func (r *adminManageRepo) UpdateAdminPasswordHash(ctx context.Context, id int, p
 		return err
 	}
 	return nil
-}
-
-func encodeMenuPermissions(menuPermissions []string) string {
-	return strings.Join(biz.NormalizeAdminMenuPermissions(menuPermissions), ",")
-}
-
-func decodeMenuPermissions(raw string) []string {
-	if strings.TrimSpace(raw) == "" {
-		return []string{}
-	}
-	return biz.NormalizeAdminMenuPermissions(strings.Split(raw, ","))
-}
-
-func encodeMobileRolePermissions(mobileRolePermissions []string) string {
-	return strings.Join(biz.NormalizeAdminMobileRolePermissions(mobileRolePermissions), ",")
-}
-
-func decodeMobileRolePermissions(raw string) []string {
-	if strings.TrimSpace(raw) == "" {
-		return []string{}
-	}
-	return biz.NormalizeAdminMobileRolePermissions(strings.Split(raw, ","))
 }
 
 func stringValue(value *string) string {

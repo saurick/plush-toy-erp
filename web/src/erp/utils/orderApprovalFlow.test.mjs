@@ -30,7 +30,7 @@ function projectOrder(overrides = {}) {
     product_name: '企鹅抱枕',
     due_date: '2026-05-01',
     business_status_key: 'project_pending',
-    owner_role_key: 'business',
+    owner_role_key: 'sales',
     payload: {},
     ...overrides,
   }
@@ -87,7 +87,7 @@ test('orderApprovalFlow: 老板驳回后生成业务补资料任务', () => {
   assert.equal(task.task_name, '补充订单资料后重新提交')
   assert.equal(task.business_status_key, 'project_pending')
   assert.equal(task.task_status_key, 'ready')
-  assert.equal(task.owner_role_key, 'business')
+  assert.equal(task.owner_role_key, 'sales')
   assert.equal(task.priority, 2)
   assert.equal(task.payload.decision, 'rejected')
   assert.equal(task.payload.transition_status, 'rejected')
@@ -104,7 +104,7 @@ test('orderApprovalFlow: 老板阻塞后补资料任务保留 blocked 决策来�
   })
 
   assert.equal(task.task_group, 'order_revision')
-  assert.equal(task.owner_role_key, 'business')
+  assert.equal(task.owner_role_key, 'sales')
   assert.equal(task.payload.decision, 'blocked')
   assert.equal(task.payload.transition_status, 'blocked')
   assert.equal(task.payload.blocked_reason, '缺少款图')

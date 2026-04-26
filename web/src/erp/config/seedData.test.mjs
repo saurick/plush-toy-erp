@@ -39,7 +39,7 @@ test('seedData: 初始化模块至少覆盖文档、移动端和打印中心', (
 
 test('seedData: 每个移动角色都有端口职责数据与兼容路由', () => {
   assert(roleWorkbenches.length >= 6)
-  assert(roleWorkbenches.some((role) => role.key === 'business'))
+  assert(roleWorkbenches.some((role) => role.key === 'sales'))
   roleWorkbenches.forEach((role) => {
     assert(role.desktopFocus.length > 0)
     assert(role.mobileFocus.length > 0)
@@ -49,7 +49,7 @@ test('seedData: 每个移动角色都有端口职责数据与兼容路由', () =
   })
   assert.equal(
     appDefinitions.find((app) => app.port === 5187)?.roleKey,
-    'business'
+    'sales'
   )
   assert.equal(getRoleWorkbench('missing-role'), null)
 })

@@ -13,6 +13,7 @@ import {
   PRINT_PAGE_STYLE_ELEMENT_ID,
 } from '../src/erp/utils/printPageMargin.mjs'
 import { RpcErrorCode } from '../src/common/consts/errorCodes.generated.js'
+import { getNavigationSections } from '../src/erp/config/seedData.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const outputDir = path.resolve(webDir, 'output', 'playwright', 'style-l1')
@@ -613,7 +614,7 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectText(page, '权限加载中')
-      await expectText(page, '正在同步管理员账号和菜单权限，请稍候...')
+      await expectText(page, '正在同步管理员、角色和权限码，请稍候...')
       await expectHeading(page, '权限管理')
       await assertTextAbsent(page, '权限加载中')
     },
@@ -627,10 +628,9 @@ const scenarios = [
       await expectHeading(page, '权限管理')
       await expectText(page, '创建管理员')
       await expectText(page, '超级管理员')
-      await expectText(page, '普通管理员')
-      const adminSearch = page.getByPlaceholder(
-        '搜索管理员账号、手机号、权限或移动端角色'
-      )
+      await expectText(page, '角色权限')
+      const adminSearch =
+        page.getByPlaceholder('搜索管理员账号、手机号、角色或权限码')
       await adminSearch.fill('assistant')
       await expectText(page, '命中 1/2 个管理员')
       const filteredTableText = await page
@@ -653,15 +653,20 @@ const scenarios = [
       await page.getByRole('button', { name: '刷新当前页' }).click()
       await expectText(page, '当前页面数据已刷新')
       await page.getByRole('button', { name: '创建管理员' }).click()
-      await expectText(page, '账号与默认菜单一次配置')
-      await assertPermissionModalLayout(page, {
+      await expectText(page, '创建管理员')
+      await expectText(page, '初始密码')
+      await expectText(page, '角色')
+      await expectText(page, '选择一个或多个角色')
+      await assertAdminRoleModalLayout(page, {
         scenarioName: 'permission-center-create-modal',
+        title: '创建管理员',
       })
-      await page.getByPlaceholder('搜索菜单权限名称或路径').fill('采购')
-      await expectText(page, '辅材/包材采购')
-      await expectText(page, '加工合同')
+      await assertTextAbsent(page, '搜索菜单权限名称或路径')
       await page
-        .locator('.erp-permission-modal .ant-modal-footer button')
+        .locator('.ant-modal-content')
+        .filter({ hasText: '创建管理员' })
+        .last()
+        .locator('.ant-modal-footer button')
         .first()
         .click()
       await page
@@ -670,15 +675,20 @@ const scenarios = [
         .click()
       const resetModal = page
         .locator('.ant-modal-content')
-        .filter({ hasText: '重置管理员密码' })
-      await resetModal.getByText('旧密码会立即失效').waitFor()
+        .filter({ hasText: '重置密码：assistant-admin' })
+        .last()
+      await resetModal.getByText('新密码').waitFor()
       await assertVisibleModalInputFocusStyle(page, {
         scenarioName: 'permission-center-reset-modal-focus',
-        modalText: '重置管理员密码',
+        modalText: '重置密码：assistant-admin',
       })
-      await resetModal.getByPlaceholder('至少 6 位').fill('new-secret')
-      await resetModal.getByPlaceholder('再次输入新密码').fill('new-secret')
-      await resetModal.getByRole('button', { name: '确认重置' }).click()
+      await resetModal
+        .locator('.ant-input-affix-wrapper input')
+        .fill('new-secret')
+      await page
+        .getByRole('button', { name: /重\s*置/ })
+        .last()
+        .click()
       await expectText(page, '已重置管理员 assistant-admin 的密码')
     },
   },
@@ -1580,21 +1590,97 @@ function resolveDelayFromReferer(request, paramName) {
 }
 
 async function installAdminRpcMocks(page) {
+  const mockMenus = getNavigationSections()
+    .flatMap((section) => section.items || [])
+    .map((item) => ({
+      key: item.key || item.path,
+      label: item.label,
+      path: item.path,
+      required_permissions: item.required_permissions || [],
+    }))
+    .filter((item) => item.path)
+  const mockPermissions = [
+    {
+      permission_key: 'system.user.read',
+      name: '查看管理员',
+      module: 'system',
+    },
+    {
+      permission_key: 'system.user.create',
+      name: '创建管理员',
+      module: 'system',
+    },
+    {
+      permission_key: 'system.user.update',
+      name: '更新管理员',
+      module: 'system',
+    },
+    {
+      permission_key: 'system.user.disable',
+      name: '启停管理员',
+      module: 'system',
+    },
+    { permission_key: 'system.role.read', name: '查看角色', module: 'system' },
+    {
+      permission_key: 'system.permission.read',
+      name: '查看权限',
+      module: 'system',
+    },
+    {
+      permission_key: 'system.permission.manage',
+      name: '管理角色权限',
+      module: 'system',
+    },
+    { permission_key: 'erp.dashboard.read', name: '查看看板', module: 'erp' },
+    {
+      permission_key: 'business.record.read',
+      name: '查看业务记录',
+      module: 'business',
+    },
+    {
+      permission_key: 'workflow.task.read',
+      name: '查看协同任务',
+      module: 'workflow',
+    },
+    {
+      permission_key: 'mobile.sales.access',
+      name: '进入业务移动端',
+      module: 'mobile',
+    },
+  ]
+  const allPermissionKeys = mockPermissions.map((item) => item.permission_key)
+  const salesRole = {
+    role_key: 'sales',
+    name: '业务',
+    description: '销售 / 业务跟进',
+    builtin: true,
+    disabled: false,
+    sort_order: 20,
+    permissions: [
+      'erp.dashboard.read',
+      'business.record.read',
+      'workflow.task.read',
+      'mobile.sales.access',
+    ],
+  }
+  const adminRole = {
+    role_key: 'admin',
+    name: '系统管理员',
+    description: '系统账号、角色和权限管理',
+    builtin: true,
+    disabled: false,
+    sort_order: 80,
+    permissions: allPermissionKeys.filter((key) => key.startsWith('system.')),
+  }
   const adminProfile = {
     id: 1,
     username: 'style-l1-admin',
-    level: 0,
+    phone: '13800138000',
+    is_super_admin: true,
     disabled: false,
-    menu_permissions: [
-      '/erp/dashboard',
-      '/erp/business-dashboard',
-      '/erp/print-center',
-      '/erp/docs/operation-flow-overview',
-      '/erp/docs/operation-guide',
-      '/erp/docs/field-linkage-guide',
-      '/erp/docs/calculation-guide',
-      '/erp/system/permissions',
-    ],
+    roles: [],
+    permissions: allPermissionKeys,
+    menus: mockMenus,
     erp_preferences: {
       column_orders: {},
     },
@@ -1616,31 +1702,46 @@ async function installAdminRpcMocks(page) {
             {
               id: 2,
               username: 'assistant-admin',
-              level: 1,
+              phone: '13900139000',
+              is_super_admin: false,
               disabled: false,
-              menu_permissions: [
-                '/erp/dashboard',
-                '/erp/business-dashboard',
-                '/erp/print-center',
-                '/erp/docs/operation-guide',
-              ],
+              roles: [salesRole],
+              permissions: salesRole.permissions,
+              menus: mockMenus.filter((item) => item.path === '/erp/dashboard'),
             },
           ],
         }
         break
       case 'create':
-      case 'set_permissions':
+      case 'set_roles':
       case 'set_disabled':
       case 'reset_password':
         data = {
           admin: {
             id: Number(params.id || 2),
             username: params.username || 'assistant-admin',
-            level: Number(params.level || 1),
+            phone: params.phone || '13900139000',
+            is_super_admin: false,
             disabled: Boolean(params.disabled),
-            menu_permissions: Array.isArray(params.menu_permissions)
-              ? params.menu_permissions
-              : ['/erp/dashboard'],
+            roles: Array.isArray(params.role_keys)
+              ? params.role_keys.map((roleKey) => ({
+                  role_key: roleKey,
+                  name: roleKey,
+                }))
+              : [salesRole],
+            permissions: salesRole.permissions,
+            menus: mockMenus.filter((item) => item.path === '/erp/dashboard'),
+          },
+        }
+        break
+      case 'set_role_permissions':
+        data = {
+          role: {
+            ...salesRole,
+            role_key: params.role_key || salesRole.role_key,
+            permissions: Array.isArray(params.permission_keys)
+              ? params.permission_keys
+              : salesRole.permissions,
           },
         }
         break
@@ -1667,12 +1768,15 @@ async function installAdminRpcMocks(page) {
         }
         break
       }
+      case 'rbac_options':
       case 'menu_options':
         data = {
-          menu_options: adminProfile.menu_permissions.map((key) => ({
-            key,
-            label: key,
-          })),
+          roles: [salesRole, adminRole],
+          permissions: mockPermissions,
+          menus: mockMenus,
+          role_options: [salesRole, adminRole],
+          permission_options: mockPermissions,
+          menu_options: mockMenus,
         }
         break
       default:
@@ -3612,6 +3716,76 @@ async function assertAppAlertDialogLayout(page, { scenarioName }) {
     metrics.title.rect.bottom < metrics.message.rect.top &&
       metrics.message.rect.bottom < metrics.confirm.rect.top,
     `${scenarioName} 弹窗内部文字和按钮发生重叠: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
+  const modal = page.locator('.ant-modal').filter({ hasText: title }).last()
+  await modal.waitFor({ state: 'visible', timeout: 10_000 })
+  await assertAntdModalCentered(page, modal, scenarioName)
+
+  const metrics = await modal.evaluate((node) => {
+    const body = node.querySelector('.ant-modal-body')
+    const formItems = [...node.querySelectorAll('.ant-form-item')]
+    const controls = [
+      ...node.querySelectorAll(
+        '.ant-input, .ant-input-affix-wrapper, .ant-select-selector'
+      ),
+    ]
+      .filter(
+        (control) =>
+          !(
+            control.matches('.ant-input') &&
+            control.closest('.ant-input-affix-wrapper')
+          )
+      )
+      .map((control) => {
+        const rect = control.getBoundingClientRect()
+        return {
+          text: control.textContent?.trim()?.slice(0, 32) || '',
+          width: rect.width,
+          height: rect.height,
+        }
+      })
+    const bodyRect = body?.getBoundingClientRect()
+
+    return {
+      body: bodyRect
+        ? {
+            width: bodyRect.width,
+            height: bodyRect.height,
+            scrollWidth: body.scrollWidth,
+            scrollHeight: body.scrollHeight,
+            clientHeight: body.clientHeight,
+          }
+        : null,
+      formItemCount: formItems.length,
+      hasRoleSelect: Boolean(
+        [...node.querySelectorAll('.ant-select-selection-placeholder')].some(
+          (item) => item.textContent?.includes('选择一个或多个角色')
+        )
+      ),
+      controls,
+    }
+  })
+
+  assert(
+    metrics.body,
+    `${scenarioName} 缺少弹窗 body: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.formItemCount >= 4 && metrics.hasRoleSelect,
+    `${scenarioName} 创建管理员弹窗缺少账号/手机号/密码/角色字段: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.body.scrollWidth <= metrics.body.width + 8,
+    `${scenarioName} 创建管理员弹窗出现横向滚动: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.controls.every(
+      (control) => control.width >= 120 && control.height >= 30
+    ),
+    `${scenarioName} 创建管理员弹窗控件尺寸异常: ${JSON.stringify(metrics)}`
   )
 }
 

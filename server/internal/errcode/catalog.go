@@ -12,7 +12,6 @@ var (
 
 	JSONRPCUnknownURL     = Definition{Name: "JSONRPCUnknownURL", Code: 40001, Message: "未知 RPC 域"}
 	InvalidParam          = Definition{Name: "InvalidParam", Code: 40010, Message: "参数不合法"}
-	AdminInvalidLevel     = Definition{Name: "AdminInvalidLevel", Code: 40011, Message: "管理员等级不合法"}
 	UnknownMethod         = Definition{Name: "UnknownMethod", Code: 40020, Message: "未知接口"}
 	UserInvalidParam      = Definition{Name: "UserInvalidParam", Code: 40030, Message: "参数不合法"}
 	TemplateRenderInvalid = Definition{Name: "TemplateRenderInvalid", Code: 40053, Message: "模板渲染请求不合法"}
@@ -57,7 +56,6 @@ var definitions = []Definition{
 	OK,
 	JSONRPCUnknownURL,
 	InvalidParam,
-	AdminInvalidLevel,
 	UnknownMethod,
 	UserInvalidParam,
 	TemplateRenderInvalid,

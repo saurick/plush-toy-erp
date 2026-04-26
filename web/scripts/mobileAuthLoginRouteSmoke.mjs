@@ -633,14 +633,17 @@ function createMockAdminToken(username) {
 }
 
 function createMockAdminLoginData({ app, token }) {
+  const roleKey = app.roleKey
   return {
     access_token: token,
     token_type: 'Bearer',
     username: `${app.roleKey}-mobile-admin`,
-    admin_level: 0,
     expires_at: Math.floor(Date.now() / 1000) + 3600,
-    menu_permissions: ['/erp/dashboard'],
-    mobile_role_permissions: [app.roleKey],
+    is_super_admin: false,
+    roles: [{ role_key: roleKey, name: app.shortTitle }],
+    permissions: [`mobile.${roleKey}.access`, 'workflow.task.read'],
+    menus: [],
+    erp_preferences: { column_orders: {} },
   }
 }
 

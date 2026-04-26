@@ -15,9 +15,7 @@ var (
 		{Name: "username", Type: field.TypeString, Size: 64},
 		{Name: "phone", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "password_hash", Type: field.TypeString},
-		{Name: "level", Type: field.TypeInt8, Default: 0},
-		{Name: "menu_permissions", Type: field.TypeString, Size: 4096, Default: ""},
-		{Name: "mobile_role_permissions", Type: field.TypeString, Size: 512, Default: ""},
+		{Name: "is_super_admin", Type: field.TypeBool, Default: false},
 		{Name: "erp_preferences", Type: field.TypeString, Size: 32768, Default: "{}"},
 		{Name: "disabled", Type: field.TypeBool, Default: false},
 		{Name: "last_login_at", Type: field.TypeTime, Nullable: true},
@@ -41,9 +39,34 @@ var (
 				Columns: []*schema.Column{AdminUsersColumns[2]},
 			},
 			{
-				Name:    "adminuser_level",
+				Name:    "adminuser_is_super_admin",
 				Unique:  false,
 				Columns: []*schema.Column{AdminUsersColumns[4]},
+			},
+		},
+	}
+	// AdminUserRolesColumns holds the columns for the "admin_user_roles" table.
+	AdminUserRolesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "admin_user_id", Type: field.TypeInt},
+		{Name: "role_id", Type: field.TypeInt},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// AdminUserRolesTable holds the schema information for the "admin_user_roles" table.
+	AdminUserRolesTable = &schema.Table{
+		Name:       "admin_user_roles",
+		Columns:    AdminUserRolesColumns,
+		PrimaryKey: []*schema.Column{AdminUserRolesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "adminuserrole_admin_user_id_role_id",
+				Unique:  true,
+				Columns: []*schema.Column{AdminUserRolesColumns[1], AdminUserRolesColumns[2]},
+			},
+			{
+				Name:    "adminuserrole_role_id",
+				Unique:  false,
+				Columns: []*schema.Column{AdminUserRolesColumns[2]},
 			},
 		},
 	}
@@ -496,6 +519,42 @@ var (
 			},
 		},
 	}
+	// PermissionsColumns holds the columns for the "permissions" table.
+	PermissionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "permission_key", Type: field.TypeString, Size: 128},
+		{Name: "name", Type: field.TypeString, Size: 128},
+		{Name: "description", Type: field.TypeString, Size: 512, Default: ""},
+		{Name: "module", Type: field.TypeString, Size: 64},
+		{Name: "action", Type: field.TypeString, Size: 64},
+		{Name: "resource", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "builtin", Type: field.TypeBool, Default: false},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// PermissionsTable holds the schema information for the "permissions" table.
+	PermissionsTable = &schema.Table{
+		Name:       "permissions",
+		Columns:    PermissionsColumns,
+		PrimaryKey: []*schema.Column{PermissionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "permission_permission_key",
+				Unique:  true,
+				Columns: []*schema.Column{PermissionsColumns[1]},
+			},
+			{
+				Name:    "permission_module",
+				Unique:  false,
+				Columns: []*schema.Column{PermissionsColumns[4]},
+			},
+			{
+				Name:    "permission_module_action",
+				Unique:  false,
+				Columns: []*schema.Column{PermissionsColumns[4], PermissionsColumns[5]},
+			},
+		},
+	}
 	// ProductsColumns holds the columns for the "products" table.
 	ProductsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -840,6 +899,66 @@ var (
 			},
 		},
 	}
+	// RolesColumns holds the columns for the "roles" table.
+	RolesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "role_key", Type: field.TypeString, Size: 64},
+		{Name: "name", Type: field.TypeString, Size: 128},
+		{Name: "description", Type: field.TypeString, Size: 512, Default: ""},
+		{Name: "builtin", Type: field.TypeBool, Default: false},
+		{Name: "disabled", Type: field.TypeBool, Default: false},
+		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// RolesTable holds the schema information for the "roles" table.
+	RolesTable = &schema.Table{
+		Name:       "roles",
+		Columns:    RolesColumns,
+		PrimaryKey: []*schema.Column{RolesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "role_role_key",
+				Unique:  true,
+				Columns: []*schema.Column{RolesColumns[1]},
+			},
+			{
+				Name:    "role_disabled",
+				Unique:  false,
+				Columns: []*schema.Column{RolesColumns[5]},
+			},
+			{
+				Name:    "role_sort_order",
+				Unique:  false,
+				Columns: []*schema.Column{RolesColumns[6]},
+			},
+		},
+	}
+	// RolePermissionsColumns holds the columns for the "role_permissions" table.
+	RolePermissionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "role_id", Type: field.TypeInt},
+		{Name: "permission_id", Type: field.TypeInt},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// RolePermissionsTable holds the schema information for the "role_permissions" table.
+	RolePermissionsTable = &schema.Table{
+		Name:       "role_permissions",
+		Columns:    RolePermissionsColumns,
+		PrimaryKey: []*schema.Column{RolePermissionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "rolepermission_role_id_permission_id",
+				Unique:  true,
+				Columns: []*schema.Column{RolePermissionsColumns[1], RolePermissionsColumns[2]},
+			},
+			{
+				Name:    "rolepermission_permission_id",
+				Unique:  false,
+				Columns: []*schema.Column{RolePermissionsColumns[2]},
+			},
+		},
+	}
 	// UnitsColumns holds the columns for the "units" table.
 	UnitsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1043,6 +1162,7 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		AdminUsersTable,
+		AdminUserRolesTable,
 		BomHeadersTable,
 		BomItemsTable,
 		BusinessRecordsTable,
@@ -1052,11 +1172,14 @@ var (
 		InventoryLotsTable,
 		InventoryTxnsTable,
 		MaterialsTable,
+		PermissionsTable,
 		ProductsTable,
 		PurchaseReceiptsTable,
 		PurchaseReceiptItemsTable,
 		PurchaseReturnsTable,
 		PurchaseReturnItemsTable,
+		RolesTable,
+		RolePermissionsTable,
 		UnitsTable,
 		UsersTable,
 		WarehousesTable,

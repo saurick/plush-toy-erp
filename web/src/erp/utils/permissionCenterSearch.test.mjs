@@ -11,32 +11,37 @@ const admins = [
   {
     id: 1,
     username: 'root-admin',
-    level: 0,
+    is_super_admin: true,
     disabled: false,
-    menu_permissions: ['/erp/dashboard', '/erp/system/permissions'],
-    mobile_role_permissions: ['boss'],
+    roles: [],
+    permissions: [],
+    menus: [],
   },
   {
     id: 2,
     username: 'warehouse-user',
     phone: '13800000002',
-    level: 1,
+    is_super_admin: false,
     disabled: false,
-    menu_permissions: ['/erp/warehouse/inbound'],
-    mobile_role_permissions: ['warehouse'],
+    roles: [{ role_key: 'warehouse', name: '仓库' }],
+    permissions: [
+      { permission_key: 'warehouse.inbound.read', name: '查看入库' },
+    ],
+    menus: [{ path: '/erp/warehouse/inbound', label: '入库通知/检验/入库' }],
   },
   {
     id: 3,
     username: 'finance-user',
     phone: '13800000003',
-    level: 1,
+    is_super_admin: false,
     disabled: true,
-    menu_permissions: ['/erp/finance/payables'],
-    mobile_role_permissions: ['finance'],
+    roles: [{ role_key: 'finance', name: '财务' }],
+    permissions: [{ permission_key: 'finance.payable.read', name: '查看应付' }],
+    menus: [{ path: '/erp/finance/payables', label: '待付款/应付提醒' }],
   },
 ]
 
-test('permissionCenterSearch: 管理员搜索覆盖账号、手机号、菜单和移动端角色', () => {
+test('permissionCenterSearch: 管理员搜索覆盖账号、手机号、角色、权限和菜单', () => {
   assert.deepEqual(
     filterAdminRecords(admins, { keyword: 'warehouse' }).map((item) => item.id),
     [2]
@@ -48,13 +53,7 @@ test('permissionCenterSearch: 管理员搜索覆盖账号、手机号、菜单�
     [3]
   )
   assert.deepEqual(
-    filterAdminRecords(admins, { keyword: '权限管理' }).map((item) => item.id),
-    [1]
-  )
-  assert.deepEqual(
-    filterAdminRecords(admins, { keyword: '全部移动端' }).map(
-      (item) => item.id
-    ),
+    filterAdminRecords(admins, { keyword: '全部权限' }).map((item) => item.id),
     [1]
   )
   assert.deepEqual(

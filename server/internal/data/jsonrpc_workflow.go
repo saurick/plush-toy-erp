@@ -39,6 +39,9 @@ func (d *JsonrpcData) handleWorkflow(
 
 	switch method {
 	case "metadata":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+			return id, res, nil
+		}
 		taskStates, businessStates, planningPhases := d.workflowUC.Metadata()
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
@@ -51,6 +54,9 @@ func (d *JsonrpcData) handleWorkflow(
 		}, nil
 
 	case "list_tasks":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+			return id, res, nil
+		}
 		limit := getWorkflowLimit(pm)
 		offset := getWorkflowOffset(pm)
 		tasks, total, err := d.workflowUC.ListTasks(ctx, biz.WorkflowTaskFilter{
@@ -76,6 +82,9 @@ func (d *JsonrpcData) handleWorkflow(
 		}, nil
 
 	case "create_task":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskCreate); res != nil {
+			return id, res, nil
+		}
 		payload, ok := getWorkflowPayload(pm, "payload")
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
@@ -118,12 +127,28 @@ func (d *JsonrpcData) handleWorkflow(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
 		}
+		taskID := getInt(pm, "id", 0)
+		currentTask, err := d.workflowUC.GetTask(ctx, taskID)
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+		actionPermission := biz.WorkflowStatusActionPermission(getString(pm, "task_status_key"), currentTask)
+		if res := d.RequireAdminPermission(ctx, actionPermission); res != nil {
+			return id, res, nil
+		}
+		admin, adminRes := d.CurrentAdmin(ctx)
+		if adminRes != nil {
+			return id, adminRes, nil
+		}
+		if !biz.CanAdminHandleWorkflowTask(admin, currentTask, getString(pm, "task_status_key")) {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
 		actorRoleKey := strings.TrimSpace(getString(pm, "actor_role_key"))
 		if actorRoleKey == "" {
-			actorRoleKey = "admin"
+			actorRoleKey = currentTask.OwnerRoleKey
 		}
 		task, err := d.workflowUC.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
-			ID:                getInt(pm, "id", 0),
+			ID:                taskID,
 			TaskStatusKey:     getString(pm, "task_status_key"),
 			BusinessStatusKey: getString(pm, "business_status_key"),
 			Reason:            getString(pm, "reason"),
@@ -139,6 +164,9 @@ func (d *JsonrpcData) handleWorkflow(
 		}, nil
 
 	case "urge_task":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskUpdate); res != nil {
+			return id, res, nil
+		}
 		payload, ok := getWorkflowPayload(pm, "payload")
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
@@ -163,6 +191,9 @@ func (d *JsonrpcData) handleWorkflow(
 		}, nil
 
 	case "list_business_states":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+			return id, res, nil
+		}
 		limit := getWorkflowLimit(pm)
 		offset := getWorkflowOffset(pm)
 		states, total, err := d.workflowUC.ListBusinessStates(ctx, biz.WorkflowBusinessStateFilter{
@@ -188,6 +219,9 @@ func (d *JsonrpcData) handleWorkflow(
 		}, nil
 
 	case "upsert_business_state":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskUpdate); res != nil {
+			return id, res, nil
+		}
 		payload, ok := getWorkflowPayload(pm, "payload")
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil

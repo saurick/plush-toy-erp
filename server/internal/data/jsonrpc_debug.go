@@ -24,9 +24,9 @@ func (d *JsonrpcData) handleDebug(
 		pm = params.AsMap()
 	}
 
-	claims, _, res := d.requireDebugOperator(ctx)
+	claims, res := d.requireAdmin(ctx)
 	if res != nil {
-		l.Warnf("[debug] requireDebugOperator denied method=%s id=%s code=%d msg=%s", method, id, res.Code, res.Message)
+		l.Warnf("[debug] requireAdmin denied method=%s id=%s code=%d msg=%s", method, id, res.Code, res.Message)
 		return id, res, nil
 	}
 	if d.debugUC == nil {
@@ -36,6 +36,9 @@ func (d *JsonrpcData) handleDebug(
 
 	switch method {
 	case "capabilities", "config":
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionDebugBusinessChainRead, biz.PermissionDebugBusinessChainRun, biz.PermissionERPBusinessChainDebugRead); res != nil {
+			return id, res, nil
+		}
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
@@ -43,6 +46,9 @@ func (d *JsonrpcData) handleDebug(
 		}, nil
 
 	case "rebuild_business_chain_scenario", "seed_business_chain_scenario":
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionDebugSeed, biz.PermissionDebugBusinessChainRun); res != nil {
+			return id, res, nil
+		}
 		scenarioKey := debugParamString(pm, "scenario_key", "scenarioKey")
 		debugRunID := debugParamString(pm, "debug_run_id", "debugRunId")
 		result, err := d.debugUC.SeedBusinessChainScenario(ctx, biz.DebugBusinessChainSeedInput{
@@ -75,6 +81,9 @@ func (d *JsonrpcData) handleDebug(
 		}, nil
 
 	case "clear_business_chain_scenario", "cleanup_business_chain_scenario":
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionDebugCleanup, biz.PermissionDebugBusinessChainRun); res != nil {
+			return id, res, nil
+		}
 		debugRunID := debugParamString(pm, "debug_run_id", "debugRunId")
 		scenarioKey := debugParamString(pm, "scenario_key", "scenarioKey")
 		dryRun := getBool(pm, "dry_run", getBool(pm, "dryRun", false))
@@ -118,6 +127,9 @@ func (d *JsonrpcData) handleDebug(
 		}, nil
 
 	case "clear_business_data":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionDebugBusinessClear); res != nil {
+			return id, res, nil
+		}
 		result, err := d.debugUC.ClearBusinessData(ctx)
 		if err != nil {
 			l.Warnw(
@@ -145,35 +157,6 @@ func (d *JsonrpcData) handleDebug(
 			Message: fmt.Sprintf("未知 debug 接口 method=%s", method),
 		}, nil
 	}
-}
-
-func (d *JsonrpcData) requireDebugOperator(ctx context.Context) (*biz.AuthClaims, *biz.AdminUser, *v1.JsonrpcResult) {
-	claims, res := d.requireAdmin(ctx)
-	if res != nil {
-		return nil, nil, res
-	}
-	admin, err := d.getCurrentAdmin(ctx, claims)
-	if err != nil {
-		d.log.WithContext(ctx).Warnf("[debug] get current admin failed err=%v", err)
-		return nil, nil, &v1.JsonrpcResult{Code: errcode.AdminRequired.Code, Message: errcode.AdminRequired.Message}
-	}
-	if !adminHasMenuPermission(admin, "/erp/qa/business-chain-debug") {
-		return nil, nil, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "需要业务链路调试权限"}
-	}
-	return claims, admin, nil
-}
-
-func adminHasMenuPermission(admin *biz.AdminUser, permission string) bool {
-	if admin == nil {
-		return false
-	}
-	allowed := biz.EffectiveAdminMenuPermissions(biz.AdminLevel(admin.Level), admin.MenuPermissions)
-	for _, item := range allowed {
-		if item == permission {
-			return true
-		}
-	}
-	return false
 }
 
 func (d *JsonrpcData) mapDebugError(ctx context.Context, err error) *v1.JsonrpcResult {

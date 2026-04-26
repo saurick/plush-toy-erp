@@ -39,6 +39,9 @@ func (d *JsonrpcData) handleBusiness(
 
 	switch method {
 	case "dashboard_stats":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionBusinessRecordRead); res != nil {
+			return id, res, nil
+		}
 		stats, err := d.businessUC.DashboardStats(ctx)
 		if err != nil {
 			return id, d.mapBusinessRecordError(ctx, err), nil
@@ -64,6 +67,9 @@ func (d *JsonrpcData) handleBusiness(
 		}, nil
 
 	case "list_records":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionBusinessRecordRead); res != nil {
+			return id, res, nil
+		}
 		limit := getWorkflowLimit(pm)
 		offset := getWorkflowOffset(pm)
 		records, total, err := d.businessUC.ListRecords(ctx, biz.BusinessRecordFilter{
@@ -96,6 +102,9 @@ func (d *JsonrpcData) handleBusiness(
 		}, nil
 
 	case "create_record":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionBusinessRecordCreate); res != nil {
+			return id, res, nil
+		}
 		mutation, ok := businessRecordMutationFromParams(pm)
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "业务单据参数不合法"}, nil
@@ -111,6 +120,9 @@ func (d *JsonrpcData) handleBusiness(
 		}, nil
 
 	case "update_record":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionBusinessRecordUpdate); res != nil {
+			return id, res, nil
+		}
 		mutation, ok := businessRecordMutationFromParams(pm)
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "业务单据参数不合法"}, nil
@@ -126,6 +138,9 @@ func (d *JsonrpcData) handleBusiness(
 		}, nil
 
 	case "delete_records":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionBusinessRecordDelete); res != nil {
+			return id, res, nil
+		}
 		affected, err := d.businessUC.DeleteRecords(ctx, getBusinessRecordIDs(pm), getString(pm, "delete_reason"), claims.UserID)
 		if err != nil {
 			return id, d.mapBusinessRecordError(ctx, err), nil
@@ -137,6 +152,9 @@ func (d *JsonrpcData) handleBusiness(
 		}, nil
 
 	case "restore_record":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionBusinessRecordDelete); res != nil {
+			return id, res, nil
+		}
 		record, err := d.businessUC.RestoreRecord(ctx, getInt(pm, "id", 0), claims.UserID)
 		if err != nil {
 			return id, d.mapBusinessRecordError(ctx, err), nil

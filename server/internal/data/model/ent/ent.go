@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/businessrecord"
@@ -17,11 +18,14 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
+	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/user"
 	"server/internal/data/model/ent/warehouse"
@@ -94,6 +98,7 @@ func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			adminuser.Table:             adminuser.ValidColumn,
+			adminuserrole.Table:         adminuserrole.ValidColumn,
 			bomheader.Table:             bomheader.ValidColumn,
 			bomitem.Table:               bomitem.ValidColumn,
 			businessrecord.Table:        businessrecord.ValidColumn,
@@ -103,11 +108,14 @@ func checkColumn(t, c string) error {
 			inventorylot.Table:          inventorylot.ValidColumn,
 			inventorytxn.Table:          inventorytxn.ValidColumn,
 			material.Table:              material.ValidColumn,
+			permission.Table:            permission.ValidColumn,
 			product.Table:               product.ValidColumn,
 			purchasereceipt.Table:       purchasereceipt.ValidColumn,
 			purchasereceiptitem.Table:   purchasereceiptitem.ValidColumn,
 			purchasereturn.Table:        purchasereturn.ValidColumn,
 			purchasereturnitem.Table:    purchasereturnitem.ValidColumn,
+			role.Table:                  role.ValidColumn,
+			rolepermission.Table:        rolepermission.ValidColumn,
 			unit.Table:                  unit.ValidColumn,
 			user.Table:                  user.ValidColumn,
 			warehouse.Table:             warehouse.ValidColumn,

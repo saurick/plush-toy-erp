@@ -26,17 +26,9 @@ func (AdminUser) Fields() []ent.Field {
 		field.String("password_hash").
 			NotEmpty().
 			Sensitive(),
-		field.Int8("level").
-			Default(0).
-			Comment("0=super,1=standard"),
-		field.String("menu_permissions").
-			Default("").
-			MaxLen(4096).
-			Comment("逗号分隔菜单权限"),
-		field.String("mobile_role_permissions").
-			Default("").
-			MaxLen(512).
-			Comment("逗号分隔移动端角色登录权限"),
+		field.Bool("is_super_admin").
+			Default(false).
+			Comment("超级管理员拥有全部 RBAC 权限，但业务任务处理仍受归属规则约束"),
 		field.String("erp_preferences").
 			Default("{}").
 			MaxLen(32768).
@@ -59,6 +51,6 @@ func (AdminUser) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("username").Unique(),
 		index.Fields("phone").Unique(),
-		index.Fields("level"),
+		index.Fields("is_super_admin"),
 	}
 }

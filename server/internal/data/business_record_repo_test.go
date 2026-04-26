@@ -42,7 +42,7 @@ func TestBusinessRecordRepo_CreateUpdateDeleteRestore(t *testing.T) {
 		DocumentNo:        &documentNo,
 		Title:             "采购测试单",
 		BusinessStatusKey: "procurement_preparing",
-		OwnerRoleKey:      "purchasing",
+		OwnerRoleKey:      "purchase",
 		SupplierName:      &supplierName,
 		Amount:            &amount,
 		Payload:           map[string]any{"scene": "repo-test"},
@@ -86,7 +86,7 @@ func TestBusinessRecordRepo_CreateUpdateDeleteRestore(t *testing.T) {
 		DocumentNo:         &documentNo,
 		Title:              newTitle,
 		BusinessStatusKey:  "procurement_ordered",
-		OwnerRoleKey:       "purchasing",
+		OwnerRoleKey:       "purchase",
 		Payload:            map[string]any{"scene": "repo-test-updated"},
 		ExpectedRowVersion: created.RowVersion,
 	}, 8)
@@ -111,7 +111,7 @@ func TestBusinessRecordRepo_CreateUpdateDeleteRestore(t *testing.T) {
 		DocumentNo:         &documentNo,
 		Title:              newTitle,
 		BusinessStatusKey:  "procurement_ordered",
-		OwnerRoleKey:       "purchasing",
+		OwnerRoleKey:       "purchase",
 		Payload:            map[string]any{},
 		ExpectedRowVersion: created.RowVersion,
 	}, 8)
@@ -184,7 +184,7 @@ func TestBusinessRecordRepo_CountBusinessRecordsByModuleAndStatus(t *testing.T) 
 			ModuleKey:         moduleKey,
 			Title:             title,
 			BusinessStatusKey: statusKey,
-			OwnerRoleKey:      "business",
+			OwnerRoleKey:      "sales",
 		}, 7)
 		if err != nil {
 			t.Fatalf("create %s failed: %v", title, err)
@@ -246,7 +246,7 @@ func TestBusinessRecordRepo_ListRecordsByDateRange(t *testing.T) {
 			ModuleKey:         "project-orders",
 			Title:             title,
 			BusinessStatusKey: "project_pending",
-			OwnerRoleKey:      "business",
+			OwnerRoleKey:      "sales",
 			DocumentDate:      &documentDate,
 			DueDate:           &dueDate,
 		}, 7)
@@ -313,7 +313,7 @@ func TestBusinessRecordRepo_ListBusinessRecordsSortOrder(t *testing.T) {
 			SetDocumentNo(item.no).
 			SetTitle(item.title).
 			SetBusinessStatusKey("project_pending").
-			SetOwnerRoleKey("business").
+			SetOwnerRoleKey("sales").
 			SetPayload(map[string]any{}).
 			SetCreatedAt(item.createdAt).
 			Save(ctx)

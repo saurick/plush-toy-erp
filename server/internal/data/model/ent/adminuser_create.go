@@ -46,44 +46,16 @@ func (_c *AdminUserCreate) SetPasswordHash(v string) *AdminUserCreate {
 	return _c
 }
 
-// SetLevel sets the "level" field.
-func (_c *AdminUserCreate) SetLevel(v int8) *AdminUserCreate {
-	_c.mutation.SetLevel(v)
+// SetIsSuperAdmin sets the "is_super_admin" field.
+func (_c *AdminUserCreate) SetIsSuperAdmin(v bool) *AdminUserCreate {
+	_c.mutation.SetIsSuperAdmin(v)
 	return _c
 }
 
-// SetNillableLevel sets the "level" field if the given value is not nil.
-func (_c *AdminUserCreate) SetNillableLevel(v *int8) *AdminUserCreate {
+// SetNillableIsSuperAdmin sets the "is_super_admin" field if the given value is not nil.
+func (_c *AdminUserCreate) SetNillableIsSuperAdmin(v *bool) *AdminUserCreate {
 	if v != nil {
-		_c.SetLevel(*v)
-	}
-	return _c
-}
-
-// SetMenuPermissions sets the "menu_permissions" field.
-func (_c *AdminUserCreate) SetMenuPermissions(v string) *AdminUserCreate {
-	_c.mutation.SetMenuPermissions(v)
-	return _c
-}
-
-// SetNillableMenuPermissions sets the "menu_permissions" field if the given value is not nil.
-func (_c *AdminUserCreate) SetNillableMenuPermissions(v *string) *AdminUserCreate {
-	if v != nil {
-		_c.SetMenuPermissions(*v)
-	}
-	return _c
-}
-
-// SetMobileRolePermissions sets the "mobile_role_permissions" field.
-func (_c *AdminUserCreate) SetMobileRolePermissions(v string) *AdminUserCreate {
-	_c.mutation.SetMobileRolePermissions(v)
-	return _c
-}
-
-// SetNillableMobileRolePermissions sets the "mobile_role_permissions" field if the given value is not nil.
-func (_c *AdminUserCreate) SetNillableMobileRolePermissions(v *string) *AdminUserCreate {
-	if v != nil {
-		_c.SetMobileRolePermissions(*v)
+		_c.SetIsSuperAdmin(*v)
 	}
 	return _c
 }
@@ -193,17 +165,9 @@ func (_c *AdminUserCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *AdminUserCreate) defaults() {
-	if _, ok := _c.mutation.Level(); !ok {
-		v := adminuser.DefaultLevel
-		_c.mutation.SetLevel(v)
-	}
-	if _, ok := _c.mutation.MenuPermissions(); !ok {
-		v := adminuser.DefaultMenuPermissions
-		_c.mutation.SetMenuPermissions(v)
-	}
-	if _, ok := _c.mutation.MobileRolePermissions(); !ok {
-		v := adminuser.DefaultMobileRolePermissions
-		_c.mutation.SetMobileRolePermissions(v)
+	if _, ok := _c.mutation.IsSuperAdmin(); !ok {
+		v := adminuser.DefaultIsSuperAdmin
+		_c.mutation.SetIsSuperAdmin(v)
 	}
 	if _, ok := _c.mutation.ErpPreferences(); !ok {
 		v := adminuser.DefaultErpPreferences
@@ -246,24 +210,8 @@ func (_c *AdminUserCreate) check() error {
 			return &ValidationError{Name: "password_hash", err: fmt.Errorf(`ent: validator failed for field "AdminUser.password_hash": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.Level(); !ok {
-		return &ValidationError{Name: "level", err: errors.New(`ent: missing required field "AdminUser.level"`)}
-	}
-	if _, ok := _c.mutation.MenuPermissions(); !ok {
-		return &ValidationError{Name: "menu_permissions", err: errors.New(`ent: missing required field "AdminUser.menu_permissions"`)}
-	}
-	if v, ok := _c.mutation.MenuPermissions(); ok {
-		if err := adminuser.MenuPermissionsValidator(v); err != nil {
-			return &ValidationError{Name: "menu_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.menu_permissions": %w`, err)}
-		}
-	}
-	if _, ok := _c.mutation.MobileRolePermissions(); !ok {
-		return &ValidationError{Name: "mobile_role_permissions", err: errors.New(`ent: missing required field "AdminUser.mobile_role_permissions"`)}
-	}
-	if v, ok := _c.mutation.MobileRolePermissions(); ok {
-		if err := adminuser.MobileRolePermissionsValidator(v); err != nil {
-			return &ValidationError{Name: "mobile_role_permissions", err: fmt.Errorf(`ent: validator failed for field "AdminUser.mobile_role_permissions": %w`, err)}
-		}
+	if _, ok := _c.mutation.IsSuperAdmin(); !ok {
+		return &ValidationError{Name: "is_super_admin", err: errors.New(`ent: missing required field "AdminUser.is_super_admin"`)}
 	}
 	if _, ok := _c.mutation.ErpPreferences(); !ok {
 		return &ValidationError{Name: "erp_preferences", err: errors.New(`ent: missing required field "AdminUser.erp_preferences"`)}
@@ -320,17 +268,9 @@ func (_c *AdminUserCreate) createSpec() (*AdminUser, *sqlgraph.CreateSpec) {
 		_spec.SetField(adminuser.FieldPasswordHash, field.TypeString, value)
 		_node.PasswordHash = value
 	}
-	if value, ok := _c.mutation.Level(); ok {
-		_spec.SetField(adminuser.FieldLevel, field.TypeInt8, value)
-		_node.Level = value
-	}
-	if value, ok := _c.mutation.MenuPermissions(); ok {
-		_spec.SetField(adminuser.FieldMenuPermissions, field.TypeString, value)
-		_node.MenuPermissions = value
-	}
-	if value, ok := _c.mutation.MobileRolePermissions(); ok {
-		_spec.SetField(adminuser.FieldMobileRolePermissions, field.TypeString, value)
-		_node.MobileRolePermissions = value
+	if value, ok := _c.mutation.IsSuperAdmin(); ok {
+		_spec.SetField(adminuser.FieldIsSuperAdmin, field.TypeBool, value)
+		_node.IsSuperAdmin = value
 	}
 	if value, ok := _c.mutation.ErpPreferences(); ok {
 		_spec.SetField(adminuser.FieldErpPreferences, field.TypeString, value)

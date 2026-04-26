@@ -248,7 +248,7 @@ export function buildPurchaseQualityExceptionTask(
     ...baseTaskSource(record),
     business_status_key: QC_FAILED_STATUS_KEY,
     task_status_key: 'ready',
-    owner_role_key: 'purchasing',
+    owner_role_key: 'purchase',
     priority: HIGH_PRIORITY,
     payload: {
       ...commonPayload(record),

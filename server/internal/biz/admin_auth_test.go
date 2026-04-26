@@ -36,8 +36,8 @@ func (r *memAdminAuthRepo) GetAdminByUsername(_ context.Context, username string
 		return nil, errors.New("not found")
 	}
 	cp := *admin
-	cp.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
-	cp.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
+	cp.Roles = append([]AdminRole(nil), admin.Roles...)
+	cp.Permissions = append([]string(nil), admin.Permissions...)
 	return &cp, nil
 }
 
@@ -50,8 +50,8 @@ func (r *memAdminAuthRepo) GetAdminByPhone(_ context.Context, phone string) (*Ad
 		return nil, errors.New("not found")
 	}
 	cp := *admin
-	cp.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
-	cp.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
+	cp.Roles = append([]AdminRole(nil), admin.Roles...)
+	cp.Permissions = append([]string(nil), admin.Permissions...)
 	return &cp, nil
 }
 
@@ -68,7 +68,10 @@ func TestAdminAuthUsecase_SMSLogin_Success(t *testing.T) {
 		ID:       1,
 		Username: "sms-admin",
 		Phone:    "13800138000",
-		Level:    int8(AdminLevelSuper),
+		Roles: []AdminRole{
+			{Key: PurchaseRoleKey, Name: "采购"},
+		},
+		Permissions: []string{PermissionMobilePurchaseAccess},
 	}
 	repo.phones["13800138000"] = repo.admins["13800138000"]
 
@@ -78,12 +81,12 @@ func TestAdminAuthUsecase_SMSLogin_Success(t *testing.T) {
 		return "tok-admin-sms", time.Now().Add(time.Hour), nil
 	}, logger, tp)
 
-	challenge, err := uc.RequestSMSLoginCode(context.Background(), "13800138000", "purchasing")
+	challenge, err := uc.RequestSMSLoginCode(context.Background(), "13800138000", "purchase")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 
-	token, _, admin, err := uc.LoginWithSMSCode(context.Background(), "13800138000", challenge.MockCode, "purchasing")
+	token, _, admin, err := uc.LoginWithSMSCode(context.Background(), "13800138000", challenge.MockCode, "purchase")
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}

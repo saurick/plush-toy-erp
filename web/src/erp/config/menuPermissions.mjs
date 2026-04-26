@@ -100,10 +100,10 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     ]),
   },
   {
-    key: 'business',
+    key: 'sales',
     label: '业务',
     description: '保留立项、待出货和相关帮助文档。',
-    mobileRolePermissions: buildMobileRolePreset(['business']),
+    mobileRolePermissions: buildMobileRolePreset(['sales']),
     permissions: buildPreset([
       '/erp/dashboard',
       '/erp/business-dashboard',
@@ -150,10 +150,10 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     ]),
   },
   {
-    key: 'purchasing',
+    key: 'purchase',
     label: '采购',
     description: '保留主料、辅包材、加工合同、入库协同和打印中心。',
-    mobileRolePermissions: buildMobileRolePreset(['purchasing']),
+    mobileRolePermissions: buildMobileRolePreset(['purchase']),
     permissions: buildPreset([
       '/erp/dashboard',
       '/erp/business-dashboard',

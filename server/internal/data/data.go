@@ -170,6 +170,9 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		conf:       c,
 	}
 
+	if err := InitRBACIfNeeded(context.Background(), data, l); err != nil {
+		return nil, nil, err
+	}
 	if err := InitAdminUsersIfNeeded(context.Background(), data, c, l); err != nil {
 		return nil, nil, err
 	}

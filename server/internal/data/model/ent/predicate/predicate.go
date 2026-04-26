@@ -9,6 +9,9 @@ import (
 // AdminUser is the predicate function for adminuser builders.
 type AdminUser func(*sql.Selector)
 
+// AdminUserRole is the predicate function for adminuserrole builders.
+type AdminUserRole func(*sql.Selector)
+
 // BOMHeader is the predicate function for bomheader builders.
 type BOMHeader func(*sql.Selector)
 
@@ -36,6 +39,9 @@ type InventoryTxn func(*sql.Selector)
 // Material is the predicate function for material builders.
 type Material func(*sql.Selector)
 
+// Permission is the predicate function for permission builders.
+type Permission func(*sql.Selector)
+
 // Product is the predicate function for product builders.
 type Product func(*sql.Selector)
 
@@ -50,6 +56,12 @@ type PurchaseReturn func(*sql.Selector)
 
 // PurchaseReturnItem is the predicate function for purchasereturnitem builders.
 type PurchaseReturnItem func(*sql.Selector)
+
+// Role is the predicate function for role builders.
+type Role func(*sql.Selector)
+
+// RolePermission is the predicate function for rolepermission builders.
+type RolePermission func(*sql.Selector)
 
 // Unit is the predicate function for unit builders.
 type Unit func(*sql.Selector)

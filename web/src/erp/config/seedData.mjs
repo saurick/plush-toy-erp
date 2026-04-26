@@ -677,12 +677,12 @@ const roleWorkbenches = [
     ],
   },
   {
-    key: 'business',
+    key: 'sales',
     title: '业务',
     label: '前台总控',
     summary:
       '业务是客户 / 款式 / 材料 / 合同 / 交期总入口，桌面负责结构化维护，移动端负责催办和风险确认。',
-    defaultPath: '/erp/roles/business',
+    defaultPath: '/erp/roles/sales',
     allowedNavKeys: [
       'workspace-home',
       'flow-overview',
@@ -939,12 +939,12 @@ const roleWorkbenches = [
     ],
   },
   {
-    key: 'purchasing',
+    key: 'purchase',
     title: '采购',
     label: '到料与回签',
     summary:
       '采购桌面端聚焦主料 / 辅料 / 包材需求和加工厂回签，移动端聚焦缺料、到料和单价确认。',
-    defaultPath: '/erp/roles/purchasing',
+    defaultPath: '/erp/roles/purchase',
     allowedNavKeys: [
       'workspace-home',
       'flow-overview',
@@ -1610,7 +1610,7 @@ const roleHelpSections = {
       ],
     },
   ],
-  business: [
+  sales: [
     {
       title: '业务先盯什么',
       items: [
@@ -1620,7 +1620,7 @@ const roleHelpSections = {
       ],
     },
   ],
-  purchasing: [
+  purchase: [
     {
       title: '采购先盯什么',
       items: [
@@ -2008,7 +2008,7 @@ const navItemRegistry = {
     label: '权限管理',
     path: '/erp/system/permissions',
     shortLabel: '权限',
-    description: '集中管理管理员账号、菜单权限和启用状态。',
+    description: '集中管理管理员账号、角色、权限码和启用状态。',
   },
 }
 
@@ -2111,7 +2111,7 @@ export const helpCenterRoleNavGroups = [
     docs: [navItemRegistry['help-role-collaboration-guide']],
   },
   {
-    key: 'business',
+    key: 'sales',
     role: '业务',
     mainWork: '订单、客户资料、出货准备和应收前置',
     taskSource: '客户资料、订单交期、包装材料和出货确认任务',
@@ -2132,7 +2132,7 @@ export const helpCenterRoleNavGroups = [
     docs: [navItemRegistry['help-notification-alert-v1']],
   },
   {
-    key: 'purchasing',
+    key: 'purchase',
     role: '采购',
     mainWork: '采购到货、补料、合同回签和供应商异常',
     taskSource: '采购任务池、缺料、到货、回签和供应商异常',

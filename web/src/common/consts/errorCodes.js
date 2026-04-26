@@ -15,7 +15,6 @@ export function isAuthFailureCode(code) {
 }
 
 export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
-  [RpcErrorCode.ADMIN_INVALID_LEVEL]: '管理员等级不合法',
   [RpcErrorCode.ADMIN_REQUIRED]: '只有管理员才能操作',
   [RpcErrorCode.AUTH_REQUIRED]: '请先登录',
   [RpcErrorCode.ADMIN_DISABLED]: '管理员已禁用',

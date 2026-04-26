@@ -142,6 +142,46 @@ func IsValidWorkflowTaskUrgeAction(action string) bool {
 	return ok
 }
 
+func IsTerminalWorkflowTaskStatus(statusKey string) bool {
+	switch strings.TrimSpace(statusKey) {
+	case "done", "cancelled", "closed":
+		return true
+	default:
+		return false
+	}
+}
+
+func WorkflowStatusActionPermission(nextStatusKey string, current *WorkflowTask) string {
+	switch strings.TrimSpace(nextStatusKey) {
+	case "done":
+		if isBossOrderApprovalTask(current) {
+			return PermissionWorkflowTaskApprove
+		}
+		return PermissionWorkflowTaskComplete
+	case "rejected":
+		return PermissionWorkflowTaskReject
+	default:
+		return PermissionWorkflowTaskUpdate
+	}
+}
+
+func CanAdminHandleWorkflowTask(admin *AdminUser, task *WorkflowTask, nextStatusKey string) bool {
+	if admin == nil || admin.Disabled || task == nil {
+		return false
+	}
+	if IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
+		return false
+	}
+	nextStatusKey = strings.TrimSpace(nextStatusKey)
+	if nextStatusKey == "" || !IsValidWorkflowTaskState(nextStatusKey) {
+		return false
+	}
+	if task.AssigneeID != nil {
+		return *task.AssigneeID == admin.ID
+	}
+	return AdminHasRole(admin, task.OwnerRoleKey)
+}
+
 type WorkflowTask struct {
 	ID                int
 	TaskCode          string
@@ -284,6 +324,13 @@ func (uc *WorkflowUsecase) ListTasks(ctx context.Context, filter WorkflowTaskFil
 		return nil, 0, ErrBadParam
 	}
 	return uc.repo.ListWorkflowTasks(ctx, filter)
+}
+
+func (uc *WorkflowUsecase) GetTask(ctx context.Context, id int) (*WorkflowTask, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.GetWorkflowTask(ctx, id)
 }
 
 func (uc *WorkflowUsecase) CreateTask(ctx context.Context, in *WorkflowTaskCreate, actorID int) (*WorkflowTask, error) {
@@ -842,7 +889,7 @@ func buildPurchaseIQCDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusS
 }
 
 func buildPurchaseIQCExceptionSideEffects(current *WorkflowTask, taskStatusKey string, reason string) *WorkflowTaskStatusSideEffects {
-	ownerRoleKey := "purchasing"
+	ownerRoleKey := PurchaseRoleKey
 	qcResult := "fail"
 	if taskStatusKey == "rejected" {
 		qcResult = "rejected"
@@ -1089,7 +1136,7 @@ func buildPurchaseQualityExceptionTaskFromIqc(current *WorkflowTask, taskStatusK
 		SourceNo:          workflowTaskSourceNo(current),
 		BusinessStatusKey: &businessStatusKey,
 		TaskStatusKey:     "ready",
-		OwnerRoleKey:      "purchasing",
+		OwnerRoleKey:      PurchaseRoleKey,
 		Priority:          3,
 		Payload:           payload,
 	}

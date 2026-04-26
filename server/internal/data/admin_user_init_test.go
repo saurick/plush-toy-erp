@@ -26,7 +26,7 @@ func TestInitAdminUsersIfNeededCreatesAdminOnce(t *testing.T) {
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(
-		"INSERT INTO admin_users (username, password_hash, level, menu_permissions, disabled, created_at, updated_at) VALUES ($1, $2, 0, '', FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
+		"INSERT INTO admin_users (username, password_hash, is_super_admin, disabled, created_at, updated_at) VALUES ($1, $2, TRUE, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
 	)).
 		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -50,10 +50,44 @@ func TestInitAdminUsersIfNeededSkipsWhenAdminAlreadyExists(t *testing.T) {
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(
-		"INSERT INTO admin_users (username, password_hash, level, menu_permissions, disabled, created_at, updated_at) VALUES ($1, $2, 0, '', FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
+		"INSERT INTO admin_users (username, password_hash, is_super_admin, disabled, created_at, updated_at) VALUES ($1, $2, TRUE, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
 	)).
 		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta(
+		"UPDATE admin_users SET is_super_admin = TRUE, updated_at = $2 WHERE username = $1 AND is_super_admin = FALSE",
+	)).
+		WithArgs("trialadmin", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectClose()
+
+	err = InitAdminUsersIfNeeded(context.Background(), &Data{sqldb: db}, testAdminInitConfig(), log.NewHelper(log.NewStdLogger(io.Discard)))
+	if err != nil {
+		t.Fatalf("InitAdminUsersIfNeeded() error = %v", err)
+	}
+	mustCloseDB(t, db)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestInitAdminUsersIfNeededPromotesExistingBootstrapAdmin(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+
+	mock.ExpectExec(regexp.QuoteMeta(
+		"INSERT INTO admin_users (username, password_hash, is_super_admin, disabled, created_at, updated_at) VALUES ($1, $2, TRUE, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
+	)).
+		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(regexp.QuoteMeta(
+		"UPDATE admin_users SET is_super_admin = TRUE, updated_at = $2 WHERE username = $1 AND is_super_admin = FALSE",
+	)).
+		WithArgs("trialadmin", sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectClose()
 
 	err = InitAdminUsersIfNeeded(context.Background(), &Data{sqldb: db}, testAdminInitConfig(), log.NewHelper(log.NewStdLogger(io.Discard)))

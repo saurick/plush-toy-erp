@@ -34,25 +34,23 @@ func (r *adminAuthRepo) GetAdminByID(ctx context.Context, id int) (*biz.AdminUse
 	}
 
 	var (
-		adminID               int
-		uname                 string
-		phone                 sql.NullString
-		passwordHash          string
-		level                 int8
-		menuPermissions       string
-		mobileRolePermissions string
-		erpPreferences        string
-		disabled              bool
-		lastLoginAt           *time.Time
-		createdAt             time.Time
-		updatedAt             time.Time
+		adminID        int
+		uname          string
+		phone          sql.NullString
+		passwordHash   string
+		isSuperAdmin   bool
+		erpPreferences string
+		disabled       bool
+		lastLoginAt    *time.Time
+		createdAt      time.Time
+		updatedAt      time.Time
 	)
 
 	err := r.data.sqldb.QueryRowContext(
 		ctx,
-		"SELECT id, username, phone, password_hash, level, menu_permissions, mobile_role_permissions, erp_preferences, disabled, last_login_at, created_at, updated_at FROM admin_users WHERE id = $1 LIMIT 1",
+		"SELECT id, username, phone, password_hash, is_super_admin, erp_preferences, disabled, last_login_at, created_at, updated_at FROM admin_users WHERE id = $1 LIMIT 1",
 		id,
-	).Scan(&adminID, &uname, &phone, &passwordHash, &level, &menuPermissions, &mobileRolePermissions, &erpPreferences, &disabled, &lastLoginAt, &createdAt, &updatedAt)
+	).Scan(&adminID, &uname, &phone, &passwordHash, &isSuperAdmin, &erpPreferences, &disabled, &lastLoginAt, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			l.Infof("GetAdminByID not found id=%d", id)
@@ -62,20 +60,22 @@ func (r *adminAuthRepo) GetAdminByID(ctx context.Context, id int) (*biz.AdminUse
 		return nil, err
 	}
 
-	return &biz.AdminUser{
-		ID:                    adminID,
-		Username:              uname,
-		Phone:                 nullStringValue(phone),
-		PasswordHash:          passwordHash,
-		Level:                 level,
-		MenuPermissions:       decodeMenuPermissions(menuPermissions),
-		MobileRolePermissions: decodeMobileRolePermissions(mobileRolePermissions),
-		ERPPreferences:        decodeAdminERPPreferences(erpPreferences),
-		Disabled:              disabled,
-		LastLoginAt:           lastLoginAt,
-		CreatedAt:             createdAt,
-		UpdatedAt:             updatedAt,
-	}, nil
+	admin := &biz.AdminUser{
+		ID:             adminID,
+		Username:       uname,
+		Phone:          nullStringValue(phone),
+		PasswordHash:   passwordHash,
+		IsSuperAdmin:   isSuperAdmin,
+		ERPPreferences: decodeAdminERPPreferences(erpPreferences),
+		Disabled:       disabled,
+		LastLoginAt:    lastLoginAt,
+		CreatedAt:      createdAt,
+		UpdatedAt:      updatedAt,
+	}
+	if err := loadAdminRBAC(ctx, r.data.sqldb, admin); err != nil {
+		return nil, err
+	}
+	return admin, nil
 }
 
 func (r *adminAuthRepo) GetAdminByUsername(ctx context.Context, username string) (*biz.AdminUser, error) {
@@ -86,25 +86,23 @@ func (r *adminAuthRepo) GetAdminByUsername(ctx context.Context, username string)
 	}
 
 	var (
-		id                    int
-		uname                 string
-		phone                 sql.NullString
-		passwordHash          string
-		level                 int8
-		menuPermissions       string
-		mobileRolePermissions string
-		erpPreferences        string
-		disabled              bool
-		lastLoginAt           *time.Time
-		createdAt             time.Time
-		updatedAt             time.Time
+		id             int
+		uname          string
+		phone          sql.NullString
+		passwordHash   string
+		isSuperAdmin   bool
+		erpPreferences string
+		disabled       bool
+		lastLoginAt    *time.Time
+		createdAt      time.Time
+		updatedAt      time.Time
 	)
 
 	err := r.data.sqldb.QueryRowContext(
 		ctx,
-		"SELECT id, username, phone, password_hash, level, menu_permissions, mobile_role_permissions, erp_preferences, disabled, last_login_at, created_at, updated_at FROM admin_users WHERE username = $1 LIMIT 1",
+		"SELECT id, username, phone, password_hash, is_super_admin, erp_preferences, disabled, last_login_at, created_at, updated_at FROM admin_users WHERE username = $1 LIMIT 1",
 		username,
-	).Scan(&id, &uname, &phone, &passwordHash, &level, &menuPermissions, &mobileRolePermissions, &erpPreferences, &disabled, &lastLoginAt, &createdAt, &updatedAt)
+	).Scan(&id, &uname, &phone, &passwordHash, &isSuperAdmin, &erpPreferences, &disabled, &lastLoginAt, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			l.Infof("GetAdminByUsername not found username=%s", username)
@@ -114,20 +112,22 @@ func (r *adminAuthRepo) GetAdminByUsername(ctx context.Context, username string)
 		return nil, err
 	}
 
-	return &biz.AdminUser{
-		ID:                    id,
-		Username:              uname,
-		Phone:                 nullStringValue(phone),
-		PasswordHash:          passwordHash,
-		Level:                 level,
-		MenuPermissions:       decodeMenuPermissions(menuPermissions),
-		MobileRolePermissions: decodeMobileRolePermissions(mobileRolePermissions),
-		ERPPreferences:        decodeAdminERPPreferences(erpPreferences),
-		Disabled:              disabled,
-		LastLoginAt:           lastLoginAt,
-		CreatedAt:             createdAt,
-		UpdatedAt:             updatedAt,
-	}, nil
+	admin := &biz.AdminUser{
+		ID:             id,
+		Username:       uname,
+		Phone:          nullStringValue(phone),
+		PasswordHash:   passwordHash,
+		IsSuperAdmin:   isSuperAdmin,
+		ERPPreferences: decodeAdminERPPreferences(erpPreferences),
+		Disabled:       disabled,
+		LastLoginAt:    lastLoginAt,
+		CreatedAt:      createdAt,
+		UpdatedAt:      updatedAt,
+	}
+	if err := loadAdminRBAC(ctx, r.data.sqldb, admin); err != nil {
+		return nil, err
+	}
+	return admin, nil
 }
 
 func (r *adminAuthRepo) GetAdminByPhone(ctx context.Context, phone string) (*biz.AdminUser, error) {
@@ -138,25 +138,23 @@ func (r *adminAuthRepo) GetAdminByPhone(ctx context.Context, phone string) (*biz
 	}
 
 	var (
-		id                    int
-		uname                 string
-		phoneValue            sql.NullString
-		passwordHash          string
-		level                 int8
-		menuPermissions       string
-		mobileRolePermissions string
-		erpPreferences        string
-		disabled              bool
-		lastLoginAt           *time.Time
-		createdAt             time.Time
-		updatedAt             time.Time
+		id             int
+		uname          string
+		phoneValue     sql.NullString
+		passwordHash   string
+		isSuperAdmin   bool
+		erpPreferences string
+		disabled       bool
+		lastLoginAt    *time.Time
+		createdAt      time.Time
+		updatedAt      time.Time
 	)
 
 	err := r.data.sqldb.QueryRowContext(
 		ctx,
-		"SELECT id, username, phone, password_hash, level, menu_permissions, mobile_role_permissions, erp_preferences, disabled, last_login_at, created_at, updated_at FROM admin_users WHERE phone = $1 LIMIT 1",
+		"SELECT id, username, phone, password_hash, is_super_admin, erp_preferences, disabled, last_login_at, created_at, updated_at FROM admin_users WHERE phone = $1 LIMIT 1",
 		phone,
-	).Scan(&id, &uname, &phoneValue, &passwordHash, &level, &menuPermissions, &mobileRolePermissions, &erpPreferences, &disabled, &lastLoginAt, &createdAt, &updatedAt)
+	).Scan(&id, &uname, &phoneValue, &passwordHash, &isSuperAdmin, &erpPreferences, &disabled, &lastLoginAt, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			l.Infof("GetAdminByPhone not found phone=%s", maskAdminAuthPhone(phone))
@@ -166,20 +164,22 @@ func (r *adminAuthRepo) GetAdminByPhone(ctx context.Context, phone string) (*biz
 		return nil, err
 	}
 
-	return &biz.AdminUser{
-		ID:                    id,
-		Username:              uname,
-		Phone:                 nullStringValue(phoneValue),
-		PasswordHash:          passwordHash,
-		Level:                 level,
-		MenuPermissions:       decodeMenuPermissions(menuPermissions),
-		MobileRolePermissions: decodeMobileRolePermissions(mobileRolePermissions),
-		ERPPreferences:        decodeAdminERPPreferences(erpPreferences),
-		Disabled:              disabled,
-		LastLoginAt:           lastLoginAt,
-		CreatedAt:             createdAt,
-		UpdatedAt:             updatedAt,
-	}, nil
+	admin := &biz.AdminUser{
+		ID:             id,
+		Username:       uname,
+		Phone:          nullStringValue(phoneValue),
+		PasswordHash:   passwordHash,
+		IsSuperAdmin:   isSuperAdmin,
+		ERPPreferences: decodeAdminERPPreferences(erpPreferences),
+		Disabled:       disabled,
+		LastLoginAt:    lastLoginAt,
+		CreatedAt:      createdAt,
+		UpdatedAt:      updatedAt,
+	}
+	if err := loadAdminRBAC(ctx, r.data.sqldb, admin); err != nil {
+		return nil, err
+	}
+	return admin, nil
 }
 
 func (r *adminAuthRepo) UpdateAdminLastLogin(ctx context.Context, id int, t time.Time) error {

@@ -570,14 +570,14 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			{Label: "协同任务调试", Path: "/erp/qa/workflow-task-debug", Reason: "核对工程资料任务是否进入 PMC / 相关角色池"},
 		},
 		records: []debugRecordTemplate{
-			{ref: "order", moduleKey: "project-orders", title: "订单审批通过，待工程资料", statusKey: "engineering_preparing", ownerRoleKey: "business", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", quantity: 1200, unit: "只", amount: 57600, dueOffsetDays: 21},
+			{ref: "order", moduleKey: "project-orders", title: "订单审批通过，待工程资料", statusKey: "engineering_preparing", ownerRoleKey: "sales", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", quantity: 1200, unit: "只", amount: 57600, dueOffsetDays: 21},
 			{ref: "bom", moduleKey: "material-bom", title: "工程资料准备中", statusKey: "engineering_preparing", ownerRoleKey: "pmc", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", materialName: "BOM / 色卡 / 包装资料", quantity: 1, unit: "套", dueOffsetDays: 3},
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "bom", suffix: "ENG", group: "engineering_material", name: "准备 BOM、色卡和包装资料", statusKey: "ready", businessStatusKey: "engineering_preparing", ownerRoleKey: "pmc", priority: 2, dueOffsetDays: 3},
 		},
 		states: []debugStateTemplate{
-			{recordRef: "order", statusKey: "engineering_preparing", ownerRoleKey: "business"},
+			{recordRef: "order", statusKey: "engineering_preparing", ownerRoleKey: "sales"},
 			{recordRef: "bom", statusKey: "engineering_preparing", ownerRoleKey: "pmc"},
 		},
 	},
@@ -595,7 +595,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			{Label: "入库通知/检验/入库", Path: "/erp/warehouse/inbound", Reason: "核对 IQC 与仓库入库任务"},
 		},
 		records: []debugRecordTemplate{
-			{ref: "purchase", moduleKey: "accessories-purchase", title: "辅材到货待 IQC", statusKey: "iqc_pending", ownerRoleKey: "purchasing", supplierName: "调试辅料供应商", materialName: "调试塑料眼睛", quantity: 5000, unit: "对", amount: 1500, dueOffsetDays: 2, items: []debugItemTemplate{{itemName: "塑料眼睛", materialName: "黑色 12mm", unit: "对", quantity: 5000, unitPrice: 0.3, amount: 1500, supplierName: "调试辅料供应商"}}},
+			{ref: "purchase", moduleKey: "accessories-purchase", title: "辅材到货待 IQC", statusKey: "iqc_pending", ownerRoleKey: "purchase", supplierName: "调试辅料供应商", materialName: "调试塑料眼睛", quantity: 5000, unit: "对", amount: 1500, dueOffsetDays: 2, items: []debugItemTemplate{{itemName: "塑料眼睛", materialName: "黑色 12mm", unit: "对", quantity: 5000, unitPrice: 0.3, amount: 1500, supplierName: "调试辅料供应商"}}},
 			{ref: "inbound", moduleKey: "inbound", title: "辅材 IQC 放行后待入库", statusKey: "warehouse_inbound_pending", ownerRoleKey: "warehouse", supplierName: "调试辅料供应商", materialName: "调试塑料眼睛", warehouseLocation: "A-DEBUG-01", quantity: 5000, unit: "对", amount: 1500, dueOffsetDays: 3},
 		},
 		tasks: []debugTaskTemplate{
@@ -621,7 +621,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			{Label: "入库通知/检验/入库", Path: "/erp/warehouse/inbound", Reason: "核对委外回货检验和入库"},
 		},
 		records: []debugRecordTemplate{
-			{ref: "contract", moduleKey: "processing-contracts", title: "委外加工回货待检", statusKey: "qc_pending", ownerRoleKey: "purchasing", supplierName: "调试加工厂", productName: "调试款毛绒兔半成品", quantity: 800, unit: "只", amount: 9600, dueOffsetDays: 4},
+			{ref: "contract", moduleKey: "processing-contracts", title: "委外加工回货待检", statusKey: "qc_pending", ownerRoleKey: "purchase", supplierName: "调试加工厂", productName: "调试款毛绒兔半成品", quantity: 800, unit: "只", amount: 9600, dueOffsetDays: 4},
 			{ref: "inbound", moduleKey: "inbound", title: "委外回货合格待入库", statusKey: "warehouse_inbound_pending", ownerRoleKey: "warehouse", supplierName: "调试加工厂", productName: "调试款毛绒兔半成品", warehouseLocation: "B-DEBUG-02", quantity: 780, unit: "只", amount: 9360, dueOffsetDays: 5},
 		},
 		tasks: []debugTaskTemplate{
@@ -654,12 +654,12 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "progress", suffix: "FQC", group: "finished_goods_qc", name: "成品抽检", statusKey: "ready", businessStatusKey: "qc_pending", ownerRoleKey: "quality", priority: 2, dueOffsetDays: 1},
-			{recordRef: "shipping", suffix: "SHIP", group: "shipment_release", name: "出货放行确认", statusKey: "ready", businessStatusKey: "shipping_released", ownerRoleKey: "business", priority: 2, dueOffsetDays: 3},
+			{recordRef: "shipping", suffix: "SHIP", group: "shipment_release", name: "出货放行确认", statusKey: "ready", businessStatusKey: "shipping_released", ownerRoleKey: "sales", priority: 2, dueOffsetDays: 3},
 			{recordRef: "outbound", suffix: "OUT", group: "warehouse_outbound", name: "仓库出库确认", statusKey: "pending", businessStatusKey: "shipped", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 4},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "progress", statusKey: "qc_pending", ownerRoleKey: "quality"},
-			{recordRef: "shipping", statusKey: "shipping_released", ownerRoleKey: "business"},
+			{recordRef: "shipping", statusKey: "shipping_released", ownerRoleKey: "sales"},
 			{recordRef: "outbound", statusKey: "shipped", ownerRoleKey: "warehouse"},
 		},
 	},

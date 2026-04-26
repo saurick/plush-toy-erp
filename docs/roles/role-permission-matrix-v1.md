@@ -1,34 +1,49 @@
 # 角色权限矩阵 v1
 
-## 权限分层
+## 当前口径
 
-`menu_permissions` 只管菜单是否可见，不等于业务审批权、任务处理权或数据写入权。
+当前项目权限模型是标准 RBAC：用户通过 `admin_user_roles` 绑定角色，角色通过 `role_permissions` 获得权限码，后端接口、桌面菜单和移动端入口统一消费 permission code。`admin_users.level`、`admin_users.menu_permissions`、`admin_users.mobile_role_permissions` 不再作为权限来源。
 
-`workflow_tasks.owner_role_key` 决定任务进入哪个角色池，`workflow_tasks.assignee_id` 决定具体处理人。`admin` 是系统权限角色，可以配置账号和菜单，但不天然拥有老板审批、品质放行、仓库入出库或财务结算的业务事实权。
+权限码和内置角色真源在 `/Users/simon/projects/plush-toy-erp/server/internal/biz/rbac.go`。登录和 `auth.me` 返回当前管理员、角色、权限码和后端推导出的菜单；前端只负责按这些结果展示入口，不能把菜单隐藏当成安全边界。
 
-PMC 可以看全链路卡点、超时、阻塞和关键路径，但不能替品质、仓库、财务完成业务事实。品质负责检验结论和放行；仓库负责收发存事实；财务负责应收、应付、发票和对账事实。
+`is_super_admin=true` 的账号拥有全部权限，用于初始化和紧急管理；普通管理员必须通过角色获得权限。普通管理员不能随意修改 super admin。
 
-## 角色矩阵
+workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作”，业务归属继续由 `owner_role_key`、`assignee_id`、`task_status_key` 判断“这条任务是不是你该处理”。`workflow.task.update` 不能绕过任务归属；boss / pmc 的查看、关注、催办能力也不等于可以替销售、采购、仓库、品质、财务完成业务事实。
 
-| 角色 | 菜单可见 | 数据范围 | 可创建 | 可编辑 | 可删除 | 可审批 | 可完成任务 | 可阻塞任务 | 可催办 | 可打印 | 可导出 | 可移动端处理 | 可查看日志 | 可配置权限 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| boss | 看板、全业务、打印、帮助 | 全链路高风险、审批、财务风险 | 否 | 少量审批备注 | 否 | 是 | 仅老板任务 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| business | 立项、出货放行、帮助 | 自己负责客户 / 订单和相关出货 | 是 | 是 | 受控 | 提交审批 | 自己角色池 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| engineering | 工程资料、BOM、帮助 | 工程资料和 BOM 相关记录 | 是 | 是 | 受控 | 否 | 工程角色池 | 是 | 可催上游补资料 | 是 | 是 | 后续接入 | 是 | 否 |
-| pmc | 看板、BOM、采购、委外、入库、生产、异常、品质、出货、帮助 | 全链路卡点、超时、阻塞、关键路径 | 可创建协同任务 | 可编辑 PMC 负责字段 | 否 | 否 | 仅 PMC 事实任务 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| purchasing | BOM、辅包材采购、加工合同、入库协同、帮助 | 采购、供应商、委外合同和到货节点 | 是 | 是 | 受控 | 否 | 采购角色池 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| outsource | 委外加工相关任务 | 指派给加工厂或委外负责人的任务 | 否 | 回填进度 / 回货说明 | 否 | 否 | 指派任务 | 是 | 否 | 否 | 否 | 后续接入 | 受限 | 否 |
-| production_manager | 排产、生产进度、异常、品质协同 | 生产排单、进度、返工和异常 | 是 | 是 | 受控 | 生产决策 | 生产经理任务 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| production_worker | 生产进度任务 | 指派工序和个人任务 | 否 | 回填完成数量 / 异常 | 否 | 否 | 指派任务 | 是 | 否 | 否 | 否 | 是 | 受限 | 否 |
-| warehouse | 入库、库存、出货放行、出库、帮助 | 收货、入库、发料、库存、出库事实 | 是 | 是 | 受控 | 否 | 仓库角色池 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| quality | 品质检验、入库协同、出货放行、异常、帮助 | IQC、委外回货检验、成品抽检、返工复检、放行 | 是 | 是 | 受控 | 品质放行 | 品质角色池 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| finance | 对账、应付、应收、发票、出货放行、打印、帮助 | 应收、应付、发票、对账和财务风险 | 是 | 是 | 受控 | 财务放行 | 财务角色池 | 是 | 是 | 是 | 是 | 是 | 是 | 否 |
-| admin | 权限管理、默认菜单集合 | 系统账号和菜单配置 | 系统配置 | 系统配置 | 系统配置 | 否 | 否 | 否 | 否 | 否 | 是 | 否 | 是 | 是 |
+跟单角色如果甲方没有，不新增独立角色；业务跟进由 `sales` 或 `pmc` 承担。
+
+## 关键权限码
+
+| 模块 | 权限码 | 用途 |
+| --- | --- | --- |
+| 系统 | `system.user.read/create/update/disable` | 管理员账号读取、创建、更新和启停 |
+| 系统 | `system.role.read/create/update/delete` | 角色读取、创建、更新和删除 |
+| 系统 | `system.permission.manage` | 给角色分配权限 |
+| 桌面入口 | `erp.dashboard.read`、`erp.print_template.read`、`erp.help_center.read`、`erp.business_chain_debug.read` | 后台菜单和页面入口 |
+| 业务记录 | `business.record.read/create/update/delete` | 通用业务记录读写删 |
+| 工作流 | `workflow.task.read/create/update/assign/approve/reject/complete` | 任务查询、创建、更新、指派、审批、驳回和完成 |
+| 移动端 | `mobile.<role>.access` | 移动端角色入口，例如 `mobile.sales.access` |
+| 调试 | `debug.seed`、`debug.cleanup`、`debug.business.clear`、`debug.business_chain.run` | 开发 / 测试调试能力 |
+
+## 预设角色
+
+| 角色 | 定位 | 默认权限范围 | 任务处理边界 |
+| --- | --- | --- | --- |
+| `boss` | 管理层、审批和风险查看 | 全局 read、审批、报表、看板和帮助中心；不默认给 `debug.business.clear` | 可处理老板角色池或指派给自己的任务；关注高风险不等于替其他角色完成事实 |
+| `sales` | 销售 / 业务跟进 | 销售链路、客户订单、出货协同、业务记录读写、基础 workflow 权限、销售移动端 | 只能处理 `owner_role_key=sales` 或 `assignee_id=自己` 的任务 |
+| `purchase` | 采购 | 采购单、采购收货、采购退货、采购异常、业务记录读写、采购移动端 | 只能处理 `owner_role_key=purchase` 或 `assignee_id=自己` 的任务 |
+| `warehouse` | 仓库 | 库存、入库、出库、盘点、仓库移动端 | 只能处理 `owner_role_key=warehouse` 或 `assignee_id=自己` 的任务 |
+| `quality` | 品质 | IQC、成品抽检、异常处理、返工复检、品质移动端 | 只能处理 `owner_role_key=quality` 或 `assignee_id=自己` 的任务 |
+| `finance` | 财务 | 应收、应付、收付款、对账、财务报表、财务移动端 | 只能处理 `owner_role_key=finance` 或 `assignee_id=自己` 的任务 |
+| `pmc` | 计划和风险跟进 | 计划、进度、风险查看和处理、PMC 移动端 | 可看风险和卡点；不能替生产、仓库、品质、财务完成业务事实 |
+| `production` | 生产执行 | 生产计划、生产进度、返工、生产移动端 | 只能处理 `owner_role_key=production` 或 `assignee_id=自己` 的任务 |
+| `admin` | 系统管理 | 用户、角色、权限、基础配置 | 不天然拥有业务审批、品质放行、仓库入出库或财务结算事实权 |
+| `debug_operator` | 开发 / 测试调试 | `debug.seed`、`debug.cleanup`、`debug.business.clear`、`debug.business_chain.run` | 只应在 local / dev / test 环境使用，生产默认不分配 |
 
 ## 操作边界
 
-- 可删除是受控能力，业务记录删除应进入回收站并写 `business_record_events`，不是物理删除。
-- 可审批需要业务语义授权，不能只靠 `admin` 或菜单可见推导。
+- 可删除是受控能力，业务记录删除应写事件和原因，不等于绕过审计物理删除。
+- 可审批必须同时满足权限码、业务归属和状态条件，不能只靠 `admin` 角色推导。
 - 可催办必须写入 `workflow_task_events`，不能只是页面红点或备注。
-- 可打印和可导出只表示入口权限，导出字段仍要受数据范围约束。
+- 可打印和可导出只表示入口权限，导出字段和数据范围仍要按后续数据权限规则收口。
 - 移动端只处理当前角色任务和规则允许的风险任务，不展示低代码配置、状态字典或系统权限页面。

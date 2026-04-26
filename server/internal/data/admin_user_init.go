@@ -37,7 +37,7 @@ func InitAdminUsersIfNeeded(ctx context.Context, d *Data, cfg *conf.Data, l *log
 	// 多副本并发启动时，管理员初始化必须保持幂等，避免“先查后插”在唯一键上互相踩踏。
 	result, err := d.sqldb.ExecContext(
 		ctx,
-		"INSERT INTO admin_users (username, password_hash, level, menu_permissions, disabled, created_at, updated_at) VALUES ($1, $2, 0, '', FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
+		"INSERT INTO admin_users (username, password_hash, is_super_admin, disabled, created_at, updated_at) VALUES ($1, $2, TRUE, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
 		username,
 		string(hash),
 		now,
@@ -54,6 +54,24 @@ func InitAdminUsersIfNeeded(ctx context.Context, d *Data, cfg *conf.Data, l *log
 		return nil
 	}
 	if affected == 0 {
+		promoteResult, promoteErr := d.sqldb.ExecContext(
+			ctx,
+			"UPDATE admin_users SET is_super_admin = TRUE, updated_at = $2 WHERE username = $1 AND is_super_admin = FALSE",
+			username,
+			now,
+		)
+		if promoteErr != nil {
+			return promoteErr
+		}
+		promoted, promoteRowsErr := promoteResult.RowsAffected()
+		if promoteRowsErr != nil {
+			l.Warnf("admin_users bootstrap promotion rows affected unavailable username=%s err=%v", username, promoteRowsErr)
+			return nil
+		}
+		if promoted > 0 {
+			l.Infof("admin_users existing bootstrap admin promoted to super admin username=%s", username)
+			return nil
+		}
 		l.Infof("admin_users admin already exists, skip create username=%s", username)
 		return nil
 	}

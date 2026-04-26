@@ -177,7 +177,7 @@ export const BUSINESS_CHAIN_DEBUG_DEFERRED_LINKS = Object.freeze([
   },
   {
     key: 'permission_change_audit',
-    title: '权限审批 / 菜单权限变更审计',
+    title: '权限审批 / RBAC 变更审计',
     status: 'deferred',
     reason: '当前有权限配置和日志文档，但没有权限变更审批流。',
     nextStep: '审计日志和权限变更记录稳定后补。',
@@ -221,7 +221,7 @@ export const BUSINESS_CHAIN_DEBUG_OUT_OF_SCOPE_LINKS = Object.freeze([
 
 export const BUSINESS_CHAIN_DEBUG_MUTATION_GUARD = Object.freeze({
   enabled: false,
-  reason: '需要后端 debug API、管理员权限和业务链路调试菜单权限',
+  reason: '需要后端 debug API、管理员身份和 debug 权限码',
   rebuildMethod: 'debug.rebuild_business_chain_scenario',
   cleanupMethod: 'debug.clear_business_chain_scenario',
   clearBusinessDataMethod: 'debug.clear_business_data',

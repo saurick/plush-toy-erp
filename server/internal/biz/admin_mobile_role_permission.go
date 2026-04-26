@@ -6,14 +6,14 @@ type AdminMobileRolePermissionOption struct {
 }
 
 var adminMobileRolePermissionOptions = []AdminMobileRolePermissionOption{
-	{Key: "boss", Label: "老板移动端"},
-	{Key: BusinessRoleKey, Label: "业务移动端"},
-	{Key: "purchasing", Label: "采购移动端"},
-	{Key: "production", Label: "生产移动端"},
-	{Key: "warehouse", Label: "仓库移动端"},
-	{Key: "finance", Label: "财务移动端"},
-	{Key: "pmc", Label: "PMC 移动端"},
-	{Key: "quality", Label: "品质移动端"},
+	{Key: BossRoleKey, Label: "老板移动端"},
+	{Key: SalesRoleKey, Label: "业务移动端"},
+	{Key: PurchaseRoleKey, Label: "采购移动端"},
+	{Key: ProductionRoleKey, Label: "生产移动端"},
+	{Key: WarehouseRoleKey, Label: "仓库移动端"},
+	{Key: FinanceRoleKey, Label: "财务移动端"},
+	{Key: PMCRoleKey, Label: "PMC 移动端"},
+	{Key: QualityRoleKey, Label: "品质移动端"},
 }
 
 var adminMobileRolePermissionSet = func() map[string]struct{} {
@@ -30,6 +30,7 @@ func AdminMobileRolePermissionOptions() []AdminMobileRolePermissionOption {
 	return out
 }
 
+// Deprecated: mobile entry access is derived from RBAC permission codes.
 func AllAdminMobileRolePermissions() []string {
 	out := make([]string, 0, len(adminMobileRolePermissionOptions))
 	for _, item := range adminMobileRolePermissionOptions {
@@ -38,6 +39,7 @@ func AllAdminMobileRolePermissions() []string {
 	return out
 }
 
+// Deprecated: mobile entry access is derived from RBAC permission codes.
 func NormalizeAdminMobileRolePermissions(input []string) []string {
 	if len(input) == 0 {
 		return []string{}
@@ -64,26 +66,6 @@ func NormalizeAdminMobileRolePermissions(input []string) []string {
 	return out
 }
 
-func EffectiveAdminMobileRolePermissions(level AdminLevel, mobileRolePermissions []string) []string {
-	if level == AdminLevelSuper {
-		return AllAdminMobileRolePermissions()
-	}
-	return NormalizeAdminMobileRolePermissions(mobileRolePermissions)
-}
-
 func AdminHasMobileRolePermission(admin *AdminUser, roleKey string) bool {
-	if admin == nil {
-		return false
-	}
-	normalized := NormalizeAdminMobileRolePermissions([]string{roleKey})
-	if len(normalized) == 0 {
-		return true
-	}
-	allowed := EffectiveAdminMobileRolePermissions(AdminLevel(admin.Level), admin.MobileRolePermissions)
-	for _, item := range allowed {
-		if item == normalized[0] {
-			return true
-		}
-	}
-	return false
+	return AdminCanAccessMobileRole(admin, roleKey)
 }

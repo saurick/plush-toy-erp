@@ -2,8 +2,8 @@ import { getRoleDisplayName, normalizeRoleKey } from '../utils/roleKeys.mjs'
 
 export const BUSINESS_ROLE_OPTIONS = Object.freeze([
   { key: 'boss', label: '老板 / 管理层' },
-  { key: 'business', label: '业务' },
-  { key: 'purchasing', label: '采购' },
+  { key: 'sales', label: '业务' },
+  { key: 'purchase', label: '采购' },
   { key: 'pmc', label: 'PMC' },
   { key: 'production', label: '生产经理' },
   { key: 'warehouse', label: '仓库' },
@@ -23,8 +23,8 @@ export const roleLabelMap = Object.freeze({
 })
 
 const DEFAULT_OWNER_BY_SECTION = Object.freeze({
-  sales: 'business',
-  purchase: 'purchasing',
+  sales: 'sales',
+  purchase: 'purchase',
   production: 'pmc',
   warehouse: 'warehouse',
   finance: 'finance',
@@ -788,7 +788,7 @@ export function getDefaultOwnerRole(moduleItem = {}) {
   if (moduleItem.key === 'production-progress') return 'production'
   if (moduleItem.key === 'production-exceptions') return 'production'
   if (moduleItem.key === 'quality-inspections') return 'quality'
-  return DEFAULT_OWNER_BY_SECTION[moduleItem.sectionKey] || 'business'
+  return DEFAULT_OWNER_BY_SECTION[moduleItem.sectionKey] || 'sales'
 }
 
 export function getDefaultBusinessStatus(moduleItem = {}) {

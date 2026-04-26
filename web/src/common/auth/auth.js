@@ -16,14 +16,23 @@ const META_KEYS = [
   'user_id',
   'username',
   'phone',
+  'is_super_admin',
+  'roles',
+  'permissions',
+  'menus',
+  'erp_preferences',
+]
+
+// 仅用于清理旧登录态残留；RBAC 权限恢复只读取 roles / permissions / menus。
+const LEGACY_META_KEYS = [
   'admin_level',
   'menu_permissions',
   'mobile_role_permissions',
-  'erp_preferences',
 ]
 const JSON_META_KEYS = new Set([
-  'menu_permissions',
-  'mobile_role_permissions',
+  'roles',
+  'permissions',
+  'menus',
   'erp_preferences',
 ])
 
@@ -81,10 +90,14 @@ function setScopedMeta(scope, data) {
       localStorage.removeItem(getScopedMetaKey(scope, key))
     }
   })
+  LEGACY_META_KEYS.forEach((key) => {
+    localStorage.removeItem(getScopedMetaKey(scope, key))
+  })
 }
 
 function clearScopedMeta(scope) {
-  META_KEYS.forEach((key) => {
+  const keys = [...META_KEYS, ...LEGACY_META_KEYS]
+  keys.forEach((key) => {
     localStorage.removeItem(getScopedMetaKey(scope, key))
   })
 }
@@ -170,22 +183,19 @@ export function getStoredAdminProfile() {
     return null
   }
 
-  const levelMeta = getAuthMeta(AUTH_SCOPE.ADMIN, 'admin_level')
-  const level = levelMeta == null ? null : Number(levelMeta)
-  const menuPermissions = getAuthMeta(AUTH_SCOPE.ADMIN, 'menu_permissions')
-  const mobileRolePermissions = getAuthMeta(
-    AUTH_SCOPE.ADMIN,
-    'mobile_role_permissions'
-  )
+  const isSuperAdminMeta = getAuthMeta(AUTH_SCOPE.ADMIN, 'is_super_admin')
+  const roles = getAuthMeta(AUTH_SCOPE.ADMIN, 'roles')
+  const permissions = getAuthMeta(AUTH_SCOPE.ADMIN, 'permissions')
+  const menus = getAuthMeta(AUTH_SCOPE.ADMIN, 'menus')
   const erpPreferences = getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences')
 
   return {
     ...admin,
-    level: Number.isFinite(level) ? level : null,
-    menu_permissions: Array.isArray(menuPermissions) ? menuPermissions : [],
-    mobile_role_permissions: Array.isArray(mobileRolePermissions)
-      ? mobileRolePermissions
-      : [],
+    is_super_admin:
+      isSuperAdminMeta === true || String(isSuperAdminMeta) === 'true',
+    roles: Array.isArray(roles) ? roles : [],
+    permissions: Array.isArray(permissions) ? permissions : [],
+    menus: Array.isArray(menus) ? menus : [],
     erp_preferences:
       erpPreferences && typeof erpPreferences === 'object'
         ? erpPreferences

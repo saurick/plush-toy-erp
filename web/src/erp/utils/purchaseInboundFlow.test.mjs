@@ -35,7 +35,7 @@ function arrivalRecord(overrides = {}) {
     unit: 'kg',
     due_date: '2026-04-28',
     business_status_key: 'material_preparing',
-    owner_role_key: 'purchasing',
+    owner_role_key: 'purchase',
     payload: {},
     ...overrides,
   }
@@ -91,7 +91,7 @@ test('purchaseInboundFlow: IQC 合格能生成 warehouse 入库任务', () => {
   assert(task.payload.related_documents.some((item) => item.includes('IQC')))
 })
 
-test('purchaseInboundFlow: IQC 不合格能生成 purchasing 异常处理任务并产生 critical 预警', () => {
+test('purchaseInboundFlow: IQC 不合格能生成 purchase 异常处理任务并产生 critical 预警', () => {
   const iqcTask = buildIqcTaskFromArrivalRecord(arrivalRecord(), {
     nowMs: NOW_MS,
   })
@@ -107,7 +107,7 @@ test('purchaseInboundFlow: IQC 不合格能生成 purchasing 异常处理任务�
   assert.equal(task.task_name, '处理来料不良 / 补货 / 退货')
   assert.equal(task.business_status_key, 'qc_failed')
   assert.equal(task.task_status_key, 'ready')
-  assert.equal(task.owner_role_key, 'purchasing')
+  assert.equal(task.owner_role_key, 'purchase')
   assert.equal(task.priority, 3)
   assert.equal(task.payload.notification_type, 'qc_failed')
   assert.equal(task.payload.alert_type, 'qc_failed')

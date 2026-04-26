@@ -23,12 +23,8 @@ type AdminUser struct {
 	Phone *string `json:"phone,omitempty"`
 	// PasswordHash holds the value of the "password_hash" field.
 	PasswordHash string `json:"-"`
-	// 0=super,1=standard
-	Level int8 `json:"level,omitempty"`
-	// 逗号分隔菜单权限
-	MenuPermissions string `json:"menu_permissions,omitempty"`
-	// 逗号分隔移动端角色登录权限
-	MobileRolePermissions string `json:"mobile_role_permissions,omitempty"`
+	// 超级管理员拥有全部 RBAC 权限，但业务任务处理仍受归属规则约束
+	IsSuperAdmin bool `json:"is_super_admin,omitempty"`
 	// 管理员 ERP 页面偏好 JSON
 	ErpPreferences string `json:"erp_preferences,omitempty"`
 	// Disabled holds the value of the "disabled" field.
@@ -47,11 +43,11 @@ func (*AdminUser) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case adminuser.FieldDisabled:
+		case adminuser.FieldIsSuperAdmin, adminuser.FieldDisabled:
 			values[i] = new(sql.NullBool)
-		case adminuser.FieldID, adminuser.FieldLevel:
+		case adminuser.FieldID:
 			values[i] = new(sql.NullInt64)
-		case adminuser.FieldUsername, adminuser.FieldPhone, adminuser.FieldPasswordHash, adminuser.FieldMenuPermissions, adminuser.FieldMobileRolePermissions, adminuser.FieldErpPreferences:
+		case adminuser.FieldUsername, adminuser.FieldPhone, adminuser.FieldPasswordHash, adminuser.FieldErpPreferences:
 			values[i] = new(sql.NullString)
 		case adminuser.FieldLastLoginAt, adminuser.FieldCreatedAt, adminuser.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -95,23 +91,11 @@ func (_m *AdminUser) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.PasswordHash = value.String
 			}
-		case adminuser.FieldLevel:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field level", values[i])
+		case adminuser.FieldIsSuperAdmin:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_super_admin", values[i])
 			} else if value.Valid {
-				_m.Level = int8(value.Int64)
-			}
-		case adminuser.FieldMenuPermissions:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field menu_permissions", values[i])
-			} else if value.Valid {
-				_m.MenuPermissions = value.String
-			}
-		case adminuser.FieldMobileRolePermissions:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field mobile_role_permissions", values[i])
-			} else if value.Valid {
-				_m.MobileRolePermissions = value.String
+				_m.IsSuperAdmin = value.Bool
 			}
 		case adminuser.FieldErpPreferences:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -190,14 +174,8 @@ func (_m *AdminUser) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("password_hash=<sensitive>")
 	builder.WriteString(", ")
-	builder.WriteString("level=")
-	builder.WriteString(fmt.Sprintf("%v", _m.Level))
-	builder.WriteString(", ")
-	builder.WriteString("menu_permissions=")
-	builder.WriteString(_m.MenuPermissions)
-	builder.WriteString(", ")
-	builder.WriteString("mobile_role_permissions=")
-	builder.WriteString(_m.MobileRolePermissions)
+	builder.WriteString("is_super_admin=")
+	builder.WriteString(fmt.Sprintf("%v", _m.IsSuperAdmin))
 	builder.WriteString(", ")
 	builder.WriteString("erp_preferences=")
 	builder.WriteString(_m.ErpPreferences)

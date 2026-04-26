@@ -31,7 +31,7 @@ func (s *stubWorkflowRepo) GetWorkflowTask(_ context.Context, id int) (*Workflow
 		SourceType:    "generic-source",
 		SourceID:      1,
 		TaskStatusKey: "ready",
-		OwnerRoleKey:  "business",
+		OwnerRoleKey:  SalesRoleKey,
 		Payload:       map[string]any{},
 	}, nil
 }
@@ -103,7 +103,7 @@ func TestWorkflowUsecase_CreateTaskDefaultsPending(t *testing.T) {
 		TaskName:     "确认资料",
 		SourceType:   "project_order",
 		SourceID:     1,
-		OwnerRoleKey: "business",
+		OwnerRoleKey: SalesRoleKey,
 	}, 7)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -129,7 +129,7 @@ func TestWorkflowUsecase_CreateTaskRejectsInvalidBusinessStatus(t *testing.T) {
 		TaskName:          "确认资料",
 		SourceType:        "project_order",
 		SourceID:          1,
-		OwnerRoleKey:      "business",
+		OwnerRoleKey:      SalesRoleKey,
 		BusinessStatusKey: &invalid,
 	}, 7)
 	if !errors.Is(err, ErrBadParam) {
@@ -446,7 +446,7 @@ func TestWorkflowUsecase_BossApprovalRejectedDerivesRevisionTask(t *testing.T) {
 	effects := repo.updateTaskInput.SideEffects
 	if effects.BusinessState.BusinessStatusKey != workflowOrderApprovalStatusKey ||
 		effects.BusinessState.OwnerRoleKey == nil ||
-		*effects.BusinessState.OwnerRoleKey != "business" {
+		*effects.BusinessState.OwnerRoleKey != SalesRoleKey {
 		t.Fatalf("unexpected rejected business state %#v", effects.BusinessState)
 	}
 	if effects.WorkflowRuleKey != "boss_approval_rejected_to_order_revision" {
@@ -467,7 +467,7 @@ func TestWorkflowUsecase_NonBossApprovalTaskKeepsOriginalUpdateBehavior(t *testi
 		SourceType:    workflowProjectOrderModuleKey,
 		SourceID:      88,
 		TaskStatusKey: "ready",
-		OwnerRoleKey:  "business",
+		OwnerRoleKey:  SalesRoleKey,
 		Payload:       map[string]any{},
 	}}
 	uc := NewWorkflowUsecase(repo)
@@ -476,7 +476,7 @@ func TestWorkflowUsecase_NonBossApprovalTaskKeepsOriginalUpdateBehavior(t *testi
 		ID:            201,
 		TaskStatusKey: "blocked",
 		Payload:       map[string]any{},
-	}, 7, "business")
+	}, 7, SalesRoleKey)
 	if err != nil {
 		t.Fatalf("non-boss task should keep original behavior, got %v", err)
 	}
@@ -499,7 +499,7 @@ func TestWorkflowUsecase_SameNameNonBossApprovalTaskDoesNotDerive(t *testing.T) 
 				SourceType:    workflowProjectOrderModuleKey,
 				SourceID:      88,
 				TaskStatusKey: "ready",
-				OwnerRoleKey:  "business",
+				OwnerRoleKey:  SalesRoleKey,
 				Payload:       map[string]any{},
 			},
 		},
@@ -692,7 +692,7 @@ func TestWorkflowUsecase_PurchaseIQCBlockedDerivesQualityExceptionTask(t *testin
 	}
 	if effects.BusinessState.BusinessStatusKey != workflowQCFailedStatusKey ||
 		effects.BusinessState.OwnerRoleKey == nil ||
-		*effects.BusinessState.OwnerRoleKey != "purchasing" ||
+		*effects.BusinessState.OwnerRoleKey != PurchaseRoleKey ||
 		effects.BusinessState.BlockedReason == nil ||
 		*effects.BusinessState.BlockedReason != "来料破包" {
 		t.Fatalf("unexpected blocked business state %#v", effects.BusinessState)
@@ -745,7 +745,7 @@ func TestWorkflowUsecase_PurchaseIQCRejectedDerivesQualityExceptionTask(t *testi
 	effects := repo.updateTaskInput.SideEffects
 	if effects.BusinessState.BusinessStatusKey != workflowQCFailedStatusKey ||
 		effects.BusinessState.OwnerRoleKey == nil ||
-		*effects.BusinessState.OwnerRoleKey != "purchasing" {
+		*effects.BusinessState.OwnerRoleKey != PurchaseRoleKey {
 		t.Fatalf("unexpected rejected business state %#v", effects.BusinessState)
 	}
 	if effects.WorkflowRuleKey != "purchase_iqc_rejected_to_quality_exception" {
@@ -1791,7 +1791,7 @@ func assertRevisionTask(t *testing.T, task *WorkflowTaskCreate, decision string,
 	}
 	if task.TaskGroup != workflowOrderRevisionTaskGroup ||
 		task.TaskName != "补充订单资料后重新提交" ||
-		task.OwnerRoleKey != "business" ||
+		task.OwnerRoleKey != SalesRoleKey ||
 		task.TaskStatusKey != "ready" {
 		t.Fatalf("unexpected revision task %#v", task)
 	}
@@ -1823,7 +1823,7 @@ func assertPurchaseQualityExceptionTask(t *testing.T, task *WorkflowTaskCreate, 
 	}
 	if task.TaskGroup != workflowPurchaseQualityExceptionGroup ||
 		task.TaskName != "处理来料不良 / 补货 / 退货" ||
-		task.OwnerRoleKey != "purchasing" ||
+		task.OwnerRoleKey != PurchaseRoleKey ||
 		task.TaskStatusKey != "ready" {
 		t.Fatalf("unexpected purchase quality exception task %#v", task)
 	}

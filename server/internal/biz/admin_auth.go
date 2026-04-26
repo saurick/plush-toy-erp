@@ -23,18 +23,18 @@ type AdminAuthRepo interface {
 }
 
 type AdminUser struct {
-	ID                    int
-	Username              string
-	Phone                 string
-	PasswordHash          string
-	Level                 int8
-	MenuPermissions       []string
-	MobileRolePermissions []string
-	ERPPreferences        AdminERPPreferences
-	Disabled              bool
-	LastLoginAt           *time.Time
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	ID             int
+	Username       string
+	Phone          string
+	PasswordHash   string
+	IsSuperAdmin   bool
+	Roles          []AdminRole
+	Permissions    []string
+	ERPPreferences AdminERPPreferences
+	Disabled       bool
+	LastLoginAt    *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type AdminAuthUsecase struct {
@@ -169,7 +169,7 @@ func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone, mobi
 		l.Infof("RequestSMSLoginCode admin disabled admin_id=%d phone=%s", admin.ID, maskPhone(normalizedPhone))
 		return nil, err
 	}
-	if !AdminHasMobileRolePermission(admin, mobileRoleKey) {
+	if !AdminCanAccessMobileRole(admin, mobileRoleKey) {
 		err = ErrMobileRoleDenied
 		span.SetStatus(codes.Error, err.Error())
 		l.Infof("RequestSMSLoginCode admin mobile role denied admin_id=%d phone=%s mobile_role_key=%s", admin.ID, maskPhone(normalizedPhone), mobileRoleKey)
@@ -225,7 +225,7 @@ func (uc *AdminAuthUsecase) LoginWithSMSCode(ctx context.Context, phone, code, m
 		l.Infof("SMSLogin admin disabled admin_id=%d phone=%s", admin.ID, maskPhone(normalizedPhone))
 		return "", time.Time{}, nil, err
 	}
-	if !AdminHasMobileRolePermission(admin, mobileRoleKey) {
+	if !AdminCanAccessMobileRole(admin, mobileRoleKey) {
 		err = ErrMobileRoleDenied
 		span.SetStatus(codes.Error, err.Error())
 		l.Infof("SMSLogin admin mobile role denied admin_id=%d phone=%s mobile_role_key=%s", admin.ID, maskPhone(normalizedPhone), mobileRoleKey)

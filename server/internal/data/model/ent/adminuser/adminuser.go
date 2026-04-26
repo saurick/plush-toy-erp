@@ -19,12 +19,8 @@ const (
 	FieldPhone = "phone"
 	// FieldPasswordHash holds the string denoting the password_hash field in the database.
 	FieldPasswordHash = "password_hash"
-	// FieldLevel holds the string denoting the level field in the database.
-	FieldLevel = "level"
-	// FieldMenuPermissions holds the string denoting the menu_permissions field in the database.
-	FieldMenuPermissions = "menu_permissions"
-	// FieldMobileRolePermissions holds the string denoting the mobile_role_permissions field in the database.
-	FieldMobileRolePermissions = "mobile_role_permissions"
+	// FieldIsSuperAdmin holds the string denoting the is_super_admin field in the database.
+	FieldIsSuperAdmin = "is_super_admin"
 	// FieldErpPreferences holds the string denoting the erp_preferences field in the database.
 	FieldErpPreferences = "erp_preferences"
 	// FieldDisabled holds the string denoting the disabled field in the database.
@@ -45,9 +41,7 @@ var Columns = []string{
 	FieldUsername,
 	FieldPhone,
 	FieldPasswordHash,
-	FieldLevel,
-	FieldMenuPermissions,
-	FieldMobileRolePermissions,
+	FieldIsSuperAdmin,
 	FieldErpPreferences,
 	FieldDisabled,
 	FieldLastLoginAt,
@@ -72,16 +66,8 @@ var (
 	PhoneValidator func(string) error
 	// PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
 	PasswordHashValidator func(string) error
-	// DefaultLevel holds the default value on creation for the "level" field.
-	DefaultLevel int8
-	// DefaultMenuPermissions holds the default value on creation for the "menu_permissions" field.
-	DefaultMenuPermissions string
-	// MenuPermissionsValidator is a validator for the "menu_permissions" field. It is called by the builders before save.
-	MenuPermissionsValidator func(string) error
-	// DefaultMobileRolePermissions holds the default value on creation for the "mobile_role_permissions" field.
-	DefaultMobileRolePermissions string
-	// MobileRolePermissionsValidator is a validator for the "mobile_role_permissions" field. It is called by the builders before save.
-	MobileRolePermissionsValidator func(string) error
+	// DefaultIsSuperAdmin holds the default value on creation for the "is_super_admin" field.
+	DefaultIsSuperAdmin bool
 	// DefaultErpPreferences holds the default value on creation for the "erp_preferences" field.
 	DefaultErpPreferences string
 	// ErpPreferencesValidator is a validator for the "erp_preferences" field. It is called by the builders before save.
@@ -119,19 +105,9 @@ func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPasswordHash, opts...).ToFunc()
 }
 
-// ByLevel orders the results by the level field.
-func ByLevel(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldLevel, opts...).ToFunc()
-}
-
-// ByMenuPermissions orders the results by the menu_permissions field.
-func ByMenuPermissions(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldMenuPermissions, opts...).ToFunc()
-}
-
-// ByMobileRolePermissions orders the results by the mobile_role_permissions field.
-func ByMobileRolePermissions(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldMobileRolePermissions, opts...).ToFunc()
+// ByIsSuperAdmin orders the results by the is_super_admin field.
+func ByIsSuperAdmin(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsSuperAdmin, opts...).ToFunc()
 }
 
 // ByErpPreferences orders the results by the erp_preferences field.

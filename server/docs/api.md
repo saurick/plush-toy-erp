@@ -52,14 +52,16 @@ HTTP 路由：
 - `me`
 - `list`
 - `create`
+- `rbac_options`
 - `menu_options`
-- `set_permissions`
+- `set_roles`
+- `set_role_permissions`
 - `set_phone`
 - `set_erp_column_order`
 - `set_disabled`
 - `reset_password`
 
-用途：管理员读取当前账号资料；超级管理员创建普通管理员、绑定登录手机号、调整菜单和移动端角色权限、启用/禁用普通管理员，以及在普通管理员忘记密码时协助重置密码。
+用途：管理员读取当前账号资料；具备对应系统权限的管理员创建管理员、绑定登录手机号、给管理员分配角色、给角色分配权限、启用 / 禁用普通管理员，以及在普通管理员忘记密码时协助重置密码。
 
 ## 鉴权规则
 
@@ -67,9 +69,10 @@ HTTP 路由：
 - `auth.login`、`auth.admin_login`、`auth.send_sms_code`、`auth.sms_login`、`auth.register`、`auth.logout` 是公开方法
 - 其他业务域默认要求已登录
 - `user.*` 额外要求管理员登录态
-- `admin.reset_password` 和普通管理员管理操作要求超级管理员登录态，且不允许通过该接口重置超级管理员密码
+- `admin.*` 管理操作要求管理员登录态，并按 `system.*` 权限码做动作级校验
+- super admin 不允许被普通管理员通过管理接口修改、禁用或重置密码
 
-说明：管理员鉴权依赖 token 里的角色信息，而不是前端页面路径。
+说明：管理员鉴权依赖后端 RBAC 权限码，而不是前端页面路径。菜单隐藏只是体验，不是安全边界。
 
 ## 默认返回结构
 
@@ -103,9 +106,9 @@ HTTP 路由：
 `auth.sms_login` 通过 `scope` 区分登录目标：
 
 - `scope=user` 或省略：普通协作账号短信登录
-- `scope=admin`：管理员短信登录，按 `admin_users.phone` 查找管理员，返回字段额外包含 `admin_level`、`menu_permissions`、`mobile_role_permissions`、`erp_preferences`
+- `scope=admin`：管理员短信登录，按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`
 
-角色移动端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`；服务端会校验该手机号已绑定管理员账号，且该管理员具备当前移动端角色权限。手机号未绑定返回 `AuthPhoneNotBound`，不返回“用户不存在”；手机号已绑定但未授权当前角色返回 `AuthMobileRoleDenied`。
+角色移动端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`；服务端会校验该手机号已绑定管理员账号，且该管理员具备当前移动端角色或对应 `mobile.<role>.access` 权限。手机号未绑定返回 `AuthPhoneNotBound`，不返回“用户不存在”；手机号已绑定但未授权当前角色返回 `AuthMobileRoleDenied`。
 
 ### `auth.send_sms_code`
 

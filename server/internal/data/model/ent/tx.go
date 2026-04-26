@@ -14,6 +14,8 @@ type Tx struct {
 	config
 	// AdminUser is the client for interacting with the AdminUser builders.
 	AdminUser *AdminUserClient
+	// AdminUserRole is the client for interacting with the AdminUserRole builders.
+	AdminUserRole *AdminUserRoleClient
 	// BOMHeader is the client for interacting with the BOMHeader builders.
 	BOMHeader *BOMHeaderClient
 	// BOMItem is the client for interacting with the BOMItem builders.
@@ -32,6 +34,8 @@ type Tx struct {
 	InventoryTxn *InventoryTxnClient
 	// Material is the client for interacting with the Material builders.
 	Material *MaterialClient
+	// Permission is the client for interacting with the Permission builders.
+	Permission *PermissionClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// PurchaseReceipt is the client for interacting with the PurchaseReceipt builders.
@@ -42,6 +46,10 @@ type Tx struct {
 	PurchaseReturn *PurchaseReturnClient
 	// PurchaseReturnItem is the client for interacting with the PurchaseReturnItem builders.
 	PurchaseReturnItem *PurchaseReturnItemClient
+	// Role is the client for interacting with the Role builders.
+	Role *RoleClient
+	// RolePermission is the client for interacting with the RolePermission builders.
+	RolePermission *RolePermissionClient
 	// Unit is the client for interacting with the Unit builders.
 	Unit *UnitClient
 	// User is the client for interacting with the User builders.
@@ -186,6 +194,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.AdminUser = NewAdminUserClient(tx.config)
+	tx.AdminUserRole = NewAdminUserRoleClient(tx.config)
 	tx.BOMHeader = NewBOMHeaderClient(tx.config)
 	tx.BOMItem = NewBOMItemClient(tx.config)
 	tx.BusinessRecord = NewBusinessRecordClient(tx.config)
@@ -195,11 +204,14 @@ func (tx *Tx) init() {
 	tx.InventoryLot = NewInventoryLotClient(tx.config)
 	tx.InventoryTxn = NewInventoryTxnClient(tx.config)
 	tx.Material = NewMaterialClient(tx.config)
+	tx.Permission = NewPermissionClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.PurchaseReceipt = NewPurchaseReceiptClient(tx.config)
 	tx.PurchaseReceiptItem = NewPurchaseReceiptItemClient(tx.config)
 	tx.PurchaseReturn = NewPurchaseReturnClient(tx.config)
 	tx.PurchaseReturnItem = NewPurchaseReturnItemClient(tx.config)
+	tx.Role = NewRoleClient(tx.config)
+	tx.RolePermission = NewRolePermissionClient(tx.config)
 	tx.Unit = NewUnitClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 	tx.Warehouse = NewWarehouseClient(tx.config)

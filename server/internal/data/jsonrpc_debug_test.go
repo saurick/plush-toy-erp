@@ -167,10 +167,19 @@ func newDebugJSONRPCTestData(config biz.DebugSafetyConfig) *JsonrpcData {
 	return &JsonrpcData{
 		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.debug.test")),
 		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{
-			ID:              7,
-			Username:        "admin",
-			Level:           int8(biz.AdminLevelStandard),
-			MenuPermissions: []string{"/erp/qa/business-chain-debug"},
+			ID:       7,
+			Username: "admin",
+			Roles: []biz.AdminRole{
+				{Key: biz.DebugOperatorRoleKey, Name: "调试操作员"},
+			},
+			Permissions: []string{
+				biz.PermissionERPBusinessChainDebugRead,
+				biz.PermissionDebugBusinessChainRead,
+				biz.PermissionDebugBusinessChainRun,
+				biz.PermissionDebugSeed,
+				biz.PermissionDebugCleanup,
+				biz.PermissionDebugBusinessClear,
+			},
 		}},
 		debugUC: biz.NewDebugUsecase(stubDebugJSONRPCRepo{}, config),
 	}

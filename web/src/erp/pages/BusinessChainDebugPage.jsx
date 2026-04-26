@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useOutletContext } from 'react-router-dom'
 import {
   Alert,
   Button,
@@ -139,6 +139,8 @@ function statusYesNoTag(enabled, enabledText = '允许', disabledText = '禁用'
 }
 
 export default function BusinessChainDebugPage() {
+  const outletContext = useOutletContext()
+  const adminProfile = outletContext?.adminProfile || null
   const [query, setQuery] = useState('')
   const [view, setView] = useState(() => createEmptyBusinessChainDebugView())
   const [loading, setLoading] = useState(false)
@@ -175,13 +177,22 @@ export default function BusinessChainDebugPage() {
   )
   const businessDataClearDisabledReason =
     getBusinessChainDebugActionDisabledReason(capabilities, 'businessDataClear')
+  const hasDebugBusinessClearPermission =
+    adminProfile?.is_super_admin === true ||
+    (Array.isArray(adminProfile?.permissions) &&
+      adminProfile.permissions.includes('debug.business.clear'))
   const selectedRunId =
     seedResult?.debugRunId || cleanupPreview?.debugRunId || ''
   const canSeed = capabilities.seedAllowed && !operationLoading
   const canCleanup =
     capabilities.cleanupAllowed && Boolean(selectedRunId) && !operationLoading
   const canClearBusinessData =
-    capabilities.businessDataClearAllowed && !operationLoading
+    capabilities.businessDataClearAllowed &&
+    hasDebugBusinessClearPermission &&
+    !operationLoading
+  const businessDataClearButtonReason = hasDebugBusinessClearPermission
+    ? businessDataClearDisabledReason
+    : '需要 debug.business.clear 权限'
 
   useEffect(() => {
     let cancelled = false
@@ -340,7 +351,7 @@ export default function BusinessChainDebugPage() {
     Modal.confirm({
       title: '清空业务数据',
       content:
-        '会硬删除本项目当前 SQL 连接中的业务链路、采购入库、库存、BOM、物料、成品、仓库和单位数据，不删除账号、权限和管理员列顺序。该操作仍要求管理员和业务链路调试菜单权限。',
+        '会硬删除本项目当前 SQL 连接中的业务链路、采购入库、库存、BOM、物料、成品、仓库和单位数据，不删除账号、角色和权限配置。该操作要求 debug.business.clear 权限。',
       okText: '确认清空',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -708,7 +719,7 @@ export default function BusinessChainDebugPage() {
             type="info"
             showIcon
             message="安全调试中心"
-            description="填入并查询只读取当前服务返回的数据；生成调试数据、按 debugRunId 清理调试数据和清空业务数据默认面向当前 SQL 连接开放，仍必须经过管理员权限和业务链路调试菜单权限。"
+            description="填入并查询只读取当前服务返回的数据；生成调试数据、按 debugRunId 清理调试数据和清空业务数据默认面向当前 SQL 连接开放，仍必须经过管理员身份和 debug 权限码校验。"
           />
           <Alert
             type="warning"
@@ -1003,7 +1014,7 @@ export default function BusinessChainDebugPage() {
                   danger
                   loading={operationLoading === 'clearBusinessData'}
                   disabled={!canClearBusinessData}
-                  title={businessDataClearDisabledReason}
+                  title={businessDataClearButtonReason}
                   onClick={handleBusinessDataClear}
                 >
                   清空业务数据

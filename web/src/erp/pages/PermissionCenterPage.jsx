@@ -27,44 +27,15 @@ import {
   filterAdminRecords,
   filterPermissionGroups,
 } from '../utils/permissionCenterSearch.mjs'
-import {
-  defaultMenuPermissions,
-  ERP_MOBILE_ROLE_PERMISSION_OPTIONS,
-  ERP_MENU_PERMISSION_GROUPS,
-  ERP_PERMISSION_PRESETS,
-  getMobileRolePermissionLabel,
-  getPermissionPreset,
-  getPermissionLabel,
-  matchPermissionPreset,
-  normalizeMobileRolePermissions,
-  normalizeMenuPermissions,
-} from '../config/menuPermissions.mjs'
 
 const { Paragraph, Text, Title } = Typography
-
-const ADMIN_LEVEL = {
-  SUPER: 0,
-  STANDARD: 1,
-}
-
-const levelTextMap = {
-  [ADMIN_LEVEL.SUPER]: '超级管理员',
-  [ADMIN_LEVEL.STANDARD]: '普通管理员',
-}
 
 const TABLE_PAGE_SIZE_OPTIONS = ['8', '10', '20', '50', '100']
 const DEFAULT_TABLE_PAGE_SIZE = 8
 const PASSWORD_MIN_LENGTH = 6
-
-const permissionGroups = ERP_MENU_PERMISSION_GROUPS.map((section) => ({
-  ...section,
-  items: section.items.filter((item) => item.key !== '/erp/system/permissions'),
-})).filter((section) => section.items.length > 0)
-
-const presetOptions = ERP_PERMISSION_PRESETS.map((preset) => ({
-  label: preset.label,
-  value: preset.key,
-}))
+const MANAGE_ROLE_PERMISSION = 'system.permission.manage'
+const UPDATE_USER_PERMISSION = 'system.user.update'
+const CREATE_USER_PERMISSION = 'system.user.create'
 
 const adminStatusOptions = [
   { label: '全部状态', value: ADMIN_STATUS_FILTERS.ALL },
@@ -73,20 +44,91 @@ const adminStatusOptions = [
   { label: '超级管理员', value: ADMIN_STATUS_FILTERS.SUPER },
 ]
 
-function PermissionSectionChecklist({ value = [], onChange }) {
-  const [permissionSearchKeyword, setPermissionSearchKeyword] = useState('')
-  const normalizedValue = normalizeMenuPermissions(value)
-  const visiblePermissionGroups = useMemo(
-    () => filterPermissionGroups(permissionGroups, permissionSearchKeyword),
-    [permissionSearchKeyword]
+function normalizeStringList(values = []) {
+  return Array.isArray(values)
+    ? values.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+}
+
+function getRoleKey(role = {}) {
+  return String(role?.role_key || role?.key || '').trim()
+}
+
+function getPermissionKey(permission = {}) {
+  return String(
+    permission?.permission_key || permission?.key || permission || ''
+  ).trim()
+}
+
+function roleKeysForAdmin(admin = {}) {
+  return normalizeStringList((admin.roles || []).map(getRoleKey))
+}
+
+function permissionKeysForRole(role = {}) {
+  return normalizeStringList(role.permissions || [])
+}
+
+function hasPermission(admin = {}, permissionKey = '') {
+  if (admin?.is_super_admin === true) {
+    return true
+  }
+  return normalizeStringList(admin?.permissions || []).includes(permissionKey)
+}
+
+function buildRoleOptions(roles = []) {
+  return roles
+    .filter((role) => getRoleKey(role) && role.disabled !== true)
+    .map((role) => ({
+      label: role.name || getRoleKey(role),
+      value: getRoleKey(role),
+    }))
+}
+
+function buildPermissionGroups(permissions = []) {
+  const groups = new Map()
+  const sourcePermissions = Array.isArray(permissions) ? permissions : []
+  sourcePermissions.forEach((permission) => {
+    const permissionKey = getPermissionKey(permission)
+    if (!permissionKey) {
+      return
+    }
+    const moduleKey = permission.module || 'other'
+    const group = groups.get(moduleKey) || {
+      title: moduleKey,
+      items: [],
+    }
+    group.items.push({
+      key: permissionKey,
+      label: permission.name || permissionKey,
+      description: permission.description || '',
+    })
+    groups.set(moduleKey, group)
+  })
+  return [...groups.values()].map((group) => ({
+    ...group,
+    items: group.items.sort((left, right) => left.key.localeCompare(right.key)),
+  }))
+}
+
+function PermissionChecklist({
+  groups,
+  value = [],
+  onChange,
+  disabled = false,
+}) {
+  const [keyword, setKeyword] = useState('')
+  const normalizedValue = normalizeStringList(value)
+  const visibleGroups = useMemo(
+    () => filterPermissionGroups(groups, keyword),
+    [groups, keyword]
   )
 
   const handleSectionChange = (sectionKeys, nextSectionValues) => {
-    const next = normalizeMenuPermissions([
+    const next = [
       ...normalizedValue.filter((item) => !sectionKeys.includes(item)),
       ...(nextSectionValues || []),
-    ])
-    onChange?.(next)
+    ]
+    onChange?.([...new Set(next)])
   }
 
   return (
@@ -94,15 +136,14 @@ function PermissionSectionChecklist({ value = [], onChange }) {
       <Input
         allowClear
         className="erp-permission-checklist-search"
-        value={permissionSearchKeyword}
-        placeholder="搜索菜单权限名称或路径"
-        onChange={(event) => setPermissionSearchKeyword(event.target.value)}
+        value={keyword}
+        placeholder="搜索权限码、权限名称或模块"
+        onChange={(event) => setKeyword(event.target.value)}
       />
       <div className="erp-permission-checklist">
-        {visiblePermissionGroups.map((section) => {
+        {visibleGroups.map((section) => {
           const originalSection =
-            permissionGroups.find((item) => item.title === section.title) ||
-            section
+            groups.find((item) => item.title === section.title) || section
           const sectionKeys = section.items.map((item) => item.key)
           const originalSectionKeys = originalSection.items.map(
             (item) => item.key
@@ -113,9 +154,7 @@ function PermissionSectionChecklist({ value = [], onChange }) {
           const selectedOriginalKeys = normalizedValue.filter((item) =>
             originalSectionKeys.includes(item)
           )
-          const hasSearchKeyword = Boolean(
-            String(permissionSearchKeyword || '').trim()
-          )
+          const hasKeyword = Boolean(String(keyword || '').trim())
 
           return (
             <section
@@ -125,17 +164,18 @@ function PermissionSectionChecklist({ value = [], onChange }) {
               <div className="erp-permission-checklist__header">
                 <Text strong>{section.title}</Text>
                 <Text type="secondary">
-                  {hasSearchKeyword
+                  {hasKeyword
                     ? `命中 ${section.items.length}/${originalSection.items.length}，已选 ${selectedOriginalKeys.length}`
                     : `${selectedOriginalKeys.length}/${originalSection.items.length}`}
                 </Text>
               </div>
               <Checkbox.Group
                 options={section.items.map((item) => ({
-                  label: item.label,
+                  label: `${item.label} (${item.key})`,
                   value: item.key,
                 }))}
                 value={selectedKeys}
+                disabled={disabled}
                 onChange={(nextValues) =>
                   handleSectionChange(sectionKeys, nextValues)
                 }
@@ -145,10 +185,10 @@ function PermissionSectionChecklist({ value = [], onChange }) {
           )
         })}
       </div>
-      {visiblePermissionGroups.length === 0 ? (
+      {visibleGroups.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配的菜单权限"
+          description="没有匹配的权限码"
         />
       ) : null}
     </div>
@@ -173,6 +213,8 @@ export default function PermissionCenterPage() {
   const [statusUpdatingAdminID, setStatusUpdatingAdminID] = useState(null)
   const [currentAdmin, setCurrentAdmin] = useState(null)
   const [admins, setAdmins] = useState([])
+  const [roles, setRoles] = useState([])
+  const [permissions, setPermissions] = useState([])
   const [adminSearchKeyword, setAdminSearchKeyword] = useState('')
   const [adminStatusFilter, setAdminStatusFilter] = useState(
     ADMIN_STATUS_FILTERS.ALL
@@ -186,26 +228,30 @@ export default function PermissionCenterPage() {
   const [resetModalOpen, setResetModalOpen] = useState(false)
   const [editingAdmin, setEditingAdmin] = useState(null)
   const [resettingAdmin, setResettingAdmin] = useState(null)
-  const [selectedPermissions, setSelectedPermissions] = useState([])
-  const [selectedMobileRolePermissions, setSelectedMobileRolePermissions] =
-    useState([])
-  const [selectedPresetKey, setSelectedPresetKey] = useState('')
+  const [selectedRoleKeys, setSelectedRoleKeys] = useState([])
+  const [selectedRoleKey, setSelectedRoleKey] = useState('')
+  const [selectedRolePermissionKeys, setSelectedRolePermissionKeys] = useState(
+    []
+  )
   const [editingPhone, setEditingPhone] = useState('')
   const [createForm] = Form.useForm()
   const [resetForm] = Form.useForm()
-  const createMenuPermissions = Form.useWatch('menu_permissions', createForm)
-  const createMobileRolePermissions = Form.useWatch(
-    'mobile_role_permissions',
-    createForm
-  )
 
-  const isSuperAdmin = currentAdmin?.level === ADMIN_LEVEL.SUPER
-  const createSelectedPermissionCount = normalizeMenuPermissions(
-    createMenuPermissions || []
-  ).length
-  const createSelectedMobileRoleCount = normalizeMobileRolePermissions(
-    createMobileRolePermissions || []
-  ).length
+  const roleOptions = useMemo(() => buildRoleOptions(roles), [roles])
+  const permissionGroups = useMemo(
+    () => buildPermissionGroups(permissions),
+    [permissions]
+  )
+  const selectedRole = useMemo(
+    () => roles.find((role) => getRoleKey(role) === selectedRoleKey) || null,
+    [roles, selectedRoleKey]
+  )
+  const canCreateUsers = hasPermission(currentAdmin, CREATE_USER_PERMISSION)
+  const canManageUsers = hasPermission(currentAdmin, UPDATE_USER_PERMISSION)
+  const canManageRolePermissions = hasPermission(
+    currentAdmin,
+    MANAGE_ROLE_PERMISSION
+  )
   const filteredAdmins = useMemo(
     () =>
       filterAdminRecords(admins, {
@@ -222,14 +268,25 @@ export default function PermissionCenterPage() {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [meResult, listResult] = await Promise.all([
+      const [meResult, listResult, optionsResult] = await Promise.all([
         adminRpc.call('me', {}),
         adminRpc.call('list', {}),
+        adminRpc.call('rbac_options', {}),
       ])
+      const nextRoles = Array.isArray(optionsResult?.data?.roles)
+        ? optionsResult.data.roles
+        : []
       setCurrentAdmin(meResult?.data || null)
       setAdmins(
         Array.isArray(listResult?.data?.admins) ? listResult.data.admins : []
       )
+      setRoles(nextRoles)
+      setPermissions(
+        Array.isArray(optionsResult?.data?.permissions)
+          ? optionsResult.data.permissions
+          : []
+      )
+      setSelectedRoleKey((current) => current || getRoleKey(nextRoles[0]))
       return true
     } catch (err) {
       message.error(getActionErrorMessage(err, '加载权限数据'))
@@ -248,6 +305,14 @@ export default function PermissionCenterPage() {
   }, [loadData, outletContext])
 
   useEffect(() => {
+    if (!selectedRole) {
+      setSelectedRolePermissionKeys([])
+      return
+    }
+    setSelectedRolePermissionKeys(permissionKeysForRole(selectedRole))
+  }, [selectedRole])
+
+  useEffect(() => {
     const totalPages = Math.max(
       1,
       Math.ceil(filteredAdmins.length / tablePagination.pageSize)
@@ -261,62 +326,22 @@ export default function PermissionCenterPage() {
     }))
   }, [filteredAdmins.length, tablePagination.current, tablePagination.pageSize])
 
-  useEffect(() => {
-    if (!createModalOpen) {
-      return
-    }
-    createForm.setFieldsValue({
-      level: ADMIN_LEVEL.STANDARD,
-      menu_permissions: defaultMenuPermissions(),
-      mobile_role_permissions: [],
-    })
-  }, [createForm, createModalOpen])
-
-  const handleTableChange = useCallback((pagination) => {
-    setTablePagination((prev) => {
-      const nextPageSize =
-        Number(pagination?.pageSize) || DEFAULT_TABLE_PAGE_SIZE
-      return {
-        pageSize: nextPageSize,
-        current:
-          nextPageSize === prev.pageSize ? Number(pagination?.current) || 1 : 1,
-      }
-    })
-  }, [])
-
-  const handleAdminSearchChange = (event) => {
-    setAdminSearchKeyword(event.target.value)
-    setTablePagination((prev) => ({
-      ...prev,
-      current: 1,
-    }))
-  }
-
-  const handleAdminStatusFilterChange = (value) => {
-    setAdminStatusFilter(value || ADMIN_STATUS_FILTERS.ALL)
-    setTablePagination((prev) => ({
-      ...prev,
-      current: 1,
-    }))
-  }
-
   const closeCreateModal = () => {
     setCreateModalOpen(false)
     createForm.resetFields()
   }
 
+  const openCreateModal = () => {
+    createForm.setFieldsValue({ role_keys: [] })
+    setCreateModalOpen(true)
+  }
+
   const openEditModal = (admin) => {
-    if (!admin || admin.level === ADMIN_LEVEL.SUPER) {
+    if (!admin || admin.is_super_admin) {
       return
     }
     setEditingAdmin(admin)
-    const normalized = normalizeMenuPermissions(admin.menu_permissions || [])
-    const mobileRoles = normalizeMobileRolePermissions(
-      admin.mobile_role_permissions || []
-    )
-    setSelectedPermissions(normalized)
-    setSelectedMobileRolePermissions(mobileRoles)
-    setSelectedPresetKey(matchPermissionPreset(normalized))
+    setSelectedRoleKeys(roleKeysForAdmin(admin))
     setEditingPhone(admin.phone || '')
     setEditModalOpen(true)
   }
@@ -324,14 +349,12 @@ export default function PermissionCenterPage() {
   const closeEditModal = () => {
     setEditModalOpen(false)
     setEditingAdmin(null)
-    setSelectedPermissions([])
-    setSelectedMobileRolePermissions([])
-    setSelectedPresetKey('')
+    setSelectedRoleKeys([])
     setEditingPhone('')
   }
 
   const openResetModal = (admin) => {
-    if (!admin || admin.level === ADMIN_LEVEL.SUPER) {
+    if (!admin || admin.is_super_admin) {
       return
     }
     setResettingAdmin(admin)
@@ -345,20 +368,26 @@ export default function PermissionCenterPage() {
     resetForm.resetFields()
   }
 
+  const handleTableChange = useCallback((pagination) => {
+    setTablePagination((prev) => {
+      const nextPageSize =
+        Number(pagination?.pageSize) || DEFAULT_TABLE_PAGE_SIZE
+      return {
+        pageSize: nextPageSize,
+        current:
+          nextPageSize === prev.pageSize ? Number(pagination?.current) || 1 : 1,
+      }
+    })
+  }, [])
+
   const createAdmin = async (values) => {
     setCreating(true)
     try {
       const payload = {
         username: String(values.username || '').trim(),
         password: values.password,
-        level: Number(values.level ?? ADMIN_LEVEL.STANDARD),
-        menu_permissions: normalizeMenuPermissions(
-          values.menu_permissions || []
-        ),
-        mobile_role_permissions: normalizeMobileRolePermissions(
-          values.mobile_role_permissions || []
-        ),
         phone: String(values.phone || '').trim(),
+        role_keys: normalizeStringList(values.role_keys || []),
       }
       const result = await adminRpc.call('create', payload)
       const createdAdmin = result?.data?.admin
@@ -376,7 +405,7 @@ export default function PermissionCenterPage() {
     }
   }
 
-  const savePermissions = async () => {
+  const saveAdminRoles = async () => {
     if (!editingAdmin?.id) {
       return
     }
@@ -391,58 +420,41 @@ export default function PermissionCenterPage() {
           phone: String(editingPhone || '').trim(),
         })
       }
-      await adminRpc.call('set_permissions', {
+      await adminRpc.call('set_roles', {
         id: editingAdmin.id,
-        menu_permissions: normalizeMenuPermissions(selectedPermissions),
-        mobile_role_permissions: normalizeMobileRolePermissions(
-          selectedMobileRolePermissions
-        ),
+        role_keys: normalizeStringList(selectedRoleKeys),
       })
-      message.success('权限已更新')
+      message.success('用户角色已更新')
       closeEditModal()
       await loadData()
     } catch (err) {
-      message.error(getActionErrorMessage(err, '更新权限'))
+      message.error(getActionErrorMessage(err, '更新用户角色'))
     } finally {
       setSaving(false)
     }
   }
 
-  const applyCreatePreset = (presetKey) => {
-    const preset = getPermissionPreset(presetKey)
-    createForm.setFieldsValue({
-      permission_preset: presetKey || undefined,
-      menu_permissions: preset?.permissions || defaultMenuPermissions(),
-      mobile_role_permissions: preset?.mobileRolePermissions || [],
-    })
-  }
-
-  const applyEditPreset = (presetKey) => {
-    const preset = getPermissionPreset(presetKey)
-    setSelectedPresetKey(presetKey || '')
-    setSelectedPermissions(
-      preset?.permissions || normalizeMenuPermissions(selectedPermissions)
-    )
-    setSelectedMobileRolePermissions(
-      preset?.mobileRolePermissions ||
-        normalizeMobileRolePermissions(selectedMobileRolePermissions)
-    )
-  }
-
-  const handleEditPermissionsChange = (permissions) => {
-    const normalized = normalizeMenuPermissions(permissions)
-    setSelectedPermissions(normalized)
-    setSelectedPresetKey(matchPermissionPreset(normalized))
-  }
-
-  const handleEditMobileRolePermissionsChange = (permissions) => {
-    setSelectedMobileRolePermissions(
-      normalizeMobileRolePermissions(permissions)
-    )
+  const saveRolePermissions = async () => {
+    if (!selectedRoleKey) {
+      return
+    }
+    setSaving(true)
+    try {
+      await adminRpc.call('set_role_permissions', {
+        role_key: selectedRoleKey,
+        permission_keys: normalizeStringList(selectedRolePermissionKeys),
+      })
+      message.success('角色权限已更新')
+      await loadData()
+    } catch (err) {
+      message.error(getActionErrorMessage(err, '更新角色权限'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const applyAdminStatus = async (admin, disabled) => {
-    if (!admin?.id || admin.level === ADMIN_LEVEL.SUPER) {
+    if (!admin?.id || admin.is_super_admin) {
       return
     }
 
@@ -514,13 +526,39 @@ export default function PermissionCenterPage() {
       render: (phone) => phone || <Text type="secondary">未录入</Text>,
     },
     {
-      title: '等级',
-      dataIndex: 'level',
-      width: 140,
-      render: (level) => {
-        const text = levelTextMap[level] || `未知(${level})`
-        const color = level === ADMIN_LEVEL.SUPER ? 'gold' : 'blue'
-        return <Tag color={color}>{text}</Tag>
+      title: '角色',
+      dataIndex: 'roles',
+      render: (_, record) => {
+        if (record.is_super_admin) {
+          return <Tag color="gold">超级管理员</Tag>
+        }
+        const assignedRoles = Array.isArray(record.roles) ? record.roles : []
+        if (assignedRoles.length === 0) {
+          return <Tag color="default">未分配角色</Tag>
+        }
+        return (
+          <Space wrap size={[4, 6]}>
+            {assignedRoles.map((role) => (
+              <Tag key={getRoleKey(role)}>{role.name || getRoleKey(role)}</Tag>
+            ))}
+          </Space>
+        )
+      },
+    },
+    {
+      title: '权限',
+      dataIndex: 'permissions',
+      width: 120,
+      render: (_, record) => {
+        if (record.is_super_admin) {
+          return <Tag color="gold">全部权限</Tag>
+        }
+        const count = normalizeStringList(record.permissions || []).length
+        return count > 0 ? (
+          <Tag color="blue">{count} 项</Tag>
+        ) : (
+          <Tag color="default">无权限</Tag>
+        )
       },
     },
     {
@@ -528,10 +566,10 @@ export default function PermissionCenterPage() {
       dataIndex: 'disabled',
       width: 150,
       render: (disabled, record) => {
-        if (record.level === ADMIN_LEVEL.SUPER) {
+        if (record.is_super_admin) {
           return <Tag color="gold">始终启用</Tag>
         }
-        if (!isSuperAdmin) {
+        if (!canManageUsers) {
           return (
             <Tag color={disabled ? 'red' : 'green'}>
               {disabled ? '禁用' : '启用'}
@@ -550,72 +588,24 @@ export default function PermissionCenterPage() {
       },
     },
     {
-      title: '菜单权限',
-      dataIndex: 'menu_permissions',
-      render: (_, record) => {
-        if (record.level === ADMIN_LEVEL.SUPER) {
-          return <Tag color="gold">全部菜单</Tag>
-        }
-        const normalized = normalizeMenuPermissions(
-          record.menu_permissions || []
-        )
-        if (normalized.length === 0) {
-          return <Tag color="default">无菜单权限</Tag>
-        }
-        return (
-          <Space wrap size={[4, 6]}>
-            {normalized.slice(0, 4).map((key) => (
-              <Tag key={key}>{getPermissionLabel(key)}</Tag>
-            ))}
-            {normalized.length > 4 ? (
-              <Text type="secondary">+{normalized.length - 4}</Text>
-            ) : null}
-          </Space>
-        )
-      },
-    },
-    {
-      title: '移动端',
-      dataIndex: 'mobile_role_permissions',
-      width: 220,
-      render: (_, record) => {
-        if (record.level === ADMIN_LEVEL.SUPER) {
-          return <Tag color="gold">全部移动端</Tag>
-        }
-        const normalized = normalizeMobileRolePermissions(
-          record.mobile_role_permissions || []
-        )
-        if (normalized.length === 0) {
-          return <Tag color="default">未开通</Tag>
-        }
-        return (
-          <Space wrap size={[4, 6]}>
-            {normalized.map((key) => (
-              <Tag key={key}>{getMobileRolePermissionLabel(key)}</Tag>
-            ))}
-          </Space>
-        )
-      },
-    },
-    {
       title: '操作',
       width: 240,
       render: (_, record) => {
-        if (record.level === ADMIN_LEVEL.SUPER) {
+        if (record.is_super_admin) {
           return <Text type="secondary">系统保留</Text>
         }
         return (
           <Space wrap size={[8, 8]}>
             <Button
               size="small"
-              disabled={!isSuperAdmin}
+              disabled={!canManageUsers}
               onClick={() => openEditModal(record)}
             >
-              编辑权限
+              分配角色
             </Button>
             <Button
               size="small"
-              disabled={!isSuperAdmin}
+              disabled={!canManageUsers}
               onClick={() => openResetModal(record)}
             >
               重置密码
@@ -638,7 +628,7 @@ export default function PermissionCenterPage() {
     return (
       <Loading
         title="权限加载中"
-        description="正在同步管理员账号和菜单权限，请稍候..."
+        description="正在同步管理员、角色和权限码，请稍候..."
       />
     )
   }
@@ -650,50 +640,62 @@ export default function PermissionCenterPage() {
           权限管理
         </Title>
         <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-          当前已补到完整页面级权限：业务页、打印中心、帮助中心和系统管理统一按菜单权限显示，并阻止直接进入未授权页面。
+          当前后台使用标准
+          RBAC：用户绑定角色，角色拥有权限码；菜单、移动端入口和接口守卫统一消费权限码。
         </Paragraph>
       </Card>
 
-      {!isSuperAdmin ? (
+      {!canManageUsers || !canManageRolePermissions ? (
         <Alert
           type="warning"
           showIcon
-          message="当前账号只能查看权限结果"
-          description="创建管理员、修改菜单权限和启用/禁用状态都需要超级管理员权限。"
+          message="当前账号只能查看部分权限结果"
+          description="创建管理员、分配用户角色或调整角色权限需要对应系统权限。超级管理员账号不能在此页面被普通管理员修改。"
         />
       ) : null}
 
-      {isSuperAdmin ? (
-        <Card variant="borderless">
-          <Space
-            size={12}
-            style={{ width: '100%', justifyContent: 'space-between' }}
-            wrap
-          >
-            <Paragraph type="secondary" style={{ margin: 0 }}>
-              新管理员默认继承完整基础菜单；如果是固定业务角色，建议先套用下面的推荐模板再微调。
-            </Paragraph>
-            <Button type="primary" onClick={() => setCreateModalOpen(true)}>
-              创建管理员
-            </Button>
-          </Space>
-        </Card>
-      ) : null}
-
       <Card variant="borderless">
+        <Space
+          size={12}
+          style={{ width: '100%', justifyContent: 'space-between' }}
+          wrap
+        >
+          <div>
+            <Title level={5} style={{ margin: 0 }}>
+              管理员与角色
+            </Title>
+            <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
+              新账号默认没有权限，必须分配角色后才能访问受保护页面和接口。
+            </Paragraph>
+          </div>
+          <Button
+            type="primary"
+            disabled={!canCreateUsers}
+            onClick={openCreateModal}
+          >
+            创建管理员
+          </Button>
+        </Space>
+
         <div className="erp-permission-list-toolbar">
           <div className="erp-permission-list-toolbar__filters">
             <Input
               allowClear
               className="erp-permission-list-toolbar__search"
               value={adminSearchKeyword}
-              placeholder="搜索管理员账号、手机号、权限或移动端角色"
-              onChange={handleAdminSearchChange}
+              placeholder="搜索管理员账号、手机号、角色或权限码"
+              onChange={(event) => {
+                setAdminSearchKeyword(event.target.value)
+                setTablePagination((prev) => ({ ...prev, current: 1 }))
+              }}
             />
             <Select
               value={adminStatusFilter}
               options={adminStatusOptions}
-              onChange={handleAdminStatusFilterChange}
+              onChange={(value) => {
+                setAdminStatusFilter(value || ADMIN_STATUS_FILTERS.ALL)
+                setTablePagination((prev) => ({ ...prev, current: 1 }))
+              }}
             />
           </div>
           <Text type="secondary">
@@ -715,18 +717,50 @@ export default function PermissionCenterPage() {
             showTotal: (total) => `共 ${total} 条`,
           }}
           locale={{ emptyText }}
-          scroll={{ x: 1180 }}
+          scroll={{ x: 1040 }}
           onChange={handleTableChange}
         />
       </Card>
 
-      <Modal
-        title={
-          <div className="erp-permission-modal__title">
-            <span className="erp-permission-modal__title-main">创建管理员</span>
-            <Text type="secondary">账号与默认菜单一次配置</Text>
+      <Card variant="borderless">
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <div>
+            <Title level={5} style={{ margin: 0 }}>
+              角色权限
+            </Title>
+            <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
+              调整后会影响所有绑定该角色的管理员；业务任务处理仍会继续校验
+              owner_role_key、assignee_id 和任务状态。
+            </Paragraph>
           </div>
-        }
+          <Select
+            value={selectedRoleKey || undefined}
+            options={roleOptions}
+            style={{ width: 280 }}
+            placeholder="选择角色"
+            onChange={setSelectedRoleKey}
+          />
+          <PermissionChecklist
+            groups={permissionGroups}
+            value={selectedRolePermissionKeys}
+            disabled={!canManageRolePermissions || !selectedRoleKey}
+            onChange={setSelectedRolePermissionKeys}
+          />
+          <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
+            <Button
+              type="primary"
+              loading={saving}
+              disabled={!canManageRolePermissions || !selectedRoleKey}
+              onClick={saveRolePermissions}
+            >
+              保存角色权限
+            </Button>
+          </Space>
+        </Space>
+      </Card>
+
+      <Modal
+        title="创建管理员"
         open={createModalOpen}
         onCancel={closeCreateModal}
         onOk={() => createForm.submit()}
@@ -734,212 +768,110 @@ export default function PermissionCenterPage() {
         okText="创建"
         cancelText="取消"
         centered
-        width={980}
-        className="erp-permission-modal"
+        width={720}
         forceRender
       >
-        <Form
-          form={createForm}
-          layout="vertical"
-          onFinish={createAdmin}
-          initialValues={{
-            level: ADMIN_LEVEL.STANDARD,
-            menu_permissions: defaultMenuPermissions(),
-            mobile_role_permissions: [],
-          }}
-        >
-          <div className="erp-permission-modal__fields">
-            <Form.Item
-              label="账号"
-              name="username"
-              rules={[
-                { required: true, message: '请输入管理员账号' },
-                {
-                  validator: (_, value) =>
-                    String(value || '').trim()
-                      ? Promise.resolve()
-                      : Promise.reject(new Error('请输入管理员账号')),
-                },
-              ]}
-            >
-              <Input placeholder="例如：manager02" maxLength={64} />
-            </Form.Item>
-            <Form.Item
-              label="手机号"
-              name="phone"
-              rules={[
-                {
-                  pattern: /^1\d{10}$/,
-                  message: '请输入 11 位手机号',
-                },
-              ]}
-            >
-              <Input
-                placeholder="用于手机端短信验证码登录"
-                maxLength={11}
-                inputMode="tel"
-              />
-            </Form.Item>
-            <Form.Item
-              label="密码"
-              name="password"
-              rules={[
-                { required: true, message: '请输入密码' },
-                { min: 6, message: '密码至少 6 位' },
-              ]}
-            >
-              <Input.Password
-                placeholder="至少 6 位"
-                autoComplete="new-password"
-              />
-            </Form.Item>
-            <Form.Item label="等级" name="level">
-              <Select
-                options={[
-                  { value: ADMIN_LEVEL.STANDARD, label: '普通管理员' },
-                  { value: ADMIN_LEVEL.SUPER, label: '超级管理员' },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item label="推荐权限模板" name="permission_preset">
-              <Select
-                allowClear
-                placeholder="可选：按老板 / PMC / 仓库 / 财务等模板先套用"
-                options={presetOptions}
-                onChange={applyCreatePreset}
-              />
-            </Form.Item>
-          </div>
-          <div className="erp-permission-modal__section-head">
-            <Text strong>移动端登录权限</Text>
-            <Text type="secondary">
-              已选 {createSelectedMobileRoleCount} 项
-            </Text>
-          </div>
-          <Form.Item name="mobile_role_permissions">
-            <Checkbox.Group
-              options={ERP_MOBILE_ROLE_PERMISSION_OPTIONS.map((item) => ({
-                label: item.label,
-                value: item.key,
-              }))}
-            />
-          </Form.Item>
-          <div className="erp-permission-modal__section-head">
-            <Text strong>默认菜单权限</Text>
-            <Text type="secondary">
-              已选 {createSelectedPermissionCount} 项
-            </Text>
-          </div>
+        <Form form={createForm} layout="vertical" onFinish={createAdmin}>
           <Form.Item
-            className="erp-permission-modal__permission-field"
-            name="menu_permissions"
+            label="账号"
+            name="username"
+            rules={[
+              { required: true, message: '请输入管理员账号' },
+              {
+                validator: (_, value) =>
+                  String(value || '').trim()
+                    ? Promise.resolve()
+                    : Promise.reject(new Error('请输入管理员账号')),
+              },
+            ]}
           >
-            <PermissionSectionChecklist />
+            <Input placeholder="例如 sales01" autoComplete="username" />
+          </Form.Item>
+          <Form.Item label="手机号" name="phone">
+            <Input placeholder="可选，用于短信登录" inputMode="tel" />
+          </Form.Item>
+          <Form.Item
+            label="初始密码"
+            name="password"
+            rules={[
+              { required: true, message: '请输入初始密码' },
+              {
+                min: PASSWORD_MIN_LENGTH,
+                message: `密码至少 ${PASSWORD_MIN_LENGTH} 位`,
+              },
+            ]}
+          >
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item label="角色" name="role_keys">
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="选择一个或多个角色"
+              options={roleOptions}
+            />
           </Form.Item>
         </Form>
       </Modal>
 
       <Modal
         title={
-          <div className="erp-permission-modal__title">
-            <span className="erp-permission-modal__title-main">
-              {editingAdmin
-                ? `编辑 ${editingAdmin.username} 的菜单权限`
-                : '编辑菜单权限'}
-            </span>
-            <Text type="secondary">修改后立即影响左侧菜单可见范围</Text>
-          </div>
+          editingAdmin?.username
+            ? `分配角色：${editingAdmin.username}`
+            : '分配角色'
         }
         open={editModalOpen}
         onCancel={closeEditModal}
-        onOk={savePermissions}
+        onOk={saveAdminRoles}
         confirmLoading={saving}
         okText="保存"
         cancelText="取消"
         centered
-        width={980}
-        className="erp-permission-modal"
+        width={720}
+        forceRender
       >
-        <Space
-          className="erp-permission-modal__edit-stack"
-          direction="vertical"
-          size={12}
-        >
-          <Alert
-            type="info"
-            showIcon
-            message="当前权限已收口到页面级"
-            description="菜单权限控制桌面后台可见范围；移动端登录权限控制对应角色手机端是否可进入任务页，手机号只用于短信验证码登录。"
-          />
-          <Input
-            value={editingPhone}
-            onChange={(event) => setEditingPhone(event.target.value)}
-            placeholder="手机号，用于短信验证码登录；清空则关闭手机号登录"
-            maxLength={11}
-            inputMode="tel"
-          />
-          <Select
-            allowClear
-            placeholder="套用推荐权限模板后可继续微调"
-            options={presetOptions}
-            value={selectedPresetKey || undefined}
-            onChange={applyEditPreset}
-          />
-          <PermissionSectionChecklist
-            value={selectedPermissions}
-            onChange={handleEditPermissionsChange}
-          />
-          <div className="erp-permission-modal__section-head">
-            <Text strong>移动端登录权限</Text>
-            <Text type="secondary">
-              已选 {selectedMobileRolePermissions.length} 项
-            </Text>
-          </div>
-          <Checkbox.Group
-            options={ERP_MOBILE_ROLE_PERMISSION_OPTIONS.map((item) => ({
-              label: item.label,
-              value: item.key,
-            }))}
-            value={selectedMobileRolePermissions}
-            onChange={handleEditMobileRolePermissionsChange}
-          />
-          <Text type="secondary">
-            当前共选择 {selectedPermissions.length} 项页面权限、
-            {selectedMobileRolePermissions.length}{' '}
-            项移动端权限，后台会按当前导航顺序保存。
-          </Text>
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <label>
+            <Text strong>手机号</Text>
+            <Input
+              value={editingPhone}
+              placeholder="可选，用于短信登录"
+              inputMode="tel"
+              style={{ marginTop: 8 }}
+              onChange={(event) => setEditingPhone(event.target.value)}
+            />
+          </label>
+          <label>
+            <Text strong>角色</Text>
+            <Select
+              mode="multiple"
+              allowClear
+              value={selectedRoleKeys}
+              options={roleOptions}
+              placeholder="选择一个或多个角色"
+              style={{ width: '100%', marginTop: 8 }}
+              onChange={setSelectedRoleKeys}
+            />
+          </label>
         </Space>
       </Modal>
 
       <Modal
         title={
-          <div className="erp-permission-modal__title">
-            <span className="erp-permission-modal__title-main">
-              重置管理员密码
-            </span>
-            <Text type="secondary">
-              {resettingAdmin ? resettingAdmin.username : ''}
-            </Text>
-          </div>
+          resettingAdmin?.username
+            ? `重置密码：${resettingAdmin.username}`
+            : '重置密码'
         }
         open={resetModalOpen}
         onCancel={closeResetModal}
         onOk={() => resetForm.submit()}
         confirmLoading={saving}
-        okText="确认重置"
+        okText="重置"
         cancelText="取消"
         centered
-        width={520}
         forceRender
       >
         <Form form={resetForm} layout="vertical" onFinish={resetAdminPassword}>
-          <Alert
-            type="warning"
-            showIcon
-            message="旧密码会立即失效"
-            description="保存后请把新密码交给本人，并提醒其尽快登录确认。"
-            style={{ marginBottom: 16 }}
-          />
           <Form.Item
             label="新密码"
             name="password"
@@ -951,31 +883,7 @@ export default function PermissionCenterPage() {
               },
             ]}
           >
-            <Input.Password
-              placeholder={`至少 ${PASSWORD_MIN_LENGTH} 位`}
-              autoComplete="new-password"
-            />
-          </Form.Item>
-          <Form.Item
-            label="确认新密码"
-            name="password_confirm"
-            dependencies={['password']}
-            rules={[
-              { required: true, message: '请再次输入新密码' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('password') === value) {
-                    return Promise.resolve()
-                  }
-                  return Promise.reject(new Error('两次输入的新密码不一致'))
-                },
-              }),
-            ]}
-          >
-            <Input.Password
-              placeholder="再次输入新密码"
-              autoComplete="new-password"
-            />
+            <Input.Password autoComplete="new-password" />
           </Form.Item>
         </Form>
       </Modal>

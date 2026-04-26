@@ -34,7 +34,7 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 		SourceType:    "project-orders",
 		SourceID:      1001,
 		TaskStatusKey: "ready",
-		OwnerRoleKey:  "business",
+		OwnerRoleKey:  biz.SalesRoleKey,
 		Payload:       map[string]any{"note": "首批联调任务"},
 	}, 7)
 	if err != nil {
@@ -49,7 +49,7 @@ func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 		TaskStatusKey:     "done",
 		BusinessStatusKey: "project_approved",
 		Payload:           map[string]any{"done_by": "test"},
-	}, 7, "business")
+	}, 7, biz.SalesRoleKey)
 	if err != nil {
 		t.Fatalf("update task failed: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 				t.Fatalf("create approval task failed: %v", err)
 			}
 
-			owner := "business"
+			owner := biz.SalesRoleKey
 			revisionStatusKey := "project_pending"
 			reason := "资料缺失"
 			workflowRuleKey := "boss_approval_rejected_to_order_revision"
@@ -318,7 +318,7 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 					SourceNo:          &sourceNo,
 					BusinessStatusKey: &revisionStatusKey,
 					TaskStatusKey:     "ready",
-					OwnerRoleKey:      "business",
+					OwnerRoleKey:      biz.SalesRoleKey,
 					Priority:          2,
 					Payload: map[string]any{
 						"decision":          tc.status,
@@ -356,7 +356,7 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 					workflowtask.SourceType("project-orders"),
 					workflowtask.SourceID(tc.sourceID),
 					workflowtask.TaskGroup("order_revision"),
-					workflowtask.OwnerRoleKey("business"),
+					workflowtask.OwnerRoleKey(biz.SalesRoleKey),
 				).
 				All(ctx)
 			if err != nil {
@@ -374,8 +374,8 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 				ID:            revisionTasks[0].ID,
 				TaskStatusKey: "done",
-				Payload:       map[string]any{"done_by": "business"},
-			}, 9, "business"); err != nil {
+				Payload:       map[string]any{"done_by": biz.SalesRoleKey},
+			}, 9, biz.SalesRoleKey); err != nil {
 				t.Fatalf("complete revision task failed: %v", err)
 			}
 
@@ -396,7 +396,7 @@ func TestWorkflowRepo_OrderRevisionIdempotencyAllowsNextRoundAfterDone(t *testin
 					workflowtask.SourceType("project-orders"),
 					workflowtask.SourceID(tc.sourceID),
 					workflowtask.TaskGroup("order_revision"),
-					workflowtask.OwnerRoleKey("business"),
+					workflowtask.OwnerRoleKey(biz.SalesRoleKey),
 				).
 				Count(ctx)
 			if err != nil {
@@ -596,7 +596,7 @@ func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyAllowsNextRoundAfterDone(t 
 			}
 			if state.BusinessStatusKey != "qc_failed" ||
 				state.OwnerRoleKey == nil ||
-				*state.OwnerRoleKey != "purchasing" ||
+				*state.OwnerRoleKey != biz.PurchaseRoleKey ||
 				state.BlockedReason == nil ||
 				*state.BlockedReason != reason {
 				t.Fatalf("unexpected IQC exception business state %#v", state)
@@ -612,7 +612,7 @@ func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyAllowsNextRoundAfterDone(t 
 					workflowtask.SourceType("inbound"),
 					workflowtask.SourceID(tc.sourceID),
 					workflowtask.TaskGroup("purchase_quality_exception"),
-					workflowtask.OwnerRoleKey("purchasing"),
+					workflowtask.OwnerRoleKey(biz.PurchaseRoleKey),
 				).
 				All(ctx)
 			if err != nil {
@@ -642,8 +642,8 @@ func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyAllowsNextRoundAfterDone(t 
 			if _, err := repo.UpdateWorkflowTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 				ID:            exceptionTasks[0].ID,
 				TaskStatusKey: "done",
-				Payload:       map[string]any{"done_by": "purchasing"},
-			}, 9, "purchasing"); err != nil {
+				Payload:       map[string]any{"done_by": biz.PurchaseRoleKey},
+			}, 9, biz.PurchaseRoleKey); err != nil {
 				t.Fatalf("complete exception task failed: %v", err)
 			}
 
@@ -661,7 +661,7 @@ func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyAllowsNextRoundAfterDone(t 
 					workflowtask.SourceType("inbound"),
 					workflowtask.SourceID(tc.sourceID),
 					workflowtask.TaskGroup("purchase_quality_exception"),
-					workflowtask.OwnerRoleKey("purchasing"),
+					workflowtask.OwnerRoleKey(biz.PurchaseRoleKey),
 				).
 				Count(ctx)
 			if err != nil {
@@ -1348,7 +1348,7 @@ func TestWorkflowRepo_UpsertWorkflowBusinessStateUpdatesExisting(t *testing.T) {
 		t.Fatalf("expected state id")
 	}
 
-	blockedOwner := "business"
+	blockedOwner := biz.SalesRoleKey
 	reason := "缺少款图"
 	updated, err := repo.UpsertWorkflowBusinessState(ctx, &biz.WorkflowBusinessStateUpsert{
 		SourceType:        "project-orders",
@@ -1364,7 +1364,7 @@ func TestWorkflowRepo_UpsertWorkflowBusinessStateUpdatesExisting(t *testing.T) {
 	if updated.ID != state.ID || updated.BusinessStatusKey != "blocked" {
 		t.Fatalf("expected same state updated to blocked, got %#v", updated)
 	}
-	if updated.OwnerRoleKey == nil || *updated.OwnerRoleKey != "business" ||
+	if updated.OwnerRoleKey == nil || *updated.OwnerRoleKey != biz.SalesRoleKey ||
 		updated.BlockedReason == nil ||
 		*updated.BlockedReason != reason {
 		t.Fatalf("unexpected updated state %#v", updated)

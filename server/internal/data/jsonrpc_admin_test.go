@@ -16,12 +16,14 @@ import (
 )
 
 type memAdminManageRepoForData struct {
-	admins map[int]*biz.AdminUser
+	admins    map[int]*biz.AdminUser
+	rolePerms map[string][]string
 }
 
 func newMemAdminManageRepoForData() *memAdminManageRepoForData {
 	return &memAdminManageRepoForData{
-		admins: map[int]*biz.AdminUser{},
+		admins:    map[int]*biz.AdminUser{},
+		rolePerms: map[string][]string{},
 	}
 }
 
@@ -30,10 +32,65 @@ func (r *memAdminManageRepoForData) clone(admin *biz.AdminUser) *biz.AdminUser {
 		return nil
 	}
 	cloned := *admin
-	cloned.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
-	cloned.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
+	cloned.Roles = append([]biz.AdminRole(nil), admin.Roles...)
+	cloned.Permissions = append([]string(nil), admin.Permissions...)
 	cloned.ERPPreferences = biz.NormalizeAdminERPPreferences(admin.ERPPreferences)
 	return &cloned
+}
+
+func (r *memAdminManageRepoForData) roleByKey(roleKey string) biz.AdminRole {
+	normalized := biz.NormalizeRoleKey(roleKey)
+	for _, role := range biz.BuiltinRoles() {
+		if role.Key == normalized {
+			permissions := r.rolePerms[role.Key]
+			if permissions == nil {
+				permissions = role.Permissions
+			}
+			return biz.AdminRole{
+				Key:         role.Key,
+				Name:        role.Name,
+				Description: role.Description,
+				Builtin:     role.Builtin,
+				Disabled:    role.Disabled,
+				SortOrder:   role.SortOrder,
+				Permissions: biz.NormalizePermissionKeys(permissions),
+			}
+		}
+	}
+	return biz.AdminRole{}
+}
+
+func (r *memAdminManageRepoForData) permissionsForRoleKeys(roleKeys []string) []string {
+	permissionSet := map[string]struct{}{}
+	for _, roleKey := range biz.NormalizeAdminRoleKeys(roleKeys) {
+		perms, ok := r.rolePerms[roleKey]
+		if !ok {
+			for _, role := range biz.BuiltinRoles() {
+				if role.Key == roleKey {
+					perms = role.Permissions
+					break
+				}
+			}
+		}
+		for _, permissionKey := range biz.NormalizePermissionKeys(perms) {
+			permissionSet[permissionKey] = struct{}{}
+		}
+	}
+	out := make([]string, 0, len(permissionSet))
+	for _, permissionKey := range biz.AllPermissionKeys() {
+		if _, ok := permissionSet[permissionKey]; ok {
+			out = append(out, permissionKey)
+		}
+	}
+	return out
+}
+
+func (r *memAdminManageRepoForData) applyAdminRoles(admin *biz.AdminUser, roleKeys []string) {
+	admin.Roles = admin.Roles[:0]
+	for _, roleKey := range biz.NormalizeAdminRoleKeys(roleKeys) {
+		admin.Roles = append(admin.Roles, r.roleByKey(roleKey))
+	}
+	admin.Permissions = r.permissionsForRoleKeys(roleKeys)
 }
 
 func (r *memAdminManageRepoForData) GetAdminByID(_ context.Context, id int) (*biz.AdminUser, error) {
@@ -73,27 +130,74 @@ func (r *memAdminManageRepoForData) ListAdmins(_ context.Context) ([]*biz.AdminU
 func (r *memAdminManageRepoForData) CreateAdmin(_ context.Context, admin *biz.AdminCreate) (*biz.AdminUser, error) {
 	now := time.Now()
 	created := &biz.AdminUser{
-		ID:                    len(r.admins) + 1,
-		Username:              admin.Username,
-		Phone:                 admin.Phone,
-		PasswordHash:          admin.PasswordHash,
-		Level:                 int8(admin.Level),
-		MenuPermissions:       append([]string(nil), admin.MenuPermissions...),
-		MobileRolePermissions: append([]string(nil), admin.MobileRolePermissions...),
-		CreatedAt:             now,
-		UpdatedAt:             now,
+		ID:           len(r.admins) + 1,
+		Username:     admin.Username,
+		Phone:        admin.Phone,
+		PasswordHash: admin.PasswordHash,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
+	r.applyAdminRoles(created, admin.RoleKeys)
 	r.admins[created.ID] = created
 	return r.clone(created), nil
 }
 
-func (r *memAdminManageRepoForData) UpdateAdminPermissions(_ context.Context, id int, menuPermissions []string, mobileRolePermissions []string) error {
+func (r *memAdminManageRepoForData) UpdateAdminRoles(_ context.Context, id int, roleKeys []string) error {
 	admin, ok := r.admins[id]
 	if !ok {
 		return biz.ErrAdminNotFound
 	}
-	admin.MenuPermissions = append([]string(nil), menuPermissions...)
-	admin.MobileRolePermissions = append([]string(nil), mobileRolePermissions...)
+	r.applyAdminRoles(admin, roleKeys)
+	return nil
+}
+
+func (r *memAdminManageRepoForData) ListRoles(_ context.Context) ([]biz.AdminRole, error) {
+	defs := biz.BuiltinRoles()
+	out := make([]biz.AdminRole, 0, len(defs))
+	for _, role := range defs {
+		out = append(out, r.roleByKey(role.Key))
+	}
+	return out, nil
+}
+
+func (r *memAdminManageRepoForData) ListPermissions(_ context.Context) ([]biz.AdminPermission, error) {
+	defs := biz.BuiltinPermissions()
+	out := make([]biz.AdminPermission, 0, len(defs))
+	for _, permission := range defs {
+		out = append(out, biz.AdminPermission{
+			Key:         permission.Key,
+			Name:        permission.Name,
+			Description: permission.Description,
+			Module:      permission.Module,
+			Action:      permission.Action,
+			Resource:    permission.Resource,
+			Builtin:     permission.Builtin,
+		})
+	}
+	return out, nil
+}
+
+func (r *memAdminManageRepoForData) GetRoleByKey(_ context.Context, roleKey string) (*biz.AdminRole, error) {
+	role := r.roleByKey(roleKey)
+	if role.Key == "" {
+		return nil, biz.ErrRoleNotFound
+	}
+	return &role, nil
+}
+
+func (r *memAdminManageRepoForData) UpdateRolePermissions(_ context.Context, roleKey string, permissionKeys []string) error {
+	role := r.roleByKey(roleKey)
+	if role.Key == "" {
+		return biz.ErrRoleNotFound
+	}
+	r.rolePerms[role.Key] = biz.NormalizePermissionKeys(permissionKeys)
+	for _, admin := range r.admins {
+		roleKeys := make([]string, 0, len(admin.Roles))
+		for _, item := range admin.Roles {
+			roleKeys = append(roleKeys, item.Key)
+		}
+		r.applyAdminRoles(admin, roleKeys)
+	}
 	return nil
 }
 
@@ -147,9 +251,9 @@ func TestJsonrpcData_AdminMe_ReturnsERPPreferences(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	now := time.Now()
 	repo.admins[1] = &biz.AdminUser{
-		ID:       1,
-		Username: "admin",
-		Level:    int8(biz.AdminLevelSuper),
+		ID:           1,
+		Username:     "admin",
+		IsSuperAdmin: true,
 		ERPPreferences: biz.AdminERPPreferences{
 			ColumnOrders: map[string][]string{
 				"project-orders": {"customer_name", "document_no"},
@@ -196,17 +300,16 @@ func TestJsonrpcData_AdminResetPassword(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	now := time.Now()
 	repo.admins[1] = &biz.AdminUser{
-		ID:        1,
-		Username:  "root",
-		Level:     int8(biz.AdminLevelSuper),
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:           1,
+		Username:     "root",
+		IsSuperAdmin: true,
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 	repo.admins[2] = &biz.AdminUser{
 		ID:           2,
 		Username:     "manager",
 		PasswordHash: "old",
-		Level:        int8(biz.AdminLevelStandard),
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
@@ -243,9 +346,12 @@ func TestJsonrpcData_AdminSetERPColumnOrder(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	now := time.Now()
 	repo.admins[1] = &biz.AdminUser{
-		ID:        1,
-		Username:  "admin",
-		Level:     int8(biz.AdminLevelStandard),
+		ID:       1,
+		Username: "admin",
+		Roles:    []biz.AdminRole{{Key: biz.AdminRoleKey, Name: "系统管理员"}},
+		Permissions: []string{
+			biz.PermissionSystemUserRead,
+		},
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

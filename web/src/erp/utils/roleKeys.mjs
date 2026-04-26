@@ -1,9 +1,11 @@
-export const BUSINESS_ROLE_KEY = 'business'
+export const SALES_ROLE_KEY = 'sales'
+export const PURCHASE_ROLE_KEY = 'purchase'
+export const BUSINESS_ROLE_KEY = SALES_ROLE_KEY
 
 export const ROLE_DISPLAY_NAMES = Object.freeze({
   boss: '老板',
-  business: '业务',
-  purchasing: '采购',
+  sales: '业务',
+  purchase: '采购',
   pmc: 'PMC',
   production: '生产经理',
   warehouse: '仓库',

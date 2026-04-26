@@ -9,6 +9,120 @@ const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
 const mockBusinessRecords = []
 
+const mockPermissions = [
+  { permission_key: 'system.user.read', name: '查看管理员', module: 'system' },
+  {
+    permission_key: 'system.user.create',
+    name: '创建管理员',
+    module: 'system',
+  },
+  {
+    permission_key: 'system.user.update',
+    name: '更新管理员',
+    module: 'system',
+  },
+  {
+    permission_key: 'system.user.disable',
+    name: '启停管理员',
+    module: 'system',
+  },
+  { permission_key: 'system.role.read', name: '查看角色', module: 'system' },
+  {
+    permission_key: 'system.permission.manage',
+    name: '管理角色权限',
+    module: 'system',
+  },
+  { permission_key: 'erp.dashboard.read', name: '查看任务看板', module: 'erp' },
+  {
+    permission_key: 'business.record.read',
+    name: '查看业务记录',
+    module: 'business',
+  },
+  {
+    permission_key: 'workflow.task.read',
+    name: '查看协同任务',
+    module: 'workflow',
+  },
+  {
+    permission_key: 'mobile.sales.access',
+    name: '进入业务移动端',
+    module: 'mobile',
+  },
+  {
+    permission_key: 'mobile.purchase.access',
+    name: '进入采购移动端',
+    module: 'mobile',
+  },
+  {
+    permission_key: 'debug.business_chain.run',
+    name: '执行业务链路调试',
+    module: 'debug',
+  },
+  {
+    permission_key: 'debug.business.clear',
+    name: '清空业务数据',
+    module: 'debug',
+  },
+]
+
+const mockRoles = [
+  {
+    role_key: 'admin',
+    name: '系统管理员',
+    permissions: mockPermissions
+      .map((item) => item.permission_key)
+      .filter((key) => key.startsWith('system.')),
+  },
+  {
+    role_key: 'sales',
+    name: '业务',
+    permissions: [
+      'erp.dashboard.read',
+      'business.record.read',
+      'workflow.task.read',
+      'mobile.sales.access',
+    ],
+  },
+  {
+    role_key: 'purchase',
+    name: '采购',
+    permissions: [
+      'erp.dashboard.read',
+      'business.record.read',
+      'workflow.task.read',
+      'mobile.purchase.access',
+    ],
+  },
+]
+
+const mockMenus = [
+  {
+    key: 'global-dashboard',
+    label: '任务看板',
+    path: '/erp/dashboard',
+    required_permissions: ['erp.dashboard.read'],
+  },
+  {
+    key: 'permission-center',
+    label: '权限管理',
+    path: '/erp/system/permissions',
+    required_permissions: ['system.user.read', 'system.role.read'],
+  },
+]
+
+const mockSuperAdminProfile = {
+  id: 1,
+  user_id: 1,
+  username: 'mock-admin',
+  phone: '13800138000',
+  is_super_admin: true,
+  disabled: false,
+  roles: [],
+  permissions: mockPermissions.map((item) => item.permission_key),
+  menus: mockMenus,
+  erp_preferences: { column_orders: {} },
+}
+
 const mockTaskStates = [
   { key: 'pending', label: '待开始', summary: '任务已创建，等待前置条件。' },
   { key: 'ready', label: '可执行', summary: '前置条件已满足。' },
@@ -276,8 +390,7 @@ function makeBusinessRecord(params, existing = {}) {
       params.business_status_key ||
       existing.business_status_key ||
       'project_pending',
-    owner_role_key:
-      params.owner_role_key || existing.owner_role_key || 'business',
+    owner_role_key: params.owner_role_key || existing.owner_role_key || 'sales',
     source_no: params.source_no || '',
     customer_name: params.customer_name || '',
     supplier_name: params.supplier_name || '',
@@ -423,39 +536,11 @@ export function setupJsonRpcMockServer() {
           jsonrpc: '2.0',
           id,
           result: makeBizResult({
-            user_id: 1,
-            username: params.username || 'mock-admin',
-            phone: '13800138000',
+            ...mockSuperAdminProfile,
             access_token: 'mock-admin-token',
             expires_at: Math.floor(Date.now() / 1000) + 3600,
             token_type: 'Bearer',
-            admin_level: 0,
-            menu_permissions: [
-              '/erp/dashboard',
-              '/erp/flows/overview',
-              '/erp/source-readiness',
-              '/erp/print-center',
-              '/erp/help-center',
-              '/erp/docs/system-init',
-              '/erp/docs/operation-playbook',
-              '/erp/docs/field-truth',
-              '/erp/docs/data-model',
-              '/erp/docs/import-mapping',
-              '/erp/docs/mobile-roles',
-              '/erp/docs/print-templates',
-              '/erp/changes/current',
-              '/erp/system/permissions',
-            ],
-            mobile_role_permissions: [
-              'boss',
-              'business',
-              'purchasing',
-              'production',
-              'warehouse',
-              'finance',
-              'pmc',
-              'quality',
-            ],
+            username: params.username || mockSuperAdminProfile.username,
           }),
           error: '',
         }
@@ -477,17 +562,11 @@ export function setupJsonRpcMockServer() {
           jsonrpc: '2.0',
           id,
           result: makeBizResult({
-            user_id: 1,
-            username: 'mock-admin',
-            phone: params.phone || '13800138000',
+            ...mockSuperAdminProfile,
             access_token: 'mock-admin-token',
             expires_at: Math.floor(Date.now() / 1000) + 3600,
             token_type: 'Bearer',
-            admin_level: 0,
-            menu_permissions: ['/erp/dashboard'],
-            mobile_role_permissions: params.mobile_role_key
-              ? [params.mobile_role_key]
-              : [],
+            phone: params.phone || mockSuperAdminProfile.phone,
           }),
           error: '',
         }
@@ -509,39 +588,7 @@ export function setupJsonRpcMockServer() {
         responseBody = {
           jsonrpc: '2.0',
           id,
-          result: makeBizResult({
-            id: 1,
-            username: 'mock-admin',
-            phone: '13800138000',
-            level: 0,
-            disabled: false,
-            menu_permissions: [
-              '/erp/dashboard',
-              '/erp/flows/overview',
-              '/erp/source-readiness',
-              '/erp/print-center',
-              '/erp/help-center',
-              '/erp/docs/system-init',
-              '/erp/docs/operation-playbook',
-              '/erp/docs/field-truth',
-              '/erp/docs/data-model',
-              '/erp/docs/import-mapping',
-              '/erp/docs/mobile-roles',
-              '/erp/docs/print-templates',
-              '/erp/changes/current',
-              '/erp/system/permissions',
-            ],
-            mobile_role_permissions: [
-              'boss',
-              'business',
-              'purchasing',
-              'production',
-              'warehouse',
-              'finance',
-              'pmc',
-              'quality',
-            ],
-          }),
+          result: makeBizResult(mockSuperAdminProfile),
           error: '',
         }
       } else if (method === 'list') {
@@ -554,10 +601,11 @@ export function setupJsonRpcMockServer() {
                 id: 1,
                 username: 'mock-admin',
                 phone: '13800138000',
-                level: 0,
+                is_super_admin: true,
                 disabled: false,
-                menu_permissions: [],
-                mobile_role_permissions: [],
+                roles: [],
+                permissions: mockPermissions.map((item) => item.permission_key),
+                menus: mockMenus,
               },
             ],
           }),
@@ -565,7 +613,8 @@ export function setupJsonRpcMockServer() {
         }
       } else if (
         method === 'create' ||
-        method === 'set_permissions' ||
+        method === 'set_roles' ||
+        method === 'set_role_permissions' ||
         method === 'set_phone' ||
         method === 'set_disabled' ||
         method === 'reset_password'
@@ -578,33 +627,28 @@ export function setupJsonRpcMockServer() {
               id: Number(params.id || 2),
               username: params.username || 'mock-created-admin',
               phone: params.phone || '',
-              level: Number(params.level || 1),
+              is_super_admin: false,
               disabled: Boolean(params.disabled),
-              menu_permissions: Array.isArray(params.menu_permissions)
-                ? params.menu_permissions
-                : [],
-              mobile_role_permissions: Array.isArray(
-                params.mobile_role_permissions
-              )
-                ? params.mobile_role_permissions
-                : [],
+              roles: mockRoles.filter((role) =>
+                (params.role_keys || []).includes(role.role_key)
+              ),
+              permissions: [],
+              menus: [],
             },
           }),
           error: '',
         }
-      } else if (method === 'menu_options') {
+      } else if (method === 'rbac_options' || method === 'menu_options') {
         responseBody = {
           jsonrpc: '2.0',
           id,
           result: makeBizResult({
-            menu_options: [
-              { key: '/erp/dashboard', label: '全局驾驶舱' },
-              { key: '/erp/system/permissions', label: '权限管理' },
-            ],
-            mobile_role_options: [
-              { key: 'purchasing', label: '采购移动端' },
-              { key: 'warehouse', label: '仓库移动端' },
-            ],
+            roles: mockRoles,
+            permissions: mockPermissions,
+            menus: mockMenus,
+            role_options: mockRoles,
+            permission_options: mockPermissions,
+            menu_options: mockMenus,
           }),
           error: '',
         }
@@ -784,7 +828,7 @@ export function setupJsonRpcMockServer() {
           source_no: params.source_no || '',
           business_status_key: params.business_status_key || '',
           task_status_key: params.task_status_key || 'pending',
-          owner_role_key: params.owner_role_key || 'business',
+          owner_role_key: params.owner_role_key || 'sales',
           assignee_id: null,
           priority: Number(params.priority || 0),
           blocked_reason: params.blocked_reason || '',
@@ -858,7 +902,7 @@ export function setupJsonRpcMockServer() {
           order_id: params.order_id || null,
           batch_id: params.batch_id || null,
           business_status_key: params.business_status_key || 'project_pending',
-          owner_role_key: params.owner_role_key || 'business',
+          owner_role_key: params.owner_role_key || 'sales',
           blocked_reason: params.blocked_reason || '',
           status_changed_at: nowUnix(),
           payload: params.payload || {},

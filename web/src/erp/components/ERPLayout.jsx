@@ -52,10 +52,7 @@ import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
-import {
-  normalizeMenuPermissions,
-  resolveMenuPermissionKey,
-} from '../config/menuPermissions.mjs'
+import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import {
   getNavigationSections,
   navigationItemRegistry,
@@ -158,6 +155,23 @@ function buildCurrentEntry({ navigationSections, locationPath }) {
   )
 }
 
+function normalizeMenuPaths(menus = []) {
+  if (!Array.isArray(menus)) {
+    return []
+  }
+  const selected = new Set()
+  menus.forEach((menu) => {
+    if (typeof menu === 'string') {
+      const path = resolveMenuPermissionKey(menu)
+      if (path) selected.add(path)
+      return
+    }
+    const path = resolveMenuPermissionKey(menu?.path || '')
+    if (path) selected.add(path)
+  })
+  return [...selected]
+}
+
 export default function ERPLayout() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -210,8 +224,10 @@ export default function ERPLayout() {
           {
             user_id: nextProfile.id,
             username: nextProfile.username,
-            admin_level: nextProfile.level,
-            menu_permissions: nextProfile.menu_permissions || [],
+            is_super_admin: nextProfile.is_super_admin === true,
+            roles: nextProfile.roles || [],
+            permissions: nextProfile.permissions || [],
+            menus: nextProfile.menus || [],
             erp_preferences: nextProfile.erp_preferences || {
               column_orders: {},
             },
@@ -233,10 +249,10 @@ export default function ERPLayout() {
     loadProfile()
   }, [loadProfile])
 
-  const isSuperAdmin = adminProfile?.level === 0
-  const allowedPermissions = useMemo(
-    () => normalizeMenuPermissions(adminProfile?.menu_permissions || []),
-    [adminProfile?.menu_permissions]
+  const isSuperAdmin = adminProfile?.is_super_admin === true
+  const allowedMenuPaths = useMemo(
+    () => normalizeMenuPaths(adminProfile?.menus || []),
+    [adminProfile?.menus]
   )
 
   const visibleSections = useMemo(() => {
@@ -248,13 +264,13 @@ export default function ERPLayout() {
       .map((section) => ({
         ...section,
         items: section.items.filter((item) =>
-          allowedPermissions.includes(item.path)
+          allowedMenuPaths.includes(item.path)
         ),
       }))
       .filter((section) => section.items.length > 0)
-  }, [allowedPermissions, isSuperAdmin, navigationSections])
+  }, [allowedMenuPaths, isSuperAdmin, navigationSections])
 
-  const currentPermissionKey = useMemo(
+  const currentMenuPath = useMemo(
     () => resolveMenuPermissionKey(location.pathname),
     [location.pathname]
   )
@@ -263,10 +279,7 @@ export default function ERPLayout() {
     if (profileLoading || isSuperAdmin) {
       return
     }
-    if (
-      !currentPermissionKey ||
-      allowedPermissions.includes(currentPermissionKey)
-    ) {
+    if (!currentMenuPath || allowedMenuPaths.includes(currentMenuPath)) {
       return
     }
     const fallbackPath = visibleSections[0]?.items[0]?.path || ''
@@ -274,8 +287,8 @@ export default function ERPLayout() {
       navigate(fallbackPath, { replace: true })
     }
   }, [
-    allowedPermissions,
-    currentPermissionKey,
+    allowedMenuPaths,
+    currentMenuPath,
     isSuperAdmin,
     location.pathname,
     navigate,
@@ -339,8 +352,10 @@ export default function ERPLayout() {
         {
           user_id: nextProfile.id,
           username: nextProfile.username,
-          admin_level: nextProfile.level,
-          menu_permissions: nextProfile.menu_permissions || [],
+          is_super_admin: nextProfile.is_super_admin === true,
+          roles: nextProfile.roles || [],
+          permissions: nextProfile.permissions || [],
+          menus: nextProfile.menus || [],
           erp_preferences: nextProfile.erp_preferences,
         },
         AUTH_SCOPE.ADMIN
@@ -428,7 +443,13 @@ export default function ERPLayout() {
     </div>
   )
 
-  const roleLabel = isSuperAdmin ? '超级管理员' : '普通管理员'
+  const roleLabel = isSuperAdmin
+    ? '超级管理员'
+    : (adminProfile?.roles || [])
+        .map((role) => role?.name || role?.role_key || role?.key)
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(' / ') || '普通管理员'
   const displayUsername =
     adminProfile?.username || tokenAdmin?.username || 'admin'
   const noVisibleMenus = !isSuperAdmin && visibleSections.length === 0
@@ -524,8 +545,8 @@ export default function ERPLayout() {
               <Alert
                 type="warning"
                 showIcon
-                message="当前账号暂无后台菜单权限"
-                description="请联系超级管理员在“系统管理 / 权限管理”里为该账号分配菜单入口。"
+                message="当前账号暂无后台入口权限"
+                description="请联系管理员在“系统管理 / 权限管理”里为该账号分配角色。"
               />
             ) : (
               <Outlet context={outletContext} />

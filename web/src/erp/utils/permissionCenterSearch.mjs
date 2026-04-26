@@ -1,16 +1,9 @@
-import {
-  getMobileRolePermissionLabel,
-  getPermissionLabel,
-} from '../config/menuPermissions.mjs'
-
 export const ADMIN_STATUS_FILTERS = Object.freeze({
   ALL: 'all',
   ENABLED: 'enabled',
   DISABLED: 'disabled',
   SUPER: 'super',
 })
-
-const ADMIN_LEVEL_SUPER = 0
 
 function normalizeSearchValue(value = '') {
   return String(value || '')
@@ -29,9 +22,23 @@ function includesKeyword(parts = [], keyword = '') {
   )
 }
 
+function normalizeList(values = []) {
+  return Array.isArray(values) ? values : []
+}
+
+function getRoleKey(role = {}) {
+  return role?.role_key || role?.key || ''
+}
+
+function getPermissionKey(permission = {}) {
+  return typeof permission === 'string'
+    ? permission
+    : permission?.permission_key || permission?.key || ''
+}
+
 function getAdminStatusText(admin = {}) {
-  if (Number(admin.level) === ADMIN_LEVEL_SUPER) {
-    return '超级管理员 始终启用 启用 全部菜单 全部移动端'
+  if (admin.is_super_admin === true) {
+    return '超级管理员 始终启用 启用 全部角色 全部权限'
   }
   return admin.disabled ? '普通管理员 禁用' : '普通管理员 启用'
 }
@@ -45,45 +52,40 @@ export function matchesAdminStatus(
     return true
   }
   if (normalizedStatus === ADMIN_STATUS_FILTERS.SUPER) {
-    return Number(admin.level) === ADMIN_LEVEL_SUPER
+    return admin.is_super_admin === true
   }
   if (normalizedStatus === ADMIN_STATUS_FILTERS.DISABLED) {
-    return Number(admin.level) !== ADMIN_LEVEL_SUPER && Boolean(admin.disabled)
+    return admin.is_super_admin !== true && Boolean(admin.disabled)
   }
   if (normalizedStatus === ADMIN_STATUS_FILTERS.ENABLED) {
-    return Number(admin.level) === ADMIN_LEVEL_SUPER || !admin.disabled
+    return admin.is_super_admin === true || !admin.disabled
   }
   return true
 }
 
 export function matchesAdminKeyword(admin = {}, keyword = '') {
-  const menuPermissions = Array.isArray(admin.menu_permissions)
-    ? admin.menu_permissions
-    : []
-  const mobileRolePermissions = Array.isArray(admin.mobile_role_permissions)
-    ? admin.mobile_role_permissions
-    : []
+  const roles = normalizeList(admin.roles)
+  const permissions = normalizeList(admin.permissions)
+  const menus = normalizeList(admin.menus)
+  const roleDisplayText =
+    admin.is_super_admin === true || roles.length > 0 ? '' : '未分配角色'
   const permissionDisplayText =
-    Number(admin.level) === ADMIN_LEVEL_SUPER || menuPermissions.length > 0
-      ? ''
-      : '无菜单权限'
-  const mobileRoleDisplayText =
-    Number(admin.level) === ADMIN_LEVEL_SUPER ||
-    mobileRolePermissions.length > 0
-      ? ''
-      : '未开通'
+    admin.is_super_admin === true || permissions.length > 0 ? '' : '无权限'
 
   return includesKeyword(
     [
       admin.username,
       admin.phone,
       getAdminStatusText(admin),
+      roleDisplayText,
       permissionDisplayText,
-      mobileRoleDisplayText,
-      ...menuPermissions,
-      ...menuPermissions.map((key) => getPermissionLabel(key)),
-      ...mobileRolePermissions,
-      ...mobileRolePermissions.map((key) => getMobileRolePermissionLabel(key)),
+      ...roles.flatMap((role) => [getRoleKey(role), role.name]),
+      ...permissions.flatMap((permission) => [
+        getPermissionKey(permission),
+        permission?.name,
+        permission?.module,
+      ]),
+      ...menus.flatMap((menu) => [menu?.path, menu?.label]),
     ],
     keyword
   )

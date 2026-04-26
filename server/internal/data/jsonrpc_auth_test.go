@@ -311,10 +311,10 @@ func TestJsonrpcData_AuthSMSLogin_InvalidCode(t *testing.T) {
 func TestJsonrpcData_AdminSMSLogin_OK(t *testing.T) {
 	repo := newMemAdminAuthRepoForData()
 	repo.admins["13800138000"] = &biz.AdminUser{
-		ID:       1,
-		Username: "sms-admin",
-		Phone:    "13800138000",
-		Level:    int8(biz.AdminLevelSuper),
+		ID:           1,
+		Username:     "sms-admin",
+		Phone:        "13800138000",
+		IsSuperAdmin: true,
 	}
 
 	logger := log.NewStdLogger(io.Discard)
@@ -359,8 +359,15 @@ func TestJsonrpcData_AdminSMSLogin_OK(t *testing.T) {
 	if res.Data.AsMap()["access_token"] != "tok-admin-sms" {
 		t.Fatalf("expected access_token=tok-admin-sms, got %v", res.Data.AsMap()["access_token"])
 	}
-	if res.Data.AsMap()["admin_level"] == nil {
-		t.Fatalf("expected admin_level in admin sms login response")
+	data := res.Data.AsMap()
+	if data["is_super_admin"] != true {
+		t.Fatalf("expected is_super_admin=true in admin sms login response, got %#v", data["is_super_admin"])
+	}
+	if _, ok := data["permissions"].([]any); !ok {
+		t.Fatalf("expected permissions in admin sms login response, got %#v", data["permissions"])
+	}
+	if _, ok := data["menus"].([]any); !ok {
+		t.Fatalf("expected menus in admin sms login response, got %#v", data["menus"])
 	}
 }
 
@@ -514,8 +521,8 @@ func (r *memAdminAuthRepoForData) GetAdminByUsername(ctx context.Context, userna
 		return nil, errors.New("not found")
 	}
 	cp := *admin
-	cp.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
-	cp.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
+	cp.Roles = append([]biz.AdminRole(nil), admin.Roles...)
+	cp.Permissions = append([]string(nil), admin.Permissions...)
 	return &cp, nil
 }
 
@@ -525,8 +532,8 @@ func (r *memAdminAuthRepoForData) GetAdminByPhone(ctx context.Context, phone str
 	for _, admin := range r.admins {
 		if admin.Phone == phone {
 			cp := *admin
-			cp.MenuPermissions = append([]string(nil), admin.MenuPermissions...)
-			cp.MobileRolePermissions = append([]string(nil), admin.MobileRolePermissions...)
+			cp.Roles = append([]biz.AdminRole(nil), admin.Roles...)
+			cp.Permissions = append([]string(nil), admin.Permissions...)
 			return &cp, nil
 		}
 	}

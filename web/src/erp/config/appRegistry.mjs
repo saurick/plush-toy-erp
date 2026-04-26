@@ -26,7 +26,7 @@ const ERP_APP_DEFINITIONS = {
     kind: 'mobile',
     title: '毛绒 ERP 业务移动端',
     shortTitle: '业务移动端',
-    roleKey: 'business',
+    roleKey: 'sales',
     port: 5187,
     command: 'pnpm start:mobile:business',
     description:
@@ -37,7 +37,7 @@ const ERP_APP_DEFINITIONS = {
     kind: 'mobile',
     title: '毛绒 ERP 采购移动端',
     shortTitle: '采购移动端',
-    roleKey: 'purchasing',
+    roleKey: 'purchase',
     port: 5188,
     command: 'pnpm start:mobile:purchasing',
     description:

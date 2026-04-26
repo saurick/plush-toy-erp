@@ -52,36 +52,43 @@ function base64UrlEncode(value) {
     .replaceAll('=', '')
 }
 
-test('auth: 缺失 admin_level 不会被误判成超级管理员', () => {
+test('auth: 缺失 is_super_admin 不会被误判成超级管理员', () => {
   installStorage()
 
   persistAuth(
     {
       access_token: createMockAdminToken('legacy-admin'),
       username: 'legacy-admin',
-      menu_permissions: ['/erp/dashboard'],
+      permissions: ['erp.dashboard.read'],
     },
     AUTH_SCOPE.ADMIN
   )
 
   const profile = getStoredAdminProfile()
-  assert.equal(profile.level, null)
+  assert.equal(profile.is_super_admin, false)
+  assert.deepEqual(profile.permissions, ['erp.dashboard.read'])
 })
 
-test('auth: 显式 admin_level=0 仍保留超级管理员等级', () => {
+test('auth: 显式 is_super_admin=true 仍保留超级管理员身份和 RBAC 元数据', () => {
   installStorage()
 
   persistAuth(
     {
       access_token: createMockAdminToken('root'),
       username: 'root',
-      admin_level: 0,
-      mobile_role_permissions: ['boss'],
+      is_super_admin: true,
+      roles: [{ role_key: 'admin', name: '系统管理员' }],
+      permissions: ['system.user.read'],
+      menus: [{ path: '/erp/system/permissions', label: '权限管理' }],
     },
     AUTH_SCOPE.ADMIN
   )
 
   const profile = getStoredAdminProfile()
-  assert.equal(profile.level, 0)
-  assert.deepEqual(profile.mobile_role_permissions, ['boss'])
+  assert.equal(profile.is_super_admin, true)
+  assert.deepEqual(profile.roles, [{ role_key: 'admin', name: '系统管理员' }])
+  assert.deepEqual(profile.permissions, ['system.user.read'])
+  assert.deepEqual(profile.menus, [
+    { path: '/erp/system/permissions', label: '权限管理' },
+  ])
 })

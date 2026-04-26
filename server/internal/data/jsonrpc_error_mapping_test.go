@@ -75,7 +75,7 @@ func TestJsonrpcData_RequireAdmin_DisabledAdminUsesAdminDisabled(t *testing.T) {
 func TestJsonrpcData_WorkflowMetadataRequiresAdminAndReturnsStates(t *testing.T) {
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.test")),
-		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 1, Username: "admin"}},
+		adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 1, Username: "admin", Permissions: []string{biz.PermissionWorkflowTaskRead}}},
 		workflowUC:  biz.NewWorkflowUsecase(nil),
 	}
 

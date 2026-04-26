@@ -50,17 +50,17 @@ test('menuPermissions: 默认权限不包含权限管理', () => {
 
 test('menuPermissions: 移动端角色权限只保留有效角色并保持端口顺序', () => {
   assert(
-    ERP_MOBILE_ROLE_PERMISSION_OPTIONS.some((item) => item.key === 'business')
+    ERP_MOBILE_ROLE_PERMISSION_OPTIONS.some((item) => item.key === 'sales')
   )
   assert.deepEqual(
     normalizeMobileRolePermissions([
       'quality',
       'invalid',
-      'business',
-      'purchasing',
+      'sales',
+      'purchase',
       'quality',
     ]),
-    ['business', 'purchasing', 'quality']
+    ['sales', 'purchase', 'quality']
   )
 })
 
