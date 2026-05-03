@@ -1,3 +1,8 @@
+## 2026-05-03 18:05
+- 完成：将 `progress.md` 人工归档规则写入 `/Users/simon/projects/plush-toy-erp/AGENTS.md`，明确进度文件只作为过程流水和交接线索，不作为当前正式需求、数据模型或部署真源；禁止定时自动清空，改为在文件明显过大、阶段完成或历史内容影响查找时人工归档。本轮未执行实际归档，也未创建 `docs/archive/`，原因是当前 `progress.md` 只有少量近期记录，且 `docs/changes/plush-erp-bootstrap-init.md` 仍是 `in_progress` 活跃变更。
+- 下一步：等阶段完成或 `progress.md` 明显变大后，再按规则把旧流水移动到 `docs/archive/progress-YYYY-MM.md`，并同步更新 `docs/README.md` 的归档入口。
+- 阻塞/风险：本轮只更新协作规则与进度记录，不改变毛绒 ERP 正式口径、数据模型草案、部署配置、运行时代码或测试样本；当前工作区已有大量业务改动，本轮未回退或整理。
+
 ## 2026-04-21 00:26
 - 完成：把本地开发数据库真源从误配的 `127.0.0.1:5435/plush_toy_erp` 收口到共享 PG `192.168.0.106:5432/plush_erp`。已同步更新 `/Users/simon/projects/plush-toy-erp/server/configs/dev/config.yaml`、`/Users/simon/projects/plush-toy-erp/server/configs/dev/config.local.example.yaml`、`/Users/simon/projects/plush-toy-erp/server/cmd/dbcheck/main.go`、`/Users/simon/projects/plush-toy-erp/server/Makefile`、`/Users/simon/projects/plush-toy-erp/server/docs/*` 和根 README，避免后续再把 Compose 宿主机映射 `5435` 误当成日常开发默认 DSN。
 - 完成：补充正式数据模型草案 `/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`，明确当前 `server/internal/data/model/schema/*.go` 只有 `users / admin_users` 两张账号表，只能算登录基线，不应误判为毛绒 ERP 的正式业务表设计；同时给出首批更适合毛绒工厂的实体建议，并明确当前不应照搬旧外贸主表，也不应先上 `erp_module_records` 这种泛 JSON 真源。
