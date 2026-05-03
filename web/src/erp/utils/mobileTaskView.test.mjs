@@ -138,7 +138,7 @@ test('mobileTaskView: 老板能看到订单审批任务并读取审批提醒', (
           notification_type: 'approval_required',
           alert_type: 'approval_pending',
           complete_condition: '老板审批通过或驳回',
-          related_documents: ['客户/款式立项记录：PO-001'],
+          related_documents: ['订单/款式立项记录：PO-001'],
         },
       }),
     ],
@@ -149,7 +149,7 @@ test('mobileTaskView: 老板能看到订单审批任务并读取审批提醒', (
   assert.equal(views.length, 1)
   assert.equal(views[0].alert_label, '待审批')
   assert.equal(views[0].complete_condition, '老板审批通过或驳回')
-  assert.deepEqual(views[0].related_documents, ['客户/款式立项记录：PO-001'])
+  assert.deepEqual(views[0].related_documents, ['订单/款式立项记录：PO-001'])
 })
 
 test('mobileTaskView: 品质和仓库能看到采购到货闭环任务字段', () => {

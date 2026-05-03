@@ -143,6 +143,69 @@ test('businessRecordDefinitions: 销售链路默认主责角色是 sales', () =>
   assert.equal(definition.defaultOwnerRole, 'sales')
 })
 
+test('businessRecordDefinitions: 业务模块按字段自动插入基础资料选择器', () => {
+  const projectOrder = getBusinessRecordDefinition({
+    key: 'project-orders',
+    sectionKey: 'sales',
+  })
+  const projectOrderKeys = projectOrder.formFields.map((field) => field.key)
+  assert(projectOrderKeys.includes('payload.customer_record_id'))
+  assert(projectOrderKeys.includes('payload.product_record_id'))
+  assert(
+    projectOrderKeys.indexOf('payload.customer_record_id') <
+      projectOrderKeys.indexOf('customer_name')
+  )
+  assert(
+    projectOrderKeys.indexOf('payload.product_record_id') <
+      projectOrderKeys.indexOf('style_no')
+  )
+
+  const processingContract = getBusinessRecordDefinition({
+    key: 'processing-contracts',
+    sectionKey: 'purchase',
+  })
+  const processingKeys = processingContract.formFields.map((field) => field.key)
+  assert(processingKeys.includes('payload.supplier_record_id'))
+  assert(processingKeys.includes('payload.product_record_id'))
+
+  const partners = getBusinessRecordDefinition({
+    key: 'partners',
+    sectionKey: 'master',
+  })
+  const products = getBusinessRecordDefinition({
+    key: 'products',
+    sectionKey: 'master',
+  })
+  assert(!partners.formFields.some((field) => field.type === 'master-record'))
+  assert(!products.formFields.some((field) => field.type === 'master-record'))
+  assert.equal(partners.hideWorkflowFields, true)
+  assert.equal(products.hideWorkflowFields, true)
+})
+
+test('businessRecordDefinitions: 客户供应商新建表单只暴露必要主档字段', () => {
+  const partners = getBusinessRecordDefinition({
+    key: 'partners',
+    sectionKey: 'master',
+  })
+  const partnerFormKeys = partners.formFields.map((field) => field.key)
+
+  assert.deepEqual(partnerFormKeys, [
+    'payload.partner_type',
+    'title',
+    'payload.address',
+    'payload.country_region',
+    'payload.sales_owner',
+    'payload.payment_method',
+    'payload.payment_cycle_days',
+    'payload.tax_no',
+  ])
+  assert.equal(
+    partners.formFields.find((field) => field.key === 'payload.address')
+      ?.fullWidth,
+    true
+  )
+})
+
 test('businessRecordDefinitions: Excel 非合同业务字段落到业务模块字段定义', () => {
   const expectations = [
     {
@@ -219,12 +282,34 @@ test('businessRecordDefinitions: Excel 非合同业务字段落到业务模块�
       sectionKey: 'master',
       formFields: [
         'payload.partner_type',
-        'payload.short_name',
-        'payload.contact_name',
-        'payload.contact_phone',
+        'title',
         'payload.address',
-        'payload.invoice_type',
-        'payload.invoice_rate',
+        'payload.country_region',
+        'payload.sales_owner',
+        'payload.payment_method',
+        'payload.payment_cycle_days',
+        'payload.tax_no',
+      ],
+      itemFields: [
+        'item_name',
+        'payload.office_phone',
+        'payload.mobile_phone',
+        'payload.email',
+      ],
+    },
+    {
+      key: 'products',
+      sectionKey: 'master',
+      formFields: [
+        'document_no',
+        'payload.product_category',
+        'payload.hs_code',
+        'payload.spec_code',
+        'product_name',
+        'payload.en_desc',
+        'payload.attachment_ref',
+        'style_no',
+        'product_no',
       ],
       itemFields: ['item_name', 'spec'],
     },
@@ -251,4 +336,78 @@ test('businessRecordDefinitions: Excel 非合同业务字段落到业务模块�
       )
     })
   })
+})
+
+test('businessRecordDefinitions: 基础资料列表列包含 trade-erp 摘要字段', () => {
+  const partners = getBusinessRecordDefinition({
+    key: 'partners',
+    sectionKey: 'master',
+  })
+  const partnerColumns = partners.tableColumns.map((column) => column.key)
+  assert(partnerColumns.includes('payload.contact_summary'))
+  assert(partnerColumns.includes('payload.office_phone_summary'))
+  assert(partnerColumns.includes('payload.mobile_phone_summary'))
+  assert(partnerColumns.includes('payload.email_summary'))
+
+  const products = getBusinessRecordDefinition({
+    key: 'products',
+    sectionKey: 'master',
+  })
+  const productColumns = products.tableColumns.map((column) => column.key)
+  assert(productColumns.includes('payload.product_category'))
+  assert(productColumns.includes('payload.spec_code'))
+  assert(productColumns.includes('payload.hs_code'))
+  assert(productColumns.includes('payload.en_desc'))
+  assert(!productColumns.includes('payload.product_order_no'))
+})
+
+test('businessRecordDefinitions: 产品主档字段不再混用资料编号、SKU 和订单编号', () => {
+  const products = getBusinessRecordDefinition({
+    key: 'products',
+    sectionKey: 'master',
+  })
+  const documentNoField = products.formFields.find(
+    (field) => field.key === 'document_no'
+  )
+  const categoryField = products.formFields.find(
+    (field) => field.key === 'payload.product_category'
+  )
+  const hsCodeField = products.formFields.find(
+    (field) => field.key === 'payload.hs_code'
+  )
+
+  assert.equal(documentNoField?.label, '产品资料编号')
+  assert.match(documentNoField?.placeholder || '', /不等同产品编号/)
+  assert.equal(categoryField?.label, '产品分类')
+  assert.equal(
+    categoryField?.options?.some((option) => option.value === '钕铁硼'),
+    false
+  )
+  assert.equal(
+    categoryField?.options?.some((option) => option.value === '毛绒公仔'),
+    true
+  )
+  assert.equal(hsCodeField?.type, 'autocomplete')
+  assert.equal(hsCodeField?.required, undefined)
+  assert.equal(hsCodeField?.options, undefined)
+  assert.equal(
+    products.formFields.some(
+      (field) => field.key === 'payload.product_order_no'
+    ),
+    false
+  )
+})
+
+test('businessRecordDefinitions: 付款方式暂不提供预设候选值', () => {
+  const partners = getBusinessRecordDefinition({
+    key: 'partners',
+    sectionKey: 'master',
+  })
+  const paymentMethodField = partners.formFields.find(
+    (field) => field.key === 'payload.payment_method'
+  )
+
+  assert.equal(paymentMethodField?.type, 'autocomplete')
+  assert.equal(paymentMethodField?.options, undefined)
+  assert.match(paymentMethodField?.placeholder || '', /可手输付款方式/)
 })

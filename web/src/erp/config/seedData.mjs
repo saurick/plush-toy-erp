@@ -1940,6 +1940,22 @@ const navItemRegistry = {
     description:
       '聚合字段联动、打印快照、workflow 状态、权限边界和错误码同步等专项。',
   },
+  'qa-system-layer-progress': {
+    key: 'qa-system-layer-progress',
+    label: '系统分层进度',
+    path: '/erp/qa/system-layer-progress',
+    shortLabel: '分层',
+    description:
+      '跟踪 MasterData、Workflow、Fact、RBAC、API/UI、Help/QA 和产品化交付进度。',
+  },
+  'qa-productization-delivery': {
+    key: 'qa-productization-delivery',
+    label: '产品化与交付',
+    path: '/erp/qa/productization-delivery',
+    shortLabel: '交付',
+    description:
+      '跟踪当前甲方、通用产品能力、私有化部署、SaaS 预留和维护费交付边界。',
+  },
   'help-center': {
     key: 'help-center',
     label: '帮助中心首页',
@@ -2056,6 +2072,8 @@ const qaNavKeys = [
   'qa-field-linkage-coverage',
   'qa-run-records',
   'qa-reports',
+  'qa-system-layer-progress',
+  'qa-productization-delivery',
 ]
 
 export const helpCenterQaDocKeys = qaNavKeys

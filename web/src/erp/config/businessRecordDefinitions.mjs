@@ -94,12 +94,138 @@ const YES_NO_OPTIONS = Object.freeze([
   { label: '是', value: 'yes' },
 ])
 const PARTNER_TYPE_OPTIONS = Object.freeze([
-  { label: '客户', value: 'customer' },
-  { label: '加工厂', value: 'processor' },
-  { label: '主料供应商', value: 'main_material_supplier' },
-  { label: '辅材供应商', value: 'accessory_supplier' },
-  { label: '包材供应商', value: 'packaging_supplier' },
+  { label: '合作客户', value: '合作客户' },
+  { label: '潜在客户', value: '潜在客户' },
+  { label: '合作供应商', value: '合作供应商' },
 ])
+const PRODUCT_CATEGORY_OPTIONS = Object.freeze([
+  { label: '毛绒公仔', value: '毛绒公仔' },
+  { label: '毛绒挂件', value: '毛绒挂件' },
+  { label: '毛绒靠垫', value: '毛绒靠垫' },
+  { label: '毛绒包袋', value: '毛绒包袋' },
+  { label: '毛绒服饰/配件', value: '毛绒服饰/配件' },
+  { label: '节庆/主题套装', value: '节庆/主题套装' },
+  { label: '包装/陈列套装', value: '包装/陈列套装' },
+  { label: '半成品/部件', value: '半成品/部件' },
+  { label: '其他', value: '其他' },
+])
+const COUNTRY_REGION_OPTIONS = Object.freeze(
+  [
+    'China',
+    'Hong Kong, China',
+    'Macao, China',
+    'Taiwan, China',
+    'Japan',
+    'South Korea',
+    'Singapore',
+    'Malaysia',
+    'Thailand',
+    'Vietnam',
+    'Indonesia',
+    'Philippines',
+    'India',
+    'United Arab Emirates',
+    'Saudi Arabia',
+    'Turkey',
+    'United Kingdom',
+    'France',
+    'Germany',
+    'Italy',
+    'Spain',
+    'Netherlands',
+    'Belgium',
+    'Switzerland',
+    'Austria',
+    'Sweden',
+    'Norway',
+    'Denmark',
+    'Finland',
+    'Poland',
+    'United States',
+    'Canada',
+    'Mexico',
+    'Brazil',
+    'Argentina',
+    'Chile',
+    'Australia',
+    'New Zealand',
+  ].map((value) => ({ label: value, value }))
+)
+const PARTNER_CONTACT_ITEM_FIELDS = Object.freeze([
+  { key: 'item_name', label: '联系人', placeholder: '联系人姓名', span: 6 },
+  {
+    key: 'payload.office_phone',
+    label: '办公室电话',
+    placeholder: '办公室电话',
+    span: 6,
+  },
+  { key: 'payload.mobile_phone', label: '手机', span: 6 },
+  { key: 'payload.email', label: '邮箱', span: 6 },
+])
+const CUSTOMER_PARTNER_TYPES = Object.freeze(['合作客户', '潜在客户'])
+const SUPPLIER_PARTNER_TYPES = Object.freeze(['合作供应商'])
+const CUSTOMER_MASTER_SELECT_FIELD = Object.freeze({
+  key: 'payload.customer_record_id',
+  label: '选择客户',
+  type: 'master-record',
+  sourceModuleKey: 'partners',
+  masterRecordKind: 'customer',
+  partnerTypes: CUSTOMER_PARTNER_TYPES,
+  placeholder: '从客户/供应商主档选择客户',
+})
+const SUPPLIER_MASTER_SELECT_FIELD = Object.freeze({
+  key: 'payload.supplier_record_id',
+  label: '选择供应商/加工厂',
+  type: 'master-record',
+  sourceModuleKey: 'partners',
+  masterRecordKind: 'supplier',
+  partnerTypes: SUPPLIER_PARTNER_TYPES,
+  placeholder: '从客户/供应商主档选择供应商',
+})
+const PRODUCT_MASTER_SELECT_FIELD = Object.freeze({
+  key: 'payload.product_record_id',
+  label: '选择产品',
+  type: 'master-record',
+  sourceModuleKey: 'products',
+  masterRecordKind: 'product',
+  placeholder: '从产品主档选择产品',
+})
+const CUSTOMER_MASTER_SNAPSHOT_FIELDS = Object.freeze(
+  [
+    'customer_record_code',
+    'customer_partner_type',
+    'customer_country_region',
+    'customer_payment_method',
+    'customer_payment_cycle_days',
+    'customer_tax_no',
+    'customer_address',
+    'customer_contact_name',
+    'customer_contact_phone',
+  ].map((key) => Object.freeze({ key: `payload.${key}`, type: 'hidden' }))
+)
+const SUPPLIER_MASTER_SNAPSHOT_FIELDS = Object.freeze(
+  [
+    'supplier_record_code',
+    'supplier_partner_type',
+    'supplier_country_region',
+    'supplier_payment_method',
+    'supplier_payment_cycle_days',
+    'supplier_tax_no',
+    'supplier_address',
+    'supplier_contact_name',
+    'supplier_contact_phone',
+  ].map((key) => Object.freeze({ key: `payload.${key}`, type: 'hidden' }))
+)
+const PRODUCT_MASTER_SNAPSHOT_FIELDS = Object.freeze(
+  [
+    'product_record_code',
+    'product_category',
+    'hs_code',
+    'spec_code',
+    'en_desc',
+    'attachment_ref',
+  ].map((key) => Object.freeze({ key: `payload.${key}`, type: 'hidden' }))
+)
 const MATERIAL_CATEGORY_OPTIONS = Object.freeze([
   { label: '主料', value: 'main_material' },
   { label: '辅料', value: 'accessory' },
@@ -124,60 +250,130 @@ function buildDateFilterOptions(formFields = []) {
   return options.length > 0 ? options : [CREATED_AT_DATE_FILTER_OPTION]
 }
 
+function hasFormFieldKey(formFields = [], key = '') {
+  return formFields.some((field) => field.key === key)
+}
+
+function insertMasterRecordFields(
+  selectField,
+  formFields = [],
+  triggerKeys = [],
+  snapshotFields = []
+) {
+  if (!selectField?.key || hasFormFieldKey(formFields, selectField.key)) {
+    return formFields
+  }
+  const existingKeys = new Set(formFields.map((field) => field.key))
+  const fieldsToInsert = [selectField, ...snapshotFields].filter(
+    (field) => field?.key && !existingKeys.has(field.key)
+  )
+  if (fieldsToInsert.length === 0) return formFields
+
+  let inserted = false
+  const nextFields = []
+  formFields.forEach((field) => {
+    if (!inserted && triggerKeys.includes(field.key)) {
+      nextFields.push(...fieldsToInsert)
+      inserted = true
+    }
+    nextFields.push(field)
+  })
+  return inserted ? nextFields : [...formFields, ...fieldsToInsert]
+}
+
+function withMasterRecordFields(moduleItem = {}, formFields = []) {
+  if (['partners', 'products'].includes(moduleItem.key)) return formFields
+
+  let nextFields = formFields
+  if (hasFormFieldKey(nextFields, 'customer_name')) {
+    nextFields = insertMasterRecordFields(
+      CUSTOMER_MASTER_SELECT_FIELD,
+      nextFields,
+      ['customer_name'],
+      CUSTOMER_MASTER_SNAPSHOT_FIELDS
+    )
+  }
+  if (hasFormFieldKey(nextFields, 'supplier_name')) {
+    nextFields = insertMasterRecordFields(
+      SUPPLIER_MASTER_SELECT_FIELD,
+      nextFields,
+      ['supplier_name'],
+      SUPPLIER_MASTER_SNAPSHOT_FIELDS
+    )
+  }
+  if (
+    ['style_no', 'product_no', 'product_name'].some((key) =>
+      hasFormFieldKey(nextFields, key)
+    )
+  ) {
+    nextFields = insertMasterRecordFields(
+      PRODUCT_MASTER_SELECT_FIELD,
+      nextFields,
+      ['style_no', 'product_no', 'product_name'],
+      PRODUCT_MASTER_SNAPSHOT_FIELDS
+    )
+  }
+  return nextFields
+}
+
 const MODULE_OVERRIDES = Object.freeze({
   partners: {
-    itemTitle: '主体资料补充',
-    itemFields: [
-      {
-        key: 'item_name',
-        label: '资料项',
-        placeholder: '联系人、开票、结算等',
-      },
-      { key: 'spec', label: '内容 / 说明' },
-    ],
+    hideWorkflowFields: true,
+    itemTitle: '联系人',
+    itemFields: PARTNER_CONTACT_ITEM_FIELDS,
     formFields: [
-      { key: 'document_no', label: '主体编号', placeholder: '留空自动生成' },
       {
         key: 'payload.partner_type',
-        label: '主体类型',
+        label: '客户类型',
         required: true,
         options: PARTNER_TYPE_OPTIONS,
       },
-      { key: 'title', label: '主体名称', required: true },
-      { key: 'payload.short_name', label: '简称' },
-      { key: 'payload.contact_name', label: '联系人' },
-      { key: 'payload.contact_phone', label: '联系电话' },
+      { key: 'title', label: '客户/供应商名称', required: true },
       {
         key: 'payload.address',
-        label: '地址',
+        label: '客户地址',
         type: 'textarea',
+        required: true,
         maxLength: 300,
+        fullWidth: true,
       },
-      { key: 'payload.category', label: '类别 / 供货类别' },
-      { key: 'payload.process_scope', label: '加工 / 供货范围' },
-      { key: 'payload.invoice_type', label: '开票类型' },
-      { key: 'payload.invoice_rate', label: '税率', type: 'number' },
-      { key: 'payload.account_manager', label: '下单人 / 对接人' },
-      { key: 'payload.account_manager_phone', label: '对接人电话' },
       {
-        key: 'payload.bank_info',
-        label: '银行信息（敏感）',
-        type: 'textarea',
-        maxLength: 300,
+        key: 'payload.country_region',
+        label: '国家/地区',
+        type: 'autocomplete',
+        required: true,
+        options: COUNTRY_REGION_OPTIONS,
       },
+      { key: 'payload.sales_owner', label: '业务负责人' },
+      {
+        key: 'payload.payment_method',
+        label: '付款方式',
+        type: 'autocomplete',
+        placeholder: '可手输付款方式，例如 D/P、T/T 30%预付',
+      },
+      {
+        key: 'payload.payment_cycle_days',
+        label: '付款周期(天)',
+        type: 'number',
+        required: true,
+      },
+      { key: 'payload.tax_no', label: '税号' },
     ],
     tableColumns: [
-      { key: 'document_no', label: '主体编号', width: 130 },
-      { key: 'payload.partner_type', label: '主体类型', width: 130 },
-      { key: 'title', label: '主体名称', width: 190 },
-      { key: 'payload.short_name', label: '简称', width: 130 },
-      { key: 'payload.contact_name', label: '联系人', width: 120 },
-      { key: 'payload.contact_phone', label: '联系电话', width: 140 },
-      { key: 'payload.category', label: '类别', width: 130 },
-      { key: 'payload.process_scope', label: '加工 / 供货范围', width: 170 },
+      { key: 'document_no', label: '代码', width: 130 },
+      { key: 'payload.partner_type', label: '类型', width: 120 },
+      { key: 'title', label: '名称', width: 190 },
+      { key: 'payload.country_region', label: '国家/地区', width: 140 },
+      { key: 'payload.sales_owner', label: '业务负责人', width: 120 },
+      { key: 'payload.contact_summary', label: '联系人', width: 150 },
+      { key: 'payload.office_phone_summary', label: '办公室电话', width: 150 },
+      { key: 'payload.mobile_phone_summary', label: '手机', width: 140 },
+      { key: 'payload.email_summary', label: '邮箱', width: 180 },
+      { key: 'payload.payment_method', label: '付款方式', width: 170 },
     ],
   },
   products: {
+    hideWorkflowFields: true,
     itemTitle: '产品资料补充',
     itemFields: [
       {
@@ -191,15 +387,40 @@ const MODULE_OVERRIDES = Object.freeze({
       {
         key: 'document_no',
         label: '产品资料编号',
-        placeholder: '留空自动生成',
+        placeholder: '留空自动生成；不等同产品编号 / SKU',
       },
-      { key: 'style_no', label: '款式编号', required: true },
+      {
+        key: 'payload.product_category',
+        label: '产品分类',
+        required: true,
+        options: PRODUCT_CATEGORY_OPTIONS,
+      },
+      {
+        key: 'payload.hs_code',
+        label: '海关编码',
+        type: 'autocomplete',
+        placeholder: '可手输，未确认时留空',
+      },
+      { key: 'payload.spec_code', label: '规格/图号', required: true },
+      {
+        key: 'product_name',
+        label: '中文描述',
+        type: 'textarea',
+        required: true,
+        maxLength: 600,
+      },
+      {
+        key: 'payload.en_desc',
+        label: '英文描述',
+        type: 'textarea',
+        required: true,
+        maxLength: 600,
+      },
+      { key: 'payload.attachment_ref', label: '附件（图纸等）' },
+      { key: 'title', label: '产品资料标题' },
+      { key: 'style_no', label: '款式编号' },
       { key: 'product_no', label: '产品编号 / SKU' },
-      { key: 'title', label: '产品名称', required: true },
-      { key: 'product_name', label: '名称快照' },
-      { key: 'payload.product_order_no', label: '产品订单编号' },
       { key: 'payload.color', label: '颜色' },
-      { key: 'payload.category', label: '类别' },
       { key: 'payload.designer_name', label: '设计师' },
       { key: 'payload.color_card_ref', label: '色卡引用' },
       { key: 'payload.image_ref', label: '图片引用' },
@@ -207,13 +428,13 @@ const MODULE_OVERRIDES = Object.freeze({
     ],
     tableColumns: [
       { key: 'document_no', label: '产品资料编号', width: 150 },
+      { key: 'payload.product_category', label: '产品分类', width: 120 },
+      { key: 'payload.spec_code', label: '规格/图号', width: 150 },
+      { key: 'product_name', label: '中文描述', width: 220 },
+      { key: 'payload.en_desc', label: '英文描述', width: 220 },
+      { key: 'payload.hs_code', label: '海关编码', width: 130 },
       { key: 'style_no', label: '款式编号', width: 130 },
       { key: 'product_no', label: '产品编号 / SKU', width: 150 },
-      { key: 'title', label: '产品名称', width: 190 },
-      { key: 'payload.product_order_no', label: '产品订单编号', width: 150 },
-      { key: 'payload.color', label: '颜色', width: 110 },
-      { key: 'payload.category', label: '类别', width: 110 },
-      { key: 'payload.designer_name', label: '设计师', width: 110 },
     ],
   },
   'project-orders': {
@@ -1021,7 +1242,10 @@ export function getDefaultBusinessStatus(moduleItem = {}) {
 
 export function getBusinessRecordDefinition(moduleItem = {}) {
   const override = MODULE_OVERRIDES[moduleItem.key] || {}
-  const formFields = override.formFields || COMMON_FORM_FIELDS
+  const formFields = withMasterRecordFields(
+    moduleItem,
+    override.formFields || COMMON_FORM_FIELDS
+  )
   return {
     formFields,
     tableColumns: override.tableColumns || COMMON_TABLE_COLUMNS,
@@ -1032,5 +1256,6 @@ export function getBusinessRecordDefinition(moduleItem = {}) {
     summaryMetric: override.summaryMetric || 'quantity',
     defaultOwnerRole: getDefaultOwnerRole(moduleItem),
     defaultBusinessStatus: getDefaultBusinessStatus(moduleItem),
+    hideWorkflowFields: Boolean(override.hideWorkflowFields),
   }
 }

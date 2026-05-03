@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import {
+  AutoComplete,
   Button,
   Card,
   Col,
@@ -85,6 +86,15 @@ import {
   summarizeRecordItems,
 } from '../utils/businessRecordForm.mjs'
 import {
+  buildMasterRecordLinkedValues,
+  buildMasterRecordOption,
+  filterMasterRecordsByField,
+  findMasterRecord,
+  isHiddenFormField,
+  isMasterRecordField,
+} from '../utils/businessRecordMasterSelection.mjs'
+import {
+  resolveBusinessRecordItemColStyle,
   resolveBusinessRecordItemDesktopSpan,
   resolveBusinessRecordItemRowMinWidth,
   resolveBusinessRecordItemUnitText,
@@ -238,20 +248,6 @@ const ROLE_OPTIONS = BUSINESS_ROLE_OPTIONS.map((role) => ({
   label: role.label,
   value: role.key,
 }))
-const ITEM_CARD_STYLES = {
-  marginBottom: 4,
-  borderRadius: 12,
-  borderColor: '#e5e7eb',
-  background: '#fafafa',
-}
-const ITEM_CARD_HEADER_STYLES = {
-  minHeight: 44,
-  padding: '0 16px',
-  borderBottom: '1px solid #f0f0f0',
-}
-const ITEM_CARD_BODY_STYLES = {
-  padding: 16,
-}
 const CALCULATION_GUIDE_PATH = '/erp/docs/calculation-guide'
 const COMPACT_SUMMARY_GROUPS = Object.freeze([
   { key: 'customer_name', label: '客户' },
@@ -485,7 +481,7 @@ function downloadCSV(filename, rows, columns) {
   URL.revokeObjectURL(url)
 }
 
-function renderFormField(field) {
+function renderFormField(field, context = {}) {
   if (field.type === 'number') {
     return (
       <InputNumber
@@ -501,6 +497,44 @@ function renderFormField(field) {
         type="date"
         onClick={openNativeDatePicker}
         style={{ cursor: 'pointer' }}
+      />
+    )
+  }
+  if (field.type === 'autocomplete') {
+    return (
+      <AutoComplete
+        allowClear
+        options={field.options || []}
+        placeholder={field.placeholder || `请输入${field.label}`}
+        filterOption={(inputValue, option) => {
+          const keyword = String(inputValue || '').toLowerCase()
+          const optionText = String(
+            option?.value || option?.label || ''
+          ).toLowerCase()
+          return optionText.includes(keyword)
+        }}
+      />
+    )
+  }
+  if (isMasterRecordField(field)) {
+    const records = context.masterRecordsByModule?.[field.sourceModuleKey] || []
+    const filteredRecords = filterMasterRecordsByField(records, field)
+    return (
+      <Select
+        allowClear
+        showSearch
+        loading={Boolean(context.masterRecordsLoading)}
+        options={filteredRecords.map(buildMasterRecordOption)}
+        placeholder={field.placeholder || `请选择${field.label}`}
+        filterOption={(inputValue, option) => {
+          const keyword = String(inputValue || '').toLowerCase()
+          return String(option?.label || '')
+            .toLowerCase()
+            .includes(keyword)
+        }}
+        onChange={(recordId) => {
+          context.onMasterRecordChange?.(field, recordId)
+        }}
       />
     )
   }
@@ -597,6 +631,22 @@ function renderItemField(field, rowValues = {}) {
       />
     )
   }
+  if (field.type === 'autocomplete') {
+    return (
+      <AutoComplete
+        allowClear
+        options={field.options || []}
+        placeholder={field.placeholder || field.label}
+        filterOption={(inputValue, option) => {
+          const keyword = String(inputValue || '').toLowerCase()
+          const optionText = String(
+            option?.value || option?.label || ''
+          ).toLowerCase()
+          return optionText.includes(keyword)
+        }}
+      />
+    )
+  }
   if (Array.isArray(field.options) && field.options.length > 0) {
     return (
       <Select
@@ -619,6 +669,12 @@ function renderItemField(field, rowValues = {}) {
 }
 
 function resolveBusinessRecordFieldColProps(field) {
+  if (field.formColProps) {
+    return field.formColProps
+  }
+  if (field.fullWidth) {
+    return { xs: 24 }
+  }
   if (field.type === 'number') {
     return { xs: 24, md: 12, xl: 6 }
   }
@@ -653,6 +709,18 @@ export default function BusinessModulePage({ moduleItem }) {
   const definition = useMemo(
     () => getBusinessRecordDefinition(moduleItem),
     [moduleItem]
+  )
+  const masterRecordFields = useMemo(
+    () => (definition.formFields || []).filter(isMasterRecordField),
+    [definition.formFields]
+  )
+  const masterRecordModuleKeys = useMemo(
+    () => [
+      ...new Set(
+        masterRecordFields.map((field) => field.sourceModuleKey).filter(Boolean)
+      ),
+    ],
+    [masterRecordFields]
   )
   const availableDateFilters = useMemo(
     () =>
@@ -689,6 +757,8 @@ export default function BusinessModulePage({ moduleItem }) {
   const [batchDeleteSubmitting, setBatchDeleteSubmitting] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+  const [masterRecordsByModule, setMasterRecordsByModule] = useState({})
+  const [masterRecordsLoading, setMasterRecordsLoading] = useState(false)
   const [sourcePrefillState, setSourcePrefillState] = useState({
     moduleKey: '',
     keyword: '',
@@ -760,6 +830,36 @@ export default function BusinessModulePage({ moduleItem }) {
     [sourcePrefillModuleOptions]
   )
   const isSourcePrefillAvailable = sourcePrefillModuleOptions.length > 0
+  const loadMasterRecords = useCallback(async () => {
+    if (masterRecordModuleKeys.length === 0) return
+    setMasterRecordsLoading(true)
+    try {
+      const entries = await Promise.all(
+        masterRecordModuleKeys.map(async (moduleKey) => {
+          const data = await listBusinessRecords({
+            module_key: moduleKey,
+            limit: 200,
+          })
+          return [moduleKey, Array.isArray(data.records) ? data.records : []]
+        })
+      )
+      setMasterRecordsByModule(Object.fromEntries(entries))
+    } catch (error) {
+      message.warning(
+        getActionErrorMessage(error, '读取基础资料失败，请稍后重试')
+      )
+    } finally {
+      setMasterRecordsLoading(false)
+    }
+  }, [masterRecordModuleKeys])
+  const handleMasterRecordChange = useCallback(
+    (field, recordId) => {
+      const sourceRecords = masterRecordsByModule[field.sourceModuleKey] || []
+      const record = findMasterRecord(recordId, sourceRecords)
+      form.setFieldsValue(buildMasterRecordLinkedValues(record, field))
+    },
+    [form, masterRecordsByModule]
+  )
 
   const selectedRecord = useMemo(() => {
     if (selectedRowKeys.length !== 1) {
@@ -1328,6 +1428,12 @@ export default function BusinessModulePage({ moduleItem }) {
   useEffect(() => {
     loadData()
   }, [loadData])
+
+  useEffect(() => {
+    if (modalOpen) {
+      loadMasterRecords()
+    }
+  }, [loadMasterRecords, modalOpen])
 
   const openUrgeTaskModal = useCallback(
     (task) => {
@@ -3185,7 +3291,12 @@ export default function BusinessModulePage({ moduleItem }) {
         selectedCount={selectedRowKeys.length}
         selectedLabel={selectedRecordDisplayText}
       >
-        <Button type="link" size="small" onClick={() => setSelectedRowKeys([])}>
+        <Button
+          type="link"
+          size="small"
+          disabled={selectedRowKeys.length === 0}
+          onClick={() => setSelectedRowKeys([])}
+        >
           清空已选
         </Button>
         {selectedRecord ? (
@@ -3626,7 +3737,7 @@ export default function BusinessModulePage({ moduleItem }) {
                 onClick: ({ key }) => handleBusinessStatusSelect(key),
               }}
               disabled={isBusinessStatusTransitionDisabled}
-              placement="topRight"
+              placement="bottomRight"
               trigger={['click']}
             >
               <Button
@@ -3657,6 +3768,38 @@ export default function BusinessModulePage({ moduleItem }) {
               icon={<DeleteOutlined />}
               onClick={openBatchDeleteModal}
             >
+              批量删除
+            </Button>
+          </>
+        ) : selectedRowKeys.length === 0 ? (
+          <>
+            <Button size="small" disabled icon={<EditOutlined />}>
+              编辑
+            </Button>
+            {printTemplate ? (
+              <Button size="small" disabled icon={<PrinterOutlined />}>
+                {printTemplate.actionLabel}
+              </Button>
+            ) : null}
+            <Button size="small" disabled icon={<LinkOutlined />}>
+              关联表格
+            </Button>
+            <Button size="small" disabled>
+              创建协同任务
+            </Button>
+            <Button
+              aria-label="流转业务状态"
+              className="erp-business-module-status-action"
+              size="small"
+              disabled
+            >
+              <span>流转</span>
+              <DownOutlined />
+            </Button>
+            <Button size="small" danger disabled icon={<DeleteOutlined />}>
+              删除
+            </Button>
+            <Button size="small" danger disabled icon={<DeleteOutlined />}>
               批量删除
             </Button>
           </>
@@ -4046,52 +4189,81 @@ export default function BusinessModulePage({ moduleItem }) {
                 </Card>
               </Col>
             ) : null}
-            {definition.formFields.map((field) => (
-              <Col
-                {...resolveBusinessRecordFieldColProps(field)}
-                key={field.key}
-              >
-                <Form.Item
-                  name={field.key}
-                  label={field.label}
-                  rules={
-                    field.required
-                      ? [{ required: true, message: `请输入${field.label}` }]
-                      : undefined
-                  }
+            {definition.formFields.map((field) => {
+              if (isHiddenFormField(field)) {
+                return (
+                  <Form.Item key={field.key} name={field.key} hidden>
+                    <Input type="hidden" />
+                  </Form.Item>
+                )
+              }
+              return (
+                <Col
+                  {...resolveBusinessRecordFieldColProps(field)}
+                  key={field.key}
                 >
-                  {renderFormField(field)}
+                  <Form.Item
+                    name={field.key}
+                    label={field.label}
+                    rules={
+                      field.required
+                        ? [{ required: true, message: `请输入${field.label}` }]
+                        : undefined
+                    }
+                  >
+                    {renderFormField(field, {
+                      masterRecordsByModule,
+                      masterRecordsLoading,
+                      onMasterRecordChange: handleMasterRecordChange,
+                    })}
+                  </Form.Item>
+                </Col>
+              )
+            })}
+            {definition.hideWorkflowFields ? (
+              <>
+                <Form.Item name="business_status_key" hidden>
+                  <Input type="hidden" />
                 </Form.Item>
-              </Col>
-            ))}
-            <Col xs={24} md={12} xl={6}>
-              <Form.Item
-                name="business_status_key"
-                label="业务状态"
-                rules={[{ required: true, message: '请选择业务状态' }]}
-              >
-                <Select options={STATUS_OPTIONS} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12} xl={6}>
-              <Form.Item
-                name="owner_role_key"
-                label="主责角色"
-                rules={[{ required: true, message: '请选择主责角色' }]}
-              >
-                <Select options={ROLE_OPTIONS} />
-              </Form.Item>
-            </Col>
-            <Col xs={24}>
-              <Form.Item name="note" label="备注 / 异常说明">
-                <Input.TextArea
-                  rows={3}
-                  showCount
-                  maxLength={300}
-                  placeholder="记录缺料、缺资料、延期、返工、结算差异等当前说明"
-                />
-              </Form.Item>
-            </Col>
+                <Form.Item name="owner_role_key" hidden>
+                  <Input type="hidden" />
+                </Form.Item>
+                <Form.Item name="note" hidden>
+                  <Input type="hidden" />
+                </Form.Item>
+              </>
+            ) : (
+              <>
+                <Col xs={24} md={12} xl={6}>
+                  <Form.Item
+                    name="business_status_key"
+                    label="业务状态"
+                    rules={[{ required: true, message: '请选择业务状态' }]}
+                  >
+                    <Select options={STATUS_OPTIONS} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12} xl={6}>
+                  <Form.Item
+                    name="owner_role_key"
+                    label="主责角色"
+                    rules={[{ required: true, message: '请选择主责角色' }]}
+                  >
+                    <Select options={ROLE_OPTIONS} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24}>
+                  <Form.Item name="note" label="备注 / 异常说明">
+                    <Input.TextArea
+                      rows={3}
+                      showCount
+                      maxLength={300}
+                      placeholder="记录缺料、缺资料、延期、返工、结算差异等当前说明"
+                    />
+                  </Form.Item>
+                </Col>
+              </>
+            )}
             <Col xs={24}>
               <Form.Item
                 label={definition.itemTitle}
@@ -4126,11 +4298,6 @@ export default function BusinessModulePage({ moduleItem }) {
                             className="erp-item-card erp-item-card-horizontal-scroll"
                             size="small"
                             title={`条目 ${index + 1}`}
-                            style={ITEM_CARD_STYLES}
-                            styles={{
-                              header: ITEM_CARD_HEADER_STYLES,
-                              body: ITEM_CARD_BODY_STYLES,
-                            }}
                             extra={
                               <Space size={4}>
                                 <Button
@@ -4175,6 +4342,9 @@ export default function BusinessModulePage({ moduleItem }) {
                                 return (
                                   <Col
                                     span={resolveBusinessRecordItemDesktopSpan(
+                                      field
+                                    )}
+                                    style={resolveBusinessRecordItemColStyle(
                                       field
                                     )}
                                     key={field.key}

@@ -566,7 +566,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前只复用通用业务记录和协同任务，不代表工程 BOM 专表已经落地。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "客户/款式立项", Path: "/erp/sales/project-orders", Reason: "核对订单调试单据和业务状态"},
+			{Label: "订单/款式立项", Path: "/erp/sales/project-orders", Reason: "核对订单调试单据和业务状态"},
 			{Label: "协同任务调试", Path: "/erp/qa/workflow-task-debug", Reason: "核对工程资料任务是否进入 PMC / 相关角色池"},
 		},
 		records: []debugRecordTemplate{

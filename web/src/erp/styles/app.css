@@ -3518,6 +3518,11 @@
   background: #fbfefb;
 }
 
+.erp-business-selection-action-bar--empty.ant-card {
+  border-color: #dfe9e1;
+  background: #fff;
+}
+
 .erp-business-selection-action-bar__row {
   display: flex;
   align-items: flex-start;
@@ -3883,10 +3888,14 @@
   gap: 16px;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .erp-item-card {
+  margin-bottom: 4px;
+  border-color: #e5e7eb;
+  border-radius: 12px;
+  background: #fafafa;
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
@@ -3895,9 +3904,16 @@
 }
 
 .erp-item-card .ant-card-head {
+  min-height: 44px;
+  border-bottom: 1px solid #f0f0f0;
+  padding: 0 16px;
   transition:
     border-color 0.18s ease,
     background-color 0.18s ease;
+}
+
+.erp-item-card .ant-card-body {
+  padding: 16px;
 }
 
 .erp-item-card-horizontal-scroll .ant-card-body {
@@ -3956,15 +3972,19 @@
 }
 
 .erp-item-card:focus-within {
-  border-color: #8fb39a;
-  background: #f7fbf8;
+  border-color: #2b8a3e;
+  background: #f3faf4;
   box-shadow: 0 0 0 3px rgb(43 138 62 / 12%);
   transform: translateY(-1px);
 }
 
+.erp-item-card:focus-within .ant-card-head,
+.erp-item-card:focus-within .ant-card-body {
+  background: #f3faf4;
+}
+
 .erp-item-card:focus-within .ant-card-head {
-  border-bottom-color: #d6e8da;
-  background: #f1f8f3;
+  border-bottom-color: rgb(43 138 62 / 22%);
 }
 
 .erp-business-record-form__item-summary {

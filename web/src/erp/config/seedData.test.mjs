@@ -80,6 +80,7 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
     navigationSections.map((section) => section.title),
     [
       '看板中心',
+      '基础资料',
       '销售链路',
       '采购/仓储',
       '生产环节',
@@ -155,6 +156,8 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
       '/erp/qa/field-linkage-coverage',
       '/erp/qa/run-records',
       '/erp/qa/reports',
+      '/erp/qa/system-layer-progress',
+      '/erp/qa/productization-delivery',
     ]
   )
   assert.deepEqual(
@@ -170,6 +173,20 @@ test('seedData: 文档卡片、导航、字段真源和资料清单保持可用'
     assert(card.path.startsWith('/erp/docs/'))
   })
   assert.equal(helpCenterNavItems.length, 8)
+  assert(
+    !helpCenterNavItems.some((item) =>
+      [
+        '/erp/qa/system-layer-progress',
+        '/erp/qa/productization-delivery',
+      ].includes(item.path)
+    )
+  )
+  assert(
+    qaNavItems.some((item) => item.path === '/erp/qa/system-layer-progress')
+  )
+  assert(
+    qaNavItems.some((item) => item.path === '/erp/qa/productization-delivery')
+  )
   assert(
     !helpCenterNavItems.some((item) =>
       /debug|seed|cleanup|调试数据|清理调试/u.test(
@@ -236,10 +253,10 @@ test('businessModules: 业务页菜单按毛绒业务收口且不回退到旧外
     section.items.map((item) => item.path)
   )
 
-  assert.equal(businessSections.length, 4)
-  assert(!navLabels.includes('客户/供应商'))
-  assert(!navLabels.includes('产品'))
-  assert(navLabels.includes('客户/款式立项'))
+  assert.equal(businessSections.length, 5)
+  assert(navLabels.includes('客户/供应商'))
+  assert(navLabels.includes('产品'))
+  assert(navLabels.includes('订单/款式立项'))
   assert(navLabels.includes('材料 BOM'))
   assert(navLabels.includes('加工合同/委外下单'))
   assert(navLabels.includes('品质检验'))
@@ -249,10 +266,6 @@ test('businessModules: 业务页菜单按毛绒业务收口且不回退到旧外
   assert(!navLabels.includes('外销'))
 
   businessModuleDefinitions.forEach((moduleItem) => {
-    if (moduleItem.sectionKey === 'master') {
-      assert(!navPaths.includes(moduleItem.path))
-      return
-    }
     assert(navPaths.includes(moduleItem.path))
     assert(moduleItem.path.startsWith('/erp/'))
     assert(moduleItem.relatedLinks.length > 0)

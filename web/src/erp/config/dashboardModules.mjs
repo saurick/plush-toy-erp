@@ -4,7 +4,7 @@ export const dashboardModules = Object.freeze([
   { key: 'products', title: '产品', path: '/erp/master/products' },
   {
     key: 'project-orders',
-    title: '客户/款式立项',
+    title: '订单/款式立项',
     path: '/erp/sales/project-orders',
   },
   {

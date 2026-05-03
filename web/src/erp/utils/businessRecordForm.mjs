@@ -190,6 +190,47 @@ export function summarizeNormalizedItems(items = []) {
   )
 }
 
+function normalizeTextList(values = []) {
+  return [
+    ...new Set(
+      values
+        .map((value) => String(value ?? '').trim())
+        .filter((value) => value.length > 0)
+    ),
+  ]
+}
+
+function joinTextList(values = []) {
+  return normalizeTextList(values).join('\n')
+}
+
+function summarizePartnerContacts(items = []) {
+  const names = []
+  const officePhones = []
+  const mobilePhones = []
+  const emails = []
+
+  items.forEach((item) => {
+    names.push(item.item_name)
+    officePhones.push(item.payload?.office_phone)
+    mobilePhones.push(item.payload?.mobile_phone)
+    emails.push(item.payload?.email)
+  })
+
+  const normalizedNames = normalizeTextList(names)
+  const normalizedOfficePhones = normalizeTextList(officePhones)
+  const normalizedMobilePhones = normalizeTextList(mobilePhones)
+
+  return {
+    contactSummary: normalizedNames.join('\n'),
+    officePhoneSummary: joinTextList(officePhones),
+    mobilePhoneSummary: joinTextList(mobilePhones),
+    emailSummary: joinTextList(emails),
+    primaryName: normalizedNames[0] || '',
+    primaryPhone: normalizedOfficePhones[0] || normalizedMobilePhones[0] || '',
+  }
+}
+
 export function summarizeRecordItems(items = [], itemFields = []) {
   return summarizeNormalizedItems(normalizeRecordItems(items, itemFields))
 }
@@ -233,6 +274,43 @@ function buildPayloadFromDefinition(
   return payload
 }
 
+function applyModuleSpecificBusinessRecordParams(params, normalizedItems = []) {
+  if (params.module_key === 'partners') {
+    const summary = summarizePartnerContacts(normalizedItems)
+    params.payload = {
+      ...(params.payload || {}),
+      contact_summary: summary.contactSummary,
+      office_phone_summary: summary.officePhoneSummary,
+      mobile_phone_summary: summary.mobilePhoneSummary,
+      email_summary: summary.emailSummary,
+    }
+    if (!params.payload.contact_name && summary.primaryName) {
+      params.payload.contact_name = summary.primaryName
+    }
+    if (!params.payload.contact_phone && summary.primaryPhone) {
+      params.payload.contact_phone = summary.primaryPhone
+    }
+  }
+
+  if (params.module_key === 'products') {
+    const fallbackTitle =
+      params.product_name ||
+      params.payload?.cn_desc ||
+      params.payload?.spec_code ||
+      ''
+    const defaultTitle = `${params.payload?.module_title || '产品'}记录`
+    if ((!params.title || params.title === defaultTitle) && fallbackTitle) {
+      params.title = fallbackTitle
+    }
+    params.payload = {
+      ...(params.payload || {}),
+      cn_desc: params.product_name || '',
+    }
+  }
+
+  return params
+}
+
 export function buildBusinessRecordParams(
   values,
   moduleItem,
@@ -245,7 +323,7 @@ export function buildBusinessRecordParams(
   )
   const itemSummary = summarizeNormalizedItems(normalizedItems)
 
-  return {
+  const params = {
     id: editingRecord?.id,
     module_key: moduleItem.key,
     document_no: normalizeString(values.document_no),
@@ -277,6 +355,8 @@ export function buildBusinessRecordParams(
     payload: buildPayloadFromDefinition(values, moduleItem, definition),
     items: normalizedItems,
   }
+
+  return applyModuleSpecificBusinessRecordParams(params, normalizedItems)
 }
 
 export function buildBusinessRecordStatusUpdateParams(

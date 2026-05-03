@@ -40,6 +40,14 @@
 - Phase 2D-C1 批次状态出库守卫变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2d-lot-status-guard.md`。当前结论是扩展 `inventory_lots.status = ACTIVE / HOLD / REJECTED / DISABLED` 业务状态，普通扣减只允许 `ACTIVE`，`PURCHASE_RETURN` 允许 `ACTIVE / HOLD / REJECTED`，`REVERSAL` 不受当前状态阻断；本轮不做质检专表、可用 / 冻结 / 预留库存、前端或 API 接入。
 - Phase 2D-C2-A 来料质检主表变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2d-quality-inspection-schema.md`。当前结论是新增 `quality_inspections` 作为采购入库后材料批次质检状态 / 判定真源，提交质检联动批次 `HOLD`，合格 / 让步接收联动 `ACTIVE`，拒收联动 `REJECTED`，取消未判定质检按 `original_lot_status` 有条件恢复；本轮不做 `quality_inspection_items`、可用 / 冻结 / 预留库存、供应商评级、财务扣款、`purchase_returns.quality_inspection_id`、前端 / API / 帮助中心接入。
 
+## 开发与验收内部总控入口
+
+- 开发与验收已新增 `系统分层进度` 和 `产品化与交付` 两个内部总控入口，对应前端文档为 `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/system-layer-progress.md` 和 `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/productization-delivery.md`。
+- `系统分层进度` 用于跟踪 MasterData、Workflow、Fact、RBAC、API / UI、Help / QA、Reporting / Audit / Integration、Productization / Delivery 等层的当前完成度、边界和下一步。
+- `产品化与交付` 用于跟踪当前甲方、通用产品能力、私有化部署、SaaS 预留、租户分层路线、维护费交付和客户差异隔离。
+- 这两个入口只属于开发与验收，不进入普通帮助中心主入口，也不替代业务操作教程。
+- 本轮没有做当前甲方资料目录隔离；客户资料隔离后续应单独评审文件清单、引用关系、docs registry、测试断言和回滚风险。
+
 ## 按任务分流
 
 ### 1. 日常开发或代码修改

@@ -239,16 +239,22 @@ export function BusinessListToolbar({ stats = [], actions = null }) {
 
 export function SelectionActionBar({ selectedCount, selectedLabel, children }) {
   const hasSelection = Number(selectedCount) > 0
-  if (!hasSelection) return null
 
   return (
-    <Card className="erp-business-selection-action-bar erp-business-module-current-action erp-business-selection-action-bar--active">
+    <Card
+      className={joinClassNames(
+        'erp-business-selection-action-bar erp-business-module-current-action',
+        hasSelection
+          ? 'erp-business-selection-action-bar--active'
+          : 'erp-business-selection-action-bar--empty'
+      )}
+    >
       <div className="erp-business-selection-action-bar__row">
         <div className="erp-business-selection-action-bar__copy erp-business-module-selection-block">
           <Text strong>已选 {selectedCount} 条</Text>
           <Tag
             className="erp-business-selection-action-bar__tag erp-business-module-selection-tag"
-            color="green"
+            color={hasSelection ? 'green' : 'default'}
           >
             {selectedLabel || `已选择 ${selectedCount} 条记录`}
           </Tag>

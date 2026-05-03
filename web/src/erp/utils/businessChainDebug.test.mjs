@@ -21,7 +21,7 @@ const pageSource = readFileSync(
 const modules = [
   {
     key: 'project-orders',
-    title: '客户/款式立项',
+    title: '订单/款式立项',
     sectionKey: 'sales',
     sectionTitle: '销售链路',
     path: '/erp/sales/project-orders',
@@ -213,7 +213,7 @@ test('businessChainDebug: 按单据号聚合业务记录和关联任务', () => 
       {
         id: 9,
         task_code: 'project-orders-21',
-        task_name: '客户/款式立项：毛绒熊立项',
+        task_name: '订单/款式立项：毛绒熊立项',
         task_group: 'order_approval',
         source_type: 'project-orders',
         source_id: 21,
@@ -248,10 +248,10 @@ test('businessChainDebug: 按单据号聚合业务记录和关联任务', () => 
   assert.equal(view.summary.blockedCount, 2)
   assert.equal(view.summary.quantity, 2)
   assert.equal(view.summary.amount, 39.8)
-  assert.equal(view.records[0].module_title, '客户/款式立项')
+  assert.equal(view.records[0].module_title, '订单/款式立项')
   assert.equal(view.records[0].task_count, 1)
   assert.equal(view.records[0].blocked_reason, '资料未齐，等待客户确认')
-  assert.equal(view.tasks[0].module_title, '客户/款式立项')
+  assert.equal(view.tasks[0].module_title, '订单/款式立项')
   assert.equal(view.tasks[0].task_group, 'order_approval')
   assert.equal(view.tasks[0].priority, 2)
   assert.equal(view.businessStates[0].source_no, 'STYLE-L1-001')

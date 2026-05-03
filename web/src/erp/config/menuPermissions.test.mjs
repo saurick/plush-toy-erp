@@ -5,6 +5,7 @@ import {
   ERP_MOBILE_ROLE_PERMISSION_OPTIONS,
   ERP_MENU_PERMISSION_GROUPS,
   ERP_MENU_PERMISSION_OPTIONS,
+  ERP_PERMISSION_PRESETS,
   PERMISSION_CENTER_PATH,
   defaultMenuPermissions,
   normalizeMobileRolePermissions,
@@ -25,6 +26,7 @@ test('menuPermissions: 权限分组顺序跟随桌面菜单顺序', () => {
     ERP_MENU_PERMISSION_GROUPS.map((section) => section.title),
     [
       '看板中心',
+      '基础资料',
       '销售链路',
       '采购/仓储',
       '生产环节',
@@ -107,6 +109,25 @@ test('menuPermissions: 包含角色权限 / 页面 / 单据矩阵入口', () => 
     ERP_MENU_PERMISSION_OPTIONS.some(
       (item) => item.key === '/erp/docs/role-page-document-matrix'
     )
+  )
+})
+
+test('menuPermissions: 基础资料入口纳入业务角色预设', () => {
+  const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
+  assert(permissionKeys.includes('/erp/master/partners'))
+  assert(permissionKeys.includes('/erp/master/products'))
+
+  ERP_PERMISSION_PRESETS.filter((preset) => preset.key !== 'admin').forEach(
+    (preset) => {
+      assert(
+        preset.permissions.includes('/erp/master/partners'),
+        `expected ${preset.key} to include partners`
+      )
+      assert(
+        preset.permissions.includes('/erp/master/products'),
+        `expected ${preset.key} to include products`
+      )
+    }
   )
 })
 

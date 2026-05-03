@@ -75,7 +75,7 @@ export function resolveOrderTitle(record = {}) {
     normalizeText(record.title) ||
     normalizeText(record.product_name) ||
     normalizeText(record.style_no) ||
-    '客户/款式立项记录'
+    '订单/款式立项记录'
   )
 }
 
@@ -122,7 +122,7 @@ export function resolveEngineeringDueAt(record = {}, options = {}) {
 function buildOrderRelatedDocuments(record = {}, options = {}) {
   const sourceNo = resolveOrderSourceNo(record)
   const documents = [
-    sourceNo ? `客户/款式立项记录：${sourceNo}` : '',
+    sourceNo ? `订单/款式立项记录：${sourceNo}` : '',
     record.customer_name ? `客户：${record.customer_name}` : '',
     record.style_no ? `款式：${record.style_no}` : '',
     record.product_name ? `产品：${record.product_name}` : '',

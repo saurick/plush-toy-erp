@@ -33,6 +33,8 @@ import workflowTaskDebugDoc from '../docs/workflow-task-debug.md?raw'
 import fieldLinkageCoverageDoc from '../docs/field-linkage-coverage.md?raw'
 import qaRunRecordsDoc from '../docs/qa-run-records.md?raw'
 import qaReportsDoc from '../docs/qa-reports.md?raw'
+import systemLayerProgressDoc from '../docs/system-layer-progress.md?raw'
+import productizationDeliveryDoc from '../docs/productization-delivery.md?raw'
 
 export const docRegistry = {
   'operation-flow-overview': {
@@ -200,6 +202,18 @@ export const docRegistry = {
     summary:
       '聚合业务闭环、字段联动、打印快照、workflow、权限、通知预警、错误码和后端 schema 专项。',
     source: qaReportsDoc,
+  },
+  'system-layer-progress': {
+    title: '系统分层进度',
+    summary:
+      '跟踪 MasterData、Workflow、Fact、RBAC、API/UI、Help/QA 和产品化交付等层的当前进度与边界。',
+    source: systemLayerProgressDoc,
+  },
+  'productization-delivery': {
+    title: '产品化与交付',
+    summary:
+      '记录当前甲方、通用产品能力、私有化部署、SaaS 预留、租户分层和维护费交付边界。',
+    source: productizationDeliveryDoc,
   },
   'system-init': {
     title: '系统初始化说明',

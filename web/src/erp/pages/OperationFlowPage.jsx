@@ -52,7 +52,7 @@ const SOURCE_FLOW_CHAINS = [
   {
     key: 'project-bom-processing',
     title: '客户 / 款式 -> BOM -> 加工合同',
-    steps: ['客户/款式立项', '材料 BOM', '加工合同'],
+    steps: ['订单/款式立项', '材料 BOM', '加工合同'],
     tags: [
       { label: '主流程', color: 'blue' },
       { label: '资料先齐套', color: 'default' },

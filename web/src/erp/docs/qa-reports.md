@@ -23,7 +23,7 @@
 | 业务闭环覆盖                 | 已接入 6 条 v1 主干闭环，不代表全量业务覆盖                                                                   | `AcceptanceOverviewPage`、workflow 工具函数测试、业务链路调试                                      |
 | 移动端角色 smoke             | 已有移动端登录与角色路由 smoke                                                                                | `pnpm smoke:mobile-auth-login-route`                                                               |
 | 后端 schema / migration 状态 | 当前不新增 Ent schema，迁移按需评审                                                                           | Ent schema、Atlas migration、`make migrate_status`                                                 |
-| workflow usecase review      | 已完成架构评审，结论是下一轮可渐进试迁后端 usecase，但本轮不改行为                                            | `workflow-usecase-review.md`、验收总览、协同任务调试                                               |
+| workflow usecase review      | 已完成架构评审，七条最小后端 workflow 规则已落地；库存、出货和财务事实仍需单独 usecase 评审                   | `workflow-usecase-review.md`、验收总览、协同任务调试                                               |
 | industry schema review       | 已完成架构评审，结论是 P1 优先评审库存和 AR/AP 专表草案，但本轮不落表                                         | `industry-schema-review.md`、当前真源文档、业务链路调试                                            |
 
 ## 3. 链路覆盖矩阵专项报告口径

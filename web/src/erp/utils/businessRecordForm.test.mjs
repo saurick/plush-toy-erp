@@ -303,3 +303,143 @@ test('businessRecordForm: 明细 payload 回显优先读取当前 payload 真源
     '2026-05-01'
   )
 })
+
+test('FL_partner_contacts__syncs_item_contacts_to_payload_summary businessRecordForm: 客户联系人明细同步为列表摘要', () => {
+  const params = buildBusinessRecordParams(
+    {
+      title: '宁波客户',
+      business_status_key: 'project_pending',
+      owner_role_key: 'sales',
+      'payload.partner_type': '合作客户',
+      'payload.address': '宁波',
+      'payload.country_region': 'China',
+      'payload.payment_cycle_days': 30,
+      items: [
+        {
+          item_name: '张三',
+          'payload.office_phone': '0574-1000',
+          'payload.mobile_phone': '13800000000',
+          'payload.email': 'a@example.com',
+        },
+        {
+          item_name: '李四',
+          'payload.office_phone': '0574-2000',
+          'payload.mobile_phone': '13900000000',
+          'payload.email': 'b@example.com',
+        },
+      ],
+    },
+    { key: 'partners', title: '客户/供应商', sectionKey: 'master' },
+    {
+      formFields: [
+        { key: 'payload.partner_type', label: '客户类型' },
+        { key: 'payload.address', label: '客户地址' },
+        { key: 'payload.country_region', label: '国家/地区' },
+        {
+          key: 'payload.payment_cycle_days',
+          label: '付款周期',
+          type: 'number',
+        },
+      ],
+      itemFields: [
+        { key: 'item_name', label: '联系人' },
+        { key: 'payload.office_phone', label: '办公室电话' },
+        { key: 'payload.mobile_phone', label: '手机' },
+        { key: 'payload.email', label: '邮箱' },
+      ],
+    },
+    null
+  )
+
+  assert.equal(params.payload.contact_summary, '张三\n李四')
+  assert.equal(params.payload.office_phone_summary, '0574-1000\n0574-2000')
+  assert.equal(params.payload.mobile_phone_summary, '13800000000\n13900000000')
+  assert.equal(params.payload.email_summary, 'a@example.com\nb@example.com')
+  assert.equal(params.payload.contact_name, '张三')
+  assert.equal(params.payload.contact_phone, '0574-1000')
+  assert.equal(params.items.length, 2)
+})
+
+test('FL_partner_contacts__clears_stale_contact_summary businessRecordForm: 清空联系人时不保留旧摘要', () => {
+  const params = buildBusinessRecordParams(
+    {
+      title: '宁波客户',
+      business_status_key: 'project_pending',
+      owner_role_key: 'sales',
+      'payload.partner_type': '合作客户',
+      'payload.address': '宁波',
+      'payload.country_region': 'China',
+      'payload.payment_cycle_days': 30,
+      items: [{ item_name: '', 'payload.office_phone': '' }],
+    },
+    { key: 'partners', title: '客户/供应商', sectionKey: 'master' },
+    {
+      formFields: [
+        { key: 'payload.partner_type', label: '客户类型' },
+        { key: 'payload.address', label: '客户地址' },
+        { key: 'payload.country_region', label: '国家/地区' },
+        {
+          key: 'payload.payment_cycle_days',
+          label: '付款周期',
+          type: 'number',
+        },
+      ],
+      itemFields: [
+        { key: 'item_name', label: '联系人' },
+        { key: 'payload.office_phone', label: '办公室电话' },
+      ],
+    },
+    {
+      id: 8,
+      row_version: 3,
+      payload: {
+        contact_summary: '旧联系人',
+        office_phone_summary: '旧电话',
+        contact_name: '旧主联系人',
+        contact_phone: '旧主联系电话',
+      },
+    }
+  )
+
+  assert.equal(params.payload.contact_summary, '')
+  assert.equal(params.payload.office_phone_summary, '')
+  assert.equal(params.payload.mobile_phone_summary, '')
+  assert.equal(params.payload.email_summary, '')
+  assert.equal(params.payload.contact_name, undefined)
+  assert.equal(params.payload.contact_phone, undefined)
+  assert.equal(params.items.length, 0)
+})
+
+test('FL_products__mirrors_cn_desc businessRecordForm: 产品中文描述同步到 trade-erp 快照字段', () => {
+  const params = buildBusinessRecordParams(
+    {
+      product_name: '毛绒兔挂件',
+      business_status_key: 'project_pending',
+      owner_role_key: 'sales',
+      'payload.product_category': '毛绒挂件',
+      'payload.hs_code': '950300',
+      'payload.spec_code': 'PLUSH-001',
+      'payload.en_desc': 'Plush bunny keychain',
+      items: [],
+    },
+    { key: 'products', title: '产品', sectionKey: 'master' },
+    {
+      formFields: [
+        { key: 'payload.product_category', label: '产品类别' },
+        { key: 'payload.hs_code', label: '海关编码' },
+        { key: 'payload.spec_code', label: '规格/图号' },
+        { key: 'product_name', label: '中文描述' },
+        { key: 'payload.en_desc', label: '英文描述' },
+      ],
+      itemFields: [],
+    },
+    null
+  )
+
+  assert.equal(params.title, '毛绒兔挂件')
+  assert.equal(params.payload.cn_desc, '毛绒兔挂件')
+  assert.equal(params.payload.product_category, '毛绒挂件')
+  assert.equal(params.payload.hs_code, '950300')
+  assert.equal(params.payload.spec_code, 'PLUSH-001')
+  assert.equal(params.payload.en_desc, 'Plush bunny keychain')
+})

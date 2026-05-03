@@ -19,6 +19,7 @@ const PERMISSION_ALIAS_MAP = Object.freeze({
 })
 
 const BUSINESS_SECTION_TITLES = Object.freeze([
+  '基础资料',
   '销售链路',
   '采购/仓储',
   '生产环节',
@@ -70,6 +71,7 @@ function collectSectionPaths(sectionTitles = []) {
 }
 
 const helpDocPaths = collectSectionPaths(['帮助中心'])
+const masterModulePaths = collectSectionPaths(['基础资料'])
 const businessModulePaths = collectSectionPaths(BUSINESS_SECTION_TITLES)
 
 function buildPreset(paths = []) {
@@ -108,6 +110,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/dashboard',
       '/erp/business-dashboard',
       '/erp/print-center',
+      ...masterModulePaths,
       '/erp/sales/project-orders',
       '/erp/warehouse/shipping-release',
       ...helpDocPaths,
@@ -121,6 +124,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     permissions: buildPreset([
       '/erp/dashboard',
       '/erp/business-dashboard',
+      ...masterModulePaths,
       '/erp/purchase/material-bom',
       '/erp/purchase/accessories',
       '/erp/purchase/processing-contracts',
@@ -141,6 +145,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     permissions: buildPreset([
       '/erp/dashboard',
       '/erp/business-dashboard',
+      ...masterModulePaths,
       '/erp/warehouse/inbound',
       '/erp/production/scheduling',
       '/erp/production/progress',
@@ -158,6 +163,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/dashboard',
       '/erp/business-dashboard',
       '/erp/print-center',
+      ...masterModulePaths,
       '/erp/purchase/material-bom',
       '/erp/purchase/accessories',
       '/erp/purchase/processing-contracts',
@@ -173,6 +179,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     permissions: buildPreset([
       '/erp/dashboard',
       '/erp/business-dashboard',
+      ...masterModulePaths,
       '/erp/warehouse/inbound',
       '/erp/warehouse/inventory',
       '/erp/warehouse/shipping-release',
@@ -188,6 +195,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     permissions: buildPreset([
       '/erp/dashboard',
       '/erp/business-dashboard',
+      ...masterModulePaths,
       '/erp/warehouse/inbound',
       '/erp/warehouse/inventory',
       '/erp/warehouse/shipping-release',
@@ -205,6 +213,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/dashboard',
       '/erp/business-dashboard',
       '/erp/print-center',
+      ...masterModulePaths,
       '/erp/purchase/processing-contracts',
       '/erp/warehouse/shipping-release',
       '/erp/finance/reconciliation',

@@ -374,7 +374,7 @@ function HelpAdvancedDocsSection() {
         />
         <HelpDocGroup
           title="开发与验收入口"
-          summary="验收总览、业务链路调试、协同任务调试、字段联动覆盖、运行记录和专项报告仍归开发与验收模块管理。"
+          summary="开发、实施和验收使用的内部入口仍归开发与验收模块管理，不作为普通业务用户主入口。"
           items={helpCenterQaDocItems}
         />
       </div>

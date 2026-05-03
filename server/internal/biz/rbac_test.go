@@ -190,6 +190,25 @@ func TestAdminVisibleMenusFiltersByPermissionCode(t *testing.T) {
 	}
 }
 
+func TestAdminVisibleMenusIncludesMasterDataForBusinessRecordRead(t *testing.T) {
+	admin := &AdminUser{
+		ID:          2,
+		Username:    "operator",
+		Permissions: []string{PermissionBusinessRecordRead},
+	}
+
+	paths := map[string]struct{}{}
+	for _, menu := range AdminVisibleMenus(admin) {
+		paths[menu.Path] = struct{}{}
+	}
+	if _, ok := paths["/erp/master/partners"]; !ok {
+		t.Fatalf("expected partners master data menu")
+	}
+	if _, ok := paths["/erp/master/products"]; !ok {
+		t.Fatalf("expected products master data menu")
+	}
+}
+
 func TestAdminVisibleMenusRequiresDebugPermission(t *testing.T) {
 	admin := &AdminUser{
 		ID:          2,

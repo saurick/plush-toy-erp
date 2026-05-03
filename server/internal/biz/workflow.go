@@ -1742,7 +1742,7 @@ func workflowOrderRelatedDocuments(current *WorkflowTask, options workflowOrderR
 	}
 	documents := make([]string, 0, 6)
 	if sourceNo := workflowSourceNoValue(current); sourceNo != "" {
-		documents = append(documents, "客户/款式立项记录："+sourceNo)
+		documents = append(documents, "订单/款式立项记录："+sourceNo)
 	}
 	if customerName := workflowPayloadString(current.Payload, "customer_name"); customerName != "" {
 		documents = append(documents, "客户："+customerName)
@@ -1963,7 +1963,7 @@ func workflowSourceNoValue(task *WorkflowTask) string {
 
 func workflowOrderRecordTitle(task *WorkflowTask) string {
 	if task == nil {
-		return "客户/款式立项记录"
+		return "订单/款式立项记录"
 	}
 	if title := workflowPayloadString(task.Payload, "record_title"); title != "" {
 		return title
@@ -1977,7 +1977,7 @@ func workflowOrderRecordTitle(task *WorkflowTask) string {
 	if title := workflowSourceNoValue(task); title != "" {
 		return title
 	}
-	return "客户/款式立项记录"
+	return "订单/款式立项记录"
 }
 
 func workflowPurchaseInboundRecordTitle(task *WorkflowTask) string {

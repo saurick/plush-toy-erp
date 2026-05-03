@@ -269,19 +269,17 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '客户/款式立项')
+      await expectHeading(page, '订单/款式立项')
       await expectText(page, '新建记录')
-      await assertTextAbsent(page, '批量删除')
       await assertBusinessModuleToolbarControlStyle(page, {
         scenarioName: 'business-module-workflow-actions',
       })
-      await assertBusinessSelectionActionBarHidden(page, {
+      await assertBusinessSelectionActionBarEmpty(page, {
         scenarioName: 'business-module-workflow-actions',
       })
       const businessActionToolbar = page.locator(
         '.erp-business-module-current-action'
       )
-      await assertTextAbsent(page, '关联表格')
       await expectText(page, '协同任务池')
       await assertBusinessPageRefreshEntrypoint(page, {
         scenarioName: 'business-module-workflow-actions',
@@ -291,7 +289,7 @@ const scenarios = [
       await verifyBusinessModuleColumnOrderDialog(page)
       await assertBusinessModuleCompactWorkspace(page, {
         scenarioName: 'business-module-workflow-actions-empty',
-        expectSelectionAction: false,
+        expectSelectionAction: true,
       })
 
       await page.getByRole('button', { name: '新建记录' }).click()
@@ -300,8 +298,11 @@ const scenarios = [
         minModalWidth: 1200,
         expectCompactGrid: true,
       })
+      await assertBusinessRecordItemCardLayout(page, {
+        scenarioName: 'business-module-create-modal',
+      })
       const createDialog = page.getByRole('dialog', {
-        name: '新建：客户/款式立项',
+        name: '新建：订单/款式立项',
       })
       await createDialog
         .getByRole('textbox', { name: '订单编号', exact: true })
@@ -364,12 +365,15 @@ const scenarios = [
         .filter({ hasText: '立项已放行' })
         .first()
       await approveStatusItem.waitFor({ state: 'visible', timeout: 10_000 })
+      await assertOpenDropdownInViewport(page, {
+        scenarioName: 'business-module-workflow-actions-approve-menu',
+      })
       await approveStatusItem.click({ force: true })
       await expectText(page, '业务状态已更新为：立项已放行')
       await expectText(page, '立项已放行')
 
       await page.getByRole('button', { name: '创建协同任务' }).click()
-      await expectText(page, '客户/款式立项：毛绒熊立项')
+      await expectText(page, '订单/款式立项：毛绒熊立项')
       await expectText(page, '可执行')
 
       await businessActionToolbar
@@ -382,6 +386,9 @@ const scenarios = [
         .filter({ hasText: '业务阻塞' })
         .first()
       await blockedStatusItem.waitFor({ state: 'visible', timeout: 10_000 })
+      await assertOpenDropdownInViewport(page, {
+        scenarioName: 'business-module-workflow-actions-blocked-menu',
+      })
       await blockedStatusItem.evaluate((element) => element.click())
       await expectText(page, '流转业务状态：业务阻塞')
       await assertBusinessRecordModalLayout(page, {
@@ -398,6 +405,10 @@ const scenarios = [
       await assertBusinessModuleCompactWorkspace(page, {
         scenarioName: 'business-module-workflow-actions-filled',
         expectSelectionAction: true,
+      })
+      await assertBusinessSelectionActionBarBoxModel(page, {
+        scenarioName: 'business-module-workflow-actions-filled',
+        expectedMode: 'active',
       })
       await assertTextAbsent(page, '返回当前记录')
 
@@ -470,7 +481,7 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 470, height: 680 },
     verify: async (page) => {
-      await expectHeading(page, '客户/款式立项')
+      await expectHeading(page, '订单/款式立项')
       await page
         .locator('.erp-business-date-range-filter input[type="date"]')
         .first()
@@ -1243,7 +1254,7 @@ const scenarios = [
         await callRpc('workflow', 'create_task', {
           task_code: 'style-l1-debug-task',
           task_group: 'sales',
-          task_name: '客户/款式立项：毛绒熊立项',
+          task_name: '订单/款式立项：毛绒熊立项',
           source_type: 'project-orders',
           source_id: record?.id,
           source_no: record?.document_no,
@@ -1260,7 +1271,7 @@ const scenarios = [
         .fill('STYLE-L1-001')
       await page.getByRole('button', { name: '查询链路' }).click()
       await expectText(page, 'STYLE-L1-001')
-      await expectText(page, '客户/款式立项：毛绒熊立项')
+      await expectText(page, '订单/款式立项：毛绒熊立项')
       await expectText(page, '业务阻塞')
       await expectText(page, '资料未齐，等待客户确认')
     },
@@ -1330,7 +1341,10 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '客户/款式立项')
+      await expectHeading(page, '订单/款式立项')
+      await expectText(page, '基础资料')
+      await expectText(page, '客户/供应商')
+      await expectText(page, '产品')
       await expectText(page, '销售链路')
       await expectText(page, '采购/仓储')
       await expectText(page, '生产环节')
@@ -1342,11 +1356,6 @@ const scenarios = [
       await expectText(page, '开发与验收')
       await expectText(page, '验收结果总览')
       await expectText(page, '字段联动覆盖')
-      assert.equal(
-        await page.getByText('基础资料', { exact: true }).count(),
-        0,
-        '主业务侧栏不应再显示“基础资料”分组'
-      )
       assert.equal(
         await page.getByText('流程与真源', { exact: true }).count(),
         0,
@@ -1362,10 +1371,124 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '客户/供应商')
       await expectText(page, '新建记录')
-      await assertBusinessSelectionActionBarHidden(page, {
+      await assertBusinessSelectionActionBarEmpty(page, {
         scenarioName: 'business-partners-desktop',
       })
       await expectText(page, '协同任务池')
+      await page.getByRole('button', { name: '新建记录' }).click()
+
+      const dialog = page
+        .locator('.ant-modal')
+        .filter({ hasText: '新建：客户/供应商' })
+        .first()
+      await dialog.waitFor({ state: 'visible', timeout: 10_000 })
+      await assertAntdModalCentered(
+        page,
+        dialog,
+        'business-partners-create-modal'
+      )
+
+      const expectedLabels = [
+        '客户类型',
+        '客户/供应商名称',
+        '客户地址',
+        '国家/地区',
+        '业务负责人',
+        '付款方式',
+        '付款周期(天)',
+        '税号',
+        '联系人',
+        '办公室电话',
+        '手机',
+        '邮箱',
+      ]
+      for (const label of expectedLabels) {
+        await dialog
+          .getByText(label, { exact: false })
+          .first()
+          .waitFor({ state: 'visible', timeout: 10_000 })
+      }
+
+      const unexpectedLabels = [
+        '代码',
+        '简称',
+        '主联系人',
+        '主联系电话',
+        '加工 / 供货范围',
+        '开票类型',
+        '税率',
+        '下单人 / 对接人',
+        '对接人电话',
+        '银行信息',
+        '业务状态',
+        '主责角色',
+        '备注 / 异常说明',
+      ]
+      for (const label of unexpectedLabels) {
+        assert.equal(
+          await dialog.getByText(label, { exact: false }).count(),
+          0,
+          `客户/供应商新建弹窗不应继续显示“${label}”`
+        )
+      }
+
+      const layoutMetrics = await dialog.evaluate((node) => {
+        const body = node.querySelector('.ant-modal-body')
+        const bodyRect = body?.getBoundingClientRect()
+        const addressLabel = Array.from(
+          node.querySelectorAll('.ant-form-item-label')
+        ).find((label) => String(label.textContent || '').includes('客户地址'))
+        const addressItem = addressLabel?.closest('.ant-col')
+        const addressRect = addressItem?.getBoundingClientRect()
+        const overflowingFields = Array.from(
+          node.querySelectorAll('.ant-col .ant-form-item')
+        )
+          .map((field) => {
+            const rect = field.getBoundingClientRect()
+            const text = String(
+              field.querySelector('.ant-form-item-label')?.textContent || ''
+            )
+              .replace(/\s+/g, ' ')
+              .trim()
+              .slice(0, 40)
+            return {
+              text,
+              left: rect.left,
+              right: rect.right,
+            }
+          })
+          .filter(
+            (field) =>
+              field.text &&
+              bodyRect &&
+              (field.left < bodyRect.left - 1 ||
+                field.right > bodyRect.right + 1)
+          )
+
+        return {
+          bodyClientWidth: body?.clientWidth || 0,
+          bodyScrollWidth: body?.scrollWidth || 0,
+          overflowingFields,
+          addressWidth: addressRect?.width || 0,
+          bodyWidth: bodyRect?.width || 0,
+        }
+      })
+      assert.deepEqual(
+        layoutMetrics.overflowingFields,
+        [],
+        `客户/供应商新建弹窗存在可见字段越界: ${JSON.stringify(layoutMetrics)}`
+      )
+      assert(
+        layoutMetrics.addressWidth >= layoutMetrics.bodyWidth * 0.9,
+        `客户地址未保持整行输入: ${JSON.stringify(layoutMetrics)}`
+      )
+      await assertPartnerContactItemFocusConsistency(page, dialog, {
+        scenarioName: 'business-partners-contact-focus',
+      })
+
+      await dialog.locator('.ant-modal-close').click()
+      await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
+      await expectHeading(page, '客户/供应商')
     },
   },
   {
@@ -1377,10 +1500,9 @@ const scenarios = [
       await expectHeading(page, '加工合同/委外下单')
       await expectText(page, '委外加工订单号')
       await expectText(page, '新建记录')
-      await assertBusinessSelectionActionBarHidden(page, {
+      await assertBusinessSelectionActionBarEmpty(page, {
         scenarioName: 'business-processing-contracts-desktop',
       })
-      await assertTextAbsent(page, '打印加工合同')
       await expectText(page, '协同任务池')
     },
   },
@@ -2116,7 +2238,7 @@ async function installAdminRpcMocks(page) {
           id: workflowTaskID++,
           task_code: params.task_code || `style-l1-task-${Date.now()}`,
           task_group: params.task_group || 'project-orders',
-          task_name: params.task_name || '客户/款式立项 跟进',
+          task_name: params.task_name || '订单/款式立项 跟进',
           source_type: params.source_type || 'project-orders',
           source_id: Number(params.source_id || Date.now()),
           source_no: params.source_no || '',
@@ -2297,31 +2419,175 @@ async function assertTextAbsent(page, text) {
   assert.equal(count, 0, `页面不应继续出现文案“${text}”，当前命中 ${count} 处`)
 }
 
-async function assertBusinessSelectionActionBarHidden(page, { scenarioName }) {
+async function assertBusinessSelectionActionBarEmpty(page, { scenarioName }) {
+  const actionBar = page.locator('.erp-business-module-current-action')
+  await actionBar.waitFor({ state: 'visible', timeout: 10_000 })
+  await actionBar.getByText('已选 0 条').waitFor({
+    state: 'visible',
+    timeout: 10_000,
+  })
+  await actionBar.getByText('请先单击或勾选一条记录').waitFor({
+    state: 'visible',
+    timeout: 10_000,
+  })
+
+  const disabledButtonChecks = [
+    { label: '清空已选' },
+    { label: '编辑' },
+    { label: '关联表格' },
+    { label: '创建协同任务' },
+    { label: '流转', ariaLabel: '流转业务状态' },
+    { label: '删除' },
+    { label: '批量删除' },
+  ]
+  const buttonMetrics = await actionBar.evaluate((element) =>
+    Array.from(element.querySelectorAll('button')).map((button) => ({
+      text: String(button.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      ariaLabel: button.getAttribute('aria-label') || '',
+      disabled: button.disabled,
+    }))
+  )
+  for (const { label, ariaLabel } of disabledButtonChecks) {
+    const button = buttonMetrics.find(
+      (item) => item.text === label || item.ariaLabel === ariaLabel
+    )
+    assert(
+      button,
+      `${scenarioName} 未选中记录时缺少 ${label} 按钮: ${JSON.stringify(buttonMetrics)}`
+    )
+    assert(
+      button.disabled,
+      `${scenarioName} 未选中记录时 ${label} 应保持禁用: ${JSON.stringify(buttonMetrics)}`
+    )
+  }
+
+  await assertBusinessSelectionActionBarBoxModel(page, {
+    scenarioName,
+    expectedMode: 'empty',
+  })
+}
+
+async function assertBusinessSelectionActionBarBoxModel(
+  page,
+  { scenarioName, expectedMode }
+) {
   const metrics = await page.evaluate(() => {
+    const rectOf = (selector, root = document) => {
+      const element = root.querySelector(selector)
+      if (!(element instanceof HTMLElement)) return null
+      const rect = element.getBoundingClientRect()
+      const style = window.getComputedStyle(element)
+      return {
+        className: element.className,
+        text: element.textContent?.replace(/\s+/g, ' ').trim() || '',
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+        display: style.display,
+        flexWrap: style.flexWrap,
+      }
+    }
     const actionBar = document.querySelector(
       '.erp-business-module-current-action'
     )
-    if (!actionBar) return { exists: false, visible: false }
+    const actionBarMetrics =
+      actionBar instanceof HTMLElement
+        ? {
+            ...rectOf('.erp-business-module-current-action'),
+            hasEmptyClass: actionBar.classList.contains(
+              'erp-business-selection-action-bar--empty'
+            ),
+            hasActiveClass: actionBar.classList.contains(
+              'erp-business-selection-action-bar--active'
+            ),
+          }
+        : null
 
-    const rect = actionBar.getBoundingClientRect()
-    const style = window.getComputedStyle(actionBar)
     return {
-      exists: true,
-      visible:
-        style.display !== 'none' &&
-        style.visibility !== 'hidden' &&
-        rect.width > 0 &&
-        rect.height > 0,
-      text: actionBar.textContent?.replace(/\s+/g, ' ').trim() || '',
-      width: rect.width,
-      height: rect.height,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      documentWidth: document.documentElement.scrollWidth,
+      actionBar: actionBarMetrics,
+      row: actionBar
+        ? rectOf('.erp-business-selection-action-bar__row', actionBar)
+        : null,
+      copy: actionBar
+        ? rectOf('.erp-business-selection-action-bar__copy', actionBar)
+        : null,
+      tag: actionBar
+        ? rectOf('.erp-business-selection-action-bar__tag', actionBar)
+        : null,
+      actions: actionBar
+        ? rectOf('.erp-business-selection-action-bar__actions', actionBar)
+        : null,
+      tableCard: rectOf('.erp-business-module-table-card'),
     }
   })
 
   assert(
-    !metrics.visible,
-    `${scenarioName} 未选中记录时不应渲染选中操作卡片: ${JSON.stringify(metrics)}`
+    metrics.actionBar,
+    `${scenarioName} 缺少业务选中操作条: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    expectedMode === 'empty'
+      ? metrics.actionBar.hasEmptyClass && !metrics.actionBar.hasActiveClass
+      : metrics.actionBar.hasActiveClass,
+    `${scenarioName} 选中操作条状态类异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.row?.flexWrap === 'nowrap' || metrics.row?.display === 'flex',
+    `${scenarioName} 选中操作条行布局异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.actionBar.scrollWidth <= metrics.actionBar.clientWidth + 2,
+    `${scenarioName} 选中操作条出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.actions.scrollWidth <= metrics.actions.clientWidth + 2,
+    `${scenarioName} 选中操作按钮区出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.documentWidth <= metrics.viewport.width + 2,
+    `${scenarioName} 页面出现横向滚动: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.tableCard?.top > metrics.actionBar.bottom,
+    `${scenarioName} 表格卡片与选中操作条发生重叠: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertOpenDropdownInViewport(page, { scenarioName }) {
+  const metrics = await page.evaluate(() => {
+    const dropdown = document.querySelector(
+      '.ant-dropdown:not(.ant-dropdown-hidden)'
+    )
+    if (!(dropdown instanceof HTMLElement)) return null
+    const rect = dropdown.getBoundingClientRect()
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      right: rect.right,
+      width: rect.width,
+      height: rect.height,
+      text: dropdown.textContent?.replace(/\s+/g, ' ').trim() || '',
+    }
+  })
+
+  assert(metrics, `${scenarioName} 未找到打开的下拉菜单`)
+  assert(
+    metrics.top >= 0 &&
+      metrics.left >= 0 &&
+      metrics.bottom <= metrics.viewport.height + 1 &&
+      metrics.right <= metrics.viewport.width + 1,
+    `${scenarioName} 下拉菜单超出视口: ${JSON.stringify(metrics)}`
   )
 }
 
@@ -2458,7 +2724,7 @@ async function verifyBusinessModuleColumnOrderDialog(page) {
     window.localStorage.removeItem(key)
   }, storageKey)
   await page.reload({ waitUntil: 'networkidle' })
-  await expectHeading(page, '客户/款式立项')
+  await expectHeading(page, '订单/款式立项')
   await page
     .locator('.erp-business-module-toolbar__actions')
     .getByRole('button', { name: /列顺序/ })
@@ -4678,6 +4944,24 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
           const bodyStyle = cardBody ? window.getComputedStyle(cardBody) : null
           const row = card.querySelector('.erp-item-card-row')
           const rowStyle = row ? window.getComputedStyle(row) : null
+          const fields = Array.from(
+            card.querySelectorAll('.erp-item-field-stack')
+          ).map((field) => {
+            const fieldRect = field.getBoundingClientRect()
+            const label =
+              field
+                .querySelector('.erp-item-field-label')
+                ?.textContent?.trim() || ''
+            const control = field.querySelector(
+              '.ant-input, .ant-input-number, .ant-picker, .ant-select-selector, .ant-space-compact'
+            )
+            const controlRect = control?.getBoundingClientRect()
+            return {
+              label,
+              width: fieldRect.width,
+              controlWidth: controlRect?.width || 0,
+            }
+          })
           return {
             width: rect.width,
             borderRadius: cardStyle.borderRadius,
@@ -4687,6 +4971,7 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
             rowFlexWrap: rowStyle?.flexWrap || '',
             rowMinWidth: row ? row.scrollWidth : 0,
             bodyClientWidth: cardBody ? cardBody.clientWidth : 0,
+            fields,
           }
         })
       : []
@@ -4756,6 +5041,19 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
       card.rowMinWidth >= card.bodyClientWidth,
       `${scenarioName} 条目行宽未形成卡片内横向预算: ${JSON.stringify(metrics)}`
     )
+    card.fields.forEach((field) => {
+      assert(
+        field.width <= 360 && field.controlWidth <= 360,
+        `${scenarioName} 条目输入框宽度未按短字段预算收口: ${JSON.stringify(metrics)}`
+      )
+    })
+    const colorField = card.fields.find((field) => field.label === '颜色')
+    if (colorField) {
+      assert(
+        colorField.width <= 220 && colorField.controlWidth <= 220,
+        `${scenarioName} 颜色字段仍然过宽: ${JSON.stringify(metrics)}`
+      )
+    }
   })
 }
 
@@ -4873,6 +5171,227 @@ async function assertBusinessRecordModalFocusStyle(page, scenarioName) {
       )
     }
   })
+}
+
+async function assertPartnerContactItemFocusConsistency(
+  page,
+  dialog,
+  { scenarioName }
+) {
+  const contactTargets = [
+    {
+      label: '联系人',
+      value: '超长联系人姓名ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+    },
+    { label: '办公室电话', value: '0571-88888888-1234567890' },
+    { label: '手机', value: '138001380001234567890' },
+    {
+      label: '邮箱',
+      value: 'very-long-contact-email-address-for-style-l1@example.com',
+    },
+  ]
+
+  const checked = []
+  for (const target of contactTargets) {
+    const fieldStack = dialog
+      .locator('.erp-item-field-stack')
+      .filter({ hasText: target.label })
+      .first()
+    await fieldStack.waitFor({ state: 'visible', timeout: 10_000 })
+    const input = fieldStack.locator('input.ant-input:not([disabled])').first()
+    await input.fill(target.value)
+    await input.focus()
+    await page.waitForTimeout(220)
+
+    const metrics = await input.evaluate((node, label) => {
+      const focusedControl =
+        node.closest('.ant-input-affix-wrapper') ||
+        node.closest('.ant-input-number') ||
+        node.closest('.ant-picker') ||
+        node
+      const controlStyle = window.getComputedStyle(focusedControl)
+      const sourceStyle = window.getComputedStyle(node)
+      const fieldStackNode = node.closest('.erp-item-field-stack')
+      const itemCardStack = node.closest(
+        '.erp-business-record-form__item-card-stack'
+      )
+      const itemCardStackStyle = itemCardStack
+        ? window.getComputedStyle(itemCardStack)
+        : null
+      const itemCard = node.closest('.erp-item-card')
+      const itemCardStyle = itemCard ? window.getComputedStyle(itemCard) : null
+      const itemCardHead = itemCard?.querySelector('.ant-card-head')
+      const itemCardHeadStyle = itemCardHead
+        ? window.getComputedStyle(itemCardHead)
+        : null
+      const itemCardBody = itemCard?.querySelector('.ant-card-body')
+      const itemCardBodyStyle = itemCardBody
+        ? window.getComputedStyle(itemCardBody)
+        : null
+      const row = itemCard?.querySelector('.erp-item-card-row')
+      const rowStyle = row ? window.getComputedStyle(row) : null
+      const fieldRect = fieldStackNode?.getBoundingClientRect()
+      const controlRect = focusedControl.getBoundingClientRect()
+
+      return {
+        label,
+        borderColor: controlStyle.borderColor,
+        boxShadow: controlStyle.boxShadow,
+        sourceBorderColor: sourceStyle.borderColor,
+        sourceBoxShadow: sourceStyle.boxShadow,
+        control: {
+          width: controlRect.width,
+          height: controlRect.height,
+          overflowX: controlStyle.overflowX,
+          textOverflow: controlStyle.textOverflow,
+          whiteSpace: controlStyle.whiteSpace,
+        },
+        field: fieldRect
+          ? {
+              width: fieldRect.width,
+              scrollWidth: fieldStackNode.scrollWidth,
+            }
+          : null,
+        row: row
+          ? {
+              clientWidth: row.clientWidth,
+              scrollWidth: row.scrollWidth,
+              flexWrap: rowStyle?.flexWrap || '',
+            }
+          : null,
+        body: itemCardBody
+          ? {
+              clientWidth: itemCardBody.clientWidth,
+              scrollWidth: itemCardBody.scrollWidth,
+              overflowX: itemCardBodyStyle?.overflowX || '',
+              overflowY: itemCardBodyStyle?.overflowY || '',
+              backgroundColor: itemCardBodyStyle?.backgroundColor || '',
+            }
+          : null,
+        stack: itemCardStack
+          ? {
+              overflowX: itemCardStackStyle?.overflowX || '',
+              overflowY: itemCardStackStyle?.overflowY || '',
+            }
+          : null,
+        itemCard: itemCard
+          ? {
+              borderColor: itemCardStyle?.borderColor,
+              boxShadow: itemCardStyle?.boxShadow,
+              backgroundColor: itemCardStyle?.backgroundColor,
+              transform: itemCardStyle?.transform,
+              headBackgroundColor: itemCardHeadStyle?.backgroundColor,
+              headBorderColor: itemCardHeadStyle?.borderBottomColor,
+              bodyBackgroundColor: itemCardBodyStyle?.backgroundColor,
+            }
+          : null,
+      }
+    }, target.label)
+
+    checked.push(metrics)
+  }
+
+  assert.equal(
+    checked.length,
+    contactTargets.length,
+    `${scenarioName} 未完整验证联系人明细 focus: ${JSON.stringify(checked)}`
+  )
+
+  checked.forEach((metrics) => {
+    assert(
+      isAcceptedFocusBorder(metrics),
+      `${scenarioName} ${metrics.label} 输入框 focus 边框未统一到绿色主题: ${JSON.stringify(metrics)}`
+    )
+    assertNoBlueFocusStyle(metrics, scenarioName)
+    assert(
+      metrics.itemCard && isGreenFocusColor(metrics.itemCard.borderColor),
+      `${scenarioName} ${metrics.label} 条目卡片 focus 边框未统一到绿色主题: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      sameCSSColor(metrics.borderColor, metrics.itemCard.borderColor),
+      `${scenarioName} ${metrics.label} 条目卡片边框和输入框 focus 边框不一致: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      sameCSSColor(
+        metrics.itemCard.backgroundColor,
+        metrics.itemCard.headBackgroundColor
+      ) &&
+        sameCSSColor(
+          metrics.itemCard.backgroundColor,
+          metrics.itemCard.bodyBackgroundColor
+        ),
+      `${scenarioName} ${metrics.label} 条目卡片 focus 头部和内容底色不一致: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      !hasBlueFocusRing(metrics.itemCard.boxShadow) &&
+        !hasBlueFocusRing(metrics.itemCard.backgroundColor) &&
+        !hasBlueFocusRing(metrics.itemCard.headBackgroundColor) &&
+        !hasBlueFocusRing(metrics.itemCard.headBorderColor),
+      `${scenarioName} ${metrics.label} 条目卡片 focus 仍残留蓝色高亮: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.control.width <= metrics.field?.width + 2 &&
+        metrics.field?.scrollWidth <= metrics.field.width + 2,
+      `${scenarioName} ${metrics.label} 长文本撑开了明细字段: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.body?.overflowX === 'auto' &&
+        metrics.body.scrollWidth >= metrics.body.clientWidth &&
+        metrics.body.overflowY === 'hidden',
+      `${scenarioName} ${metrics.label} 条目卡片横向滚动容器异常: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.stack?.overflowX === 'visible' &&
+        metrics.stack?.overflowY === 'visible',
+      `${scenarioName} ${metrics.label} 条目卡片外圈被父容器裁剪: ${JSON.stringify(metrics)}`
+    )
+  })
+
+  const firstFocusStyle = {
+    borderColor: checked[0].borderColor,
+    boxShadow: checked[0].boxShadow,
+    itemCard: checked[0].itemCard,
+  }
+  checked.slice(1).forEach((metrics) => {
+    assert.deepEqual(
+      {
+        borderColor: metrics.borderColor,
+        boxShadow: metrics.boxShadow,
+        itemCard: metrics.itemCard,
+      },
+      firstFocusStyle,
+      `${scenarioName} ${metrics.label} focus 样式与联系人不一致: ${JSON.stringify(checked)}`
+    )
+  })
+
+  await page.evaluate(() => {
+    document.activeElement?.blur?.()
+  })
+  await page.waitForTimeout(220)
+  const recovered = await dialog
+    .locator('.erp-item-card')
+    .first()
+    .evaluate((node) => {
+      const style = window.getComputedStyle(node)
+      const head = node.querySelector('.ant-card-head')
+      const headStyle = head ? window.getComputedStyle(head) : null
+      return {
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow,
+        backgroundColor: style.backgroundColor,
+        transform: style.transform,
+        headBackgroundColor: headStyle?.backgroundColor || '',
+        bodyBackgroundColor:
+          window.getComputedStyle(node.querySelector('.ant-card-body'))
+            ?.backgroundColor || '',
+      }
+    })
+  assert(
+    !isGreenFocusColor(recovered.borderColor) &&
+      recovered.boxShadow === 'none' &&
+      !isGreenFocusColor(recovered.headBackgroundColor),
+    `${scenarioName} blur 后条目卡片未恢复默认态: ${JSON.stringify(recovered)}`
+  )
 }
 
 async function readActiveSelectSearchFocusMetric(page, label) {
@@ -5061,6 +5580,13 @@ function isTransparentFocusColor(color) {
   return (
     color === 'transparent' ||
     String(color || '').replaceAll(' ', '') === 'rgba(0,0,0,0)'
+  )
+}
+
+function sameCSSColor(left, right) {
+  return (
+    String(left || '').replaceAll(' ', '') ===
+    String(right || '').replaceAll(' ', '')
   )
 }
 
@@ -5445,7 +5971,7 @@ async function assertPaginationSizeChangerFocusStyle(page, { scenarioName }) {
 
 async function assertBusinessModuleCompactWorkspace(
   page,
-  { scenarioName, expectSelectionAction = false }
+  { scenarioName, expectSelectionAction = true }
 ) {
   const metrics = await page.evaluate(() => {
     const rectOf = (selector) => {
@@ -5562,7 +6088,7 @@ async function assertBusinessModuleCompactWorkspace(
   } else {
     assert(
       !metrics.currentAction,
-      `${scenarioName} 未选中时不应渲染当前操作区: ${JSON.stringify(metrics)}`
+      `${scenarioName} 当前操作区可见性不符合预期: ${JSON.stringify(metrics)}`
     )
   }
   assert(

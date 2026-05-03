@@ -139,7 +139,7 @@ test('docs: 帮助中心主入口受控且高级文档不丢', () => {
   assert(!helpCenterPrimaryNavKeys.includes('help-industry-schema-review'))
 })
 
-test('docs: 开发与验收入口保持 5 个 QA 页面', () => {
+test('docs: 开发与验收入口保持 7 个 QA 页面', () => {
   assert.deepEqual(
     qaNavItems.map((item) => item.path),
     [
@@ -148,13 +148,25 @@ test('docs: 开发与验收入口保持 5 个 QA 页面', () => {
       '/erp/qa/field-linkage-coverage',
       '/erp/qa/run-records',
       '/erp/qa/reports',
+      '/erp/qa/system-layer-progress',
+      '/erp/qa/productization-delivery',
     ]
   )
+  assert(registryKeys.has('system-layer-progress'))
+  assert(registryKeys.has('productization-delivery'))
   assert(
     !helpCenterNavItems.some((item) =>
       /debug seed|debug cleanup|生成调试数据|清理调试数据/u.test(
         `${item.title || ''} ${item.label || ''} ${item.summary || ''}`
       )
+    )
+  )
+  assert(
+    !helpCenterNavItems.some((item) =>
+      [
+        '/erp/qa/system-layer-progress',
+        '/erp/qa/productization-delivery',
+      ].includes(item.path)
     )
   )
 })
