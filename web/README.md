@@ -106,7 +106,7 @@ docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm build:all
-APP_ID=mobile-boss PORT=5186 API_ORIGIN=http://127.0.0.1:8200 pnpm serve:prod
+APP_ID=mobile-boss PORT=5186 API_ORIGIN=http://127.0.0.1:8300 pnpm serve:prod
 ```
 
 固定端口矩阵：
@@ -126,7 +126,7 @@ APP_ID=mobile-boss PORT=5186 API_ORIGIN=http://127.0.0.1:8200 pnpm serve:prod
 生产静态服务约定：
 
 - `/healthz` 和 `/readyz` 返回当前入口健康状态，供容器健康检查或网关探活。
-- `/rpc` 和 `/templates` 默认反代到 `API_ORIGIN`，Compose 内默认是 `http://app-server:8200`。
+- `/rpc` 和 `/templates` 默认反代到 `API_ORIGIN`，Compose 内默认是 `http://app-server:8300`。
 - 默认构建 `VITE_BASE_URL=/`，网关应让每个前端实例看到根路径流量；如果使用路径前缀且不做前缀剥离，需要按入口重新设置构建期 `VITE_BASE_URL`。
 
 ## 当前回归命令

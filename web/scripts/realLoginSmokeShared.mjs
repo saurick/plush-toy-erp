@@ -21,7 +21,7 @@ export function createRealLoginSmokeRuntime({
   const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
   const backendHealthURL = String(
     process.env.REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL ||
-      'http://127.0.0.1:8200/healthz'
+      'http://127.0.0.1:8300/healthz'
   ).trim()
   const backendAuthURL = new URL('/rpc/auth', backendHealthURL).toString()
   const headless = process.env.REAL_LOGIN_SMOKE_HEADED !== '1'

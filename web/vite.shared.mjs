@@ -76,11 +76,11 @@ export function createERPViteConfig(appId) {
         open: app.kind === 'desktop',
         proxy: {
           '/rpc': {
-            target: 'http://localhost:8200',
+            target: 'http://localhost:8300',
             changeOrigin: true,
           },
           '/templates': {
-            target: 'http://localhost:8200',
+            target: 'http://localhost:8300',
             changeOrigin: true,
           },
         },

@@ -14,7 +14,7 @@
 ## 当前边界
 
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
-- 当前后端统一走 `8200`
+- 当前后端统一走 `8300`
 - 当前数据库默认命中 `192.168.0.106:5432/plush_erp`
 - 当前账号表、工作流协同表和首版通用业务记录表已通过 Ent + Atlas 落地；Phase 2A 最小库存事实专表、Phase 2B 最小 BOM + 批次库存、Phase 2C 采购入库和 Phase 2D-A 采购退货 schema 已生成 migration；具体目标库是否已 apply 仍以 `make migrate_status` 为准
 - 采购、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM 当前只落最小主数据，不生成采购、生产或成本
@@ -91,8 +91,8 @@ make run
 
 默认端口：
 
-- HTTP：`8200`
-- gRPC：`9200`
+- HTTP：`8300`
+- gRPC：`9300`
 - PostgreSQL Compose 宿主机映射：`5435`
 
 ## 当前不做

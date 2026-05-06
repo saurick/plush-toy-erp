@@ -34,14 +34,14 @@ export IMAGE_NAME=plush-toy-erp-server:dev
 export WEB_IMAGE=plush-toy-erp-web:dev
 export POSTGRES_DSN='postgres://postgres:***@postgres:5432/plush_erp?sslmode=disable'
 export TRACE_ENDPOINT=jaeger:4318
-export WEB_API_ORIGIN=http://app-server:8200
+export WEB_API_ORIGIN=http://app-server:8300
 ```
 
 默认宿主机端口：
 
 - PostgreSQL：`5435`
-- HTTP：`8200`
-- gRPC：`9200`
+- HTTP：`8300`
+- gRPC：`9300`
 - 桌面后台：`5175`
 - 老板移动端：`5186`
 - 业务移动端：`5187`
@@ -75,7 +75,7 @@ docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 docker run --rm \
   -e APP_ID=mobile-boss \
   -e PORT=5186 \
-  -e API_ORIGIN=http://host.docker.internal:8200 \
+  -e API_ORIGIN=http://host.docker.internal:8300 \
   -p 5186:5186 \
   plush-toy-erp-web:dev
 ```

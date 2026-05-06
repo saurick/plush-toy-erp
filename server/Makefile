@@ -335,7 +335,7 @@ DEV_BIN ?= ./bin/server-dev
 ARGS ?=
 
 # 当前项目本地 dev 会占用的端口；dev_stop/dev_restart 只清理这些端口，避免误杀别的项目。
-DEV_PORTS ?= 8200 9200
+DEV_PORTS ?= 8300 9300
 
 .PHONY: dev_build
 # build dev binary (stable path)

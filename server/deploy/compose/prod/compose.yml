@@ -8,7 +8,7 @@ x-web-app-common: &web-app-common
       condition: service_started
   environment: &web-app-environment
     TZ: "${TZ:-Asia/Shanghai}"
-    API_ORIGIN: "${WEB_API_ORIGIN:-http://app-server:8200}"
+    API_ORIGIN: "${WEB_API_ORIGIN:-http://app-server:8300}"
     PROXY_PREFIXES: "${WEB_PROXY_PREFIXES:-/rpc,/templates}"
     PROXY_TIMEOUT_MS: "${WEB_PROXY_TIMEOUT_MS:-30000}"
   mem_limit: "${WEB_MEM_LIMIT:-96m}"
@@ -83,8 +83,8 @@ services:
       jaeger:
         condition: service_started
     ports:
-      - "${APP_HTTP_PORT:-8200}:8200"
-      - "${APP_GRPC_PORT:-9200}:9200"
+      - "${APP_HTTP_PORT:-8300}:8300"
+      - "${APP_GRPC_PORT:-9300}:9300"
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
       # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。

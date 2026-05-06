@@ -26,8 +26,8 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 
 ## 默认端口
 
-- HTTP：`8200`
-- gRPC：`9200`
+- HTTP：`8300`
+- gRPC：`9300`
 - 本地开发数据库：`192.168.0.106:5432/plush_erp`
 - PostgreSQL Compose 宿主机映射：`5435`
 
@@ -59,7 +59,7 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 ## gRPC 入口
 
 - gRPC 服务同样承载 `Jsonrpc` 服务定义
-- 默认监听 `0.0.0.0:9200`
+- 默认监听 `0.0.0.0:9300`
 
 说明：当前服务主要以 HTTP JSON-RPC 为默认入口，gRPC 更多是保留 Kratos 的统一接入能力。
 
