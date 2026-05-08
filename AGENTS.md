@@ -302,6 +302,7 @@ RBAC / API 改动必须覆盖：
 
 - 当前唯一部署真源：`/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前仓库没有初始化 `lab-ha`、Kubernetes 清单和 dashboard；未获明确需求前，不要补回第二套部署主路径。
+- 低配服务器只负责加载已构建镜像、启动 Compose、执行 migration 与部署后检查；发布时必须在本地或 CI 构建服务端/前端镜像并上传，禁止在服务器上执行 `docker build`、`pnpm build`、`go build`、`make build_server` 等重构建步骤。
 - Compose 基线默认保留 PostgreSQL、Jaeger、`/healthz`、`/readyz` 和 `depends_on: service_healthy`。
 - 如果后续确实要引入 Kubernetes 或其他部署方式，必须先补正式文档，再落代码和脚本。
 - 私有化部署相关能力应优先沉淀到产品化与交付文档、部署配置和初始化模板中，不要散落在业务 usecase 中。

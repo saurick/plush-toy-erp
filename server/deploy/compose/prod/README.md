@@ -62,10 +62,13 @@ export WEB_API_ORIGIN=http://app-server:8300
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关可以直接把入口流量映射到对应前端固定端口
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要按入口重新设置构建期 `VITE_BASE_URL`
 
-## 前端镜像
+## 镜像构建
+
+目标服务器配置较低，镜像构建必须在本地开发机或 CI 完成。服务器侧只负责接收镜像包、`docker load`、`docker compose up`、migration 和部署后检查；不要在服务器上执行 `docker build`、`pnpm build`、`go build` 或 `make build_server`。
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp
+docker build -f server/Dockerfile -t plush-toy-erp-server:dev .
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 

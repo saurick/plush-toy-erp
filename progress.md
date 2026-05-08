@@ -1,3 +1,8 @@
+## 2026-05-08 23:59
+- 完成：按低配服务器发布口径补充部署构建边界，更新 `AGENTS.md`、`docs/deployment-conventions.md`、`server/deploy/README.md` 和 `server/deploy/compose/prod/README.md`，明确服务器只负责加载已构建镜像、启动 Compose、执行 migration 与部署后检查；服务端/前端镜像必须先在本地或 CI 构建并上传。
+- 下一步：后续如补发布脚本，可继续把该规则做成脚本级 preflight，检测到远端执行构建命令时直接阻断。
+- 阻塞/风险：本轮只更新正式部署口径和协作规则，未触达运行时代码、schema、Compose 配置或线上服务；更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-06 22:52
 - 完成：将本项目后端默认端口从 `8200 / 9200` 收口到 `8300 / 9300`，同步更新 dev/prod 配置、Compose 默认反代与映射、Docker 暴露端口、`server` dev 清理端口、前端 Vite 代理、真实登录回归默认后端地址，以及 README、后端运行/配置文档和前端帮助文档口径；本轮未涉及 schema、migration 或业务字段真源。
 - 下一步：后续启动本项目后端前，先确认 `8300 / 9300` 未被其他本机服务占用；若已有外部 `.env` 或线上网关配置，需按同一端口口径同步调整。

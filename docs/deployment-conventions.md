@@ -4,6 +4,7 @@
 
 - 当前唯一部署真源：`/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前仓库只保留 `docker compose` 这一路径，未初始化 `lab-ha`、Kubernetes 和 dashboard
+- 目标服务器配置较低，部署时不在服务器构建；服务端和前端镜像必须先在本地或 CI 构建完成，再上传到服务器加载运行
 - 如果后续确实需要第二套部署方式，先补文档和目录，再补脚本和发布流程
 
 ## 目录职责
@@ -13,6 +14,7 @@
 - 单机或单宿主机部署入口
 - 保留 PostgreSQL、Jaeger、业务容器和线上迁移脚本
 - 所有运行时参数优先通过 `.env` 覆盖，不要直接硬改 `compose.yml`
+- 服务器侧只允许执行 `docker load`、`docker compose up`、migration 与 smoke；不要执行 `docker build`、`pnpm build`、`go build` 或其他重构建命令
 
 ## 单一真源规则
 
