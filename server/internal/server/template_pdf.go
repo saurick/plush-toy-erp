@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -803,6 +804,11 @@ func resolveTemplatePDFChromeExecPath(rawEnv string, lookPath func(file string) 
 		}
 	}
 
+	// 本地开发兜底：复用 Playwright 已下载的 Linux Chromium，避免要求每台机器额外配置 ERP_PDF_CHROME_PATH。
+	if resolved, err := resolveTemplatePDFPlaywrightChromeExecPath(); err == nil {
+		return resolved, nil
+	}
+
 	return "", errors.New("未找到 Chrome/Chromium 可执行文件，请安装 Google Chrome/Chromium 或设置 ERP_PDF_CHROME_PATH")
 }
 
@@ -830,6 +836,27 @@ func templatePDFChromeExecCandidates(goos string) []string {
 	default:
 		return baseCandidates
 	}
+}
+
+func resolveTemplatePDFPlaywrightChromeExecPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil || strings.TrimSpace(homeDir) == "" {
+		return "", errors.New("用户目录不可用")
+	}
+
+	pattern := filepath.Join(homeDir, ".cache", "ms-playwright", "chromium-*", "chrome-linux64", "chrome")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		return "", err
+	}
+	for idx := len(matches) - 1; idx >= 0; idx-- {
+		candidate := matches[idx]
+		info, statErr := os.Stat(candidate)
+		if statErr == nil && !info.IsDir() && info.Mode().Perm()&0111 != 0 {
+			return candidate, nil
+		}
+	}
+	return "", errors.New("未找到 Playwright Chromium")
 }
 
 func injectTemplatePDFBaseTag(htmlDoc string, baseURL string) string {

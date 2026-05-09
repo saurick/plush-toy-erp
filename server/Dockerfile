@@ -6,8 +6,8 @@ ARG RUNTIMEPLATFORM=linux/amd64
 ARG GO_TARGETOS=linux
 ARG GO_TARGETARCH=amd64
 ARG NODE_BUILDER_IMAGE=node:24.14.0
-ARG GO_BUILDER_IMAGE=golang:1.24.1
-ARG RUNTIME_BASE_IMAGE=alpine:3.21
+ARG GO_BUILDER_IMAGE=golang:1.26.2
+ARG RUNTIME_BASE_IMAGE=debian:bookworm-slim
 
 # ======================
 # 1) 构建前端静态文件
@@ -18,7 +18,7 @@ FROM --platform=$BUILDPLATFORM ${NODE_BUILDER_IMAGE} AS web-builder
 WORKDIR /web
 
 COPY web/package.json web/pnpm-lock.yaml ./
-RUN npm install -g pnpm && \
+RUN npm install -g pnpm@10.13.1 && \
     pnpm config set store-dir /web/.pnpm-store && \
     pnpm config set registry https://registry.npmmirror.com && \
     pnpm install --frozen-lockfile
@@ -26,7 +26,7 @@ RUN npm install -g pnpm && \
 COPY web/src ./src
 COPY web/public ./public
 COPY web/index.html ./
-COPY web/vite.config.mjs ./
+COPY web/vite*.mjs ./
 COPY web/tailwind.config.js ./
 COPY web/postcss.config.js ./
 # 关键兜底：前端 prebuild 依赖服务端错误码真源与生成脚本，镜像构建时必须一并带入。
@@ -47,10 +47,10 @@ WORKDIR /src
 ADD server/go.mod ./go.mod
 ADD server/go.sum ./go.sum
 
-RUN go env -w GOPROXY=https://goproxy.cn,direct
+RUN go env -w GOPROXY=https://goproxy.cn\|https://proxy.golang.org\|direct
 
-RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
-    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
+RUN --mount=type=cache,id=plush-gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=plush-gobuild,target=/root/.cache/go-build \
     go mod download
 
 COPY server/ /src
@@ -58,19 +58,13 @@ COPY server/ /src
 ENV CGO_ENABLED=0
 
 ARG GIT_SHA
-ARG GIT_SHA_SHORT
-ARG BUILD_TIME
-ARG IMAGE_TAG
 
 ENV GIT_SHA=${GIT_SHA}
-ENV GIT_SHA_SHORT=${GIT_SHA_SHORT}
-ENV BUILD_TIME=${BUILD_TIME}
-ENV IMAGE_TAG=${IMAGE_TAG}
 ENV TZ=Asia/Shanghai
 
 # Go 二进制跟随目标参数，避免镜像架构与可执行文件不一致。
-RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
-    --mount=type=cache,id=gobuild,target=/root/.cache/go-build \
+RUN --mount=type=cache,id=plush-gomod,target=/go/pkg/mod \
+    --mount=type=cache,id=plush-gobuild,target=/root/.cache/go-build \
     mkdir -p bin && \
     GOOS=${GO_TARGETOS} GOARCH=${GO_TARGETARCH} go build \
       -ldflags "-X main.Version=${GIT_SHA}" \
@@ -81,6 +75,17 @@ RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
 # ======================
 FROM --platform=$RUNTIMEPLATFORM ${RUNTIME_BASE_IMAGE}
 
+ENV TZ=Asia/Shanghai
+ENV ERP_PDF_CHROME_PATH=/usr/bin/chromium
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      tzdata \
+      ca-certificates \
+      chromium \
+      fonts-noto-cjk && \
+    rm -rf /var/lib/apt/lists/*
+
 ARG GIT_SHA
 ARG GIT_SHA_SHORT
 ARG BUILD_TIME
@@ -90,9 +95,6 @@ ENV GIT_SHA=${GIT_SHA}
 ENV GIT_SHA_SHORT=${GIT_SHA_SHORT}
 ENV BUILD_TIME=${BUILD_TIME}
 ENV IMAGE_TAG=${IMAGE_TAG}
-ENV TZ=Asia/Shanghai
-
-RUN apk add --no-cache tzdata ca-certificates
 
 WORKDIR /app
 

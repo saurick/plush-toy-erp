@@ -15,6 +15,7 @@
 - 保留 PostgreSQL、Jaeger、业务容器和线上迁移脚本
 - 所有运行时参数优先通过 `.env` 覆盖，不要直接硬改 `compose.yml`
 - 服务器侧只允许执行 `docker load`、`docker compose up`、migration 与 smoke；不要执行 `docker build`、`pnpm build`、`go build` 或其他重构建命令
+- 服务端镜像内置 Chromium / CJK 字体用于在线 PDF，PDF 浏览器路径、并发和容器内存预算统一从 `.env` / Compose 管理
 
 ## 单一真源规则
 

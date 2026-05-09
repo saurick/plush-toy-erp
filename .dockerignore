@@ -1,11 +1,16 @@
 .git
 .DS_Store
 
+# 本地依赖、构建产物和 QA 输出不进入镜像构建上下文。
 **/node_modules
 **/.vite-cache
 **/build
 **/dist
 **/coverage
 
+web/output
+server/bin
+server/tmp
+output
 tmp
 *.log

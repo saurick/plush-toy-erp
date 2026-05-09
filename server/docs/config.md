@@ -99,6 +99,15 @@
 | `ERP_DEBUG_CLEANUP_ENABLED` | `true` | 显式设为 `false` / `0` / `off` 可关闭清理调试数据和业务数据清空 |
 | `ERP_DEBUG_CLEANUP_SCOPE` | `debug_run` | 当前只允许 `debug_run`，表示必须按 debugRunId 清理 |
 
+## PDF 运行环境变量
+
+在线 PDF 使用后端 `/templates/render-pdf` 和 Headless Chromium。生产镜像已内置 Debian `chromium` 与 `fonts-noto-cjk`，Compose 默认设置：
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `ERP_PDF_CHROME_PATH` | `/usr/bin/chromium` | Chrome / Chromium 可执行文件路径；本地开发可留空由服务自动探测系统 Chrome |
+| `ERP_PDF_RENDER_CONCURRENCY` | `2` | 同时渲染 PDF 的上限；低配服务器优先通过降低并发控制内存峰值 |
+
 安全边界：
 
 - seed、debugRunId cleanup 和业务数据清空默认面向当前 SQL 连接开启，只有显式关闭环境变量、权限不足或清理范围不匹配时拒绝。

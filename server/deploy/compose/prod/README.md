@@ -21,6 +21,9 @@ docker compose -f compose.yml up -d
 - `POSTGRES_DATA_DIR`
 - `APP_IMAGE`
 - `WEB_IMAGE`
+- `APP_JWT_SECRET`
+- `APP_ADMIN_USERNAME`
+- `APP_ADMIN_PASSWORD`
 
 如果不需要自带 tracing 存储，可以再按需移除 Jaeger 服务和对应环境变量。
 
@@ -35,6 +38,14 @@ export WEB_IMAGE=plush-toy-erp-web:dev
 export POSTGRES_DSN='postgres://postgres:***@postgres:5432/plush_erp?sslmode=disable'
 export TRACE_ENDPOINT=jaeger:4318
 export WEB_API_ORIGIN=http://app-server:8300
+export ERP_PDF_CHROME_PATH=/usr/bin/chromium
+export ERP_PDF_RENDER_CONCURRENCY=2
+export APP_JWT_SECRET='replace-with-runtime-secret'
+export APP_ADMIN_USERNAME=admin
+export APP_ADMIN_PASSWORD='replace-with-initial-admin-password'
+export ERP_DEBUG_ENV=prod
+export ERP_DEBUG_SEED_ENABLED=false
+export ERP_DEBUG_CLEANUP_ENABLED=false
 ```
 
 默认宿主机端口：
@@ -59,12 +70,17 @@ export WEB_API_ORIGIN=http://app-server:8300
 - 宿主机本地调试 `make run` 默认走 `/Users/simon/projects/plush-toy-erp/server/configs/dev/config.yaml` 里的 `192.168.0.106:4318`
 - 宿主机线上进程默认走 `server/configs/prod/config.yaml` 里的 `127.0.0.1:4318`
 - 当前 Compose 容器内默认走 `jaeger:4318`，因为容器内不能把宿主机的 `127.0.0.1` 当成 Jaeger 地址
+- `POSTGRES_DSN` 是 URL，若 `POSTGRES_PASSWORD` 包含 `@`、`:`、`/`、`%`、`#` 等特殊字符，DSN 里的密码必须先 URL 编码；`POSTGRES_PASSWORD` 本身保持原值。
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关可以直接把入口流量映射到对应前端固定端口
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要按入口重新设置构建期 `VITE_BASE_URL`
+- 若云安全组未开放 `5175-5193`，推荐在宿主机 Nginx / SLB / 其他网关上只开放 `80/443`，并按域名或 Host 将桌面端入口反代到 `127.0.0.1:5175`；移动端入口如果也要公网访问，应优先分配独立域名或开放对应固定端口，不要在未调整构建 base path 的情况下直接挂路径前缀。
+- PDF 运行依赖：服务端镜像内置 Debian `chromium` 与 `fonts-noto-cjk`，默认浏览器路径为 `/usr/bin/chromium`；如需自定义可通过 `ERP_PDF_CHROME_PATH` 覆盖。
+- PDF 资源建议：默认 `APP_MEM_LIMIT=896m`、`ERP_PDF_RENDER_CONCURRENCY=2`，优先稳住在线 PDF 预览；如果同机项目较多，先降低并发，再评估是否调整内存。
 
 ## 镜像构建
 
 目标服务器配置较低，镜像构建必须在本地开发机或 CI 完成。服务器侧只负责接收镜像包、`docker load`、`docker compose up`、migration 和部署后检查；不要在服务器上执行 `docker build`、`pnpm build`、`go build` 或 `make build_server`。
+服务端 Dockerfile 已把 Go 依赖 / 编译缓存、Chromium 与 CJK 字体安装层分开；同一源码和依赖下重复构建时，应复用这些缓存层。
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp

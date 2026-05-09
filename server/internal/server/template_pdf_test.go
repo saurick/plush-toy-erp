@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -120,12 +123,167 @@ func TestResolveTemplatePDFChromeExecPath(t *testing.T) {
 	if got != "/custom/chrome" {
 		t.Fatalf("resolveTemplatePDFChromeExecPath(env) = %q", got)
 	}
+}
 
-	_, err = resolveTemplatePDFChromeExecPath("", func(file string) (string, error) {
+func TestResolveTemplatePDFChromeExecPathNotFound(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	_, err := resolveTemplatePDFChromeExecPath("", func(file string) (string, error) {
 		return "", errors.New("not found")
 	})
 	if err == nil {
 		t.Fatal("resolveTemplatePDFChromeExecPath() expected error when not found")
+	}
+}
+
+func TestResolveTemplatePDFChromeExecPathUsesNativeCandidates(t *testing.T) {
+	t.Parallel()
+
+	calls := make([]string, 0, 4)
+	got, err := resolveTemplatePDFChromeExecPath("", func(file string) (string, error) {
+		calls = append(calls, file)
+		if file == "chromium-browser" {
+			return "/usr/bin/chromium-browser", nil
+		}
+		return "", errors.New("not found")
+	})
+	if err != nil {
+		t.Fatalf("resolveTemplatePDFChromeExecPath() error = %v", err)
+	}
+	if got != "/usr/bin/chromium-browser" {
+		t.Fatalf("resolveTemplatePDFChromeExecPath() = %q, want /usr/bin/chromium-browser", got)
+	}
+
+	wantOrder := make([]string, 0, 4)
+	for _, candidate := range templatePDFChromeExecCandidates(runtime.GOOS) {
+		wantOrder = append(wantOrder, candidate)
+		if candidate == "chromium-browser" {
+			break
+		}
+	}
+	if strings.Join(calls, ",") != strings.Join(wantOrder, ",") {
+		t.Fatalf("lookup order = %v, want %v", calls, wantOrder)
+	}
+}
+
+func TestResolveTemplatePDFPlaywrightChromeExecPath(t *testing.T) {
+	tempHome := t.TempDir()
+	chromePath := filepath.Join(tempHome, ".cache", "ms-playwright", "chromium-1208", "chrome-linux64", "chrome")
+	if err := os.MkdirAll(filepath.Dir(chromePath), 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(chromePath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	t.Setenv("HOME", tempHome)
+
+	got, err := resolveTemplatePDFPlaywrightChromeExecPath()
+	if err != nil {
+		t.Fatalf("resolveTemplatePDFPlaywrightChromeExecPath() error = %v", err)
+	}
+	if got != chromePath {
+		t.Fatalf("resolveTemplatePDFPlaywrightChromeExecPath() = %q, want %q", got, chromePath)
+	}
+}
+
+func TestTemplatePDFChromeManagerAcquireReuseAliveRuntime(t *testing.T) {
+	t.Parallel()
+
+	launchCount := 0
+	manager := newTemplatePDFChromeManager(func(_ context.Context, chromeExecPath string) (*templatePDFChromeRuntime, string, error) {
+		launchCount++
+		if chromeExecPath != "/usr/bin/chromium" {
+			t.Fatalf("chromeExecPath = %q", chromeExecPath)
+		}
+		return &templatePDFChromeRuntime{exited: make(chan struct{})}, "ws://127.0.0.1:9222/devtools/browser/reused", nil
+	})
+
+	runtimeA, wsURLA, err := manager.Acquire(context.Background(), "/usr/bin/chromium")
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	runtimeB, wsURLB, err := manager.Acquire(context.Background(), "/usr/bin/chromium")
+	if err != nil {
+		t.Fatalf("Acquire() second error = %v", err)
+	}
+
+	if launchCount != 1 {
+		t.Fatalf("launchCount = %d, want 1", launchCount)
+	}
+	if runtimeA != runtimeB {
+		t.Fatal("Acquire() should reuse alive runtime")
+	}
+	if wsURLA != wsURLB {
+		t.Fatalf("wsURL mismatch: %q != %q", wsURLA, wsURLB)
+	}
+}
+
+func TestTemplatePDFChromeManagerAcquireRelaunchExitedRuntime(t *testing.T) {
+	t.Parallel()
+
+	launchCount := 0
+	manager := newTemplatePDFChromeManager(func(_ context.Context, _ string) (*templatePDFChromeRuntime, string, error) {
+		launchCount++
+		return &templatePDFChromeRuntime{exited: make(chan struct{})}, "ws://127.0.0.1:9222/devtools/browser/test", nil
+	})
+
+	runtimeA, _, err := manager.Acquire(context.Background(), "/usr/bin/chromium")
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	close(runtimeA.exited)
+
+	runtimeB, _, err := manager.Acquire(context.Background(), "/usr/bin/chromium")
+	if err != nil {
+		t.Fatalf("Acquire() second error = %v", err)
+	}
+	if launchCount != 2 {
+		t.Fatalf("launchCount = %d, want 2", launchCount)
+	}
+	if runtimeA == runtimeB {
+		t.Fatal("Acquire() should relaunch after runtime exit")
+	}
+}
+
+func TestTemplatePDFChromeManagerCloseClearsRuntime(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	runtime := &templatePDFChromeRuntime{
+		exited:      make(chan struct{}),
+		userDataDir: tempDir,
+	}
+	manager := newTemplatePDFChromeManager(func(_ context.Context, _ string) (*templatePDFChromeRuntime, string, error) {
+		return runtime, "ws://127.0.0.1:9222/devtools/browser/test", nil
+	})
+
+	_, _, err := manager.Acquire(context.Background(), "/usr/bin/chromium")
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		manager.Close()
+		close(done)
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	close(runtime.exited)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("Close() did not finish")
+	}
+
+	if manager.runtime != nil {
+		t.Fatal("Close() should clear cached runtime")
+	}
+	if manager.wsURL != "" {
+		t.Fatalf("Close() should clear wsURL, got %q", manager.wsURL)
+	}
+	if _, err := os.Stat(tempDir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected temp dir removed, got err=%v", err)
 	}
 }
 

@@ -48,6 +48,8 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
   - 进程级健康检查，返回 `ok`
 - `/readyz`
   - 就绪检查，当前默认只检查 PostgreSQL 连通性，成功返回 `ready`
+- `/templates/render-pdf`
+  - 在线 PDF 渲染入口，使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`，并通过 `ERP_PDF_RENDER_CONCURRENCY` 限制并发
 
 如果容器内存在静态目录，还会挂载前端静态资源：
 

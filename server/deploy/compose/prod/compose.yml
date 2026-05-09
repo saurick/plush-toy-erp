@@ -87,11 +87,20 @@ services:
       - "${APP_GRPC_PORT:-9300}:9300"
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
+      ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"
+      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-2}"
       # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。
       POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
-    mem_limit: "${APP_MEM_LIMIT:-160m}"
-    mem_reservation: "${APP_MEM_RESERVATION:-80m}"
+      APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"
+      APP_ADMIN_USERNAME: "${APP_ADMIN_USERNAME:-admin}"
+      APP_ADMIN_PASSWORD: "${APP_ADMIN_PASSWORD:-change-this-prod-admin-password}"
+      ERP_DEBUG_ENV: "${ERP_DEBUG_ENV:-prod}"
+      ERP_DEBUG_SEED_ENABLED: "${ERP_DEBUG_SEED_ENABLED:-false}"
+      ERP_DEBUG_CLEANUP_ENABLED: "${ERP_DEBUG_CLEANUP_ENABLED:-false}"
+      ERP_DEBUG_CLEANUP_SCOPE: "${ERP_DEBUG_CLEANUP_SCOPE:-debug_run}"
+    mem_limit: "${APP_MEM_LIMIT:-896m}"
+    mem_reservation: "${APP_MEM_RESERVATION:-384m}"
     networks: {}
 
   web-desktop:
