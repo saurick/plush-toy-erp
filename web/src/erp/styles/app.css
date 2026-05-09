@@ -3883,12 +3883,22 @@
   padding-inline: 0;
 }
 
+.erp-business-record-form__items-scroll {
+  width: 100%;
+  max-width: 100%;
+  max-height: min(62vh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable both-edges;
+  -webkit-overflow-scrolling: touch;
+}
+
 .erp-business-record-form__item-card-stack {
   display: grid;
+  width: max-content;
+  min-width: 100%;
   gap: 16px;
-  min-width: 0;
-  max-width: 100%;
-  overflow: visible;
+  padding: 2px 2px 8px;
 }
 
 .erp-item-card {
@@ -3914,17 +3924,6 @@
 
 .erp-item-card .ant-card-body {
   padding: 16px;
-}
-
-.erp-item-card-horizontal-scroll .ant-card-body {
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.erp-item-card-horizontal-scroll {
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
 }
 
 .erp-item-card-row-nowrap {

@@ -223,6 +223,7 @@ const SORT_ORDER_OPTIONS = [
   { label: '最新优先', value: 'desc' },
   { label: '最早优先', value: 'asc' },
 ]
+const TABLE_SORT_DIRECTIONS = ['ascend', 'descend']
 const MODULE_TABLE_COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const MODULE_TABLE_HEADER_ACTION_WIDTH = 24
 const MODULE_TABLE_HEADER_GAP = 6
@@ -293,6 +294,25 @@ function resolveModuleHeaderMinWidth(titleText = '') {
         MODULE_TABLE_HEADER_SAFE_PADDING
     )
   )
+}
+
+function toAntTableSortOrder(sortOrder) {
+  if (sortOrder === 'asc') return 'ascend'
+  if (sortOrder === 'desc') return 'descend'
+  return null
+}
+
+function fromAntTableSortOrder(sortOrder) {
+  if (sortOrder === 'ascend') return 'asc'
+  if (sortOrder === 'descend') return 'desc'
+  return ''
+}
+
+function getActiveTableSorter(sorter) {
+  if (Array.isArray(sorter)) {
+    return sorter.find((item) => item?.order) || null
+  }
+  return sorter?.order ? sorter : null
 }
 
 function buildColumnOrderStorageKey(moduleKey) {
@@ -717,6 +737,7 @@ export default function BusinessModulePage({ moduleItem }) {
   const [dateRangeStart, setDateRangeStart] = useState('')
   const [dateRangeEnd, setDateRangeEnd] = useState('')
   const [sortOrder, setSortOrder] = useState('desc')
+  const [tableSortState, setTableSortState] = useState(null)
   const [recycleModalOpen, setRecycleModalOpen] = useState(false)
   const [recycleLoading, setRecycleLoading] = useState(false)
   const [recycleRecords, setRecycleRecords] = useState([])
@@ -788,6 +809,13 @@ export default function BusinessModulePage({ moduleItem }) {
     () => sortModuleRecords(filteredRecords, sortOrder),
     [filteredRecords, sortOrder]
   )
+  const displayRecords = useMemo(
+    () =>
+      tableSortState
+        ? sortModuleRecords(sortedRecords, tableSortState)
+        : sortedRecords,
+    [sortedRecords, tableSortState]
+  )
   const sourcePrefillModuleOptions = useMemo(
     () =>
       getBusinessRecordSourcePrefillModuleKeys(moduleItem.key).map((key) => ({
@@ -853,6 +881,29 @@ export default function BusinessModulePage({ moduleItem }) {
     }
     return '请先单击或勾选一条记录'
   }, [selectedRecord, selectedRowKeys.length])
+  const handleCreatedSortOrderChange = useCallback((nextSortOrder) => {
+    setSortOrder(nextSortOrder)
+    setTableSortState(null)
+  }, [])
+  const handleTableChange = useCallback((_pagination, _filters, sorter) => {
+    const activeSorter = getActiveTableSorter(sorter)
+    const nextOrder = fromAntTableSortOrder(activeSorter?.order)
+    const dataIndex =
+      activeSorter?.field ||
+      activeSorter?.column?.dataIndex ||
+      activeSorter?.columnKey
+    if (!nextOrder || !dataIndex) {
+      setTableSortState(null)
+      return
+    }
+    setTableSortState({
+      columnKey:
+        activeSorter?.columnKey ||
+        (Array.isArray(dataIndex) ? dataIndex.join('.') : dataIndex),
+      dataIndex,
+      order: nextOrder,
+    })
+  }, [])
   const selectedRecordLinkedTargets = useMemo(
     () => getLinkedTargets(moduleItem.key, selectedRecord),
     [moduleItem.key, selectedRecord]
@@ -1246,6 +1297,10 @@ export default function BusinessModulePage({ moduleItem }) {
     () => summarizeRecordItems(watchedItems, definition.itemFields),
     [definition.itemFields, watchedItems]
   )
+  const itemRowMinWidth = useMemo(
+    () => resolveBusinessRecordItemRowMinWidth(definition.itemFields),
+    [definition.itemFields]
+  )
   const moduleTaskAlerts = useMemo(
     () =>
       tasks
@@ -1455,6 +1510,7 @@ export default function BusinessModulePage({ moduleItem }) {
   useEffect(() => {
     setStatusFilterKeys(businessModuleNavigationQuery.businessStatusKeys)
     setSelectedRowKeys([])
+    setTableSortState(null)
   }, [businessModuleNavigationQuery.businessStatusKeys, moduleItem.key])
 
   useEffect(() => {
@@ -1607,6 +1663,10 @@ export default function BusinessModulePage({ moduleItem }) {
   ])
 
   const tableColumns = useMemo(() => {
+    const resolveColumnSortOrder = (columnKey) =>
+      tableSortState?.columnKey === columnKey
+        ? toAntTableSortOrder(tableSortState.order)
+        : null
     const mainColumns = orderedTableColumnDefinitions.map((column, index) => {
       const columnKey = resolveModuleColumnKey(column)
       const titleText = String(column.label || column.key || '当前列')
@@ -1615,6 +1675,9 @@ export default function BusinessModulePage({ moduleItem }) {
       return {
         dataIndex: column.key,
         key: column.key,
+        sorter: Boolean(column.key),
+        sortDirections: TABLE_SORT_DIRECTIONS,
+        sortOrder: column.key ? resolveColumnSortOrder(column.key) : null,
         width: Math.max(
           column.width || 120,
           resolveModuleHeaderMinWidth(titleText)
@@ -1717,6 +1780,9 @@ export default function BusinessModulePage({ moduleItem }) {
         title: '明细',
         dataIndex: 'items',
         key: 'items',
+        sorter: true,
+        sortDirections: TABLE_SORT_DIRECTIONS,
+        sortOrder: resolveColumnSortOrder('items'),
         width: 90,
         render: (items) => `${Array.isArray(items) ? items.length : 0} 行`,
       },
@@ -1724,6 +1790,9 @@ export default function BusinessModulePage({ moduleItem }) {
         title: '业务状态',
         dataIndex: 'business_status_key',
         key: 'business_status_key',
+        sorter: true,
+        sortDirections: TABLE_SORT_DIRECTIONS,
+        sortOrder: resolveColumnSortOrder('business_status_key'),
         width: 130,
         fixed: 'right',
         render: (value) => (
@@ -1736,6 +1805,9 @@ export default function BusinessModulePage({ moduleItem }) {
         title: '主责角色',
         dataIndex: 'owner_role_key',
         key: 'owner_role_key',
+        sorter: true,
+        sortDirections: TABLE_SORT_DIRECTIONS,
+        sortOrder: resolveColumnSortOrder('owner_role_key'),
         width: 120,
         fixed: 'right',
         render: (value) => roleLabelMap.get(value) || value || '-',
@@ -1746,6 +1818,7 @@ export default function BusinessModulePage({ moduleItem }) {
     handleRepositionColumnOrder,
     orderedTableColumnDefinitions,
     resolveModuleColumnKey,
+    tableSortState,
   ])
   const tableScrollX = useMemo(
     () =>
@@ -3111,7 +3184,7 @@ export default function BusinessModulePage({ moduleItem }) {
       { key: 'business_status_key', label: '业务状态' },
       { key: 'owner_role_key', label: '主责角色' },
     ]
-    downloadCSV(`${moduleItem.title}-业务记录.csv`, sortedRecords, columns)
+    downloadCSV(`${moduleItem.title}-业务记录.csv`, displayRecords, columns)
   }
 
   return (
@@ -3230,7 +3303,7 @@ export default function BusinessModulePage({ moduleItem }) {
           className="erp-business-filter-control--sort"
           options={SORT_ORDER_OPTIONS}
           value={sortOrder}
-          onChange={setSortOrder}
+          onChange={handleCreatedSortOrderChange}
         />
       </BusinessFilterPanel>
 
@@ -3774,7 +3847,7 @@ export default function BusinessModulePage({ moduleItem }) {
         loading={loading}
         rowKey="id"
         columns={tableColumns}
-        dataSource={sortedRecords}
+        dataSource={displayRecords}
         scroll={{ x: tableScrollX }}
         rowSelection={{
           selectedRowKeys,
@@ -3791,6 +3864,7 @@ export default function BusinessModulePage({ moduleItem }) {
             setModalOpen(true)
           },
         })}
+        onChange={handleTableChange}
         pagination={{
           pageSize: DEFAULT_PAGE_SIZE,
           showSizeChanger: true,
@@ -4238,89 +4312,90 @@ export default function BusinessModulePage({ moduleItem }) {
                           查看计算口径
                         </Button>
                       </div>
-                      <div className="erp-business-record-form__item-card-stack">
-                        {fields.map(({ key, name, ...restField }, index) => (
-                          <Card
-                            key={key}
-                            className="erp-item-card erp-item-card-horizontal-scroll"
-                            size="small"
-                            title={`条目 ${index + 1}`}
-                            extra={
-                              <Space size={4}>
-                                <Button
-                                  aria-label={`复制条目 ${index + 1}`}
-                                  type="text"
-                                  icon={<CopyOutlined />}
-                                  onClick={() => {
-                                    const currentItems =
-                                      form.getFieldValue('items') || []
-                                    add(
-                                      {
-                                        ...createBlankItem(definition),
-                                        ...(currentItems[name] || {}),
-                                      },
-                                      name + 1
-                                    )
-                                  }}
-                                />
-                                <Button
-                                  aria-label={`删除条目 ${index + 1}`}
-                                  danger
-                                  type="text"
-                                  icon={<DeleteOutlined />}
-                                  onClick={() => remove(name)}
-                                />
-                              </Space>
-                            }
-                          >
-                            <Row
-                              gutter={[12, 12]}
-                              align="top"
-                              wrap={false}
-                              className="erp-item-card-row erp-item-card-row-nowrap erp-business-record-item-grid"
-                              style={{
-                                minWidth: `${resolveBusinessRecordItemRowMinWidth(
-                                  definition.itemFields
-                                )}px`,
-                              }}
+                      <div className="erp-business-record-form__items-scroll">
+                        <div
+                          className="erp-business-record-form__item-card-stack"
+                          style={{ minWidth: `${itemRowMinWidth}px` }}
+                        >
+                          {fields.map(({ key, name, ...restField }, index) => (
+                            <Card
+                              key={key}
+                              className="erp-item-card"
+                              size="small"
+                              title={`条目 ${index + 1}`}
+                              extra={
+                                <Space size={4}>
+                                  <Button
+                                    aria-label={`复制条目 ${index + 1}`}
+                                    type="text"
+                                    icon={<CopyOutlined />}
+                                    onClick={() => {
+                                      const currentItems =
+                                        form.getFieldValue('items') || []
+                                      add(
+                                        {
+                                          ...createBlankItem(definition),
+                                          ...(currentItems[name] || {}),
+                                        },
+                                        name + 1
+                                      )
+                                    }}
+                                  />
+                                  <Button
+                                    aria-label={`删除条目 ${index + 1}`}
+                                    danger
+                                    type="text"
+                                    icon={<DeleteOutlined />}
+                                    onClick={() => remove(name)}
+                                  />
+                                </Space>
+                              }
                             >
-                              {definition.itemFields.map((field) => {
-                                const rowValues = watchedItems?.[name] || {}
-                                return (
-                                  <Col
-                                    span={resolveBusinessRecordItemDesktopSpan(
-                                      field
-                                    )}
-                                    style={resolveBusinessRecordItemColStyle(
-                                      field
-                                    )}
-                                    key={field.key}
-                                  >
-                                    <Space
-                                      direction="vertical"
-                                      size={4}
-                                      className="erp-item-field-stack"
+                              <Row
+                                gutter={[12, 12]}
+                                align="top"
+                                wrap={false}
+                                className="erp-item-card-row erp-item-card-row-nowrap erp-business-record-item-grid"
+                                style={{ minWidth: `${itemRowMinWidth}px` }}
+                              >
+                                {definition.itemFields.map((field) => {
+                                  const rowValues = watchedItems?.[name] || {}
+                                  return (
+                                    <Col
+                                      span={resolveBusinessRecordItemDesktopSpan(
+                                        field
+                                      )}
+                                      style={resolveBusinessRecordItemColStyle(
+                                        field
+                                      )}
+                                      key={field.key}
                                     >
-                                      <Text
-                                        type="secondary"
-                                        className="erp-item-field-label"
+                                      <Space
+                                        direction="vertical"
+                                        size={4}
+                                        className="erp-item-field-stack"
                                       >
-                                        {field.label}
-                                      </Text>
-                                      <Form.Item
-                                        {...restField}
-                                        className="erp-item-field-form-item"
-                                        name={[name, field.key]}
-                                      >
-                                        {renderItemField(field, rowValues)}
-                                      </Form.Item>
-                                    </Space>
-                                  </Col>
-                                )
-                              })}
-                            </Row>
-                          </Card>
-                        ))}
+                                        <Text
+                                          type="secondary"
+                                          className="erp-item-field-label"
+                                        >
+                                          {field.label}
+                                        </Text>
+                                        <Form.Item
+                                          {...restField}
+                                          className="erp-item-field-form-item"
+                                          name={[name, field.key]}
+                                        >
+                                          {renderItemField(field, rowValues)}
+                                        </Form.Item>
+                                      </Space>
+                                    </Col>
+                                  )
+                                })}
+                              </Row>
+                            </Card>
+                          ))}
+                        </div>
                       </div>
                       <Button
                         className="erp-business-record-form__add-item-button"

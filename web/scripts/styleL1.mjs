@@ -4773,7 +4773,7 @@ async function assertBusinessRecordModalLayout(
     const nestedHorizontalScrollContainers = body
       ? Array.from(
           body.querySelectorAll(
-            '.erp-item-card-horizontal-scroll .ant-card-body'
+            '.erp-business-record-form__items-scroll, .erp-item-card-horizontal-scroll .ant-card-body'
           )
         ).map((node) => {
           const rect = node.getBoundingClientRect()
@@ -4934,6 +4934,12 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
       })
       .at(-1)
     const body = modal?.querySelector('.ant-modal-body')
+    const itemsScroll = modal?.querySelector(
+      '.erp-business-record-form__items-scroll'
+    )
+    const itemsScrollStyle = itemsScroll
+      ? window.getComputedStyle(itemsScroll)
+      : null
     const cards = modal
       ? Array.from(modal.querySelectorAll('.erp-item-card')).map((card) => {
           const rect = card.getBoundingClientRect()
@@ -4982,8 +4988,20 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
             scrollWidth: body.scrollWidth,
           }
         : null,
+      itemsScroll: itemsScroll
+        ? {
+            width: itemsScroll.getBoundingClientRect().width,
+            clientWidth: itemsScroll.clientWidth,
+            scrollWidth: itemsScroll.scrollWidth,
+            overflowX: itemsScrollStyle?.overflowX || '',
+            overflowY: itemsScrollStyle?.overflowY || '',
+          }
+        : null,
       cardCount: cards.length,
       cards,
+      perCardScrollClassCount: modal
+        ? modal.querySelectorAll('.erp-item-card-horizontal-scroll').length
+        : 0,
       legacyItemHeaders: modal
         ? modal.querySelectorAll('.erp-business-record-item-grid__head').length
         : 0,
@@ -5018,6 +5036,21 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
     metrics.body && metrics.body.scrollWidth <= metrics.body.width + 8,
     `${scenarioName} 条目横向滚动泄漏到弹窗 body: ${JSON.stringify(metrics)}`
   )
+  assert(
+    metrics.itemsScroll,
+    `${scenarioName} 缺少整组条目滚动容器: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.perCardScrollClassCount,
+    0,
+    `${scenarioName} 仍残留逐条滚动卡片类名: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.itemsScroll.width <= metrics.body.width + 8 &&
+      metrics.itemsScroll.overflowX === 'auto' &&
+      metrics.itemsScroll.scrollWidth > metrics.itemsScroll.clientWidth + 8,
+    `${scenarioName} 整组条目容器未接管横向滚动: ${JSON.stringify(metrics)}`
+  )
   metrics.cards.forEach((card) => {
     assert(
       Number.parseFloat(card.borderRadius) >= 9,
@@ -5027,10 +5060,10 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
       card.headMinHeight >= 40,
       `${scenarioName} 条目卡片头部高度不符合本项目样式: ${JSON.stringify(metrics)}`
     )
-    assert.equal(
+    assert.notEqual(
       card.bodyOverflowX,
       'auto',
-      `${scenarioName} 条目卡片内部未接管横向滚动: ${JSON.stringify(metrics)}`
+      `${scenarioName} 条目卡片仍在逐条接管横向滚动: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       card.rowFlexWrap,
@@ -5038,8 +5071,9 @@ async function assertBusinessRecordItemCardLayout(page, { scenarioName }) {
       `${scenarioName} 条目字段未保持单行横向风格: ${JSON.stringify(metrics)}`
     )
     assert(
-      card.rowMinWidth >= card.bodyClientWidth,
-      `${scenarioName} 条目行宽未形成卡片内横向预算: ${JSON.stringify(metrics)}`
+      card.width >= card.rowMinWidth &&
+        card.rowMinWidth >= card.bodyClientWidth - 24,
+      `${scenarioName} 条目行宽未形成整组横向预算: ${JSON.stringify(metrics)}`
     )
     card.fields.forEach((field) => {
       assert(
@@ -5218,6 +5252,12 @@ async function assertPartnerContactItemFocusConsistency(
       const itemCardStackStyle = itemCardStack
         ? window.getComputedStyle(itemCardStack)
         : null
+      const itemsScroll = node.closest(
+        '.erp-business-record-form__items-scroll'
+      )
+      const itemsScrollStyle = itemsScroll
+        ? window.getComputedStyle(itemsScroll)
+        : null
       const itemCard = node.closest('.erp-item-card')
       const itemCardStyle = itemCard ? window.getComputedStyle(itemCard) : null
       const itemCardHead = itemCard?.querySelector('.ant-card-head')
@@ -5272,6 +5312,14 @@ async function assertPartnerContactItemFocusConsistency(
           ? {
               overflowX: itemCardStackStyle?.overflowX || '',
               overflowY: itemCardStackStyle?.overflowY || '',
+            }
+          : null,
+        itemsScroll: itemsScroll
+          ? {
+              clientWidth: itemsScroll.clientWidth,
+              scrollWidth: itemsScroll.scrollWidth,
+              overflowX: itemsScrollStyle?.overflowX || '',
+              overflowY: itemsScrollStyle?.overflowY || '',
             }
           : null,
         itemCard: itemCard
@@ -5330,15 +5378,16 @@ async function assertPartnerContactItemFocusConsistency(
       `${scenarioName} ${metrics.label} 条目卡片 focus 仍残留蓝色高亮: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.control.width <= metrics.field?.width + 2 &&
-        metrics.field?.scrollWidth <= metrics.field.width + 2,
+      metrics.field &&
+        metrics.control.width <= metrics.field.width + 2 &&
+        metrics.field.scrollWidth <= metrics.field.width + 2,
       `${scenarioName} ${metrics.label} 长文本撑开了明细字段: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.body?.overflowX === 'auto' &&
-        metrics.body.scrollWidth >= metrics.body.clientWidth &&
-        metrics.body.overflowY === 'hidden',
-      `${scenarioName} ${metrics.label} 条目卡片横向滚动容器异常: ${JSON.stringify(metrics)}`
+      metrics.body?.overflowX !== 'auto' &&
+        metrics.itemsScroll?.overflowX === 'auto' &&
+        metrics.itemsScroll.scrollWidth >= metrics.itemsScroll.clientWidth,
+      `${scenarioName} ${metrics.label} 整组条目横向滚动容器异常: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.stack?.overflowX === 'visible' &&

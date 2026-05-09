@@ -1,3 +1,15 @@
+## 2026-05-09 11:57
+- 完成：按 trade-erp 同口径把桌面业务表单里的条目卡片滚动边界上移到整组明细。当前明细真源仍为表单 / 业务记录 `items` 数组，本轮只改前端布局和 L1 断言，不改保存、带值、打印、导出、后端或数据库。`BusinessModulePage.jsx` 现在复用一次 `itemRowMinWidth`，用 `.erp-business-record-form__items-scroll` 统一承接横向 / 纵向滚动，单个 `.erp-item-card` 不再各自接管横向滚动；`app.css` 删除逐条滚动样式，改为整组滚动容器；`styleL1.mjs` 同步验证整组滚动容器和联系人明细 focus 恢复态。
+- 验证：已执行 `cd /Users/simon/projects/plush-toy-erp/web && pnpm lint`、`pnpm css`、`pnpm test`，全量 node test `270` 条通过；已执行 `cd /Users/simon/projects/plush-toy-erp/web && pnpm style:l1`，真实浏览器 `45` 个场景通过，覆盖业务模块新建弹窗、BOM 明细弹窗、客户/供应商联系人明细 focus、默认态 / 交互态 / 恢复态和相邻页面。
+- 下一步：如甲方还希望条目区高度更小或横向滚动条固定可见，可再按真实使用反馈调整 `.erp-business-record-form__items-scroll` 的 `max-height` 或补粘性横向滚动条；当前实现先保持整组滚动，不重排条目字段。
+- 阻塞/风险：未更新 `docs/current-source-of-truth.md`、产品化文档或帮助中心正式口径，因为本轮是局部表单布局调整，不改变业务能力、架构边界、菜单入口、字段真源、数据模型或交付状态。当前工作区仍有本轮外改动（如部署、顶部摘要、表头排序相关文件），本轮未回退这些现场。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-09 11:54
+- 完成：按 trade-erp 同口径给桌面业务列表补表头排序。`BusinessModulePage.jsx` 现在维护表头排序状态，点击任一可见列名可升序 / 降序排列，顶部“最新 / 最早”切换会清空表头排序并回到创建时间排序；导出当前结果沿用当前筛选、列顺序和页面排序。`moduleRecordSort.mjs` 收口为统一排序工具：默认仍按 `created_at`，表头排序支持普通字段、`payload.*` 路径、数字、文本和明细数组长度，空值固定排最后。本轮只改变前端展示和导出顺序，不改变 `business_records` 真源、保存、流转、后端或数据库。
+- 验证：已执行 `cd /Users/simon/projects/plush-toy-erp/web && pnpm exec node --test src/erp/utils/moduleRecordSort.test.mjs`、`pnpm lint`、`pnpm css`、`pnpm test`；全量前端 node test `273` 条通过。未执行 `pnpm style:l1`，因为本轮排序改动不触达样式布局，且当前工作区已有条目滚动相关样式 / L1 脚本现场。
+- 下一步：如需更强浏览器级验收，可在现有条目滚动现场收口后，补一个业务页点击客户名称、金额和明细列的浏览器回归场景。
+- 阻塞/风险：当前工作区已有本轮外改动 `/Users/simon/projects/plush-toy-erp/web/Dockerfile`、`/Users/simon/projects/plush-toy-erp/web/scripts/serveStaticApp.mjs`、`/Users/simon/projects/plush-toy-erp/web/scripts/styleL1.mjs`、`/Users/simon/projects/plush-toy-erp/web/src/erp/styles/app.css`，且 `BusinessModulePage.jsx` 中已有顶部摘要和条目滚动改动；本轮未回退这些现场。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-09 11:49
 - 完成：按 trade-erp 同口径收口桌面业务页顶部摘要。当前展示层在 `/Users/simon/projects/plush-toy-erp/web/src/erp/pages/BusinessModulePage.jsx` 统一隐藏客户、供应商 / 加工厂、主责角色等分类 chip，并且工具栏摘要只在 `summaryMetric` 为金额类时显示 `金额合计`；数量类业务页不再显示 `数量合计` 摘要 chip。顶部 `总记录 / 当前结果 / 已选记录` 仍保留为筛选与选中态反馈。本轮不改保存、导入、打印、导出、后端、数据库或业务字段真源。
 - 验证：已执行 `cd /Users/simon/projects/plush-toy-erp/web && pnpm lint`、`pnpm css`、`pnpm test`，其中 node test `270` 条通过；已执行 `STYLE_L1_SCENARIOS=business-processing-contracts-desktop,business-reconciliation-desktop pnpm style:l1`，`2` 个业务页浏览器场景通过，覆盖默认业务页与金额业务页相邻布局。完整 `pnpm style:l1` 仍失败在既有 / 并行的 `business-partners-contact-focus` 联系人条目卡片横向滚动容器断言，失败点是条目卡片滚动样式，不是本轮顶部摘要路径。

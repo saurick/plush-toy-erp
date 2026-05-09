@@ -139,7 +139,7 @@ async function handleRequest(request, response) {
   if (requestUrl.pathname === '/healthz' || requestUrl.pathname === '/readyz') {
     sendJson(response, 200, {
       status: 'ok',
-      appId,
+      appId: requestedAppId,
       title: app.title,
     })
     return

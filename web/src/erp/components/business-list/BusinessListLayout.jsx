@@ -278,6 +278,7 @@ export function BusinessDataTable({
   scroll,
   rowSelection,
   onRow,
+  onChange,
   pagination,
   emptyDescription = '暂无业务记录，点击“新建记录”开始落盘',
 }) {
@@ -291,6 +292,7 @@ export function BusinessDataTable({
         scroll={scroll}
         rowSelection={rowSelection}
         onRow={onRow}
+        onChange={onChange}
         pagination={pagination}
         locale={{
           emptyText: <Empty description={emptyDescription} />,
