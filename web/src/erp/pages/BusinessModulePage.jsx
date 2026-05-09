@@ -249,15 +249,6 @@ const ROLE_OPTIONS = BUSINESS_ROLE_OPTIONS.map((role) => ({
   value: role.key,
 }))
 const CALCULATION_GUIDE_PATH = '/erp/docs/calculation-guide'
-const COMPACT_SUMMARY_GROUPS = Object.freeze([
-  { key: 'customer_name', label: '客户' },
-  { key: 'supplier_name', label: '供应商 / 加工厂' },
-  {
-    key: 'owner_role_key',
-    label: '主责角色',
-    resolveLabel: (value) => roleLabelMap.get(value) || value,
-  },
-])
 const NUMBER_FIELDS = new Set(['quantity', 'amount'])
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
 const ACTIVE_APPROVAL_TASK_STATUS_KEYS = new Set([
@@ -376,29 +367,9 @@ function sumRecords(records, key) {
   }, 0)
 }
 
-function summarizeCompactGroup(records, group) {
-  const counts = new Map()
-  records.forEach((record) => {
-    const rawValue = record?.[group.key]
-    if (rawValue === null || rawValue === undefined || rawValue === '') return
-    const resolvedValue = group.resolveLabel
-      ? group.resolveLabel(rawValue)
-      : String(rawValue)
-    const value = String(resolvedValue || '').trim()
-    if (!value) return
-    counts.set(value, (counts.get(value) || 0) + 1)
-  })
-  const allItems = Array.from(counts.entries())
-    .map(([label, count]) => ({ label, count }))
-    .sort(
-      (left, right) =>
-        right.count - left.count || left.label.localeCompare(right.label)
-    )
-  return {
-    ...group,
-    items: allItems.slice(0, 4),
-    hiddenCount: Math.max(0, allItems.length - 4),
-  }
+function isAmountSummaryMetric(metricKey) {
+  const key = String(metricKey || '').trim()
+  return key === 'amount' || /(^|_)amount($|_)/i.test(key)
 }
 
 function createDefaultValues(moduleItem, definition) {
@@ -1270,13 +1241,7 @@ export default function BusinessModulePage({ moduleItem }) {
     () => sumRecords(activeRecords, metricKey),
     [activeRecords, metricKey]
   )
-  const compactSummaryGroups = useMemo(
-    () =>
-      COMPACT_SUMMARY_GROUPS.map((group) =>
-        summarizeCompactGroup(activeRecords, group)
-      ).filter((group) => group.items.length > 0),
-    [activeRecords]
-  )
+  const shouldShowAmountSummary = isAmountSummaryMetric(metricKey)
   const itemSummary = useMemo(
     () => summarizeRecordItems(watchedItems, definition.itemFields),
     [definition.itemFields, watchedItems]
@@ -3182,36 +3147,18 @@ export default function BusinessModulePage({ moduleItem }) {
           { key: 'current', label: '当前结果', value: sortedRecords.length },
           { key: 'selected', label: '已选记录', value: selectedRowKeys.length },
         ]}
-        summary={
-          compactSummaryGroups.length > 0 ? (
-            <>
-              {compactSummaryGroups.map((group) => (
-                <div key={group.key} className="erp-business-module-chip-row">
-                  <Text type="secondary">{group.label}：</Text>
-                  {group.items.map((item) => (
-                    <Tag key={`${group.key}-${item.label}`}>
-                      {item.label} {item.count}
-                    </Tag>
-                  ))}
-                  {group.hiddenCount > 0 ? (
-                    <Tag className="erp-business-module-summary-chip">
-                      +{group.hiddenCount}
-                    </Tag>
-                  ) : null}
-                </div>
-              ))}
-            </>
-          ) : null
-        }
+        summary={null}
       />
 
       <BusinessFilterPanel
         compact
         summary={
-          <Tag className="erp-business-module-summary-chip">
-            {metricKey === 'amount' ? '金额合计' : '数量合计'}{' '}
-            {formatMetric(metricTotal)}
-          </Tag>
+          shouldShowAmountSummary ? (
+            <Tag className="erp-business-module-summary-chip">
+              {/* 当前业务页顶部只保留金额摘要，分类统计和数量摘要不再占用表格首屏。 */}
+              金额合计 {formatMetric(metricTotal)}
+            </Tag>
+          ) : null
         }
         actions={
           <>
