@@ -4,7 +4,7 @@
 
 - `compose.yml`：PostgreSQL + Jaeger + 业务服务 + 前端固定端口静态服务
 - `.env.example`：推荐环境变量
-- `migrate_online.sh`：通过临时 Atlas 容器执行 migration
+- `migrate_online.sh`：通过宿主机 `/usr/local/bin/atlas` 执行 migration
 
 ## 快速开始
 
@@ -62,6 +62,22 @@ export ERP_DEBUG_CLEANUP_ENABLED=false
 - 财务移动端：`5191`
 - PMC 移动端：`5192`
 - 品质移动端：`5193`
+
+当前 `8.218.4.199` 生产网关域名映射：
+
+| 入口 | 域名 | 上游端口 |
+| --- | --- | --- |
+| 桌面后台 | `admin.yoyoosun.net` | `5175` |
+| 老板移动端 | `boss.yoyoosun.net` | `5186` |
+| 业务移动端 | `business.yoyoosun.net` | `5187` |
+| 采购移动端 | `purchasing.yoyoosun.net` | `5188` |
+| 生产移动端 | `production.yoyoosun.net` | `5189` |
+| 仓库移动端 | `warehouse.yoyoosun.net` | `5190` |
+| 财务移动端 | `finance.yoyoosun.net` | `5191` |
+| PMC 移动端 | `pmc.yoyoosun.net` | `5192` |
+| 品质移动端 | `quality.yoyoosun.net` | `5193` |
+
+DNS 侧应为上述域名添加 A 记录并指向 `8.218.4.199`，当前 Cloudflare 使用 Proxied 模式。`admin.yoyoosun.net` 已在服务器侧签发 Let's Encrypt 证书并通过 Nginx HTTPS 反代到桌面后台；8 个移动端子域名共用 `mobile.yoyoosun.net` 证书文件，证书 SAN 覆盖 `boss / business / purchasing / production / warehouse / finance / pmc / quality.yoyoosun.net`，并分别通过 Nginx HTTPS 反代到固定移动端口。`yoyoosun.net` 根域已签发独立证书并跳转到 `https://admin.yoyoosun.net`。证书由服务器 `/usr/local/sbin/renew-acme-certs.sh` 统一续签，root crontab 每天 `03:23` 执行。
 
 说明：
 
@@ -132,11 +148,24 @@ open http://127.0.0.1:16687
 
 ## 迁移脚本
 
+低配服务器上不要使用 `arigaio/atlas:*` 临时容器，也不要把 Atlas 写入 Compose。先把 Atlas 安装到宿主机 `/usr/local/bin/atlas`；脚本会通过宿主机映射端口访问 PostgreSQL，并用 `/tmp/atlas-migrate.lock` 串行化迁移。
+
 ```bash
 cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
 sh migrate_online.sh --status-only
 sh migrate_online.sh
 sh migrate_online.sh --apply
+```
+
+常用覆盖项：
+
+```bash
+export COMPOSE_FILE=/path/to/compose.yml
+export MIG_DIR=/path/to/server/internal/data/model/migrate
+export POSTGRES_SERVICE=postgres
+export POSTGRES_HOST=127.0.0.1
+export POSTGRES_HOST_PORT=5435
+export ATLAS_BIN=/usr/local/bin/atlas
 ```
 
 ## 最小校验

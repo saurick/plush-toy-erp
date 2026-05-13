@@ -303,6 +303,7 @@ RBAC / API 改动必须覆盖：
 - 当前唯一部署真源：`/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前仓库没有初始化 `lab-ha`、Kubernetes 清单和 dashboard；未获明确需求前，不要补回第二套部署主路径。
 - 低配服务器只负责加载已构建镜像、启动 Compose、执行 migration 与部署后检查；发布时必须在本地或 CI 构建服务端/前端镜像并上传，禁止在服务器上执行 `docker build`、`pnpm build`、`go build`、`make build_server` 等重构建步骤。
+- 线上 / 低配服务器执行 Atlas migration 时，Atlas 是宿主机级运维工具，固定使用 `/usr/local/bin/atlas`；禁止用 `arigaio/atlas:*` 临时容器执行 migration，也不要把 Atlas 写进业务 Compose。migration 目录随 release 上传，执行时使用宿主机可达 DSN（如 `127.0.0.1:5435`）并用 `flock /tmp/atlas-migrate.lock` 串行化。
 - 多项目低配 Docker 宿主机发布完成、健康检查和必要回归通过后，应清理未被任何容器使用的旧镜像和构建缓存：优先执行 `docker image prune -a -f` 与 `docker builder prune -f`；清理前后记录 `df -h /`、`docker system df`、`docker ps --format '{{.Names}} {{.Status}} {{.Image}}'`。禁止在发布清理中执行 `docker system prune --volumes`、`docker volume prune`，也禁止删除 `/data`、数据库目录、compose `.env`、上传目录或运行中容器依赖的镜像。若需要保留回滚能力，应至少保留当前运行版本，磁盘允许时再额外保留上一版镜像。
 - Compose 基线默认保留 PostgreSQL、Jaeger、`/healthz`、`/readyz` 和 `depends_on: service_healthy`。
 - 如果后续确实要引入 Kubernetes 或其他部署方式，必须先补正式文档，再落代码和脚本。

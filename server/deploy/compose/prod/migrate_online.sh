@@ -1,13 +1,15 @@
 #!/usr/bin/env sh
 set -eu
 
-# 设计意图：在宿主机通过临时 Atlas 容器执行迁移，避免依赖业务容器内工具链。
+# 设计意图：低配生产服务器只调用宿主机 Atlas 二进制，避免迁移时拉起额外 Docker 镜像导致内存压力。
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 COMPOSE_FILE="${COMPOSE_FILE:-$SCRIPT_DIR/compose.yml}"
 SERVER_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
 MIG_DIR="${MIG_DIR:-$SERVER_ROOT/internal/data/model/migrate}"
-ATLAS_IMAGE="${ATLAS_IMAGE:-arigaio/atlas:latest}"
+ATLAS_BIN="${ATLAS_BIN:-/usr/local/bin/atlas}"
 POSTGRES_SERVICE="${POSTGRES_SERVICE:-postgres}"
+POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
+MIGRATION_LOCK_FILE="${MIGRATION_LOCK_FILE:-/tmp/atlas-migrate.lock}"
 
 APPLY_MODE=0
 STATUS_ONLY=0
@@ -26,8 +28,11 @@ usage() {
   COMPOSE_FILE   compose 文件路径（默认同目录 compose.yml）
   MIG_DIR        迁移目录（默认 server/internal/data/model/migrate）
   POSTGRES_SERVICE  compose 里的 Postgres 服务名（默认 postgres）
-  ATLAS_IMAGE    Atlas 镜像（默认 arigaio/atlas:latest）
-  DB_URL         手动覆盖数据库连接串（未设置时自动从 Postgres 容器推导）
+  ATLAS_BIN      宿主机 Atlas 二进制路径（默认 /usr/local/bin/atlas）
+  POSTGRES_HOST  宿主机访问 PostgreSQL 的地址（默认 127.0.0.1）
+  POSTGRES_HOST_PORT  宿主机映射的 PostgreSQL 端口（未设置时从容器端口绑定推导）
+  MIGRATION_LOCK_FILE 迁移串行锁文件（默认 /tmp/atlas-migrate.lock）
+  DB_URL         手动覆盖数据库连接串（未设置时自动从 Postgres 容器和宿主机端口推导）
 EOF
 }
 
@@ -59,6 +64,17 @@ fi
 
 if [ ! -d "$MIG_DIR" ]; then
 	echo "ERROR: 迁移目录不存在: $MIG_DIR" >&2
+	exit 1
+fi
+
+if ! command -v "$ATLAS_BIN" >/dev/null 2>&1; then
+	echo "ERROR: 未找到宿主机 Atlas: $ATLAS_BIN" >&2
+	echo "请先在服务器安装 Atlas 到 /usr/local/bin/atlas，不要使用 arigaio/atlas 容器执行线上迁移。" >&2
+	exit 1
+fi
+
+if ! command -v flock >/dev/null 2>&1; then
+	echo "ERROR: 未找到 flock，无法串行化线上迁移。" >&2
 	exit 1
 fi
 
@@ -105,17 +121,6 @@ if [ -z "${POSTGRES_CID:-}" ]; then
 	exit 1
 fi
 
-DB_NET=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' "$POSTGRES_CID" | head -n1 | tr -d '\r')
-if [ -z "${DB_NET:-}" ]; then
-	echo "ERROR: 无法解析 Postgres 容器网络" >&2
-	exit 1
-fi
-
-DB_HOST=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{"\n"}}{{end}}' "$POSTGRES_CID" | head -n1 | tr -d '\r')
-if [ -z "${DB_HOST:-}" ]; then
-	DB_HOST="$POSTGRES_SERVICE"
-fi
-
 if [ -z "${DB_URL:-}" ]; then
 	DB_NAME=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_DB"')
 	DB_PASS_RAW=$(docker exec "$POSTGRES_CID" sh -lc 'printf "%s" "$POSTGRES_PASSWORD"')
@@ -128,34 +133,37 @@ if [ -z "${DB_URL:-}" ]; then
 
 	DB_PASS_ENC=$(urlencode "$DB_PASS_RAW")
 	DB_USER_ENC=$(urlencode "$DB_USER")
-	DB_URL="postgres://${DB_USER_ENC}:${DB_PASS_ENC}@${DB_HOST}:5432/${DB_NAME}?sslmode=disable"
+	POSTGRES_HOST_PORT="${POSTGRES_HOST_PORT:-$(docker inspect -f '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}' "$POSTGRES_CID" 2>/dev/null || true)}"
+	if [ -z "${POSTGRES_HOST_PORT:-}" ]; then
+		echo "ERROR: 无法解析 PostgreSQL 宿主机端口。" >&2
+		echo "请确认 compose 已发布 5432/tcp，或显式设置 DB_URL / POSTGRES_HOST_PORT。" >&2
+		exit 1
+	fi
+	DB_URL="postgres://${DB_USER_ENC}:${DB_PASS_ENC}@${POSTGRES_HOST}:${POSTGRES_HOST_PORT}/${DB_NAME}?sslmode=disable"
 fi
 
 atlas_run() {
-	docker run --rm \
-		--network "$DB_NET" \
-		-v "$MIG_DIR:/migrate:ro" \
-		"$ATLAS_IMAGE" "$@"
+	flock "$MIGRATION_LOCK_FILE" "$ATLAS_BIN" "$@"
 }
 
 echo "==> 迁移目录: $MIG_DIR"
 echo "==> compose 文件: $COMPOSE_FILE"
 echo "==> Postgres 容器: $POSTGRES_CID"
-echo "==> Atlas 镜像: $ATLAS_IMAGE"
+echo "==> Atlas: $ATLAS_BIN"
 
 echo "==> [1/3] 查看当前迁移状态"
-atlas_run migrate status --dir "file:///migrate" --url "$DB_URL"
+atlas_run migrate status --dir "file://$MIG_DIR" --url "$DB_URL"
 
 if [ "$STATUS_ONLY" -eq 1 ]; then
 	exit 0
 fi
 
 echo "==> [2/3] dry-run 预演"
-atlas_run migrate apply --dry-run --dir "file:///migrate" --url "$DB_URL"
+atlas_run migrate apply --dry-run --dir "file://$MIG_DIR" --url "$DB_URL"
 
 if [ "$APPLY_MODE" -eq 1 ]; then
 	echo "==> [3/3] 正式执行迁移"
-	atlas_run migrate apply --dir "file:///migrate" --url "$DB_URL"
+	atlas_run migrate apply --dir "file://$MIG_DIR" --url "$DB_URL"
 else
 	echo "==> 未执行正式迁移。传入 --apply 可一键落库。"
 fi

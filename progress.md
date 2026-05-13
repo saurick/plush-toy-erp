@@ -1,3 +1,20 @@
+## 2026-05-13 22:14
+- 完成：将线上 Atlas migration 口径收口到正式规则与脚本：`AGENTS.md`、`docs/deployment-conventions.md`、`server/deploy/README.md` 和 `server/deploy/compose/prod/README.md` 均明确低配服务器使用宿主机 `/usr/local/bin/atlas`，禁止 `arigaio/atlas:*` 临时容器和 Compose 内 Atlas；`migrate_online.sh` 已从 Docker Atlas 容器改为宿主机 Atlas + `flock /tmp/atlas-migrate.lock`，默认通过宿主机 PostgreSQL 映射端口执行 `status / dry-run / apply`。
+- 下一步：后续发布时先确认服务器已有 `/usr/local/bin/atlas`；如继续扩展发布脚本，可把 Atlas 版本和端口可达性纳入 preflight。
+- 阻塞/风险：本轮未连接线上数据库执行迁移，只做规则、runbook 和脚本主路径收口；若某台服务器没有安装 Atlas，脚本会提前失败并提示安装。
+
+## 2026-05-13 00:14
+- 完成：在 Cloudflare DNS 补齐后，继续完成 `8.218.4.199` 上的移动端 HTTPS 部署。已为 `boss / business / purchasing / production / warehouse / finance / pmc / quality.yoyoosun.net` 签发一张 Let's Encrypt SAN 证书并安装到 `/etc/nginx/certs/mobile.yoyoosun.net/`，Nginx 已把 8 个移动端域名切为 HTTPS 入口并分别反代到 `5186-5193`。已为 `yoyoosun.net` 根域签发独立证书并配置 `https://yoyoosun.net` 跳转到 `https://admin.yoyoosun.net`。续签继续由 `/usr/local/sbin/renew-acme-certs.sh` 统一执行，root crontab 为每天 `03:23`。
+- 验证：公网 `https://admin.yoyoosun.net/healthz` 返回桌面后台健康信息，`https://yoyoosun.net/` 返回 301 到后台域名；公网 8 个移动端 `https://<role>.yoyoosun.net/healthz` 均返回对应角色健康信息。远端执行 `/usr/local/sbin/renew-acme-certs.sh` 后，`acme.sh --list` 已包含 `admin.yoyoosun.net`、`boss.yoyoosun.net` SAN 证书、`yoyoosun.net` 和既有 `oauth-api.saurick.me`；远端 `nginx -t` 通过，本项目 Compose 容器仍处于运行 / healthy 状态。
+- 下一步：后续如新增角色移动端域名，需要同时更新 Nginx server block、重新签发包含新域名的 SAN 证书，并确认 acme.sh 续签列表。
+- 阻塞/风险：本轮只变更线上 Nginx / 证书 / 续签配置和部署 README，不重建应用镜像，不改 Compose、业务代码、schema 或数据库。Cloudflare 当前为 Proxied 模式，实际公网证书链先经过 Cloudflare，源站证书仍已按 Full Strict 可用方式配置。
+
+## 2026-05-13 00:03
+- 完成：将 `plush-toy-erp` 线上网关域名收口到 `admin.yoyoosun.net` 和 8 个角色移动端子域名。服务器 `8.218.4.199` 上已配置 Nginx：`admin.yoyoosun.net` 通过 HTTPS 反代到桌面后台 `127.0.0.1:5175`；老板、业务、采购、生产、仓库、财务、PMC、品质移动端域名分别预置 HTTP / ACME 入口并反代到 `5186-5193`。已通过 acme.sh 为 `admin.yoyoosun.net` 签发 Let's Encrypt 证书，安装到 `/etc/nginx/certs/admin.yoyoosun.net/`，并把 root crontab 的续签入口收口到 `/usr/local/sbin/renew-acme-certs.sh`，每天 `03:23` 执行 `acme.sh --cron` 后校验并 reload Nginx。同步更新 `server/deploy/compose/prod/README.md` 的生产域名映射。
+- 验证：已执行远端 `nginx -t`、`systemctl reload nginx`、`/usr/local/sbin/renew-acme-certs.sh`；`acme.sh --list` 显示 `admin.yoyoosun.net` 已纳入续签，当前下一次续签时间为 `2026-06-10T15:58:39Z`。公网 `https://admin.yoyoosun.net/healthz` 返回桌面后台健康信息；直连解析到 `8.218.4.199` 的 8 个移动端 Host 均返回对应角色 `/healthz`；本项目 Compose 容器仍处于运行 / healthy 状态。
+- 下一步：在 DNS 中继续为 `boss / business / purchasing / production / warehouse / finance / pmc / quality.yoyoosun.net` 添加 A 记录到 `8.218.4.199`。移动端 DNS 生效后，再签发包含移动端域名的证书并把移动端入口切换为 HTTPS。
+- 阻塞/风险：当前 `admin.yoyoosun.net` 已有 A 记录但解析表现为 Cloudflare 代理地址；8 个移动端子域名当前还没有公网 A 记录，因此本轮不能签发移动端证书。移动端暂只完成服务器侧 HTTP / ACME 预置和直连 Host 回归，不代表公网 DNS 已可访问。
+
 ## 2026-05-10 00:30
 - 完成：补充 `AGENTS.md` 的多项目低配 Docker 宿主机发布后清理约束，明确发布完成、健康检查和必要回归通过后，只清理未被任何容器使用的旧镜像与构建缓存，优先使用 `docker image prune -a -f` 与 `docker builder prune -f`；清理前后记录磁盘、Docker 占用和运行容器状态，并禁止清理 volume、数据库目录、compose `.env`、上传目录或运行中容器依赖镜像。
 - 下一步：如后续继续完善发布脚本，可将该约束落为 post-deploy cleanup，并保留必要回滚镜像边界。
