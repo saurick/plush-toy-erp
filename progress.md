@@ -1,3 +1,13 @@
+## 2026-05-14 14:51
+- 完成：按“单纯列问题，其余都不要”的口径重写 Word 文档 `/Users/simon/projects/plush-toy-erp/output/doc/erp-customer-requirements-questionnaire.docx`，并同步覆盖桌面文件 `/Users/simon/Desktop/erp-customer-requirements-questionnaire.docx`。新版只保留 9 个业务分类标题和 73 条问题，删除封面式标题、访谈信息、使用说明、表格、客户反馈栏和待确认事项汇总。
+- 下一步：如客户反馈后需要形成正式需求确认稿，再基于这份问题清单整理结论并同步相关正式文档。
+- 阻塞/风险：已检查两份 `.docx` 均为 82 个非空段落、9 个标题、73 条问题、0 张表格，且 `unzip -t` 通过；本轮未做逐页 PDF 渲染，因为当前文档已是纯文本问题列表且本机没有 LibreOffice/soffice。
+
+## 2026-05-14 14:38
+- 完成：按客户访谈问题清单生成 Word 文档 `/Users/simon/projects/plush-toy-erp/output/doc/erp-customer-requirements-questionnaire.docx`，整理为 9 个业务模块、73 条调研问题和 10 行待确认事项汇总表，便于现场记录客户反馈、当前做法和系统落地结论。本轮只新增文档交付物，不改变业务代码、schema、菜单入口、部署配置或正式业务真源。
+- 下一步：如后续客户给出回答，可在该 Word 基础上整理为正式需求确认稿，并按影响范围同步 `docs/current-source-of-truth.md`、产品化 / 交付文档或对应业务边界文档。
+- 阻塞/风险：已用 `python-docx` 结构检查确认文档包含 10 个章节、73 条问题和 10 行汇总记录，并通过 `unzip -t` 校验文件完整；本机未发现 LibreOffice/soffice，无法执行逐页 PDF 渲染，只通过 macOS Quick Look 生成首页预览图做版面抽检。
+
 ## 2026-05-13 22:14
 - 完成：将线上 Atlas migration 口径收口到正式规则与脚本：`AGENTS.md`、`docs/deployment-conventions.md`、`server/deploy/README.md` 和 `server/deploy/compose/prod/README.md` 均明确低配服务器使用宿主机 `/usr/local/bin/atlas`，禁止 `arigaio/atlas:*` 临时容器和 Compose 内 Atlas；`migrate_online.sh` 已从 Docker Atlas 容器改为宿主机 Atlas + `flock /tmp/atlas-migrate.lock`，默认通过宿主机 PostgreSQL 映射端口执行 `status / dry-run / apply`。
 - 下一步：后续发布时先确认服务器已有 `/usr/local/bin/atlas`；如继续扩展发布脚本，可把 Atlas 版本和端口可达性纳入 preflight。
