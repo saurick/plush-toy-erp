@@ -6,6 +6,7 @@
 
 - 运行时行为的最终真源始终是代码。
 - 仓库级约定、部署边界和项目基线，以当前文档为索引，再分流到对应子目录文档。
+- `docs/changes/` 只记录历史变更、设计评审和当时验收，不直接代表当前状态、当前能力或当前禁止事项；当前状态必须回到本文档、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认。
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
 

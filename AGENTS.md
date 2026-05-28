@@ -24,6 +24,8 @@
 
 如果任务已经明确落在某个子系统，再继续读对应专题文档，不要先凭印象补丁。
 
+`docs/changes/` 只记录历史变更、设计评审和当时验收，不能作为当前状态、当前能力或当前禁止事项的最终真源。判断当前状态时，必须以 `docs/current-source-of-truth.md`、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试为准；若历史 changes 与当前代码 / 测试 / 真源索引冲突，优先按当前代码、测试和真源索引收敛。
+
 常见专题文档包括但不限于：
 
 - Workflow 协同层：`docs/architecture/workflow-usecase-review.md`

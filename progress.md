@@ -1,3 +1,8 @@
+## 2026-05-28 23:29
+- 完成：补充文档真源层级规则，明确 `docs/changes/` 只记录历史变更、设计评审和当时验收，不能作为当前状态、当前能力或当前禁止事项的最终真源；当前状态应以 `docs/current-source-of-truth.md`、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认为准。同步更新 `AGENTS.md` 与 `docs/current-source-of-truth.md`。
+- 下一步：如果后续要启用独立 `docs/capability-ledger.md`，应单独补齐文件结构、维护职责、与系统分层进度文档的边界和测试 / 文档引用。
+- 阻塞/风险：本轮只补文档规则，没有新建能力账本，也未改变代码、schema、菜单、测试或部署配置；更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-14 14:51
 - 完成：按“单纯列问题，其余都不要”的口径重写 Word 文档 `/Users/simon/projects/plush-toy-erp/output/doc/erp-customer-requirements-questionnaire.docx`，并同步覆盖桌面文件 `/Users/simon/Desktop/erp-customer-requirements-questionnaire.docx`。新版只保留 9 个业务分类标题和 73 条问题，删除封面式标题、访谈信息、使用说明、表格、客户反馈栏和待确认事项汇总。
 - 下一步：如客户反馈后需要形成正式需求确认稿，再基于这份问题清单整理结论并同步相关正式文档。
