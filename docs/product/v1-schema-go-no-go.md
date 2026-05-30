@@ -1,15 +1,15 @@
 Doc Type: V1 Schema Go/No-Go
 Status: Proposed
-Runtime Implemented: No
+Runtime Implemented: MasterData repo/usecase for customers / suppliers / contacts added in 005; API/RBAC/UI remain not implemented
 Ent Schema Implemented: Schema files added in 003; generated code added in 004
 Migration Implemented: Yes, generated in 004
-Current Implementation Source of Truth: Schema files, generated Ent code and Atlas migration; repo/usecase/API/UI remain not implemented
+Current Implementation Source of Truth: Schema files, generated Ent code, Atlas migration, and 005 MasterData repo/usecase for customers / suppliers / contacts; sales order usecase/API/UI remain not implemented
 
 # V1 Schema Go / No-Go Checklist
 
 本检查清单用于下一轮 Ent schema goal 前的 go/no-go。结论只允许在 `docs/product/v1-implementation-cutline.md` 的范围内 Proceed With Restrictions。
 
-003 schema-only 已按本清单落入 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件；004 已运行 Ent generate 并生成 Atlas migration。仍未接 repo/usecase、API、RBAC、UI、docs registry、seedData 或 `business_records` transition。
+003 schema-only 已按本清单落入 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件；004 已运行 Ent generate 并生成 Atlas migration；005 已新增 `customers / suppliers / contacts` repo/usecase 和测试。销售订单 usecase、API、RBAC、UI、docs registry、seedData 和 `business_records` transition 仍未实现。
 
 | Check | Answer | Evidence | Decision | Owner Layer |
 |---|---|---|---|---|

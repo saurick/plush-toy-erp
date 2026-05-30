@@ -44,7 +44,7 @@ docs/codex-goals/_goal-file-template.md
 
 本轮允许和禁止修改的文件，以任务 md 为准。
 
-完成后必须按 docs/codex-goals/_review-output-protocol.md 生成 .codex-review/latest.md。
+正式 Goal 收口后必须按 docs/codex-goals/_review-output-protocol.md 生成 .codex-review/latest.md。
 
 用户应能用下面命令一键复制：
 
@@ -82,15 +82,21 @@ API/RBAC -> UI：新开会话
 修正当前 Goal 输出格式
 ```
 
-## 每轮必须生成审查报告
+## 正式 Goal 收口必须生成审查报告
 
-每轮 Codex 任务完成后，必须生成：
+每轮正式 Codex Goal 完成后，必须生成：
 
 ```text
 .codex-review/latest.md
 ```
 
 `.codex-review/` 是本地临时审查交接产物，不提交进 Git；长期记录应进入具体 Goal 文件、`progress.md` 或正式文档。
+
+只有明确执行 `docs/codex-goals/<goal-file>.md`、修复当前 Goal 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时，才生成或覆盖 `.codex-review/latest.md`。
+
+Codex 没有可靠的内置“当前是否 Goal 模式”标志，必须根据当前上下文判断：用户是否明确指定 Goal 文件、当前输入是否是短 Goal 模板、是否正在修复当前 Goal 的后续问题、是否明确要求 review 输出。若上下文不明确，默认按普通任务处理，不碰 `.codex-review/latest.md`。
+
+普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除 `.codex-review/latest.md`。
 
 审查报告格式必须遵守：
 

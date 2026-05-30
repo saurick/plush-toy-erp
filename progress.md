@@ -1,3 +1,19 @@
+## 2026-05-31 00:37
+- 完成：执行 `005-v1-repo-usecase-masterdata`，新增 `customers / suppliers / contacts` 后端 MasterData repo/usecase 和测试；contacts create/update 会在 usecase 校验 `owner_type` 只能是 `CUSTOMER / SUPPLIER`，并校验 `owner_id` 对应客户或供应商存在；设置主联系人采用事务内自动取消同一 owner 其他 primary 的策略。本轮未接 API/RBAC/UI、docs registry、seedData、sales order usecase 或 `business_records` transition。
+- 下一步：建议进入 `006-v1-repo-usecase-sales-order`，单独实现销售订单 Source Document repo/usecase 和生命周期状态机，继续禁止写库存、出货、财务事实。
+- 阻塞/风险：目标库 migration 是否已 apply 仍不是本轮范围；当前只通过 SQLite/Go 测试验证 repo/usecase 行为，未接外部 API 入口。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 00:42
+- 完成：收紧 Codex Goal 审查报告规则，明确 `.codex-review/latest.md` 只在正式执行 `docs/codex-goals/<goal>.md`、修复当前 Goal 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时才生成或覆盖；普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除该文件。同步更新 `AGENTS.md`、`docs/codex-goals/README.md` 和 `docs/codex-goals/_review-output-protocol.md`。
+- 完成：补充“Codex 没有可靠内置 Goal 模式标志，必须根据当前上下文判断”的说明；若上下文不明确，默认按普通任务处理，不碰 `.codex-review/latest.md`。
+- 下一步：后续普通文档小修仍按需更新 `progress.md`，但不再套用 `.codex-review/latest.md` 审查报告流程；正式 Goal 收口时继续按协议生成审查报告。
+- 阻塞/风险：本轮只改协作规则文档和进度记录，不恢复此前被误删的本地临时 `.codex-review/latest.md`；当前工作区仍有其他业务和 Goal 草稿改动未纳入本轮处理。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 00:34
+- 完成：修正 `docs/product/v1-next-codex-goals.md` 汉化后的 Markdown 格式问题：移除重复 H1，补齐文件末尾 newline，并把表格中含 `|` / `||` 的测试命令改为不破坏表格分列的 HTML code + entity 写法。本轮只做文档格式修复，不改变 V1 Goal 顺序、实现状态、运行时代码、Ent schema、migration、API、UI、docs registry 或 seedData。
+- 下一步：继续处理 `005-v1-repo-usecase-masterdata` 时，按该 Goal 文件单独收敛允许 / 禁止路径和测试命令；不要把 sales order usecase、API/RBAC 或 UI 混进同一轮。
+- 阻塞/风险：当前工作区仍有未跟踪的 `docs/codex-goals/005-v1-repo-usecase-masterdata.md` 与 masterdata backend 草稿文件，本轮未回退、整理或纳入验证；更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-31 00:16
 - 完成：执行 `004-v1-migration-and-ent-generate`，基于 003 的 `customers / suppliers / contacts / sales_orders / sales_order_items` 五个 Ent schema 运行 `make data`，生成 Ent 代码与 Atlas migration `server/internal/data/model/migrate/20260530161152_migrate.sql`。本轮未接 repo/usecase、API/RBAC、UI、docs registry、seedData 或 `business_records` transition。
 - 下一步：建议拆分进入 `005-v1-repo-usecase-masterdata`，先做 customers / suppliers / contacts repo/usecase 和测试；再进入 `006-v1-repo-usecase-sales-order`，单独处理销售订单 Source Document 生命周期。

@@ -2,7 +2,17 @@
 
 ## 目的
 
-每轮 Codex 完成后，必须生成一个用户可以直接复制给 GPT 审查的 Markdown 报告。
+每轮正式 Codex Goal 收口后，必须生成一个用户可以直接复制给 GPT 审查的 Markdown 报告。
+
+本协议只适用于以下场景：
+
+- 明确执行 `docs/codex-goals/<goal-file>.md`。
+- 修复当前 Goal 遗漏、测试失败或审查报告。
+- 用户明确要求生成审查报告。
+
+Codex 没有可靠的内置“当前是否 Goal 模式”标志，必须根据当前上下文判断：用户是否明确指定 Goal 文件、当前输入是否是短 Goal 模板、是否正在修复当前 Goal 的后续问题、是否明确要求 review 输出。若上下文不明确，默认按普通任务处理，不碰 `.codex-review/latest.md`。
+
+普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除 `.codex-review/latest.md`。
 
 不要只在 Codex 聊天窗口里分散输出。
 不要要求用户截图。
@@ -10,7 +20,7 @@
 
 ## 必须生成的文件
 
-必须创建或覆盖本地临时文件：
+正式 Goal 收口时，必须创建或覆盖本地临时文件：
 
 ```text
 .codex-review/latest.md
@@ -22,7 +32,7 @@
 
 ## Codex 最终必须告诉用户
 
-Codex 最终回复必须告诉用户：
+正式 Goal 收口的最终回复必须告诉用户：
 
 ```bash
 cat .codex-review/latest.md | pbcopy
@@ -376,7 +386,7 @@ grep -R "Runtime Implemented: Yes\|Ent Schema Implemented: Yes\|Migration Implem
 
 ## Codex 最终回复要求
 
-Codex 最终回复必须包含：
+正式 Goal 收口的 Codex 最终回复必须包含：
 
 1. `.codex-review/latest.md` 已生成。
 2. 给出 Mac 一键复制命令：

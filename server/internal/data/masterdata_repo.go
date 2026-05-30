@@ -1,0 +1,488 @@
+package data
+
+import (
+	"context"
+
+	"server/internal/biz"
+	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/contact"
+	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/supplier"
+
+	"github.com/go-kratos/kratos/v2/log"
+)
+
+type masterDataRepo struct {
+	data *Data
+	log  *log.Helper
+}
+
+func NewMasterDataRepo(d *Data, logger log.Logger) *masterDataRepo {
+	return &masterDataRepo{
+		data: d,
+		log:  log.NewHelper(log.With(logger, "module", "data.masterdata_repo")),
+	}
+}
+
+var _ biz.MasterDataRepo = (*masterDataRepo)(nil)
+
+func (r *masterDataRepo) CreateCustomer(ctx context.Context, in *biz.CustomerMutation) (*biz.Customer, error) {
+	row, err := r.data.postgres.Customer.Create().
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetNillableShortName(in.ShortName).
+		SetNillableTaxNo(in.TaxNo).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entCustomerToBiz(row), nil
+}
+
+func (r *masterDataRepo) UpdateCustomer(ctx context.Context, id int, in *biz.CustomerMutation) (*biz.Customer, error) {
+	update := r.data.postgres.Customer.UpdateOneID(id).
+		SetCode(in.Code).
+		SetName(in.Name)
+	if in.ShortName == nil {
+		update.ClearShortName()
+	} else {
+		update.SetShortName(*in.ShortName)
+	}
+	if in.TaxNo == nil {
+		update.ClearTaxNo()
+	} else {
+		update.SetTaxNo(*in.TaxNo)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrCustomerNotFound
+		}
+		return nil, err
+	}
+	return entCustomerToBiz(row), nil
+}
+
+func (r *masterDataRepo) GetCustomer(ctx context.Context, id int) (*biz.Customer, error) {
+	row, err := r.data.postgres.Customer.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrCustomerNotFound
+		}
+		return nil, err
+	}
+	return entCustomerToBiz(row), nil
+}
+
+func (r *masterDataRepo) ListCustomers(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Customer, int, error) {
+	query := r.data.postgres.Customer.Query()
+	if filter.Keyword != "" {
+		query = query.Where(customer.Or(
+			customer.CodeContains(filter.Keyword),
+			customer.NameContains(filter.Keyword),
+			customer.ShortNameContains(filter.Keyword),
+		))
+	}
+	if filter.ActiveOnly {
+		query = query.Where(customer.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Asc(customer.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entCustomersToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) SetCustomerActive(ctx context.Context, id int, active bool) (*biz.Customer, error) {
+	row, err := r.data.postgres.Customer.UpdateOneID(id).SetIsActive(active).Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrCustomerNotFound
+		}
+		return nil, err
+	}
+	return entCustomerToBiz(row), nil
+}
+
+func (r *masterDataRepo) CustomerExists(ctx context.Context, id int) (bool, error) {
+	return r.data.postgres.Customer.Query().Where(customer.ID(id)).Exist(ctx)
+}
+
+func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMutation) (*biz.Supplier, error) {
+	row, err := r.data.postgres.Supplier.Create().
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetNillableShortName(in.ShortName).
+		SetNillableSupplierType(in.SupplierType).
+		SetNillableTaxNo(in.TaxNo).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entSupplierToBiz(row), nil
+}
+
+func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.SupplierMutation) (*biz.Supplier, error) {
+	update := r.data.postgres.Supplier.UpdateOneID(id).
+		SetCode(in.Code).
+		SetName(in.Name)
+	if in.ShortName == nil {
+		update.ClearShortName()
+	} else {
+		update.SetShortName(*in.ShortName)
+	}
+	if in.SupplierType == nil {
+		update.ClearSupplierType()
+	} else {
+		update.SetSupplierType(*in.SupplierType)
+	}
+	if in.TaxNo == nil {
+		update.ClearTaxNo()
+	} else {
+		update.SetTaxNo(*in.TaxNo)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSupplierNotFound
+		}
+		return nil, err
+	}
+	return entSupplierToBiz(row), nil
+}
+
+func (r *masterDataRepo) GetSupplier(ctx context.Context, id int) (*biz.Supplier, error) {
+	row, err := r.data.postgres.Supplier.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSupplierNotFound
+		}
+		return nil, err
+	}
+	return entSupplierToBiz(row), nil
+}
+
+func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Supplier, int, error) {
+	query := r.data.postgres.Supplier.Query()
+	if filter.Keyword != "" {
+		query = query.Where(supplier.Or(
+			supplier.CodeContains(filter.Keyword),
+			supplier.NameContains(filter.Keyword),
+			supplier.ShortNameContains(filter.Keyword),
+		))
+	}
+	if filter.ActiveOnly {
+		query = query.Where(supplier.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Asc(supplier.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entSuppliersToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) SetSupplierActive(ctx context.Context, id int, active bool) (*biz.Supplier, error) {
+	row, err := r.data.postgres.Supplier.UpdateOneID(id).SetIsActive(active).Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSupplierNotFound
+		}
+		return nil, err
+	}
+	return entSupplierToBiz(row), nil
+}
+
+func (r *masterDataRepo) SupplierExists(ctx context.Context, id int) (bool, error) {
+	return r.data.postgres.Supplier.Query().Where(supplier.ID(id)).Exist(ctx)
+}
+
+func (r *masterDataRepo) CreateContact(ctx context.Context, in *biz.ContactMutation) (*biz.Contact, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+
+	if in.IsPrimary {
+		if _, err := tx.Contact.Update().
+			Where(contact.OwnerType(in.OwnerType), contact.OwnerID(in.OwnerID), contact.IsPrimary(true)).
+			SetIsPrimary(false).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+	row, err := tx.Contact.Create().
+		SetOwnerType(in.OwnerType).
+		SetOwnerID(in.OwnerID).
+		SetName(in.Name).
+		SetNillablePhone(in.Phone).
+		SetNillableMobile(in.Mobile).
+		SetNillableEmail(in.Email).
+		SetNillableTitle(in.Title).
+		SetIsPrimary(in.IsPrimary).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := entContactToBiz(row)
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
+}
+
+func (r *masterDataRepo) UpdateContact(ctx context.Context, id int, in *biz.ContactMutation) (*biz.Contact, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+
+	if exists, err := tx.Contact.Query().Where(contact.ID(id)).Exist(ctx); err != nil {
+		return nil, err
+	} else if !exists {
+		return nil, biz.ErrContactNotFound
+	}
+	if in.IsPrimary {
+		if _, err := tx.Contact.Update().
+			Where(contact.OwnerType(in.OwnerType), contact.OwnerID(in.OwnerID), contact.IDNEQ(id), contact.IsPrimary(true)).
+			SetIsPrimary(false).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+	update := tx.Contact.UpdateOneID(id).
+		SetOwnerType(in.OwnerType).
+		SetOwnerID(in.OwnerID).
+		SetName(in.Name).
+		SetIsPrimary(in.IsPrimary)
+	if in.Phone == nil {
+		update.ClearPhone()
+	} else {
+		update.SetPhone(*in.Phone)
+	}
+	if in.Mobile == nil {
+		update.ClearMobile()
+	} else {
+		update.SetMobile(*in.Mobile)
+	}
+	if in.Email == nil {
+		update.ClearEmail()
+	} else {
+		update.SetEmail(*in.Email)
+	}
+	if in.Title == nil {
+		update.ClearTitle()
+	} else {
+		update.SetTitle(*in.Title)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrContactNotFound
+		}
+		return nil, err
+	}
+	out := entContactToBiz(row)
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
+}
+
+func (r *masterDataRepo) GetContact(ctx context.Context, id int) (*biz.Contact, error) {
+	row, err := r.data.postgres.Contact.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrContactNotFound
+		}
+		return nil, err
+	}
+	return entContactToBiz(row), nil
+}
+
+func (r *masterDataRepo) ListContactsByOwner(ctx context.Context, filter biz.ContactFilter) ([]*biz.Contact, int, error) {
+	query := r.data.postgres.Contact.Query().
+		Where(contact.OwnerType(filter.OwnerType), contact.OwnerID(filter.OwnerID))
+	if filter.ActiveOnly {
+		query = query.Where(contact.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Desc(contact.FieldIsPrimary), ent.Asc(contact.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entContactsToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) SetPrimaryContact(ctx context.Context, id int) (*biz.Contact, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+
+	row, err := tx.Contact.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrContactNotFound
+		}
+		return nil, err
+	}
+	if _, err := tx.Contact.Update().
+		Where(contact.OwnerType(row.OwnerType), contact.OwnerID(row.OwnerID), contact.IDNEQ(row.ID), contact.IsPrimary(true)).
+		SetIsPrimary(false).
+		Save(ctx); err != nil {
+		return nil, err
+	}
+	row, err = tx.Contact.UpdateOneID(row.ID).SetIsPrimary(true).SetIsActive(true).Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrContactNotFound
+		}
+		return nil, err
+	}
+	out := entContactToBiz(row)
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
+}
+
+func (r *masterDataRepo) DisableContact(ctx context.Context, id int) (*biz.Contact, error) {
+	row, err := r.data.postgres.Contact.UpdateOneID(id).
+		SetIsActive(false).
+		SetIsPrimary(false).
+		Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrContactNotFound
+		}
+		return nil, err
+	}
+	return entContactToBiz(row), nil
+}
+
+func rollbackMasterDataEntTx(ctx context.Context, tx *ent.Tx, logger *log.Helper) {
+	if tx == nil {
+		return
+	}
+	if err := tx.Rollback(); err != nil && logger != nil {
+		logger.WithContext(ctx).Warnf("rollback ent tx failed err=%v", err)
+	}
+}
+
+func entCustomerToBiz(row *ent.Customer) *biz.Customer {
+	if row == nil {
+		return nil
+	}
+	return &biz.Customer{
+		ID:        row.ID,
+		Code:      row.Code,
+		Name:      row.Name,
+		ShortName: row.ShortName,
+		TaxNo:     row.TaxNo,
+		IsActive:  row.IsActive,
+		Note:      row.Note,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}
+}
+
+func entCustomersToBiz(rows []*ent.Customer) []*biz.Customer {
+	out := make([]*biz.Customer, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entCustomerToBiz(row))
+	}
+	return out
+}
+
+func entSupplierToBiz(row *ent.Supplier) *biz.Supplier {
+	if row == nil {
+		return nil
+	}
+	return &biz.Supplier{
+		ID:           row.ID,
+		Code:         row.Code,
+		Name:         row.Name,
+		ShortName:    row.ShortName,
+		SupplierType: row.SupplierType,
+		TaxNo:        row.TaxNo,
+		IsActive:     row.IsActive,
+		Note:         row.Note,
+		CreatedAt:    row.CreatedAt,
+		UpdatedAt:    row.UpdatedAt,
+	}
+}
+
+func entSuppliersToBiz(rows []*ent.Supplier) []*biz.Supplier {
+	out := make([]*biz.Supplier, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entSupplierToBiz(row))
+	}
+	return out
+}
+
+func entContactToBiz(row *ent.Contact) *biz.Contact {
+	if row == nil {
+		return nil
+	}
+	return &biz.Contact{
+		ID:        row.ID,
+		OwnerType: row.OwnerType,
+		OwnerID:   row.OwnerID,
+		Name:      row.Name,
+		Phone:     row.Phone,
+		Mobile:    row.Mobile,
+		Email:     row.Email,
+		Title:     row.Title,
+		IsPrimary: row.IsPrimary,
+		IsActive:  row.IsActive,
+		Note:      row.Note,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}
+}
+
+func entContactsToBiz(rows []*ent.Contact) []*biz.Contact {
+	out := make([]*biz.Contact, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entContactToBiz(row))
+	}
+	return out
+}

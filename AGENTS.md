@@ -54,8 +54,10 @@
 - Codex Goal 输入框只放 `4000` 字以内中文短 Goal；复杂任务、长背景、禁止项、验收命令和交接细节必须写入 `docs/codex-goals/*.md`。
 - 每个任务的允许修改文件、禁止修改文件、验收命令，以对应的 Goal md 为准。
 - 每个任务必须在对应 Goal md 中明确成功标准、当前真源与非真源、改动范围分级、停止条件、Git 策略、测试分层选择和验收命令；不要让本文件代替具体任务的测试选择。
-- 每轮完成后必须按 `docs/codex-goals/_review-output-protocol.md` 生成或覆盖本地临时文件 `.codex-review/latest.md`，不生成 `.codex-review/runs` 历史副本，也不把 `.codex-review/` 提交进 Git。用户必须能用 `cat .codex-review/latest.md | pbcopy` 一键复制给 GPT 审查。
-- Codex 不要要求用户截图；需要交接给 GPT 的内容应收敛到仓库文件、命令输出和 `.codex-review/latest.md`。
+- 每轮正式 Codex Goal 收口后，必须按 `docs/codex-goals/_review-output-protocol.md` 生成或覆盖本地临时文件 `.codex-review/latest.md`，不生成 `.codex-review/runs` 历史副本，也不把 `.codex-review/` 提交进 Git。用户必须能用 `cat .codex-review/latest.md | pbcopy` 一键复制给 GPT 审查。
+- Codex 没有可靠的内置“当前是否 Goal 模式”标志，必须根据当前上下文判断：用户是否明确要求执行 `docs/codex-goals/<goal>.md`，当前输入是否是短 Goal 模板，是否正在修复当前 Goal 的测试失败 / 漏项 / 审查报告，或用户是否明确要求生成审查报告。若上下文不明确，默认按普通任务处理，不生成、不覆盖、也不删除 `.codex-review/latest.md`。
+- 只有明确执行 `docs/codex-goals/<goal>.md`、修复当前 Goal 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时，才生成或覆盖 `.codex-review/latest.md`。普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除 `.codex-review/latest.md`。
+- Codex 不要要求用户截图；正式 Goal 需要交接给 GPT 的内容应收敛到仓库文件、命令输出和 `.codex-review/latest.md`。
 - 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/codex-goals/README.md`、`docs/codex-goals/_review-output-protocol.md`、`docs/product/*`、`docs/architecture/*`。具体任务的执行范围、允许 / 禁止路径和验收命令，以当前用户指定的 `docs/codex-goals/<goal>.md` 为准。
 - plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和 current 客户边界，仍以本文件和正式产品 / 架构文档为准。
 - 处理 Codex Goal 时禁止：
