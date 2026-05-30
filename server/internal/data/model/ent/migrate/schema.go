@@ -308,6 +308,98 @@ var (
 			},
 		},
 	}
+	// ContactsColumns holds the columns for the "contacts" table.
+	ContactsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "owner_type", Type: field.TypeString, Size: 16},
+		{Name: "owner_id", Type: field.TypeInt},
+		{Name: "name", Type: field.TypeString, Size: 128},
+		{Name: "phone", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "mobile", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "email", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "title", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "is_primary", Type: field.TypeBool, Default: false},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// ContactsTable holds the schema information for the "contacts" table.
+	ContactsTable = &schema.Table{
+		Name:       "contacts",
+		Columns:    ContactsColumns,
+		PrimaryKey: []*schema.Column{ContactsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contact_owner_type_owner_id",
+				Unique:  false,
+				Columns: []*schema.Column{ContactsColumns[1], ContactsColumns[2]},
+			},
+			{
+				Name:    "contact_owner_type_owner_id_is_primary",
+				Unique:  true,
+				Columns: []*schema.Column{ContactsColumns[1], ContactsColumns[2], ContactsColumns[8]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "is_primary = true",
+				},
+			},
+			{
+				Name:    "contact_phone",
+				Unique:  false,
+				Columns: []*schema.Column{ContactsColumns[4]},
+			},
+			{
+				Name:    "contact_mobile",
+				Unique:  false,
+				Columns: []*schema.Column{ContactsColumns[5]},
+			},
+			{
+				Name:    "contact_is_active",
+				Unique:  false,
+				Columns: []*schema.Column{ContactsColumns[9]},
+			},
+		},
+	}
+	// CustomersColumns holds the columns for the "customers" table.
+	CustomersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "code", Type: field.TypeString, Size: 64},
+		{Name: "name", Type: field.TypeString, Size: 255},
+		{Name: "short_name", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "tax_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// CustomersTable holds the schema information for the "customers" table.
+	CustomersTable = &schema.Table{
+		Name:       "customers",
+		Columns:    CustomersColumns,
+		PrimaryKey: []*schema.Column{CustomersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "customer_code",
+				Unique:  true,
+				Columns: []*schema.Column{CustomersColumns[1]},
+			},
+			{
+				Name:    "customer_name",
+				Unique:  false,
+				Columns: []*schema.Column{CustomersColumns[2]},
+			},
+			{
+				Name:    "customer_short_name",
+				Unique:  false,
+				Columns: []*schema.Column{CustomersColumns[3]},
+			},
+			{
+				Name:    "customer_is_active",
+				Unique:  false,
+				Columns: []*schema.Column{CustomersColumns[5]},
+			},
+		},
+	}
 	// InventoryBalancesColumns holds the columns for the "inventory_balances" table.
 	InventoryBalancesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1222,6 +1314,184 @@ var (
 			},
 		},
 	}
+	// SalesOrdersColumns holds the columns for the "sales_orders" table.
+	SalesOrdersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "order_no", Type: field.TypeString, Size: 64},
+		{Name: "customer_order_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "customer_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "order_date", Type: field.TypeTime},
+		{Name: "planned_delivery_date", Type: field.TypeTime, Nullable: true},
+		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "customer_id", Type: field.TypeInt},
+	}
+	// SalesOrdersTable holds the schema information for the "sales_orders" table.
+	SalesOrdersTable = &schema.Table{
+		Name:       "sales_orders",
+		Columns:    SalesOrdersColumns,
+		PrimaryKey: []*schema.Column{SalesOrdersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "sales_orders_customers_sales_orders",
+				Columns:    []*schema.Column{SalesOrdersColumns[10]},
+				RefColumns: []*schema.Column{CustomersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "salesorder_order_no",
+				Unique:  true,
+				Columns: []*schema.Column{SalesOrdersColumns[1]},
+			},
+			{
+				Name:    "salesorder_customer_id",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrdersColumns[10]},
+			},
+			{
+				Name:    "salesorder_customer_order_no",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrdersColumns[2]},
+			},
+			{
+				Name:    "salesorder_lifecycle_status",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrdersColumns[6]},
+			},
+			{
+				Name:    "salesorder_order_date",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrdersColumns[4]},
+			},
+			{
+				Name:    "salesorder_planned_delivery_date",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrdersColumns[5]},
+			},
+		},
+	}
+	// SalesOrderItemsColumns holds the columns for the "sales_order_items" table.
+	SalesOrderItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "line_no", Type: field.TypeInt},
+		{Name: "product_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "product_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "color_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "ordered_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "planned_delivery_date", Type: field.TypeTime, Nullable: true},
+		{Name: "line_status", Type: field.TypeString, Size: 32, Default: "open"},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "sales_order_id", Type: field.TypeInt},
+		{Name: "product_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+	}
+	// SalesOrderItemsTable holds the schema information for the "sales_order_items" table.
+	SalesOrderItemsTable = &schema.Table{
+		Name:       "sales_order_items",
+		Columns:    SalesOrderItemsColumns,
+		PrimaryKey: []*schema.Column{SalesOrderItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "sales_order_items_sales_orders_items",
+				Columns:    []*schema.Column{SalesOrderItemsColumns[13]},
+				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "sales_order_items_products_product",
+				Columns:    []*schema.Column{SalesOrderItemsColumns[14]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "sales_order_items_units_unit",
+				Columns:    []*schema.Column{SalesOrderItemsColumns[15]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "salesorderitem_sales_order_id_line_no",
+				Unique:  true,
+				Columns: []*schema.Column{SalesOrderItemsColumns[13], SalesOrderItemsColumns[1]},
+			},
+			{
+				Name:    "salesorderitem_product_id",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrderItemsColumns[14]},
+			},
+			{
+				Name:    "salesorderitem_unit_id",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrderItemsColumns[15]},
+			},
+			{
+				Name:    "salesorderitem_line_status",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrderItemsColumns[9]},
+			},
+			{
+				Name:    "salesorderitem_planned_delivery_date",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrderItemsColumns[8]},
+			},
+		},
+	}
+	// SuppliersColumns holds the columns for the "suppliers" table.
+	SuppliersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "code", Type: field.TypeString, Size: 64},
+		{Name: "name", Type: field.TypeString, Size: 255},
+		{Name: "short_name", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "supplier_type", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "tax_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// SuppliersTable holds the schema information for the "suppliers" table.
+	SuppliersTable = &schema.Table{
+		Name:       "suppliers",
+		Columns:    SuppliersColumns,
+		PrimaryKey: []*schema.Column{SuppliersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "supplier_code",
+				Unique:  true,
+				Columns: []*schema.Column{SuppliersColumns[1]},
+			},
+			{
+				Name:    "supplier_name",
+				Unique:  false,
+				Columns: []*schema.Column{SuppliersColumns[2]},
+			},
+			{
+				Name:    "supplier_short_name",
+				Unique:  false,
+				Columns: []*schema.Column{SuppliersColumns[3]},
+			},
+			{
+				Name:    "supplier_supplier_type",
+				Unique:  false,
+				Columns: []*schema.Column{SuppliersColumns[4]},
+			},
+			{
+				Name:    "supplier_is_active",
+				Unique:  false,
+				Columns: []*schema.Column{SuppliersColumns[6]},
+			},
+		},
+	}
 	// UnitsColumns holds the columns for the "units" table.
 	UnitsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1431,6 +1701,8 @@ var (
 		BusinessRecordsTable,
 		BusinessRecordEventsTable,
 		BusinessRecordItemsTable,
+		ContactsTable,
+		CustomersTable,
 		InventoryBalancesTable,
 		InventoryLotsTable,
 		InventoryTxnsTable,
@@ -1446,6 +1718,9 @@ var (
 		QualityInspectionsTable,
 		RolesTable,
 		RolePermissionsTable,
+		SalesOrdersTable,
+		SalesOrderItemsTable,
+		SuppliersTable,
 		UnitsTable,
 		UsersTable,
 		WarehousesTable,
@@ -1464,6 +1739,10 @@ func init() {
 	BomItemsTable.Annotation.Checks = map[string]string{
 		"bom_items_loss_rate_non_negative": "loss_rate >= 0",
 		"bom_items_quantity_positive":      "quantity > 0",
+	}
+	ContactsTable.Annotation = &entsql.Annotation{}
+	ContactsTable.Annotation.Checks = map[string]string{
+		"contacts_owner_type_allowed": "owner_type IN ('CUSTOMER', 'SUPPLIER')",
 	}
 	InventoryBalancesTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	InventoryBalancesTable.ForeignKeys[1].RefTable = UnitsTable
@@ -1516,5 +1795,25 @@ func init() {
 	QualityInspectionsTable.ForeignKeys[2].RefTable = PurchaseReceiptsTable
 	QualityInspectionsTable.ForeignKeys[3].RefTable = PurchaseReceiptItemsTable
 	QualityInspectionsTable.ForeignKeys[4].RefTable = WarehousesTable
+	SalesOrdersTable.ForeignKeys[0].RefTable = CustomersTable
+	SalesOrdersTable.Annotation = &entsql.Annotation{}
+	SalesOrdersTable.Annotation.Checks = map[string]string{
+		"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
+	}
+	SalesOrderItemsTable.ForeignKeys[0].RefTable = SalesOrdersTable
+	SalesOrderItemsTable.ForeignKeys[1].RefTable = ProductsTable
+	SalesOrderItemsTable.ForeignKeys[2].RefTable = UnitsTable
+	SalesOrderItemsTable.Annotation = &entsql.Annotation{}
+	SalesOrderItemsTable.Annotation.Checks = map[string]string{
+		"sales_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
+		"sales_order_items_line_no_positive":        "line_no > 0",
+		"sales_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
+		"sales_order_items_ordered_qty_positive":    "ordered_quantity > 0",
+		"sales_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
+	}
+	SuppliersTable.Annotation = &entsql.Annotation{}
+	SuppliersTable.Annotation.Checks = map[string]string{
+		"suppliers_supplier_type_allowed": "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
+	}
 	WorkflowTaskEventsTable.ForeignKeys[0].RefTable = WorkflowTasksTable
 }

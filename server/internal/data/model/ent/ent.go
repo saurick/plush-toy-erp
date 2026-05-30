@@ -14,6 +14,8 @@ import (
 	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/businessrecordevent"
 	"server/internal/data/model/ent/businessrecorditem"
+	"server/internal/data/model/ent/contact"
+	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
@@ -29,6 +31,9 @@ import (
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
+	"server/internal/data/model/ent/salesorder"
+	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/user"
 	"server/internal/data/model/ent/warehouse"
@@ -107,6 +112,8 @@ func checkColumn(t, c string) error {
 			businessrecord.Table:                businessrecord.ValidColumn,
 			businessrecordevent.Table:           businessrecordevent.ValidColumn,
 			businessrecorditem.Table:            businessrecorditem.ValidColumn,
+			contact.Table:                       contact.ValidColumn,
+			customer.Table:                      customer.ValidColumn,
 			inventorybalance.Table:              inventorybalance.ValidColumn,
 			inventorylot.Table:                  inventorylot.ValidColumn,
 			inventorytxn.Table:                  inventorytxn.ValidColumn,
@@ -122,6 +129,9 @@ func checkColumn(t, c string) error {
 			qualityinspection.Table:             qualityinspection.ValidColumn,
 			role.Table:                          role.ValidColumn,
 			rolepermission.Table:                rolepermission.ValidColumn,
+			salesorder.Table:                    salesorder.ValidColumn,
+			salesorderitem.Table:                salesorderitem.ValidColumn,
+			supplier.Table:                      supplier.ValidColumn,
 			unit.Table:                          unit.ValidColumn,
 			user.Table:                          user.ValidColumn,
 			warehouse.Table:                     warehouse.ValidColumn,

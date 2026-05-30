@@ -1,9 +1,9 @@
 Doc Type: V1 Next Codex Goals
 Status: Proposed
 Runtime Implemented: No
-Ent Schema Implemented: No
-Migration Implemented: No
-Current Implementation Source of Truth: No
+Ent Schema Implemented: Schema files added in 003; generated code added in 004
+Migration Implemented: Yes, generated in 004
+Current Implementation Source of Truth: Schema files, generated Ent code and Atlas migration; repo/usecase/API/UI remain not implemented
 
 # V1 Next Codex Goals
 
@@ -17,11 +17,11 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 
 ## 003-v1-ent-schema-customers-suppliers-orders
 
-Status: schema files added in 003; no generated code, no migration, no runtime.
+Status: schema files added in 003; generated code and Atlas migration added in 004; no runtime.
 
 | Item | Content |
 |---|---|
-| objective | 仅新增 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 草案。已完成 schema-only 文件新增；后续仍需独立 migration/generate Goal。 |
+| objective | 仅新增 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 草案。已完成 schema-only 文件新增；004 已完成独立 migration/generate Goal。 |
 | allowed files | `server/internal/data/model/schema/*`, generated Ent files if required by project workflow, schema docs status updates. |
 | forbidden files | `server/internal/biz/workflow.go`, `server/internal/biz/rbac.go`, business repo/usecase, API/service/server, web UI, docs registry, seedData, `server/internal/core/*`. |
 | schema change yes/no | Yes |
@@ -32,6 +32,8 @@ Status: schema files added in 003; no generated code, no migration, no runtime.
 | expected output | Ent schema diff and updated docs proving cutline compliance. |
 
 ## 004-v1-migration-and-ent-generate
+
+Status: generated code and Atlas migration added in 004; no repo/usecase, API/RBAC, UI, docs registry or seedData.
 
 | Item | Content |
 |---|---|

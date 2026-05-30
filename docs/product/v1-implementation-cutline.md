@@ -1,15 +1,15 @@
 Doc Type: V1 Implementation Cutline
 Status: Proposed
 Runtime Implemented: No
-Ent Schema Implemented: Schema files added in 003; generated code and migration not implemented
-Migration Implemented: No
-Current Implementation Source of Truth: Schema files only; runtime source of truth remains existing generated code and migrations
+Ent Schema Implemented: Schema files added in 003; generated code added in 004
+Migration Implemented: Yes, generated in 004
+Current Implementation Source of Truth: Schema files, generated Ent code and Atlas migration; repo/usecase/API/UI remain not implemented
 
 # V1 Implementation Cutline
 
 本文件决定下一轮真正可以实现的 Ent schema 范围。下一轮只允许做这里标为 `Yes` 的表；不得顺手实现 repo/usecase、API/RBAC、UI、seed、docs registry 或迁移外的业务逻辑。
 
-003 schema-only 已新增 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件。该状态不代表 Ent generated code、Atlas migration、repo/usecase、API、RBAC、UI、docs registry 或 seedData 已实现。
+003 schema-only 已新增 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件；004 已生成对应 Ent generated code 和 Atlas migration。该状态不代表 repo/usecase、API、RBAC、UI、docs registry、seedData 或 `business_records` transition 已实现。
 
 ## Allowed in next Ent schema goal
 
@@ -109,7 +109,7 @@ V1 明确禁止：
 
 ## Next Ent Schema Goal Exact Cutline
 
-下一轮 goal 名建议：`003-v1-ent-schema-customers-suppliers-orders`。
+下一轮建议进入 repo/usecase 拆分，不要把 masterdata 和 sales order 业务逻辑混在一个不可审查的大任务里。建议 goal 名：`005-v1-repo-usecase-masterdata`，后续再进入 `006-v1-repo-usecase-sales-order`。
 
 允许文件范围应限制为：
 
@@ -129,7 +129,7 @@ V1 明确禁止：
 - seedData
 - `server/internal/core/*`
 
-下一轮必须先在 goal 内重新确认：
+下一轮 repo/usecase goal 必须先重新确认：
 
 1. 本文件仍是最新 cutline。
 2. `tenant_id` 未进入字段列表。

@@ -26,6 +26,10 @@ type Tx struct {
 	BusinessRecordEvent *BusinessRecordEventClient
 	// BusinessRecordItem is the client for interacting with the BusinessRecordItem builders.
 	BusinessRecordItem *BusinessRecordItemClient
+	// Contact is the client for interacting with the Contact builders.
+	Contact *ContactClient
+	// Customer is the client for interacting with the Customer builders.
+	Customer *CustomerClient
 	// InventoryBalance is the client for interacting with the InventoryBalance builders.
 	InventoryBalance *InventoryBalanceClient
 	// InventoryLot is the client for interacting with the InventoryLot builders.
@@ -56,6 +60,12 @@ type Tx struct {
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
 	RolePermission *RolePermissionClient
+	// SalesOrder is the client for interacting with the SalesOrder builders.
+	SalesOrder *SalesOrderClient
+	// SalesOrderItem is the client for interacting with the SalesOrderItem builders.
+	SalesOrderItem *SalesOrderItemClient
+	// Supplier is the client for interacting with the Supplier builders.
+	Supplier *SupplierClient
 	// Unit is the client for interacting with the Unit builders.
 	Unit *UnitClient
 	// User is the client for interacting with the User builders.
@@ -206,6 +216,8 @@ func (tx *Tx) init() {
 	tx.BusinessRecord = NewBusinessRecordClient(tx.config)
 	tx.BusinessRecordEvent = NewBusinessRecordEventClient(tx.config)
 	tx.BusinessRecordItem = NewBusinessRecordItemClient(tx.config)
+	tx.Contact = NewContactClient(tx.config)
+	tx.Customer = NewCustomerClient(tx.config)
 	tx.InventoryBalance = NewInventoryBalanceClient(tx.config)
 	tx.InventoryLot = NewInventoryLotClient(tx.config)
 	tx.InventoryTxn = NewInventoryTxnClient(tx.config)
@@ -221,6 +233,9 @@ func (tx *Tx) init() {
 	tx.QualityInspection = NewQualityInspectionClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
+	tx.SalesOrder = NewSalesOrderClient(tx.config)
+	tx.SalesOrderItem = NewSalesOrderItemClient(tx.config)
+	tx.Supplier = NewSupplierClient(tx.config)
 	tx.Unit = NewUnitClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 	tx.Warehouse = NewWarehouseClient(tx.config)

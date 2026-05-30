@@ -27,6 +27,12 @@ type BusinessRecordEvent func(*sql.Selector)
 // BusinessRecordItem is the predicate function for businessrecorditem builders.
 type BusinessRecordItem func(*sql.Selector)
 
+// Contact is the predicate function for contact builders.
+type Contact func(*sql.Selector)
+
+// Customer is the predicate function for customer builders.
+type Customer func(*sql.Selector)
+
 // InventoryBalance is the predicate function for inventorybalance builders.
 type InventoryBalance func(*sql.Selector)
 
@@ -71,6 +77,15 @@ type Role func(*sql.Selector)
 
 // RolePermission is the predicate function for rolepermission builders.
 type RolePermission func(*sql.Selector)
+
+// SalesOrder is the predicate function for salesorder builders.
+type SalesOrder func(*sql.Selector)
+
+// SalesOrderItem is the predicate function for salesorderitem builders.
+type SalesOrderItem func(*sql.Selector)
+
+// Supplier is the predicate function for supplier builders.
+type Supplier func(*sql.Selector)
 
 // Unit is the predicate function for unit builders.
 type Unit func(*sql.Selector)

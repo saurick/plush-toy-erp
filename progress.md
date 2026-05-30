@@ -1,3 +1,13 @@
+## 2026-05-31 00:16
+- 完成：执行 `004-v1-migration-and-ent-generate`，基于 003 的 `customers / suppliers / contacts / sales_orders / sales_order_items` 五个 Ent schema 运行 `make data`，生成 Ent 代码与 Atlas migration `server/internal/data/model/migrate/20260530161152_migrate.sql`。本轮未接 repo/usecase、API/RBAC、UI、docs registry、seedData 或 `business_records` transition。
+- 下一步：建议拆分进入 `005-v1-repo-usecase-masterdata`，先做 customers / suppliers / contacts repo/usecase 和测试；再进入 `006-v1-repo-usecase-sales-order`，单独处理销售订单 Source Document 生命周期。
+- 阻塞/风险：目标库 `make migrate_status` 仍显示 migration pending，本轮只生成不 apply；contacts 的跨 customers / suppliers owner 存在性仍需后续 usecase guard；本轮未执行前端或浏览器回归，因为未改 UI / 样式。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 00:20
+- 完成：将丢失名称的 `docs/codex-goals/000-.md` 按同目录命名规则和文件内容重命名为 `docs/codex-goals/000-phase0-foundation.md`；该文件对应 Phase 0 产品化架构、状态分层、配置权限、客户实例和交付骨架任务。
+- 下一步：后续引用 Phase 0 Goal 时统一使用 `docs/codex-goals/000-phase0-foundation.md`，继续保持 `001` 到 `004` 的编号顺序。
+- 阻塞/风险：本轮只修复 Goal 文件名并更新进度记录，不改运行时代码、Ent schema、migration、API、UI、docs registry 或 seedData；当前工作区仍有其他未提交 Ent/migration 现场和 `004` Goal 文件，本轮未回退、整理或纳入验证。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-30 23:24
 - 完成：执行 `003-v1-ent-schema-customers-suppliers-orders` 的 schema-only cutline，新增 `customers / suppliers / contacts / sales_orders / sales_order_items` 五个 Ent schema 文件；同步小幅更新 `docs/current-source-of-truth.md`、`docs/product/v1-implementation-cutline.md`、`docs/product/v1-schema-go-no-go.md` 和 `docs/product/v1-next-codex-goals.md`，明确本轮只新增 schema 文件，不生成 migration / Ent generated code，不接 repo/usecase、API、RBAC、UI、docs registry 或 seedData。
 - 下一步：下一轮按独立 Goal 执行 Ent generate / Atlas migration 前，继续复核 `tenant_id` 禁止项、`product_skus` / `purchase_orders` / `shipments` deferred 边界，以及 `shipping_released != shipped`。
