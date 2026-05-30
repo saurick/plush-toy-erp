@@ -1,3 +1,8 @@
+## 2026-05-30 23:03
+- 完成：将 `.codex-review/` 收口为本地临时审查交接产物，新增 `.gitignore` 忽略规则，并同步更新 `AGENTS.md`、`docs/codex-goals/README.md`、`_new-session-goal-template.md`、`_review-output-protocol.md` 和 `_goal-file-template.md` 的口径，明确每轮只生成本地 `.codex-review/latest.md`，不生成 runs 历史副本，也不提交 `.codex-review/`；长期记录应进入具体 Goal 文件、`progress.md` 或正式文档。
+- 下一步：后续如果需要查看历史目标，优先查 `docs/codex-goals/*.md`、`progress.md` 和 Git commit log，不依赖 `.codex-review/runs`。
+- 阻塞/风险：本轮只改 Codex 工作流文档和 Git 忽略规则，不触达运行时代码、Ent schema、migration、API、UI、docs registry 或 seedData；更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-30 19:09
 - 完成：在 `docs/codex-goals/README.md` 增加“新会话短 Goal 模板”说明，明确 `_new-session-goal-template.md` 只用于复制到 Codex Goal 输入框，具体任务范围、允许 / 禁止修改文件、验收命令和风险边界仍写入具体 `docs/codex-goals/<goal-file>.md`；同时标明新建具体 Goal 文件使用 `_template.md`。
 - 下一步：后续可按需瘦身 `_new-session-goal-template.md`，避免在短 Goal 模板里重复长期项目边界。

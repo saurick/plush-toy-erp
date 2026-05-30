@@ -134,7 +134,7 @@ scripts
 - <标准 1>
 - <标准 2>
 - <标准 3>
-- `.codex-review/latest.md` 已生成。
+- 本地 `.codex-review/latest.md` 已生成，且 `.codex-review/` 未提交进 Git。
 
 不要只写“完成任务”“文档写好”“代码可用”。
 
@@ -245,7 +245,7 @@ git diff --check
 .codex-review/latest.md
 ```
 
-只生成 latest，不生成 `.codex-review/runs` 历史副本。
+`.codex-review/` 是本地临时审查交接产物，不提交进 Git。只生成 latest，不生成 `.codex-review/runs` 历史副本。
 
 审查报告必须遵守：
 

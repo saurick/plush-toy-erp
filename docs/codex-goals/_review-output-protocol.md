@@ -10,13 +10,15 @@
 
 ## 必须生成的文件
 
-必须创建或覆盖：
+必须创建或覆盖本地临时文件：
 
 ```text
 .codex-review/latest.md
 ```
 
-只生成 latest，不生成 `.codex-review/runs` 历史副本。
+`.codex-review/` 不提交进 Git。只生成 latest，不生成 `.codex-review/runs` 历史副本。
+
+如果某轮审查结论需要长期保留，应整理进具体 `docs/codex-goals/<goal>.md`、`progress.md` 或正式文档，而不是依赖 `.codex-review/`。
 
 ## Codex 最终必须告诉用户
 
@@ -265,6 +267,7 @@ grep -R "Runtime Implemented: Yes\|Ent Schema Implemented: Yes\|Migration Implem
 
 ## 17. Git 策略检查
 
+- `.codex-review/` 是否保持未提交：
 - 是否执行 `git add .`：
 - 是否提交：
 - 是否推送：

@@ -23,7 +23,7 @@ Codex 新会话不能依赖历史聊天记忆，只能以仓库文件为准。
 
 本轮允许修改、禁止修改、明确不做、成功标准、停止条件、Git 策略、测试分层选择和验收命令，以任务 md 为准；项目长期边界以 AGENTS.md、docs/product/*、docs/architecture/* 为准。
 
-完成后必须按 docs/codex-goals/_review-output-protocol.md 生成 .codex-review/latest.md。只生成 latest，不生成 .codex-review/runs 历史副本。
+完成后必须按 docs/codex-goals/_review-output-protocol.md 生成本地 .codex-review/latest.md。只生成 latest，不生成 .codex-review/runs 历史副本，不提交 .codex-review/。
 
 用户应能用 cat .codex-review/latest.md | pbcopy 一键复制；不要要求用户截图。
 ```
@@ -45,7 +45,7 @@ docs/codex-goals/003-v1-ent-schema-customers-suppliers-orders.md
 
 本轮允许修改、禁止修改、明确不做、成功标准、停止条件、Git 策略、测试分层选择和验收命令，以任务 md 为准；项目长期边界以 AGENTS.md、docs/product/*、docs/architecture/* 为准。
 
-完成后必须按 docs/codex-goals/_review-output-protocol.md 生成 .codex-review/latest.md。只生成 latest，不生成 .codex-review/runs 历史副本。
+完成后必须按 docs/codex-goals/_review-output-protocol.md 生成本地 .codex-review/latest.md。只生成 latest，不生成 .codex-review/runs 历史副本，不提交 .codex-review/。
 
 用户应能用 cat .codex-review/latest.md | pbcopy 一键复制；不要要求用户截图。
 ```
@@ -93,7 +93,7 @@ docs-only -> schema implementation
 2. 长期规则必须写进仓库文件。
 3. 任务范围必须以 `docs/codex-goals/<goal-file>.md` 为准。
 4. 每轮必须在任务文件里选择测试层级，并说明选择 / 未选择原因。
-5. 审查报告必须生成 `.codex-review/latest.md`，不生成 `.codex-review/runs` 历史副本。
+5. 审查报告必须生成本地 `.codex-review/latest.md`，不生成 `.codex-review/runs` 历史副本，也不提交 `.codex-review/`。
 6. 不要让用户截图。
 7. 用户复制报告给 GPT 的命令是：
 
