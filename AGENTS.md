@@ -35,6 +35,42 @@
 
 如果后续新增 `web/src/erp/docs/system-layer-progress.md`、`web/src/erp/docs/productization-delivery.md`、`docs/architecture/project-boundary-map.md` 或等价文档，涉及系统层级、产品化、客户差异、部署交付、下一步规划时必须同步阅读。
 
+## Codex 工作流与 Goal 交接
+
+- 本仓库使用“中文短 Goal + 仓库内任务文件 + 可复制审查报告”的 Codex 工作流。
+- 每个独立 Goal 建议新开 Codex 会话，避免不同目标的上下文、现场判断和验收结论互相污染。
+- 同一个 Goal 内的补漏、测试失败修复、生成 review 报告，可以继续原 Codex 会话；只有目标边界变化时再拆新会话。以下情况属于同一个 Goal 内的后续处理：
+  - 修复当前 Goal 导致的测试失败。
+  - 生成或修复 `.codex-review/latest.md`。
+  - 补充当前 Goal 明确要求但遗漏的文件。
+  - 修正当前 Goal 产物中的格式问题。
+- 以下情况建议新开 Codex 会话：
+  - 从一个编号 Goal 进入下一个编号 Goal。
+  - 从 docs-only 评审进入 schema 实现。
+  - 从 schema 进入 repo/usecase。
+  - 从 repo/usecase 进入 API/RBAC。
+  - 从 API/RBAC 进入 UI。
+- 新 Codex 会话不能依赖历史 ChatGPT 或 Codex 聊天记忆，必须先读本文件，再读对应的 `docs/codex-goals/<goal>.md`。
+- Codex Goal 输入框只放 `4000` 字以内中文短 Goal；复杂任务、长背景、禁止项、验收命令和交接细节必须写入 `docs/codex-goals/*.md`。
+- 每个任务的允许修改文件、禁止修改文件、验收命令，以对应的 Goal md 为准。
+- 每个任务必须在对应 Goal md 中明确成功标准、当前真源与非真源、改动范围分级、停止条件、Git 策略、测试分层选择和验收命令；不要让本文件代替具体任务的测试选择。
+- 每轮完成后必须按 `docs/codex-goals/_review-output-protocol.md` 生成或覆盖 `.codex-review/latest.md`，不生成 `.codex-review/runs` 历史副本。用户必须能用 `cat .codex-review/latest.md | pbcopy` 一键复制给 GPT 审查。
+- Codex 不要要求用户截图；需要交接给 GPT 的内容应收敛到仓库文件、命令输出和 `.codex-review/latest.md`。
+- 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/codex-goals/README.md`、`docs/codex-goals/_review-output-protocol.md`、`docs/product/*`、`docs/architecture/*`。具体任务的执行范围、允许 / 禁止路径和验收命令，以当前用户指定的 `docs/codex-goals/<goal>.md` 为准。
+- plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和 current 客户边界，仍以本文件和正式产品 / 架构文档为准。
+- 处理 Codex Goal 时禁止：
+  - 新增 `tenant_id`。
+  - 实现 SaaS 多租户。
+  - 实现 license server、套餐计费或客户工单系统。
+  - 创建泛化 `ChangeUsecase` 或 `change_records`。
+  - 把 current 客户资料写成 Product Core 规则。
+  - 混淆 Workflow / Fact。
+  - 让 `WorkflowUsecase` 写库存、出货、财务、应收、应付、发票或收付款事实。
+  - 把 `shipping_released` 写成 `shipped`。
+  - 把 workflow task done 当成 fact posted。
+  - 把 `business_records` 当长期事实真源。
+- 客户专属资料应进入 `docs/customers/<customer-key>/`、客户配置草案、seed/demo、打印模板或导入适配；除非经过 Product Core 评审，否则不能上升为产品内核规则。
+
 ## 工程原则
 
 - 先理解现状、确认当前真源与主路径，再决定改动范围。

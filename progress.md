@@ -1,3 +1,33 @@
+## 2026-05-30 19:09
+- 完成：在 `docs/codex-goals/README.md` 增加“新会话短 Goal 模板”说明，明确 `_new-session-goal-template.md` 只用于复制到 Codex Goal 输入框，具体任务范围、允许 / 禁止修改文件、验收命令和风险边界仍写入具体 `docs/codex-goals/<goal-file>.md`；同时标明新建具体 Goal 文件使用 `_template.md`。
+- 下一步：后续可按需瘦身 `_new-session-goal-template.md`，避免在短 Goal 模板里重复长期项目边界。
+- 阻塞/风险：当前工作区仍有大量本轮外改动和未跟踪文件，本轮未整理或回退；更新前已确认 `progress.md` 未达到归档阈值。
+
+## 2026-05-30 19:05
+- 完成：新增 `docs/codex-goals/_template.md`，沉淀 Codex Goal 文件模板，覆盖目标、必须先读、允许/禁止修改、明确不做、验收命令、review 输出和风险边界；同步在 `docs/codex-goals/README.md` 增加模板入口。本轮只改 Codex 工作流文档，不触达运行时代码、Ent schema、migration、API、UI、docs registry、seedData 或部署。
+- 下一步：后续新建复杂 Goal 时先复制 `_template.md`，再按具体任务收窄允许路径、禁止路径和验收命令。
+- 阻塞/风险：当前工作区已有大量本轮外改动和未跟踪文件，本轮未整理、回退或纳入验证；更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-30 19:01
+- 完成：合并扩展 `AGENTS.md` 的 Codex 工作流与 Goal 交接章节，补齐同一 Goal 后续处理、新开会话建议、Goal 输入规则、审查报告历史副本、长期规则来源和项目长期边界；本轮只改协作规则文档，不改 runtime、Ent schema、migration、API、UI、docs registry 或 seedData。
+- 下一步：后续新增或执行 `docs/codex-goals/*.md` 时，继续以任务 md 的允许 / 禁止文件和验收命令为准，并按 `docs/codex-goals/_review-output-protocol.md` 生成 `.codex-review/latest.md`。
+- 阻塞/风险：当前工作区已有本轮前的多项未提交文档 / 骨架现场，本轮未回退或整理；更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-30 02:58
+- 完成：完成 Phase 2 schema final review docs-only 收口，新增 `docs/product/schema-design-final-review.md`、`docs/product/v1-entity-decision-record.md`、`docs/product/v1-implementation-cutline.md`、`docs/product/v1-schema-go-no-go.md`、`docs/product/business-records-transition-plan.md` 和 `docs/product/v1-next-codex-goals.md`；同步小幅更新真源索引、V1/V2 schema draft、Phase 1 implementation plan、risk register 和 rewrite roadmap。本轮不改 runtime、Ent schema、migration、API、UI、docs registry、seedData、`workflow.go`、`rbac.go`、`server/internal/data` 或 `server/internal/core`。
+- 下一步：建议按 `003-v1-ent-schema-customers-suppliers-orders` 只落 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema；`product_skus`、采购订单、BOM version extension、出货、预留和财务事实继续保持 draft-only / deferred。
+- 阻塞/风险：`business_records` shadow model 仍需引用审计和迁移 dry-run；`contacts` 的 `owner_type + owner_id` 需要下一轮 schema 明确 DB check / usecase guard；本轮已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-30 01:18
+- 完成：新增 Phase 1 masterdata / order / BOM / purchase 架构评审文档、V1/V2 schema draft、migration readiness checklist、phase1 implementation plan 和 risk register；同步小幅更新 `docs/current-source-of-truth.md`、`docs/product/domain-model-v1.md`、`docs/product/rewrite-roadmap.md`。本轮只写文档和实施计划，不改 runtime、Ent schema、migration、docs registry、seedData、`workflow.go`、`rbac.go` 或 `server/internal/data`。
+- 下一步：建议按 `docs/product/phase1-implementation-plan.md` 从 `002-schema-design-final-review` 开始，先做 schema final review，再拆客户/供应商 schema、repo/usecase、销售订单 schema/usecase、API/RBAC、前端和导入草案。
+- 阻塞/风险：`product_skus` 是否 V1 落 schema、contacts owner 模型、`business_records` 迁移退出路径、采购订单是否 V2、以及出货/财务事实生成时机仍需后续独立评审；本轮明确不新增 `tenant_id`，current 客户资料不进入 Product Core 真源。
+
+## 2026-05-30 00:00
+- 完成：完成 Phase 0 只读设计输入与文档 / 目录骨架收口。两个外部设计 md 已导入 `docs/reference/imported-notes/` 并标记为 Imported Design Note / Reference Only；正式产品架构、产品原则、领域模型草案、模块边界、配置权限策略、客户实例策略、客户差异策略、重构路线、release gates、测试策略和状态 / Workflow / Fact 边界已落到 `docs/product/*` 与 `docs/architecture/status-workflow-fact-boundary.md`。同时建立 `docs/customers/current/*`、`config/industry-templates/plush`、`config/customers/current`、`deployments/current`、`server/internal/core/*`、`web/src/erp/modules`、`web/src/erp/mobile/roles` 骨架，并同步更新 README、真源索引和开发验收入口摘要。
+- 下一步：下一轮应优先做 Phase 1 的主数据 / 订单源单据评审，或针对 current 客户资料做单独的文件清单、引用关系、docs registry、测试断言和回滚风险评审；不要在未评审前把 current 资料迁移进 Product Core，也不要新增 `tenant_id`。
+- 阻塞/风险：本轮不改 runtime、Ent schema、migration、`workflow.go`、`rbac.go`、`server/internal/data`、`web/src/erp/config/docs.mjs` 或 `seedData.mjs`，也不创建运行时 config loader。`grep tenant_id` 会命中 imported notes 和正式文档中的“禁止新增”说明；这些不是 schema 或 runtime 方案。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-28 23:29
 - 完成：补充文档真源层级规则，明确 `docs/changes/` 只记录历史变更、设计评审和当时验收，不能作为当前状态、当前能力或当前禁止事项的最终真源；当前状态应以 `docs/current-source-of-truth.md`、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认为准。同步更新 `AGENTS.md` 与 `docs/current-source-of-truth.md`。
 - 下一步：如果后续要启用独立 `docs/capability-ledger.md`，应单独补齐文件结构、维护职责、与系统分层进度文档的边界和测试 / 文档引用。

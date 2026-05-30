@@ -9,7 +9,9 @@
 | `web/` | Vite + React 前端，包含桌面后台统一入口和八个角色移动端入口，内部目录职责见 [`web/README.md`](web/README.md) |
 | `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、通用业务记录、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
-| `docs/` | 仓库级约定、流程、数据模型、changes 和部署文档 |
+| `docs/` | 仓库级约定、流程、数据模型、产品化架构、changes 和部署文档 |
+| `config/` | 行业模板和客户配置包的未来落点；当前只做 README 骨架，不接运行时 loader |
+| `deployments/` | 客户私有化部署实例资料的未来落点；当前唯一部署真源仍在 `server/deploy/compose/prod` |
 
 ## 当前边界
 
@@ -126,6 +128,10 @@ pnpm style:l1
 
 - 协作约定：`/Users/simon/projects/plush-toy-erp/AGENTS.md`
 - 阅读顺序与真源：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
+- 0 到 1 产品架构：`/Users/simon/projects/plush-toy-erp/docs/product/zero-to-one-architecture.md`
+- 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md`
+- current 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/current/README.md`
+- imported design notes：`/Users/simon/projects/plush-toy-erp/docs/reference/imported-notes/README.md`
 - 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
 - 主流程：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
 - 数据模型与导入映射：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`

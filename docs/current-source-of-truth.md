@@ -12,6 +12,8 @@
 
 ## 当前业务保存层真源
 
+- Phase 1 新增的是主数据、订单源单据、BOM 和采购前置模型评审文档与 schema draft，不是 runtime 实现。当前正式实现状态仍以现有代码、Ent schema、Atlas migration 和测试为准；`docs/product/domain-schema-draft-v1-v2.md` 只记录候选表和迁移前检查口径，不代表 schema 已落地。
+- Phase 2 新增的是 schema final review、V1 entity decision record、V1 implementation cutline、go/no-go checklist、`business_records` transition plan 和 next Codex goals，不是 runtime 实现。当前正式实现状态仍以现有代码、Ent schema、Atlas migration 和测试为准；下一轮 Ent schema 只能按 `docs/product/v1-implementation-cutline.md` 的允许范围推进。
 - 首版业务落盘真源是后端 Ent schema 和 Atlas migration：`workflow_tasks`、`workflow_task_events`、`workflow_business_states`、`business_records`、`business_record_items`、`business_record_events`。
 - Phase 2A 已新增最小库存事实闭环专表：`units`、`materials`、`products`、`warehouses`、`inventory_txns`、`inventory_balances`。Phase 2B 已新增最小 BOM + 批次库存闭环：`inventory_lots`、`bom_headers`、`bom_items`，并让 `inventory_txns / inventory_balances` 支持 nullable `lot_id`。Phase 2C 已新增采购入库最小闭环：`purchase_receipts`、`purchase_receipt_items`，让采购入库过账驱动 `inventory_lots / inventory_txns / inventory_balances`。Phase 2D-A 已新增采购退货最小闭环：`purchase_returns`、`purchase_return_items`，让已入库后的采购退货作为独立业务单据写 `inventory_txns.OUT` 并扣减 `inventory_balances`，取消退货通过 `REVERSAL` 回补库存。Phase 2D-B1 已新增采购入库调整单最小闭环：`purchase_receipt_adjustments`、`purchase_receipt_adjustment_items`，只支持已过账采购入库后的数量类差异和 `lot / warehouse` 维度更正，调整过账写 `inventory_txns.ADJUST_IN / ADJUST_OUT`，取消调整写 `REVERSAL`。Phase 2D-C1 已扩展 `inventory_lots.status` 最小状态集并在有 `lot_id` 的库存扣减路径增加批次状态守卫。Phase 2D-C2-A 已新增 `quality_inspections` 最小来料质检主表，作为采购入库后材料批次质检状态 / 判定真源，并在事务内联动 `inventory_lots.status`。其中 `inventory_txns` 是库存事实流水真源，`inventory_balances` 是当前余额 / 查询加速表，`inventory_lots` 是批次追溯和批次可用性状态真源，`quality_inspections` 是来料质检判定和批次状态变化来源真源；`business_records / business_record_items` 仍保留为通用单据快照和兼容层，不替代库存、采购入库、采购退货、采购入库调整、批次状态或来料质检真源。
 - 桌面业务页当前走通用 `business_records` 表格 / 弹窗保存，明细行落到 `business_record_items`；行金额为空且已有数量 / 单价时由前端保存转换层派生，表头数量 / 金额为空时按明细合计回写，保存和状态流转都会按单据来源写入 `workflow_business_states`；列表列顺序属于管理员 ERP 偏好，后端真源字段是 `admin_users.erp_preferences.column_orders`，浏览器 localStorage 只作为同步失败或未登录资料加载完成前的兜底。表头排序只改变当前页面展示和导出行顺序，不改变 `business_records` 真源、状态流转或后端写入顺序。
@@ -47,7 +49,10 @@
 - `系统分层进度` 用于跟踪 MasterData、Workflow、Fact、RBAC、API / UI、Help / QA、Reporting / Audit / Integration、Productization / Delivery 等层的当前完成度、边界和下一步。
 - `产品化与交付` 用于跟踪当前甲方、通用产品能力、私有化部署、SaaS 预留、租户分层路线、维护费交付和客户差异隔离。
 - 这两个入口只属于开发与验收，不进入普通帮助中心主入口，也不替代业务操作教程。
-- 本轮没有做当前甲方资料目录隔离；客户资料隔离后续应单独评审文件清单、引用关系、docs registry、测试断言和回滚风险。
+- Phase 0 已新增 0 到 1 产品架构、客户实例、客户差异和状态 / Workflow / Fact 边界文档：`docs/product/*`、`docs/architecture/status-workflow-fact-boundary.md`、`docs/customers/current/*`。
+- `docs/reference/imported-notes/*` 只保存 imported design notes，状态是 Reference Only，不是 runtime、schema 或当前实现真源。
+- `current` 只表示第一个真实客户 / 种子客户 / 私有化客户实例和配置包来源，不是 SaaS runtime tenant；当前不新增 `tenant_id`。
+- 客户资料已建立 `docs/customers/current` 文档边界和 `config/customers/current` 配置包骨架，但未移动旧资料、未接 docs registry、未改 runtime；后续若做资料迁移，仍需单独评审文件清单、引用关系、docs registry、测试断言和回滚风险。
 
 ## 按任务分流
 

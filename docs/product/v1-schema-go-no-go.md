@@ -1,0 +1,63 @@
+Doc Type: V1 Schema Go/No-Go
+Status: Proposed
+Runtime Implemented: No
+Ent Schema Implemented: No
+Migration Implemented: No
+Current Implementation Source of Truth: No
+
+# V1 Schema Go / No-Go Checklist
+
+本检查清单用于下一轮 Ent schema goal 前的 go/no-go。结论只允许在 `docs/product/v1-implementation-cutline.md` 的范围内 Proceed With Restrictions。
+
+| Check | Answer | Evidence | Decision | Owner Layer |
+|---|---|---|---|---|
+| 是否重复已有 `products/materials/units/warehouses` | No for cutline | 下一轮只落 customers/suppliers/contacts/sales_orders/sales_order_items；`products/materials/units/warehouses` 已有 Ent schema。 | Go with restriction | MasterData |
+| 是否重复已有 `bom_headers/bom_items` | No for cutline | BOM version extension Draft Only；现有 BOM 已有 version/status/effective fields。 | No-Go for BOM extension | MasterData |
+| 是否重复已有 `purchase_receipts/purchase_returns/purchase_receipt_adjustments` | No for cutline | purchase_orders Draft Only；采购入库、退货、调整事实已有专表。 | No-Go for PO in V1 | Purchase / Inventory |
+| 是否重复已有 `inventory_txns/inventory_balances/inventory_lots` | No for cutline | stock_reservations / shipments deferred；不写库存事实。 | Go with restriction | Inventory |
+| 是否重复已有 `quality_inspections` | No | 本轮不落 quality entities。 | Go | Quality |
+| 是否只是 current 客户样本字段 | Some candidates yes | SKU、地址、结算、供应商供货习惯仍多来自 current 线索。 | Exclude from V1 cutline | Productization |
+| 是否影响库存事实 | Allowed cutline does not directly | sales orders only indirect demand source；不写 inventory_txns。 | Go with restriction | Inventory |
+| 是否影响出货事实 | Allowed cutline indirect only | sales_orders 是 shipment source document，不是 shipment fact。 | Go with restriction | Shipment |
+| 是否影响财务事实 | Allowed cutline indirect only | customers/suppliers/orders 不生成 AR/AP/invoice/payment。 | Go with restriction | Finance |
+| 是否需要 workflow 写 fact | No | Workflow 只记录协同许可；source documents 不由 workflow 写事实。 | Go | Workflow / Fact |
+| 是否需要 migration backfill | Yes, later | business_records partners/orders may be migration source snapshots；下一轮 schema 可先不 backfill。 | Restrict: require dry-run in migration goal | Data |
+| 是否需要唯一索引 | Yes | customers/suppliers code、sales_orders order_no、sales_order_items order_id+line_no 需要唯一策略。 | Go if included in schema goal | Data |
+| 是否需要状态机 | Yes for orders | customers/suppliers/contacts only active status；sales_orders/items need lifecycle status, not fact status。 | Go with restriction | Domain |
+| 是否需要幂等键 | Not for pure schema; later usecase yes | Source document create/update usecase later must define idempotency / duplicate handling。 | Defer to usecase goal | Biz |
+| 是否需要 RBAC 权限码 | Later API yes | 本轮不改 `rbac.go`；API/RBAC 在后续独立 goal。 | Defer | RBAC |
+| 是否需要 API | Later yes | Ent schema goal 不接 API。 | Defer | API |
+| 是否需要 UI | Later yes | Ent schema goal 不改 UI / docs registry / seedData。 | Defer | UI |
+| 是否需要导入 | Later yes | current 数据导入必须 dry-run 和字段分类，不能混入 schema goal。 | Defer | Data Import |
+| 是否需要客户配置 | Later yes | 字段显示、编号规则、打印模板属于 config draft，非 schema first cut。 | Defer | Productization |
+| 是否包含 `tenant_id` | No | 正式 cutline 禁止；grep 命中只能是 imported notes / 禁止说明 / future SaaS 候选说明。 | Go | Data / Productization |
+| 是否误把 draft 写成 implemented | No | 新增文档顶部均为 implemented = No。 | Go | Docs / QA |
+
+## Final Conclusion
+
+```text
+Proceed With Restrictions
+```
+
+限制条件：
+
+1. 下一轮 Ent schema 只能落 `customers / suppliers / contacts / sales_orders / sales_order_items`。
+2. `product_skus`、BOM version extension、purchase orders、addresses、settlement terms 都不能顺手落 schema。
+3. Ent schema goal 不得实现 repo/usecase、API/RBAC、UI、seed、docs registry 或 business_records 迁移。
+4. 不得新增 `tenant_id`。
+5. 不得从 Workflow 写库存、出货、预留或财务事实。
+6. High risks 中 `business_records` shadow model、migration dry-run、SKU 粒度和 purchase order 边界仍需在后续 goals 继续关闭，因此不能写 `Proceed`。
+
+## Migration Readiness Checklist
+
+下一轮 Ent schema goal 前必须逐项确认：
+
+- 字段列表没有 current-only required fields。
+- code / order_no / line_no unique index 规则明确。
+- nullable 策略明确。
+- status key 不混用 workflow / fact / derived。
+- generated migration 可回滚或 forward-fix。
+- no `tenant_id`。
+- no `product_sku_id` in first sales_order_items cutline。
+- no shipment / inventory / finance fact columns。
+- `business_records` 只作为 source snapshot / migration reference。
