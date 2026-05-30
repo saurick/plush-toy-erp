@@ -1,3 +1,8 @@
+## 2026-05-31 00:57
+- 完成：执行 `006-v1-repo-usecase-sales-order`，新增 `sales_orders / sales_order_items` 后端 repo/usecase 和测试；订单生命周期只使用 `draft / submitted / active / closed / canceled`，订单行状态只使用 `open / closed / canceled`；创建订单校验 active customer，创建 / 更新订单行校验 active product 和 active unit。本轮没有写 shipment、inventory、stock reservation、finance、invoice、payment 或 Workflow facts。
+- 下一步：建议进入 `007-v1-api-rbac-masterdata-order`，单独接入 customers / suppliers / contacts / sales_orders API 与 RBAC 动作权限，继续把 API/RBAC 与 UI 拆轮执行。
+- 阻塞/风险：本轮未接 API/RBAC/UI、docs registry、seedData 或 `business_records` transition；目标库 migration 是否已 apply 仍不是本轮范围，未执行 migration apply / status。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-31 00:37
 - 完成：执行 `005-v1-repo-usecase-masterdata`，新增 `customers / suppliers / contacts` 后端 MasterData repo/usecase 和测试；contacts create/update 会在 usecase 校验 `owner_type` 只能是 `CUSTOMER / SUPPLIER`，并校验 `owner_id` 对应客户或供应商存在；设置主联系人采用事务内自动取消同一 owner 其他 primary 的策略。本轮未接 API/RBAC/UI、docs registry、seedData、sales order usecase 或 `business_records` transition。
 - 下一步：建议进入 `006-v1-repo-usecase-sales-order`，单独实现销售订单 Source Document repo/usecase 和生命周期状态机，继续禁止写库存、出货、财务事实。

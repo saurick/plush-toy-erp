@@ -2,10 +2,10 @@
 
 文档类型：V1 后续 Codex Goals
 状态：拟定中
-运行时代码是否已实现：005 已新增 `customers / suppliers / contacts` 后端 repo/usecase；API/RBAC/UI 仍未实现
+运行时代码是否已实现：005 已新增 `customers / suppliers / contacts` 后端 repo/usecase；006 已新增 `sales_orders / sales_order_items` 后端 repo/usecase；API/RBAC/UI 仍未实现
 Ent Schema 是否已实现：003 已新增 schema 文件；004 已新增生成代码
 Migration 是否已实现：是，004 已生成
-当前实现真源：schema 文件、生成的 Ent 代码、Atlas migration，以及 005 新增的 `customers / suppliers / contacts` 后端 repo/usecase；`sales_orders / sales_order_items` usecase、API/RBAC/UI 仍未实现
+当前实现真源：schema 文件、生成的 Ent 代码、Atlas migration、005 新增的 `customers / suppliers / contacts` 后端 repo/usecase，以及 006 新增的 `sales_orders / sales_order_items` 后端 repo/usecase；API/RBAC/UI 仍未实现
 
 不要把 schema、repo/usecase、API/RBAC、UI 放进同一轮。
 
@@ -59,7 +59,7 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 
 ## 006-v1-repo-usecase-sales-order
 
-状态：建议下一轮执行；尚未实现。
+状态：已新增 `sales_orders / sales_order_items` 后端 repo/usecase 和测试；未接 API/RBAC/UI、docs registry、seedData 或 `business_records` transition。
 
 - 目标：增加 SalesOrderUsecase 和订单生命周期状态机，但不写 shipment/inventory/finance facts。
 - 允许修改文件：backend biz/data/tests 和文档。
@@ -69,7 +69,7 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 - 是否允许 runtime：是。
 - 测试命令：`cd server && go test ./internal/biz ./internal/data`。
 - 停止条件：把 `shipping_released` 等同于 `shipped`；手工写 `shipped_quantity` 事实；订单 done 时写 `inventory_txns`、shipments、AR/AP、invoice/payment。
-- 预期输出：Sales order repo/usecase/tests，并且状态只覆盖生命周期，不写下游事实。
+- 输出：Sales order repo/usecase/tests 已完成，状态只覆盖 source document lifecycle，不写下游事实。
 
 ## 007-v1-api-rbac-masterdata-order
 
