@@ -1,13 +1,15 @@
 Doc Type: V1 Schema Go/No-Go
 Status: Proposed
 Runtime Implemented: No
-Ent Schema Implemented: No
+Ent Schema Implemented: Schema files added in 003; generated code and migration not implemented
 Migration Implemented: No
-Current Implementation Source of Truth: No
+Current Implementation Source of Truth: Schema files only; runtime source of truth remains existing generated code and migrations
 
 # V1 Schema Go / No-Go Checklist
 
 本检查清单用于下一轮 Ent schema goal 前的 go/no-go。结论只允许在 `docs/product/v1-implementation-cutline.md` 的范围内 Proceed With Restrictions。
+
+003 schema-only 已按本清单落入 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件；未生成 migration，未运行 Ent generate，未接 repo/usecase、API、RBAC、UI、docs registry 或 seedData。后续 migration/generate 仍需按独立 Goal 复核本清单。
 
 | Check | Answer | Evidence | Decision | Owner Layer |
 |---|---|---|---|---|

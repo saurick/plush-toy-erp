@@ -1,13 +1,15 @@
 Doc Type: V1 Implementation Cutline
 Status: Proposed
 Runtime Implemented: No
-Ent Schema Implemented: No
+Ent Schema Implemented: Schema files added in 003; generated code and migration not implemented
 Migration Implemented: No
-Current Implementation Source of Truth: No
+Current Implementation Source of Truth: Schema files only; runtime source of truth remains existing generated code and migrations
 
 # V1 Implementation Cutline
 
 本文件决定下一轮真正可以实现的 Ent schema 范围。下一轮只允许做这里标为 `Yes` 的表；不得顺手实现 repo/usecase、API/RBAC、UI、seed、docs registry 或迁移外的业务逻辑。
+
+003 schema-only 已新增 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件。该状态不代表 Ent generated code、Atlas migration、repo/usecase、API、RBAC、UI、docs registry 或 seedData 已实现。
 
 ## Allowed in next Ent schema goal
 

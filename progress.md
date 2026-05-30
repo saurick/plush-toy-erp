@@ -1,3 +1,8 @@
+## 2026-05-30 23:24
+- 完成：执行 `003-v1-ent-schema-customers-suppliers-orders` 的 schema-only cutline，新增 `customers / suppliers / contacts / sales_orders / sales_order_items` 五个 Ent schema 文件；同步小幅更新 `docs/current-source-of-truth.md`、`docs/product/v1-implementation-cutline.md`、`docs/product/v1-schema-go-no-go.md` 和 `docs/product/v1-next-codex-goals.md`，明确本轮只新增 schema 文件，不生成 migration / Ent generated code，不接 repo/usecase、API、RBAC、UI、docs registry 或 seedData。
+- 下一步：下一轮按独立 Goal 执行 Ent generate / Atlas migration 前，继续复核 `tenant_id` 禁止项、`product_skus` / `purchase_orders` / `shipments` deferred 边界，以及 `shipping_released != shipped`。
+- 阻塞/风险：contacts 采用 `owner_type + owner_id`，DB 只约束 owner_type 枚举和主联系人唯一，跨 customers / suppliers 存在性需要后续 usecase guard；销售订单只落 Source Document 生命周期，不落 fulfillment / shipment / finance fact 字段。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-30 23:03
 - 完成：将 `.codex-review/` 收口为本地临时审查交接产物，新增 `.gitignore` 忽略规则，并同步更新 `AGENTS.md`、`docs/codex-goals/README.md`、`_new-session-goal-template.md`、`_review-output-protocol.md` 和 `_goal-file-template.md` 的口径，明确每轮只生成本地 `.codex-review/latest.md`，不生成 runs 历史副本，也不提交 `.codex-review/`；长期记录应进入具体 Goal 文件、`progress.md` 或正式文档。
 - 下一步：后续如果需要查看历史目标，优先查 `docs/codex-goals/*.md`、`progress.md` 和 Git commit log，不依赖 `.codex-review/runs`。

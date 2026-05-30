@@ -17,9 +17,11 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 
 ## 003-v1-ent-schema-customers-suppliers-orders
 
+Status: schema files added in 003; no generated code, no migration, no runtime.
+
 | Item | Content |
 |---|---|
-| objective | 仅新增 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 草案。 |
+| objective | 仅新增 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 草案。已完成 schema-only 文件新增；后续仍需独立 migration/generate Goal。 |
 | allowed files | `server/internal/data/model/schema/*`, generated Ent files if required by project workflow, schema docs status updates. |
 | forbidden files | `server/internal/biz/workflow.go`, `server/internal/biz/rbac.go`, business repo/usecase, API/service/server, web UI, docs registry, seedData, `server/internal/core/*`. |
 | schema change yes/no | Yes |
