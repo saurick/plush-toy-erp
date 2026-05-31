@@ -1,3 +1,38 @@
+## 2026-05-31 23:07
+- 完成：将未跟踪草稿 `docs/product/product-completion-roadmap-issues.md` 移入系统废纸篓。该文件的有效结论已吸收到 `docs/product/product-completion-roadmap.md`，后续不再保留第二份 issues 草稿，避免被误读为 roadmap 之外的并行真源。
+- 下一步：提交时只纳入 `AGENTS.md`、`docs/product/product-completion-roadmap.md` 和 `progress.md`。
+- 阻塞/风险：本轮只是清理未跟踪草稿，没有永久删除 tracked 文件，也未修改 runtime、schema、migration、API、UI、seedData 或 docs registry。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 23:03
+- 完成：继续细化 `docs/product/product-completion-roadmap.md` 的菜单拆分路线，新增“当前菜单拆分建议”和“菜单隐藏与权限关闭后的业务保证”。文档已按当前截图入口拆成 Work Queue、Dashboard、MasterData、Source Document、BOM、Purchase、Outsourcing、Warehouse / Quality、Inventory、Shipment、Production 等能力，并标注哪些属于 current MVP 必须可达、哪些是行业默认、哪些可按客户隐藏或后续评审；同时写清菜单隐藏、功能未启用、用户无权限、旧入口只读归档四种状态的不同后端要求和 workflow 保证。
+- 下一步：后续 `013` Goal 应以这两张表为验收基线，先审计 active workflow task、menu permission、seedData、mobile task projection、docs / print 入口，再设计 customer menu overlay 配置模型。
+- 阻塞/风险：本轮仍未修改前端运行时代码；菜单拆分后真正保证状态机不死，需要后续实现层检查 `owner_role_key`、`assignee_id`、`task_status_key`、RBAC action permission 和功能启用状态的一致性。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 22:54
+- 完成：在 `docs/product/product-completion-roadmap.md` 第 12 阶段补充“菜单目标形态”，把菜单调整方向明确为“产品能力基线 + 行业默认菜单 + customer menu overlay + RBAC action permission + mobile/docs/print projection + legacy archive entry”。同步写清菜单配置只控制启用、隐藏、排序、文案和默认入口，不改变库存、出货、财务、审计等核心事实规则；菜单隐藏只影响入口可见性，不替代后端权限校验。
+- 下一步：后续 `013` Goal 应按该目标形态审计当前菜单、seedData、docs registry、移动端入口和权限守卫，再决定配置模型和迁移步骤。
+- 阻塞/风险：本轮仍未修改前端菜单运行时代码或客户配置实现，只把目标形态写入 roadmap。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 22:47
+- 完成：补强 `docs/product/product-completion-roadmap.md` 的前端 UI / 菜单路线：明确每个客户的菜单通过 customer menu overlay 配置隐藏、启用、排序和显示文案；通用产品能力仍是菜单投影基线，不为每个客户 fork 一套菜单代码；菜单隐藏不是权限边界，后端动作权限仍是安全边界。同步将后续 `013` 路线收紧为菜单入口、能力投影和客户菜单 overlay 评审。
+- 下一步：真正执行菜单拆分时，应单独写 `013` Goal，先审计现有菜单 / seedData / docs registry / 权限 / mobile 入口，再决定 customer menu overlay 的配置模型和回归范围。
+- 阻塞/风险：本轮只更新 roadmap 文档，未改前端菜单运行时代码、seedData、docs registry、权限模型或客户配置加载逻辑。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 22:41
+- 完成：将 `docs/product/product-completion-roadmap.md` 正文同步到已确认的 issues 口径：新增 current MVP 基线关系说明；总表和第 12/13 阶段改为正式产品入口、菜单投影评审、`business_records` 旧写入口退役与只读归档；当前阶段禁止项补充不做长期可写兼容、不双写、不保留旧正式写入口；第 15 阶段新增 current MVP 试用范围和“后端事实已存在但 UI/API 暴露范围需另评审”表；后续路线将 `013` 收紧为菜单入口与能力投影评审，将 `015` 收紧为旧写入口退役评审。
+- 下一步：如需执行 current MVP 约束，应单独新增 `docs/product/current-mvp-requirements-baseline.md` 或对应 Codex Goal；不要把 roadmap 本身当成单个执行规格。
+- 阻塞/风险：本轮仍是文档路线修订，未修改 runtime、schema、migration、API、UI、seedData、docs registry，也未执行真实导入或菜单切换。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 22:37
+- 完成：按复核结论修正 `docs/product/product-completion-roadmap-issues.md`：路径改为 `docs/product/product-completion-roadmap.md`；旧系统口径从“完全不兼容”收敛为“不做长期可写兼容、不双写、旧写入口退役”；补充历史数据、source snapshot 和 admin-only readonly archive 可保留但不得承接正式写入；把 current MVP 中采购 / 库存 / 质检等能力拆成“后端事实已存在但 UI/API 暴露范围需另评审”；将 `Product Capability Registry` 明确为后续 review 目标；收紧 `current-mvp-requirements-baseline.md` 的优先级边界，避免覆盖 roadmap、current-source、代码和测试真源。
+- 下一步：若要把 issues 的有效建议落进正式 roadmap，可单独做一次 roadmap 正文修订；`current-mvp-requirements-baseline.md` 也应单独成文，不要混进当前 issues。
+- 阻塞/风险：本轮仍未修改 runtime、schema、migration、API、UI、seedData、docs registry；`docs/product/product-completion-roadmap-issues.md` 目前是未跟踪草稿文件，尚未提交为正式仓库真源。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 22:33
+- 完成：补充 roadmap 可演进规则到 `AGENTS.md` 和 `docs/product/product-completion-roadmap.md`。规则明确 `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源；`docs/codex-goals/001-xxx.md` 等编号 Goal 只是阶段性施工单和审计记录；路线调整必须显式修改 roadmap，写清原因、影响范围、新的下一步和不再复用的旧 Goal 编号，并在影响当前状态时同步检查 `docs/current-source-of-truth.md`。
+- 下一步：根据最新 `docs/product/product-completion-roadmap-issues.md` 继续判断哪些建议应进入 roadmap 正文，哪些应拆到 `current-mvp-requirements-baseline.md` 或后续独立 review Goal。
+- 阻塞/风险：本轮只补协作规则和 roadmap 自身变更规则，未修改 runtime、schema、migration、API、UI、seedData、docs registry，也未把 issues 文件纳入正式路线真源。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-31 22:11
 - 完成：将产品完成路线图从 `docs/codex-goals/_product-completion-roadmap.md` 移到 `docs/product/product-completion-roadmap.md`，并明确其角色是可演进产品规划真源，不替代 `docs/current-source-of-truth.md`、代码、schema、migration、API/UI 或具体 Goal 文件。同步修正后续建议路线从 `013` 起排，避免重占已完成的 `011/012`；移除当前交付包里的 `k8s` 默认口径，明确当前部署主路径仍是 Compose；删除末尾多余 Markdown 代码块。`docs/product/rewrite-roadmap.md` 已收口为历史路径兼容入口，指向新的产品完成路线图。
 - 下一步：后续真正执行新路线时，仍需为每个编号拆独立 `docs/codex-goals/<编号>.md`，并按具体 Goal 文件授权 schema、migration、runtime、API/UI 或导入执行。

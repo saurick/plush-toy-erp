@@ -52,6 +52,10 @@
   - 从 API/RBAC 进入 UI。
 - 新 Codex 会话不能依赖历史 ChatGPT 或 Codex 聊天记忆，必须先读本文件，再读对应的 `docs/codex-goals/<goal>.md`。
 - Codex Goal 输入框只放 `4000` 字以内中文短 Goal；复杂任务、长背景、禁止项、验收命令和交接细节必须写入 `docs/codex-goals/*.md`。
+- `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源，用于判断产品长期阶段、候选 Goal 顺序和下一步大方向；它不是单个 Codex Goal 的执行规格，也不替代 `docs/current-source-of-truth.md`、代码、migration、测试或当前任务文件。
+- Roadmap 可以在执行过程中根据代码现状、客户反馈、验收结果、风险发现或 AI 规划复盘显式调整；调整时必须直接修改 roadmap，并写清调整原因、影响阶段或 Goal、新的下一步，以及哪些旧 Goal 编号不再继续复用。
+- `docs/codex-goals/001-xxx.md`、`002-xxx.md` 等编号 Goal 只是阶段性施工单和审计记录；完成后不再作为后续路线真源，不能用单个 Goal 文件、聊天结论或临时判断悄悄覆盖 roadmap。
+- Roadmap 调整如果改变已完成 / 未完成 / 暂停 / 取消 / 下一步编号等当前状态，必须同步检查并按需更新 `docs/current-source-of-truth.md` 或等价当前状态索引。
 - 每个任务的允许修改文件、禁止修改文件、验收命令，以对应的 Goal md 为准。
 - 每个任务必须在对应 Goal md 中明确成功标准、当前真源与非真源、改动范围分级、停止条件、Git 策略、测试分层选择和验收命令；不要让本文件代替具体任务的测试选择。
 - 正式 Goal 开始和收口时都必须检查工作区状态。若运行期间出现其他会话写入的非本 Goal 路径改动，Codex 只能记录并隔离这些改动，不得回退、删除、格式化、提交或写入本轮审查报告正文作为本轮成果；需要提交时必须按本 Goal 允许路径精确 stage。
