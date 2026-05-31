@@ -129,6 +129,7 @@ pnpm style:l1
 - 协作约定：`/Users/simon/projects/plush-toy-erp/AGENTS.md`
 - 阅读顺序与真源：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
 - 0 到 1 产品架构：`/Users/simon/projects/plush-toy-erp/docs/product/zero-to-one-architecture.md`
+- 产品完成路线图：`/Users/simon/projects/plush-toy-erp/docs/product/product-completion-roadmap.md`
 - 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md`
 - current 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/current/README.md`
 - imported design notes：`/Users/simon/projects/plush-toy-erp/docs/reference/imported-notes/README.md`

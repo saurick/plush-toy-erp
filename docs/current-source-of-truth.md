@@ -7,6 +7,7 @@
 - 运行时行为的最终真源始终是代码。
 - 仓库级约定、部署边界和项目基线，以当前文档为索引，再分流到对应子目录文档。
 - 历史 changes 文档不再作为阅读入口；当前状态必须回到本文档、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认。
+- 产品从起步到成熟的阶段规划、候选 Goal 顺序和产品化路线，以 `docs/product/product-completion-roadmap.md` 作为可演进规划真源；它不替代当前实现真源，也不直接授权 schema、migration、runtime、API 或 UI 改动。
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
 

@@ -1,3 +1,8 @@
+## 2026-05-31 22:11
+- 完成：将产品完成路线图从 `docs/codex-goals/_product-completion-roadmap.md` 移到 `docs/product/product-completion-roadmap.md`，并明确其角色是可演进产品规划真源，不替代 `docs/current-source-of-truth.md`、代码、schema、migration、API/UI 或具体 Goal 文件。同步修正后续建议路线从 `013` 起排，避免重占已完成的 `011/012`；移除当前交付包里的 `k8s` 默认口径，明确当前部署主路径仍是 Compose；删除末尾多余 Markdown 代码块。`docs/product/rewrite-roadmap.md` 已收口为历史路径兼容入口，指向新的产品完成路线图。
+- 下一步：后续真正执行新路线时，仍需为每个编号拆独立 `docs/codex-goals/<编号>.md`，并按具体 Goal 文件授权 schema、migration、runtime、API/UI 或导入执行。
+- 阻塞/风险：本轮只做文档迁移、路线图口径修正和 docs 缓存清理；未创建 013/014 Goal，未改 runtime、schema、migration、API、UI、seedData、docs registry 或真实导入逻辑。已将 docs 下 3 个 `.DS_Store` 移入系统废纸篓；`rewrite-roadmap.md` 因被历史 Goal 文件引用，未删除实体文件，仅删除重复路线内容并保留兼容入口。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-31 18:13
 - 完成：Checkpoint 7 验证进入收口，已运行 012 必跑验证命令主体：Git / diff 检查、011 前置文件存在、freeze checker help、freeze checker smoke、freeze output 存在性、012 freeze checker tests、011 dry-run CLI 回归测试、real dry-run evidence smoke、dry-run output 存在性、no-real-import grep、shipping / workflow-fact / forbidden boundary grep、docs existence、禁止路径检查、013/014 文件检查、output 未纳入 git、`tenant_id` / `ChangeUsecase` / `change_records` 检查。禁止路径 `server/`、`web/`、`migrations/`、`config/`、`deployments/`、seedData、docs registry 和 `docs/product/business-records-*` 均无本轮 diff；`find docs/codex-goals -name '013-*' -o -name '014-*'` 无输出；grep 命中 013/014 仅来自 012 Goal 的禁止说明。
 - 下一步：生成 `.codex-review/latest.md`，最终回复只总结 012，不自动进入 013/014。
