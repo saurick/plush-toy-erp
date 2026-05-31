@@ -9,7 +9,7 @@ Current Implementation Source of Truth: Schema files, generated Ent code, Atlas 
 
 本检查清单用于下一轮 Ent schema goal 前的 go/no-go。结论只允许在 `docs/product/v1-implementation-cutline.md` 的范围内 Proceed With Restrictions。
 
-003 schema-only 已按本清单落入 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件；004 已运行 Ent generate 并生成 Atlas migration；005 已新增 `customers / suppliers / contacts` repo/usecase 和测试；006 已新增 `sales_orders / sales_order_items` repo/usecase 和测试；007 已新增这些对象的 JSON-RPC API 和 RBAC 动作权限；008 已新增 V1 前端页面和前端 API client/tests。docs registry、seedData 和 `business_records` transition 仍未实现；销售订单仍是 Source Document，不写 shipment / inventory / finance facts。
+003 schema-only 已按本清单落入 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件；004 已运行 Ent generate 并生成 Atlas migration；005 已新增 `customers / suppliers / contacts` repo/usecase 和测试；006 已新增 `sales_orders / sales_order_items` repo/usecase 和测试；007 已新增这些对象的 JSON-RPC API 和 RBAC 动作权限；008 已新增 V1 前端页面和前端 API client/tests；009 已新增 `business_records` 兼容层引用审计、过渡审计、cutover plan、data map draft 和 risk register。docs registry、seedData 和 `business_records` runtime transition 仍未实现；009 未做真实数据迁移、import/backfill 或删除；销售订单仍是 Source Document，不写 shipment / inventory / finance facts。
 
 | Check | Answer | Evidence | Decision | Owner Layer |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@ Current Implementation Source of Truth: Schema files, generated Ent code, Atlas 
 | 是否需要 RBAC 权限码 | Done for V1 API cutline | 007 已新增 `customer.* / supplier.* / contact.* / sales_order.* / sales_order_item.*` 动作权限。 | Done for API-RBAC cutline | RBAC |
 | 是否需要 API | Done for V1 API cutline | 007 已新增 `masterdata` 与 `sales_order` JSON-RPC handlers，仍不接 UI。 | Done for API-RBAC cutline | API |
 | 是否需要 UI | Done for V1 UI cutline | 008 已新增客户 / 供应商 / 联系人 / 销售订单 / 销售订单行前端页面；docs registry、seedData 和 `business_records` transition 仍未实现。 | Done for UI cutline | UI |
-| 是否需要导入 | Later yes | current 数据导入必须 dry-run 和字段分类，不能混入 schema goal。 | Defer | Data Import |
+| 是否需要导入 | Later yes | 009 已输出 data map draft；current 数据导入仍必须 dry-run 和字段分类，不能混入 schema goal。 | Defer | Data Import |
 | 是否需要客户配置 | Later yes | 字段显示、编号规则、打印模板属于 config draft，非 schema first cut。 | Defer | Productization |
 | 是否包含 `tenant_id` | No | 正式 cutline 禁止；grep 命中只能是 imported notes / 禁止说明 / future SaaS 候选说明。 | Go | Data / Productization |
 | 是否误把 draft 写成 implemented | No | 新增文档顶部均为 implemented = No。 | Go | Docs / QA |

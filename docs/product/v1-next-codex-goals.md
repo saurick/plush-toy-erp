@@ -101,28 +101,22 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 
 ## 009-business-records-transition-audit
 
-状态：未实现。
+状态：已完成 docs-only 审计；未改 runtime、schema、migration、API/RBAC、UI、docs registry、seedData，未做 import/backfill、真实数据迁移或删除。
 
 - 目标：审计 `business_records` 在 partners/products/orders/purchase/shipping/finance/debug 中的引用和退出路径。
-- 允许修改文件：docs/product、docs/architecture、audit notes；scripts 只有在单独批准时才允许。
-- 禁止修改文件：runtime deletion、Ent schema、migrations、UI removal、seedData destructive edits。
-- 是否允许 schema change：否。
-- 是否允许 migration：否。
-- 是否允许 runtime：否。
-- 测试命令：`git diff --stat`；`rg -n "business_records|businessRecord|BusinessRecord|partners|products" server web docs`；`cd web && pnpm test`；`cd server && go test ./internal/biz ./internal/data`。
-- 停止条件：未做引用审计就直接建议删除；不能区分 compatibility/demo/source snapshot 和 Product Core。
-- 预期输出：Reference inventory、transition risk list、migration source map。
+- 已输出：`business-records-reference-audit.md`、`business-records-transition-audit.md`、`business-records-cutover-plan.md`、`business-records-data-map-draft.md`、`business-records-risk-register.md`。
+- 后续禁止误读：009 不是 cutover 实施，不代表 `business_records` 已只读、已 deprecated、已迁移或可删除。
 
 ## 010-current-customer-data-import-draft
 
-状态：未实现。
+状态：建议下一轮；执行前以最新 009 审计产物重新收窄。
 
-- 目标：设计 current 客户数据导入草案，分类字段，并提出 dry-run / backfill 策略。
+- 目标：基于 009 data map，设计 current 客户数据导入 dry-run / backfill 草案、字段分类、unresolved queue 和禁止自动迁移清单。
 - 允许修改文件：docs/customers/current、docs/product import draft、docs/architecture。
-- 禁止修改文件：runtime import loader、Ent schema、migrations、seedData、frontend pages。
+- 禁止修改文件：runtime import loader、Ent schema、migrations、seedData、frontend pages、docs registry。
 - 是否允许 schema change：否。
 - 是否允许 migration：否。
 - 是否允许 runtime：否。
 - 测试命令：`git diff --stat`；`grep -R "tenant_id" docs/product docs/architecture docs/customers docs/reference config deployments || true`；后续 Goal 可选 fixture validation。
-- 停止条件：把 current Excel columns 变成 Product Core required fields；导入覆盖已入账 / 已过账事实；没有 dry-run 或 unresolved queue。
-- 预期输出：字段分类表、导入映射草案、未决问题列表。
+- 停止条件：把 current Excel columns 变成 Product Core required fields；导入覆盖已入账 / 已过账事实；没有 dry-run 或 unresolved queue；从旧记录生成 shipment / inventory / finance facts。
+- 预期输出：字段分类表、导入映射草案、dry-run 校验口径、未决问题列表。

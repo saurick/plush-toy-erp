@@ -7,6 +7,16 @@ Current Implementation Source of Truth: No
 
 # Business Records Transition Plan
 
+009 已补充 docs-only 审计产物：
+
+- `docs/product/business-records-reference-audit.md`
+- `docs/product/business-records-transition-audit.md`
+- `docs/product/business-records-cutover-plan.md`
+- `docs/product/business-records-data-map-draft.md`
+- `docs/product/business-records-risk-register.md`
+
+这些文件只增加引用审计、风险清单、迁移草案和下一步计划；未实施 runtime、API、UI、seedData、docs registry、schema、migration、import/backfill、真实数据迁移或删除。
+
 ```text
 business_records 当前可继续作为兼容层、demo、seed、source snapshot、调研入口。
 business_records 不能长期替代正式 customers / suppliers / sales_orders / inventory / shipment / finance facts。
