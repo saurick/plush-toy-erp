@@ -1,3 +1,28 @@
+## 2026-05-31 18:13
+- 完成：Checkpoint 7 验证进入收口，已运行 012 必跑验证命令主体：Git / diff 检查、011 前置文件存在、freeze checker help、freeze checker smoke、freeze output 存在性、012 freeze checker tests、011 dry-run CLI 回归测试、real dry-run evidence smoke、dry-run output 存在性、no-real-import grep、shipping / workflow-fact / forbidden boundary grep、docs existence、禁止路径检查、013/014 文件检查、output 未纳入 git、`tenant_id` / `ChangeUsecase` / `change_records` 检查。禁止路径 `server/`、`web/`、`migrations/`、`config/`、`deployments/`、seedData、docs registry 和 `docs/product/business-records-*` 均无本轮 diff；`find docs/codex-goals -name '013-*' -o -name '014-*'` 无输出；grep 命中 013/014 仅来自 012 Goal 的禁止说明。
+- 下一步：生成 `.codex-review/latest.md`，最终回复只总结 012，不自动进入 013/014。
+- 阻塞/风险：当前仍未提交、未推送、未 stage；`docs/codex-goals/012-current-source-snapshot-freeze-and-real-dry-run-evidence.md` 是启动前未跟踪任务文件，output 目录为本地 evidence 且未纳入 git。
+
+## 2026-05-31 18:12
+- 完成：Checkpoint 6 完成，已新增 `docs/customers/current/source-snapshot-freeze.md`、`docs/customers/current/real-dry-run-evidence.md`、`docs/customers/current/source-snapshot-manual-review-checklist.md`，并同步更新 `docs/customers/current/import-dry-run-tooling.md`、`docs/customers/current/import-dry-run-plan.md`、`docs/customers/current/import-acceptance-checklist.md`、`docs/customers/current/README.md`、`docs/product/current-customer-import-strategy.md`、`docs/product/current-customer-import-risk-register.md`、`docs/current-source-of-truth.md` 和 `scripts/README.md`。文档明确 012 已新增 freeze checker 与 evidence preparation，但仍不是真实导入、不写 DB、不做 loader、不改 schema/API/UI/seedData/docs registry，output 只是 evidence 不是 import approval。
+- 下一步：运行 012 全部必跑验证命令、禁止路径检查、tenant_id / Workflow-Fact 边界检查和 docs existence / grep 检查，然后生成 `.codex-review/latest.md`。
+- 阻塞/风险：本轮文档引用的是 sanitized fixture evidence；真实客户 source freeze、客户 sign-off、备份/回滚/幂等/对账和真实 loader 仍需后续单独 Goal。
+
+## 2026-05-31 18:09
+- 完成：Checkpoint 5 完成，已运行 freeze checker 生成 `output/current-source-snapshot-freeze/` 3 个文件，并运行 011 dry-run CLI 生成 `output/current-real-dry-run-evidence/` 9 个文件；`freeze-metadata.json` 中 `canExecuteRealImport=false`、`noRealImport=true`，011 `validation-summary.json` 中 `canExecuteRealImport=false`。已执行 `node --test scripts/import/currentCustomerDryRun.test.mjs`，11 个测试通过。`git status --short output` 无输出，output 目录未纳入 git。
+- 下一步：新增 012 source snapshot freeze、real dry-run evidence、manual review checklist 文档，并同步 import dry-run tooling / plan / acceptance、Product strategy / risk register、current-source-of-truth、scripts README。
+- 阻塞/风险：dry-run evidence 中 `forbiddenCount=15`、`blockerCount=32` 是预期边界证据，说明不能真实导入；不是失败，也不是 import approval。
+
+## 2026-05-31 18:09
+- 完成：Checkpoint 1-4 完成，已新增 `scripts/import/currentSourceSnapshotFreezeCheck.mjs`、`scripts/import/currentSourceSnapshotFreezeCheck.test.mjs`、`scripts/import/fixtures/current/source-snapshot.freeze.sample.json` 和 `scripts/import/fixtures/current/existing-v1.freeze.sample.json`，并更新 fixtures README。freeze checker 支持 `--help`、缺参非 0、source/existing 只读校验、output 目录生成、sourceId 唯一性、domain、fields object、source reference、existing 常见数组校验、SHA256、metadata、summary、Markdown report，以及 sensitive / forbidden / deferred / `shipping_released != shipped` / `workflow task done != fact posted` 风险扫描。已执行 `node --test scripts/import/currentSourceSnapshotFreezeCheck.test.mjs`，18 个测试通过；已执行 freeze checker smoke 生成 `output/current-source-snapshot-freeze`，`canExecuteRealImport=false`、`noRealImport=true`。
+- 下一步：运行 011 dry-run CLI 回归与 real dry-run evidence smoke，再同步 012 指定文档和最终验收。
+- 阻塞/风险：freeze fixture 为合成 sanitized 数据；summary 中存在预期 blocker / warning，用于人工 review evidence，不代表真实导入批准。
+
+## 2026-05-31 18:05
+- 完成：启动执行 `012-current-source-snapshot-freeze-and-real-dry-run-evidence`。已读取 `AGENTS.md`、012 Goal、011 dry-run tooling 代码 / 测试 / fixture、010 current import 草案、009 `business_records` 审计文档、V1/Product 边界、Workflow / Fact 边界、`docs/current-source-of-truth.md` 和 `scripts/README.md`；已记录启动 git 现场，当前分支 `main`，tracked diff 为空，未跟踪文件为 `docs/codex-goals/012-current-source-snapshot-freeze-and-real-dry-run-evidence.md`；`progress.md` 为 270 行 / 56017 bytes，未达到归档阈值。
+- 下一步：只在 012 允许路径内新增 freeze checker、sanitized freeze fixtures、测试和 evidence/docs；继续禁止真实导入、写 DB、loader、schema/API/UI/seedData/docs registry、`business_records` runtime cutover 或 013/014 队列。
+- 阻塞/风险：012 Goal 文件为启动前未跟踪文件；本轮默认不提交、不推送、不 stage，`.codex-review/latest.md` 只在最终收口覆盖生成。
+
 ## 2026-05-31 19:08
 - 完成：Checkpoint 8 完成，已运行 011 必跑验证命令：Git / diff 检查、CLI help、CLI smoke、输出文件存在性检查、`--fail-on-blockers` 非 0 检查、`node --test scripts/import/currentCustomerDryRun.test.mjs`、输出内容 grep、docs 文件存在检查、禁止路径 diff、`tenant_id` / `ChangeUsecase` / `change_records` 检查和 Workflow / Fact 边界 grep。CLI smoke 生成 `output/current-import-dry-run`，`validation-summary.json` 中 `canExecuteRealImport=false`，`dry-run-report.md` 明确 `No real import`；`--fail-on-blockers` 输出 `blockerCount=24, forbiddenCount=10` 并返回非 0。补充完成 `Print Template Input` 默认 review、`Industry Template Candidate` 默认 defer/review 的 sourceType 规则后，`node --test scripts/import/currentCustomerDryRun.test.mjs` 为 11 个测试通过。禁止路径 `server/`、`web/`、`migrations/`、`config/`、`deployments/`、seedData、docs registry 和 `docs/product/business-records-*` 均无本轮 diff。
 - 下一步：生成 `.codex-review/latest.md`，最终回复只总结 011，不输出后续候选 Goal 队列。

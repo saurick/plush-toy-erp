@@ -7,7 +7,7 @@ Current Implementation Source of Truth: No
 
 # Current Customer Import Strategy
 
-本策略从 Product 层约束 current 客户数据导入。011 已新增 dry-run preview package tooling，但它不是真实 import loader，不代表真实导入已经开始。
+本策略从 Product 层约束 current 客户数据导入。011 已新增 dry-run preview package tooling，012 已新增 source snapshot freeze checker 和 real dry-run evidence preparation；它们都不是真实 import loader，不代表真实导入已经开始。
 
 ## Position
 
@@ -33,6 +33,7 @@ current 资料不能直接成为：
 | principle | decision |
 |---|---|
 | 先 dry-run | 所有来源先生成 preview、skipped rows、unresolved queue、duplicates 和 conflicts。 |
+| 先 freeze evidence | source snapshot 先生成 freeze metadata、checksum、风险 summary 和 manual review checklist。 |
 | 先字段分类 | 字段必须先归类为 Product Core、Industry Template Candidate、Customer Config、Customer Material、Demo Seed、Data Import Source、Print Template Input、Deferred 或 Forbidden Auto Import。 |
 | 先 unresolved queue | 不能唯一判断的主体、字段、数量、金额、单位、仓库、SKU、采购、出货、库存和财务信息先进入 queue。 |
 | 先人工确认 | 所有 Medium/Low confidence、重复、冲突、deferred 和 current 专属字段必须人工确认。 |
@@ -70,6 +71,17 @@ node scripts/import/currentCustomerDryRun.mjs \
 ```
 
 该 preview package 可输出 source references、normalized rows、candidates、unresolved queue、duplicates、conflicts、forbidden auto-import、validation summary 和 Markdown report。它只证明 dry-run tooling 可运行；真实 loader 仍需单独 Goal。
+
+012 已实现 freeze checker 和 evidence preparation：
+
+```bash
+node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
+  --out output/current-source-snapshot-freeze
+```
+
+012 同时用 freeze fixtures 生成 `output/current-real-dry-run-evidence/`。这些 output 目录只是 evidence，不是 import approval；`freeze-metadata.json` 和 dry-run `validation-summary.json` 都必须保持 `canExecuteRealImport=false`。
 
 后续真实 import loader 必须单独 Goal，并先满足：
 

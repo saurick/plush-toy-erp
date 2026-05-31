@@ -7,12 +7,15 @@ Current Implementation Source of Truth: No
 
 # Current Customer Import Risk Register
 
-本风险登记覆盖 current 客户导入 dry-run 设计和 011 CLI tooling 控制。011 控制只存在于 dry-run 报告层，不是 runtime 防护，也不代表任何真实导入已经实施。
+本风险登记覆盖 current 客户导入 dry-run 设计、011 CLI tooling 控制和 012 freeze / evidence preparation 控制。011 / 012 控制只存在于 tooling evidence 和报告层，不是 runtime 防护，也不代表任何真实导入已经实施。
 
-## 011 Tooling Controls
+## 011 / 012 Tooling Controls
 
 | control | output | coverage | limitation |
 |---|---|---|---|
+| source snapshot freeze metadata | `freeze-metadata.json` | 记录 freezeId、freezeDate、source/existing SHA256、source count、domain/source type counts、`noRealImport=true`、`canExecuteRealImport=false` | 只证明 snapshot evidence 已生成，不批准导入 |
+| freeze check summary | `freeze-check-summary.json` | 记录 duplicate sourceId、invalid domain、invalid fields、missing source reference、sensitive / forbidden / deferred / boundary 风险 | 只做 evidence preparation，不自动修复 source |
+| freeze check report | `freeze-check-report.md` | 可读化 checksum、blockers、warnings、sensitive review、forbidden review、deferred review 和 no-real-import statement | 不替代人工 review 或客户 sign-off |
 | forbidden-auto-import report | `forbidden-auto-import.json` | 阻断 shipment、inventory、finance、`shipping_released -> shipped`、workflow done -> fact posted 等自动导入风险 | 只在 dry-run package 中呈现，不拦截 runtime 写入 |
 | unresolved queue | `unresolved-queue.json` | 记录 block / defer / review / warning，要求人工确认缺 owner、缺 customer、未知 unit、invalid value 等问题 | 不会自动修复数据 |
 | duplicates / conflicts | `duplicates.json`、`conflicts.json` | 暴露 code/name 重复和更新冲突，避免自动合并同名主体 | 需要人工决策 |
@@ -48,6 +51,7 @@ Current Implementation Source of Truth: No
 | P0 | current 字段污染 Product Core | field classification + Product layer strategy |
 | P0 | `business_records` 与 V1 双真源 | no runtime changes in 010；future cutover 单独 Goal |
 | P0 | dry-run 报告被误当真实导入批准 | 011 `validation-summary.canExecuteRealImport=false` + `dry-run-report.md` No real import |
+| P0 | freeze evidence 被误当真实导入批准 | 012 `freeze-metadata.canExecuteRealImport=false` + `source-snapshot-manual-review-checklist.md` import-not-approved conclusion |
 | P1 | SKU / purchase order 过早落地 | deferred domain policy |
 | P1 | 未确认字段丢失或塞 note | unresolved queue + manual review |
 
@@ -61,3 +65,4 @@ Current Implementation Source of Truth: No
 - customer sign-off。
 - import loader design review。
 - backup / rollback / validation review。
+- customer sign-off based on reviewed freeze evidence and dry-run evidence。

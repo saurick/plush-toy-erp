@@ -7,7 +7,7 @@ Current Implementation Source of Truth: No
 
 # Current Customer Import Dry-run Plan
 
-本计划最初由 010 设计 dry-run 流程。011 已新增 `scripts/import/currentCustomerDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview；它仍不读写正式数据库、不执行真实迁移、不修改 seedData 或 `business_records`。
+本计划最初由 010 设计 dry-run 流程。011 已新增 `scripts/import/currentCustomerDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview。012 已新增 `scripts/import/currentSourceSnapshotFreezeCheck.mjs`，用于冻结 source snapshot evidence，并基于 sanitized freeze fixtures 生成 real dry-run evidence package。011 和 012 都不读写正式数据库、不执行真实迁移、不修改 seedData 或 `business_records`。
 
 ## Scope
 
@@ -19,6 +19,7 @@ Current Implementation Source of Truth: No
 | 本轮是否修改 runtime/schema/migration/API/UI/seedData | 否 |
 | 010 输出 | 来源清单、字段分类、dry-run plan、unresolved queue、验收清单、产品策略、风险登记 |
 | 011 输出 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` |
+| 012 输出 | `freeze-metadata.json`、`freeze-check-summary.json`、`freeze-check-report.md`、`output/current-real-dry-run-evidence/*`、source snapshot freeze 文档、real dry-run evidence 文档和人工 review checklist |
 
 ## 011 Tooling Status
 
@@ -44,6 +45,37 @@ node scripts/import/currentCustomerDryRun.mjs \
 - Stage 4：人工确认 unresolved、duplicate、conflict、forbidden。
 - Stage 5：客户 sign-off、备份 / 回滚 / 导入审批。
 - Stage 6：真实 import execution；011 未实现。
+
+## 012 Freeze + Evidence Status
+
+012 已实现 freeze checker：
+
+```bash
+node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
+  --out output/current-source-snapshot-freeze
+```
+
+012 已用 freeze fixtures 生成 dry-run evidence：
+
+```bash
+node scripts/import/currentCustomerDryRun.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
+  --out output/current-real-dry-run-evidence \
+  --format json,md
+```
+
+012 的 evidence 只用于人工 review：
+
+- 不是真实导入。
+- 不写 DB。
+- 不做 loader。
+- 不改 schema / migration / API / UI / seedData / docs registry。
+- 不做 `business_records` runtime cutover。
+- output 是 evidence，不是 import approval。
+- 真实 import loader 仍需单独 Goal，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
 
 ## Stage 0: Source Collection
 

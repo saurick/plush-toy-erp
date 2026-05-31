@@ -19,7 +19,11 @@
 | `import-dry-run-plan.md` | 记录 current 数据导入 dry-run 阶段设计 |
 | `import-unresolved-queue.md` | 记录导入未决队列类型、阻断规则和处理方式 |
 | `import-acceptance-checklist.md` | 记录 future import execution 前的验收清单 |
+| `import-dry-run-tooling.md` | 记录 011 dry-run CLI 与 012 freeze evidence tooling 的用法和边界 |
+| `source-snapshot-freeze.md` | 记录 012 source snapshot freeze metadata、checksum、风险统计和重跑方式 |
+| `real-dry-run-evidence.md` | 记录 012 real dry-run evidence package 摘要和 no-real-import 结论 |
+| `source-snapshot-manual-review-checklist.md` | 记录 freeze / dry-run evidence 的人工 review checklist 和 import-not-approved 结论 |
 
 只有经过通用化评审的能力才能进入 Product Core。
 
-当前导入草案只做 dry-run / 字段分类 / unresolved queue 设计，不代表真实导入、backfill、seedData 改造、docs registry 改造或运行时代码已经实现。
+当前导入草案和 012 evidence preparation 只做 dry-run / 字段分类 / unresolved queue / source freeze / evidence review，不代表真实导入、backfill、loader、DB 写入、seedData 改造、docs registry 改造、`business_records` runtime cutover 或运行时代码已经实现。

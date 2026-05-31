@@ -1,0 +1,117 @@
+Doc Type: Current Source Snapshot Freeze Evidence
+Status: 012 Evidence Prepared
+Runtime Implemented: No
+Ent Schema Implemented: No
+Migration Implemented: No
+Current Implementation Source of Truth: `scripts/import/currentSourceSnapshotFreezeCheck.mjs`
+
+# Current Source Snapshot Freeze
+
+012 已新增 current source snapshot freeze checker，并基于 sanitized fixture 生成 freeze evidence。该 evidence 只证明 source snapshot freeze checker 可运行、输入可追溯、风险可复查；它不是真实导入批准。
+
+## Freeze Metadata
+
+| item | value |
+|---|---|
+| Freeze ID | `current-freeze-1bcde22d39ea-7e31081a7a8b` |
+| Freeze date | `2026-05-31T10:09:15.575Z` |
+| Source snapshot file path | `scripts/import/fixtures/current/source-snapshot.freeze.sample.json` |
+| Existing snapshot file path | `scripts/import/fixtures/current/existing-v1.freeze.sample.json` |
+| Output directory | `output/current-source-snapshot-freeze/` |
+| Source SHA256 | `1bcde22d39ea34c0f801183229348e9c903d968cc5478b0e2d2dd2bbcabe31b9` |
+| Existing SHA256 | `7e31081a7a8b50ebb74e916d4a2f7e9b110c55cf44ccbc9231598a40e38dff9f` |
+| Source count | `20` |
+| `noRealImport` | `true` |
+| `canExecuteRealImport` | `false` |
+| Manual review required | `true` |
+
+## Freeze Checker Command
+
+```bash
+node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
+  --out output/current-source-snapshot-freeze
+```
+
+## 011 Dry-run Command
+
+```bash
+node scripts/import/currentCustomerDryRun.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
+  --out output/current-real-dry-run-evidence \
+  --format json,md
+```
+
+## Domain Count
+
+| domain | count |
+|---|---:|
+| customers | 2 |
+| suppliers | 1 |
+| contacts | 2 |
+| sales_orders | 3 |
+| sales_order_items | 2 |
+| products | 1 |
+| materials | 1 |
+| units | 1 |
+| warehouses | 1 |
+| bom | 1 |
+| product_skus | 1 |
+| purchase_orders | 1 |
+| shipment | 1 |
+| inventory | 1 |
+| finance | 1 |
+
+## Source Type Count
+
+| sourceType | count |
+|---|---:|
+| Data Import Source | 19 |
+| Industry Template Candidate | 1 |
+
+## Known Blockers
+
+| blocker type | count | meaning |
+|---|---:|---|
+| forbidden field | 11 | shipment / inventory / finance / shipped-like fields must not be auto-imported. |
+| shipping boundary risk | 4 | `shipping_released` or shipped wording must not become shipment, shipped, or inventory facts. |
+| workflow fact boundary risk | 2 | workflow done / fact posted wording must not become posted facts. |
+
+## Known Warnings
+
+| warning type | count | handling |
+|---|---:|---|
+| sensitive field | 5 | Review field names only; do not copy raw values into reports. |
+| deferred field | 5 | `product_skus` and `purchase_orders` stay deferred until a later Goal explicitly changes the boundary. |
+
+## Sensitive Field Handling
+
+Freeze checker evidence records sensitive field names and source references only. It does not output raw phone, email, address, contact, bank, account, or identity values in `freeze-check-summary.json` or `freeze-check-report.md`.
+
+## No Real Import Statement
+
+012 does not execute real import. It does not read DB, write DB, create a loader, generate SQL, generate migration, modify schema/API/UI/seedData/docs registry, write `business_records`, or perform `business_records` cutover. `canExecuteRealImport=false` is mandatory.
+
+## Re-run Instructions
+
+```bash
+rm -rf output/current-source-snapshot-freeze
+node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
+  --out output/current-source-snapshot-freeze
+```
+
+Then inspect:
+
+```bash
+cat output/current-source-snapshot-freeze/freeze-metadata.json
+cat output/current-source-snapshot-freeze/freeze-check-summary.json
+cat output/current-source-snapshot-freeze/freeze-check-report.md
+```
+
+## Output Directory Policy
+
+`output/current-source-snapshot-freeze/` is local evidence output and is not committed to git. The committed truth is the CLI, sanitized fixtures, tests, and this documentation.

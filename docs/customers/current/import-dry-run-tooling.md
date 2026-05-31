@@ -7,7 +7,31 @@ Current Implementation Source of Truth: `scripts/import/currentCustomerDryRun.mj
 
 # Current Customer Import Dry-run Tooling
 
-011 已新增 current 客户导入 dry-run CLI。该工具只读取 JSON snapshot，生成 dry-run package，供人工 review 使用；它不执行真实导入。
+011 已新增 current 客户导入 dry-run CLI。012 又新增 source snapshot freeze checker，并用 sanitized freeze fixtures 生成 freeze evidence 与 real dry-run evidence package。两者都只读取 JSON snapshot，供人工 review 使用；它们不执行真实导入。
+
+## 012 Freeze Checker
+
+```bash
+node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
+  --out output/current-source-snapshot-freeze
+```
+
+输出：
+
+| 文件 | 说明 |
+|---|---|
+| `freeze-metadata.json` | Freeze ID、freeze date、source/existing path、SHA256、source count、domain/source type counts、`noRealImport=true`、`canExecuteRealImport=false`。 |
+| `freeze-check-summary.json` | Source root/row 校验、duplicate sourceId、domain、fields、source reference、sensitive / forbidden / deferred / boundary 风险统计。 |
+| `freeze-check-report.md` | 可读 freeze 报告，包含 checksum、domain counts、blockers、warnings、sensitive review、forbidden review、deferred review 和 no-real-import statement。 |
+
+012 生成的 evidence 目录：
+
+- `output/current-source-snapshot-freeze/`
+- `output/current-real-dry-run-evidence/`
+
+这些 output 目录只作为本地 evidence，不纳入 git，也不是 import approval。
 
 ## CLI 用法
 
@@ -16,6 +40,16 @@ node scripts/import/currentCustomerDryRun.mjs \
   --source scripts/import/fixtures/current/source-snapshot.sample.json \
   --existing scripts/import/fixtures/current/existing-v1.sample.json \
   --out output/current-import-dry-run \
+  --format json,md
+```
+
+012 real dry-run evidence 使用 freeze fixtures：
+
+```bash
+node scripts/import/currentCustomerDryRun.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
+  --out output/current-real-dry-run-evidence \
   --format json,md
 ```
 
@@ -144,6 +178,8 @@ existing snapshot 只作为只读匹配输入。CLI 不从数据库读取 existi
 - 不改 docs registry。
 - 不执行真实 import / backfill。
 - `canExecuteRealImport` 永远是 `false`。
+- 012 freeze evidence 和 dry-run evidence 不是导入批准。
+- 真实 import loader 仍需单独 Goal，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
 - `sales_order` 仍是 Source Document / Business Commitment，不是 shipment、inventory 或 finance fact。
 - `shipping_released != shipped`。
 - `workflow task done != fact posted`。
