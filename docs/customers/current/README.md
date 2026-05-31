@@ -14,5 +14,12 @@
 | `customer-config-draft.md` | 记录 current 未来可能的配置项 |
 | `delta-register.md` | 记录客户差异项 |
 | `change-request-process.md` | 记录后续需求分类和评审流程 |
+| `import-source-inventory.md` | 记录 current 导入来源清单和用途分类 |
+| `import-field-classification.md` | 记录 current 字段分类、可导入候选和禁止自动迁移项 |
+| `import-dry-run-plan.md` | 记录 current 数据导入 dry-run 阶段设计 |
+| `import-unresolved-queue.md` | 记录导入未决队列类型、阻断规则和处理方式 |
+| `import-acceptance-checklist.md` | 记录 future import execution 前的验收清单 |
 
 只有经过通用化评审的能力才能进入 Product Core。
+
+当前导入草案只做 dry-run / 字段分类 / unresolved queue 设计，不代表真实导入、backfill、seedData 改造、docs registry 改造或运行时代码已经实现。

@@ -1,15 +1,15 @@
 Doc Type: V1 Schema Go/No-Go
 Status: Proposed
-Runtime Implemented: MasterData repo/usecase for customers / suppliers / contacts added in 005; Sales Order repo/usecase for sales_orders / sales_order_items added in 006; JSON-RPC API/RBAC for these V1 objects added in 007; V1 frontend pages for customers / suppliers / contacts / sales_orders / sales_order_items added in 008
+Runtime Implemented: MasterData repo/usecase for customers / suppliers / contacts added in 005; Sales Order repo/usecase for sales_orders / sales_order_items added in 006; JSON-RPC API/RBAC for these V1 objects added in 007; V1 frontend pages for customers / suppliers / contacts / sales_orders / sales_order_items added in 008; current customer import dry-run draft added in 010 docs-only, with no runtime import/backfill implemented
 Ent Schema Implemented: Schema files added in 003; generated code added in 004
 Migration Implemented: Yes, generated in 004
-Current Implementation Source of Truth: Schema files, generated Ent code, Atlas migration, 005 MasterData repo/usecase for customers / suppliers / contacts, 006 Sales Order repo/usecase for sales_orders / sales_order_items, 007 JSON-RPC API/RBAC handlers, and 008 V1 frontend pages/API client/tests
+Current Implementation Source of Truth: Schema files, generated Ent code, Atlas migration, 005 MasterData repo/usecase for customers / suppliers / contacts, 006 Sales Order repo/usecase for sales_orders / sales_order_items, 007 JSON-RPC API/RBAC handlers, 008 V1 frontend pages/API client/tests, and 010 docs-only current customer import dry-run draft documents
 
 # V1 Schema Go / No-Go Checklist
 
 本检查清单用于下一轮 Ent schema goal 前的 go/no-go。结论只允许在 `docs/product/v1-implementation-cutline.md` 的范围内 Proceed With Restrictions。
 
-003 schema-only 已按本清单落入 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件；004 已运行 Ent generate 并生成 Atlas migration；005 已新增 `customers / suppliers / contacts` repo/usecase 和测试；006 已新增 `sales_orders / sales_order_items` repo/usecase 和测试；007 已新增这些对象的 JSON-RPC API 和 RBAC 动作权限；008 已新增 V1 前端页面和前端 API client/tests；009 已新增 `business_records` 兼容层引用审计、过渡审计、cutover plan、data map draft 和 risk register。docs registry、seedData 和 `business_records` runtime transition 仍未实现；009 未做真实数据迁移、import/backfill 或删除；销售订单仍是 Source Document，不写 shipment / inventory / finance facts。
+003 schema-only 已按本清单落入 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema 文件；004 已运行 Ent generate 并生成 Atlas migration；005 已新增 `customers / suppliers / contacts` repo/usecase 和测试；006 已新增 `sales_orders / sales_order_items` repo/usecase 和测试；007 已新增这些对象的 JSON-RPC API 和 RBAC 动作权限；008 已新增 V1 前端页面和前端 API client/tests；009 已新增 `business_records` 兼容层引用审计、过渡审计、cutover plan、data map draft 和 risk register；010 已新增 current customer import dry-run draft、字段分类、unresolved queue、acceptance checklist、Product 层 import strategy 和 risk register。docs registry、seedData、`business_records` runtime transition、真实 import loader、backfill 和真实数据迁移仍未实现；销售订单仍是 Source Document，不写 shipment / inventory / finance facts。
 
 | Check | Answer | Evidence | Decision | Owner Layer |
 |---|---|---|---|---|
@@ -31,6 +31,7 @@ Current Implementation Source of Truth: Schema files, generated Ent code, Atlas 
 | 是否需要 API | Done for V1 API cutline | 007 已新增 `masterdata` 与 `sales_order` JSON-RPC handlers，仍不接 UI。 | Done for API-RBAC cutline | API |
 | 是否需要 UI | Done for V1 UI cutline | 008 已新增客户 / 供应商 / 联系人 / 销售订单 / 销售订单行前端页面；docs registry、seedData 和 `business_records` transition 仍未实现。 | Done for UI cutline | UI |
 | 是否需要导入 | Later yes | 009 已输出 data map draft；current 数据导入仍必须 dry-run 和字段分类，不能混入 schema goal。 | Defer | Data Import |
+| 010 current import dry-run draft 是否已补 | Yes, docs-only | 已新增 current 导入来源清单、字段分类、dry-run plan、unresolved queue、acceptance checklist、Product 层 strategy 和 risk register。 | Done for docs draft only | Data Import |
 | 是否需要客户配置 | Later yes | 字段显示、编号规则、打印模板属于 config draft，非 schema first cut。 | Defer | Productization |
 | 是否包含 `tenant_id` | No | 正式 cutline 禁止；grep 命中只能是 imported notes / 禁止说明 / future SaaS 候选说明。 | Go | Data / Productization |
 | 是否误把 draft 写成 implemented | No | 新增文档顶部均为 implemented = No。 | Go | Docs / QA |

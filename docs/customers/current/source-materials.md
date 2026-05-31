@@ -9,9 +9,12 @@
 | 图片 / 截图 | Customer Material / QA Debug | 可帮助识别页面、字段和流程线索；不作为唯一真源 |
 | seed / demo 数据 | Demo Seed / QA Debug | 只用于开发验收和演示，不替代真实业务事实 |
 | print template | Print Template Input | 可进入客户打印模板或行业模板候选，数据来源必须统一 |
+| business_records 快照 | Source Snapshot / Data Import Source / Demo Seed | 可作为 dry-run 来源和历史快照，不是长期事实真源 |
+| V1 正式页面当前数据 | Data Import Target Preview | 只作为 future import preview 的目标模型参照；010 不写数据库 |
 
 使用规则：
 
 1. 资料先归档用途，再决定是否进入 Product Core、Industry Template、Customer Config 或 Customer Extension。
 2. 当前客户特殊字段、特殊流程和特殊报表不能直接进入核心 usecase。
 3. 涉及库存、出货、财务事实的资料必须进入架构评审。
+4. current 数据导入必须先 dry-run、字段分类、unresolved queue 和人工确认；010 不执行真实导入。

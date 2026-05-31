@@ -109,14 +109,28 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 
 ## 010-current-customer-data-import-draft
 
-状态：建议下一轮；执行前以最新 009 审计产物重新收窄。
+状态：已完成 docs-only draft；未改 runtime、schema、migration、API/RBAC、UI、docs registry、seedData，未写 import/backfill code，未执行真实数据迁移。
 
-- 目标：基于 009 data map，设计 current 客户数据导入 dry-run / backfill 草案、字段分类、unresolved queue 和禁止自动迁移清单。
-- 允许修改文件：docs/customers/current、docs/product import draft、docs/architecture。
+- 目标：基于 009 data map，设计 current 客户数据导入 dry-run / import 草案、字段分类、unresolved queue 和禁止自动迁移清单。
+- 已输出：`docs/customers/current/import-source-inventory.md`、`docs/customers/current/import-field-classification.md`、`docs/customers/current/import-dry-run-plan.md`、`docs/customers/current/import-unresolved-queue.md`、`docs/customers/current/import-acceptance-checklist.md`、`docs/product/current-customer-import-strategy.md`、`docs/product/current-customer-import-risk-register.md`。
 - 禁止修改文件：runtime import loader、Ent schema、migrations、seedData、frontend pages、docs registry。
 - 是否允许 schema change：否。
 - 是否允许 migration：否。
 - 是否允许 runtime：否。
 - 测试命令：`git diff --stat`；`grep -R "tenant_id" docs/product docs/architecture docs/customers docs/reference config deployments || true`；后续 Goal 可选 fixture validation。
 - 停止条件：把 current Excel columns 变成 Product Core required fields；导入覆盖已入账 / 已过账事实；没有 dry-run 或 unresolved queue；从旧记录生成 shipment / inventory / finance facts。
-- 预期输出：字段分类表、导入映射草案、dry-run 校验口径、未决问题列表。
+- 后续禁止误读：010 不是真实导入，不代表 loader、backfill、seedData、docs registry、`business_records` cutover 或客户数据迁移已经完成。
+
+## 011-current-customer-import-loader-design
+
+状态：建议下一轮或后续；必须在 010 dry-run draft 经人工审查后再执行。
+
+- 目标：只设计真实 import loader 的技术方案、备份 / 回滚 / 幂等 / 对账 / source reference，不写运行时代码。
+- 禁止同轮做：真实 import loader、backfill execution、schema/migration、seedData、docs registry、UI、business_records cutover、shipment/inventory/finance facts。
+
+## V1 menu entry review
+
+状态：建议单独 Goal。
+
+- 目标：评审 seedData、docs registry、Dashboard、menu permissions 和旧 `business_records` 重叠入口的只读 / demo / deprecated 策略。
+- 禁止同轮做：current 真实导入、schema/migration、API/RBAC 大改或事实层自动生成。
