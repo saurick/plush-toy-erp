@@ -10,7 +10,7 @@
 - ERP 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
 - ERP 主流程草案：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
 - ERP 数据模型草案：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
-- 本轮 changes 记录：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
+- 架构评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/`
 
 ## 相关目录
 

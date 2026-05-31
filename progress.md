@@ -1,3 +1,8 @@
+## 2026-05-31 13:35
+- 完成：清理 docs 无用入口，保留当前工作区已删除的 `docs/changes/*` 现场，移除正式索引和前端文档入口中指向已删除 changes 文件的断链；将库存 / 采购 / BOM / 质量事实层阅读入口改回 `docs/current-source-of-truth.md` 与 `docs/architecture/*` 评审文档；将本地 `docs/.DS_Store` 移到系统废纸篓。
+- 下一步：如需继续收缩 docs 体量，建议单独评审 `docs/product/*` 与 `docs/architecture/*` 的重复内容，先列保留 / 归档 / 合并清单，再移动文件。
+- 阻塞/风险：本轮未删除我无法证明无用的 current 客户导入草案和产品化文档；工作区存在未跟踪的 010 import 相关文档与若干既有修改，按用户现场保留。已执行 `cd web && pnpm lint && pnpm test`，279 个测试通过，仍有既有 `MODULE_TYPELESS_PACKAGE_JSON` warning。
+
 ## 2026-05-31 12:37
 - 完成：执行 `008-v1-frontend-masterdata-order-pages`，新增 V1 客户 / 供应商 / 联系人 / 销售订单 / 销售订单行前端页面、JSON-RPC 前端 client、路由入口和前端测试；页面复用 007 已完成的 `masterdata` / `sales_order` API 与 RBAC permission code，不在前端本地派生库存、出货、财务事实，也不与 `business_records` 双写。
 - 下一步：建议进入 `009-business-records-transition-audit`，单独审计 `business_records` 兼容层引用和退出路径；或进入 `010-current-customer-data-import-draft`，单独设计 current 客户数据导入 dry-run / backfill 草案。
@@ -7,6 +12,11 @@
 - 完成：执行 `009-business-records-transition-audit` docs-only 审计，新增 `business_records` 引用审计清单、过渡审计、cutover 分阶段计划、data map draft 和 risk register；同步小幅更新当前真源索引、既有 transition plan、V1 go/no-go 和后续 Goal 建议。本轮明确 `business_records` 仍是兼容层、demo、seed、source snapshot 和调研入口，不是长期事实真源。
 - 下一步：建议进入 `010-current-customer-data-import-draft`，只做 current 客户数据导入 dry-run / backfill 草案、字段分类和 unresolved queue；或单独做 V1 menu entry review，评审 seedData、docs registry、Dashboard、menu permissions 和旧入口只读化。
 - 阻塞/风险：本轮未改 runtime、schema、migration、generated code、repo/usecase、API/RBAC、UI、docs registry、seedData，未做 import/backfill、真实数据迁移、双写或删除；旧 `partners / products / project-orders` 入口仍存在并可能继续可写，需后续 runtime / UI / menu Goal 单独处理。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-05-31 13:35
+- 完成：执行 `010-current-customer-data-import-draft` docs-only 草案，新增 current 客户导入来源清单、字段分类表、dry-run plan、unresolved queue、import acceptance checklist、Product 层 current customer import strategy 和 import risk register；同步小幅更新当前真源索引、current 资料 README、source materials、delta register、V1 go/no-go 和后续 Goal 建议。本轮明确 current 客户资料只能作为 Customer Material / Demo Seed / Industry Template Candidate / Print Template Input / Data Import Source，不能直接变成 Product Core。
+- 下一步：建议先由 GPT / 人工审查 010 文档，再单独拆 `current-customer-import-loader-design` 或 V1 menu entry review；真实 import loader、backfill execution、seedData/docs registry 切换和 `business_records` cutover 不应混在同一轮。
+- 阻塞/风险：本轮未改 runtime、schema、migration、generated code、repo/usecase、API/RBAC、UI、docs registry、seedData，未写 import/backfill code，未执行真实数据迁移，未删除或修改 `business_records`；`product_skus`、`purchase_orders`、`shipments`、`stock_reservations` 和 finance facts 仍 deferred / forbidden auto import。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 01:35
 - 完成：执行 `007-v1-api-rbac-masterdata-order`，为 `customers / suppliers / contacts` 接入 `masterdata` JSON-RPC API，为 `sales_orders / sales_order_items` 接入 `sales_order` JSON-RPC API；所有写入均走 005/006 已完成的 usecase，不绕过 contacts owner guard、sales order lifecycle guard、product/unit/customer active guard。同步新增 `customer.* / supplier.* / contact.* / sales_order.* / sales_order_item.*` 动作权限和 API/RBAC 测试。

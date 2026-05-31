@@ -63,7 +63,7 @@ export default function DocumentationPage() {
               模板打印中心
             </Link>
             <Link className="erp-secondary-button" to="/erp/changes/current">
-              查看本轮变更记录
+              查看当前真源索引
             </Link>
           </>
         }

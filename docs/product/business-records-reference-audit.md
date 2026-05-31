@@ -56,7 +56,7 @@ Current Implementation Source of Truth: No
 | `docs/product/business-records-transition-plan.md` | 既有 transition plan，明确兼容层定位和不得直接删除 | docs/plan | 是 | update with 009 audit outputs |
 | `docs/product/domain-schema-draft-v1-v2.md`、`v1-implementation-cutline.md`、`v1-schema-go-no-go.md`、`v1-next-codex-goals.md` | 记录 V1 正式模型、draft-only / deferred 对象和 `business_records` 过渡边界 | docs/plan | 是 | keep；按 009 小幅更新状态 |
 | `docs/architecture/*business*`、`docs/architecture/*source-document*`、`docs/architecture/*purchase*`、`docs/architecture/*shipment*` | 架构评审文档反复声明 `business_records` 是快照 / 兼容层，不替代事实 | docs/architecture | 是 | keep；后续 runtime cutover 前继续作为边界输入 |
-| `docs/changes/phase-2*` | 历史变更记录说明专表落地时不删除、不迁移、不替代 `business_records` | docs/history | 间接重叠 | keep as history；不能作为当前最终真源 |
+| Phase 2 历史变更记录 | 历史记录曾说明专表落地时不删除、不迁移、不替代 `business_records` | docs/history | 间接重叠 | 已从当前 docs 入口清理；当前口径以 `docs/current-source-of-truth.md`、代码和测试为准 |
 | `web/src/erp/config/businessRecordDefinitions.test.mjs`、`businessRecordForm.test.mjs`、`businessRecordItemLayout.test.mjs`、`linkedNavigation.test.mjs` 等 | 覆盖旧通用页面配置、表单转换、滚动布局、source linkage 和链路派生 | test / compatibility | 是 | keep；后续 cutover 时必须调整测试语义 |
 | `web/src/mocks/jsonRpcMockServer.js` | 前端测试 mock 包含通用业务记录接口 | test / compatibility | 间接重叠 | keep |
 | `web/scripts/styleL1.mjs` | 浏览器级 L1 覆盖旧业务页和通用 business record 表单状态 | test / UI regression | 是 | keep until UI cutover；切换 V1 入口需新增回归 |

@@ -9,7 +9,7 @@
 | `web/` | Vite + React 前端，包含桌面后台统一入口和八个角色移动端入口，内部目录职责见 [`web/README.md`](web/README.md) |
 | `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、通用业务记录、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
-| `docs/` | 仓库级约定、流程、数据模型、产品化架构、changes 和部署文档 |
+| `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
 | `config/` | 行业模板和客户配置包的未来落点；当前只做 README 骨架，不接运行时 loader |
 | `deployments/` | 客户私有化部署实例资料的未来落点；当前唯一部署真源仍在 `server/deploy/compose/prod` |
 
@@ -135,9 +135,9 @@ pnpm style:l1
 - 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
 - 主流程：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
 - 数据模型与导入映射：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
-- Phase 2B BOM 与批次库存变更：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2b-bom-lot-schema.md`
-- Phase 2C 采购入库变更：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2c-purchase-receipt-schema.md`
-- Phase 2D-A 采购退货变更：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2d-purchase-return-schema.md`
+- Phase 2B BOM 与批次库存评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2b-bom-lot-schema-review.md`
+- Phase 2C 采购入库评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2c-purchase-receipt-review.md`
+- Phase 2D 采购退货 / 入库差异 / 来料质检入口评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2d-purchase-return-quality-review.md`
 - 工作流主任务树 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/task-flow-v1.md`
 - 通知 / 预警 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/notification-alert-v1.md`
 - 角色权限矩阵 v1：`/Users/simon/projects/plush-toy-erp/docs/roles/role-permission-matrix-v1.md`
@@ -148,7 +148,7 @@ pnpm style:l1
 - 行业专表 Schema 评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/industry-schema-review.md`
 - 打印模板字段与编辑行为：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-field-behavior.md`
 - 打印模板实现原理：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-implementation.md`
-- 当前 changes：`/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
+- 当前真源索引：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
 - 前端说明：`/Users/simon/projects/plush-toy-erp/web/README.md`
 - 打印模板与帮助中心口径：`/Users/simon/projects/plush-toy-erp/web/src/erp/docs/print-templates.md`
 - 后端说明：`/Users/simon/projects/plush-toy-erp/server/README.md`

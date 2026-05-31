@@ -27,29 +27,27 @@ export default function ChangeLogPage() {
   return (
     <div className="space-y-6">
       <PageHero
-        eyebrow="changes slug"
-        title="本轮真源收口变更记录"
-        description="复杂任务继续写进 changes slug。后续如果继续接合同、Excel、移动端或 schema，只需要按这份记录续做，不需要再从聊天记录倒推当前范围。"
+        eyebrow="source of truth"
+        title="当前真源索引"
+        description="继续以仓库正式文档、当前代码和测试确认主路径。历史记录只作为线索，不替代当前真源。"
       />
 
       <SurfacePanel className="p-5">
         <div className="grid gap-4 xl:grid-cols-3">
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-xs uppercase tracking-[0.24em] text-slate-400">
-              变更文件
+              真源文件
             </div>
             <div className="mt-3 text-lg font-semibold text-slate-50">
               {bootstrapChange.repoPath}
             </div>
             <div className="mt-2 text-sm text-slate-400">
-              slug：{bootstrapChange.slug}
+              slug: {bootstrapChange.slug}
             </div>
           </div>
 
           <div className="bg-emerald-300/8 rounded-3xl border border-emerald-300/20 p-4">
-            <div className="text-sm font-semibold text-emerald-100">
-              本轮已做
-            </div>
+            <div className="text-sm font-semibold text-emerald-100">已沉淀</div>
             <div className="mt-3 space-y-2">
               {DONE_ITEMS.map((item) => (
                 <div key={item} className="text-sm leading-6 text-slate-200">

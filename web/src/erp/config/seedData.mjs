@@ -17,9 +17,9 @@ export const STATUS_STYLES = {
 }
 
 export const bootstrapChange = {
-  slug: 'plush-erp-bootstrap-init',
-  repoPath: 'docs/changes/plush-erp-bootstrap-init.md',
-  updatedAt: '2026-04-21',
+  slug: 'current-source-of-truth',
+  repoPath: 'docs/current-source-of-truth.md',
+  updatedAt: '2026-05-31',
 }
 
 export const portMatrix = appDefinitions.map((app) => ({
@@ -2014,10 +2014,11 @@ const navItemRegistry = {
   },
   changes: {
     key: 'changes',
-    label: '本轮变更记录',
+    label: '当前真源索引',
     path: '/erp/changes/current',
-    shortLabel: '变更',
-    description: '继续把复杂任务写进 changes slug，不回退到聊天补丁。',
+    shortLabel: '真源',
+    description:
+      '从当前真源索引确认阅读顺序、主路径和边界，不回退到历史记录或聊天补丁。',
   },
   'permission-center': {
     key: 'permission-center',

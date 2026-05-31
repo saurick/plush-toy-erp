@@ -6,7 +6,7 @@
 
 - 运行时行为的最终真源始终是代码。
 - 仓库级约定、部署边界和项目基线，以当前文档为索引，再分流到对应子目录文档。
-- `docs/changes/` 只记录历史变更、设计评审和当时验收，不直接代表当前状态、当前能力或当前禁止事项；当前状态必须回到本文档、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认。
+- 历史 changes 文档不再作为阅读入口；当前状态必须回到本文档、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认。
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
 
@@ -35,14 +35,7 @@
 - workflow usecase 统一编排评审文档：`/Users/simon/projects/plush-toy-erp/docs/architecture/workflow-usecase-review.md`。当前结论是老板审批、IQC、采购仓库入库、委外回货检验、成品抽检、成品入库和出货放行七条最小规则已落地；仓库入库专项文档为 `/Users/simon/projects/plush-toy-erp/docs/architecture/warehouse-inbound-workflow-review.md`，成品入库专项文档为 `/Users/simon/projects/plush-toy-erp/docs/architecture/finished-goods-inbound-workflow-review.md`，`shipment_release` 专项评审文档为 `/Users/simon/projects/plush-toy-erp/docs/architecture/shipment-release-workflow-review.md`。第三条规则只迁协同状态推进：`done -> inbound_done`，`blocked/rejected -> blocked` 并强制原因；第四条规则只迁委外回货检验后的任务 / 状态派生：`done -> outsource_warehouse_inbound`，`blocked/rejected -> outsource_rework` 并强制原因；第五条规则只迁成品抽检后的任务 / 状态派生：`done -> finished_goods_inbound`，`blocked/rejected -> finished_goods_rework` 并强制原因；第六条规则只迁成品入库协同状态推进：`done -> inbound_done`，`blocked/rejected -> blocked` 并强制原因；第七条规则只迁出货放行协同状态推进：`done -> shipping_released`，`blocked/rejected -> blocked` 并强制原因。`shipment_release done` 不等于 `shipped`，真实 shipped 必须由未来 `ShipmentUsecase / shipment_execution / outbound done` 确认。库存专表、库存流水、库存余额、批次、出货扣减、应收、开票、应付和对账派生仍必须单独评审，不要把七条最小 usecase 误读成完整 workflow engine。
 - 行业专表 schema 早期评审文档：`/Users/simon/projects/plush-toy-erp/docs/architecture/industry-schema-review.md`。该文档用于说明不要一次性拆完整 ERP 的判断。
 - 材料、成品、BOM 与库存专表评审文档：`/Users/simon/projects/plush-toy-erp/docs/architecture/material-product-inventory-schema-review.md`。Phase 2A 只从该草案中落最小库存事实闭环。
-- Phase 2A 库存事实专表变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2a-inventory-fact-schema.md`。当前结论是先落最小库存事实闭环，不扩展到采购、生产、委外、品质、财务和 BOM。
-- Phase 2A PostgreSQL 落地验收记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2a-postgres-verification.md`。该文档记录本地临时库 migration apply、numeric/unique 约束和并发出库测试结果。
-- Phase 2B BOM 与批次库存变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2b-bom-lot-schema.md`。当前结论是采用方案 B，让批次进入库存流水和当前余额维度，同时落最小 BOM 主数据。
-- Phase 2C 采购入库变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2c-purchase-receipt-schema.md`。当前结论是新增 `purchase_receipts / purchase_receipt_items` 作为采购入库专表真源，`business_records` 继续作为通用快照和兼容层。
-- Phase 2D-A 采购退货变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2d-purchase-return-schema.md`。当前结论是新增 `purchase_returns / purchase_return_items` 作为采购退货专表真源，退货过账写 `inventory_txns.OUT`，取消退货写 `REVERSAL`，指向原采购入库单 / 行的追溯 FK 使用 `ON DELETE NO ACTION`，有关联原入库行的累计有效退货不得超过原入库行数量，`business_records` 继续作为通用快照和兼容层。
-- Phase 2D-B1 采购入库调整变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2d-purchase-receipt-adjustment-schema.md`。当前结论是新增 `purchase_receipt_adjustments / purchase_receipt_adjustment_items` 作为采购入库后数量差异和 `lot / warehouse` 更正专表真源，调整过账写 `inventory_txns.ADJUST_IN / ADJUST_OUT`，取消调整写 `REVERSAL`，采购退货累计上限改用 `effective_receipt_quantity`，本轮不做金额差异、质检、通用库存调整、可用 / 冻结 / 预留库存或前端 / API 接入。
-- Phase 2D-C1 批次状态出库守卫变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2d-lot-status-guard.md`。当前结论是扩展 `inventory_lots.status = ACTIVE / HOLD / REJECTED / DISABLED` 业务状态，普通扣减只允许 `ACTIVE`，`PURCHASE_RETURN` 允许 `ACTIVE / HOLD / REJECTED`，`REVERSAL` 不受当前状态阻断；本轮不做质检专表、可用 / 冻结 / 预留库存、前端或 API 接入。
-- Phase 2D-C2-A 来料质检主表变更记录：`/Users/simon/projects/plush-toy-erp/docs/changes/phase-2d-quality-inspection-schema.md`。当前结论是新增 `quality_inspections` 作为采购入库后材料批次质检状态 / 判定真源，提交质检联动批次 `HOLD`，合格 / 让步接收联动 `ACTIVE`，拒收联动 `REJECTED`，取消未判定质检按 `original_lot_status` 有条件恢复；本轮不做 `quality_inspection_items`、可用 / 冻结 / 预留库存、供应商评级、财务扣款、`purchase_returns.quality_inspection_id`、前端 / API / 帮助中心接入。
+- Phase 2A 到 Phase 2D-C2-A 的历史 changes 文件已清理；当前结论以内嵌在本文的真源摘要、当前 Ent schema / Atlas migration、repo/usecase 测试和对应 `docs/architecture/*` 评审文档为准。
 
 ## 开发与验收内部总控入口
 
@@ -54,6 +47,7 @@
 - `docs/reference/imported-notes/*` 只保存 imported design notes，状态是 Reference Only，不是 runtime、schema 或当前实现真源。
 - `current` 只表示第一个真实客户 / 种子客户 / 私有化客户实例和配置包来源，不是 SaaS runtime tenant；当前不新增 `tenant_id`。
 - 客户资料已建立 `docs/customers/current` 文档边界和 `config/customers/current` 配置包骨架，但未移动旧资料、未接 docs registry、未改 runtime；后续若做资料迁移，仍需单独评审文件清单、引用关系、docs registry、测试断言和回滚风险。
+- 010 已新增 current customer import dry-run draft：`docs/customers/current/import-source-inventory.md`、`docs/customers/current/import-field-classification.md`、`docs/customers/current/import-dry-run-plan.md`、`docs/customers/current/import-unresolved-queue.md`、`docs/customers/current/import-acceptance-checklist.md`、`docs/product/current-customer-import-strategy.md` 和 `docs/product/current-customer-import-risk-register.md`。本轮只新增导入来源清单、字段分类、dry-run 流程、unresolved queue、验收清单、Product 层策略和风险登记；未实现 runtime、API、UI、seedData、docs registry、migration、schema、import/backfill loader 或真实数据迁移。
 
 ## 按任务分流
 
@@ -72,7 +66,6 @@
 - `/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
 - `/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
 - `/Users/simon/projects/plush-toy-erp/web/README.md`
-- `/Users/simon/projects/plush-toy-erp/docs/changes/plush-erp-bootstrap-init.md`
 - `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/role-page-document-matrix.md`
 - `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/task-document-mapping.md`
 - `/Users/simon/projects/plush-toy-erp/web/src/erp/docs/workflow-status-guide.md`

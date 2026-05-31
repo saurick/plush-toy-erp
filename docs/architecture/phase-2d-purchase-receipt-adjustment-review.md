@@ -8,10 +8,10 @@
 | --- | --- |
 | 当前真源 | `README.md`、`docs/current-source-of-truth.md` 明确 `inventory_txns` 是库存事实流水真源，`inventory_balances` 是当前余额 / 查询加速表，`inventory_lots` 是批次追溯真源；`business_records` 仍是通用单据快照和兼容层。 |
 | RBAC | `docs/roles/role-permission-matrix-v1.md` 和 `server/internal/biz/rbac.go` 明确权限真源为标准 RBAC，旧 `admin_users.level / menu_permissions / mobile_role_permissions` 不再作为权限来源。 |
-| Phase 2A | `docs/changes/phase-2a-inventory-fact-schema.md` 和 `server/internal/data/inventory_repo.go` 明确库存影响必须追加 `inventory_txns`，余额在同事务内更新，默认禁止负库存。 |
-| Phase 2B | `docs/changes/phase-2b-bom-lot-schema.md` 和 `inventory_lots / inventory_balances` schema 明确批次库存和非批次库存分开聚合、分开扣减，不能互相抵扣。 |
-| Phase 2C | `docs/changes/phase-2c-purchase-receipt-schema.md`、`purchase_receipt.go` 和 `purchase_receipt_repo.go` 明确 `purchase_receipts / purchase_receipt_items` 是采购入库专表真源；过账写 `IN`，取消已过账入库写 `REVERSAL`；`POSTED / CANCELLED` 后关键字段不可改。 |
-| Phase 2D-A | `docs/changes/phase-2d-purchase-return-schema.md`、`phase-2d-purchase-return-quality-review.md`、`purchase_return.go` 和 `purchase_return_repo.go` 明确采购退货是独立单据，过账写 `OUT`，取消写 `REVERSAL`，并校验累计有效退货不能超过原入库行数量。 |
+| Phase 2A | `docs/current-source-of-truth.md` 和 `server/internal/data/inventory_repo.go` 明确库存影响必须追加 `inventory_txns`，余额在同事务内更新，默认禁止负库存。 |
+| Phase 2B | `docs/architecture/phase-2b-bom-lot-schema-review.md` 和 `inventory_lots / inventory_balances` schema 明确批次库存和非批次库存分开聚合、分开扣减，不能互相抵扣。 |
+| Phase 2C | `docs/architecture/phase-2c-purchase-receipt-review.md`、`purchase_receipt.go` 和 `purchase_receipt_repo.go` 明确 `purchase_receipts / purchase_receipt_items` 是采购入库专表真源；过账写 `IN`，取消已过账入库写 `REVERSAL`；`POSTED / CANCELLED` 后关键字段不可改。 |
+| Phase 2D-A | `docs/architecture/phase-2d-purchase-return-quality-review.md`、`purchase_return.go` 和 `purchase_return_repo.go` 明确采购退货是独立单据，过账写 `OUT`，取消写 `REVERSAL`，并校验累计有效退货不能超过原入库行数量。 |
 | 回归测试 | `inventory_repo_test.go` 和 `inventory_postgres_test.go` 已覆盖入库 / 退货状态机、幂等、批次隔离、余额不足回滚、追溯保护、退货累计上限和并发扣减。 |
 
 ## 1. Phase 2D-B 边界

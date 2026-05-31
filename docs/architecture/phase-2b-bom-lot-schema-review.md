@@ -11,8 +11,8 @@ Phase 2B 建议只推进 `inventory_lots`、`bom_headers`、`bom_items`，并把
 | 类型 | 文件 / 实现 | 当前结论 |
 | --- | --- | --- |
 | 仓库真源 | `README.md`、`AGENTS.md`、`docs/current-source-of-truth.md` | Phase 2A 已落 `units / materials / products / warehouses / inventory_txns / inventory_balances`；仍未落 BOM、批次、采购、生产、委外、品质、财务。 |
-| Phase 2A 设计 | `docs/changes/phase-2a-inventory-fact-schema.md` | `inventory_txns` 是库存历史事实真源；`inventory_balances` 是当前余额 / 查询加速表；数量使用 decimal/numeric，不使用 float。 |
-| Phase 2A 验收 | `docs/changes/phase-2a-postgres-verification.md` | 本地临时 PostgreSQL 已验证 migration、numeric 精度、幂等、冲正、余额唯一键和并发出库。未对 `192.168.0.106:5432/plush_erp` 执行 apply。 |
+| Phase 2A 当前真源 | `docs/current-source-of-truth.md`、`server/internal/data/model/schema/*.go`、`server/internal/data/inventory_repo.go` | `inventory_txns` 是库存历史事实真源；`inventory_balances` 是当前余额 / 查询加速表；数量使用 decimal/numeric，不使用 float。 |
+| Phase 2A 验收线索 | `server/internal/data/inventory_repo_test.go`、`server/internal/data/inventory_postgres_test.go` | 当前测试覆盖 migration 相关结构、numeric 精度、幂等、冲正、余额唯一键和并发出库；目标库是否已 apply 仍以 `make migrate_status` 为准。 |
 | 早期 schema 评审 | `docs/architecture/material-product-inventory-schema-review.md` | 早期已识别 BOM、批次和库存 lot 维度，但 Phase 2A 只落了最小库存事实闭环。 |
 | 业务字段材料 | `docs/plush-erp-data-model.md` | 材料分析明细表中款式编号、单位用量、损耗、组装部位、色号 / 颜色等字段已经足够支持最小 BOM 评审；该文档早期“暂不建表”的口径已被 Phase 2A 库存事实落地文档局部更新。 |
 | 当前 Ent schema | `server/internal/data/model/schema/*.go` | `products` 已有 `style_no / customer_style_no`；`inventory_txns` 和 `inventory_balances` 当前唯一维度都不含 `lot_id`。 |
