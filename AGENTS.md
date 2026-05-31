@@ -54,7 +54,9 @@
 - Codex Goal 输入框只放 `4000` 字以内中文短 Goal；复杂任务、长背景、禁止项、验收命令和交接细节必须写入 `docs/codex-goals/*.md`。
 - 每个任务的允许修改文件、禁止修改文件、验收命令，以对应的 Goal md 为准。
 - 每个任务必须在对应 Goal md 中明确成功标准、当前真源与非真源、改动范围分级、停止条件、Git 策略、测试分层选择和验收命令；不要让本文件代替具体任务的测试选择。
+- 正式 Goal 开始和收口时都必须检查工作区状态。若运行期间出现其他会话写入的非本 Goal 路径改动，Codex 只能记录并隔离这些改动，不得回退、删除、格式化、提交或写入本轮审查报告正文作为本轮成果；需要提交时必须按本 Goal 允许路径精确 stage。
 - 每轮正式 Codex Goal 收口后，必须按 `docs/codex-goals/_review-output-protocol.md` 生成或覆盖本地临时文件 `.codex-review/latest.md`，不生成 `.codex-review/runs` 历史副本，也不把 `.codex-review/` 提交进 Git。用户必须能用 `cat .codex-review/latest.md | pbcopy` 一键复制给 GPT 审查。
+- `.codex-review/latest.md` 只能描述当前 Goal 的目标、允许范围、实际纳入的文件、验证命令、提交状态和风险；不得把其他会话的未提交改动、无关 diff、并行提交或工作区噪音写成本轮成果。若这些外部改动影响收口，只能在“非本轮现场 / 阻塞风险”中点名路径和处置建议。
 - Codex 没有可靠的内置“当前是否 Goal 模式”标志，必须根据当前上下文判断：用户是否明确要求执行 `docs/codex-goals/<goal>.md`，当前输入是否是短 Goal 模板，是否正在修复当前 Goal 的测试失败 / 漏项 / 审查报告，或用户是否明确要求生成审查报告。若上下文不明确，默认按普通任务处理，不生成、不覆盖、也不删除 `.codex-review/latest.md`。
 - 只有明确执行 `docs/codex-goals/<goal>.md`、修复当前 Goal 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时，才生成或覆盖 `.codex-review/latest.md`。普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除 `.codex-review/latest.md`。
 - Codex 不要要求用户截图；正式 Goal 需要交接给 GPT 的内容应收敛到仓库文件、命令输出和 `.codex-review/latest.md`。

@@ -127,6 +127,14 @@ scripts
 - 不得把 schema、repo/usecase、API、UI 放在同一轮，除非任务明确允许。
 - 不得因为测试失败去乱改无关文件。
 
+## 工作区与并发改动隔离
+
+- 开始执行前记录 `git status --short`、`git diff --name-status` 和未跟踪文件。
+- 收口前再次检查 `git status --short`、`git diff --name-status` 和 `git diff --cached --name-status`。
+- 如果运行期间出现其他会话写入的非本 Goal 路径改动，必须视为“非本轮现场”，不得回退、删除、格式化、提交，也不得写成本轮完成内容。
+- 需要提交时，只能按“允许修改的文件”逐路径 `git add -- <path>`，禁止 `git add .`。
+- `.codex-review/latest.md` 只能描述当前 Goal 的目标、允许范围、实际纳入文件、验证命令、提交状态和本轮风险；非本轮现场只能在“风险 / Git 状态摘要”中列路径和建议处置。
+
 ## 成功标准
 
 本轮完成必须满足以下可验证标准：
@@ -252,6 +260,8 @@ git diff --check
 ```text
 docs/codex-goals/_review-output-protocol.md
 ```
+
+`.codex-review/latest.md` 只覆盖当前 Goal，不得把并发会话或非本轮路径改动写成本轮成果；如发现非本轮现场，只在风险或 Git 状态摘要中列出路径、影响和建议处置。
 
 用户必须能用下面命令复制：
 

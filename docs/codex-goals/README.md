@@ -94,6 +94,8 @@ API/RBAC -> UI：新开会话
 
 只有明确执行 `docs/codex-goals/<goal-file>.md`、修复当前 Goal 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时，才生成或覆盖 `.codex-review/latest.md`。
 
+`.codex-review/latest.md` 只能覆盖当前 Goal：目标、允许范围、实际纳入文件、验证命令、提交状态和本轮风险。若 Goal 运行期间其他会话修改了非本 Goal 路径，Codex 不得把这些改动写成本轮成果，也不得回退、删除、格式化或提交这些现场；只能在报告的“非本轮现场 / 阻塞风险”中点名路径和建议处置。
+
 Codex 没有可靠的内置“当前是否 Goal 模式”标志，必须根据当前上下文判断：用户是否明确指定 Goal 文件、当前输入是否是短 Goal 模板、是否正在修复当前 Goal 的后续问题、是否明确要求 review 输出。若上下文不明确，默认按普通任务处理，不碰 `.codex-review/latest.md`。
 
 普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除 `.codex-review/latest.md`。

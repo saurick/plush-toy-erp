@@ -1,3 +1,8 @@
+## 2026-05-31 14:20
+- 完成：补充 Codex Goal 并发现场隔离规则，更新 `AGENTS.md`、`docs/codex-goals/README.md`、`docs/codex-goals/_goal-file-template.md`、`docs/codex-goals/_new-session-goal-template.md` 和 `docs/codex-goals/_review-output-protocol.md`，明确 `.codex-review/latest.md` 只覆盖当前 Goal；其他会话写入的非本轮路径只能记录为非本轮现场，不得写成本轮成果、不得擅自回退 / 删除 / 格式化 / 提交，提交时必须按本 Goal 允许路径精确 stage。
+- 下一步：后续正式 Goal 按新模板在开始和收口时检查工作区状态，并在审查报告的 Git 策略检查里说明是否发现非本轮路径改动。
+- 阻塞/风险：本轮只更新协作规则和模板，不生成 `.codex-review/latest.md`，也不触达 runtime、schema、migration、API、UI 或 seedData。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-31 13:35
 - 完成：清理 docs 无用入口，保留当前工作区已删除的 `docs/changes/*` 现场，移除正式索引和前端文档入口中指向已删除 changes 文件的断链；将库存 / 采购 / BOM / 质量事实层阅读入口改回 `docs/current-source-of-truth.md` 与 `docs/architecture/*` 评审文档；将本地 `docs/.DS_Store` 移到系统废纸篓。
 - 下一步：如需继续收缩 docs 体量，建议单独评审 `docs/product/*` 与 `docs/architecture/*` 的重复内容，先列保留 / 归档 / 合并清单，再移动文件。
