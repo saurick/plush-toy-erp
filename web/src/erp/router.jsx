@@ -37,6 +37,8 @@ const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
 const WorkflowTaskDebugPage = lazy(
   () => import('./pages/WorkflowTaskDebugPage')
 )
+const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
+const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
 
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
@@ -114,6 +116,18 @@ export default function ERPRouter() {
               element={<BusinessModulePage moduleItem={moduleItem} />}
             />
           ))}
+          <Route
+            path="master/partners/customers"
+            element={<V1MasterDataPage type="customers" />}
+          />
+          <Route
+            path="master/partners/suppliers"
+            element={<V1MasterDataPage type="suppliers" />}
+          />
+          <Route
+            path="sales/project-orders/sales-orders"
+            element={<V1SalesOrdersPage />}
+          />
           <Route
             path="docs/operation-flow-overview"
             element={<OperationFlowPage />}

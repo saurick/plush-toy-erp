@@ -2,10 +2,10 @@
 
 文档类型：V1 后续 Codex Goals
 状态：拟定中
-运行时代码是否已实现：005 已新增 `customers / suppliers / contacts` 后端 repo/usecase；006 已新增 `sales_orders / sales_order_items` 后端 repo/usecase；007 已新增这些对象的 JSON-RPC API/RBAC；UI 仍未实现
+运行时代码是否已实现：005 已新增 `customers / suppliers / contacts` 后端 repo/usecase；006 已新增 `sales_orders / sales_order_items` 后端 repo/usecase；007 已新增这些对象的 JSON-RPC API/RBAC；008 已新增 V1 前端页面
 Ent Schema 是否已实现：003 已新增 schema 文件；004 已新增生成代码
 Migration 是否已实现：是，004 已生成
-当前实现真源：schema 文件、生成的 Ent 代码、Atlas migration、005 新增的 `customers / suppliers / contacts` 后端 repo/usecase、006 新增的 `sales_orders / sales_order_items` 后端 repo/usecase，以及 007 新增的 JSON-RPC API/RBAC handlers；UI 仍未实现
+当前实现真源：schema 文件、生成的 Ent 代码、Atlas migration、005 新增的 `customers / suppliers / contacts` 后端 repo/usecase、006 新增的 `sales_orders / sales_order_items` 后端 repo/usecase、007 新增的 JSON-RPC API/RBAC handlers，以及 008 新增的 V1 前端页面/API client/tests
 
 不要把 schema、repo/usecase、API/RBAC、UI 放进同一轮。
 
@@ -87,7 +87,7 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 
 ## 008-v1-frontend-masterdata-order-pages
 
-状态：未实现。
+状态：已新增 V1 客户 / 供应商 / 联系人 / 销售订单 / 销售订单行前端页面；未改 docs registry、seedData 或 `business_records` transition。
 
 - 目标：接入 V1 客户 / 供应商 / 订单页面，退出或降级 overlapping `business_records` 写入。
 - 允许修改文件：web pages/config/tests；只有当本 Goal 明确包含 docs registry 时，才允许修改 docs registry。
@@ -97,7 +97,7 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 - 是否允许 runtime：是，frontend。
 - 测试命令：`cd web && pnpm lint && pnpm css && pnpm test && pnpm style:l1`。
 - 停止条件：前端本地派生库存 / 出货 / 财务事实；用中文文案做业务判断；`business_records` 和正式 API 双写。
-- 预期输出：UI pages/tests/browser regression，并记录状态覆盖范围。
+- 输出：V1 UI pages/API client/tests 已完成；页面挂在现有兼容父菜单下，继续避免 `business_records` 双写、shipment / inventory / finance facts 和 docs registry / seedData 改动。
 
 ## 009-business-records-transition-audit
 

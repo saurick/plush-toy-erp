@@ -1,3 +1,8 @@
+## 2026-05-31 12:37
+- 完成：执行 `008-v1-frontend-masterdata-order-pages`，新增 V1 客户 / 供应商 / 联系人 / 销售订单 / 销售订单行前端页面、JSON-RPC 前端 client、路由入口和前端测试；页面复用 007 已完成的 `masterdata` / `sales_order` API 与 RBAC permission code，不在前端本地派生库存、出货、财务事实，也不与 `business_records` 双写。
+- 下一步：建议进入 `009-business-records-transition-audit`，单独审计 `business_records` 兼容层引用和退出路径；或进入 `010-current-customer-data-import-draft`，单独设计 current 客户数据导入 dry-run / backfill 草案。
+- 阻塞/风险：本轮未改 schema、migration、generated code、repo/usecase、API/RBAC、docs registry、seedData、`business_records` transition、shipment / stock reservation / inventory / finance facts；销售订单行的 product / unit 当前只提供 ID 输入，未接产品 / 单位选择器，因为本轮禁止扩大到相关 API/UI 入口。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-31 01:35
 - 完成：执行 `007-v1-api-rbac-masterdata-order`，为 `customers / suppliers / contacts` 接入 `masterdata` JSON-RPC API，为 `sales_orders / sales_order_items` 接入 `sales_order` JSON-RPC API；所有写入均走 005/006 已完成的 usecase，不绕过 contacts owner guard、sales order lifecycle guard、product/unit/customer active guard。同步新增 `customer.* / supplier.* / contact.* / sales_order.* / sales_order_item.*` 动作权限和 API/RBAC 测试。
 - 下一步：建议进入 `008-v1-frontend-masterdata-order-pages`，单独接 UI；继续禁止在 UI 轮混入 schema/migration、shipment facts、inventory facts、finance facts 或 `business_records` migration。
