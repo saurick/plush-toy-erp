@@ -15,7 +15,7 @@ test('masterDataOrderApi: V1 API client uses 007 JSON-RPC urls', () => {
 })
 
 test('masterDataOrderApi: masterdata methods cover customers suppliers contacts', () => {
-  ;[
+  for (const methodName of [
     'list_customers',
     'create_customer',
     'update_customer',
@@ -31,13 +31,13 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers contacts'
     'update_contact',
     'set_primary_contact',
     'disable_contact',
-  ].forEach((methodName) => {
+  ]) {
     assert.match(source, new RegExp(`call\\('${methodName}'`))
-  })
+  }
 })
 
 test('masterDataOrderApi: sales order methods do not expose shipment or finance actions', () => {
-  ;[
+  for (const methodName of [
     'list_sales_orders',
     'create_sales_order',
     'update_sales_order',
@@ -50,9 +50,9 @@ test('masterDataOrderApi: sales order methods do not expose shipment or finance 
     'add_sales_order_item',
     'update_sales_order_item',
     'remove_sales_order_item',
-  ].forEach((methodName) => {
+  ]) {
     assert.match(source, new RegExp(`call\\('${methodName}'`))
-  })
+  }
 
   const forbiddenActionNames = [
     ['ship', 'Sales', 'Order'],
