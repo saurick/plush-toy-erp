@@ -2,10 +2,10 @@
 
 文档类型：V1 后续 Codex Goals
 状态：拟定中
-运行时代码是否已实现：005 已新增 `customers / suppliers / contacts` 后端 repo/usecase；006 已新增 `sales_orders / sales_order_items` 后端 repo/usecase；API/RBAC/UI 仍未实现
+运行时代码是否已实现：005 已新增 `customers / suppliers / contacts` 后端 repo/usecase；006 已新增 `sales_orders / sales_order_items` 后端 repo/usecase；007 已新增这些对象的 JSON-RPC API/RBAC；UI 仍未实现
 Ent Schema 是否已实现：003 已新增 schema 文件；004 已新增生成代码
 Migration 是否已实现：是，004 已生成
-当前实现真源：schema 文件、生成的 Ent 代码、Atlas migration、005 新增的 `customers / suppliers / contacts` 后端 repo/usecase，以及 006 新增的 `sales_orders / sales_order_items` 后端 repo/usecase；API/RBAC/UI 仍未实现
+当前实现真源：schema 文件、生成的 Ent 代码、Atlas migration、005 新增的 `customers / suppliers / contacts` 后端 repo/usecase、006 新增的 `sales_orders / sales_order_items` 后端 repo/usecase，以及 007 新增的 JSON-RPC API/RBAC handlers；UI 仍未实现
 
 不要把 schema、repo/usecase、API/RBAC、UI 放进同一轮。
 
@@ -73,7 +73,7 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 
 ## 007-v1-api-rbac-masterdata-order
 
-状态：未实现。
+状态：已实现后端 JSON-RPC API/RBAC；未接 UI、docs registry、seedData 或 `business_records` transition。
 
 - 目标：接入 customers / suppliers / contacts / sales_orders API 和 RBAC 动作权限。
 - 允许修改文件：server API/service/biz/rbac/data tests；如有需要，可修改 error code files；相关文档。
@@ -83,7 +83,7 @@ final review -> Ent schema -> migration/generate -> repo/usecase tests -> API/RB
 - 是否允许 runtime：是。
 - 测试命令：`cd server && go test ./internal/biz ./internal/data ./internal/service ./internal/server`；如果 error codes 变更，运行 `bash scripts/qa/error-code-sync.sh` 和 `bash scripts/qa/error-codes.sh`。
 - 停止条件：只做菜单权限；缺少 unauth / disabled / non-admin / no-permission 测试；没有 data scope / state machine 检查。
-- 预期输出：API/RBAC/tests，并且执行顺序遵守 Feature Flag -> RBAC -> Data Scope -> State Machine -> Business Rule -> Idempotency -> Audit Log。
+- 输出：`masterdata` 与 `sales_order` JSON-RPC handlers、`customer.* / supplier.* / contact.* / sales_order.* / sales_order_item.*` 动作权限和 API/RBAC 测试已完成；仍不接 UI。
 
 ## 008-v1-frontend-masterdata-order-pages
 

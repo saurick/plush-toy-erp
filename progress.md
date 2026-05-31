@@ -1,3 +1,8 @@
+## 2026-05-31 01:35
+- 完成：执行 `007-v1-api-rbac-masterdata-order`，为 `customers / suppliers / contacts` 接入 `masterdata` JSON-RPC API，为 `sales_orders / sales_order_items` 接入 `sales_order` JSON-RPC API；所有写入均走 005/006 已完成的 usecase，不绕过 contacts owner guard、sales order lifecycle guard、product/unit/customer active guard。同步新增 `customer.* / supplier.* / contact.* / sales_order.* / sales_order_item.*` 动作权限和 API/RBAC 测试。
+- 下一步：建议进入 `008-v1-frontend-masterdata-order-pages`，单独接 UI；继续禁止在 UI 轮混入 schema/migration、shipment facts、inventory facts、finance facts 或 `business_records` migration。
+- 阻塞/风险：本轮未接 UI、docs registry、seedData、移动端页面或 `business_records` transition；未改 Ent schema、migration、generated code、`workflow.go` 或 repo/usecase。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
 ## 2026-05-31 00:57
 - 完成：执行 `006-v1-repo-usecase-sales-order`，新增 `sales_orders / sales_order_items` 后端 repo/usecase 和测试；订单生命周期只使用 `draft / submitted / active / closed / canceled`，订单行状态只使用 `open / closed / canceled`；创建订单校验 active customer，创建 / 更新订单行校验 active product 和 active unit。本轮没有写 shipment、inventory、stock reservation、finance、invoice、payment 或 Workflow facts。
 - 下一步：建议进入 `007-v1-api-rbac-masterdata-order`，单独接入 customers / suppliers / contacts / sales_orders API 与 RBAC 动作权限，继续把 API/RBAC 与 UI 拆轮执行。

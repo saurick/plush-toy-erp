@@ -37,6 +37,8 @@ type JsonrpcData struct {
 	workflowUC    *biz.WorkflowUsecase
 	businessUC    *biz.BusinessRecordUsecase
 	debugUC       *biz.DebugUsecase
+	masterDataUC  *biz.MasterDataUsecase
+	salesOrderUC  *biz.SalesOrderUsecase
 
 	adminReader adminAccountReader
 }
@@ -85,6 +87,8 @@ func NewJsonrpcData(
 	workflowUC := biz.NewWorkflowUsecase(NewWorkflowRepo(data, logger))
 	businessUC := biz.NewBusinessRecordUsecase(NewBusinessRecordRepo(data, logger))
 	debugUC := biz.NewDebugUsecase(NewDebugSeedRepo(data, logger), newDebugSafetyConfig(c))
+	masterDataUC := biz.NewMasterDataUsecase(NewMasterDataRepo(data, logger))
+	salesOrderUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
 
 	helper.Info("JsonrpcData created (auth/admin auth/user admin usecases constructed inside)")
 
@@ -99,6 +103,8 @@ func NewJsonrpcData(
 		workflowUC:    workflowUC,
 		businessUC:    businessUC,
 		debugUC:       debugUC,
+		masterDataUC:  masterDataUC,
+		salesOrderUC:  salesOrderUC,
 		adminReader:   adminAuthRepo,
 	}
 }
@@ -142,6 +148,10 @@ func (d *JsonrpcData) Handle(
 		return d.handleWorkflow(ctx, method, id, params)
 	case "business":
 		return d.handleBusiness(ctx, method, id, params)
+	case "masterdata":
+		return d.handleMasterData(ctx, method, id, params)
+	case "sales_order":
+		return d.handleSalesOrder(ctx, method, id, params)
 	case "debug":
 		return d.handleDebug(ctx, method, id, params)
 	default:
