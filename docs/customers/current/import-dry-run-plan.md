@@ -1,5 +1,5 @@
 Doc Type: Current Customer Import Dry-run Plan
-Status: Draft
+Status: Draft + 011 Tooling Added
 Runtime Implemented: No
 Ent Schema Implemented: No
 Migration Implemented: No
@@ -7,17 +7,43 @@ Current Implementation Source of Truth: No
 
 # Current Customer Import Dry-run Plan
 
-本计划只设计 dry-run 流程，不写代码、不读写正式数据库、不执行真实迁移、不修改 seedData 或 `business_records`。
+本计划最初由 010 设计 dry-run 流程。011 已新增 `scripts/import/currentCustomerDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview；它仍不读写正式数据库、不执行真实迁移、不修改 seedData 或 `business_records`。
 
 ## Scope
 
 | item | decision |
 |---|---|
 | 本轮是否执行 Stage 6 | 否 |
-| 本轮是否写 import loader | 否 |
+| 本轮是否写真实 import loader | 否 |
 | 本轮是否写 backfill 脚本 | 否 |
 | 本轮是否修改 runtime/schema/migration/API/UI/seedData | 否 |
-| 本轮输出 | 来源清单、字段分类、dry-run plan、unresolved queue、验收清单、产品策略、风险登记 |
+| 010 输出 | 来源清单、字段分类、dry-run plan、unresolved queue、验收清单、产品策略、风险登记 |
+| 011 输出 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` |
+
+## 011 Tooling Status
+
+011 已实现一个只读 CLI：
+
+```bash
+node scripts/import/currentCustomerDryRun.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.sample.json \
+  --out output/current-import-dry-run \
+  --format json,md
+```
+
+该 CLI 已支撑：
+
+- Stage 0：读取 source snapshot 与 existing snapshot，生成 source references。
+- Stage 1：基础字段规范化和 source metadata 校验。
+- Stage 2：匹配 customers / suppliers / contacts / sales_orders / sales_order_items / products / materials / units / warehouses / BOM 候选。
+- Stage 3：生成 candidates、duplicates、conflicts、unresolved、forbidden 和 validation summary。
+
+仍需人工或 future Goal 处理：
+
+- Stage 4：人工确认 unresolved、duplicate、conflict、forbidden。
+- Stage 5：客户 sign-off、备份 / 回滚 / 导入审批。
+- Stage 6：真实 import execution；011 未实现。
 
 ## Stage 0: Source Collection
 

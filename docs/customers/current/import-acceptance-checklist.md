@@ -1,5 +1,5 @@
 Doc Type: Current Customer Import Acceptance Checklist
-Status: Draft
+Status: Draft + 011 Tooling Evidence Added
 Runtime Implemented: No
 Ent Schema Implemented: No
 Migration Implemented: No
@@ -7,13 +7,14 @@ Current Implementation Source of Truth: No
 
 # Current Customer Import Acceptance Checklist
 
-本清单用于 future current 客户导入前的 dry-run 验收。010 只产出清单，不执行真实导入。
+本清单用于 future current 客户导入前的 dry-run 验收。010 只产出清单，不执行真实导入；011 已新增 CLI dry-run package，可作为 future import 前置 evidence，但仍不代表真实导入可以直接执行。
 
 ## Checklist
 
 | item | required before import execution | evidence | 010 status |
 |---|---:|---|---|
 | source files confirmed | 是 | source reference list，文件名 / sheet / row / business_record id | Draft only |
+| 011 dry-run package generated | 是 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` | Tooling available |
 | field classification reviewed | 是 | `import-field-classification.md` 经人工评审 | Draft only |
 | target model confirmed | 是 | V1 / existing formal model 列表 | Draft only |
 | required fields present | 是 | required field validation summary | Draft only |
@@ -33,6 +34,20 @@ Current Implementation Source of Truth: No
 | rollback plan prepared | 是 | rollback 或 forward-fix 方案 | Future Stage 6 required |
 | backup plan prepared | 是 | 数据库备份和 source artifact 归档 | Future Stage 6 required |
 | customer sign-off | 是 | 客户确认导入预览和 unresolved 处理 | Future Stage 5 required |
+
+## 011 CLI Evidence
+
+011 的 dry-run evidence 由以下命令生成：
+
+```bash
+node scripts/import/currentCustomerDryRun.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.sample.json \
+  --out output/current-import-dry-run \
+  --format json,md
+```
+
+`validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。真实导入仍需要人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和单独 implementation Goal。
 
 ## Pre-import Gate
 

@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `scripts/bootstrap.sh` | 安装依赖、启用 hooks、跑快速自检 | 新机器 / 首次拉仓库 |
 | `scripts/project-scan.sh` | 扫描项目名、默认密钥、部署地址和页面文案残留 | 改名后 / 配置收口后 |
+| `scripts/import/currentCustomerDryRun.mjs` | current 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包 | current 导入前人工 review / 数据映射检查 |
 | `scripts/phase2b-pg.sh` | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口 | 验证 Phase 2B schema 和批次库存行为 |
 | `scripts/phase2c-pg.sh` | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口 | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯 |
 | `scripts/phase2d-pg.sh` | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口 | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
@@ -45,6 +46,34 @@ pnpm smoke:processing-contract-real-login
 ```
 
 ## 推荐顺序
+
+### 0. Import dry-run tooling
+
+current 客户导入 dry-run 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`。
+
+```bash
+node scripts/import/currentCustomerDryRun.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.sample.json \
+  --out output/current-import-dry-run \
+  --format json,md
+```
+
+输出目录会生成：
+
+```text
+source-references.json
+normalized-rows.json
+candidates.json
+unresolved-queue.json
+duplicates.json
+conflicts.json
+forbidden-auto-import.json
+validation-summary.json
+dry-run-report.md
+```
+
+`validation-summary.json` 中 `canExecuteRealImport` 永远为 `false`。该脚本是 import QA / preview tooling，不是 runtime loader。
 
 ### 1. 初始化环境
 

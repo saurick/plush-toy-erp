@@ -1,5 +1,5 @@
 Doc Type: Current Customer Import Risk Register
-Status: Draft
+Status: Draft + 011 Tooling Controls Added
 Runtime Implemented: No
 Ent Schema Implemented: No
 Migration Implemented: No
@@ -7,7 +7,17 @@ Current Implementation Source of Truth: No
 
 # Current Customer Import Risk Register
 
-本风险登记只覆盖 current 客户导入 dry-run 设计，不代表任何 runtime 防护或真实导入已经实施。
+本风险登记覆盖 current 客户导入 dry-run 设计和 011 CLI tooling 控制。011 控制只存在于 dry-run 报告层，不是 runtime 防护，也不代表任何真实导入已经实施。
+
+## 011 Tooling Controls
+
+| control | output | coverage | limitation |
+|---|---|---|---|
+| forbidden-auto-import report | `forbidden-auto-import.json` | 阻断 shipment、inventory、finance、`shipping_released -> shipped`、workflow done -> fact posted 等自动导入风险 | 只在 dry-run package 中呈现，不拦截 runtime 写入 |
+| unresolved queue | `unresolved-queue.json` | 记录 block / defer / review / warning，要求人工确认缺 owner、缺 customer、未知 unit、invalid value 等问题 | 不会自动修复数据 |
+| duplicates / conflicts | `duplicates.json`、`conflicts.json` | 暴露 code/name 重复和更新冲突，避免自动合并同名主体 | 需要人工决策 |
+| validation summary | `validation-summary.json` | 统计 candidate、unresolved、forbidden、duplicate、conflict；`canExecuteRealImport` 永远为 `false` | 不是导入批准单 |
+| Markdown report | `dry-run-report.md` | 给人工 review 提供可读摘要和 No real import 声明 | 不替代客户 sign-off、备份、回滚和真实 loader 审查 |
 
 | risk | impact | evidence | mitigation | owner layer | next review needed |
 |---|---|---|---|---|---:|
@@ -37,6 +47,7 @@ Current Implementation Source of Truth: No
 | P0 | 从旧快照自动生成 shipment / inventory / finance facts | Forbidden Auto Import + block queue |
 | P0 | current 字段污染 Product Core | field classification + Product layer strategy |
 | P0 | `business_records` 与 V1 双真源 | no runtime changes in 010；future cutover 单独 Goal |
+| P0 | dry-run 报告被误当真实导入批准 | 011 `validation-summary.canExecuteRealImport=false` + `dry-run-report.md` No real import |
 | P1 | SKU / purchase order 过早落地 | deferred domain policy |
 | P1 | 未确认字段丢失或塞 note | unresolved queue + manual review |
 

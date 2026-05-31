@@ -1,5 +1,5 @@
 Doc Type: Current Customer Import Strategy
-Status: Draft
+Status: Draft + 011 Tooling Added
 Runtime Implemented: No
 Ent Schema Implemented: No
 Migration Implemented: No
@@ -7,7 +7,7 @@ Current Implementation Source of Truth: No
 
 # Current Customer Import Strategy
 
-本策略从 Product 层约束 current 客户数据导入。它不是 import loader 设计，不代表真实导入已经开始。
+本策略从 Product 层约束 current 客户数据导入。011 已新增 dry-run preview package tooling，但它不是真实 import loader，不代表真实导入已经开始。
 
 ## Position
 
@@ -59,6 +59,18 @@ current 资料不能直接成为：
 
 ## Future Import Loader Requirements
 
+011 已实现 dry-run preview package：
+
+```bash
+node scripts/import/currentCustomerDryRun.mjs \
+  --source scripts/import/fixtures/current/source-snapshot.sample.json \
+  --existing scripts/import/fixtures/current/existing-v1.sample.json \
+  --out output/current-import-dry-run \
+  --format json,md
+```
+
+该 preview package 可输出 source references、normalized rows、candidates、unresolved queue、duplicates、conflicts、forbidden auto-import、validation summary 和 Markdown report。它只证明 dry-run tooling 可运行；真实 loader 仍需单独 Goal。
+
 后续真实 import loader 必须单独 Goal，并先满足：
 
 1. 允许修改范围明确包含 import code。
@@ -69,6 +81,7 @@ current 资料不能直接成为：
 6. 有导入后对账报告。
 7. 不修改 seedData 或 docs registry 作为导入的必要条件。
 8. 不删除或覆盖 `business_records` 历史快照。
+9. 不绕过 V1 MasterData / SalesOrder usecase 或已有正式 fact usecase。
 
 ## Non-goals
 

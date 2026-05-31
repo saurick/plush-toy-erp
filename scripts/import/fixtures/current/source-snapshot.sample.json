@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "generatedAt": "2026-05-31T00:00:00.000Z",
+  "sources": [
+    {
+      "sourceId": "src-customer-update",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "partners",
+      "fileName": "business-records-export.json",
+      "sheetName": null,
+      "rowNumber": 1,
+      "domain": "customers",
+      "fields": {
+        "document_no": "C001",
+        "title": "Existing Customer",
+        "country_region": "CN",
+        "address": " Demo address "
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-customer-create",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "partners",
+      "fileName": "business-records-export.json",
+      "sheetName": null,
+      "rowNumber": 2,
+      "domain": "customers",
+      "fields": {
+        "document_no": "C002",
+        "title": "New Customer"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-customer-duplicate",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "partners",
+      "fileName": "business-records-export.json",
+      "sheetName": null,
+      "rowNumber": 3,
+      "domain": "customers",
+      "fields": {
+        "document_no": "C-DUP",
+        "title": "Duplicate Customer"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-supplier-review",
+      "sourceType": "Data Import Source",
+      "sourceKind": "manual_snapshot",
+      "moduleKey": "partners",
+      "fileName": "supplier-snapshot.json",
+      "sheetName": null,
+      "rowNumber": 4,
+      "domain": "suppliers",
+      "fields": {
+        "document_no": "S001",
+        "factory_name": "Demo Processing Factory",
+        "partner_type": "加工厂"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-contact-no-owner",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "partners",
+      "fileName": "contacts.json",
+      "sheetName": null,
+      "rowNumber": 5,
+      "domain": "contacts",
+      "fields": {
+        "item_name": "No Owner Contact",
+        "mobile_phone": "13800000000"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-sales-order-create",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "project-orders",
+      "fileName": "orders.json",
+      "sheetName": null,
+      "rowNumber": 6,
+      "domain": "sales_orders",
+      "fields": {
+        "document_no": "SO-001",
+        "customer_code": "C001",
+        "order_date": "2026/05/31",
+        "shipping_date": "2026-06-10"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-sales-order-no-customer",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "project-orders",
+      "fileName": "orders.json",
+      "sheetName": null,
+      "rowNumber": 7,
+      "domain": "sales_orders",
+      "fields": {
+        "document_no": "SO-NO-CUSTOMER",
+        "order_date": "2026-05-31"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-sales-order-item-unknown-unit",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "project-orders",
+      "fileName": "order-items.json",
+      "sheetName": null,
+      "rowNumber": 8,
+      "domain": "sales_order_items",
+      "fields": {
+        "product_no": "P001",
+        "quantity": "12.50",
+        "unit": "BOX"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-product-sku-deferred",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "products",
+      "fileName": "products.json",
+      "sheetName": null,
+      "rowNumber": 9,
+      "domain": "product_skus",
+      "fields": {
+        "product_no": "P001",
+        "sku": "P001-RED",
+        "color": "red"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-purchase-order-deferred",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "accessories-purchase",
+      "fileName": "purchase.json",
+      "sheetName": null,
+      "rowNumber": 10,
+      "domain": "purchase_orders",
+      "fields": {
+        "purchase_order_no": "PO-001",
+        "supplier_name": "Demo Supplier"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-shipment-forbidden",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "shipping-release",
+      "fileName": "shipment.json",
+      "sheetName": null,
+      "rowNumber": 11,
+      "domain": "shipment",
+      "fields": {
+        "document_no": "SHIP-001",
+        "shipping_released": "done",
+        "shipped": "true"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-inventory-forbidden",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "inventory",
+      "fileName": "inventory.json",
+      "sheetName": null,
+      "rowNumber": 12,
+      "domain": "inventory",
+      "fields": {
+        "inventory_txn": "IN",
+        "inventory_balance": "100",
+        "warehouse": "Demo Warehouse"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-finance-forbidden",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "receivables",
+      "fileName": "finance.json",
+      "sheetName": null,
+      "rowNumber": 13,
+      "domain": "finance",
+      "fields": {
+        "invoice": "INV-001",
+        "payment": "paid",
+        "amount": "￥1,200.50"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-workflow-done-forbidden",
+      "sourceType": "Data Import Source",
+      "sourceKind": "business_records",
+      "moduleKey": "workflow",
+      "fileName": "workflow.json",
+      "sheetName": null,
+      "rowNumber": 14,
+      "domain": "sales_orders",
+      "fields": {
+        "document_no": "SO-WORKFLOW",
+        "customer_code": "C001",
+        "workflow_task_done": "true"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-demo-skip",
+      "sourceType": "Demo Seed",
+      "sourceKind": "manual_snapshot",
+      "moduleKey": "partners",
+      "fileName": "demo-seed.json",
+      "sheetName": null,
+      "rowNumber": 15,
+      "domain": "customers",
+      "fields": {
+        "document_no": "DEMO-CUSTOMER",
+        "title": "Demo Customer"
+      },
+      "items": []
+    },
+    {
+      "sourceId": "src-debug-skip",
+      "sourceType": "QA Debug",
+      "sourceKind": "manual_snapshot",
+      "moduleKey": "project-orders",
+      "fileName": "debug.json",
+      "sheetName": null,
+      "rowNumber": 16,
+      "domain": "sales_orders",
+      "fields": {
+        "document_no": "DEBUG-SO",
+        "customer_code": "C001"
+      },
+      "items": []
+    }
+  ]
+}

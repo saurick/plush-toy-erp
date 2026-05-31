@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "customers": [
+    {
+      "id": "customer-1",
+      "code": "C001",
+      "name": "Existing Customer",
+      "displayName": "Existing Customer",
+      "status": "active"
+    },
+    {
+      "id": "customer-dup-1",
+      "code": "C-DUP",
+      "name": "Duplicate Customer",
+      "displayName": "Duplicate Customer A",
+      "status": "active"
+    },
+    {
+      "id": "customer-dup-2",
+      "code": "C-DUP",
+      "name": "Duplicate Customer",
+      "displayName": "Duplicate Customer B",
+      "status": "active"
+    }
+  ],
+  "suppliers": [
+    {
+      "id": "supplier-1",
+      "code": "S-EXISTING",
+      "name": "Existing Supplier",
+      "shortName": "Existing Supplier",
+      "status": "active"
+    }
+  ],
+  "contacts": [],
+  "salesOrders": [],
+  "salesOrderItems": [],
+  "products": [
+    {
+      "id": "product-1",
+      "code": "P001",
+      "name": "Existing Product",
+      "status": "active"
+    }
+  ],
+  "materials": [
+    {
+      "id": "material-1",
+      "code": "M001",
+      "name": "Existing Material",
+      "status": "active"
+    }
+  ],
+  "units": [
+    {
+      "id": "unit-pcs",
+      "code": "PCS",
+      "name": "只",
+      "status": "active"
+    }
+  ],
+  "warehouses": [
+    {
+      "id": "warehouse-1",
+      "code": "WH01",
+      "name": "Demo Warehouse",
+      "status": "active"
+    }
+  ],
+  "bomHeaders": [],
+  "bomItems": []
+}

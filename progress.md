@@ -1,3 +1,53 @@
+## 2026-05-31 19:08
+- 完成：Checkpoint 8 完成，已运行 011 必跑验证命令：Git / diff 检查、CLI help、CLI smoke、输出文件存在性检查、`--fail-on-blockers` 非 0 检查、`node --test scripts/import/currentCustomerDryRun.test.mjs`、输出内容 grep、docs 文件存在检查、禁止路径 diff、`tenant_id` / `ChangeUsecase` / `change_records` 检查和 Workflow / Fact 边界 grep。CLI smoke 生成 `output/current-import-dry-run`，`validation-summary.json` 中 `canExecuteRealImport=false`，`dry-run-report.md` 明确 `No real import`；`--fail-on-blockers` 输出 `blockerCount=24, forbiddenCount=10` 并返回非 0。补充完成 `Print Template Input` 默认 review、`Industry Template Candidate` 默认 defer/review 的 sourceType 规则后，`node --test scripts/import/currentCustomerDryRun.test.mjs` 为 11 个测试通过。禁止路径 `server/`、`web/`、`migrations/`、`config/`、`deployments/`、seedData、docs registry 和 `docs/product/business-records-*` 均无本轮 diff。
+- 下一步：生成 `.codex-review/latest.md`，最终回复只总结 011，不输出后续候选 Goal 队列。
+- 阻塞/风险：`docs/codex-goals/011-current-customer-import-dry-run-tooling.md` 是启动前已存在的未跟踪 Goal 文件；本轮未提交、未推送，`.codex-review/` 只作为本地临时审查报告。
+
+## 2026-05-31 18:52
+- 完成：Checkpoint 7 完成，已新增 `docs/customers/current/import-dry-run-tooling.md`，并同步更新 `docs/customers/current/import-dry-run-plan.md`、`docs/customers/current/import-acceptance-checklist.md`、`docs/product/current-customer-import-strategy.md`、`docs/product/current-customer-import-risk-register.md`、`docs/current-source-of-truth.md` 和 `scripts/README.md`。文档明确 011 已实现 dry-run tooling，但仍未实现真实导入、schema、migration、API/RBAC、UI、seedData、docs registry、`business_records` runtime cutover 或 import execution。
+- 下一步：运行 011 全部必跑验证命令，检查禁止路径、tenant_id、Workflow / Fact 边界，再生成 `.codex-review/latest.md`。
+- 阻塞/风险：文档只记录 dry-run tooling 和边界；未将 011 写成 runtime loader 或真实导入已完成。
+
+## 2026-05-31 18:38
+- 完成：Checkpoint 1 完成，已新增 `scripts/import/currentCustomerDryRun.mjs`，支持 `--help`、`--source`、`--existing`、`--out`、`--format`、`--fail-on-blockers`、`--strict-source`；main 与 `runDryRun` / `runCli` 分离；CLI 只读 source / existing JSON，只写 `--out` 目录，不读取 DB、server config 或 web runtime。
+- 下一步：继续同步指定 docs，并在最终收口跑完整 011 验收命令。
+- 阻塞/风险：无新增依赖；仍未触达 server、web、schema、migration、API/RBAC、seedData、docs registry 或真实导入执行。
+
+## 2026-05-31 18:39
+- 完成：Checkpoint 2 完成，CLI 已读取并校验 source / existing snapshot `version=1`，实现 required source metadata 校验、`--strict-source` 阻断、trim、空字符串转 null、基础 decimal/date/money/unit 规范化，并输出 `source-references.json` 与 `normalized-rows.json`。
+- 下一步：继续文档同步和最终验收。
+- 阻塞/风险：Excel / PDF parser 不在本轮范围，CLI 只接受已导出的 JSON snapshot。
+
+## 2026-05-31 18:40
+- 完成：Checkpoint 3 完成，CLI 已实现 customers / suppliers / contacts / sales_orders / sales_order_items / products / materials / units / warehouses / BOM 的 dry-run 候选、唯一匹配、重复识别、冲突识别和阻断规则，并输出 `candidates.json`、`duplicates.json`、`conflicts.json`。
+- 下一步：继续文档同步和最终验收。
+- 阻塞/风险：BOM 只生成候选，不写库存事实；contacts 无 owner、sales_order 缺 customer、sales_order_item 缺 product/unit/quantity 均不会输出 create。
+
+## 2026-05-31 18:41
+- 完成：Checkpoint 4 完成，CLI 已实现 unresolved queue、severity `block/defer/review/warning`、`product_skus` / `purchase_orders` deferred、shipment / inventory / finance forbidden、`shipping_released != shipped`、`workflow task done != fact posted`，并输出 `unresolved-queue.json` 与 `forbidden-auto-import.json`。
+- 下一步：继续文档同步和最终验收。
+- 阻塞/风险：forbidden 只作为 dry-run 阻断报告，不是 runtime 防护。
+
+## 2026-05-31 18:42
+- 完成：Checkpoint 5 完成，CLI 已输出 `validation-summary.json` 与 `dry-run-report.md`；`canExecuteRealImport` 固定为 `false`，报告明确 `No real import`、输入路径、输出目录、summary、candidate/unresolved counts、forbidden/duplicate/conflict 摘要和人工 review 下一步。
+- 下一步：继续文档同步和最终验收。
+- 阻塞/风险：真实 import execution 仍未实现，后续不得把 dry-run 报告误读成可直接落库。
+
+## 2026-05-31 18:43
+- 完成：Checkpoint 6 完成，已新增 `scripts/import/currentCustomerDryRun.test.mjs` 和 `scripts/import/fixtures/current/*` 合成样本；测试使用 Node.js 内置 `node:test` / `assert`，临时目录运行，覆盖 help、缺参、完整输出、customer update/create、duplicate、contact owner block、sales_order customer block、sales_order_item unknown unit、product_skus / purchase_orders defer、shipment/inventory/finance forbidden、`shipping_released`、workflow done、Demo Seed / QA Debug skip、Print Template Input / Industry Template Candidate sourceType 规则、`--fail-on-blockers`、`--strict-source`、no DB/runtime、输出确定性。已执行 `node --test scripts/import/currentCustomerDryRun.test.mjs`，11 个测试通过。
+- 下一步：同步 docs/customers/current、docs/product、docs/current-source-of-truth 和 scripts/README。
+- 阻塞/风险：fixture 为合成数据，不含真实客户敏感数据。
+
+## 2026-05-31 18:05
+- 完成：启动执行 `011-current-customer-import-dry-run-tooling`。已读取 `AGENTS.md`、011 Goal、010 current import 草案、009 `business_records` 审计 / data map / 风险文档、V1/Product 边界、Workflow / Fact 边界和 `scripts/README.md`；已记录启动 git 现场，当前分支 `main`，启动时 tracked diff 为 `progress.md`，未跟踪文件为 `docs/codex-goals/011-current-customer-import-dry-run-tooling.md`；`progress.md` 为 225 行 / 49138 bytes，未达到归档阈值。
+- 下一步：只在 `scripts/import/**` 落 current import dry-run CLI、fixtures 和 node:test 覆盖，再同步 011 指定 docs；继续禁止修改 server、web、schema、migration、API/RBAC、seedData、docs registry、`business_records` runtime 或真实导入执行。
+- 阻塞/风险：本轮必须每个 checkpoint 更新 `progress.md`，但启动时 `progress.md` 已有上一轮现场 diff；后续收口会只把本 Goal 允许范围纳入审查报告，不回退外部现场。
+
+## 2026-05-31 17:18
+- 完成：清理旧 011 docs-only / candidate queue 现场。已将旧 `docs/codex-goals/011-current-customer-import-second-review-and-go-no-go.md`、012/013/014 candidate Goal、`docs/product/current-customer-import-go-no-go.md`、`docs/product/current-customer-import-second-review.md` 和旧 `.codex-review/latest.md` 移到系统废纸篓；已恢复旧 011 对 `docs/product/business-records-risk-register.md`、`docs/product/current-customer-import-risk-register.md`、`docs/product/current-customer-import-strategy.md` 和 `progress.md` 的未提交 diff；保留新的 `docs/codex-goals/011-current-customer-import-dry-run-tooling.md`。
+- 下一步：新 011 可按 `docs/codex-goals/011-current-customer-import-dry-run-tooling.md` 单独执行，目标是 import dry-run tooling 实现，不应把旧 011 二审和 candidate queue 写成本轮成果。
+- 阻塞/风险：新 011 文件仍是未跟踪文件；本次只做现场清理和任务文件小口径修正，未执行 dry-run tooling 实现，未改 runtime、schema、migration、server、web、seedData 或 docs registry。
+
 ## 2026-05-31 14:20
 - 完成：补充 Codex Goal 并发现场隔离规则，更新 `AGENTS.md`、`docs/codex-goals/README.md`、`docs/codex-goals/_goal-file-template.md`、`docs/codex-goals/_new-session-goal-template.md` 和 `docs/codex-goals/_review-output-protocol.md`，明确 `.codex-review/latest.md` 只覆盖当前 Goal；其他会话写入的非本轮路径只能记录为非本轮现场，不得写成本轮成果、不得擅自回退 / 删除 / 格式化 / 提交，提交时必须按本 Goal 允许路径精确 stage。
 - 下一步：后续正式 Goal 按新模板在开始和收口时检查工作区状态，并在审查报告的 Git 策略检查里说明是否发现非本轮路径改动。
