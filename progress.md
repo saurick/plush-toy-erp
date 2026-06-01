@@ -1,3 +1,13 @@
+## 2026-06-01 21:39
+- 完成：继续按“roadmap 只管产品业务闭环和路线”的口径清理文档。`docs/product/product-completion-roadmap.md` 新增 ERP 业务闭环覆盖口径，明确 Order to Cash、Procure to Pay、Plan / Make to Stock、Outsourcing、Inventory Control 和 Governance / Delivery 六条闭环路线；同时把默认行业菜单基线、current 组合入口拆分和菜单隐藏后的业务保证从 roadmap 主文拆出到 `docs/product/formal-menu-entry-plan.md`，并将 current MVP 明细收回到 `docs/product/product-delivery-ledgers.md` 客户交付矩阵维护。同步更新 README、`docs/current-source-of-truth.md` 和 `product-delivery-ledgers.md` 的引用与下一步名称。
+- 下一步：roadmap 后续只继续保留产品业务闭环、阶段顺序、边界和禁止项；菜单细节、客户试用明细、交付矩阵、台账成熟度和具体 Goal 执行清单分别放在配套计划、台账或 `docs/codex-goals/*.md`。
+- 阻塞/风险：本轮仍是 docs-only 收敛，未修改 runtime、schema、migration、API/RBAC、UI、seedData、docs registry 或真实配置 loader。更新前已检查 `progress.md` 规模，为 375 行 / 78313 bytes，未达到归档阈值。
+
+## 2026-06-01 21:15
+- 完成：按“roadmap 只列产品路线，不把台账治理动作塞进产品路线编号”的口径，收紧 `docs/product/product-completion-roadmap.md`。文档顶部明确不包含台账维护、issue 标签、可视化系统、一次性检查清单等治理动作的独立路线编号；第 12 阶段把菜单投影评审措辞收回到正式产品入口、客户菜单配置和入口依赖对齐；第 23 节把 `013 v1-menu-entry-capability-projection-and-customer-menu-overlay-review` 改为 `013 v1-formal-menu-and-legacy-entry-exit`，并将后续 current 试用路线改成正式菜单 / 旧入口退出、导入 loader、执行审计、试用部署包、试用验收等产品目标。
+- 下一步：后续拆正式 Goal 时，台账影响检查只作为每个 Goal 的前置 / 收口检查；roadmap 编号继续只放产品能力、交付阶段或长期架构评审，不单独为台账、可视化或 checklist 占号。
+- 阻塞/风险：本轮只改产品路线图文档和过程记录，未修改 runtime、schema、migration、API/RBAC、UI、seedData、docs registry 或真实 loader。更新前已检查 `progress.md` 规模，为 370 行 / 77086 bytes，未达到归档阈值。
+
 ## 2026-06-01 20:47
 - 完成：按“系统分层表不整张塞进 roadmap”的口径完成 docs-only 收敛。`docs/product/product-completion-roadmap.md` 新增系统分层进入 roadmap 的规则和分层总表，只保留路线、顺序、边界和禁止项；`docs/product/product-delivery-ledgers.md` 新增行业默认模板清单、Customer Config 配置形态、Customer Extension 边界、业务帮助分离和 Reporting / Audit / Integration 后续增强等能力 / 交付 / 差异台账行；`web/src/erp/docs/system-layer-progress.md` 修正 MasterData 状态，明确客户 / 供应商 / 联系人已完成 V1 最小链路，剩余是地址、账期、供应商价格、正式菜单、导入和配置 loader 等扩展；`web/src/erp/docs/productization-delivery.md` 将 `Tenant Config` 收口为 `Customer Config`，避免误读成 Runtime Tenant 或 `tenant_id`。
 - 下一步：后续如要执行，应先拆 `industry-template-inventory`、`customer-config-shape-review`、`business-help-split-review` 或事实层具体 usecase Goal；不要把本次 docs 口径当成 runtime、schema、API/UI 或 loader 已实现。
