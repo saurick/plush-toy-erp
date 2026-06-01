@@ -120,7 +120,7 @@
 | ------------- | ---------------------------------------------------------------------------------- |
 | Capability ID | 能力编号                                                                               |
 | 能力名称          | 产品能力名                                                                              |
-| 所属层           | Product Core / Industry Template / Customer Config / Customer Extension / Delivery |
+| 所属层           | Product Core / Industry Template / Customer Config / Customer Extension / Delivery / Help / Reporting |
 | 业务域           | MasterData / Order / Inventory / Workflow / Finance 等                              |
 | 当前成熟度         | L0-L8                                                                              |
 | 当前结果          | 当前已具备的能力                                                                           |
@@ -165,6 +165,11 @@
 | CAP-025       | mobile task entry                         | Industry Template / UI | Mobile                  | L1-L2 | 已有方向和骨架                                                                                      | 未实现真实移动端任务闭环                      | V3 汇报 / mobile roles README                                       | mobile-task-entry-review            | 不要先做空壳菜单                         | No             | No    |
 | CAP-026       | current 私有化部署包                            | Delivery               | Deployment              | L1-L2 | deployments/current README 已有                                                                | 未形成可执行部署包                         | `deployments/current/README.md`                                   | deployment-package-current          | 备份/恢复/发布未完整                      | No             | No    |
 | CAP-027       | 客户验收体系                                    | Delivery               | Acceptance              | L1-L2 | 已有导入验收、阶段验收口径                                                                                | 未形成客户验收包                          | import acceptance checklist                                       | customer-trial-acceptance           | 验收口径要业务化                         | No             | No    |
+| CAP-028       | 行业默认模板清单                                  | Industry Template      | Productization / Menu   | L1-L2 | 已有毛绒玩具角色、菜单、流程、字段样本、打印模板和移动端角色方向；current 只能作为模板候选输入                                   | 尚未从 current 样本中抽离正式行业默认模板         | `docs/product/product-completion-roadmap.md`、`config/industry-templates/plush/README.md` | industry-template-inventory         | 单客户样本被误读为行业标准                    | No             | No    |
+| CAP-029       | Customer Config 配置形态                         | Customer Config        | Productization          | L1-L2 | 已有公司名、logo、主题色、菜单、字段、编号、模板、角色、权限和初始化数据等配置项口径，并已有 current 配置包骨架                       | 没有 runtime config loader，不新增 `tenant_id` | `web/src/erp/docs/productization-delivery.md`、`config/customers/current/README.md` | customer-config-shape-review        | 被误读为 Runtime Tenant 或 SaaS 多租户      | No             | No    |
+| CAP-030       | Customer Extension 边界                         | Customer Extension     | Productization          | L1    | 已有原则：极端客户专属逻辑才进入 extension，并记录原因、范围、退出条件和维护责任                                             | 目前没有清晰 runtime extension 层，也没有真实专属逻辑落地 | `docs/product/product-completion-roadmap.md`、`web/src/erp/docs/productization-delivery.md` | real-customer-extension-review-only | 核心 schema / 库存 / 财务规则被客户长期分叉     | No             | No    |
+| CAP-031       | 业务帮助 / 开发验收 / 客户交付说明分离                    | Help / Delivery        | Help / QA               | L1-L2 | 已有开发验收、QA、产品化和交付说明入口，业务版帮助方向明确                                                              | 普通业务用户版帮助不足，客户样本与 QA 说明边界仍需继续分离 | `web/src/erp/docs/system-layer-progress.md`、`web/src/erp/docs/productization-delivery.md` | business-help-split-review          | 开发术语暴露给业务用户或误导实现状态              | No             | No    |
+| CAP-032       | Reporting / Audit / Integration 增强层           | Reporting              | Reporting / Integration | L0-L2 | 已有 observability / audit 口径和后续增强方向                                                               | 报表、附件、导入导出、扫码、外部集成未落地            | `web/src/erp/docs/system-layer-progress.md`                         | wait-for-fact-layer-stability       | 先做报表倒推事实模型                       | No             | No    |
 
 ---
 
@@ -230,6 +235,11 @@
 | current      | 移动端任务                | CAP-025             | Planned        | 骨架/方向                 | 任务驱动方向明确                     | 真实移动端任务未做                | mobile task review             | 哪些岗位用手机            | 不做空壳入口                    |
 | current      | 私有化部署包               | CAP-026             | Planned        | deployments/current   | 方向明确                         | 备份/恢复/发布未完整              | deployment package             | 部署环境               | 运维风险                      |
 | current      | 客户验收                 | CAP-027             | Planned        | checklist 草案          | 导入验收部分已有                     | 完整试点验收未做                 | trial acceptance               | 验收范围               | 范围过大风险                    |
+| current      | 行业默认模板清单             | CAP-028             | Planned        | config/industry-templates/plush | 方向明确，current 样本可作为候选输入        | 未完成行业共性 / 客户样本拆分       | industry template inventory    | 哪些角色、菜单、字段属于行业共性 | 单客户样本污染行业模板             |
+| current      | 客户配置包                | CAP-029             | Config Draft   | config/customers/current | 已有目录骨架和配置项口径                 | 没有 runtime loader，不是 `tenant_id` | customer config shape review   | 公司信息、主题、菜单、编号、模板 | 被误读为 SaaS tenant           |
+| current      | 客户扩展边界               | CAP-030             | Not Planned    | 无                     | 当前没有需要落地的专属 extension          | 不创建 extension runtime         | 真实出现专属逻辑后再评审              | 暂无                 | 为假想定制过早造层                |
+| current      | 业务帮助 / 交付说明          | CAP-031             | Planned        | 开发验收文档 / 后续业务帮助     | 开发验收说明已有，业务版帮助待补              | 不把开发验收页当业务教程            | business help split review     | 客户培训材料             | 开发术语误导业务用户               |
+| current      | 报表 / 审计 / 集成增强       | CAP-032             | Deferred       | 无正式入口                 | 后续增强方向明确                      | 报表、附件、扫码、外部集成未做        | 事实层稳定后再评审                  | 报表范围               | 倒推事实模型                    |
 
 ---
 
@@ -287,6 +297,10 @@
 | DELTA-CURRENT-023 | current  | 菜单入口                                 | V1 页面可试用需要   | Customer Config / UI                       | 未接正式菜单         | 否                 | formal menu review + legacy entry removal | business_records cutover    | 菜单误导成熟度                  | V1 menu entry review     |
 | DELTA-CURRENT-024 | current  | seedData 初始化                         | 交付/演示需要      | Customer Config / Demo Seed                | 未改             | 否                 | 单独评审                              | menu/seed boundary          | 误当正式数据                   | seed review              |
 | DELTA-CURRENT-025 | current  | docs registry / 帮助中心                 | 交付/培训需要      | Help / QA                                  | 未改             | 否                 | 后续帮助中心业务版                         | 功能稳定后                       | 文档误导实现状态                 | help review              |
+| DELTA-CURRENT-026 | current  | 行业默认角色、菜单、字段、打印模板                 | current 样本 / 产品化方向 | Industry Template Candidate                | 待抽离模板清单        | 否                 | 先分类行业共性、current 样本和 deferred 输入      | 多客户或人工评审                    | 单客户样本被当行业标准              | industry template inventory |
+| DELTA-CURRENT-027 | current  | 客户配置包 / 配置 loader                   | 产品化交付需要      | Customer Config                            | 目录骨架已有，runtime loader 未做 | 否                 | 先设计配置形态，不新增 `tenant_id`              | 配置项边界评审                     | 被误读为 Runtime Tenant / SaaS | customer config shape review |
+| DELTA-CURRENT-028 | current  | 极端客户专属逻辑放置边界                       | 产品化交付需要      | Customer Extension                         | 当前没有真实落地需求     | 否                 | 只有真实出现专属逻辑时建立 extension，并记录退出条件    | 明确客户专属规则                    | 核心规则长期分叉                 | extension review only    |
+| DELTA-CURRENT-029 | current  | 报表、附件、导入导出、扫码、外部集成                | 后续增强方向       | Reporting / Deferred                       | 延后             | 否                 | 事实层稳定后再评审                         | 生产 / 出货 / 财务事实稳定             | 报表倒推事实模型                 | reporting review later   |
 
 ---
 

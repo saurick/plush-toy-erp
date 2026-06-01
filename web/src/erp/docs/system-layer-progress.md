@@ -12,20 +12,20 @@
 
 ## 2. 总体分层
 
-| 层级                                       | 当前状态                     | 本页口径                                                             |
-| ------------------------------------------ | ---------------------------- | -------------------------------------------------------------------- |
-| MasterData 主数据层                        | 部分完成                     | 已有单位、材料、产品、仓库和最小 BOM；客户 / 供应商仍待评审。        |
-| Workflow 协同层                            | 已落 7 条最小后端规则        | 只承接协同任务、事件、业务状态和必要任务派生。                       |
-| Inventory 库存事实层                       | 已有最小事实底座             | `inventory_txns` 是库存事实真源，`inventory_balances` 是查询加速表。 |
-| Quality 质检事实层                         | 已有来料质检最小主表         | `quality_inspections` 已落地，但明细、报告、页面和 API 未接。        |
-| Purchase 采购事实层                        | 已有入库、退货、调整事实     | 还不是完整采购订单系统。                                             |
-| Shipment 出货事实层                        | 已评审，未落事实表           | `shipment_release done` 只是 `shipping_released`，不是 `shipped`。   |
-| Finance 财务事实层                         | 未开始                       | 应收 / 开票至少应在真实 `shipped` 后评审。                           |
-| RBAC 权限层                                | 已切换标准 RBAC              | 前端隐藏菜单不是安全边界。                                           |
-| API / UI 层                                | 部分接入                     | 多个事实能力仍停留在 schema / repo / usecase / test。                |
-| Help / Debug / QA 层                       | 已有 5 个入口，本轮新增 2 个 | 开发验收入口不与普通帮助中心主入口混淆。                             |
-| Reporting / Audit / Integration 后续增强层 | 未开始 / 后续增强            | 报表、审计、附件、导入导出、扫码和集成后续再做。                     |
-| Productization / Delivery 产品化交付层     | 本轮新增总控入口             | 当前只记录单客户私有化和产品化边界，不提前实现复杂 SaaS。            |
+| 层级                                       | 当前状态                 | 本页口径                                                                                       |
+| ------------------------------------------ | ------------------------ | ---------------------------------------------------------------------------------------------- |
+| MasterData 主数据层                        | 部分完成                 | 已有单位、材料、产品、仓库、最小 BOM、客户、供应商和联系人；地址、账期、供应商价格等仍待评审。 |
+| Workflow 协同层                            | 已落 7 条最小后端规则    | 只承接协同任务、事件、业务状态和必要任务派生。                                                 |
+| Inventory 库存事实层                       | 已有最小事实底座         | `inventory_txns` 是库存事实真源，`inventory_balances` 是查询加速表。                           |
+| Quality 质检事实层                         | 已有来料质检最小主表     | `quality_inspections` 已落地，但明细、报告、页面和 API 未接。                                  |
+| Purchase 采购事实层                        | 已有入库、退货、调整事实 | 还不是完整采购订单系统。                                                                       |
+| Shipment 出货事实层                        | 已评审，未落事实表       | `shipment_release done` 只是 `shipping_released`，不是 `shipped`。                             |
+| Finance 财务事实层                         | 未开始                   | 应收 / 开票至少应在真实 `shipped` 后评审。                                                     |
+| RBAC 权限层                                | 已切换标准 RBAC          | 前端隐藏菜单不是安全边界。                                                                     |
+| API / UI 层                                | 部分接入                 | 多个事实能力仍停留在 schema / repo / usecase / test。                                          |
+| Help / Debug / QA 层                       | 已有开发验收入口         | 开发验收入口不与普通帮助中心主入口混淆。                                                       |
+| Reporting / Audit / Integration 后续增强层 | 未开始 / 后续增强        | 报表、审计、附件、导入导出、扫码和集成后续再做。                                               |
+| Productization / Delivery 产品化交付层     | 已有总控入口和目录骨架   | 当前只记录单客户私有化和产品化边界，不提前实现复杂 SaaS。                                      |
 
 ## 3. 必须长期保持的边界
 
@@ -48,19 +48,24 @@
 - `warehouses`
 - `bom_headers`
 - `bom_items`
+- `customers`
+- `suppliers`
+- `contacts`
+- V1 客户 / 供应商 / 联系人 schema、migration、repo/usecase、API/RBAC 和 UI
 
 ### 未完成
 
-- `customers / suppliers`
-- `supplier_contacts`
+- customer addresses
+- settlement terms
 - `supplier_materials / supplier_prices`
-- 产品 / 客户 / 供应商前端页面
+- 联系人通知权限
+- 正式菜单入口、seedData、导入落库和客户配置包 loader
 
 ### 下一步
 
 - 不重复设计 `products / materials / units / warehouses`。
-- 客户 / 供应商先做方案评审，再落最小主数据。
-- 供应商价格、联系人和默认资料应先确认字段真源，再决定是否进入主数据层。
+- 客户 / 供应商 / 联系人已完成 V1 最小链路；后续只评审地址、账期、信用额度、供应商物料档案、供应商价格等扩展字段。
+- 供应商价格、联系人通知和默认资料应先确认字段真源，再决定是否进入主数据层或 Customer Config。
 
 ## 5. Workflow 协同层
 
@@ -244,7 +249,7 @@
 - 运行记录
 - 专项报告
 
-### 本轮新增
+### 已有开发验收入口
 
 - 系统分层进度
 - 产品化与交付
@@ -271,7 +276,7 @@
 
 ## 15. Productization / Delivery 产品化交付层
 
-- 本轮新增“产品化与交付”入口。
+- 已有“产品化与交付”入口。
 - 当前阶段只做单客户私有化部署和产品化边界记录。
 - 当前不提前实现复杂 SaaS 多租户。
 - Phase 0 已建立 `docs/product/*`、`docs/customers/current/*`、`config/industry-templates/plush`、`config/customers/current` 和 `deployments/current` 骨架。

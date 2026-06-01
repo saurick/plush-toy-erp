@@ -1,3 +1,8 @@
+## 2026-06-01 20:47
+- 完成：按“系统分层表不整张塞进 roadmap”的口径完成 docs-only 收敛。`docs/product/product-completion-roadmap.md` 新增系统分层进入 roadmap 的规则和分层总表，只保留路线、顺序、边界和禁止项；`docs/product/product-delivery-ledgers.md` 新增行业默认模板清单、Customer Config 配置形态、Customer Extension 边界、业务帮助分离和 Reporting / Audit / Integration 后续增强等能力 / 交付 / 差异台账行；`web/src/erp/docs/system-layer-progress.md` 修正 MasterData 状态，明确客户 / 供应商 / 联系人已完成 V1 最小链路，剩余是地址、账期、供应商价格、正式菜单、导入和配置 loader 等扩展；`web/src/erp/docs/productization-delivery.md` 将 `Tenant Config` 收口为 `Customer Config`，避免误读成 Runtime Tenant 或 `tenant_id`。
+- 下一步：后续如要执行，应先拆 `industry-template-inventory`、`customer-config-shape-review`、`business-help-split-review` 或事实层具体 usecase Goal；不要把本次 docs 口径当成 runtime、schema、API/UI 或 loader 已实现。
+- 阻塞/风险：本轮只改正式文档和过程记录，未修改 runtime、schema、migration、API/RBAC、UI 组件、seedData、docs registry 或真实配置 loader。更新前已检查 `progress.md` 规模，为 365 行 / 75677 bytes，未达到归档阈值。
+
 ## 2026-06-01 18:28
 - 完成：修正 `docs/product/product-completion-roadmap.md` 中“一级导航 / 二级菜单”的误导性术语。当前截图对应的是左侧“分组标题 + 功能入口”，roadmap 现已明确不要求引入可展开多级菜单树；后续重点是把旧组合入口拆成稳定功能入口，并把流程步骤放到页面内 Tab、按钮、待办、移动端任务或 workflow 节点。
 - 下一步：后续 UI 菜单改造时，优先沿用当前分组式侧边栏形态评审信息架构；只有实际需要时再单独评审是否引入折叠 / 展开层级。

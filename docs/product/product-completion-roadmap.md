@@ -222,6 +222,8 @@ current 不是：
 | Customer Extension | 极少数客户扩展     | 数据适配、专属模板、特殊报表                 | 核心事实分叉         |
 | Runtime Tenant     | SaaS 多租户运行时 | tenant_id、租户隔离、计费授权            | 当前阶段不做         |
 
+本文统一使用 `Customer Config` 表示客户配置包。若历史讨论或外部材料写成 `Tenant Config`，当前阶段只能按客户配置包理解，不代表 Runtime Tenant、`tenant_id`、多租户中间件或 SaaS 套餐能力。
+
 ### 4.1 客户可以配置
 
 * 公司名。
@@ -278,6 +280,25 @@ current 不是：
 * L8 才能进入客户交付承诺；必须同时具备数据、权限、菜单、部署、培训、验收和回滚口径。
 
 这意味着 roadmap 的下一步排序要同时看“产品内核优先级”和“交付台账阻塞项”。例如 current 要试用 V1，不只是写完 V1 页面，还必须处理菜单入口、旧写入口退役、导入 dry-run / 人工确认、权限模板、客户确认项和部署回滚。
+
+### 4.5 系统分层进入 roadmap 的口径
+
+系统分层表可以进入 roadmap，但只能进入“路线、顺序、边界和禁止项”层面；“当前已有内容 / 当前缺口 / 是否可试用 / 是否可交付”必须落到 `docs/product/product-delivery-ledgers.md` 和 `web/src/erp/docs/system-layer-progress.md`，避免 roadmap 变成第二份易漂移的实现台账。
+
+| 层 | Roadmap 口径 | 当前状态跟踪 | 下一步排序原则 | 禁止项 |
+| --- | --- | --- | --- | --- |
+| Product Core 通用产品内核 | 所有客户共享的 schema、usecase、事实、权限、API / UI 和正式帮助口径 | 产品能力进度台账 + 当前真源 | 继续按主数据、源单据、事实闭环、API / UI、测试和文档逐步演进 | 不写死 current 甲方名称、logo、特殊字段或特殊流程 |
+| Industry Template 行业模板 | 毛绒玩具行业默认角色、菜单、流程模式、字段样本、打印模板和初始化模板 | 产品能力台账 + 客户差异台账 | 先做模板清单，区分行业共性、current 样本和 deferred 输入 | 不把第一个客户样本等同于行业标准 |
+| Customer Config 客户配置包 | 公司信息、logo、主题色、菜单开关、字段显示、编号规则、打印模板、角色权限模板和初始化数据 | 客户交付矩阵 + 客户差异台账 | 先设计配置形态和目录边界，不接 runtime loader，不加 `tenant_id` | 不实现 Runtime Tenant、多租户中间件、SaaS 套餐 |
+| Customer Extension 客户扩展层 | 极少数客户专属逻辑的隔离边界 | 客户差异台账 | 只有真实出现专属逻辑时才建立 extension，并记录原因、范围、退出条件 | 不让核心 schema、库存、出货或财务规则为客户长期分叉 |
+| Workflow 协同层 | 任务、事件、业务状态和必要任务派生 | 当前真源 + 系统分层进度 | 先守住 `shipment_release` 边界，再评审 Quality bridge 或后续 workflow 对接 | 不让 `WorkflowUsecase` 直接写库存、出货、财务事实 |
+| MasterData 主数据层 | 客户、供应商、联系人、产品、材料、单位、仓库、BOM 等稳定主数据 | 当前真源 + 产品能力台账 | 先复用已落对象，再评审地址、账期、供应商物料档案和价格 | 不重复设计 products、materials、units、warehouses |
+| Fact 事实层 | 采购、质检、库存、生产、委外、出货、财务等真实业务事实 | 当前真源 + 系统分层进度 | 按生产 / 委外 -> 出货 -> 财务顺序推进，具体事实单独评审 | 不把 `business_records` 或 workflow payload 当事实真源 |
+| RBAC 权限层 | 菜单权限、动作权限、角色职责、数据范围和任务处理边界 | 产品能力台账 + 当前真源 | 每接一个事实 API，同步权限码、owner / assignee / status 校验和测试 | 不只靠前端隐藏菜单作为安全边界 |
+| API / UI 层 | 将已评审 usecase 以 JSON-RPC/API、桌面页、移动任务和正式菜单投影出来 | 产品能力台账 + 客户交付矩阵 | 一次只接一个事实模块，不把 schema-only 或后端可测写成客户可用 | 不让前端继续做后端已迁规则的本地双写 |
+| Help / Debug / QA 层 | 分离业务帮助、开发验收、客户交付说明和调试入口 | 系统分层进度 + 客户交付矩阵 | 先补业务版帮助，再保持开发验收入口不进普通帮助中心 | 不把 schema、migration、usecase 等开发术语暴露给业务用户 |
+| Productization / Delivery 交付层 | 私有化部署包、客户配置包、初始化数据包、培训验收和维护交付 | 客户交付矩阵 + 产品化文档 | 先做目录隔离评审，再做配置包和部署模板 | 不提前做 `tenant_id`、license、计费、工单系统 |
+| Reporting / Audit / Integration 后续增强层 | 报表、审计、附件、导入导出、扫码和外部集成 | 产品能力台账 | 事实层稳定后再做，不用报表倒推事实模型 | 不先做报表或集成反向污染核心事实 |
 
 ---
 
