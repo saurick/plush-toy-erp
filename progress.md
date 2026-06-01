@@ -1,3 +1,33 @@
+## 2026-06-01 18:28
+- 完成：修正 `docs/product/product-completion-roadmap.md` 中“一级导航 / 二级菜单”的误导性术语。当前截图对应的是左侧“分组标题 + 功能入口”，roadmap 现已明确不要求引入可展开多级菜单树；后续重点是把旧组合入口拆成稳定功能入口，并把流程步骤放到页面内 Tab、按钮、待办、移动端任务或 workflow 节点。
+- 下一步：后续 UI 菜单改造时，优先沿用当前分组式侧边栏形态评审信息架构；只有实际需要时再单独评审是否引入折叠 / 展开层级。
+- 阻塞/风险：本轮仍是 docs-only 方向修正，未修改 runtime、UI、seedData、docs registry、权限码或路由。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-06-01 18:23
+- 完成：继续收紧 `docs/product/product-completion-roadmap.md` 的菜单方向，把第 14.2 段从“当前菜单拆分建议”改为“当前组合入口拆分建议”。旧 UI 组合入口只作为待拆依据，不作为正式菜单名；正式方向逐项落到任务中心、经营看板、客户档案、供应商档案、销售订单、款式立项、采购订单、委外订单、入库管理、来料质检、库存台账、出货计划、出货放行、出货单、出库管理、生产排程、生产订单等稳定入口。
+- 下一步：后续真正改 UI 菜单时，按 roadmap 的默认行业核心菜单基线单独拆 seedData / docs registry / route / permission / mobile task projection，不沿用旧组合入口命名。
+- 阻塞/风险：本轮只改产品路线图文档，未修改 runtime、UI、seedData、docs registry、权限码或路由。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-06-01 18:21
+- 完成：按“菜单颗粒度要说清楚，不能继续用 `/` 把多个业务绑成一个菜单”的方向，补充 `docs/product/product-completion-roadmap.md` 第 14 阶段菜单颗粒度规则和默认行业核心菜单基线。现在 roadmap 明确菜单分组表达业务域，功能入口表达稳定业务对象或管理页，流程节点放 Tab / 按钮 / 待办 / 移动端任务；并列出工作台、基础资料、销售、产品工程、采购、质检、仓储、委外、生产、出货、财务、报表、打印、系统等长期核心菜单方向。
+- 下一步：后续真正接菜单时，应以该默认行业菜单基线 + customer menu overlay 为输入，再单独拆 seedData / docs registry / permission / route 变更 Goal。
+- 阻塞/风险：本轮只改产品路线图文档，未修改 runtime、UI、seedData、docs registry、权限码或路由。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-06-01 18:19
+- 完成：按用户确认删除 `docs/product/roadmap-governance-checklists.md`，已移动到 macOS 废纸篓；同步移除 README 和 `docs/current-source-of-truth.md` 中对该 checklist 的正式索引。产品方向保留为 `product-completion-roadmap.md` 管阶段路线，`product-delivery-ledgers.md` 管能力 / 交付 / 差异台账，不再保留第三份治理清单并行真源。
+- 下一步：后续如确需 checklist，只在具体 Goal 文件或路线图中放短前置检查，不再恢复 700 行级别的并行清单。
+- 阻塞/风险：本轮只删除未跟踪 checklist 草稿并清理引用，未修改 runtime、schema、migration、API、UI、seedData 或 docs registry。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-06-01 17:22
+- 完成：结合 `docs/product/product-delivery-ledgers.md`、`docs/product/roadmap-governance-checklists.md` 与 `docs/reference/imported-notes/*` 完善产品路线图。`product-completion-roadmap.md` 新增 roadmap / 三类台账 / imported-notes 的关系、三类台账门禁、权限职责判断顺序、菜单命名原则、导入 loader 前置边界和交付包配置边界；同步在 `docs/current-source-of-truth.md` 与 README 文档索引加入 `product-delivery-ledgers.md` 和 `roadmap-governance-checklists.md`；并按“现在是定方向”口径，把产品方向收口为旧 `business_records` 入口默认删除或隐藏，不承诺只读归档页，底层历史数据只按迁移 / 审计 / 回滚需要处理。
+- 下一步：后续拆新 Goal 前按 `workspace checkpoint -> roadmap / product-delivery-ledgers impact check -> current-source-of-truth verification -> allowed / forbidden path confirmation` 做前置检查；若进入真实导入，下一步应是 `current-customer-import-loader-design`，不能从 dry-run / evidence 直接跳到写库。
+- 阻塞/风险：本轮是 docs-only 方向、路线图和台账口径收口，未修改 runtime、schema、migration、API、UI、seedData 或 docs registry；`docs/product/product-delivery-ledgers.md` 和 `docs/product/roadmap-governance-checklists.md` 仍是当前工作区未跟踪文件，提交时需要显式纳入或按用户边界处理。更新前已检查 `progress.md` 规模，未达到归档阈值。
+
+## 2026-06-01 16:49
+- 完成：按要求撤回 `docs/product/product-completion-roadmap.md` 中基于未完整 ChatGPT 会话加入的 roadmap 补充内容；当前该 roadmap 文件已回到 Git 基线，无剩余 diff。同步移除未提交的错误过程记录，避免把已撤回的 roadmap 增补继续写成当前成果。
+- 下一步：若后续仍要补充 roadmap，必须先拿到可证明完整的 ChatGPT 会话 transcript、官方导出或正确的 conversation-level share 快照，再按完整内容重新评估。
+- 阻塞/风险：本轮只撤回 roadmap 文档改动并更新过程记录，未修改 runtime、schema、migration、API、UI、seedData 或 docs registry；全局长会话读取规则未撤回。
+
 ## 2026-05-31 23:07
 - 完成：将未跟踪草稿 `docs/product/product-completion-roadmap-issues.md` 移入系统废纸篓。该文件的有效结论已吸收到 `docs/product/product-completion-roadmap.md`，后续不再保留第二份 issues 草稿，避免被误读为 roadmap 之外的并行真源。
 - 下一步：提交时只纳入 `AGENTS.md`、`docs/product/product-completion-roadmap.md` 和 `progress.md`。

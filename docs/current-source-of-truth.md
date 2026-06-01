@@ -7,7 +7,7 @@
 - 运行时行为的最终真源始终是代码。
 - 仓库级约定、部署边界和项目基线，以当前文档为索引，再分流到对应子目录文档。
 - 历史 changes 文档不再作为阅读入口；当前状态必须回到本文档、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认。
-- 产品从起步到成熟的阶段规划、候选 Goal 顺序和产品化路线，以 `docs/product/product-completion-roadmap.md` 作为可演进规划真源；它不替代当前实现真源，也不直接授权 schema、migration、runtime、API 或 UI 改动。
+- 产品从起步到成熟的阶段规划、候选 Goal 顺序和产品化路线，以 `docs/product/product-completion-roadmap.md` 作为可演进规划真源；产品能力成熟度、客户交付状态和客户差异分类，以 `docs/product/product-delivery-ledgers.md` 作为长期台账入口；它们都不替代当前实现真源，也不直接授权 schema、migration、runtime、API 或 UI 改动。
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
 
@@ -45,6 +45,7 @@
 - `产品化与交付` 用于跟踪当前甲方、通用产品能力、私有化部署、SaaS 预留、租户分层路线、维护费交付和客户差异隔离。
 - 这两个入口只属于开发与验收，不进入普通帮助中心主入口，也不替代业务操作教程。
 - Phase 0 已新增 0 到 1 产品架构、客户实例、客户差异和状态 / Workflow / Fact 边界文档：`docs/product/*`、`docs/architecture/status-workflow-fact-boundary.md`、`docs/customers/current/*`。
+- `docs/product/product-delivery-ledgers.md` 是产品能力进度台账、客户交付矩阵和客户差异台账入口，用于判断能力成熟度、交付承诺和客户差异分类；它不是 runtime、schema、migration、API、UI 或测试真源。
 - `docs/reference/imported-notes/*` 只保存 imported design notes，状态是 Reference Only，不是 runtime、schema 或当前实现真源。
 - `current` 只表示第一个真实客户 / 种子客户 / 私有化客户实例和配置包来源，不是 SaaS runtime tenant；当前不新增 `tenant_id`。
 - 客户资料已建立 `docs/customers/current` 文档边界和 `config/customers/current` 配置包骨架，但未移动旧资料、未接 docs registry、未改 runtime；后续若做资料迁移，仍需单独评审文件清单、引用关系、docs registry、测试断言和回滚风险。
