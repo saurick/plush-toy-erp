@@ -9,7 +9,7 @@
 
 本文只承接正式产品入口、行业默认菜单候选、客户菜单配置和旧入口退出的规划细节。
 
-本文不是产品总路线图，不替代 `docs/product/product-completion-roadmap.md`。本文也不是当前菜单 runtime、seedData、docs registry、权限码、路由或前端实现真源；任何实际修改仍必须拆到具体 `docs/codex-goals/*.md`。
+本文不是产品总路线图，不替代 `docs/product/product-completion-roadmap.md`。本文也不是当前菜单 runtime、seedData、docs registry、权限码、路由或前端实现真源；任何实际修改仍必须拆成具体实现任务。
 
 ## 1. 产品目标
 

@@ -153,7 +153,7 @@ deprecated 条件：
 
 archive / delete 条件：
 
-- 必须另开 migration / cleanup Goal。
+- 必须另开 migration / cleanup 实现任务。
 - 必须检查所有 runtime 引用。
 - 必须提供备份、回滚和 smoke / regression。
 - 必须确认不破坏历史审计、打印、帮助和 QA。
@@ -164,4 +164,4 @@ archive / delete 条件：
 |---|---|
 | yoyoosun customer import dry-run / strategy | 先基于本 data map 做 dry-run/import 设计，分类 永绅 yoyoosun 样本字段 |
 | V1 menu entry review | 单独评审 seedData、docs registry、Dashboard、menu permissions 和旧入口只读化 |
-| business_records read-only runtime Goal | 只有菜单 / import 方案确认后再做，不应和 audit 混轮 |
+| business_records read-only runtime task | 只有菜单 / import 方案确认后再做，不应和 audit 混轮 |

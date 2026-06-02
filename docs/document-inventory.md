@@ -19,7 +19,6 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 - `web/src/erp/docs/*.md` 是产品内文档源文件，是否展示取决于 `web/src/erp/config/docs.mjs` 和 `web/src/erp/config/seedData.mjs`。
 - `docs/product/*` 和 `docs/architecture/*` 是正式产品 / 架构评审文档，但不自动进入前端帮助中心。
-- `docs/codex-goals/*` 只保留模板、协议和未来待执行 Goal；完成后的编号 Goal 不保留为活跃文档，可从 Git 历史追溯，后续路线回到 roadmap。
 - `docs/archive/*`、`progress.md` 只用于历史追溯；原 `docs/changes/*` 历史文件已删除，当前状态回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、代码和测试交叉确认。
 - `docs/reference/imported-notes/*` 是外部输入，必须先经过正式文档和代码复核。
 - README / server docs / config docs / deployment docs 是目录、运行、部署或子系统维护说明。
@@ -145,17 +144,6 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/warehouse/warehouse-quality-v1.md` | 仓库与品质 v1 |
 | `docs/observability/README.md` | 可观测性目录说明 / Observability |
 | `docs/observability/log-trace-audit-v1.md` | 日志 / 审计 / Trace v1 |
-
-### Codex 任务 / Codex Goal
-
-| 路径 | 标题 / 当前用途 |
-| --- | --- |
-| `docs/codex-goals/README.md` | Codex Goals 使用说明 |
-| `docs/codex-goals/_goal-file-template.md` | Codex Goal 文件模板 |
-| `docs/codex-goals/_new-session-goal-template.md` | Codex 新会话短 Goal 模板 |
-| `docs/codex-goals/_review-output-protocol.md` | Codex 审查报告输出协议 |
-
-已完成的 `000` 到 `012` 编号 Goal 已从活跃文档树删除；需要追溯执行规格时使用 Git 历史，不再从当前 `docs/codex-goals/` 读取。
 
 ### 归档
 

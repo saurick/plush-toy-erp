@@ -1,11 +1,11 @@
 # 自动化测试策略
 
-本文用于把自动化测试和验收命令按改动影响面分层，帮助每个 Codex Goal 或日常改动选择合适的验证范围。
+本文用于把自动化测试和验收命令按改动影响面分层，帮助每个实施任务或日常改动选择合适的验证范围。
 
 ## 1. 定位
 
-- 本文是测试选择和验收分层文档，不替代 `docs/current-source-of-truth.md`、代码、Ent schema、Atlas migration、`scripts/README.md` 或具体 `docs/codex-goals/*.md`。
-- 具体任务的允许修改文件、禁止修改文件和验收命令，仍以当前 Goal 文件或用户本轮要求为准。
+- 本文是测试选择和验收分层文档，不替代 `docs/current-source-of-truth.md`、代码、Ent schema、Atlas migration、`scripts/README.md` 或本轮具体任务说明。
+- 具体任务的允许修改文件、禁止修改文件和验收命令，仍以当前用户要求、正式设计文档或任务说明为准。
 - 文档里的“未来 / 后续”测试项只表示后续能力成熟后应补的方向，不代表当前仓库已经有对应 runner、脚本、API 或 E2E 环境。
 - 自动化测试通过是必要条件，不等于业务事实、权限边界、部署状态和客户交付已经完成。涉及当前实现状态时，必须回到代码、测试和当前真源文档交叉确认。
 
@@ -39,7 +39,7 @@
 | 层级 | 改动类型 | 必跑或优先命令 | 说明 |
 | --- | --- | --- | --- |
 | T0 静态检查 | 所有改动 | `git status --short`；`git diff --stat`；`git diff --check`；`git ls-files --others --exclude-standard` | 用于确认工作区、空白错误、未跟踪文件和并行现场 |
-| T1 文档 / 规划 | roadmap、cutline、audit、risk register、客户资料、Goal 文件 | T0 + 相关边界 grep | 不改 runtime / schema / 前端配置时，一般不跑 Go / pnpm 测试 |
+| T1 文档 / 规划 | roadmap、cutline、audit、risk register、客户资料、任务说明 | T0 + 相关边界 grep | 不改 runtime / schema / 前端配置时，一般不跑 Go / pnpm 测试 |
 | T2 Schema / Migration | Ent schema、generated code、Atlas migration | `cd server && make print_db_url`；`cd server && make data`；`cd server && make migrate_status`；`cd server && go test ./internal/data/model/schema`；`cd server && go test ./internal/biz ./internal/data` | `migrate_status` pending 不是自动失败，但必须说明目标库是否已 apply |
 | T3 Repo / Usecase | `internal/biz`、`internal/data`、状态机、guard、事务、事实层规则 | `cd server && go test ./internal/biz ./internal/data`；必要时加 `-count=1` 和 Phase PG target | 业务规则在 usecase / repo 锁住，API 和 UI 不复制业务规则 |
 | T4 API / RBAC | JSON-RPC / HTTP handler、auth、permission code、角色矩阵、错误码 | `cd server && go test ./internal/biz ./internal/data ./internal/service ./internal/server`；改错误码时跑 `scripts/qa/error-code-sync.sh` 和 `scripts/qa/error-codes.sh` | 必须覆盖未登录、disabled admin、无权限、有权限、super admin 和 owner / assignee / status 边界 |
@@ -156,9 +156,9 @@ cd /Users/simon/projects/plush-toy-erp
 node scripts/qa/erp-field-linkage.mjs
 ```
 
-## 7. Codex Goal 验收记录
+## 7. 任务验收记录 / Task Verification Notes
 
-正式 Codex Goal 的 `.codex-review/latest.md` 应包含：
+非平凡任务的最终回复、`progress.md` 或用户明确要求的正式验收文档应包含：
 
 - 本轮选择的测试层级。
 - 本轮未选择的测试层级及原因。
@@ -168,7 +168,7 @@ node scripts/qa/erp-field-linkage.mjs
 - Git 状态、未跟踪文件和并行现场说明。
 - 若跳过 Go / pnpm / browser / migration / E2E，必须写明原因和剩余风险。
 
-普通非 Goal 文档整理不自动生成 `.codex-review/latest.md`。
+普通文档整理不自动生成额外审查报告；如只改正文且未触达 runtime、schema、前端配置或 docs registry，应在最终回复中说明验证范围。
 
 ## 8. 后续 CI 分层建议
 
@@ -176,8 +176,8 @@ node scripts/qa/erp-field-linkage.mjs
 
 | 层级 | 建议内容 |
 | --- | --- |
-| 小任务 / PR | `git diff --check`、相关 package 测试、前端相关测试、边界 grep、Goal review 产物检查 |
+| 小任务 / PR | `git diff --check`、相关 package 测试、前端相关测试、边界 grep、任务验收说明检查 |
 | 每日 | server 全量 `go test`、web `lint/css/test`、`style:l1`、docs implemented wording grep、migration status 检查 |
 | 发版前 | `scripts/qa/strict.sh`、生产镜像本地构建、migration apply 演练、UI / API smoke、备份恢复演练、回滚路径检查 |
 
-CI 落地前仍以本地命令、Git hooks、部署文档和当前任务文件为准。
+CI 落地前仍以本地命令、Git hooks、部署文档和当前任务说明为准。

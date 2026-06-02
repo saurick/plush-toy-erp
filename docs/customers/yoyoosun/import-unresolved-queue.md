@@ -35,7 +35,7 @@ unresolved queue 用于 dry-run 阶段记录不能自动处理的来源、字段
 | invalid quantity | 数量无效 | 负数、文本、无法换算 | Data Import | 修正、跳过行、人工确认单位 | 否 | 是 | 不得把异常数量写入 Source Document 或 Fact。 |
 | invalid money | 金额无效 | 公式残留、币种不明、税额混合 | Finance / Data | 修正、忽略金额、保留为 note | 否 | 否，除非目标要求金额 | 金额不生成 finance facts。 |
 | unmapped field | 字段未分类 | Excel 列“客户专属码” | Product / Data | 分类为 Customer Material / Config / Template / Deferred | 否 | 否 | 不得自动塞入 note 后伪装为已确认字段。 |
-| deferred domain | 属于后续模型 | purchase order、SKU、shipment、finance | Product / Architecture | 进入后续 Goal、保留 source snapshot、禁止导入 | 否 | 是 | `product_skus / purchase_orders / shipments / finance` 均 deferred。 |
+| deferred domain | 属于后续模型 | purchase order、SKU、shipment、finance | Product / Architecture | 进入后续实现任务、保留 source snapshot、禁止导入 | 否 | 是 | `product_skus / purchase_orders / shipments / finance` 均 deferred。 |
 | forbidden fact generation | 会伪造事实 | 从“未出货数”生成 shipment 或库存扣减 | Architecture / Data | 拒绝自动导入、记录风险、后续事实 usecase 评审 | 否 | 是 | shipment / inventory / finance facts 必须 block。 |
 | needs manual review | 置信度不足 | 字段语义不清或 yoyoosun 特殊字段 | Domain Owner | 人工确认分类、补充样本、跳过 | 否 | 视目标而定 | 客户字段不能自动进 Product Core。 |
 

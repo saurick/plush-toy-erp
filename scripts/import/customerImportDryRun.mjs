@@ -766,8 +766,8 @@ function evaluateRow(row, existingIndex, context) {
       targetCandidate: DEFERRED_DOMAINS.get(row.domain),
       severity: 'defer',
       ownerRole: 'Product / Architecture',
-      resolution: 'defer to future Goal',
-      reason: `${DEFERRED_DOMAINS.get(row.domain)} is not implemented by this dry-run tooling Goal.`,
+      resolution: 'defer to future implementation task',
+      reason: `${DEFERRED_DOMAINS.get(row.domain)} is not implemented by this dry-run tooling task.`,
     })
     candidates.push(
       buildCandidate(row, {
@@ -1858,7 +1858,7 @@ No real import is executed by this dry-run package. The tool does not connect to
 1. Review \`unresolved-queue.json\` and resolve block / defer / review items manually.
 2. Review \`duplicates.json\` and \`conflicts.json\` before any future loader design.
 3. Confirm \`forbidden-auto-import.json\` remains excluded from real import.
-4. Only a separate future Goal may design or implement real import execution with backup, rollback, idempotency, validation, and customer sign-off.
+4. Only a separate future implementation task may design or implement real import execution with backup, rollback, idempotency, validation, and customer sign-off.
 `
 }
 

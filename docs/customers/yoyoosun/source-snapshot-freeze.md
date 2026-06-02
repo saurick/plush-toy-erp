@@ -84,7 +84,7 @@ node scripts/import/customerImportDryRun.mjs \
 | warning type | count | handling |
 |---|---:|---|
 | sensitive field | 5 | Review field names only; do not copy raw values into reports. |
-| deferred field | 5 | `product_skus` and `purchase_orders` stay deferred until a later Goal explicitly changes the boundary. |
+| deferred field | 5 | `product_skus` and `purchase_orders` stay deferred until a later implementation task explicitly changes the boundary. |
 
 ## 敏感字段处理 / Sensitive Field Handling
 

@@ -105,7 +105,7 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-`output/customers/yoyoosun/source-snapshot-freeze/` 和 `output/customers/yoyoosun/real-dry-run-evidence/` 是本地 evidence 输出，不纳入 git；真实 import loader 仍需单独 Goal，并且必须另有备份、回滚、幂等、对账和客户确认。
+`output/customers/yoyoosun/source-snapshot-freeze/` 和 `output/customers/yoyoosun/real-dry-run-evidence/` 是本地 evidence 输出，不纳入 git；真实 import loader 仍需单独实现任务，并且必须另有备份、回滚、幂等、对账和客户确认。
 
 ### 1. 初始化环境
 

@@ -49,7 +49,7 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-`validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。真实导入仍需要人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和单独 implementation Goal。
+`validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。真实导入仍需要人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和单独 implementation task。
 
 ## 012 冻结证据 / 012 Freeze Evidence
 
@@ -80,9 +80,9 @@ node scripts/import/customerImportDryRun.mjs \
 
 1. dry-run preview 已生成且通过人工确认。
 2. unresolved queue 不存在 block 项。
-3. deferred domain 已被明确排除或转入后续 Goal。
+3. deferred domain 已被明确排除或转入后续实现任务。
 4. forbidden fact generation 清单全部 block。
-5. 备份、回滚、幂等、校验和审计已在单独 implementation Goal 中设计。
+5. 备份、回滚、幂等、校验和审计已在单独 implementation task 中设计。
 6. import loader 只走正式 V1 / existing usecase，不绕过业务规则。
 7. `business_records` 保留为 source snapshot，不双写。
 

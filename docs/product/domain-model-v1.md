@@ -2,7 +2,7 @@
 
 本文只描述 0 到 1 重构的业务域模型草案，不改 Ent schema，不生成 migration。
 
-本文吸收 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` 中稳定的业务域划分，但不吸收其字段示例作为 schema 真源。任何新增表、字段、状态机、API 或页面都必须回到对应架构评审、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和新的具体 Goal 文件。
+本文吸收 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` 中稳定的业务域划分，但不吸收其字段示例作为 schema 真源。任何新增表、字段、状态机、API 或页面都必须回到对应架构评审、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和本轮具体任务说明。
 
 当前仍可用于边界核对的评审文档：
 

@@ -8,14 +8,13 @@
 - 仓库级约定、部署边界和项目基线，以当前文档为索引，再分流到对应子目录文档。
 - 历史 changes 文档不再作为阅读入口；当前状态必须回到本文档、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认。
 - 产品从起步到成熟的阶段规划、重新做项目的 Phase 路线和产品化路线，以 `docs/product/product-completion-roadmap.md` 作为可演进规划真源；正式菜单入口、行业菜单候选、客户菜单配置和旧入口退出细节，以 `docs/product/formal-menu-entry-plan.md` 作为路线配套计划；产品能力成熟度、客户交付状态和客户差异分类，以 `docs/product/product-delivery-ledgers.md` 作为长期台账入口；它们都不替代当前实现真源，也不直接授权 schema、migration、runtime、API 或 UI 改动。
-- 模块进入实现前的施工治理、Phase 与 Architecture Layer 区分、门禁和 Codex Goal 拆分规则，以 `docs/product/implementation-governance.md` 作为阅读入口；它不替代 roadmap、当前实现真源、测试或具体任务文件。
-- 已完成的编号 Codex Goal 是阶段性施工记录，不保留为活跃文档入口；如需追溯 `000` 到 `012` 的原执行规格，从 Git 历史读取，不要把旧 Goal 文件当当前路线真源。
+- 模块进入实现前的施工治理、Phase 与 Architecture Layer 区分、门禁和实施任务拆分规则，以 `docs/product/implementation-governance.md` 作为阅读入口；它不替代 roadmap、当前实现真源、测试或本轮具体任务说明。
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
 
 ## 当前业务保存层真源
 
-- 早期 Phase 1 / Phase 2 schema draft、cutline、go/no-go 和 next Codex goals 文档已从活跃文档树删除；它们只可从 Git 历史追溯。当前正式实现状态以现有代码、Ent schema、Atlas migration、测试、本文和 roadmap / 产品台账交叉确认为准。
+- 早期 Phase 1 / Phase 2 schema draft、cutline、go/no-go 和旧执行规划文档已从活跃文档树删除；它们只可从 Git 历史追溯。当前正式实现状态以现有代码、Ent schema、Atlas migration、测试、本文和 roadmap / 产品台账交叉确认为准。
 - 003 schema-only 已按 V1 cutline 新增 `server/internal/data/model/schema/customer.go`、`supplier.go`、`contact.go`、`sales_order.go` 和 `sales_order_item.go`；004 已基于这 5 个 schema 生成 Ent 代码和 Atlas migration；005 已新增客户 / 供应商 / 联系人 MasterData repo/usecase 和测试；006 已新增 `sales_orders / sales_order_items` 后端 repo/usecase 和测试；007 已为这些 V1 对象接入后端 JSON-RPC API 和 RBAC 动作权限；008 已新增 V1 客户 / 供应商 / 联系人 / 销售订单 / 销售订单行前端页面；009 已新增 `business_records` 兼容层引用审计、过渡审计、cutover plan、data map draft 和 risk register。Sales order 仍是 Source Document / Business Commitment，不写 shipment、inventory、stock reservation、finance、invoice、payment 或 Workflow facts；docs registry、seedData 和 `business_records` runtime transition 仍未实现，009 未改 runtime、API、UI、seedData、docs registry、schema、migration，也未做 import/backfill、真实数据迁移或删除。
 - 首版业务落盘真源是后端 Ent schema 和 Atlas migration：`workflow_tasks`、`workflow_task_events`、`workflow_business_states`、`business_records`、`business_record_items`、`business_record_events`。
 - Phase 2A 已新增最小库存事实闭环专表：`units`、`materials`、`products`、`warehouses`、`inventory_txns`、`inventory_balances`。Phase 2B 已新增最小 BOM + 批次库存闭环：`inventory_lots`、`bom_headers`、`bom_items`，并让 `inventory_txns / inventory_balances` 支持 nullable `lot_id`。Phase 2C 已新增采购入库最小闭环：`purchase_receipts`、`purchase_receipt_items`，让采购入库过账驱动 `inventory_lots / inventory_txns / inventory_balances`。Phase 2D-A 已新增采购退货最小闭环：`purchase_returns`、`purchase_return_items`，让已入库后的采购退货作为独立业务单据写 `inventory_txns.OUT` 并扣减 `inventory_balances`，取消退货通过 `REVERSAL` 回补库存。Phase 2D-B1 已新增采购入库调整单最小闭环：`purchase_receipt_adjustments`、`purchase_receipt_adjustment_items`，只支持已过账采购入库后的数量类差异和 `lot / warehouse` 维度更正，调整过账写 `inventory_txns.ADJUST_IN / ADJUST_OUT`，取消调整写 `REVERSAL`。Phase 2D-C1 已扩展 `inventory_lots.status` 最小状态集并在有 `lot_id` 的库存扣减路径增加批次状态守卫。Phase 2D-C2-A 已新增 `quality_inspections` 最小来料质检主表，作为采购入库后材料批次质检状态 / 判定真源，并在事务内联动 `inventory_lots.status`。其中 `inventory_txns` 是库存事实流水真源，`inventory_balances` 是当前余额 / 查询加速表，`inventory_lots` 是批次追溯和批次可用性状态真源，`quality_inspections` 是来料质检判定和批次状态变化来源真源；`business_records / business_record_items` 仍保留为通用单据快照和兼容层，不替代库存、采购入库、采购退货、采购入库调整、批次状态或来料质检真源。
@@ -47,7 +46,7 @@
 - 这两个入口只属于开发与验收，不进入普通帮助中心主入口，也不替代业务操作教程。
 - Phase 0 已新增 0 到 1 产品架构、客户实例、客户差异和状态 / Workflow / Fact 边界文档：`docs/product/*`、`docs/architecture/status-workflow-fact-boundary.md`、`docs/customers/yoyoosun/*`。
 - `docs/product/product-delivery-ledgers.md` 是产品能力进度台账、客户交付矩阵和客户差异台账入口，用于判断能力成熟度、交付承诺和客户差异分类；它不是 runtime、schema、migration、API、UI 或测试真源。
-- `docs/product/implementation-governance.md` 是模块实施治理入口，用于拆新 Goal 前确认 Phase、Architecture Layer、门禁、范围和禁止项；它不是 runtime、schema、migration、API、UI 或测试真源。
+- `docs/product/implementation-governance.md` 是模块实施治理入口，用于拆新实现任务前确认 Phase、Architecture Layer、门禁、范围和禁止项；它不是 runtime、schema、migration、API、UI 或测试真源。
 - `docs/reference/imported-notes/*` 只保存 imported design notes，状态是 Reference Only，不是 runtime、schema 或当前实现真源。
 - 永绅客户的稳定客户 key 是 `yoyoosun`；本仓库按稳定客户 key 管理客户资料，不保留活跃客户目录或导入工作区别名。当前不新增 `tenant_id`，也不把客户 key 当 SaaS runtime tenant。
 - 永绅客户资料已建立 `docs/customers/yoyoosun` 文档边界和 `config/customers/yoyoosun` 配置包骨架；本地原始 Excel / PDF / PNG 已归档到 `docs/customers/yoyoosun/raw-source-files/`，并由 `docs/customers/yoyoosun/raw-source-file-archive-review.md` 记录 checksum、用途分类和边界。该归档只用于功能、字段、模板、导入和验收溯源，未接 docs registry，未改 runtime；原件不代表 Product Core、真实导入批准、schema、migration、API、UI、seedData 或 `business_records` cutover。后续若继续新增客户或新增大批原始二进制文件，应按 `docs/customers/<customer-key>/` 隔离，并单独评审敏感信息、文件大小、引用关系、docs registry、测试断言、Git 历史体积和回滚风险。

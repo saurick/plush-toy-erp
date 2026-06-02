@@ -1,4 +1,4 @@
-# Finished Goods Inbound Workflow Usecase 评审
+# 成品入库 Workflow Usecase 评审 / Finished Goods Inbound Workflow Usecase Review
 
 > 结论：方案 A 已落地。第六条后端 workflow usecase 规则 `finished_goods_inbound done / blocked / rejected` 只收口后端协同状态：当前任务更新、写 `workflow_task_events`、upsert `workflow_business_states`。`done` 沿用当前状态字典口径写 `inbound_done`；`blocked / rejected` 写通用 `blocked` 并强制原因。不写 `inventory_txns`，不更新 `inventory_balances`，不创建 `inventory_lots`，不派生 `shipment_release`，不派生应收 / 开票 / 应付 / 对账。
 

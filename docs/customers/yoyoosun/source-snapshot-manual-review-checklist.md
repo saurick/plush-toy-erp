@@ -8,7 +8,7 @@ Current Evidence Inputs / 当前证据输入: `output/customers/yoyoosun/source-
 
 # yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist
 
-本清单用于 review 012 freeze evidence 和 dry-run evidence。结论默认是 import not approved，直到后续单独 Goal 完成真实 loader 设计、备份、回滚、幂等、对账和客户确认。
+本清单用于 review 012 freeze evidence 和 dry-run evidence。结论默认是 import not approved，直到后续单独实现任务完成真实 loader 设计、备份、回滚、幂等、对账和客户确认。
 
 ## 复查清单 / Review Checklist
 

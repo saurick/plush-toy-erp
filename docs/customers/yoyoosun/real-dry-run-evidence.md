@@ -112,7 +112,7 @@ Every block must be reviewed before any later import-loader design. Deferred row
 
 ## 下一步允许事项 / Next Allowed Step
 
-A later Goal may review the evidence and design a real import loader only if it explicitly includes backup, rollback / forward-fix, idempotency, source reference, reconciliation, customer sign-off, and formal usecase boundaries.
+A later implementation task may review the evidence and design a real import loader only if it explicitly includes backup, rollback / forward-fix, idempotency, source reference, reconciliation, customer sign-off, and formal usecase boundaries.
 
 ## 下一步禁止事项 / Next Forbidden Step
 

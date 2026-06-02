@@ -768,7 +768,7 @@ No real import is executed by this freeze checker. The tool does not connect to 
 
 1. Review every blocker in \`freeze-check-summary.json\` before any future loader design.
 2. Review sensitive field names without copying raw values into reports.
-3. Keep product_skus and purchase_orders deferred unless a later Goal explicitly changes the boundary.
+3. Keep product_skus and purchase_orders deferred unless a later implementation task explicitly changes the boundary.
 4. Keep shipment, inventory, and finance rows out of automatic import.
 5. Run the 011 dry-run CLI and review its evidence package separately.
 `

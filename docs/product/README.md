@@ -13,7 +13,7 @@
 
 - 当前 runtime、schema、migration 或 API 的唯一真源。
 - 单客户原始资料和导入 evidence。
-- 单轮 Codex Goal 执行文件。
+- 单轮临时执行说明。
 - 临时过程记录。
 
 ## 是否是真源

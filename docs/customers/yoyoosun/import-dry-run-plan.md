@@ -40,7 +40,7 @@ node scripts/import/customerImportDryRun.mjs \
 - Stage 2：匹配 customers / suppliers / contacts / sales_orders / sales_order_items / products / materials / units / warehouses / BOM 候选。
 - Stage 3：生成 candidates、duplicates、conflicts、unresolved、forbidden 和 validation summary。
 
-仍需人工或 future Goal 处理：
+仍需人工或后续实现任务处理：
 
 - Stage 4：人工确认 unresolved、duplicate、conflict、forbidden。
 - Stage 5：客户 sign-off、备份 / 回滚 / 导入审批。
@@ -75,7 +75,7 @@ node scripts/import/customerImportDryRun.mjs \
 - 不改 schema / migration / API / UI / seedData / docs registry。
 - 不做 `business_records` runtime cutover。
 - output 是 evidence，不是 import approval。
-- 真实 import loader 仍需单独 Goal，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
+- 真实 import loader 仍需单独实现任务，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
 
 ## 阶段 0：来源收集 / Stage 0: Source Collection
 
@@ -237,7 +237,7 @@ skipped rows 包含：
 
 当前 010 不执行 Stage 6。
 
-后续只有单独 Goal 才能设计或实现 import loader。Stage 6 必须满足：
+后续只有单独实现任务才能设计或实现 import loader。Stage 6 必须满足：
 
 - 明确允许修改 runtime/import code。
 - 只走 V1 usecase 或已有正式 usecase。

@@ -162,7 +162,7 @@ existing snapshot 只作为只读匹配输入。CLI 不从数据库读取 existi
 2. 处理 `unresolved-queue.json` 中的 block / defer / review 项。
 3. 核对 `duplicates.json` 和 `conflicts.json`，不要自动合并同名或同 code 主体。
 4. 确认 `forbidden-auto-import.json` 中的 shipment / inventory / finance 项全部排除。
-5. 只有后续单独 Goal 才能设计或实现真实 import loader，并且必须补备份、回滚、幂等、校验和客户 sign-off。
+5. 只有后续单独实现任务才能设计或实现真实 import loader，并且必须补备份、回滚、幂等、校验和客户 sign-off。
 
 ## 明确边界
 
@@ -179,7 +179,7 @@ existing snapshot 只作为只读匹配输入。CLI 不从数据库读取 existi
 - 不执行真实 import / backfill。
 - `canExecuteRealImport` 永远是 `false`。
 - 012 freeze evidence 和 dry-run evidence 不是导入批准。
-- 真实 import loader 仍需单独 Goal，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
+- 真实 import loader 仍需单独实现任务，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
 - `sales_order` 仍是 Source Document / Business Commitment，不是 shipment、inventory 或 finance fact。
 - `shipping_released != shipped`。
 - `workflow task done != fact posted`。

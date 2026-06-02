@@ -40,7 +40,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 不自动生成 deferred facts | `product_skus`、`purchase_orders`、`shipments`、`stock_reservations`、inventory facts、finance facts 全部禁止自动生成。 |
 | 不绕过 V1 usecase | future import loader 必须走 V1 MasterData / SalesOrder usecase 或已有正式 usecase，不直接写表绕过校验。 |
 | 不双写 | future import 不得同时写 V1 和 `business_records` 作为两个正式真源。 |
-| 单独 Goal | 真实 import loader、backfill、migration execution 必须作为后续单独 Goal。 |
+| 单独实现任务 | 真实 import loader、backfill、migration execution 必须作为后续单独实现任务。 |
 
 ## 目标模型策略 / Target Model Strategy
 
@@ -70,7 +70,7 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-该 preview package 可输出 source references、normalized rows、candidates、unresolved queue、duplicates、conflicts、forbidden auto-import、validation summary 和 Markdown report。它只证明 dry-run tooling 可运行；真实 loader 仍需单独 Goal。
+该 preview package 可输出 source references、normalized rows、candidates、unresolved queue、duplicates、conflicts、forbidden auto-import、validation summary 和 Markdown report。它只证明 dry-run tooling 可运行；真实 loader 仍需单独实现任务。
 
 012 已实现 freeze checker 和 evidence preparation：
 
@@ -83,7 +83,7 @@ node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
 
 012 同时用 freeze fixtures 生成 `output/customers/yoyoosun/real-dry-run-evidence/`。这些 output 目录只是 evidence，不是 import approval；`freeze-metadata.json` 和 dry-run `validation-summary.json` 都必须保持 `canExecuteRealImport=false`。
 
-后续真实 import loader 必须单独 Goal，并先满足：
+后续真实 import loader 必须作为单独实现任务，并先满足：
 
 1. 允许修改范围明确包含 import code。
 2. 备份计划明确，包含数据库和 source artifacts。
@@ -95,7 +95,7 @@ node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
 8. 不删除或覆盖 `business_records` 历史快照。
 9. 不绕过 V1 MasterData / SalesOrder usecase 或已有正式 fact usecase。
 
-## 非目标 / Non-goals
+## 非目标 / Out Of Scope
 
 - 不实现 SaaS 多租户。
 - 不新增 `tenant_id`。

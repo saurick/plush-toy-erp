@@ -25,9 +25,9 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `server/internal/data/model/schema/business_record_event.go` | 记录通用业务记录创建、更新、删除、恢复等事件 | runtime / audit / compatibility | 间接重叠 | keep；仅作历史审计线索，不替代 V1 usecase 审计 |
 | `server/internal/data/model/ent/businessrecord*`、`businessrecorditem*`、`businessrecordevent*` | Ent generated code，承接当前 runtime 查询和写入 | generated runtime | 是 | keep；本轮不得改 generated code |
 | `server/internal/data/model/migrate/20260423090005_migrate.sql`、`20260425153557_migrate.sql`、`20260426033346_migrate.sql`、`20260426095103_migrate.sql` | 历史 migration 中包含 `business_records` 及其与采购事实的兼容关系 | migration / compatibility | 是 | keep；不得改历史 migration；后续只追加新迁移，不能回写 |
-| `server/internal/biz/business_record.go` | 通用业务记录模块列表、编号前缀、字段模型、创建 / 更新 / 删除 / 恢复 usecase | runtime / compatibility | 是，模块中包含 `partners`、`products`、`project-orders` | keep；重叠领域后续不新增核心能力；进入只读或 demo 化需单独 Goal |
+| `server/internal/biz/business_record.go` | 通用业务记录模块列表、编号前缀、字段模型、创建 / 更新 / 删除 / 恢复 usecase | runtime / compatibility | 是，模块中包含 `partners`、`products`、`project-orders` | keep；重叠领域后续不新增核心能力；进入只读或 demo 化需单独任务 |
 | `server/internal/data/business_record_repo.go` | `business_records` repo 查询、创建、更新、软删除、恢复和明细替换 | runtime / compatibility | 是 | keep；不得用于向 V1 模型双写 |
-| `server/internal/data/jsonrpc_business.go` | `business` JSON-RPC 域：dashboard、list、create、update、delete、restore | API / compatibility | 是 | keep；后续重叠领域可限制写入或只读，但需单独 runtime Goal |
+| `server/internal/data/jsonrpc_business.go` | `business` JSON-RPC 域：dashboard、list、create、update、delete、restore | API / compatibility | 是 | keep；后续重叠领域可限制写入或只读，但需单独 runtime 任务 |
 | `server/internal/data/jsonrpc.go` | 注册 `business` JSON-RPC 域 | API / compatibility | 间接重叠 | keep |
 | `server/internal/biz/rbac.go`、`server/internal/biz/rbac_test.go` | `business.record.*` 权限仍保护通用业务记录 API | RBAC / compatibility | 间接重叠 | keep；不得把菜单隐藏当安全边界 |
 | `server/internal/biz/debug_seed.go`、`server/internal/data/debug_seed_repo.go`、`server/internal/data/jsonrpc_debug.go` | debug seed / cleanup / 业务链路调试复用 `business_records`、workflow 表和 debug 标记 | seed/demo / QA / compatibility | 间接重叠 | keep as demo；必须保持 debug 标记和权限边界 |
@@ -41,7 +41,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `web/src/erp/config/businessRecordDefinitions.mjs` | 定义通用业务记录表单、表格、明细和 master-record 选择；`partners`、`products`、`project-orders` 有专门 override | UI config / compatibility | 是 | needs manual review；后续避免继续扩展重叠领域核心字段 |
 | `web/src/erp/config/seedData.mjs` | 初始化导航、模块和示例数据入口 | seed/demo / UI config | 是 | keep as demo；本轮禁止改；后续要单独评审 seedData 与 V1 菜单切换 |
 | `web/src/erp/config/docs.mjs` | docs registry 可能引用通用业务文档和验收入口 | docs/help | 间接重叠 | keep；本轮禁止改 docs registry |
-| `web/src/erp/config/dashboardModules.mjs` | Dashboard 快捷模块仍指向 `partners`、`project-orders` 等兼容父路径 | UI / compatibility | 是 | deprecate later；后续入口切换需单独 Goal |
+| `web/src/erp/config/dashboardModules.mjs` | Dashboard 快捷模块仍指向 `partners`、`project-orders` 等兼容父路径 | UI / compatibility | 是 | deprecate later；后续入口切换需单独任务 |
 | `web/src/erp/config/menuPermissions.mjs`、测试 | 菜单权限仍包含 `/erp/master/partners`、`/erp/sales/project-orders` | UI / RBAC display | 是 | keep until menu review；不能当后端安全边界 |
 | `web/src/erp/router.jsx` | 同时挂载通用业务页和 V1 页面：`/erp/master/partners/customers`、`/erp/master/partners/suppliers`、`/erp/sales/project-orders/sales-orders` | UI route | 是 | keep；避免旧入口和 V1 页面双写同一真源 |
 | `web/src/erp/utils/businessRecordForm.mjs` | 通用记录保存转换、明细金额派生、partners 联系人摘要和 products 标题兜底 | UI helper / compatibility | 是 | needs manual review；重叠领域不能继续把转换结果当 Product Core |
@@ -90,6 +90,6 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 | 缺口 | 影响 | 下一步 |
 |---|---|---|
-| 本轮未读取真实数据库数据 | 无法判断旧记录数量、重复主体、缺值比例 | 后续 import draft / dry-run Goal 读取数据并输出 unresolved queue |
+| 本轮未读取真实数据库数据 | 无法判断旧记录数量、重复主体、缺值比例 | 后续 import draft / dry-run 任务读取数据并输出 unresolved queue |
 | 未改 UI / seedData / docs registry | 旧入口仍可见，V1 页面仍未完成正式菜单切换 | 后续菜单入口评审单独处理 |
-| 生成代码引用数量较多 | 文件级审计可确认存在，但不应手改 generated code | 后续 runtime cutover 不触碰 generated code，除非 schema/migration Goal |
+| 生成代码引用数量较多 | 文件级审计可确认存在，但不应手改 generated code | 后续 runtime cutover 不触碰 generated code，除非 schema/migration 任务 |

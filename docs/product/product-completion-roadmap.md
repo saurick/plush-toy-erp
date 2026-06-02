@@ -4,13 +4,13 @@
 - 状态：可演进规划真源
 - 作用域：描述 `plush-toy-erp` 重新从 0 到产品成熟的阶段、边界、结果和执行顺序
 - 不代表：当前 runtime / schema / migration / API / UI 已实现状态
-- 不包含：单轮 Codex 审查报告、历史实现台账
+- 不包含：单轮任务审查报告、历史实现台账
 
 ## 0. 文档目的
 
 本文用于描述 `plush-toy-erp` 重新做项目时，从产品定位、分层边界、MVP 主链路、客户资料治理、交付运维，到多客户复制和未来 SaaS 评审的完整路线。
 
-本文是产品路线图，不替代 `docs/current-source-of-truth.md`、代码、Ent schema、Atlas migration、测试或具体 `docs/codex-goals/*.md`。如果涉及“当前已经实现了什么”，必须回到当前代码、测试、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md` 交叉确认。
+本文是产品路线图，不替代 `docs/current-source-of-truth.md`、代码、Ent schema、Atlas migration、测试或本轮具体任务说明。如果涉及“当前已经实现了什么”，必须回到当前代码、测试、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md` 交叉确认。
 
 ## 0.1 Roadmap、台账和当前真源的关系
 
@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | `docs/product/product-completion-roadmap.md` | 重新做项目的阶段路线、边界、结果 | 当前代码、测试、schema、migration |
 | `docs/product/product-delivery-ledgers.md` | 产品能力成熟度、客户交付状态、客户差异分类 | roadmap 和当前实现真源 |
-| `docs/product/implementation-governance.md` | 模块实施门禁、Phase 与 Architecture Layer 区分、Codex Goal 拆分规则 | roadmap、当前实现真源和测试结果 |
+| `docs/product/implementation-governance.md` | 模块实施门禁、Phase 与 Architecture Layer 区分、实施任务拆分规则 | roadmap、当前实现真源和测试结果 |
 | `docs/current-source-of-truth.md` | 当前仓库实现和阅读顺序 | 产品长期路线 |
 | `docs/product/formal-menu-entry-plan.md` | 正式菜单、客户菜单配置和旧入口退出规划 | runtime 菜单实现 |
 | `docs/customers/<customer-key>/` | 单客户资料、问题、差异、导入 evidence | Product Core 规则 |
@@ -29,7 +29,7 @@
 
 * 修改本文的阶段、顺序或产品目标时，应检查产品台账是否需要同步。
 * 修改台账中的能力成熟度、客户交付状态或客户差异分类后，如影响长期路线，应回写本文。
-* 拆新模块 Goal 前，应先读 `docs/product/implementation-governance.md`，确认 Phase、Architecture Layer、门禁和允许范围。
+* 拆新模块实现任务前，应先读 `docs/product/implementation-governance.md`，确认 Phase、Architecture Layer、门禁和允许范围。
 * 未有代码、测试或当前真源证据的能力，不应在本文写成“已完成”或“可交付”。
 * 本文允许描述“未来应做”，但不允许暗示 runtime、schema、API 或 UI 已经实现。
 
@@ -110,7 +110,7 @@
 
 | Phase | 阶段 | 目标 | 关键产物 | 不做 |
 | ---: | --- | --- | --- | --- |
-| 0 | 产品重启与边界收口 | 重新确认产品定位、分层、禁止项和执行纪律 | 产品原则、分层说明、状态边界、测试策略、Goal 模板 | 不写业务 runtime |
+| 0 | 产品重启与边界收口 | 重新确认产品定位、分层、禁止项和执行纪律 | 产品原则、分层说明、状态边界、测试策略、任务拆分规则 | 不写业务 runtime |
 | 1 | 客户资料治理 | 把客户资料变成线索、问题、差异和导入输入 | source materials、question backlog、delta ledger、customer config draft | 不把客户样本写进 schema |
 | 2 | MVP cutline 与领域模型 | 定义第一版先打通哪些对象和边界 | MVP cutline、domain model、source document / fact boundary | 不把完整 ERP 一次做完 |
 | 3 | MasterData + Source Document MVP | 建立基础主数据和销售订单等源单据 | schema / repo / usecase / API / UI / tests | 不做出货、库存、财务伪事实 |
@@ -135,7 +135,7 @@
 * Workflow / Fact 边界。
 * Customer Config / Customer Extension 准入规则。
 * 测试和验收策略。
-* Codex Goal 模板和 review 输出协议。
+* 实施任务拆分规则和验收记录口径。
 * 当前真源阅读顺序。
 
 不做：
@@ -148,7 +148,7 @@
 
 验收结果：
 
-* 后续任何 Codex Goal 都能先判断自己属于哪一层。
+* 后续任何实现任务都能先判断自己属于哪一层。
 * 后续任何客户资料都能先分类，再决定是否进入 Product Core。
 * 后续任何 workflow 需求都不会直接写事实。
 
@@ -298,7 +298,7 @@ MVP 原则：
 强制边界：
 
 * dry-run 和 freeze evidence 不是真实导入批准。
-* `canExecuteRealImport` 必须保持 `false`，直到单独的真实导入执行 Goal 明确打开。
+* `canExecuteRealImport` 必须保持 `false`，直到单独的真实导入执行任务明确打开。
 * loader design 先于 implementation。
 * 真实导入不能生成出货、库存出库、财务、发票或付款事实。
 
@@ -426,7 +426,7 @@ MVP 原则：
 
 ## 15. 下一步执行路线
 
-后续每个正式 Goal 的前置检查：
+后续每个正式实现任务的前置检查：
 
 ```text
 workspace checkpoint
@@ -459,7 +459,7 @@ Phase 0 docs-only reset
 Phase 0 docs-only reset
 ```
 
-这轮只更新产品原则、分层、状态边界、客户配置、交付骨架、测试策略和 Goal 模板；不改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry 或 loader。
+这轮只更新产品原则、分层、状态边界、客户配置、交付骨架、测试策略和任务拆分规则；不改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry 或 loader。
 
 如果目标是尽快给 yoyoosun 试用：
 

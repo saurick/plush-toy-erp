@@ -6,6 +6,17 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-02 21:08
+- 完成：修正 `docs/architecture/finished-goods-inbound-workflow-review.md` H1 标题，按仓库长期维护 Markdown 约定改为中文主体 + English anchor：`成品入库 Workflow Usecase 评审 / Finished Goods Inbound Workflow Usecase Review`。
+- 下一步：后续触达其它长期维护 Markdown 时，继续检查 H1 和文档清单是否保持中文主体 + English anchor；本轮不批量重命名相邻评审文档。
+- 阻塞/风险：docs-only 标题修正；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 140 行 / 26203 bytes，未达到归档阈值。
+
+## 2026-06-02 21:07
+- 完成：收口旧执行工作流口径，活跃规则改为普通实施任务边界：同步 `AGENTS.md`、当前真源、产品路线、实施治理、测试策略、文档清单、客户导入资料和 import dry-run / freeze checker 输出文案，统一避免把旧执行规格目录、短任务模板或本地审查报告当当前执行主路径。
+- 完成：将原执行规格目录下 4 个模板 / 协议 Markdown 移入系统废纸篓，Git 记录为删除；`docs/document-inventory.md` 已移除该活跃分类，避免旧模板继续充当隐藏真源。
+- 下一步：后续非平凡任务直接在当前会话、正式设计文档、roadmap 或台账中明确目标、允许 / 禁止路径、验收命令、停止条件和风险；如需要审查材料，直接在最终回复或用户指定文档中输出，不恢复本地审查报告默认流程。
+- 阻塞/风险：docs/script wording 收口；未改 runtime 业务逻辑、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、数据库或部署配置。本轮追加前 `progress.md` 为 140 行 / 26203 bytes，未达到归档阈值。
+
 ## 2026-06-02 20:45
 - 完成：审查 `docs` 目录 README 覆盖情况，补齐长期维护目录 README：`docs/architecture/README.md`、`docs/product/README.md`、`docs/customers/README.md`、`docs/reference/README.md`、`docs/workflow/README.md`、`docs/roles/README.md`、`docs/finance/README.md`、`docs/warehouse/README.md`、`docs/observability/README.md`。
 - 完成：同步 `AGENTS.md` 和 `docs/README.md` 的目录 README 维护规则；同步 `docs/document-inventory.md` 新增 README 条目；修正 `docs/reference/imported-notes/README.md` 漏列的 imported notes 文件。

@@ -35,38 +35,19 @@
 
 如果后续新增 `web/src/erp/docs/system-layer-progress.md`、`web/src/erp/docs/productization-delivery.md`、`docs/architecture/project-boundary-map.md` 或等价文档，涉及系统层级、产品化、客户差异、部署交付、下一步规划时必须同步阅读。
 
-## Codex 工作流与 Goal 交接
+## 实施协作与任务边界
 
-- 本仓库使用“中文短 Goal + 仓库内任务文件 + 可复制审查报告”的 Codex 工作流。
-- 每个独立 Goal 建议新开 Codex 会话，避免不同目标的上下文、现场判断和验收结论互相污染。
-- 同一个 Goal 内的补漏、测试失败修复、生成 review 报告，可以继续原 Codex 会话；只有目标边界变化时再拆新会话。以下情况属于同一个 Goal 内的后续处理：
-  - 修复当前 Goal 导致的测试失败。
-  - 生成或修复 `.codex-review/latest.md`。
-  - 补充当前 Goal 明确要求但遗漏的文件。
-  - 修正当前 Goal 产物中的格式问题。
-- 以下情况建议新开 Codex 会话：
-  - 从一个编号 Goal 进入下一个编号 Goal。
-  - 从 docs-only 评审进入 schema 实现。
-  - 从 schema 进入 repo/usecase。
-  - 从 repo/usecase 进入 API/RBAC。
-  - 从 API/RBAC 进入 UI。
-- 新 Codex 会话不能依赖历史 ChatGPT 或 Codex 聊天记忆，必须先读本文件，再读对应的 `docs/codex-goals/<goal>.md`。
-- Codex Goal 输入框只放 `4000` 字以内中文短 Goal；复杂任务、长背景、禁止项、验收命令和交接细节必须写入 `docs/codex-goals/*.md`。
-- `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源，用于判断产品长期阶段、候选 Goal 顺序和下一步大方向；它不是单个 Codex Goal 的执行规格，也不替代 `docs/current-source-of-truth.md`、代码、migration、测试或当前任务文件。
-- Roadmap 可以在执行过程中根据代码现状、客户反馈、验收结果、风险发现或 AI 规划复盘显式调整；调整时必须直接修改 roadmap，并写清调整原因、影响阶段或 Goal、新的下一步，以及哪些旧 Goal 编号不再继续复用。
-- `docs/codex-goals/*.md` 只是阶段性施工单和审计记录；完成后不再作为后续路线真源，历史编号 Goal 可从 Git 历史追溯，不应长期留在活跃文档树里覆盖 roadmap。
-- Roadmap 调整如果改变已完成 / 未完成 / 暂停 / 取消 / 下一步编号等当前状态，必须同步检查并按需更新 `docs/current-source-of-truth.md` 或等价当前状态索引。
-- 每个任务的允许修改文件、禁止修改文件、验收命令，以对应的 Goal md 为准。
-- 每个任务必须在对应 Goal md 中明确成功标准、当前真源与非真源、改动范围分级、停止条件、Git 策略、测试分层选择和验收命令；不要让本文件代替具体任务的测试选择。
-- 正式 Goal 开始和收口时都必须检查工作区状态。若运行期间出现其他会话写入的非本 Goal 路径改动，Codex 只能记录并隔离这些改动，不得回退、删除、格式化、提交或写入本轮审查报告正文作为本轮成果；需要提交时必须按本 Goal 允许路径精确 stage。
-- 每轮正式 Codex Goal 收口后，必须按 `docs/codex-goals/_review-output-protocol.md` 生成或覆盖本地临时文件 `.codex-review/latest.md`，不生成 `.codex-review/runs` 历史副本，也不把 `.codex-review/` 提交进 Git。用户必须能用 `cat .codex-review/latest.md | pbcopy` 一键复制给 GPT 审查。
-- `.codex-review/latest.md` 只能描述当前 Goal 的目标、允许范围、实际纳入的文件、验证命令、提交状态和风险；不得把其他会话的未提交改动、无关 diff、并行提交或工作区噪音写成本轮成果。若这些外部改动影响收口，只能在“非本轮现场 / 阻塞风险”中点名路径和处置建议。
-- Codex 没有可靠的内置“当前是否 Goal 模式”标志，必须根据当前上下文判断：用户是否明确要求执行 `docs/codex-goals/<goal>.md`，当前输入是否是短 Goal 模板，是否正在修复当前 Goal 的测试失败 / 漏项 / 审查报告，或用户是否明确要求生成审查报告。若上下文不明确，默认按普通任务处理，不生成、不覆盖、也不删除 `.codex-review/latest.md`。
-- 只有明确执行 `docs/codex-goals/<goal>.md`、修复当前 Goal 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时，才生成或覆盖 `.codex-review/latest.md`。普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除 `.codex-review/latest.md`。
-- Codex 不要要求用户截图；正式 Goal 需要交接给 GPT 的内容应收敛到仓库文件、命令输出和 `.codex-review/latest.md`。
-- 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/codex-goals/README.md`、`docs/codex-goals/_review-output-protocol.md`、`docs/product/*`、`docs/architecture/*`。具体任务的执行范围、允许 / 禁止路径和验收命令，以当前用户指定的 `docs/codex-goals/<goal>.md` 为准。
+- 本仓库不再使用单独执行规格目录、短任务模板或本地审查报告目录作为执行工作流。
+- GPT / ChatGPT 只作为需求澄清、架构讨论和方案比较的辅助输入；长期规则、当前状态和实施边界必须回到本仓库文件、真实代码、migration、测试和当前工作区确认。
+- `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源，用于判断产品长期 Phase、候选任务顺序和下一步大方向；它不替代 `docs/current-source-of-truth.md`、代码、migration、测试或本轮用户要求。
+- Roadmap 可以在执行过程中根据代码现状、客户反馈、验收结果、风险发现或 AI 规划复盘显式调整；调整时必须直接修改 roadmap，并写清调整原因、影响阶段、新的下一步，以及哪些旧编号或旧路线不再复用。
+- 复杂实现应按 `docs/product/implementation-governance.md` 拆为可验证任务。任务边界可以写在当前会话、正式设计文档、roadmap 或台账中；不要恢复额外长期施工单目录。
+- 每个非平凡任务都必须先明确本轮目标、允许修改路径、禁止修改路径、明确不做的内容、验收命令、停止条件和剩余风险；不要让本文件代替具体任务的测试选择。
+- 任务开始和收口时都必须检查工作区状态。若运行期间出现其他会话写入的非本轮路径改动，Codex 只能记录并隔离这些改动，不得回退、删除、格式化、提交或写成本轮成果；需要提交时必须按本轮允许路径精确 stage。
+- 普通任务不生成、不覆盖、也不要求本地审查报告。如用户需要审查材料，应直接在最终回复或用户明确指定的正式文档中说明目标、范围、修改文件、验证命令和风险。
+- 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/product/*`、`docs/architecture/*`、`docs/current-source-of-truth.md`、代码和测试。
 - plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和客户资料边界，仍以本文件和正式产品 / 架构文档为准。当前永绅客户稳定 key 是 `yoyoosun`，不要恢复 `current` 客户目录或导入工作区别名。
-- 处理 Codex Goal 时禁止：
+- 处理任务时禁止：
   - 新增 `tenant_id`。
   - 实现 SaaS 多租户。
   - 实现 license server、套餐计费或客户工单系统。
@@ -340,7 +321,7 @@ RBAC / API 改动必须覆盖：
 
 - 当本仓库新增、删除、重命名仓库一级目录，或新增/调整需要长期维护的关键子系统目录时，必须同步检查并按需更新相关目录说明文档，避免代码结构已变化而 `README / docs` 仍停留在旧口径。
 - `docs/` 下长期维护且容易误读职责的目录应有对应 `README.md`。新增、删除、重命名长期维护文档，或改变文档职责、归属目录、入口状态、真源状态时，必须同步检查该目录 README 是否需要更新；只改正文且不改变目录职责或入口状态时，通常不需要更新目录 README。
-- 当新增、删除、重命名长期维护的 Markdown 文档，或调整文档用途、归属目录、是否属于产品内入口 / 外部参考 / 归档 / Codex Goal 等分类时，必须同步更新 `docs/document-inventory.md`。
+- 当新增、删除、重命名长期维护的 Markdown 文档，或调整文档用途、归属目录、是否属于产品内入口 / 外部参考 / 归档 / 任务说明等分类时，必须同步更新 `docs/document-inventory.md`。
 - 只修改现有文档正文内容、措辞、局部结论或表格数据，且不改变该文档的标题、职责、分类、路径或入口状态时，通常不需要更新 `docs/document-inventory.md`；若修改导致清单中的“标题 / 当前用途”失真，则必须同步更新。
 - `docs/document-inventory.md` 的“标题 / 当前用途”列应使用中文主体 + English anchor；即使原文档标题为英文，也要补中文说明，方便人工审查时快速理解，不把清单退化成英文文件名索引。
 - 长期维护 Markdown 文档的 H1 标题和用于阅读的主要章节标题，也应优先使用中文主体 + English anchor；项目名、包名、工具名、表名、API 路径等英文专名可以保留，但应按需要补中文用途或语义说明，方便人工审查时直接理解文档职责。外部导入原文、归档日期标题、纯代码锚点可保留原样。
@@ -423,9 +404,9 @@ RBAC / API 改动必须覆盖：
 
 ## GPT 与 Codex 协作
 
-本项目允许通过 GPT 进行需求澄清、架构讨论、方案比较和 Codex prompt 生成，但 GPT 输出不能直接替代本仓库真源。
+本项目允许通过 GPT 进行需求澄清、架构讨论和方案比较，但 GPT 输出不能直接替代本仓库真源，也不再作为必须回传给 Codex 的执行 prompt 链路。
 
-当 Codex 接收来自 GPT 的执行 prompt 时，必须先审查：
+当 Codex 参考来自 GPT 的规划或建议时，必须先审查：
 
 - 是否符合本项目 `AGENTS.md`
 - 是否符合当前 README、docs、Makefile、构建脚本和真实目录结构
@@ -433,6 +414,6 @@ RBAC / API 改动必须覆盖：
 - 是否把规划、schema、迁移、runtime、前端接入、测试补齐、部署等多阶段内容混在一轮执行
 - 是否需要先拆成更小的可验证阶段
 
-Codex 应优先遵循本仓库真实代码、项目文档和当前工作区状态。若 GPT prompt 与项目真源冲突，应收窄或修正执行范围，并在最终回复中说明原因。
+Codex 应优先遵循本仓库真实代码、项目文档和当前工作区状态。若 GPT 建议与项目真源冲突，应收窄或修正执行范围，并在最终回复中说明原因。
 
-大型任务默认拆阶段执行，每一轮只完成一个可验证闭环。执行后应反馈已完成内容、未做内容、验证结果、剩余风险，以及建议下一步交给 GPT 分析的问题。
+大型任务默认拆阶段执行，每一轮只完成一个可验证闭环。执行后应反馈已完成内容、未做内容、验证结果和剩余风险；是否继续让 GPT 辅助分析由用户决定。

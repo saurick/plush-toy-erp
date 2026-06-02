@@ -4,7 +4,7 @@
 
 `plush-toy-erp` 的目标是毛绒玩具工厂任务驱动型 ERP 产品内核，而不是一次性外包系统、所有行业通用 ERP、低代码平台或复杂 BPMN 系统。
 
-本文已吸收 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` 中稳定的产品定位、分层和闭环顺序；未吸收其中的目录大重构、时间估算、团队排期或 API/schema 示例。外部 planning note 只能作为参考输入，不覆盖当前代码、测试、`docs/current-source-of-truth.md` 或具体 Goal 文件。
+本文已吸收 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` 中稳定的产品定位、分层和闭环顺序；未吸收其中的目录大重构、时间估算、团队排期或 API/schema 示例。外部 planning note 只能作为参考输入，不覆盖当前代码、测试、`docs/current-source-of-truth.md` 或本轮具体任务说明。
 
 当前路线是：
 
