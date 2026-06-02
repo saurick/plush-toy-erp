@@ -4,6 +4,8 @@
 
 `plush-toy-erp` 的目标是毛绒玩具工厂任务驱动型 ERP 产品内核，而不是一次性外包系统、所有行业通用 ERP、低代码平台或复杂 BPMN 系统。
 
+本文已吸收 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` 中稳定的产品定位、分层和闭环顺序；未吸收其中的目录大重构、时间估算、团队排期或 API/schema 示例。外部 planning note 只能作为参考输入，不覆盖当前代码、测试、`docs/current-source-of-truth.md` 或具体 Goal 文件。
+
 当前路线是：
 
 | 层级 | 口径 |
@@ -23,6 +25,18 @@
 | 第三阶段 | SaaS 多租户 | 未来单独评审，不在当前阶段实现 |
 
 当前不实现 SaaS runtime tenant，不新增 `tenant_id`，不改 Ent schema，不改 RBAC 为多租户模型。
+
+## 业务闭环主线
+
+0 到 1 的产品目标不是先做完整 SaaS，也不是先做通用低代码平台，而是把毛绒工厂的业务主链路按事实边界闭环：
+
+| 主线 | 0 到 1 成熟口径 |
+| --- | --- |
+| Order To Shipment | 客户订单作为 Source Document，老板审批只推进协同；真实出货必须由 ShipmentUsecase 和库存事实确认 |
+| Procure To Inventory | 采购承诺、到货、质检、入库、退货和调整分层；采购入库事实写 `inventory_txns / inventory_balances / inventory_lots` |
+| Production / Outsourcing | 生产领料、委外发料、委外回货、成品入库必须形成事实，不靠 workflow task done 伪造库存 |
+| Shipment To Finance | `shipping_released` 只表示可发货；实际 shipped 后才评审应收、发票、收款和对账 |
+| Productization / Delivery | 用一个产品内核、一个行业模板、多个客户配置包和私有化部署包复制客户，不复制多套核心代码 |
 
 ## V0 到 V6
 

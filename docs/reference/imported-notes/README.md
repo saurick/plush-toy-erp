@@ -11,6 +11,12 @@
 | 数据库结构 | Ent schema、Atlas migration、数据库验收 |
 | 当前项目状态 | `docs/current-source-of-truth.md`、正式架构文档、代码和测试 |
 
+## 文件清单
+
+| 文件 | 来源 | 当前用途 |
+| --- | --- | --- |
+| `plush-toy-erp-from-0-to-1-plan.md` | Desktop 外部规划稿 | 0 到 1 架构、业务域闭环、Workflow / Fact 边界和后续 Goal 拆分的参考输入；不直接作为 roadmap、schema、runtime 或目录迁移指令 |
+
 使用约束：
 
 1. 不直接按 imported note 生成 schema、migration 或 runtime 代码。

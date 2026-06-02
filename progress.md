@@ -1,3 +1,9 @@
+## 2026-06-02 10:28
+- 完成：将 `/Users/simon/Desktop/plush-toy-erp-from-0-to-1-plan.md` 归档为 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md`，明确 `Reference Only`，不作为 runtime、schema、migration、API、UI、目录结构、roadmap 编号或交付排期真源；同步更新 imported-notes README 文件清单。
+- 完成：从外部规划稿中只提炼稳定口径到正式文档：`docs/product/zero-to-one-architecture.md` 补业务闭环主线；`docs/product/domain-model-v1.md` 补业务域职责和字段 / API / 状态示例边界；`docs/architecture/status-workflow-fact-boundary.md` 补混合状态词拆层规则。
+- 下一步：如继续吸收外部规划，只能按具体评审拆到 domain model、architecture review 或 `docs/codex-goals/*.md`；roadmap 不吸收目录大重构、团队排期、时间估算或 API / schema 示例。
+- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。`progress.md` 本次追加前已检查为 380 行 / 79551 bytes，后续再更新时大概率需要先归档。
+
 ## 2026-06-01 21:39
 - 完成：继续按“roadmap 只管产品业务闭环和路线”的口径清理文档。`docs/product/product-completion-roadmap.md` 新增 ERP 业务闭环覆盖口径，明确 Order to Cash、Procure to Pay、Plan / Make to Stock、Outsourcing、Inventory Control 和 Governance / Delivery 六条闭环路线；同时把默认行业菜单基线、current 组合入口拆分和菜单隐藏后的业务保证从 roadmap 主文拆出到 `docs/product/formal-menu-entry-plan.md`，并将 current MVP 明细收回到 `docs/product/product-delivery-ledgers.md` 客户交付矩阵维护。同步更新 README、`docs/current-source-of-truth.md` 和 `product-delivery-ledgers.md` 的引用与下一步名称。
 - 下一步：roadmap 后续只继续保留产品业务闭环、阶段顺序、边界和禁止项；菜单细节、客户试用明细、交付矩阵、台账成熟度和具体 Goal 执行清单分别放在配套计划、台账或 `docs/codex-goals/*.md`。

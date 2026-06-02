@@ -16,6 +16,18 @@
 | 业务结果 / 派生状态 | 从事实汇总出来的结果 | partial_shipped / fully_paid / settled |
 | 系统横切状态 | 幂等、同步、导入、通知等系统过程 | processing / synced / failed |
 
+## 状态词拆分规则
+
+外部规划稿、客户表格或旧入口里可能把审批、工程、采购、生产、出货和财务阶段都写进一个订单状态。正式实现必须拆层处理：
+
+| 状态词 | 正确归属 | 不能做什么 |
+| --- | --- | --- |
+| boss_reviewing / approved | Workflow 或订单审批阶段 | 不能表示采购、生产、出货或财务完成 |
+| engineering / purchasing / production | 业务阶段或协同进度 | 不能替代采购入库、生产领料、成品入库事实 |
+| shipping_releasing / shipping_released | 出货放行阶段 | 不能表示已出库、已扣库存或已生成应收 |
+| partially_shipped / shipped | 由 shipment fact 和库存事实推导 | 不能由 workflow task done 直接写入 |
+| receivable / invoice / paid | Finance fact 或派生结果 | 不能从 `shipping_released`、旧快照或 workflow payload 直接生成 |
+
 ## 出货放行边界
 
 - `workflow done != 已出库 / 已入库 / 已开票 / 已收款`。

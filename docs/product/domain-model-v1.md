@@ -2,6 +2,8 @@
 
 本文只描述 0 到 1 重构的业务域模型草案，不改 Ent schema，不生成 migration。
 
+本文吸收 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` 中稳定的业务域划分，但不吸收其字段示例作为 schema 真源。任何新增表、字段、状态机、API 或页面都必须回到对应架构评审、`docs/current-source-of-truth.md` 和具体 `docs/codex-goals/*.md`。
+
 Phase 1 评审补充文档：
 
 - `docs/product/domain-schema-draft-v1-v2.md`
@@ -11,6 +13,21 @@ Phase 1 评审补充文档：
 - `docs/architecture/order-purchase-boundary-review.md`
 
 这些文档仍是 proposed / review，不代表 Ent schema、migration、runtime、API 或 UI 已实现。
+
+## 业务域职责
+
+| 业务域 | 正式职责 | 不负责 |
+| --- | --- | --- |
+| MasterData | 客户、供应商、联系人、物料、产品、单位、仓库等长期稳定资料 | 不承接临时订单字段或客户样本残值 |
+| Order | 客户订单、订单行、订单变更等业务承诺和源单据 | 不写库存、出货、应收、发票或付款事实 |
+| BOM | 产品工程资料、用料和版本关系 | 不直接改库存，不替代采购需求评审 |
+| Purchase | 采购承诺、到货、入库、退货、入库调整 | 不直接生成应付真源，除非 Finance 评审明确 |
+| Quality | 来料、委外回货、成品质检的判定和批次状态影响 | 不直接写库存数量流水 |
+| Inventory | 批次、流水、余额、预留、冻结和冲正 | 不从 workflow payload 或 `business_records` 伪造事实 |
+| Production | 生产单、生产领料、成品入库事实 | 不用协同状态代替生产领料或成品入库落账 |
+| Outsourcing | 委外订单、发料、回货、质检、返工和结算线索 | 不把加工合同样本直接写成通用产品规则 |
+| Shipment | 出货计划、预留、拣货、实际出库和出货事实 | 不把 `shipment_release done` 当 `shipped` |
+| Finance | 应收、应付、发票、收付款和对账事实 | 不从 `shipping_released` 或采购入库任务 done 直接生成财务事实 |
 
 | 模型 | Purpose | 分类 | V1 必做 | 影响库存 | 影响出货 | 影响财务 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -55,3 +72,5 @@ Phase 1 评审补充文档：
 - 事实表只在真实业务动作发生时写入，错误通过作废、冲正、反向记录或重新生成修正记录处理。
 - 派生状态可以缓存，但必须能从事实重算。
 - 当前表清单是设计草案，不代表当前 schema 已经存在。
+- 外部规划稿中的字段、API 名、状态名和目录名都是评审输入；不得直接当成 Ent schema、JSON-RPC 方法或前端路由。
+- `sales_order.status` 不能混入审批、工程、采购、生产、出货、财务等全链路状态；这些状态必须按单据生命周期、Workflow、Fact 和派生结果拆开。
