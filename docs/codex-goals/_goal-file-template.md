@@ -58,7 +58,7 @@
 ### 只能作为线索
 
 - `docs/reference/imported-notes/*`
-- 历史 changes 文档
+- 已删除的历史 changes 记录（仅可从 Git 历史回查）
 - 旧 Goal 输出
 - 客户样本、截图、Excel、PDF
 

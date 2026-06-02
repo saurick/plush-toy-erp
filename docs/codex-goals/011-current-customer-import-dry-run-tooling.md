@@ -206,7 +206,7 @@ docs/codex-goals/011-current-customer-import-dry-run-tooling.md
 * web/src/erp/config/seedData.mjs
 * web/src/erp/config/businessModules.mjs
 * web/src/erp/config/businessRecordDefinitions.mjs
-* 历史 changes 文档
+* 已删除的历史 changes 记录（仅可从 Git 历史回查）
 * imported notes
 * 历史聊天记忆
 * 旧 Codex 输出

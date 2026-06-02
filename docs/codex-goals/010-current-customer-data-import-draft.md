@@ -275,7 +275,7 @@ grep -R "current\|客户\|供应商\|订单\|产品\|材料\|仓库\|Excel\|PDF\
 * current 客户 Excel / PDF / 图片样本
 * business_records 历史快照
 * imported notes
-* 历史 changes 文档
+* 已删除的历史 changes 记录（仅可从 Git 历史回查）
 
 ### 禁止作为当前实现真源
 

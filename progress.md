@@ -6,6 +6,11 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-02 15:06
+- 完成：按用户已删除 `docs/changes/*` 的现场同步相关文档，更新 `docs/document-inventory.md`、`docs/README.md` 和 `web/README.md`，移除当前索引和前端文档规则中的 `docs/changes/*` 入口；保留 `docs/current-source-of-truth.md` 中“历史 changes 文件已清理、当前状态回到真源索引 / 正式文档 / 代码 / 测试”的口径。
+- 下一步：后续若需要追溯旧 changes 内容，只能从 Git 历史或 `docs/archive/progress-2026-06-02-before-print-template-defer.md` 的过程线索回查；当前文档清单不再列出 `docs/changes/*`。
+- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 49 行 / 8649 bytes，未达到归档阈值。
+
 ## 2026-06-02 12:42
 - 完成：将 `docs/document-inventory.md` 同步维护规则写入 `AGENTS.md`、`docs/README.md` 和 `docs/document-inventory.md` 本身：新增、删除、重命名长期维护 Markdown 文档，或调整文档用途、归属分类、产品内入口 / 外部参考 / 归档 / Codex Goal 等入口状态时，必须同步更新文档清单。
 - 完成：明确例外边界：只改现有文档正文、措辞、局部结论或表格数据，且不改变标题、职责、分类、路径或入口状态时，通常不需要更新文档清单；如果清单中的“标题 / 当前用途”会因此失真，则必须同步更新。

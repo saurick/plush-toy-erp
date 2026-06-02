@@ -40,7 +40,7 @@
 | 当前真源索引 | `docs/current-source-of-truth.md` | 本身就是阅读顺序和真源索引，不需要再被前端 registry 二次定义 | 真源原则、当前状态、按任务分流 |
 | 产品 / 架构正式文档 | `docs/product/*`、`docs/architecture/*` | 这些是仓库正式评审和路线文档；只有被复制或镜像到 `web/src/erp/docs` 后才需要前端 registry metadata | 结论、范围、真源 / 非真源、后续边界 |
 | Codex Goal 文件 | `docs/codex-goals/*.md` | 这是执行规格和验收边界，不是帮助中心内容 | Goal 名称、允许 / 禁止路径、验收命令、停止条件 |
-| 历史 changes / archive / progress | `docs/changes/*`、`docs/archive/*`、`progress.md` | 只用于过程追溯，不作为当前实现或产品路线真源 | 归档说明、发生时间、非真源声明 |
+| archive / progress | `docs/archive/*`、`progress.md` | 只用于过程追溯，不作为当前实现或产品路线真源；原 `docs/changes/*` 历史文件已删除 | 归档说明、发生时间、非真源声明 |
 | imported notes / 外部输入 | `docs/reference/imported-notes/*` | 只作为参考输入，不能直接驱动 runtime、schema、migration 或 roadmap | 来源、导入时间、Reference Only、Not Source Of Truth |
 | 后端 / 内部技术文档 | `server/docs/*`、`server/internal/**/README.md` | 面向子系统维护，不进入产品帮助中心 | 子系统边界、命令、配置、维护注意事项 |
 

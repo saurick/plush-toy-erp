@@ -20,7 +20,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 - `web/src/erp/docs/*.md` 是产品内文档源文件，是否展示取决于 `web/src/erp/config/docs.mjs` 和 `web/src/erp/config/seedData.mjs`。
 - `docs/product/*` 和 `docs/architecture/*` 是正式产品 / 架构评审文档，但不自动进入前端帮助中心。
 - `docs/codex-goals/*` 是阶段性执行规格和审计记录，完成后不作为后续路线真源。
-- `docs/changes/*`、`docs/archive/*`、`progress.md` 只用于历史追溯。
+- `docs/archive/*`、`progress.md` 只用于历史追溯；原 `docs/changes/*` 历史文件已删除，当前状态回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、代码和测试交叉确认。
 - `docs/reference/imported-notes/*` 是外部输入，必须先经过正式文档和代码复核。
 - README / server docs / config docs / deployment docs 是目录、运行、部署或子系统维护说明。
 - 新增、删除、重命名长期维护 Markdown 文档，或调整文档用途、归属分类、入口状态时，必须同步更新本文。
@@ -174,19 +174,10 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/codex-goals/011-current-customer-import-dry-run-tooling.md` | Codex Goal 011: current Customer Import Dry-run Tooling |
 | `docs/codex-goals/012-current-source-snapshot-freeze-and-real-dry-run-evidence.md` | Codex Goal 012: Source Snapshot Freeze and Real Dry-run Evidence |
 
-### 历史变更与归档
+### 归档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/changes/plush-erp-bootstrap-init.md` | 毛绒 ERP 初始化框架历史记录 |
-| `docs/changes/phase-2a-inventory-fact-schema.md` | Phase 2A 库存事实专表 |
-| `docs/changes/phase-2a-postgres-verification.md` | Phase 2A PostgreSQL 落地验收 |
-| `docs/changes/phase-2b-bom-lot-schema.md` | Phase 2B BOM 与批次库存闭环 |
-| `docs/changes/phase-2c-purchase-receipt-schema.md` | Phase 2C 采购入库最小闭环 |
-| `docs/changes/phase-2d-lot-status-guard.md` | Phase 2D-C1 批次状态出库守卫 |
-| `docs/changes/phase-2d-purchase-receipt-adjustment-schema.md` | Phase 2D-B1 采购入库调整单最小闭环 |
-| `docs/changes/phase-2d-purchase-return-schema.md` | Phase 2D-A 采购退货最小闭环 |
-| `docs/changes/phase-2d-quality-inspection-schema.md` | Phase 2D-C2-A 来料质检最小主表 |
 | `docs/archive/README.md` | archive 目录说明 |
 | `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 2026-05-31 至 2026-06-02 旧 progress 归档 |
 

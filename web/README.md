@@ -198,7 +198,7 @@ STYLE_L1_SCENARIOS=qa-acceptance-overview-desktop pnpm style:l1
 - 进入帮助中心、开发与验收、高级文档或文档卡片的入口，必须在 `web/src/erp/config/seedData.mjs` 的 `navItemRegistry` 中登记 `label`、`path`、`shortLabel`、`description`，再放入对应分组。
 - 如果后续给前端文档 registry 新增可检索 metadata，必须采用中文说明 + English anchor 的双语结构，例如 `title_zh` / `title_en`、`summary_zh` / `summary_en`、`status_zh` / `status_key`；新增字段前必须同步改渲染消费逻辑和 `docs.test.mjs`，不能只写未被消费的字段。
 - 帮助中心主入口只放普通业务用户需要先看的文档；架构评审、状态字典、QA 和调试说明默认放高级文档或开发与验收，不混进普通主入口。
-- 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/codex-goals/*`、`docs/changes/*`、`docs/archive/*` 不会自动进入前端。只有明确要做成产品内文档页时，才应新增或同步到 `web/src/erp/docs/*.md` 并走 registry。
+- 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/codex-goals/*`、`docs/archive/*` 不会自动进入前端。只有明确要做成产品内文档页时，才应新增或同步到 `web/src/erp/docs/*.md` 并走 registry。
 - 不要为了“看起来完整”给所有 Markdown 添加前端 metadata；无解析器、无页面入口、无导航分组时，这些字段只会变成重复真源。
 
 相关守卫：
