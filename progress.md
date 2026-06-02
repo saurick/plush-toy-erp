@@ -26,24 +26,24 @@
 ## 2026-06-02 20:36
 - 完成：将 `docs/architecture/` 中 6 份旧 Phase 实现历史评审归档到 `docs/archive/architecture-history/`，包括 `phase-2b-bom-lot-schema-review.md`、`phase-2c-purchase-receipt-review.md`、`phase-2d-purchase-return-quality-review.md`、`phase-2d-purchase-receipt-adjustment-review.md`、`phase-2d-quality-inspection-entry-review.md` 和 `phase-2d-quality-inspection-schema-review.md`；新增归档 README，明确这些文件只作历史追溯，不再作为当前架构真源。
 - 完成：同步 `AGENTS.md`、根 `README.md`、`docs/current-source-of-truth.md`、`docs/document-inventory.md` 和 `docs/archive/README.md`，把活跃架构入口收口到长期边界文档，避免旧 Phase 施工记录继续主导后续 roadmap 或模块实现。
-- 下一步：后续模块 Goal 先读活跃 `docs/architecture/*` 边界文档和 `docs/current-source-of-truth.md`；若归档 Phase 文档中有结论需要恢复为当前真源，必须先抽取到正式架构 / 产品文档并重新验收。
-- 阻塞/风险：docs-only 归档；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、部署配置或 `.codex-review/latest.md`。本轮追加前 `progress.md` 为 128 行 / 23768 bytes，未达到归档阈值。
+- 下一步：后续模块实现任务先读活跃 `docs/architecture/*` 边界文档和 `docs/current-source-of-truth.md`；若归档 Phase 文档中有结论需要恢复为当前真源，必须先抽取到正式架构 / 产品文档并重新验收。
+- 阻塞/风险：docs-only 归档；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、部署配置或本地审查报告。 本轮追加前 `progress.md` 为 128 行 / 23768 bytes，未达到归档阈值。
 
 ## 2026-06-02 20:24
-- 完成：新增 `docs/product/implementation-governance.md`，固化模块实施治理口径，明确 Phase 是实施顺序，Architecture Layer 是职责边界，并补充标准模块开发闭环、模块类型适用强度、阶段门禁、禁止项和 Codex Goal 拆分规则。
+- 完成：新增 `docs/product/implementation-governance.md`，固化模块实施治理口径，明确 Phase 是实施顺序，Architecture Layer 是职责边界，并补充标准模块开发闭环、模块类型适用强度、阶段门禁、禁止项和实施任务拆分规则。
 - 完成：同步 `docs/product/product-completion-roadmap.md` 的短引用、`docs/current-source-of-truth.md` 的阅读入口和 `docs/document-inventory.md` 的长期文档登记。
-- 下一步：后续拆新模块 Goal 前先按 `docs/product/implementation-governance.md` 确认 Phase、Architecture Layer、门禁、允许范围和测试层级，再进入 schema、usecase、API/RBAC、UI 或 delivery/import。
-- 阻塞/风险：docs-only 治理文档收口；未改 runtime、schema、migration、generated code、server/web 代码、seedData、docs registry、API、RBAC、UI、真实 import loader 或 `.codex-review/latest.md`。本轮追加前 `progress.md` 为 122 行 / 22741 bytes，未达到归档阈值。
+- 下一步：后续拆新模块实现任务前先按 `docs/product/implementation-governance.md` 确认 Phase、Architecture Layer、门禁、允许范围和测试层级，再进入 schema、usecase、API/RBAC、UI 或 delivery/import。
+- 阻塞/风险：docs-only 治理文档收口；未改 runtime、schema、migration、generated code、server/web 代码、seedData、docs registry、API、RBAC、UI、真实 import loader 或本地审查报告。本轮追加前 `progress.md` 为 122 行 / 22741 bytes，未达到归档阈值。
 
 ## 2026-06-02 19:50
 - 完成：删除 `docs/product/product-completion-roadmap.md` 顶部“本次重构结论”过程说明，避免 roadmap 长期保留来源解释和补丁口吻；同步前移 `0.x` 小节编号，并收紧 metadata 中“不包含”的表述。
-- 下一步：后续 roadmap 只保留当前产品路线、边界和阶段结果；过程来源、调整背景和本轮执行记录只进入 `progress.md` 或审查报告。
+- 下一步：后续 roadmap 只保留当前产品路线、边界和阶段结果；过程来源、调整背景和本轮执行记录只进入 `progress.md` 或用户指定的验收材料。
 - 阻塞/风险：docs-only 文案收口；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 117 行 / 22025 bytes，未达到归档阈值。
 
 ## 2026-06-02 19:31
 - 完成：将 `docs/product/product-completion-roadmap.md` 从旧 `00x` 编号执行进度口径重构为“重新做项目”的 Phase 路线，明确旧编号只作为历史施工记录，新路线按 Phase 0 到 Phase 12 表达。
-- 完成：同步 `docs/product/product-delivery-ledgers.md` 的当前推荐下一步和相关前置条件，把 `v1-formal-menu-and-legacy-entry-exit`、旧 import loader 编号式路线改为 Phase 制；同步 `docs/current-source-of-truth.md` 对 roadmap 的描述，避免继续暗示 roadmap 是旧候选 Goal 顺序。
-- 下一步：如果继续执行，应先拆 `Phase 0 docs-only reset` 的正式任务文件，限定为产品原则、分层、状态边界、客户配置、交付骨架、测试策略和 Goal 模板，不改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry 或 loader。
+- 完成：同步 `docs/product/product-delivery-ledgers.md` 的当前推荐下一步和相关前置条件，把 `v1-formal-menu-and-legacy-entry-exit`、旧 import loader 编号式路线改为 Phase 制；同步 `docs/current-source-of-truth.md` 对 roadmap 的描述，避免继续暗示 roadmap 是旧候选任务顺序。
+- 下一步：如果继续执行，应先拆 `Phase 0 docs-only reset` 的正式任务说明，限定为产品原则、分层、状态边界、客户配置、交付骨架、测试策略和任务拆分规则，不改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry 或 loader。
 - 阻塞/风险：docs-only roadmap 重构；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 111 行 / 20871 bytes，未达到归档阈值。
 
 ## 2026-06-02 17:15
@@ -98,8 +98,8 @@
 - 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 60 行 / 11157 bytes，未达到归档阈值。
 
 ## 2026-06-02 15:34
-- 完成：按“活跃文档树回到 roadmap / current-source / product-delivery-ledgers”的口径清理历史遗留文档。删除已完成编号 Codex Goal `000` 到 `012`、旧 `rewrite-roadmap` 兼容入口、早期根目录初始化 / 主流程 / 数据模型 / 项目状态文档，以及旧 Phase 1 / V1 schema draft、cutline、go/no-go、next-goals 等执行规划文档；这些内容后续仅从 Git 历史或 `docs/archive/*` 过程线索追溯。
-- 完成：同步 `README.md`、`AGENTS.md`、`docs/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/codex-goals/*` 模板说明、`docs/product/product-completion-roadmap.md`、`docs/product/domain-model-v1.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-cutover-plan.md`、`docs/architecture/phase-2b-bom-lot-schema-review.md` 和 `scripts/project-scan.sh`，移除活跃文档对已删除文件的引用。
+- 完成：按“活跃文档树回到 roadmap / current-source / product-delivery-ledgers”的口径清理历史遗留文档。删除已完成编号执行规格 `000` 到 `012`、旧 `rewrite-roadmap` 兼容入口、早期根目录初始化 / 主流程 / 数据模型 / 项目状态文档，以及旧 Phase 1 / V1 schema draft、cutline、go/no-go、旧下一步规划等执行规划文档；这些内容后续仅从 Git 历史或 `docs/archive/*` 过程线索追溯。
+- 完成：同步 `README.md`、`AGENTS.md`、`docs/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、原执行规格目录模板说明、`docs/product/product-completion-roadmap.md`、`docs/product/domain-model-v1.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-cutover-plan.md`、`docs/architecture/phase-2b-bom-lot-schema-review.md` 和 `scripts/project-scan.sh`，移除活跃文档对已删除文件的引用。
 - 下一步：剩余 `business_records` 过渡文档、current import 文档、正式架构评审、产品内帮助文档和 imported-notes 仍保留；它们分别对应 roadmap 第 13 / 14 阶段、当前事实边界、产品内展示或 Reference Only 输入，后续应按具体阶段再整合，不在本轮无差别删除。
 - 阻塞/风险：docs / governance cleanup；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。`scripts/project-scan.sh` 仅更新扫描目标中的已删除文档路径。本轮追加前 `progress.md` 为 54 行 / 9495 bytes，未达到归档阈值。
 
@@ -109,14 +109,14 @@
 - 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 49 行 / 8649 bytes，未达到归档阈值。
 
 ## 2026-06-02 12:42
-- 完成：将 `docs/document-inventory.md` 同步维护规则写入 `AGENTS.md`、`docs/README.md` 和 `docs/document-inventory.md` 本身：新增、删除、重命名长期维护 Markdown 文档，或调整文档用途、归属分类、产品内入口 / 外部参考 / 归档 / Codex Goal 等入口状态时，必须同步更新文档清单。
+- 完成：将 `docs/document-inventory.md` 同步维护规则写入 `AGENTS.md`、`docs/README.md` 和 `docs/document-inventory.md` 本身：新增、删除、重命名长期维护 Markdown 文档，或调整文档用途、归属分类、产品内入口 / 外部参考 / 归档 / 任务说明等入口状态时，必须同步更新文档清单。
 - 完成：明确例外边界：只改现有文档正文、措辞、局部结论或表格数据，且不改变标题、职责、分类、路径或入口状态时，通常不需要更新文档清单；如果清单中的“标题 / 当前用途”会因此失真，则必须同步更新。
 - 下一步：后续文档增删改名或分类调整时，按该规则同步维护 `docs/document-inventory.md`。
 - 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 43 行 / 7658 bytes，未达到归档阈值。
 
 ## 2026-06-02 12:39
 - 完成：将现有英文 metadata 字段名双语化，覆盖 `Doc Type`、`Status`、`Runtime Implemented`、`Ent Schema Implemented`、`Migration Implemented`、`Current Implementation Source of Truth`、`Runtime Source of Truth`、`Schema Source of Truth`、`Notes`、`Current Evidence Inputs` 以及 imported note 的 `Source`、`Imported At`、`Purpose`、`Not Source Of Truth` 等字段；同时给常见 `Status` 值和 `Yes/No` 值补中文说明。
-- 完成：新增 `docs/document-inventory.md`，按仓库根文档、配置与部署骨架、docs 真源入口、架构评审、产品与路线、客户资料边界、Codex Goal、历史变更、外部参考、前端产品内文档、前后端 / 脚本说明等分类列出当前 tracked Markdown 文档；同步在根 `README.md` 和 `docs/README.md` 增加文档清单入口。
+- 完成：新增 `docs/document-inventory.md`，按仓库根文档、配置与部署骨架、docs 真源入口、架构评审、产品与路线、客户资料边界、旧执行规格、历史变更、外部参考、前端产品内文档、前后端 / 脚本说明等分类列出当前 tracked Markdown 文档；同步在根 `README.md` 和 `docs/README.md` 增加文档清单入口。
 - 下一步：后续新增、删除或重命名长期维护文档时，同步更新 `docs/document-inventory.md`；若状态值或类型值容易误解，在对应文档触达时继续补中文值说明。
 - 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 37 行 / 6371 bytes，未达到归档阈值。
 
@@ -128,7 +128,7 @@
 
 ## 2026-06-02 12:22
 - 完成：整理文档 metadata / registry 边界，明确当前仓库不要求所有 Markdown 添加 YAML frontmatter 或统一 metadata 头；metadata 主要用于减少产品内文档入口、受众、状态和是否接入前端页面的信息差，不制造新的内容真源。
-- 完成：在 `docs/README.md` 增加全仓分类规则，列出 `README`、`docs/current-source-of-truth.md`、`docs/product/*`、`docs/architecture/*`、`docs/codex-goals/*`、`docs/changes/*`、`docs/archive/*`、`progress.md`、`docs/reference/imported-notes/*`、`server/docs/*` 等不需要产品内 metadata 的文档类型和应保留信息；在 `web/README.md` 增加前端文档注册约定，明确 `docRegistry`、`seedData.mjs` 和 `docs.test.mjs` 才是产品内文档入口守卫。
+- 完成：在 `docs/README.md` 增加全仓分类规则，列出 `README`、`docs/current-source-of-truth.md`、`docs/product/*`、`docs/architecture/*`、旧执行规格目录、`docs/changes/*`、`docs/archive/*`、`progress.md`、`docs/reference/imported-notes/*`、`server/docs/*` 等不需要产品内 metadata 的文档类型和应保留信息；在 `web/README.md` 增加前端文档注册约定，明确 `docRegistry`、`seedData.mjs` 和 `docs.test.mjs` 才是产品内文档入口守卫。
 - 下一步：后续若新增产品内文档页，只对 `web/src/erp/docs/*.md` 走 `docs.mjs` / `seedData.mjs` 注册；若要引入 Markdown frontmatter，必须先实现解析器和测试，再限定目录。
 - 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 25 行 / 4253 bytes，未达到归档阈值。
 
@@ -147,5 +147,5 @@
 ## 2026-06-02 10:28
 - 完成：将 `/Users/simon/Desktop/plush-toy-erp-from-0-to-1-plan.md` 归档为 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md`，明确 `Reference Only`，不作为 runtime、schema、migration、API、UI、目录结构、roadmap 编号或交付排期真源；同步更新 imported-notes README 文件清单。
 - 完成：从外部规划稿中只提炼稳定口径到正式文档：`docs/product/zero-to-one-architecture.md` 补业务闭环主线；`docs/product/domain-model-v1.md` 补业务域职责和字段 / API / 状态示例边界；`docs/architecture/status-workflow-fact-boundary.md` 补混合状态词拆层规则。
-- 下一步：如继续吸收外部规划，只能按具体评审拆到 domain model、architecture review 或 `docs/codex-goals/*.md`；roadmap 不吸收目录大重构、团队排期、时间估算或 API / schema 示例。
+- 下一步：如继续吸收外部规划，只能按具体评审拆到 domain model、architecture review 或单独任务说明；roadmap 不吸收目录大重构、团队排期、时间估算或 API / schema 示例。
 - 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。`progress.md` 本次追加前已检查为 380 行 / 79551 bytes，后续再更新时大概率需要先归档。
