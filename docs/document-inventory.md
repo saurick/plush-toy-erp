@@ -60,7 +60,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/architecture/README.md` | 架构评审目录说明 / Architecture Reviews |
+| `docs/architecture/README.md` | 架构评审 / Architecture Reviews |
 | `docs/architecture/customer-supplier-masterdata-review.md` | 客户 / 供应商主数据评审 / Customer / Supplier MasterData Review |
 | `docs/architecture/finished-goods-inbound-workflow-review.md` | 成品入库 Workflow Usecase 评审 / Finished Goods Inbound Workflow Usecase Review |
 | `docs/architecture/industry-schema-review.md` | 行业专表 Ent Schema 评审 / Industry Schema Review |
@@ -79,7 +79,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/product/README.md` | 产品与路线目录说明 / Product Docs |
+| `docs/product/README.md` | 产品与路线 / Product Docs |
 | `docs/product/business-records-cutover-plan.md` | 业务记录切换计划 / business_records Cutover Plan |
 | `docs/product/business-records-data-map-draft.md` | 业务记录数据映射草案 / business_records Data Map Draft |
 | `docs/product/business-records-reference-audit.md` | 业务记录引用审计 / business_records Reference Audit |
@@ -105,8 +105,8 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/customers/README.md` | 客户资料目录说明 / Customer Materials |
-| `docs/customers/yoyoosun/README.md` | 永绅 yoyoosun 客户资料边界 |
+| `docs/customers/README.md` | 客户资料 / Customer Materials |
+| `docs/customers/yoyoosun/README.md` | 永绅 yoyoosun 客户资料 / Yoyoosun Customer Materials |
 | `docs/customers/yoyoosun/assumption-register.md` | 假设登记 / Assumption Register |
 | `docs/customers/yoyoosun/change-request-process.md` | 变更请求流程 / Change Request Process |
 | `docs/customers/yoyoosun/customer-config-draft.md` | 客户配置草案 / Customer Config Draft |
@@ -121,53 +121,53 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/import-strategy.md` | 永绅 yoyoosun 客户导入策略 / Yoyoosun Customer Import Strategy |
 | `docs/customers/yoyoosun/import-unresolved-queue.md` | 永绅 yoyoosun 客户导入待确认队列 / Yoyoosun Customer Import Unresolved Queue |
 | `docs/customers/yoyoosun/question-backlog.md` | 问题待办 / Question Backlog |
-| `docs/customers/yoyoosun/real-dry-run-evidence.md` | yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
+| `docs/customers/yoyoosun/real-dry-run-evidence.md` | 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
 | `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |
 | `docs/customers/yoyoosun/source-materials.md` | 来源材料 / Source Materials |
-| `docs/customers/yoyoosun/source-snapshot-freeze.md` | yoyoosun 来源快照冻结 / Yoyoosun Source Snapshot Freeze |
-| `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md` | yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist |
+| `docs/customers/yoyoosun/source-snapshot-freeze.md` | 永绅 yoyoosun 来源快照冻结 / Yoyoosun Source Snapshot Freeze |
+| `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md` | 永绅 yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist |
 | `docs/customers/yoyoosun/raw-source-file-archive-review.md` | 永绅 yoyoosun 原始客户文件归档评审 / Yoyoosun Raw Source File Archive Review |
-| `docs/customers/yoyoosun/raw-source-files/README.md` | 永绅 yoyoosun 原始客户文件归档目录说明 / Yoyoosun Raw Source Files Directory |
+| `docs/customers/yoyoosun/raw-source-files/README.md` | 永绅 yoyoosun 原始客户文件 / Yoyoosun Raw Source Files |
 
 ### Workflow / 角色 / 财务 / 仓库 / 可观测性
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/workflow/README.md` | Workflow 文档目录说明 / Workflow Docs |
-| `docs/workflow/notification-alert-v1.md` | 通知 / 预警 / 催办 / 升级 v1 |
-| `docs/workflow/task-flow-v1.md` | 工作流主任务树 v1 |
-| `docs/roles/README.md` | 角色与权限目录说明 / Roles And Permissions |
-| `docs/roles/role-permission-matrix-v1.md` | 角色权限矩阵 v1 |
-| `docs/finance/README.md` | 财务文档目录说明 / Finance Docs |
-| `docs/finance/finance-v1.md` | 财务 v1 |
-| `docs/warehouse/README.md` | 仓库与品质目录说明 / Warehouse And Quality |
-| `docs/warehouse/warehouse-quality-v1.md` | 仓库与品质 v1 |
-| `docs/observability/README.md` | 可观测性目录说明 / Observability |
-| `docs/observability/log-trace-audit-v1.md` | 日志 / 审计 / Trace v1 |
+| `docs/workflow/README.md` | 工作流文档 / Workflow Docs |
+| `docs/workflow/notification-alert-v1.md` | 通知、预警、催办与升级 v1 / Notification Alert v1 |
+| `docs/workflow/task-flow-v1.md` | 工作流主任务树 v1 / Task Flow v1 |
+| `docs/roles/README.md` | 角色与权限 / Roles And Permissions |
+| `docs/roles/role-permission-matrix-v1.md` | 角色权限矩阵 v1 / Role Permission Matrix v1 |
+| `docs/finance/README.md` | 财务文档 / Finance Docs |
+| `docs/finance/finance-v1.md` | 财务 v1 / Finance v1 |
+| `docs/warehouse/README.md` | 仓库与品质 / Warehouse And Quality |
+| `docs/warehouse/warehouse-quality-v1.md` | 仓库与品质 v1 / Warehouse Quality v1 |
+| `docs/observability/README.md` | 可观测性 / Observability |
+| `docs/observability/log-trace-audit-v1.md` | 日志 / 审计 / Trace v1 / Log / Trace / Audit v1 |
 
 ### 归档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/archive/README.md` | archive 目录说明 |
-| `docs/archive/architecture-history/README.md` | architecture 历史评审归档说明 |
-| `docs/archive/architecture-history/phase-2b-bom-lot-schema-review.md` | Phase 2B BOM 与库存批次历史评审归档 |
-| `docs/archive/architecture-history/phase-2c-purchase-receipt-review.md` | Phase 2C 采购入库最小闭环历史评审归档 |
-| `docs/archive/architecture-history/phase-2d-purchase-receipt-adjustment-review.md` | Phase 2D-B 采购入库差异 / 入库后更正历史评审归档 |
-| `docs/archive/architecture-history/phase-2d-purchase-return-quality-review.md` | Phase 2D 采购退货 / 入库差异 / 来料质检入口历史评审归档 |
-| `docs/archive/architecture-history/phase-2d-quality-inspection-entry-review.md` | Phase 2D-C 来料质检入口 / 批次状态历史评审归档 |
-| `docs/archive/architecture-history/phase-2d-quality-inspection-schema-review.md` | Phase 2D-C2 quality_inspections 最小主表历史评审归档 |
-| `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 2026-05-31 至 2026-06-02 旧 progress 归档 |
+| `docs/archive/README.md` | 归档 / Archive |
+| `docs/archive/architecture-history/README.md` | 架构历史评审归档 / Architecture History Archive |
+| `docs/archive/architecture-history/phase-2b-bom-lot-schema-review.md` | 库存批次与 BOM Schema 历史评审归档 / Phase 2B BOM And Inventory Lot Schema Review |
+| `docs/archive/architecture-history/phase-2c-purchase-receipt-review.md` | 采购入库最小闭环历史评审归档 / Phase 2C Purchase Receipt Review |
+| `docs/archive/architecture-history/phase-2d-purchase-receipt-adjustment-review.md` | 采购入库差异与入库后更正历史评审归档 / Phase 2D-B Purchase Receipt Adjustment Review |
+| `docs/archive/architecture-history/phase-2d-purchase-return-quality-review.md` | 采购退货、入库差异与来料质检入口历史评审归档 / Phase 2D Purchase Return And Quality Review |
+| `docs/archive/architecture-history/phase-2d-quality-inspection-entry-review.md` | 来料质检入口、批次状态与冻结库存边界历史评审归档 / Phase 2D-C Quality Inspection Entry Review |
+| `docs/archive/architecture-history/phase-2d-quality-inspection-schema-review.md` | 来料质检最小主表历史评审归档 / Phase 2D-C2 quality_inspections Schema Review |
+| `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 过程记录归档 / Progress Archive 2026-06-02 Before Print Template Defer |
 
 ### 外部参考
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/reference/README.md` | 参考资料目录说明 / Reference |
+| `docs/reference/README.md` | 参考资料 / Reference |
 | `docs/reference/imported-notes/README.md` | 外部设计输入 / Imported Design Notes |
 | `docs/reference/imported-notes/erp_plush_productization_config_permission_workflow_state_design.md` | 毛绒玩具 ERP 产品化配置、权限、流程与状态设计总结 |
-| `docs/reference/imported-notes/erp_status_workflow_context.md` | ERP 状态分层、状态机、Workflow 与业务事实设计总结 |
-| `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` | 外部 0 到 1 重构方案参考输入 |
+| `docs/reference/imported-notes/erp_status_workflow_context.md` | 状态分层、状态机、Workflow 与业务事实设计总结 / ERP Status Workflow Context |
+| `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` | 外部导入说明：毛绒玩具 ERP 从 0 到 1 重构方案 / Imported Note: Plush Toy ERP From 0 To 1 Plan |
 
 ### 前端产品内文档
 
