@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Business Records Transition Audit
+Doc Type / 文档类型: Business Records Transition Audit / business_records 过渡审计
 Status / 状态: Audit / 审计
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Business Records Data Map Draft
+Doc Type / 文档类型: Business Records Data Map Draft / business_records 数据映射草案
 Status / 状态: Draft / 草案
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

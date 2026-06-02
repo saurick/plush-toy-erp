@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Current Customer Import Risk Register
+Doc Type / 文档类型: Current Customer Import Risk Register / current 客户导入风险登记
 Status / 状态: Draft + 011 Tooling Controls Added / 草案，已补 011 工具控制
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

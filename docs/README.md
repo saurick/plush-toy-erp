@@ -42,7 +42,7 @@
 | imported notes / 外部输入 | `docs/reference/imported-notes/*` | 只作为参考输入，不能直接驱动 runtime、schema、migration 或 roadmap | 来源、导入时间、Reference Only、Not Source Of Truth |
 | 后端 / 内部技术文档 | `server/docs/*`、`server/internal/**/README.md` | 面向子系统维护，不进入产品帮助中心 | 子系统边界、命令、配置、维护注意事项 |
 
-不需要产品内 metadata 不等于不需要中文。任何文档只要已经出现 `Doc Type`、`Status`、`Source`、`Current Implementation Source of Truth` 等 metadata 字段，都必须至少做到字段名中英双语；状态值或类型值容易误解时，也应补中文说明。
+不需要产品内 metadata 不等于不需要中文。任何文档只要已经出现 `Doc Type`、`Status`、`Source`、`Current Implementation Source of Truth` 等 metadata 字段，都必须至少做到字段名中英双语；其中 `Doc Type / 文档类型` 的类型值必须保留 English anchor 并补中文说明，例如 `Current Source Snapshot Freeze Evidence / current 来源快照冻结证据`。`Status`、`Source` 等状态值或来源值若容易误解，也应补中文说明。
 
 `docs/document-inventory.md` 是当前仓库 Markdown 文档的查阅索引。新增、删除、重命名长期维护文档，或调整文档用途、归属分类、入口状态时，必须同步更新该索引。只改正文但不改变文档职责和分类时，可以不更新该索引；如果清单中的“标题 / 当前用途”会因此失真，则必须同步更新。
 

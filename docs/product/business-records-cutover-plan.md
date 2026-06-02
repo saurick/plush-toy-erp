@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Business Records Cutover Plan
+Doc Type / 文档类型: Business Records Cutover Plan / business_records 切换计划
 Status / 状态: Draft Plan / 草案计划
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

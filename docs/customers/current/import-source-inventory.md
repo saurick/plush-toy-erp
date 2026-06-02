@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Current Customer Import Source Inventory
+Doc Type / 文档类型: Current Customer Import Source Inventory / current 客户导入来源清单
 Status / 状态: Draft / 草案
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

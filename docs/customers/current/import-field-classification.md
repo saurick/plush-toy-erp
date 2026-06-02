@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Current Customer Import Field Classification
+Doc Type / 文档类型: Current Customer Import Field Classification / current 客户导入字段分类
 Status / 状态: Draft / 草案
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

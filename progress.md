@@ -6,6 +6,12 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-02 16:50
+- 完成：补齐 `docs/` 下 19 个 `Doc Type / 文档类型` metadata 值的中文说明，保留原 English anchor，并将 `Current Source Snapshot Freeze Evidence` 明确为 `current 来源快照冻结证据`。
+- 完成：同步 `docs/README.md` 文档 metadata 规则，明确凡出现 `Doc Type / 文档类型`，类型值必须保留 English anchor 并补中文说明。
+- 下一步：后续新增带 metadata 头的 Markdown 时，先按 `docs/README.md` 保持字段名和值的中英可读性，再判断是否需要同步 `docs/document-inventory.md`。
+- 阻塞/风险：docs-only 文案口径修正；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。本轮追加前 `progress.md` 为 92 行 / 17229 bytes，未达到归档阈值。
+
 ## 2026-06-02 16:18
 - 完成：新增 `docs/customers/current/raw-source-file-archive-review.md`，登记 `/Users/simon/Downloads/永绅erp/原文件/` 下 8 个 current 原始 Excel / PDF / PNG 的类型、大小、checksum、用途分类、允许落点和禁止事项。
 - 完成：同步 `docs/customers/current/README.md`、`docs/customers/current/source-materials.md`、`docs/document-inventory.md` 和 `docs/current-source-of-truth.md`，明确原始文件本轮不移动进仓库、不提交二进制原件、不作为 Product Core 或真实导入批准。

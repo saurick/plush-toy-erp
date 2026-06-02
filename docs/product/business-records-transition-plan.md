@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Business Records Transition Plan
+Doc Type / 文档类型: Business Records Transition Plan / business_records 过渡计划
 Status / 状态: Proposed / 候选
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

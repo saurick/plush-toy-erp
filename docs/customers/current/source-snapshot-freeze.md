@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Current Source Snapshot Freeze Evidence
+Doc Type / 文档类型: Current Source Snapshot Freeze Evidence / current 来源快照冻结证据
 Status / 状态: 012 Evidence Prepared / 012 证据已准备
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

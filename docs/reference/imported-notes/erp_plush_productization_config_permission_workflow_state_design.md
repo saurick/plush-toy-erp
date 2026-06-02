@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Imported Design Note
+Doc Type / 文档类型: Imported Design Note / 外部导入设计笔记
 Status / 状态: Reference Only / 仅作参考
 Runtime Source of Truth / 运行时真源: No / 否
 Schema Source of Truth / Schema 真源: No / 否

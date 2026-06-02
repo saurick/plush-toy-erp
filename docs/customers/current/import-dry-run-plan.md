@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Current Customer Import Dry-run Plan
+Doc Type / 文档类型: Current Customer Import Dry-run Plan / current 客户导入 dry-run 计划
 Status / 状态: Draft + 011 Tooling Added / 草案，已补 011 工具
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

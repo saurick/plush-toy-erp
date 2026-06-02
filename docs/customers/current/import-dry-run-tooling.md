@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Current Customer Import Dry-run Tooling
+Doc Type / 文档类型: Current Customer Import Dry-run Tooling / current 客户导入 dry-run 工具说明
 Status / 状态: Implemented Tooling / 已实现本地工具
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否

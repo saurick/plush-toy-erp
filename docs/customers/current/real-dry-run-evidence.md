@@ -1,4 +1,4 @@
-Doc Type / 文档类型: Current Real Dry-run Evidence
+Doc Type / 文档类型: Current Real Dry-run Evidence / current 真实 dry-run 证据
 Status / 状态: 012 Evidence Prepared / 012 证据已准备
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
