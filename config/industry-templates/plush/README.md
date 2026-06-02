@@ -1,4 +1,4 @@
-# Plush Industry Template
+# 毛绒行业模板 / Plush Industry Template
 
 本目录是毛绒玩具行业模板的未来落点。
 

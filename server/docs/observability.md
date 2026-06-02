@@ -12,7 +12,7 @@
 - 日志会额外输出 `trace_sampled`；只有 trace 真正被采样时才输出 `trace_link_id`，供 Loki 安全跳转 Jaeger
 - 关键鉴权与后台账号链路已保留成功 / 失败日志
 
-### Trace
+### Trace 链路追踪 / Trace
 
 - HTTP JSON-RPC 路由已接入 tracing middleware
 - gRPC 服务已接入 tracing middleware
@@ -47,7 +47,7 @@
 
 ## 对当前部署路径的影响
 
-### Compose
+### Compose 部署观测 / Compose
 
 - Compose 当前保留 PostgreSQL `healthcheck`
 - 业务容器默认依赖 `/healthz`、`/readyz` 作为发布后 smoke 检查入口

@@ -6,11 +6,11 @@ Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: `scripts/import/currentSourceSnapshotFreezeCheck.mjs` and `scripts/import/currentCustomerDryRun.mjs`
 Current Evidence Inputs / 当前证据输入: `output/current-source-snapshot-freeze/` and `output/current-real-dry-run-evidence/`
 
-# Current Source Snapshot Manual Review Checklist
+# current 来源快照人工复查清单 / Current Source Snapshot Manual Review Checklist
 
 本清单用于 review 012 freeze evidence 和 dry-run evidence。结论默认是 import not approved，直到后续单独 Goal 完成真实 loader 设计、备份、回滚、幂等、对账和客户确认。
 
-## Review Checklist
+## 复查清单 / Review Checklist
 
 | area | review item | evidence | required conclusion |
 |---|---|---|---|
@@ -33,7 +33,7 @@ Current Evidence Inputs / 当前证据输入: `output/current-source-snapshot-fr
 | sensitive data review | 只 review 字段名和 source reference，不复制 raw sensitive values。 | `freeze-check-summary.json`、`freeze-check-report.md` | 禁止把敏感原值写入报告。 |
 | customer sign-off | 预留客户确认 evidence package、unresolved 处理和 exclusions。 | customer sign-off notes | 012 不包含 sign-off。 |
 
-## Customer Sign-off Placeholder
+## 客户签收占位 / Customer Sign-off Placeholder
 
 | item | status | note |
 |---|---|---|
@@ -44,7 +44,7 @@ Current Evidence Inputs / 当前证据输入: `output/current-source-snapshot-fr
 | backup / rollback plan approved | Pending | 012 未设计真实 loader。 |
 | import execution approved | Not approved | 012 不是真实导入批准。 |
 
-## Import-not-approved Conclusion
+## 不批准导入结论 / Import-not-approved Conclusion
 
 当前结论：import not approved。
 

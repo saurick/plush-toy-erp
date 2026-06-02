@@ -1,4 +1,4 @@
-# Decision Log
+# 决策日志 / Decision Log
 
 只记录已经确认的决策，不把猜测写成已决策。
 

@@ -1,4 +1,4 @@
-# Imported Design Notes
+# 外部设计输入 / Imported Design Notes
 
 本目录保存外部设计输入，只作为 0 到 1 架构整理的参考资料。
 

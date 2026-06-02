@@ -1,4 +1,4 @@
-# Customer / Supplier MasterData Review
+# 客户 / 供应商主数据评审 / Customer / Supplier MasterData Review
 
 ## 结论
 
@@ -91,7 +91,7 @@
 
 - partners 记录按类型迁移或保留为历史快照。
 
-### Option B: partners + roles
+### 方案 B：合作方 + 角色 / Option B: partners + roles
 
 优点：
 

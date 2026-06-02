@@ -1,4 +1,4 @@
-# Change Request Process
+# 变更请求流程 / Change Request Process
 
 本流程只说明后续客户需求如何分类和评审，不创建 Change 模块，不新增 `change_records`。
 

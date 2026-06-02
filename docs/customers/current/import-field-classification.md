@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Current Customer Import Field Classification
+# current 客户导入字段分类 / Current Customer Import Field Classification
 
 本字段分类表只服务 current 客户导入 dry-run。字段分类不代表 schema 变更，不代表导入执行，也不代表 current 样本字段已经成为 Product Core。
 
@@ -20,7 +20,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 不能自动迁移的字段 | `product_skus`、`purchase_orders`、`shipments`、`stock_reservations`、inventory facts、finance facts、workflow done 推导字段、`shipping_released` 推导字段、demo/seed/debug 数据。 |
 | Product Core 判断 | current 客户样本字段不能自动变成 Product Core 必填字段；只有既有正式模型字段或经过 Product Core 评审的通用字段才可进入核心。 |
 
-## customers
+## 客户 / customers
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -29,7 +29,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 国家 / 地区 / 地址 | 客户资料快照 | `customers` | nullable address / country fields 或 note | Customer Material | 否 | 是 | 否 | 可能是 current 客户样本字段，不能自动变成 Product Core 必填。 |
 | 税号 / 付款方式 / 账期 | 财务候选资料 | `customers` | nullable tax_no / note candidate | Customer Material | 否 | 是 | 否 | future finance / customer config review 前不能强制写入核心必填。 |
 
-## suppliers
+## 供应商 / suppliers
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -37,7 +37,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 供应商编号 / document_no | 供应商代码候选 | `suppliers` | `supplier_code` / `code` | Data Import Source | 条件允许 | 是 | 否 | 编号缺失时不得伪造；重复进入 unresolved。 |
 | 开票 / 银行 / 结算字段 | 供应商财务资料 | `suppliers` | nullable note candidate | Customer Material | 否 | 是 | 否 | 不得自动生成 AP、invoice、payment，也不得成为 Product Core 必填。 |
 
-## contacts
+## 联系人 / contacts
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -45,7 +45,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 办公室电话 / 手机 / 邮箱 | 联系方式 | `contacts` | `phone`, `mobile`, `email` | Data Import Source | 条件允许 | 是 | 否 | 格式异常进入 unresolved；不得无 owner 写入。 |
 | 职务 / 称谓 / 备注 | 联系人说明 | `contacts` | `title`, `note` | Customer Material | 否 | 是 | 否 | 可能是客户习惯字段，需人工决定是否写 note。 |
 
-## sales_orders
+## 销售订单 / sales_orders
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -55,7 +55,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 订单日期 / 交期 / 出货日期 | 单据日期和预期交付 | `sales_orders` | `order_date`, `expected_ship_date` | Data Import Source | 条件允许 | 是 | 否 | 日期格式无效进入 unresolved；出货日期不证明已发货。 |
 | 业务员 / 类别 / 资料齐套 | 订单协同或客户样本字段 | `sales_orders` | note candidate | Customer Material | 否 | 是 | 否 | 不自动形成 Product Core 状态机或 Workflow facts。 |
 
-## sales_order_items
+## 销售订单明细 / sales_order_items
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -65,7 +65,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 单价 / 金额 | 订单行金额快照 | `sales_order_items` | nullable unit_price / amount candidate | Data Import Source | 条件允许 | 是 | 否 | 只可作为源单据金额，不生成应收、发票或付款。 |
 | 未出货数 / 生产数量 | 履约或生产线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | 没有 shipment / production facts，不得自动写 shipped quantity、shipment、inventory 或 finance。 |
 
-## products
+## 产品 / products
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -73,7 +73,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 产品名称 / 规格 / 图号 | 成品资料 | existing `products` | name / spec candidate | Data Import Source | 条件允许 | 是 | 否 | 需防止旧 `business_records.products` 与正式 products 双真源。 |
 | 颜色 / 尺寸 / 包装版本 / SKU | 可售规格线索 | none in 010 | none | Deferred | 否 | 是 | 是 | `product_skus` 仍 draft-only，不得自动创建。 |
 
-## materials
+## 材料 / materials
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -81,14 +81,14 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 厂商料号 / 规格 / 材料类别 | 物料属性线索 | existing `materials` | spec / category candidate | Data Import Source | 条件允许 | 是 | 否 | 供应商料号和物料编码需人工确认。 |
 | 主料 / 辅料 / 包材 | 行业分类 | existing `materials` / template | category candidate | Industry Template Candidate | 否 | 是 | 否 | 可作为行业模板候选，但不能直接写死 Product Core 必填。 |
 
-## warehouses
+## 仓库 / warehouses
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
 | 仓库 / 仓库位置 / 货位 | 仓库或库位文本 | existing `warehouses` | code / name candidate | Data Import Source | 低置信条件允许 | 是 | 否 | 可能是仓库、库位、备注或地点；必须人工归类。 |
 | 成品仓 / 原料仓 | 默认仓库候选 | Customer Config | default warehouse candidate | Customer Config | 否 | 是 | 否 | 可进入客户配置草案，不写运行时 loader。 |
 
-## BOM
+## 物料清单 / BOM
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -96,14 +96,14 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 物料 / 单位用量 / 损耗 | BOM 明细候选 | existing `bom_items` | material_id / unit_id / quantity / loss_rate | Data Import Source | 条件允许 | 是 | 否 | material/unit/product 必须唯一匹配；BOM 不写库存事实。 |
 | 色卡 / 作业指导书 / 图片 | 工程附件线索 | none in 010 | none | Industry Template Candidate | 否 | 是 | 否 | 作为附件或模板候选，不塞进事实或库存。 |
 
-## purchase
+## 采购 / purchase
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
 | 采购单号 / 下单日期 / 采购数量 | 采购承诺线索 | none in 010 | none | Deferred | 否 | 是 | 是 | `purchase_orders` 仍 draft-only / V2 candidate，不得自动创建。 |
 | 入库 / 到仓 / 检验字段 | 采购入库或质检线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | 不得从 Excel/PDF/business_records 自动生成 purchase receipt、quality、inventory facts。 |
 
-## outsourcing
+## 外协 / outsourcing
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
@@ -111,21 +111,21 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | 加工厂 / 联系人 | 委外交易主体 | `suppliers` / `contacts` | supplier/contact candidate | Data Import Source | 条件允许 | 是 | 否 | 仅主数据候选；合同和结算不自动落事实。 |
 | 加工金额 / 结算方式 | 结算线索 | none in 010 | none | Print Template Input | 否 | 是 | 是 | 可作打印样本输入，不生成 AP、invoice、payment。 |
 
-## shipment
+## 出货 / shipment
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
 | 出货放行 / `shipping_released` | 放行状态线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | `shipping_released != shipped`；不得自动生成 shipments 或扣库存。 |
 | 出货日期 / 未出货数 / 出库单 | 出货事实线索 | none in 010 | none | Deferred | 否 | 是 | 是 | `shipments` 和 `stock_reservations` deferred；真实出货必须后续 ShipmentUsecase 评审。 |
 
-## inventory
+## 库存 / inventory
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
 | 库存数量 / 入库数量 / 出库数量 | 库存事实线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | 不得自动生成 `inventory_txns`、`inventory_balances`、`inventory_lots`。 |
 | 仓库文本 | 仓库主数据线索 | existing `warehouses` | warehouse candidate | Data Import Source | 低置信条件允许 | 是 | 否 | 只做主数据候选，不写余额或流水。 |
 
-## finance
+## 财务 / finance
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|

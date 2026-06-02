@@ -1,4 +1,4 @@
-# Current Import Dry-run Fixtures
+# current 导入 dry-run fixtures / Current Import Dry-run Fixtures
 
 These fixtures are synthetic samples for `scripts/import/currentCustomerDryRun.mjs`.
 They contain no real customer data and are only used to verify the dry-run tooling.
@@ -8,7 +8,7 @@ customer data, not import approval, and not evidence that real import execution 
 allowed. They exist only for the 012 source snapshot freeze checker and dry-run
 evidence preparation flow.
 
-## Files
+## 文件 / Files
 
 | file | purpose |
 |---|---|
@@ -17,7 +17,7 @@ evidence preparation flow.
 | `source-snapshot.freeze.sample.json` | Larger sanitized freeze source snapshot covering customer update/create, supplier review, contact with owner, contact missing owner, sales order and item candidates, unknown unit, product/material/unit/warehouse references, BOM candidate, product_skus and purchase_orders deferred rows, shipment/inventory/finance forbidden rows, shipping boundary, workflow/fact boundary, and sensitive field-name warning. |
 | `existing-v1.freeze.sample.json` | Sanitized existing V1/formal model snapshot for freeze evidence and real dry-run evidence generation. |
 
-## Source Snapshot Format
+## 来源快照格式 / Source Snapshot Format
 
 ```json
 {
@@ -45,7 +45,7 @@ evidence preparation flow.
 
 `--strict-source` requires every source row to include `sourceId`, `sourceType`, `sourceKind`, `moduleKey`, `domain`, and `fields`.
 
-## Existing Snapshot Format
+## 现有数据快照格式 / Existing Snapshot Format
 
 ```json
 {
@@ -74,7 +74,7 @@ evidence preparation flow.
 
 The existing snapshot is read-only matching input. The CLI never reads from or writes to a database.
 
-## Freeze Fixture Boundary
+## 冻结 fixture 边界 / Freeze Fixture Boundary
 
 `source-snapshot.freeze.sample.json` and `existing-v1.freeze.sample.json` are
 safe fixtures for repeatable evidence generation:

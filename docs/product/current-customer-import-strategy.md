@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Current Customer Import Strategy
+# current 客户导入策略 / Current Customer Import Strategy
 
 本策略从 Product 层约束 current 客户数据导入。011 已新增 dry-run preview package tooling，012 已新增 source snapshot freeze checker 和 real dry-run evidence preparation；它们都不是真实 import loader，不代表真实导入已经开始。
 
-## Position
+## 定位 / Position
 
 `current` 是第一个真实客户、种子客户和私有化客户实例来源。current 资料可以作为：
 
@@ -28,7 +28,7 @@ current 资料不能直接成为：
 - shipment / inventory / finance facts。
 - `business_records` 之外的隐藏兼容事实。
 
-## Import Principles
+## 导入原则 / Import Principles
 
 | principle | decision |
 |---|---|
@@ -42,7 +42,7 @@ current 资料不能直接成为：
 | 不双写 | future import 不得同时写 V1 和 `business_records` 作为两个正式真源。 |
 | 单独 Goal | 真实 import loader、backfill、migration execution 必须作为后续单独 Goal。 |
 
-## Target Model Strategy
+## 目标模型策略 / Target Model Strategy
 
 | domain | strategy |
 |---|---|
@@ -58,7 +58,7 @@ current 资料不能直接成为：
 | inventory facts | 只由 InventoryUsecase / purchase facts 等正式事实 usecase 写入；导入不生成。 |
 | finance facts | 至少等待 finance review；导入不生成 AR/AP、invoice、payment、reconciliation。 |
 
-## Future Import Loader Requirements
+## 未来导入 loader 要求 / Future Import Loader Requirements
 
 011 已实现 dry-run preview package：
 
@@ -95,7 +95,7 @@ node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
 8. 不删除或覆盖 `business_records` 历史快照。
 9. 不绕过 V1 MasterData / SalesOrder usecase 或已有正式 fact usecase。
 
-## Non-goals
+## 非目标 / Non-goals
 
 - 不实现 SaaS 多租户。
 - 不新增 `tenant_id`。

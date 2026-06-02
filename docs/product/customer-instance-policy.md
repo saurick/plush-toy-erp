@@ -1,4 +1,4 @@
-# Customer Instance Policy
+# 客户实例策略 / Customer Instance Policy
 
 ## current 是什么
 

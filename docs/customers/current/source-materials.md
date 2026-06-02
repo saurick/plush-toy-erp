@@ -1,4 +1,4 @@
-# Source Materials
+# 来源材料 / Source Materials
 
 本文件只记录 current 客户资料用途，不把资料直接升级为通用产品真源。
 
@@ -18,3 +18,9 @@
 2. 当前客户特殊字段、特殊流程和特殊报表不能直接进入核心 usecase。
 3. 涉及库存、出货、财务事实的资料必须进入架构评审。
 4. current 数据导入必须先 dry-run、字段分类、unresolved queue 和人工确认；010 不执行真实导入。
+
+## 原始文件归档口径 / Raw Source File Archive
+
+`/Users/simon/Downloads/永绅erp/原文件/` 下的 current 原始 Excel / PDF / PNG 本轮不移动进仓库，也不作为 Product Core、runtime、schema、migration、API、UI、seedData、docs registry 或真实导入批准。
+
+具体文件清单、checksum、用途分类和后续允许落点见 `raw-source-file-archive-review.md`。

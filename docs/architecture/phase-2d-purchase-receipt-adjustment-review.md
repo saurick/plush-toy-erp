@@ -76,7 +76,7 @@ Phase 2D-B 本轮只评审入库差异、收货差异和入库后更正如何建
 
 采购退货是供应商方向的业务动作，不是库存账纠错工具。少收扣账如果用退货表达，会错误暗示货物曾经退回供应商。
 
-### Inventory adjustment
+### 库存调整 / Inventory adjustment
 
 | 适合 | 当前缺口 |
 | --- | --- |
@@ -84,7 +84,7 @@ Phase 2D-B 本轮只评审入库差异、收货差异和入库后更正如何建
 
 现有 `inventory_txns` 已支持 `ADJUST_IN / ADJUST_OUT`，但库存流水不能自己充当业务单据。只要用调整类流水，就必须先有来源单据真源。
 
-### Quality hold / reject
+### 质检暂挂 / 拒收 / Quality hold / reject
 
 | 适合 | 当前缺口 |
 | --- | --- |

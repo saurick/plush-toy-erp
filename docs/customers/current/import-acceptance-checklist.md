@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Current Customer Import Acceptance Checklist
+# current 客户导入验收清单 / Current Customer Import Acceptance Checklist
 
 本清单用于 future current 客户导入前的 dry-run 验收。010 只产出清单，不执行真实导入；011 已新增 CLI dry-run package；012 已新增 source snapshot freeze checker、sanitized freeze fixtures、freeze evidence、real dry-run evidence 和 manual review checklist。这些都可作为 future import 前置 evidence，但仍不代表真实导入可以直接执行。
 
-## Checklist
+## 检查清单 / Checklist
 
 | item | required before import execution | evidence | 010 status |
 |---|---:|---|---|
@@ -37,7 +37,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | backup plan prepared | 是 | 数据库备份和 source artifact 归档 | Future Stage 6 required |
 | customer sign-off | 是 | 客户确认导入预览和 unresolved 处理 | Future Stage 5 required |
 
-## 011 CLI Evidence
+## 011 CLI 证据 / 011 CLI Evidence
 
 011 的 dry-run evidence 由以下命令生成：
 
@@ -51,7 +51,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 
 `validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。真实导入仍需要人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和单独 implementation Goal。
 
-## 012 Freeze Evidence
+## 012 冻结证据 / 012 Freeze Evidence
 
 012 的 freeze evidence 由以下命令生成：
 
@@ -74,7 +74,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 
 `freeze-metadata.json` 和 `validation-summary.json` 中 `canExecuteRealImport` 都必须为 `false`。output 目录是 evidence，不是 import approval，不纳入 git。
 
-## Pre-import Gate
+## 导入前门禁 / Pre-import Gate
 
 真实 import execution 之前必须同时满足：
 
@@ -86,7 +86,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 6. import loader 只走正式 V1 / existing usecase，不绕过业务规则。
 7. `business_records` 保留为 source snapshot，不双写。
 
-## Rejection Criteria
+## 拒绝条件 / Rejection Criteria
 
 出现以下情况不得执行导入：
 

@@ -8,6 +8,7 @@
 | --- | --- |
 | `source-materials.md` | 记录当前客户样本资料类型和用途 |
 | `requirement-clues.md` | 按业务域记录需求线索 |
+| `raw-source-file-archive-review.md` | 记录 current 原始客户文件归档评审、用途分类和未来落点 |
 | `assumption-register.md` | 记录尚不能开发成规则的假设 |
 | `question-backlog.md` | 用业务人员能看懂的话列待确认问题 |
 | `decision-log.md` | 只记录已经确认的决策 |

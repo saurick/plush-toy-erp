@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Current Customer Import Source Inventory
+# current 客户导入来源清单 / Current Customer Import Source Inventory
 
 本清单只用于 010 的 current 客户数据导入 dry-run 设计。它不执行真实导入，不写 import/backfill 代码，不修改 runtime、schema、migration、API、UI、docs registry、seedData 或 `business_records`。
 
-## Source Inventory
+## 来源清单 / Source Inventory
 
 | source | type | owner | business domain | can import? | import target | confidence | needs manual review? | notes |
 |---|---|---|---|---:|---|---|---:|---|

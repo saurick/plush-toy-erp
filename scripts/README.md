@@ -48,7 +48,7 @@ pnpm smoke:processing-contract-real-login
 
 ## 推荐顺序
 
-### 0. Import freeze and dry-run tooling
+### 0. 导入冻结与 dry-run 工具 / Import freeze and dry-run tooling
 
 current source snapshot freeze checker 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
 

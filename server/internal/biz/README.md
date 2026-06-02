@@ -1,4 +1,4 @@
-# Biz
+# 业务层说明 / Biz
 
 `biz` 层承载业务规约和 usecase，不直接关心 HTTP / gRPC / JSON-RPC 传输细节，也不直接操作数据库驱动。
 

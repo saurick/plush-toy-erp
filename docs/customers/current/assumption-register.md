@@ -1,4 +1,4 @@
-# Assumption Register
+# 假设登记 / Assumption Register
 
 这些内容是当前假设，不能直接开发成规则。
 

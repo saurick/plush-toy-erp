@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Current Customer Import Dry-run Plan
+# current 客户导入 dry-run 计划 / Current Customer Import Dry-run Plan
 
 本计划最初由 010 设计 dry-run 流程。011 已新增 `scripts/import/currentCustomerDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview。012 已新增 `scripts/import/currentSourceSnapshotFreezeCheck.mjs`，用于冻结 source snapshot evidence，并基于 sanitized freeze fixtures 生成 real dry-run evidence package。011 和 012 都不读写正式数据库、不执行真实迁移、不修改 seedData 或 `business_records`。
 
-## Scope
+## 范围 / Scope
 
 | item | decision |
 |---|---|
@@ -21,7 +21,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 011 输出 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` |
 | 012 输出 | `freeze-metadata.json`、`freeze-check-summary.json`、`freeze-check-report.md`、`output/current-real-dry-run-evidence/*`、source snapshot freeze 文档、real dry-run evidence 文档和人工 review checklist |
 
-## 011 Tooling Status
+## 011 工具状态 / 011 Tooling Status
 
 011 已实现一个只读 CLI：
 
@@ -46,7 +46,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 - Stage 5：客户 sign-off、备份 / 回滚 / 导入审批。
 - Stage 6：真实 import execution；011 未实现。
 
-## 012 Freeze + Evidence Status
+## 012 冻结 + 证据状态 / 012 Freeze + Evidence Status
 
 012 已实现 freeze checker：
 
@@ -77,7 +77,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 - output 是 evidence，不是 import approval。
 - 真实 import loader 仍需单独 Goal，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
 
-## Stage 0: Source Collection
+## 阶段 0：来源收集 / Stage 0: Source Collection
 
 目标：收集来源文件、seed、`business_records` 快照和 V1 现有数据引用，只读扫描，不写数据库。
 
@@ -106,7 +106,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 - 无法区分 demo/seed/source snapshot 与正式事实。
 - 需要写数据库、写 loader 或改 seedData。
 
-## Stage 1: Parse and Normalize
+## 阶段 1：解析与标准化 / Stage 1: Parse and Normalize
 
 目标：解析字段并标准化客户、供应商、产品、材料、订单字段；记录无法识别字段。
 
@@ -132,7 +132,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 - 旧快照缺值不自动补“看起来合理”的值。
 - current 专属字段不自动成为 Product Core。
 
-## Stage 2: Match Existing V1 Data
+## 阶段 2：匹配现有 V1 数据 / Stage 2: Match Existing V1 Data
 
 目标：只读匹配 V1 和 existing formal model，识别可导入候选、重复候选和冲突候选。
 
@@ -164,7 +164,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 - 不创建 shipments、stock reservations、inventory facts 或 finance facts。
 - 不让 `business_records` 成为正式模型父表。
 
-## Stage 3: Generate Preview
+## 阶段 3：生成预览 / Stage 3: Generate Preview
 
 目标：生成可导入预览、skipped rows、unresolved queue、duplicate candidates 和 conflict candidates。
 
@@ -184,7 +184,7 @@ skipped rows 包含：
 - 目标模型不存在或属于 deferred domain。
 - forbidden fact generation。
 
-## Stage 4: Manual Review
+## 阶段 4：人工复查 / Stage 4: Manual Review
 
 目标：人工确认客户、供应商、产品、订单映射和不能自动判断的字段。
 
@@ -207,7 +207,7 @@ skipped rows 包含：
 - unresolved remain list。
 - forbidden auto-import acknowledgement。
 
-## Stage 5: Approval Before Import
+## 阶段 5：导入前批准 / Stage 5: Approval Before Import
 
 目标：审批导入结果，明确本阶段仍不写数据库。
 
@@ -233,7 +233,7 @@ skipped rows 包含：
 - import execution readiness notes。
 - future loader design requirements。
 
-## Stage 6: Future Import Execution
+## 阶段 6：未来真实导入执行 / Stage 6: Future Import Execution
 
 当前 010 不执行 Stage 6。
 
@@ -247,7 +247,7 @@ skipped rows 包含：
 - 禁止自动生成 shipments、stock reservations、inventory_txns、AR/AP、invoice、payment。
 - 导入前后对账，并保留 source reference。
 
-## Dry-run Deliverables
+## Dry-run 交付物 / Dry-run Deliverables
 
 | deliverable | purpose |
 |---|---|

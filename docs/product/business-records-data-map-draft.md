@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Business Records Data Map Draft
+# business_records 数据映射草案 / Business Records Data Map Draft
 
 本草案只描述后续 dry-run / import draft 可使用的字段映射，不迁移数据，不写 import/backfill 代码，不修改 schema。
 
@@ -19,7 +19,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 - `purchase_orders / shipments / finance facts` 仍 deferred，不得自动映射。
 - 没有事实依据不得生成 shipment / inventory / finance facts。
 
-## Data Map Draft
+## 数据映射草案 / Data Map Draft
 
 | Source | Source fields | Target model | Target fields | Can auto map? | Needs manual review? | Forbidden auto map? | Notes |
 |---|---|---|---|---:|---:|---:|---|

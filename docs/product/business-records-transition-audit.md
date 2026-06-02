@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Business Records Transition Audit
+# business_records 过渡审计 / Business Records Transition Audit
 
 本文件是 009 docs-only 审计结论，不代表任何 runtime 切换已经实施。
 

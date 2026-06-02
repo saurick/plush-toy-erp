@@ -1,4 +1,4 @@
-# taskgroup
+# taskgroup 并发任务工具说明 / taskgroup
 
 `taskgroup` 是一个轻量的后台 goroutine 生命周期管理器，目标不是做通用线程池，而是把“启动、取消、等待、panic 收口”集中到一个点，方便服务退出和问题排查。
 

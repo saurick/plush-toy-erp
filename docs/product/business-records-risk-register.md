@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Business Records Risk Register
+# business_records 风险登记 / Business Records Risk Register
 
 本风险登记只覆盖 `business_records` 兼容层过渡，不代表任何 runtime 防护已经实施。
 
@@ -28,7 +28,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 财务快照误写财务事实 | 旧 reconciliation/payables/receivables/invoices 记录可能被当正式应收应付 | finance facts 尚未落地；旧入口只是快照 | finance review 前只保留 source snapshot；不得自动生成 AR/AP/invoice/payment | Finance | 是 |
 | Workflow source 切换破坏移动端任务 | workflow_tasks source_type/source_id 可能仍指向旧 module 和 record | mobile task、linked navigation、workflow helper 使用旧 source key | source cutover 单独评审；兼容期保留旧 source 跳转 | Workflow / Mobile | 是 |
 
-## Top Risks
+## 主要风险 / Top Risks
 
 | 优先级 | 风险 | 当前处理 |
 |---:|---|---|

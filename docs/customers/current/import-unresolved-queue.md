@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Current Customer Import Unresolved Queue
+# current 客户导入待确认队列 / Current Customer Import Unresolved Queue
 
 unresolved queue 用于 dry-run 阶段记录不能自动处理的来源、字段和候选动作。本设计不实现队列代码，不创建表，不写 `business_records`，不执行真实迁移。
 
-## Queue Rules
+## 队列规则 / Queue Rules
 
 - 涉及 shipment / inventory / finance facts 的 unresolved 必须 block。
 - 涉及 `product_skus / purchase_orders` 的 unresolved 必须 deferred。
@@ -17,7 +17,7 @@ unresolved queue 用于 dry-run 阶段记录不能自动处理的来源、字段
 - 无 source reference 的记录不得自动导入。
 - demo/seed/debug 数据默认 skip 或单独标记，不能进入正式数据。
 
-## Unresolved Types
+## 待确认类型 / Unresolved Types
 
 | type | meaning | example | owner role | resolution options | can auto resolve? | must block import? | notes |
 |---|---|---|---|---|---:|---:|---|
@@ -39,7 +39,7 @@ unresolved queue 用于 dry-run 阶段记录不能自动处理的来源、字段
 | forbidden fact generation | 会伪造事实 | 从“未出货数”生成 shipment 或库存扣减 | Architecture / Data | 拒绝自动导入、记录风险、后续事实 usecase 评审 | 否 | 是 | shipment / inventory / finance facts 必须 block。 |
 | needs manual review | 置信度不足 | 字段语义不清或 current 特殊字段 | Domain Owner | 人工确认分类、补充样本、跳过 | 否 | 视目标而定 | 当前客户字段不能自动进 Product Core。 |
 
-## Queue Item Minimum Fields
+## 队列项最小字段 / Queue Item Minimum Fields
 
 | field | purpose |
 |---|---|
@@ -55,7 +55,7 @@ unresolved queue 用于 dry-run 阶段记录不能自动处理的来源、字段
 | resolution | resolved / skipped / deferred / forbidden |
 | decision_note | 人工确认说明 |
 
-## Block Policy
+## 阻断策略 / Block Policy
 
 | domain | policy |
 |---|---|

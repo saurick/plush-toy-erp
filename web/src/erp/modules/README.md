@@ -1,4 +1,4 @@
-# ERP Modules Skeleton
+# ERP 模块骨架 / ERP Modules Skeleton
 
 本目录是未来前端模块化的骨架目录。
 

@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: `scripts/import/currentSourceSnapshotFreezeCheck.mjs`
 
-# Current Source Snapshot Freeze
+# current 来源快照冻结 / Current Source Snapshot Freeze
 
 012 已新增 current source snapshot freeze checker，并基于 sanitized fixture 生成 freeze evidence。该 evidence 只证明 source snapshot freeze checker 可运行、输入可追溯、风险可复查；它不是真实导入批准。
 
-## Freeze Metadata
+## 冻结 metadata / Freeze Metadata
 
 | item | value |
 |---|---|
@@ -25,7 +25,7 @@ Current Implementation Source of Truth / 当前实现真源: `scripts/import/cur
 | `canExecuteRealImport` | `false` |
 | Manual review required | `true` |
 
-## Freeze Checker Command
+## 冻结检查命令 / Freeze Checker Command
 
 ```bash
 node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
@@ -34,7 +34,7 @@ node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
   --out output/current-source-snapshot-freeze
 ```
 
-## 011 Dry-run Command
+## 011 Dry-run 命令 / 011 Dry-run Command
 
 ```bash
 node scripts/import/currentCustomerDryRun.mjs \
@@ -44,7 +44,7 @@ node scripts/import/currentCustomerDryRun.mjs \
   --format json,md
 ```
 
-## Domain Count
+## 领域计数 / Domain Count
 
 | domain | count |
 |---|---:|
@@ -64,14 +64,14 @@ node scripts/import/currentCustomerDryRun.mjs \
 | inventory | 1 |
 | finance | 1 |
 
-## Source Type Count
+## 来源类型计数 / Source Type Count
 
 | sourceType | count |
 |---|---:|
 | Data Import Source | 19 |
 | Industry Template Candidate | 1 |
 
-## Known Blockers
+## 已知阻塞 / Known Blockers
 
 | blocker type | count | meaning |
 |---|---:|---|
@@ -79,22 +79,22 @@ node scripts/import/currentCustomerDryRun.mjs \
 | shipping boundary risk | 4 | `shipping_released` or shipped wording must not become shipment, shipped, or inventory facts. |
 | workflow fact boundary risk | 2 | workflow done / fact posted wording must not become posted facts. |
 
-## Known Warnings
+## 已知警告 / Known Warnings
 
 | warning type | count | handling |
 |---|---:|---|
 | sensitive field | 5 | Review field names only; do not copy raw values into reports. |
 | deferred field | 5 | `product_skus` and `purchase_orders` stay deferred until a later Goal explicitly changes the boundary. |
 
-## Sensitive Field Handling
+## 敏感字段处理 / Sensitive Field Handling
 
 Freeze checker evidence records sensitive field names and source references only. It does not output raw phone, email, address, contact, bank, account, or identity values in `freeze-check-summary.json` or `freeze-check-report.md`.
 
-## No Real Import Statement
+## 无真实导入声明 / No Real Import Statement
 
 012 does not execute real import. It does not read DB, write DB, create a loader, generate SQL, generate migration, modify schema/API/UI/seedData/docs registry, write `business_records`, or perform `business_records` cutover. `canExecuteRealImport=false` is mandatory.
 
-## Re-run Instructions
+## 重新运行说明 / Re-run Instructions
 
 ```bash
 rm -rf output/current-source-snapshot-freeze
@@ -112,6 +112,6 @@ cat output/current-source-snapshot-freeze/freeze-check-summary.json
 cat output/current-source-snapshot-freeze/freeze-check-report.md
 ```
 
-## Output Directory Policy
+## 输出目录策略 / Output Directory Policy
 
 `output/current-source-snapshot-freeze/` is local evidence output and is not committed to git. The committed truth is the CLI, sanitized fixtures, tests, and this documentation.

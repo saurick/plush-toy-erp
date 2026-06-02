@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Business Records Cutover Plan
+# business_records 切换计划 / Business Records Cutover Plan
 
 本计划只设计 `business_records` 兼容层的分阶段切换，不执行切换、迁移、删除或双写。
 
@@ -135,7 +135,7 @@ dry-run 输出：
 - 订单行数量 / 单位 / 金额校验。
 - 正式模型状态没有伪造出货、库存和财务事实。
 
-## Stage 5: deprecated / archive
+## 阶段 5：废弃 / 归档 / Stage 5: deprecated / archive
 
 目标：
 

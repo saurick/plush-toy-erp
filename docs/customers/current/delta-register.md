@@ -1,4 +1,4 @@
-# Delta Register
+# 差异登记 / Delta Register
 
 本文件记录 current 客户差异项。差异项默认不进入 Product Core，除非通过通用化评审。
 

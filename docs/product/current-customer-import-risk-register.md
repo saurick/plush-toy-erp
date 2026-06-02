@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Current Customer Import Risk Register
+# current 客户导入风险登记 / Current Customer Import Risk Register
 
 本风险登记覆盖 current 客户导入 dry-run 设计、011 CLI tooling 控制和 012 freeze / evidence preparation 控制。011 / 012 控制只存在于 tooling evidence 和报告层，不是 runtime 防护，也不代表任何真实导入已经实施。
 
-## 011 / 012 Tooling Controls
+## 011 / 012 工具控制 / 011 / 012 Tooling Controls
 
 | control | output | coverage | limitation |
 |---|---|---|---|
@@ -43,7 +43,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 单位映射错误 | 数量语义错误，影响订单、BOM、采购候选 | 单位文本可能是只、件、套、PCS 等 | unknown unit queue；人工映射 existing units | MasterData / Data | 是 |
 | 仓库映射错误 | 仓库、库位、地点混淆 | 仓库字段可能是成品仓、A区、货位或备注 | unknown warehouse queue；库存事实一律 block | Warehouse / Data | 是 |
 
-## Top Risks
+## 主要风险 / Top Risks
 
 | priority | risk | current control |
 |---:|---|---|
@@ -55,7 +55,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | P1 | SKU / purchase order 过早落地 | deferred domain policy |
 | P1 | 未确认字段丢失或塞 note | unresolved queue + manual review |
 
-## Required Next Review
+## 必要下一步评审 / Required Next Review
 
 真实导入前至少需要：
 

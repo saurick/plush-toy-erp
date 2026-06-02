@@ -1,4 +1,4 @@
-# Migration Readiness Checklist
+# 迁移准备检查清单 / Migration Readiness Checklist
 
 ## 目的
 
@@ -9,7 +9,7 @@
 如果 schema 草案包含多租户运行时字段，则停止。
 如果只是 current 客户样本字段但被写成 Product Core，则停止。
 
-## Checklist
+## 检查清单 / Checklist
 
 | Check | Question | Required Evidence | Stop If |
 |---|---|---|---|
@@ -58,7 +58,7 @@ Audit Log
 6. 菜单权限不等于动作权限，前端隐藏按钮不是安全边界。
 7. `business_records` 的兼容期、退出路径和只读 / 迁移策略有文档记录。
 
-## Stop Conditions
+## 停止条件 / Stop Conditions
 
 - 无法证明不重复已有真源。
 - 影响库存 / 出货 / 财务事实但没有对应架构评审。

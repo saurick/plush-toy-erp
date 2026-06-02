@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: `scripts/import/currentCustomerDryRun.mjs`
 
-# Current Real Dry-run Evidence
+# current 真实 dry-run evidence / Current Real Dry-run Evidence
 
 012 使用 011 已实现的 dry-run CLI 和 012 sanitized freeze fixtures 生成 real dry-run evidence package。该 package 用于人工 review，不是真实导入批准。
 
-## Evidence Package
+## 证据包 / Evidence Package
 
 | item | value |
 |---|---|
@@ -20,7 +20,7 @@ Current Implementation Source of Truth / 当前实现真源: `scripts/import/cur
 | No real import | Yes |
 | Manual review required | Yes |
 
-## Dry-run Command
+## Dry-run 命令 / Dry-run Command
 
 ```bash
 node scripts/import/currentCustomerDryRun.mjs \
@@ -30,7 +30,7 @@ node scripts/import/currentCustomerDryRun.mjs \
   --format json,md
 ```
 
-## Generated Output Files
+## 生成输出文件 / Generated Output Files
 
 | file | purpose |
 |---|---|
@@ -44,7 +44,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 | `validation-summary.json` | Summary counts and `canExecuteRealImport=false`. |
 | `dry-run-report.md` | Markdown review report with no-real-import statement. |
 
-## validation-summary Summary
+## validation-summary 摘要 / validation-summary Summary
 
 | metric | value |
 |---|---:|
@@ -57,7 +57,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 | canProceedToManualReview | true |
 | canExecuteRealImport | false |
 
-## Candidates Summary
+## 候选项摘要 / Candidates Summary
 
 | actionCandidate | count |
 |---|---:|
@@ -70,7 +70,7 @@ node scripts/import/currentCustomerDryRun.mjs \
 
 These are dry-run candidates only. `create` and `update` do not mean the system may write DB in 012.
 
-## Unresolved Summary
+## 待确认摘要 / Unresolved Summary
 
 | severity | count |
 |---|---:|
@@ -81,14 +81,14 @@ These are dry-run candidates only. `create` and `update` do not mean the system 
 
 Every block must be reviewed before any later import-loader design. Deferred rows remain out of scope for real import.
 
-## Duplicates / Conflicts Summary
+## 重复 / 冲突摘要 / Duplicates / Conflicts Summary
 
 | output | count | handling |
 |---|---:|---|
 | duplicates | 0 | Continue to review if future real source snapshots include duplicate code/name. |
 | conflicts | 0 | Continue to review if future real source snapshots produce update conflicts. |
 
-## Forbidden Auto-import Summary
+## 禁止自动导入摘要 / Forbidden Auto-import Summary
 
 `forbidden-auto-import.json` contains 15 forbidden entries. The evidence intentionally preserves shipment / inventory / finance boundary records, including:
 
@@ -98,11 +98,11 @@ Every block must be reviewed before any later import-loader design. Deferred row
 - inventory facts require formal fact usecases
 - finance facts require later finance review
 
-## No Real Import Statement
+## 无真实导入声明 / No Real Import Statement
 
 012 does not execute real import. It does not write DB, create a loader, write V1 tables, write `business_records`, generate SQL, generate migration, modify schema/API/UI/seedData/docs registry, or do `business_records` cutover. The dry-run output is evidence, not import approval.
 
-## Manual Review Next Steps
+## 人工复查下一步 / Manual Review Next Steps
 
 1. Review `output/current-source-snapshot-freeze/freeze-check-summary.json`.
 2. Review `output/current-real-dry-run-evidence/unresolved-queue.json`.
@@ -110,14 +110,14 @@ Every block must be reviewed before any later import-loader design. Deferred row
 4. Confirm `product_skus` and `purchase_orders` remain deferred.
 5. Confirm no customer-sensitive raw value is copied into review notes.
 
-## Next Allowed Step
+## 下一步允许事项 / Next Allowed Step
 
 A later Goal may review the evidence and design a real import loader only if it explicitly includes backup, rollback / forward-fix, idempotency, source reference, reconciliation, customer sign-off, and formal usecase boundaries.
 
-## Next Forbidden Step
+## 下一步禁止事项 / Next Forbidden Step
 
 Do not jump from this evidence package directly to real import, DB writes, schema/API/UI/seedData/docs registry changes, or `business_records` runtime cutover.
 
-## Output Directory Policy
+## 输出目录策略 / Output Directory Policy
 
 `output/current-real-dry-run-evidence/` is local evidence output and is not committed to git.

@@ -1,4 +1,4 @@
-# Order / Purchase Boundary Review
+# 订单 / 采购边界评审 / Order / Purchase Boundary Review
 
 ## 结论
 
@@ -14,7 +14,7 @@ inventory_txns = 库存落账事实。
 AR/AP = 财务事实。
 ```
 
-## Sales Order
+## 销售订单 / Sales Order
 
 `sales_orders` 应记录客户订单承诺：
 

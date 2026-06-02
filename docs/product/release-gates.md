@@ -1,6 +1,6 @@
-# Release Gates
+# 发布门禁 / Release Gates
 
-## Definition of Done
+## 完成定义 / Definition of Done
 
 | 层 | DoD |
 | --- | --- |

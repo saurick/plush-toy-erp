@@ -1,10 +1,30 @@
-# Progress
+# 过程记录 / Progress
 
 本文件只保留当前活跃事项、最近完成事项和归档索引；历史流水不作为当前正式需求、实现状态或产品路线真源。
 
 ## 归档索引
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
+
+## 2026-06-02 16:18
+- 完成：新增 `docs/customers/current/raw-source-file-archive-review.md`，登记 `/Users/simon/Downloads/永绅erp/原文件/` 下 8 个 current 原始 Excel / PDF / PNG 的类型、大小、checksum、用途分类、允许落点和禁止事项。
+- 完成：同步 `docs/customers/current/README.md`、`docs/customers/current/source-materials.md`、`docs/document-inventory.md` 和 `docs/current-source-of-truth.md`，明确原始文件本轮不移动进仓库、不提交二进制原件、不作为 Product Core 或真实导入批准。
+- 下一步：如需从原件生成 dry-run 数据，先做脱敏 / 结构化 snapshot fixture，落到 `scripts/import/fixtures/current/*`；如需迁移原件，另开归档迁移任务评审敏感信息、引用关系、docs registry、测试断言和 Git 历史体积。
+- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。本轮追加前 `progress.md` 为 74 行 / 13483 bytes，未达到归档阈值。
+
+## 2026-06-02 16:03
+- 完成：检查 tracked Markdown 的中英可读性状态，确认 metadata 字段已无英文-only 问题、`docs/document-inventory.md` 清单无漏列 / stale 路径 / 英文-only 用途项。
+- 完成：将 54 个仍为英文-only 的 Markdown H1 标题补为中文主体 + English anchor，覆盖根 README、配置 / 部署 README、架构评审、产品路线、current 客户资料、外部参考、server internal README、脚本 fixtures 和前端骨架 README。
+- 完成：继续补齐当前活跃文档里明显用于阅读的英文-only 二级 / 三级章节标题，共 111 处；保留外部导入原文、归档日期标题、纯表名 / API / 代码锚点等不适合机械翻译的标题边界。
+- 完成：把“长期维护 Markdown H1 标题和用于阅读的主要章节标题应中文主体 + English anchor”的规则同步写入 `AGENTS.md` 和 `docs/README.md`。
+- 下一步：后续新增或重命名长期维护 Markdown 文档时，同时检查 H1、主要章节标题、metadata 和 `docs/document-inventory.md` 标题 / 用途列是否都保留中文说明与 English anchor。
+- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 66 行 / 12127 bytes，未达到归档阈值。
+
+## 2026-06-02 15:47
+- 完成：将 `docs/document-inventory.md` 的“标题 / 当前用途”清单项统一补成中文主体 + English anchor，覆盖架构评审、产品路线、current 客户资料、外部参考、前端 / 后端 / 脚本说明等仍偏英文的条目，方便人工审查时先读懂用途、再用英文锚点检索。
+- 完成：把“文档清单标题 / 用途列必须中文主体 + English anchor”的规则同步写入 `AGENTS.md`、`docs/README.md` 和 `docs/document-inventory.md` 使用规则。
+- 下一步：后续新增、删除、重命名或调整长期维护 Markdown 文档时，除同步清单外，也要按中文主体 + English anchor 维护清单里的“标题 / 当前用途”列。
+- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。本轮追加前 `progress.md` 为 60 行 / 11157 bytes，未达到归档阈值。
 
 ## 2026-06-02 15:34
 - 完成：按“活跃文档树回到 roadmap / current-source / product-delivery-ledgers”的口径清理历史遗留文档。删除已完成编号 Codex Goal `000` 到 `012`、旧 `rewrite-roadmap` 兼容入口、早期根目录初始化 / 主流程 / 数据模型 / 项目状态文档，以及旧 Phase 1 / V1 schema draft、cutline、go/no-go、next-goals 等执行规划文档；这些内容后续仅从 Git 历史或 `docs/archive/*` 过程线索追溯。

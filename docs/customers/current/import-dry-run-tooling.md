@@ -5,11 +5,11 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: `scripts/import/currentCustomerDryRun.mjs`
 
-# Current Customer Import Dry-run Tooling
+# current 客户导入 dry-run 工具说明 / Current Customer Import Dry-run Tooling
 
 011 已新增 current 客户导入 dry-run CLI。012 又新增 source snapshot freeze checker，并用 sanitized freeze fixtures 生成 freeze evidence 与 real dry-run evidence package。两者都只读取 JSON snapshot，供人工 review 使用；它们不执行真实导入。
 
-## 012 Freeze Checker
+## 012 冻结检查器 / 012 Freeze Checker
 
 ```bash
 node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
@@ -144,7 +144,7 @@ existing snapshot 只作为只读匹配输入。CLI 不从数据库读取 existi
 | `validation-summary.json` | 统计汇总；`canExecuteRealImport` 永远是 `false`。 |
 | `dry-run-report.md` | 可读 Markdown 报告。 |
 
-## Exit Code
+## 退出码 / Exit Code
 
 | 场景 | 结果 |
 |---|---|

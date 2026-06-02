@@ -1,4 +1,4 @@
-# Mobile Roles Skeleton
+# 移动端角色骨架 / Mobile Roles Skeleton
 
 本目录是未来移动端角色模块化的骨架目录。
 

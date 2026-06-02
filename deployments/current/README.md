@@ -1,4 +1,4 @@
-# current Deployment
+# current 客户部署 / current Deployment
 
 本目录记录 current 私有化部署实例资料。
 

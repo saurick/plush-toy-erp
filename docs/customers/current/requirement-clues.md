@@ -1,4 +1,4 @@
-# Requirement Clues
+# 需求线索 / Requirement Clues
 
 本文件只记录需求线索，不等于已确认需求或 Product Core 规则。
 

@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# Business Records Transition Plan
+# business_records 过渡计划 / Business Records Transition Plan
 
 009 已补充 docs-only 审计产物：
 
@@ -143,7 +143,7 @@ Stage 2: official pages/API switch to V1 models.
 Stage 3: business_records retained only for generic snapshots/debug/demo or deprecated.
 ```
 
-## Stop Conditions
+## 停止条件 / Stop Conditions
 
 - Stop if partners and formal customers/suppliers both remain official writable truth.
 - Stop if products page creates a second Product Core truth instead of using existing `products`.

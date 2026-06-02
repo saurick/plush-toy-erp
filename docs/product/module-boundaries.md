@@ -1,4 +1,4 @@
-# Module Boundaries
+# 模块边界 / Module Boundaries
 
 ## 核心边界
 
@@ -11,7 +11,7 @@
 | `business_records` 不替代事实表 | 它是通用快照和兼容层，不是库存、出货、财务事实真源 |
 | current 客户资料不等于 Product Core | 只有经过架构评审并通用化的能力才能进入产品内核 |
 
-## Workflow
+## Workflow 协同层 / Workflow
 
 Workflow 只负责：
 
@@ -31,7 +31,7 @@ WorkflowUsecase 禁止直接写：
 - invoice
 - payment
 
-## Fact
+## Fact 事实层 / Fact
 
 Fact 层记录真实业务发生：
 

@@ -25,6 +25,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 - README / server docs / config docs / deployment docs 是目录、运行、部署或子系统维护说明。
 - 新增、删除、重命名长期维护 Markdown 文档，或调整文档用途、归属分类、入口状态时，必须同步更新本文。
 - 只改现有文档正文且不改变标题、职责、分类、路径或入口状态时，可以不更新本文；若“标题 / 当前用途”会失真，则必须同步更新。
+- 本文“标题 / 当前用途”列默认使用中文主体 + English anchor；若原文档标题是英文，仍应补中文说明，避免清单变成只有英文的索引。
 
 ## 文档清单
 
@@ -59,49 +60,49 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/architecture/customer-supplier-masterdata-review.md` | Customer / Supplier MasterData Review |
-| `docs/architecture/finished-goods-inbound-workflow-review.md` | Finished Goods Inbound Workflow Usecase 评审 |
+| `docs/architecture/customer-supplier-masterdata-review.md` | 客户 / 供应商主数据评审 / Customer / Supplier MasterData Review |
+| `docs/architecture/finished-goods-inbound-workflow-review.md` | 成品入库 Workflow Usecase 评审 / Finished Goods Inbound Workflow Usecase Review |
 | `docs/architecture/industry-schema-review.md` | 行业专表 Ent Schema 评审 |
-| `docs/architecture/masterdata-order-source-document-review.md` | MasterData / Source Document / Fact Review |
+| `docs/architecture/masterdata-order-source-document-review.md` | 主数据 / 源单据 / 事实边界评审 / MasterData / Source Document / Fact Review |
 | `docs/architecture/material-product-inventory-schema-review.md` | 材料、成品、BOM 与库存专表 Schema 评审 |
-| `docs/architecture/order-purchase-boundary-review.md` | Order / Purchase Boundary Review |
+| `docs/architecture/order-purchase-boundary-review.md` | 订单 / 采购边界评审 / Order / Purchase Boundary Review |
 | `docs/architecture/phase-2b-bom-lot-schema-review.md` | Phase 2B BOM 与库存批次 Schema 评审 |
 | `docs/architecture/phase-2c-purchase-receipt-review.md` | Phase 2C 采购入库最小闭环评审 |
 | `docs/architecture/phase-2d-purchase-receipt-adjustment-review.md` | Phase 2D-B 采购入库差异 / 收货差异 / 入库后更正评审 |
 | `docs/architecture/phase-2d-purchase-return-quality-review.md` | Phase 2D 采购退货 / 入库差异 / 来料质检入口评审 |
 | `docs/architecture/phase-2d-quality-inspection-entry-review.md` | Phase 2D-C 来料质检入口 / 批次状态 / 冻结库存边界评审 |
 | `docs/architecture/phase-2d-quality-inspection-schema-review.md` | Phase 2D-C2 quality_inspections 最小主表设计评审 |
-| `docs/architecture/product-sku-bom-boundary-review.md` | Product / SKU / BOM Boundary Review |
+| `docs/architecture/product-sku-bom-boundary-review.md` | 产品 / SKU / BOM 边界评审 / Product / SKU / BOM Boundary Review |
 | `docs/architecture/shipment-inventory-boundary-review.md` | Shipment / Inventory 出货事实边界评审 |
-| `docs/architecture/shipment-release-workflow-review.md` | Shipment Release Workflow Usecase 评审 |
+| `docs/architecture/shipment-release-workflow-review.md` | 出货放行 Workflow Usecase 评审 / Shipment Release Workflow Usecase Review |
 | `docs/architecture/shipment-usecase-review.md` | ShipmentUsecase / 出货事实最小模型评审 |
-| `docs/architecture/status-workflow-fact-boundary.md` | Status, Workflow And Fact Boundary |
-| `docs/architecture/warehouse-inbound-workflow-review.md` | Warehouse Inbound Workflow Usecase 评审 |
-| `docs/architecture/workflow-usecase-review.md` | Workflow Usecase 统一编排评审 |
+| `docs/architecture/status-workflow-fact-boundary.md` | 状态 / Workflow / Fact 边界 / Status, Workflow And Fact Boundary |
+| `docs/architecture/warehouse-inbound-workflow-review.md` | 仓库入库 Workflow Usecase 评审 / Warehouse Inbound Workflow Usecase Review |
+| `docs/architecture/workflow-usecase-review.md` | Workflow Usecase 统一编排评审 / Workflow Usecase Review |
 
 ### 产品与路线
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/product/business-records-cutover-plan.md` | Business Records Cutover Plan |
-| `docs/product/business-records-data-map-draft.md` | Business Records Data Map Draft |
-| `docs/product/business-records-reference-audit.md` | Business Records Reference Audit |
-| `docs/product/business-records-risk-register.md` | Business Records Risk Register |
-| `docs/product/business-records-transition-audit.md` | Business Records Transition Audit |
-| `docs/product/business-records-transition-plan.md` | Business Records Transition Plan |
-| `docs/product/config-permission-policy.md` | Config And Permission Policy |
-| `docs/product/current-customer-import-risk-register.md` | Current Customer Import Risk Register |
-| `docs/product/current-customer-import-strategy.md` | Current Customer Import Strategy |
-| `docs/product/customer-delta-policy.md` | Customer Delta Policy |
-| `docs/product/customer-instance-policy.md` | Customer Instance Policy |
-| `docs/product/domain-model-v1.md` | Domain Model V1 |
+| `docs/product/business-records-cutover-plan.md` | business_records 切换计划 / Business Records Cutover Plan |
+| `docs/product/business-records-data-map-draft.md` | business_records 数据映射草案 / Business Records Data Map Draft |
+| `docs/product/business-records-reference-audit.md` | business_records 引用审计 / Business Records Reference Audit |
+| `docs/product/business-records-risk-register.md` | business_records 风险登记 / Business Records Risk Register |
+| `docs/product/business-records-transition-audit.md` | business_records 过渡审计 / Business Records Transition Audit |
+| `docs/product/business-records-transition-plan.md` | business_records 过渡计划 / Business Records Transition Plan |
+| `docs/product/config-permission-policy.md` | 配置与权限策略 / Config And Permission Policy |
+| `docs/product/current-customer-import-risk-register.md` | current 客户导入风险登记 / Current Customer Import Risk Register |
+| `docs/product/current-customer-import-strategy.md` | current 客户导入策略 / Current Customer Import Strategy |
+| `docs/product/customer-delta-policy.md` | 客户差异策略 / Customer Delta Policy |
+| `docs/product/customer-instance-policy.md` | 客户实例策略 / Customer Instance Policy |
+| `docs/product/domain-model-v1.md` | 领域模型 V1 / Domain Model V1 |
 | `docs/product/formal-menu-entry-plan.md` | 正式产品入口与菜单配置计划 |
-| `docs/product/migration-readiness-checklist.md` | Migration Readiness Checklist |
-| `docs/product/module-boundaries.md` | Module Boundaries |
+| `docs/product/migration-readiness-checklist.md` | 迁移准备检查清单 / Migration Readiness Checklist |
+| `docs/product/module-boundaries.md` | 模块边界 / Module Boundaries |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 |
 | `docs/product/product-delivery-ledgers.md` | 产品能力进度台账 + 客户交付矩阵 + 客户差异台账 |
 | `docs/product/product-principles.md` | 产品原则 |
-| `docs/product/release-gates.md` | Release Gates |
+| `docs/product/release-gates.md` | 发布门禁 / Release Gates |
 | `docs/product/test-strategy.md` | 自动化测试策略 |
 | `docs/product/zero-to-one-architecture.md` | 0 到 1 产品架构 |
 
@@ -110,23 +111,24 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
 | `docs/customers/current/README.md` | current 客户资料边界 |
-| `docs/customers/current/assumption-register.md` | Assumption Register |
-| `docs/customers/current/change-request-process.md` | Change Request Process |
-| `docs/customers/current/customer-config-draft.md` | Customer Config Draft |
-| `docs/customers/current/decision-log.md` | Decision Log |
-| `docs/customers/current/delta-register.md` | Delta Register |
-| `docs/customers/current/import-acceptance-checklist.md` | Current Customer Import Acceptance Checklist |
-| `docs/customers/current/import-dry-run-plan.md` | Current Customer Import Dry-run Plan |
-| `docs/customers/current/import-dry-run-tooling.md` | Current Customer Import Dry-run Tooling |
-| `docs/customers/current/import-field-classification.md` | Current Customer Import Field Classification |
-| `docs/customers/current/import-source-inventory.md` | Current Customer Import Source Inventory |
-| `docs/customers/current/import-unresolved-queue.md` | Current Customer Import Unresolved Queue |
-| `docs/customers/current/question-backlog.md` | Question Backlog |
-| `docs/customers/current/real-dry-run-evidence.md` | Current Real Dry-run Evidence |
-| `docs/customers/current/requirement-clues.md` | Requirement Clues |
-| `docs/customers/current/source-materials.md` | Source Materials |
-| `docs/customers/current/source-snapshot-freeze.md` | Current Source Snapshot Freeze |
-| `docs/customers/current/source-snapshot-manual-review-checklist.md` | Current Source Snapshot Manual Review Checklist |
+| `docs/customers/current/assumption-register.md` | 假设登记 / Assumption Register |
+| `docs/customers/current/change-request-process.md` | 变更请求流程 / Change Request Process |
+| `docs/customers/current/customer-config-draft.md` | 客户配置草案 / Customer Config Draft |
+| `docs/customers/current/decision-log.md` | 决策日志 / Decision Log |
+| `docs/customers/current/delta-register.md` | 差异登记 / Delta Register |
+| `docs/customers/current/import-acceptance-checklist.md` | current 客户导入验收清单 / Current Customer Import Acceptance Checklist |
+| `docs/customers/current/import-dry-run-plan.md` | current 客户导入 dry-run 计划 / Current Customer Import Dry-run Plan |
+| `docs/customers/current/import-dry-run-tooling.md` | current 客户导入 dry-run 工具说明 / Current Customer Import Dry-run Tooling |
+| `docs/customers/current/import-field-classification.md` | current 客户导入字段分类 / Current Customer Import Field Classification |
+| `docs/customers/current/import-source-inventory.md` | current 客户导入来源清单 / Current Customer Import Source Inventory |
+| `docs/customers/current/import-unresolved-queue.md` | current 客户导入待确认队列 / Current Customer Import Unresolved Queue |
+| `docs/customers/current/question-backlog.md` | 问题待办 / Question Backlog |
+| `docs/customers/current/raw-source-file-archive-review.md` | current 原始客户文件归档评审 / Current Raw Source File Archive Review |
+| `docs/customers/current/real-dry-run-evidence.md` | current 真实 dry-run evidence / Current Real Dry-run Evidence |
+| `docs/customers/current/requirement-clues.md` | 需求线索 / Requirement Clues |
+| `docs/customers/current/source-materials.md` | 来源材料 / Source Materials |
+| `docs/customers/current/source-snapshot-freeze.md` | current 来源快照冻结 / Current Source Snapshot Freeze |
+| `docs/customers/current/source-snapshot-manual-review-checklist.md` | current 来源快照人工复查清单 / Current Source Snapshot Manual Review Checklist |
 
 ### Workflow / 角色 / 财务 / 仓库 / 可观测性
 
@@ -139,7 +141,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/warehouse/warehouse-quality-v1.md` | 仓库与品质 v1 |
 | `docs/observability/log-trace-audit-v1.md` | 日志 / 审计 / Trace v1 |
 
-### Codex Goal
+### Codex 任务 / Codex Goal
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
@@ -161,7 +163,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/reference/imported-notes/README.md` | Imported Design Notes |
+| `docs/reference/imported-notes/README.md` | 外部设计输入 / Imported Design Notes |
 | `docs/reference/imported-notes/erp_plush_productization_config_permission_workflow_state_design.md` | 毛绒玩具 ERP 产品化配置、权限、流程与状态设计总结 |
 | `docs/reference/imported-notes/erp_status_workflow_context.md` | ERP 状态分层、状态机、Workflow 与业务事实设计总结 |
 | `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` | 外部 0 到 1 重构方案参考输入 |
@@ -213,8 +215,8 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
 | `web/README.md` | web 前端说明 |
-| `web/src/erp/mobile/roles/README.md` | Mobile Roles Skeleton |
-| `web/src/erp/modules/README.md` | ERP Modules Skeleton |
+| `web/src/erp/mobile/roles/README.md` | 移动端角色骨架 / Mobile Roles Skeleton |
+| `web/src/erp/modules/README.md` | ERP 模块骨架 / ERP Modules Skeleton |
 | `server/README.md` | server 后端说明 |
 | `server/deploy/README.md` | server/deploy 说明 |
 | `server/deploy/compose/prod/README.md` | Compose 部署说明 |
@@ -224,13 +226,13 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `server/docs/ent.md` | Ent + Atlas 数据模型说明 |
 | `server/docs/observability.md` | 可观测性与健康检查说明 |
 | `server/docs/runtime.md` | 服务运行说明 |
-| `server/internal/biz/README.md` | Biz |
-| `server/internal/core/README.md` | Core Skeleton |
+| `server/internal/biz/README.md` | 业务层说明 / Biz |
+| `server/internal/core/README.md` | 核心层骨架 / Core Skeleton |
 | `server/internal/data/AI_DB_WORKFLOW.md` | AI 助手数据库变更操作手册 |
-| `server/internal/data/README.md` | Data |
-| `server/internal/service/README.md` | Service |
-| `server/pkg/taskgroup/README.md` | taskgroup |
-| `server/third_party/README.md` | third_party |
-| `server/third_party/validate/README.md` | protoc-gen-validate |
+| `server/internal/data/README.md` | 数据层说明 / Data |
+| `server/internal/service/README.md` | 服务层说明 / Service |
+| `server/pkg/taskgroup/README.md` | taskgroup 并发任务工具说明 / taskgroup |
+| `server/third_party/README.md` | 第三方代码说明 / third_party |
+| `server/third_party/validate/README.md` | protoc-gen-validate 说明 / protoc-gen-validate |
 | `scripts/README.md` | QA 脚本说明 |
-| `scripts/import/fixtures/current/README.md` | Current Import Dry-run Fixtures |
+| `scripts/import/fixtures/current/README.md` | current 导入 dry-run fixtures / Current Import Dry-run Fixtures |

@@ -27,7 +27,7 @@
 
 当前后端已提供 `POST /rpc/workflow` 和 `POST /rpc/business`，都需要管理员登录态。`workflow` 只操作协同层和状态快照；`business` 操作当前首版通用业务记录真源。
 
-### 3.1 `/rpc/workflow`
+### 3.1 Workflow RPC 接口 / `/rpc/workflow`
 
 | method                  | 当前用途                                            | 关键参数                                                                               |
 | ----------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -38,7 +38,7 @@
 | `list_business_states`  | 查询业务状态快照                                    | `source_type`、`source_id`、`business_status_key`、`owner_role_key`、`limit`、`offset` |
 | `upsert_business_state` | 按 `source_type + source_id` 写入或更新业务状态快照 | `source_type`、`source_id`、`business_status_key`、`owner_role_key`、`payload`         |
 
-### 3.2 `/rpc/business`
+### 3.2 Business RPC 接口 / `/rpc/business`
 
 | method           | 当前用途                                            | 关键参数                                                                                                               |
 | ---------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -216,7 +216,7 @@ create index idx_business_record_events_record_id
 
 ## 5. 字段说明
 
-### 5.1 `workflow_tasks`
+### 5.1 协同任务表 / `workflow_tasks`
 
 | 字段                        | 当前建议含义                                               |
 | --------------------------- | ---------------------------------------------------------- |
@@ -229,7 +229,7 @@ create index idx_business_record_events_record_id
 | `blocked_reason`            | 仅保存当前阻塞摘要；详细历史写进事件表                     |
 | `payload`                   | 临时承接催办上下文、页面摘要和兼容字段，避免过早硬拆大量列 |
 
-### 5.2 `workflow_task_events`
+### 5.2 协同任务事件表 / `workflow_task_events`
 
 | 字段                                | 当前建议含义                                                     |
 | ----------------------------------- | ---------------------------------------------------------------- |
@@ -238,7 +238,7 @@ create index idx_business_record_events_record_id
 | `reason`                            | 退回、阻塞、取消、关闭原因                                       |
 | `payload`                           | 补充记录按钮来源、页面来源、备注快照                             |
 
-### 5.3 `workflow_business_states`
+### 5.3 业务状态表 / `workflow_business_states`
 
 | 字段                        | 当前建议含义                                     |
 | --------------------------- | ------------------------------------------------ |
@@ -249,7 +249,7 @@ create index idx_business_record_events_record_id
 | `blocked_reason`            | 当前主链阻塞摘要                                 |
 | `payload`                   | 存页面聚合所需的轻量快照，不替代正式业务单据字段 |
 
-### 5.4 `business_records`
+### 5.4 业务记录表 / `business_records`
 
 | 字段                                          | 当前建议含义                                                                |
 | --------------------------------------------- | --------------------------------------------------------------------------- |
@@ -262,7 +262,7 @@ create index idx_business_record_events_record_id
 | `row_version`                                 | 更新时的乐观锁版本；前端编辑旧版本会提示刷新                                |
 | `deleted_at` / `deleted_by` / `delete_reason` | 回收站软删除字段，避免误删业务记录                                          |
 
-### 5.5 `business_record_items`
+### 5.5 业务记录明细表 / `business_record_items`
 
 | 字段                                   | 当前建议含义                                                                |
 | -------------------------------------- | --------------------------------------------------------------------------- |
@@ -272,7 +272,7 @@ create index idx_business_record_events_record_id
 | `quantity` / `unit_price` / `amount`   | 数量、单价和金额快照；行金额为空且已有数量 / 单价时由前端保存转换层派生     |
 | `payload`                              | 行级补充快照，不替代正式字段                                                |
 
-### 5.6 `business_record_events`
+### 5.6 业务记录事件表 / `business_record_events`
 
 | 字段                                | 当前建议含义                                               |
 | ----------------------------------- | ---------------------------------------------------------- |

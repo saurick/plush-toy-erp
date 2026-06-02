@@ -105,7 +105,7 @@ flowchart LR
 
 ## 字段建议
 
-### purchase_receipts
+### 采购入库主表 / purchase_receipts
 
 | 字段 | 类型建议 | 说明 |
 | --- | --- | --- |
@@ -119,7 +119,7 @@ flowchart LR
 | `note` | varchar(255) nullable | 备注。 |
 | `created_at / updated_at` | timestamptz | 审计时间。 |
 
-### purchase_receipt_items
+### 采购入库明细 / purchase_receipt_items
 
 | 字段 | 类型建议 | 说明 |
 | --- | --- | --- |

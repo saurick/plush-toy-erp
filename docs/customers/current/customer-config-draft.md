@@ -1,4 +1,4 @@
-# Customer Config Draft
+# 客户配置草案 / Customer Config Draft
 
 本文件记录 current 未来可能的配置项。它不是 runtime tenant 配置，不要求新增 `tenant_id`，当前也不创建 runtime loader。
 

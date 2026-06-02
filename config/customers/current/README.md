@@ -1,4 +1,4 @@
-# current Customer Config
+# current 客户配置 / current Customer Config
 
 本目录是 current 客户配置包的未来落点。
 

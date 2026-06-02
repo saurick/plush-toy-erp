@@ -1,4 +1,4 @@
-# Core Skeleton
+# 核心层骨架 / Core Skeleton
 
 本目录是 0 到 1 产品内核分层的目录骨架。
 

@@ -1,4 +1,4 @@
-# Domain Model V1
+# 领域模型 V1 / Domain Model V1
 
 本文只描述 0 到 1 重构的业务域模型草案，不改 Ent schema，不生成 migration。
 
