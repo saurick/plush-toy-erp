@@ -1,10 +1,10 @@
 # Imported Note: 毛绒玩具 ERP 从 0 到 1 重构方案
 
-- Source: `/Users/simon/Desktop/plush-toy-erp-from-0-to-1-plan.md`
-- Imported At: 2026-06-02
-- Status: Reference Only
-- Purpose: 作为 0 到 1 产品架构、业务域闭环、Workflow / Fact 边界和后续 Goal 拆分的外部规划输入。
-- Not Source Of Truth: 本文不是 runtime、schema、migration、API、UI、目录结构、roadmap 编号或交付排期真源。
+- Source / 来源: `/Users/simon/Desktop/plush-toy-erp-from-0-to-1-plan.md`
+- Imported At / 导入时间: 2026-06-02
+- Status / 状态: Reference Only / 仅作参考
+- Purpose / 用途: 作为 0 到 1 产品架构、业务域闭环、Workflow / Fact 边界和后续 Goal 拆分的外部规划输入。
+- Not Source Of Truth / 非真源: 本文不是 runtime、schema、migration、API、UI、目录结构、roadmap 编号或交付排期真源。
 
 使用时必须先对照：
 

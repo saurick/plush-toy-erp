@@ -1,9 +1,9 @@
-Doc Type: V1 Schema Go/No-Go
-Status: Proposed
-Runtime Implemented: MasterData repo/usecase for customers / suppliers / contacts added in 005; Sales Order repo/usecase for sales_orders / sales_order_items added in 006; JSON-RPC API/RBAC for these V1 objects added in 007; V1 frontend pages for customers / suppliers / contacts / sales_orders / sales_order_items added in 008; current customer import dry-run draft added in 010 docs-only, with no runtime import/backfill implemented
-Ent Schema Implemented: Schema files added in 003; generated code added in 004
-Migration Implemented: Yes, generated in 004
-Current Implementation Source of Truth: Schema files, generated Ent code, Atlas migration, 005 MasterData repo/usecase for customers / suppliers / contacts, 006 Sales Order repo/usecase for sales_orders / sales_order_items, 007 JSON-RPC API/RBAC handlers, 008 V1 frontend pages/API client/tests, and 010 docs-only current customer import dry-run draft documents
+Doc Type / 文档类型: V1 Schema Go/No-Go
+Status / 状态: Proposed / 候选
+Runtime Implemented / 运行时已实现: MasterData repo/usecase for customers / suppliers / contacts added in 005; Sales Order repo/usecase for sales_orders / sales_order_items added in 006; JSON-RPC API/RBAC for these V1 objects added in 007; V1 frontend pages for customers / suppliers / contacts / sales_orders / sales_order_items added in 008; current customer import dry-run draft added in 010 docs-only, with no runtime import/backfill implemented
+Ent Schema Implemented / Ent Schema 已实现: Schema files added in 003; generated code added in 004
+Migration Implemented / Migration 已实现: Yes, generated in 004 / 是，004 已生成
+Current Implementation Source of Truth / 当前实现真源: Schema files, generated Ent code, Atlas migration, 005 MasterData repo/usecase for customers / suppliers / contacts, 006 Sales Order repo/usecase for sales_orders / sales_order_items, 007 JSON-RPC API/RBAC handlers, 008 V1 frontend pages/API client/tests, and 010 docs-only current customer import dry-run draft documents
 
 # V1 Schema Go / No-Go Checklist
 

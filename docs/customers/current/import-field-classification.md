@@ -1,9 +1,9 @@
-Doc Type: Current Customer Import Field Classification
-Status: Draft
-Runtime Implemented: No
-Ent Schema Implemented: No
-Migration Implemented: No
-Current Implementation Source of Truth: No
+Doc Type / 文档类型: Current Customer Import Field Classification
+Status / 状态: Draft / 草案
+Runtime Implemented / 运行时已实现: No / 否
+Ent Schema Implemented / Ent Schema 已实现: No / 否
+Migration Implemented / Migration 已实现: No / 否
+Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # Current Customer Import Field Classification
 

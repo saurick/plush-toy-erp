@@ -1,9 +1,9 @@
-Doc Type: Current Customer Import Risk Register
-Status: Draft + 011 Tooling Controls Added
-Runtime Implemented: No
-Ent Schema Implemented: No
-Migration Implemented: No
-Current Implementation Source of Truth: No
+Doc Type / 文档类型: Current Customer Import Risk Register
+Status / 状态: Draft + 011 Tooling Controls Added / 草案，已补 011 工具控制
+Runtime Implemented / 运行时已实现: No / 否
+Ent Schema Implemented / Ent Schema 已实现: No / 否
+Migration Implemented / Migration 已实现: No / 否
+Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # Current Customer Import Risk Register
 

@@ -1,9 +1,9 @@
-Doc Type: Current Source Snapshot Freeze Evidence
-Status: 012 Evidence Prepared
-Runtime Implemented: No
-Ent Schema Implemented: No
-Migration Implemented: No
-Current Implementation Source of Truth: `scripts/import/currentSourceSnapshotFreezeCheck.mjs`
+Doc Type / 文档类型: Current Source Snapshot Freeze Evidence
+Status / 状态: 012 Evidence Prepared / 012 证据已准备
+Runtime Implemented / 运行时已实现: No / 否
+Ent Schema Implemented / Ent Schema 已实现: No / 否
+Migration Implemented / Migration 已实现: No / 否
+Current Implementation Source of Truth / 当前实现真源: `scripts/import/currentSourceSnapshotFreezeCheck.mjs`
 
 # Current Source Snapshot Freeze
 

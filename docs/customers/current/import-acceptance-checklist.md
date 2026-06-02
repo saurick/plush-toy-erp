@@ -1,9 +1,9 @@
-Doc Type: Current Customer Import Acceptance Checklist
-Status: Draft + 011 Tooling Evidence Added
-Runtime Implemented: No
-Ent Schema Implemented: No
-Migration Implemented: No
-Current Implementation Source of Truth: No
+Doc Type / 文档类型: Current Customer Import Acceptance Checklist
+Status / 状态: Draft + 011 Tooling Evidence Added / 草案，已补 011 工具证据
+Runtime Implemented / 运行时已实现: No / 否
+Ent Schema Implemented / Ent Schema 已实现: No / 否
+Migration Implemented / Migration 已实现: No / 否
+Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # Current Customer Import Acceptance Checklist
 

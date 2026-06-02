@@ -1,9 +1,9 @@
-Doc Type: Imported Design Note
-Status: Reference Only
-Runtime Source of Truth: No
-Schema Source of Truth: No
-Current Implementation Source of Truth: No
-Notes: 当前文档只作为 0 到 1 架构输入，不能直接驱动 schema 或 runtime。
+Doc Type / 文档类型: Imported Design Note
+Status / 状态: Reference Only / 仅作参考
+Runtime Source of Truth / 运行时真源: No / 否
+Schema Source of Truth / Schema 真源: No / 否
+Current Implementation Source of Truth / 当前实现真源: No / 否
+Notes / 备注: 当前文档只作为 0 到 1 架构输入，不能直接驱动 schema 或 runtime。
 
 # 毛绒玩具 ERP 产品化配置、权限、流程与状态设计总结
 

@@ -1,9 +1,9 @@
-Doc Type: V1 Implementation Cutline
-Status: Proposed
-Runtime Implemented: No
-Ent Schema Implemented: Schema files added in 003; generated code added in 004
-Migration Implemented: Yes, generated in 004
-Current Implementation Source of Truth: Schema files, generated Ent code and Atlas migration; repo/usecase/API/UI remain not implemented
+Doc Type / 文档类型: V1 Implementation Cutline
+Status / 状态: Proposed / 候选
+Runtime Implemented / 运行时已实现: No / 否
+Ent Schema Implemented / Ent Schema 已实现: Schema files added in 003; generated code added in 004
+Migration Implemented / Migration 已实现: Yes, generated in 004 / 是，004 已生成
+Current Implementation Source of Truth / 当前实现真源: Schema files, generated Ent code and Atlas migration; repo/usecase/API/UI remain not implemented
 
 # V1 Implementation Cutline
 
