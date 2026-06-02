@@ -137,9 +137,7 @@ pnpm style:l1
 - 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md`
 - 永绅 yoyoosun 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/README.md`
 - imported design notes：`/Users/simon/projects/plush-toy-erp/docs/reference/imported-notes/README.md`
-- Phase 2B BOM 与批次库存评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2b-bom-lot-schema-review.md`
-- Phase 2C 采购入库评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2c-purchase-receipt-review.md`
-- Phase 2D 采购退货 / 入库差异 / 来料质检入口评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2d-purchase-return-quality-review.md`
+- architecture 历史评审归档：`/Users/simon/projects/plush-toy-erp/docs/archive/architecture-history/README.md`
 - 工作流主任务树 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/task-flow-v1.md`
 - 通知 / 预警 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/notification-alert-v1.md`
 - 角色权限矩阵 v1：`/Users/simon/projects/plush-toy-erp/docs/roles/role-permission-matrix-v1.md`

@@ -30,7 +30,7 @@
 
 - Workflow 协同层：`docs/architecture/workflow-usecase-review.md`
 - Shipment / 出货边界：`docs/architecture/shipment-release-workflow-review.md`、`docs/architecture/shipment-inventory-boundary-review.md`、`docs/architecture/shipment-usecase-review.md`
-- Inventory / Purchase / BOM / Quality 事实层：`docs/current-source-of-truth.md`、`docs/architecture/material-product-inventory-schema-review.md`、`docs/architecture/phase-2b-bom-lot-schema-review.md`、`docs/architecture/phase-2c-purchase-receipt-review.md`、`docs/architecture/phase-2d-purchase-return-quality-review.md`、`docs/architecture/phase-2d-purchase-receipt-adjustment-review.md`、`docs/architecture/phase-2d-quality-inspection-schema-review.md`
+- Inventory / Purchase / BOM / Quality 事实层：`docs/current-source-of-truth.md`、`docs/architecture/material-product-inventory-schema-review.md`、`docs/architecture/product-sku-bom-boundary-review.md`、`docs/architecture/order-purchase-boundary-review.md`
 - 开发与验收 / 帮助文档：`web/src/erp/docs/acceptance-overview.md`、`web/src/erp/docs/qa-reports.md`、`web/src/erp/docs/current-boundaries.md`
 
 如果后续新增 `web/src/erp/docs/system-layer-progress.md`、`web/src/erp/docs/productization-delivery.md`、`docs/architecture/project-boundary-map.md` 或等价文档，涉及系统层级、产品化、客户差异、部署交付、下一步规划时必须同步阅读。
@@ -339,6 +339,7 @@ RBAC / API 改动必须覆盖：
 ## 目录结构文档同步约定
 
 - 当本仓库新增、删除、重命名仓库一级目录，或新增/调整需要长期维护的关键子系统目录时，必须同步检查并按需更新相关目录说明文档，避免代码结构已变化而 `README / docs` 仍停留在旧口径。
+- `docs/` 下长期维护且容易误读职责的目录应有对应 `README.md`。新增、删除、重命名长期维护文档，或改变文档职责、归属目录、入口状态、真源状态时，必须同步检查该目录 README 是否需要更新；只改正文且不改变目录职责或入口状态时，通常不需要更新目录 README。
 - 当新增、删除、重命名长期维护的 Markdown 文档，或调整文档用途、归属目录、是否属于产品内入口 / 外部参考 / 归档 / Codex Goal 等分类时，必须同步更新 `docs/document-inventory.md`。
 - 只修改现有文档正文内容、措辞、局部结论或表格数据，且不改变该文档的标题、职责、分类、路径或入口状态时，通常不需要更新 `docs/document-inventory.md`；若修改导致清单中的“标题 / 当前用途”失真，则必须同步更新。
 - `docs/document-inventory.md` 的“标题 / 当前用途”列应使用中文主体 + English anchor；即使原文档标题为英文，也要补中文说明，方便人工审查时快速理解，不把清单退化成英文文件名索引。

@@ -16,6 +16,8 @@
 | 文件 | 来源 | 当前用途 |
 | --- | --- | --- |
 | `plush-toy-erp-from-0-to-1-plan.md` | Desktop 外部规划稿 | 0 到 1 架构、业务域闭环、Workflow / Fact 边界和后续 Goal 拆分的参考输入；不直接作为 roadmap、schema、runtime 或目录迁移指令 |
+| `erp_plush_productization_config_permission_workflow_state_design.md` | ChatGPT / GPT 规划输入 | 产品化配置、权限、Workflow 和状态设计参考；不直接作为 runtime、schema、API、UI 或目录迁移指令 |
+| `erp_status_workflow_context.md` | ChatGPT / GPT 规划输入 | 状态分层、Workflow / Fact 边界和业务事实设计参考；不直接作为当前实现状态或代码修改指令 |
 
 使用约束：
 

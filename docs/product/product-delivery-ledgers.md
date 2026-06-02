@@ -151,7 +151,7 @@
 | CAP-007       | sales_order_items 销售订单明细                  | Product Core           | Order                   |    L7 | 支持新增、编辑、取消/移除、列表                                                                             | 不含 `shipped_quantity`、product_sku | `sales_order_item.go`、V1 UI                                       | 产品/单位选择器                            | 当前 UI 产品/单位暂用 ID                 | Limited        | No    |
 | CAP-008       | business_records 旧入口退出                    | Productization         | Compatibility           |    L3 | 已完成引用审计、cutover plan、data map draft、risk register                                            | 不把旧入口作为正式产品入口，不承诺只读归档页          | `docs/product/business-records-*.md`                              | legacy entry removal / formal menu direction | 双真源、旧入口误导                        | No             | No    |
 | CAP-009       | 永绅 yoyoosun 客户导入 dry-run tooling / evidence    | Delivery               | Data Import             |    L5 | 已具备 source inventory、field classification、dry-run plan、unresolved queue、acceptance checklist、只读 dry-run CLI 和 source freeze / evidence preparation | 未写真实 import loader，未执行真实导入，不写 DB，不写 `business_records` | `docs/customers/yoyoosun/import-*.md`、`docs/customers/yoyoosun/source-snapshot-freeze.md`、`docs/customers/yoyoosun/real-dry-run-evidence.md`、`scripts/import/customerImportDryRun.mjs`、`scripts/import/customerSourceSnapshotFreezeCheck.mjs` | import loader design                | 字段语义仍需人工确认，dry-run 不能被误读成真实导入批准 | No             | No    |
-| CAP-010       | V1 前端页面                                   | Product Core           | UI                      |    L7 | V1 customers / suppliers / contacts / sales_orders 页面和路由已完成                                  | 未接正式菜单 / seedData / docs registry | `V1MasterDataPage.jsx`、`V1SalesOrdersPage.jsx`                    | v1-formal-menu-and-legacy-entry-exit | 只能直链访问或路由访问                      | Limited        | No    |
+| CAP-010       | V1 前端页面                                   | Product Core           | UI                      |    L7 | V1 customers / suppliers / contacts / sales_orders 页面和路由已完成                                  | 未接正式菜单 / seedData / docs registry | `V1MasterDataPage.jsx`、`V1SalesOrdersPage.jsx`                    | Phase 5 formal product entry and legacy exit | 只能直链访问或路由访问                      | Limited        | No    |
 | CAP-011       | V1 API/RBAC                               | Product Core           | API / RBAC              |    L7 | JSON-RPC API + 动作权限已完成                                                                       | 未接 UI 菜单权限体系总收口                   | `jsonrpc_masterdata_order.go`、`rbac.go`                           | API smoke / menu permission review  | JSON-RPC handler 位于 data 层历史架构   | Yes            | No    |
 | CAP-012       | 产品 / materials / units / warehouses 既有主数据 | Product Core           | MasterData              | L5-L7 | 已有既有 schema / runtime 能力                                                                     | 本台账未重新评审全部 UI/API                 | 既有代码和 docs                                                        | 后续与导入和 SKU 评审对齐                     | 与 business_records products 可能重叠 | Limited        | No    |
 | CAP-013       | product_skus                              | Product Core           | Product / SKU           |    L3 | Draft Only                                                                                   | 未落 schema / runtime / UI          | `docs/architecture/product-sku-bom-boundary-review.md`、roadmap 未来专项评审 | SKU/BOM version review              | 不能因颜色字段直接落 SKU                   | No             | No    |
@@ -214,16 +214,16 @@
 
 | Customer Key | 模块 / 能力              | 产品能力 ID             | 交付状态           | 当前客户可见方式              | 交付结果                         | 不包含                      | 前置条件                           | 客户确认项              | 风险                        |
 | ------------ | -------------------- | ------------------- | -------------- | --------------------- | ---------------------------- | ------------------------ | ------------------------------ | ------------------ | ------------------------- |
-| yoyoosun     | 客户主数据                | CAP-003             | Trial Ready    | V1 route / 后续菜单入口     | 可创建、编辑、查看、启停客户               | 地址、账期、信用额度               | v1-formal-menu-and-legacy-entry-exit | 客户编码规则、客户简称、税号是否必填 | 真实数据未导入                   |
-| yoyoosun     | 供应商主数据               | CAP-004             | Trial Ready    | V1 route / 后续菜单入口     | 可创建、编辑、查看、启停供应商              | 银行账号、账期、供应物料档案           | v1-formal-menu-and-legacy-entry-exit | 供应商分类、是否区分委外/材料    | supplier_type 后续可能调整      |
-| yoyoosun     | 联系人                  | CAP-005             | Trial Ready    | 客户/供应商详情区块            | 可维护主联系人和普通联系人                | 联系人通知权限                  | v1-formal-menu-and-legacy-entry-exit | 联系人角色、手机号、微信等字段    | owner guard 依赖 usecase    |
-| yoyoosun     | 销售订单                 | CAP-006             | Trial Ready    | V1 sales_orders route | 可录入、提交、激活、关闭、取消销售订单          | 出货、库存、财务                 | v1-formal-menu-and-legacy-entry-exit | 订单编号规则、客户订单号、交期字段  | 甲方可能误解为出货闭环               |
+| yoyoosun     | 客户主数据                | CAP-003             | Trial Ready    | V1 route / 后续菜单入口     | 可创建、编辑、查看、启停客户               | 地址、账期、信用额度               | Phase 5 formal product entry and legacy exit | 客户编码规则、客户简称、税号是否必填 | 真实数据未导入                   |
+| yoyoosun     | 供应商主数据               | CAP-004             | Trial Ready    | V1 route / 后续菜单入口     | 可创建、编辑、查看、启停供应商              | 银行账号、账期、供应物料档案           | Phase 5 formal product entry and legacy exit | 供应商分类、是否区分委外/材料    | supplier_type 后续可能调整      |
+| yoyoosun     | 联系人                  | CAP-005             | Trial Ready    | 客户/供应商详情区块            | 可维护主联系人和普通联系人                | 联系人通知权限                  | Phase 5 formal product entry and legacy exit | 联系人角色、手机号、微信等字段    | owner guard 依赖 usecase    |
+| yoyoosun     | 销售订单                 | CAP-006             | Trial Ready    | V1 sales_orders route | 可录入、提交、激活、关闭、取消销售订单          | 出货、库存、财务                 | Phase 5 formal product entry and legacy exit | 订单编号规则、客户订单号、交期字段  | 甲方可能误解为出货闭环               |
 | yoyoosun     | 销售订单明细               | CAP-007             | Trial Ready    | 销售订单详情区块              | 可维护订单行                       | SKU、已出货数                 | 产品/单位选择器                       | 颜色、尺寸、客户款号如何处理     | 当前产品/单位暂用 ID              |
 | yoyoosun     | V1 API/RBAC          | CAP-011             | Internal Ready | 后端 JSON-RPC           | 有权限码和后端校验                    | 前端完整权限体验                 | 菜单入口 / 用户角色配置                  | 角色权限模板             | 权限模板还未客户化                 |
-| yoyoosun     | V1 前端页面              | CAP-010             | Trial Ready    | 直链 / route            | 页面可操作                        | 菜单入口未正式接                 | v1-formal-menu-and-legacy-entry-exit | 甲方试用入口             | 旧入口仍存在                    |
+| yoyoosun     | V1 前端页面              | CAP-010             | Trial Ready    | 直链 / route            | 页面可操作                        | 菜单入口未正式接                 | Phase 5 formal product entry and legacy exit | 甲方试用入口             | 旧入口仍存在                    |
 | yoyoosun     | business_records 旧入口 | CAP-008             | Deprecated     | 不进入正式菜单 / 默认隐藏或删除 | 仅可作为迁移来源或审计线索，不作为交付能力         | 不承诺客户可见只读归档页            | legacy removal direction / data migration decision | 如需迁移历史数据再确认范围 | 双真源风险                     |
 | yoyoosun     | yoyoosun 数据导入 dry-run | CAP-009             | Internal Ready | 本地 CLI evidence / Markdown 报告 | 已有来源清单、字段分类、unresolved queue、只读 dry-run tooling、source freeze evidence | 没有真实 import loader，不写 DB，不执行导入 | loader design                  | 字段含义、冲突处理、签字确认     | 样本语义不清，dry-run 可能被误读成批准导入 |
-| yoyoosun     | 正式菜单入口               | 待建                  | Planned        | 暂未正式接                 | 待评审                          | 不做全局菜单重构                 | v1-formal-menu-and-legacy-entry-exit | 确认旧入口不进入正式产品菜单 | seedData/docs registry 风险 |
+| yoyoosun     | 正式菜单入口               | 待建                  | Planned        | 暂未正式接                 | 待评审                          | 不做全局菜单重构                 | Phase 5 formal product entry and legacy exit | 确认旧入口不进入正式产品菜单 | seedData/docs registry 风险 |
 | yoyoosun     | 产品 / SKU             | CAP-012 / CAP-013   | Deferred       | 既有产品可用，SKU 延后         | 产品主数据已有基础                    | SKU 未落                   | product-sku-bom-version-review | 色号、尺寸、版本口径         | 不能从订单颜色自动建 SKU            |
 | yoyoosun     | BOM                  | CAP-014             | Deferred       | 既有 BOM 能力 / 后续评审      | 有基础 BOM 真源                   | 版本扩展未做                   | BOM version review             | BOM 改版规则           | 与 SKU 关系未定                |
 | yoyoosun     | 采购订单                 | CAP-015             | Deferred       | 无正式 V1 入口             | 延后 V2                        | 不代表采购入库                  | purchase-order review          | 采购流程口径             | 不可替代 purchase_receipts    |
@@ -281,7 +281,7 @@
 | DELTA-YOYOOSUN-003 | yoyoosun | 客户资料字段可能不同 | yoyoosun 资料 | Customer Config / Data Import Source | 待确认 | 否 | 字段分类 + unresolved queue | 甲方确认 | 污染 Product Core | import dry-run |
 | DELTA-YOYOOSUN-004 | yoyoosun | 客户 / 供应商 / 联系人正式主数据 | V1 需求 | Product Core | 已进入 V1 | 是 | 已做 V1 能力 | 已完成基础链路 | 后续字段扩张风险 | 地址/账期另评审 |
 | DELTA-YOYOOSUN-005 | yoyoosun | 销售订单正式源单据 | V1 需求 | Product Core | 已进入 V1 | 是 | 已做 V1 能力 | 已完成基础链路 | 误当出货事实 | UI 文案继续约束 |
-| DELTA-YOYOOSUN-006 | yoyoosun | 颜色、尺寸、客户款号 | Excel/订单字段线索 | Industry Template Candidate / Deferred | 不直接落 SKU | 暂不进入 | 作为 SKU/BOM 评审输入 | product_sku review | 过早建 SKU | 016 review |
+| DELTA-YOYOOSUN-006 | yoyoosun | 颜色、尺寸、客户款号 | Excel/订单字段线索 | Industry Template Candidate / Deferred | 不直接落 SKU | 暂不进入 | 作为 SKU/BOM 评审输入 | product_sku review | 过早建 SKU | SKU/BOM review |
 | DELTA-YOYOOSUN-007 | yoyoosun | 加工合同样式 | PDF / 合同样本 | Customer Material / Print Template Candidate | 只作客户打印样本输入 | 否 | 记录样式、字段来源和条款线索；不抽产品内核模板 | 委外模块评审；至少 2-3 客户重复后再评审模板化 | 合同条款当业务规则 | outsourcing review + print sample inventory |
 | DELTA-YOYOOSUN-008 | yoyoosun | 委外加工流程                               | 合同/业务线索      | Product Core / Industry Template Candidate | 延后             | 待评审               | 委外事实阶段评审                          | outsourcing facts           | 只用合同不足以建模                | outsourcing review       |
 | DELTA-YOYOOSUN-009 | yoyoosun | 采购 / 包材 / 辅材                         | 需求线索         | Product Core / Deferred                    | 延后             | 待评审               | 采购订单 / 采购需求评审                     | purchase review             | 与已有 purchase_receipts 重复 | purchase-order review    |
@@ -298,7 +298,7 @@
 | DELTA-YOYOOSUN-020 | yoyoosun | 旧 business_records products 入口       | 旧系统兼容        | Compatibility / Deferred                   | 退出正式入口         | 否                 | 与正式 products / SKU 方向对齐；旧入口删除 / 隐藏 | product review              | 重复主数据                    | product-sku review       |
 | DELTA-YOYOOSUN-021 | yoyoosun | yoyoosun 数据导入                         | 客户落地需要       | Data Import Adapter                        | dry-run / freeze tooling 已完成，真实导入未做 | 否                 | source freeze / dry-run evidence -> loader design -> import execution | 人工确认                        | 误导入/误生成事实                | import loader design     |
 | DELTA-YOYOOSUN-022 | yoyoosun | 打印/导出格式                              | 客户交付需要       | Customer Material / Print Template Candidate | 默认 Deferred    | 否                 | 只登记客户样本和交付诉求，不建立打印交付包或模板引擎    | 多客户同类单据重复、字段来源稳定后再评审       | 模板当业务规则                  | print sample inventory   |
-| DELTA-YOYOOSUN-023 | yoyoosun | 菜单入口                                 | V1 页面可试用需要   | Customer Config / UI                       | 未接正式菜单         | 否                 | formal menu entry + legacy entry removal | business_records cutover    | 菜单误导成熟度                  | v1-formal-menu-and-legacy-entry-exit |
+| DELTA-YOYOOSUN-023 | yoyoosun | 菜单入口                                 | V1 页面可试用需要   | Customer Config / UI                       | 未接正式菜单         | 否                 | formal menu entry + legacy entry removal | business_records cutover    | 菜单误导成熟度                  | Phase 5 formal product entry and legacy exit |
 | DELTA-YOYOOSUN-024 | yoyoosun | seedData 初始化                         | 交付/演示需要      | Customer Config / Demo Seed                | 未改             | 否                 | 单独评审                              | menu/seed boundary          | 误当正式数据                   | seed review              |
 | DELTA-YOYOOSUN-025 | yoyoosun | docs registry / 帮助中心                 | 交付/培训需要      | Help / QA                                  | 未改             | 否                 | 后续帮助中心业务版                         | 功能稳定后                       | 文档误导实现状态                 | help review              |
 | DELTA-YOYOOSUN-026 | yoyoosun | 行业默认角色、菜单、字段、编号规则                 | 永绅 yoyoosun 样本 / 产品化方向 | Industry Template Candidate                | 待抽离模板清单        | 否                 | 先分类行业共性、永绅 yoyoosun 样本和 deferred 输入      | 多客户或人工评审                    | 单客户样本被当行业标准              | industry template inventory |
@@ -576,38 +576,41 @@ docs/product/capability-ledger.md
 
 ## 16. 当前推荐下一步
 
-建议下一步优先做：
+当前下一步按 roadmap Phase 制执行，不再复用旧 `00x` 编号作为路线。
+
+通用前置检查：
 
 ```text
-workspace-boundary-checkpoint
+workspace checkpoint
+-> roadmap / product-delivery-ledgers impact check
+-> current-source-of-truth verification
+-> allowed / forbidden path confirmation
 ```
 
-然后二选一：
+如果目标是重新开工：
 
 ```text
-v1-formal-menu-and-legacy-entry-exit
-```
-
-或：
-
-```text
-yoyoosun-customer-import-loader-design
+Phase 0 docs-only reset
 ```
 
 如果目标是让 yoyoosun 甲方尽快试用：
 
 ```text
-workspace-boundary-checkpoint
--> v1-formal-menu-and-legacy-entry-exit
--> yoyoosun customer trial checklist
+Phase 0 docs-only reset
+-> Phase 1 yoyoosun source governance
+-> Phase 2 MVP cutline
+-> Phase 3 MasterData + Sales Order MVP
+-> Phase 5 Formal product entry and legacy exit
+-> Phase 6 import loader design
+-> Phase 7 trial deployment and acceptance
 ```
 
 如果目标是准备真实数据落地：
 
 ```text
-workspace-boundary-checkpoint
--> yoyoosun-customer-import-loader-design
--> customer-import-execution-and-audit
+Phase 0 docs-only reset
+-> Phase 6 customer import loader design
+-> Phase 7 controlled import and audit
 ```
 
 ---

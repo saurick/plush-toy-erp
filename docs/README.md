@@ -52,8 +52,26 @@
 
 如果后续确实要引入 Markdown frontmatter，必须先实现解析和测试，再限定到明确目录；不要在当前无解析器的情况下给所有文件堆重复字段。
 
+## 目录 README 维护规则
+
+`docs/` 下长期维护且容易误读职责的目录应保留对应 `README.md`。目录 README 维护目录级事实，不维护每篇文档的正文细节。
+
+目录 README 应优先说明：
+
+- 这个目录放什么。
+- 这个目录不放什么。
+- 是否是真源，或与当前真源的关系。
+- 相关入口和更新规则。
+
+新增、删除、重命名长期维护 Markdown 文档，或改变文档职责、归属目录、入口状态、真源状态时，必须同步检查该目录 README 是否需要更新。只修改现有文档正文、措辞、局部结论或表格数据，且不改变文档职责、分类、路径或入口状态时，通常不需要更新目录 README。
+
 ## 相关目录
 
+- 产品与路线：`/Users/simon/projects/plush-toy-erp/docs/product/README.md`
+- 架构评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/README.md`
+- 客户资料：`/Users/simon/projects/plush-toy-erp/docs/customers/README.md`
+- 外部参考：`/Users/simon/projects/plush-toy-erp/docs/reference/README.md`
+- 归档：`/Users/simon/projects/plush-toy-erp/docs/archive/README.md`
 - 后端总览：`/Users/simon/projects/plush-toy-erp/server/README.md`
 - 后端专题：`/Users/simon/projects/plush-toy-erp/server/docs/README.md`
 - Compose 部署：`/Users/simon/projects/plush-toy-erp/server/deploy/README.md`

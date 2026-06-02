@@ -7,7 +7,8 @@
 - 运行时行为的最终真源始终是代码。
 - 仓库级约定、部署边界和项目基线，以当前文档为索引，再分流到对应子目录文档。
 - 历史 changes 文档不再作为阅读入口；当前状态必须回到本文档、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认。
-- 产品从起步到成熟的阶段规划、候选 Goal 顺序和产品化路线，以 `docs/product/product-completion-roadmap.md` 作为可演进规划真源；正式菜单入口、行业菜单候选、客户菜单配置和旧入口退出细节，以 `docs/product/formal-menu-entry-plan.md` 作为路线配套计划；产品能力成熟度、客户交付状态和客户差异分类，以 `docs/product/product-delivery-ledgers.md` 作为长期台账入口；它们都不替代当前实现真源，也不直接授权 schema、migration、runtime、API 或 UI 改动。
+- 产品从起步到成熟的阶段规划、重新做项目的 Phase 路线和产品化路线，以 `docs/product/product-completion-roadmap.md` 作为可演进规划真源；正式菜单入口、行业菜单候选、客户菜单配置和旧入口退出细节，以 `docs/product/formal-menu-entry-plan.md` 作为路线配套计划；产品能力成熟度、客户交付状态和客户差异分类，以 `docs/product/product-delivery-ledgers.md` 作为长期台账入口；它们都不替代当前实现真源，也不直接授权 schema、migration、runtime、API 或 UI 改动。
+- 模块进入实现前的施工治理、Phase 与 Architecture Layer 区分、门禁和 Codex Goal 拆分规则，以 `docs/product/implementation-governance.md` 作为阅读入口；它不替代 roadmap、当前实现真源、测试或具体任务文件。
 - 已完成的编号 Codex Goal 是阶段性施工记录，不保留为活跃文档入口；如需追溯 `000` 到 `012` 的原执行规格，从 Git 历史读取，不要把旧 Goal 文件当当前路线真源。
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
@@ -35,8 +36,8 @@
 - 业务链路调试 seed / cleanup / 业务数据清空已作为开发验收能力接入后端 JSON-RPC `debug` 域；seed 和 debugRunId cleanup 只复用 `business_records`、`business_record_items`、`business_record_events`、`workflow_tasks`、`workflow_task_events`、`workflow_business_states`。业务数据清空是本项目当前 SQL 连接的破坏性开发重置入口，清理本项目业务链路、采购入库、采购退货、采购入库调整、库存、BOM、物料、成品、仓库和单位相关业务表，不清账号、角色、权限、管理员偏好、配置和数据库结构。相关写操作默认面向当前 SQL 连接开启，可通过 `ERP_DEBUG_*` 环境变量显式关闭，并通过管理员身份和 `debug.seed`、`debug.cleanup`、`debug.business.clear`、`debug.business_chain.run` 等权限码限制范围；按 debugRunId 清理还会校验 payload debug 标记，不是普通业务入口。
 - workflow usecase 统一编排评审文档：`/Users/simon/projects/plush-toy-erp/docs/architecture/workflow-usecase-review.md`。当前结论是老板审批、IQC、采购仓库入库、委外回货检验、成品抽检、成品入库和出货放行七条最小规则已落地；仓库入库专项文档为 `/Users/simon/projects/plush-toy-erp/docs/architecture/warehouse-inbound-workflow-review.md`，成品入库专项文档为 `/Users/simon/projects/plush-toy-erp/docs/architecture/finished-goods-inbound-workflow-review.md`，`shipment_release` 专项评审文档为 `/Users/simon/projects/plush-toy-erp/docs/architecture/shipment-release-workflow-review.md`。第三条规则只迁协同状态推进：`done -> inbound_done`，`blocked/rejected -> blocked` 并强制原因；第四条规则只迁委外回货检验后的任务 / 状态派生：`done -> outsource_warehouse_inbound`，`blocked/rejected -> outsource_rework` 并强制原因；第五条规则只迁成品抽检后的任务 / 状态派生：`done -> finished_goods_inbound`，`blocked/rejected -> finished_goods_rework` 并强制原因；第六条规则只迁成品入库协同状态推进：`done -> inbound_done`，`blocked/rejected -> blocked` 并强制原因；第七条规则只迁出货放行协同状态推进：`done -> shipping_released`，`blocked/rejected -> blocked` 并强制原因。`shipment_release done` 不等于 `shipped`，真实 shipped 必须由未来 `ShipmentUsecase / shipment_execution / outbound done` 确认。库存专表、库存流水、库存余额、批次、出货扣减、应收、开票、应付和对账派生仍必须单独评审，不要把七条最小 usecase 误读成完整 workflow engine。
 - 行业专表 schema 早期评审文档：`/Users/simon/projects/plush-toy-erp/docs/architecture/industry-schema-review.md`。该文档用于说明不要一次性拆完整 ERP 的判断。
-- 材料、成品、BOM 与库存专表评审文档：`/Users/simon/projects/plush-toy-erp/docs/architecture/material-product-inventory-schema-review.md`。Phase 2A 只从该草案中落最小库存事实闭环。
-- Phase 2A 到 Phase 2D-C2-A 的历史 changes 文件已清理；当前结论以内嵌在本文的真源摘要、当前 Ent schema / Atlas migration、repo/usecase 测试和对应 `docs/architecture/*` 评审文档为准。
+- 材料、成品、BOM 与库存专表长期边界评审文档：`/Users/simon/projects/plush-toy-erp/docs/architecture/material-product-inventory-schema-review.md`。Phase 2A 只从该草案中落最小库存事实闭环；后续 BOM / SKU 与采购承诺边界继续以 `docs/architecture/product-sku-bom-boundary-review.md` 和 `docs/architecture/order-purchase-boundary-review.md` 复核。
+- Phase 2B 到 Phase 2D-C2-A 的旧阶段实现评审已移出活跃 `docs/architecture/`，归档到 `docs/archive/architecture-history/`。当前结论以内嵌在本文的真源摘要、当前 Ent schema / Atlas migration、repo/usecase 测试和活跃长期边界评审文档为准；归档文件只用于追溯历史设计过程。
 
 ## 开发与验收内部总控入口
 
@@ -46,12 +47,13 @@
 - 这两个入口只属于开发与验收，不进入普通帮助中心主入口，也不替代业务操作教程。
 - Phase 0 已新增 0 到 1 产品架构、客户实例、客户差异和状态 / Workflow / Fact 边界文档：`docs/product/*`、`docs/architecture/status-workflow-fact-boundary.md`、`docs/customers/yoyoosun/*`。
 - `docs/product/product-delivery-ledgers.md` 是产品能力进度台账、客户交付矩阵和客户差异台账入口，用于判断能力成熟度、交付承诺和客户差异分类；它不是 runtime、schema、migration、API、UI 或测试真源。
+- `docs/product/implementation-governance.md` 是模块实施治理入口，用于拆新 Goal 前确认 Phase、Architecture Layer、门禁、范围和禁止项；它不是 runtime、schema、migration、API、UI 或测试真源。
 - `docs/reference/imported-notes/*` 只保存 imported design notes，状态是 Reference Only，不是 runtime、schema 或当前实现真源。
 - 永绅客户的稳定客户 key 是 `yoyoosun`；本仓库按稳定客户 key 管理客户资料，不保留活跃客户目录或导入工作区别名。当前不新增 `tenant_id`，也不把客户 key 当 SaaS runtime tenant。
 - 永绅客户资料已建立 `docs/customers/yoyoosun` 文档边界和 `config/customers/yoyoosun` 配置包骨架；本地原始 Excel / PDF / PNG 已归档到 `docs/customers/yoyoosun/raw-source-files/`，并由 `docs/customers/yoyoosun/raw-source-file-archive-review.md` 记录 checksum、用途分类和边界。该归档只用于功能、字段、模板、导入和验收溯源，未接 docs registry，未改 runtime；原件不代表 Product Core、真实导入批准、schema、migration、API、UI、seedData 或 `business_records` cutover。后续若继续新增客户或新增大批原始二进制文件，应按 `docs/customers/<customer-key>/` 隔离，并单独评审敏感信息、文件大小、引用关系、docs registry、测试断言、Git 历史体积和回滚风险。
 - 010 已新增 yoyoosun customer import dry-run draft：`docs/customers/yoyoosun/import-source-inventory.md`、`docs/customers/yoyoosun/import-field-classification.md`、`docs/customers/yoyoosun/import-dry-run-plan.md`、`docs/customers/yoyoosun/import-unresolved-queue.md`、`docs/customers/yoyoosun/import-acceptance-checklist.md`、`docs/customers/yoyoosun/import-strategy.md` 和 `docs/customers/yoyoosun/import-risk-register.md`。010 只新增导入来源清单、字段分类、dry-run 流程、unresolved queue、验收清单、导入策略和风险登记；未实现 runtime、API、UI、seedData、docs registry、migration、schema、import/backfill loader 或真实数据迁移。
 - 011 已新增 yoyoosun import dry-run tooling：`scripts/import/customerImportDryRun.mjs`、`scripts/import/customerImportDryRun.test.mjs` 和 `scripts/import/fixtures/customers/yoyoosun/*`。该 CLI 只读取 source snapshot JSON 与 existing V1 / formal model snapshot JSON，输出 dry-run package 和 Markdown 报告；它不连接数据库、不写正式表、不写 `business_records`、不改 schema / migration / API / UI / seedData / docs registry，也不执行真实 import / backfill。`validation-summary.json` 中 `canExecuteRealImport` 永远为 `false`。
-- 012 已新增 yoyoosun source snapshot freeze + real dry-run evidence preparation：`scripts/import/customerSourceSnapshotFreezeCheck.mjs`、`scripts/import/customerSourceSnapshotFreezeCheck.test.mjs`、sanitized freeze fixtures、`docs/customers/yoyoosun/source-snapshot-freeze.md`、`docs/customers/yoyoosun/real-dry-run-evidence.md` 和 `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md`。012 可生成 `output/customers/yoyoosun/source-snapshot-freeze/` 与 `output/customers/yoyoosun/real-dry-run-evidence/`，但 output 只是本地 evidence，不纳入 git，不是真实导入批准。012 不读 DB、不写 DB、不做 loader、不改 schema / migration / API / UI / seedData / docs registry、不写 `business_records`、不做 `business_records` runtime cutover，也不生成 013/014 队列；`freeze-metadata.json` 和 011 dry-run `validation-summary.json` 中 `canExecuteRealImport` 都必须为 `false`。
+- 012 已新增 yoyoosun source snapshot freeze + real dry-run evidence preparation：`scripts/import/customerSourceSnapshotFreezeCheck.mjs`、`scripts/import/customerSourceSnapshotFreezeCheck.test.mjs`、sanitized freeze fixtures、`docs/customers/yoyoosun/source-snapshot-freeze.md`、`docs/customers/yoyoosun/real-dry-run-evidence.md` 和 `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md`。012 可生成 `output/customers/yoyoosun/source-snapshot-freeze/` 与 `output/customers/yoyoosun/real-dry-run-evidence/`，但 output 只是本地 evidence，不纳入 git，不是真实导入批准。012 不读 DB、不写 DB、不做 loader、不改 schema / migration / API / UI / seedData / docs registry、不写 `business_records`、不做 `business_records` runtime cutover，也不生成后续执行队列；`freeze-metadata.json` 和 011 dry-run `validation-summary.json` 中 `canExecuteRealImport` 都必须为 `false`。
 
 ## 按任务分流
 
@@ -64,6 +66,7 @@
 - `/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
 - `/Users/simon/projects/plush-toy-erp/docs/product/product-completion-roadmap.md`
 - `/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- `/Users/simon/projects/plush-toy-erp/docs/product/implementation-governance.md`
 - `/Users/simon/projects/plush-toy-erp/server/README.md`
 - `/Users/simon/projects/plush-toy-erp/scripts/README.md`
 

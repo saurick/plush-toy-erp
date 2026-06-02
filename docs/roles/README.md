@@ -1,0 +1,28 @@
+# 角色与权限 / Roles And Permissions
+
+本目录保存角色、权限矩阵和岗位职责相关文档。
+
+## 放什么
+
+- 角色权限矩阵。
+- 岗位职责和权限配置方向。
+- 与 RBAC、owner role、assignee 边界相关的长期说明。
+
+## 不放什么
+
+- 客户专属角色模板。
+- 前端菜单显隐的临时配置。
+- 后端权限码唯一真源。
+
+## 是否是真源
+
+本目录是角色权限说明入口。后端权限码和内置角色矩阵的当前真源仍以代码和 `docs/current-source-of-truth.md` 指向为准；前端隐藏菜单不是安全边界。
+
+## 更新规则
+
+新增、删除、重命名角色权限文档，或改变角色职责、权限矩阵口径时，必须同步检查：
+
+- 本 README。
+- `docs/document-inventory.md`。
+- `docs/current-source-of-truth.md`。
+- 相关 RBAC / API 测试和前端权限入口说明。

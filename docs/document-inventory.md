@@ -23,6 +23,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 - `docs/archive/*`、`progress.md` 只用于历史追溯；原 `docs/changes/*` 历史文件已删除，当前状态回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、代码和测试交叉确认。
 - `docs/reference/imported-notes/*` 是外部输入，必须先经过正式文档和代码复核。
 - README / server docs / config docs / deployment docs 是目录、运行、部署或子系统维护说明。
+- `docs/` 下长期维护目录的 `README.md` 只维护目录职责、非真源边界和更新规则，不维护每篇文档正文细节。
 - 新增、删除、重命名长期维护 Markdown 文档，或调整文档用途、归属分类、入口状态时，必须同步更新本文。
 - 只改现有文档正文且不改变标题、职责、分类、路径或入口状态时，可以不更新本文；若“标题 / 当前用途”会失真，则必须同步更新。
 - 本文“标题 / 当前用途”列默认使用中文主体 + English anchor；若原文档标题是英文，仍应补中文说明，避免清单变成只有英文的索引。
@@ -60,18 +61,13 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
+| `docs/architecture/README.md` | 架构评审目录说明 / Architecture Reviews |
 | `docs/architecture/customer-supplier-masterdata-review.md` | 客户 / 供应商主数据评审 / Customer / Supplier MasterData Review |
 | `docs/architecture/finished-goods-inbound-workflow-review.md` | 成品入库 Workflow Usecase 评审 / Finished Goods Inbound Workflow Usecase Review |
 | `docs/architecture/industry-schema-review.md` | 行业专表 Ent Schema 评审 |
 | `docs/architecture/masterdata-order-source-document-review.md` | 主数据 / 源单据 / 事实边界评审 / MasterData / Source Document / Fact Review |
 | `docs/architecture/material-product-inventory-schema-review.md` | 材料、成品、BOM 与库存专表 Schema 评审 |
 | `docs/architecture/order-purchase-boundary-review.md` | 订单 / 采购边界评审 / Order / Purchase Boundary Review |
-| `docs/architecture/phase-2b-bom-lot-schema-review.md` | Phase 2B BOM 与库存批次 Schema 评审 |
-| `docs/architecture/phase-2c-purchase-receipt-review.md` | Phase 2C 采购入库最小闭环评审 |
-| `docs/architecture/phase-2d-purchase-receipt-adjustment-review.md` | Phase 2D-B 采购入库差异 / 收货差异 / 入库后更正评审 |
-| `docs/architecture/phase-2d-purchase-return-quality-review.md` | Phase 2D 采购退货 / 入库差异 / 来料质检入口评审 |
-| `docs/architecture/phase-2d-quality-inspection-entry-review.md` | Phase 2D-C 来料质检入口 / 批次状态 / 冻结库存边界评审 |
-| `docs/architecture/phase-2d-quality-inspection-schema-review.md` | Phase 2D-C2 quality_inspections 最小主表设计评审 |
 | `docs/architecture/product-sku-bom-boundary-review.md` | 产品 / SKU / BOM 边界评审 / Product / SKU / BOM Boundary Review |
 | `docs/architecture/shipment-inventory-boundary-review.md` | Shipment / Inventory 出货事实边界评审 |
 | `docs/architecture/shipment-release-workflow-review.md` | 出货放行 Workflow Usecase 评审 / Shipment Release Workflow Usecase Review |
@@ -84,6 +80,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
+| `docs/product/README.md` | 产品与路线目录说明 / Product Docs |
 | `docs/product/business-records-cutover-plan.md` | business_records 切换计划 / Business Records Cutover Plan |
 | `docs/product/business-records-data-map-draft.md` | business_records 数据映射草案 / Business Records Data Map Draft |
 | `docs/product/business-records-reference-audit.md` | business_records 引用审计 / Business Records Reference Audit |
@@ -95,6 +92,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/customer-instance-policy.md` | 客户实例策略 / Customer Instance Policy |
 | `docs/product/domain-model-v1.md` | 领域模型 V1 / Domain Model V1 |
 | `docs/product/formal-menu-entry-plan.md` | 正式产品入口与菜单配置计划 |
+| `docs/product/implementation-governance.md` | 模块实施治理 / Implementation Governance |
 | `docs/product/migration-readiness-checklist.md` | 迁移准备检查清单 / Migration Readiness Checklist |
 | `docs/product/module-boundaries.md` | 模块边界 / Module Boundaries |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 |
@@ -108,6 +106,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
+| `docs/customers/README.md` | 客户资料目录说明 / Customer Materials |
 | `docs/customers/yoyoosun/README.md` | 永绅 yoyoosun 客户资料边界 |
 | `docs/customers/yoyoosun/assumption-register.md` | 假设登记 / Assumption Register |
 | `docs/customers/yoyoosun/change-request-process.md` | 变更请求流程 / Change Request Process |
@@ -135,11 +134,16 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
+| `docs/workflow/README.md` | Workflow 文档目录说明 / Workflow Docs |
 | `docs/workflow/notification-alert-v1.md` | 通知 / 预警 / 催办 / 升级 v1 |
 | `docs/workflow/task-flow-v1.md` | 工作流主任务树 v1 |
+| `docs/roles/README.md` | 角色与权限目录说明 / Roles And Permissions |
 | `docs/roles/role-permission-matrix-v1.md` | 角色权限矩阵 v1 |
+| `docs/finance/README.md` | 财务文档目录说明 / Finance Docs |
 | `docs/finance/finance-v1.md` | 财务 v1 |
+| `docs/warehouse/README.md` | 仓库与品质目录说明 / Warehouse And Quality |
 | `docs/warehouse/warehouse-quality-v1.md` | 仓库与品质 v1 |
+| `docs/observability/README.md` | 可观测性目录说明 / Observability |
 | `docs/observability/log-trace-audit-v1.md` | 日志 / 审计 / Trace v1 |
 
 ### Codex 任务 / Codex Goal
@@ -158,12 +162,20 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
 | `docs/archive/README.md` | archive 目录说明 |
+| `docs/archive/architecture-history/README.md` | architecture 历史评审归档说明 |
+| `docs/archive/architecture-history/phase-2b-bom-lot-schema-review.md` | Phase 2B BOM 与库存批次历史评审归档 |
+| `docs/archive/architecture-history/phase-2c-purchase-receipt-review.md` | Phase 2C 采购入库最小闭环历史评审归档 |
+| `docs/archive/architecture-history/phase-2d-purchase-receipt-adjustment-review.md` | Phase 2D-B 采购入库差异 / 入库后更正历史评审归档 |
+| `docs/archive/architecture-history/phase-2d-purchase-return-quality-review.md` | Phase 2D 采购退货 / 入库差异 / 来料质检入口历史评审归档 |
+| `docs/archive/architecture-history/phase-2d-quality-inspection-entry-review.md` | Phase 2D-C 来料质检入口 / 批次状态历史评审归档 |
+| `docs/archive/architecture-history/phase-2d-quality-inspection-schema-review.md` | Phase 2D-C2 quality_inspections 最小主表历史评审归档 |
 | `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 2026-05-31 至 2026-06-02 旧 progress 归档 |
 
 ### 外部参考
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
+| `docs/reference/README.md` | 参考资料目录说明 / Reference |
 | `docs/reference/imported-notes/README.md` | 外部设计输入 / Imported Design Notes |
 | `docs/reference/imported-notes/erp_plush_productization_config_permission_workflow_state_design.md` | 毛绒玩具 ERP 产品化配置、权限、流程与状态设计总结 |
 | `docs/reference/imported-notes/erp_status_workflow_context.md` | ERP 状态分层、状态机、Workflow 与业务事实设计总结 |
