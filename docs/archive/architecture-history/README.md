@@ -1,4 +1,4 @@
-# architecture 历史评审归档 / Architecture History Archive
+# 架构历史评审归档 / Architecture History Archive
 
 本目录保存已经退出活跃 `docs/architecture/` 入口的旧阶段实现评审文档。
 

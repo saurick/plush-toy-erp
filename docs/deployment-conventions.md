@@ -1,4 +1,4 @@
-# 部署真源约定
+# 部署真源约定 / Deployment Conventions
 
 ## 当前口径
 

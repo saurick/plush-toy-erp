@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: `scripts/import/customerSourceSnapshotFreezeCheck.mjs`
 
-# yoyoosun 来源快照冻结 / Yoyoosun Source Snapshot Freeze
+# 永绅 yoyoosun 来源快照冻结 / Yoyoosun Source Snapshot Freeze
 
 012 已新增 customer source snapshot freeze checker，并基于 sanitized fixture 生成 freeze evidence。该 evidence 只证明 source snapshot freeze checker 可运行、输入可追溯、风险可复查；它不是真实导入批准。
 

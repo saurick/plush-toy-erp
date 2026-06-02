@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# business_records 引用审计 / Business Records Reference Audit
+# 业务记录引用审计 / business_records Reference Audit
 
 本审计只记录当前仓库中 `business_records / business_record_items / business_record_events` 的引用面和过渡建议，不修改 runtime、schema、migration、API、RBAC、UI、docs registry、seedData，也不迁移或删除数据。
 

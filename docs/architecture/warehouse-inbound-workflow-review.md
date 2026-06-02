@@ -1,4 +1,4 @@
-# Warehouse Inbound Workflow Usecase 评审
+# 仓库入库 Workflow Usecase 评审 / Warehouse Inbound Workflow Usecase Review
 
 > 结论：方案 A 已落地。第三条后端 workflow usecase 只推进采购 `warehouse_inbound done / blocked / rejected` 协同状态，不在 workflow 中写 `inventory_txns`、不更新 `inventory_balances`、不生成库存批次，也不顺手迁采购应付、委外、成品、出货和应收链路。
 

@@ -1,4 +1,4 @@
-# plush-toy-erp 重新做项目产品路线图 / Product Completion Roadmap
+# 产品完成路线图 / Product Completion Roadmap
 
 - 文档类型：产品完成路线图
 - 状态：可演进规划真源

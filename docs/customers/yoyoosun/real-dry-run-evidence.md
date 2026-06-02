@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: `scripts/import/customerImportDryRun.mjs`
 
-# yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence
+# 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence
 
 012 使用 011 已实现的 dry-run CLI 和 012 sanitized freeze fixtures 生成 real dry-run evidence package。该 package 用于人工 review，不是真实导入批准。
 

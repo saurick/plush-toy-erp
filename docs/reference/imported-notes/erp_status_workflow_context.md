@@ -5,7 +5,7 @@ Schema Source of Truth / Schema 真源: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 Notes / 备注: 当前文档只作为 0 到 1 架构输入，不能直接驱动 schema 或 runtime。
 
-# ERP 状态分层、状态机、Workflow 与业务事实设计总结
+# 状态分层、状态机、Workflow 与业务事实设计总结 / ERP Status Workflow Context
 
 ## 一、核心结论
 

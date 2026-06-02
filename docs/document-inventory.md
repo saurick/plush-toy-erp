@@ -5,7 +5,7 @@ Schema Source of Truth / Schema 真源: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档，不替代 `docs/current-source-of-truth.md`、正式产品 / 架构文档、代码或测试。
 
-# Document Inventory / 文档清单
+# 文档清单 / Document Inventory
 
 本文按目录整理当前仓库 tracked Markdown 文档，回答三个问题：
 
@@ -49,12 +49,12 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/README.md` | docs 目录说明、文档 metadata 与注册边界 |
-| `docs/document-inventory.md` | 当前文档清单和查阅索引 |
-| `docs/current-source-of-truth.md` | 当前真源与交接顺序 |
-| `docs/deployment-conventions.md` | 部署真源约定 |
-| `docs/erp-print-template-field-behavior.md` | ERP 打印模板字段与编辑行为清单 |
-| `docs/erp-print-template-implementation.md` | ERP 打印模板实现原理 |
+| `docs/README.md` | 文档目录说明 / docs Directory Guide |
+| `docs/document-inventory.md` | 文档清单 / Document Inventory |
+| `docs/current-source-of-truth.md` | 当前真源与交接顺序 / Current Source Of Truth And Handoff Order |
+| `docs/deployment-conventions.md` | 部署真源约定 / Deployment Conventions |
+| `docs/erp-print-template-field-behavior.md` | 打印模板字段与编辑行为清单 / ERP Print Template Field Behavior |
+| `docs/erp-print-template-implementation.md` | 打印模板实现原理 / ERP Print Template Implementation |
 
 ### 架构评审
 
@@ -63,43 +63,43 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/architecture/README.md` | 架构评审目录说明 / Architecture Reviews |
 | `docs/architecture/customer-supplier-masterdata-review.md` | 客户 / 供应商主数据评审 / Customer / Supplier MasterData Review |
 | `docs/architecture/finished-goods-inbound-workflow-review.md` | 成品入库 Workflow Usecase 评审 / Finished Goods Inbound Workflow Usecase Review |
-| `docs/architecture/industry-schema-review.md` | 行业专表 Ent Schema 评审 |
+| `docs/architecture/industry-schema-review.md` | 行业专表 Ent Schema 评审 / Industry Schema Review |
 | `docs/architecture/masterdata-order-source-document-review.md` | 主数据 / 源单据 / 事实边界评审 / MasterData / Source Document / Fact Review |
 | `docs/architecture/material-product-inventory-schema-review.md` | 材料、成品、BOM 与库存专表 Schema 评审 |
 | `docs/architecture/order-purchase-boundary-review.md` | 订单 / 采购边界评审 / Order / Purchase Boundary Review |
 | `docs/architecture/product-sku-bom-boundary-review.md` | 产品 / SKU / BOM 边界评审 / Product / SKU / BOM Boundary Review |
-| `docs/architecture/shipment-inventory-boundary-review.md` | Shipment / Inventory 出货事实边界评审 |
+| `docs/architecture/shipment-inventory-boundary-review.md` | 出货事实与库存边界评审 / Shipment / Inventory Boundary Review |
 | `docs/architecture/shipment-release-workflow-review.md` | 出货放行 Workflow Usecase 评审 / Shipment Release Workflow Usecase Review |
-| `docs/architecture/shipment-usecase-review.md` | ShipmentUsecase / 出货事实最小模型评审 |
+| `docs/architecture/shipment-usecase-review.md` | 出货事实最小模型评审 / ShipmentUsecase Review |
 | `docs/architecture/status-workflow-fact-boundary.md` | 状态 / Workflow / Fact 边界 / Status, Workflow And Fact Boundary |
 | `docs/architecture/warehouse-inbound-workflow-review.md` | 仓库入库 Workflow Usecase 评审 / Warehouse Inbound Workflow Usecase Review |
-| `docs/architecture/workflow-usecase-review.md` | Workflow Usecase 统一编排评审 / Workflow Usecase Review |
+| `docs/architecture/workflow-usecase-review.md` | 工作流 Usecase 统一编排评审 / Workflow Usecase Review |
 
 ### 产品与路线
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
 | `docs/product/README.md` | 产品与路线目录说明 / Product Docs |
-| `docs/product/business-records-cutover-plan.md` | business_records 切换计划 / Business Records Cutover Plan |
-| `docs/product/business-records-data-map-draft.md` | business_records 数据映射草案 / Business Records Data Map Draft |
-| `docs/product/business-records-reference-audit.md` | business_records 引用审计 / Business Records Reference Audit |
-| `docs/product/business-records-risk-register.md` | business_records 风险登记 / Business Records Risk Register |
-| `docs/product/business-records-transition-audit.md` | business_records 过渡审计 / Business Records Transition Audit |
-| `docs/product/business-records-transition-plan.md` | business_records 过渡计划 / Business Records Transition Plan |
+| `docs/product/business-records-cutover-plan.md` | 业务记录切换计划 / business_records Cutover Plan |
+| `docs/product/business-records-data-map-draft.md` | 业务记录数据映射草案 / business_records Data Map Draft |
+| `docs/product/business-records-reference-audit.md` | 业务记录引用审计 / business_records Reference Audit |
+| `docs/product/business-records-risk-register.md` | 业务记录风险登记 / business_records Risk Register |
+| `docs/product/business-records-transition-audit.md` | 业务记录过渡审计 / business_records Transition Audit |
+| `docs/product/business-records-transition-plan.md` | 业务记录过渡计划 / business_records Transition Plan |
 | `docs/product/config-permission-policy.md` | 配置与权限策略 / Config And Permission Policy |
 | `docs/product/customer-delta-policy.md` | 客户差异策略 / Customer Delta Policy |
 | `docs/product/customer-instance-policy.md` | 客户实例策略 / Customer Instance Policy |
 | `docs/product/domain-model-v1.md` | 领域模型 V1 / Domain Model V1 |
-| `docs/product/formal-menu-entry-plan.md` | 正式产品入口与菜单配置计划 |
+| `docs/product/formal-menu-entry-plan.md` | 正式产品入口与菜单配置计划 / Formal Menu Entry Plan |
 | `docs/product/implementation-governance.md` | 模块实施治理 / Implementation Governance |
 | `docs/product/migration-readiness-checklist.md` | 迁移准备检查清单 / Migration Readiness Checklist |
 | `docs/product/module-boundaries.md` | 模块边界 / Module Boundaries |
-| `docs/product/product-completion-roadmap.md` | 产品完成路线图 |
-| `docs/product/product-delivery-ledgers.md` | 产品能力进度台账 + 客户交付矩阵 + 客户差异台账 |
-| `docs/product/product-principles.md` | 产品原则 |
+| `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |
+| `docs/product/product-delivery-ledgers.md` | 产品能力进度台账、客户交付矩阵与客户差异台账 / Product Delivery Ledgers |
+| `docs/product/product-principles.md` | 产品原则 / Product Principles |
 | `docs/product/release-gates.md` | 发布门禁 / Release Gates |
-| `docs/product/test-strategy.md` | 自动化测试策略 |
-| `docs/product/zero-to-one-architecture.md` | 0 到 1 产品架构 |
+| `docs/product/test-strategy.md` | 自动化测试策略 / Test Strategy |
+| `docs/product/zero-to-one-architecture.md` | 零到一产品架构 / Zero To One Architecture |
 
 ### 客户资料边界
 

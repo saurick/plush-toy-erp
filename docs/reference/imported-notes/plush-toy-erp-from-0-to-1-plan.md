@@ -1,4 +1,4 @@
-# Imported Note: 毛绒玩具 ERP 从 0 到 1 重构方案
+# 外部导入说明：毛绒玩具 ERP 从 0 到 1 重构方案 / Imported Note: Plush Toy ERP From 0 To 1 Plan
 
 - Source / 来源: `/Users/simon/Desktop/plush-toy-erp-from-0-to-1-plan.md`
 - Imported At / 导入时间: 2026-06-02

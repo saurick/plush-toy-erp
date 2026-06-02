@@ -1,4 +1,4 @@
-# Shipment / Inventory 出货事实边界评审
+# 出货事实与库存边界评审 / Shipment / Inventory Boundary Review
 
 > 结论：当前 `InventoryUsecase` 已具备库存事实底座，可以承接“已明确出货行”的 `OUT` 扣减原语，但还不足以直接支撑真实出货扣减闭环。缺口不在单条库存流水，而在 shipment / outbound 事实输入、可用量、预留、冻结、库位和财务放行边界。第七条后端 workflow usecase 已把 `shipment_release done` 收口为“允许出货 / 出货放行”即 `shipping_released`，不直接等同 `shipped`。
 

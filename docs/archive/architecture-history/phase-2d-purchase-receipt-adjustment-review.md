@@ -1,4 +1,4 @@
-# Phase 2D-B 采购入库差异 / 收货差异 / 入库后更正评审
+# 采购入库差异与入库后更正历史评审归档 / Phase 2D-B Purchase Receipt Adjustment Review
 
 > 结论：本轮只做设计评审，不改 Ent schema，不生成 migration，不改运行时代码，不改前端和帮助中心。下一轮推荐优先落 `purchase_receipt_adjustments / purchase_receipt_adjustment_items`，先只承接已过账采购入库后的数量类差异和 lot / warehouse 维度更正；通用库存调整、来料质检、可用 / 冻结 / 预留库存、应付和发票付款继续暂缓。
 

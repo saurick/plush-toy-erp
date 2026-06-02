@@ -1,4 +1,4 @@
-# Phase 2D-C 来料质检入口 / 批次状态 / 冻结库存边界评审
+# 来料质检入口、批次状态与冻结库存边界历史评审归档 / Phase 2D-C Quality Inspection Entry Review
 
 > 结论：本轮只做设计评审，不改 Ent schema，不生成 migration，不改运行时代码，不改前端和帮助中心。下一轮推荐优先做 `inventory_lots.status` 最小状态扩展和库存出库守卫，先防止待检 / 不合格批次被误领用；`quality_inspections`、质检明细、可用 / 冻结 / 预留库存和财务扣款继续暂缓。
 

@@ -1,4 +1,4 @@
-# Phase 2B BOM 与库存批次 Schema 评审
+# 库存批次与 BOM Schema 历史评审归档 / Phase 2B BOM And Inventory Lot Schema Review
 
 ## 结论
 

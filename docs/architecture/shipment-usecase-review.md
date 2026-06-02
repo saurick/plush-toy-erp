@@ -1,4 +1,4 @@
-# ShipmentUsecase / 出货事实最小模型评审
+# 出货事实最小模型评审 / ShipmentUsecase Review
 
 > 结论：建议新增或明确 `ShipmentUsecase`。`WorkflowUsecase` 只负责协同任务状态，`InventoryUsecase` 只负责库存流水、余额、批次、防负库存、冲正和幂等等库存事实原语；出货单据、出货行、预留 / 冻结、出货放行、实际出货、取消 / 冲正和 `shipped` 确认应由 `ShipmentUsecase` 统一承接。`shipment_release done` 不等于 `shipped`，最小语义应是 `shipping_released`；实际 `shipment_execution / outbound done` 才能写 `inventory_txns.OUT` 并推进到 `shipped`。
 

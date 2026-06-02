@@ -1,4 +1,4 @@
-# 行业专表 Ent Schema 评审
+# 行业专表 Ent Schema 评审 / Industry Schema Review
 
 > 结论：当前不应马上拆行业专表，也不应生成 migration。`business_records + workflow_tasks + workflow_task_events + workflow_business_states` 仍足以承接 v1 闭环验证。下一轮如果要推进 schema，应先定义字段真源和一致性策略，再优先评审库存流水/余额和 AR/AP 财务明细。
 

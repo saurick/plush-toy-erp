@@ -1,4 +1,4 @@
-# Phase 2D-C2 quality_inspections 最小主表设计评审
+# 来料质检最小主表历史评审归档 / Phase 2D-C2 quality_inspections Schema Review
 
 > 结论：本轮只做 `quality_inspections` 最小主表设计评审，不改 Ent schema，不生成 migration，不改运行时代码，不改前端和帮助中心。下一轮建议优先落 `quality_inspections` 主表和最小 `lot.status` 联动；`quality_inspection_items`、可用 / 冻结 / 预留库存、供应商评级、财务扣款和采购退货质检外键继续暂缓。
 

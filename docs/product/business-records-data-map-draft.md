@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# business_records 数据映射草案 / Business Records Data Map Draft
+# 业务记录数据映射草案 / business_records Data Map Draft
 
 本草案只描述后续 dry-run / import draft 可使用的字段映射，不迁移数据，不写 import/backfill 代码，不修改 schema。
 

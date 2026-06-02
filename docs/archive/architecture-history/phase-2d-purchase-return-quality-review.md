@@ -1,4 +1,4 @@
-# Phase 2D 采购退货 / 入库差异 / 来料质检入口评审
+# 采购退货、入库差异与来料质检入口历史评审归档 / Phase 2D Purchase Return And Quality Review
 
 > 结论：本轮只做设计评审，不改 Ent schema，不生成 migration，不改运行时代码，不改前端和帮助中心。Phase 2D 后续优先落地采购退货最小闭环，暂缓完整质检专表、采购差异专表、库存预留和可用库存拆分。
 

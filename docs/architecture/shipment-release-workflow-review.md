@@ -1,4 +1,4 @@
-# Shipment Release Workflow Usecase 评审
+# 出货放行 Workflow Usecase 评审 / Shipment Release Workflow Usecase Review
 
 > 结论：第七条最小后端 workflow usecase 已落地。`shipment_release done / blocked / rejected` 只推进协同业务状态：`done -> shipping_released`，`blocked / rejected -> blocked`。它不等于 `shipped`，不写库存流水，不更新库存余额，不创建库存批次，不做库存预留 / 冻结 / 扣减，不创建 DerivedTask，不派生出货执行、应收、开票或任何财务任务，也不改 Ent schema 或生成 migration。
 

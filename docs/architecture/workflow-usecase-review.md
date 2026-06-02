@@ -1,4 +1,4 @@
-# Workflow Usecase 统一编排评审
+# 工作流 Usecase 统一编排评审 / Workflow Usecase Review
 
 > 结论：后端 workflow usecase 渐进迁入已经开始，但不建议一次性重写全部闭环，也不引入复杂流程引擎。前七条最小规则已落地：老板审批任务 `done / blocked / rejected` 后派生工程资料或补资料任务；IQC 来料检验任务 `done / blocked / rejected` 后派生仓库入库或来料异常处理任务；采购仓库入库 `warehouse_inbound done / blocked / rejected` 只推进协同业务状态；委外回货检验 `outsource_return_qc done / blocked / rejected` 后派生委外入库或返工补做任务；成品抽检 `finished_goods_qc done / blocked / rejected` 后派生成品入库或成品返工任务；成品入库 `finished_goods_inbound done / blocked / rejected` 只推进协同业务状态；出货放行 `shipment_release done / blocked / rejected` 只推进协同业务状态。第三条、第六条和第七条都不在 workflow 中写库存流水或余额，不创建库存批次；第七条不派生出货执行、应收、开票或财务任务。
 

@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# business_records 风险登记 / Business Records Risk Register
+# 业务记录风险登记 / business_records Risk Register
 
 本风险登记只覆盖 `business_records` 兼容层过渡，不代表任何 runtime 防护已经实施。
 

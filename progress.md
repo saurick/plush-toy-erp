@@ -6,6 +6,11 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-02 21:15
+- 完成：批量补齐长期维护 Markdown 的 H1 中文主体 + English anchor，覆盖产品、架构、工作流、仓库、财务、角色、可观测性、部署约定、打印模板说明、外部 imported notes、客户 evidence 和旧架构归档文档；同时给旧进度归档补 H1。
+- 下一步：后续新增或触达长期维护 Markdown 时，继续保持 H1 和 `docs/document-inventory.md` 的标题 / 当前用途口径一致；不要把标题双语化误认为 runtime、schema、API 或 UI 能力变化。
+- 阻塞/风险：docs-only 标题收口；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、数据库或部署配置。
+
 ## 2026-06-02 21:08
 - 完成：修正 `docs/architecture/finished-goods-inbound-workflow-review.md` H1 标题，按仓库长期维护 Markdown 约定改为中文主体 + English anchor：`成品入库 Workflow Usecase 评审 / Finished Goods Inbound Workflow Usecase Review`。
 - 下一步：后续触达其它长期维护 Markdown 时，继续检查 H1 和文档清单是否保持中文主体 + English anchor；本轮不批量重命名相邻评审文档。

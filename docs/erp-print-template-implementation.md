@@ -1,4 +1,4 @@
-# ERP 打印模板实现原理
+# 打印模板实现原理 / ERP Print Template Implementation
 
 > 目的：把当前毛绒 ERP 打印模板的共享编辑壳层、窗口级状态和正文真源收口到一份正式文档，避免后续继续把“普通路由页 + 模板共用一份 localStorage 草稿”的旧认知当成主实现。
 

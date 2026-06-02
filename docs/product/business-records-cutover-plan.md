@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# business_records 切换计划 / Business Records Cutover Plan
+# 业务记录切换计划 / business_records Cutover Plan
 
 本计划只设计 `business_records` 兼容层的分阶段切换，不执行切换、迁移、删除或双写。
 

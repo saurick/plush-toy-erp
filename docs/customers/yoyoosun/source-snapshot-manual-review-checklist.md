@@ -6,7 +6,7 @@ Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: `scripts/import/customerSourceSnapshotFreezeCheck.mjs` and `scripts/import/customerImportDryRun.mjs`
 Current Evidence Inputs / 当前证据输入: `output/customers/yoyoosun/source-snapshot-freeze/` and `output/customers/yoyoosun/real-dry-run-evidence/`
 
-# yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist
+# 永绅 yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist
 
 本清单用于 review 012 freeze evidence 和 dry-run evidence。结论默认是 import not approved，直到后续单独实现任务完成真实 loader 设计、备份、回滚、幂等、对账和客户确认。
 

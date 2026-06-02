@@ -5,7 +5,7 @@ Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
-# business_records 过渡计划 / Business Records Transition Plan
+# 业务记录过渡计划 / business_records Transition Plan
 
 009 已补充 docs-only 审计产物：
 
