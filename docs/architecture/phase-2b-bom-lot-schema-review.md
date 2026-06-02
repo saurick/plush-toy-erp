@@ -14,7 +14,7 @@ Phase 2B 建议只推进 `inventory_lots`、`bom_headers`、`bom_items`，并把
 | Phase 2A 当前真源 | `docs/current-source-of-truth.md`、`server/internal/data/model/schema/*.go`、`server/internal/data/inventory_repo.go` | `inventory_txns` 是库存历史事实真源；`inventory_balances` 是当前余额 / 查询加速表；数量使用 decimal/numeric，不使用 float。 |
 | Phase 2A 验收线索 | `server/internal/data/inventory_repo_test.go`、`server/internal/data/inventory_postgres_test.go` | 当前测试覆盖 migration 相关结构、numeric 精度、幂等、冲正、余额唯一键和并发出库；目标库是否已 apply 仍以 `make migrate_status` 为准。 |
 | 早期 schema 评审 | `docs/architecture/material-product-inventory-schema-review.md` | 早期已识别 BOM、批次和库存 lot 维度，但 Phase 2A 只落了最小库存事实闭环。 |
-| 业务字段材料 | `docs/plush-erp-data-model.md` | 材料分析明细表中款式编号、单位用量、损耗、组装部位、色号 / 颜色等字段已经足够支持最小 BOM 评审；该文档早期“暂不建表”的口径已被 Phase 2A 库存事实落地文档局部更新。 |
+| 业务字段材料 | `docs/current-source-of-truth.md`、`docs/product/domain-model-v1.md` | 材料分析明细表中款式编号、单位用量、损耗、组装部位、色号 / 颜色等字段已经足够支持最小 BOM 评审；早期根目录数据模型草案已删除，当前结论回到当前真源、产品域模型和 Ent schema。 |
 | 当前 Ent schema | `server/internal/data/model/schema/*.go` | `products` 已有 `style_no / customer_style_no`；`inventory_txns` 和 `inventory_balances` 当前唯一维度都不含 `lot_id`。 |
 | 当前库存写入主路径 | `server/internal/biz/inventory.go`、`server/internal/data/inventory_repo.go`、`server/internal/data/inventory_repo_test.go` | 库存写入在同事务内新增流水并更新余额；余额唯一键当前是 `subject_type + subject_id + warehouse_id + unit_id`。 |
 
@@ -47,7 +47,7 @@ Phase 2B 建议只推进 `inventory_lots`、`bom_headers`、`bom_items`，并把
 | 判断项 | 当前观察 | Phase 2B 决策 |
 | --- | --- | --- |
 | 现有字段 | `products` 已有 `style_no` 和 `customer_style_no`。 | 可表达当前 BOM 最小绑定所需的款式编号和客户款号。 |
-| 文档线索 | `docs/plush-erp-data-model.md` 明确提示产品、款式、客户款号、产品订单编号存在多层语义。 | 现有真实样本还不足以稳定“产品、款式、纸样、客户款号”四套独立生命周期。 |
+| 文档线索 | `docs/current-source-of-truth.md` 和 `docs/product/domain-model-v1.md` 明确提示产品、款式、客户款号、产品订单编号存在多层语义。 | 现有真实样本还不足以稳定“产品、款式、纸样、客户款号”四套独立生命周期。 |
 | 最小闭环 | 本轮 BOM 可以先绑定 `products.id`。 | 通过 `products.style_no / customer_style_no` 保存款式和客户款号线索。 |
 | 推荐 | Phase 2B 不新增 `product_styles`。 | 等后续明确“一个款式下多个产品 / SKU / 颜色款 / 纸样版本”的长期维护关系，再单独评审并迁移。 |
 

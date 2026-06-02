@@ -37,13 +37,13 @@ Codex 新会话不能依赖历史聊天记忆，只能以仓库文件为准。
 如果下一轮任务文件是：
 
 ```text
-docs/codex-goals/003-v1-ent-schema-customers-suppliers-orders.md
+docs/codex-goals/<goal-file>.md
 ```
 
 则复制给 Codex 的 Goal 是：
 
 ```text
-目标：执行 docs/codex-goals/003-v1-ent-schema-customers-suppliers-orders.md。
+目标：执行 docs/codex-goals/<goal-file>.md。
 
 请先阅读 AGENTS.md，再阅读该任务文件。每次新会话不能依赖历史聊天记忆，只能以仓库文件为准。
 
@@ -63,8 +63,8 @@ docs/codex-goals/003-v1-ent-schema-customers-suppliers-orders.md
 建议新开会话：
 
 ```text
-002 -> 003
-003 -> 004
+schema review -> schema
+schema -> migration/generate
 schema -> repo/usecase
 repo/usecase -> API/RBAC
 API/RBAC -> UI

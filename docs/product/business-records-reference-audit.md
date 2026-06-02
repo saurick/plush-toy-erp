@@ -54,7 +54,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `web/src/erp/docs/*` | 帮助中心和开发验收文档描述旧通用业务记录、字段联动、workflow draft、debug 和业务链路 | docs/help / compatibility | 是 | deprecate later；正式口径应逐步指向 V1 文档 |
 | `docs/current-source-of-truth.md` | 当前状态入口，同时说明 `business_records` 仍是兼容层且 V1 已完成到 UI | docs/source index | 是 | update with 009 audit note |
 | `docs/product/business-records-transition-plan.md` | 既有 transition plan，明确兼容层定位和不得直接删除 | docs/plan | 是 | update with 009 audit outputs |
-| `docs/product/domain-schema-draft-v1-v2.md`、`v1-implementation-cutline.md`、`v1-schema-go-no-go.md`、`v1-next-codex-goals.md` | 记录 V1 正式模型、draft-only / deferred 对象和 `business_records` 过渡边界 | docs/plan | 是 | keep；按 009 小幅更新状态 |
+| `docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md` | 记录当前 V1 正式模型状态、roadmap 阶段和 `business_records` 退出方向 | docs/plan | 是 | keep；旧 V1 schema draft / cutline / go-no-go 文件已从活跃文档树删除 |
 | `docs/architecture/*business*`、`docs/architecture/*source-document*`、`docs/architecture/*purchase*`、`docs/architecture/*shipment*` | 架构评审文档反复声明 `business_records` 是快照 / 兼容层，不替代事实 | docs/architecture | 是 | keep；后续 runtime cutover 前继续作为边界输入 |
 | Phase 2 历史变更记录 | 历史记录曾说明专表落地时不删除、不迁移、不替代 `business_records` | docs/history | 间接重叠 | 已从当前 docs 入口清理；当前口径以 `docs/current-source-of-truth.md`、代码和测试为准 |
 | `web/src/erp/config/businessRecordDefinitions.test.mjs`、`businessRecordForm.test.mjs`、`businessRecordItemLayout.test.mjs`、`linkedNavigation.test.mjs` 等 | 覆盖旧通用页面配置、表单转换、滚动布局、source linkage 和链路派生 | test / compatibility | 是 | keep；后续 cutover 时必须调整测试语义 |

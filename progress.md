@@ -6,6 +6,12 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-02 15:34
+- 完成：按“活跃文档树回到 roadmap / current-source / product-delivery-ledgers”的口径清理历史遗留文档。删除已完成编号 Codex Goal `000` 到 `012`、旧 `rewrite-roadmap` 兼容入口、早期根目录初始化 / 主流程 / 数据模型 / 项目状态文档，以及旧 Phase 1 / V1 schema draft、cutline、go/no-go、next-goals 等执行规划文档；这些内容后续仅从 Git 历史或 `docs/archive/*` 过程线索追溯。
+- 完成：同步 `README.md`、`AGENTS.md`、`docs/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/codex-goals/*` 模板说明、`docs/product/product-completion-roadmap.md`、`docs/product/domain-model-v1.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-cutover-plan.md`、`docs/architecture/phase-2b-bom-lot-schema-review.md` 和 `scripts/project-scan.sh`，移除活跃文档对已删除文件的引用。
+- 下一步：剩余 `business_records` 过渡文档、current import 文档、正式架构评审、产品内帮助文档和 imported-notes 仍保留；它们分别对应 roadmap 第 13 / 14 阶段、当前事实边界、产品内展示或 Reference Only 输入，后续应按具体阶段再整合，不在本轮无差别删除。
+- 阻塞/风险：docs / governance cleanup；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。`scripts/project-scan.sh` 仅更新扫描目标中的已删除文档路径。本轮追加前 `progress.md` 为 54 行 / 9495 bytes，未达到归档阈值。
+
 ## 2026-06-02 15:06
 - 完成：按用户已删除 `docs/changes/*` 的现场同步相关文档，更新 `docs/document-inventory.md`、`docs/README.md` 和 `web/README.md`，移除当前索引和前端文档规则中的 `docs/changes/*` 入口；保留 `docs/current-source-of-truth.md` 中“历史 changes 文件已清理、当前状态回到真源索引 / 正式文档 / 代码 / 测试”的口径。
 - 下一步：后续若需要追溯旧 changes 内容，只能从 Git 历史或 `docs/archive/progress-2026-06-02-before-print-template-defer.md` 的过程线索回查；当前文档清单不再列出 `docs/changes/*`。

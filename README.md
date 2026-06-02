@@ -137,9 +137,6 @@ pnpm style:l1
 - 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md`
 - current 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/current/README.md`
 - imported design notes：`/Users/simon/projects/plush-toy-erp/docs/reference/imported-notes/README.md`
-- 初始化范围：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-initialization.md`
-- 主流程：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
-- 数据模型与导入映射：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
 - Phase 2B BOM 与批次库存评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2b-bom-lot-schema-review.md`
 - Phase 2C 采购入库评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2c-purchase-receipt-review.md`
 - Phase 2D 采购退货 / 入库差异 / 来料质检入口评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2d-purchase-return-quality-review.md`

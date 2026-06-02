@@ -57,13 +57,13 @@ cat .codex-review/latest.md | pbcopy
 
 ## 什么时候新开 Codex 会话
 
-切换到新的编号 Goal 时，建议新开 Codex 会话。
+切换到新的 Goal 时，建议新开 Codex 会话。
 
 例如：
 
 ```text
-002 -> 003：新开会话
-003 -> 004：新开会话
+schema review -> schema：新开会话
+schema -> migration/generate：新开会话
 schema -> repo/usecase：新开会话
 repo/usecase -> API/RBAC：新开会话
 API/RBAC -> UI：新开会话
@@ -116,21 +116,13 @@ cat .codex-review/latest.md | pbcopy
 
 ## Goal 文件命名规则
 
-使用数字前缀：
+使用 `roadmap stage / 顺序号 + 短任务名` 的数字前缀，例如：
 
 ```text
-000-phase0-foundation.md
-001-overnight-phase1-masterdata-order-review.md
-002-schema-design-final-review.md
-003-v1-ent-schema-customers-suppliers-orders.md
-004-v1-migration-and-ent-generate.md
-005-v1-repo-usecase-masterdata.md
-006-v1-repo-usecase-sales-order.md
-007-v1-api-rbac-masterdata-order.md
-008-v1-frontend-masterdata-order-pages.md
-009-business-records-transition-audit.md
-010-current-customer-data-import-draft.md
+013-v1-formal-menu-and-legacy-entry-exit.md
 ```
+
+已完成的 `000` 到 `012` 编号 Goal 不保留在活跃文档树中；需要追溯旧执行规格时从 Git 历史读取。后续新增 Goal 必须先对齐 `docs/product/product-completion-roadmap.md` 和 `docs/current-source-of-truth.md`，不要复用旧编号或旧 Goal 文件。
 
 ## Goal 文件建议结构
 

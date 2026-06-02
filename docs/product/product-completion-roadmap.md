@@ -16,7 +16,7 @@
 
 本文件是产品完成路线图的可演进规划真源，不是一次性固定计划。执行过程中如果发现路线、顺序、范围或前置条件与当前代码、客户反馈、验收结果或风险判断不一致，应先显式更新本文件，再拆分新的 `docs/codex-goals/*.md` 执行任务。
 
-`docs/codex-goals/001-xxx.md`、`002-xxx.md` 等编号 Goal 只表示阶段性施工单和审计记录；完成后不再作为后续路线真源。后续路线以本文件和 `docs/current-source-of-truth.md` 的当前状态为准。
+`docs/codex-goals/*.md` 只表示阶段性施工单和审计记录；完成后不再作为后续路线真源，也不应长期留在活跃文档树里覆盖 roadmap。后续路线以本文件和 `docs/current-source-of-truth.md` 的当前状态为准；旧 Goal 执行规格如需追溯，从 Git 历史读取。
 
 任何 roadmap 调整都应写清：
 

@@ -19,7 +19,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 - `web/src/erp/docs/*.md` 是产品内文档源文件，是否展示取决于 `web/src/erp/config/docs.mjs` 和 `web/src/erp/config/seedData.mjs`。
 - `docs/product/*` 和 `docs/architecture/*` 是正式产品 / 架构评审文档，但不自动进入前端帮助中心。
-- `docs/codex-goals/*` 是阶段性执行规格和审计记录，完成后不作为后续路线真源。
+- `docs/codex-goals/*` 只保留模板、协议和未来待执行 Goal；完成后的编号 Goal 不保留为活跃文档，可从 Git 历史追溯，后续路线回到 roadmap。
 - `docs/archive/*`、`progress.md` 只用于历史追溯；原 `docs/changes/*` 历史文件已删除，当前状态回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、代码和测试交叉确认。
 - `docs/reference/imported-notes/*` 是外部输入，必须先经过正式文档和代码复核。
 - README / server docs / config docs / deployment docs 是目录、运行、部署或子系统维护说明。
@@ -51,11 +51,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/README.md` | docs 目录说明、文档 metadata 与注册边界 |
 | `docs/document-inventory.md` | 当前文档清单和查阅索引 |
 | `docs/current-source-of-truth.md` | 当前真源与交接顺序 |
-| `docs/project-status.md` | 当前项目基线 |
 | `docs/deployment-conventions.md` | 部署真源约定 |
-| `docs/plush-erp-initialization.md` | 毛绒 ERP 初始化范围 |
-| `docs/plush-erp-operation-flow.md` | 毛绒 ERP 主流程 |
-| `docs/plush-erp-data-model.md` | 毛绒 ERP 数据模型与导入映射 |
 | `docs/erp-print-template-field-behavior.md` | ERP 打印模板字段与编辑行为清单 |
 | `docs/erp-print-template-implementation.md` | ERP 打印模板实现原理 |
 
@@ -99,23 +95,14 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/customer-delta-policy.md` | Customer Delta Policy |
 | `docs/product/customer-instance-policy.md` | Customer Instance Policy |
 | `docs/product/domain-model-v1.md` | Domain Model V1 |
-| `docs/product/domain-schema-draft-v1-v2.md` | Domain Schema Draft V1 / V2 |
 | `docs/product/formal-menu-entry-plan.md` | 正式产品入口与菜单配置计划 |
 | `docs/product/migration-readiness-checklist.md` | Migration Readiness Checklist |
 | `docs/product/module-boundaries.md` | Module Boundaries |
-| `docs/product/phase1-implementation-plan.md` | Phase 1 Implementation Plan |
-| `docs/product/phase1-risk-register.md` | Phase 1 Risk Register |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 |
 | `docs/product/product-delivery-ledgers.md` | 产品能力进度台账 + 客户交付矩阵 + 客户差异台账 |
 | `docs/product/product-principles.md` | 产品原则 |
 | `docs/product/release-gates.md` | Release Gates |
-| `docs/product/rewrite-roadmap.md` | Rewrite Roadmap |
-| `docs/product/schema-design-final-review.md` | Schema Design Final Review |
 | `docs/product/test-strategy.md` | 自动化测试策略 |
-| `docs/product/v1-entity-decision-record.md` | V1 Entity Decision Record |
-| `docs/product/v1-implementation-cutline.md` | V1 Implementation Cutline |
-| `docs/product/v1-next-codex-goals.md` | V1 后续 Codex Goals |
-| `docs/product/v1-schema-go-no-go.md` | V1 Schema Go / No-Go Checklist |
 | `docs/product/zero-to-one-architecture.md` | 0 到 1 产品架构 |
 
 ### 客户资料边界
@@ -160,19 +147,8 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/codex-goals/_goal-file-template.md` | Codex Goal 文件模板 |
 | `docs/codex-goals/_new-session-goal-template.md` | Codex 新会话短 Goal 模板 |
 | `docs/codex-goals/_review-output-protocol.md` | Codex 审查报告输出协议 |
-| `docs/codex-goals/000-phase0-foundation.md` | Phase 0 执行规格 |
-| `docs/codex-goals/001-overnight-phase1-masterdata-order-review.md` | Codex Goal 001: MasterData / Order / BOM / Purchase Review |
-| `docs/codex-goals/002-schema-design-final-review.md` | Codex Goal 002: Schema Design Final Review |
-| `docs/codex-goals/003-v1-ent-schema-customers-suppliers-orders.md` | Codex Goal 003: V1 Ent Schema |
-| `docs/codex-goals/004-v1-migration-and-ent-generate.md` | Codex Goal 004: V1 Ent Generate and Atlas Migration |
-| `docs/codex-goals/005-v1-repo-usecase-masterdata.md` | Codex Goal 005: V1 MasterData Repo / Usecase |
-| `docs/codex-goals/006-v1-repo-usecase-sales-order.md` | Codex Goal 006: V1 Sales Order Repo / Usecase |
-| `docs/codex-goals/007-v1-api-rbac-masterdata-order.md` | Codex Goal 007: V1 API / RBAC |
-| `docs/codex-goals/008-v1-frontend-masterdata-order-pages.md` | Codex Goal 008: V1 Frontend Pages |
-| `docs/codex-goals/009-business-records-transition-audit.md` | Codex Goal 009: business_records Transition Audit |
-| `docs/codex-goals/010-current-customer-data-import-draft.md` | Codex Goal 010: current Customer Data Import Draft |
-| `docs/codex-goals/011-current-customer-import-dry-run-tooling.md` | Codex Goal 011: current Customer Import Dry-run Tooling |
-| `docs/codex-goals/012-current-source-snapshot-freeze-and-real-dry-run-evidence.md` | Codex Goal 012: Source Snapshot Freeze and Real Dry-run Evidence |
+
+已完成的 `000` 到 `012` 编号 Goal 已从活跃文档树删除；需要追溯执行规格时使用 Git 历史，不再从当前 `docs/codex-goals/` 读取。
 
 ### 归档
 

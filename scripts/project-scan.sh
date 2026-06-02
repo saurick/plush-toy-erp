@@ -152,7 +152,7 @@ IDENTITY_HITS="$(
     README.md \
     AGENTS.md \
     docs/README.md \
-    docs/project-status.md \
+    docs/current-source-of-truth.md \
     server/README.md \
     server/docs/k8s.md \
     web/package.json \
@@ -207,7 +207,7 @@ DOC_HITS="$(
     AGENTS.md \
     README.md \
     docs/README.md \
-    docs/project-status.md \
+    docs/current-source-of-truth.md \
     scripts/README.md \
     server/README.md \
     server/deploy/README.md \

@@ -2,17 +2,16 @@
 
 本文只描述 0 到 1 重构的业务域模型草案，不改 Ent schema，不生成 migration。
 
-本文吸收 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` 中稳定的业务域划分，但不吸收其字段示例作为 schema 真源。任何新增表、字段、状态机、API 或页面都必须回到对应架构评审、`docs/current-source-of-truth.md` 和具体 `docs/codex-goals/*.md`。
+本文吸收 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` 中稳定的业务域划分，但不吸收其字段示例作为 schema 真源。任何新增表、字段、状态机、API 或页面都必须回到对应架构评审、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和新的具体 Goal 文件。
 
-Phase 1 评审补充文档：
+当前仍可用于边界核对的评审文档：
 
-- `docs/product/domain-schema-draft-v1-v2.md`
 - `docs/architecture/masterdata-order-source-document-review.md`
 - `docs/architecture/customer-supplier-masterdata-review.md`
 - `docs/architecture/product-sku-bom-boundary-review.md`
 - `docs/architecture/order-purchase-boundary-review.md`
 
-这些文档仍是 proposed / review，不代表 Ent schema、migration、runtime、API 或 UI 已实现。
+这些文档仍是 review / boundary input，不代表 Ent schema、migration、runtime、API 或 UI 已实现。已删除的早期 schema draft、cutline 和 go/no-go 文档只可从 Git 历史追溯，不再作为活跃路线入口。
 
 ## 业务域职责
 
