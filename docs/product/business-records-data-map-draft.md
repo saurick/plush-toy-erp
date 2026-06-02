@@ -53,7 +53,7 @@ Current Implementation Source of Truth: No
 - 文本单位到 `units.id` 的匹配。
 - 仓库文本到底是仓库、库位还是备注。
 - 旧订单金额、币种、税率是否用于正式对账。
-- current 客户字段是否属于 Product Core、Industry Template、Customer Config、Print Template 或 Import Adapter。
+- current 客户字段是否属于 Product Core、Industry Template、Customer Config、Print Template Input / Candidate 或 Import Adapter。
 
 ## 不能自动迁移
 

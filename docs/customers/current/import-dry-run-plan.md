@@ -196,7 +196,7 @@ skipped rows 包含：
 - 文本单位到 `units.id` 的匹配。
 - 仓库文本到底是仓库、库位还是备注。
 - 旧订单金额、币种、税率是否进入正式 Source Document。
-- current 特殊字段属于 Product Core、Industry Template、Customer Config、Print Template、Reporting 还是 Customer Material。
+- current 特殊字段属于 Product Core、Industry Template、Customer Config、Print Template Input / Candidate、Reporting 还是 Customer Material。
 - 任何 shipment / inventory / finance 相关字段。
 
 输出：

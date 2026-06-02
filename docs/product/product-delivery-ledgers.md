@@ -11,7 +11,7 @@
    用来回答：某个客户交付了哪些模块？哪些可试用？哪些还只是配置草案？哪些不能承诺？
 
 3. 客户差异台账
-   用来回答：客户提出的差异需求属于 Product Core、Industry Template、Customer Config、Customer Extension、Data Import Adapter、Print Template、Reporting 中哪一类？是否允许进入产品内核？
+   用来回答：客户提出的差异需求属于 Product Core、Industry Template、Customer Config、Customer Extension、Data Import Adapter、Print Template Candidate、Reporting、Deferred 中哪一类？是否允许进入产品内核？
 
 本文不是业务帮助中心。
 本文不是客户合同。
@@ -29,9 +29,13 @@
 * 一套标准产品内核。
 * 一个毛绒玩具行业模板。
 * 多个客户配置包。
-* 少量客户专属模板 / 数据适配。
+* 少量客户专属打印样本记录 / 数据适配。
 * 极少数客户扩展。
 * 核心业务代码尽量不分叉。
+
+### 1.1.1 打印样本当前处理原则
+
+当前阶段不建立 Print Template 产品内核，也不把 current 单一客户合同样式抽成行业默认模板。打印相关资料只按客户打印样本、交付说明或差异线索记录；不新增模板 schema、不实现模板设计器、不做通用渲染引擎，也不让打印格式反向决定 schema、fact、workflow 或 API。只有至少 2-3 个真实客户出现同类单据、字段来源稳定且差异主要是抬头 / 字段显示 / 版式微调时，才重新评审是否进入 `PRINT-TEMPLATE-CORE-MVP`。
 
 ### 1.2 当前阶段禁止项
 
@@ -165,8 +169,8 @@
 | CAP-025       | mobile task entry                         | Industry Template / UI | Mobile                  | L1-L2 | 已有方向和骨架                                                                                      | 未实现真实移动端任务闭环                      | V3 汇报 / mobile roles README                                       | mobile-task-entry-review            | 不要先做空壳菜单                         | No             | No    |
 | CAP-026       | current 私有化部署包                            | Delivery               | Deployment              | L1-L2 | deployments/current README 已有                                                                | 未形成可执行部署包                         | `deployments/current/README.md`                                   | deployment-package-current          | 备份/恢复/发布未完整                      | No             | No    |
 | CAP-027       | 客户验收体系                                    | Delivery               | Acceptance              | L1-L2 | 已有导入验收、阶段验收口径                                                                                | 未形成客户验收包                          | import acceptance checklist                                       | customer-trial-acceptance           | 验收口径要业务化                         | No             | No    |
-| CAP-028       | 行业默认模板清单                                  | Industry Template      | Productization / Menu   | L1-L2 | 已有毛绒玩具角色、菜单、流程、字段样本、打印模板和移动端角色方向；current 只能作为模板候选输入                                   | 尚未从 current 样本中抽离正式行业默认模板         | `docs/product/formal-menu-entry-plan.md`、`config/industry-templates/plush/README.md` | industry-template-inventory         | 单客户样本被误读为行业标准                    | No             | No    |
-| CAP-029       | Customer Config 配置形态                         | Customer Config        | Productization          | L1-L2 | 已有公司名、logo、主题色、菜单、字段、编号、模板、角色、权限和初始化数据等配置项口径，并已有 current 配置包骨架                       | 没有 runtime config loader，不新增 `tenant_id` | `web/src/erp/docs/productization-delivery.md`、`config/customers/current/README.md` | customer-config-shape-review        | 被误读为 Runtime Tenant 或 SaaS 多租户      | No             | No    |
+| CAP-028       | 行业默认模板清单                                  | Industry Template      | Productization / Menu   | L1-L2 | 已有毛绒玩具角色、菜单、流程、字段样本、编号和移动端角色方向；current 只能作为模板候选输入，打印样本暂不进入行业默认模板                      | 尚未从 current 样本中抽离正式行业默认模板；不含 Print Template Core | `docs/product/formal-menu-entry-plan.md`、`config/industry-templates/plush/README.md` | industry-template-inventory         | 单客户样本或打印格式被误读为行业标准              | No             | No    |
+| CAP-029       | Customer Config 配置形态                         | Customer Config        | Productization          | L1-L2 | 已有公司名、logo、主题色、菜单、字段、编号、角色、权限、初始化数据和打印样本引用等配置项口径，并已有 current 配置包骨架                  | 没有 runtime config loader，不新增 `tenant_id`，不含通用打印模板引擎 | `web/src/erp/docs/productization-delivery.md`、`config/customers/current/README.md` | customer-config-shape-review        | 被误读为 Runtime Tenant、SaaS 多租户或模板系统 | No             | No    |
 | CAP-030       | Customer Extension 边界                         | Customer Extension     | Productization          | L1    | 已有原则：极端客户专属逻辑才进入 extension，并记录原因、范围、退出条件和维护责任                                             | 目前没有清晰 runtime extension 层，也没有真实专属逻辑落地 | `docs/product/product-completion-roadmap.md`、`web/src/erp/docs/productization-delivery.md` | real-customer-extension-review-only | 核心 schema / 库存 / 财务规则被客户长期分叉     | No             | No    |
 | CAP-031       | 业务帮助 / 开发验收 / 客户交付说明分离                    | Help / Delivery        | Help / QA               | L1-L2 | 已有开发验收、QA、产品化和交付说明入口，业务版帮助方向明确                                                              | 普通业务用户版帮助不足，客户样本与 QA 说明边界仍需继续分离 | `web/src/erp/docs/system-layer-progress.md`、`web/src/erp/docs/productization-delivery.md` | business-help-split-review          | 开发术语暴露给业务用户或误导实现状态              | No             | No    |
 | CAP-032       | Reporting / Audit / Integration 增强层           | Reporting              | Reporting / Integration | L0-L2 | 已有 observability / audit 口径和后续增强方向                                                               | 报表、附件、导入导出、扫码、外部集成未落地            | `web/src/erp/docs/system-layer-progress.md`                         | wait-for-fact-layer-stability       | 先做报表倒推事实模型                       | No             | No    |
@@ -235,8 +239,8 @@
 | current      | 移动端任务                | CAP-025             | Planned        | 骨架/方向                 | 任务驱动方向明确                     | 真实移动端任务未做                | mobile task review             | 哪些岗位用手机            | 不做空壳入口                    |
 | current      | 私有化部署包               | CAP-026             | Planned        | deployments/current   | 方向明确                         | 备份/恢复/发布未完整              | deployment package             | 部署环境               | 运维风险                      |
 | current      | 客户验收                 | CAP-027             | Planned        | checklist 草案          | 导入验收部分已有                     | 完整试点验收未做                 | trial acceptance               | 验收范围               | 范围过大风险                    |
-| current      | 行业默认模板清单             | CAP-028             | Planned        | config/industry-templates/plush | 方向明确，current 样本可作为候选输入        | 未完成行业共性 / 客户样本拆分       | industry template inventory    | 哪些角色、菜单、字段属于行业共性 | 单客户样本污染行业模板             |
-| current      | 客户配置包                | CAP-029             | Config Draft   | config/customers/current | 已有目录骨架和配置项口径                 | 没有 runtime loader，不是 `tenant_id` | customer config shape review   | 公司信息、主题、菜单、编号、模板 | 被误读为 SaaS tenant           |
+| current      | 行业默认模板清单             | CAP-028             | Planned        | config/industry-templates/plush | 方向明确，current 样本可作为候选输入        | 未完成行业共性 / 客户样本拆分；打印样本暂不进入行业默认模板 | industry template inventory    | 哪些角色、菜单、字段属于行业共性 | 单客户样本或打印格式污染行业模板       |
+| current      | 客户配置包                | CAP-029             | Config Draft   | config/customers/current | 已有目录骨架和配置项口径                 | 没有 runtime loader，不是 `tenant_id`，不含通用打印模板引擎 | customer config shape review   | 公司信息、主题、菜单、编号、打印样本记录 | 被误读为 SaaS tenant 或模板系统    |
 | current      | 客户扩展边界               | CAP-030             | Not Planned    | 无                     | 当前没有需要落地的专属 extension          | 不创建 extension runtime         | 真实出现专属逻辑后再评审              | 暂无                 | 为假想定制过早造层                |
 | current      | 业务帮助 / 交付说明          | CAP-031             | Planned        | 开发验收文档 / 后续业务帮助     | 开发验收说明已有，业务版帮助待补              | 不把开发验收页当业务教程            | business help split review     | 客户培训材料             | 开发术语误导业务用户               |
 | current      | 报表 / 审计 / 集成增强       | CAP-032             | Deferred       | 无正式入口                 | 后续增强方向明确                      | 报表、附件、扫码、外部集成未做        | 事实层稳定后再评审                  | 报表范围               | 倒推事实模型                    |
@@ -260,7 +264,7 @@
 | Customer Config     | 客户配置项          | 否                 |
 | Customer Extension  | 客户专属扩展         | 否，除非多客户验证         |
 | Data Import Adapter | 数据导入适配         | 否                 |
-| Print Template      | 打印 / 导出模板      | 否                 |
+| Print Template Candidate | 打印 / 导出格式样本 | 否，当前默认 Deferred |
 | Reporting           | 报表展示差异         | 视情况               |
 | Customer Material   | 客户资料线索         | 否                 |
 | Deferred            | 延后评审           | 否                 |
@@ -278,7 +282,7 @@
 | DELTA-CURRENT-004 | current  | 客户 / 供应商 / 联系人正式主数据                  | V1 需求        | Product Core                               | 已进入 V1         | 是                 | 已做 V1 能力                          | 已完成基础链路                     | 后续字段扩张风险                 | 地址/账期另评审                 |
 | DELTA-CURRENT-005 | current  | 销售订单正式源单据                            | V1 需求        | Product Core                               | 已进入 V1         | 是                 | 已做 V1 能力                          | 已完成基础链路                     | 误当出货事实                   | UI 文案继续约束                |
 | DELTA-CURRENT-006 | current  | 颜色、尺寸、客户款号                           | Excel/订单字段线索 | Industry Template Candidate / Deferred     | 不直接落 SKU       | 暂不进入              | 作为 SKU/BOM 评审输入                   | product_sku review          | 过早建 SKU                  | 016 review               |
-| DELTA-CURRENT-007 | current  | 加工合同样式                               | PDF / 合同样本   | Print Template                             | 只作模板输入         | 否                 | 进入打印模板候选                          | 委外模块评审                      | 合同条款当业务规则                | outsourcing review       |
+| DELTA-CURRENT-007 | current  | 加工合同样式                               | PDF / 合同样本   | Customer Material / Print Template Candidate | 只作客户打印样本输入    | 否                 | 记录样式、字段来源和条款线索；不抽产品内核模板      | 委外模块评审；至少 2-3 客户重复后再评审模板化 | 合同条款当业务规则                | outsourcing review + print sample inventory |
 | DELTA-CURRENT-008 | current  | 委外加工流程                               | 合同/业务线索      | Product Core / Industry Template Candidate | 延后             | 待评审               | 委外事实阶段评审                          | outsourcing facts           | 只用合同不足以建模                | outsourcing review       |
 | DELTA-CURRENT-009 | current  | 采购 / 包材 / 辅材                         | 需求线索         | Product Core / Deferred                    | 延后             | 待评审               | 采购订单 / 采购需求评审                     | purchase review             | 与已有 purchase_receipts 重复 | purchase-order review    |
 | DELTA-CURRENT-010 | current  | 出货放行                                 | Workflow 规则  | Product Core                               | 已有 workflow 边界 | 是                 | 保持 `shipping_released != shipped` | shipment review             | 被误解为已出库                  | shipment-usecase-review  |
@@ -293,11 +297,11 @@
 | DELTA-CURRENT-019 | current  | 旧 business_records project-orders 入口 | 旧系统兼容        | Compatibility                              | 退出正式入口         | 否                 | 用正式 sales_orders 承接新写入；旧入口删除 / 隐藏 | transition audit            | 双写/误导                    | legacy removal review    |
 | DELTA-CURRENT-020 | current  | 旧 business_records products 入口       | 旧系统兼容        | Compatibility / Deferred                   | 退出正式入口         | 否                 | 与正式 products / SKU 方向对齐；旧入口删除 / 隐藏 | product review              | 重复主数据                    | product-sku review       |
 | DELTA-CURRENT-021 | current  | current 数据导入                         | 客户落地需要       | Data Import Adapter                        | dry-run / freeze tooling 已完成，真实导入未做 | 否                 | source freeze / dry-run evidence -> loader design -> import execution | 人工确认                        | 误导入/误生成事实                | import loader design     |
-| DELTA-CURRENT-022 | current  | 打印/导出模板                              | 客户交付需要       | Print Template                             | 未做             | 否                 | 模板包                               | 确认格式                        | 模板当业务规则                  | print template review    |
+| DELTA-CURRENT-022 | current  | 打印/导出格式                              | 客户交付需要       | Customer Material / Print Template Candidate | 默认 Deferred    | 否                 | 只登记客户样本和交付诉求，不建立打印交付包或模板引擎    | 多客户同类单据重复、字段来源稳定后再评审       | 模板当业务规则                  | print sample inventory   |
 | DELTA-CURRENT-023 | current  | 菜单入口                                 | V1 页面可试用需要   | Customer Config / UI                       | 未接正式菜单         | 否                 | formal menu entry + legacy entry removal | business_records cutover    | 菜单误导成熟度                  | v1-formal-menu-and-legacy-entry-exit |
 | DELTA-CURRENT-024 | current  | seedData 初始化                         | 交付/演示需要      | Customer Config / Demo Seed                | 未改             | 否                 | 单独评审                              | menu/seed boundary          | 误当正式数据                   | seed review              |
 | DELTA-CURRENT-025 | current  | docs registry / 帮助中心                 | 交付/培训需要      | Help / QA                                  | 未改             | 否                 | 后续帮助中心业务版                         | 功能稳定后                       | 文档误导实现状态                 | help review              |
-| DELTA-CURRENT-026 | current  | 行业默认角色、菜单、字段、打印模板                 | current 样本 / 产品化方向 | Industry Template Candidate                | 待抽离模板清单        | 否                 | 先分类行业共性、current 样本和 deferred 输入      | 多客户或人工评审                    | 单客户样本被当行业标准              | industry template inventory |
+| DELTA-CURRENT-026 | current  | 行业默认角色、菜单、字段、编号规则                 | current 样本 / 产品化方向 | Industry Template Candidate                | 待抽离模板清单        | 否                 | 先分类行业共性、current 样本和 deferred 输入      | 多客户或人工评审                    | 单客户样本被当行业标准              | industry template inventory |
 | DELTA-CURRENT-027 | current  | 客户配置包 / 配置 loader                   | 产品化交付需要      | Customer Config                            | 目录骨架已有，runtime loader 未做 | 否                 | 先设计配置形态，不新增 `tenant_id`              | 配置项边界评审                     | 被误读为 Runtime Tenant / SaaS | customer config shape review |
 | DELTA-CURRENT-028 | current  | 极端客户专属逻辑放置边界                       | 产品化交付需要      | Customer Extension                         | 当前没有真实落地需求     | 否                 | 只有真实出现专属逻辑时建立 extension，并记录退出条件    | 明确客户专属规则                    | 核心规则长期分叉                 | extension review only    |
 | DELTA-CURRENT-029 | current  | 报表、附件、导入导出、扫码、外部集成                | 后续增强方向       | Reporting / Deferred                       | 延后             | 否                 | 事实层稳定后再评审                         | 生产 / 出货 / 财务事实稳定             | 报表倒推事实模型                 | reporting review later   |
@@ -323,7 +327,7 @@
 * current Excel 中单独出现的字段。
 * current PDF 中单独出现的合同条款。
 * 当前客户口头说法但未确认的问题。
-* 打印模板字段。
+* 打印样本字段和单客户打印格式。
 * 导入适配字段。
 * 旧 business_records 快照字段。
 * demo / seed 数据字段。
@@ -338,7 +342,7 @@
 * 菜单显示。
 * 字段显示 / 必填。
 * 编号规则。
-* 打印模板参数。
+* 打印抬头、页脚、logo、公司信息等低风险展示参数。
 * 默认仓库。
 * 默认单位。
 * 角色模板。
@@ -358,9 +362,9 @@
 * duplicate candidates。
 * conflict candidates。
 
-### 9.5 必须进入 Print Template 的内容
+### 9.5 打印样本默认 Deferred
 
-适合 Print Template：
+当前不建立 Print Template 产品能力。以下内容只作为 Customer Material / Delivery Note / Print Template Candidate 记录，默认 Deferred：
 
 * 加工合同格式。
 * 客户送货单样式。
@@ -369,6 +373,8 @@
 * 页眉页脚。
 * 公司名称、地址、电话、税号。
 * 客户专属条款。
+
+这些内容不得直接影响 Product Core、schema、fact、workflow、API 或权限模型。只有至少 2-3 个真实客户的同类单据结构重复，且差异主要是抬头、字段显示、字段排序或版式微调时，才允许新建独立评审判断是否进入 Print Template Core MVP。
 
 ### 9.6 必须 Deferred 的内容
 
@@ -448,7 +454,7 @@
 * 从 Excel / PDF / 截图中发现字段差异。
 * 从试用反馈中发现特殊流程。
 * 从导入 dry-run 中发现 unresolved 字段。
-* 从打印模板中发现客户专属字段。
+* 从客户打印样本中发现客户专属字段。
 * 从权限配置中发现职责差异。
 * 从业务讨论中发现行业共性。
 * 某客户差异被提升为行业模板候选。
@@ -462,7 +468,7 @@
 * Customer Config
 * Customer Extension
 * Data Import Adapter
-* Print Template
+* Print Template Candidate
 * Reporting
 * Customer Material
 * Deferred

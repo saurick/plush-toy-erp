@@ -11,6 +11,7 @@
 - ERP 主流程草案：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-operation-flow.md`
 - ERP 数据模型草案：`/Users/simon/projects/plush-toy-erp/docs/plush-erp-data-model.md`
 - 架构评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/`
+- 历史归档：`/Users/simon/projects/plush-toy-erp/docs/archive/`
 
 ## 相关目录
 

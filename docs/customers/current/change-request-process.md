@@ -5,7 +5,7 @@
 ## 步骤
 
 1. 记录需求来源、业务场景和样本资料。
-2. 判断属于 Product Core、Industry Template、Customer Config、Customer Extension、Data Import Adapter、Print Template 或 Reporting。
+2. 判断属于 Product Core、Industry Template、Customer Config、Customer Extension、Data Import Adapter、Print Template Candidate、Reporting 或 Deferred。
 3. 涉及库存、出货、质检、财务事实时，必须进入架构评审。
 4. 只服务 current 的内容先进入 `docs/customers/current` 或 `config/customers/current`。
 5. 可以通用化的内容再进入 `docs/product/*`、`docs/architecture/*`、schema、usecase 和 tests。

@@ -32,7 +32,7 @@ Current Implementation Source of Truth: Schema files, generated Ent code, Atlas 
 | 是否需要 UI | Done for V1 UI cutline | 008 已新增客户 / 供应商 / 联系人 / 销售订单 / 销售订单行前端页面；docs registry、seedData 和 `business_records` transition 仍未实现。 | Done for UI cutline | UI |
 | 是否需要导入 | Later yes | 009 已输出 data map draft；current 数据导入仍必须 dry-run 和字段分类，不能混入 schema goal。 | Defer | Data Import |
 | 010 current import dry-run draft 是否已补 | Yes, docs-only | 已新增 current 导入来源清单、字段分类、dry-run plan、unresolved queue、acceptance checklist、Product 层 strategy 和 risk register。 | Done for docs draft only | Data Import |
-| 是否需要客户配置 | Later yes | 字段显示、编号规则、打印模板属于 config draft，非 schema first cut。 | Defer | Productization |
+| 是否需要客户配置 | Later yes | 字段显示、编号规则属于 config draft；打印格式当前只记录客户样本和低风险展示参数，不进入 schema first cut，也不做模板内核。 | Defer | Productization |
 | 是否包含 `tenant_id` | No | 正式 cutline 禁止；grep 命中只能是 imported notes / 禁止说明 / future SaaS 候选说明。 | Go | Data / Productization |
 | 是否误把 draft 写成 implemented | No | 新增文档顶部均为 implemented = No。 | Go | Docs / QA |
 

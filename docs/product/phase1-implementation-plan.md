@@ -151,4 +151,4 @@ Phase 2 schema final review 已新增实现前 cutline。任何 Ent schema goal 
 | test commands | `git diff --stat`, keyword grep, optional fixture validation in later goal |
 | stop conditions | current Excel 列直接写 Product Core；导入覆盖正式事实；无 dry-run |
 | expected output | import mapping draft and unresolved question list |
-| review checklist | Product Core / Industry Template / Customer Config / Customer Extension / Data Import Adapter / Print Template / Reporting / Customer Material 分类 |
+| review checklist | Product Core / Industry Template / Customer Config / Customer Extension / Data Import Adapter / Print Template Input / Candidate / Reporting / Customer Material 分类 |

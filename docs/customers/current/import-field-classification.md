@@ -109,7 +109,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 |---|---|---|---|---|---:|---:|---:|---|
 | 加工合同号 / 加工项目 / 工序 | 委外源单据线索 | none in 010 | none | Deferred | 否 | 是 | 否 | future outsourcing source document review 后再决定模型。 |
 | 加工厂 / 联系人 | 委外交易主体 | `suppliers` / `contacts` | supplier/contact candidate | Data Import Source | 条件允许 | 是 | 否 | 仅主数据候选；合同和结算不自动落事实。 |
-| 加工金额 / 结算方式 | 结算线索 | none in 010 | none | Print Template Input | 否 | 是 | 是 | 可作打印模板输入，不生成 AP、invoice、payment。 |
+| 加工金额 / 结算方式 | 结算线索 | none in 010 | none | Print Template Input | 否 | 是 | 是 | 可作打印样本输入，不生成 AP、invoice、payment。 |
 
 ## shipment
 
@@ -130,4 +130,4 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
 | 应收 / 应付 / 发票 / 收付款 / 对账 | 财务事实线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | finance facts deferred，不能从旧快照或 `shipping_released` 自动生成。 |
-| 单价 / 金额 / 税额 | 源单据或打印金额 | V1 source document nullable fields / Print Template | amount candidate | Data Import Source | 条件允许 | 是 | 否 | 只在已存在源单据字段中作为候选；不产生 AR/AP、invoice、payment。 |
+| 单价 / 金额 / 税额 | 源单据或打印金额 | V1 source document nullable fields / Print Template Input | amount candidate | Data Import Source | 条件允许 | 是 | 否 | 只在已存在源单据字段中作为候选；不产生 AR/AP、invoice、payment。 |

@@ -72,7 +72,7 @@ business_records 不能长期替代正式 customers / suppliers / sales_orders /
 
 1. 不得新增与 existing `products` schema 语义重复的第二套 Product Core 表。
 2. 新正式产品能力应复用 existing `products`。
-3. current 产品样本字段先分类为 Product Core Candidate、Customer Material、Print Template 或 Reporting。
+3. current 产品样本字段先分类为 Product Core Candidate、Customer Material、Print Template Input / Candidate 或 Reporting。
 4. `product_skus` 不因 products 页面存在或 current 颜色字段而自动进入 V1 schema。
 
 ## 订单样本迁移

@@ -67,7 +67,7 @@
 可以吸收的原则：
 
 * 通用产品内核 + 受控客户差异 + 客户配置包，而不是每客户一套代码。
-* 配置自由度分层：业务事实、库存、财务、审计和核心状态机受控；菜单、字段显示、打印模板、角色模板等可配置。
+* 配置自由度分层：业务事实、库存、财务、审计和核心状态机受控；菜单、字段显示、角色模板等可配置；打印格式先作为客户交付样本记录，不抽成当前产品内核。
 * 状态分层：Workflow 协同层、单据生命周期层、业务事实层、派生结果层和系统横切状态不能混用。
 * 执行业务动作的判断链路：Feature Flag -> RBAC -> Data Scope -> State Machine -> Business Rule -> Idempotency -> Audit Log。
 * 内部 canonical status 与中文展示文案分离，尤其 `shipping_released != shipped`。
@@ -80,7 +80,7 @@
 * imported note 中尚未被本仓库评审的字段、表、状态、权限码、菜单名或目录结构。
 * imported note 中对未来模块的完整设想，不能越过本路线图和三类台账直接进入 schema / runtime。
 
-任何从 imported-notes 提炼出的新路线项，都必须先进入客户差异台账或产品能力台账分类，再决定是否成为 Product Core、Industry Template、Customer Config、Customer Extension、Data Import Adapter、Print Template、Reporting、Deferred 或 Forbidden。
+任何从 imported-notes 提炼出的新路线项，都必须先进入客户差异台账或产品能力台账分类，再决定是否成为 Product Core、Industry Template、Customer Config、Customer Extension、Data Import Adapter、Print Template Candidate、Reporting、Deferred 或 Forbidden。Print Template Candidate 当前默认 Deferred，只有多客户重复性被证明后才重新评审是否产品化。
 
 ## 0.5 ERP 业务闭环覆盖口径
 
@@ -130,7 +130,7 @@
 | 14 | current 数据导入     | 当前甲方数据 dry-run、人工确认、受控导入                                          | import dry-run、unresolved queue、loader、acceptance report  | 不自动生成出货/库存/财务事实                |
 | 15 | 客户试点上线           | current 甲方可真实试用主链路                                                | 私有化部署、迁移、备份、培训、试运行                                        | 不无备份上线                         |
 | 16 | 交付运维体系           | 多客户私有化部署可复制                                                       | deployment package、release checklist、backup/restore       | 不每客户 fork 一套代码                 |
-| 17 | 行业模板沉淀           | 将多个客户共性沉淀成毛绒玩具行业模板                                                | roles、menus、fields、print templates、numbering              | 不把单一客户特殊项变默认                   |
+| 17 | 行业模板沉淀           | 将多个客户共性沉淀成毛绒玩具行业模板                                                | roles、menus、fields、numbering、seed / import templates       | 不把单一客户特殊项或打印格式变默认              |
 | 18 | 多客户复制            | 第二、第三个客户能快速部署                                                     | customer config package、import adapter、deployment notes   | 不做长期分叉                         |
 | 19 | 产品成熟             | 核心业务闭环、数据可信、权限清楚、可交付可维护                                           | 版本化产品、回归测试、客户升级机制                                         | 不急着 SaaS                       |
 | 20 | SaaS 评审          | 私有化多客户成熟后再评审 SaaS                                                 | tenant_id、隔离、计费、授权、运营后台设计                                 | 不提前污染当前 schema                 |
@@ -244,8 +244,8 @@ current 不是：
 | 层级                 | 含义          | 应包含                            | 不应包含           |
 | ------------------ | ----------- | ------------------------------ | -------------- |
 | Product Core       | 所有客户共用的产品内核 | 主数据、事实模型、核心 usecase、API、权限、审计  | current 客户专属字段 |
-| Industry Template  | 毛绒玩具行业默认模板  | 默认角色、默认菜单、流程模式、字段模板、打印模板       | 无限制低代码         |
-| Customer Config    | 客户配置包       | 公司信息、菜单开关、字段显示、编号规则、打印模板、初始化数据 | 库存扣减规则、财务核销规则  |
+| Industry Template  | 毛绒玩具行业默认模板  | 默认角色、默认菜单、流程模式、字段模板、编号规则、seed / import 模板 | 无限制低代码、单客户打印格式 |
+| Customer Config    | 客户配置包       | 公司信息、菜单开关、字段显示、编号规则、打印样本引用、初始化数据 | 库存扣减规则、财务核销规则、通用打印模板引擎 |
 | Customer Extension | 极少数客户扩展     | 数据适配、专属模板、特殊报表                 | 核心事实分叉         |
 | Runtime Tenant     | SaaS 多租户运行时 | tenant_id、租户隔离、计费授权            | 当前阶段不做         |
 
@@ -260,7 +260,7 @@ current 不是：
 * 字段显示。
 * 字段必填。
 * 编号规则。
-* 打印模板。
+* 已确认的客户打印样本引用或打印诉求记录，不包含通用模板引擎。
 * 角色模板。
 * 权限模板。
 * 初始化数据。
@@ -297,7 +297,7 @@ current 不是：
 | --- | --- | --- |
 | 产品能力进度台账 | 该能力是 L0 未开始、L3 草案、L5 后端可测、L7 UI 可试用，还是 L8 可交付？ | 决定它能否从设计阶段进入实现、试用或交付阶段 |
 | 客户交付矩阵 | current 或其他客户是否真的能看到、试用、验收该能力？ | 防止 roadmap 写“可试用”但客户入口、数据、权限、培训或回滚缺失 |
-| 客户差异台账 | 客户输入属于 Product Core、Industry Template、Customer Config、Extension、Import、Print、Reporting、Deferred 还是 Forbidden？ | 防止 current 样本字段、打印格式或旧快照字段直接污染 Product Core |
+| 客户差异台账 | 客户输入属于 Product Core、Industry Template、Customer Config、Extension、Import、Print Template Candidate、Reporting、Deferred 还是 Forbidden？ | 防止 current 样本字段、打印格式或旧快照字段直接污染 Product Core |
 
 成熟度口径：
 
@@ -315,8 +315,8 @@ current 不是：
 | 层 | Roadmap 口径 | 当前状态跟踪 | 下一步排序原则 | 禁止项 |
 | --- | --- | --- | --- | --- |
 | Product Core 通用产品内核 | 所有客户共享的 schema、usecase、事实、权限、API / UI 和正式帮助口径 | 产品能力进度台账 + 当前真源 | 继续按主数据、源单据、事实闭环、API / UI、测试和文档逐步演进 | 不写死 current 甲方名称、logo、特殊字段或特殊流程 |
-| Industry Template 行业模板 | 毛绒玩具行业默认角色、菜单、流程模式、字段样本、打印模板和初始化模板 | 产品能力台账 + 客户差异台账 | 先做模板清单，区分行业共性、current 样本和 deferred 输入 | 不把第一个客户样本等同于行业标准 |
-| Customer Config 客户配置包 | 公司信息、logo、主题色、菜单开关、字段显示、编号规则、打印模板、角色权限模板和初始化数据 | 客户交付矩阵 + 客户差异台账 | 先设计配置形态和目录边界，不接 runtime loader，不加 `tenant_id` | 不实现 Runtime Tenant、多租户中间件、SaaS 套餐 |
+| Industry Template 行业模板 | 毛绒玩具行业默认角色、菜单、流程模式、字段样本、编号规则和初始化模板 | 产品能力台账 + 客户差异台账 | 先做模板清单，区分行业共性、current 样本和 deferred 输入 | 不把第一个客户样本或打印格式等同于行业标准 |
+| Customer Config 客户配置包 | 公司信息、logo、主题色、菜单开关、字段显示、编号规则、打印样本引用、角色权限模板和初始化数据 | 客户交付矩阵 + 客户差异台账 | 先设计配置形态和目录边界，不接 runtime loader，不加 `tenant_id` | 不实现 Runtime Tenant、多租户中间件、SaaS 套餐或通用打印模板引擎 |
 | Customer Extension 客户扩展层 | 极少数客户专属逻辑的隔离边界 | 客户差异台账 | 只有真实出现专属逻辑时才建立 extension，并记录原因、范围、退出条件 | 不让核心 schema、库存、出货或财务规则为客户长期分叉 |
 | Workflow 协同层 | 任务、事件、业务状态和必要任务派生 | 当前真源 + 系统分层进度 | 先守住 `shipment_release` 边界，再评审 Quality bridge 或后续 workflow 对接 | 不让 `WorkflowUsecase` 直接写库存、出货、财务事实 |
 | MasterData 主数据层 | 客户、供应商、联系人、产品、材料、单位、仓库、BOM 等稳定主数据 | 当前真源 + 产品能力台账 | 先复用已落对象，再评审地址、账期、供应商物料档案和价格 | 不重复设计 products、materials、units、warehouses |
@@ -627,7 +627,7 @@ Feature Flag、菜单权限和动作权限也不能混用：
 * 旧 `business_records` 重叠入口退出正式业务写路径。
 * 客户菜单配置只控制启用、隐藏、排序、文案和默认入口。
 * 菜单隐藏不替代 RBAC action permission、状态机、事实校验和审计。
-* 移动端、帮助文档、打印模板入口跟随产品能力和客户启用状态。
+* 移动端和帮助文档入口跟随产品能力和客户启用状态；打印入口只在已有客户交付样本范围内展示，不作为当前产品内核路线。
 
 菜单基线、current 组合入口拆分和隐藏后的业务保证不放在 roadmap 主文中，统一进入 `docs/product/formal-menu-entry-plan.md`。该文件只作为 013 的规划输入，不代表 seedData、docs registry、路由、权限码或前端 runtime 已修改。
 
@@ -672,7 +672,7 @@ Feature Flag、菜单权限和动作权限也不能混用：
 
 * 产品能力进度台账：记录 dry-run tooling、loader design、真实导入执行、post-import audit 各自成熟度和证据。
 * 客户交付矩阵：记录 current 哪些资料已 freeze、哪些 dry-run 已通过、哪些需要客户确认、哪些仍 blocked。
-* 客户差异台账：记录 Excel / PDF / 旧快照字段属于 Product Core、Customer Config、Data Import Adapter、Print Template、Deferred 还是 Forbidden。
+* 客户差异台账：记录 Excel / PDF / 旧快照字段属于 Product Core、Customer Config、Data Import Adapter、Print Template Candidate、Deferred 还是 Forbidden；Print Template Candidate 当前默认 Deferred。
 
 真实导入前必须先有 loader design，而不是从 dry-run evidence 直接跳到写库。loader design 至少要覆盖备份、回滚、幂等键、冲突处理、unresolved queue、审计日志、重复导入保护、客户签字确认和导入后对账。
 
@@ -737,7 +737,7 @@ current 甲方能真实试用系统，并且反馈能分类进入产品、配置
 * 角色模板与权限模板。
 * 字典和初始化数据。
 * 客户菜单配置。
-* 打印模板。
+* 客户打印样本和打印诉求记录。
 * 导入 mapper。
 * 部署参数与备份恢复说明。
 * 客户差异说明和验收清单。
@@ -767,7 +767,7 @@ current 甲方能真实试用系统，并且反馈能分类进入产品、配置
 * 默认流程模式。
 * 默认字段显示。
 * 默认编号规则。
-* 默认打印模板。
+* 打印样本重复性评估清单，不默认抽成打印模板。
 * 默认导入模板。
 * 默认培训文档。
 * 默认验收清单。

@@ -5,10 +5,10 @@
 | 资料类型 | 用途分类 | 说明 |
 | --- | --- | --- |
 | Excel | Customer Material / Demo Seed / Industry Template Candidate | 可作为字段、导入、seed 和行业模板候选；需评审后再沉淀 |
-| PDF | Customer Material / Print Template Input | 可作为合同、报表或交付样式输入；不直接决定 schema |
+| PDF | Customer Material / Print Template Input | 可作为合同、报表或交付样式输入；不直接决定 schema，也不直接抽成产品模板 |
 | 图片 / 截图 | Customer Material / QA Debug | 可帮助识别页面、字段和流程线索；不作为唯一真源 |
 | seed / demo 数据 | Demo Seed / QA Debug | 只用于开发验收和演示，不替代真实业务事实 |
-| print template | Print Template Input | 可进入客户打印模板或行业模板候选，数据来源必须统一 |
+| print template | Print Template Input | 只作客户打印样本和字段来源记录；默认 Deferred，待多客户重复后再评审是否模板化 |
 | business_records 快照 | Source Snapshot / Data Import Source / Demo Seed | 可作为 dry-run 来源和历史快照，不是长期事实真源 |
 | V1 正式页面当前数据 | Data Import Target Preview | 只作为 future import preview 的目标模型参照；010 不写数据库 |
 
