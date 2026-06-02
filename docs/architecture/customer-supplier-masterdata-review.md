@@ -8,7 +8,7 @@
 
 - 当前代码处于正式客户 / 供应商主数据起步阶段，分表更直观，迁移和权限边界更容易验收。
 - `business_records` 的 partners 页面只是当前主档快照和兼容入口，不应继续长期承担正式主数据。
-- future finance 需要客户、供应商、开票资料、结算条件，但 V1 可以先把 finance 相关字段评审为可选或后置，避免把 current 样本字段硬写进 Product Core。
+- future finance 需要客户、供应商、开票资料、结算条件，但 V1 可以先把 finance 相关字段评审为可选或后置，避免把 永绅 yoyoosun 样本字段硬写进 Product Core。
 
 本文件是评审文档，不改 Ent schema，不生成 migration。
 
@@ -30,7 +30,7 @@
 | Product Core | code、name、status/is_active、display_name、created_at、updated_at | 可进入 V1 草案 |
 | Product Core 可选 | tax_no、default_currency、default_payment_terms、default_contact_id | 需要确认是否对所有客户通用，V1 可先 nullable |
 | Customer Config | 编号规则、字段显示 / 必填、默认付款方式、默认角色可见性 | 放配置草案，不写死 usecase |
-| Customer Material | current 样本中的厂家简称、办公室电话格式、银行账户、特殊开票字段 | 先作为线索，不直接成为 V1 必填字段 |
+| Customer Material | 永绅 yoyoosun 样本中的厂家简称、办公室电话格式、银行账户、特殊开票字段 | 先作为线索，不直接成为 V1 必填字段 |
 | Finance Review Candidate | 开票抬头、税号、银行账号、账期、结算币种 | future AR/AP / invoice 评审前不作为强事实规则 |
 
 ## 与下游关系
@@ -123,7 +123,7 @@
 
 与 `business_records` 的关系：
 
-- 需要从 partner type 推导 roles，容易把 current 样本文案当系统角色。
+- 需要从 partner type 推导 roles，容易把 永绅 yoyoosun 样本文案当系统角色。
 
 ### Option C: 先分表，未来抽象 party
 
@@ -148,7 +148,7 @@
 
 对客户配置的影响：
 
-- current 客户字段先进入 Customer Config / Customer Material 分类，不污染 Product Core。
+- 永绅 yoyoosun 客户字段先进入 Customer Config / Customer Material 分类，不污染 Product Core。
 
 对 migration 的影响：
 

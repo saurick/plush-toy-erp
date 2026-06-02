@@ -41,9 +41,9 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `config/customers/current/README.md` | current 客户配置包骨架 |
+| `config/customers/yoyoosun/README.md` | 永绅 yoyoosun 客户配置包骨架 |
 | `config/industry-templates/plush/README.md` | 毛绒行业模板骨架 |
-| `deployments/current/README.md` | current 客户部署资料未来落点 |
+| `deployments/yoyoosun/README.md` | 永绅 yoyoosun 客户部署资料未来落点 |
 
 ### docs 根入口与当前真源
 
@@ -91,8 +91,6 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/business-records-transition-audit.md` | business_records 过渡审计 / Business Records Transition Audit |
 | `docs/product/business-records-transition-plan.md` | business_records 过渡计划 / Business Records Transition Plan |
 | `docs/product/config-permission-policy.md` | 配置与权限策略 / Config And Permission Policy |
-| `docs/product/current-customer-import-risk-register.md` | current 客户导入风险登记 / Current Customer Import Risk Register |
-| `docs/product/current-customer-import-strategy.md` | current 客户导入策略 / Current Customer Import Strategy |
 | `docs/product/customer-delta-policy.md` | 客户差异策略 / Customer Delta Policy |
 | `docs/product/customer-instance-policy.md` | 客户实例策略 / Customer Instance Policy |
 | `docs/product/domain-model-v1.md` | 领域模型 V1 / Domain Model V1 |
@@ -110,25 +108,28 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `docs/customers/current/README.md` | current 客户资料边界 |
-| `docs/customers/current/assumption-register.md` | 假设登记 / Assumption Register |
-| `docs/customers/current/change-request-process.md` | 变更请求流程 / Change Request Process |
-| `docs/customers/current/customer-config-draft.md` | 客户配置草案 / Customer Config Draft |
-| `docs/customers/current/decision-log.md` | 决策日志 / Decision Log |
-| `docs/customers/current/delta-register.md` | 差异登记 / Delta Register |
-| `docs/customers/current/import-acceptance-checklist.md` | current 客户导入验收清单 / Current Customer Import Acceptance Checklist |
-| `docs/customers/current/import-dry-run-plan.md` | current 客户导入 dry-run 计划 / Current Customer Import Dry-run Plan |
-| `docs/customers/current/import-dry-run-tooling.md` | current 客户导入 dry-run 工具说明 / Current Customer Import Dry-run Tooling |
-| `docs/customers/current/import-field-classification.md` | current 客户导入字段分类 / Current Customer Import Field Classification |
-| `docs/customers/current/import-source-inventory.md` | current 客户导入来源清单 / Current Customer Import Source Inventory |
-| `docs/customers/current/import-unresolved-queue.md` | current 客户导入待确认队列 / Current Customer Import Unresolved Queue |
-| `docs/customers/current/question-backlog.md` | 问题待办 / Question Backlog |
-| `docs/customers/current/raw-source-file-archive-review.md` | current 原始客户文件归档评审 / Current Raw Source File Archive Review |
-| `docs/customers/current/real-dry-run-evidence.md` | current 真实 dry-run evidence / Current Real Dry-run Evidence |
-| `docs/customers/current/requirement-clues.md` | 需求线索 / Requirement Clues |
-| `docs/customers/current/source-materials.md` | 来源材料 / Source Materials |
-| `docs/customers/current/source-snapshot-freeze.md` | current 来源快照冻结 / Current Source Snapshot Freeze |
-| `docs/customers/current/source-snapshot-manual-review-checklist.md` | current 来源快照人工复查清单 / Current Source Snapshot Manual Review Checklist |
+| `docs/customers/yoyoosun/README.md` | 永绅 yoyoosun 客户资料边界 |
+| `docs/customers/yoyoosun/assumption-register.md` | 假设登记 / Assumption Register |
+| `docs/customers/yoyoosun/change-request-process.md` | 变更请求流程 / Change Request Process |
+| `docs/customers/yoyoosun/customer-config-draft.md` | 客户配置草案 / Customer Config Draft |
+| `docs/customers/yoyoosun/decision-log.md` | 决策日志 / Decision Log |
+| `docs/customers/yoyoosun/delta-register.md` | 差异登记 / Delta Register |
+| `docs/customers/yoyoosun/import-acceptance-checklist.md` | 永绅 yoyoosun 客户导入验收清单 / Yoyoosun Customer Import Acceptance Checklist |
+| `docs/customers/yoyoosun/import-dry-run-plan.md` | 永绅 yoyoosun 客户导入 dry-run 计划 / Yoyoosun Customer Import Dry-run Plan |
+| `docs/customers/yoyoosun/import-dry-run-tooling.md` | 永绅 yoyoosun 客户导入 dry-run 工具说明 / Yoyoosun Customer Import Dry-run Tooling |
+| `docs/customers/yoyoosun/import-field-classification.md` | 永绅 yoyoosun 客户导入字段分类 / Yoyoosun Customer Import Field Classification |
+| `docs/customers/yoyoosun/import-risk-register.md` | 永绅 yoyoosun 客户导入风险登记 / Yoyoosun Customer Import Risk Register |
+| `docs/customers/yoyoosun/import-source-inventory.md` | 永绅 yoyoosun 客户导入来源清单 / Yoyoosun Customer Import Source Inventory |
+| `docs/customers/yoyoosun/import-strategy.md` | 永绅 yoyoosun 客户导入策略 / Yoyoosun Customer Import Strategy |
+| `docs/customers/yoyoosun/import-unresolved-queue.md` | 永绅 yoyoosun 客户导入待确认队列 / Yoyoosun Customer Import Unresolved Queue |
+| `docs/customers/yoyoosun/question-backlog.md` | 问题待办 / Question Backlog |
+| `docs/customers/yoyoosun/real-dry-run-evidence.md` | yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
+| `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |
+| `docs/customers/yoyoosun/source-materials.md` | 来源材料 / Source Materials |
+| `docs/customers/yoyoosun/source-snapshot-freeze.md` | yoyoosun 来源快照冻结 / Yoyoosun Source Snapshot Freeze |
+| `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md` | yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist |
+| `docs/customers/yoyoosun/raw-source-file-archive-review.md` | 永绅 yoyoosun 原始客户文件归档评审 / Yoyoosun Raw Source File Archive Review |
+| `docs/customers/yoyoosun/raw-source-files/README.md` | 永绅 yoyoosun 原始客户文件归档目录说明 / Yoyoosun Raw Source Files Directory |
 
 ### Workflow / 角色 / 财务 / 仓库 / 可观测性
 
@@ -235,4 +236,4 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `server/third_party/README.md` | 第三方代码说明 / third_party |
 | `server/third_party/validate/README.md` | protoc-gen-validate 说明 / protoc-gen-validate |
 | `scripts/README.md` | QA 脚本说明 |
-| `scripts/import/fixtures/current/README.md` | current 导入 dry-run fixtures / Current Import Dry-run Fixtures |
+| `scripts/import/fixtures/customers/yoyoosun/README.md` | yoyoosun 导入 dry-run fixtures / Yoyoosun Import Dry-run Fixtures |

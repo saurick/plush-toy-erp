@@ -93,11 +93,11 @@ V1 不应直接做：
 - 完整 SaaS 多租户。
 - license server、billing、customer ticket system。
 - 泛化 ChangeUsecase 或 `change_records`。
-- 把 current 客户 Excel 列直接升级成 Product Core schema。
+- 把 永绅 yoyoosun 客户 Excel 列直接升级成 Product Core schema。
 
 ```text
 V1 应优先评审正式 customers / suppliers / contacts / sales_orders / sales_order_items。
-V1 不应直接把 current 客户 Excel 列变成 Product Core schema。
+V1 不应直接把 永绅 yoyoosun 客户 Excel 列变成 Product Core schema。
 V1 不应直接从 Workflow 推导库存、出货、财务事实。
 ```
 

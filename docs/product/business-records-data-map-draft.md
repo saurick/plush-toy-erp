@@ -14,7 +14,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 - `business_records` 只是 source snapshot，不是正式模型父表。
 - 自动映射只允许用于唯一、低风险、无歧义字段。
 - 缺少唯一主体、单位、产品或 owner 时必须进入人工确认。
-- current 客户样本字段不能自动变成 Product Core 必填字段。
+- 永绅 yoyoosun 客户样本字段不能自动变成 Product Core 必填字段。
 - `product_skus` 仍 draft-only，不得自动映射。
 - `purchase_orders / shipments / finance facts` 仍 deferred，不得自动映射。
 - 没有事实依据不得生成 shipment / inventory / finance facts。
@@ -53,7 +53,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 - 文本单位到 `units.id` 的匹配。
 - 仓库文本到底是仓库、库位还是备注。
 - 旧订单金额、币种、税率是否用于正式对账。
-- current 客户字段是否属于 Product Core、Industry Template、Customer Config、Print Template Input / Candidate 或 Import Adapter。
+- 永绅 yoyoosun 客户字段是否属于 Product Core、Industry Template、Customer Config、Print Template Input / Candidate 或 Import Adapter。
 
 ## 不能自动迁移
 

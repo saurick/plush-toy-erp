@@ -158,7 +158,7 @@ Git 策略
 - 不实现 license server、套餐计费、客户工单系统。
 - 不创建泛化 `ChangeUsecase`。
 - 不创建泛化 `change_records`。
-- 不把 `current` 客户资料写成 Product Core 规则。
+- 不把任一客户资料写成 Product Core 规则。
 - 不让 Workflow 写库存、出货、财务、应收、应付、发票、收付款事实。
 - `shipping_released != shipped`。
 - `workflow task done != fact posted`。

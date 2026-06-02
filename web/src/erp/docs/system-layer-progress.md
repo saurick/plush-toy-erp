@@ -279,6 +279,6 @@
 - 已有“产品化与交付”入口。
 - 当前阶段只做单客户私有化部署和产品化边界记录。
 - 当前不提前实现复杂 SaaS 多租户。
-- Phase 0 已建立 `docs/product/*`、`docs/customers/current/*`、`config/industry-templates/plush`、`config/customers/current` 和 `deployments/current` 骨架。
-- current 客户资料和配置包不是 SaaS runtime tenant，当前不新增 `tenant_id`。
+- Phase 0 已建立 `docs/product/*`、`docs/customers/yoyoosun/*`、`config/industry-templates/plush`、`config/customers/yoyoosun` 和 `deployments/yoyoosun` 骨架。
+- 永绅 yoyoosun 客户资料和配置包不是 SaaS runtime tenant，当前不新增 `tenant_id`。
 - 客户资料实际迁移、docs registry 接入、运行时配置 loader、部署模板改动和客户扩展边界后续单独评审。

@@ -72,8 +72,8 @@ business_records 不能长期替代正式 customers / suppliers / sales_orders /
 
 1. 不得新增与 existing `products` schema 语义重复的第二套 Product Core 表。
 2. 新正式产品能力应复用 existing `products`。
-3. current 产品样本字段先分类为 Product Core Candidate、Customer Material、Print Template Input / Candidate 或 Reporting。
-4. `product_skus` 不因 products 页面存在或 current 颜色字段而自动进入 V1 schema。
+3. yoyoosun 产品样本字段先分类为 Product Core Candidate、Customer Material、Print Template Input / Candidate 或 Reporting。
+4. `product_skus` 不因 products 页面存在或 yoyoosun 颜色字段而自动进入 V1 schema。
 
 ## 订单样本迁移
 
@@ -86,9 +86,9 @@ business_records 不能长期替代正式 customers / suppliers / sales_orders /
 5. 明细数量和单位必须映射到 decimal 和 `units`。
 6. 迁移结果应记录 source snapshot reference，但正式订单不应依赖 `business_records` 作为长期父表。
 
-## current 客户样本保留
+## 永绅 yoyoosun 客户样本保留
 
-current 客户资料继续保留为：
+永绅 yoyoosun 客户资料继续保留为：
 
 - Customer Material。
 - Demo Seed。
@@ -148,5 +148,5 @@ Stage 3: business_records retained only for generic snapshots/debug/demo or depr
 - Stop if partners and formal customers/suppliers both remain official writable truth.
 - Stop if products page creates a second Product Core truth instead of using existing `products`.
 - Stop if order migration fabricates customers, products, SKUs, shipped status or finance facts.
-- Stop if current sample fields become required schema fields without classification.
+- Stop if yoyoosun sample fields become required schema fields without classification.
 - Stop if business_records is deleted before reference audit.

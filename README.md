@@ -135,7 +135,7 @@ pnpm style:l1
 - 正式产品入口与菜单配置计划：`/Users/simon/projects/plush-toy-erp/docs/product/formal-menu-entry-plan.md`
 - 产品能力 / 交付 / 差异台账：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
 - 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md`
-- current 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/current/README.md`
+- 永绅 yoyoosun 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/README.md`
 - imported design notes：`/Users/simon/projects/plush-toy-erp/docs/reference/imported-notes/README.md`
 - Phase 2B BOM 与批次库存评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2b-bom-lot-schema-review.md`
 - Phase 2C 采购入库评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/phase-2c-purchase-receipt-review.md`

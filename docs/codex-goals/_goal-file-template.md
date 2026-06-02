@@ -68,7 +68,7 @@
 - 未经确认的截图 / 口头描述
 - 未落地的 architecture review
 - 未实现的 schema draft
-- current 客户样本字段
+- 永绅 yoyoosun 客户样本字段
 - demo / seed 数据
 
 必须保持：
@@ -239,7 +239,7 @@ git diff --check
 - 不实现 license server、套餐计费、客户工单系统。
 - 不创建泛化 `ChangeUsecase`。
 - 不创建泛化 `change_records`。
-- 不把 current 客户资料写成 Product Core。
+- 不把 永绅 yoyoosun 客户资料写成 Product Core。
 - 不让 `WorkflowUsecase` 写库存、出货、财务、应收、应付、发票或收付款事实。
 - `shipping_released != shipped`。
 - `workflow task done != fact posted`。

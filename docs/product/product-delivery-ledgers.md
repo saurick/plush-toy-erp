@@ -35,7 +35,7 @@
 
 ### 1.1.1 打印样本当前处理原则
 
-当前阶段不建立 Print Template 产品内核，也不把 current 单一客户合同样式抽成行业默认模板。打印相关资料只按客户打印样本、交付说明或差异线索记录；不新增模板 schema、不实现模板设计器、不做通用渲染引擎，也不让打印格式反向决定 schema、fact、workflow 或 API。只有至少 2-3 个真实客户出现同类单据、字段来源稳定且差异主要是抬头 / 字段显示 / 版式微调时，才重新评审是否进入 `PRINT-TEMPLATE-CORE-MVP`。
+当前阶段不建立 Print Template 产品内核，也不把 yoyoosun 单一客户合同样式抽成行业默认模板。打印相关资料只按客户打印样本、交付说明或差异线索记录；不新增模板 schema、不实现模板设计器、不做通用渲染引擎，也不让打印格式反向决定 schema、fact、workflow 或 API。只有至少 2-3 个真实客户出现同类单据、字段来源稳定且差异主要是抬头 / 字段显示 / 版式微调时，才重新评审是否进入 `PRINT-TEMPLATE-CORE-MVP`。
 
 ### 1.2 当前阶段禁止项
 
@@ -48,7 +48,7 @@
 * 不实现客户工单系统。
 * 不创建泛化 `ChangeUsecase`。
 * 不创建泛化 `change_records`。
-* 不把 `current` 客户资料直接写成 Product Core。
+* 不把任一客户资料直接写成 Product Core。
 * 不让 Workflow 写库存、出货、财务、应收、应付、发票、收付款事实。
 * 不把 `business_records` 当长期事实真源。
 
@@ -141,16 +141,16 @@
 
 | Capability ID | 能力名称                                      | 所属层                    | 业务域                     | 当前成熟度 | 当前结果                                                                                         | 当前不包含                             | 证据                                                                | 下一步                                 | 风险                               | 可客户试用          | 可交付承诺 |
 | ------------- | ----------------------------------------- | ---------------------- | ----------------------- | ----: | -------------------------------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------- | ----------------------------------- | -------------------------------- | -------------- | ----- |
-| CAP-000       | 产品化架构骨架                                   | Product Core           | Architecture            |    L7 | 已建立产品原则、分层边界、current 客户边界、Codex 工作流                                                          | 不代表业务闭环完成                         | `docs/product/*`、`docs/architecture/*`、`docs/codex-goals/*`       | 持续维护 current-source-of-truth        | 文档多，需防信息差                        | Yes            | No    |
+| CAP-000       | 产品化架构骨架                                   | Product Core           | Architecture            |    L7 | 已建立产品原则、分层边界、永绅 yoyoosun 客户边界、Codex 工作流                                                          | 不代表业务闭环完成                         | `docs/product/*`、`docs/architecture/*`、`docs/codex-goals/*`       | 持续维护 current-source-of-truth        | 文档多，需防信息差                        | Yes            | No    |
 | CAP-001       | Workflow / Fact 边界                        | Product Core           | Architecture / Workflow |    L7 | 已明确 `workflow done != fact posted`、`shipping_released != shipped`                            | 不代表 shipment facts 已实现            | `docs/architecture/status-workflow-fact-boundary.md`              | 后续 shipment / finance 继续复用          | UI 文案可能误导                        | Yes            | No    |
-| CAP-002       | current 客户资料治理                            | Customer Config        | Productization          |    L6 | 已建立 current 客户资料、导入来源、字段分类、dry-run 草案、source freeze 和 real dry-run evidence 口径                         | 未真实导入                             | `docs/customers/current/*import*.md`、`docs/customers/current/*freeze*.md` | import loader design                | current 字段污染 Product Core        | Limited        | No    |
+| CAP-002       | 永绅 yoyoosun 客户资料治理                            | Customer Config        | Productization          |    L6 | 已建立 永绅 yoyoosun 客户资料、导入来源、字段分类、dry-run 草案、source freeze 和 real dry-run evidence 口径                         | 未真实导入                             | `docs/customers/yoyoosun/*import*.md`、`docs/customers/yoyoosun/*freeze*.md` | import loader design                | 永绅 yoyoosun 字段污染 Product Core        | Limited        | No    |
 | CAP-003       | customers 主数据                             | Product Core           | MasterData              |    L7 | schema / migration / repo/usecase / API/RBAC / UI 已完成                                        | 地址、账期、信用额度未做                      | `customer.go`、`masterdata.go`、`jsonrpc_masterdata_order.go`、V1 UI | 菜单入口评审 / 数据导入                       | 真实数据尚未导入                         | Yes            | No    |
 | CAP-004       | suppliers 主数据                             | Product Core           | MasterData              |    L7 | schema / migration / repo/usecase / API/RBAC / UI 已完成                                        | 供应商物料档案、结算资料未做                    | `supplier.go`、`masterdata.go`、V1 UI                               | 菜单入口评审 / 数据导入                       | supplier_type 后续可能细化             | Yes            | No    |
 | CAP-005       | contacts 联系人                              | Product Core           | MasterData              |    L7 | 支持 customer / supplier owner，usecase guard 已完成，UI 区块已完成                                      | DB 无跨表强 FK，依赖 usecase guard       | `contact.go`、`masterdata.go`、V1 UI                                | 导入 dry-run / API smoke              | 直接 SQL 可能绕过 guard                | Yes            | No    |
 | CAP-006       | sales_orders 销售订单源单据                      | Product Core           | Order                   |    L7 | schema / migration / repo/usecase / API/RBAC / UI 已完成                                        | 不含出货事实、库存扣减、应收、发票                 | `sales_order.go`、`sales_order.go usecase`、V1 UI                   | 菜单入口 / 真实试用                         | 甲方可能误认为已出货闭环                     | Yes, with note | No    |
 | CAP-007       | sales_order_items 销售订单明细                  | Product Core           | Order                   |    L7 | 支持新增、编辑、取消/移除、列表                                                                             | 不含 `shipped_quantity`、product_sku | `sales_order_item.go`、V1 UI                                       | 产品/单位选择器                            | 当前 UI 产品/单位暂用 ID                 | Limited        | No    |
 | CAP-008       | business_records 旧入口退出                    | Productization         | Compatibility           |    L3 | 已完成引用审计、cutover plan、data map draft、risk register                                            | 不把旧入口作为正式产品入口，不承诺只读归档页          | `docs/product/business-records-*.md`                              | legacy entry removal / formal menu direction | 双真源、旧入口误导                        | No             | No    |
-| CAP-009       | current 客户导入 dry-run tooling / evidence    | Delivery               | Data Import             |    L5 | 已具备 source inventory、field classification、dry-run plan、unresolved queue、acceptance checklist、只读 dry-run CLI 和 source freeze / evidence preparation | 未写真实 import loader，未执行真实导入，不写 DB，不写 `business_records` | `docs/customers/current/import-*.md`、`docs/customers/current/source-snapshot-freeze.md`、`docs/customers/current/real-dry-run-evidence.md`、`scripts/import/currentCustomerDryRun.mjs`、`scripts/import/currentSourceSnapshotFreezeCheck.mjs` | import loader design                | 字段语义仍需人工确认，dry-run 不能被误读成真实导入批准 | No             | No    |
+| CAP-009       | 永绅 yoyoosun 客户导入 dry-run tooling / evidence    | Delivery               | Data Import             |    L5 | 已具备 source inventory、field classification、dry-run plan、unresolved queue、acceptance checklist、只读 dry-run CLI 和 source freeze / evidence preparation | 未写真实 import loader，未执行真实导入，不写 DB，不写 `business_records` | `docs/customers/yoyoosun/import-*.md`、`docs/customers/yoyoosun/source-snapshot-freeze.md`、`docs/customers/yoyoosun/real-dry-run-evidence.md`、`scripts/import/customerImportDryRun.mjs`、`scripts/import/customerSourceSnapshotFreezeCheck.mjs` | import loader design                | 字段语义仍需人工确认，dry-run 不能被误读成真实导入批准 | No             | No    |
 | CAP-010       | V1 前端页面                                   | Product Core           | UI                      |    L7 | V1 customers / suppliers / contacts / sales_orders 页面和路由已完成                                  | 未接正式菜单 / seedData / docs registry | `V1MasterDataPage.jsx`、`V1SalesOrdersPage.jsx`                    | v1-formal-menu-and-legacy-entry-exit | 只能直链访问或路由访问                      | Limited        | No    |
 | CAP-011       | V1 API/RBAC                               | Product Core           | API / RBAC              |    L7 | JSON-RPC API + 动作权限已完成                                                                       | 未接 UI 菜单权限体系总收口                   | `jsonrpc_masterdata_order.go`、`rbac.go`                           | API smoke / menu permission review  | JSON-RPC handler 位于 data 层历史架构   | Yes            | No    |
 | CAP-012       | 产品 / materials / units / warehouses 既有主数据 | Product Core           | MasterData              | L5-L7 | 已有既有 schema / runtime 能力                                                                     | 本台账未重新评审全部 UI/API                 | 既有代码和 docs                                                        | 后续与导入和 SKU 评审对齐                     | 与 business_records products 可能重叠 | Limited        | No    |
@@ -167,10 +167,10 @@
 | CAP-023       | production facts                          | Product Core           | Production              | L0-L2 | Deferred                                                                                     | 未评审 / 未落地                         | roadmap                                                           | production-fact-review              | 不能只靠任务状态                         | No             | No    |
 | CAP-024       | outsourcing facts                         | Product Core           | Outsourcing             | L0-L2 | Deferred                                                                                     | 未评审 / 未落地                         | roadmap                                                           | outsourcing-fact-review             | 委外发料/回货/结算要分开                    | No             | No    |
 | CAP-025       | mobile task entry                         | Industry Template / UI | Mobile                  | L1-L2 | 已有方向和骨架                                                                                      | 未实现真实移动端任务闭环                      | V3 汇报 / mobile roles README                                       | mobile-task-entry-review            | 不要先做空壳菜单                         | No             | No    |
-| CAP-026       | current 私有化部署包                            | Delivery               | Deployment              | L1-L2 | deployments/current README 已有                                                                | 未形成可执行部署包                         | `deployments/current/README.md`                                   | deployment-package-current          | 备份/恢复/发布未完整                      | No             | No    |
+| CAP-026       | 永绅 yoyoosun 私有化部署包                            | Delivery               | Deployment              | L1-L2 | deployments/yoyoosun README 已有                                                                | 未形成可执行部署包                         | `deployments/yoyoosun/README.md`                                   | deployment-package-yoyoosun          | 备份/恢复/发布未完整                      | No             | No    |
 | CAP-027       | 客户验收体系                                    | Delivery               | Acceptance              | L1-L2 | 已有导入验收、阶段验收口径                                                                                | 未形成客户验收包                          | import acceptance checklist                                       | customer-trial-acceptance           | 验收口径要业务化                         | No             | No    |
-| CAP-028       | 行业默认模板清单                                  | Industry Template      | Productization / Menu   | L1-L2 | 已有毛绒玩具角色、菜单、流程、字段样本、编号和移动端角色方向；current 只能作为模板候选输入，打印样本暂不进入行业默认模板                      | 尚未从 current 样本中抽离正式行业默认模板；不含 Print Template Core | `docs/product/formal-menu-entry-plan.md`、`config/industry-templates/plush/README.md` | industry-template-inventory         | 单客户样本或打印格式被误读为行业标准              | No             | No    |
-| CAP-029       | Customer Config 配置形态                         | Customer Config        | Productization          | L1-L2 | 已有公司名、logo、主题色、菜单、字段、编号、角色、权限、初始化数据和打印样本引用等配置项口径，并已有 current 配置包骨架                  | 没有 runtime config loader，不新增 `tenant_id`，不含通用打印模板引擎 | `web/src/erp/docs/productization-delivery.md`、`config/customers/current/README.md` | customer-config-shape-review        | 被误读为 Runtime Tenant、SaaS 多租户或模板系统 | No             | No    |
+| CAP-028       | 行业默认模板清单                                  | Industry Template      | Productization / Menu   | L1-L2 | 已有毛绒玩具角色、菜单、流程、字段样本、编号和移动端角色方向；yoyoosun 只能作为模板候选输入，打印样本暂不进入行业默认模板                      | 尚未从 永绅 yoyoosun 样本中抽离正式行业默认模板；不含 Print Template Core | `docs/product/formal-menu-entry-plan.md`、`config/industry-templates/plush/README.md` | industry-template-inventory         | 单客户样本或打印格式被误读为行业标准              | No             | No    |
+| CAP-029       | Customer Config 配置形态                         | Customer Config        | Productization          | L1-L2 | 已有公司名、logo、主题色、菜单、字段、编号、角色、权限、初始化数据和打印样本引用等配置项口径，并已有 yoyoosun 配置包骨架                  | 没有 runtime config loader，不新增 `tenant_id`，不含通用打印模板引擎 | `web/src/erp/docs/productization-delivery.md`、`config/customers/yoyoosun/README.md` | customer-config-shape-review        | 被误读为 Runtime Tenant、SaaS 多租户或模板系统 | No             | No    |
 | CAP-030       | Customer Extension 边界                         | Customer Extension     | Productization          | L1    | 已有原则：极端客户专属逻辑才进入 extension，并记录原因、范围、退出条件和维护责任                                             | 目前没有清晰 runtime extension 层，也没有真实专属逻辑落地 | `docs/product/product-completion-roadmap.md`、`web/src/erp/docs/productization-delivery.md` | real-customer-extension-review-only | 核心 schema / 库存 / 财务规则被客户长期分叉     | No             | No    |
 | CAP-031       | 业务帮助 / 开发验收 / 客户交付说明分离                    | Help / Delivery        | Help / QA               | L1-L2 | 已有开发验收、QA、产品化和交付说明入口，业务版帮助方向明确                                                              | 普通业务用户版帮助不足，客户样本与 QA 说明边界仍需继续分离 | `web/src/erp/docs/system-layer-progress.md`、`web/src/erp/docs/productization-delivery.md` | business-help-split-review          | 开发术语暴露给业务用户或误导实现状态              | No             | No    |
 | CAP-032       | Reporting / Audit / Integration 增强层           | Reporting              | Reporting / Integration | L0-L2 | 已有 observability / audit 口径和后续增强方向                                                               | 报表、附件、导入导出、扫码、外部集成未落地            | `web/src/erp/docs/system-layer-progress.md`                         | wait-for-fact-layer-stability       | 先做报表倒推事实模型                       | No             | No    |
@@ -210,40 +210,40 @@
 
 ---
 
-## 6. 客户交付矩阵：current
+## 6. 客户交付矩阵：yoyoosun
 
 | Customer Key | 模块 / 能力              | 产品能力 ID             | 交付状态           | 当前客户可见方式              | 交付结果                         | 不包含                      | 前置条件                           | 客户确认项              | 风险                        |
 | ------------ | -------------------- | ------------------- | -------------- | --------------------- | ---------------------------- | ------------------------ | ------------------------------ | ------------------ | ------------------------- |
-| current      | 客户主数据                | CAP-003             | Trial Ready    | V1 route / 后续菜单入口     | 可创建、编辑、查看、启停客户               | 地址、账期、信用额度               | v1-formal-menu-and-legacy-entry-exit | 客户编码规则、客户简称、税号是否必填 | 真实数据未导入                   |
-| current      | 供应商主数据               | CAP-004             | Trial Ready    | V1 route / 后续菜单入口     | 可创建、编辑、查看、启停供应商              | 银行账号、账期、供应物料档案           | v1-formal-menu-and-legacy-entry-exit | 供应商分类、是否区分委外/材料    | supplier_type 后续可能调整      |
-| current      | 联系人                  | CAP-005             | Trial Ready    | 客户/供应商详情区块            | 可维护主联系人和普通联系人                | 联系人通知权限                  | v1-formal-menu-and-legacy-entry-exit | 联系人角色、手机号、微信等字段    | owner guard 依赖 usecase    |
-| current      | 销售订单                 | CAP-006             | Trial Ready    | V1 sales_orders route | 可录入、提交、激活、关闭、取消销售订单          | 出货、库存、财务                 | v1-formal-menu-and-legacy-entry-exit | 订单编号规则、客户订单号、交期字段  | 甲方可能误解为出货闭环               |
-| current      | 销售订单明细               | CAP-007             | Trial Ready    | 销售订单详情区块              | 可维护订单行                       | SKU、已出货数                 | 产品/单位选择器                       | 颜色、尺寸、客户款号如何处理     | 当前产品/单位暂用 ID              |
-| current      | V1 API/RBAC          | CAP-011             | Internal Ready | 后端 JSON-RPC           | 有权限码和后端校验                    | 前端完整权限体验                 | 菜单入口 / 用户角色配置                  | 角色权限模板             | 权限模板还未客户化                 |
-| current      | V1 前端页面              | CAP-010             | Trial Ready    | 直链 / route            | 页面可操作                        | 菜单入口未正式接                 | v1-formal-menu-and-legacy-entry-exit | 甲方试用入口             | 旧入口仍存在                    |
-| current      | business_records 旧入口 | CAP-008             | Deprecated     | 不进入正式菜单 / 默认隐藏或删除 | 仅可作为迁移来源或审计线索，不作为交付能力         | 不承诺客户可见只读归档页            | legacy removal direction / data migration decision | 如需迁移历史数据再确认范围 | 双真源风险                     |
-| current      | current 数据导入 dry-run | CAP-009             | Internal Ready | 本地 CLI evidence / Markdown 报告 | 已有来源清单、字段分类、unresolved queue、只读 dry-run tooling、source freeze evidence | 没有真实 import loader，不写 DB，不执行导入 | loader design                  | 字段含义、冲突处理、签字确认     | 样本语义不清，dry-run 可能被误读成批准导入 |
-| current      | 正式菜单入口               | 待建                  | Planned        | 暂未正式接                 | 待评审                          | 不做全局菜单重构                 | v1-formal-menu-and-legacy-entry-exit | 确认旧入口不进入正式产品菜单 | seedData/docs registry 风险 |
-| current      | 产品 / SKU             | CAP-012 / CAP-013   | Deferred       | 既有产品可用，SKU 延后         | 产品主数据已有基础                    | SKU 未落                   | product-sku-bom-version-review | 色号、尺寸、版本口径         | 不能从订单颜色自动建 SKU            |
-| current      | BOM                  | CAP-014             | Deferred       | 既有 BOM 能力 / 后续评审      | 有基础 BOM 真源                   | 版本扩展未做                   | BOM version review             | BOM 改版规则           | 与 SKU 关系未定                |
-| current      | 采购订单                 | CAP-015             | Deferred       | 无正式 V1 入口             | 延后 V2                        | 不代表采购入库                  | purchase-order review          | 采购流程口径             | 不可替代 purchase_receipts    |
-| current      | 采购入库                 | CAP-016             | Internal Ready | 既有能力                  | 有采购入库事实基础                    | 与采购订单衔接未做                | purchase review                | 入库/质检流程            | 口径需客户确认                   |
-| current      | 质检                   | CAP-017             | Internal Ready | 既有能力                  | 有 quality_inspections 基础     | 与 workflow 任务对接需评审       | quality-workflow review        | IQC/OQC 口径         | task done 与 passed 混淆     |
-| current      | 库存事实                 | CAP-018             | Internal Ready | 既有能力                  | 有 txns / lots / balances     | 出货预留/出库未做                | inventory boundary review      | 仓库/批次规则            | 出货会影响库存，需谨慎               |
-| current      | 出货放行                 | Workflow capability | Internal Ready | workflow 状态           | `shipping_released` 表示已放行    | 不等于出库                    | shipment review                | 放行权限               | UI 文案误导                   |
-| current      | 出货事实                 | CAP-020             | Deferred       | 无                     | 未做                           | shipments/items/outbound | shipment-usecase-review        | 出货流程               | 高风险事实层                    |
-| current      | 库存预留                 | CAP-019             | Deferred       | 无                     | 未做                           | reservations             | stock-reservation review       | 是否需要预留             | 容易和出库混                    |
-| current      | 财务应收 / 应付            | CAP-022             | Deferred       | 无                     | 未做                           | AR/AP/invoice/payment    | finance review                 | 对账/开票/收付款流程        | 不能从放行生成                   |
-| current      | 生产事实                 | CAP-023             | Deferred       | 无                     | 未做                           | 生产领料/成品入库                | production review              | 排产/领料流程            | 不要只做状态                    |
-| current      | 委外事实                 | CAP-024             | Deferred       | 无                     | 未做                           | 委外发料/回货/结算               | outsourcing review             | 加工合同/外发流程          | 委外合同样本需人工确认               |
-| current      | 移动端任务                | CAP-025             | Planned        | 骨架/方向                 | 任务驱动方向明确                     | 真实移动端任务未做                | mobile task review             | 哪些岗位用手机            | 不做空壳入口                    |
-| current      | 私有化部署包               | CAP-026             | Planned        | deployments/current   | 方向明确                         | 备份/恢复/发布未完整              | deployment package             | 部署环境               | 运维风险                      |
-| current      | 客户验收                 | CAP-027             | Planned        | checklist 草案          | 导入验收部分已有                     | 完整试点验收未做                 | trial acceptance               | 验收范围               | 范围过大风险                    |
-| current      | 行业默认模板清单             | CAP-028             | Planned        | config/industry-templates/plush | 方向明确，current 样本可作为候选输入        | 未完成行业共性 / 客户样本拆分；打印样本暂不进入行业默认模板 | industry template inventory    | 哪些角色、菜单、字段属于行业共性 | 单客户样本或打印格式污染行业模板       |
-| current      | 客户配置包                | CAP-029             | Config Draft   | config/customers/current | 已有目录骨架和配置项口径                 | 没有 runtime loader，不是 `tenant_id`，不含通用打印模板引擎 | customer config shape review   | 公司信息、主题、菜单、编号、打印样本记录 | 被误读为 SaaS tenant 或模板系统    |
-| current      | 客户扩展边界               | CAP-030             | Not Planned    | 无                     | 当前没有需要落地的专属 extension          | 不创建 extension runtime         | 真实出现专属逻辑后再评审              | 暂无                 | 为假想定制过早造层                |
-| current      | 业务帮助 / 交付说明          | CAP-031             | Planned        | 开发验收文档 / 后续业务帮助     | 开发验收说明已有，业务版帮助待补              | 不把开发验收页当业务教程            | business help split review     | 客户培训材料             | 开发术语误导业务用户               |
-| current      | 报表 / 审计 / 集成增强       | CAP-032             | Deferred       | 无正式入口                 | 后续增强方向明确                      | 报表、附件、扫码、外部集成未做        | 事实层稳定后再评审                  | 报表范围               | 倒推事实模型                    |
+| yoyoosun     | 客户主数据                | CAP-003             | Trial Ready    | V1 route / 后续菜单入口     | 可创建、编辑、查看、启停客户               | 地址、账期、信用额度               | v1-formal-menu-and-legacy-entry-exit | 客户编码规则、客户简称、税号是否必填 | 真实数据未导入                   |
+| yoyoosun     | 供应商主数据               | CAP-004             | Trial Ready    | V1 route / 后续菜单入口     | 可创建、编辑、查看、启停供应商              | 银行账号、账期、供应物料档案           | v1-formal-menu-and-legacy-entry-exit | 供应商分类、是否区分委外/材料    | supplier_type 后续可能调整      |
+| yoyoosun     | 联系人                  | CAP-005             | Trial Ready    | 客户/供应商详情区块            | 可维护主联系人和普通联系人                | 联系人通知权限                  | v1-formal-menu-and-legacy-entry-exit | 联系人角色、手机号、微信等字段    | owner guard 依赖 usecase    |
+| yoyoosun     | 销售订单                 | CAP-006             | Trial Ready    | V1 sales_orders route | 可录入、提交、激活、关闭、取消销售订单          | 出货、库存、财务                 | v1-formal-menu-and-legacy-entry-exit | 订单编号规则、客户订单号、交期字段  | 甲方可能误解为出货闭环               |
+| yoyoosun     | 销售订单明细               | CAP-007             | Trial Ready    | 销售订单详情区块              | 可维护订单行                       | SKU、已出货数                 | 产品/单位选择器                       | 颜色、尺寸、客户款号如何处理     | 当前产品/单位暂用 ID              |
+| yoyoosun     | V1 API/RBAC          | CAP-011             | Internal Ready | 后端 JSON-RPC           | 有权限码和后端校验                    | 前端完整权限体验                 | 菜单入口 / 用户角色配置                  | 角色权限模板             | 权限模板还未客户化                 |
+| yoyoosun     | V1 前端页面              | CAP-010             | Trial Ready    | 直链 / route            | 页面可操作                        | 菜单入口未正式接                 | v1-formal-menu-and-legacy-entry-exit | 甲方试用入口             | 旧入口仍存在                    |
+| yoyoosun     | business_records 旧入口 | CAP-008             | Deprecated     | 不进入正式菜单 / 默认隐藏或删除 | 仅可作为迁移来源或审计线索，不作为交付能力         | 不承诺客户可见只读归档页            | legacy removal direction / data migration decision | 如需迁移历史数据再确认范围 | 双真源风险                     |
+| yoyoosun     | yoyoosun 数据导入 dry-run | CAP-009             | Internal Ready | 本地 CLI evidence / Markdown 报告 | 已有来源清单、字段分类、unresolved queue、只读 dry-run tooling、source freeze evidence | 没有真实 import loader，不写 DB，不执行导入 | loader design                  | 字段含义、冲突处理、签字确认     | 样本语义不清，dry-run 可能被误读成批准导入 |
+| yoyoosun     | 正式菜单入口               | 待建                  | Planned        | 暂未正式接                 | 待评审                          | 不做全局菜单重构                 | v1-formal-menu-and-legacy-entry-exit | 确认旧入口不进入正式产品菜单 | seedData/docs registry 风险 |
+| yoyoosun     | 产品 / SKU             | CAP-012 / CAP-013   | Deferred       | 既有产品可用，SKU 延后         | 产品主数据已有基础                    | SKU 未落                   | product-sku-bom-version-review | 色号、尺寸、版本口径         | 不能从订单颜色自动建 SKU            |
+| yoyoosun     | BOM                  | CAP-014             | Deferred       | 既有 BOM 能力 / 后续评审      | 有基础 BOM 真源                   | 版本扩展未做                   | BOM version review             | BOM 改版规则           | 与 SKU 关系未定                |
+| yoyoosun     | 采购订单                 | CAP-015             | Deferred       | 无正式 V1 入口             | 延后 V2                        | 不代表采购入库                  | purchase-order review          | 采购流程口径             | 不可替代 purchase_receipts    |
+| yoyoosun     | 采购入库                 | CAP-016             | Internal Ready | 既有能力                  | 有采购入库事实基础                    | 与采购订单衔接未做                | purchase review                | 入库/质检流程            | 口径需客户确认                   |
+| yoyoosun     | 质检                   | CAP-017             | Internal Ready | 既有能力                  | 有 quality_inspections 基础     | 与 workflow 任务对接需评审       | quality-workflow review        | IQC/OQC 口径         | task done 与 passed 混淆     |
+| yoyoosun     | 库存事实                 | CAP-018             | Internal Ready | 既有能力                  | 有 txns / lots / balances     | 出货预留/出库未做                | inventory boundary review      | 仓库/批次规则            | 出货会影响库存，需谨慎               |
+| yoyoosun     | 出货放行                 | Workflow capability | Internal Ready | workflow 状态           | `shipping_released` 表示已放行    | 不等于出库                    | shipment review                | 放行权限               | UI 文案误导                   |
+| yoyoosun     | 出货事实                 | CAP-020             | Deferred       | 无                     | 未做                           | shipments/items/outbound | shipment-usecase-review        | 出货流程               | 高风险事实层                    |
+| yoyoosun     | 库存预留                 | CAP-019             | Deferred       | 无                     | 未做                           | reservations             | stock-reservation review       | 是否需要预留             | 容易和出库混                    |
+| yoyoosun     | 财务应收 / 应付            | CAP-022             | Deferred       | 无                     | 未做                           | AR/AP/invoice/payment    | finance review                 | 对账/开票/收付款流程        | 不能从放行生成                   |
+| yoyoosun     | 生产事实                 | CAP-023             | Deferred       | 无                     | 未做                           | 生产领料/成品入库                | production review              | 排产/领料流程            | 不要只做状态                    |
+| yoyoosun     | 委外事实                 | CAP-024             | Deferred       | 无                     | 未做                           | 委外发料/回货/结算               | outsourcing review             | 加工合同/外发流程          | 委外合同样本需人工确认               |
+| yoyoosun     | 移动端任务                | CAP-025             | Planned        | 骨架/方向                 | 任务驱动方向明确                     | 真实移动端任务未做                | mobile task review             | 哪些岗位用手机            | 不做空壳入口                    |
+| yoyoosun     | 私有化部署包               | CAP-026             | Planned        | deployments/yoyoosun   | 方向明确                         | 备份/恢复/发布未完整              | deployment package             | 部署环境               | 运维风险                      |
+| yoyoosun     | 客户验收                 | CAP-027             | Planned        | checklist 草案          | 导入验收部分已有                     | 完整试点验收未做                 | trial acceptance               | 验收范围               | 范围过大风险                    |
+| yoyoosun     | 行业默认模板清单             | CAP-028             | Planned        | config/industry-templates/plush | 方向明确，永绅 yoyoosun 样本可作为候选输入        | 未完成行业共性 / 客户样本拆分；打印样本暂不进入行业默认模板 | industry template inventory    | 哪些角色、菜单、字段属于行业共性 | 单客户样本或打印格式污染行业模板       |
+| yoyoosun     | 客户配置包                | CAP-029             | Config Draft   | config/customers/yoyoosun | 已有目录骨架和配置项口径                 | 没有 runtime loader，不是 `tenant_id`，不含通用打印模板引擎 | customer config shape review   | 公司信息、主题、菜单、编号、打印样本记录 | 被误读为 SaaS tenant 或模板系统    |
+| yoyoosun     | 客户扩展边界               | CAP-030             | Not Planned    | 无                     | 当前没有需要落地的专属 extension          | 不创建 extension runtime         | 真实出现专属逻辑后再评审              | 暂无                 | 为假想定制过早造层                |
+| yoyoosun     | 业务帮助 / 交付说明          | CAP-031             | Planned        | 开发验收文档 / 后续业务帮助     | 开发验收说明已有，业务版帮助待补              | 不把开发验收页当业务教程            | business help split review     | 客户培训材料             | 开发术语误导业务用户               |
+| yoyoosun     | 报表 / 审计 / 集成增强       | CAP-032             | Deferred       | 无正式入口                 | 后续增强方向明确                      | 报表、附件、扫码、外部集成未做        | 事实层稳定后再评审                  | 报表范围               | 倒推事实模型                    |
 
 ---
 
@@ -272,39 +272,39 @@
 
 ---
 
-## 8. 客户差异台账：current
+## 8. 客户差异台账：yoyoosun
 
 | Delta ID          | Customer | 差异/需求                                | 来源           | 分类                                         | 当前判断           | 是否进入 Product Core | 处理方式                              | 前置条件                        | 风险                       | 下一步                      |
 | ----------------- | -------- | ------------------------------------ | ------------ | ------------------------------------------ | -------------- | ----------------- | --------------------------------- | --------------------------- | ------------------------ | ------------------------ |
-| DELTA-CURRENT-001 | current  | current 是第一个真实客户和种子客户                | 项目背景         | Customer Material                          | 已确认            | 否                 | 作为配置包来源                           | 无                           | 误当 runtime tenant        | 保持 current 非 tenant      |
-| DELTA-CURRENT-002 | current  | current 私有化部署                        | 项目背景         | Customer Config / Delivery                 | 已确认方向          | 否                 | `deployments/current`             | 部署包设计                       | 运维边界不清                   | deployment package       |
-| DELTA-CURRENT-003 | current  | 客户资料字段可能不同                           | current 资料   | Customer Config / Data Import Source       | 待确认            | 否                 | 字段分类 + unresolved queue           | 甲方确认                        | 污染 Product Core          | import dry-run           |
-| DELTA-CURRENT-004 | current  | 客户 / 供应商 / 联系人正式主数据                  | V1 需求        | Product Core                               | 已进入 V1         | 是                 | 已做 V1 能力                          | 已完成基础链路                     | 后续字段扩张风险                 | 地址/账期另评审                 |
-| DELTA-CURRENT-005 | current  | 销售订单正式源单据                            | V1 需求        | Product Core                               | 已进入 V1         | 是                 | 已做 V1 能力                          | 已完成基础链路                     | 误当出货事实                   | UI 文案继续约束                |
-| DELTA-CURRENT-006 | current  | 颜色、尺寸、客户款号                           | Excel/订单字段线索 | Industry Template Candidate / Deferred     | 不直接落 SKU       | 暂不进入              | 作为 SKU/BOM 评审输入                   | product_sku review          | 过早建 SKU                  | 016 review               |
-| DELTA-CURRENT-007 | current  | 加工合同样式                               | PDF / 合同样本   | Customer Material / Print Template Candidate | 只作客户打印样本输入    | 否                 | 记录样式、字段来源和条款线索；不抽产品内核模板      | 委外模块评审；至少 2-3 客户重复后再评审模板化 | 合同条款当业务规则                | outsourcing review + print sample inventory |
-| DELTA-CURRENT-008 | current  | 委外加工流程                               | 合同/业务线索      | Product Core / Industry Template Candidate | 延后             | 待评审               | 委外事实阶段评审                          | outsourcing facts           | 只用合同不足以建模                | outsourcing review       |
-| DELTA-CURRENT-009 | current  | 采购 / 包材 / 辅材                         | 需求线索         | Product Core / Deferred                    | 延后             | 待评审               | 采购订单 / 采购需求评审                     | purchase review             | 与已有 purchase_receipts 重复 | purchase-order review    |
-| DELTA-CURRENT-010 | current  | 出货放行                                 | Workflow 规则  | Product Core                               | 已有 workflow 边界 | 是                 | 保持 `shipping_released != shipped` | shipment review             | 被误解为已出库                  | shipment-usecase-review  |
-| DELTA-CURRENT-011 | current  | 实际出货 / 出库                            | 业务主链路        | Product Core                               | 未做             | 是                 | 后续 shipment facts                 | shipment review             | 高风险事实层                   | shipment-usecase-review  |
-| DELTA-CURRENT-012 | current  | 库存预留                                 | 出货/库存需求      | Product Core                               | 未做             | 是                 | 后续 reservation review             | shipment/inventory boundary | 预留和扣减混淆                  | stock-reservation review |
-| DELTA-CURRENT-013 | current  | 应收 / 发票 / 收款                         | 财务需求         | Product Core                               | 未做             | 是                 | 后续 finance review                 | 出货事实/对账口径                   | 不能从放行生成                  | finance review           |
-| DELTA-CURRENT-014 | current  | 供应商应付 / 付款                           | 财务需求         | Product Core                               | 未做             | 是                 | 后续 finance review                 | purchase/outsourcing facts  | 付款口径复杂                   | finance review           |
-| DELTA-CURRENT-015 | current  | 手机端任务处理                              | 汇报资料/产品方向    | Industry Template / UI                     | 计划中            | 可能                | mobile task review                | 任务/岗位权限                     | 空壳入口风险                   | mobile review            |
-| DELTA-CURRENT-016 | current  | 老板审批更快                               | 汇报资料         | Industry Template                          | 方向成立           | 可能                | Workflow/mobile                   | 审批节点设计                      | 只做 UI 不做权限               | mobile workflow review   |
-| DELTA-CURRENT-017 | current  | 仓库 / 品质现场扫码拍照                        | 汇报资料         | Industry Template / Product Core           | 延后             | 可能                | 质检/库存/移动端评审                       | 事实模型                        | 手机端先做空壳风险                | mobile + quality review  |
-| DELTA-CURRENT-018 | current  | 旧 business_records partners 入口       | 旧系统兼容        | Compatibility                              | 退出正式入口         | 否                 | 删除 / 隐藏旧入口；必要时仅保留迁移参考数据 | transition audit            | 双真源                      | legacy removal review    |
-| DELTA-CURRENT-019 | current  | 旧 business_records project-orders 入口 | 旧系统兼容        | Compatibility                              | 退出正式入口         | 否                 | 用正式 sales_orders 承接新写入；旧入口删除 / 隐藏 | transition audit            | 双写/误导                    | legacy removal review    |
-| DELTA-CURRENT-020 | current  | 旧 business_records products 入口       | 旧系统兼容        | Compatibility / Deferred                   | 退出正式入口         | 否                 | 与正式 products / SKU 方向对齐；旧入口删除 / 隐藏 | product review              | 重复主数据                    | product-sku review       |
-| DELTA-CURRENT-021 | current  | current 数据导入                         | 客户落地需要       | Data Import Adapter                        | dry-run / freeze tooling 已完成，真实导入未做 | 否                 | source freeze / dry-run evidence -> loader design -> import execution | 人工确认                        | 误导入/误生成事实                | import loader design     |
-| DELTA-CURRENT-022 | current  | 打印/导出格式                              | 客户交付需要       | Customer Material / Print Template Candidate | 默认 Deferred    | 否                 | 只登记客户样本和交付诉求，不建立打印交付包或模板引擎    | 多客户同类单据重复、字段来源稳定后再评审       | 模板当业务规则                  | print sample inventory   |
-| DELTA-CURRENT-023 | current  | 菜单入口                                 | V1 页面可试用需要   | Customer Config / UI                       | 未接正式菜单         | 否                 | formal menu entry + legacy entry removal | business_records cutover    | 菜单误导成熟度                  | v1-formal-menu-and-legacy-entry-exit |
-| DELTA-CURRENT-024 | current  | seedData 初始化                         | 交付/演示需要      | Customer Config / Demo Seed                | 未改             | 否                 | 单独评审                              | menu/seed boundary          | 误当正式数据                   | seed review              |
-| DELTA-CURRENT-025 | current  | docs registry / 帮助中心                 | 交付/培训需要      | Help / QA                                  | 未改             | 否                 | 后续帮助中心业务版                         | 功能稳定后                       | 文档误导实现状态                 | help review              |
-| DELTA-CURRENT-026 | current  | 行业默认角色、菜单、字段、编号规则                 | current 样本 / 产品化方向 | Industry Template Candidate                | 待抽离模板清单        | 否                 | 先分类行业共性、current 样本和 deferred 输入      | 多客户或人工评审                    | 单客户样本被当行业标准              | industry template inventory |
-| DELTA-CURRENT-027 | current  | 客户配置包 / 配置 loader                   | 产品化交付需要      | Customer Config                            | 目录骨架已有，runtime loader 未做 | 否                 | 先设计配置形态，不新增 `tenant_id`              | 配置项边界评审                     | 被误读为 Runtime Tenant / SaaS | customer config shape review |
-| DELTA-CURRENT-028 | current  | 极端客户专属逻辑放置边界                       | 产品化交付需要      | Customer Extension                         | 当前没有真实落地需求     | 否                 | 只有真实出现专属逻辑时建立 extension，并记录退出条件    | 明确客户专属规则                    | 核心规则长期分叉                 | extension review only    |
-| DELTA-CURRENT-029 | current  | 报表、附件、导入导出、扫码、外部集成                | 后续增强方向       | Reporting / Deferred                       | 延后             | 否                 | 事实层稳定后再评审                         | 生产 / 出货 / 财务事实稳定             | 报表倒推事实模型                 | reporting review later   |
+| DELTA-YOYOOSUN-001 | yoyoosun | yoyoosun 是第一个真实客户和种子客户 | 项目背景 | Customer Material | 已确认 | 否 | 作为配置包来源 | 无 | 误当 runtime tenant | 保持 yoyoosun 非 tenant |
+| DELTA-YOYOOSUN-002 | yoyoosun | 永绅 yoyoosun 私有化部署 | 项目背景 | Customer Config / Delivery | 已确认方向 | 否 | `deployments/yoyoosun` | 部署包设计 | 运维边界不清 | deployment package |
+| DELTA-YOYOOSUN-003 | yoyoosun | 客户资料字段可能不同 | yoyoosun 资料 | Customer Config / Data Import Source | 待确认 | 否 | 字段分类 + unresolved queue | 甲方确认 | 污染 Product Core | import dry-run |
+| DELTA-YOYOOSUN-004 | yoyoosun | 客户 / 供应商 / 联系人正式主数据 | V1 需求 | Product Core | 已进入 V1 | 是 | 已做 V1 能力 | 已完成基础链路 | 后续字段扩张风险 | 地址/账期另评审 |
+| DELTA-YOYOOSUN-005 | yoyoosun | 销售订单正式源单据 | V1 需求 | Product Core | 已进入 V1 | 是 | 已做 V1 能力 | 已完成基础链路 | 误当出货事实 | UI 文案继续约束 |
+| DELTA-YOYOOSUN-006 | yoyoosun | 颜色、尺寸、客户款号 | Excel/订单字段线索 | Industry Template Candidate / Deferred | 不直接落 SKU | 暂不进入 | 作为 SKU/BOM 评审输入 | product_sku review | 过早建 SKU | 016 review |
+| DELTA-YOYOOSUN-007 | yoyoosun | 加工合同样式 | PDF / 合同样本 | Customer Material / Print Template Candidate | 只作客户打印样本输入 | 否 | 记录样式、字段来源和条款线索；不抽产品内核模板 | 委外模块评审；至少 2-3 客户重复后再评审模板化 | 合同条款当业务规则 | outsourcing review + print sample inventory |
+| DELTA-YOYOOSUN-008 | yoyoosun | 委外加工流程                               | 合同/业务线索      | Product Core / Industry Template Candidate | 延后             | 待评审               | 委外事实阶段评审                          | outsourcing facts           | 只用合同不足以建模                | outsourcing review       |
+| DELTA-YOYOOSUN-009 | yoyoosun | 采购 / 包材 / 辅材                         | 需求线索         | Product Core / Deferred                    | 延后             | 待评审               | 采购订单 / 采购需求评审                     | purchase review             | 与已有 purchase_receipts 重复 | purchase-order review    |
+| DELTA-YOYOOSUN-010 | yoyoosun | 出货放行                                 | Workflow 规则  | Product Core                               | 已有 workflow 边界 | 是                 | 保持 `shipping_released != shipped` | shipment review             | 被误解为已出库                  | shipment-usecase-review  |
+| DELTA-YOYOOSUN-011 | yoyoosun | 实际出货 / 出库                            | 业务主链路        | Product Core                               | 未做             | 是                 | 后续 shipment facts                 | shipment review             | 高风险事实层                   | shipment-usecase-review  |
+| DELTA-YOYOOSUN-012 | yoyoosun | 库存预留                                 | 出货/库存需求      | Product Core                               | 未做             | 是                 | 后续 reservation review             | shipment/inventory boundary | 预留和扣减混淆                  | stock-reservation review |
+| DELTA-YOYOOSUN-013 | yoyoosun | 应收 / 发票 / 收款                         | 财务需求         | Product Core                               | 未做             | 是                 | 后续 finance review                 | 出货事实/对账口径                   | 不能从放行生成                  | finance review           |
+| DELTA-YOYOOSUN-014 | yoyoosun | 供应商应付 / 付款                           | 财务需求         | Product Core                               | 未做             | 是                 | 后续 finance review                 | purchase/outsourcing facts  | 付款口径复杂                   | finance review           |
+| DELTA-YOYOOSUN-015 | yoyoosun | 手机端任务处理                              | 汇报资料/产品方向    | Industry Template / UI                     | 计划中            | 可能                | mobile task review                | 任务/岗位权限                     | 空壳入口风险                   | mobile review            |
+| DELTA-YOYOOSUN-016 | yoyoosun | 老板审批更快                               | 汇报资料         | Industry Template                          | 方向成立           | 可能                | Workflow/mobile                   | 审批节点设计                      | 只做 UI 不做权限               | mobile workflow review   |
+| DELTA-YOYOOSUN-017 | yoyoosun | 仓库 / 品质现场扫码拍照                        | 汇报资料         | Industry Template / Product Core           | 延后             | 可能                | 质检/库存/移动端评审                       | 事实模型                        | 手机端先做空壳风险                | mobile + quality review  |
+| DELTA-YOYOOSUN-018 | yoyoosun | 旧 business_records partners 入口       | 旧系统兼容        | Compatibility                              | 退出正式入口         | 否                 | 删除 / 隐藏旧入口；必要时仅保留迁移参考数据 | transition audit            | 双真源                      | legacy removal review    |
+| DELTA-YOYOOSUN-019 | yoyoosun | 旧 business_records project-orders 入口 | 旧系统兼容        | Compatibility                              | 退出正式入口         | 否                 | 用正式 sales_orders 承接新写入；旧入口删除 / 隐藏 | transition audit            | 双写/误导                    | legacy removal review    |
+| DELTA-YOYOOSUN-020 | yoyoosun | 旧 business_records products 入口       | 旧系统兼容        | Compatibility / Deferred                   | 退出正式入口         | 否                 | 与正式 products / SKU 方向对齐；旧入口删除 / 隐藏 | product review              | 重复主数据                    | product-sku review       |
+| DELTA-YOYOOSUN-021 | yoyoosun | yoyoosun 数据导入                         | 客户落地需要       | Data Import Adapter                        | dry-run / freeze tooling 已完成，真实导入未做 | 否                 | source freeze / dry-run evidence -> loader design -> import execution | 人工确认                        | 误导入/误生成事实                | import loader design     |
+| DELTA-YOYOOSUN-022 | yoyoosun | 打印/导出格式                              | 客户交付需要       | Customer Material / Print Template Candidate | 默认 Deferred    | 否                 | 只登记客户样本和交付诉求，不建立打印交付包或模板引擎    | 多客户同类单据重复、字段来源稳定后再评审       | 模板当业务规则                  | print sample inventory   |
+| DELTA-YOYOOSUN-023 | yoyoosun | 菜单入口                                 | V1 页面可试用需要   | Customer Config / UI                       | 未接正式菜单         | 否                 | formal menu entry + legacy entry removal | business_records cutover    | 菜单误导成熟度                  | v1-formal-menu-and-legacy-entry-exit |
+| DELTA-YOYOOSUN-024 | yoyoosun | seedData 初始化                         | 交付/演示需要      | Customer Config / Demo Seed                | 未改             | 否                 | 单独评审                              | menu/seed boundary          | 误当正式数据                   | seed review              |
+| DELTA-YOYOOSUN-025 | yoyoosun | docs registry / 帮助中心                 | 交付/培训需要      | Help / QA                                  | 未改             | 否                 | 后续帮助中心业务版                         | 功能稳定后                       | 文档误导实现状态                 | help review              |
+| DELTA-YOYOOSUN-026 | yoyoosun | 行业默认角色、菜单、字段、编号规则                 | 永绅 yoyoosun 样本 / 产品化方向 | Industry Template Candidate                | 待抽离模板清单        | 否                 | 先分类行业共性、永绅 yoyoosun 样本和 deferred 输入      | 多客户或人工评审                    | 单客户样本被当行业标准              | industry template inventory |
+| DELTA-YOYOOSUN-027 | yoyoosun | 客户配置包 / 配置 loader                   | 产品化交付需要      | Customer Config                            | 目录骨架已有，runtime loader 未做 | 否                 | 先设计配置形态，不新增 `tenant_id`              | 配置项边界评审                     | 被误读为 Runtime Tenant / SaaS | customer config shape review |
+| DELTA-YOYOOSUN-028 | yoyoosun | 极端客户专属逻辑放置边界                       | 产品化交付需要      | Customer Extension                         | 当前没有真实落地需求     | 否                 | 只有真实出现专属逻辑时建立 extension，并记录退出条件    | 明确客户专属规则                    | 核心规则长期分叉                 | extension review only    |
+| DELTA-YOYOOSUN-029 | yoyoosun | 报表、附件、导入导出、扫码、外部集成                | 后续增强方向       | Reporting / Deferred                       | 延后             | 否                 | 事实层稳定后再评审                         | 生产 / 出货 / 财务事实稳定             | 报表倒推事实模型                 | reporting review later   |
 
 ---
 
@@ -317,15 +317,15 @@
 * 多个客户都会用。
 * 属于 ERP 核心事实正确性。
 * 属于库存、出货、财务、审计、权限等不可客户自由配置的规则。
-* 不依赖 current 单一客户特殊字段。
+* 不依赖 yoyoosun 单一客户特殊字段。
 * 有明确业务口径和测试口径。
 
 ### 9.2 不得直接进入 Product Core 的内容
 
 以下内容不得直接进入 Product Core：
 
-* current Excel 中单独出现的字段。
-* current PDF 中单独出现的合同条款。
+* yoyoosun Excel 中单独出现的字段。
+* yoyoosun PDF 中单独出现的合同条款。
 * 当前客户口头说法但未确认的问题。
 * 打印样本字段和单客户打印格式。
 * 导入适配字段。
@@ -353,7 +353,7 @@
 
 适合 Data Import Adapter：
 
-* current Excel 字段映射。
+* yoyoosun Excel 字段映射。
 * business_records 历史快照映射。
 * 不同客户导入表头。
 * 数据清洗规则。
@@ -492,10 +492,10 @@
 关系示例：
 
 ```text
-current 提出“订单里要颜色”
-  -> 客户差异台账：颜色字段来自 current 样本，分类为 Industry Template Candidate / Deferred
+yoyoosun 提出“订单里要颜色”
+  -> 客户差异台账：颜色字段来自 永绅 yoyoosun 样本，分类为 Industry Template Candidate / Deferred
   -> 产品能力进度台账：product_skus 仍 L3 Draft Only
-  -> 客户交付矩阵：current 暂不能承诺 SKU 能力，只能在 sales_order_item 中保留 color snapshot 或备注类字段
+  -> 客户交付矩阵：yoyoosun 暂不能承诺 SKU 能力，只能在 sales_order_item 中保留 color snapshot 或备注类字段
 ```
 
 ---
@@ -549,15 +549,15 @@ current 提出“订单里要颜色”
 
 ```text
 docs/product/capability-ledger.md
-docs/customers/current/delivery-matrix.md
-docs/customers/current/delta-ledger.md
+docs/customers/yoyoosun/delivery-matrix.md
+docs/customers/yoyoosun/delta-ledger.md
 ```
 
 其中：
 
 * `capability-ledger.md` 维护产品能力进度。
-* `delivery-matrix.md` 维护 current 客户交付状态。
-* `delta-ledger.md` 维护 current 客户差异。
+* `delivery-matrix.md` 维护 永绅 yoyoosun 客户交付状态。
+* `delta-ledger.md` 维护 永绅 yoyoosun 客户差异。
 
 未来新增客户时：
 
@@ -591,23 +591,23 @@ v1-formal-menu-and-legacy-entry-exit
 或：
 
 ```text
-current-customer-import-loader-design
+yoyoosun-customer-import-loader-design
 ```
 
-如果目标是让 current 甲方尽快试用：
+如果目标是让 yoyoosun 甲方尽快试用：
 
 ```text
 workspace-boundary-checkpoint
 -> v1-formal-menu-and-legacy-entry-exit
--> current customer trial checklist
+-> yoyoosun customer trial checklist
 ```
 
 如果目标是准备真实数据落地：
 
 ```text
 workspace-boundary-checkpoint
--> current-customer-import-loader-design
--> current-import-execution-and-audit
+-> yoyoosun-customer-import-loader-design
+-> customer-import-execution-and-audit
 ```
 
 ---
@@ -629,7 +629,7 @@ workspace-boundary-checkpoint
 
 它们共同防止：
 
-* current 客户资料污染 Product Core。
+* 永绅 yoyoosun 客户资料污染 Product Core。
 * 旧 business_records 变成双真源或旧入口继续误导用户。
 * 菜单看起来比能力成熟。
 * Workflow 和 Fact 混淆。

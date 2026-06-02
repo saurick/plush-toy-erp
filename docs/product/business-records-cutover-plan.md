@@ -162,6 +162,6 @@ archive / delete 条件：
 
 | 下一步 | 为什么 |
 |---|---|
-| current customer import dry-run / strategy | 先基于本 data map 做 dry-run/import 设计，分类 current 样本字段 |
+| yoyoosun customer import dry-run / strategy | 先基于本 data map 做 dry-run/import 设计，分类 永绅 yoyoosun 样本字段 |
 | V1 menu entry review | 单独评审 seedData、docs registry、Dashboard、menu permissions 和旧入口只读化 |
 | business_records read-only runtime Goal | 只有菜单 / import 方案确认后再做，不应和 audit 混轮 |

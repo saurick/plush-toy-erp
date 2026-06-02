@@ -8,8 +8,8 @@
 | --- | --- | --- |
 | `scripts/bootstrap.sh` | 安装依赖、启用 hooks、跑快速自检 | 新机器 / 首次拉仓库 |
 | `scripts/project-scan.sh` | 扫描项目名、默认密钥、部署地址和页面文案残留 | 改名后 / 配置收口后 |
-| `scripts/import/currentSourceSnapshotFreezeCheck.mjs` | current source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence | current 导入前 source freeze / 人工 review evidence |
-| `scripts/import/currentCustomerDryRun.mjs` | current 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包 | current 导入前人工 review / 数据映射检查 |
+| `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence | yoyoosun 导入前 source freeze / 人工 review evidence |
+| `scripts/import/customerImportDryRun.mjs` | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包 | yoyoosun 导入前人工 review / 数据映射检查 |
 | `scripts/phase2b-pg.sh` | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口 | 验证 Phase 2B schema 和批次库存行为 |
 | `scripts/phase2c-pg.sh` | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口 | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯 |
 | `scripts/phase2d-pg.sh` | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口 | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
@@ -50,13 +50,13 @@ pnpm smoke:processing-contract-real-login
 
 ### 0. 导入冻结与 dry-run 工具 / Import freeze and dry-run tooling
 
-current source snapshot freeze checker 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
+customer source snapshot freeze checker 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
 
 ```bash
-node scripts/import/currentSourceSnapshotFreezeCheck.mjs \
-  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
-  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
-  --out output/current-source-snapshot-freeze
+node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
+  --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.freeze.sample.json \
+  --out output/customers/yoyoosun/source-snapshot-freeze
 ```
 
 输出目录会生成：
@@ -69,13 +69,13 @@ freeze-check-report.md
 
 `freeze-metadata.json` 中 `noRealImport` 必须为 `true`，`canExecuteRealImport` 必须为 `false`。该脚本是 freeze evidence tooling，不是 runtime loader，不是 import approval。
 
-current 客户导入 dry-run 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`。
+永绅 yoyoosun 客户导入 dry-run 只使用 Node.js 内置模块，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`。
 
 ```bash
-node scripts/import/currentCustomerDryRun.mjs \
-  --source scripts/import/fixtures/current/source-snapshot.sample.json \
-  --existing scripts/import/fixtures/current/existing-v1.sample.json \
-  --out output/current-import-dry-run \
+node scripts/import/customerImportDryRun.mjs \
+  --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.sample.json \
+  --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.sample.json \
+  --out output/customers/yoyoosun/import-dry-run \
   --format json,md
 ```
 
@@ -98,14 +98,14 @@ dry-run-report.md
 012 real dry-run evidence 使用 freeze fixtures：
 
 ```bash
-node scripts/import/currentCustomerDryRun.mjs \
-  --source scripts/import/fixtures/current/source-snapshot.freeze.sample.json \
-  --existing scripts/import/fixtures/current/existing-v1.freeze.sample.json \
-  --out output/current-real-dry-run-evidence \
+node scripts/import/customerImportDryRun.mjs \
+  --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.freeze.sample.json \
+  --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.freeze.sample.json \
+  --out output/customers/yoyoosun/real-dry-run-evidence \
   --format json,md
 ```
 
-`output/current-source-snapshot-freeze/` 和 `output/current-real-dry-run-evidence/` 是本地 evidence 输出，不纳入 git；真实 import loader 仍需单独 Goal，并且必须另有备份、回滚、幂等、对账和客户确认。
+`output/customers/yoyoosun/source-snapshot-freeze/` 和 `output/customers/yoyoosun/real-dry-run-evidence/` 是本地 evidence 输出，不纳入 git；真实 import loader 仍需单独 Goal，并且必须另有备份、回滚、幂等、对账和客户确认。
 
 ### 1. 初始化环境
 

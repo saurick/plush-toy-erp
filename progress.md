@@ -6,15 +6,40 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-02 17:15
+- 完成：同步修正 `AGENTS.md` 中残留的 `current` 客户边界口径，明确当前永绅客户稳定 key 是 `yoyoosun`，不要恢复 `current` 客户目录或导入工作区别名，并把“禁止把 current 客户资料写成 Product Core”改为“禁止把任一客户资料写成 Product Core”。
+- 完成：将工程原则中的文档同步规则扩展为：代码行为、目录结构、脚本名称、部署方式、配置字段、客户 key 或正式文档口径变化时，必须同轮检查并按需更新相关 README、docs、`docs/current-source-of-truth.md`、`docs/document-inventory.md`、产品 / 架构文档、帮助文档和 `progress.md`。
+- 完成：新增根 `.gitattributes`，将 `docs/customers/*/raw-source-files/**` 标记为 binary；同步 `docs/customers/yoyoosun/raw-source-files/README.md`，明确 Git 不应把原始 Excel / PDF / PNG 当文本做 whitespace 检查或展示正文 diff。
+- 下一步：后续改代码、目录、脚本名、客户 key 或正式口径时，按 `AGENTS.md` 先确认影响面，再同步相关文档；只属于历史归档、外部参考或普通变量名的 `current` 不机械改。
+- 阻塞/风险：规则 / docs 口径修正；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 104 行 / 19403 bytes，未达到归档阈值。
+
+## 2026-06-02 17:07
+- 完成：按用户确认删除 `current` 客户目录 / 导入工作区别名，将可追溯客户资料统一收口到 `docs/customers/yoyoosun/`，并同步 `config/customers/yoyoosun/`、`deployments/yoyoosun/`、`scripts/import/fixtures/customers/yoyoosun/`。
+- 完成：将 import tooling 从 `currentCustomerDryRun` / `currentSourceSnapshotFreezeCheck` 改为通用 `customerImportDryRun` / `customerSourceSnapshotFreezeCheck`，同时把 yoyoosun fixture 与 evidence 输出路径改到客户 key 下；同步 README、当前真源、文档清单、产品路线、交付台账和客户导入文档，移除活跃文档里的 `current` 客户 key 口径。
+- 下一步：后续同时处理多个客户时，按 `docs/customers/<customer-key>/`、`config/customers/<customer-key>/`、`deployments/<customer-key>/` 和 `scripts/import/fixtures/customers/<customer-key>/` 并列隔离；不要恢复 `current` alias。
+- 阻塞/风险：本轮不改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径；原始二进制文件仍直接进入 Git，后续继续批量增加时应单独评审 Git LFS / 对象存储 / 脱敏 fixture。本轮追加前 `progress.md` 为 98 行 / 18077 bytes，未达到归档阈值。
+
 ## 2026-06-02 16:50
 - 完成：补齐 `docs/` 下 19 个 `Doc Type / 文档类型` metadata 值的中文说明，保留原 English anchor，并将 `Current Source Snapshot Freeze Evidence` 明确为 `current 来源快照冻结证据`。
 - 完成：同步 `docs/README.md` 文档 metadata 规则，明确凡出现 `Doc Type / 文档类型`，类型值必须保留 English anchor 并补中文说明。
 - 下一步：后续新增带 metadata 头的 Markdown 时，先按 `docs/README.md` 保持字段名和值的中英可读性，再判断是否需要同步 `docs/document-inventory.md`。
 - 阻塞/风险：docs-only 文案口径修正；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。本轮追加前 `progress.md` 为 92 行 / 17229 bytes，未达到归档阈值。
 
-## 2026-06-02 16:18
-- 完成：新增 `docs/customers/current/raw-source-file-archive-review.md`，登记 `/Users/simon/Downloads/永绅erp/原文件/` 下 8 个 current 原始 Excel / PDF / PNG 的类型、大小、checksum、用途分类、允许落点和禁止事项。
-- 完成：同步 `docs/customers/current/README.md`、`docs/customers/current/source-materials.md`、`docs/document-inventory.md` 和 `docs/current-source-of-truth.md`，明确原始文件本轮不移动进仓库、不提交二进制原件、不作为 Product Core 或真实导入批准。
+## 2026-06-02 16:33
+- 完成：按客户维度修正原始文件归档路径，将永绅客户稳定 key 定为 `yoyoosun`，把原件目录和归档评审从 `docs/customers/current/` 移到 `docs/customers/yoyoosun/`。
+- 完成：新增 `docs/customers/yoyoosun/README.md`，同步 `docs/customers/current/README.md`、`source-materials.md`、`docs/current-source-of-truth.md` 和 `docs/document-inventory.md`，明确 `current` 只是当前活跃客户 / 导入工作区别名，不是长期客户 key；后续多客户资料按 `docs/customers/<customer-key>/` 隔离。
+- 下一步：后续若需要客户级配置或交付包，应优先建立 `config/customers/yoyoosun/*` 和 `deployments/yoyoosun/*`，不要继续把长期客户资料塞进 `current`。
+- 阻塞/风险：docs-only + 原件归档路径修正；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。
+
+## 2026-06-02 16:27（已由 16:33 修正）
+- 完成：当时修正 current 原始客户文件归档口径，将 8 个本地原始 Excel / PDF / PNG 复制到 `docs/customers/current/raw-source-files/`，保留原始文件名，用于后续字段、模板、导入、页面和验收溯源；该路径已在 16:33 修正为 `docs/customers/yoyoosun/raw-source-files/`。
+- 完成：当时新增 `docs/customers/current/raw-source-files/README.md`，并同步 `raw-source-file-archive-review.md`、`source-materials.md`、`README.md`、`docs/current-source-of-truth.md` 和 `docs/document-inventory.md`，明确原件已在项目归档，但仍不是 Product Core、runtime、schema、migration、API、UI、seedData、docs registry、真实导入批准或 `business_records` cutover；该归档文档已在 16:33 移至 `docs/customers/yoyoosun/`。
+- 下一步：后续从原件推进功能前，先生成脱敏 / 结构化 fixture 或正式产品 / 架构评审；如果继续批量增加原始二进制文件，再评审 Git LFS、对象存储或只提交脱敏样本。
+- 阻塞/风险：当前仓库未启用 Git LFS，本批原件约 24MB，直接进入 Git 会增加仓库历史体积；本轮未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。本轮追加前 `progress.md` 为 80 行 / 14564 bytes，未达到归档阈值。
+
+## 2026-06-02 16:18（已由 16:27 和 16:33 修正）
+- 完成：当时新增 `docs/customers/current/raw-source-file-archive-review.md`，登记 `/Users/simon/Downloads/永绅erp/原文件/` 下 8 个 current 原始 Excel / PDF / PNG 的类型、大小、checksum、用途分类、允许落点和禁止事项；该归档文档已在 16:33 移至 `docs/customers/yoyoosun/raw-source-file-archive-review.md`。
+- 完成：同步 `docs/customers/current/README.md`、`docs/customers/current/source-materials.md`、`docs/document-inventory.md` 和 `docs/current-source-of-truth.md`，当时明确原始文件本轮不移动进仓库、不提交二进制原件、不作为 Product Core 或真实导入批准；该“原件不进仓库”口径已在 16:27 修正为“原件进入 `raw-source-files/` 归档，但仍不作为 Product Core 或真实导入批准”。
 - 下一步：如需从原件生成 dry-run 数据，先做脱敏 / 结构化 snapshot fixture，落到 `scripts/import/fixtures/current/*`；如需迁移原件，另开归档迁移任务评审敏感信息、引用关系、docs registry、测试断言和 Git 历史体积。
 - 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、`business_records` 或部署配置。本轮追加前 `progress.md` 为 74 行 / 13483 bytes，未达到归档阈值。
 

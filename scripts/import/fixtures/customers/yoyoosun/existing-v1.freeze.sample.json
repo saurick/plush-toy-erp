@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "description": "Synthetic sanitized existing V1/formal model snapshot for yoyoosun freeze evidence. Not real customer data. Not import approval.",
+  "customers": [
+    {
+      "id": "customer-1",
+      "code": "C001",
+      "name": "Existing Customer",
+      "displayName": "Existing Customer",
+      "status": "active"
+    }
+  ],
+  "suppliers": [
+    {
+      "id": "supplier-1",
+      "code": "S001",
+      "name": "Existing Supplier",
+      "shortName": "Existing Supplier",
+      "status": "active"
+    }
+  ],
+  "contacts": [],
+  "salesOrders": [],
+  "salesOrderItems": [],
+  "products": [
+    {
+      "id": "product-1",
+      "code": "P001",
+      "name": "Existing Product",
+      "status": "active"
+    }
+  ],
+  "materials": [
+    {
+      "id": "material-1",
+      "code": "M001",
+      "name": "Existing Material",
+      "status": "active"
+    }
+  ],
+  "units": [
+    {
+      "id": "unit-pcs",
+      "code": "PCS",
+      "name": "Piece",
+      "status": "active"
+    }
+  ],
+  "warehouses": [
+    {
+      "id": "warehouse-1",
+      "code": "WH01",
+      "name": "Sanitized Warehouse",
+      "status": "active"
+    }
+  ],
+  "bomHeaders": [
+    {
+      "id": "bom-header-1",
+      "productId": "product-1",
+      "version": "v1",
+      "status": "ACTIVE"
+    }
+  ],
+  "bomItems": [
+    {
+      "id": "bom-item-1",
+      "bomHeaderId": "bom-header-1",
+      "materialId": "material-1",
+      "unitId": "unit-pcs",
+      "quantity": "2.5"
+    }
+  ]
+}

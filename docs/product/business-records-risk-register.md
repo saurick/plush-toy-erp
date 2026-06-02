@@ -14,7 +14,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 双真源风险 | 同一客户、供应商、联系人或订单在旧入口和 V1 正式模型中各自可写，后续无法判断谁是准 | `partners`、`project-orders` 仍在通用业务页；V1 pages 已新增 | 重叠领域进入只读 / demo 化；正式写入只走 V1 usecase | Product / UI / API | 是 |
 | 双写风险 | 同一操作同时写 V1 和 `business_records`，导致状态、字段和审计分裂 | 旧 `BusinessModulePage` 和 V1 页面并存 | 禁止双写；旧记录仅做 source snapshot；后续 runtime Goal 加写入限制 | API / UI / Data | 是 |
 | demo 数据误当正式数据 | debug seed 或样本被导入正式模型，污染客户资料和订单 | `debug_seed`、`seedData`、mock 和 QA 文档仍引用 `business_records` | 保留 debug/demo 标记；import dry-run 排除 demo/debug | Data Import / QA | 是 |
-| current 客户字段污染 Product Core | 客户专属字段变成通用必填字段，后续产品化失败 | `partners`、`products`、current 样本含付款、税号、地址、SKU 等字段 | 字段先分类为 Product Core Candidate / Customer Material / Print Template Input / Import Adapter | Productization | 是 |
+| 永绅 yoyoosun 客户字段污染 Product Core | 客户专属字段变成通用必填字段，后续产品化失败 | `partners`、`products`、永绅 yoyoosun 样本含付款、税号、地址、SKU 等字段 | 字段先分类为 Product Core Candidate / Customer Material / Print Template Input / Import Adapter | Productization | 是 |
 | `business_records` orders 误当 `sales_orders` | 旧 `project-orders` 状态、数量或未出货数被当正式 Source Document 或出货结果 | `project-orders` 定义包含订单数量、生产数量、未出货数 | 只做 dry-run；正式 sales order 不写 shipment / inventory / finance facts | Sales / Data | 是 |
 | `business_records.products` 与 `products` schema 重复 | 旧产品资料页继续新增核心字段，形成第二套产品主档 | existing `products` 已是成品主数据；旧 `products` 仍在业务模块 | 旧 products 只保留 source snapshot；正式产品能力复用 existing `products` | MasterData | 是 |
 | partners 同时对应 customers / suppliers | 同一 `partners` 记录可能是客户、供应商、加工厂或潜在客户，自动拆分可能错 | `payload.partner_type` 是文本分类，历史数据可能缺值或不一致 | 按 partner_type dry-run；无法唯一判断进入人工确认 | MasterData / Data Import | 是 |

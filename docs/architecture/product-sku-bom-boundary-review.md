@@ -2,7 +2,7 @@
 
 ## 结论
 
-现有 `products / materials / units / warehouses / bom_headers / bom_items` 已经是当前最小主数据与工程资料真源。Phase 1 可以提出 `product_skus` 和 BOM version 扩展草案，但不得重复设计已存在的 `products / materials / units / bom_*`，也不得把 current 客户 Excel 字段直接写成 Product Core 必填字段。
+现有 `products / materials / units / warehouses / bom_headers / bom_items` 已经是当前最小主数据与工程资料真源。Phase 1 可以提出 `product_skus` 和 BOM version 扩展草案，但不得重复设计已存在的 `products / materials / units / bom_*`，也不得把 永绅 yoyoosun 客户 Excel 字段直接写成 Product Core 必填字段。
 
 ```text
 BOM 是工程资料 / 物料需求来源。
@@ -43,7 +43,7 @@ SKU 不应承接：
 - 出货事实。
 - 客户专属报表临时列。
 - BOM 明细事实。
-- current 样本中未通用化的任意 Excel 列。
+- 永绅 yoyoosun 样本中未通用化的任意 Excel 列。
 
 ## SKU 与产品编号、款式、颜色、尺寸关系
 
@@ -124,7 +124,7 @@ BOM 不写 `inventory_txns`，不更新 `inventory_balances`，不决定 `purcha
 | BOM version、status、effective dates、quantity、loss_rate | Product Core | 现有 `bom_headers / bom_items`，按需扩展 |
 | sku_code、barcode、sku_name、color、size、packaging_version | Product Core Candidate | `product_skus` draft |
 | 色卡、作业指导书、图片 | Industry Template Candidate / Attachment | 先做引用和模板，不塞进库存事实 |
-| current Excel 中的设计师、特殊颜色描述、客户内部列名 | Customer Material | 作为线索，不直接必填 |
+| yoyoosun Excel 中的设计师、特殊颜色描述、客户内部列名 | Customer Material | 作为线索，不直接必填 |
 | 字段显示、必填、编号规则 | Customer Config | 配置草案 |
 | 染批、供应商批号、生产批号 | Fact / Lot | `inventory_lots`，不放 SKU 主数据 |
 
@@ -133,5 +133,5 @@ BOM 不写 `inventory_txns`，不更新 `inventory_balances`，不决定 `purcha
 - 不重复设计 `products / materials / units / warehouses / bom_headers / bom_items`。
 - 不让 BOM 直接写库存事实。
 - 不把 `product_sku` 写成库存必然粒度，除非 schema final review 证明需要。
-- 不把 current 客户 Excel 列直接写成 Product Core schema。
+- 不把 永绅 yoyoosun 客户 Excel 列直接写成 Product Core schema。
 - 不做材料替代 V1 强制能力。

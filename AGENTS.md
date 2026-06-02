@@ -65,13 +65,13 @@
 - 只有明确执行 `docs/codex-goals/<goal>.md`、修复当前 Goal 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时，才生成或覆盖 `.codex-review/latest.md`。普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除 `.codex-review/latest.md`。
 - Codex 不要要求用户截图；正式 Goal 需要交接给 GPT 的内容应收敛到仓库文件、命令输出和 `.codex-review/latest.md`。
 - 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/codex-goals/README.md`、`docs/codex-goals/_review-output-protocol.md`、`docs/product/*`、`docs/architecture/*`。具体任务的执行范围、允许 / 禁止路径和验收命令，以当前用户指定的 `docs/codex-goals/<goal>.md` 为准。
-- plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和 current 客户边界，仍以本文件和正式产品 / 架构文档为准。
+- plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和客户资料边界，仍以本文件和正式产品 / 架构文档为准。当前永绅客户稳定 key 是 `yoyoosun`，不要恢复 `current` 客户目录或导入工作区别名。
 - 处理 Codex Goal 时禁止：
   - 新增 `tenant_id`。
   - 实现 SaaS 多租户。
   - 实现 license server、套餐计费或客户工单系统。
   - 创建泛化 `ChangeUsecase` 或 `change_records`。
-  - 把 current 客户资料写成 Product Core 规则。
+  - 把任一客户资料写成 Product Core 规则。
   - 混淆 Workflow / Fact。
   - 让 `WorkflowUsecase` 写库存、出货、财务、应收、应付、发票或收付款事实。
   - 把 `shipping_released` 写成 `shipped`。
@@ -86,7 +86,7 @@
 - 优先保留稳定、可维护、可观测的实现。
 - 能复用现有能力就不要额外造层。
 - 注释只写设计意图、边界条件和兼容性兜底，避免补丁口吻。
-- 代码行为、部署方式、配置字段或正式文档口径变化时，同轮更新相关文档。
+- 代码行为、目录结构、脚本名称、部署方式、配置字段、客户 key 或正式文档口径变化时，必须同轮检查并按需更新相关 README、docs、`docs/current-source-of-truth.md`、`docs/document-inventory.md`、产品 / 架构文档、帮助文档和 `progress.md`。
 - 自动化测试通过是必要条件，不是充分条件；还必须确认架构边界、业务真源、权限边界、文档口径和产品化约束没有被破坏。
 - 不要为了让当前页面或当前测试通过而引入长期不可维护的特殊分支、局部兜底、重复真源或隐藏兼容路径。
 

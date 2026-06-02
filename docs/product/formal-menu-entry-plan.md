@@ -64,15 +64,15 @@
 | --- | --- | --- | --- | --- |
 | 工作台 | 任务中心 | Workflow / Work Queue | 必须保留可达入口 | 展示待办和职责任务，不替代业务事实 |
 | 工作台 | 经营看板 | Dashboard / Reporting | 默认可见，可隐藏 | 看板只读汇总，不作为事实真源 |
-| 基础资料 | 客户档案 | MasterData | current MVP 必须 | 单一主数据对象 |
-| 基础资料 | 供应商档案 | MasterData | current MVP 必须 | 单一主数据对象 |
-| 基础资料 | 联系人 | MasterData | current MVP 必须 | 可作为客户 / 供应商详情区块或独立管理入口 |
-| 基础资料 | 产品档案 | MasterData | current MVP 必须 | 不把 SKU / 颜色尺寸强塞进未评审模型 |
+| 基础资料 | 客户档案 | MasterData | yoyoosun MVP 必须 | 单一主数据对象 |
+| 基础资料 | 供应商档案 | MasterData | yoyoosun MVP 必须 | 单一主数据对象 |
+| 基础资料 | 联系人 | MasterData | yoyoosun MVP 必须 | 可作为客户 / 供应商详情区块或独立管理入口 |
+| 基础资料 | 产品档案 | MasterData | yoyoosun MVP 必须 | 不把 SKU / 颜色尺寸强塞进未评审模型 |
 | 基础资料 | 材料档案 | MasterData | 行业默认 | 材料主数据，不等于采购或库存事实 |
 | 基础资料 | 单位档案 | MasterData | 行业默认 | 单位主数据和后续换算规则 |
 | 基础资料 | 仓库档案 | MasterData | 行业默认 | 仓库主数据，库位后续评审 |
 | 销售 | 款式立项 | Source Document / Product Planning | 后续评审 | 不和销售订单塞成一个菜单名 |
-| 销售 | 销售订单 | Source Document | current MVP 必须 | 表达业务承诺，不生成出货、库存、财务事实 |
+| 销售 | 销售订单 | Source Document | yoyoosun MVP 必须 | 表达业务承诺，不生成出货、库存、财务事实 |
 | 产品工程 | BOM 管理 | Product Structure | 行业默认 | BOM 是工程资料，不直接写库存事实 |
 | 产品工程 | SKU / 规格 | Product Structure | 后续评审 | 色号、尺寸、版本按独立模型评审 |
 | 采购 | 采购需求 | Purchase Planning | 后续评审 | 不等于采购订单或入库事实 |
@@ -117,10 +117,10 @@
 | --- | --- | --- | --- | --- | --- |
 | 任务看板 | 任务中心 | Work Queue / Workflow | 必须有可达入口 | 可按角色换位置或改名，不应全局关闭 | 如果有任务流转，必须至少有任务入口或移动端任务入口 |
 | 业务看板 | 经营看板 | Dashboard / Reporting | 默认可见 | 可隐藏 | 不能作为业务事实或状态机真源 |
-| 客户与供应商组合入口 | 客户档案 | MasterData | current MVP 必须 | 可对非相关角色隐藏 | 订单、导入依赖时不能禁用对应后端能力 |
-| 客户与供应商组合入口 | 供应商档案 | MasterData | current MVP 必须 | 可对非相关角色隐藏 | 采购、导入依赖时不能禁用对应后端能力 |
-| 产品 | 产品档案 | MasterData | current MVP 必须 | 可对非相关角色隐藏 | 订单、BOM、库存依赖时不能禁用对应后端能力 |
-| 订单与款式立项组合入口 | 销售订单 | Source Document | current MVP 必须 | 无销售链路客户可隐藏 | 只是源单据，不自动生成出货、库存、财务事实 |
+| 客户与供应商组合入口 | 客户档案 | MasterData | yoyoosun MVP 必须 | 可对非相关角色隐藏 | 订单、导入依赖时不能禁用对应后端能力 |
+| 客户与供应商组合入口 | 供应商档案 | MasterData | yoyoosun MVP 必须 | 可对非相关角色隐藏 | 采购、导入依赖时不能禁用对应后端能力 |
+| 产品 | 产品档案 | MasterData | yoyoosun MVP 必须 | 可对非相关角色隐藏 | 订单、BOM、库存依赖时不能禁用对应后端能力 |
+| 订单与款式立项组合入口 | 销售订单 | Source Document | yoyoosun MVP 必须 | 无销售链路客户可隐藏 | 只是源单据，不自动生成出货、库存、财务事实 |
 | 订单与款式立项组合入口 | 款式立项 | Product Planning | 后续评审 | 未启用产品工程客户可隐藏 | 款式资料、打样和评审状态不和销售订单共用正式菜单名 |
 | 材料 BOM | BOM 管理 | Product Structure | 行业默认 | 可在未启用 BOM 客户隐藏 | 若启用生产、采购需求或成本核算，需先保证 BOM 入口或导入路径 |
 | 辅材与包材采购组合入口 | 材料档案 | MasterData | 行业默认 | 可对非相关角色隐藏 | 材料主数据不等于采购事实 |

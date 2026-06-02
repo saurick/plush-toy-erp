@@ -9,7 +9,7 @@
 | `shipping_released != shipped` | 已放行不等于已出库、已发货、已扣库存 |
 | Quality task done != quality_inspection passed | 协同任务完成不等于质检事实判定通过 |
 | `business_records` 不替代事实表 | 它是通用快照和兼容层，不是库存、出货、财务事实真源 |
-| current 客户资料不等于 Product Core | 只有经过架构评审并通用化的能力才能进入产品内核 |
+| 永绅 yoyoosun 客户资料不等于 Product Core | 只有经过架构评审并通用化的能力才能进入产品内核 |
 
 ## Workflow 协同层 / Workflow
 

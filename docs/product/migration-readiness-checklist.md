@@ -7,7 +7,7 @@
 如果无法证明不重复已有真源，则停止。
 如果影响库存 / 出货 / 财务事实但没有架构评审，则停止。
 如果 schema 草案包含多租户运行时字段，则停止。
-如果只是 current 客户样本字段但被写成 Product Core，则停止。
+如果只是 永绅 yoyoosun 客户样本字段但被写成 Product Core，则停止。
 
 ## 检查清单 / Checklist
 
@@ -29,9 +29,9 @@
 | API | 是否需要 API？ | JSON-RPC / service DTO、错误码、权限守卫计划 | UI 直接拼事实或绕过后端 usecase |
 | UI | 是否需要 UI？ | 页面入口、状态文案、默认/交互/恢复态回归计划 | UI 文案和 canonical status 混用 |
 | Seed / demo / import | 是否需要 seed、demo 或导入？ | seed 范围、debug 标记、导入 dry-run | seed 被当真实客户事实或 Product Core |
-| Customer config | 是否需要客户配置？ | config/customer draft、字段显示/必填/编号规则 | current 样本字段写死进 core schema |
+| Customer config | 是否需要客户配置？ | config/customer draft、字段显示/必填/编号规则 | 永绅 yoyoosun 样本字段写死进 core schema |
 | Tests | 需要哪些测试？ | biz/data/API/UI 对应命令和用例清单 | 只有文档或截图，没有可运行验证 |
-| current material classification | current 资料分类是否明确？ | Product Core / Industry Template / Customer Config / Customer Material 分类表 | 只在 current 样本出现却进入 V1 必填 |
+| yoyoosun material classification | yoyoosun 资料分类是否明确？ | Product Core / Industry Template / Customer Config / Customer Material 分类表 | 只在永绅 yoyoosun 样本出现却进入 V1 必填 |
 | current-source-of-truth | 是否需要更新真源索引？ | `docs/current-source-of-truth.md` diff | 实现状态变化但真源索引仍说 draft |
 | domain-model-v1 | 是否需要更新领域模型？ | `docs/product/domain-model-v1.md` diff | 表状态、分类或影响面变化未同步 |
 | release gates | 是否需要更新 release gates？ | `docs/product/release-gates.md` diff | 新能力缺少 DoD / stop conditions |
@@ -63,7 +63,7 @@ Audit Log
 - 无法证明不重复已有真源。
 - 影响库存 / 出货 / 财务事实但没有对应架构评审。
 - schema 草案包含当前阶段禁止的多租户运行时字段。
-- current 客户样本字段被写成 Product Core 必填。
+- 永绅 yoyoosun 客户样本字段被写成 Product Core 必填。
 - `shipping_released` 被当作 `shipped`。
 - `purchase_order` 被当作 `purchase_receipt`。
 - `shipped_quantity`、`received_quantity`、AR/AP 等派生值没有事实来源。

@@ -26,6 +26,6 @@
 
 1. 先把 Product Core、Industry Template、Customer Config 和 Customer Extension 边界写清。
 2. 先用文档和目录表达未来落点，不提前做 loader、DSL 或 schema。
-3. 客户差异先进入 `docs/customers/current` 和 `config/customers/current` 草案，不直接进入核心 usecase。
+3. 客户差异先进入 `docs/customers/yoyoosun` 和 `config/customers/yoyoosun` 草案，不直接进入核心 usecase。
 4. 只有库存、出货、财务等事实规则经过架构评审后，才进入 Product Core。
 5. 打印格式先按客户样本和交付诉求记录，只有多客户重复性成立后才评审是否产品化。

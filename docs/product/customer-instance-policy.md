@@ -1,24 +1,24 @@
 # 客户实例策略 / Customer Instance Policy
 
-## current 是什么
+## yoyoosun 是什么
 
-`current` 表示当前甲方相关资料和第一个私有化交付实例。
+`yoyoosun` 表示永绅客户资料和第一个私有化交付实例。
 
 | Key | 口径 |
 | --- | --- |
-| customer_key | `current` |
-| config_key | `current-private` |
-| deployment_key | `current-prod` |
+| customer_key | `yoyoosun` |
+| config_path | `config/customers/yoyoosun` |
+| deployment_path | `deployments/yoyoosun` |
 | template_key | `plush-industry` |
 
-`current` 是：
+`yoyoosun` 是：
 
 - 第一个真实客户。
 - 种子客户。
 - 第一个私有化客户实例。
 - 第一个客户配置包来源。
 
-`current` 不是：
+`yoyoosun` 不是：
 
 - SaaS runtime tenant。
 - 数据库多租户。
@@ -35,11 +35,11 @@
 
 ## 使用方式
 
-当前客户资料进入：
+永绅客户资料进入：
 
-- `docs/customers/current/*`
-- `config/customers/current/*`
-- `deployments/current/*`
+- `docs/customers/yoyoosun/*`
+- `config/customers/yoyoosun/*`
+- `deployments/yoyoosun/*`
 
 通用产品规则只有在经过评审后，才进入：
 
