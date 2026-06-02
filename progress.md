@@ -6,6 +6,12 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-02 12:01
+- 完成：读取 `/Users/simon/Desktop/automated-test-strategy.md`，将其中适合本项目的自动化测试分层、Workflow / Fact 边界检查、docs-only 验收、Schema / Migration、Repo / Usecase、API / RBAC、Frontend UI、current import dry-run / freeze 和部署前验收口径整理进 `docs/product/test-strategy.md`。
+- 完成：明确暂不直接落地的内容，包括完整业务 E2E runner、真实 import loader 测试、shipment / finance 完整事实测试、backup / restore 脚本和 CI 分层自动化，避免把未来建议写成当前已实现能力；同步在 `README.md` 文档索引加入自动化测试策略入口。
+- 下一步：后续新增真实 import loader、出货 / 财务事实层或 CI 流水线时，再按本文 T6 / T7 / T8 补 runner、结构化摘要和验收命令。
+- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、import loader、部署脚本或 CI 配置。本轮追加前 `progress.md` 为 19 行 / 3170 bytes，未达到归档阈值。
+
 ## 2026-06-02 11:47
 - 完成：按“打印模板暂不做产品内核”的决策收紧正式产品文档。`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/zero-to-one-architecture.md`、`docs/product/product-principles.md`、`docs/product/config-permission-policy.md`、`docs/product/v1-schema-go-no-go.md`、`docs/product/customer-delta-policy.md` 和 `docs/product/formal-menu-entry-plan.md` 均已明确：打印格式当前只作为客户打印样本、交付诉求或 `Print Template Candidate` 记录，默认 Deferred；不进入 Product Core，不作为行业模板默认能力，不新增模板 schema，不实现模板设计器或通用模板引擎。
 - 完成：同步 current 客户资料边界和业务记录过渡文档，把“打印模板 / 合同样式”统一改为客户打印样本、`Print Template Input` 或 `Print Template Candidate`；只有至少 2-3 个真实客户同类单据重复、字段来源稳定且差异主要是抬头 / 字段显示 / 版式微调时，才重新评审是否做 Print Template Core MVP。
