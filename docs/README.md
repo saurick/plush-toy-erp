@@ -12,6 +12,50 @@
 - 架构评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/`
 - 历史归档：`/Users/simon/projects/plush-toy-erp/docs/archive/`
 
+## 设计文档分类入口 / Design Document Entry Points
+
+本节只按人工校对和任务拆分顺序提供常用入口，不替代完整文档清单。判断当前实现状态时，仍以 `docs/current-source-of-truth.md`、当前代码、migration 和测试为准。
+
+### 顶层设计 / Top-level Design
+
+- 当前真源与阅读顺序：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
+- 产品完成路线图：`/Users/simon/projects/plush-toy-erp/docs/product/product-completion-roadmap.md`
+- 零到一产品架构：`/Users/simon/projects/plush-toy-erp/docs/product/zero-to-one-architecture.md`
+- 产品原则：`/Users/simon/projects/plush-toy-erp/docs/product/product-principles.md`
+- 模块边界：`/Users/simon/projects/plush-toy-erp/docs/product/module-boundaries.md`
+- 模块实施治理：`/Users/simon/projects/plush-toy-erp/docs/product/implementation-governance.md`
+- 产品能力 / 交付 / 差异台账：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+
+### 详细设计 / Detailed Design
+
+- 领域模型 V1：`/Users/simon/projects/plush-toy-erp/docs/product/domain-model-v1.md`
+- 正式产品入口与菜单配置计划：`/Users/simon/projects/plush-toy-erp/docs/product/formal-menu-entry-plan.md`
+- 配置与权限策略：`/Users/simon/projects/plush-toy-erp/docs/product/config-permission-policy.md`
+- 客户实例策略：`/Users/simon/projects/plush-toy-erp/docs/product/customer-instance-policy.md`
+- 客户差异策略：`/Users/simon/projects/plush-toy-erp/docs/product/customer-delta-policy.md`
+- 架构评审入口：`/Users/simon/projects/plush-toy-erp/docs/architecture/README.md`
+
+### 测试与验收设计 / Test And Acceptance Design
+
+- 自动化测试策略：`/Users/simon/projects/plush-toy-erp/docs/product/test-strategy.md`
+- 发布门禁：`/Users/simon/projects/plush-toy-erp/docs/product/release-gates.md`
+- 迁移准备检查清单：`/Users/simon/projects/plush-toy-erp/docs/product/migration-readiness-checklist.md`
+- QA 脚本说明：`/Users/simon/projects/plush-toy-erp/scripts/README.md`
+
+### 客户与交付设计 / Customer And Delivery Design
+
+- 客户资料入口：`/Users/simon/projects/plush-toy-erp/docs/customers/README.md`
+- 永绅 yoyoosun 客户资料：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/README.md`
+- 产品能力 / 交付 / 差异台账：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 部署口径：`/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
+- Compose 部署：`/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
+
+### 参考与归档 / Reference And Archive
+
+- 外部参考：`/Users/simon/projects/plush-toy-erp/docs/reference/README.md`
+- imported design notes：`/Users/simon/projects/plush-toy-erp/docs/reference/imported-notes/README.md`
+- 历史归档：`/Users/simon/projects/plush-toy-erp/docs/archive/README.md`
+
 ## 文档 metadata 与产品内入口边界
 
 当前仓库不要求所有 Markdown 都添加 YAML frontmatter 或统一 metadata 头。metadata 的目的不是制造新真源，而是减少入口、受众、状态和是否已接产品页面的信息差。

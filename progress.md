@@ -6,6 +6,11 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-03 13:59
+- 完成：在 `docs/README.md` 新增“设计文档分类入口 / Design Document Entry Points”，按顶层设计、详细设计、测试与验收设计、客户与交付设计、参考与归档列出人工校对和任务拆分常用入口；同时明确该分类不替代 `docs/document-inventory.md` 完整清单，也不替代 `docs/current-source-of-truth.md`、代码、migration 和测试。
+- 下一步：后续人工校对设计文档时，可先按 `docs/README.md` 分类入口逐层检查；若新增、删除、重命名长期维护文档或改变职责分类，再同步检查 `docs/document-inventory.md` 和相关目录 README。
+- 阻塞/风险：docs-only 导航补充；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、真实 import loader、`business_records` 或部署主路径。本轮追加前 `progress.md` 为 162 行 / 30370 bytes，未达到归档阈值。
+
 ## 2026-06-03 12:16
 - 完成：移除前端产品内文档中心、帮助中心、高级文档和开发与验收页面的运行时代码与 Markdown，包括 `web/src/erp/docs/*`、`docs.mjs`、对应页面 / 组件 / util / 测试、前端 debug API client 和相关样式；旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness`、`/erp/mobile-workbenches`、`/erp/roles/*` 等路径仅兼容重定向到 `/erp/dashboard`。
 - 完成：同步服务端内置菜单和 RBAC，移除帮助中心权限与旧 docs / QA 菜单下发，旧菜单权限归一到看板；同步 `AGENTS.md`、`README.md`、`docs/current-source-of-truth.md`、`web/README.md`、产品 / 架构 / 客户相关文档和 `docs/document-inventory.md`，将当前口径收敛为“仓库正式文档保留，产品内文档入口已下线”。
