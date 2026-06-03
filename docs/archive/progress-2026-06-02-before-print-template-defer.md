@@ -3,22 +3,22 @@
 ## 2026-06-02 10:28
 - 完成：将 `/Users/simon/Desktop/plush-toy-erp-from-0-to-1-plan.md` 归档为 `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md`，明确 `Reference Only`，不作为 runtime、schema、migration、API、UI、目录结构、roadmap 编号或交付排期真源；同步更新 imported-notes README 文件清单。
 - 完成：从外部规划稿中只提炼稳定口径到正式文档：`docs/product/zero-to-one-architecture.md` 补业务闭环主线；`docs/product/domain-model-v1.md` 补业务域职责和字段 / API / 状态示例边界；`docs/architecture/status-workflow-fact-boundary.md` 补混合状态词拆层规则。
-- 下一步：如继续吸收外部规划，只能按具体评审拆到 domain model、architecture review 或 `docs/codex-goals/*.md`；roadmap 不吸收目录大重构、团队排期、时间估算或 API / schema 示例。
+- 下一步：如继续吸收外部规划，只能按具体评审拆到 domain model、architecture review 或 单独任务说明；roadmap 不吸收目录大重构、团队排期、时间估算或 API / schema 示例。
 - 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader 或部署配置。`progress.md` 本次追加前已检查为 380 行 / 79551 bytes，后续再更新时大概率需要先归档。
 
 ## 2026-06-01 21:39
 - 完成：继续按“roadmap 只管产品业务闭环和路线”的口径清理文档。`docs/product/product-completion-roadmap.md` 新增 ERP 业务闭环覆盖口径，明确 Order to Cash、Procure to Pay、Plan / Make to Stock、Outsourcing、Inventory Control 和 Governance / Delivery 六条闭环路线；同时把默认行业菜单基线、current 组合入口拆分和菜单隐藏后的业务保证从 roadmap 主文拆出到 `docs/product/formal-menu-entry-plan.md`，并将 current MVP 明细收回到 `docs/product/product-delivery-ledgers.md` 客户交付矩阵维护。同步更新 README、`docs/current-source-of-truth.md` 和 `product-delivery-ledgers.md` 的引用与下一步名称。
-- 下一步：roadmap 后续只继续保留产品业务闭环、阶段顺序、边界和禁止项；菜单细节、客户试用明细、交付矩阵、台账成熟度和具体 Goal 执行清单分别放在配套计划、台账或 `docs/codex-goals/*.md`。
+- 下一步：roadmap 后续只继续保留产品业务闭环、阶段顺序、边界和禁止项；菜单细节、客户试用明细、交付矩阵、台账成熟度和具体任务执行清单分别放在配套计划、台账或 单独任务说明。
 - 阻塞/风险：本轮仍是 docs-only 收敛，未修改 runtime、schema、migration、API/RBAC、UI、seedData、docs registry 或真实配置 loader。更新前已检查 `progress.md` 规模，为 375 行 / 78313 bytes，未达到归档阈值。
 
 ## 2026-06-01 21:15
 - 完成：按“roadmap 只列产品路线，不把台账治理动作塞进产品路线编号”的口径，收紧 `docs/product/product-completion-roadmap.md`。文档顶部明确不包含台账维护、issue 标签、可视化系统、一次性检查清单等治理动作的独立路线编号；第 12 阶段把菜单投影评审措辞收回到正式产品入口、客户菜单配置和入口依赖对齐；第 23 节把 `013 v1-menu-entry-capability-projection-and-customer-menu-overlay-review` 改为 `013 v1-formal-menu-and-legacy-entry-exit`，并将后续 current 试用路线改成正式菜单 / 旧入口退出、导入 loader、执行审计、试用部署包、试用验收等产品目标。
-- 下一步：后续拆正式 Goal 时，台账影响检查只作为每个 Goal 的前置 / 收口检查；roadmap 编号继续只放产品能力、交付阶段或长期架构评审，不单独为台账、可视化或 checklist 占号。
+- 下一步：后续拆正式任务 时，台账影响检查只作为每个任务的前置 / 收口检查；roadmap 编号继续只放产品能力、交付阶段或长期架构评审，不单独为台账、可视化或 checklist 占号。
 - 阻塞/风险：本轮只改产品路线图文档和过程记录，未修改 runtime、schema、migration、API/RBAC、UI、seedData、docs registry 或真实 loader。更新前已检查 `progress.md` 规模，为 370 行 / 77086 bytes，未达到归档阈值。
 
 ## 2026-06-01 20:47
 - 完成：按“系统分层表不整张塞进 roadmap”的口径完成 docs-only 收敛。`docs/product/product-completion-roadmap.md` 新增系统分层进入 roadmap 的规则和分层总表，只保留路线、顺序、边界和禁止项；`docs/product/product-delivery-ledgers.md` 新增行业默认模板清单、Customer Config 配置形态、Customer Extension 边界、业务帮助分离和 Reporting / Audit / Integration 后续增强等能力 / 交付 / 差异台账行；`web/src/erp/docs/system-layer-progress.md` 修正 MasterData 状态，明确客户 / 供应商 / 联系人已完成 V1 最小链路，剩余是地址、账期、供应商价格、正式菜单、导入和配置 loader 等扩展；`web/src/erp/docs/productization-delivery.md` 将 `Tenant Config` 收口为 `Customer Config`，避免误读成 Runtime Tenant 或 `tenant_id`。
-- 下一步：后续如要执行，应先拆 `industry-template-inventory`、`customer-config-shape-review`、`business-help-split-review` 或事实层具体 usecase Goal；不要把本次 docs 口径当成 runtime、schema、API/UI 或 loader 已实现。
+- 下一步：后续如要执行，应先拆 `industry-template-inventory`、`customer-config-shape-review`、`business-help-split-review` 或事实层具体 usecase 任务；不要把本次 docs 口径当成 runtime、schema、API/UI 或 loader 已实现。
 - 阻塞/风险：本轮只改正式文档和过程记录，未修改 runtime、schema、migration、API/RBAC、UI 组件、seedData、docs registry 或真实配置 loader。更新前已检查 `progress.md` 规模，为 365 行 / 75677 bytes，未达到归档阈值。
 
 ## 2026-06-01 18:28
@@ -33,17 +33,17 @@
 
 ## 2026-06-01 18:21
 - 完成：按“菜单颗粒度要说清楚，不能继续用 `/` 把多个业务绑成一个菜单”的方向，补充 `docs/product/product-completion-roadmap.md` 第 14 阶段菜单颗粒度规则和默认行业核心菜单基线。现在 roadmap 明确菜单分组表达业务域，功能入口表达稳定业务对象或管理页，流程节点放 Tab / 按钮 / 待办 / 移动端任务；并列出工作台、基础资料、销售、产品工程、采购、质检、仓储、委外、生产、出货、财务、报表、打印、系统等长期核心菜单方向。
-- 下一步：后续真正接菜单时，应以该默认行业菜单基线 + customer menu overlay 为输入，再单独拆 seedData / docs registry / permission / route 变更 Goal。
+- 下一步：后续真正接菜单时，应以该默认行业菜单基线 + customer menu overlay 为输入，再单独拆 seedData / docs registry / permission / route 变更任务。
 - 阻塞/风险：本轮只改产品路线图文档，未修改 runtime、UI、seedData、docs registry、权限码或路由。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-06-01 18:19
 - 完成：按用户确认删除 `docs/product/roadmap-governance-checklists.md`，已移动到 macOS 废纸篓；同步移除 README 和 `docs/current-source-of-truth.md` 中对该 checklist 的正式索引。产品方向保留为 `product-completion-roadmap.md` 管阶段路线，`product-delivery-ledgers.md` 管能力 / 交付 / 差异台账，不再保留第三份治理清单并行真源。
-- 下一步：后续如确需 checklist，只在具体 Goal 文件或路线图中放短前置检查，不再恢复 700 行级别的并行清单。
+- 下一步：后续如确需 checklist，只在具体 任务文件或路线图中放短前置检查，不再恢复 700 行级别的并行清单。
 - 阻塞/风险：本轮只删除未跟踪 checklist 草稿并清理引用，未修改 runtime、schema、migration、API、UI、seedData 或 docs registry。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-06-01 17:22
 - 完成：结合 `docs/product/product-delivery-ledgers.md`、`docs/product/roadmap-governance-checklists.md` 与 `docs/reference/imported-notes/*` 完善产品路线图。`product-completion-roadmap.md` 新增 roadmap / 三类台账 / imported-notes 的关系、三类台账门禁、权限职责判断顺序、菜单命名原则、导入 loader 前置边界和交付包配置边界；同步在 `docs/current-source-of-truth.md` 与 README 文档索引加入 `product-delivery-ledgers.md` 和 `roadmap-governance-checklists.md`；并按“现在是定方向”口径，把产品方向收口为旧 `business_records` 入口默认删除或隐藏，不承诺只读归档页，底层历史数据只按迁移 / 审计 / 回滚需要处理。
-- 下一步：后续拆新 Goal 前按 `workspace checkpoint -> roadmap / product-delivery-ledgers impact check -> current-source-of-truth verification -> allowed / forbidden path confirmation` 做前置检查；若进入真实导入，下一步应是 `current-customer-import-loader-design`，不能从 dry-run / evidence 直接跳到写库。
+- 下一步：后续拆新任务 前按 `workspace checkpoint -> roadmap / product-delivery-ledgers impact check -> current-source-of-truth verification -> allowed / forbidden path confirmation` 做前置检查；若进入真实导入，下一步应是 `current-customer-import-loader-design`，不能从 dry-run / evidence 直接跳到写库。
 - 阻塞/风险：本轮是 docs-only 方向、路线图和台账口径收口，未修改 runtime、schema、migration、API、UI、seedData 或 docs registry；`docs/product/product-delivery-ledgers.md` 和 `docs/product/roadmap-governance-checklists.md` 仍是当前工作区未跟踪文件，提交时需要显式纳入或按用户边界处理。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-06-01 16:49
@@ -58,22 +58,22 @@
 
 ## 2026-05-31 23:03
 - 完成：继续细化 `docs/product/product-completion-roadmap.md` 的菜单拆分路线，新增“当前菜单拆分建议”和“菜单隐藏与权限关闭后的业务保证”。文档已按当前截图入口拆成 Work Queue、Dashboard、MasterData、Source Document、BOM、Purchase、Outsourcing、Warehouse / Quality、Inventory、Shipment、Production 等能力，并标注哪些属于 current MVP 必须可达、哪些是行业默认、哪些可按客户隐藏或后续评审；同时写清菜单隐藏、功能未启用、用户无权限、旧入口只读归档四种状态的不同后端要求和 workflow 保证。
-- 下一步：后续 `013` Goal 应以这两张表为验收基线，先审计 active workflow task、menu permission、seedData、mobile task projection、docs / print 入口，再设计 customer menu overlay 配置模型。
+- 下一步：后续 `013` 任务 应以这两张表为验收基线，先审计 active workflow task、menu permission、seedData、mobile task projection、docs / print 入口，再设计 customer menu overlay 配置模型。
 - 阻塞/风险：本轮仍未修改前端运行时代码；菜单拆分后真正保证状态机不死，需要后续实现层检查 `owner_role_key`、`assignee_id`、`task_status_key`、RBAC action permission 和功能启用状态的一致性。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 22:54
 - 完成：在 `docs/product/product-completion-roadmap.md` 第 12 阶段补充“菜单目标形态”，把菜单调整方向明确为“产品能力基线 + 行业默认菜单 + customer menu overlay + RBAC action permission + mobile/docs/print projection + legacy archive entry”。同步写清菜单配置只控制启用、隐藏、排序、文案和默认入口，不改变库存、出货、财务、审计等核心事实规则；菜单隐藏只影响入口可见性，不替代后端权限校验。
-- 下一步：后续 `013` Goal 应按该目标形态审计当前菜单、seedData、docs registry、移动端入口和权限守卫，再决定配置模型和迁移步骤。
+- 下一步：后续 `013` 任务 应按该目标形态审计当前菜单、seedData、docs registry、移动端入口和权限守卫，再决定配置模型和迁移步骤。
 - 阻塞/风险：本轮仍未修改前端菜单运行时代码或客户配置实现，只把目标形态写入 roadmap。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 22:47
 - 完成：补强 `docs/product/product-completion-roadmap.md` 的前端 UI / 菜单路线：明确每个客户的菜单通过 customer menu overlay 配置隐藏、启用、排序和显示文案；通用产品能力仍是菜单投影基线，不为每个客户 fork 一套菜单代码；菜单隐藏不是权限边界，后端动作权限仍是安全边界。同步将后续 `013` 路线收紧为菜单入口、能力投影和客户菜单 overlay 评审。
-- 下一步：真正执行菜单拆分时，应单独写 `013` Goal，先审计现有菜单 / seedData / docs registry / 权限 / mobile 入口，再决定 customer menu overlay 的配置模型和回归范围。
+- 下一步：真正执行菜单拆分时，应单独写 `013` 任务，先审计现有菜单 / seedData / docs registry / 权限 / mobile 入口，再决定 customer menu overlay 的配置模型和回归范围。
 - 阻塞/风险：本轮只更新 roadmap 文档，未改前端菜单运行时代码、seedData、docs registry、权限模型或客户配置加载逻辑。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 22:41
 - 完成：将 `docs/product/product-completion-roadmap.md` 正文同步到已确认的 issues 口径：新增 current MVP 基线关系说明；总表和第 12/13 阶段改为正式产品入口、菜单投影评审、`business_records` 旧写入口退役与只读归档；当前阶段禁止项补充不做长期可写兼容、不双写、不保留旧正式写入口；第 15 阶段新增 current MVP 试用范围和“后端事实已存在但 UI/API 暴露范围需另评审”表；后续路线将 `013` 收紧为菜单入口与能力投影评审，将 `015` 收紧为旧写入口退役评审。
-- 下一步：如需执行 current MVP 约束，应单独新增 `docs/product/current-mvp-requirements-baseline.md` 或对应 Codex Goal；不要把 roadmap 本身当成单个执行规格。
+- 下一步：如需执行 current MVP 约束，应单独新增 `docs/product/current-mvp-requirements-baseline.md` 或对应 Codex 执行规格；不要把 roadmap 本身当成单个执行规格。
 - 阻塞/风险：本轮仍是文档路线修订，未修改 runtime、schema、migration、API、UI、seedData、docs registry，也未执行真实导入或菜单切换。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 22:37
@@ -82,24 +82,24 @@
 - 阻塞/风险：本轮仍未修改 runtime、schema、migration、API、UI、seedData、docs registry；`docs/product/product-completion-roadmap-issues.md` 目前是未跟踪草稿文件，尚未提交为正式仓库真源。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 22:33
-- 完成：补充 roadmap 可演进规则到 `AGENTS.md` 和 `docs/product/product-completion-roadmap.md`。规则明确 `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源；`docs/codex-goals/001-xxx.md` 等编号 Goal 只是阶段性施工单和审计记录；路线调整必须显式修改 roadmap，写清原因、影响范围、新的下一步和不再复用的旧 Goal 编号，并在影响当前状态时同步检查 `docs/current-source-of-truth.md`。
-- 下一步：根据最新 `docs/product/product-completion-roadmap-issues.md` 继续判断哪些建议应进入 roadmap 正文，哪些应拆到 `current-mvp-requirements-baseline.md` 或后续独立 review Goal。
+- 完成：补充 roadmap 可演进规则到 `AGENTS.md` 和 `docs/product/product-completion-roadmap.md`。规则明确 `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源；原执行规格目录中的历史文件 等编号 任务 只是阶段性施工单和审计记录；路线调整必须显式修改 roadmap，写清原因、影响范围、新的下一步和不再复用的旧任务编号，并在影响当前状态时同步检查 `docs/current-source-of-truth.md`。
+- 下一步：根据最新 `docs/product/product-completion-roadmap-issues.md` 继续判断哪些建议应进入 roadmap 正文，哪些应拆到 `current-mvp-requirements-baseline.md` 或后续独立 review 任务。
 - 阻塞/风险：本轮只补协作规则和 roadmap 自身变更规则，未修改 runtime、schema、migration、API、UI、seedData、docs registry，也未把 issues 文件纳入正式路线真源。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 22:11
-- 完成：将产品完成路线图从 `docs/codex-goals/_product-completion-roadmap.md` 移到 `docs/product/product-completion-roadmap.md`，并明确其角色是可演进产品规划真源，不替代 `docs/current-source-of-truth.md`、代码、schema、migration、API/UI 或具体 Goal 文件。同步修正后续建议路线从 `013` 起排，避免重占已完成的 `011/012`；移除当前交付包里的 `k8s` 默认口径，明确当前部署主路径仍是 Compose；删除末尾多余 Markdown 代码块。`docs/product/rewrite-roadmap.md` 已收口为历史路径兼容入口，指向新的产品完成路线图。
-- 下一步：后续真正执行新路线时，仍需为每个编号拆独立 `docs/codex-goals/<编号>.md`，并按具体 Goal 文件授权 schema、migration、runtime、API/UI 或导入执行。
-- 阻塞/风险：本轮只做文档迁移、路线图口径修正和 docs 缓存清理；未创建 013/014 Goal，未改 runtime、schema、migration、API、UI、seedData、docs registry 或真实导入逻辑。已将 docs 下 3 个 `.DS_Store` 移入系统废纸篓；`rewrite-roadmap.md` 因被历史 Goal 文件引用，未删除实体文件，仅删除重复路线内容并保留兼容入口。更新前已检查 `progress.md` 规模，未达到归档阈值。
+- 完成：将产品完成路线图从 原执行规格目录中的历史文件 移到 `docs/product/product-completion-roadmap.md`，并明确其角色是可演进产品规划真源，不替代 `docs/current-source-of-truth.md`、代码、schema、migration、API/UI 或具体 任务文件。同步修正后续建议路线从 `013` 起排，避免重占已完成的 `011/012`；移除当前交付包里的 `k8s` 默认口径，明确当前部署主路径仍是 Compose；删除末尾多余 Markdown 代码块。`docs/product/rewrite-roadmap.md` 已收口为历史路径兼容入口，指向新的产品完成路线图。
+- 下一步：后续真正执行新路线时，仍需为每个编号拆独立 原执行规格目录中的历史文件，并按具体 任务文件授权 schema、migration、runtime、API/UI 或导入执行。
+- 阻塞/风险：本轮只做文档迁移、路线图口径修正和 docs 缓存清理；未创建 013/014 任务，未改 runtime、schema、migration、API、UI、seedData、docs registry 或真实导入逻辑。已将 docs 下 3 个 `.DS_Store` 移入系统废纸篓；`rewrite-roadmap.md` 因被历史 任务文件引用，未删除实体文件，仅删除重复路线内容并保留兼容入口。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 18:13
-- 完成：Checkpoint 7 验证进入收口，已运行 012 必跑验证命令主体：Git / diff 检查、011 前置文件存在、freeze checker help、freeze checker smoke、freeze output 存在性、012 freeze checker tests、011 dry-run CLI 回归测试、real dry-run evidence smoke、dry-run output 存在性、no-real-import grep、shipping / workflow-fact / forbidden boundary grep、docs existence、禁止路径检查、013/014 文件检查、output 未纳入 git、`tenant_id` / `ChangeUsecase` / `change_records` 检查。禁止路径 `server/`、`web/`、`migrations/`、`config/`、`deployments/`、seedData、docs registry 和 `docs/product/business-records-*` 均无本轮 diff；`find docs/codex-goals -name '013-*' -o -name '014-*'` 无输出；grep 命中 013/014 仅来自 012 Goal 的禁止说明。
-- 下一步：生成 `.codex-review/latest.md`，最终回复只总结 012，不自动进入 013/014。
-- 阻塞/风险：当前仍未提交、未推送、未 stage；`docs/codex-goals/012-current-source-snapshot-freeze-and-real-dry-run-evidence.md` 是启动前未跟踪任务文件，output 目录为本地 evidence 且未纳入 git。
+- 完成：Checkpoint 7 验证进入收口，已运行 012 必跑验证命令主体：Git / diff 检查、011 前置文件存在、freeze checker help、freeze checker smoke、freeze output 存在性、012 freeze checker tests、011 dry-run CLI 回归测试、real dry-run evidence smoke、dry-run output 存在性、no-real-import grep、shipping / workflow-fact / forbidden boundary grep、docs existence、禁止路径检查、013/014 文件检查、output 未纳入 git、`tenant_id` / `ChangeUsecase` / `change_records` 检查。禁止路径 `server/`、`web/`、`migrations/`、`config/`、`deployments/`、seedData、docs registry 和 `docs/product/business-records-*` 均无本轮 diff；`find 原执行规格目录 -name '013-*' -o -name '014-*'` 无输出；grep 命中 013/014 仅来自 012 任务的禁止说明。
+- 下一步：生成 `本地审查报告`，最终回复只总结 012，不自动进入 013/014。
+- 阻塞/风险：当前仍未提交、未推送、未 stage；原执行规格目录中的历史文件 是启动前未跟踪任务文件，output 目录为本地 evidence 且未纳入 git。
 
 ## 2026-05-31 18:12
 - 完成：Checkpoint 6 完成，已新增 `docs/customers/current/source-snapshot-freeze.md`、`docs/customers/current/real-dry-run-evidence.md`、`docs/customers/current/source-snapshot-manual-review-checklist.md`，并同步更新 `docs/customers/current/import-dry-run-tooling.md`、`docs/customers/current/import-dry-run-plan.md`、`docs/customers/current/import-acceptance-checklist.md`、`docs/customers/current/README.md`、`docs/product/current-customer-import-strategy.md`、`docs/product/current-customer-import-risk-register.md`、`docs/current-source-of-truth.md` 和 `scripts/README.md`。文档明确 012 已新增 freeze checker 与 evidence preparation，但仍不是真实导入、不写 DB、不做 loader、不改 schema/API/UI/seedData/docs registry，output 只是 evidence 不是 import approval。
-- 下一步：运行 012 全部必跑验证命令、禁止路径检查、tenant_id / Workflow-Fact 边界检查和 docs existence / grep 检查，然后生成 `.codex-review/latest.md`。
-- 阻塞/风险：本轮文档引用的是 sanitized fixture evidence；真实客户 source freeze、客户 sign-off、备份/回滚/幂等/对账和真实 loader 仍需后续单独 Goal。
+- 下一步：运行 012 全部必跑验证命令、禁止路径检查、tenant_id / Workflow-Fact 边界检查和 docs existence / grep 检查，然后生成 `本地审查报告`。
+- 阻塞/风险：本轮文档引用的是 sanitized fixture evidence；真实客户 source freeze、客户 sign-off、备份/回滚/幂等/对账和真实 loader 仍需后续单独 任务。
 
 ## 2026-05-31 18:09
 - 完成：Checkpoint 5 完成，已运行 freeze checker 生成 `output/current-source-snapshot-freeze/` 3 个文件，并运行 011 dry-run CLI 生成 `output/current-real-dry-run-evidence/` 9 个文件；`freeze-metadata.json` 中 `canExecuteRealImport=false`、`noRealImport=true`，011 `validation-summary.json` 中 `canExecuteRealImport=false`。已执行 `node --test scripts/import/currentCustomerDryRun.test.mjs`，11 个测试通过。`git status --short output` 无输出，output 目录未纳入 git。
@@ -112,18 +112,18 @@
 - 阻塞/风险：freeze fixture 为合成 sanitized 数据；summary 中存在预期 blocker / warning，用于人工 review evidence，不代表真实导入批准。
 
 ## 2026-05-31 18:05
-- 完成：启动执行 `012-current-source-snapshot-freeze-and-real-dry-run-evidence`。已读取 `AGENTS.md`、012 Goal、011 dry-run tooling 代码 / 测试 / fixture、010 current import 草案、009 `business_records` 审计文档、V1/Product 边界、Workflow / Fact 边界、`docs/current-source-of-truth.md` 和 `scripts/README.md`；已记录启动 git 现场，当前分支 `main`，tracked diff 为空，未跟踪文件为 `docs/codex-goals/012-current-source-snapshot-freeze-and-real-dry-run-evidence.md`；`progress.md` 为 270 行 / 56017 bytes，未达到归档阈值。
+- 完成：启动执行 `012-current-source-snapshot-freeze-and-real-dry-run-evidence`。已读取 `AGENTS.md`、012 任务、011 dry-run tooling 代码 / 测试 / fixture、010 current import 草案、009 `business_records` 审计文档、V1/Product 边界、Workflow / Fact 边界、`docs/current-source-of-truth.md` 和 `scripts/README.md`；已记录启动 git 现场，当前分支 `main`，tracked diff 为空，未跟踪文件为 原执行规格目录中的历史文件；`progress.md` 为 270 行 / 56017 bytes，未达到归档阈值。
 - 下一步：只在 012 允许路径内新增 freeze checker、sanitized freeze fixtures、测试和 evidence/docs；继续禁止真实导入、写 DB、loader、schema/API/UI/seedData/docs registry、`business_records` runtime cutover 或 013/014 队列。
-- 阻塞/风险：012 Goal 文件为启动前未跟踪文件；本轮默认不提交、不推送、不 stage，`.codex-review/latest.md` 只在最终收口覆盖生成。
+- 阻塞/风险：012 任务文件为启动前未跟踪文件；本轮默认不提交、不推送、不 stage，`本地审查报告` 只在最终收口覆盖生成。
 
 ## 2026-05-31 19:08
 - 完成：Checkpoint 8 完成，已运行 011 必跑验证命令：Git / diff 检查、CLI help、CLI smoke、输出文件存在性检查、`--fail-on-blockers` 非 0 检查、`node --test scripts/import/currentCustomerDryRun.test.mjs`、输出内容 grep、docs 文件存在检查、禁止路径 diff、`tenant_id` / `ChangeUsecase` / `change_records` 检查和 Workflow / Fact 边界 grep。CLI smoke 生成 `output/current-import-dry-run`，`validation-summary.json` 中 `canExecuteRealImport=false`，`dry-run-report.md` 明确 `No real import`；`--fail-on-blockers` 输出 `blockerCount=24, forbiddenCount=10` 并返回非 0。补充完成 `Print Template Input` 默认 review、`Industry Template Candidate` 默认 defer/review 的 sourceType 规则后，`node --test scripts/import/currentCustomerDryRun.test.mjs` 为 11 个测试通过。禁止路径 `server/`、`web/`、`migrations/`、`config/`、`deployments/`、seedData、docs registry 和 `docs/product/business-records-*` 均无本轮 diff。
-- 下一步：生成 `.codex-review/latest.md`，最终回复只总结 011，不输出后续候选 Goal 队列。
-- 阻塞/风险：`docs/codex-goals/011-current-customer-import-dry-run-tooling.md` 是启动前已存在的未跟踪 Goal 文件；本轮未提交、未推送，`.codex-review/` 只作为本地临时审查报告。
+- 下一步：生成 `本地审查报告`，最终回复只总结 011，不输出后续候选 任务 队列。
+- 阻塞/风险：原执行规格目录中的历史文件 是启动前已存在的未跟踪 任务文件；本轮未提交、未推送，`本地审查报告目录` 只作为本地临时审查报告。
 
 ## 2026-05-31 18:52
 - 完成：Checkpoint 7 完成，已新增 `docs/customers/current/import-dry-run-tooling.md`，并同步更新 `docs/customers/current/import-dry-run-plan.md`、`docs/customers/current/import-acceptance-checklist.md`、`docs/product/current-customer-import-strategy.md`、`docs/product/current-customer-import-risk-register.md`、`docs/current-source-of-truth.md` 和 `scripts/README.md`。文档明确 011 已实现 dry-run tooling，但仍未实现真实导入、schema、migration、API/RBAC、UI、seedData、docs registry、`business_records` runtime cutover 或 import execution。
-- 下一步：运行 011 全部必跑验证命令，检查禁止路径、tenant_id、Workflow / Fact 边界，再生成 `.codex-review/latest.md`。
+- 下一步：运行 011 全部必跑验证命令，检查禁止路径、tenant_id、Workflow / Fact 边界，再生成 `本地审查报告`。
 - 阻塞/风险：文档只记录 dry-run tooling 和边界；未将 011 写成 runtime loader 或真实导入已完成。
 
 ## 2026-05-31 18:38
@@ -157,19 +157,19 @@
 - 阻塞/风险：fixture 为合成数据，不含真实客户敏感数据。
 
 ## 2026-05-31 18:05
-- 完成：启动执行 `011-current-customer-import-dry-run-tooling`。已读取 `AGENTS.md`、011 Goal、010 current import 草案、009 `business_records` 审计 / data map / 风险文档、V1/Product 边界、Workflow / Fact 边界和 `scripts/README.md`；已记录启动 git 现场，当前分支 `main`，启动时 tracked diff 为 `progress.md`，未跟踪文件为 `docs/codex-goals/011-current-customer-import-dry-run-tooling.md`；`progress.md` 为 225 行 / 49138 bytes，未达到归档阈值。
+- 完成：启动执行 `011-current-customer-import-dry-run-tooling`。已读取 `AGENTS.md`、011 任务、010 current import 草案、009 `business_records` 审计 / data map / 风险文档、V1/Product 边界、Workflow / Fact 边界和 `scripts/README.md`；已记录启动 git 现场，当前分支 `main`，启动时 tracked diff 为 `progress.md`，未跟踪文件为 原执行规格目录中的历史文件；`progress.md` 为 225 行 / 49138 bytes，未达到归档阈值。
 - 下一步：只在 `scripts/import/**` 落 current import dry-run CLI、fixtures 和 node:test 覆盖，再同步 011 指定 docs；继续禁止修改 server、web、schema、migration、API/RBAC、seedData、docs registry、`business_records` runtime 或真实导入执行。
-- 阻塞/风险：本轮必须每个 checkpoint 更新 `progress.md`，但启动时 `progress.md` 已有上一轮现场 diff；后续收口会只把本 Goal 允许范围纳入审查报告，不回退外部现场。
+- 阻塞/风险：本轮必须每个 checkpoint 更新 `progress.md`，但启动时 `progress.md` 已有上一轮现场 diff；后续收口会只把本 任务 允许范围纳入审查报告，不回退外部现场。
 
 ## 2026-05-31 17:18
-- 完成：清理旧 011 docs-only / candidate queue 现场。已将旧 `docs/codex-goals/011-current-customer-import-second-review-and-go-no-go.md`、012/013/014 candidate Goal、`docs/product/current-customer-import-go-no-go.md`、`docs/product/current-customer-import-second-review.md` 和旧 `.codex-review/latest.md` 移到系统废纸篓；已恢复旧 011 对 `docs/product/business-records-risk-register.md`、`docs/product/current-customer-import-risk-register.md`、`docs/product/current-customer-import-strategy.md` 和 `progress.md` 的未提交 diff；保留新的 `docs/codex-goals/011-current-customer-import-dry-run-tooling.md`。
-- 下一步：新 011 可按 `docs/codex-goals/011-current-customer-import-dry-run-tooling.md` 单独执行，目标是 import dry-run tooling 实现，不应把旧 011 二审和 candidate queue 写成本轮成果。
+- 完成：清理旧 011 docs-only / candidate queue 现场。已将旧 原执行规格目录中的历史文件、012/013/014 candidate 任务、`docs/product/current-customer-import-go-no-go.md`、`docs/product/current-customer-import-second-review.md` 和旧 `本地审查报告` 移到系统废纸篓；已恢复旧 011 对 `docs/product/business-records-risk-register.md`、`docs/product/current-customer-import-risk-register.md`、`docs/product/current-customer-import-strategy.md` 和 `progress.md` 的未提交 diff；保留新的 原执行规格目录中的历史文件。
+- 下一步：新 011 可按 原执行规格目录中的历史文件 单独执行，目标是 import dry-run tooling 实现，不应把旧 011 二审和 candidate queue 写成本轮成果。
 - 阻塞/风险：新 011 文件仍是未跟踪文件；本次只做现场清理和任务文件小口径修正，未执行 dry-run tooling 实现，未改 runtime、schema、migration、server、web、seedData 或 docs registry。
 
 ## 2026-05-31 14:20
-- 完成：补充 Codex Goal 并发现场隔离规则，更新 `AGENTS.md`、`docs/codex-goals/README.md`、`docs/codex-goals/_goal-file-template.md`、`docs/codex-goals/_new-session-goal-template.md` 和 `docs/codex-goals/_review-output-protocol.md`，明确 `.codex-review/latest.md` 只覆盖当前 Goal；其他会话写入的非本轮路径只能记录为非本轮现场，不得写成本轮成果、不得擅自回退 / 删除 / 格式化 / 提交，提交时必须按本 Goal 允许路径精确 stage。
-- 下一步：后续正式 Goal 按新模板在开始和收口时检查工作区状态，并在审查报告的 Git 策略检查里说明是否发现非本轮路径改动。
-- 阻塞/风险：本轮只更新协作规则和模板，不生成 `.codex-review/latest.md`，也不触达 runtime、schema、migration、API、UI 或 seedData。更新前已检查 `progress.md` 规模，未达到归档阈值。
+- 完成：补充 Codex 执行规格 并发现场隔离规则，更新 `AGENTS.md`、原执行规格目录中的历史文件、原执行规格目录中的历史文件、原执行规格目录中的历史文件 和 原执行规格目录中的历史文件，明确 `本地审查报告` 只覆盖当前任务；其他会话写入的非本轮路径只能记录为非本轮现场，不得写成本轮成果、不得擅自回退 / 删除 / 格式化 / 提交，提交时必须按本 任务 允许路径精确 stage。
+- 下一步：后续正式任务 按新模板在开始和收口时检查工作区状态，并在审查报告的 Git 策略检查里说明是否发现非本轮路径改动。
+- 阻塞/风险：本轮只更新协作规则和模板，不生成 `本地审查报告`，也不触达 runtime、schema、migration、API、UI 或 seedData。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 13:35
 - 完成：清理 docs 无用入口，保留当前工作区已删除的 `docs/changes/*` 现场，移除正式索引和前端文档入口中指向已删除 changes 文件的断链；将库存 / 采购 / BOM / 质量事实层阅读入口改回 `docs/current-source-of-truth.md` 与 `docs/architecture/*` 评审文档；将本地 `docs/.DS_Store` 移到系统废纸篓。
@@ -182,12 +182,12 @@
 - 阻塞/风险：本轮未改 schema、migration、generated code、repo/usecase、API/RBAC、docs registry、seedData、`business_records` transition、shipment / stock reservation / inventory / finance facts；销售订单行的 product / unit 当前只提供 ID 输入，未接产品 / 单位选择器，因为本轮禁止扩大到相关 API/UI 入口。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 13:13
-- 完成：执行 `009-business-records-transition-audit` docs-only 审计，新增 `business_records` 引用审计清单、过渡审计、cutover 分阶段计划、data map draft 和 risk register；同步小幅更新当前真源索引、既有 transition plan、V1 go/no-go 和后续 Goal 建议。本轮明确 `business_records` 仍是兼容层、demo、seed、source snapshot 和调研入口，不是长期事实真源。
+- 完成：执行 `009-business-records-transition-audit` docs-only 审计，新增 `business_records` 引用审计清单、过渡审计、cutover 分阶段计划、data map draft 和 risk register；同步小幅更新当前真源索引、既有 transition plan、V1 go/no-go 和后续任务 建议。本轮明确 `business_records` 仍是兼容层、demo、seed、source snapshot 和调研入口，不是长期事实真源。
 - 下一步：建议进入 `010-current-customer-data-import-draft`，只做 current 客户数据导入 dry-run / backfill 草案、字段分类和 unresolved queue；或单独做 V1 menu entry review，评审 seedData、docs registry、Dashboard、menu permissions 和旧入口只读化。
-- 阻塞/风险：本轮未改 runtime、schema、migration、generated code、repo/usecase、API/RBAC、UI、docs registry、seedData，未做 import/backfill、真实数据迁移、双写或删除；旧 `partners / products / project-orders` 入口仍存在并可能继续可写，需后续 runtime / UI / menu Goal 单独处理。更新前已检查 `progress.md` 规模，未达到归档阈值。
+- 阻塞/风险：本轮未改 runtime、schema、migration、generated code、repo/usecase、API/RBAC、UI、docs registry、seedData，未做 import/backfill、真实数据迁移、双写或删除；旧 `partners / products / project-orders` 入口仍存在并可能继续可写，需后续 runtime / UI / menu 任务 单独处理。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 13:35
-- 完成：执行 `010-current-customer-data-import-draft` docs-only 草案，新增 current 客户导入来源清单、字段分类表、dry-run plan、unresolved queue、import acceptance checklist、Product 层 current customer import strategy 和 import risk register；同步小幅更新当前真源索引、current 资料 README、source materials、delta register、V1 go/no-go 和后续 Goal 建议。本轮明确 current 客户资料只能作为 Customer Material / Demo Seed / Industry Template Candidate / Print Template Input / Data Import Source，不能直接变成 Product Core。
+- 完成：执行 `010-current-customer-data-import-draft` docs-only 草案，新增 current 客户导入来源清单、字段分类表、dry-run plan、unresolved queue、import acceptance checklist、Product 层 current customer import strategy 和 import risk register；同步小幅更新当前真源索引、current 资料 README、source materials、delta register、V1 go/no-go 和后续任务 建议。本轮明确 current 客户资料只能作为 Customer Material / Demo Seed / Industry Template Candidate / Print Template Input / Data Import Source，不能直接变成 Product Core。
 - 下一步：建议先由 GPT / 人工审查 010 文档，再单独拆 `current-customer-import-loader-design` 或 V1 menu entry review；真实 import loader、backfill execution、seedData/docs registry 切换和 `business_records` cutover 不应混在同一轮。
 - 阻塞/风险：本轮未改 runtime、schema、migration、generated code、repo/usecase、API/RBAC、UI、docs registry、seedData，未写 import/backfill code，未执行真实数据迁移，未删除或修改 `business_records`；`product_skus`、`purchase_orders`、`shipments`、`stock_reservations` 和 finance facts 仍 deferred / forbidden auto import。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
@@ -207,15 +207,15 @@
 - 阻塞/风险：目标库 migration 是否已 apply 仍不是本轮范围；当前只通过 SQLite/Go 测试验证 repo/usecase 行为，未接外部 API 入口。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 00:42
-- 完成：收紧 Codex Goal 审查报告规则，明确 `.codex-review/latest.md` 只在正式执行 `docs/codex-goals/<goal>.md`、修复当前 Goal 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时才生成或覆盖；普通问答、检查、解释、临时排查、小格式修复、非 Goal 的“下一步”不生成、不覆盖、也不删除该文件。同步更新 `AGENTS.md`、`docs/codex-goals/README.md` 和 `docs/codex-goals/_review-output-protocol.md`。
-- 完成：补充“Codex 没有可靠内置 Goal 模式标志，必须根据当前上下文判断”的说明；若上下文不明确，默认按普通任务处理，不碰 `.codex-review/latest.md`。
-- 下一步：后续普通文档小修仍按需更新 `progress.md`，但不再套用 `.codex-review/latest.md` 审查报告流程；正式 Goal 收口时继续按协议生成审查报告。
-- 阻塞/风险：本轮只改协作规则文档和进度记录，不恢复此前被误删的本地临时 `.codex-review/latest.md`；当前工作区仍有其他业务和 Goal 草稿改动未纳入本轮处理。更新前已检查 `progress.md` 规模，未达到归档阈值。
+- 完成：收紧 Codex 执行规格审查报告规则，明确 `本地审查报告` 只在正式执行 原执行规格目录中的历史文件、修复当前任务 遗漏 / 测试失败 / 审查报告，或用户明确要求生成审查报告时才生成或覆盖；普通问答、检查、解释、临时排查、小格式修复、非任务的“下一步”不生成、不覆盖、也不删除该文件。同步更新 `AGENTS.md`、原执行规格目录中的历史文件 和 原执行规格目录中的历史文件。
+- 完成：补充“Codex 没有可靠内置 任务 模式标志，必须根据当前上下文判断”的说明；若上下文不明确，默认按普通任务处理，不碰 `本地审查报告`。
+- 下一步：后续普通文档小修仍按需更新 `progress.md`，但不再套用 `本地审查报告` 审查报告流程；正式任务 收口时继续按协议生成审查报告。
+- 阻塞/风险：本轮只改协作规则文档和进度记录，不恢复此前被误删的本地临时 `本地审查报告`；当前工作区仍有其他业务和 任务 草稿改动未纳入本轮处理。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 00:34
-- 完成：修正 `docs/product/v1-next-codex-goals.md` 汉化后的 Markdown 格式问题：移除重复 H1，补齐文件末尾 newline，并把表格中含 `|` / `||` 的测试命令改为不破坏表格分列的 HTML code + entity 写法。本轮只做文档格式修复，不改变 V1 Goal 顺序、实现状态、运行时代码、Ent schema、migration、API、UI、docs registry 或 seedData。
-- 下一步：继续处理 `005-v1-repo-usecase-masterdata` 时，按该 Goal 文件单独收敛允许 / 禁止路径和测试命令；不要把 sales order usecase、API/RBAC 或 UI 混进同一轮。
-- 阻塞/风险：当前工作区仍有未跟踪的 `docs/codex-goals/005-v1-repo-usecase-masterdata.md` 与 masterdata backend 草稿文件，本轮未回退、整理或纳入验证；更新前已检查 `progress.md` 规模，未达到归档阈值。
+- 完成：修正 `docs/product/V1 后续任务规划历史文件` 汉化后的 Markdown 格式问题：移除重复 H1，补齐文件末尾 newline，并把表格中含 `|` / `||` 的测试命令改为不破坏表格分列的 HTML code + entity 写法。本轮只做文档格式修复，不改变 V1 任务 顺序、实现状态、运行时代码、Ent schema、migration、API、UI、docs registry 或 seedData。
+- 下一步：继续处理 `005-v1-repo-usecase-masterdata` 时，按该 任务文件单独收敛允许 / 禁止路径和测试命令；不要把 sales order usecase、API/RBAC 或 UI 混进同一轮。
+- 阻塞/风险：当前工作区仍有未跟踪的 原执行规格目录中的历史文件 与 masterdata backend 草稿文件，本轮未回退、整理或纳入验证；更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 00:16
 - 完成：执行 `004-v1-migration-and-ent-generate`，基于 003 的 `customers / suppliers / contacts / sales_orders / sales_order_items` 五个 Ent schema 运行 `make data`，生成 Ent 代码与 Atlas migration `server/internal/data/model/migrate/20260530161152_migrate.sql`。本轮未接 repo/usecase、API/RBAC、UI、docs registry、seedData 或 `business_records` transition。
@@ -223,37 +223,37 @@
 - 阻塞/风险：目标库 `make migrate_status` 仍显示 migration pending，本轮只生成不 apply；contacts 的跨 customers / suppliers owner 存在性仍需后续 usecase guard；本轮未执行前端或浏览器回归，因为未改 UI / 样式。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-31 00:20
-- 完成：将丢失名称的 `docs/codex-goals/000-.md` 按同目录命名规则和文件内容重命名为 `docs/codex-goals/000-phase0-foundation.md`；该文件对应 Phase 0 产品化架构、状态分层、配置权限、客户实例和交付骨架任务。
-- 下一步：后续引用 Phase 0 Goal 时统一使用 `docs/codex-goals/000-phase0-foundation.md`，继续保持 `001` 到 `004` 的编号顺序。
-- 阻塞/风险：本轮只修复 Goal 文件名并更新进度记录，不改运行时代码、Ent schema、migration、API、UI、docs registry 或 seedData；当前工作区仍有其他未提交 Ent/migration 现场和 `004` Goal 文件，本轮未回退、整理或纳入验证。更新前已检查 `progress.md` 规模，未达到归档阈值。
+- 完成：将丢失名称的 原执行规格目录中的历史文件 按同目录命名规则和文件内容重命名为 原执行规格目录中的历史文件；该文件对应 Phase 0 产品化架构、状态分层、配置权限、客户实例和交付骨架任务。
+- 下一步：后续引用 Phase 0 任务 时统一使用 原执行规格目录中的历史文件，继续保持 `001` 到 `004` 的编号顺序。
+- 阻塞/风险：本轮只修复 任务文件名并更新进度记录，不改运行时代码、Ent schema、migration、API、UI、docs registry 或 seedData；当前工作区仍有其他未提交 Ent/migration 现场和 `004` 任务文件，本轮未回退、整理或纳入验证。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-30 23:24
-- 完成：执行 `003-v1-ent-schema-customers-suppliers-orders` 的 schema-only cutline，新增 `customers / suppliers / contacts / sales_orders / sales_order_items` 五个 Ent schema 文件；同步小幅更新 `docs/current-source-of-truth.md`、`docs/product/v1-implementation-cutline.md`、`docs/product/v1-schema-go-no-go.md` 和 `docs/product/v1-next-codex-goals.md`，明确本轮只新增 schema 文件，不生成 migration / Ent generated code，不接 repo/usecase、API、RBAC、UI、docs registry 或 seedData。
-- 下一步：下一轮按独立 Goal 执行 Ent generate / Atlas migration 前，继续复核 `tenant_id` 禁止项、`product_skus` / `purchase_orders` / `shipments` deferred 边界，以及 `shipping_released != shipped`。
+- 完成：执行 `003-v1-ent-schema-customers-suppliers-orders` 的 schema-only cutline，新增 `customers / suppliers / contacts / sales_orders / sales_order_items` 五个 Ent schema 文件；同步小幅更新 `docs/current-source-of-truth.md`、`docs/product/v1-implementation-cutline.md`、`docs/product/v1-schema-go-no-go.md` 和 `docs/product/V1 后续任务规划历史文件`，明确本轮只新增 schema 文件，不生成 migration / Ent generated code，不接 repo/usecase、API、RBAC、UI、docs registry 或 seedData。
+- 下一步：下一轮按独立 任务 执行 Ent generate / Atlas migration 前，继续复核 `tenant_id` 禁止项、`product_skus` / `purchase_orders` / `shipments` deferred 边界，以及 `shipping_released != shipped`。
 - 阻塞/风险：contacts 采用 `owner_type + owner_id`，DB 只约束 owner_type 枚举和主联系人唯一，跨 customers / suppliers 存在性需要后续 usecase guard；销售订单只落 Source Document 生命周期，不落 fulfillment / shipment / finance fact 字段。更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-30 23:03
-- 完成：将 `.codex-review/` 收口为本地临时审查交接产物，新增 `.gitignore` 忽略规则，并同步更新 `AGENTS.md`、`docs/codex-goals/README.md`、`_new-session-goal-template.md`、`_review-output-protocol.md` 和 `_goal-file-template.md` 的口径，明确每轮只生成本地 `.codex-review/latest.md`，不生成 runs 历史副本，也不提交 `.codex-review/`；长期记录应进入具体 Goal 文件、`progress.md` 或正式文档。
-- 下一步：后续如果需要查看历史目标，优先查 `docs/codex-goals/*.md`、`progress.md` 和 Git commit log，不依赖 `.codex-review/runs`。
+- 完成：将 `本地审查报告目录` 收口为本地临时审查交接产物，新增 `.gitignore` 忽略规则，并同步更新 `AGENTS.md`、原执行规格目录中的历史文件、`_new-session-任务-template.md`、`_review-output-protocol.md` 和 `_任务-file-template.md` 的口径，明确每轮只生成本地 `本地审查报告`，不生成 runs 历史副本，也不提交 `本地审查报告目录`；长期记录应进入具体 任务文件、`progress.md` 或正式文档。
+- 下一步：后续如果需要查看历史目标，优先查 单独任务说明、`progress.md` 和 Git commit log，不依赖 `本地审查报告目录中的 runs`。
 - 阻塞/风险：本轮只改 Codex 工作流文档和 Git 忽略规则，不触达运行时代码、Ent schema、migration、API、UI、docs registry 或 seedData；更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-30 19:09
-- 完成：在 `docs/codex-goals/README.md` 增加“新会话短 Goal 模板”说明，明确 `_new-session-goal-template.md` 只用于复制到 Codex Goal 输入框，具体任务范围、允许 / 禁止修改文件、验收命令和风险边界仍写入具体 `docs/codex-goals/<goal-file>.md`；同时标明新建具体 Goal 文件使用 `_template.md`。
-- 下一步：后续可按需瘦身 `_new-session-goal-template.md`，避免在短 Goal 模板里重复长期项目边界。
+- 完成：在 原执行规格目录中的历史文件 增加“新会话短 任务模板”说明，明确 `_new-session-任务-template.md` 只用于复制到 Codex 执行规格输入框，具体任务范围、允许 / 禁止修改文件、验收命令和风险边界仍写入具体 原执行规格目录中的历史文件；同时标明新建具体 任务文件使用 `_template.md`。
+- 下一步：后续可按需瘦身 `_new-session-任务-template.md`，避免在短 任务模板里重复长期项目边界。
 - 阻塞/风险：当前工作区仍有大量本轮外改动和未跟踪文件，本轮未整理或回退；更新前已确认 `progress.md` 未达到归档阈值。
 
 ## 2026-05-30 19:05
-- 完成：新增 `docs/codex-goals/_template.md`，沉淀 Codex Goal 文件模板，覆盖目标、必须先读、允许/禁止修改、明确不做、验收命令、review 输出和风险边界；同步在 `docs/codex-goals/README.md` 增加模板入口。本轮只改 Codex 工作流文档，不触达运行时代码、Ent schema、migration、API、UI、docs registry、seedData 或部署。
-- 下一步：后续新建复杂 Goal 时先复制 `_template.md`，再按具体任务收窄允许路径、禁止路径和验收命令。
+- 完成：新增 原执行规格目录中的历史文件，沉淀 Codex 执行规格 文件模板，覆盖目标、必须先读、允许/禁止修改、明确不做、验收命令、review 输出和风险边界；同步在 原执行规格目录中的历史文件 增加模板入口。本轮只改 Codex 工作流文档，不触达运行时代码、Ent schema、migration、API、UI、docs registry、seedData 或部署。
+- 下一步：后续新建复杂 任务 时先复制 `_template.md`，再按具体任务收窄允许路径、禁止路径和验收命令。
 - 阻塞/风险：当前工作区已有大量本轮外改动和未跟踪文件，本轮未整理、回退或纳入验证；更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-30 19:01
-- 完成：合并扩展 `AGENTS.md` 的 Codex 工作流与 Goal 交接章节，补齐同一 Goal 后续处理、新开会话建议、Goal 输入规则、审查报告历史副本、长期规则来源和项目长期边界；本轮只改协作规则文档，不改 runtime、Ent schema、migration、API、UI、docs registry 或 seedData。
-- 下一步：后续新增或执行 `docs/codex-goals/*.md` 时，继续以任务 md 的允许 / 禁止文件和验收命令为准，并按 `docs/codex-goals/_review-output-protocol.md` 生成 `.codex-review/latest.md`。
+- 完成：合并扩展 `AGENTS.md` 的 Codex 工作流与 任务 交接章节，补齐同一 任务 后续处理、新开会话建议、任务输入规则、审查报告历史副本、长期规则来源和项目长期边界；本轮只改协作规则文档，不改 runtime、Ent schema、migration、API、UI、docs registry 或 seedData。
+- 下一步：后续新增或执行 单独任务说明 时，继续以任务 md 的允许 / 禁止文件和验收命令为准，并按 原执行规格目录中的历史文件 生成 `本地审查报告`。
 - 阻塞/风险：当前工作区已有本轮前的多项未提交文档 / 骨架现场，本轮未回退或整理；更新前已检查 `progress.md` 规模，未达到归档阈值。
 
 ## 2026-05-30 02:58
-- 完成：完成 Phase 2 schema final review docs-only 收口，新增 `docs/product/schema-design-final-review.md`、`docs/product/v1-entity-decision-record.md`、`docs/product/v1-implementation-cutline.md`、`docs/product/v1-schema-go-no-go.md`、`docs/product/business-records-transition-plan.md` 和 `docs/product/v1-next-codex-goals.md`；同步小幅更新真源索引、V1/V2 schema draft、Phase 1 implementation plan、risk register 和 rewrite roadmap。本轮不改 runtime、Ent schema、migration、API、UI、docs registry、seedData、`workflow.go`、`rbac.go`、`server/internal/data` 或 `server/internal/core`。
+- 完成：完成 Phase 2 schema final review docs-only 收口，新增 `docs/product/schema-design-final-review.md`、`docs/product/v1-entity-decision-record.md`、`docs/product/v1-implementation-cutline.md`、`docs/product/v1-schema-go-no-go.md`、`docs/product/business-records-transition-plan.md` 和 `docs/product/V1 后续任务规划历史文件`；同步小幅更新真源索引、V1/V2 schema draft、Phase 1 implementation plan、risk register 和 rewrite roadmap。本轮不改 runtime、Ent schema、migration、API、UI、docs registry、seedData、`workflow.go`、`rbac.go`、`server/internal/data` 或 `server/internal/core`。
 - 下一步：建议按 `003-v1-ent-schema-customers-suppliers-orders` 只落 `customers / suppliers / contacts / sales_orders / sales_order_items` Ent schema；`product_skus`、采购订单、BOM version extension、出货、预留和财务事实继续保持 draft-only / deferred。
 - 阻塞/风险：`business_records` shadow model 仍需引用审计和迁移 dry-run；`contacts` 的 `owner_type + owner_id` 需要下一轮 schema 明确 DB check / usecase guard；本轮已检查 `progress.md` 规模，未达到归档阈值。
 

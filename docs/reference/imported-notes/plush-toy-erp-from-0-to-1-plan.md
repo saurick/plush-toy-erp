@@ -3,7 +3,7 @@
 - Source / 来源: `/Users/simon/Desktop/plush-toy-erp-from-0-to-1-plan.md`
 - Imported At / 导入时间: 2026-06-02
 - Status / 状态: Reference Only / 仅作参考
-- Purpose / 用途: 作为 0 到 1 产品架构、业务域闭环、Workflow / Fact 边界和后续 Goal 拆分的外部规划输入。
+- Purpose / 用途: 作为 0 到 1 产品架构、业务域闭环、Workflow / Fact 边界和后续任务拆分的外部规划输入。
 - Not Source Of Truth / 非真源: 本文不是 runtime、schema、migration、API、UI、目录结构、roadmap 编号或交付排期真源。
 
 使用时必须先对照：
@@ -14,7 +14,7 @@
 - `docs/product/domain-model-v1.md`
 - `docs/architecture/status-workflow-fact-boundary.md`
 
-本文中的“大量重构”、目录树、API 示例、状态示例、字段示例和时间估算只能作为评审素材；不得直接作为执行指令，也不得绕过具体 `docs/codex-goals/*.md`。
+本文中的“大量重构”、目录树、API 示例、状态示例、字段示例和时间估算只能作为评审素材；不得直接作为执行指令，也不得绕过具体 单独任务说明。
 
 ---
 

@@ -1,7 +1,5 @@
 .cursor/
 .DS_Store
-.codex-review/
-
 web/node_modules/
 web/build/
 web/.vite-cache/
