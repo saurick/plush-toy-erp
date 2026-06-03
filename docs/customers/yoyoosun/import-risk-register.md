@@ -1,5 +1,5 @@
 Doc Type / 文档类型: Yoyoosun Customer Import Risk Register / 永绅 yoyoosun 客户导入风险登记
-Status / 状态: Draft + 011 Tooling Controls Added / 草案，已补 011 工具控制
+Status / 状态: Draft + Dry-run / Freeze Controls Added / 草案，已补 dry-run / freeze 控制
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
@@ -7,9 +7,9 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入风险登记 / Yoyoosun Customer Import Risk Register
 
-本风险登记覆盖 永绅 yoyoosun 客户导入 dry-run 设计、011 CLI tooling 控制和 012 freeze / evidence preparation 控制。011 / 012 控制只存在于 tooling evidence 和报告层，不是 runtime 防护，也不代表任何真实导入已经实施。
+本风险登记覆盖 永绅 yoyoosun 客户导入 dry-run 设计、CLI tooling 控制和 freeze / evidence preparation 控制。这些控制只存在于 tooling evidence 和报告层，不是 runtime 防护，也不代表任何真实导入已经实施。
 
-## 011 / 012 工具控制 / 011 / 012 Tooling Controls
+## 工具控制 / Tooling Controls
 
 | control | output | coverage | limitation |
 |---|---|---|---|
@@ -33,7 +33,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `business_records` 与 V1 双真源 | 同一客户、供应商或订单两边可写导致准绳不清 | 旧入口和 V1 页面并存 | 禁止双写；future menu/read-only task 单独处理 | Product / UI / API | 是 |
 | seedData 被误当正式数据 | demo seed 污染客户正式资料 | seedData 是 Demo Seed / QA Debug | dry-run 排除 demo/debug 或单独标记 | QA / Data Import | 是 |
 | 自动生成出货 / 库存 / 财务事实 | 造成 shipped、库存余额、应收应付错误 | `shipping_released != shipped`，finance facts deferred | shipment/inventory/finance 全部 Forbidden Auto Import | Workflow / Fact | 是 |
-| migration / import 无回滚 | 导入错误后无法恢复 | 010 不实现真实导入或 loader | future Stage 6 必须先有备份、rollback、forward-fix 和对账 | Ops / Data | 是 |
+| migration / import 无回滚 | 导入错误后无法恢复 | 当前 dry-run draft 不实现真实导入或 loader | future Stage 6 必须先有备份、rollback、forward-fix 和对账 | Ops / Data | 是 |
 | 导入后客户不认可 | 正式数据与客户理解不一致，返工成本高 | 永绅 yoyoosun 样本字段和业务口径仍多处待确认 | Stage 5 需要 customer sign-off | Delivery / Product | 是 |
 | 未确认字段被自动丢弃 | 后续追溯困难，客户认为资料缺失 | Excel/PDF 存在未知列和专属字段 | unmapped fields 进入 unresolved，不静默丢弃 | Data Import | 是 |
 | 未确认字段被错误写入 note | note 变成隐藏垃圾桶，后续无法结构化 | 009 要求字段先分类，不要用 note 掩盖未确认 | note 写入必须有人工决策和 source reference | Product / Data | 是 |
@@ -49,9 +49,9 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 |---:|---|---|
 | P0 | 从旧快照自动生成 shipment / inventory / finance facts | Forbidden Auto Import + block queue |
 | P0 | 永绅 yoyoosun 字段污染 Product Core | field classification + Product layer strategy |
-| P0 | `business_records` 与 V1 双真源 | no runtime changes in 010；future cutover 单独实现任务 |
-| P0 | dry-run 报告被误当真实导入批准 | 011 `validation-summary.canExecuteRealImport=false` + `dry-run-report.md` No real import |
-| P0 | freeze evidence 被误当真实导入批准 | 012 `freeze-metadata.canExecuteRealImport=false` + `source-snapshot-manual-review-checklist.md` import-not-approved conclusion |
+| P0 | `business_records` 与 V1 双真源 | no runtime changes in dry-run draft；future cutover 单独实现任务 |
+| P0 | dry-run 报告被误当真实导入批准 | `validation-summary.canExecuteRealImport=false` + `dry-run-report.md` No real import |
+| P0 | freeze evidence 被误当真实导入批准 | `freeze-metadata.canExecuteRealImport=false` + `source-snapshot-manual-review-checklist.md` import-not-approved conclusion |
 | P1 | SKU / purchase order 过早落地 | deferred domain policy |
 | P1 | 未确认字段丢失或塞 note | unresolved queue + manual review |
 

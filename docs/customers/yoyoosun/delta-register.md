@@ -9,4 +9,4 @@
 | 当前客户角色叫法 | Customer Config | 通过 RBAC 角色模板映射职责 | 否 |
 | 当前客户部署实例 | Delivery / Ops | `deployments/yoyoosun` 记录 | 否 |
 | 毛绒玩具 BOM / 辅材 / 包材模式 | Industry Template Candidate | 评审后可沉淀为行业模板 | 待评审 |
-| yoyoosun 历史资料导入适配 | Data Import Adapter | 先做 dry-run、字段分类和 unresolved queue；真实 loader 单独评审 | 否，待评审 |
+| yoyoosun 数据导入适配 | Data Import Adapter | 先做 dry-run、字段分类和 unresolved queue；真实 loader 单独评审 | 否，待评审 |

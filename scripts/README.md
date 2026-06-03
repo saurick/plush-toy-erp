@@ -95,7 +95,7 @@ dry-run-report.md
 
 `validation-summary.json` 中 `canExecuteRealImport` 永远为 `false`。该脚本是 import QA / preview tooling，不是 runtime loader。
 
-012 real dry-run evidence 使用 freeze fixtures：
+real dry-run evidence 使用 freeze fixtures：
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \

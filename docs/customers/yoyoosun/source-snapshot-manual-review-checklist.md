@@ -1,5 +1,5 @@
 Doc Type / 文档类型: Yoyoosun Source Snapshot Manual Review Checklist / yoyoosun 来源快照人工复查清单
-Status / 状态: 012 Evidence Prepared / 012 证据已准备
+Status / 状态: Evidence Prepared / 证据已准备
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
@@ -8,7 +8,7 @@ Current Evidence Inputs / 当前证据输入: `output/customers/yoyoosun/source-
 
 # 永绅 yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist
 
-本清单用于 review 012 freeze evidence 和 dry-run evidence。结论默认是 import not approved，直到后续单独实现任务完成真实 loader 设计、备份、回滚、幂等、对账和客户确认。
+本清单用于 review freeze evidence 和 dry-run evidence。结论默认是 import not approved，直到后续单独实现任务完成真实 loader 设计、备份、回滚、幂等、对账和客户确认。
 
 ## 复查清单 / Review Checklist
 
@@ -31,18 +31,18 @@ Current Evidence Inputs / 当前证据输入: `output/customers/yoyoosun/source-
 | unresolved block review | 检查所有 block 项，尤其 contact owner、unknown unit、forbidden facts。 | `unresolved-queue.json` | block 未关闭前不得设计真实导入执行。 |
 | missing source reference | 检查 sourceId/sourceKind/moduleKey/fileName/domain 是否完整。 | `freeze-check-summary.json` | 缺 source reference 不得导入。 |
 | sensitive data review | 只 review 字段名和 source reference，不复制 raw sensitive values。 | `freeze-check-summary.json`、`freeze-check-report.md` | 禁止把敏感原值写入报告。 |
-| customer sign-off | 预留客户确认 evidence package、unresolved 处理和 exclusions。 | customer sign-off notes | 012 不包含 sign-off。 |
+| customer sign-off | 预留客户确认 evidence package、unresolved 处理和 exclusions。 | customer sign-off notes | 当前 evidence 不包含 sign-off。 |
 
 ## 客户签收占位 / Customer Sign-off Placeholder
 
 | item | status | note |
 |---|---|---|
-| source snapshot freeze reviewed by customer | Pending | 012 未执行客户确认。 |
-| dry-run candidates reviewed by customer | Pending | 012 只生成 evidence。 |
+| source snapshot freeze reviewed by customer | Pending | 当前未执行客户确认。 |
+| dry-run candidates reviewed by customer | Pending | 当前只生成 evidence。 |
 | forbidden rows acknowledged | Pending | shipment / inventory / finance 必须确认排除。 |
 | unresolved queue resolved | Pending | 当前仍有 block / defer / review 项。 |
-| backup / rollback plan approved | Pending | 012 未设计真实 loader。 |
-| import execution approved | Not approved | 012 不是真实导入批准。 |
+| backup / rollback plan approved | Pending | 当前未设计真实 loader。 |
+| import execution approved | Not approved | 当前 evidence 不是真实导入批准。 |
 
 ## 不批准导入结论 / Import-not-approved Conclusion
 
@@ -50,7 +50,7 @@ Current Evidence Inputs / 当前证据输入: `output/customers/yoyoosun/source-
 
 原因：
 
-1. 012 只生成 freeze evidence 和 dry-run evidence。
+1. 当前只生成 freeze evidence 和 dry-run evidence。
 2. `canExecuteRealImport=false`。
 3. evidence 中仍有 blocker、defer、review 和 forbidden 项。
 4. 未完成客户 sign-off。

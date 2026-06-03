@@ -1,5 +1,5 @@
 Doc Type / 文档类型: Yoyoosun Real Dry-run Evidence / yoyoosun 真实 dry-run 证据
-Status / 状态: 012 Evidence Prepared / 012 证据已准备
+Status / 状态: Evidence Prepared / 证据已准备
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
@@ -7,7 +7,7 @@ Current Implementation Source of Truth / 当前实现真源: `scripts/import/cus
 
 # 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence
 
-012 使用 011 已实现的 dry-run CLI 和 012 sanitized freeze fixtures 生成 real dry-run evidence package。该 package 用于人工 review，不是真实导入批准。
+使用已实现的 dry-run CLI 和 sanitized freeze fixtures 生成 real dry-run evidence package。该 package 用于人工 review，不是真实导入批准。
 
 ## 证据包 / Evidence Package
 
@@ -68,7 +68,7 @@ node scripts/import/customerImportDryRun.mjs \
 | forbidden | 3 |
 | skip | 0 |
 
-These are dry-run candidates only. `create` and `update` do not mean the system may write DB in 012.
+These are dry-run candidates only. `create` and `update` do not mean the system may write DB from this evidence package.
 
 ## 待确认摘要 / Unresolved Summary
 
@@ -100,7 +100,7 @@ Every block must be reviewed before any later import-loader design. Deferred row
 
 ## 无真实导入声明 / No Real Import Statement
 
-012 does not execute real import. It does not write DB, create a loader, write V1 tables, write `business_records`, generate SQL, generate migration, modify schema/API/UI/seedData/docs registry, or do `business_records` cutover. The dry-run output is evidence, not import approval.
+This evidence package does not execute real import. It does not write DB, create a loader, write V1 tables, write `business_records`, generate SQL, generate migration, modify schema/API/UI/seedData/docs registry, or do `business_records` cutover. The dry-run output is evidence, not import approval.
 
 ## 人工复查下一步 / Manual Review Next Steps
 

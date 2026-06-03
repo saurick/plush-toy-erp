@@ -5,6 +5,7 @@ import { AUTH_SCOPE, getCurrentUser } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
 import { businessModuleDefinitions } from './config/businessModules.mjs'
+import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
 
 const AdminUsersPage = lazy(() => import('@/pages/AdminUsers'))
 const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
@@ -23,6 +24,9 @@ const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
 const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
+const DevDocsPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevDocsPage.jsx'))
+  : null
 
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
@@ -48,6 +52,9 @@ export default function ERPRouter() {
   return (
     <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>
+        {DevDocsPage ? (
+          <Route path={DEV_DOCS_ROUTE} element={<DevDocsPage />} />
+        ) : null}
         <Route path="/" element={<RootEntryRedirect />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

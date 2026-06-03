@@ -5,7 +5,7 @@ They contain no real customer data and are only used to verify the dry-run tooli
 
 The `*.freeze.sample.json` fixtures are also synthetic / sanitized. They are not
 customer data, not import approval, and not evidence that real import execution is
-allowed. They exist only for the 012 source snapshot freeze checker and dry-run
+allowed. They exist only for the source snapshot freeze checker and dry-run
 evidence preparation flow.
 
 ## 文件 / Files

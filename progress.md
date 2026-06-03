@@ -6,6 +6,40 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-03 18:12
+- 完成：将开发态文档查看器右侧章节标签改为可点击按钮，Markdown 渲染时给 H1-H6 标题补稳定 id；点击章节标签会在右侧阅读容器内滚动到对应标题，并新增“回到顶部”按钮。
+- 完成：切换文档时右侧阅读区自动回到顶部；同步 `web/README.md` 和 `docs/current-source-of-truth.md` 记录该开发态阅读辅助能力。
+- 下一步：如后续要加强长文档导航，可考虑将 TOC 固定在右侧或增加当前章节高亮；仍限开发态 viewer，不进入产品内 docs registry。
+- 阻塞/风险：本轮只改开发态 viewer、Markdown 渲染 id、样式和说明文档；未改 schema、migration、后端 API、业务 fact usecase、RBAC、seedData 或产品内菜单。验证已通过 `cd web && pnpm lint && pnpm css && pnpm test && pnpm build:desktop && pnpm style:l1`；生产构建产物 DevDocs 文本扫描无命中。Browser 验证 TOC 标签点击后右侧阅读区滚到对应标题、回到顶部后 `scrollTop=0`、390px 移动端无横向溢出；未为 `.jsx` Markdown 组件新增 Node 单测，因为当前 Node 测试不能直接 import `.jsx`，避免扩测试加载器范围。本轮追加前 `progress.md` 为 195 行 / 37065 bytes，未达到归档阈值。
+
+## 2026-06-03 17:44
+- 完成：按“左侧全给目录树”的反馈移除开发态文档查看器默认态的常用置顶卡片，侧栏默认只保留搜索框和真实目录树；搜索态仍显示匹配结果列表，目录树 / 搜索结果都占满左侧剩余高度。
+- 完成：清理不再使用的置顶卡片样式，并把移动端目录树高度从固定 `320px` 调整为 `min(52vh, 560px)`，减少窄屏下目录树被压缩的问题；同步 `web/README.md` 和 `docs/current-source-of-truth.md` 的开发态入口口径。
+- 下一步：如后续要恢复快捷入口，优先考虑目录树中的虚拟“常用”目录或最近访问，不再用大卡片挤占目录树首屏。
+- 阻塞/风险：本轮只改开发态 viewer 布局、样式和说明文档；未改 schema、migration、后端 API、业务 fact usecase、RBAC、seedData 或产品内菜单。验证已通过 `cd web && pnpm lint && pnpm css && pnpm test && pnpm build:desktop`；`pnpm style:l1` 首次在无关 `permission-center-desktop` 场景等待标题超时，原命令重跑通过 32 个场景。Browser 验证默认态无常用置顶、目录树占满左侧剩余空间、可展开目录并切换文档、390px 移动端上下堆叠且无横向溢出；搜索输入仍受 in-app Browser 虚拟剪贴板限制，搜索筛选由 `devDocs.test.mjs` 覆盖。本轮追加前 `progress.md` 为 189 行 / 35627 bytes，未达到归档阈值。
+
+## 2026-06-03 17:21
+- 完成：将开发态文档查看器左侧从全量平铺列表改为“常用置顶 + 真实目录树”，默认只展开 `docs` 一级，显示 `93 篇`总数和各目录文档数；目录按钮补稳定 `data-dev-doc-dir`，方便浏览器回归和后续维护。
+- 完成：同步 `web/README.md` 和 `docs/current-source-of-truth.md`，把该入口口径更新为按真实目录树浏览仓库 tracked Markdown；补 `buildDevDocsTree` 数据层和对应测试，保留搜索态平铺结果。
+- 下一步：如后续要优化大目录默认展开、目录中文别名或最近访问记录，只改开发态 viewer，不恢复产品内 docs registry、菜单、RBAC、seedData 或生产入口。
+- 阻塞/风险：本轮只改开发态查看器、样式、说明文档和测试；未改 schema、migration、后端 API、业务 fact usecase、RBAC、seedData 或产品内菜单。验证已通过 `cd web && pnpm lint && pnpm css && pnpm test && pnpm build:desktop && pnpm style:l1`、生产构建产物 DevDocs 文本扫描、Browser 默认目录树点击与 390px 移动端盒模型检查。in-app Browser 搜索输入仍受虚拟剪贴板限制，搜索筛选由 `devDocs.test.mjs` 覆盖；Browser 截图接口本轮超时，改用 DOM / console / box metrics 验证。本轮追加前 `progress.md` 为 183 行 / 34243 bytes，未达到归档阈值。
+
+## 2026-06-03 16:31
+- 完成：收口永绅 yoyoosun 导入资料中的旧执行编号口径，将 `010/011/012` 阶段编号改为 dry-run draft、dry-run package、source snapshot freeze evidence 和 real dry-run evidence 等产物口径；同步 `docs/current-source-of-truth.md`、`docs/customers/yoyoosun/*import*.md`、freeze / evidence 相关文档、客户目录 README、`scripts/README.md`、freeze checker 报告文案和 fixture README。
+- 下一步：如后续真的要进入 import loader design，必须另开单独实现任务，明确备份、回滚、幂等、对账、客户确认和正式 usecase 边界；不能把 dry-run / freeze evidence 当导入批准。
+- 阻塞/风险：本轮只改文档和 CLI 报告文案；未改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry、loader、数据库或部署配置。本轮追加前 `progress.md` 为 178 行 / 33217 bytes，未达到归档阈值。
+
+## 2026-06-03 16:28
+- 完成：将 `docs/customers/yoyoosun/delta-register.md` 中的差异项名收敛为“yoyoosun 数据导入适配”，与 `docs/product/product-delivery-ledgers.md` 的“yoyoosun 数据导入”口径保持一致，避免误读为历史事实导入已批准。
+- 下一步：如后续要做真实 import loader，必须按 `import-strategy.md` 单独评审 loader、备份、回滚、幂等、对账和人工确认，不从该差异项直接推导执行。
+- 阻塞/风险：docs-only；未改 runtime、schema、migration、API、RBAC、UI、seedData、loader、`business_records` 或真实导入流程。本轮追加前 `progress.md` 为 173 行 / 32502 bytes，未达到归档阈值。
+
+## 2026-06-03 16:22
+- 完成：新增开发态文档查看器 `http://localhost:5175/__dev/docs`，常用文档置顶并全量读取 `docs/**/*.md` 及根 / web / server / scripts README；支持标题 / 路径 / 正文搜索、分类标签、文档切换、章节摘要和复制相对路径。
+- 完成：入口用 `import.meta.env.DEV` 直接门禁，不进入 ERP 侧栏、seedData、RBAC、产品内 docs registry 或生产构建；同步 `docs/current-source-of-truth.md` 和 `web/README.md` 说明该开发态例外。
+- 下一步：如后续要调整置顶顺序或分类，只改 `web/src/erp/config/devDocs.mjs` 并补测试；不要恢复旧 `/erp/docs/*` 产品内文档中心。
+- 阻塞/风险：本轮只新增开发态查看页面和样式；未改 schema、migration、后端 API、RBAC、seedData、业务 fact usecase 或产品内菜单。Browser 验证显示当前列出 93 篇 Markdown，包含 archive/customers/reference/server/scripts；in-app Browser 输入搜索受虚拟剪贴板限制未能用真实键盘输入验证，搜索筛选由 `devDocs.test.mjs` 覆盖；非置顶文档点击切换、桌面 / 移动布局、console、生产构建排除均已验证。本轮追加前 `progress.md` 为 167 行 / 31312 bytes，未达到归档阈值。
+
 ## 2026-06-03 13:59
 - 完成：在 `docs/README.md` 新增“设计文档分类入口 / Design Document Entry Points”，按顶层设计、详细设计、测试与验收设计、客户与交付设计、参考与归档列出人工校对和任务拆分常用入口；同时明确该分类不替代 `docs/document-inventory.md` 完整清单，也不替代 `docs/current-source-of-truth.md`、代码、migration 和测试。
 - 下一步：后续人工校对设计文档时，可先按 `docs/README.md` 分类入口逐层检查；若新增、删除、重命名长期维护文档或改变职责分类，再同步检查 `docs/document-inventory.md` 和相关目录 README。

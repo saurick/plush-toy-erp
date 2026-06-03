@@ -1,5 +1,5 @@
 Doc Type / 文档类型: Yoyoosun Source Snapshot Freeze Evidence / yoyoosun 来源快照冻结证据
-Status / 状态: 012 Evidence Prepared / 012 证据已准备
+Status / 状态: Evidence Prepared / 证据已准备
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
@@ -7,7 +7,7 @@ Current Implementation Source of Truth / 当前实现真源: `scripts/import/cus
 
 # 永绅 yoyoosun 来源快照冻结 / Yoyoosun Source Snapshot Freeze
 
-012 已新增 customer source snapshot freeze checker，并基于 sanitized fixture 生成 freeze evidence。该 evidence 只证明 source snapshot freeze checker 可运行、输入可追溯、风险可复查；它不是真实导入批准。
+已新增 customer source snapshot freeze checker，并基于 sanitized fixture 生成 freeze evidence。该 evidence 只证明 source snapshot freeze checker 可运行、输入可追溯、风险可复查；它不是真实导入批准。
 
 ## 冻结 metadata / Freeze Metadata
 
@@ -34,7 +34,7 @@ node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
   --out output/customers/yoyoosun/source-snapshot-freeze
 ```
 
-## 011 Dry-run 命令 / 011 Dry-run Command
+## Dry-run 命令 / Dry-run Command
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \
@@ -92,7 +92,7 @@ Freeze checker evidence records sensitive field names and source references only
 
 ## 无真实导入声明 / No Real Import Statement
 
-012 does not execute real import. It does not read DB, write DB, create a loader, generate SQL, generate migration, modify schema/API/UI/seedData/docs registry, write `business_records`, or perform `business_records` cutover. `canExecuteRealImport=false` is mandatory.
+Source snapshot freeze evidence does not execute real import. It does not read DB, write DB, create a loader, generate SQL, generate migration, modify schema/API/UI/seedData/docs registry, write `business_records`, or perform `business_records` cutover. `canExecuteRealImport=false` is mandatory.
 
 ## 重新运行说明 / Re-run Instructions
 

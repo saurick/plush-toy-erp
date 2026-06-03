@@ -1,5 +1,5 @@
 Doc Type / 文档类型: Yoyoosun Customer Import Dry-run Plan / 永绅 yoyoosun 客户导入 dry-run 计划
-Status / 状态: Draft + 011 Tooling Added / 草案，已补 011 工具
+Status / 状态: Draft + Dry-run / Freeze Tooling Added / 草案，已补 dry-run / freeze 工具
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
@@ -7,7 +7,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入 dry-run 计划 / Yoyoosun Customer Import Dry-run Plan
 
-本计划最初由 010 设计 dry-run 流程。011 已新增 `scripts/import/customerImportDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview。012 已新增 `scripts/import/customerSourceSnapshotFreezeCheck.mjs`，用于冻结 source snapshot evidence，并基于 sanitized freeze fixtures 生成 real dry-run evidence package。011 和 012 都不读写正式数据库、不执行真实迁移、不修改 seedData 或 `business_records`。
+本计划用于设计 dry-run 流程。当前已新增 `scripts/import/customerImportDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview；也已新增 `scripts/import/customerSourceSnapshotFreezeCheck.mjs`，用于冻结 source snapshot evidence，并基于 sanitized freeze fixtures 生成 real dry-run evidence package。这些工具都不读写正式数据库、不执行真实迁移、不修改 seedData 或 `business_records`。
 
 ## 范围 / Scope
 
@@ -17,13 +17,13 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 本轮是否写真实 import loader | 否 |
 | 本轮是否写 backfill 脚本 | 否 |
 | 本轮是否修改 runtime/schema/migration/API/UI/seedData | 否 |
-| 010 输出 | 来源清单、字段分类、dry-run plan、unresolved queue、验收清单、产品策略、风险登记 |
-| 011 输出 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` |
-| 012 输出 | `freeze-metadata.json`、`freeze-check-summary.json`、`freeze-check-report.md`、`output/customers/yoyoosun/real-dry-run-evidence/*`、source snapshot freeze 文档、real dry-run evidence 文档和人工 review checklist |
+| dry-run draft 输出 | 来源清单、字段分类、dry-run plan、unresolved queue、验收清单、产品策略、风险登记 |
+| dry-run package 输出 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` |
+| freeze / evidence 输出 | `freeze-metadata.json`、`freeze-check-summary.json`、`freeze-check-report.md`、`output/customers/yoyoosun/real-dry-run-evidence/*`、source snapshot freeze 文档、real dry-run evidence 文档和人工 review checklist |
 
-## 011 工具状态 / 011 Tooling Status
+## 工具状态 / Tooling Status
 
-011 已实现一个只读 CLI：
+已实现一个只读 CLI：
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \
@@ -44,11 +44,11 @@ node scripts/import/customerImportDryRun.mjs \
 
 - Stage 4：人工确认 unresolved、duplicate、conflict、forbidden。
 - Stage 5：客户 sign-off、备份 / 回滚 / 导入审批。
-- Stage 6：真实 import execution；011 未实现。
+- Stage 6：真实 import execution；dry-run CLI 未实现。
 
-## 012 冻结 + 证据状态 / 012 Freeze + Evidence Status
+## 冻结 + 证据状态 / Freeze + Evidence Status
 
-012 已实现 freeze checker：
+已实现 freeze checker：
 
 ```bash
 node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
@@ -57,7 +57,7 @@ node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
   --out output/customers/yoyoosun/source-snapshot-freeze
 ```
 
-012 已用 freeze fixtures 生成 dry-run evidence：
+已用 freeze fixtures 生成 dry-run evidence：
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \
@@ -67,7 +67,7 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-012 的 evidence 只用于人工 review：
+这些 evidence 只用于人工 review：
 
 - 不是真实导入。
 - 不写 DB。
@@ -235,7 +235,7 @@ skipped rows 包含：
 
 ## 阶段 6：未来真实导入执行 / Stage 6: Future Import Execution
 
-当前 010 不执行 Stage 6。
+当前 dry-run plan 不执行 Stage 6。
 
 后续只有单独实现任务才能设计或实现 import loader。Stage 6 必须满足：
 

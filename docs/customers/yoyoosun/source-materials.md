@@ -10,14 +10,14 @@
 | seed / demo 数据 | Demo Seed / QA Debug | 只用于开发验收和演示，不替代真实业务事实 |
 | print template | Print Template Input | 只作客户打印样本和字段来源记录；默认 Deferred，待多客户重复后再评审是否模板化 |
 | business_records 快照 | Source Snapshot / Data Import Source / Demo Seed | 可作为 dry-run 来源和历史快照，不是长期事实真源 |
-| V1 正式页面当前数据 | Data Import Target Preview | 只作为 future import preview 的目标模型参照；010 不写数据库 |
+| V1 正式页面当前数据 | Data Import Target Preview | 只作为 future import preview 的目标模型参照；当前 dry-run 不写数据库 |
 
 使用规则：
 
 1. 资料先归档用途，再决定是否进入 Product Core、Industry Template、Customer Config 或 Customer Extension。
 2. 当前客户特殊字段、特殊流程和特殊报表不能直接进入核心 usecase。
 3. 涉及库存、出货、财务事实的资料必须进入架构评审。
-4. yoyoosun 数据导入必须先 dry-run、字段分类、unresolved queue 和人工确认；010 不执行真实导入。
+4. yoyoosun 数据导入必须先 dry-run、字段分类、unresolved queue 和人工确认；当前不执行真实导入。
 
 ## 原始文件归档口径 / Raw Source File Archive
 

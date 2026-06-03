@@ -15,7 +15,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 
 | rule | decision |
 |---|---|
-| 可以自动进入 V1 正式模型的字段 | 仅限 V1 / existing model 已有字段、来源非 demo/debug、主体唯一匹配、字段非空且无冲突的候选；010 只生成 dry-run preview，不写数据库。 |
+| 可以自动进入 V1 正式模型的字段 | 仅限 V1 / existing model 已有字段、来源非 demo/debug、主体唯一匹配、字段非空且无冲突的候选；当前 dry-run 只生成 preview，不写数据库。 |
 | 必须人工确认的字段 | customer/supplier/product/material/unit/warehouse 不唯一、语义不清、金额/数量/日期异常、客户专属字段、SKU/颜色/包装版本、合同/结算/财务字段。 |
 | 不能自动迁移的字段 | `product_skus`、`purchase_orders`、`shipments`、`stock_reservations`、inventory facts、finance facts、workflow done 推导字段、`shipping_released` 推导字段、demo/seed/debug 数据。 |
 | Product Core 判断 | 永绅 yoyoosun 客户样本字段不能自动变成 Product Core 必填字段；只有既有正式模型字段或经过 Product Core 评审的通用字段才可进入核心。 |
@@ -60,10 +60,10 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
 | 产品编号 / 产品名称 | 订单行产品 | `sales_order_items` | `product_id`, product snapshot | Data Import Source | 条件允许 | 是 | 否 | product 必须唯一匹配 existing `products`；不得自动创建 `product_skus`。 |
-| 款式编号 / 颜色 | 款式或规格线索 | none in 010 | none | Industry Template Candidate | 否 | 是 | 否 | 只能进入 SKU / product / template review，不自动落正式 SKU。 |
+| 款式编号 / 颜色 | 款式或规格线索 | none in current dry-run | none | Industry Template Candidate | 否 | 是 | 否 | 只能进入 SKU / product / template review，不自动落正式 SKU。 |
 | 数量 / 单位 | 订单承诺数量 | `sales_order_items` | `ordered_quantity`, `unit_id` | Data Import Source | 条件允许 | 是 | 否 | unit 必须唯一匹配；数量非法进入 unresolved。 |
 | 单价 / 金额 | 订单行金额快照 | `sales_order_items` | nullable unit_price / amount candidate | Data Import Source | 条件允许 | 是 | 否 | 只可作为源单据金额，不生成应收、发票或付款。 |
-| 未出货数 / 生产数量 | 履约或生产线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | 没有 shipment / production facts，不得自动写 shipped quantity、shipment、inventory 或 finance。 |
+| 未出货数 / 生产数量 | 履约或生产线索 | none in current dry-run | none | Forbidden Auto Import | 否 | 是 | 是 | 没有 shipment / production facts，不得自动写 shipped quantity、shipment、inventory 或 finance。 |
 
 ## 产品 / products
 
@@ -71,7 +71,7 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 |---|---|---|---|---|---:|---:|---:|---|
 | 产品资料编号 / 产品编号 | 成品编码候选 | existing `products` | product code candidate | Data Import Source | 条件允许 | 是 | 否 | 只能匹配或候选创建 existing products；重复或冲突进入 unresolved。 |
 | 产品名称 / 规格 / 图号 | 成品资料 | existing `products` | name / spec candidate | Data Import Source | 条件允许 | 是 | 否 | 需防止旧 `business_records.products` 与正式 products 双真源。 |
-| 颜色 / 尺寸 / 包装版本 / SKU | 可售规格线索 | none in 010 | none | Deferred | 否 | 是 | 是 | `product_skus` 仍 draft-only，不得自动创建。 |
+| 颜色 / 尺寸 / 包装版本 / SKU | 可售规格线索 | none in current dry-run | none | Deferred | 否 | 是 | 是 | `product_skus` 仍 draft-only，不得自动创建。 |
 
 ## 材料 / materials
 
@@ -94,40 +94,40 @@ classification 只使用：Product Core、Industry Template Candidate、Customer
 |---|---|---|---|---|---:|---:|---:|---|
 | BOM 头 / 产品 / 版本 | 工程资料候选 | existing `bom_headers` | product_id / version candidate | Data Import Source | 条件允许 | 是 | 否 | 只生成 dry-run 候选；不得影响历史采购或库存。 |
 | 物料 / 单位用量 / 损耗 | BOM 明细候选 | existing `bom_items` | material_id / unit_id / quantity / loss_rate | Data Import Source | 条件允许 | 是 | 否 | material/unit/product 必须唯一匹配；BOM 不写库存事实。 |
-| 色卡 / 作业指导书 / 图片 | 工程附件线索 | none in 010 | none | Industry Template Candidate | 否 | 是 | 否 | 作为附件或模板候选，不塞进事实或库存。 |
+| 色卡 / 作业指导书 / 图片 | 工程附件线索 | none in current dry-run | none | Industry Template Candidate | 否 | 是 | 否 | 作为附件或模板候选，不塞进事实或库存。 |
 
 ## 采购 / purchase
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
-| 采购单号 / 下单日期 / 采购数量 | 采购承诺线索 | none in 010 | none | Deferred | 否 | 是 | 是 | `purchase_orders` 仍 draft-only / V2 candidate，不得自动创建。 |
-| 入库 / 到仓 / 检验字段 | 采购入库或质检线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | 不得从 Excel/PDF/business_records 自动生成 purchase receipt、quality、inventory facts。 |
+| 采购单号 / 下单日期 / 采购数量 | 采购承诺线索 | none in current dry-run | none | Deferred | 否 | 是 | 是 | `purchase_orders` 仍 draft-only / V2 candidate，不得自动创建。 |
+| 入库 / 到仓 / 检验字段 | 采购入库或质检线索 | none in current dry-run | none | Forbidden Auto Import | 否 | 是 | 是 | 不得从 Excel/PDF/business_records 自动生成 purchase receipt、quality、inventory facts。 |
 
 ## 外协 / outsourcing
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
-| 加工合同号 / 加工项目 / 工序 | 委外源单据线索 | none in 010 | none | Deferred | 否 | 是 | 否 | future outsourcing source document review 后再决定模型。 |
+| 加工合同号 / 加工项目 / 工序 | 委外源单据线索 | none in current dry-run | none | Deferred | 否 | 是 | 否 | future outsourcing source document review 后再决定模型。 |
 | 加工厂 / 联系人 | 委外交易主体 | `suppliers` / `contacts` | supplier/contact candidate | Data Import Source | 条件允许 | 是 | 否 | 仅主数据候选；合同和结算不自动落事实。 |
-| 加工金额 / 结算方式 | 结算线索 | none in 010 | none | Print Template Input | 否 | 是 | 是 | 可作打印样本输入，不生成 AP、invoice、payment。 |
+| 加工金额 / 结算方式 | 结算线索 | none in current dry-run | none | Print Template Input | 否 | 是 | 是 | 可作打印样本输入，不生成 AP、invoice、payment。 |
 
 ## 出货 / shipment
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
-| 出货放行 / `shipping_released` | 放行状态线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | `shipping_released != shipped`；不得自动生成 shipments 或扣库存。 |
-| 出货日期 / 未出货数 / 出库单 | 出货事实线索 | none in 010 | none | Deferred | 否 | 是 | 是 | `shipments` 和 `stock_reservations` deferred；真实出货必须后续 ShipmentUsecase 评审。 |
+| 出货放行 / `shipping_released` | 放行状态线索 | none in current dry-run | none | Forbidden Auto Import | 否 | 是 | 是 | `shipping_released != shipped`；不得自动生成 shipments 或扣库存。 |
+| 出货日期 / 未出货数 / 出库单 | 出货事实线索 | none in current dry-run | none | Deferred | 否 | 是 | 是 | `shipments` 和 `stock_reservations` deferred；真实出货必须后续 ShipmentUsecase 评审。 |
 
 ## 库存 / inventory
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
-| 库存数量 / 入库数量 / 出库数量 | 库存事实线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | 不得自动生成 `inventory_txns`、`inventory_balances`、`inventory_lots`。 |
+| 库存数量 / 入库数量 / 出库数量 | 库存事实线索 | none in current dry-run | none | Forbidden Auto Import | 否 | 是 | 是 | 不得自动生成 `inventory_txns`、`inventory_balances`、`inventory_lots`。 |
 | 仓库文本 | 仓库主数据线索 | existing `warehouses` | warehouse candidate | Data Import Source | 低置信条件允许 | 是 | 否 | 只做主数据候选，不写余额或流水。 |
 
 ## 财务 / finance
 
 | source field | meaning | target model | target field | classification | auto import? | manual review? | forbidden? | reason |
 |---|---|---|---|---|---:|---:|---:|---|
-| 应收 / 应付 / 发票 / 收付款 / 对账 | 财务事实线索 | none in 010 | none | Forbidden Auto Import | 否 | 是 | 是 | finance facts deferred，不能从旧快照或 `shipping_released` 自动生成。 |
+| 应收 / 应付 / 发票 / 收付款 / 对账 | 财务事实线索 | none in current dry-run | none | Forbidden Auto Import | 否 | 是 | 是 | finance facts deferred，不能从旧快照或 `shipping_released` 自动生成。 |
 | 单价 / 金额 / 税额 | 源单据或打印金额 | V1 source document nullable fields / Print Template Input | amount candidate | Data Import Source | 条件允许 | 是 | 否 | 只在已存在源单据字段中作为候选；不产生 AR/AP、invoice、payment。 |

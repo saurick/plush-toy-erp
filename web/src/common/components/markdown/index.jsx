@@ -1,3 +1,4 @@
+import React from 'react'
 import { Remarkable } from 'remarkable'
 import RemarkableReactRenderer from 'remarkable-react'
 
@@ -70,9 +71,37 @@ export const extractMarkdownHeadings = (source = '', levels = [2]) => {
   return headings
 }
 
+const addHeadingIds = (node, headingQueue) => {
+  if (!React.isValidElement(node)) {
+    return node
+  }
+
+  const elementType = String(node.type || '')
+  const headingMatch = /^h([1-6])$/.exec(elementType)
+  const nextHeading = headingMatch ? headingQueue.shift() : null
+  const children = React.Children.map(node.props.children, (child) =>
+    addHeadingIds(child, headingQueue)
+  )
+
+  if (!nextHeading) {
+    return React.cloneElement(node, undefined, children)
+  }
+
+  return React.cloneElement(
+    node,
+    {
+      id: nextHeading.id,
+    },
+    children
+  )
+}
+
 // Markdown md展示
 export const Markdown = ({ source }) => {
   const md = new Remarkable()
   md.renderer = new RemarkableReactRenderer()
-  return md.render(source)
+  const headingQueue = extractMarkdownHeadings(source, [1, 2, 3, 4, 5, 6])
+  return React.Children.map(md.render(source), (node) =>
+    addHeadingIds(node, headingQueue)
+  )
 }

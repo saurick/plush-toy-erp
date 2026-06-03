@@ -7,9 +7,9 @@ Current Implementation Source of Truth / 当前实现真源: `scripts/import/cus
 
 # 永绅 yoyoosun 客户导入 dry-run 工具说明 / Yoyoosun Customer Import Dry-run Tooling
 
-011 已新增 永绅 yoyoosun 客户导入 dry-run CLI。012 又新增 source snapshot freeze checker，并用 sanitized freeze fixtures 生成 freeze evidence 与 real dry-run evidence package。两者都只读取 JSON snapshot，供人工 review 使用；它们不执行真实导入。
+已新增 永绅 yoyoosun 客户导入 dry-run CLI、source snapshot freeze checker，并用 sanitized freeze fixtures 生成 freeze evidence 与 real dry-run evidence package。两者都只读取 JSON snapshot，供人工 review 使用；它们不执行真实导入。
 
-## 012 冻结检查器 / 012 Freeze Checker
+## 冻结检查器 / Freeze Checker
 
 ```bash
 node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
@@ -26,7 +26,7 @@ node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
 | `freeze-check-summary.json` | Source root/row 校验、duplicate sourceId、domain、fields、source reference、sensitive / forbidden / deferred / boundary 风险统计。 |
 | `freeze-check-report.md` | 可读 freeze 报告，包含 checksum、domain counts、blockers、warnings、sensitive review、forbidden review、deferred review 和 no-real-import statement。 |
 
-012 生成的 evidence 目录：
+生成的 evidence 目录：
 
 - `output/customers/yoyoosun/source-snapshot-freeze/`
 - `output/customers/yoyoosun/real-dry-run-evidence/`
@@ -43,7 +43,7 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-012 real dry-run evidence 使用 freeze fixtures：
+real dry-run evidence 使用 freeze fixtures：
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \
@@ -178,7 +178,7 @@ existing snapshot 只作为只读匹配输入。CLI 不从数据库读取 existi
 - 不改 docs registry。
 - 不执行真实 import / backfill。
 - `canExecuteRealImport` 永远是 `false`。
-- 012 freeze evidence 和 dry-run evidence 不是导入批准。
+- freeze evidence 和 dry-run evidence 不是导入批准。
 - 真实 import loader 仍需单独实现任务，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
 - `sales_order` 仍是 Source Document / Business Commitment，不是 shipment、inventory 或 finance fact。
 - `shipping_released != shipped`。

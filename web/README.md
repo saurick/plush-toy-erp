@@ -192,6 +192,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面侧栏只保留看板、业务分组、单据模板和系统管理。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径只做兼容重定向，不再作为产品内页面。
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
+- 开发环境额外提供 `http://localhost:5175/__dev/docs` 作为本地开发态文档查看器；该入口左侧专用于按真实目录树浏览仓库 tracked Markdown，搜索态显示匹配结果，右侧章节标签可滚动到对应标题并提供回到顶部，不进入侧栏、seedData、RBAC 或产品内文档 registry，生产构建不可访问。
 
 ## 当前前端边界
 

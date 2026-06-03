@@ -1,5 +1,5 @@
 Doc Type / 文档类型: Yoyoosun Customer Import Strategy / 永绅 yoyoosun 客户导入策略
-Status / 状态: Draft + 011 Tooling Added / 草案，已补 011 工具
+Status / 状态: Draft + Dry-run / Freeze Tooling Added / 草案，已补 dry-run / freeze 工具
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
@@ -7,7 +7,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入策略 / Yoyoosun Customer Import Strategy
 
-本策略从 Product 层约束 永绅 yoyoosun 客户数据导入。011 已新增 dry-run preview package tooling，012 已新增 source snapshot freeze checker 和 real dry-run evidence preparation；它们都不是真实 import loader，不代表真实导入已经开始。
+本策略从 Product 层约束 永绅 yoyoosun 客户数据导入。当前已新增 dry-run preview package tooling、source snapshot freeze checker 和 real dry-run evidence preparation；它们都不是真实 import loader，不代表真实导入已经开始。
 
 ## 定位 / Position
 
@@ -60,7 +60,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 ## 未来导入 loader 要求 / Future Import Loader Requirements
 
-011 已实现 dry-run preview package：
+已实现 dry-run preview package：
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \
@@ -72,7 +72,7 @@ node scripts/import/customerImportDryRun.mjs \
 
 该 preview package 可输出 source references、normalized rows、candidates、unresolved queue、duplicates、conflicts、forbidden auto-import、validation summary 和 Markdown report。它只证明 dry-run tooling 可运行；真实 loader 仍需单独实现任务。
 
-012 已实现 freeze checker 和 evidence preparation：
+已实现 freeze checker 和 evidence preparation：
 
 ```bash
 node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
@@ -81,7 +81,7 @@ node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
   --out output/customers/yoyoosun/source-snapshot-freeze
 ```
 
-012 同时用 freeze fixtures 生成 `output/customers/yoyoosun/real-dry-run-evidence/`。这些 output 目录只是 evidence，不是 import approval；`freeze-metadata.json` 和 dry-run `validation-summary.json` 都必须保持 `canExecuteRealImport=false`。
+同时用 freeze fixtures 生成 `output/customers/yoyoosun/real-dry-run-evidence/`。这些 output 目录只是 evidence，不是 import approval；`freeze-metadata.json` 和 dry-run `validation-summary.json` 都必须保持 `canExecuteRealImport=false`。
 
 后续真实 import loader 必须作为单独实现任务，并先满足：
 

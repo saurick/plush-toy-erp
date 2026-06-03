@@ -1,5 +1,5 @@
 Doc Type / 文档类型: Yoyoosun Customer Import Acceptance Checklist / 永绅 yoyoosun 客户导入验收清单
-Status / 状态: Draft + 011 Tooling Evidence Added / 草案，已补 011 工具证据
+Status / 状态: Draft + Dry-run / Freeze Evidence Prepared / 草案，已准备 dry-run / freeze 证据
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
@@ -7,16 +7,16 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入验收清单 / Yoyoosun Customer Import Acceptance Checklist
 
-本清单用于 future 永绅 yoyoosun 客户导入前的 dry-run 验收。010 只产出清单，不执行真实导入；011 已新增 CLI dry-run package；012 已新增 source snapshot freeze checker、sanitized freeze fixtures、freeze evidence、real dry-run evidence 和 manual review checklist。这些都可作为 future import 前置 evidence，但仍不代表真实导入可以直接执行。
+本清单用于 future 永绅 yoyoosun 客户导入前的 dry-run 验收。当前已具备 dry-run draft、CLI dry-run package、source snapshot freeze checker、sanitized freeze fixtures、freeze evidence、real dry-run evidence 和 manual review checklist。这些都可作为 future import 前置 evidence，但仍不代表真实导入可以直接执行。
 
 ## 检查清单 / Checklist
 
-| item | required before import execution | evidence | 010 status |
+| item | required before import execution | evidence | status |
 |---|---:|---|---|
 | source files confirmed | 是 | source reference list，文件名 / sheet / row / business_record id | Draft only |
-| 011 dry-run package generated | 是 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` | Tooling available |
-| 012 source snapshot freeze evidence generated | 是 | `freeze-metadata.json`、`freeze-check-summary.json`、`freeze-check-report.md` | Evidence prepared |
-| 012 manual review checklist prepared | 是 | `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md` | Evidence prepared |
+| dry-run package generated | 是 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` | Tooling available |
+| source snapshot freeze evidence generated | 是 | `freeze-metadata.json`、`freeze-check-summary.json`、`freeze-check-report.md` | Evidence prepared |
+| manual review checklist prepared | 是 | `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md` | Evidence prepared |
 | field classification reviewed | 是 | `import-field-classification.md` 经人工评审 | Draft only |
 | target model confirmed | 是 | V1 / existing formal model 列表 | Draft only |
 | required fields present | 是 | required field validation summary | Draft only |
@@ -37,9 +37,9 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | backup plan prepared | 是 | 数据库备份和 source artifact 归档 | Future Stage 6 required |
 | customer sign-off | 是 | 客户确认导入预览和 unresolved 处理 | Future Stage 5 required |
 
-## 011 CLI 证据 / 011 CLI Evidence
+## CLI 证据 / CLI Evidence
 
-011 的 dry-run evidence 由以下命令生成：
+dry-run evidence 由以下命令生成：
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \
@@ -51,9 +51,9 @@ node scripts/import/customerImportDryRun.mjs \
 
 `validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。真实导入仍需要人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和单独 implementation task。
 
-## 012 冻结证据 / 012 Freeze Evidence
+## 冻结证据 / Freeze Evidence
 
-012 的 freeze evidence 由以下命令生成：
+freeze evidence 由以下命令生成：
 
 ```bash
 node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
@@ -62,7 +62,7 @@ node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
   --out output/customers/yoyoosun/source-snapshot-freeze
 ```
 
-012 的 real dry-run evidence 由以下命令生成：
+real dry-run evidence 由以下命令生成：
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \
@@ -96,4 +96,4 @@ node scripts/import/customerImportDryRun.mjs \
 - 需要修改 seedData、docs registry、runtime API/UI 或 `business_records` 才能让 dry-run 通过。
 - 永绅 yoyoosun 客户字段被当作 Product Core 必填字段。
 - unresolved queue 中还有 block 项。
-- 012 freeze evidence 或 real dry-run evidence 被误读为真实导入批准。
+- freeze evidence 或 real dry-run evidence 被误读为真实导入批准。

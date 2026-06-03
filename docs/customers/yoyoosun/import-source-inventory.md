@@ -7,7 +7,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入来源清单 / Yoyoosun Customer Import Source Inventory
 
-本清单只用于 010 的 永绅 yoyoosun 客户数据导入 dry-run 设计。它不执行真实导入，不写 import/backfill 代码，不修改 runtime、schema、migration、API、UI、docs registry、seedData 或 `business_records`。
+本清单只用于 永绅 yoyoosun 客户数据导入 dry-run 设计。它不执行真实导入，不写 import/backfill 代码，不修改 runtime、schema、migration、API、UI、docs registry、seedData 或 `business_records`。
 
 ## 来源清单 / Source Inventory
 
@@ -28,8 +28,8 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `docs/product/business-records-data-map-draft.md` | Source Snapshot / Data Import Source | Product / Data Import | partners, products, project-orders | 是，仅作为 dry-run 设计输入 | V1 MasterData / Sales Order 候选 | High | 是 | 009 输出的映射草案是本轮 data map 输入，不是迁移执行。 |
 | `docs/product/business-records-reference-audit.md` | Audit / Source Snapshot | Product | business_records references | 否 | 无直接导入目标 | High | 是 | 用于确认兼容层引用面和旧入口风险。 |
 | `business_records` 旧数据或旧入口 | Source Snapshot / Demo Seed / QA Debug / Data Import Source | Product / Data Import | partners, products, project-orders, purchase, shipment, finance | 仅 dry-run | customers / suppliers / contacts / sales_orders / sales_order_items / existing products/materials/warehouses 候选 | Medium | 是 | 不删除、不迁移、不双写；不能作为长期事实真源。 |
-| V1 customers 页面和 API | V1 formal model | MasterData | customers | 是，未来 import execution 才可写 | `customers` | High | 是 | 当前 010 不写入；后续真实 loader 必须走 V1 usecase。 |
-| V1 suppliers 页面和 API | V1 formal model | MasterData | suppliers | 是，未来 import execution 才可写 | `suppliers` | High | 是 | 当前 010 不写入；加工厂 / 供应商分类不清时必须 unresolved。 |
+| V1 customers 页面和 API | V1 formal model | MasterData | customers | 是，未来 import execution 才可写 | `customers` | High | 是 | 当前 dry-run 不写入；后续真实 loader 必须走 V1 usecase。 |
+| V1 suppliers 页面和 API | V1 formal model | MasterData | suppliers | 是，未来 import execution 才可写 | `suppliers` | High | 是 | 当前 dry-run 不写入；加工厂 / 供应商分类不清时必须 unresolved。 |
 | V1 contacts 页面和 API | V1 formal model | MasterData | contacts | 是，未来 import execution 才可写 | `contacts` | High | 是 | owner_type + owner_id 必须先唯一确认。 |
 | V1 sales_orders 页面和 API | V1 formal model | Source Document | sales orders | 是，未来 import execution 才可写 | `sales_orders` | High | 是 | Sales order 只是 Source Document / Business Commitment，不写 shipment、inventory、finance facts。 |
 | V1 sales_order_items 页面和 API | V1 formal model | Source Document | sales order items | 是，未来 import execution 才可写 | `sales_order_items` | High | 是 | product_id 和 unit_id 必须唯一匹配；不自动生成 `product_skus`。 |
