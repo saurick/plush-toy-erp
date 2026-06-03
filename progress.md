@@ -6,6 +6,12 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-03 12:16
+- 完成：移除前端产品内文档中心、帮助中心、高级文档和开发与验收页面的运行时代码与 Markdown，包括 `web/src/erp/docs/*`、`docs.mjs`、对应页面 / 组件 / util / 测试、前端 debug API client 和相关样式；旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness`、`/erp/mobile-workbenches`、`/erp/roles/*` 等路径仅兼容重定向到 `/erp/dashboard`。
+- 完成：同步服务端内置菜单和 RBAC，移除帮助中心权限与旧 docs / QA 菜单下发，旧菜单权限归一到看板；同步 `AGENTS.md`、`README.md`、`docs/current-source-of-truth.md`、`web/README.md`、产品 / 架构 / 客户相关文档和 `docs/document-inventory.md`，将当前口径收敛为“仓库正式文档保留，产品内文档入口已下线”。
+- 下一步：若未来要恢复产品内业务帮助或开发验收入口，需单独设计 registry、菜单权限、路由、seed navigation 和浏览器回归；不要复用本轮删除的旧页面作为隐藏真源。
+- 阻塞/风险：本轮未改 schema、migration、库存 / 出货 / 财务 fact usecase、真实导入 loader 或部署脚本；后端 debug JSON-RPC 能力仍保留为受权限保护的内部调试接口，不再有前端调试页面入口。验证已通过 `cd web && pnpm lint && pnpm css && pnpm test && pnpm style:l1`、`cd server && go test ./internal/biz ./internal/data`、`git diff --check`。本轮追加前 `progress.md` 为 156 行 / 28819 bytes，未达到归档阈值。
+
 ## 2026-06-02 21:15
 - 完成：批量补齐长期维护 Markdown 的 H1 中文主体 + English anchor，覆盖产品、架构、工作流、仓库、财务、角色、可观测性、部署约定、打印模板说明、外部 imported notes、客户 evidence 和旧架构归档文档；同时给旧进度归档补 H1。
 - 下一步：后续新增或触达长期维护 Markdown 时，继续保持 H1 和 `docs/document-inventory.md` 的标题 / 当前用途口径一致；不要把标题双语化误认为 runtime、schema、API 或 UI 能力变化。

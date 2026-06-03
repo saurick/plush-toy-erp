@@ -249,7 +249,6 @@ const ROLE_OPTIONS = BUSINESS_ROLE_OPTIONS.map((role) => ({
   label: role.label,
   value: role.key,
 }))
-const CALCULATION_GUIDE_PATH = '/erp/docs/calculation-guide'
 const NUMBER_FIELDS = new Set(['quantity', 'amount'])
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
 const ACTIVE_APPROVAL_TASK_STATUS_KEYS = new Set([
@@ -4303,14 +4302,6 @@ export default function BusinessModulePage({ moduleItem }) {
                           金额会自动按 数量 × 单价
                           计算，金额合计按全部条目汇总。
                         </Text>
-                        <Button
-                          type="link"
-                          size="small"
-                          className="erp-business-record-form__items-help-link"
-                          onClick={() => navigate(CALCULATION_GUIDE_PATH)}
-                        >
-                          查看计算口径
-                        </Button>
                       </div>
                       <div className="erp-business-record-form__items-scroll">
                         <div

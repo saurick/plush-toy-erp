@@ -31,7 +31,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | no `purchase_orders` generated unless future review approves | 是 | purchase order 字段全部 deferred / unresolved | Draft only |
 | business_records not deleted | 是 | `business_records` 只作 source snapshot | Draft only |
 | seedData not modified | 是 | `web/src/erp/config/seedData.mjs` 未改 | Draft only |
-| docs registry not modified | 是 | `web/src/erp/config/docs.mjs` 未改 | Draft only |
+| frontend docs registry not restored | 是 | 产品内 docs registry 已移除，导入任务不恢复 `web/src/erp/config/docs.mjs` | Draft only |
 | V1 data preview reviewed | 是 | customers/suppliers/contacts/orders/items preview | Draft only |
 | rollback plan prepared | 是 | rollback 或 forward-fix 方案 | Future Stage 6 required |
 | backup plan prepared | 是 | 数据库备份和 source artifact 归档 | Future Stage 6 required |

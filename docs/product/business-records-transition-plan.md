@@ -15,7 +15,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 - `docs/product/business-records-data-map-draft.md`
 - `docs/product/business-records-risk-register.md`
 
-这些文件只增加引用审计、风险清单、迁移草案和下一步计划；未实施 runtime、API、UI、seedData、docs registry、schema、migration、import/backfill、真实数据迁移或删除。
+这些文件只增加引用审计、风险清单、迁移草案和下一步计划；未实施 runtime、API、UI、seedData、菜单路由、schema、migration、import/backfill、真实数据迁移或删除。
 
 ```text
 business_records 当前可继续作为兼容层、demo、seed、source snapshot、调研入口。

@@ -5,17 +5,10 @@ import { normalizeRoleKey } from '../utils/roleKeys.mjs'
 export const PERMISSION_CENTER_PATH = '/erp/system/permissions'
 
 const PERMISSION_ALIAS_MAP = Object.freeze({
-  '/erp/flows/overview': '/erp/docs/operation-flow-overview',
-  '/erp/source-readiness': '/erp/docs/field-linkage-guide',
-  '/erp/mobile-workbenches': '/erp/docs/operation-guide',
-  '/erp/help-center': '/erp/docs/operation-flow-overview',
-  '/erp/docs/system-init': '/erp/docs/operation-guide',
-  '/erp/docs/mobile-roles': '/erp/docs/mobile-role-guide',
-  '/erp/docs/operation-playbook': '/erp/docs/operation-flow-overview',
-  '/erp/docs/field-truth': '/erp/docs/field-linkage-guide',
-  '/erp/docs/import-mapping': '/erp/docs/field-linkage-guide',
-  '/erp/docs/data-model': '/erp/docs/calculation-guide',
-  '/erp/docs/print-templates': '/erp/docs/print-snapshot-guide',
+  '/erp/flows/overview': '/erp/dashboard',
+  '/erp/source-readiness': '/erp/dashboard',
+  '/erp/mobile-workbenches': '/erp/dashboard',
+  '/erp/help-center': '/erp/dashboard',
 })
 
 const BUSINESS_SECTION_TITLES = Object.freeze([
@@ -70,9 +63,16 @@ function collectSectionPaths(sectionTitles = []) {
   )
 }
 
-const helpDocPaths = collectSectionPaths(['帮助中心'])
 const masterModulePaths = collectSectionPaths(['基础资料'])
 const businessModulePaths = collectSectionPaths(BUSINESS_SECTION_TITLES)
+
+function normalizePermissionAlias(path = '') {
+  const key = String(path || '').trim()
+  if (key.startsWith('/erp/docs/') || key.startsWith('/erp/qa/')) {
+    return '/erp/dashboard'
+  }
+  return PERMISSION_ALIAS_MAP[key] || key
+}
 
 function buildPreset(paths = []) {
   return uniquePaths(paths).filter((path) =>
@@ -91,20 +91,19 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
   {
     key: 'boss',
     label: '老板 / 管理层',
-    description: '看全链路业务页、打印中心和全部帮助中心，不含权限管理。',
+    description: '看全链路业务页和打印中心，不含权限管理。',
     mobileRolePermissions: buildMobileRolePreset(['boss']),
     permissions: buildPreset([
       '/erp/dashboard',
       '/erp/business-dashboard',
       '/erp/print-center',
       ...businessModulePaths,
-      ...helpDocPaths,
     ]),
   },
   {
     key: 'sales',
     label: '业务',
-    description: '保留立项、待出货和相关帮助文档。',
+    description: '保留立项、待出货和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['sales']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -113,7 +112,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       ...masterModulePaths,
       '/erp/sales/project-orders',
       '/erp/warehouse/shipping-release',
-      ...helpDocPaths,
     ]),
   },
   {
@@ -134,7 +132,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/production/progress',
       '/erp/production/exceptions',
       '/erp/production/quality-inspections',
-      ...helpDocPaths,
     ]),
   },
   {
@@ -151,7 +148,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/production/progress',
       '/erp/production/exceptions',
       '/erp/production/quality-inspections',
-      ...helpDocPaths,
     ]),
   },
   {
@@ -168,13 +164,12 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/purchase/accessories',
       '/erp/purchase/processing-contracts',
       '/erp/warehouse/inbound',
-      ...helpDocPaths,
     ]),
   },
   {
     key: 'warehouse',
     label: '仓库',
-    description: '保留收货、库存、待出货、出库和相关帮助中心入口。',
+    description: '保留收货、库存、待出货和出库入口。',
     mobileRolePermissions: buildMobileRolePreset(['warehouse']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -184,7 +179,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/warehouse/inventory',
       '/erp/warehouse/shipping-release',
       '/erp/warehouse/outbound',
-      ...helpDocPaths,
     ]),
   },
   {
@@ -201,13 +195,12 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/warehouse/shipping-release',
       '/erp/production/quality-inspections',
       '/erp/production/exceptions',
-      ...helpDocPaths,
     ]),
   },
   {
     key: 'finance',
     label: '财务',
-    description: '保留放行、对账、待付款、打印中心和帮助中心入口。',
+    description: '保留放行、对账、待付款和打印中心入口。',
     mobileRolePermissions: buildMobileRolePreset(['finance']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -220,7 +213,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/finance/payables',
       '/erp/finance/receivables',
       '/erp/finance/invoices',
-      ...helpDocPaths,
     ]),
   },
 ])
@@ -242,8 +234,7 @@ export const normalizeMenuPermissions = (permissions = []) => {
 
   const selected = new Set()
   permissions.forEach((rawKey) => {
-    const key = String(rawKey || '').trim()
-    const normalizedKey = PERMISSION_ALIAS_MAP[key] || key
+    const normalizedKey = normalizePermissionAlias(rawKey)
     if (!normalizedKey || !permissionSet.has(normalizedKey)) {
       return
     }
@@ -310,8 +301,7 @@ export const matchPermissionPreset = (permissions = []) => {
 }
 
 export const resolveMenuPermissionKey = (pathname = '') => {
-  const rawPath = String(pathname || '').trim()
-  const normalizedPath = PERMISSION_ALIAS_MAP[rawPath] || rawPath
+  const normalizedPath = normalizePermissionAlias(pathname)
   if (!normalizedPath) {
     return ''
   }

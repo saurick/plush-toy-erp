@@ -18,12 +18,12 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `business_records` orders 误当 `sales_orders` | 旧 `project-orders` 状态、数量或未出货数被当正式 Source Document 或出货结果 | `project-orders` 定义包含订单数量、生产数量、未出货数 | 只做 dry-run；正式 sales order 不写 shipment / inventory / finance facts | Sales / Data | 是 |
 | `business_records.products` 与 `products` schema 重复 | 旧产品资料页继续新增核心字段，形成第二套产品主档 | existing `products` 已是成品主数据；旧 `products` 仍在业务模块 | 旧 products 只保留 source snapshot；正式产品能力复用 existing `products` | MasterData | 是 |
 | partners 同时对应 customers / suppliers | 同一 `partners` 记录可能是客户、供应商、加工厂或潜在客户，自动拆分可能错 | `payload.partner_type` 是文本分类，历史数据可能缺值或不一致 | 按 partner_type dry-run；无法唯一判断进入人工确认 | MasterData / Data Import | 是 |
-| 旧页面继续新增功能导致 V1 失焦 | 新功能继续堆到通用页面，V1 正式模型长期无法成为主路径 | `BusinessModulePage` 功能完整，V1 页面仍未进 seedData/docs registry | 停止重叠领域新增核心能力；单独做菜单和只读化任务 | Product / UI | 是 |
+| 旧页面继续新增功能导致 V1 失焦 | 新功能继续堆到通用页面，V1 正式模型长期无法成为主路径 | `BusinessModulePage` 功能完整，V1 页面仍需按菜单和路由分阶段切换 | 停止重叠领域新增核心能力；单独做菜单和只读化任务 | Product / UI | 是 |
 | 自动迁移误写正式数据 | 缺值、重名、单位不匹配或 payload 语义错误导致正式表污染 | 旧记录字段包含自由文本、float 数量和 payload | 先 dry-run；输出 unresolved queue；人工确认后才迁移 | Data Import / Ops | 是 |
-| 删除 `business_records` 破坏历史文档 / demo / QA | 旧帮助、debug、L1、mock、移动端任务和历史记录不可用 | 引用审计显示后端、前端、docs、tests 多处依赖 | 禁止直接删除；先只读 / archive；保留历史查看 | Product / QA / Ops | 是 |
-| seedData / docs registry 修改引发前端回归 | 菜单、权限、帮助入口和 L1 场景受影响 | `seedData.mjs`、`docs.mjs` 是前端入口真源，本轮禁止修改 | 单独菜单入口任务；跑前端 lint/css/test/style:l1 | UI / QA | 是 |
+| 删除 `business_records` 破坏历史文档 / demo / QA | 旧 debug、L1、mock、移动端任务和历史记录不可用 | 引用审计显示后端、前端、docs、tests 多处依赖 | 禁止直接删除；先只读 / archive；保留历史查看 | Product / QA / Ops | 是 |
+| seedData / 菜单路由修改引发前端回归 | 菜单、权限、兼容重定向和 L1 场景受影响 | `seedData.mjs`、`menuPermissions.mjs`、后端内置菜单和路由共同决定前端入口 | 单独菜单入口任务；跑前端 lint/css/test/style:l1 | UI / QA | 是 |
 | 迁移后无法回滚 | 正式表被错误写入后无法恢复旧状态 | 当前无 migration / import 实现和备份方案 | 受控迁移前必须备份、dry-run、幂等、对账和 rollback/forward-fix | Data / Ops | 是 |
-| 用户误认为 `business_records` 是正式入口 | 旧页面仍有完整表单和保存能力，容易继续用于正式业务 | Dashboard、menu、BusinessModulePage、帮助文档仍暴露旧入口 | UI 文案标识 compatibility / demo / read-only；正式菜单指向 V1 | UI / Docs | 是 |
+| 用户误认为 `business_records` 是正式入口 | 旧页面仍有完整表单和保存能力，容易继续用于正式业务 | Dashboard、menu、BusinessModulePage 仍暴露旧入口 | UI 文案标识 compatibility / demo / read-only；正式菜单指向 V1 | UI / Docs | 是 |
 | 出货放行误读为已发货 | `shipping-release` / `outbound` 旧快照可能和 `shipping_released` 混用 | 文档反复强调 `shipping_released != shipped` | 禁止自动生成 shipments / inventory facts；出货事实单独评审 | Workflow / Shipment | 是 |
 | 财务快照误写财务事实 | 旧 reconciliation/payables/receivables/invoices 记录可能被当正式应收应付 | finance facts 尚未落地；旧入口只是快照 | finance review 前只保留 source snapshot；不得自动生成 AR/AP/invoice/payment | Finance | 是 |
 | Workflow source 切换破坏移动端任务 | workflow_tasks source_type/source_id 可能仍指向旧 module 和 record | mobile task、linked navigation、workflow helper 使用旧 source key | source cutover 单独评审；兼容期保留旧 source 跳转 | Workflow / Mobile | 是 |
@@ -34,6 +34,6 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 |---:|---|---|
 | P0 | 双真源 / 双写 | 009 只输出审计和计划；后续 runtime 任务才能限制写入 |
 | P0 | 自动迁移误写正式数据 | 后续必须先做 dry-run，不允许直接 backfill |
-| P1 | seedData / docs registry 切换影响前端 | 单独菜单入口任务，不能混在审计里 |
+| P1 | seedData / 菜单路由切换影响前端 | 单独菜单入口任务，不能混在审计里 |
 | P1 | 用户误认为旧入口仍是正式入口 | 后续 UI / docs 标识只读或 deprecated |
 | P1 | 出货 / 财务事实被旧快照伪造 | 继续保持 Workflow / Fact 边界和禁止自动映射 |

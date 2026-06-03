@@ -34,7 +34,7 @@ workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作
 
 | 角色 | 定位 | 默认权限范围 | 任务处理边界 |
 | --- | --- | --- | --- |
-| `boss` | 管理层、审批和风险查看 | 全局 read、审批、报表、看板和帮助中心；不默认给 `debug.business.clear` | 可处理老板角色池或指派给自己的任务；关注高风险不等于替其他角色完成事实 |
+| `boss` | 管理层、审批和风险查看 | 全局 read、审批、报表和看板；不默认给 `debug.business.clear` | 可处理老板角色池或指派给自己的任务；关注高风险不等于替其他角色完成事实 |
 | `sales` | 销售 / 业务跟进 | 销售链路、客户订单、出货协同、业务记录读写、基础 workflow 权限、销售移动端 | 只能处理 `owner_role_key=sales` 或 `assignee_id=自己` 的任务 |
 | `purchase` | 采购 | 采购单、采购收货、采购退货、采购异常、业务记录读写、采购移动端 | 只能处理 `owner_role_key=purchase` 或 `assignee_id=自己` 的任务 |
 | `warehouse` | 仓库 | 库存、入库、出库、盘点、仓库移动端 | 只能处理 `owner_role_key=warehouse` 或 `assignee_id=自己` 的任务 |

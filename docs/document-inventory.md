@@ -17,8 +17,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 ## 使用规则
 
-- `web/src/erp/docs/*.md` 是产品内文档源文件，是否展示取决于 `web/src/erp/config/docs.mjs` 和 `web/src/erp/config/seedData.mjs`。
-- `docs/product/*` 和 `docs/architecture/*` 是正式产品 / 架构评审文档，但不自动进入前端帮助中心。
+- `docs/product/*` 和 `docs/architecture/*` 是正式产品 / 架构评审文档；当前不再镜像到前端文档中心。
 - `docs/archive/*`、`progress.md` 只用于历史追溯；原 `docs/changes/*` 历史文件已删除，当前状态回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、代码和测试交叉确认。
 - `docs/reference/imported-notes/*` 是外部输入，必须先经过正式文档和代码复核。
 - README / server docs / config docs / deployment docs 是目录、运行、部署或子系统维护说明。
@@ -168,48 +167,6 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/reference/imported-notes/erp_plush_productization_config_permission_workflow_state_design.md` | 毛绒玩具 ERP 产品化配置、权限、流程与状态设计总结 |
 | `docs/reference/imported-notes/erp_status_workflow_context.md` | 状态分层、状态机、Workflow 与业务事实设计总结 / ERP Status Workflow Context |
 | `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` | 外部导入说明：毛绒玩具 ERP 从 0 到 1 重构方案 / Imported Note: Plush Toy ERP From 0 To 1 Plan |
-
-### 前端产品内文档
-
-| 路径 | 标题 / 当前用途 |
-| --- | --- |
-| `web/src/erp/docs/acceptance-overview.md` | 验收结果总览 |
-| `web/src/erp/docs/business-chain-debug.md` | 业务链路调试 |
-| `web/src/erp/docs/calculation-guide.md` | ERP 计算口径 |
-| `web/src/erp/docs/current-boundaries.md` | 当前明确不做 |
-| `web/src/erp/docs/data-model.md` | 首批正式数据模型 |
-| `web/src/erp/docs/desktop-role-guide.md` | 桌面端角色流程 |
-| `web/src/erp/docs/exception-handling-guide.md` | 异常 / 返工 / 延期处理 |
-| `web/src/erp/docs/field-linkage-coverage.md` | 字段联动覆盖 |
-| `web/src/erp/docs/field-linkage-guide.md` | ERP 字段联动口径 |
-| `web/src/erp/docs/field-truth.md` | 字段真源对照 |
-| `web/src/erp/docs/finance-v1.md` | 财务 v1 |
-| `web/src/erp/docs/import-mapping.md` | Excel / PDF 导入映射 |
-| `web/src/erp/docs/industry-schema-review.md` | 行业专表 Ent Schema 评审 |
-| `web/src/erp/docs/log-trace-audit-v1.md` | 日志 / 审计 / Trace v1 |
-| `web/src/erp/docs/mobile-role-guide.md` | 手机端角色流程 |
-| `web/src/erp/docs/mobile-roles.md` | 桌面单后台与移动端端口 |
-| `web/src/erp/docs/notification-alert-v1.md` | 通知 / 预警 / 催办 / 升级 v1 |
-| `web/src/erp/docs/operation-flow-overview.md` | ERP 流程图总览 |
-| `web/src/erp/docs/operation-guide.md` | ERP 操作教程 |
-| `web/src/erp/docs/operation-playbook.md` | 毛绒 ERP 主流程 |
-| `web/src/erp/docs/print-snapshot-guide.md` | 打印 / 合同 / 快照口径 |
-| `web/src/erp/docs/print-templates.md` | 模板打印与字段口径 |
-| `web/src/erp/docs/productization-delivery.md` | 产品化与交付 |
-| `web/src/erp/docs/qa-reports.md` | 专项报告 |
-| `web/src/erp/docs/qa-run-records.md` | 运行记录 |
-| `web/src/erp/docs/role-collaboration-guide.md` | 角色协同链路 |
-| `web/src/erp/docs/role-page-document-matrix.md` | 角色权限 / 页面 / 单据矩阵 |
-| `web/src/erp/docs/role-permission-matrix-v1.md` | 角色权限矩阵 v1 |
-| `web/src/erp/docs/system-init.md` | 系统初始化与端口说明 |
-| `web/src/erp/docs/system-layer-progress.md` | 系统分层进度 |
-| `web/src/erp/docs/task-document-mapping.md` | 任务 / 单据映射表 |
-| `web/src/erp/docs/task-flow-v1.md` | 工作流主任务树 v1 |
-| `web/src/erp/docs/warehouse-quality-v1.md` | 仓库与品质 v1 |
-| `web/src/erp/docs/workflow-schema-draft.md` | Workflow / Schema 草案 |
-| `web/src/erp/docs/workflow-status-guide.md` | 任务 / 业务状态字典 |
-| `web/src/erp/docs/workflow-task-debug.md` | 协同任务调试 |
-| `web/src/erp/docs/workflow-usecase-review.md` | Workflow Usecase 统一编排评审 |
 
 ### 前端 / 后端 / 脚本说明
 

@@ -7,7 +7,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 业务记录引用审计 / business_records Reference Audit
 
-本审计只记录当前仓库中 `business_records / business_record_items / business_record_events` 的引用面和过渡建议，不修改 runtime、schema、migration、API、RBAC、UI、docs registry、seedData，也不迁移或删除数据。
+本审计只记录当前仓库中 `business_records / business_record_items / business_record_events` 的引用面和过渡建议，不修改 runtime、schema、migration、API、RBAC、UI、seedData、菜单路由或产品内文档入口，也不迁移或删除数据。
 
 结论先行：
 
@@ -40,7 +40,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `web/src/erp/config/businessModules.mjs` | 定义通用业务模块导航、文案和边界；包含 `partners`、`products`、`project-orders` | UI config / docs/help | 是 | deprecate later for overlapping domains；当前保留为兼容入口 |
 | `web/src/erp/config/businessRecordDefinitions.mjs` | 定义通用业务记录表单、表格、明细和 master-record 选择；`partners`、`products`、`project-orders` 有专门 override | UI config / compatibility | 是 | needs manual review；后续避免继续扩展重叠领域核心字段 |
 | `web/src/erp/config/seedData.mjs` | 初始化导航、模块和示例数据入口 | seed/demo / UI config | 是 | keep as demo；本轮禁止改；后续要单独评审 seedData 与 V1 菜单切换 |
-| `web/src/erp/config/docs.mjs` | docs registry 可能引用通用业务文档和验收入口 | docs/help | 间接重叠 | keep；本轮禁止改 docs registry |
+| `web/src/erp/config/docs.mjs` | 原前端 docs registry 已移除 | docs/help | 否 | removed；产品内文档中心不再作为运行时入口 |
 | `web/src/erp/config/dashboardModules.mjs` | Dashboard 快捷模块仍指向 `partners`、`project-orders` 等兼容父路径 | UI / compatibility | 是 | deprecate later；后续入口切换需单独任务 |
 | `web/src/erp/config/menuPermissions.mjs`、测试 | 菜单权限仍包含 `/erp/master/partners`、`/erp/sales/project-orders` | UI / RBAC display | 是 | keep until menu review；不能当后端安全边界 |
 | `web/src/erp/router.jsx` | 同时挂载通用业务页和 V1 页面：`/erp/master/partners/customers`、`/erp/master/partners/suppliers`、`/erp/sales/project-orders/sales-orders` | UI route | 是 | keep；避免旧入口和 V1 页面双写同一真源 |
@@ -51,7 +51,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `web/src/erp/utils/orderApprovalFlow.mjs` | 老 `project-orders` 审批任务以 `business_records` 为 source | workflow helper / compatibility | 是，与 `sales_orders` Source Document 重叠 | deprecate later；不得把 workflow done 当 sales order fact |
 | `web/src/erp/utils/purchaseInboundFlow.mjs`、`outsourceReturnFlow.mjs`、`finishedGoodsFlow.mjs`、`shipmentFinanceFlow.mjs`、`payableReconciliationFlow.mjs` | 旧通用业务链路从兼容记录派生协同任务或展示状态 | workflow helper / compatibility / demo | 间接重叠 | needs manual review；不得生成 inventory / shipment / finance facts |
 | `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | 移动端任务详情按 source_type 跳转和展示兼容记录 | UI / compatibility | 间接重叠 | keep until source route cutover |
-| `web/src/erp/docs/*` | 帮助中心和开发验收文档描述旧通用业务记录、字段联动、workflow draft、debug 和业务链路 | docs/help / compatibility | 是 | deprecate later；正式口径应逐步指向 V1 文档 |
+| `web/src/erp/docs/*` | 原帮助中心、开发验收和高级文档 Markdown 已移除 | docs/help / compatibility | 否 | removed；正式口径回到 `docs/` 和 README |
 | `docs/current-source-of-truth.md` | 当前状态入口，同时说明 `business_records` 仍是兼容层且 V1 已完成到 UI | docs/source index | 是 | update with 009 audit note |
 | `docs/product/business-records-transition-plan.md` | 既有 transition plan，明确兼容层定位和不得直接删除 | docs/plan | 是 | update with 009 audit outputs |
 | `docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md` | 记录当前 V1 正式模型状态、roadmap 阶段和 `business_records` 退出方向 | docs/plan | 是 | keep；旧 V1 schema draft / cutline / go-no-go 文件已从活跃文档树删除 |
@@ -91,5 +91,5 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 缺口 | 影响 | 下一步 |
 |---|---|---|
 | 本轮未读取真实数据库数据 | 无法判断旧记录数量、重复主体、缺值比例 | 后续 import draft / dry-run 任务读取数据并输出 unresolved queue |
-| 未改 UI / seedData / docs registry | 旧入口仍可见，V1 页面仍未完成正式菜单切换 | 后续菜单入口评审单独处理 |
+| 未改 UI / seedData / 菜单路由 | 旧入口仍可见，V1 页面仍未完成正式菜单切换；产品内 docs registry 已下线 | 后续菜单入口评审单独处理 |
 | 生成代码引用数量较多 | 文件级审计可确认存在，但不应手改 generated code | 后续 runtime cutover 不触碰 generated code，除非 schema/migration 任务 |

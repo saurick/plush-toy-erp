@@ -708,93 +708,6 @@ const scenarios = [
     },
   },
   {
-    name: 'help-center-desktop',
-    path: '/erp/help-center',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '业务操作导航')
-      await expectText(page, '新手先看')
-      await expectText(page, '按角色找工作')
-      await expectText(page, '按业务主线查')
-      await expectText(page, '手机端看不到任务怎么办？')
-      await expectText(page, '高级文档 / 管理员 / 开发验收')
-      await assertNoHorizontalOverflow(page, 'help-center-desktop-before-click')
-      await page.getByRole('link', { name: 'ERP 操作教程' }).first().click()
-      await expectHeading(page, 'ERP 操作教程')
-    },
-  },
-  {
-    name: 'help-center-mobile',
-    path: '/erp/help-center',
-    auth: 'admin',
-    viewport: { width: 390, height: 844 },
-    verify: async (page) => {
-      await expectHeading(page, '业务操作导航')
-      await expectText(page, '新手先看')
-      await expectText(page, '按角色找工作')
-      await expectText(page, '常见问题')
-      await expectText(page, '高级文档 / 管理员 / 开发验收')
-    },
-  },
-  {
-    name: 'operation-flow-overview-desktop',
-    path: '/erp/docs/operation-flow-overview',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, 'ERP 流程图总览')
-      await expectText(page, '流程速览')
-      await expectText(page, '来源链路速览')
-      await expectText(page, '基础资料与业务立项')
-      await expectText(page, '材料与委外准备')
-      await expectText(page, '结算与移动端协同')
-      await expectText(page, '查看完整版流程文档')
-    },
-  },
-  {
-    name: 'role-collaboration-guide-desktop',
-    path: '/erp/docs/role-collaboration-guide',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '角色协同链路')
-      await expectText(page, '业务 -> 老板')
-      await expectText(page, '采购 -> PMC')
-      await expectText(page, '手机端和桌面端怎么衔接')
-    },
-  },
-  {
-    name: 'desktop-role-guide-desktop',
-    path: '/erp/docs/desktop-role-guide',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '桌面端角色流程')
-      await expectText(page, '桌面端角色总览')
-      await expectText(page, '老板')
-      await expectText(page, 'PMC')
-      await expectText(page, '生产经理')
-      await page.locator('.erp-admin-content').evaluate((node) => {
-        node.scrollTo({ top: 1200 })
-      })
-      await expectButton(page, '回顶部')
-    },
-  },
-  {
-    name: 'mobile-role-guide-desktop',
-    path: '/erp/docs/mobile-role-guide',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '手机端角色流程')
-      await expectText(page, '手机端角色总览')
-      await expectText(page, '品质')
-      await expectText(page, '财务')
-      await expectText(page, '任务分配、任务处理、处理反馈')
-    },
-  },
-  {
     name: 'print-center-desktop',
     path: '/erp/print-center',
     auth: 'admin',
@@ -1115,233 +1028,12 @@ const scenarios = [
     },
   },
   {
-    name: 'docs-field-linkage-guide-desktop',
-    path: '/erp/docs/field-linkage-guide',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await page
-        .getByRole('heading', { name: 'ERP 字段联动口径' })
-        .first()
-        .waitFor({ state: 'visible', timeout: 10_000 })
-      await expectText(page, 'BOM 真源')
-      await assertDocsArticleReadable(page)
-    },
-  },
-  {
-    name: 'operation-guide-mobile',
-    path: '/erp/docs/operation-guide',
-    auth: 'admin',
-    viewport: { width: 390, height: 844 },
-    verify: async (page) => {
-      await expectHeading(page, 'ERP 操作教程')
-      await expectText(page, '当前帮助中心怎么读')
-      await expectText(page, '角色后台和帮助中心的关系')
-    },
-  },
-  {
-    name: 'field-linkage-guide-desktop',
-    path: '/erp/docs/field-linkage-guide',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, 'ERP 字段联动口径')
-      await expectText(page, '产品订单编号')
-      await expectText(page, '材料分析明细表')
-    },
-  },
-  {
-    name: 'qa-field-linkage-coverage-desktop',
-    path: '/erp/qa/field-linkage-coverage',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, 'ERP 字段联动覆盖状态')
-      await expectText(page, 'catalog -> latest JSON -> 页面汇总')
-      await expectText(page, '字段覆盖明细')
-      await expectText(page, '委托加工金额')
-      await page.getByRole('button', { name: '重新读取报告' }).click()
-      await expectText(page, '字段覆盖明细')
-      await expectText(page, '委托加工金额')
-    },
-  },
-  {
-    name: 'qa-acceptance-overview-desktop',
-    path: '/erp/qa/acceptance-overview',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '验收结果总览')
-      await expectText(page, '状态总览')
-      await expectText(page, '总览与当前工具页')
-      await expectText(page, '字段联动字段覆盖')
-      await expectText(page, '打印模板覆盖')
-      await expectText(page, '当前入口与建议动作')
-      await expectText(page, '业务链路调试')
-      await expectText(page, '打印模板与合同回归')
-      await expectText(page, '已知盲区与使用顺序')
-      await expectText(page, '规划表速查')
-      await page.getByRole('button', { name: '进入字段联动覆盖' }).click()
-      await waitForPath(page, '/erp/qa/field-linkage-coverage')
-    },
-  },
-  {
-    name: 'qa-business-chain-debug-desktop',
-    path: '/erp/qa/business-chain-debug',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '业务链路调试')
-      await expectText(page, '安全调试中心')
-      await expectText(page, '覆盖边界')
-      await expectText(page, '链路覆盖矩阵')
-      await expectText(page, '已接入 v1 主干闭环')
-      await expectText(page, '未覆盖 / 待补扩展链路')
-      await expectText(page, '当前不做')
-      await expectText(page, '按需生成调试场景')
-      await expectText(page, '填入并查询')
-      await page.evaluate(async () => {
-        const callRpc = async (domain, method, params) => {
-          const response = await fetch(`/rpc/${domain}`, {
-            method: 'POST',
-            headers: {
-              Accept: 'application/json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: `${domain}-${method}`,
-              method,
-              params,
-            }),
-          })
-          return response.json()
-        }
-
-        const recordResult = await callRpc('business', 'create_record', {
-          module_key: 'project-orders',
-          document_no: 'STYLE-L1-001',
-          title: '毛绒熊立项',
-          customer_name: '联调客户',
-          quantity: 2,
-          amount: 39.8,
-          business_status_key: 'blocked',
-          owner_role_key: 'business',
-          payload: {
-            status_reason: '资料未齐，等待客户确认',
-          },
-          items: [
-            {
-              line_no: 1,
-              item_name: '浅棕色毛绒熊',
-              quantity: 2,
-              amount: 39.8,
-            },
-          ],
-        })
-        const record = recordResult?.result?.data?.record
-        await callRpc('workflow', 'upsert_business_state', {
-          source_type: 'project-orders',
-          source_id: record?.id,
-          source_no: record?.document_no,
-          business_status_key: 'blocked',
-          owner_role_key: 'business',
-          blocked_reason: '资料未齐，等待客户确认',
-          payload: {
-            status_reason: '资料未齐，等待客户确认',
-          },
-        })
-        await callRpc('workflow', 'create_task', {
-          task_code: 'style-l1-debug-task',
-          task_group: 'sales',
-          task_name: '订单/款式立项：毛绒熊立项',
-          source_type: 'project-orders',
-          source_id: record?.id,
-          source_no: record?.document_no,
-          business_status_key: 'blocked',
-          task_status_key: 'blocked',
-          owner_role_key: 'business',
-          blocked_reason: '资料未齐，等待客户确认',
-        })
-      })
-      await page
-        .getByPlaceholder(
-          '输入单据号、来源单号、客户、供应商、物料、模块 key 或任务名称'
-        )
-        .fill('STYLE-L1-001')
-      await page.getByRole('button', { name: '查询链路' }).click()
-      await expectText(page, 'STYLE-L1-001')
-      await expectText(page, '订单/款式立项：毛绒熊立项')
-      await expectText(page, '业务阻塞')
-      await expectText(page, '资料未齐，等待客户确认')
-    },
-  },
-  {
-    name: 'qa-workflow-task-debug-desktop',
-    path: '/erp/qa/workflow-task-debug',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '协同任务调试')
-      await expectText(page, 'v1 前端诊断模式')
-      await expectText(page, '移动端可见性诊断')
-      await page.evaluate(async () => {
-        const response = await fetch('/rpc/workflow', {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 'workflow-create-debug-task',
-            method: 'create_task',
-            params: {
-              task_code: 'style-l1-workflow-task-debug',
-              task_group: 'shipment_release',
-              task_name: '协同任务调试：出货资料确认',
-              source_type: 'shipping-release',
-              source_id: 9001,
-              source_no: 'OUT-STYLE-L1',
-              business_status_key: 'shipment_pending',
-              task_status_key: 'blocked',
-              owner_role_key: 'warehouse',
-              priority: 3,
-              blocked_reason: '客户出货资料未确认',
-              payload: {
-                notification_type: 'shipment_risk',
-                alert_type: 'shipment_due',
-                critical_path: true,
-                shipment_risk: true,
-                urge_count: 1,
-                last_urge_reason: '客户催交',
-                escalated: true,
-                escalate_target_role_key: 'boss',
-              },
-            },
-          }),
-        })
-        return response.json()
-      })
-      await page.getByRole('button', { name: '重新读取任务' }).click()
-      await expectText(page, 'OUT-STYLE-L1')
-      await expectText(page, '协同任务调试：出货资料确认')
-      await page.getByLabel('可选 source_no').fill('OUT-STYLE-L1')
-      await page.getByLabel('可选 task_group').fill('shipment_release')
-      await expectText(page, 'mobileTaskQueries 查询计划')
-      await expectText(page, 'PMC 扩展命中 critical_path 任务。')
-      await page.getByRole('button', { name: '查看事件' }).first().click()
-      await expectText(page, '任务事件接口待接入')
-      await expectText(page, '业务、任务、角色绑定关系')
-    },
-  },
-  {
     name: 'business-menu-groups-desktop',
     path: '/erp/sales/project-orders',
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '订单/款式立项')
+      await expectButton(page, '新建记录')
       await expectText(page, '基础资料')
       await expectText(page, '客户/供应商')
       await expectText(page, '产品')
@@ -1353,13 +1045,27 @@ const scenarios = [
       await page.locator('.erp-admin-menu').evaluate((node) => {
         node.scrollTop = node.scrollHeight
       })
-      await expectText(page, '开发与验收')
-      await expectText(page, '验收结果总览')
-      await expectText(page, '字段联动覆盖')
+      await expectText(page, '系统管理')
+      await expectText(page, '权限管理')
       assert.equal(
         await page.getByText('流程与真源', { exact: true }).count(),
         0,
         '侧栏不应再显示“流程与真源”分组'
+      )
+      assert.equal(
+        await page.getByText('开发与验收', { exact: true }).count(),
+        0,
+        '侧栏不应再显示“开发与验收”分组'
+      )
+      assert.equal(
+        await page.getByText('帮助中心', { exact: true }).count(),
+        0,
+        '侧栏不应再显示“帮助中心”分组'
+      )
+      assert.equal(
+        await page.getByText('高级文档', { exact: true }).count(),
+        0,
+        '侧栏不应再显示“高级文档”分组'
       )
     },
   },
@@ -6144,88 +5850,6 @@ async function assertBusinessModuleCompactWorkspace(
     taskCardVisible,
     `${scenarioName} 协同任务池未在首屏边界内出现: ${JSON.stringify(metrics)}`
   )
-}
-
-async function assertDocsArticleReadable(page) {
-  const metrics = await page.evaluate(() => {
-    const article = document.querySelector('.erp-docs-article')
-    const paragraph = article?.querySelector('p')
-    const listItem = article?.querySelector('li')
-    const link = article?.querySelector('a')
-    const inlineCode = article?.querySelector('code')
-
-    const parseColor = (value) => {
-      if (!value) return null
-      const match = value.match(/\d+(\.\d+)?/g)
-      if (!match || match.length < 3) return null
-      const [r, g, b, a] = match.map(Number)
-      return { r, g, b, a: Number.isFinite(a) ? a : 1 }
-    }
-
-    const toLinear = (channel) => {
-      const normalized = channel / 255
-      if (normalized <= 0.03928) {
-        return normalized / 12.92
-      }
-      return ((normalized + 0.055) / 1.055) ** 2.4
-    }
-
-    const luminance = (color) => {
-      if (!color) return 0
-      return (
-        0.2126 * toLinear(color.r) +
-        0.7152 * toLinear(color.g) +
-        0.0722 * toLinear(color.b)
-      )
-    }
-
-    const resolveBackground = (element) => {
-      let current = element
-      while (current && current !== document.documentElement) {
-        const background = parseColor(getComputedStyle(current).backgroundColor)
-        if (background && background.a > 0) {
-          return background
-        }
-        current = current.parentElement
-      }
-      return { r: 255, g: 255, b: 255, a: 1 }
-    }
-
-    const describe = (element) => {
-      if (!element) return null
-      const style = getComputedStyle(element)
-      const color = parseColor(style.color)
-      const background = resolveBackground(element)
-      const contrast =
-        (Math.max(luminance(color), luminance(background)) + 0.05) /
-        (Math.min(luminance(color), luminance(background)) + 0.05)
-
-      return {
-        text: element.textContent?.trim().slice(0, 80) || '',
-        color: style.color,
-        background: `rgb(${background.r}, ${background.g}, ${background.b})`,
-        contrast: Number(contrast.toFixed(2)),
-      }
-    }
-
-    return {
-      paragraph: describe(paragraph),
-      listItem: describe(listItem),
-      link: describe(link),
-      inlineCode: describe(inlineCode),
-    }
-  })
-
-  for (const [name, item] of Object.entries(metrics)) {
-    if (name === 'link' && !item) {
-      continue
-    }
-    assert(item, `文档页缺少 ${name} 节点: ${JSON.stringify(metrics)}`)
-    assert(
-      item.contrast >= 4.5,
-      `文档页 ${name} 对比度不足: ${JSON.stringify(item)}`
-    )
-  }
 }
 
 function createMockAdminToken() {

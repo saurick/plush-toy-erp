@@ -27,7 +27,7 @@
 | `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | `finished_goods_inbound` 已纳入仓库退回按钮，`blocked / rejected` 由后端强制原因并统一写 `blocked`。 | 成品入库失败状态不由前端派生异常、返工或复检任务。 |
 | `web/src/erp/utils/finishedGoodsFlow.mjs` | `buildShipmentReleaseTask` 只依赖业务记录和入库任务快照，未查询真实库存可用量，也没有库存预留、出库扣减或财务放行前置。 | 直接把该派生搬到后端会把“协同入库完成”误表达成“库存可发”。 |
 | `web/src/erp/utils/finishedGoodsFlow.test.mjs` | 已测试移动端不再调用 `completeFinishedGoodsInboundTask`、不再导入 `buildShipmentReleaseTask` 或 `SHIPMENT_RELEASE_TASK_GROUP`；`buildShipmentReleaseTask` 测试只保留 seed / test / demo / 未来出货辅助字段口径。 | 前端测试保护第六条真实运行时不再本地派生出货。 |
-| `web/src/erp/config/seedData.mjs`、业务链路调试页相关代码 | 前端 seed / 帮助配置只把“生产到出货”作为 v1 主链展示；`server/internal/biz/debug_seed.go` 的 `finished_goods_shipment` 调试场景会直接 seed `finished_goods_qc` 和 `shipment_release`。 | 调试 seed 是开发验收样本，不是第六条运行时真源；不能据此把出货派生写进后端规则。 |
+| `web/src/erp/config/seedData.mjs`、debug seed | 前端 seed 只把“生产到出货”作为 v1 主链展示；`server/internal/biz/debug_seed.go` 的 `finished_goods_shipment` 调试场景会直接 seed `finished_goods_qc` 和 `shipment_release`。 | 调试 seed 是开发验收样本，不是第六条运行时真源；不能据此把出货派生写进后端规则。 |
 
 ## 3. `done` 口径
 
@@ -108,11 +108,11 @@
 3. `web/src/erp/utils/finishedGoodsFlow.test.mjs`
    - 保留 `buildShipmentReleaseTask` 字段口径测试，但明确不作为真实移动端运行时派生。
    - 覆盖移动端不再导入 `buildShipmentReleaseTask`，不再保留 `completeFinishedGoodsInboundTask`。
-4. 业务链路调试页和 debug seed
-   - `businessChainDebug.mjs` 把“成品完工 -> 成品抽检 -> 成品入库 -> 出货”标为 partial v1 场景。
+4. debug seed 调试样本
+   - 原前端业务链路调试页已移除，不再作为运行时入口。
    - `server/internal/biz/debug_seed.go` 的 `finished_goods_shipment` 会直接 seed `shipment_release`，用于调试样本，不代表运行时后端规则。
 
-业务链路调试页和 debug seed 可继续 seed `shipment_release` 作为开发样本或展示辅助，但它不是 `finished_goods_inbound done` 的后端运行时派生结果。
+debug seed 可继续 seed `shipment_release` 作为开发样本或展示辅助，但它不是 `finished_goods_inbound done` 的后端运行时派生结果。
 
 ## 8. 第六条识别边界
 

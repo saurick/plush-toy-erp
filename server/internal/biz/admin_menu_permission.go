@@ -8,18 +8,21 @@ type AdminMenuPermissionOption struct {
 }
 
 var adminMenuPermissionAliases = map[string]string{
-	"/erp/flows/overview":          "/erp/docs/operation-flow-overview",
-	"/erp/source-readiness":        "/erp/docs/field-linkage-guide",
-	"/erp/mobile-workbenches":      "/erp/docs/operation-guide",
-	"/erp/help-center":             "/erp/docs/operation-flow-overview",
-	"/erp/docs/system-init":        "/erp/docs/operation-guide",
-	"/erp/docs/operation-playbook": "/erp/docs/operation-flow-overview",
-	"/erp/docs/field-truth":        "/erp/docs/field-linkage-guide",
-	"/erp/docs/data-model":         "/erp/docs/calculation-guide",
-	"/erp/docs/import-mapping":     "/erp/docs/field-linkage-guide",
-	"/erp/docs/mobile-roles":       "/erp/docs/mobile-role-guide",
-	"/erp/docs/print-templates":    "/erp/docs/print-snapshot-guide",
-	"/erp/changes/current":         "/erp/docs/operation-guide",
+	"/erp/flows/overview":     "/erp/dashboard",
+	"/erp/source-readiness":   "/erp/dashboard",
+	"/erp/mobile-workbenches": "/erp/dashboard",
+	"/erp/help-center":        "/erp/dashboard",
+	"/erp/changes/current":    "/erp/dashboard",
+}
+
+func normalizeAdminMenuPermissionAlias(key string) string {
+	if normalized, ok := adminMenuPermissionAliases[key]; ok {
+		return normalized
+	}
+	if strings.HasPrefix(key, "/erp/docs/") || strings.HasPrefix(key, "/erp/qa/") {
+		return "/erp/dashboard"
+	}
+	return key
 }
 
 func adminMenuPathSet() map[string]struct{} {
@@ -75,9 +78,7 @@ func NormalizeAdminMenuPermissions(input []string) []string {
 		if key == "" {
 			continue
 		}
-		if normalized, ok := adminMenuPermissionAliases[key]; ok {
-			key = normalized
-		}
+		key = normalizeAdminMenuPermissionAlias(key)
 		if _, ok := known[key]; !ok {
 			continue
 		}

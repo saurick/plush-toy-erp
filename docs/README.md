@@ -12,15 +12,15 @@
 - 架构评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/`
 - 历史归档：`/Users/simon/projects/plush-toy-erp/docs/archive/`
 
-## 文档 metadata 与注册边界
+## 文档 metadata 与产品内入口边界
 
 当前仓库不要求所有 Markdown 都添加 YAML frontmatter 或统一 metadata 头。metadata 的目的不是制造新真源，而是减少入口、受众、状态和是否已接产品页面的信息差。
 
-当前唯一会被前端文档页消费的 metadata 在 `web/src/erp/config/docs.mjs` 和 `web/src/erp/config/seedData.mjs`：
+当前前端不再维护产品内文档中心、帮助中心、高级文档和开发与验收页面：
 
-- `web/src/erp/docs/*.md` 若作为 `/erp/docs/:docKey` 或 `/erp/qa/:docKey` 文档页展示，必须在 `docRegistry` 中有 `title`、`summary`、`source`。
-- 文档若进入帮助中心、开发与验收、高级文档或文档卡片，还必须在 `seedData.mjs` 中有导航项和明确分组。
-- `web/src/erp/config/docs.test.mjs` 已校验前端正式 Markdown 是否导入注册、导航是否指向已注册文档、帮助中心主入口和开发与验收入口是否受控。
+- 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
+- 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径只做兼容重定向到 `/erp/dashboard`。
+- 正式文档继续保留在 `docs/`、`server/docs/`、`web/README.md`、`server/README.md` 等仓库文档入口，不复制或镜像到前端运行时页面。
 
 若后续新增可被机器读取或跨团队复用的 metadata，必须同时保留中文说明和 English anchor：
 
@@ -28,7 +28,7 @@
 - English anchor 用于机器检索、跨工具对齐、导入导出、API / config / status code 等稳定键名。
 - 对同一字段不要只写中文或只写英文；推荐使用成对字段，例如 `title_zh` / `title_en`、`summary_zh` / `summary_en`、`status_zh` / `status_key`。
 - English anchor 应保持稳定、短小、可检索，不要为了翻译优雅频繁改名；中文说明可以随业务口径优化。
-- 当前前端 registry 还没有消费 `title_en` / `summary_en` 等字段；除非同步修改渲染代码和测试，不要把这些字段加入运行时 registry 当作已生效能力。
+- 当前前端没有文档 registry；除非重新设计产品内文档中心并同步渲染代码、菜单、权限和测试，不要把 metadata 字段写成已被运行时消费的能力。
 
 不需要产品内 metadata 的文档类型如下：
 
@@ -36,10 +36,10 @@
 | --- | --- | --- | --- |
 | 仓库 / 子系统 README | `README.md`、`docs/README.md`、`web/README.md`、`server/README.md`、`scripts/README.md` | 这是目录和使用说明，不是产品内文档页 | 入口、目录职责、命令、当前边界 |
 | 当前真源索引 | `docs/current-source-of-truth.md` | 本身就是阅读顺序和真源索引，不需要再被前端 registry 二次定义 | 真源原则、当前状态、按任务分流 |
-| 产品 / 架构正式文档 | `docs/product/*`、`docs/architecture/*` | 这些是仓库正式评审和路线文档；只有被复制或镜像到 `web/src/erp/docs` 后才需要前端 registry metadata | 结论、范围、真源 / 非真源、后续边界 |
+| 产品 / 架构正式文档 | `docs/product/*`、`docs/architecture/*` | 这些是仓库正式评审和路线文档，不再镜像到前端文档中心 | 结论、范围、真源 / 非真源、后续边界 |
 | archive / progress | `docs/archive/*`、`progress.md` | 只用于过程追溯，不作为当前实现或产品路线真源；原 `docs/changes/*` 历史文件已删除 | 归档说明、发生时间、非真源声明 |
 | imported notes / 外部输入 | `docs/reference/imported-notes/*` | 只作为参考输入，不能直接驱动 runtime、schema、migration 或 roadmap | 来源、导入时间、Reference Only、Not Source Of Truth |
-| 后端 / 内部技术文档 | `server/docs/*`、`server/internal/**/README.md` | 面向子系统维护，不进入产品帮助中心 | 子系统边界、命令、配置、维护注意事项 |
+| 后端 / 内部技术文档 | `server/docs/*`、`server/internal/**/README.md` | 面向子系统维护，不进入产品内文档入口 | 子系统边界、命令、配置、维护注意事项 |
 
 不需要产品内 metadata 不等于不需要中文。任何文档只要已经出现 `Doc Type`、`Status`、`Source`、`Current Implementation Source of Truth` 等 metadata 字段，都必须至少做到字段名中英双语；其中 `Doc Type / 文档类型` 的类型值必须保留 English anchor 并补中文说明，例如 `Yoyoosun Source Snapshot Freeze Evidence / yoyoosun 来源快照冻结证据`。`Status`、`Source` 等状态值或来源值若容易误解，也应补中文说明。
 

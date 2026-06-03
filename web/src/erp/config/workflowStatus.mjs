@@ -242,7 +242,7 @@ export const WORKFLOW_PLANNING_PHASES = Object.freeze([
   {
     key: 'page_defined',
     label: '页面已收口',
-    summary: '菜单、角色入口、帮助中心和工作台卡片范围已确定。',
+    summary: '菜单、角色入口和工作台卡片范围已确定。',
   },
   {
     key: 'status_defined',

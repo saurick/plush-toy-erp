@@ -4,22 +4,17 @@ import {
   ApartmentOutlined,
   AppstoreOutlined,
   BarsOutlined,
-  BookOutlined,
-  CalculatorOutlined,
   DashboardOutlined,
   FileSearchOutlined,
   FileTextOutlined,
   HomeOutlined,
   InboxOutlined,
   MenuOutlined,
-  MobileOutlined,
   PrinterOutlined,
-  QuestionCircleOutlined,
   ReloadOutlined,
   ScheduleOutlined,
   SettingOutlined,
   ShoppingCartOutlined,
-  TagOutlined,
   WalletOutlined,
 } from '@ant-design/icons'
 import {
@@ -53,10 +48,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
-import {
-  getNavigationSections,
-  navigationItemRegistry,
-} from '../config/seedData.mjs'
+import { getNavigationSections } from '../config/seedData.mjs'
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
 
 const { Content, Header, Sider } = Layout
@@ -81,45 +73,7 @@ const navIconRegistry = {
   'production-exceptions': <AlertOutlined />,
   reconciliation: <WalletOutlined />,
   payables: <WalletOutlined />,
-  'flow-overview': <ScheduleOutlined />,
-  'source-readiness': <FileSearchOutlined />,
-  'mobile-workbenches': <MobileOutlined />,
   'print-center': <PrinterOutlined />,
-  'help-operation-flow-overview': <ApartmentOutlined />,
-  'help-operation-guide': <BookOutlined />,
-  'help-role-collaboration-guide': <ApartmentOutlined />,
-  'help-role-page-document-matrix': <BarsOutlined />,
-  'help-task-document-mapping': <ScheduleOutlined />,
-  'help-workflow-status-guide': <DashboardOutlined />,
-  'help-workflow-schema-draft': <FileTextOutlined />,
-  'help-task-flow-v1': <ScheduleOutlined />,
-  'help-role-permission-matrix-v1': <BarsOutlined />,
-  'help-notification-alert-v1': <AlertOutlined />,
-  'help-finance-v1': <WalletOutlined />,
-  'help-warehouse-quality-v1': <InboxOutlined />,
-  'help-log-trace-audit-v1': <FileSearchOutlined />,
-  'help-desktop-role-guide': <AppstoreOutlined />,
-  'help-mobile-role-guide': <MobileOutlined />,
-  'help-field-linkage-guide': <TagOutlined />,
-  'help-calculation-guide': <CalculatorOutlined />,
-  'help-print-snapshot-guide': <PrinterOutlined />,
-  'help-exception-handling-guide': <AlertOutlined />,
-  'help-current-boundaries': <QuestionCircleOutlined />,
-  'qa-acceptance-overview': <DashboardOutlined />,
-  'qa-business-chain-debug': <FileSearchOutlined />,
-  'qa-workflow-task-debug': <ScheduleOutlined />,
-  'qa-field-linkage-coverage': <TagOutlined />,
-  'qa-run-records': <ScheduleOutlined />,
-  'qa-reports': <FileTextOutlined />,
-  'help-center': <QuestionCircleOutlined />,
-  'doc-system-init': <BookOutlined />,
-  'doc-operation-playbook': <BookOutlined />,
-  'doc-field-truth': <TagOutlined />,
-  'doc-data-model': <BarsOutlined />,
-  'doc-import-mapping': <FileTextOutlined />,
-  'doc-mobile-roles': <MobileOutlined />,
-  'doc-print-templates': <PrinterOutlined />,
-  changes: <FileTextOutlined />,
   'permission-center': <SettingOutlined />,
 }
 
@@ -133,10 +87,7 @@ const BUSINESS_MODULE_PATHS = new Set(
 )
 
 function buildCurrentEntry({ navigationSections, locationPath }) {
-  const items = [
-    ...navigationSections.flatMap((section) => section.items),
-    navigationItemRegistry['help-center'],
-  ].filter(Boolean)
+  const items = navigationSections.flatMap((section) => section.items)
   const exactMatch = items.find((item) => item.path === locationPath)
   if (exactMatch) {
     return exactMatch
@@ -318,9 +269,7 @@ export default function ERPLayout() {
   const hidePageHead =
     isBusinessModulePage ||
     currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path ||
-    currentEntry?.path === '/erp/business-dashboard' ||
-    location.pathname.startsWith('/erp/docs/') ||
-    location.pathname.startsWith('/erp/qa/')
+    currentEntry?.path === '/erp/business-dashboard'
 
   const registerPageRefresh = useCallback((handler) => {
     if (typeof handler !== 'function') {

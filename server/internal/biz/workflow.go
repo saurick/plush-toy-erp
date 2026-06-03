@@ -91,7 +91,7 @@ var workflowBusinessStates = []WorkflowStateOption{
 
 var workflowPlanningPhases = []WorkflowStateOption{
 	{Key: "source_locked", Label: "真源已收口", Summary: "先明确当前唯一真源字段、单据和业务节点。"},
-	{Key: "page_defined", Label: "页面已收口", Summary: "菜单、角色入口、帮助中心和工作台卡片范围已确定。"},
+	{Key: "page_defined", Label: "页面已收口", Summary: "菜单、角色入口和工作台卡片范围已确定。"},
 	{Key: "status_defined", Label: "状态已统一", Summary: "任务状态、业务状态和阻塞原因已形成统一字典。"},
 	{Key: "schema_v1_ready", Label: "Schema v1 已落地", Summary: "workflow 和通用业务记录表已通过 Ent + Atlas 生成迁移。"},
 	{Key: "api_v1_ready", Label: "API v1 已接通", Summary: "workflow 与 business JSON-RPC 已支持当前表格、弹窗和任务池主路径。"},

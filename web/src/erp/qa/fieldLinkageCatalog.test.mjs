@@ -14,42 +14,12 @@ import {
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const projectRoot = path.resolve(__dirname, '..', '..', '..', '..')
-const fieldLinkageGuidePath = path.join(
-  projectRoot,
-  'web',
-  'src',
-  'erp',
-  'docs',
-  'field-linkage-guide.md'
-)
 
 function normalizeLabel(value) {
   return String(value || '')
     .replaceAll('`', '')
     .replace(/\s+/gu, ' ')
     .trim()
-}
-
-function extractTableFirstColumn(markdown, sectionHeading, nextHeading) {
-  const startIndex = markdown.indexOf(sectionHeading)
-  if (startIndex < 0) return []
-
-  const nextIndex =
-    nextHeading &&
-    markdown.indexOf(nextHeading, startIndex + sectionHeading.length)
-  const section = markdown.slice(
-    startIndex,
-    nextIndex > startIndex ? nextIndex : undefined
-  )
-
-  return section
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith('|'))
-    .slice(2)
-    .map((line) => line.split('|')[1]?.trim() || '')
-    .filter(Boolean)
-    .map(normalizeLabel)
 }
 
 function getRegisteredCaseIdsFromFiles() {
@@ -68,20 +38,22 @@ function getRegisteredCaseIdsFromFiles() {
   return caseIds
 }
 
-test('fieldLinkageCatalog: 帮助中心核心字段已进入覆盖目录', () => {
-  const markdown = readFileSync(fieldLinkageGuidePath, 'utf8')
-  const documentedLabels = new Set([
-    ...extractTableFirstColumn(
-      markdown,
-      '### 5.1 核心业务字段',
-      '### 5.2 日期与条款字段'
-    ),
-    ...extractTableFirstColumn(
-      markdown,
-      '### 5.2 日期与条款字段',
-      '## 6. 改下游后，会不会反写上游'
-    ),
-  ])
+test('fieldLinkageCatalog: 核心字段已进入覆盖目录', () => {
+  const requiredLabels = new Set(
+    [
+      '客户',
+      '款式编号',
+      '产品编号 / SKU',
+      '产品订单编号',
+      '数量',
+      '单价',
+      '金额',
+      '主料物料字段',
+      '辅材 / 包材字段',
+      '回货日期',
+      '出货日期',
+    ].map(normalizeLabel)
+  )
   const catalogLabels = new Set(
     FIELD_LINKAGE_FIELD_CATALOG.flatMap((item) =>
       (Array.isArray(item.docLabels) ? item.docLabels : [item.fieldLabel]).map(
@@ -90,7 +62,7 @@ test('fieldLinkageCatalog: 帮助中心核心字段已进入覆盖目录', () =>
     )
   )
 
-  for (const label of documentedLabels) {
+  for (const label of requiredLabels) {
     assert.equal(catalogLabels.has(label), true, `${label} 未进入覆盖目录`)
   }
 })

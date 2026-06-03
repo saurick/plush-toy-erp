@@ -10,33 +10,17 @@ const AdminUsersPage = lazy(() => import('@/pages/AdminUsers'))
 const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
 const LoginPage = lazy(() => import('@/pages/Login'))
 const RegisterPage = lazy(() => import('@/pages/Register'))
-const AcceptanceOverviewPage = lazy(
-  () => import('./pages/AcceptanceOverviewPage')
-)
 const BusinessModulePage = lazy(() => import('./pages/BusinessModulePage'))
 const BusinessDashboardPage = lazy(
   () => import('./pages/BusinessDashboardPage')
 )
-const BusinessChainDebugPage = lazy(
-  () => import('./pages/BusinessChainDebugPage')
-)
-const ChangeLogPage = lazy(() => import('./pages/ChangeLogPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
-const DocumentationPage = lazy(() => import('./pages/DocumentationPage'))
-const FieldLinkageCoveragePage = lazy(
-  () => import('./pages/FieldLinkageCoveragePage')
-)
-const HelpCenterPage = lazy(() => import('./pages/HelpCenterPage'))
-const OperationFlowPage = lazy(() => import('./pages/OperationFlowPage'))
 const PrintCenterPage = lazy(() => import('./pages/PrintCenterPage'))
 const PrintTemplatePreviewPage = lazy(
   () => import('./pages/PrintTemplatePreviewPage')
 )
 const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
-const WorkflowTaskDebugPage = lazy(
-  () => import('./pages/WorkflowTaskDebugPage')
-)
 const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
 
@@ -88,7 +72,7 @@ export default function ERPRouter() {
         />
         <Route
           path="/admin-guide"
-          element={<Navigate to="/erp/docs/operation-guide" replace />}
+          element={<Navigate to="/erp/dashboard" replace />}
         />
         <Route
           path="/dashboard"
@@ -129,16 +113,13 @@ export default function ERPRouter() {
             element={<V1SalesOrdersPage />}
           />
           <Route
-            path="docs/operation-flow-overview"
-            element={<OperationFlowPage />}
+            path="flows/overview"
+            element={<Navigate to="/erp/dashboard" replace />}
           />
           <Route
-            path="flows/overview"
-            element={
-              <Navigate to="/erp/docs/operation-flow-overview" replace />
-            }
+            path="help-center"
+            element={<Navigate to="/erp/dashboard" replace />}
           />
-          <Route path="help-center" element={<HelpCenterPage />} />
           <Route path="print-center" element={<PrintCenterPage />} />
           <Route
             path="print-center/:templateKey"
@@ -147,7 +128,7 @@ export default function ERPRouter() {
           <Route path="system/permissions" element={<PermissionCenterPage />} />
           <Route
             path="mobile-workbenches"
-            element={<Navigate to="/erp/docs/operation-guide" replace />}
+            element={<Navigate to="/erp/dashboard" replace />}
           />
           <Route
             path="roles/:roleKey"
@@ -155,27 +136,20 @@ export default function ERPRouter() {
           />
           <Route
             path="source-readiness"
-            element={<Navigate to="/erp/docs/field-linkage-guide" replace />}
+            element={<Navigate to="/erp/dashboard" replace />}
           />
           <Route
-            path="qa/acceptance-overview"
-            element={<AcceptanceOverviewPage />}
+            path="docs/*"
+            element={<Navigate to="/erp/dashboard" replace />}
           />
           <Route
-            path="qa/business-chain-debug"
-            element={<BusinessChainDebugPage />}
+            path="qa/*"
+            element={<Navigate to="/erp/dashboard" replace />}
           />
           <Route
-            path="qa/workflow-task-debug"
-            element={<WorkflowTaskDebugPage />}
+            path="changes/current"
+            element={<Navigate to="/erp/dashboard" replace />}
           />
-          <Route
-            path="qa/field-linkage-coverage"
-            element={<FieldLinkageCoveragePage />}
-          />
-          <Route path="qa/:docKey" element={<DocumentationPage />} />
-          <Route path="docs/:docKey" element={<DocumentationPage />} />
-          <Route path="changes/current" element={<ChangeLogPage />} />
         </Route>
 
         <Route

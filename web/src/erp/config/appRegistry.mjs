@@ -8,7 +8,7 @@ const ERP_APP_DEFINITIONS = {
     port: 5175,
     command: 'pnpm start:desktop',
     description:
-      '桌面后台保持一个入口，统一承载流程、真源、打印和帮助中心；角色差异通过各自移动端端口访问。',
+      '桌面后台保持一个入口，统一承载看板、业务页面、打印中心和权限管理；角色差异通过各自移动端端口访问。',
   },
   'mobile-boss': {
     id: 'mobile-boss',

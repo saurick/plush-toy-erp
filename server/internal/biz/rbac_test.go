@@ -1,6 +1,9 @@
 package biz
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func builtinRolePermissionSet(t *testing.T, roleKey string) map[string]struct{} {
 	t.Helper()
@@ -176,12 +179,12 @@ func TestAdminVisibleMenusFiltersByPermissionCode(t *testing.T) {
 	admin := &AdminUser{
 		ID:          2,
 		Username:    "manager",
-		Permissions: []string{PermissionERPHelpCenterRead},
+		Permissions: []string{PermissionERPDashboardRead},
 	}
 
 	menus := AdminVisibleMenus(admin)
 	if len(menus) == 0 {
-		t.Fatalf("expected help menus")
+		t.Fatalf("expected visible menus")
 	}
 	for _, menu := range menus {
 		if !PermissionSetHasAny(PermissionKeySet(admin.Permissions), menu.RequiredPermissions...) {
@@ -209,29 +212,35 @@ func TestAdminVisibleMenusIncludesMasterDataForBusinessRecordRead(t *testing.T) 
 	}
 }
 
-func TestAdminVisibleMenusRequiresDebugPermission(t *testing.T) {
-	admin := &AdminUser{
-		ID:          2,
-		Username:    "manager",
-		Permissions: []string{PermissionERPHelpCenterRead},
-	}
+func TestAdminMenusOmitRetiredFrontendDocsAndQAPaths(t *testing.T) {
+	menus := append(BuiltinAdminMenus(), AdminVisibleMenus(&AdminUser{
+		ID:           1,
+		Username:     "root",
+		IsSuperAdmin: true,
+	})...)
 
-	for _, menu := range AdminVisibleMenus(admin) {
-		if menu.Path == "/erp/qa/business-chain-debug" {
-			t.Fatalf("debug menu must not be visible without debug permission")
+	for _, menu := range menus {
+		if menu.Path == "/erp/help-center" {
+			t.Fatalf("help center menu must not be registered")
+		}
+		if strings.HasPrefix(menu.Path, "/erp/docs/") {
+			t.Fatalf("docs menu must not be registered: %s", menu.Path)
+		}
+		if strings.HasPrefix(menu.Path, "/erp/qa/") {
+			t.Fatalf("QA menu must not be registered: %s", menu.Path)
 		}
 	}
+}
 
-	admin.Permissions = append(admin.Permissions, PermissionDebugBusinessChainRun)
-	foundDebugMenu := false
-	for _, menu := range AdminVisibleMenus(admin) {
-		if menu.Path == "/erp/qa/business-chain-debug" {
-			foundDebugMenu = true
-			break
-		}
-	}
-	if !foundDebugMenu {
-		t.Fatalf("expected debug menu with debug.business_chain.run")
+func TestNormalizeAdminMenuPermissionsRedirectsRetiredFrontendPaths(t *testing.T) {
+	normalized := NormalizeAdminMenuPermissions([]string{
+		"/erp/help-center",
+		"/erp/docs/operation-guide",
+		"/erp/qa/business-chain-debug",
+	})
+
+	if len(normalized) != 1 || normalized[0] != "/erp/dashboard" {
+		t.Fatalf("expected retired paths to normalize to dashboard, got %#v", normalized)
 	}
 }
 

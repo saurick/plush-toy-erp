@@ -31,9 +31,9 @@
 - Workflow 协同层：`docs/architecture/workflow-usecase-review.md`
 - Shipment / 出货边界：`docs/architecture/shipment-release-workflow-review.md`、`docs/architecture/shipment-inventory-boundary-review.md`、`docs/architecture/shipment-usecase-review.md`
 - Inventory / Purchase / BOM / Quality 事实层：`docs/current-source-of-truth.md`、`docs/architecture/material-product-inventory-schema-review.md`、`docs/architecture/product-sku-bom-boundary-review.md`、`docs/architecture/order-purchase-boundary-review.md`
-- 开发与验收 / 帮助文档：`web/src/erp/docs/acceptance-overview.md`、`web/src/erp/docs/qa-reports.md`、`web/src/erp/docs/current-boundaries.md`
+- 开发与验收 / 帮助文档：`docs/product/test-strategy.md`、`web/README.md`、`scripts/README.md`
 
-如果后续新增 `web/src/erp/docs/system-layer-progress.md`、`web/src/erp/docs/productization-delivery.md`、`docs/architecture/project-boundary-map.md` 或等价文档，涉及系统层级、产品化、客户差异、部署交付、下一步规划时必须同步阅读。
+如果后续新增 `docs/architecture/project-boundary-map.md`、`docs/architecture/system-layer-progress.md` 或等价正式文档，涉及系统层级、产品化、客户差异、部署交付、下一步规划时必须同步阅读。
 
 ## 实施协作与任务边界
 
@@ -143,12 +143,11 @@ RBAC / API 改动必须覆盖：
 - super_admin 边界。
 - 前端隐藏菜单不是安全边界。
 
-前端菜单 / docs / seed 改动必须覆盖：
+前端菜单 / 路由 / seed 改动必须覆盖：
 
-- docs registry。
-- 导航 seed。
+- 导航 seed 和后端内置菜单。
 - 对应测试断言。
-- 帮助中心主入口和开发与验收入口不混淆。
+- 旧帮助中心、开发与验收和高级文档入口不再出现在导航；旧路径按兼容规则重定向。
 - 默认态、交互态、恢复态。
 - style:l1 相关场景。
 - 移动端角色 smoke 不破坏。
@@ -176,7 +175,7 @@ RBAC / API 改动必须覆盖：
 - Fact 事实层：采购、库存、质检、生产、出货、财务等真实业务事实。
 - RBAC 权限层：权限码、角色、owner_role_key、assignee_id、任务处理边界。
 - API / UI 层：JSON-RPC/API、Web 页面、移动端页面。
-- Help / Debug / QA 层：帮助中心、业务链路调试、验收报告、测试说明。
+- Help / Debug / QA 层：正式文档、debug seed、验收报告、测试说明。
 - Productization / Delivery 层：SaaS、私有化部署、客户定制、通用产品能力、维护费交付。
 - Reporting / Audit / Integration 层：报表、审计、附件、导入导出、条码扫码、外部系统集成、数据归档与压测。
 
@@ -185,8 +184,8 @@ RBAC / API 改动必须覆盖：
 - `docs/current-source-of-truth.md`
 - `docs/architecture/project-boundary-map.md` 或等价边界文档
 - `docs/architecture/system-layer-progress.md` 或等价分层进度文档
-- `web/src/erp/docs/system-layer-progress.md`
-- `web/src/erp/docs/productization-delivery.md`
+- `docs/product/product-delivery-ledgers.md`
+- `docs/product/test-strategy.md`
 
 必须同步检查的改动包括：
 
@@ -194,7 +193,7 @@ RBAC / API 改动必须覆盖：
 - 新增或修改 InventoryUsecase、PurchaseUsecase、QualityUsecase、ShipmentUsecase、FinanceUsecase 行为。
 - 新增或修改 Ent schema、migration、repo、usecase。
 - 新增或修改 RBAC 权限码、角色矩阵、JSON-RPC 权限守卫。
-- 新增或修改菜单入口、开发与验收页面、帮助中心页面。
+- 新增或修改菜单入口、产品内文档入口或开发与验收页面。
 - 新增或修改 SaaS、私有化部署、产品化交付相关设计。
 - 改变“已完成 / 已评审 / 未开始 / 暂停 / 禁止事项 / 下一步建议”等项目状态。
 - 改变客户差异隔离方式、部署方式、初始化模板、打印模板、字段显示配置、菜单开关或 feature flag 规则。
@@ -245,13 +244,13 @@ RBAC / API 改动必须覆盖：
 处理原则：
 
 - 当前甲方资料可以作为种子客户样本，但不能自动升级为通用产品真源。
-- 通用产品规则必须沉淀到正式架构文档、usecase、schema、测试和帮助中心通用口径中。
+- 通用产品规则必须沉淀到正式架构文档、usecase、schema、测试和产品内帮助或正式文档通用口径中。
 - 当前甲方专属资料后续应逐步隔离到明确目录或配置边界，例如 `docs/customers/<customer-key>/`、`deployments/<customer-key>/`、`config/tenants/<tenant-key>/` 或等价结构。
 - 本轮若只是补总控页面或 AGENTS 约束，不要顺手重构目录。
-- 若任务明确要求做客户资料隔离，必须先做目录隔离评审，列出要迁移的文件、引用关系、docs registry、测试断言和回滚风险，再执行移动。
-- 移动文档或目录时，必须同步修复所有引用、导航注册、测试断言和帮助中心入口。
+- 若任务明确要求做客户资料隔离，必须先做目录隔离评审，列出要迁移的文件、引用关系、产品内文档入口、测试断言和回滚风险，再执行移动。
+- 移动文档或目录时，必须同步修复所有引用、导航注册、测试断言和产品内文档入口。
 - 不要把当前甲方公司名、logo、特殊流程、特殊报表、特殊字段硬编码进通用核心 usecase。
-- 当前甲方专属说明若仍在普通业务帮助中心出现，必须确认它是否确实是通用业务规则；如果不是，应迁移到产品化 / 客户交付 / customer-specific 文档边界。
+- 当前甲方专属说明若仍在产品内业务帮助出现，必须确认它是否确实是通用业务规则；如果不是，应迁移到产品化 / 客户交付 / customer-specific 文档边界。
 
 ## Workflow 与 Fact 边界
 
@@ -307,13 +306,13 @@ RBAC / API 改动必须覆盖：
 1. 现有真源是否可复用。
 2. 新增对象是否只是别名或重复。
 3. 是否应该扩展现有表，而不是新建表。
-4. 是否会破坏文档、测试、菜单或帮助中心口径。
+4. 是否会破坏文档、测试、菜单或产品内帮助口径。
 5. 是否需要 migration，以及 migration 是否属于当前任务范围。
 
 ## 旧项目迁移边界
 
 - 当前项目的唯一业务真源是 `plush-toy-erp` 自身的代码、正式文档和真实业务样本；旧项目只能作为迁移背景或经验来源，不能作为当前业务字段、流程、页面命名、测试基线或文案真源。
-- 运行时页面、帮助中心、业务配置、种子数据、测试断言、错误信息和用户可见文案中默认不出现旧项目名，也不要用“对齐旧项目”“沿用旧项目”这类表述解释当前行为。
+- 运行时页面、产品内帮助、业务配置、种子数据、测试断言、错误信息和用户可见文案中默认不出现旧项目名，也不要用“对齐旧项目”“沿用旧项目”这类表述解释当前行为。
 - 若确实需要说明历史迁移背景，只允许集中写在正式真源文档的“迁移背景 / 禁止照搬旧模型”小节里，并且必须同时写清当前项目自己的主路径和不应照搬的旧语义。
 - 从旧项目复用过来的通用结构可以保留，但应改写成当前项目自己的命名、说明和验收口径；不要因为来源旧就删除已经稳定承接当前业务的通用实现。
 
@@ -353,7 +352,7 @@ RBAC / API 改动必须覆盖：
 - 迁移前先确认命中的数据库：`cd /Users/simon/projects/plush-toy-erp/server && make print_db_url`
 - 生成迁移后执行：`cd /Users/simon/projects/plush-toy-erp/server && make data && make migrate_status`
 - 若服务逻辑依赖新表/新列，发布前先确认目标库 migration 已落地。
-- 不要因为文档、前端导航、帮助中心、开发验收总控页面改动而运行或生成 migration。
+- 不要因为文档、前端导航、产品内帮助入口、开发验收总控页面改动而运行或生成 migration。
 - 不要把与当前任务无关的 Phase 2A / 2B / 2C / 2D 现场文件清理、回退或纳入本轮，除非任务明确要求。
 
 ## 前端与样式
@@ -363,8 +362,8 @@ RBAC / API 改动必须覆盖：
   - `cd /Users/simon/projects/plush-toy-erp/web && pnpm lint && pnpm css && pnpm test`
   - `cd /Users/simon/projects/plush-toy-erp/web && pnpm style:l1`
 - 需要验证的状态至少包括默认态、交互态、恢复态和相邻区域。
-- 新增开发与验收入口时，必须同步 docs registry、seed navigation、对应测试断言，且确认普通帮助中心主入口没有被误加入开发内部文档。
-- 新增文档页优先复用现有 docs registry 和页面渲染机制，不要为了静态说明页新建复杂状态管理或后端 API。
+- 当前前端不再维护产品内 docs registry。未来若重新新增开发与验收或产品内文档入口，必须先正式设计 registry、seed navigation、菜单权限、路由和对应测试断言。
+- 新增文档页应优先复用重新设计后的 registry 和页面渲染机制，不要为了静态说明页新建复杂状态管理或后端 API。
 
 ## Ant Design 表单实例约定
 

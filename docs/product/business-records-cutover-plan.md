@@ -15,8 +15,8 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 - `business_records` 继续存在。
 - V1 正式模型已具备 schema、migration、repo/usecase、API/RBAC 和 UI。
-- `business_records` 仍可能承载旧入口、demo、source snapshot、seed、debug、帮助文档和旧测试。
-- V1 页面已存在，但 seedData、docs registry 和完整菜单切换仍未在本轮处理。
+- `business_records` 仍可能承载旧入口、demo、source snapshot、seed、debug 和旧测试。
+- V1 页面已存在，但 seedData 和完整菜单切换仍未在本轮处理。
 
 保持边界：
 
@@ -52,7 +52,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 进入下一阶段条件：
 
-- 确认 seedData / docs registry / Dashboard / menu permissions / mobile task 的旧入口影响。
+- 确认 seedData / Dashboard / menu permissions / mobile task 的旧入口影响。
 - 确认旧入口是否仍承担打印、debug 或验收用途。
 - 完成用户可见文案和权限入口的切换方案。
 
@@ -74,7 +74,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 - UI 只读策略。
 - seedData 菜单入口策略。
-- docs registry 和帮助文档口径。
+- 产品内帮助入口口径；当前不恢复已下线 docs registry。
 - 前端 L1 / route / permission 回归。
 
 禁止：
@@ -146,7 +146,7 @@ dry-run 输出：
 deprecated 条件：
 
 - UI 写入口已经关闭。
-- seedData / docs registry / Dashboard / mobile / tests 不再依赖旧写入。
+- seedData / Dashboard / mobile / tests 不再依赖旧写入。
 - debug seed 和 QA 已有替代或明确保留 demo 边界。
 - 历史数据归档查看可用。
 - 客户确认不再使用旧入口新增正式记录。
@@ -163,5 +163,5 @@ archive / delete 条件：
 | 下一步 | 为什么 |
 |---|---|
 | yoyoosun customer import dry-run / strategy | 先基于本 data map 做 dry-run/import 设计，分类 永绅 yoyoosun 样本字段 |
-| V1 menu entry review | 单独评审 seedData、docs registry、Dashboard、menu permissions 和旧入口只读化 |
+| V1 menu entry review | 单独评审 seedData、Dashboard、menu permissions 和旧入口只读化 |
 | business_records read-only runtime task | 只有菜单 / import 方案确认后再做，不应和 audit 混轮 |

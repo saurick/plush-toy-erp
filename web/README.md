@@ -6,19 +6,19 @@
 
 - 桌面后台：单入口
 - 移动端：按角色拆成八个端口
-- 仍然共享同一个 React 项目、同一个 common / ui / api / 文档层
+- 仍然共享同一个 React 项目、同一个 common / ui / api 层
 
 ## 目录结构（简版）
 
-| 路径          | 职责                                                            |
-| ------------- | --------------------------------------------------------------- |
-| `src/common/` | 通用认证、组件、hooks、状态、常量与工具函数                     |
-| `src/erp/`    | 毛绒 ERP 桌面后台、业务页、移动端页面、流程页、帮助中心、文档页 |
-| `src/erp/qa/` | 字段联动等前端 QA catalog 与覆盖报告视图模型                    |
-| `src/pages/`  | 根路由重定向、登录、注册、管理员登录                            |
-| `public/qa/`  | 字段联动覆盖等 latest 结构化报告，供后台验收页读取              |
-| `scripts/`    | 浏览器级样式回归脚本                                            |
-| `build/`      | 构建产物，不作为业务真源                                        |
+| 路径          | 职责                                               |
+| ------------- | -------------------------------------------------- |
+| `src/common/` | 通用认证、组件、hooks、状态、常量与工具函数        |
+| `src/erp/`    | 毛绒 ERP 桌面后台、业务页、移动端页面和打印工作台  |
+| `src/erp/qa/` | 字段联动等前端 QA catalog 与 latest 报告生成依赖   |
+| `src/pages/`  | 根路由重定向、登录、注册、管理员登录               |
+| `public/qa/`  | 字段联动覆盖等 latest 结构化报告，供后台验收页读取 |
+| `scripts/`    | 浏览器级样式回归脚本                               |
+| `build/`      | 构建产物，不作为业务真源                           |
 
 ## 启动命令
 
@@ -169,15 +169,9 @@ pnpm smoke:processing-contract-real-login
 - 桌面业务看板
 - 桌面业务页表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗布局 / 弹窗保存、批量删除、协同任务创建和回收站
 - 权限管理
-- 帮助中心
 - 模板打印中心
 - 采购合同打印工作台
 - 加工合同打印工作台
-- 移动端端口说明页
-- 资料与字段真源页
-- 开发与验收分组总览页
-- 业务链路调试只读查询页
-- 协同任务调试只读诊断页
 
 `pnpm smoke:mobile-auth-login-route` 当前覆盖全部 8 个角色移动端入口的未登录拦截、缺少移动端角色授权的旧登录态回登录页、登录页密码 / 短信入口、账号密码登录后回跳任务页、任务 / 预警 / 通知 / 进度展示、移动端不显示说明 / 角色文案，以及退出登录清空登录态。
 
@@ -185,30 +179,19 @@ pnpm smoke:processing-contract-real-login
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
-STYLE_L1_SCENARIOS=qa-acceptance-overview-desktop pnpm style:l1
+STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 ```
 
-## 前端文档注册约定
+## 前端文档入口边界
 
-前端文档页不解析 Markdown frontmatter。`web/src/erp/docs/*.md` 能否在产品内展示，取决于显式注册，而不是文件头 metadata。
+前端已移除产品内文档中心、帮助中心、高级文档和开发与验收页面入口。
 
 当前规则：
 
-- `web/src/erp/docs/*.md` 必须在 `web/src/erp/config/docs.mjs` 中导入，并在 `docRegistry` 中登记 `title`、`summary`、`source`。
-- 进入帮助中心、开发与验收、高级文档或文档卡片的入口，必须在 `web/src/erp/config/seedData.mjs` 的 `navItemRegistry` 中登记 `label`、`path`、`shortLabel`、`description`，再放入对应分组。
-- 如果后续给前端文档 registry 新增可检索 metadata，必须采用中文说明 + English anchor 的双语结构，例如 `title_zh` / `title_en`、`summary_zh` / `summary_en`、`status_zh` / `status_key`；新增字段前必须同步改渲染消费逻辑和 `docs.test.mjs`，不能只写未被消费的字段。
-- 帮助中心主入口只放普通业务用户需要先看的文档；架构评审、状态字典、QA 和调试说明默认放高级文档或开发与验收，不混进普通主入口。
-- 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/codex-goals/*`、`docs/archive/*` 不会自动进入前端。只有明确要做成产品内文档页时，才应新增或同步到 `web/src/erp/docs/*.md` 并走 registry。
-- 不要为了“看起来完整”给所有 Markdown 添加前端 metadata；无解析器、无页面入口、无导航分组时，这些字段只会变成重复真源。
-
-相关守卫：
-
-```bash
-cd /Users/simon/projects/plush-toy-erp/web
-pnpm test
-```
-
-其中 `src/erp/config/docs.test.mjs` 会校验前端正式 Markdown 的导入注册、文档路径和帮助中心 / QA 入口边界。
+- 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
+- 桌面侧栏只保留看板、业务分组、单据模板和系统管理。
+- 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径只做兼容重定向，不再作为产品内页面。
+- 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
 
 ## 当前前端边界
 
@@ -216,15 +199,14 @@ pnpm test
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、移动端入口和后端接口统一消费 permission code
 - 桌面后台主业务菜单按基础资料、销售链路、采购/仓储、生产和财务收口；各业务页已接入通用业务记录表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗保存、批量删除、workflow 业务状态保存和协同任务池，基础资料页当前暴露客户/供应商和产品入口，并复用 `business_records` 承接 trade-erp 字段口径
-- 桌面后台已新增 `开发与验收` 分组，当前先承接验收结果总览、业务链路调试、协同任务调试、字段联动覆盖、运行记录和专项报告；其中验收结果总览已升级为状态总览页，会读取字段联动 latest 报告并按模板目录展示打印专项范围，业务链路调试是只读链路排查页，协同任务调试是只读角色池和移动端可见性诊断页，字段联动覆盖已读取 `public/qa/erp-field-linkage-coverage.latest.json`，运行记录和专项报告仍以文档型入口为主，这些入口不表示已具备一键造数能力
-- 帮助中心的高级文档区域承接 workflow usecase 统一编排评审和行业专表 Schema 评审；这两份文档面向管理员、实施、开发和验收人员，不进入普通业务用户主入口
+- 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 移动端按角色拆端口访问，但不拆第二个仓库
 - 移动端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
 - 移动端任务页读取真实 workflow API，展示任务、预警、通知和进度，并按当前端口角色支持处理、阻塞、完成三类状态回填
 - 移动端复用管理员登录态，登录页提供密码登录和短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮
 - 模板打印当前由对应业务页选中记录后带值打开；打印中心保留默认样例和模板核对入口
 - 扩展硬件链路、PDA、条码枪、图片识别继续 deferred
-- 当前业务页、移动端页面、文档、帮助中心和模板预览已经齐入口；通用业务记录已落盘，采购合同 / 加工合同已支持业务页带值打开，Excel 导入、打印留档回写和细分业务专表继续 deferred
+- 当前业务页、移动端页面和模板预览已经齐入口；通用业务记录已落盘，采购合同 / 加工合同已支持业务页带值打开，Excel 导入、打印留档回写和细分业务专表继续 deferred
 
 ## 桌面业务弹窗约定
 

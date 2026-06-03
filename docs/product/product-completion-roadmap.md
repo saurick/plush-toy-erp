@@ -459,7 +459,7 @@ Phase 0 docs-only reset
 Phase 0 docs-only reset
 ```
 
-这轮只更新产品原则、分层、状态边界、客户配置、交付骨架、测试策略和任务拆分规则；不改 runtime、schema、migration、API、RBAC、UI、seedData、docs registry 或 loader。
+这轮只更新产品原则、分层、状态边界、客户配置、交付骨架、测试策略和任务拆分规则；不改 runtime、schema、migration、API、RBAC、UI、seedData，不恢复产品内 docs registry，也不做 loader。
 
 如果目标是尽快给 yoyoosun 试用：
 

@@ -1,6 +1,3 @@
-export const FIELD_LINKAGE_COVERAGE_PATH = '/erp/qa/field-linkage-coverage'
-export const FIELD_LINKAGE_REPORT_PATH =
-  '/qa/erp-field-linkage-coverage.latest.json'
 export const FIELD_LINKAGE_RUN_COMMAND = 'node scripts/qa/erp-field-linkage.mjs'
 
 const riskOrder = ['P0', 'P1', 'P2']
@@ -435,7 +432,7 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     title: '合同正文、条款和打印专用字段本轮不作为业务表单字段',
     fieldKeys: ['settlementTerms'],
     scenarioKey: 'contract_terms_excluded_from_business_scope',
-    layer: 'docs',
+    layer: 'qa',
     testFile: 'web/src/erp/qa/fieldLinkageCatalog.test.mjs',
   },
   {

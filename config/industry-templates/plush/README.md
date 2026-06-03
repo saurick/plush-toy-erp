@@ -12,6 +12,6 @@
 - 打印模板。
 - seed template。
 
-当前 Phase 0 只建立 README，不创建运行时配置加载器，不改 seed，不接前端 docs registry。
+当前 Phase 0 只建立 README，不创建运行时配置加载器，不改 seed，不恢复产品内 docs registry。
 
 行业模板是 Product Core 的配置输入，不是客户运行时租户。

@@ -5,17 +5,6 @@ import {
   buildPrintCenterPath,
 } from '../utils/printWorkspace.js'
 
-const docLink = (label, path) => ({ label, path })
-
-const helpLinkRegistry = Object.freeze({
-  flow: docLink('ERP 流程图总览', '/erp/docs/operation-flow-overview'),
-  operations: docLink('ERP 操作教程', '/erp/docs/operation-guide'),
-  field: docLink('ERP 字段联动口径', '/erp/docs/field-linkage-guide'),
-  calculation: docLink('ERP 计算口径', '/erp/docs/calculation-guide'),
-})
-
-const helpLink = (key) => ({ ...helpLinkRegistry[key] })
-
 const businessSectionMeta = [
   { key: 'master', title: '基础资料' },
   { key: 'sales', title: '销售链路' },
@@ -59,7 +48,6 @@ const businessModules = [
       '当前仍复用 business_records 的 document_no 作为代码，不新增 partner Ent schema 或第二套主档表。',
       '银行卡等敏感信息仍以文档设计为主，本轮不在页面上假装已可维护。',
     ],
-    relatedLinks: [helpLink('field'), helpLink('operations')],
   },
   {
     key: 'products',
@@ -95,7 +83,6 @@ const businessModules = [
       '当前不把“款式编号 = SKU”硬并到一个字段里。',
       '当前仍复用 business_records 的产品资料页，不新增与现有 products 事实表重复的产品主档 schema。',
     ],
-    relatedLinks: [helpLink('field'), helpLink('flow')],
   },
   {
     key: 'project-orders',
@@ -131,7 +118,6 @@ const businessModules = [
       '当前已接通通用业务记录保存和业务状态回写；后续再拆立项专表和审批细表。',
       '外贸“外销”相关字段不会被混入当前订单页。',
     ],
-    relatedLinks: [helpLink('flow'), helpLink('operations')],
   },
   {
     key: 'material-bom',
@@ -165,10 +151,6 @@ const businessModules = [
       '当前已接通通用业务记录保存；Excel 导入和 BOM 明细专表继续等样本稳定后再做。',
       '辅材 / 包材不会混到主料 BOM 页里。',
     ],
-    relatedLinks: [
-      helpLink('field'),
-      docLink('模板打印中心', '/erp/print-center'),
-    ],
   },
   {
     key: 'accessories-purchase',
@@ -200,15 +182,6 @@ const businessModules = [
     boundaries: [
       '当前不把厂商料号缺失时的供应商简称强行标准化成主档码。',
       '金额公式列只作为快照口径，不在页面里假装已完成财务核算。',
-    ],
-    relatedLinks: [
-      docLink(
-        '采购合同模板',
-        buildPrintCenterPath(MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY, {
-          entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
-        })
-      ),
-      helpLink('field'),
     ],
   },
   {
@@ -244,15 +217,6 @@ const businessModules = [
       '当前不把供应商采购字段和委外加工字段混成一个模型。',
       '通用业务记录保存已接通；业务页已可带值打开加工合同打印草稿，合同专表继续按样本推进。',
     ],
-    relatedLinks: [
-      docLink(
-        '加工合同模板',
-        buildPrintCenterPath(PROCESSING_CONTRACT_TEMPLATE_KEY, {
-          entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
-        })
-      ),
-      helpLink('calculation'),
-    ],
   },
   {
     key: 'inbound',
@@ -285,7 +249,6 @@ const businessModules = [
       '当前已接通通用业务记录保存；库存自动增减和扫码硬件链路继续 deferred。',
       '扩展硬件链路、PDA、条码枪继续 deferred，不在本页假装可用。',
     ],
-    relatedLinks: [helpLink('flow'), helpLink('operations')],
   },
   {
     key: 'inventory',
@@ -319,7 +282,6 @@ const businessModules = [
       '当前不伪造实时库存算法，只先把页面与字段口径补齐。',
       '不会把外销独占库存口径搬进当前库存模型。',
     ],
-    relatedLinks: [helpLink('field'), helpLink('calculation')],
   },
   {
     key: 'shipping-release',
@@ -353,10 +315,6 @@ const businessModules = [
       '当前不引入外贸运输、港口、发票号字段。',
       '发货单、物流单等正式模板仍以后续样本为准，本页先补流程入口。',
     ],
-    relatedLinks: [
-      helpLink('flow'),
-      docLink('模板打印中心', '/erp/print-center'),
-    ],
   },
   {
     key: 'outbound',
@@ -389,7 +347,6 @@ const businessModules = [
       '当前不会照搬发票号、来源外销号等外贸字段。',
       '库存扣减仍以后续库存专表和状态迁移为准，本页先保存出库业务记录。',
     ],
-    relatedLinks: [helpLink('flow'), helpLink('calculation')],
   },
   {
     key: 'production-scheduling',
@@ -423,7 +380,6 @@ const businessModules = [
       '当前不接工时采集、设备采集或现场硬件链路。',
       '排单页先承接流程和字段，不抢跑到实时产能算法。',
     ],
-    relatedLinks: [helpLink('flow'), helpLink('operations')],
   },
   {
     key: 'production-progress',
@@ -457,7 +413,6 @@ const businessModules = [
       '当前进度页先承接信息结构，不伪造实时报工与现场采集。',
       '返工和异常不会继续沉在备注，会拆到独立页承接。',
     ],
-    relatedLinks: [helpLink('field'), helpLink('flow')],
   },
   {
     key: 'production-exceptions',
@@ -491,7 +446,6 @@ const businessModules = [
       '当前已接通通用业务记录和协同任务；复杂异常工单系统继续后续拆。',
       '不会再把异常长期放在生产备注或聊天记录里。',
     ],
-    relatedLinks: [helpLink('operations'), helpLink('flow')],
   },
   {
     key: 'quality-inspections',
@@ -528,10 +482,6 @@ const businessModules = [
       '本轮不做图片识别、PDA、条码枪或硬件扫码。',
       '品质只负责检验结论和放行，不代替仓库确认入库 / 出库数量。',
     ],
-    relatedLinks: [
-      docLink('仓库与品质 v1', '/erp/docs/warehouse-quality-v1'),
-      docLink('通知 / 预警 v1', '/erp/docs/notification-alert-v1'),
-    ],
   },
   {
     key: 'reconciliation',
@@ -566,7 +516,6 @@ const businessModules = [
       '当前还缺正式对账单 / 结算单样本，不假装账务模型已经完整。',
       '不会把结汇、水单认领概念硬套进当前财务页。',
     ],
-    relatedLinks: [helpLink('calculation'), helpLink('field')],
   },
   {
     key: 'payables',
@@ -600,7 +549,6 @@ const businessModules = [
       '当前没有正式付款审批单样本，本页先作为提醒页，不伪装成完整审批流。',
       '不会引入不属于当前业务的收汇 / 水单认领字段。',
     ],
-    relatedLinks: [helpLink('calculation'), helpLink('operations')],
   },
   {
     key: 'receivables',
@@ -636,10 +584,6 @@ const businessModules = [
       '本轮不做总账、凭证、纳税申报或多账簿。',
       '应收登记只记录业务应收事实和状态，不伪造会计分录。',
     ],
-    relatedLinks: [
-      docLink('财务 v1', '/erp/docs/finance-v1'),
-      docLink('角色权限矩阵 v1', '/erp/docs/role-permission-matrix-v1'),
-    ],
   },
   {
     key: 'invoices',
@@ -674,10 +618,6 @@ const businessModules = [
     boundaries: [
       '本轮不做税务申报、复杂会计科目或凭证。',
       '发票登记是财务业务快照，不替代发票查验平台或税控系统。',
-    ],
-    relatedLinks: [
-      docLink('财务 v1', '/erp/docs/finance-v1'),
-      docLink('通知 / 预警 v1', '/erp/docs/notification-alert-v1'),
     ],
   },
 ]

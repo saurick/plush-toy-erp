@@ -567,7 +567,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		nextCheckpoints: []DebugCheckpoint{
 			{Label: "订单/款式立项", Path: "/erp/sales/project-orders", Reason: "核对订单调试单据和业务状态"},
-			{Label: "协同任务调试", Path: "/erp/qa/workflow-task-debug", Reason: "核对工程资料任务是否进入 PMC / 相关角色池"},
+			{Label: "任务看板", Path: "/erp/dashboard", Reason: "核对工程资料任务是否进入 PMC / 相关角色池"},
 		},
 		records: []debugRecordTemplate{
 			{ref: "order", moduleKey: "project-orders", title: "订单审批通过，待工程资料", statusKey: "engineering_preparing", ownerRoleKey: "sales", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", quantity: 1200, unit: "只", amount: 57600, dueOffsetDays: 21},

@@ -150,7 +150,6 @@ pnpm style:l1
 - 打印模板实现原理：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-implementation.md`
 - 当前真源索引：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
 - 前端说明：`/Users/simon/projects/plush-toy-erp/web/README.md`
-- 打印模板与帮助中心口径：`/Users/simon/projects/plush-toy-erp/web/src/erp/docs/print-templates.md`
 - 后端说明：`/Users/simon/projects/plush-toy-erp/server/README.md`
 
 ## 数据库约束

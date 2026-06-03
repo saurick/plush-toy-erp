@@ -18,14 +18,14 @@
 
 ## 开发验收 debug 能力
 
-业务链路调试页调用后端 JSON-RPC `debug` 域生成和清理调试数据：
+后端 JSON-RPC `debug` 域可生成和清理开发验收调试数据。前端业务链路调试页已移除，这组接口只作为受权限保护的后端调试能力保留：
 
 - `debug.capabilities`：返回当前环境、seed / cleanup / 业务数据清空是否允许和禁用原因
 - `debug.rebuild_business_chain_scenario`：生成带 debugRunId 标记的调试数据
 - `debug.clear_business_chain_scenario`：按 debugRunId 预览或清理调试数据
 - `debug.clear_business_data`：清空本项目当前 SQL 连接中的业务链路、采购入库、库存、BOM、物料、成品、仓库和单位业务表
 
-这些接口默认面向当前 SQL 连接开启。可用 `ERP_DEBUG_SEED_ENABLED=false` 或 `ERP_DEBUG_CLEANUP_ENABLED=false` 显式关闭写操作；清理类能力仍要求 `ERP_DEBUG_CLEANUP_SCOPE=debug_run`。业务数据清空不删除账号、权限、管理员偏好、配置和数据库结构。后端还会校验管理员身份和业务链路调试菜单权限。
+这些接口默认面向当前 SQL 连接开启。可用 `ERP_DEBUG_SEED_ENABLED=false` 或 `ERP_DEBUG_CLEANUP_ENABLED=false` 显式关闭写操作；清理类能力仍要求 `ERP_DEBUG_CLEANUP_SCOPE=debug_run`。业务数据清空不删除账号、权限、管理员偏好、配置和数据库结构。后端还会校验管理员身份和 debug 权限。
 
 ## 快速开始
 

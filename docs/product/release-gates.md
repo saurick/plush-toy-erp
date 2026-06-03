@@ -12,7 +12,7 @@
 | Fact | happy path、非法状态、重复提交、取消 / 冲正、幂等、事务失败和不可物理删除覆盖 |
 | RBAC | 未登录、disabled、非管理员、无权限、角色不匹配、super_admin 和业务边界覆盖 |
 | API / UI | UI 只展示和提交动作，不承接后端事实逻辑；后端仍校验权限和状态 |
-| Help / QA | docs registry、导航 seed、帮助入口和验收文档同步 |
+| Help / QA | 当前不维护产品内 docs registry；未来若恢复帮助或验收入口，必须同步导航 seed、菜单权限、路由和验收文档 |
 | Delivery / Ops | migration、备份恢复、发布、健康检查、smoke、回滚和清理记录明确 |
 
 ## 必测门禁
