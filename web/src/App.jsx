@@ -7,15 +7,16 @@ import { Helmet } from 'react-helmet-async'
 import { authBus } from '@/common/auth/authBus'
 import { appAlert } from '@/common/components/modal/alertBridge'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
-import { getRuntimeAppDefinition } from '@/erp/config/appRegistry.mjs'
 import ERPRouter from '@/erp/router'
 import MobileRoleRouter from '@/erp/mobile/router'
-import { ERPWorkspaceProvider } from '@/erp/context/ERPWorkspaceProvider'
+import {
+  ERPWorkspaceProvider,
+  useERPWorkspace,
+} from '@/erp/context/ERPWorkspaceProvider'
 
 function AppContent() {
   const navigate = useNavigate()
-  const appConfig = getRuntimeAppDefinition()
-  const isDesktopApp = appConfig.kind === 'desktop'
+  const { appConfig, isDesktopApp, isMobileExperience } = useERPWorkspace()
   const appTitle =
     appConfig.title || import.meta.env.VITE_APP_TITLE || 'Plush Toy ERP'
 
@@ -29,7 +30,7 @@ function AppContent() {
       }
       const targetLoginPath = loginPath || '/login'
 
-      if (!isDesktopApp) {
+      if (isMobileExperience) {
         navigate(targetLoginPath, {
           replace: true,
           state: { from: safeFrom },
@@ -49,7 +50,7 @@ function AppContent() {
         },
       })
     })
-  }, [isDesktopApp, navigate])
+  }, [isMobileExperience, navigate])
 
   return (
     <>

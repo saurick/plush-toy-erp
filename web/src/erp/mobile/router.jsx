@@ -13,15 +13,14 @@ export default function MobileRoleRouter() {
         element={<AdminLoginPage defaultRedirect="/" />}
       />
       <Route
-        path="/"
         element={
           <AuthGuard requireAdmin>
             <MobileAppLayout />
           </AuthGuard>
         }
       >
-        <Route index element={<Navigate to="/tasks" replace />} />
-        <Route path="tasks" element={<MobileRoleTasksPage />} />
+        <Route path="/" element={<Navigate to="/tasks" replace />} />
+        <Route path="/tasks" element={<MobileRoleTasksPage />} />
         <Route path="*" element={<Navigate to="/tasks" replace />} />
       </Route>
     </Routes>

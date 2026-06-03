@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { hasMobileRolePermission } from './mobileRolePermissions.mjs'
+import {
+  getAllowedMobileRoleKeys,
+  hasMobileRolePermission,
+} from './mobileRolePermissions.mjs'
 
 test('mobileRolePermissions: 超级管理员拥有全部移动端角色权限', () => {
   assert.equal(
@@ -59,5 +62,22 @@ test('mobileRolePermissions: 八个移动端角色入口使用独立权限码', 
       'warehouse'
     ),
     false
+  )
+})
+
+test('mobileRolePermissions: 未知移动端角色不默认放行', () => {
+  assert.equal(
+    hasMobileRolePermission({ permissions: ['mobile.unknown.access'] }, 'foo'),
+    false
+  )
+})
+
+test('mobileRolePermissions: 可按权限筛出允许进入的岗位角色', () => {
+  assert.deepEqual(
+    getAllowedMobileRoleKeys(
+      { permissions: ['mobile.quality.access', 'mobile.warehouse.access'] },
+      ['boss', 'quality', 'warehouse']
+    ),
+    ['quality', 'warehouse']
   )
 })

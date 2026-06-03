@@ -24,17 +24,87 @@ import {
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import {
+  ENTRY_TARGET,
+  getEnabledMobileRoleKeys,
+  getEntryConfig,
+  hasDesktopEntryAccess,
+  isDesktopEntryEnabled,
+  isMobileRoleEntryEnabled,
+  isMobileTasksEntryEnabled,
+  parseMobileRoleFromPath,
+  rememberEntryChoice,
+  resolveDefaultEntryTarget,
+  resolveMobileTasksPath,
+} from '@/erp/config/entryConfig.mjs'
 import { useERPWorkspace } from '@/erp/context/ERPWorkspaceProvider'
-import { hasMobileRolePermission } from '@/erp/utils/mobileRolePermissions.mjs'
+import {
+  getAllowedMobileRoleKeys,
+  hasMobileRolePermission,
+} from '@/erp/utils/mobileRolePermissions.mjs'
 
 const { Title } = Typography
+
+function buildLocationPath(locationLike, fallback = '') {
+  if (!locationLike) {
+    return fallback
+  }
+  return `${locationLike.pathname || fallback}${locationLike.search || ''}${
+    locationLike.hash || ''
+  }`
+}
+
+function pickSupportedEntryTarget(defaultTarget, supportedTargets) {
+  if (
+    defaultTarget === ENTRY_TARGET.DESKTOP &&
+    supportedTargets.desktop === true
+  ) {
+    return defaultTarget
+  }
+  if (
+    defaultTarget === ENTRY_TARGET.MOBILE_TASKS &&
+    supportedTargets.mobileTasks === true
+  ) {
+    return defaultTarget
+  }
+  if (
+    supportedTargets.desktop === true &&
+    supportedTargets.mobileTasks !== true
+  ) {
+    return ENTRY_TARGET.DESKTOP
+  }
+  if (
+    supportedTargets.mobileTasks === true &&
+    supportedTargets.desktop !== true
+  ) {
+    return ENTRY_TARGET.MOBILE_TASKS
+  }
+  return ''
+}
 
 export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { isMobileApp, activeRoleKey, activeRole } = useERPWorkspace()
+  const { isDesktopApp, isMobileApp, activeRoleKey } = useERPWorkspace()
+  const entryConfig = useMemo(() => getEntryConfig(), [])
+  const canSelectDesktopEntry =
+    isDesktopApp && isDesktopEntryEnabled(entryConfig)
+  const canSelectMobileEntry =
+    (isDesktopApp || isMobileApp) && isMobileTasksEntryEnabled(entryConfig)
   const admin = getStoredAdminProfile()
+  const fromPathname = location.state?.from?.pathname || ''
+  const fromMobileRoleKey = parseMobileRoleFromPath(fromPathname)
+  const fixedMobileRoleKey = isMobileApp ? activeRoleKey : fromMobileRoleKey
+  const defaultEntryTarget = resolveDefaultEntryTarget({
+    pathname: fromPathname,
+    config: entryConfig,
+  })
+  const initialEntryTarget = pickSupportedEntryTarget(defaultEntryTarget, {
+    desktop: canSelectDesktopEntry,
+    mobileTasks: canSelectMobileEntry,
+  })
   const [loginMode, setLoginMode] = useState('password')
+  const [entryTarget, setEntryTarget] = useState(initialEntryTarget)
   const [smsPhone, setSmsPhone] = useState('')
   const [smsHint, setSmsHint] = useState('')
   const [requestingCode, setRequestingCode] = useState(false)
@@ -50,10 +120,21 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const canRequestSMSCode =
     smsPhone.trim().length > 0 && !requestingCode && smsCooldownSeconds === 0
 
-  const redirectTo =
-    (location.state?.from?.pathname || defaultRedirect) +
-    (location.state?.from?.search || '') +
-    (location.state?.from?.hash || '')
+  const redirectTo = buildLocationPath(location.state?.from, '')
+  let mobileRoleForRequest = ''
+  if (entryTarget === ENTRY_TARGET.MOBILE_TASKS && fixedMobileRoleKey) {
+    mobileRoleForRequest = fixedMobileRoleKey
+  } else if (isMobileApp) {
+    mobileRoleForRequest = activeRoleKey
+  }
+  const entryOptions = [
+    canSelectDesktopEntry
+      ? { label: '后台管理', value: ENTRY_TARGET.DESKTOP }
+      : null,
+    canSelectMobileEntry
+      ? { label: '岗位任务端', value: ENTRY_TARGET.MOBILE_TASKS }
+      : null,
+  ].filter(Boolean)
 
   const authRpc = useMemo(
     () =>
@@ -80,11 +161,85 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
     return () => window.clearInterval(timer)
   }, [smsCooldownUntil])
 
-  const canUseCurrentMobileRole =
-    !isMobileApp || hasMobileRolePermission(admin, activeRoleKey)
+  const resolvePostLoginPath = (
+    adminProfile,
+    { shouldRemember = true } = {}
+  ) => {
+    if (!adminProfile) {
+      return ''
+    }
 
-  if (admin && canUseCurrentMobileRole) {
-    return <Navigate to={redirectTo} replace />
+    if (fromMobileRoleKey) {
+      if (
+        isMobileRoleEntryEnabled(fromMobileRoleKey, entryConfig) &&
+        hasMobileRolePermission(adminProfile, fromMobileRoleKey)
+      ) {
+        if (shouldRemember) {
+          rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
+        }
+        return redirectTo
+      }
+      return ''
+    }
+
+    if (entryTarget === ENTRY_TARGET.DESKTOP) {
+      if (hasDesktopEntryAccess(adminProfile)) {
+        if (shouldRemember) {
+          rememberEntryChoice(ENTRY_TARGET.DESKTOP)
+        }
+        return redirectTo.startsWith('/erp/') ? redirectTo : defaultRedirect
+      }
+      return '/entry'
+    }
+
+    if (entryTarget === ENTRY_TARGET.MOBILE_TASKS) {
+      const enabledRoleKeys = getEnabledMobileRoleKeys(entryConfig)
+      const allowedRoleKeys = getAllowedMobileRoleKeys(
+        adminProfile,
+        enabledRoleKeys
+      )
+      const requestedRoleKey = fixedMobileRoleKey
+      if (
+        requestedRoleKey &&
+        allowedRoleKeys.includes(requestedRoleKey) &&
+        isMobileRoleEntryEnabled(requestedRoleKey, entryConfig)
+      ) {
+        if (shouldRemember) {
+          rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
+        }
+        return isMobileApp ? '/tasks' : resolveMobileTasksPath(requestedRoleKey)
+      }
+      if (allowedRoleKeys.length === 1) {
+        if (shouldRemember) {
+          rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
+        }
+        return isMobileApp
+          ? '/tasks'
+          : resolveMobileTasksPath(allowedRoleKeys[0])
+      }
+      if (allowedRoleKeys.length > 1) {
+        const defaultRoleKey = allowedRoleKeys[0]
+        if (shouldRemember) {
+          rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
+        }
+        return isMobileApp ? '/tasks' : resolveMobileTasksPath(defaultRoleKey)
+      }
+      if (hasDesktopEntryAccess(adminProfile)) {
+        return '/entry?target=desktop'
+      }
+      return ''
+    }
+
+    return '/entry'
+  }
+
+  if (admin) {
+    const loggedInRedirect = resolvePostLoginPath(admin, {
+      shouldRemember: false,
+    })
+    if (loggedInRedirect) {
+      return <Navigate to={loggedInRedirect} replace />
+    }
   }
 
   const requestSMSCode = async () => {
@@ -98,7 +253,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       const result = await authRpc.call('send_sms_code', {
         phone: smsPhone.trim(),
         scope: 'admin',
-        mobile_role_key: isMobileApp ? activeRoleKey : '',
+        mobile_role_key: mobileRoleForRequest,
       })
       const data = result?.data || {}
       const resendAfter = Number(data.resend_after || 0)
@@ -118,6 +273,11 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   }
 
   const onFinish = async (values) => {
+    if (!entryTarget && entryOptions.length > 1) {
+      setError('请选择登录入口。')
+      return
+    }
+
     setSubmitting(true)
     setError('')
 
@@ -132,21 +292,17 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
               phone: values.phone.trim(),
               code: values.code.trim(),
               scope: 'admin',
-              mobile_role_key: isMobileApp ? activeRoleKey : '',
+              mobile_role_key: mobileRoleForRequest,
             })
 
       persistAuth(result?.data, AUTH_SCOPE.ADMIN)
-      if (
-        isMobileApp &&
-        !hasMobileRolePermission(result?.data, activeRoleKey)
-      ) {
+      const nextPath = resolvePostLoginPath(result?.data)
+      if (!nextPath) {
         logout(AUTH_SCOPE.ADMIN)
-        setError(
-          `该账号暂无${activeRole?.label || '当前角色'}移动端登录权限，请联系管理员。`
-        )
+        setError('该账号暂无当前入口权限，请联系管理员。')
         return
       }
-      navigate(redirectTo, { replace: true })
+      navigate(nextPath, { replace: true })
     } catch (err) {
       setError(getActionErrorMessage(err, '登录'))
     } finally {
@@ -173,8 +329,25 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
           </Title>
 
           {error ? <Alert type="error" showIcon message={error} /> : null}
+          {entryOptions.length === 0 ? (
+            <Alert type="warning" showIcon message="当前部署未启用登录入口" />
+          ) : null}
 
           <Form layout="vertical" onFinish={onFinish}>
+            {entryOptions.length > 1 ? (
+              <Form.Item label="登录入口">
+                <Segmented
+                  block
+                  value={entryTarget}
+                  onChange={(value) => {
+                    setEntryTarget(value)
+                    setError('')
+                  }}
+                  options={entryOptions}
+                />
+              </Form.Item>
+            ) : null}
+
             <Form.Item>
               <Segmented
                 block

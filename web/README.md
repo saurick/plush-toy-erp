@@ -5,7 +5,8 @@
 当前前端不是“一个桌面站点 + 一个通用移动壳层”，而是：
 
 - 桌面后台：单入口
-- 移动端：按角色拆成八个端口
+- 移动端：按角色拆成八个端口，并在桌面构建中提供 `/m/<role>/tasks` 单端口兼容路径
+- 登录页：按入口配置显示“后台管理 / 岗位任务端”，设备只决定默认选项，不决定权限，岗位由账号授权自动决定
 - 仍然共享同一个 React 项目、同一个 common / ui / api 层
 
 ## 目录结构（简版）
@@ -31,6 +32,21 @@ pnpm start:desktop
 ```
 
 默认端口：`5175`
+
+桌面构建已提供单端口移动任务端兼容路径：
+
+```text
+http://localhost:5175/m/boss/tasks
+http://localhost:5175/m/sales/tasks
+http://localhost:5175/m/purchase/tasks
+http://localhost:5175/m/production/tasks
+http://localhost:5175/m/warehouse/tasks
+http://localhost:5175/m/finance/tasks
+http://localhost:5175/m/pmc/tasks
+http://localhost:5175/m/quality/tasks
+```
+
+`/admin-login` 统一承接后台和岗位任务端登录。手机默认选择岗位任务端，电脑默认选择后台，平板没有历史选择时保留入口选择；用户手动选择入口优先于设备默认。入口显隐由 `web/src/erp/config/entryConfig.mjs` 控制，并可通过 `window.__PLUSH_ERP_ENTRY_CONFIG__` 覆盖。用户不在登录前手选岗位，岗位任务端登录后按账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位；是否真正可进入仍由后端返回的 `permissions / menus` 决定。
 
 ### 角色移动端
 
@@ -86,6 +102,7 @@ pnpm build:mobile:quality
 说明：
 
 - 桌面后台默认输出到 `build/`
+- 桌面后台构建产物同时包含 `/m/<role>/tasks` 单端口任务端兼容路由
 - 移动端按入口输出到 `build/mobile-*`
 - 生产环境应使用构建产物加静态服务，不使用 `pnpm start:*` 或 Vite dev server 承载流量
 - 后续如果需要不同域名，可以直接绑定不同构建产物
@@ -155,7 +172,7 @@ pnpm smoke:processing-contract-real-login
 
 - 两条烟测都会真实打开管理员登录页，使用 `server/configs/dev/config.local.yaml` 或 `config.yaml` 中的管理员账号登录
 - 若本地账号不在配置文件中，可通过环境变量 `REAL_LOGIN_ADMIN_USERNAME` / `REAL_LOGIN_ADMIN_PASSWORD` 覆盖
-- 桌面管理员登录页和角色移动端登录页都保留密码登录和短信登录；角色移动端登录后统一按权限管理里的移动端角色授权校验，短信登录额外依赖手机号绑定
+- 桌面管理员登录页和岗位任务端登录页都保留密码登录和短信登录；用户不在登录前手选岗位角色，岗位任务端登录后按账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，固定 `/m/<role>/tasks` 直达入口仍校验对应岗位授权，短信登录额外依赖手机号绑定
 - 可通过 `REAL_LOGIN_PREVIEW_MAX_MS` 覆盖默认 `10000ms` 的 PDF 预览时延阈值
 - 采购合同烟测会验证：登录成功、采购合同工作台可打开、采购金额可手工修改、改单价后金额会按公式重算、在线 PDF 预览在阈值内打开
 - 加工合同烟测会验证：登录成功、加工合同工作台可打开、工序名称 / 数量 / 单价会同步到纸面并联动金额、在线 PDF 预览在阈值内打开
@@ -197,11 +214,11 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 ## 当前前端边界
 
 - 桌面后台继续只保留一个入口
-- 桌面后台不再保留角色切换、角色首页或角色入口菜单
+- 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、移动端入口和后端接口统一消费 permission code
 - 桌面后台主业务菜单按基础资料、销售链路、采购/仓储、生产和财务收口；各业务页已接入通用业务记录表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗保存、批量删除、workflow 业务状态保存和协同任务池，基础资料页当前暴露客户/供应商和产品入口，并复用 `business_records` 承接 trade-erp 字段口径
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
-- 移动端按角色拆端口访问，但不拆第二个仓库
+- 移动端仍保留按角色拆端口访问，同时桌面构建提供 `/m/<role>/tasks` 单端口兼容路径；两者不拆第二个仓库
 - 移动端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
 - 移动端任务页读取真实 workflow API，展示任务、预警、通知和进度，并按当前端口角色支持处理、阻塞、完成三类状态回填
 - 移动端复用管理员登录态，登录页提供密码登录和短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮

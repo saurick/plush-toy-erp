@@ -868,6 +868,28 @@
   margin-bottom: 24px;
 }
 
+.erp-login-card .ant-segmented {
+  padding: 4px;
+  border-radius: 18px;
+  background: #eef4f0;
+}
+
+.erp-login-card .ant-segmented .ant-segmented-item {
+  min-height: 42px;
+  border-radius: 14px;
+}
+
+.erp-login-card .ant-segmented .ant-segmented-item-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: normal;
+}
+
 .erp-login-card .ant-form-item-label > label {
   color: #1f2937;
   font-size: 15px;
@@ -946,6 +968,22 @@
 .erp-login-card .ant-btn.ant-btn-primary:focus-visible {
   border-color: #27753d;
   background: #27753d;
+}
+
+.erp-entry-card__button.ant-btn {
+  min-height: 56px;
+  justify-content: flex-start;
+  border-radius: 18px;
+  border-color: #d1d5db;
+  color: #204160;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.erp-entry-card__button.ant-btn:hover,
+.erp-entry-card__button.ant-btn:focus-visible {
+  border-color: #8fb39a;
+  color: #204160;
 }
 
 .erp-primary-button,

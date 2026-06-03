@@ -1,6 +1,6 @@
 import { normalizeRoleKey } from './roleKeys.mjs'
 
-const MOBILE_ROLE_PERMISSION_MAP = Object.freeze({
+export const MOBILE_ROLE_PERMISSION_MAP = Object.freeze({
   boss: 'mobile.boss.access',
   sales: 'mobile.sales.access',
   purchase: 'mobile.purchase.access',
@@ -17,6 +17,10 @@ function normalizeStringList(values = []) {
     : []
 }
 
+export function getMobileRolePermissionKey(roleKey) {
+  return MOBILE_ROLE_PERMISSION_MAP[normalizeRoleKey(roleKey)] || ''
+}
+
 export function hasMobileRolePermission(adminProfile, roleKey) {
   const normalizedRole = normalizeRoleKey(roleKey)
   if (!normalizedRole) {
@@ -25,13 +29,19 @@ export function hasMobileRolePermission(adminProfile, roleKey) {
   if (adminProfile?.is_super_admin === true) {
     return true
   }
-  const requiredPermission = MOBILE_ROLE_PERMISSION_MAP[normalizedRole]
+  const requiredPermission = getMobileRolePermissionKey(normalizedRole)
   if (!requiredPermission) {
-    return true
+    return false
   }
   const permissions = normalizeStringList(adminProfile?.permissions || [])
   if (permissions.includes(requiredPermission)) {
     return true
   }
   return false
+}
+
+export function getAllowedMobileRoleKeys(adminProfile, roleKeys = []) {
+  return normalizeStringList(roleKeys).filter((roleKey) =>
+    hasMobileRolePermission(adminProfile, roleKey)
+  )
 }

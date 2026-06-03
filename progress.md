@@ -6,6 +6,25 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-03 21:08
+- 完成：修复统一登录页入口选择被默认后台回跳覆盖的问题；`/admin-login` 现在只在存在真实来源路由时回跳，普通登录页选择“岗位任务端”后会按账号移动端权限进入 `/m/<role>/tasks`，不会因 `defaultRedirect=/erp/dashboard` 回到后台。
+- 下一步：如后续要支持一人多岗切换，仍按单独任务设计；本轮只修入口选择优先级。
+- 阻塞/风险：本轮未改后端 schema、migration、API、RBAC 码表、部署脚本或生产 Compose。本轮追加前 `progress.md` 为 215 行 / 41170 bytes，未达到归档阈值。
+
+## 2026-06-03 20:23
+- 完成：按“账号决定岗位”口径收窄统一登录入口，移除登录页和 `/entry` 的岗位角色选择 UI；用户只选择“后台管理 / 岗位任务端”，岗位任务端按账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位。
+- 完成：修正 `/admin-login` 无真实来源路径时的默认入口判断，普通手机 UA 默认选中岗位任务端、电脑默认后台；同时把旧多端口移动端路由改为 pathless 受保护父路由，确保 `/tasks` 未登录和旧登录态缺权限时稳定回 `/admin-login`。
+- 完成：同步 `README.md`、`web/README.md` 和 `docs/current-source-of-truth.md`，明确当前阶段不做登录前岗位选择；若后续出现一个账号多岗位高频切换，再单独设计账号内角色切换。
+- 下一步：如后续需要支持一人多岗，应另开任务评审角色切换入口、默认岗位偏好、短信直达校验和移动任务页切换后的状态恢复，不在本轮提前实现。
+- 阻塞/风险：本轮仍未改后端 schema、migration、API、RBAC 码表、部署脚本或生产 Compose；多岗位账号当前自动进入配置顺序中的第一个可用岗位。本轮追加前 `progress.md` 为 208 行 / 39875 bytes，未达到归档阈值。
+
+## 2026-06-03 19:59
+- 完成：新增统一登录入口选择和桌面单端口移动任务端兼容路径。桌面构建现在同时支持 `/erp/*` 后台和 `/m/<role>/tasks` 岗位任务端；`/admin-login` 按入口配置显示“后台管理 / 岗位任务端”，手机默认岗位任务端、电脑默认后台、平板无历史选择时保留入口选择；`/entry` 用于登录后在后台和岗位任务端之间切换。
+- 完成：新增 `web/src/erp/config/entryConfig.mjs` 作为入口显隐配置真源，默认启用后台和 8 个移动端角色，并支持 `window.__PLUSH_ERP_ENTRY_CONFIG__` 覆盖；移动端岗位可用性先看配置，实际进入和操作仍由后端 `permissions / menus` 与 `mobile.<role>.access` 控制。
+- 完成：同步 `README.md`、`web/README.md` 和 `docs/current-source-of-truth.md`，明确本轮保留现有多端口移动端构建 / 生产主路径，未删除 `APP_ID=mobile-*` 多实例部署约定。
+- 下一步：如要正式把生产前端收口为单构建 / 单端口，需要另开部署收口任务，改 `serveStaticApp.mjs`、Docker / Compose / 网关文档和旧端口重定向策略，并重新跑移动端全角色 smoke。
+- 阻塞/风险：本轮未改后端 schema、migration、API、RBAC 码表、部署脚本或生产 Compose；入口配置当前是前端运行时 / 构建侧配置，不是数据库配置中心，也没有引入 `tenant_id`。本轮追加前 `progress.md` 为 201 行 / 38360 bytes，未达到归档阈值。
+
 ## 2026-06-03 18:12
 - 完成：将开发态文档查看器右侧章节标签改为可点击按钮，Markdown 渲染时给 H1-H6 标题补稳定 id；点击章节标签会在右侧阅读容器内滚动到对应标题，并新增“回到顶部”按钮。
 - 完成：切换文档时右侧阅读区自动回到顶部；同步 `web/README.md` 和 `docs/current-source-of-truth.md` 记录该开发态阅读辅助能力。

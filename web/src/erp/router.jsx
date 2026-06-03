@@ -1,16 +1,26 @@
 import React, { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import AuthGuard from '@/common/auth/AuthGuard'
-import { AUTH_SCOPE, getCurrentUser } from '@/common/auth/auth'
+import { getStoredAdminProfile } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
 import { businessModuleDefinitions } from './config/businessModules.mjs'
 import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
+import {
+  ENTRY_TARGET,
+  getEnabledMobileRoleKeys,
+  getEntryConfig,
+  hasDesktopEntryAccess,
+  resolveDefaultEntryTarget,
+  resolveMobileTasksPath,
+} from './config/entryConfig.mjs'
+import { getAllowedMobileRoleKeys } from './utils/mobileRolePermissions.mjs'
 
 const AdminUsersPage = lazy(() => import('@/pages/AdminUsers'))
 const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
 const LoginPage = lazy(() => import('@/pages/Login'))
 const RegisterPage = lazy(() => import('@/pages/Register'))
+const EntrySelectionPage = lazy(() => import('./pages/EntrySelectionPage'))
 const BusinessModulePage = lazy(() => import('./pages/BusinessModulePage'))
 const BusinessDashboardPage = lazy(
   () => import('./pages/BusinessDashboardPage')
@@ -24,6 +34,10 @@ const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
 const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
+const MobileAppLayout = lazy(() => import('./mobile/MobileAppLayout'))
+const MobileRoleTasksPage = lazy(
+  () => import('./mobile/pages/MobileRoleTasksPage')
+)
 const DevDocsPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevDocsPage.jsx'))
   : null
@@ -33,8 +47,28 @@ function DesktopEntryRedirect() {
 }
 
 function RootEntryRedirect() {
-  const admin = getCurrentUser(AUTH_SCOPE.ADMIN)
-  return <Navigate to={admin ? '/erp/dashboard' : '/admin-login'} replace />
+  const admin = getStoredAdminProfile()
+  if (!admin) {
+    return <Navigate to="/admin-login" replace />
+  }
+
+  const entryConfig = getEntryConfig()
+  const target = resolveDefaultEntryTarget({ config: entryConfig })
+  if (target === ENTRY_TARGET.DESKTOP && hasDesktopEntryAccess(admin)) {
+    return <Navigate to="/erp/dashboard" replace />
+  }
+
+  const allowedMobileRoles = getAllowedMobileRoleKeys(
+    admin,
+    getEnabledMobileRoleKeys(entryConfig)
+  )
+  if (target === ENTRY_TARGET.MOBILE_TASKS && allowedMobileRoles.length > 0) {
+    return (
+      <Navigate to={resolveMobileTasksPath(allowedMobileRoles[0])} replace />
+    )
+  }
+
+  return <Navigate to="/entry" replace />
 }
 
 function RouteLoadingFallback() {
@@ -59,6 +93,14 @@ export default function ERPRouter() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/admin-login" element={<AdminLoginPage />} />
+        <Route
+          path="/entry"
+          element={
+            <AuthGuard requireAdmin>
+              <EntrySelectionPage />
+            </AuthGuard>
+          }
+        />
 
         <Route
           path="/admin-accounts"
@@ -167,6 +209,19 @@ export default function ERPRouter() {
             </AuthGuard>
           }
         />
+
+        <Route
+          path="/m/:roleKey"
+          element={
+            <AuthGuard requireAdmin>
+              <MobileAppLayout />
+            </AuthGuard>
+          }
+        >
+          <Route index element={<Navigate to="tasks" replace />} />
+          <Route path="tasks" element={<MobileRoleTasksPage />} />
+          <Route path="*" element={<Navigate to="tasks" replace />} />
+        </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
