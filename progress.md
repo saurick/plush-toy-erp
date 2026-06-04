@@ -6,6 +6,12 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-04 15:44
+- 完成：修复登录页刷新时旧登录态触发全局“登录状态已失效”弹窗的问题。`JsonRpc` 新增 `withAuth=false` 公开调用模式，登录、管理员登录和注册页的 `auth` RPC 不再携带旧 token，也不会把登录前能力探测错误升级为全局重新登录弹窗；受保护业务 RPC 的登录态失效处理保持不变。
+- 完成：新增 `web/src/common/utils/jsonRpc.test.mjs` 并纳入 `pnpm test`，覆盖公开 RPC 不带 Authorization、公开 RPC 鉴权错误不触发全局弹窗、默认受保护 RPC 仍触发登出与登录页跳转。
+- 下一步：如后续继续新增登录前公开 `auth` 方法，默认复用 `withAuth=false` 的公开 RPC 实例，不要重新让旧 token 进入能力探测或验证码请求。
+- 阻塞/风险：本轮只改前端认证 RPC 和登录前页面；未改后端鉴权语义、schema、migration、RBAC、菜单、业务 API、样式或部署。验证已通过 `cd web && pnpm lint && pnpm css && pnpm test`、`cd web && pnpm smoke:mobile-auth-login-route`、`STYLE_L1_SCENARIOS=admin-login-mobile,auth-expired-alert-mobile pnpm style:l1`；Playwright 验证过期旧 token 下刷新 `/admin-login` 时 `auth.capabilities` 请求均不携带 Authorization，页面停留登录页，未出现“登录状态已失效”弹窗且控制台无 error/warn。本轮追加前 `progress.md` 为 233 行 / 44627 bytes，未达到归档阈值。
+
 ## 2026-06-04 Go 漏洞依赖升级
 - 完成：修复 `govulncheck` 可达漏洞告警，升级 `server/go.mod` 的 Go 基线到 `go 1.25.0` 并显式固定 `toolchain go1.26.4`，同步升级 `go.opentelemetry.io/otel/*` 到 `v1.43.0`、`golang.org/x/net` 到 `v0.53.0` 及相关间接依赖。未改 Workflow / Fact 边界、schema、migration、API、RBAC、UI、seedData、客户资料或业务字段映射链路。
 - 验证：已执行 `bash scripts/qa/govulncheck.sh`，结果为 0 个可达漏洞；已执行 `cd server && go test ./...`，通过。

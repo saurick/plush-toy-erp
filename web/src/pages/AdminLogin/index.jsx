@@ -120,6 +120,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
         url: 'auth',
         basePath: ADMIN_BASE_PATH,
         authScope: AUTH_SCOPE.ADMIN,
+        withAuth: false,
       }),
     []
   )

@@ -7,24 +7,25 @@ import { isAuthFailureCode } from '@/common/consts/errorCodes'
 let globalRpcId = 0
 
 export class JsonRpc {
-  constructor({ url, basePath = '/rpc', authScope = 'user' }) {
+  constructor({ url, basePath = '/rpc', authScope = 'user', withAuth = true }) {
     if (!url) {
       throw new Error('JsonRpc: url is required, e.g. "system" or "auth"')
     }
     this.url = url
     this.basePath = basePath
     this.authScope = authScope
+    this.withAuth = withAuth
   }
 
   async call(method, params = {}, options = {}) {
-    const { receiveError = false, signal } = options
+    const { receiveError = false, signal, withAuth = this.withAuth } = options
     const id = String(++globalRpcId)
 
     let response
     let json
 
     // 自动附带 token。
-    const token = getToken(this.authScope)
+    const token = withAuth ? getToken(this.authScope) : ''
     const headers = {
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -83,7 +84,9 @@ export class JsonRpc {
     // 4) 业务错误 result.code != 0
     const { result } = json
     if (result && typeof result.code === 'number' && result.code !== 0) {
-      handleAuthError(result.code, result.message, this.authScope)
+      if (withAuth) {
+        handleAuthError(result.code, result.message, this.authScope)
+      }
       const err = RpcError.fromBiz(json)
       if (receiveError) return err
       throw err

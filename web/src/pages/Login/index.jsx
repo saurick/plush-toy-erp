@@ -16,7 +16,10 @@ export default function LoginPage() {
     (location.state?.from?.search || '') +
     (location.state?.from?.hash || '')
 
-  const authRpc = useMemo(() => new JsonRpc({ url: 'auth' }), [])
+  const authRpc = useMemo(
+    () => new JsonRpc({ url: 'auth', withAuth: false }),
+    []
+  )
   const authCapabilities = useAuthCapabilities(authRpc)
   const { smsLoginEnabled } = authCapabilities
 

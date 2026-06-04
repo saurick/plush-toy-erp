@@ -8,7 +8,10 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 
 export default function RegisterPage() {
   const navigate = useNavigate()
-  const authRpc = useMemo(() => new JsonRpc({ url: 'auth' }), [])
+  const authRpc = useMemo(
+    () => new JsonRpc({ url: 'auth', withAuth: false }),
+    []
+  )
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
