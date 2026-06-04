@@ -31,6 +31,7 @@ const SERVER_PDF_SELECTION_CLASS_NAMES = [
   'erp-material-contract-table__row-selected',
   'erp-processing-contract-table__row--selected',
 ]
+const SERVER_PDF_PRINT_PREPARING_CLASS_NAMES = ['erp-print-shell--preparing']
 
 const escapePreviewHTML = (raw) =>
   String(raw ?? '')
@@ -736,15 +737,86 @@ async function optimizeServerPdfSnapshotImages(clonedRoot, options = {}) {
 }
 
 function normalizeServerPdfSnapshotRuntimeState(clonedRoot) {
+  clonedRoot.setAttribute('data-erp-theme', 'light')
+  clonedRoot.setAttribute('data-erp-theme-mode', 'light')
+  if (clonedRoot.style) {
+    clonedRoot.style.colorScheme = 'light'
+  }
+  clonedRoot.querySelectorAll('[data-erp-theme]').forEach((element) => {
+    element.setAttribute('data-erp-theme', 'light')
+  })
+  clonedRoot.querySelectorAll('[data-erp-theme-mode]').forEach((element) => {
+    element.setAttribute('data-erp-theme-mode', 'light')
+  })
+
   clonedRoot.querySelectorAll('script').forEach((node) => {
     node.remove()
   })
+  clonedRoot.querySelectorAll('link').forEach((node) => {
+    const rel = String(node.getAttribute('rel') || '').toLowerCase()
+    if (rel === 'stylesheet' || rel === 'modulepreload' || rel === 'preload') {
+      node.remove()
+    }
+  })
 
-  SERVER_PDF_SELECTION_CLASS_NAMES.forEach((className) => {
+  const classNamesToClear = [
+    ...SERVER_PDF_SELECTION_CLASS_NAMES,
+    ...SERVER_PDF_PRINT_PREPARING_CLASS_NAMES,
+  ]
+  classNamesToClear.forEach((className) => {
     clonedRoot.querySelectorAll(`.${className}`).forEach((element) => {
       element.classList.remove(className)
     })
   })
+}
+
+function readServerPdfStylesheetText(sourceDocument) {
+  const styleSheets = Array.from(sourceDocument?.styleSheets || [])
+  const chunks = []
+
+  styleSheets.forEach((styleSheet) => {
+    let cssRules
+    try {
+      cssRules = Array.from(styleSheet.cssRules || [])
+    } catch (error) {
+      return
+    }
+    if (cssRules.length === 0) {
+      return
+    }
+
+    const cssText = cssRules
+      .map((rule) => String(rule?.cssText || '').trim())
+      .filter(Boolean)
+      .join('\n')
+    if (!cssText) {
+      return
+    }
+
+    const href = String(styleSheet.href || '').trim()
+    chunks.push(href ? `/* ${href} */\n${cssText}` : cssText)
+  })
+
+  return chunks.join('\n\n')
+}
+
+function inlineServerPdfStylesheets(clonedRoot, sourceDocument) {
+  const head = clonedRoot?.querySelector?.('head')
+  const snapshotDocument = clonedRoot?.ownerDocument
+  if (!head || !snapshotDocument?.createElement) {
+    return false
+  }
+
+  const cssText = readServerPdfStylesheetText(sourceDocument)
+  if (!cssText.trim()) {
+    return false
+  }
+
+  const style = snapshotDocument.createElement('style')
+  style.setAttribute('data-server-pdf-inline-styles', 'true')
+  style.textContent = cssText
+  head.appendChild(style)
+  return true
 }
 
 function buildServerPdfTargetSelector() {
@@ -765,6 +837,8 @@ function applyServerPdfLayoutOverrides(clonedRoot) {
     '  margin: 0 !important;',
     '  padding: 0 !important;',
     '  background: #fff !important;',
+    '  color: #111827 !important;',
+    '  color-scheme: light !important;',
     '}',
     'body {',
     '  min-height: 0 !important;',
@@ -773,12 +847,20 @@ function applyServerPdfLayoutOverrides(clonedRoot) {
     '  margin: 0 auto !important;',
     '  box-shadow: none !important;',
     '  border-radius: 0 !important;',
+    '  background: #fff !important;',
+    '  color: #111827 !important;',
+    '  opacity: 1 !important;',
+    '  visibility: visible !important;',
     '}',
     '.erp-material-contract-paper,',
     '.erp-processing-contract-paper {',
     '  margin: 0 auto !important;',
     '  box-shadow: none !important;',
     '  border-radius: 0 !important;',
+    '  background: #fff !important;',
+    '  color: #111827 !important;',
+    '  opacity: 1 !important;',
+    '  visibility: visible !important;',
     '}',
   ].join('\n')
   head.appendChild(style)
@@ -814,6 +896,7 @@ async function buildServerPdfSnapshotHTMLFromElement(element, options = {}) {
   } finally {
     element.removeAttribute(SERVER_PDF_TARGET_ATTRIBUTE)
   }
+  inlineServerPdfStylesheets(clonedRoot, doc)
   normalizeServerPdfSnapshotRuntimeState(clonedRoot)
   if (isolateServerPdfSnapshotToTarget(clonedRoot)) {
     applyServerPdfLayoutOverrides(clonedRoot)
@@ -1050,7 +1133,9 @@ export const __TEST_ONLY__ = {
   shouldSkipPdfPreviewWarmup,
   buildServerPdfTargetSelector,
   isolateServerPdfSnapshotToTarget,
+  normalizeServerPdfSnapshotRuntimeState,
   normalizeServerPdfSnapshotOptions,
+  inlineServerPdfStylesheets,
   shouldOptimizeServerPdfImageSource,
   applyServerPdfLayoutOverrides,
   normalizeServerPdfRequestOptions,

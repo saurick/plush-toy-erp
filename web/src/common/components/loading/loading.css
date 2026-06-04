@@ -54,6 +54,32 @@
     linear-gradient(180deg, #f5f9f2 0%, #eef4eb 100%);
 }
 
+[data-erp-theme='dark'] .loading-page {
+  color: var(--erp-text, #e5edf5);
+}
+
+[data-erp-theme='dark'] .loading-page__panel {
+  border-color: var(--erp-border, #334155);
+  background: rgb(17 24 39 / 0.92);
+  box-shadow:
+    0 24px 70px rgb(0 0 0 / 0.36),
+    inset 0 1px 0 rgb(148 163 184 / 0.12);
+}
+
+[data-erp-theme='dark'] .loading-page__title {
+  color: var(--erp-text, #e5edf5);
+}
+
+[data-erp-theme='dark'] .loading-page__description {
+  color: var(--erp-text-muted, #94a3b8);
+}
+
+[data-erp-theme='dark'] .loading-page--erp {
+  background:
+    radial-gradient(circle at top, rgb(96 165 250 / 16%), transparent 42%),
+    linear-gradient(180deg, #111827 0%, #0f172a 100%);
+}
+
 @media screen and (max-width: 768px) {
   .loading-page--fullscreen {
     padding: 24px 16px;

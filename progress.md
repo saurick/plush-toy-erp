@@ -6,6 +6,53 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-04 21:34 CST
+- 完成：全局扫描并补齐暗色主题状态类 UI 覆盖，重点收口自定义 `Loading`、Ant Design `Spin / Empty / Alert / message / notification / tooltip / popover / tag / badge / progress / pagination / drawer / table placeholder` 等容易漏暗色的组件，避免页面加载中、空态、提示和浮层继续出现浅底浅字或橄榄绿大面积底色。
+- 完成：`permission-center-loading-state` 改为暗色场景，先断言「权限加载中」面板背景、边框、阴影、Spin 主色和标题 / 说明对比度，再等待页面恢复并检查 AntD 状态组件不会回到浅色面；同步 `web/README.md` 的主题模式约定，要求新增状态类组件优先走全局 token 和 L1 断言。
+- 完成：全量 L1 首次复跑暴露 `business-module-dark-products-modal-desktop` 的超宽弹窗 body 横向溢出断言误报，本轮把断言改为按 `clientWidth / scrollWidth / overflowX` 判断真实可见横向滚动，保留对大溢出和未托管横向滚动的失败保护。
+- 验证：`node --check web/scripts/styleL1.mjs` 通过；`cd web && pnpm css` 通过；`STYLE_L1_PORT=4453 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=permission-center-loading-state,business-module-dark-partners-desktop pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过；`STYLE_L1_PORT=4455 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=business-module-dark-products-modal-desktop pnpm style:l1` 通过；完整 `STYLE_L1_PORT=4456 NODE_USE_ENV_PROXY=0 pnpm style:l1` 通过 40 个场景。
+- 下一步：后续新增 Ant Design 状态组件、异步加载页、浮层或标签类 UI 时，先复用 `data-erp-theme` 和 ERP theme token；若页面有独立 CSS，必须补暗色覆盖和对应 L1 断言。
+- 阻塞/风险：本轮只改前端暗色状态组件样式、L1 断言、前端 README 和过程记录；未改后端、schema、migration、RBAC、seedData、业务事实层或部署。工作区仍存在非本轮 DevDocs、PDF、realLoginSmoke、tmp 等未提交现场改动，本轮未回退、清理或纳入成果。追加前 `progress.md` 为 335 行 / 71142 bytes，未达到归档阈值。
+
+## 2026-06-04 21:28 CST
+- 完成：微调开发文档查看器 `/__dev/docs` 目录树文档行的垂直对齐。目录树文档打开按钮、外层行容器和右侧图钉统一上下居中，解决长标题换行时左侧 Markdown 图标和右侧图钉贴近顶部的问题。
+- 验证：`pnpm --dir web css` 通过；`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1` 通过；Browser 打开 `http://localhost:5175/__dev/docs` 量测目录树长标题行，文件图标、标题文本块、右侧图钉和整行容器 center 均为 `910.3671875`，页面无横向溢出且 console error/warn 为空。
+- 下一步：后续如果目录树行继续加按钮，优先保持“打开区域 + 动作按钮”分离，并同步检查多行标题、长路径和暗色 hover / focus 状态。
+- 阻塞/风险：本轮只改 dev docs 目录树样式；未改产品菜单、seedData、RBAC、docs registry、后端或部署。工作区仍有非本轮未提交现场和 `tmp/pdfs/*` 产物，本轮未回退或清理。追加前 `progress.md` 为 335 行 / 71142 bytes，未达到归档阈值。
+
+## 2026-06-04 21:20 CST
+- 完成：继续优化开发文档查看器 `/__dev/docs` 的置顶交互。置顶区每行右侧新增常驻实心图钉，可直接取消置顶；目录树和搜索结果文档行新增行内图钉动作，默认隐藏，hover / focus / 当前选中时显示，支持快速置顶 / 取消置顶。
+- 完成：为避免嵌套按钮，把文档行 DOM 拆成外层行容器、左侧打开按钮和右侧图钉动作按钮；保留右侧标题栏图钉作为当前文档主操作。
+- 完成：同步 `web/README.md` 的 dev-only 文档查看器说明，明确置顶区、目录树、搜索结果和右侧标题栏图钉行为仍只属于开发态隐藏入口。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web exec node --test src/erp/config/devDocs.test.mjs`、`pnpm --dir web test` 通过；`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1` 通过；Browser 打开 `http://localhost:5175/__dev/docs` 验证置顶区取消图钉、目录树图钉默认隐藏、目录树图钉置顶后置顶数 7 -> 8、置顶区取消后恢复 7、搜索结果图钉置顶 `server/README.md` 后恢复取消、页面无横向溢出且 console error/warn 为空。
+- 下一步：如果继续加 dev docs 快捷操作，仍保持“左侧导航区负责跨文档操作、右侧标题栏负责当前文档操作”的分层，不恢复产品内文档中心。
+- 阻塞/风险：Browser 的 CSS hover computed opacity 检查受 in-app move 行为限制，已用默认隐藏态、focus/active 可见、真实点击和截图补足验证；全量 `pnpm --dir web style:l1` 未复跑，上一轮非本轮业务弹窗暗色场景已由 21:10 记录修复并全量通过。运行期间仍存在非本轮 `web/scripts/styleL1.mjs`、`web/scripts/realLoginSmokeShared.mjs`、`web/src/common/components/loading/loading.css`、`web/src/erp/utils/printPdf.mjs`、`web/src/erp/utils/printPdf.test.mjs`、`tmp/pdfs/*` 以及 `app.css` 暗色弹窗相关现场改动，本轮未回退或清理。追加前 `progress.md` 为 327 行 / 69032 bytes，未达到归档阈值。
+
+## 2026-06-04 21:10 CST
+- 完成：按 `openai-oauth-api-service` 暗色弹窗的层级方向，修复 ERP 暗色主题业务弹窗边界不清的问题。暗色 `antd Modal` 现在有更深遮罩、背景虚化、独立浅色边框、浮层阴影、header / body / footer 分隔和暗色二级 Card 面；浅色主题仍保持原 Ant Design 轻量壳层。
+- 完成：新增 `business-module-dark-products-modal-desktop` L1 场景，打开 `/erp/master/products` 暗色新建产品弹窗，断言遮罩 alpha、backdrop-filter、弹窗边框 / 阴影 / 分隔线、暗色输入框边界、普通控件无绿色残留、body 纵向滚动和横向溢出收口。超宽 Modal 居中断言按滚动条补偿放宽到 20px，普通弹窗仍保持 3px 容差。
+- 完成：同步 `web/README.md` 的桌面业务弹窗约定，明确浅色轻量、暗色必须有可辨认浮层边界，暗色普通 hover / focus 使用 slate / blue，绿色只保留给品牌主按钮和状态强调。
+- 验证：`node --check web/scripts/styleL1.mjs`、`cd web && pnpm lint && pnpm css && pnpm test` 通过；`STYLE_L1_SCENARIOS=business-module-dark-products-modal-desktop pnpm style:l1` 通过；`STYLE_L1_SCENARIOS=business-module-workflow-actions,business-module-dark-partners-desktop,business-module-dark-products-modal-desktop pnpm style:l1` 通过；完整 `STYLE_L1_PORT=4452 NODE_USE_ENV_PROXY=0 pnpm style:l1` 通过 40 个场景。已查看 `web/output/playwright/style-l1/business-module-dark-products-modal-desktop.png`，弹窗遮罩、外框、头尾分隔和内部 section 边界清楚。
+- 下一步：后续若继续精修暗色主题，优先补同类 L1 断言后再改共享样式，避免回到局部截图补丁。
+- 阻塞/风险：本轮只改前端暗色 Modal 样式、L1 断言和前端 README；未改后端、schema、migration、RBAC、seedData 或部署。工作区里仍存在非本轮 DevDocs、PDF、realLoginSmoke、tmp 等未提交现场改动，本轮未回退、清理或纳入成果。追加前 `progress.md` 为 319 行 / 66949 bytes，未达到归档阈值。
+
+## 2026-06-04 21:06 CST
+- 完成：开发文档查看器 `/__dev/docs` 加回图钉式置顶交互。右侧当前文档标题栏新增状态型图钉 icon，可置顶 / 取消置顶当前文档；左侧搜索框下方新增置顶文档区，点击置顶项可切换右侧文档并重置正文滚动。
+- 完成：置顶路径使用浏览器 localStorage 本地持久化，首次打开沿用现有默认置顶清单；运行时只影响 dev-only 查看器，不进入 ERP 菜单、seedData、RBAC、产品内 docs registry 或生产构建。
+- 完成：同步 `web/README.md` 的前端文档入口边界说明，并补充 `devDocs` 纯函数测试覆盖置顶路径归一化、默认置顶和置顶排序。
+- 验证：`pnpm --dir web exec node --test src/erp/config/devDocs.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过；`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1` 通过；Browser 打开 `http://localhost:5175/__dev/docs` 验证左侧置顶区、右侧图钉取消 / 恢复、刷新后状态保留、回到顶部和置顶项切换，console error/warn 为空，页面无横向溢出。
+- 下一步：后续如果继续扩展 dev docs 查看器，只保留在 `/__dev/docs` 开发态隐藏入口内；不要恢复产品内 docs registry、菜单或 seedData 链路。
+- 阻塞/风险：全量 `pnpm --dir web style:l1` 当前失败在非本轮 `business-module-dark-products-modal-desktop` 业务弹窗暗色控件边框场景；本轮已用 dev docs 目标 L1 场景和 Browser 交互回归覆盖目标页面。运行期间存在非本轮 `progress.md`、`web/README.md`、`web/scripts/styleL1.mjs`、`web/scripts/realLoginSmokeShared.mjs`、`web/src/erp/utils/printPdf.mjs`、`web/src/erp/utils/printPdf.test.mjs`、`tmp/pdfs/pdf-content-check-local-dev/` 以及 `app.css` 暗色弹窗相关现场改动，本轮未回退或清理。追加前 `progress.md` 为 311 行 / 64969 bytes，未达到归档阈值。
+
+## 2026-06-04 20:58 CST
+- 完成：排查并修复 `192.168.0.133` 采购合同模板打印在线预览和下载 PDF 白页问题。根因是 133 前端运行在新增暗色主题后的 web 镜像，服务端 `/templates/render-pdf` 返回非空 PDF（约 368KB），但前端传给服务端 Chromium 的 HTML 快照保留了 `data-erp-theme="dark"`，而暗色主题 CSS 位于打印样式之后，导致 print-to-PDF 仍套用运行时暗色 / 等待态样式，纸面内容渲染为空白。
+- 完成：在 `web/src/erp/utils/printPdf.mjs` 的服务端 PDF 快照主路径中固定浅色纸面口径：快照归一化阶段把 `data-erp-theme` / `data-erp-theme-mode` 收口为 `light`、清理打印等待态和选中态类；服务端 PDF 专用样式显式设置白底、深色文字、`color-scheme: light`、可见性和不透明度。在线预览和下载 PDF 共用该快照生成链路。
+- 完成：补充 `web/src/erp/utils/printPdf.test.mjs` 单元测试，覆盖深色运行态快照进入服务端 PDF 时必须变回浅色纸面、清理等待态 / 选中态，并追加浅色打印覆盖。
+- 完成：按低配服务器发布约束在本地构建 `linux/amd64` web 镜像 `plush-toy-erp-web:20260604T204500-c43a0b2-pdf-light-amd64`，上传到 133 后只更新 `WEB_IMAGE` 并重建 web-* 容器；PostgreSQL、Jaeger 和 server 未重建。过程中第一次误构建了本机 arm64 镜像，Compose 提示平台不匹配并导致 web 容器短暂重启，随后立即用 amd64 镜像替换并恢复健康。
+- 验证：`cd web && pnpm test`、`pnpm lint`、`pnpm css`、`pnpm build` 通过；`node --test web/src/erp/utils/printPdf.test.mjs` 通过；本地修复版接 133 后端时，暗色主题下采购合同在线预览和下载 PDF 均能用 `pdftoppm` 渲染出合同内容，第一页像素指标从线上旧版白页 `mean=0.999252 / stddev=0.0263616` 恢复为 `mean=0.962309 / stddev=0.165652`；133 正式地址部署后，在线预览和下载 PDF 均返回约 368KB，渲染第一页同为 `mean=0.962309 / stddev=0.165652`，浏览器 console errors 为空；133 上 5175、5186-5193、8300 `/healthz` 均返回 200，web-* 容器均 healthy 且镜像架构为 `amd64 linux`。
+- 下一步：后续继续改打印 / PDF / 合同纸面预览时，必须确保导出物固定浅色，不跟随运行时暗色主题；如全量 `style:l1` 的打印窗口刷新场景继续被 Vite HMR WebSocket 告警干扰，应单独收口测试脚本的 HMR console 过滤或刷新态等待。
+- 阻塞/风险：`pnpm style:l1` 全量本轮失败在 `print-workspace-material-shell-refresh` 场景的 Vite HMR WebSocket console error，已用真实 133 在线预览 / 下载 PDF + Poppler 渲染作为本次核心回归补足；本轮未改后端 PDF renderer、schema、migration、RBAC、业务事实层或模板字段口径。133 server 仍是既有 `plush-toy-erp-server:20260531T145153-9b414a58-vm`，本轮仅修复前端 PDF 快照。追加前 `progress.md` 为 302 行 / 61929 bytes，未达到归档阈值。
+
 ## 2026-06-04 20:24 CST
 - 完成：排查 `192.168.0.133` 上 plush-toy-erp 管理员登录密码错误。确认线上容器存在 `APP_ADMIN_PASSWORD` 环境变量覆盖，且当前数据库 `admin` 是已存在账号，启动初始化不会因 config 或 env 变化自动重置密码。已调整生产 Compose 模板和部署文档，默认不再注入 `APP_ADMIN_PASSWORD`，只有明确需要覆盖首次初始化密码时才临时添加。
 - 验证：本地执行 `docker compose -f server/deploy/compose/prod/compose.yml config` 后确认渲染配置不再包含 `APP_ADMIN_PASSWORD`，`git diff --check -- server/deploy/compose/prod/compose.yml server/deploy/compose/prod/.env.example server/deploy/README.md server/deploy/compose/prod/README.md server/docs/config.md progress.md` 通过；133 现场已备份 `.env` 和 `compose.yml`，移除 `.env` 密码项和 compose 默认密码注入后重启 `app-server`；`docker exec plush-toy-erp-server printenv APP_ADMIN_PASSWORD` 已不存在；`/healthz` 返回 `ok`、`/readyz` 返回 `ready`；真实 `admin_login` 使用目标密码返回 code `0`。

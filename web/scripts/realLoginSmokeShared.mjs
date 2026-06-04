@@ -95,7 +95,7 @@ export async function loginAsAdmin(page, credentials, baseURL) {
     waitUntil: 'domcontentloaded',
   })
   await page.getByLabel('管理员账号').fill(credentials.username)
-  await page.getByLabel('密码').fill(credentials.password)
+  await page.locator('input[type="password"]').fill(credentials.password)
 
   const submitButton = page.locator('button[type="submit"]').first()
 

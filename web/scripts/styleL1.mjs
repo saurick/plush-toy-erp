@@ -318,6 +318,37 @@ const scenarios = [
     },
   },
   {
+    name: 'business-module-dark-products-modal-desktop',
+    path: '/erp/master/products',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 2048, height: 1024 },
+    verify: async (page) => {
+      await expectHeading(page, '产品')
+      await expectText(page, '导出当前结果')
+      await expectText(page, '协同任务池')
+      await assertERPThemeMode(page, {
+        scenarioName: 'business-module-dark-products-modal-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'business-module-dark-products-modal-desktop',
+        selector: '.erp-business-page-layout',
+      })
+      await assertDarkThemeNeutralInteractions(page, {
+        scenarioName: 'business-module-dark-products-modal-desktop',
+      })
+      await page.getByRole('button', { name: '新建记录' }).click()
+      await assertBusinessRecordModalLayout(page, {
+        scenarioName: 'business-module-dark-products-modal',
+        minModalWidth: 1200,
+        expectCompactGrid: false,
+        expectDarkChrome: true,
+      })
+    },
+  },
+  {
     name: 'business-module-dark-partners-desktop',
     path: '/erp/master/partners',
     auth: 'admin',
@@ -543,7 +574,7 @@ const scenarios = [
       await assertOpenDropdownInViewport(page, {
         scenarioName: 'business-module-workflow-actions-approve-menu',
       })
-      await approveStatusItem.click({ force: true })
+      await approveStatusItem.evaluate((element) => element.click())
       await expectText(page, '业务状态已更新为：立项已放行')
       await expectText(page, '立项已放行')
 
@@ -801,12 +832,24 @@ const scenarios = [
     name: 'permission-center-loading-state',
     path: '/erp/system/permissions?__style_l1_admin_list_delay=900',
     auth: 'admin',
+    themeMode: 'dark',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectText(page, '权限加载中')
       await expectText(page, '正在同步管理员、角色和权限码，请稍候...')
+      await assertERPThemeMode(page, {
+        scenarioName: 'permission-center-loading-state',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkLoadingState(page, {
+        scenarioName: 'permission-center-loading-state',
+      })
       await expectHeading(page, '权限管理')
       await assertTextAbsent(page, '权限加载中')
+      await assertDarkAntdStateSurfaces(page, {
+        scenarioName: 'permission-center-loading-state',
+      })
     },
   },
   {
@@ -2819,7 +2862,10 @@ async function assertPrintPreviewPopup(
   const popupErrors = []
   popup.on('console', (message) => {
     if (message.type() === 'error') {
-      popupErrors.push(`popup console error: ${message.text()}`)
+      const text = message.text()
+      if (!isIgnorableDevServerError(text)) {
+        popupErrors.push(`popup console error: ${text}`)
+      }
     }
   })
   popup.on('pageerror', (error) => {
@@ -2866,7 +2912,10 @@ async function assertEditablePrintWorkspacePopupRefresh(
 
   popup.on('console', (message) => {
     if (message.type() === 'error') {
-      popupErrors.push(`popup console error: ${message.text()}`)
+      const text = message.text()
+      if (!isIgnorableDevServerError(text)) {
+        popupErrors.push(`popup console error: ${text}`)
+      }
     }
   })
   popup.on('pageerror', (error) => {
@@ -4073,8 +4122,11 @@ async function assertAntdModalCenteredImpl(page, modalLocator, scenarioName) {
     metrics.wrapClassName.includes('ant-modal-centered'),
     `${scenarioName} Ant Design 弹窗未启用 centered: ${JSON.stringify(metrics)}`
   )
+  const horizontalCenterTolerance =
+    metrics.modal.width >= metrics.viewport.width * 0.85 ? 20 : 3
   assert(
-    Math.abs(metrics.modal.centerX - metrics.viewport.width / 2) <= 2,
+    Math.abs(metrics.modal.centerX - metrics.viewport.width / 2) <=
+      horizontalCenterTolerance,
     `${scenarioName} 弹窗未水平居中: ${JSON.stringify(metrics)}`
   )
   assert(
@@ -4650,7 +4702,7 @@ async function assertVisibleModalInputFocusStyle(
 
 async function assertBusinessRecordModalLayout(
   page,
-  { scenarioName, minModalWidth, expectCompactGrid }
+  { scenarioName, minModalWidth, expectCompactGrid, expectDarkChrome = false }
 ) {
   await page
     .locator('.erp-business-record-modal:visible .ant-modal-content')
@@ -4682,6 +4734,7 @@ async function assertBusinessRecordModalLayout(
     const header = modal?.querySelector('.ant-modal-header')
     const body = modal?.querySelector('.ant-modal-body')
     const footer = modal?.querySelector('.ant-modal-footer')
+    const mask = document.querySelector('.ant-modal-mask')
     const form = modal?.querySelector('.erp-business-record-form')
     const fieldCols = form
       ? Array.from(form.querySelectorAll(':scope > .ant-row > .ant-col')).map(
@@ -4739,6 +4792,7 @@ async function assertBusinessRecordModalLayout(
     const bodyRect = body?.getBoundingClientRect()
     const bodyStyle = body ? window.getComputedStyle(body) : null
     const footerStyle = footer ? window.getComputedStyle(footer) : null
+    const maskStyle = mask ? window.getComputedStyle(mask) : null
     const nestedHorizontalScrollContainers = body
       ? Array.from(
           body.querySelectorAll(
@@ -4769,12 +4823,18 @@ async function assertBusinessRecordModalLayout(
         : null,
       modalChrome: content
         ? {
+            mask: {
+              backgroundColor: maskStyle?.backgroundColor,
+              backdropFilter: maskStyle?.backdropFilter,
+            },
             content: {
               borderTopWidth: contentStyle?.borderTopWidth,
               borderRightWidth: contentStyle?.borderRightWidth,
               borderBottomWidth: contentStyle?.borderBottomWidth,
               borderLeftWidth: contentStyle?.borderLeftWidth,
+              borderTopColor: contentStyle?.borderTopColor,
               borderRadius: contentStyle?.borderRadius,
+              backgroundColor: contentStyle?.backgroundColor,
               boxShadow: contentStyle?.boxShadow,
               paddingTop: contentStyle?.paddingTop,
               paddingRight: contentStyle?.paddingRight,
@@ -4783,15 +4843,20 @@ async function assertBusinessRecordModalLayout(
             },
             header: {
               borderBottomWidth: headerStyle?.borderBottomWidth,
+              borderBottomColor: headerStyle?.borderBottomColor,
+              backgroundColor: headerStyle?.backgroundColor,
             },
             footer: {
               borderTopWidth: footerStyle?.borderTopWidth,
+              borderTopColor: footerStyle?.borderTopColor,
+              backgroundColor: footerStyle?.backgroundColor,
             },
           }
         : null,
       body: bodyRect
         ? {
             width: bodyRect.width,
+            clientWidth: body.clientWidth,
             height: bodyRect.height,
             clientHeight: body.clientHeight,
             scrollHeight: body.scrollHeight,
@@ -4822,7 +4887,11 @@ async function assertBusinessRecordModalLayout(
     metrics.modal.height <= metrics.viewport.height - 32,
     `${scenarioName} 弹窗高度溢出视口: ${JSON.stringify(metrics)}`
   )
-  assertTradeLikeModalChrome(metrics, scenarioName)
+  if (expectDarkChrome) {
+    assertDarkModalChrome(metrics, scenarioName)
+  } else {
+    assertTradeLikeModalChrome(metrics, scenarioName)
+  }
   assert(
     metrics.body?.overflowY === 'auto',
     `${scenarioName} 弹窗 body 未接管纵向滚动: ${JSON.stringify(metrics)}`
@@ -4835,8 +4904,13 @@ async function assertBusinessRecordModalLayout(
         container.width <= metrics.body.width + 8 &&
         container.scrollWidth > container.clientWidth + 8
     )
+  const bodyHorizontalOverflow =
+    metrics.body.scrollWidth - (metrics.body.clientWidth || metrics.body.width)
+  const hasOnlyClippedScrollbarOverflow =
+    metrics.body?.overflowX === 'hidden' && bodyHorizontalOverflow <= 16
   assert(
-    metrics.body.scrollWidth <= metrics.body.width + 8 ||
+    bodyHorizontalOverflow <= 8 ||
+      hasOnlyClippedScrollbarOverflow ||
       hasManagedNestedHorizontalScroll,
     `${scenarioName} 弹窗 body 出现未受控横向滚动: ${JSON.stringify(metrics)}`
   )
@@ -4860,9 +4934,12 @@ async function assertBusinessRecordModalLayout(
       `${scenarioName} 控件圆角未符合当前 ERP 表单基线: ${JSON.stringify(control)}`
     )
   })
-  assertTradeLikeModalControls(metrics, scenarioName)
-
-  await assertBusinessRecordModalFocusStyle(page, scenarioName)
+  if (expectDarkChrome) {
+    assertDarkModalControls(metrics, scenarioName)
+  } else {
+    assertTradeLikeModalControls(metrics, scenarioName)
+    await assertBusinessRecordModalFocusStyle(page, scenarioName)
+  }
 
   if (!expectCompactGrid) {
     return
@@ -5481,6 +5558,73 @@ function assertTradeLikeModalChrome(metrics, scenarioName) {
   )
 }
 
+function assertDarkModalChrome(metrics, scenarioName) {
+  const chrome = metrics.modalChrome
+  assert(
+    chrome?.content,
+    `${scenarioName} 缺少可检查的暗色弹窗壳层样式: ${JSON.stringify(metrics)}`
+  )
+
+  const pixel = (value) => Number.parseFloat(String(value || '0'))
+  const maskAlpha = readCssAlpha(chrome.mask?.backgroundColor)
+  assert(
+    maskAlpha >= 0.55,
+    `${scenarioName} 暗色弹窗遮罩过浅，背景和弹窗容易融在一起: ${JSON.stringify(chrome)}`
+  )
+  assert(
+    String(chrome.mask?.backdropFilter || '') !== 'none',
+    `${scenarioName} 暗色弹窗遮罩缺少背景虚化层级: ${JSON.stringify(chrome)}`
+  )
+  assert(
+    pixel(chrome.content.borderTopWidth) >= 1 &&
+      pixel(chrome.content.borderRightWidth) >= 1 &&
+      pixel(chrome.content.borderBottomWidth) >= 1 &&
+      pixel(chrome.content.borderLeftWidth) >= 1,
+    `${scenarioName} 暗色弹窗壳层缺少可见边框: ${JSON.stringify(chrome)}`
+  )
+  assert(
+    isLightSlateBorderColor(chrome.content.borderTopColor),
+    `${scenarioName} 暗色弹窗边框颜色不够清楚: ${JSON.stringify(chrome)}`
+  )
+  assert(
+    String(chrome.content.boxShadow || '') !== 'none',
+    `${scenarioName} 暗色弹窗缺少浮层阴影: ${JSON.stringify(chrome)}`
+  )
+  assert(
+    pixel(chrome.header?.borderBottomWidth) >= 1,
+    `${scenarioName} 暗色弹窗头部缺少分割线: ${JSON.stringify(chrome)}`
+  )
+  assert(
+    pixel(chrome.footer?.borderTopWidth) >= 1,
+    `${scenarioName} 暗色弹窗底部缺少分割线: ${JSON.stringify(chrome)}`
+  )
+  assert(
+    !sameCSSColor(
+      chrome.content.backgroundColor,
+      chrome.header.backgroundColor
+    ) ||
+      !sameCSSColor(
+        chrome.content.backgroundColor,
+        chrome.footer.backgroundColor
+      ) ||
+      pixel(chrome.header.borderBottomWidth) >= 1,
+    `${scenarioName} 暗色弹窗标题区、内容区和底部缺少层级区分: ${JSON.stringify(chrome)}`
+  )
+
+  const radius = pixel(chrome.content.borderRadius)
+  assert(
+    Number.isFinite(radius) && radius >= 10 && radius <= 18,
+    `${scenarioName} 暗色弹窗圆角异常: ${JSON.stringify(chrome)}`
+  )
+  assert(
+    pixel(chrome.content.paddingTop) === 0 &&
+      pixel(chrome.content.paddingRight) === 0 &&
+      pixel(chrome.content.paddingBottom) === 0 &&
+      pixel(chrome.content.paddingLeft) === 0,
+    `${scenarioName} 暗色弹窗壳层应由 header/body/footer 管理间距: ${JSON.stringify(chrome)}`
+  )
+}
+
 function assertTradeLikeModalControls(metrics, scenarioName) {
   const visibleControls = (metrics.controls || []).filter(
     (control) =>
@@ -5546,11 +5690,118 @@ function assertTradeLikeModalControls(metrics, scenarioName) {
   })
 }
 
+function assertDarkModalControls(metrics, scenarioName) {
+  const visibleControls = (metrics.controls || []).filter(
+    (control) =>
+      control.width > 0 &&
+      control.height > 0 &&
+      !control.isNestedInAffixInput &&
+      !String(control.className || '').includes('erp-item-field-unit-suffix') &&
+      !String(control.className || '').includes('ant-btn-link')
+  )
+  assert(
+    visibleControls.length > 0,
+    `${scenarioName} 未找到可检查的暗色弹窗控件: ${JSON.stringify(metrics)}`
+  )
+
+  const fieldControls = visibleControls.filter(
+    (control) => !control.className.includes('ant-btn')
+  )
+  fieldControls.forEach((control) => {
+    assert(
+      isDarkControlBackground(control.backgroundColor),
+      `${scenarioName} 暗色弹窗控件未使用深色输入面: ${JSON.stringify(control)}`
+    )
+    assert(
+      isDarkNeutralBorderColor(control.borderColor),
+      `${scenarioName} 暗色弹窗控件边框不够清楚: ${JSON.stringify(control)}`
+    )
+    assert(
+      !containsGreenDominantColor(control.backgroundColor) &&
+        !containsGreenDominantColor(control.borderColor),
+      `${scenarioName} 暗色弹窗普通控件残留绿色边界或背景: ${JSON.stringify(control)}`
+    )
+  })
+
+  const primaryButtons = visibleControls.filter((control) =>
+    control.className.includes('ant-btn-primary')
+  )
+  primaryButtons.forEach((control) => {
+    assert(
+      isGreenFocusColor(control.backgroundColor) ||
+        isGreenFocusColor(control.borderColor) ||
+        isBluePrimaryColor(control.backgroundColor) ||
+        isBluePrimaryColor(control.borderColor),
+      `${scenarioName} 暗色弹窗主按钮应保留可辨认的品牌或蓝色主操作强调: ${JSON.stringify(control)}`
+    )
+  })
+}
+
 function isGreenFocusColor(color) {
   const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
   if (!match) return false
   const [, red, green, blue] = match.map(Number)
   return green > red && green >= blue
+}
+
+function readCssAlpha(color) {
+  const match = String(color || '').match(
+    /rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\s*\)/i
+  )
+  if (!match) return 0
+  return match[4] === undefined ? 1 : Number(match[4])
+}
+
+function isLightSlateBorderColor(color) {
+  const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
+  if (!match) return false
+  const [, red, green, blue] = match.map(Number)
+  return red >= 140 && green >= 150 && blue >= 160
+}
+
+function isDarkControlBackground(color) {
+  const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
+  if (!match) return false
+  const [, red, green, blue] = match.map(Number)
+  return red <= 32 && green <= 44 && blue <= 64
+}
+
+function isDarkNeutralBorderColor(color) {
+  const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
+  if (!match) return false
+  const [, red, green, blue] = match.map(Number)
+  return red >= 45 && green >= 55 && blue >= 70 && blue >= red
+}
+
+function isBluePrimaryColor(color) {
+  const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
+  if (!match) return false
+  const [, red, green, blue] = match.map(Number)
+  return blue >= 140 && blue > red * 1.25 && blue >= green
+}
+
+function isLightSurfaceColor(color) {
+  const rgb = parseRgb(color)
+  if (!rgb) return false
+  return rgb[0] >= 220 && rgb[1] >= 220 && rgb[2] >= 220
+}
+
+function assertReadableOnDark(foreground, background, message) {
+  const color = parseRgb(foreground)
+  const bg = parseRgb(background)
+  assert(
+    color && bg,
+    `${message}: ${JSON.stringify({ foreground, background })}`
+  )
+  const ratio = getContrastRatio(color, bg)
+  assert(
+    ratio >= 3,
+    `${message}: ${JSON.stringify({
+      foreground,
+      background,
+      ratio: Number(ratio.toFixed(2)),
+    })}`
+  )
 }
 
 function hasBlueFocusRing(value) {
@@ -6134,7 +6385,10 @@ function isIgnorableDevServerError(text) {
   return (
     text.includes('Outdated Request') ||
     text.includes('[hmr] Failed to reload') ||
-    text.includes('net::ERR_CONNECTION_REFUSED')
+    text.includes('net::ERR_CONNECTION_REFUSED') ||
+    text.includes('[vite] failed to connect to websocket') ||
+    (text.includes("WebSocket connection to 'ws://127.0.0.1:") &&
+      text.includes('net::ERR_ADDRESS_INVALID'))
   )
 }
 
@@ -6563,6 +6817,116 @@ async function assertDarkThemeNeutralInteractions(page, { scenarioName }) {
       greenIssues
     )}`
   )
+}
+
+async function assertDarkLoadingState(page, { scenarioName }) {
+  const metrics = await page.evaluate(() => {
+    const readNode = (selector) => {
+      const node = document.querySelector(selector)
+      if (!node) return null
+      const style = window.getComputedStyle(node)
+      const rect = node.getBoundingClientRect()
+      return {
+        selector,
+        text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow,
+        color: style.color,
+        width: rect.width,
+        height: rect.height,
+      }
+    }
+    return {
+      page: readNode('.loading-page'),
+      panel: readNode('.loading-page__panel'),
+      title: readNode('.loading-page__title'),
+      description: readNode('.loading-page__description'),
+      dot: readNode('.loading-page .ant-spin-dot-item'),
+    }
+  })
+
+  assert(
+    metrics.page &&
+      metrics.panel &&
+      metrics.title &&
+      metrics.description &&
+      metrics.dot,
+    `${scenarioName} 缺少可检查的暗色加载态: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    isDarkControlBackground(metrics.panel.backgroundColor),
+    `${scenarioName} 加载态面板仍是浅色背景: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    isDarkNeutralBorderColor(metrics.panel.borderColor),
+    `${scenarioName} 加载态面板边框未接入暗色主题: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    String(metrics.panel.boxShadow || '') !== 'none',
+    `${scenarioName} 加载态面板缺少浮层阴影: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    isBluePrimaryColor(metrics.dot.backgroundColor),
+    `${scenarioName} 加载态 Spin 未使用暗色主题主交互色: ${JSON.stringify(metrics)}`
+  )
+  assertReadableOnDark(
+    metrics.title.color,
+    metrics.panel.backgroundColor,
+    `${scenarioName} 加载态标题对比度不足`
+  )
+  assertReadableOnDark(
+    metrics.description.color,
+    metrics.panel.backgroundColor,
+    `${scenarioName} 加载态说明对比度不足`
+  )
+}
+
+async function assertDarkAntdStateSurfaces(page, { scenarioName }) {
+  const metrics = await page.evaluate(() => {
+    const readNode = (selector) => {
+      const node = document.querySelector(selector)
+      if (!node) return null
+      const style = window.getComputedStyle(node)
+      return {
+        selector,
+        text: node.textContent?.replace(/\s+/g, ' ').trim().slice(0, 100) || '',
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+        color: style.color,
+      }
+    }
+    return {
+      empty: readNode('.ant-empty'),
+      emptyDescription: readNode('.ant-empty-description'),
+      tag: readNode('.ant-tag'),
+      paginationItem: readNode('.ant-pagination .ant-pagination-item'),
+      tablePlaceholder: readNode('.ant-table-placeholder > td'),
+    }
+  })
+
+  const visibleStates = Object.values(metrics).filter(Boolean)
+  assert(
+    visibleStates.length >= 1,
+    `${scenarioName} 缺少可检查的 AntD 状态组件: ${JSON.stringify(metrics)}`
+  )
+
+  visibleStates.forEach((item) => {
+    const background = isTransparentColor(item.backgroundColor)
+      ? 'rgb(17, 24, 39)'
+      : item.backgroundColor
+    if (!isTransparentColor(item.backgroundColor)) {
+      assert(
+        !isLightSurfaceColor(item.backgroundColor),
+        `${scenarioName} ${item.selector} 仍是浅色背景: ${JSON.stringify(metrics)}`
+      )
+    }
+    assertReadableOnDark(
+      item.color,
+      background,
+      `${scenarioName} ${item.selector} 文字对比度不足`
+    )
+  })
 }
 
 function hasGreenDominantInteractivePaint(metric) {

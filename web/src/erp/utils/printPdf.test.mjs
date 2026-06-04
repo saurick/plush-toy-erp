@@ -10,6 +10,7 @@ class FakeNode {
     this.children = []
     this.parentNode = null
     this.textContent = ''
+    this.style = {}
   }
 
   setAttribute(name, value) {
@@ -24,6 +25,30 @@ class FakeNode {
 
   removeAttribute(name) {
     this.attributes.delete(String(name))
+  }
+
+  get classList() {
+    const readClassNames = () =>
+      String(this.attributes.get('class') || '')
+        .split(/\s+/)
+        .filter(Boolean)
+    const writeClassNames = (classNames) => {
+      if (classNames.length > 0) {
+        this.attributes.set('class', classNames.join(' '))
+      } else {
+        this.attributes.delete('class')
+      }
+    }
+    return {
+      remove: (...classNames) => {
+        const toRemove = new Set(
+          classNames.map((className) => String(className))
+        )
+        writeClassNames(
+          readClassNames().filter((className) => !toRemove.has(className))
+        )
+      },
+    }
   }
 
   appendChild(child) {
@@ -93,6 +118,10 @@ class FakeNode {
     if (attributeMatch) {
       return this.attributes.get(attributeMatch[1]) === attributeMatch[2]
     }
+    const attributeExistsMatch = selector.match(/^\[([^=\]]+)\]$/)
+    if (attributeExistsMatch) {
+      return this.attributes.has(attributeExistsMatch[1])
+    }
     return this.tagName === selector.toLowerCase()
   }
 
@@ -133,6 +162,7 @@ class FakeDocument {
   constructor() {
     this.body = null
     this.activeElement = null
+    this.styleSheets = []
   }
 
   createElement(tagName) {
@@ -142,9 +172,31 @@ class FakeDocument {
 
 function createFakeSnapshotRoot() {
   const documentLike = new FakeDocument()
+  documentLike.styleSheets = [
+    {
+      href: 'http://127.0.0.1:4173/assets/app.css',
+      cssRules: [
+        {
+          cssText: '.erp-material-contract-paper { width: 210mm; }',
+        },
+        {
+          cssText:
+            '.erp-material-contract-table th { border: 1px solid #111827; }',
+        },
+      ],
+    },
+  ]
   const root = documentLike.createElement('html')
   const head = documentLike.createElement('head')
   const body = documentLike.createElement('body')
+  const stylesheet = documentLike.createElement('link')
+  stylesheet.setAttribute('rel', 'stylesheet')
+  stylesheet.setAttribute('crossorigin', '')
+  stylesheet.setAttribute('href', '/assets/app.css')
+  const modulePreload = documentLike.createElement('link')
+  modulePreload.setAttribute('rel', 'modulepreload')
+  modulePreload.setAttribute('crossorigin', '')
+  modulePreload.setAttribute('href', '/assets/vendor.js')
   const toolbar = documentLike.createElement('div')
   toolbar.setAttribute('class', 'erp-print-shell__toolbar')
   toolbar.textContent = 'toolbar'
@@ -154,6 +206,8 @@ function createFakeSnapshotRoot() {
   target.textContent = 'paper'
   const script = documentLike.createElement('script')
   script.textContent = 'console.log("preview")'
+  head.appendChild(stylesheet)
+  head.appendChild(modulePreload)
   body.appendChild(toolbar)
   body.appendChild(target)
   body.appendChild(script)
@@ -585,6 +639,45 @@ test('printPdf: 服务端 PDF 快照会收口到纸面主区域并追加打印�
   assert.doesNotMatch(body.outerHTML, /toolbar/)
   assert.match(head.outerHTML, /data-server-pdf-style="true"/)
   assert.match(head.outerHTML, /\.erp-material-contract-paper/)
+})
+
+test('printPdf: 服务端 PDF 快照固定为浅色纸面口径', () => {
+  const { root, head, body } = createFakeSnapshotRoot()
+  const target = body.querySelector('[data-server-pdf-root="true"]')
+  root.setAttribute('data-erp-theme', 'dark')
+  root.setAttribute('data-erp-theme-mode', 'system')
+  body.setAttribute('data-erp-theme', 'dark')
+  target.setAttribute(
+    'class',
+    'erp-material-contract-paper erp-print-shell--preparing erp-material-contract-table__row-selected'
+  )
+
+  assert.equal(
+    __TEST_ONLY__.inlineServerPdfStylesheets(root, root.ownerDocument),
+    true
+  )
+  const inlineStyle = head.querySelector(
+    '[data-server-pdf-inline-styles="true"]'
+  )
+  assert.match(inlineStyle.textContent, /width: 210mm/)
+  assert.match(inlineStyle.textContent, /border: 1px solid #111827/)
+
+  __TEST_ONLY__.normalizeServerPdfSnapshotRuntimeState(root)
+  assert.equal(root.getAttribute('data-erp-theme'), 'light')
+  assert.equal(root.getAttribute('data-erp-theme-mode'), 'light')
+  assert.equal(root.style.colorScheme, 'light')
+  assert.equal(body.getAttribute('data-erp-theme'), 'light')
+  assert.equal(target.getAttribute('class'), 'erp-material-contract-paper')
+  assert.equal(head.querySelector('link'), null)
+  assert.doesNotMatch(head.outerHTML, /modulepreload/)
+
+  assert.equal(__TEST_ONLY__.isolateServerPdfSnapshotToTarget(root), true)
+  __TEST_ONLY__.applyServerPdfLayoutOverrides(root)
+
+  assert.match(head.outerHTML, /color-scheme: light !important/)
+  assert.match(head.outerHTML, /background: #fff !important/)
+  assert.match(head.outerHTML, /visibility: visible !important/)
+  assert.doesNotMatch(body.outerHTML, /erp-print-shell--preparing/)
 })
 
 test('printPdf: 预览窗口被拦截时返回统一错误文案', async () => {

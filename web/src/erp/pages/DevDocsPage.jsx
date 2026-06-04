@@ -6,17 +6,24 @@ import {
   FileMarkdownOutlined,
   FolderOpenOutlined,
   FolderOutlined,
+  PushpinFilled,
+  PushpinOutlined,
   RightOutlined,
   SearchOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Input, Space, Tag, Typography } from 'antd'
+import { Button, Empty, Input, Space, Tag, Tooltip, Typography } from 'antd'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import {
+  DEV_DOCS_PINNED_STORAGE_KEY,
+  applyDevDocsPinnedState,
   buildDevDocsItems,
   buildDevDocsTree,
   filterDevDocsItems,
+  getDefaultDevDocsPinnedPaths,
+  normalizeDevDocsPinnedPaths,
+  sortDevDocsItemsByPinned,
 } from '../config/devDocs.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -46,11 +53,32 @@ function collectDirectoryKeys(nodes = []) {
   )
 }
 
+function readPinnedPaths(docs = []) {
+  if (typeof window === 'undefined') {
+    return getDefaultDevDocsPinnedPaths(docs)
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(DEV_DOCS_PINNED_STORAGE_KEY)
+    if (!rawValue) {
+      return getDefaultDevDocsPinnedPaths(docs)
+    }
+    const parsedValue = JSON.parse(rawValue)
+    return normalizeDevDocsPinnedPaths(
+      Array.isArray(parsedValue) ? parsedValue : [],
+      docs
+    )
+  } catch (error) {
+    return getDefaultDevDocsPinnedPaths(docs)
+  }
+}
+
 function DevDocsTreeNode({
   node,
   depth = 0,
   expandedKeys,
   selectedKey,
+  onToggleDocPin,
   onToggleDirectory,
   onSelectDoc,
 }) {
@@ -80,6 +108,7 @@ function DevDocsTreeNode({
                 depth={depth + 1}
                 expandedKeys={expandedKeys}
                 selectedKey={selectedKey}
+                onToggleDocPin={onToggleDocPin}
                 onToggleDirectory={onToggleDirectory}
                 onSelectDoc={onSelectDoc}
               />
@@ -91,36 +120,70 @@ function DevDocsTreeNode({
   }
 
   const active = node.item.key === selectedKey
+  const pinned = Boolean(node.item.pinned)
   return (
-    <button
-      type="button"
+    <div
       data-dev-doc-key={node.item.key}
       className={
         active
-          ? 'erp-dev-docs-tree__row erp-dev-docs-tree__doc erp-dev-docs-tree__doc--active'
-          : 'erp-dev-docs-tree__row erp-dev-docs-tree__doc'
+          ? 'erp-dev-docs-tree__doc-shell erp-dev-docs-tree__doc-shell--active'
+          : 'erp-dev-docs-tree__doc-shell'
       }
       style={{ '--depth-offset': `${depth * 14}px` }}
-      onClick={() => onSelectDoc(node.item.key)}
     >
-      <FileMarkdownOutlined />
-      <span className="erp-dev-docs-tree__doc-copy">
-        <span className="erp-dev-docs-tree__doc-title">{node.item.title}</span>
-        <span className="erp-dev-docs-tree__doc-path">{node.item.path}</span>
-      </span>
-    </button>
+      <button
+        type="button"
+        className="erp-dev-docs-tree__row erp-dev-docs-tree__doc"
+        onClick={() => onSelectDoc(node.item.key)}
+      >
+        <FileMarkdownOutlined />
+        <span className="erp-dev-docs-tree__doc-copy">
+          <span className="erp-dev-docs-tree__doc-title">
+            {node.item.title}
+          </span>
+          <span className="erp-dev-docs-tree__doc-path">{node.item.path}</span>
+        </span>
+      </button>
+      <Tooltip title={pinned ? '取消置顶' : '置顶文档'}>
+        <button
+          type="button"
+          className={
+            pinned
+              ? 'erp-dev-docs-row-pin erp-dev-docs-row-pin--active'
+              : 'erp-dev-docs-row-pin'
+          }
+          aria-label={
+            pinned ? `取消置顶 ${node.item.title}` : `置顶 ${node.item.title}`
+          }
+          aria-pressed={pinned}
+          onClick={() => onToggleDocPin(node.item)}
+        >
+          {pinned ? <PushpinFilled /> : <PushpinOutlined />}
+        </button>
+      </Tooltip>
+    </div>
   )
 }
 
 export default function DevDocsPage() {
   const docs = useMemo(() => buildDevDocsItems(markdownModules), [])
-  const docTree = useMemo(() => buildDevDocsTree(docs), [docs])
+  const [pinnedPaths, setPinnedPaths] = useState(() => readPinnedPaths(docs))
+  const docsWithPinnedState = useMemo(
+    () => applyDevDocsPinnedState(docs, pinnedPaths),
+    [docs, pinnedPaths]
+  )
+  const docTree = useMemo(
+    () => buildDevDocsTree(docsWithPinnedState),
+    [docsWithPinnedState]
+  )
   const allDirectoryKeys = useMemo(
     () => collectDirectoryKeys(docTree),
     [docTree]
   )
   const [keyword, setKeyword] = useState('')
-  const [selectedKey, setSelectedKey] = useState(docs[0]?.key || '')
+  const [selectedKey, setSelectedKey] = useState(
+    docsWithPinnedState[0]?.key || ''
+  )
   const [expandedKeys, setExpandedKeys] = useState(
     () => new Set(DEFAULT_EXPANDED_DIR_KEYS)
   )
@@ -128,16 +191,24 @@ export default function DevDocsPage() {
 
   const docsWithSearchText = useMemo(
     () =>
-      docs.map((item) => ({
+      docsWithPinnedState.map((item) => ({
         ...item,
         searchText: item.source,
       })),
-    [docs]
+    [docsWithPinnedState]
   )
 
   const visibleDocs = useMemo(
-    () => filterDevDocsItems(docsWithSearchText, keyword),
+    () =>
+      sortDevDocsItemsByPinned(filterDevDocsItems(docsWithSearchText, keyword)),
     [docsWithSearchText, keyword]
+  )
+  const pinnedDocs = useMemo(
+    () =>
+      sortDevDocsItemsByPinned(
+        docsWithPinnedState.filter((item) => item.pinned)
+      ),
+    [docsWithPinnedState]
   )
   const trimmedKeyword = keyword.trim()
   const isSearching = trimmedKeyword.length > 0
@@ -146,11 +217,28 @@ export default function DevDocsPage() {
     allDirectoryKeys.every((key) => expandedKeys.has(key))
 
   const selectedDoc =
-    docs.find((item) => item.key === selectedKey) || visibleDocs[0] || docs[0]
+    docsWithPinnedState.find((item) => item.key === selectedKey) ||
+    visibleDocs[0] ||
+    docsWithPinnedState[0]
+  const selectedDocPinned = Boolean(selectedDoc?.pinned)
   const headings = useMemo(
     () => extractMarkdownHeadings(selectedDoc?.source || '', [1, 2, 3]),
     [selectedDoc?.source]
   )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      window.localStorage.setItem(
+        DEV_DOCS_PINNED_STORAGE_KEY,
+        JSON.stringify(normalizeDevDocsPinnedPaths(pinnedPaths, docs))
+      )
+    } catch (error) {
+      // 本地偏好写入失败时不影响 dev docs 主路径浏览。
+    }
+  }, [docs, pinnedPaths])
 
   useEffect(() => {
     markdownRef.current?.scrollTo({ top: 0 })
@@ -186,6 +274,20 @@ export default function DevDocsPage() {
         ? new Set(DEFAULT_EXPANDED_DIR_KEYS)
         : new Set(allDirectoryKeys)
     )
+  }
+
+  const toggleDocPin = (doc) => {
+    if (!doc?.path) {
+      return
+    }
+
+    setPinnedPaths((current) => {
+      const normalizedCurrent = normalizeDevDocsPinnedPaths(current, docs)
+      const next = normalizedCurrent.includes(doc.path)
+        ? normalizedCurrent.filter((path) => path !== doc.path)
+        : [doc.path, ...normalizedCurrent]
+      return normalizeDevDocsPinnedPaths(next, docs)
+    })
   }
 
   const scrollReaderToTop = () => {
@@ -242,6 +344,58 @@ export default function DevDocsPage() {
             className="erp-dev-docs-search"
           />
 
+          {pinnedDocs.length > 0 ? (
+            <section className="erp-dev-docs-sidebar__section erp-dev-docs-pinned">
+              <div className="erp-dev-docs-sidebar__section-head">
+                <Text strong>
+                  <PushpinOutlined className="erp-dev-docs-sidebar__section-icon" />
+                  置顶
+                </Text>
+                <Text type="secondary">{pinnedDocs.length}</Text>
+              </div>
+              <div className="erp-dev-docs-pinned__list">
+                {pinnedDocs.map((item) => (
+                  <div
+                    key={item.key}
+                    data-dev-doc-pinned-key={item.key}
+                    className={
+                      item.key === selectedDoc?.key
+                        ? 'erp-dev-docs-pinned__item erp-dev-docs-pinned__item--active'
+                        : 'erp-dev-docs-pinned__item'
+                    }
+                  >
+                    <button
+                      type="button"
+                      className="erp-dev-docs-pinned__open"
+                      onClick={() => setSelectedKey(item.key)}
+                    >
+                      <FileMarkdownOutlined />
+                      <span className="erp-dev-docs-pinned__copy">
+                        <span className="erp-dev-docs-pinned__title">
+                          {item.title}
+                        </span>
+                        <span className="erp-dev-docs-pinned__path">
+                          {item.path}
+                        </span>
+                      </span>
+                    </button>
+                    <Tooltip title="取消置顶">
+                      <button
+                        type="button"
+                        className="erp-dev-docs-row-pin erp-dev-docs-row-pin--active erp-dev-docs-row-pin--pinned"
+                        aria-label={`取消置顶 ${item.title}`}
+                        aria-pressed
+                        onClick={() => toggleDocPin(item)}
+                      >
+                        <PushpinFilled />
+                      </button>
+                    </Tooltip>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {isSearching ? (
             <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--results">
               <div className="erp-dev-docs-sidebar__section-head">
@@ -253,8 +407,7 @@ export default function DevDocsPage() {
               <div className="erp-dev-docs-list">
                 {visibleDocs.length > 0 ? (
                   visibleDocs.map((item) => (
-                    <button
-                      type="button"
+                    <div
                       key={item.key}
                       data-dev-doc-key={item.key}
                       className={
@@ -262,29 +415,57 @@ export default function DevDocsPage() {
                           ? 'erp-dev-docs-list__item erp-dev-docs-list__item--active'
                           : 'erp-dev-docs-list__item'
                       }
-                      onClick={() => setSelectedKey(item.key)}
                     >
-                      <span className="erp-dev-docs-list__title">
-                        <FileMarkdownOutlined />
-                        {item.title}
-                      </span>
-                      <span className="erp-dev-docs-list__meta">
-                        <Tag
-                          color={item.pinned ? 'green' : 'default'}
-                          className="erp-dev-docs-list__tag"
-                        >
-                          {item.pinned ? '置顶' : item.group}
-                        </Tag>
-                        {item.pinned ? (
-                          <Tag className="erp-dev-docs-list__tag">
-                            {item.group}
+                      <button
+                        type="button"
+                        className="erp-dev-docs-list__open"
+                        onClick={() => setSelectedKey(item.key)}
+                      >
+                        <span className="erp-dev-docs-list__title">
+                          <FileMarkdownOutlined />
+                          {item.title}
+                        </span>
+                        <span className="erp-dev-docs-list__meta">
+                          <Tag
+                            color={item.pinned ? 'green' : 'default'}
+                            className="erp-dev-docs-list__tag"
+                          >
+                            {item.pinned ? '置顶' : item.group}
                           </Tag>
-                        ) : null}
-                      </span>
-                      <span className="erp-dev-docs-list__path">
-                        {item.path}
-                      </span>
-                    </button>
+                          {item.pinned ? (
+                            <Tag className="erp-dev-docs-list__tag">
+                              {item.group}
+                            </Tag>
+                          ) : null}
+                        </span>
+                        <span className="erp-dev-docs-list__path">
+                          {item.path}
+                        </span>
+                      </button>
+                      <Tooltip title={item.pinned ? '取消置顶' : '置顶文档'}>
+                        <button
+                          type="button"
+                          className={
+                            item.pinned
+                              ? 'erp-dev-docs-row-pin erp-dev-docs-row-pin--active'
+                              : 'erp-dev-docs-row-pin'
+                          }
+                          aria-label={
+                            item.pinned
+                              ? `取消置顶 ${item.title}`
+                              : `置顶 ${item.title}`
+                          }
+                          aria-pressed={item.pinned}
+                          onClick={() => toggleDocPin(item)}
+                        >
+                          {item.pinned ? (
+                            <PushpinFilled />
+                          ) : (
+                            <PushpinOutlined />
+                          )}
+                        </button>
+                      </Tooltip>
+                    </div>
                   ))
                 ) : (
                   <Empty
@@ -316,6 +497,7 @@ export default function DevDocsPage() {
                     node={node}
                     expandedKeys={expandedKeys}
                     selectedKey={selectedDoc?.key}
+                    onToggleDocPin={toggleDocPin}
                     onToggleDirectory={toggleDirectory}
                     onSelectDoc={setSelectedKey}
                   />
@@ -334,6 +516,23 @@ export default function DevDocsPage() {
               </Text>
             </div>
             <Space size={8} wrap>
+              <Tooltip title={selectedDocPinned ? '取消置顶' : '置顶文档'}>
+                <Button
+                  type="text"
+                  shape="circle"
+                  className={
+                    selectedDocPinned
+                      ? 'erp-dev-docs-pin-button erp-dev-docs-pin-button--active'
+                      : 'erp-dev-docs-pin-button'
+                  }
+                  icon={
+                    selectedDocPinned ? <PushpinFilled /> : <PushpinOutlined />
+                  }
+                  aria-label={selectedDocPinned ? '取消置顶' : '置顶文档'}
+                  aria-pressed={selectedDocPinned}
+                  onClick={() => toggleDocPin(selectedDoc)}
+                />
+              </Tooltip>
               <Button
                 icon={<VerticalAlignTopOutlined />}
                 onClick={scrollReaderToTop}

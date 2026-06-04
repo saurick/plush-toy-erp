@@ -10,6 +10,8 @@ export const PINNED_DEV_DOC_PATHS = Object.freeze([
   'docs/product/test-strategy.md',
 ])
 
+export const DEV_DOCS_PINNED_STORAGE_KEY = 'plush_erp_dev_docs_pinned_paths'
+
 export function isDevDocsEnabled(env = import.meta.env) {
   return env?.DEV === true
 }
@@ -102,7 +104,7 @@ function normalizeModuleValue(value) {
 }
 
 export function buildDevDocsItems(markdownModules = {}) {
-  const pinnedRank = new Map(
+  const defaultPinnedRank = new Map(
     PINNED_DEV_DOC_PATHS.map((path, index) => [path, index])
   )
   const byPath = new Map()
@@ -119,24 +121,62 @@ export function buildDevDocsItems(markdownModules = {}) {
       filename: filenameForPath(path),
       path,
       group: groupForPath(path),
-      pinned: pinnedRank.has(path),
+      defaultPinned: PINNED_DEV_DOC_PATHS.includes(path),
       source,
     })
   })
 
   return [...byPath.values()].sort((left, right) => {
-    const leftPinned = pinnedRank.has(left.path)
-    const rightPinned = pinnedRank.has(right.path)
-    if (leftPinned || rightPinned) {
+    const leftDefaultPinned = defaultPinnedRank.has(left.path)
+    const rightDefaultPinned = defaultPinnedRank.has(right.path)
+    if (leftDefaultPinned || rightDefaultPinned) {
       return (
-        (pinnedRank.get(left.path) ?? Number.MAX_SAFE_INTEGER) -
-        (pinnedRank.get(right.path) ?? Number.MAX_SAFE_INTEGER)
+        (defaultPinnedRank.get(left.path) ?? Number.MAX_SAFE_INTEGER) -
+        (defaultPinnedRank.get(right.path) ?? Number.MAX_SAFE_INTEGER)
       )
     }
     if (left.group !== right.group) {
       return left.group.localeCompare(right.group, 'zh-Hans-CN')
     }
     return left.path.localeCompare(right.path, 'zh-Hans-CN')
+  })
+}
+
+export function normalizeDevDocsPinnedPaths(paths = [], docs = []) {
+  const availablePaths = new Set(docs.map((item) => item.path))
+  return [...new Set(paths)]
+    .map((path) => String(path || '').trim())
+    .filter((path) => path.endsWith('.md'))
+    .filter((path) => availablePaths.size === 0 || availablePaths.has(path))
+}
+
+export function getDefaultDevDocsPinnedPaths(docs = []) {
+  return normalizeDevDocsPinnedPaths(PINNED_DEV_DOC_PATHS, docs)
+}
+
+export function applyDevDocsPinnedState(docs = [], pinnedPaths = []) {
+  const pinnedRank = new Map(
+    normalizeDevDocsPinnedPaths(pinnedPaths, docs).map((path, index) => [
+      path,
+      index,
+    ])
+  )
+  return docs.map((item) => ({
+    ...item,
+    pinned: pinnedRank.has(item.path),
+    pinnedRank: pinnedRank.get(item.path) ?? Number.MAX_SAFE_INTEGER,
+  }))
+}
+
+export function sortDevDocsItemsByPinned(items = []) {
+  return [...items].sort((left, right) => {
+    if (left.pinned !== right.pinned) {
+      return left.pinned ? -1 : 1
+    }
+    if (left.pinned && right.pinned) {
+      return left.pinnedRank - right.pinnedRank
+    }
+    return 0
   })
 }
 

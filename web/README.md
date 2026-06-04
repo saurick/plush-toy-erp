@@ -57,6 +57,7 @@ http://localhost:5175/m/quality/tasks
 - 运行时状态由 `src/common/theme/erpTheme.jsx` 和 `src/common/theme/erpThemeMode.mjs` 维护。
 - Ant Design 组件通过根 `ConfigProvider` 在 `defaultAlgorithm / darkAlgorithm` 间切换。
 - 项目自定义壳层、移动端任务卡片和局部硬编码样式通过 `data-erp-theme` 与 `src/erp/styles/app.css` 的 ERP theme 变量覆盖。
+- 新增状态类组件时必须同步覆盖暗色主题，包括 loading / empty / alert / message / notification / tooltip / popover / tag / badge / progress / pagination / drawer / table placeholder；优先复用全局 token 和 L1 断言，避免组件只在浅色模式可读。
 - 打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随暗色主题，避免污染导出物。
 
 ### 角色移动端
@@ -221,7 +222,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面侧栏只保留看板、业务分组、单据模板和系统管理。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径只做兼容重定向，不再作为产品内页面。
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
-- 开发环境额外提供 `http://localhost:5175/__dev/docs` 作为本地开发态文档查看器；该入口左侧专用于按真实目录树浏览仓库 tracked Markdown，搜索态显示匹配结果，右侧章节标签可滚动到对应标题并提供回到顶部，不进入侧栏、seedData、RBAC 或产品内文档 registry，生产构建不可访问。
+- 开发环境额外提供 `http://localhost:5175/__dev/docs` 作为本地开发态文档查看器；该入口左侧专用于按真实目录树浏览仓库 tracked Markdown，并在搜索框下方提供浏览器本地持久化的置顶文档区；搜索态显示匹配结果，右侧标题栏图钉可置顶 / 取消置顶当前文档，置顶区行内图钉可直接取消置顶，目录树和搜索结果行内图钉可快速置顶 / 取消置顶，章节标签可滚动到对应标题并提供回到顶部，不进入侧栏、seedData、RBAC 或产品内文档 registry，生产构建不可访问。
 
 ## 当前前端边界
 
@@ -244,5 +245,6 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 业务记录弹窗按当前 ERP 宽弹窗基线承载表头字段和明细行。
 - 桌面端业务录入弹窗默认按紧凑栅格排布：文本字段收口到三列，数量类短字段进一步收口，备注和明细区保留整行。
 - 明细条目按共享列宽预算展示，长文本字段保留较宽输入，数量 / 单价 / 金额等短数字字段收窄；数量后缀读取当前行已填单位，金额类字段默认显示 `CNY` 后缀，但不把空单位强行保存成 `pcs`。
-- 弹窗壳层沿用当前 ERP 的 Ant Design 轻量基线，不额外叠加头尾分割线、厚边框或重阴影；只在弹窗 body 内部接管纵向滚动，避免长表单溢出视口。
-- 弹窗内普通输入框、密码框、数字输入框、日期输入、下拉框和按钮统一沿用 Ant Design 的 32px 控件高度、10px 圆角和绿色焦点态，避免 Tailwind 表单 reset 覆盖到业务弹窗控件。
+- 弹窗壳层按主题区分：浅色主题保持 Ant Design 轻量基线；暗色主题必须提供可辨认的遮罩、独立边框、浮层阴影以及 header / body / footer 分隔，避免业务页背景和弹窗融成一片。
+- 弹窗 body 内部接管纵向滚动，避免长表单溢出视口；明细横向滚动只允许收口在明细容器内，不外溢到整组 Modal。
+- 弹窗内普通输入框、密码框、数字输入框、日期输入、下拉框和按钮统一沿用 Ant Design 的 32px 控件高度、10px 圆角；浅色焦点态保留 ERP 绿色，暗色普通 hover / focus 使用 slate / blue 交互色，绿色仅保留给品牌主按钮和状态强调，避免 Tailwind 表单 reset 覆盖到业务弹窗控件。

@@ -3,10 +3,14 @@ import test from 'node:test'
 
 import {
   DEV_DOCS_ROUTE,
+  applyDevDocsPinnedState,
   buildDevDocsItems,
   buildDevDocsTree,
   filterDevDocsItems,
+  getDefaultDevDocsPinnedPaths,
   isDevDocsEnabled,
+  normalizeDevDocsPinnedPaths,
+  sortDevDocsItemsByPinned,
 } from './devDocs.mjs'
 
 function findDirectory(nodes, path) {
@@ -74,6 +78,10 @@ test('devDocs: 全量开发文档列表不恢复产品内文档 registry', () =>
     '客户'
   )
   assert.equal(docs[0]?.path, 'README.md')
+  assert.equal(
+    docs.find((item) => item.path === 'README.md')?.defaultPinned,
+    true
+  )
 })
 
 test('devDocs: 按仓库路径生成目录树', () => {
@@ -124,4 +132,45 @@ test('devDocs: 支持按标题、路径和正文索引筛选', () => {
     filterDevDocsItems(items, 'phase').map((item) => item.title),
     ['路线图']
   )
+})
+
+test('devDocs: 支持本地置顶路径归一化和排序', () => {
+  const docs = buildDevDocsItems({
+    '../../../../README.md': '# 仓库 README',
+    '../../../../docs/current-source-of-truth.md': '# 当前真源与交接顺序',
+    '../../../../docs/product/product-completion-roadmap.md':
+      '# 产品完成路线图',
+    '../../../../docs/archive/progress-2026-06.md': '# 过程归档',
+  })
+
+  assert.deepEqual(getDefaultDevDocsPinnedPaths(docs), [
+    'README.md',
+    'docs/current-source-of-truth.md',
+    'docs/product/product-completion-roadmap.md',
+  ])
+  assert.deepEqual(
+    normalizeDevDocsPinnedPaths(
+      [
+        'docs/product/product-completion-roadmap.md',
+        'missing.md',
+        'docs/product/product-completion-roadmap.md',
+        '../unsafe.txt',
+      ],
+      docs
+    ),
+    ['docs/product/product-completion-roadmap.md']
+  )
+
+  const docsWithPinned = applyDevDocsPinnedState(docs, [
+    'docs/archive/progress-2026-06.md',
+    'docs/current-source-of-truth.md',
+  ])
+  const sortedPaths = sortDevDocsItemsByPinned(docsWithPinned).map(
+    (item) => item.path
+  )
+
+  assert.deepEqual(sortedPaths.slice(0, 2), [
+    'docs/archive/progress-2026-06.md',
+    'docs/current-source-of-truth.md',
+  ])
 })
