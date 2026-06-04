@@ -48,6 +48,17 @@ http://localhost:5175/m/quality/tasks
 
 `/admin-login` 统一承接后台和岗位任务端登录。手机默认选择岗位任务端，电脑默认选择后台，平板没有历史选择时保留入口选择；用户手动选择入口优先于设备默认。入口显隐由 `web/src/erp/config/entryConfig.mjs` 控制，并可通过 `window.__PLUSH_ERP_ENTRY_CONFIG__` 覆盖。用户不在登录前手选岗位，岗位任务端登录后按账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位；是否真正可进入仍由后端返回的 `permissions / menus` 决定。短信登录入口由后端 `auth.capabilities` 决定，前端不自行决定认证方式是否可用。
 
+### 主题模式 / Theme mode
+
+桌面后台、统一登录页和岗位移动端支持「跟系统 / 浅色 / 暗色」三种主题模式，默认跟随系统偏好。用户手动选择会写入浏览器 `localStorage` 的 `plush_erp_theme_mode`，刷新后保持；`跟系统` 只决定视觉主题，不影响入口选择、权限判断或最终路由。
+
+主题主路径：
+
+- 运行时状态由 `src/common/theme/erpTheme.jsx` 和 `src/common/theme/erpThemeMode.mjs` 维护。
+- Ant Design 组件通过根 `ConfigProvider` 在 `defaultAlgorithm / darkAlgorithm` 间切换。
+- 项目自定义壳层、移动端任务卡片和局部硬编码样式通过 `data-erp-theme` 与 `src/erp/styles/app.css` 的 ERP theme 变量覆盖。
+- 打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随暗色主题，避免污染导出物。
+
 ### 角色移动端
 
 ```bash
@@ -181,6 +192,7 @@ pnpm smoke:processing-contract-real-login
 
 - 根路由到后台登录的重定向
 - 管理员登录
+- 登录页主题三态、暗色后台看板、暗色打印中心 / 预览入口和暗色岗位移动端核心路径
 - 未登录访问桌面后台的重定向
 - 桌面任务看板
 - 桌面业务看板

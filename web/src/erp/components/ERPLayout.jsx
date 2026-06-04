@@ -43,6 +43,7 @@ import {
   ERP_COMPANY_NAME,
 } from '@/common/consts/brand'
 import { Loading } from '@/common/components/loading'
+import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -452,6 +453,10 @@ export default function ERPLayout() {
               >
                 刷新当前页
               </Button>
+              <ERPThemeToggle
+                className="erp-admin-header__theme-toggle"
+                variant="menu"
+              />
               <div className="erp-admin-header__meta">
                 <Tag color={isSuperAdmin ? 'gold' : 'blue'}>{roleLabel}</Tag>
                 <Text className="erp-admin-header__user">

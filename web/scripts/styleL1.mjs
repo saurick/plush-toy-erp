@@ -75,6 +75,45 @@ const scenarios = [
     },
   },
   {
+    name: 'admin-login-theme-modes-desktop',
+    path: '/admin-login',
+    viewport: { width: 1280, height: 800 },
+    verify: async (page) => {
+      await expectText(page, '毛绒 ERP 管理后台')
+      await assertERPThemeMode(page, {
+        scenarioName: 'admin-login-theme-modes-desktop',
+        expectedMode: 'system',
+        expectedEffectiveTheme: 'light',
+      })
+      await clickERPThemeOption(page, '暗色')
+      await assertERPThemeMode(page, {
+        scenarioName: 'admin-login-theme-modes-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertThemeReadable(page, {
+        scenarioName: 'admin-login-theme-modes-desktop',
+        selector: '.erp-login-card',
+      })
+      await assertLoginSegmentedReadable(page, {
+        scenarioName: 'admin-login-theme-modes-desktop',
+      })
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await expectText(page, '毛绒 ERP 管理后台')
+      await assertERPThemeMode(page, {
+        scenarioName: 'admin-login-theme-modes-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await clickERPThemeOption(page, '跟系统')
+      await assertERPThemeMode(page, {
+        scenarioName: 'admin-login-theme-modes-desktop',
+        expectedMode: 'system',
+        expectedEffectiveTheme: 'light',
+      })
+    },
+  },
+  {
     name: 'auth-expired-alert-mobile',
     path: '/erp/dashboard',
     auth: 'admin-expired',
@@ -248,6 +287,118 @@ const scenarios = [
       await expectText(page, '任务看板')
       await expectText(page, '任务处理统计')
       await expectText(page, '任务处理明细')
+    },
+  },
+  {
+    name: 'erp-dashboard-dark-desktop',
+    path: '/erp/dashboard',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectText(page, '毛绒 ERP 管理后台')
+      await expectText(page, '任务看板')
+      await assertERPThemeMode(page, {
+        scenarioName: 'erp-dashboard-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertThemeReadable(page, {
+        scenarioName: 'erp-dashboard-dark-desktop',
+        selector: '.erp-admin-header',
+      })
+      await assertThemeReadable(page, {
+        scenarioName: 'erp-dashboard-dark-desktop',
+        selector: '.erp-dashboard-card',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'erp-dashboard-dark-desktop',
+        selector: '.erp-admin-shell',
+      })
+    },
+  },
+  {
+    name: 'business-module-dark-partners-desktop',
+    path: '/erp/master/partners',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 2048, height: 1024 },
+    verify: async (page) => {
+      await expectHeading(page, '客户/供应商')
+      await expectText(page, '导出当前结果')
+      await expectText(page, '协同任务池')
+      await assertERPThemeMode(page, {
+        scenarioName: 'business-module-dark-partners-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'business-module-dark-partners-desktop',
+        selector: '.erp-business-page-layout',
+      })
+    },
+  },
+  {
+    name: 'mobile-tasks-dark',
+    path: '/m/sales/tasks',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await page.evaluate(async () => {
+        await fetch('/rpc/workflow', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'mobile-dark-task',
+            method: 'create_task',
+            params: {
+              task_code: 'STYLE-L1-MOBILE-DARK-001',
+              task_group: 'project-orders',
+              task_name: '暗色任务验证',
+              source_type: 'project-orders',
+              source_id: 9001,
+              source_no: 'STYLE-L1-MOBILE-DARK-001',
+              business_status_key: 'project_pending',
+              task_status_key: 'blocked',
+              owner_role_key: 'sales',
+              priority: 3,
+              blocked_reason: '暗色模式阻塞原因回显',
+              payload: {
+                critical_path: true,
+                customer_name: '暗色客户',
+                style_no: '深色测试款',
+                due_date: '2026-06-06',
+              },
+            },
+          }),
+        })
+      })
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await expectText(page, '待办')
+      await expectText(page, '暗色任务验证')
+      await expectText(page, '阻塞原因')
+      await assertERPThemeMode(page, {
+        scenarioName: 'mobile-tasks-dark',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertThemeReadable(page, {
+        scenarioName: 'mobile-tasks-dark',
+        selector: '.mobile-app-layout .surface-panel',
+      })
+      await assertThemeReadable(page, {
+        scenarioName: 'mobile-tasks-dark',
+        selector: '.erp-mobile-card',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'mobile-tasks-dark',
+        selector: '.mobile-app-layout',
+      })
     },
   },
   {
@@ -729,6 +880,29 @@ const scenarios = [
     },
   },
   {
+    name: 'print-center-dark-desktop',
+    path: '/erp/print-center',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 2048, height: 1024 },
+    verify: async (page) => {
+      await expectHeading(page, '打印模板中心')
+      await expectText(page, '打开可编辑打印窗口')
+      await expectText(page, '模板目录')
+      await expectText(page, '采购合同')
+      await expectText(page, '加工合同')
+      await assertERPThemeMode(page, {
+        scenarioName: 'print-center-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'print-center-dark-desktop',
+        selector: '.erp-print-center-page',
+      })
+    },
+  },
+  {
     name: 'print-preview-material',
     path: '/erp/print-center/material-purchase-contract',
     auth: 'admin',
@@ -738,6 +912,28 @@ const scenarios = [
       await expectText(page, '兼容入口')
       await expectText(page, '打开可编辑打印窗口')
       await expectText(page, '返回打印中心')
+    },
+  },
+  {
+    name: 'print-preview-material-dark-desktop',
+    path: '/erp/print-center/material-purchase-contract',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '采购合同')
+      await expectText(page, '兼容入口')
+      await expectText(page, '打开可编辑打印窗口')
+      await expectText(page, '返回打印中心')
+      await assertERPThemeMode(page, {
+        scenarioName: 'print-preview-material-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'print-preview-material-dark-desktop',
+        selector: '.erp-admin-content',
+      })
     },
   },
   {
@@ -1355,7 +1551,21 @@ async function runScenario(browser, scenario) {
     }
     await page.addInitScript((mockToken) => {
       localStorage.setItem('admin_access_token', mockToken)
+      localStorage.setItem('admin_is_super_admin', 'true')
+      localStorage.setItem('admin_roles', '[]')
+      localStorage.setItem('admin_permissions', '[]')
+      localStorage.setItem('admin_menus', '[]')
+      localStorage.setItem(
+        'admin_erp_preferences',
+        JSON.stringify({ column_orders: {} })
+      )
     }, token)
+  }
+
+  if (scenario.themeMode) {
+    await page.addInitScript((themeMode) => {
+      localStorage.setItem('plush_erp_theme_mode', themeMode)
+    }, scenario.themeMode)
   }
 
   page.on('console', (message) => {
@@ -1391,6 +1601,11 @@ async function runScenario(browser, scenario) {
       `[style:l1] 场景失败: ${scenario.name}\n${error.message}\n最近 vite 输出：\n${tailLogs(devServerLogs)}`
     )
   } finally {
+    await page
+      .evaluate(() => {
+        localStorage.removeItem('plush_erp_theme_mode')
+      })
+      .catch(() => {})
     await page.close()
   }
 }
@@ -5913,6 +6128,356 @@ async function assertNoHorizontalOverflow(page, scenarioName) {
   assert(
     metrics.docScrollWidth <= metrics.viewportWidth + 2,
     `${scenarioName} document 出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertERPThemeMode(
+  page,
+  { scenarioName, expectedMode, expectedEffectiveTheme }
+) {
+  const metrics = await page.evaluate(() => ({
+    mode: document.documentElement.dataset.erpThemeMode || '',
+    effectiveTheme: document.documentElement.dataset.erpTheme || '',
+    colorScheme: document.documentElement.style.colorScheme || '',
+    storedMode: window.localStorage.getItem('plush_erp_theme_mode') || '',
+  }))
+
+  assert.equal(
+    metrics.mode,
+    expectedMode,
+    `${scenarioName} 主题模式不符合预期: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.effectiveTheme,
+    expectedEffectiveTheme,
+    `${scenarioName} 生效主题不符合预期: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.colorScheme,
+    expectedEffectiveTheme,
+    `${scenarioName} color-scheme 未同步: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    expectedMode === 'system' || metrics.storedMode === expectedMode,
+    `${scenarioName} 手动主题未持久化: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function clickERPThemeOption(page, label) {
+  const expectedModeByLabel = {
+    跟系统: 'system',
+    浅色: 'light',
+    暗色: 'dark',
+  }
+  const expectedMode = expectedModeByLabel[label]
+  const segmentedOption = page
+    .locator('.erp-theme-toggle .ant-segmented-item')
+    .filter({ hasText: label })
+  if ((await segmentedOption.count()) > 0) {
+    await segmentedOption.click()
+  } else {
+    const menuToggle = page.locator('.erp-theme-menu-toggle')
+    assert.equal(
+      await menuToggle.count(),
+      1,
+      `主题菜单按钮数量异常，无法切换到 ${label}`
+    )
+    await menuToggle.click()
+    const menuItem = page
+      .locator(
+        '.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item'
+      )
+      .filter({ hasText: label })
+    await menuItem.waitFor({ state: 'visible', timeout: 10_000 })
+    await menuItem.click()
+    await page.keyboard.press('Escape')
+    await page
+      .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+      .waitFor({ state: 'hidden', timeout: 10_000 })
+      .catch(() => {})
+  }
+  if (expectedMode) {
+    await page.waitForFunction(
+      (mode) => document.documentElement.dataset.erpThemeMode === mode,
+      expectedMode
+    )
+  }
+}
+
+async function assertThemeReadable(page, { scenarioName, selector }) {
+  const metrics = await page.evaluate((targetSelector) => {
+    const target = document.querySelector(targetSelector)
+    if (!target) {
+      return null
+    }
+    const style = window.getComputedStyle(target)
+    const textNode =
+      target.querySelector(
+        'h1, h2, h3, .ant-typography, .ant-card-head-title, .erp-mobile-strong, .erp-mobile-page-title, button, input'
+      ) || target
+    const textStyle = window.getComputedStyle(textNode)
+    return {
+      selector: targetSelector,
+      backgroundColor: style.backgroundColor,
+      color: textStyle.color,
+      rect: target.getBoundingClientRect().toJSON(),
+    }
+  }, selector)
+
+  assert(metrics, `${scenarioName} 缺少主题可读性目标: ${selector}`)
+  assert(
+    !isTransparentColor(metrics.backgroundColor),
+    `${scenarioName} 主题目标背景透明，无法验证可读性: ${JSON.stringify(metrics)}`
+  )
+  const background = parseRgb(metrics.backgroundColor)
+  const color = parseRgb(metrics.color)
+  assert(
+    background && color,
+    `${scenarioName} 无法解析主题颜色: ${JSON.stringify(metrics)}`
+  )
+  const ratio = getContrastRatio(color, background)
+  assert(
+    ratio >= 3,
+    `${scenarioName} 主题文字对比度不足: ${JSON.stringify({
+      ...metrics,
+      contrastRatio: ratio,
+    })}`
+  )
+}
+
+async function assertLoginSegmentedReadable(page, { scenarioName }) {
+  const metrics = await page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll(
+        '.erp-login-card .ant-segmented .ant-segmented-item-selected'
+      )
+    ).map((item) => {
+      const label = item.querySelector('.ant-segmented-item-label') || item
+      const itemStyle = window.getComputedStyle(item)
+      const labelStyle = window.getComputedStyle(label)
+      return {
+        text: label.textContent?.replace(/\s+/g, ' ').trim() || '',
+        backgroundColor: itemStyle.backgroundColor,
+        color: labelStyle.color,
+      }
+    })
+  )
+
+  assert(
+    metrics.length >= 2,
+    `${scenarioName} 登录页缺少主题或入口 Segmented 选中项: ${JSON.stringify(metrics)}`
+  )
+  metrics.forEach((item) => {
+    const background = parseRgb(item.backgroundColor)
+    const color = parseRgb(item.color)
+    assert(
+      background && color,
+      `${scenarioName} 无法解析登录页 Segmented 颜色: ${JSON.stringify(metrics)}`
+    )
+    const ratio = getContrastRatio(color, background)
+    assert(
+      ratio >= 4.5,
+      `${scenarioName} 登录页 Segmented 选中项对比度不足: ${JSON.stringify({
+        ...item,
+        contrastRatio: ratio,
+      })}`
+    )
+  })
+}
+
+async function assertDarkThemeContrast(
+  page,
+  { scenarioName, selector = 'body', minRatio = 3 }
+) {
+  const issues = await page.evaluate(
+    ({ targetSelector, minContrastRatio }) => {
+      const target = document.querySelector(targetSelector)
+      if (!target)
+        return [{ reason: 'missing-target', selector: targetSelector }]
+
+      const parseColor = (value) => {
+        const match = String(value || '').match(
+          /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/
+        )
+        if (!match) return null
+        const alpha = match[4] === undefined ? 1 : Number(match[4])
+        if (alpha === 0) return null
+        return [Number(match[1]), Number(match[2]), Number(match[3]), alpha]
+      }
+      const luminance = ([red, green, blue]) => {
+        const values = [red, green, blue].map((value) => {
+          const channel = value / 255
+          return channel <= 0.03928
+            ? channel / 12.92
+            : ((channel + 0.055) / 1.055) ** 2.4
+        })
+        return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722
+      }
+      const contrast = (foreground, background) => {
+        const lighter = Math.max(luminance(foreground), luminance(background))
+        const darker = Math.min(luminance(foreground), luminance(background))
+        return (lighter + 0.05) / (darker + 0.05)
+      }
+      const compositeColor = (top, bottom) => {
+        const topAlpha = top[3] ?? 1
+        const bottomAlpha = bottom[3] ?? 1
+        const alpha = topAlpha + bottomAlpha * (1 - topAlpha)
+        if (alpha === 0) return [0, 0, 0, 0]
+        return [
+          (top[0] * topAlpha + bottom[0] * bottomAlpha * (1 - topAlpha)) /
+            alpha,
+          (top[1] * topAlpha + bottom[1] * bottomAlpha * (1 - topAlpha)) /
+            alpha,
+          (top[2] * topAlpha + bottom[2] * bottomAlpha * (1 - topAlpha)) /
+            alpha,
+          alpha,
+        ]
+      }
+      const backgroundFor = (element) => {
+        const layers = []
+        let current = element
+        while (current && current instanceof Element) {
+          const parsed = parseColor(
+            window.getComputedStyle(current).backgroundColor
+          )
+          if (parsed) layers.push(parsed)
+          current = current.parentElement
+        }
+        const bodyColor = parseColor(
+          window.getComputedStyle(document.body).backgroundColor
+        ) || [255, 255, 255, 1]
+        return layers
+          .reverse()
+          .reduce(
+            (background, layer) => compositeColor(layer, background),
+            bodyColor
+          )
+      }
+      const isVisible = (element) => {
+        const style = window.getComputedStyle(element)
+        const rect = element.getBoundingClientRect()
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          Number(style.opacity || 1) > 0.05 &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.bottom >= 0 &&
+          rect.right >= 0 &&
+          rect.top <= window.innerHeight &&
+          rect.left <= window.innerWidth
+        )
+      }
+      const describe = (element) => {
+        const classes =
+          element.className && typeof element.className === 'string'
+            ? `.${element.className.trim().split(/\s+/).slice(0, 4).join('.')}`
+            : ''
+        return `${element.tagName.toLowerCase()}${classes}`
+      }
+      const ignoredSelector = [
+        '.anticon',
+        '.ant-empty-img-default',
+        '.ant-empty-image',
+        '.ant-select-arrow',
+        '.ant-table-column-sorter',
+        '.erp-module-column-header-trigger',
+      ].join(',')
+      const visibleTextSelector =
+        'a, button, label, th, td, h1, h2, h3, h4, p, span, strong, small, input, textarea, .ant-typography, .ant-tag, .ant-btn, .ant-select-selection-item, .ant-select-selection-placeholder, .ant-empty-description'
+      const semanticCandidates = Array.from(
+        target.querySelectorAll(visibleTextSelector)
+      )
+      const directTextCandidates = Array.from(
+        target.querySelectorAll('*')
+      ).filter((element) =>
+        Array.from(element.childNodes).some(
+          (node) =>
+            node.nodeType === Node.TEXT_NODE &&
+            String(node.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim()
+        )
+      )
+      const candidates = Array.from(
+        new Set([...semanticCandidates, ...directTextCandidates])
+      )
+      const failures = []
+      for (const element of candidates) {
+        if (!(element instanceof HTMLElement)) continue
+        if (
+          element.matches(ignoredSelector) ||
+          element.closest(ignoredSelector)
+        ) {
+          continue
+        }
+        if (!isVisible(element)) continue
+        const text =
+          element instanceof HTMLInputElement ||
+          element instanceof HTMLTextAreaElement
+            ? element.placeholder || element.value || ''
+            : element.textContent || ''
+        const normalizedText = text.replace(/\s+/g, ' ').trim()
+        if (!normalizedText) continue
+        const style = window.getComputedStyle(element)
+        const color = parseColor(style.color)
+        const background = backgroundFor(element)
+        if (!color || !background) continue
+        const ratio = contrast(color, background)
+        if (ratio < minContrastRatio) {
+          failures.push({
+            element: describe(element),
+            text: normalizedText.slice(0, 80),
+            color: style.color,
+            backgroundColor: window.getComputedStyle(element).backgroundColor,
+            effectiveBackground: `rgb(${Math.round(background[0])}, ${Math.round(
+              background[1]
+            )}, ${Math.round(background[2])})`,
+            ratio: Number(ratio.toFixed(2)),
+          })
+        }
+      }
+      return failures.slice(0, 12)
+    },
+    { targetSelector: selector, minContrastRatio: minRatio }
+  )
+
+  assert.deepEqual(
+    issues,
+    [],
+    `${scenarioName} 暗色主题存在低对比可见文本: ${JSON.stringify(issues)}`
+  )
+}
+
+function getContrastRatio(foreground, background) {
+  const lighter = Math.max(getLuminance(foreground), getLuminance(background))
+  const darker = Math.min(getLuminance(foreground), getLuminance(background))
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+function parseRgb(value) {
+  const match = String(value || '').match(
+    /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/
+  )
+  if (!match) return null
+  if (match[4] !== undefined && Number(match[4]) === 0) return null
+  return [Number(match[1]), Number(match[2]), Number(match[3])]
+}
+
+function getLuminance([red, green, blue]) {
+  const values = [red, green, blue].map((value) => {
+    const channel = value / 255
+    return channel <= 0.03928
+      ? channel / 12.92
+      : ((channel + 0.055) / 1.055) ** 2.4
+  })
+  return values[0] * 0.2126 + values[1] * 0.7152 + values[2] * 0.0722
+}
+
+function isTransparentColor(color) {
+  return (
+    String(color || '').replaceAll(' ', '') === 'rgba(0,0,0,0)' ||
+    String(color || '').trim() === 'transparent'
   )
 }
 

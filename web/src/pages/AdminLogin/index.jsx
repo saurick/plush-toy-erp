@@ -25,6 +25,7 @@ import {
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
@@ -337,6 +338,11 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
     <div className="erp-login-page">
       <div className="erp-login-page__bg" />
       <Card variant="borderless" className="erp-login-card">
+        <ERPThemeToggle
+          className="erp-login-card__theme-toggle"
+          size="large"
+          variant="menu"
+        />
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
           <div className="erp-login-logo" aria-label={ERP_COMPANY_NAME}>
             <span className="erp-admin-brand__logo-mark erp-login-logo__mark">

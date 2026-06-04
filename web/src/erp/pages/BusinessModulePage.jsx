@@ -3285,7 +3285,7 @@ export default function BusinessModulePage({ moduleItem }) {
           allowClear
           mode="multiple"
           maxTagCount="responsive"
-          listHeight={224}
+          listHeight={144}
           placement="bottomLeft"
           className="erp-business-filter-control--status"
           classNames={{

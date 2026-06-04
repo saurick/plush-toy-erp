@@ -13,6 +13,7 @@ import {
   ERPWorkspaceProvider,
   useERPWorkspace,
 } from '@/erp/context/ERPWorkspaceProvider'
+import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 
 function AppContent() {
   const navigate = useNavigate()
@@ -62,20 +63,29 @@ function AppContent() {
   )
 }
 
-const App = () => (
-  <ERPWorkspaceProvider>
+function ThemedApp() {
+  const { isDark } = useERPTheme()
+
+  return (
     <ConfigProvider
       locale={zhCN}
       modal={{
         centered: true,
       }}
       theme={{
-        algorithm: theme.defaultAlgorithm,
+        algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
           colorPrimary: '#2b8a3e',
+          colorInfo: '#2f8f4b',
           borderRadius: 10,
           fontFamily:
             '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
+          colorBgLayout: isDark ? '#0f172a' : '#f4f8f3',
+          colorBgContainer: isDark ? '#17231c' : '#ffffff',
+          colorBgElevated: isDark ? '#1b2a22' : '#ffffff',
+          colorBorder: isDark ? '#31443a' : '#d9d9d9',
+          colorText: isDark ? '#e5edf4' : 'rgba(0, 0, 0, 0.88)',
+          colorTextSecondary: isDark ? '#a9b9ad' : 'rgba(0, 0, 0, 0.65)',
         },
       }}
     >
@@ -84,6 +94,14 @@ const App = () => (
         <AppContent />
       </AntdApp>
     </ConfigProvider>
+  )
+}
+
+const App = () => (
+  <ERPWorkspaceProvider>
+    <ERPThemeProvider>
+      <ThemedApp />
+    </ERPThemeProvider>
   </ERPWorkspaceProvider>
 )
 

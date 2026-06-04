@@ -43,6 +43,7 @@
 - 前端已移除产品内文档中心、帮助中心、高级文档和开发与验收页面入口；`web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs`、`DocumentationPage`、`HelpCenterPage`、`AcceptanceOverviewPage`、业务链路调试页和协同任务调试页不再作为运行时入口维护。
 - 桌面侧栏当前只保留看板中心、业务分组、单据模板和系统管理；旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径仅兼容重定向到桌面看板。
 - 桌面构建当前新增 `/m/<role>/tasks` 单端口移动任务端兼容路径，并保留现有八个角色移动端端口和构建产物；本轮未删除 `APP_ID=mobile-*` 多实例生产主路径，也未改部署脚本。`/entry` 只作为登录后“后台管理 / 岗位任务端”入口选择页，不提供登录前岗位角色选择；入口显隐由前端入口配置和登录账号权限共同决定。
+- 统一登录页、桌面后台和岗位移动端当前支持「跟系统 / 浅色 / 暗色」三种主题模式，默认跟随系统偏好，手动选择持久化到浏览器 `localStorage` 的 `plush_erp_theme_mode`。主题只影响视觉，不影响入口选择、RBAC、移动端角色推导或最终路由；打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随运行时暗色主题。
 - 系统分层、产品化与交付、客户差异、状态 / Workflow / Fact 边界继续以仓库正式 `docs/product/*`、`docs/architecture/*`、`docs/customers/*` 和当前代码 / 测试为准，不再镜像成前端 Markdown 页面。
 - 开发环境可访问独立隐藏路径 `/__dev/docs` 查看仓库 tracked Markdown；该入口左侧专用于按真实目录树浏览 `docs/**/*.md` 及主要 README，搜索态显示匹配结果，右侧章节标签可滚动到对应标题并提供回到顶部，只服务本地开发查阅，不进入 ERP 菜单、seedData、RBAC、产品内 docs registry 或生产构建。
 - Phase 0 已新增 0 到 1 产品架构、客户实例、客户差异和状态 / Workflow / Fact 边界文档：`docs/product/*`、`docs/architecture/status-workflow-fact-boundary.md`、`docs/customers/yoyoosun/*`。

@@ -6,6 +6,49 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-04 19:03 CST
+- 完成：参考 `openai-oauth-api-service` 的暗色基线，把本项目暗色主题从大面积橄榄绿面板调整为蓝黑 / slate 面板体系：页面底色、侧栏、卡片、表格、输入框、弹窗和打印中心运行时外壳改用 `#0f172a`、`#111827`、`#162033`、`#1b2538`、`#334155` 等中性深色；绿色保留为品牌点缀、主按钮、选中标记和状态提示。
+- 完成：收窄打印中心大面积选中卡的绿色背景，改为 slate 面板 + 绿色边框 / 标记，避免暗色主题继续呈现“绿绿的橄榄色”。
+- 验证：`STYLE_L1_PORT=4414 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,erp-dashboard-dark-desktop,business-module-dark-partners-desktop,mobile-tasks-dark,print-center-dark-desktop,print-preview-material-dark-desktop pnpm style:l1` 通过；`STYLE_L1_PORT=4415 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=business-module-dark-partners-desktop,print-center-dark-desktop,erp-dashboard-dark-desktop pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过；`STYLE_L1_PORT=4416 NODE_USE_ENV_PROXY=0 pnpm style:l1` 全量 38 场景通过。
+- 下一步：后续如果继续精修暗色视觉，优先按页面层级把“背景 / 面板 / 控件 / 状态点缀”拆清楚，不再把绿色用作大面积底色。
+- 阻塞/风险：未改后端、RBAC、schema、seedData、业务语义或部署；本轮只调整暗色主题运行时视觉 token 和相关覆盖。本轮追加前 `progress.md` 为 275 行 / 54259 bytes，未达到归档阈值。
+
+## 2026-06-04 18:56 CST
+- 完成：继续全局检查暗色模式可读性，修复打印模板中心和打印预览兼容入口在暗色主题下浅底 / 浅字导致看不清的问题；打印中心 hero、当前模板卡、模板目录卡、提示项和模板卡片均改为暗色可读语义覆盖。
+- 完成：保持打印 / PDF / 合同纸面预览固定浅色，不让运行时暗色主题污染导出物；`style:l1` 新增 `print-center-dark-desktop` 和 `print-preview-material-dark-desktop` 场景，并把暗色可见文本对比扫描改为按父级背景 alpha 合成计算，同时覆盖直接写在元素里的可见文本。
+- 验证：`STYLE_L1_PORT=4411 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=print-center-dark-desktop,print-preview-material-dark-desktop pnpm style:l1` 通过；`STYLE_L1_PORT=4412 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,erp-dashboard-dark-desktop,business-module-dark-partners-desktop,mobile-tasks-dark,print-center-dark-desktop,print-preview-material-dark-desktop pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过；`STYLE_L1_PORT=4413 NODE_USE_ENV_PROXY=0 pnpm style:l1` 全量 38 场景通过；`git diff --check` 通过。
+- 下一步：后续新增硬编码浅色卡片、提示块、表单或打印中心同类 UI 时，优先补进暗色对比扫描场景，不只补局部颜色。
+- 阻塞/风险：本轮未改后端、RBAC、schema、seedData、打印模板数据源或部署；当前修复只处理运行时暗色 UI 外壳，纸面打印交付仍按浅色口径。本轮追加前 `progress.md` 为 268 行 / 52598 bytes，未达到归档阈值。
+
+## 2026-06-04 18:12 CST
+- 完成：按 Product Design 评审结论调整主题切换层级。登录页主题选择从主内容中部三段式控件改为卡片右上角紧凑图标菜单；桌面后台 header 和岗位移动端 header 也改为复用同一紧凑菜单，避免主题偏好控件抢登录入口、登录方式和表单主流程的注意力。
+- 完成：`ERPThemeToggle` 支持 `segmented` 与 `menu` 两种形态；`style:l1` 的主题切换 helper 同时支持三段式和下拉菜单，并在菜单点击后等待浮层关闭，避免截图停在临时 dropdown 状态。
+- 验证：`cd web && pnpm lint && pnpm css && pnpm test` 通过；`STYLE_L1_PORT=4408 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,erp-dashboard-dark-desktop,business-module-dark-partners-desktop,mobile-tasks-dark,business-module-toolbar-mobile-dropdown pnpm style:l1` 通过；`STYLE_L1_PORT=4409 NODE_USE_ENV_PROXY=0 pnpm style:l1` 全量 36 场景通过；人工查看 `admin-login-theme-modes-desktop.png`，确认主题按钮位于登录卡片右上角且最终截图无 dropdown 残留。
+- 下一步：若后续要进一步精修，可只在桌面后台 header 给主题菜单保留短标签，登录页和移动端继续保持图标形态。
+- 阻塞/风险：未改登录鉴权、入口权限、后端、RBAC、schema、seedData 或部署；本轮只调整主题切换控件展示形态和对应浏览器回归。本轮追加前 `progress.md` 为 261 行 / 51KB，未达到归档阈值。
+
+## 2026-06-04 17:46 CST
+- 完成：全局检查暗色模式可读性，修复登录页以外的同类问题。暗色主题新增业务页、权限页、业务弹窗、下拉、表格、统计数字、左侧选中菜单、移动端 Tailwind 文本色和移动端 textarea 的统一覆盖，避免旧浅色硬编码继续把深色文字或浅色输入框带到暗色页面。
+- 完成：`style:l1` 新增 `business-module-dark-partners-desktop` 场景，覆盖用户截图中的「客户/供应商」业务页；`mobile-tasks-dark` 改为先创建一条阻塞任务再回归，覆盖移动端任务详情、阻塞原因和催办原因输入框；桌面看板、业务页和移动端暗色场景新增全局可见文本对比度扫描。
+- 验证：`cd web && pnpm lint && pnpm css && pnpm test` 通过；`STYLE_L1_PORT=4403 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,erp-dashboard-dark-desktop,business-module-dark-partners-desktop,mobile-tasks-dark,business-module-toolbar-mobile-dropdown pnpm style:l1` 通过；`STYLE_L1_PORT=4404 NODE_USE_ENV_PROXY=0 pnpm style:l1` 全量 36 场景通过；人工查看 `business-module-dark-partners-desktop.png` 和 `mobile-tasks-dark.png`，确认标题、筛选区、表格空态、任务详情和输入框均可读。
+- 下一步：后续若新增新的硬编码浅色模块，优先补进暗色对比度扫描，而不是只加局部 CSS 覆盖。
+- 阻塞/风险：本轮没有改后端、RBAC、schema、seedData 或部署；对比度扫描覆盖当前 L1 暗色关键路径，不等于逐像素审过所有业务模块的每个弹窗状态。本轮追加前 `progress.md` 为 254 行 / 49KB，未达到归档阈值。
+
+## 2026-06-04 17:19 CST
+- 完成：修复登录页暗色模式下 Segmented 选中项文字过暗的问题。根因是登录页既有 `.erp-login-card .ant-segmented .ant-segmented-item-label` 浅色规则优先级高于主题切换器通用样式，暗色下把「跟系统」和「后台管理」选中态文字压成深色。
+- 完成：在暗色登录页样式中显式接管 Segmented 背景、选中态、hover / focus 和 label 颜色；`style:l1` 登录页主题场景新增选中项文字 / 背景对比度断言，要求不低于 4.5。
+- 验证：`cd web && pnpm css && node --check scripts/styleL1.mjs` 通过；`STYLE_L1_PORT=4395 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过；`STYLE_L1_PORT=4396 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,erp-dashboard-dark-desktop,mobile-tasks-dark,business-module-toolbar-mobile-dropdown pnpm style:l1` 通过；`STYLE_L1_PORT=4399 NODE_USE_ENV_PROXY=0 pnpm style:l1` 全量 35 场景通过。
+- 下一步：后续继续把登录页和后台硬编码浅色规则迁移到主题变量，避免局部旧选择器再次压过暗色主题。
+- 阻塞/风险：`STYLE_L1_PORT=4397 NODE_USE_ENV_PROXY=0 pnpm style:l1` 曾在 `business-module-workflow-actions` 场景一次性未等到业务状态提示；该场景单独复跑通过，随后全量 35 场景复跑通过，未发现稳定复现问题。本轮追加前 `progress.md` 为 247 行 / 48KB，未达到归档阈值。
+
+## 2026-06-04 16:53 CST
+- 完成：前端新增「跟系统 / 浅色 / 暗色」主题底座，统一登录页、桌面后台和岗位移动端接入主题切换；Ant Design 走根 `ConfigProvider` 算法切换，自定义壳层和移动端任务卡片通过 `data-erp-theme` 与 ERP theme 覆盖接管；打印 / PDF / 合同纸面预览保持浅色口径。
+- 完成：同步更新 `AGENTS.md`、`web/README.md` 和 `docs/current-source-of-truth.md`，明确后续桌面后台与岗位移动端样式改动需覆盖浅色 / 暗色，打印交付物不跟随暗色。
+- 完成：`style:l1` 新增登录页主题三态、桌面后台暗色和移动任务端暗色回归；业务页状态筛选下拉高度收口，避免窄屏向上翻转遮挡前置筛选项。
+- 验证：`cd web && pnpm lint && pnpm css && pnpm test` 通过；`STYLE_L1_PORT=4393 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,erp-dashboard-dark-desktop,mobile-tasks-dark,business-module-toolbar-mobile-dropdown pnpm style:l1` 通过；`STYLE_L1_PORT=4394 NODE_USE_ENV_PROXY=0 pnpm style:l1` 全量 35 场景通过；Browser 打开 `http://127.0.0.1:4383/admin-login` 验证暗色切换后根节点 `data-erp-theme=dark`、无横向溢出、无 console error。
+- 下一步：后续新增页面或样式时继续把硬编码颜色迁移到 ERP theme 变量；如要精修全站暗色视觉，可分模块补更细的表格、弹窗和业务页暗色断言。
+- 阻塞/风险：Browser 截图接口本轮在当前 tab 上超时，最终视觉证据主要来自 `style:l1` 截图产物和 DOM / console 状态检查；未改后端、RBAC、schema、seedData 或部署脚本。本轮追加前 `progress.md` 为 239 行 / 48KB，未达到归档阈值。
+
 ## 2026-06-04 15:44
 - 完成：修复登录页刷新时旧登录态触发全局“登录状态已失效”弹窗的问题。`JsonRpc` 新增 `withAuth=false` 公开调用模式，登录、管理员登录和注册页的 `auth` RPC 不再携带旧 token，也不会把登录前能力探测错误升级为全局重新登录弹窗；受保护业务 RPC 的登录态失效处理保持不变。
 - 完成：新增 `web/src/common/utils/jsonRpc.test.mjs` 并纳入 `pnpm test`，覆盖公开 RPC 不带 Authorization、公开 RPC 鉴权错误不触发全局弹窗、默认受保护 RPC 仍触发登出与登录页跳转。
