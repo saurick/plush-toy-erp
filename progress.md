@@ -6,6 +6,19 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-04 Go 漏洞依赖升级
+- 完成：修复 `govulncheck` 可达漏洞告警，升级 `server/go.mod` 的 Go 基线到 `go 1.25.0` 并显式固定 `toolchain go1.26.4`，同步升级 `go.opentelemetry.io/otel/*` 到 `v1.43.0`、`golang.org/x/net` 到 `v0.53.0` 及相关间接依赖。未改 Workflow / Fact 边界、schema、migration、API、RBAC、UI、seedData、客户资料或业务字段映射链路。
+- 验证：已执行 `bash scripts/qa/govulncheck.sh`，结果为 0 个可达漏洞；已执行 `cd server && go test ./...`，通过。
+- 下一步：后续若要把 `govulncheck` 从默认提示升级为严格阻断，可单独评审 pre-push / full QA 时间成本和剩余不可达依赖漏洞处理策略。
+- 阻塞/风险：当前主工作区仍存在其它会话留下的未提交改动，本轮只精确触达并准备提交 `server/go.mod`、`server/go.sum` 和 `progress.md`；未运行前端或业务页面回归，因为未触达前端和业务逻辑。
+
+## 2026-06-04 14:13
+- 完成：将短信登录收口为后端 Auth 能力配置，新增 `data.auth.sms.mode`，dev 默认 `mock`、prod 默认 `disabled`，并支持 `APP_AUTH_SMS_MODE` 覆盖；新增公开 `auth.capabilities`，`send_sms_code` / `sms_login` 在未启用时统一返回 `AuthSMSLoginDisabled`，生产默认不返回 `mock_code`。
+- 完成：前端登录页改为读取后端能力后再展示短信登录入口；管理员登录、普通协作登录、mock server、`style:l1` 和移动端认证烟测脚本同步 `auth.capabilities`；新增前端能力解析测试和错误码中文消费层。
+- 完成：同步 `server/docs/config.md`、`docs/current-source-of-truth.md`、`web/README.md`，明确短信登录是部署/Auth 能力配置，不是客户配置包 runtime、`tenant_id` 或 SaaS tenant 配置。
+- 下一步：如后续接真实短信服务商，单独实现 provider adapter、密钥/模板 Secret 注入、发送结果观测和生产回归；不要把 `provider` 配置误当已接入。
+- 阻塞/风险：本轮未改 schema、migration、RBAC 权限矩阵、客户配置 loader、tenant 配置、生产 Compose 或真实短信服务商；`provider` 模式当前保留但不可用。验证已通过 `cd server && go test ./cmd/server ./internal/data ./internal/biz ./internal/errcode`、`bash scripts/qa/error-code-sync.sh`、`bash scripts/qa/error-codes.sh`、`cd web && pnpm lint && pnpm css && pnpm test`、`STYLE_L1_SCENARIOS=root-redirect-desktop,root-redirect-mobile,admin-login-mobile,erp-dashboard-redirect pnpm style:l1`、`pnpm smoke:mobile-auth-login-route`；Playwright 真实页面检查 `/admin-login` 移动宽度下短信入口可见、登录按钮唯一、无横向溢出和控制台错误。本轮追加前 `progress.md` 为 220 行 / 41805 bytes，未达到归档阈值。
+
 ## 2026-06-03 21:08
 - 完成：修复统一登录页入口选择被默认后台回跳覆盖的问题；`/admin-login` 现在只在存在真实来源路由时回跳，普通登录页选择“岗位任务端”后会按账号移动端权限进入 `/m/<role>/tasks`，不会因 `defaultRedirect=/erp/dashboard` 回到后台。
 - 下一步：如后续要支持一人多岗切换，仍按单独任务设计；本轮只修入口选择优先级。
