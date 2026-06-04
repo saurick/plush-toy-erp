@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AppShell from '@/common/components/layout/AppShell'
 import SurfacePanel from '@/common/components/layout/SurfacePanel'
 import { AUTH_SCOPE, persistAuth } from '@/common/auth/auth'
+import { useAuthCapabilities } from '@/common/auth/useAuthCapabilities'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 
@@ -16,6 +17,8 @@ export default function LoginPage() {
     (location.state?.from?.hash || '')
 
   const authRpc = useMemo(() => new JsonRpc({ url: 'auth' }), [])
+  const authCapabilities = useAuthCapabilities(authRpc)
+  const { smsLoginEnabled } = authCapabilities
 
   const [loginMode, setLoginMode] = useState('password')
   const [username, setUsername] = useState('')
@@ -38,12 +41,18 @@ export default function LoginPage() {
     () =>
       loginMode === 'password'
         ? username.trim().length > 0 && password.length > 0 && !submitting
-        : phone.trim().length > 0 && smsCode.trim().length > 0 && !submitting,
-    [loginMode, username, password, phone, smsCode, submitting]
+        : smsLoginEnabled &&
+          phone.trim().length > 0 &&
+          smsCode.trim().length > 0 &&
+          !submitting,
+    [loginMode, username, password, phone, smsCode, smsLoginEnabled, submitting]
   )
 
   const canRequestSMSCode =
-    phone.trim().length > 0 && !requestingCode && smsCooldownSeconds === 0
+    smsLoginEnabled &&
+    phone.trim().length > 0 &&
+    !requestingCode &&
+    smsCooldownSeconds === 0
   let smsCodeButtonText = '获取验证码'
   if (smsCooldownSeconds > 0) {
     smsCodeButtonText = `${smsCooldownSeconds}s`
@@ -66,6 +75,14 @@ export default function LoginPage() {
     const timer = window.setInterval(tick, 1000)
     return () => window.clearInterval(timer)
   }, [smsCooldownUntil])
+
+  useEffect(() => {
+    if (!smsLoginEnabled && loginMode === 'sms') {
+      setLoginMode('password')
+      setSmsHint('')
+      setErrMsg('')
+    }
+  }, [loginMode, smsLoginEnabled])
 
   const requestSMSCode = async () => {
     if (!canRequestSMSCode) return
@@ -101,6 +118,10 @@ export default function LoginPage() {
   const onSubmit = async (e) => {
     e.preventDefault()
     if (!canSubmit) return
+    if (loginMode === 'sms' && !smsLoginEnabled) {
+      setErrMsg('当前部署未启用短信登录。')
+      return
+    }
 
     setErrMsg('')
     setSubmitting(true)
@@ -147,36 +168,37 @@ export default function LoginPage() {
             协作账号登录
           </div>
           <div className="mt-2 text-sm leading-6 text-slate-300">
-            使用已有账号继续访问毛绒 ERP
-            的协作入口。当前普通用户链路支持密码和短信验证码登录，后续再逐步挂接移动端动作。
+            使用已有账号继续访问毛绒 ERP 的协作入口。
           </div>
         </div>
 
         <SurfacePanel className="p-4 sm:p-6">
           <form onSubmit={onSubmit} className="p-4 sm:p-6">
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-                {[
-                  ['password', '密码登录'],
-                  ['sms', '短信登录'],
-                ].map(([mode, label]) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => {
-                      setLoginMode(mode)
-                      setErrMsg('')
-                    }}
-                    className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
-                      loginMode === mode
-                        ? 'bg-cyan-300 text-slate-950'
-                        : 'text-slate-300 hover:bg-white/[0.06] hover:text-slate-100'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {smsLoginEnabled ? (
+                <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+                  {[
+                    ['password', '密码登录'],
+                    ['sms', '短信登录'],
+                  ].map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => {
+                        setLoginMode(mode)
+                        setErrMsg('')
+                      }}
+                      className={`rounded-xl px-3 py-2 text-sm font-medium transition ${
+                        loginMode === mode
+                          ? 'bg-cyan-300 text-slate-950'
+                          : 'text-slate-300 hover:bg-white/[0.06] hover:text-slate-100'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
               {loginMode === 'password' ? (
                 <>

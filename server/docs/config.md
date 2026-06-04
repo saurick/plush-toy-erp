@@ -80,6 +80,7 @@
 
 - `data.auth.jwtSecret`
 - `data.auth.jwtExpireSeconds`
+- `data.auth.sms.mode`
 - `data.auth.admin.username`
 - `data.auth.admin.password`
 
@@ -87,6 +88,21 @@
 
 - 这组字段决定用户 token 签名和默认管理员初始化逻辑。
 - 必须替换仓库里的默认密钥和管理员密码。
+- `data.auth.sms.mode` 控制短信登录运行时能力，当前只实现 `disabled` 和 `mock`：
+  - `disabled`：关闭短信登录，`auth.capabilities` 返回不可用，`send_sms_code` / `sms_login` 返回 `AuthSMSLoginDisabled`。
+  - `mock`：仅用于 local / dev / test，后端返回 `mock_code` 方便本地回归。
+  - `provider`：保留给后续真实短信服务商接入；当前不会假装可用。
+- dev 默认 `mock`，prod 默认 `disabled`；生产环境禁止返回 mock 验证码。
+- 短信登录是后端 Auth 能力配置，不是客户业务配置包、`tenant_id` 或 SaaS tenant 级认证策略。
+
+## Auth 运行环境变量
+
+| 环境变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `APP_JWT_SECRET` | 读取配置文件 | 覆盖 `data.auth.jwtSecret`，不在日志中输出密钥明文 |
+| `APP_AUTH_SMS_MODE` | 读取配置文件 | 覆盖 `data.auth.sms.mode`，当前支持 `disabled` / `mock`，`provider` 保留但未接入真实服务商 |
+| `APP_ADMIN_USERNAME` | 读取配置文件 | 覆盖默认管理员账号 |
+| `APP_ADMIN_PASSWORD` | 读取配置文件 | 覆盖默认管理员密码 |
 
 ## debug seed / cleanup 环境变量
 

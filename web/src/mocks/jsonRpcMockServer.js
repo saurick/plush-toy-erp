@@ -519,7 +519,16 @@ export function setupJsonRpcMockServer() {
         )
       }
     } else if (domain === 'auth') {
-      if (method === 'login') {
+      if (method === 'capabilities') {
+        responseBody = makeJsonRpcSuccess(id, {
+          sms_login: {
+            enabled: true,
+            mode: 'mock',
+            mock_delivery: true,
+            disabled_reason: '',
+          },
+        })
+      } else if (method === 'login') {
         // 模拟一个简单登录规则：username === 'error' 时返回业务错误
         if (params.username === 'error') {
           responseBody = makeJsonRpcBizError(id, 401, 'invalid username')

@@ -215,6 +215,30 @@ async function runMobileAuthScenario(
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
 
+    if (method === 'capabilities') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            code: 0,
+            message: 'OK',
+            data: {
+              sms_login: {
+                enabled: true,
+                mode: 'mock',
+                mock_delivery: true,
+                disabled_reason: '',
+              },
+            },
+          },
+        }),
+      })
+      return
+    }
+
     if (method === 'logout') {
       await route.fulfill({
         status: 200,

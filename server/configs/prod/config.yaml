@@ -46,6 +46,8 @@ data:
   auth:
     jwtSecret: "change-this-prod-jwt-secret"
     jwtExpireSeconds: 604800 # 7 days
+    sms:
+      mode: "disabled"
     admin:
       username: "admin"
       password: "change-this-prod-admin-password"

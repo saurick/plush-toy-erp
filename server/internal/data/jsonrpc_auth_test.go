@@ -215,6 +215,72 @@ func TestRedactRPCParamsMasksSensitiveFields(t *testing.T) {
 	}
 }
 
+func TestJsonrpcData_AuthCapabilities_SMSModes(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	j := &JsonrpcData{
+		log:     log.NewHelper(log.With(logger, "module", "data.jsonrpc.test")),
+		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeMock),
+	}
+
+	_, res, err := j.handleAuth(context.Background(), "capabilities", "1", nil)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected code=0, got %+v", res)
+	}
+	smsLogin, ok := res.Data.AsMap()["sms_login"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected sms_login capabilities, got %#v", res.Data.AsMap())
+	}
+	if smsLogin["enabled"] != true {
+		t.Fatalf("expected sms login enabled in mock mode, got %#v", smsLogin)
+	}
+	if smsLogin["mode"] != authSMSModeMock {
+		t.Fatalf("expected mode=mock, got %#v", smsLogin)
+	}
+	if smsLogin["mock_delivery"] != true {
+		t.Fatalf("expected mock_delivery=true, got %#v", smsLogin)
+	}
+}
+
+func TestJsonrpcData_AuthSMSLogin_DisabledByConfig(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	j := &JsonrpcData{
+		log:     log.NewHelper(log.With(logger, "module", "data.jsonrpc.test")),
+		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeDisabled),
+	}
+
+	sendParams, _ := structpb.NewStruct(map[string]any{
+		"phone": "13800138000",
+		"scope": "user",
+	})
+	_, res, err := j.handleAuth(context.Background(), "send_sms_code", "1", sendParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.AuthSMSLoginDisabled.Code {
+		t.Fatalf("expected sms disabled code=%d, got %+v", errcode.AuthSMSLoginDisabled.Code, res)
+	}
+	smsLogin, ok := res.Data.AsMap()["sms_login"].(map[string]any)
+	if !ok || smsLogin["enabled"] != false {
+		t.Fatalf("expected disabled sms_login capabilities, got %#v", res.Data.AsMap())
+	}
+
+	loginParams, _ := structpb.NewStruct(map[string]any{
+		"phone": "13800138000",
+		"code":  "123456",
+		"scope": "user",
+	})
+	_, res, err = j.handleAuth(context.Background(), "sms_login", "2", loginParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.AuthSMSLoginDisabled.Code {
+		t.Fatalf("expected sms disabled code=%d, got %+v", errcode.AuthSMSLoginDisabled.Code, res)
+	}
+}
+
 func TestJsonrpcData_AuthSMSLogin_OK(t *testing.T) {
 	repo := newMemAuthRepoForData()
 	_ = repo.putUser("13800138000", "unused", false)
@@ -226,8 +292,9 @@ func TestJsonrpcData_AuthSMSLogin_OK(t *testing.T) {
 	}, logger, tp)
 
 	j := &JsonrpcData{
-		log:    log.NewHelper(log.With(logger, "module", "data.jsonrpc.test")),
-		authUC: authUC,
+		log:     log.NewHelper(log.With(logger, "module", "data.jsonrpc.test")),
+		authUC:  authUC,
+		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeMock),
 	}
 
 	params, _ := structpb.NewStruct(map[string]any{
@@ -275,8 +342,9 @@ func TestJsonrpcData_AuthSMSLogin_InvalidCode(t *testing.T) {
 	}, logger, tp)
 
 	j := &JsonrpcData{
-		log:    log.NewHelper(log.With(logger, "module", "data.jsonrpc.test")),
-		authUC: authUC,
+		log:     log.NewHelper(log.With(logger, "module", "data.jsonrpc.test")),
+		authUC:  authUC,
+		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeMock),
 	}
 
 	params, _ := structpb.NewStruct(map[string]any{
@@ -326,6 +394,7 @@ func TestJsonrpcData_AdminSMSLogin_OK(t *testing.T) {
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(logger, "module", "data.jsonrpc.test")),
 		adminAuthUC: adminAuthUC,
+		authSMS:     normalizeAuthSMSRuntimeConfig(authSMSModeMock),
 	}
 
 	params, _ := structpb.NewStruct(map[string]any{

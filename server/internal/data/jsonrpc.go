@@ -39,6 +39,7 @@ type JsonrpcData struct {
 	debugUC       *biz.DebugUsecase
 	masterDataUC  *biz.MasterDataUsecase
 	salesOrderUC  *biz.SalesOrderUsecase
+	authSMS       authSMSRuntimeConfig
 
 	adminReader adminAccountReader
 }
@@ -89,6 +90,7 @@ func NewJsonrpcData(
 	debugUC := biz.NewDebugUsecase(NewDebugSeedRepo(data, logger), newDebugSafetyConfig(c))
 	masterDataUC := biz.NewMasterDataUsecase(NewMasterDataRepo(data, logger))
 	salesOrderUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
+	authSMS := newAuthSMSRuntimeConfig(c)
 
 	helper.Info("JsonrpcData created (auth/admin auth/user admin usecases constructed inside)")
 
@@ -105,6 +107,7 @@ func NewJsonrpcData(
 		debugUC:       debugUC,
 		masterDataUC:  masterDataUC,
 		salesOrderUC:  salesOrderUC,
+		authSMS:       authSMS,
 		adminReader:   adminAuthRepo,
 	}
 }
@@ -201,6 +204,13 @@ func (d *JsonrpcData) handleAuth(
 	}
 
 	switch method {
+	case "capabilities":
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(authSMSCapabilitiesToMap(d.authSMS)),
+		}, nil
+
 	case "login":
 		username := getString(pm, "username")
 		password := getString(pm, "password")
@@ -228,6 +238,13 @@ func (d *JsonrpcData) handleAuth(
 		}, nil
 
 	case "send_sms_code":
+		if !d.authSMS.Enabled {
+			return id, &v1.JsonrpcResult{
+				Code:    errcode.AuthSMSLoginDisabled.Code,
+				Message: errcode.AuthSMSLoginDisabled.Message,
+				Data:    newDataStruct(authSMSCapabilitiesToMap(d.authSMS)),
+			}, nil
+		}
 		phone := getString(pm, "phone")
 		mobileRoleKey := getString(pm, "mobile_role_key")
 		scope, scopeErr := getAuthLoginScope(pm)
@@ -264,6 +281,13 @@ func (d *JsonrpcData) handleAuth(
 		}, nil
 
 	case "sms_login":
+		if !d.authSMS.Enabled {
+			return id, &v1.JsonrpcResult{
+				Code:    errcode.AuthSMSLoginDisabled.Code,
+				Message: errcode.AuthSMSLoginDisabled.Message,
+				Data:    newDataStruct(authSMSCapabilitiesToMap(d.authSMS)),
+			}, nil
+		}
 		phone := getString(pm, "phone")
 		code := getString(pm, "code")
 		mobileRoleKey := getString(pm, "mobile_role_key")
@@ -718,7 +742,7 @@ func (d *JsonrpcData) isPublic(url, method string) bool {
 	if url == "system" && (method == "ping" || method == "version") {
 		return true
 	}
-	if url == "auth" && (method == "login" || method == "admin_login" || method == "register" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
+	if url == "auth" && (method == "capabilities" || method == "login" || method == "admin_login" || method == "register" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
 		return true
 	}
 	return false

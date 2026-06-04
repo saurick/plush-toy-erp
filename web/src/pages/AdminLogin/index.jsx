@@ -16,6 +16,7 @@ import {
   logout,
   persistAuth,
 } from '@/common/auth/auth'
+import { useAuthCapabilities } from '@/common/auth/useAuthCapabilities'
 import {
   ERP_ADMIN_SYSTEM_NAME,
   ERP_BRAND_MARK,
@@ -113,12 +114,27 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  const authRpc = useMemo(
+    () =>
+      new JsonRpc({
+        url: 'auth',
+        basePath: ADMIN_BASE_PATH,
+        authScope: AUTH_SCOPE.ADMIN,
+      }),
+    []
+  )
+  const authCapabilities = useAuthCapabilities(authRpc)
+  const { smsLoginEnabled } = authCapabilities
+
   const smsCooldownSeconds = Math.max(
     0,
     Math.ceil((smsCooldownUntil - smsNow) / 1000)
   )
   const canRequestSMSCode =
-    smsPhone.trim().length > 0 && !requestingCode && smsCooldownSeconds === 0
+    smsLoginEnabled &&
+    smsPhone.trim().length > 0 &&
+    !requestingCode &&
+    smsCooldownSeconds === 0
 
   const redirectTo = buildLocationPath(location.state?.from, '')
   let mobileRoleForRequest = ''
@@ -135,16 +151,10 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       ? { label: '岗位任务端', value: ENTRY_TARGET.MOBILE_TASKS }
       : null,
   ].filter(Boolean)
-
-  const authRpc = useMemo(
-    () =>
-      new JsonRpc({
-        url: 'auth',
-        basePath: ADMIN_BASE_PATH,
-        authScope: AUTH_SCOPE.ADMIN,
-      }),
-    []
-  )
+  const loginModeOptions = [
+    { label: '密码登录', value: 'password' },
+    smsLoginEnabled ? { label: '短信登录', value: 'sms' } : null,
+  ].filter(Boolean)
 
   useEffect(() => {
     if (!smsCooldownUntil) return undefined
@@ -160,6 +170,14 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
     const timer = window.setInterval(tick, 1000)
     return () => window.clearInterval(timer)
   }, [smsCooldownUntil])
+
+  useEffect(() => {
+    if (!smsLoginEnabled && loginMode === 'sms') {
+      setLoginMode('password')
+      setSmsHint('')
+      setError('')
+    }
+  }, [loginMode, smsLoginEnabled])
 
   const resolvePostLoginPath = (
     adminProfile,
@@ -277,6 +295,10 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       setError('请选择登录入口。')
       return
     }
+    if (loginMode === 'sms' && !smsLoginEnabled) {
+      setError('当前部署未启用短信登录。')
+      return
+    }
 
     setSubmitting(true)
     setError('')
@@ -348,21 +370,20 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
               </Form.Item>
             ) : null}
 
-            <Form.Item>
-              <Segmented
-                block
-                value={loginMode}
-                onChange={(value) => {
-                  setLoginMode(value)
-                  setError('')
-                  setSmsHint('')
-                }}
-                options={[
-                  { label: '密码登录', value: 'password' },
-                  { label: '短信登录', value: 'sms' },
-                ]}
-              />
-            </Form.Item>
+            {loginModeOptions.length > 1 ? (
+              <Form.Item>
+                <Segmented
+                  block
+                  value={loginMode}
+                  onChange={(value) => {
+                    setLoginMode(value)
+                    setError('')
+                    setSmsHint('')
+                  }}
+                  options={loginModeOptions}
+                />
+              </Form.Item>
+            ) : null}
 
             {loginMode === 'password' ? (
               <>

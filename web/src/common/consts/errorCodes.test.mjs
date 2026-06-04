@@ -85,4 +85,8 @@ test('errorCodes: 默认文案覆盖核心鉴权错误', () => {
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_INVALID_SMS_CODE],
     '验证码错误'
   )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_LOGIN_DISABLED],
+    '当前部署未启用短信登录'
+  )
 })

@@ -47,7 +47,7 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '毛绒 ERP 管理后台')
-      await expectButton(page, /登\s*录/)
+      await expectButton(page, /^登\s*录$/)
       await expectText(page, '东莞市永绅玩具有限公司')
       await assertAdminLoginLayout(page, { minCardWidth: 520 })
     },
@@ -58,7 +58,7 @@ const scenarios = [
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
       await expectHeading(page, '毛绒 ERP 管理后台')
-      await expectButton(page, /登\s*录/)
+      await expectButton(page, /^登\s*录$/)
       await expectText(page, '东莞市永绅玩具有限公司')
       await assertAdminLoginLayout(page, { minCardWidth: 320 })
     },
@@ -69,7 +69,7 @@ const scenarios = [
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
-      await expectButton(page, /登\s*录/)
+      await expectButton(page, /^登\s*录$/)
       await expectText(page, '东莞市永绅玩具有限公司')
       await assertAdminLoginLayout(page, { minCardWidth: 320 })
     },
@@ -100,7 +100,7 @@ const scenarios = [
     viewport: { width: 1280, height: 800 },
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
-      await expectButton(page, /登\s*录/)
+      await expectButton(page, /^登\s*录$/)
       await assertAdminLoginLayout(page, { minCardWidth: 520 })
     },
   },
@@ -1648,6 +1648,30 @@ async function installAdminRpcMocks(page) {
   await page.route('**/rpc/auth', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
+
+    if (method === 'capabilities') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id,
+          result: {
+            code: 0,
+            message: 'OK',
+            data: {
+              sms_login: {
+                enabled: true,
+                mode: 'mock',
+                mock_delivery: true,
+                disabled_reason: '',
+              },
+            },
+          },
+        }),
+      })
+      return
+    }
 
     if (method === 'logout') {
       await route.fulfill({

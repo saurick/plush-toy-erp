@@ -46,6 +46,8 @@ data:
   auth:
     jwtSecret: "change-this-dev-jwt-secret"
     jwtExpireSeconds: 604800 # 7 days
+    sms:
+      mode: "mock"
     admin:
       username: "admin"
       password: "change-this-dev-admin-password"

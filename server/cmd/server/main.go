@@ -124,6 +124,13 @@ func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) {
 		dataCfg.Auth.JwtSecret = v
 		helper.Info("jwt secret overridden from env")
 	}
+	if dataCfg.Auth.Sms == nil {
+		dataCfg.Auth.Sms = &conf.Data_Auth_SMS{}
+	}
+	if v := strings.TrimSpace(os.Getenv("APP_AUTH_SMS_MODE")); v != "" {
+		dataCfg.Auth.Sms.Mode = v
+		helper.Info("auth sms mode overridden from env")
+	}
 
 	if dataCfg.Auth.Admin == nil {
 		dataCfg.Auth.Admin = &conf.Data_Auth_Admin{}

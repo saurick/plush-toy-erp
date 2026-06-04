@@ -42,7 +42,11 @@ message Data {
       string username = 1;
       string password = 2;
     }
+    message SMS {
+      string mode = 1;
+    }
     Admin admin = 3;
+    SMS sms = 4;
   }
 
   Postgres postgres = 1;
