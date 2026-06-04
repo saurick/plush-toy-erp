@@ -336,6 +336,9 @@ const scenarios = [
         scenarioName: 'business-module-dark-partners-desktop',
         selector: '.erp-business-page-layout',
       })
+      await assertDarkThemeNeutralInteractions(page, {
+        scenarioName: 'business-module-dark-partners-desktop',
+      })
     },
   },
   {
@@ -398,6 +401,27 @@ const scenarios = [
       await assertDarkThemeContrast(page, {
         scenarioName: 'mobile-tasks-dark',
         selector: '.mobile-app-layout',
+      })
+    },
+  },
+  {
+    name: 'dev-docs-dark-desktop',
+    path: '/__dev/docs',
+    themeMode: 'dark',
+    viewport: { width: 1536, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '开发文档查看器')
+      await expectText(page, '目录树')
+      await expectText(page, '毛绒玩具 ERP / plush-toy-erp')
+      await expectText(page, '目录结构')
+      await assertERPThemeMode(page, {
+        scenarioName: 'dev-docs-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'dev-docs-dark-desktop',
+        selector: '.erp-dev-docs-page',
       })
     },
   },
@@ -2306,7 +2330,7 @@ async function installAdminAuthExpiredRpcMocks(page) {
 
 async function expectHeading(page, text) {
   const locator = page.getByRole('heading', { name: text }).first()
-  await locator.waitFor({ state: 'visible', timeout: 10_000 })
+  await locator.waitFor({ state: 'visible', timeout: 20_000 })
 }
 
 async function expectRole(page, role, name) {
@@ -6447,6 +6471,125 @@ async function assertDarkThemeContrast(
     [],
     `${scenarioName} 暗色主题存在低对比可见文本: ${JSON.stringify(issues)}`
   )
+}
+
+async function assertDarkThemeNeutralInteractions(page, { scenarioName }) {
+  const checks = [
+    {
+      label: '搜索输入 hover',
+      selector: '.erp-business-filter-control--search',
+      action: 'hover',
+    },
+    {
+      label: '搜索输入 focus',
+      selector: '.erp-business-filter-control--search',
+      action: 'click',
+    },
+    {
+      label: '业务状态筛选 hover',
+      selector: '.erp-business-filter-control--status .ant-select-selector',
+      action: 'hover',
+    },
+    {
+      label: '日期筛选 hover',
+      selector: '.erp-business-date-range-filter',
+      action: 'hover',
+    },
+    {
+      label: '普通工具按钮 hover',
+      selector: '.erp-business-toolbar-button:not(.ant-btn-primary)',
+      action: 'hover',
+    },
+    {
+      label: '表头工具按钮 hover',
+      selector: '.erp-module-column-header-trigger.ant-btn',
+      action: 'hover',
+    },
+    {
+      label: '表头单元格 hover',
+      selector: '.erp-business-data-table-card .ant-table-thead > tr > th',
+      action: 'hover',
+      index: 2,
+    },
+  ]
+
+  const metrics = []
+  for (const check of checks) {
+    const locator =
+      check.index === undefined
+        ? page.locator(check.selector).first()
+        : page.locator(check.selector).nth(check.index)
+    await locator.waitFor({ state: 'visible', timeout: 10_000 })
+    if (check.action === 'click') {
+      await locator.click()
+    } else {
+      await locator.hover()
+    }
+    await page.waitForTimeout(160)
+    metrics.push(
+      await locator.evaluate((node, label) => {
+        const style = window.getComputedStyle(node)
+        return {
+          label,
+          selector:
+            node.className && typeof node.className === 'string'
+              ? `${node.tagName.toLowerCase()}.${node.className
+                  .trim()
+                  .split(/\s+/)
+                  .slice(0, 4)
+                  .join('.')}`
+              : node.tagName.toLowerCase(),
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderColor,
+          borderTopColor: style.borderTopColor,
+          boxShadow: style.boxShadow,
+          outlineColor: style.outlineColor,
+        }
+      }, check.label)
+    )
+    if (check.action === 'click') {
+      await page.keyboard.press('Escape').catch(() => {})
+      await page.evaluate(() => document.activeElement?.blur?.())
+    }
+  }
+
+  const greenIssues = metrics.filter((metric) =>
+    hasGreenDominantInteractivePaint(metric)
+  )
+  assert.deepEqual(
+    greenIssues,
+    [],
+    `${scenarioName} 暗色主题交互态仍残留绿色 hover/focus 面: ${JSON.stringify(
+      greenIssues
+    )}`
+  )
+}
+
+function hasGreenDominantInteractivePaint(metric) {
+  return [
+    metric.backgroundColor,
+    metric.borderColor,
+    metric.borderTopColor,
+    metric.boxShadow,
+    metric.outlineColor,
+  ].some((value) => containsGreenDominantColor(value))
+}
+
+function containsGreenDominantColor(value) {
+  const matches = String(value || '').matchAll(
+    /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/gi
+  )
+  for (const match of matches) {
+    const red = Number(match[1])
+    const green = Number(match[2])
+    const blue = Number(match[3])
+    const alpha = match[4] === undefined ? 1 : Number(match[4])
+    if (alpha <= 0.05) continue
+    if (green >= 72 && green > red * 1.18 && green > blue * 1.08) {
+      return true
+    }
+  }
+  return false
 }
 
 function getContrastRatio(foreground, background) {

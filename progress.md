@@ -6,6 +6,20 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-04 19:45 CST
+- 完成：继续全局收敛暗色主题的绿色残留，根因包括 Ant Design 暗色 token 仍使用绿色系 `colorBgContainer / colorBgElevated / colorBorder / colorTextSecondary`，以及业务控件、普通按钮、弹窗控件、DevDocs、打印中心和移动端按钮 hover / focus 复用 `--erp-primary` / `--erp-primary-soft`。本轮把暗色 AntD token 改为 slate / blue，并新增 `--erp-interactive-*` 中性交互 token，绿色保留给品牌标识、主按钮和少量状态强调。
+- 完成：`business-module-dark-partners-desktop` 新增暗色交互态断言，实际触发搜索框、业务状态筛选、日期筛选、普通工具按钮、表头工具按钮和表头单元格 hover / focus；若背景、边框或阴影出现绿色主导色会直接失败，避免后续把输入框 / hover 又改回绿黑底。
+- 验证：`cd web && pnpm css && pnpm lint && pnpm test` 通过；`STYLE_L1_PORT=4435 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=business-module-dark-partners-desktop pnpm style:l1` 通过，其中新增交互态断言已覆盖用户截图里的筛选区和表头 hover；`STYLE_L1_PORT=4438 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=business-module-dark-partners-desktop,erp-dashboard-dark-desktop,dev-docs-dark-desktop,print-center-dark-desktop pnpm style:l1` 通过；`STYLE_L1_PORT=4439 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；人工查看 `web/output/playwright/style-l1/business-module-dark-partners-desktop.png`，确认输入框、筛选下拉、日期控件、表头 hover 和普通按钮不再呈现绿黑底。
+- 下一步：如果后续继续暗色视觉细化，优先检查 AntD theme token、组件 hover/focus token 和页面级 CSS 三层是否一致，不再只在单个页面局部覆盖颜色。
+- 阻塞/风险：本轮未改后端、RBAC、schema、seedData、业务语义、产品内菜单或部署；`STYLE_L1_PORT=4440 NODE_USE_ENV_PROXY=0 pnpm style:l1` 全量复跑仍失败在无关 `erp-dashboard-dark-desktop` 场景等待「毛绒 ERP 管理后台」文案，随后 `STYLE_L1_PORT=4441 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=erp-dashboard-dark-desktop pnpm style:l1` 单场景复跑通过，按既有全量长链路等待抖动记录。本轮追加前 `progress.md` 为 289 行 / 57903 bytes，未达到归档阈值。
+
+## 2026-06-04 19:32 CST
+- 完成：修复开发文档查看器在暗色主题下无法查看的问题，暗色模式显式接管 DevDocs 侧栏标题 / 目录项 / 文档标题，以及 Markdown 标题、正文、列表、表格、引用、行内代码和代码块颜色，避免浅色主题的深绿 / 深灰文字落在深色背景上。
+- 完成：`style:l1` 新增 `dev-docs-dark-desktop` 场景，把 `/__dev/docs` 暗色模式纳入可重复回归；同时把标题等待阈值从 10s 调整到 20s，降低全量 L1 长链路中页面刚渲染完成前误判标题不可见的概率。
+- 验证：`cd web && node --check scripts/styleL1.mjs && pnpm css && pnpm lint && pnpm test` 通过；`STYLE_L1_PORT=4427 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm style:l1` 通过；`STYLE_L1_PORT=4428 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=dev-docs-dark-desktop,erp-dashboard-dark-desktop,business-module-dark-partners-desktop,print-center-dark-desktop pnpm style:l1` 通过；Browser 打开 `http://127.0.0.1:4432/__dev/docs` 确认根主题为 dark、标题 / 正文 / 表格 / 行内代码 computed color 已切到暗色 token、无横向溢出且无 console error；人工查看 `web/output/playwright/style-l1/dev-docs-dark-desktop.png`，确认用户截图中的标题、正文、表格和行内代码均恢复可读。
+- 下一步：后续新增开发态 Markdown 组件、帮助页或浅底代码标签时，必须同步纳入暗色主题对比检查，避免只覆盖业务后台页面。
+- 阻塞/风险：本轮未改后端、RBAC、schema、seedData、业务页面语义或产品内菜单；`STYLE_L1_PORT=4429 NODE_USE_ENV_PROXY=0 pnpm style:l1` 全量复跑失败在无关 `business-module-derived-item-amount` 场景等待「辅材/包材采购」标题，随后 `STYLE_L1_PORT=4430 NODE_USE_ENV_PROXY=0 STYLE_L1_SCENARIOS=business-module-derived-item-amount pnpm style:l1` 单场景复跑通过，按既有长链路等待抖动记录。本轮追加前 `progress.md` 为 282 行 / 55845 bytes，未达到归档阈值。
+
 ## 2026-06-04 19:03 CST
 - 完成：参考 `openai-oauth-api-service` 的暗色基线，把本项目暗色主题从大面积橄榄绿面板调整为蓝黑 / slate 面板体系：页面底色、侧栏、卡片、表格、输入框、弹窗和打印中心运行时外壳改用 `#0f172a`、`#111827`、`#162033`、`#1b2538`、`#334155` 等中性深色；绿色保留为品牌点缀、主按钮、选中标记和状态提示。
 - 完成：收窄打印中心大面积选中卡的绿色背景，改为 slate 面板 + 绿色边框 / 标记，避免暗色主题继续呈现“绿绿的橄榄色”。

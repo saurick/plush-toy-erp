@@ -75,17 +75,17 @@ function ThemedApp() {
       theme={{
         algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
-          colorPrimary: '#2b8a3e',
-          colorInfo: '#2f8f4b',
+          colorPrimary: isDark ? '#60a5fa' : '#2b8a3e',
+          colorInfo: isDark ? '#60a5fa' : '#2f8f4b',
           borderRadius: 10,
           fontFamily:
             '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif',
           colorBgLayout: isDark ? '#0f172a' : '#f4f8f3',
-          colorBgContainer: isDark ? '#17231c' : '#ffffff',
-          colorBgElevated: isDark ? '#1b2a22' : '#ffffff',
-          colorBorder: isDark ? '#31443a' : '#d9d9d9',
+          colorBgContainer: isDark ? '#111827' : '#ffffff',
+          colorBgElevated: isDark ? '#1b2538' : '#ffffff',
+          colorBorder: isDark ? '#334155' : '#d9d9d9',
           colorText: isDark ? '#e5edf4' : 'rgba(0, 0, 0, 0.88)',
-          colorTextSecondary: isDark ? '#a9b9ad' : 'rgba(0, 0, 0, 0.65)',
+          colorTextSecondary: isDark ? '#94a3b8' : 'rgba(0, 0, 0, 0.65)',
         },
       }}
     >
