@@ -94,7 +94,8 @@ services:
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
       APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"
       APP_ADMIN_USERNAME: "${APP_ADMIN_USERNAME:-admin}"
-      APP_ADMIN_PASSWORD: "${APP_ADMIN_PASSWORD:-change-this-prod-admin-password}"
+      # 默认不注入 APP_ADMIN_PASSWORD，避免环境变量长期覆盖配置文件里的管理员初始化口径。
+      # 如确需通过环境变量覆盖首次初始化密码，应在明确场景下临时添加；已有 admin 不会因重启自动改密。
       ERP_DEBUG_ENV: "${ERP_DEBUG_ENV:-prod}"
       ERP_DEBUG_SEED_ENABLED: "${ERP_DEBUG_SEED_ENABLED:-false}"
       ERP_DEBUG_CLEANUP_ENABLED: "${ERP_DEBUG_CLEANUP_ENABLED:-false}"

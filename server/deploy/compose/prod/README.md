@@ -23,9 +23,10 @@ docker compose -f compose.yml up -d
 - `WEB_IMAGE`
 - `APP_JWT_SECRET`
 - `APP_ADMIN_USERNAME`
-- `APP_ADMIN_PASSWORD`
 
 如果不需要自带 tracing 存储，可以再按需移除 Jaeger 服务和对应环境变量。
+
+生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有明确需要通过环境变量覆盖首次初始化密码时才临时添加；如果 `admin` 已经存在，重启不会重置旧密码，应通过管理员改密或受控 SQL 更新密码哈希。
 
 前端生产容器不运行 Vite dev server。`WEB_IMAGE` 是一个前端镜像，Compose 会用同一镜像启动桌面端和 8 个移动端实例，并通过 `APP_ID` 与 `PORT` 固定每个入口。
 
@@ -42,7 +43,6 @@ export ERP_PDF_CHROME_PATH=/usr/bin/chromium
 export ERP_PDF_RENDER_CONCURRENCY=2
 export APP_JWT_SECRET='replace-with-runtime-secret'
 export APP_ADMIN_USERNAME=admin
-export APP_ADMIN_PASSWORD='replace-with-initial-admin-password'
 export ERP_DEBUG_ENV=prod
 export ERP_DEBUG_SEED_ENABLED=false
 export ERP_DEBUG_CLEANUP_ENABLED=false

@@ -31,8 +31,9 @@ Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/
 - `WEB_IMAGE`
 - `APP_JWT_SECRET`
 - `APP_ADMIN_USERNAME`
-- `APP_ADMIN_PASSWORD`
 - 任何默认 JWT 密钥和管理员密码
+
+说明：生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有明确需要通过环境变量覆盖首次初始化密码时才临时添加；如果 `admin` 已经存在，重启不会重置旧密码，应通过管理员改密或受控 SQL 更新密码哈希。
 
 建议先执行：
 

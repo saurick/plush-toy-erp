@@ -6,6 +6,12 @@
 
 - `docs/archive/progress-2026-06-02-before-print-template-defer.md`：归档 2026-05-31 至 2026-06-02 10:28 的旧过程记录。归档原因：原 `progress.md` 达到 386 行 / 80696 bytes，超过 80KB 阈值。
 
+## 2026-06-04 20:24 CST
+- 完成：排查 `192.168.0.133` 上 plush-toy-erp 管理员登录密码错误。确认线上容器存在 `APP_ADMIN_PASSWORD` 环境变量覆盖，且当前数据库 `admin` 是已存在账号，启动初始化不会因 config 或 env 变化自动重置密码。已调整生产 Compose 模板和部署文档，默认不再注入 `APP_ADMIN_PASSWORD`，只有明确需要覆盖首次初始化密码时才临时添加。
+- 验证：本地执行 `docker compose -f server/deploy/compose/prod/compose.yml config` 后确认渲染配置不再包含 `APP_ADMIN_PASSWORD`，`git diff --check -- server/deploy/compose/prod/compose.yml server/deploy/compose/prod/.env.example server/deploy/README.md server/deploy/compose/prod/README.md server/docs/config.md progress.md` 通过；133 现场已备份 `.env` 和 `compose.yml`，移除 `.env` 密码项和 compose 默认密码注入后重启 `app-server`；`docker exec plush-toy-erp-server printenv APP_ADMIN_PASSWORD` 已不存在；`/healthz` 返回 `ok`、`/readyz` 返回 `ready`；真实 `admin_login` 使用目标密码返回 code `0`。
+- 下一步：后续若确实需要通过环境变量覆盖管理员初始化密码，应只在明确场景临时添加，并在初始化后移除；已有 admin 改密应走管理员改密或受控 SQL 更新密码哈希。
+- 阻塞/风险：已有 admin 的密码哈希只由数据库决定；仅删除环境变量或重启服务不会改变旧密码，必须显式改密。133 旧哈希已备份到 `/root/plush-toy-erp-admin-password-hash-backup-20260604T122602.txt`。本轮追加前 `progress.md` 为 296 行 / 60262 bytes，未达到归档阈值。
+
 ## 2026-06-04 19:45 CST
 - 完成：继续全局收敛暗色主题的绿色残留，根因包括 Ant Design 暗色 token 仍使用绿色系 `colorBgContainer / colorBgElevated / colorBorder / colorTextSecondary`，以及业务控件、普通按钮、弹窗控件、DevDocs、打印中心和移动端按钮 hover / focus 复用 `--erp-primary` / `--erp-primary-soft`。本轮把暗色 AntD token 改为 slate / blue，并新增 `--erp-interactive-*` 中性交互 token，绿色保留给品牌标识、主按钮和少量状态强调。
 - 完成：`business-module-dark-partners-desktop` 新增暗色交互态断言，实际触发搜索框、业务状态筛选、日期筛选、普通工具按钮、表头工具按钮和表头单元格 hover / focus；若背景、边框或阴影出现绿色主导色会直接失败，避免后续把输入框 / hover 又改回绿黑底。
