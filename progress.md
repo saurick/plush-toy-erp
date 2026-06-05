@@ -8,6 +8,13 @@
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
 
 ## 2026-06-05
+- 完成：撤销生产 Compose README 中 `8.218.4.199` / Cloudflare / `yoyoosun.net` 域名 / Nginx / Let's Encrypt 作为当前部署真源的旧口径，当前部署目标改为内网服务器 `192.168.0.133`，Compose 入口为 `/opt/plush-toy-erp/current/server/deploy/compose/prod`。本轮未向 `8.218.4.199` 上传、加载镜像、重启服务或修改文件。
+- 完成：按低配服务器发布约束在本机构建并上传 amd64 前端镜像 `plush-toy-erp-web:20260605T101206-0e5b65b-mobile-metrics-amd64`，服务器侧仅执行 `docker load`、更新 `.env` 的 `WEB_IMAGE`、重建 9 个 web 容器；服务端镜像仍为 `plush-toy-erp-server:20260531T145153-9b414a58-vm`。
+- 完成：线上 Atlas 状态初查发现 1 个历史 pending migration `20260530161152`。该迁移为新增 `contacts / suppliers / customers / sales_orders / sales_order_items` 及索引约束，dry-run 通过后使用宿主机 `/usr/local/bin/atlas` 执行 apply；迁移后 `Migration Status: OK`，当前版本 `20260530161152`，pending files 为 0。
+- 验证：`192.168.0.133` 上 `5175` 和 `5186-5193` 的 `/healthz` 均返回对应桌面 / 移动端 `{"status":"ok"}`；`8300/healthz` 返回 `ok`，`8300/readyz` 返回 `ready`；9 个 web 容器均 `healthy` 并运行新镜像。发布后按约定执行 `docker image prune -a -f` 与 `docker builder prune -f`，未执行 volume prune；清理前 `/` 为 98G / used 19G / avail 74G，清理后 avail 75G，回收 unused images 314.8MB。
+- 下一步：后续如果要恢复公网域名或网关入口，必须先补新的正式部署方案、README、Compose 环境说明和 smoke，不要沿用已撤销的阿里云 / Cloudflare 旧口径。
+- 阻塞/风险：本轮前端功能发布只改 web 镜像；Atlas apply 是补齐线上 release 已携带的历史 pending migration，不来自本轮移动端统计卡改动。清理已删除未被容器使用的旧 web 镜像，当前运行镜像保留；如需要更强回滚保留策略，应单独调整低配宿主机镜像清理口径。
+
 - 完成：移动端岗位任务页统计卡改为可点击快捷入口。待办页顶部“我的预警 / 已超时 / 即将超时 / 阻塞/高优先”、已办页进度“待处理 / 处理中 / 卡住 / 完成”、我的页“待办 / 已办 / 预警 / 高优先”均只做 tab 切换和当前可见任务池筛选；点击不会选中第一条任务，也不会触发完成、催办、状态流转或 Workflow / Fact 动作。
 - 完成：补齐移动端筛选主路径。新增 pending、processing、blocked、due_soon、high_priority、blocked_or_high_priority 等前端筛选 key；统计入口切换后清空选中任务、关闭详情动作态并收回对应长列表，避免沿用旧展开状态。
 - 完成：`mobile-tasks-dark` L1 回归补充统计卡点击断言。测试数据新增 processing 任务，回归覆盖“处理中 / 待处理 / 完成 / 我的预警 / 阻塞或高优先 / 我的高优先 / 我的已办”等入口，确认进入正确 tab 和筛选结果。
