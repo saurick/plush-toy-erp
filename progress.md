@@ -8,6 +8,32 @@
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
 
 ## 2026-06-05
+- 完成：移动端岗位任务页统计卡改为可点击快捷入口。待办页顶部“我的预警 / 已超时 / 即将超时 / 阻塞/高优先”、已办页进度“待处理 / 处理中 / 卡住 / 完成”、我的页“待办 / 已办 / 预警 / 高优先”均只做 tab 切换和当前可见任务池筛选；点击不会选中第一条任务，也不会触发完成、催办、状态流转或 Workflow / Fact 动作。
+- 完成：补齐移动端筛选主路径。新增 pending、processing、blocked、due_soon、high_priority、blocked_or_high_priority 等前端筛选 key；统计入口切换后清空选中任务、关闭详情动作态并收回对应长列表，避免沿用旧展开状态。
+- 完成：`mobile-tasks-dark` L1 回归补充统计卡点击断言。测试数据新增 processing 任务，回归覆盖“处理中 / 待处理 / 完成 / 我的预警 / 阻塞或高优先 / 我的高优先 / 我的已办”等入口，确认进入正确 tab 和筛选结果。
+- 验证：`node --check web/scripts/styleL1.mjs`、`cd web && pnpm exec eslint --ext .jsx src/erp/mobile/pages/MobileRoleTasksPage.jsx`、`cd web && pnpm exec stylelint "src/erp/styles/app.css"` 通过；`cd web && STYLE_L1_PORT=4187 STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过；`cd web && STYLE_L1_PORT=4188 pnpm style:l1` 通过，41 个场景通过。Browser 使用 `VITE_ENABLE_RPC_MOCK=true pnpm start:mobile:business` 打开 `http://localhost:5187/tasks`，390x844 视口未登录守卫落到 `/admin-login`、页面非空、console error/warn 为空；Browser 因登录表单事件和本地存储注入安全策略限制未进入已登录任务页，已登录统计卡交互证据以 L1 mock 后端回归为准。
+- 下一步：如果后续希望统计入口支持 URL 可分享筛选态，再单独评审 query 参数、返回恢复态和底部 tab 状态同步；不要把点击统计卡升级为业务动作入口。
+- 阻塞/风险：本轮只改移动端任务页前端交互、移动端按钮样式、L1 回归脚本和本过程记录；未改后端、schema、migration、RBAC、seedData、WorkflowUsecase、Inventory / Shipment / Finance facts、部署或真实通知表。当前工作区已有同文件移动端消息、刷新和长列表现场改动，本轮在其上增量实现，未回退或清理非本轮内容。
+
+- 完成：继续优化移动端岗位任务页在数据很多时的浏览体验。待办、已办、预警、通知四类长列表统一增加默认收起和“展开全部 / 收起”控制：待办默认 12 条，已办默认 10 条，预警 / 通知默认 8 条；展开按钮显示总数和剩余数量，筛选切换会收回待办列表，避免换筛选后直接铺满长页面。
+- 完成：通知候选列表不再在数据层预先 `slice(0, 8)`，改由统一展示控制决定默认条数和展开，避免通知多时永远无法看到第 9 条之后。该调整仍只属于移动端展示层，不改变通知事实来源或后端 API。
+- 完成：`mobile-tasks-dark` L1 回归改为创建大量待办、预警、通知和已办样本，逐项验证默认收起、展开后条目增加、收起后恢复、无横向溢出、消息二级 tab sticky 和暗色可读性。
+- 验证：`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过；`cd web && pnpm style:l1` 通过，41 个场景通过；Browser 打开 `http://127.0.0.1:5175/m/sales/tasks` 验证未登录守卫落到 `/admin-login`、页面 DOM 非空、无 framework overlay、console error/warn 为空。
+- 下一步：如果后续真实任务量继续增大到数百条，应先评审后端分页 / cursor 和移动端搜索，而不是继续提高前端一次性渲染上限。
+- 阻塞/风险：本轮仍未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。当前优化只控制前端已加载数据的展示长度；接口仍按现有查询返回任务集合。
+
+- 完成：移动端岗位任务页“消息”分区新增预警 / 通知二级切换。消息页默认显示预警列表，通知通过顶部 sticky 分段控件一键切换，不再把通知区块排在预警长列表后面；当前只调整前端展示信息架构，不改后端通知真源、Workflow / Fact 语义、路由、RBAC 或真实通知表。
+- 完成：补齐二级切换的浅色 / 暗色样式和 `mobile-tasks-dark` L1 回归断言。回归检查消息页默认只渲染预警 section，点击“通知”后只渲染通知 section，二级 tab sticky 盒模型稳定、卡片无横向溢出，并保留暗色消息卡片对比度检查。
+- 验证：`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过；`cd web && pnpm style:l1` 通过，41 个场景通过。Browser 打开 `http://127.0.0.1:5175/m/boss/tasks` 验证未登录守卫落到 `/admin-login`、页面非空、console error/warn 为空；Browser 受限于本地 mock 登录态写入 / Ant Design Form 状态，未进入已登录消息页，已登录消息页交互证据以 L1 的 Playwright mock 后端回归为准。
+- 下一步：如后续要把“通知”从当前 active task 摘要升级为真实通知流，应先评审通知事实来源、已读状态和后端 API，再改数据层；不要只在前端继续派生长期通知真源。
+- 阻塞/风险：本轮只改移动端任务页展示、移动端样式、L1 回归脚本和本过程记录；未改后端、schema、migration、RBAC、seedData、部署、WorkflowUsecase、Inventory / Shipment / Finance facts 或真实通知表。通知列表仍沿用当前 `activeTasks.slice(0, 8)` 的既有口径，本轮未重新定义通知数据来源。
+
+- 完成：移动端岗位任务页手动刷新新增明确反馈。页面初始化加载仍保持原有加载失败提示；用户点击页头“刷新”后，成功显示“数据已刷新”，失败显示“刷新移动端任务失败，已保留上次数据”，并保留上次任务列表不清空。
+- 完成：`mobile-tasks-dark` L1 回归补充手动刷新成功 / 失败提示断言。失败分支用一次未知英文业务错误模拟接口异常，验证前端不会透传英文原文，而是走当前交互的中文 fallback。
+- 验证：`node --check web/scripts/styleL1.mjs` 通过；`cd web && pnpm exec eslint --ext .jsx src/erp/mobile/pages/MobileRoleTasksPage.jsx` 通过；`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过。Browser 使用 `VITE_ENABLE_RPC_MOCK=true pnpm start:mobile:business` 临时打开 `http://localhost:5187/tasks`，未登录守卫落到 `/admin-login`，390x844 视口非空、无 framework overlay、console error/warn 为空；目标刷新交互证据以 L1 的 Playwright mock 后端回归为准。
+- 下一步：如后续要覆盖真实登录态下的移动端刷新，可复用 `mobile-auth-login-route-smoke` 的登录 mock，把刷新 toast 断言扩到全部 8 个岗位入口。
+- 阻塞/风险：本轮只改移动端任务页刷新提示和 L1 回归脚本；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、移动端路由或部署。`cd web && pnpm style:l1` 全量运行在到达移动端场景前失败于既有 `business-module-dark-products-modal-desktop` 弹窗水平居中断言（modal centerX=1776，viewport centerX=1024），与本轮刷新入口不同页，本轮未顺手修改该无关弹窗布局。
+
 - 完成：继续修复移动端岗位任务“消息”分区暗色模式可读性。预警 / 通知消息区块和消息卡片新增稳定语义类，暗色下不再沿用浅灰 `bg-white/bg-slate-50` 背景；预警等级、任务名、来源单号、阻塞原因和通知时间分别补齐暗色背景上的可读文字颜色。
 - 完成：`mobile-tasks-dark` L1 回归扩展到消息 tab，切入“消息”后检查预警 / 通知区块、消息卡片非浅色背景、边框清晰、文字对比度不低于 4.5、底部导航固定和无横向溢出；保留详情态暗色断言。
 - 验证：`node --check web/scripts/styleL1.mjs`、`cd web && pnpm exec eslint --ext .jsx src/erp/mobile/pages/MobileRoleTasksPage.jsx`、`cd web && pnpm exec stylelint "src/erp/styles/app.css"` 通过；`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过；`cd web && pnpm style:l1` 通过，41 个场景通过；临时 Playwright 截图 `/tmp/plush-mobile-messages-dark.png` 验证 `/m/boss/tasks` 消息页卡片为暗色背景且 console error 为空。

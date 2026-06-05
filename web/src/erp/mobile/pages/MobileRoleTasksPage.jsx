@@ -136,6 +136,38 @@ const MOBILE_MAIN_TAB_ITEMS = Object.freeze([
   { key: MOBILE_MAIN_TAB_KEYS.MINE, label: '我的', Icon: UserOutlined },
 ])
 
+const MOBILE_MESSAGE_TAB_KEYS = Object.freeze({
+  WARNING: 'warning',
+  NOTICE: 'notice',
+})
+
+const MOBILE_TASK_FILTER_KEYS = Object.freeze({
+  ALL: 'all',
+  ALERT: 'alert',
+  OVERDUE: 'overdue',
+  DUE_SOON: 'due_soon',
+  MINE: 'mine',
+  HIGH_PRIORITY: 'high_priority',
+  BLOCKED: 'blocked',
+  BLOCKED_OR_HIGH_PRIORITY: 'blocked_or_high_priority',
+  PENDING: 'pending',
+  PROCESSING: 'processing',
+})
+
+const MOBILE_LIST_KEYS = Object.freeze({
+  TODO: 'todo',
+  DONE: 'done',
+  WARNING: 'warning',
+  NOTICE: 'notice',
+})
+
+const MOBILE_LIST_COLLAPSED_LIMITS = Object.freeze({
+  [MOBILE_LIST_KEYS.TODO]: 12,
+  [MOBILE_LIST_KEYS.DONE]: 10,
+  [MOBILE_LIST_KEYS.WARNING]: 8,
+  [MOBILE_LIST_KEYS.NOTICE]: 8,
+})
+
 function getMobileRoleLabel(roleKey) {
   return MOBILE_ROLE_LABELS[normalizeRoleKey(roleKey)] || '岗位'
 }
@@ -403,8 +435,28 @@ function isTaskOverdue(task) {
   return task.due_status === 'overdue'
 }
 
+function isTaskDueSoon(task) {
+  return task.due_status === 'due_soon'
+}
+
 function isTaskAlerted(task) {
   return task.alert_level !== 'info'
+}
+
+function isTaskHighPriority(task) {
+  return Number(task.priority || 0) >= 3
+}
+
+function isTaskPendingProgress(task) {
+  return ['pending', 'ready'].includes(
+    String(task.task_status_key || '').trim()
+  )
+}
+
+function isTaskBlockedProgress(task) {
+  return ['blocked', 'rejected'].includes(
+    String(task.task_status_key || '').trim()
+  )
 }
 
 function getTaskQueueTone(task) {
@@ -484,6 +536,10 @@ export default function MobileRoleTasksPage() {
   const [activeMainTabKey, setActiveMainTabKey] = useState(
     MOBILE_MAIN_TAB_KEYS.TODO
   )
+  const [activeMessageTabKey, setActiveMessageTabKey] = useState(
+    MOBILE_MESSAGE_TAB_KEYS.WARNING
+  )
+  const [expandedListKeys, setExpandedListKeys] = useState({})
   const [activeFilterKey, setActiveFilterKey] = useState('all')
   const [selectedTaskID, setSelectedTaskID] = useState(null)
   const [detailAction, setDetailAction] = useState(null)
@@ -512,7 +568,7 @@ export default function MobileRoleTasksPage() {
     () => activeTasks.filter((task) => isTaskAlerted(task)),
     [activeTasks]
   )
-  const noticeTasks = useMemo(() => activeTasks.slice(0, 8), [activeTasks])
+  const noticeTasks = useMemo(() => activeTasks, [activeTasks])
   const taskSummary = useMemo(
     () => buildMobileTaskSummary(taskViews),
     [taskViews]
@@ -527,28 +583,56 @@ export default function MobileRoleTasksPage() {
       ? 0
       : Math.round((taskSummary.done / progressTotal) * 100)
   const filteredTasks = useMemo(() => {
-    if (activeFilterKey === 'alert') {
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.ALERT) {
       return activeTasks.filter((task) => isTaskAlerted(task))
     }
-    if (activeFilterKey === 'overdue') {
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.OVERDUE) {
       return activeTasks.filter((task) => isTaskOverdue(task))
     }
-    if (activeFilterKey === 'mine') {
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.DUE_SOON) {
+      return activeTasks.filter((task) => isTaskDueSoon(task))
+    }
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.MINE) {
       return activeTasks.filter((task) => canOperateTask(activeRoleKey, task))
+    }
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.HIGH_PRIORITY) {
+      return activeTasks.filter((task) => isTaskHighPriority(task))
+    }
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.BLOCKED) {
+      return activeTasks.filter((task) => isTaskBlockedProgress(task))
+    }
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.BLOCKED_OR_HIGH_PRIORITY) {
+      return activeTasks.filter(
+        (task) => isTaskBlockedProgress(task) || isTaskHighPriority(task)
+      )
+    }
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.PENDING) {
+      return activeTasks.filter((task) => isTaskPendingProgress(task))
+    }
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.PROCESSING) {
+      return activeTasks.filter((task) => task.task_status_key === 'processing')
     }
     return activeTasks
   }, [activeFilterKey, activeRoleKey, activeTasks])
   const filterItems = useMemo(
     () => [
-      { key: 'all', label: '全部', count: activeTasks.length },
-      { key: 'alert', label: '预警', count: warningTasks.length },
       {
-        key: 'overdue',
+        key: MOBILE_TASK_FILTER_KEYS.ALL,
+        label: '全部',
+        count: activeTasks.length,
+      },
+      {
+        key: MOBILE_TASK_FILTER_KEYS.ALERT,
+        label: '预警',
+        count: warningTasks.length,
+      },
+      {
+        key: MOBILE_TASK_FILTER_KEYS.OVERDUE,
         label: '超时',
         count: activeTasks.filter((task) => isTaskOverdue(task)).length,
       },
       {
-        key: 'mine',
+        key: MOBILE_TASK_FILTER_KEYS.MINE,
         label: '我负责',
         count: activeTasks.filter((task) => canOperateTask(activeRoleKey, task))
           .length,
@@ -587,23 +671,34 @@ export default function MobileRoleTasksPage() {
     setDetailAction(null)
   }, [activeMainTabKey])
 
-  const loadTasks = useCallback(async () => {
-    setLoading(true)
-    try {
-      const queryResults = await Promise.all(
-        buildMobileWorkflowTaskQueryPlan(activeRoleKey).map((query) =>
-          listWorkflowTasks(query)
+  const loadTasks = useCallback(
+    async ({ showRefreshFeedback = false } = {}) => {
+      setLoading(true)
+      try {
+        const queryResults = await Promise.all(
+          buildMobileWorkflowTaskQueryPlan(activeRoleKey).map((query) =>
+            listWorkflowTasks(query)
+          )
         )
-      )
-      setTasks(mergeWorkflowTaskResults(queryResults))
-    } catch (error) {
-      message.error(
-        getActionErrorMessage(error, '加载移动端任务失败，请稍后重试')
-      )
-    } finally {
-      setLoading(false)
-    }
-  }, [activeRoleKey])
+        setTasks(mergeWorkflowTaskResults(queryResults))
+        if (showRefreshFeedback) {
+          message.success('数据已刷新')
+        }
+      } catch (error) {
+        message.error(
+          getActionErrorMessage(
+            error,
+            showRefreshFeedback
+              ? '刷新移动端任务失败，已保留上次数据'
+              : '加载移动端任务失败，请稍后重试'
+          )
+        )
+      } finally {
+        setLoading(false)
+      }
+    },
+    [activeRoleKey]
+  )
 
   useEffect(() => {
     loadTasks()
@@ -1352,6 +1447,97 @@ export default function MobileRoleTasksPage() {
     updateDetailReason(nextValue)
   }
 
+  const isListExpanded = (listKey) => expandedListKeys[listKey] === true
+
+  const setListExpanded = (listKey, expanded) => {
+    setExpandedListKeys((current) => ({
+      ...current,
+      [listKey]: expanded,
+    }))
+  }
+
+  const getVisibleListItems = (items, listKey) => {
+    const limit = MOBILE_LIST_COLLAPSED_LIMITS[listKey] || items.length
+    return isListExpanded(listKey) ? items : items.slice(0, limit)
+  }
+
+  const renderListLimitControl = (items, listKey, noun = '条') => {
+    const limit = MOBILE_LIST_COLLAPSED_LIMITS[listKey] || items.length
+    if (items.length <= limit) return null
+    const expanded = isListExpanded(listKey)
+    const hiddenCount = items.length - limit
+    return (
+      <div className="mobile-role-list-control">
+        <button
+          type="button"
+          data-testid={`mobile-role-list-toggle-${listKey}`}
+          className="mobile-role-list-control__button"
+          onClick={() => setListExpanded(listKey, !expanded)}
+        >
+          <span>
+            {expanded
+              ? `收起，保留前 ${limit} ${noun}`
+              : `展开全部 ${items.length} ${noun}`}
+          </span>
+          {!expanded ? (
+            <span className="mobile-role-list-control__hint">
+              还有 {hiddenCount} {noun}
+            </span>
+          ) : null}
+        </button>
+      </div>
+    )
+  }
+
+  const openTaskBucket = ({
+    mainTabKey = MOBILE_MAIN_TAB_KEYS.TODO,
+    filterKey = MOBILE_TASK_FILTER_KEYS.ALL,
+    messageTabKey,
+    listKey = MOBILE_LIST_KEYS.TODO,
+  } = {}) => {
+    setActiveMainTabKey(mainTabKey)
+    if (mainTabKey === MOBILE_MAIN_TAB_KEYS.TODO) {
+      setActiveFilterKey(filterKey)
+    }
+    if (messageTabKey) {
+      setActiveMessageTabKey(messageTabKey)
+    }
+    setSelectedTaskID(null)
+    setDetailAction(null)
+    setListExpanded(listKey, false)
+  }
+
+  const renderMetricButton = ({
+    label,
+    value,
+    Icon,
+    valueClassName = 'text-slate-950',
+    labelClassName = 'text-slate-500',
+    className = '',
+    onClick,
+    testID,
+  }) => (
+    <button
+      key={label}
+      type="button"
+      data-testid={testID}
+      className={`mobile-role-metric-button min-w-0 px-2 text-center ${className}`}
+      onClick={onClick}
+    >
+      <div
+        className={`mobile-role-metric-button__value font-semibold leading-tight ${valueClassName}`}
+      >
+        {value}
+      </div>
+      <div
+        className={`mobile-role-metric-button__label mt-1 flex items-center justify-center gap-1 ${labelClassName}`}
+      >
+        {Icon ? <Icon aria-hidden="true" /> : null}
+        <span>{label}</span>
+      </div>
+    </button>
+  )
+
   const renderProgressPanel = () => (
     <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
@@ -1366,19 +1552,48 @@ export default function MobileRoleTasksPage() {
       </div>
       <div className="mt-4 grid grid-cols-4 divide-x divide-slate-200 rounded-xl border border-slate-100 bg-slate-50 py-3 text-center">
         {[
-          ['待处理', taskSummary.pending, FileTextOutlined],
-          ['处理中', taskSummary.processing, ClockCircleOutlined],
-          ['卡住', taskSummary.blockedProgress, PauseOutlined],
-          ['完成', taskSummary.done, CheckSquareOutlined],
-        ].map(([label, value, Icon]) => (
-          <div key={label} className="space-y-1 px-2">
-            <div className="text-xl font-semibold text-slate-950">{value}</div>
-            <div className="flex items-center justify-center gap-1 text-xs text-slate-500">
-              <Icon />
-              <span>{label}</span>
-            </div>
-          </div>
-        ))}
+          {
+            label: '待处理',
+            value: taskSummary.pending,
+            Icon: FileTextOutlined,
+            filterKey: MOBILE_TASK_FILTER_KEYS.PENDING,
+            testID: 'mobile-role-progress-pending',
+          },
+          {
+            label: '处理中',
+            value: taskSummary.processing,
+            Icon: ClockCircleOutlined,
+            filterKey: MOBILE_TASK_FILTER_KEYS.PROCESSING,
+            testID: 'mobile-role-progress-processing',
+          },
+          {
+            label: '卡住',
+            value: taskSummary.blockedProgress,
+            Icon: PauseOutlined,
+            filterKey: MOBILE_TASK_FILTER_KEYS.BLOCKED,
+            testID: 'mobile-role-progress-blocked',
+          },
+          {
+            label: '完成',
+            value: taskSummary.done,
+            Icon: CheckSquareOutlined,
+            mainTabKey: MOBILE_MAIN_TAB_KEYS.DONE,
+            listKey: MOBILE_LIST_KEYS.DONE,
+            testID: 'mobile-role-progress-done',
+          },
+        ].map((item) =>
+          renderMetricButton({
+            ...item,
+            valueClassName: 'text-xl text-slate-950',
+            labelClassName: 'text-xs text-slate-500',
+            onClick: () =>
+              openTaskBucket({
+                mainTabKey: item.mainTabKey || MOBILE_MAIN_TAB_KEYS.TODO,
+                filterKey: item.filterKey || MOBILE_TASK_FILTER_KEYS.ALL,
+                listKey: item.listKey || MOBILE_LIST_KEYS.TODO,
+              }),
+          })
+        )}
       </div>
     </section>
   )
@@ -1453,22 +1668,45 @@ export default function MobileRoleTasksPage() {
   const renderTaskMetricCards = () => (
     <section className="mx-5 mt-5 grid grid-cols-4 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white py-5 text-center shadow-sm">
       {[
-        ['我的预警', taskSummary.alerts, 'text-orange-500'],
-        ['已超时', taskSummary.overdue, 'text-red-500'],
-        ['即将超时', taskSummary.dueSoon, 'text-slate-600'],
-        [
-          '阻塞/高优先',
-          `${taskSummary.blocked}/${taskSummary.highPriority}`,
-          'text-red-500',
-        ],
-      ].map(([label, value, colorClass]) => (
-        <div key={label} className="min-w-0 px-2">
-          <div className={`text-4xl font-semibold leading-tight ${colorClass}`}>
-            {value}
-          </div>
-          <div className="mt-1 text-base text-slate-600">{label}</div>
-        </div>
-      ))}
+        {
+          label: '我的预警',
+          value: taskSummary.alerts,
+          valueClassName: 'text-4xl text-orange-500',
+          filterKey: MOBILE_TASK_FILTER_KEYS.ALERT,
+          testID: 'mobile-role-metric-alerts',
+        },
+        {
+          label: '已超时',
+          value: taskSummary.overdue,
+          valueClassName: 'text-4xl text-red-500',
+          filterKey: MOBILE_TASK_FILTER_KEYS.OVERDUE,
+          testID: 'mobile-role-metric-overdue',
+        },
+        {
+          label: '即将超时',
+          value: taskSummary.dueSoon,
+          valueClassName: 'text-4xl text-slate-600',
+          filterKey: MOBILE_TASK_FILTER_KEYS.DUE_SOON,
+          testID: 'mobile-role-metric-due-soon',
+        },
+        {
+          label: '阻塞/高优先',
+          value: `${taskSummary.blocked}/${taskSummary.highPriority}`,
+          valueClassName: 'text-4xl text-red-500',
+          filterKey: MOBILE_TASK_FILTER_KEYS.BLOCKED_OR_HIGH_PRIORITY,
+          testID: 'mobile-role-metric-risk',
+        },
+      ].map((item) =>
+        renderMetricButton({
+          ...item,
+          labelClassName: 'text-base text-slate-600',
+          onClick: () =>
+            openTaskBucket({
+              filterKey: item.filterKey,
+              listKey: MOBILE_LIST_KEYS.TODO,
+            }),
+        })
+      )}
     </section>
   )
 
@@ -1489,6 +1727,7 @@ export default function MobileRoleTasksPage() {
               setActiveFilterKey(item.key)
               setSelectedTaskID(null)
               setDetailAction(null)
+              setListExpanded(MOBILE_LIST_KEYS.TODO, false)
             }}
           >
             <span className="truncate">
@@ -1516,7 +1755,14 @@ export default function MobileRoleTasksPage() {
             </div>
           ) : (
             <div className="divide-y divide-slate-200">
-              {filteredTasks.map(renderTaskRow)}
+              {getVisibleListItems(filteredTasks, MOBILE_LIST_KEYS.TODO).map(
+                renderTaskRow
+              )}
+              {renderListLimitControl(
+                filteredTasks,
+                MOBILE_LIST_KEYS.TODO,
+                '条任务'
+              )}
             </div>
           )}
         </div>
@@ -1559,76 +1805,153 @@ export default function MobileRoleTasksPage() {
               暂无已办任务
             </div>
           ) : (
-            doneTasks.slice(0, 20).map(renderDoneTaskItem)
+            <>
+              {getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).map(
+                renderDoneTaskItem
+              )}
+              {renderListLimitControl(
+                doneTasks,
+                MOBILE_LIST_KEYS.DONE,
+                '条已办'
+              )}
+            </>
           )}
         </div>
       </section>
     </section>
   )
 
+  const renderMessageTabs = () => {
+    const items = [
+      {
+        key: MOBILE_MESSAGE_TAB_KEYS.WARNING,
+        label: '预警',
+        count: warningTasks.length,
+      },
+      {
+        key: MOBILE_MESSAGE_TAB_KEYS.NOTICE,
+        label: '通知',
+        count: noticeTasks.length,
+      },
+    ]
+
+    return (
+      <div className="mobile-role-message-tabs" role="tablist">
+        {items.map((item) => {
+          const active = item.key === activeMessageTabKey
+          return (
+            <button
+              key={item.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              data-testid={`mobile-role-message-tab-${item.key}`}
+              className={`mobile-role-message-tabs__item ${
+                active ? 'mobile-role-message-tabs__item--active' : ''
+              }`}
+              onClick={() => setActiveMessageTabKey(item.key)}
+            >
+              <span>{item.label}</span>
+              <span className="mobile-role-message-tabs__count">
+                {item.count}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const renderWarningMessages = () => (
+    <section className="mobile-role-message-section mobile-role-message-section--warning erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+      <h2 className="text-lg font-semibold text-slate-950">预警</h2>
+      <div className="mt-3 space-y-2">
+        {warningTasks.length === 0 ? (
+          <div className="mobile-role-message-empty rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
+            暂无预警任务
+          </div>
+        ) : (
+          <>
+            {getVisibleListItems(warningTasks, MOBILE_LIST_KEYS.WARNING).map(
+              (task) => (
+                <button
+                  key={task.id}
+                  type="button"
+                  className="mobile-role-message-card mobile-role-message-card--warning w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
+                  onClick={() => setSelectedTaskID(task.id)}
+                >
+                  <div className="mobile-role-message-card__tone font-semibold text-amber-800">
+                    {getTaskQueueTone(task)}
+                  </div>
+                  <div className="mobile-role-message-card__title mt-1 text-sm text-slate-900">
+                    {task.task_name}
+                  </div>
+                  <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
+                    {resolveTaskSourceLabel(task)}
+                  </div>
+                  {task.blocked_reason ? (
+                    <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
+                      {task.blocked_reason}
+                    </div>
+                  ) : null}
+                </button>
+              )
+            )}
+            {renderListLimitControl(
+              warningTasks,
+              MOBILE_LIST_KEYS.WARNING,
+              '条预警'
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  )
+
+  const renderNoticeMessages = () => (
+    <section className="mobile-role-message-section mobile-role-message-section--notice erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
+      <h2 className="text-lg font-semibold text-slate-950">通知</h2>
+      <div className="mt-3 space-y-2">
+        {noticeTasks.length === 0 ? (
+          <div className="mobile-role-message-empty rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
+            暂无通知
+          </div>
+        ) : (
+          <>
+            {getVisibleListItems(noticeTasks, MOBILE_LIST_KEYS.NOTICE).map(
+              (task) => (
+                <button
+                  key={task.id}
+                  type="button"
+                  className="mobile-role-message-card mobile-role-message-card--notice flex w-full items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
+                  onClick={() => setSelectedTaskID(task.id)}
+                >
+                  <span className="mobile-role-message-card__title min-w-0 text-sm font-medium text-slate-700">
+                    {task.task_name}
+                  </span>
+                  <span className="mobile-role-message-card__time shrink-0 text-xs text-slate-400">
+                    {formatMobileTaskTime(task.updated_at)}
+                  </span>
+                </button>
+              )
+            )}
+            {renderListLimitControl(
+              noticeTasks,
+              MOBILE_LIST_KEYS.NOTICE,
+              '条通知'
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  )
+
   const renderMessagesPanel = () => (
     <section className="mobile-role-messages mx-5 mt-5 space-y-4 pb-5">
-      <section className="mobile-role-message-section mobile-role-message-section--warning erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-        <h2 className="text-lg font-semibold text-slate-950">预警</h2>
-        <div className="mt-3 space-y-2">
-          {warningTasks.length === 0 ? (
-            <div className="mobile-role-message-empty rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
-              暂无预警任务
-            </div>
-          ) : (
-            warningTasks.slice(0, 8).map((task) => (
-              <button
-                key={task.id}
-                type="button"
-                className="mobile-role-message-card mobile-role-message-card--warning w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
-                onClick={() => setSelectedTaskID(task.id)}
-              >
-                <div className="mobile-role-message-card__tone font-semibold text-amber-800">
-                  {getTaskQueueTone(task)}
-                </div>
-                <div className="mobile-role-message-card__title mt-1 text-sm text-slate-900">
-                  {task.task_name}
-                </div>
-                <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
-                  {resolveTaskSourceLabel(task)}
-                </div>
-                {task.blocked_reason ? (
-                  <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
-                    {task.blocked_reason}
-                  </div>
-                ) : null}
-              </button>
-            ))
-          )}
-        </div>
-      </section>
-
-      <section className="mobile-role-message-section mobile-role-message-section--notice erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
-        <h2 className="text-lg font-semibold text-slate-950">通知</h2>
-        <div className="mt-3 space-y-2">
-          {noticeTasks.length === 0 ? (
-            <div className="mobile-role-message-empty rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
-              暂无通知
-            </div>
-          ) : (
-            noticeTasks.map((task) => (
-              <button
-                key={task.id}
-                type="button"
-                className="mobile-role-message-card mobile-role-message-card--notice flex w-full items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
-                onClick={() => setSelectedTaskID(task.id)}
-              >
-                <span className="mobile-role-message-card__title min-w-0 text-sm font-medium text-slate-700">
-                  {task.task_name}
-                </span>
-                <span className="mobile-role-message-card__time shrink-0 text-xs text-slate-400">
-                  {formatMobileTaskTime(task.updated_at)}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      </section>
+      {renderMessageTabs()}
+      {activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING
+        ? renderWarningMessages()
+        : renderNoticeMessages()}
     </section>
   )
 
@@ -1671,15 +1994,48 @@ export default function MobileRoleTasksPage() {
 
         <section className="grid grid-cols-4 gap-3">
           {[
-            ['待办', activeTasks.length],
-            ['已办', doneTasks.length],
-            ['预警', taskSummary.alerts],
-            ['高优先', taskSummary.highPriority],
-          ].map(([label, value]) => (
-            <div key={label} className={mobileTheme.metricCard}>
-              <div className={mobileTheme.metricValue}>{value}</div>
-              <div className={mobileTheme.metricLabel}>{label}</div>
-            </div>
+            {
+              label: '待办',
+              value: activeTasks.length,
+              filterKey: MOBILE_TASK_FILTER_KEYS.ALL,
+              testID: 'mobile-role-mine-metric-todo',
+            },
+            {
+              label: '已办',
+              value: doneTasks.length,
+              mainTabKey: MOBILE_MAIN_TAB_KEYS.DONE,
+              listKey: MOBILE_LIST_KEYS.DONE,
+              testID: 'mobile-role-mine-metric-done',
+            },
+            {
+              label: '预警',
+              value: taskSummary.alerts,
+              filterKey: MOBILE_TASK_FILTER_KEYS.ALERT,
+              testID: 'mobile-role-mine-metric-alerts',
+            },
+            {
+              label: '高优先',
+              value: taskSummary.highPriority,
+              filterKey: MOBILE_TASK_FILTER_KEYS.HIGH_PRIORITY,
+              testID: 'mobile-role-mine-metric-high-priority',
+            },
+          ].map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              data-testid={item.testID}
+              className={`${mobileTheme.metricCard} mobile-role-mine-metric-button`}
+              onClick={() =>
+                openTaskBucket({
+                  mainTabKey: item.mainTabKey || MOBILE_MAIN_TAB_KEYS.TODO,
+                  filterKey: item.filterKey || MOBILE_TASK_FILTER_KEYS.ALL,
+                  listKey: item.listKey || MOBILE_LIST_KEYS.TODO,
+                })
+              }
+            >
+              <div className={mobileTheme.metricValue}>{item.value}</div>
+              <div className={mobileTheme.metricLabel}>{item.label}</div>
+            </button>
           ))}
         </section>
 
@@ -1765,7 +2121,7 @@ export default function MobileRoleTasksPage() {
               <button
                 type="button"
                 className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-base font-semibold text-emerald-700"
-                onClick={loadTasks}
+                onClick={() => loadTasks({ showRefreshFeedback: true })}
                 disabled={loading}
               >
                 <ReloadOutlined className={loading ? 'animate-spin' : ''} />

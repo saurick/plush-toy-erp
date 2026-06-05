@@ -380,36 +380,112 @@ const scenarios = [
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
       await page.evaluate(async () => {
-        await fetch('/rpc/workflow', {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: 'mobile-dark-task',
-            method: 'create_task',
-            params: {
-              task_code: 'STYLE-L1-MOBILE-DARK-001',
-              task_group: 'project-orders',
-              task_name: '暗色任务验证',
-              source_type: 'project-orders',
-              source_id: 9001,
-              source_no: 'STYLE-L1-MOBILE-DARK-001',
-              business_status_key: 'project_pending',
-              task_status_key: 'blocked',
-              owner_role_key: 'sales',
-              priority: 3,
-              blocked_reason: '暗色模式阻塞原因回显',
-              payload: {
-                critical_path: true,
-                customer_name: '暗色客户',
-                style_no: '深色测试款',
-                due_date: '2026-06-06',
-              },
+        const createTask = async (params) =>
+          fetch('/rpc/workflow', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
             },
-          }),
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: params.task_code,
+              method: 'create_task',
+              params,
+            }),
+          })
+
+        const bulkTasks = [
+          ...Array.from({ length: 15 }, (_, index) => ({
+            task_code: `STYLE-L1-MOBILE-BULK-${String(index + 1).padStart(2, '0')}`,
+            task_group: 'project-orders',
+            task_name: `批量待办任务 ${index + 1}`,
+            source_type: 'project-orders',
+            source_id: 9100 + index,
+            source_no: `STYLE-L1-BULK-${String(index + 1).padStart(2, '0')}`,
+            business_status_key: 'project_pending',
+            task_status_key: 'ready',
+            owner_role_key: 'sales',
+            priority: 1,
+            payload: {
+              customer_name: `批量客户 ${index + 1}`,
+              style_no: `BULK-${index + 1}`,
+              due_date: '2026-06-08',
+            },
+          })),
+          ...Array.from({ length: 11 }, (_, index) => ({
+            task_code: `STYLE-L1-MOBILE-WARN-${String(index + 1).padStart(2, '0')}`,
+            task_group: 'project-orders',
+            task_name: `批量预警任务 ${index + 1}`,
+            source_type: 'project-orders',
+            source_id: 9300 + index,
+            source_no: `STYLE-L1-WARN-${String(index + 1).padStart(2, '0')}`,
+            business_status_key: 'project_pending',
+            task_status_key: 'blocked',
+            owner_role_key: 'sales',
+            priority: 3,
+            blocked_reason: `批量阻塞原因 ${index + 1}`,
+            payload: {
+              critical_path: true,
+              customer_name: `预警客户 ${index + 1}`,
+              style_no: `WARN-${index + 1}`,
+              due_date: '2026-06-07',
+            },
+          })),
+          ...Array.from({ length: 12 }, (_, index) => ({
+            task_code: `STYLE-L1-MOBILE-DONE-${String(index + 1).padStart(2, '0')}`,
+            task_group: 'project-orders',
+            task_name: `批量已办任务 ${index + 1}`,
+            source_type: 'project-orders',
+            source_id: 9500 + index,
+            source_no: `STYLE-L1-DONE-${String(index + 1).padStart(2, '0')}`,
+            business_status_key: 'project_pending',
+            task_status_key: 'done',
+            owner_role_key: 'sales',
+            priority: 1,
+            payload: {
+              customer_name: `已办客户 ${index + 1}`,
+              style_no: `DONE-${index + 1}`,
+            },
+          })),
+          {
+            task_code: 'STYLE-L1-MOBILE-PROCESSING-001',
+            task_group: 'project-orders',
+            task_name: '批量处理中任务',
+            source_type: 'project-orders',
+            source_id: 9701,
+            source_no: 'STYLE-L1-PROCESSING-001',
+            business_status_key: 'project_pending',
+            task_status_key: 'processing',
+            owner_role_key: 'sales',
+            priority: 1,
+            payload: {
+              customer_name: '处理中客户',
+              style_no: 'PROCESSING-1',
+              due_date: '2026-06-09',
+            },
+          },
+        ]
+
+        await Promise.all(bulkTasks.map((params) => createTask(params)))
+        await createTask({
+          task_code: 'STYLE-L1-MOBILE-DARK-001',
+          task_group: 'project-orders',
+          task_name: '暗色任务验证',
+          source_type: 'project-orders',
+          source_id: 9001,
+          source_no: 'STYLE-L1-MOBILE-DARK-001',
+          business_status_key: 'project_pending',
+          task_status_key: 'blocked',
+          owner_role_key: 'sales',
+          priority: 3,
+          blocked_reason: '暗色模式阻塞原因回显',
+          payload: {
+            critical_path: true,
+            customer_name: '暗色客户',
+            style_no: '深色测试款',
+            due_date: '2026-06-06',
+          },
         })
       })
       await page.reload({ waitUntil: 'domcontentloaded' })
@@ -434,6 +510,9 @@ const scenarios = [
         selector: '.mobile-app-layout',
       })
       await assertMobileTaskMainNavigation(page, {
+        scenarioName: 'mobile-tasks-dark',
+      })
+      await assertMobileTaskRefreshFeedback(page, {
         scenarioName: 'mobile-tasks-dark',
       })
       await assertMobileTaskDarkDetailReadable(page, {
@@ -2738,6 +2817,55 @@ async function assertShellRefreshButton(page, { scenarioName, expectVisible }) {
   assert(
     metrics.hasIcon,
     `${scenarioName} 壳层刷新按钮缺少图标: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
+  const refreshButton = page
+    .locator('.mobile-role-tasks-page header button')
+    .filter({ hasText: '刷新' })
+    .first()
+  await refreshButton.waitFor({ state: 'visible', timeout: 10_000 })
+  await refreshButton.click()
+  await expectText(page, '数据已刷新')
+  const beforeFailureMetrics = await readMobileTaskVisibleListMetrics(
+    page,
+    '.erp-mobile-list-item'
+  )
+
+  let failedOnce = false
+  await page.route('**/rpc/workflow', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    if (!failedOnce && body.method === 'list_tasks') {
+      failedOnce = true
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: body.id || 'mobile-refresh-failed',
+          result: {
+            code: 500123,
+            message: 'refresh failed',
+            data: null,
+          },
+        }),
+      })
+      return
+    }
+    await route.fallback()
+  })
+
+  await refreshButton.click()
+  await expectText(page, '刷新移动端任务失败，已保留上次数据')
+  const afterFailureMetrics = await readMobileTaskVisibleListMetrics(
+    page,
+    '.erp-mobile-list-item'
+  )
+  assert.equal(
+    afterFailureMetrics.itemCount,
+    beforeFailureMetrics.itemCount,
+    `${scenarioName} 刷新失败后没有保留上次任务列表: ${JSON.stringify({ beforeFailureMetrics, afterFailureMetrics })}`
   )
 }
 
@@ -6671,6 +6799,12 @@ async function assertMobileTaskMainNavigation(page, { scenarioName }) {
       !todoMetrics.sectionHeadings.includes('预警'),
     `${scenarioName} 待办分区仍混入旧进度/预警/通知区块: ${JSON.stringify(todoMetrics)}`
   )
+  await assertMobileTaskListToggle(page, {
+    scenarioName,
+    listKey: 'todo',
+    itemSelector: '.erp-mobile-list-item',
+    collapsedMax: 12,
+  })
 
   await page.getByTestId('mobile-role-nav-messages').click()
   await page.waitForFunction(() => {
@@ -6681,9 +6815,10 @@ async function assertMobileTaskMainNavigation(page, { scenarioName }) {
   assertMobileTaskBottomNavLayout(messageMetrics, scenarioName)
   assert(
     messageMetrics.sectionHeadings.includes('预警') &&
-      messageMetrics.sectionHeadings.includes('通知'),
-    `${scenarioName} 消息分区应承载预警和通知: ${JSON.stringify(messageMetrics)}`
+      !messageMetrics.sectionHeadings.includes('通知'),
+    `${scenarioName} 消息分区默认应先显示预警且不把通知压在预警列表后: ${JSON.stringify(messageMetrics)}`
   )
+  await assertMobileTaskMessageTabsSwitch(page, { scenarioName })
   await assertMobileTaskDarkMessagesReadable(page, { scenarioName })
 
   await page.getByTestId('mobile-role-nav-done').click()
@@ -6698,6 +6833,13 @@ async function assertMobileTaskMainNavigation(page, { scenarioName }) {
       doneMetrics.sectionHeadings.includes('已办任务'),
     `${scenarioName} 已办分区应承载进度和已办任务: ${JSON.stringify(doneMetrics)}`
   )
+  await assertMobileTaskListToggle(page, {
+    scenarioName,
+    listKey: 'done',
+    itemSelector: '.erp-mobile-list-item',
+    collapsedMax: 10,
+  })
+  await assertMobileTaskProgressMetricNavigation(page, { scenarioName })
 
   await page.getByTestId('mobile-role-nav-mine').click()
   await page.waitForFunction(() => {
@@ -6723,6 +6865,247 @@ async function assertMobileTaskMainNavigation(page, { scenarioName }) {
     false,
     `${scenarioName} 从我的返回待办后不应残留退出登录: ${JSON.stringify(restoredMetrics)}`
   )
+  await assertMobileTaskDashboardMetricNavigation(page, { scenarioName })
+}
+
+async function readVisibleMobileTaskListText(page) {
+  return page.locator('.erp-mobile-list-item').evaluateAll((items) =>
+    items
+      .filter((item) => {
+        const rect = item.getBoundingClientRect()
+        return rect.width > 0 && rect.height > 0
+      })
+      .map((item) => item.textContent?.replace(/\s+/g, ' ').trim() || '')
+      .join('\n')
+  )
+}
+
+async function assertMobileTaskProgressMetricNavigation(
+  page,
+  { scenarioName }
+) {
+  await page.getByTestId('mobile-role-progress-processing').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '待办'
+  })
+  let visibleText = await readVisibleMobileTaskListText(page)
+  assert(
+    visibleText.includes('批量处理中任务') &&
+      !visibleText.includes('批量待办任务 1'),
+    `${scenarioName} 点击“处理中”后未进入处理中筛选: ${visibleText}`
+  )
+
+  await page.getByTestId('mobile-role-nav-done').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '已办'
+  })
+  await page.getByTestId('mobile-role-progress-pending').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '待办'
+  })
+  visibleText = await readVisibleMobileTaskListText(page)
+  assert(
+    visibleText.includes('批量待办任务 1') &&
+      !visibleText.includes('暗色任务验证'),
+    `${scenarioName} 点击“待处理”后未进入待处理筛选: ${visibleText}`
+  )
+
+  await page.getByTestId('mobile-role-nav-done').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '已办'
+  })
+  await page.getByTestId('mobile-role-progress-done').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '已办'
+  })
+  visibleText = await readVisibleMobileTaskListText(page)
+  assert(
+    visibleText.includes('批量已办任务 1'),
+    `${scenarioName} 点击“完成”后未停留到已办列表: ${visibleText}`
+  )
+}
+
+async function assertMobileTaskDashboardMetricNavigation(
+  page,
+  { scenarioName }
+) {
+  await page.getByTestId('mobile-role-metric-alerts').click()
+  let visibleText = await readVisibleMobileTaskListText(page)
+  assert(
+    visibleText.includes('暗色任务验证') &&
+      !visibleText.includes('批量待办任务 1'),
+    `${scenarioName} 点击“我的预警”后未进入预警筛选: ${visibleText}`
+  )
+
+  await page.getByTestId('mobile-role-metric-risk').click()
+  visibleText = await readVisibleMobileTaskListText(page)
+  assert(
+    visibleText.includes('暗色任务验证') &&
+      !visibleText.includes('批量待办任务 1'),
+    `${scenarioName} 点击“阻塞/高优先”后未进入风险筛选: ${visibleText}`
+  )
+
+  await page.getByTestId('mobile-role-nav-mine').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '我的'
+  })
+  await page.getByTestId('mobile-role-mine-metric-high-priority').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '待办'
+  })
+  visibleText = await readVisibleMobileTaskListText(page)
+  assert(
+    visibleText.includes('暗色任务验证') &&
+      !visibleText.includes('批量待办任务 1'),
+    `${scenarioName} 点击“我的/高优先”后未进入高优先筛选: ${visibleText}`
+  )
+
+  await page.getByTestId('mobile-role-nav-mine').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '我的'
+  })
+  await page.getByTestId('mobile-role-mine-metric-done').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '已办'
+  })
+  visibleText = await readVisibleMobileTaskListText(page)
+  assert(
+    visibleText.includes('批量已办任务 1'),
+    `${scenarioName} 点击“我的/已办”后未进入已办列表: ${visibleText}`
+  )
+
+  await page.getByTestId('mobile-role-nav-todo').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '待办'
+  })
+}
+
+async function assertMobileTaskListToggle(
+  page,
+  { scenarioName, listKey, itemSelector, collapsedMax }
+) {
+  const toggle = page.getByTestId(`mobile-role-list-toggle-${listKey}`)
+  const toggleCount = await toggle.count()
+  assert.equal(
+    toggleCount,
+    1,
+    `${scenarioName} ${listKey} 长列表应出现唯一展开控制，实际 ${toggleCount}`
+  )
+
+  const collapsedMetrics = await readMobileTaskVisibleListMetrics(
+    page,
+    itemSelector
+  )
+  assert(
+    collapsedMetrics.itemCount > 0 &&
+      collapsedMetrics.itemCount <= collapsedMax,
+    `${scenarioName} ${listKey} 默认收起数量异常: ${JSON.stringify(collapsedMetrics)}`
+  )
+  assert(
+    collapsedMetrics.toggleText.includes('展开全部') &&
+      collapsedMetrics.toggleText.includes('还有'),
+    `${scenarioName} ${listKey} 展开控制缺少总数或剩余提示: ${JSON.stringify(collapsedMetrics)}`
+  )
+  assert(
+    collapsedMetrics.documentScrollWidth <=
+      collapsedMetrics.documentClientWidth + 1,
+    `${scenarioName} ${listKey} 默认收起态横向溢出: ${JSON.stringify(collapsedMetrics)}`
+  )
+
+  await toggle.click()
+  const expandedMetrics = await readMobileTaskVisibleListMetrics(
+    page,
+    itemSelector
+  )
+  assert(
+    expandedMetrics.itemCount > collapsedMetrics.itemCount,
+    `${scenarioName} ${listKey} 展开后条目数量没有增加: ${JSON.stringify({ collapsedMetrics, expandedMetrics })}`
+  )
+  assert(
+    expandedMetrics.toggleText.includes('收起'),
+    `${scenarioName} ${listKey} 展开后缺少收起入口: ${JSON.stringify(expandedMetrics)}`
+  )
+
+  await toggle.click()
+  const restoredMetrics = await readMobileTaskVisibleListMetrics(
+    page,
+    itemSelector
+  )
+  assert.equal(
+    restoredMetrics.itemCount,
+    collapsedMetrics.itemCount,
+    `${scenarioName} ${listKey} 收起后没有恢复默认数量: ${JSON.stringify({ collapsedMetrics, restoredMetrics })}`
+  )
+}
+
+async function assertMobileTaskMessageTabsSwitch(page, { scenarioName }) {
+  const noticeTab = page.getByTestId('mobile-role-message-tab-notice')
+  const warningTab = page.getByTestId('mobile-role-message-tab-warning')
+
+  await noticeTab.waitFor({ state: 'visible', timeout: 10_000 })
+  await warningTab.waitFor({ state: 'visible', timeout: 10_000 })
+  await assertMobileTaskListToggle(page, {
+    scenarioName,
+    listKey: 'warning',
+    itemSelector: '.mobile-role-message-card',
+    collapsedMax: 8,
+  })
+  await noticeTab.click()
+  await page.waitForFunction(() => {
+    const headings = Array.from(
+      document.querySelectorAll('.mobile-role-tasks-page h2')
+    ).map((heading) => heading.textContent?.trim() || '')
+    return headings.includes('通知') && !headings.includes('预警')
+  })
+
+  const noticeMetrics = await readMobileTaskMessageTabMetrics(page)
+  assert(
+    noticeMetrics.activeTab === '通知',
+    `${scenarioName} 点击通知后未激活通知 tab: ${JSON.stringify(noticeMetrics)}`
+  )
+  assert(
+    noticeMetrics.sectionHeadings.length === 1 &&
+      noticeMetrics.sectionHeadings[0] === '通知',
+    `${scenarioName} 通知 tab 不应继续被预警列表挤到下方: ${JSON.stringify(noticeMetrics)}`
+  )
+  assert(
+    noticeMetrics.tabsSticky &&
+      noticeMetrics.tabs &&
+      noticeMetrics.tabs.width > 280 &&
+      noticeMetrics.tabs.scrollWidth <= noticeMetrics.tabs.clientWidth + 1,
+    `${scenarioName} 消息二级 tab 盒模型异常: ${JSON.stringify(noticeMetrics)}`
+  )
+  assert(
+    noticeMetrics.cards.length > 0 &&
+      noticeMetrics.cards.every(
+        (card) => card.width > 280 && card.scrollWidth <= card.clientWidth + 1
+      ),
+    `${scenarioName} 通知卡片出现横向溢出: ${JSON.stringify(noticeMetrics)}`
+  )
+  await assertMobileTaskListToggle(page, {
+    scenarioName,
+    listKey: 'notice',
+    itemSelector: '.mobile-role-message-card',
+    collapsedMax: 8,
+  })
+
+  await warningTab.click()
+  await page.waitForFunction(() => {
+    const headings = Array.from(
+      document.querySelectorAll('.mobile-role-tasks-page h2')
+    ).map((heading) => heading.textContent?.trim() || '')
+    return headings.includes('预警') && !headings.includes('通知')
+  })
 }
 
 async function assertMobileTaskDarkMessagesReadable(page, { scenarioName }) {
@@ -6804,12 +7187,11 @@ async function assertMobileTaskDarkMessagesReadable(page, { scenarioName }) {
     `${scenarioName} 消息可读性断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.sections.some((section) => section.heading === '预警') &&
-      metrics.sections.some((section) => section.heading === '通知'),
-    `${scenarioName} 消息页缺少预警或通知区块: ${JSON.stringify(metrics)}`
+    metrics.sections.length === 1 && metrics.sections[0].heading === '预警',
+    `${scenarioName} 消息页默认应只渲染当前预警区块: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.cards.length >= 2,
+    metrics.cards.length >= 1,
     `${scenarioName} 消息页缺少可验证卡片或空态: ${JSON.stringify(metrics)}`
   )
   assert(
@@ -7013,6 +7395,77 @@ async function readMobileTaskLayoutMetrics(page) {
       windowScrollY: window.scrollY,
     }
   })
+}
+
+async function readMobileTaskMessageTabMetrics(page) {
+  return page.evaluate(() => {
+    const tabs = document.querySelector('.mobile-role-message-tabs')
+    const tabsRect = tabs?.getBoundingClientRect()
+    const tabsStyle =
+      tabs instanceof HTMLElement ? window.getComputedStyle(tabs) : null
+    const sectionHeadings = Array.from(
+      document.querySelectorAll('.mobile-role-tasks-page h2')
+    ).map((heading) => heading.textContent?.trim() || '')
+    const activeTab = Array.from(
+      document.querySelectorAll('.mobile-role-message-tabs__item')
+    ).find((item) => item.getAttribute('aria-selected') === 'true')
+    const cards = Array.from(
+      document.querySelectorAll(
+        '.mobile-role-message-card, .mobile-role-message-empty'
+      )
+    ).map((card) => {
+      const rect = card.getBoundingClientRect()
+      return {
+        text: card.textContent?.replace(/\s+/g, ' ').trim() || '',
+        width: rect.width,
+        height: rect.height,
+        clientWidth: card instanceof HTMLElement ? card.clientWidth : 0,
+        scrollWidth: card instanceof HTMLElement ? card.scrollWidth : 0,
+      }
+    })
+
+    return {
+      activeTab: activeTab?.textContent?.replace(/\d+/g, '').trim() || '',
+      sectionHeadings,
+      tabsSticky: tabsStyle?.position === 'sticky',
+      tabs: tabsRect
+        ? {
+            width: tabsRect.width,
+            height: tabsRect.height,
+            clientWidth: tabs instanceof HTMLElement ? tabs.clientWidth : 0,
+            scrollWidth: tabs instanceof HTMLElement ? tabs.scrollWidth : 0,
+          }
+        : null,
+      cards,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+    }
+  })
+}
+
+async function readMobileTaskVisibleListMetrics(page, itemSelector) {
+  return page.evaluate((selector) => {
+    const items = Array.from(document.querySelectorAll(selector)).map(
+      (item) => {
+        const rect = item.getBoundingClientRect()
+        return {
+          text: item.textContent?.replace(/\s+/g, ' ').trim() || '',
+          width: rect.width,
+          height: rect.height,
+          clientWidth: item instanceof HTMLElement ? item.clientWidth : 0,
+          scrollWidth: item instanceof HTMLElement ? item.scrollWidth : 0,
+        }
+      }
+    )
+    const toggle = document.querySelector('.mobile-role-list-control__button')
+    return {
+      itemCount: items.length,
+      items,
+      toggleText: toggle?.textContent?.replace(/\s+/g, ' ').trim() || '',
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+    }
+  }, itemSelector)
 }
 
 function assertMobileTaskBottomNavLayout(metrics, scenarioName) {
