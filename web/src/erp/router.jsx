@@ -1,5 +1,12 @@
-import React, { Suspense, lazy } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import React, { Suspense, lazy, useLayoutEffect, useRef } from 'react'
+import {
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+} from 'react-router-dom'
 import AuthGuard from '@/common/auth/AuthGuard'
 import { getStoredAdminProfile } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
@@ -11,6 +18,7 @@ import {
   getEnabledMobileRoleKeys,
   getEntryConfig,
   hasDesktopEntryAccess,
+  parseMobileRoleFromPath,
   resolveDefaultEntryTarget,
   resolveMobileTasksPath,
 } from './config/entryConfig.mjs'
@@ -41,6 +49,7 @@ const MobileRoleTasksPage = lazy(
 const DevDocsPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevDocsPage.jsx'))
   : null
+const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
 
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
@@ -82,9 +91,71 @@ function RouteLoadingFallback() {
   )
 }
 
+function buildLocationPath(location) {
+  return `${location.pathname || ''}${location.search || ''}${
+    location.hash || ''
+  }`
+}
+
+function isDesktopEntryPath(pathname = '') {
+  return pathname === '/' || pathname === '/erp' || pathname.startsWith('/erp/')
+}
+
+function readLastMobileEntryPath() {
+  try {
+    return window.sessionStorage?.getItem(LAST_MOBILE_ENTRY_PATH_KEY) || ''
+  } catch {
+    return ''
+  }
+}
+
+function rememberLastMobileEntryPath(path) {
+  try {
+    window.sessionStorage?.setItem(LAST_MOBILE_ENTRY_PATH_KEY, path)
+  } catch {
+    // sessionStorage is best-effort; the in-memory ref still covers SPA back.
+  }
+}
+
+function isBrowserHistoryRestore() {
+  const [navigationEntry] = performance.getEntriesByType('navigation')
+  return navigationEntry?.type === 'back_forward'
+}
+
+function MobileEntryBackGuard() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const navigationType = useNavigationType()
+  const lastMobilePathRef = useRef('')
+  const currentPath = buildLocationPath(location)
+
+  useLayoutEffect(() => {
+    if (parseMobileRoleFromPath(location.pathname)) {
+      lastMobilePathRef.current = currentPath
+      rememberLastMobileEntryPath(currentPath)
+      return
+    }
+
+    const lastMobilePath =
+      lastMobilePathRef.current ||
+      (isBrowserHistoryRestore() ? readLastMobileEntryPath() : '')
+
+    if (
+      navigationType === 'POP' &&
+      lastMobilePath &&
+      isDesktopEntryPath(location.pathname)
+    ) {
+      navigate(lastMobilePath, { replace: true })
+    }
+  }, [currentPath, location.pathname, navigate, navigationType])
+
+  return null
+}
+
 export default function ERPRouter() {
   return (
     <Suspense fallback={<RouteLoadingFallback />}>
+      <MobileEntryBackGuard />
       <Routes>
         {DevDocsPage ? (
           <Route path={DEV_DOCS_ROUTE} element={<DevDocsPage />} />

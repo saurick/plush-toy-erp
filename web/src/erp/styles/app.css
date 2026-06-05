@@ -5529,6 +5529,149 @@
   background: rgb(15 23 42 / 0.96);
 }
 
+[data-erp-theme='dark'] .mobile-role-detail-header {
+  border-color: var(--erp-border);
+  background: rgb(17 24 39 / 0.96);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .mobile-role-message-section {
+  border-color: var(--erp-border-strong);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .mobile-role-message-section--warning {
+  border-color: rgb(217 119 6 / 0.72);
+  background: rgb(41 26 12 / 0.9);
+}
+
+[data-erp-theme='dark'] .mobile-role-message-card,
+[data-erp-theme='dark'] .mobile-role-message-empty {
+  border-color: var(--erp-border-strong);
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .mobile-role-message-card--warning {
+  border-color: rgb(217 119 6 / 0.72);
+  background: rgb(67 38 12 / 0.78);
+}
+
+[data-erp-theme='dark'] .mobile-role-message-card--notice {
+  background: var(--erp-surface-bg-muted);
+}
+
+[data-erp-theme='dark'] .mobile-role-message-card__tone,
+[data-erp-theme='dark'] .mobile-role-message-card__source {
+  color: #fbbf24;
+}
+
+[data-erp-theme='dark'] .mobile-role-message-card__title {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .mobile-role-message-card__time {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .mobile-role-message-card__reason {
+  color: #fca5a5;
+}
+
+[data-erp-theme='dark']
+  .mobile-role-tasks-page--detail
+  .mobile-role-tasks-page__detail-main {
+  background: #0b1220;
+}
+
+[data-erp-theme='dark'] .mobile-role-detail-fact-grid,
+[data-erp-theme='dark'] .mobile-role-detail-fact-grid > div,
+[data-erp-theme='dark'] .mobile-role-detail-related-item {
+  border-color: var(--erp-border-strong);
+}
+
+[data-erp-theme='dark'] .mobile-role-detail-related-item,
+[data-erp-theme='dark'] .mobile-role-detail-event {
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .mobile-role-detail-risk {
+  border-color: rgb(248 113 113 / 0.72);
+  background: rgb(127 29 29 / 0.24);
+  color: #fca5a5;
+}
+
+[data-erp-theme='dark'] .mobile-role-tasks-page--detail .bg-blue-100 {
+  background: rgb(30 64 175 / 0.5);
+}
+
+[data-erp-theme='dark'] .mobile-role-tasks-page--detail .text-blue-700,
+[data-erp-theme='dark'] .mobile-role-tasks-page--detail .text-blue-600 {
+  color: #dbeafe;
+}
+
+[data-erp-theme='dark'] .mobile-role-tasks-page--detail .text-red-700,
+[data-erp-theme='dark'] .mobile-role-tasks-page--detail .text-red-600,
+[data-erp-theme='dark'] .mobile-role-tasks-page--detail .text-red-500 {
+  color: #fca5a5;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button {
+  min-width: 0;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button:disabled {
+  opacity: 1;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--processing {
+  background: #1d4ed8;
+  color: #eff6ff;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--processing:disabled {
+  background: #1e3a8a;
+  color: #dbeafe;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--blocked {
+  background: #9a3412;
+  color: #fff7ed;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--blocked:disabled {
+  background: #7c2d12;
+  color: #fed7aa;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--done {
+  background: #065f46;
+  color: #ecfdf5;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--done:disabled {
+  background: #064e3b;
+  color: #a7f3d0;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--urge {
+  border-color: var(--erp-border-strong);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--urge:disabled {
+  color: #e5edf5;
+}
+
+[data-erp-theme='dark'] .mobile-role-action-bar__button--rejected {
+  border-color: rgb(248 113 113 / 0.72);
+  background: rgb(127 29 29 / 0.24);
+  color: #fca5a5;
+}
+
 [data-erp-theme='dark'] .mobile-app-layout .text-slate-900,
 [data-erp-theme='dark'] .mobile-app-layout .text-slate-950,
 [data-erp-theme='dark'] .mobile-app-layout .text-slate-800,

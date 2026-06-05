@@ -8,6 +8,24 @@
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
 
 ## 2026-06-05
+- 完成：继续修复移动端岗位任务“消息”分区暗色模式可读性。预警 / 通知消息区块和消息卡片新增稳定语义类，暗色下不再沿用浅灰 `bg-white/bg-slate-50` 背景；预警等级、任务名、来源单号、阻塞原因和通知时间分别补齐暗色背景上的可读文字颜色。
+- 完成：`mobile-tasks-dark` L1 回归扩展到消息 tab，切入“消息”后检查预警 / 通知区块、消息卡片非浅色背景、边框清晰、文字对比度不低于 4.5、底部导航固定和无横向溢出；保留详情态暗色断言。
+- 验证：`node --check web/scripts/styleL1.mjs`、`cd web && pnpm exec eslint --ext .jsx src/erp/mobile/pages/MobileRoleTasksPage.jsx`、`cd web && pnpm exec stylelint "src/erp/styles/app.css"` 通过；`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过；`cd web && pnpm style:l1` 通过，41 个场景通过；临时 Playwright 截图 `/tmp/plush-mobile-messages-dark.png` 验证 `/m/boss/tasks` 消息页卡片为暗色背景且 console error 为空。
+- 下一步：如果继续出现暗色可读性问题，应优先把对应页面状态纳入 L1 的 computed color / box 模型断言，再调整具体样式。
+- 阻塞/风险：本轮只改移动端任务消息页样式、组件语义类和前端回归脚本；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义或部署。Browser 对 authenticated mock 状态仍不作为主验证路径，消息页视觉证据来自 Playwright L1 和临时截图。
+
+- 完成：修复移动端岗位任务详情暗色模式文字可读性问题。任务详情页头、任务关键信息表格、质检不合格风险提示、关联单据、最近动态和底部处理动作按钮补齐暗色背景、边框、文字与禁用态覆盖；按钮不再依赖透明度压暗导致文字对比不足。
+- 完成：`style:l1` 的 `mobile-tasks-dark` 场景新增详情态断言，进入“暗色任务验证”任务后检查详情页关键文字、暗色对比度、横向溢出、底部动作栏固定位置和 4 个动作按钮尺寸，避免列表态通过但详情态漏检。
+- 验证：`cd web && pnpm lint && pnpm css && pnpm test` 通过，267 个测试通过；`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm style:l1` 通过，41 个场景通过；已查看 `web/output/playwright/style-l1/mobile-tasks-dark.png`，暗色详情页文字、风险提示和底部按钮均可读且无横向溢出。
+- 下一步：如继续反馈暗色问题，优先按页面状态补语义类名和 L1 computed style / box 模型断言，不只修当前截图节点。
+- 阻塞/风险：本轮只改移动端任务详情页前端样式、详情组件类名和前端回归脚本；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义或部署。Browser 辅助打开未登录移动任务入口会跳转 `/admin-login` 且 console 无 error/warn；Browser 截图接口本轮仍超时，详情态视觉证据以 Playwright L1 产物为准。
+
+- 完成：修复桌面单端口移动任务页 `/m/<role>/tasks` 的浏览器后退串回桌面后台问题。`ERPRouter` 新增 `MobileEntryBackGuard`，记录最近一次岗位任务端路径；当浏览器 `POP` 或 back/forward 整页恢复落到 `/` 或 `/erp/*` 桌面入口时，用 `replace` 回到上一条移动任务路径，避免从任务端后退到后台壳层。
+- 完成：`style:l1` 新增 `mobile-tasks-browser-back-stays-mobile` 场景，覆盖已登录 `/erp/dashboard` -> `/m/sales/tasks` -> 浏览器后退，断言最终仍在 `/m/sales/tasks`、移动任务页壳层存在、桌面后台壳层不存在。
+- 验证：`cd web && pnpm lint`、`pnpm css`、`pnpm test` 通过，267 个测试通过；`STYLE_L1_SCENARIOS=mobile-tasks-browser-back-stays-mobile pnpm style:l1` 通过。Browser 复用 `http://localhost:5175`，真实登录后验证 `/erp/dashboard -> /m/boss/tasks -> 浏览器后退` 最终仍停在 `/m/boss/tasks`，移动任务页壳层存在、桌面后台壳层不存在、console error/warn 为空。
+- 下一步：如后续新增任务端到桌面后台的显式切换入口，应使用明确按钮或入口选择页，不依赖浏览器后退跨入口切换。
+- 阻塞/风险：本轮只改桌面单端口移动任务端的前端路由返回栈和 L1 回归脚本；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义或部署。Browser 截图接口本轮 `Page.captureScreenshot` 超时，视觉截图证据以 `style:l1` 产物为准。
+
 - 完成：新增移动端岗位任务页原型资产落点 `docs/assets/mobile-role-tasks/README.md`，预留列表页、详情页、风险分组页 3 个稳定原型文件名；新增 `docs/product/mobile-role-tasks-redesign.md` 记录采用方向、实现边界和“原型图非业务真源”说明。
 - 完成：同步更新 `docs/README.md` 和 `docs/document-inventory.md`，把移动端岗位任务页改版说明纳入详细设计入口，并把原型资产 README / 产品改版说明纳入长期文档清单。
 - 下一步：用户提供原始 PNG 文件或本地路径后，将图片补入 `docs/assets/mobile-role-tasks/` 并把产品说明中的“待补原图”更新为“已归档”。

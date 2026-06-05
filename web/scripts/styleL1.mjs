@@ -436,6 +436,60 @@ const scenarios = [
       await assertMobileTaskMainNavigation(page, {
         scenarioName: 'mobile-tasks-dark',
       })
+      await assertMobileTaskDarkDetailReadable(page, {
+        scenarioName: 'mobile-tasks-dark',
+      })
+    },
+  },
+  {
+    name: 'mobile-tasks-browser-back-stays-mobile',
+    path: '/erp/dashboard',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectHeading(page, '任务看板')
+      await gotoScenarioPath(page, '/m/sales/tasks', {
+        waitUntil: 'domcontentloaded',
+      })
+      await waitForPath(page, '/m/sales/tasks')
+      await expectText(page, '待办')
+      await expectText(page, '任务')
+
+      await page.goBack()
+      await waitForPath(page, '/m/sales/tasks')
+      await expectText(page, '待办')
+      const metrics = await page.evaluate(() => ({
+        path: window.location.pathname,
+        hasDesktopShell: Boolean(document.querySelector('.erp-admin-sider')),
+        hasMobileShell: Boolean(
+          document.querySelector('.mobile-role-tasks-page')
+        ),
+        heading:
+          document
+            .querySelector('.mobile-role-tasks-page h1')
+            ?.textContent?.trim() || '',
+      }))
+
+      assert.equal(
+        metrics.path,
+        '/m/sales/tasks',
+        `浏览器后退不应离开岗位任务端: ${JSON.stringify(metrics)}`
+      )
+      assert.equal(
+        metrics.hasDesktopShell,
+        false,
+        `浏览器后退不应渲染桌面后台壳层: ${JSON.stringify(metrics)}`
+      )
+      assert.equal(
+        metrics.hasMobileShell,
+        true,
+        `浏览器后退后应保持移动任务页壳层: ${JSON.stringify(metrics)}`
+      )
+      assert.equal(
+        metrics.heading,
+        '待办',
+        `浏览器后退后应保持移动任务页默认分区: ${JSON.stringify(metrics)}`
+      )
     },
   },
   {
@@ -5871,10 +5925,35 @@ function isBluePrimaryColor(color) {
   return blue >= 140 && blue > red * 1.25 && blue >= green
 }
 
+function isWarningBorderColor(color) {
+  const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
+  if (!match) return false
+  const [, red, green, blue] = match.map(Number)
+  return red >= 120 && green >= 70 && green <= 160 && blue <= 90 && red >= green
+}
+
 function isLightSurfaceColor(color) {
   const rgb = parseRgb(color)
   if (!rgb) return false
   return rgb[0] >= 220 && rgb[1] >= 220 && rgb[2] >= 220
+}
+
+function assertReadableOnBackground(foreground, background, message) {
+  const color = parseRgb(foreground)
+  const bg = parseRgb(background)
+  assert(
+    color && bg,
+    `${message}: ${JSON.stringify({ foreground, background })}`
+  )
+  const ratio = getContrastRatio(color, bg)
+  assert(
+    ratio >= 4.5,
+    `${message}: ${JSON.stringify({
+      foreground,
+      background,
+      ratio: Number(ratio.toFixed(2)),
+    })}`
+  )
 }
 
 function assertReadableOnDark(foreground, background, message) {
@@ -6605,6 +6684,7 @@ async function assertMobileTaskMainNavigation(page, { scenarioName }) {
       messageMetrics.sectionHeadings.includes('通知'),
     `${scenarioName} 消息分区应承载预警和通知: ${JSON.stringify(messageMetrics)}`
   )
+  await assertMobileTaskDarkMessagesReadable(page, { scenarioName })
 
   await page.getByTestId('mobile-role-nav-done').click()
   await page.waitForFunction(() => {
@@ -6643,6 +6723,235 @@ async function assertMobileTaskMainNavigation(page, { scenarioName }) {
     false,
     `${scenarioName} 从我的返回待办后不应残留退出登录: ${JSON.stringify(restoredMetrics)}`
   )
+}
+
+async function assertMobileTaskDarkMessagesReadable(page, { scenarioName }) {
+  const metrics = await page.evaluate(() => {
+    const readRect = (element) => {
+      const rect = element?.getBoundingClientRect?.()
+      return rect
+        ? {
+            width: rect.width,
+            height: rect.height,
+            top: rect.top,
+            bottom: rect.bottom,
+          }
+        : null
+    }
+    const readColor = (element) => {
+      const style = window.getComputedStyle(element)
+      return {
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+      }
+    }
+    const textSelectors = [
+      '.mobile-role-message-card__tone',
+      '.mobile-role-message-card__title',
+      '.mobile-role-message-card__source',
+      '.mobile-role-message-card__reason',
+      '.mobile-role-message-card__time',
+    ].join(',')
+
+    const sections = Array.from(
+      document.querySelectorAll('.mobile-role-message-section')
+    ).map((section) => {
+      const heading = section.querySelector('h2')
+      return {
+        heading: heading?.textContent?.trim() || '',
+        rect: readRect(section),
+        ...readColor(section),
+        headingColor: heading ? window.getComputedStyle(heading).color : '',
+      }
+    })
+
+    const cards = Array.from(
+      document.querySelectorAll(
+        '.mobile-role-message-card, .mobile-role-message-empty'
+      )
+    ).map((card) => {
+      const textNodes = Array.from(card.querySelectorAll(textSelectors))
+      if (textNodes.length === 0 && card.textContent?.trim()) {
+        textNodes.push(card)
+      }
+      return {
+        text: card.textContent?.replace(/\s+/g, ' ').trim() || '',
+        isWarning: card.classList.contains('mobile-role-message-card--warning'),
+        isNotice: card.classList.contains('mobile-role-message-card--notice'),
+        isEmpty: card.classList.contains('mobile-role-message-empty'),
+        rect: readRect(card),
+        ...readColor(card),
+        textNodes: textNodes.map((node) => ({
+          text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+          color: window.getComputedStyle(node).color,
+        })),
+      }
+    })
+
+    return {
+      effectiveTheme: document.documentElement.dataset.erpTheme || '',
+      sections,
+      cards,
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+    }
+  })
+
+  assert.equal(
+    metrics.effectiveTheme,
+    'dark',
+    `${scenarioName} 消息可读性断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.sections.some((section) => section.heading === '预警') &&
+      metrics.sections.some((section) => section.heading === '通知'),
+    `${scenarioName} 消息页缺少预警或通知区块: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.cards.length >= 2,
+    `${scenarioName} 消息页缺少可验证卡片或空态: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.cards.some((card) => card.isWarning),
+    `${scenarioName} 消息页缺少预警卡片: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
+    `${scenarioName} 消息页出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+
+  metrics.sections.forEach((section) => {
+    assert(
+      !isLightSurfaceColor(section.backgroundColor),
+      `${scenarioName} 消息分区仍是浅色背景: ${JSON.stringify(section)}`
+    )
+    assertReadableOnBackground(
+      section.headingColor,
+      section.backgroundColor,
+      `${scenarioName} 消息分区标题对比度不足`
+    )
+  })
+
+  metrics.cards.forEach((card) => {
+    assert(
+      card.rect && card.rect.width > 280 && card.rect.height >= 40,
+      `${scenarioName} 消息卡片尺寸异常: ${JSON.stringify(card)}`
+    )
+    assert(
+      !isLightSurfaceColor(card.backgroundColor),
+      `${scenarioName} 消息卡片仍是浅色背景: ${JSON.stringify(card)}`
+    )
+    assert(
+      isDarkNeutralBorderColor(card.borderColor) ||
+        isWarningBorderColor(card.borderColor),
+      `${scenarioName} 消息卡片边框不够清楚: ${JSON.stringify(card)}`
+    )
+    card.textNodes.forEach((node) => {
+      if (!node.text) return
+      assertReadableOnBackground(
+        node.color,
+        card.backgroundColor,
+        `${scenarioName} 消息卡片文字对比度不足`
+      )
+    })
+  })
+}
+
+async function assertMobileTaskDarkDetailReadable(page, { scenarioName }) {
+  await page
+    .getByRole('button', { name: /暗色任务验证/ })
+    .first()
+    .click()
+  await page
+    .locator('.mobile-role-tasks-page--detail')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await expectText(page, '任务关键信息')
+  await expectText(page, '关联单据')
+  await expectText(page, '最近动态')
+  await assertThemeReadable(page, {
+    scenarioName,
+    selector: '.mobile-role-detail-header',
+  })
+  await assertDarkThemeContrast(page, {
+    scenarioName,
+    selector: '.mobile-role-tasks-page--detail',
+    minRatio: 4.5,
+  })
+
+  const metrics = await page.evaluate(() => {
+    const shell = document.querySelector('.mobile-role-tasks-page--detail')
+    const header = document.querySelector('.mobile-role-detail-header')
+    const actionBar = document.querySelector('.mobile-role-action-bar')
+    const shellRect = shell?.getBoundingClientRect()
+    const headerRect = header?.getBoundingClientRect()
+    const actionBarRect = actionBar?.getBoundingClientRect()
+    const buttons = Array.from(
+      actionBar?.querySelectorAll('.mobile-role-action-bar__button') || []
+    ).map((button) => {
+      const rect = button.getBoundingClientRect()
+      const style = window.getComputedStyle(button)
+      return {
+        text: button.textContent?.replace(/\s+/g, ' ').trim() || '',
+        width: rect.width,
+        height: rect.height,
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        opacity: style.opacity,
+      }
+    })
+    return {
+      shell: shellRect
+        ? {
+            bottom: shellRect.bottom,
+            height: shellRect.height,
+          }
+        : null,
+      header: headerRect
+        ? {
+            top: headerRect.top,
+            height: headerRect.height,
+          }
+        : null,
+      actionBar: actionBarRect
+        ? {
+            top: actionBarRect.top,
+            bottom: actionBarRect.bottom,
+            height: actionBarRect.height,
+          }
+        : null,
+      buttons,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+    }
+  })
+
+  assert(metrics.shell, `${scenarioName} 详情页容器未渲染`)
+  assert(metrics.header, `${scenarioName} 详情页标题栏未渲染`)
+  assert(metrics.actionBar, `${scenarioName} 详情页动作栏未渲染`)
+  assert.equal(
+    metrics.buttons.length,
+    4,
+    `${scenarioName} 详情页动作栏应保留四个主按钮: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
+    `${scenarioName} 详情页出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    Math.abs(metrics.actionBar.bottom - metrics.shell.bottom) <= 1.5,
+    `${scenarioName} 详情页动作栏未贴住容器底部: ${JSON.stringify(metrics)}`
+  )
+  metrics.buttons.forEach((button) => {
+    assert(
+      button.width >= 72 && button.height >= 52,
+      `${scenarioName} 详情页动作按钮尺寸不稳定: ${JSON.stringify(metrics)}`
+    )
+  })
 }
 
 async function readMobileTaskLayoutMetrics(page) {

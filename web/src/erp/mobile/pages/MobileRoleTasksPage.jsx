@@ -1567,12 +1567,12 @@ export default function MobileRoleTasksPage() {
   )
 
   const renderMessagesPanel = () => (
-    <section className="mx-5 mt-5 space-y-4 pb-5">
-      <section className="erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+    <section className="mobile-role-messages mx-5 mt-5 space-y-4 pb-5">
+      <section className="mobile-role-message-section mobile-role-message-section--warning erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
         <h2 className="text-lg font-semibold text-slate-950">预警</h2>
         <div className="mt-3 space-y-2">
           {warningTasks.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
+            <div className="mobile-role-message-empty rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
               暂无预警任务
             </div>
           ) : (
@@ -1580,20 +1580,20 @@ export default function MobileRoleTasksPage() {
               <button
                 key={task.id}
                 type="button"
-                className="w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
+                className="mobile-role-message-card mobile-role-message-card--warning w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
                 onClick={() => setSelectedTaskID(task.id)}
               >
-                <div className="font-semibold text-amber-800">
+                <div className="mobile-role-message-card__tone font-semibold text-amber-800">
                   {getTaskQueueTone(task)}
                 </div>
-                <div className="mt-1 text-sm text-slate-900">
+                <div className="mobile-role-message-card__title mt-1 text-sm text-slate-900">
                   {task.task_name}
                 </div>
-                <div className="mt-1 break-all text-xs text-amber-700">
+                <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
                   {resolveTaskSourceLabel(task)}
                 </div>
                 {task.blocked_reason ? (
-                  <div className="mt-1 text-sm text-red-600">
+                  <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
                     {task.blocked_reason}
                   </div>
                 ) : null}
@@ -1603,11 +1603,11 @@ export default function MobileRoleTasksPage() {
         </div>
       </section>
 
-      <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
+      <section className="mobile-role-message-section mobile-role-message-section--notice erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
         <h2 className="text-lg font-semibold text-slate-950">通知</h2>
         <div className="mt-3 space-y-2">
           {noticeTasks.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
+            <div className="mobile-role-message-empty rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
               暂无通知
             </div>
           ) : (
@@ -1615,13 +1615,13 @@ export default function MobileRoleTasksPage() {
               <button
                 key={task.id}
                 type="button"
-                className="flex w-full items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
+                className="mobile-role-message-card mobile-role-message-card--notice flex w-full items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
                 onClick={() => setSelectedTaskID(task.id)}
               >
-                <span className="min-w-0 text-sm font-medium text-slate-700">
+                <span className="mobile-role-message-card__title min-w-0 text-sm font-medium text-slate-700">
                   {task.task_name}
                 </span>
-                <span className="shrink-0 text-xs text-slate-400">
+                <span className="mobile-role-message-card__time shrink-0 text-xs text-slate-400">
                   {formatMobileTaskTime(task.updated_at)}
                 </span>
               </button>
@@ -1799,7 +1799,7 @@ export default function MobileRoleTasksPage() {
 
     return (
       <div className="mobile-role-tasks-page mobile-role-tasks-page--detail surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
-        <header className="shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur">
+        <header className="mobile-role-detail-header shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="grid grid-cols-[112px_minmax(0,1fr)_92px] items-center gap-2 px-4 py-4">
             <button
               type="button"
@@ -1845,7 +1845,7 @@ export default function MobileRoleTasksPage() {
                 编辑查看详情 &gt;
               </button>
             </div>
-            <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200">
+            <div className="mobile-role-detail-fact-grid mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200">
               {factRows.slice(0, 6).map(([label, value]) => (
                 <div
                   key={label}
@@ -1861,7 +1861,7 @@ export default function MobileRoleTasksPage() {
           </section>
 
           {selectedTask.business_status_label || selectedTask.blocked_reason ? (
-            <section className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-lg font-semibold text-red-700">
+            <section className="mobile-role-detail-risk rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-lg font-semibold text-red-700">
               <ExclamationCircleFilled className="mr-2" />
               {selectedTask.business_status_label || '任务需要处理'}
               {selectedTask.blocked_reason
@@ -1883,7 +1883,7 @@ export default function MobileRoleTasksPage() {
                 查看全部 &gt;
               </button>
             </div>
-            <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-600">
+            <div className="mobile-role-detail-related-item mt-4 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-600">
               <span className="min-w-0 break-all">订单：{relatedSource}</span>
               <span className="shrink-0 text-slate-400">&gt;</span>
             </div>
@@ -1902,7 +1902,7 @@ export default function MobileRoleTasksPage() {
                 查看全部 &gt;
               </button>
             </div>
-            <div className="mt-4 rounded-xl bg-slate-50 px-4 py-4">
+            <div className="mobile-role-detail-event mt-4 rounded-xl bg-slate-50 px-4 py-4">
               <div className="flex items-start gap-3">
                 <span className="mt-1 h-3 w-3 rounded-full bg-blue-500" />
                 <div className="min-w-0">
@@ -1988,7 +1988,7 @@ export default function MobileRoleTasksPage() {
         <div className="mobile-role-action-bar grid grid-cols-4 gap-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
           <button
             type="button"
-            className="rounded-xl bg-blue-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--processing rounded-xl bg-blue-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
             disabled={!selectedCanOperate || isUpdating}
             onClick={() => handleTaskAction(selectedTask, 'processing')}
           >
@@ -1997,7 +1997,7 @@ export default function MobileRoleTasksPage() {
           </button>
           <button
             type="button"
-            className="rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--blocked rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
             disabled={!selectedCanOperate || isUpdating}
             onClick={() => handleTaskAction(selectedTask, 'blocked')}
           >
@@ -2006,7 +2006,7 @@ export default function MobileRoleTasksPage() {
           </button>
           <button
             type="button"
-            className="rounded-xl bg-emerald-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--done rounded-xl bg-emerald-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
             disabled={!selectedCanOperate || isUpdating}
             onClick={() => handleTaskAction(selectedTask, 'done')}
           >
@@ -2015,7 +2015,7 @@ export default function MobileRoleTasksPage() {
           </button>
           <button
             type="button"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-4 text-lg font-semibold text-slate-700 disabled:opacity-50"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--urge rounded-xl border border-slate-200 bg-white px-3 py-4 text-lg font-semibold text-slate-700 disabled:opacity-50"
             disabled={!selectedCanUrge || isUrging}
             onClick={() => handleTaskAction(selectedTask, 'urge')}
           >
@@ -2025,7 +2025,7 @@ export default function MobileRoleTasksPage() {
           {showRejected ? (
             <button
               type="button"
-              className="col-span-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-base font-semibold text-red-600 disabled:opacity-50"
+              className="mobile-role-action-bar__button mobile-role-action-bar__button--rejected col-span-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-base font-semibold text-red-600 disabled:opacity-50"
               disabled={!selectedCanOperate || isUpdating}
               onClick={() => handleTaskAction(selectedTask, 'rejected')}
             >
