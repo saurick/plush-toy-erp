@@ -6759,6 +6759,7 @@ async function clickERPThemeOption(page, label) {
       `主题菜单按钮数量异常，无法切换到 ${label}`
     )
     await menuToggle.click()
+    await assertNoERPThemeTooltip(page, `主题菜单打开后不应显示 tooltip`)
     const menuItem = page
       .locator(
         '.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item'
@@ -6778,6 +6779,13 @@ async function clickERPThemeOption(page, label) {
       expectedMode
     )
   }
+}
+
+async function assertNoERPThemeTooltip(page, message) {
+  const tooltip = page
+    .locator('.ant-tooltip:not(.ant-tooltip-hidden)')
+    .filter({ hasText: /主题/ })
+  assert.equal(await tooltip.count(), 0, message)
 }
 
 async function assertMobileTaskMainNavigation(page, { scenarioName }) {

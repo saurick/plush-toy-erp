@@ -8,6 +8,12 @@
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
 
 ## 2026-06-05
+- 完成：统一移除主题菜单触发按钮的 tooltip。`ERPThemeToggle` 的 menu 形态现在只保留按钮 `aria-label` 和下拉菜单选中态，不再在点击主题按钮时额外弹出“主题：浅色 / 暗色”提示，避免移动端菜单选项被 tooltip 覆盖。
+- 完成：`style:l1` 的主题菜单切换 helper 新增断言，菜单打开后不允许出现可见的“主题” tooltip，防止后续重新包回 tooltip 造成遮挡回归。
+- 验证：`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，267 个测试通过；`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,mobile-tasks-dark pnpm style:l1` 通过，覆盖桌面登录页主题菜单和移动任务端暗色主题场景。Browser 复用 `http://127.0.0.1:5175`，390x844 视口打开移动任务入口后未登录守卫落到 `/admin-login`，主题菜单打开时“跟系统 / 浅色 / 暗色”可见、可见主题 tooltip 数为 0，点击“暗色”后按钮变为“主题模式：暗色”，console error/warn 为空。
+- 下一步：如后续继续优化移动端主题菜单，可优先调整菜单位置、触控尺寸或选中态，不再为该按钮恢复 hover tooltip。
+- 阻塞/风险：本轮只改前端共用主题组件和 L1 回归脚本；未改主题真源、localStorage key、暗色样式 token、后端、schema、migration、RBAC、seedData、Workflow / Fact 语义或部署。Browser 截图接口本轮仍出现 `Page.captureScreenshot` 超时，视觉证据以 L1 产物为准；Browser DOM / console / 交互状态已验证。
+
 - 完成：撤销生产 Compose README 中 `8.218.4.199` / Cloudflare / `yoyoosun.net` 域名 / Nginx / Let's Encrypt 作为当前部署真源的旧口径，当前部署目标改为内网服务器 `192.168.0.133`，Compose 入口为 `/opt/plush-toy-erp/current/server/deploy/compose/prod`。本轮未向 `8.218.4.199` 上传、加载镜像、重启服务或修改文件。
 - 完成：按低配服务器发布约束在本机构建并上传 amd64 前端镜像 `plush-toy-erp-web:20260605T101206-0e5b65b-mobile-metrics-amd64`，服务器侧仅执行 `docker load`、更新 `.env` 的 `WEB_IMAGE`、重建 9 个 web 容器；服务端镜像仍为 `plush-toy-erp-server:20260531T145153-9b414a58-vm`。
 - 完成：线上 Atlas 状态初查发现 1 个历史 pending migration `20260530161152`。该迁移为新增 `contacts / suppliers / customers / sales_orders / sales_order_items` 及索引约束，dry-run 通过后使用宿主机 `/usr/local/bin/atlas` 执行 apply；迁移后 `Migration Status: OK`，当前版本 `20260530161152`，pending files 为 0。

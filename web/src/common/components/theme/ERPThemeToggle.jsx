@@ -1,6 +1,6 @@
 import React from 'react'
 import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Segmented, Tooltip } from 'antd'
+import { Button, Dropdown, Segmented } from 'antd'
 import { ERP_THEME_MODE, useERPTheme } from '@/common/theme/erpTheme'
 
 const themeOptions = [
@@ -82,11 +82,7 @@ export default function ERPThemeToggle({
         placement="bottomRight"
         trigger={['click']}
       >
-        {showLabel ? (
-          button
-        ) : (
-          <Tooltip title={`主题：${currentLabel}`}>{button}</Tooltip>
-        )}
+        {button}
       </Dropdown>
     )
   }
