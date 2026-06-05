@@ -63,21 +63,13 @@ export ERP_DEBUG_CLEANUP_ENABLED=false
 - PMC 移动端：`5192`
 - 品质移动端：`5193`
 
-当前 `8.218.4.199` 生产网关域名映射：
+当前部署目标是内网服务器 `192.168.0.133`，Compose 入口位于：
 
-| 入口 | 域名 | 上游端口 |
-| --- | --- | --- |
-| 桌面后台 | `admin.yoyoosun.net` | `5175` |
-| 老板移动端 | `boss.yoyoosun.net` | `5186` |
-| 业务移动端 | `business.yoyoosun.net` | `5187` |
-| 采购移动端 | `purchasing.yoyoosun.net` | `5188` |
-| 生产移动端 | `production.yoyoosun.net` | `5189` |
-| 仓库移动端 | `warehouse.yoyoosun.net` | `5190` |
-| 财务移动端 | `finance.yoyoosun.net` | `5191` |
-| PMC 移动端 | `pmc.yoyoosun.net` | `5192` |
-| 品质移动端 | `quality.yoyoosun.net` | `5193` |
+```bash
+/opt/plush-toy-erp/current/server/deploy/compose/prod
+```
 
-DNS 侧应为上述域名添加 A 记录并指向 `8.218.4.199`，当前 Cloudflare 使用 Proxied 模式。`admin.yoyoosun.net` 已在服务器侧签发 Let's Encrypt 证书并通过 Nginx HTTPS 反代到桌面后台；8 个移动端子域名共用 `mobile.yoyoosun.net` 证书文件，证书 SAN 覆盖 `boss / business / purchasing / production / warehouse / finance / pmc / quality.yoyoosun.net`，并分别通过 Nginx HTTPS 反代到固定移动端口。`yoyoosun.net` 根域已签发独立证书并跳转到 `https://admin.yoyoosun.net`。证书由服务器 `/usr/local/sbin/renew-acme-certs.sh` 统一续签，root crontab 每天 `03:23` 执行。
+当前不再把 `8.218.4.199`、Cloudflare、`yoyoosun.net` 域名、Nginx 反代或 Let's Encrypt 证书作为本仓库的当前部署真源。阿里云服务器如曾经承载过镜像或网关配置，只能作为历史部署记录追溯，不能作为后续发布目标或当前运维口径。
 
 说明：
 
@@ -89,7 +81,7 @@ DNS 侧应为上述域名添加 A 记录并指向 `8.218.4.199`，当前 Cloudfl
 - `POSTGRES_DSN` 是 URL，若 `POSTGRES_PASSWORD` 包含 `@`、`:`、`/`、`%`、`#` 等特殊字符，DSN 里的密码必须先 URL 编码；`POSTGRES_PASSWORD` 本身保持原值。
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关可以直接把入口流量映射到对应前端固定端口
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要按入口重新设置构建期 `VITE_BASE_URL`
-- 若云安全组未开放 `5175-5193`，推荐在宿主机 Nginx / SLB / 其他网关上只开放 `80/443`，并按域名或 Host 将桌面端入口反代到 `127.0.0.1:5175`；移动端入口如果也要公网访问，应优先分配独立域名或开放对应固定端口，不要在未调整构建 base path 的情况下直接挂路径前缀。
+- 如果后续要重新开放公网域名或网关入口，必须先补新的正式部署方案，再更新本 README、Compose 环境说明和对应 smoke；不要沿用已经撤销的阿里云 / Cloudflare 旧口径。
 - PDF 运行依赖：服务端镜像内置 Debian `chromium` 与 `fonts-noto-cjk`，默认浏览器路径为 `/usr/bin/chromium`；如需自定义可通过 `ERP_PDF_CHROME_PATH` 覆盖。
 - PDF 资源建议：默认 `APP_MEM_LIMIT=896m`、`ERP_PDF_RENDER_CONCURRENCY=2`，优先稳住在线 PDF 预览；如果同机项目较多，先降低并发，再评估是否调整内存。
 
