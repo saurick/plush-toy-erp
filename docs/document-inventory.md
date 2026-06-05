@@ -55,6 +55,12 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/erp-print-template-field-behavior.md` | 打印模板字段与编辑行为清单 / ERP Print Template Field Behavior |
 | `docs/erp-print-template-implementation.md` | 打印模板实现原理 / ERP Print Template Implementation |
 
+### 设计资产
+
+| 路径 | 标题 / 当前用途 |
+| --- | --- |
+| `docs/assets/mobile-role-tasks/README.md` | 移动端岗位任务页原型资产 / Mobile Role Tasks Prototype Assets |
+
 ### 架构评审
 
 | 路径 | 标题 / 当前用途 |
@@ -93,6 +99,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/implementation-governance.md` | 模块实施治理 / Implementation Governance |
 | `docs/product/migration-readiness-checklist.md` | 迁移准备检查清单 / Migration Readiness Checklist |
 | `docs/product/module-boundaries.md` | 模块边界 / Module Boundaries |
+| `docs/product/mobile-role-tasks-redesign.md` | 移动端岗位任务页改版 / Mobile Role Tasks Redesign |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |
 | `docs/product/product-delivery-ledgers.md` | 产品能力进度台账、客户交付矩阵与客户差异台账 / Product Delivery Ledgers |
 | `docs/product/product-principles.md` | 产品原则 / Product Principles |

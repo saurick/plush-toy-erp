@@ -30,6 +30,7 @@
 
 - 领域模型 V1：`/Users/simon/projects/plush-toy-erp/docs/product/domain-model-v1.md`
 - 正式产品入口与菜单配置计划：`/Users/simon/projects/plush-toy-erp/docs/product/formal-menu-entry-plan.md`
+- 移动端岗位任务页改版：`/Users/simon/projects/plush-toy-erp/docs/product/mobile-role-tasks-redesign.md`
 - 配置与权限策略：`/Users/simon/projects/plush-toy-erp/docs/product/config-permission-policy.md`
 - 客户实例策略：`/Users/simon/projects/plush-toy-erp/docs/product/customer-instance-policy.md`
 - 客户差异策略：`/Users/simon/projects/plush-toy-erp/docs/product/customer-delta-policy.md`
