@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import {
   BellOutlined,
   CheckOutlined,
@@ -9,6 +10,7 @@ import {
   InboxOutlined,
   LeftOutlined,
   LinkOutlined,
+  LogoutOutlined,
   MoreOutlined,
   PauseOutlined,
   CaretRightOutlined,
@@ -119,6 +121,20 @@ const MOBILE_ROLE_LABELS = {
 }
 
 const QUICK_REASONS = ['材料不足', '产能不足', '工艺/模具问题', '信息不清']
+
+const MOBILE_MAIN_TAB_KEYS = Object.freeze({
+  TODO: 'todo',
+  DONE: 'done',
+  MESSAGES: 'messages',
+  MINE: 'mine',
+})
+
+const MOBILE_MAIN_TAB_ITEMS = Object.freeze([
+  { key: MOBILE_MAIN_TAB_KEYS.TODO, label: '待办', Icon: InboxOutlined },
+  { key: MOBILE_MAIN_TAB_KEYS.DONE, label: '已办', Icon: CheckSquareOutlined },
+  { key: MOBILE_MAIN_TAB_KEYS.MESSAGES, label: '消息', Icon: BellOutlined },
+  { key: MOBILE_MAIN_TAB_KEYS.MINE, label: '我的', Icon: UserOutlined },
+])
 
 function getMobileRoleLabel(roleKey) {
   return MOBILE_ROLE_LABELS[normalizeRoleKey(roleKey)] || '岗位'
@@ -460,10 +476,14 @@ function buildTaskFactRows(task) {
 
 export default function MobileRoleTasksPage() {
   const { activeRoleKey } = useERPWorkspace()
+  const { adminProfile, handleLogout, loggingOut } = useOutletContext() || {}
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
   const [updatingID, setUpdatingID] = useState(null)
   const [urgingID, setUrgingID] = useState(null)
+  const [activeMainTabKey, setActiveMainTabKey] = useState(
+    MOBILE_MAIN_TAB_KEYS.TODO
+  )
   const [activeFilterKey, setActiveFilterKey] = useState('all')
   const [selectedTaskID, setSelectedTaskID] = useState(null)
   const [detailAction, setDetailAction] = useState(null)
@@ -478,6 +498,13 @@ export default function MobileRoleTasksPage() {
     () =>
       taskViews.filter(
         (task) => !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
+      ),
+    [taskViews]
+  )
+  const doneTasks = useMemo(
+    () =>
+      taskViews.filter((task) =>
+        TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
       ),
     [taskViews]
   )
@@ -550,6 +577,15 @@ export default function MobileRoleTasksPage() {
   useEffect(() => {
     setDetailAction(null)
   }, [selectedTaskID])
+
+  useEffect(() => {
+    if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO) {
+      return
+    }
+    setActiveFilterKey('all')
+    setSelectedTaskID(null)
+    setDetailAction(null)
+  }, [activeMainTabKey])
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
@@ -1288,10 +1324,6 @@ export default function MobileRoleTasksPage() {
   const selectedCanUrge = selectedTask
     ? canUrgeTask(activeRoleKey, selectedTask)
     : false
-  const recentTaskSummary = activeTasks
-    .slice(0, 2)
-    .map((task) => resolveTaskSourceLabel(task))
-    .join(' / ')
   const detailReasonValue = selectedTask
     ? detailAction === 'urge'
       ? urgeReasonByTaskID[selectedTask.id] || ''
@@ -1406,192 +1438,356 @@ export default function MobileRoleTasksPage() {
     )
   }
 
-  const renderListScreen = () => (
-    <div className="mobile-role-tasks-page surface-panel min-h-screen bg-white pb-24 text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
-      <header className="flex items-center justify-between gap-3 px-5 pb-3 pt-8">
-        <div className="flex min-w-0 items-center gap-3">
-          <h1 className="shrink-0 text-4xl font-semibold tracking-normal text-slate-950">
-            待办
-          </h1>
-          <span className="inline-flex shrink-0 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-base font-semibold text-emerald-700">
-            {roleLabel}
-          </span>
+  const renderTabSummary = () => {
+    const summaryByTab = {
+      [MOBILE_MAIN_TAB_KEYS.TODO]: `共 ${activeTasks.length} 条待处理`,
+      [MOBILE_MAIN_TAB_KEYS.DONE]: `共 ${doneTasks.length} 条已办`,
+      [MOBILE_MAIN_TAB_KEYS.MESSAGES]: `共 ${
+        warningTasks.length + noticeTasks.length
+      } 条消息`,
+      [MOBILE_MAIN_TAB_KEYS.MINE]: `${roleLabel}任务端`,
+    }
+    return summaryByTab[activeMainTabKey] || summaryByTab.todo
+  }
+
+  const renderTaskMetricCards = () => (
+    <section className="mx-5 mt-5 grid grid-cols-4 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white py-5 text-center shadow-sm">
+      {[
+        ['我的预警', taskSummary.alerts, 'text-orange-500'],
+        ['已超时', taskSummary.overdue, 'text-red-500'],
+        ['即将超时', taskSummary.dueSoon, 'text-slate-600'],
+        [
+          '阻塞/高优先',
+          `${taskSummary.blocked}/${taskSummary.highPriority}`,
+          'text-red-500',
+        ],
+      ].map(([label, value, colorClass]) => (
+        <div key={label} className="min-w-0 px-2">
+          <div className={`text-4xl font-semibold leading-tight ${colorClass}`}>
+            {value}
+          </div>
+          <div className="mt-1 text-base text-slate-600">{label}</div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <ERPThemeToggle size="small" variant="menu" />
+      ))}
+    </section>
+  )
+
+  const renderTaskFilters = () => (
+    <div className="mx-5 mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner">
+      {filterItems.map((item) => {
+        const active = item.key === activeFilterKey
+        return (
           <button
+            key={item.key}
             type="button"
-            className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-base font-semibold text-emerald-700"
-            onClick={loadTasks}
-            disabled={loading}
-          >
-            <ReloadOutlined className={loading ? 'animate-spin' : ''} />
-            <span>{loading ? '刷新中' : '刷新'}</span>
-          </button>
-        </div>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-3 px-5 text-sm text-slate-500">
-        <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-        <span>最后同步：{latestSync}</span>
-        <span className="text-slate-300">|</span>
-        <span>共 {activeTasks.length} 条待处理</span>
-      </div>
-      {recentTaskSummary ? (
-        <div className="mt-2 max-h-10 overflow-hidden break-words px-5 text-sm leading-5 text-slate-500">
-          最近任务：{recentTaskSummary}
-        </div>
-      ) : null}
-
-      <section className="mx-5 mt-5 grid grid-cols-4 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white py-5 text-center shadow-sm">
-        {[
-          ['我的预警', taskSummary.alerts, 'text-orange-500'],
-          ['已超时', taskSummary.overdue, 'text-red-500'],
-          ['即将超时', taskSummary.dueSoon, 'text-slate-600'],
-          [
-            '阻塞/高优先',
-            `${taskSummary.blocked}/${taskSummary.highPriority}`,
-            'text-red-500',
-          ],
-        ].map(([label, value, colorClass]) => (
-          <div key={label} className="min-w-0 px-2">
-            <div
-              className={`text-4xl font-semibold leading-tight ${colorClass}`}
-            >
-              {value}
-            </div>
-            <div className="mt-1 text-base text-slate-600">{label}</div>
-          </div>
-        ))}
-      </section>
-
-      <div className="mx-5 mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner">
-        {filterItems.map((item) => {
-          const active = item.key === activeFilterKey
-          return (
-            <button
-              key={item.key}
-              type="button"
-              className={`min-w-0 rounded-xl px-2 py-3 text-base font-semibold transition ${
-                active
-                  ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200'
-                  : 'text-slate-500'
-              }`}
-              onClick={() => {
-                setActiveFilterKey(item.key)
-                setSelectedTaskID(null)
-                setDetailAction(null)
-              }}
-            >
-              <span className="truncate">
-                {item.label}({item.count})
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="mobile-role-tasks-page__sections mt-5 grid grid-cols-1 gap-4 md:grid-cols-[0.78fr_1.22fr] md:px-5">
-        <div className="order-2 space-y-4 px-5 md:order-1 md:px-0">
-          {renderProgressPanel()}
-
-          <section className="erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-            <h2 className="text-lg font-semibold text-slate-950">预警</h2>
-            <div className="mt-3 space-y-2">
-              {warningTasks.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
-                  暂无预警任务
-                </div>
-              ) : (
-                warningTasks.slice(0, 4).map((task) => (
-                  <button
-                    key={task.id}
-                    type="button"
-                    className="w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
-                    onClick={() => setSelectedTaskID(task.id)}
-                  >
-                    <div className="font-semibold text-amber-800">
-                      {getTaskQueueTone(task)}
-                    </div>
-                    <div className="mt-1 text-sm text-slate-900">
-                      {task.task_name}
-                    </div>
-                    <div className="mt-1 break-all text-xs text-amber-700">
-                      {resolveTaskSourceLabel(task)}
-                    </div>
-                    {task.blocked_reason ? (
-                      <div className="mt-1 text-sm text-red-600">
-                        {task.blocked_reason}
-                      </div>
-                    ) : null}
-                  </button>
-                ))
-              )}
-            </div>
-          </section>
-
-          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
-            <h2 className="text-lg font-semibold text-slate-950">通知</h2>
-            <div className="mt-3 space-y-2">
-              {noticeTasks.map((task) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  className="flex w-full items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
-                  onClick={() => setSelectedTaskID(task.id)}
-                >
-                  <span className="min-w-0 text-sm font-medium text-slate-700">
-                    {task.task_name}
-                  </span>
-                  <span className="shrink-0 text-xs text-slate-400">
-                    {formatMobileTaskTime(task.updated_at)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        <section className="order-1 md:order-2">
-          <div className="grid grid-cols-[minmax(0,1fr)_112px] px-5 pb-2 text-base text-slate-500 md:px-0">
-            <span>任务信息</span>
-            <span className="text-right">业务状态 / 截止时间</span>
-          </div>
-          <div className="overflow-hidden border-y border-slate-200 bg-white md:rounded-2xl md:border">
-            {filteredTasks.length === 0 ? (
-              <div className="px-5 py-8 text-center text-sm text-slate-500">
-                当前筛选下暂无任务
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-200">
-                {filteredTasks.map(renderTaskRow)}
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
-
-      <nav className="sticky bottom-0 mt-6 grid grid-cols-4 border-t border-slate-200 bg-white/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
-        {[
-          ['待办', InboxOutlined, true],
-          ['已办', CheckSquareOutlined, false],
-          ['消息', BellOutlined, false],
-          ['我的', UserOutlined, false],
-        ].map(([label, Icon, active]) => (
-          <button
-            key={label}
-            type="button"
-            className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-sm ${
-              active ? 'text-emerald-700' : 'text-slate-500'
+            className={`min-w-0 rounded-xl px-2 py-3 text-base font-semibold transition ${
+              active
+                ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200'
+                : 'text-slate-500'
             }`}
+            onClick={() => {
+              setActiveFilterKey(item.key)
+              setSelectedTaskID(null)
+              setDetailAction(null)
+            }}
           >
-            <Icon className="text-2xl" />
-            <span>{label}</span>
+            <span className="truncate">
+              {item.label}({item.count})
+            </span>
           </button>
-        ))}
-      </nav>
+        )
+      })}
     </div>
   )
+
+  const renderTodoPanel = () => (
+    <>
+      {renderTaskMetricCards()}
+      {renderTaskFilters()}
+      <section className="mx-5 mt-5 pb-5">
+        <div className="grid grid-cols-[minmax(0,1fr)_112px] pb-2 text-base text-slate-500">
+          <span>任务信息</span>
+          <span className="text-right">业务状态 / 截止时间</span>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          {filteredTasks.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-slate-500">
+              当前筛选下暂无任务
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200">
+              {filteredTasks.map(renderTaskRow)}
+            </div>
+          )}
+        </div>
+      </section>
+    </>
+  )
+
+  const renderDoneTaskItem = (task) => (
+    <div
+      key={task.id}
+      className="erp-mobile-list-item rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="break-words text-base font-semibold text-slate-950">
+            {task.task_name}
+          </div>
+          <div className="mt-1 break-all text-sm text-slate-500">
+            {resolveTaskSourceLabel(task)}
+          </div>
+        </div>
+        <span className="shrink-0 rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-sm font-semibold text-emerald-700">
+          {task.task_status_label}
+        </span>
+      </div>
+      <div className="mt-2 text-sm text-slate-500">
+        更新时间：{formatMobileTaskTime(task.updated_at)}
+      </div>
+    </div>
+  )
+
+  const renderDonePanel = () => (
+    <section className="mx-5 mt-5 space-y-4 pb-5">
+      {renderProgressPanel()}
+      <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-950">已办任务</h2>
+        <div className="mt-3 space-y-3">
+          {doneTasks.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 px-3 py-5 text-center text-sm text-slate-500">
+              暂无已办任务
+            </div>
+          ) : (
+            doneTasks.slice(0, 20).map(renderDoneTaskItem)
+          )}
+        </div>
+      </section>
+    </section>
+  )
+
+  const renderMessagesPanel = () => (
+    <section className="mx-5 mt-5 space-y-4 pb-5">
+      <section className="erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+        <h2 className="text-lg font-semibold text-slate-950">预警</h2>
+        <div className="mt-3 space-y-2">
+          {warningTasks.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
+              暂无预警任务
+            </div>
+          ) : (
+            warningTasks.slice(0, 8).map((task) => (
+              <button
+                key={task.id}
+                type="button"
+                className="w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
+                onClick={() => setSelectedTaskID(task.id)}
+              >
+                <div className="font-semibold text-amber-800">
+                  {getTaskQueueTone(task)}
+                </div>
+                <div className="mt-1 text-sm text-slate-900">
+                  {task.task_name}
+                </div>
+                <div className="mt-1 break-all text-xs text-amber-700">
+                  {resolveTaskSourceLabel(task)}
+                </div>
+                {task.blocked_reason ? (
+                  <div className="mt-1 text-sm text-red-600">
+                    {task.blocked_reason}
+                  </div>
+                ) : null}
+              </button>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
+        <h2 className="text-lg font-semibold text-slate-950">通知</h2>
+        <div className="mt-3 space-y-2">
+          {noticeTasks.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
+              暂无通知
+            </div>
+          ) : (
+            noticeTasks.map((task) => (
+              <button
+                key={task.id}
+                type="button"
+                className="flex w-full items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
+                onClick={() => setSelectedTaskID(task.id)}
+              >
+                <span className="min-w-0 text-sm font-medium text-slate-700">
+                  {task.task_name}
+                </span>
+                <span className="shrink-0 text-xs text-slate-400">
+                  {formatMobileTaskTime(task.updated_at)}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </section>
+    </section>
+  )
+
+  const renderMinePanel = () => {
+    const roleNames = (adminProfile?.roles || [])
+      .map((role) => role?.name || role?.role_key)
+      .filter(Boolean)
+      .join(' / ')
+    return (
+      <section className="mx-5 mt-5 space-y-4 pb-5">
+        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-3xl text-emerald-700">
+              <UserOutlined />
+            </span>
+            <div className="min-w-0">
+              <div className="truncate text-xl font-semibold text-slate-950">
+                {adminProfile?.username || '当前账号'}
+              </div>
+              <div className="mt-1 text-sm text-slate-500">
+                {roleLabel}任务端
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-xl bg-slate-50 px-3 py-3">
+              <div className="text-slate-500">账号角色</div>
+              <div className="mt-1 min-w-0 break-words font-semibold text-slate-950">
+                {roleNames || '-'}
+              </div>
+            </div>
+            <div className="rounded-xl bg-slate-50 px-3 py-3">
+              <div className="text-slate-500">权限模式</div>
+              <div className="mt-1 font-semibold text-slate-950">
+                {adminProfile?.is_super_admin ? '超级管理员' : '角色授权'}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid grid-cols-4 gap-3">
+          {[
+            ['待办', activeTasks.length],
+            ['已办', doneTasks.length],
+            ['预警', taskSummary.alerts],
+            ['高优先', taskSummary.highPriority],
+          ].map(([label, value]) => (
+            <div key={label} className={mobileTheme.metricCard}>
+              <div className={mobileTheme.metricValue}>{value}</div>
+              <div className={mobileTheme.metricLabel}>{label}</div>
+            </div>
+          ))}
+        </section>
+
+        <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-950">登录与安全</h2>
+          <button
+            type="button"
+            data-testid="mobile-role-logout-button"
+            className={`${mobileTheme.logoutButton} mt-4 w-full`}
+            onClick={handleLogout}
+            disabled={loggingOut || typeof handleLogout !== 'function'}
+          >
+            <LogoutOutlined aria-hidden="true" />
+            <span>{loggingOut ? '退出中' : '退出登录'}</span>
+          </button>
+        </section>
+      </section>
+    )
+  }
+
+  const renderActiveTabPanel = () => {
+    if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE) {
+      return renderDonePanel()
+    }
+    if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES) {
+      return renderMessagesPanel()
+    }
+    if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MINE) {
+      return renderMinePanel()
+    }
+    return renderTodoPanel()
+  }
+
+  const renderBottomNavigation = () => (
+    <nav
+      className="mobile-role-bottom-nav"
+      aria-label="移动端主导航"
+      data-testid="mobile-role-bottom-nav"
+    >
+      {MOBILE_MAIN_TAB_ITEMS.map(({ key, label, Icon }) => {
+        const active = key === activeMainTabKey
+        return (
+          <button
+            key={key}
+            type="button"
+            data-testid={`mobile-role-nav-${key}`}
+            aria-current={active ? 'page' : undefined}
+            className={`mobile-role-bottom-nav__item ${
+              active ? 'mobile-role-bottom-nav__item--active' : ''
+            }`}
+            onClick={() => setActiveMainTabKey(key)}
+          >
+            <Icon aria-hidden="true" />
+            <span>{label}</span>
+          </button>
+        )
+      })}
+    </nav>
+  )
+
+  const renderListScreen = () => {
+    const activeTabLabel =
+      MOBILE_MAIN_TAB_ITEMS.find((item) => item.key === activeMainTabKey)
+        ?.label || '待办'
+
+    return (
+      <div className="mobile-role-tasks-page mobile-role-tasks-page--tabs surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
+        <div
+          className="mobile-role-tasks-page__scroll"
+          data-testid="mobile-role-scroll"
+        >
+          <header className="flex items-center justify-between gap-3 px-5 pb-3 pt-8">
+            <div className="flex min-w-0 items-center gap-3">
+              <h1 className="shrink-0 text-4xl font-semibold tracking-normal text-slate-950">
+                {activeTabLabel}
+              </h1>
+              <span className="inline-flex shrink-0 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-base font-semibold text-emerald-700">
+                {roleLabel}
+              </span>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <ERPThemeToggle size="small" variant="menu" />
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-base font-semibold text-emerald-700"
+                onClick={loadTasks}
+                disabled={loading}
+              >
+                <ReloadOutlined className={loading ? 'animate-spin' : ''} />
+                <span>{loading ? '刷新中' : '刷新'}</span>
+              </button>
+            </div>
+          </header>
+
+          <div className="flex flex-wrap items-center gap-3 px-5 text-sm text-slate-500">
+            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            <span>最后同步：{latestSync}</span>
+            <span className="text-slate-300">|</span>
+            <span>{renderTabSummary()}</span>
+          </div>
+
+          {renderActiveTabPanel()}
+        </div>
+
+        {renderBottomNavigation()}
+      </div>
+    )
+  }
 
   const renderDetailScreen = () => {
     if (!selectedTask || !selectedSeverity) return null
@@ -1602,8 +1798,8 @@ export default function MobileRoleTasksPage() {
     const isUrging = urgingID === selectedTask.id
 
     return (
-      <div className="mobile-role-tasks-page surface-panel min-h-screen bg-white pb-4 text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+      <div className="mobile-role-tasks-page mobile-role-tasks-page--detail surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
+        <header className="shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="grid grid-cols-[112px_minmax(0,1fr)_92px] items-center gap-2 px-4 py-4">
             <button
               type="button"
@@ -1635,7 +1831,7 @@ export default function MobileRoleTasksPage() {
           </div>
         </header>
 
-        <main className="space-y-5 bg-slate-50 px-4 py-5">
+        <main className="mobile-role-tasks-page__detail-main space-y-5 bg-slate-50 px-4 py-5">
           <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
@@ -1789,7 +1985,7 @@ export default function MobileRoleTasksPage() {
           ) : null}
         </main>
 
-        <div className="sticky bottom-0 grid grid-cols-4 gap-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="mobile-role-action-bar grid grid-cols-4 gap-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
           <button
             type="button"
             className="rounded-xl bg-blue-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"

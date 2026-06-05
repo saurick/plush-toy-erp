@@ -3178,6 +3178,11 @@ export default function BusinessModulePage({ moduleItem }) {
   )
 
   const exportCurrentRecords = () => {
+    if (displayRecords.length === 0) {
+      message.warning('当前结果没有记录，无法导出')
+      return
+    }
+
     const columns = [
       ...orderedTableColumnDefinitions,
       { key: 'business_status_key', label: '业务状态' },

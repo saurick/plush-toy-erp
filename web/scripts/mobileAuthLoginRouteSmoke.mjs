@@ -509,29 +509,37 @@ async function runMobileAuthScenario(
 
   await waitForPath(page, '/tasks')
   assert.equal(passwordLoginCalls, 1, `${app.id} 应完成一次管理员密码登录`)
+  await expectText(page, '任务')
   await expectText(page, '待办')
-  await expectText(page, '退出登录')
   await expectText(page, '我的预警')
   await expectText(page, '已超时')
   await expectText(page, '即将超时')
   await expectText(page, '阻塞/高优先')
-  await expectText(page, '预警')
-  await expectText(page, '通知')
-  await expectText(page, '任务')
+  await expectText(page, 'STYLE-001')
+  await expectText(page, 'OUT-001')
+  await expectText(page, '登录回跳验证任务')
+  await expectText(page, '回签跟进')
+  await expectNoText(page, app.shortTitle)
+  await expectNoText(page, 'owner_role_key')
+  await expectNoText(page, '说明')
+  await expectNoText(page, 'Deferred')
+
+  await page.getByTestId('mobile-role-nav-done').click()
+  await expectText(page, '已办任务')
   await expectText(page, '进度')
   await expectText(page, '待处理')
   await expectText(page, '处理中')
   await expectText(page, '卡住')
   await expectText(page, '完成')
-  await expectText(page, 'STYLE-001')
-  await expectText(page, 'OUT-001')
-  await expectText(page, '登录回跳验证任务')
-  await expectText(page, '回签跟进')
+  await expectText(page, 'DONE-001')
+
+  await page.getByTestId('mobile-role-nav-messages').click()
+  await expectText(page, '预警')
+  await expectText(page, '通知')
   await expectText(page, '供应商延期')
-  await expectNoText(page, app.shortTitle)
-  await expectNoText(page, 'owner_role_key')
-  await expectNoText(page, '说明')
-  await expectNoText(page, 'Deferred')
+
+  await page.getByTestId('mobile-role-nav-todo').click()
+  await expectText(page, '待办')
 
   assert(
     workflowCalls >= 1,
@@ -545,17 +553,12 @@ async function runMobileAuthScenario(
   const metrics = await page.evaluate(() => {
     const main = document.querySelector('main') || document.body
     const appLayout = document.querySelector('.mobile-app-layout')
-    const taskSections = document.querySelector(
-      '.mobile-role-tasks-page__sections'
-    )
-    const taskSectionStyle = taskSections
-      ? window.getComputedStyle(taskSections)
-      : null
-    const taskSectionColumns = String(
-      taskSectionStyle?.gridTemplateColumns || ''
-    )
-      .split(/\s+/)
-      .filter(Boolean)
+    const shell = document.querySelector('.mobile-role-tasks-page')
+    const scroll = document.querySelector('[data-testid="mobile-role-scroll"]')
+    const nav = document.querySelector('[data-testid="mobile-role-bottom-nav"]')
+    const shellRect = shell?.getBoundingClientRect()
+    const scrollRect = scroll?.getBoundingClientRect()
+    const navRect = nav?.getBoundingClientRect()
     return {
       path: window.location.pathname,
       viewport: { width: window.innerWidth, height: window.innerHeight },
@@ -563,8 +566,28 @@ async function runMobileAuthScenario(
       clientWidth: document.documentElement.clientWidth,
       mainHeight: main.getBoundingClientRect().height,
       appLayoutWidth: appLayout?.getBoundingClientRect().width || 0,
-      taskSectionDisplay: taskSectionStyle?.display || '',
-      taskSectionColumnCount: taskSectionColumns.length,
+      shell: shellRect
+        ? {
+            top: shellRect.top,
+            bottom: shellRect.bottom,
+            height: shellRect.height,
+          }
+        : null,
+      scroll: scrollRect
+        ? {
+            top: scrollRect.top,
+            bottom: scrollRect.bottom,
+            height: scrollRect.height,
+          }
+        : null,
+      nav: navRect
+        ? {
+            top: navRect.top,
+            bottom: navRect.bottom,
+            height: navRect.height,
+          }
+        : null,
+      navButtonCount: nav?.querySelectorAll('button').length || 0,
       activeElementTagName: document.activeElement?.tagName || '',
     }
   })
@@ -582,26 +605,36 @@ async function runMobileAuthScenario(
     metrics.appLayoutWidth > 0,
     `移动端登录回跳后主布局容器未渲染: ${JSON.stringify(metrics)}`
   )
+  assert(metrics.shell, `移动端任务页容器未渲染: ${JSON.stringify(metrics)}`)
+  assert(metrics.scroll, `移动端任务页滚动区未渲染: ${JSON.stringify(metrics)}`)
+  assert(metrics.nav, `移动端底部导航未渲染: ${JSON.stringify(metrics)}`)
+  assert.equal(
+    metrics.navButtonCount,
+    4,
+    `移动端底部导航应固定为四项: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.shell.bottom <= metrics.viewport.height + 1,
+    `移动端任务页容器应固定在当前视口内: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    Math.abs(metrics.nav.bottom - metrics.shell.bottom) <= 1.5,
+    `移动端底部导航未贴住任务页底部: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.scroll.bottom <= metrics.nav.top + 1.5,
+    `移动端正文滚动区不应覆盖底部导航: ${JSON.stringify(metrics)}`
+  )
 
   if (viewportProfile.viewport.width >= 768) {
     assert(
       metrics.appLayoutWidth >= viewportProfile.viewport.width - 96,
       `${app.id} ${viewportProfile.label} 视口下主内容仍按手机窄宽度渲染: ${JSON.stringify(metrics)}`
     )
-    assert.equal(
-      metrics.taskSectionColumnCount,
-      2,
-      `${app.id} ${viewportProfile.label} 视口下任务区应切换为双栏: ${JSON.stringify(metrics)}`
-    )
   } else {
     assert(
       metrics.appLayoutWidth <= 560,
       `${app.id} ${viewportProfile.label} 视口下主内容不应超过手机阅读宽度: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      metrics.taskSectionColumnCount,
-      1,
-      `${app.id} ${viewportProfile.label} 视口下任务区应保持单栏: ${JSON.stringify(metrics)}`
     )
   }
 
@@ -616,7 +649,9 @@ async function runMobileAuthScenario(
   await waitForPath(page, '/tasks')
   await expectNoText(page, '说明')
 
-  await page.getByRole('button', { name: '退出登录' }).click()
+  await page.getByTestId('mobile-role-nav-mine').click()
+  await expectText(page, '登录与安全')
+  await page.getByTestId('mobile-role-logout-button').click()
   await waitForPath(page, '/admin-login')
   const storedToken = await page.evaluate(() =>
     localStorage.getItem('admin_access_token')

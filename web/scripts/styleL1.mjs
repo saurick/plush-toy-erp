@@ -427,11 +427,14 @@ const scenarios = [
       })
       await assertThemeReadable(page, {
         scenarioName: 'mobile-tasks-dark',
-        selector: '.erp-mobile-card',
+        selector: '.erp-mobile-list-item',
       })
       await assertDarkThemeContrast(page, {
         scenarioName: 'mobile-tasks-dark',
         selector: '.mobile-app-layout',
+      })
+      await assertMobileTaskMainNavigation(page, {
+        scenarioName: 'mobile-tasks-dark',
       })
     },
   },
@@ -1506,7 +1509,10 @@ async function main() {
       await waitForServer(baseURL)
     }
 
-    const browser = await chromium.launch({ headless })
+    const browser = await chromium.launch({
+      headless,
+      args: ['--no-proxy-server', '--proxy-bypass-list=<-loopback>'],
+    })
     try {
       for (const scenario of selectedScenarios) {
         await runScenario(browser, scenario)
@@ -1648,7 +1654,7 @@ async function runScenario(browser, scenario) {
   })
 
   try {
-    await page.goto(new URL(scenario.path, `${baseURL}/`).toString(), {
+    await gotoScenarioPath(page, scenario.path, {
       waitUntil: 'domcontentloaded',
     })
     await delay(300)
@@ -1675,6 +1681,35 @@ async function runScenario(browser, scenario) {
       .catch(() => {})
     await page.close()
   }
+}
+
+async function gotoScenarioPath(page, scenarioPath, options = {}) {
+  const url = new URL(scenarioPath, `${baseURL}/`).toString()
+  const maxAttempts = 3
+  let lastError = null
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await page.goto(url, options)
+      return
+    } catch (error) {
+      lastError = error
+      if (!isRetryableLocalNavigationError(error) || attempt === maxAttempts) {
+        throw error
+      }
+      await delay(250 * attempt)
+    }
+  }
+
+  throw lastError
+}
+
+function isRetryableLocalNavigationError(error) {
+  const message = String(error?.message || '')
+  return (
+    message.includes('net::ERR_ADDRESS_INVALID') ||
+    message.includes('net::ERR_CONNECTION_REFUSED')
+  )
 }
 
 async function waitForPath(page, expectedPath) {
@@ -4782,6 +4817,28 @@ async function assertBusinessRecordModalLayout(
     const addItemButton = controls.find((control) =>
       control.className.includes('erp-business-record-form__add-item-button')
     )
+    const itemSummaryMetrics = modal
+      ? Array.from(modal.querySelectorAll('.erp-item-summary-metric')).map(
+          (metric) => {
+            const style = window.getComputedStyle(metric)
+            const label = metric.querySelector('.ant-typography')
+            const labelStyle = label ? window.getComputedStyle(label) : null
+            const value = metric.querySelector('.erp-item-summary-value')
+            const valueStyle = value ? window.getComputedStyle(value) : null
+            const rect = metric.getBoundingClientRect()
+            return {
+              text: metric.textContent?.replace(/\s+/g, ' ').trim() || '',
+              width: rect.width,
+              height: rect.height,
+              backgroundColor: style.backgroundColor,
+              borderColor: style.borderColor,
+              color: style.color,
+              labelColor: labelStyle?.color || '',
+              valueColor: valueStyle?.color || '',
+            }
+          }
+        )
+      : []
     const headerFieldCols = fieldCols.filter(
       (col) => !String(col.text || '').startsWith('来源带值')
     )
@@ -4870,6 +4927,7 @@ async function assertBusinessRecordModalLayout(
       firstRowCols,
       controls,
       addItemButton,
+      itemSummaryMetrics,
       nestedHorizontalScrollContainers,
     }
   }, expectCompactGrid)
@@ -4936,6 +4994,7 @@ async function assertBusinessRecordModalLayout(
   })
   if (expectDarkChrome) {
     assertDarkModalControls(metrics, scenarioName)
+    assertDarkItemSummaryMetrics(metrics, scenarioName)
   } else {
     assertTradeLikeModalControls(metrics, scenarioName)
     await assertBusinessRecordModalFocusStyle(page, scenarioName)
@@ -5737,6 +5796,38 @@ function assertDarkModalControls(metrics, scenarioName) {
   })
 }
 
+function assertDarkItemSummaryMetrics(metrics, scenarioName) {
+  const summaries = (metrics.itemSummaryMetrics || []).filter(
+    (summary) => summary.width > 0 && summary.height > 0
+  )
+  assert(
+    summaries.length >= 3,
+    `${scenarioName} 缺少可检查的暗色明细统计胶囊: ${JSON.stringify(metrics)}`
+  )
+
+  summaries.forEach((summary) => {
+    assert(
+      isDarkControlBackground(summary.backgroundColor),
+      `${scenarioName} 明细统计胶囊仍是浅色背景: ${JSON.stringify(summary)}`
+    )
+    assert(
+      isDarkNeutralBorderColor(summary.borderColor) ||
+        isBluePrimaryColor(summary.borderColor),
+      `${scenarioName} 明细统计胶囊边框不够清楚: ${JSON.stringify(summary)}`
+    )
+    assertReadableOnDark(
+      summary.labelColor || summary.color,
+      summary.backgroundColor,
+      `${scenarioName} 明细统计胶囊 label 对比度不足`
+    )
+    assertReadableOnDark(
+      summary.valueColor,
+      summary.backgroundColor,
+      `${scenarioName} 明细统计胶囊数值对比度不足`
+    )
+  })
+}
+
 function isGreenFocusColor(color) {
   const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
   if (!match) return false
@@ -6480,6 +6571,166 @@ async function clickERPThemeOption(page, label) {
       expectedMode
     )
   }
+}
+
+async function assertMobileTaskMainNavigation(page, { scenarioName }) {
+  const todoMetrics = await readMobileTaskLayoutMetrics(page)
+  assertMobileTaskBottomNavLayout(todoMetrics, scenarioName)
+  assert.equal(
+    todoMetrics.heading,
+    '待办',
+    `${scenarioName} 默认分区应为待办: ${JSON.stringify(todoMetrics)}`
+  )
+  assert.equal(
+    todoMetrics.logoutVisible,
+    false,
+    `${scenarioName} 退出登录不应出现在待办分区: ${JSON.stringify(todoMetrics)}`
+  )
+  assert(
+    !todoMetrics.sectionHeadings.includes('进度') &&
+      !todoMetrics.sectionHeadings.includes('通知') &&
+      !todoMetrics.sectionHeadings.includes('预警'),
+    `${scenarioName} 待办分区仍混入旧进度/预警/通知区块: ${JSON.stringify(todoMetrics)}`
+  )
+
+  await page.getByTestId('mobile-role-nav-messages').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '消息'
+  })
+  const messageMetrics = await readMobileTaskLayoutMetrics(page)
+  assertMobileTaskBottomNavLayout(messageMetrics, scenarioName)
+  assert(
+    messageMetrics.sectionHeadings.includes('预警') &&
+      messageMetrics.sectionHeadings.includes('通知'),
+    `${scenarioName} 消息分区应承载预警和通知: ${JSON.stringify(messageMetrics)}`
+  )
+
+  await page.getByTestId('mobile-role-nav-done').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '已办'
+  })
+  const doneMetrics = await readMobileTaskLayoutMetrics(page)
+  assertMobileTaskBottomNavLayout(doneMetrics, scenarioName)
+  assert(
+    doneMetrics.sectionHeadings.includes('进度') &&
+      doneMetrics.sectionHeadings.includes('已办任务'),
+    `${scenarioName} 已办分区应承载进度和已办任务: ${JSON.stringify(doneMetrics)}`
+  )
+
+  await page.getByTestId('mobile-role-nav-mine').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '我的'
+  })
+  const mineMetrics = await readMobileTaskLayoutMetrics(page)
+  assertMobileTaskBottomNavLayout(mineMetrics, scenarioName)
+  assert(
+    mineMetrics.logoutVisible,
+    `${scenarioName} 退出登录应只在我的分区出现: ${JSON.stringify(mineMetrics)}`
+  )
+
+  await page.getByTestId('mobile-role-nav-todo').click()
+  await page.waitForFunction(() => {
+    const heading = document.querySelector('.mobile-role-tasks-page h1')
+    return heading?.textContent?.trim() === '待办'
+  })
+  const restoredMetrics = await readMobileTaskLayoutMetrics(page)
+  assertMobileTaskBottomNavLayout(restoredMetrics, scenarioName)
+  assert.equal(
+    restoredMetrics.logoutVisible,
+    false,
+    `${scenarioName} 从我的返回待办后不应残留退出登录: ${JSON.stringify(restoredMetrics)}`
+  )
+}
+
+async function readMobileTaskLayoutMetrics(page) {
+  return page.evaluate(() => {
+    const shell = document.querySelector('.mobile-role-tasks-page')
+    const scroll = document.querySelector('[data-testid="mobile-role-scroll"]')
+    const nav = document.querySelector('[data-testid="mobile-role-bottom-nav"]')
+    const logout = document.querySelector(
+      '[data-testid="mobile-role-logout-button"]'
+    )
+    const shellRect = shell?.getBoundingClientRect()
+    const scrollRect = scroll?.getBoundingClientRect()
+    const navRect = nav?.getBoundingClientRect()
+    const logoutRect = logout?.getBoundingClientRect()
+    const sectionHeadings = Array.from(
+      document.querySelectorAll('.mobile-role-tasks-page h2')
+    ).map((heading) => heading.textContent?.trim() || '')
+
+    return {
+      heading:
+        document
+          .querySelector('.mobile-role-tasks-page h1')
+          ?.textContent?.trim() || '',
+      sectionHeadings,
+      shell: shellRect
+        ? {
+            top: shellRect.top,
+            bottom: shellRect.bottom,
+            height: shellRect.height,
+          }
+        : null,
+      scroll: scrollRect
+        ? {
+            top: scrollRect.top,
+            bottom: scrollRect.bottom,
+            height: scrollRect.height,
+            scrollHeight: scroll?.scrollHeight || 0,
+          }
+        : null,
+      nav: navRect
+        ? {
+            top: navRect.top,
+            bottom: navRect.bottom,
+            height: navRect.height,
+          }
+        : null,
+      navButtonCount: nav?.querySelectorAll('button').length || 0,
+      logoutVisible:
+        Boolean(logout) &&
+        Boolean(logoutRect) &&
+        logoutRect.width > 0 &&
+        logoutRect.height > 0,
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+      windowScrollY: window.scrollY,
+    }
+  })
+}
+
+function assertMobileTaskBottomNavLayout(metrics, scenarioName) {
+  assert(metrics.shell, `${scenarioName} 未找到移动端任务页容器`)
+  assert(metrics.scroll, `${scenarioName} 未找到移动端正文滚动容器`)
+  assert(metrics.nav, `${scenarioName} 未找到移动端底部导航`)
+  assert.equal(
+    metrics.navButtonCount,
+    4,
+    `${scenarioName} 底部导航应固定为四项: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.shell.bottom <= metrics.viewport.height + 1,
+    `${scenarioName} 任务页容器超出视口导致底部导航不固定: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    Math.abs(metrics.nav.bottom - metrics.shell.bottom) <= 1.5,
+    `${scenarioName} 底部导航未贴住任务页容器底部: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.scroll.bottom <= metrics.nav.top + 1.5,
+    `${scenarioName} 正文滚动区与底部导航发生覆盖: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
+    `${scenarioName} 移动端任务页出现横向溢出: ${JSON.stringify(metrics)}`
+  )
 }
 
 async function assertThemeReadable(page, { scenarioName, selector }) {

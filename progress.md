@@ -20,6 +20,13 @@
 - 下一步：如继续做第二轮移动端细节，可优先补“详情页真实动作流”的专门 Playwright 回归，包括阻塞原因输入、完成、催办和返回列表；也可按 PMC / 老板汇总视角做风险分组列表。
 - 阻塞/风险：本轮只改移动端任务页、移动端外壳和移动端暗色样式覆盖；未改后端、schema、migration、RBAC、seedData、业务事实层或部署。当前工作区仍有本轮之前就存在的 `web/scripts/styleL1.mjs`、`web/src/erp/pages/BusinessModulePage.jsx` 等现场改动，本轮未回退、未清理、未作为移动端改版成果处理。
 
+- 完成：继续修正移动端岗位任务页改版遗留问题。底部 `待办 / 已办 / 消息 / 我的` 改为同页真实分区并固定在任务页视口底部；正文改为独立滚动区，退出登录从外壳底部移入“我的”分区，待办默认态不再混入旧的进度 / 预警 / 通知区块。
+- 完成：详情页同步改为固定高度壳层，任务正文独立滚动，底部处理 / 阻塞 / 完成 / 催办动作栏固定在容器底部；状态更新、催办和后续 follow-up 仍复用现有 `moveTask` / `urgeTask` 主路径，未新增路由、权限码或后端事实写入。
+- 完成：同步 `docs/product/mobile-role-tasks-redesign.md`，明确底部四项当前只是页面内前端分区，不升级为权限或路由真源；更新 `style:l1` 和 `mobile-auth-login-route-smoke` 断言，覆盖底部导航固定、tab 切换、退出登录只在“我的”出现，以及手机 / iPad 盒模型。
+- 验证：`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，267 个测试通过；`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm style:l1` 通过，40 个场景通过；`MOBILE_AUTH_SMOKE_APP_ID=mobile-business pnpm smoke:mobile-auth-login-route` 通过；`cd web && pnpm smoke:mobile-auth-login-route` 通过，覆盖 8 个移动端角色和手机 / iPad。Browser 打开 `http://localhost:5175/m/sales/tasks` 验证未登录守卫跳转 `/admin-login` 且 console 无 error/warn；Browser 截图接口本轮超时，移动端任务页视觉证据以 L1 / smoke Playwright 截图和 DOM 断言为准。
+- 下一步：如果继续按原型细化，可补“已办 / 消息 / 我的”更完整的信息架构，或为详情页真实动作流增加专门回归：阻塞原因输入、完成、催办、返回列表和恢复态。
+- 阻塞/风险：本轮只改移动端任务页、移动端外壳、移动端样式、前端回归脚本和改版说明；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。原型 PNG 仍未落入 `docs/assets/mobile-role-tasks/`，当前按仓库改版说明和用户截图方向实现；工作区仍保留本轮之前已有的 `BusinessModulePage.jsx`、合同纸面样式、dev docs 样式和部分 L1 框架现场改动，本轮未回退。
+
 ## 2026-06-04 22:04 CST
 - 完成：修复采购合同服务端 PDF 在线预览 / 下载样式丢失。根因是后端通过 `data:text/html` 交给 Chromium 渲染时，生产构建里的外链 CSS 会被 `data:` 文档跨源加载拦截；当前快照改为在前端克隆阶段内联已加载 stylesheet，并移除外链 stylesheet / preload，保证服务端 PDF 使用同一份纸面样式。
 - 完成：补齐服务器与本机字体度量差异下的采购合同短字段列样式，采购订单号、产品订单编号、单位、数量、金额列不再按字符拆行；同步让 `style:l1` 的 Chromium 直连本地地址，并对本地 `goto` 的 `ERR_ADDRESS_INVALID / ERR_CONNECTION_REFUSED` 做有限重试，修复全量回归里 Vite HMR / 127.0.0.1 导航偶发打断。
