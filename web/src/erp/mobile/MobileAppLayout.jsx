@@ -3,8 +3,6 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import { LogoutOutlined } from '@ant-design/icons'
 import { AUTH_SCOPE, getStoredAdminProfile, logout } from '@/common/auth/auth'
 import AppShell from '@/common/components/layout/AppShell'
-import SurfacePanel from '@/common/components/layout/SurfacePanel'
-import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
@@ -91,22 +89,11 @@ export default function MobileAppLayout() {
   }
 
   return (
-    <AppShell className="px-3 py-4 sm:px-4 md:px-8">
-      <div className="mobile-app-layout mx-auto max-w-[540px] space-y-4 md:max-w-[920px]">
-        <SurfacePanel className="p-4 md:p-5">
-          <div className="mobile-app-layout__header">
-            <h1 className={mobileTheme.pageTitle}>待办</h1>
-            <ERPThemeToggle
-              className="mobile-app-layout__theme-toggle"
-              size="small"
-              variant="menu"
-            />
-          </div>
-        </SurfacePanel>
-
+    <AppShell className="px-0 py-0 md:px-8 md:py-4">
+      <div className="mobile-app-layout mx-auto min-h-screen w-full max-w-[430px] md:max-w-[920px]">
         {canUseCurrentMobileRole ? <Outlet /> : null}
 
-        <div className="flex justify-center pb-3">
+        <div className="flex justify-center bg-white px-4 pb-6 pt-2 md:rounded-b-[28px]">
           <button
             type="button"
             className={mobileTheme.logoutButton}

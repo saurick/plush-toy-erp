@@ -5372,6 +5372,7 @@
 }
 
 [data-erp-theme='dark'] .mobile-app-layout .text-slate-900,
+[data-erp-theme='dark'] .mobile-app-layout .text-slate-950,
 [data-erp-theme='dark'] .mobile-app-layout .text-slate-800,
 [data-erp-theme='dark'] .mobile-app-layout .text-slate-700 {
   color: var(--erp-text);
@@ -5383,15 +5384,38 @@
   color: var(--erp-text-muted);
 }
 
+[data-erp-theme='dark'] .mobile-app-layout .text-emerald-700,
+[data-erp-theme='dark'] .mobile-app-layout .text-emerald-600 {
+  color: #6ee7b7;
+}
+
+[data-erp-theme='dark'] .mobile-app-layout .text-blue-700,
+[data-erp-theme='dark'] .mobile-app-layout .text-blue-600 {
+  color: #93c5fd;
+}
+
 [data-erp-theme='dark'] .mobile-app-layout .surface-panel,
 [data-erp-theme='dark'] .erp-mobile-card,
 [data-erp-theme='dark'] .erp-mobile-list-item {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
-  color: var(--erp-text-muted);
+  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-mobile-highlight-card {
+  background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .mobile-app-layout .bg-white,
+[data-erp-theme='dark'] .mobile-app-layout .bg-slate-50,
+[data-erp-theme='dark'] .mobile-app-layout .bg-slate-100,
+[data-erp-theme='dark'] .mobile-app-layout .bg-red-50,
+[data-erp-theme='dark'] .mobile-app-layout .bg-blue-50,
+[data-erp-theme='dark'] .mobile-app-layout .bg-emerald-50 {
+  background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .mobile-app-layout .erp-mobile-list-item {
   background: var(--erp-surface-bg-soft);
 }
 

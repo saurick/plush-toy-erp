@@ -1,7 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  BellOutlined,
+  CheckOutlined,
+  CheckSquareOutlined,
+  ClockCircleOutlined,
+  ExclamationCircleFilled,
+  FileTextOutlined,
+  InboxOutlined,
+  LeftOutlined,
+  LinkOutlined,
+  MoreOutlined,
+  PauseOutlined,
+  CaretRightOutlined,
+  ReloadOutlined,
+  UserOutlined,
+} from '@ant-design/icons'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import SurfacePanel from '@/common/components/layout/SurfacePanel'
+import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import { useERPWorkspace } from '../../context/ERPWorkspaceProvider'
 import {
   createWorkflowTask,
@@ -89,6 +105,98 @@ import {
 import { mobileTheme } from '../theme'
 
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
+
+const MOBILE_ROLE_LABELS = {
+  boss: '老板',
+  business: '业务',
+  sales: '业务',
+  purchase: '采购',
+  production: '生产',
+  warehouse: '仓库组',
+  finance: '财务',
+  pmc: 'PMC',
+  quality: '质检',
+}
+
+const QUICK_REASONS = ['材料不足', '产能不足', '工艺/模具问题', '信息不清']
+
+function getMobileRoleLabel(roleKey) {
+  return MOBILE_ROLE_LABELS[normalizeRoleKey(roleKey)] || '岗位'
+}
+
+function resolveLatestTaskTime(tasks) {
+  const latest = tasks
+    .map((task) => task.updated_at || task.created_at)
+    .filter(Boolean)
+    .sort()
+  const latestValue = latest[latest.length - 1]
+  return latestValue ? formatMobileTaskTime(latestValue) : '-'
+}
+
+function getTaskSeverityView(task) {
+  if (isTaskOverdue(task)) {
+    return {
+      label: '超时',
+      badgeClass: 'border-red-300 bg-red-50 text-red-600',
+      rowClass: 'bg-red-50/35',
+      timeClass: 'text-red-500',
+    }
+  }
+  if (task.alert_level === 'critical') {
+    return {
+      label: '严重',
+      badgeClass: 'border-red-300 bg-red-50 text-red-600',
+      rowClass: 'bg-red-50/35',
+      timeClass: 'text-red-500',
+    }
+  }
+  if (isTaskAlerted(task)) {
+    return {
+      label: '预警',
+      badgeClass: 'border-amber-300 bg-amber-50 text-amber-600',
+      rowClass: 'bg-emerald-50/25',
+      timeClass: 'text-orange-500',
+    }
+  }
+  return {
+    label: '普通',
+    badgeClass: 'border-slate-200 bg-slate-50 text-slate-500',
+    rowClass: 'bg-white',
+    timeClass: 'text-slate-500',
+  }
+}
+
+function resolveTaskListMeta(task) {
+  const payload = task.payload || {}
+  if (payload.customer_name || payload.style_no || payload.quantity) {
+    return `客户：${payload.customer_name || '-'} ｜ 款式：${
+      payload.style_no || payload.product_name || '-'
+    } ｜ 数量：${payload.quantity || '-'}${payload.unit || ''}`
+  }
+  if (payload.material_name || payload.spec || payload.quantity) {
+    return `物料：${payload.material_name || '-'} ｜ 规格：${
+      payload.spec || '-'
+    } ｜ 数量：${payload.quantity || '-'}${payload.unit || ''}`
+  }
+  if (payload.supplier_name || payload.payable_type) {
+    return `供应商：${payload.supplier_name || '-'} ｜ 类型：${
+      payload.payable_type || '-'
+    }`
+  }
+  return `分组：${task.task_group || '-'} ｜ 优先级：${task.priority || '-'}`
+}
+
+function resolveTaskBusinessChip(task) {
+  return task.business_status_label || task.task_status_label || '待处理'
+}
+
+function resolveDetailActionLabel(action) {
+  if (action === 'blocked') return '阻塞原因（必填）'
+  if (action === 'rejected') return '退回原因（必填）'
+  if (action === 'urge') return '催办原因（必填）'
+  return '处理原因'
+}
+
 function resolveOrderApprovalBusinessStatus(task, taskStatusKey) {
   if (!isOrderApprovalTask(task)) {
     return task.business_status_key || undefined
@@ -271,12 +379,94 @@ function hasFinanceAmountPayload(task) {
   ].some((key) => payload[key] !== undefined && payload[key] !== '')
 }
 
+function resolveTaskSourceLabel(task) {
+  return task.source_no || `${task.source_type} #${task.source_id}`
+}
+
+function isTaskOverdue(task) {
+  return task.due_status === 'overdue'
+}
+
+function isTaskAlerted(task) {
+  return task.alert_level !== 'info'
+}
+
+function getTaskQueueTone(task) {
+  if (
+    ['blocked', 'rejected'].includes(String(task.task_status_key || '').trim())
+  ) {
+    return '卡住'
+  }
+  if (task.alert_level === 'critical' || isTaskOverdue(task)) {
+    return '高风险'
+  }
+  if (isTaskAlerted(task)) {
+    return task.alert_label || task.due_status_label || '预警'
+  }
+  return task.task_status_label || '待处理'
+}
+
+function buildTaskFactRows(task) {
+  const payload = task.payload || {}
+  const rows = [
+    [
+      '状态',
+      `${task.task_status_label} / ${formatMobileTaskTime(task.updated_at)}`,
+    ],
+    ['业务', task.business_status_label],
+    ['分组', `${task.task_group || '-'} / 优先级 ${task.priority}`],
+    ['截止', task.due_at_label || '-'],
+  ]
+
+  if (payload.customer_name || payload.style_no || payload.due_date) {
+    rows.push([
+      '客户/款式/交期',
+      `${payload.customer_name || '-'} / ${
+        payload.style_no || payload.product_name || '-'
+      } / ${payload.due_date || '-'}`,
+    ])
+  }
+
+  if (payload.supplier_name || payload.material_name || payload.quantity) {
+    rows.push([
+      '供应/物料/数量',
+      `${payload.supplier_name || '-'} / ${
+        payload.material_name || payload.product_name || '-'
+      } / ${payload.quantity || '-'}${payload.unit || ''}`,
+    ])
+  }
+
+  if (payload.qc_result) {
+    rows.push(['IQC 结果', payload.qc_result])
+  }
+
+  if (hasFinanceAmountPayload(task)) {
+    rows.push([
+      '金额/税率',
+      `${payload.amount || '-'} / ${payload.tax_rate || '-'} / 税额 ${
+        payload.tax_amount || '-'
+      } / 含税 ${payload.amount_with_tax || '-'} / 不含税 ${
+        payload.amount_without_tax || '-'
+      }`,
+    ])
+  }
+
+  if (payload.payable_type) {
+    rows.push(['应付类型', payload.payable_type])
+  }
+
+  return rows
+}
+
 export default function MobileRoleTasksPage() {
   const { activeRoleKey } = useERPWorkspace()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
   const [updatingID, setUpdatingID] = useState(null)
   const [urgingID, setUrgingID] = useState(null)
+  const [activeFilterKey, setActiveFilterKey] = useState('all')
+  const [selectedTaskID, setSelectedTaskID] = useState(null)
+  const [detailAction, setDetailAction] = useState(null)
   const [blockedReasonByTaskID, setBlockedReasonByTaskID] = useState({})
   const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState({})
 
@@ -292,7 +482,7 @@ export default function MobileRoleTasksPage() {
     [taskViews]
   )
   const warningTasks = useMemo(
-    () => activeTasks.filter((task) => task.alert_level !== 'info'),
+    () => activeTasks.filter((task) => isTaskAlerted(task)),
     [activeTasks]
   )
   const noticeTasks = useMemo(() => activeTasks.slice(0, 8), [activeTasks])
@@ -309,6 +499,57 @@ export default function MobileRoleTasksPage() {
     progressTotal === 0
       ? 0
       : Math.round((taskSummary.done / progressTotal) * 100)
+  const filteredTasks = useMemo(() => {
+    if (activeFilterKey === 'alert') {
+      return activeTasks.filter((task) => isTaskAlerted(task))
+    }
+    if (activeFilterKey === 'overdue') {
+      return activeTasks.filter((task) => isTaskOverdue(task))
+    }
+    if (activeFilterKey === 'mine') {
+      return activeTasks.filter((task) => canOperateTask(activeRoleKey, task))
+    }
+    return activeTasks
+  }, [activeFilterKey, activeRoleKey, activeTasks])
+  const filterItems = useMemo(
+    () => [
+      { key: 'all', label: '全部', count: activeTasks.length },
+      { key: 'alert', label: '预警', count: warningTasks.length },
+      {
+        key: 'overdue',
+        label: '超时',
+        count: activeTasks.filter((task) => isTaskOverdue(task)).length,
+      },
+      {
+        key: 'mine',
+        label: '我负责',
+        count: activeTasks.filter((task) => canOperateTask(activeRoleKey, task))
+          .length,
+      },
+    ],
+    [activeRoleKey, activeTasks, warningTasks.length]
+  )
+  const selectedTask = useMemo(
+    () =>
+      activeTasks.find((task) => String(task.id) === String(selectedTaskID)) ||
+      null,
+    [activeTasks, selectedTaskID]
+  )
+  useEffect(() => {
+    if (selectedTaskID === null) {
+      return
+    }
+    const selectedVisible = filteredTasks.some(
+      (task) => String(task.id) === String(selectedTaskID)
+    )
+    if (!selectedVisible) {
+      setSelectedTaskID(null)
+    }
+  }, [filteredTasks, selectedTaskID])
+
+  useEffect(() => {
+    setDetailAction(null)
+  }, [selectedTaskID])
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
@@ -871,7 +1112,7 @@ export default function MobileRoleTasksPage() {
   const moveTask = async (task, taskStatusKey) => {
     if (!canOperateTask(activeRoleKey, task)) {
       message.warning('当前角色只能查看该任务，不能代办完成')
-      return
+      return false
     }
     const blockedReason = String(
       blockedReasonByTaskID[task.id] ?? task.blocked_reason ?? ''
@@ -879,7 +1120,7 @@ export default function MobileRoleTasksPage() {
     const reasonRequired = ['blocked', 'rejected'].includes(taskStatusKey)
     if (reasonRequired && !blockedReason) {
       message.warning('请先填写阻塞或退回原因')
-      return
+      return false
     }
     const nextBusinessStatusKey = resolveMobileTaskBusinessStatus(
       task,
@@ -963,10 +1204,12 @@ export default function MobileRoleTasksPage() {
       })
       message.success('任务状态已更新')
       await loadTasks()
+      return true
     } catch (error) {
       message.error(
         getActionErrorMessage(error, '更新任务状态失败，请稍后重试')
       )
+      return false
     } finally {
       setUpdatingID(null)
     }
@@ -975,12 +1218,12 @@ export default function MobileRoleTasksPage() {
   const urgeTask = async (task) => {
     if (!canUrgeTask(activeRoleKey, task)) {
       message.warning('当前角色没有催办该任务的权限')
-      return
+      return false
     }
     const reason = String(urgeReasonByTaskID[task.id] || '').trim()
     if (!reason) {
       message.warning('请先填写催办原因')
-      return
+      return false
     }
 
     setUrgingID(task.id)
@@ -1004,370 +1247,599 @@ export default function MobileRoleTasksPage() {
       })
       message.success('催办已记录')
       await loadTasks()
+      return true
     } catch (error) {
       message.error(getActionErrorMessage(error, '催办失败，请稍后重试'))
+      return false
     } finally {
       setUrgingID(null)
     }
   }
 
-  return (
-    <div className="mobile-role-tasks-page space-y-4">
-      <SurfacePanel className="p-4 sm:p-5 md:p-6">
-        <div className="space-y-4">
-          <div className="grid grid-cols-4 gap-2 md:gap-3">
-            <div className={mobileTheme.metricCard}>
-              <div className={mobileTheme.metricValue}>
-                {taskSummary.alerts}
-              </div>
-              <div className={mobileTheme.metricLabel}>我的预警</div>
-            </div>
-            <div className={mobileTheme.metricCard}>
-              <div className={mobileTheme.metricValue}>
-                {taskSummary.overdue}
-              </div>
-              <div className={mobileTheme.metricLabel}>已超时</div>
-            </div>
-            <div className={mobileTheme.metricCard}>
-              <div className={mobileTheme.metricValue}>
-                {taskSummary.dueSoon}
-              </div>
-              <div className={mobileTheme.metricLabel}>即将超时</div>
-            </div>
-            <div className={mobileTheme.metricCard}>
-              <div className={mobileTheme.metricValue}>
-                {taskSummary.blocked}/{taskSummary.highPriority}
-              </div>
-              <div className={mobileTheme.metricLabel}>阻塞/高优先</div>
+  const handleTaskAction = async (task, action) => {
+    setSelectedTaskID(task.id)
+    if (['blocked', 'rejected', 'urge'].includes(action)) {
+      setDetailAction(action)
+      return
+    }
+    setDetailAction(null)
+    await moveTask(task, action)
+  }
+
+  const submitDetailAction = async () => {
+    if (!selectedTask || !detailAction) return
+    const actionCompleted =
+      detailAction === 'urge'
+        ? await urgeTask(selectedTask)
+        : await moveTask(selectedTask, detailAction)
+    if (actionCompleted) {
+      setDetailAction(null)
+    }
+  }
+
+  const roleLabel = getMobileRoleLabel(activeRoleKey)
+  const latestSync = resolveLatestTaskTime(activeTasks)
+  const selectedSeverity = selectedTask
+    ? getTaskSeverityView(selectedTask)
+    : null
+  const selectedCanOperate = selectedTask
+    ? canOperateTask(activeRoleKey, selectedTask)
+    : false
+  const selectedCanUrge = selectedTask
+    ? canUrgeTask(activeRoleKey, selectedTask)
+    : false
+  const recentTaskSummary = activeTasks
+    .slice(0, 2)
+    .map((task) => resolveTaskSourceLabel(task))
+    .join(' / ')
+  const detailReasonValue = selectedTask
+    ? detailAction === 'urge'
+      ? urgeReasonByTaskID[selectedTask.id] || ''
+      : blockedReasonByTaskID[selectedTask.id] || ''
+    : ''
+
+  const updateDetailReason = (value) => {
+    if (!selectedTask) return
+    if (detailAction === 'urge') {
+      setUrgeReasonByTaskID((current) => ({
+        ...current,
+        [selectedTask.id]: value,
+      }))
+      return
+    }
+    setBlockedReasonByTaskID((current) => ({
+      ...current,
+      [selectedTask.id]: value,
+    }))
+  }
+
+  const appendQuickReason = (value) => {
+    const nextValue = detailReasonValue
+      ? `${detailReasonValue}；${value}`
+      : value
+    updateDetailReason(nextValue)
+  }
+
+  const renderProgressPanel = () => (
+    <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-slate-950">进度</h2>
+        <span className="text-sm text-slate-500">{progressPercent}%</span>
+      </div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-emerald-500"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+      <div className="mt-4 grid grid-cols-4 divide-x divide-slate-200 rounded-xl border border-slate-100 bg-slate-50 py-3 text-center">
+        {[
+          ['待处理', taskSummary.pending, FileTextOutlined],
+          ['处理中', taskSummary.processing, ClockCircleOutlined],
+          ['卡住', taskSummary.blockedProgress, PauseOutlined],
+          ['完成', taskSummary.done, CheckSquareOutlined],
+        ].map(([label, value, Icon]) => (
+          <div key={label} className="space-y-1 px-2">
+            <div className="text-xl font-semibold text-slate-950">{value}</div>
+            <div className="flex items-center justify-center gap-1 text-xs text-slate-500">
+              <Icon />
+              <span>{label}</span>
             </div>
           </div>
+        ))}
+      </div>
+    </section>
+  )
 
-          <div className="flex justify-end">
-            <button
-              type="button"
-              className={mobileTheme.actionButton}
-              onClick={loadTasks}
-              disabled={loading}
-            >
-              {loading ? '刷新中' : '刷新'}
-            </button>
+  const renderTaskRow = (task) => {
+    const severity = getTaskSeverityView(task)
+    const isSelected = String(selectedTask?.id) === String(task.id)
+    return (
+      <button
+        key={task.id}
+        type="button"
+        className={`erp-mobile-list-item grid w-full grid-cols-[64px_minmax(0,1fr)_94px] gap-3 px-5 py-4 text-left transition hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${severity.rowClass} ${
+          isSelected ? 'ring-2 ring-emerald-500/40' : ''
+        }`}
+        onClick={() => {
+          setSelectedTaskID(task.id)
+          setDetailAction(null)
+        }}
+      >
+        <div className="pt-1">
+          <span
+            className={`inline-flex min-w-[52px] items-center justify-center rounded-md border px-2 py-1 text-sm font-semibold ${severity.badgeClass}`}
+          >
+            {severity.label}
+          </span>
+        </div>
+        <div className="min-w-0">
+          <div className="break-words text-base font-semibold leading-snug text-slate-950">
+            {task.task_name}
           </div>
-
-          <div className="mobile-role-tasks-page__sections grid gap-4 md:grid-cols-[minmax(0,0.92fr)_minmax(0,1.28fr)] md:items-start">
-            <div className="space-y-4">
-              <section className="space-y-2">
-                <div className={mobileTheme.sectionTitle}>进度</div>
-                <div className={mobileTheme.listItem}>
-                  <div className={mobileTheme.progressTrack}>
-                    <div
-                      className={mobileTheme.progressFill}
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                  <div className="mt-3 grid grid-cols-4 gap-2">
-                    <div className={mobileTheme.progressStat}>
-                      <div>{taskSummary.pending}</div>
-                      <span>待处理</span>
-                    </div>
-                    <div className={mobileTheme.progressStat}>
-                      <div>{taskSummary.processing}</div>
-                      <span>处理中</span>
-                    </div>
-                    <div className={mobileTheme.progressStat}>
-                      <div>{taskSummary.blockedProgress}</div>
-                      <span>卡住</span>
-                    </div>
-                    <div className={mobileTheme.progressStat}>
-                      <div>{taskSummary.done}</div>
-                      <span>完成</span>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-2">
-                <div className={mobileTheme.sectionTitle}>预警</div>
-                {warningTasks.length === 0 ? (
-                  <div className={mobileTheme.warningItem}>暂无预警</div>
-                ) : (
-                  <div className="space-y-2">
-                    {warningTasks.map((task) => (
-                      <div key={task.id} className={mobileTheme.warningItem}>
-                        <div className="text-sm font-semibold">
-                          {task.alert_label || task.due_status_label}
-                        </div>
-                        <div className="mt-1 text-sm">{task.task_name}</div>
-                        <div className="mt-1 text-xs">
-                          {task.source_no ||
-                            `${task.source_type} #${task.source_id}`}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <section className="space-y-2">
-                <div className={mobileTheme.sectionTitle}>通知</div>
-                {noticeTasks.length === 0 ? (
-                  <div className={mobileTheme.listItem}>暂无通知</div>
-                ) : (
-                  <div className="space-y-2">
-                    {noticeTasks.map((task) => (
-                      <div key={task.id} className={mobileTheme.listItem}>
-                        <div className="font-semibold text-slate-900">
-                          {task.task_name}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {task.task_status_label}
-                          {' / '}
-                          {formatMobileTaskTime(task.updated_at)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </section>
+          <div className="mt-1 break-all text-sm leading-5 text-slate-500">
+            {resolveTaskSourceLabel(task)}
+          </div>
+          <div className="mt-2 flex min-w-0 items-start gap-1 text-sm leading-5 text-slate-600">
+            <UserOutlined className="mt-0.5 shrink-0 text-slate-400" />
+            <span className="min-w-0 break-words">
+              {resolveTaskListMeta(task)}
+            </span>
+          </div>
+          {task.blocked_reason ? (
+            <div className="mt-1 text-sm leading-5 text-red-500">
+              阻塞：{task.blocked_reason}
             </div>
-
-            <section className="space-y-2">
-              <div className={mobileTheme.sectionTitle}>任务</div>
-              {activeTasks.length === 0 ? (
-                <div className={mobileTheme.warningItem}>暂无任务</div>
-              ) : (
-                <div className="space-y-3">
-                  {activeTasks.map((task) => (
-                    <div key={task.id} className={mobileTheme.highlightCard}>
-                      <div className={mobileTheme.sectionEyebrow}>
-                        {task.source_no ||
-                          `${task.source_type} #${task.source_id}`}
-                      </div>
-                      <div className="min-w-0 text-sm font-semibold text-slate-900 [overflow-wrap:anywhere]">
-                        {task.task_name}
-                      </div>
-                      <div className={mobileTheme.highlightNote}>
-                        状态：
-                        {task.task_status_label}
-                        {' / '}
-                        更新：{formatMobileTaskTime(task.updated_at)}
-                      </div>
-                      <div className={mobileTheme.highlightNote}>
-                        业务：
-                        {task.business_status_label}
-                      </div>
-                      <div className={mobileTheme.highlightNote}>
-                        分组：{task.task_group || '-'} / 优先级：
-                        {task.priority} / 截止：{task.due_at_label}
-                      </div>
-                      {task.payload?.customer_name ||
-                      task.payload?.style_no ||
-                      task.payload?.due_date ? (
-                        <div className={mobileTheme.highlightNote}>
-                          客户/款式/交期：
-                          {task.payload?.customer_name || '-'}
-                          {' / '}
-                          {task.payload?.style_no ||
-                            task.payload?.product_name ||
-                            '-'}
-                          {' / '}
-                          {task.payload?.due_date || '-'}
-                        </div>
-                      ) : null}
-                      {task.payload?.supplier_name ||
-                      task.payload?.material_name ||
-                      task.payload?.quantity ? (
-                        <div className={mobileTheme.highlightNote}>
-                          供应/物料/数量：
-                          {task.payload?.supplier_name || '-'}
-                          {' / '}
-                          {task.payload?.material_name ||
-                            task.payload?.product_name ||
-                            '-'}
-                          {' / '}
-                          {task.payload?.quantity || '-'}
-                          {task.payload?.unit || ''}
-                        </div>
-                      ) : null}
-                      {task.payload?.qc_result ? (
-                        <div className={mobileTheme.highlightNote}>
-                          IQC 结果：{task.payload.qc_result}
-                        </div>
-                      ) : null}
-                      {hasFinanceAmountPayload(task) ? (
-                        <div className={mobileTheme.highlightNote}>
-                          金额/税率：
-                          {task.payload?.amount || '-'}
-                          {' / '}
-                          {task.payload?.tax_rate || '-'}
-                          {' / 税额 '}
-                          {task.payload?.tax_amount || '-'}
-                          {' / 含税 '}
-                          {task.payload?.amount_with_tax || '-'}
-                          {' / 不含税 '}
-                          {task.payload?.amount_without_tax || '-'}
-                        </div>
-                      ) : null}
-                      {task.payload?.payable_type ? (
-                        <div className={mobileTheme.highlightNote}>
-                          应付类型：{task.payload.payable_type}
-                        </div>
-                      ) : null}
-                      <div className={mobileTheme.highlightNote}>
-                        预警：
-                        {task.alert_label || task.due_status_label} / 等级：
-                        {task.alert_level}
-                      </div>
-                      {task.blocked_reason ? (
-                        <div className={mobileTheme.warningItem}>
-                          阻塞原因：{task.blocked_reason}
-                        </div>
-                      ) : null}
-                      {task.complete_condition ? (
-                        <div className={mobileTheme.highlightNote}>
-                          完成条件：{task.complete_condition}
-                        </div>
-                      ) : null}
-                      {task.related_documents.length > 0 ? (
-                        <div className={mobileTheme.highlightNote}>
-                          关联单据：{task.related_documents.join(' / ')}
-                        </div>
-                      ) : null}
-                      {task.is_urged ? (
-                        <div className={mobileTheme.warningItem}>
-                          已催办 {task.urge_count || 1} 次
-                          {task.last_urge_reason
-                            ? ` / 最近原因：${task.last_urge_reason}`
-                            : ''}
-                          {task.last_urge_at
-                            ? ` / ${task.last_urge_at_label}`
-                            : ''}
-                        </div>
-                      ) : null}
-                      {task.is_escalated ? (
-                        <div className={mobileTheme.warningItem}>
-                          已升级：
-                          {task.escalate_target_role_key || '关注角色'}
-                        </div>
-                      ) : null}
-                      <textarea
-                        aria-label={`任务阻塞原因 ${task.id}`}
-                        className="mt-3 h-20 w-full resize-none rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                        disabled={!canOperateTask(activeRoleKey, task)}
-                        maxLength={300}
-                        placeholder="阻塞原因"
-                        value={
-                          blockedReasonByTaskID[task.id] ??
-                          task.blocked_reason ??
-                          ''
-                        }
-                        onChange={(event) => {
-                          setBlockedReasonByTaskID((current) => ({
-                            ...current,
-                            [task.id]: event.target.value,
-                          }))
-                        }}
-                      />
-                      {canUrgeTask(activeRoleKey, task) ? (
-                        <textarea
-                          aria-label={`任务催办原因 ${task.id}`}
-                          className="mt-3 h-20 w-full resize-none rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                          disabled={urgingID === task.id}
-                          maxLength={300}
-                          placeholder="催办原因（必填）"
-                          value={urgeReasonByTaskID[task.id] || ''}
-                          onChange={(event) => {
-                            setUrgeReasonByTaskID((current) => ({
-                              ...current,
-                              [task.id]: event.target.value,
-                            }))
-                          }}
-                        />
-                      ) : null}
-                      <div
-                        className={`mt-3 grid gap-2 ${
-                          supportsRejectedAction(activeRoleKey, task)
-                            ? 'grid-cols-4'
-                            : 'grid-cols-3'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          className={mobileTheme.actionButton}
-                          disabled={
-                            updatingID === task.id ||
-                            !canOperateTask(activeRoleKey, task)
-                          }
-                          onClick={() => moveTask(task, 'processing')}
-                        >
-                          处理
-                        </button>
-                        <button
-                          type="button"
-                          className={mobileTheme.actionButton}
-                          disabled={
-                            updatingID === task.id ||
-                            !canOperateTask(activeRoleKey, task)
-                          }
-                          onClick={() => moveTask(task, 'blocked')}
-                        >
-                          阻塞
-                        </button>
-                        {supportsRejectedAction(activeRoleKey, task) ? (
-                          <button
-                            type="button"
-                            className={mobileTheme.actionButton}
-                            disabled={
-                              updatingID === task.id ||
-                              !canOperateTask(activeRoleKey, task)
-                            }
-                            onClick={() => moveTask(task, 'rejected')}
-                          >
-                            退回
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className={mobileTheme.actionButton}
-                          disabled={
-                            updatingID === task.id ||
-                            !canOperateTask(activeRoleKey, task)
-                          }
-                          onClick={() => moveTask(task, 'done')}
-                        >
-                          完成
-                        </button>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          className={mobileTheme.actionButton}
-                          disabled={
-                            urgingID === task.id ||
-                            !canUrgeTask(activeRoleKey, task)
-                          }
-                          onClick={() => urgeTask(task)}
-                        >
-                          {resolveMobileUrgeAction(activeRoleKey, task) ===
-                          'escalate_to_boss'
-                            ? '升级'
-                            : '催办'}
-                        </button>
-                        <button
-                          type="button"
-                          className={mobileTheme.actionButton}
-                          disabled
-                        >
-                          查看日志待接入
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+          ) : null}
+        </div>
+        <div className="min-w-0 text-right">
+          <span className="inline-flex max-w-full items-center justify-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-sm font-semibold leading-5 text-blue-600">
+            <span className="truncate">{resolveTaskBusinessChip(task)}</span>
+          </span>
+          <div
+            className={`mt-2 break-words text-sm leading-5 ${severity.timeClass}`}
+          >
+            {task.due_at_label || task.due_status_label || '-'}
           </div>
         </div>
-      </SurfacePanel>
+      </button>
+    )
+  }
+
+  const renderListScreen = () => (
+    <div className="mobile-role-tasks-page surface-panel min-h-screen bg-white pb-24 text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
+      <header className="flex items-center justify-between gap-3 px-5 pb-3 pt-8">
+        <div className="flex min-w-0 items-center gap-3">
+          <h1 className="shrink-0 text-4xl font-semibold tracking-normal text-slate-950">
+            待办
+          </h1>
+          <span className="inline-flex shrink-0 items-center rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-base font-semibold text-emerald-700">
+            {roleLabel}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <ERPThemeToggle size="small" variant="menu" />
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-xl px-2 py-2 text-base font-semibold text-emerald-700"
+            onClick={loadTasks}
+            disabled={loading}
+          >
+            <ReloadOutlined className={loading ? 'animate-spin' : ''} />
+            <span>{loading ? '刷新中' : '刷新'}</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-3 px-5 text-sm text-slate-500">
+        <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+        <span>最后同步：{latestSync}</span>
+        <span className="text-slate-300">|</span>
+        <span>共 {activeTasks.length} 条待处理</span>
+      </div>
+      {recentTaskSummary ? (
+        <div className="mt-2 max-h-10 overflow-hidden break-words px-5 text-sm leading-5 text-slate-500">
+          最近任务：{recentTaskSummary}
+        </div>
+      ) : null}
+
+      <section className="mx-5 mt-5 grid grid-cols-4 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white py-5 text-center shadow-sm">
+        {[
+          ['我的预警', taskSummary.alerts, 'text-orange-500'],
+          ['已超时', taskSummary.overdue, 'text-red-500'],
+          ['即将超时', taskSummary.dueSoon, 'text-slate-600'],
+          [
+            '阻塞/高优先',
+            `${taskSummary.blocked}/${taskSummary.highPriority}`,
+            'text-red-500',
+          ],
+        ].map(([label, value, colorClass]) => (
+          <div key={label} className="min-w-0 px-2">
+            <div
+              className={`text-4xl font-semibold leading-tight ${colorClass}`}
+            >
+              {value}
+            </div>
+            <div className="mt-1 text-base text-slate-600">{label}</div>
+          </div>
+        ))}
+      </section>
+
+      <div className="mx-5 mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner">
+        {filterItems.map((item) => {
+          const active = item.key === activeFilterKey
+          return (
+            <button
+              key={item.key}
+              type="button"
+              className={`min-w-0 rounded-xl px-2 py-3 text-base font-semibold transition ${
+                active
+                  ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200'
+                  : 'text-slate-500'
+              }`}
+              onClick={() => {
+                setActiveFilterKey(item.key)
+                setSelectedTaskID(null)
+                setDetailAction(null)
+              }}
+            >
+              <span className="truncate">
+                {item.label}({item.count})
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="mobile-role-tasks-page__sections mt-5 grid grid-cols-1 gap-4 md:grid-cols-[0.78fr_1.22fr] md:px-5">
+        <div className="order-2 space-y-4 px-5 md:order-1 md:px-0">
+          {renderProgressPanel()}
+
+          <section className="erp-mobile-card rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+            <h2 className="text-lg font-semibold text-slate-950">预警</h2>
+            <div className="mt-3 space-y-2">
+              {warningTasks.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-amber-200 bg-white/70 px-3 py-4 text-sm text-slate-500">
+                  暂无预警任务
+                </div>
+              ) : (
+                warningTasks.slice(0, 4).map((task) => (
+                  <button
+                    key={task.id}
+                    type="button"
+                    className="w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
+                    onClick={() => setSelectedTaskID(task.id)}
+                  >
+                    <div className="font-semibold text-amber-800">
+                      {getTaskQueueTone(task)}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-900">
+                      {task.task_name}
+                    </div>
+                    <div className="mt-1 break-all text-xs text-amber-700">
+                      {resolveTaskSourceLabel(task)}
+                    </div>
+                    {task.blocked_reason ? (
+                      <div className="mt-1 text-sm text-red-600">
+                        {task.blocked_reason}
+                      </div>
+                    ) : null}
+                  </button>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
+            <h2 className="text-lg font-semibold text-slate-950">通知</h2>
+            <div className="mt-3 space-y-2">
+              {noticeTasks.map((task) => (
+                <button
+                  key={task.id}
+                  type="button"
+                  className="flex w-full items-start justify-between gap-3 rounded-xl bg-slate-50 px-3 py-3 text-left"
+                  onClick={() => setSelectedTaskID(task.id)}
+                >
+                  <span className="min-w-0 text-sm font-medium text-slate-700">
+                    {task.task_name}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    {formatMobileTaskTime(task.updated_at)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <section className="order-1 md:order-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_112px] px-5 pb-2 text-base text-slate-500 md:px-0">
+            <span>任务信息</span>
+            <span className="text-right">业务状态 / 截止时间</span>
+          </div>
+          <div className="overflow-hidden border-y border-slate-200 bg-white md:rounded-2xl md:border">
+            {filteredTasks.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sm text-slate-500">
+                当前筛选下暂无任务
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-200">
+                {filteredTasks.map(renderTaskRow)}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+
+      <nav className="sticky bottom-0 mt-6 grid grid-cols-4 border-t border-slate-200 bg-white/95 px-2 py-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+        {[
+          ['待办', InboxOutlined, true],
+          ['已办', CheckSquareOutlined, false],
+          ['消息', BellOutlined, false],
+          ['我的', UserOutlined, false],
+        ].map(([label, Icon, active]) => (
+          <button
+            key={label}
+            type="button"
+            className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2 text-sm ${
+              active ? 'text-emerald-700' : 'text-slate-500'
+            }`}
+          >
+            <Icon className="text-2xl" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   )
+
+  const renderDetailScreen = () => {
+    if (!selectedTask || !selectedSeverity) return null
+    const factRows = buildTaskFactRows(selectedTask)
+    const relatedSource = resolveTaskSourceLabel(selectedTask)
+    const showRejected = supportsRejectedAction(activeRoleKey, selectedTask)
+    const isUpdating = updatingID === selectedTask.id
+    const isUrging = urgingID === selectedTask.id
+
+    return (
+      <div className="mobile-role-tasks-page surface-panel min-h-screen bg-white pb-4 text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
+        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
+          <div className="grid grid-cols-[112px_minmax(0,1fr)_92px] items-center gap-2 px-4 py-4">
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 text-lg text-slate-950"
+              onClick={() => {
+                setSelectedTaskID(null)
+                setDetailAction(null)
+              }}
+            >
+              <LeftOutlined />
+              <span>任务列表</span>
+            </button>
+            <h1 className="truncate text-center text-2xl font-semibold text-slate-950">
+              {selectedTask.task_name}
+            </h1>
+            <div className="flex items-center justify-end gap-2">
+              <span
+                className={`rounded-full px-3 py-1 text-base font-semibold ${selectedSeverity.badgeClass}`}
+              >
+                {selectedSeverity.label}
+              </span>
+              <MoreOutlined className="text-xl text-slate-700" />
+            </div>
+          </div>
+          <div className="flex min-w-0 items-center gap-2 px-5 pb-4 text-base text-slate-500">
+            <FileTextOutlined />
+            <span className="shrink-0">单号：</span>
+            <span className="min-w-0 break-all">{relatedSource}</span>
+          </div>
+        </header>
+
+        <main className="space-y-5 bg-slate-50 px-4 py-5">
+          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
+                <FileTextOutlined className="text-blue-500" />
+                任务关键信息
+              </h2>
+              <button
+                type="button"
+                className="text-base font-semibold text-blue-600"
+              >
+                编辑查看详情 &gt;
+              </button>
+            </div>
+            <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200">
+              {factRows.slice(0, 6).map(([label, value]) => (
+                <div
+                  key={label}
+                  className="min-h-[84px] border-b border-r border-slate-200 p-4 last:border-b-0"
+                >
+                  <div className="text-base text-slate-500">{label}</div>
+                  <div className="mt-2 break-words text-lg font-medium text-slate-950">
+                    {value || '-'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {selectedTask.business_status_label || selectedTask.blocked_reason ? (
+            <section className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-lg font-semibold text-red-700">
+              <ExclamationCircleFilled className="mr-2" />
+              {selectedTask.business_status_label || '任务需要处理'}
+              {selectedTask.blocked_reason
+                ? ` · ${selectedTask.blocked_reason}`
+                : ' · 需要确认后继续流转'}
+            </section>
+          ) : null}
+
+          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
+                <LinkOutlined className="text-purple-500" />
+                关联单据（1）
+              </h2>
+              <button
+                type="button"
+                className="text-base font-semibold text-blue-600"
+              >
+                查看全部 &gt;
+              </button>
+            </div>
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-600">
+              <span className="min-w-0 break-all">订单：{relatedSource}</span>
+              <span className="shrink-0 text-slate-400">&gt;</span>
+            </div>
+          </section>
+
+          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
+                <ClockCircleOutlined className="text-orange-500" />
+                最近动态
+              </h2>
+              <button
+                type="button"
+                className="text-base font-semibold text-blue-600"
+              >
+                查看全部 &gt;
+              </button>
+            </div>
+            <div className="mt-4 rounded-xl bg-slate-50 px-4 py-4">
+              <div className="flex items-start gap-3">
+                <span className="mt-1 h-3 w-3 rounded-full bg-blue-500" />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-950">
+                    <span>系统</span>
+                    <span className="rounded-md bg-blue-100 px-2 py-1 text-sm text-blue-700">
+                      {selectedTask.task_status_label}
+                    </span>
+                    <span className="text-sm text-slate-400">
+                      {formatMobileTaskTime(selectedTask.updated_at)}
+                    </span>
+                  </div>
+                  <div className="mt-2 break-words text-base text-slate-700">
+                    任务已流转至 {roleLabel} /{' '}
+                    {selectedTask.owner_role_key || '-'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {detailAction ? (
+            <section className="rounded-t-[28px] border border-slate-200 bg-white p-4 shadow-[0_-8px_28px_rgba(15,23,42,0.10)]">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-2xl font-semibold text-slate-950">
+                  {resolveDetailActionLabel(detailAction)}
+                  <span className="ml-2 text-red-500">·</span>
+                </h2>
+                <button
+                  type="button"
+                  className="text-base text-slate-500"
+                  onClick={() => setDetailAction(null)}
+                >
+                  收起 ^
+                </button>
+              </div>
+              <textarea
+                className="mt-4 min-h-[128px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                placeholder="请填写原因，至少 5 个字..."
+                maxLength={500}
+                value={detailReasonValue}
+                onChange={(event) => updateDetailReason(event.target.value)}
+              />
+              <div className="mt-1 text-right text-sm text-slate-400">
+                {detailReasonValue.length}/500
+              </div>
+              <div className="mt-4 text-base text-slate-500">
+                快捷选择（可选）
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {QUICK_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-600"
+                    onClick={() => appendQuickReason(reason)}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-600"
+                  onClick={() => setDetailAction(null)}
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-50"
+                  disabled={isUpdating || isUrging}
+                  onClick={submitDetailAction}
+                >
+                  提交
+                </button>
+              </div>
+            </section>
+          ) : null}
+        </main>
+
+        <div className="sticky bottom-0 grid grid-cols-4 gap-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
+          <button
+            type="button"
+            className="rounded-xl bg-blue-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            disabled={!selectedCanOperate || isUpdating}
+            onClick={() => handleTaskAction(selectedTask, 'processing')}
+          >
+            <CaretRightOutlined className="mr-2" />
+            处理
+          </button>
+          <button
+            type="button"
+            className="rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            disabled={!selectedCanOperate || isUpdating}
+            onClick={() => handleTaskAction(selectedTask, 'blocked')}
+          >
+            <PauseOutlined className="mr-2" />
+            阻塞
+          </button>
+          <button
+            type="button"
+            className="rounded-xl bg-emerald-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            disabled={!selectedCanOperate || isUpdating}
+            onClick={() => handleTaskAction(selectedTask, 'done')}
+          >
+            <CheckOutlined className="mr-2" />
+            完成
+          </button>
+          <button
+            type="button"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-4 text-lg font-semibold text-slate-700 disabled:opacity-50"
+            disabled={!selectedCanUrge || isUrging}
+            onClick={() => handleTaskAction(selectedTask, 'urge')}
+          >
+            <BellOutlined className="mr-2" />
+            催办
+          </button>
+          {showRejected ? (
+            <button
+              type="button"
+              className="col-span-4 rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-base font-semibold text-red-600 disabled:opacity-50"
+              disabled={!selectedCanOperate || isUpdating}
+              onClick={() => handleTaskAction(selectedTask, 'rejected')}
+            >
+              退回当前任务
+            </button>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  return selectedTask ? renderDetailScreen() : renderListScreen()
 }

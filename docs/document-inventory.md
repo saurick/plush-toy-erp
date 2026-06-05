@@ -157,6 +157,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/archive/architecture-history/phase-2d-quality-inspection-entry-review.md` | 来料质检入口、批次状态与冻结库存边界历史评审归档 / Phase 2D-C Quality Inspection Entry Review |
 | `docs/archive/architecture-history/phase-2d-quality-inspection-schema-review.md` | 来料质检最小主表历史评审归档 / Phase 2D-C2 quality_inspections Schema Review |
 | `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 过程记录归档 / Progress Archive 2026-06-02 Before Print Template Defer |
+| `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md` | 移动端任务页改版前过程记录归档 / Progress Archive 2026-06-05 Before Mobile Task Redesign |
 
 ### 外部参考
 
