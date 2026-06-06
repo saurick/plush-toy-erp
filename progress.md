@@ -210,3 +210,10 @@
 - 验证：`cd web && pnpm exec prettier --check src/erp/mobile/pages/MobileRoleTasksPage.jsx scripts/styleL1.mjs ../docs/product/mobile-role-tasks-redesign.md` 通过；`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`cd web && pnpm style:l1` 首次在 `root-redirect-mobile` 偶发等待登录页标题超时，复跑通过 42 个场景；`git diff --check` 覆盖本轮触达文件通过。
 - 下一步：如果后续单角色任务量继续上升，再评审是否补轻量关键词搜索；当前先保持筛选 + 风险优先排序 + 分批展开。
 - 阻塞/风险：本轮只改移动端列表展开交互、L1 回归和产品设计说明；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。in-app Browser 对本地 `127.0.0.1 / localhost:5175` 返回 `ERR_BLOCKED_BY_CLIENT`，本轮浏览器级交互证据以项目 `style:l1` Playwright 断言为准。追加前 `progress.md` 为 205 行 / 52240 bytes，未达到归档阈值。
+
+## 2026-06-06 12:07 CST
+- 完成：为岗位任务端列表页增加右下角回到顶部按钮。按钮只在正文滚动超过阈值后出现，点击只滚动当前 `[data-testid="mobile-role-scroll"]` 容器回到顶部，不改变筛选、展开数量或任务状态；任务详情页不渲染该按钮，避免遮挡底部动作栏。
+- 完成：同步补齐浅色 / 暗色样式和正式设计说明；`mobile-tasks-dark` L1 场景新增回到顶部断言，覆盖默认隐藏、滚动后显示、按钮尺寸、与底部导航安全距离、横向溢出、点击后回到顶部并隐藏、详情页不显示。
+- 验证：`cd web && pnpm exec prettier --check src/erp/mobile/pages/MobileRoleTasksPage.jsx scripts/styleL1.mjs src/erp/styles/app.css ../docs/product/mobile-role-tasks-redesign.md` 通过；`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`cd web && pnpm style:l1` 通过，42 个场景通过；`git diff --check` 覆盖本轮触达文件通过。Browser 打开 `http://127.0.0.1:5175/m/sales/tasks` 后按未登录状态跳转 `/admin-login`，React root 正常、页面非空、无 Vite error overlay。
+- 下一步：如果后续需要进一步提升长列表效率，再评审是否给顶部标题增加点击回顶或补轻量搜索；当前主路径先保留明确按钮。
+- 阻塞/风险：本轮只改移动端岗位任务页列表回顶交互、样式、L1 回归和产品设计说明；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。Browser 无法注入 `style:l1` 的 JSON-RPC route mock，真实任务列表交互仍以项目 Playwright L1 断言为准。追加前 `progress.md` 为 212 行 / 53921 bytes，未达到归档阈值。

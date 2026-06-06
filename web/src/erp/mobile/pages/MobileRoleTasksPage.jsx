@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   BellOutlined,
@@ -15,6 +15,7 @@ import {
   PauseOutlined,
   CaretRightOutlined,
   ReloadOutlined,
+  ArrowUpOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { message } from '@/common/utils/antdApp'
@@ -168,6 +169,8 @@ const MOBILE_LIST_COLLAPSED_LIMITS = Object.freeze({
   [MOBILE_LIST_KEYS.WARNING]: 8,
   [MOBILE_LIST_KEYS.NOTICE]: 8,
 })
+
+const MOBILE_SCROLL_TOP_VISIBLE_OFFSET = 280
 
 function getMobileRoleLabel(roleKey) {
   return MOBILE_ROLE_LABELS[normalizeRoleKey(roleKey)] || '岗位'
@@ -539,10 +542,12 @@ function buildTaskFactRows(task) {
 export default function MobileRoleTasksPage() {
   const { activeRoleKey } = useERPWorkspace()
   const { adminProfile, handleLogout, loggingOut } = useOutletContext() || {}
+  const scrollContainerRef = useRef(null)
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
   const [updatingID, setUpdatingID] = useState(null)
   const [urgingID, setUrgingID] = useState(null)
+  const [showScrollTopButton, setShowScrollTopButton] = useState(false)
   const [activeMainTabKey, setActiveMainTabKey] = useState(
     MOBILE_MAIN_TAB_KEYS.TODO
   )
@@ -1468,6 +1473,20 @@ export default function MobileRoleTasksPage() {
     updateDetailReason(nextValue)
   }
 
+  const handleMainScroll = useCallback((event) => {
+    setShowScrollTopButton(
+      event.currentTarget.scrollTop >= MOBILE_SCROLL_TOP_VISIBLE_OFFSET
+    )
+  }, [])
+
+  const scrollMainToTop = () => {
+    scrollContainerRef.current?.scrollTo({
+      top: 0,
+      behavior: 'smooth',
+    })
+    setShowScrollTopButton(false)
+  }
+
   const getCollapsedListLimit = (listKey) =>
     MOBILE_LIST_COLLAPSED_LIMITS[listKey] || Number.POSITIVE_INFINITY
 
@@ -2120,8 +2139,10 @@ export default function MobileRoleTasksPage() {
     return (
       <div className="mobile-role-tasks-page mobile-role-tasks-page--tabs surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
         <div
+          ref={scrollContainerRef}
           className="mobile-role-tasks-page__scroll"
           data-testid="mobile-role-scroll"
+          onScroll={handleMainScroll}
         >
           <header className="flex items-center justify-between gap-3 px-5 pb-3 pt-8">
             <div className="flex min-w-0 items-center gap-3">
@@ -2155,6 +2176,18 @@ export default function MobileRoleTasksPage() {
 
           {renderActiveTabPanel()}
         </div>
+
+        {showScrollTopButton ? (
+          <button
+            type="button"
+            className="mobile-role-scroll-top"
+            data-testid="mobile-role-scroll-top"
+            aria-label="回到顶部"
+            onClick={scrollMainToTop}
+          >
+            <ArrowUpOutlined aria-hidden="true" />
+          </button>
+        ) : null}
 
         {renderBottomNavigation()}
       </div>

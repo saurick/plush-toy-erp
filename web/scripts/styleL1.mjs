@@ -7030,6 +7030,7 @@ async function assertMobileTaskMainNavigation(page, { scenarioName }) {
     itemSelector: '.erp-mobile-list-item',
     collapsedMax: 12,
   })
+  await assertMobileTaskScrollTopControl(page, { scenarioName })
   await assertMobileTaskFilterTabsSticky(page, { scenarioName })
 
   await page.getByTestId('mobile-role-nav-messages').click()
@@ -7419,6 +7420,101 @@ async function assertMobileTaskListToggle(
   )
 }
 
+async function assertMobileTaskScrollTopControl(page, { scenarioName }) {
+  const button = page.getByTestId('mobile-role-scroll-top')
+  await page.evaluate(() => {
+    const scroll = document.querySelector('[data-testid="mobile-role-scroll"]')
+    if (scroll instanceof HTMLElement) {
+      scroll.scrollTop = 0
+      scroll.dispatchEvent(new Event('scroll', { bubbles: true }))
+    }
+  })
+  await page.waitForTimeout(100)
+  assert.equal(
+    await button.count(),
+    0,
+    `${scenarioName} 回到顶部按钮默认不应显示`
+  )
+
+  const scrolled = await page.evaluate(() => {
+    const scroll = document.querySelector('[data-testid="mobile-role-scroll"]')
+    if (!(scroll instanceof HTMLElement)) return null
+    const maxScrollTop = Math.max(0, scroll.scrollHeight - scroll.clientHeight)
+    scroll.scrollTop = Math.min(720, maxScrollTop)
+    scroll.dispatchEvent(new Event('scroll', { bubbles: true }))
+    const nav = document.querySelector('[data-testid="mobile-role-bottom-nav"]')
+    return {
+      scrollTop: scroll.scrollTop,
+      scrollHeight: scroll.scrollHeight,
+      clientHeight: scroll.clientHeight,
+      navTop: nav?.getBoundingClientRect().top || 0,
+    }
+  })
+  assert(
+    scrolled && scrolled.scrollTop >= 280,
+    `${scenarioName} 回到顶部控制缺少可滚动距离: ${JSON.stringify(scrolled)}`
+  )
+
+  await button.waitFor({ state: 'visible', timeout: 10_000 })
+  const visibleMetrics = await page.evaluate(() => {
+    const buttonNode = document.querySelector(
+      '[data-testid="mobile-role-scroll-top"]'
+    )
+    const nav = document.querySelector('[data-testid="mobile-role-bottom-nav"]')
+    const buttonRect = buttonNode?.getBoundingClientRect()
+    const navRect = nav?.getBoundingClientRect()
+    return {
+      button: buttonRect
+        ? {
+            top: buttonRect.top,
+            right: buttonRect.right,
+            bottom: buttonRect.bottom,
+            width: buttonRect.width,
+            height: buttonRect.height,
+          }
+        : null,
+      nav: navRect
+        ? {
+            top: navRect.top,
+            bottom: navRect.bottom,
+          }
+        : null,
+      ariaLabel: buttonNode?.getAttribute('aria-label') || '',
+      documentScrollWidth: document.documentElement.scrollWidth,
+      documentClientWidth: document.documentElement.clientWidth,
+    }
+  })
+  assert.equal(
+    visibleMetrics.ariaLabel,
+    '回到顶部',
+    `${scenarioName} 回到顶部按钮缺少 aria-label: ${JSON.stringify(visibleMetrics)}`
+  )
+  assert(
+    visibleMetrics.button &&
+      visibleMetrics.button.width === 44 &&
+      visibleMetrics.button.height === 44,
+    `${scenarioName} 回到顶部按钮尺寸异常: ${JSON.stringify(visibleMetrics)}`
+  )
+  assert(
+    visibleMetrics.button &&
+      visibleMetrics.nav &&
+      visibleMetrics.button.bottom <= visibleMetrics.nav.top - 8,
+    `${scenarioName} 回到顶部按钮遮挡底部导航: ${JSON.stringify(visibleMetrics)}`
+  )
+  assert(
+    visibleMetrics.documentScrollWidth <=
+      visibleMetrics.documentClientWidth + 1,
+    `${scenarioName} 回到顶部按钮造成横向溢出: ${JSON.stringify(visibleMetrics)}`
+  )
+
+  await button.click()
+  await page.waitForFunction(() => {
+    const scroll = document.querySelector('[data-testid="mobile-role-scroll"]')
+    return scroll instanceof HTMLElement && scroll.scrollTop <= 2
+  })
+  assert.equal(await button.count(), 0, `${scenarioName} 回到顶部后按钮应隐藏`)
+}
+
 async function assertMobileTaskMessageTabsSwitch(page, { scenarioName }) {
   const noticeTab = page.getByTestId('mobile-role-message-tab-notice')
   const warningTab = page.getByTestId('mobile-role-message-tab-warning')
@@ -7674,6 +7770,9 @@ async function assertMobileTaskDarkDetailReadable(page, { scenarioName }) {
           }
         : null,
       buttons,
+      scrollTopButtonCount: document.querySelectorAll(
+        '[data-testid="mobile-role-scroll-top"]'
+      ).length,
       viewport: {
         width: window.innerWidth,
         height: window.innerHeight,
@@ -7690,6 +7789,11 @@ async function assertMobileTaskDarkDetailReadable(page, { scenarioName }) {
     metrics.buttons.length,
     4,
     `${scenarioName} 详情页动作栏应保留四个主按钮: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.scrollTopButtonCount,
+    0,
+    `${scenarioName} 详情页不应显示回到顶部按钮: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
