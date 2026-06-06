@@ -47,7 +47,7 @@ test('menuPermissions: 默认权限不包含权限管理', () => {
   assert(!defaultMenuPermissions().includes(PERMISSION_CENTER_PATH))
 })
 
-test('menuPermissions: 移动端角色权限只保留有效角色并保持端口顺序', () => {
+test('menuPermissions: 岗位任务端角色权限只保留有效角色并保持端口顺序', () => {
   assert(
     ERP_MOBILE_ROLE_PERMISSION_OPTIONS.some((item) => item.key === 'sales')
   )

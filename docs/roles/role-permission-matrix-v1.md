@@ -2,15 +2,15 @@
 
 ## 当前口径
 
-当前项目权限模型是标准 RBAC：用户通过 `admin_user_roles` 绑定角色，角色通过 `role_permissions` 获得权限码，后端接口、桌面菜单和移动端入口统一消费 permission code。`admin_users.level`、`admin_users.menu_permissions`、`admin_users.mobile_role_permissions` 不再作为权限来源。
+当前项目权限模型是标准 RBAC：用户通过 `admin_user_roles` 绑定角色，角色通过 `role_permissions` 获得权限码，后端接口、桌面菜单和岗位任务端入口统一消费 permission code。`admin_users.level`、`admin_users.menu_permissions`、`admin_users.mobile_role_permissions` 不再作为权限来源。
 
 权限码和内置角色真源在 `/Users/simon/projects/plush-toy-erp/server/internal/biz/rbac.go`。登录和 `auth.me` 返回当前管理员、角色、权限码和后端推导出的菜单；前端只负责按这些结果展示入口，不能把菜单隐藏当成安全边界。
 
-移动端角色入口只认 `mobile.<role>.access` 权限码，`auth.me.roles` 用于身份展示、任务归属匹配和审计语义，不能替代入口权限。
+岗位任务端角色入口只认 `mobile.<role>.access` 权限码，`auth.me.roles` 用于身份展示、任务归属匹配和审计语义，不能替代入口权限。
 
 `is_super_admin=true` 的账号拥有全部权限，用于初始化和紧急管理；普通管理员必须通过角色获得权限。普通管理员不能随意修改 super admin。
 
-普通管理员的权限只来自未禁用角色；禁用角色不再授予权限。当前 `permissions` 表不提供独立 disabled 字段，权限停用方式是从角色权限中移除，或从 `rbac.go` 真源移除后由后端归一化丢弃，不能再用旧字段或历史权限码推导菜单、移动端入口或接口权限。
+普通管理员的权限只来自未禁用角色；禁用角色不再授予权限。当前 `permissions` 表不提供独立 disabled 字段，权限停用方式是从角色权限中移除，或从 `rbac.go` 真源移除后由后端归一化丢弃，不能再用旧字段或历史权限码推导菜单、岗位任务端入口或接口权限。
 
 workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作”，业务归属继续由 `owner_role_key`、`assignee_id`、`task_status_key` 判断“这条任务是不是你该处理”。`update_task_status` 中老板审批 `done` 要求 `workflow.task.approve`，其他 `done` 要求 `workflow.task.complete`，`rejected` 要求 `workflow.task.reject`，普通状态更新要求 `workflow.task.update`。`workflow.task.update / complete / approve / reject` 都不能绕过任务归属；boss / pmc 的查看、关注、催办能力也不等于可以替销售、采购、仓库、品质、财务完成业务事实。
 
@@ -27,7 +27,7 @@ workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作
 | 业务记录 | `business.record.read/create/update/delete` | 通用业务记录读写删 |
 | 工作流 | `workflow.task.read/create/update/assign/approve/reject/complete` | 任务查询、创建、更新、指派、审批、驳回和完成 |
 | 采购入库 / 退货 | `purchase.receipt.read/create`、`purchase.return.read/create` | 当前为后端 usecase/repo 权限码预留；外部 JSON-RPC/API 接入时必须加对应守卫 |
-| 移动端 | `mobile.<role>.access` | 移动端角色入口，例如 `mobile.sales.access` |
+| 岗位任务端 | `mobile.<role>.access` | 岗位任务端角色入口，例如 `mobile.sales.access` |
 | 调试 | `debug.seed`、`debug.cleanup`、`debug.business.clear`、`debug.business_chain.run` | 开发 / 测试调试能力 |
 
 ## 预设角色
@@ -35,13 +35,13 @@ workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作
 | 角色 | 定位 | 默认权限范围 | 任务处理边界 |
 | --- | --- | --- | --- |
 | `boss` | 管理层、审批和风险查看 | 全局 read、审批、报表和看板；不默认给 `debug.business.clear` | 可处理老板角色池或指派给自己的任务；关注高风险不等于替其他角色完成事实 |
-| `sales` | 销售 / 业务跟进 | 销售链路、客户订单、出货协同、业务记录读写、基础 workflow 权限、销售移动端 | 只能处理 `owner_role_key=sales` 或 `assignee_id=自己` 的任务 |
-| `purchase` | 采购 | 采购单、采购收货、采购退货、采购异常、业务记录读写、采购移动端 | 只能处理 `owner_role_key=purchase` 或 `assignee_id=自己` 的任务 |
-| `warehouse` | 仓库 | 库存、入库、出库、盘点、仓库移动端 | 只能处理 `owner_role_key=warehouse` 或 `assignee_id=自己` 的任务 |
-| `quality` | 品质 | IQC、成品抽检、异常处理、返工复检、品质移动端 | 只能处理 `owner_role_key=quality` 或 `assignee_id=自己` 的任务 |
-| `finance` | 财务 | 应收、应付、收付款、对账、财务报表、财务移动端 | 只能处理 `owner_role_key=finance` 或 `assignee_id=自己` 的任务 |
-| `pmc` | 计划和风险跟进 | 计划、进度、风险查看和处理、PMC 移动端 | 可看风险和卡点；不能替生产、仓库、品质、财务完成业务事实 |
-| `production` | 生产执行 | 生产计划、生产进度、返工、生产移动端 | 只能处理 `owner_role_key=production` 或 `assignee_id=自己` 的任务 |
+| `sales` | 销售 / 业务跟进 | 销售链路、客户订单、出货协同、业务记录读写、基础 workflow 权限、销售岗位任务端 | 只能处理 `owner_role_key=sales` 或 `assignee_id=自己` 的任务 |
+| `purchase` | 采购 | 采购单、采购收货、采购退货、采购异常、业务记录读写、采购岗位任务端 | 只能处理 `owner_role_key=purchase` 或 `assignee_id=自己` 的任务 |
+| `warehouse` | 仓库 | 库存、入库、出库、盘点、仓库岗位任务端 | 只能处理 `owner_role_key=warehouse` 或 `assignee_id=自己` 的任务 |
+| `quality` | 品质 | IQC、成品抽检、异常处理、返工复检、品质岗位任务端 | 只能处理 `owner_role_key=quality` 或 `assignee_id=自己` 的任务 |
+| `finance` | 财务 | 应收、应付、收付款、对账、财务报表、财务岗位任务端 | 只能处理 `owner_role_key=finance` 或 `assignee_id=自己` 的任务 |
+| `pmc` | 计划和风险跟进 | 计划、进度、风险查看和处理、PMC 岗位任务端 | 可看风险和卡点；不能替生产、仓库、品质、财务完成业务事实 |
+| `production` | 生产执行 | 生产计划、生产进度、返工、生产岗位任务端 | 只能处理 `owner_role_key=production` 或 `assignee_id=自己` 的任务 |
 | `admin` | 系统管理 | 用户、角色、权限、基础配置 | 不天然拥有业务审批、品质放行、仓库入出库或财务结算事实权 |
 | `debug_operator` | 开发 / 测试调试 | `debug.seed`、`debug.cleanup`、`debug.business.clear`、`debug.business_chain.run` | 只应在 local / dev / test 环境使用，生产默认不分配 |
 

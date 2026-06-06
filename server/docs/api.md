@@ -108,7 +108,7 @@ HTTP 路由：
 - `scope=user` 或省略：普通协作账号短信登录
 - `scope=admin`：管理员短信登录，按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`
 
-角色移动端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`；服务端会校验该手机号已绑定管理员账号，且该管理员具备当前移动端角色或对应 `mobile.<role>.access` 权限。手机号未绑定返回 `AuthPhoneNotBound`，不返回“用户不存在”；手机号已绑定但未授权当前角色返回 `AuthMobileRoleDenied`。
+岗位任务端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`；服务端会校验该手机号已绑定管理员账号，且该管理员具备当前岗位任务端角色或对应 `mobile.<role>.access` 权限。手机号未绑定返回 `AuthPhoneNotBound`，不返回“用户不存在”；手机号已绑定但未授权当前岗位任务端角色返回 `AuthMobileRoleDenied`。
 
 ### `auth.send_sms_code`
 
@@ -116,7 +116,7 @@ HTTP 路由：
 
 - `phone`：手机号，当前支持中国大陆手机号，允许 `+86`、`86` 前缀和空格 / 连字符
 - `scope`：`user` 或 `admin`，省略时按 `user`
-- `mobile_role_key`：角色移动端登录时传当前端口角色；桌面短信登录可省略
+- `mobile_role_key`：岗位任务端登录时传当前端口角色；桌面短信登录可省略
 
 返回字段：
 

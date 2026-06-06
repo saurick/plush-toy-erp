@@ -137,6 +137,24 @@ func TestDebugUsecase_SeedReturnsScenarioRunRecordsAndTasks(t *testing.T) {
 	if len(result.CreatedRecords) == 0 || len(result.CreatedTasks) == 0 {
 		t.Fatalf("expected records and tasks, got %#v", result)
 	}
+	bossMobileSampleCounts := map[string]int{}
+	for _, task := range repo.seedPlan.Tasks {
+		if task.OwnerRoleKey != "boss" {
+			continue
+		}
+		switch task.TaskStatusKey {
+		case "ready", "blocked", "done":
+			bossMobileSampleCounts[task.TaskStatusKey]++
+		}
+	}
+	for statusKey, count := range bossMobileSampleCounts {
+		if count < debugMobileListStressCount {
+			t.Fatalf("expected boss mobile list samples for %s, got %d", statusKey, count)
+		}
+	}
+	if len(bossMobileSampleCounts) != 3 {
+		t.Fatalf("expected boss ready/blocked/done mobile samples, got %#v", bossMobileSampleCounts)
+	}
 	if len(result.NextCheckpoints) == 0 || result.CleanupToken == "" {
 		t.Fatalf("expected checkpoints and cleanup token, got %#v", result)
 	}

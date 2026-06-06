@@ -42,7 +42,7 @@ var (
 	AuthSMSCodeTooFrequent      = Definition{Name: "AuthSMSCodeTooFrequent", Code: 10010, Message: "验证码发送过于频繁，请稍后再试"}
 	AuthSMSCodeAttemptsExceeded = Definition{Name: "AuthSMSCodeAttemptsExceeded", Code: 10011, Message: "验证码错误次数过多，请重新获取"}
 	AuthPhoneNotBound           = Definition{Name: "AuthPhoneNotBound", Code: 10012, Message: "该手机号未开通登录权限，请联系管理员"}
-	AuthMobileRoleDenied        = Definition{Name: "AuthMobileRoleDenied", Code: 10013, Message: "该账号暂无当前角色登录权限，请联系管理员"}
+	AuthMobileRoleDenied        = Definition{Name: "AuthMobileRoleDenied", Code: 10013, Message: "该账号暂无当前岗位任务端登录权限，请联系管理员"}
 	AuthSMSLoginDisabled        = Definition{Name: "AuthSMSLoginDisabled", Code: 10014, Message: "当前部署未启用短信登录"}
 	AdminExists                 = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
 	AdminPhoneExists            = Definition{Name: "AdminPhoneExists", Code: 40911, Message: "手机号已绑定其他管理员"}

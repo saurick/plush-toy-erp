@@ -6,14 +6,14 @@ type AdminMobileRolePermissionOption struct {
 }
 
 var adminMobileRolePermissionOptions = []AdminMobileRolePermissionOption{
-	{Key: BossRoleKey, Label: "老板移动端"},
-	{Key: SalesRoleKey, Label: "业务移动端"},
-	{Key: PurchaseRoleKey, Label: "采购移动端"},
-	{Key: ProductionRoleKey, Label: "生产移动端"},
-	{Key: WarehouseRoleKey, Label: "仓库移动端"},
-	{Key: FinanceRoleKey, Label: "财务移动端"},
-	{Key: PMCRoleKey, Label: "PMC 移动端"},
-	{Key: QualityRoleKey, Label: "品质移动端"},
+	{Key: BossRoleKey, Label: "老板岗位任务端"},
+	{Key: SalesRoleKey, Label: "业务岗位任务端"},
+	{Key: PurchaseRoleKey, Label: "采购岗位任务端"},
+	{Key: ProductionRoleKey, Label: "生产岗位任务端"},
+	{Key: WarehouseRoleKey, Label: "仓库岗位任务端"},
+	{Key: FinanceRoleKey, Label: "财务岗位任务端"},
+	{Key: PMCRoleKey, Label: "PMC 岗位任务端"},
+	{Key: QualityRoleKey, Label: "品质岗位任务端"},
 }
 
 var adminMobileRolePermissionSet = func() map[string]struct{} {

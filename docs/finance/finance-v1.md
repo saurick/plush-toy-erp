@@ -59,9 +59,9 @@
 | 环节 | 当前 v1 规则 |
 | --- | --- |
 | 触发点 | 真实出货业务状态进入 `shipped` 后创建 `receivable_registration`。`shipment_release done` 只表示 `shipping_released`，不能作为应收 / 开票触发点；桌面 `shipping-release` / `outbound` 手动入口也必须基于真实 `shipped`。 |
-| 应收登记责任人 | `owner_role_key=finance`，财务移动端处理；PMC 和老板只看风险，不代办。 |
+| 应收登记责任人 | `owner_role_key=finance`，财务岗位任务端处理；PMC 和老板只看风险，不代办。 |
 | 应收登记完成条件 | 财务确认客户、出货数量、应收金额、税率、含税 / 不含税金额和收款状态。完成后创建 `invoice_registration`，业务状态推进到 `reconciling`。 |
-| 开票登记责任人 | `owner_role_key=finance`，继续由财务移动端处理。 |
+| 开票登记责任人 | `owner_role_key=finance`，继续由财务岗位任务端处理。 |
 | 开票登记完成条件 | 财务登记发票号、发票类型、税率、税额、含税金额、不含税金额和发票状态。完成后业务状态保持 `reconciling`，交给后续对账。 |
 | 财务异常 / 阻塞 | 应收或开票任务阻塞 / 退回必须填写原因；状态快照记录 `blocked_reason`；Dashboard 以 `finance_pending`、`invoice_pending` 或 `finance_overdue` 展示预警。 |
 | 当前不做 | 不做总账、凭证、会计科目、纳税申报；不新增 `ar_receivable`、`ar_invoice`、`settlement` 或 finance 专表；不自动生成真实发票文件。 |
@@ -73,8 +73,8 @@
 
 | 环节 | 当前 v1 规则 |
 | --- | --- |
-| 触发点 | 采购入库或委外入库完成，业务状态进入 `inbound_done` 后创建应付登记任务。桌面业务页可手动发起；移动端仓库完成采购 / 委外入库任务后会自动发起。 |
-| 采购应付责任人 | `purchase_payable_registration` 进入 `finance`，财务移动端处理；PMC 和老板只看风险，不代办。 |
+| 触发点 | 采购入库或委外入库完成，业务状态进入 `inbound_done` 后创建应付登记任务。桌面业务页可手动发起；岗位任务端仓库完成采购 / 委外入库任务后会自动发起。 |
+| 采购应付责任人 | `purchase_payable_registration` 进入 `finance`，财务岗位任务端处理；PMC 和老板只看风险，不代办。 |
 | 委外应付责任人 | `outsource_payable_registration` 进入 `finance`，payload 标记 `payable_type=outsource` 和 `outsource_processing=true`。 |
 | 应付登记完成条件 | 财务确认供应商或加工厂、数量、金额、税率、含税 / 不含税金额和应付状态。完成后业务状态推进到 `reconciling`，并创建采购或委外对账任务。 |
 | 采购对账完成条件 | 财务完成采购单、入库记录、发票 / 对账资料和金额差异核对。完成后业务状态进入 `settled`。 |

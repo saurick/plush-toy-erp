@@ -175,7 +175,7 @@
 
 | 位置 | 当前行为 | 后续迁入后的处理 |
 | --- | --- | --- |
-| `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | warehouse 移动端完成 `shipment_release done / blocked / rejected` 后只调用 `updateWorkflowTaskStatus` 并刷新任务列表；已移除 `completeShipmentReleaseTask` 真实运行时 follow-up。 | 真实移动端动作不再本地推进 `shipped`、upsert warehouse / finance 状态或创建应收任务。 |
+| `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | warehouse 岗位任务端完成 `shipment_release done / blocked / rejected` 后只调用 `updateWorkflowTaskStatus` 并刷新任务列表；已移除 `completeShipmentReleaseTask` 真实运行时 follow-up。 | 真实岗位任务端动作不再本地推进 `shipped`、upsert warehouse / finance 状态或创建应收任务。 |
 | `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | `runFinishedGoodsFollowUp` 对 warehouse `shipment_release` 直接 return。 | `shipment_release` 已迁入后端后不再本地推进 shipped。 |
 | `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | 移动端提交 `shipment_release done` 时 payload 写 `shipment_release_result=done`，不再写 `shipment_result=shipped`。 | 前端不再伪造实际 shipped 事实。 |
 | `web/src/erp/utils/finishedGoodsFlow.mjs:303-332` | `buildShipmentReleaseTask` 构造出货放行任务，payload 仍是展示快照。 | 可保留给 seed / test / demo / 展示辅助。 |

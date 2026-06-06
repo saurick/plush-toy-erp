@@ -12,7 +12,7 @@ import {
 } from './seedData.mjs'
 import { appDefinitions } from './appRegistry.mjs'
 
-test('seedData: 每个移动端入口都有运行时角色标签', () => {
+test('seedData: 每个岗位任务端入口都有运行时角色标签', () => {
   const mobileApps = appDefinitions.filter((app) => app.kind === 'mobile')
   assert.equal(roleWorkbenches.length, mobileApps.length)
   assert(roleWorkbenches.some((role) => role.key === 'sales'))

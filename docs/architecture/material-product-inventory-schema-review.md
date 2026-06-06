@@ -190,7 +190,7 @@
 | Phase 1：字段真源评审 | 明确材料、成品、BOM、仓库、库存维度、单位精度、批次、来源行和幂等键 | 输出字段字典、状态口径、decimal scale、来源映射和旧数据回补策略 | 不生成 migration，不改运行时代码 | 每个字段有唯一真源、缺值回补和残值清理策略。 |
 | Phase 2：落核心表 | 先落 `units`、`product_styles`、`products`、`materials`、`bom_headers`、`bom_items`、`warehouses`、`inventory_txns`、`inventory_balances` | 使用 Ent + Atlas 生成迁移；库存数量使用 numeric/decimal；先支持默认库位 / 默认批次 | 不拆完整采购、委外、生产、品质、财务 | 专表能承接材料 / 成品 / BOM 和最小库存流水 / 余额闭环。 |
 | Phase 3：后端 usecase 双写或只读校验 | 在后端统一入口内写专表，或先根据通用记录只读校验专表计算结果 | 同事务写库存流水和余额；保留通用记录写入；补幂等测试 | 不让前端分别写两套事实 | 重复点击不会重复入库 / 出库，流水与余额一致。 |
-| Phase 4：库存查询和报表切换到专表 | 库存列表、库存余额、库存流水、仓库移动端查询改读专表 | 报表按专表读；通用快照只用于单据详情和历史兼容 | 不删除 `business_records` | 查询性能、余额准确性和历史追溯通过校验。 |
+| Phase 4：库存查询和报表切换到专表 | 库存列表、库存余额、库存流水、仓库岗位任务端查询改读专表 | 报表按专表读；通用快照只用于单据详情和历史兼容 | 不删除 `business_records` | 查询性能、余额准确性和历史追溯通过校验。 |
 | Phase 5：再拆采购、委外、生产、品质、财务 | 在库存底座稳定后，逐步拆采购单、委外单、生产单、质检单、AR/AP/结算表 | 每次只拆一条强事实链路；同步迁移 workflow source | 不一次性重写全部 ERP | 每个新专表有明确来源、幂等、回补、兼容和回滚策略。 |
 
 下一轮如果要落 Ent schema，建议先从 `materials`、`products`、`warehouses`、`inventory_txns`、`inventory_balances` 开始；`units` 实际上应作为库存数量落表前的前置小表同步处理。
@@ -199,12 +199,12 @@
 
 | 风险 | 影响 | 建议控制 |
 | --- | --- | --- |
-| 前端通用 `business_records` 依赖 | 桌面业务页、弹窗、列表、Dashboard、打印入口和移动端任务详情都依赖当前通用记录结构 | 专表落地后保留通用记录写入和读取；先只把库存查询切专表，不直接替换所有业务详情。 |
-| workflow `source_type/source_id` 迁移 | 当前任务和业务状态通常指向通用单据。直接改指向会影响移动端跳转、任务列表、状态回显和 debug 数据清理 | 兼容期允许 workflow 继续指向 `business_records`；专表 ID 先放 payload 或映射表，等单链路稳定后再迁 source。 |
+| 前端通用 `business_records` 依赖 | 桌面业务页、弹窗、列表、Dashboard、打印入口和岗位任务详情都依赖当前通用记录结构 | 专表落地后保留通用记录写入和读取；先只把库存查询切专表，不直接替换所有业务详情。 |
+| workflow `source_type/source_id` 迁移 | 当前任务和业务状态通常指向通用单据。直接改指向会影响岗位任务端跳转、任务列表、状态回显和 debug 数据清理 | 兼容期允许 workflow 继续指向 `business_records`；专表 ID 先放 payload 或映射表，等单链路稳定后再迁 source。 |
 | 旧数据回补 | 老 `business_records/items` 里有快照字段、payload 字段和 `float` 数量，缺少强主档 ID、批次、库位和幂等键 | 回补只能按既定口径补真实存在的字段；缺主档 ID 时建立待确认清单，不伪造材料 / 成品 / 批次。 |
 | 调试 seed / cleanup 兼容 | debug seed 当前创建通用记录、任务和业务状态；cleanup 根据 debugRunId 和 DBG 前缀清理 | 专表双写阶段的 debug 数据必须也带 debugRunId 和来源标记；cleanup 才能安全清理或归档。 |
 | 打印模板取值兼容 | 采购合同、加工合同和后续模板当前从通用单据快照取值 | 专表不反向覆盖历史打印快照；打印优先使用单据快照，必要时只从专表补缺值并标明口径。 |
-| 移动端任务详情跳转兼容 | 移动端按任务来源打开业务详情，若来源变成专表会找不到旧详情入口 | 保留 `source_type=business_record` 的旧路径；新专表来源需要统一详情解析器，支持从专表回到通用单据快照。 |
+| 岗位任务详情跳转兼容 | 移动端按任务来源打开业务详情，若来源变成专表会找不到旧详情入口 | 保留 `source_type=business_record` 的旧路径；新专表来源需要统一详情解析器，支持从专表回到通用单据快照。 |
 | 数量精度迁移 | 当前通用表数量和金额是 `double precision`，专表使用 decimal 后可能出现历史值四舍五入差异 | 定义单位精度和导入 rounding 规则；回补差异进入校验报告，不直接静默改数。 |
 | 分区与 Ent 默认主键 | 大规模流水需要按 `occurred_at` 分区，但 Ent 默认单列 ID 与 PostgreSQL 分区唯一约束可能冲突 | Phase 1 就决定分区 DDL 策略；必要时为 `inventory_txns` 编写受控 Atlas migration，而不是让默认生成结果决定表形。 |
 

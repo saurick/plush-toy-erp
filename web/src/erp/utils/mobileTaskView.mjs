@@ -265,7 +265,7 @@ export function explainMobileTaskVisibility(
   const visible = isMobileTaskVisibleForRole(taskView, normalizedRoleKey)
 
   if (!normalizedRoleKey) {
-    blockers.push('未选择 role_key，无法判断角色移动端可见性。')
+    blockers.push('未选择 role_key，无法判断岗位任务端角色可见性。')
   }
 
   if (terminal) {
@@ -400,7 +400,9 @@ export function explainMobileTaskVisibility(
       'sales 扩展命中出货相关 source_type。'
     )
   } else if (normalizedRoleKey === 'purchase') {
-    checks.push('采购移动端当前按 owner_role_key 直查，没有额外扩展可见性。')
+    checks.push(
+      '采购岗位任务端当前按 owner_role_key 直查，没有额外扩展可见性。'
+    )
   }
 
   if (!visible && normalizedRoleKey) {

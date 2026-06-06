@@ -10,11 +10,11 @@
 | --- | --- |
 | 前端工具函数 | `orderApprovalFlow.mjs`、`purchaseInboundFlow.mjs`、`outsourceReturnFlow.mjs` 和 `finishedGoodsFlow.mjs` 仍保留字段口径、seed、demo 和测试辅助；老板审批后的工程资料 / 补资料派生、IQC 后的仓库入库 / 来料异常处理派生、委外回货检验后的委外入库 / 返工补做派生、成品抽检后的成品入库 / 成品返工派生已由后端 usecase 执行；成品入库和出货放行完成 / 阻塞 / 退回的业务状态也已由后端执行。`finishedGoodsFlow.mjs` 的 `buildShipmentReleaseTask` 仅保留 seed / test / demo / 未来出货专项辅助口径，不是真实运行时派生入口。`shipmentFinanceFlow.mjs` 只服务 seed / test / demo / 手动财务入口和未来财务专项辅助，真实 `shipment_release done` 动作不再调用它派生应收或开票 |
 | 桌面业务页 | `BusinessModulePage.jsx` 负责手动发起审批、IQC、委外回货、成品抽检、应收、开票、应付和对账等任务，并同步 `workflow_business_states` |
-| 移动端任务页 | `MobileRoleTasksPage.jsx` 对老板审批、IQC、采购 `warehouse_inbound`、委外 `outsource_return_qc`、成品 `finished_goods_qc`、成品 `finished_goods_inbound` 和 `shipment_release` 任务只调用 `update_task_status` 并刷新任务列表；委外回货跟踪、委外入库完成、财务登记和对账等未迁闭环仍在 `update_task_status` 之后按任务类型创建下游任务并补写业务状态 |
+| 岗位任务页 | `MobileRoleTasksPage.jsx` 对老板审批、IQC、采购 `warehouse_inbound`、委外 `outsource_return_qc`、成品 `finished_goods_qc`、成品 `finished_goods_inbound` 和 `shipment_release` 任务只调用 `update_task_status` 并刷新任务列表；委外回货跟踪、委外入库完成、财务登记和对账等未迁闭环仍在 `update_task_status` 之后按任务类型创建下游任务并补写业务状态 |
 | 后端 workflow usecase | `server/internal/biz/workflow.go` 校验任务状态、业务状态、催办动作和基础参数；对老板审批、IQC、采购 `warehouse_inbound`、委外 `outsource_return_qc`、成品 `finished_goods_qc`、成品 `finished_goods_inbound` 和 `shipment_release` 任务的 `done / blocked / rejected` 执行最小 workflow rule，并构造业务状态或下游任务派生意图 |
 | 后端 repo | `workflow_repo.go` 在事务内创建任务和 `created` 事件，更新任务状态和 `status_changed` 事件，催办和升级写 `workflow_task_events`；老板审批、IQC、委外回货检验和成品抽检规则会在同一事务内 upsert `workflow_business_states` 并幂等创建下游任务，采购 `warehouse_inbound`、成品 `finished_goods_inbound` 和 `shipment_release` 规则只 upsert `workflow_business_states`，其余业务状态 upsert 仍可通过单独接口写入 |
 | JSON-RPC API | `create_task`、`update_task_status`、`upsert_business_state`、`urge_task` 等是当前稳定接口；workflow / business / debug 域已进入动作级 permission guard，`actor_role_key` 只用于审计和业务角色语义，不是授权边界 |
-| 通知中心 | v1 通过任务 payload、Dashboard 聚合和移动端可见性表达通知/预警；当前没有 `notifications` 独立表 |
+| 通知中心 | v1 通过任务 payload、Dashboard 聚合和岗位任务端可见性表达通知/预警；当前没有 `notifications` 独立表 |
 
 第三条仓库入库专项评审和落地边界见：`/Users/simon/projects/plush-toy-erp/docs/architecture/warehouse-inbound-workflow-review.md`。
 
@@ -24,10 +24,10 @@
 | --- | --- | --- |
 | 订单提交 -> 老板审批 -> 工程资料任务 | `orderApprovalFlow.mjs`、`BusinessModulePage.jsx`、`MobileRoleTasksPage.jsx` | 老板审批、工程资料、订单资料补充 |
 | 采购到货 -> IQC -> 入库 | `purchaseInboundFlow.mjs`、桌面发起动作、后端 IQC 状态派生 | IQC、仓库入库、来料不良处理 |
-| 委外发料 -> 回货 -> 检验 -> 入库 | `outsourceReturnFlow.mjs`、桌面和移动端动作 | 委外回货跟踪、回货检验、委外入库、委外返工 |
+| 委外发料 -> 回货 -> 检验 -> 入库 | `outsourceReturnFlow.mjs`、桌面和岗位任务端动作 | 委外回货跟踪、回货检验、委外入库、委外返工 |
 | 成品完工 -> 成品抽检 -> 成品入库 -> 出货放行 | `finishedGoodsFlow.mjs` 仅保留 seed/test/demo/展示辅助；桌面发起抽检，后端处理成品抽检派生、成品入库状态推进和出货放行状态推进；`buildShipmentReleaseTask` 不再被真实成品入库完成动作调用 | 成品抽检、成品入库、成品返工；既有 `shipment_release` 完成后只进入 `shipping_released` |
-| 真实出货 -> 应收登记 -> 开票登记 | `shipmentFinanceFlow.mjs`、桌面手动入口和移动端财务任务 | 应收登记、开票登记、财务阻塞状态；应收只能基于真实 `shipped`，不基于 `shipment_release done` |
-| 采购/委外 -> 应付登记 -> 对账 | `payableReconciliationFlow.mjs`、桌面和移动端动作 | 采购应付、委外应付、采购对账、委外对账、财务阻塞状态 |
+| 真实出货 -> 应收登记 -> 开票登记 | `shipmentFinanceFlow.mjs`、桌面手动入口和岗位任务端财务任务 | 应收登记、开票登记、财务阻塞状态；应收只能基于真实 `shipped`，不基于 `shipment_release done` |
+| 采购/委外 -> 应付登记 -> 对账 | `payableReconciliationFlow.mjs`、桌面和岗位任务端动作 | 采购应付、委外应付、采购对账、委外对账、财务阻塞状态 |
 
 ## 3. 哪些状态和事件由后端保证
 
@@ -120,28 +120,28 @@
 
 - 委外入库完成、真实出货执行、应收、应付链路的 `update_task_status(done/blocked/rejected)` 后必须创建哪一个下游或异常任务。
 - 其余闭环中 `task + event + business_state + downstream_task` 的完整事务一致性。
-- 除老板审批、IQC、采购仓库入库、委外回货检验、成品抽检、成品入库和出货放行外，桌面端、移动端、API 多入口触发同一规则时的一致结果。
+- 除老板审批、IQC、采购仓库入库、委外回货检验、成品抽检、成品入库和出货放行外，桌面端、岗位任务端、API 多入口触发同一规则时的一致结果。
 
-## 4. 哪些移动端动作会触发下游任务
+## 4. 哪些岗位任务端动作会触发下游任务
 
-| 移动端动作 | 当前后续动作 |
+| 岗位任务端动作 | 当前后续动作 |
 | --- | --- |
-| 老板审批任务 done | 已迁入后端：移动端只调用 `update_task_status`，后端写 `project_approved` 并生成工程资料任务 |
-| 老板审批 blocked/rejected | 已迁入后端：移动端只调用 `update_task_status`，后端强制原因、写阻塞或待审批状态，并生成订单资料补充任务 |
-| IQC done | 已迁入后端：移动端只调用 `update_task_status`，后端写 `warehouse_inbound_pending` 并生成仓库入库任务 |
-| IQC blocked/rejected | 已迁入后端：移动端只调用 `update_task_status`，后端强制原因、写 `qc_failed`，并生成来料不良处理任务 |
-| 采购仓库入库 done | 已迁入后端：移动端只调用 `update_task_status`，后端写 `inbound_done`；不写库存流水 / 余额 / 批次，不创建采购应付登记任务 |
-| 采购仓库入库 blocked/rejected | 已迁入后端：移动端只调用 `update_task_status`，后端强制原因并写 `blocked`；不派生异常任务，不复用 `purchase_quality_exception` |
+| 老板审批任务 done | 已迁入后端：岗位任务端只调用 `update_task_status`，后端写 `project_approved` 并生成工程资料任务 |
+| 老板审批 blocked/rejected | 已迁入后端：岗位任务端只调用 `update_task_status`，后端强制原因、写阻塞或待审批状态，并生成订单资料补充任务 |
+| IQC done | 已迁入后端：岗位任务端只调用 `update_task_status`，后端写 `warehouse_inbound_pending` 并生成仓库入库任务 |
+| IQC blocked/rejected | 已迁入后端：岗位任务端只调用 `update_task_status`，后端强制原因、写 `qc_failed`，并生成来料不良处理任务 |
+| 采购仓库入库 done | 已迁入后端：岗位任务端只调用 `update_task_status`，后端写 `inbound_done`；不写库存流水 / 余额 / 批次，不创建采购应付登记任务 |
+| 采购仓库入库 blocked/rejected | 已迁入后端：岗位任务端只调用 `update_task_status`，后端强制原因并写 `blocked`；不派生异常任务，不复用 `purchase_quality_exception` |
 | 委外回货跟踪 done | 更新为 `qc_pending`，生成委外回货检验任务 |
-| 委外回货检验 done | 已迁入后端：移动端只调用 `update_task_status`，后端写 `warehouse_inbound_pending` 并生成委外入库任务 |
-| 委外回货检验 blocked/rejected | 已迁入后端：移动端只调用 `update_task_status`，后端强制原因、写 `qc_failed`，并生成委外返工 / 补做任务 |
+| 委外回货检验 done | 已迁入后端：岗位任务端只调用 `update_task_status`，后端写 `warehouse_inbound_pending` 并生成委外入库任务 |
+| 委外回货检验 blocked/rejected | 已迁入后端：岗位任务端只调用 `update_task_status`，后端强制原因、写 `qc_failed`，并生成委外返工 / 补做任务 |
 | 委外入库 done | 更新为 `inbound_done`，生成委外应付登记任务 |
-| 成品抽检 done | 已迁入后端：移动端只调用 `update_task_status`，后端写 `warehouse_inbound_pending` 并生成成品入库任务 |
-| 成品抽检 blocked/rejected | 已迁入后端：移动端只调用 `update_task_status`，后端强制原因、写 `qc_failed`，并生成成品返工任务 |
-| 成品入库 done | 已迁入后端：移动端只调用 `update_task_status`，后端写 `inbound_done`；不写库存流水 / 余额 / 批次，不派生 `shipment_release` |
-| 成品入库 blocked/rejected | 已迁入后端：移动端只调用 `update_task_status`，后端强制原因并写 `blocked`；不派生异常、返工、复检或出货任务 |
-| 出货放行 done | 已迁入后端：移动端只调用 `update_task_status`，后端写 `shipping_released`；不推进 `shipped`，不写库存，不派生应收 / 开票 / 财务任务 |
-| 出货放行 blocked/rejected | 已迁入后端：移动端只调用 `update_task_status`，后端强制原因并写 `blocked`；不派生异常、出货执行、应收或开票任务 |
+| 成品抽检 done | 已迁入后端：岗位任务端只调用 `update_task_status`，后端写 `warehouse_inbound_pending` 并生成成品入库任务 |
+| 成品抽检 blocked/rejected | 已迁入后端：岗位任务端只调用 `update_task_status`，后端强制原因、写 `qc_failed`，并生成成品返工任务 |
+| 成品入库 done | 已迁入后端：岗位任务端只调用 `update_task_status`，后端写 `inbound_done`；不写库存流水 / 余额 / 批次，不派生 `shipment_release` |
+| 成品入库 blocked/rejected | 已迁入后端：岗位任务端只调用 `update_task_status`，后端强制原因并写 `blocked`；不派生异常、返工、复检或出货任务 |
+| 出货放行 done | 已迁入后端：岗位任务端只调用 `update_task_status`，后端写 `shipping_released`；不推进 `shipped`，不写库存，不派生应收 / 开票 / 财务任务 |
+| 出货放行 blocked/rejected | 已迁入后端：岗位任务端只调用 `update_task_status`，后端强制原因并写 `blocked`；不派生异常、出货执行、应收或开票任务 |
 | 应收登记 done | 更新为 `reconciling`，生成开票登记任务 |
 | 应付登记 done | 更新为 `reconciling`，生成对账任务 |
 | 对账 done | 更新为 `settled` |
@@ -151,14 +151,14 @@
 
 - 开发速度快，适合 v1 快速验证主干闭环。
 - 不需要立刻冻结所有业务字段和行业专表。
-- 前端按钮、正式文档、调试样本和移动端验收可以快速同步。
+- 前端按钮、正式文档、调试样本和岗位任务端验收可以快速同步。
 - 后端表结构稳定，当前只需要承接任务、事件和业务状态。
 - 迁移风险低，旧数据继续通过 `business_records` 和 `workflow_tasks` 可查。
 
 ## 6. 当前前后端边界的风险
 
 - 流程规则分散在多个前端文件，后端无法单独保证完整业务状态机。
-- 桌面端、移动端和未来 API 入口可能触发不同下游任务。
+- 桌面端、岗位任务端和未来 API 入口可能触发不同下游任务。
 - 下游任务创建依赖前端执行顺序，网络中断时可能出现任务已完成但下游任务未创建。
 - 除老板审批、IQC、采购仓库入库、委外回货检验、成品抽检、成品入库和出货放行规则外，幂等主要仍靠前端查询和判断，无法抵御并发入口重复创建。
 - 除老板审批、IQC、采购仓库入库、委外回货检验、成品抽检、成品入库和出货放行规则外，`workflow_business_states` 与任务事件不是所有链路都在同一后端事务内完成。
@@ -172,7 +172,7 @@
 | 调试/验收场景 | debug seed、调试样本和验收说明仍应保持只读或辅助性质 |
 | 非关键链路 | 不影响库存、财务、审批责任和审计闭环的提示类动作可以留在前端 |
 | 频繁调整流程 | 仍在确认字段、角色或操作口径的流程不宜过早固化到后端 |
-| 页面展示逻辑 | Dashboard 风险标签、移动端可见性解释、下一步按钮文案可以继续前端计算 |
+| 页面展示逻辑 | Dashboard 风险标签、岗位任务端可见性解释、下一步按钮文案可以继续前端计算 |
 
 边界：前端可以决定“显示什么”和“建议做什么”，但不宜长期决定“任务完成后系统必须创建什么事实”。
 
@@ -181,7 +181,7 @@
 满足任意条件时，应迁入后端 usecase：
 
 - 任务完成后必须强一致生成下游任务。
-- 同一任务可能被桌面端、移动端、API 或未来外部系统多入口触发。
+- 同一任务可能被桌面端、岗位任务端、API 或未来外部系统多入口触发。
 - 需要防重复创建。
 - 需要事务保证 `workflow_tasks + workflow_task_events + workflow_business_states` 一致。
 - 需要权限和角色校验。
@@ -253,7 +253,7 @@
 - 不承诺强一致任务派生。
 - 不做并发高频创建。
 - 不把 Dashboard 风险聚合当作后端状态机真源。
-- 每次新增下游任务规则都必须同步桌面端、移动端、调试页和测试。
+- 每次新增下游任务规则都必须同步桌面端、岗位任务端、调试页和测试。
 
 ## 13. 迁移风险、回滚和测试要求
 
@@ -265,6 +265,6 @@
 | 兼容 | 本项目是新项目，已迁入后端的七条规则不保留真实运行时旧前端 follow-up 双写；前端工具函数可继续服务 seed / test / demo / 展示辅助 |
 | 回滚 | 若后端规则异常，应按正常发布回滚后端和对应前端调用，不通过恢复移动端本地 follow-up 来维持双轨运行时 |
 | 审计 | 所有自动派生任务必须写 `workflow_task_events`，payload 标明派生来源 |
-| 测试 | 覆盖 done、blocked、rejected、重复点击、并发重复、移动端和桌面端双入口 |
+| 测试 | 覆盖 done、blocked、rejected、重复点击、并发重复、岗位任务端和桌面端双入口 |
 
 当前不是完整 workflow engine，只是七条后端 usecase 最小规则；不要把本文误读为库存 / 出货 / 财务专表已接入 workflow。采购仓库入库已按方案 A 落地：只推进协同状态；委外回货检验只派生委外入库或返工补做任务；成品抽检只派生成品入库或成品返工任务；成品入库只推进 `inbound_done / blocked` 协同业务状态；出货放行只推进 `shipping_released / blocked` 协同业务状态。库存入账和真实出货执行必须单独评审 `ShipmentUsecase / InventoryUsecase`。本轮没有写 `inventory_txns`，没有更新 `inventory_balances`，没有创建 `inventory_lots`，没有库存预留 / 冻结 / 扣减，没有修改 Ent schema，也没有生成 migration，没有推进 `shipped`，没有派生应收、开票、应付或对账。

@@ -45,12 +45,12 @@ const mockPermissions = [
   },
   {
     permission_key: 'mobile.sales.access',
-    name: '进入业务移动端',
+    name: '进入业务岗位任务端',
     module: 'mobile',
   },
   {
     permission_key: 'mobile.purchase.access',
-    name: '进入采购移动端',
+    name: '进入采购岗位任务端',
     module: 'mobile',
   },
   {
@@ -205,6 +205,141 @@ function makeBizResult(payload = {}) {
 function nowUnix() {
   return Math.floor(Date.now() / 1000)
 }
+
+function seedMockMobileWorkflowTasks() {
+  if (mockWorkflowTasks.length > 0) return
+
+  const now = nowUnix()
+  const roles = [
+    'boss',
+    'sales',
+    'purchase',
+    'warehouse',
+    'quality',
+    'finance',
+    'pmc',
+    'production',
+  ]
+  const roleLabels = {
+    boss: '老板',
+    sales: '业务',
+    purchase: '采购',
+    warehouse: '仓库',
+    quality: '品质',
+    finance: '财务',
+    pmc: 'PMC',
+    production: '生产',
+  }
+  const sourceTypes = {
+    boss: 'project-orders',
+    sales: 'project-orders',
+    purchase: 'accessories-purchase',
+    warehouse: 'inbound',
+    quality: 'quality-inspections',
+    finance: 'payables',
+    pmc: 'production-progress',
+    production: 'production-progress',
+  }
+  const taskCount = 24
+
+  roles.forEach((roleKey) => {
+    const roleLabel = roleLabels[roleKey] || roleKey
+    const sourceType = sourceTypes[roleKey] || 'project-orders'
+    for (let index = 0; index < taskCount; index += 1) {
+      const number = String(index + 1).padStart(2, '0')
+      const sourceIDBase = roles.indexOf(roleKey) * 1000 + index
+      mockWorkflowTasks.push(
+        {
+          id: mockWorkflowTaskID++,
+          task_code: `MOCK-MOBILE-${roleKey.toUpperCase()}-TODO-${number}`,
+          task_group: 'mock_mobile_list',
+          task_name: `${roleLabel}待办长列表样本 ${number}`,
+          source_type: sourceType,
+          source_id: 10_000 + sourceIDBase,
+          source_no: `MOCK-${roleKey.toUpperCase()}-TODO-${number}`,
+          business_status_key: 'project_pending',
+          task_status_key: 'ready',
+          owner_role_key: roleKey,
+          assignee_id: null,
+          priority: 1,
+          blocked_reason: '',
+          due_at: now + (index + 2) * 86_400,
+          started_at: null,
+          completed_at: null,
+          closed_at: null,
+          payload: {
+            customer_name: `${roleLabel}长列表客户 ${number}`,
+            debug_mobile_list: true,
+            notification_type: 'debug_notice',
+          },
+          created_by: 1,
+          updated_by: 1,
+          created_at: now - index * 60,
+          updated_at: now - index * 60,
+        },
+        {
+          id: mockWorkflowTaskID++,
+          task_code: `MOCK-MOBILE-${roleKey.toUpperCase()}-WARN-${number}`,
+          task_group: 'mock_mobile_warning',
+          task_name: `${roleLabel}预警长列表样本 ${number}`,
+          source_type: sourceType,
+          source_id: 20_000 + sourceIDBase,
+          source_no: `MOCK-${roleKey.toUpperCase()}-WARN-${number}`,
+          business_status_key: 'blocked',
+          task_status_key: 'blocked',
+          owner_role_key: roleKey,
+          assignee_id: null,
+          priority: 3,
+          blocked_reason: `${roleLabel}预警样本阻塞原因 ${number}`,
+          due_at: now - (index + 1) * 86_400,
+          started_at: null,
+          completed_at: null,
+          closed_at: null,
+          payload: {
+            alert_type: 'debug_warning',
+            critical_path: true,
+            customer_name: `${roleLabel}预警客户 ${number}`,
+            debug_mobile_list: true,
+            notification_type: 'debug_notice',
+          },
+          created_by: 1,
+          updated_by: 1,
+          created_at: now - (index + 100) * 60,
+          updated_at: now - (index + 100) * 60,
+        },
+        {
+          id: mockWorkflowTaskID++,
+          task_code: `MOCK-MOBILE-${roleKey.toUpperCase()}-DONE-${number}`,
+          task_group: 'mock_mobile_done',
+          task_name: `${roleLabel}已办长列表样本 ${number}`,
+          source_type: sourceType,
+          source_id: 30_000 + sourceIDBase,
+          source_no: `MOCK-${roleKey.toUpperCase()}-DONE-${number}`,
+          business_status_key: 'project_approved',
+          task_status_key: 'done',
+          owner_role_key: roleKey,
+          assignee_id: null,
+          priority: 1,
+          blocked_reason: '',
+          due_at: now - (index + 2) * 86_400,
+          started_at: now - (index + 2) * 86_400,
+          completed_at: now - (index + 1) * 86_400,
+          closed_at: null,
+          payload: {
+            customer_name: `${roleLabel}已办客户 ${number}`,
+            debug_mobile_list: true,
+          },
+          created_by: 1,
+          updated_by: 1,
+          created_at: now - (index + 200) * 60,
+          updated_at: now - (index + 200) * 60,
+        }
+      )
+    }
+  })
+}
+
+seedMockMobileWorkflowTasks()
 
 function matchWorkflowFilter(item, params) {
   return (

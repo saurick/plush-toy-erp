@@ -143,6 +143,7 @@ const MOBILE_MESSAGE_TAB_KEYS = Object.freeze({
 
 const MOBILE_TASK_FILTER_KEYS = Object.freeze({
   ALL: 'all',
+  RISK: 'risk',
   ALERT: 'alert',
   OVERDUE: 'overdue',
   DUE_SOON: 'due_soon',
@@ -443,6 +444,15 @@ function isTaskAlerted(task) {
   return task.alert_level !== 'info'
 }
 
+function isTaskRisk(task) {
+  return (
+    isTaskAlerted(task) ||
+    isTaskDueSoon(task) ||
+    isTaskBlockedProgress(task) ||
+    isTaskHighPriority(task)
+  )
+}
+
 function isTaskHighPriority(task) {
   return Number(task.priority || 0) >= 3
 }
@@ -539,7 +549,7 @@ export default function MobileRoleTasksPage() {
   const [activeMessageTabKey, setActiveMessageTabKey] = useState(
     MOBILE_MESSAGE_TAB_KEYS.WARNING
   )
-  const [expandedListKeys, setExpandedListKeys] = useState({})
+  const [visibleListLimitsByKey, setVisibleListLimitsByKey] = useState({})
   const [activeFilterKey, setActiveFilterKey] = useState('all')
   const [selectedTaskID, setSelectedTaskID] = useState(null)
   const [detailAction, setDetailAction] = useState(null)
@@ -568,6 +578,14 @@ export default function MobileRoleTasksPage() {
     () => activeTasks.filter((task) => isTaskAlerted(task)),
     [activeTasks]
   )
+  const overdueTasks = useMemo(
+    () => activeTasks.filter((task) => isTaskOverdue(task)),
+    [activeTasks]
+  )
+  const riskTasks = useMemo(
+    () => activeTasks.filter((task) => isTaskRisk(task)),
+    [activeTasks]
+  )
   const noticeTasks = useMemo(() => activeTasks, [activeTasks])
   const taskSummary = useMemo(
     () => buildMobileTaskSummary(taskViews),
@@ -583,6 +601,9 @@ export default function MobileRoleTasksPage() {
       ? 0
       : Math.round((taskSummary.done / progressTotal) * 100)
   const filteredTasks = useMemo(() => {
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.RISK) {
+      return activeTasks.filter((task) => isTaskRisk(task))
+    }
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.ALERT) {
       return activeTasks.filter((task) => isTaskAlerted(task))
     }
@@ -622,14 +643,14 @@ export default function MobileRoleTasksPage() {
         count: activeTasks.length,
       },
       {
-        key: MOBILE_TASK_FILTER_KEYS.ALERT,
-        label: '预警',
-        count: warningTasks.length,
+        key: MOBILE_TASK_FILTER_KEYS.RISK,
+        label: '风险',
+        count: riskTasks.length,
       },
       {
         key: MOBILE_TASK_FILTER_KEYS.OVERDUE,
         label: '超时',
-        count: activeTasks.filter((task) => isTaskOverdue(task)).length,
+        count: overdueTasks.length,
       },
       {
         key: MOBILE_TASK_FILTER_KEYS.MINE,
@@ -638,7 +659,7 @@ export default function MobileRoleTasksPage() {
           .length,
       },
     ],
-    [activeRoleKey, activeTasks, warningTasks.length]
+    [activeRoleKey, activeTasks, overdueTasks.length, riskTasks.length]
   )
   const selectedTask = useMemo(
     () =>
@@ -1447,41 +1468,62 @@ export default function MobileRoleTasksPage() {
     updateDetailReason(nextValue)
   }
 
-  const isListExpanded = (listKey) => expandedListKeys[listKey] === true
+  const getCollapsedListLimit = (listKey) =>
+    MOBILE_LIST_COLLAPSED_LIMITS[listKey] || Number.POSITIVE_INFINITY
 
-  const setListExpanded = (listKey, expanded) => {
-    setExpandedListKeys((current) => ({
+  const getVisibleListLimit = (items, listKey) => {
+    const collapsedLimit = getCollapsedListLimit(listKey)
+    const configuredLimit = Number(visibleListLimitsByKey[listKey] || 0)
+    const visibleLimit = configuredLimit > 0 ? configuredLimit : collapsedLimit
+    return Math.min(items.length, visibleLimit)
+  }
+
+  const setNextVisibleListBatch = (items, listKey) => {
+    const collapsedLimit = getCollapsedListLimit(listKey)
+    const currentLimit = getVisibleListLimit(items, listKey)
+    const nextLimit = Math.min(items.length, currentLimit + collapsedLimit)
+    setVisibleListLimitsByKey((current) => ({
       ...current,
-      [listKey]: expanded,
+      [listKey]: nextLimit,
     }))
   }
 
+  const resetVisibleListLimit = (listKey) => {
+    setVisibleListLimitsByKey((current) => {
+      const next = { ...current }
+      delete next[listKey]
+      return next
+    })
+  }
+
   const getVisibleListItems = (items, listKey) => {
-    const limit = MOBILE_LIST_COLLAPSED_LIMITS[listKey] || items.length
-    return isListExpanded(listKey) ? items : items.slice(0, limit)
+    return items.slice(0, getVisibleListLimit(items, listKey))
   }
 
   const renderListLimitControl = (items, listKey, noun = '条') => {
-    const limit = MOBILE_LIST_COLLAPSED_LIMITS[listKey] || items.length
-    if (items.length <= limit) return null
-    const expanded = isListExpanded(listKey)
-    const hiddenCount = items.length - limit
+    const collapsedLimit = getCollapsedListLimit(listKey)
+    if (items.length <= collapsedLimit) return null
+    const visibleLimit = getVisibleListLimit(items, listKey)
+    const remainingCount = items.length - visibleLimit
+    const nextCount = Math.min(collapsedLimit, remainingCount)
+    const fullyVisible = remainingCount <= 0
     return (
       <div className="mobile-role-list-control">
         <button
           type="button"
           data-testid={`mobile-role-list-toggle-${listKey}`}
+          data-total-item-count={items.length}
           className="mobile-role-list-control__button"
-          onClick={() => setListExpanded(listKey, !expanded)}
+          onClick={() =>
+            fullyVisible
+              ? resetVisibleListLimit(listKey)
+              : setNextVisibleListBatch(items, listKey)
+          }
         >
-          <span>
-            {expanded
-              ? `收起，保留前 ${limit} ${noun}`
-              : `展开全部 ${items.length} ${noun}`}
-          </span>
-          {!expanded ? (
+          <span>{fullyVisible ? '收起' : `再显示 ${nextCount} ${noun}`}</span>
+          {!fullyVisible ? (
             <span className="mobile-role-list-control__hint">
-              还有 {hiddenCount} {noun}
+              剩余 {remainingCount} {noun}
             </span>
           ) : null}
         </button>
@@ -1504,38 +1546,31 @@ export default function MobileRoleTasksPage() {
     }
     setSelectedTaskID(null)
     setDetailAction(null)
-    setListExpanded(listKey, false)
+    resetVisibleListLimit(listKey)
   }
 
-  const renderMetricButton = ({
+  const renderSummaryMetric = ({
     label,
     value,
     Icon,
     valueClassName = 'text-slate-950',
-    labelClassName = 'text-slate-500',
-    className = '',
-    onClick,
     testID,
   }) => (
-    <button
+    <div
       key={label}
-      type="button"
       data-testid={testID}
-      className={`mobile-role-metric-button min-w-0 px-2 text-center ${className}`}
-      onClick={onClick}
+      className="mobile-role-summary-metric min-w-0 px-2 text-center"
     >
       <div
         className={`mobile-role-metric-button__value font-semibold leading-tight ${valueClassName}`}
       >
         {value}
       </div>
-      <div
-        className={`mobile-role-metric-button__label mt-1 flex items-center justify-center gap-1 ${labelClassName}`}
-      >
+      <div className="mobile-role-metric-button__label mt-1 flex items-center justify-center gap-1 text-base text-slate-600">
         {Icon ? <Icon aria-hidden="true" /> : null}
         <span>{label}</span>
       </div>
-    </button>
+    </div>
   )
 
   const renderProgressPanel = () => (
@@ -1582,16 +1617,9 @@ export default function MobileRoleTasksPage() {
             testID: 'mobile-role-progress-done',
           },
         ].map((item) =>
-          renderMetricButton({
+          renderSummaryMetric({
             ...item,
             valueClassName: 'text-xl text-slate-950',
-            labelClassName: 'text-xs text-slate-500',
-            onClick: () =>
-              openTaskBucket({
-                mainTabKey: item.mainTabKey || MOBILE_MAIN_TAB_KEYS.TODO,
-                filterKey: item.filterKey || MOBILE_TASK_FILTER_KEYS.ALL,
-                listKey: item.listKey || MOBILE_LIST_KEYS.TODO,
-              }),
           })
         )}
       </div>
@@ -1669,65 +1697,53 @@ export default function MobileRoleTasksPage() {
     <section className="mx-5 mt-5 grid grid-cols-4 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white py-5 text-center shadow-sm">
       {[
         {
-          label: '我的预警',
-          value: taskSummary.alerts,
+          label: '风险',
+          value: riskTasks.length,
           valueClassName: 'text-4xl text-orange-500',
-          filterKey: MOBILE_TASK_FILTER_KEYS.ALERT,
           testID: 'mobile-role-metric-alerts',
         },
         {
           label: '已超时',
           value: taskSummary.overdue,
           valueClassName: 'text-4xl text-red-500',
-          filterKey: MOBILE_TASK_FILTER_KEYS.OVERDUE,
           testID: 'mobile-role-metric-overdue',
         },
         {
           label: '即将超时',
           value: taskSummary.dueSoon,
           valueClassName: 'text-4xl text-slate-600',
-          filterKey: MOBILE_TASK_FILTER_KEYS.DUE_SOON,
           testID: 'mobile-role-metric-due-soon',
         },
         {
           label: '阻塞/高优先',
           value: `${taskSummary.blocked}/${taskSummary.highPriority}`,
           valueClassName: 'text-4xl text-red-500',
-          filterKey: MOBILE_TASK_FILTER_KEYS.BLOCKED_OR_HIGH_PRIORITY,
           testID: 'mobile-role-metric-risk',
         },
-      ].map((item) =>
-        renderMetricButton({
-          ...item,
-          labelClassName: 'text-base text-slate-600',
-          onClick: () =>
-            openTaskBucket({
-              filterKey: item.filterKey,
-              listKey: MOBILE_LIST_KEYS.TODO,
-            }),
-        })
-      )}
+      ].map((item) => renderSummaryMetric(item))}
     </section>
   )
 
   const renderTaskFilters = () => (
-    <div className="mx-5 mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner">
+    <div className="mobile-role-task-filters mx-5 mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner">
       {filterItems.map((item) => {
         const active = item.key === activeFilterKey
         return (
           <button
             key={item.key}
             type="button"
-            className={`min-w-0 rounded-xl px-2 py-3 text-base font-semibold transition ${
+            data-testid={`mobile-role-filter-${item.key}`}
+            aria-pressed={active}
+            className={`mobile-role-task-filter min-w-0 rounded-xl px-2 py-3 text-base font-semibold transition ${
               active
-                ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200'
+                ? 'mobile-role-task-filter--active shadow-sm ring-1 ring-slate-200'
                 : 'text-slate-500'
             }`}
             onClick={() => {
               setActiveFilterKey(item.key)
               setSelectedTaskID(null)
               setDetailAction(null)
-              setListExpanded(MOBILE_LIST_KEYS.TODO, false)
+              resetVisibleListLimit(MOBILE_LIST_KEYS.TODO)
             }}
           >
             <span className="truncate">
@@ -2008,16 +2024,16 @@ export default function MobileRoleTasksPage() {
               testID: 'mobile-role-mine-metric-done',
             },
             {
-              label: '预警',
-              value: taskSummary.alerts,
-              filterKey: MOBILE_TASK_FILTER_KEYS.ALERT,
-              testID: 'mobile-role-mine-metric-alerts',
+              label: '超时',
+              value: overdueTasks.length,
+              filterKey: MOBILE_TASK_FILTER_KEYS.OVERDUE,
+              testID: 'mobile-role-mine-metric-overdue',
             },
             {
-              label: '高优先',
-              value: taskSummary.highPriority,
-              filterKey: MOBILE_TASK_FILTER_KEYS.HIGH_PRIORITY,
-              testID: 'mobile-role-mine-metric-high-priority',
+              label: '风险',
+              value: riskTasks.length,
+              filterKey: MOBILE_TASK_FILTER_KEYS.RISK,
+              testID: 'mobile-role-mine-metric-risk',
             },
           ].map((item) => (
             <button

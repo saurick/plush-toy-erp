@@ -4,7 +4,7 @@
 
 通知和预警用于减少状态沟通，不替代业务事实。预警来自任务状态、业务状态、截止时间、优先级和 payload 中明确的风险标记。
 
-v1 只做系统内通知和页面预警：桌面 Dashboard 预警区、桌面业务页顶部预警条、移动端任务页预警区、移动端任务卡红 / 黄标识和正式文档说明。不做短信、邮件、企业微信、飞书、Telegram、App Push 或 WebSocket 实时推送。
+v1 只做系统内通知和页面预警：桌面 Dashboard 预警区、桌面业务页顶部预警条、岗位任务页预警区、岗位任务卡红 / 黄标识和正式文档说明。不做短信、邮件、企业微信、飞书、Telegram、App Push 或 WebSocket 实时推送。
 
 ## 通知类型
 
@@ -144,7 +144,7 @@ v1 只做系统内通知和页面预警：桌面 Dashboard 预警区、桌面业
 | 委外回货检验不合格 | `notification_type=qc_failed`、`alert_type=qc_failed`、critical | production、PMC；品质保留检验事实 |
 | 委外回货或入库超时 | `task_due_soon` / `task_overdue`，或 `vendor_delay` / `outsource_delay` | owner_role_key 对应角色、PMC |
 
-当前不新增 `outsource` 移动端入口，委外回货跟踪和返工 / 补做先由 production 移动端承接。PMC、boss、production 移动端会按 `limit=200` 拉取任务池后由前端可见性规则过滤；quality、warehouse、finance、purchase 继续按 `owner_role_key` 直查。不新增后端复合查询 API。
+当前不新增 `outsource` 岗位任务端入口，委外回货跟踪和返工 / 补做先由 production 岗位任务端承接。PMC、boss、production 岗位任务端会按 `limit=200` 拉取任务池后由前端可见性规则过滤；quality、warehouse、finance、purchase 继续按 `owner_role_key` 直查。不新增后端复合查询 API。
 
 ## 第四条真实闭环预警
 

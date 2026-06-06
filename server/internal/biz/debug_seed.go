@@ -537,6 +537,7 @@ type debugTaskTemplate struct {
 	priority          int16
 	dueOffsetDays     int
 	blockedReason     string
+	payload           map[string]any
 }
 
 type debugStateTemplate struct {
@@ -732,6 +733,137 @@ func (s debugBusinessChainScenario) summary() DebugScenarioSummary {
 	}
 }
 
+const debugMobileListStressCount = 24
+
+var debugMobileListStressRoleKeys = []string{
+	"boss",
+	"sales",
+	"purchase",
+	"warehouse",
+	"quality",
+	"finance",
+	"pmc",
+	"production",
+}
+
+func (s debugBusinessChainScenario) mobileListStressTaskTemplates() []debugTaskTemplate {
+	if len(s.records) == 0 {
+		return nil
+	}
+
+	roles := s.mobileListStressRoles()
+	tasks := make([]debugTaskTemplate, 0, len(roles)*debugMobileListStressCount*3)
+	for _, roleKey := range roles {
+		roleLabel := debugMobileRoleLabel(roleKey)
+		roleSuffix := debugMobileRoleSuffix(roleKey)
+		for index := 1; index <= debugMobileListStressCount; index++ {
+			record := s.records[(index-1)%len(s.records)]
+			number := fmt.Sprintf("%02d", index)
+			tasks = append(tasks,
+				debugTaskTemplate{
+					recordRef:         record.ref,
+					suffix:            fmt.Sprintf("MOB-%s-TODO-%s", roleSuffix, number),
+					group:             "debug_mobile_list",
+					name:              fmt.Sprintf("%s待办长列表样本 %s", roleLabel, number),
+					statusKey:         "ready",
+					businessStatusKey: record.statusKey,
+					ownerRoleKey:      roleKey,
+					priority:          1,
+					dueOffsetDays:     2 + index%5,
+					payload: map[string]any{
+						"debug_mobile_list": true,
+						"notification_type": "debug_notice",
+					},
+				},
+				debugTaskTemplate{
+					recordRef:         record.ref,
+					suffix:            fmt.Sprintf("MOB-%s-WARN-%s", roleSuffix, number),
+					group:             "debug_mobile_warning",
+					name:              fmt.Sprintf("%s预警长列表样本 %s", roleLabel, number),
+					statusKey:         "blocked",
+					businessStatusKey: record.statusKey,
+					ownerRoleKey:      roleKey,
+					priority:          3,
+					dueOffsetDays:     -1 - index%3,
+					blockedReason:     fmt.Sprintf("%s预警样本阻塞原因 %s", roleLabel, number),
+					payload: map[string]any{
+						"alert_type":        "debug_warning",
+						"critical_path":     true,
+						"debug_mobile_list": true,
+						"notification_type": "debug_notice",
+					},
+				},
+				debugTaskTemplate{
+					recordRef:         record.ref,
+					suffix:            fmt.Sprintf("MOB-%s-DONE-%s", roleSuffix, number),
+					group:             "debug_mobile_done",
+					name:              fmt.Sprintf("%s已办长列表样本 %s", roleLabel, number),
+					statusKey:         "done",
+					businessStatusKey: record.statusKey,
+					ownerRoleKey:      roleKey,
+					priority:          1,
+					dueOffsetDays:     -index % 7,
+					payload: map[string]any{
+						"debug_mobile_list": true,
+					},
+				},
+			)
+		}
+	}
+	return tasks
+}
+
+func (s debugBusinessChainScenario) mobileListStressRoles() []string {
+	seen := make(map[string]bool, len(debugMobileListStressRoleKeys)+len(s.tasks))
+	for _, roleKey := range debugMobileListStressRoleKeys {
+		seen[roleKey] = true
+	}
+	for _, task := range s.tasks {
+		roleKey := strings.TrimSpace(task.ownerRoleKey)
+		if roleKey != "" {
+			seen[roleKey] = true
+		}
+	}
+	roles := make([]string, 0, len(seen))
+	for roleKey := range seen {
+		roles = append(roles, roleKey)
+	}
+	sort.Strings(roles)
+	return roles
+}
+
+func debugMobileRoleSuffix(roleKey string) string {
+	roleKey = strings.TrimSpace(roleKey)
+	if roleKey == "" {
+		return "ROLE"
+	}
+	roleKey = strings.ReplaceAll(roleKey, "_", "-")
+	return strings.ToUpper(roleKey)
+}
+
+func debugMobileRoleLabel(roleKey string) string {
+	switch strings.TrimSpace(roleKey) {
+	case "boss":
+		return "老板"
+	case "sales":
+		return "业务"
+	case "purchase":
+		return "采购"
+	case "warehouse":
+		return "仓库"
+	case "quality":
+		return "品质"
+	case "finance":
+		return "财务"
+	case "pmc":
+		return "PMC"
+	case "production":
+		return "生产"
+	default:
+		return roleKey
+	}
+}
+
 func (s debugBusinessChainScenario) buildPlan(debugRunID string, now time.Time) DebugSeedPlan {
 	cleanupToken := fmt.Sprintf("%s:%s", debugRunID, s.key)
 	basePayload := func(extra map[string]any) map[string]any {
@@ -802,12 +934,21 @@ func (s debugBusinessChainScenario) buildPlan(debugRunID string, now time.Time) 
 		records = append(records, record)
 	}
 
-	tasks := make([]DebugTaskPlan, 0, len(s.tasks))
-	for _, template := range s.tasks {
+	taskTemplates := append([]debugTaskTemplate{}, s.tasks...)
+	taskTemplates = append(taskTemplates, s.mobileListStressTaskTemplates()...)
+	tasks := make([]DebugTaskPlan, 0, len(taskTemplates))
+	for _, template := range taskTemplates {
 		taskCode := fmt.Sprintf("%s-%s-%s-%s", debugDocumentPrefix, debugRunID, s.code, template.suffix)
 		var blockedReason *string
 		if strings.TrimSpace(template.blockedReason) != "" {
 			blockedReason = stringPtr(template.blockedReason)
+		}
+		taskPayload := map[string]any{
+			"record_ref": template.recordRef,
+			"task_group": template.group,
+		}
+		for key, value := range template.payload {
+			taskPayload[key] = value
 		}
 		tasks = append(tasks, DebugTaskPlan{
 			RecordRef:         template.recordRef,
@@ -820,10 +961,7 @@ func (s debugBusinessChainScenario) buildPlan(debugRunID string, now time.Time) 
 			Priority:          template.priority,
 			DueAt:             timePtr(now.AddDate(0, 0, template.dueOffsetDays)),
 			BlockedReason:     blockedReason,
-			Payload: basePayload(map[string]any{
-				"record_ref": template.recordRef,
-				"task_group": template.group,
-			}),
+			Payload:           basePayload(taskPayload),
 		})
 	}
 

@@ -80,7 +80,7 @@ async function main() {
   }
 
   console.log(
-    `[mobile-auth-login-route-smoke] 通过，已验证 ${verifiedApps.length} 个移动端角色：${verifiedApps.join('、')}。`
+    `[mobile-auth-login-route-smoke] 通过，已验证 ${verifiedApps.length} 个岗位任务端角色：${verifiedApps.join('、')}。`
   )
 }
 
@@ -260,7 +260,7 @@ async function runMobileAuthScenario(
       assert.equal(
         body.params?.mobile_role_key,
         app.roleKey,
-        `${app.id} 获取验证码应携带当前移动端角色`
+        `${app.id} 获取验证码应携带当前岗位任务端角色`
       )
       await route.fulfill({
         status: 200,
@@ -319,7 +319,7 @@ async function runMobileAuthScenario(
     assert.equal(
       body.params?.mobile_role_key,
       app.roleKey,
-      `${app.id} 短信登录应携带当前移动端角色`
+      `${app.id} 短信登录应携带当前岗位任务端角色`
     )
     assert.equal(body.params?.scope, 'admin')
     assert.equal(body.params?.code, '123456')
@@ -466,7 +466,7 @@ async function runMobileAuthScenario(
   assert.equal(
     workflowCalls,
     0,
-    '完全未登录访问移动端任务页时，应先进入登录页，不应提前请求 workflow API'
+    '完全未登录访问岗位任务页时，应先进入登录页，不应提前请求 workflow API'
   )
 
   await page.goto(new URL('/', `${appBaseURL}/`).toString(), {
@@ -495,7 +495,7 @@ async function runMobileAuthScenario(
   assert.equal(
     workflowCalls,
     0,
-    '缺少移动端角色权限元数据的旧登录态应回到登录页，不应提前请求 workflow API'
+    '缺少岗位任务端角色权限元数据的旧登录态应回到登录页，不应提前请求 workflow API'
   )
 
   await expectText(page, '密码登录')
@@ -511,7 +511,7 @@ async function runMobileAuthScenario(
   assert.equal(passwordLoginCalls, 1, `${app.id} 应完成一次管理员密码登录`)
   await expectText(page, '任务')
   await expectText(page, '待办')
-  await expectText(page, '我的预警')
+  await expectText(page, '风险')
   await expectText(page, '已超时')
   await expectText(page, '即将超时')
   await expectText(page, '阻塞/高优先')
@@ -605,8 +605,8 @@ async function runMobileAuthScenario(
     metrics.appLayoutWidth > 0,
     `移动端登录回跳后主布局容器未渲染: ${JSON.stringify(metrics)}`
   )
-  assert(metrics.shell, `移动端任务页容器未渲染: ${JSON.stringify(metrics)}`)
-  assert(metrics.scroll, `移动端任务页滚动区未渲染: ${JSON.stringify(metrics)}`)
+  assert(metrics.shell, `岗位任务页容器未渲染: ${JSON.stringify(metrics)}`)
+  assert(metrics.scroll, `岗位任务页滚动区未渲染: ${JSON.stringify(metrics)}`)
   assert(metrics.nav, `移动端底部导航未渲染: ${JSON.stringify(metrics)}`)
   assert.equal(
     metrics.navButtonCount,
@@ -615,7 +615,7 @@ async function runMobileAuthScenario(
   )
   assert(
     metrics.shell.bottom <= metrics.viewport.height + 1,
-    `移动端任务页容器应固定在当前视口内: ${JSON.stringify(metrics)}`
+    `岗位任务页容器应固定在当前视口内: ${JSON.stringify(metrics)}`
   )
   assert(
     Math.abs(metrics.nav.bottom - metrics.shell.bottom) <= 1.5,

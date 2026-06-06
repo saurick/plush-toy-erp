@@ -6,7 +6,7 @@ import {
   hasMobileRolePermission,
 } from './mobileRolePermissions.mjs'
 
-test('mobileRolePermissions: 超级管理员拥有全部移动端角色权限', () => {
+test('mobileRolePermissions: 超级管理员拥有全部岗位任务端角色权限', () => {
   assert.equal(
     hasMobileRolePermission({ is_super_admin: true, permissions: [] }, 'boss'),
     true
@@ -20,7 +20,7 @@ test('mobileRolePermissions: 缺失超级管理员标识不会被误判成超级
   )
 })
 
-test('mobileRolePermissions: 移动端入口只由权限码控制', () => {
+test('mobileRolePermissions: 岗位任务端入口只由权限码控制', () => {
   assert.equal(
     hasMobileRolePermission(
       { permissions: ['mobile.purchase.access'], roles: [] },
@@ -37,7 +37,7 @@ test('mobileRolePermissions: 移动端入口只由权限码控制', () => {
   )
 })
 
-test('mobileRolePermissions: 八个移动端角色入口使用独立权限码', () => {
+test('mobileRolePermissions: 八个岗位任务端角色入口使用独立权限码', () => {
   const cases = [
     ['boss', 'mobile.boss.access'],
     ['sales', 'mobile.sales.access'],
@@ -65,7 +65,7 @@ test('mobileRolePermissions: 八个移动端角色入口使用独立权限码', 
   )
 })
 
-test('mobileRolePermissions: 未知移动端角色不默认放行', () => {
+test('mobileRolePermissions: 未知岗位任务端角色不默认放行', () => {
   assert.equal(
     hasMobileRolePermission({ permissions: ['mobile.unknown.access'] }, 'foo'),
     false

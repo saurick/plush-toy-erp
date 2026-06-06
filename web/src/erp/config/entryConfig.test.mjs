@@ -29,7 +29,7 @@ test('entryConfig: 默认展示后台和全部岗位任务端角色', () => {
   ])
 })
 
-test('entryConfig: 支持运行时配置隐藏单个移动端角色', () => {
+test('entryConfig: 支持运行时配置隐藏单个岗位任务端角色', () => {
   globalThis.window = {
     __PLUSH_ERP_ENTRY_CONFIG__: {
       mobileRoles: { warehouse: false },
@@ -81,7 +81,7 @@ test('entryConfig: 路径优先于设备默认', () => {
   )
 })
 
-test('entryConfig: 移动端角色路径解析和生成稳定', () => {
+test('entryConfig: 岗位任务端角色路径解析和生成稳定', () => {
   assert.equal(parseMobileRoleFromPath('/m/warehouse/tasks'), 'warehouse')
   assert.equal(resolveMobileTasksPath('quality'), '/m/quality/tasks')
 })

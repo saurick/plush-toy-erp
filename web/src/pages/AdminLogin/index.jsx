@@ -28,22 +28,16 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import {
   ENTRY_TARGET,
-  getEnabledMobileRoleKeys,
   getEntryConfig,
-  hasDesktopEntryAccess,
   isDesktopEntryEnabled,
   isMobileRoleEntryEnabled,
   isMobileTasksEntryEnabled,
   parseMobileRoleFromPath,
   rememberEntryChoice,
   resolveDefaultEntryTarget,
-  resolveMobileTasksPath,
 } from '@/erp/config/entryConfig.mjs'
 import { useERPWorkspace } from '@/erp/context/ERPWorkspaceProvider'
-import {
-  getAllowedMobileRoleKeys,
-  hasMobileRolePermission,
-} from '@/erp/utils/mobileRolePermissions.mjs'
+import { resolveAdminPostLoginPath } from './adminLoginRouting.mjs'
 
 const { Title } = Typography
 
@@ -181,77 +175,19 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
     }
   }, [loginMode, smsLoginEnabled])
 
-  const resolvePostLoginPath = (
-    adminProfile,
-    { shouldRemember = true } = {}
-  ) => {
-    if (!adminProfile) {
-      return ''
-    }
-
-    if (fromMobileRoleKey) {
-      if (
-        isMobileRoleEntryEnabled(fromMobileRoleKey, entryConfig) &&
-        hasMobileRolePermission(adminProfile, fromMobileRoleKey)
-      ) {
-        if (shouldRemember) {
-          rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
-        }
-        return redirectTo
-      }
-      return ''
-    }
-
-    if (entryTarget === ENTRY_TARGET.DESKTOP) {
-      if (hasDesktopEntryAccess(adminProfile)) {
-        if (shouldRemember) {
-          rememberEntryChoice(ENTRY_TARGET.DESKTOP)
-        }
-        return redirectTo.startsWith('/erp/') ? redirectTo : defaultRedirect
-      }
-      return '/entry'
-    }
-
-    if (entryTarget === ENTRY_TARGET.MOBILE_TASKS) {
-      const enabledRoleKeys = getEnabledMobileRoleKeys(entryConfig)
-      const allowedRoleKeys = getAllowedMobileRoleKeys(
-        adminProfile,
-        enabledRoleKeys
-      )
-      const requestedRoleKey = fixedMobileRoleKey
-      if (
-        requestedRoleKey &&
-        allowedRoleKeys.includes(requestedRoleKey) &&
-        isMobileRoleEntryEnabled(requestedRoleKey, entryConfig)
-      ) {
-        if (shouldRemember) {
-          rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
-        }
-        return isMobileApp ? '/tasks' : resolveMobileTasksPath(requestedRoleKey)
-      }
-      if (allowedRoleKeys.length === 1) {
-        if (shouldRemember) {
-          rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
-        }
-        return isMobileApp
-          ? '/tasks'
-          : resolveMobileTasksPath(allowedRoleKeys[0])
-      }
-      if (allowedRoleKeys.length > 1) {
-        const defaultRoleKey = allowedRoleKeys[0]
-        if (shouldRemember) {
-          rememberEntryChoice(ENTRY_TARGET.MOBILE_TASKS)
-        }
-        return isMobileApp ? '/tasks' : resolveMobileTasksPath(defaultRoleKey)
-      }
-      if (hasDesktopEntryAccess(adminProfile)) {
-        return '/entry?target=desktop'
-      }
-      return ''
-    }
-
-    return '/entry'
-  }
+  const resolvePostLoginPath = (adminProfile, { shouldRemember = true } = {}) =>
+    resolveAdminPostLoginPath({
+      adminProfile,
+      entryTarget,
+      entryConfig,
+      redirectTo,
+      defaultRedirect,
+      fromMobileRoleKey,
+      fixedMobileRoleKey,
+      isMobileApp,
+      shouldRemember,
+      rememberChoice: rememberEntryChoice,
+    })
 
   if (admin) {
     const loggedInRedirect = resolvePostLoginPath(admin, {

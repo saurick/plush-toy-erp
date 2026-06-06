@@ -8,6 +8,50 @@
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
 
 ## 2026-06-05
+- 完成：精简岗位任务端长列表展开后的收起按钮文案。展开态从“收起，保留前 N 条...”改为只显示“收起”；折叠态继续保留“展开全部 / 还有 N 条”数量提示，避免按钮承担过多解释文案。
+- 验证：`cd web && pnpm exec eslint --ext .js --ext .jsx src/erp/mobile/pages/MobileRoleTasksPage.jsx` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过，覆盖岗位任务端长列表默认收起、展开、再收起恢复、暗色可读性和横向溢出。
+- 下一步：如后续继续优化岗位任务端长列表，可进一步检查展开控制在不同列表名词下的短文案一致性。
+- 阻塞/风险：本轮只改岗位任务端前端文案和本过程记录；未改列表数量限制、筛选逻辑、Workflow / Fact 语义、API、RBAC、schema、migration、seedData 或正式文档入口。
+
+- 完成：纠偏岗位任务端列表 sticky 交互。撤回“把底部主导航复制到列表上方”的错误方向；待办页改为让列表上方的筛选分段 tab（全部 / 风险 / 已超时 / 即将超时）像消息页“预警 / 通知”一样在正文列表滚动时 sticky。已办列表继续复用既有展开 / 收起控制，不新增没有业务维度的二级 tab。
+- 完成：补齐 `mobile-tasks-dark` L1 断言，滚动待办长列表后检查筛选 tab 仍贴住正文滚动区顶部、四个按钮不横向溢出；同时继续覆盖待办 / 已办展开收起、消息预警 / 通知 sticky、暗色可读性和底部导航固定。
+- 完成：补强老板岗位任务端已办列表回归数据。`mobile-tasks-dark` 现在额外创建 12 条 `owner_role_key=boss`、`task_status_key=done` 的“批量老板已办任务”，并打开 `/m/boss/tasks` 切到已办页，验证已办列表不再只走空态，且同样触发展开 / 收起。
+- 验证：`cd web && pnpm exec prettier --check src/erp/mobile/pages/MobileRoleTasksPage.jsx src/erp/styles/app.css scripts/styleL1.mjs` 通过；`cd web && pnpm exec eslint --ext .js --ext .jsx src/erp/mobile/pages/MobileRoleTasksPage.jsx scripts/styleL1.mjs` 通过；`cd web && pnpm css` 通过；`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm test` 通过，271 个测试通过；`git diff --check -- web/src/erp/mobile/pages/MobileRoleTasksPage.jsx web/src/erp/styles/app.css web/scripts/styleL1.mjs progress.md` 通过。
+- 下一步：如后续要给“已办任务”加类似二级 tab，应先明确业务维度（例如全部 / 完成 / 关闭 / 退回等），不能用底部主导航替代列表内部 tab。
+- 阻塞/风险：本轮只改岗位任务端前端展示、局部样式、L1 回归脚本和本过程记录；未改后端、API、RBAC、schema、migration、seedData、Workflow / Fact 语义、路由或真实通知表。当前工作区仍有大量非本轮改动，本轮未回退、未整理、未提交。
+
+- 完成：按 Product Design 反馈重新调整权限管理页面结构。创建管理员主按钮上移到页面首屏 hero 操作区；“管理员与角色”模块移动到“当前客户角色模板”之前，避免账号创建入口被角色权限矩阵推到下方才出现。
+- 完成：强化权限页模块视觉分区。管理员模块使用 Account Roles 标识、绿色顶边和偏绿背景；角色模板模块使用 Role Templates 标识、蓝紫顶边和偏蓝背景；暗色模式下两个模块使用不同边框、渐变背景和强调色，肉眼可区分“管理员 / 角色管理”和“权限模板管理”。
+- 完成：更新 `style:l1` 权限页断言，校验 hero 创建按钮早于管理员模块、管理员模块早于角色权限模块，并在暗色权限页校验两个模块的边框和背景不能相同。
+- 验证：`cd web && pnpm exec eslint --ext .js --ext .jsx src/erp/pages/PermissionCenterPage.jsx` 通过；`cd web && pnpm css` 通过；`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm style:l1` 通过，覆盖暗色分区和桌面默认态；`cd web && pnpm test` 通过，271 个测试通过；`cd web && pnpm style:l1` 通过，42 个场景通过；`git diff --check -- web/src/erp/pages/PermissionCenterPage.jsx web/src/erp/styles/app.css web/scripts/styleL1.mjs progress.md` 通过。
+- 下一步：如果后续继续接客户配置，应优先让 `rbac_options` 返回当前客户角色模板排序和默认权限包；页面不需要新增本地权限真源。
+- 阻塞/风险：本轮仍只改权限管理前端页面、样式、L1 回归脚本和本过程记录；未改后端 RBAC、权限码、schema、migration、API、seedData、客户配置 runtime loader、Workflow / Fact 语义或部署。Browser 插件本轮未暴露直接 in-app browser 控制工具，最终视觉证据来自 Playwright L1 截图和 DOM / box 模型断言。
+
+- 完成：重构权限管理页面为“当前客户角色模板”优先的角色中心。页面左侧展示角色模板列表，右侧展示当前角色的权限码数量、影响账号、岗位入口数量、系统权限数量、影响管理员和关键入口 / 高风险能力；账号创建与角色分配保留下方“管理员与角色”区。
+- 完成：权限矩阵继续复用现有 RBAC 权限码和 `set_role_permissions` 保存主路径，只调整前端信息架构和样式；新增客户配置边界提示，明确不同甲方可以有不同角色名称和默认权限包，但 Product Core 权限码、流程职责和业务事实规则保持稳定。
+- 完成：补齐角色中心浅色 / 暗色样式和 `style:l1` 盒模型断言，检查角色中心左右布局、权限矩阵和页面横向溢出，避免后续客户角色模板入口被压缩或遮挡。
+- 验证：`cd web && pnpm exec eslint --ext .js --ext .jsx src/erp/pages/PermissionCenterPage.jsx` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`STYLE_L1_SCENARIOS=permission-center-desktop pnpm style:l1` 通过；`cd web && pnpm style:l1` 通过，42 个场景通过。未执行全量 `pnpm lint`，因为该脚本会对整个 `src/` 执行 `--fix`，当前工作区已有大量非本轮改动，避免格式化无关现场。
+- 下一步：后续真正接客户配置时，应让 `roles / permissions` 来源从行业默认模板或客户配置包生成；页面可以继续消费同一份 `rbac_options` 形态，不需要新增前端本地权限真源。
+- 阻塞/风险：本轮只改权限管理前端页面、样式、L1 回归脚本和本过程记录；未改后端 RBAC 真源、权限码、schema、migration、API、seedData、客户配置 runtime loader、Workflow / Fact 语义或部署。当前 `config/customers/yoyoosun` 仍只是配置草案落点，未进入运行时。
+
+- 完成：修复权限中心角色权限分组标题只有英文模块 key 的问题。新增前端权限模块显示映射，页面分组改为“中文模块名 (英文 key)”显示，例如 `业务记录 (business)`、`岗位任务端 (mobile)`、`调试能力 (debug)`；权限码和后端 RBAC 模块 key 保持不变。
+- 完成：新增 `permissionModuleLabels` 单测并接入现有 `pnpm test` 列表，覆盖内置模块中文显示、空模块归入其他和未知模块保留原 key。
+- 验证：`cd web && pnpm exec node --test src/erp/utils/permissionModuleLabels.test.mjs src/erp/utils/permissionCenterSearch.test.mjs` 通过；`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过。使用 `VITE_ENABLE_RPC_MOCK=true` 临时启动 `http://127.0.0.1:5185/`，Playwright 隔离登录态打开 `/erp/system/permissions`，实际 DOM 显示 `系统管理 (system)`、`业务记录 (business)`、`岗位任务端 (mobile)`、`调试能力 (debug)` 等分组标题。
+- 下一步：后续新增权限模块时，优先在同一显示映射中补中文名；不要把权限码 key 改成中文，也不要让 UI 直接裸显模块 key。
+- 阻塞/风险：本轮只改权限中心前端显示、前端单测和本过程记录；未改后端 RBAC 真源、权限码、schema、migration、API、seedData、Workflow / Fact 语义或部署。in-app browser 受本地 mock 登录 token 不是 JWT 与页面执行环境限制，未作为最终已登录页验证路径；已登录页证据来自隔离 Playwright 会话。
+
+- 完成：将入口、权限显示名、错误提示、前端 app 标题、mock 数据、回归脚本提示和正式 README/docs 中面向用户的“移动端 / 角色移动端”口径收口为“岗位任务端”。底层 `mobile.<role>.access` 权限码、`APP_ID=mobile-*`、`build/mobile-*`、`start:mobile:*`、`/m/<role>/tasks` 路由和 `mobileRoleKey` 技术字段保持不变。
+- 完成：同步 `docs/current-source-of-truth.md`、RBAC 角色权限矩阵、产品 roadmap、workflow / finance / warehouse / architecture 相关正式文档和部署 README，明确设备只影响默认入口，岗位任务端仍按账号权限进入对应角色任务页。
+- 验证：`bash scripts/qa/error-code-sync.sh && bash scripts/qa/error-codes.sh` 通过；`cd server && go test ./internal/biz ./internal/errcode` 通过；`cd web && pnpm test` 通过，269 个测试通过。未跑 `style:l1`，因为本轮未改 CSS、布局或交互样式。
+- 下一步：后续新增用户可见入口、权限名、帮助文案时默认写“岗位任务端”；只有描述手机视口、窄屏布局、Vite 移动端端口或 `mobile-*` 技术标识时继续使用“移动端”。
+- 阻塞/风险：本轮只做命名口径收口，未改权限 key、schema、migration、API 参数、路由兼容、Workflow / Fact 语义或部署。工作区同时存在非本轮的 `AdminLogin` 路由重构、`style:l1` 新场景和 `web/package.json` 测试入口改动，本轮未回退、未整理、未作为术语收口成果处理。
+
+- 完成：修复从桌面单端口岗位任务端退出登录后，手动选择“后台管理”仍被移动端来源回跳覆盖的问题。登录后跳转逻辑已收口到 `adminLoginRouting.mjs`，`/m/<role>/tasks` 来源只有在当前仍选择“岗位任务端”时才回跳任务端；手动选择后台会进入 `/erp/dashboard`。
+- 完成：补齐入口路由单测和 L1 回归场景。新增 `adminLoginRouting.test.mjs` 覆盖“任务端来源 + 继续任务端”和“任务端来源 + 手动后台”两个状态；`style:l1` 新增 `admin-login-mobile-source-desktop-choice`，从 `/m/sales/tasks` 未登录拦截到登录页，选择后台并 mock 登录后断言进入后台看板。
+- 验证：`cd web && pnpm test` 通过，269 个测试通过；`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`STYLE_L1_SCENARIOS=admin-login-mobile-source-desktop-choice pnpm style:l1` 通过；`cd web && pnpm smoke:mobile-auth-login-route` 通过，覆盖 8 个岗位任务端。Browser 复用 `http://localhost:5175`，从已登录任务端退出到 `/admin-login`，确认后台 / 岗位任务端入口可见，点击“后台管理”后选中态为后台，console error/warn 为空。
+- 下一步：如果后续新增“后台 / 任务端”显式切换入口，应继续复用该路由优先级：真实来源回跳只服务当前选择的入口，用户手动选择优先于设备默认和历史任务端来源。
+- 阻塞/风险：本轮只改前端登录入口路由、前端 L1 回归脚本、测试登记和过程记录；未改后端、登录接口、RBAC 权限码、seedData、schema、migration、Workflow / Fact 语义或部署。当前工作区存在大量非本轮改动，本轮未回退、未整理、未纳入成果。
+
 - 完成：统一移除主题菜单触发按钮的 tooltip。`ERPThemeToggle` 的 menu 形态现在只保留按钮 `aria-label` 和下拉菜单选中态，不再在点击主题按钮时额外弹出“主题：浅色 / 暗色”提示，避免移动端菜单选项被 tooltip 覆盖。
 - 完成：`style:l1` 的主题菜单切换 helper 新增断言，菜单打开后不允许出现可见的“主题” tooltip，防止后续重新包回 tooltip 造成遮挡回归。
 - 验证：`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，267 个测试通过；`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,mobile-tasks-dark pnpm style:l1` 通过，覆盖桌面登录页主题菜单和移动任务端暗色主题场景。Browser 复用 `http://127.0.0.1:5175`，390x844 视口打开移动任务入口后未登录守卫落到 `/admin-login`，主题菜单打开时“跟系统 / 浅色 / 暗色”可见、可见主题 tooltip 数为 0，点击“暗色”后按钮变为“主题模式：暗色”，console error/warn 为空。
@@ -109,3 +153,60 @@
 - 验证：`pnpm --dir web css` 通过；`pnpm --dir web exec node --test src/erp/config/devDocs.test.mjs` 通过；`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1` 通过；Browser 打开 `http://localhost:5175/__dev/docs` 实测目录树右侧计数 / pin 到滚动容器右边距从约 10-11px 提升到 18-27px，滚动后可见图钉真实点击置顶数 `7 -> 8`，再次点击恢复 `7`，页面无横向溢出且 console error/warn 为空。
 - 下一步：后续若继续加目录树右侧动作，优先复用该滚动安全区，避免动作按钮贴近滚动条；如新增移动端独立布局，再补对应视口回归。
 - 阻塞/风险：本轮只改 dev docs 左侧滚动列表样式；未改产品菜单、seedData、RBAC、docs registry、后端、schema、migration 或部署。工作区仍有非本轮未提交现场和 `tmp/pdfs/*` 产物，本轮未回退或清理。追加前 `progress.md` 为 349 行 / 74451 bytes，未达到归档阈值。
+
+## 2026-06-05 21:38 CST
+- 完成：按 Product Design 审计方式先扫描输入控件使用点并采集权限创建管理员弹窗浅色 / 暗色近景证据；确认本轮截图里的风格不统一根因是权限中心三个 Modal 漏挂已有 `.erp-permission-modal` 样式入口，普通 `Input` 未继承权限弹窗控件圆角和边框 token。
+- 完成：为创建管理员、分配角色、重置密码三个权限中心弹窗接回 `.erp-permission-modal`；`style:l1` 的权限中心创建管理员弹窗回归新增 class 挂载和普通 Input / Password / Select 圆角一致性断言，避免后续再次退回到 0px 圆角输入框。
+- 验证：`cd web && pnpm exec eslint --ext .js --ext .jsx src/erp/pages/PermissionCenterPage.jsx scripts/styleL1.mjs` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`STYLE_L1_SCENARIOS=permission-center-desktop pnpm style:l1` 通过。已重新采集权限创建管理员弹窗浅色 / 暗色截图，修复后账号、手机号、密码和角色控件均为 10px 圆角、32px 高度，`erp-permission-modal` class 已挂载。
+- 下一步：如果继续做全局表单控件治理，应按审计结果分层推进：先抽统一 modal/form control 规则，再逐步覆盖业务表单、V1 主数据 / 订单表单、筛选器和移动端；登录页与打印工作台控件不应直接套后台业务表单风格。
+- 阻塞/风险：本轮只修复权限中心弹窗样式入口和对应前端回归断言；未改后端、schema、migration、RBAC、seedData、权限语义、角色模板配置或部署。`web/output/product-design/input-control-style-audit-2026-06-05/` 下为本轮本地审计截图和指标证据，不作为正式产品文档真源。
+
+## 2026-06-05 22:01 CST
+- 完成：修复岗位任务端待办页顶部统计快捷卡没有选中态的问题。`我的预警`、`已超时`、`即将超时`、`阻塞/高优先` 现在由 `activeMainTabKey / activeFilterKey` 派生 `aria-pressed` 和 active class；从“我的”分区点击“高优先”跳回待办后，会在顶部 `阻塞/高优先` 卡片显示选中态。
+- 完成：同步补齐统计快捷卡盒模型收缩规则，长标签可换行，`0/1` 这类组合数值在 390px 四列移动视口下不再造成横向溢出；选中态只改变背景、内阴影和颜色，不改变网格结构。
+- 完成：`style:l1` 的 `mobile-tasks-dark` 交互链路新增选中态断言，覆盖点击“我的预警”、点击“阻塞/高优先”、以及从“我的 / 高优先”跳回待办后的 `aria-pressed`、active class、可见背景 / 内阴影和按钮横向溢出。
+- 验证：`cd web && pnpm exec prettier --check src/erp/styles/app.css src/erp/mobile/pages/MobileRoleTasksPage.jsx scripts/styleL1.mjs` 通过；`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm style:l1` 通过，42 个场景通过。Browser 打开 `http://127.0.0.1:5175/m/sales/tasks` 验证未登录跳转 `/admin-login`、页面非空、无框架 overlay、console error/warn 为空；Browser 截图接口本轮超时，视觉 / 交互证据以 `style:l1` DOM 和盒模型断言为准。
+- 下一步：若继续细化岗位任务端，可再评审是否把 `高优先` 从合并统计卡拆成独立顶部筛选；本轮先沿用现有 `阻塞/高优先` 统计口径，不新增筛选项或任务语义。
+- 阻塞/风险：本轮只改移动端任务页统计按钮状态、移动端样式和前端 L1 回归；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。工作区已有大量非本轮改动，本轮未回退、未提交。
+
+## 2026-06-05 22:23 CST
+- 完成：继续收口岗位任务端待办页信息架构，取消顶部统计卡和已办进度卡的筛选 / 选中态，把它们改为只读摘要，避免“统计卡 + 主筛选 tab + 我的快捷卡”三层都像 tab 的冗余交互。
+- 完成：待办主筛选收敛为 `全部 / 风险 / 超时 / 我负责`；其中 `风险` 聚合预警、即将超时、阻塞和高优先任务。`我的` 分区的原 `高优先` 快捷入口同步改为 `风险`，点击后回到待办页并选中主筛选 `风险`。
+- 完成：同步更新岗位任务端产品设计记录，明确顶部指标只读、进度只读、主筛选唯一承担列表过滤，避免后续继续把统计摘要做成隐性 tab。
+- 验证：`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && MOBILE_AUTH_SMOKE_APP_ID=mobile-business pnpm smoke:mobile-auth-login-route` 通过；`cd web && pnpm exec prettier --check src/erp/mobile/pages/MobileRoleTasksPage.jsx scripts/styleL1.mjs scripts/mobileAuthLoginRouteSmoke.mjs src/erp/styles/app.css ../docs/product/mobile-role-tasks-redesign.md` 通过；`cd web && pnpm lint && pnpm css && pnpm test && pnpm style:l1 && pnpm smoke:mobile-auth-login-route` 通过，测试 271 个通过、L1 42 个场景通过、8 个移动角色登录路由 smoke 通过；`git diff --check` 覆盖本轮触达文件通过。Browser 打开 `http://127.0.0.1:5175/m/sales/tasks` 验证运行时可启动，未登录按预期跳转 `/admin-login`，React root 挂载、页面非空且无 Vite error overlay。
+- 下一步：如果后续还要强化岗位任务端，可以再做任务风险分组 / 通知来源的正式能力评审；本轮不新增后端任务语义或通知事实。
+- 阻塞/风险：本轮只改移动端岗位任务页 UI 交互、样式、前端回归脚本和产品设计说明；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。Browser 健康检查受限于 in-app Browser 无法安装测试脚本里的 JSON-RPC route mock，完整列表筛选交互以 `style:l1` 自动化断言为准。追加前 `progress.md` 为 163 行 / 41944 bytes，未达到归档阈值。
+
+## 2026-06-05 23:14 CST
+- 完成：修复“我的”页点击 `预警` 跳到待办后没有任何选中态的问题。根因是 `预警` 仍使用旧的 `alert` 隐藏筛选 key，而待办页主筛选已经收敛为 `全部 / 风险 / 超时 / 我负责`，目标页没有可见 `预警` tab 可以高亮。
+- 完成：按主筛选对齐原则，把“我的”页快捷入口改为 `待办 / 已办 / 超时 / 风险`；`超时` 跳回待办后选中 `超时` 主筛选，`风险` 继续承接预警、即将超时、阻塞和高优先的聚合入口，避免 `预警` 与 `风险` 并列造成包含关系不清。
+- 完成：`mobile-tasks-dark` L1 场景新增明确超时任务，并断言“我的 / 超时”跳回后 `mobile-role-filter-overdue` 高亮且列表进入超时集合；产品设计说明同步记录“我的”快捷入口必须落到可见主筛选。
+- 验证：`cd web && pnpm exec prettier --check src/erp/mobile/pages/MobileRoleTasksPage.jsx scripts/styleL1.mjs ../docs/product/mobile-role-tasks-redesign.md` 通过；`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；顺序执行 `cd web && pnpm style:l1` 通过，42 个场景通过；顺序执行 `cd web && pnpm smoke:mobile-auth-login-route` 通过，8 个岗位任务端角色通过；`git diff --check` 覆盖本轮触达文件通过。
+- 下一步：如后续仍要保留单独“预警”入口，必须先把它设计成待办页可见主筛选或消息页入口，不能再用隐藏 filter key 跳到待办列表。
+- 阻塞/风险：本轮只改移动端“我的”快捷入口、L1 回归数据 / 断言和产品设计说明；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。全量 `style:l1` 与移动登录 smoke 曾被并行执行互相污染本地浏览器 / 会话状态，已改为顺序执行并通过。追加前 `progress.md` 为 192 行 / 49346 bytes，未达到归档阈值。
+
+## 2026-06-05 22:52 CST
+- 完成：把岗位任务端长列表造数从临时 L1 数据补到真实 debug seed 主路径。每个业务链路调试场景现在保留原始关键任务，并额外按“老板 + 场景已有任务角色”生成待办、预警、已办三组长列表样本，每组 24 条；任务 payload 标记 `debug_mobile_list`，不改变 Workflow / Fact 业务语义。
+- 完成：前端 mock JSON-RPC server 初始任务池同步补齐 8 个岗位的待办 / 预警 / 已办长列表样本，每组 24 条；`style:l1` 的移动任务场景造数扩到 30 条，并修正断言不再依赖第 1 条刚好出现在收起区。
+- 验证：`cd server && go test ./internal/biz` 通过；`cd web && pnpm exec eslint --ext .js --ext .jsx src/mocks/jsonRpcMockServer.js scripts/styleL1.mjs` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过，覆盖待办筛选 sticky、待办 / 已办 / 预警 / 通知长列表展开收起和老板端已办长列表。
+- 下一步：当前已存在的旧 `DBG-RUN-*` 数据不会自动补新样本；需要在业务链路调试里重新生成一个 debug run，或先清理旧 run 后再生成，才能在真实页面看到几十条。
+- 阻塞/风险：本轮只改 debug seed / mock / L1 造数与后端 seed 单测；未改 schema、migration、RBAC、正式 WorkflowUsecase 规则、业务事实层、seedData、菜单或部署。追加前 `progress.md` 为 178 行 / 46209 bytes，未达到归档阈值。
+
+## 2026-06-05 23:10 CST
+- 完成：按用户要求实际运行业务链路 debug seed。先用 `RUN-20260605T2255-MOBILE-LIST` 验证老板 / 场景角色长列表可生成，随后发现采购、生产真实岗位页仍缺少样本，因此把 `server/internal/biz/debug_seed.go` 的移动端长列表角色范围扩大到 8 个岗位全覆盖。
+- 完成：重建并重启本地后端 `server-dev`，用最终 run id `RUN-20260605T2310-MOBILE-ALL` 重新生成 6 个内置业务链路场景；每个场景生成约 577-579 条任务，老板、业务、采购、仓库、品质、财务、PMC、生产 8 个岗位均能查到本轮待办 / 预警 / 已办长列表任务。
+- 验证：`cd server && go test ./internal/biz` 通过；`curl -fsS http://127.0.0.1:8300/healthz` 返回 `ok`；通过 JSON-RPC `workflow.list_tasks` 按 8 个 `owner_role_key` 复核 `RUN-20260605T2310-MOBILE-ALL`，每个岗位在返回窗口内均包含 ready / blocked / done 长列表任务。
+- 下一步：页面如果仍显示旧数据，刷新岗位任务端或重新登录；如后续需要减少 debug 数据体积，可按 `debug_run_id` 单独清理旧 run，再保留最终 `RUN-20260605T2310-MOBILE-ALL`。
+- 阻塞/风险：本轮追加了真实调试数据，没有清理旧 `RUN-20260605T2255-MOBILE-LIST`、`RUN-20260605T2305-MOBILE-ALL` 或更早 `DBG-RUN-*` 数据；未改 schema、migration、RBAC、正式 WorkflowUsecase 规则、业务事实层、seedData、菜单或部署。追加前 `progress.md` 为 185 行 / 47788 bytes，未达到归档阈值。
+
+## 2026-06-06 11:14 CST
+- 完成：补齐岗位任务端待办筛选的正式交互语义。`docs/product/mobile-role-tasks-redesign.md` 现在明确待办主筛选是视图筛选，不是互斥业务分类；`风险` 是异常聚合视图，`超时` 是其中需要单独快速定位的强风险子集，同一任务可以同时出现在两个视图中。
+- 下一步：后续若继续新增待办快捷入口或筛选项，必须先判断它是互斥分类、聚合视图还是子集视图，再决定是否需要可见 tab、快捷入口或消息页入口。
+- 阻塞/风险：本轮只补正式产品设计说明，不改前端代码、后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。追加前 `progress.md` 为 200 行 / 51422 bytes，未达到归档阈值。
+
+## 2026-06-06 11:47 CST
+- 完成：把岗位任务端长列表展开从“一次展开全部”改为分批展开。待办初始 12 条、已办初始 10 条、预警 / 通知初始 8 条；每次点击只增加一个同等批次，直到最后一批才显示 `收起`。
+- 完成：同步更新 `mobile-tasks-dark` L1 回归，断言初始数量、`再显示 N / 剩余 N` 文案、首次只增加一个批次、连续展开到最后出现收起、收起后恢复默认数量；产品设计说明补充暂不搜索时的长列表定位策略。
+- 验证：`cd web && pnpm exec prettier --check src/erp/mobile/pages/MobileRoleTasksPage.jsx scripts/styleL1.mjs ../docs/product/mobile-role-tasks-redesign.md` 通过；`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`cd web && pnpm style:l1` 首次在 `root-redirect-mobile` 偶发等待登录页标题超时，复跑通过 42 个场景；`git diff --check` 覆盖本轮触达文件通过。
+- 下一步：如果后续单角色任务量继续上升，再评审是否补轻量关键词搜索；当前先保持筛选 + 风险优先排序 + 分批展开。
+- 阻塞/风险：本轮只改移动端列表展开交互、L1 回归和产品设计说明；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。in-app Browser 对本地 `127.0.0.1 / localhost:5175` 返回 `ERR_BLOCKED_BY_CLIENT`，本轮浏览器级交互证据以项目 `style:l1` Playwright 断言为准。追加前 `progress.md` 为 205 行 / 52240 bytes，未达到归档阈值。

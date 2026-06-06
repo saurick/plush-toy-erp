@@ -119,7 +119,7 @@
 | 6 | 客户数据 dry-run 与 loader 设计 | 设计受控导入，不写错库、不伪造事实 | freeze、dry-run evidence、loader design、unresolved queue、acceptance checklist | 不直接真实导入 |
 | 7 | 受控导入与试点部署 | 备份、回滚、导入、校验、培训和试运行 | import execution audit、deployment package、trial acceptance | 不无备份上线 |
 | 8 | 生产 / 委外 / 出货 / 财务事实扩展 | 补齐 ERP 主干事实闭环 | production facts、outsourcing facts、shipment facts、finance facts | 不从 workflow 放行直接生成事实 |
-| 9 | 移动端任务与岗位协同 | 将高频任务投影到岗位移动端 | mobile task entry、workflow action UI、role task smoke | 不做空壳移动端 |
+| 9 | 岗位任务端与岗位协同 | 将高频任务投影到岗位任务端 | mobile task entry、workflow action UI、role task smoke | 不做空壳岗位任务端 |
 | 10 | 行业模板沉淀 | 从多客户共性沉淀默认模板 | industry roles、menus、fields、numbering、import template | 不把单客户特殊项变默认 |
 | 11 | 多客户私有化复制 | 新客户主要靠配置、导入和部署上线 | customer package、deployment runbook、upgrade checklist | 不长期 fork |
 | 12 | SaaS 单独评审 | 私有化多客户成熟后再评审 SaaS | tenant isolation design、billing / license review、ops console design | 不提前污染当前 schema |
@@ -345,11 +345,11 @@ MVP 原则：
 * 采购入库或委外结算后才评审应付。
 * 财务事实必须可冲正、可审计。
 
-## 11. Phase 9：移动端任务与岗位协同
+## 11. Phase 9：岗位任务端与岗位协同
 
 目标：把高频岗位任务投影到移动端，减少现场回填和等待。
 
-移动端应优先承接：
+岗位任务端应优先承接：
 
 * 审批。
 * 质检确认。
@@ -362,7 +362,7 @@ MVP 原则：
 
 * 不复制桌面菜单树。
 * 不做空壳角色入口。
-* 不让移动端绕过后端权限、状态机和事实 usecase。
+* 不让岗位任务端绕过后端权限、状态机和事实 usecase。
 
 ## 12. Phase 10：行业模板沉淀
 
@@ -496,7 +496,7 @@ Phase 0 docs-only reset
 -> 客户数据 dry-run + loader design
 -> 受控导入 + 私有化试点
 -> 生产 / 委外 / 出货 / 财务事实
--> 移动端任务
+-> 岗位任务
 -> 行业模板
 -> 多客户私有化复制
 -> 产品成熟
