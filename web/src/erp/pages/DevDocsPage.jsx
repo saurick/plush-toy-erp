@@ -16,13 +16,17 @@ import { Button, Empty, Input, Space, Tag, Tooltip, Typography } from 'antd'
 import { Markdown, extractMarkdownHeadings } from '@/common/components/markdown'
 import { message } from '@/common/utils/antdApp'
 import {
+  DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
   DEV_DOCS_PINNED_STORAGE_KEY,
+  DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
   applyDevDocsPinnedState,
   buildDevDocsItems,
   buildDevDocsTree,
   filterDevDocsItems,
   getDefaultDevDocsPinnedPaths,
+  normalizeDevDocsExpandedDirKeys,
   normalizeDevDocsPinnedPaths,
+  normalizeDevDocsSelectedPath,
   sortDevDocsItemsByPinned,
 } from '../config/devDocs.mjs'
 
@@ -70,6 +74,50 @@ function readPinnedPaths(docs = []) {
     )
   } catch (error) {
     return getDefaultDevDocsPinnedPaths(docs)
+  }
+}
+
+function readSelectedKey(docs = []) {
+  if (typeof window === 'undefined') {
+    return docs[0]?.key || ''
+  }
+
+  try {
+    const selectedPath = normalizeDevDocsSelectedPath(
+      window.localStorage.getItem(DEV_DOCS_SELECTED_PATH_STORAGE_KEY),
+      docs
+    )
+    return (
+      docs.find((item) => item.path === selectedPath)?.key || docs[0]?.key || ''
+    )
+  } catch (error) {
+    return docs[0]?.key || ''
+  }
+}
+
+function readExpandedKeys(availableKeys = []) {
+  const defaultKeys = normalizeDevDocsExpandedDirKeys(
+    DEFAULT_EXPANDED_DIR_KEYS,
+    availableKeys
+  )
+  if (typeof window === 'undefined') {
+    return defaultKeys
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(
+      DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY
+    )
+    if (!rawValue) {
+      return defaultKeys
+    }
+    const parsedValue = JSON.parse(rawValue)
+    return normalizeDevDocsExpandedDirKeys(
+      Array.isArray(parsedValue) ? parsedValue : [],
+      availableKeys
+    )
+  } catch (error) {
+    return defaultKeys
   }
 }
 
@@ -181,11 +229,11 @@ export default function DevDocsPage() {
     [docTree]
   )
   const [keyword, setKeyword] = useState('')
-  const [selectedKey, setSelectedKey] = useState(
-    docsWithPinnedState[0]?.key || ''
+  const [selectedKey, setSelectedKey] = useState(() =>
+    readSelectedKey(docsWithPinnedState)
   )
   const [expandedKeys, setExpandedKeys] = useState(
-    () => new Set(DEFAULT_EXPANDED_DIR_KEYS)
+    () => new Set(readExpandedKeys(allDirectoryKeys))
   )
   const markdownRef = useRef(null)
 
@@ -241,6 +289,36 @@ export default function DevDocsPage() {
   }, [docs, pinnedPaths])
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !selectedDoc?.path) {
+      return
+    }
+    try {
+      window.localStorage.setItem(
+        DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
+        normalizeDevDocsSelectedPath(selectedDoc.path, docs)
+      )
+    } catch (error) {
+      // 当前文档偏好写入失败时不影响 dev docs 主路径浏览。
+    }
+  }, [docs, selectedDoc?.path])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      window.localStorage.setItem(
+        DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
+        JSON.stringify(
+          normalizeDevDocsExpandedDirKeys([...expandedKeys], allDirectoryKeys)
+        )
+      )
+    } catch (error) {
+      // 目录展开偏好写入失败时不影响 dev docs 主路径浏览。
+    }
+  }, [allDirectoryKeys, expandedKeys])
+
+  useEffect(() => {
     markdownRef.current?.scrollTo({ top: 0 })
   }, [selectedDoc?.key])
 
@@ -264,15 +342,24 @@ export default function DevDocsPage() {
       } else {
         next.add(key)
       }
-      return next
+      return new Set(
+        normalizeDevDocsExpandedDirKeys([...next], allDirectoryKeys)
+      )
     })
   }
 
   const toggleAllDirectories = () => {
     setExpandedKeys(
       allExpanded
-        ? new Set(DEFAULT_EXPANDED_DIR_KEYS)
-        : new Set(allDirectoryKeys)
+        ? new Set(
+            normalizeDevDocsExpandedDirKeys(
+              DEFAULT_EXPANDED_DIR_KEYS,
+              allDirectoryKeys
+            )
+          )
+        : new Set(
+            normalizeDevDocsExpandedDirKeys(allDirectoryKeys, allDirectoryKeys)
+          )
     )
   }
 
@@ -288,6 +375,10 @@ export default function DevDocsPage() {
         : [doc.path, ...normalizedCurrent]
       return normalizeDevDocsPinnedPaths(next, docs)
     })
+  }
+
+  const selectDoc = (docKey) => {
+    setSelectedKey(docKey)
   }
 
   const scrollReaderToTop = () => {
@@ -367,7 +458,7 @@ export default function DevDocsPage() {
                     <button
                       type="button"
                       className="erp-dev-docs-pinned__open"
-                      onClick={() => setSelectedKey(item.key)}
+                      onClick={() => selectDoc(item.key)}
                     >
                       <FileMarkdownOutlined />
                       <span className="erp-dev-docs-pinned__copy">
@@ -419,7 +510,7 @@ export default function DevDocsPage() {
                       <button
                         type="button"
                         className="erp-dev-docs-list__open"
-                        onClick={() => setSelectedKey(item.key)}
+                        onClick={() => selectDoc(item.key)}
                       >
                         <span className="erp-dev-docs-list__title">
                           <FileMarkdownOutlined />
@@ -499,7 +590,7 @@ export default function DevDocsPage() {
                     selectedKey={selectedDoc?.key}
                     onToggleDocPin={toggleDocPin}
                     onToggleDirectory={toggleDirectory}
-                    onSelectDoc={setSelectedKey}
+                    onSelectDoc={selectDoc}
                   />
                 ))}
               </div>

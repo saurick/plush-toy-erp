@@ -11,6 +11,10 @@ export const PINNED_DEV_DOC_PATHS = Object.freeze([
 ])
 
 export const DEV_DOCS_PINNED_STORAGE_KEY = 'plush_erp_dev_docs_pinned_paths'
+export const DEV_DOCS_SELECTED_PATH_STORAGE_KEY =
+  'plush_erp_dev_docs_selected_path'
+export const DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY =
+  'plush_erp_dev_docs_expanded_dirs'
 
 export function isDevDocsEnabled(env = import.meta.env) {
   return env?.DEV === true
@@ -148,6 +152,25 @@ export function normalizeDevDocsPinnedPaths(paths = [], docs = []) {
     .map((path) => String(path || '').trim())
     .filter((path) => path.endsWith('.md'))
     .filter((path) => availablePaths.size === 0 || availablePaths.has(path))
+}
+
+export function normalizeDevDocsSelectedPath(path = '', docs = []) {
+  const selectedPath = String(path || '').trim()
+  if (!selectedPath.endsWith('.md')) {
+    return ''
+  }
+  const availablePaths = new Set(docs.map((item) => item.path))
+  return availablePaths.size === 0 || availablePaths.has(selectedPath)
+    ? selectedPath
+    : ''
+}
+
+export function normalizeDevDocsExpandedDirKeys(keys = [], availableKeys = []) {
+  const availableKeySet = new Set(availableKeys)
+  return [...new Set(keys)]
+    .map((key) => String(key || '').trim())
+    .filter((key) => key.startsWith('dir:'))
+    .filter((key) => availableKeySet.size === 0 || availableKeySet.has(key))
 }
 
 export function getDefaultDevDocsPinnedPaths(docs = []) {

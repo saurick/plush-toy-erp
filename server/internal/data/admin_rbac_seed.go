@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
@@ -14,9 +15,16 @@ func InitRBACIfNeeded(ctx context.Context, d *Data, l *log.Helper) error {
 	if d == nil || d.sqldb == nil {
 		return errors.New("InitRBACIfNeeded: missing db")
 	}
+	return SeedBuiltinRBACIfNeeded(ctx, d.sqldb, l)
+}
+
+func SeedBuiltinRBACIfNeeded(ctx context.Context, db *sql.DB, l *log.Helper) error {
+	if db == nil {
+		return errors.New("SeedBuiltinRBACIfNeeded: missing db")
+	}
 	now := time.Now()
 	for _, permission := range biz.BuiltinPermissions() {
-		if _, err := d.sqldb.ExecContext(ctx, `
+		if _, err := db.ExecContext(ctx, `
 INSERT INTO permissions (permission_key, name, description, module, action, resource, builtin, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $8)
 ON CONFLICT (permission_key) DO UPDATE SET
@@ -41,7 +49,7 @@ ON CONFLICT (permission_key) DO UPDATE SET
 	}
 
 	for _, role := range biz.BuiltinRoles() {
-		if _, err := d.sqldb.ExecContext(ctx, `
+		if _, err := db.ExecContext(ctx, `
 INSERT INTO roles (role_key, name, description, builtin, disabled, sort_order, created_at, updated_at)
 VALUES ($1, $2, $3, TRUE, $4, $5, $6, $7)
 ON CONFLICT (role_key) DO UPDATE SET
@@ -60,7 +68,7 @@ ON CONFLICT (role_key) DO UPDATE SET
 		); err != nil {
 			return err
 		}
-		if err := seedBuiltinRolePermissions(ctx, d, role, now); err != nil {
+		if err := seedBuiltinRolePermissions(ctx, db, role, now, l); err != nil {
 			return err
 		}
 	}
@@ -71,12 +79,12 @@ ON CONFLICT (role_key) DO UPDATE SET
 	return nil
 }
 
-func seedBuiltinRolePermissions(ctx context.Context, d *Data, role biz.RoleDefinition, now time.Time) error {
-	tx, err := d.sqldb.BeginTx(ctx, nil)
+func seedBuiltinRolePermissions(ctx context.Context, db *sql.DB, role biz.RoleDefinition, now time.Time, l *log.Helper) error {
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer rollbackSQLTx(ctx, tx, d.log)
+	defer rollbackSQLTx(ctx, tx, l)
 
 	var roleID int
 	if err := tx.QueryRowContext(ctx, "SELECT id FROM roles WHERE role_key = $1 LIMIT 1", role.Key).Scan(&roleID); err != nil {

@@ -639,10 +639,65 @@ const scenarios = [
     themeMode: 'dark',
     viewport: { width: 1536, height: 900 },
     verify: async (page) => {
+      await page.evaluate(() => {
+        window.localStorage.removeItem('plush_erp_dev_docs_expanded_dirs')
+        window.localStorage.removeItem('plush_erp_dev_docs_selected_path')
+      })
+      await page.reload({ waitUntil: 'domcontentloaded' })
       await expectHeading(page, '开发文档查看器')
       await expectText(page, '目录树')
       await expectText(page, '毛绒玩具 ERP / plush-toy-erp')
       await expectText(page, '目录结构')
+      const productDir = page.locator('[data-dev-doc-dir="docs/product"]')
+      const warehouseDir = page.locator('[data-dev-doc-dir="docs/warehouse"]')
+      assert.equal(
+        await productDir.getAttribute('aria-expanded'),
+        'false',
+        '产品文档目录默认不应展开'
+      )
+      assert.equal(
+        await warehouseDir.getAttribute('aria-expanded'),
+        'false',
+        '仓库文档目录默认不应展开'
+      )
+      await productDir.click()
+      await warehouseDir.click()
+      assert.equal(
+        await productDir.getAttribute('aria-expanded'),
+        'true',
+        '点击后产品文档目录应展开'
+      )
+      assert.equal(
+        await warehouseDir.getAttribute('aria-expanded'),
+        'true',
+        '点击后仓库文档目录应展开'
+      )
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await expectHeading(page, '开发文档查看器')
+      assert.equal(
+        await productDir.getAttribute('aria-expanded'),
+        'true',
+        '刷新后产品文档目录应保持展开'
+      )
+      assert.equal(
+        await warehouseDir.getAttribute('aria-expanded'),
+        'true',
+        '刷新后仓库文档目录应保持展开'
+      )
+      assert.equal(
+        await page
+          .locator('[data-dev-doc-key="docs-product-test-strategy-md"]')
+          .count(),
+        1,
+        '刷新后产品目录内文档应保持可见'
+      )
+      assert.equal(
+        await page
+          .locator('[data-dev-doc-key="docs-warehouse-README-md"]')
+          .count(),
+        1,
+        '刷新后仓库目录内文档应保持可见'
+      )
       await assertERPThemeMode(page, {
         scenarioName: 'dev-docs-dark-desktop',
         expectedMode: 'dark',

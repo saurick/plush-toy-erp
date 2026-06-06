@@ -217,3 +217,25 @@
 - 验证：`cd web && pnpm exec prettier --check src/erp/mobile/pages/MobileRoleTasksPage.jsx scripts/styleL1.mjs src/erp/styles/app.css ../docs/product/mobile-role-tasks-redesign.md` 通过；`cd web && STYLE_L1_SCENARIOS=mobile-tasks-dark pnpm style:l1` 通过；`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，271 个测试通过；`cd web && pnpm style:l1` 通过，42 个场景通过；`git diff --check` 覆盖本轮触达文件通过。Browser 打开 `http://127.0.0.1:5175/m/sales/tasks` 后按未登录状态跳转 `/admin-login`，React root 正常、页面非空、无 Vite error overlay。
 - 下一步：如果后续需要进一步提升长列表效率，再评审是否给顶部标题增加点击回顶或补轻量搜索；当前主路径先保留明确按钮。
 - 阻塞/风险：本轮只改移动端岗位任务页列表回顶交互、样式、L1 回归和产品设计说明；未改后端、schema、migration、RBAC、seedData、Workflow / Fact 语义、部署或真实通知表。Browser 无法注入 `style:l1` 的 JSON-RPC route mock，真实任务列表交互仍以项目 Playwright L1 断言为准。追加前 `progress.md` 为 212 行 / 53921 bytes，未达到归档阈值。
+
+## 2026-06-06 13:20 CST
+- 完成：新增 dev/test/demo 专用角色演示管理员账号 seed。`server/cmd/seed-role-demo-admins` 和 `scripts/seed-role-demo-admins.sh` 会显式生成 `demo_boss`、`demo_sales`、`demo_purchase`、`demo_production`、`demo_warehouse`、`demo_quality`、`demo_finance`、`demo_pmc`、`demo_admin`，每个账号只绑定对应真实 RBAC 角色；`demo_debug` 仅在 `--include-debug` 时生成。
+- 完成：将 RBAC 内置 seed 抽成可复用 `SeedBuiltinRBACIfNeeded`，脚本执行前先确保内置权限和角色存在；已有演示账号重跑时恢复 `disabled=false`、`is_super_admin=false` 和单一角色绑定，默认不重置密码，`--reset-password` 才更新密码。脚本默认拒绝 prod 配置或 prod 环境变量。
+- 完成：同步更新 `scripts/README.md`、`server/docs/config.md` 和 `server/Makefile`，明确角色演示账号不是 `config` 默认凭据、不是客户配置包，也不会写入 `conf.proto` 或生产配置。
+- 验证：`cd server && go test ./internal/data ./cmd/seed-role-demo-admins` 通过；`cd server && go run ./cmd/seed-role-demo-admins -conf ./configs/dev/config.yaml` 按预期先拒绝缺少演示密码且不连库；`bash -n scripts/seed-role-demo-admins.sh` 通过；`cd server && go run ./cmd/seed-role-demo-admins -conf ./configs/prod/config.yaml -password role-demo-password` 按预期拒绝 prod 配置；`git diff --check` 通过；`bash scripts/project-scan.sh --strict` 通过。
+- 下一步：需要实际生成账号时，在本地或验收库执行 `ERP_ROLE_DEMO_PASSWORD='...' bash scripts/seed-role-demo-admins.sh`；如需统一更新已有演示账号密码，加 `--reset-password`。
+- 阻塞/风险：本轮未实际连接数据库生成账号，未改 schema、migration、前端登录态、RBAC 角色语义、seedData、Workflow / Fact、客户配置包或部署。追加前 `progress.md` 为 219 行 / 55785 bytes，未达到归档阈值。
+
+## 2026-06-06 15:37 CST
+- 完成：修复开发文档查看器 `/__dev/docs` 刷新后回到默认文档的问题。当前打开文档路径现在写入浏览器本地偏好 `plush_erp_dev_docs_selected_path`，页面初始化时只恢复仍存在的仓库 Markdown 路径；若文档被删除或路径失效，则回到默认文档。
+- 完成：置顶区、搜索结果和目录树选择文档统一走当前文档选择入口；同步更新 `web/README.md` 的开发态文档查看器说明，明确当前打开文档和置顶文档都属于浏览器本地偏好。
+- 验证：`cd web && pnpm exec eslint --fix --ext .js --ext .jsx src/erp/pages/DevDocsPage.jsx src/erp/config/devDocs.mjs src/erp/config/devDocs.test.mjs` 通过；`cd web && pnpm exec node --test src/erp/config/devDocs.test.mjs` 通过；`cd web && pnpm test` 通过，272 个测试通过；`cd web && pnpm css` 通过；`cd web && STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm style:l1` 通过；Browser 打开 `http://localhost:5175/__dev/docs`，搜索并选择 `docs/product/test-strategy.md` 后刷新，右侧 toolbar 仍显示 `docs/product/test-strategy.md`，置顶区 active 也保持该文档，console error/warn 为空。
+- 下一步：如后续希望跨浏览器或跨设备保留文档位置，再评审 URL query 或 hash 方案；当前先使用本地偏好满足开发阶段频繁刷新场景。
+- 阻塞/风险：本轮只改 dev-only 文档查看器、前端配置测试和 `web/README.md` 说明；未改产品菜单、seedData、RBAC、docs registry、后端、schema、migration、部署或正式文档真源。Browser 首次新标签导航到 `127.0.0.1:5175` 时崩溃，改用 `localhost:5175` 后完成 DOM 回归；Browser 截图接口仍超时，视觉截图证据以 `style:l1` 场景为准。追加前 `progress.md` 为 227 行 / 57755 bytes，未达到归档阈值。
+
+## 2026-06-06 15:56 CST
+- 完成：继续优化开发文档查看器 `/__dev/docs` 的刷新体验。目录树展开状态现在写入浏览器本地偏好 `plush_erp_dev_docs_expanded_dirs`，页面初始化时只恢复仍存在的 `dir:*` 目录 key；本地没有记录时仍默认展开 `docs`。
+- 完成：`dev-docs-dark-desktop` L1 场景新增目录展开刷新恢复断言，覆盖清空旧偏好、默认 `product / warehouse` 未展开、手动展开、刷新后仍展开且内部文档仍可见；`web/README.md` 同步说明当前打开文档和目录树展开状态都会刷新恢复。
+- 验证：`cd web && pnpm exec eslint --fix --ext .js --ext .jsx src/erp/pages/DevDocsPage.jsx src/erp/config/devDocs.mjs src/erp/config/devDocs.test.mjs scripts/styleL1.mjs` 通过；`cd web && pnpm exec prettier --check src/erp/pages/DevDocsPage.jsx src/erp/config/devDocs.mjs src/erp/config/devDocs.test.mjs scripts/styleL1.mjs README.md` 通过；`cd web && pnpm exec node --test src/erp/config/devDocs.test.mjs` 通过，7 条 devDocs 测试通过；`cd web && pnpm test` 通过，273 个测试通过；`cd web && pnpm css` 通过；`cd web && STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm style:l1` 通过；`git diff --check` 通过。
+- 下一步：如果后续还想保留搜索关键词、侧栏滚动位置或右侧阅读滚动位置，应单独评审是否会干扰频繁改文档后的阅读起点；本轮先只保留文档选择和目录展开这两个低风险上下文。
+- 阻塞/风险：本轮只改 dev-only 文档查看器、本地偏好归一化、L1 回归、配置测试和 `web/README.md`；未改产品菜单、seedData、RBAC、docs registry、后端、schema、migration、部署或正式文档真源。Browser 页面可读但点击目录按钮时 CDP 超时，因此交互级证明收口到项目 `style:l1` Playwright 断言。追加前 `progress.md` 为 234 行 / 59627 bytes，未达到归档阈值。

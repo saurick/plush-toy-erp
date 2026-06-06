@@ -2,14 +2,18 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
   DEV_DOCS_ROUTE,
+  DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
   applyDevDocsPinnedState,
   buildDevDocsItems,
   buildDevDocsTree,
   filterDevDocsItems,
   getDefaultDevDocsPinnedPaths,
   isDevDocsEnabled,
+  normalizeDevDocsExpandedDirKeys,
   normalizeDevDocsPinnedPaths,
+  normalizeDevDocsSelectedPath,
   sortDevDocsItemsByPinned,
 } from './devDocs.mjs'
 
@@ -173,4 +177,47 @@ test('devDocs: 支持本地置顶路径归一化和排序', () => {
     'docs/archive/progress-2026-06.md',
     'docs/current-source-of-truth.md',
   ])
+})
+
+test('devDocs: 支持刷新后恢复当前文档路径', () => {
+  const docs = buildDevDocsItems({
+    '../../../../README.md': '# 仓库 README',
+    '../../../../docs/current-source-of-truth.md': '# 当前真源与交接顺序',
+    '../../../../docs/product/test-strategy.md': '# 自动化测试策略',
+  })
+
+  assert.equal(
+    DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
+    'plush_erp_dev_docs_selected_path'
+  )
+  assert.equal(
+    normalizeDevDocsSelectedPath('docs/product/test-strategy.md', docs),
+    'docs/product/test-strategy.md'
+  )
+  assert.equal(
+    normalizeDevDocsSelectedPath('docs/product/missing.md', docs),
+    ''
+  )
+  assert.equal(normalizeDevDocsSelectedPath('../unsafe.txt', docs), '')
+})
+
+test('devDocs: 支持刷新后恢复目录展开状态', () => {
+  assert.equal(
+    DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
+    'plush_erp_dev_docs_expanded_dirs'
+  )
+  assert.deepEqual(
+    normalizeDevDocsExpandedDirKeys(
+      [
+        'dir:docs',
+        'dir:docs/product',
+        'dir:docs/product',
+        'doc:docs/product/test-strategy.md',
+        '../unsafe',
+        'dir:missing',
+      ],
+      ['dir:docs', 'dir:docs/product', 'dir:docs/archive']
+    ),
+    ['dir:docs', 'dir:docs/product']
+  )
 })

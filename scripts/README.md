@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | `scripts/bootstrap.sh` | 安装依赖、启用 hooks、跑快速自检 | 新机器 / 首次拉仓库 |
 | `scripts/project-scan.sh` | 扫描项目名、默认密钥、部署地址和页面文案残留 | 改名后 / 配置收口后 |
+| `scripts/seed-role-demo-admins.sh` | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色 | 需要多角色登录 / 岗位任务端验收 |
 | `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence | yoyoosun 导入前 source freeze / 人工 review evidence |
 | `scripts/import/customerImportDryRun.mjs` | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包 | yoyoosun 导入前人工 review / 数据映射检查 |
 | `scripts/phase2b-pg.sh` | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口 | 验证 Phase 2B schema 和批次库存行为 |
@@ -120,6 +121,38 @@ bash /Users/simon/projects/plush-toy-erp/scripts/doctor.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 ```
+
+### 2A. 生成角色演示账号
+
+角色演示账号只服务开发 / 验收登录测试，不写入 `server/configs/*/config.yaml`，也不是客户配置包。脚本会先确保内置 RBAC 权限和角色已 seed，再创建或更新以下账号并绑定真实角色：
+
+| 账号 | 角色 |
+| --- | --- |
+| `demo_boss` | `boss` |
+| `demo_sales` | `sales` |
+| `demo_purchase` | `purchase` |
+| `demo_production` | `production` |
+| `demo_warehouse` | `warehouse` |
+| `demo_quality` | `quality` |
+| `demo_finance` | `finance` |
+| `demo_pmc` | `pmc` |
+| `demo_admin` | `admin` |
+
+默认不生成 `debug_operator` 账号；如确需调试权限账号，必须显式加 `--include-debug`，此时会额外生成 `demo_debug`。
+
+```bash
+ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
+  bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
+```
+
+已有账号重跑时会恢复 `disabled=false`、`is_super_admin=false` 和对应单一角色绑定；默认不重置已有账号密码。如需统一重置演示账号密码：
+
+```bash
+ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
+  bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh --reset-password
+```
+
+脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`，除非显式传 `--allow-prod`。常规开发和验收不要对生产库执行该脚本。
 
 ### 3. 日常开发检查
 

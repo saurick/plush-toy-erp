@@ -152,6 +152,11 @@ migrate_apply:
 print_db_url:
 	@go run ./cmd/dburl -conf ./configs/dev/config.yaml && echo
 
+.PHONY: seed_role_demo_admins
+# 显式生成开发/验收角色演示账号；密码请通过 ERP_ROLE_DEMO_PASSWORD 或命令参数传入。
+seed_role_demo_admins:
+	go run ./cmd/seed-role-demo-admins -conf ./configs/dev/config.yaml
+
 .PHONY: migrate_status
 migrate_status:
 	@URL=$$(go run ./cmd/dburl -conf ./configs/dev/config.yaml); \
