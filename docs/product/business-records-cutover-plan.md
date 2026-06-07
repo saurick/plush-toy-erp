@@ -16,7 +16,8 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 - `business_records` 继续存在。
 - V1 正式模型已具备 schema、migration、repo/usecase、API/RBAC 和 UI。
 - `business_records` 仍可能承载旧入口、demo、source snapshot、seed、debug 和旧测试。
-- V1 页面已存在，但 seedData 和完整菜单切换仍未在本轮处理。
+- V1 页面已存在，桌面正式菜单、dashboard、前后端菜单权限已切到 `客户档案`、`供应商档案`、`销售订单`。
+- 旧 `partners / project-orders` 路径不再承载旧通用业务页，访问时只重定向到正式 V1 入口；其他旧模块和旧数据迁移 / 归档仍未处理。
 
 保持边界：
 
@@ -46,21 +47,21 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 项目 | 规则 |
 |---|---|
 | 正式写入 | V1 MasterData / SalesOrder usecase |
-| 旧入口 | 保持兼容可见，必要时加只读 / deprecated 提示 |
+| 旧入口 | `partners / project-orders` 不作为旧入口保留，旧路径只重定向到正式 V1；其他旧入口按各自领域后续评审 |
 | 数据关系 | 旧记录只作为 source snapshot，不作为 V1 父表 |
 | 禁止 | 同一业务动作同时写 V1 和 `business_records` |
 
 进入下一阶段条件：
 
-- 确认 seedData / Dashboard / menu permissions / mobile task 的旧入口影响。
-- 确认旧入口是否仍承担打印、debug 或验收用途。
-- 完成用户可见文案和权限入口的切换方案。
+- 继续确认 mobile task、debug 和历史打印是否依赖旧入口。
+- 评审旧数据迁移、归档、删除或只读归档是否需要客户可见承诺。
+- 补客户培训说明和客户菜单配置方案。
 
 ## Stage 2: 只读 / demo 化
 
 目标：
 
-- 重叠领域的 `business_records` 页面转为只读或 demo。
+- `partners / project-orders` 旧路径已退出旧通用业务页并重定向到正式 V1；其他重叠领域按后续评审转为只读、demo 或直接退出。
 - seed / demo 数据明确标记。
 - 用户操作引导到 V1 页面。
 
@@ -121,7 +122,7 @@ dry-run 输出：
 
 1. dry-run 报告已被人工确认。
 2. 目标模型 usecase、API、权限和测试已稳定。
-3. 旧入口已只读或冻结写入。
+3. 旧入口已重定向、只读或冻结写入。
 4. 备份和恢复方案已演练。
 5. 幂等键和重复导入策略明确。
 6. 迁移后校验口径明确。
@@ -163,5 +164,5 @@ archive / delete 条件：
 | 下一步 | 为什么 |
 |---|---|
 | yoyoosun customer import dry-run / strategy | 先基于本 data map 做 dry-run/import 设计，分类 永绅 yoyoosun 样本字段 |
-| V1 menu entry review | 单独评审 seedData、Dashboard、menu permissions 和旧入口只读化 |
-| business_records read-only runtime task | 只有菜单 / import 方案确认后再做，不应和 audit 混轮 |
+| business_records migration / archive decision | 正式菜单、Dashboard 和菜单权限已指向 V1 入口，`partners / project-orders` 旧路径已重定向到 V1；下一步应单独评审旧数据迁移、归档或删除边界 |
+| customer menu config review | 在正式入口基础上继续评审客户菜单配置，不把客户菜单开关当 RBAC 或事实规则 |

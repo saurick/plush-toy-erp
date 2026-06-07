@@ -374,26 +374,48 @@ const scenarios = [
     },
   },
   {
-    name: 'business-module-dark-partners-desktop',
-    path: '/erp/master/partners',
+    name: 'business-module-dark-customers-desktop',
+    path: '/erp/master/partners/customers',
     auth: 'admin',
     themeMode: 'dark',
     viewport: { width: 2048, height: 1024 },
     verify: async (page) => {
-      await expectHeading(page, '客户/供应商')
-      await expectText(page, '导出当前结果')
-      await expectText(page, '协同任务池')
+      await expectHeading(page, '客户档案')
+      await expectText(page, '新建')
       await assertERPThemeMode(page, {
-        scenarioName: 'business-module-dark-partners-desktop',
+        scenarioName: 'business-module-dark-customers-desktop',
         expectedMode: 'dark',
         expectedEffectiveTheme: 'dark',
       })
       await assertDarkThemeContrast(page, {
-        scenarioName: 'business-module-dark-partners-desktop',
-        selector: '.erp-business-page-layout',
+        scenarioName: 'business-module-dark-customers-desktop',
+        selector: '.erp-dashboard-page',
       })
       await assertDarkThemeNeutralInteractions(page, {
-        scenarioName: 'business-module-dark-partners-desktop',
+        scenarioName: 'business-module-dark-customers-desktop',
+        checks: [
+          {
+            label: '主数据搜索输入 hover',
+            selector: '.erp-dashboard-page .ant-input-search',
+            action: 'hover',
+          },
+          {
+            label: '主数据搜索输入 focus',
+            selector: '.erp-dashboard-page .ant-input',
+            action: 'click',
+          },
+          {
+            label: '主数据普通按钮 hover',
+            selector: '.erp-dashboard-page .ant-btn:not(.ant-btn-primary)',
+            action: 'hover',
+          },
+          {
+            label: '主数据表头 hover',
+            selector: '.erp-dashboard-page .ant-table-thead > tr > th',
+            action: 'hover',
+            index: 1,
+          },
+        ],
       })
     },
   },
@@ -724,11 +746,11 @@ const scenarios = [
   },
   {
     name: 'business-module-workflow-actions',
-    path: '/erp/sales/project-orders',
+    path: '/erp/purchase/accessories',
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '订单/款式立项')
+      await expectHeading(page, '辅材/包材采购')
       await expectText(page, '新建记录')
       await assertBusinessModuleToolbarControlStyle(page, {
         scenarioName: 'business-module-workflow-actions',
@@ -745,7 +767,10 @@ const scenarios = [
       })
       await page.getByRole('button', { name: '刷新当前页' }).click()
       await expectText(page, '当前页面数据已刷新')
-      await verifyBusinessModuleColumnOrderDialog(page)
+      await verifyBusinessModuleColumnOrderDialog(page, {
+        moduleKey: 'accessories-purchase',
+        heading: '辅材/包材采购',
+      })
       await assertBusinessModuleCompactWorkspace(page, {
         scenarioName: 'business-module-workflow-actions-empty',
         expectSelectionAction: true,
@@ -761,24 +786,24 @@ const scenarios = [
         scenarioName: 'business-module-create-modal',
       })
       const createDialog = page.getByRole('dialog', {
-        name: '新建：订单/款式立项',
+        name: '新建：辅材/包材采购',
       })
       await createDialog
-        .getByRole('textbox', { name: '订单编号', exact: true })
-        .fill('STYLE-L1-001')
+        .getByRole('textbox', { name: '采购单号', exact: true })
+        .fill('PUR-L1-WF-001')
       await createDialog
-        .getByRole('textbox', { name: '* 客户' })
-        .fill('联调客户')
-      await createDialog.getByLabel('款式 / 项目名称').fill('毛绒熊立项')
+        .getByRole('textbox', { name: '* 供应商' })
+        .fill('联调供应商')
+      await createDialog.getByLabel('采购事项').fill('辅料采购流程回归')
       await page
         .locator(
-          '.erp-business-record-item-grid input[placeholder="产品、颜色或款式分行"]'
+          '.erp-business-record-item-grid input[placeholder="辅材 / 包材名称"]'
         )
-        .fill('浅棕色毛绒熊')
+        .fill('PP 棉')
       const itemGrid = page.locator('.erp-business-record-item-grid')
       await itemGrid
         .locator('.erp-item-field-stack')
-        .filter({ hasText: '订单数量' })
+        .filter({ hasText: '采购数量' })
         .locator('.ant-input-number-input')
         .fill('2')
       await page
@@ -799,20 +824,9 @@ const scenarios = [
       await expectText(page, '数量合计 2')
       await expectText(page, '金额合计 39.80')
       await createDialog.getByRole('button', { name: /确\s*定/ }).click()
-      await expectText(page, 'STYLE-L1-001')
+      await expectText(page, 'PUR-L1-WF-001')
       await expectText(page, '1 行')
       await expectText(page, '39.80')
-
-      await businessActionToolbar
-        .getByRole('button', { name: /关联表格/ })
-        .click()
-      await page
-        .locator(
-          '.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item'
-        )
-        .filter({ hasText: '材料 BOM' })
-        .waitFor({ state: 'visible', timeout: 10_000 })
-      await page.keyboard.press('Escape')
 
       await businessActionToolbar
         .getByRole('button', { name: /流转业务状态|流转/ })
@@ -821,18 +835,18 @@ const scenarios = [
         .locator(
           '.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item'
         )
-        .filter({ hasText: '立项已放行' })
+        .filter({ hasText: 'IQC 待检' })
         .first()
       await approveStatusItem.waitFor({ state: 'visible', timeout: 10_000 })
       await assertOpenDropdownInViewport(page, {
         scenarioName: 'business-module-workflow-actions-approve-menu',
       })
       await approveStatusItem.evaluate((element) => element.click())
-      await expectText(page, '业务状态已更新为：立项已放行')
-      await expectText(page, '立项已放行')
+      await expectText(page, '业务状态已更新为：IQC 待检')
+      await expectText(page, 'IQC 待检')
 
       await page.getByRole('button', { name: '创建协同任务' }).click()
-      await expectText(page, '订单/款式立项：毛绒熊立项')
+      await expectText(page, '辅材/包材采购：辅料采购流程回归')
       await expectText(page, '可执行')
 
       await businessActionToolbar
@@ -910,7 +924,7 @@ const scenarios = [
         recycleDialog,
         'business-module-recycle-modal'
       )
-      await recycleDialog.getByText('STYLE-L1-001').waitFor({
+      await recycleDialog.getByText('PUR-L1-WF-001').waitFor({
         state: 'visible',
         timeout: 10_000,
       })
@@ -920,7 +934,7 @@ const scenarios = [
       })
       await recycleDialog
         .locator('.ant-table-tbody tr')
-        .filter({ hasText: 'STYLE-L1-001' })
+        .filter({ hasText: 'PUR-L1-WF-001' })
         .locator('button')
         .last()
         .click()
@@ -936,11 +950,11 @@ const scenarios = [
   },
   {
     name: 'business-module-toolbar-mobile-dropdown',
-    path: '/erp/sales/project-orders',
+    path: '/erp/purchase/accessories',
     auth: 'admin',
     viewport: { width: 470, height: 680 },
     verify: async (page) => {
-      await expectHeading(page, '订单/款式立项')
+      await expectHeading(page, '辅材/包材采购')
       await page
         .locator('.erp-business-date-range-filter input[type="date"]')
         .first()
@@ -1617,15 +1631,17 @@ const scenarios = [
   },
   {
     name: 'business-menu-groups-desktop',
-    path: '/erp/sales/project-orders',
+    path: '/erp/sales/project-orders/sales-orders',
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectButton(page, '新建记录')
+      await expectButton(page, '新建订单')
       await expectText(page, '基础资料')
-      await expectText(page, '客户/供应商')
+      await expectText(page, '客户档案')
+      await expectText(page, '供应商档案')
       await expectText(page, '产品')
       await expectText(page, '销售链路')
+      await expectText(page, '销售订单')
       await expectText(page, '采购/仓储')
       await expectText(page, '生产环节')
       await expectText(page, '财务环节')
@@ -1635,6 +1651,17 @@ const scenarios = [
       })
       await expectText(page, '系统管理')
       await expectText(page, '权限管理')
+      const menu = page.locator('.erp-admin-menu')
+      assert.equal(
+        await menu.getByText('客户/供应商', { exact: true }).count(),
+        0,
+        '侧栏不应再显示旧“客户/供应商”正式入口'
+      )
+      assert.equal(
+        await menu.getByText('订单/款式立项', { exact: true }).count(),
+        0,
+        '侧栏不应再显示旧“订单/款式立项”正式入口'
+      )
       assert.equal(
         await page.getByText('流程与真源', { exact: true }).count(),
         0,
@@ -1658,131 +1685,51 @@ const scenarios = [
     },
   },
   {
-    name: 'business-partners-desktop',
+    name: 'legacy-partners-redirects-to-customers',
     path: '/erp/master/partners',
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '客户/供应商')
-      await expectText(page, '新建记录')
-      await assertBusinessSelectionActionBarEmpty(page, {
-        scenarioName: 'business-partners-desktop',
-      })
-      await expectText(page, '协同任务池')
-      await page.getByRole('button', { name: '新建记录' }).click()
-
-      const dialog = page
-        .locator('.ant-modal')
-        .filter({ hasText: '新建：客户/供应商' })
-        .first()
-      await dialog.waitFor({ state: 'visible', timeout: 10_000 })
-      await assertAntdModalCentered(
-        page,
-        dialog,
-        'business-partners-create-modal'
+      await expectText(page, '客户档案')
+      await expectHeading(page, '客户档案')
+      assert.equal(
+        await page.getByRole('button', { name: '新建记录' }).count(),
+        0,
+        '旧客户/供应商路径不应再渲染通用业务页“新建记录”按钮'
       )
-
-      const expectedLabels = [
-        '客户类型',
-        '客户/供应商名称',
-        '客户地址',
-        '国家/地区',
-        '业务负责人',
-        '付款方式',
-        '付款周期(天)',
-        '税号',
-        '联系人',
-        '办公室电话',
-        '手机',
-        '邮箱',
-      ]
-      for (const label of expectedLabels) {
-        await dialog
-          .getByText(label, { exact: false })
-          .first()
-          .waitFor({ state: 'visible', timeout: 10_000 })
-      }
-
-      const unexpectedLabels = [
-        '代码',
-        '简称',
-        '主联系人',
-        '主联系电话',
-        '加工 / 供货范围',
-        '开票类型',
-        '税率',
-        '下单人 / 对接人',
-        '对接人电话',
-        '银行信息',
-        '业务状态',
-        '主责角色',
-        '备注 / 异常说明',
-      ]
-      for (const label of unexpectedLabels) {
-        assert.equal(
-          await dialog.getByText(label, { exact: false }).count(),
-          0,
-          `客户/供应商新建弹窗不应继续显示“${label}”`
-        )
-      }
-
-      const layoutMetrics = await dialog.evaluate((node) => {
-        const body = node.querySelector('.ant-modal-body')
-        const bodyRect = body?.getBoundingClientRect()
-        const addressLabel = Array.from(
-          node.querySelectorAll('.ant-form-item-label')
-        ).find((label) => String(label.textContent || '').includes('客户地址'))
-        const addressItem = addressLabel?.closest('.ant-col')
-        const addressRect = addressItem?.getBoundingClientRect()
-        const overflowingFields = Array.from(
-          node.querySelectorAll('.ant-col .ant-form-item')
-        )
-          .map((field) => {
-            const rect = field.getBoundingClientRect()
-            const text = String(
-              field.querySelector('.ant-form-item-label')?.textContent || ''
-            )
-              .replace(/\s+/g, ' ')
-              .trim()
-              .slice(0, 40)
-            return {
-              text,
-              left: rect.left,
-              right: rect.right,
-            }
-          })
-          .filter(
-            (field) =>
-              field.text &&
-              bodyRect &&
-              (field.left < bodyRect.left - 1 ||
-                field.right > bodyRect.right + 1)
-          )
-
-        return {
-          bodyClientWidth: body?.clientWidth || 0,
-          bodyScrollWidth: body?.scrollWidth || 0,
-          overflowingFields,
-          addressWidth: addressRect?.width || 0,
-          bodyWidth: bodyRect?.width || 0,
-        }
-      })
-      assert.deepEqual(
-        layoutMetrics.overflowingFields,
-        [],
-        `客户/供应商新建弹窗存在可见字段越界: ${JSON.stringify(layoutMetrics)}`
+      assert.equal(
+        await page.getByText('兼容只读入口', { exact: true }).count(),
+        0,
+        '旧客户/供应商路径不应再渲染兼容只读页'
       )
       assert(
-        layoutMetrics.addressWidth >= layoutMetrics.bodyWidth * 0.9,
-        `客户地址未保持整行输入: ${JSON.stringify(layoutMetrics)}`
+        page.url().includes('/erp/master/partners/customers'),
+        `旧客户/供应商路径未重定向到正式客户档案: ${page.url()}`
       )
-      await assertPartnerContactItemFocusConsistency(page, dialog, {
-        scenarioName: 'business-partners-contact-focus',
-      })
-
-      await dialog.locator('.ant-modal-close').click()
-      await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
-      await expectHeading(page, '客户/供应商')
+    },
+  },
+  {
+    name: 'legacy-project-orders-redirects-to-sales-orders',
+    path: '/erp/sales/project-orders',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '销售订单')
+      await expectButton(page, '新建订单')
+      assert.equal(
+        await page.getByText('兼容只读入口', { exact: true }).count(),
+        0,
+        '旧订单/款式立项路径不应再渲染兼容只读页'
+      )
+      assert.equal(
+        await page.getByRole('button', { name: '新建记录' }).count(),
+        0,
+        '旧订单/款式立项路径不应再渲染通用业务页“新建记录”按钮'
+      )
+      assert(
+        page.url().includes('/erp/sales/project-orders/sales-orders'),
+        `旧订单/款式立项路径未重定向到正式销售订单: ${page.url()}`
+      )
     },
   },
   {
@@ -1954,6 +1901,7 @@ async function runScenario(browser, scenario) {
       localStorage.setItem('admin_roles', '[]')
       localStorage.setItem('admin_permissions', '[]')
       localStorage.setItem('admin_menus', '[]')
+      localStorage.setItem('erp:last_entry_target', 'desktop')
       localStorage.setItem(
         'admin_erp_preferences',
         JSON.stringify({ column_orders: {} })
@@ -2383,6 +2331,178 @@ async function installAdminRpcMocks(page) {
             requiresDebugRunId: true,
             destructiveRemoteDenied: true,
           },
+        },
+      }),
+    })
+  })
+
+  await page.route('**/rpc/masterdata', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    const customer = {
+      id: 1,
+      code: 'CUS-STYLE-L1',
+      name: '暗色客户',
+      short_name: '暗色',
+      tax_no: 'TAX-STYLE-L1',
+      note: '',
+      is_active: true,
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const supplier = {
+      id: 1,
+      code: 'SUP-STYLE-L1',
+      name: '样式供应商',
+      short_name: '样式供',
+      supplier_type: '加工厂',
+      tax_no: '',
+      note: '',
+      is_active: true,
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const contact = {
+      id: 1,
+      owner_type: params.owner_type || 'CUSTOMER',
+      owner_id: Number(params.owner_id || 1),
+      name: '样式联系人',
+      mobile: '13800138000',
+      phone: '',
+      email: '',
+      title: '业务',
+      is_primary: true,
+      is_active: true,
+      note: '',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_customers':
+        data = { customers: [customer], total: 1, limit: 100, offset: 0 }
+        break
+      case 'list_suppliers':
+        data = { suppliers: [supplier], total: 1, limit: 100, offset: 0 }
+        break
+      case 'list_contacts_by_owner':
+        data = { contacts: [contact], total: 1, limit: 100, offset: 0 }
+        break
+      case 'create_customer':
+      case 'update_customer':
+      case 'set_customer_active':
+      case 'get_customer':
+        data = { customer: { ...customer, ...params } }
+        break
+      case 'create_supplier':
+      case 'update_supplier':
+      case 'set_supplier_active':
+      case 'get_supplier':
+        data = { supplier: { ...supplier, ...params } }
+        break
+      case 'create_contact':
+      case 'update_contact':
+      case 'set_primary_contact':
+      case 'disable_contact':
+        data = { contact: { ...contact, ...params } }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
+
+  await page.route('**/rpc/sales_order', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    const salesOrder = {
+      id: 1,
+      order_no: 'SO-STYLE-L1',
+      customer_id: 1,
+      customer_snapshot: { id: 1, code: 'CUS-STYLE-L1', name: '暗色客户' },
+      customer_order_no: 'PO-STYLE-L1',
+      title: '样式销售订单',
+      order_date: nowUnix(),
+      expected_ship_date: nowUnix() + 86_400,
+      lifecycle_status: 'draft',
+      note: '',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const salesOrderItem = {
+      id: 1,
+      sales_order_id: 1,
+      line_no: 1,
+      product_id: 1,
+      product_snapshot: { id: 1, code: 'PROD-STYLE-L1', name: '样式产品' },
+      ordered_quantity: '10',
+      unit_id: 1,
+      unit_snapshot: { id: 1, code: 'PCS', name: '只' },
+      unit_price: '12.50',
+      amount: '125.00',
+      line_status: 'open',
+      note: '',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_sales_orders':
+        data = { sales_orders: [salesOrder], total: 1, limit: 100, offset: 0 }
+        break
+      case 'list_sales_order_items':
+        data = {
+          sales_order_items: [salesOrderItem],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'create_sales_order':
+      case 'update_sales_order':
+      case 'get_sales_order':
+      case 'submit_sales_order':
+      case 'activate_sales_order':
+      case 'close_sales_order':
+      case 'cancel_sales_order':
+        data = { sales_order: { ...salesOrder, ...params } }
+        break
+      case 'add_sales_order_item':
+      case 'update_sales_order_item':
+      case 'remove_sales_order_item':
+        data = { sales_order_item: { ...salesOrderItem, ...params } }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
         },
       }),
     })
@@ -3084,8 +3204,11 @@ async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
   )
 }
 
-async function verifyBusinessModuleColumnOrderDialog(page) {
-  const storageKey = 'erp.module.column-order.project-orders'
+async function verifyBusinessModuleColumnOrderDialog(
+  page,
+  { moduleKey = 'project-orders', heading = '订单/款式立项' } = {}
+) {
+  const storageKey = `erp.module.column-order.${moduleKey}`
   await page
     .locator('.erp-business-module-toolbar__actions')
     .getByRole('button', { name: /列顺序/ })
@@ -3168,7 +3291,7 @@ async function verifyBusinessModuleColumnOrderDialog(page) {
     window.localStorage.removeItem(key)
   }, storageKey)
   await page.reload({ waitUntil: 'networkidle' })
-  await expectHeading(page, '订单/款式立项')
+  await expectHeading(page, heading)
   await page
     .locator('.erp-business-module-toolbar__actions')
     .getByRole('button', { name: /列顺序/ })
@@ -8367,8 +8490,11 @@ async function assertDarkThemeContrast(
   )
 }
 
-async function assertDarkThemeNeutralInteractions(page, { scenarioName }) {
-  const checks = [
+async function assertDarkThemeNeutralInteractions(
+  page,
+  { scenarioName, checks }
+) {
+  const interactionChecks = checks || [
     {
       label: '搜索输入 hover',
       selector: '.erp-business-filter-control--search',
@@ -8408,7 +8534,7 @@ async function assertDarkThemeNeutralInteractions(page, { scenarioName }) {
   ]
 
   const metrics = []
-  for (const check of checks) {
+  for (const check of interactionChecks) {
     const locator =
       check.index === undefined
         ? page.locator(check.selector).first()

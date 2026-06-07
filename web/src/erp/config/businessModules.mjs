@@ -18,6 +18,7 @@ const businessModules = [
     key: 'partners',
     title: '客户/供应商',
     route: 'master/partners',
+    legacyRouteDisabled: true,
     sectionKey: 'master',
     status: 'source_grounded',
     owner: '业务 + 采购 + 财务',
@@ -88,6 +89,7 @@ const businessModules = [
     key: 'project-orders',
     title: '订单/款式立项',
     route: 'sales/project-orders',
+    legacyRouteDisabled: true,
     sectionKey: 'sales',
     status: 'source_grounded',
     owner: '业务 + 老板',
@@ -622,6 +624,37 @@ const businessModules = [
   },
 ]
 
+const formalNavigationOverrides = Object.freeze({
+  partners: [
+    {
+      key: 'customers',
+      label: '客户档案',
+      path: '/erp/master/partners/customers',
+      shortLabel: '客户',
+      description:
+        '正式 customers 表入口，只维护客户交易主体；联系人随客户详情维护。',
+    },
+    {
+      key: 'suppliers',
+      label: '供应商档案',
+      path: '/erp/master/partners/suppliers',
+      shortLabel: '供应商',
+      description:
+        '正式 suppliers 表入口，只维护供应商 / 加工厂交易主体；联系人随供应商详情维护。',
+    },
+  ],
+  'project-orders': [
+    {
+      key: 'sales-orders',
+      label: '销售订单',
+      path: '/erp/sales/project-orders/sales-orders',
+      shortLabel: '销售订单',
+      description:
+        '正式 sales_orders 表入口，只记录客户订单承诺，不写出货、库存或财务事实。',
+    },
+  ],
+})
+
 export const businessModuleDefinitions = businessModules.map((moduleItem) => {
   const sectionTitle =
     businessSectionMeta.find((section) => section.key === moduleItem.sectionKey)
@@ -651,13 +684,21 @@ export function getBusinessNavigationSections() {
       title: section.title,
       items: businessModuleDefinitions
         .filter((moduleItem) => moduleItem.sectionKey === section.key)
-        .map((moduleItem) => ({
-          key: moduleItem.key,
-          label: moduleItem.navigationLabel,
-          path: moduleItem.path,
-          shortLabel: moduleItem.navigationLabel,
-          description: moduleItem.navigationDescription,
-        })),
+        .flatMap((moduleItem) => {
+          const formalItems = formalNavigationOverrides[moduleItem.key]
+          if (formalItems) {
+            return formalItems
+          }
+          return [
+            {
+              key: moduleItem.key,
+              label: moduleItem.navigationLabel,
+              path: moduleItem.path,
+              shortLabel: moduleItem.navigationLabel,
+              description: moduleItem.navigationDescription,
+            },
+          ]
+        }),
     }))
     .filter((section) => section.items.length > 0)
 }

@@ -52,7 +52,7 @@ const { Paragraph, Text, Title } = Typography
 
 const PAGE_CONFIG = Object.freeze({
   customers: {
-    title: 'V1 客户主数据',
+    title: '客户档案',
     ownerType: 'CUSTOMER',
     recordKey: 'customers',
     list: listCustomers,
@@ -72,7 +72,7 @@ const PAGE_CONFIG = Object.freeze({
       '正式 customers 表页面，只维护客户交易主体，不写订单、出货、库存或财务事实。',
   },
   suppliers: {
-    title: 'V1 供应商主数据',
+    title: '供应商档案',
     ownerType: 'SUPPLIER',
     recordKey: 'suppliers',
     list: listSuppliers,

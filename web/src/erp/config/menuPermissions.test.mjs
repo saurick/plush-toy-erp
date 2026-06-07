@@ -76,6 +76,24 @@ test('menuPermissions: 只保留有效权限并把旧文档路径归一到看板
   )
 })
 
+test('menuPermissions: 旧业务记录重叠入口归一到正式 V1 入口', () => {
+  assert.deepEqual(
+    normalizeMenuPermissions([
+      '/erp/master/partners',
+      '/erp/sales/project-orders',
+    ]),
+    ['/erp/master/partners/customers', '/erp/sales/project-orders/sales-orders']
+  )
+  assert.equal(
+    resolveMenuPermissionKey('/erp/master/partners/customers'),
+    '/erp/master/partners/customers'
+  )
+  assert.equal(
+    resolveMenuPermissionKey('/erp/sales/project-orders/sales-orders/42'),
+    '/erp/sales/project-orders/sales-orders'
+  )
+})
+
 test('menuPermissions: 打印预览子路由按打印中心权限归属', () => {
   assert.equal(
     resolveMenuPermissionKey('/erp/print-center/processing-contract'),
@@ -97,20 +115,34 @@ test('menuPermissions: 旧帮助与文档路径不再生成独立权限项', () 
 
 test('menuPermissions: 基础资料入口纳入业务角色预设', () => {
   const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
-  assert(permissionKeys.includes('/erp/master/partners'))
+  assert(permissionKeys.includes('/erp/master/partners/customers'))
+  assert(permissionKeys.includes('/erp/master/partners/suppliers'))
   assert(permissionKeys.includes('/erp/master/products'))
+  assert(!permissionKeys.includes('/erp/master/partners'))
+  assert(!permissionKeys.includes('/erp/sales/project-orders'))
+  assert(permissionKeys.includes('/erp/sales/project-orders/sales-orders'))
 
   ERP_PERMISSION_PRESETS.filter((preset) => preset.key !== 'admin').forEach(
     (preset) => {
       assert(
-        preset.permissions.includes('/erp/master/partners'),
-        `expected ${preset.key} to include partners`
+        preset.permissions.includes('/erp/master/partners/customers'),
+        `expected ${preset.key} to include customers`
+      )
+      assert(
+        preset.permissions.includes('/erp/master/partners/suppliers'),
+        `expected ${preset.key} to include suppliers`
       )
       assert(
         preset.permissions.includes('/erp/master/products'),
         `expected ${preset.key} to include products`
       )
     }
+  )
+  const salesPreset = ERP_PERMISSION_PRESETS.find(
+    (preset) => preset.key === 'sales'
+  )
+  assert(
+    salesPreset.permissions.includes('/erp/sales/project-orders/sales-orders')
   )
 })
 

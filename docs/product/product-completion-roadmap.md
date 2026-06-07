@@ -115,7 +115,7 @@
 | 2 | MVP cutline 与领域模型 | 定义第一版先打通哪些对象和边界 | MVP cutline、domain model、source document / fact boundary | 不把完整 ERP 一次做完 |
 | 3 | MasterData + Source Document MVP | 建立基础主数据和销售订单等源单据 | schema / repo / usecase / API / UI / tests | 不做出货、库存、财务伪事实 |
 | 4 | 采购 / 质检 / 库存事实基础 | 建立可信库存和采购事实基础 | purchase receipt / return / adjustment、quality、inventory txns / lots / balances | 不让客户配置核心库存规则 |
-| 5 | 正式产品入口与旧入口退出 | 建立正式菜单、权限入口和业务帮助边界 | formal menu、legacy removal、RBAC guard、business help | 不保留旧入口作为正式写路径 |
+| 5 | 正式产品入口与旧入口退出 | 建立正式菜单、权限入口和业务帮助边界；开发阶段不保留与正式 V1 重叠的旧兼容页面 | formal menu、legacy removal、RBAC guard、business help | 不保留旧入口作为正式写路径或兼容只读页 |
 | 6 | 客户数据 dry-run 与 loader 设计 | 设计受控导入，不写错库、不伪造事实 | freeze、dry-run evidence、loader design、unresolved queue、acceptance checklist | 不直接真实导入 |
 | 7 | 受控导入与试点部署 | 备份、回滚、导入、校验、培训和试运行 | import execution audit、deployment package、trial acceptance | 不无备份上线 |
 | 8 | 生产 / 委外 / 出货 / 财务事实扩展 | 补齐 ERP 主干事实闭环 | production facts、outsourcing facts、shipment facts、finance facts | 不从 workflow 放行直接生成事实 |
@@ -259,7 +259,7 @@ MVP 原则：
 
 ## 7. Phase 5：正式产品入口与旧入口退出
 
-目标：让客户看到正式产品能力，而不是继续在旧兼容入口里写重叠数据。
+目标：让客户看到正式产品能力，而不是继续在旧兼容入口里写重叠数据。当前仍处于开发阶段，尚未进入甲方正式测试；与正式 V1 能力重叠的旧入口不保留产品内可见兼容页面，也不做只读兼容页，旧路径只允许重定向到正式 V1 入口。
 
 必须处理：
 
@@ -267,12 +267,13 @@ MVP 原则：
 * 客户菜单配置。
 * 后端动作权限。
 * 业务帮助文档。
-* 旧 `business_records` 重叠入口删除、隐藏或退出正式写路径。
+* 旧 `business_records` 重叠入口删除、隐藏或退出正式写路径；已由 V1 承接的旧路径只重定向到正式 V1。
 * 旧数据是否迁移、保留或只作为审计线索。
 
 不做：
 
 * 不把旧入口保留为正式业务写入口。
+* 不为已由 V1 承接的旧入口保留兼容只读页。
 * 不承诺旧入口只读归档页，除非后续单独评审。
 * 不双写 V1 正式表和 `business_records`。
 * 不靠前端隐藏菜单当安全边界。

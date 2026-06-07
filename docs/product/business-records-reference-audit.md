@@ -36,14 +36,14 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `server/internal/biz/business_record_test.go`、`server/internal/data/business_record_repo_test.go` | 覆盖通用记录 module guard、编号、软删除、查询等行为 | test / compatibility | 是 | keep；后续只读化时需新增或调整测试 |
 | `server/internal/biz/debug_seed_test.go`、`server/internal/data/debug_seed_repo_test.go`、`jsonrpc_debug_test.go` | 覆盖 demo/debug seed 和 cleanup | test / seed/demo | 间接重叠 | keep as demo；不得把 demo 数据当正式数据 |
 | `web/src/erp/api/businessRecordApi.mjs` | 前端通用业务记录 JSON-RPC client | UI / API compatibility | 是 | keep；V1 正式页面不得与它双写 |
-| `web/src/erp/pages/BusinessModulePage.jsx` | 通用业务模块页面，列表、弹窗、保存、删除、恢复、打印、任务协同和 source prefill 都围绕 `business_records` | UI / runtime compatibility | 是，承载 partners、products、project-orders 等重叠入口 | make read-only or deprecate later for overlapping domains；本轮不改 UI |
-| `web/src/erp/config/businessModules.mjs` | 定义通用业务模块导航、文案和边界；包含 `partners`、`products`、`project-orders` | UI config / docs/help | 是 | deprecate later for overlapping domains；当前保留为兼容入口 |
+| `web/src/erp/pages/BusinessModulePage.jsx` | 通用业务模块页面，列表、弹窗、保存、删除、恢复、打印、任务协同和 source prefill 都围绕 `business_records`；`partners / project-orders` 已不再挂载旧通用业务页 | UI / runtime compatibility | 是，承载 products 等仍保留的旧通用入口；不再承载 partners / project-orders 旧路径 | keep for non-disabled compatibility modules；其他重叠领域后续评审 |
+| `web/src/erp/config/businessModules.mjs` | 定义通用业务模块文案和边界；`partners`、`project-orders` 保留为配置和迁移线索，但旧路由已禁用，正式入口覆盖到 `customers / suppliers / sales_orders` V1 入口 | UI config / compatibility | 是 | keep source metadata；旧重叠路径重定向到正式 V1 |
 | `web/src/erp/config/businessRecordDefinitions.mjs` | 定义通用业务记录表单、表格、明细和 master-record 选择；`partners`、`products`、`project-orders` 有专门 override | UI config / compatibility | 是 | needs manual review；后续避免继续扩展重叠领域核心字段 |
 | `web/src/erp/config/seedData.mjs` | 初始化导航、模块和示例数据入口 | seed/demo / UI config | 是 | keep as demo；本轮禁止改；后续要单独评审 seedData 与 V1 菜单切换 |
 | `web/src/erp/config/docs.mjs` | 原前端 docs registry 已移除 | docs/help | 否 | removed；产品内文档中心不再作为运行时入口 |
-| `web/src/erp/config/dashboardModules.mjs` | Dashboard 快捷模块仍指向 `partners`、`project-orders` 等兼容父路径 | UI / compatibility | 是 | deprecate later；后续入口切换需单独任务 |
-| `web/src/erp/config/menuPermissions.mjs`、测试 | 菜单权限仍包含 `/erp/master/partners`、`/erp/sales/project-orders` | UI / RBAC display | 是 | keep until menu review；不能当后端安全边界 |
-| `web/src/erp/router.jsx` | 同时挂载通用业务页和 V1 页面：`/erp/master/partners/customers`、`/erp/master/partners/suppliers`、`/erp/sales/project-orders/sales-orders` | UI route | 是 | keep；避免旧入口和 V1 页面双写同一真源 |
+| `web/src/erp/config/dashboardModules.mjs` | Dashboard 快捷模块已指向 `客户档案`、`供应商档案`、`销售订单` 正式 V1 路径 | UI / formal entry | 否，已退出旧重叠入口 | keep formal V1 entry；旧兼容路由不再作为 dashboard 入口 |
+| `web/src/erp/config/menuPermissions.mjs`、测试 | 菜单权限选项已包含正式 V1 路径，并将旧 `/erp/master/partners`、`/erp/sales/project-orders` 归一到正式入口 | UI / RBAC display | 否，已退出旧重叠入口 | keep aliases；不能把菜单隐藏当后端安全边界 |
+| `web/src/erp/router.jsx` | 挂载 V1 页面：`/erp/master/partners/customers`、`/erp/master/partners/suppliers`、`/erp/sales/project-orders/sales-orders`；旧 `/erp/master/partners`、`/erp/sales/project-orders` 只重定向到正式 V1 | UI route | 是 | keep redirects；避免旧入口和 V1 页面双写同一真源 |
 | `web/src/erp/utils/businessRecordForm.mjs` | 通用记录保存转换、明细金额派生、partners 联系人摘要和 products 标题兜底 | UI helper / compatibility | 是 | needs manual review；重叠领域不能继续把转换结果当 Product Core |
 | `web/src/erp/utils/businessRecordSourcePrefill.mjs` | 跨模块 source prefill，从 project-orders / products / material-bom 等旧记录带值 | UI helper / source snapshot | 是 | keep as source snapshot；切换来源必须防残值和伪造值 |
 | `web/src/erp/utils/businessRecordMasterSelection.mjs` | 从 `partners` / `products` 通用记录选择客户、供应商、产品并保存快照 | UI helper / compatibility | 是 | replace by V1 for overlapping domains；本轮只审计 |
@@ -91,5 +91,5 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 缺口 | 影响 | 下一步 |
 |---|---|---|
 | 本轮未读取真实数据库数据 | 无法判断旧记录数量、重复主体、缺值比例 | 后续 import draft / dry-run 任务读取数据并输出 unresolved queue |
-| 未改 UI / seedData / 菜单路由 | 旧入口仍可见，V1 页面仍未完成正式菜单切换；产品内 docs registry 已下线 | 后续菜单入口评审单独处理 |
+| 已改正式菜单 / dashboard / 菜单权限 | `客户档案`、`供应商档案`、`销售订单` 已进入正式入口；旧 `partners / project-orders` 路径只重定向到正式 V1 | 后续单独评审旧数据迁移、归档、删除或 API 层冻结 |
 | 生成代码引用数量较多 | 文件级审计可确认存在，但不应手改 generated code | 后续 runtime cutover 不触碰 generated code，除非 schema/migration 任务 |

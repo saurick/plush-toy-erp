@@ -1,11 +1,20 @@
 // 首页只需要模块键和标题，单独拆一份轻量配置，避免把整份业务页定义打进首屏。
 export const dashboardModules = Object.freeze([
-  { key: 'partners', title: '客户/供应商', path: '/erp/master/partners' },
+  {
+    key: 'customers',
+    title: '客户档案',
+    path: '/erp/master/partners/customers',
+  },
+  {
+    key: 'suppliers',
+    title: '供应商档案',
+    path: '/erp/master/partners/suppliers',
+  },
   { key: 'products', title: '产品', path: '/erp/master/products' },
   {
-    key: 'project-orders',
-    title: '订单/款式立项',
-    path: '/erp/sales/project-orders',
+    key: 'sales-orders',
+    title: '销售订单',
+    path: '/erp/sales/project-orders/sales-orders',
   },
   {
     key: 'material-bom',

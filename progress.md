@@ -245,3 +245,30 @@
 - 完成：在 `docs/current-source-of-truth.md` 增加状态词典树入口说明，只保留真源引用，不复制完整词典，避免两处长期漂移。
 - 下一步：后续新增或修改状态 key、状态字段、状态流转或事实 usecase 时，应同步更新该状态词典树，并确认是否需要补测试或文档入口摘要。
 - 阻塞/风险：本轮只改正式文档和 `progress.md`；未改 runtime、schema、migration、API、UI、RBAC、seedData、WorkflowUsecase 或事实 usecase。追加前 `progress.md` 为 241 行 / 61565 bytes，未达到归档阈值。
+
+## 2026-06-07 12:36 CST
+- 完成：Phase 5 正式产品入口接入。桌面菜单、dashboard 模块入口、前端菜单权限选项和后端内置菜单已从旧 `partners / project-orders` 重叠入口切到正式 `客户档案`、`供应商档案`、`销售订单` V1 路径；旧 `/erp/master/partners` 与 `/erp/sales/project-orders` 路径保留兼容访问，但不再作为正式菜单项或权限选项，旧菜单路径会归一到正式 V1 入口。
+- 完成：同步移除页面标题里的 `V1` 阶段口吻，并更新 `docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-*` 相关审计 / 风险 / cutover 文档，明确旧 `business_records` 兼容路由仍未 runtime 只读化。
+- 下一步：继续单独评审旧 `business_records` 重叠路由的只读化 / 迁移 / 归档策略，或进入客户菜单配置 review；不要把本轮菜单退出误读成旧入口已经删除或只读。
+- 阻塞/风险：本轮未改 schema、migration、真实导入、loader、WorkflowUsecase、库存 / 出货 / 财务事实层，也未删除 `business_records` 或旧兼容路由。旧直链仍可访问旧通用业务页，仍需后续 runtime transition 防止双真源误用。追加前 `progress.md` 为 247 行 / 62569 bytes，未达到归档阈值。
+
+## 2026-06-07 13:06 CST
+- 完成：继续收口同一轮 Phase 5，不拆 A/B/C。`partners / project-orders` 旧 `business_records` 兼容路由已前端运行时只读：旧页显示“兼容只读入口”，保留历史查看、筛选、打印、导出和正式 V1 入口跳转；新建、编辑、状态流转、协同任务写入、催办、删除、批量删除和回收站恢复均被 UI 和 handler 守卫拦住。
+- 完成：同步更新 `docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-cutover-plan.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-risk-register.md`，把旧口径从“仍未只读化”修正为“旧重叠兼容路由只读；迁移、删除、归档和客户菜单配置仍待评审”。
+- 完成：`style:l1` 的旧 `project-orders` 写入场景迁到仍可写的 `辅材/包材采购` 通用业务页；旧 `客户/供应商` L1 场景改为只读提示、无新建按钮、正式 `客户档案` 跳转和提示盒模型回归。
+- 验证：`pnpm --dir web lint` 通过；`pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs` 通过；`pnpm --dir web css` 通过；`pnpm --dir web test` 通过，274 个测试通过；`cd server && go test ./internal/biz` 通过；`pnpm --dir web style:l1` 最终完整通过，42 个场景通过；`git diff --check` 通过；Browser 真实页面验证旧 `/erp/master/partners` 和 `/erp/sales/project-orders` 均无可用写按钮、显示只读提示并能跳转到正式 V1 入口，控制台无 error。
+- 下一步：Phase 5 后续只剩客户菜单 runtime config loader、客户培训说明，以及旧 `business_records` 数据迁移 / 归档 / 删除边界评审；不要把旧兼容路由只读误读成旧数据已经迁移或 `business_records` 已可删除。
+- 阻塞/风险：本轮未改 schema、migration、真实导入、loader、WorkflowUsecase、库存 / 出货 / 财务事实层，也未删除 `business_records` 或旧兼容路由。`products` 等其他旧业务模块仍按各自领域后续评审处理；本轮只对与正式 V1 `customers / suppliers / sales_orders` 重叠的 `partners / project-orders` 做只读兼容。追加前 `progress.md` 为 253 行 / 63944 bytes，未达到归档阈值。
+
+## 2026-06-07 14:08 CST
+- 完成：按“开发阶段不保留旧兼容”的口径继续收口 Phase 5。`partners / project-orders` 旧路径不再挂载旧 `BusinessModulePage` 或兼容只读页，`/erp/master/partners` 直接重定向到 `/erp/master/partners/customers`，`/erp/sales/project-orders` 直接重定向到 `/erp/sales/project-orders/sales-orders`。
+- 完成：`businessModules.mjs` 为重叠旧模块增加 `legacyRouteDisabled`，`router.jsx`、`ERPLayout.jsx` 和 `seedData.test.mjs` 按该语义排除旧通用入口；`BusinessModulePage.jsx` 删除前一轮兼容只读守卫，继续服务其他未禁用通用业务模块。
+- 完成：同步更新 `docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-cutover-plan.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-risk-register.md` 和 `docs/customers/yoyoosun/import-risk-register.md`，把当前状态改为“旧路径重定向到正式 V1；旧数据迁移 / 归档 / 删除另评审”。
+- 验证：`pnpm --dir web lint` 通过；`pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs` 通过；`pnpm --dir web css` 通过；`pnpm --dir web test` 通过，274 个测试通过；`cd server && go test ./internal/biz` 通过；`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop,legacy-partners-redirects-to-customers,legacy-project-orders-redirects-to-sales-orders pnpm --dir web style:l1` 通过；`pnpm --dir web style:l1` 通过，43 个场景通过；`git diff --check` 通过。Codex 内置浏览器未登录访问旧 `/erp/master/partners` 会先被后台守卫带到 `/admin-login`，登录后旧路径重定向由 L1 场景覆盖。
+- 下一步：继续客户菜单 runtime config loader、客户培训说明，或单独评审旧 `business_records` 数据迁移 / 归档 / 删除边界；不要把旧路径重定向误读成 `business_records` 表、数据或其他旧通用模块已经删除。
+- 阻塞/风险：本轮未改 schema、migration、真实导入、loader、WorkflowUsecase、库存 / 出货 / 财务事实层，也未删除 `business_records` 或其他旧通用模块。`products` 等其他旧业务模块仍按各自领域后续评审处理；本轮只移除与正式 V1 `customers / suppliers / sales_orders` 重叠的 `partners / project-orders` 旧页面入口。追加前 `progress.md` 为 261 行 / 66343 bytes，未达到归档阈值。
+
+## 2026-06-07 14:39 CST
+- 完成：将“开发阶段不保留与正式 V1 重叠的旧兼容页面”写入 Phase 5 正式目标。`docs/product/product-completion-roadmap.md` 和 `docs/product/formal-menu-entry-plan.md` 均已明确：当前尚未进入甲方正式测试，已由 V1 承接的旧入口不保留产品内可见旧页面或兼容只读页，旧路径只允许重定向到正式 V1。
+- 下一步：后续继续客户菜单 runtime config loader、客户培训说明，或单独评审旧 `business_records` 数据迁移 / 归档 / 删除边界。
+- 阻塞/风险：本轮只改正式文档目标和 `progress.md`，未改 runtime、schema、migration、API、UI、RBAC、测试或部署。追加前 `progress.md` 为 269 行 / 68894 bytes，未达到归档阈值。

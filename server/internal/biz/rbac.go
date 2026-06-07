@@ -459,10 +459,11 @@ func AdminCanAccessMobileRole(admin *AdminUser, roleKey string) bool {
 var builtinAdminMenus = []AdminMenu{
 	{Key: "global-dashboard", Label: "任务看板", Path: "/erp/dashboard", RequiredPermissions: []string{PermissionERPDashboardRead}},
 	{Key: "business-dashboard", Label: "业务总览", Path: "/erp/business-dashboard", RequiredPermissions: []string{PermissionBusinessRecordRead}},
-	{Key: "partners", Label: "客户/供应商", Path: "/erp/master/partners", RequiredPermissions: []string{PermissionBusinessRecordRead}},
+	{Key: "customers", Label: "客户档案", Path: "/erp/master/partners/customers", RequiredPermissions: []string{PermissionCustomerRead}},
+	{Key: "suppliers", Label: "供应商档案", Path: "/erp/master/partners/suppliers", RequiredPermissions: []string{PermissionSupplierRead}},
 	{Key: "products", Label: "产品", Path: "/erp/master/products", RequiredPermissions: []string{PermissionBusinessRecordRead}},
 	{Key: "print-center", Label: "模板打印中心", Path: "/erp/print-center", RequiredPermissions: []string{PermissionERPPrintTemplateRead}},
-	{Key: "project-orders", Label: "订单/款式立项", Path: "/erp/sales/project-orders", RequiredPermissions: []string{PermissionBusinessRecordRead}},
+	{Key: "sales-orders", Label: "销售订单", Path: "/erp/sales/project-orders/sales-orders", RequiredPermissions: []string{PermissionSalesOrderRead}},
 	{Key: "material-bom", Label: "材料 BOM", Path: "/erp/purchase/material-bom", RequiredPermissions: []string{PermissionPurchaseOrderRead}},
 	{Key: "accessories-purchase", Label: "辅材/包材采购", Path: "/erp/purchase/accessories", RequiredPermissions: []string{PermissionPurchaseOrderRead}},
 	{Key: "processing-contracts", Label: "加工合同/委外下单", Path: "/erp/purchase/processing-contracts", RequiredPermissions: []string{PermissionPurchaseOrderRead}},

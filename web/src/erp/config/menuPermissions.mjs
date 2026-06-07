@@ -9,6 +9,8 @@ const PERMISSION_ALIAS_MAP = Object.freeze({
   '/erp/source-readiness': '/erp/dashboard',
   '/erp/mobile-workbenches': '/erp/dashboard',
   '/erp/help-center': '/erp/dashboard',
+  '/erp/master/partners': '/erp/master/partners/customers',
+  '/erp/sales/project-orders': '/erp/sales/project-orders/sales-orders',
 })
 
 const BUSINESS_SECTION_TITLES = Object.freeze([
@@ -110,7 +112,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/business-dashboard',
       '/erp/print-center',
       ...masterModulePaths,
-      '/erp/sales/project-orders',
+      '/erp/sales/project-orders/sales-orders',
       '/erp/warehouse/shipping-release',
     ]),
   },

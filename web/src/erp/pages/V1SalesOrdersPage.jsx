@@ -595,7 +595,7 @@ export default function V1SalesOrdersPage() {
         <Space className="erp-dashboard-heading-row" align="start">
           <div>
             <Title level={4} className="erp-dashboard-title">
-              V1 销售订单
+              销售订单
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
               销售订单只表示 Source Document /

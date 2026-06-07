@@ -30,7 +30,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 产品与 `product_skus` 混淆 | 把颜色、尺寸、包装版本误写入 product core 或自动建 SKU | `product_skus` 在 V1 cutline 中为 Draft Only | SKU 类字段 deferred，不自动创建 | Product / Sales | 是 |
 | 订单样本误当 `sales_orders` 正式数据 | 旧 project-orders 状态或样本订单污染正式 Source Document | 009 说明 project-orders 只能作 source snapshot | 只生成 dry-run preview；customer/product/unit 唯一匹配后才候选 | Sales / Data | 是 |
 | 业务快照误当事实 | 从旧快照生成库存、出货或财务记录 | `business_records` 是 source snapshot，不是事实真源 | forbidden auto-import list 强制 block | Architecture / Data | 是 |
-| `business_records` 与 V1 双真源 | 同一客户、供应商或订单两边可写导致准绳不清 | 旧入口和 V1 页面并存 | 禁止双写；future menu/read-only task 单独处理 | Product / UI / API | 是 |
+| `business_records` 与 V1 双真源 | 同一客户、供应商或订单两边可写导致准绳不清 | 重叠旧路径已重定向到 V1，但旧数据仍未迁移或归档 | 禁止双写；future migration/archive task 单独处理 | Product / UI / API | 是 |
 | seedData 被误当正式数据 | demo seed 污染客户正式资料 | seedData 是 Demo Seed / QA Debug | dry-run 排除 demo/debug 或单独标记 | QA / Data Import | 是 |
 | 自动生成出货 / 库存 / 财务事实 | 造成 shipped、库存余额、应收应付错误 | `shipping_released != shipped`，finance facts deferred | shipment/inventory/finance 全部 Forbidden Auto Import | Workflow / Fact | 是 |
 | migration / import 无回滚 | 导入错误后无法恢复 | 当前 dry-run draft 不实现真实导入或 loader | future Stage 6 必须先有备份、rollback、forward-fix 和对账 | Ops / Data | 是 |

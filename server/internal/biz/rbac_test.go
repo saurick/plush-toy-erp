@@ -193,22 +193,34 @@ func TestAdminVisibleMenusFiltersByPermissionCode(t *testing.T) {
 	}
 }
 
-func TestAdminVisibleMenusIncludesMasterDataForBusinessRecordRead(t *testing.T) {
+func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 	admin := &AdminUser{
 		ID:          2,
 		Username:    "operator",
-		Permissions: []string{PermissionBusinessRecordRead},
+		Permissions: []string{PermissionCustomerRead, PermissionSupplierRead, PermissionSalesOrderRead, PermissionBusinessRecordRead},
 	}
 
 	paths := map[string]struct{}{}
 	for _, menu := range AdminVisibleMenus(admin) {
 		paths[menu.Path] = struct{}{}
 	}
-	if _, ok := paths["/erp/master/partners"]; !ok {
-		t.Fatalf("expected partners master data menu")
+	if _, ok := paths["/erp/master/partners/customers"]; !ok {
+		t.Fatalf("expected customers formal master data menu")
+	}
+	if _, ok := paths["/erp/master/partners/suppliers"]; !ok {
+		t.Fatalf("expected suppliers formal master data menu")
 	}
 	if _, ok := paths["/erp/master/products"]; !ok {
 		t.Fatalf("expected products master data menu")
+	}
+	if _, ok := paths["/erp/sales/project-orders/sales-orders"]; !ok {
+		t.Fatalf("expected sales orders formal source document menu")
+	}
+	if _, ok := paths["/erp/master/partners"]; ok {
+		t.Fatalf("old partners business_records entry must not be a visible formal menu")
+	}
+	if _, ok := paths["/erp/sales/project-orders"]; ok {
+		t.Fatalf("old project-orders business_records entry must not be a visible formal menu")
 	}
 }
 
@@ -241,6 +253,19 @@ func TestNormalizeAdminMenuPermissionsRedirectsRetiredFrontendPaths(t *testing.T
 
 	if len(normalized) != 1 || normalized[0] != "/erp/dashboard" {
 		t.Fatalf("expected retired paths to normalize to dashboard, got %#v", normalized)
+	}
+}
+
+func TestNormalizeAdminMenuPermissionsRedirectsLegacyBusinessRecordEntries(t *testing.T) {
+	normalized := NormalizeAdminMenuPermissions([]string{
+		"/erp/master/partners",
+		"/erp/sales/project-orders",
+	})
+
+	if len(normalized) != 2 ||
+		normalized[0] != "/erp/master/partners/customers" ||
+		normalized[1] != "/erp/sales/project-orders/sales-orders" {
+		t.Fatalf("expected legacy business record paths to normalize to formal V1 entries, got %#v", normalized)
 	}
 }
 
