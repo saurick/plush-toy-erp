@@ -239,3 +239,9 @@
 - 验证：`cd web && pnpm exec eslint --fix --ext .js --ext .jsx src/erp/pages/DevDocsPage.jsx src/erp/config/devDocs.mjs src/erp/config/devDocs.test.mjs scripts/styleL1.mjs` 通过；`cd web && pnpm exec prettier --check src/erp/pages/DevDocsPage.jsx src/erp/config/devDocs.mjs src/erp/config/devDocs.test.mjs scripts/styleL1.mjs README.md` 通过；`cd web && pnpm exec node --test src/erp/config/devDocs.test.mjs` 通过，7 条 devDocs 测试通过；`cd web && pnpm test` 通过，273 个测试通过；`cd web && pnpm css` 通过；`cd web && STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm style:l1` 通过；`git diff --check` 通过。
 - 下一步：如果后续还想保留搜索关键词、侧栏滚动位置或右侧阅读滚动位置，应单独评审是否会干扰频繁改文档后的阅读起点；本轮先只保留文档选择和目录展开这两个低风险上下文。
 - 阻塞/风险：本轮只改 dev-only 文档查看器、本地偏好归一化、L1 回归、配置测试和 `web/README.md`；未改产品菜单、seedData、RBAC、docs registry、后端、schema、migration、部署或正式文档真源。Browser 页面可读但点击目录按钮时 CDP 超时，因此交互级证明收口到项目 `style:l1` Playwright 断言。追加前 `progress.md` 为 234 行 / 59627 bytes，未达到归档阈值。
+
+## 2026-06-07 11:49 CST
+- 完成：将当前 ERP 状态词典树写入 `docs/architecture/status-workflow-fact-boundary.md` 的“当前状态词典树 / Current Status Dictionary Tree”章节，按总览树、当前已实现状态、未来候选状态和禁止混用项组织；明确区分协同层状态、业务对象生命周期状态、事实层对象状态、事实流水类型和派生结果状态。
+- 完成：在 `docs/current-source-of-truth.md` 增加状态词典树入口说明，只保留真源引用，不复制完整词典，避免两处长期漂移。
+- 下一步：后续新增或修改状态 key、状态字段、状态流转或事实 usecase 时，应同步更新该状态词典树，并确认是否需要补测试或文档入口摘要。
+- 阻塞/风险：本轮只改正式文档和 `progress.md`；未改 runtime、schema、migration、API、UI、RBAC、seedData、WorkflowUsecase 或事实 usecase。追加前 `progress.md` 为 241 行 / 61565 bytes，未达到归档阈值。
