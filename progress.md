@@ -292,3 +292,28 @@
 - 验证：`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过；Phase 8 口径扫描仅命中“不拆字母子阶段”“未实现 / 不写成 Delivery Ready”等正确边界说明，未再出现字母子阶段编号。
 - 下一步：已被 2026-06-08 21:08 CST 记录更新为 Phase 8 统一 docs-only review 一次覆盖五条事实链；后续按实现门禁进入具体实现闭环。
 - 阻塞/风险：本轮只开启 Phase 8 评审层，未改 schema、migration、runtime、API、RBAC 真源、Workflow / Fact usecase、部署脚本或 DB；不能把 Phase 8 开启误读为生产、委外、出货、库存预留或财务事实已实现。追加前 `progress.md` 为 269 行 / 51139 bytes，未达到归档阈值。
+
+## 2026-06-08 22:26 CST
+
+- 完成：按“下一步先做目标环境发布与客户验收闭环，不继续扩大 Phase 8 功能”的口径，新增 `docs/customers/yoyoosun/phase8-target-release-acceptance.md`，收口目标环境发布、镜像加载、Atlas migration、健康检查、Phase 8 五页签只读验收、权限验收、受控写入验收、evidence 模板和停止条件。
+- 完成：同步更新 `docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`、`docs/architecture/phase8-fact-expansion-review.md` 和 `deployments/yoyoosun/README.md`，明确该手册是 Draft / Runbook Draft，不代表目标环境已发布、migration 已执行或客户已签收；CAP-019 到 CAP-024 仍不能写成 Delivery Ready。
+- 验证：`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过；Phase 8 / Delivery Ready 口径扫描只命中“手册草案、不代表发布 / 验收、不得写成 Delivery Ready”等正确边界说明。
+- 下一步：执行文档格式 / 链接 / 关键口径扫描；若用户确认进入真实发布，再按手册准备镜像、目标服务器备份、migration 和验收 evidence。
+- 阻塞/风险：本轮为 docs-only，未改 schema、migration、runtime、API、RBAC、部署脚本、客户配置 runtime 或目标环境；未执行真实发布、未连接目标服务器、未导入真实客户数据。追加前 `progress.md` 为 294 行 / 56727 bytes，未达到归档阈值。
+
+## 2026-06-08 22:53 CST
+
+- 完成：按低配 Docker 发布主路径将 Phase 8 `a490b92` 发布到当前目标环境 `192.168.0.133`；本地构建 `linux/amd64` 镜像 `plush-toy-erp-server:20260608T2230-a490b92-phase8-amd64` 和 `plush-toy-erp-web:20260608T2230-a490b92-phase8-amd64`，上传到 `/opt/plush-toy-erp/releases/20260608T2230-a490b92-phase8-amd64`，远端只执行 `docker load`、migration、Compose 重建和 smoke。
+- 完成：同步远端 migration 目录，执行 `migrate_online.sh --apply`，远端 Atlas migration 从 `20260530161152` 到 `20260608134530`，pending 0；备份 `.env` 后只重建 `app-server` 和 `web-desktop`；生成 post-deploy 逻辑备份 `plush_erp-postdeploy-20260608T2230-a490b92-phase8-amd64.dump`。
+- 完成：新增 `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md`，并同步 README、document inventory、current source、roadmap、Phase 8 review、deployment README 和 product-delivery-ledgers；台账更新为 Target Deployed / Acceptance Pending，不写 Delivery Ready。
+- 验证：目标环境 `app-server` 和 `web-desktop` 运行新镜像；`/healthz=ok`、`/readyz=ready`、`/erp/phase8/facts` HTTP 200；未登录 `phase8.list_finance_facts` 返回 `40302 未登录` 且 `unknownUrl=false`；server logs 近 5 分钟无 `panic` / `fatal`。
+- 下一步：准备或创建目标环境试用账号与权限后，执行登录态 Phase 8 只读 API / 浏览器验收；如需受控写入验收，必须先准备模拟数据、冲正方案和客户确认。
+- 阻塞/风险：目标环境没有 `demo_boss`，登录态 JSON-RPC smoke 未完成；本次执行前未记录明确 pre-migration 备份 evidence，已补 post-deploy 备份；为保留上一版回滚镜像且可回收空间较小，本轮未执行 `docker image prune -a -f`。真实客户数据导入、完整打印、报表、发票明细、收付款核销、对账单、物流退货、并发锁升级和自动派生仍未做。追加前 `progress.md` 为 302 行 / 58332 bytes，未达到归档阈值。
+
+## 2026-06-08 23:07 CST
+
+- 完成：补齐目标环境 Phase 8 账号和登录态 smoke blocker。通过受控 seed 命令在目标数据库创建 / 更新 9 个 `demo_*` 角色试用账号，未创建 `demo_debug`，未分配 `debug_operator`；密码只通过本地环境变量传入，未写入仓库文档。
+- 完成：同步更新 `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md`、`docs/customers/yoyoosun/phase8-target-release-acceptance.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/architecture/phase8-fact-expansion-review.md`、`docs/product/product-delivery-ledgers.md`、`deployments/yoyoosun/README.md` 和 `docs/customers/yoyoosun/README.md`；把“目标环境没有 demo_boss / 登录态 smoke 未完成”更新为“目标账号 RBAC 和登录态只读 API smoke 已通过”，同时把 pre-migration 备份 evidence 加为后续 migration apply 的硬门槛。
+- 验证：`TRIAL_ACCOUNT_PASSWORD=... TRIAL_ACCOUNT_BACKEND_URL=http://192.168.0.133:8300 node scripts/qa/trial-account-rbac.mjs` 通过，覆盖 9 个 demo 账号角色、岗位权限、debug 权限、super admin 和 disabled 边界；`demo_boss` 登录后 `phase8.list_finance_facts` 返回 code `0`、`total=0`，确认登录态只读 handler 和权限生效。
+- 下一步：进入客户正式业务验收；如需受控写入验收，必须先准备模拟数据、冲正方案和客户授权。后续任何目标环境 migration apply 前，必须先记录 pre-migration 备份 evidence。
+- 阻塞/风险：客户正式验收和受控写入验收仍未做；本次执行前缺 pre-migration 备份 evidence 不能倒补，只能保留为发布风险记录并用 post-deploy 备份作为当前状态恢复点；旧镜像仍保留用于回滚，未执行镜像清理。真实客户数据导入、完整打印、报表、发票明细、收付款核销、对账单、物流退货、并发锁升级和自动派生仍未做。追加前 `progress.md` 为 311 行 / 60388 bytes，未达到归档阈值。

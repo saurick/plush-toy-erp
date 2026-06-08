@@ -1,7 +1,7 @@
 # Phase 8 事实层扩展总评审 / Phase 8 Fact Expansion Review
 
 - 文档类型：架构评审 / Architecture Review
-- 状态：Phase 8 统一 review 与本地最小实现闭环已完成，待目标环境发布和客户验收
+- 状态：Phase 8 统一 review、本地最小实现闭环、当前目标环境发布 smoke 和登录态只读 API smoke 已完成，客户业务验收待继续
 - Runtime Source of Truth / 运行时真源：No
 - Schema Source of Truth / Schema 真源：No
 - Current Implementation Source of Truth / 当前实现真源：No；当前实现以 Ent schema、migration、biz/data usecase、JSON-RPC、前端页面和测试为准
@@ -10,7 +10,7 @@
 
 Phase 8 不拆任何字母子阶段，也不再把生产、委外、出货、库存预留和财务拆成后续字母半阶段。本文先作为 Phase 8 的统一 review，一次性覆盖五条事实链的真源、边界、状态、冲正、幂等、RBAC、API、UI、测试和停止条件；当前同一 Phase 8 内已落本地最小实现闭环。
 
-本文最初作为 docs-only review，随后同一 Phase 8 内已落本地最小实现闭环：schema / migration、repo / usecase、API / RBAC、最小 UI 和测试。该结论不代表目标客户环境已执行 migration、已上线、已完成客户验收，也不代表真实客户数据导入、完整打印、完整报表、发票和收付款核销已经交付。
+本文最初作为 docs-only review，随后同一 Phase 8 内已落本地最小实现闭环：schema / migration、repo / usecase、API / RBAC、最小 UI 和测试。2026-06-08 已发布到当前目标环境并执行 migration 到 `20260608134530`，健康检查、前端 Phase 8 路由、未登录鉴权 smoke、目标试用账号 RBAC 核对和登录态只读 Phase 8 API smoke 通过。该结论不代表目标客户环境已完成客户业务验收、受控写入验收或客户签收，也不代表真实客户数据导入、完整打印、完整报表、发票和收付款核销已经交付。
 
 ## 2. 范围项
 
@@ -133,4 +133,4 @@ Phase 8 不拆任何字母子阶段，也不再把生产、委外、出货、库
 - 把 Phase 7 模拟数据或客户样本转写成真实导入、出货、库存或财务事实。
 - 把目标客户环境未验收状态写成 Delivery Ready。
 
-下一步如进入目标环境发布、客户验收、自动派生、报表、打印或核销扩展，仍必须按 `docs/product/implementation-governance.md` 明确允许路径、禁止路径、验收命令和停止条件。
+下一步先完成目标环境客户验收闭环，执行手册为 `docs/customers/yoyoosun/phase8-target-release-acceptance.md`，本次发布 evidence 为 `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md`。自动派生、报表、打印、核销、物流退货或并发锁升级仍是后续增强，不作为 Phase 8 本地最小实现的补尾；若启动这些增强，仍必须按 `docs/product/implementation-governance.md` 明确允许路径、禁止路径、验收命令和停止条件。
