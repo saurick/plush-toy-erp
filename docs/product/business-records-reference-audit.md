@@ -1,20 +1,20 @@
 Doc Type / 文档类型: Business Records Reference Audit / business_records 引用审计
 Status / 状态: Audit / 审计
-Runtime Implemented / 运行时已实现: No / 否
+Runtime Implemented / 运行时已实现: Partial / 部分
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 业务记录引用审计 / business_records Reference Audit
 
-本审计只记录当前仓库中 `business_records / business_record_items / business_record_events` 的引用面和过渡建议，不修改 runtime、schema、migration、API、RBAC、UI、seedData、菜单路由或产品内文档入口，也不迁移或删除数据。
+本审计记录当前仓库中 `business_records / business_record_items / business_record_events` 的引用面和过渡建议；当前已同步删除旧路径权限别名，并冻结 `partners / project-orders` 普通业务 API 写操作。本审计不执行 schema、migration、seedData、真实数据迁移或删除。
 
 结论先行：
 
 - `business_records` 仍是兼容层、demo、seed、source snapshot、调研入口和旧页面承载层。
 - `business_records` 不再适合作为正式 `customers / suppliers / contacts / sales_orders / sales_order_items` 的长期可写真源。
 - `business_records` 不得替代库存、采购入库、采购退货、采购入库调整、批次、质检、出货或财务事实真源。
-- 与 V1 正式模型重叠的入口应进入只读、demo 化、迁移 dry-run 或人工确认流程，不能双写。
+- 与 V1 正式模型重叠的旧前端入口已不再保留产品路由、菜单权限别名或旧路径重定向；普通 `business` JSON-RPC 已拒绝 `partners / project-orders` create / update / delete / restore；历史数据后续应进入迁移 dry-run、归档或人工确认流程，不能双写。
 
 ## 引用审计清单
 
@@ -25,9 +25,9 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `server/internal/data/model/schema/business_record_event.go` | 记录通用业务记录创建、更新、删除、恢复等事件 | runtime / audit / compatibility | 间接重叠 | keep；仅作历史审计线索，不替代 V1 usecase 审计 |
 | `server/internal/data/model/ent/businessrecord*`、`businessrecorditem*`、`businessrecordevent*` | Ent generated code，承接当前 runtime 查询和写入 | generated runtime | 是 | keep；本轮不得改 generated code |
 | `server/internal/data/model/migrate/20260423090005_migrate.sql`、`20260425153557_migrate.sql`、`20260426033346_migrate.sql`、`20260426095103_migrate.sql` | 历史 migration 中包含 `business_records` 及其与采购事实的兼容关系 | migration / compatibility | 是 | keep；不得改历史 migration；后续只追加新迁移，不能回写 |
-| `server/internal/biz/business_record.go` | 通用业务记录模块列表、编号前缀、字段模型、创建 / 更新 / 删除 / 恢复 usecase | runtime / compatibility | 是，模块中包含 `partners`、`products`、`project-orders` | keep；重叠领域后续不新增核心能力；进入只读或 demo 化需单独任务 |
-| `server/internal/data/business_record_repo.go` | `business_records` repo 查询、创建、更新、软删除、恢复和明细替换 | runtime / compatibility | 是 | keep；不得用于向 V1 模型双写 |
-| `server/internal/data/jsonrpc_business.go` | `business` JSON-RPC 域：dashboard、list、create、update、delete、restore | API / compatibility | 是 | keep；后续重叠领域可限制写入或只读，但需单独 runtime 任务 |
+| `server/internal/biz/business_record.go` | 通用业务记录模块列表、编号前缀、字段模型、创建 / 更新 / 删除 / 恢复 usecase；`partners / project-orders` 已标记为 retired module 并禁止普通写操作 | runtime / compatibility | 是，模块中包含 `partners`、`products`、`project-orders` | keep；重叠旧模块只保留查询 / 审计，不允许普通业务写入 |
+| `server/internal/data/business_record_repo.go` | `business_records` repo 查询、创建、更新、软删除、恢复和明细替换；对已 retired 的 `partners / project-orders` 现有记录阻断 update / delete / restore | runtime / compatibility | 是 | keep；不得用于向 V1 模型双写 |
+| `server/internal/data/jsonrpc_business.go` | `business` JSON-RPC 域：dashboard、list、create、update、delete、restore；旧模块写入返回“旧业务记录入口已停用，请使用正式 V1 入口” | API / compatibility | 是 | keep non-retired modules；旧重叠模块普通写入已冻结 |
 | `server/internal/data/jsonrpc.go` | 注册 `business` JSON-RPC 域 | API / compatibility | 间接重叠 | keep |
 | `server/internal/biz/rbac.go`、`server/internal/biz/rbac_test.go` | `business.record.*` 权限仍保护通用业务记录 API | RBAC / compatibility | 间接重叠 | keep；不得把菜单隐藏当安全边界 |
 | `server/internal/biz/debug_seed.go`、`server/internal/data/debug_seed_repo.go`、`server/internal/data/jsonrpc_debug.go` | debug seed / cleanup / 业务链路调试复用 `business_records`、workflow 表和 debug 标记 | seed/demo / QA / compatibility | 间接重叠 | keep as demo；必须保持 debug 标记和权限边界 |
@@ -37,13 +37,13 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `server/internal/biz/debug_seed_test.go`、`server/internal/data/debug_seed_repo_test.go`、`jsonrpc_debug_test.go` | 覆盖 demo/debug seed 和 cleanup | test / seed/demo | 间接重叠 | keep as demo；不得把 demo 数据当正式数据 |
 | `web/src/erp/api/businessRecordApi.mjs` | 前端通用业务记录 JSON-RPC client | UI / API compatibility | 是 | keep；V1 正式页面不得与它双写 |
 | `web/src/erp/pages/BusinessModulePage.jsx` | 通用业务模块页面，列表、弹窗、保存、删除、恢复、打印、任务协同和 source prefill 都围绕 `business_records`；`partners / project-orders` 已不再挂载旧通用业务页 | UI / runtime compatibility | 是，承载 products 等仍保留的旧通用入口；不再承载 partners / project-orders 旧路径 | keep for non-disabled compatibility modules；其他重叠领域后续评审 |
-| `web/src/erp/config/businessModules.mjs` | 定义通用业务模块文案和边界；`partners`、`project-orders` 保留为配置和迁移线索，但旧路由已禁用，正式入口覆盖到 `customers / suppliers / sales_orders` V1 入口 | UI config / compatibility | 是 | keep source metadata；旧重叠路径重定向到正式 V1 |
+| `web/src/erp/config/businessModules.mjs` | 定义通用业务模块文案和边界；`partners`、`project-orders` 旧模块定义已删除，正式入口由 `customers / suppliers / sales_orders` V1 路径直接注入菜单 section | UI config / formal entry | 是 | keep formal V1 entries；不再保留旧产品入口配置 |
 | `web/src/erp/config/businessRecordDefinitions.mjs` | 定义通用业务记录表单、表格、明细和 master-record 选择；`partners`、`products`、`project-orders` 有专门 override | UI config / compatibility | 是 | needs manual review；后续避免继续扩展重叠领域核心字段 |
 | `web/src/erp/config/seedData.mjs` | 初始化导航、模块和示例数据入口 | seed/demo / UI config | 是 | keep as demo；本轮禁止改；后续要单独评审 seedData 与 V1 菜单切换 |
 | `web/src/erp/config/docs.mjs` | 原前端 docs registry 已移除 | docs/help | 否 | removed；产品内文档中心不再作为运行时入口 |
 | `web/src/erp/config/dashboardModules.mjs` | Dashboard 快捷模块已指向 `客户档案`、`供应商档案`、`销售订单` 正式 V1 路径 | UI / formal entry | 否，已退出旧重叠入口 | keep formal V1 entry；旧兼容路由不再作为 dashboard 入口 |
-| `web/src/erp/config/menuPermissions.mjs`、测试 | 菜单权限选项已包含正式 V1 路径，并将旧 `/erp/master/partners`、`/erp/sales/project-orders` 归一到正式入口 | UI / RBAC display | 否，已退出旧重叠入口 | keep aliases；不能把菜单隐藏当后端安全边界 |
-| `web/src/erp/router.jsx` | 挂载 V1 页面：`/erp/master/partners/customers`、`/erp/master/partners/suppliers`、`/erp/sales/project-orders/sales-orders`；旧 `/erp/master/partners`、`/erp/sales/project-orders` 只重定向到正式 V1 | UI route | 是 | keep redirects；避免旧入口和 V1 页面双写同一真源 |
+| `web/src/erp/config/menuPermissions.mjs`、测试；`server/internal/biz/admin_menu_permission.go`、测试 | 菜单权限选项已包含正式 V1 路径；旧 `/erp/master/partners`、`/erp/sales/project-orders` 在前后端权限归一化中均不再归一到正式入口，解析为空权限 key | UI / RBAC display | 否，已退出旧重叠入口 | keep formal V1 options；不能把菜单隐藏当后端安全边界 |
+| `web/src/erp/router.jsx` | 挂载 V1 页面：`/erp/master/partners/customers`、`/erp/master/partners/suppliers`、`/erp/sales/project-orders/sales-orders`；旧 `/erp/master/partners`、`/erp/sales/project-orders` 不再挂载旧页面或重定向 | UI route | 是 | keep formal V1 routes；避免旧入口和 V1 页面双写同一真源 |
 | `web/src/erp/utils/businessRecordForm.mjs` | 通用记录保存转换、明细金额派生、partners 联系人摘要和 products 标题兜底 | UI helper / compatibility | 是 | needs manual review；重叠领域不能继续把转换结果当 Product Core |
 | `web/src/erp/utils/businessRecordSourcePrefill.mjs` | 跨模块 source prefill，从 project-orders / products / material-bom 等旧记录带值 | UI helper / source snapshot | 是 | keep as source snapshot；切换来源必须防残值和伪造值 |
 | `web/src/erp/utils/businessRecordMasterSelection.mjs` | 从 `partners` / `products` 通用记录选择客户、供应商、产品并保存快照 | UI helper / compatibility | 是 | replace by V1 for overlapping domains；本轮只审计 |
@@ -90,6 +90,6 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 | 缺口 | 影响 | 下一步 |
 |---|---|---|
-| 本轮未读取真实数据库数据 | 无法判断旧记录数量、重复主体、缺值比例 | 后续 import draft / dry-run 任务读取数据并输出 unresolved queue |
-| 已改正式菜单 / dashboard / 菜单权限 | `客户档案`、`供应商档案`、`销售订单` 已进入正式入口；旧 `partners / project-orders` 路径只重定向到正式 V1 | 后续单独评审旧数据迁移、归档、删除或 API 层冻结 |
+| 已完成当前 dev DB 统计与受控 cleanup | `partners` 旧记录为 0；`project-orders` 旧记录总数为 4、active 为 0、deleted 为 4，均为 debug seed；清理后 `workflow_tasks.source_type=project-orders` 和 `workflow_business_states.source_type=project-orders` 均为 0；采购事实 `business_record_id` 引用为 0；V1 正式表当前为 0 | 不需要把当前 dev DB 的 `partners / project-orders` 数据迁移到 V1；后续客户库或生产库仍需按库单独统计，不能套用 dev DB 清理结论 |
+| 已改正式菜单 / dashboard / 菜单权限 / API 写入 | `客户档案`、`供应商档案`、`销售订单` 已进入正式入口；旧 `partners / project-orders` 产品入口、旧路径重定向和权限别名均已移除；普通 `business` API 已冻结旧模块写操作 | 后续单独评审旧数据迁移、归档或删除 |
 | 生成代码引用数量较多 | 文件级审计可确认存在，但不应手改 generated code | 后续 runtime cutover 不触碰 generated code，除非 schema/migration 任务 |

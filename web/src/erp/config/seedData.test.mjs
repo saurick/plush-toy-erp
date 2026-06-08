@@ -98,14 +98,50 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(!navPaths.includes('/erp/master/partners'))
   assert(!navPaths.includes('/erp/sales/project-orders'))
 
-  businessModuleDefinitions
-    .filter((moduleItem) => !moduleItem.legacyRouteDisabled)
-    .forEach((moduleItem) => {
-      assert(navPaths.includes(moduleItem.path))
-    })
+  businessModuleDefinitions.forEach((moduleItem) => {
+    assert(navPaths.includes(moduleItem.path))
+  })
   businessModuleDefinitions.forEach((moduleItem) => {
     assert(moduleItem.path.startsWith('/erp/'))
     assert(moduleItem.sourceRefs.length > 0)
     assert.equal(moduleItem.relatedLinks, undefined)
   })
+})
+
+test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序和文案', () => {
+  const navigationSections = getNavigationSections({
+    customerKey: 'demo',
+    desktopMenu: {
+      sections: [
+        {
+          title: '销售试用',
+          items: ['sales-orders', 'customers', 'suppliers'],
+        },
+        {
+          title: '系统',
+          items: ['permission-center'],
+        },
+      ],
+      hiddenItemKeys: ['suppliers'],
+      itemOverrides: {
+        'sales-orders': {
+          label: '客户订单',
+          shortLabel: '订单',
+          description: '客户试用菜单里的销售订单入口。',
+        },
+      },
+    },
+  })
+
+  assert.deepEqual(
+    navigationSections.map((section) => section.title),
+    ['销售试用', '系统']
+  )
+  assert.deepEqual(
+    navigationSections[0].items.map((item) => item.key),
+    ['sales-orders', 'customers']
+  )
+  assert.equal(navigationSections[0].items[0].label, '客户订单')
+  assert.equal(navigationSections[0].items[0].shortLabel, '订单')
+  assert(!navigationSections[0].items.some((item) => item.key === 'suppliers'))
 })

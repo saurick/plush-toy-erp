@@ -11,7 +11,7 @@ Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/
 ### `compose/prod`
 
 - 单机或单宿主机部署入口
-- 默认包含 PostgreSQL、Jaeger、业务服务、前端固定端口静态服务和基础 smoke 检查
+- 默认包含 PostgreSQL、Jaeger、业务服务、前端单入口静态服务和基础 smoke 检查
 - 服务端镜像内置 Chromium / CJK 字体用于 `/templates/render-pdf`，Compose 默认通过 `ERP_PDF_CHROME_PATH=/usr/bin/chromium` 和 `ERP_PDF_RENDER_CONCURRENCY=2` 控制 PDF 引擎
 - 提供迁移脚本，不再保留远端增量发布脚本
 

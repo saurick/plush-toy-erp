@@ -189,6 +189,9 @@ func (d *JsonrpcData) mapBusinessRecordError(ctx context.Context, err error) *v1
 	case errors.Is(err, biz.ErrBusinessRecordVersionConflict):
 		l.Warnf("[business] version conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "业务记录已被其他人更新，请刷新后重试"}
+	case errors.Is(err, biz.ErrBusinessRecordModuleRetired):
+		l.Warnf("[business] retired module write denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "旧业务记录入口已停用，请使用正式 V1 入口"}
 	default:
 		l.Errorf("[business] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}

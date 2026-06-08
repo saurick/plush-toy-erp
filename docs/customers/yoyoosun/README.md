@@ -25,7 +25,9 @@
 | `source-snapshot-manual-review-checklist.md` | 记录 freeze / dry-run evidence 的人工 review checklist 和 import-not-approved 结论 |
 | `import-strategy.md` | 记录永绅 yoyoosun 导入策略和真实导入前置要求 |
 | `import-risk-register.md` | 记录永绅 yoyoosun 导入风险登记 |
-| `raw-source-files/` | 保存永绅 yoyoosun 原始 Excel / PDF / PNG，用于字段、模板、导入、页面和验收溯源 |
+| `trial-training-note.md` | 记录永绅 yoyoosun 试用培训说明、正式入口和旧入口退出边界 |
+| `trial-account-role-menu-checklist.md` | 记录永绅 yoyoosun 试用账号、角色、菜单和岗位任务端核对清单 |
+| `raw-source-files/` | 保存永绅 yoyoosun 原始 Excel / PDF / PNG / JPG / JPEG，用于字段、模板、导入、页面和验收溯源 |
 | `raw-source-file-archive-review.md` | 记录永绅 yoyoosun 原始客户文件归档评审、用途分类、checksum 和边界 |
 
 ## 边界 / Boundary

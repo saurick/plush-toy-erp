@@ -213,25 +213,13 @@ export default function ERPRouter() {
             path="business-dashboard"
             element={<BusinessDashboardPage />}
           />
-          {businessModuleDefinitions
-            .filter((moduleItem) => !moduleItem.legacyRouteDisabled)
-            .map((moduleItem) => (
-              <Route
-                key={moduleItem.key}
-                path={moduleItem.route}
-                element={<BusinessModulePage moduleItem={moduleItem} />}
-              />
-            ))}
-          <Route
-            path="master/partners"
-            element={<Navigate to="/erp/master/partners/customers" replace />}
-          />
-          <Route
-            path="sales/project-orders"
-            element={
-              <Navigate to="/erp/sales/project-orders/sales-orders" replace />
-            }
-          />
+          {businessModuleDefinitions.map((moduleItem) => (
+            <Route
+              key={moduleItem.key}
+              path={moduleItem.route}
+              element={<BusinessModulePage moduleItem={moduleItem} />}
+            />
+          ))}
           <Route
             path="master/partners/customers"
             element={<V1MasterDataPage type="customers" />}

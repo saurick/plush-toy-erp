@@ -1,5 +1,9 @@
 import { appDefinitions } from './appRegistry.mjs'
 import { businessNavigationSections } from './businessModules.mjs'
+import {
+  applyCustomerMenuConfig,
+  getActiveCustomerMenuConfig,
+} from './customerMenuConfig.mjs'
 
 export const STATUS_LABELS = {
   source_grounded: '已按真源收口',
@@ -85,7 +89,7 @@ const navItemRegistry = {
 
 export const navigationItemRegistry = navItemRegistry
 
-export function getNavigationSections() {
+function getDefaultNavigationSections() {
   return [
     {
       title: '看板中心',
@@ -104,6 +108,15 @@ export function getNavigationSections() {
       items: [navItemRegistry['permission-center']],
     },
   ]
+}
+
+export function getNavigationSections(
+  customerMenuConfig = getActiveCustomerMenuConfig()
+) {
+  return applyCustomerMenuConfig(
+    getDefaultNavigationSections(),
+    customerMenuConfig
+  )
 }
 
 export const navigationSections = getNavigationSections()

@@ -59,11 +59,9 @@ const navIconRegistry = {
   'workspace-home': <AppstoreOutlined />,
   'global-dashboard': <DashboardOutlined />,
   'business-dashboard': <AppstoreOutlined />,
-  partners: <ApartmentOutlined />,
   customers: <ApartmentOutlined />,
   suppliers: <ApartmentOutlined />,
   products: <AppstoreOutlined />,
-  'project-orders': <ScheduleOutlined />,
   'sales-orders': <ScheduleOutlined />,
   'material-bom': <BarsOutlined />,
   'accessories-purchase': <ShoppingCartOutlined />,
@@ -87,9 +85,7 @@ const DEFAULT_DESKTOP_ENTRY = {
   description: '按协同任务状态看待处理、处理中、阻塞、退回和超时任务。',
 }
 const BUSINESS_MODULE_PATHS = new Set(
-  businessModuleDefinitions
-    .filter((moduleItem) => !moduleItem.legacyRouteDisabled)
-    .map((moduleItem) => moduleItem.path)
+  businessModuleDefinitions.map((moduleItem) => moduleItem.path)
 )
 
 function buildCurrentEntry({ navigationSections, locationPath }) {

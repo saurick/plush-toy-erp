@@ -2,10 +2,12 @@
 
 ## 当前结构
 
-当前前端不是“一个桌面站点 + 一个通用移动壳层”，而是：
+当前前端是一个生产入口加开发调试入口：
 
-- 桌面后台：单入口
-- 移动端：按角色拆成八个端口，并在桌面构建中提供 `/m/<role>/tasks` 单端口兼容路径
+- 生产前端：单入口 `5175`
+- 桌面后台：根路径和 `/erp/*`
+- 岗位任务端：`/m/<role>/tasks`
+- 本地开发：仍可按角色拆成八个移动端调试端口
 - 登录页：按入口配置显示“后台管理 / 岗位任务端”，设备只决定默认选项，不决定权限，岗位由账号授权自动决定
 - 仍然共享同一个 React 项目、同一个 common / ui / api 层
 
@@ -48,6 +50,8 @@ http://localhost:5175/m/quality/tasks
 
 `/admin-login` 统一承接后台和岗位任务端登录。手机默认选择岗位任务端，电脑默认选择后台，平板没有历史选择时保留入口选择；用户手动选择入口优先于设备默认。入口显隐由 `web/src/erp/config/entryConfig.mjs` 控制，并可通过 `window.__PLUSH_ERP_ENTRY_CONFIG__` 覆盖。用户不在登录前手选岗位，岗位任务端登录后按账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位；是否真正可进入仍由后端返回的 `permissions / menus` 决定。短信登录入口由后端 `auth.capabilities` 决定，前端不自行决定认证方式是否可用。
 
+桌面后台菜单由 `web/src/erp/config/seedData.mjs` 生成，并可通过 `web/src/erp/config/customerMenuConfig.mjs` 接入客户菜单配置。当前已登记 `config/customers/yoyoosun/menuConfig.mjs`，可通过构建环境 `VITE_ERP_CUSTOMER_KEY=yoyoosun` 或页面预置 `window.__PLUSH_ERP_CUSTOMER_KEY__ = 'yoyoosun'` 启用；也可用 `window.__PLUSH_ERP_CUSTOMER_CONFIG__` 直接提供一次性菜单配置。客户菜单配置只控制前端桌面菜单分组、排序、显隐和文案，不替代后端 RBAC action permission、Workflow / Fact usecase、schema、migration 或真实导入。
+
 ### 主题模式 / Theme mode
 
 桌面后台、统一登录页和岗位任务端支持「跟系统 / 浅色 / 暗色」三种主题模式，默认跟随系统偏好。用户手动选择会写入浏览器 `localStorage` 的 `plush_erp_theme_mode`，刷新后保持；`跟系统` 只决定视觉主题，不影响入口选择、权限判断或最终路由。
@@ -60,7 +64,9 @@ http://localhost:5175/m/quality/tasks
 - 新增状态类组件时必须同步覆盖暗色主题，包括 loading / empty / alert / message / notification / tooltip / popover / tag / badge / progress / pagination / drawer / table placeholder；优先复用全局 token 和 L1 断言，避免组件只在浅色模式可读。
 - 打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随暗色主题，避免污染导出物。
 
-### 岗位任务端
+### 岗位任务端本地调试
+
+生产环境不再为岗位任务端启动独立前端容器或独立端口，统一使用 `5175` 上的 `/m/<role>/tasks`。下面的多端口命令只用于本地开发和回归调试：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
@@ -121,7 +127,7 @@ pnpm build:mobile:quality
 
 ## 生产静态服务
 
-前端生产镜像使用一个镜像、多实例启动：镜像内包含桌面端和 8 个移动端构建产物，运行时通过 `APP_ID` 选择入口，通过 `PORT` 固定监听端口。
+前端生产镜像使用一个镜像、一个实例启动：运行时固定 `APP_ID=desktop`、`PORT=5175`，桌面后台和岗位任务端都由这一组静态服务承载。岗位任务端访问路径为 `/m/<role>/tasks`，不再启动 `APP_ID=mobile-*` 的生产容器。
 
 构建镜像：
 
@@ -130,33 +136,25 @@ cd /Users/simon/projects/plush-toy-erp
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 
-本地验证某个入口：
+本地验证生产入口：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
 pnpm build:all
-APP_ID=mobile-boss PORT=5186 API_ORIGIN=http://127.0.0.1:8300 pnpm serve:prod
+APP_ID=desktop PORT=5175 API_ORIGIN=http://127.0.0.1:8300 pnpm serve:prod
 ```
 
-固定端口矩阵：
+生产入口：
 
-| APP_ID              | 入口           | 构建产物                  | 生产端口 |
-| ------------------- | -------------- | ------------------------- | -------- |
-| `desktop`           | 桌面后台       | `build/`                  | `5175`   |
-| `mobile-boss`       | 老板岗位任务端 | `build/mobile-boss`       | `5186`   |
-| `mobile-business`   | 业务岗位任务端 | `build/mobile-business`   | `5187`   |
-| `mobile-purchasing` | 采购岗位任务端 | `build/mobile-purchasing` | `5188`   |
-| `mobile-production` | 生产岗位任务端 | `build/mobile-production` | `5189`   |
-| `mobile-warehouse`  | 仓库岗位任务端 | `build/mobile-warehouse`  | `5190`   |
-| `mobile-finance`    | 财务岗位任务端 | `build/mobile-finance`    | `5191`   |
-| `mobile-pmc`        | PMC 岗位任务端 | `build/mobile-pmc`        | `5192`   |
-| `mobile-quality`    | 品质岗位任务端 | `build/mobile-quality`    | `5193`   |
+| APP_ID    | 入口                         | 构建产物 | 生产端口 |
+| --------- | ---------------------------- | -------- | -------- |
+| `desktop` | 桌面后台与 `/m/<role>/tasks` | `build/` | `5175`   |
 
 生产静态服务约定：
 
 - `/healthz` 和 `/readyz` 返回当前入口健康状态，供容器健康检查或网关探活。
 - `/rpc` 和 `/templates` 默认反代到 `API_ORIGIN`，Compose 内默认是 `http://app-server:8300`。
-- 默认构建 `VITE_BASE_URL=/`，网关应让每个前端实例看到根路径流量；如果使用路径前缀且不做前缀剥离，需要按入口重新设置构建期 `VITE_BASE_URL`。
+- 默认构建 `VITE_BASE_URL=/`，网关应让前端实例看到根路径流量；如果使用路径前缀且不做前缀剥离，需要先评审构建期 `VITE_BASE_URL`。
 
 ## 当前回归命令
 
@@ -231,7 +229,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code
 - 桌面后台主业务菜单按基础资料、销售链路、采购/仓储、生产和财务收口；各业务页已接入通用业务记录表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗保存、批量删除、workflow 业务状态保存和协同任务池，基础资料页当前暴露客户/供应商和产品入口，并复用 `business_records` 承接 trade-erp 字段口径
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
-- 岗位任务端仍保留按角色拆端口访问，同时桌面构建提供 `/m/<role>/tasks` 单端口兼容路径；两者不拆第二个仓库
+- 岗位任务端生产环境统一走 `5175` 的 `/m/<role>/tasks`；按角色拆端口只作为本地开发调试入口保留，两者不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
 - 岗位任务页读取真实 workflow API，展示任务、预警、通知和进度，并按当前端口角色支持处理、阻塞、完成三类状态回填
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮

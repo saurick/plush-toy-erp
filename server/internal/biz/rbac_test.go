@@ -256,16 +256,14 @@ func TestNormalizeAdminMenuPermissionsRedirectsRetiredFrontendPaths(t *testing.T
 	}
 }
 
-func TestNormalizeAdminMenuPermissionsRedirectsLegacyBusinessRecordEntries(t *testing.T) {
+func TestNormalizeAdminMenuPermissionsDropsLegacyBusinessRecordEntries(t *testing.T) {
 	normalized := NormalizeAdminMenuPermissions([]string{
 		"/erp/master/partners",
 		"/erp/sales/project-orders",
 	})
 
-	if len(normalized) != 2 ||
-		normalized[0] != "/erp/master/partners/customers" ||
-		normalized[1] != "/erp/sales/project-orders/sales-orders" {
-		t.Fatalf("expected legacy business record paths to normalize to formal V1 entries, got %#v", normalized)
+	if len(normalized) != 0 {
+		t.Fatalf("expected legacy business record paths to be dropped, got %#v", normalized)
 	}
 }
 

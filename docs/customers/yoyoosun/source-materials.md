@@ -21,7 +21,7 @@
 
 ## 原始文件归档口径 / Raw Source File Archive
 
-`/Users/simon/Downloads/永绅erp/原文件/` 下的永绅 yoyoosun 原始 Excel / PDF / PNG 已归档到 `docs/customers/yoyoosun/raw-source-files/`，用于后续字段、模板、导入、页面和验收工作的溯源。
+本地永绅 yoyoosun 原始 Excel / PDF / PNG / JPG / JPEG 已归档到 `docs/customers/yoyoosun/raw-source-files/`，用于后续字段、模板、导入、页面和验收工作的溯源。
 
 这些原件仍不作为 Product Core、runtime、schema、migration、API、UI、seedData、docs registry 或真实导入批准。
 

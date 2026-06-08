@@ -11,6 +11,7 @@ var (
 	ErrBusinessRecordNotFound        = errors.New("business record not found")
 	ErrBusinessRecordExists          = errors.New("business record already exists")
 	ErrBusinessRecordVersionConflict = errors.New("business record version conflict")
+	ErrBusinessRecordModuleRetired   = errors.New("business record module retired")
 )
 
 var businessRecordModuleKeyOrder = []string{
@@ -57,6 +58,11 @@ var businessRecordModulePrefixes = map[string]string{
 
 var businessRecordModuleSet = buildBusinessRecordModuleSet()
 
+var retiredBusinessRecordModuleSet = map[string]struct{}{
+	"partners":       {},
+	"project-orders": {},
+}
+
 func buildBusinessRecordModuleSet() map[string]struct{} {
 	out := make(map[string]struct{}, len(businessRecordModulePrefixes))
 	for key := range businessRecordModulePrefixes {
@@ -67,6 +73,11 @@ func buildBusinessRecordModuleSet() map[string]struct{} {
 
 func IsValidBusinessRecordModule(key string) bool {
 	_, ok := businessRecordModuleSet[strings.TrimSpace(key)]
+	return ok
+}
+
+func IsRetiredBusinessRecordModule(key string) bool {
+	_, ok := retiredBusinessRecordModuleSet[strings.TrimSpace(key)]
 	return ok
 }
 
@@ -279,6 +290,9 @@ func (uc *BusinessRecordUsecase) CreateRecord(ctx context.Context, in *BusinessR
 	if err != nil {
 		return nil, err
 	}
+	if IsRetiredBusinessRecordModule(normalized.ModuleKey) {
+		return nil, ErrBusinessRecordModuleRetired
+	}
 	return uc.repo.CreateBusinessRecord(ctx, &normalized, actorID)
 }
 
@@ -289,6 +303,9 @@ func (uc *BusinessRecordUsecase) UpdateRecord(ctx context.Context, id int, in *B
 	normalized, err := normalizeBusinessRecordMutation(*in, false)
 	if err != nil {
 		return nil, err
+	}
+	if IsRetiredBusinessRecordModule(normalized.ModuleKey) {
+		return nil, ErrBusinessRecordModuleRetired
 	}
 	return uc.repo.UpdateBusinessRecord(ctx, id, &normalized, actorID)
 }

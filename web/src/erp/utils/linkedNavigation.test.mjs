@@ -36,7 +36,7 @@ test('linkedNavigation: 客户款式立项可跳转到主链下游业务页', ()
   )
 })
 
-test('linkedNavigation: 采购和加工记录按 source_no 回跳上游并按 document_no 找下游', () => {
+test('linkedNavigation: 采购和加工记录不再回跳已退出的旧 project-orders 入口', () => {
   const purchaseTargets = getLinkedTargets('accessories-purchase', {
     document_no: 'CG260424001',
     source_no: 'BOM260424001',
@@ -44,10 +44,10 @@ test('linkedNavigation: 采购和加工记录按 source_no 回跳上游并按 do
 
   assert.deepEqual(
     purchaseTargets.map((item) => item.targetKey),
-    ['project-orders', 'material-bom', 'inbound', 'reconciliation']
+    ['material-bom', 'inbound', 'reconciliation']
   )
   assert.equal(purchaseTargets[0].keyword, 'BOM260424001')
-  assert.equal(purchaseTargets[2].keyword, 'CG260424001')
+  assert.equal(purchaseTargets[1].keyword, 'CG260424001')
 
   const processingTargets = getLinkedTargets('processing-contracts', {
     document_no: 'JG260424001',
@@ -56,13 +56,7 @@ test('linkedNavigation: 采购和加工记录按 source_no 回跳上游并按 do
 
   assert.deepEqual(
     processingTargets.map((item) => item.targetKey),
-    [
-      'project-orders',
-      'material-bom',
-      'inbound',
-      'production-scheduling',
-      'reconciliation',
-    ]
+    ['material-bom', 'inbound', 'production-scheduling', 'reconciliation']
   )
 })
 

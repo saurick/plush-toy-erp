@@ -19,6 +19,7 @@ RUN npm install -g pnpm@10.13.1 && \
     pnpm install --frozen-lockfile
 
 COPY web ./web
+COPY config ./config
 COPY scripts ./scripts
 COPY server/internal/errcode ./server/internal/errcode
 

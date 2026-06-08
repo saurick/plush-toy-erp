@@ -1,6 +1,10 @@
 package biz
 
-import "testing"
+import (
+	"context"
+	"errors"
+	"testing"
+)
 
 func TestBusinessRecordModuleRegistryIncludesFinanceAndQualityV1(t *testing.T) {
 	tests := []struct {
@@ -58,4 +62,68 @@ func TestNormalizeBusinessRecordFilterAllowsPayloadDateFields(t *testing.T) {
 	if unsafeFilter.DateFilterKey != "" {
 		t.Fatalf("expected unsafe payload date filter key cleared, got %q", unsafeFilter.DateFilterKey)
 	}
+}
+
+func TestBusinessRecordUsecaseRejectsRetiredModuleWrites(t *testing.T) {
+	ctx := context.Background()
+	uc := NewBusinessRecordUsecase(&businessRecordRepoSpy{})
+
+	for _, moduleKey := range []string{"partners", "project-orders"} {
+		t.Run("create_"+moduleKey, func(t *testing.T) {
+			_, err := uc.CreateRecord(ctx, &BusinessRecordMutation{
+				ModuleKey:         moduleKey,
+				Title:             "旧入口写入",
+				BusinessStatusKey: "project_pending",
+				OwnerRoleKey:      "sales",
+				Payload:           map[string]any{},
+			}, 1)
+			if !errors.Is(err, ErrBusinessRecordModuleRetired) {
+				t.Fatalf("expected retired module error, got %v", err)
+			}
+		})
+
+		t.Run("update_"+moduleKey, func(t *testing.T) {
+			_, err := uc.UpdateRecord(ctx, 1, &BusinessRecordMutation{
+				ModuleKey:         moduleKey,
+				Title:             "旧入口更新",
+				BusinessStatusKey: "project_pending",
+				OwnerRoleKey:      "sales",
+				Payload:           map[string]any{},
+			}, 1)
+			if !errors.Is(err, ErrBusinessRecordModuleRetired) {
+				t.Fatalf("expected retired module error, got %v", err)
+			}
+		})
+	}
+}
+
+type businessRecordRepoSpy struct {
+	createCalled bool
+	updateCalled bool
+}
+
+func (r *businessRecordRepoSpy) ListBusinessRecords(context.Context, BusinessRecordFilter) ([]*BusinessRecord, int, error) {
+	return nil, 0, nil
+}
+
+func (r *businessRecordRepoSpy) CountBusinessRecordsByModuleAndStatus(context.Context) ([]BusinessRecordModuleStatusCount, error) {
+	return nil, nil
+}
+
+func (r *businessRecordRepoSpy) CreateBusinessRecord(context.Context, *BusinessRecordMutation, int) (*BusinessRecord, error) {
+	r.createCalled = true
+	return &BusinessRecord{}, nil
+}
+
+func (r *businessRecordRepoSpy) UpdateBusinessRecord(context.Context, int, *BusinessRecordMutation, int) (*BusinessRecord, error) {
+	r.updateCalled = true
+	return &BusinessRecord{}, nil
+}
+
+func (r *businessRecordRepoSpy) DeleteBusinessRecords(context.Context, []int, string, int) (int, error) {
+	return 0, nil
+}
+
+func (r *businessRecordRepoSpy) RestoreBusinessRecord(context.Context, int, int) (*BusinessRecord, error) {
+	return &BusinessRecord{}, nil
 }

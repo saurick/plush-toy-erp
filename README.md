@@ -1,16 +1,16 @@
 # 毛绒玩具 ERP / plush-toy-erp
 
-`plush-toy-erp` 当前是一套已经开始按真实资料收口的毛绒工厂 ERP：桌面后台继续保持一个入口，岗位任务端按角色拆入口；当前仍保留八个岗位任务端端口，同时桌面构建已提供 `/m/<role>/tasks` 单端口兼容路径，并开始基于真实 PDF、Excel、报表截图收口流程、字段真源、数据模型和导入映射。
+`plush-toy-erp` 当前是一套已经开始按真实资料收口的毛绒工厂 ERP：生产前端保持一个入口，桌面后台和岗位任务端统一由 `5175` 承载，岗位任务端通过 `/m/<role>/tasks` 进入；本地开发仍保留按角色拆端口的调试命令，并开始基于真实 PDF、Excel、报表截图收口流程、字段真源、数据模型和导入映射。
 
 ## 目录结构
 
 | 路径 | 职责 |
 | --- | --- |
-| `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择、八个岗位任务端入口和桌面单端口 `/m/<role>/tasks` 兼容路径，内部目录职责见 [`web/README.md`](web/README.md) |
+| `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择、生产单端口 `/m/<role>/tasks` 岗位任务端路径，以及本地开发用的按角色移动端调试入口，内部目录职责见 [`web/README.md`](web/README.md) |
 | `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、通用业务记录、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
-| `config/` | 行业模板和客户配置包的未来落点；当前只做 README 骨架，不接运行时 loader |
+| `config/` | 行业模板和客户配置包落点；当前已有 yoyoosun 前端桌面菜单配置 loader，不代表 SaaS tenant，也不改变后端 RBAC、schema 或事实规则 |
 | `deployments/` | 客户私有化部署实例资料的未来落点；当前唯一部署真源仍在 `server/deploy/compose/prod` |
 
 ## 当前边界
@@ -76,14 +76,14 @@ pnpm start:mobile:quality
 
 ### 生产前端
 
-生产环境不使用 Vite dev server。前端镜像从构建产物启动静态服务，并通过 `APP_ID` / `PORT` 固定入口与端口，供任意外部网关映射：
+生产环境不使用 Vite dev server。前端镜像从桌面构建产物启动一个静态服务，统一监听 `5175`；岗位任务端通过 `/m/<role>/tasks` 访问，由外部网关只映射这一组前端入口：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 
-固定端口：桌面后台 `5175`，老板 `5186`，业务 `5187`，采购 `5188`，生产 `5189`，仓库 `5190`，财务 `5191`，PMC `5192`，品质 `5193`。
+固定端口：前端 `5175`，后端 HTTP `8300`，后端 gRPC `9300`。
 
 ### 后端
 

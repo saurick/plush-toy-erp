@@ -76,17 +76,23 @@ test('menuPermissions: 只保留有效权限并把旧文档路径归一到看板
   )
 })
 
-test('menuPermissions: 旧业务记录重叠入口归一到正式 V1 入口', () => {
+test('menuPermissions: 旧业务记录重叠入口不再兼容到正式 V1', () => {
   assert.deepEqual(
     normalizeMenuPermissions([
       '/erp/master/partners',
       '/erp/sales/project-orders',
     ]),
-    ['/erp/master/partners/customers', '/erp/sales/project-orders/sales-orders']
+    []
   )
+  assert.equal(resolveMenuPermissionKey('/erp/master/partners'), '')
+  assert.equal(resolveMenuPermissionKey('/erp/sales/project-orders'), '')
   assert.equal(
     resolveMenuPermissionKey('/erp/master/partners/customers'),
     '/erp/master/partners/customers'
+  )
+  assert.equal(
+    resolveMenuPermissionKey('/erp/master/partners/suppliers'),
+    '/erp/master/partners/suppliers'
   )
   assert.equal(
     resolveMenuPermissionKey('/erp/sales/project-orders/sales-orders/42'),

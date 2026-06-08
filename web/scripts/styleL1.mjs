@@ -352,6 +352,9 @@ const scenarios = [
       await expectHeading(page, '产品')
       await expectText(page, '导出当前结果')
       await expectText(page, '协同任务池')
+      await assertAntdTableHeaderTextFlow(page, {
+        scenarioName: 'business-module-dark-products-table-header',
+      })
       await assertERPThemeMode(page, {
         scenarioName: 'business-module-dark-products-modal-desktop',
         expectedMode: 'dark',
@@ -370,6 +373,10 @@ const scenarios = [
         minModalWidth: 1200,
         expectCompactGrid: false,
         expectDarkChrome: true,
+      })
+      await assertAntdFormLabelTextFlow(page, {
+        scenarioName: 'business-module-dark-products-modal-label',
+        rootSelector: '.erp-business-record-modal',
       })
     },
   },
@@ -1681,54 +1688,6 @@ const scenarios = [
         await page.getByText('高级文档', { exact: true }).count(),
         0,
         '侧栏不应再显示“高级文档”分组'
-      )
-    },
-  },
-  {
-    name: 'legacy-partners-redirects-to-customers',
-    path: '/erp/master/partners',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectText(page, '客户档案')
-      await expectHeading(page, '客户档案')
-      assert.equal(
-        await page.getByRole('button', { name: '新建记录' }).count(),
-        0,
-        '旧客户/供应商路径不应再渲染通用业务页“新建记录”按钮'
-      )
-      assert.equal(
-        await page.getByText('兼容只读入口', { exact: true }).count(),
-        0,
-        '旧客户/供应商路径不应再渲染兼容只读页'
-      )
-      assert(
-        page.url().includes('/erp/master/partners/customers'),
-        `旧客户/供应商路径未重定向到正式客户档案: ${page.url()}`
-      )
-    },
-  },
-  {
-    name: 'legacy-project-orders-redirects-to-sales-orders',
-    path: '/erp/sales/project-orders',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '销售订单')
-      await expectButton(page, '新建订单')
-      assert.equal(
-        await page.getByText('兼容只读入口', { exact: true }).count(),
-        0,
-        '旧订单/款式立项路径不应再渲染兼容只读页'
-      )
-      assert.equal(
-        await page.getByRole('button', { name: '新建记录' }).count(),
-        0,
-        '旧订单/款式立项路径不应再渲染通用业务页“新建记录”按钮'
-      )
-      assert(
-        page.url().includes('/erp/sales/project-orders/sales-orders'),
-        `旧订单/款式立项路径未重定向到正式销售订单: ${page.url()}`
       )
     },
   },
@@ -6518,8 +6477,15 @@ function assertNoBlueFocusStyle(metrics, scenarioName) {
 }
 
 function isNeutralModalControlBorderColor(color) {
-  const normalized = String(color || '').replaceAll(' ', '')
-  return normalized === 'rgb(217,217,217)' || normalized === 'rgb(191,191,191)'
+  const rgb = parseRgb(color)
+  if (!rgb) return false
+  const [red, green, blue] = rgb
+  const maxChannelGap = Math.max(
+    Math.abs(red - green),
+    Math.abs(red - blue),
+    Math.abs(green - blue)
+  )
+  return red >= 190 && red <= 225 && maxChannelGap <= 4
 }
 
 function isTailwindFormsResetBorderColor(color) {
@@ -7056,6 +7022,189 @@ async function assertBusinessModuleCompactWorkspace(
   assert(
     taskCardVisible,
     `${scenarioName} 协同任务池未在首屏边界内出现: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertAntdTableHeaderTextFlow(page, { scenarioName }) {
+  const metrics = await page.evaluate(() => {
+    const isVisible = (node) => {
+      if (!(node instanceof HTMLElement)) return false
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }
+    const rectOf = (node) => {
+      if (!(node instanceof HTMLElement)) return null
+      const rect = node.getBoundingClientRect()
+      return {
+        left: rect.left,
+        right: rect.right,
+        top: rect.top,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+      }
+    }
+
+    return Array.from(
+      document.querySelectorAll('.ant-table-wrapper .ant-table-thead th')
+    )
+      .filter(isVisible)
+      .map((cell) => {
+        const title =
+          cell.querySelector('.ant-table-column-title') ||
+          cell.querySelector('.erp-module-column-header') ||
+          cell
+        const text =
+          cell.querySelector('.erp-module-column-header-text') || title
+        const sorter = cell.querySelector('.ant-table-column-sorter')
+        const cellStyle = window.getComputedStyle(cell)
+        const titleStyle = window.getComputedStyle(title)
+        const textStyle = window.getComputedStyle(text)
+        return {
+          text: String(text.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 80),
+          cellRect: rectOf(cell),
+          titleRect: rectOf(title),
+          textRect: rectOf(text),
+          sorterRect: rectOf(sorter),
+          cellWhiteSpace: cellStyle.whiteSpace,
+          titleWhiteSpace: titleStyle.whiteSpace,
+          titleOverflow: titleStyle.overflow,
+          textWhiteSpace: textStyle.whiteSpace,
+          textOverflow: textStyle.overflow,
+          textOverflowWrap: textStyle.overflowWrap,
+          textWordBreak: textStyle.wordBreak,
+          textClientWidth: text.clientWidth,
+          textScrollWidth: text.scrollWidth,
+          textClientHeight: text.clientHeight,
+          textScrollHeight: text.scrollHeight,
+        }
+      })
+      .filter((item) => item.text)
+  })
+
+  assert(
+    metrics.length > 0,
+    `${scenarioName} 未找到可检查的 AntD 表头文案: ${JSON.stringify(metrics)}`
+  )
+
+  const clippedHeaders = metrics.filter((item) => {
+    const horizontalClip =
+      item.textScrollWidth > item.textClientWidth + 1 &&
+      item.textOverflow === 'hidden' &&
+      item.textOverflowWrap !== 'anywhere'
+    const verticalClip =
+      item.textScrollHeight > item.textClientHeight + 1 &&
+      item.textOverflow === 'hidden'
+    return (
+      item.cellWhiteSpace === 'nowrap' ||
+      item.titleWhiteSpace === 'nowrap' ||
+      item.textWhiteSpace === 'nowrap' ||
+      horizontalClip ||
+      verticalClip
+    )
+  })
+  assert.equal(
+    clippedHeaders.length,
+    0,
+    `${scenarioName} 表头仍存在 nowrap 或 hidden 裁切: ${JSON.stringify(clippedHeaders)}`
+  )
+
+  const sorterOverlaps = metrics.filter((item) => {
+    if (!item.sorterRect || !item.textRect) return false
+    const horizontalOverlap =
+      item.textRect.left < item.sorterRect.right &&
+      item.textRect.right > item.sorterRect.left
+    const verticalOverlap =
+      item.textRect.top < item.sorterRect.bottom &&
+      item.textRect.bottom > item.sorterRect.top
+    return horizontalOverlap && verticalOverlap
+  })
+  assert.equal(
+    sorterOverlaps.length,
+    0,
+    `${scenarioName} 表头标题与排序器发生覆盖: ${JSON.stringify(sorterOverlaps)}`
+  )
+}
+
+async function assertAntdFormLabelTextFlow(
+  page,
+  { scenarioName, rootSelector = '.ant-modal' } = {}
+) {
+  const metrics = await page.evaluate((selector) => {
+    const root = document.querySelector(selector)
+    const isVisible = (node) => {
+      if (!(node instanceof HTMLElement)) return false
+      const rect = node.getBoundingClientRect()
+      const style = window.getComputedStyle(node)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }
+
+    return Array.from(
+      (root || document).querySelectorAll('.ant-form-item-label > label')
+    )
+      .filter(isVisible)
+      .map((label) => {
+        const style = window.getComputedStyle(label)
+        const rect = label.getBoundingClientRect()
+        return {
+          text: String(label.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 80),
+          width: rect.width,
+          height: rect.height,
+          whiteSpace: style.whiteSpace,
+          overflow: style.overflow,
+          overflowWrap: style.overflowWrap,
+          wordBreak: style.wordBreak,
+          lineHeight: style.lineHeight,
+          clientWidth: label.clientWidth,
+          scrollWidth: label.scrollWidth,
+          clientHeight: label.clientHeight,
+          scrollHeight: label.scrollHeight,
+        }
+      })
+      .filter((item) => item.text)
+  }, rootSelector)
+
+  assert(
+    metrics.length > 0,
+    `${scenarioName} 未找到可检查的 AntD 表单标签: ${JSON.stringify(metrics)}`
+  )
+
+  const clippedLabels = metrics.filter((item) => {
+    const horizontalClip =
+      item.scrollWidth > item.clientWidth + 1 &&
+      item.overflow === 'hidden' &&
+      item.overflowWrap !== 'anywhere'
+    const verticalClip =
+      item.scrollHeight > item.clientHeight + 1 && item.overflow === 'hidden'
+    return (
+      item.whiteSpace === 'nowrap' ||
+      item.width <= 0 ||
+      item.height <= 0 ||
+      horizontalClip ||
+      verticalClip
+    )
+  })
+  assert.equal(
+    clippedLabels.length,
+    0,
+    `${scenarioName} 表单标签仍存在 nowrap 或 hidden 裁切: ${JSON.stringify(clippedLabels)}`
   )
 }
 

@@ -8,13 +8,11 @@ type AdminMenuPermissionOption struct {
 }
 
 var adminMenuPermissionAliases = map[string]string{
-	"/erp/flows/overview":       "/erp/dashboard",
-	"/erp/source-readiness":     "/erp/dashboard",
-	"/erp/mobile-workbenches":   "/erp/dashboard",
-	"/erp/help-center":          "/erp/dashboard",
-	"/erp/changes/current":      "/erp/dashboard",
-	"/erp/master/partners":      "/erp/master/partners/customers",
-	"/erp/sales/project-orders": "/erp/sales/project-orders/sales-orders",
+	"/erp/flows/overview":     "/erp/dashboard",
+	"/erp/source-readiness":   "/erp/dashboard",
+	"/erp/mobile-workbenches": "/erp/dashboard",
+	"/erp/help-center":        "/erp/dashboard",
+	"/erp/changes/current":    "/erp/dashboard",
 }
 
 func normalizeAdminMenuPermissionAlias(key string) string {

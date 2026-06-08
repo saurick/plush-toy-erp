@@ -168,6 +168,66 @@ func TestBusinessRecordRepo_CreateUpdateDeleteRestore(t *testing.T) {
 	}
 }
 
+func TestBusinessRecordRepo_RetiredModulesAreReadOnly(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:business_record_repo_retired?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewBusinessRecordRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+
+	created, err := client.BusinessRecord.Create().
+		SetModuleKey("project-orders").
+		SetDocumentNo("PO-RETIRED-001").
+		SetTitle("旧订单记录").
+		SetBusinessStatusKey("project_pending").
+		SetOwnerRoleKey("sales").
+		SetPayload(map[string]any{}).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create retired fixture failed: %v", err)
+	}
+
+	rows, total, err := repo.ListBusinessRecords(ctx, biz.BusinessRecordFilter{
+		ModuleKey: "project-orders",
+		Limit:     20,
+	})
+	if err != nil {
+		t.Fatalf("list retired records failed: %v", err)
+	}
+	if total != 1 || len(rows) != 1 {
+		t.Fatalf("expected retired record remains readable, total=%d len=%d", total, len(rows))
+	}
+
+	_, err = repo.UpdateBusinessRecord(ctx, created.ID, &biz.BusinessRecordMutation{
+		Title:             "旧订单更新",
+		BusinessStatusKey: "project_pending",
+		OwnerRoleKey:      "sales",
+		Payload:           map[string]any{},
+	}, 7)
+	if !errors.Is(err, biz.ErrBusinessRecordModuleRetired) {
+		t.Fatalf("expected retired module update denied, got %v", err)
+	}
+
+	affected, err := repo.DeleteBusinessRecords(ctx, []int{created.ID}, "retired cleanup", 7)
+	if !errors.Is(err, biz.ErrBusinessRecordModuleRetired) {
+		t.Fatalf("expected retired module delete denied, got %v", err)
+	}
+	if affected != 0 {
+		t.Fatalf("expected no retired records deleted, got %d", affected)
+	}
+
+	if _, err := client.BusinessRecord.UpdateOneID(created.ID).SetDeletedAt(time.Now()).Save(ctx); err != nil {
+		t.Fatalf("mark retired record deleted failed: %v", err)
+	}
+	_, err = repo.RestoreBusinessRecord(ctx, created.ID, 7)
+	if !errors.Is(err, biz.ErrBusinessRecordModuleRetired) {
+		t.Fatalf("expected retired module restore denied, got %v", err)
+	}
+}
+
 func TestBusinessRecordRepo_CountBusinessRecordsByModuleAndStatus(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:business_record_repo_dashboard?mode=memory&cache=shared&_fk=1")

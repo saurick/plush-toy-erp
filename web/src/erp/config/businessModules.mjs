@@ -15,42 +15,6 @@ const businessSectionMeta = [
 
 const businessModules = [
   {
-    key: 'partners',
-    title: '客户/供应商',
-    route: 'master/partners',
-    legacyRouteDisabled: true,
-    sectionKey: 'master',
-    status: 'source_grounded',
-    owner: '业务 + 采购 + 财务',
-    summary:
-      '当前主档入口承接客户、潜在客户和供应商资料，字段口径已并入 trade-erp 的国家/地区、付款方式、付款周期、税号和联系人明细。',
-    description:
-      '先把客户/供应商资料放进统一主档页，后续订单/款式立项、采购、加工合同、出货和结算都从这里复用主体信息。',
-    currentScope: [
-      '代码继续由 business_records 自动生成，表单只维护客户类型、名称、地址、国家/地区、业务负责人、付款方式、付款周期和税号。',
-      '联系人按明细维护，并同步联系人、办公室电话、手机和邮箱摘要到列表展示。',
-      '为后续合同快照、结算对象和移动端选择器预留统一入口。',
-    ],
-    keyFields: [
-      '客户类型（合作客户 / 潜在客户 / 合作供应商）',
-      '客户/供应商名称、客户地址、国家/地区',
-      '业务负责人、付款方式、付款周期、税号',
-      '联系人、办公室电话、手机、邮箱',
-    ],
-    upstream: ['生产订单总表截图', '加工厂商资料', '辅材/包材采购表'],
-    downstream: ['订单/款式立项', '加工合同/委外下单', '对账/结算'],
-    mobileFocus: ['业务核对客户', '采购确认供应商', '财务核对结算对象'],
-    sourceRefs: [
-      '加工厂商资料 sheet：厂家简称、厂家全称、联系人、联系电话、地址、开票字段。',
-      '生产订单总表截图：客户、业务人员与交期信息。',
-      '辅材、包材采购表：供应商、下单人、联系电话等业务快照。',
-    ],
-    boundaries: [
-      '当前仍复用 business_records 的 document_no 作为代码，不新增 partner Ent schema 或第二套主档表。',
-      '银行卡等敏感信息仍以文档设计为主，本轮不在页面上假装已可维护。',
-    ],
-  },
-  {
     key: 'products',
     title: '产品',
     route: 'master/products',
@@ -83,42 +47,6 @@ const businessModules = [
     boundaries: [
       '当前不把“款式编号 = SKU”硬并到一个字段里。',
       '当前仍复用 business_records 的产品资料页，不新增与现有 products 事实表重复的产品主档 schema。',
-    ],
-  },
-  {
-    key: 'project-orders',
-    title: '订单/款式立项',
-    route: 'sales/project-orders',
-    legacyRouteDisabled: true,
-    sectionKey: 'sales',
-    status: 'source_grounded',
-    owner: '业务 + 老板',
-    summary:
-      '这是毛绒 ERP 的正式接单与立项入口，先收客户、款式、交期与资料齐套，不把它伪装成外贸外销单。',
-    description:
-      '订单/款式立项页负责接单、确认编号层级、交期、资料齐套和业务责任人，是当前主流程的正式起点。',
-    currentScope: [
-      '先收客户、订单编号、产品订单编号、款式编号、产品编号和交期；客户和产品可从基础资料选择后保存当次快照。',
-      '把缺资料、催合同、包装材料放行等前置动作集中挂在业务立项页。',
-      '为生产、采购、仓库和移动端建立统一的订单起点。',
-    ],
-    keyFields: [
-      '客户 / 业务员',
-      '订单编号 / 产品订单编号 / 客户订单号',
-      '款式编号 / 产品编号 / 产品名称 / 颜色',
-      '交期 / 出货日期 / 资料齐套状态',
-    ],
-    upstream: ['客户/供应商', '产品'],
-    downstream: ['材料 BOM', '加工合同/委外下单', '生产排单'],
-    mobileFocus: ['缺资料提醒', '客户确认节点', '交期预警'],
-    sourceRefs: [
-      '生产订单总表截图：客户、订单编号、客户订单号、产品编号、产品名称、出货日期。',
-      '材料分析 Excel：款式编号、订单编号、数量、设计师。',
-      '正式汇报版 PDF：老板审核包装材料打单表后才放行采购与生产资料。',
-    ],
-    boundaries: [
-      '当前已接通通用业务记录保存和业务状态回写；后续再拆立项专表和审批细表。',
-      '外贸“外销”相关字段不会被混入当前订单页。',
     ],
   },
   {
@@ -624,8 +552,8 @@ const businessModules = [
   },
 ]
 
-const formalNavigationOverrides = Object.freeze({
-  partners: [
+const formalNavigationItemsBySection = Object.freeze({
+  master: [
     {
       key: 'customers',
       label: '客户档案',
@@ -643,7 +571,7 @@ const formalNavigationOverrides = Object.freeze({
         '正式 suppliers 表入口，只维护供应商 / 加工厂交易主体；联系人随供应商详情维护。',
     },
   ],
-  'project-orders': [
+  sales: [
     {
       key: 'sales-orders',
       label: '销售订单',
@@ -682,23 +610,18 @@ export function getBusinessNavigationSections() {
     .filter((section) => section.visibleInNavigation !== false)
     .map((section) => ({
       title: section.title,
-      items: businessModuleDefinitions
-        .filter((moduleItem) => moduleItem.sectionKey === section.key)
-        .flatMap((moduleItem) => {
-          const formalItems = formalNavigationOverrides[moduleItem.key]
-          if (formalItems) {
-            return formalItems
-          }
-          return [
-            {
-              key: moduleItem.key,
-              label: moduleItem.navigationLabel,
-              path: moduleItem.path,
-              shortLabel: moduleItem.navigationLabel,
-              description: moduleItem.navigationDescription,
-            },
-          ]
-        }),
+      items: [
+        ...(formalNavigationItemsBySection[section.key] || []),
+        ...businessModuleDefinitions
+          .filter((moduleItem) => moduleItem.sectionKey === section.key)
+          .map((moduleItem) => ({
+            key: moduleItem.key,
+            label: moduleItem.navigationLabel,
+            path: moduleItem.path,
+            shortLabel: moduleItem.navigationLabel,
+            description: moduleItem.navigationDescription,
+          })),
+      ],
     }))
     .filter((section) => section.items.length > 0)
 }

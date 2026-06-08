@@ -1,6 +1,6 @@
 # 永绅 yoyoosun 原始客户文件 / Yoyoosun Raw Source Files
 
-本目录保存永绅 yoyoosun 客户原始 Excel / PDF / PNG，用于后续字段、模板、导入、页面和验收工作的溯源。
+本目录保存永绅 yoyoosun 客户原始 Excel / PDF / PNG / JPG / JPEG，用于后续字段、模板、导入、页面和验收工作的溯源。
 
 ## 使用边界 / Usage Boundary
 
@@ -23,11 +23,14 @@
 | `9.3加工合同-子淳.pdf` | 加工合同纸面、条款、合同行和附件快照样本 |
 | `plush_factory_formal_report_v3_mobile.pdf` | 客户汇报、移动端观感和交付线索 |
 | `Weixin Image_20260420164444_2155_288.png` | 截图线索和字段 / 页面核对材料 |
+| `Weixin Image_20260413193511_710_288.png` | 永绅岗位职责流程图截图，作为 Workflow / Fact 边界、岗位节点和后续需求确认线索 |
+| `Weixin Image_20260421153105_2272_288.jpeg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与同名 `.jpg` 为同一张照片的另一份源文件 |
+| `Weixin Image_20260421153105_2272_288.jpg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与同名 `.jpeg` 为同一张照片的另一份源文件 |
 
 更完整的用途分类、checksum、禁止事项和后续落点见 `../raw-source-file-archive-review.md`。
 
 ## 后续新增规则 / Future File Rule
 
-后续新增原始客户文件时，先确认敏感信息、文件大小和用途分类；如果只是导入 dry-run，应优先生成脱敏结构化 fixture，而不是无限制堆放原件。当前仓库未启用 Git LFS，本批约 24MB 原件直接纳入 Git；若后续批量增长，应单独评审 Git LFS、对象存储或只提交脱敏样本。
+后续新增原始客户文件时，先确认敏感信息、文件大小和用途分类；如果只是导入 dry-run，应优先生成脱敏结构化 fixture，而不是无限制堆放原件。当前仓库未启用 Git LFS，本批约 25.4MB 原件直接纳入 Git；若后续批量增长，应单独评审 Git LFS、对象存储或只提交脱敏样本。
 
 本目录已通过仓库根 `.gitattributes` 标记为 binary，避免 Git 将 Excel / PDF / PNG 原件当作文本做 whitespace 检查或展示正文 diff；不要为通过检查而改写原件内容。

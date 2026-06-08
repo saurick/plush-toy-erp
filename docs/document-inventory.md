@@ -40,7 +40,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
-| `config/customers/yoyoosun/README.md` | 永绅 yoyoosun 客户配置包骨架 |
+| `config/customers/yoyoosun/README.md` | 永绅 yoyoosun 客户配置包说明 |
 | `config/industry-templates/plush/README.md` | 毛绒行业模板骨架 |
 | `deployments/yoyoosun/README.md` | 永绅 yoyoosun 客户部署资料未来落点 |
 
@@ -130,6 +130,8 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/real-dry-run-evidence.md` | 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
 | `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |
 | `docs/customers/yoyoosun/source-materials.md` | 来源材料 / Source Materials |
+| `docs/customers/yoyoosun/trial-account-role-menu-checklist.md` | 永绅 yoyoosun 试用账号角色菜单核对清单 / Yoyoosun Trial Account Role Menu Checklist |
+| `docs/customers/yoyoosun/trial-training-note.md` | 永绅 yoyoosun 试用培训说明 / Yoyoosun Trial Training Note |
 | `docs/customers/yoyoosun/source-snapshot-freeze.md` | 永绅 yoyoosun 来源快照冻结 / Yoyoosun Source Snapshot Freeze |
 | `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md` | 永绅 yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist |
 | `docs/customers/yoyoosun/raw-source-file-archive-review.md` | 永绅 yoyoosun 原始客户文件归档评审 / Yoyoosun Raw Source File Archive Review |
@@ -165,6 +167,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/archive/architecture-history/phase-2d-quality-inspection-schema-review.md` | 来料质检最小主表历史评审归档 / Phase 2D-C2 quality_inspections Schema Review |
 | `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 过程记录归档 / Progress Archive 2026-06-02 Before Print Template Defer |
 | `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md` | 移动端任务页改版前过程记录归档 / Progress Archive 2026-06-05 Before Mobile Task Redesign |
+| `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md` | 旧 business_records debug cleanup 前过程记录归档 / Progress Archive 2026-06-08 Before Business Records Debug Cleanup |
 
 ### 外部参考
 

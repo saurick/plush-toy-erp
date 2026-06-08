@@ -1,21 +1,24 @@
 # 永绅 yoyoosun 客户配置 / Yoyoosun Customer Config
 
-本目录是 永绅 yoyoosun 客户配置包的未来落点。
+本目录是 永绅 yoyoosun 客户配置包的落点。
 
 当前口径：
 
 - `yoyoosun` 是永绅客户的稳定客户 key。
-- 本目录只作为配置草案和未来落地位置。
+- 本目录保存客户配置草案和已经接入的低风险前端菜单配置。
 - 不代表 SaaS runtime tenant。
 - 不新增 `tenant_id`。
-- 不创建 runtime loader。
+- 不改变后端 RBAC 动作权限、Workflow / Fact 边界、schema、migration 或真实导入。
 - 不改 Ent schema。
 
-未来可放：
+当前已接入：
+
+- `menuConfig.mjs`：永绅 yoyoosun 桌面菜单配置。该配置只控制前端桌面菜单的分组、排序、隐藏和文案；菜单隐藏不是安全边界，后端仍以 RBAC action permission 和业务 usecase 校验为准。
+
+未来可继续放：
 
 - 公司信息。
 - logo / 主题色。
-- 菜单和模块开关。
 - 字段显示 / 必填。
 - 编号规则。
 - 打印模板选择。

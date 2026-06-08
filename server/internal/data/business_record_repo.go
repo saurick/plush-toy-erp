@@ -484,9 +484,15 @@ func (r *businessRecordRepo) UpdateBusinessRecord(ctx context.Context, id int, i
 	if in.ExpectedRowVersion > 0 && current.RowVersion != in.ExpectedRowVersion {
 		return nil, biz.ErrBusinessRecordVersionConflict
 	}
+	if biz.IsRetiredBusinessRecordModule(current.ModuleKey) {
+		return nil, biz.ErrBusinessRecordModuleRetired
+	}
 	moduleKey := in.ModuleKey
 	if moduleKey == "" {
 		moduleKey = current.ModuleKey
+	}
+	if biz.IsRetiredBusinessRecordModule(moduleKey) {
+		return nil, biz.ErrBusinessRecordModuleRetired
 	}
 
 	update := tx.BusinessRecord.UpdateOneID(id).
@@ -560,6 +566,9 @@ func (r *businessRecordRepo) DeleteBusinessRecords(ctx context.Context, ids []in
 	if len(rows) == 0 {
 		return 0, nil
 	}
+	if hasRetiredBusinessRecordRows(rows) {
+		return 0, biz.ErrBusinessRecordModuleRetired
+	}
 
 	now := time.Now()
 	update := tx.BusinessRecord.Update().
@@ -603,6 +612,9 @@ func (r *businessRecordRepo) RestoreBusinessRecord(ctx context.Context, id int, 
 		}
 		return nil, err
 	}
+	if biz.IsRetiredBusinessRecordModule(current.ModuleKey) {
+		return nil, biz.ErrBusinessRecordModuleRetired
+	}
 	update := tx.BusinessRecord.UpdateOneID(id).
 		ClearDeletedAt().
 		ClearDeletedBy().
@@ -633,6 +645,15 @@ func (r *businessRecordRepo) RestoreBusinessRecord(ctx context.Context, id int, 
 	}
 	out.Items = itemsByRecordID[row.ID]
 	return out, nil
+}
+
+func hasRetiredBusinessRecordRows(rows []*ent.BusinessRecord) bool {
+	for _, row := range rows {
+		if row != nil && biz.IsRetiredBusinessRecordModule(row.ModuleKey) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *businessRecordRepo) loadBusinessRecordItems(ctx context.Context, rows []*ent.BusinessRecord) (map[int][]*biz.BusinessRecordItem, error) {

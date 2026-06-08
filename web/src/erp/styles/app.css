@@ -1374,6 +1374,22 @@
   margin-bottom: 24px;
 }
 
+.ant-form-item-label {
+  min-width: 0;
+}
+
+.ant-form-item-label > label {
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  min-height: 22px;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .erp-login-card .ant-segmented {
   padding: 4px;
   border-radius: 18px;
@@ -4498,22 +4514,48 @@
   overflow: hidden;
 }
 
+.ant-table-wrapper .ant-table-thead > tr > th {
+  white-space: normal;
+  vertical-align: top;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-sorters {
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  white-space: normal;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-title {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-sorter {
+  flex: 0 0 auto;
+  margin-inline-start: 0;
+}
+
 .erp-module-column-header {
   display: flex;
   min-width: 0;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
+  white-space: normal;
 }
 
 .erp-module-column-header-text {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   text-overflow: clip;
-  white-space: nowrap;
-  word-break: keep-all;
-  overflow-wrap: normal;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 .erp-module-column-header-trigger.ant-btn {

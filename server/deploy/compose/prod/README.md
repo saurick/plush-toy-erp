@@ -2,7 +2,7 @@
 
 本目录是当前仓库唯一部署主路径，默认提供：
 
-- `compose.yml`：PostgreSQL + Jaeger + 业务服务 + 前端固定端口静态服务
+- `compose.yml`：PostgreSQL + Jaeger + 业务服务 + 前端单入口静态服务
 - `.env.example`：推荐环境变量
 - `migrate_online.sh`：通过宿主机 `/usr/local/bin/atlas` 执行 migration
 
@@ -28,7 +28,7 @@ docker compose -f compose.yml up -d
 
 生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有明确需要通过环境变量覆盖首次初始化密码时才临时添加；如果 `admin` 已经存在，重启不会重置旧密码，应通过管理员改密或受控 SQL 更新密码哈希。
 
-前端生产容器不运行 Vite dev server。`WEB_IMAGE` 是一个前端镜像，Compose 会用同一镜像启动桌面端和 8 个移动端实例，并通过 `APP_ID` 与 `PORT` 固定每个入口。
+前端生产容器不运行 Vite dev server。`WEB_IMAGE` 是一个前端镜像，Compose 只启动 `web-desktop` 一个前端实例，并通过 `APP_ID=desktop`、`PORT=5175` 固定入口；岗位任务端统一走 `/m/<role>/tasks`，不再启动 8 个 `APP_ID=mobile-*` 生产容器。
 
 ## 关键环境变量
 
@@ -53,15 +53,7 @@ export ERP_DEBUG_CLEANUP_ENABLED=false
 - PostgreSQL：`5435`
 - HTTP：`8300`
 - gRPC：`9300`
-- 桌面后台：`5175`
-- 老板岗位任务端：`5186`
-- 业务岗位任务端：`5187`
-- 采购岗位任务端：`5188`
-- 生产岗位任务端：`5189`
-- 仓库岗位任务端：`5190`
-- 财务岗位任务端：`5191`
-- PMC 岗位任务端：`5192`
-- 品质岗位任务端：`5193`
+- 前端：`5175`
 
 当前部署目标是内网服务器 `192.168.0.133`，Compose 入口位于：
 
@@ -79,8 +71,8 @@ export ERP_DEBUG_CLEANUP_ENABLED=false
 - 宿主机线上进程默认走 `server/configs/prod/config.yaml` 里的 `127.0.0.1:4318`
 - 当前 Compose 容器内默认走 `jaeger:4318`，因为容器内不能把宿主机的 `127.0.0.1` 当成 Jaeger 地址
 - `POSTGRES_DSN` 是 URL，若 `POSTGRES_PASSWORD` 包含 `@`、`:`、`/`、`%`、`#` 等特殊字符，DSN 里的密码必须先 URL 编码；`POSTGRES_PASSWORD` 本身保持原值。
-- 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关可以直接把入口流量映射到对应前端固定端口
-- 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要按入口重新设置构建期 `VITE_BASE_URL`
+- 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关只需把前端流量映射到 `5175`
+- 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要先评审构建期 `VITE_BASE_URL`
 - 如果后续要重新开放公网域名或网关入口，必须先补新的正式部署方案，再更新本 README、Compose 环境说明和对应 smoke；不要沿用已经撤销的阿里云 / Cloudflare 旧口径。
 - PDF 运行依赖：服务端镜像内置 Debian `chromium` 与 `fonts-noto-cjk`，默认浏览器路径为 `/usr/bin/chromium`；如需自定义可通过 `ERP_PDF_CHROME_PATH` 覆盖。
 - PDF 资源建议：默认 `APP_MEM_LIMIT=896m`、`ERP_PDF_RENDER_CONCURRENCY=2`，优先稳住在线 PDF 预览；如果同机项目较多，先降低并发，再评估是否调整内存。
@@ -96,14 +88,14 @@ docker build -f server/Dockerfile -t plush-toy-erp-server:dev .
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 
-单入口容器也可以独立运行，例如：
+前端容器也可以独立运行，例如：
 
 ```bash
 docker run --rm \
-  -e APP_ID=mobile-boss \
-  -e PORT=5186 \
+  -e APP_ID=desktop \
+  -e PORT=5175 \
   -e API_ORIGIN=http://host.docker.internal:8300 \
-  -p 5186:5186 \
+  -p 5175:5175 \
   plush-toy-erp-web:dev
 ```
 
