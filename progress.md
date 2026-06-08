@@ -197,3 +197,10 @@
 - 验证：`node --test scripts/import/customerImportDryRun.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs scripts/import/customerImportExecute.test.mjs` 通过，覆盖 36 条 import 工具测试；`bash scripts/qa/fast.sh`、`bash scripts/qa/full.sh`、`bash scripts/qa/strict.sh` 均通过；`git diff --check` 通过。
 - 下一步：按用户要求提交并推送当前所有代码。
 - 阻塞/风险：`govulncheck` 仍报告当前代码可达漏洞为 0，但依赖树存在未被当前代码调用的漏洞提示；web test/build 仍有既有 Node module type warning 和 Vite chunk warning。真实客户库导入仍未执行，需等客户 sign-off、备份证据、目标环境和导入后对账。追加前 `progress.md` 为 192 行 / 36896 bytes，未达到归档阈值。
+
+## 2026-06-08 17:59 CST
+
+- 完成：133 部署本地构建时发现 `server/Dockerfile` 的 web-builder 阶段未复制根目录 `config/`，导致服务端镜像内置前端构建无法解析 `config/customers/yoyoosun/menuConfig.mjs`；已补 `COPY config /config`，与独立 `web/Dockerfile` 的 customer config 构建边界对齐。
+- 验证：`node --test web/src/erp/config/menuPermissions.test.mjs` 通过；`git diff --check` 通过。后续将提交推送该构建修复，并用新提交重新构建 server/web 镜像部署到 `192.168.0.133`。
+- 下一步：提交推送 Dockerfile 修复，重新本地构建镜像，上传到 133，远端 `docker load`、更新 `.env` 镜像标签、执行 migration、重启 Compose、健康检查和 smoke。
+- 阻塞/风险：这是 Docker 镜像构建主路径修复，不涉及 schema、migration、runtime API 语义或真实客户导入；真实部署仍需等待新镜像构建、远端加载和健康检查。追加前 `progress.md` 为 199 行 / 37981 bytes，未达到归档阈值。
