@@ -85,6 +85,13 @@ const navItemRegistry = {
     shortLabel: '权限',
     description: '集中管理管理员账号、角色、权限码和启用状态。',
   },
+  'phase8-facts': {
+    key: 'phase8-facts',
+    label: 'Phase 8 事实闭环',
+    path: '/erp/phase8/facts',
+    shortLabel: '事实',
+    description: '统一处理生产、委外、出货、库存预留和财务事实的最小运行入口。',
+  },
 }
 
 export const navigationItemRegistry = navItemRegistry
@@ -99,6 +106,10 @@ function getDefaultNavigationSections() {
       ],
     },
     ...businessNavigationSections,
+    {
+      title: '事实闭环',
+      items: [navItemRegistry['phase8-facts']],
+    },
     {
       title: '单据模板',
       items: [navItemRegistry['print-center']],

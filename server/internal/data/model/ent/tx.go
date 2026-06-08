@@ -30,6 +30,8 @@ type Tx struct {
 	Contact *ContactClient
 	// Customer is the client for interacting with the Customer builders.
 	Customer *CustomerClient
+	// FinanceFact is the client for interacting with the FinanceFact builders.
+	FinanceFact *FinanceFactClient
 	// InventoryBalance is the client for interacting with the InventoryBalance builders.
 	InventoryBalance *InventoryBalanceClient
 	// InventoryLot is the client for interacting with the InventoryLot builders.
@@ -38,10 +40,14 @@ type Tx struct {
 	InventoryTxn *InventoryTxnClient
 	// Material is the client for interacting with the Material builders.
 	Material *MaterialClient
+	// OutsourcingFact is the client for interacting with the OutsourcingFact builders.
+	OutsourcingFact *OutsourcingFactClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
+	// ProductionFact is the client for interacting with the ProductionFact builders.
+	ProductionFact *ProductionFactClient
 	// PurchaseReceipt is the client for interacting with the PurchaseReceipt builders.
 	PurchaseReceipt *PurchaseReceiptClient
 	// PurchaseReceiptAdjustment is the client for interacting with the PurchaseReceiptAdjustment builders.
@@ -64,6 +70,12 @@ type Tx struct {
 	SalesOrder *SalesOrderClient
 	// SalesOrderItem is the client for interacting with the SalesOrderItem builders.
 	SalesOrderItem *SalesOrderItemClient
+	// Shipment is the client for interacting with the Shipment builders.
+	Shipment *ShipmentClient
+	// ShipmentItem is the client for interacting with the ShipmentItem builders.
+	ShipmentItem *ShipmentItemClient
+	// StockReservation is the client for interacting with the StockReservation builders.
+	StockReservation *StockReservationClient
 	// Supplier is the client for interacting with the Supplier builders.
 	Supplier *SupplierClient
 	// Unit is the client for interacting with the Unit builders.
@@ -218,12 +230,15 @@ func (tx *Tx) init() {
 	tx.BusinessRecordItem = NewBusinessRecordItemClient(tx.config)
 	tx.Contact = NewContactClient(tx.config)
 	tx.Customer = NewCustomerClient(tx.config)
+	tx.FinanceFact = NewFinanceFactClient(tx.config)
 	tx.InventoryBalance = NewInventoryBalanceClient(tx.config)
 	tx.InventoryLot = NewInventoryLotClient(tx.config)
 	tx.InventoryTxn = NewInventoryTxnClient(tx.config)
 	tx.Material = NewMaterialClient(tx.config)
+	tx.OutsourcingFact = NewOutsourcingFactClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
+	tx.ProductionFact = NewProductionFactClient(tx.config)
 	tx.PurchaseReceipt = NewPurchaseReceiptClient(tx.config)
 	tx.PurchaseReceiptAdjustment = NewPurchaseReceiptAdjustmentClient(tx.config)
 	tx.PurchaseReceiptAdjustmentItem = NewPurchaseReceiptAdjustmentItemClient(tx.config)
@@ -235,6 +250,9 @@ func (tx *Tx) init() {
 	tx.RolePermission = NewRolePermissionClient(tx.config)
 	tx.SalesOrder = NewSalesOrderClient(tx.config)
 	tx.SalesOrderItem = NewSalesOrderItemClient(tx.config)
+	tx.Shipment = NewShipmentClient(tx.config)
+	tx.ShipmentItem = NewShipmentItemClient(tx.config)
+	tx.StockReservation = NewStockReservationClient(tx.config)
 	tx.Supplier = NewSupplierClient(tx.config)
 	tx.Unit = NewUnitClient(tx.config)
 	tx.User = NewUserClient(tx.config)

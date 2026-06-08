@@ -43,6 +43,10 @@ func (Warehouse) Edges() []ent.Edge {
 		edge.To("purchase_return_items", PurchaseReturnItem.Type),
 		edge.To("purchase_receipt_adjustment_items", PurchaseReceiptAdjustmentItem.Type),
 		edge.To("quality_inspections", QualityInspection.Type),
+		edge.To("production_facts", ProductionFact.Type),
+		edge.To("outsourcing_facts", OutsourcingFact.Type),
+		edge.To("shipment_items", ShipmentItem.Type),
+		edge.To("stock_reservations", StockReservation.Type),
 	}
 }
 

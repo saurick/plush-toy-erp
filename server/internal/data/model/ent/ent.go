@@ -16,12 +16,15 @@ import (
 	"server/internal/data/model/ent/businessrecorditem"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
@@ -33,6 +36,9 @@ import (
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/shipmentitem"
+	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 	"server/internal/data/model/ent/user"
@@ -114,12 +120,15 @@ func checkColumn(t, c string) error {
 			businessrecorditem.Table:            businessrecorditem.ValidColumn,
 			contact.Table:                       contact.ValidColumn,
 			customer.Table:                      customer.ValidColumn,
+			financefact.Table:                   financefact.ValidColumn,
 			inventorybalance.Table:              inventorybalance.ValidColumn,
 			inventorylot.Table:                  inventorylot.ValidColumn,
 			inventorytxn.Table:                  inventorytxn.ValidColumn,
 			material.Table:                      material.ValidColumn,
+			outsourcingfact.Table:               outsourcingfact.ValidColumn,
 			permission.Table:                    permission.ValidColumn,
 			product.Table:                       product.ValidColumn,
+			productionfact.Table:                productionfact.ValidColumn,
 			purchasereceipt.Table:               purchasereceipt.ValidColumn,
 			purchasereceiptadjustment.Table:     purchasereceiptadjustment.ValidColumn,
 			purchasereceiptadjustmentitem.Table: purchasereceiptadjustmentitem.ValidColumn,
@@ -131,6 +140,9 @@ func checkColumn(t, c string) error {
 			rolepermission.Table:                rolepermission.ValidColumn,
 			salesorder.Table:                    salesorder.ValidColumn,
 			salesorderitem.Table:                salesorderitem.ValidColumn,
+			shipment.Table:                      shipment.ValidColumn,
+			shipmentitem.Table:                  shipmentitem.ValidColumn,
+			stockreservation.Table:              stockreservation.ValidColumn,
 			supplier.Table:                      supplier.ValidColumn,
 			unit.Table:                          unit.ValidColumn,
 			user.Table:                          user.ValidColumn,

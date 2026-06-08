@@ -50,6 +50,8 @@ func (Product) Edges() []ent.Edge {
 			Required().
 			Unique(),
 		edge.To("bom_headers", BOMHeader.Type),
+		edge.To("shipment_items", ShipmentItem.Type),
+		edge.To("stock_reservations", StockReservation.Type),
 	}
 }
 

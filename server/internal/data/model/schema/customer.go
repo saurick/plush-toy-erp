@@ -47,6 +47,7 @@ func (Customer) Fields() []ent.Field {
 func (Customer) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("sales_orders", SalesOrder.Type),
+		edge.To("shipments", Shipment.Type),
 	}
 }
 

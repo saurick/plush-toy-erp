@@ -8,11 +8,15 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/shipmentitem"
+	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/warehouse"
 	"time"
 
@@ -186,6 +190,66 @@ func (_u *WarehouseUpdate) AddQualityInspections(v ...*QualityInspection) *Wareh
 	return _u.AddQualityInspectionIDs(ids...)
 }
 
+// AddProductionFactIDs adds the "production_facts" edge to the ProductionFact entity by IDs.
+func (_u *WarehouseUpdate) AddProductionFactIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.AddProductionFactIDs(ids...)
+	return _u
+}
+
+// AddProductionFacts adds the "production_facts" edges to the ProductionFact entity.
+func (_u *WarehouseUpdate) AddProductionFacts(v ...*ProductionFact) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionFactIDs(ids...)
+}
+
+// AddOutsourcingFactIDs adds the "outsourcing_facts" edge to the OutsourcingFact entity by IDs.
+func (_u *WarehouseUpdate) AddOutsourcingFactIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.AddOutsourcingFactIDs(ids...)
+	return _u
+}
+
+// AddOutsourcingFacts adds the "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_u *WarehouseUpdate) AddOutsourcingFacts(v ...*OutsourcingFact) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOutsourcingFactIDs(ids...)
+}
+
+// AddShipmentItemIDs adds the "shipment_items" edge to the ShipmentItem entity by IDs.
+func (_u *WarehouseUpdate) AddShipmentItemIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.AddShipmentItemIDs(ids...)
+	return _u
+}
+
+// AddShipmentItems adds the "shipment_items" edges to the ShipmentItem entity.
+func (_u *WarehouseUpdate) AddShipmentItems(v ...*ShipmentItem) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddShipmentItemIDs(ids...)
+}
+
+// AddStockReservationIDs adds the "stock_reservations" edge to the StockReservation entity by IDs.
+func (_u *WarehouseUpdate) AddStockReservationIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.AddStockReservationIDs(ids...)
+	return _u
+}
+
+// AddStockReservations adds the "stock_reservations" edges to the StockReservation entity.
+func (_u *WarehouseUpdate) AddStockReservations(v ...*StockReservation) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddStockReservationIDs(ids...)
+}
+
 // Mutation returns the WarehouseMutation object of the builder.
 func (_u *WarehouseUpdate) Mutation() *WarehouseMutation {
 	return _u.mutation
@@ -315,6 +379,90 @@ func (_u *WarehouseUpdate) RemoveQualityInspections(v ...*QualityInspection) *Wa
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveQualityInspectionIDs(ids...)
+}
+
+// ClearProductionFacts clears all "production_facts" edges to the ProductionFact entity.
+func (_u *WarehouseUpdate) ClearProductionFacts() *WarehouseUpdate {
+	_u.mutation.ClearProductionFacts()
+	return _u
+}
+
+// RemoveProductionFactIDs removes the "production_facts" edge to ProductionFact entities by IDs.
+func (_u *WarehouseUpdate) RemoveProductionFactIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.RemoveProductionFactIDs(ids...)
+	return _u
+}
+
+// RemoveProductionFacts removes "production_facts" edges to ProductionFact entities.
+func (_u *WarehouseUpdate) RemoveProductionFacts(v ...*ProductionFact) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionFactIDs(ids...)
+}
+
+// ClearOutsourcingFacts clears all "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_u *WarehouseUpdate) ClearOutsourcingFacts() *WarehouseUpdate {
+	_u.mutation.ClearOutsourcingFacts()
+	return _u
+}
+
+// RemoveOutsourcingFactIDs removes the "outsourcing_facts" edge to OutsourcingFact entities by IDs.
+func (_u *WarehouseUpdate) RemoveOutsourcingFactIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.RemoveOutsourcingFactIDs(ids...)
+	return _u
+}
+
+// RemoveOutsourcingFacts removes "outsourcing_facts" edges to OutsourcingFact entities.
+func (_u *WarehouseUpdate) RemoveOutsourcingFacts(v ...*OutsourcingFact) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOutsourcingFactIDs(ids...)
+}
+
+// ClearShipmentItems clears all "shipment_items" edges to the ShipmentItem entity.
+func (_u *WarehouseUpdate) ClearShipmentItems() *WarehouseUpdate {
+	_u.mutation.ClearShipmentItems()
+	return _u
+}
+
+// RemoveShipmentItemIDs removes the "shipment_items" edge to ShipmentItem entities by IDs.
+func (_u *WarehouseUpdate) RemoveShipmentItemIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.RemoveShipmentItemIDs(ids...)
+	return _u
+}
+
+// RemoveShipmentItems removes "shipment_items" edges to ShipmentItem entities.
+func (_u *WarehouseUpdate) RemoveShipmentItems(v ...*ShipmentItem) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveShipmentItemIDs(ids...)
+}
+
+// ClearStockReservations clears all "stock_reservations" edges to the StockReservation entity.
+func (_u *WarehouseUpdate) ClearStockReservations() *WarehouseUpdate {
+	_u.mutation.ClearStockReservations()
+	return _u
+}
+
+// RemoveStockReservationIDs removes the "stock_reservations" edge to StockReservation entities by IDs.
+func (_u *WarehouseUpdate) RemoveStockReservationIDs(ids ...int) *WarehouseUpdate {
+	_u.mutation.RemoveStockReservationIDs(ids...)
+	return _u
+}
+
+// RemoveStockReservations removes "stock_reservations" edges to StockReservation entities.
+func (_u *WarehouseUpdate) RemoveStockReservations(v ...*StockReservation) *WarehouseUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveStockReservationIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -670,6 +818,186 @@ func (_u *WarehouseUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ProductionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ProductionFactsTable,
+			Columns: []string{warehouse.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionFactsIDs(); len(nodes) > 0 && !_u.mutation.ProductionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ProductionFactsTable,
+			Columns: []string{warehouse.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ProductionFactsTable,
+			Columns: []string{warehouse.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OutsourcingFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.OutsourcingFactsTable,
+			Columns: []string{warehouse.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOutsourcingFactsIDs(); len(nodes) > 0 && !_u.mutation.OutsourcingFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.OutsourcingFactsTable,
+			Columns: []string{warehouse.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OutsourcingFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.OutsourcingFactsTable,
+			Columns: []string{warehouse.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ShipmentItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ShipmentItemsTable,
+			Columns: []string{warehouse.ShipmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipmentitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedShipmentItemsIDs(); len(nodes) > 0 && !_u.mutation.ShipmentItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ShipmentItemsTable,
+			Columns: []string{warehouse.ShipmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ShipmentItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ShipmentItemsTable,
+			Columns: []string{warehouse.ShipmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.StockReservationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.StockReservationsTable,
+			Columns: []string{warehouse.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedStockReservationsIDs(); len(nodes) > 0 && !_u.mutation.StockReservationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.StockReservationsTable,
+			Columns: []string{warehouse.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.StockReservationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.StockReservationsTable,
+			Columns: []string{warehouse.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{warehouse.Label}
@@ -842,6 +1170,66 @@ func (_u *WarehouseUpdateOne) AddQualityInspections(v ...*QualityInspection) *Wa
 	return _u.AddQualityInspectionIDs(ids...)
 }
 
+// AddProductionFactIDs adds the "production_facts" edge to the ProductionFact entity by IDs.
+func (_u *WarehouseUpdateOne) AddProductionFactIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.AddProductionFactIDs(ids...)
+	return _u
+}
+
+// AddProductionFacts adds the "production_facts" edges to the ProductionFact entity.
+func (_u *WarehouseUpdateOne) AddProductionFacts(v ...*ProductionFact) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionFactIDs(ids...)
+}
+
+// AddOutsourcingFactIDs adds the "outsourcing_facts" edge to the OutsourcingFact entity by IDs.
+func (_u *WarehouseUpdateOne) AddOutsourcingFactIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.AddOutsourcingFactIDs(ids...)
+	return _u
+}
+
+// AddOutsourcingFacts adds the "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_u *WarehouseUpdateOne) AddOutsourcingFacts(v ...*OutsourcingFact) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOutsourcingFactIDs(ids...)
+}
+
+// AddShipmentItemIDs adds the "shipment_items" edge to the ShipmentItem entity by IDs.
+func (_u *WarehouseUpdateOne) AddShipmentItemIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.AddShipmentItemIDs(ids...)
+	return _u
+}
+
+// AddShipmentItems adds the "shipment_items" edges to the ShipmentItem entity.
+func (_u *WarehouseUpdateOne) AddShipmentItems(v ...*ShipmentItem) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddShipmentItemIDs(ids...)
+}
+
+// AddStockReservationIDs adds the "stock_reservations" edge to the StockReservation entity by IDs.
+func (_u *WarehouseUpdateOne) AddStockReservationIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.AddStockReservationIDs(ids...)
+	return _u
+}
+
+// AddStockReservations adds the "stock_reservations" edges to the StockReservation entity.
+func (_u *WarehouseUpdateOne) AddStockReservations(v ...*StockReservation) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddStockReservationIDs(ids...)
+}
+
 // Mutation returns the WarehouseMutation object of the builder.
 func (_u *WarehouseUpdateOne) Mutation() *WarehouseMutation {
 	return _u.mutation
@@ -971,6 +1359,90 @@ func (_u *WarehouseUpdateOne) RemoveQualityInspections(v ...*QualityInspection) 
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveQualityInspectionIDs(ids...)
+}
+
+// ClearProductionFacts clears all "production_facts" edges to the ProductionFact entity.
+func (_u *WarehouseUpdateOne) ClearProductionFacts() *WarehouseUpdateOne {
+	_u.mutation.ClearProductionFacts()
+	return _u
+}
+
+// RemoveProductionFactIDs removes the "production_facts" edge to ProductionFact entities by IDs.
+func (_u *WarehouseUpdateOne) RemoveProductionFactIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.RemoveProductionFactIDs(ids...)
+	return _u
+}
+
+// RemoveProductionFacts removes "production_facts" edges to ProductionFact entities.
+func (_u *WarehouseUpdateOne) RemoveProductionFacts(v ...*ProductionFact) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionFactIDs(ids...)
+}
+
+// ClearOutsourcingFacts clears all "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_u *WarehouseUpdateOne) ClearOutsourcingFacts() *WarehouseUpdateOne {
+	_u.mutation.ClearOutsourcingFacts()
+	return _u
+}
+
+// RemoveOutsourcingFactIDs removes the "outsourcing_facts" edge to OutsourcingFact entities by IDs.
+func (_u *WarehouseUpdateOne) RemoveOutsourcingFactIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.RemoveOutsourcingFactIDs(ids...)
+	return _u
+}
+
+// RemoveOutsourcingFacts removes "outsourcing_facts" edges to OutsourcingFact entities.
+func (_u *WarehouseUpdateOne) RemoveOutsourcingFacts(v ...*OutsourcingFact) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOutsourcingFactIDs(ids...)
+}
+
+// ClearShipmentItems clears all "shipment_items" edges to the ShipmentItem entity.
+func (_u *WarehouseUpdateOne) ClearShipmentItems() *WarehouseUpdateOne {
+	_u.mutation.ClearShipmentItems()
+	return _u
+}
+
+// RemoveShipmentItemIDs removes the "shipment_items" edge to ShipmentItem entities by IDs.
+func (_u *WarehouseUpdateOne) RemoveShipmentItemIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.RemoveShipmentItemIDs(ids...)
+	return _u
+}
+
+// RemoveShipmentItems removes "shipment_items" edges to ShipmentItem entities.
+func (_u *WarehouseUpdateOne) RemoveShipmentItems(v ...*ShipmentItem) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveShipmentItemIDs(ids...)
+}
+
+// ClearStockReservations clears all "stock_reservations" edges to the StockReservation entity.
+func (_u *WarehouseUpdateOne) ClearStockReservations() *WarehouseUpdateOne {
+	_u.mutation.ClearStockReservations()
+	return _u
+}
+
+// RemoveStockReservationIDs removes the "stock_reservations" edge to StockReservation entities by IDs.
+func (_u *WarehouseUpdateOne) RemoveStockReservationIDs(ids ...int) *WarehouseUpdateOne {
+	_u.mutation.RemoveStockReservationIDs(ids...)
+	return _u
+}
+
+// RemoveStockReservations removes "stock_reservations" edges to StockReservation entities.
+func (_u *WarehouseUpdateOne) RemoveStockReservations(v ...*StockReservation) *WarehouseUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveStockReservationIDs(ids...)
 }
 
 // Where appends a list predicates to the WarehouseUpdate builder.
@@ -1349,6 +1821,186 @@ func (_u *WarehouseUpdateOne) sqlSave(ctx context.Context) (_node *Warehouse, er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ProductionFactsTable,
+			Columns: []string{warehouse.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionFactsIDs(); len(nodes) > 0 && !_u.mutation.ProductionFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ProductionFactsTable,
+			Columns: []string{warehouse.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ProductionFactsTable,
+			Columns: []string{warehouse.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OutsourcingFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.OutsourcingFactsTable,
+			Columns: []string{warehouse.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOutsourcingFactsIDs(); len(nodes) > 0 && !_u.mutation.OutsourcingFactsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.OutsourcingFactsTable,
+			Columns: []string{warehouse.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OutsourcingFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.OutsourcingFactsTable,
+			Columns: []string{warehouse.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ShipmentItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ShipmentItemsTable,
+			Columns: []string{warehouse.ShipmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipmentitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedShipmentItemsIDs(); len(nodes) > 0 && !_u.mutation.ShipmentItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ShipmentItemsTable,
+			Columns: []string{warehouse.ShipmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ShipmentItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.ShipmentItemsTable,
+			Columns: []string{warehouse.ShipmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.StockReservationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.StockReservationsTable,
+			Columns: []string{warehouse.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedStockReservationsIDs(); len(nodes) > 0 && !_u.mutation.StockReservationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.StockReservationsTable,
+			Columns: []string{warehouse.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.StockReservationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   warehouse.StockReservationsTable,
+			Columns: []string{warehouse.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

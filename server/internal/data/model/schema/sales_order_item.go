@@ -89,6 +89,8 @@ func (SalesOrderItem) Edges() []ent.Edge {
 			Field("unit_id").
 			Required().
 			Unique(),
+		edge.To("shipment_items", ShipmentItem.Type),
+		edge.To("stock_reservations", StockReservation.Type),
 	}
 }
 

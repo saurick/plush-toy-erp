@@ -43,9 +43,11 @@ type Customer struct {
 type CustomerEdges struct {
 	// SalesOrders holds the value of the sales_orders edge.
 	SalesOrders []*SalesOrder `json:"sales_orders,omitempty"`
+	// Shipments holds the value of the shipments edge.
+	Shipments []*Shipment `json:"shipments,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // SalesOrdersOrErr returns the SalesOrders value or an error if the edge
@@ -55,6 +57,15 @@ func (e CustomerEdges) SalesOrdersOrErr() ([]*SalesOrder, error) {
 		return e.SalesOrders, nil
 	}
 	return nil, &NotLoadedError{edge: "sales_orders"}
+}
+
+// ShipmentsOrErr returns the Shipments value or an error if the edge
+// was not loaded in eager-loading.
+func (e CustomerEdges) ShipmentsOrErr() ([]*Shipment, error) {
+	if e.loadedTypes[1] {
+		return e.Shipments, nil
+	}
+	return nil, &NotLoadedError{edge: "shipments"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -158,6 +169,11 @@ func (_m *Customer) Value(name string) (ent.Value, error) {
 // QuerySalesOrders queries the "sales_orders" edge of the Customer entity.
 func (_m *Customer) QuerySalesOrders() *SalesOrderQuery {
 	return NewCustomerClient(_m.config).QuerySalesOrders(_m)
+}
+
+// QueryShipments queries the "shipments" edge of the Customer entity.
+func (_m *Customer) QueryShipments() *ShipmentQuery {
+	return NewCustomerClient(_m.config).QueryShipments(_m)
 }
 
 // Update returns a builder for updating this Customer.

@@ -10,6 +10,8 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/stockreservation"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -184,6 +186,36 @@ func (_u *SalesOrderUpdate) AddItems(v ...*SalesOrderItem) *SalesOrderUpdate {
 	return _u.AddItemIDs(ids...)
 }
 
+// AddShipmentIDs adds the "shipments" edge to the Shipment entity by IDs.
+func (_u *SalesOrderUpdate) AddShipmentIDs(ids ...int) *SalesOrderUpdate {
+	_u.mutation.AddShipmentIDs(ids...)
+	return _u
+}
+
+// AddShipments adds the "shipments" edges to the Shipment entity.
+func (_u *SalesOrderUpdate) AddShipments(v ...*Shipment) *SalesOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddShipmentIDs(ids...)
+}
+
+// AddStockReservationIDs adds the "stock_reservations" edge to the StockReservation entity by IDs.
+func (_u *SalesOrderUpdate) AddStockReservationIDs(ids ...int) *SalesOrderUpdate {
+	_u.mutation.AddStockReservationIDs(ids...)
+	return _u
+}
+
+// AddStockReservations adds the "stock_reservations" edges to the StockReservation entity.
+func (_u *SalesOrderUpdate) AddStockReservations(v ...*StockReservation) *SalesOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddStockReservationIDs(ids...)
+}
+
 // Mutation returns the SalesOrderMutation object of the builder.
 func (_u *SalesOrderUpdate) Mutation() *SalesOrderMutation {
 	return _u.mutation
@@ -214,6 +246,48 @@ func (_u *SalesOrderUpdate) RemoveItems(v ...*SalesOrderItem) *SalesOrderUpdate 
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveItemIDs(ids...)
+}
+
+// ClearShipments clears all "shipments" edges to the Shipment entity.
+func (_u *SalesOrderUpdate) ClearShipments() *SalesOrderUpdate {
+	_u.mutation.ClearShipments()
+	return _u
+}
+
+// RemoveShipmentIDs removes the "shipments" edge to Shipment entities by IDs.
+func (_u *SalesOrderUpdate) RemoveShipmentIDs(ids ...int) *SalesOrderUpdate {
+	_u.mutation.RemoveShipmentIDs(ids...)
+	return _u
+}
+
+// RemoveShipments removes "shipments" edges to Shipment entities.
+func (_u *SalesOrderUpdate) RemoveShipments(v ...*Shipment) *SalesOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveShipmentIDs(ids...)
+}
+
+// ClearStockReservations clears all "stock_reservations" edges to the StockReservation entity.
+func (_u *SalesOrderUpdate) ClearStockReservations() *SalesOrderUpdate {
+	_u.mutation.ClearStockReservations()
+	return _u
+}
+
+// RemoveStockReservationIDs removes the "stock_reservations" edge to StockReservation entities by IDs.
+func (_u *SalesOrderUpdate) RemoveStockReservationIDs(ids ...int) *SalesOrderUpdate {
+	_u.mutation.RemoveStockReservationIDs(ids...)
+	return _u
+}
+
+// RemoveStockReservations removes "stock_reservations" edges to StockReservation entities.
+func (_u *SalesOrderUpdate) RemoveStockReservations(v ...*StockReservation) *SalesOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveStockReservationIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -407,6 +481,96 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ShipmentsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.ShipmentsTable,
+			Columns: []string{salesorder.ShipmentsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipment.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedShipmentsIDs(); len(nodes) > 0 && !_u.mutation.ShipmentsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.ShipmentsTable,
+			Columns: []string{salesorder.ShipmentsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ShipmentsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.ShipmentsTable,
+			Columns: []string{salesorder.ShipmentsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.StockReservationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.StockReservationsTable,
+			Columns: []string{salesorder.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedStockReservationsIDs(); len(nodes) > 0 && !_u.mutation.StockReservationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.StockReservationsTable,
+			Columns: []string{salesorder.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.StockReservationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.StockReservationsTable,
+			Columns: []string{salesorder.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{salesorder.Label}
@@ -581,6 +745,36 @@ func (_u *SalesOrderUpdateOne) AddItems(v ...*SalesOrderItem) *SalesOrderUpdateO
 	return _u.AddItemIDs(ids...)
 }
 
+// AddShipmentIDs adds the "shipments" edge to the Shipment entity by IDs.
+func (_u *SalesOrderUpdateOne) AddShipmentIDs(ids ...int) *SalesOrderUpdateOne {
+	_u.mutation.AddShipmentIDs(ids...)
+	return _u
+}
+
+// AddShipments adds the "shipments" edges to the Shipment entity.
+func (_u *SalesOrderUpdateOne) AddShipments(v ...*Shipment) *SalesOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddShipmentIDs(ids...)
+}
+
+// AddStockReservationIDs adds the "stock_reservations" edge to the StockReservation entity by IDs.
+func (_u *SalesOrderUpdateOne) AddStockReservationIDs(ids ...int) *SalesOrderUpdateOne {
+	_u.mutation.AddStockReservationIDs(ids...)
+	return _u
+}
+
+// AddStockReservations adds the "stock_reservations" edges to the StockReservation entity.
+func (_u *SalesOrderUpdateOne) AddStockReservations(v ...*StockReservation) *SalesOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddStockReservationIDs(ids...)
+}
+
 // Mutation returns the SalesOrderMutation object of the builder.
 func (_u *SalesOrderUpdateOne) Mutation() *SalesOrderMutation {
 	return _u.mutation
@@ -611,6 +805,48 @@ func (_u *SalesOrderUpdateOne) RemoveItems(v ...*SalesOrderItem) *SalesOrderUpda
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveItemIDs(ids...)
+}
+
+// ClearShipments clears all "shipments" edges to the Shipment entity.
+func (_u *SalesOrderUpdateOne) ClearShipments() *SalesOrderUpdateOne {
+	_u.mutation.ClearShipments()
+	return _u
+}
+
+// RemoveShipmentIDs removes the "shipments" edge to Shipment entities by IDs.
+func (_u *SalesOrderUpdateOne) RemoveShipmentIDs(ids ...int) *SalesOrderUpdateOne {
+	_u.mutation.RemoveShipmentIDs(ids...)
+	return _u
+}
+
+// RemoveShipments removes "shipments" edges to Shipment entities.
+func (_u *SalesOrderUpdateOne) RemoveShipments(v ...*Shipment) *SalesOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveShipmentIDs(ids...)
+}
+
+// ClearStockReservations clears all "stock_reservations" edges to the StockReservation entity.
+func (_u *SalesOrderUpdateOne) ClearStockReservations() *SalesOrderUpdateOne {
+	_u.mutation.ClearStockReservations()
+	return _u
+}
+
+// RemoveStockReservationIDs removes the "stock_reservations" edge to StockReservation entities by IDs.
+func (_u *SalesOrderUpdateOne) RemoveStockReservationIDs(ids ...int) *SalesOrderUpdateOne {
+	_u.mutation.RemoveStockReservationIDs(ids...)
+	return _u
+}
+
+// RemoveStockReservations removes "stock_reservations" edges to StockReservation entities.
+func (_u *SalesOrderUpdateOne) RemoveStockReservations(v ...*StockReservation) *SalesOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveStockReservationIDs(ids...)
 }
 
 // Where appends a list predicates to the SalesOrderUpdate builder.
@@ -827,6 +1063,96 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(salesorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ShipmentsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.ShipmentsTable,
+			Columns: []string{salesorder.ShipmentsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipment.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedShipmentsIDs(); len(nodes) > 0 && !_u.mutation.ShipmentsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.ShipmentsTable,
+			Columns: []string{salesorder.ShipmentsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ShipmentsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.ShipmentsTable,
+			Columns: []string{salesorder.ShipmentsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.StockReservationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.StockReservationsTable,
+			Columns: []string{salesorder.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedStockReservationsIDs(); len(nodes) > 0 && !_u.mutation.StockReservationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.StockReservationsTable,
+			Columns: []string{salesorder.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.StockReservationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   salesorder.StockReservationsTable,
+			Columns: []string{salesorder.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

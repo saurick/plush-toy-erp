@@ -479,6 +479,7 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "payables", Label: "待付款/应付提醒", Path: "/erp/finance/payables", RequiredPermissions: []string{PermissionFinancePayableRead}},
 	{Key: "receivables", Label: "应收提醒", Path: "/erp/finance/receivables", RequiredPermissions: []string{PermissionFinanceReceivableRead}},
 	{Key: "invoices", Label: "发票/开票异常", Path: "/erp/finance/invoices", RequiredPermissions: []string{PermissionFinanceReceivableRead, PermissionFinancePayableRead}},
+	{Key: "phase8-facts", Label: "Phase 8 事实闭环", Path: "/erp/phase8/facts", RequiredPermissions: []string{PermissionPMCPlanRead, PermissionPurchaseOrderRead, PermissionWarehouseInventoryRead, PermissionWarehouseOutboundRead, PermissionFinanceReceivableRead, PermissionFinancePayableRead}},
 	{Key: "permission-center", Label: "权限管理", Path: "/erp/system/permissions", RequiredPermissions: []string{PermissionSystemUserRead, PermissionSystemRoleRead}},
 }
 

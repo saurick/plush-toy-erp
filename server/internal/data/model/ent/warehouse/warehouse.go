@@ -38,6 +38,14 @@ const (
 	EdgePurchaseReceiptAdjustmentItems = "purchase_receipt_adjustment_items"
 	// EdgeQualityInspections holds the string denoting the quality_inspections edge name in mutations.
 	EdgeQualityInspections = "quality_inspections"
+	// EdgeProductionFacts holds the string denoting the production_facts edge name in mutations.
+	EdgeProductionFacts = "production_facts"
+	// EdgeOutsourcingFacts holds the string denoting the outsourcing_facts edge name in mutations.
+	EdgeOutsourcingFacts = "outsourcing_facts"
+	// EdgeShipmentItems holds the string denoting the shipment_items edge name in mutations.
+	EdgeShipmentItems = "shipment_items"
+	// EdgeStockReservations holds the string denoting the stock_reservations edge name in mutations.
+	EdgeStockReservations = "stock_reservations"
 	// Table holds the table name of the warehouse in the database.
 	Table = "warehouses"
 	// InventoryTxnsTable is the table that holds the inventory_txns relation/edge.
@@ -82,6 +90,34 @@ const (
 	QualityInspectionsInverseTable = "quality_inspections"
 	// QualityInspectionsColumn is the table column denoting the quality_inspections relation/edge.
 	QualityInspectionsColumn = "warehouse_id"
+	// ProductionFactsTable is the table that holds the production_facts relation/edge.
+	ProductionFactsTable = "production_facts"
+	// ProductionFactsInverseTable is the table name for the ProductionFact entity.
+	// It exists in this package in order to avoid circular dependency with the "productionfact" package.
+	ProductionFactsInverseTable = "production_facts"
+	// ProductionFactsColumn is the table column denoting the production_facts relation/edge.
+	ProductionFactsColumn = "warehouse_id"
+	// OutsourcingFactsTable is the table that holds the outsourcing_facts relation/edge.
+	OutsourcingFactsTable = "outsourcing_facts"
+	// OutsourcingFactsInverseTable is the table name for the OutsourcingFact entity.
+	// It exists in this package in order to avoid circular dependency with the "outsourcingfact" package.
+	OutsourcingFactsInverseTable = "outsourcing_facts"
+	// OutsourcingFactsColumn is the table column denoting the outsourcing_facts relation/edge.
+	OutsourcingFactsColumn = "warehouse_id"
+	// ShipmentItemsTable is the table that holds the shipment_items relation/edge.
+	ShipmentItemsTable = "shipment_items"
+	// ShipmentItemsInverseTable is the table name for the ShipmentItem entity.
+	// It exists in this package in order to avoid circular dependency with the "shipmentitem" package.
+	ShipmentItemsInverseTable = "shipment_items"
+	// ShipmentItemsColumn is the table column denoting the shipment_items relation/edge.
+	ShipmentItemsColumn = "warehouse_id"
+	// StockReservationsTable is the table that holds the stock_reservations relation/edge.
+	StockReservationsTable = "stock_reservations"
+	// StockReservationsInverseTable is the table name for the StockReservation entity.
+	// It exists in this package in order to avoid circular dependency with the "stockreservation" package.
+	StockReservationsInverseTable = "stock_reservations"
+	// StockReservationsColumn is the table column denoting the stock_reservations relation/edge.
+	StockReservationsColumn = "warehouse_id"
 )
 
 // Columns holds all SQL columns for warehouse fields.
@@ -243,6 +279,62 @@ func ByQualityInspections(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOptio
 		sqlgraph.OrderByNeighborTerms(s, newQualityInspectionsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByProductionFactsCount orders the results by production_facts count.
+func ByProductionFactsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProductionFactsStep(), opts...)
+	}
+}
+
+// ByProductionFacts orders the results by production_facts terms.
+func ByProductionFacts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductionFactsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByOutsourcingFactsCount orders the results by outsourcing_facts count.
+func ByOutsourcingFactsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOutsourcingFactsStep(), opts...)
+	}
+}
+
+// ByOutsourcingFacts orders the results by outsourcing_facts terms.
+func ByOutsourcingFacts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOutsourcingFactsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByShipmentItemsCount orders the results by shipment_items count.
+func ByShipmentItemsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newShipmentItemsStep(), opts...)
+	}
+}
+
+// ByShipmentItems orders the results by shipment_items terms.
+func ByShipmentItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newShipmentItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByStockReservationsCount orders the results by stock_reservations count.
+func ByStockReservationsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newStockReservationsStep(), opts...)
+	}
+}
+
+// ByStockReservations orders the results by stock_reservations terms.
+func ByStockReservations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newStockReservationsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newInventoryTxnsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -283,5 +375,33 @@ func newQualityInspectionsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(QualityInspectionsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, QualityInspectionsTable, QualityInspectionsColumn),
+	)
+}
+func newProductionFactsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductionFactsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ProductionFactsTable, ProductionFactsColumn),
+	)
+}
+func newOutsourcingFactsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OutsourcingFactsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingFactsTable, OutsourcingFactsColumn),
+	)
+}
+func newShipmentItemsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ShipmentItemsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ShipmentItemsTable, ShipmentItemsColumn),
+	)
+}
+func newStockReservationsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(StockReservationsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, StockReservationsTable, StockReservationsColumn),
 	)
 }

@@ -8,6 +8,23 @@
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`：归档截至 2026-06-08 13:50 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 318 行 / 82540 bytes，超过 80KB 阈值；本轮旧 `project-orders` debug cleanup 前先保留完整现场，再收缩当前入口。
 
+## 2026-06-08 21:08 CST
+
+- 完成：按“继续 Phase 8、一次完成、不要分子阶段”的口径，将 `docs/architecture/phase8-fact-expansion-review.md` 从评审准备改为 Phase 8 统一 docs-only review 已完成；同一文档一次性覆盖生产事实、委外事实、出货事实、库存预留和财务事实五条事实链的真源、边界、状态、冲正、幂等、RBAC、API、UI、测试和停止条件。
+- 完成：同步更新 `docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/product/implementation-governance.md`、`docs/product/product-delivery-ledgers.md` 和 `docs/architecture/README.md`，明确 Phase 8 不拆字母子阶段，CAP-019 至 CAP-024 推进到 L2 Reviewed / 实现候选，但 yoyoosun 交付矩阵仍保持 Planned，不写成 runtime、schema、API、UI、客户试用或 Delivery Ready。
+- 验证：后续执行 Phase 8 口径扫描、`git diff --check` 和 Markdown 表格解析检查；本轮只改正式文档和过程记录，不触发 migration、server build 或前端回归。
+- 下一步：可以在同一 Phase 8 内进入第一个实现闭环；进入实现前仍需按 `docs/product/implementation-governance.md` 明确允许路径、禁止路径、验收命令和停止条件。
+- 阻塞/风险：本轮未新增 schema、migration、runtime API、RBAC、UI、库存出库、出货事实、生产事实、委外事实、应收、应付、发票、收付款或对账能力；不能把 Phase 8 统一 review 已完成误读为事实层已经可用。
+
+## 2026-06-08 22:03 CST
+
+- 完成：按“继续阶段 8，一次完成，不要分子阶段”的口径完成 Phase 8 本地最小实现闭环。新增生产事实、委外事实、出货单、出货行、库存预留和财务事实 Ent schema、Atlas migration、后端 `Phase8Usecase` / repo、`phase8` JSON-RPC、前端 `/erp/phase8/facts` 统一事实闭环页面、桌面菜单 / 客户菜单 / 后端内置菜单和菜单权限测试。
+- 完成：库存影响收口到后端 usecase：生产领料 / 返工写 OUT、成品入库写 IN、委外发料写 OUT、委外回料写 IN、出货发货写 OUT，取消已过账 / 已发货事实写 REVERSAL；库存预留只检查并占用可用量，不写库存流水；财务事实只维护 AR/AP/invoice/payment/reconciliation 状态，不从 workflow task 或 `shipping_released` 自动派生。
+- 完成：同步更新 `docs/current-source-of-truth.md`、`docs/architecture/phase8-fact-expansion-review.md`、`docs/product/product-completion-roadmap.md`、`docs/product/implementation-governance.md` 和 `docs/product/product-delivery-ledgers.md`，把 CAP-019 至 CAP-024 从 L2 review 推进到 L6 / Internal Ready，同时明确目标环境未 migration / 未上线 / 未客户验收，不写成 Delivery Ready。
+- 验证：`cd server && make data`、`cd server && go test ./internal/biz ./internal/data`、`cd server && go test ./...`、`cd server && make migrate_apply && make migrate_status` 通过；当前 dev DB migration status 为 OK / pending 0。`cd web && pnpm lint && pnpm css && pnpm test && pnpm style:l1` 通过，前端单测 275 条、style:l1 41 个场景通过；`git diff --check` 通过。Browser 回归覆盖 `http://127.0.0.1:5175/erp/phase8/facts` 桌面浅色、财务事实 tab 切换、刷新交互、移动宽度暗色版面和 console health。
+- 下一步：如果要进入目标客户环境，需要按发布流程构建 / 发布、执行目标库 migration、做目标账号 RBAC / 菜单 / 页面回归；若继续扩展，应单独评审打印、报表、核销、自动派生、并发扣减压力、生产订单 / 委外订单专表和移动端岗位任务投影。
+- 阻塞/风险：本轮是本地最小事实闭环，不包含真实客户数据导入、目标环境正式验收、完整打印 / 报表 / 发票明细 / 收付款核销 / 对账单 / 总账、物流 / 退货、并发锁升级或自动派生；委外结算明确不写入 `outsourcing_facts` 库存事实，进入 `finance_facts`。
+
 ## 2026-06-08 16:53 CST
 
 - 完成：将永绅 yoyoosun 原始图片从微信默认文件名改为语义化文件名：岗位职责流程图、移动端汇报截图、合同订单照片主 `.jpeg` 和合同订单照片 `source-copy` `.jpg`。本轮只重命名文件，不压缩、不改写图片内容。
@@ -273,5 +290,5 @@
 - 完成：按“开启 Phase 8，但不拆任何字母子阶段”的口径新增 `docs/architecture/phase8-fact-expansion-review.md`，正式登记生产事实、委外事实、出货事实、库存预留和财务事实五条范围项的总评审入口、门禁、停止条件和禁止项。
 - 完成：同步更新 `docs/architecture/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/product/implementation-governance.md` 和 `docs/product/product-delivery-ledgers.md`。台账中 Phase 8 相关能力和 yoyoosun 出货 / 预留 / 财务 / 生产 / 委外条目只推进到 Planned / 总评审范围，不写成 runtime、schema、API、UI 或 Delivery Ready。
 - 验证：`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过；Phase 8 口径扫描仅命中“不拆字母子阶段”“未实现 / 不写成 Delivery Ready”等正确边界说明，未再出现字母子阶段编号。
-- 下一步：在 Phase 8 统一阶段内选择一条事实链做专项 docs-only review；专项评审通过后，才能按门禁进入 schema / migration 或 runtime 实现。
+- 下一步：已被 2026-06-08 21:08 CST 记录更新为 Phase 8 统一 docs-only review 一次覆盖五条事实链；后续按实现门禁进入具体实现闭环。
 - 阻塞/风险：本轮只开启 Phase 8 评审层，未改 schema、migration、runtime、API、RBAC 真源、Workflow / Fact usecase、部署脚本或 DB；不能把 Phase 8 开启误读为生产、委外、出货、库存预留或财务事实已实现。追加前 `progress.md` 为 269 行 / 51139 bytes，未达到归档阈值。

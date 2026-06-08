@@ -59,9 +59,17 @@ type InventoryLotEdges struct {
 	PurchaseReceiptAdjustmentItems []*PurchaseReceiptAdjustmentItem `json:"purchase_receipt_adjustment_items,omitempty"`
 	// QualityInspections holds the value of the quality_inspections edge.
 	QualityInspections []*QualityInspection `json:"quality_inspections,omitempty"`
+	// ProductionFacts holds the value of the production_facts edge.
+	ProductionFacts []*ProductionFact `json:"production_facts,omitempty"`
+	// OutsourcingFacts holds the value of the outsourcing_facts edge.
+	OutsourcingFacts []*OutsourcingFact `json:"outsourcing_facts,omitempty"`
+	// ShipmentItems holds the value of the shipment_items edge.
+	ShipmentItems []*ShipmentItem `json:"shipment_items,omitempty"`
+	// StockReservations holds the value of the stock_reservations edge.
+	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [10]bool
 }
 
 // InventoryTxnsOrErr returns the InventoryTxns value or an error if the edge
@@ -116,6 +124,42 @@ func (e InventoryLotEdges) QualityInspectionsOrErr() ([]*QualityInspection, erro
 		return e.QualityInspections, nil
 	}
 	return nil, &NotLoadedError{edge: "quality_inspections"}
+}
+
+// ProductionFactsOrErr returns the ProductionFacts value or an error if the edge
+// was not loaded in eager-loading.
+func (e InventoryLotEdges) ProductionFactsOrErr() ([]*ProductionFact, error) {
+	if e.loadedTypes[6] {
+		return e.ProductionFacts, nil
+	}
+	return nil, &NotLoadedError{edge: "production_facts"}
+}
+
+// OutsourcingFactsOrErr returns the OutsourcingFacts value or an error if the edge
+// was not loaded in eager-loading.
+func (e InventoryLotEdges) OutsourcingFactsOrErr() ([]*OutsourcingFact, error) {
+	if e.loadedTypes[7] {
+		return e.OutsourcingFacts, nil
+	}
+	return nil, &NotLoadedError{edge: "outsourcing_facts"}
+}
+
+// ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
+// was not loaded in eager-loading.
+func (e InventoryLotEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
+	if e.loadedTypes[8] {
+		return e.ShipmentItems, nil
+	}
+	return nil, &NotLoadedError{edge: "shipment_items"}
+}
+
+// StockReservationsOrErr returns the StockReservations value or an error if the edge
+// was not loaded in eager-loading.
+func (e InventoryLotEdges) StockReservationsOrErr() ([]*StockReservation, error) {
+	if e.loadedTypes[9] {
+		return e.StockReservations, nil
+	}
+	return nil, &NotLoadedError{edge: "stock_reservations"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -262,6 +306,26 @@ func (_m *InventoryLot) QueryPurchaseReceiptAdjustmentItems() *PurchaseReceiptAd
 // QueryQualityInspections queries the "quality_inspections" edge of the InventoryLot entity.
 func (_m *InventoryLot) QueryQualityInspections() *QualityInspectionQuery {
 	return NewInventoryLotClient(_m.config).QueryQualityInspections(_m)
+}
+
+// QueryProductionFacts queries the "production_facts" edge of the InventoryLot entity.
+func (_m *InventoryLot) QueryProductionFacts() *ProductionFactQuery {
+	return NewInventoryLotClient(_m.config).QueryProductionFacts(_m)
+}
+
+// QueryOutsourcingFacts queries the "outsourcing_facts" edge of the InventoryLot entity.
+func (_m *InventoryLot) QueryOutsourcingFacts() *OutsourcingFactQuery {
+	return NewInventoryLotClient(_m.config).QueryOutsourcingFacts(_m)
+}
+
+// QueryShipmentItems queries the "shipment_items" edge of the InventoryLot entity.
+func (_m *InventoryLot) QueryShipmentItems() *ShipmentItemQuery {
+	return NewInventoryLotClient(_m.config).QueryShipmentItems(_m)
+}
+
+// QueryStockReservations queries the "stock_reservations" edge of the InventoryLot entity.
+func (_m *InventoryLot) QueryStockReservations() *StockReservationQuery {
+	return NewInventoryLotClient(_m.config).QueryStockReservations(_m)
 }
 
 // Update returns a builder for updating this InventoryLot.

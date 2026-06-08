@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/salesorder"
+	"server/internal/data/model/ent/shipment"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -130,6 +131,21 @@ func (_c *CustomerCreate) AddSalesOrders(v ...*SalesOrder) *CustomerCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddSalesOrderIDs(ids...)
+}
+
+// AddShipmentIDs adds the "shipments" edge to the Shipment entity by IDs.
+func (_c *CustomerCreate) AddShipmentIDs(ids ...int) *CustomerCreate {
+	_c.mutation.AddShipmentIDs(ids...)
+	return _c
+}
+
+// AddShipments adds the "shipments" edges to the Shipment entity.
+func (_c *CustomerCreate) AddShipments(v ...*Shipment) *CustomerCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddShipmentIDs(ids...)
 }
 
 // Mutation returns the CustomerMutation object of the builder.
@@ -290,6 +306,22 @@ func (_c *CustomerCreate) createSpec() (*Customer, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(salesorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ShipmentsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   customer.ShipmentsTable,
+			Columns: []string{customer.ShipmentsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipment.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

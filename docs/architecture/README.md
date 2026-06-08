@@ -6,7 +6,7 @@
 
 - Workflow / Fact / Source Document / MasterData 等系统分层边界。
 - 已进入长期维护的 usecase、schema、状态和业务事实评审。
-- Phase 8 生产、委外、出货、库存预留和财务事实扩展的总评审与专项评审。
+- Phase 8 生产、委外、出货、库存预留和财务事实扩展的统一总评审。
 - 后续实现前需要反复复核的设计约束。
 
 ## 不放什么

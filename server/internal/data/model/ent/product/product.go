@@ -34,6 +34,10 @@ const (
 	EdgeDefaultUnit = "default_unit"
 	// EdgeBomHeaders holds the string denoting the bom_headers edge name in mutations.
 	EdgeBomHeaders = "bom_headers"
+	// EdgeShipmentItems holds the string denoting the shipment_items edge name in mutations.
+	EdgeShipmentItems = "shipment_items"
+	// EdgeStockReservations holds the string denoting the stock_reservations edge name in mutations.
+	EdgeStockReservations = "stock_reservations"
 	// Table holds the table name of the product in the database.
 	Table = "products"
 	// DefaultUnitTable is the table that holds the default_unit relation/edge.
@@ -50,6 +54,20 @@ const (
 	BomHeadersInverseTable = "bom_headers"
 	// BomHeadersColumn is the table column denoting the bom_headers relation/edge.
 	BomHeadersColumn = "product_id"
+	// ShipmentItemsTable is the table that holds the shipment_items relation/edge.
+	ShipmentItemsTable = "shipment_items"
+	// ShipmentItemsInverseTable is the table name for the ShipmentItem entity.
+	// It exists in this package in order to avoid circular dependency with the "shipmentitem" package.
+	ShipmentItemsInverseTable = "shipment_items"
+	// ShipmentItemsColumn is the table column denoting the shipment_items relation/edge.
+	ShipmentItemsColumn = "product_id"
+	// StockReservationsTable is the table that holds the stock_reservations relation/edge.
+	StockReservationsTable = "stock_reservations"
+	// StockReservationsInverseTable is the table name for the StockReservation entity.
+	// It exists in this package in order to avoid circular dependency with the "stockreservation" package.
+	StockReservationsInverseTable = "stock_reservations"
+	// StockReservationsColumn is the table column denoting the stock_reservations relation/edge.
+	StockReservationsColumn = "product_id"
 )
 
 // Columns holds all SQL columns for product fields.
@@ -164,6 +182,34 @@ func ByBomHeaders(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newBomHeadersStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByShipmentItemsCount orders the results by shipment_items count.
+func ByShipmentItemsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newShipmentItemsStep(), opts...)
+	}
+}
+
+// ByShipmentItems orders the results by shipment_items terms.
+func ByShipmentItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newShipmentItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByStockReservationsCount orders the results by stock_reservations count.
+func ByStockReservationsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newStockReservationsStep(), opts...)
+	}
+}
+
+// ByStockReservations orders the results by stock_reservations terms.
+func ByStockReservations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newStockReservationsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newDefaultUnitStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -176,5 +222,19 @@ func newBomHeadersStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(BomHeadersInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, BomHeadersTable, BomHeadersColumn),
+	)
+}
+func newShipmentItemsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ShipmentItemsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ShipmentItemsTable, ShipmentItemsColumn),
+	)
+}
+func newStockReservationsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(StockReservationsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, StockReservationsTable, StockReservationsColumn),
 	)
 }

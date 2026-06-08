@@ -85,6 +85,14 @@ func (InventoryLot) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("quality_inspections", QualityInspection.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("production_facts", ProductionFact.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("outsourcing_facts", OutsourcingFact.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("shipment_items", ShipmentItem.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("stock_reservations", StockReservation.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 

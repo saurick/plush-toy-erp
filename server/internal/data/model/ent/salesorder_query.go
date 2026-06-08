@@ -11,6 +11,8 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/stockreservation"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -21,12 +23,14 @@ import (
 // SalesOrderQuery is the builder for querying SalesOrder entities.
 type SalesOrderQuery struct {
 	config
-	ctx          *QueryContext
-	order        []salesorder.OrderOption
-	inters       []Interceptor
-	predicates   []predicate.SalesOrder
-	withCustomer *CustomerQuery
-	withItems    *SalesOrderItemQuery
+	ctx                   *QueryContext
+	order                 []salesorder.OrderOption
+	inters                []Interceptor
+	predicates            []predicate.SalesOrder
+	withCustomer          *CustomerQuery
+	withItems             *SalesOrderItemQuery
+	withShipments         *ShipmentQuery
+	withStockReservations *StockReservationQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -100,6 +104,50 @@ func (_q *SalesOrderQuery) QueryItems() *SalesOrderItemQuery {
 			sqlgraph.From(salesorder.Table, salesorder.FieldID, selector),
 			sqlgraph.To(salesorderitem.Table, salesorderitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, salesorder.ItemsTable, salesorder.ItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryShipments chains the current query on the "shipments" edge.
+func (_q *SalesOrderQuery) QueryShipments() *ShipmentQuery {
+	query := (&ShipmentClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesorder.Table, salesorder.FieldID, selector),
+			sqlgraph.To(shipment.Table, shipment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, salesorder.ShipmentsTable, salesorder.ShipmentsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryStockReservations chains the current query on the "stock_reservations" edge.
+func (_q *SalesOrderQuery) QueryStockReservations() *StockReservationQuery {
+	query := (&StockReservationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesorder.Table, salesorder.FieldID, selector),
+			sqlgraph.To(stockreservation.Table, stockreservation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, salesorder.StockReservationsTable, salesorder.StockReservationsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -294,13 +342,15 @@ func (_q *SalesOrderQuery) Clone() *SalesOrderQuery {
 		return nil
 	}
 	return &SalesOrderQuery{
-		config:       _q.config,
-		ctx:          _q.ctx.Clone(),
-		order:        append([]salesorder.OrderOption{}, _q.order...),
-		inters:       append([]Interceptor{}, _q.inters...),
-		predicates:   append([]predicate.SalesOrder{}, _q.predicates...),
-		withCustomer: _q.withCustomer.Clone(),
-		withItems:    _q.withItems.Clone(),
+		config:                _q.config,
+		ctx:                   _q.ctx.Clone(),
+		order:                 append([]salesorder.OrderOption{}, _q.order...),
+		inters:                append([]Interceptor{}, _q.inters...),
+		predicates:            append([]predicate.SalesOrder{}, _q.predicates...),
+		withCustomer:          _q.withCustomer.Clone(),
+		withItems:             _q.withItems.Clone(),
+		withShipments:         _q.withShipments.Clone(),
+		withStockReservations: _q.withStockReservations.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -326,6 +376,28 @@ func (_q *SalesOrderQuery) WithItems(opts ...func(*SalesOrderItemQuery)) *SalesO
 		opt(query)
 	}
 	_q.withItems = query
+	return _q
+}
+
+// WithShipments tells the query-builder to eager-load the nodes that are connected to
+// the "shipments" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SalesOrderQuery) WithShipments(opts ...func(*ShipmentQuery)) *SalesOrderQuery {
+	query := (&ShipmentClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withShipments = query
+	return _q
+}
+
+// WithStockReservations tells the query-builder to eager-load the nodes that are connected to
+// the "stock_reservations" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SalesOrderQuery) WithStockReservations(opts ...func(*StockReservationQuery)) *SalesOrderQuery {
+	query := (&StockReservationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withStockReservations = query
 	return _q
 }
 
@@ -407,9 +479,11 @@ func (_q *SalesOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*S
 	var (
 		nodes       = []*SalesOrder{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [4]bool{
 			_q.withCustomer != nil,
 			_q.withItems != nil,
+			_q.withShipments != nil,
+			_q.withStockReservations != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -440,6 +514,22 @@ func (_q *SalesOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*S
 		if err := _q.loadItems(ctx, query, nodes,
 			func(n *SalesOrder) { n.Edges.Items = []*SalesOrderItem{} },
 			func(n *SalesOrder, e *SalesOrderItem) { n.Edges.Items = append(n.Edges.Items, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withShipments; query != nil {
+		if err := _q.loadShipments(ctx, query, nodes,
+			func(n *SalesOrder) { n.Edges.Shipments = []*Shipment{} },
+			func(n *SalesOrder, e *Shipment) { n.Edges.Shipments = append(n.Edges.Shipments, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withStockReservations; query != nil {
+		if err := _q.loadStockReservations(ctx, query, nodes,
+			func(n *SalesOrder) { n.Edges.StockReservations = []*StockReservation{} },
+			func(n *SalesOrder, e *StockReservation) {
+				n.Edges.StockReservations = append(n.Edges.StockReservations, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -500,6 +590,72 @@ func (_q *SalesOrderQuery) loadItems(ctx context.Context, query *SalesOrderItemQ
 		node, ok := nodeids[fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "sales_order_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *SalesOrderQuery) loadShipments(ctx context.Context, query *ShipmentQuery, nodes []*SalesOrder, init func(*SalesOrder), assign func(*SalesOrder, *Shipment)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*SalesOrder)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(shipment.FieldSalesOrderID)
+	}
+	query.Where(predicate.Shipment(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(salesorder.ShipmentsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.SalesOrderID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "sales_order_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "sales_order_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *SalesOrderQuery) loadStockReservations(ctx context.Context, query *StockReservationQuery, nodes []*SalesOrder, init func(*SalesOrder), assign func(*SalesOrder, *StockReservation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*SalesOrder)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(stockreservation.FieldSalesOrderID)
+	}
+	query.Where(predicate.StockReservation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(salesorder.StockReservationsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.SalesOrderID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "sales_order_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "sales_order_id" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

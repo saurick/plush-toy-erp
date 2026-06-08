@@ -65,9 +65,13 @@ type SalesOrderItemEdges struct {
 	Product *Product `json:"product,omitempty"`
 	// Unit holds the value of the unit edge.
 	Unit *Unit `json:"unit,omitempty"`
+	// ShipmentItems holds the value of the shipment_items edge.
+	ShipmentItems []*ShipmentItem `json:"shipment_items,omitempty"`
+	// StockReservations holds the value of the stock_reservations edge.
+	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [5]bool
 }
 
 // SalesOrderOrErr returns the SalesOrder value or an error if the edge
@@ -101,6 +105,24 @@ func (e SalesOrderItemEdges) UnitOrErr() (*Unit, error) {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
+}
+
+// ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
+// was not loaded in eager-loading.
+func (e SalesOrderItemEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
+	if e.loadedTypes[3] {
+		return e.ShipmentItems, nil
+	}
+	return nil, &NotLoadedError{edge: "shipment_items"}
+}
+
+// StockReservationsOrErr returns the StockReservations value or an error if the edge
+// was not loaded in eager-loading.
+func (e SalesOrderItemEdges) StockReservationsOrErr() ([]*StockReservation, error) {
+	if e.loadedTypes[4] {
+		return e.StockReservations, nil
+	}
+	return nil, &NotLoadedError{edge: "stock_reservations"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -262,6 +284,16 @@ func (_m *SalesOrderItem) QueryProduct() *ProductQuery {
 // QueryUnit queries the "unit" edge of the SalesOrderItem entity.
 func (_m *SalesOrderItem) QueryUnit() *UnitQuery {
 	return NewSalesOrderItemClient(_m.config).QueryUnit(_m)
+}
+
+// QueryShipmentItems queries the "shipment_items" edge of the SalesOrderItem entity.
+func (_m *SalesOrderItem) QueryShipmentItems() *ShipmentItemQuery {
+	return NewSalesOrderItemClient(_m.config).QueryShipmentItems(_m)
+}
+
+// QueryStockReservations queries the "stock_reservations" edge of the SalesOrderItem entity.
+func (_m *SalesOrderItem) QueryStockReservations() *StockReservationQuery {
+	return NewSalesOrderItemClient(_m.config).QueryStockReservations(_m)
 }
 
 // Update returns a builder for updating this SalesOrderItem.

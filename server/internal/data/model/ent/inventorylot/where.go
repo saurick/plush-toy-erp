@@ -913,6 +913,98 @@ func HasQualityInspectionsWith(preds ...predicate.QualityInspection) predicate.I
 	})
 }
 
+// HasProductionFacts applies the HasEdge predicate on the "production_facts" edge.
+func HasProductionFacts() predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ProductionFactsTable, ProductionFactsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductionFactsWith applies the HasEdge predicate on the "production_facts" edge with a given conditions (other predicates).
+func HasProductionFactsWith(preds ...predicate.ProductionFact) predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := newProductionFactsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasOutsourcingFacts applies the HasEdge predicate on the "outsourcing_facts" edge.
+func HasOutsourcingFacts() predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingFactsTable, OutsourcingFactsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOutsourcingFactsWith applies the HasEdge predicate on the "outsourcing_facts" edge with a given conditions (other predicates).
+func HasOutsourcingFactsWith(preds ...predicate.OutsourcingFact) predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := newOutsourcingFactsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasShipmentItems applies the HasEdge predicate on the "shipment_items" edge.
+func HasShipmentItems() predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ShipmentItemsTable, ShipmentItemsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasShipmentItemsWith applies the HasEdge predicate on the "shipment_items" edge with a given conditions (other predicates).
+func HasShipmentItemsWith(preds ...predicate.ShipmentItem) predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := newShipmentItemsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasStockReservations applies the HasEdge predicate on the "stock_reservations" edge.
+func HasStockReservations() predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, StockReservationsTable, StockReservationsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasStockReservationsWith applies the HasEdge predicate on the "stock_reservations" edge with a given conditions (other predicates).
+func HasStockReservationsWith(preds ...predicate.StockReservation) predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := newStockReservationsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.InventoryLot) predicate.InventoryLot {
 	return predicate.InventoryLot(sql.AndPredicates(predicates...))

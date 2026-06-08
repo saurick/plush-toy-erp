@@ -42,6 +42,7 @@ const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
 const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
+const Phase8FactsPage = lazy(() => import('./pages/Phase8FactsPage'))
 const MobileAppLayout = lazy(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazy(
   () => import('./mobile/pages/MobileRoleTasksPage')
@@ -232,6 +233,7 @@ export default function ERPRouter() {
             path="sales/project-orders/sales-orders"
             element={<V1SalesOrdersPage />}
           />
+          <Route path="phase8/facts" element={<Phase8FactsPage />} />
           <Route
             path="flows/overview"
             element={<Navigate to="/erp/dashboard" replace />}

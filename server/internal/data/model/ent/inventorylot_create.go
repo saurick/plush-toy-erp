@@ -9,10 +9,14 @@ import (
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/shipmentitem"
+	"server/internal/data/model/ent/stockreservation"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -244,6 +248,66 @@ func (_c *InventoryLotCreate) AddQualityInspections(v ...*QualityInspection) *In
 		ids[i] = v[i].ID
 	}
 	return _c.AddQualityInspectionIDs(ids...)
+}
+
+// AddProductionFactIDs adds the "production_facts" edge to the ProductionFact entity by IDs.
+func (_c *InventoryLotCreate) AddProductionFactIDs(ids ...int) *InventoryLotCreate {
+	_c.mutation.AddProductionFactIDs(ids...)
+	return _c
+}
+
+// AddProductionFacts adds the "production_facts" edges to the ProductionFact entity.
+func (_c *InventoryLotCreate) AddProductionFacts(v ...*ProductionFact) *InventoryLotCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductionFactIDs(ids...)
+}
+
+// AddOutsourcingFactIDs adds the "outsourcing_facts" edge to the OutsourcingFact entity by IDs.
+func (_c *InventoryLotCreate) AddOutsourcingFactIDs(ids ...int) *InventoryLotCreate {
+	_c.mutation.AddOutsourcingFactIDs(ids...)
+	return _c
+}
+
+// AddOutsourcingFacts adds the "outsourcing_facts" edges to the OutsourcingFact entity.
+func (_c *InventoryLotCreate) AddOutsourcingFacts(v ...*OutsourcingFact) *InventoryLotCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOutsourcingFactIDs(ids...)
+}
+
+// AddShipmentItemIDs adds the "shipment_items" edge to the ShipmentItem entity by IDs.
+func (_c *InventoryLotCreate) AddShipmentItemIDs(ids ...int) *InventoryLotCreate {
+	_c.mutation.AddShipmentItemIDs(ids...)
+	return _c
+}
+
+// AddShipmentItems adds the "shipment_items" edges to the ShipmentItem entity.
+func (_c *InventoryLotCreate) AddShipmentItems(v ...*ShipmentItem) *InventoryLotCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddShipmentItemIDs(ids...)
+}
+
+// AddStockReservationIDs adds the "stock_reservations" edge to the StockReservation entity by IDs.
+func (_c *InventoryLotCreate) AddStockReservationIDs(ids ...int) *InventoryLotCreate {
+	_c.mutation.AddStockReservationIDs(ids...)
+	return _c
+}
+
+// AddStockReservations adds the "stock_reservations" edges to the StockReservation entity.
+func (_c *InventoryLotCreate) AddStockReservations(v ...*StockReservation) *InventoryLotCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddStockReservationIDs(ids...)
 }
 
 // Mutation returns the InventoryLotMutation object of the builder.
@@ -523,6 +587,70 @@ func (_c *InventoryLotCreate) createSpec() (*InventoryLot, *sqlgraph.CreateSpec)
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.ProductionFactsTable,
+			Columns: []string{inventorylot.ProductionFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OutsourcingFactsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.OutsourcingFactsTable,
+			Columns: []string{inventorylot.OutsourcingFactsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ShipmentItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.ShipmentItemsTable,
+			Columns: []string{inventorylot.ShipmentItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.StockReservationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   inventorylot.StockReservationsTable,
+			Columns: []string{inventorylot.StockReservationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(stockreservation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

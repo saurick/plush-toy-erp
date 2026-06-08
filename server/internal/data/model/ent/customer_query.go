@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/salesorder"
+	"server/internal/data/model/ent/shipment"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -25,6 +26,7 @@ type CustomerQuery struct {
 	inters          []Interceptor
 	predicates      []predicate.Customer
 	withSalesOrders *SalesOrderQuery
+	withShipments   *ShipmentQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -76,6 +78,28 @@ func (_q *CustomerQuery) QuerySalesOrders() *SalesOrderQuery {
 			sqlgraph.From(customer.Table, customer.FieldID, selector),
 			sqlgraph.To(salesorder.Table, salesorder.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, customer.SalesOrdersTable, customer.SalesOrdersColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryShipments chains the current query on the "shipments" edge.
+func (_q *CustomerQuery) QueryShipments() *ShipmentQuery {
+	query := (&ShipmentClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(customer.Table, customer.FieldID, selector),
+			sqlgraph.To(shipment.Table, shipment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, customer.ShipmentsTable, customer.ShipmentsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -276,6 +300,7 @@ func (_q *CustomerQuery) Clone() *CustomerQuery {
 		inters:          append([]Interceptor{}, _q.inters...),
 		predicates:      append([]predicate.Customer{}, _q.predicates...),
 		withSalesOrders: _q.withSalesOrders.Clone(),
+		withShipments:   _q.withShipments.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -290,6 +315,17 @@ func (_q *CustomerQuery) WithSalesOrders(opts ...func(*SalesOrderQuery)) *Custom
 		opt(query)
 	}
 	_q.withSalesOrders = query
+	return _q
+}
+
+// WithShipments tells the query-builder to eager-load the nodes that are connected to
+// the "shipments" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *CustomerQuery) WithShipments(opts ...func(*ShipmentQuery)) *CustomerQuery {
+	query := (&ShipmentClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withShipments = query
 	return _q
 }
 
@@ -371,8 +407,9 @@ func (_q *CustomerQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Cus
 	var (
 		nodes       = []*Customer{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			_q.withSalesOrders != nil,
+			_q.withShipments != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -397,6 +434,13 @@ func (_q *CustomerQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Cus
 		if err := _q.loadSalesOrders(ctx, query, nodes,
 			func(n *Customer) { n.Edges.SalesOrders = []*SalesOrder{} },
 			func(n *Customer, e *SalesOrder) { n.Edges.SalesOrders = append(n.Edges.SalesOrders, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withShipments; query != nil {
+		if err := _q.loadShipments(ctx, query, nodes,
+			func(n *Customer) { n.Edges.Shipments = []*Shipment{} },
+			func(n *Customer, e *Shipment) { n.Edges.Shipments = append(n.Edges.Shipments, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -428,6 +472,39 @@ func (_q *CustomerQuery) loadSalesOrders(ctx context.Context, query *SalesOrderQ
 		node, ok := nodeids[fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "customer_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *CustomerQuery) loadShipments(ctx context.Context, query *ShipmentQuery, nodes []*Customer, init func(*Customer), assign func(*Customer, *Shipment)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Customer)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(shipment.FieldCustomerID)
+	}
+	query.Where(predicate.Shipment(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(customer.ShipmentsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.CustomerID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "customer_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "customer_id" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

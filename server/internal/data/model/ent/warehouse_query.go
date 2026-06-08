@@ -9,11 +9,15 @@ import (
 	"math"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/shipmentitem"
+	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/warehouse"
 
 	"entgo.io/ent"
@@ -35,6 +39,10 @@ type WarehouseQuery struct {
 	withPurchaseReturnItems            *PurchaseReturnItemQuery
 	withPurchaseReceiptAdjustmentItems *PurchaseReceiptAdjustmentItemQuery
 	withQualityInspections             *QualityInspectionQuery
+	withProductionFacts                *ProductionFactQuery
+	withOutsourcingFacts               *OutsourcingFactQuery
+	withShipmentItems                  *ShipmentItemQuery
+	withStockReservations              *StockReservationQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -196,6 +204,94 @@ func (_q *WarehouseQuery) QueryQualityInspections() *QualityInspectionQuery {
 			sqlgraph.From(warehouse.Table, warehouse.FieldID, selector),
 			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, warehouse.QualityInspectionsTable, warehouse.QualityInspectionsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductionFacts chains the current query on the "production_facts" edge.
+func (_q *WarehouseQuery) QueryProductionFacts() *ProductionFactQuery {
+	query := (&ProductionFactClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(warehouse.Table, warehouse.FieldID, selector),
+			sqlgraph.To(productionfact.Table, productionfact.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, warehouse.ProductionFactsTable, warehouse.ProductionFactsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOutsourcingFacts chains the current query on the "outsourcing_facts" edge.
+func (_q *WarehouseQuery) QueryOutsourcingFacts() *OutsourcingFactQuery {
+	query := (&OutsourcingFactClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(warehouse.Table, warehouse.FieldID, selector),
+			sqlgraph.To(outsourcingfact.Table, outsourcingfact.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, warehouse.OutsourcingFactsTable, warehouse.OutsourcingFactsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryShipmentItems chains the current query on the "shipment_items" edge.
+func (_q *WarehouseQuery) QueryShipmentItems() *ShipmentItemQuery {
+	query := (&ShipmentItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(warehouse.Table, warehouse.FieldID, selector),
+			sqlgraph.To(shipmentitem.Table, shipmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, warehouse.ShipmentItemsTable, warehouse.ShipmentItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryStockReservations chains the current query on the "stock_reservations" edge.
+func (_q *WarehouseQuery) QueryStockReservations() *StockReservationQuery {
+	query := (&StockReservationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(warehouse.Table, warehouse.FieldID, selector),
+			sqlgraph.To(stockreservation.Table, stockreservation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, warehouse.StockReservationsTable, warehouse.StockReservationsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -401,6 +497,10 @@ func (_q *WarehouseQuery) Clone() *WarehouseQuery {
 		withPurchaseReturnItems:            _q.withPurchaseReturnItems.Clone(),
 		withPurchaseReceiptAdjustmentItems: _q.withPurchaseReceiptAdjustmentItems.Clone(),
 		withQualityInspections:             _q.withQualityInspections.Clone(),
+		withProductionFacts:                _q.withProductionFacts.Clone(),
+		withOutsourcingFacts:               _q.withOutsourcingFacts.Clone(),
+		withShipmentItems:                  _q.withShipmentItems.Clone(),
+		withStockReservations:              _q.withStockReservations.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -470,6 +570,50 @@ func (_q *WarehouseQuery) WithQualityInspections(opts ...func(*QualityInspection
 		opt(query)
 	}
 	_q.withQualityInspections = query
+	return _q
+}
+
+// WithProductionFacts tells the query-builder to eager-load the nodes that are connected to
+// the "production_facts" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *WarehouseQuery) WithProductionFacts(opts ...func(*ProductionFactQuery)) *WarehouseQuery {
+	query := (&ProductionFactClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductionFacts = query
+	return _q
+}
+
+// WithOutsourcingFacts tells the query-builder to eager-load the nodes that are connected to
+// the "outsourcing_facts" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *WarehouseQuery) WithOutsourcingFacts(opts ...func(*OutsourcingFactQuery)) *WarehouseQuery {
+	query := (&OutsourcingFactClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOutsourcingFacts = query
+	return _q
+}
+
+// WithShipmentItems tells the query-builder to eager-load the nodes that are connected to
+// the "shipment_items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *WarehouseQuery) WithShipmentItems(opts ...func(*ShipmentItemQuery)) *WarehouseQuery {
+	query := (&ShipmentItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withShipmentItems = query
+	return _q
+}
+
+// WithStockReservations tells the query-builder to eager-load the nodes that are connected to
+// the "stock_reservations" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *WarehouseQuery) WithStockReservations(opts ...func(*StockReservationQuery)) *WarehouseQuery {
+	query := (&StockReservationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withStockReservations = query
 	return _q
 }
 
@@ -551,13 +695,17 @@ func (_q *WarehouseQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Wa
 	var (
 		nodes       = []*Warehouse{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [10]bool{
 			_q.withInventoryTxns != nil,
 			_q.withInventoryBalances != nil,
 			_q.withPurchaseReceiptItems != nil,
 			_q.withPurchaseReturnItems != nil,
 			_q.withPurchaseReceiptAdjustmentItems != nil,
 			_q.withQualityInspections != nil,
+			_q.withProductionFacts != nil,
+			_q.withOutsourcingFacts != nil,
+			_q.withShipmentItems != nil,
+			_q.withStockReservations != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -626,6 +774,36 @@ func (_q *WarehouseQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Wa
 			func(n *Warehouse) { n.Edges.QualityInspections = []*QualityInspection{} },
 			func(n *Warehouse, e *QualityInspection) {
 				n.Edges.QualityInspections = append(n.Edges.QualityInspections, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductionFacts; query != nil {
+		if err := _q.loadProductionFacts(ctx, query, nodes,
+			func(n *Warehouse) { n.Edges.ProductionFacts = []*ProductionFact{} },
+			func(n *Warehouse, e *ProductionFact) { n.Edges.ProductionFacts = append(n.Edges.ProductionFacts, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withOutsourcingFacts; query != nil {
+		if err := _q.loadOutsourcingFacts(ctx, query, nodes,
+			func(n *Warehouse) { n.Edges.OutsourcingFacts = []*OutsourcingFact{} },
+			func(n *Warehouse, e *OutsourcingFact) { n.Edges.OutsourcingFacts = append(n.Edges.OutsourcingFacts, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withShipmentItems; query != nil {
+		if err := _q.loadShipmentItems(ctx, query, nodes,
+			func(n *Warehouse) { n.Edges.ShipmentItems = []*ShipmentItem{} },
+			func(n *Warehouse, e *ShipmentItem) { n.Edges.ShipmentItems = append(n.Edges.ShipmentItems, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withStockReservations; query != nil {
+		if err := _q.loadStockReservations(ctx, query, nodes,
+			func(n *Warehouse) { n.Edges.StockReservations = []*StockReservation{} },
+			func(n *Warehouse, e *StockReservation) {
+				n.Edges.StockReservations = append(n.Edges.StockReservations, e)
 			}); err != nil {
 			return nil, err
 		}
@@ -798,6 +976,126 @@ func (_q *WarehouseQuery) loadQualityInspections(ctx context.Context, query *Qua
 	}
 	query.Where(predicate.QualityInspection(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(warehouse.QualityInspectionsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.WarehouseID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "warehouse_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *WarehouseQuery) loadProductionFacts(ctx context.Context, query *ProductionFactQuery, nodes []*Warehouse, init func(*Warehouse), assign func(*Warehouse, *ProductionFact)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Warehouse)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionfact.FieldWarehouseID)
+	}
+	query.Where(predicate.ProductionFact(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(warehouse.ProductionFactsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.WarehouseID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "warehouse_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *WarehouseQuery) loadOutsourcingFacts(ctx context.Context, query *OutsourcingFactQuery, nodes []*Warehouse, init func(*Warehouse), assign func(*Warehouse, *OutsourcingFact)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Warehouse)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(outsourcingfact.FieldWarehouseID)
+	}
+	query.Where(predicate.OutsourcingFact(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(warehouse.OutsourcingFactsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.WarehouseID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "warehouse_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *WarehouseQuery) loadShipmentItems(ctx context.Context, query *ShipmentItemQuery, nodes []*Warehouse, init func(*Warehouse), assign func(*Warehouse, *ShipmentItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Warehouse)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(shipmentitem.FieldWarehouseID)
+	}
+	query.Where(predicate.ShipmentItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(warehouse.ShipmentItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.WarehouseID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "warehouse_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *WarehouseQuery) loadStockReservations(ctx context.Context, query *StockReservationQuery, nodes []*Warehouse, init func(*Warehouse), assign func(*Warehouse, *StockReservation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Warehouse)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(stockreservation.FieldWarehouseID)
+	}
+	query.Where(predicate.StockReservation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(warehouse.StockReservationsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

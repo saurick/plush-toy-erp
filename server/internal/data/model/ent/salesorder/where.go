@@ -626,6 +626,52 @@ func HasItemsWith(preds ...predicate.SalesOrderItem) predicate.SalesOrder {
 	})
 }
 
+// HasShipments applies the HasEdge predicate on the "shipments" edge.
+func HasShipments() predicate.SalesOrder {
+	return predicate.SalesOrder(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ShipmentsTable, ShipmentsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasShipmentsWith applies the HasEdge predicate on the "shipments" edge with a given conditions (other predicates).
+func HasShipmentsWith(preds ...predicate.Shipment) predicate.SalesOrder {
+	return predicate.SalesOrder(func(s *sql.Selector) {
+		step := newShipmentsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasStockReservations applies the HasEdge predicate on the "stock_reservations" edge.
+func HasStockReservations() predicate.SalesOrder {
+	return predicate.SalesOrder(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, StockReservationsTable, StockReservationsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasStockReservationsWith applies the HasEdge predicate on the "stock_reservations" edge with a given conditions (other predicates).
+func HasStockReservationsWith(preds ...predicate.StockReservation) predicate.SalesOrder {
+	return predicate.SalesOrder(func(s *sql.Selector) {
+		step := newStockReservationsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.SalesOrder) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.AndPredicates(predicates...))

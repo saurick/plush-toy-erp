@@ -53,9 +53,17 @@ type UnitEdges struct {
 	PurchaseReturnItems []*PurchaseReturnItem `json:"purchase_return_items,omitempty"`
 	// PurchaseReceiptAdjustmentItems holds the value of the purchase_receipt_adjustment_items edge.
 	PurchaseReceiptAdjustmentItems []*PurchaseReceiptAdjustmentItem `json:"purchase_receipt_adjustment_items,omitempty"`
+	// ProductionFacts holds the value of the production_facts edge.
+	ProductionFacts []*ProductionFact `json:"production_facts,omitempty"`
+	// OutsourcingFacts holds the value of the outsourcing_facts edge.
+	OutsourcingFacts []*OutsourcingFact `json:"outsourcing_facts,omitempty"`
+	// ShipmentItems holds the value of the shipment_items edge.
+	ShipmentItems []*ShipmentItem `json:"shipment_items,omitempty"`
+	// StockReservations holds the value of the stock_reservations edge.
+	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [12]bool
 }
 
 // MaterialsOrErr returns the Materials value or an error if the edge
@@ -128,6 +136,42 @@ func (e UnitEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceiptAdju
 		return e.PurchaseReceiptAdjustmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustment_items"}
+}
+
+// ProductionFactsOrErr returns the ProductionFacts value or an error if the edge
+// was not loaded in eager-loading.
+func (e UnitEdges) ProductionFactsOrErr() ([]*ProductionFact, error) {
+	if e.loadedTypes[8] {
+		return e.ProductionFacts, nil
+	}
+	return nil, &NotLoadedError{edge: "production_facts"}
+}
+
+// OutsourcingFactsOrErr returns the OutsourcingFacts value or an error if the edge
+// was not loaded in eager-loading.
+func (e UnitEdges) OutsourcingFactsOrErr() ([]*OutsourcingFact, error) {
+	if e.loadedTypes[9] {
+		return e.OutsourcingFacts, nil
+	}
+	return nil, &NotLoadedError{edge: "outsourcing_facts"}
+}
+
+// ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
+// was not loaded in eager-loading.
+func (e UnitEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
+	if e.loadedTypes[10] {
+		return e.ShipmentItems, nil
+	}
+	return nil, &NotLoadedError{edge: "shipment_items"}
+}
+
+// StockReservationsOrErr returns the StockReservations value or an error if the edge
+// was not loaded in eager-loading.
+func (e UnitEdges) StockReservationsOrErr() ([]*StockReservation, error) {
+	if e.loadedTypes[11] {
+		return e.StockReservations, nil
+	}
+	return nil, &NotLoadedError{edge: "stock_reservations"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -251,6 +295,26 @@ func (_m *Unit) QueryPurchaseReturnItems() *PurchaseReturnItemQuery {
 // QueryPurchaseReceiptAdjustmentItems queries the "purchase_receipt_adjustment_items" edge of the Unit entity.
 func (_m *Unit) QueryPurchaseReceiptAdjustmentItems() *PurchaseReceiptAdjustmentItemQuery {
 	return NewUnitClient(_m.config).QueryPurchaseReceiptAdjustmentItems(_m)
+}
+
+// QueryProductionFacts queries the "production_facts" edge of the Unit entity.
+func (_m *Unit) QueryProductionFacts() *ProductionFactQuery {
+	return NewUnitClient(_m.config).QueryProductionFacts(_m)
+}
+
+// QueryOutsourcingFacts queries the "outsourcing_facts" edge of the Unit entity.
+func (_m *Unit) QueryOutsourcingFacts() *OutsourcingFactQuery {
+	return NewUnitClient(_m.config).QueryOutsourcingFacts(_m)
+}
+
+// QueryShipmentItems queries the "shipment_items" edge of the Unit entity.
+func (_m *Unit) QueryShipmentItems() *ShipmentItemQuery {
+	return NewUnitClient(_m.config).QueryShipmentItems(_m)
+}
+
+// QueryStockReservations queries the "stock_reservations" edge of the Unit entity.
+func (_m *Unit) QueryStockReservations() *StockReservationQuery {
+	return NewUnitClient(_m.config).QueryStockReservations(_m)
 }
 
 // Update returns a builder for updating this Unit.

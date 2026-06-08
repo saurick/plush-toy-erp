@@ -38,6 +38,10 @@ const (
 	EdgeCustomer = "customer"
 	// EdgeItems holds the string denoting the items edge name in mutations.
 	EdgeItems = "items"
+	// EdgeShipments holds the string denoting the shipments edge name in mutations.
+	EdgeShipments = "shipments"
+	// EdgeStockReservations holds the string denoting the stock_reservations edge name in mutations.
+	EdgeStockReservations = "stock_reservations"
 	// Table holds the table name of the salesorder in the database.
 	Table = "sales_orders"
 	// CustomerTable is the table that holds the customer relation/edge.
@@ -54,6 +58,20 @@ const (
 	ItemsInverseTable = "sales_order_items"
 	// ItemsColumn is the table column denoting the items relation/edge.
 	ItemsColumn = "sales_order_id"
+	// ShipmentsTable is the table that holds the shipments relation/edge.
+	ShipmentsTable = "shipments"
+	// ShipmentsInverseTable is the table name for the Shipment entity.
+	// It exists in this package in order to avoid circular dependency with the "shipment" package.
+	ShipmentsInverseTable = "shipments"
+	// ShipmentsColumn is the table column denoting the shipments relation/edge.
+	ShipmentsColumn = "sales_order_id"
+	// StockReservationsTable is the table that holds the stock_reservations relation/edge.
+	StockReservationsTable = "stock_reservations"
+	// StockReservationsInverseTable is the table name for the StockReservation entity.
+	// It exists in this package in order to avoid circular dependency with the "stockreservation" package.
+	StockReservationsInverseTable = "stock_reservations"
+	// StockReservationsColumn is the table column denoting the stock_reservations relation/edge.
+	StockReservationsColumn = "sales_order_id"
 )
 
 // Columns holds all SQL columns for salesorder fields.
@@ -175,6 +193,34 @@ func ByItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByShipmentsCount orders the results by shipments count.
+func ByShipmentsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newShipmentsStep(), opts...)
+	}
+}
+
+// ByShipments orders the results by shipments terms.
+func ByShipments(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newShipmentsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByStockReservationsCount orders the results by stock_reservations count.
+func ByStockReservationsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newStockReservationsStep(), opts...)
+	}
+}
+
+// ByStockReservations orders the results by stock_reservations terms.
+func ByStockReservations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newStockReservationsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newCustomerStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -187,5 +233,19 @@ func newItemsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ItemsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, ItemsTable, ItemsColumn),
+	)
+}
+func newShipmentsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ShipmentsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ShipmentsTable, ShipmentsColumn),
+	)
+}
+func newStockReservationsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(StockReservationsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, StockReservationsTable, StockReservationsColumn),
 	)
 }

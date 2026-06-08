@@ -10,6 +10,8 @@ import (
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/shipmentitem"
+	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/unit"
 
 	"entgo.io/ent"
@@ -21,12 +23,14 @@ import (
 // ProductQuery is the builder for querying Product entities.
 type ProductQuery struct {
 	config
-	ctx             *QueryContext
-	order           []product.OrderOption
-	inters          []Interceptor
-	predicates      []predicate.Product
-	withDefaultUnit *UnitQuery
-	withBomHeaders  *BOMHeaderQuery
+	ctx                   *QueryContext
+	order                 []product.OrderOption
+	inters                []Interceptor
+	predicates            []predicate.Product
+	withDefaultUnit       *UnitQuery
+	withBomHeaders        *BOMHeaderQuery
+	withShipmentItems     *ShipmentItemQuery
+	withStockReservations *StockReservationQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -100,6 +104,50 @@ func (_q *ProductQuery) QueryBomHeaders() *BOMHeaderQuery {
 			sqlgraph.From(product.Table, product.FieldID, selector),
 			sqlgraph.To(bomheader.Table, bomheader.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, product.BomHeadersTable, product.BomHeadersColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryShipmentItems chains the current query on the "shipment_items" edge.
+func (_q *ProductQuery) QueryShipmentItems() *ShipmentItemQuery {
+	query := (&ShipmentItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(product.Table, product.FieldID, selector),
+			sqlgraph.To(shipmentitem.Table, shipmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, product.ShipmentItemsTable, product.ShipmentItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryStockReservations chains the current query on the "stock_reservations" edge.
+func (_q *ProductQuery) QueryStockReservations() *StockReservationQuery {
+	query := (&StockReservationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(product.Table, product.FieldID, selector),
+			sqlgraph.To(stockreservation.Table, stockreservation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, product.StockReservationsTable, product.StockReservationsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -294,13 +342,15 @@ func (_q *ProductQuery) Clone() *ProductQuery {
 		return nil
 	}
 	return &ProductQuery{
-		config:          _q.config,
-		ctx:             _q.ctx.Clone(),
-		order:           append([]product.OrderOption{}, _q.order...),
-		inters:          append([]Interceptor{}, _q.inters...),
-		predicates:      append([]predicate.Product{}, _q.predicates...),
-		withDefaultUnit: _q.withDefaultUnit.Clone(),
-		withBomHeaders:  _q.withBomHeaders.Clone(),
+		config:                _q.config,
+		ctx:                   _q.ctx.Clone(),
+		order:                 append([]product.OrderOption{}, _q.order...),
+		inters:                append([]Interceptor{}, _q.inters...),
+		predicates:            append([]predicate.Product{}, _q.predicates...),
+		withDefaultUnit:       _q.withDefaultUnit.Clone(),
+		withBomHeaders:        _q.withBomHeaders.Clone(),
+		withShipmentItems:     _q.withShipmentItems.Clone(),
+		withStockReservations: _q.withStockReservations.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -326,6 +376,28 @@ func (_q *ProductQuery) WithBomHeaders(opts ...func(*BOMHeaderQuery)) *ProductQu
 		opt(query)
 	}
 	_q.withBomHeaders = query
+	return _q
+}
+
+// WithShipmentItems tells the query-builder to eager-load the nodes that are connected to
+// the "shipment_items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductQuery) WithShipmentItems(opts ...func(*ShipmentItemQuery)) *ProductQuery {
+	query := (&ShipmentItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withShipmentItems = query
+	return _q
+}
+
+// WithStockReservations tells the query-builder to eager-load the nodes that are connected to
+// the "stock_reservations" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductQuery) WithStockReservations(opts ...func(*StockReservationQuery)) *ProductQuery {
+	query := (&StockReservationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withStockReservations = query
 	return _q
 }
 
@@ -407,9 +479,11 @@ func (_q *ProductQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Prod
 	var (
 		nodes       = []*Product{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [4]bool{
 			_q.withDefaultUnit != nil,
 			_q.withBomHeaders != nil,
+			_q.withShipmentItems != nil,
+			_q.withStockReservations != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -440,6 +514,22 @@ func (_q *ProductQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Prod
 		if err := _q.loadBomHeaders(ctx, query, nodes,
 			func(n *Product) { n.Edges.BomHeaders = []*BOMHeader{} },
 			func(n *Product, e *BOMHeader) { n.Edges.BomHeaders = append(n.Edges.BomHeaders, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withShipmentItems; query != nil {
+		if err := _q.loadShipmentItems(ctx, query, nodes,
+			func(n *Product) { n.Edges.ShipmentItems = []*ShipmentItem{} },
+			func(n *Product, e *ShipmentItem) { n.Edges.ShipmentItems = append(n.Edges.ShipmentItems, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withStockReservations; query != nil {
+		if err := _q.loadStockReservations(ctx, query, nodes,
+			func(n *Product) { n.Edges.StockReservations = []*StockReservation{} },
+			func(n *Product, e *StockReservation) {
+				n.Edges.StockReservations = append(n.Edges.StockReservations, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -490,6 +580,66 @@ func (_q *ProductQuery) loadBomHeaders(ctx context.Context, query *BOMHeaderQuer
 	}
 	query.Where(predicate.BOMHeader(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(product.BomHeadersColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductQuery) loadShipmentItems(ctx context.Context, query *ShipmentItemQuery, nodes []*Product, init func(*Product), assign func(*Product, *ShipmentItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Product)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(shipmentitem.FieldProductID)
+	}
+	query.Where(predicate.ShipmentItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(product.ShipmentItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductQuery) loadStockReservations(ctx context.Context, query *StockReservationQuery, nodes []*Product, init func(*Product), assign func(*Product, *StockReservation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Product)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(stockreservation.FieldProductID)
+	}
+	query.Where(predicate.StockReservation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(product.StockReservationsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

@@ -400,6 +400,60 @@ var (
 			},
 		},
 	}
+	// FinanceFactsColumns holds the columns for the "finance_facts" table.
+	FinanceFactsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "fact_no", Type: field.TypeString, Size: 64},
+		{Name: "fact_type", Type: field.TypeString, Size: 32},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "counterparty_type", Type: field.TypeString, Size: 16},
+		{Name: "counterparty_id", Type: field.TypeInt, Nullable: true},
+		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "currency", Type: field.TypeString, Size: 16, Default: "CNY"},
+		{Name: "source_type", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "source_id", Type: field.TypeInt, Nullable: true},
+		{Name: "source_line_id", Type: field.TypeInt, Nullable: true},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
+		{Name: "occurred_at", Type: field.TypeTime},
+		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "settled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// FinanceFactsTable holds the schema information for the "finance_facts" table.
+	FinanceFactsTable = &schema.Table{
+		Name:       "finance_facts",
+		Columns:    FinanceFactsColumns,
+		PrimaryKey: []*schema.Column{FinanceFactsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "financefact_fact_no",
+				Unique:  true,
+				Columns: []*schema.Column{FinanceFactsColumns[1]},
+			},
+			{
+				Name:    "financefact_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{FinanceFactsColumns[11]},
+			},
+			{
+				Name:    "financefact_fact_type_status",
+				Unique:  false,
+				Columns: []*schema.Column{FinanceFactsColumns[2], FinanceFactsColumns[3]},
+			},
+			{
+				Name:    "financefact_counterparty_type_counterparty_id",
+				Unique:  false,
+				Columns: []*schema.Column{FinanceFactsColumns[4], FinanceFactsColumns[5]},
+			},
+			{
+				Name:    "financefact_source_type_source_id_source_line_id",
+				Unique:  false,
+				Columns: []*schema.Column{FinanceFactsColumns[8], FinanceFactsColumns[9], FinanceFactsColumns[10]},
+			},
+		},
+	}
 	// InventoryBalancesColumns holds the columns for the "inventory_balances" table.
 	InventoryBalancesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -611,6 +665,88 @@ var (
 			},
 		},
 	}
+	// OutsourcingFactsColumns holds the columns for the "outsourcing_facts" table.
+	OutsourcingFactsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "fact_no", Type: field.TypeString, Size: 64},
+		{Name: "fact_type", Type: field.TypeString, Size: 32},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "subject_type", Type: field.TypeString, Size: 16},
+		{Name: "subject_id", Type: field.TypeInt},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "supplier_id", Type: field.TypeInt, Nullable: true},
+		{Name: "supplier_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "source_type", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "source_id", Type: field.TypeInt, Nullable: true},
+		{Name: "source_line_id", Type: field.TypeInt, Nullable: true},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
+		{Name: "occurred_at", Type: field.TypeTime},
+		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// OutsourcingFactsTable holds the schema information for the "outsourcing_facts" table.
+	OutsourcingFactsTable = &schema.Table{
+		Name:       "outsourcing_facts",
+		Columns:    OutsourcingFactsColumns,
+		PrimaryKey: []*schema.Column{OutsourcingFactsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "outsourcing_facts_inventory_lots_outsourcing_facts",
+				Columns:    []*schema.Column{OutsourcingFactsColumns[18]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "outsourcing_facts_units_outsourcing_facts",
+				Columns:    []*schema.Column{OutsourcingFactsColumns[19]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "outsourcing_facts_warehouses_outsourcing_facts",
+				Columns:    []*schema.Column{OutsourcingFactsColumns[20]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "outsourcingfact_fact_no",
+				Unique:  true,
+				Columns: []*schema.Column{OutsourcingFactsColumns[1]},
+			},
+			{
+				Name:    "outsourcingfact_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{OutsourcingFactsColumns[12]},
+			},
+			{
+				Name:    "outsourcingfact_fact_type_status",
+				Unique:  false,
+				Columns: []*schema.Column{OutsourcingFactsColumns[2], OutsourcingFactsColumns[3]},
+			},
+			{
+				Name:    "outsourcingfact_supplier_id",
+				Unique:  false,
+				Columns: []*schema.Column{OutsourcingFactsColumns[7]},
+			},
+			{
+				Name:    "outsourcingfact_source_type_source_id_source_line_id",
+				Unique:  false,
+				Columns: []*schema.Column{OutsourcingFactsColumns[9], OutsourcingFactsColumns[10], OutsourcingFactsColumns[11]},
+			},
+			{
+				Name:    "outsourcingfact_subject_type_subject_id_warehouse_id_lot_id",
+				Unique:  false,
+				Columns: []*schema.Column{OutsourcingFactsColumns[4], OutsourcingFactsColumns[5], OutsourcingFactsColumns[20], OutsourcingFactsColumns[18]},
+			},
+		},
+	}
 	// PermissionsColumns holds the columns for the "permissions" table.
 	PermissionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -692,6 +828,81 @@ var (
 				Name:    "product_name",
 				Unique:  false,
 				Columns: []*schema.Column{ProductsColumns[2]},
+			},
+		},
+	}
+	// ProductionFactsColumns holds the columns for the "production_facts" table.
+	ProductionFactsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "fact_no", Type: field.TypeString, Size: 64},
+		{Name: "fact_type", Type: field.TypeString, Size: 32},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "subject_type", Type: field.TypeString, Size: 16},
+		{Name: "subject_id", Type: field.TypeInt},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "source_type", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "source_id", Type: field.TypeInt, Nullable: true},
+		{Name: "source_line_id", Type: field.TypeInt, Nullable: true},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
+		{Name: "occurred_at", Type: field.TypeTime},
+		{Name: "posted_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// ProductionFactsTable holds the schema information for the "production_facts" table.
+	ProductionFactsTable = &schema.Table{
+		Name:       "production_facts",
+		Columns:    ProductionFactsColumns,
+		PrimaryKey: []*schema.Column{ProductionFactsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "production_facts_inventory_lots_production_facts",
+				Columns:    []*schema.Column{ProductionFactsColumns[16]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_facts_units_production_facts",
+				Columns:    []*schema.Column{ProductionFactsColumns[17]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_facts_warehouses_production_facts",
+				Columns:    []*schema.Column{ProductionFactsColumns[18]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productionfact_fact_no",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionFactsColumns[1]},
+			},
+			{
+				Name:    "productionfact_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{ProductionFactsColumns[10]},
+			},
+			{
+				Name:    "productionfact_fact_type_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionFactsColumns[2], ProductionFactsColumns[3]},
+			},
+			{
+				Name:    "productionfact_source_type_source_id_source_line_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionFactsColumns[7], ProductionFactsColumns[8], ProductionFactsColumns[9]},
+			},
+			{
+				Name:    "productionfact_subject_type_subject_id_warehouse_id_lot_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionFactsColumns[4], ProductionFactsColumns[5], ProductionFactsColumns[18], ProductionFactsColumns[16]},
 			},
 		},
 	}
@@ -1446,6 +1657,239 @@ var (
 			},
 		},
 	}
+	// ShipmentsColumns holds the columns for the "shipments" table.
+	ShipmentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shipment_no", Type: field.TypeString, Size: 64},
+		{Name: "customer_snapshot", Type: field.TypeString, Nullable: true, Size: 512},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
+		{Name: "planned_ship_at", Type: field.TypeTime, Nullable: true},
+		{Name: "shipped_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "customer_id", Type: field.TypeInt, Nullable: true},
+		{Name: "sales_order_id", Type: field.TypeInt, Nullable: true},
+	}
+	// ShipmentsTable holds the schema information for the "shipments" table.
+	ShipmentsTable = &schema.Table{
+		Name:       "shipments",
+		Columns:    ShipmentsColumns,
+		PrimaryKey: []*schema.Column{ShipmentsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shipments_customers_shipments",
+				Columns:    []*schema.Column{ShipmentsColumns[10]},
+				RefColumns: []*schema.Column{CustomersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "shipments_sales_orders_shipments",
+				Columns:    []*schema.Column{ShipmentsColumns[11]},
+				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shipment_shipment_no",
+				Unique:  true,
+				Columns: []*schema.Column{ShipmentsColumns[1]},
+			},
+			{
+				Name:    "shipment_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{ShipmentsColumns[4]},
+			},
+			{
+				Name:    "shipment_sales_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentsColumns[11]},
+			},
+			{
+				Name:    "shipment_customer_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentsColumns[10]},
+			},
+			{
+				Name:    "shipment_status",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentsColumns[3]},
+			},
+		},
+	}
+	// ShipmentItemsColumns holds the columns for the "shipment_items" table.
+	ShipmentItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "product_id", Type: field.TypeInt},
+		{Name: "sales_order_item_id", Type: field.TypeInt, Nullable: true},
+		{Name: "shipment_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// ShipmentItemsTable holds the schema information for the "shipment_items" table.
+	ShipmentItemsTable = &schema.Table{
+		Name:       "shipment_items",
+		Columns:    ShipmentItemsColumns,
+		PrimaryKey: []*schema.Column{ShipmentItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shipment_items_inventory_lots_shipment_items",
+				Columns:    []*schema.Column{ShipmentItemsColumns[5]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "shipment_items_products_shipment_items",
+				Columns:    []*schema.Column{ShipmentItemsColumns[6]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "shipment_items_sales_order_items_shipment_items",
+				Columns:    []*schema.Column{ShipmentItemsColumns[7]},
+				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "shipment_items_shipments_items",
+				Columns:    []*schema.Column{ShipmentItemsColumns[8]},
+				RefColumns: []*schema.Column{ShipmentsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "shipment_items_units_shipment_items",
+				Columns:    []*schema.Column{ShipmentItemsColumns[9]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "shipment_items_warehouses_shipment_items",
+				Columns:    []*schema.Column{ShipmentItemsColumns[10]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shipmentitem_shipment_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentItemsColumns[8]},
+			},
+			{
+				Name:    "shipmentitem_sales_order_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentItemsColumns[7]},
+			},
+			{
+				Name:    "shipmentitem_product_id_warehouse_id_lot_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentItemsColumns[6], ShipmentItemsColumns[10], ShipmentItemsColumns[5]},
+			},
+		},
+	}
+	// StockReservationsColumns holds the columns for the "stock_reservations" table.
+	StockReservationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "reservation_no", Type: field.TypeString, Size: 64},
+		{Name: "status", Type: field.TypeString, Size: 32, Default: "ACTIVE"},
+		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
+		{Name: "reserved_at", Type: field.TypeTime},
+		{Name: "released_at", Type: field.TypeTime, Nullable: true},
+		{Name: "consumed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
+		{Name: "product_id", Type: field.TypeInt},
+		{Name: "sales_order_id", Type: field.TypeInt, Nullable: true},
+		{Name: "sales_order_item_id", Type: field.TypeInt, Nullable: true},
+		{Name: "unit_id", Type: field.TypeInt},
+		{Name: "warehouse_id", Type: field.TypeInt},
+	}
+	// StockReservationsTable holds the schema information for the "stock_reservations" table.
+	StockReservationsTable = &schema.Table{
+		Name:       "stock_reservations",
+		Columns:    StockReservationsColumns,
+		PrimaryKey: []*schema.Column{StockReservationsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "stock_reservations_inventory_lots_stock_reservations",
+				Columns:    []*schema.Column{StockReservationsColumns[11]},
+				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "stock_reservations_products_stock_reservations",
+				Columns:    []*schema.Column{StockReservationsColumns[12]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "stock_reservations_sales_orders_stock_reservations",
+				Columns:    []*schema.Column{StockReservationsColumns[13]},
+				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "stock_reservations_sales_order_items_stock_reservations",
+				Columns:    []*schema.Column{StockReservationsColumns[14]},
+				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "stock_reservations_units_stock_reservations",
+				Columns:    []*schema.Column{StockReservationsColumns[15]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "stock_reservations_warehouses_stock_reservations",
+				Columns:    []*schema.Column{StockReservationsColumns[16]},
+				RefColumns: []*schema.Column{WarehousesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "stockreservation_reservation_no",
+				Unique:  true,
+				Columns: []*schema.Column{StockReservationsColumns[1]},
+			},
+			{
+				Name:    "stockreservation_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{StockReservationsColumns[4]},
+			},
+			{
+				Name:    "stockreservation_status",
+				Unique:  false,
+				Columns: []*schema.Column{StockReservationsColumns[2]},
+			},
+			{
+				Name:    "stockreservation_sales_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{StockReservationsColumns[13]},
+			},
+			{
+				Name:    "stockreservation_sales_order_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{StockReservationsColumns[14]},
+			},
+			{
+				Name:    "stockreservation_product_id_warehouse_id_lot_id",
+				Unique:  false,
+				Columns: []*schema.Column{StockReservationsColumns[12], StockReservationsColumns[16], StockReservationsColumns[11]},
+			},
+		},
+	}
 	// SuppliersColumns holds the columns for the "suppliers" table.
 	SuppliersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1703,12 +2147,15 @@ var (
 		BusinessRecordItemsTable,
 		ContactsTable,
 		CustomersTable,
+		FinanceFactsTable,
 		InventoryBalancesTable,
 		InventoryLotsTable,
 		InventoryTxnsTable,
 		MaterialsTable,
+		OutsourcingFactsTable,
 		PermissionsTable,
 		ProductsTable,
+		ProductionFactsTable,
 		PurchaseReceiptsTable,
 		PurchaseReceiptAdjustmentsTable,
 		PurchaseReceiptAdjustmentItemsTable,
@@ -1720,6 +2167,9 @@ var (
 		RolePermissionsTable,
 		SalesOrdersTable,
 		SalesOrderItemsTable,
+		ShipmentsTable,
+		ShipmentItemsTable,
+		StockReservationsTable,
 		SuppliersTable,
 		UnitsTable,
 		UsersTable,
@@ -1744,6 +2194,13 @@ func init() {
 	ContactsTable.Annotation.Checks = map[string]string{
 		"contacts_owner_type_allowed": "owner_type IN ('CUSTOMER', 'SUPPLIER')",
 	}
+	FinanceFactsTable.Annotation = &entsql.Annotation{}
+	FinanceFactsTable.Annotation.Checks = map[string]string{
+		"finance_facts_amount_positive":      "amount > 0",
+		"finance_facts_counterparty_allowed": "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
+		"finance_facts_status_allowed":       "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
+		"finance_facts_type_allowed":         "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'PAYMENT', 'RECONCILIATION')",
+	}
 	InventoryBalancesTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	InventoryBalancesTable.ForeignKeys[1].RefTable = UnitsTable
 	InventoryBalancesTable.ForeignKeys[2].RefTable = WarehousesTable
@@ -1751,7 +2208,27 @@ func init() {
 	InventoryTxnsTable.ForeignKeys[1].RefTable = UnitsTable
 	InventoryTxnsTable.ForeignKeys[2].RefTable = WarehousesTable
 	MaterialsTable.ForeignKeys[0].RefTable = UnitsTable
+	OutsourcingFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	OutsourcingFactsTable.ForeignKeys[1].RefTable = UnitsTable
+	OutsourcingFactsTable.ForeignKeys[2].RefTable = WarehousesTable
+	OutsourcingFactsTable.Annotation = &entsql.Annotation{}
+	OutsourcingFactsTable.Annotation.Checks = map[string]string{
+		"outsourcing_facts_quantity_positive": "quantity > 0",
+		"outsourcing_facts_status_allowed":    "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+		"outsourcing_facts_subject_allowed":   "subject_type IN ('MATERIAL', 'PRODUCT')",
+		"outsourcing_facts_type_allowed":      "fact_type IN ('MATERIAL_ISSUE', 'RETURN_RECEIPT')",
+	}
 	ProductsTable.ForeignKeys[0].RefTable = UnitsTable
+	ProductionFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	ProductionFactsTable.ForeignKeys[1].RefTable = UnitsTable
+	ProductionFactsTable.ForeignKeys[2].RefTable = WarehousesTable
+	ProductionFactsTable.Annotation = &entsql.Annotation{}
+	ProductionFactsTable.Annotation.Checks = map[string]string{
+		"production_facts_quantity_positive": "quantity > 0",
+		"production_facts_status_allowed":    "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+		"production_facts_subject_allowed":   "subject_type IN ('MATERIAL', 'PRODUCT')",
+		"production_facts_type_allowed":      "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK')",
+	}
 	PurchaseReceiptsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
 	PurchaseReceiptAdjustmentsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
 	PurchaseReceiptAdjustmentsTable.ForeignKeys[1].RefTable = PurchaseReceiptsTable
@@ -1810,6 +2287,33 @@ func init() {
 		"sales_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
 		"sales_order_items_ordered_qty_positive":    "ordered_quantity > 0",
 		"sales_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
+	}
+	ShipmentsTable.ForeignKeys[0].RefTable = CustomersTable
+	ShipmentsTable.ForeignKeys[1].RefTable = SalesOrdersTable
+	ShipmentsTable.Annotation = &entsql.Annotation{}
+	ShipmentsTable.Annotation.Checks = map[string]string{
+		"shipments_status_allowed": "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
+	}
+	ShipmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	ShipmentItemsTable.ForeignKeys[1].RefTable = ProductsTable
+	ShipmentItemsTable.ForeignKeys[2].RefTable = SalesOrderItemsTable
+	ShipmentItemsTable.ForeignKeys[3].RefTable = ShipmentsTable
+	ShipmentItemsTable.ForeignKeys[4].RefTable = UnitsTable
+	ShipmentItemsTable.ForeignKeys[5].RefTable = WarehousesTable
+	ShipmentItemsTable.Annotation = &entsql.Annotation{}
+	ShipmentItemsTable.Annotation.Checks = map[string]string{
+		"shipment_items_quantity_positive": "quantity > 0",
+	}
+	StockReservationsTable.ForeignKeys[0].RefTable = InventoryLotsTable
+	StockReservationsTable.ForeignKeys[1].RefTable = ProductsTable
+	StockReservationsTable.ForeignKeys[2].RefTable = SalesOrdersTable
+	StockReservationsTable.ForeignKeys[3].RefTable = SalesOrderItemsTable
+	StockReservationsTable.ForeignKeys[4].RefTable = UnitsTable
+	StockReservationsTable.ForeignKeys[5].RefTable = WarehousesTable
+	StockReservationsTable.Annotation = &entsql.Annotation{}
+	StockReservationsTable.Annotation.Checks = map[string]string{
+		"stock_reservations_quantity_positive": "quantity > 0",
+		"stock_reservations_status_allowed":    "status IN ('ACTIVE', 'RELEASED', 'CONSUMED', 'CANCELLED')",
 	}
 	SuppliersTable.Annotation = &entsql.Annotation{}
 	SuppliersTable.Annotation.Checks = map[string]string{
