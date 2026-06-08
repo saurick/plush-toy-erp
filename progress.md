@@ -251,3 +251,19 @@
 - 验证：`TRIAL_ACCOUNT_PASSWORD=12345678 node scripts/qa/trial-account-rbac.mjs` 通过，覆盖 9 个 demo 账号角色、岗位权限、debug 权限、super admin 和 disabled 边界；`pnpm --dir web smoke:trial-demo-browser` 通过，覆盖桌面账号 9 个、岗位任务端 8 个、拒绝态 1 个；`bash scripts/qa/fast.sh` 通过；`git diff --check` 通过。
 - 下一步：可按当前本地 evidence 继续整理 Phase 7 验收记录；若要提交推送，需要用户明确确认提交推送。
 - 阻塞/风险：本轮只在本地 dev DB 写入模拟数据，不代表目标客户环境已写入或客户已验收；未执行真实 import，未写 `business_records`，未创建出货、库存、财务、发票、付款、应收或应付事实。追加前 `progress.md` 为 245 行 / 46862 bytes，未达到归档阈值。
+
+## 2026-06-08 20:20 CST
+
+- 完成：新增 `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md`，正式记录 Phase 7 本地模拟数据试用验收结果：本地 dev DB 已完成模拟主数据、模拟客户 / 供应商 / 联系人 / 销售订单写入，账号 RBAC、浏览器入口 smoke 和 `fast.sh` 均已通过。
+- 完成：同步更新 `docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和 `docs/product/product-delivery-ledgers.md`，明确 Phase 7 不拆 A/B/C/D 或字母子阶段，真实客户数据当前不可导入，只能模拟；本地通过不等于目标客户环境正式验收，也不代表进入 Phase 8。
+- 验证：`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过；`node --test scripts/qa/phase7-simulated-trial-data.test.mjs` 通过。
+- 下一步：若用户确认以本地模拟试用作为当前 Phase 7 完成口径，可记录 Phase 7 closure decision；若要客户正式试用验收，需要在目标环境复跑账号、RBAC、菜单、V1 页面和岗位任务端验证并追加 evidence。
+- 阻塞/风险：本轮只做正式文档记录和台账同步，未改 schema、migration、runtime、API、RBAC 真源、Workflow / Fact usecase、部署脚本或 DB；目标客户环境和客户正式验收仍未完成。追加前 `progress.md` 为 253 行 / 48422 bytes，未达到归档阈值。
+
+## 2026-06-08 20:25 CST
+
+- 完成：按用户继续指令，将“本地模拟试用通过”正式写为当前 Phase 7 关闭口径；更新 `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md`、`docs/customers/yoyoosun/decision-log.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和 `docs/product/product-delivery-ledgers.md`。
+- 完成：明确 Phase 7 关闭不等于目标客户环境正式验收、不等于真实客户数据导入、不等于 Phase 8 事实层能力已实现；目标环境验收保留为交付后续项，Phase 8 只能先进入事实层评审准备。
+- 验证：`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过；`node --test scripts/qa/phase7-simulated-trial-data.test.mjs` 通过。
+- 下一步：开始 Phase 8 前，应先做事实层评审准备，优先确认生产、委外、出货、库存预留、财务哪条链路先开，不直接写 runtime / migration。
+- 阻塞/风险：本轮只做 Phase 7 closure 文档口径更新，未改 schema、migration、runtime、API、RBAC 真源、Workflow / Fact usecase、部署脚本或 DB。追加前 `progress.md` 为 261 行 / 49904 bytes，未达到归档阈值。

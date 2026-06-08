@@ -318,10 +318,10 @@ MVP 原则：
 | 环境准备 | DB、对象存储、Compose、配置包就绪 |
 | migration apply | 目标库结构确认 |
 | simulated data prepared | `scripts/seed-phase7-sim-masterdata.sh`、`scripts/qa/phase7-simulated-trial-data.mjs` 或等价 seed、fixture、手工样本已标记为模拟数据 |
-| trial rehearsal | 用模拟数据验证试用环境、账号、菜单、V1 页面和岗位任务端入口 |
+| trial rehearsal | 本地 dev DB 已用模拟数据验证账号、RBAC、菜单、V1 页面和岗位任务端入口；目标客户环境复跑仍待执行 |
 | training | 按岗位培训 |
 | trial run | 小范围模拟数据试用 |
-| acceptance | 记录通过、阻塞和下一轮问题 |
+| acceptance | `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md` 已记录本地模拟试用通过，并作为当前 Phase 7 关闭口径；真实导入不可执行，目标客户环境验收转为交付后续 |
 
 完成口径：
 
@@ -331,6 +331,7 @@ MVP 原则：
 * 试用账号、RBAC、菜单、V1 页面和岗位任务端回归通过。
 * 培训说明已覆盖销售订单、导入、出货、库存和财务边界。
 * 验收记录明确剩余问题、阻塞和下一轮任务。
+* 当前 Phase 7 已按本地 dev DB 模拟数据试用通过关闭；目标客户环境正式验收仍需单独复跑并追加 evidence，不能自动视为客户交付完成。
 
 不做：
 
@@ -341,6 +342,8 @@ MVP 原则：
 * 不把当前模拟数据试用写成 Phase 7 真实导入完成。
 * 不把真实数据导入拆成 Phase 7 的 A/B/C/D 或其他字母子阶段。
 * 不绕过 V1 usecase 直接写 DB、`business_records`、库存、出货或财务事实。
+
+Phase 7 关闭后，Phase 8 可以开始评审准备，但不得跳过生产、委外、出货、库存预留和财务事实的单独 usecase / schema / migration / API / UI / 测试评审。
 
 ## 10. Phase 8：生产 / 委外 / 出货 / 财务事实扩展
 

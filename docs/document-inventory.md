@@ -128,6 +128,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/import-source-inventory.md` | 永绅 yoyoosun 客户导入来源清单 / Yoyoosun Customer Import Source Inventory |
 | `docs/customers/yoyoosun/import-strategy.md` | 永绅 yoyoosun 客户导入策略 / Yoyoosun Customer Import Strategy |
 | `docs/customers/yoyoosun/import-unresolved-queue.md` | 永绅 yoyoosun 客户导入待确认队列 / Yoyoosun Customer Import Unresolved Queue |
+| `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md` | Phase 7 模拟数据试用验收记录 / Phase 7 Simulated Trial Acceptance |
 | `docs/customers/yoyoosun/question-backlog.md` | 问题待办 / Question Backlog |
 | `docs/customers/yoyoosun/real-dry-run-evidence.md` | 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
 | `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |
