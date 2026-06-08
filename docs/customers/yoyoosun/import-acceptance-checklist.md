@@ -7,7 +7,9 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入验收清单 / Yoyoosun Customer Import Acceptance Checklist
 
-本清单用于 永绅 yoyoosun 客户导入前的 dry-run、freeze、approval 和 execution gate 验收。当前已具备 dry-run draft、CLI dry-run package、source snapshot freeze checker、sanitized freeze fixtures、freeze evidence、real dry-run evidence、manual review checklist 和受控 import execution loader。执行器默认只生成报告；真实写入仍必须另有客户确认、备份证据、显式执行门禁和目标环境信息。
+本清单用于 永绅 yoyoosun 客户导入前的 dry-run、freeze、approval 和 execution gate 验收。当前已具备 dry-run draft、CLI dry-run package、source snapshot freeze checker、sanitized freeze fixtures、freeze evidence、real dry-run evidence、manual review checklist 和受控 import execution loader。当前没有可直接执行的客户真实数据，Phase 7 中执行器只允许用于报告模式和门禁校验，不执行真实写入。
+
+Phase 7 不拆 A/B/C/D 或任何字母子阶段，试用目标只能一次性使用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据做环境、账号、菜单、V1 页面和岗位任务端演练；本清单中的 execution loader 不应被用于把模拟数据写成客户真实导入结果。
 
 ## 检查清单 / Checklist
 
@@ -19,6 +21,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | manual review checklist prepared                             |                               是 | `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md`                                                                                                                                            | Evidence prepared          |
 | execution loader available                                   |                               是 | `scripts/import/customerImportExecute.mjs`、`scripts/import/customerImportExecute.test.mjs`                                                                                                                     | Tooling available          |
 | execution report generated                                   |                               是 | `import-execution-report.json`、`import-execution-report.md`                                                                                                                                                    | Report mode available      |
+| simulated trial data marked                                  |                               是 | seed、fixture 或手工样本必须标记为 simulated / demo，不可写成客户真实数据                                                                                                                                       | Current trial target       |
 | field classification reviewed                                |                               是 | `import-field-classification.md` 经人工评审                                                                                                                                                                     | Draft only                 |
 | target model confirmed                                       |                               是 | V1 / existing formal model 列表                                                                                                                                                                                 | Draft only                 |
 | required fields present                                      |                               是 | required field validation summary                                                                                                                                                                               | Draft only                 |
@@ -51,7 +54,7 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-`validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。真实导入仍需要人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和受控 execution loader 门禁。
+`validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。当前 Phase 7 不执行真实导入；人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和 execution loader 门禁只能作为未来另开数据治理评审的输入，不能改变当前只能模拟的试用目标。
 
 ## 冻结证据 / Freeze Evidence
 
@@ -88,7 +91,7 @@ node scripts/import/customerImportExecute.mjs \
   --out output/customers/yoyoosun/import-execution
 ```
 
-没有 `--execute` 时，报告中的 `executed` 必须为 `false`。真实写入必须额外提供：
+没有 `--execute` 时，报告中的 `executed` 必须为 `false`。当前 Phase 7 禁止真实写入；以下变量只描述执行器历史门禁形态，不代表当前允许使用：
 
 ```bash
 CUSTOMER_IMPORT_CONFIRM=EXECUTE_YOYOOSUN_IMPORT
@@ -96,7 +99,7 @@ CUSTOMER_IMPORT_ADMIN_TOKEN=...
 # or CUSTOMER_IMPORT_ADMIN_USERNAME / CUSTOMER_IMPORT_ADMIN_PASSWORD
 ```
 
-并显式传入 `--backend-url` 或 `CUSTOMER_IMPORT_BACKEND_URL`。不要把 sample approval fixture 当客户批准。
+即使显式传入 `--backend-url` 或 `CUSTOMER_IMPORT_BACKEND_URL`，当前也不得在 Phase 7 执行真实写入。不要把 sample approval fixture 当客户批准。
 
 ## 导入前门禁 / Pre-import Gate
 
@@ -109,7 +112,7 @@ CUSTOMER_IMPORT_ADMIN_TOKEN=...
 5. 备份、回滚、幂等、校验和审计已在单独 implementation task 中设计。
 6. import loader 只走正式 V1 JSON-RPC API / existing usecase，不绕过业务规则。
 7. `business_records` 保留为 source snapshot，不双写。
-8. execution report 已生成并归档，真实执行后还必须补导入后对账。
+8. execution report 已生成并归档；当前不进入真实执行或导入后对账。
 
 ## 拒绝条件 / Rejection Criteria
 
@@ -120,6 +123,8 @@ CUSTOMER_IMPORT_ADMIN_TOKEN=...
 - 需要从旧记录自动生成 shipment / inventory / finance facts。
 - 需要修改 seedData、docs registry、runtime API/UI 或 `business_records` 才能让 dry-run 通过。
 - 永绅 yoyoosun 客户字段被当作 Product Core 必填字段。
+- 模拟数据被当作客户真实数据或导入批准。
+- 真实导入被拆成 Phase 7 的字母子阶段或后续半阶段。
 - unresolved queue 中还有 block 项。
 - freeze evidence 或 real dry-run evidence 被误读为真实导入批准。
 - 缺少 approval、backup evidence、确认短语、目标后端或管理员凭据。

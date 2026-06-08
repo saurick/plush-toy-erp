@@ -117,7 +117,7 @@
 | 4 | 采购 / 质检 / 库存事实基础 | 建立可信库存和采购事实基础 | purchase receipt / return / adjustment、quality、inventory txns / lots / balances | 不让客户配置核心库存规则 |
 | 5 | 正式产品入口与旧入口退出 | 建立正式菜单、权限入口和业务帮助边界；开发阶段不保留与正式 V1 重叠的旧兼容页面 | formal menu、legacy removal、RBAC guard、business help | 不保留旧入口作为正式写路径或兼容只读页 |
 | 6 | 客户数据 dry-run 与 loader 设计 | 设计受控导入，不写错库、不伪造事实 | freeze、dry-run evidence、loader design、unresolved queue、acceptance checklist | 不直接真实导入 |
-| 7 | 受控导入与试点部署 | 备份、回滚、导入、校验、培训和试运行 | import execution audit、deployment package、trial acceptance | 不无备份上线 |
+| 7 | 模拟数据试点部署与验收 | 当前无真实客户数据，Phase 7 不拆字母子阶段，只能一次性用模拟数据完成试用环境演练和验收 | simulated data set、trial deployment、RBAC / menu / UI / mobile smoke、training acceptance | 不真实导入；不把模拟数据试用写成真实导入 |
 | 8 | 生产 / 委外 / 出货 / 财务事实扩展 | 补齐 ERP 主干事实闭环 | production facts、outsourcing facts、shipment facts、finance facts | 不从 workflow 放行直接生成事实 |
 | 9 | 岗位任务端与岗位协同 | 将高频任务投影到岗位任务端 | mobile task entry、workflow action UI、role task smoke | 不做空壳岗位任务端 |
 | 10 | 行业模板沉淀 | 从多客户共性沉淀默认模板 | industry roles、menus、fields、numbering、import template | 不把单客户特殊项变默认 |
@@ -303,9 +303,13 @@ MVP 原则：
 * loader design 先于 implementation。
 * 真实导入不能生成出货、库存出库、财务、发票或付款事实。
 
-## 9. Phase 7：受控导入与试点部署
+## 9. Phase 7：模拟数据试点部署与验收
 
 目标：让第一个客户在可备份、可回滚、可验收的私有化实例中试用。
+
+当前 yoyoosun 没有可直接执行的客户真实数据。Phase 7 不拆 A/B/C/D 或任何字母子阶段，当前目标只能一次性用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据验证环境、账号、RBAC、菜单、V1 页面、岗位任务端入口和培训口径；不执行真实 import，不写客户真实数据，不承诺字段已经客户确认，也不生成出货、库存或财务事实。
+
+真实客户数据导入在当前 Phase 7 中不可执行，也不作为后续半阶段、隐藏目标或完成条件。若未来真的出现可导入客户真实数据，必须另开 roadmap / 数据治理评审，不得把它作为当前 Phase 7 的延续。
 
 过程：
 
@@ -313,18 +317,29 @@ MVP 原则：
 | --- | --- |
 | 环境准备 | DB、对象存储、Compose、配置包就绪 |
 | migration apply | 目标库结构确认 |
-| backup | 导入前备份可恢复 |
-| import execution | 只写批准范围内的正式表 |
-| post-import audit | 数量、字段、关系、异常核对 |
+| simulated data prepared | seed、fixture 或手工样本已标记为模拟数据 |
+| trial rehearsal | 用模拟数据验证试用环境、账号、菜单、V1 页面和岗位任务端入口 |
 | training | 按岗位培训 |
-| trial run | 小范围真实试用 |
+| trial run | 小范围模拟数据试用 |
 | acceptance | 记录通过、阻塞和下一轮问题 |
+
+完成口径：
+
+* 目标试用环境或本地等价环境可访问。
+* migration 状态与当前服务匹配。
+* 模拟数据已标记为 seed / fixture / demo，不冒充客户真实数据。
+* 试用账号、RBAC、菜单、V1 页面和岗位任务端回归通过。
+* 培训说明已覆盖销售订单、导入、出货、库存和财务边界。
+* 验收记录明确剩余问题、阻塞和下一轮任务。
 
 不做：
 
 * 不无备份上线。
 * 不在低配服务器构建。
 * 不把试运行问题直接写成核心规则。
+* 不把 seed / fixture / demo 数据当客户真实导入结果。
+* 不把当前模拟数据试用写成 Phase 7 真实导入完成。
+* 不把真实数据导入拆成 Phase 7 的 A/B/C/D 或其他字母子阶段。
 
 ## 10. Phase 8：生产 / 委外 / 出货 / 财务事实扩展
 
@@ -446,7 +461,7 @@ Phase 0 docs-only reset
 -> Phase 4 Purchase / Quality / Inventory fact foundation
 -> Phase 5 Formal product entry and legacy exit
 -> Phase 6 Customer import loader design
--> Phase 7 Controlled import and trial deployment
+-> Phase 7 Simulated data trial deployment and acceptance
 -> Phase 8 Production / Outsourcing / Shipment / Finance facts
 -> Phase 9 Mobile task entry
 -> Phase 10 Industry template hardening
@@ -471,7 +486,7 @@ Phase 0 docs-only reset
 -> Phase 3 MasterData + Sales Order MVP
 -> Phase 5 Formal product entry
 -> Phase 6 import loader design
--> Phase 7 trial deployment and acceptance
+-> Phase 7 simulated data trial rehearsal and acceptance
 ```
 
 如果目标是尽快完善产品内核：

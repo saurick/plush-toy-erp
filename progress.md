@@ -189,7 +189,7 @@
 - 完成：新增 `scripts/import/customerImportExecute.test.mjs` 和 sample approval fixture，覆盖 help、参数解析、报告模式、备份证据缺失、forbidden source、unresolved block 和执行确认短语门禁；同步更新 `scripts/README.md`、`docs/customers/yoyoosun/import-strategy.md`、`docs/customers/yoyoosun/import-dry-run-plan.md`、`docs/customers/yoyoosun/import-acceptance-checklist.md`、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md`。
 - 验证：`node --check scripts/import/customerImportExecute.mjs && node --check scripts/import/customerImportExecute.test.mjs` 通过；`node --test scripts/import/customerImportExecute.test.mjs` 通过。后续还需跑格式、import 相关测试和 fast / full / strict 后再提交推送。
 - 下一步：执行格式检查、导入工具专项测试、customer config 守卫和仓库 QA；通过后按本轮用户要求提交并推送所有代码。
-- 阻塞/风险：本轮完成 execution loader 和门禁，不代表已对客户库真实导入。真实导入仍需要客户 sign-off、目标环境、数据库备份证据、rollback / forward-fix 方案和导入后对账；执行器拒绝 product_skus、purchase_orders、shipments、stock reservations、inventory facts 和 finance facts。追加前 `progress.md` 为 162 行 / 35050 bytes，未达到归档阈值。
+- 阻塞/风险：本轮完成 execution loader 和门禁，不代表已对客户库真实导入；该历史记录中的真实导入门禁说明已被 19:20 CST 的 Phase 7 当前规则收口为“只能模拟、不可执行真实导入”。执行器拒绝 product_skus、purchase_orders、shipments、stock reservations、inventory facts 和 finance facts。追加前 `progress.md` 为 162 行 / 35050 bytes，未达到归档阈值。
 
 ## 2026-06-08 17:50 CST
 
@@ -204,3 +204,19 @@
 - 验证：`node --test web/src/erp/config/menuPermissions.test.mjs` 通过；`git diff --check` 通过。后续将提交推送该构建修复，并用新提交重新构建 server/web 镜像部署到 `192.168.0.133`。
 - 下一步：提交推送 Dockerfile 修复，重新本地构建镜像，上传到 133，远端 `docker load`、更新 `.env` 镜像标签、执行 migration、重启 Compose、健康检查和 smoke。
 - 阻塞/风险：这是 Docker 镜像构建主路径修复，不涉及 schema、migration、runtime API 语义或真实客户导入；真实部署仍需等待新镜像构建、远端加载和健康检查。追加前 `progress.md` 为 199 行 / 37981 bytes，未达到归档阈值。
+
+## 2026-06-08 19:13 CST
+
+- 完成：同步收口 Phase 7 目标口径，明确当前 yoyoosun 没有可直接执行的客户真实数据，Phase 7 先用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据做试用环境、账号、RBAC、菜单、V1 页面、岗位任务端和培训口径演练；不拆子阶段，也不把模拟数据写成真实导入。
+- 完成：更新 `docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`、`docs/current-source-of-truth.md`、`docs/customers/yoyoosun/README.md`、`docs/customers/yoyoosun/trial-training-note.md`、`docs/customers/yoyoosun/trial-environment-runbook.md` 和 `docs/customers/yoyoosun/import-acceptance-checklist.md`，把模拟数据、真实导入、客户字段确认、出货 / 库存 / 财务事实边界同步到 roadmap、台账、真源索引和客户试用文档。
+- 验证：子阶段拆分关键词扫描无残留；`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过。
+- 下一步：准备或选择模拟数据集，在目标试用环境或本地等价环境跑账号 / RBAC / 菜单 / V1 页面 / 岗位任务端回归；当前不进入真实 import。
+- 阻塞/风险：本轮为 docs-only，未新增 seed / fixture，未执行真实导入，未改 schema、migration、runtime API、RBAC 真源、Workflow / Fact usecase、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 206 行 / 39026 bytes，未达到归档阈值。
+
+## 2026-06-08 19:20 CST
+
+- 完成：按“不要拆 A/B/C/D 子阶段、一次性做完 Phase 7、真实数据无法导入只能模拟”的口径继续收口规则层。`AGENTS.md` 新增 Phase 7 规则；`docs/product/implementation-governance.md` 新增 Phase 7 不拆字母子阶段、不可执行真实导入、只能用模拟数据一次性验收的治理要求。
+- 完成：继续更新 `docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`、`docs/current-source-of-truth.md`、`docs/customers/yoyoosun/README.md`、`docs/customers/yoyoosun/trial-training-note.md`、`docs/customers/yoyoosun/trial-environment-runbook.md` 和 `docs/customers/yoyoosun/import-acceptance-checklist.md`，移除旧的真实导入延续口径，改为当前 Phase 7 只做模拟数据试点部署与验收。
+- 验证：后续执行子阶段和后续真实导入口径扫描、`git diff --check`、`node scripts/qa/customer-config-boundaries.mjs`。
+- 下一步：准备或选择模拟数据集，在目标试用环境或本地等价环境一次性跑完账号 / RBAC / 菜单 / V1 页面 / 岗位任务端 / 培训验收；不进入真实 import。
+- 阻塞/风险：本轮仍为 docs-only，未新增 seed / fixture，未执行真实导入，未改 schema、migration、runtime API、RBAC 真源、Workflow / Fact usecase、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 214 行 / 40633 bytes，未达到归档阈值。
