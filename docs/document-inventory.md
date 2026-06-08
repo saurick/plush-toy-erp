@@ -72,6 +72,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/architecture/masterdata-order-source-document-review.md` | 主数据 / 源单据 / 事实边界评审 / MasterData / Source Document / Fact Review |
 | `docs/architecture/material-product-inventory-schema-review.md` | 材料、成品、BOM 与库存专表 Schema 评审 |
 | `docs/architecture/order-purchase-boundary-review.md` | 订单 / 采购边界评审 / Order / Purchase Boundary Review |
+| `docs/architecture/phase8-fact-expansion-review.md` | Phase 8 事实层扩展总评审 / Phase 8 Fact Expansion Review |
 | `docs/architecture/product-sku-bom-boundary-review.md` | 产品 / SKU / BOM 边界评审 / Product / SKU / BOM Boundary Review |
 | `docs/architecture/shipment-inventory-boundary-review.md` | 出货事实与库存边界评审 / Shipment / Inventory Boundary Review |
 | `docs/architecture/shipment-release-workflow-review.md` | 出货放行 Workflow Usecase 评审 / Shipment Release Workflow Usecase Review |

@@ -267,3 +267,11 @@
 - 验证：`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过；`node --test scripts/qa/phase7-simulated-trial-data.test.mjs` 通过。
 - 下一步：开始 Phase 8 前，应先做事实层评审准备，优先确认生产、委外、出货、库存预留、财务哪条链路先开，不直接写 runtime / migration。
 - 阻塞/风险：本轮只做 Phase 7 closure 文档口径更新，未改 schema、migration、runtime、API、RBAC 真源、Workflow / Fact usecase、部署脚本或 DB。追加前 `progress.md` 为 261 行 / 49904 bytes，未达到归档阈值。
+
+## 2026-06-08 20:36 CST
+
+- 完成：按“开启 Phase 8，但不拆任何字母子阶段”的口径新增 `docs/architecture/phase8-fact-expansion-review.md`，正式登记生产事实、委外事实、出货事实、库存预留和财务事实五条范围项的总评审入口、门禁、停止条件和禁止项。
+- 完成：同步更新 `docs/architecture/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/product/implementation-governance.md` 和 `docs/product/product-delivery-ledgers.md`。台账中 Phase 8 相关能力和 yoyoosun 出货 / 预留 / 财务 / 生产 / 委外条目只推进到 Planned / 总评审范围，不写成 runtime、schema、API、UI 或 Delivery Ready。
+- 验证：`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过；Phase 8 口径扫描仅命中“不拆字母子阶段”“未实现 / 不写成 Delivery Ready”等正确边界说明，未再出现字母子阶段编号。
+- 下一步：在 Phase 8 统一阶段内选择一条事实链做专项 docs-only review；专项评审通过后，才能按门禁进入 schema / migration 或 runtime 实现。
+- 阻塞/风险：本轮只开启 Phase 8 评审层，未改 schema、migration、runtime、API、RBAC 真源、Workflow / Fact usecase、部署脚本或 DB；不能把 Phase 8 开启误读为生产、委外、出货、库存预留或财务事实已实现。追加前 `progress.md` 为 269 行 / 51139 bytes，未达到归档阈值。
