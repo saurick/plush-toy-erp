@@ -248,6 +248,55 @@ func TestPhase2APostgresInventoryFlow(t *testing.T) {
 	}
 }
 
+func TestPhase8PostgresOutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPhase2APostgresTestData(t)
+	fixtures := createPhase2APostgresFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	repo := NewPhase8Repo(data, log.NewStdLogger(io.Discard))
+
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(5),
+		UnitID:         fixtures.unitID,
+		SourceType:     "phase8_pg_outsourcing_seed",
+		IdempotencyKey: "phase8-pg-outsourcing-seed-" + fixtures.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres product inventory failed: %v", err)
+	}
+	fact, err := repo.CreateOutsourcingFactDraft(ctx, &biz.Phase8FactMutation{
+		FactNo:         "PG-OF-" + fixtures.suffix,
+		FactType:       biz.OutsourcingFactMaterialIssue,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(2),
+		IdempotencyKey: "phase8-pg-outsourcing-" + fixtures.suffix,
+	})
+	if err != nil {
+		t.Fatalf("create postgres outsourcing fact failed: %v", err)
+	}
+	posted, err := repo.PostOutsourcingFact(ctx, fact.ID)
+	if err != nil {
+		t.Fatalf("post postgres outsourcing fact failed: %v", err)
+	}
+	if posted.Status != biz.Phase8StatusPosted {
+		t.Fatalf("expected POSTED, got %s", posted.Status)
+	}
+	cancelled, err := repo.CancelPostedOutsourcingFact(ctx, fact.ID)
+	if err != nil {
+		t.Fatalf("cancel postgres outsourcing fact failed: %v", err)
+	}
+	if cancelled.Status != biz.Phase8StatusCancelled {
+		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
+	}
+}
+
 func TestPhase2APostgresConcurrentOutbound(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPhase2APostgresTestData(t)

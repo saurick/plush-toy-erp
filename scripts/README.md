@@ -14,6 +14,7 @@
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                 | yoyoosun 导入前人工 review / 数据映射检查                  |
 | `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；Phase 7 不执行真实导入           | import tooling 自检 / 非 Phase 7 的单独数据治理评审        |
 | `scripts/qa/phase7-simulated-trial-data.mjs`           | Phase 7 模拟试用数据入口，只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | Phase 7 试用环境演练                                      |
+| `scripts/qa/phase8-simulated-fact-closure.mjs`         | Phase 8 模拟事实闭环入口，只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路 | Phase 8 内部模拟验收 / 目标环境事实闭环回归               |
 | `scripts/phase2b-pg.sh`                                | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口                   | 验证 Phase 2B schema 和批次库存行为                        |
 | `scripts/phase2c-pg.sh`                                | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口                         | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
 | `scripts/phase2d-pg.sh`                                | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口                       | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
@@ -171,6 +172,31 @@ PHASE7_SIM_PASSWORD='replace-with-demo-password' \
 ```
 
 默认岗位账号模式会用 `demo_sales` 写客户、联系人和销售订单，用 `demo_purchase` 写供应商和供应商联系人。若目标环境提供了具备全部 V1 权限的账号，也可以改用 `PHASE7_SIM_ADMIN_TOKEN` 或 `PHASE7_SIM_ADMIN_USERNAME` / `PHASE7_SIM_ADMIN_PASSWORD`。
+
+Phase 8 只允许模拟事实闭环验收，不执行真实客户数据导入。先生成报告，确认模拟范围：
+
+```bash
+node scripts/qa/phase8-simulated-fact-closure.mjs \
+  --product-id 1 \
+  --unit-id 1 \
+  --warehouse-id 1 \
+  --out output/customers/yoyoosun/phase8-simulated-fact-closure
+```
+
+若要写入本地或目标试用环境，只能显式 `--apply`，并提供已有模拟产品、单位和仓库 ID。该脚本使用 `demo_pmc`、`demo_purchase`、`demo_warehouse` 和 `demo_finance` 角色账号覆盖生产、库存预留、委外、出货和财务五条 Phase 8 最小事实链；所有编号固定带 `SIM-YOYOOSUN-PHASE8` 前缀，不写真实客户数据，不执行 import，不绕过 `Phase8Usecase` 直接写事实表：
+
+```bash
+PHASE8_SIM_CONFIRM=APPLY_SIMULATED_PHASE8_FACTS \
+PHASE8_SIM_PASSWORD='replace-with-demo-password' \
+  node scripts/qa/phase8-simulated-fact-closure.mjs \
+    --apply \
+    --backend-url http://127.0.0.1:8300 \
+    --product-id 1 \
+    --unit-id 1 \
+    --warehouse-id 1 \
+    --run-id target-yyyymmdd-closure \
+    --out output/customers/yoyoosun/phase8-simulated-fact-closure-target
+```
 
 ### 1. 初始化环境
 

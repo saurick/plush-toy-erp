@@ -536,7 +536,7 @@ DO UPDATE SET quantity = inventory_balances.quantity + EXCLUDED.quantity, update
 
 func updateInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, key biz.InventoryBalanceKey, delta decimal.Decimal, preventNegative bool) (int64, error) {
 	now := time.Now()
-	p := inventorySQLPlaceholders(tx.dialect, 8)
+	p := inventorySQLPlaceholders(tx.dialect, 6)
 	query := fmt.Sprintf(
 		`UPDATE inventory_balances
 SET quantity = quantity + %s, updated_at = %s
@@ -547,11 +547,13 @@ WHERE subject_type = %s AND subject_id = %s AND warehouse_id = %s AND unit_id = 
 	if key.LotID == nil {
 		query += " AND lot_id IS NULL"
 	} else {
+		p = inventorySQLPlaceholders(tx.dialect, len(args)+1)
 		query += fmt.Sprintf(" AND lot_id = %s", p[6])
 		args = append(args, *key.LotID)
 	}
 	if preventNegative {
-		query += fmt.Sprintf(" AND quantity + %s >= 0", p[7])
+		p = inventorySQLPlaceholders(tx.dialect, len(args)+1)
+		query += fmt.Sprintf(" AND quantity + %s >= 0", p[len(args)])
 		args = append(args, delta)
 	}
 	result, err := tx.sqlTx.ExecContext(ctx, query, args...)

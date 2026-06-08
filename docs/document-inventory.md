@@ -130,7 +130,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/import-strategy.md` | 永绅 yoyoosun 客户导入策略 / Yoyoosun Customer Import Strategy |
 | `docs/customers/yoyoosun/import-unresolved-queue.md` | 永绅 yoyoosun 客户导入待确认队列 / Yoyoosun Customer Import Unresolved Queue |
 | `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md` | Phase 7 模拟数据试用验收记录 / Phase 7 Simulated Trial Acceptance |
-| `docs/customers/yoyoosun/phase8-target-release-acceptance.md` | Phase 8 目标环境发布与验收 / Phase 8 Target Release And Acceptance |
+| `docs/customers/yoyoosun/phase8-target-release-acceptance.md` | Phase 8 目标环境发布与内部模拟验收 / Phase 8 Target Release And Internal Simulated Acceptance |
 | `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md` | Phase 8 目标环境发布证据 2026-06-08 / Phase 8 Target Release Evidence 2026-06-08 |
 | `docs/customers/yoyoosun/question-backlog.md` | 问题待办 / Question Backlog |
 | `docs/customers/yoyoosun/real-dry-run-evidence.md` | 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |

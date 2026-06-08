@@ -15,6 +15,7 @@ print_help() {
   customer-config-boundaries: 客户配置草案边界检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
   phase7-simulated-trial-data: Phase 7 模拟数据工具测试
+  phase8-simulated-fact-closure: Phase 8 模拟事实闭环工具测试
   web: pnpm lint -> pnpm css
   server: go test ./internal/... ./pkg/...（存在即测）
 
@@ -76,6 +77,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs" ]; then
   echo "[qa:fast] 运行 Phase 7 模拟数据工具测试"
   node --test "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/phase8-simulated-fact-closure.test.mjs" ]; then
+  echo "[qa:fast] 运行 Phase 8 模拟事实闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/phase8-simulated-fact-closure.test.mjs"
 fi
 
 echo "[qa:fast] 运行 web 快速检查"

@@ -95,6 +95,58 @@ func TestPhase8Repo_StockReservationChecksAvailableQuantity(t *testing.T) {
 	}
 }
 
+func TestPhase8Repo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "phase8_outsourcing_no_lot")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	repo := NewPhase8Repo(data, log.NewStdLogger(io.Discard))
+
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(5),
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST_OUTSOURCING",
+		IdempotencyKey: "TEST_OUTSOURCING:IN",
+	}); err != nil {
+		t.Fatalf("seed product inventory failed: %v", err)
+	}
+	fact, err := repo.CreateOutsourcingFactDraft(ctx, &biz.Phase8FactMutation{
+		FactNo:         "OF-001",
+		FactType:       biz.OutsourcingFactMaterialIssue,
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       decimal.NewFromInt(2),
+		IdempotencyKey: "OF-001",
+	})
+	if err != nil {
+		t.Fatalf("create outsourcing fact failed: %v", err)
+	}
+	posted, err := repo.PostOutsourcingFact(ctx, fact.ID)
+	if err != nil {
+		t.Fatalf("post outsourcing fact failed: %v", err)
+	}
+	if posted.Status != biz.Phase8StatusPosted {
+		t.Fatalf("expected POSTED, got %s", posted.Status)
+	}
+	cancelled, err := repo.CancelPostedOutsourcingFact(ctx, fact.ID)
+	if err != nil {
+		t.Fatalf("cancel outsourcing fact failed: %v", err)
+	}
+	if cancelled.Status != biz.Phase8StatusCancelled {
+		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
+	}
+	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType)).CountX(ctx); count != 2 {
+		t.Fatalf("expected outbound + reversal outsourcing txns, got %d", count)
+	}
+}
+
 func TestPhase8Repo_ShipShipmentAndCancelWritesOutboundReversal(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "phase8_shipment")

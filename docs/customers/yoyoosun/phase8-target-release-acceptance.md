@@ -1,19 +1,19 @@
-Doc Type / 文档类型: Customer Target Release And Acceptance Runbook / 客户目标环境发布与验收手册
-Status / 状态: Draft / 草案
+Doc Type / 文档类型: Customer Target Release And Internal Simulated Acceptance Runbook / 客户目标环境发布与内部模拟验收手册
+Status / 状态: Phase 8 Internal Closure Passed / Phase 8 内部闭环已通过
 Runtime Source of Truth / 运行时真源: No / 否
 Schema Source of Truth / Schema 真源: No / 否
 
-# Phase 8 目标环境发布与验收 / Phase 8 Target Release And Acceptance
+# Phase 8 目标环境发布与内部模拟验收 / Phase 8 Target Release And Internal Simulated Acceptance
 
-本文用于把 Phase 8 本地最小事实闭环推进到永绅 yoyoosun 目标环境发布、migration、smoke、业务验收和 evidence 记录。本文不是部署脚本、runtime、schema、migration、RBAC 或客户签收真源；真实运行状态仍以目标环境、`server/deploy/compose/prod`、当前代码、migration 状态和验收记录为准。
+本文用于把 Phase 8 本地最小事实闭环推进到永绅 yoyoosun 目标环境发布、migration、smoke、内部模拟事实验收和 evidence 记录。本文不是部署脚本、runtime、schema、migration、RBAC 或客户签收真源；真实运行状态仍以目标环境、`server/deploy/compose/prod`、当前代码、migration 状态和验收记录为准。
 
 本文禁止记录真实密码、token、短信验证码、数据库 DSN、私钥、客户真实敏感账号、完整生产地址或备份文件密钥。所有敏感值只通过本地 shell 环境变量、目标服务器 `.env` 或受控运维渠道传递。
 
 ## 1. 结论 / Conclusion
 
-Phase 8 下一步不是继续扩大功能，而是先完成目标环境发布与客户验收闭环。
+Phase 8 下一步不是继续扩大功能，而是先完成目标环境发布与内部模拟事实闭环。
 
-目标环境验收通过前，CAP-019 到 CAP-024 仍只能写为 `Internal Ready` 或等价内部可用状态，不能写成 `Delivery Ready`、客户已验收或真实客户数据已导入。
+2026-06-08 已按 `phase8-target-release-evidence-2026-06-08.md` 完成目标环境发布、试用账号 RBAC、登录态只读 smoke 和内部模拟事实写入闭环。客户使用确认属于交付后的业务确认，不作为 Phase 8 完成阻塞；仍禁止写成客户已签收、真实客户数据已导入或完整业务交付。
 
 ## 2. 范围 / Scope
 
@@ -25,6 +25,7 @@ Phase 8 下一步不是继续扩大功能，而是先完成目标环境发布与
 | migration | 使用目标宿主机 `/usr/local/bin/atlas` 和 `migrate_online.sh` 执行状态检查与 apply |
 | 健康检查 | `/healthz`、`/readyz`、Compose 状态、容器日志 |
 | Phase 8 页面验收 | `/erp/phase8/facts` 五个事实页签加载、权限、空态或数据态 |
+| 内部模拟事实验收 | 使用显式 `SIM-YOYOOSUN-PHASE8` 模拟主数据和 QA 脚本覆盖五条事实链 |
 | 事实边界验收 | 确认 `shipping_released != shipped`，Workflow 不写库存、出货或财务事实 |
 | Evidence | 记录非敏感命令结果、提交版本、镜像标签、migration 状态、验收结论和剩余问题 |
 
@@ -48,7 +49,7 @@ Phase 8 下一步不是继续扩大功能，而是先完成目标环境发布与
 5. 目标服务器已安装 `/usr/local/bin/atlas`，并能通过宿主机端口访问 PostgreSQL。
 6. 目标 Compose `.env` 已替换 `APP_IMAGE`、`WEB_IMAGE`、`POSTGRES_DSN`、`APP_JWT_SECRET` 等占位，不保留默认密钥。
 7. 目标试用账号、权限和临时密码已通过授权渠道准备；普通业务账号不使用 `is_super_admin=true`，不分配 `debug_operator`。
-8. 如需写入验收数据，只能使用显式标记的模拟数据，并先取得目标环境写入授权；默认验收以只读页面和健康检查为主。
+8. 如需写入验收数据，只能使用显式标记的模拟数据；真实客户数据不可作为 Phase 8 写入验收输入。
 
 ## 4. 发布步骤 / Release Steps
 
@@ -160,7 +161,7 @@ curl -fsS http://127.0.0.1:8300/readyz
 - `/healthz` 返回 ok。
 - `/readyz` 返回 ok。
 
-## 5. 验收步骤 / Acceptance Steps
+## 5. 内部模拟验收步骤 / Internal Simulated Acceptance Steps
 
 ### 5.1 只读页面验收
 
@@ -192,25 +193,43 @@ curl -fsS http://127.0.0.1:8300/readyz
 4. 普通试用账号没有 `debug.*` 权限。
 5. `demo_admin` 或等价系统管理员账号不冒充业务角色完成事实动作。
 
-### 5.3 受控写入验收
+### 5.3 内部受控模拟写入验收
 
-默认不做写入验收。只有同时满足以下条件才允许：
+写入验收只使用显式模拟数据。只有同时满足以下条件才允许：
 
-1. 目标环境已授权写入模拟数据。
-2. 数据编号、备注或 evidence 明确标记为 simulated / trial。
-3. 已准备可回滚或可冲正方案。
-4. 验收人员清楚写入会影响库存余额、预留状态或财务事实状态。
+1. 数据编号、备注或 evidence 明确标记为 simulated / trial。
+2. 已准备可回滚或可冲正方案。
+3. 验收人员清楚写入会影响库存余额、预留状态或财务事实状态。
 
-推荐最小验收顺序：
+Phase 8 推荐统一使用脚本执行，不手工拼 API：
+
+```bash
+PHASE8_SIM_CONFIRM=APPLY_SIMULATED_PHASE8_FACTS \
+PHASE8_SIM_PASSWORD='replace-with-demo-password' \
+  node scripts/qa/phase8-simulated-fact-closure.mjs \
+    --apply \
+    --backend-url http://127.0.0.1:8300 \
+    --product-id 1 \
+    --unit-id 1 \
+    --warehouse-id 1 \
+    --run-id target-yyyymmdd-closure \
+    --out output/customers/yoyoosun/phase8-simulated-fact-closure-target
+```
+
+该脚本只接受模拟闭环确认值，不执行真实客户导入。它会覆盖生产、库存预留、委外、出货和财务五条 Phase 8 最小事实链。
+
+若必须人工分步检查，可参考以下最小顺序：
 
 | 动作 | 预期 |
 | --- | --- |
 | 新建库存预留 | 只占用可用量，不写 `inventory_txns` |
 | 释放库存预留 | 预留状态从 `ACTIVE` 到 `RELEASED` |
-| 新建财务草稿并过账 | 状态从 `DRAFT` 到 `POSTED`，不自动结清 |
-| 取消草稿或已过账事实 | 进入 `CANCELLED`，库存类已过账事实按 usecase 写 REVERSAL |
+| 消耗库存预留 | 预留状态从 `ACTIVE` 到 `CONSUMED` |
+| 新建并过账生产 / 委外 / 出货事实 | 库存类事实写 `inventory_txns` IN / OUT |
+| 取消已过账库存类事实 | 进入 `CANCELLED`，按 usecase 写 REVERSAL |
+| 新建财务草稿并过账 / 结清 / 取消 | 状态覆盖 `DRAFT` / `POSTED` / `SETTLED` / `CANCELLED` |
 
-生产、委外和出货事实会写库存流水，除非已准备专门模拟库存和冲正检查，否则不在客户目标环境随手试。
+真实客户数据、真实出货、真实库存或真实财务单据不得作为本步骤输入。
 
 ## 6. Evidence 模板 / Evidence Template
 
@@ -236,7 +255,7 @@ curl -fsS http://127.0.0.1:8300/readyz
 
 ## 7. 停止条件 / Stop Conditions
 
-出现以下任一情况，停止发布或停止客户验收：
+出现以下任一情况，停止发布或停止内部模拟验收：
 
 | 停止条件 | 处理方式 |
 | --- | --- |
@@ -253,10 +272,10 @@ curl -fsS http://127.0.0.1:8300/readyz
 
 ## 8. 通过后的下一步 / Next After Pass
 
-目标环境验收通过后，才允许按 evidence 更新交付台账：
+目标环境内部模拟验收已在 2026-06-08 通过，允许按 evidence 更新交付台账：
 
-1. 将 CAP-019 到 CAP-024 从 `Internal Ready` 推进到目标环境验证后的状态。
-2. 将 CAP-026 / CAP-027 的 evidence 从草案推进到实际目标环境记录。
-3. 再按客户反馈决定是否启动打印、报表、发票明细、收付款核销、对账单或物流退货专项。
+1. 将 CAP-019 到 CAP-024 推进到 `Phase 8 Internal Simulated Closure Passed` 或等价内部闭环状态。
+2. 将 CAP-026 / CAP-027 的 evidence 从草案推进到实际目标环境记录和交付后业务确认口径。
+3. 再按客户使用反馈决定是否启动打印、报表、发票明细、收付款核销、对账单或物流退货专项。
 
 任何后续增强都必须重新按 `docs/product/implementation-governance.md` 明确允许路径、禁止路径、验收命令和停止条件。

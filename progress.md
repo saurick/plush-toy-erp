@@ -317,3 +317,13 @@
 - 验证：`TRIAL_ACCOUNT_PASSWORD=... TRIAL_ACCOUNT_BACKEND_URL=http://192.168.0.133:8300 node scripts/qa/trial-account-rbac.mjs` 通过，覆盖 9 个 demo 账号角色、岗位权限、debug 权限、super admin 和 disabled 边界；`demo_boss` 登录后 `phase8.list_finance_facts` 返回 code `0`、`total=0`，确认登录态只读 handler 和权限生效。
 - 下一步：进入客户正式业务验收；如需受控写入验收，必须先准备模拟数据、冲正方案和客户授权。后续任何目标环境 migration apply 前，必须先记录 pre-migration 备份 evidence。
 - 阻塞/风险：客户正式验收和受控写入验收仍未做；本次执行前缺 pre-migration 备份 evidence 不能倒补，只能保留为发布风险记录并用 post-deploy 备份作为当前状态恢复点；旧镜像仍保留用于回滚，未执行镜像清理。真实客户数据导入、完整打印、报表、发票明细、收付款核销、对账单、物流退货、并发锁升级和自动派生仍未做。追加前 `progress.md` 为 311 行 / 60388 bytes，未达到归档阈值。
+
+## 2026-06-08 23:55 CST
+
+- 完成：按“一步做完 Phase 8、客户验收不作为阶段阻塞、真实数据只能模拟”的口径完成 Phase 8 目标环境内部模拟事实闭环。新增 `scripts/qa/phase8-simulated-fact-closure.mjs` 及测试，并接入 `scripts/qa/fast.sh`、`full.sh`、`strict.sh`；脚本只接受 `SIM-YOYOOSUN-PHASE8` 模拟数据和显式确认，覆盖生产 create/post/cancel、预留 release/consume、委外 create/post/cancel、出货 create/add/ship/cancel、财务 post/settle/cancel。
+- 完成：修复无批次库存余额扣减路径中的 PostgreSQL placeholder 间隙问题，补充本地 repo 测试和 PostgreSQL gated 集成测试；本地构建并发布 `plush-toy-erp-server:20260608T2345-phase8-closure-amd64` 到目标环境，保留 web 镜像 `plush-toy-erp-web:20260608T2230-a490b92-phase8-amd64` 不动。
+- 完成：目标环境已用模拟主数据 `SIM-YOYOOSUN-PHASE8-PCS` / `SIM-YOYOOSUN-PHASE8-PRODUCT` / `SIM-YOYOOSUN-PHASE8-WH` 执行内部模拟事实闭环；旧失败留下的生产事实已冲正为 `CANCELLED`，旧委外 `DRAFT` 无库存流水影响。
+- 完成：同步更新 `docs/current-source-of-truth.md`、`docs/architecture/phase8-fact-expansion-review.md`、`docs/customers/yoyoosun/phase8-target-release-acceptance.md`、`docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md`、`docs/customers/yoyoosun/README.md`、`deployments/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md` 和 `scripts/README.md`，把 Phase 8 状态更新为目标环境内部模拟事实闭环通过；客户使用确认改为交付后业务确认，不再作为 Phase 8 完成阻塞。
+- 验证：目标环境 `/healthz` 返回 `ok`、`/readyz` 返回 `ready`，Atlas status pending 0；`trial-account-rbac.mjs` 验证 9 个 demo 账号通过；`phase8-simulated-fact-closure.mjs --apply` 生成 `TARGET-20260608-CLOSURE-V2` evidence；目标数据库核对生产、委外、出货、财务状态和 production / outsourcing / shipment 正反库存流水通过；服务端日志未发现 `ERROR` / `panic` / `fatal` / placeholder 错误。
+- 下一步：进入 Phase 9 或后续增强评审；打印、报表、核销、物流退货、自动派生、并发锁升级、生产订单专表、委外订单专表和岗位任务端都不作为 Phase 8 补尾。
+- 阻塞/风险：Phase 8 内部闭环不等于客户已签收、真实客户数据导入、完整打印、完整报表、发票明细、收付款核销或对账单已交付；首次目标发布前仍缺 pre-migration 备份 evidence，只能保留为历史发布风险，后续发布必须先记录 pre-migration 备份 evidence。目标机执行了 `docker builder prune -f`，为保留上一版回滚镜像且可回收空间很小，未执行 `docker image prune -a -f`。追加前 `progress.md` 为 319 行 / 62448 bytes，未达到归档阈值。
