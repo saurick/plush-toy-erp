@@ -14,6 +14,7 @@ print_help() {
   error-codes: 统一错误码魔法数字检查
   customer-config-boundaries: 客户配置草案边界检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
+  phase7-simulated-trial-data: Phase 7 模拟数据工具测试
   web: pnpm lint -> pnpm css -> (若存在 test 脚本则 pnpm test) -> pnpm build
   server: go test ./... -> make build
 
@@ -71,7 +72,14 @@ fi
 
 if ls "$ROOT_DIR"/scripts/import/*.test.mjs >/dev/null 2>&1; then
   echo "[qa:full] 运行客户导入工具测试"
-  node --test "$ROOT_DIR"/scripts/import/*.test.mjs
+  for test_file in "$ROOT_DIR"/scripts/import/*.test.mjs; do
+    node --test "$test_file"
+  done
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs" ]; then
+  echo "[qa:full] 运行 Phase 7 模拟数据工具测试"
+  node --test "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs"
 fi
 
 if [ -x "$ROOT_DIR/scripts/qa/secrets.sh" ]; then

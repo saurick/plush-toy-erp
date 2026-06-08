@@ -38,7 +38,7 @@
 - 本目录资料只代表永绅 yoyoosun 客户材料，不自动成为 Product Core。
 - 不代表 SaaS runtime tenant，不新增 `tenant_id`。
 - 不代表真实 import / backfill 已批准。
-- 当前没有可直接执行的客户真实数据；Phase 7 不拆 A/B/C/D 或任何字母子阶段，试用目标只能一次性使用 seed、fixture 或手工构造的模拟数据做环境、账号、菜单、V1 页面和岗位任务端演练。
+- 当前没有可直接执行的客户真实数据；Phase 7 不拆 A/B/C/D 或任何字母子阶段，试用目标只能一次性使用 `scripts/qa/phase7-simulated-trial-data.mjs`、seed、fixture 或手工构造的模拟数据做环境、账号、菜单、V1 页面和岗位任务端演练。
 - 模拟数据不代表客户字段已经确认，也不能转写成真实导入、出货、库存或财务事实。
 - 不直接写 `business_records`，也不生成库存、出货、财务、委外或采购事实。
 - 后续若多个客户进入项目，应继续按 `docs/customers/<customer-key>/` 隔离原始资料和客户差异。

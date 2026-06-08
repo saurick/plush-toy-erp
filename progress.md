@@ -220,3 +220,34 @@
 - 验证：后续执行子阶段和后续真实导入口径扫描、`git diff --check`、`node scripts/qa/customer-config-boundaries.mjs`。
 - 下一步：准备或选择模拟数据集，在目标试用环境或本地等价环境一次性跑完账号 / RBAC / 菜单 / V1 页面 / 岗位任务端 / 培训验收；不进入真实 import。
 - 阻塞/风险：本轮仍为 docs-only，未新增 seed / fixture，未执行真实导入，未改 schema、migration、runtime API、RBAC 真源、Workflow / Fact usecase、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 214 行 / 40633 bytes，未达到归档阈值。
+
+## 2026-06-08 19:36 CST
+
+- 完成：新增 `scripts/qa/phase7-simulated-trial-data.mjs` 和测试，作为 Phase 7 模拟试用数据入口；默认只生成报告，显式 `--apply` 且 `PHASE7_SIM_CONFIRM=APPLY_SIMULATED_PHASE7_DATA` 后才通过 V1 JSON-RPC 创建 / 复用带 `SIM-YOYOOSUN-PHASE7` 前缀的模拟客户、供应商、联系人、销售订单和销售订单行。
+- 完成：将 Phase 7 模拟数据工具测试接入 `scripts/qa/fast.sh`、`scripts/qa/full.sh` 和 `scripts/qa/strict.sh`；同步更新 `scripts/README.md`、`docs/customers/yoyoosun/trial-environment-runbook.md`、`docs/customers/yoyoosun/README.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和 `docs/product/product-delivery-ledgers.md`，明确该脚本不执行真实 import，不写 `business_records`，不生成 schema / migration，也不创建出货、库存、财务、发票、付款、应收或应付事实。
+- 验证：`node --check scripts/qa/phase7-simulated-trial-data.mjs && node --check scripts/qa/phase7-simulated-trial-data.test.mjs` 通过；`node --test scripts/qa/phase7-simulated-trial-data.test.mjs` 通过；`bash -n scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh` 通过；报告模式 `node scripts/qa/phase7-simulated-trial-data.mjs --out output/customers/yoyoosun/phase7-simulated-trial` 通过；`bash scripts/qa/fast.sh` 通过；`git diff --check` 通过。
+- 下一步：在本地或目标试用环境准备一个活跃 product ID 和 unit ID 后，用 `--apply` 写入模拟数据，再按 runbook 一次性跑账号 / RBAC / 菜单 / V1 页面 / 岗位任务端 / 培训验收；仍不进入真实 import。
+- 阻塞/风险：本轮没有实际连接目标后端写入模拟数据，因为缺少目标环境凭据和可用 product/unit ID；未改 schema、migration、runtime API 语义、RBAC 真源、Workflow / Fact usecase、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 222 行 / 42037 bytes，未达到归档阈值。
+
+## 2026-06-08 19:42 CST
+
+- 完成：新增 `scripts/seed-phase7-sim-masterdata.sh` 和 `server/cmd/seed-phase7-sim-masterdata`，用于 Phase 7 试用前 seed 带 `SIM-YOYOOSUN-PHASE7` 前缀的模拟单位 / 产品主数据；本地 dev DB 已执行一次，得到 `unit_id=1`、`product_id=1`。
+- 完成：同步更新 `scripts/README.md`、`docs/customers/yoyoosun/trial-environment-runbook.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md` 和 `docs/product/product-delivery-ledgers.md`，明确该 seed 只写 `units` / `products` 主数据，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实。
+- 验证：`cd server && go test ./cmd/seed-phase7-sim-masterdata` 通过；`bash -n scripts/seed-phase7-sim-masterdata.sh` 通过；`cd server && go run ./cmd/seed-phase7-sim-masterdata --help` 通过；`bash scripts/seed-phase7-sim-masterdata.sh` 通过；DB 只读查询确认模拟产品 / 单位活跃；`node scripts/qa/phase7-simulated-trial-data.mjs --product-id 1 --unit-id 1 --out output/customers/yoyoosun/phase7-simulated-trial` 通过；`git diff --check` 通过。
+- 下一步：拿到本地或目标环境管理员 token/password 后，执行 `PHASE7_SIM_CONFIRM=APPLY_SIMULATED_PHASE7_DATA ... phase7-simulated-trial-data.mjs --apply --product-id 1 --unit-id 1`，再跑账号 / RBAC / 浏览器入口回归；仍不执行真实 import。
+- 阻塞/风险：当前 shell 没有 `PHASE7_SIM_ADMIN_TOKEN`、`PHASE7_SIM_ADMIN_PASSWORD`、`TRIAL_ACCOUNT_PASSWORD` 或 `ERP_ROLE_DEMO_PASSWORD`，dev 配置内置 admin 密码也不匹配，因此本轮未写入模拟客户 / 供应商 / 联系人 / 销售订单；未重置现有 demo 密码。追加前 `progress.md` 为 230 行 / 44066 bytes，未达到归档阈值。
+
+## 2026-06-08 19:44 CST
+
+- 完成：将 `scripts/qa/fast.sh`、`scripts/qa/full.sh` 和 `scripts/qa/strict.sh` 中的 import 工具测试从单次 glob 并行执行改为逐文件顺序执行，避免多个会 spawn CLI 子进程的 import 测试在同一 `node --test` 进程里偶发假红。
+- 验证：单独 `node --test scripts/import/customerSourceSnapshotFreezeCheck.test.mjs` 通过；`bash -n scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh scripts/seed-phase7-sim-masterdata.sh` 通过；`bash scripts/qa/fast.sh` 通过；`git diff --check` 通过。
+- 下一步：仍是等待可用管理员凭据后执行 Phase 7 模拟客户 / 供应商 / 联系人 / 销售订单 `--apply`，再跑账号 / RBAC / 浏览器入口回归。
+- 阻塞/风险：本轮修复 QA 假红和准备模拟 product/unit，但仍未写入模拟客户 / 订单数据；未提交、未推送。追加前 `progress.md` 为 238 行 / 45894 bytes，未达到归档阈值。
+
+## 2026-06-08 19:50 CST
+
+- 完成：按用户确认的演示密码口径，将 9 个 `demo_*` 账号重置为 `12345678`，并把 Phase 7 模拟数据脚本改成默认岗位账号模式：`demo_sales` 写客户、联系人和销售订单，`demo_purchase` 写供应商和供应商联系人；修正模拟供应商 `supplier_type=material`，符合 schema 约束。
+- 完成：本地执行 Phase 7 模拟数据 `--apply` 成功，报告为 `output/customers/yoyoosun/phase7-simulated-trial/phase7-simulated-trial-report.json`，`mode=apply-simulated-data`、`simulatedOnly=true`、`realCustomerImport=false`；DB 只读核对确认模拟客户、供应商、联系人、销售订单和销售订单行均已存在。
+- 验证：`TRIAL_ACCOUNT_PASSWORD=12345678 node scripts/qa/trial-account-rbac.mjs` 通过，覆盖 9 个 demo 账号角色、岗位权限、debug 权限、super admin 和 disabled 边界；`pnpm --dir web smoke:trial-demo-browser` 通过，覆盖桌面账号 9 个、岗位任务端 8 个、拒绝态 1 个；`bash scripts/qa/fast.sh` 通过；`git diff --check` 通过。
+- 下一步：可按当前本地 evidence 继续整理 Phase 7 验收记录；若要提交推送，需要用户明确确认提交推送。
+- 阻塞/风险：本轮只在本地 dev DB 写入模拟数据，不代表目标客户环境已写入或客户已验收；未执行真实 import，未写 `business_records`，未创建出货、库存、财务、发票、付款、应收或应付事实。追加前 `progress.md` 为 245 行 / 46862 bytes，未达到归档阈值。

@@ -317,7 +317,7 @@ MVP 原则：
 | --- | --- |
 | 环境准备 | DB、对象存储、Compose、配置包就绪 |
 | migration apply | 目标库结构确认 |
-| simulated data prepared | seed、fixture 或手工样本已标记为模拟数据 |
+| simulated data prepared | `scripts/seed-phase7-sim-masterdata.sh`、`scripts/qa/phase7-simulated-trial-data.mjs` 或等价 seed、fixture、手工样本已标记为模拟数据 |
 | trial rehearsal | 用模拟数据验证试用环境、账号、菜单、V1 页面和岗位任务端入口 |
 | training | 按岗位培训 |
 | trial run | 小范围模拟数据试用 |
@@ -327,7 +327,7 @@ MVP 原则：
 
 * 目标试用环境或本地等价环境可访问。
 * migration 状态与当前服务匹配。
-* 模拟数据已标记为 seed / fixture / demo，不冒充客户真实数据。
+* 模拟数据已标记为 seed / fixture / demo，不冒充客户真实数据；优先保留模拟主数据 seed 输出和 `phase7-simulated-trial-report.json` 作为 evidence。
 * 试用账号、RBAC、菜单、V1 页面和岗位任务端回归通过。
 * 培训说明已覆盖销售订单、导入、出货、库存和财务边界。
 * 验收记录明确剩余问题、阻塞和下一轮任务。
@@ -340,6 +340,7 @@ MVP 原则：
 * 不把 seed / fixture / demo 数据当客户真实导入结果。
 * 不把当前模拟数据试用写成 Phase 7 真实导入完成。
 * 不把真实数据导入拆成 Phase 7 的 A/B/C/D 或其他字母子阶段。
+* 不绕过 V1 usecase 直接写 DB、`business_records`、库存、出货或财务事实。
 
 ## 10. Phase 8：生产 / 委外 / 出货 / 财务事实扩展
 
