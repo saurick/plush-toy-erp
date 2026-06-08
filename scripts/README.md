@@ -4,30 +4,33 @@
 
 ## 总览
 
-| 脚本 | 主要作用 | 建议时机 |
-| --- | --- | --- |
-| `scripts/bootstrap.sh` | 安装依赖、启用 hooks、跑快速自检 | 新机器 / 首次拉仓库 |
-| `scripts/project-scan.sh` | 扫描项目名、默认密钥、部署地址和页面文案残留 | 改名后 / 配置收口后 |
-| `scripts/seed-role-demo-admins.sh` | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色 | 需要多角色登录 / 岗位任务端验收 |
-| `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence | yoyoosun 导入前 source freeze / 人工 review evidence |
-| `scripts/import/customerImportDryRun.mjs` | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包 | yoyoosun 导入前人工 review / 数据映射检查 |
-| `scripts/phase2b-pg.sh` | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口 | 验证 Phase 2B schema 和批次库存行为 |
-| `scripts/phase2c-pg.sh` | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口 | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯 |
-| `scripts/phase2d-pg.sh` | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口 | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
-| `scripts/doctor.sh` | 检查本机依赖和 hooks 是否齐全 | 环境初始化 / 异常排查 |
-| `scripts/qa/fast.sh` | 高频快速检查 | 日常开发 |
-| `scripts/qa/erp-field-linkage.mjs` | 字段联动专项测试并刷新 latest 覆盖报告 | 改字段真源、保存转换、合同金额、打印快照后 |
-| `scripts/qa/full.sh` | 全量检查 | 提交前 / 推送前 |
-| `scripts/qa/strict.sh` | 严格检查 | 发版前 |
-| `scripts/qa/db-guard.sh` | 约束 schema 变更必须带 migration | 改数据模型后 |
-| `scripts/qa/error-code-sync.sh` | 校验前后端错误码同步 | 改错误码后 |
-| `scripts/qa/error-codes.sh` | 阻止业务代码裸写已注册错误码 | 改接口 / 鉴权 / 前端错误处理后 |
-| `scripts/qa/shellcheck.sh` | 检查 shell 脚本 | 调整脚本后 |
-| `scripts/qa/shfmt.sh` | 统一 shell 格式 | 调整脚本后 |
-| `scripts/qa/go-vet.sh` | 执行 Go vet | 改 Go 代码后 |
-| `scripts/qa/golangci-lint.sh` | 执行 golangci-lint | 改 Go 代码后 |
-| `scripts/qa/yamllint.sh` | 检查 YAML 语法与风格 | 改 YAML 后 |
-| `scripts/qa/govulncheck.sh` | 扫描 Go 可达漏洞 | 推送前 / 发版前 |
+| 脚本                                                   | 主要作用                                                                              | 建议时机                                                   |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `scripts/bootstrap.sh`                                 | 安装依赖、启用 hooks、跑快速自检                                                      | 新机器 / 首次拉仓库                                        |
+| `scripts/project-scan.sh`                              | 扫描项目名、默认密钥、部署地址和页面文案残留                                          | 改名后 / 配置收口后                                        |
+| `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                         | 需要多角色登录 / 岗位任务端验收                            |
+| `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence  | yoyoosun 导入前 source freeze / 人工 review evidence       |
+| `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                 | yoyoosun 导入前人工 review / 数据映射检查                  |
+| `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 客户导入受控执行器，只按批准清单走 JSON-RPC V1 API                      | yoyoosun 导入批准、备份和回滚方案齐备后                    |
+| `scripts/phase2b-pg.sh`                                | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口                   | 验证 Phase 2B schema 和批次库存行为                        |
+| `scripts/phase2c-pg.sh`                                | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口                         | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
+| `scripts/phase2d-pg.sh`                                | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口                       | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
+| `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                         | 环境初始化 / 异常排查                                      |
+| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入工具测试                                                    | 日常开发                                                   |
+| `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界             | 生成试用 / 演示账号后                                      |
+| `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界 | 调整客户配置草案后                                         |
+| `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                | 改字段真源、保存转换、合同金额、打印快照后                 |
+| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入工具测试                                                        | 提交前 / 推送前                                            |
+| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入工具测试                                                        | 发版前                                                     |
+| `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                      | 改数据模型后                                               |
+| `scripts/qa/error-code-sync.sh`                        | 校验前后端错误码同步                                                                  | 改错误码后                                                 |
+| `scripts/qa/error-codes.sh`                            | 阻止业务代码裸写已注册错误码                                                          | 改接口 / 鉴权 / 前端错误处理后                             |
+| `scripts/qa/shellcheck.sh`                             | 检查 shell 脚本                                                                       | 调整脚本后                                                 |
+| `scripts/qa/shfmt.sh`                                  | 统一 shell 格式                                                                       | 调整脚本后                                                 |
+| `scripts/qa/go-vet.sh`                                 | 执行 Go vet                                                                           | 改 Go 代码后                                               |
+| `scripts/qa/golangci-lint.sh`                          | 执行 golangci-lint                                                                    | 改 Go 代码后                                               |
+| `scripts/qa/yamllint.sh`                               | 检查 YAML 语法与风格                                                                  | 改 YAML 后                                                 |
+| `scripts/qa/govulncheck.sh`                            | 扫描 Go 可达漏洞                                                                      | 推送前 / 发版前                                            |
 
 前端浏览器级样式回归不在 `scripts/qa` 下，统一执行：
 
@@ -106,7 +109,36 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-`output/customers/yoyoosun/source-snapshot-freeze/` 和 `output/customers/yoyoosun/real-dry-run-evidence/` 是本地 evidence 输出，不纳入 git；真实 import loader 仍需单独实现任务，并且必须另有备份、回滚、幂等、对账和客户确认。
+`output/customers/yoyoosun/source-snapshot-freeze/` 和 `output/customers/yoyoosun/real-dry-run-evidence/` 是本地 evidence 输出，不纳入 git；它们仍不是 import approval。
+
+真实执行器已提供受控报告模式，默认不调用后端：
+
+```bash
+node scripts/import/customerImportExecute.mjs \
+  --dry-run-package output/customers/yoyoosun/real-dry-run-evidence \
+  --approval scripts/import/fixtures/customers/yoyoosun/import-approval.sample.json \
+  --backup-evidence output/customers/yoyoosun/backup-evidence.txt \
+  --out output/customers/yoyoosun/import-execution
+```
+
+该命令会生成 `import-execution-report.json` 和 `import-execution-report.md`，并校验 approval、backup evidence、unresolved block、forbidden auto-import 和 supported target。没有 `--execute` 时不会连接数据库或后端。
+
+真实写入只能显式开启，并且只走 JSON-RPC V1 API，不直接写表、不写 `business_records`、不生成 schema / migration，也不创建出货、库存或财务事实：
+
+```bash
+CUSTOMER_IMPORT_CONFIRM=EXECUTE_YOYOOSUN_IMPORT \
+CUSTOMER_IMPORT_ADMIN_USERNAME='admin' \
+CUSTOMER_IMPORT_ADMIN_PASSWORD='replace-with-password' \
+  node scripts/import/customerImportExecute.mjs \
+    --dry-run-package output/customers/yoyoosun/real-dry-run-evidence \
+    --approval output/customers/yoyoosun/import-approval.json \
+    --backup-evidence output/customers/yoyoosun/backup-evidence.txt \
+    --out output/customers/yoyoosun/import-execution \
+    --backend-url http://127.0.0.1:8300 \
+    --execute
+```
+
+执行前必须已有客户确认、数据库备份、rollback / forward-fix 方案和目标环境信息；不要把 fixture approval 当真实客户批准。
 
 ### 1. 初始化环境
 
@@ -126,17 +158,17 @@ bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 
 角色演示账号只服务开发 / 验收登录测试，不写入 `server/configs/*/config.yaml`，也不是客户配置包。脚本会先确保内置 RBAC 权限和角色已 seed，再创建或更新以下账号并绑定真实角色：
 
-| 账号 | 角色 |
-| --- | --- |
-| `demo_boss` | `boss` |
-| `demo_sales` | `sales` |
-| `demo_purchase` | `purchase` |
+| 账号              | 角色         |
+| ----------------- | ------------ |
+| `demo_boss`       | `boss`       |
+| `demo_sales`      | `sales`      |
+| `demo_purchase`   | `purchase`   |
 | `demo_production` | `production` |
-| `demo_warehouse` | `warehouse` |
-| `demo_quality` | `quality` |
-| `demo_finance` | `finance` |
-| `demo_pmc` | `pmc` |
-| `demo_admin` | `admin` |
+| `demo_warehouse`  | `warehouse`  |
+| `demo_quality`    | `quality`    |
+| `demo_finance`    | `finance`    |
+| `demo_pmc`        | `pmc`        |
+| `demo_admin`      | `admin`      |
 
 默认不生成 `debug_operator` 账号；如确需调试权限账号，必须显式加 `--include-debug`，此时会额外生成 `demo_debug`。
 
@@ -153,6 +185,40 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 ```
 
 脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`，除非显式传 `--allow-prod`。常规开发和验收不要对生产库执行该脚本。
+
+生成或重置演示账号后，可执行只读核对。该脚本不创建账号、不改密码、不写数据库，只通过真实 `/rpc/auth` 登录和 `me` 返回校验角色、`mobile.<role>.access`、`debug.*` 权限、`is_super_admin` 和 `disabled` 边界：
+
+```bash
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs
+```
+
+如需核对其他后端地址：
+
+```bash
+TRIAL_ACCOUNT_BACKEND_URL='http://127.0.0.1:8300' \
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs
+```
+
+需要用真实浏览器核对桌面菜单、岗位任务端和无岗位权限拒绝态时，先确认后端已启动，再执行：
+
+```bash
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:trial-demo-browser
+```
+
+该浏览器回归会自动启动单端口桌面 Vite，并使用 yoyoosun 菜单配置；如需核对已启动前端地址，可设置 `TRIAL_BROWSER_SMOKE_BASE_URL`。
+
+### 2B. Customer Config 草案边界检查
+
+调整 yoyoosun 字段显示、编号规则或其他 customer config 草案后，执行：
+
+```bash
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-boundaries.mjs
+```
+
+该脚本只读取 `config/customers/yoyoosun/fieldNumberingConfig.mjs`，验证其仍为 draft，`runtimeEnabled=false`，且不放开 tenant、schema、migration、后端 RBAC、Workflow / Fact 或真实导入边界。脚本不连接数据库、不调用后端、不写配置。
 
 ### 3. 日常开发检查
 

@@ -1,25 +1,26 @@
 Doc Type / 文档类型: Yoyoosun Customer Import Dry-run Plan / 永绅 yoyoosun 客户导入 dry-run 计划
-Status / 状态: Draft + Dry-run / Freeze Tooling Added / 草案，已补 dry-run / freeze 工具
-Runtime Implemented / 运行时已实现: No / 否
+Status / 状态: Draft + Dry-run / Freeze + Execution Loader Added / 草案，已补 dry-run / freeze / 受控执行器
+Runtime Implemented / 运行时已实现: Import execution tooling only / 仅导入执行工具
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入 dry-run 计划 / Yoyoosun Customer Import Dry-run Plan
 
-本计划用于设计 dry-run 流程。当前已新增 `scripts/import/customerImportDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview；也已新增 `scripts/import/customerSourceSnapshotFreezeCheck.mjs`，用于冻结 source snapshot evidence，并基于 sanitized freeze fixtures 生成 real dry-run evidence package。这些工具都不读写正式数据库、不执行真实迁移、不修改 seedData 或 `business_records`。
+本计划用于设计 dry-run 流程。当前已新增 `scripts/import/customerImportDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview；也已新增 `scripts/import/customerSourceSnapshotFreezeCheck.mjs`，用于冻结 source snapshot evidence，并基于 sanitized freeze fixtures 生成 real dry-run evidence package。Stage 6 受控执行器 `scripts/import/customerImportExecute.mjs` 也已实现，但默认只生成报告；只有显式 `--execute`、确认短语、approval、backup evidence、目标后端和管理员凭据齐备时才会通过 JSON-RPC V1 API 写入。
 
 ## 范围 / Scope
 
-| item | decision |
-|---|---|
-| 本轮是否执行 Stage 6 | 否 |
-| 本轮是否写真实 import loader | 否 |
-| 本轮是否写 backfill 脚本 | 否 |
-| 本轮是否修改 runtime/schema/migration/API/UI/seedData | 否 |
-| dry-run draft 输出 | 来源清单、字段分类、dry-run plan、unresolved queue、验收清单、产品策略、风险登记 |
-| dry-run package 输出 | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md` |
-| freeze / evidence 输出 | `freeze-metadata.json`、`freeze-check-summary.json`、`freeze-check-report.md`、`output/customers/yoyoosun/real-dry-run-evidence/*`、source snapshot freeze 文档、real dry-run evidence 文档和人工 review checklist |
+| item                                                  | decision                                                                                                                                                                                                           |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 本轮是否执行 Stage 6                                  | 工具实现完成；未对客户库执行真实写入                                                                                                                                                                               |
+| 本轮是否写真实 import loader                          | 是，受控 JSON-RPC execution loader                                                                                                                                                                                 |
+| 本轮是否写 backfill 脚本                              | 否                                                                                                                                                                                                                 |
+| 本轮是否修改 runtime/schema/migration/API/UI/seedData | 否                                                                                                                                                                                                                 |
+| dry-run draft 输出                                    | 来源清单、字段分类、dry-run plan、unresolved queue、验收清单、产品策略、风险登记                                                                                                                                   |
+| dry-run package 输出                                  | `source-references.json`、`normalized-rows.json`、`candidates.json`、`unresolved-queue.json`、`duplicates.json`、`conflicts.json`、`forbidden-auto-import.json`、`validation-summary.json`、`dry-run-report.md`    |
+| freeze / evidence 输出                                | `freeze-metadata.json`、`freeze-check-summary.json`、`freeze-check-report.md`、`output/customers/yoyoosun/real-dry-run-evidence/*`、source snapshot freeze 文档、real dry-run evidence 文档和人工 review checklist |
+| execution report 输出                                 | `import-execution-report.json`、`import-execution-report.md`，默认 `executed=false`                                                                                                                                |
 
 ## 工具状态 / Tooling Status
 
@@ -40,11 +41,11 @@ node scripts/import/customerImportDryRun.mjs \
 - Stage 2：匹配 customers / suppliers / contacts / sales_orders / sales_order_items / products / materials / units / warehouses / BOM 候选。
 - Stage 3：生成 candidates、duplicates、conflicts、unresolved、forbidden 和 validation summary。
 
-仍需人工或后续实现任务处理：
+仍需人工或受控执行门禁处理：
 
 - Stage 4：人工确认 unresolved、duplicate、conflict、forbidden。
 - Stage 5：客户 sign-off、备份 / 回滚 / 导入审批。
-- Stage 6：真实 import execution；dry-run CLI 未实现。
+- Stage 6：真实 import execution；执行器已实现，但本轮未对客户库执行真实写入。
 
 ## 冻结 + 证据状态 / Freeze + Evidence Status
 
@@ -71,11 +72,22 @@ node scripts/import/customerImportDryRun.mjs \
 
 - 不是真实导入。
 - 不写 DB。
-- 不做 loader。
 - 不改 schema / migration / API / UI / seedData / docs registry。
 - 不做 `business_records` runtime cutover。
 - output 是 evidence，不是 import approval。
-- 真实 import loader 仍需单独实现任务，并且必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
+- 真实 import execution 必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
+
+受控执行器报告模式：
+
+```bash
+node scripts/import/customerImportExecute.mjs \
+  --dry-run-package output/customers/yoyoosun/real-dry-run-evidence \
+  --approval output/customers/yoyoosun/import-approval.json \
+  --backup-evidence output/customers/yoyoosun/backup-evidence.txt \
+  --out output/customers/yoyoosun/import-execution
+```
+
+报告模式会校验 approval、backup evidence、unresolved block、forbidden auto-import 和 supported target，不连接后端、不写 DB。
 
 ## 阶段 0：来源收集 / Stage 0: Source Collection
 
@@ -233,15 +245,16 @@ skipped rows 包含：
 - import execution readiness notes。
 - future loader design requirements。
 
-## 阶段 6：未来真实导入执行 / Stage 6: Future Import Execution
+## 阶段 6：受控真实导入执行 / Stage 6: Controlled Import Execution
 
-当前 dry-run plan 不执行 Stage 6。
+当前已实现 Stage 6 execution loader，但本轮没有对客户库执行真实写入。
 
-后续只有单独实现任务才能设计或实现 import loader。Stage 6 必须满足：
+Stage 6 必须满足：
 
-- 明确允许修改 runtime/import code。
-- 只走 V1 usecase 或已有正式 usecase。
+- 只走 V1 JSON-RPC API / usecase 或已有正式 usecase。
 - 有备份、回滚、校验、幂等和审计。
+- 有客户确认和 approval JSON。
+- 有 `CUSTOMER_IMPORT_CONFIRM=EXECUTE_YOYOOSUN_IMPORT` 和显式 `--execute`。
 - 禁止双写 `business_records`。
 - 禁止直接写 schema 外字段。
 - 禁止自动生成 shipments、stock reservations、inventory_txns、AR/AP、invoice、payment。
@@ -249,14 +262,14 @@ skipped rows 包含：
 
 ## Dry-run 交付物 / Dry-run Deliverables
 
-| deliverable | purpose |
-|---|---|
-| source reference list | 证明每条候选来自哪里 |
-| normalized preview | 显示字段解析结果 |
-| target candidate preview | 显示拟进入的正式模型候选 |
-| skipped rows | 说明不导入原因 |
-| unresolved queue | 人工确认队列 |
-| duplicate candidates | 去重审核 |
-| conflict candidates | 冲突审核 |
-| forbidden auto-import list | 拦截 deferred facts 和禁止对象 |
-| validation summary | 统计 can import / manual / deferred / forbidden |
+| deliverable                | purpose                                         |
+| -------------------------- | ----------------------------------------------- |
+| source reference list      | 证明每条候选来自哪里                            |
+| normalized preview         | 显示字段解析结果                                |
+| target candidate preview   | 显示拟进入的正式模型候选                        |
+| skipped rows               | 说明不导入原因                                  |
+| unresolved queue           | 人工确认队列                                    |
+| duplicate candidates       | 去重审核                                        |
+| conflict candidates        | 冲突审核                                        |
+| forbidden auto-import list | 拦截 deferred facts 和禁止对象                  |
+| validation summary         | 统计 can import / manual / deferred / forbidden |

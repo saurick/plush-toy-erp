@@ -81,6 +81,7 @@
     "playwright:install": "playwright install chromium",
     "style:l1": "node ./scripts/styleL1.mjs",
     "smoke:mobile-auth-login-route": "node ./scripts/mobileAuthLoginRouteSmoke.mjs",
+    "smoke:trial-demo-browser": "node ./scripts/trialDemoAccountBrowserSmoke.mjs",
     "smoke:purchase-contract-real-login": "node ./scripts/purchaseContractRealLoginSmoke.mjs",
     "smoke:processing-contract-real-login": "node ./scripts/processingContractRealLoginSmoke.mjs",
     "report:field-linkage:erp": "node ../scripts/qa/erp-field-linkage.mjs",

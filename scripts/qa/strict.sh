@@ -11,10 +11,12 @@ print_help() {
 
 检查内容:
   1) db-guard + secrets
-  2) shellcheck + shfmt（可选）
-  3) govulncheck（可选）
-  4) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  5) server: go test ./... + make build
+  2) customer-config-boundaries
+  3) customer-import-tooling
+  4) shellcheck + shfmt（可选）
+  5) govulncheck（可选）
+  6) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  7) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -57,6 +59,16 @@ fi
 
 if [ -x "$ROOT_DIR/scripts/qa/secrets.sh" ]; then
   bash "$ROOT_DIR/scripts/qa/secrets.sh"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then
+  echo "[qa:strict] 运行客户配置草案边界检查"
+  node "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs"
+fi
+
+if ls "$ROOT_DIR"/scripts/import/*.test.mjs >/dev/null 2>&1; then
+  echo "[qa:strict] 运行客户导入工具测试"
+  node --test "$ROOT_DIR"/scripts/import/*.test.mjs
 fi
 
 if [[ "${STRICT_SKIP_SHELLCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/shellcheck.sh" ]; then

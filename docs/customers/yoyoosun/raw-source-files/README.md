@@ -22,10 +22,10 @@
 | `模板-材料与加工合同.xlsx` | 采购合同、加工合同和字段映射样本 |
 | `9.3加工合同-子淳.pdf` | 加工合同纸面、条款、合同行和附件快照样本 |
 | `plush_factory_formal_report_v3_mobile.pdf` | 客户汇报、移动端观感和交付线索 |
-| `Weixin Image_20260420164444_2155_288.png` | 截图线索和字段 / 页面核对材料 |
-| `Weixin Image_20260413193511_710_288.png` | 永绅岗位职责流程图截图，作为 Workflow / Fact 边界、岗位节点和后续需求确认线索 |
-| `Weixin Image_20260421153105_2272_288.jpeg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与同名 `.jpg` 为同一张照片的另一份源文件 |
-| `Weixin Image_20260421153105_2272_288.jpg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与同名 `.jpeg` 为同一张照片的另一份源文件 |
+| `yoyoosun-report-mobile-screenshot-20260420.png` | 截图线索和字段 / 页面核对材料 |
+| `yoyoosun-role-workflow-v3-20260413.png` | 永绅岗位职责流程图截图，作为 Workflow / Fact 边界、岗位节点和后续需求确认线索 |
+| `yoyoosun-purchase-contract-order-photo-20260421.jpeg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与 `source-copy` `.jpg` 为同一张照片的另一份源文件 |
+| `yoyoosun-purchase-contract-order-photo-20260421-source-copy.jpg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与主 `.jpeg` 为同一张照片的另一份源文件 |
 
 更完整的用途分类、checksum、禁止事项和后续落点见 `../raw-source-file-archive-review.md`。
 
@@ -33,4 +33,4 @@
 
 后续新增原始客户文件时，先确认敏感信息、文件大小和用途分类；如果只是导入 dry-run，应优先生成脱敏结构化 fixture，而不是无限制堆放原件。当前仓库未启用 Git LFS，本批约 25.4MB 原件直接纳入 Git；若后续批量增长，应单独评审 Git LFS、对象存储或只提交脱敏样本。
 
-本目录已通过仓库根 `.gitattributes` 标记为 binary，避免 Git 将 Excel / PDF / PNG 原件当作文本做 whitespace 检查或展示正文 diff；不要为通过检查而改写原件内容。
+本目录已通过仓库根 `.gitattributes` 标记为 binary，避免 Git 将 Excel / PDF / PNG / JPG / JPEG 原件当作文本做 whitespace 检查或展示正文 diff；不要为通过检查而改写原件内容。

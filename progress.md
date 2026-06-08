@@ -8,7 +8,16 @@
 - `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md`：归档截至 2026-06-04 22:04 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 375 行 / 80895 bytes，超过 80KB 阈值；本轮移动端任务页改版前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`：归档截至 2026-06-08 13:50 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 318 行 / 82540 bytes，超过 80KB 阈值；本轮旧 `project-orders` debug cleanup 前先保留完整现场，再收缩当前入口。
 
+## 2026-06-08 16:53 CST
+
+- 完成：将永绅 yoyoosun 原始图片从微信默认文件名改为语义化文件名：岗位职责流程图、移动端汇报截图、合同订单照片主 `.jpeg` 和合同订单照片 `source-copy` `.jpg`。本轮只重命名文件，不压缩、不改写图片内容。
+- 完成：同步更新 `docs/customers/yoyoosun/raw-source-files/README.md` 和 `docs/customers/yoyoosun/raw-source-file-archive-review.md`，把文件清单、checksum 文件名和“保留原始文件名 / 不改名”的旧口径调整为“Excel / PDF 保留来源文件名，微信图片按语义命名并用 hash 追溯来源版本”。
+- 验证：后续执行 `rg` 确认旧 `Weixin Image_202604*` 引用无残留；执行 `shasum -a 256` 确认重命名前后的 hash 对应不变；执行 `git diff --check` 覆盖本轮文档通过。
+- 下一步：如后续继续新增微信或截图类原件，优先按 `yoyoosun-<content>-<date>.<ext>` 命名，避免继续堆微信默认文件名。
+- 阻塞/风险：本轮未改 customer import 语义、runtime、schema、migration、API、UI、seedData、真实导入、库存 / 出货 / 财务事实或部署。工作区仍有多处非本轮既有改动，本轮只隔离处理图片文件名和相关归档文档。
+
 ## 2026-06-08 14:35 CST
+
 - 完成：复核新增永绅 yoyoosun 原始图片对需求目标和文档的影响。结论是不改产品路线、能力成熟度或交付承诺；岗位职责流程图和合同订单照片只增强客户资料治理、需求线索和人工复核输入，不升级为 Product Core、runtime、schema、migration、API、UI、seedData 或采购 / 库存 / 出货 / 财务事实。
 - 完成：补充 `docs/customers/yoyoosun/import-source-inventory.md`，显式登记“岗位职责流程图截图”和“合同订单照片”两个来源，避免后续 dry-run / 人工复核只看到泛化的“图片 / 截图”而漏掉具体线索。
 - 验证：人工复核 `docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`、`docs/customers/yoyoosun/import-source-inventory.md`、`docs/customers/yoyoosun/requirement-clues.md` 和 `progress.md`；本轮仅补 customer import source inventory 和过程记录，未触达 runtime。
@@ -16,6 +25,7 @@
 - 阻塞/风险：仓库为内部使用，合同照片中的联系人、电话、地址和订单内容按现有客户原件政策保留；当前不额外引入脱敏或对象存储。工作区已有多处非本轮既有改动，本轮只在上述文档上追加最小登记。
 
 ## 2026-06-07 22:32 CST
+
 - 完成：按“开发阶段不保留旧兼容”的口径删除 `partners / project-orders` 旧产品入口本身。`businessModules.mjs` 不再保留旧模块定义或 `legacyRouteDisabled` 标记，正式 `客户档案 / 供应商档案 / 销售订单` V1 入口改为按 section 直接注入菜单；旧 `/erp/master/partners`、`/erp/sales/project-orders` 不再有旧页面、只读兼容页、前端重定向或权限别名。
 - 完成：同步清理 `router.jsx`、`ERPLayout.jsx`、`menuPermissions.mjs`、相关配置测试和 `style:l1` 旧 redirect 场景；同步更新 `docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`、`docs/product/business-records-cutover-plan.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-risk-register.md`，明确旧产品入口已删除，`business_records` 表和历史数据不在本轮删除。
 - 验证：`pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs` 通过，13 条测试通过；`pnpm --dir web lint` 通过；`pnpm --dir web exec prettier --check scripts/styleL1.mjs src/erp/config/businessModules.mjs src/erp/router.jsx src/erp/config/menuPermissions.mjs src/erp/components/ERPLayout.jsx src/erp/config/menuPermissions.test.mjs src/erp/config/seedData.test.mjs` 通过；`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop,business-menu-groups-desktop pnpm --dir web style:l1` 通过；`git diff --check` 覆盖本轮触达文件通过；旧 `/erp/master/partners`、`/erp/sales/project-orders` 登录后不再跳到正式 V1 路由，未授权状态按当前入口守卫回到 `/entry`。
@@ -23,6 +33,7 @@
 - 阻塞/风险：本轮未改 schema、migration、后端 API、RBAC 真正权限守卫、seedData 业务数据、WorkflowUsecase、库存 / 出货 / 财务事实层，也未删除 `business_records`、历史 source key 或通用业务记录 API。追加前 `progress.md` 为 296 行 / 75986 bytes，未达到归档阈值；工作区存在多处本轮外的既有未提交改动，收口和提交时需按路径精确隔离。
 
 ## 2026-06-08 13:26 CST
+
 - 完成：继续收口 `partners / project-orders` 旧入口兼容残留。后端 `NormalizeAdminMenuPermissions` 不再把旧 `/erp/master/partners`、`/erp/sales/project-orders` 归一到正式 V1 路径；对应 RBAC 测试改为旧路径被丢弃。
 - 完成：冻结已由 V1 替代的旧 `business_records` 模块写入。`partners / project-orders` 仍可作为历史记录查询和审计线索，但普通 `business` JSON-RPC 的 create / update / delete / restore 均返回“旧业务记录入口已停用，请使用正式 V1 入口”；repo 层也阻断对现有旧模块记录的 update / delete / restore，避免绕过 usecase。
 - 完成：同步更新 `docs/current-source-of-truth.md`、`docs/product/business-records-cutover-plan.md`、`docs/product/business-records-risk-register.md`、`docs/product/business-records-reference-audit.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`，明确当前只冻结旧重叠模块普通写入，不删除 `business_records` 表、数据、schema 或其他通用模块。
@@ -31,6 +42,7 @@
 - 阻塞/风险：本轮未改 schema、migration、真实数据、采购事实外键、debug seed、seedData、前端路由、WorkflowUsecase、库存 / 出货 / 财务事实层，也未删除 `business_records` API 或表。追加前 `progress.md` 为 303 行 / 78459 bytes，未达到归档阈值；工作区仍存在多处本轮外既有未提交改动，提交时需按路径精确隔离。
 
 ## 2026-06-08 13:50 CST
+
 - 完成：对当前 dev DB `plush_erp` 执行 `business_records` 退出只读统计。migration status 为 latest / `20260530161152`；`partners` 旧记录为 0；`project-orders` 旧记录为 4，全部带 `DBG-*` / `debug_run_id` 标记；`project-orders` 明细为 0、事件为 4；`workflow_tasks.source_type=project-orders` 为 432，全部 debug 标记且无 missing source record；`workflow_business_states.source_type=project-orders` 为 4；采购入库 / 退货 / 调整的 `business_record_id` 引用为 0；V1 `customers / suppliers / contacts / sales_orders / sales_order_items` 均为 0；明细和事件孤儿数为 0。
 - 完成：同步更新 `docs/product/business-records-cutover-plan.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-risk-register.md`、`docs/product/product-delivery-ledgers.md`，把“未读取真实数据库”的缺口改为当前 dev DB 统计结果，并明确当前不需要把 `partners / project-orders` 旧记录迁移到 V1。
 - 验证：`cd server && make print_db_url` 确认当前 DB；`cd server && make migrate_status` 通过且无 pending migration；只读 SQL 统计通过；未执行 INSERT / UPDATE / DELETE / migration；本轮文档 `git diff --check` 通过。
@@ -38,6 +50,7 @@
 - 阻塞/风险：本轮统计只覆盖当前 dev DB，不代表未来客户库或生产库；未清理 debug 数据，未删除表 / schema / API / seedData / debug seed / workflow / 采购事实外键。追加前 `progress.md` 为 311 行 / 80548 bytes，未达到归档阈值；工作区仍有多处本轮外既有改动，提交时需按路径精确隔离。
 
 ## 2026-06-08 14:18 CST
+
 - 完成：对当前 dev DB `plush_erp` 执行受控 `project-orders` debug cleanup。先确认现有 `clear_business_chain_scenario` debug API 按 run / scenario 匹配范围过宽，会命中同一 run 下其他模块，因此本轮改用只针对 `business_records.module_key = project-orders`、`DBG-*` 单号和 debug payload 的事务清理。
 - 完成：4 条 `project-orders` debug business record 已软归档并追加 `debug_cleanup_archived` 事件；432 条 `workflow_tasks.source_type=project-orders`、432 条对应 `workflow_task_events` 和 4 条 `workflow_business_states.source_type=project-orders` 已删除。清理后 `partners / project-orders` active 旧记录为 0，相关 workflow task / business state 为 0；采购事实 `business_record_id` 引用仍为 0。
 - 完成：同步更新 `docs/product/business-records-cutover-plan.md`、`docs/product/business-records-reference-audit.md`、`docs/product/business-records-risk-register.md` 和 `docs/product/product-delivery-ledgers.md`，并按阈值把旧 `progress.md` 归档到 `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md`。
@@ -46,6 +59,7 @@
 - 阻塞/风险：本轮只清理当前 dev DB 的 debug seed 残留；未迁移或导入 V1 正式数据，未清理其他旧模块，未提交或推送。归档前 `progress.md` 为 318 行 / 82540 bytes，已超过 80KB 阈值；归档后当前文件只保留最近活跃记录。
 
 ## 2026-06-08 14:29 CST
+
 - 完成：接入客户菜单 runtime config loader。新增 `web/src/erp/config/customerMenuConfig.mjs`，桌面菜单可读取构建环境 `VITE_ERP_CUSTOMER_KEY`、页面预置 `window.__PLUSH_ERP_CUSTOMER_KEY__` 或 `window.__PLUSH_ERP_CUSTOMER_CONFIG__`；`seedData.mjs` 统一通过该 loader 生成桌面导航，前端菜单权限选项继续复用同一导航真源。
 - 完成：新增 `config/customers/yoyoosun/menuConfig.mjs` 作为永绅 yoyoosun 桌面菜单配置；同步更新 `config/customers/yoyoosun/README.md`、`README.md`、`web/README.md`、`docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/product-delivery-ledgers.md` 和 `docs/document-inventory.md`。前端 Dockerfile 已补 `COPY config ./config`，避免镜像构建阶段丢失客户配置包。
 - 完成：修正 `linkedNavigation.test.mjs` 的旧入口断言，采购 / 加工记录不再期待回跳已退出的 `project-orders` 旧入口，和当前“开发阶段不保留旧兼容”口径一致。
@@ -54,6 +68,7 @@
 - 阻塞/风险：本轮未新增 `tenant_id`，未改 schema、migration、后端 RBAC 真源、Workflow / Fact usecase、真实导入、角色模板 runtime、字段配置 runtime、编号规则 runtime 或通用打印模板引擎。客户菜单隐藏不是安全边界，后端动作权限和业务 usecase 仍是最终保护层。追加前 `progress.md` 为 39 行 / 9671 bytes，未达到归档阈值。
 
 ## 2026-06-08 14:34 CST
+
 - 完成：新增 `docs/customers/yoyoosun/trial-training-note.md` 作为永绅 yoyoosun 试用培训说明草案，明确正式入口、旧 `partners / project-orders` 退出、客户菜单配置边界、销售订单不等于出货 / 库存 / 财务，以及试用前培训和验收清单。
 - 完成：同步更新 `docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/business-records-cutover-plan.md`、`docs/product/business-records-risk-register.md` 和 `docs/product/product-delivery-ledgers.md`，把“后续补客户培训说明”的旧口径改为“培训说明草案已补，后续按真实试用反馈复核”。
 - 验证：`rg` 扫描未再发现“客户培训说明未做 / 后续补客户培训”等旧口径；`git diff --check` 通过。本轮为 docs-only，未运行前端 / 后端测试。
@@ -61,6 +76,7 @@
 - 阻塞/风险：培训说明仍是草案，不是产品内帮助中心，也不是客户正式签收材料；未改 runtime、schema、migration、API、RBAC、菜单配置代码、真实导入、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 47 行 / 12036 bytes，未达到归档阈值。
 
 ## 2026-06-08 14:43 CST
+
 - 完成：新增 `docs/customers/yoyoosun/trial-account-role-menu-checklist.md` 作为永绅 yoyoosun 试用账号、角色、桌面菜单和岗位任务端核对清单，明确普通试用账号不使用 super admin、不分配 `debug_operator`、不在文档记录真实密码或 token，岗位任务端只认 `mobile.<role>.access`。
 - 完成：同步更新 `docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md`，把试用培训说明后的下一步从“待准备账号核对”推进到“账号角色菜单核对清单已补，真实账号仍待运行环境配置”。
 - 验证：本轮为 docs-only；后续已执行 Markdown 尾随空白扫描和 `git diff --check`。未运行前端 / 后端测试。
@@ -68,8 +84,116 @@
 - 阻塞/风险：本轮未创建真实账号、未写密码、未改 runtime、schema、migration、API、RBAC 真源、菜单配置代码、真实导入、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 61 行 / 14922 bytes，未达到归档阈值。
 
 ## 2026-06-08 14:52 CST
+
 - 完成：执行试用前入口回归。桌面菜单使用 `VITE_ERP_CUSTOMER_KEY=yoyoosun` 跑 `business-menu-groups-desktop`，验证 yoyoosun 菜单配置下正式 `客户档案`、`供应商档案`、`销售订单` 和业务分组可见，旧“客户/供应商”“订单/款式立项”、帮助中心、开发与验收和高级文档分组不再作为侧栏入口出现。
 - 完成：执行岗位任务端 8 角色登录路由烟测，覆盖 boss / sales / purchase / production / warehouse / finance / pmc / quality 的未登录拦截、旧登录态回登录页、密码登录后回跳 `/m/<role>/tasks`、任务页展示和退出登录。
 - 验证：`STYLE_L1_SCENARIOS=business-menu-groups-desktop VITE_ERP_CUSTOMER_KEY=yoyoosun pnpm --dir web style:l1` 通过；`pnpm --dir web smoke:mobile-auth-login-route` 通过，已验证 8 个岗位任务端角色。本轮未跑后端测试，未执行真实账号 seed。
 - 下一步：如要进入真实试用环境，需要按 `trial-account-role-menu-checklist.md` 创建或核对真实试用账号、绑定角色和权限，再用真实账号逐个登录复核；或者继续推进字段显示 / 编号规则 customer config。
 - 阻塞/风险：本轮是前端自动化回归和 mock 角色链路验证，不代表真实试用账号已创建，也不代表客户库 / 生产库权限已核对。未改 runtime、schema、migration、API、RBAC 真源、菜单配置代码、真实导入、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 68 行 / 16264 bytes，未达到归档阈值。
+
+## 2026-06-08 16:22 CST
+
+- 完成：在当前 dev DB `plush_erp` 上按 `scripts/seed-role-demo-admins.sh` 受控生成 / 更新 9 个角色演示管理员账号，并统一重置本地 dev 密码；账号包括 `demo_boss`、`demo_sales`、`demo_purchase`、`demo_production`、`demo_warehouse`、`demo_quality`、`demo_finance`、`demo_pmc` 和 `demo_admin`。本轮未生成 `demo_debug`，未分配 `debug_operator`。
+- 完成：只读 SQL 复核 9 个账号均为 `is_super_admin=false`、`disabled=false`、单一角色绑定；8 个业务岗位账号具备对应 `mobile.<role>.access`，`demo_admin` 不具备岗位任务端入口权限，全部 demo 账号 debug 权限数为 0。
+- 验证：`cd server && make migrate_status` 通过且无 pending migration；`cd server && go test ./internal/data -run 'TestSeedRoleDemo|TestJsonrpcAdmin|TestJsonrpcAuth'` 通过；真实后端 `/rpc/auth` 覆盖 9 个 demo 账号 `admin_login` + `me`，角色、mobile 权限、debug 权限、super admin 和 disabled 边界均通过；`STYLE_L1_SCENARIOS=business-menu-groups-desktop VITE_ERP_CUSTOMER_KEY=yoyoosun pnpm --dir web style:l1` 通过。
+- 下一步：如要进入客户试用环境，需要把本轮 dev DB 演示账号核对动作迁移到目标试用环境的授权账号流程，再用真实人员账号或正式试用账号做桌面菜单和岗位任务端手工回归；也可继续推进字段显示 / 编号规则 customer config。
+- 阻塞/风险：本轮只影响当前 dev DB 账号数据，不代表客户库 / 生产库账号已创建；未记录真实密码、token 或验证码，未改 runtime、schema、migration、API、RBAC 真源、菜单配置代码、真实导入、库存 / 出货 / 财务事实或部署。追加前 `progress.md` 为 75 行 / 17856 bytes，未达到归档阈值。
+
+## 2026-06-08 16:26 CST
+
+- 完成：新增 `scripts/qa/trial-account-rbac.mjs`，把本轮试用 / 演示账号核对从一次性 Node 命令收口成可重复 QA 入口。脚本只通过真实 `/rpc/auth` 执行 `admin_login` + `me`，校验 9 个 `demo_*` 账号的预期角色、`mobile.<role>.access`、无 `debug.*` 权限、非 super admin 和未禁用；不创建账号、不改密码、不写数据库。
+- 完成：同步更新 `scripts/README.md`，在角色演示账号生成说明后补充只读核对命令、密码环境变量和目标后端地址用法。
+- 验证：`TRIAL_ACCOUNT_PASSWORD=... node scripts/qa/trial-account-rbac.mjs` 通过，已验证 9 个 demo 账号；`node --check scripts/qa/trial-account-rbac.mjs` 通过；`pnpm --dir web exec prettier --check ../scripts/qa/trial-account-rbac.mjs` 通过；`git diff --check` 通过。
+- 下一步：如进入目标试用环境，先在该环境按授权流程 seed / 创建账号，再用 `TRIAL_ACCOUNT_BACKEND_URL` 和 `TRIAL_ACCOUNT_PASSWORD` 运行该核对脚本；之后再做真实浏览器登录、桌面菜单和岗位任务端手工回归。
+- 阻塞/风险：本轮只新增只读 QA 脚本和脚本说明，未改 schema、migration、API、RBAC 真源、菜单配置代码、真实账号流程、真实导入、库存 / 出货 / 财务事实或部署。`scripts/README.md` 整篇 Prettier 检查对既有 Markdown 风格仍有格式意见，本轮未做整篇重排以避免无关 diff；使用 `git diff --check` 约束本轮空白问题。
+
+## 2026-06-08 16:33 CST
+
+- 完成：新增 `web/scripts/trialDemoAccountBrowserSmoke.mjs` 并接入 `web/package.json` 的 `smoke:trial-demo-browser`。该浏览器回归使用单端口桌面 Vite 和 yoyoosun 菜单配置，覆盖 9 个 `demo_*` 账号桌面登录 / 菜单可见性 / 旧入口不可见，8 个岗位账号 `/m/<role>/tasks` 授权进入，以及 `demo_admin` 访问岗位任务端时被登录页拒绝。
+- 完成：同步更新 `scripts/README.md`，在演示账号核对说明后补充真实浏览器回归命令和 `TRIAL_BROWSER_SMOKE_BASE_URL` 用法。
+- 验证：`TRIAL_ACCOUNT_PASSWORD=... pnpm --dir web smoke:trial-demo-browser` 通过，已验证桌面账号 9 个、岗位任务端 8 个、拒绝态 1 个；`pnpm --dir web exec prettier --check scripts/trialDemoAccountBrowserSmoke.mjs package.json ../scripts/qa/trial-account-rbac.mjs ../scripts/README.md` 通过；`node --check web/scripts/trialDemoAccountBrowserSmoke.mjs && node --check scripts/qa/trial-account-rbac.mjs` 通过；`git diff --check` 通过。
+- 下一步：目标试用环境准备好后，先运行 `trial-account-rbac.mjs` 确认账号 / RBAC，再运行 `smoke:trial-demo-browser` 确认真实页面入口；如果两者都通过，就可以按 `trial-training-note.md` 做人工试用培训和反馈记录。
+- 阻塞/风险：本轮仍只覆盖当前 dev DB 和本机后端 / 前端，不代表客户库 / 生产库账号已创建或权限已核对；未改 schema、migration、后端 RBAC 真源、真实导入、库存 / 出货 / 财务事实或部署。截图输出位于 `web/output/playwright/trial-demo-account-browser-smoke/`，仅作本地验证 evidence，不纳入 git。
+
+## 2026-06-08 16:39 CST
+
+- 完成：新增 `docs/customers/yoyoosun/trial-environment-runbook.md`，把目标试用环境的账号 / RBAC / 桌面菜单 / 岗位任务端核对步骤收口成正式客户手册；手册要求通过环境变量传入目标地址和密码，禁止记录真实密码、token、验证码、密钥、DSN 或客户敏感信息。
+- 完成：同步更新 `docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md`，把试用培训说明、账号角色菜单核对清单与目标试用环境执行手册挂到同一交付链路。
+- 验证：本轮文档索引更新后继续执行脚本语法、Prettier 检查和 `git diff --check`。未重新跑后端测试或真实浏览器回归，因为本轮未改 runtime / API / RBAC / UI 行为。
+- 下一步：需要目标试用环境的后端地址、前端地址和授权试用账号密码后，按 `trial-environment-runbook.md` 运行 `trial-account-rbac.mjs` 与 `smoke:trial-demo-browser`；通过后再进入人工培训和试用反馈记录。
+- 阻塞/风险：当前仍只有本地 dev DB / 本机页面验证结果，不代表目标客户环境已创建账号、已完成 RBAC 核对或已通过真实浏览器回归。追加前 `progress.md` 为 96 行 / 22895 bytes，未达到归档阈值。
+
+## 2026-06-08 16:42 CST
+
+- 完成：新增 `config/customers/yoyoosun/fieldNumberingConfig.mjs`，把 yoyoosun 字段显示和编号规则收口成 Customer Config 评审草案；文件显式标记 `runtimeEnabled=false`，并记录不新增 tenant、不改 schema、不改 migration、不改后端 RBAC、不改 Workflow / Fact、不执行真实导入。
+- 完成：同步更新 `config/customers/yoyoosun/README.md`、`docs/customers/yoyoosun/customer-config-draft.md`、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md`，明确字段 / 编号当前只是评审清单，不是已生效 runtime 规则。
+- 验证：`node --check config/customers/yoyoosun/fieldNumberingConfig.mjs && node --check web/scripts/trialDemoAccountBrowserSmoke.mjs && node --check scripts/qa/trial-account-rbac.mjs` 通过；`fieldNumberingConfig.mjs` 边界断言通过，确认 `runtimeEnabled=false` 且不改 schema / import；`pnpm --dir web exec prettier --check ...` 通过；`git diff --check` 通过。本轮未跑前端 / 后端测试，因为没有接入运行时、API、RBAC、schema 或 UI。
+- 下一步：字段 / 编号需要客户确认后，才能决定是否进入前端字段显示配置、导入 loader 设计或后续 schema/runtime 评审；未确认前不应把款式、颜色、尺寸、采购订单号等字段落成 Product Core。
+- 阻塞/风险：草案中列出的字段和编号仍来自样本、导入分类和问题待办，不能当客户已签字口径或行业默认模板。追加前 `progress.md` 为 103 行 / 24264 bytes，未达到归档阈值。
+
+## 2026-06-08 16:51 CST
+
+- 完成：新增 `docs/customers/yoyoosun/field-numbering-confirmation-checklist.md`，把字段显示、字段必填和编号规则拆成可给客户确认的问题清单，覆盖客户、供应商、销售订单、销售订单明细、产品 / SKU、采购和合同编号。
+- 完成：同步更新 `docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md`，明确该清单是客户确认材料，不是已生效 runtime 配置、schema、导入或行业默认模板。
+- 验证：`git diff --check` 通过；`node --check config/customers/yoyoosun/fieldNumberingConfig.mjs && node --check web/scripts/trialDemoAccountBrowserSmoke.mjs && node --check scripts/qa/trial-account-rbac.mjs` 通过；`pnpm --dir web exec prettier --check ...` 通过；`fieldNumberingConfig.mjs` 边界断言通过，确认 `runtimeEnabled=false` 且不改 schema / import / 后端 RBAC。本轮未跑前端 / 后端测试，因为没有接入运行时、API、RBAC、schema 或 UI。
+- 下一步：拿该确认清单和客户逐项确认；确认后只把非敏感结论写回 `customer-config-draft.md`、`fieldNumberingConfig.mjs`、`question-backlog.md` 或 `delta-register.md`，再决定是否进入 runtime / schema / import loader 任务。
+- 阻塞/风险：清单仍是 Draft，不能替代客户签字确认；未确认前不能把客户字段、款式、颜色、尺寸、采购订单号或合同样式落成 Product Core。追加前 `progress.md` 为 110 行 / 25864 bytes，未达到归档阈值。
+
+## 2026-06-08 17:09 CST
+
+- 完成：新增 `scripts/qa/customer-config-boundaries.mjs`，只读校验 yoyoosun 字段 / 编号 Customer Config 草案仍为 draft，`runtimeEnabled=false`，且不放开 tenant、schema、migration、后端 RBAC、Workflow / Fact 或真实导入边界；同时校验字段候选和编号候选的必填说明完整。
+- 完成：同步更新 `scripts/README.md`，把 customer config 草案边界检查加入 QA 脚本总览和推荐执行顺序。
+- 验证：`node --check scripts/qa/customer-config-boundaries.mjs && node scripts/qa/customer-config-boundaries.mjs` 通过；`node --check scripts/qa/trial-account-rbac.mjs && node --check web/scripts/trialDemoAccountBrowserSmoke.mjs` 通过；`pnpm --dir web exec prettier --check ...` 通过；`git diff --check` 通过。
+- 下一步：后续只要调整 yoyoosun 字段 / 编号草案，先跑 `node scripts/qa/customer-config-boundaries.mjs`；客户确认后再决定是否把已确认项推进到 runtime、schema、导入 loader 或行业模板评审。
+- 阻塞/风险：QA 守卫只能防草案边界被误改，不能替代客户确认，也不证明字段 / 编号已经适合进入 Product Core。追加前 `progress.md` 为 124 行 / 28755 bytes，未达到归档阈值。
+
+## 2026-06-08 17:11 CST
+
+- 完成：将 `scripts/qa/customer-config-boundaries.mjs` 接入 `scripts/qa/fast.sh`、`scripts/qa/full.sh` 和 `scripts/qa/strict.sh`，让日常、提交前和严格 QA 都会自动检查 yoyoosun Customer Config 草案边界。
+- 验证：`bash -n scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过；目标 `pnpm --dir web exec prettier --check ...` 通过；`git diff --check` 通过。未跑完整 `fast/full/strict`，因为会触发较重的 web/server 测试；本轮改动已覆盖 shell 语法和新增守卫主路径。
+- 下一步：如果继续不接目标试用环境，可以把客户确认后的结论回写流程做成小型模板；如果已有客户确认或环境地址，则转入对应实跑。
+- 阻塞/风险：QA 主路径会防止草案边界漂移，但仍不能替代客户确认或目标环境验证。追加前 `progress.md` 为 131 行 / 30025 bytes，未达到归档阈值。
+
+## 2026-06-08 17:12 CST
+
+- 完成：执行 `bash scripts/qa/fast.sh`，验证新接入的 customer config 草案边界检查能随 fast 主路径运行。
+- 验证：`scripts/qa/fast.sh` 通过，覆盖 `db-guard`、`error-code-sync`、`error-codes`、`customer-config-boundaries`、web `pnpm lint` / `pnpm css`、server `go test ./internal/... ./pkg/...`。
+- 下一步：继续不接目标环境时，可把客户确认后的结论回写流程模板化；若需要提交，则先按当前工作区区分本轮改动和已有 raw-source 重命名现场。
+- 阻塞/风险：本轮 fast 验证不包含完整 web build、前端 test、全量 Go `go test ./...`、真实浏览器回归或目标试用环境验证。追加前 `progress.md` 为 137 行 / 31035 bytes，未达到归档阈值。
+
+## 2026-06-08 17:14 CST
+
+- 完成：执行 `bash scripts/qa/full.sh`，验证新接入的 customer config 草案边界检查能随提交前全量 QA 主路径运行。
+- 验证：`scripts/qa/full.sh` 通过，覆盖 `db-guard`、`error-code-sync`、`error-codes`、`customer-config-boundaries`、`secrets`、`govulncheck`、web `lint/css/test/build`、server `go test ./...` 和 `make build`；随后 `git diff --check` 通过。
+- 下一步：如继续本地闭环，可执行 `scripts/qa/strict.sh` 或补客户确认结论回写模板；如要提交，需要先明确是否把已有 raw-source 文件重命名现场纳入同一次提交。
+- 阻塞/风险：`govulncheck` 报告当前代码可达漏洞为 0，但依赖树仍有未被当前代码调用的漏洞提示；web test/build 仍有既有 Node module type warning 和 Vite chunk warning。本轮仍未做真实浏览器回归或目标试用环境验证。追加前 `progress.md` 为 143 行 / 31826 bytes，未达到归档阈值。
+
+## 2026-06-08 17:27 CST
+
+- 完成：执行 `bash scripts/qa/strict.sh`，验证新接入的 customer config 草案边界检查能随严格 QA 主路径运行。
+- 验证：`scripts/qa/strict.sh` 通过，覆盖 `db-guard`、`secrets`、`customer-config-boundaries`、`shellcheck`、`shfmt`、`govulncheck`、web 严格 eslint / stylelint / test / build、server `go test ./...` 和 `make build`；随后 `git diff --check` 通过。
+- 下一步：本地 QA 闭环已覆盖 fast / full / strict。若要提交，需要先确认是否把已有 raw-source 文件重命名现场纳入同一次提交；若不提交，可以继续补客户确认结论回写模板或等待目标试用环境信息。
+- 阻塞/风险：`govulncheck` 报告当前代码可达漏洞为 0，但依赖树仍有未被当前代码调用的漏洞提示；web test/build 仍有既有 Node module type warning 和 Vite chunk warning。本轮仍未做真实浏览器回归或目标试用环境验证。追加前 `progress.md` 为 149 行 / 32820 bytes，未达到归档阈值。
+
+## 2026-06-08 17:29 CST
+
+- 完成：新增 `docs/customers/yoyoosun/field-numbering-confirmation-result-template.md`，把字段 / 编号客户确认结果的回写方式模板化，明确结论应写入 `customer-config-draft.md`、`fieldNumberingConfig.mjs`、`question-backlog.md`、`delta-register.md` 或后续产品评审任务。
+- 完成：同步更新 `docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md`，把确认清单和结果回写模板挂到 Customer Config 交付链路。
+- 验证：`git diff --check` 通过；`node scripts/qa/customer-config-boundaries.mjs` 通过。本轮是 docs-only，没有重跑 fast / full / strict。
+- 下一步：等待客户确认后，按该模板回写非敏感结论；若要提交，需要先确认是否把已有 raw-source 文件重命名现场纳入同一次提交。
+- 阻塞/风险：模板不能替代客户签字确认；即使客户确认，也不能直接把 SKU、采购订单、出货、库存、财务或打印模板内核结论接入 runtime。追加前 `progress.md` 为 155 行 / 33866 bytes，未达到归档阈值。
+
+## 2026-06-08 17:47 CST
+
+- 完成：新增 `scripts/import/customerImportExecute.mjs` 作为 yoyoosun 受控真实导入执行器；默认只校验 dry-run package、approval、backup evidence、unresolved block、forbidden auto-import 和 supported target，并输出 execution report。真实执行必须显式 `--execute`、`CUSTOMER_IMPORT_CONFIRM=EXECUTE_YOYOOSUN_IMPORT`、目标后端和管理员凭据，且只走 V1 JSON-RPC API。
+- 完成：新增 `scripts/import/customerImportExecute.test.mjs` 和 sample approval fixture，覆盖 help、参数解析、报告模式、备份证据缺失、forbidden source、unresolved block 和执行确认短语门禁；同步更新 `scripts/README.md`、`docs/customers/yoyoosun/import-strategy.md`、`docs/customers/yoyoosun/import-dry-run-plan.md`、`docs/customers/yoyoosun/import-acceptance-checklist.md`、`docs/current-source-of-truth.md` 和 `docs/product/product-delivery-ledgers.md`。
+- 验证：`node --check scripts/import/customerImportExecute.mjs && node --check scripts/import/customerImportExecute.test.mjs` 通过；`node --test scripts/import/customerImportExecute.test.mjs` 通过。后续还需跑格式、import 相关测试和 fast / full / strict 后再提交推送。
+- 下一步：执行格式检查、导入工具专项测试、customer config 守卫和仓库 QA；通过后按本轮用户要求提交并推送所有代码。
+- 阻塞/风险：本轮完成 execution loader 和门禁，不代表已对客户库真实导入。真实导入仍需要客户 sign-off、目标环境、数据库备份证据、rollback / forward-fix 方案和导入后对账；执行器拒绝 product_skus、purchase_orders、shipments、stock reservations、inventory facts 和 finance facts。追加前 `progress.md` 为 162 行 / 35050 bytes，未达到归档阈值。
+
+## 2026-06-08 17:50 CST
+
+- 完成：将 `scripts/import/*.test.mjs` 接入 `scripts/qa/fast.sh`、`scripts/qa/full.sh` 和 `scripts/qa/strict.sh`，确保 dry-run、freeze 和 execution loader 进入日常、提交前和严格 QA 主路径；同步更新 `scripts/README.md`。
+- 验证：`node --test scripts/import/customerImportDryRun.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs scripts/import/customerImportExecute.test.mjs` 通过，覆盖 36 条 import 工具测试；`bash scripts/qa/fast.sh`、`bash scripts/qa/full.sh`、`bash scripts/qa/strict.sh` 均通过；`git diff --check` 通过。
+- 下一步：按用户要求提交并推送当前所有代码。
+- 阻塞/风险：`govulncheck` 仍报告当前代码可达漏洞为 0，但依赖树存在未被当前代码调用的漏洞提示；web test/build 仍有既有 Node module type warning 和 Vite chunk warning。真实客户库导入仍未执行，需等客户 sign-off、备份证据、目标环境和导入后对账。追加前 `progress.md` 为 192 行 / 36896 bytes，未达到归档阈值。

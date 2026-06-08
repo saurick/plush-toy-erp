@@ -118,6 +118,8 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/customer-config-draft.md` | 客户配置草案 / Customer Config Draft |
 | `docs/customers/yoyoosun/decision-log.md` | 决策日志 / Decision Log |
 | `docs/customers/yoyoosun/delta-register.md` | 差异登记 / Delta Register |
+| `docs/customers/yoyoosun/field-numbering-confirmation-checklist.md` | 永绅 yoyoosun 字段编号确认清单 / Yoyoosun Field Numbering Confirmation Checklist |
+| `docs/customers/yoyoosun/field-numbering-confirmation-result-template.md` | 永绅 yoyoosun 字段编号确认结果模板 / Yoyoosun Field Numbering Confirmation Result Template |
 | `docs/customers/yoyoosun/import-acceptance-checklist.md` | 永绅 yoyoosun 客户导入验收清单 / Yoyoosun Customer Import Acceptance Checklist |
 | `docs/customers/yoyoosun/import-dry-run-plan.md` | 永绅 yoyoosun 客户导入 dry-run 计划 / Yoyoosun Customer Import Dry-run Plan |
 | `docs/customers/yoyoosun/import-dry-run-tooling.md` | 永绅 yoyoosun 客户导入 dry-run 工具说明 / Yoyoosun Customer Import Dry-run Tooling |
@@ -131,6 +133,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |
 | `docs/customers/yoyoosun/source-materials.md` | 来源材料 / Source Materials |
 | `docs/customers/yoyoosun/trial-account-role-menu-checklist.md` | 永绅 yoyoosun 试用账号角色菜单核对清单 / Yoyoosun Trial Account Role Menu Checklist |
+| `docs/customers/yoyoosun/trial-environment-runbook.md` | 永绅 yoyoosun 试用环境执行手册 / Yoyoosun Trial Environment Runbook |
 | `docs/customers/yoyoosun/trial-training-note.md` | 永绅 yoyoosun 试用培训说明 / Yoyoosun Trial Training Note |
 | `docs/customers/yoyoosun/source-snapshot-freeze.md` | 永绅 yoyoosun 来源快照冻结 / Yoyoosun Source Snapshot Freeze |
 | `docs/customers/yoyoosun/source-snapshot-manual-review-checklist.md` | 永绅 yoyoosun 来源快照人工复查清单 / Yoyoosun Source Snapshot Manual Review Checklist |

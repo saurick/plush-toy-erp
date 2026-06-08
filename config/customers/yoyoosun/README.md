@@ -15,12 +15,12 @@
 
 - `menuConfig.mjs`：永绅 yoyoosun 桌面菜单配置。该配置只控制前端桌面菜单的分组、排序、隐藏和文案；菜单隐藏不是安全边界，后端仍以 RBAC action permission 和业务 usecase 校验为准。
 
+- `fieldNumberingConfig.mjs`：永绅 yoyoosun 字段显示和编号规则配置草案。该文件当前 `runtimeEnabled=false`，只作为 Customer Config 评审清单；不接前端运行时、不改后端、不改 schema、不执行导入。
+
 未来可继续放：
 
 - 公司信息。
 - logo / 主题色。
-- 字段显示 / 必填。
-- 编号规则。
 - 打印模板选择。
 - 角色模板和权限模板。
 - 初始化数据。

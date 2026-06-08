@@ -12,6 +12,8 @@ print_help() {
 检查内容:
   error-code-sync: 前端生成错误码同步检查
   error-codes: 统一错误码魔法数字检查
+  customer-config-boundaries: 客户配置草案边界检查
+  customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
   web: pnpm lint -> pnpm css
   server: go test ./internal/... ./pkg/...（存在即测）
 
@@ -56,6 +58,16 @@ if [ -x "$ROOT_DIR/scripts/qa/error-codes.sh" ]; then
   # 先拦截错误码魔法数字，避免在明显违规代码上继续跑后续检查。
   echo "[qa:fast] 运行错误码魔法数字检查"
   bash "$ROOT_DIR/scripts/qa/error-codes.sh"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then
+  echo "[qa:fast] 运行客户配置草案边界检查"
+  node "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs"
+fi
+
+if ls "$ROOT_DIR"/scripts/import/*.test.mjs >/dev/null 2>&1; then
+  echo "[qa:fast] 运行客户导入工具测试"
+  node --test "$ROOT_DIR"/scripts/import/*.test.mjs
 fi
 
 echo "[qa:fast] 运行 web 快速检查"

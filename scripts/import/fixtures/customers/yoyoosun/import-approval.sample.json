@@ -1,0 +1,18 @@
+{
+  "customerKey": "yoyoosun",
+  "approvedAt": "2026-06-08T00:00:00.000Z",
+  "approvedBy": "sample-approver",
+  "realImportApproved": true,
+  "allowRemainingReviewItems": true,
+  "items": [
+    {
+      "sourceId": "src-customer-create",
+      "targetModel": "customers",
+      "action": "create",
+      "decision": "approved_for_sample_loader_report",
+      "params": {
+        "note": "sample approval only; do not use for real customer import"
+      }
+    }
+  ]
+}
