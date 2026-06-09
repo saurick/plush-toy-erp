@@ -47,6 +47,7 @@
 - 统一登录页、桌面后台和岗位任务端当前支持「跟系统 / 浅色 / 暗色」三种主题模式，默认跟随系统偏好，手动选择持久化到浏览器 `localStorage` 的 `plush_erp_theme_mode`。主题只影响视觉，不影响入口选择、RBAC、岗位角色推导或最终路由；打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随运行时暗色主题。
 - 系统分层、产品化与交付、客户差异、状态 / Workflow / Fact 边界继续以仓库正式 `docs/product/*`、`docs/architecture/*`、`docs/customers/*` 和当前代码 / 测试为准，不再镜像成前端 Markdown 页面。
 - 开发环境可访问独立隐藏路径 `/__dev/docs` 查看仓库 tracked Markdown；该入口左侧专用于按真实目录树浏览 `docs/**/*.md` 及主要 README，搜索态显示匹配结果，右侧章节标签可滚动到对应标题并提供回到顶部，只服务本地开发查阅，不进入 ERP 菜单、seedData、RBAC、产品内 docs registry 或生产构建。
+- 开发环境可访问独立隐藏路径 `/__dev/prototypes` 查看产品原型资产；该入口只浏览 `docs/product/prototypes` 下的 HTML 原型、PNG 方案图和截图证据，可按资产状态筛选并在右侧预览，只服务本地开发和产品评审查阅，不进入 ERP 菜单、seedData、RBAC、后端业务、产品内 docs registry 或生产构建。
 - Phase 0 已新增 0 到 1 产品架构、客户实例、客户差异和状态 / Workflow / Fact 边界文档：`docs/product/*`、`docs/architecture/status-workflow-fact-boundary.md`、`docs/customers/yoyoosun/*`。
 - `docs/product/product-delivery-ledgers.md` 是产品能力进度台账、客户交付矩阵和客户差异台账入口，用于判断能力成熟度、交付承诺和客户差异分类；它不是 runtime、schema、migration、API、UI 或测试真源。
 - `docs/product/implementation-governance.md` 是模块实施治理入口，用于拆新实现任务前确认 Phase、Architecture Layer、门禁、范围和禁止项；它不是 runtime、schema、migration、API、UI 或测试真源。

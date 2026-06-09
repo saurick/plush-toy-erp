@@ -81,3 +81,51 @@
 - 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web style:l1` 第二轮全量通过 41 个场景；`STYLE_L1_SCENARIOS=print-workspace-processing-row-selection-reset pnpm --dir web style:l1` 单独复跑通过；`git diff --check` 通过。Browser 验证默认实例显示 `毛绒玩具 ERP` / `绒`，yoyoosun 实例显示 `东莞市永绅玩具有限公司` / `永`，console 无 error / warn。
 - 下一步：如需目标环境也切到新品牌逻辑，需要按低配 Docker 发布主路径构建并发布 Web 镜像；若要新增第二客户，优先在客户配置包中放 brand/menu，而不是改核心常量。
 - 阻塞/风险：本轮只改前端品牌展示配置、测试和文档；未改后端 RBAC、schema、migration、Workflow / Fact usecase、真实导入、部署脚本或目标环境镜像。Browser 中未完成登录表单按钮交互验证，因为测试 profile 存在旧登录态缓存并自动进入入口页；交互态已由 `style:l1` 覆盖。
+
+## 2026-06-09 20:39 CST
+
+- 完成：新增 `docs/product/prototypes/` 产品原型资产目录，集中归档业务模块标准页整页原型、协同入口独立探索原型和三张协同入口方向图；原型明确不进入 `web/src`、菜单、路由或生产构建，只作为设计评审和后续共享组件实现参考。
+- 完成：新增 `docs/product/prototypes/README.md` 和 `docs/product/prototypes/business-module-page-standard-v1/README.md`，说明适用页面、非运行时边界、Workflow / Fact 边界、debug 任务不进生产业务页，以及后续应收口到共享业务列表页组件。
+- 完成：同步更新 `docs/product/README.md` 和 `docs/document-inventory.md`，将长期原型资产纳入产品文档体系；HTML 和 PNG 由原型目录 README 索引，不作为 Markdown 文档清单条目逐项登记。
+- 下一步：如确认该原型方向进入实现，优先改共享业务列表页布局、协同面板和分页 / 选中操作条组件，并按前端样式规则覆盖浅色 / 暗色和交互态回归。
+- 阻塞/风险：本轮只归档设计资产和说明文档，未改 runtime、schema、migration、API、RBAC、Workflow / Fact usecase、菜单、路由或目标环境镜像。追加前 `progress.md` 为 83 行 / 21226 bytes，未达到归档阈值。
+
+## 2026-06-09 20:52 CST
+
+- 完成：将之前岗位任务端改版使用的三张 PNG 原型图归档到 `docs/product/prototypes/mobile-role-tasks-v1/images/`，覆盖待办列表页、任务详情页和风险分组页。
+- 完成：新增 `docs/product/prototypes/mobile-role-tasks-v1/README.md`，说明这批 PNG 已作为岗位任务端改版参考、真实页面已落到 `MobileRoleTasksPage.jsx`，当前不再机械复刻成 HTML；后续若做岗位任务端 v2，应基于当前真实页面和新目标重新做可交互 HTML。
+- 完成：同步更新 `docs/product/prototypes/README.md`、`docs/product/mobile-role-tasks-redesign.md`、`docs/assets/mobile-role-tasks/README.md` 和 `docs/document-inventory.md`，把旧占位路径改为项目内原型归档路径。
+- 下一步：如果后续需要继续改岗位任务端，应先评审当前运行态页面与新目标差异，再决定补 HTML 原型还是直接改真实页面。
+- 阻塞/风险：本轮只补设计资产归档和说明文档，未改 runtime、schema、migration、API、RBAC、Workflow / Fact usecase、菜单、路由、前端样式或目标环境镜像。
+
+## 2026-06-09 21:08 CST
+
+- 完成：新增 `docs/product/prototypes/mobile-role-tasks-v1/implemented-reference.html`，作为岗位任务端当前实现对齐版原型，覆盖待办 / 已办 / 消息 / 我的、主筛选、分批展开、任务详情、现场留痕、原因面板和底部动作栏。
+- 完成：同步更新 `docs/product/prototypes/README.md`、`docs/product/prototypes/mobile-role-tasks-v1/README.md`、`docs/product/mobile-role-tasks-redesign.md` 和 `docs/assets/mobile-role-tasks/README.md`，明确 PNG 统一归为早期视觉方向 / 截图证据 / 方案对比 / 历史参考；岗位任务端三张 PNG 属于早期视觉方向和历史参考，HTML 是 as-built 参考。
+- 下一步：如继续推进岗位任务端 v2，应基于当前真实页面、新目标和浏览器回归证据重做交互原型或直接改运行时代码。
+- 阻塞/风险：本轮只补原型资产和说明文档，未改 `web/src` 运行时代码、schema、migration、API、RBAC、Workflow / Fact usecase、菜单、路由、前端样式或目标环境镜像。
+
+## 2026-06-09 21:40 CST
+
+- 完成：在 `docs/product/prototypes/README.md` 补充原型格式约定，明确页面 / 交互原型默认用 HTML，流程 / 架构 / 状态关系用 Markdown + Mermaid，PNG 只作为早期视觉方向、截图证据和方案对比，不强行转换为 HTML。
+- 完成：补充真实页面落地后的优先级口径：以 `web/src` 运行时代码、自动化测试和浏览器回归结果为准，HTML 原型退为历史参考。
+- 下一步：后续新增关键页面原型时按该目录约定归档；若进入实现，仍优先改共享组件并做真实浏览器回归。
+- 阻塞/风险：本轮只改原型目录 README 和过程记录，未改 runtime、schema、migration、API、RBAC、菜单、路由、构建或目标环境镜像。追加前 `progress.md` 为 91 行 / 22539 bytes，未达到归档阈值。
+
+## 2026-06-09 22:22 CST
+
+- 完成：新增 `docs/product/prototypes/index.html` 轻量静态产品原型查看器，可直接通过 `file://` 浏览当前 HTML 原型、PNG 方案图和截图证据；页面按当前实现对齐版、探索方案、历史参考、截图证据和方案对比筛选，并提供打开 HTML、查看 PNG / 截图、打开说明或目录入口。
+- 完成：同步更新 `docs/product/prototypes/README.md`，明确 `index.html` 只作为原型资产入口，不接后端、不接权限、不进入 ERP 正式菜单、不作为开发文档 registry；补充资产状态分类和维护规则。
+- 验证：`git diff --check -- docs/product/prototypes/index.html docs/product/prototypes/README.md progress.md` 通过；本地 Node 静态校验确认 `index.html` 登记 9 个资产、3 个 HTML 链接、6 个 PNG 链接、5 个 README 链接均能解析到本地文件或目录，内联筛选 JS 语法可编译；`file` 确认入口页为 UTF-8 HTML、代表性 PNG 为有效图片。
+- 下一步：后续新增原型资产时继续在对应子目录 README 和根 `index.html` 中手工补充条目；若某个原型进入真实实现，仍回到共享组件、运行时代码、测试和浏览器回归。
+- 阻塞/风险：本轮只改 `docs/product/prototypes/index.html`、`docs/product/prototypes/README.md` 和 `progress.md`，未改 `web/`、`server/`、migration、ERP 正式菜单、权限、seed、路由、构建流程或 `docs/current-source-of-truth.md`。内置浏览器对 `file://` 访问被策略拦截，本轮未完成真实浏览器点击验证，只完成静态链接和文件有效性校验；追加前 `progress.md` 为 113 行 / 25618 bytes，未达到归档阈值。
+
+## 2026-06-09 22:42 CST
+
+- 完成：新增本地开发态 `/__dev/prototypes` 产品原型查看器，使用 React dev-only route 浏览 `docs/product/prototypes` 下的 HTML 原型、PNG 方案图和截图证据；左侧支持搜索和状态筛选，右侧通过 iframe 预览 HTML 或直接预览 PNG。
+- 完成：新增 `web/src/erp/config/devPrototypes.mjs` 和测试，登记 9 个当前原型资产并锁定 dev-only 路由、类型、状态、路径和筛选行为；新增 `web/src/erp/pages/DevPrototypesPage.jsx`，并接入 `web/src/erp/router.jsx`、`web/package.json` 和 `web/src/erp/styles/app.css`。
+- 完成：同步更新 `web/README.md`、`docs/current-source-of-truth.md` 和 `docs/product/prototypes/README.md`，明确 `/__dev/prototypes` 不进入 ERP 正式菜单、seedData、RBAC、后端业务、产品内文档 registry 或生产构建。
+- 验证：`node --test src/erp/config/devPrototypes.test.mjs src/erp/config/devDocs.test.mjs`、`pnpm css`、`pnpm lint`、`pnpm test`、`pnpm build:desktop`、顺序重跑 `pnpm style:l1` 和 `git diff --check` 均通过；`pnpm test` 通过 284 项，`style:l1` 通过 41 个场景。
+- 验证：Browser 打开 `http://localhost:5175/__dev/prototypes` 成功，页面显示 9 个资产，默认 HTML iframe 预览为“业务模块标准页整页原型”；“当前实现对齐版”筛选只剩 `mobile-role-tasks-implemented`，搜索“风险”只剩 `mobile-role-task-detail` 和 `mobile-role-risk-dashboard`，点击 PNG 卡片能加载 853x1844 图片；390px 移动视口无横向溢出，控制台无 error / warn。
+- 下一步：如后续新增原型资产，继续同步 `devPrototypes.mjs`、静态 `index.html` 和原型 README；如需要把 `/__dev/prototypes` 纳入专门 L1 场景，再单独扩展 `styleL1.mjs`。
+- 阻塞/风险：本轮只触达前端 dev-only route、样式和正式说明文档；未改 `server/`、migration、ERP 正式菜单、权限、seed、后端业务或生产构建主路径。暗色态通过 CSS/主题覆盖和既有 `style:l1` 主题回归间接覆盖，Browser 直接写 `localStorage` 切暗色被只读执行环境拦截，未完成原型页暗色态的浏览器直测；追加前 `progress.md` 为 121 行 / 27340 bytes，未达到归档阈值。

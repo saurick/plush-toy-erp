@@ -1,0 +1,1081 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>岗位任务端当前实现对齐版原型</title>
+    <style>
+      :root {
+        --bg: #eef4ef;
+        --surface: #fff;
+        --surface-soft: #f8fafc;
+        --line: #dbe5df;
+        --line-strong: #c8d5ce;
+        --text: #0f172a;
+        --muted: #64748b;
+        --green: #047857;
+        --green-soft: #e8f5ea;
+        --blue: #2563eb;
+        --blue-soft: #eff6ff;
+        --red: #dc2626;
+        --red-soft: #fef2f2;
+        --orange: #ea580c;
+        --orange-soft: #fff7ed;
+        --shadow: 0 12px 32px rgb(15 23 42 / 10%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #dfe9e2;
+        color: var(--text);
+        font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      .page {
+        display: grid;
+        min-height: 100vh;
+        place-items: center;
+        padding: 20px;
+      }
+
+      .phone {
+        position: relative;
+        display: flex;
+        width: min(430px, 100%);
+        height: min(860px, calc(100vh - 40px));
+        min-height: 720px;
+        overflow: hidden;
+        border: 1px solid var(--line-strong);
+        border-radius: 28px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .screen {
+        display: none;
+        flex: 1;
+        min-height: 0;
+        flex-direction: column;
+      }
+
+      .screen.active {
+        display: flex;
+      }
+
+      .main-scroll,
+      .detail-main {
+        min-height: 0;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 24px 20px 10px;
+      }
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 10px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 34px;
+        line-height: 1.1;
+      }
+
+      h2 {
+        font-size: 20px;
+      }
+
+      .role-pill,
+      .badge,
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+      }
+
+      .role-pill {
+        min-height: 38px;
+        border: 1px solid #bde6cc;
+        border-radius: 12px;
+        background: var(--green-soft);
+        color: var(--green);
+        padding: 0 12px;
+        font-weight: 700;
+      }
+
+      .refresh {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 0;
+        background: transparent;
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      .sync {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 0 20px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #34d399;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        margin: 20px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--surface);
+        box-shadow: 0 5px 18px rgb(15 23 42 / 5%);
+      }
+
+      .metric {
+        min-width: 0;
+        min-height: 82px;
+        border-right: 1px solid var(--line);
+        padding: 12px 6px;
+        text-align: center;
+      }
+
+      .metric:last-child {
+        border-right: 0;
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 28px;
+        line-height: 1.15;
+      }
+
+      .metric span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
+      .filters,
+      .message-tabs {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: grid;
+        gap: 6px;
+        margin: 0 20px;
+        border-radius: 16px;
+        background: #f1f5f9;
+        padding: 5px;
+        box-shadow: inset 0 0 0 1px rgb(15 23 42 / 4%);
+      }
+
+      .filters {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .message-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        background: rgb(255 255 255 / 94%);
+        border: 1px solid var(--line);
+        box-shadow: 0 8px 18px rgb(15 23 42 / 8%);
+      }
+
+      .filter,
+      .message-tab {
+        min-width: 0;
+        min-height: 42px;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .filter.active,
+      .message-tab.active {
+        background: #fff;
+        color: var(--green);
+        box-shadow: 0 1px 5px rgb(15 23 42 / 8%);
+      }
+
+      .list-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 112px;
+        padding: 20px 20px 8px;
+        color: var(--muted);
+      }
+
+      .task-list {
+        margin: 0 20px 18px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: #fff;
+      }
+
+      .task-row {
+        display: grid;
+        grid-template-columns: 58px minmax(0, 1fr) 92px;
+        gap: 12px;
+        width: 100%;
+        border: 0;
+        border-bottom: 1px solid var(--line);
+        background: #fff;
+        padding: 14px;
+        text-align: left;
+      }
+
+      .task-row:last-child {
+        border-bottom: 0;
+      }
+
+      .task-row.alert {
+        background: #f8fffb;
+      }
+
+      .task-row.overdue {
+        background: #fff7f7;
+      }
+
+      .badge {
+        min-width: 48px;
+        min-height: 30px;
+        border: 1px solid #d8e1e8;
+        border-radius: 8px;
+        background: #f8fafc;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .badge.overdue,
+      .badge.critical {
+        border-color: #fecaca;
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .badge.alert {
+        border-color: #fed7aa;
+        background: var(--orange-soft);
+        color: var(--orange);
+      }
+
+      .task-title {
+        font-size: 16px;
+        font-weight: 750;
+        line-height: 1.25;
+      }
+
+      .task-source,
+      .task-meta,
+      .task-blocked {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
+      .task-blocked {
+        color: var(--red);
+      }
+
+      .right {
+        min-width: 0;
+        text-align: right;
+      }
+
+      .chip {
+        max-width: 100%;
+        min-height: 28px;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        padding: 0 8px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .due {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .due.overdue {
+        color: var(--red);
+      }
+
+      .due.alert {
+        color: var(--orange);
+      }
+
+      .list-more {
+        width: calc(100% - 40px);
+        min-height: 44px;
+        margin: 0 20px 20px;
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        background: rgb(248 250 252 / 86%);
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      .panel {
+        margin: 20px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: #fff;
+        padding: 16px;
+        box-shadow: 0 5px 18px rgb(15 23 42 / 5%);
+      }
+
+      .progress-bar {
+        height: 8px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e2e8f0;
+        margin-top: 12px;
+      }
+
+      .progress-bar span {
+        display: block;
+        width: 42%;
+        height: 100%;
+        border-radius: inherit;
+        background: #10b981;
+      }
+
+      .done-card,
+      .message-card,
+      .mine-card {
+        border-radius: 14px;
+        background: var(--surface-soft);
+        padding: 12px;
+        margin-top: 10px;
+      }
+
+      .message-card.warning {
+        border: 1px solid #fed7aa;
+        background: #fff7ed;
+      }
+
+      .mine-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin: 20px;
+      }
+
+      .mine-metric {
+        min-height: 76px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #fff;
+        text-align: center;
+      }
+
+      .mine-metric strong {
+        display: block;
+        margin-top: 12px;
+        font-size: 24px;
+      }
+
+      .mine-metric span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .bottom-nav {
+        display: grid;
+        flex: 0 0 auto;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border-top: 1px solid var(--line);
+        background: rgb(255 255 255 / 96%);
+        box-shadow: 0 -8px 24px rgb(15 23 42 / 8%);
+        padding: 8px 8px 10px;
+      }
+
+      .nav-btn {
+        min-height: 58px;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .nav-btn.active {
+        color: var(--green);
+      }
+
+      .nav-btn .icon {
+        display: block;
+        font-size: 22px;
+      }
+
+      .scroll-top {
+        position: absolute;
+        right: 18px;
+        bottom: 92px;
+        z-index: 8;
+        display: none;
+        width: 44px;
+        height: 44px;
+        border: 1px solid rgb(16 185 129 / 32%);
+        border-radius: 999px;
+        background: rgb(255 255 255 / 94%);
+        box-shadow: 0 12px 28px rgb(15 23 42 / 18%);
+        color: var(--green);
+      }
+
+      .scroll-top.visible {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .detail-header {
+        flex: 0 0 auto;
+        border-bottom: 1px solid var(--line);
+        background: rgb(255 255 255 / 95%);
+        padding: 14px 16px;
+      }
+
+      .detail-top {
+        display: grid;
+        grid-template-columns: 98px minmax(0, 1fr) 82px;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .back {
+        border: 0;
+        background: transparent;
+        text-align: left;
+        font-size: 16px;
+      }
+
+      .detail-title {
+        overflow: hidden;
+        text-align: center;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 20px;
+        font-weight: 750;
+      }
+
+      .detail-source {
+        display: flex;
+        gap: 6px;
+        margin-top: 10px;
+        color: var(--muted);
+        overflow-wrap: anywhere;
+      }
+
+      .detail-main {
+        background: #f8fafc;
+        padding: 14px;
+      }
+
+      .fact-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        margin-top: 12px;
+      }
+
+      .fact {
+        min-height: 76px;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 12px;
+      }
+
+      .fact:nth-child(2n) {
+        border-right: 0;
+      }
+
+      .fact label {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .fact strong {
+        display: block;
+        margin-top: 6px;
+      }
+
+      .risk-box,
+      .exception-box {
+        margin-top: 14px;
+        border-radius: 16px;
+        padding: 14px;
+        font-weight: 750;
+      }
+
+      .risk-box {
+        border: 1px solid #fecaca;
+        background: var(--red-soft);
+        color: #b91c1c;
+      }
+
+      .exception-box {
+        border: 1px solid #fed7aa;
+        background: var(--orange-soft);
+        color: #9a3412;
+      }
+
+      .textarea {
+        width: 100%;
+        min-height: 96px;
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        resize: vertical;
+      }
+
+      .event {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+        border-radius: 14px;
+        background: var(--surface-soft);
+        padding: 12px;
+      }
+
+      .event-dot {
+        width: 11px;
+        height: 11px;
+        margin-top: 6px;
+        border-radius: 999px;
+        background: var(--blue);
+      }
+
+      .reason-sheet {
+        display: none;
+        border: 1px solid var(--line);
+        border-radius: 22px 22px 0 0;
+        background: #fff;
+        padding: 14px;
+        box-shadow: 0 -8px 28px rgb(15 23 42 / 10%);
+      }
+
+      .reason-sheet.visible {
+        display: block;
+      }
+
+      .quick-reasons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .quick-reasons button {
+        min-height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        padding: 0 10px;
+        color: var(--muted);
+      }
+
+      .action-bar {
+        display: grid;
+        flex: 0 0 auto;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        border-top: 1px solid var(--line);
+        background: rgb(255 255 255 / 95%);
+        padding: 10px;
+        box-shadow: 0 -8px 24px rgb(15 23 42 / 8%);
+      }
+
+      .action {
+        min-height: 56px;
+        border: 0;
+        border-radius: 14px;
+        color: #fff;
+        font-weight: 800;
+      }
+
+      .action.process {
+        background: var(--blue);
+      }
+
+      .action.block {
+        background: var(--orange);
+      }
+
+      .action.done {
+        background: #059669;
+      }
+
+      .action.urge {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+      }
+
+      .note {
+        margin: 12px 20px 18px;
+        border: 1px solid #fde68a;
+        border-radius: 14px;
+        background: #fffbeb;
+        color: #92400e;
+        padding: 12px;
+        font-size: 14px;
+      }
+
+      @media (max-width: 460px) {
+        .page {
+          padding: 0;
+        }
+
+        .phone {
+          width: 100%;
+          height: 100vh;
+          min-height: 0;
+          border: 0;
+          border-radius: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="phone" aria-label="岗位任务端当前实现对齐版原型">
+        <section class="screen active" id="listScreen">
+          <div class="main-scroll" id="mainScroll">
+            <header class="header">
+              <div class="header-left">
+                <h1 id="pageTitle">待办</h1>
+                <span class="role-pill">仓库组</span>
+              </div>
+              <button class="refresh" id="refreshButton">↻ 刷新</button>
+            </header>
+
+            <div class="sync">
+              <span class="dot"></span>
+              <span>最后同步：04/26 12:14</span>
+              <span>|</span>
+              <span id="tabSummary">共 18 条待处理</span>
+            </div>
+
+            <section id="tabContent"></section>
+          </div>
+          <button class="scroll-top" id="scrollTopButton">↑</button>
+          <nav class="bottom-nav" aria-label="岗位任务端主导航">
+            <button class="nav-btn active" data-tab="todo">
+              <span class="icon">▣</span>待办
+            </button>
+            <button class="nav-btn" data-tab="done">
+              <span class="icon">☑</span>已办
+            </button>
+            <button class="nav-btn" data-tab="messages">
+              <span class="icon">◔</span>消息
+            </button>
+            <button class="nav-btn" data-tab="mine">
+              <span class="icon">♙</span>我的
+            </button>
+          </nav>
+        </section>
+
+        <section class="screen" id="detailScreen">
+          <header class="detail-header">
+            <div class="detail-top">
+              <button class="back" id="backButton">‹ 任务列表</button>
+              <div class="detail-title">成品返工处理</div>
+              <div style="text-align: right">
+                <span class="badge overdue">超时</span>
+              </div>
+            </div>
+            <div class="detail-source">
+              <span>▤</span>
+              <span>单号：DBG-RUN-20260425T161301-F6D947-PROSHIP-01</span>
+            </div>
+          </header>
+
+          <main class="detail-main">
+            <section class="panel" style="margin: 0">
+              <div style="display: flex; justify-content: space-between; gap: 12px">
+                <h2>▤ 任务关键信息</h2>
+                <button class="refresh">编辑查看详情 ›</button>
+              </div>
+              <div class="fact-grid">
+                <div class="fact"><label>状态</label><strong>待处理</strong></div>
+                <div class="fact"><label>业务</label><strong>质检不合格</strong></div>
+                <div class="fact"><label>客户</label><strong>调试客户 B</strong></div>
+                <div class="fact"><label>款式</label><strong>调试款毛绒狗</strong></div>
+                <div class="fact"><label>数量</label><strong>600 只</strong></div>
+                <div class="fact"><label>截止</label><strong>2026-04-28</strong></div>
+              </div>
+            </section>
+
+            <section class="risk-box">! 质检不合格 · 需要确认后继续流转</section>
+            <section class="exception-box">
+              <strong>异常上报</strong>
+              <div style="margin-top: 6px; font-weight: 500">生产确认返工完成后重新提交成品抽检。</div>
+            </section>
+
+            <section class="panel" style="margin: 14px 0 0">
+              <div style="display: flex; justify-content: space-between">
+                <h2>◇ 关联单据（1）</h2>
+                <button class="refresh">查看全部 ›</button>
+              </div>
+              <div class="done-card">订单：DBG-RUN-20260425T161301-F6D947-PROSHIP-01 ›</div>
+            </section>
+
+            <section class="panel" style="margin: 14px 0 0">
+              <div style="display: flex; justify-content: space-between">
+                <h2>▧ 现场留痕</h2>
+                <span style="color: var(--muted); font-size: 13px">可选</span>
+              </div>
+              <textarea class="textarea" placeholder="填写照片、附件编号或链接；多条可换行"></textarea>
+              <div style="text-align: right; color: var(--muted); font-size: 13px">0/500</div>
+            </section>
+
+            <section class="panel" style="margin: 14px 0 0">
+              <div style="display: flex; justify-content: space-between">
+                <h2>◷ 最近动态</h2>
+                <button class="refresh">查看全部 ›</button>
+              </div>
+              <div class="event">
+                <span class="event-dot"></span>
+                <div>
+                  <strong>系统 <span class="chip">待处理</span></strong>
+                  <div style="margin-top: 6px; color: var(--muted)">
+                    任务已流转至仓库组 / warehouse
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="reason-sheet" id="reasonSheet">
+              <div style="display: flex; justify-content: space-between">
+                <h2 id="reasonTitle">阻塞原因（必填） ·</h2>
+                <button class="refresh" id="closeReasonButton">收起 ^</button>
+              </div>
+              <textarea class="textarea" placeholder="请填写原因，至少 5 个字..."></textarea>
+              <div style="text-align: right; color: var(--muted); font-size: 13px">0/500</div>
+              <div style="margin-top: 12px; color: var(--muted)">快捷选择（可选）</div>
+              <div class="quick-reasons">
+                <button>材料不足</button>
+                <button>产能不足</button>
+                <button>工艺/模具问题</button>
+                <button>信息不清</button>
+              </div>
+            </section>
+          </main>
+
+          <div class="action-bar">
+            <button class="action process" data-action="处理原因">▶ 处理</button>
+            <button class="action block" data-action="阻塞原因（必填）">Ⅱ 阻塞</button>
+            <button class="action done" data-action="处理原因">✓ 完成</button>
+            <button class="action urge" data-action="催办原因（必填）">◔ 催办</button>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      const tasks = [
+        {
+          title: "成品返工处理",
+          source: "DBG-RUN-20260425T161301-F6D947-01",
+          meta: "客户：调试客户 B ｜ 款式：调试款毛绒狗 ｜ 数量：600只",
+          badge: "超时",
+          tone: "overdue",
+          chip: "质检不合格",
+          due: "04/25 18:00",
+        },
+        {
+          title: "成品返工处理",
+          source: "DBG-RUN-20260425T161301-F6D947-02",
+          meta: "客户：调试客户 B ｜ 款式：调试款毛绒狗 ｜ 数量：600只",
+          badge: "预警",
+          tone: "alert",
+          chip: "生产确认返工完成",
+          due: "04/27 15:00",
+        },
+        {
+          title: "财务已超时-应收登记",
+          source: "DBG-RUN-20260425T161301-F6D947-03",
+          meta: "客户：调试客户 B ｜ 款式：毛绒狗 ｜ 数量：600只",
+          badge: "预警",
+          tone: "alert",
+          chip: "应收登记",
+          due: "04/24 17:30",
+        },
+        {
+          title: "成品抽检待处理",
+          source: "DBG-RUN-20260425T161301-F6D947-04",
+          meta: "客户：调试客户 B ｜ 款式：毛绒狗 ｜ 数量：600只",
+          badge: "预警",
+          tone: "alert",
+          chip: "生产抽检",
+          due: "04/28 10:00",
+        },
+        {
+          title: "物料入库确认",
+          source: "DBG-RUN-20260425T161301-F6D947-05",
+          meta: "物料：PP棉 ｜ 规格：1kg/包 ｜ 数量：120包",
+          badge: "普通",
+          tone: "",
+          chip: "待入库确认",
+          due: "04/29 09:30",
+        },
+        {
+          title: "生产领料审核",
+          source: "DBG-RUN-20260425T090201-F3C84E-PICKMTL-02",
+          meta: "产品：泰迪熊 ｜ 规格：35cm ｜ 数量：1,000只",
+          badge: "普通",
+          tone: "",
+          chip: "待领料审核",
+          due: "04/29 11:00",
+        },
+      ];
+
+      const tabData = {
+        todo: {
+          title: "待办",
+          summary: "共 18 条待处理",
+          content: renderTodo(),
+        },
+        done: {
+          title: "已办",
+          summary: "共 6 条已办",
+          content: renderDone(),
+        },
+        messages: {
+          title: "消息",
+          summary: "共 12 条消息",
+          content: renderMessages(),
+        },
+        mine: {
+          title: "我的",
+          summary: "仓库组任务端",
+          content: renderMine(),
+        },
+      };
+
+      const tabContent = document.querySelector("#tabContent");
+      const pageTitle = document.querySelector("#pageTitle");
+      const tabSummary = document.querySelector("#tabSummary");
+      const listScreen = document.querySelector("#listScreen");
+      const detailScreen = document.querySelector("#detailScreen");
+      const mainScroll = document.querySelector("#mainScroll");
+      const scrollTopButton = document.querySelector("#scrollTopButton");
+      const reasonSheet = document.querySelector("#reasonSheet");
+      const reasonTitle = document.querySelector("#reasonTitle");
+
+      function renderTaskRows() {
+        return `
+          <div class="list-head">
+            <span>任务信息</span>
+            <span style="text-align:right">业务状态 / 截止时间</span>
+          </div>
+          <div class="task-list">
+            ${tasks
+              .map(
+                (task, index) => `
+                <button class="task-row ${task.tone}" data-open-detail="${index}">
+                  <div><span class="badge ${task.tone}">${task.badge}</span></div>
+                  <div>
+                    <div class="task-title">${task.title}</div>
+                    <div class="task-source">${task.source}</div>
+                    <div class="task-meta">♙ ${task.meta}</div>
+                    ${index === 0 ? '<div class="task-blocked">阻塞：生产确认返工完成，重新提交成品抽检</div>' : ''}
+                  </div>
+                  <div class="right">
+                    <span class="chip">${task.chip}</span>
+                    <div class="due ${task.tone}">${task.due}</div>
+                  </div>
+                </button>`
+              )
+              .join("")}
+          </div>
+          <button class="list-more">展开更多任务 <span style="color:var(--muted);font-size:12px">剩余 12 条</span></button>
+        `;
+      }
+
+      function renderTodo() {
+        return `
+          <section class="metrics">
+            <div class="metric"><strong style="color:var(--orange)">9</strong><span>风险</span></div>
+            <div class="metric"><strong style="color:var(--red)">8</strong><span>已超时</span></div>
+            <div class="metric"><strong>0</strong><span>即将超时</span></div>
+            <div class="metric"><strong style="color:var(--red)">0/1</strong><span>阻塞/高优先</span></div>
+          </section>
+          <div class="filters">
+            <button class="filter active">全部(18)</button>
+            <button class="filter">风险(9)</button>
+            <button class="filter">超时(8)</button>
+            <button class="filter">我负责(6)</button>
+          </div>
+          ${renderTaskRows()}
+        `;
+      }
+
+      function renderDone() {
+        return `
+          <section class="panel">
+            <div style="display:flex;justify-content:space-between">
+              <h2>进度</h2><span style="color:var(--muted)">42%</span>
+            </div>
+            <div class="progress-bar"><span></span></div>
+            <section class="metrics" style="margin:16px 0 0">
+              <div class="metric"><strong>8</strong><span>待处理</span></div>
+              <div class="metric"><strong>1</strong><span>处理中</span></div>
+              <div class="metric"><strong>1</strong><span>卡住</span></div>
+              <div class="metric"><strong style="color:var(--green)">6</strong><span>完成</span></div>
+            </section>
+          </section>
+          <section class="panel">
+            <h2>已办任务</h2>
+            <div class="done-card"><strong>仓库入库确认</strong><br><span style="color:var(--muted)">已完成 · 04/26 16:20</span></div>
+            <div class="done-card"><strong>包装发料确认</strong><br><span style="color:var(--muted)">已完成 · 04/26 17:40</span></div>
+          </section>
+        `;
+      }
+
+      function renderMessages() {
+        return `
+          <section class="message-tabs">
+            <button class="message-tab active">预警 <span class="chip">9</span></button>
+            <button class="message-tab">通知 <span class="chip">3</span></button>
+          </section>
+          <section class="panel">
+            <h2>预警</h2>
+            <div class="message-card warning"><strong>已超时</strong><br>成品返工处理<br><span style="color:var(--muted)">DBG-RUN-20260425T161301-F6D947-01</span></div>
+            <div class="message-card warning"><strong>阻塞任务</strong><br>成品入库登记<br><span style="color:var(--red)">生产确认返工完成，重新提交成品抽检</span></div>
+          </section>
+        `;
+      }
+
+      function renderMine() {
+        return `
+          <section class="panel">
+            <div style="display:flex;gap:12px;align-items:center">
+              <span style="display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:var(--green-soft);color:var(--green);font-size:28px">♙</span>
+              <div><h2>demo_warehouse</h2><p style="color:var(--muted)">仓库组任务端</p></div>
+            </div>
+            <div class="mine-card"><span style="color:var(--muted)">账号角色</span><br><strong>仓库 / demo</strong></div>
+          </section>
+          <section class="mine-grid">
+            <button class="mine-metric"><strong>18</strong><span>待办</span></button>
+            <button class="mine-metric"><strong>6</strong><span>已办</span></button>
+            <button class="mine-metric"><strong>8</strong><span>超时</span></button>
+            <button class="mine-metric"><strong>9</strong><span>风险</span></button>
+          </section>
+          <section class="panel">
+            <h2>登录与安全</h2>
+            <button class="action block" style="width:100%;margin-top:14px">退出登录</button>
+          </section>
+        `;
+      }
+
+      function setTab(tab) {
+        const data = tabData[tab] || tabData.todo;
+        pageTitle.textContent = data.title;
+        tabSummary.textContent = data.summary;
+        tabContent.innerHTML = data.content;
+        document.querySelectorAll("[data-tab]").forEach((button) => {
+          button.classList.toggle("active", button.dataset.tab === tab);
+        });
+        mainScroll.scrollTop = 0;
+      }
+
+      document.querySelectorAll("[data-tab]").forEach((button) => {
+        button.addEventListener("click", () => setTab(button.dataset.tab));
+      });
+
+      tabContent.addEventListener("click", (event) => {
+        if (event.target.closest("[data-open-detail]")) {
+          listScreen.classList.remove("active");
+          detailScreen.classList.add("active");
+        }
+      });
+
+      document.querySelector("#backButton").addEventListener("click", () => {
+        detailScreen.classList.remove("active");
+        listScreen.classList.add("active");
+        reasonSheet.classList.remove("visible");
+      });
+
+      document.querySelectorAll("[data-action]").forEach((button) => {
+        button.addEventListener("click", () => {
+          reasonTitle.textContent = `${button.dataset.action} ·`;
+          reasonSheet.classList.add("visible");
+        });
+      });
+
+      document.querySelector("#closeReasonButton").addEventListener("click", () => {
+        reasonSheet.classList.remove("visible");
+      });
+
+      mainScroll.addEventListener("scroll", () => {
+        scrollTopButton.classList.toggle("visible", mainScroll.scrollTop > 280);
+      });
+
+      scrollTopButton.addEventListener("click", () => {
+        mainScroll.scrollTo({ top: 0, behavior: "smooth" });
+      });
+
+      document.querySelector("#refreshButton").addEventListener("click", (event) => {
+        const button = event.currentTarget;
+        button.textContent = "↻ 刷新中";
+        window.setTimeout(() => {
+          button.textContent = "↻ 刷新";
+        }, 700);
+      });
+
+      setTab("todo");
+    </script>
+  </body>
+</html>

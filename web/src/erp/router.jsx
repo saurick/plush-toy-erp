@@ -14,6 +14,7 @@ import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
 import { businessModuleDefinitions } from './config/businessModules.mjs'
 import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
+import { DEV_PROTOTYPES_ROUTE } from './config/devPrototypes.mjs'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
@@ -50,6 +51,9 @@ const MobileRoleTasksPage = lazy(
 )
 const DevDocsPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevDocsPage.jsx'))
+  : null
+const DevPrototypesPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevPrototypesPage.jsx'))
   : null
 const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
 
@@ -166,6 +170,9 @@ export default function ERPRouter() {
       <Routes>
         {DevDocsPage ? (
           <Route path={DEV_DOCS_ROUTE} element={<DevDocsPage />} />
+        ) : null}
+        {DevPrototypesPage ? (
+          <Route path={DEV_PROTOTYPES_ROUTE} element={<DevPrototypesPage />} />
         ) : null}
         <Route path="/" element={<RootEntryRedirect />} />
         <Route path="/login" element={<LoginPage />} />

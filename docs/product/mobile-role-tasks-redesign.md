@@ -6,9 +6,10 @@
 
 | 原型文件                                                                 | 参考重点                                                                 | 当前状态 |
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ | -------- |
-| `docs/assets/mobile-role-tasks/mobile-role-tasks-list-reference.png`     | 列表页：岗位胶囊、刷新、同步信息、四项指标、筛选、任务列表、底部导航     | 待补原图 |
-| `docs/assets/mobile-role-tasks/mobile-role-task-detail-reference.png`    | 详情页：任务关键信息、风险提示、关联单据、最近动态、原因输入、底部动作栏 | 待补原图 |
-| `docs/assets/mobile-role-tasks/mobile-role-risk-dashboard-reference.png` | 风险分组页：今日必须处理、卡点、等待他人、催办等分组                     | 待补原图 |
+| `docs/product/prototypes/mobile-role-tasks-v1/images/mobile-role-tasks-list-reference.png` | 列表页：岗位胶囊、刷新、同步信息、四项指标、筛选、任务列表、底部导航     | 已归档 PNG，真实页面已落地 |
+| `docs/product/prototypes/mobile-role-tasks-v1/images/mobile-role-task-detail-reference.png` | 详情页：任务关键信息、风险提示、关联单据、最近动态、原因输入、底部动作栏 | 已归档 PNG，真实页面已落地 |
+| `docs/product/prototypes/mobile-role-tasks-v1/images/mobile-role-risk-dashboard-reference.png` | 风险分组页：今日必须处理、卡点、等待他人、催办等分组                     | 已归档 PNG，真实页面已落地 |
+| `docs/product/prototypes/mobile-role-tasks-v1/implemented-reference.html` | 当前实现对齐版：待办 / 已办 / 消息 / 我的、主筛选、分批展开、详情页、现场留痕、底部动作栏 | 已补 HTML，作为 as-built 设计参考 |
 
 ## 已采用方向
 

@@ -104,6 +104,9 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/module-boundaries.md` | 模块边界 / Module Boundaries |
 | `docs/product/mobile-role-tasks-redesign.md` | 移动端岗位任务页改版 / Mobile Role Tasks Redesign |
 | `docs/product/phase12-saas-review.md` | Phase 12 SaaS 单独评审 / Phase 12 SaaS Review |
+| `docs/product/prototypes/README.md` | 产品原型资产 / Product Prototype Assets |
+| `docs/product/prototypes/business-module-page-standard-v1/README.md` | 业务模块标准页原型 / Business Module Page Standard Prototype |
+| `docs/product/prototypes/mobile-role-tasks-v1/README.md` | 岗位任务端原型 / Mobile Role Tasks Prototype |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |
 | `docs/product/product-delivery-ledgers.md` | 产品能力进度台账、客户交付矩阵与客户差异台账 / Product Delivery Ledgers |
 | `docs/product/product-principles.md` | 产品原则 / Product Principles |
