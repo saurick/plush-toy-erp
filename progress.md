@@ -140,6 +140,13 @@
 - 下一步：如要让目标环境浏览器标签页也更新，需要按低配 Docker 发布主路径重新构建并发布 Web 镜像。
 - 阻塞/风险：本轮只改 favicon 资源、前端路由切换 helper、测试和过程记录；未改客户配置加载、后端、schema、migration、RBAC、菜单、Workflow / Fact usecase 或部署脚本。Browser 截图接口对当前页面两次 `Page.captureScreenshot` 超时，本轮以 DOM / link / console / HTTP 资源验证收口；追加前 `progress.md` 为 131 行 / 29619 bytes，未达到归档阈值。
 
+## 2026-06-09 23:37 CST
+
+- 完成：补提交 pre-push 后遗留的原型查看器状态筛选控件改动，将 Ant Design `Segmented` 改为页面内自定义按钮组，补齐移动端双列排布和暗色主题状态。
+- 验证：第一次 push 的 pre-push 已跑过 `qa:full`，包含 web lint / css / test / build、server 全量检查、govulncheck、secrets、error-code、客户配置和 Phase 边界检查，全部通过。
+- 下一步：如继续打磨原型查看器交互，建议把 `/__dev/prototypes` 纳入独立 L1 场景。
+- 阻塞/风险：这是补提交第一次 push 后本地遗留的两处前端样式 / 组件改动；未改 schema、migration、后端、菜单、权限或目标环境镜像。追加前 `progress.md` 为 153 行 / 34099 bytes，未达到归档阈值。
+
 ## 2026-06-09 23:42 CST
 
 - 完成：为本地开发态 `/__dev/prototypes` 产品原型查看器新增全屏预览能力；选中 HTML 原型时以全屏 iframe 查看，选中 PNG / 截图时以全屏长图查看，支持关闭按钮、`Esc` 关闭和背景滚动锁定。

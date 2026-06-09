@@ -8,7 +8,7 @@ import {
   FullscreenOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
-import { Button, Empty, Input, Segmented, Space, Tag, Typography } from 'antd'
+import { Button, Empty, Input, Space, Tag, Typography } from 'antd'
 import {
   DEV_PROTOTYPE_STATUS_OPTIONS,
   buildDevPrototypeItems,
@@ -207,19 +207,29 @@ export default function DevPrototypesPage() {
             className="erp-dev-prototypes-search"
             onChange={(event) => setKeyword(event.target.value)}
           />
-          <Segmented
-            block
-            value={statusFilter}
-            className="erp-dev-prototypes-filter"
-            options={[
+          <div className="erp-dev-prototypes-filter" aria-label="按状态筛选">
+            {[
               { label: '全部', value: 'all' },
               ...DEV_PROTOTYPE_STATUS_OPTIONS.map((status) => ({
                 label: status,
                 value: status,
               })),
-            ]}
-            onChange={setStatusFilter}
-          />
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={
+                  statusFilter === option.value
+                    ? 'erp-dev-prototypes-filter__item erp-dev-prototypes-filter__item--active'
+                    : 'erp-dev-prototypes-filter__item'
+                }
+                aria-pressed={statusFilter === option.value}
+                onClick={() => setStatusFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
 
           <div className="erp-dev-prototypes-list" aria-label="产品原型资产">
             {visibleItems.length > 0 ? (

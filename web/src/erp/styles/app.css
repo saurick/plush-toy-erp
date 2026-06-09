@@ -1339,14 +1339,41 @@
   flex: 0 0 auto;
 }
 
-.erp-dev-prototypes-filter.ant-segmented {
+.erp-dev-prototypes-filter {
+  display: flex;
   flex: 0 0 auto;
-  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 4px;
 }
 
-.erp-dev-prototypes-filter .ant-segmented-group {
-  min-width: max-content;
+.erp-dev-prototypes-filter__item {
+  min-height: 34px;
+  min-width: 0;
+  border: 1px solid #dce8dd;
+  border-radius: 10px;
+  background: #f7fbf8;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 650;
+  line-height: 1.25;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.erp-dev-prototypes-filter__item:hover,
+.erp-dev-prototypes-filter__item:focus-visible {
+  border-color: #80aee0;
+  background: #eef6ff;
+  color: #1d4f91;
+  outline: none;
+}
+
+.erp-dev-prototypes-filter__item--active {
+  border-color: #80aee0;
+  background: #eaf3ff;
+  color: #164e91;
+  box-shadow: inset 0 0 0 1px rgb(37 99 235 / 0.12);
 }
 
 .erp-dev-prototypes-list {
@@ -3768,6 +3795,15 @@
   .erp-dev-prototypes-header__stats {
     justify-content: flex-start;
     min-width: 0;
+  }
+
+  .erp-dev-prototypes-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-prototypes-filter__item {
+    width: 100%;
   }
 
   .erp-dev-docs-reader__toolbar {
@@ -6286,7 +6322,8 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-prototypes-header__stats span,
-[data-erp-theme='dark'] .erp-dev-prototypes-card {
+[data-erp-theme='dark'] .erp-dev-prototypes-card,
+[data-erp-theme='dark'] .erp-dev-prototypes-filter__item {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text);
@@ -6294,7 +6331,10 @@
 
 [data-erp-theme='dark'] .erp-dev-prototypes-card:hover,
 [data-erp-theme='dark'] .erp-dev-prototypes-card:focus-visible,
-[data-erp-theme='dark'] .erp-dev-prototypes-card--active {
+[data-erp-theme='dark'] .erp-dev-prototypes-card--active,
+[data-erp-theme='dark'] .erp-dev-prototypes-filter__item:hover,
+[data-erp-theme='dark'] .erp-dev-prototypes-filter__item:focus-visible,
+[data-erp-theme='dark'] .erp-dev-prototypes-filter__item--active {
   border-color: var(--erp-interactive-border-hover);
   background: var(--erp-interactive-bg-hover);
   color: var(--erp-text);
