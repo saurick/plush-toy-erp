@@ -105,8 +105,8 @@ Phase 8 不拆任何字母子阶段，也不再把生产、委外、出货、库
 1. Ent schema 和 Atlas migration：`production_facts`、`outsourcing_facts`、`shipments`、`shipment_items`、`stock_reservations`、`finance_facts`。
 2. 后端 usecase / repo：`Phase8Usecase` 和 `NewPhase8Repo`，库存影响统一复用 `InventoryUsecase` 的事务内流水与余额更新能力。
 3. JSON-RPC / RBAC：新增 `phase8` handler，复用既有生产、采购、销售、仓库和财务权限码。
-4. 前端 UI：新增 `/erp/phase8/facts`，统一处理五条事实链的创建、过账 / 发货 / 释放 / 消耗 / 结清 / 取消动作。
-5. 测试：新增 repo 层生产过账与冲正、库存预留可用量检查、出货发货与取消冲正测试；同步菜单和权限测试。
+4. 前端 UI：保留内部直达页面 `/erp/phase8/facts`，统一处理五条事实链的创建、过账 / 发货 / 释放 / 消耗 / 结清 / 取消动作；该页面不进入客户侧栏、前端默认菜单或后端内置菜单。
+5. 测试：新增 repo 层生产过账与冲正、库存预留可用量检查、出货发货与取消冲正测试；同步验证客户菜单不展示内部 Phase 8 入口。
 
 后续扩展仍必须至少写清：
 

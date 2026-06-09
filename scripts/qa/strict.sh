@@ -11,15 +11,17 @@ print_help() {
 
 检查内容:
   1) db-guard + secrets
-  2) customer-config-boundaries
-  3) customer-import-tooling
-  4) phase7-simulated-trial-data
-  5) phase8-simulated-fact-closure
-  6) phase9-simulated-mobile-closure
-  7) shellcheck + shfmt（可选）
-  8) govulncheck（可选）
-  9) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  10) server: go test ./... + make build
+  2) industry-template-boundaries
+  3) customer-config-boundaries
+  4) customer-import-tooling
+  5) phase7-simulated-trial-data
+  6) phase8-simulated-fact-closure
+  7) phase9-simulated-mobile-closure
+  8) phase10-industry-template-closure
+  9) shellcheck + shfmt（可选）
+  10) govulncheck（可选）
+  11) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  12) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -64,6 +66,11 @@ if [ -x "$ROOT_DIR/scripts/qa/secrets.sh" ]; then
   bash "$ROOT_DIR/scripts/qa/secrets.sh"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
+  echo "[qa:strict] 运行 Phase 10 行业模板候选边界检查"
+  node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then
   echo "[qa:strict] 运行客户配置草案边界检查"
   node "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs"
@@ -89,6 +96,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs" ]; then
   echo "[qa:strict] 运行 Phase 9 模拟岗位任务闭环工具测试"
   node --test "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs" ]; then
+  echo "[qa:strict] 运行 Phase 10 行业模板模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs"
 fi
 
 if [[ "${STRICT_SKIP_SHELLCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/shellcheck.sh" ]; then

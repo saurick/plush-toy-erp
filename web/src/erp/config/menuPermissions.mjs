@@ -18,7 +18,6 @@ const BUSINESS_SECTION_TITLES = Object.freeze([
   '生产环节',
   '财务环节',
 ])
-const PHASE8_FACTS_PATH = '/erp/phase8/facts'
 
 const rawPermissionGroups = getNavigationSections()
   .map((section) => ({
@@ -99,7 +98,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/business-dashboard',
       '/erp/print-center',
       ...businessModulePaths,
-      PHASE8_FACTS_PATH,
     ]),
   },
   {
@@ -114,7 +112,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       ...masterModulePaths,
       '/erp/sales/project-orders/sales-orders',
       '/erp/warehouse/shipping-release',
-      PHASE8_FACTS_PATH,
     ]),
   },
   {
@@ -135,7 +132,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/production/progress',
       '/erp/production/exceptions',
       '/erp/production/quality-inspections',
-      PHASE8_FACTS_PATH,
     ]),
   },
   {
@@ -152,7 +148,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/production/progress',
       '/erp/production/exceptions',
       '/erp/production/quality-inspections',
-      PHASE8_FACTS_PATH,
     ]),
   },
   {
@@ -169,7 +164,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/purchase/accessories',
       '/erp/purchase/processing-contracts',
       '/erp/warehouse/inbound',
-      PHASE8_FACTS_PATH,
     ]),
   },
   {
@@ -185,7 +179,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/warehouse/inventory',
       '/erp/warehouse/shipping-release',
       '/erp/warehouse/outbound',
-      PHASE8_FACTS_PATH,
     ]),
   },
   {
@@ -202,7 +195,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/warehouse/shipping-release',
       '/erp/production/quality-inspections',
       '/erp/production/exceptions',
-      PHASE8_FACTS_PATH,
     ]),
   },
   {
@@ -221,7 +213,6 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/finance/payables',
       '/erp/finance/receivables',
       '/erp/finance/invoices',
-      PHASE8_FACTS_PATH,
     ]),
   },
 ])

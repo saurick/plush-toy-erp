@@ -328,6 +328,13 @@
 - 下一步：进入 Phase 9 或后续增强评审；打印、报表、核销、物流退货、自动派生、并发锁升级、生产订单专表、委外订单专表和岗位任务端都不作为 Phase 8 补尾。
 - 阻塞/风险：Phase 8 内部闭环不等于客户已签收、真实客户数据导入、完整打印、完整报表、发票明细、收付款核销或对账单已交付；首次目标发布前仍缺 pre-migration 备份 evidence，只能保留为历史发布风险，后续发布必须先记录 pre-migration 备份 evidence。目标机执行了 `docker builder prune -f`，为保留上一版回滚镜像且可回收空间很小，未执行 `docker image prune -a -f`。追加前 `progress.md` 为 319 行 / 62448 bytes，未达到归档阈值。
 
+## 2026-06-09
+
+- 完成：撤掉客户侧栏和默认桌面菜单中的 `Phase 8 事实闭环` / `事实闭环` 工程入口；同步从 yoyoosun 客户菜单、前端默认导航、前端菜单权限选项 / 预设和后端内置菜单移除 `phase8-facts`。保留 `/erp/phase8/facts` 内部直达页面、Phase 8 JSON-RPC、RBAC 动作权限和后端事实 usecase，不影响内部验证和脚本闭环。
+- 完成：同步更新 `docs/current-source-of-truth.md`、`docs/architecture/phase8-fact-expansion-review.md`、`docs/customers/yoyoosun/phase8-target-release-acceptance.md` 和 `docs/product/product-delivery-ledgers.md`，明确客户菜单不展示 `Phase 8` 或 `事实闭环` 这类内部工程入口，菜单隐藏不替代后端 RBAC。
+- 下一步：如后续要把 Phase 8 能力产品化给客户用，应分别并入生产、委外、出货、库存和财务对应业务菜单，而不是恢复统一的 Phase 编号菜单。
+- 阻塞/风险：本轮只改菜单曝光和文档口径，未改 schema、migration、Phase8Usecase、JSON-RPC handler、目标环境镜像或部署配置。追加前 `progress.md` 为 340 行 / 69042 bytes，未达到归档阈值。
+
 ## 2026-06-09 11:05 CST
 
 - 完成：按“下一步、不分子阶段、真实导入只能模拟”的口径一次性完成 Phase 9 岗位任务端与岗位协同闭环。新增 `scripts/qa/phase9-simulated-mobile-closure.mjs` 及测试，并接入 `scripts/qa/fast.sh`、`full.sh`、`strict.sh`；脚本只创建和更新 `SIM-YOYOOSUN-PHASE9` 模拟 workflow 任务，覆盖老板审批、成品抽检、仓库入库确认、出货放行异常上报和现场留痕，不写真实客户数据、`business_records` 或任何事实表。
@@ -338,3 +345,22 @@
 - 验证：目标环境通过 `curl http://192.168.0.133:5175/healthz`、`curl http://192.168.0.133:8300/healthz`、`curl http://192.168.0.133:8300/readyz`、`MOBILE_AUTH_SMOKE_BASE_URL=http://192.168.0.133:5175 MOBILE_AUTH_SMOKE_APP_ID=mobile-warehouse TRIAL_ACCOUNT_PASSWORD=12345678 pnpm --dir web smoke:mobile-auth-login-route`、`TRIAL_ACCOUNT_PASSWORD=12345678 TRIAL_ACCOUNT_BACKEND_URL=http://192.168.0.133:8300 node scripts/qa/trial-account-rbac.mjs` 和目标 `PHASE9_SIM_CONFIRM=APPLY_SIMULATED_PHASE9_MOBILE_TASKS ... --run-id TARGET-20260609-PHASE9`；目标日志近 10 分钟无 `panic|fatal|error` 命中。
 - 下一步：进入 Phase 10 行业模板沉淀，先把 yoyoosun 已验证的角色、菜单、字段、编号、导入模板和岗位任务模式区分为行业共性候选、客户样本和 deferred 输入；不要把单客户样本直接写成行业默认。
 - 阻塞/风险：Phase 9 内部模拟 workflow 闭环不等于客户已签收、真实客户数据导入、拍照上传 / 附件服务、扫码、完整打印、报表、核销、物流退货、自动派生或出货 / 库存 / 财务事实自动过账已交付。目标机执行了 `docker builder prune -f` 和 `docker image prune -f`；磁盘空间充足且可回收空间极小，为保留当前运行镜像和相邻项目回滚镜像，未执行 `docker image prune -a -f`。追加前 `progress.md` 为 329 行 / 65430 bytes，未达到归档阈值。
+
+## 2026-06-09 11:27 CST
+
+- 完成：将撤掉 `Phase 8 事实闭环` / `事实闭环` 客户菜单入口的补丁发布到目标环境；从干净临时 worktree 构建并加载 `plush-toy-erp-web:20260609Tphase8-menu-hide-amd64` 和 `plush-toy-erp-server:20260609Tphase8-menu-hide-amd64`，只替换 `app-server` 与 `web-desktop`，未在目标服务器构建。
+- 完成：目标环境 `.env` 已备份为 `.env.bak.20260609Tphase8-menu-hide-amd64`，`APP_IMAGE` 和 `WEB_IMAGE` 均切到本次新 tag；本轮没有 schema 变更，Atlas status 显示 pending 0。
+- 验证：目标环境 `plush-toy-erp-web-desktop` healthy，`plush-toy-erp-server` 运行新镜像；`/healthz=ok`、`/readyz=ready`、桌面前端 `/healthz` 返回 `{"status":"ok","appId":"desktop","title":"桌面后台"}`，首页 HTTP 200；前端静态资源和服务端二进制中均未检出 `phase8-facts`，服务端二进制中未检出 `Phase 8 事实闭环`；近 5 分钟 server logs 无 `error|panic|fatal|phase8-facts`。
+- 下一步：如后续需要给客户暴露 Phase 8 相关能力，应拆入生产、委外、出货、库存和财务对应业务菜单，而不是恢复 `Phase` 编号工程菜单。
+- 阻塞/风险：本轮只发布菜单曝光修正，未改 Phase 8 内部直达页、JSON-RPC handler、RBAC 动作权限、事实 usecase、schema 或 migration。远端磁盘 `/` 为 98G/22G used/72G avail；已执行 `docker builder prune -f`，实际 0B；为保留上一版镜像回滚且磁盘充足，未执行 `docker image prune -a -f`。追加前 `progress.md` 为 347 行 / 70227 bytes，未达到归档阈值。
+
+## 2026-06-09 11:45 CST
+
+- 完成：按“进入 Phase 10，一步完成，不拆子阶段，真实导入只能本地模拟”的口径完成行业模板沉淀闭环。新增 `config/industry-templates/plush/templateConfig.mjs`，将 yoyoosun 已验证的角色、菜单、字段显示、编号、导入模板和岗位任务模式沉淀为毛绒玩具行业候选模板；模板状态为 `candidate`，`runtimeEnabled=false`，不作为运行时 loader 或多客户默认。
+- 完成：新增 `scripts/qa/industry-template-boundaries.mjs`、`scripts/qa/phase10-industry-template-closure.mjs` 及测试，并接入 `scripts/qa/fast.sh`、`full.sh`、`strict.sh`；脚本只生成 Phase 10 本地模拟 evidence，不连接数据库、不执行真实客户数据导入、不写 `business_records` 或事实表。
+- 完成：同步更新 `config/industry-templates/plush/README.md`、`scripts/README.md`、`docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/product/product-delivery-ledgers.md`、`docs/customers/yoyoosun/README.md`、`docs/document-inventory.md`、`docs/architecture/phase8-fact-expansion-review.md` 和 `docs/customers/yoyoosun/phase8-target-release-acceptance.md`；新增 `docs/customers/yoyoosun/phase10-target-release-evidence-2026-06-09.md`。
+- 完成：本地构建 `linux/amd64` 镜像 `plush-toy-erp-server:20260609T1125-dd845a4-phase10-industry-amd64` 和 `plush-toy-erp-web:20260609T1125-dd845a4-phase10-industry-amd64`，上传到目标环境 `192.168.0.133` 的 `/home/simon/plush-toy-erp-releases/20260609T1125-dd845a4-phase10-industry-amd64/images.tar.gz`，远端只执行 `docker load`、Compose 切换、migration status、健康检查、浏览器回归和发布后清理；未在目标服务器构建。
+- 验证：本地通过 `node scripts/qa/industry-template-boundaries.mjs`、`node --test scripts/qa/phase10-industry-template-closure.test.mjs`、`node scripts/qa/phase10-industry-template-closure.mjs --out output/customers/yoyoosun/phase10-industry-template-closure-local`、`node scripts/qa/customer-config-boundaries.mjs`、`node --test web/src/erp/config/seedData.test.mjs web/src/erp/config/menuPermissions.test.mjs`、`bash scripts/qa/fast.sh`、`pnpm --dir web test`、`pnpm --dir web style:l1`、`bash scripts/qa/full.sh` 和 `git diff --check`。
+- 验证：目标环境 Atlas status OK、pending 0；`/healthz=ok`、`/readyz=ready`、桌面前端 `/healthz` 返回 `{"status":"ok","appId":"desktop","title":"桌面后台"}`，`/erp/dashboard` HTTP 200；`TRIAL_ACCOUNT_PASSWORD=12345678 TRIAL_ACCOUNT_BACKEND_URL=http://192.168.0.133:8300 node scripts/qa/trial-account-rbac.mjs` 通过 9 个 demo 账号；`TRIAL_ACCOUNT_PASSWORD=12345678 TRIAL_BROWSER_SMOKE_BASE_URL=http://192.168.0.133:5175 TRIAL_BROWSER_SMOKE_BACKEND_HEALTH_URL=http://192.168.0.133:8300/healthz pnpm --dir web smoke:trial-demo-browser` 通过桌面账号 9 个、岗位任务端 8 个、拒绝态 1 个；目标日志近 10 分钟无 `panic|fatal|error`。
+- 下一步：Phase 10 已按内部模拟和目标环境发布口径关闭。后续若要把行业模板从 `candidate` 升为正式默认，必须先有第二客户或更完整业务样本验证，并单独评审 runtime loader、客户差异隔离和回滚路径。
+- 阻塞/风险：Phase 10 行业模板不是真实客户数据导入、客户已签收、多客户默认、SaaS、多租户、license、通用打印模板引擎、正式报表、扫码、附件服务或事实自动过账交付；客户使用确认属于交付后业务确认。目标机执行 `docker builder prune -f` 和 `docker image prune -f`，回收 0B；为保留当前运行镜像和相邻项目回滚镜像，未执行 `docker image prune -a -f`。追加前 `progress.md` 为 355 行 / 71849 bytes，未达到归档阈值。

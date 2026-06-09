@@ -241,6 +241,9 @@ func TestAdminMenusOmitRetiredFrontendDocsAndQAPaths(t *testing.T) {
 		if strings.HasPrefix(menu.Path, "/erp/qa/") {
 			t.Fatalf("QA menu must not be registered: %s", menu.Path)
 		}
+		if menu.Key == "phase8-facts" || menu.Path == "/erp/phase8/facts" {
+			t.Fatalf("phase8 internal facts page must not be registered as a menu")
+		}
 	}
 }
 

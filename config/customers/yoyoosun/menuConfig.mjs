@@ -41,10 +41,6 @@ export const yoyoosunMenuConfig = Object.freeze({
         items: ["reconciliation", "payables", "receivables", "invoices"],
       },
       {
-        title: "事实闭环",
-        items: ["phase8-facts"],
-      },
-      {
         title: "单据模板",
         items: ["print-center"],
       },

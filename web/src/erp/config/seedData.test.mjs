@@ -42,7 +42,6 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
       '采购/仓储',
       '生产环节',
       '财务环节',
-      '事实闭环',
       '单据模板',
       '系统管理',
     ]
@@ -53,12 +52,11 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
       ?.items.map((item) => item.path),
     ['/erp/dashboard', '/erp/business-dashboard']
   )
-  assert.deepEqual(
-    navigationSections
-      .find((section) => section.title === '事实闭环')
-      ?.items.map((item) => item.path),
-    ['/erp/phase8/facts']
+  assert.equal(
+    navigationSections.find((section) => section.title === '事实闭环'),
+    undefined
   )
+  assert(!navPaths.includes('/erp/phase8/facts'))
   assert.deepEqual(
     navigationSections
       .find((section) => section.title === '单据模板')

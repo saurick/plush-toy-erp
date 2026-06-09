@@ -12,11 +12,13 @@ print_help() {
 检查内容:
   error-code-sync: 前端生成错误码同步检查
   error-codes: 统一错误码魔法数字检查
+  industry-template-boundaries: Phase 10 行业模板候选边界检查
   customer-config-boundaries: 客户配置草案边界检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
   phase7-simulated-trial-data: Phase 7 模拟数据工具测试
   phase8-simulated-fact-closure: Phase 8 模拟事实闭环工具测试
   phase9-simulated-mobile-closure: Phase 9 模拟岗位任务闭环工具测试
+  phase10-industry-template-closure: Phase 10 行业模板模拟闭环工具测试
   web: pnpm lint -> pnpm css -> (若存在 test 脚本则 pnpm test) -> pnpm build
   server: go test ./... -> make build
 
@@ -67,6 +69,11 @@ if [ -x "$ROOT_DIR/scripts/qa/error-codes.sh" ]; then
   bash "$ROOT_DIR/scripts/qa/error-codes.sh"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
+  echo "[qa:full] 运行 Phase 10 行业模板候选边界检查"
+  node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then
   echo "[qa:full] 运行客户配置草案边界检查"
   node "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs"
@@ -92,6 +99,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs" ]; then
   echo "[qa:full] 运行 Phase 9 模拟岗位任务闭环工具测试"
   node --test "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs" ]; then
+  echo "[qa:full] 运行 Phase 10 行业模板模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs"
 fi
 
 if [ -x "$ROOT_DIR/scripts/qa/secrets.sh" ]; then

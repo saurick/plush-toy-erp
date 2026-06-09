@@ -31,7 +31,6 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
       '采购/仓储',
       '生产环节',
       '财务环节',
-      '事实闭环',
       '单据模板',
       '系统管理',
     ]
@@ -159,7 +158,7 @@ test('menuPermissions: 当前权限项不包含前端文档或开发验收路径
   assert(permissionKeys.includes('/erp/production/quality-inspections'))
   assert(permissionKeys.includes('/erp/finance/receivables'))
   assert(permissionKeys.includes('/erp/finance/invoices'))
-  assert(permissionKeys.includes('/erp/phase8/facts'))
+  assert(!permissionKeys.includes('/erp/phase8/facts'))
   assert(!permissionKeys.some((key) => key.startsWith('/erp/docs/')))
   assert(!permissionKeys.some((key) => key.startsWith('/erp/qa/')))
   assert(!permissionKeys.includes('/erp/help-center'))
