@@ -322,10 +322,113 @@
         padding: 5px 9px;
       }
 
+      button.action {
+        cursor: pointer;
+      }
+
       .action.primary {
         border-color: #6c96c6;
         background: var(--blue-soft);
         color: #164e91;
+      }
+
+      .preview-dialog {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .preview-dialog[hidden] {
+        display: none;
+      }
+
+      .preview-bar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        background: rgb(255 255 255 / 96%);
+        padding: 10px 14px;
+        box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+      }
+
+      .preview-title {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .preview-title strong,
+      .preview-title span {
+        overflow-wrap: anywhere;
+      }
+
+      .preview-title span {
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .preview-close {
+        display: inline-flex;
+        min-height: 34px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text);
+        cursor: pointer;
+        font-weight: 700;
+        padding: 6px 12px;
+      }
+
+      .preview-body {
+        display: grid;
+        min-height: 0;
+        flex: 1 1 auto;
+        place-items: stretch;
+        overflow: hidden;
+      }
+
+      .preview-frame {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #fff;
+      }
+
+      .preview-image-wrap {
+        display: grid;
+        place-items: start center;
+        overflow: auto;
+        background:
+          linear-gradient(45deg, #f8fafc 25%, transparent 25%),
+          linear-gradient(-45deg, #f8fafc 25%, transparent 25%),
+          linear-gradient(45deg, transparent 75%, #f8fafc 75%),
+          linear-gradient(-45deg, transparent 75%, #f8fafc 75%);
+        background-color: #fff;
+        background-position:
+          0 0,
+          0 8px,
+          8px -8px,
+          -8px 0;
+        background-size: 16px 16px;
+        padding: 20px;
+      }
+
+      .preview-image {
+        display: block;
+        max-width: none;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 18px 40px rgb(15 23 42 / 16%);
       }
 
       .empty {
@@ -387,6 +490,14 @@
 
         h1 {
           font-size: 21px;
+        }
+
+        .preview-bar {
+          grid-template-columns: 1fr;
+        }
+
+        .preview-close {
+          width: 100%;
         }
       }
     </style>
@@ -609,12 +720,95 @@
       </section>
     </main>
 
+    <div class="preview-dialog" id="previewDialog" role="dialog" aria-modal="true" aria-labelledby="previewTitle" hidden>
+      <div class="preview-bar">
+        <div class="preview-title">
+          <strong id="previewTitle">原型全屏预览</strong>
+          <span id="previewPath"></span>
+        </div>
+        <button class="preview-close" id="previewClose" type="button">关闭</button>
+      </div>
+      <div class="preview-body" id="previewBody"></div>
+    </div>
+
     <script>
       const buttons = Array.from(document.querySelectorAll(".filter"));
       const searchInput = document.querySelector("#assetSearch");
       const assets = Array.from(document.querySelectorAll(".asset"));
       const emptyState = document.querySelector("#emptyState");
+      const previewDialog = document.querySelector("#previewDialog");
+      const previewTitle = document.querySelector("#previewTitle");
+      const previewPath = document.querySelector("#previewPath");
+      const previewBody = document.querySelector("#previewBody");
+      const previewClose = document.querySelector("#previewClose");
       let currentFilter = "all";
+      let lastPreviewTrigger = null;
+      let previousBodyOverflow = "";
+
+      function getAssetPreviewMeta(asset) {
+        const primaryLink = asset.querySelector(".action.primary");
+        const type = asset.querySelector(".type")?.textContent.trim() || "";
+        const title = asset.querySelector(".asset-title")?.textContent.trim() || "";
+        if (!primaryLink || !type || !title) return null;
+        return {
+          href: primaryLink.getAttribute("href"),
+          type,
+          title,
+        };
+      }
+
+      function addPreviewButtons() {
+        for (const asset of assets) {
+          const meta = getAssetPreviewMeta(asset);
+          const actions = asset.querySelector(".actions");
+          if (!meta || !actions) continue;
+
+          const button = document.createElement("button");
+          button.className = "action";
+          button.type = "button";
+          button.textContent = "全屏预览";
+          button.addEventListener("click", () => openPreview(meta, button));
+          actions.insertBefore(button, actions.children[1] || null);
+        }
+      }
+
+      function openPreview(meta, trigger) {
+        lastPreviewTrigger = trigger;
+        previewTitle.textContent = meta.title;
+        previewPath.textContent = meta.href;
+        previewBody.replaceChildren();
+
+        if (meta.type === "HTML") {
+          const frame = document.createElement("iframe");
+          frame.className = "preview-frame";
+          frame.title = meta.title;
+          frame.src = meta.href;
+          frame.setAttribute("sandbox", "allow-scripts allow-same-origin");
+          previewBody.append(frame);
+        } else {
+          const wrap = document.createElement("div");
+          wrap.className = "preview-image-wrap";
+          const image = document.createElement("img");
+          image.className = "preview-image";
+          image.src = meta.href;
+          image.alt = meta.title;
+          wrap.append(image);
+          previewBody.append(wrap);
+        }
+
+        previousBodyOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        previewDialog.hidden = false;
+        previewClose.focus();
+      }
+
+      function closePreview() {
+        if (previewDialog.hidden) return;
+        previewDialog.hidden = true;
+        previewBody.replaceChildren();
+        document.body.style.overflow = previousBodyOverflow;
+        if (lastPreviewTrigger) lastPreviewTrigger.focus();
+      }
 
       function applyFilters() {
         const query = searchInput.value.trim().toLowerCase();
@@ -644,6 +838,11 @@
       }
 
       searchInput.addEventListener("input", applyFilters);
+      previewClose.addEventListener("click", closePreview);
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") closePreview();
+      });
+      addPreviewButtons();
     </script>
   </body>
 </html>

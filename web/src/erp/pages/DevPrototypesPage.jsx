@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from 'react'
 import {
   AppstoreOutlined,
+  CloseOutlined,
   FileImageOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
+  FullscreenOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
-import { Empty, Input, Segmented, Space, Tag, Typography } from 'antd'
+import { Button, Empty, Input, Segmented, Space, Tag, Typography } from 'antd'
 import {
   DEV_PROTOTYPE_STATUS_OPTIONS,
   buildDevPrototypeItems,
@@ -45,7 +47,7 @@ function PrototypeStatusTags({ statuses = [] }) {
   )
 }
 
-function PrototypePreview({ item }) {
+function PrototypePreview({ item, fullscreen = false }) {
   if (!item) {
     return (
       <div className="erp-dev-prototypes-preview__empty">
@@ -65,7 +67,11 @@ function PrototypePreview({ item }) {
   if (item.type === 'HTML') {
     return (
       <iframe
-        className="erp-dev-prototypes-preview__frame"
+        className={
+          fullscreen
+            ? 'erp-dev-prototypes-preview__frame erp-dev-prototypes-preview__frame--fullscreen'
+            : 'erp-dev-prototypes-preview__frame'
+        }
         title={item.title}
         srcDoc={item.source}
         sandbox="allow-scripts allow-same-origin"
@@ -74,12 +80,53 @@ function PrototypePreview({ item }) {
   }
 
   return (
-    <div className="erp-dev-prototypes-preview__image-wrap">
+    <div
+      className={
+        fullscreen
+          ? 'erp-dev-prototypes-preview__image-wrap erp-dev-prototypes-preview__image-wrap--fullscreen'
+          : 'erp-dev-prototypes-preview__image-wrap'
+      }
+    >
       <img
-        className="erp-dev-prototypes-preview__image"
+        className={
+          fullscreen
+            ? 'erp-dev-prototypes-preview__image erp-dev-prototypes-preview__image--fullscreen'
+            : 'erp-dev-prototypes-preview__image'
+        }
         src={item.url}
         alt={item.title}
       />
+    </div>
+  )
+}
+
+function FullscreenPrototypePreview({ item, onClose }) {
+  if (!item) return null
+
+  return (
+    <div
+      className="erp-dev-prototypes-fullscreen"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${item.title} 全屏预览`}
+    >
+      <div className="erp-dev-prototypes-fullscreen__bar">
+        <div className="erp-dev-prototypes-fullscreen__title">
+          <Text strong>{item.title}</Text>
+          <Text
+            type="secondary"
+            className="erp-dev-prototypes-fullscreen__path"
+          >
+            {item.assetPath}
+          </Text>
+        </div>
+        <Button icon={<CloseOutlined />} onClick={onClose}>
+          关闭
+        </Button>
+      </div>
+      <div className="erp-dev-prototypes-fullscreen__body">
+        <PrototypePreview item={item} fullscreen />
+      </div>
     </div>
   )
 }
@@ -100,11 +147,29 @@ export default function DevPrototypesPage() {
     [items, keyword, statusFilter]
   )
   const [selectedKey, setSelectedKey] = useState(items[0]?.key || '')
+  const [fullscreenItem, setFullscreenItem] = useState(null)
   const selectedItem =
     visibleItems.find((item) => item.key === selectedKey) ||
     visibleItems[0] ||
     items.find((item) => item.key === selectedKey) ||
     items[0]
+
+  React.useEffect(() => {
+    if (!fullscreenItem) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setFullscreenItem(null)
+      }
+    }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [fullscreenItem])
 
   return (
     <div className="erp-dev-prototypes-page">
@@ -219,6 +284,13 @@ export default function DevPrototypesPage() {
                     {selectedItem.type}
                   </Tag>
                   <PrototypeStatusTags statuses={selectedItem.statuses} />
+                  <Button
+                    icon={<FullscreenOutlined />}
+                    disabled={!selectedItem.available}
+                    onClick={() => setFullscreenItem(selectedItem)}
+                  >
+                    全屏预览
+                  </Button>
                 </>
               ) : null}
             </div>
@@ -234,6 +306,10 @@ export default function DevPrototypesPage() {
           <PrototypePreview item={selectedItem} />
         </section>
       </main>
+      <FullscreenPrototypePreview
+        item={fullscreenItem}
+        onClose={() => setFullscreenItem(null)}
+      />
     </div>
   )
 }

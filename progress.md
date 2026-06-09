@@ -129,3 +129,25 @@
 - 验证：Browser 打开 `http://localhost:5175/__dev/prototypes` 成功，页面显示 9 个资产，默认 HTML iframe 预览为“业务模块标准页整页原型”；“当前实现对齐版”筛选只剩 `mobile-role-tasks-implemented`，搜索“风险”只剩 `mobile-role-task-detail` 和 `mobile-role-risk-dashboard`，点击 PNG 卡片能加载 853x1844 图片；390px 移动视口无横向溢出，控制台无 error / warn。
 - 下一步：如后续新增原型资产，继续同步 `devPrototypes.mjs`、静态 `index.html` 和原型 README；如需要把 `/__dev/prototypes` 纳入专门 L1 场景，再单独扩展 `styleL1.mjs`。
 - 阻塞/风险：本轮只触达前端 dev-only route、样式和正式说明文档；未改 `server/`、migration、ERP 正式菜单、权限、seed、后端业务或生产构建主路径。暗色态通过 CSS/主题覆盖和既有 `style:l1` 主题回归间接覆盖，Browser 直接写 `localStorage` 切暗色被只读执行环境拦截，未完成原型页暗色态的浏览器直测；追加前 `progress.md` 为 121 行 / 27340 bytes，未达到归档阈值。
+
+## 2026-06-09 23:34 CST
+
+- 完成：将默认 `YS` favicon 替换为产品中性后台图标，并新增后台、岗位任务端、开发文档和产品原型四套 SVG favicon；`web/index.html` 与 `web/public/index.html` 不再引用旧 PNG 备用图标。
+- 完成：新增 `web/src/common/consts/favicon.mjs` 和测试，按当前路由切换 favicon：后台 `/erp/*` 使用 `/favicon-admin.svg`，岗位任务端 `/m/<role>/tasks` 和独立移动端 `/tasks` 使用 `/favicon-tasks.svg`，开发文档 `/__dev/docs` 使用 `/favicon-docs.svg`，原型 `/__dev/prototypes` 使用 `/favicon-prototypes.svg`；从任务端跳转到登录页时按 `location.state.from` 保持任务端图标。
+- 完成：用中性后台图标重新生成 `web/public/favicon.png` 和 `web/src/assets/icons/favicon.png`，避免旧 `YS` PNG 通过直接访问或历史引用残留。
+- 验证：`pnpm lint && pnpm css && pnpm test && pnpm build && pnpm style:l1` 通过；`pnpm test` 通过 288 项，`style:l1` 通过 41 个场景。`pnpm build` 仍只有既有的动态 / 静态 import 和 chunk size 警告。
+- 验证：Browser 复用 `http://localhost:5175` 依次打开 `/erp/dashboard`、`/m/warehouse/tasks`、`/__dev/docs`、`/__dev/prototypes`，4 个路由页面非空、无 Vite overlay、console 无 error / warn，`link[rel~="icon"]` 分别命中对应 SVG；`curl -I http://localhost:5175/favicon.png` 返回 `200 image/png`。
+- 下一步：如要让目标环境浏览器标签页也更新，需要按低配 Docker 发布主路径重新构建并发布 Web 镜像。
+- 阻塞/风险：本轮只改 favicon 资源、前端路由切换 helper、测试和过程记录；未改客户配置加载、后端、schema、migration、RBAC、菜单、Workflow / Fact usecase 或部署脚本。Browser 截图接口对当前页面两次 `Page.captureScreenshot` 超时，本轮以 DOM / link / console / HTTP 资源验证收口；追加前 `progress.md` 为 131 行 / 29619 bytes，未达到归档阈值。
+
+## 2026-06-09 23:42 CST
+
+- 完成：为本地开发态 `/__dev/prototypes` 产品原型查看器新增全屏预览能力；选中 HTML 原型时以全屏 iframe 查看，选中 PNG / 截图时以全屏长图查看，支持关闭按钮、`Esc` 关闭和背景滚动锁定。
+- 完成：为静态 `docs/product/prototypes/index.html` 新增同类全屏预览能力；页面根据现有资产主链接自动补充“全屏预览”按钮，继续保持手工登记、相对链接、无依赖和无构建工具。
+- 完成：同步更新 `docs/product/prototypes/README.md`，明确两个查看器的全屏预览只作为资产查看辅助，不改变资产状态或正式实现口径。
+- 验证：`git diff --check -- web/src/erp/pages/DevPrototypesPage.jsx web/src/erp/styles/app.css docs/product/prototypes/index.html docs/product/prototypes/README.md`、静态 `index.html` 内联脚本编译检查、静态 20 个 `href` 本地存在性检查、`node --test src/erp/config/devPrototypes.test.mjs src/erp/config/devDocs.test.mjs`、`pnpm css`、`pnpm lint`、`pnpm test`、`pnpm build:desktop` 均通过；`pnpm test` 通过 287 项，构建仍只有既有 chunk / 动静态 import 警告。
+- 验证：`pnpm style:l1` 与 `pnpm build:desktop` 并行时出现一次既有业务弹窗居中断言失败；顺序单独重跑 `pnpm style:l1` 通过 41 个场景。
+- 验证：Browser 通过 `http://127.0.0.1:5185/__dev/prototypes` 验证 dev 原型查看器：HTML 全屏 overlay 覆盖 1280x720 视口，iframe 铺满顶部栏以外区域，`Esc` 可关闭并恢复背景滚动；PNG 全屏可加载 853x1844 长图并在容器内滚动；390x844 移动视口无横向溢出，overlay 和关闭按钮按移动宽度适配。
+- 验证：Browser 因安全策略拒绝直接访问 `file://`，本轮未绕过该策略；改用 `http://127.0.0.1:5195/index.html` 验证同一个静态 `index.html` 的 9 个资产均生成“全屏预览”按钮，HTML iframe 和 PNG 长图全屏预览均可打开和关闭。
+- 下一步：如后续要把全屏预览纳入专门 L1 场景，可扩展 `styleL1.mjs` 覆盖 `/__dev/prototypes` 的 HTML / PNG 全屏状态。
+- 阻塞/风险：本轮未改 `server/`、migration、ERP 正式菜单、权限、seed、后端业务或生产构建主路径。原型页暗色态通过 CSS 变量和既有 CSS / L1 回归间接覆盖，未完成原型页暗色态浏览器直测；追加前 `progress.md` 为 141 行 / 31616 bytes，未达到归档阈值。

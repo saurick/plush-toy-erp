@@ -2,11 +2,12 @@
 import React, { useEffect } from 'react'
 import { App as AntdApp, ConfigProvider, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Helmet } from 'react-helmet-async'
 import { authBus } from '@/common/auth/authBus'
 import { appAlert } from '@/common/components/modal/alertBridge'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
+import { applyERPFavicon } from '@/common/consts/favicon.mjs'
 import ERPRouter from '@/erp/router'
 import MobileRoleRouter from '@/erp/mobile/router'
 import {
@@ -16,6 +17,7 @@ import {
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
 
 function AppContent() {
+  const location = useLocation()
   const navigate = useNavigate()
   const { appConfig, isDesktopApp, isMobileExperience } = useERPWorkspace()
   const appTitle =
@@ -52,6 +54,13 @@ function AppContent() {
       })
     })
   }, [isMobileExperience, navigate])
+
+  useEffect(() => {
+    applyERPFavicon(document, location.pathname, {
+      fromPathname: location.state?.from?.pathname,
+      isMobileExperience,
+    })
+  }, [isMobileExperience, location.pathname, location.state])
 
   return (
     <>
