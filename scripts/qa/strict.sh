@@ -15,10 +15,11 @@ print_help() {
   3) customer-import-tooling
   4) phase7-simulated-trial-data
   5) phase8-simulated-fact-closure
-  6) shellcheck + shfmt（可选）
-  7) govulncheck（可选）
-  8) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  9) server: go test ./... + make build
+  6) phase9-simulated-mobile-closure
+  7) shellcheck + shfmt（可选）
+  8) govulncheck（可选）
+  9) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  10) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -83,6 +84,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/phase8-simulated-fact-closure.test.mjs" ]; then
   echo "[qa:strict] 运行 Phase 8 模拟事实闭环工具测试"
   node --test "$ROOT_DIR/scripts/qa/phase8-simulated-fact-closure.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs" ]; then
+  echo "[qa:strict] 运行 Phase 9 模拟岗位任务闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs"
 fi
 
 if [[ "${STRICT_SKIP_SHELLCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/shellcheck.sh" ]; then

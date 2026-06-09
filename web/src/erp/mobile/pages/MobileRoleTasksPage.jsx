@@ -4,6 +4,7 @@ import {
   BellOutlined,
   CheckOutlined,
   CheckSquareOutlined,
+  CameraOutlined,
   ClockCircleOutlined,
   ExclamationCircleFilled,
   FileTextOutlined,
@@ -39,7 +40,9 @@ import { buildBusinessRecordStatusUpdateParams } from '../../utils/businessRecor
 import {
   buildMobileTaskListForRole,
   buildMobileTaskSummary,
+  buildMobileTaskActionEvidence,
   formatMobileTaskTime,
+  normalizeMobileActionEvidenceRefs,
 } from '../../utils/mobileTaskView.mjs'
 import {
   buildMobileWorkflowTaskQueryPlan,
@@ -560,6 +563,7 @@ export default function MobileRoleTasksPage() {
   const [detailAction, setDetailAction] = useState(null)
   const [blockedReasonByTaskID, setBlockedReasonByTaskID] = useState({})
   const [urgeReasonByTaskID, setUrgeReasonByTaskID] = useState({})
+  const [evidenceTextByTaskID, setEvidenceTextByTaskID] = useState({})
 
   const taskViews = useMemo(
     () => buildMobileTaskListForRole(tasks, activeRoleKey),
@@ -1283,6 +1287,12 @@ export default function MobileRoleTasksPage() {
       task,
       taskStatusKey
     )
+    const mobileActionEvidence = buildMobileTaskActionEvidence({
+      roleKey: activeRoleKey,
+      actionKey: taskStatusKey,
+      reason: reasonRequired ? blockedReason : '',
+      evidenceText: evidenceTextByTaskID[task.id] || '',
+    })
 
     setUpdatingID(task.id)
     try {
@@ -1294,6 +1304,7 @@ export default function MobileRoleTasksPage() {
         reason: reasonRequired ? blockedReason : '',
         payload: {
           ...(task.payload || {}),
+          ...mobileActionEvidence,
           mobile_role_key: activeRoleKey,
           approval_result:
             isOrderApprovalTask(task) && taskStatusKey === 'done'
@@ -1359,6 +1370,11 @@ export default function MobileRoleTasksPage() {
         }
         return next
       })
+      setEvidenceTextByTaskID((current) => {
+        const next = { ...current }
+        delete next[task.id]
+        return next
+      })
       message.success('任务状态已更新')
       await loadTasks()
       return true
@@ -1385,6 +1401,12 @@ export default function MobileRoleTasksPage() {
 
     setUrgingID(task.id)
     try {
+      const mobileActionEvidence = buildMobileTaskActionEvidence({
+        roleKey: activeRoleKey,
+        actionKey: 'urge',
+        reason,
+        evidenceText: evidenceTextByTaskID[task.id] || '',
+      })
       await urgeWorkflowTask({
         task_id: task.id,
         action: resolveMobileUrgeAction(activeRoleKey, task),
@@ -1395,9 +1417,15 @@ export default function MobileRoleTasksPage() {
           source_id: task.source_id,
           source_no: task.source_no,
           mobile_role_key: activeRoleKey,
+          ...mobileActionEvidence,
         },
       })
       setUrgeReasonByTaskID((current) => {
+        const next = { ...current }
+        delete next[task.id]
+        return next
+      })
+      setEvidenceTextByTaskID((current) => {
         const next = { ...current }
         delete next[task.id]
         return next
@@ -1450,6 +1478,14 @@ export default function MobileRoleTasksPage() {
       ? urgeReasonByTaskID[selectedTask.id] || ''
       : blockedReasonByTaskID[selectedTask.id] || ''
     : ''
+  const detailEvidenceValue = selectedTask
+    ? evidenceTextByTaskID[selectedTask.id] || ''
+    : ''
+  const savedEvidenceRefs = selectedTask
+    ? normalizeMobileActionEvidenceRefs(
+        selectedTask.mobile_action_evidence_refs
+      )
+    : []
 
   const updateDetailReason = (value) => {
     if (!selectedTask) return
@@ -1461,6 +1497,14 @@ export default function MobileRoleTasksPage() {
       return
     }
     setBlockedReasonByTaskID((current) => ({
+      ...current,
+      [selectedTask.id]: value,
+    }))
+  }
+
+  const updateEvidenceText = (value) => {
+    if (!selectedTask) return
+    setEvidenceTextByTaskID((current) => ({
       ...current,
       [selectedTask.id]: value,
     }))
@@ -2198,6 +2242,10 @@ export default function MobileRoleTasksPage() {
     if (!selectedTask || !selectedSeverity) return null
     const factRows = buildTaskFactRows(selectedTask)
     const relatedSource = resolveTaskSourceLabel(selectedTask)
+    const latestMobileAction = selectedTask.mobile_action
+    const latestMobileActionRoleLabel = latestMobileAction
+      ? getMobileRoleLabel(latestMobileAction.role_key || activeRoleKey)
+      : roleLabel
     const showRejected = supportsRejectedAction(activeRoleKey, selectedTask)
     const isUpdating = updatingID === selectedTask.id
     const isUrging = urgingID === selectedTask.id
@@ -2275,6 +2323,15 @@ export default function MobileRoleTasksPage() {
             </section>
           ) : null}
 
+          {selectedTask.mobile_exception_report ? (
+            <section className="mobile-role-detail-exception rounded-2xl border border-orange-200 bg-orange-50 px-4 py-4 text-base text-orange-800">
+              <div className="font-semibold">异常上报</div>
+              <div className="mt-2 break-words">
+                {selectedTask.mobile_exception_report.reason || '已记录异常'}
+              </div>
+            </section>
+          ) : null}
+
           <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
@@ -2292,6 +2349,42 @@ export default function MobileRoleTasksPage() {
               <span className="min-w-0 break-all">订单：{relatedSource}</span>
               <span className="shrink-0 text-slate-400">&gt;</span>
             </div>
+          </section>
+
+          <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
+                <CameraOutlined className="text-emerald-500" />
+                现场留痕
+              </h2>
+              <span className="text-sm font-semibold text-slate-400">可选</span>
+            </div>
+            <textarea
+              data-testid="mobile-role-evidence-input"
+              className="mt-4 min-h-[96px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+              placeholder="填写照片、附件编号或链接；多条可换行"
+              maxLength={500}
+              value={detailEvidenceValue}
+              onChange={(event) => updateEvidenceText(event.target.value)}
+            />
+            <div className="mt-1 text-right text-sm text-slate-400">
+              {detailEvidenceValue.length}/500
+            </div>
+            {savedEvidenceRefs.length > 0 ? (
+              <div
+                data-testid="mobile-role-saved-evidence"
+                className="mt-3 flex flex-wrap gap-2"
+              >
+                {savedEvidenceRefs.map((ref) => (
+                  <span
+                    key={ref}
+                    className="min-w-0 max-w-full break-all rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-sm font-semibold text-emerald-700"
+                  >
+                    {ref}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </section>
 
           <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -2321,9 +2414,23 @@ export default function MobileRoleTasksPage() {
                     </span>
                   </div>
                   <div className="mt-2 break-words text-base text-slate-700">
-                    任务已流转至 {roleLabel} /{' '}
-                    {selectedTask.owner_role_key || '-'}
+                    {latestMobileAction
+                      ? `${latestMobileActionRoleLabel} 已执行 ${
+                          latestMobileAction.action_key || '移动处理'
+                        }${
+                          latestMobileAction.reason
+                            ? `：${latestMobileAction.reason}`
+                            : ''
+                        }`
+                      : `任务已流转至 ${roleLabel} / ${
+                          selectedTask.owner_role_key || '-'
+                        }`}
                   </div>
+                  {latestMobileAction?.evidence_refs?.length > 0 ? (
+                    <div className="mt-2 break-words text-sm text-slate-500">
+                      留痕：{latestMobileAction.evidence_refs.join(' / ')}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>

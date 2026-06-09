@@ -31,6 +31,7 @@
 | `phase7-simulated-trial-acceptance.md` | 记录 Phase 7 本地模拟数据试用验收结果、验证命令和不导入真实数据边界 |
 | `phase8-target-release-acceptance.md` | 记录 Phase 8 目标环境发布、migration、事实闭环页面验收、内部模拟事实写入验收和 evidence 模板 |
 | `phase8-target-release-evidence-2026-06-08.md` | 记录 2026-06-08 Phase 8 目标环境发布 smoke、migration、试用账号 RBAC、登录态只读 API smoke、内部模拟事实写入闭环和剩余交付确认项 |
+| `phase9-target-release-evidence-2026-06-09.md` | 记录 2026-06-09 Phase 9 岗位任务端发布、目标环境 smoke、岗位路由回归和内部模拟 workflow 闭环 |
 | `field-numbering-confirmation-checklist.md` | 记录永绅 yoyoosun 字段显示、字段必填和编号规则的客户确认清单 |
 | `field-numbering-confirmation-result-template.md` | 记录永绅 yoyoosun 字段编号客户确认结果的回写模板和边界 |
 | `raw-source-files/` | 保存永绅 yoyoosun 原始 Excel / PDF / PNG / JPG / JPEG，用于字段、模板、导入、页面和验收溯源 |
@@ -45,6 +46,7 @@
 - `phase7-simulated-trial-acceptance.md` 记录本地模拟数据试用已通过，并作为当前 Phase 7 关闭口径；不代表目标客户环境已正式验收，也不代表 Phase 8 事实层能力已实现。
 - `phase8-target-release-acceptance.md` 定义 Phase 8 目标环境发布和内部模拟事实验收闭环；它不代表客户已签收或真实客户数据已导入。
 - `phase8-target-release-evidence-2026-06-08.md` 记录 Phase 8 已发布到当前目标环境，并通过发布 smoke、目标试用账号 RBAC 核对、登录态只读 API smoke 和 `SIM-YOYOOSUN-PHASE8` 内部模拟事实写入闭环；客户使用确认属于交付后的业务确认，不作为 Phase 8 完成阻塞。
+- `phase9-target-release-evidence-2026-06-09.md` 记录 Phase 9 岗位任务端已发布到当前目标环境，并通过目标健康检查、仓库岗位任务端路由 smoke、试用账号 RBAC 核对和 `SIM-YOYOOSUN-PHASE9` 内部模拟 workflow 闭环；它不代表客户已签收、真实导入已批准、拍照上传 / 附件服务已交付或出货 / 库存 / 财务事实已自动过账。
 - 模拟数据不代表客户字段已经确认，也不能转写成真实导入、出货、库存或财务事实。
 - 不直接写 `business_records`，也不生成库存、出货、财务、委外或采购事实。
 - 后续若多个客户进入项目，应继续按 `docs/customers/<customer-key>/` 隔离原始资料和客户差异。

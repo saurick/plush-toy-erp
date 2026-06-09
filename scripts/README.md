@@ -4,36 +4,37 @@
 
 ## 总览
 
-| 脚本                                                   | 主要作用                                                                              | 建议时机                                                   |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `scripts/bootstrap.sh`                                 | 安装依赖、启用 hooks、跑快速自检                                                      | 新机器 / 首次拉仓库                                        |
-| `scripts/project-scan.sh`                              | 扫描项目名、默认密钥、部署地址和页面文案残留                                          | 改名后 / 配置收口后                                        |
-| `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                         | 需要多角色登录 / 岗位任务端验收                            |
-| `scripts/seed-phase7-sim-masterdata.sh`                | 显式生成 Phase 7 模拟产品 / 单位主数据，供模拟销售订单行引用                          | Phase 7 试用环境演练前                                    |
-| `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence  | yoyoosun 导入前 source freeze / 人工 review evidence       |
-| `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                 | yoyoosun 导入前人工 review / 数据映射检查                  |
-| `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；Phase 7 不执行真实导入           | import tooling 自检 / 非 Phase 7 的单独数据治理评审        |
-| `scripts/qa/phase7-simulated-trial-data.mjs`           | Phase 7 模拟试用数据入口，只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | Phase 7 试用环境演练                                      |
-| `scripts/qa/phase8-simulated-fact-closure.mjs`         | Phase 8 模拟事实闭环入口，只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路 | Phase 8 内部模拟验收 / 目标环境事实闭环回归               |
-| `scripts/phase2b-pg.sh`                                | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口                   | 验证 Phase 2B schema 和批次库存行为                        |
-| `scripts/phase2c-pg.sh`                                | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口                         | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
-| `scripts/phase2d-pg.sh`                                | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口                       | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
-| `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                         | 环境初始化 / 异常排查                                      |
-| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入和 Phase 7 模拟数据工具测试                                | 日常开发                                                   |
-| `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界             | 生成试用 / 演示账号后                                      |
-| `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界 | 调整客户配置草案后                                         |
-| `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入和 Phase 7 模拟数据工具测试                                    | 提交前 / 推送前                                            |
-| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入和 Phase 7 模拟数据工具测试                                    | 发版前                                                     |
-| `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                      | 改数据模型后                                               |
-| `scripts/qa/error-code-sync.sh`                        | 校验前后端错误码同步                                                                  | 改错误码后                                                 |
-| `scripts/qa/error-codes.sh`                            | 阻止业务代码裸写已注册错误码                                                          | 改接口 / 鉴权 / 前端错误处理后                             |
-| `scripts/qa/shellcheck.sh`                             | 检查 shell 脚本                                                                       | 调整脚本后                                                 |
-| `scripts/qa/shfmt.sh`                                  | 统一 shell 格式                                                                       | 调整脚本后                                                 |
-| `scripts/qa/go-vet.sh`                                 | 执行 Go vet                                                                           | 改 Go 代码后                                               |
-| `scripts/qa/golangci-lint.sh`                          | 执行 golangci-lint                                                                    | 改 Go 代码后                                               |
-| `scripts/qa/yamllint.sh`                               | 检查 YAML 语法与风格                                                                  | 改 YAML 后                                                 |
-| `scripts/qa/govulncheck.sh`                            | 扫描 Go 可达漏洞                                                                      | 推送前 / 发版前                                            |
+| 脚本                                                   | 主要作用                                                                                                          | 建议时机                                                   |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `scripts/bootstrap.sh`                                 | 安装依赖、启用 hooks、跑快速自检                                                                                  | 新机器 / 首次拉仓库                                        |
+| `scripts/project-scan.sh`                              | 扫描项目名、默认密钥、部署地址和页面文案残留                                                                      | 改名后 / 配置收口后                                        |
+| `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                     | 需要多角色登录 / 岗位任务端验收                            |
+| `scripts/seed-phase7-sim-masterdata.sh`                | 显式生成 Phase 7 模拟产品 / 单位主数据，供模拟销售订单行引用                                                      | Phase 7 试用环境演练前                                     |
+| `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence                              | yoyoosun 导入前 source freeze / 人工 review evidence       |
+| `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
+| `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；Phase 7 不执行真实导入                                       | import tooling 自检 / 非 Phase 7 的单独数据治理评审        |
+| `scripts/qa/phase7-simulated-trial-data.mjs`           | Phase 7 模拟试用数据入口，只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据                             | Phase 7 试用环境演练                                       |
+| `scripts/qa/phase8-simulated-fact-closure.mjs`         | Phase 8 模拟事实闭环入口，只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路                            | Phase 8 内部模拟验收 / 目标环境事实闭环回归                |
+| `scripts/qa/phase9-simulated-mobile-closure.mjs`       | Phase 9 模拟岗位任务闭环入口，只创建和更新显式模拟 workflow 任务，覆盖审批 / 质检 / 入库 / 出货放行异常和现场留痕 | Phase 9 岗位任务端回归 / 目标环境移动任务闭环验收          |
+| `scripts/phase2b-pg.sh`                                | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口                                               | 验证 Phase 2B schema 和批次库存行为                        |
+| `scripts/phase2c-pg.sh`                                | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口                                                     | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
+| `scripts/phase2d-pg.sh`                                | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                   | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
+| `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
+| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入和 Phase 7 模拟数据工具测试                                                             | 日常开发                                                   |
+| `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界                                         | 生成试用 / 演示账号后                                      |
+| `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界                             | 调整客户配置草案后                                         |
+| `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
+| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入和 Phase 7 模拟数据工具测试                                                                 | 提交前 / 推送前                                            |
+| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入和 Phase 7 模拟数据工具测试                                                                 | 发版前                                                     |
+| `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
+| `scripts/qa/error-code-sync.sh`                        | 校验前后端错误码同步                                                                                              | 改错误码后                                                 |
+| `scripts/qa/error-codes.sh`                            | 阻止业务代码裸写已注册错误码                                                                                      | 改接口 / 鉴权 / 前端错误处理后                             |
+| `scripts/qa/shellcheck.sh`                             | 检查 shell 脚本                                                                                                   | 调整脚本后                                                 |
+| `scripts/qa/shfmt.sh`                                  | 统一 shell 格式                                                                                                   | 调整脚本后                                                 |
+| `scripts/qa/go-vet.sh`                                 | 执行 Go vet                                                                                                       | 改 Go 代码后                                               |
+| `scripts/qa/golangci-lint.sh`                          | 执行 golangci-lint                                                                                                | 改 Go 代码后                                               |
+| `scripts/qa/yamllint.sh`                               | 检查 YAML 语法与风格                                                                                              | 改 YAML 后                                                 |
+| `scripts/qa/govulncheck.sh`                            | 扫描 Go 可达漏洞                                                                                                  | 推送前 / 发版前                                            |
 
 前端浏览器级样式回归不在 `scripts/qa` 下，统一执行：
 
@@ -198,6 +199,25 @@ PHASE8_SIM_PASSWORD='replace-with-demo-password' \
     --out output/customers/yoyoosun/phase8-simulated-fact-closure-target
 ```
 
+Phase 9 只允许模拟岗位任务闭环验收，不执行真实客户数据导入，也不写生产、出货、库存、预留或财务事实。先生成报告，确认模拟范围：
+
+```bash
+node scripts/qa/phase9-simulated-mobile-closure.mjs \
+  --out output/customers/yoyoosun/phase9-simulated-mobile-closure
+```
+
+若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-PHASE9` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality` 和 `demo_warehouse` 分别处理老板审批、成品抽检、仓库入库确认、出货放行异常上报和现场留痕 evidence；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 Phase 8 fact usecase：
+
+```bash
+PHASE9_SIM_CONFIRM=APPLY_SIMULATED_PHASE9_MOBILE_TASKS \
+PHASE9_SIM_PASSWORD='replace-with-demo-password' \
+  node scripts/qa/phase9-simulated-mobile-closure.mjs \
+    --apply \
+    --backend-url http://127.0.0.1:8300 \
+    --run-id target-yyyymmdd-mobile \
+    --out output/customers/yoyoosun/phase9-simulated-mobile-closure-target
+```
+
 ### 1. 初始化环境
 
 ```bash
@@ -267,6 +287,15 @@ TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
 ```
 
 该浏览器回归会自动启动单端口桌面 Vite，并使用 yoyoosun 菜单配置；如需核对已启动前端地址，可设置 `TRIAL_BROWSER_SMOKE_BASE_URL`。
+
+如只核对岗位任务端登录后回跳和生产单端口路由，执行：
+
+```bash
+TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
+  pnpm --dir /Users/simon/projects/plush-toy-erp/web smoke:mobile-auth-login-route
+```
+
+该回归默认验证 `/m/<role>/tasks`，与当前生产 `web-desktop` 单容器主路径一致。旧的 `mobile-*` 多实例 `/tasks` 路径仅用于本地兼容调试，需要显式设置 `MOBILE_AUTH_SMOKE_LEGACY_MULTI_APP=1`。
 
 ### 2B. Customer Config 草案边界检查
 

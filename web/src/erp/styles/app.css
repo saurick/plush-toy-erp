@@ -6145,6 +6145,12 @@
   color: #fca5a5;
 }
 
+[data-erp-theme='dark'] .mobile-role-detail-exception {
+  border-color: rgb(251 146 60 / 0.72);
+  background: rgb(124 45 18 / 0.28);
+  color: #fed7aa;
+}
+
 [data-erp-theme='dark'] .mobile-role-tasks-page--detail .bg-blue-100 {
   background: rgb(30 64 175 / 0.5);
 }
@@ -6254,7 +6260,8 @@
 [data-erp-theme='dark'] .mobile-app-layout .bg-slate-100,
 [data-erp-theme='dark'] .mobile-app-layout .bg-red-50,
 [data-erp-theme='dark'] .mobile-app-layout .bg-blue-50,
-[data-erp-theme='dark'] .mobile-app-layout .bg-emerald-50 {
+[data-erp-theme='dark'] .mobile-app-layout .bg-emerald-50,
+[data-erp-theme='dark'] .mobile-app-layout .bg-orange-50 {
   background: var(--erp-surface-bg-soft);
 }
 

@@ -104,9 +104,74 @@ export function normalizeRelatedDocuments(value) {
   return [String(value)].filter(Boolean)
 }
 
+export function normalizeMobileActionEvidenceRefs(value) {
+  if (!value) return []
+  const values = Array.isArray(value)
+    ? value.map((item) => String(item).trim())
+    : String(value)
+        .split(/[\n,，;；]/u)
+        .map((item) => item.trim())
+  return [...new Set(values.filter(Boolean))]
+}
+
+export function buildMobileTaskActionEvidence({
+  roleKey = '',
+  actionKey = '',
+  reason = '',
+  evidenceText = '',
+  evidenceRefs,
+  nowSec = Math.floor(Date.now() / 1000),
+} = {}) {
+  const normalizedEvidenceRefs = normalizeMobileActionEvidenceRefs(
+    evidenceRefs || evidenceText
+  )
+  const normalizedRoleKey = normalizeRoleKey(roleKey)
+  const normalizedActionKey = String(actionKey || '').trim()
+  const normalizedReason = String(reason || '').trim()
+  const mobileAction = {
+    role_key: normalizedRoleKey,
+    action_key: normalizedActionKey,
+    reason: normalizedReason,
+    evidence_refs: normalizedEvidenceRefs,
+    recorded_at: nowSec,
+    simulated_only: false,
+  }
+  const payload = {
+    mobile_action: mobileAction,
+    mobile_action_evidence_refs: normalizedEvidenceRefs,
+    mobile_action_recorded_at: nowSec,
+    mobile_action_role_key: normalizedRoleKey,
+    mobile_action_key: normalizedActionKey,
+  }
+  if (['blocked', 'rejected'].includes(normalizedActionKey)) {
+    payload.mobile_exception_report = {
+      role_key: normalizedRoleKey,
+      action_key: normalizedActionKey,
+      reason: normalizedReason,
+      evidence_refs: normalizedEvidenceRefs,
+      reported_at: nowSec,
+    }
+  }
+  return payload
+}
+
 export function buildMobileTaskView(task = {}, options = {}) {
   const nowMs = Number(options.nowMs || Date.now())
   const payload = normalizeRolePayload(payloadOf(task))
+  const mobileAction =
+    payload.mobile_action && typeof payload.mobile_action === 'object'
+      ? {
+          ...payload.mobile_action,
+          evidence_refs: normalizeMobileActionEvidenceRefs(
+            payload.mobile_action.evidence_refs
+          ),
+        }
+      : null
+  const mobileActionEvidenceRefs = normalizeMobileActionEvidenceRefs(
+    payload.mobile_action_evidence_refs ||
+      payload.evidence_refs ||
+      mobileAction?.evidence_refs
+  )
   const alert = buildWorkflowTaskAlert(task, { nowMs })
   const dueStatus = getWorkflowTaskDueStatus(task, nowMs)
   const taskStatusKey = String(task.task_status_key || '').trim()
@@ -142,6 +207,18 @@ export function buildMobileTaskView(task = {}, options = {}) {
     escalate_target_role_key: payload.escalate_target_role_key || '',
     complete_condition: payload.complete_condition || '',
     related_documents: normalizeRelatedDocuments(payload.related_documents),
+    mobile_action: mobileAction,
+    mobile_action_evidence_refs: mobileActionEvidenceRefs,
+    mobile_exception_report:
+      payload.mobile_exception_report &&
+      typeof payload.mobile_exception_report === 'object'
+        ? {
+            ...payload.mobile_exception_report,
+            evidence_refs: normalizeMobileActionEvidenceRefs(
+              payload.mobile_exception_report.evidence_refs
+            ),
+          }
+        : null,
   }
 }
 

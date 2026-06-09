@@ -6,6 +6,7 @@ import {
   useLocation,
   useNavigate,
   useNavigationType,
+  useParams,
 } from 'react-router-dom'
 import AuthGuard from '@/common/auth/AuthGuard'
 import { getStoredAdminProfile } from '@/common/auth/auth'
@@ -54,6 +55,11 @@ const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
 
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
+}
+
+function MobileRoleTasksRedirect() {
+  const { roleKey } = useParams()
+  return <Navigate to={`/m/${roleKey || 'boss'}/tasks`} replace />
 }
 
 function RootEntryRedirect() {
@@ -293,7 +299,7 @@ export default function ERPRouter() {
         >
           <Route index element={<Navigate to="tasks" replace />} />
           <Route path="tasks" element={<MobileRoleTasksPage />} />
-          <Route path="*" element={<Navigate to="tasks" replace />} />
+          <Route path="*" element={<MobileRoleTasksRedirect />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

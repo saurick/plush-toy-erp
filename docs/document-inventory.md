@@ -132,6 +132,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md` | Phase 7 模拟数据试用验收记录 / Phase 7 Simulated Trial Acceptance |
 | `docs/customers/yoyoosun/phase8-target-release-acceptance.md` | Phase 8 目标环境发布与内部模拟验收 / Phase 8 Target Release And Internal Simulated Acceptance |
 | `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md` | Phase 8 目标环境发布证据 2026-06-08 / Phase 8 Target Release Evidence 2026-06-08 |
+| `docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md` | Phase 9 目标环境发布证据 2026-06-09 / Phase 9 Target Release Evidence 2026-06-09 |
 | `docs/customers/yoyoosun/question-backlog.md` | 问题待办 / Question Backlog |
 | `docs/customers/yoyoosun/real-dry-run-evidence.md` | 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
 | `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |

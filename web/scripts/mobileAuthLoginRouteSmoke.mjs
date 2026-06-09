@@ -23,6 +23,8 @@ const externalBaseURL = String(
   process.env.MOBILE_AUTH_SMOKE_BASE_URL || ''
 ).trim()
 const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
+const legacyMultiAppMode =
+  process.env.MOBILE_AUTH_SMOKE_LEGACY_MULTI_APP === '1'
 const headless = process.env.HEADED !== '1'
 const viewportProfiles = [
   {
@@ -122,7 +124,9 @@ async function runMobileAppScenario(browser, { app }) {
 }
 
 function startDevServer(app) {
-  const viteConfig = `vite.${app.id}.config.mjs`
+  const viteConfig = legacyMultiAppMode
+    ? `vite.${app.id}.config.mjs`
+    : 'vite.config.mjs'
   const child = spawn(
     'pnpm',
     [
@@ -205,6 +209,9 @@ async function runMobileAuthScenario(
   page,
   { app, appBaseURL, viewportProfile }
 ) {
+  const tasksPath = legacyMultiAppMode ? '/tasks' : `/m/${app.roleKey}/tasks`
+  const roleRootPath = legacyMultiAppMode ? '/' : `/m/${app.roleKey}`
+  const guidePath = legacyMultiAppMode ? '/guide' : `/m/${app.roleKey}/guide`
   const staleToken = createMockAdminToken(`${app.roleKey}-stale-admin`)
   const loginToken = createMockAdminToken(`${app.roleKey}-mobile-admin`)
   let workflowCalls = 0
@@ -458,7 +465,7 @@ async function runMobileAuthScenario(
     })
   })
 
-  await page.goto(new URL('/tasks', `${appBaseURL}/`).toString(), {
+  await page.goto(new URL(tasksPath, `${appBaseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
   })
   await waitForPath(page, '/admin-login')
@@ -469,11 +476,11 @@ async function runMobileAuthScenario(
     '完全未登录访问岗位任务页时，应先进入登录页，不应提前请求 workflow API'
   )
 
-  await page.goto(new URL('/', `${appBaseURL}/`).toString(), {
+  await page.goto(new URL(roleRootPath, `${appBaseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
   })
   await waitForPath(page, '/admin-login')
-  await page.goto(new URL('/guide', `${appBaseURL}/`).toString(), {
+  await page.goto(new URL(guidePath, `${appBaseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
   })
   await waitForPath(page, '/admin-login')
@@ -486,7 +493,7 @@ async function runMobileAuthScenario(
   await page.evaluate((mockToken) => {
     localStorage.setItem('admin_access_token', mockToken)
   }, staleToken)
-  await page.goto(new URL('/tasks', `${appBaseURL}/`).toString(), {
+  await page.goto(new URL(tasksPath, `${appBaseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
   })
 
@@ -507,7 +514,7 @@ async function runMobileAuthScenario(
   await page.locator('#password').fill('mobile-password')
   await page.getByRole('button', { name: /登\s*录/ }).click()
 
-  await waitForPath(page, '/tasks')
+  await waitForPath(page, tasksPath)
   assert.equal(passwordLoginCalls, 1, `${app.id} 应完成一次管理员密码登录`)
   await expectText(page, '任务')
   await expectText(page, '待办')
@@ -592,7 +599,7 @@ async function runMobileAuthScenario(
     }
   })
 
-  assert.equal(metrics.path, '/tasks')
+  assert.equal(metrics.path, tasksPath)
   assert(
     metrics.scrollWidth <= metrics.clientWidth + 1,
     `移动端登录回跳后出现横向溢出: ${JSON.stringify(metrics)}`
@@ -643,10 +650,10 @@ async function runMobileAuthScenario(
     fullPage: true,
   })
 
-  await page.goto(new URL('/guide', `${appBaseURL}/`).toString(), {
+  await page.goto(new URL(guidePath, `${appBaseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',
   })
-  await waitForPath(page, '/tasks')
+  await waitForPath(page, tasksPath)
   await expectNoText(page, '说明')
 
   await page.getByTestId('mobile-role-nav-mine').click()

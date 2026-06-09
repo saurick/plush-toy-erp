@@ -2,10 +2,12 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  buildMobileTaskActionEvidence,
   buildMobileTaskListForRole,
   buildMobileTaskSummary,
   buildMobileTaskView,
   explainMobileTaskVisibility,
+  normalizeMobileActionEvidenceRefs,
   normalizeRelatedDocuments,
 } from './mobileTaskView.mjs'
 
@@ -850,4 +852,58 @@ test('mobileTaskView: 预警摘要统计可用于移动端顶部卡片', () => {
   assert.equal(summary.blocked, 1)
   assert.equal(summary.highPriority, 1)
   assert.deepEqual(normalizeRelatedDocuments('INV000001'), ['INV000001'])
+})
+
+test('mobileTaskView: 岗位处理 evidence 支持照片附件引用和去重', () => {
+  assert.deepEqual(
+    normalizeMobileActionEvidenceRefs('P-001\nP-002，P-001; https://e.test/a'),
+    ['P-001', 'P-002', 'https://e.test/a']
+  )
+  assert.deepEqual(
+    normalizeMobileActionEvidenceRefs([' PHOTO-001 ', '', 'PHOTO-001']),
+    ['PHOTO-001']
+  )
+
+  const payload = buildMobileTaskActionEvidence({
+    roleKey: 'warehouse',
+    actionKey: 'done',
+    evidenceText: 'PHOTO-001\nATT-002',
+    nowSec: NOW_SEC,
+  })
+
+  assert.equal(payload.mobile_action.role_key, 'warehouse')
+  assert.equal(payload.mobile_action.action_key, 'done')
+  assert.equal(payload.mobile_action.recorded_at, NOW_SEC)
+  assert.deepEqual(payload.mobile_action_evidence_refs, [
+    'PHOTO-001',
+    'ATT-002',
+  ])
+})
+
+test('mobileTaskView: blocked / rejected 移动处理生成异常上报快照', () => {
+  const payload = buildMobileTaskActionEvidence({
+    roleKey: 'quality',
+    actionKey: 'blocked',
+    reason: '成品抽检发现色差',
+    evidenceRefs: ['QC-PHOTO-001'],
+    nowSec: NOW_SEC,
+  })
+
+  assert.equal(payload.mobile_exception_report.role_key, 'quality')
+  assert.equal(payload.mobile_exception_report.action_key, 'blocked')
+  assert.equal(payload.mobile_exception_report.reason, '成品抽检发现色差')
+  assert.deepEqual(payload.mobile_exception_report.evidence_refs, [
+    'QC-PHOTO-001',
+  ])
+
+  const view = buildMobileTaskView(
+    task({
+      payload,
+    }),
+    { nowMs: NOW_MS }
+  )
+
+  assert.deepEqual(view.mobile_action.evidence_refs, ['QC-PHOTO-001'])
+  assert.deepEqual(view.mobile_action_evidence_refs, ['QC-PHOTO-001'])
+  assert.equal(view.mobile_exception_report.reason, '成品抽检发现色差')
 })

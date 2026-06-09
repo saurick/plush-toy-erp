@@ -8044,10 +8044,18 @@ async function assertMobileTaskDarkDetailReadable(page, { scenarioName }) {
     .waitFor({ state: 'visible', timeout: 10_000 })
   await expectText(page, '任务关键信息')
   await expectText(page, '关联单据')
+  await expectText(page, '现场留痕')
   await expectText(page, '最近动态')
+  await page
+    .getByTestId('mobile-role-evidence-input')
+    .fill('STYLE-L1-EVIDENCE-001\nhttps://example.invalid/style-l1')
   await assertThemeReadable(page, {
     scenarioName,
     selector: '.mobile-role-detail-header',
+  })
+  await assertThemeReadable(page, {
+    scenarioName,
+    selector: '[data-testid="mobile-role-evidence-input"]',
   })
   await assertDarkThemeContrast(page, {
     scenarioName,
