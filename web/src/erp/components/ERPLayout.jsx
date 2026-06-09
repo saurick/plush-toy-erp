@@ -37,11 +37,7 @@ import {
   logout,
   persistAuthMeta,
 } from '@/common/auth/auth'
-import {
-  ERP_ADMIN_SYSTEM_NAME,
-  ERP_BRAND_MARK,
-  ERP_COMPANY_NAME,
-} from '@/common/consts/brand'
+import { getActiveERPBrand } from '@/common/consts/brand'
 import { Loading } from '@/common/components/loading'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
@@ -129,6 +125,7 @@ export default function ERPLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const tokenAdmin = getCurrentUser(AUTH_SCOPE.ADMIN)
+  const activeBrand = useMemo(() => getActiveERPBrand(), [])
   const [loggingOut, setLoggingOut] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [profileLoading, setProfileLoading] = useState(!getStoredAdminProfile())
@@ -372,13 +369,15 @@ export default function ERPLayout() {
     <div className="erp-admin-sider__body">
       <div className="erp-admin-brand">
         <div className="erp-admin-brand__logo">
-          <span className="erp-admin-brand__logo-mark">{ERP_BRAND_MARK}</span>
+          <span className="erp-admin-brand__logo-mark">
+            {activeBrand.brandMark}
+          </span>
           <div className="erp-admin-brand__logo-copy">
             <div className="erp-admin-brand__logo-title">
-              {ERP_COMPANY_NAME}
+              {activeBrand.companyName}
             </div>
             <div className="erp-admin-brand__logo-subtitle">
-              {ERP_ADMIN_SYSTEM_NAME}
+              {activeBrand.systemName}
             </div>
           </div>
         </div>

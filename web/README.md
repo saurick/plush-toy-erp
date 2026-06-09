@@ -50,7 +50,7 @@ http://localhost:5175/m/quality/tasks
 
 `/admin-login` 统一承接后台和岗位任务端登录。手机默认选择岗位任务端，电脑默认选择后台，平板没有历史选择时保留入口选择；用户手动选择入口优先于设备默认。入口显隐由 `web/src/erp/config/entryConfig.mjs` 控制，并可通过 `window.__PLUSH_ERP_ENTRY_CONFIG__` 覆盖。用户不在登录前手选岗位，岗位任务端登录后按账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位；是否真正可进入仍由后端返回的 `permissions / menus` 决定。短信登录入口由后端 `auth.capabilities` 决定，前端不自行决定认证方式是否可用。
 
-桌面后台菜单由 `web/src/erp/config/seedData.mjs` 生成，并可通过 `web/src/erp/config/customerMenuConfig.mjs` 接入客户菜单配置。当前已登记 `config/customers/yoyoosun/menuConfig.mjs`，可通过构建环境 `VITE_ERP_CUSTOMER_KEY=yoyoosun` 或页面预置 `window.__PLUSH_ERP_CUSTOMER_KEY__ = 'yoyoosun'` 启用；也可用 `window.__PLUSH_ERP_CUSTOMER_CONFIG__` 直接提供一次性菜单配置。客户菜单配置只控制前端桌面菜单分组、排序、显隐和文案，不替代后端 RBAC action permission、Workflow / Fact usecase、schema、migration 或真实导入。
+桌面后台菜单由 `web/src/erp/config/seedData.mjs` 生成，并可通过 `web/src/erp/config/customerMenuConfig.mjs` 接入客户菜单配置。前端品牌默认走 `web/src/common/consts/brand.js` 的中性产品名；当前已登记 `config/customers/yoyoosun/menuConfig.mjs`，可通过构建环境 `VITE_ERP_CUSTOMER_KEY=yoyoosun` 或页面预置 `window.__PLUSH_ERP_CUSTOMER_KEY__ = 'yoyoosun'` 启用 yoyoosun 品牌和菜单；也可用 `window.__PLUSH_ERP_CUSTOMER_CONFIG__` 直接提供一次性品牌 / 菜单配置。客户配置只控制前端品牌展示和桌面菜单分组、排序、显隐、文案，不替代后端 RBAC action permission、Workflow / Fact usecase、schema、migration 或真实导入。
 
 ### 主题模式 / Theme mode
 

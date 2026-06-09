@@ -103,6 +103,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/migration-readiness-checklist.md` | 迁移准备检查清单 / Migration Readiness Checklist |
 | `docs/product/module-boundaries.md` | 模块边界 / Module Boundaries |
 | `docs/product/mobile-role-tasks-redesign.md` | 移动端岗位任务页改版 / Mobile Role Tasks Redesign |
+| `docs/product/phase12-saas-review.md` | Phase 12 SaaS 单独评审 / Phase 12 SaaS Review |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |
 | `docs/product/product-delivery-ledgers.md` | 产品能力进度台账、客户交付矩阵与客户差异台账 / Product Delivery Ledgers |
 | `docs/product/product-principles.md` | 产品原则 / Product Principles |
@@ -181,6 +182,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 过程记录归档 / Progress Archive 2026-06-02 Before Print Template Defer |
 | `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md` | 移动端任务页改版前过程记录归档 / Progress Archive 2026-06-05 Before Mobile Task Redesign |
 | `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md` | 旧 business_records debug cleanup 前过程记录归档 / Progress Archive 2026-06-08 Before Business Records Debug Cleanup |
+| `docs/archive/progress-2026-06-09-before-brand-config.md` | 前端品牌客户配置化前过程记录归档 / Progress Archive 2026-06-09 Before Brand Config |
 
 ### 外部参考
 

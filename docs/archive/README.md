@@ -12,3 +12,4 @@
 | `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 旧 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md` | 移动端任务页改版前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md` | 旧 `business_records` debug cleanup 前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-09-before-brand-config.md` | 前端品牌客户配置化前的 `progress.md` 过程记录归档 |

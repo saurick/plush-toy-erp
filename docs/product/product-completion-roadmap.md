@@ -462,7 +462,7 @@ Phase 11 关闭口径：
 
 ## 14. Phase 12：SaaS 单独评审
 
-只有私有化多客户成熟后，再评审 SaaS。
+只有私有化多客户成熟后，再评审 SaaS。当前已新增 `docs/product/phase12-saas-review.md` 作为 Phase 12 docs-only 评审入口；评审结论是当前不进入 SaaS 实现，仍优先验证 Phase 11 私有化客户包。
 
 评审内容包括：
 
@@ -477,7 +477,12 @@ Phase 11 关闭口径：
 * 多租户迁移方案。
 * 私有化与 SaaS 共存策略。
 
-当前阶段明确不做。
+当前阶段明确不做：
+
+* 不新增 `tenant_id`。
+* 不改 schema / migration。
+* 不新增 runtime tenant、license server、billing、套餐权限、客户工单系统或 SaaS 运营后台。
+* 不把 customer key、客户配置包、行业模板候选或私有化部署模板接成多租户 runtime loader。
 
 ## 15. 下一步执行路线
 

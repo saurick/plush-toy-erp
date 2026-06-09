@@ -48,7 +48,7 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '毛绒 ERP 管理后台')
       await expectButton(page, /^登\s*录$/)
-      await expectText(page, '东莞市永绅玩具有限公司')
+      await expectText(page, '毛绒玩具 ERP')
       await assertAdminLoginLayout(page, { minCardWidth: 520 })
     },
   },
@@ -59,7 +59,7 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '毛绒 ERP 管理后台')
       await expectButton(page, /^登\s*录$/)
-      await expectText(page, '东莞市永绅玩具有限公司')
+      await expectText(page, '毛绒玩具 ERP')
       await assertAdminLoginLayout(page, { minCardWidth: 320 })
     },
   },
@@ -70,7 +70,7 @@ const scenarios = [
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
       await expectButton(page, /^登\s*录$/)
-      await expectText(page, '东莞市永绅玩具有限公司')
+      await expectText(page, '毛绒玩具 ERP')
       await assertAdminLoginLayout(page, { minCardWidth: 320 })
     },
   },
@@ -174,7 +174,7 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectText(page, '东莞市永绅玩具有限公司')
+      await expectText(page, '毛绒玩具 ERP')
       await expectText(page, '超级管理员')
       await expectText(page, 'style-l1-admin')
       await expectText(page, '看板中心')
@@ -234,7 +234,7 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectText(page, '东莞市永绅玩具有限公司')
+      await expectText(page, '毛绒玩具 ERP')
       await expectText(page, '超级管理员')
       await expectText(page, '看板中心')
       await expectHeading(page, '业务看板')

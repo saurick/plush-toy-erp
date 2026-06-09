@@ -3,11 +3,7 @@ import { Alert, Button, Card, Space, Typography } from 'antd'
 import { DesktopOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getStoredAdminProfile } from '@/common/auth/auth'
-import {
-  ERP_ADMIN_SYSTEM_NAME,
-  ERP_BRAND_MARK,
-  ERP_COMPANY_NAME,
-} from '@/common/consts/brand'
+import { getActiveERPBrand } from '@/common/consts/brand'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
@@ -25,6 +21,7 @@ export default function EntrySelectionPage() {
   const [searchParams] = useSearchParams()
   const adminProfile = getStoredAdminProfile()
   const entryConfig = useMemo(() => getEntryConfig(), [])
+  const activeBrand = useMemo(() => getActiveERPBrand(), [])
   const preferredTarget = searchParams.get('target')
 
   const desktopVisible =
@@ -75,17 +72,19 @@ export default function EntrySelectionPage() {
       <div className="erp-login-page__bg" />
       <Card variant="borderless" className="erp-login-card erp-entry-card">
         <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <div className="erp-login-logo" aria-label={ERP_COMPANY_NAME}>
+          <div className="erp-login-logo" aria-label={activeBrand.companyName}>
             <span className="erp-admin-brand__logo-mark erp-login-logo__mark">
-              {ERP_BRAND_MARK}
+              {activeBrand.brandMark}
             </span>
             <div className="erp-login-logo__copy">
-              <div className="erp-login-logo__title">{ERP_COMPANY_NAME}</div>
+              <div className="erp-login-logo__title">
+                {activeBrand.companyName}
+              </div>
             </div>
           </div>
 
           <Title level={3} className="erp-login-card__title">
-            {ERP_ADMIN_SYSTEM_NAME}
+            {activeBrand.systemName}
           </Title>
 
           {!hasAnyEntry ? (
