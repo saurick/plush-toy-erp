@@ -42,6 +42,8 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | --- | --- |
 | `config/customers/yoyoosun/README.md` | 永绅 yoyoosun 客户配置包说明 |
 | `config/industry-templates/plush/README.md` | 毛绒行业模板骨架 |
+| `config/private-deployment-template/README.md` | 多客户私有化复制模板说明 |
+| `deployments/README.md` | 客户私有化部署资料目录说明 |
 | `deployments/yoyoosun/README.md` | 永绅 yoyoosun 客户部署资料未来落点 |
 
 ### docs 根入口与当前真源
@@ -104,6 +106,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |
 | `docs/product/product-delivery-ledgers.md` | 产品能力进度台账、客户交付矩阵与客户差异台账 / Product Delivery Ledgers |
 | `docs/product/product-principles.md` | 产品原则 / Product Principles |
+| `docs/product/private-deployment-package-review.md` | 多客户私有化复制包评审 / Private Deployment Package Review |
 | `docs/product/release-gates.md` | 发布门禁 / Release Gates |
 | `docs/product/test-strategy.md` | 自动化测试策略 / Test Strategy |
 | `docs/product/zero-to-one-architecture.md` | 零到一产品架构 / Zero To One Architecture |
@@ -134,6 +137,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md` | Phase 8 目标环境发布证据 2026-06-08 / Phase 8 Target Release Evidence 2026-06-08 |
 | `docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md` | Phase 9 目标环境发布证据 2026-06-09 / Phase 9 Target Release Evidence 2026-06-09 |
 | `docs/customers/yoyoosun/phase10-target-release-evidence-2026-06-09.md` | Phase 10 目标环境发布证据 2026-06-09 / Phase 10 Target Release Evidence 2026-06-09 |
+| `docs/customers/yoyoosun/phase11-target-release-evidence-2026-06-09.md` | Phase 11 目标环境发布证据 2026-06-09 / Phase 11 Target Release Evidence 2026-06-09 |
 | `docs/customers/yoyoosun/question-backlog.md` | 问题待办 / Question Backlog |
 | `docs/customers/yoyoosun/real-dry-run-evidence.md` | 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
 | `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |

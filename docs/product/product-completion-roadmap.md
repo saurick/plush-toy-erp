@@ -432,6 +432,8 @@ Phase 10 不拆任何字母子阶段；2026-06-09 已新增 `config/industry-tem
 
 目标：新增客户时主要做配置、导入和部署，而不是复制代码。
 
+Phase 11 不拆任何字母子阶段；2026-06-09 已新增 `config/private-deployment-template/templateConfig.mjs` 和 Phase 11 QA / 模拟闭环脚本，把新增客户包所需的客户资料、客户配置、部署资料、导入 dry-run、差异台账、备份恢复、发布 runbook 和验收清单沉淀为私有化复制模板候选。当前模板状态是 `template_candidate`，`runtimeEnabled=false`；`SIM-PRIVATE-PHASE11` 只作为本地模拟 customer key，不创建正式客户目录。
+
 每个客户应有：
 
 * `docs/customers/<customer-key>/`
@@ -447,6 +449,16 @@ Phase 10 不拆任何字母子阶段；2026-06-09 已新增 `config/industry-tem
 * 不长期 fork 一套代码。
 * 不按客户复制核心 schema。
 * 不让客户扩展污染 Product Core。
+* 不新增 `tenant_id`。
+* 不执行真实客户数据导入；遇到导入需求只能先本地模拟并另开数据治理评审。
+* 不在低配目标服务器构建镜像或前后端制品。
+* 不把行业模板 `candidate` 提升为 runtime 默认。
+
+Phase 11 关闭口径：
+
+* 私有化客户包模板已形成。
+* 边界守卫和模拟闭环脚本已接入 fast / full / strict。
+* 本地 evidence 只证明复制包边界、模拟 key、dry-run 和部署 runbook 口径，不代表真实第二客户已签约、真实导入已批准或多客户 runtime 已生效。
 
 ## 14. Phase 12：SaaS 单独评审
 

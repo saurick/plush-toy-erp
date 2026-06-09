@@ -18,6 +18,8 @@
 | `scripts/qa/phase9-simulated-mobile-closure.mjs`       | Phase 9 模拟岗位任务闭环入口，只创建和更新显式模拟 workflow 任务，覆盖审批 / 质检 / 入库 / 出货放行异常和现场留痕 | Phase 9 岗位任务端回归 / 目标环境移动任务闭环验收          |
 | `scripts/qa/industry-template-boundaries.mjs`          | Phase 10 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                      | Phase 10 行业模板调整后                                    |
 | `scripts/qa/phase10-industry-template-closure.mjs`      | Phase 10 行业模板模拟闭环入口，只读取候选配置并生成 evidence 报告                                                | Phase 10 行业模板回归 / 目标环境发布前                     |
+| `scripts/qa/private-deployment-boundaries.mjs`         | Phase 11 多客户私有化复制边界检查，确保客户包模板不变成 SaaS、tenant、代码分叉或真实导入入口                     | Phase 11 私有化客户包模板调整后                            |
+| `scripts/qa/phase11-private-deployment-closure.mjs`     | Phase 11 多客户私有化复制模拟闭环入口，只读取模板并生成 evidence 报告                                           | Phase 11 私有化客户包回归 / 目标环境发布前                 |
 | `scripts/phase2b-pg.sh`                                | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口                                               | 验证 Phase 2B schema 和批次库存行为                        |
 | `scripts/phase2c-pg.sh`                                | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口                                                     | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
 | `scripts/phase2d-pg.sh`                                | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                   | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
@@ -232,6 +234,21 @@ node scripts/qa/industry-template-boundaries.mjs
 node scripts/qa/phase10-industry-template-closure.mjs \
   --out output/customers/yoyoosun/phase10-industry-template-closure
 ```
+
+Phase 11 只允许多客户私有化复制包模拟闭环验收，不创建真实客户目录，不执行真实客户数据导入，不复制核心 schema / migration / usecase / RBAC，也不在目标服务器构建。先运行边界守卫：
+
+```bash
+node scripts/qa/private-deployment-boundaries.mjs
+```
+
+再生成本地 evidence 报告：
+
+```bash
+node scripts/qa/phase11-private-deployment-closure.mjs \
+  --out output/customers/yoyoosun/phase11-private-deployment-closure
+```
+
+`SIM-PRIVATE-PHASE11` 只是模拟 customer key，不得创建为正式 `docs/customers/`、`config/customers/` 或 `deployments/` 目录。真实新增客户前必须先确认稳定 customer key、客户资料入仓边界、导入 dry-run / unresolved queue、部署地址、备份恢复和验收清单。
 
 ### 1. 初始化环境
 

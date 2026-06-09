@@ -12,16 +12,18 @@ print_help() {
 检查内容:
   1) db-guard + secrets
   2) industry-template-boundaries
-  3) customer-config-boundaries
-  4) customer-import-tooling
-  5) phase7-simulated-trial-data
-  6) phase8-simulated-fact-closure
-  7) phase9-simulated-mobile-closure
-  8) phase10-industry-template-closure
-  9) shellcheck + shfmt（可选）
-  10) govulncheck（可选）
-  11) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  12) server: go test ./... + make build
+  3) private-deployment-boundaries
+  4) customer-config-boundaries
+  5) customer-import-tooling
+  6) phase7-simulated-trial-data
+  7) phase8-simulated-fact-closure
+  8) phase9-simulated-mobile-closure
+  9) phase10-industry-template-closure
+  10) phase11-private-deployment-closure
+  11) shellcheck + shfmt（可选）
+  12) govulncheck（可选）
+  13) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  14) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -71,6 +73,11 @@ if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
   node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs" ]; then
+  echo "[qa:strict] 运行 Phase 11 多客户私有化复制边界检查"
+  node "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then
   echo "[qa:strict] 运行客户配置草案边界检查"
   node "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs"
@@ -101,6 +108,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs" ]; then
   echo "[qa:strict] 运行 Phase 10 行业模板模拟闭环工具测试"
   node --test "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/phase11-private-deployment-closure.test.mjs" ]; then
+  echo "[qa:strict] 运行 Phase 11 多客户私有化复制模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/phase11-private-deployment-closure.test.mjs"
 fi
 
 if [[ "${STRICT_SKIP_SHELLCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/shellcheck.sh" ]; then

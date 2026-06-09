@@ -10,8 +10,8 @@
 | `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、通用业务记录、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
-| `config/` | 行业模板和客户配置包落点；当前已有 yoyoosun 前端桌面菜单配置 loader，不代表 SaaS tenant，也不改变后端 RBAC、schema 或事实规则 |
-| `deployments/` | 客户私有化部署实例资料的未来落点；当前唯一部署真源仍在 `server/deploy/compose/prod` |
+| `config/` | 行业模板、客户配置包和 Phase 11 私有化复制模板落点；当前已有 yoyoosun 前端桌面菜单配置 loader，不代表 SaaS tenant，也不改变后端 RBAC、schema 或事实规则 |
+| `deployments/` | 客户私有化部署实例资料落点；当前唯一部署真源仍在 `server/deploy/compose/prod`，Phase 11 模板不创建第二套部署主路径 |
 
 ## 当前边界
 

@@ -25,6 +25,15 @@ Phase 8 目标环境发布和内部模拟验收手册已记录在：
 - 巡检清单。
 - 客户培训和交付记录。
 
+Phase 11 已新增私有化客户包模板：
+
+- `/Users/simon/projects/plush-toy-erp/config/private-deployment-template/templateConfig.mjs`
+- `/Users/simon/projects/plush-toy-erp/docs/product/private-deployment-package-review.md`
+- `/Users/simon/projects/plush-toy-erp/scripts/qa/private-deployment-boundaries.mjs`
+- `/Users/simon/projects/plush-toy-erp/scripts/qa/phase11-private-deployment-closure.mjs`
+
+该模板只说明新增客户时如何准备 `docs/customers/<customer-key>/`、`config/customers/<customer-key>/` 和 `deployments/<customer-key>/`，不创建真实第二客户、不执行真实导入、不新增 `tenant_id`，也不改变当前 yoyoosun 部署主路径。
+
 部署边界：
 
 - 当前唯一部署真源仍是 `server/deploy/compose/prod`。
