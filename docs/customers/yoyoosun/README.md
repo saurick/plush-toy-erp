@@ -2,6 +2,36 @@
 
 `yoyoosun` 是永绅客户的稳定客户 key，用于保存该客户专属原始资料、归档评审、后续配置草案和交付线索。
 
+## 客户投影边界图 / Customer Projection Boundary
+
+```mermaid
+flowchart TD
+  raw["raw-source-files<br/>原始 Excel / PDF / PNG / JPG / JPEG"]
+  review["人工评审<br/>字段分类 / 敏感信息 / 导入 dry-run / 差异判断"]
+  docs["docs/customers/yoyoosun<br/>客户资料 / 交付矩阵 / 差异台账 / 验收证据"]
+  config["config/customers/yoyoosun<br/>客户配置草案 / runtimeEnabled=false"]
+  training["seed / fixture / training<br/>模拟试用数据 / 账号 / 岗位任务端演练"]
+  templates["打印模板 / 字段显示 / 编号规则<br/>客户配置或候选模板"]
+  productCore["Product Core<br/>通用 ERP 内核"]
+  coreGate["Product Core 评审<br/>通用性依据 / 排除客户专属内容 / 测试同步"]
+  facts["Fact tables<br/>库存 / 出货 / 预留 / 财务事实"]
+  tenant["tenant_id / SaaS runtime tenant"]
+
+  raw --> review
+  review --> docs
+  review --> config
+  review --> training
+  review --> templates
+  review -->|只有确认通用能力后| coreGate
+  coreGate --> productCore
+  docs -. 不得自动升级 .-> productCore
+  config -. 不是 .-> tenant
+  training -. 不得写入 .-> facts
+  review -. 禁止自动导入 .-> facts
+```
+
+上图只描述 yoyoosun 资料的归属和禁区。客户资料可以进入客户文档、客户配置草案、模拟 seed、培训验收或模板候选；不能因为存在原始资料、原型、截图或 dry-run evidence，就自动进入 Product Core、SaaS tenant、真实导入、库存、出货、预留或财务事实。
+
 ## 文件 / Files
 
 | 路径 | 作用 |

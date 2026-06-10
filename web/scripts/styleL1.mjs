@@ -2200,22 +2200,87 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '打印模板中心')
-      await expectText(page, '打开可编辑打印窗口')
-      await expectText(page, '模板目录')
+      await expectHeading(page, '模板打印中心')
+      await expectText(page, '打印当前模板')
+      await expectText(page, '模板')
       await expectText(page, '采购合同')
       await expectText(page, '加工合同')
-      await expectText(page, '当前模板')
-      await expectText(page, '模板数量')
+      await expectText(page, '样品确认单')
+      await expectText(page, '候选模板 / 未启用')
       await expectText(page, '纸面预览')
       await expectText(page, '字段映射')
-      await expectText(page, '打开当前模板')
+      await expectText(page, '字段核对')
+      await assertTextAbsent(page, '运营中枢')
+      await assertTextAbsent(page, '模板数量')
+      await assertTextAbsent(page, '示例记录')
+      await assertTextAbsent(page, '打开可编辑打印窗口')
+      await assertTextAbsent(page, '打开当前模板')
+      const candidateTemplateButton = page.getByRole('button', {
+        name: /样品确认单/,
+      })
+      assert.equal(
+        await candidateTemplateButton.isDisabled(),
+        true,
+        '样品确认单候选模板不应开放打印动作'
+      )
+      const printCenterLayout = await page.evaluate(() => {
+        const root = document.querySelector('.erp-print-center-page')
+        const workbench = document.querySelector('.erp-print-center-workbench')
+        const panels = [
+          '.erp-print-center-nav-panel',
+          '.erp-print-center-preview-panel',
+          '.erp-print-center-mapping-panel',
+        ].map((selector) => document.querySelector(selector))
+
+        return {
+          commandRailInPage: Boolean(
+            root?.querySelector('.erp-command-center-rail')
+          ),
+          oldHero: Boolean(root?.querySelector('.erp-print-center-hero-card')),
+          oldSampleCard: Boolean(
+            root?.querySelector('.erp-print-center-sample-card')
+          ),
+          panelCount: panels.filter(Boolean).length,
+          gridTemplateColumns:
+            workbench && window.getComputedStyle(workbench).gridTemplateColumns,
+        }
+      })
+      assert.equal(
+        printCenterLayout.commandRailInPage,
+        false,
+        `打印中心不应再嵌套运营中枢导航: ${JSON.stringify(printCenterLayout)}`
+      )
+      assert.equal(
+        printCenterLayout.oldHero,
+        false,
+        `打印中心不应保留旧 hero 卡: ${JSON.stringify(printCenterLayout)}`
+      )
+      assert.equal(
+        printCenterLayout.oldSampleCard,
+        false,
+        `打印中心右栏不应保留示例记录卡: ${JSON.stringify(printCenterLayout)}`
+      )
+      assert.equal(
+        printCenterLayout.panelCount,
+        3,
+        `打印中心应保持三栏工作台: ${JSON.stringify(printCenterLayout)}`
+      )
+      await page
+        .locator('.erp-print-center-template-list')
+        .getByRole('button', { name: /^加工合同/ })
+        .click()
+      assert.match(
+        page.url(),
+        /[?&]template=processing-contract(?:&|$)/,
+        '切换打印模板应写入 URL 以便刷新恢复'
+      )
       await assertTextAbsent(page, '页面结构')
       await assertTextAbsent(page, '适用场景')
       await assertTextAbsent(page, '版式特点')
       await assertTextAbsent(page, '输出方式')
       await assertTextAbsent(page, '模板来源')
       await assertTextAbsent(page, '使用提醒')
+      await assertNoHorizontalOverflow(page, 'print-center-desktop')
     },
   },
   {
@@ -2225,13 +2290,16 @@ const scenarios = [
     themeMode: 'dark',
     viewport: { width: 2048, height: 1024 },
     verify: async (page) => {
-      await expectHeading(page, '打印模板中心')
-      await expectText(page, '打开可编辑打印窗口')
-      await expectText(page, '模板目录')
+      await expectHeading(page, '模板打印中心')
+      await expectText(page, '打印当前模板')
+      await expectText(page, '模板')
       await expectText(page, '采购合同')
       await expectText(page, '加工合同')
+      await expectText(page, '样品确认单')
       await expectText(page, '纸面预览')
       await expectText(page, '字段映射')
+      await assertTextAbsent(page, '运营中枢')
+      await assertTextAbsent(page, '示例记录')
       await assertERPThemeMode(page, {
         scenarioName: 'print-center-dark-desktop',
         expectedMode: 'dark',
@@ -2241,6 +2309,7 @@ const scenarios = [
         scenarioName: 'print-center-dark-desktop',
         selector: '.erp-print-center-page',
       })
+      await assertNoHorizontalOverflow(page, 'print-center-dark-desktop')
     },
   },
   {
@@ -4584,7 +4653,7 @@ async function assertEditablePrintWorkspacePopupRefresh(
 ) {
   const [popup] = await Promise.all([
     page.waitForEvent('popup', { timeout: 10_000 }),
-    page.getByRole('button', { name: '打开可编辑打印窗口' }).click(),
+    page.getByRole('button', { name: '打印当前模板' }).click(),
   ])
   const mockToken = createMockAdminToken()
   await installAdminRpcMocks(popup)

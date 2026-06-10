@@ -1,13 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Space, Typography } from 'antd'
-import { ArrowRightOutlined, PrinterOutlined } from '@ant-design/icons'
+import { Button, Card, Space, Tag, Typography } from 'antd'
+import { FileSearchOutlined, PrinterOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import {
-  printTemplateCatalog,
-  printTemplateStats,
-} from '../config/printTemplates.mjs'
+import { printTemplateCatalog } from '../config/printTemplates.mjs'
 import {
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
@@ -19,24 +16,58 @@ import {
 
 const { Paragraph, Text, Title } = Typography
 
-const PRINT_CENTER_OVERVIEW_ITEMS = [
+const PRINT_CENTER_CANDIDATE_TEMPLATES = Object.freeze([
   {
-    label: '模板数量',
-    value: `${printTemplateStats.total} 套固定模板`,
+    key: 'sample-confirmation-candidate',
+    title: '样品确认单',
+    category: '候选模板',
+    stateText: '候选模板 / 未启用',
+    summary: '缺少正式模板样本和字段真源，本轮只保留导航占位。',
+    enabled: false,
   },
-  {
-    label: '字段方式',
-    value: '左侧编辑 + 右侧合同同步',
-  },
-  {
-    label: '输出链路',
-    value: '在线 PDF / 下载 / 打印',
-  },
-]
+])
+
+function buildTemplateNavItems() {
+  return [
+    ...printTemplateCatalog.map((template) => ({
+      ...template,
+      stateText: '正式模板 / 已启用',
+      enabled: true,
+    })),
+    ...PRINT_CENTER_CANDIDATE_TEMPLATES,
+  ]
+}
+
+function buildPrintMappingRows(template = {}) {
+  const sample = template.sample || {}
+  return [
+    {
+      label: '合同编号 / 单号',
+      state: sample.contractNo ? '默认样例' : '字段已定义',
+      color: 'success',
+    },
+    {
+      label: '供应商 / 客户',
+      state:
+        sample.supplierName || sample.buyerCompany ? '样例字段' : '按业务带值',
+      color: 'success',
+    },
+    {
+      label: '产品 / 明细行',
+      state: '来自明细行',
+      color: 'processing',
+    },
+    {
+      label: '条款 / 签章栏',
+      state: '手工确认',
+      color: 'default',
+    },
+  ]
+}
 
 export default function PrintCenterPage() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const requestedTemplateKey = String(searchParams.get('template') || '').trim()
   const requestedEntrySource = resolvePrintWorkspaceEntrySource(searchParams)
   const requestedDraftMode =
@@ -70,21 +101,47 @@ export default function PrintCenterPage() {
       printTemplateCatalog[0],
     [activeKey]
   )
+  const templateNavItems = useMemo(() => buildTemplateNavItems(), [])
   const supportsWorkspace = isSupportedPrintWorkspaceTemplate(
     activeTemplate?.key
   )
   const activePreviewLines = activeTemplate?.previewLines || []
-  const activeFieldTruth = activeTemplate?.fieldTruth || []
   const activeSample = activeTemplate?.sample || {}
+  const activeMappingRows = useMemo(
+    () => buildPrintMappingRows(activeTemplate),
+    [activeTemplate]
+  )
   const previewSummary = [
     activeSample.contractNo
       ? `合同编号：${activeSample.contractNo}`
       : `模板：${activeTemplate?.title || '-'}`,
+    activeSample.signDateText
+      ? `签约日期：${activeSample.signDateText}`
+      : `场景：${activeTemplate?.scene || '-'}`,
     activeSample.supplierName
       ? `供应商：${activeSample.supplierName}`
-      : `场景：${activeTemplate?.scene || '-'}`,
+      : `模板场景：${activeTemplate?.scene || '-'}`,
+    activeSample.buyerCompany
+      ? `客户/委托方：${activeSample.buyerCompany}`
+      : `输出：${activeTemplate?.output || '-'}`,
     activeTemplate?.layout || activeTemplate?.output || '固定打印模板',
   ]
+
+  const selectTemplate = (template) => {
+    if (!template?.enabled) {
+      return
+    }
+    setActiveKey(template.key)
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.set('template', template.key)
+    setSearchParams(nextSearchParams, { replace: true })
+  }
+
+  const openTemplateCheck = () => {
+    if (activeTemplate?.key) {
+      navigate(`/erp/print-center/${activeTemplate.key}`)
+    }
+  }
 
   const handleOpenEditablePrint = async () => {
     try {
@@ -109,111 +166,68 @@ export default function PrintCenterPage() {
       className="erp-print-center-page"
     >
       <Card
-        className="erp-page-card erp-print-center-hero-card"
-        variant="borderless"
-      >
-        <div className="erp-print-center-hero">
-          <div className="erp-print-center-hero-main">
-            <Text className="erp-print-center-eyebrow">模板工作台</Text>
-            <Title level={3} className="erp-print-center-hero-title">
-              打印模板中心
-            </Title>
-            <Paragraph className="erp-print-center-hero-description">
-              当前只保留采购合同和加工合同两套正式打印模板；业务页可从已选记录带值打开，打印中心保留默认样例和模板核对入口。
-            </Paragraph>
-            {PRINT_CENTER_OVERVIEW_ITEMS.map((item) => (
-              <div className="erp-print-center-overview-card" key={item.label}>
-                <Text className="erp-print-center-overview-label">
-                  {item.label}
-                </Text>
-                <Text className="erp-print-center-overview-value">
-                  {item.value}
-                </Text>
-              </div>
-            ))}
-          </div>
-          <div className="erp-print-center-hero-side">
-            <Text className="erp-print-center-action-title">当前模板</Text>
-            <Title
-              level={4}
-              className="erp-print-center-hero-side-title"
-              style={{ margin: 0 }}
-            >
-              {activeTemplate.title}
-            </Title>
-            <Text className="erp-print-center-hero-action-hint">
-              这里按默认样例打开独立打印窗口；需要带业务记录字段时，请从对应业务页选中记录后打印。
-            </Text>
-            <Button
-              type="primary"
-              size="large"
-              icon={<PrinterOutlined />}
-              className="erp-print-center-hero-primary-action"
-              onClick={handleOpenEditablePrint}
-            >
-              打开可编辑打印窗口
-            </Button>
-            <Button onClick={() => navigate('/erp/dashboard')}>回工作台</Button>
-            <Text type="secondary" className="erp-print-center-action-hint">
-              采购合同入口在“辅材/包材采购”，加工合同入口在“加工合同/委外下单”。
-            </Text>
-          </div>
-        </div>
-      </Card>
-
-      <Card
         className="erp-page-card erp-print-center-workbench-card"
         variant="borderless"
       >
+        <div className="erp-print-center-section-head">
+          <div>
+            <Title level={4} className="erp-print-center-section-title">
+              模板打印中心
+            </Title>
+            <Paragraph className="erp-print-center-nav-description">
+              轻量工作台：模板选择、字段映射、纸面预览和打印窗口入口。
+            </Paragraph>
+          </div>
+          <Space wrap>
+            <Button icon={<FileSearchOutlined />} onClick={openTemplateCheck}>
+              字段核对
+            </Button>
+            <Button
+              type="primary"
+              icon={<PrinterOutlined />}
+              onClick={handleOpenEditablePrint}
+            >
+              打印当前模板
+            </Button>
+          </Space>
+        </div>
+        <Text className="erp-print-center-workbench-note">
+          打印预览固定浅色；业务带值从对应业务页选中记录后进入，打印中心只展示默认样例。
+        </Text>
         <div className="erp-print-center-workbench">
           <div className="erp-print-center-nav-panel">
             <div className="erp-print-center-nav-header">
-              <Text className="erp-print-center-nav-title">模板目录</Text>
+              <Text className="erp-print-center-nav-title">模板</Text>
               <Text className="erp-print-center-nav-description">
-                当前目录只保留采购合同和加工合同两套模板，点击左侧模板卡可切换默认样例；业务带值入口在对应业务页。
+                正式模板可切换；候选模板暂不开放打印。
               </Text>
             </div>
             <div
-              className="erp-print-center-tabs"
-              role="tablist"
+              className="erp-print-center-template-list"
+              role="listbox"
               aria-label="打印模板目录"
             >
-              {printTemplateCatalog.map((template, index) => {
+              {templateNavItems.map((template) => {
                 const isActive = template.key === activeTemplate.key
                 return (
-                  <div
-                    className={`ant-tabs-tab${isActive ? ' ant-tabs-tab-active' : ''}`}
+                  <button
+                    type="button"
                     key={template.key}
-                    role="presentation"
+                    className={`erp-print-center-template-btn${
+                      isActive ? ' erp-print-center-template-btn--active' : ''
+                    }`}
+                    aria-pressed={isActive}
+                    aria-disabled={!template.enabled}
+                    disabled={!template.enabled}
+                    onClick={() => selectTemplate(template)}
                   >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={isActive}
-                      className="erp-print-center-tab-trigger"
-                      onClick={() => setActiveKey(template.key)}
-                    >
-                      <span className="erp-print-center-tab-label">
-                        <span className="erp-print-center-tab-index">
-                          {String(index + 1).padStart(2, '0')}
-                        </span>
-                        <span className="erp-print-center-tab-copy">
-                          <span className="erp-print-center-tab-title">
-                            {template.title}
-                          </span>
-                          <span className="erp-print-center-tab-note">
-                            {template.category}
-                          </span>
-                        </span>
-                        <span className="erp-print-center-tab-meta">
-                          <span className="erp-print-center-tab-state">
-                            已启用
-                          </span>
-                          <ArrowRightOutlined className="erp-print-center-tab-arrow" />
-                        </span>
-                      </span>
-                    </button>
-                  </div>
+                    <span className="erp-print-center-template-title">
+                      {template.title}
+                    </span>
+                    <span className="erp-print-center-template-meta">
+                      {template.stateText}
+                    </span>
+                  </button>
                 )
               })}
             </div>
@@ -222,18 +236,33 @@ export default function PrintCenterPage() {
             <div className="erp-print-center-nav-header">
               <Text className="erp-print-center-nav-title">纸面预览</Text>
               <Text className="erp-print-center-nav-description">
-                固定浅色打印口径；业务带值从对应业务页进入，打印中心只展示正式模板的默认样例。
+                默认样例预览，实际输出以独立打印窗口中的纸面 DOM 为准。
               </Text>
             </div>
             <div className="erp-print-center-paper-preview">
               <Text className="erp-print-center-paper-title">
                 {activeTemplate.title}
               </Text>
-              {previewSummary.map((line) => (
-                <div className="erp-print-center-paper-line" key={line}>
-                  {line}
+              <div className="erp-print-center-paper-grid">
+                {previewSummary.map((line) => (
+                  <div className="erp-print-center-paper-line" key={line}>
+                    {line}
+                  </div>
+                ))}
+              </div>
+              {activeSample.lines?.[0]?.productName ? (
+                <div className="erp-print-center-paper-line">
+                  产品名称：{activeSample.lines[0].productName}
                 </div>
-              ))}
+              ) : null}
+              {activeSample.lines?.[0]?.quantity ? (
+                <div className="erp-print-center-paper-line">
+                  数量 / 金额：{activeSample.lines[0].quantity} / 默认样例
+                </div>
+              ) : null}
+              <div className="erp-print-center-paper-line">
+                备注：字段来自当前模板样例或业务页选中记录，仅用于打印预览。
+              </div>
               <div className="erp-print-center-paper-section">
                 {activePreviewLines.length > 0
                   ? activePreviewLines.map((line) => (
@@ -250,26 +279,19 @@ export default function PrintCenterPage() {
             <div className="erp-print-center-nav-header">
               <Text className="erp-print-center-nav-title">字段映射</Text>
               <Text className="erp-print-center-nav-description">
-                这里只展示现有模板元数据；字段真源仍以打印模板配置、业务页带值和独立打印窗口为准。
+                这里只展示现有模板的关键字段状态。
               </Text>
             </div>
             <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              {activeFieldTruth.slice(0, 5).map((item) => (
-                <div className="erp-print-center-map-row" key={item}>
-                  <Text>{item}</Text>
-                  <Text type="success">已定义</Text>
+              {activeMappingRows.map((item) => (
+                <div className="erp-print-center-map-row" key={item.label}>
+                  <Text>{item.label}</Text>
+                  <Tag color={item.color}>{item.state}</Tag>
                 </div>
               ))}
-              {activeFieldTruth.length === 0 ? (
-                <Text type="secondary">当前模板未登记额外字段说明。</Text>
-              ) : null}
-              <Button
-                type="primary"
-                icon={<PrinterOutlined />}
-                onClick={handleOpenEditablePrint}
-              >
-                打开当前模板
-              </Button>
+              <Text className="erp-print-center-mapping-note">
+                字段真源仍以打印模板配置、业务页带值和独立打印窗口为准；本页不编辑模板、不反写业务记录。
+              </Text>
             </Space>
           </div>
         </div>

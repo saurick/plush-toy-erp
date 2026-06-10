@@ -13,6 +13,18 @@
 - 架构评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/`
 - 历史归档：`/Users/simon/projects/plush-toy-erp/docs/archive/`
 
+## 可视化图索引 / Visual Diagram Index
+
+本节只列出当前已维护的 Mermaid 图，方便快速定位流程和边界。图只是正式文档的可视化索引，不替代 `docs/current-source-of-truth.md`、代码、migration 或测试。
+
+| 图 | 位置 | 用途 |
+| --- | --- | --- |
+| 产品核心与客户投影 / Product Core And Customer Projection | `/Users/simon/projects/plush-toy-erp/docs/product/module-boundaries.md` | 区分 Product Core、客户投影、升级门禁和 Workflow / Fact 禁区。 |
+| yoyoosun 客户投影 / Yoyoosun Customer Projection | `/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/README.md` | 说明 yoyoosun 原始资料、客户配置、模拟 seed、模板候选、Product Core、tenant 和事实表边界。 |
+| 出货放行边界 / Shipment Release Boundary | `/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md` | 锁住 `shipment_release done -> shipping_released`，禁止直接生成 shipment、inventory 或 finance facts。 |
+| T1-T8 主任务树 / Main Task Flow | `/Users/simon/projects/plush-toy-erp/docs/workflow/task-flow-v1.md` | 作为 Workflow 协同主链和事实 usecase 落账边界的可视化索引。 |
+| 标准实施门禁 / Standard Delivery Gate | `/Users/simon/projects/plush-toy-erp/docs/product/implementation-governance.md` | 说明从 docs-only review 到 schema、usecase、API、UI、测试、文档和交付的门禁。 |
+
 ## 设计文档分类入口 / Design Document Entry Points
 
 本节只按人工校对和任务拆分顺序提供常用入口，不替代完整文档清单。判断当前实现状态时，仍以 `docs/current-source-of-truth.md`、当前代码、migration 和测试为准。

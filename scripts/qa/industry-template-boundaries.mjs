@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { plushIndustryTemplateConfig } from "../../config/industry-templates/plush/templateConfig.mjs";
-import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ALLOWED_CLASSIFICATIONS = new Set([
   "industry_default_candidate",
@@ -53,14 +55,18 @@ function assertStringList(values, path) {
 }
 
 function collectNavigationItemKeys() {
+  const scriptDir = path.dirname(fileURLToPath(import.meta.url));
+  const rootDir = path.resolve(scriptDir, "../..");
+  const sourceTexts = [
+    readFileSync(path.join(rootDir, "web/src/erp/config/seedData.mjs"), "utf8"),
+    readFileSync(path.join(rootDir, "web/src/erp/config/businessModules.mjs"), "utf8"),
+  ];
   const keys = new Set();
-  getNavigationSections(null).forEach((section) => {
-    (section.items || []).forEach((item) => {
-      if (item?.key) {
-        keys.add(item.key);
-      }
-    });
-  });
+  for (const sourceText of sourceTexts) {
+    for (const match of sourceText.matchAll(/\bkey:\s*["']([^"']+)["']/g)) {
+      keys.add(match[1]);
+    }
+  }
   return keys;
 }
 

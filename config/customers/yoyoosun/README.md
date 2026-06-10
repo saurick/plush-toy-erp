@@ -17,6 +17,8 @@
 
 - `fieldNumberingConfig.mjs`：永绅 yoyoosun 字段显示和编号规则配置草案。该文件当前 `runtimeEnabled=false`，只作为 Customer Config 评审清单；不接前端运行时、不改后端、不改 schema、不执行导入。
 
+- `importConfig.mjs`：永绅 yoyoosun 导入与客户差异配置草案。该文件根据已提取的 Excel evidence、产品核心边界和客户台账收口导入顺序、字段映射分组、人工 review 队列、禁止自动导入目标和 deferred runtime 项；当前 `runtimeEnabled=false`，不嵌入 raw rows，不接 loader，不执行真实导入。
+
 未来可继续放：
 
 - logo / 主题色。

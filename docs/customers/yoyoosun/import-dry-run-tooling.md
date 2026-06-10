@@ -3,11 +3,54 @@ Status / 状态: Implemented Tooling / 已实现本地工具
 Runtime Implemented / 运行时已实现: No / 否
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
-Current Implementation Source of Truth / 当前实现真源: `scripts/import/customerImportDryRun.mjs`
+Current Implementation Source of Truth / 当前实现真源: `scripts/import/customerSourceExtract.mjs`, `scripts/import/customerImportDryRun.mjs`, `scripts/import/customerSourceSnapshotFreezeCheck.mjs`
 
 # 永绅 yoyoosun 客户导入 dry-run 工具说明 / Yoyoosun Customer Import Dry-run Tooling
 
-已新增 永绅 yoyoosun 客户导入 dry-run CLI、source snapshot freeze checker，并用 sanitized freeze fixtures 生成 freeze evidence 与 real dry-run evidence package。两者都只读取 JSON snapshot，供人工 review 使用；它们不执行真实导入。
+已新增 永绅 yoyoosun 客户来源 Excel 提取 CLI、导入 dry-run CLI、source snapshot freeze checker，并用 sanitized freeze fixtures 生成 freeze evidence 与 real dry-run evidence package。这组工具只生成本地导入前 evidence 和人工 review 材料；它们不执行真实导入。
+
+## 原始 Excel 提取器 / Source Extractor
+
+```bash
+node scripts/import/customerSourceExtract.mjs \
+  --raw-dir docs/customers/yoyoosun/raw-source-files \
+  --out output/customers/yoyoosun/source-extract
+```
+
+输出：
+
+| 文件 | 说明 |
+|---|---|
+| `source-snapshot.extracted.json` | 从永绅原始 Excel 提取的 source snapshot，可继续交给 dry-run CLI。 |
+| `existing-v1.empty-preview.json` | 空 existing preview，只方便先跑 dry-run preview；不是真实 V1 / formal model 现有数据快照。 |
+| `customer-import-config.candidate.json` | 客户导入配置候选，记录 source 文件、字段映射、建议导入顺序、阻断项和边界。 |
+| `extraction-summary.json` | workbook / sheet / domain / source type 统计。 |
+| `extraction-report.md` | 可读提取报告。 |
+
+提取器只处理本地 Excel。PDF / 图片仍保留为人工来源引用，不做 OCR，不从图片生成结构化事实。输出目录在 `output/` 下，不纳入 git，也不是 import approval。
+
+`customer-import-config.candidate.json` 是本地生成的 evidence 候选，不是 tracked runtime 配置。已人工收口后的客户配置草案落在 `config/customers/yoyoosun/importConfig.mjs`：该文件只记录统计、字段映射分组、导入顺序、review queue、deferred runtime 项和 forbidden auto-import targets，不嵌入 raw rows，不接 loader，不执行真实导入。
+
+提取后可先用空 existing preview 做本地 dry-run 预览：
+
+```bash
+node scripts/import/customerImportDryRun.mjs \
+  --source output/customers/yoyoosun/source-extract/source-snapshot.extracted.json \
+  --existing output/customers/yoyoosun/source-extract/existing-v1.empty-preview.json \
+  --out output/customers/yoyoosun/source-extract/dry-run-preview \
+  --format json,md
+```
+
+也可对提取结果做 source snapshot freeze check：
+
+```bash
+node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
+  --source output/customers/yoyoosun/source-extract/source-snapshot.extracted.json \
+  --existing output/customers/yoyoosun/source-extract/existing-v1.empty-preview.json \
+  --out output/customers/yoyoosun/source-extract/freeze-check
+```
+
+这两条命令仍只生成本地 evidence。`existing-v1.empty-preview.json` 不是真实现有数据快照，因此预览中的 create / block / unresolved 只用于整理顺序和字段队列，不能作为正式导入签核依据。
 
 ## 冻结检查器 / Freeze Checker
 
@@ -97,7 +140,7 @@ node scripts/import/customerImportDryRun.mjs --help
 }
 ```
 
-本工具不解析 Excel / PDF / OCR。外部资料必须先被人工或后续单独工具整理成 JSON snapshot。
+`customerImportDryRun.mjs` 本身仍只读取 JSON snapshot，不直接解析 Excel / PDF / OCR。永绅原始 Excel 可先通过 `customerSourceExtract.mjs` 提取为 `source-snapshot.extracted.json`；PDF / 图片仍必须人工整理或后续单独工具处理。
 
 ## Existing Snapshot 最小格式
 

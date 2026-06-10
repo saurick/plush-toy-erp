@@ -17,6 +17,7 @@ import {
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import CommandCenterNav from '../components/CommandCenterNav.jsx'
 import { getBusinessDashboardStats } from '../api/businessRecordApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
@@ -220,48 +221,58 @@ export default function BusinessDashboardPage() {
   return (
     <Space direction="vertical" size={16} className="erp-dashboard-page">
       <Card className="erp-dashboard-card" variant="borderless">
-        <div className="erp-business-board-hero">
-          <div className="erp-business-board-hero-main">
-            <Text type="secondary">ERP / 业务看板</Text>
-            <Title level={4} className="erp-dashboard-title">
-              按业务模块看运行状态，不把摘要当事实真源
-            </Title>
-            <Paragraph type="secondary" className="erp-dashboard-summary">
-              业务看板用于经营和协同观察：显示业务记录数量、异常分布、即将到期任务和模块入口；真实库存、出货和财务事实仍由各自
-              usecase 与事实表负责。
-            </Paragraph>
-            <Space wrap>
-              <Tag color="green">业务记录 {summary.totalRecords}</Tag>
-              <Tag color="orange">推进中 {summary.activeCount}</Tag>
-              <Tag color="red">阻塞/取消 {summary.blockedCount}</Tag>
-              <Tag color="blue">完成比例 {summary.completionRatio}%</Tag>
-            </Space>
-          </div>
-          <div className="erp-business-board-hero-side">
-            <Button icon={<ArrowLeftOutlined />} onClick={openTaskDashboard}>
-              去任务看板
-            </Button>
-            <div
-              className="erp-business-board-mini-chart"
-              aria-label="模块记录分布"
-            >
-              {moduleRows.slice(0, 7).map((row) => (
-                <span
-                  className="erp-business-board-mini-bar"
-                  key={row.key}
-                  style={{
-                    '--erp-business-board-bar-height': `${Math.max(
-                      12,
-                      summary.totalRecords
-                        ? Math.round((row.count / summary.totalRecords) * 100)
-                        : 12
-                    )}%`,
-                  }}
-                  title={`${row.module}: ${row.count}`}
+        <div className="erp-command-center-shell">
+          <CommandCenterNav activeKey="business-board" />
+          <div className="erp-command-center-shell-main">
+            <div className="erp-business-board-hero">
+              <div className="erp-business-board-hero-main">
+                <Text type="secondary">ERP / 业务看板</Text>
+                <Title level={4} className="erp-dashboard-title">
+                  按业务模块看运行状态，不把摘要当事实真源
+                </Title>
+                <Paragraph type="secondary" className="erp-dashboard-summary">
+                  业务看板用于经营和协同观察：显示业务记录数量、异常分布、即将到期任务和模块入口；真实库存、出货和财务事实仍由各自
+                  usecase 与事实表负责。
+                </Paragraph>
+                <Space wrap>
+                  <Tag color="green">业务记录 {summary.totalRecords}</Tag>
+                  <Tag color="orange">推进中 {summary.activeCount}</Tag>
+                  <Tag color="red">阻塞/取消 {summary.blockedCount}</Tag>
+                  <Tag color="blue">完成比例 {summary.completionRatio}%</Tag>
+                </Space>
+              </div>
+              <div className="erp-business-board-hero-side">
+                <Button
+                  icon={<ArrowLeftOutlined />}
+                  onClick={openTaskDashboard}
                 >
-                  {row.module.slice(0, 2)}
-                </span>
-              ))}
+                  去任务看板
+                </Button>
+                <div
+                  className="erp-business-board-mini-chart"
+                  aria-label="模块记录分布"
+                >
+                  {moduleRows.slice(0, 7).map((row) => (
+                    <span
+                      className="erp-business-board-mini-bar"
+                      key={row.key}
+                      style={{
+                        '--erp-business-board-bar-height': `${Math.max(
+                          12,
+                          summary.totalRecords
+                            ? Math.round(
+                                (row.count / summary.totalRecords) * 100
+                              )
+                            : 12
+                        )}%`,
+                      }}
+                      title={`${row.module}: ${row.count}`}
+                    >
+                      {row.module.slice(0, 2)}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>

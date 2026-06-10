@@ -256,3 +256,105 @@
 - 验证：Browser 在 `http://localhost:5175/m/sales/tasks`、390x844 浅色视口进入“我的”页，四个按钮 computed style 均为 `1px solid rgb(203, 213, 225)`、`rgba(255,255,255,0.98)` 背景和双层阴影，页面 `scrollWidth=390/clientWidth=390` 无横向溢出；点击“风险”后回到“待办”并选中 `风险(49)`。
 - 下一步：如继续调整岗位任务端视觉，可优先沿用 `mobile-tasks-dark` 的盒模型断言，并按影响范围补浅色 Browser 或新增浅色 L1 场景。
 - 阻塞/风险：本轮只改岗位任务端前端样式和 L1 回归脚本；未改后端、schema、migration、RBAC、seedData、WorkflowUsecase、Fact usecase、正式菜单、生产构建、部署、提交或推送。完整全量 `pnpm --dir web style:l1` 未重跑，已按本轮影响范围跑移动任务端相关场景。
+
+## 2026-06-11 01:13 CST
+
+- 完成：继续吸收后台工作台 / 看板原型里漏掉的运营中枢和打印模板导航。新增共享 `CommandCenterNav` 与 `commandCenter` 配置，`/erp/dashboard`、`/erp/business-dashboard` 和 `/erp/print-center` 共用同一套运营中枢导航；`/erp/print-center` 改成左侧模板导航、中间纸面预览、右侧字段映射 / 示例记录 / 模板核对的三栏工作台。
+- 完成：打印中心只注册当前已有采购合同和加工合同模板；`样品确认单` 仅作为“候选模板 / 未启用”的禁用导航项展示，不进入正式 `printTemplateCatalog`，不新增模板引擎、后端 API、schema、migration、RBAC 权限码、菜单或 Fact 写入。同步 `docs/current-source-of-truth.md`、`docs/product/prototypes/README.md`、`docs/product/prototypes/admin-command-center-v1/README.md` 和 `web/README.md`；三个产品内核相关 HTML 继续保留 To Implement，未晋级 Current。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/styleL1.mjs`、`node --check web/src/erp/config/commandCenter.mjs`、目标 `STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-business-dashboard-desktop,print-center-desktop,print-center-dark-desktop pnpm --dir web style:l1`、完整 `pnpm --dir web style:l1` 和 `git diff --check` 均通过；`pnpm test` 当前 339 项通过，完整 L1 当前通过 54 个场景。
+- 下一步：若用户确认这些运行时差异可接受，再单独评审是否把 `admin-command-center-v1` 和 `business-module-page-standard-v1` 相关 HTML 晋级 Current；否则继续保持 To Implement 队列并按差异继续微调。
+- 阻塞/风险：本轮没有新增正式打印模板真源，样品确认单仍不能打印；没有做后端、schema、migration、RBAC、seedData、正式菜单、WorkflowUsecase、Fact usecase、生产构建或部署。Browser 直接打开真实后台路由仍受 AuthGuard 登录边界影响，最终截图与 DOM 证据以项目 Playwright L1 登录态场景为准。
+
+## 2026-06-11 01:36 CST
+
+- 完成：按用户反馈将 `/erp/print-center` 从上一轮过重的运营中枢 / hero / 统计 / 示例记录形态收回为原型里的轻量三栏：左侧模板导航、中间纸面预览、右侧字段映射，顶部只保留“字段核对”和“打印当前模板”两个动作。
+- 完成：删除打印中心页内不再命中的 hero、统计、示例记录、字段真源摘要、tabs 和旧暗色覆盖样式；`样品确认单` 继续作为禁用候选模板展示，不进入正式模板目录或打印动作。同步 `docs/current-source-of-truth.md`、`docs/product/prototypes/README.md`、`docs/product/prototypes/admin-command-center-v1/README.md` 和 `web/README.md` 的当前实现口径。
+- 完成：`style:l1` 打印中心断言改为锁住轻量三栏、禁用候选模板、无内嵌运营中枢、无旧 hero、无示例记录卡和无横向溢出；打印弹窗刷新恢复 helper 改用当前“打印当前模板”动作。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-center-desktop,print-center-dark-desktop,print-workspace-material-shell-refresh,print-workspace-processing-shell-refresh pnpm --dir web style:l1`、完整 `pnpm --dir web style:l1`、`node --check web/scripts/styleL1.mjs` 和 `git diff --check` 均通过；`pnpm test` 当前 339 项通过，完整 L1 当前通过 54 个场景。
+- 验证：Browser 打开 `http://localhost:5175/erp/print-center`，确认 URL / title 正常、console warn/error 为空、桌面三栏存在、旧 hero / 内嵌运营中枢 / 示例记录 / 字段真源块不存在、样品确认单禁用；点击“加工合同”后 URL 更新为 `?template=processing-contract` 且纸面标题切换为“加工合同”；移动 390x844 视口下三栏收成单列且 `scrollWidth=390/clientWidth=390`。
+- 下一步：如继续调整模板打印中心，只在这套轻量三栏上做小步改动；不要再把运营说明、统计卡、示例记录和字段真源全文堆回页面。
+- 阻塞/风险：本轮未新增正式打印模板、后端、schema、migration、RBAC、seedData、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送；Browser 截图接口本轮两次 `Page.captureScreenshot` 超时，最终视觉验收以 Browser DOM/盒模型证据和项目 Playwright L1 为准。工作区里存在非本轮现场改动，包括 Dashboard / BusinessDashboard 相关改动以及未跟踪 `server/internal/data/core_demo_seed.go`，本轮未回退或处理。
+
+## 2026-06-11 01:49 CST
+
+- 完成：新增核心产品模拟基础资料 seed 主路径：`server/internal/data/core_demo_seed.go`、`server/cmd/seed-core-demo-data` 和 `scripts/seed-core-demo-data.sh`。默认写入 `SIM-PLUSH-CORE` 前缀的单位、材料、产品、仓库和 BOM，并输出 Phase 7 / Phase 8 可复用的 `product_id`、`unit_id`、`warehouse_id` 参数。
+- 完成：保留 `seed-phase7-sim-masterdata.sh` 旧最小入口；同步 `scripts/README.md`、`server/README.md`、`docs/current-source-of-truth.md`、`docs/product/capability-ledger.md` 和 `docs/customers/yoyoosun/trial-environment-runbook.md`，明确 core demo seed 不是真实导入、不写 `business_records`，也不直接写库存流水、生产、出货或财务事实。
+- 验证：`go test ./internal/data ./cmd/seed-core-demo-data ./cmd/seed-phase7-sim-masterdata -count=1` 通过；`bash scripts/seed-core-demo-data.sh --help` 通过；`bash -n scripts/seed-core-demo-data.sh scripts/seed-phase7-sim-masterdata.sh scripts/seed-role-demo-admins.sh` 通过；本轮触达文件 `git diff --check` 通过。
+- 验证：已在当前 dev DB `192.168.0.106:5432/plush_erp` 执行 `bash scripts/seed-core-demo-data.sh`，写入 `units=3`、`materials=3`、`products=2`、`warehouses=3`、`bom_headers=1`、`bom_items=3`；只读 SQL 确认同前缀 `business_records=0`、`inventory_txns=0`、`production_facts=0`、`shipments=0`、`finance_facts=0`。
+- 下一步：若要让页面出现模拟客户 / 供应商 / 联系人 / 销售订单，继续显式执行 `scripts/qa/phase7-simulated-trial-data.mjs --apply`，并复用 seed 输出的 `phase7_args`；若要跑 Phase 8 内部事实闭环，复用 `phase8_args`，仍必须走 `Phase8Usecase` 的 JSON-RPC 脚本。
+- 阻塞/风险：本轮没有做真实客户数据导入，没有新增 schema / migration / RBAC / 菜单 / 前端页面 / 部署；模拟基础资料可能被 `debug.clear_business_data` 清理，因为该清理范围包含主数据表。工作区仍有多处非本轮前端现场改动和未跟踪前端文件，本轮未回退、未整理、未纳入 seed 成果。
+
+## 2026-06-11 01:50 CST
+
+- 完成：按“完善之后要测试完美通过”要求补跑仓库级验证；核心产品模拟 seed 仍保持只写基础资料，不扩展到真实导入、业务事实或前端页面。
+- 验证：`bash scripts/qa/full.sh` 通过，覆盖 DB guard、错误码同步、边界扫描、导入脚本测试、Phase 7/8/9/10/11 QA、secrets、`govulncheck`、web lint/css/test/build、server `go test ./...` 和 `make build`。
+- 验证：`bash scripts/qa/strict.sh` 通过，覆盖 strict secrets、boundaries、import tests、Phase QA、`shellcheck`、`shfmt`、strict `govulncheck`、strict web eslint/stylelint/test/build、server `go test ./...` 和 `make build`。
+- 验证：完整 `pnpm --dir web style:l1` 通过，共验证 54 个场景；`git diff --check` 通过。
+- 下一步：如要把 seed 扩展到试用页面可见的客户、供应商、联系人和销售订单，应另起一轮显式跑 Phase 7 simulated trial data apply，并继续保持模拟数据边界。
+- 阻塞/风险：验证命令返回码均为 0；web build / `style:l1` 原始输出仍有既有 Node `MODULE_TYPELESS_PACKAGE_JSON` 与 Vite chunk / dynamic import 警告，未作为失败项。本轮未清理这些构建警告，也未处理工作区内非 seed 现场改动。
+
+## 2026-06-11 01:57 CST
+
+- 完成：执行下一步 Phase 7 simulated trial apply。先确认本地后端 `/healthz`、`/readyz` 正常，再复用 core demo seed 输出的 `--product-id 2 --unit-id 2`，通过 `scripts/qa/phase7-simulated-trial-data.mjs --apply` 只走 V1 JSON-RPC 创建 / 复用模拟客户、供应商、联系人、销售订单和销售订单行。
+- 完成：当前环境未设置 Phase 7 密码环境变量，已通过既有 `scripts/seed-role-demo-admins.sh --reset-password` 刷新本地 dev demo 角色账号；未启用 `demo_debug`，未放开 debug 权限。`trialDemoAccountBrowserSmoke.mjs` 的桌面菜单期望同步从旧侧栏“任务看板”更新为当前 yoyoosun 正式侧栏“工作台”，并把浏览器 console / page / request 错误改为按账号收集后统一断言，方便保留失败上下文。
+- 验证：`node scripts/qa/phase7-simulated-trial-data.mjs --out output/customers/yoyoosun/phase7-simulated-trial-next` 报告模式通过；写入模式报告 `mode=apply-simulated-data`、`simulatedOnly=true`、`realCustomerImport=false`、`noDirectDatabaseWrite=true`、`noBusinessRecordsWrite=true`、`noSchemaOrMigrationChange=true`、`noShipmentInventoryFinanceFacts=true`，本次 V1 记录均为 reuse。
+- 验证：只读 SQL 确认 `SIM-YOYOOSUN-PHASE7` 口径下 `customers=1`、`suppliers=1`、`contacts=2`、`sales_orders=1`、`sales_order_items=1`；`business_records=0`、`inventory_txns=0`、`production_facts=0`、`shipments=0`、`finance_facts=0`。
+- 验证：`node --test scripts/qa/phase7-simulated-trial-data.test.mjs` 通过 5/5；`TRIAL_ACCOUNT_PASSWORD=... node scripts/qa/trial-account-rbac.mjs` 通过 9 个 demo 账号；`TRIAL_ACCOUNT_PASSWORD=... pnpm --dir web smoke:trial-demo-browser` 通过，覆盖 9 个桌面账号、8 个岗位任务端和 1 个拒绝态；`node --check web/scripts/trialDemoAccountBrowserSmoke.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`bash scripts/qa/fast.sh`、`git diff --check` 均通过。
+- 下一步：如果继续推进内部事实链，可用 core seed 输出的 `phase8_args` 跑 `scripts/qa/phase8-simulated-fact-closure.mjs --apply`；若继续客户真实导入方向，必须回到 dry-run / freeze evidence 和人工 review，不把 Phase 7 模拟数据当真实导入。
+- 阻塞/风险：本轮只写本地 dev 模拟数据和 demo 账号，不写真实客户导入、不新增 schema / migration / RBAC / 菜单 / API / UI 页面 / 部署。测试输出仍有既有 Node `MODULE_TYPELESS_PACKAGE_JSON` warning；本轮未清理构建 warning。工作区仍有非本轮客户导入配置和前端现场改动，本轮未回退或归入 Phase 7 seed 成果。
+
+## 2026-06-11 01:50 CST
+
+- 完成：新增 `scripts/import/customerSourceExtract.mjs`，只读解析 `docs/customers/yoyoosun/raw-source-files/*.xlsx`，生成本地 `source-snapshot.extracted.json`、`existing-v1.empty-preview.json`、`customer-import-config.candidate.json`、`extraction-summary.json` 和 `extraction-report.md`，用于把永绅原始 Excel 整理成导入前 evidence。
+- 完成：新增 `scripts/import/customerSourceExtract.test.mjs`，覆盖 CLI help、XLSX 自闭合空单元格后的 shared string 解析，以及 no-real-import / no-tenant / no-schema 边界；同步 `scripts/README.md`、`docs/current-source-of-truth.md`、`docs/customers/yoyoosun/import-dry-run-tooling.md`、`docs/customers/yoyoosun/import-dry-run-plan.md`、`docs/customers/yoyoosun/import-source-inventory.md` 和 `docs/customers/yoyoosun/customer-config-draft.md`。
+- 验证：`node scripts/import/customerSourceExtract.mjs --raw-dir docs/customers/yoyoosun/raw-source-files --out output/customers/yoyoosun/source-extract` 通过，提取 5 个 workbook / 20 个 sheet / 5800 条 source rows；domain 统计为 products 369、units 11、materials 438、bom 91、purchase_orders 1971、suppliers 970、outsourcing 1266、contacts 684。
+- 验证：`node scripts/import/customerImportDryRun.mjs --source output/customers/yoyoosun/source-extract/source-snapshot.extracted.json --existing output/customers/yoyoosun/source-extract/existing-v1.empty-preview.json --out output/customers/yoyoosun/source-extract/dry-run-preview --format json,md` 通过，`canExecuteRealImport=false`，blockerCount 969，defer 3231，forbiddenCount 6，进入人工 review 而非真实导入。
+- 验证：`node scripts/import/customerSourceSnapshotFreezeCheck.mjs --source output/customers/yoyoosun/source-extract/source-snapshot.extracted.json --existing output/customers/yoyoosun/source-extract/existing-v1.empty-preview.json --out output/customers/yoyoosun/source-extract/freeze-check` 通过，freeze `valid=true`、`blockerCount=0`、`canExecuteRealImport=false`；`for test_file in scripts/import/*.test.mjs; do node --test "$test_file"; done` 通过。
+- 验证：`bash scripts/qa/fast.sh` 通过，覆盖 db-guard、error-code sync、错误码魔法数字检查、Phase 10 / Phase 11 / customer config 边界、客户导入工具测试、Phase 7-11 模拟工具测试、web lint/css 和 server `go test ./internal/... ./pkg/...`。
+- 完成：顺手修正 `scripts/qa/industry-template-boundaries.mjs` 的前端运行时 import 方式，改为静态读取导航 key，避免 Node 在 QA 输出中出现 typeless package warning；不改变产品运行时代码和菜单口径。
+- 验证：`node scripts/qa/industry-template-boundaries.mjs` 通过且无 warning；再次执行 `bash scripts/qa/fast.sh` 通过且无该 warning。
+- 下一步：真实导入前必须把 `existing-v1.empty-preview.json` 替换成已 review 的 existing V1 / formal model snapshot，并人工处理 dry-run 的 block / defer / review 队列；采购订单、委外源单据、shipment、inventory 和 finance 仍不得自动导入。
+- 阻塞/风险：本轮只做本地 Excel 提取、dry-run/freeze evidence 和文档同步；未解析 PDF / 图片 OCR，未写 DB、未执行真实 import、未新增 schema / migration / API / UI / RBAC / seedData / 部署，也未把 output 纳入 git。
+
+## 2026-06-11 01:59 CST
+
+- 完成：根据永绅提取结果、产品核心边界、行业模板候选、私有化客户包模板、客户交付矩阵和差异台账做配置项全局扫描；新增 `config/customers/yoyoosun/importConfig.mjs`，把 source extract 统计、字段映射分组、推荐导入顺序、review queue、deferred runtime 项和 forbidden auto-import targets 收口为 tracked 客户配置草案。
+- 完成：扩展 `scripts/qa/customer-config-boundaries.mjs`，锁住 `importConfig.mjs` 的 `runtimeEnabled=false`、no raw rows、no tenant、no schema / migration / RBAC / Workflow / Fact、no real import、no `business_records`、no fact 写入和 5800 行提取统计边界；同步 `config/customers/yoyoosun/README.md`、`docs/customers/yoyoosun/customer-config-draft.md`、`import-dry-run-tooling.md`、`import-source-inventory.md`、`import-dry-run-plan.md`、`docs/current-source-of-truth.md`、`docs/product/capability-ledger.md`、`delivery-matrix.md`、`delta-ledger.md` 和 `scripts/README.md`。
+- 验证：`node --check config/customers/yoyoosun/importConfig.mjs && node --check scripts/qa/customer-config-boundaries.mjs && node --check scripts/qa/industry-template-boundaries.mjs && node scripts/qa/customer-config-boundaries.mjs && node scripts/qa/industry-template-boundaries.mjs` 通过；`customer config boundaries ok` 显示 import config items=9、extracted rows=5800。
+- 验证：重新执行 `customerSourceExtract -> customerImportDryRun -> customerSourceSnapshotFreezeCheck` 通过，仍为 5 个 workbook / 20 个 sheet / 5800 条 source rows，`canExecuteRealImport=false`，freeze `valid=true`；`for test_file in scripts/import/*.test.mjs; do node --test "$test_file"; done` 通过，共 39 个导入工具测试。
+- 验证：`bash scripts/qa/fast.sh` 通过，覆盖 db guard、错误码、行业模板、私有化复制、客户配置、导入工具、Phase 7-11、web lint/css 和 server Go 快速测试；`bash scripts/qa/full.sh` 返回 0，覆盖 secrets、govulncheck、web lint/css/test/build、server `go test ./...` 和 `make build`，其中前端测试 339 项通过。
+- 验证：`git diff --check` 通过。
+- 下一步：真实导入仍需先替换 `existing-v1.empty-preview.json` 为已 review 的 existing V1 / formal model snapshot，并处理 units、supplier role split、contact owner、BOM match、sensitive fields 等 review queue；采购订单、委外源单据、打印模板、SKU、库存、出货、预留和财务继续按独立评审推进。
+- 阻塞/风险：`importConfig.mjs` 仍是 Customer Config 草案，不接 runtime loader、不嵌入 raw rows、不执行真实导入；本轮未改后端、schema、migration、RBAC、WorkflowUsecase、Fact usecase、前端菜单 loader、seedData、部署或生产构建。`bash scripts/qa/full.sh` 虽返回 0，但 web test/build 仍输出既有 Node `MODULE_TYPELESS_PACKAGE_JSON` 和 Vite chunk / mixed import warnings；这些不是本轮配置改动引入，也未在本轮调整前端包类型或构建分包。
+
+## 2026-06-11 02:01 CST
+
+- 完成：按“产品核心和甲方都要描述”的要求补 Mermaid 表达层；`docs/product/module-boundaries.md` 新增产品核心与客户投影边界图，`docs/customers/yoyoosun/README.md` 新增 yoyoosun 客户投影边界图，`docs/architecture/status-workflow-fact-boundary.md` 新增出货放行 Workflow / Fact 禁区图。
+- 完成：三张图只可视化现有正式口径，不新增 runtime loader、schema、migration、RBAC、菜单、seedData、WorkflowUsecase 或 Fact usecase；yoyoosun 资料仍只能进入客户文档、客户配置草案、模拟 seed、培训验收或模板候选，不能自动升级 Product Core、SaaS tenant、真实导入或事实表。
+- 验证：`git diff --check -- docs/product/module-boundaries.md docs/customers/yoyoosun/README.md docs/architecture/status-workflow-fact-boundary.md progress.md` 通过；`rg` 已确认三份文档新增 Mermaid block、核心 / 客户投影 / 出货放行边界关键节点和禁区箭头。
+- 下一步：如后续继续补流程图，优先补 `docs/workflow/task-flow-v1.md` 的 T1-T8 主链路图，并保持 Mermaid 只描述已确认流程和边界，不把原型假数据或客户习惯画成产品核心规则。
+- 阻塞/风险：当前工作区已有大量非本轮未提交改动，本轮只追加上述三份 Markdown 和本 progress 记录；未触碰正在变更的 `docs/current-source-of-truth.md`、前端、后端、脚本或配置现场。
+
+## 2026-06-11 02:05 CST
+
+- 完成：继续补 `docs/workflow/task-flow-v1.md` 的 T1-T8 主任务树 Mermaid；图中以实线表达 Workflow 协同主链，以虚线表达 Purchase / Inventory、Production / Outsourcing、Shipment、Finance 等事实 usecase 落账边界。
+- 完成：图下明确说明该图不是 workflow engine 设计器，不新增菜单、RBAC、schema、migration 或事实写入；`workflow task done`、`shipping_released` 和 workflow payload 不能直接伪造事实。
+- 验证：`git diff --check -- docs/workflow/task-flow-v1.md progress.md` 通过；`rg` 已确认 `docs/workflow/task-flow-v1.md` 新增 Mermaid block、T1-T8 主链路节点、事实 usecase 节点和 `shipping_released` 禁区说明。
+- 下一步：如果继续补图，建议转向 `docs/product/implementation-governance.md` 或 capability ledger 的“从规划到实现门禁”图；否则先停在这四张核心图，避免文档图过多反而维护漂移。
+- 阻塞/风险：当前工作区仍有大量非本轮改动；本轮只追加 workflow 文档和 progress 记录，未改运行时代码、后端、前端、脚本、配置、部署或 current-source。
+
+## 2026-06-11 02:05 CST
+
+- 完成：继续补 `docs/product/implementation-governance.md` 的标准实施门禁 Mermaid；从 roadmap / current-source / 用户目标进入 docs-only review、任务边界、schema gate、schema / migration、repo / usecase、RBAC / API、UI、测试、文档同步和 delivery / trial。
+- 完成：图中明确 docs-only 不能直接进入 runtime、范围不清或触达禁止路径时必须停止或拆下一轮、UI 不能补造后端事实、客户反馈或真实导入需求必须回到 review。
+- 验证：`git diff --check -- docs/product/implementation-governance.md progress.md` 通过；`rg` 已确认 `docs/product/implementation-governance.md` 新增 Mermaid block、docs-only review、schema gate、禁止路径停止、UI 不补造事实和 delivery 回 review 的关键节点。
+- 下一步：四张核心 Mermaid 已覆盖产品核心 / 客户投影、yoyoosun 客户投影、Workflow / Fact 出货边界、T1-T8 主链路和实施门禁；建议先停在这里，后续只在新增正式能力或边界变化时按需补图。
+- 阻塞/风险：`docs/product/capability-ledger.md` 当前已有非本轮改动，本轮未触碰；未改运行时代码、后端、前端、脚本、配置、部署或 current-source。
+
+## 2026-06-11 02:08 CST
+
+- 完成：补 `docs/README.md` 的可视化图索引，集中列出产品核心与客户投影、yoyoosun 客户投影、出货放行边界、T1-T8 主任务树和标准实施门禁五张 Mermaid 图的位置和用途。
+- 完成：索引明确 Mermaid 只是正式文档的可视化入口，不替代 `docs/current-source-of-truth.md`、代码、migration 或测试；本轮未更新 `docs/document-inventory.md`，因为未新增、删除、重命名长期文档，也未改变文档职责或分类。
+- 验证：`git diff --check -- docs/README.md progress.md` 通过；`rg` 已确认 `docs/README.md` 的可视化图索引包含五张 Mermaid 图、对应正式文档路径和不替代 current-source / 代码 / migration / 测试的边界说明。
+- 下一步：建议停止继续扩图；后续新增图应由正式能力变化、边界变化或新客户资料归属变化触发，而不是为了形式补齐。
+- 阻塞/风险：当前工作区已有非本轮改动；本轮只改 docs 入口索引和 progress，不改运行时代码、后端、前端、脚本、配置、部署或 current-source。

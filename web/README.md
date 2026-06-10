@@ -239,9 +239,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
 - 岗位任务页读取真实 workflow API，展示任务、预警、通知和进度，并按当前端口角色支持处理、阻塞、完成三类状态回填
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮
-- 模板打印当前由对应业务页选中记录后带值打开；打印中心保留默认样例、模板目录、纸面预览、字段映射和模板核对入口
+- 模板打印当前由对应业务页选中记录后带值打开；打印中心保留默认样例，并已按原型式轻量三栏承接左侧模板导航、中间纸面预览、右侧字段映射 / 模板核对入口
 - 扩展硬件链路、PDA、条码枪、图片识别继续 deferred
-- `docs/product/prototypes/admin-command-center-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`/erp/dashboard` 是后台首页 / 工作台，`/erp/task-board` 是任务看板，`/erp/business-dashboard` 是业务看板，`/erp/print-center` 是模板打印中心，`/erp/operations/exceptions` 是异常 / 阻塞闭环；但未获用户明确确认前，不能把该资产改成 Current。
+- `docs/product/prototypes/admin-command-center-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`/erp/dashboard` 是后台首页 / 工作台，`/erp/task-board` 是任务看板，`/erp/business-dashboard` 是业务看板，`/erp/print-center` 是模板打印中心，`/erp/operations/exceptions` 是异常 / 阻塞闭环；工作台和业务看板保留后台运营中枢导航，打印中心按原型式轻量三栏保留模板导航 / 预览 / 字段映射。未获用户明确确认前，不能把该资产改成 Current。
 - `/erp/task-board` 任务看板的关键词、状态、角色、到期和来源筛选使用 URL query 保存，支持复制链接、刷新恢复和一键清空；首屏按原型式四泳道展示本页待办、阻塞异常、今日到期和已完成协同，这些筛选和分组只影响当前页面展示，不写后端用户偏好、WorkflowUsecase 或事实表。
 - `docs/product/prototypes/business-module-page-standard-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`BusinessModulePage` 和共享业务列表组件承接通用业务页骨架，协同入口由共享协同面板承接；客户档案、供应商档案和销售订单 V1 页面也已复用同一标准页骨架；材料 BOM、入库通知/检验/入库、库存和出库额外补充只读变体区，强调 BOM、质检 / 入库、库存事实和出库事实边界。`/__dev/prototypes` 仍保留待实现队列，未获用户明确确认前不清空队列、不晋级 Current。
 - 当前业务页、岗位任务端页面、桌面工作台、任务看板、异常闭环、业务看板和模板预览已经齐入口；通用业务记录已落盘，采购合同 / 加工合同已支持业务页带值打开，桌面任务看板只处理 Workflow 协同任务，不直接写库存、出货、应收、开票、付款或其他事实表；Excel 导入、打印留档回写和细分业务专表继续 deferred

@@ -11,6 +11,49 @@
 | `business_records` 不替代事实表 | 它是通用快照和兼容层，不是库存、出货、财务事实真源 |
 | 永绅 yoyoosun 客户资料不等于 Product Core | 只有经过架构评审并通用化的能力才能进入产品内核 |
 
+## 产品核心与客户投影 / Product Core And Customer Projection
+
+```mermaid
+flowchart TD
+  subgraph core["产品核心 / Product Core"]
+    coreEntry["Core change entry<br/>正式实现前再评审 schema / usecase / RBAC / UI"]
+    master["MasterData<br/>单位 / 材料 / 产品 / 仓库 / 客户 / 供应商 / BOM"]
+    sourceDoc["Source Document<br/>销售订单 / 采购入库 / 业务承诺"]
+    workflow["Workflow<br/>任务 / 事件 / 协同状态 / 角色流转"]
+    fact["Fact Usecases<br/>库存 / 质检 / 生产 / 出货 / 财务事实"]
+    rbac["RBAC<br/>权限码 / 角色 / 菜单守卫 / API 守卫"]
+    ui["UI<br/>桌面后台 / 岗位任务端 / 打印入口"]
+  end
+
+  subgraph customer["客户投影 / Customer Projection"]
+    customerDocs["docs/customers/&lt;customer-key&gt;<br/>客户资料 / 交付矩阵 / 差异台账"]
+    customerConfig["config/customers/&lt;customer-key&gt;<br/>品牌 / 菜单展示 / 字段编号 / 导入草案"]
+    customerSeed["seed / fixture / training<br/>试用账号 / 模拟数据 / 培训验收"]
+    customerTemplate["打印模板 / 字段显示<br/>客户配置或模板候选"]
+  end
+
+  subgraph review["升级门禁 / Promotion Gate"]
+    coreReview["Product Core 评审<br/>通用性依据 / 排除客户专属内容 / 测试与文档同步"]
+  end
+
+  master --> sourceDoc
+  sourceDoc --> workflow
+  sourceDoc --> fact
+  workflow --> ui
+  fact --> ui
+  rbac --> ui
+  customerDocs --> customerConfig
+  customerConfig --> customerSeed
+  customerConfig --> customerTemplate
+  customerConfig -->|确认通用能力后| coreReview
+  coreReview --> coreEntry
+  coreEntry --> master
+  customerDocs -. 不得自动升级 .-> coreEntry
+  workflow -. 禁止直接写 .-> fact
+```
+
+上图只描述归属边界，不新增 runtime loader、schema、migration、RBAC 权限码或菜单入口。客户资料要进入产品核心，必须先完成通用性评审；Workflow 到 Fact 的虚线是禁区提示，不是调用关系。
+
 ## Workflow 协同层 / Workflow
 
 Workflow 只负责：

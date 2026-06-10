@@ -39,35 +39,35 @@ const oldEntryLabels = [
 const desktopAccounts = [
   {
     username: 'demo_boss',
-    expectedMenus: ['任务看板', '客户档案', '供应商档案', '销售订单'],
+    expectedMenus: ['工作台', '客户档案', '供应商档案', '销售订单'],
   },
   {
     username: 'demo_sales',
-    expectedMenus: ['任务看板', '客户档案', '销售订单'],
+    expectedMenus: ['工作台', '客户档案', '销售订单'],
   },
   {
     username: 'demo_purchase',
-    expectedMenus: ['任务看板', '供应商档案', '材料 BOM'],
+    expectedMenus: ['工作台', '供应商档案', '材料 BOM'],
   },
   {
     username: 'demo_production',
-    expectedMenus: ['任务看板', '生产排单', '生产进度'],
+    expectedMenus: ['工作台', '生产排单', '生产进度'],
   },
   {
     username: 'demo_warehouse',
-    expectedMenus: ['任务看板', '库存', '出库'],
+    expectedMenus: ['工作台', '库存', '出库'],
   },
   {
     username: 'demo_quality',
-    expectedMenus: ['任务看板', '品质检验'],
+    expectedMenus: ['工作台', '品质检验'],
   },
   {
     username: 'demo_finance',
-    expectedMenus: ['任务看板', '对账/结算', '应收/开票登记'],
+    expectedMenus: ['工作台', '对账/结算', '应收/开票登记'],
   },
   {
     username: 'demo_pmc',
-    expectedMenus: ['任务看板', '生产排单', '延期/返工/异常'],
+    expectedMenus: ['工作台', '生产排单', '延期/返工/异常'],
   },
   {
     username: 'demo_admin',
@@ -237,19 +237,26 @@ async function waitForServer(url) {
 async function newPage(browser, viewport) {
   const context = await browser.newContext({ viewport })
   const page = await context.newPage()
+  const runtimeErrors = []
   page.on('console', (message) => {
     if (message.type() === 'error') {
-      throw new Error(`console error: ${message.text()}`)
+      runtimeErrors.push(`console error: ${message.text()}`)
     }
   })
   page.on('pageerror', (error) => {
-    throw error
+    runtimeErrors.push(`page error: ${error.message}`)
   })
-  return { context, page }
+  page.on('requestfailed', (request) => {
+    const errorText = request.failure()?.errorText || ''
+    if (errorText && errorText !== 'net::ERR_ABORTED') {
+      runtimeErrors.push(`request failed: ${request.url()} ${errorText}`)
+    }
+  })
+  return { context, page, runtimeErrors }
 }
 
 async function verifyDesktopAccount(browser, account) {
-  const { context, page } = await newPage(browser, {
+  const { context, page, runtimeErrors } = await newPage(browser, {
     width: 1440,
     height: 900,
   })
@@ -280,6 +287,7 @@ async function verifyDesktopAccount(browser, account) {
       path: path.resolve(outputDir, `${account.username}-desktop.png`),
       fullPage: true,
     })
+    assertNoRuntimeErrors(runtimeErrors, `${account.username} desktop`)
   } catch (error) {
     await screenshotOnFailure(page, `${account.username}-desktop-failed.png`)
     throw error
@@ -289,7 +297,7 @@ async function verifyDesktopAccount(browser, account) {
 }
 
 async function verifyMobileAccount(browser, { username, roleKey }) {
-  const { context, page } = await newPage(browser, {
+  const { context, page, runtimeErrors } = await newPage(browser, {
     width: 390,
     height: 844,
   })
@@ -312,6 +320,7 @@ async function verifyMobileAccount(browser, { username, roleKey }) {
       path: path.resolve(outputDir, `${username}-${roleKey}-mobile.png`),
       fullPage: true,
     })
+    assertNoRuntimeErrors(runtimeErrors, `${username} mobile`)
   } catch (error) {
     await screenshotOnFailure(page, `${username}-${roleKey}-mobile-failed.png`)
     throw error
@@ -321,7 +330,7 @@ async function verifyMobileAccount(browser, { username, roleKey }) {
 }
 
 async function verifyMobileDeniedAccount(browser) {
-  const { context, page } = await newPage(browser, {
+  const { context, page, runtimeErrors } = await newPage(browser, {
     width: 390,
     height: 844,
   })
@@ -345,6 +354,7 @@ async function verifyMobileDeniedAccount(browser) {
       path: path.resolve(outputDir, 'demo_admin-mobile-denied.png'),
       fullPage: true,
     })
+    assertNoRuntimeErrors(runtimeErrors, 'demo_admin mobile denied')
   } catch (error) {
     await screenshotOnFailure(page, 'demo_admin-mobile-denied-failed.png')
     throw error
@@ -396,6 +406,14 @@ async function assertNotVisibleInMenu(page, label, username) {
     .getByText(label, { exact: true })
     .count()
   assert.equal(count, 0, `${username} 不应看到旧入口菜单: ${label}`)
+}
+
+function assertNoRuntimeErrors(runtimeErrors, scope) {
+  assert.deepEqual(
+    runtimeErrors,
+    [],
+    `${scope} 出现浏览器运行时错误:\n${runtimeErrors.join('\n')}`
+  )
 }
 
 async function screenshotOnFailure(page, fileName) {

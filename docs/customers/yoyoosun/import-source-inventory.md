@@ -39,6 +39,8 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 ## 使用边界
 
 - `yoyoosun` 客户资料只能作为 Customer Material、Demo Seed、Industry Template Candidate、Print Template Input 或 Data Import Source。
+- 原始 Excel 可通过 `scripts/import/customerSourceExtract.mjs` 生成本地 `output/customers/yoyoosun/source-extract/*` evidence；该输出不纳入 git，不是真实导入批准。
+- `config/customers/yoyoosun/importConfig.mjs` 是从提取 evidence、产品核心边界和客户台账人工收口后的配置草案；只记录统计、字段分组、review queue 和 forbidden targets，不嵌入 raw rows、不接 loader、不执行真实导入。
 - `business_records` 只能作为兼容层、demo、seed、source snapshot 和调研入口。
 - 本轮 import source inventory 不是 migration plan，也不是 loader spec。
 - 任何涉及 shipment、inventory 或 finance facts 的来源只能进入 deferred / forbidden review，不得自动导入。

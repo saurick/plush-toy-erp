@@ -46,6 +46,7 @@ make print_db_url
 make migrate_status
 go test ./...
 make build
+go run ./cmd/seed-core-demo-data --help
 ```
 
 Phase 2A 库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_phase2a_test`：

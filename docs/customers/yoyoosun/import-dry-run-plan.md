@@ -7,7 +7,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入 dry-run 计划 / Yoyoosun Customer Import Dry-run Plan
 
-本计划用于设计 dry-run 流程。当前已新增 `scripts/import/customerImportDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview；也已新增 `scripts/import/customerSourceSnapshotFreezeCheck.mjs`，用于冻结 source snapshot evidence，并基于 sanitized freeze fixtures 生成 real dry-run evidence package。Stage 6 受控执行器 `scripts/import/customerImportExecute.mjs` 也已实现，但默认只生成报告；只有显式 `--execute`、确认短语、approval、backup evidence、目标后端和管理员凭据齐备时才会通过 JSON-RPC V1 API 写入。
+本计划用于设计 dry-run 流程。当前已新增 `scripts/import/customerSourceExtract.mjs`，用于把永绅原始 Excel 提取成本地 source snapshot、空 existing preview 和客户导入配置候选；已新增 `config/customers/yoyoosun/importConfig.mjs`，用于把提取 evidence、产品核心边界和客户台账人工收口成 tracked 配置草案；已新增 `scripts/import/customerImportDryRun.mjs`，用于执行 Stage 0 - Stage 3 的 JSON snapshot dry-run preview；也已新增 `scripts/import/customerSourceSnapshotFreezeCheck.mjs`，用于冻结 source snapshot evidence，并基于 sanitized freeze fixtures 生成 real dry-run evidence package。Stage 6 受控执行器 `scripts/import/customerImportExecute.mjs` 也已实现，但默认只生成报告；只有显式 `--execute`、确认短语、approval、backup evidence、目标后端和管理员凭据齐备时才会通过 JSON-RPC V1 API 写入。
 
 ## 范围 / Scope
 
@@ -24,7 +24,17 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 ## 工具状态 / Tooling Status
 
-已实现一个只读 CLI：
+已实现一个只读 Excel 提取 CLI：
+
+```bash
+node scripts/import/customerSourceExtract.mjs \
+  --raw-dir docs/customers/yoyoosun/raw-source-files \
+  --out output/customers/yoyoosun/source-extract
+```
+
+该 CLI 会生成 `source-snapshot.extracted.json`、`existing-v1.empty-preview.json`、`customer-import-config.candidate.json`、`extraction-summary.json` 和 `extraction-report.md`。`existing-v1.empty-preview.json` 只是预览占位；真实 sign-off 前必须替换为已 review 的 existing V1 / formal model snapshot。`customer-import-config.candidate.json` 仍是本地 evidence，人工收口后的 tracked 草案是 `config/customers/yoyoosun/importConfig.mjs`；该草案不嵌入 raw rows、不接 loader、不执行真实导入。PDF / 图片仍作为人工来源引用，不做 OCR。
+
+已实现一个只读 dry-run CLI：
 
 ```bash
 node scripts/import/customerImportDryRun.mjs \

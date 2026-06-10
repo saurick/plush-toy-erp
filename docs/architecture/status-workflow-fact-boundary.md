@@ -42,6 +42,37 @@
 - `reservations`
 - AR / invoice
 
+### 出货放行边界图 / Shipment Release Boundary Diagram
+
+```mermaid
+flowchart LR
+  task["Workflow task<br/>shipment_release done"]
+  released["Business workflow status<br/>shipping_released"]
+  shipmentUsecase["ShipmentUsecase / 出库确认<br/>真实出货专项 usecase"]
+  shipmentFact["Shipment fact<br/>shipments / shipment_items"]
+  inventoryFact["Inventory fact<br/>inventory_txns / inventory_balances"]
+  shipped["Derived or lifecycle result<br/>shipped"]
+  financeUsecase["Finance usecase review<br/>应收 / 开票 / 收付款"]
+  financeFact["Finance facts<br/>AR / invoice / payment"]
+  wrongLabel["禁止显示为<br/>已出库 / 已发货 / 已扣库存"]
+
+  task --> released
+  released -->|后续专项确认后| shipmentUsecase
+  shipmentUsecase --> shipmentFact
+  shipmentUsecase --> inventoryFact
+  shipmentFact --> shipped
+  inventoryFact --> shipped
+  shipped --> financeUsecase
+  financeUsecase --> financeFact
+
+  task -. 禁止直接写 .-> shipmentFact
+  task -. 禁止直接写 .-> inventoryFact
+  task -. 禁止直接生成 .-> financeFact
+  released -. 不能等同 .-> wrongLabel
+```
+
+上图只把既有边界可视化：`shipment_release done` 当前只能推进协同状态到 `shipping_released`。真实出货、库存扣减、应收、开票和收付款必须分别由对应事实 usecase 承接，不能由 Workflow 任务完成或旧 payload 伪造。
+
 ## 动作、事实、结果
 
 正确链路：

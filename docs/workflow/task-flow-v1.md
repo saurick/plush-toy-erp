@@ -19,6 +19,45 @@
 | T7 | 包装出货 | 仓库、业务、财务、PMC | 成品检验通过并准备出货 | 成品入库、出货通知、拣货、装箱、财务放行、出货确认完成 | `inventory`、`shipping-release`、`outbound`、`receivables` | 桌面、仓库岗位任务端、业务岗位任务端、财务岗位任务端、PMC 岗位任务端、老板岗位任务端 | 成品不足、财务未放行、客户信息未确认、装箱异常、出货日期风险 | 出货日前 1 天为 `shipment_due` critical；出货日后未确认为 `overdue` | 是 |
 | T8 | 财务结算 | 财务、采购、业务、老板 | 采购入库、委外回货入库或出货确认 | 采购对账、委外对账、应收登记、应付登记、发票登记、收付款状态完成 | `reconciliation`、`payables`、`receivables`、`invoices` | 桌面、财务岗位任务端、老板岗位任务端 | 对账差异、发票未登记、应收逾期、应付待确认、异常费用未说明 | 应收 / 应付到期日前 1 天预警，到期后为 `finance_overdue` | 是 |
 
+## 主任务树图 / Main Task Flow Diagram
+
+```mermaid
+flowchart LR
+  subgraph workflow["Workflow 协同主链 / Coordination Flow"]
+    T1["T1 订单审批<br/>业务提交 -> 老板审批"]
+    T2["T2 工程资料<br/>BOM / 色卡 / 作业指导书 / 包装要求"]
+    T3["T3 材料采购<br/>采购到货 -> IQC -> 入库协同"]
+    T4["T4 委外加工<br/>发料 -> 回货 -> 检验 -> 入库协同"]
+    T5["T5 内部生产<br/>排产 -> 工序 -> 完工 / 返工"]
+    T6["T6 品质检验<br/>IQC / 回货检验 / 成品抽检 / 复检"]
+    T7["T7 包装出货<br/>成品入库协同 -> 出货放行"]
+    T8["T8 财务结算<br/>应收 / 应付 / 发票 / 对账"]
+  end
+
+  subgraph facts["事实落账 / Fact Usecases"]
+    purchaseFact["Purchase / Inventory facts<br/>purchase_receipts / inventory_txns"]
+    productionFact["Production / Outsourcing facts<br/>production_facts / outsourcing_facts"]
+    shipmentFact["Shipment facts<br/>shipments / shipment_items / inventory_txns"]
+    financeFact["Finance facts<br/>AR / AP / invoice / payment / reconciliation"]
+  end
+
+  T1 --> T2
+  T2 --> T3
+  T3 -->|齐套后排产| T5
+  T3 -->|需要委外| T4
+  T4 -->|回货或返工复检| T6
+  T5 -->|完工或返工复检| T6
+  T6 -->|合格 / 放行| T7
+  T7 -->|真实出货后| T8
+  T3 -. 采购入库事实由专项 usecase 落账 .-> purchaseFact
+  T4 -. 委外事实由专项 usecase 落账 .-> productionFact
+  T5 -. 生产事实由专项 usecase 落账 .-> productionFact
+  T7 -. 出货放行只到 shipping_released .-> shipmentFact
+  T8 -. 财务事实由专项 usecase 落账 .-> financeFact
+```
+
+上图是 T1 到 T8 的主链路索引，不是 workflow engine 设计器，也不新增菜单、RBAC、schema、migration 或事实写入。实线表示协同任务主路径；虚线表示需要由对应 Fact usecase 承接的事实落账边界，不能由 `workflow task done`、`shipping_released` 或 workflow payload 直接伪造。
+
 ## 关键原则
 
 - PMC 可以看全链路卡点、超时、阻塞和关键路径，但不能替仓库、品质、财务伪造完成事实。

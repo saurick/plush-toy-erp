@@ -34,12 +34,17 @@ import {
 } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import CommandCenterNav from '../components/CommandCenterNav.jsx'
 import {
   listWorkflowTasks,
   updateWorkflowTaskStatus,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import { getBusinessDashboardStats } from '../api/businessRecordApi.mjs'
+import {
+  commandCenterViews,
+  getCommandCenterView,
+} from '../config/commandCenter.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
 import { printTemplateStats } from '../config/printTemplates.mjs'
 import {
@@ -74,34 +79,6 @@ import {
 
 const { Paragraph, Text, Title } = Typography
 const { TextArea } = Input
-
-const COMMAND_CENTER_VIEWS = Object.freeze([
-  {
-    key: 'workbench',
-    label: '后台首页 / 工作台',
-    path: '/erp/dashboard',
-  },
-  {
-    key: 'task-board',
-    label: '任务看板',
-    path: '/erp/task-board',
-  },
-  {
-    key: 'business-board',
-    label: '业务看板',
-    path: '/erp/business-dashboard',
-  },
-  {
-    key: 'print-center',
-    label: '模板打印中心',
-    path: '/erp/print-center',
-  },
-  {
-    key: 'exception-flow',
-    label: '异常 / 阻塞闭环',
-    path: '/erp/operations/exceptions',
-  },
-])
 
 const EXCEPTION_FLOW_STEPS = Object.freeze([
   {
@@ -356,8 +333,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     ? resolveWorkflowTaskEntryPath(selectedTask)
     : ''
   const activeViewMeta =
-    COMMAND_CENTER_VIEWS.find((item) => item.key === activeView) ||
-    COMMAND_CENTER_VIEWS[0]
+    getCommandCenterView(activeView) || commandCenterViews[0]
   const activeExceptionStep =
     EXCEPTION_FLOW_STEPS.find((step) => step.key === exceptionStepKey) ||
     EXCEPTION_FLOW_STEPS[0]
@@ -449,7 +425,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }
 
   const openCommandCenterView = (viewKey) => {
-    const viewMeta = COMMAND_CENTER_VIEWS.find((item) => item.key === viewKey)
+    const viewMeta = getCommandCenterView(viewKey)
     if (!viewMeta) return
     if (['workbench', 'task-board', 'exception-flow'].includes(viewKey)) {
       setActiveView(viewKey)
@@ -639,38 +615,37 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         className="erp-dashboard-card erp-command-center-nav-card"
         variant="borderless"
       >
-        <Space direction="vertical" size={12} className="erp-dashboard-block">
-          <Space className="erp-dashboard-heading-row" align="start">
-            <div>
-              <Text type="secondary">ERP / 运营中枢</Text>
-              <Title level={4} className="erp-dashboard-section-title">
-                {activeViewMeta.label}
-              </Title>
-              <Paragraph type="secondary" className="erp-dashboard-summary">
-                吸收后台工作台原型的五个视图；所有动作仍回到现有
-                Workflow、业务页和打印工作台，不写库存、出货、财务或发票事实。
-              </Paragraph>
-            </div>
-            <Button
-              icon={<ReloadOutlined />}
-              loading={loading}
-              onClick={loadDashboardStats}
-            >
-              刷新运营数据
-            </Button>
-          </Space>
-          <Space wrap className="erp-command-center-view-switch">
-            {COMMAND_CENTER_VIEWS.map((item) => (
+        <div className="erp-command-center-shell">
+          <CommandCenterNav
+            activeKey={activeView}
+            onSelect={(item) => openCommandCenterView(item.key)}
+          />
+          <Space
+            direction="vertical"
+            size={12}
+            className="erp-dashboard-block erp-command-center-shell-main"
+          >
+            <Space className="erp-dashboard-heading-row" align="start">
+              <div>
+                <Text type="secondary">ERP / 运营中枢</Text>
+                <Title level={4} className="erp-dashboard-section-title">
+                  {activeViewMeta.label}
+                </Title>
+                <Paragraph type="secondary" className="erp-dashboard-summary">
+                  吸收后台工作台原型的五个视图；所有动作仍回到现有
+                  Workflow、业务页和打印工作台，不写库存、出货、财务或发票事实。
+                </Paragraph>
+              </div>
               <Button
-                key={item.key}
-                type={item.key === activeView ? 'primary' : 'default'}
-                onClick={() => openCommandCenterView(item.key)}
+                icon={<ReloadOutlined />}
+                loading={loading}
+                onClick={loadDashboardStats}
               >
-                {item.label}
+                刷新运营数据
               </Button>
-            ))}
+            </Space>
           </Space>
-        </Space>
+        </div>
       </Card>
 
       {activeView === 'workbench' ? (

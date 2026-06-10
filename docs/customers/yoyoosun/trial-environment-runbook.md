@@ -105,7 +105,13 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/phase7-simulated-trial-data.
 
 若目标试用环境需要真实页面中可见的模拟客户、供应商、联系人和销售订单数据，再显式写入模拟数据。写入前必须确认目标环境已有一个可用于销售订单行的活跃产品 ID 和单位 ID；该脚本不会创建产品、单位、库存、出货或财务事实。
 
-如果当前环境没有活跃产品 / 单位，可先 seed Phase 7 模拟主数据。该 seed 只写 `units` 和 `products`，编码带 `SIM-YOYOOSUN-PHASE7` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实：
+如果当前环境缺少核心演示基础资料，优先 seed core demo 数据。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`bom_headers` 和 `bom_items`，编码带 `SIM-PLUSH-CORE` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `phase7_args` 可直接传给下面的 Phase 7 模拟数据写入命令：
+
+```bash
+bash /Users/simon/projects/plush-toy-erp/scripts/seed-core-demo-data.sh
+```
+
+如果只需要旧 Phase 7 最小产品 / 单位前置数据，也可继续使用 Phase 7 专用 seed。该 seed 只写 `units` 和 `products`，编码带 `SIM-YOYOOSUN-PHASE7` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实：
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/seed-phase7-sim-masterdata.sh
