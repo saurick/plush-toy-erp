@@ -5,6 +5,8 @@ import {
   DEV_PROTOTYPES_ROUTE,
   DEV_PROTOTYPE_ASSETS,
   DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY,
+  DEV_PROTOTYPE_FILTER_OPTIONS,
+  DEV_PROTOTYPE_FILTERS,
   DEV_PROTOTYPE_PINNED_STORAGE_KEY,
   DEV_PROTOTYPE_STATUSES,
   applyDevPrototypePinnedState,
@@ -38,10 +40,31 @@ test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
     DEV_PROTOTYPE_ASSETS.flatMap((item) => item.statuses)
   )
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.CURRENT))
-  assert(statuses.has(DEV_PROTOTYPE_STATUSES.EXPLORATION))
+  assert(statuses.has(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT))
+  assert(statuses.has(DEV_PROTOTYPE_STATUSES.DRAFT))
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.HISTORY))
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.EVIDENCE))
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.COMPARISON))
+  assert.deepEqual(
+    DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => option.value),
+    [
+      DEV_PROTOTYPE_FILTERS.ALL,
+      DEV_PROTOTYPE_FILTERS.CURRENT,
+      DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
+      DEV_PROTOTYPE_FILTERS.REFERENCE,
+    ]
+  )
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'admin-command-center')
+      ?.statuses[0],
+    DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
+  )
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.find(
+      (item) => item.key === 'business-direction-sidebar'
+    )?.statuses[0],
+    DEV_PROTOTYPE_STATUSES.DRAFT
+  )
 })
 
 test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
@@ -86,15 +109,30 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
 
   assert.deepEqual(
     filterDevPrototypeItems(items, {
-      status: DEV_PROTOTYPE_STATUSES.CURRENT,
+      status: DEV_PROTOTYPE_FILTERS.CURRENT,
     }).map((item) => item.key),
     ['mobile-role-tasks-implemented']
   )
   assert(
     filterDevPrototypeItems(items, {
-      status: DEV_PROTOTYPE_STATUSES.EVIDENCE,
+      status: DEV_PROTOTYPE_FILTERS.REFERENCE,
       keyword: '风险',
     }).some((item) => item.key === 'mobile-role-risk-dashboard')
+  )
+  assert(
+    filterDevPrototypeItems(items, {
+      status: DEV_PROTOTYPE_FILTERS.REFERENCE,
+    }).every(
+      (item) =>
+        !item.statuses.includes(DEV_PROTOTYPE_STATUSES.CURRENT) &&
+        !item.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)
+    )
+  )
+  assert(
+    filterDevPrototypeItems(items, {
+      status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
+      keyword: '后台工作台',
+    }).some((item) => item.key === 'admin-command-center')
   )
   assert.equal(
     filterDevPrototypeItems(items, { keyword: '../unsafe' }).length,

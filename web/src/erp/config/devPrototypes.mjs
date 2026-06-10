@@ -6,7 +6,8 @@ export const DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY =
 
 export const DEV_PROTOTYPE_STATUSES = Object.freeze({
   CURRENT: '当前实现对齐版 / Current',
-  EXPLORATION: '探索方案 / Exploration',
+  TO_IMPLEMENT: '待吸收实现 / To Implement',
+  DRAFT: '起草阶段 / Draft',
   HISTORY: '历史参考 / History',
   EVIDENCE: '截图证据 / Evidence',
   COMPARISON: '方案对比 / Comparison',
@@ -14,10 +15,28 @@ export const DEV_PROTOTYPE_STATUSES = Object.freeze({
 
 export const DEV_PROTOTYPE_STATUS_OPTIONS = Object.freeze([
   DEV_PROTOTYPE_STATUSES.CURRENT,
-  DEV_PROTOTYPE_STATUSES.EXPLORATION,
+  DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT,
+  DEV_PROTOTYPE_STATUSES.DRAFT,
   DEV_PROTOTYPE_STATUSES.HISTORY,
   DEV_PROTOTYPE_STATUSES.EVIDENCE,
   DEV_PROTOTYPE_STATUSES.COMPARISON,
+])
+
+export const DEV_PROTOTYPE_FILTERS = Object.freeze({
+  ALL: 'all',
+  CURRENT: 'current',
+  TO_IMPLEMENT: 'to-implement',
+  REFERENCE: 'reference',
+})
+
+export const DEV_PROTOTYPE_FILTER_OPTIONS = Object.freeze([
+  { value: DEV_PROTOTYPE_FILTERS.ALL, label: '全部 / All' },
+  { value: DEV_PROTOTYPE_FILTERS.CURRENT, label: '当前实现 / Current' },
+  {
+    value: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
+    label: '待实现 / To Implement',
+  },
+  { value: DEV_PROTOTYPE_FILTERS.REFERENCE, label: '参考资料 / Reference' },
 ])
 
 export const DEV_PROTOTYPE_ASSETS = Object.freeze([
@@ -25,7 +44,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     key: 'admin-command-center',
     title: '后台工作台与看板整套原型',
     type: 'HTML',
-    statuses: [DEV_PROTOTYPE_STATUSES.EXPLORATION],
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'admin-command-center-v1/',
     assetPath: 'admin-command-center-v1/index.html',
     readmePath: 'admin-command-center-v1/README.md',
@@ -36,7 +55,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     key: 'business-module-standard-page',
     title: '业务模块标准页整页原型',
     type: 'HTML',
-    statuses: [DEV_PROTOTYPE_STATUSES.EXPLORATION],
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'business-module-page-standard-v1/',
     assetPath: 'business-module-page-standard-v1/index.html',
     readmePath: 'business-module-page-standard-v1/README.md',
@@ -45,10 +64,10 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
   },
   {
     key: 'business-task-collab-entry',
-    title: '协同入口独立探索原型',
+    title: '协同入口独立候选原型',
     type: 'HTML',
     statuses: [
-      DEV_PROTOTYPE_STATUSES.EXPLORATION,
+      DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT,
       DEV_PROTOTYPE_STATUSES.COMPARISON,
     ],
     directory: 'business-module-page-standard-v1/',
@@ -60,10 +79,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     key: 'business-direction-sidebar',
     title: '方向 1：右侧当前记录协同侧栏',
     type: 'PNG',
-    statuses: [
-      DEV_PROTOTYPE_STATUSES.COMPARISON,
-      DEV_PROTOTYPE_STATUSES.HISTORY,
-    ],
+    statuses: [DEV_PROTOTYPE_STATUSES.DRAFT, DEV_PROTOTYPE_STATUSES.COMPARISON],
     directory: 'business-module-page-standard-v1/images/',
     assetPath:
       'business-module-page-standard-v1/images/direction-1-current-record-sidebar.png',
@@ -74,10 +90,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     key: 'business-direction-flowbar',
     title: '方向 2：顶部流程条 + 协同任务抽屉',
     type: 'PNG',
-    statuses: [
-      DEV_PROTOTYPE_STATUSES.COMPARISON,
-      DEV_PROTOTYPE_STATUSES.HISTORY,
-    ],
+    statuses: [DEV_PROTOTYPE_STATUSES.DRAFT, DEV_PROTOTYPE_STATUSES.COMPARISON],
     directory: 'business-module-page-standard-v1/images/',
     assetPath:
       'business-module-page-standard-v1/images/direction-2-flowbar-task-drawer.png',
@@ -89,10 +102,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     key: 'business-direction-bottom-table',
     title: '方向 3：表格下方协同待办表',
     type: 'PNG',
-    statuses: [
-      DEV_PROTOTYPE_STATUSES.COMPARISON,
-      DEV_PROTOTYPE_STATUSES.HISTORY,
-    ],
+    statuses: [DEV_PROTOTYPE_STATUSES.DRAFT, DEV_PROTOTYPE_STATUSES.COMPARISON],
     directory: 'business-module-page-standard-v1/images/',
     assetPath:
       'business-module-page-standard-v1/images/direction-3-bottom-task-table.png',
@@ -213,14 +223,23 @@ export function buildDevPrototypeItems({
 
 export function filterDevPrototypeItems(
   items = [],
-  { status = 'all', keyword = '' } = {}
+  { status = DEV_PROTOTYPE_FILTERS.ALL, keyword = '' } = {}
 ) {
   const query = String(keyword || '')
     .trim()
     .toLowerCase()
   return items.filter((item) => {
+    const statuses = item.statuses || []
+    const filter = String(status || DEV_PROTOTYPE_FILTERS.ALL)
     const statusMatched =
-      status === 'all' || item.statuses?.includes(String(status))
+      filter === DEV_PROTOTYPE_FILTERS.ALL ||
+      (filter === DEV_PROTOTYPE_FILTERS.CURRENT &&
+        statuses.includes(DEV_PROTOTYPE_STATUSES.CURRENT)) ||
+      (filter === DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT &&
+        statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)) ||
+      (filter === DEV_PROTOTYPE_FILTERS.REFERENCE &&
+        !statuses.includes(DEV_PROTOTYPE_STATUSES.CURRENT) &&
+        !statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT))
     const keywordMatched = !query || item.searchText?.includes(query)
     return statusMatched && keywordMatched
   })

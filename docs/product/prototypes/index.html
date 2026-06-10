@@ -142,6 +142,15 @@
         justify-content: flex-end;
       }
 
+      .status-note {
+        grid-column: 1 / -1;
+        margin: -2px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+        text-align: right;
+      }
+
       .filter {
         height: 34px;
         border: 1px solid var(--line);
@@ -276,9 +285,14 @@
         color: var(--green);
       }
 
-      .badge-explore {
+      .badge-implement {
         background: var(--blue-soft);
         color: var(--blue);
+      }
+
+      .badge-draft {
+        background: var(--orange-soft);
+        color: var(--orange);
       }
 
       .badge-history {
@@ -528,14 +542,15 @@
           placeholder="搜索名称、目录、用途"
           aria-label="搜索名称、目录、用途"
         />
-        <div class="filters" aria-label="按状态筛选">
-          <button class="filter" type="button" data-filter="all" aria-pressed="true">全部</button>
-          <button class="filter" type="button" data-filter="当前实现对齐版" aria-pressed="false">当前实现对齐版</button>
-          <button class="filter" type="button" data-filter="探索方案" aria-pressed="false">探索方案</button>
-          <button class="filter" type="button" data-filter="历史参考" aria-pressed="false">历史参考</button>
-          <button class="filter" type="button" data-filter="截图证据" aria-pressed="false">截图证据</button>
-          <button class="filter" type="button" data-filter="方案对比" aria-pressed="false">方案对比</button>
+        <div class="filters" aria-label="按资产分类筛选">
+          <button class="filter" type="button" data-filter="all" aria-pressed="true">全部 / All</button>
+          <button class="filter" type="button" data-filter="current" aria-pressed="false">当前实现 / Current</button>
+          <button class="filter" type="button" data-filter="to-implement" aria-pressed="false">待实现 / To Implement</button>
+          <button class="filter" type="button" data-filter="reference" aria-pressed="false">参考资料 / Reference</button>
         </div>
+        <p class="status-note">
+          顶部筛选只用于判断当前、待实现和参考资料；起草阶段、截图证据和方案对比保留在卡片标签里。
+        </p>
       </div>
 
       <section class="section" aria-labelledby="admin-heading">
@@ -547,13 +562,13 @@
           <a class="open-readme" href="admin-command-center-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-status="探索方案" data-text="后台工作台 看板 HTML admin-command-center-v1 工作台 任务看板 业务看板 模板打印中心 异常 阻塞 闭环">
+          <article class="asset" data-category="to-implement" data-status="待吸收实现" data-text="后台工作台 看板 HTML admin-command-center-v1 工作台 任务看板 业务看板 模板打印中心 异常 阻塞 闭环 待吸收实现">
             <div class="name">
               <p class="asset-title">后台工作台与看板整套原型</p>
               <div class="dir">admin-command-center-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
-            <div class="badges"><span class="badge badge-explore">探索方案</span></div>
+            <div class="badges"><span class="badge badge-implement">待吸收实现</span></div>
             <p class="purpose">覆盖工作台、任务看板、业务看板、模板打印中心和异常 / 阻塞闭环五个视图。</p>
             <div class="actions">
               <a class="action primary" href="admin-command-center-v1/index.html">打开 HTML 原型</a>
@@ -572,13 +587,13 @@
           <a class="open-readme" href="business-module-page-standard-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-status="探索方案" data-text="业务模块标准页 HTML business-module-page-standard-v1 当前推荐整页原型 标题统计 筛选 表格工具 选中操作条 分页 协同入口">
+          <article class="asset" data-category="to-implement" data-status="待吸收实现" data-text="业务模块标准页 HTML business-module-page-standard-v1 当前推荐整页原型 标题统计 筛选 表格工具 选中操作条 分页 协同入口 待吸收实现">
             <div class="name">
               <p class="asset-title">业务模块标准页整页原型</p>
               <div class="dir">business-module-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
-            <div class="badges"><span class="badge badge-explore">探索方案</span></div>
+            <div class="badges"><span class="badge badge-implement">待吸收实现</span></div>
             <p class="purpose">覆盖标题统计、筛选、表格工具、选中记录操作条、主表分页和底部常驻协同入口。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/index.html">打开 HTML 原型</a>
@@ -586,14 +601,14 @@
             </div>
           </article>
 
-          <article class="asset" data-status="探索方案 方案对比" data-text="协同入口探索 HTML task-collab-entry-v2 任务分组 展开面板 底部入口 桌面端 拖拽手柄 高度调节">
+          <article class="asset" data-category="to-implement" data-status="待吸收实现 方案对比" data-text="协同入口候选 HTML task-collab-entry-v2 任务分组 展开面板 底部入口 桌面端 拖拽手柄 高度调节 待吸收实现">
             <div class="name">
-              <p class="asset-title">协同入口独立探索原型</p>
+              <p class="asset-title">协同入口独立候选原型</p>
               <div class="dir">business-module-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges">
-              <span class="badge badge-explore">探索方案</span>
+              <span class="badge badge-implement">待吸收实现</span>
               <span class="badge badge-compare">方案对比</span>
             </div>
             <p class="purpose">用于对比底部常驻入口、展开面板、本页待办任务分组和桌面端高度拖拽手柄。</p>
@@ -603,15 +618,15 @@
             </div>
           </article>
 
-          <article class="asset" data-status="方案对比 历史参考" data-text="方向1 右侧当前记录协同侧栏 PNG direction-1-current-record-sidebar">
+          <article class="asset" data-category="reference" data-status="起草阶段 方案对比" data-text="方向1 右侧当前记录协同侧栏 PNG direction-1-current-record-sidebar 起草阶段">
             <div class="name">
               <p class="asset-title">方向 1：右侧当前记录协同侧栏</p>
               <div class="dir">business-module-page-standard-v1/images/</div>
             </div>
             <span class="type type-png">PNG</span>
             <div class="badges">
+              <span class="badge badge-draft">起草阶段</span>
               <span class="badge badge-compare">方案对比</span>
-              <span class="badge badge-history">历史参考</span>
             </div>
             <p class="purpose">早期协同入口方向图，用于追溯为何不采用右侧侧栏作为默认骨架。</p>
             <div class="actions">
@@ -620,15 +635,15 @@
             </div>
           </article>
 
-          <article class="asset" data-status="方案对比 历史参考" data-text="方向2 顶部流程条 协同任务抽屉 PNG direction-2-flowbar-task-drawer">
+          <article class="asset" data-category="reference" data-status="起草阶段 方案对比" data-text="方向2 顶部流程条 协同任务抽屉 PNG direction-2-flowbar-task-drawer 起草阶段">
             <div class="name">
               <p class="asset-title">方向 2：顶部流程条 + 协同任务抽屉</p>
               <div class="dir">business-module-page-standard-v1/images/</div>
             </div>
             <span class="type type-png">PNG</span>
             <div class="badges">
+              <span class="badge badge-draft">起草阶段</span>
               <span class="badge badge-compare">方案对比</span>
-              <span class="badge badge-history">历史参考</span>
             </div>
             <p class="purpose">早期协同入口方向图，用于比较流程条和抽屉结构的占位与理解成本。</p>
             <div class="actions">
@@ -637,15 +652,15 @@
             </div>
           </article>
 
-          <article class="asset" data-status="方案对比 历史参考" data-text="方向3 表格下方协同待办表 PNG direction-3-bottom-task-table">
+          <article class="asset" data-category="reference" data-status="起草阶段 方案对比" data-text="方向3 表格下方协同待办表 PNG direction-3-bottom-task-table 起草阶段">
             <div class="name">
               <p class="asset-title">方向 3：表格下方协同待办表</p>
               <div class="dir">business-module-page-standard-v1/images/</div>
             </div>
             <span class="type type-png">PNG</span>
             <div class="badges">
+              <span class="badge badge-draft">起草阶段</span>
               <span class="badge badge-compare">方案对比</span>
-              <span class="badge badge-history">历史参考</span>
             </div>
             <p class="purpose">早期协同入口方向图，用于说明长表格下方入口的可见性问题。</p>
             <div class="actions">
@@ -665,7 +680,7 @@
           <a class="open-readme" href="mobile-role-tasks-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-status="当前实现对齐版" data-text="岗位任务端 当前实现对齐版 HTML implemented-reference 待办 已办 消息 我的 筛选 详情 现场留痕 原因面板 动作栏">
+          <article class="asset" data-category="current" data-status="当前实现对齐版" data-text="岗位任务端 当前实现对齐版 HTML implemented-reference 待办 已办 消息 我的 筛选 详情 现场留痕 原因面板 动作栏">
             <div class="name">
               <p class="asset-title">岗位任务端当前实现对齐版原型</p>
               <div class="dir">mobile-role-tasks-v1/</div>
@@ -679,7 +694,7 @@
             </div>
           </article>
 
-          <article class="asset" data-status="历史参考 截图证据" data-text="岗位任务端 待办列表页 PNG mobile-role-tasks-list-reference 早期视觉方向 截图证据">
+          <article class="asset" data-category="reference" data-status="历史参考 截图证据" data-text="岗位任务端 待办列表页 PNG mobile-role-tasks-list-reference 早期视觉方向 截图证据">
             <div class="name">
               <p class="asset-title">岗位任务端早期待办列表图</p>
               <div class="dir">mobile-role-tasks-v1/images/</div>
@@ -696,7 +711,7 @@
             </div>
           </article>
 
-          <article class="asset" data-status="历史参考 截图证据" data-text="岗位任务端 任务详情页 PNG mobile-role-task-detail-reference 早期视觉方向 截图证据">
+          <article class="asset" data-category="reference" data-status="历史参考 截图证据" data-text="岗位任务端 任务详情页 PNG mobile-role-task-detail-reference 早期视觉方向 截图证据">
             <div class="name">
               <p class="asset-title">岗位任务端早期任务详情图</p>
               <div class="dir">mobile-role-tasks-v1/images/</div>
@@ -713,7 +728,7 @@
             </div>
           </article>
 
-          <article class="asset" data-status="历史参考 截图证据" data-text="岗位任务端 风险分组页 PNG mobile-role-risk-dashboard-reference 今日必须处理 卡点 等待他人 催办 已完成">
+          <article class="asset" data-category="reference" data-status="历史参考 截图证据" data-text="岗位任务端 风险分组页 PNG mobile-role-risk-dashboard-reference 今日必须处理 卡点 等待他人 催办 已完成">
             <div class="name">
               <p class="asset-title">岗位任务端早期风险分组图</p>
               <div class="dir">mobile-role-tasks-v1/images/</div>
@@ -738,7 +753,7 @@
         <h2 id="rules-heading">维护规则</h2>
         <ul>
           <li>新增资产时优先放在清晰的子目录，并同步补充本页和对应 README。</li>
-          <li>HTML 原型可直接用浏览器打开；PNG 只作为方案图、截图证据、方案对比或历史参考。</li>
+          <li>HTML 原型可直接用浏览器打开；PNG 只作为起草阶段、方案图、截图证据、方案对比或历史参考。</li>
           <li>真实页面落地后，以 <code>web/src</code> 运行时代码、自动化测试和浏览器回归为准。</li>
           <li>本页不接后端、不进 ERP 正式菜单、不接权限、不跑构建。</li>
         </ul>
@@ -840,9 +855,9 @@
         let visibleCount = 0;
 
         for (const asset of assets) {
-          const status = asset.dataset.status || "";
+          const category = asset.dataset.category || "";
           const text = (asset.dataset.text || "").toLowerCase();
-          const statusMatches = currentFilter === "all" || status.includes(currentFilter);
+          const statusMatches = currentFilter === "all" || category === currentFilter;
           const textMatches = !query || text.includes(query);
           const visible = statusMatches && textMatches;
           asset.hidden = !visible;

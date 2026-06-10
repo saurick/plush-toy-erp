@@ -7,7 +7,7 @@
 | 文件 | 说明 |
 | --- | --- |
 | `index.html` | 当前推荐整页原型。包含顶部业务统计、筛选区、表格工具、选中记录操作条、主表分页和底部常驻协同入口。 |
-| `task-collab-entry-v2.html` | 协同入口独立探索原型。用于对比任务分组、展开 / 收起、本页待办展示方式和桌面端高度拖拽手柄。 |
+| `task-collab-entry-v2.html` | 协同入口独立候选原型。用于对比任务分组、展开 / 收起、本页待办展示方式和桌面端高度拖拽手柄。 |
 | `images/direction-1-current-record-sidebar.png` | 方向 1：右侧当前记录协同侧栏。 |
 | `images/direction-2-flowbar-task-drawer.png` | 方向 2：顶部流程条 + 协同任务抽屉。 |
 | `images/direction-3-bottom-task-table.png` | 方向 3：表格下方协同待办表。 |

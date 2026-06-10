@@ -1231,6 +1231,116 @@ const scenarios = [
     },
   },
   {
+    name: 'dev-prototypes-dark-desktop',
+    path: '/__dev/prototypes',
+    themeMode: 'dark',
+    viewport: { width: 1536, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '产品原型查看器 / Prototype Viewer')
+      await expectText(page, '待实现 / To Implement')
+      await expectText(page, '参考资料 / Reference')
+      await expectText(page, '顶部筛选只用于判断当前、待实现和参考资料')
+      await assertERPThemeMode(page, {
+        scenarioName: 'dev-prototypes-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+
+      await page
+        .getByRole('button', {
+          name: '待实现 / To Implement',
+          exact: true,
+        })
+        .click()
+      await expectText(page, '后台工作台与看板整套原型')
+      await expectText(page, '业务模块标准页整页原型')
+      const implementMetrics = await page.evaluate(() => ({
+        activeText:
+          document
+            .querySelector('.erp-dev-prototypes-filter__item--active')
+            ?.textContent?.replace(/\s+/g, ' ')
+            .trim() || '',
+        visibleCards: document.querySelectorAll('.erp-dev-prototypes-card')
+          .length,
+        visibleTitles: Array.from(
+          document.querySelectorAll('.erp-dev-prototypes-card__title')
+        ).map((item) => item.textContent?.trim() || ''),
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }))
+      assert.equal(
+        implementMetrics.activeText,
+        '待实现 / To Implement',
+        `原型查看器待实现筛选应激活: ${JSON.stringify(implementMetrics)}`
+      )
+      assert(
+        implementMetrics.visibleCards >= 3 &&
+          implementMetrics.visibleTitles.some((title) =>
+            title.includes('后台工作台')
+          ),
+        `原型查看器待实现筛选结果异常: ${JSON.stringify(implementMetrics)}`
+      )
+      assert(
+        implementMetrics.scrollWidth <= implementMetrics.clientWidth + 1,
+        `原型查看器待实现筛选不应横向溢出: ${JSON.stringify(implementMetrics)}`
+      )
+
+      await page
+        .getByRole('button', { name: '参考资料 / Reference', exact: true })
+        .click()
+      await expectText(page, '方向 1：右侧当前记录协同侧栏')
+      const referenceMetrics = await page.evaluate(() => ({
+        activeText:
+          document
+            .querySelector('.erp-dev-prototypes-filter__item--active')
+            ?.textContent?.replace(/\s+/g, ' ')
+            .trim() || '',
+        visibleCards: document.querySelectorAll('.erp-dev-prototypes-card')
+          .length,
+        draftTagCount: Array.from(
+          document.querySelectorAll(
+            '.erp-dev-prototypes-list .erp-dev-prototypes-status'
+          )
+        ).filter((item) => item.textContent?.includes('起草阶段')).length,
+        evidenceTagCount: Array.from(
+          document.querySelectorAll(
+            '.erp-dev-prototypes-list .erp-dev-prototypes-status'
+          )
+        ).filter((item) => item.textContent?.includes('截图证据')).length,
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }))
+      assert.equal(
+        referenceMetrics.activeText,
+        '参考资料 / Reference',
+        `原型查看器参考资料筛选应激活: ${JSON.stringify(referenceMetrics)}`
+      )
+      assert.equal(
+        referenceMetrics.visibleCards,
+        6,
+        `原型查看器参考资料筛选应展示 6 个参考资产: ${JSON.stringify(referenceMetrics)}`
+      )
+      assert.equal(
+        referenceMetrics.draftTagCount,
+        3,
+        `原型查看器参考资料起草阶段标签数量异常: ${JSON.stringify(referenceMetrics)}`
+      )
+      assert.equal(
+        referenceMetrics.evidenceTagCount,
+        3,
+        `原型查看器参考资料截图证据标签数量异常: ${JSON.stringify(referenceMetrics)}`
+      )
+      assert(
+        referenceMetrics.scrollWidth <= referenceMetrics.clientWidth + 1,
+        `原型查看器参考资料筛选不应横向溢出: ${JSON.stringify(referenceMetrics)}`
+      )
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'dev-prototypes-dark-desktop',
+        selector: '.erp-dev-prototypes-page',
+      })
+    },
+  },
+  {
     name: 'dev-testing-dark-desktop',
     path: '/__dev/testing',
     themeMode: 'dark',

@@ -15,8 +15,8 @@ import {
 import { Button, Empty, Input, Space, Tag, Typography } from 'antd'
 import {
   DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY,
+  DEV_PROTOTYPE_FILTER_OPTIONS,
   DEV_PROTOTYPE_PINNED_STORAGE_KEY,
-  DEV_PROTOTYPE_STATUS_OPTIONS,
   applyDevPrototypePinnedState,
   buildDevPrototypeItems,
   filterDevPrototypeItems,
@@ -413,13 +413,7 @@ export default function DevPrototypesPage() {
             onChange={(event) => setKeyword(event.target.value)}
           />
           <div className="erp-dev-prototypes-filter" aria-label="按状态筛选">
-            {[
-              { label: '全部 / All', value: 'all' },
-              ...DEV_PROTOTYPE_STATUS_OPTIONS.map((status) => ({
-                label: status,
-                value: status,
-              })),
-            ].map((option) => (
+            {DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => (
               <button
                 key={option.value}
                 type="button"
@@ -435,6 +429,9 @@ export default function DevPrototypesPage() {
               </button>
             ))}
           </div>
+          <Paragraph className="erp-dev-prototypes-filter-note">
+            顶部筛选只用于判断当前、待实现和参考资料；起草阶段、截图证据和方案对比保留在卡片标签里。
+          </Paragraph>
           <div
             className="erp-dev-prototypes-group-controls"
             aria-label="目录分组操作"

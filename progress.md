@@ -18,6 +18,39 @@
 - 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增正式原型菜单。
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
 
+## 2026-06-10 21:41 CST
+
+- 完成：收敛产品原型资产分类口径，移除容易误读的 `探索方案 / Exploration` 状态，改为 `待吸收实现 / To Implement`；新增 `起草阶段 / Draft`，用于标记尚未定稿的 PNG 方向图。HTML / PNG 只表示资产格式，不再承担是否即将实现的语义。
+- 完成：同步 `/__dev/prototypes` 运行时 registry、筛选按钮、筛选说明、静态 `docs/product/prototypes/index.html`、`docs/product/prototypes/README.md` 和业务模块原型 README；后台工作台、业务模块标准页和协同入口 HTML 标记为待吸收实现，三张业务协同方向 PNG 标记为起草阶段 + 方案对比。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/styleL1.mjs`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1` 和 `git diff --check` 均通过；Browser 插件在 `http://127.0.0.1:5175/__dev/prototypes` 验证页面无 Vite overlay、console warn/error 为空、无横向溢出，`待吸收实现` 筛选展示 3 个 HTML 候选，`起草阶段` 筛选展示 3 张 PNG 方向图。Browser 截图 API 两次超时，未留下截图证据。
+- 下一步：后续新增原型资产时先判断用途状态，再登记格式；待吸收实现落地时仍必须接入现有 API、RBAC、菜单、theme token 和测试，不直接复制静态数据或未评审交互。
+- 阻塞/风险：本轮只改 dev-only 原型查看器配置、静态原型资产索引、README、样式和测试；不改正式 ERP 菜单、seedData、后端 API、schema、migration、RBAC、WorkflowUsecase 或 Fact usecase。
+
+## 2026-06-10 22:01 CST
+
+- 完成：继续整理产品原型查看器分类，顶部筛选从多个细状态收敛为 `全部 / All`、`当前实现 / Current`、`待实现 / To Implement`、`参考资料 / Reference` 四类；`起草阶段 / Draft`、`截图证据 / Evidence`、`方案对比 / Comparison` 等保留为卡片细标签和 README 追溯信息。
+- 完成：同步 `/__dev/prototypes`、静态 `docs/product/prototypes/index.html`、原型 README、筛选配置测试和 `dev-prototypes-dark-desktop` L1 回归；参考资料分类现在统一覆盖未进入当前实现或待实现队列的草图、方向图、截图证据、历史方案和方案对比。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/styleL1.mjs`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1` 和 `git diff --check` 均通过；`pnpm test` 当前 339 项通过。
+- 下一步：后续新增原型资产时先归入四个顶部决策分类，再用细标签解释来源和状态；HTML / PNG 文件格式仍不承担状态语义。
+- 阻塞/风险：本轮仍只改 dev-only 原型查看器、静态原型资产索引、README、样式和测试；未改正式 ERP 菜单、seedData、后端 API、schema、migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-10 22:13 CST
+
+- 完成：补齐原型协作长期规则。`docs/product/prototypes/README.md` 增加 `起草阶段 PNG -> 待实现 HTML -> 当前实现` 三阶段流程、可跳过条件、Product Design / Codex 分工和主阶段 / 辅助标签口径。
+- 完成：`AGENTS.md` 新增“原型与 Product Design 协作”规则，明确视觉探索、PNG 草案、多方案比较、截图 / mockup / Figma / URL 转原型和设计 QA 优先使用 `@product-design`；把已选方案吸收到正式代码时仍由 Codex 回到仓库真源、现有组件、API、RBAC、菜单、theme token、正式文档和测试。
+- 完成：同步 `docs/current-source-of-truth.md` 与 `web/README.md` 中 `/__dev/prototypes` 筛选说明为全部 / 当前实现 / 待实现 / 参考资料四类。
+- 验证：`rg` 检查原型流程、Product Design、主阶段和辅助标签口径；`git diff --check` 通过。本轮只改规则和 Markdown，未重跑前端构建或浏览器回归。
+- 下一步：后续涉及原型任务时先按三阶段判断；辅助标签继续保留为追溯信息，不再扩展成顶部筛选分类。
+- 阻塞/风险：本轮未改运行时代码、测试脚本、正式菜单、后端 API、schema、migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-10 22:30 CST
+
+- 完成：在 `docs/product/prototypes/README.md` 增加“待实现吸收提示 / To Implement Checklist”，把原型吸收到真实页面前必须核对的目标、必须对齐项、禁止照搬项、实现和验证范围固定下来。
+- 完成：`AGENTS.md` 同步要求从 `待实现 / To Implement` 原型进入真实页面前必须按 checklist 核对，避免后续只凭“像原型”直接复制静态数据或绕过仓库边界。
+- 验证：`rg` 检查 checklist 和 AGENTS 引用；`git diff --check` 通过。本轮只改规则和 Markdown，未重跑前端构建、单测或浏览器回归。
+- 下一步：后续待实现原型落地时直接按 checklist 明确“必须对齐”和“明确不吸收”的清单，再进入运行时代码改动。
+- 阻塞/风险：本轮未改运行时代码、测试脚本、正式菜单、后端 API、schema、migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
+
 ## 2026-06-10 21:03 CST
 
 - 完成：将 `/erp/dashboard` 从旧工作台命令中心布局收回为原型式任务看板首屏，移除当前页面主路径里的 hero、统计卡、任务池概览、右侧首屏处理队列、业务风险卡和打印入口卡；业务看板与打印中心仍通过页面按钮进入，不新增菜单、后端 API、schema、migration、RBAC 或 Fact 写入。
