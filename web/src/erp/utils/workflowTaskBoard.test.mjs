@@ -89,14 +89,14 @@ test('workflowTaskBoard: 状态文案和原因从任务或 payload 收口', () =
   assert.equal(getWorkflowTaskReason(tasks[1]), '库位未确认')
 })
 
-test('workflowTaskBoard: 生成工作台泳道并保留协同完成边界', () => {
+test('workflowTaskBoard: 生成原型式任务看板泳道并保留协同完成边界', () => {
   const lanes = buildWorkflowTaskBoardLanes(tasks)
   assert.deepEqual(
     lanes.map((lane) => [lane.key, lane.count]),
     [
-      ['today', 2],
+      ['pending', 1],
       ['blocked', 1],
-      ['finance', 1],
+      ['due', 2],
       ['done', 1],
     ]
   )

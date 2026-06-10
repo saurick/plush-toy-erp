@@ -2,11 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertOutlined,
   ArrowRightOutlined,
-  BellOutlined,
-  CheckCircleOutlined,
   CloseCircleOutlined,
-  ClockCircleOutlined,
-  ExclamationCircleOutlined,
   FileSearchOutlined,
   PrinterOutlined,
   ReloadOutlined,
@@ -15,16 +11,13 @@ import {
   Alert,
   Button,
   Card,
-  Col,
   Descriptions,
   Drawer,
   Empty,
   Input,
-  Row,
   Select,
   Space,
   Spin,
-  Statistic,
   Table,
   Tag,
   Typography,
@@ -362,35 +355,6 @@ export default function DashboardPage() {
     }
   }
 
-  const metricCards = [
-    {
-      key: 'today',
-      title: '待处理任务数',
-      value: workflowStats.pending + workflowStats.processing,
-      icon: <ClockCircleOutlined />,
-    },
-    {
-      key: 'blocked',
-      title: '跨角色阻塞',
-      value: workflowStats.blocked,
-      color: '#d4380d',
-      icon: <ExclamationCircleOutlined />,
-    },
-    {
-      key: 'dueSoon',
-      title: '即将到期任务数',
-      value: workflowStats.dueSoon,
-      color: '#d48806',
-      icon: <BellOutlined />,
-    },
-    {
-      key: 'done',
-      title: '已完成协同',
-      value: workflowStats.done,
-      icon: <CheckCircleOutlined />,
-    },
-  ]
-
   const taskColumns = [
     {
       title: '任务',
@@ -486,87 +450,47 @@ export default function DashboardPage() {
   return (
     <Space direction="vertical" size={16} className="erp-dashboard-page">
       <Card
-        className="erp-dashboard-card erp-workbench-hero-card"
+        className="erp-dashboard-card erp-dashboard-task-board-card"
         variant="borderless"
         loading={loading}
       >
-        <div className="erp-workbench-hero">
-          <div>
-            <Title level={4} className="erp-dashboard-title">
-              任务看板
-            </Title>
-            <Paragraph type="secondary" className="erp-dashboard-summary">
-              工作台式协同入口：先处理今日任务、阻塞和即将到期任务，再进入具体业务模块。这里处理
-              Workflow 任务，不代表库存、出货、应收、开票或收付款事实已过账。
-            </Paragraph>
-            <Space wrap>
-              <Tag color="green">本页任务 {workflowStats.total}</Tag>
-              <Tag color="red">阻塞 {workflowStats.blocked}</Tag>
-              <Tag color="orange">超时 {workflowStats.overdue}</Tag>
-              <Tag>完成任务只关闭协同，不写事实</Tag>
-            </Space>
-          </div>
-          <Space wrap className="erp-workbench-hero-actions">
-            <Button icon={<ReloadOutlined />} onClick={loadDashboardStats}>
-              刷新任务
-            </Button>
-            <Button
-              icon={<ArrowRightOutlined />}
-              onClick={openBusinessDashboard}
-            >
-              去业务看板
-            </Button>
-            <Button icon={<PrinterOutlined />} onClick={openPrintCenter}>
-              去打印中心
-            </Button>
-          </Space>
-        </div>
-      </Card>
-
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" className="erp-dashboard-block" size={12}>
-          <Title level={5} className="erp-dashboard-section-title">
-            任务处理统计
-          </Title>
-          <Row gutter={[12, 12]}>
-            {metricCards.map((item) => (
-              <Col xs={24} sm={12} lg={6} key={item.key}>
-                <Card size="small" variant="borderless">
-                  <Statistic
-                    title={
-                      <Space>
-                        {item.icon}
-                        <span>{item.title}</span>
-                      </Space>
-                    }
-                    value={item.value}
-                    valueStyle={item.color ? { color: item.color } : undefined}
-                  />
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </Space>
-      </Card>
-
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" className="erp-dashboard-block" size={12}>
+        <Space direction="vertical" className="erp-dashboard-block" size={14}>
           <Space className="erp-dashboard-heading-row" align="start">
             <div>
-              <Title level={5} className="erp-dashboard-section-title">
-                任务处理明细
+              <Title level={4} className="erp-dashboard-section-title">
+                任务看板
               </Title>
               <Paragraph type="secondary" className="erp-dashboard-summary">
-                支持按状态、角色、来源和到期筛选；阻塞、催办、完成动作会回到现有
-                workflow API。
+                协同层总览。任务完成不代表库存、出货、财务或发票事实已过账。
               </Paragraph>
             </div>
-            <Button
-              icon={<FileSearchOutlined />}
-              onClick={openBusinessDashboard}
-            >
-              看业务状态
-            </Button>
+            <Space wrap className="erp-dashboard-task-board-actions">
+              <Button icon={<ReloadOutlined />} onClick={loadDashboardStats}>
+                刷新任务
+              </Button>
+              <Button
+                icon={<ArrowRightOutlined />}
+                onClick={openBusinessDashboard}
+              >
+                看业务状态
+              </Button>
+              <Button icon={<PrinterOutlined />} onClick={openPrintCenter}>
+                去打印中心
+              </Button>
+            </Space>
+          </Space>
+          <Space wrap>
+            <Tag color="blue">
+              本页待办 {workflowStats.pending + workflowStats.processing}
+            </Tag>
+            <Tag color="red">阻塞 {workflowStats.blocked}</Tag>
+            <Tag color="orange">
+              到期 {workflowStats.dueSoon + workflowStats.overdue}
+            </Tag>
+            <Tag color="green">已完成 {workflowStats.done}</Tag>
+            <Tag color={hasActiveFilters ? 'green' : 'default'}>
+              {hasActiveFilters ? '筛选已生效' : '全部任务'}
+            </Tag>
           </Space>
           <div className="erp-task-board-filters">
             <Input.Search
@@ -603,23 +527,28 @@ export default function DashboardPage() {
               清空筛选
             </Button>
           </div>
+          <div className="erp-task-board-lanes" aria-label="任务看板泳道">
+            {taskLanes.map((lane) => (
+              <TaskLane
+                key={lane.key}
+                lane={lane}
+                onOpenTask={openTaskDrawer}
+                onOpenAction={openTaskDrawer}
+              />
+            ))}
+          </div>
         </Space>
       </Card>
-
-      <div className="erp-task-board-lanes">
-        {taskLanes.map((lane) => (
-          <TaskLane
-            key={lane.key}
-            lane={lane}
-            onOpenTask={openTaskDrawer}
-            onOpenAction={openTaskDrawer}
-          />
-        ))}
-      </div>
 
       <Card
         className="erp-dashboard-card erp-dashboard-table-card"
         variant="borderless"
+        title="任务处理明细"
+        extra={
+          <Button icon={<FileSearchOutlined />} onClick={openBusinessDashboard}>
+            打开业务状态
+          </Button>
+        }
       >
         <Table
           size="middle"

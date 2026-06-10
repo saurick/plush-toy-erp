@@ -422,6 +422,7 @@
       }
 
       .dock {
+        --dock-body-height: 360px;
         position: absolute;
         right: 16px;
         bottom: 12px;
@@ -486,10 +487,49 @@
       }
 
       .dock-body {
+        display: flex;
+        height: var(--dock-body-height);
+        min-height: 320px;
+        max-height: calc(100vh - 180px);
+        flex-direction: column;
         border-top: 1px solid var(--border);
       }
 
+      .dock-resize {
+        display: flex;
+        width: 100%;
+        height: 14px;
+        align-items: center;
+        justify-content: center;
+        margin: 5px 0 2px;
+        border: 0;
+        background: transparent;
+        cursor: ns-resize;
+        touch-action: none;
+      }
+
+      .dock-resize span {
+        width: 64px;
+        height: 5px;
+        border-radius: 999px;
+        background: #94a3b8;
+        box-shadow: 0 1px 3px rgb(15 23 42 / 16%);
+      }
+
+      .dock-resize:hover span,
+      .dock-resize:focus-visible span,
+      .dock.resizing .dock-resize span {
+        background: #475569;
+      }
+
+      .dock-note {
+        margin: 0 12px 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
       .tabs {
+        flex: 0 0 auto;
         display: flex;
         gap: 4px;
         padding: 8px 12px 0;
@@ -514,7 +554,8 @@
       }
 
       .task-table {
-        max-height: 210px;
+        min-height: 0;
+        flex: 1;
         overflow: auto;
         padding: 0 12px 10px;
       }
@@ -738,6 +779,10 @@
               </div>
             </div>
             <div class="dock-body">
+              <button class="dock-resize" id="dockResize" type="button" aria-label="桌面端可上下拖动调整协同入口高度">
+                <span aria-hidden="true"></span>
+              </button>
+              <p class="dock-note">桌面端展开后可拖动横杆临时调整高度；高度不缓存，刷新后回到默认值，移动端不启用拖拽。</p>
               <div class="tabs">
                 <button class="tab active" data-tab="todo">本页待办</button>
                 <button class="tab" data-tab="current">当前记录</button>
@@ -770,10 +815,18 @@
       const recordRows = document.querySelector("#recordRows");
       const taskRows = document.querySelector("#taskRows");
       const dock = document.querySelector("#dock");
+      const dockResize = document.querySelector("#dockResize");
       const toggleDock = document.querySelector("#toggleDock");
       const debugToggle = document.querySelector("#debugToggle");
       const tabs = [...document.querySelectorAll(".tab")];
       let activeTab = "todo";
+      let resizeState = null;
+
+      function clampDockHeight(value) {
+        const minHeight = 320;
+        const maxHeight = Math.max(minHeight, window.innerHeight - 180);
+        return Math.min(Math.max(value, minHeight), maxHeight);
+      }
 
       const records = Array.from({ length: 24 }, (_, index) => {
         const id = index + 1;
@@ -871,6 +924,37 @@
         dock.classList.toggle("collapsed");
         toggleDock.textContent = dock.classList.contains("collapsed") ? "展开" : "收起";
       });
+
+      dockResize.addEventListener("pointerdown", (event) => {
+        if (dock.classList.contains("collapsed") || event.button !== 0) return;
+        const currentHeight = dock.querySelector(".dock-body").getBoundingClientRect().height;
+        resizeState = {
+          pointerId: event.pointerId,
+          startY: event.clientY,
+          startHeight: currentHeight,
+        };
+        dock.classList.add("resizing");
+        dockResize.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      });
+
+      dockResize.addEventListener("pointermove", (event) => {
+        if (!resizeState || resizeState.pointerId !== event.pointerId) return;
+        const nextHeight = clampDockHeight(resizeState.startHeight + resizeState.startY - event.clientY);
+        dock.style.setProperty("--dock-body-height", `${nextHeight}px`);
+        event.preventDefault();
+      });
+
+      function stopDockResize(event) {
+        if (resizeState && resizeState.pointerId === event.pointerId) {
+          dockResize.releasePointerCapture(event.pointerId);
+        }
+        resizeState = null;
+        dock.classList.remove("resizing");
+      }
+
+      dockResize.addEventListener("pointerup", stopDockResize);
+      dockResize.addEventListener("pointercancel", stopDockResize);
 
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {

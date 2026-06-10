@@ -1,5 +1,10 @@
 import React from 'react'
-import { SearchOutlined } from '@ant-design/icons'
+
+import {
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  SearchOutlined,
+} from '@ant-design/icons'
 import {
   Button,
   Card,
@@ -11,12 +16,51 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import {
+  buildBusinessCollaborationTaskPanelModel,
+  getBusinessCollaborationTaskReason,
+  getBusinessCollaborationTaskStatusKey,
+  getBusinessCollaborationTaskUrgeMeta,
+  isBusinessCollaborationTaskBlocking,
+  isBusinessCollaborationTaskTerminal,
+} from '../../utils/businessCollaborationTasks.mjs'
 
 const { Text } = Typography
-const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
+const DEFAULT_TASK_STATUS_LABELS = new Map([
+  ['pending', '待处理'],
+  ['ready', '可执行'],
+  ['processing', '处理中'],
+  ['blocked', '阻塞'],
+  ['rejected', '退回'],
+  ['done', '已完成'],
+  ['closed', '已关闭'],
+  ['cancelled', '已取消'],
+])
+const COLLABORATION_PANEL_MIN_HEIGHT = 320
+const COLLABORATION_PANEL_DEFAULT_HEIGHT = 560
+const COLLABORATION_PANEL_VIEWPORT_OFFSET = 180
+const DESKTOP_RESIZE_MEDIA_QUERY = '(min-width: 769px)'
 
 function joinClassNames(...items) {
   return items.filter(Boolean).join(' ')
+}
+
+function clampCollaborationPanelHeight(value) {
+  const fallbackHeight = COLLABORATION_PANEL_DEFAULT_HEIGHT
+  const numericValue = Number.isFinite(value) ? value : fallbackHeight
+  const viewportHeight =
+    typeof window === 'undefined'
+      ? fallbackHeight + COLLABORATION_PANEL_VIEWPORT_OFFSET
+      : window.innerHeight
+  const maxHeight = Math.max(
+    COLLABORATION_PANEL_MIN_HEIGHT,
+    viewportHeight - COLLABORATION_PANEL_VIEWPORT_OFFSET
+  )
+
+  return Math.min(
+    Math.max(numericValue, COLLABORATION_PANEL_MIN_HEIGHT),
+    maxHeight
+  )
 }
 
 export function BusinessPageLayout({ children, className = '' }) {
@@ -142,10 +186,52 @@ export function SelectFilter({
   allowClear = false,
   maxTagCount,
   className = '',
+  onOpenChange,
+  onMouseDownCapture,
   ...restProps
 }) {
+  const selectRef = React.useRef(null)
+  const scrollMobileSelectIntoView = React.useCallback((element) => {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia?.('(max-width: 768px)').matches
+    ) {
+      element?.scrollIntoView({
+        block: 'center',
+        inline: 'nearest',
+      })
+    }
+  }, [])
+  const handleMouseDownCapture = React.useCallback(
+    (event) => {
+      scrollMobileSelectIntoView(event.currentTarget)
+      onMouseDownCapture?.(event)
+    },
+    [onMouseDownCapture, scrollMobileSelectIntoView]
+  )
+  const handleOpenChange = React.useCallback(
+    (open) => {
+      if (
+        open &&
+        typeof window !== 'undefined' &&
+        window.matchMedia?.('(max-width: 768px)').matches
+      ) {
+        window.requestAnimationFrame(() => {
+          scrollMobileSelectIntoView(selectRef.current?.nativeElement)
+          window.requestAnimationFrame(() => {
+            window.dispatchEvent(new Event('scroll'))
+            window.dispatchEvent(new Event('resize'))
+          })
+        })
+      }
+      onOpenChange?.(open)
+    },
+    [onOpenChange, scrollMobileSelectIntoView]
+  )
+
   return (
     <Select
+      ref={selectRef}
       className={joinClassNames(
         'erp-business-filter-control erp-business-filter-control--select',
         className
@@ -157,6 +243,8 @@ export function SelectFilter({
       mode={mode}
       allowClear={allowClear}
       maxTagCount={maxTagCount}
+      onOpenChange={handleOpenChange}
+      onMouseDownCapture={handleMouseDownCapture}
       {...restProps}
     />
   )
@@ -237,7 +325,14 @@ export function BusinessListToolbar({ stats = [], actions = null }) {
   )
 }
 
-export function SelectionActionBar({ selectedCount, selectedLabel, children }) {
+export function SelectionActionBar({
+  selectedCount,
+  selectedLabel,
+  summaryItems = [],
+  collaborationItems = [],
+  boundaryText = '当前区域只提供记录操作和 Workflow 协同，不代表事实层已完成。',
+  children,
+}) {
   const hasSelection = Number(selectedCount) > 0
 
   return (
@@ -251,13 +346,46 @@ export function SelectionActionBar({ selectedCount, selectedLabel, children }) {
     >
       <div className="erp-business-selection-action-bar__row">
         <div className="erp-business-selection-action-bar__copy erp-business-module-selection-block">
-          <Text strong>已选 {selectedCount} 条</Text>
-          <Tag
-            className="erp-business-selection-action-bar__tag erp-business-module-selection-tag"
-            color={hasSelection ? 'green' : 'default'}
-          >
-            {selectedLabel || `已选择 ${selectedCount} 条记录`}
-          </Tag>
+          <div className="erp-business-selection-action-bar__primary">
+            <Text strong>当前操作</Text>
+            <Tag
+              className="erp-business-selection-action-bar__tag erp-business-module-selection-tag"
+              color={hasSelection ? 'green' : 'default'}
+            >
+              {selectedLabel || `已选择 ${selectedCount} 条记录`}
+            </Tag>
+            <Tag color={hasSelection ? 'blue' : 'default'}>
+              已选 {selectedCount} 条
+            </Tag>
+          </div>
+          {summaryItems.length > 0 ? (
+            <div className="erp-business-selection-action-bar__summary">
+              {summaryItems.map((item) => (
+                <span
+                  key={item.key || `${item.label}-${item.value}`}
+                  className="erp-business-selection-action-bar__summary-item"
+                >
+                  <Text type="secondary">{item.label}</Text>
+                  <strong>{item.value}</strong>
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {collaborationItems.length > 0 ? (
+            <div className="erp-business-selection-action-bar__collab">
+              {collaborationItems.map((item) => (
+                <Tag
+                  key={item.key || `${item.label}-${item.value}`}
+                  color={item.color || 'default'}
+                >
+                  {item.label} {item.value}
+                </Tag>
+              ))}
+            </div>
+          ) : null}
+          <Text className="erp-business-selection-action-bar__hint">
+            {boundaryText}
+          </Text>
         </div>
         <Space
           wrap
@@ -304,84 +432,280 @@ export function BusinessDataTable({
 
 export function CollaborationTaskPanel({
   tasks = [],
+  selectedTasks = [],
+  selectedRecordLabel = '',
   taskStatusLabels,
   roleLabelMap,
   onUrgeTask,
+  onCompleteTask,
+  onBlockTask,
   urgingTaskID,
+  taskActionLoadingID,
 }) {
+  const [expanded, setExpanded] = React.useState(false)
+  const [activeTaskTab, setActiveTaskTab] = React.useState('todo')
+  const [panelHeight, setPanelHeight] = React.useState(null)
+  const [isResizing, setIsResizing] = React.useState(false)
+  const resizeStateRef = React.useRef(null)
+  const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
+  const roleLabels = roleLabelMap || new Map()
+  const taskPanelModel = buildBusinessCollaborationTaskPanelModel({
+    tasks,
+    selectedTasks,
+  })
+  const panelStyle = panelHeight
+    ? { '--erp-business-collaboration-panel-height': `${panelHeight}px` }
+    : undefined
+  const handleResizePointerDown = React.useCallback(
+    (event) => {
+      if (
+        !expanded ||
+        (event.pointerType === 'mouse' && event.button !== 0) ||
+        typeof window === 'undefined' ||
+        !window.matchMedia?.(DESKTOP_RESIZE_MEDIA_QUERY).matches
+      ) {
+        return
+      }
+
+      const cardBody = event.currentTarget.closest('.ant-card-body')
+      const startHeight = clampCollaborationPanelHeight(
+        cardBody?.getBoundingClientRect().height || panelHeight
+      )
+
+      resizeStateRef.current = {
+        pointerId: event.pointerId,
+        startY: event.clientY,
+        startHeight,
+      }
+      setIsResizing(true)
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+      event.preventDefault()
+    },
+    [expanded, panelHeight]
+  )
+  const handleResizePointerMove = React.useCallback((event) => {
+    const resizeState = resizeStateRef.current
+    if (!resizeState || resizeState.pointerId !== event.pointerId) return
+
+    const nextHeight = clampCollaborationPanelHeight(
+      resizeState.startHeight + resizeState.startY - event.clientY
+    )
+    setPanelHeight(nextHeight)
+    event.preventDefault()
+  }, [])
+  const stopResize = React.useCallback((event) => {
+    const resizeState = resizeStateRef.current
+    if (resizeState && resizeState.pointerId === event.pointerId) {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+    }
+    resizeStateRef.current = null
+    setIsResizing(false)
+  }, [])
+  const tabItems = [
+    {
+      key: 'todo',
+      label: '本页待办',
+      count: taskPanelModel.pageTasks.length,
+      items: taskPanelModel.pageTasks,
+      emptyText: '本页暂无协同任务，可从上方选中业务记录后创建。',
+    },
+    {
+      key: 'current',
+      label: '当前记录',
+      count: taskPanelModel.currentRecordTasks.length,
+      items: taskPanelModel.currentRecordTasks,
+      emptyText: selectedRecordLabel
+        ? '当前记录暂无协同任务，可从上方创建。'
+        : '先选择一条业务记录，再查看当前记录协同。',
+    },
+    {
+      key: 'blocked',
+      label: '阻塞异常',
+      count: taskPanelModel.blockedTasks.length,
+      items: taskPanelModel.blockedTasks,
+      emptyText: '暂无阻塞或退回协同任务。',
+    },
+    {
+      key: 'done',
+      label: '已完成',
+      count: taskPanelModel.doneTasks.length,
+      items: taskPanelModel.doneTasks,
+      emptyText: '暂无已完成协同任务。',
+    },
+  ]
+  const activeTab =
+    tabItems.find((item) => item.key === activeTaskTab) || tabItems[0]
+  const renderTaskList = (items, emptyText) => {
+    if (items.length === 0) {
+      return (
+        <div className="erp-business-collaboration-task-panel__empty">
+          <Text type="secondary">{emptyText}</Text>
+        </div>
+      )
+    }
+
+    return items.map((task) => {
+      const taskStatusKey = getBusinessCollaborationTaskStatusKey(task)
+      const isTerminal = isBusinessCollaborationTaskTerminal(task)
+      const isBlocking = isBusinessCollaborationTaskBlocking(task)
+      const taskReason = getBusinessCollaborationTaskReason(task)
+      const urgeMeta = getBusinessCollaborationTaskUrgeMeta(task)
+      const taskLoading =
+        String(taskActionLoadingID || '') === String(task.id || '')
+
+      return (
+        <div
+          key={task.id}
+          className="erp-business-collaboration-task-panel__item erp-business-module-task-item"
+        >
+          <div className="erp-business-module-task-item__main">
+            <strong>{task.task_name}</strong>
+            <span>
+              {task.source_no || `${task.source_type} #${task.source_id}`}
+            </span>
+            {taskReason ? (
+              <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
+                阻塞原因：{taskReason}
+              </span>
+            ) : null}
+            {urgeMeta.isUrged ? (
+              <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
+                已催办 {urgeMeta.urgeCount} 次
+                {urgeMeta.lastUrgeReason ? `：${urgeMeta.lastUrgeReason}` : ''}
+              </span>
+            ) : null}
+          </div>
+          <div className="erp-business-module-task-item__meta">
+            <Tag>
+              {roleLabels.get(task.owner_role_key) || task.owner_role_key}
+            </Tag>
+            <Tag color={isBlocking ? 'red' : isTerminal ? 'green' : 'blue'}>
+              {statusLabels.get(taskStatusKey) || taskStatusKey}
+            </Tag>
+          </div>
+          <Space
+            wrap
+            size={[6, 6]}
+            className="erp-business-module-task-item__actions"
+          >
+            {onCompleteTask && !isTerminal ? (
+              <Button
+                size="small"
+                icon={<CheckCircleOutlined />}
+                loading={taskLoading}
+                onClick={() => onCompleteTask(task)}
+              >
+                完成
+              </Button>
+            ) : null}
+            {onBlockTask && !isTerminal ? (
+              <Button
+                size="small"
+                danger
+                icon={<ExclamationCircleOutlined />}
+                disabled={taskLoading}
+                onClick={() => onBlockTask(task)}
+              >
+                阻塞
+              </Button>
+            ) : null}
+            {onUrgeTask && !isTerminal ? (
+              <Button
+                size="small"
+                loading={String(urgingTaskID || '') === String(task.id)}
+                disabled={taskLoading}
+                onClick={() => onUrgeTask(task)}
+              >
+                催办
+              </Button>
+            ) : null}
+          </Space>
+        </div>
+      )
+    })
+  }
+
   return (
-    <Card className="erp-business-collaboration-task-panel erp-business-module-task-card">
+    <Card
+      className={joinClassNames(
+        'erp-business-collaboration-task-panel erp-business-module-task-card',
+        expanded ? 'erp-business-collaboration-task-panel--expanded' : '',
+        isResizing ? 'erp-business-collaboration-task-panel--resizing' : ''
+      )}
+      style={panelStyle}
+    >
+      {expanded ? (
+        <button
+          type="button"
+          className="erp-business-collaboration-task-panel__resize-handle"
+          aria-label="上下拖动调整本页协同入口高度"
+          title="上下拖动调整高度"
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={stopResize}
+          onPointerCancel={stopResize}
+        >
+          <span
+            className="erp-business-collaboration-task-panel__resize-bar"
+            aria-hidden="true"
+          />
+        </button>
+      ) : null}
       <div className="erp-business-collaboration-task-panel__head erp-business-module-task-card__head">
-        <strong>协同任务池</strong>
-        <Tag>{tasks.length} 个任务</Tag>
+        <div>
+          <strong>本页协同入口</strong>
+          <Text type="secondary">
+            只处理 Workflow 任务，不写库存、出货、财务、开票或收付款事实。
+          </Text>
+        </div>
+        <Space wrap size={[6, 6]}>
+          <Tag>{taskPanelModel.totalTaskCount} 个任务</Tag>
+          <Tag color="blue">待办 {taskPanelModel.activeTaskCount}</Tag>
+          <Tag color={taskPanelModel.blockedTaskCount > 0 ? 'red' : 'default'}>
+            阻塞 {taskPanelModel.blockedTaskCount}
+          </Tag>
+          <Button
+            size="small"
+            onClick={() => setExpanded((current) => !current)}
+            aria-expanded={expanded}
+          >
+            {expanded ? '收起' : '展开'}
+          </Button>
+        </Space>
       </div>
-      <div className="erp-business-collaboration-task-panel__list erp-business-module-task-list">
-        {tasks.length === 0 ? (
-          <div className="erp-business-collaboration-task-panel__empty">
+      {expanded ? (
+        <div className="erp-business-collaboration-task-panel__panel">
+          <div className="erp-business-collaboration-task-panel__tabs">
+            {tabItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={joinClassNames(
+                  'erp-business-collaboration-task-panel__tab',
+                  item.key === activeTab.key
+                    ? 'erp-business-collaboration-task-panel__tab--active'
+                    : ''
+                )}
+                onClick={() => setActiveTaskTab(item.key)}
+              >
+                <span>{item.label}</span>
+                <strong>{item.count}</strong>
+              </button>
+            ))}
+          </div>
+          <div className="erp-business-collaboration-task-panel__active-head">
+            <Text strong>{activeTab.label}</Text>
             <Text type="secondary">
-              暂无协同任务，可从上方选中业务记录后创建。
+              {activeTab.key === 'current'
+                ? selectedRecordLabel || '未选择记录'
+                : '按当前业务模块读取现有 workflow 任务'}
             </Text>
           </div>
-        ) : (
-          tasks.slice(0, 6).map((task) => {
-            const payload =
-              task.payload && typeof task.payload === 'object'
-                ? task.payload
-                : {}
-            const urgeCount = Number(payload.urge_count || 0)
-            const isUrged = Boolean(
-              payload.urged === true || urgeCount > 0 || payload.last_urge_at
-            )
-            const isTerminal = TERMINAL_TASK_STATUS_KEYS.has(
-              String(task.task_status_key || '').trim()
-            )
-            return (
-              <div
-                key={task.id}
-                className="erp-business-collaboration-task-panel__item erp-business-module-task-item"
-              >
-                <div>
-                  <strong>{task.task_name}</strong>
-                  <span>
-                    {task.source_no || `${task.source_type} #${task.source_id}`}
-                  </span>
-                  {task.blocked_reason ? (
-                    <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
-                      阻塞原因：{task.blocked_reason}
-                    </span>
-                  ) : null}
-                  {isUrged ? (
-                    <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
-                      已催办 {urgeCount || 1} 次
-                      {payload.last_urge_reason
-                        ? `：${payload.last_urge_reason}`
-                        : ''}
-                    </span>
-                  ) : null}
-                </div>
-                <Tag>
-                  {roleLabelMap.get(task.owner_role_key) || task.owner_role_key}
-                </Tag>
-                <Tag
-                  color={task.task_status_key === 'blocked' ? 'red' : 'blue'}
-                >
-                  {taskStatusLabels.get(task.task_status_key) ||
-                    task.task_status_key}
-                </Tag>
-                {onUrgeTask && !isTerminal ? (
-                  <Button
-                    size="small"
-                    loading={String(urgingTaskID || '') === String(task.id)}
-                    onClick={() => onUrgeTask(task)}
-                  >
-                    催办
-                  </Button>
-                ) : null}
-              </div>
-            )
-          })
-        )}
-      </div>
+          <div className="erp-business-collaboration-task-panel__list erp-business-module-task-list">
+            {renderTaskList(activeTab.items, activeTab.emptyText)}
+          </div>
+        </div>
+      ) : null}
     </Card>
   )
 }

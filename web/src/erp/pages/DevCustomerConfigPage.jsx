@@ -35,10 +35,10 @@ const VIEW_FIELDS = 'fields'
 const VIEW_IMPORT = 'import'
 
 const VIEW_OPTIONS = [
-  { label: '总览', value: VIEW_OVERVIEW },
-  { label: '菜单品牌', value: VIEW_MENU },
-  { label: '字段编号', value: VIEW_FIELDS },
-  { label: '导入工具', value: VIEW_IMPORT },
+  { label: '总览 / Overview', value: VIEW_OVERVIEW },
+  { label: '菜单品牌 / Menu Brand', value: VIEW_MENU },
+  { label: '字段编号 / Fields', value: VIEW_FIELDS },
+  { label: '导入工具 / Import Tools', value: VIEW_IMPORT },
 ]
 
 function StatusTag({ status }) {
@@ -129,15 +129,16 @@ function CustomerPackageSelector({ overview, onChange }) {
 
   return (
     <div className="erp-dev-customer-selector">
-      <Text type="secondary">客户包选择</Text>
+      <Text type="secondary">客户包选择 / Customer Package</Text>
       <Select
         value={matched ? overview.customerKey : undefined}
-        placeholder="选择已登记客户包"
+        placeholder="选择已登记客户包 / Select registered package"
         options={options}
         onChange={onChange}
       />
       <Text type="secondary" className="erp-dev-customer-selector__note">
-        只更新 URL query，不写 localStorage、后端或正式运行配置。
+        只更新 URL query / updates URL query only；不写
+        localStorage、后端或正式运行配置。
       </Text>
     </div>
   )
@@ -148,16 +149,16 @@ function MissingCustomerPanel({ overview }) {
     <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-missing">
       <div className="erp-dev-customer-panel__head">
         <ExclamationCircleOutlined />
-        <Text strong>未登记客户配置包</Text>
+        <Text strong>未登记客户配置包 / Missing Customer Package</Text>
       </div>
       <Alert
         type="warning"
         showIcon
         message={`未登记客户配置包：${overview.requestedCustomerKey}`}
-        description="当前 URL customer 参数没有对应客户配置包。开发态总控不会 fallback 到 yoyoosun 冒充，不创建 SaaS tenant，不新增 tenant_id，也不接后端或数据库。"
+        description="当前 URL customer 参数没有对应客户配置包 / no registered package for this customer query. 开发态总控不会 fallback 到 yoyoosun 冒充，不创建 SaaS tenant，不新增 tenant_id，也不接后端或数据库。"
       />
       <div className="erp-dev-customer-registered-list">
-        <Text type="secondary">已登记客户包</Text>
+        <Text type="secondary">已登记客户包 / Registered Packages</Text>
         <Space wrap>
           {(overview.registeredCustomers || []).map((item) => (
             <Tag key={item.customerKey}>
@@ -176,21 +177,21 @@ function OverviewPanel({ overview }) {
       <section className="erp-dev-customer-panel">
         <div className="erp-dev-customer-panel__head">
           <CheckCircleOutlined />
-          <Text strong>已接运行时</Text>
+          <Text strong>已接运行时 / Runtime Enabled</Text>
         </div>
         <BoundaryList items={overview.runtimePieces} />
       </section>
       <section className="erp-dev-customer-panel">
         <div className="erp-dev-customer-panel__head">
           <SettingOutlined />
-          <Text strong>仍是草案</Text>
+          <Text strong>仍是草案 / Draft Only</Text>
         </div>
         <BoundaryList items={overview.draftPieces} />
       </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <ExclamationCircleOutlined />
-          <Text strong>禁止误读</Text>
+          <Text strong>禁止误读 / Guardrails</Text>
         </div>
         <BoundaryList items={overview.blockedPieces} />
       </section>
@@ -220,7 +221,7 @@ function MenuPanel({ menuSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <ApartmentOutlined />
-          <Text strong>桌面菜单分组</Text>
+          <Text strong>桌面菜单分组 / Desktop Menu Groups</Text>
         </div>
         <div className="erp-dev-customer-menu-groups">
           {menuSummary.sections.map((section) => (
@@ -254,7 +255,7 @@ function FieldsPanel({ fieldNumberingSummary }) {
       <section className="erp-dev-customer-panel">
         <div className="erp-dev-customer-panel__head">
           <SafetyCertificateOutlined />
-          <Text strong>边界守卫</Text>
+          <Text strong>边界守卫 / Boundary Guards</Text>
         </div>
         <div className="erp-dev-customer-guard-list">
           {fieldNumberingSummary.boundaries.map((item) => (
@@ -270,7 +271,7 @@ function FieldsPanel({ fieldNumberingSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <SettingOutlined />
-          <Text strong>字段显示候选</Text>
+          <Text strong>字段显示候选 / Field Candidates</Text>
         </div>
         <div className="erp-dev-customer-field-list">
           {fieldNumberingSummary.fieldCandidates.map((candidate) => (
@@ -294,7 +295,7 @@ function FieldsPanel({ fieldNumberingSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <CodeOutlined />
-          <Text strong>编号规则候选</Text>
+          <Text strong>编号规则候选 / Numbering Candidates</Text>
         </div>
         <div className="erp-dev-customer-numbering-list">
           {fieldNumberingSummary.numberingRules.map((rule) => (
@@ -322,7 +323,7 @@ function ImportPanel({ importSummary }) {
       <section className="erp-dev-customer-panel">
         <div className="erp-dev-customer-panel__head">
           <DatabaseOutlined />
-          <Text strong>执行边界</Text>
+          <Text strong>执行边界 / Execution Boundary</Text>
         </div>
         <div className="erp-dev-customer-import-flags">
           <div>
@@ -339,7 +340,7 @@ function ImportPanel({ importSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <DeploymentUnitOutlined />
-          <Text strong>工具命令</Text>
+          <Text strong>工具命令 / Tool Commands</Text>
         </div>
         <div className="erp-dev-customer-tool-list">
           {importSummary.tools.map((tool) => (
@@ -388,12 +389,12 @@ export default function DevCustomerConfigPage() {
           <Space align="center" size={10}>
             <SettingOutlined className="erp-dev-customer-header__icon" />
             <Title className="erp-dev-customer-title" level={1}>
-              客户配置开发总控
+              客户配置开发总控 / Customer Config Hub
             </Title>
           </Space>
           <Paragraph className="erp-dev-customer-summary">
-            只读查看客户配置包、菜单品牌
-            runtime、字段编号草案和导入工具边界。客户选择只属于 dev 页面 URL
+            只读查看客户配置包、菜单品牌 runtime、字段编号草案和导入工具边界 /
+            read-only customer config overview。客户选择只属于 dev 页面 URL
             展示状态，不代表 SaaS tenant。
           </Paragraph>
           <CustomerPackageSelector
@@ -410,7 +411,7 @@ export default function DevCustomerConfigPage() {
           )}
         </div>
         <div className="erp-dev-customer-source">
-          <Text type="secondary">当前 URL customer</Text>
+          <Text type="secondary">当前 URL customer / Query</Text>
           <Text strong>{overview.requestedCustomerKey}</Text>
           <Text type="secondary">
             {overview.sourcePath || '未登记客户配置包'}
@@ -428,27 +429,27 @@ export default function DevCustomerConfigPage() {
           >
             <MetricTile
               icon={<ApartmentOutlined />}
-              label="菜单分组"
+              label="菜单分组 / Menu Groups"
               value={overview.menuSummary.sectionCount}
               note={`${overview.menuSummary.itemCount} 个菜单项，只控制前端展示`}
               tone="success"
             />
             <MetricTile
               icon={<SettingOutlined />}
-              label="字段候选"
+              label="字段候选 / Field Candidates"
               value={overview.fieldNumberingSummary.fieldCandidateCount}
               note={`${overview.fieldNumberingSummary.fieldModuleCount} 个模块，仍待确认`}
               tone="warning"
             />
             <MetricTile
               icon={<CodeOutlined />}
-              label="编号规则"
+              label="编号规则 / Numbering"
               value={overview.fieldNumberingSummary.numberingRuleCount}
               note="全部停留在 review / deferred"
             />
             <MetricTile
               icon={<DatabaseOutlined />}
-              label="真实导入"
+              label="真实导入 / Real Import"
               value="blocked"
               note="只读 evidence / report gate，不写 DB"
               tone="danger"

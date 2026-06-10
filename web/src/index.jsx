@@ -8,6 +8,7 @@ import './tailwind.css'
 import './erp/styles/app.css'
 import App from './App'
 import { AppAlertProvider } from '@/common/components/modal/AppAlertProvider'
+import { redirectToCanonicalLocalDevHost } from '@/common/theme/localDevThemeOrigin.mjs'
 
 const routerFutureFlags = {
   v7_startTransition: true,
@@ -22,21 +23,26 @@ if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_RPC_MOCK === 'true') {
   })()
 }
 
-const rootElement = document.getElementById('root')
-if (!rootElement) {
-  throw new Error('Root element #root not found')
+const redirectedLocalDevHost =
+  import.meta.env.DEV && redirectToCanonicalLocalDevHost(window)
+
+if (!redirectedLocalDevHost) {
+  const rootElement = document.getElementById('root')
+  if (!rootElement) {
+    throw new Error('Root element #root not found')
+  }
+
+  const root = ReactDOM.createRoot(rootElement)
+
+  root.render(
+    <StrictMode>
+      <HelmetProvider>
+        <Router basename={import.meta.env.BASE_URL} future={routerFutureFlags}>
+          <AppAlertProvider>
+            <App />
+          </AppAlertProvider>
+        </Router>
+      </HelmetProvider>
+    </StrictMode>
+  )
 }
-
-const root = ReactDOM.createRoot(rootElement)
-
-root.render(
-  <StrictMode>
-    <HelmetProvider>
-      <Router basename={import.meta.env.BASE_URL} future={routerFutureFlags}>
-        <AppAlertProvider>
-          <App />
-        </AppAlertProvider>
-      </Router>
-    </HelmetProvider>
-  </StrictMode>
-)

@@ -57,6 +57,35 @@ export function ERPThemeProvider({ children }) {
     return () => mediaQuery.removeEventListener('change', handleChange)
   }, [])
 
+  useEffect(() => {
+    const syncStoredThemeMode = () => {
+      const nextMode = getInitialThemeMode()
+      setThemeModeState((currentMode) =>
+        currentMode === nextMode ? currentMode : nextMode
+      )
+    }
+    const handleStorage = (event) => {
+      if (event.key === ERP_THEME_STORAGE_KEY || event.key === null) {
+        setThemeModeState(normalizeERPThemeMode(event.newValue))
+      }
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncStoredThemeMode()
+      }
+    }
+
+    window.addEventListener('storage', handleStorage)
+    window.addEventListener('focus', syncStoredThemeMode)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      window.removeEventListener('focus', syncStoredThemeMode)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
   const effectiveTheme = resolveEffectiveERPTheme(themeMode, prefersDark)
 
   useEffect(() => {

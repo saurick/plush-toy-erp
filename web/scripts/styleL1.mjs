@@ -20,7 +20,7 @@ const webDir = path.resolve(import.meta.dirname, '..')
 const outputDir = path.resolve(webDir, 'output', 'playwright', 'style-l1')
 const devServerPort = Number(process.env.STYLE_L1_PORT || 4173)
 const externalBaseURL = String(process.env.STYLE_L1_BASE_URL || '').trim()
-const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
+const baseURL = externalBaseURL || `http://localhost:${devServerPort}`
 const headless = process.env.HEADED !== '1'
 const scenarioFilter = new Set(
   String(process.env.STYLE_L1_SCENARIOS || '')
@@ -28,6 +28,7 @@ const scenarioFilter = new Set(
     .map((item) => item.trim())
     .filter(Boolean)
 )
+const scenarioMaxAttempts = 2
 
 let devServerProcess = null
 let devServerLogs = ''
@@ -103,6 +104,21 @@ const scenarios = [
       await assertLoginSegmentedReadable(page, {
         scenarioName: 'admin-login-theme-modes-desktop',
       })
+      await page.evaluate(() => {
+        window.localStorage.setItem('plush_erp_theme_mode', 'light')
+        window.dispatchEvent(new Event('focus'))
+      })
+      await page.waitForFunction(
+        () => document.documentElement.dataset.erpThemeMode === 'light',
+        null,
+        { timeout: 10_000 }
+      )
+      await assertERPThemeMode(page, {
+        scenarioName: 'admin-login-theme-modes-desktop-storage-sync',
+        expectedMode: 'light',
+        expectedEffectiveTheme: 'light',
+      })
+      await clickERPThemeOption(page, '暗色')
       await page.reload({ waitUntil: 'domcontentloaded' })
       await expectText(page, '毛绒 ERP 管理后台')
       await assertERPThemeMode(page, {
@@ -184,11 +200,14 @@ const scenarios = [
       await expectText(page, 'style-l1-admin')
       await expectText(page, '看板中心')
       await expectHeading(page, '任务看板')
-      await expectText(page, '任务处理统计')
-      await expectText(page, '待处理任务数')
-      await expectText(page, '即将到期任务数')
+      await expectText(page, '本页待办')
+      await expectText(page, '阻塞异常')
+      await expectText(page, '今日到期')
       await expectText(page, '任务处理明细')
-      await expectButton(page, '去业务看板')
+      await expectButton(page, '看业务状态')
+      await assertDashboardTaskBoardLayout(page, {
+        scenarioName: 'erp-dashboard-desktop',
+      })
       await assertShellRefreshButton(page, {
         scenarioName: 'erp-dashboard-desktop',
         expectVisible: true,
@@ -223,7 +242,7 @@ const scenarios = [
         })
         return response.json()
       })
-      await page.getByRole('button', { name: /刷新当前页/ }).click()
+      await page.getByRole('button', { name: /刷新任务/ }).click()
       await expectText(page, '看板跳转测试任务')
       await page
         .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
@@ -274,7 +293,9 @@ const scenarios = [
         true,
         '任务看板回到默认筛选后清空按钮应禁用'
       )
-      await page.getByRole('button', { name: '看板跳转测试任务' }).click()
+      await page
+        .getByRole('button', { name: '看板跳转测试任务', exact: true })
+        .click()
       await waitForPath(page, '/erp/warehouse/shipping-release')
       await expectText(page, '待出货/出货放行')
       await page.goBack()
@@ -364,7 +385,8 @@ const scenarios = [
       await expectText(page, '超级管理员')
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '任务看板')
-      await expectText(page, '任务处理统计')
+      await expectText(page, '本页待办')
+      await expectText(page, '今日到期')
       await expectText(page, '任务处理明细')
     },
   },
@@ -390,8 +412,68 @@ const scenarios = [
         scenarioName: 'erp-dashboard-dark-desktop',
         selector: '.erp-dashboard-card',
       })
+      await assertDashboardTaskBoardLayout(page, {
+        scenarioName: 'erp-dashboard-dark-desktop',
+      })
       await assertDarkThemeContrast(page, {
         scenarioName: 'erp-dashboard-dark-desktop',
+        selector: '.erp-admin-shell',
+      })
+    },
+  },
+  {
+    name: 'erp-dashboard-dark-wide-desktop',
+    path: '/erp/dashboard',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 2048, height: 1024 },
+    verify: async (page) => {
+      await expectText(page, '毛绒 ERP 管理后台')
+      await expectText(page, '任务看板')
+      await expectText(page, '本页待办')
+      await page.evaluate(async () => {
+        const response = await fetch('/rpc/workflow', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'dashboard-wide-layout-task',
+            method: 'create_task',
+            params: {
+              task_code: 'style-l1-dashboard-wide-layout',
+              task_group: 'shipment_release',
+              task_name: '宽屏重叠回归任务',
+              source_type: 'shipping-release',
+              source_id: 9020,
+              source_no: 'OUT-DASH-WIDE-LAYOUT',
+              business_status_key: 'shipment_pending',
+              task_status_key: 'ready',
+              owner_role_key: 'warehouse',
+              payload: {
+                notification_type: 'task_created',
+                alert_type: 'shipment_pending',
+              },
+            },
+          }),
+        })
+        return response.json()
+      })
+      await page.getByRole('button', { name: /刷新任务/ }).click()
+      await expectText(page, '宽屏重叠回归任务')
+      await assertERPThemeMode(page, {
+        scenarioName: 'erp-dashboard-dark-wide-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await page.locator('.erp-dashboard-table-card').scrollIntoViewIfNeeded()
+      await assertDashboardTaskBoardLayout(page, {
+        scenarioName: 'erp-dashboard-dark-wide-desktop',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'erp-dashboard-dark-wide-desktop',
         selector: '.erp-admin-shell',
       })
     },
@@ -405,7 +487,10 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '产品')
       await expectText(page, '导出当前结果')
-      await expectText(page, '协同任务池')
+      await expectText(page, '本页协同入口')
+      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+        scenarioName: 'business-module-dark-products-modal-desktop',
+      })
       await assertAntdTableHeaderTextFlow(page, {
         scenarioName: 'business-module-dark-products-table-header',
       })
@@ -681,6 +766,13 @@ const scenarios = [
 
       await page.goBack()
       await waitForPath(page, '/m/sales/tasks')
+      await page.waitForFunction(
+        () =>
+          Boolean(document.querySelector('.mobile-role-tasks-page')) &&
+          !document.querySelector('.erp-admin-sider'),
+        null,
+        { timeout: 10_000 }
+      )
       await expectText(page, '待办')
       const metrics = await page.evaluate(() => ({
         path: window.location.pathname,
@@ -727,8 +819,8 @@ const scenarios = [
         window.localStorage.removeItem('plush_erp_dev_docs_selected_path')
       })
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectHeading(page, '开发文档查看器')
-      await expectText(page, '目录树')
+      await expectHeading(page, '开发文档查看器 / Dev Docs Viewer')
+      await expectText(page, '目录树 / Directory Tree')
       await expectText(page, '毛绒玩具 ERP / plush-toy-erp')
       await expectText(page, '目录结构')
       const productDir = page.locator('[data-dev-doc-dir="docs/product"]')
@@ -756,7 +848,7 @@ const scenarios = [
         '点击后仓库文档目录应展开'
       )
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectHeading(page, '开发文档查看器')
+      await expectHeading(page, '开发文档查看器 / Dev Docs Viewer')
       assert.equal(
         await productDir.getAttribute('aria-expanded'),
         'true',
@@ -798,8 +890,8 @@ const scenarios = [
     themeMode: 'dark',
     viewport: { width: 1536, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '客户配置开发总控')
-      await expectText(page, '当前 URL customer')
+      await expectHeading(page, '客户配置开发总控 / Customer Config Hub')
+      await expectText(page, '当前 URL customer / Query')
       await expectText(page, 'yoyoosun')
       await expectText(page, '已接运行时')
       await expectText(page, '真实客户数据导入')
@@ -820,18 +912,25 @@ const scenarios = [
         '/favicon-customer-config.svg',
         `客户配置开发页 favicon 异常: ${faviconHref}`
       )
+      await assertDevPageUsesGlobalThemeOnly(page, {
+        scenarioName: 'dev-customer-config-dark-desktop',
+        selector: '.erp-dev-customer-page',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+        expectDarkContrast: true,
+      })
 
       await page
         .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-        .filter({ hasText: '字段编号' })
+        .filter({ hasText: '字段编号 / Fields' })
         .click()
-      await expectText(page, '边界守卫')
+      await expectText(page, '边界守卫 / Boundary Guards')
       await expectText(page, 'runtimeEnabled')
       await expectText(page, '客户编码')
 
       await page
         .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-        .filter({ hasText: '导入工具' })
+        .filter({ hasText: '导入工具 / Import Tools' })
         .click()
       await expectText(page, 'canExecuteRealImport')
       await expectText(page, 'false')
@@ -845,10 +944,10 @@ const scenarios = [
           waitUntil: 'domcontentloaded',
         }
       )
-      await expectHeading(page, '客户配置开发总控')
-      await expectText(page, '未登记客户配置包')
+      await expectHeading(page, '客户配置开发总控 / Customer Config Hub')
+      await expectText(page, '未登记客户配置包 / Missing Customer Package')
       await expectText(page, 'missing-customer')
-      await expectText(page, '已登记客户包')
+      await expectText(page, '已登记客户包 / Registered Packages')
       await expectText(page, '永绅 yoyoosun')
       await assertTextAbsent(page, '东莞市永绅玩具有限公司')
 
@@ -860,10 +959,27 @@ const scenarios = [
       assert(!switchedUrl.pathname.startsWith('/erp'))
       await page
         .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-        .filter({ hasText: '菜单品牌' })
+        .filter({ hasText: '菜单品牌 / Menu Brand' })
         .click()
       await expectText(page, '东莞市永绅玩具有限公司')
       await assertNoHorizontalOverflow(page, 'dev-customer-config-missing-view')
+    },
+  },
+  {
+    name: 'dev-customer-config-light-desktop',
+    path: '/__dev/customer-config?customer=yoyoosun',
+    themeMode: 'light',
+    viewport: { width: 1536, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '客户配置开发总控 / Customer Config Hub')
+      await expectText(page, '当前 URL customer / Query')
+      await expectText(page, 'yoyoosun')
+      await assertDevPageUsesGlobalThemeOnly(page, {
+        scenarioName: 'dev-customer-config-light-desktop',
+        selector: '.erp-dev-customer-page',
+        expectedMode: 'light',
+        expectedEffectiveTheme: 'light',
+      })
     },
   },
   {
@@ -871,12 +987,12 @@ const scenarios = [
     path: '/__dev/customer-config',
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
-      await expectHeading(page, '客户配置开发总控')
-      await expectText(page, '菜单分组')
-      await expectText(page, '字段候选')
+      await expectHeading(page, '客户配置开发总控 / Customer Config Hub')
+      await expectText(page, '菜单分组 / Menu Groups')
+      await expectText(page, '字段候选 / Field Candidates')
       await page
         .locator('.erp-dev-customer-view-switch .ant-segmented-item')
-        .filter({ hasText: '菜单品牌' })
+        .filter({ hasText: '菜单品牌 / Menu Brand' })
         .click()
       await expectText(page, '东莞市永绅玩具有限公司')
       await expectText(page, '采购/仓储')
@@ -906,16 +1022,16 @@ const scenarios = [
     themeMode: 'dark',
     viewport: { width: 1536, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '开发入口总控')
-      await expectText(page, '开发文档')
-      await expectText(page, '测试入口')
-      await expectText(page, '产品原型')
-      await expectText(page, '能力台账')
-      await expectText(page, '客户配置')
-      await expectText(page, '入口台账规则')
-      await expectText(page, '置顶入口')
+      await expectHeading(page, '开发入口总控 / Dev Hub')
+      await expectText(page, '开发文档 / Dev Docs')
+      await expectText(page, '测试入口 / Test Entry')
+      await expectText(page, '产品原型 / Prototypes')
+      await expectText(page, '能力台账 / Capability Ledger')
+      await expectText(page, '客户配置 / Customer Config')
+      await expectText(page, '入口台账规则 / Registry Rules')
+      await expectText(page, '置顶入口 / Pinned')
       await expectText(page, '用入口卡片右上角图钉把常用页面固定在这里。')
-      await expectText(page, '最近访问')
+      await expectText(page, '最近访问 / Recent')
       await expectText(page, '点击任一入口后会在这里保留最近访问记录。')
       const defaultMetrics = await page.evaluate(() => ({
         cardCount: document.querySelectorAll(
@@ -995,7 +1111,7 @@ const scenarios = [
         )
       })
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectText(page, '保存在当前浏览器')
+      await expectText(page, '保存在当前浏览器 / Local browser')
       const recentMetrics = await page.evaluate(() => ({
         pinnedCount: document.querySelectorAll(
           '.erp-dev-hub-pinned .erp-dev-hub-card'
@@ -1031,7 +1147,7 @@ const scenarios = [
 
       await page
         .locator('.erp-dev-hub-grid .erp-dev-hub-card')
-        .filter({ hasText: '测试入口' })
+        .filter({ hasText: '测试入口 / Test Entry' })
         .locator('.erp-dev-hub-card__pin')
         .click()
       const pinnedAfterClick = await page.evaluate(() => ({
@@ -1061,9 +1177,9 @@ const scenarios = [
 
       await page
         .locator('.erp-dev-hub-group-filter .ant-segmented-item')
-        .filter({ hasText: '产品治理' })
+        .filter({ hasText: '产品治理 / Product Governance' })
         .click()
-      await expectText(page, '当前匹配 1 / 5')
+      await expectText(page, '当前匹配 / Matches 1 / 5')
       const groupMetrics = await page.evaluate(() => ({
         cardCount: document.querySelectorAll(
           '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -1087,10 +1203,10 @@ const scenarios = [
 
       await page
         .locator('.erp-dev-hub-group-filter .ant-segmented-item')
-        .filter({ hasText: '全部' })
+        .filter({ hasText: '全部 / All' })
         .click()
       await page.getByPlaceholder('搜索入口、路径或资料来源').fill('测试')
-      await expectText(page, '当前匹配 1 / 5')
+      await expectText(page, '当前匹配 / Matches 1 / 5')
       const filteredMetrics = await page.evaluate(() => ({
         cardCount: document.querySelectorAll(
           '.erp-dev-hub-grid .erp-dev-hub-card'
@@ -1120,9 +1236,9 @@ const scenarios = [
     themeMode: 'dark',
     viewport: { width: 1536, height: 900 },
     verify: async (page) => {
-      await expectHeading(page, '开发测试入口')
-      await expectText(page, '测试分层')
-      await expectText(page, '命令入口')
+      await expectHeading(page, '开发测试入口 / Dev Test Entry')
+      await expectText(page, '测试分层 / Tiers')
+      await expectText(page, '命令入口 / Commands')
       await expectText(page, 'docs/product/test-strategy.md')
       const defaultMetrics = await page.evaluate(() => {
         const root = document.querySelector('.erp-dev-testing-page')
@@ -1169,9 +1285,16 @@ const scenarios = [
         '/favicon-testing.svg',
         `测试入口 favicon 异常: ${faviconHref}`
       )
+      await assertDevPageUsesGlobalThemeOnly(page, {
+        scenarioName: 'dev-testing-dark-desktop',
+        selector: '.erp-dev-testing-page',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+        expectDarkContrast: true,
+      })
       await page
         .locator('.erp-dev-testing-preset')
-        .filter({ hasText: '本轮前端验证' })
+        .filter({ hasText: '本轮前端验证 / Frontend Check' })
         .click()
       const frontendPresetClipboard = await page.evaluate(() =>
         navigator.clipboard.readText()
@@ -1193,7 +1316,10 @@ const scenarios = [
         `T5 层级复制内容应包含前端 L1 命令: ${tierClipboard}`
       )
 
-      await page.getByText('命令入口', { exact: true }).click()
+      await page
+        .locator('.erp-dev-testing-reader__toolbar .ant-segmented-item')
+        .filter({ hasText: '命令入口 / Commands' })
+        .click()
       await expectText(page, 'pnpm style:l1')
       const commandMetrics = await page.evaluate(() => ({
         commandBlocks: document.querySelectorAll(
@@ -1215,6 +1341,23 @@ const scenarios = [
       await assertDarkThemeContrast(page, {
         scenarioName: 'dev-testing-dark-desktop',
         selector: '.erp-dev-testing-page',
+      })
+    },
+  },
+  {
+    name: 'dev-testing-light-desktop',
+    path: '/__dev/testing',
+    themeMode: 'light',
+    viewport: { width: 1536, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '开发测试入口 / Dev Test Entry')
+      await expectText(page, '测试分层 / Tiers')
+      await expectText(page, '命令入口 / Commands')
+      await assertDevPageUsesGlobalThemeOnly(page, {
+        scenarioName: 'dev-testing-light-desktop',
+        selector: '.erp-dev-testing-page',
+        expectedMode: 'light',
+        expectedEffectiveTheme: 'light',
       })
     },
   },
@@ -1248,7 +1391,10 @@ const scenarios = [
       const businessActionToolbar = page.locator(
         '.erp-business-module-current-action'
       )
-      await expectText(page, '协同任务池')
+      await expectText(page, '本页协同入口')
+      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+        scenarioName: 'business-module-workflow-actions',
+      })
       await assertBusinessPageRefreshEntrypoint(page, {
         scenarioName: 'business-module-workflow-actions',
       })
@@ -1333,8 +1479,28 @@ const scenarios = [
       await expectText(page, 'IQC 待检')
 
       await page.getByRole('button', { name: '创建协同任务' }).click()
+      const collaborationPanel = page
+        .locator('.erp-business-collaboration-task-panel')
+        .first()
+      await collaborationPanel
+        .locator('button[aria-expanded="false"]')
+        .first()
+        .evaluate((button) => button.click())
+      await collaborationPanel
+        .locator('.erp-business-collaboration-task-panel__panel')
+        .waitFor({ state: 'visible', timeout: 10_000 })
+      await collaborationPanel
+        .locator('.erp-business-collaboration-task-panel__tab')
+        .filter({ hasText: '当前记录' })
+        .first()
+        .evaluate((button) => button.click())
       await expectText(page, '辅材/包材采购：辅料采购流程回归')
       await expectText(page, '可执行')
+      await expectText(page, '当前操作')
+      await expectText(page, '业务状态')
+      await expectText(page, '主责')
+      await expectText(page, '当前记录协同')
+      await expectText(page, '当前区域只提供记录操作和 Workflow 协同')
 
       await businessActionToolbar
         .getByRole('button', { name: /流转业务状态|流转/ })
@@ -1351,11 +1517,15 @@ const scenarios = [
       })
       await blockedStatusItem.evaluate((element) => element.click())
       await expectText(page, '流转业务状态：业务阻塞')
-      await assertBusinessRecordModalLayout(page, {
-        scenarioName: 'business-status-reason-modal',
-        minModalWidth: 480,
-        expectCompactGrid: false,
-      })
+      const statusReasonDialog = page.locator(
+        '.erp-business-status-reason-modal:visible'
+      )
+      await statusReasonDialog.waitFor({ state: 'visible', timeout: 10_000 })
+      await assertAntdModalCentered(
+        page,
+        statusReasonDialog,
+        'business-status-reason-modal'
+      )
       await page.getByLabel('原因说明').fill('资料未齐，等待客户确认')
       await page.getByRole('button', { name: '确认流转' }).click()
       await expectText(page, '业务状态已更新为：业务阻塞')
@@ -2183,7 +2353,10 @@ const scenarios = [
       await assertBusinessSelectionActionBarEmpty(page, {
         scenarioName: 'business-processing-contracts-desktop',
       })
-      await expectText(page, '协同任务池')
+      await expectText(page, '本页协同入口')
+      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+        scenarioName: 'business-processing-contracts-desktop',
+      })
     },
   },
   {
@@ -2195,7 +2368,10 @@ const scenarios = [
       await expectHeading(page, '对账/结算')
       await expectText(page, '对账单号')
       await expectText(page, '导出当前结果')
-      await expectText(page, '协同任务池')
+      await expectText(page, '本页协同入口')
+      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+        scenarioName: 'business-reconciliation-desktop',
+      })
     },
   },
 ]
@@ -2244,7 +2420,7 @@ function startDevServer() {
       '--config',
       'vite.config.mjs',
       '--host',
-      '127.0.0.1',
+      'localhost',
       '--port',
       String(devServerPort),
       '--strictPort',
@@ -2255,6 +2431,7 @@ function startDevServer() {
         ...process.env,
         BROWSER: 'none',
       },
+      detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     }
   )
@@ -2280,8 +2457,28 @@ async function stopDevServer() {
     return
   }
 
+  const devServerPID = devServerProcess.pid
+  const killDevServer = (signal) => {
+    if (!devServerPID) return
+    try {
+      process.kill(-devServerPID, signal)
+    } catch {
+      // Fall through to direct child kill when the process group is gone.
+    }
+    try {
+      process.kill(devServerPID, signal)
+    } catch {
+      // The process already exited.
+    }
+    try {
+      devServerProcess.kill(signal)
+    } catch {
+      // The child handle is already closed.
+    }
+  }
+
   if (devServerProcess.exitCode === null) {
-    devServerProcess.kill('SIGTERM')
+    killDevServer('SIGTERM')
     await Promise.race([
       new Promise((resolve) => devServerProcess.once('exit', resolve)),
       delay(3000),
@@ -2289,10 +2486,61 @@ async function stopDevServer() {
   }
 
   if (devServerProcess.exitCode === null) {
-    devServerProcess.kill('SIGKILL')
+    killDevServer('SIGKILL')
+    await delay(500)
   }
 
+  devServerProcess.stdout?.destroy()
+  devServerProcess.stderr?.destroy()
+  devServerProcess.unref()
   devServerProcess = null
+  await killDevServerPortListeners()
+}
+
+async function killDevServerPortListeners() {
+  const pids = await listDevServerPortPIDs()
+  await Promise.all(
+    pids.map(async (pid) => {
+      try {
+        process.kill(pid, 'SIGTERM')
+      } catch {
+        return
+      }
+      await delay(300)
+      try {
+        process.kill(pid, 0)
+      } catch {
+        return
+      }
+      try {
+        process.kill(pid, 'SIGKILL')
+      } catch {
+        // The process exited between checks.
+      }
+    })
+  )
+}
+
+function listDevServerPortPIDs() {
+  return new Promise((resolve) => {
+    const child = spawn('lsof', [
+      '-tiTCP:' + String(devServerPort),
+      '-sTCP:LISTEN',
+    ])
+    let output = ''
+    child.stdout.on('data', (chunk) => {
+      output += chunk.toString()
+    })
+    child.once('error', () => resolve([]))
+    child.once('close', () => {
+      resolve(
+        output
+          .split('\n')
+          .map((item) => Number(item.trim()))
+          .filter((pid) => Number.isInteger(pid) && pid > 0)
+      )
+    })
+  })
 }
 
 async function waitForServer(url) {
@@ -2365,6 +2613,33 @@ function canConnectToLocalServer(url) {
 }
 
 async function runScenario(browser, scenario) {
+  let lastError = null
+
+  for (let attempt = 1; attempt <= scenarioMaxAttempts; attempt += 1) {
+    try {
+      await runScenarioOnce(browser, scenario)
+      return
+    } catch (error) {
+      lastError = error
+      if (
+        attempt === scenarioMaxAttempts ||
+        !isRetryableScenarioFailure(error)
+      ) {
+        break
+      }
+
+      const reason = String(error?.message || error).split('\n')[0]
+      devServerLogs += `\n[style:l1] retry ${scenario.name} ${attempt + 1}/${scenarioMaxAttempts}: ${reason}\n`
+      await delay(500 * attempt)
+    }
+  }
+
+  throw new Error(
+    `[style:l1] 场景失败: ${scenario.name}\n${lastError?.message || lastError}\n最近 vite 输出：\n${tailLogs(devServerLogs)}`
+  )
+}
+
+async function runScenarioOnce(browser, scenario) {
   const context = await browser.newContext({ viewport: scenario.viewport })
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
     origin: baseURL,
@@ -2419,6 +2694,7 @@ async function runScenario(browser, scenario) {
     await gotoScenarioPath(page, scenario.path, {
       waitUntil: 'domcontentloaded',
     })
+    await waitForScenarioDocumentReady(page)
     await delay(300)
 
     if (scenario.expectPath) {
@@ -2431,10 +2707,6 @@ async function runScenario(browser, scenario) {
 
     const screenshotPath = path.resolve(outputDir, `${scenario.name}.png`)
     await page.screenshot({ path: screenshotPath, fullPage: true })
-  } catch (error) {
-    throw new Error(
-      `[style:l1] 场景失败: ${scenario.name}\n${error.message}\n最近 vite 输出：\n${tailLogs(devServerLogs)}`
-    )
   } finally {
     await page
       .evaluate(() => {
@@ -2443,6 +2715,29 @@ async function runScenario(browser, scenario) {
       .catch(() => {})
     await context.close()
   }
+}
+
+async function waitForScenarioDocumentReady(page) {
+  await page.waitForLoadState('domcontentloaded', { timeout: 20_000 })
+  await page.waitForFunction(
+    () =>
+      document.readyState !== 'loading' &&
+      document.body &&
+      document.body.innerText.trim().length > 0,
+    null,
+    { timeout: 20_000 }
+  )
+}
+
+function isRetryableScenarioFailure(error) {
+  const message = String(error?.message || '')
+  return (
+    message.includes('Timeout') ||
+    message.includes('未找到可见文案') ||
+    message.includes('Execution context was destroyed') ||
+    message.includes('net::ERR_ADDRESS_INVALID') ||
+    message.includes('net::ERR_CONNECTION_REFUSED')
+  )
 }
 
 async function gotoScenarioPath(page, scenarioPath, options = {}) {
@@ -5137,7 +5432,37 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
 
 async function assertAntdModalCenteredImpl(page, modalLocator, scenarioName) {
   await modalLocator.waitFor({ state: 'visible', timeout: 10_000 })
-  await delay(350)
+  await modalLocator
+    .waitFor({
+      state: 'visible',
+      timeout: 10_000,
+    })
+    .catch(() => {})
+  await page.waitForFunction(
+    (selector) => {
+      const modals = Array.from(document.querySelectorAll(selector)).filter(
+        (node) => {
+          const rect = node.getBoundingClientRect()
+          const style = window.getComputedStyle(node)
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden'
+          )
+        }
+      )
+      const modal = modals.at(-1)
+      if (!modal) return false
+      const className = String(modal.className || '')
+      return (
+        !className.includes('ant-zoom-enter') &&
+        !className.includes('ant-zoom-appear')
+      )
+    },
+    '.ant-modal',
+    { timeout: 10_000 }
+  )
 
   const metrics = await modalLocator.evaluate((node) => {
     const modal =
@@ -5157,6 +5482,11 @@ async function assertAntdModalCenteredImpl(page, modalLocator, scenarioName) {
           }
         : null,
       wrapClassName: String(wrap?.className || ''),
+      modalClassName: String(modal?.className || ''),
+      modalTitle: String(
+        modal?.querySelector('.ant-modal-title')?.textContent || ''
+      ).trim(),
+      modalStyle: modal?.getAttribute('style') || '',
       modal: modalRect
         ? {
             left: modalRect.left,
@@ -7472,6 +7802,11 @@ async function assertBusinessModuleCompactWorkspace(
         .querySelector('.erp-business-filter-panel__summary')
         ?.textContent?.replace(/\s+/g, ' ')
         .trim() || ''
+    const listToolbarText =
+      document
+        .querySelector('.erp-business-list-toolbar')
+        ?.textContent?.replace(/\s+/g, ' ')
+        .trim() || ''
 
     return {
       viewport: { width: window.innerWidth, height: window.innerHeight },
@@ -7487,6 +7822,7 @@ async function assertBusinessModuleCompactWorkspace(
       statTiles,
       summaryText,
       filterSummaryText,
+      listToolbarText,
     }
   })
 
@@ -7513,12 +7849,16 @@ async function assertBusinessModuleCompactWorkspace(
     `${scenarioName} 头部摘要不应重复展示金额/数量合计: ${JSON.stringify(metrics)}`
   )
   assert(
-    /(?:金额合计|数量合计)/.test(metrics.filterSummaryText),
-    `${scenarioName} 金额/数量合计应只保留在筛选工具卡摘要区: ${JSON.stringify(metrics)}`
+    /(?:金额合计|数量合计)/.test(metrics.listToolbarText),
+    `${scenarioName} 金额/数量合计应保留在表格工具栏: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    !/(?:金额合计|数量合计)/.test(metrics.filterSummaryText),
+    `${scenarioName} 筛选区不应重复展示金额/数量合计: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.hero.height <= 300,
-    `${scenarioName} 业务页头部过高，挤占表格和协同任务池空间: ${JSON.stringify(metrics)}`
+    `${scenarioName} 业务页头部过高，挤占表格和本页协同入口空间: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.toolbar?.height <= 240,
@@ -7550,7 +7890,336 @@ async function assertBusinessModuleCompactWorkspace(
   }
   assert(
     taskCardVisible,
-    `${scenarioName} 协同任务池未在首屏边界内出现: ${JSON.stringify(metrics)}`
+    `${scenarioName} 本页协同入口未在首屏边界内出现: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertBusinessCollaborationPanelCollapsedByDefault(
+  page,
+  { scenarioName }
+) {
+  const compactText = (text) => String(text || '').replace(/\s+/gu, '')
+  const panel = page.locator('.erp-business-collaboration-task-panel').first()
+  await panel.waitFor({ state: 'visible', timeout: 10_000 })
+  const toggle = panel.locator('button[aria-expanded]').first()
+  await toggle.waitFor({ state: 'attached', timeout: 10_000 })
+
+  const collapsedMetrics = await panel.evaluate((node) => {
+    const toggleButton = node.querySelector('button[aria-expanded]')
+    return {
+      className: node.className,
+      ariaExpanded: toggleButton?.getAttribute('aria-expanded') || null,
+      toggleText: String(toggleButton?.textContent || '').trim(),
+      hasExpandedPanel: Boolean(
+        node.querySelector('.erp-business-collaboration-task-panel__panel')
+      ),
+      tabCount: node.querySelectorAll(
+        '.erp-business-collaboration-task-panel__tab'
+      ).length,
+      scrollWidth: node.scrollWidth,
+      clientWidth: node.clientWidth,
+    }
+  })
+
+  assert.equal(
+    collapsedMetrics.ariaExpanded,
+    'false',
+    `${scenarioName} 本页协同入口默认应收起: ${JSON.stringify(collapsedMetrics)}`
+  )
+  assert.equal(
+    collapsedMetrics.hasExpandedPanel,
+    false,
+    `${scenarioName} 默认收起态不应渲染协同任务面板: ${JSON.stringify(collapsedMetrics)}`
+  )
+  assert.equal(
+    collapsedMetrics.tabCount,
+    0,
+    `${scenarioName} 默认收起态不应显示任务 tab: ${JSON.stringify(collapsedMetrics)}`
+  )
+  assert(
+    compactText(collapsedMetrics.toggleText).includes('展开'),
+    `${scenarioName} 默认收起态按钮应提示展开: ${JSON.stringify(collapsedMetrics)}`
+  )
+  assert(
+    collapsedMetrics.scrollWidth <= collapsedMetrics.clientWidth + 1,
+    `${scenarioName} 默认收起态出现横向溢出: ${JSON.stringify(collapsedMetrics)}`
+  )
+
+  await toggle.evaluate((button) => button.click())
+  await panel
+    .locator('.erp-business-collaboration-task-panel__panel')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+
+  const expandedMetrics = await panel.evaluate((node) => {
+    const toggleButton = node.querySelector('button[aria-expanded]')
+    return {
+      ariaExpanded: toggleButton?.getAttribute('aria-expanded') || null,
+      toggleText: String(toggleButton?.textContent || '').trim(),
+      hasExpandedPanel: Boolean(
+        node.querySelector('.erp-business-collaboration-task-panel__panel')
+      ),
+      tabTexts: [
+        ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
+      ].map((item) => String(item.textContent || '').trim()),
+      scrollWidth: node.scrollWidth,
+      clientWidth: node.clientWidth,
+    }
+  })
+
+  assert.equal(
+    expandedMetrics.ariaExpanded,
+    'true',
+    `${scenarioName} 点击展开后 aria-expanded 应为 true: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert.deepEqual(
+    expandedMetrics.tabTexts.map((text) =>
+      compactText(text).replace(/\d+$/u, '')
+    ),
+    ['本页待办', '当前记录', '阻塞异常', '已完成'],
+    `${scenarioName} 展开后任务 tab 不完整: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert(
+    compactText(expandedMetrics.toggleText).includes('收起'),
+    `${scenarioName} 展开态按钮应提示收起: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert(
+    expandedMetrics.scrollWidth <= expandedMetrics.clientWidth + 1,
+    `${scenarioName} 展开态出现横向溢出: ${JSON.stringify(expandedMetrics)}`
+  )
+
+  const viewportSize = page.viewportSize()
+  if ((viewportSize?.width || 0) >= 769) {
+    const resizeHandle = panel.locator(
+      '.erp-business-collaboration-task-panel__resize-handle'
+    )
+    await resizeHandle.waitFor({ state: 'visible', timeout: 10_000 })
+
+    const beforeResizeMetrics = await panel.evaluate((node) => {
+      const cardBody = node.querySelector('.ant-card-body')
+      const taskList = node.querySelector('.erp-business-module-task-list')
+      return {
+        bodyHeight: cardBody?.getBoundingClientRect().height || 0,
+        listClientHeight: taskList?.clientHeight || 0,
+        listScrollHeight: taskList?.scrollHeight || 0,
+        scrollWidth: node.scrollWidth,
+        clientWidth: node.clientWidth,
+      }
+    })
+    assert(
+      beforeResizeMetrics.bodyHeight >= 320,
+      `${scenarioName} 协同入口默认高度过低: ${JSON.stringify(beforeResizeMetrics)}`
+    )
+
+    const growHandleBox = await resizeHandle.boundingBox()
+    assert(growHandleBox, `${scenarioName} 协同入口桌面拖拽手柄缺少可点击区域`)
+    await page.mouse.move(
+      growHandleBox.x + growHandleBox.width / 2,
+      growHandleBox.y + growHandleBox.height / 2
+    )
+    await page.mouse.down()
+    await page.mouse.move(
+      growHandleBox.x + growHandleBox.width / 2,
+      growHandleBox.y + growHandleBox.height / 2 - 120,
+      { steps: 6 }
+    )
+    await page.mouse.up()
+
+    const grownMetrics = await panel.evaluate((node) => {
+      const cardBody = node.querySelector('.ant-card-body')
+      const taskList = node.querySelector('.erp-business-module-task-list')
+      return {
+        bodyHeight: cardBody?.getBoundingClientRect().height || 0,
+        listClientHeight: taskList?.clientHeight || 0,
+        listScrollHeight: taskList?.scrollHeight || 0,
+        scrollWidth: node.scrollWidth,
+        clientWidth: node.clientWidth,
+      }
+    })
+    assert(
+      grownMetrics.bodyHeight >= beforeResizeMetrics.bodyHeight + 80,
+      `${scenarioName} 向上拖动后协同入口高度未增加: ${JSON.stringify({
+        beforeResizeMetrics,
+        grownMetrics,
+      })}`
+    )
+    assert(
+      grownMetrics.scrollWidth <= grownMetrics.clientWidth + 1,
+      `${scenarioName} 拖高后协同入口出现横向溢出: ${JSON.stringify(grownMetrics)}`
+    )
+
+    const shrinkHandleBox = await resizeHandle.boundingBox()
+    assert(shrinkHandleBox, `${scenarioName} 协同入口拖高后手柄丢失`)
+    await page.mouse.move(
+      shrinkHandleBox.x + shrinkHandleBox.width / 2,
+      shrinkHandleBox.y + shrinkHandleBox.height / 2
+    )
+    await page.mouse.down()
+    await page.mouse.move(
+      shrinkHandleBox.x + shrinkHandleBox.width / 2,
+      shrinkHandleBox.y + shrinkHandleBox.height / 2 + 100,
+      { steps: 6 }
+    )
+    await page.mouse.up()
+
+    const shrunkMetrics = await panel.evaluate((node) => {
+      const cardBody = node.querySelector('.ant-card-body')
+      const taskList = node.querySelector('.erp-business-module-task-list')
+      return {
+        bodyHeight: cardBody?.getBoundingClientRect().height || 0,
+        listClientHeight: taskList?.clientHeight || 0,
+        listScrollHeight: taskList?.scrollHeight || 0,
+        scrollWidth: node.scrollWidth,
+        clientWidth: node.clientWidth,
+      }
+    })
+    assert(
+      shrunkMetrics.bodyHeight <= grownMetrics.bodyHeight - 70,
+      `${scenarioName} 向下拖动后协同入口高度未缩小: ${JSON.stringify({
+        grownMetrics,
+        shrunkMetrics,
+      })}`
+    )
+    assert(
+      shrunkMetrics.bodyHeight >= 320,
+      `${scenarioName} 拖动后协同入口低于最小高度: ${JSON.stringify(shrunkMetrics)}`
+    )
+    assert(
+      shrunkMetrics.listScrollHeight >= shrunkMetrics.listClientHeight,
+      `${scenarioName} 协同任务列表没有保持面板内滚动边界: ${JSON.stringify(shrunkMetrics)}`
+    )
+    assert(
+      shrunkMetrics.scrollWidth <= shrunkMetrics.clientWidth + 1,
+      `${scenarioName} 拖低后协同入口出现横向溢出: ${JSON.stringify(shrunkMetrics)}`
+    )
+  }
+
+  await toggle.evaluate((button) => button.click())
+  const restoredMetrics = await panel.evaluate((node) => {
+    const toggleButton = node.querySelector('button[aria-expanded]')
+    return {
+      ariaExpanded: toggleButton?.getAttribute('aria-expanded') || null,
+      toggleText: String(toggleButton?.textContent || '').trim(),
+      hasExpandedPanel: Boolean(
+        node.querySelector('.erp-business-collaboration-task-panel__panel')
+      ),
+    }
+  })
+  assert.equal(
+    restoredMetrics.ariaExpanded,
+    'false',
+    `${scenarioName} 收起后 aria-expanded 应恢复 false: ${JSON.stringify(restoredMetrics)}`
+  )
+  assert.equal(
+    restoredMetrics.hasExpandedPanel,
+    false,
+    `${scenarioName} 收起后不应继续显示任务面板: ${JSON.stringify(restoredMetrics)}`
+  )
+  assert(
+    compactText(restoredMetrics.toggleText).includes('展开'),
+    `${scenarioName} 收起后按钮应恢复展开: ${JSON.stringify(restoredMetrics)}`
+  )
+}
+
+async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
+  await page.locator('.erp-dashboard-task-board-card').waitFor({
+    timeout: 10_000,
+  })
+
+  const metrics = await page.evaluate(() => {
+    const rectOf = (selectorOrNode) => {
+      const element =
+        typeof selectorOrNode === 'string'
+          ? document.querySelector(selectorOrNode)
+          : selectorOrNode
+      if (!(element instanceof HTMLElement)) return null
+      const rect = element.getBoundingClientRect()
+      const style = window.getComputedStyle(element)
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        left: rect.left,
+        right: rect.right,
+        width: rect.width,
+        height: rect.height,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+        position: style.position,
+        gridTemplateColumns: style.gridTemplateColumns,
+      }
+    }
+    const boardCard = rectOf('.erp-dashboard-task-board-card')
+    const lanes = rectOf('.erp-task-board-lanes')
+    const filters = rectOf('.erp-task-board-filters')
+    const tableCard = rectOf('.erp-dashboard-table-card')
+    const tableBody = rectOf('.erp-dashboard-table-card .ant-card-body')
+    const tableContent = rectOf('.erp-dashboard-table-card .ant-table-content')
+    const laneRects = Array.from(
+      document.querySelectorAll('.erp-task-board-lane')
+    )
+      .map((node) => rectOf(node))
+      .filter(Boolean)
+    const overlappingLanePairs = []
+    for (let i = 0; i < laneRects.length; i += 1) {
+      for (let j = i + 1; j < laneRects.length; j += 1) {
+        const left = laneRects[i]
+        const right = laneRects[j]
+        const xOverlap =
+          left.left < right.right - 1 && left.right > right.left + 1
+        const yOverlap =
+          left.top < right.bottom - 1 && left.bottom > right.top + 1
+        if (xOverlap && yOverlap) {
+          overlappingLanePairs.push([i, j])
+        }
+      }
+    }
+
+    return {
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        documentScrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      },
+      boardCard,
+      lanes,
+      filters,
+      laneRects,
+      overlappingLanePairs,
+      tableCard,
+      tableBody,
+      tableContent,
+    }
+  })
+
+  assert(
+    metrics.boardCard && metrics.lanes && metrics.filters && metrics.tableCard,
+    `${scenarioName} 缺少任务看板布局关键节点: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.laneRects.length === 4,
+    `${scenarioName} 任务看板应渲染四个泳道: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.laneRects.every((lane) => lane.width >= 180 && lane.height > 0),
+    `${scenarioName} 任务看板泳道尺寸异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.overlappingLanePairs.length === 0,
+    `${scenarioName} 任务看板泳道之间发生重叠: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.filters.right <= metrics.boardCard.right + 2,
+    `${scenarioName} 任务看板筛选区溢出卡片: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.tableCard.overflowX !== 'visible' ||
+      metrics.tableBody?.overflowX !== 'visible' ||
+      metrics.tableContent?.overflowX !== 'visible',
+    `${scenarioName} 任务表格未提供可控横向滚动容器: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 2,
+    `${scenarioName} 任务看板产生页面级横向滚动: ${JSON.stringify(metrics)}`
   )
 }
 
@@ -7812,6 +8481,40 @@ async function assertERPThemeMode(
   )
 }
 
+async function assertDevPageUsesGlobalThemeOnly(
+  page,
+  {
+    scenarioName,
+    selector,
+    expectedMode,
+    expectedEffectiveTheme,
+    expectDarkContrast = false,
+  }
+) {
+  const toggleCount = await page.evaluate(
+    (targetSelector) =>
+      document.querySelectorAll(`${targetSelector} .erp-theme-toggle`).length,
+    selector
+  )
+  assert.equal(toggleCount, 0, `${scenarioName} 开发页不应重复放置主题切换控件`)
+  await assertERPThemeMode(page, {
+    scenarioName,
+    expectedMode,
+    expectedEffectiveTheme,
+  })
+  if (expectDarkContrast) {
+    await assertDarkThemeContrast(page, {
+      scenarioName,
+      selector,
+    })
+  }
+  await assertThemeReadable(page, {
+    scenarioName,
+    selector,
+  })
+  await assertNoHorizontalOverflow(page, `${scenarioName}-theme`)
+}
+
 async function clickERPThemeOption(page, label) {
   const expectedModeByLabel = {
     跟系统: 'system',
@@ -7935,6 +8638,7 @@ async function assertMobileTaskMainNavigation(page, { scenarioName }) {
     mineMetrics.logoutVisible,
     `${scenarioName} 退出登录应只在我的分区出现: ${JSON.stringify(mineMetrics)}`
   )
+  await assertMobileMineMetricButtonsVisible(page, { scenarioName })
 
   await page.getByTestId('mobile-role-nav-todo').click()
   await page.waitForFunction(() => {
@@ -8153,6 +8857,66 @@ async function assertMobileSummaryMetricsReadonly(page, { scenarioName }) {
     assert(
       item.scrollWidth <= item.clientWidth + 1,
       `${scenarioName} 顶部统计摘要出现横向溢出: ${JSON.stringify(metrics)}`
+    )
+  })
+}
+
+async function assertMobileMineMetricButtonsVisible(page, { scenarioName }) {
+  const metrics = await page.evaluate(() =>
+    [
+      'mobile-role-mine-metric-todo',
+      'mobile-role-mine-metric-done',
+      'mobile-role-mine-metric-overdue',
+      'mobile-role-mine-metric-risk',
+    ].map((testID) => {
+      const node = document.querySelector(`[data-testid="${testID}"]`)
+      const style = node ? window.getComputedStyle(node) : null
+      const rect = node?.getBoundingClientRect()
+      return {
+        testID,
+        tagName: node?.tagName || '',
+        className: node?.className || '',
+        backgroundColor: style?.backgroundColor || '',
+        borderColor: style?.borderColor || '',
+        borderStyle: style?.borderStyle || '',
+        borderWidth: style?.borderWidth || '',
+        boxShadow: style?.boxShadow || '',
+        width: rect?.width || 0,
+        height: rect?.height || 0,
+        scrollWidth: node?.scrollWidth || 0,
+        clientWidth: node?.clientWidth || 0,
+      }
+    })
+  )
+
+  metrics.forEach((item) => {
+    const borderWidth = Number.parseFloat(item.borderWidth) || 0
+    assert.equal(
+      item.tagName,
+      'BUTTON',
+      `${scenarioName} 我的统计入口应保持可点击按钮: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      item.width >= 64 && item.height >= 58,
+      `${scenarioName} 我的统计入口点击区域过小: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      item.borderStyle !== 'none' &&
+        borderWidth >= 1 &&
+        !isTransparentColor(item.borderColor),
+      `${scenarioName} 我的统计入口缺少可见边框: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      !isTransparentColor(item.backgroundColor),
+      `${scenarioName} 我的统计入口背景透明，边界会融入外层: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      item.boxShadow && item.boxShadow !== 'none',
+      `${scenarioName} 我的统计入口缺少外层阴影分离: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      item.scrollWidth <= item.clientWidth + 1,
+      `${scenarioName} 我的统计入口出现横向溢出: ${JSON.stringify(metrics)}`
     )
   })
 }

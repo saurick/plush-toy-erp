@@ -138,7 +138,7 @@ function PrototypePreview({ item, fullscreen = false }) {
   if (!item) {
     return (
       <div className="erp-dev-prototypes-preview__empty">
-        <Empty description="请选择一个原型资产" />
+        <Empty description="请选择一个原型资产 / Select a prototype asset" />
       </div>
     )
   }
@@ -146,7 +146,7 @@ function PrototypePreview({ item, fullscreen = false }) {
   if (!item.available) {
     return (
       <div className="erp-dev-prototypes-preview__empty">
-        <Empty description="当前资产未被 Vite 开发态加载" />
+        <Empty description="当前资产未被 Vite 开发态加载 / Asset not loaded by Vite dev" />
       </div>
     )
   }
@@ -383,13 +383,13 @@ export default function DevPrototypesPage() {
           <Space align="center" size={10} wrap>
             <AppstoreOutlined className="erp-dev-prototypes-header__icon" />
             <Title level={3} className="erp-dev-prototypes-title">
-              产品原型查看器
+              产品原型查看器 / Prototype Viewer
             </Title>
             <Tag color="green">DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-prototypes-summary">
-            只浏览 docs/product/prototypes 下的 HTML 原型、PNG
-            方案图和截图证据；不进入 ERP
+            只浏览 docs/product/prototypes 下的 HTML 原型、PNG 方案图和截图证据
+            / preview prototype assets only；不进入 ERP
             菜单、权限、seedData、后端业务或开发文档 registry。
           </Paragraph>
         </div>
@@ -398,7 +398,7 @@ export default function DevPrototypesPage() {
             HTML {items.filter((item) => item.type === 'HTML').length}
           </span>
           <span>PNG {items.filter((item) => item.type === 'PNG').length}</span>
-          <span>总计 {items.length}</span>
+          <span>总计 / Total {items.length}</span>
         </div>
       </header>
 
@@ -414,7 +414,7 @@ export default function DevPrototypesPage() {
           />
           <div className="erp-dev-prototypes-filter" aria-label="按状态筛选">
             {[
-              { label: '全部', value: 'all' },
+              { label: '全部 / All', value: 'all' },
               ...DEV_PROTOTYPE_STATUS_OPTIONS.map((status) => ({
                 label: status,
                 value: status,
@@ -459,7 +459,7 @@ export default function DevPrototypesPage() {
                   >
                     <div className="erp-dev-prototypes-list-section__head">
                       <span>
-                        <PushpinFilled /> 置顶
+                        <PushpinFilled /> 置顶 / Pinned
                       </span>
                       <Text type="secondary">{pinnedItems.length}</Text>
                     </div>
@@ -520,7 +520,7 @@ export default function DevPrototypesPage() {
             ) : (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="没有匹配的原型资产"
+                description="没有匹配的原型资产 / No matching prototype assets"
               />
             )}
           </div>
@@ -555,14 +555,14 @@ export default function DevPrototypesPage() {
                     aria-pressed={selectedItem.pinned}
                     onClick={() => togglePinned(selectedItem.key)}
                   >
-                    {selectedItem.pinned ? '取消置顶' : '置顶'}
+                    {selectedItem.pinned ? '取消置顶 / Unpin' : '置顶 / Pin'}
                   </Button>
                   <Button
                     icon={<FullscreenOutlined />}
                     disabled={!selectedItem.available}
                     onClick={() => setFullscreenItem(selectedItem)}
                   >
-                    全屏预览
+                    全屏预览 / Fullscreen
                   </Button>
                 </>
               ) : null}

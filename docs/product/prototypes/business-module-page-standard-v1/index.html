@@ -496,7 +496,39 @@
       }
 
       .collab.expanded .collab-panel {
-        display: block;
+        display: flex;
+        min-height: 0;
+        flex-direction: column;
+      }
+
+      .collab-resize {
+        display: none;
+        width: 100%;
+        height: 14px;
+        align-items: center;
+        justify-content: center;
+        margin: -3px 0 5px;
+        border: 0;
+        background: transparent;
+        cursor: ns-resize;
+      }
+
+      .collab-resize span {
+        width: 64px;
+        height: 5px;
+        border-radius: 999px;
+        background: #94a3b8;
+        box-shadow: 0 1px 3px rgb(15 23 42 / 16%);
+      }
+
+      .collab.expanded .collab-resize {
+        display: flex;
+      }
+
+      .collab-note {
+        margin: 0 12px 8px;
+        color: var(--muted);
+        font-size: 12px;
       }
 
       .task-tabs {
@@ -732,6 +764,10 @@
               </div>
             </div>
             <div class="collab-panel" id="collabPanel">
+              <button class="collab-resize" type="button" aria-label="桌面端可上下拖动调整协同入口高度">
+                <span aria-hidden="true"></span>
+              </button>
+              <p class="collab-note">桌面端展开后可拖动上方横杆临时调整高度；不缓存，刷新后回到默认高度。移动端不启用拖拽。</p>
               <div class="task-tabs">
                 <button class="task-tab active" data-task-tab="todo">本页待办</button>
                 <button class="task-tab" data-task-tab="current">当前记录</button>

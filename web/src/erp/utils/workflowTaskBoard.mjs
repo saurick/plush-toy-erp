@@ -72,13 +72,12 @@ const TASK_STATUS_META = Object.freeze({
 
 const LANE_DEFINITIONS = Object.freeze([
   {
-    key: 'today',
-    title: '今日必须处理',
-    description: '待处理、可执行、处理中、超时和即将到期任务。',
+    key: 'pending',
+    title: '本页待办',
+    description: '待处理、可执行和处理中任务，优先从这里处理。',
     tagColor: 'blue',
     match: (task) =>
-      ['pending', 'ready', 'processing'].includes(getTaskStatusKey(task)) ||
-      ['overdue', 'due_soon'].includes(getWorkflowTaskDueStatus(task)),
+      ['pending', 'ready', 'processing'].includes(getTaskStatusKey(task)),
   },
   {
     key: 'blocked',
@@ -88,11 +87,13 @@ const LANE_DEFINITIONS = Object.freeze([
     match: (task) => ['blocked', 'rejected'].includes(getTaskStatusKey(task)),
   },
   {
-    key: 'finance',
-    title: '财务协同',
-    description: '财务角色负责的对账、应收、应付或开票任务。',
-    tagColor: 'purple',
-    match: (task) => getTaskOwnerRoleKey(task) === 'finance',
+    key: 'due',
+    title: '今日到期',
+    description: '已超时或即将到期任务，需要当天确认处理人。',
+    tagColor: 'orange',
+    match: (task) =>
+      ['overdue', 'due_soon'].includes(getWorkflowTaskDueStatus(task)) &&
+      !isTerminalWorkflowTask(task),
   },
   {
     key: 'done',

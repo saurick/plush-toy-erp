@@ -18,8 +18,9 @@ export const DEV_TESTING_DOC_KEYWORDS = Object.freeze([
 export const DEV_TESTING_COPY_PRESETS = Object.freeze([
   {
     key: 'frontend',
-    label: '本轮前端验证',
-    description: '页面、路由、样式或前端 helper 改动时优先复制。',
+    label: '本轮前端验证 / Frontend Check',
+    description:
+      '页面、路由、样式或前端 helper 改动时优先复制 / use for frontend changes.',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp/web',
       'pnpm lint',
@@ -30,8 +31,9 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
   },
   {
     key: 'pre-commit',
-    label: '提交前 QA',
-    description: '提交或推送前复制；具体范围仍按本轮改动判断。',
+    label: '提交前 QA / Pre-commit QA',
+    description:
+      '提交或推送前复制 / copy before commit or push；具体范围仍按本轮改动判断。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'bash scripts/qa/full.sh',
@@ -39,8 +41,9 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
   },
   {
     key: 'release',
-    label: '发版前严格 QA',
-    description: '发版前复制，不代表部署、备份或回滚已自动完成。',
+    label: '发版前严格 QA / Release QA',
+    description:
+      '发版前复制 / copy before release；不代表部署、备份或回滚已自动完成。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'bash scripts/qa/strict.sh',

@@ -413,13 +413,14 @@ export default function DevDocsPage() {
           <Space align="center" size={10} wrap>
             <BookOutlined className="erp-dev-docs-header__icon" />
             <Title level={3} className="erp-dev-docs-title">
-              开发文档查看器
+              开发文档查看器 / Dev Docs Viewer
             </Title>
             <Tag color="green">DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-docs-summary">
-            左侧专用于仓库目录树浏览全量 Markdown；不进入 ERP
-            菜单、权限、seedData 或产品文档 registry。
+            左侧专用于仓库目录树浏览全量 Markdown / browse repo Markdown by
+            directory tree；不进入 ERP 菜单、权限、seedData 或产品文档
+            registry。
           </Paragraph>
         </div>
       </header>
@@ -440,7 +441,7 @@ export default function DevDocsPage() {
               <div className="erp-dev-docs-sidebar__section-head">
                 <Text strong>
                   <PushpinOutlined className="erp-dev-docs-sidebar__section-icon" />
-                  置顶
+                  置顶 / Pinned
                 </Text>
                 <Text type="secondary">{pinnedDocs.length}</Text>
               </div>
@@ -490,7 +491,7 @@ export default function DevDocsPage() {
           {isSearching ? (
             <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--results">
               <div className="erp-dev-docs-sidebar__section-head">
-                <Text strong>搜索结果</Text>
+                <Text strong>搜索结果 / Search Results</Text>
                 <Text type="secondary">
                   {visibleDocs.length} / {docs.length}
                 </Text>
@@ -569,7 +570,7 @@ export default function DevDocsPage() {
           ) : (
             <section className="erp-dev-docs-sidebar__section erp-dev-docs-sidebar__section--tree">
               <div className="erp-dev-docs-sidebar__section-head">
-                <Text strong>目录树</Text>
+                <Text strong>目录树 / Directory Tree</Text>
                 <Space size={6}>
                   <Text type="secondary">{docs.length} 篇</Text>
                   <Button
@@ -577,7 +578,7 @@ export default function DevDocsPage() {
                     type="text"
                     onClick={toggleAllDirectories}
                   >
-                    {allExpanded ? '收起' : '展开'}
+                    {allExpanded ? '收起 / Collapse' : '展开 / Expand'}
                   </Button>
                 </Space>
               </div>
@@ -628,10 +629,10 @@ export default function DevDocsPage() {
                 icon={<VerticalAlignTopOutlined />}
                 onClick={scrollReaderToTop}
               >
-                回到顶部
+                回到顶部 / Top
               </Button>
               <Button icon={<CopyOutlined />} onClick={copyPath}>
-                复制路径
+                复制路径 / Copy Path
               </Button>
             </Space>
           </div>

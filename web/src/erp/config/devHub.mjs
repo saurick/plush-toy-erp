@@ -14,60 +14,83 @@ export const DEV_HUB_ALL_GROUP = 'all'
 export const DEV_HUB_ITEMS = Object.freeze([
   Object.freeze({
     key: 'docs',
-    title: '开发文档',
-    group: '文档治理',
+    title: '开发文档 / Dev Docs',
+    group: '文档治理 / Docs',
     route: DEV_DOCS_ROUTE,
     source: 'docs/**/*.md',
-    truthSource: '仓库 tracked Markdown',
-    status: '本地只读',
-    guardrails: Object.freeze(['不进菜单', '不接 RBAC', '不进生产构建']),
+    truthSource: '仓库 tracked Markdown / Repo Markdown',
+    status: '本地只读 / Local read-only',
+    guardrails: Object.freeze([
+      '不进菜单 / No menu',
+      '不接 RBAC / No RBAC',
+      '不进生产构建 / No prod build',
+    ]),
     description:
-      '按真实目录树浏览仓库 tracked Markdown，辅助开发查阅和章节定位。',
+      '按真实目录树浏览仓库 tracked Markdown；browse repo Markdown by real directory tree.',
   }),
   Object.freeze({
     key: 'testing',
-    title: '测试入口',
-    group: '验证治理',
+    title: '测试入口 / Test Entry',
+    group: '验证治理 / QA',
     route: DEV_TESTING_ROUTE,
     source: 'docs/product/test-strategy.md',
-    truthSource: '测试策略文档',
-    status: '策略索引',
-    guardrails: Object.freeze(['不执行命令', '不替代测试结果', '不进生产构建']),
+    truthSource: '测试策略文档 / Test strategy',
+    status: '策略索引 / Strategy index',
+    guardrails: Object.freeze([
+      '不执行命令 / No shell execution',
+      '不替代测试结果 / Not test evidence',
+      '不进生产构建 / No prod build',
+    ]),
     description:
-      '汇总测试分层、命令块和 docs 下测试相关资料，帮助选择本轮验收命令。',
+      '汇总测试分层、命令块和 docs 下测试相关资料；pick validation commands for the current change.',
   }),
   Object.freeze({
     key: 'prototypes',
-    title: '产品原型',
-    group: '产品设计',
+    title: '产品原型 / Prototypes',
+    group: '产品设计 / Product Design',
     route: DEV_PROTOTYPES_ROUTE,
     source: 'docs/product/prototypes',
-    truthSource: '原型资产目录',
-    status: '资产预览',
-    guardrails: Object.freeze(['只预览资产', '不写运行时', '不进生产构建']),
-    description: '浏览 HTML 原型、PNG 方案图和截图证据，供本地产品评审使用。',
+    truthSource: '原型资产目录 / Prototype assets',
+    status: '资产预览 / Asset preview',
+    guardrails: Object.freeze([
+      '只预览资产 / Preview only',
+      '不写运行时 / No runtime writes',
+      '不进生产构建 / No prod build',
+    ]),
+    description:
+      '浏览 HTML 原型、PNG 方案图和截图证据；review local prototype assets.',
   }),
   Object.freeze({
     key: 'capability-ledger',
-    title: '能力台账',
-    group: '产品治理',
+    title: '能力台账 / Capability Ledger',
+    group: '产品治理 / Product Governance',
     route: DEV_CAPABILITY_LEDGER_ROUTE,
     source: 'docs/product/capability-ledger.md',
-    truthSource: '能力 / 交付台账 Markdown',
-    status: '台账只读',
-    guardrails: Object.freeze(['只读可视化', '不替代真源', '不接后端']),
-    description: '联动产品能力、客户交付和客户差异台账，快速定位 CAP 关联。',
+    truthSource: '能力 / 交付台账 Markdown / Ledger Markdown',
+    status: '台账只读 / Read-only ledger',
+    guardrails: Object.freeze([
+      '只读可视化 / Read-only view',
+      '不替代真源 / Not source of truth',
+      '不接后端 / No backend',
+    ]),
+    description:
+      '联动产品能力、客户交付和客户差异台账；trace CAP links across ledgers.',
   }),
   Object.freeze({
     key: 'customer-config',
-    title: '客户配置',
-    group: '客户治理',
+    title: '客户配置 / Customer Config',
+    group: '客户治理 / Customer Governance',
     route: DEV_CUSTOMER_CONFIG_ROUTE,
     source: 'config/customers/yoyoosun',
-    truthSource: '客户配置包与导入 tooling',
-    status: '配置总控',
-    guardrails: Object.freeze(['只读汇总', '不做真实导入', '不写核心规则']),
-    description: '汇总 yoyoosun 客户配置包、菜单品牌、字段编号草案和导入边界。',
+    truthSource: '客户配置包与导入 tooling / Customer package',
+    status: '配置总控 / Config hub',
+    guardrails: Object.freeze([
+      '只读汇总 / Read-only summary',
+      '不做真实导入 / No real import',
+      '不写核心规则 / No core rules',
+    ]),
+    description:
+      '汇总 yoyoosun 客户配置包、菜单品牌、字段编号草案和导入边界；review customer config boundaries.',
   }),
 ])
 
@@ -99,7 +122,7 @@ export function getDevHubGroupOptions(items = DEV_HUB_ITEMS) {
     new Set(items.map((item) => item.group).filter(Boolean))
   )
   return [
-    { label: '全部', value: DEV_HUB_ALL_GROUP },
+    { label: '全部 / All', value: DEV_HUB_ALL_GROUP },
     ...groups.map((group) => ({ label: group, value: group })),
   ]
 }

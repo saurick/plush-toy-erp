@@ -207,6 +207,7 @@ import {
 import {
   BusinessDataTable,
   BusinessFilterPanel,
+  BusinessListToolbar,
   BusinessPageLayout,
   CollaborationTaskPanel,
   DateRangeFilter,
@@ -696,6 +697,7 @@ export default function BusinessModulePage({ moduleItem }) {
   const [form] = Form.useForm()
   const [statusReasonForm] = Form.useForm()
   const [urgeReasonForm] = Form.useForm()
+  const [blockTaskReasonForm] = Form.useForm()
   const definition = useMemo(
     () => getBusinessRecordDefinition(moduleItem),
     [moduleItem]
@@ -766,6 +768,10 @@ export default function BusinessModulePage({ moduleItem }) {
     open: false,
     task: null,
   })
+  const [blockTaskModalState, setBlockTaskModalState] = useState({
+    open: false,
+    task: null,
+  })
   const [statusReasonModalOpen, setStatusReasonModalOpen] = useState(false)
   const [pendingStatusKey, setPendingStatusKey] = useState('')
   const [orderApprovalSubmitting, setOrderApprovalSubmitting] = useState(false)
@@ -778,6 +784,7 @@ export default function BusinessModulePage({ moduleItem }) {
   const [payableReconciliationSubmitting, setPayableReconciliationSubmitting] =
     useState(false)
   const [urgingTaskID, setUrgingTaskID] = useState(null)
+  const [taskActionLoadingID, setTaskActionLoadingID] = useState(null)
   const [columnOrderModalOpen, setColumnOrderModalOpen] = useState(false)
   const [columnOrderKeys, setColumnOrderKeys] = useState(() =>
     readStoredColumnOrder(moduleItem.key, definition.tableColumns)
@@ -916,6 +923,99 @@ export default function BusinessModulePage({ moduleItem }) {
         String(task.source_id) === String(selectedRecord.id)
     )
   }, [moduleItem.key, selectedRecord, tasks])
+  const selectedRecordSummaryItems = useMemo(() => {
+    if (!selectedRecord) return []
+    const items = [
+      {
+        key: 'status',
+        label: '业务状态',
+        value:
+          BUSINESS_STATUS_LABELS.get(selectedRecord.business_status_key) ||
+          selectedRecord.business_status_key ||
+          '-',
+      },
+      {
+        key: 'owner',
+        label: '主责',
+        value:
+          roleLabelMap.get(selectedRecord.owner_role_key) ||
+          selectedRecord.owner_role_key ||
+          '-',
+      },
+    ]
+    const partnerName =
+      selectedRecord.customer_name ||
+      selectedRecord.supplier_name ||
+      selectedRecord.payload?.customer_name ||
+      selectedRecord.payload?.supplier_name
+    if (partnerName) {
+      items.push({
+        key: 'partner',
+        label: selectedRecord.customer_name ? '客户' : '供应商',
+        value: partnerName,
+      })
+    }
+    if (
+      selectedRecord.quantity !== null &&
+      selectedRecord.quantity !== undefined &&
+      selectedRecord.quantity !== ''
+    ) {
+      items.push({
+        key: 'quantity',
+        label: '数量',
+        value: `${formatMetric(selectedRecord.quantity)}${selectedRecord.unit || ''}`,
+      })
+    }
+    if (
+      selectedRecord.amount !== null &&
+      selectedRecord.amount !== undefined &&
+      selectedRecord.amount !== ''
+    ) {
+      items.push({
+        key: 'amount',
+        label: '金额',
+        value: formatMetric(selectedRecord.amount),
+      })
+    }
+    const dueDate = selectedRecord.due_date || selectedRecord.document_date
+    if (dueDate) {
+      items.push({
+        key: 'date',
+        label: selectedRecord.due_date ? '交期' : '日期',
+        value: dueDate,
+      })
+    }
+    return items.slice(0, 6)
+  }, [selectedRecord])
+  const selectedRecordCollaborationItems = useMemo(() => {
+    if (!selectedRecord) return []
+    const activeCount = selectedRecordTasks.filter(
+      (task) => !TERMINAL_TASK_STATUS_KEYS.has(String(task.task_status_key))
+    ).length
+    const blockedCount = selectedRecordTasks.filter((task) =>
+      ['blocked', 'rejected'].includes(String(task.task_status_key))
+    ).length
+    return [
+      {
+        key: 'workflow-total',
+        label: '当前记录协同',
+        value: selectedRecordTasks.length,
+        color: selectedRecordTasks.length > 0 ? 'blue' : 'default',
+      },
+      {
+        key: 'workflow-active',
+        label: '待处理',
+        value: activeCount,
+        color: activeCount > 0 ? 'gold' : 'default',
+      },
+      {
+        key: 'workflow-blocked',
+        label: '阻塞',
+        value: blockedCount,
+        color: blockedCount > 0 ? 'red' : 'default',
+      },
+    ]
+  }, [selectedRecord, selectedRecordTasks])
   const selectedOrderApprovalTasks = useMemo(
     () => selectedRecordTasks.filter(isOrderApprovalTask),
     [selectedRecordTasks]
@@ -1501,6 +1601,84 @@ export default function BusinessModulePage({ moduleItem }) {
     urgeReasonForm,
     urgeTaskModalState.task,
   ])
+
+  const completeCollaborationTask = useCallback(
+    async (task) => {
+      if (!task?.id) return
+      setTaskActionLoadingID(task.id)
+      try {
+        await updateWorkflowTaskStatus({
+          id: task.id,
+          task_status_key: 'done',
+          business_status_key: task.business_status_key || undefined,
+          reason: '',
+          payload: {
+            ...(task.payload || {}),
+            business_page_collaboration_action: 'complete',
+          },
+        })
+        message.success('协同任务已完成')
+        await loadData()
+      } catch (error) {
+        message.error(
+          getActionErrorMessage(error, '完成协同任务失败，请稍后重试')
+        )
+      } finally {
+        setTaskActionLoadingID(null)
+      }
+    },
+    [loadData]
+  )
+
+  const openBlockTaskModal = useCallback(
+    (task) => {
+      setBlockTaskModalState({ open: true, task })
+      blockTaskReasonForm.setFieldsValue({
+        block_reason: String(
+          task?.blocked_reason ||
+            task?.payload?.blocked_reason ||
+            task?.payload?.business_status_reason ||
+            ''
+        ),
+      })
+    },
+    [blockTaskReasonForm]
+  )
+
+  const closeBlockTaskModal = useCallback(() => {
+    setBlockTaskModalState({ open: false, task: null })
+    blockTaskReasonForm.resetFields()
+  }, [blockTaskReasonForm])
+
+  const submitBlockTask = useCallback(async () => {
+    const { task } = blockTaskModalState
+    if (!task?.id) return
+    const values = await blockTaskReasonForm.validateFields()
+    const reason = String(values.block_reason || '').trim()
+    setTaskActionLoadingID(task.id)
+    try {
+      await updateWorkflowTaskStatus({
+        id: task.id,
+        task_status_key: 'blocked',
+        business_status_key: 'blocked',
+        reason,
+        payload: {
+          ...(task.payload || {}),
+          business_page_collaboration_action: 'block',
+          blocked_reason: reason,
+        },
+      })
+      message.success('阻塞原因已记录')
+      closeBlockTaskModal()
+      await loadData()
+    } catch (error) {
+      message.error(
+        getActionErrorMessage(error, '标记协同阻塞失败，请稍后重试')
+      )
+    } finally {
+      setTaskActionLoadingID(null)
+    }
+  }, [blockTaskModalState, blockTaskReasonForm, closeBlockTaskModal, loadData])
 
   useEffect(() => {
     setKeyword(moduleTableNavigationQuery.keyword)
@@ -3227,16 +3405,66 @@ export default function BusinessModulePage({ moduleItem }) {
         summary={null}
       />
 
-      <BusinessFilterPanel
-        compact
-        summary={
-          shouldShowAmountSummary ? (
-            <Tag className="erp-business-module-summary-chip">
-              {/* 当前业务页顶部只保留金额摘要，分类统计和数量摘要不再占用表格首屏。 */}
-              金额合计 {formatMetric(metricTotal)}
-            </Tag>
-          ) : null
-        }
+      <BusinessFilterPanel compact summary={null}>
+        <SearchInput
+          placeholder="搜编号/名称/客户/合同"
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          onPressEnter={loadData}
+        />
+        <DateRangeFilter
+          options={availableDateFilters.map((item) => ({
+            label: item.label,
+            value: item.key,
+          }))}
+          value={activeDateFilterKey}
+          onTypeChange={setDateFilterKey}
+          startValue={dateRangeStart}
+          endValue={dateRangeEnd}
+          onStartChange={setDateRangeStart}
+          onEndChange={setDateRangeEnd}
+          onOpenNativeDatePicker={openNativeDatePicker}
+        />
+        <SelectFilter
+          allowClear
+          mode="multiple"
+          maxTagCount="responsive"
+          showSearch={false}
+          listHeight={144}
+          placement="bottomLeft"
+          className="erp-business-filter-control--status"
+          classNames={{
+            popup: { root: 'erp-business-module-select-popup' },
+          }}
+          placeholder="按业务状态筛选"
+          options={STATUS_OPTIONS}
+          value={statusFilterKeys}
+          onChange={(nextValue) =>
+            setStatusFilterKeys(normalizeBusinessStatusKeys(nextValue))
+          }
+        />
+        <SelectFilter
+          className="erp-business-filter-control--sort"
+          options={SORT_ORDER_OPTIONS}
+          value={sortOrder}
+          onChange={handleCreatedSortOrderChange}
+        />
+      </BusinessFilterPanel>
+
+      <BusinessListToolbar
+        stats={[
+          { key: 'current', label: '当前结果', value: sortedRecords.length },
+          { key: 'selected', label: '已选记录', value: selectedRowKeys.length },
+          ...(shouldShowAmountSummary
+            ? [
+                {
+                  key: 'amount',
+                  label: '金额合计',
+                  value: formatMetric(metricTotal),
+                },
+              ]
+            : []),
+        ]}
         actions={
           <>
             <ToolbarButton
@@ -3266,54 +3494,13 @@ export default function BusinessModulePage({ moduleItem }) {
             </ToolbarButton>
           </>
         }
-      >
-        <SearchInput
-          placeholder="搜编号/名称/客户/合同"
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          onPressEnter={loadData}
-        />
-        <DateRangeFilter
-          options={availableDateFilters.map((item) => ({
-            label: item.label,
-            value: item.key,
-          }))}
-          value={activeDateFilterKey}
-          onTypeChange={setDateFilterKey}
-          startValue={dateRangeStart}
-          endValue={dateRangeEnd}
-          onStartChange={setDateRangeStart}
-          onEndChange={setDateRangeEnd}
-          onOpenNativeDatePicker={openNativeDatePicker}
-        />
-        <SelectFilter
-          allowClear
-          mode="multiple"
-          maxTagCount="responsive"
-          listHeight={144}
-          placement="bottomLeft"
-          className="erp-business-filter-control--status"
-          classNames={{
-            popup: { root: 'erp-business-module-select-popup' },
-          }}
-          placeholder="按业务状态筛选"
-          options={STATUS_OPTIONS}
-          value={statusFilterKeys}
-          onChange={(nextValue) =>
-            setStatusFilterKeys(normalizeBusinessStatusKeys(nextValue))
-          }
-        />
-        <SelectFilter
-          className="erp-business-filter-control--sort"
-          options={SORT_ORDER_OPTIONS}
-          value={sortOrder}
-          onChange={handleCreatedSortOrderChange}
-        />
-      </BusinessFilterPanel>
+      />
 
       <SelectionActionBar
         selectedCount={selectedRowKeys.length}
         selectedLabel={selectedRecordDisplayText}
+        summaryItems={selectedRecordSummaryItems}
+        collaborationItems={selectedRecordCollaborationItems}
       >
         <Button
           type="link"
@@ -3879,10 +4066,15 @@ export default function BusinessModulePage({ moduleItem }) {
 
       <CollaborationTaskPanel
         tasks={tasks}
+        selectedTasks={selectedRecordTasks}
+        selectedRecordLabel={selectedRecordDisplayText}
         taskStatusLabels={TASK_STATUS_LABELS}
         roleLabelMap={roleLabelMap}
         onUrgeTask={openUrgeTaskModal}
+        onCompleteTask={completeCollaborationTask}
+        onBlockTask={openBlockTaskModal}
         urgingTaskID={urgingTaskID}
+        taskActionLoadingID={taskActionLoadingID}
       />
 
       <Modal
@@ -4039,6 +4231,44 @@ export default function BusinessModulePage({ moduleItem }) {
                 showCount
                 maxLength={300}
                 placeholder="说明交期、资料、异常或当前需要对方处理的事项"
+              />
+            </Form.Item>
+          </Form>
+        </Space>
+      </Modal>
+
+      <Modal
+        title="标记协同阻塞"
+        open={blockTaskModalState.open}
+        onCancel={closeBlockTaskModal}
+        onOk={submitBlockTask}
+        okText="记录阻塞"
+        cancelText="取消"
+        confirmLoading={Boolean(taskActionLoadingID)}
+        centered
+        forceRender
+        destroyOnHidden
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Text type="secondary">
+            当前任务：
+            {blockTaskModalState.task?.task_name || '-'}
+            。阻塞只更新 Workflow 协同状态，不写库存、出货、财务或开票事实。
+          </Text>
+          <Form form={blockTaskReasonForm} layout="vertical">
+            <Form.Item
+              name="block_reason"
+              label="阻塞原因"
+              rules={[
+                { required: true, message: '请填写阻塞原因' },
+                { max: 300, message: '阻塞原因不能超过 300 字' },
+              ]}
+            >
+              <Input.TextArea
+                rows={4}
+                showCount
+                maxLength={300}
+                placeholder="说明卡点、影响范围和需要哪个角色继续处理"
               />
             </Form.Item>
           </Form>
@@ -4438,7 +4668,7 @@ export default function BusinessModulePage({ moduleItem }) {
         open={statusReasonModalOpen}
         centered
         forceRender
-        className="erp-business-record-modal erp-business-status-reason-modal"
+        className="erp-business-status-reason-modal"
         confirmLoading={businessStatusSaving}
         onOk={submitBusinessStatusReason}
         onCancel={() => {

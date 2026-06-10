@@ -205,12 +205,12 @@ export default function DevHubPage() {
           <Space align="center" size={10}>
             <ExperimentOutlined className="erp-dev-hub-header__icon" />
             <Title level={3} className="erp-dev-hub-title">
-              开发入口总控
+              开发入口总控 / Dev Hub
             </Title>
           </Space>
           <Paragraph className="erp-dev-hub-summary">
-            统一收口本地开发态工具入口；不进入 ERP 正式菜单、seedData、RBAC、
-            后端业务或生产构建。
+            统一收口本地开发态工具入口 / centralize local dev-only tools；不进入
+            ERP 正式菜单、seedData、RBAC、后端业务或生产构建。
           </Paragraph>
         </div>
         <div className="erp-dev-hub-header__metrics">
@@ -227,7 +227,7 @@ export default function DevHubPage() {
       <main className="erp-dev-hub-shell">
         <section className="erp-dev-hub-governance" aria-label="入口治理规则">
           <div>
-            <Text strong>入口台账规则</Text>
+            <Text strong>入口台账规则 / Registry Rules</Text>
             <Paragraph className="erp-dev-hub-governance__copy">
               新增或调整 `/__dev/*` 入口时，只维护配置台账和对应 dev-only 页面；
               不恢复产品内 docs registry、菜单、seedData、RBAC 或后端业务写入。
@@ -238,8 +238,10 @@ export default function DevHubPage() {
 
         <section className="erp-dev-hub-pinned" aria-label="置顶开发入口">
           <div className="erp-dev-hub-section-head">
-            <Text strong>置顶入口</Text>
-            <Text className="erp-dev-hub-toolbar__note">保存在当前浏览器</Text>
+            <Text strong>置顶入口 / Pinned</Text>
+            <Text className="erp-dev-hub-toolbar__note">
+              保存在当前浏览器 / Local browser
+            </Text>
           </div>
           {pinnedItems.length > 0 ? (
             <div className="erp-dev-hub-pinned__grid">
@@ -263,8 +265,10 @@ export default function DevHubPage() {
 
         <section className="erp-dev-hub-recent" aria-label="最近访问入口">
           <div className="erp-dev-hub-section-head">
-            <Text strong>最近访问</Text>
-            <Text className="erp-dev-hub-toolbar__note">保存在当前浏览器</Text>
+            <Text strong>最近访问 / Recent</Text>
+            <Text className="erp-dev-hub-toolbar__note">
+              保存在当前浏览器 / Local browser
+            </Text>
           </div>
           {recentItems.length > 0 ? (
             <div className="erp-dev-hub-recent__grid">
@@ -300,7 +304,7 @@ export default function DevHubPage() {
             onChange={(value) => setGroup(value)}
           />
           <Text className="erp-dev-hub-toolbar__note">
-            当前匹配 {items.length} / {DEV_HUB_ITEMS.length}
+            当前匹配 / Matches {items.length} / {DEV_HUB_ITEMS.length}
           </Text>
         </section>
 

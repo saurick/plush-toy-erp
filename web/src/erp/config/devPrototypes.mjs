@@ -5,11 +5,11 @@ export const DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY =
   'plush_erp_dev_prototype_expanded_groups'
 
 export const DEV_PROTOTYPE_STATUSES = Object.freeze({
-  CURRENT: '当前实现对齐版',
-  EXPLORATION: '探索方案',
-  HISTORY: '历史参考',
-  EVIDENCE: '截图证据',
-  COMPARISON: '方案对比',
+  CURRENT: '当前实现对齐版 / Current',
+  EXPLORATION: '探索方案 / Exploration',
+  HISTORY: '历史参考 / History',
+  EVIDENCE: '截图证据 / Evidence',
+  COMPARISON: '方案对比 / Comparison',
 })
 
 export const DEV_PROTOTYPE_STATUS_OPTIONS = Object.freeze([

@@ -44,9 +44,9 @@ const VIEW_DELIVERY = 'delivery'
 const VIEW_DELTA = 'delta'
 
 const VIEW_OPTIONS = [
-  { label: '产品能力', value: VIEW_CAPABILITIES },
-  { label: '客户交付', value: VIEW_DELIVERY },
-  { label: '客户差异', value: VIEW_DELTA },
+  { label: '产品能力 / Capabilities', value: VIEW_CAPABILITIES },
+  { label: '客户交付 / Delivery', value: VIEW_DELIVERY },
+  { label: '客户差异 / Delta', value: VIEW_DELTA },
 ]
 
 const SOURCE_PATH_BY_VIEW = {
@@ -354,7 +354,10 @@ function CapabilityDetail({
   if (!item) {
     return (
       <section className="erp-dev-capability-detail">
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择能力" />
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="请选择能力 / Select a capability"
+        />
       </section>
     )
   }
@@ -381,7 +384,7 @@ function CapabilityDetail({
       </div>
 
       <div className="erp-dev-capability-detail__grid">
-        <DetailBlock title="yoyoosun 交付关联">
+        <DetailBlock title="yoyoosun 交付关联 / Delivery Links">
           <RelationList
             items={deliveryRelations}
             renderItem={(deliveryItem) => (
@@ -397,7 +400,7 @@ function CapabilityDetail({
             )}
           />
         </DetailBlock>
-        <DetailBlock title="yoyoosun 差异关联">
+        <DetailBlock title="yoyoosun 差异关联 / Delta Links">
           <RelationList
             items={deltaRelations}
             renderItem={(deltaItem) => (
@@ -412,11 +415,15 @@ function CapabilityDetail({
             )}
           />
         </DetailBlock>
-        <DetailBlock title="当前结果">{item.currentResult}</DetailBlock>
-        <DetailBlock title="当前不包含">{item.notIncluded}</DetailBlock>
-        <DetailBlock title="证据">{item.evidence}</DetailBlock>
-        <DetailBlock title="下一步">{item.nextStep}</DetailBlock>
-        <DetailBlock title="风险">{item.risk}</DetailBlock>
+        <DetailBlock title="当前结果 / Current Result">
+          {item.currentResult}
+        </DetailBlock>
+        <DetailBlock title="当前不包含 / Not Included">
+          {item.notIncluded}
+        </DetailBlock>
+        <DetailBlock title="证据 / Evidence">{item.evidence}</DetailBlock>
+        <DetailBlock title="下一步 / Next Step">{item.nextStep}</DetailBlock>
+        <DetailBlock title="风险 / Risk">{item.risk}</DetailBlock>
       </div>
     </section>
   )
@@ -428,7 +435,7 @@ function DeliveryDetail({ item }) {
       <section className="erp-dev-capability-detail">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="请选择交付项"
+          description="请选择交付项 / Select a delivery item"
         />
       </section>
     )
@@ -450,14 +457,22 @@ function DeliveryDetail({ item }) {
       </div>
 
       <div className="erp-dev-capability-detail__grid">
-        <DetailBlock title="当前客户可见方式">{item.visibleMethod}</DetailBlock>
-        <DetailBlock title="交付结果">{item.deliveryResult}</DetailBlock>
-        <DetailBlock title="不包含">{item.notIncluded}</DetailBlock>
-        <DetailBlock title="前置条件">{item.prerequisites}</DetailBlock>
-        <DetailBlock title="客户确认项">
+        <DetailBlock title="当前客户可见方式 / Visible Method">
+          {item.visibleMethod}
+        </DetailBlock>
+        <DetailBlock title="交付结果 / Delivery Result">
+          {item.deliveryResult}
+        </DetailBlock>
+        <DetailBlock title="不包含 / Not Included">
+          {item.notIncluded}
+        </DetailBlock>
+        <DetailBlock title="前置条件 / Prerequisites">
+          {item.prerequisites}
+        </DetailBlock>
+        <DetailBlock title="客户确认项 / Customer Confirmation">
           {item.customerConfirmation}
         </DetailBlock>
-        <DetailBlock title="风险">{item.risk}</DetailBlock>
+        <DetailBlock title="风险 / Risk">{item.risk}</DetailBlock>
       </div>
     </section>
   )
@@ -467,7 +482,10 @@ function DeltaDetail({ item }) {
   if (!item) {
     return (
       <section className="erp-dev-capability-detail">
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请选择差异" />
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description="请选择差异 / Select a delta item"
+        />
       </section>
     )
   }
@@ -491,12 +509,16 @@ function DeltaDetail({ item }) {
       </div>
 
       <div className="erp-dev-capability-detail__grid">
-        <DetailBlock title="来源">{item.source}</DetailBlock>
-        <DetailBlock title="当前判断">{item.judgement}</DetailBlock>
-        <DetailBlock title="处理方式">{item.handling}</DetailBlock>
-        <DetailBlock title="前置条件">{item.prerequisites}</DetailBlock>
-        <DetailBlock title="风险">{item.risk}</DetailBlock>
-        <DetailBlock title="下一步">{item.nextStep}</DetailBlock>
+        <DetailBlock title="来源 / Source">{item.source}</DetailBlock>
+        <DetailBlock title="当前判断 / Current Judgement">
+          {item.judgement}
+        </DetailBlock>
+        <DetailBlock title="处理方式 / Handling">{item.handling}</DetailBlock>
+        <DetailBlock title="前置条件 / Prerequisites">
+          {item.prerequisites}
+        </DetailBlock>
+        <DetailBlock title="风险 / Risk">{item.risk}</DetailBlock>
+        <DetailBlock title="下一步 / Next Step">{item.nextStep}</DetailBlock>
       </div>
     </section>
   )
@@ -653,13 +675,14 @@ export default function DevCapabilityLedgerPage() {
           <Space align="center" size={10} wrap>
             <FundProjectionScreenOutlined className="erp-dev-capability-header__icon" />
             <Title level={3} className="erp-dev-capability-title">
-              能力台账可视化
+              能力台账可视化 / Capability Ledger
             </Title>
             <Tag color="green">DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-capability-summary">
-            只读解析产品能力台账、yoyoosun 客户交付矩阵和客户差异台账；不进入
-            ERP 菜单、权限、后端业务 API 或产品文档 registry。
+            只读解析产品能力台账、yoyoosun 客户交付矩阵和客户差异台账 /
+            read-only ledger visualization；不进入 ERP 菜单、权限、后端业务 API
+            或产品文档 registry。
           </Paragraph>
           <Segmented
             className="erp-dev-capability-view-switch"
@@ -669,9 +692,9 @@ export default function DevCapabilityLedgerPage() {
           />
         </div>
         <div className="erp-dev-capability-source">
-          <Text type="secondary">当前视图真源</Text>
+          <Text type="secondary">当前视图真源 / Source</Text>
           <Text strong>{SOURCE_PATH_BY_VIEW[activeView]}</Text>
-          <Text type="secondary">联动读取 3 份 Markdown</Text>
+          <Text type="secondary">联动读取 3 份 Markdown / 3 linked docs</Text>
         </div>
       </header>
 

@@ -25,9 +25,9 @@ const VIEW_COMMANDS = 'commands'
 const VIEW_DOCS = 'docs'
 
 const VIEW_OPTIONS = [
-  { label: '测试分层', value: VIEW_TIERS },
-  { label: '命令入口', value: VIEW_COMMANDS },
-  { label: '相关文档', value: VIEW_DOCS },
+  { label: '测试分层 / Tiers', value: VIEW_TIERS },
+  { label: '命令入口 / Commands', value: VIEW_COMMANDS },
+  { label: '相关文档 / Docs', value: VIEW_DOCS },
 ]
 
 const markdownModules = import.meta.glob('../../../../docs/**/*.md', {
@@ -164,7 +164,7 @@ function SelectedDocDetail({ doc }) {
       <div className="erp-dev-testing-empty">
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="没有匹配文档"
+          description="没有匹配文档 / No matching docs"
         />
       </div>
     )
@@ -180,12 +180,12 @@ function SelectedDocDetail({ doc }) {
         <Tag>{doc.category}</Tag>
       </div>
       <div className="erp-dev-testing-doc-detail__stats">
-        <span>关键词命中 {doc.keywordHits}</span>
-        <span>命令 {doc.commandCount}</span>
+        <span>关键词命中 / Hits {doc.keywordHits}</span>
+        <span>命令 / Commands {doc.commandCount}</span>
         <span>
           {doc.path === DEV_TESTING_STRATEGY_SOURCE_PATH
-            ? '策略真源'
-            : '测试相关'}
+            ? '策略真源 / Strategy source'
+            : '测试相关 / Test related'}
         </span>
       </div>
       {doc.commandBlocks.length > 0 ? (
@@ -196,7 +196,8 @@ function SelectedDocDetail({ doc }) {
         </div>
       ) : (
         <Paragraph className="erp-dev-testing-doc-detail__note">
-          该文档没有 fenced command block，更多验证口径请回到正文阅读。
+          该文档没有 fenced command block / no fenced command
+          block；更多验证口径请回到正文阅读。
         </Paragraph>
       )}
     </section>
@@ -241,30 +242,31 @@ export default function DevTestingPage() {
           <Space align="center" size={10}>
             <SafetyCertificateOutlined className="erp-dev-testing-header__icon" />
             <Title level={3} className="erp-dev-testing-title">
-              开发测试入口
+              开发测试入口 / Dev Test Entry
             </Title>
           </Space>
           <Paragraph className="erp-dev-testing-summary">
-            读取测试策略和 docs 下测试 / 验收文档，收口本地开发验证入口。
+            读取测试策略和 docs 下测试 / 验收文档；index local validation tiers,
+            commands, and related docs.
           </Paragraph>
         </div>
         <div className="erp-dev-testing-header__stats">
           <MetricTile
             icon={<CheckCircleOutlined />}
-            label="测试层级"
+            label="测试层级 / Tiers"
             value={summary.tierCount}
             note="来自 test-strategy"
             tone="primary"
           />
           <MetricTile
             icon={<FileSearchOutlined />}
-            label="相关文档"
+            label="相关文档 / Docs"
             value={summary.docCount}
             note={`${summary.docsWithCommands} 篇含命令`}
           />
           <MetricTile
             icon={<CodeOutlined />}
-            label="命令行"
+            label="命令行 / Commands"
             value={summary.commandCount}
             note={`${summary.strategyCommandCount} 条来自策略`}
           />
@@ -344,7 +346,7 @@ export default function DevTestingPage() {
                 <div className="erp-dev-testing-empty">
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="当前筛选没有命令块"
+                    description="当前筛选没有命令块 / No command blocks"
                   />
                 </div>
               )}

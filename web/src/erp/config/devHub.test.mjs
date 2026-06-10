@@ -97,17 +97,24 @@ test('devHub: filters by title, group, source and route', () => {
 test('devHub: filters by governance group and keyword together', () => {
   assert.deepEqual(
     getDevHubGroupOptions(DEV_HUB_ITEMS).map((item) => item.value),
-    ['all', '文档治理', '验证治理', '产品设计', '产品治理', '客户治理']
+    [
+      'all',
+      '文档治理 / Docs',
+      '验证治理 / QA',
+      '产品设计 / Product Design',
+      '产品治理 / Product Governance',
+      '客户治理 / Customer Governance',
+    ]
   )
   assert.deepEqual(
-    filterDevHubItems(DEV_HUB_ITEMS, { group: '产品治理' }).map(
-      (item) => item.key
-    ),
+    filterDevHubItems(DEV_HUB_ITEMS, {
+      group: '产品治理 / Product Governance',
+    }).map((item) => item.key),
     ['capability-ledger']
   )
   assert.deepEqual(
     filterDevHubItems(DEV_HUB_ITEMS, {
-      group: '产品治理',
+      group: '产品治理 / Product Governance',
       keyword: '测试',
     }),
     []
