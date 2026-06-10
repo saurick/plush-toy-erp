@@ -678,6 +678,113 @@
   vertical-align: middle;
 }
 
+.erp-workbench-hero-card .ant-card-body {
+  padding: 20px;
+}
+
+.erp-workbench-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.erp-workbench-hero-actions {
+  justify-content: flex-end;
+}
+
+.erp-task-board-filters {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1.4fr) repeat(4, minmax(132px, 1fr))
+    minmax(104px, auto);
+  gap: 10px;
+  align-items: center;
+}
+
+.erp-task-board-lanes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.erp-task-board-lane.ant-card {
+  border: 1px solid #dfe9e1;
+  background: rgb(255 255 255 / 0.96);
+}
+
+.erp-task-board-lane .ant-card-head {
+  min-height: 44px;
+  border-bottom-color: #edf2ee;
+}
+
+.erp-task-board-lane .ant-card-body {
+  padding: 12px;
+}
+
+.erp-task-board-lane-note.ant-typography {
+  margin-bottom: 10px;
+}
+
+.erp-task-board-list {
+  width: 100%;
+}
+
+.erp-task-board-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid #e6eee9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.erp-task-board-card-head {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.erp-task-board-card-head .ant-typography,
+.erp-task-board-card-meta.ant-typography {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-board-card-meta.ant-typography {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+}
+
+.erp-task-board-action-panel.ant-card {
+  border-color: #ffd591;
+  background: #fffaf0;
+}
+
+@media (max-width: 1280px) {
+  .erp-task-board-lanes {
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .erp-workbench-hero,
+  .erp-task-board-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-workbench-hero-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .erp-task-board-lanes {
+    grid-template-columns: 1fr;
+  }
+}
+
 .erp-dev-docs-page {
   min-height: 100vh;
   background: #f3f7f2;
@@ -1289,6 +1396,17 @@
   color: #647067;
 }
 
+.erp-dev-capability-view-switch {
+  margin-top: 12px;
+  max-width: 100%;
+}
+
+.erp-dev-capability-view-switch .ant-segmented-item-label {
+  padding-inline: 14px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .erp-dev-capability-source {
   display: grid;
   flex: 0 0 auto;
@@ -1587,6 +1705,7 @@
 
 .erp-dev-capability-row__tags {
   flex-wrap: wrap;
+  min-height: 22px;
 }
 
 .erp-dev-capability-row__tags .ant-tag,
@@ -1641,6 +1760,754 @@
   color: #334155;
   line-height: 1.65;
   overflow-wrap: anywhere;
+}
+
+.erp-dev-capability-relation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-dev-capability-relation {
+  display: grid;
+  gap: 3px;
+  border-radius: 10px;
+  background: #eef7ef;
+  padding: 9px 10px;
+}
+
+.erp-dev-capability-relation__title {
+  color: #173f2a;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-capability-relation__meta,
+.erp-dev-capability-relation-empty {
+  color: #647067;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-customer-page {
+  min-height: 100vh;
+  background: #f3f7f2;
+  color: #1f2937;
+  padding: 18px;
+}
+
+.erp-dev-customer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1480px;
+  margin: 0 auto 14px;
+  border: 1px solid #dce8dd;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.96);
+  padding: 16px 18px;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.erp-dev-customer-header__copy {
+  min-width: 0;
+}
+
+.erp-dev-customer-header__icon {
+  color: #2b8a3e;
+  font-size: 22px;
+}
+
+.erp-dev-customer-title.ant-typography {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.erp-dev-customer-summary.ant-typography {
+  max-width: 760px;
+  margin: 8px 0 0;
+  color: #647067;
+}
+
+.erp-dev-customer-view-switch {
+  margin-top: 12px;
+  max-width: 100%;
+}
+
+.erp-dev-customer-view-switch .ant-segmented-item-label {
+  padding-inline: 14px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.erp-dev-customer-source {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 4px;
+  width: min(360px, 100%);
+  border: 1px solid #dce8dd;
+  border-radius: 12px;
+  background: #f8fbf7;
+  padding: 10px 12px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-customer-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 1480px;
+  margin: 0 auto 14px;
+}
+
+.erp-dev-customer-metric {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid #dce8dd;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.96);
+  padding: 14px;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 10px 22px rgb(15 23 42 / 0.05);
+}
+
+.erp-dev-customer-metric__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: #e8f5ea;
+  color: #2b8a3e;
+  font-size: 18px;
+}
+
+.erp-dev-customer-metric--success .erp-dev-customer-metric__icon {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.erp-dev-customer-metric--warning .erp-dev-customer-metric__icon {
+  background: #fef3c7;
+  color: #a16207;
+}
+
+.erp-dev-customer-metric--danger .erp-dev-customer-metric__icon {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.erp-dev-customer-metric__copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-dev-customer-metric__label,
+.erp-dev-customer-metric__note {
+  color: #647067;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.erp-dev-customer-metric__value {
+  color: #173f2a;
+  font-size: 26px;
+  font-weight: 760;
+  line-height: 1.05;
+}
+
+.erp-dev-customer-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: 14px;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+
+.erp-dev-customer-panel {
+  min-width: 0;
+  border: 1px solid #dce8dd;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.96);
+  padding: 14px;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.erp-dev-customer-panel--wide {
+  grid-column: 1 / -1;
+}
+
+.erp-dev-customer-panel--brand {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.erp-dev-customer-panel__head,
+.erp-dev-customer-boundary__head,
+.erp-dev-customer-menu-group__title,
+.erp-dev-customer-field__head,
+.erp-dev-customer-tool__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-dev-customer-panel__head {
+  margin-bottom: 12px;
+  color: #173f2a;
+}
+
+.erp-dev-customer-boundaries,
+.erp-dev-customer-field-list,
+.erp-dev-customer-numbering-list,
+.erp-dev-customer-tool-list,
+.erp-dev-customer-guard-list {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-dev-customer-boundary,
+.erp-dev-customer-field,
+.erp-dev-customer-numbering,
+.erp-dev-customer-tool,
+.erp-dev-customer-menu-group,
+.erp-dev-customer-guard {
+  min-width: 0;
+  border: 1px solid #dce8dd;
+  border-radius: 12px;
+  background: #f8fbf7;
+  padding: 12px;
+}
+
+.erp-dev-customer-boundary__path,
+.erp-dev-customer-field__key {
+  display: block;
+  margin-top: 6px;
+  color: #647067;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-customer-boundary__body.ant-typography,
+.erp-dev-customer-field .ant-typography,
+.erp-dev-customer-numbering .ant-typography {
+  margin: 8px 0 0;
+  color: #334155;
+  line-height: 1.55;
+}
+
+.erp-dev-customer-brand-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 74px;
+  height: 74px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: #166534;
+  color: #f0fdf4;
+  font-size: 34px;
+  font-weight: 760;
+}
+
+.erp-dev-customer-panel--brand .ant-typography {
+  margin: 0 0 8px;
+}
+
+.erp-dev-customer-menu-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-dev-customer-menu-group__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.erp-dev-customer-field__head {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.erp-dev-customer-numbering {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.erp-dev-customer-numbering > div {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-customer-guard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.erp-dev-customer-import-flags {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.erp-dev-customer-import-flags > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.erp-dev-customer-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  border: 1px solid #dce8dd;
+  border-radius: 10px;
+  background: #102016;
+  padding: 10px;
+}
+
+.erp-dev-customer-command :where(code) {
+  color: #d9fbe4;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.erp-dev-customer-command .ant-btn {
+  color: #bbf7d0;
+}
+
+.erp-dev-testing-page {
+  min-height: 100vh;
+  background: #f4f7f5;
+  color: #1f2937;
+  padding: 18px;
+}
+
+.erp-dev-testing-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 1440px;
+  margin: 0 auto 14px;
+  border: 1px solid #dce8dd;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.96);
+  padding: 16px 18px;
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.erp-dev-testing-header__copy {
+  min-width: 0;
+}
+
+.erp-dev-testing-header__icon {
+  color: #0f766e;
+  font-size: 22px;
+}
+
+.erp-dev-testing-title.ant-typography {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.erp-dev-testing-summary.ant-typography {
+  margin: 8px 0 0;
+  color: #647067;
+}
+
+.erp-dev-testing-header__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(150px, 1fr));
+  gap: 8px;
+  min-width: min(560px, 48vw);
+}
+
+.erp-dev-testing-metric {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #dce8dd;
+  border-radius: 12px;
+  background: #f8fbf8;
+  padding: 10px;
+}
+
+.erp-dev-testing-metric--primary {
+  border-color: #9bd0c9;
+  background: #effaf7;
+}
+
+.erp-dev-testing-metric__icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: #e5f4ef;
+  color: #0f766e;
+  font-size: 18px;
+}
+
+.erp-dev-testing-metric__copy {
+  display: grid;
+  min-width: 0;
+}
+
+.erp-dev-testing-metric__label,
+.erp-dev-testing-metric__note {
+  color: #647067;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-metric__value {
+  color: #172033;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.erp-dev-testing-shell {
+  display: grid;
+  grid-template-columns: minmax(310px, 400px) minmax(0, 1fr);
+  gap: 14px;
+  max-width: 1440px;
+  height: calc(100vh - 132px);
+  min-height: 0;
+  margin: 0 auto;
+}
+
+.erp-dev-testing-sidebar,
+.erp-dev-testing-reader {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid #dce8dd;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 0.04),
+    0 12px 28px rgb(15 23 42 / 0.06);
+}
+
+.erp-dev-testing-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+}
+
+.erp-dev-testing-search {
+  flex: 0 0 auto;
+}
+
+.erp-dev-testing-filter {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-dev-testing-filter__item {
+  min-height: 34px;
+  min-width: 0;
+  border: 1px solid #dce8dd;
+  border-radius: 10px;
+  background: #f7fbf8;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 650;
+  line-height: 1.25;
+  padding: 6px 12px;
+  text-align: center;
+}
+
+.erp-dev-testing-filter__item:hover,
+.erp-dev-testing-filter__item:focus-visible {
+  border-color: #7dbeb7;
+  background: #edf8f6;
+  color: #0f766e;
+  outline: none;
+}
+
+.erp-dev-testing-filter__item--active {
+  border-color: #7dbeb7;
+  background: #e8f7f4;
+  color: #0f766e;
+  box-shadow: inset 0 0 0 1px rgb(15 118 110 / 0.12);
+}
+
+.erp-dev-testing-doc-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.erp-dev-testing-doc-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+  border: 1px solid #e2ebe5;
+  border-radius: 12px;
+  background: #fbfdfc;
+  color: #1f2937;
+  cursor: pointer;
+  padding: 10px;
+  text-align: left;
+}
+
+.erp-dev-testing-doc-row:hover,
+.erp-dev-testing-doc-row:focus-visible,
+.erp-dev-testing-doc-row--active {
+  border-color: #7dbeb7;
+  background: #edf8f6;
+  box-shadow: inset 3px 0 0 #0f766e;
+  outline: none;
+}
+
+.erp-dev-testing-doc-row__top {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dev-testing-doc-row__title {
+  min-width: 0;
+  color: #172033;
+  font-weight: 750;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-doc-row__path,
+.erp-dev-testing-doc-row__meta,
+.erp-dev-testing-command-block__path,
+.erp-dev-testing-doc-detail__path {
+  color: #647067;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-doc-row__meta {
+  font-family: inherit;
+}
+
+.erp-dev-testing-reader {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.erp-dev-testing-reader__toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #dce8dd;
+  background: #fbfdfc;
+  padding: 12px 14px;
+}
+
+.erp-dev-testing-tier-grid,
+.erp-dev-testing-command-list,
+.erp-dev-testing-doc-detail {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+}
+
+.erp-dev-testing-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 12px;
+}
+
+.erp-dev-testing-tier,
+.erp-dev-testing-command-block,
+.erp-dev-testing-doc-detail {
+  border: 1px solid #dce8dd;
+  border-radius: 14px;
+  background: #fbfdfc;
+}
+
+.erp-dev-testing-tier {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 13px;
+}
+
+.erp-dev-testing-tier__head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.erp-dev-testing-tier__level {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #dff4ef;
+  color: #0f766e;
+  font-weight: 800;
+  padding: 4px 9px;
+}
+
+.erp-dev-testing-tier__title {
+  min-width: 0;
+  color: #172033;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-tier__type,
+.erp-dev-testing-tier__desc {
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-command-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.erp-dev-testing-command-tags :where(code) {
+  max-width: 100%;
+  border-radius: 8px;
+  background: #eef7ef;
+  color: #173f2a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  padding: 3px 7px;
+}
+
+.erp-dev-testing-command-list {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.erp-dev-testing-command-block {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.erp-dev-testing-command-block__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e4ede7;
+  padding: 11px 12px;
+}
+
+.erp-dev-testing-command-block pre {
+  max-width: 100%;
+  margin: 0;
+  overflow: auto;
+  background: #101827;
+  color: #e5edf5;
+  padding: 12px;
+}
+
+.erp-dev-testing-command-block :where(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.erp-dev-testing-doc-detail {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.erp-dev-testing-doc-detail__head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-dev-testing-doc-detail__head .ant-typography {
+  margin: 0 0 4px;
+}
+
+.erp-dev-testing-doc-detail__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-dev-testing-doc-detail__stats span {
+  border: 1px solid #dce8dd;
+  border-radius: 999px;
+  background: #f7fbf8;
+  color: #475569;
+  font-weight: 650;
+  padding: 4px 9px;
+}
+
+.erp-dev-testing-doc-detail__note.ant-typography {
+  color: #647067;
+  margin: 0;
+}
+
+.erp-dev-testing-empty {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
 }
 
 .erp-dev-prototypes-page {
@@ -4202,10 +5069,17 @@
     height: auto;
   }
 
+  .erp-dev-testing-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
   .erp-dev-docs-sidebar,
   .erp-dev-docs-reader,
   .erp-dev-prototypes-sidebar,
-  .erp-dev-prototypes-reader {
+  .erp-dev-prototypes-reader,
+  .erp-dev-testing-sidebar,
+  .erp-dev-testing-reader {
     max-height: none;
   }
 
@@ -4215,6 +5089,14 @@
 
   .erp-dev-prototypes-list {
     max-height: 360px;
+  }
+
+  .erp-dev-testing-doc-list {
+    max-height: 360px;
+  }
+
+  .erp-dev-testing-tier-grid {
+    grid-template-columns: 1fr;
   }
 
   .erp-dev-prototypes-preview__frame {
@@ -4288,21 +5170,60 @@
     padding: 10px;
   }
 
+  .erp-dev-testing-page {
+    padding: 10px;
+  }
+
   .erp-dev-docs-header,
   .erp-dev-docs-sidebar,
   .erp-dev-docs-reader,
   .erp-dev-prototypes-header,
   .erp-dev-prototypes-sidebar,
-  .erp-dev-prototypes-reader {
+  .erp-dev-prototypes-reader,
+  .erp-dev-testing-header,
+  .erp-dev-testing-sidebar,
+  .erp-dev-testing-reader {
     border-radius: 12px;
   }
 
+  .erp-dev-testing-header,
+  .erp-dev-testing-reader__toolbar,
   .erp-dev-prototypes-header,
   .erp-dev-prototypes-reader__toolbar,
   .erp-dev-prototypes-reader__info,
   .erp-dev-prototypes-fullscreen__bar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .erp-dev-testing-header__stats {
+    grid-template-columns: 1fr;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .erp-dev-testing-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-testing-filter__item {
+    width: 100%;
+  }
+
+  .erp-dev-testing-reader__toolbar .ant-segmented {
+    width: 100%;
+  }
+
+  .erp-dev-testing-reader__toolbar .ant-segmented-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .erp-dev-testing-reader__toolbar .ant-segmented-item-label {
+    min-height: 32px;
+    padding-inline: 6px;
   }
 
   .erp-dev-prototypes-reader__meta,
@@ -5846,6 +6767,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .erp-dev-customer-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .erp-dev-capability-shell {
     grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
     height: auto;
@@ -5880,7 +6805,42 @@
     flex-direction: column;
   }
 
+  .erp-dev-customer-header {
+    flex-direction: column;
+  }
+
+  .erp-dev-capability-view-switch {
+    width: 100%;
+  }
+
+  .erp-dev-customer-view-switch {
+    width: 100%;
+  }
+
+  .erp-dev-capability-view-switch .ant-segmented-group {
+    width: 100%;
+  }
+
+  .erp-dev-customer-view-switch .ant-segmented-group {
+    width: 100%;
+  }
+
+  .erp-dev-capability-view-switch .ant-segmented-item {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .erp-dev-customer-view-switch .ant-segmented-item {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
   .erp-dev-capability-source {
+    width: 100%;
+    max-width: none;
+  }
+
+  .erp-dev-customer-source {
     width: 100%;
     max-width: none;
   }
@@ -5890,8 +6850,16 @@
     min-height: 0;
   }
 
+  .erp-dev-customer-panel-grid {
+    grid-template-columns: 1fr;
+  }
+
   .erp-dev-capability-sidebar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-customer-numbering {
+    grid-template-columns: 1fr;
   }
 
   .erp-dev-capability-filters {
@@ -5965,6 +6933,10 @@
     padding: 12px;
   }
 
+  .erp-dev-customer-page {
+    padding: 12px;
+  }
+
   .erp-dev-capability-header,
   .erp-dev-capability-metric,
   .erp-dev-capability-panel,
@@ -5973,9 +6945,25 @@
     border-radius: 12px;
   }
 
+  .erp-dev-customer-header,
+  .erp-dev-customer-metric,
+  .erp-dev-customer-panel {
+    border-radius: 12px;
+  }
+
   .erp-dev-capability-metrics,
   .erp-dev-capability-sidebar {
     grid-template-columns: 1fr;
+  }
+
+  .erp-dev-customer-metrics,
+  .erp-dev-customer-menu-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-customer-panel--brand {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .erp-dev-capability-results__head {
@@ -5991,6 +6979,14 @@
 
   .erp-dev-capability-detail__title.ant-typography {
     font-size: 18px;
+  }
+
+  .erp-dev-capability-view-switch .ant-segmented-item-label {
+    padding-inline: 8px;
+  }
+
+  .erp-dev-customer-view-switch .ant-segmented-item-label {
+    padding-inline: 8px;
   }
 
   .erp-business-page-header-card__stats {
@@ -6207,6 +7203,8 @@
 [data-erp-theme='dark'] .erp-admin-page-head__pill,
 [data-erp-theme='dark'] .erp-dashboard-card.ant-card,
 [data-erp-theme='dark'] .erp-dashboard-status-card.ant-card,
+[data-erp-theme='dark'] .erp-task-board-lane.ant-card,
+[data-erp-theme='dark'] .erp-task-board-card,
 [data-erp-theme='dark'] .erp-dev-docs-header,
 [data-erp-theme='dark'] .erp-dev-docs-sidebar,
 [data-erp-theme='dark'] .erp-dev-docs-reader,
@@ -6216,6 +7214,20 @@
   box-shadow:
     0 1px 2px rgb(0 0 0 / 0.18),
     0 14px 32px rgb(0 0 0 / 0.26);
+}
+
+[data-erp-theme='dark'] .erp-task-board-lane .ant-card-head,
+[data-erp-theme='dark'] .erp-task-board-card,
+[data-erp-theme='dark'] .erp-task-board-action-panel.ant-card {
+  border-color: var(--erp-border);
+}
+
+[data-erp-theme='dark'] .erp-task-board-card {
+  background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .erp-task-board-action-panel.ant-card {
+  background: #2a2316;
 }
 
 [data-erp-theme='dark'] .app-shell {
@@ -6912,15 +7924,22 @@
 [data-erp-theme='dark'] .erp-dev-capability-metric__label,
 [data-erp-theme='dark'] .erp-dev-capability-metric__note,
 [data-erp-theme='dark'] .erp-dev-capability-row__meta,
-[data-erp-theme='dark'] .erp-dev-capability-detail__block .ant-typography {
+[data-erp-theme='dark'] .erp-dev-capability-detail__block .ant-typography,
+[data-erp-theme='dark'] .erp-dev-capability-relation__meta,
+[data-erp-theme='dark'] .erp-dev-capability-relation-empty {
   color: var(--erp-text-muted);
 }
 
 [data-erp-theme='dark'] .erp-dev-capability-source,
 [data-erp-theme='dark'] .erp-dev-capability-row,
-[data-erp-theme='dark'] .erp-dev-capability-detail__block {
+[data-erp-theme='dark'] .erp-dev-capability-detail__block,
+[data-erp-theme='dark'] .erp-dev-capability-relation {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-capability-relation__title {
   color: var(--erp-text);
 }
 
@@ -6988,6 +8007,173 @@
   .erp-dev-capability-metric--danger
   .erp-dev-capability-metric__icon {
   color: #fecaca;
+}
+
+[data-erp-theme='dark'] .erp-dev-customer-page {
+  background: var(--erp-page-bg);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-customer-header,
+[data-erp-theme='dark'] .erp-dev-customer-source,
+[data-erp-theme='dark'] .erp-dev-customer-metric,
+[data-erp-theme='dark'] .erp-dev-customer-panel {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 14px 32px rgb(0 0 0 / 0.26);
+}
+
+[data-erp-theme='dark'] .erp-dev-customer-title.ant-typography,
+[data-erp-theme='dark'] .erp-dev-customer-metric__value,
+[data-erp-theme='dark'] .erp-dev-customer-panel__head,
+[data-erp-theme='dark'] .erp-dev-customer-boundary__head,
+[data-erp-theme='dark'] .erp-dev-customer-menu-group__title,
+[data-erp-theme='dark'] .erp-dev-customer-field__head,
+[data-erp-theme='dark'] .erp-dev-customer-tool__head {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-customer-summary.ant-typography,
+[data-erp-theme='dark'] .erp-dev-customer-metric__label,
+[data-erp-theme='dark'] .erp-dev-customer-metric__note,
+[data-erp-theme='dark'] .erp-dev-customer-boundary__path,
+[data-erp-theme='dark'] .erp-dev-customer-field__key,
+[data-erp-theme='dark'] .erp-dev-customer-boundary__body.ant-typography,
+[data-erp-theme='dark'] .erp-dev-customer-field .ant-typography,
+[data-erp-theme='dark'] .erp-dev-customer-numbering .ant-typography {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-dev-customer-boundary,
+[data-erp-theme='dark'] .erp-dev-customer-field,
+[data-erp-theme='dark'] .erp-dev-customer-numbering,
+[data-erp-theme='dark'] .erp-dev-customer-tool,
+[data-erp-theme='dark'] .erp-dev-customer-menu-group,
+[data-erp-theme='dark'] .erp-dev-customer-guard {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-customer-metric__icon {
+  background: var(--erp-interactive-bg-hover);
+  color: #86efac;
+}
+
+[data-erp-theme='dark']
+  .erp-dev-customer-metric--success
+  .erp-dev-customer-metric__icon {
+  color: #7dd3fc;
+}
+
+[data-erp-theme='dark']
+  .erp-dev-customer-metric--warning
+  .erp-dev-customer-metric__icon {
+  color: #fde68a;
+}
+
+[data-erp-theme='dark']
+  .erp-dev-customer-metric--danger
+  .erp-dev-customer-metric__icon {
+  color: #fecaca;
+}
+
+[data-erp-theme='dark'] .erp-dev-customer-command {
+  border-color: var(--erp-border);
+  background: #06110b;
+}
+
+[data-erp-theme='dark'] .erp-dev-customer-command :where(code),
+[data-erp-theme='dark'] .erp-dev-customer-command .ant-btn {
+  color: #bbf7d0;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-page {
+  background: var(--erp-page-bg);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-header,
+[data-erp-theme='dark'] .erp-dev-testing-sidebar,
+[data-erp-theme='dark'] .erp-dev-testing-reader,
+[data-erp-theme='dark'] .erp-dev-testing-metric,
+[data-erp-theme='dark'] .erp-dev-testing-tier,
+[data-erp-theme='dark'] .erp-dev-testing-command-block,
+[data-erp-theme='dark'] .erp-dev-testing-doc-detail {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.18),
+    0 14px 32px rgb(0 0 0 / 0.26);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-reader__toolbar,
+[data-erp-theme='dark'] .erp-dev-testing-doc-detail__stats span {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-title.ant-typography,
+[data-erp-theme='dark'] .erp-dev-testing-metric__value,
+[data-erp-theme='dark'] .erp-dev-testing-doc-row__title,
+[data-erp-theme='dark'] .erp-dev-testing-tier__title {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-summary.ant-typography,
+[data-erp-theme='dark'] .erp-dev-testing-metric__label,
+[data-erp-theme='dark'] .erp-dev-testing-metric__note,
+[data-erp-theme='dark'] .erp-dev-testing-doc-row__path,
+[data-erp-theme='dark'] .erp-dev-testing-doc-row__meta,
+[data-erp-theme='dark'] .erp-dev-testing-command-block__path,
+[data-erp-theme='dark'] .erp-dev-testing-doc-detail__path,
+[data-erp-theme='dark'] .erp-dev-testing-tier__type,
+[data-erp-theme='dark'] .erp-dev-testing-tier__desc,
+[data-erp-theme='dark'] .erp-dev-testing-doc-detail__stats span,
+[data-erp-theme='dark'] .erp-dev-testing-doc-detail__note.ant-typography {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-metric__icon,
+[data-erp-theme='dark'] .erp-dev-testing-tier__level,
+[data-erp-theme='dark'] .erp-dev-testing-command-tags :where(code) {
+  background: var(--erp-interactive-bg-hover);
+  color: #99f6e4;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-doc-row,
+[data-erp-theme='dark'] .erp-dev-testing-filter__item {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-doc-row:hover,
+[data-erp-theme='dark'] .erp-dev-testing-doc-row:focus-visible,
+[data-erp-theme='dark'] .erp-dev-testing-doc-row--active,
+[data-erp-theme='dark'] .erp-dev-testing-filter__item:hover,
+[data-erp-theme='dark'] .erp-dev-testing-filter__item:focus-visible,
+[data-erp-theme='dark'] .erp-dev-testing-filter__item--active {
+  border-color: var(--erp-interactive-border-hover);
+  background: var(--erp-interactive-bg-hover);
+  color: #99f6e4;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-doc-row--active {
+  box-shadow: inset 3px 0 0 #5eead4;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-command-block__head {
+  border-bottom-color: var(--erp-border);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-command-block pre {
+  background: #020617;
+  color: #dbeafe;
 }
 
 [data-erp-theme='dark'] .erp-dev-prototypes-page {

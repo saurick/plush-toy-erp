@@ -24,6 +24,7 @@
 | 路径 | 用途 |
 | --- | --- |
 | `index.html` | 产品原型资产查看器，可直接用浏览器 `file://` 打开，用于筛选和访问本目录下的 HTML 原型、PNG 方案图和截图证据。 |
+| `admin-command-center-v1/index.html` | 后台工作台与看板整套原型，覆盖工作台、任务看板、业务看板、模板打印中心和异常 / 阻塞闭环。 |
 | `business-module-page-standard-v1/index.html` | 业务模块标准页整页原型，覆盖标题统计、筛选、表格工具、选中操作条、分页和底部协同入口。 |
 | `business-module-page-standard-v1/task-collab-entry-v2.html` | 协同入口单独探索原型，用于对比底部常驻入口、展开面板和任务分组。 |
 | `business-module-page-standard-v1/images/` | 早期三张协同入口方向图，用于追溯方案比较。 |

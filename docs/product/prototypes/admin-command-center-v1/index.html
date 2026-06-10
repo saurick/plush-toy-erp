@@ -1,0 +1,1583 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>后台工作台与看板原型</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f7f5;
+        --side: #edf6f0;
+        --surface: #fff;
+        --surface-soft: #f8fbf9;
+        --line: #d9e5dd;
+        --line-strong: #bfd3c7;
+        --text: #142033;
+        --muted: #64748b;
+        --green: #16834b;
+        --green-soft: #e8f6ee;
+        --blue: #1f6fe5;
+        --blue-soft: #edf5ff;
+        --red: #d73b3e;
+        --red-soft: #fff1f1;
+        --amber: #b76505;
+        --amber-soft: #fff6e3;
+        --purple: #5d4bc4;
+        --purple-soft: #f1efff;
+        --shadow: 0 10px 28px rgb(15 23 42 / 7%);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 246px minmax(0, 1fr);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .side {
+        min-height: 0;
+        overflow: auto;
+        border-right: 1px solid var(--line);
+        background: linear-gradient(180deg, #f8fcf9, var(--side));
+        padding: 16px 12px;
+      }
+
+      .brand {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .logo {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        background: #2367a5;
+        color: #fff;
+        font-size: 20px;
+        font-weight: 750;
+      }
+
+      .brand strong,
+      .brand span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span {
+        color: #72877c;
+        font-size: 12px;
+      }
+
+      .group-title {
+        color: #768a81;
+        font-size: 12px;
+        padding: 13px 10px 5px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+
+      .nav-btn {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 38px;
+        width: 100%;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--text);
+        text-align: left;
+        padding: 0 12px;
+      }
+
+      .nav-icon {
+        display: grid;
+        flex: 0 0 auto;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        color: #31556f;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .nav-btn[aria-current="page"] {
+        background: #cfe3d2;
+        color: #0f6f40;
+        font-weight: 700;
+      }
+
+      .nav-btn[aria-current="page"] .nav-icon {
+        border-color: #8ac99e;
+        background: #e8f6ee;
+        color: #0f6f40;
+      }
+
+      .main {
+        display: grid;
+        grid-template-rows: 62px minmax(0, 1fr);
+        min-width: 0;
+        min-height: 0;
+      }
+
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        background: rgb(255 255 255 / 95%);
+        padding: 0 18px;
+      }
+
+      .top h1 {
+        margin: 0;
+        font-size: 17px;
+      }
+
+      .top-actions,
+      .actions,
+      .inline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .btn {
+        min-height: 32px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--text);
+        padding: 0 11px;
+        white-space: nowrap;
+      }
+
+      .btn.primary {
+        border-color: var(--green);
+        background: var(--green);
+        color: #fff;
+      }
+
+      .btn.blue {
+        border-color: #b7d4ff;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 700;
+      }
+
+      .btn.danger {
+        border-color: #ffb4b4;
+        background: #fff;
+        color: var(--red);
+      }
+
+      .btn.ghost {
+        border-color: transparent;
+        background: transparent;
+        color: var(--blue);
+      }
+
+      .content {
+        min-width: 0;
+        min-height: 0;
+        overflow: auto;
+        padding: 16px;
+      }
+
+      .view {
+        display: none;
+      }
+
+      .view.active {
+        display: block;
+      }
+
+      .section {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .section + .section,
+      .grid + .section,
+      .section + .grid {
+        margin-top: 12px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-soft);
+        padding: 12px 14px;
+      }
+
+      .section-head h2,
+      .card h3,
+      .panel-title {
+        margin: 0;
+        font-size: 15px;
+        line-height: 1.35;
+      }
+
+      .section-note,
+      .muted {
+        color: var(--muted);
+      }
+
+      .section-note {
+        margin: 4px 0 0;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 470px;
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      .hero-main {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: linear-gradient(135deg, #fff 0%, #f7fbf8 55%, #eef7ff 100%);
+        box-shadow: var(--shadow);
+        padding: 18px;
+      }
+
+      .crumb {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+
+      .hero-main h2 {
+        margin: 0;
+        font-size: 24px;
+        letter-spacing: 0;
+      }
+
+      .hero-main p {
+        max-width: 760px;
+        margin: 8px 0 0;
+        color: var(--muted);
+      }
+
+      .flow {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .pill,
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        font-size: 12px;
+        font-weight: 650;
+        padding: 0 8px;
+        white-space: nowrap;
+      }
+
+      .tag.green,
+      .pill.green {
+        border-color: #a7dfb9;
+        background: var(--green-soft);
+        color: #137640;
+      }
+
+      .tag.blue,
+      .pill.blue {
+        border-color: #b9d7ff;
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .tag.red,
+      .pill.red {
+        border-color: #ffb7b7;
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .tag.amber,
+      .pill.amber {
+        border-color: #ffd891;
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .tag.purple,
+      .pill.purple {
+        border-color: #cdc5ff;
+        background: var(--purple-soft);
+        color: var(--purple);
+      }
+
+      .tag.gray,
+      .pill.gray {
+        border-color: #d8e1e7;
+        background: #f3f6f7;
+        color: #596779;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #fff;
+        padding: 14px;
+      }
+
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .metric small {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        gap: 12px;
+      }
+
+      .grid.cols-2 {
+        grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+      }
+
+      .grid.cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .grid.cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        padding: 14px;
+      }
+
+      .card-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .item {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+        border: 1px solid #e7eee9;
+        border-radius: 10px;
+        background: #fff;
+        padding: 10px 12px;
+      }
+
+      .item strong,
+      .item span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .item span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .filters {
+        display: grid;
+        grid-template-columns: minmax(220px, 1.3fr) repeat(4, minmax(130px, 1fr)) auto;
+        gap: 9px;
+        align-items: end;
+        padding: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .field label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-height: 34px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: #fff;
+        color: var(--text);
+        padding: 0 10px;
+      }
+
+      textarea {
+        min-height: 86px;
+        resize: vertical;
+        padding-top: 8px;
+      }
+
+      .board {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(220px, 1fr));
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .lane {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: #fbfdfb;
+        padding: 10px;
+      }
+
+      .lane-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-weight: 750;
+      }
+
+      .task {
+        display: grid;
+        gap: 8px;
+        border: 1px solid #e4ece7;
+        border-radius: 10px;
+        background: #fff;
+        padding: 10px;
+      }
+
+      .task + .task {
+        margin-top: 8px;
+      }
+
+      .task-title {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .task-title strong {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .mini {
+        border: 1px solid #e7eee9;
+        border-radius: 9px;
+        background: #fff;
+        padding: 9px;
+      }
+
+      .mini span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .mini strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 18px;
+      }
+
+      .table-wrap {
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 920px;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+
+      th,
+      td {
+        overflow: hidden;
+        border-bottom: 1px solid #edf1ee;
+        padding: 10px 11px;
+        text-align: left;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      th {
+        background: #fafcfb;
+        color: #334155;
+        font-weight: 700;
+      }
+
+      tr:hover td {
+        background: #f8fbf9;
+      }
+
+      .pager {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+      }
+
+      .chart {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(18px, 1fr));
+        align-items: end;
+        gap: 8px;
+        height: 148px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fff, #f9fbfa);
+        padding: 16px 14px 10px;
+      }
+
+      .bar {
+        display: grid;
+        align-items: end;
+        height: 100%;
+        gap: 5px;
+        color: var(--muted);
+        font-size: 11px;
+        text-align: center;
+      }
+
+      .bar::before {
+        content: "";
+        display: block;
+        width: 100%;
+        height: var(--h);
+        border-radius: 7px 7px 3px 3px;
+        background: linear-gradient(180deg, #54a86e, #1f7b49);
+      }
+
+      .health-row {
+        display: grid;
+        grid-template-columns: 150px minmax(0, 1fr) auto;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .health-row + .health-row {
+        margin-top: 10px;
+      }
+
+      .track {
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #edf2f0;
+      }
+
+      .fill {
+        width: var(--w);
+        height: 100%;
+        border-radius: inherit;
+        background: var(--green);
+      }
+
+      .fill.amber {
+        background: #dd8a17;
+      }
+
+      .fill.red {
+        background: #d94f4f;
+      }
+
+      .print-layout {
+        display: grid;
+        grid-template-columns: 320px minmax(0, 1fr) 340px;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      .template-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .template-btn {
+        display: grid;
+        gap: 4px;
+        width: 100%;
+        border: 1px solid #e4ece7;
+        border-radius: 10px;
+        background: #fff;
+        color: var(--text);
+        text-align: left;
+        padding: 10px;
+      }
+
+      .template-btn[aria-pressed="true"] {
+        border-color: #9bd4ae;
+        background: var(--green-soft);
+      }
+
+      .paper {
+        min-height: 430px;
+        border: 1px solid #d9d2c8;
+        border-radius: 4px;
+        background: #fffdf8;
+        box-shadow: 0 14px 28px rgb(15 23 42 / 10%);
+        padding: 26px 30px;
+      }
+
+      .paper h3 {
+        margin: 0 0 16px;
+        text-align: center;
+        font-size: 22px;
+      }
+
+      .paper-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 18px;
+        margin-bottom: 14px;
+      }
+
+      .paper-line {
+        border-bottom: 1px solid #d8d0c4;
+        color: #384356;
+        padding-bottom: 5px;
+      }
+
+      .stamp {
+        display: grid;
+        place-items: center;
+        width: 86px;
+        height: 86px;
+        margin: 20px 0 0 auto;
+        border: 2px solid #d68080;
+        border-radius: 50%;
+        color: #b94f4f;
+        font-weight: 750;
+      }
+
+      .mapping {
+        display: grid;
+        gap: 8px;
+      }
+
+      .map-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+        border: 1px solid #e4ece7;
+        border-radius: 9px;
+        padding: 8px;
+      }
+
+      .flow-steps {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(150px, 1fr));
+        gap: 9px;
+        padding: 12px;
+      }
+
+      .step {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+        padding: 11px;
+      }
+
+      .step.active {
+        border-color: #9bd4ae;
+        background: var(--green-soft);
+      }
+
+      .step strong {
+        display: block;
+      }
+
+      .step span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        z-index: 20;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        width: min(520px, 100vw);
+        height: 100vh;
+        border-left: 1px solid var(--line);
+        background: #fff;
+        box-shadow: -16px 0 40px rgb(15 23 42 / 16%);
+        transform: translateX(100%);
+        transition: transform 0.18s ease;
+      }
+
+      .drawer.open {
+        transform: translateX(0);
+      }
+
+      .drawer-head,
+      .drawer-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        border-bottom: 1px solid var(--line);
+        padding: 12px 14px;
+      }
+
+      .drawer-foot {
+        border-top: 1px solid var(--line);
+        border-bottom: 0;
+      }
+
+      .drawer-body {
+        min-height: 0;
+        overflow: auto;
+        padding: 14px;
+      }
+
+      .reason-panel {
+        display: none;
+        margin-top: 12px;
+        border: 1px solid #ffd8a4;
+        border-radius: 10px;
+        background: #fffaf0;
+        padding: 12px;
+      }
+
+      .reason-panel.open {
+        display: block;
+      }
+
+      .reason-panel h3 {
+        margin: 0 0 8px;
+        font-size: 15px;
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 19;
+        display: none;
+        background: rgb(15 23 42 / 18%);
+      }
+
+      .overlay.open {
+        display: block;
+      }
+
+      .mobile-switch {
+        display: none;
+      }
+
+      @media (max-width: 1180px) {
+        .hero,
+        .grid.cols-2,
+        .print-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics,
+        .grid.cols-3,
+        .grid.cols-4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .board,
+        .flow-steps {
+          grid-template-columns: repeat(2, minmax(220px, 1fr));
+        }
+      }
+
+      @media (max-width: 760px) {
+        .app {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto minmax(0, 1fr);
+        }
+
+        .side {
+          display: none;
+        }
+
+        .mobile-switch {
+          display: block;
+          width: 100%;
+          max-width: 260px;
+        }
+
+        .top {
+          align-items: stretch;
+          flex-direction: column;
+          height: auto;
+          padding: 12px;
+        }
+
+        .top-actions {
+          flex-wrap: wrap;
+        }
+
+        .content {
+          padding: 10px;
+        }
+
+        .metrics,
+        .grid.cols-3,
+        .grid.cols-4,
+        .board,
+        .flow-steps,
+        .filters {
+          grid-template-columns: 1fr;
+        }
+
+        .section-head,
+        .item,
+        .health-row,
+        .pager {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .section-head,
+        .pager {
+          display: flex;
+        }
+
+        .actions,
+        .inline {
+          flex-wrap: wrap;
+        }
+
+        .hero-main h2 {
+          font-size: 21px;
+        }
+
+        table {
+          min-width: 760px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="side" aria-label="后台原型导航">
+        <div class="brand">
+          <div class="logo">永</div>
+          <div>
+            <strong>毛绒 ERP 管理后台</strong>
+            <span>工作台与看板原型</span>
+          </div>
+        </div>
+        <nav class="nav" id="sideNav">
+          <button class="nav-btn" type="button" data-view="workbench" aria-current="page">
+            <span class="nav-icon">首</span><span>后台首页 / 工作台</span>
+          </button>
+          <button class="nav-btn" type="button" data-view="task-board">
+            <span class="nav-icon">任</span><span>任务看板</span>
+          </button>
+          <button class="nav-btn" type="button" data-view="business-board">
+            <span class="nav-icon">业</span><span>业务看板</span>
+          </button>
+          <div class="group-title">运营工具</div>
+          <button class="nav-btn" type="button" data-view="print-center">
+            <span class="nav-icon">印</span><span>模板打印中心</span>
+          </button>
+          <button class="nav-btn" type="button" data-view="exception-flow">
+            <span class="nav-icon">异</span><span>异常 / 阻塞闭环</span>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="top">
+          <div>
+            <h1 id="topTitle">后台首页 / 工作台</h1>
+            <div class="muted">原型资产，不接后端、不进入正式菜单</div>
+          </div>
+          <div class="top-actions">
+            <select class="mobile-switch" id="mobileViewSelect" aria-label="切换原型视图">
+              <option value="workbench">后台首页 / 工作台</option>
+              <option value="task-board">任务看板</option>
+              <option value="business-board">业务看板</option>
+              <option value="print-center">模板打印中心</option>
+              <option value="exception-flow">异常 / 阻塞闭环</option>
+            </select>
+            <button class="btn" type="button">刷新当前页</button>
+            <button class="btn blue" type="button">导出视图</button>
+            <button class="btn primary" type="button" data-action="open-task">处理当前任务</button>
+          </div>
+        </header>
+
+        <div class="content">
+          <section class="view active" id="view-workbench" data-title="后台首页 / 工作台">
+            <div class="hero">
+              <div class="hero-main">
+                <div class="crumb">ERP / 工作台</div>
+                <h2>今天先处理协同卡点，再进入具体业务模块</h2>
+                <p>
+                  工作台只做跨模块聚合和入口分发：把今日必须处理、跨角色阻塞、业务记录摘要、
+                  打印队列和常用业务入口放在第一屏，避免用户登录后先去长菜单里找任务。
+                </p>
+                <div class="flow">
+                  <span class="pill green">本页待办 12</span>
+                  <span class="pill red">阻塞 3</span>
+                  <span class="pill amber">今日到期 5</span>
+                  <span class="pill blue">打印待处理 6</span>
+                  <span class="pill gray">仅展示协同状态，不写事实</span>
+                </div>
+              </div>
+              <div class="metrics">
+                <div class="metric">
+                  <span>今日必须处理</span>
+                  <strong>17</strong>
+                  <small>含 5 条即将到期任务</small>
+                </div>
+                <div class="metric">
+                  <span>跨角色阻塞</span>
+                  <strong>3</strong>
+                  <small>2 条等待采购补资料</small>
+                </div>
+                <div class="metric">
+                  <span>待打印模板</span>
+                  <strong>6</strong>
+                  <small>采购合同 4，加工合同 2</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid cols-2">
+              <section class="section">
+                <div class="section-head">
+                  <div>
+                    <h2>今日焦点</h2>
+                    <p class="section-note">从任务看板、业务记录和打印中心抽取的首屏队列。</p>
+                  </div>
+                  <button class="btn ghost" type="button" data-jump="task-board">看全部任务</button>
+                </div>
+                <div class="list" style="padding: 12px">
+                  <div class="item">
+                    <div>
+                      <strong>采购合同 KSC260507002 缺少供应商确认</strong>
+                      <span>采购 / 1 小时后到期 / 需要上传确认记录</span>
+                    </div>
+                    <button class="btn primary" type="button" data-action="open-task">处理</button>
+                  </div>
+                  <div class="item">
+                    <div>
+                      <strong>仓库入库预警被阻塞</strong>
+                      <span>仓库 / 阻塞原因：样本阻塞原因 23</span>
+                    </div>
+                    <button class="btn danger" type="button" data-jump="exception-flow">看闭环</button>
+                  </div>
+                  <div class="item">
+                    <div>
+                      <strong>采购合同模板等待打印</strong>
+                      <span>模板打印中心 / 当前记录已选中 / 字段映射完整</span>
+                    </div>
+                    <button class="btn blue" type="button" data-jump="print-center">去打印</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="section">
+                <div class="section-head">
+                  <div>
+                    <h2>业务状态摘要</h2>
+                    <p class="section-note">只统计业务记录和协同状态，不代表事实层已过账。</p>
+                  </div>
+                  <button class="btn ghost" type="button" data-jump="business-board">看业务看板</button>
+                </div>
+                <div style="padding: 12px">
+                  <div class="health-row">
+                    <strong>采购合同</strong>
+                    <div class="track"><div class="fill" style="--w: 72%"></div></div>
+                    <span class="tag green">72% 正常</span>
+                  </div>
+                  <div class="health-row">
+                    <strong>生产排期</strong>
+                    <div class="track"><div class="fill amber" style="--w: 54%"></div></div>
+                    <span class="tag amber">5 条预警</span>
+                  </div>
+                  <div class="health-row">
+                    <strong>出货放行</strong>
+                    <div class="track"><div class="fill red" style="--w: 31%"></div></div>
+                    <span class="tag red">2 条阻塞</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div class="grid cols-3">
+              <div class="card">
+                <div class="card-head">
+                  <h3>常用入口</h3>
+                  <span class="tag gray">按角色配置</span>
+                </div>
+                <div class="flow">
+                  <button class="btn">采购合同</button>
+                  <button class="btn">生产排单</button>
+                  <button class="btn">入库通知</button>
+                  <button class="btn">应收登记</button>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <h3>协同趋势</h3>
+                  <span class="tag blue">7 日</span>
+                </div>
+                <div class="chart" aria-label="协同趋势示意图">
+                  <span class="bar" style="--h: 48%">周四</span>
+                  <span class="bar" style="--h: 72%">周五</span>
+                  <span class="bar" style="--h: 52%">周六</span>
+                  <span class="bar" style="--h: 38%">周日</span>
+                  <span class="bar" style="--h: 78%">周一</span>
+                  <span class="bar" style="--h: 66%">周二</span>
+                  <span class="bar" style="--h: 84%">今天</span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <h3>角色提醒</h3>
+                  <span class="tag amber">3 个角色</span>
+                </div>
+                <div class="mini-grid">
+                  <div class="mini"><span>财务</span><strong>6</strong></div>
+                  <div class="mini"><span>仓库</span><strong>5</strong></div>
+                  <div class="mini"><span>采购</span><strong>4</strong></div>
+                  <div class="mini"><span>品质</span><strong>2</strong></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="view-task-board" data-title="任务看板">
+            <div class="section">
+              <div class="section-head">
+                <div>
+                  <h2>任务看板</h2>
+                  <p class="section-note">协同层总览。任务完成不代表库存、出货、财务或发票事实已过账。</p>
+                </div>
+                <div class="actions">
+                  <button class="btn">批量催办</button>
+                  <button class="btn primary" type="button" data-action="open-task">新建协同任务</button>
+                </div>
+              </div>
+              <div class="filters">
+                <div class="field">
+                  <label>搜索任务 / 单号 / 客户</label>
+                  <input value="SO-20260608" aria-label="搜索任务" />
+                </div>
+                <div class="field">
+                  <label>负责角色</label>
+                  <select><option>全部角色</option><option>仓库</option><option>财务</option><option>采购</option></select>
+                </div>
+                <div class="field">
+                  <label>任务状态</label>
+                  <select><option>待处理</option><option>阻塞</option><option>可执行</option><option>已完成</option></select>
+                </div>
+                <div class="field">
+                  <label>到期</label>
+                  <select><option>今日到期</option><option>三天内</option><option>已超时</option></select>
+                </div>
+                <div class="field">
+                  <label>来源模块</label>
+                  <select><option>全部模块</option><option>采购</option><option>生产</option><option>出货</option></select>
+                </div>
+                <button class="btn primary">查询</button>
+              </div>
+              <div class="board">
+                <div class="lane">
+                  <div class="lane-title"><span>本页待办</span><span class="tag blue">12</span></div>
+                  <article class="task">
+                    <div class="task-title"><strong>应收对账</strong><span class="tag blue">待处理</span></div>
+                    <span class="muted">SO-20260528-01 / 财务 / 今天 18:00</span>
+                    <div class="actions"><button class="btn primary" data-action="open-task">处理</button><button class="btn">查看</button></div>
+                  </article>
+                  <article class="task">
+                    <div class="task-title"><strong>开票申请</strong><span class="tag blue">待处理</span></div>
+                    <span class="muted">AR-20260607-00 / 财务 / 1 天后到期</span>
+                    <div class="actions"><button class="btn primary" data-action="open-task">处理</button><button class="btn">查看</button></div>
+                  </article>
+                </div>
+                <div class="lane">
+                  <div class="lane-title"><span>阻塞异常</span><span class="tag red">3</span></div>
+                  <article class="task">
+                    <div class="task-title"><strong>仓库预警长列表样本 23</strong><span class="tag red">阻塞</span></div>
+                    <span class="muted">仓库 / 阻塞原因：样本阻塞原因 23</span>
+                    <div class="actions"><button class="btn danger" data-action="reason">补原因</button><button class="btn" data-jump="exception-flow">闭环</button></div>
+                  </article>
+                </div>
+                <div class="lane">
+                  <div class="lane-title"><span>今日到期</span><span class="tag amber">5</span></div>
+                  <article class="task">
+                    <div class="task-title"><strong>客户确认对账</strong><span class="tag amber">18:00</span></div>
+                    <span class="muted">客户：调试客户 C / 负责人：财务</span>
+                    <div class="actions"><button class="btn blue" data-action="reason">催办</button><button class="btn">查看</button></div>
+                  </article>
+                </div>
+                <div class="lane">
+                  <div class="lane-title"><span>已完成</span><span class="tag green">28</span></div>
+                  <article class="task">
+                    <div class="task-title"><strong>采购审批完成</strong><span class="tag green">已完成</span></div>
+                    <span class="muted">只关闭协同任务，不代表入库事实</span>
+                    <div class="actions"><button class="btn">查看事件</button></div>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="view-business-board" data-title="业务看板">
+            <div class="hero">
+              <div class="hero-main">
+                <div class="crumb">ERP / 业务看板</div>
+                <h2>按业务模块看运行状态，不把摘要当事实真源</h2>
+                <p>
+                  业务看板用于经营和协同观察：显示业务记录数量、异常分布、即将到期任务和模块入口。
+                  真实库存、出货和财务事实仍由各自 usecase 与事实表负责。
+                </p>
+                <div class="flow">
+                  <span class="pill green">业务记录 186</span>
+                  <span class="pill amber">预警记录 14</span>
+                  <span class="pill red">阻塞记录 3</span>
+                  <span class="pill blue">本周新增 38</span>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head">
+                  <h3>本周业务记录趋势</h3>
+                  <span class="tag blue">示意</span>
+                </div>
+                <div class="chart">
+                  <span class="bar" style="--h: 42%">周四</span>
+                  <span class="bar" style="--h: 58%">周五</span>
+                  <span class="bar" style="--h: 36%">周六</span>
+                  <span class="bar" style="--h: 24%">周日</span>
+                  <span class="bar" style="--h: 82%">周一</span>
+                  <span class="bar" style="--h: 76%">周二</span>
+                  <span class="bar" style="--h: 68%">今天</span>
+                </div>
+              </div>
+            </div>
+            <div class="grid cols-4">
+              <div class="card">
+                <div class="card-head"><h3>采购</h3><span class="tag green">稳定</span></div>
+                <div class="mini-grid">
+                  <div class="mini"><span>当前记录</span><strong>42</strong></div>
+                  <div class="mini"><span>待审批</span><strong>8</strong></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head"><h3>生产</h3><span class="tag amber">预警</span></div>
+                <div class="mini-grid">
+                  <div class="mini"><span>排单</span><strong>26</strong></div>
+                  <div class="mini"><span>延期</span><strong>5</strong></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head"><h3>仓库</h3><span class="tag red">阻塞</span></div>
+                <div class="mini-grid">
+                  <div class="mini"><span>协同待办</span><strong>11</strong></div>
+                  <div class="mini"><span>阻塞</span><strong>2</strong></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-head"><h3>财务</h3><span class="tag blue">跟进</span></div>
+                <div class="mini-grid">
+                  <div class="mini"><span>对账待办</span><strong>9</strong></div>
+                  <div class="mini"><span>开票申请</span><strong>4</strong></div>
+                </div>
+              </div>
+            </div>
+            <section class="section">
+              <div class="section-head">
+                <div>
+                  <h2>模块健康明细</h2>
+                  <p class="section-note">用于跳转具体模块，不替代各模块列表页和事实层查询。</p>
+                </div>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>模块</th><th>当前记录</th><th>待协同</th><th>阻塞</th><th>即将到期</th><th>建议动作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>采购合同</td><td>42</td><td>8</td><td>0</td><td>3</td><td><button class="btn">进入模块</button></td></tr>
+                    <tr><td>生产排单</td><td>26</td><td>7</td><td>1</td><td>2</td><td><button class="btn">查看预警</button></td></tr>
+                    <tr><td>出货放行</td><td>18</td><td>5</td><td>2</td><td>0</td><td><button class="btn danger" data-jump="exception-flow">处理阻塞</button></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+
+          <section class="view" id="view-print-center" data-title="模板打印中心">
+            <section class="section">
+              <div class="section-head">
+                <div>
+                  <h2>模板打印中心</h2>
+                  <p class="section-note">轻量工作台：模板选择、记录带值、字段映射、预览、打印和导出。</p>
+                </div>
+                <div class="actions">
+                  <button class="btn">字段核对</button>
+                  <button class="btn primary">打印当前模板</button>
+                </div>
+              </div>
+              <div class="print-layout">
+                <aside>
+                  <div class="panel-title" style="margin-bottom: 8px">模板</div>
+                  <div class="template-list" id="templateList">
+                    <button class="template-btn" type="button" data-template="purchase" aria-pressed="true">
+                      <strong>采购合同</strong><span class="muted">正式模板 / 4 条待打印</span>
+                    </button>
+                    <button class="template-btn" type="button" data-template="processing" aria-pressed="false">
+                      <strong>加工合同</strong><span class="muted">正式模板 / 2 条待打印</span>
+                    </button>
+                    <button class="template-btn" type="button" data-template="sample" aria-pressed="false">
+                      <strong>样品确认单</strong><span class="muted">候选模板 / 暂未正式启用</span>
+                    </button>
+                  </div>
+                </aside>
+                <div>
+                  <div class="paper" id="paperPreview">
+                    <h3 id="paperTitle">采购合同</h3>
+                    <div class="paper-grid">
+                      <div class="paper-line">合同编号：KSC260507002</div>
+                      <div class="paper-line">签约日期：2026/06/10</div>
+                      <div class="paper-line">供应商：调试供应商 A</div>
+                      <div class="paper-line">客户：调试客户 C</div>
+                    </div>
+                    <div class="paper-line">产品名称：调试款抱枕</div>
+                    <div class="paper-line" style="margin-top: 10px">数量 / 金额：300 件 / 21,000.00</div>
+                    <div class="paper-line" style="margin-top: 10px">备注：字段来自当前选中业务记录，仅用于打印预览。</div>
+                    <div class="stamp">模板预览</div>
+                  </div>
+                </div>
+                <aside>
+                  <div class="panel-title" style="margin-bottom: 8px">字段映射</div>
+                  <div class="mapping">
+                    <div class="map-row"><span>合同编号</span><span class="tag green">已带值</span></div>
+                    <div class="map-row"><span>供应商 / 客户</span><span class="tag green">已带值</span></div>
+                    <div class="map-row"><span>产品明细</span><span class="tag blue">来自明细行</span></div>
+                    <div class="map-row"><span>签章栏</span><span class="tag gray">手工确认</span></div>
+                  </div>
+                  <div class="section-note" style="margin-top: 12px">
+                    打印预览固定浅色，不跟随后台暗色主题。正式字段口径仍以打印模板文档和运行时代码为准。
+                  </div>
+                </aside>
+              </div>
+            </section>
+          </section>
+
+          <section class="view" id="view-exception-flow" data-title="异常 / 阻塞闭环">
+            <section class="section">
+              <div class="section-head">
+                <div>
+                  <h2>异常 / 阻塞闭环</h2>
+                  <p class="section-note">定义用户处理动作和责任流转，不直接写库存、出货、财务或发票事实。</p>
+                </div>
+                <button class="btn primary" type="button" data-action="reason">登记阻塞原因</button>
+              </div>
+              <div class="flow-steps">
+                <button class="step active" type="button" data-step="阻塞记录">
+                  <strong>1. 阻塞记录</strong><span>必须填写原因和影响范围</span>
+                </button>
+                <button class="step" type="button" data-step="责任分派">
+                  <strong>2. 责任分派</strong><span>按 owner_role_key 或指定人员接收</span>
+                </button>
+                <button class="step" type="button" data-step="处理跟进">
+                  <strong>3. 处理跟进</strong><span>上传说明、催办或转派</span>
+                </button>
+                <button class="step" type="button" data-step="验证恢复">
+                  <strong>4. 验证恢复</strong><span>确认可继续执行</span>
+                </button>
+                <button class="step" type="button" data-step="关闭归档">
+                  <strong>5. 关闭归档</strong><span>只关闭协同异常</span>
+                </button>
+              </div>
+            </section>
+
+            <div class="grid cols-2">
+              <section class="section">
+                <div class="section-head">
+                  <div>
+                    <h2 id="stepTitle">阻塞记录</h2>
+                    <p class="section-note">当前选中步骤的操作说明和输入要求。</p>
+                  </div>
+                </div>
+                <div style="padding: 12px">
+                  <div class="field">
+                    <label>阻塞原因</label>
+                    <textarea>仓库预警样本阻塞原因 23，需采购补齐供应商确认资料。</textarea>
+                  </div>
+                  <div class="grid cols-3" style="margin-top: 10px">
+                    <div class="mini"><span>责任角色</span><strong>采购</strong></div>
+                    <div class="mini"><span>影响模块</span><strong>入库通知</strong></div>
+                    <div class="mini"><span>到期</span><strong>今天 18:00</strong></div>
+                  </div>
+                  <div class="flow">
+                    <button class="btn primary">保存原因</button>
+                    <button class="btn blue">催办采购</button>
+                    <button class="btn">转派</button>
+                    <button class="btn danger">退回</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="section">
+                <div class="section-head">
+                  <div>
+                    <h2>闭环队列</h2>
+                    <p class="section-note">把阻塞、催办、处理记录和验证结果放在同一条链路里。</p>
+                  </div>
+                </div>
+                <div class="list" style="padding: 12px">
+                  <div class="item">
+                    <div><strong>仓库预警长列表样本 23</strong><span>阻塞 2 小时 / 等待采购补资料</span></div>
+                    <span class="tag red">阻塞</span>
+                  </div>
+                  <div class="item">
+                    <div><strong>客户确认对账</strong><span>已催办 1 次 / 财务负责</span></div>
+                    <span class="tag amber">催办中</span>
+                  </div>
+                  <div class="item">
+                    <div><strong>出货放行资料复核</strong><span>已补材料 / 等待仓库验证</span></div>
+                    <span class="tag blue">待验证</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <aside class="drawer" id="taskDrawer" aria-label="任务详情面板" aria-hidden="true">
+      <div class="drawer-head">
+        <div>
+          <strong>任务详情</strong>
+          <div class="muted">SO-20260528-01 / AR-20260608-00</div>
+        </div>
+        <button class="btn" type="button" id="closeDrawer">关闭</button>
+      </div>
+      <div class="drawer-body">
+        <div class="flow">
+          <span class="tag blue">待处理</span>
+          <span class="tag gray">负责人：财务</span>
+          <span class="tag amber">今天 18:00 到期</span>
+        </div>
+        <div class="grid cols-2" style="margin-top: 12px">
+          <div class="mini"><span>任务</span><strong>应收对账</strong></div>
+          <div class="mini"><span>来源单号</span><strong>SO-20260528-01</strong></div>
+          <div class="mini"><span>关联记录</span><strong>AR-20260608-00</strong></div>
+          <div class="mini"><span>当前角色</span><strong>财务</strong></div>
+        </div>
+        <section class="card" style="box-shadow: none; margin-top: 12px">
+          <div class="card-head"><h3>处理要求</h3><span class="tag gray">Workflow</span></div>
+          <p class="muted" style="margin: 0">
+            请核对应收金额与订单金额是否一致。点击完成只关闭协同任务，不代表应收、发票或收款事实已写入。
+          </p>
+        </section>
+        <div class="reason-panel" id="reasonPanel">
+          <h3 id="reasonTitle">阻塞原因（必填）</h3>
+          <textarea placeholder="填写原因、影响范围、需要谁处理"></textarea>
+          <div class="flow">
+            <button class="btn primary">提交</button>
+            <button class="btn" type="button" id="cancelReason">取消</button>
+          </div>
+        </div>
+      </div>
+      <div class="drawer-foot">
+        <button class="btn primary">处理完成</button>
+        <button class="btn danger" type="button" data-action="reason">标记阻塞</button>
+        <button class="btn blue" type="button" data-action="reason">催办</button>
+      </div>
+    </aside>
+
+    <script>
+      const viewTitles = {
+        "workbench": "后台首页 / 工作台",
+        "task-board": "任务看板",
+        "business-board": "业务看板",
+        "print-center": "模板打印中心",
+        "exception-flow": "异常 / 阻塞闭环",
+      };
+
+      const navButtons = Array.from(document.querySelectorAll("[data-view]"));
+      const views = Array.from(document.querySelectorAll(".view"));
+      const topTitle = document.querySelector("#topTitle");
+      const mobileViewSelect = document.querySelector("#mobileViewSelect");
+      const drawer = document.querySelector("#taskDrawer");
+      const overlay = document.querySelector("#overlay");
+      const closeDrawer = document.querySelector("#closeDrawer");
+      const reasonPanel = document.querySelector("#reasonPanel");
+      const reasonTitle = document.querySelector("#reasonTitle");
+      const cancelReason = document.querySelector("#cancelReason");
+      const templateButtons = Array.from(document.querySelectorAll(".template-btn"));
+      const paperTitle = document.querySelector("#paperTitle");
+      const stepButtons = Array.from(document.querySelectorAll(".step"));
+      const stepTitle = document.querySelector("#stepTitle");
+
+      function setView(viewKey) {
+        for (const view of views) view.classList.toggle("active", view.id === `view-${viewKey}`);
+        for (const button of navButtons) {
+          if (button.dataset.view) {
+            button.setAttribute("aria-current", button.dataset.view === viewKey ? "page" : "false");
+          }
+        }
+        topTitle.textContent = viewTitles[viewKey] || "后台工作台";
+        if (mobileViewSelect) mobileViewSelect.value = viewKey;
+      }
+
+      function openDrawer(mode = "task") {
+        drawer.classList.add("open");
+        drawer.setAttribute("aria-hidden", "false");
+        overlay.classList.add("open");
+        if (mode === "reason") openReason("阻塞原因（必填）");
+      }
+
+      function closeTaskDrawer() {
+        drawer.classList.remove("open");
+        drawer.setAttribute("aria-hidden", "true");
+        overlay.classList.remove("open");
+        reasonPanel.classList.remove("open");
+      }
+
+      function openReason(title) {
+        reasonTitle.textContent = title || "处理原因";
+        reasonPanel.classList.add("open");
+      }
+
+      document.addEventListener("click", (event) => {
+        const jump = event.target.closest("[data-jump]");
+        if (jump) setView(jump.dataset.jump);
+
+        const action = event.target.closest("[data-action]");
+        if (!action) return;
+        if (action.dataset.action === "open-task") openDrawer("task");
+        if (action.dataset.action === "reason") openDrawer("reason");
+      });
+
+      for (const button of navButtons) {
+        button.addEventListener("click", () => setView(button.dataset.view));
+      }
+
+      mobileViewSelect.addEventListener("change", () => setView(mobileViewSelect.value));
+      closeDrawer.addEventListener("click", closeTaskDrawer);
+      overlay.addEventListener("click", closeTaskDrawer);
+      cancelReason.addEventListener("click", () => reasonPanel.classList.remove("open"));
+
+      for (const button of templateButtons) {
+        button.addEventListener("click", () => {
+          for (const item of templateButtons) item.setAttribute("aria-pressed", String(item === button));
+          const titles = {
+            purchase: "采购合同",
+            processing: "加工合同",
+            sample: "样品确认单",
+          };
+          paperTitle.textContent = titles[button.dataset.template] || "模板预览";
+        });
+      }
+
+      for (const step of stepButtons) {
+        step.addEventListener("click", () => {
+          for (const item of stepButtons) item.classList.toggle("active", item === step);
+          stepTitle.textContent = step.dataset.step;
+        });
+      }
+    </script>
+  </body>
+</html>

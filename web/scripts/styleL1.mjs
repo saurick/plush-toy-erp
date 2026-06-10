@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
+import net from 'node:net'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -44,6 +45,7 @@ const scenarios = [
   {
     name: 'root-redirect-desktop',
     path: '/',
+    mockAdminRpc: true,
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '毛绒 ERP 管理后台')
@@ -55,6 +57,7 @@ const scenarios = [
   {
     name: 'root-redirect-mobile',
     path: '/',
+    mockAdminRpc: true,
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
       await expectHeading(page, '毛绒 ERP 管理后台')
@@ -66,6 +69,7 @@ const scenarios = [
   {
     name: 'admin-login-mobile',
     path: '/admin-login',
+    mockAdminRpc: true,
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
@@ -77,6 +81,7 @@ const scenarios = [
   {
     name: 'admin-login-theme-modes-desktop',
     path: '/admin-login',
+    mockAdminRpc: true,
     viewport: { width: 1280, height: 800 },
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
@@ -220,6 +225,55 @@ const scenarios = [
       })
       await page.getByRole('button', { name: /刷新当前页/ }).click()
       await expectText(page, '看板跳转测试任务')
+      await page
+        .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
+        .fill('OUT-DASH-NAV')
+      await page.getByText('全部角色').click()
+      await page.getByTitle('仓库', { exact: true }).click()
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await waitForPath(page, '/erp/dashboard')
+      assert.match(
+        page.url(),
+        /[?&]q=OUT-DASH-NAV(?:&|$)/,
+        '任务看板关键词筛选应写入 URL'
+      )
+      assert.match(
+        page.url(),
+        /[?&]role=warehouse(?:&|$)/,
+        '任务看板角色筛选应写入 URL'
+      )
+      await expectText(page, '看板跳转测试任务')
+      const restoredKeyword = await page
+        .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
+        .inputValue()
+      assert.equal(restoredKeyword, 'OUT-DASH-NAV')
+      const clearFiltersButton = page.getByRole('button', { name: '清空筛选' })
+      assert.equal(
+        await clearFiltersButton.isEnabled(),
+        true,
+        '任务看板存在 URL 筛选时清空按钮应可用'
+      )
+      await clearFiltersButton.click()
+      assert.doesNotMatch(
+        page.url(),
+        /[?&](q|role)=/,
+        '清空筛选后应移除任务看板 URL 筛选参数'
+      )
+      await page.waitForFunction(
+        () =>
+          document.querySelector(
+            'input[placeholder="搜索任务、单号、来源、阻塞原因"]'
+          )?.value === ''
+      )
+      const clearedKeyword = await page
+        .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
+        .inputValue()
+      assert.equal(clearedKeyword, '')
+      assert.equal(
+        await clearFiltersButton.isDisabled(),
+        true,
+        '任务看板回到默认筛选后清空按钮应禁用'
+      )
       await page.getByRole('button', { name: '看板跳转测试任务' }).click()
       await waitForPath(page, '/erp/warehouse/shipping-release')
       await expectText(page, '待出货/出货放行')
@@ -735,6 +789,146 @@ const scenarios = [
       await assertDarkThemeContrast(page, {
         scenarioName: 'dev-docs-dark-desktop',
         selector: '.erp-dev-docs-page',
+      })
+    },
+  },
+  {
+    name: 'dev-customer-config-dark-desktop',
+    path: '/__dev/customer-config',
+    themeMode: 'dark',
+    viewport: { width: 1536, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '客户配置开发总控')
+      await expectText(page, '当前客户 key')
+      await expectText(page, 'yoyoosun')
+      await expectText(page, '已接运行时')
+      await expectText(page, '真实客户数据导入')
+      await assertERPThemeMode(page, {
+        scenarioName: 'dev-customer-config-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'dev-customer-config-dark-desktop',
+        selector: '.erp-dev-customer-page',
+      })
+      const faviconHref = await page.evaluate(() =>
+        document.querySelector('link[rel~="icon"]')?.getAttribute('href')
+      )
+      assert.equal(
+        faviconHref,
+        '/favicon-customer-config.svg',
+        `客户配置开发页 favicon 异常: ${faviconHref}`
+      )
+
+      await page
+        .locator('.erp-dev-customer-view-switch .ant-segmented-item')
+        .filter({ hasText: '字段编号' })
+        .click()
+      await expectText(page, '边界守卫')
+      await expectText(page, 'runtimeEnabled')
+      await expectText(page, '客户编码')
+
+      await page
+        .locator('.erp-dev-customer-view-switch .ant-segmented-item')
+        .filter({ hasText: '导入工具' })
+        .click()
+      await expectText(page, 'canExecuteRealImport')
+      await expectText(page, 'false')
+      await expectText(page, 'customerImportDryRun.mjs')
+      await assertNoHorizontalOverflow(page, 'dev-customer-config-import-view')
+    },
+  },
+  {
+    name: 'dev-customer-config-mobile',
+    path: '/__dev/customer-config',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectHeading(page, '客户配置开发总控')
+      await expectText(page, '菜单分组')
+      await expectText(page, '字段候选')
+      await page
+        .locator('.erp-dev-customer-view-switch .ant-segmented-item')
+        .filter({ hasText: '菜单品牌' })
+        .click()
+      await expectText(page, '东莞市永绅玩具有限公司')
+      await expectText(page, '采购/仓储')
+      const metrics = await page.evaluate(() => {
+        const panel = document.querySelector('.erp-dev-customer-panel-grid')
+        const style = panel ? getComputedStyle(panel) : null
+        return {
+          gridTemplateColumns: style?.gridTemplateColumns || '',
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        }
+      })
+      assert(
+        metrics.gridTemplateColumns &&
+          !metrics.gridTemplateColumns.includes('420px'),
+        `移动端客户配置页不应保持桌面双列布局: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        metrics.scrollWidth <= metrics.clientWidth + 1,
+        `移动端客户配置页出现横向溢出: ${JSON.stringify(metrics)}`
+      )
+    },
+  },
+  {
+    name: 'dev-testing-dark-desktop',
+    path: '/__dev/testing',
+    themeMode: 'dark',
+    viewport: { width: 1536, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '开发测试入口')
+      await expectText(page, '测试分层')
+      await expectText(page, '命令入口')
+      await expectText(page, 'docs/product/test-strategy.md')
+      const defaultMetrics = await page.evaluate(() => {
+        const root = document.querySelector('.erp-dev-testing-page')
+        return {
+          tierCount: document.querySelectorAll('.erp-dev-testing-tier').length,
+          docCount: document.querySelectorAll('.erp-dev-testing-doc-row')
+            .length,
+          overflow:
+            root && document.documentElement.scrollWidth > root.clientWidth + 1,
+        }
+      })
+      assert.equal(
+        defaultMetrics.overflow,
+        false,
+        `测试入口默认态不应横向溢出: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert(
+        defaultMetrics.tierCount >= 8,
+        `测试入口应渲染测试分层: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert(
+        defaultMetrics.docCount > 0,
+        `测试入口应渲染相关文档: ${JSON.stringify(defaultMetrics)}`
+      )
+
+      await page.getByText('命令入口', { exact: true }).click()
+      await expectText(page, 'pnpm style:l1')
+      const commandMetrics = await page.evaluate(() => ({
+        commandBlocks: document.querySelectorAll(
+          '.erp-dev-testing-command-block'
+        ).length,
+        hasCommandPre: Boolean(
+          document.querySelector('.erp-dev-testing-command-block pre')
+        ),
+      }))
+      assert(
+        commandMetrics.commandBlocks > 0 && commandMetrics.hasCommandPre,
+        `测试入口命令视图应渲染命令块: ${JSON.stringify(commandMetrics)}`
+      )
+      await assertERPThemeMode(page, {
+        scenarioName: 'dev-testing-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'dev-testing-dark-desktop',
+        selector: '.erp-dev-testing-page',
       })
     },
   },
@@ -1820,6 +2014,12 @@ async function waitForServer(url) {
   let lastError = 'server did not become ready'
 
   while (Date.now() < deadline) {
+    if (devServerProcess?.exitCode !== null) {
+      throw new Error(
+        `[style:l1] 前端预览进程已退出，无法继续使用可能残留的旧服务\n最近 vite 输出：\n${tailLogs(devServerLogs)}`
+      )
+    }
+
     try {
       const response = await fetch(url, {
         redirect: 'manual',
@@ -1830,6 +2030,9 @@ async function waitForServer(url) {
       lastError = `unexpected status ${response.status}`
     } catch (error) {
       lastError = error.message
+      if (await canConnectToLocalServer(url)) {
+        return
+      }
     }
     await delay(300)
   }
@@ -1839,8 +2042,45 @@ async function waitForServer(url) {
   )
 }
 
+function canConnectToLocalServer(url) {
+  return new Promise((resolve) => {
+    let settled = false
+    const { hostname, port, protocol } = new URL(url)
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      resolve(false)
+      return
+    }
+
+    const socket = net.createConnection({
+      host: hostname,
+      port: Number(port || (protocol === 'https:' ? 443 : 80)),
+    })
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      socket.destroy()
+      resolve(false)
+    }, 500)
+
+    socket.once('connect', () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      socket.end()
+      resolve(true)
+    })
+    socket.once('error', () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      resolve(false)
+    })
+  })
+}
+
 async function runScenario(browser, scenario) {
-  const page = await browser.newPage({ viewport: scenario.viewport })
+  const context = await browser.newContext({ viewport: scenario.viewport })
+  const page = await context.newPage()
   const errors = []
 
   if (scenario.mockAdminRpc) {
@@ -1912,7 +2152,7 @@ async function runScenario(browser, scenario) {
         localStorage.removeItem('plush_erp_theme_mode')
       })
       .catch(() => {})
-    await page.close()
+    await context.close()
   }
 }
 

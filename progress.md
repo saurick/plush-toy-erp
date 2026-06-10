@@ -202,7 +202,6 @@
 - 下一步：如果继续对齐 `/__dev/docs`，可以考虑把目录分组标题也改成“目录”区块标题，但当前不再扩大范围。
 - 阻塞/风险：本轮只改 `/__dev/prototypes` dev-only 前端入口、样式和过程记录；未改静态 `docs/product/prototypes/index.html`、后端、schema、migration、RBAC、ERP 正式菜单、seed、生产构建或目标环境镜像。追加前 `progress.md` 为 195 行 / 41691 bytes，未达到归档阈值。
 
-
 ## 2026-06-10 11:14 CST
 
 - 完成：将原 `docs/product/product-delivery-ledgers.md` 拆为索引文档，新增全局 `docs/product/capability-ledger.md`，并把 yoyoosun 客户交付矩阵和客户差异台账分别落到 `docs/customers/yoyoosun/delivery-matrix.md` 与 `docs/customers/yoyoosun/delta-ledger.md`。
@@ -210,3 +209,87 @@
 - 验证：已确认能力台账保留 35 条 `CAP-*`，yoyoosun 交付矩阵保留 32 条客户行，yoyoosun 差异台账保留 30 条 `DELTA-YOYOOSUN-*`；旧“产品能力 / 交付 / 差异台账”合并文案已从活跃 README / docs / web 入口清理；`node --test src/erp/config/devCapabilityLedger.test.mjs`、`pnpm lint`、`pnpm test` 和 `git diff --check` 均通过，`pnpm test` 通过 294 项。
 - 下一步：后续新增客户时按 `docs/customers/<customer-key>/delivery-matrix.md` 和 `docs/customers/<customer-key>/delta-ledger.md` 新建客户台账，不复制产品能力台账。
 - 阻塞/风险：本轮是文档结构和 dev-only 可视化读取源调整；未改后端、schema、migration、RBAC、ERP 正式菜单、seed、生产构建或目标环境镜像。追加前 `progress.md` 为 203 行 / 43272 bytes，未达到归档阈值。
+
+## 2026-06-10 11:40 CST
+
+- 完成：新增 `docs/product/prototypes/admin-command-center-v1/` 后台工作台与看板整套原型，单文件 HTML 覆盖后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常 / 阻塞闭环五个视图，并提供任务详情抽屉、阻塞原因面板、模板切换和异常步骤切换交互。
+- 完成：同步更新 `docs/product/prototypes/index.html`、`docs/product/prototypes/README.md`、`docs/document-inventory.md`、`web/src/erp/config/devPrototypes.mjs` 和 `web/src/erp/config/devPrototypes.test.mjs`，让静态原型查看器和开发态 `/__dev/prototypes` 都登记新资产。
+- 验证：HTML 内联脚本编译检查、静态原型索引本地链接检查、`node --test web/src/erp/config/devPrototypes.test.mjs`、`pnpm exec eslint --ext .js --ext .jsx src/erp/config/devPrototypes.mjs src/erp/config/devPrototypes.test.mjs`、指定文件 `git diff --check` 均通过；Playwright 打开 `admin-command-center-v1/index.html` 验证桌面五视图切换、任务抽屉、阻塞原因面板、模板切换、异常步骤切换和 390x844 移动视口无横向溢出。
+- 下一步：如果要落地真实运行时页面，应先分别评审任务看板、业务看板和工作台的菜单入口、RBAC 权限码、后端 API 聚合口径和浏览器回归范围；不要直接复制 HTML 到 `web/src`。
+- 阻塞/风险：本轮只新增和登记原型资产，未改后端、schema、migration、WorkflowUsecase、Fact usecase、ERP 正式菜单、seed、生产构建或目标环境镜像。工作区已有多处非本轮文档 / dev-only 改动，本轮未回退或整理；追加前 `progress.md` 为 211 行 / 44796 bytes，未达到归档阈值。
+
+## 2026-06-10 12:19 CST
+
+- 完成：新增开发态 `/__dev/testing` 测试入口，解析 `docs/product/test-strategy.md` 的 T0-T8 测试分层，并从 `docs/**/*.md` 中筛出测试、验收、QA、smoke、`style:l1` 等相关文档和 fenced command blocks。
+- 完成：新增 `devTesting` 解析 helper、单测和 `DevTestingPage`；接入 dev-only router、浅色 / 暗色 / 响应式样式、默认前端测试脚本和 `style:l1` 场景；同步更新 `web/README.md` 与 `docs/current-source-of-truth.md`，明确该入口不进 ERP 菜单、seedData、RBAC、后端业务、产品内 docs registry 或生产构建。
+- 验证：`node --test web/src/erp/config/devTesting.test.mjs`、`pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-testing-dark-desktop pnpm --dir web style:l1`、`STYLE_L1_PORT=4185 pnpm --dir web style:l1` 均通过；完整 `style:l1` 通过 44 个场景。Browser 通过 `http://127.0.0.1:5175/__dev/testing` 验证默认态 9 个测试层级、92 篇相关文档、命令视图 280 个命令块、包含 `pnpm style:l1` 和 `scripts/qa/fast.sh`，桌面与 390x844 移动视口均无横向溢出。
+- 下一步：如后续测试文档继续膨胀，可再评估是否默认隐藏 `docs/reference/*` 或为发布 evidence 单独加筛选组；当前先保持“docs 下测试相关文档可发现”的总入口。
+- 阻塞/风险：完整 `style:l1` 前两次分别因 4173 端口残留和 `erp-dashboard-dark-desktop` 偶发加载时序失败，清理为独立端口后重跑通过；本轮未改后端、schema、migration、RBAC、ERP 正式菜单、seed、业务事实、生产构建或目标环境镜像。工作区已有多处非本轮 dev-only / dashboard / prototype 改动，本轮未回退或整理；追加前 `progress.md` 为 236 行 / 50197 bytes，未达到归档阈值。
+
+## 2026-06-10 12:08 CST
+
+- 完成：把开发态 `/__dev/capability-ledger` 从单一产品能力台账扩展为三账联动可视化，继续只读解析 `docs/product/capability-ledger.md`，并新增读取 `docs/customers/yoyoosun/delivery-matrix.md` 与 `docs/customers/yoyoosun/delta-ledger.md`。
+- 完成：新增产品能力 / 客户交付 / 客户差异三个视图，支持关键词、产品能力层级 / 业务域 / 成熟度、客户交付状态 / CAP ID、客户差异分类 / Product Core 判断筛选；产品能力详情展示 yoyoosun 交付关联和差异关联，只按显式 `CAP-*` 建立关联，不猜测客户差异到产品能力的隐含关系。
+- 完成：同步更新 `web/README.md` 和 `docs/current-source-of-truth.md`，明确该入口是 dev-only 三账只读联动，不进入 ERP 正式菜单、RBAC、后端 API、schema、migration 或产品内 docs registry。
+- 验证：`node --test web/src/erp/config/devCapabilityLedger.test.mjs` 通过 6 项；`pnpm lint`、`pnpm css`、`pnpm test` 均通过，`pnpm test` 通过 296 项；指定文件 `git diff --check` 通过。Browser 通过 `http://127.0.0.1:5175/__dev/capability-ledger` 验证默认产品能力视图 35 条、三视图切换、`CAP-029` 搜索收敛到 1/35、390x844 移动视口横向溢出为 0。
+- 下一步：如果后续新增第二个客户，可以把当前 yoyoosun source path 抽成 dev-only 客户选择，但仍应先保持 Markdown 台账为唯一维护入口。
+- 阻塞/风险：`pnpm style:l1` 当前失败在既有 `erp-dashboard-desktop` 场景，错误为未找到“待处理任务数”；工作区已有非本轮 `web/src/erp/pages/DashboardPage.jsx` 删除现场，本轮未回退或修复该相邻改动。Browser console 存在编辑期旧 HMR reload 失败日志，但新渲染页面无 Vite overlay，DOM 回归和交互验证均通过。追加前 `progress.md` 为 219 行 / 46538 bytes，未达到归档阈值。
+
+## 2026-06-10 12:32 CST
+
+- 完成：新增开发态 `/__dev/customer-config` 客户配置总控页，基于现有 yoyoosun 客户配置资料只读汇总前端品牌 / 菜单 runtime、字段 / 编号草案、导入 tooling 和边界状态；该入口只在 `import.meta.env.DEV` 下注册，不进入 ERP 正式菜单、seedData、RBAC、后端业务、真实导入或生产构建。
+- 完成：新增 `devCustomerConfig` 汇总 helper、单测、页面样式、暗色 / 移动端回归场景和独立 `/favicon-customer-config.svg`；同步更新 favicon 路由映射、`web/README.md` 与 `docs/current-source-of-truth.md`，明确 `config/customers/yoyoosun/*`、`scripts/import/*` 和正式文档仍是维护真源。
+- 验证：`node --test src/erp/config/devCustomerConfig.test.mjs src/common/consts/favicon.test.mjs`、`node scripts/qa/customer-config-boundaries.mjs`、`pnpm lint`、`pnpm css`、`pnpm test`、`STYLE_L1_SCENARIOS=dev-customer-config-dark-desktop,dev-customer-config-mobile pnpm style:l1`、`pnpm style:l1` 和 `git diff --check` 均通过；`pnpm test` 当前通过 306 项，完整 `style:l1` 通过 44 个场景，客户配置 L1 覆盖暗色桌面、视图切换、favicon 和 390x844 移动视口无横向溢出。Browser 通过 `http://127.0.0.1:5189/__dev/customer-config` 验证标题、yoyoosun、字段编号、导入工具、`/favicon-customer-config.svg`、无横向溢出和 console error 为空。
+- 下一步：如后续要把字段 / 编号草案接入运行时，应先做 Product Core 评审、schema / API / UI / 测试边界确认，再从当前只读 dev 页面推进，不直接把草案写入业务 usecase。
+- 阻塞/风险：本轮未执行真实客户数据导入、未写数据库、未改后端 / schema / migration / RBAC / ERP 正式菜单 / seed / 生产构建；工作区已有多处非本轮 dev-only 和原型改动，本轮未回退或整理。追加前 `progress.md` 为 228 行 / 48487 bytes，未达到归档阈值。
+
+## 2026-06-10 12:22 CST
+
+- 完成：恢复前端 `style:l1` 基线。原 dashboard 断言已随当前 `DashboardPage.jsx` 恢复通过；继续修复新暴露的 `dev-customer-config-dark-desktop` 失败，把 `runtimeEnabled=false` 显式纳入客户字段编号草案的边界守卫输出，并补充 `devCustomerConfig` 单测。
+- 完成：修复 `web/scripts/styleL1.mjs` 场景隔离和本地预览启动判定。每个场景改为独立 browser context，避免 localStorage / 登录态在全量场景之间串场；预览进程若已非 0 退出则直接失败，不再误连端口上可能残留的旧服务。
+- 验证：`node --test web/src/erp/config/devCustomerConfig.test.mjs` 通过 5 项；`node --check web/scripts/styleL1.mjs`、`pnpm lint`、`pnpm css`、`pnpm style:l1` 和 `pnpm test` 均通过；完整 `style:l1` 通过 44 个场景，`pnpm test` 通过 306 项；4173 端口收口后无残留监听。
+- 下一步：当前可继续做真实运行时页面评审或下一个 dev-only 治理入口，但前端样式回归基线已恢复，后续改动应保持每轮都能完整跑过 `style:l1`。
+- 阻塞/风险：本轮只修 QA 脚本隔离和客户配置 dev-only 守卫展示；未改后端、schema、migration、RBAC、ERP 正式菜单、seed、业务事实、生产构建或目标环境镜像。工作区已有多处非本轮 dev-only / dashboard / prototype 改动，本轮未回退或整理；追加前 `progress.md` 为 244 行 / 52340 bytes，未达到归档阈值。
+
+## 2026-06-10 12:24 CST
+
+- 完成：把后台 `/erp/dashboard` 从原任务列表升级为工作台式任务协同入口，保留“任务看板”路由和既有 L1 文案契约，同时新增任务池总览、统计卡、状态 / 角色 / 到期 / 来源筛选、任务泳道、分页表格、详情抽屉、阻塞原因面板、催办和完成动作。
+- 完成：新增 `workflowTaskBoard` 展示 helper 与测试，统一任务状态文案、负责人角色、到期标签、阻塞 / 退回原因读取、筛选和泳道分组；同步更新业务看板边界提示、打印中心回工作台入口、工作台样式浅色 / 暗色 / 响应式覆盖、`web/README.md` 和 `web/package.json` 测试清单。
+- 验证：`pnpm lint`、`pnpm css`、`pnpm test`、`pnpm style:l1`、`git diff --check` 均通过；`pnpm test` 当前通过 310 项，完整 `style:l1` 通过 44 个场景。另用 Playwright 在 `http://127.0.0.1:5187/erp/dashboard` mock workflow/admin RPC 验证任务详情抽屉、提交阻塞原因、桌面和 390x844 移动视口横向溢出均通过。
+- 下一步：如果要继续推进，可评审是否把任务看板的筛选状态写入 URL 或本地偏好；当前先保持运行时最小闭环，不新增后端聚合 API。
+- 阻塞/风险：本轮只改桌面前端工作台、现有 workflow API 调用、样式、测试和前端说明；未改后端、schema、migration、RBAC 权限码、seed、WorkflowUsecase、Fact usecase、库存 / 出货 / 应收 / 开票 / 收付款事实写入、生产构建或目标环境镜像。工作区仍有多处非本轮 dev-only / 文档 / 原型改动，本轮未回退或整理；追加前 `progress.md` 为 252 行 / 53845 bytes，未达到归档阈值。
+
+## 2026-06-10 12:25 CST
+
+- 完成：同步后台工作台与看板原型的运行时承接口径，明确 `docs/product/prototypes/admin-command-center-v1/` 仍是参考原型，而 `/erp/dashboard`、`/erp/business-dashboard` 和 `/erp/print-center` 已分别承接 Workflow 任务工作台、业务摘要看板和模板打印中心。
+- 完成：更新 `docs/current-source-of-truth.md` 和 `web/README.md`，把原型参考、运行时入口、Workflow / Fact 边界和不写库存 / 出货 / 财务 / 发票 / 收付款事实的限制写到正式阅读入口。
+- 验证：`git diff --check -- docs/product/prototypes/admin-command-center-v1/README.md docs/current-source-of-truth.md web/README.md progress.md` 通过。
+- 下一步：可继续评审任务看板是否需要 URL / 本地偏好保存，或转向下一个 dev-only 治理入口；若继续扩展运行时工作台，需先评审菜单、RBAC、seed、后端聚合口径和浏览器回归范围。
+- 阻塞/风险：本轮只同步文档口径，未改后端、schema、migration、RBAC、seed、WorkflowUsecase、Fact usecase、正式菜单、生产构建或目标环境镜像；追加前 `progress.md` 为 260 行 / 55576 bytes，未达到归档阈值。
+
+## 2026-06-10 12:30 CST
+
+- 完成：将 `/erp/dashboard` 任务工作台筛选状态收口到 URL query，关键词、状态、角色、到期和来源筛选可复制链接并在刷新后恢复；默认筛选不写入 URL，无关 query 参数保留。
+- 完成：新增 `workflowTaskBoard` URL 筛选读写 helper 和单测，`DashboardPage` 改为从 `useSearchParams` 派生筛选状态；扩展 `erp-dashboard-desktop` L1 场景，覆盖关键词 / 角色筛选写入 URL、刷新恢复和任务跳转仍可用。
+- 完成：修复 `style:l1` 本地预览启动探活，`fetch` 失败但 Vite 本地端口已 TCP 可连时允许继续进入浏览器加载，避免 Vite 已 ready 但 Node fetch 瞬时失败导致误判。
+- 完成：同步更新 `docs/current-source-of-truth.md` 和 `web/README.md`，明确 URL 筛选只影响当前页面展示，不写后端用户偏好、WorkflowUsecase 或事实表。
+- 验证：`node --test web/src/erp/utils/workflowTaskBoard.test.mjs`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=erp-dashboard-desktop STYLE_L1_PORT=4186 pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=root-redirect-desktop,root-redirect-mobile,admin-login-mobile,admin-login-theme-modes-desktop STYLE_L1_PORT=4191 pnpm --dir web style:l1` 和 `STYLE_L1_PORT=4192 pnpm --dir web style:l1` 均通过；`pnpm test` 当前通过 312 项，完整 `style:l1` 通过 44 个场景。
+- 下一步：可继续把业务看板的状态钻取参数和任务工作台筛选参数做双向联动，或先补任务工作台筛选清空按钮；当前不新增后端聚合 API。
+- 阻塞/风险：本轮只改桌面前端页面状态、helper、L1 回归和文档；未改后端、schema、migration、RBAC、seed、WorkflowUsecase、Fact usecase、正式菜单、生产构建或目标环境镜像。追加前 `progress.md` 为 268 行 / 56802 bytes，未达到归档阈值。
+
+## 2026-06-10 12:38 CST
+
+- 完成：为 `/erp/dashboard` 任务工作台新增“清空筛选”按钮；仅在关键词、状态、角色、到期或来源存在非默认筛选时启用，点击后移除任务看板自己的 URL query 参数并保留无关 query。
+- 完成：新增 `hasActiveWorkflowTaskBoardFilters` helper 和单测，扩展 `erp-dashboard-desktop` L1 场景，覆盖筛选后按钮启用、清空后 URL 和输入框恢复默认、按钮禁用以及任务跳转仍可用。
+- 完成：同步更新 `docs/current-source-of-truth.md` 和 `web/README.md`，明确任务筛选支持复制链接、刷新恢复和一键清空，但仍只影响页面展示。
+- 验证：`node --test web/src/erp/utils/workflowTaskBoard.test.mjs`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=erp-dashboard-desktop STYLE_L1_PORT=4195 pnpm --dir web style:l1`、`pnpm --dir web lint`、`pnpm --dir web test` 和 `STYLE_L1_PORT=4196 pnpm --dir web style:l1` 均通过；`pnpm test` 当前通过 313 项，完整 `style:l1` 通过 44 个场景。首次 dashboard 定向 L1 曾出现浏览器 `localStorage access denied` 偶发 pageerror，换新端口重跑同场景通过。
+- 下一步：可继续做业务看板状态钻取参数与任务工作台筛选参数的双向联动；当前仍不新增后端聚合 API。
+- 阻塞/风险：本轮只改桌面前端筛选交互、helper、样式、L1 回归和文档；未改后端、schema、migration、RBAC、seed、WorkflowUsecase、Fact usecase、正式菜单、生产构建或目标环境镜像。追加前 `progress.md` 为 278 行 / 58768 bytes，未达到归档阈值。
+
+## 2026-06-10 13:27 CST
+
+- 完成：提交前修复 `web/scripts/styleL1.mjs` 登录页类 L1 场景的 `/rpc/auth` capabilities mock，避免本地无后端时 Vite proxy 500 被误判为页面控制台错误；保留控制台错误零容忍校验，不放宽失败条件。
+- 完成：按用户要求准备提交推送当前工作区全部代码，提交范围包括后台工作台 / 看板、dev-only 能力台账 / 客户配置 / 测试入口、原型登记、favicon、正式说明文档和本过程记录。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 已通过，`pnpm test` 当前通过 313 项；`pnpm --dir web style:l1` 重跑通过 44 个场景。首次完整链路曾暴露登录页 `/rpc/auth` proxy 500 和 `erp-dashboard-mobile` 偶发等待问题，修复 mock 后完整重跑通过。
+- 下一步：完成 `git add -A`、提交和推送；推送前继续确认 `origin/main...HEAD` 状态，若远端新增提交则按仓库 Git 约定停止直接覆盖。
+- 阻塞/风险：本轮收口只补 L1 mock 和提交前验证记录；未改后端、schema、migration、RBAC、seed、WorkflowUsecase、Fact usecase、ERP 正式菜单、生产构建或目标环境镜像。追加前 `progress.md` 为 287 行 / 60432 bytes，未达到归档阈值。

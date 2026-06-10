@@ -1,4 +1,5 @@
 import { DEV_CAPABILITY_LEDGER_ROUTE } from '../../erp/config/devCapabilityLedger.mjs'
+import { DEV_CUSTOMER_CONFIG_ROUTE } from '../../erp/config/devCustomerConfig.mjs'
 import { DEV_DOCS_ROUTE } from '../../erp/config/devDocs.mjs'
 import { DEV_PROTOTYPES_ROUTE } from '../../erp/config/devPrototypes.mjs'
 
@@ -28,6 +29,11 @@ export const ERP_FAVICON_VARIANTS = Object.freeze({
     href: '/favicon-prototypes.svg',
     type: 'image/svg+xml',
   }),
+  customerConfig: Object.freeze({
+    key: 'customer-config',
+    href: '/favicon-customer-config.svg',
+    type: 'image/svg+xml',
+  }),
 })
 
 function normalizePathname(pathname = '') {
@@ -54,6 +60,9 @@ export function resolveERPFavicon(pathname = '', options = {}) {
   }
   if (normalizedPathname === DEV_PROTOTYPES_ROUTE) {
     return ERP_FAVICON_VARIANTS.prototypes
+  }
+  if (normalizedPathname === DEV_CUSTOMER_CONFIG_ROUTE) {
+    return ERP_FAVICON_VARIANTS.customerConfig
   }
   if (
     options.isMobileExperience ||

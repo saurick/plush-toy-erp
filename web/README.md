@@ -191,9 +191,9 @@ pnpm smoke:processing-contract-real-login
 
 - 根路由到后台登录的重定向
 - 管理员登录
-- 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
+- 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色客户配置开发页、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
 - 未登录访问桌面后台的重定向
-- 桌面任务看板
+- 桌面工作台 / 任务看板，包括协同任务筛选、任务详情抽屉、阻塞原因面板、催办和完成动作
 - 桌面业务看板
 - 桌面业务页表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗布局 / 弹窗保存、批量删除、协同任务创建和回收站
 - 权限管理
@@ -222,7 +222,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
 - 开发环境额外提供 `http://localhost:5175/__dev/docs` 作为本地开发态文档查看器；该入口左侧专用于按真实目录树浏览仓库 tracked Markdown，并在搜索框下方提供浏览器本地持久化的置顶文档区，当前打开文档和目录树展开状态也会写入浏览器本地偏好以便刷新后恢复；搜索态显示匹配结果，右侧标题栏图钉可置顶 / 取消置顶当前文档，置顶区行内图钉可直接取消置顶，目录树和搜索结果行内图钉可快速置顶 / 取消置顶，章节标签可滚动到对应标题并提供回到顶部，不进入侧栏、seedData、RBAC 或产品内文档 registry，生产构建不可访问。
 - 开发环境额外提供 `http://localhost:5175/__dev/prototypes` 作为本地开发态产品原型查看器；该入口只浏览 `docs/product/prototypes` 下的 HTML 原型、PNG 方案图和截图证据，可按资产状态筛选、按目录分组折叠、使用浏览器本地置顶偏好并在右侧预览，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问。
-- 开发环境额外提供 `http://localhost:5175/__dev/capability-ledger` 作为本地开发态能力台账可视化；该入口只读解析 `docs/product/capability-ledger.md` 的产品能力进度台账，展示成熟度、层级、业务域、客户试用和交付承诺分布，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；能力台账 Markdown 仍是唯一维护入口。
+- 开发环境额外提供 `http://localhost:5175/__dev/capability-ledger` 作为本地开发态能力台账可视化；该入口只读解析 `docs/product/capability-ledger.md`、`docs/customers/yoyoosun/delivery-matrix.md` 和 `docs/customers/yoyoosun/delta-ledger.md`，展示产品能力成熟度、客户交付状态、客户差异分类和显式 `CAP-*` 关联，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；三份 Markdown 仍是唯一维护入口。
+- 开发环境额外提供 `http://localhost:5175/__dev/testing` 作为本地开发态测试入口；该入口只读解析 `docs/product/test-strategy.md` 和 `docs/**/*.md` 中的测试、验收、QA、smoke、`style:l1` 等相关文档，展示测试分层、命令块和相关文档索引，不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；`docs/product/test-strategy.md` 仍是测试选择真源。
+- 开发环境额外提供 `http://localhost:5175/__dev/customer-config` 作为本地开发态客户配置总控页；该入口只读展示 yoyoosun 客户配置包、前端品牌 / 桌面菜单 runtime、字段 / 编号草案、导入 tooling 和边界状态，不进入侧栏、seedData、RBAC、后端业务、真实导入或 ERP 正式菜单，生产构建不可访问；`config/customers/yoyoosun/*`、`scripts/import/*` 和正式文档仍是维护真源。
 
 ## 当前前端边界
 
@@ -237,7 +239,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮
 - 模板打印当前由对应业务页选中记录后带值打开；打印中心保留默认样例和模板核对入口
 - 扩展硬件链路、PDA、条码枪、图片识别继续 deferred
-- 当前业务页、岗位任务端页面和模板预览已经齐入口；通用业务记录已落盘，采购合同 / 加工合同已支持业务页带值打开，Excel 导入、打印留档回写和细分业务专表继续 deferred
+- `docs/product/prototypes/admin-command-center-v1/` 已部分承接到运行时：`/erp/dashboard`、`/erp/business-dashboard`、`/erp/print-center` 分别承接任务工作台、业务看板和模板打印中心；原型仍只作评审参考，不是运行时真源。
+- `/erp/dashboard` 任务工作台的关键词、状态、角色、到期和来源筛选使用 URL query 保存，支持复制链接、刷新恢复和一键清空；这些筛选只影响当前页面展示，不写后端用户偏好、WorkflowUsecase 或事实表。
+- 当前业务页、岗位任务端页面、桌面工作台 / 任务看板、业务看板和模板预览已经齐入口；通用业务记录已落盘，采购合同 / 加工合同已支持业务页带值打开，桌面工作台只处理 Workflow 协同任务，不直接写库存、出货、应收、开票、付款或其他事实表；Excel 导入、打印留档回写和细分业务专表继续 deferred
 
 ## 桌面业务弹窗约定
 

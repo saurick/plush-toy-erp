@@ -24,10 +24,10 @@ test('devPrototypes: 只通过开发态独立路径暴露', () => {
 })
 
 test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
-  assert.equal(DEV_PROTOTYPE_ASSETS.length, 9)
+  assert.equal(DEV_PROTOTYPE_ASSETS.length, 10)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'HTML').length,
-    3
+    4
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'PNG').length,
@@ -47,6 +47,8 @@ test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
 test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const items = buildDevPrototypeItems({
     htmlModules: {
+      '../../../../docs/product/prototypes/admin-command-center-v1/index.html':
+        '<!doctype html><title>后台工作台与看板原型</title>',
       '../../../../docs/product/prototypes/business-module-page-standard-v1/index.html':
         '<!doctype html><title>业务模块标准页原型</title>',
       '../../../../docs/product/prototypes/mobile-role-tasks-v1/implemented-reference.html':
@@ -61,8 +63,13 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const businessPrototype = items.find(
     (item) => item.key === 'business-module-standard-page'
   )
+  const commandCenterPrototype = items.find(
+    (item) => item.key === 'admin-command-center'
+  )
   const mobileList = items.find((item) => item.key === 'mobile-role-tasks-list')
 
+  assert.equal(commandCenterPrototype?.available, true)
+  assert.match(commandCenterPrototype?.source || '', /后台工作台与看板原型/)
   assert.equal(businessPrototype?.available, true)
   assert.match(businessPrototype?.source || '', /业务模块标准页原型/)
   assert.equal(mobileList?.available, true)
@@ -143,6 +150,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
   assert.deepEqual(
     groups.map((group) => group.directory),
     [
+      'admin-command-center-v1/',
       'business-module-page-standard-v1/',
       'business-module-page-standard-v1/images/',
       'mobile-role-tasks-v1/',
@@ -151,7 +159,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
   )
   assert.deepEqual(
     groups.map((group) => group.items.length),
-    [2, 3, 1, 3]
+    [1, 2, 3, 1, 3]
   )
 
   assert.deepEqual(

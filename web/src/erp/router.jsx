@@ -14,8 +14,10 @@ import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
 import { businessModuleDefinitions } from './config/businessModules.mjs'
 import { DEV_CAPABILITY_LEDGER_ROUTE } from './config/devCapabilityLedger.mjs'
+import { DEV_CUSTOMER_CONFIG_ROUTE } from './config/devCustomerConfig.mjs'
 import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
 import { DEV_PROTOTYPES_ROUTE } from './config/devPrototypes.mjs'
+import { DEV_TESTING_ROUTE } from './config/devTesting.mjs'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
@@ -58,6 +60,12 @@ const DevPrototypesPage = import.meta.env.DEV
   : null
 const DevCapabilityLedgerPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevCapabilityLedgerPage.jsx'))
+  : null
+const DevCustomerConfigPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevCustomerConfigPage.jsx'))
+  : null
+const DevTestingPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevTestingPage.jsx'))
   : null
 const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
 
@@ -183,6 +191,15 @@ export default function ERPRouter() {
             path={DEV_CAPABILITY_LEDGER_ROUTE}
             element={<DevCapabilityLedgerPage />}
           />
+        ) : null}
+        {DevCustomerConfigPage ? (
+          <Route
+            path={DEV_CUSTOMER_CONFIG_ROUTE}
+            element={<DevCustomerConfigPage />}
+          />
+        ) : null}
+        {DevTestingPage ? (
+          <Route path={DEV_TESTING_ROUTE} element={<DevTestingPage />} />
         ) : null}
         <Route path="/" element={<RootEntryRedirect />} />
         <Route path="/login" element={<LoginPage />} />

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -225,7 +226,7 @@ export default function BusinessDashboardPage() {
               业务看板
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
-              看业务记录推进、部门待处理和风险预警；具体人员待办请到任务看板处理。
+              看业务记录推进、部门待处理和风险预警；具体人员待办和异常闭环请到工作台处理。
             </Paragraph>
           </div>
           <Button icon={<ArrowLeftOutlined />} onClick={openTaskDashboard}>
@@ -233,6 +234,13 @@ export default function BusinessDashboardPage() {
           </Button>
         </Space>
       </Card>
+
+      <Alert
+        type="info"
+        showIcon
+        message="业务看板只做运营摘要"
+        description="本页统计业务记录和协同状态，用于发现模块风险和跳转业务列表；不作为库存、出货、财务、发票或收付款事实真源。"
+      />
 
       <Row gutter={[12, 12]}>
         {businessMetricCards.map((item) => (

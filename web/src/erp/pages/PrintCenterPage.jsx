@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Space, Typography } from 'antd'
 import { ArrowRightOutlined, PrinterOutlined } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -35,6 +35,7 @@ const PRINT_CENTER_OVERVIEW_ITEMS = [
 ]
 
 export default function PrintCenterPage() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const requestedTemplateKey = String(searchParams.get('template') || '').trim()
   const requestedEntrySource = resolvePrintWorkspaceEntrySource(searchParams)
@@ -140,6 +141,7 @@ export default function PrintCenterPage() {
             >
               打开可编辑打印窗口
             </Button>
+            <Button onClick={() => navigate('/erp/dashboard')}>回工作台</Button>
             <Text type="secondary" className="erp-print-center-action-hint">
               采购合同入口在“辅材/包材采购”，加工合同入口在“加工合同/委外下单”。
             </Text>

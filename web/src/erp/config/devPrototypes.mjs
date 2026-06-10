@@ -22,6 +22,17 @@ export const DEV_PROTOTYPE_STATUS_OPTIONS = Object.freeze([
 
 export const DEV_PROTOTYPE_ASSETS = Object.freeze([
   {
+    key: 'admin-command-center',
+    title: '后台工作台与看板整套原型',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.EXPLORATION],
+    directory: 'admin-command-center-v1/',
+    assetPath: 'admin-command-center-v1/index.html',
+    readmePath: 'admin-command-center-v1/README.md',
+    description:
+      '覆盖工作台、任务看板、业务看板、模板打印中心和异常 / 阻塞闭环五个视图。',
+  },
+  {
     key: 'business-module-standard-page',
     title: '业务模块标准页整页原型',
     type: 'HTML',

@@ -60,7 +60,7 @@ function createDocumentStub(existingLinks = []) {
   }
 }
 
-test('favicon: routes resolve to separate admin, tasks, docs, capability ledger and prototype icons', () => {
+test('favicon: routes resolve to separate admin, tasks, docs, capability ledger, prototype and customer config icons', () => {
   assert.equal(resolveERPFavicon('/erp/dashboard'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(resolveERPFavicon('/admin-login'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(
@@ -76,6 +76,10 @@ test('favicon: routes resolve to separate admin, tasks, docs, capability ledger 
   assert.equal(
     resolveERPFavicon('/__dev/prototypes'),
     ERP_FAVICON_VARIANTS.prototypes
+  )
+  assert.equal(
+    resolveERPFavicon('/__dev/customer-config'),
+    ERP_FAVICON_VARIANTS.customerConfig
   )
 })
 
