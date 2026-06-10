@@ -60,7 +60,7 @@ function createDocumentStub(existingLinks = []) {
   }
 }
 
-test('favicon: routes resolve to separate admin, tasks, docs and prototype icons', () => {
+test('favicon: routes resolve to separate admin, tasks, docs, capability ledger and prototype icons', () => {
   assert.equal(resolveERPFavicon('/erp/dashboard'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(resolveERPFavicon('/admin-login'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(
@@ -69,6 +69,10 @@ test('favicon: routes resolve to separate admin, tasks, docs and prototype icons
   )
   assert.equal(resolveERPFavicon('/tasks'), ERP_FAVICON_VARIANTS.tasks)
   assert.equal(resolveERPFavicon('/__dev/docs'), ERP_FAVICON_VARIANTS.docs)
+  assert.equal(
+    resolveERPFavicon('/__dev/capability-ledger'),
+    ERP_FAVICON_VARIANTS.capabilityLedger
+  )
   assert.equal(
     resolveERPFavicon('/__dev/prototypes'),
     ERP_FAVICON_VARIANTS.prototypes
@@ -108,12 +112,12 @@ test('favicon: runtime update keeps a single active icon link', () => {
 test('favicon: runtime update creates an icon link when HTML has none', () => {
   const documentStub = createDocumentStub()
 
-  const result = applyERPFavicon(documentStub, '/__dev/prototypes')
+  const result = applyERPFavicon(documentStub, '/__dev/capability-ledger')
 
-  assert.equal(result, ERP_FAVICON_VARIANTS.prototypes)
+  assert.equal(result, ERP_FAVICON_VARIANTS.capabilityLedger)
   assert.equal(documentStub.appended.length, 1)
   assert.equal(
     documentStub.appended[0].getAttribute('href'),
-    '/favicon-prototypes.svg'
+    '/favicon-capability-ledger.svg'
   )
 })

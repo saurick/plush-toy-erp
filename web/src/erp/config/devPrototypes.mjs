@@ -1,4 +1,8 @@
 export const DEV_PROTOTYPES_ROUTE = '/__dev/prototypes'
+export const DEV_PROTOTYPE_PINNED_STORAGE_KEY =
+  'plush_erp_dev_prototype_pinned_keys'
+export const DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY =
+  'plush_erp_dev_prototype_expanded_groups'
 
 export const DEV_PROTOTYPE_STATUSES = Object.freeze({
   CURRENT: '当前实现对齐版',
@@ -209,4 +213,86 @@ export function filterDevPrototypeItems(
     const keywordMatched = !query || item.searchText?.includes(query)
     return statusMatched && keywordMatched
   })
+}
+
+export function normalizeDevPrototypePinnedKeys(pinnedKeys = [], items = []) {
+  if (!Array.isArray(pinnedKeys)) return []
+
+  const availableKeys = new Set(items.map((item) => item.key))
+  const normalized = []
+  const seen = new Set()
+  pinnedKeys.forEach((key) => {
+    const itemKey = String(key || '')
+    if (!itemKey || !availableKeys.has(itemKey) || seen.has(itemKey)) return
+    normalized.push(itemKey)
+    seen.add(itemKey)
+  })
+  return normalized
+}
+
+export function applyDevPrototypePinnedState(items = [], pinnedKeys = []) {
+  const normalizedPinnedKeys = normalizeDevPrototypePinnedKeys(
+    pinnedKeys,
+    items
+  )
+  const pinnedRankByKey = new Map(
+    normalizedPinnedKeys.map((key, index) => [key, index])
+  )
+
+  return items
+    .map((item, index) => {
+      const pinnedRank = pinnedRankByKey.get(item.key)
+      return {
+        ...item,
+        pinned: pinnedRank !== undefined,
+        pinnedRank: pinnedRank ?? Number.POSITIVE_INFINITY,
+        originalIndex: index,
+      }
+    })
+    .sort((left, right) => {
+      if (left.pinned && right.pinned) return left.pinnedRank - right.pinnedRank
+      if (left.pinned) return -1
+      if (right.pinned) return 1
+      return left.originalIndex - right.originalIndex
+    })
+}
+
+export function groupDevPrototypeItemsByDirectory(items = []) {
+  const groups = []
+  const groupByDirectory = new Map()
+
+  items.forEach((item) => {
+    const directory = item.directory || '(未归类)'
+    let group = groupByDirectory.get(directory)
+    if (!group) {
+      group = {
+        key: directory,
+        directory,
+        items: [],
+      }
+      groupByDirectory.set(directory, group)
+      groups.push(group)
+    }
+    group.items.push(item)
+  })
+
+  return groups
+}
+
+export function normalizeDevPrototypeExpandedGroupKeys(
+  expandedGroupKeys = [],
+  availableGroupKeys = []
+) {
+  if (!Array.isArray(expandedGroupKeys)) return []
+
+  const availableKeys = new Set(availableGroupKeys)
+  const normalized = []
+  const seen = new Set()
+  expandedGroupKeys.forEach((key) => {
+    const groupKey = String(key || '')
+    if (!groupKey || !availableKeys.has(groupKey) || seen.has(groupKey)) return
+    normalized.push(groupKey)
+    seen.add(groupKey)
+  })
+  return normalized
 }

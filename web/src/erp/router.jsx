@@ -13,6 +13,7 @@ import { getStoredAdminProfile } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
 import { businessModuleDefinitions } from './config/businessModules.mjs'
+import { DEV_CAPABILITY_LEDGER_ROUTE } from './config/devCapabilityLedger.mjs'
 import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
 import { DEV_PROTOTYPES_ROUTE } from './config/devPrototypes.mjs'
 import {
@@ -54,6 +55,9 @@ const DevDocsPage = import.meta.env.DEV
   : null
 const DevPrototypesPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevPrototypesPage.jsx'))
+  : null
+const DevCapabilityLedgerPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevCapabilityLedgerPage.jsx'))
   : null
 const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
 
@@ -173,6 +177,12 @@ export default function ERPRouter() {
         ) : null}
         {DevPrototypesPage ? (
           <Route path={DEV_PROTOTYPES_ROUTE} element={<DevPrototypesPage />} />
+        ) : null}
+        {DevCapabilityLedgerPage ? (
+          <Route
+            path={DEV_CAPABILITY_LEDGER_ROUTE}
+            element={<DevCapabilityLedgerPage />}
+          />
         ) : null}
         <Route path="/" element={<RootEntryRedirect />} />
         <Route path="/login" element={<LoginPage />} />

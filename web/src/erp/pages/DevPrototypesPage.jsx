@@ -2,17 +2,27 @@ import React, { useMemo, useState } from 'react'
 import {
   AppstoreOutlined,
   CloseOutlined,
+  DownOutlined,
   FileImageOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
   FullscreenOutlined,
+  PushpinFilled,
+  PushpinOutlined,
+  RightOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Input, Space, Tag, Typography } from 'antd'
 import {
+  DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY,
+  DEV_PROTOTYPE_PINNED_STORAGE_KEY,
   DEV_PROTOTYPE_STATUS_OPTIONS,
+  applyDevPrototypePinnedState,
   buildDevPrototypeItems,
   filterDevPrototypeItems,
+  groupDevPrototypeItemsByDirectory,
+  normalizeDevPrototypeExpandedGroupKeys,
+  normalizeDevPrototypePinnedKeys,
 } from '../config/devPrototypes.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -44,6 +54,83 @@ function PrototypeStatusTags({ statuses = [] }) {
         </Tag>
       ))}
     </Space>
+  )
+}
+
+function readStoredStringArray(storageKey) {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const rawValue = window.localStorage?.getItem(storageKey)
+    if (!rawValue) return null
+    const parsedValue = JSON.parse(rawValue)
+    return Array.isArray(parsedValue) ? parsedValue : null
+  } catch {
+    return null
+  }
+}
+
+function writeStoredStringArray(storageKey, value) {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage?.setItem(storageKey, JSON.stringify(value))
+  } catch {
+    // 本地偏好不可用时不影响原型查看器主路径。
+  }
+}
+
+function areStringArraysEqual(left = [], right = []) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  )
+}
+
+function PrototypeAssetCard({ item, selected, onSelect, onTogglePinned }) {
+  return (
+    <div
+      className={
+        selected
+          ? 'erp-dev-prototypes-card erp-dev-prototypes-card--active'
+          : 'erp-dev-prototypes-card'
+      }
+      data-dev-prototype-key={item.key}
+    >
+      <button
+        type="button"
+        className="erp-dev-prototypes-card__body"
+        onClick={() => onSelect(item.key)}
+      >
+        <span className="erp-dev-prototypes-card__title">
+          {item.type === 'HTML' ? <FileTextOutlined /> : <FileImageOutlined />}
+          {item.title}
+        </span>
+        <span className="erp-dev-prototypes-card__meta">
+          <Tag color={item.type === 'HTML' ? 'green' : 'blue'}>{item.type}</Tag>
+          <PrototypeStatusTags statuses={item.statuses} />
+        </span>
+        <span className="erp-dev-prototypes-card__dir">{item.directory}</span>
+        <span className="erp-dev-prototypes-card__desc">
+          {item.description}
+        </span>
+      </button>
+      <button
+        type="button"
+        className={
+          item.pinned
+            ? 'erp-dev-prototypes-card__pin erp-dev-prototypes-card__pin--active'
+            : 'erp-dev-prototypes-card__pin'
+        }
+        aria-label={
+          item.pinned ? `取消置顶 ${item.title}` : `置顶 ${item.title}`
+        }
+        aria-pressed={item.pinned}
+        onClick={() => onTogglePinned(item.key)}
+      >
+        {item.pinned ? <PushpinFilled /> : <PushpinOutlined />}
+      </button>
+    </div>
   )
 }
 
@@ -138,21 +225,139 @@ export default function DevPrototypesPage() {
   )
   const [statusFilter, setStatusFilter] = useState('all')
   const [keyword, setKeyword] = useState('')
+  const [pinnedKeys, setPinnedKeys] = useState(() =>
+    normalizeDevPrototypePinnedKeys(
+      readStoredStringArray(DEV_PROTOTYPE_PINNED_STORAGE_KEY) || [],
+      items
+    )
+  )
+  const [storedExpandedGroupKeys, setStoredExpandedGroupKeys] = useState(() =>
+    readStoredStringArray(DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY)
+  )
+  const itemsWithPinnedState = useMemo(
+    () => applyDevPrototypePinnedState(items, pinnedKeys),
+    [items, pinnedKeys]
+  )
   const visibleItems = useMemo(
     () =>
-      filterDevPrototypeItems(items, {
+      filterDevPrototypeItems(itemsWithPinnedState, {
         status: statusFilter,
         keyword,
       }),
-    [items, keyword, statusFilter]
+    [itemsWithPinnedState, keyword, statusFilter]
   )
+  const pinnedItems = useMemo(
+    () => visibleItems.filter((item) => item.pinned),
+    [visibleItems]
+  )
+  const directoryGroups = useMemo(
+    () =>
+      groupDevPrototypeItemsByDirectory(
+        visibleItems.filter((item) => !item.pinned)
+      ),
+    [visibleItems]
+  )
+  const visibleGroupKeys = useMemo(
+    () => directoryGroups.map((group) => group.key),
+    [directoryGroups]
+  )
+  const allGroupKeys = useMemo(
+    () => groupDevPrototypeItemsByDirectory(items).map((group) => group.key),
+    [items]
+  )
+  const expandedGroupKeys = useMemo(() => {
+    if (storedExpandedGroupKeys === null) return allGroupKeys
+    return normalizeDevPrototypeExpandedGroupKeys(
+      storedExpandedGroupKeys,
+      allGroupKeys
+    )
+  }, [allGroupKeys, storedExpandedGroupKeys])
+  const expandedGroupKeySet = useMemo(
+    () => new Set(expandedGroupKeys),
+    [expandedGroupKeys]
+  )
+  const visibleGroupsExpanded =
+    visibleGroupKeys.length > 0 &&
+    visibleGroupKeys.every((groupKey) => expandedGroupKeySet.has(groupKey))
   const [selectedKey, setSelectedKey] = useState(items[0]?.key || '')
   const [fullscreenItem, setFullscreenItem] = useState(null)
   const selectedItem =
     visibleItems.find((item) => item.key === selectedKey) ||
     visibleItems[0] ||
-    items.find((item) => item.key === selectedKey) ||
-    items[0]
+    itemsWithPinnedState.find((item) => item.key === selectedKey) ||
+    itemsWithPinnedState[0]
+
+  const togglePinned = (itemKey) => {
+    setPinnedKeys((currentPinnedKeys) => {
+      const normalizedPinnedKeys = normalizeDevPrototypePinnedKeys(
+        currentPinnedKeys,
+        items
+      )
+      if (normalizedPinnedKeys.includes(itemKey)) {
+        return normalizedPinnedKeys.filter((key) => key !== itemKey)
+      }
+      return normalizeDevPrototypePinnedKeys(
+        [itemKey, ...normalizedPinnedKeys],
+        items
+      )
+    })
+  }
+
+  const toggleDirectoryGroup = (groupKey) => {
+    setStoredExpandedGroupKeys((currentGroupKeys) => {
+      const normalizedGroupKeys =
+        currentGroupKeys === null
+          ? allGroupKeys
+          : normalizeDevPrototypeExpandedGroupKeys(
+              currentGroupKeys,
+              allGroupKeys
+            )
+      if (normalizedGroupKeys.includes(groupKey)) {
+        return normalizedGroupKeys.filter((key) => key !== groupKey)
+      }
+      return normalizeDevPrototypeExpandedGroupKeys(
+        [...normalizedGroupKeys, groupKey],
+        allGroupKeys
+      )
+    })
+  }
+
+  const toggleAllDirectoryGroups = () => {
+    setStoredExpandedGroupKeys(visibleGroupsExpanded ? [] : allGroupKeys)
+  }
+
+  React.useEffect(() => {
+    setPinnedKeys((currentPinnedKeys) => {
+      const normalizedPinnedKeys = normalizeDevPrototypePinnedKeys(
+        currentPinnedKeys,
+        items
+      )
+      return areStringArraysEqual(currentPinnedKeys, normalizedPinnedKeys)
+        ? currentPinnedKeys
+        : normalizedPinnedKeys
+    })
+  }, [items])
+
+  React.useEffect(() => {
+    writeStoredStringArray(DEV_PROTOTYPE_PINNED_STORAGE_KEY, pinnedKeys)
+  }, [pinnedKeys])
+
+  React.useEffect(() => {
+    if (storedExpandedGroupKeys === null) return
+
+    const normalizedGroupKeys = normalizeDevPrototypeExpandedGroupKeys(
+      storedExpandedGroupKeys,
+      allGroupKeys
+    )
+    if (!areStringArraysEqual(storedExpandedGroupKeys, normalizedGroupKeys)) {
+      setStoredExpandedGroupKeys(normalizedGroupKeys)
+      return
+    }
+    writeStoredStringArray(
+      DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY,
+      normalizedGroupKeys
+    )
+  }, [allGroupKeys, storedExpandedGroupKeys])
 
   React.useEffect(() => {
     if (!fullscreenItem) return undefined
@@ -230,43 +435,88 @@ export default function DevPrototypesPage() {
               </button>
             ))}
           </div>
+          <div
+            className="erp-dev-prototypes-group-controls"
+            aria-label="目录分组操作"
+          >
+            <Button
+              size="small"
+              type="text"
+              disabled={visibleGroupKeys.length === 0}
+              onClick={toggleAllDirectoryGroups}
+            >
+              {visibleGroupsExpanded ? '收起' : '展开'}
+            </Button>
+          </div>
 
           <div className="erp-dev-prototypes-list" aria-label="产品原型资产">
             {visibleItems.length > 0 ? (
-              visibleItems.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  className={
-                    selectedItem?.key === item.key
-                      ? 'erp-dev-prototypes-card erp-dev-prototypes-card--active'
-                      : 'erp-dev-prototypes-card'
-                  }
-                  data-dev-prototype-key={item.key}
-                  onClick={() => setSelectedKey(item.key)}
-                >
-                  <span className="erp-dev-prototypes-card__title">
-                    {item.type === 'HTML' ? (
-                      <FileTextOutlined />
-                    ) : (
-                      <FileImageOutlined />
-                    )}
-                    {item.title}
-                  </span>
-                  <span className="erp-dev-prototypes-card__meta">
-                    <Tag color={item.type === 'HTML' ? 'green' : 'blue'}>
-                      {item.type}
-                    </Tag>
-                    <PrototypeStatusTags statuses={item.statuses} />
-                  </span>
-                  <span className="erp-dev-prototypes-card__dir">
-                    {item.directory}
-                  </span>
-                  <span className="erp-dev-prototypes-card__desc">
-                    {item.description}
-                  </span>
-                </button>
-              ))
+              <>
+                {pinnedItems.length > 0 ? (
+                  <section
+                    className="erp-dev-prototypes-pinned"
+                    aria-label="置顶原型资产"
+                  >
+                    <div className="erp-dev-prototypes-list-section__head">
+                      <span>
+                        <PushpinFilled /> 置顶
+                      </span>
+                      <Text type="secondary">{pinnedItems.length}</Text>
+                    </div>
+                    <div className="erp-dev-prototypes-group__items">
+                      {pinnedItems.map((item) => (
+                        <PrototypeAssetCard
+                          key={item.key}
+                          item={item}
+                          selected={selectedItem?.key === item.key}
+                          onSelect={setSelectedKey}
+                          onTogglePinned={togglePinned}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {directoryGroups.map((group) => {
+                  const expanded = expandedGroupKeySet.has(group.key)
+                  return (
+                    <section
+                      key={group.key}
+                      className="erp-dev-prototypes-group"
+                      aria-label={`${group.directory} 原型资产`}
+                    >
+                      <button
+                        type="button"
+                        className="erp-dev-prototypes-group__head"
+                        aria-expanded={expanded}
+                        onClick={() => toggleDirectoryGroup(group.key)}
+                      >
+                        <span className="erp-dev-prototypes-group__title">
+                          {expanded ? <DownOutlined /> : <RightOutlined />}
+                          <FolderOpenOutlined />
+                          {group.directory}
+                        </span>
+                        <span className="erp-dev-prototypes-group__count">
+                          {group.items.length}
+                        </span>
+                      </button>
+                      {expanded ? (
+                        <div className="erp-dev-prototypes-group__items">
+                          {group.items.map((item) => (
+                            <PrototypeAssetCard
+                              key={item.key}
+                              item={item}
+                              selected={selectedItem?.key === item.key}
+                              onSelect={setSelectedKey}
+                              onTogglePinned={togglePinned}
+                            />
+                          ))}
+                        </div>
+                      ) : null}
+                    </section>
+                  )
+                })}
+              </>
             ) : (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -294,6 +544,19 @@ export default function DevPrototypesPage() {
                     {selectedItem.type}
                   </Tag>
                   <PrototypeStatusTags statuses={selectedItem.statuses} />
+                  <Button
+                    icon={
+                      selectedItem.pinned ? (
+                        <PushpinFilled />
+                      ) : (
+                        <PushpinOutlined />
+                      )
+                    }
+                    aria-pressed={selectedItem.pinned}
+                    onClick={() => togglePinned(selectedItem.key)}
+                  >
+                    {selectedItem.pinned ? '取消置顶' : '置顶'}
+                  </Button>
                   <Button
                     icon={<FullscreenOutlined />}
                     disabled={!selectedItem.available}

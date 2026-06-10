@@ -158,3 +158,46 @@
 - 验证：Browser 因安全策略拒绝直接访问 `file://`，本轮未绕过该策略；改用 `http://127.0.0.1:5195/index.html` 验证同一个静态 `index.html` 的 9 个资产均生成“全屏预览”按钮，HTML iframe 和 PNG 长图全屏预览均可打开和关闭。
 - 下一步：如后续要把全屏预览纳入专门 L1 场景，可扩展 `styleL1.mjs` 覆盖 `/__dev/prototypes` 的 HTML / PNG 全屏状态。
 - 阻塞/风险：本轮未改 `server/`、migration、ERP 正式菜单、权限、seed、后端业务或生产构建主路径。原型页暗色态通过 CSS 变量和既有 CSS / L1 回归间接覆盖，未完成原型页暗色态浏览器直测；追加前 `progress.md` 为 141 行 / 31616 bytes，未达到归档阈值。
+
+## 2026-06-10 00:18 CST
+
+- 完成：为本地开发态 `/__dev/prototypes` 产品原型查看器新增轻量目录分组、折叠和置顶能力；资产列表按所属目录分组，置顶资产独立显示在顶部，右侧预览栏也可对当前资产置顶 / 取消置顶。
+- 完成：新增原型查看器本地偏好 helper 和测试，清理未知 / 重复 pin key、保持置顶排序、按目录分组，并清理无效展开目录 key；偏好只写浏览器本地，不接后端、权限或正式菜单。
+- 完成：同步更新 `docs/product/prototypes/README.md` 和 `web/README.md`，说明 `/__dev/prototypes` 支持目录分组折叠和本地置顶，但仍是独立 dev-only 原型资产入口，不是正式文档 registry。
+- 验证：`node --test src/erp/config/devPrototypes.test.mjs src/erp/config/devDocs.test.mjs`、`git diff --check -- web/src/erp/pages/DevPrototypesPage.jsx web/src/erp/config/devPrototypes.mjs web/src/erp/config/devPrototypes.test.mjs web/src/erp/styles/app.css docs/product/prototypes/README.md web/README.md`、`pnpm css`、`pnpm lint`、`pnpm test`、`pnpm style:l1` 均通过；`pnpm test` 通过 290 项，`style:l1` 通过 41 个场景。
+- 验证：Browser 通过 `http://127.0.0.1:5186/__dev/prototypes` 验证默认桌面态显示 9 个资产、4 个目录分组且无横向溢出；置顶 `mobile-role-tasks-implemented` 后出现置顶区，折叠 `mobile-role-tasks-v1/images/` 后该组资产隐藏，搜索“当前实现”后只剩匹配的置顶资产；390x844 移动视口筛选区双列排布、无横向溢出，控制台无 error / warn。
+- 下一步：如原型资产继续增多，可再评估是否增加“只看置顶 / 展开全部 / 收起全部”这类轻量操作；暂不复制 `/__dev/docs` 的完整文档树 registry。
+- 阻塞/风险：本轮只改 `/__dev/prototypes` dev-only 前端入口、样式、测试和说明文档；未改静态 `docs/product/prototypes/index.html`、`server/`、migration、ERP 正式菜单、权限、seed、后端业务、生产构建或目标环境镜像。Browser 只读执行环境不能直接读取 `localStorage`，本地偏好持久化以单元测试和页面可见状态验证收口；追加前 `progress.md` 为 160 行 / 34900 bytes，未达到归档阈值。
+
+## 2026-06-10 10:55 CST
+
+- 完成：新增开发态 `/__dev/capability-ledger` 能力台账只读可视化，解析 `docs/product/product-delivery-ledgers.md` 的产品能力进度台账，展示能力总数、成熟度、所属层、业务域、客户试用和交付承诺分布，并支持关键词 / 层级 / 业务域 / 成熟度筛选与详情查看。
+- 完成：新增 `devCapabilityLedger` 解析 helper 和测试；接入 dev-only route、favicon 归类、前端样式浅色 / 暗色覆盖和响应式布局；同步更新 `web/README.md` 与 `docs/current-source-of-truth.md`，明确 Markdown 台账仍是唯一维护入口，可视化不进入 ERP 菜单、RBAC、后端业务、产品内 docs registry 或生产构建。
+- 验证：`pnpm lint`、`pnpm css`、`pnpm test` 和 `pnpm style:l1` 均通过；`pnpm test` 通过 294 项，`style:l1` 通过 41 个场景。Browser 验证 `http://127.0.0.1:5175/__dev/capability-ledger` 默认态解析 35 条能力，搜索 `tenant` 收敛到 3 条，选择 `CAP-029` 后详情正确更新；桌面、暗色和 390x844 移动视口横向溢出均为 0，console 无 error / warn。
+- 下一步：如台账继续膨胀，可再评估是否拆出正式 `docs/product/capability-ledger.md` 后由可视化读取拆分后的单一能力台账。
+- 阻塞/风险：本轮只改 dev-only 前端治理入口、测试和说明文档；未改 `server/`、schema、migration、RBAC、Workflow / Fact usecase、ERP 正式菜单、seed、后端业务、生产构建或目标环境镜像。追加前 `progress.md` 为 170 行 / 37188 bytes，未达到归档阈值。
+
+## 2026-06-10 11:00 CST
+
+- 完成：为本地开发态 `/__dev/prototypes` 原型查看器新增明确的“展开全部 / 收起全部”按钮，放在状态筛选下方；按钮作用于目录分组展开状态，并继续使用浏览器本地偏好保存。
+- 完成：确认 `/__dev/prototypes` favicon 已由现有 `resolveERPFavicon('/__dev/prototypes') -> /favicon-prototypes.svg` 覆盖，本轮未重复改 favicon 主路径。
+- 验证：`node --test src/erp/config/devPrototypes.test.mjs src/erp/config/devDocs.test.mjs src/common/consts/favicon.test.mjs`、`pnpm css`、`pnpm exec eslint --ext .js --ext .jsx src/`、`git diff --check -- web/src/erp/pages/DevPrototypesPage.jsx web/src/erp/styles/app.css web/src/common/consts/favicon.mjs web/src/common/consts/favicon.test.mjs`、`pnpm test`、`pnpm style:l1` 均通过；`pnpm test` 通过 294 项，`style:l1` 通过 41 个场景。
+- 验证：Playwright 通过 `http://127.0.0.1:5187/__dev/prototypes` 验证 favicon 为 `/favicon-prototypes.svg`；默认 4 个目录均展开且显示 9 个资产，点击“收起全部”后 4 个目录均为 `aria-expanded=false` 且资产卡片收起，点击“展开全部”后恢复 9 个资产；390x844 移动视口按钮可见且无横向溢出。
+- 下一步：如继续打磨原型查看器，可再评估“只看置顶”或“只看当前筛选结果目录”的操作，但不恢复产品内文档 registry。
+- 阻塞/风险：本轮只改 `/__dev/prototypes` dev-only 前端入口和样式；未改静态 `docs/product/prototypes/index.html`、`server/`、schema、migration、RBAC、ERP 正式菜单、seed、后端业务、生产构建或目标环境镜像。in-app Browser 本轮未执行入口脚本，改用本地 Playwright 完成浏览器级验证；追加前 `progress.md` 为 170 行 / 37188 bytes，未达到归档阈值。
+
+## 2026-06-10 11:06 CST
+
+- 完成：为 `/__dev/capability-ledger` 替换为独立 favicon，新增 `web/public/favicon-capability-ledger.svg`，并将能力台账路由从 docs favicon 改为 `capability-ledger` favicon variant。
+- 完成：同步更新 favicon 路由单测，要求 `/__dev/capability-ledger` 返回 `/favicon-capability-ledger.svg`，避免后续又回退成 docs favicon。
+- 验证：`node --test src/common/consts/favicon.test.mjs` 通过 4 项；Browser 验证 `http://127.0.0.1:5175/__dev/capability-ledger` 页面存在且运行时 `link[rel~="icon"]` href 为 `/favicon-capability-ledger.svg`。
+- 下一步：如还要区分 `/__dev/docs` 与其他治理页，可继续按独立 favicon variant 扩展，不复用 docs 图标。
+- 阻塞/风险：本轮只改 favicon 静态资产、favicon 映射和测试；未改 ERP 正式菜单、业务页面、后端、schema、migration、RBAC、seed、生产构建或目标环境镜像。追加前 `progress.md` 为 178 行 / 38798 bytes，未达到归档阈值。
+
+## 2026-06-10 11:07 CST
+
+- 完成：将 `/__dev/prototypes` 目录分组操作从两个并排按钮收口为一个按钮，按 `/__dev/docs` 目录树口径显示“展开 / 收起”，减少按钮占位和操作噪音。
+- 验证：`node --test src/erp/config/devPrototypes.test.mjs src/common/consts/favicon.test.mjs`、`pnpm css`、`pnpm exec eslint --ext .js --ext .jsx src/erp/pages/DevPrototypesPage.jsx src/erp/config/devPrototypes.mjs src/erp/config/devPrototypes.test.mjs src/common/consts/favicon.test.mjs`、`git diff --check -- web/src/erp/pages/DevPrototypesPage.jsx web/src/erp/styles/app.css progress.md`、`pnpm lint`、`pnpm test`、`pnpm style:l1` 均通过；`pnpm test` 通过 294 项，`style:l1` 通过 41 个场景。
+- 验证：Playwright 通过 `http://127.0.0.1:5188/__dev/prototypes` 验证初始单按钮为“收起”，4 个目录均展开且显示 9 个资产；点击后按钮变为“展开”、4 个目录均收起且资产卡片为 0；再次点击恢复“收起”和 9 个资产；favicon 仍为 `/favicon-prototypes.svg`，390x844 移动视口无横向溢出。
+- 下一步：如果继续对齐 `/__dev/docs`，可以考虑把目录分组标题也改成“目录”区块标题，但当前不再扩大范围。
+- 阻塞/风险：本轮只改 `/__dev/prototypes` dev-only 前端入口、样式和过程记录；未改静态 `docs/product/prototypes/index.html`、后端、schema、migration、RBAC、ERP 正式菜单、seed、生产构建或目标环境镜像。追加前 `progress.md` 为 195 行 / 41691 bytes，未达到归档阈值。
