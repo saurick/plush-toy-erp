@@ -73,7 +73,8 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     directory: 'business-module-page-standard-v1/',
     assetPath: 'business-module-page-standard-v1/task-collab-entry-v2.html',
     readmePath: 'business-module-page-standard-v1/README.md',
-    description: '用于对比底部常驻入口、展开面板和本页待办任务分组。',
+    description:
+      '用于对比底部常驻入口、展开面板、本页待办任务分组和桌面端高度拖拽手柄。',
   },
   {
     key: 'business-direction-sidebar',

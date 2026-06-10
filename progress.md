@@ -17,6 +17,39 @@
 - `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板打印中心入口。
 - 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增正式原型菜单。
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
+- `docs/product/prototypes` 当前待实现队列包含后台工作台与看板、业务模块标准页和协同入口三个 HTML 原型；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现对齐版。
+
+## 2026-06-10 23:01 CST
+
+- 完成：回退原型资产状态误标。`admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html` 和 `business-module-page-standard-v1/task-collab-entry-v2.html` 已从 `当前实现 / Current` 退回 `待吸收实现 / To Implement`；图中岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 继续保留 Current。
+- 完成：同步 `/__dev/prototypes` registry、`devPrototypes` 测试、静态 `docs/product/prototypes/index.html`、原型总 README 和两个子 README；明确已有局部页面或片段不等于完整实现，三个产品内核相关 HTML 仍需按 To Implement Checklist 实现、测试、浏览器回归并经用户确认后才能晋级 Current。
+- 验证：`node --test web/src/erp/config/devPrototypes.test.mjs`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1` 和 `git diff --check` 均通过；`rg` 已确认 Current 只剩岗位任务端资产，三个产品内核 HTML 均为待吸收实现。
+- 下一步：如果要开 goal 做实现，应以这 3 个 To Implement 原型为范围，先收敛产品内核页面清单和分批验收，不把状态改为 Current，直到用户明确确认。
+- 阻塞/风险：本轮只修正原型状态、文档和测试口径；未实现后台工作台整套体验、业务模块标准页覆盖所有产品内核页面，或协同入口完整运行时闭环。
+
+## 2026-06-10 23:00 CST
+
+- 完成：补充原型阶段晋级门禁。`docs/product/prototypes/README.md` 现在明确 `待实现 / To Implement` 晋级 `当前实现 / Current` 必须满足真实实现、测试 / 浏览器回归、正式文档同步和用户明确确认；Codex 不能仅凭自己完成代码、测试通过或部分承接就擅自清空待实现队列。
+- 完成：`AGENTS.md` 同步执行约束，要求未获用户明确确认时只能在 `progress.md` 或最终回复中建议“候选晋级 Current”，不能修改 registry、静态索引、README 或资产状态为 Current。
+- 验证：待完成 `git diff --check -- docs/product/prototypes/README.md AGENTS.md progress.md`。
+- 下一步：后续需要单独评审当前已被改成 Current 的原型资产是否应回退为 To Implement；本轮先只补规则，不调整现有资产状态。
+- 阻塞/风险：本轮只改 Markdown 规则和过程记录，未改 `/__dev/prototypes` registry、静态索引、运行时代码、后端 API、schema、migration、RBAC、seedData 或 Fact 写入。
+
+## 2026-06-10 22:52 CST
+
+- 完成：补充 `docs/product/prototypes/README.md` 的原型分类规则，将阶段分类和归属分类拆开说明：阶段用于判断 Draft / To Implement / Current / Reference，归属用于判断 Core / Customer / Exploration / Evidence。
+- 完成：为当前原型资产表增加阶段和归属列，先完成文档级分类；本轮不移动目录、不调整 `/__dev/prototypes` registry、不改运行时代码、不新增菜单、后端 API、schema、migration、RBAC、seedData 或 Fact 写入。
+- 验证：`git diff --check -- docs/product/prototypes/README.md progress.md` 通过；`rg` 已确认 README 中阶段分类、归属分类和当前资产分类可检索。
+- 下一步：后续如原型资产数量继续增加，再评审是否把目录物理拆成 `core/`、`customers/<customer-key>/`、`exploration/` 和 `evidence/`；新增客户原型时必须写明 customer key。
+- 阻塞/风险：现有 `/__dev/prototypes` 顶部筛选仍是全部 / 当前实现 / 待实现 / 参考资料四类；本轮只补文档分类说明，没有新增第二维筛选 UI。
+
+## 2026-06-10 22:44 CST
+
+- 完成：继续收口所有 `待实现 / To Implement` 原型。后台工作台与看板、业务模块标准页和协同入口三个 HTML 原型已从 `/__dev/prototypes` 待实现队列移入当前实现队列；运行时承接路径保持为 `/erp/dashboard`、`/erp/business-dashboard`、`/erp/print-center`、`BusinessModulePage` 和共享业务列表 / 协同面板组件。
+- 完成：同步 `web/src/erp/config/devPrototypes.mjs`、`devPrototypes` 测试、`style:l1` 原型查看器断言、静态 `docs/product/prototypes/index.html`、原型 README、`docs/current-source-of-truth.md`、`web/README.md` 和本进度记录。明确不吸收原型固定数字、静态任务、假客户、mock 脚本、dev-only 外壳、第二套菜单、第二套任务状态或 Fact 写入。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/styleL1.mjs`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop,erp-dashboard-desktop,erp-dashboard-mobile,erp-dashboard-dark-desktop,erp-business-dashboard-desktop,print-center-desktop,print-center-dark-desktop,business-module-workflow-actions,business-processing-contracts-desktop,business-reconciliation-desktop pnpm --dir web style:l1` 和 `git diff --check` 均通过；`pnpm test` 当前 339 项通过。Browser 在 `http://127.0.0.1:5175/__dev/prototypes` 验证当前实现 4 项、待实现 0 项、console warn/error 为空、无横向溢出；在 `/erp/dashboard` 验证任务看板加载完成、无 overlay、无横向溢出；在 `/erp/purchase/accessories` 验证标题、新建记录、当前操作、本页协同入口和 Workflow 边界提示可见、console warn/error 为空、无横向溢出。业务页截图 API 两次超时，已用 DOM / box metrics 与 L1 断言收口。
+- 下一步：完成验证后收口；后续新增 To Implement 原型仍按 checklist 进入待实现筛选，不从旧 HTML 复制静态逻辑到运行时。
+- 阻塞/风险：本轮未改后端 API、schema、migration、seedData、正式菜单、RBAC、WorkflowUsecase 或 Fact usecase；当前变更主要是运行时原型状态登记、测试守卫和正式文档口径同步。
 
 ## 2026-06-10 21:41 CST
 
@@ -49,6 +82,21 @@
 - 完成：`AGENTS.md` 同步要求从 `待实现 / To Implement` 原型进入真实页面前必须按 checklist 核对，避免后续只凭“像原型”直接复制静态数据或绕过仓库边界。
 - 验证：`rg` 检查 checklist 和 AGENTS 引用；`git diff --check` 通过。本轮只改规则和 Markdown，未重跑前端构建、单测或浏览器回归。
 - 下一步：后续待实现原型落地时直接按 checklist 明确“必须对齐”和“明确不吸收”的清单，再进入运行时代码改动。
+- 阻塞/风险：本轮未改运行时代码、测试脚本、正式菜单、后端 API、schema、migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-10 22:37 CST
+
+- 完成：补充原型三阶段可调整规则。`docs/product/prototypes/README.md` 和 `AGENTS.md` 现在明确 Draft、To Implement、Current 都不是锁定状态，都可以继续调整；区别只是越靠后越需要回到仓库真源、测试、浏览器回归和正式文档同步。
+- 验证：`git diff --check` 通过。本轮只改 Markdown 规则，未重跑前端构建、单测或浏览器回归。
+- 下一步：后续原型沟通时可以直接按“可调整但约束递增”理解，不把待实现或当前实现误读成永久冻结。
+- 阻塞/风险：本轮未改运行时代码、测试脚本、正式菜单、后端 API、schema、migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-10 22:40 CST
+
+- 完成：补齐 `起草阶段 / Draft` 收敛到 `待实现 / To Implement` 的 checklist。`docs/product/prototypes/README.md` 现在要求先核对输入来源、选中 / 放弃方向、必须收敛项、禁止升级项和 HTML 原型输出要求，再把 PNG / 方向图升级为待实现 HTML。
+- 完成：`AGENTS.md` 同步要求 Draft 收敛到 To Implement 前按“起草收敛提示 / Draft To Implement Checklist”核对，避免把 PNG 里的假数据、偶然按钮或未讨论能力直接升级成实现承诺。
+- 验证：`rg` 检查 Draft checklist 和 AGENTS 引用；`git diff --check` 通过。本轮只改 Markdown 规则，未重跑前端构建、单测或浏览器回归。
+- 下一步：后续从视觉草案进入待实现原型时，先按 checklist 明确选中方向、放弃方向、吸收范围和不吸收范围。
 - 阻塞/风险：本轮未改运行时代码、测试脚本、正式菜单、后端 API、schema、migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
 
 ## 2026-06-10 21:03 CST

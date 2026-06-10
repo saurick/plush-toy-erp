@@ -374,7 +374,10 @@ RBAC / API 改动必须覆盖：
 - 涉及产品原型、PNG 草案、视觉探索、多方案比较、截图 / mockup 转原型或设计 QA 时，默认先判断当前任务属于 `起草阶段 / Draft`、`待实现 / To Implement` 还是 `当前实现 / Current`，并优先阅读 `docs/product/prototypes/README.md`。
 - 视觉探索、从 0 出 PNG 方向图、多方案比较、从截图 / mockup / Figma / URL 生成轻量原型、设计 QA 等任务，应优先使用 `@product-design` 插件；若只是整理仓库内已有原型资产、补 README、维护 `/__dev/prototypes` 查看器或把已选方案吸收到正式代码，不需要为了流程机械调用 Product Design。
 - 当前推荐流程是 `起草阶段 PNG -> 待实现 HTML -> 当前实现`。复杂页面、信息架构、交互入口和多方案取舍应先进入 Draft 或 To Implement；小型文案、局部样式或用户已明确选定的目标可以跳过中间步骤，但必须说明跳过原因和验证方式。
+- 任一阶段都不是锁定状态，都可以继续调整；区别只在调整约束。Draft 调整成本最低，To Implement 需要同步原型和吸收范围，Current 属于正式代码变更，必须回到仓库真源、测试和浏览器回归，并按需同步正式文档。
+- 从 `起草阶段 / Draft` 收敛到 `待实现 / To Implement` 前，必须按 `docs/product/prototypes/README.md` 的“起草收敛提示 / Draft To Implement Checklist”核对输入来源、必须收敛项、禁止升级项和输出要求。
 - 从 `待实现 / To Implement` 原型吸收到真实页面前，必须按 `docs/product/prototypes/README.md` 的“待实现吸收提示 / To Implement Checklist”核对目标、必须对齐项、禁止照搬项、实现和验证范围。
+- `待实现 / To Implement` 晋级为 `当前实现 / Current` 必须有用户明确确认。Codex 不能仅凭自己完成了代码、测试、浏览器回归或“部分承接”就擅自把资产状态、registry、静态索引或 README 改成 Current；未获确认时，只能在 `progress.md` 或最终回复中建议候选晋级，并保留待实现队列。
 - `HTML / PNG` 只表示资产格式；`当前实现 / 待实现 / 起草阶段 / 参考资料` 是主阶段；`方案对比 / 截图证据 / 历史参考` 只作为辅助标签和追溯信息，不作为顶部筛选分类或实现承诺。
 - 原型不能替代仓库真源。进入正式实现时，Codex 必须回到真实代码、现有共享组件、API、RBAC、菜单、theme token、正式文档、测试和浏览器回归；不得直接复制静态原型数据、绕过权限 / 菜单边界，或把 Workflow 原型动作写成库存、出货、财务、应收、开票或收付款事实。
 - 原型结论改变业务能力、菜单入口、Workflow / Fact 边界、交付状态或产品化口径时，必须同步检查 `docs/current-source-of-truth.md`、相关产品 / 架构文档、`web/README.md` 和 `progress.md`，不能只改原型文件。

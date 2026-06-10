@@ -1247,6 +1247,46 @@ const scenarios = [
       })
 
       await page
+        .getByRole('button', { name: '当前实现 / Current', exact: true })
+        .click()
+      await expectText(page, '岗位任务端当前实现对齐版原型')
+      const currentMetrics = await page.evaluate(() => ({
+        activeText:
+          document
+            .querySelector('.erp-dev-prototypes-filter__item--active')
+            ?.textContent?.replace(/\s+/g, ' ')
+            .trim() || '',
+        visibleCards: document.querySelectorAll('.erp-dev-prototypes-card')
+          .length,
+        currentTagCount: Array.from(
+          document.querySelectorAll(
+            '.erp-dev-prototypes-list .erp-dev-prototypes-status'
+          )
+        ).filter((item) => item.textContent?.includes('当前实现对齐版')).length,
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }))
+      assert.equal(
+        currentMetrics.activeText,
+        '当前实现 / Current',
+        `原型查看器当前实现筛选应激活: ${JSON.stringify(currentMetrics)}`
+      )
+      assert.equal(
+        currentMetrics.visibleCards,
+        1,
+        `原型查看器当前实现筛选只应展示岗位任务端资产: ${JSON.stringify(currentMetrics)}`
+      )
+      assert.equal(
+        currentMetrics.currentTagCount,
+        1,
+        `原型查看器当前实现标签数量异常: ${JSON.stringify(currentMetrics)}`
+      )
+      assert(
+        currentMetrics.scrollWidth <= currentMetrics.clientWidth + 1,
+        `原型查看器当前实现筛选不应横向溢出: ${JSON.stringify(currentMetrics)}`
+      )
+
+      await page
         .getByRole('button', {
           name: '待实现 / To Implement',
           exact: true,
@@ -1254,6 +1294,7 @@ const scenarios = [
         .click()
       await expectText(page, '后台工作台与看板整套原型')
       await expectText(page, '业务模块标准页整页原型')
+      await expectText(page, '协同入口独立候选原型')
       const implementMetrics = await page.evaluate(() => ({
         activeText:
           document
@@ -1273,12 +1314,10 @@ const scenarios = [
         '待实现 / To Implement',
         `原型查看器待实现筛选应激活: ${JSON.stringify(implementMetrics)}`
       )
-      assert(
-        implementMetrics.visibleCards >= 3 &&
-          implementMetrics.visibleTitles.some((title) =>
-            title.includes('后台工作台')
-          ),
-        `原型查看器待实现筛选结果异常: ${JSON.stringify(implementMetrics)}`
+      assert.equal(
+        implementMetrics.visibleCards,
+        3,
+        `原型查看器待实现筛选应展示 3 个产品内核 HTML 原型: ${JSON.stringify(implementMetrics)}`
       )
       assert(
         implementMetrics.scrollWidth <= implementMetrics.clientWidth + 1,

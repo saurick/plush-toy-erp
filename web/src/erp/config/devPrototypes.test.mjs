@@ -40,11 +40,16 @@ test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
     DEV_PROTOTYPE_ASSETS.flatMap((item) => item.statuses)
   )
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.CURRENT))
-  assert(statuses.has(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT))
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.DRAFT))
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.HISTORY))
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.EVIDENCE))
   assert(statuses.has(DEV_PROTOTYPE_STATUSES.COMPARISON))
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.filter((item) =>
+      item.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)
+    ).length,
+    3
+  )
   assert.deepEqual(
     DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => option.value),
     [
@@ -57,6 +62,12 @@ test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'admin-command-center')
       ?.statuses[0],
+    DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
+  )
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.find(
+      (item) => item.key === 'business-task-collab-entry'
+    )?.statuses[0],
     DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
   )
   assert.equal(
@@ -130,9 +141,19 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
   )
   assert(
     filterDevPrototypeItems(items, {
+      status: DEV_PROTOTYPE_FILTERS.CURRENT,
+      keyword: '岗位任务端',
+    }).some((item) => item.key === 'mobile-role-tasks-implemented')
+  )
+  assert.deepEqual(
+    filterDevPrototypeItems(items, {
       status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
-      keyword: '后台工作台',
-    }).some((item) => item.key === 'admin-command-center')
+    }).map((item) => item.key),
+    [
+      'admin-command-center',
+      'business-module-standard-page',
+      'business-task-collab-entry',
+    ]
   )
   assert.equal(
     filterDevPrototypeItems(items, { keyword: '../unsafe' }).length,

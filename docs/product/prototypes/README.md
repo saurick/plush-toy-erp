@@ -22,7 +22,18 @@
 
 ## 协作流程
 
-涉及原型的新需求先判断处于哪个阶段，再决定使用 Product Design 插件、Codex 原型维护，还是正式工程实现。
+涉及原型的新需求先判断处于哪个阶段、属于哪个归属，再决定使用 Product Design 插件、Codex 原型维护，还是正式工程实现。
+
+阶段和归属是两个维度，不能混用：
+
+- 阶段说明这个资产在生命周期里处于哪里，例如起草、待实现、当前实现或参考资料。
+- 归属说明这个资产属于产品内核、某个甲方投影、探索方案还是证据资料。
+
+同一个资产必须先说清这两个维度，再进入真实页面、客户配置、模板、seed 或归档处理。不要因为一个原型是“当前实现对齐版”，就自动把它理解成产品内核标准；也不要因为一个客户原型已经确认，就把客户习惯写进通用 usecase。
+
+### 阶段分类 / Lifecycle
+
+阶段用于判断 Codex 下一步应该做设计探索、待实现整理、正式实现，还是只做参考查阅。
 
 | 阶段 | 常见资产 | 适用动作 | 进入下一阶段的条件 |
 | --- | --- | --- | --- |
@@ -31,6 +42,75 @@
 | 当前实现 / Current | `web/src` 真实运行时代码、当前实现对齐版 HTML | Codex 在正式页面或共享组件里实现，并跑对应测试和浏览器回归；原型退为 as-built 参考或历史参考。 | 代码、正式文档、测试和浏览器回归已同步；不再把旧原型当实现真源。 |
 
 允许跳过中间步骤，但必须写清原因：小型文案或局部样式可以直接从截图进入真实实现；复杂页面、信息架构、交互入口或多方案取舍应先经历 Draft 或 To Implement。无论是否使用 Product Design，最终落地都必须回到仓库真源和项目测试。
+
+任一阶段都不是锁定状态，都可以继续调整；区别只在调整约束。Draft 调整成本最低，To Implement 需要同步原型和吸收范围，Current 属于正式代码变更，必须回到仓库真源、测试和浏览器回归，并按需同步正式文档。
+
+### 阶段晋级门禁 / Promotion Gate
+
+原型阶段只能按明确门禁晋级，Codex 不能因为自己完成了代码、测试或浏览器回归，就擅自把 `待实现 / To Implement` 改成 `当前实现 / Current`。
+
+| 晋级 | 必须满足 |
+| --- | --- |
+| Draft -> To Implement | 用户明确选定方向；README 写清吸收范围、不吸收范围和风险；资产登记为待实现。 |
+| To Implement -> Current | 真实页面或共享组件已实现；必要测试和浏览器回归已跑；正式文档按需同步；用户明确确认“可以改为当前实现 / 已实现 / Current”。 |
+| Customer / Exploration -> Core | 用户明确确认要上升为产品内核；写清通用性依据、排除的客户专属内容、影响范围和需要同步的测试 / 文档。 |
+
+禁止事项：
+
+- 禁止 Codex 仅凭“代码已改”“测试通过”“看起来对齐”就把待实现资产改成当前实现。
+- 禁止在用户只要求实现或修页面时，顺手清空待实现队列。
+- 禁止用“已部分实现”“大致承接”“可以以后再补”作为进入 Current 的理由。
+- 如果实现和待实现原型存在差异，默认仍保留 To Implement 状态，并在 README 或 progress 写清差异；只有用户确认这些差异可接受，才能晋级 Current。
+- 如果用户没有明确确认，最多只能在 progress 中建议“候选晋级 Current”，不能修改 registry、静态索引或 README 状态为 Current。
+
+### 归属分类 / Ownership
+
+归属用于判断一个原型能进入哪里。当前先以 README、资产登记和 `/__dev/prototypes` 标签说明为主，不急于移动目录；当资产数量明显增加时，再评审是否改成 `core/`、`customers/<customer-key>/`、`exploration/` 和 `evidence/` 目录。
+
+| 归属 | 维护口径 | 可进入的实现边界 | 禁止事项 |
+| --- | --- | --- | --- |
+| 产品内核 / Core | 通用 ERP 产品母版，描述行业通用页面结构、信息层级、交互路径和 Workflow / Fact 边界。 | 经确认后可进入正式页面、共享组件、正式文档和测试。 | 不把单个甲方的字段、称呼、流程、打印格式或习惯直接写进产品核心。 |
+| 甲方原型 / Customer | 某个客户基于产品内核的配置化投影，例如 `yoyoosun` 菜单、字段显示、打印模板、角色任务和初始化样例。 | 进入客户配置、打印模板、seed/demo、客户文档或客户扩展边界。 | 不直接污染通用 schema、usecase、权限码、菜单主路径或事实语义。 |
+| 探索原型 / Exploration | 多方案比较、早期视觉方向、信息架构试验或交互试验。 | 先经过评审，升级为 Core 或 Customer 的 Draft / To Implement 后再实现。 | 不直接照抄进正式页面，也不因为探索稿里有按钮就新增后端、RBAC、schema 或 Fact 写入。 |
+| 证据资料 / Evidence | 截图证据、方案对比、历史参考、浏览器回归截图和 as-built 说明。 | 用于判断差异、追溯取舍和辅助评审。 | 不单独作为实现真源，不替代代码、测试、正式文档或当前页面。 |
+
+后续新增原型时，README 或资产登记至少写清：
+
+1. 阶段：Draft、To Implement、Current 或 Reference。
+2. 归属：Core、Customer、Exploration 或 Evidence。
+3. 若为 Customer，必须写明 customer key，例如 `yoyoosun`。
+4. 若要从 Customer 或 Exploration 升级为 Core，必须说明通用性依据、排除的客户专属内容和需要同步的正式文档 / 测试。
+
+## 起草收敛提示 / Draft To Implement Checklist
+
+当用户要求把起草阶段 PNG、方向图或截图草案收敛为待实现 HTML 原型时，Codex 应先按下面清单核对，再生成或调整 HTML 原型。目标是把视觉方向转成可实现的页面骨架、信息层级和交互路径，而不是把图片静态复刻成一张网页。
+
+1. 明确输入
+   - 起草资产路径是什么。
+   - 用户选中了哪个方向。
+   - 哪些方向被放弃，原因是什么。
+   - 是否需要继续用 `@product-design` 补视觉方向、变体或设计 QA。
+
+2. 必须收敛
+   - 首屏结构：哪些区块必须保留，哪些区块需要合并、弱化或删除。
+   - 信息层级：主信息、辅助信息、状态信息、风险提示和动作入口的优先级。
+   - 交互路径：筛选、查看、处理、展开 / 收起、抽屉、弹窗、跳转或分页是否需要在 HTML 原型中表达。
+   - 响应式边界：本轮是否覆盖桌面、移动或两者；未覆盖的断点必须说明。
+   - 视觉气质：背景、卡片、边框、圆角、密度、按钮层级、状态色和空态的方向。
+   - 吸收范围：哪些内容进入待实现 HTML，哪些内容只保留为参考资料或历史证据。
+
+3. 禁止升级
+   - 不把 PNG 里的固定数字、假任务、假客户或截图偶然内容写成真实需求。
+   - 不把未讨论清楚的按钮、状态、模块或业务动作升级为待实现能力。
+   - 不因为图片里出现入口就默认新增后端 API、RBAC、菜单、schema、migration、seedData 或 Fact 语义。
+   - 不把多个方向混成一个复杂方案，除非用户明确选择组合，并写清组合原因。
+   - 不把客户专属截图内容升级为产品核心规则，除非经过 Product Core 评审。
+
+4. 输出要求
+   - 生成或调整可交互 HTML 原型，优先表达页面骨架、主要状态和关键交互。
+   - README 写清选中方向、放弃方向、吸收范围、不吸收范围和后续进入真实页面前的风险。
+   - 在 `/__dev/prototypes` 中把新 HTML 标记为 `待实现 / To Implement`；原 PNG 继续保留为 `参考资料`、`起草阶段`、`方案对比`、`截图证据` 或 `历史参考`。
+   - 不进入 `web/src`、正式菜单、seedData、RBAC、后端业务或生产构建，除非用户明确要求进入 Current 阶段并按正式实现流程执行。
 
 ## 待实现吸收提示 / To Implement Checklist
 
@@ -64,15 +144,15 @@
 
 ## 当前原型
 
-| 路径 | 用途 |
-| --- | --- |
-| `index.html` | 产品原型资产查看器，可直接用浏览器 `file://` 打开，用于筛选和访问本目录下的 HTML 原型、PNG 方案图和截图证据。 |
-| `admin-command-center-v1/index.html` | 后台工作台与看板整套原型，覆盖工作台、任务看板、业务看板、模板打印中心和异常 / 阻塞闭环。 |
-| `business-module-page-standard-v1/index.html` | 业务模块标准页整页原型，覆盖标题统计、筛选、表格工具、选中操作条、分页和底部协同入口。 |
-| `business-module-page-standard-v1/task-collab-entry-v2.html` | 协同入口单独候选原型，用于对比底部常驻入口、展开面板、任务分组和桌面端高度拖拽手柄。 |
-| `business-module-page-standard-v1/images/` | 早期三张协同入口方向图，用于追溯方案比较。 |
-| `mobile-role-tasks-v1/implemented-reference.html` | 岗位任务端当前实现对齐版原型，用于说明真实页面吸收早期 PNG 后的 as-built 形态。 |
-| `mobile-role-tasks-v1/images/` | 岗位任务端改版三张 PNG 原型图，作为早期视觉方向和历史参考。 |
+| 路径 | 阶段 | 归属 | 用途 |
+| --- | --- | --- | --- |
+| `index.html` | Current | Evidence | 产品原型资产查看器，可直接用浏览器 `file://` 打开，用于筛选和访问本目录下的 HTML 原型、PNG 方案图和截图证据。 |
+| `admin-command-center-v1/index.html` | To Implement | Core | 后台工作台与看板待实现原型，覆盖工作台、任务看板、业务看板、模板打印中心和异常 / 阻塞闭环。 |
+| `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页待实现原型，覆盖标题统计、筛选、表格工具、选中记录操作条、分页和底部协同入口。 |
+| `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement / Reference | Core / Exploration | 协同入口候选待实现原型 + 方案对比参考，用于对比底部常驻入口、展开面板、任务分组和桌面端高度拖拽手柄。 |
+| `business-module-page-standard-v1/images/` | Reference | Exploration / Evidence | 早期三张协同入口方向图，用于追溯方案比较。 |
+| `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前实现对齐版原型，用于说明真实页面吸收早期 PNG 后的 as-built 形态。 |
+| `mobile-role-tasks-v1/images/` | Reference | Exploration / Evidence | 岗位任务端改版三张 PNG 原型图，作为早期视觉方向和历史参考。 |
 
 ## 资产状态
 
@@ -103,6 +183,8 @@
 | 方案对比 | 用于并排比较多个方向，后续采纳结论应写回对应 README 或正式设计文档。 |
 
 当前推荐的简化理解是：顶部只判断“当前 / 待实现 / 参考资料”；`HTML / PNG` 只表示格式，`截图证据 / Evidence`、`方案对比 / Comparison`、`历史参考 / History` 等细标签只解释来源和用途。不要反过来用 HTML / PNG 文件格式或辅助标签判断资产阶段。
+
+截至 2026-06-10，待实现队列包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html` 和 `business-module-page-standard-v1/task-collab-entry-v2.html`。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现对齐版登记；其余产品内核相关 HTML 仍需按 To Implement Checklist 进入真实页面实现、测试和浏览器回归后，才能改为 Current。
 
 ## 使用方式
 
