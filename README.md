@@ -135,7 +135,10 @@ pnpm style:l1
 - 产品完成路线图：`/Users/simon/projects/plush-toy-erp/docs/product/product-completion-roadmap.md`
 - 自动化测试策略：`/Users/simon/projects/plush-toy-erp/docs/product/test-strategy.md`
 - 正式产品入口与菜单配置计划：`/Users/simon/projects/plush-toy-erp/docs/product/formal-menu-entry-plan.md`
-- 产品能力 / 交付 / 差异台账：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 产品台账索引：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 产品能力进度台账：`/Users/simon/projects/plush-toy-erp/docs/product/capability-ledger.md`
+- 永绅 yoyoosun 客户交付矩阵：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delivery-matrix.md`
+- 永绅 yoyoosun 客户差异台账：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delta-ledger.md`
 - 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md`
 - 永绅 yoyoosun 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/README.md`
 - imported design notes：`/Users/simon/projects/plush-toy-erp/docs/reference/imported-notes/README.md`

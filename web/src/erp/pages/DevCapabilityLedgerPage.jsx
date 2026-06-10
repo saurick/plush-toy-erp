@@ -15,7 +15,7 @@ import {
   parseCapabilityLedgerMarkdown,
 } from '../config/devCapabilityLedger.mjs'
 
-import capabilityLedgerSource from '../../../../docs/product/product-delivery-ledgers.md?raw'
+import capabilityLedgerSource from '../../../../docs/product/capability-ledger.md?raw'
 
 const { Paragraph, Text, Title } = Typography
 

@@ -11,7 +11,7 @@ import {
 } from './devCapabilityLedger.mjs'
 
 const ledgerMarkdown = `
-# 产品能力进度台账、客户交付矩阵与客户差异台账 / Product Delivery Ledgers
+# 产品能力进度台账 / Product Capability Ledger
 
 ## 4. 产品能力进度台账
 
@@ -19,7 +19,7 @@ const ledgerMarkdown = `
 | ------------- | -------- | ------ | ------ | ---------: | -------- | ---------- | ---- | ------ | ---- | ------------ | ---------- |
 | CAP-001 | Workflow / Fact 边界 | Product Core | Architecture / Workflow | L7 | 已明确 \`workflow done != fact posted\` | 不代表 shipment facts 已实现 | \`docs/architecture/status-workflow-fact-boundary.md\` | 后续 shipment / finance 继续复用 | UI 文案可能误导 | Yes | No |
 | CAP-013 | product_skus | Product Core | Product / SKU | L3 | Draft Only | 未落 schema / runtime / UI | roadmap | SKU/BOM version review | 不能因颜色字段直接落 SKU | No | No |
-| CAP-029 | Customer Config 配置形态 | Customer Config | Productization | L2-L3 | 草案配置 | 不新增 \`tenant_id\` | \`docs/product/product-delivery-ledgers.md\` | customer review | 被误读为 Runtime Tenant | Limited | No |
+| CAP-029 | Customer Config 配置形态 | Customer Config | Productization | L2-L3 | 草案配置 | 不新增 \`tenant_id\` | \`docs/product/capability-ledger.md\` | customer review | 被误读为 Runtime Tenant | Limited | No |
 
 ---
 
@@ -30,7 +30,7 @@ test('devCapabilityLedger: 只通过开发态独立路径暴露', () => {
   assert.equal(DEV_CAPABILITY_LEDGER_ROUTE, '/__dev/capability-ledger')
   assert.equal(
     DEV_CAPABILITY_LEDGER_SOURCE_PATH,
-    'docs/product/product-delivery-ledgers.md'
+    'docs/product/capability-ledger.md'
   )
   assert.equal(isDevCapabilityLedgerEnabled({ DEV: true }), true)
   assert.equal(isDevCapabilityLedgerEnabled({ DEV: false }), false)

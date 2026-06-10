@@ -6,8 +6,8 @@
 
 - 运行时行为的最终真源始终是代码。
 - 仓库级约定、部署边界和项目基线，以当前文档为索引，再分流到对应子目录文档。
-- 历史 changes 文档不再作为阅读入口；当前状态必须回到本文档、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认。
-- 产品从起步到成熟的阶段规划、重新做项目的 Phase 路线和产品化路线，以 `docs/product/product-completion-roadmap.md` 作为可演进规划真源；正式菜单入口、行业菜单候选、客户菜单配置和旧入口退出细节，以 `docs/product/formal-menu-entry-plan.md` 作为路线配套计划；产品能力成熟度、客户交付状态和客户差异分类，以 `docs/product/product-delivery-ledgers.md` 作为长期台账入口；它们都不替代当前实现真源，也不直接授权 schema、migration、runtime、API 或 UI 改动。
+- 历史 changes 文档不再作为阅读入口；当前状态必须回到本文档、正式能力账本（`docs/product/capability-ledger.md`）、当前代码和当前测试交叉确认。
+- 产品从起步到成熟的阶段规划、重新做项目的 Phase 路线和产品化路线，以 `docs/product/product-completion-roadmap.md` 作为可演进规划真源；正式菜单入口、行业菜单候选、客户菜单配置和旧入口退出细节，以 `docs/product/formal-menu-entry-plan.md` 作为路线配套计划；产品能力成熟度以 `docs/product/capability-ledger.md` 作为长期台账，客户交付状态和客户差异分类按客户放在 `docs/customers/<customer-key>/delivery-matrix.md` 和 `docs/customers/<customer-key>/delta-ledger.md`；`docs/product/product-delivery-ledgers.md` 只作为三类台账索引保留。它们都不替代当前实现真源，也不直接授权 schema、migration、runtime、API 或 UI 改动。
 - 模块进入实现前的施工治理、Phase 与 Architecture Layer 区分、门禁和实施任务拆分规则，以 `docs/product/implementation-governance.md` 作为阅读入口；它不替代 roadmap、当前实现真源、测试或本轮具体任务说明。
 - 当前部署真源是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`。
 - 当前仓库没有 `lab-ha`、Kubernetes 和 dashboard 主路径；不要按不存在的目录做推断。
@@ -48,9 +48,9 @@
 - 系统分层、产品化与交付、客户差异、状态 / Workflow / Fact 边界继续以仓库正式 `docs/product/*`、`docs/architecture/*`、`docs/customers/*` 和当前代码 / 测试为准，不再镜像成前端 Markdown 页面。
 - 开发环境可访问独立隐藏路径 `/__dev/docs` 查看仓库 tracked Markdown；该入口左侧专用于按真实目录树浏览 `docs/**/*.md` 及主要 README，搜索态显示匹配结果，右侧章节标签可滚动到对应标题并提供回到顶部，只服务本地开发查阅，不进入 ERP 菜单、seedData、RBAC、产品内 docs registry 或生产构建。
 - 开发环境可访问独立隐藏路径 `/__dev/prototypes` 查看产品原型资产；该入口只浏览 `docs/product/prototypes` 下的 HTML 原型、PNG 方案图和截图证据，可按资产状态筛选并在右侧预览，只服务本地开发和产品评审查阅，不进入 ERP 菜单、seedData、RBAC、后端业务、产品内 docs registry 或生产构建。
-- 开发环境可访问独立隐藏路径 `/__dev/capability-ledger` 查看能力台账只读可视化；该入口只解析 `docs/product/product-delivery-ledgers.md` 中的产品能力进度台账，展示成熟度、所属层、业务域、客户试用和交付承诺分布，只服务本地治理查阅，不进入 ERP 菜单、seedData、RBAC、后端业务、产品内 docs registry 或生产构建；台账 Markdown 仍是唯一维护入口，可视化不替代当前实现真源、schema、migration、API、UI 或测试。
+- 开发环境可访问独立隐藏路径 `/__dev/capability-ledger` 查看能力台账只读可视化；该入口只解析 `docs/product/capability-ledger.md` 中的产品能力进度台账，展示成熟度、所属层、业务域、客户试用和交付承诺分布，只服务本地治理查阅，不进入 ERP 菜单、seedData、RBAC、后端业务、产品内 docs registry 或生产构建；能力台账 Markdown 仍是唯一维护入口，可视化不替代当前实现真源、schema、migration、API、UI 或测试。
 - Phase 0 已新增 0 到 1 产品架构、客户实例、客户差异和状态 / Workflow / Fact 边界文档：`docs/product/*`、`docs/architecture/status-workflow-fact-boundary.md`、`docs/customers/yoyoosun/*`。
-- `docs/product/product-delivery-ledgers.md` 是产品能力进度台账、客户交付矩阵和客户差异台账入口，用于判断能力成熟度、交付承诺和客户差异分类；它不是 runtime、schema、migration、API、UI 或测试真源。
+- `docs/product/capability-ledger.md` 是全局产品能力进度台账，用于判断能力成熟度、证据和下一步；`docs/customers/yoyoosun/delivery-matrix.md` 和 `docs/customers/yoyoosun/delta-ledger.md` 是永绅 yoyoosun 客户交付矩阵和客户差异台账；`docs/product/product-delivery-ledgers.md` 只保留三类台账索引。它们不是 runtime、schema、migration、API、UI 或测试真源。
 - `docs/product/implementation-governance.md` 是模块实施治理入口，用于拆新实现任务前确认 Phase、Architecture Layer、门禁、范围和禁止项；它不是 runtime、schema、migration、API、UI 或测试真源。
 - `docs/reference/imported-notes/*` 只保存 imported design notes，状态是 Reference Only，不是 runtime、schema 或当前实现真源。
 - 永绅客户的稳定客户 key 是 `yoyoosun`；本仓库按稳定客户 key 管理客户资料，不保留活跃客户目录或导入工作区别名。当前不新增 `tenant_id`，也不把客户 key 当 SaaS runtime tenant。
@@ -77,6 +77,9 @@
 - `/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
 - `/Users/simon/projects/plush-toy-erp/docs/product/product-completion-roadmap.md`
 - `/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- `/Users/simon/projects/plush-toy-erp/docs/product/capability-ledger.md`
+- `/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delivery-matrix.md`
+- `/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delta-ledger.md`
 - `/Users/simon/projects/plush-toy-erp/docs/product/implementation-governance.md`
 - `/Users/simon/projects/plush-toy-erp/server/README.md`
 - `/Users/simon/projects/plush-toy-erp/scripts/README.md`

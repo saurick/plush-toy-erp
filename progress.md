@@ -201,3 +201,12 @@
 - 验证：Playwright 通过 `http://127.0.0.1:5188/__dev/prototypes` 验证初始单按钮为“收起”，4 个目录均展开且显示 9 个资产；点击后按钮变为“展开”、4 个目录均收起且资产卡片为 0；再次点击恢复“收起”和 9 个资产；favicon 仍为 `/favicon-prototypes.svg`，390x844 移动视口无横向溢出。
 - 下一步：如果继续对齐 `/__dev/docs`，可以考虑把目录分组标题也改成“目录”区块标题，但当前不再扩大范围。
 - 阻塞/风险：本轮只改 `/__dev/prototypes` dev-only 前端入口、样式和过程记录；未改静态 `docs/product/prototypes/index.html`、后端、schema、migration、RBAC、ERP 正式菜单、seed、生产构建或目标环境镜像。追加前 `progress.md` 为 195 行 / 41691 bytes，未达到归档阈值。
+
+
+## 2026-06-10 11:14 CST
+
+- 完成：将原 `docs/product/product-delivery-ledgers.md` 拆为索引文档，新增全局 `docs/product/capability-ledger.md`，并把 yoyoosun 客户交付矩阵和客户差异台账分别落到 `docs/customers/yoyoosun/delivery-matrix.md` 与 `docs/customers/yoyoosun/delta-ledger.md`。
+- 完成：同步更新 `/__dev/capability-ledger` 读取源、单测样例、README、`docs/current-source-of-truth.md`、`docs/document-inventory.md`、`docs/product/README.md`、`docs/customers/README.md` 和 yoyoosun 客户 README，明确产品能力台账全局一份，客户交付矩阵和客户差异台账按客户一份。
+- 验证：已确认能力台账保留 35 条 `CAP-*`，yoyoosun 交付矩阵保留 32 条客户行，yoyoosun 差异台账保留 30 条 `DELTA-YOYOOSUN-*`；旧“产品能力 / 交付 / 差异台账”合并文案已从活跃 README / docs / web 入口清理；`node --test src/erp/config/devCapabilityLedger.test.mjs`、`pnpm lint`、`pnpm test` 和 `git diff --check` 均通过，`pnpm test` 通过 294 项。
+- 下一步：后续新增客户时按 `docs/customers/<customer-key>/delivery-matrix.md` 和 `docs/customers/<customer-key>/delta-ledger.md` 新建客户台账，不复制产品能力台账。
+- 阻塞/风险：本轮是文档结构和 dev-only 可视化读取源调整；未改后端、schema、migration、RBAC、ERP 正式菜单、seed、生产构建或目标环境镜像。追加前 `progress.md` 为 203 行 / 43272 bytes，未达到归档阈值。

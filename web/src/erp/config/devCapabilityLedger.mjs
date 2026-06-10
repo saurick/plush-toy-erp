@@ -1,6 +1,6 @@
 export const DEV_CAPABILITY_LEDGER_ROUTE = '/__dev/capability-ledger'
 export const DEV_CAPABILITY_LEDGER_SOURCE_PATH =
-  'docs/product/product-delivery-ledgers.md'
+  'docs/product/capability-ledger.md'
 
 const CAPABILITY_LEDGER_SECTION_HEADING = '## 4. 产品能力进度台账'
 

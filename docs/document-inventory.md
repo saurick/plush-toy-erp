@@ -94,6 +94,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/business-records-risk-register.md` | 业务记录风险登记 / business_records Risk Register |
 | `docs/product/business-records-transition-audit.md` | 业务记录过渡审计 / business_records Transition Audit |
 | `docs/product/business-records-transition-plan.md` | 业务记录过渡计划 / business_records Transition Plan |
+| `docs/product/capability-ledger.md` | 产品能力进度台账 / Product Capability Ledger |
 | `docs/product/config-permission-policy.md` | 配置与权限策略 / Config And Permission Policy |
 | `docs/product/customer-delta-policy.md` | 客户差异策略 / Customer Delta Policy |
 | `docs/product/customer-instance-policy.md` | 客户实例策略 / Customer Instance Policy |
@@ -108,7 +109,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/prototypes/business-module-page-standard-v1/README.md` | 业务模块标准页原型 / Business Module Page Standard Prototype |
 | `docs/product/prototypes/mobile-role-tasks-v1/README.md` | 岗位任务端原型 / Mobile Role Tasks Prototype |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |
-| `docs/product/product-delivery-ledgers.md` | 产品能力进度台账、客户交付矩阵与客户差异台账 / Product Delivery Ledgers |
+| `docs/product/product-delivery-ledgers.md` | 产品台账索引 / Product Delivery Ledgers Index |
 | `docs/product/product-principles.md` | 产品原则 / Product Principles |
 | `docs/product/private-deployment-package-review.md` | 多客户私有化复制包评审 / Private Deployment Package Review |
 | `docs/product/release-gates.md` | 发布门禁 / Release Gates |
@@ -125,6 +126,8 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/change-request-process.md` | 变更请求流程 / Change Request Process |
 | `docs/customers/yoyoosun/customer-config-draft.md` | 客户配置草案 / Customer Config Draft |
 | `docs/customers/yoyoosun/decision-log.md` | 决策日志 / Decision Log |
+| `docs/customers/yoyoosun/delivery-matrix.md` | 永绅 yoyoosun 客户交付矩阵 / Yoyoosun Delivery Matrix |
+| `docs/customers/yoyoosun/delta-ledger.md` | 永绅 yoyoosun 客户差异台账 / Yoyoosun Delta Ledger |
 | `docs/customers/yoyoosun/delta-register.md` | 差异登记 / Delta Register |
 | `docs/customers/yoyoosun/field-numbering-confirmation-checklist.md` | 永绅 yoyoosun 字段编号确认清单 / Yoyoosun Field Numbering Confirmation Checklist |
 | `docs/customers/yoyoosun/field-numbering-confirmation-result-template.md` | 永绅 yoyoosun 字段编号确认结果模板 / Yoyoosun Field Numbering Confirmation Result Template |

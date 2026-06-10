@@ -12,6 +12,8 @@
 | `question-backlog.md` | 用业务人员能看懂的话列待确认问题 |
 | `decision-log.md` | 只记录已经确认的决策 |
 | `customer-config-draft.md` | 记录永绅 yoyoosun 未来可能的配置项 |
+| `delivery-matrix.md` | 记录永绅 yoyoosun 客户交付矩阵 |
+| `delta-ledger.md` | 记录永绅 yoyoosun 客户差异台账 |
 | `delta-register.md` | 记录客户差异项 |
 | `change-request-process.md` | 记录后续需求分类和评审流程 |
 | `import-source-inventory.md` | 记录永绅 yoyoosun 导入来源清单和用途分类 |

@@ -8,7 +8,8 @@
 - 文档清单：`/Users/simon/projects/plush-toy-erp/docs/document-inventory.md`
 - 部署口径：`/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
 - 产品完成路线图：`/Users/simon/projects/plush-toy-erp/docs/product/product-completion-roadmap.md`
-- 产品能力 / 交付 / 差异台账：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 产品台账索引：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 产品能力进度台账：`/Users/simon/projects/plush-toy-erp/docs/product/capability-ledger.md`
 - 架构评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/`
 - 历史归档：`/Users/simon/projects/plush-toy-erp/docs/archive/`
 
@@ -24,7 +25,8 @@
 - 产品原则：`/Users/simon/projects/plush-toy-erp/docs/product/product-principles.md`
 - 模块边界：`/Users/simon/projects/plush-toy-erp/docs/product/module-boundaries.md`
 - 模块实施治理：`/Users/simon/projects/plush-toy-erp/docs/product/implementation-governance.md`
-- 产品能力 / 交付 / 差异台账：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 产品台账索引：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 产品能力进度台账：`/Users/simon/projects/plush-toy-erp/docs/product/capability-ledger.md`
 
 ### 详细设计 / Detailed Design
 
@@ -47,7 +49,9 @@
 
 - 客户资料入口：`/Users/simon/projects/plush-toy-erp/docs/customers/README.md`
 - 永绅 yoyoosun 客户资料：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/README.md`
-- 产品能力 / 交付 / 差异台账：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 产品台账索引：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
+- 永绅 yoyoosun 客户交付矩阵：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delivery-matrix.md`
+- 永绅 yoyoosun 客户差异台账：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delta-ledger.md`
 - 部署口径：`/Users/simon/projects/plush-toy-erp/docs/deployment-conventions.md`
 - Compose 部署：`/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
 
