@@ -794,12 +794,12 @@ const scenarios = [
   },
   {
     name: 'dev-customer-config-dark-desktop',
-    path: '/__dev/customer-config',
+    path: '/__dev/customer-config?customer=yoyoosun',
     themeMode: 'dark',
     viewport: { width: 1536, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '客户配置开发总控')
-      await expectText(page, '当前客户 key')
+      await expectText(page, '当前 URL customer')
       await expectText(page, 'yoyoosun')
       await expectText(page, '已接运行时')
       await expectText(page, '真实客户数据导入')
@@ -837,6 +837,33 @@ const scenarios = [
       await expectText(page, 'false')
       await expectText(page, 'customerImportDryRun.mjs')
       await assertNoHorizontalOverflow(page, 'dev-customer-config-import-view')
+
+      await gotoScenarioPath(
+        page,
+        '/__dev/customer-config?customer=missing-customer',
+        {
+          waitUntil: 'domcontentloaded',
+        }
+      )
+      await expectHeading(page, '客户配置开发总控')
+      await expectText(page, '未登记客户配置包')
+      await expectText(page, 'missing-customer')
+      await expectText(page, '已登记客户包')
+      await expectText(page, '永绅 yoyoosun')
+      await assertTextAbsent(page, '东莞市永绅玩具有限公司')
+
+      await page.locator('.erp-dev-customer-selector .ant-select').click()
+      await page.getByText('永绅 yoyoosun (yoyoosun)', { exact: true }).click()
+      const switchedUrl = new URL(page.url())
+      assert.equal(switchedUrl.pathname, '/__dev/customer-config')
+      assert.equal(switchedUrl.searchParams.get('customer'), 'yoyoosun')
+      assert(!switchedUrl.pathname.startsWith('/erp'))
+      await page
+        .locator('.erp-dev-customer-view-switch .ant-segmented-item')
+        .filter({ hasText: '菜单品牌' })
+        .click()
+      await expectText(page, '东莞市永绅玩具有限公司')
+      await assertNoHorizontalOverflow(page, 'dev-customer-config-missing-view')
     },
   },
   {
@@ -874,6 +901,220 @@ const scenarios = [
     },
   },
   {
+    name: 'dev-hub-dark-desktop',
+    path: '/__dev',
+    themeMode: 'dark',
+    viewport: { width: 1536, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '开发入口总控')
+      await expectText(page, '开发文档')
+      await expectText(page, '测试入口')
+      await expectText(page, '产品原型')
+      await expectText(page, '能力台账')
+      await expectText(page, '客户配置')
+      await expectText(page, '入口台账规则')
+      await expectText(page, '置顶入口')
+      await expectText(page, '用入口卡片右上角图钉把常用页面固定在这里。')
+      await expectText(page, '最近访问')
+      await expectText(page, '点击任一入口后会在这里保留最近访问记录。')
+      const defaultMetrics = await page.evaluate(() => ({
+        cardCount: document.querySelectorAll(
+          '.erp-dev-hub-grid .erp-dev-hub-card'
+        ).length,
+        guardrailCount: document.querySelectorAll(
+          '.erp-dev-hub-grid .erp-dev-hub-card__guards span'
+        ).length,
+        pinButtonCount: document.querySelectorAll(
+          '.erp-dev-hub-grid .erp-dev-hub-card__pin'
+        ).length,
+        firstHref: document
+          .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
+          ?.getAttribute('href'),
+        firstTarget: document
+          .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
+          ?.getAttribute('target'),
+        firstRel: document
+          .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
+          ?.getAttribute('rel'),
+        faviconHref: document
+          .querySelector('link[rel~="icon"]')
+          ?.getAttribute('href'),
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }))
+      assert.equal(
+        defaultMetrics.faviconHref,
+        '/favicon-dev.svg',
+        `开发入口总控 favicon 异常: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert.equal(
+        defaultMetrics.cardCount,
+        5,
+        `开发入口总控应渲染 5 个入口: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert(
+        defaultMetrics.guardrailCount >= 10,
+        `开发入口总控应展示入口边界标签: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert.equal(
+        defaultMetrics.pinButtonCount,
+        5,
+        `开发入口总控应为每个入口提供置顶按钮: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert(
+        defaultMetrics.firstHref?.startsWith('/__dev/'),
+        `开发入口总控卡片链接应指向 /__dev 子路径: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert.equal(
+        defaultMetrics.firstTarget,
+        '_blank',
+        `开发入口总控卡片链接应新标签打开: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert.equal(
+        defaultMetrics.firstRel,
+        'noreferrer',
+        `开发入口总控卡片链接应隔离 opener: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert(
+        defaultMetrics.scrollWidth <= defaultMetrics.clientWidth + 1,
+        `开发入口总控默认态不应横向溢出: ${JSON.stringify(defaultMetrics)}`
+      )
+
+      await page.evaluate(() => {
+        localStorage.setItem(
+          'plush_erp_dev_hub_recent_routes',
+          JSON.stringify(['/__dev/testing', '/__dev/docs', '/erp/dashboard'])
+        )
+        localStorage.setItem(
+          'plush_erp_dev_hub_pinned_routes',
+          JSON.stringify([
+            '/__dev/customer-config',
+            '/__dev/prototypes',
+            '/erp/dashboard',
+          ])
+        )
+      })
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await expectText(page, '保存在当前浏览器')
+      const recentMetrics = await page.evaluate(() => ({
+        pinnedCount: document.querySelectorAll(
+          '.erp-dev-hub-pinned .erp-dev-hub-card'
+        ).length,
+        pinnedHrefs: Array.from(
+          document.querySelectorAll(
+            '.erp-dev-hub-pinned .erp-dev-hub-card__link'
+          )
+        ).map((link) => link.getAttribute('href')),
+        recentCount: document.querySelectorAll(
+          '.erp-dev-hub-recent .erp-dev-hub-card'
+        ).length,
+        recentHrefs: Array.from(
+          document.querySelectorAll(
+            '.erp-dev-hub-recent .erp-dev-hub-card__link'
+          )
+        ).map((link) => link.getAttribute('href')),
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth + 1,
+      }))
+      assert.deepEqual(
+        recentMetrics,
+        {
+          pinnedCount: 2,
+          pinnedHrefs: ['/__dev/customer-config', '/__dev/prototypes'],
+          recentCount: 2,
+          recentHrefs: ['/__dev/testing', '/__dev/docs'],
+          overflow: false,
+        },
+        `开发入口总控最近访问应过滤非法路径并保持顺序: ${JSON.stringify(recentMetrics)}`
+      )
+
+      await page
+        .locator('.erp-dev-hub-grid .erp-dev-hub-card')
+        .filter({ hasText: '测试入口' })
+        .locator('.erp-dev-hub-card__pin')
+        .click()
+      const pinnedAfterClick = await page.evaluate(() => ({
+        storedRoutes: JSON.parse(
+          localStorage.getItem('plush_erp_dev_hub_pinned_routes') || '[]'
+        ),
+        firstPinnedHref: document
+          .querySelector('.erp-dev-hub-pinned .erp-dev-hub-card__link')
+          ?.getAttribute('href'),
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth + 1,
+      }))
+      assert.deepEqual(
+        pinnedAfterClick,
+        {
+          storedRoutes: [
+            '/__dev/testing',
+            '/__dev/customer-config',
+            '/__dev/prototypes',
+          ],
+          firstPinnedHref: '/__dev/testing',
+          overflow: false,
+        },
+        `开发入口总控置顶入口应写入本地偏好并移动到首位: ${JSON.stringify(pinnedAfterClick)}`
+      )
+
+      await page
+        .locator('.erp-dev-hub-group-filter .ant-segmented-item')
+        .filter({ hasText: '产品治理' })
+        .click()
+      await expectText(page, '当前匹配 1 / 5')
+      const groupMetrics = await page.evaluate(() => ({
+        cardCount: document.querySelectorAll(
+          '.erp-dev-hub-grid .erp-dev-hub-card'
+        ).length,
+        onlyHref: document
+          .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
+          ?.getAttribute('href'),
+        overflow:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth + 1,
+      }))
+      assert.deepEqual(
+        groupMetrics,
+        {
+          cardCount: 1,
+          onlyHref: '/__dev/capability-ledger',
+          overflow: false,
+        },
+        `开发入口总控分组筛选应只保留能力台账: ${JSON.stringify(groupMetrics)}`
+      )
+
+      await page
+        .locator('.erp-dev-hub-group-filter .ant-segmented-item')
+        .filter({ hasText: '全部' })
+        .click()
+      await page.getByPlaceholder('搜索入口、路径或资料来源').fill('测试')
+      await expectText(page, '当前匹配 1 / 5')
+      const filteredMetrics = await page.evaluate(() => ({
+        cardCount: document.querySelectorAll(
+          '.erp-dev-hub-grid .erp-dev-hub-card'
+        ).length,
+        onlyHref: document
+          .querySelector('.erp-dev-hub-grid .erp-dev-hub-card__link')
+          ?.getAttribute('href'),
+      }))
+      assert.deepEqual(filteredMetrics, {
+        cardCount: 1,
+        onlyHref: '/__dev/testing',
+      })
+      await assertERPThemeMode(page, {
+        scenarioName: 'dev-hub-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await assertDarkThemeContrast(page, {
+        scenarioName: 'dev-hub-dark-desktop',
+        selector: '.erp-dev-hub-page',
+      })
+    },
+  },
+  {
     name: 'dev-testing-dark-desktop',
     path: '/__dev/testing',
     themeMode: 'dark',
@@ -887,6 +1128,11 @@ const scenarios = [
         const root = document.querySelector('.erp-dev-testing-page')
         return {
           tierCount: document.querySelectorAll('.erp-dev-testing-tier').length,
+          tierCopyButtonCount: document.querySelectorAll(
+            '.erp-dev-testing-tier .ant-btn'
+          ).length,
+          presetCount: document.querySelectorAll('.erp-dev-testing-preset')
+            .length,
           docCount: document.querySelectorAll('.erp-dev-testing-doc-row')
             .length,
           overflow:
@@ -905,6 +1151,46 @@ const scenarios = [
       assert(
         defaultMetrics.docCount > 0,
         `测试入口应渲染相关文档: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert.equal(
+        defaultMetrics.presetCount,
+        3,
+        `测试入口应渲染常用复制预设: ${JSON.stringify(defaultMetrics)}`
+      )
+      assert(
+        defaultMetrics.tierCopyButtonCount >= defaultMetrics.tierCount,
+        `每个测试层级应提供复制按钮: ${JSON.stringify(defaultMetrics)}`
+      )
+      const faviconHref = await page.evaluate(() =>
+        document.querySelector('link[rel~="icon"]')?.getAttribute('href')
+      )
+      assert.equal(
+        faviconHref,
+        '/favicon-testing.svg',
+        `测试入口 favicon 异常: ${faviconHref}`
+      )
+      await page
+        .locator('.erp-dev-testing-preset')
+        .filter({ hasText: '本轮前端验证' })
+        .click()
+      const frontendPresetClipboard = await page.evaluate(() =>
+        navigator.clipboard.readText()
+      )
+      assert(
+        frontendPresetClipboard.includes('pnpm style:l1'),
+        `前端验证预设应复制 style:l1 命令: ${frontendPresetClipboard}`
+      )
+      await page
+        .locator('.erp-dev-testing-tier')
+        .filter({ hasText: 'T5 Frontend UI / 样式' })
+        .getByRole('button', { name: '复制' })
+        .click()
+      const tierClipboard = await page.evaluate(() =>
+        navigator.clipboard.readText()
+      )
+      assert(
+        tierClipboard.includes('cd web && pnpm style:l1'),
+        `T5 层级复制内容应包含前端 L1 命令: ${tierClipboard}`
       )
 
       await page.getByText('命令入口', { exact: true }).click()
@@ -2080,6 +2366,9 @@ function canConnectToLocalServer(url) {
 
 async function runScenario(browser, scenario) {
   const context = await browser.newContext({ viewport: scenario.viewport })
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
+    origin: baseURL,
+  })
   const page = await context.newPage()
   const errors = []
 

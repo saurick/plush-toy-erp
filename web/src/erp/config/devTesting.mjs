@@ -15,6 +15,62 @@ export const DEV_TESTING_DOC_KEYWORDS = Object.freeze([
   'Playwright',
 ])
 
+export const DEV_TESTING_COPY_PRESETS = Object.freeze([
+  {
+    key: 'frontend',
+    label: '本轮前端验证',
+    description: '页面、路由、样式或前端 helper 改动时优先复制。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp/web',
+      'pnpm lint',
+      'pnpm css',
+      'pnpm test',
+      'pnpm style:l1',
+    ],
+  },
+  {
+    key: 'pre-commit',
+    label: '提交前 QA',
+    description: '提交或推送前复制；具体范围仍按本轮改动判断。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'bash scripts/qa/full.sh',
+    ],
+  },
+  {
+    key: 'release',
+    label: '发版前严格 QA',
+    description: '发版前复制，不代表部署、备份或回滚已自动完成。',
+    commands: [
+      'cd /Users/simon/projects/plush-toy-erp',
+      'bash scripts/qa/strict.sh',
+    ],
+  },
+])
+
+const DEV_TESTING_TIER_COPY_FALLBACKS = Object.freeze({
+  T1: [
+    'cd /Users/simon/projects/plush-toy-erp',
+    'git status --short',
+    'git diff --stat',
+    'git diff --check',
+    'grep -R "tenant_id" docs/customers docs/product docs/architecture docs/reference config deployments server web || true',
+    'grep -R "ChangeUsecase\\|change_records" server web docs || true',
+  ],
+  T7: [
+    '# T7 当前没有完整业务 E2E runner；按触达事实层选择下列当前可用检查，不要伪造全链路自动化。',
+    'cd /Users/simon/projects/plush-toy-erp/server',
+    'go test ./internal/biz ./internal/data',
+    '# 如本轮明确触达对应 Phase PG，再按阶段选择 make phase2a_pg_test / phase2b_pg_test / phase2c_pg_test / phase2d_pg_test',
+  ],
+  T8: [
+    'cd /Users/simon/projects/plush-toy-erp',
+    'bash scripts/qa/full.sh',
+    'bash scripts/qa/strict.sh',
+    '# 部署、备份、migration、health、smoke 和回滚按 server/deploy/README.md 与目标环境执行，浏览器入口不直接运行。',
+  ],
+})
+
 export function isDevTestingEnabled(env = import.meta.env) {
   return env?.DEV === true
 }
@@ -157,17 +213,32 @@ export function parseDevTestingStrategyTiers(source = '') {
     const description = stripMarkdownInline(cells[headerIndex['说明']] || '')
     const key = level.split(/\s+/)[0] || `T${index}`
 
+    const commands = extractInlineCommands(commandText)
+    const copyCommands =
+      commands.length > 0
+        ? commands
+        : DEV_TESTING_TIER_COPY_FALLBACKS[key] || []
+
     return {
       key,
       level,
       changeType,
-      commands: extractInlineCommands(commandText),
+      commands,
+      copyCommands,
+      copyText: buildDevTestingCopyText(copyCommands),
       description,
       searchText: [level, changeType, commandText, description]
         .join(' ')
         .toLowerCase(),
     }
   })
+}
+
+export function buildDevTestingCopyText(commands = []) {
+  return commands
+    .map((command) => String(command || '').trim())
+    .filter(Boolean)
+    .join('\n')
 }
 
 export function extractDevTestingCommandBlocks(

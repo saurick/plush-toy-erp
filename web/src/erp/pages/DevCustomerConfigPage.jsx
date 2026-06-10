@@ -10,9 +10,22 @@ import {
   SafetyCertificateOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Segmented, Space, Tag, Tooltip, Typography } from 'antd'
+import {
+  Alert,
+  Button,
+  Segmented,
+  Select,
+  Space,
+  Tag,
+  Tooltip,
+  Typography,
+} from 'antd'
+import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
-import { buildCustomerConfigDevOverview } from '../config/devCustomerConfig.mjs'
+import {
+  DEV_CUSTOMER_CONFIG_QUERY_KEY,
+  buildCustomerConfigDevOverviewFromSearch,
+} from '../config/devCustomerConfig.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -34,6 +47,7 @@ function StatusTag({ status }) {
     草案: 'gold',
     未批准: 'red',
     禁止误接: 'red',
+    未登记: 'red',
     runtime_frontend_only: 'green',
     evidence_only: 'blue',
     preview_only: 'cyan',
@@ -103,6 +117,56 @@ function CommandBlock({ command }) {
         />
       </Tooltip>
     </div>
+  )
+}
+
+function CustomerPackageSelector({ overview, onChange }) {
+  const options = (overview.registeredCustomers || []).map((item) => ({
+    value: item.customerKey,
+    label: `${item.label} (${item.customerKey})`,
+  }))
+  const matched = options.some((item) => item.value === overview.customerKey)
+
+  return (
+    <div className="erp-dev-customer-selector">
+      <Text type="secondary">客户包选择</Text>
+      <Select
+        value={matched ? overview.customerKey : undefined}
+        placeholder="选择已登记客户包"
+        options={options}
+        onChange={onChange}
+      />
+      <Text type="secondary" className="erp-dev-customer-selector__note">
+        只更新 URL query，不写 localStorage、后端或正式运行配置。
+      </Text>
+    </div>
+  )
+}
+
+function MissingCustomerPanel({ overview }) {
+  return (
+    <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-missing">
+      <div className="erp-dev-customer-panel__head">
+        <ExclamationCircleOutlined />
+        <Text strong>未登记客户配置包</Text>
+      </div>
+      <Alert
+        type="warning"
+        showIcon
+        message={`未登记客户配置包：${overview.requestedCustomerKey}`}
+        description="当前 URL customer 参数没有对应客户配置包。开发态总控不会 fallback 到 yoyoosun 冒充，不创建 SaaS tenant，不新增 tenant_id，也不接后端或数据库。"
+      />
+      <div className="erp-dev-customer-registered-list">
+        <Text type="secondary">已登记客户包</Text>
+        <Space wrap>
+          {(overview.registeredCustomers || []).map((item) => (
+            <Tag key={item.customerKey}>
+              {item.label} / {item.customerKey}
+            </Tag>
+          ))}
+        </Space>
+      </div>
+    </section>
   )
 }
 
@@ -294,8 +358,19 @@ function ImportPanel({ importSummary }) {
 }
 
 export default function DevCustomerConfigPage() {
-  const overview = useMemo(() => buildCustomerConfigDevOverview(), [])
+  const [searchParams, setSearchParams] = useSearchParams()
+  const overview = useMemo(
+    () => buildCustomerConfigDevOverviewFromSearch(searchParams),
+    [searchParams]
+  )
   const [activeView, setActiveView] = useState(VIEW_OVERVIEW)
+  const isMissingCustomer = overview.status === 'missing'
+
+  const handleCustomerChange = (customerKey) => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set(DEV_CUSTOMER_CONFIG_QUERY_KEY, customerKey)
+    setSearchParams(nextParams, { replace: true })
+  }
 
   const panel = {
     [VIEW_OVERVIEW]: <OverviewPanel overview={overview} />,
@@ -317,54 +392,72 @@ export default function DevCustomerConfigPage() {
             </Title>
           </Space>
           <Paragraph className="erp-dev-customer-summary">
-            只读查看 yoyoosun 客户配置包、菜单品牌
-            runtime、字段编号草案和导入工具边界。
+            只读查看客户配置包、菜单品牌
+            runtime、字段编号草案和导入工具边界。客户选择只属于 dev 页面 URL
+            展示状态，不代表 SaaS tenant。
           </Paragraph>
-          <Segmented
-            className="erp-dev-customer-view-switch"
-            options={VIEW_OPTIONS}
-            value={activeView}
-            onChange={setActiveView}
+          <CustomerPackageSelector
+            overview={overview}
+            onChange={handleCustomerChange}
           />
+          {isMissingCustomer ? null : (
+            <Segmented
+              className="erp-dev-customer-view-switch"
+              options={VIEW_OPTIONS}
+              value={activeView}
+              onChange={setActiveView}
+            />
+          )}
         </div>
         <div className="erp-dev-customer-source">
-          <Text type="secondary">当前客户 key</Text>
-          <Text strong>{overview.customerKey}</Text>
-          <Text type="secondary">{overview.sourcePath}</Text>
+          <Text type="secondary">当前 URL customer</Text>
+          <Text strong>{overview.requestedCustomerKey}</Text>
+          <Text type="secondary">
+            {overview.sourcePath || '未登记客户配置包'}
+          </Text>
         </div>
       </header>
 
-      <section className="erp-dev-customer-metrics" aria-label="客户配置摘要">
-        <MetricTile
-          icon={<ApartmentOutlined />}
-          label="菜单分组"
-          value={overview.menuSummary.sectionCount}
-          note={`${overview.menuSummary.itemCount} 个菜单项，只控制前端展示`}
-          tone="success"
-        />
-        <MetricTile
-          icon={<SettingOutlined />}
-          label="字段候选"
-          value={overview.fieldNumberingSummary.fieldCandidateCount}
-          note={`${overview.fieldNumberingSummary.fieldModuleCount} 个模块，仍待确认`}
-          tone="warning"
-        />
-        <MetricTile
-          icon={<CodeOutlined />}
-          label="编号规则"
-          value={overview.fieldNumberingSummary.numberingRuleCount}
-          note="全部停留在 review / deferred"
-        />
-        <MetricTile
-          icon={<DatabaseOutlined />}
-          label="真实导入"
-          value="blocked"
-          note="只读 evidence / report gate，不写 DB"
-          tone="danger"
-        />
-      </section>
+      {isMissingCustomer ? (
+        <MissingCustomerPanel overview={overview} />
+      ) : (
+        <>
+          <section
+            className="erp-dev-customer-metrics"
+            aria-label="客户配置摘要"
+          >
+            <MetricTile
+              icon={<ApartmentOutlined />}
+              label="菜单分组"
+              value={overview.menuSummary.sectionCount}
+              note={`${overview.menuSummary.itemCount} 个菜单项，只控制前端展示`}
+              tone="success"
+            />
+            <MetricTile
+              icon={<SettingOutlined />}
+              label="字段候选"
+              value={overview.fieldNumberingSummary.fieldCandidateCount}
+              note={`${overview.fieldNumberingSummary.fieldModuleCount} 个模块，仍待确认`}
+              tone="warning"
+            />
+            <MetricTile
+              icon={<CodeOutlined />}
+              label="编号规则"
+              value={overview.fieldNumberingSummary.numberingRuleCount}
+              note="全部停留在 review / deferred"
+            />
+            <MetricTile
+              icon={<DatabaseOutlined />}
+              label="真实导入"
+              value="blocked"
+              note="只读 evidence / report gate，不写 DB"
+              tone="danger"
+            />
+          </section>
 
-      {panel}
+          {panel}
+        </>
+      )}
     </main>
   )
 }

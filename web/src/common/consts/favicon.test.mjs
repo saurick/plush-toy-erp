@@ -60,7 +60,7 @@ function createDocumentStub(existingLinks = []) {
   }
 }
 
-test('favicon: routes resolve to separate admin, tasks, docs, capability ledger, prototype and customer config icons', () => {
+test('favicon: routes resolve to separate admin, tasks, dev, testing, docs, capability ledger, prototype and customer config icons', () => {
   assert.equal(resolveERPFavicon('/erp/dashboard'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(resolveERPFavicon('/admin-login'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(
@@ -68,6 +68,12 @@ test('favicon: routes resolve to separate admin, tasks, docs, capability ledger,
     ERP_FAVICON_VARIANTS.tasks
   )
   assert.equal(resolveERPFavicon('/tasks'), ERP_FAVICON_VARIANTS.tasks)
+  assert.equal(resolveERPFavicon('/__dev'), ERP_FAVICON_VARIANTS.devHub)
+  assert.equal(resolveERPFavicon('/__dev/'), ERP_FAVICON_VARIANTS.devHub)
+  assert.equal(
+    resolveERPFavicon('/__dev/testing'),
+    ERP_FAVICON_VARIANTS.testing
+  )
   assert.equal(resolveERPFavicon('/__dev/docs'), ERP_FAVICON_VARIANTS.docs)
   assert.equal(
     resolveERPFavicon('/__dev/capability-ledger'),
@@ -96,6 +102,41 @@ test('favicon: mobile login redirect keeps the task icon by source route', () =>
   )
 })
 
+test('favicon: customer favicon overrides customer-facing admin and task routes', () => {
+  assert.deepEqual(
+    resolveERPFavicon('/erp/dashboard', {
+      customerFaviconHref: '/favicon-yoyoosun.svg',
+    }),
+    {
+      key: 'customer',
+      href: '/favicon-yoyoosun.svg',
+      type: 'image/svg+xml',
+    }
+  )
+  assert.deepEqual(
+    resolveERPFavicon('/m/warehouse/tasks', {
+      customerFaviconHref: '/favicon-yoyoosun.png',
+    }),
+    {
+      key: 'customer',
+      href: '/favicon-yoyoosun.png',
+      type: 'image/png',
+    }
+  )
+  assert.equal(
+    resolveERPFavicon('/__dev', {
+      customerFaviconHref: '/favicon-yoyoosun.svg',
+    }),
+    ERP_FAVICON_VARIANTS.devHub
+  )
+  assert.equal(
+    resolveERPFavicon('/__dev/testing', {
+      customerFaviconHref: '/favicon-yoyoosun.svg',
+    }),
+    ERP_FAVICON_VARIANTS.testing
+  )
+})
+
 test('favicon: runtime update keeps a single active icon link', () => {
   const documentStub = createDocumentStub([
     { rel: 'icon', href: '/favicon.svg' },
@@ -111,6 +152,27 @@ test('favicon: runtime update keeps a single active icon link', () => {
   assert.equal(documentStub.removed.length, 1)
   assert.equal(documentStub.removed[0].getAttribute('href'), '/favicon.png')
   assert.equal(documentStub.appended.length, 0)
+})
+
+test('favicon: runtime update applies configured customer favicon', () => {
+  const documentStub = createDocumentStub([
+    { rel: 'icon', href: '/favicon.svg' },
+  ])
+
+  const result = applyERPFavicon(documentStub, '/erp/dashboard', {
+    customerFaviconHref: '/favicon-yoyoosun.svg',
+  })
+
+  assert.deepEqual(result, {
+    key: 'customer',
+    href: '/favicon-yoyoosun.svg',
+    type: 'image/svg+xml',
+  })
+  assert.equal(
+    documentStub.links[0].getAttribute('href'),
+    '/favicon-yoyoosun.svg'
+  )
+  assert.equal(documentStub.links[0].getAttribute('type'), 'image/svg+xml')
 })
 
 test('favicon: runtime update creates an icon link when HTML has none', () => {

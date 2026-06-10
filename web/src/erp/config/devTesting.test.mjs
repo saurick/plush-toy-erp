@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_ROUTE,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
+  buildDevTestingCopyText,
   buildDevTestingDocs,
   buildDevTestingSummary,
   extractDevTestingCommandBlocks,
@@ -22,6 +24,7 @@ const strategyMarkdown = `
 | --- | --- | --- | --- |
 | T0 静态检查 | 所有改动 | \`git status --short\`；\`git diff --check\` | 确认工作区和空白错误 |
 | T5 Frontend UI / 样式 | 页面、路由、API client、菜单、seed、表单、样式 | \`cd web && pnpm lint\`；\`cd web && pnpm css\`；\`cd web && pnpm test\`；\`cd web && pnpm style:l1\` | 必须做浏览器级默认态、交互态、恢复态和相邻区域回归 |
+| T7 业务事实 / E2E | 库存、采购、质检、未来出货、财务、生产、委外真实事实 | 当前已有事实层按 T3 + Phase PG target；完整 E2E 后续再设计 | 不存在稳定 runner 时，不得把手工点按或未来命令写成已自动化 |
 
 ## 6. 现有命令入口
 
@@ -68,15 +71,34 @@ test('devTesting: 只通过开发态独立路径暴露', () => {
 test('devTesting: 解析测试策略分层表和命令', () => {
   const tiers = parseDevTestingStrategyTiers(strategyMarkdown)
 
-  assert.equal(tiers.length, 2)
+  assert.equal(tiers.length, 3)
   assert.equal(tiers[0].key, 'T0')
   assert.deepEqual(tiers[0].commands, [
     'git status --short',
     'git diff --check',
   ])
+  assert.equal(tiers[0].copyText, 'git status --short\ngit diff --check')
   assert.equal(tiers[1].key, 'T5')
   assert(tiers[1].commands.includes('cd web && pnpm style:l1'))
   assert.match(tiers[1].description, /浏览器级/)
+  assert.equal(tiers[2].key, 'T7')
+  assert.equal(tiers[2].commands.length, 0)
+  assert.match(tiers[2].copyText, /当前没有完整业务 E2E runner/)
+})
+
+test('devTesting: 为常用预设和分层复制生成命令文本', () => {
+  assert.deepEqual(
+    DEV_TESTING_COPY_PRESETS.map((preset) => preset.key),
+    ['frontend', 'pre-commit', 'release']
+  )
+  assert.match(
+    buildDevTestingCopyText(DEV_TESTING_COPY_PRESETS[0].commands),
+    /pnpm style:l1/
+  )
+  assert.equal(
+    buildDevTestingCopyText(['pnpm test', '', '  pnpm css  ']),
+    'pnpm test\npnpm css'
+  )
 })
 
 test('devTesting: 提取 fenced command blocks 并保留章节上下文', () => {
@@ -121,7 +143,7 @@ test('devTesting: 支持分类和关键词筛选并汇总', () => {
   const tiers = parseDevTestingStrategyTiers(strategyMarkdown)
   const summary = buildDevTestingSummary({ tiers, docs })
 
-  assert.equal(summary.tierCount, 2)
+  assert.equal(summary.tierCount, 3)
   assert.equal(summary.docCount, 2)
   assert.equal(summary.docsWithCommands, 2)
   assert.equal(summary.commandCount, 7)

@@ -293,3 +293,77 @@
 - 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 已通过，`pnpm test` 当前通过 313 项；`pnpm --dir web style:l1` 重跑通过 44 个场景。首次完整链路曾暴露登录页 `/rpc/auth` proxy 500 和 `erp-dashboard-mobile` 偶发等待问题，修复 mock 后完整重跑通过。
 - 下一步：完成 `git add -A`、提交和推送；推送前继续确认 `origin/main...HEAD` 状态，若远端新增提交则按仓库 Git 约定停止直接覆盖。
 - 阻塞/风险：本轮收口只补 L1 mock 和提交前验证记录；未改后端、schema、migration、RBAC、seed、WorkflowUsecase、Fact usecase、ERP 正式菜单、生产构建或目标环境镜像。追加前 `progress.md` 为 287 行 / 60432 bytes，未达到归档阈值。
+
+## 2026-06-10 13:54 CST
+
+- 完成：新增开发态 `/__dev` 入口总控页，集中展示 `/__dev/docs`、`/__dev/testing`、`/__dev/prototypes`、`/__dev/capability-ledger` 和 `/__dev/customer-config`，支持按标题、分组、路径和资料来源搜索后跳转；该入口仍只在 `import.meta.env.DEV` 下注册，不进入 ERP 正式菜单、seedData、RBAC、后端业务、产品内 docs registry 或生产构建。
+- 完成：新增 `devHub` 配置 helper、单测、页面样式、暗色 / 移动端 L1 场景；新增 `/favicon-dev.svg` 与 `/favicon-testing.svg`，并更新 favicon 路由映射，使 `/__dev` 使用开发总控图标、`/__dev/testing` 使用测试图标；同步更新 `web/README.md` 和 `docs/current-source-of-truth.md`。
+- 验证：`node --test web/src/erp/config/devHub.test.mjs web/src/common/consts/favicon.test.mjs`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web css`、目标文件 ESLint、`pnpm --dir web lint`、`pnpm --dir web test` 和 `STYLE_L1_SCENARIOS=dev-hub-dark-desktop,dev-testing-dark-desktop STYLE_L1_PORT=4197 pnpm --dir web style:l1` 均通过；`pnpm test` 当前通过 317 项。Browser 通过 `http://127.0.0.1:5201/__dev` 验证桌面 5 个入口、搜索“测试”后只剩 `/__dev/testing`、跳转到测试入口、两页 favicon 分别为 `/favicon-dev.svg` 和 `/favicon-testing.svg`，console warn/error 为空，桌面与 390x844 移动视口均无横向溢出。
+- 下一步：如果后续 dev-only 页面继续增多，可以在 `/__dev` 里增加分组折叠或最近访问本地偏好；当前先保持只读搜索和跳转，不新增 registry、权限、后端 API 或生产入口。
+- 阻塞/风险：完整 `pnpm --dir web style:l1` 本轮两次重跑分别在既有 `mobile-tasks-dark` 导航 `ERR_ADDRESS_INVALID` 和既有 `admin-login-mobile-source-desktop-choice` 回跳断言失败处中断；后者单场景 `STYLE_L1_SCENARIOS=admin-login-mobile-source-desktop-choice STYLE_L1_PORT=4200 pnpm --dir web style:l1` 通过，新增的两个 dev-only 场景已定向通过。追加前 `progress.md` 为 295 行 / 61731 bytes，未达到归档阈值；本轮未改后端、schema、migration、RBAC、seed、WorkflowUsecase、Fact usecase、ERP 正式菜单、生产构建或目标环境镜像。
+
+## 2026-06-10 14:27 CST
+
+- 完成：为开发态 `/__dev` 入口总控补充浏览器本地“最近访问”偏好，点击任一 dev-only 入口后会记录最近 3 个有效 `/__dev/*` 子入口；无效路径、重复路径和非 dev 路径会被过滤，不写后端、权限、菜单、seedData 或产品内 docs registry。
+- 完成：新增 `DEV_HUB_RECENT_STORAGE_KEY`、最近访问归一化 / 记录 / 映射 helper 和单测；页面新增最近访问区，样式覆盖浅色、暗色和移动端；`dev-hub-dark-desktop` L1 场景补充空态、非法路径过滤、最近访问顺序和横向溢出断言；同步更新 `web/README.md` 与 `docs/current-source-of-truth.md`。
+- 验证：`node --test web/src/erp/config/devHub.test.mjs`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web css`、目标文件 ESLint、`pnpm --dir web lint`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-hub-dark-desktop STYLE_L1_PORT=4201 pnpm --dir web style:l1` 和 `STYLE_L1_PORT=4202 pnpm --dir web style:l1` 均通过；完整 `style:l1` 当前通过 45 个场景，`pnpm test` 当前通过 320 项。Browser 通过 `http://127.0.0.1:5202/__dev` 验证空态、点击 `/__dev/testing` 后回到总控出现最近访问 `/__dev/testing`、favicon 正确、console warn/error 为空，桌面与 390x844 移动视口无横向溢出。
+- 下一步：如继续优化 dev-only 总控，可增加“分组折叠 / 只看某类治理面”这类纯前端本地偏好；仍不应引入后端 registry、正式菜单、RBAC 或生产入口。
+- 阻塞/风险：首次完整 `pnpm --dir web test` 因本机 Node 子进程 `spawn /usr/local/bin/node EAGAIN` 导致 `linkedNavigation` 与 `masterDataOrderView` 两个文件未启动，单独复跑通过，随后完整 `pnpm --dir web test` 重跑通过。追加前 `progress.md` 为 303 行 / 64030 bytes，未达到归档阈值；本轮未改后端、schema、migration、RBAC、seed、WorkflowUsecase、Fact usecase、ERP 正式菜单、生产构建或目标环境镜像。
+
+## 2026-06-10 14:42 CST
+
+- 完成：为开发态 `/__dev` 入口总控新增治理分组筛选，按“文档治理 / 验证治理 / 产品设计 / 产品治理 / 客户治理”切换，并与关键词搜索组合生效；默认仍显示全部入口，不持久化筛选条件，避免上次筛选影响下一次进入总控。
+- 完成：新增 `DEV_HUB_ALL_GROUP`、分组选项构造和组合筛选 helper，补充单测、Ant Design `Segmented` 样式、暗色 / 移动端回归断言；同步更新 `web/README.md` 与 `docs/current-source-of-truth.md`，明确 `/__dev` 提供分组筛选、搜索、跳转和浏览器本地最近访问记录。
+- 验证：`node --test web/src/erp/config/devHub.test.mjs`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web css`、目标文件 ESLint、`pnpm --dir web lint`、`pnpm --dir web test` 和 `STYLE_L1_SCENARIOS=dev-hub-dark-desktop STYLE_L1_PORT=4203 pnpm --dir web style:l1` 均通过；`pnpm test` 当前通过 321 项。完整 `STYLE_L1_PORT=4204 pnpm --dir web style:l1` 曾在既有 `print-preview-material` 等待“采购合同”标题处超时，随后 `STYLE_L1_SCENARIOS=print-preview-material STYLE_L1_PORT=4205 pnpm --dir web style:l1` 单场景复跑通过。Browser 通过 `http://127.0.0.1:5203/__dev` 验证桌面 5 个入口、`产品治理` 分组收敛到 `/__dev/capability-ledger`、切回全部后搜索“测试”收敛到 `/__dev/testing`、`/favicon-dev.svg` 正确、console warn/error 为空，桌面与 390x844 移动视口无横向溢出。
+- 下一步：如继续优化 dev-only 总控，可评审是否需要把分组筛选写入 URL 或本地偏好；当前先保持默认全量视图，避免开发入口被历史筛选状态隐藏。
+- 阻塞/风险：本轮仍只改 dev-only 前端入口、测试、样式和说明文档；未改后端、schema、migration、RBAC、seedData、WorkflowUsecase、Fact usecase、ERP 正式菜单、产品内 docs registry、生产构建或目标环境镜像。追加前 `progress.md` 为 311 行 / 66058 bytes，未达到归档阈值。
+
+## 2026-06-10 15:37 CST
+
+- 完成：为开发态 `/__dev/testing` 测试入口补齐 T0-T8 每层“一键复制”按钮，并新增“本轮前端验证 / 提交前 QA / 发版前严格 QA”三个常用复制预设；按钮只写入浏览器剪贴板，不在浏览器内执行 shell。
+- 完成：在 `devTesting` 配置层收口复制预设、分层复制文本和 T1 / T7 / T8 的说明性 fallback；T7 明确当前没有完整业务 E2E runner，只复制当前可用事实层检查和后续说明，避免把未来能力伪装成当前自动化。
+- 完成：同步更新 `web/README.md` 与 `docs/current-source-of-truth.md`，明确测试入口支持每层及常用预设一键复制命令 / 清单，但不进入 ERP 菜单、seedData、RBAC、后端业务、产品内 docs registry 或生产构建。
+- 验证：`node --test web/src/erp/config/devTesting.test.mjs`、`node --check web/scripts/styleL1.mjs`、目标文件 ESLint、`pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-testing-dark-desktop STYLE_L1_PORT=4206 pnpm --dir web style:l1` 和 `STYLE_L1_PORT=4207 pnpm --dir web style:l1` 均通过；`pnpm test` 当前通过 327 项，完整 `style:l1` 通过 45 个场景。Codex app 崩溃后 Browser 插件会话不可用，改用项目 Playwright 在 `http://127.0.0.1:5205/__dev/testing` 验证桌面 9 个层级、9 个层级复制按钮、3 个常用预设、T7 无完整 E2E runner 提示、测试 favicon、命令入口、T5 和前端预设复制内容、console warn/error 为空，桌面与 390x844 移动视口无横向溢出。
+- 下一步：如果要进一步提升测试入口，可增加“按本轮改动类型推荐测试层级”的只读选择器；当前仍不引入浏览器内执行器或 dev 后端 runner。
+- 阻塞/风险：本轮只改 dev-only 测试入口、测试、样式、L1 回归和说明文档；未改后端、schema、migration、RBAC、seedData、WorkflowUsecase、Fact usecase、ERP 正式菜单、产品内 docs registry、生产构建或目标环境镜像。追加前 `progress.md` 为 344 行 / 74418 bytes，未达到归档阈值；工作区仍包含前面几轮未提交改动和相邻 favicon / 品牌相关现场，本轮未回退或整理。
+
+## 2026-06-10 15:35 CST
+
+- 完成：为开发态 `/__dev/testing` 测试入口补齐 T0-T8 每层一键复制命令 / 清单；T7 明确当前没有完整业务 E2E runner，只复制当前可用事实层检查与“按阶段选择 Phase PG”的说明，不伪造自动化能力。
+- 完成：新增“本轮前端验证 / 提交前 QA / 发版前严格 QA”三个顶部常用预设；复制按钮只写浏览器剪贴板，不在页面内执行 shell，不接后端 runner、正式菜单、RBAC、seedData、产品内 docs registry 或生产构建。同步更新 `web/README.md` 与 `docs/current-source-of-truth.md`。
+- 验证：`node --test web/src/erp/config/devTesting.test.mjs`、`node --check web/scripts/styleL1.mjs`、目标文件 ESLint、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-testing-dark-desktop STYLE_L1_PORT=4206 pnpm --dir web style:l1`、`pnpm --dir web lint` 和 `STYLE_L1_PORT=4207 pnpm --dir web style:l1` 均通过；`pnpm test` 当前通过 327 项，完整 `style:l1` 当前通过 45 个场景。L1 已覆盖 3 个顶部预设、每层复制按钮、前端预设剪贴板内容、T5 层级剪贴板内容、暗色桌面和无横向溢出。
+- 下一步：如后续确实要“一键执行”，需要另行评审 dev-only 本地 runner / 后端桥接的安全边界、权限、输出日志和不可进入生产的守卫；当前建议继续停留在一键复制。
+- 阻塞/风险：Browser 插件路径在本轮验证时先出现 native pipe closed，重连后返回 `Browser is not available: iab`，因此未完成 in-app Browser 实测；已用仓库 L1 的真实 Chromium 渲染与剪贴板交互覆盖本轮 UI 行为。追加前 `progress.md` 为 336 行 / 72584 bytes，未达到归档阈值；当前工作区还有相邻未提交改动，本轮未回退或整理。
+
+## 2026-06-10 15:05 CST
+
+- 完成：将开发态 `/__dev` 入口总控升级为入口台账 / 管理页，每个入口展示维护真源和边界标签，并新增浏览器本地置顶入口；置顶和最近访问只写本地偏好，不写后端配置。
+- 完成：新增 `DEV_HUB_PINNED_STORAGE_KEY`、置顶归一化 / 切换 / 映射 helper，补充 devHub 单测、页面图钉交互、浅色 / 暗色 / 移动端样式和 `dev-hub-dark-desktop` L1 断言；同步更新 `docs/current-source-of-truth.md` 与 `web/README.md`，明确 `/__dev` 是 dev-only 入口台账，不进入正式菜单、seedData、RBAC、后端业务、产品内 docs registry 或生产构建。
+- 验证：`pnpm --dir web exec eslint --fix --ext .js --ext .jsx src/erp/config/devHub.mjs src/erp/config/devHub.test.mjs src/erp/pages/DevHubPage.jsx`、`pnpm --dir web exec node --test src/erp/config/devHub.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-hub-dark-desktop pnpm --dir web style:l1` 和 `pnpm --dir web style:l1` 均通过；完整 `style:l1` 当前通过 45 个场景，`pnpm test` 当前通过 324 项。Browser 通过 `http://localhost:5175/__dev` 验证页面非空、5 个入口、15 个边界标签、5 个图钉按钮、置顶新增 / 取消 DOM 状态、console warn/error 为空，桌面 1280 宽与 390x844 移动视口均无横向溢出。
+- 下一步：后续如果 `/__dev/*` 继续增加，优先只扩展 `DEV_HUB_ITEMS` 台账元数据和对应 dev-only 页面；不新增第二套管理页、不接后端 registry、不接正式菜单。
+- 阻塞/风险：Browser 移动截图捕获曾因 CDP `Page.captureScreenshot` 超时中断一次，已恢复默认视口并改用 DOM / box metrics 完成移动回归；本轮未改后端、schema、migration、RBAC、seedData、WorkflowUsecase、Fact usecase、ERP 正式菜单、产品内 docs registry、生产构建或目标环境镜像。追加前 `progress.md` 为 319 行 / 68125 bytes，未达到归档阈值。
+
+## 2026-06-10 15:28 CST
+
+- 完成：为 yoyoosun 客户配置包新增甲方专属 favicon，`config/customers/yoyoosun/menuConfig.mjs` 的 `brand.faviconHref` 指向 `/favicon-yoyoosun.svg`；默认中性产品品牌仍不带客户 favicon。
+- 完成：`getActiveERPBrand()` 现在会从 runtime config、客户 key 或 yoyoosun bundled config 读取 `faviconHref`；`applyERPFavicon()` 在后台和岗位任务端等客户运行时路径优先使用客户 favicon，但 `/__dev`、`/__dev/testing`、`/__dev/docs`、`/__dev/prototypes`、`/__dev/capability-ledger` 和 `/__dev/customer-config` 继续使用各自开发态识别图标。
+- 完成：同步更新 `docs/current-source-of-truth.md` 与 `web/README.md`，明确客户前端展示配置包含品牌、favicon 和菜单，且只影响前端展示，不替代后端 RBAC、Workflow / Fact usecase、schema、migration 或真实导入。
+- 验证：`pnpm --dir web exec node --test src/common/consts/brand.test.mjs src/common/consts/favicon.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；`pnpm test` 当前通过 326 项。临时启动 `VITE_ERP_CUSTOMER_KEY=yoyoosun pnpm --dir web exec vite --config vite.config.mjs --host 127.0.0.1 --port 5210` 后，Browser 验证 `http://127.0.0.1:5210/erp/dashboard` 重定向到登录页仍使用 `/favicon-yoyoosun.svg`，`http://127.0.0.1:5210/__dev` 仍使用 `/favicon-dev.svg`，console warn/error 为空；`curl` 验证 `/favicon-yoyoosun.svg` 和 `/favicon-dev.svg` 资产可访问。完整 `pnpm --dir web style:l1` 曾在既有 `business-module-toolbar-mobile-dropdown` 等待标题处超时，随后 `STYLE_L1_SCENARIOS=business-module-toolbar-mobile-dropdown pnpm --dir web style:l1` 单场景复跑通过；`STYLE_L1_PORT=4210 STYLE_L1_SCENARIOS=dev-hub-dark-desktop,dev-testing-dark-desktop pnpm --dir web style:l1` 通过。
+- 下一步：如果后续新增其他客户，按 `config/customers/<customer-key>/menuConfig.mjs` 增加各自 `brand.faviconHref`，不要把客户 favicon 写死到通用 favicon helper。
+- 阻塞/风险：本轮只改前端品牌 / favicon 展示链路、客户配置、文档和测试；未改后端、schema、migration、RBAC、seedData、WorkflowUsecase、Fact usecase、ERP 正式菜单、产品内 docs registry、生产构建或目标环境镜像。追加前 `progress.md` 为 327 行 / 70157 bytes，未达到归档阈值。
+
+## 2026-06-10 15:48 CST
+
+- 完成：将开发态 `/__dev` 入口总控中的入口卡片统一改为新标签打开，置顶、最近访问和主入口列表都走 `target="_blank"` / `rel="noreferrer"`；只影响总控页入口跳转，不改变 ERP 正式业务页或各 `/__dev/*` 子页内部导航。
+- 完成：扩展 `dev-hub-dark-desktop` L1 断言，锁住入口链接 `href` 仍指向 `/__dev/*`、`target="_blank"` 且 `rel="noreferrer"`；同步更新 `docs/current-source-of-truth.md` 与 `web/README.md`。
+- 验证：`pnpm --dir web exec eslint --fix --ext .js --ext .jsx src/erp/pages/DevHubPage.jsx`、`pnpm --dir web exec node --test src/erp/config/devHub.test.mjs`、`STYLE_L1_PORT=4211 STYLE_L1_SCENARIOS=dev-hub-dark-desktop pnpm --dir web style:l1` 均通过。Browser 通过 `http://localhost:5175/__dev` 验证页面 5 个主入口卡片、所有 `.erp-dev-hub-card__link` 的 `target` 均为 `_blank`、`rel` 均为 `noreferrer`，console warn/error 为空，桌面无横向溢出。
+- 下一步：如后续要给某个 `/__dev/*` 子页内部链接也新标签打开，应单独按页面使用场景评审；不要扩大到 ERP 正式业务导航。
+- 阻塞/风险：本轮只改 dev-only 总控入口链接行为、L1 断言和说明文档；未改后端、schema、migration、RBAC、seedData、WorkflowUsecase、Fact usecase、ERP 正式菜单、生产构建或目标环境镜像。追加前 `progress.md` 为 353 行 / 76674 bytes，未达到归档阈值。
+
+## 2026-06-10 17:09 CST
+
+- 完成：为开发态 `/__dev/customer-config` 预留客户包选择器和 URL query `customer`；query 缺失默认 `yoyoosun`，当前 registry 只登记 `yoyoosun`，后续新增客户包可在同一 registry 扩展。未登记 customer 显示“未登记客户配置包”和已登记客户列表，不 fallback 到 yoyoosun 冒充。
+- 完成：客户配置总控页新增下拉选择器，切换只更新 URL query，不写 localStorage、后端、数据库或正式运行配置；未知客户阻断态不展示 yoyoosun 菜单品牌内容。同步更新 `web/README.md` 与 `docs/current-source-of-truth.md`。
+- 验证：`node --test web/src/erp/config/devCustomerConfig.test.mjs`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 和 `STYLE_L1_SCENARIOS=dev-customer-config-dark-desktop,dev-customer-config-mobile pnpm --dir web style:l1` 均通过；`pnpm test` 当前通过 331 项，客户配置 L1 覆盖 `?customer=yoyoosun`、无 query 默认 yoyoosun、未知 customer 阻断提示、下拉切回 yoyoosun 只停留在 `/__dev/customer-config` URL，以及暗色桌面和 390x844 移动视口无横向溢出。
+- 下一步：新增第二个客户包时，只扩展 dev customer config registry 和对应 `config/customers/<customer-key>/` 配置 / 文档，不把客户 key 升级成 SaaS runtime tenant。
+- 阻塞/风险：本轮只改 dev-only 客户配置总控、helper、测试、样式、L1 场景和说明文档；未改后端、schema、migration、RBAC、seedData、WorkflowUsecase、Fact usecase、ERP 正式菜单、生产登录页客户切换、SaaS tenant、`tenant_id`、真实客户数据导入或目标环境镜像。追加前 `progress.md` 为 361 行 / 78165 bytes，未达到归档阈值。

@@ -2,6 +2,8 @@ import { yoyoosunFieldNumberingConfig } from '../../../../config/customers/yoyoo
 import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
 
 export const DEV_CUSTOMER_CONFIG_ROUTE = '/__dev/customer-config'
+export const DEV_CUSTOMER_CONFIG_QUERY_KEY = 'customer'
+export const DEFAULT_DEV_CUSTOMER_KEY = 'yoyoosun'
 export const DEV_CUSTOMER_CONFIG_SOURCE_PATH =
   'config/customers/yoyoosun/README.md'
 export const DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH =
@@ -11,6 +13,18 @@ export const DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH =
 export const DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH = 'scripts/import'
 export const DEV_CUSTOMER_CONFIG_QA_COMMAND =
   'node scripts/qa/customer-config-boundaries.mjs'
+
+export const DEV_CUSTOMER_CONFIG_REGISTRY = Object.freeze({
+  yoyoosun: Object.freeze({
+    customerKey: 'yoyoosun',
+    label: '永绅 yoyoosun',
+    sourcePath: DEV_CUSTOMER_CONFIG_SOURCE_PATH,
+    menuConfig: yoyoosunMenuConfig,
+    menuConfigSourcePath: DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH,
+    fieldNumberingConfig: yoyoosunFieldNumberingConfig,
+    fieldNumberingSourcePath: DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH,
+  }),
+})
 
 const FIELD_DECISION_LABELS = Object.freeze({
   review_required: '待客户确认',
@@ -24,6 +38,51 @@ const NUMBERING_DECISION_LABELS = Object.freeze({
 
 export function isDevCustomerConfigEnabled(env = import.meta.env) {
   return env?.DEV === true
+}
+
+function normalizeCustomerKey(value = '') {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+}
+
+export function listRegisteredDevCustomerPackages(
+  registry = DEV_CUSTOMER_CONFIG_REGISTRY
+) {
+  return Object.values(registry).map((item) => ({
+    customerKey: item.customerKey,
+    label: item.label,
+    sourcePath: item.sourcePath,
+  }))
+}
+
+export function readDevCustomerKeyFromSearch(
+  searchParams = '',
+  defaultCustomerKey = DEFAULT_DEV_CUSTOMER_KEY
+) {
+  const params =
+    typeof searchParams.get === 'function'
+      ? searchParams
+      : new URLSearchParams(searchParams)
+  return (
+    normalizeCustomerKey(params.get(DEV_CUSTOMER_CONFIG_QUERY_KEY)) ||
+    defaultCustomerKey
+  )
+}
+
+export function resolveDevCustomerConfigPackage(
+  customerKey = DEFAULT_DEV_CUSTOMER_KEY,
+  registry = DEV_CUSTOMER_CONFIG_REGISTRY
+) {
+  const normalizedKey =
+    normalizeCustomerKey(customerKey) || DEFAULT_DEV_CUSTOMER_KEY
+  const matched = registry[normalizedKey]
+  return {
+    status: matched ? 'ready' : 'missing',
+    customerKey: normalizedKey,
+    packageConfig: matched || null,
+    registeredCustomers: listRegisteredDevCustomerPackages(registry),
+  }
 }
 
 function countMenuItems(sections = []) {
@@ -62,7 +121,8 @@ function buildBoundaryItems(config = {}) {
 }
 
 export function buildCustomerMenuRuntimeSummary(
-  menuConfig = yoyoosunMenuConfig
+  menuConfig = yoyoosunMenuConfig,
+  sourcePath = DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH
 ) {
   const sections = menuConfig.desktopMenu?.sections || []
   return {
@@ -72,13 +132,14 @@ export function buildCustomerMenuRuntimeSummary(
     sectionCount: sections.length,
     itemCount: countMenuItems(sections),
     sections,
-    sourcePath: DEV_CUSTOMER_MENU_CONFIG_SOURCE_PATH,
+    sourcePath,
     runtimeStatus: 'runtime_frontend_only',
   }
 }
 
 export function buildFieldNumberingDraftSummary(
-  config = yoyoosunFieldNumberingConfig
+  config = yoyoosunFieldNumberingConfig,
+  sourcePath = DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH
 ) {
   const fieldCandidates = flattenFieldCandidates(config)
   const fieldDecisionCounts = countBy(fieldCandidates, 'decision')
@@ -111,11 +172,16 @@ export function buildFieldNumberingDraftSummary(
       },
       ...buildBoundaryItems(config),
     ],
-    sourcePath: DEV_CUSTOMER_FIELD_NUMBERING_SOURCE_PATH,
+    sourcePath,
   }
 }
 
-export function buildImportToolingSummary() {
+export function buildImportToolingSummary(
+  customerKey = DEFAULT_DEV_CUSTOMER_KEY
+) {
+  const normalizedCustomerKey = normalizeCustomerKey(customerKey)
+  const fixtureBasePath = `scripts/import/fixtures/customers/${normalizedCustomerKey}`
+  const outputBasePath = `output/customers/${normalizedCustomerKey}`
   return {
     sourcePath: DEV_CUSTOMER_IMPORT_TOOLING_SOURCE_PATH,
     qaCommand: DEV_CUSTOMER_CONFIG_QA_COMMAND,
@@ -125,22 +191,19 @@ export function buildImportToolingSummary() {
       {
         key: 'freeze',
         title: 'source snapshot freeze',
-        command:
-          'node scripts/import/customerSourceSnapshotFreezeCheck.mjs --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.freeze.sample.json --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.freeze.sample.json --out output/customers/yoyoosun/source-snapshot-freeze',
+        command: `node scripts/import/customerSourceSnapshotFreezeCheck.mjs --source ${fixtureBasePath}/source-snapshot.freeze.sample.json --existing ${fixtureBasePath}/existing-v1.freeze.sample.json --out ${outputBasePath}/source-snapshot-freeze`,
         status: 'evidence_only',
       },
       {
         key: 'dry-run',
         title: 'customer import dry-run',
-        command:
-          'node scripts/import/customerImportDryRun.mjs --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.sample.json --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.sample.json --out output/customers/yoyoosun/import-dry-run',
+        command: `node scripts/import/customerImportDryRun.mjs --source ${fixtureBasePath}/source-snapshot.sample.json --existing ${fixtureBasePath}/existing-v1.sample.json --out ${outputBasePath}/import-dry-run`,
         status: 'preview_only',
       },
       {
         key: 'execute-report',
         title: 'import execution report',
-        command:
-          'node scripts/import/customerImportExecute.mjs --dry-run output/customers/yoyoosun/import-dry-run --approval scripts/import/fixtures/customers/yoyoosun/import-approval.sample.json --out output/customers/yoyoosun/import-execution',
+        command: `node scripts/import/customerImportExecute.mjs --dry-run ${outputBasePath}/import-dry-run --approval ${fixtureBasePath}/import-approval.sample.json --out ${outputBasePath}/import-execution`,
         status: 'report_gate_only',
       },
     ],
@@ -148,18 +211,56 @@ export function buildImportToolingSummary() {
 }
 
 export function buildCustomerConfigDevOverview({
-  menuConfig = yoyoosunMenuConfig,
-  fieldNumberingConfig = yoyoosunFieldNumberingConfig,
+  customerKey = DEFAULT_DEV_CUSTOMER_KEY,
+  registry = DEV_CUSTOMER_CONFIG_REGISTRY,
+  menuConfig,
+  fieldNumberingConfig,
 } = {}) {
-  const menuSummary = buildCustomerMenuRuntimeSummary(menuConfig)
-  const fieldNumberingSummary =
-    buildFieldNumberingDraftSummary(fieldNumberingConfig)
-  const importSummary = buildImportToolingSummary()
+  const resolved = resolveDevCustomerConfigPackage(customerKey, registry)
+  if (!resolved.packageConfig) {
+    return {
+      status: resolved.status,
+      customerKey: resolved.customerKey,
+      requestedCustomerKey: resolved.customerKey,
+      route: DEV_CUSTOMER_CONFIG_ROUTE,
+      sourcePath: '',
+      registeredCustomers: resolved.registeredCustomers,
+      runtimePieces: [],
+      draftPieces: [],
+      blockedPieces: [
+        {
+          key: 'missing-customer-package',
+          title: '未登记客户配置包',
+          sourcePath: 'config/customers/<customer-key>/',
+          status: '未登记',
+          boundary:
+            '当前 URL customer 参数没有对应客户配置包；开发态总控不会 fallback 到 yoyoosun 冒充，也不会创建 SaaS tenant。',
+        },
+      ],
+    }
+  }
+
+  const { packageConfig } = resolved
+  const activeMenuConfig = menuConfig || packageConfig.menuConfig
+  const activeFieldNumberingConfig =
+    fieldNumberingConfig || packageConfig.fieldNumberingConfig
+  const menuSummary = buildCustomerMenuRuntimeSummary(
+    activeMenuConfig,
+    packageConfig.menuConfigSourcePath
+  )
+  const fieldNumberingSummary = buildFieldNumberingDraftSummary(
+    activeFieldNumberingConfig,
+    packageConfig.fieldNumberingSourcePath
+  )
+  const importSummary = buildImportToolingSummary(packageConfig.customerKey)
 
   return {
+    status: resolved.status,
     customerKey: menuSummary.customerKey,
+    requestedCustomerKey: resolved.customerKey,
     route: DEV_CUSTOMER_CONFIG_ROUTE,
-    sourcePath: DEV_CUSTOMER_CONFIG_SOURCE_PATH,
+    sourcePath: packageConfig.sourcePath,
+    registeredCustomers: resolved.registeredCustomers,
     menuSummary,
     fieldNumberingSummary,
     importSummary,
@@ -202,4 +303,10 @@ export function buildCustomerConfigDevOverview({
       },
     ],
   }
+}
+
+export function buildCustomerConfigDevOverviewFromSearch(searchParams = '') {
+  return buildCustomerConfigDevOverview({
+    customerKey: readDevCustomerKeyFromSearch(searchParams),
+  })
 }

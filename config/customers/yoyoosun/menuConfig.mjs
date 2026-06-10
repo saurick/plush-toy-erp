@@ -5,6 +5,7 @@ export const yoyoosunMenuConfig = Object.freeze({
     brandMark: "永",
     companyName: "东莞市永绅玩具有限公司",
     systemName: "毛绒 ERP 管理后台",
+    faviconHref: "/favicon-yoyoosun.svg",
   },
   desktopMenu: {
     sections: [

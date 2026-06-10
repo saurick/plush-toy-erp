@@ -1,7 +1,9 @@
 import { DEV_CAPABILITY_LEDGER_ROUTE } from '../../erp/config/devCapabilityLedger.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from '../../erp/config/devCustomerConfig.mjs'
 import { DEV_DOCS_ROUTE } from '../../erp/config/devDocs.mjs'
+import { DEV_HUB_ROUTE } from '../../erp/config/devHub.mjs'
 import { DEV_PROTOTYPES_ROUTE } from '../../erp/config/devPrototypes.mjs'
+import { DEV_TESTING_ROUTE } from '../../erp/config/devTesting.mjs'
 
 export const ERP_FAVICON_VARIANTS = Object.freeze({
   admin: Object.freeze({
@@ -12,6 +14,16 @@ export const ERP_FAVICON_VARIANTS = Object.freeze({
   tasks: Object.freeze({
     key: 'tasks',
     href: '/favicon-tasks.svg',
+    type: 'image/svg+xml',
+  }),
+  devHub: Object.freeze({
+    key: 'dev-hub',
+    href: '/favicon-dev.svg',
+    type: 'image/svg+xml',
+  }),
+  testing: Object.freeze({
+    key: 'testing',
+    href: '/favicon-testing.svg',
     type: 'image/svg+xml',
   }),
   docs: Object.freeze({
@@ -47,11 +59,36 @@ function isMobileTaskPath(pathname = '') {
   )
 }
 
+function buildCustomerFaviconVariant(href = '') {
+  const normalizedHref = String(href || '').trim()
+  if (!normalizedHref) {
+    return null
+  }
+  return Object.freeze({
+    key: 'customer',
+    href: normalizedHref,
+    type: normalizedHref.endsWith('.ico')
+      ? 'image/x-icon'
+      : normalizedHref.endsWith('.png')
+        ? 'image/png'
+        : 'image/svg+xml',
+  })
+}
+
 export function resolveERPFavicon(pathname = '', options = {}) {
   const normalizedPathname = normalizePathname(pathname)
   const normalizedFromPathname = options.fromPathname
     ? normalizePathname(options.fromPathname)
     : ''
+  if (
+    normalizedPathname === DEV_HUB_ROUTE ||
+    normalizedPathname === `${DEV_HUB_ROUTE}/`
+  ) {
+    return ERP_FAVICON_VARIANTS.devHub
+  }
+  if (normalizedPathname === DEV_TESTING_ROUTE) {
+    return ERP_FAVICON_VARIANTS.testing
+  }
   if (normalizedPathname === DEV_CAPABILITY_LEDGER_ROUTE) {
     return ERP_FAVICON_VARIANTS.capabilityLedger
   }
@@ -63,6 +100,12 @@ export function resolveERPFavicon(pathname = '', options = {}) {
   }
   if (normalizedPathname === DEV_CUSTOMER_CONFIG_ROUTE) {
     return ERP_FAVICON_VARIANTS.customerConfig
+  }
+  const customerFavicon = buildCustomerFaviconVariant(
+    options.customerFaviconHref
+  )
+  if (customerFavicon) {
+    return customerFavicon
   }
   if (
     options.isMobileExperience ||

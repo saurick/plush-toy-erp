@@ -7,6 +7,7 @@ import { Helmet } from 'react-helmet-async'
 import { authBus } from '@/common/auth/authBus'
 import { appAlert } from '@/common/components/modal/alertBridge'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
+import { getActiveERPBrand } from '@/common/consts/brand'
 import { applyERPFavicon } from '@/common/consts/favicon.mjs'
 import ERPRouter from '@/erp/router'
 import MobileRoleRouter from '@/erp/mobile/router'
@@ -22,6 +23,7 @@ function AppContent() {
   const { appConfig, isDesktopApp, isMobileExperience } = useERPWorkspace()
   const appTitle =
     appConfig.title || import.meta.env.VITE_APP_TITLE || 'Plush Toy ERP'
+  const activeBrand = getActiveERPBrand()
 
   useEffect(() => {
     return authBus.onUnauthorized(({ from, message, loginPath }) => {
@@ -57,10 +59,16 @@ function AppContent() {
 
   useEffect(() => {
     applyERPFavicon(document, location.pathname, {
+      customerFaviconHref: activeBrand.faviconHref,
       fromPathname: location.state?.from?.pathname,
       isMobileExperience,
     })
-  }, [isMobileExperience, location.pathname, location.state])
+  }, [
+    activeBrand.faviconHref,
+    isMobileExperience,
+    location.pathname,
+    location.state,
+  ])
 
   return (
     <>

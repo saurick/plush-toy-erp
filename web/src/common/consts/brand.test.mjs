@@ -16,6 +16,7 @@ test('brand: 默认品牌保持产品中性，不包含客户公司名', () => {
     assert.deepEqual(getActiveERPBrand(), {
       brandMark: ERP_BRAND_MARK,
       companyName: ERP_COMPANY_NAME,
+      faviconHref: undefined,
       systemName: ERP_ADMIN_SYSTEM_NAME,
     })
     assert.equal(ERP_BRAND_MARK, '绒')
@@ -40,6 +41,7 @@ test('brand: yoyoosun 客户 key 只通过客户配置覆盖品牌', () => {
     assert.deepEqual(getActiveERPBrand(), {
       brandMark: '永',
       companyName: '东莞市永绅玩具有限公司',
+      faviconHref: '/favicon-yoyoosun.svg',
       systemName: '毛绒 ERP 管理后台',
     })
   } finally {
@@ -59,6 +61,7 @@ test('brand: runtime config can override bundled customer brand', () => {
       brand: {
         brandMark: '测',
         companyName: '测试客户',
+        faviconHref: '/favicon-test.svg',
         systemName: '测试 ERP',
       },
     },
@@ -68,6 +71,7 @@ test('brand: runtime config can override bundled customer brand', () => {
     assert.deepEqual(getActiveERPBrand(), {
       brandMark: '测',
       companyName: '测试客户',
+      faviconHref: '/favicon-test.svg',
       systemName: '测试 ERP',
     })
   } finally {

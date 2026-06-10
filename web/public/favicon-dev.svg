@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Development hub favicon">
+  <rect width="256" height="256" rx="52" fill="#334155" />
+  <rect x="44" y="48" width="168" height="160" rx="28" fill="#f8fafc" />
+  <rect x="68" y="74" width="48" height="48" rx="14" fill="#14b8a6" />
+  <rect x="140" y="74" width="48" height="48" rx="14" fill="#2563eb" />
+  <rect x="68" y="144" width="48" height="48" rx="14" fill="#7c3aed" />
+  <rect x="140" y="144" width="48" height="48" rx="14" fill="#16a34a" />
+  <path d="M84 98h16M92 90v16M156 98h16M84 168h16M156 168h16M164 160v16" stroke="#f8fafc" stroke-width="10" stroke-linecap="round" />
+</svg>

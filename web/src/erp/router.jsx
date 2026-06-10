@@ -16,6 +16,7 @@ import { businessModuleDefinitions } from './config/businessModules.mjs'
 import { DEV_CAPABILITY_LEDGER_ROUTE } from './config/devCapabilityLedger.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from './config/devCustomerConfig.mjs'
 import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
+import { DEV_HUB_ROUTE } from './config/devHub.mjs'
 import { DEV_PROTOTYPES_ROUTE } from './config/devPrototypes.mjs'
 import { DEV_TESTING_ROUTE } from './config/devTesting.mjs'
 import {
@@ -52,6 +53,9 @@ const MobileAppLayout = lazy(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazy(
   () => import('./mobile/pages/MobileRoleTasksPage')
 )
+const DevHubPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/DevHubPage.jsx'))
+  : null
 const DevDocsPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevDocsPage.jsx'))
   : null
@@ -180,6 +184,9 @@ export default function ERPRouter() {
     <Suspense fallback={<RouteLoadingFallback />}>
       <MobileEntryBackGuard />
       <Routes>
+        {DevHubPage ? (
+          <Route path={DEV_HUB_ROUTE} element={<DevHubPage />} />
+        ) : null}
         {DevDocsPage ? (
           <Route path={DEV_DOCS_ROUTE} element={<DevDocsPage />} />
         ) : null}

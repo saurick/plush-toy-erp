@@ -2,12 +2,14 @@ import React, { useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CodeOutlined,
+  CopyOutlined,
   FileSearchOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { Button, Empty, Input, Segmented, Space, Tag, Typography } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import {
+  DEV_TESTING_COPY_PRESETS,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
   buildDevTestingDocs,
   buildDevTestingSummary,
@@ -48,6 +50,10 @@ function MetricTile({ icon, label, value, note, tone = 'default' }) {
 }
 
 function runCopy(text) {
+  if (!String(text || '').trim()) {
+    message.warning('当前层级没有可复制命令')
+    return
+  }
   if (typeof navigator === 'undefined' || !navigator.clipboard) {
     message.warning('当前浏览器不支持复制')
     return
@@ -59,20 +65,48 @@ function runCopy(text) {
 }
 
 function TierCard({ tier }) {
+  const hasCopyText = Boolean(tier.copyText)
+
   return (
     <article className="erp-dev-testing-tier">
       <div className="erp-dev-testing-tier__head">
-        <span className="erp-dev-testing-tier__level">{tier.key}</span>
-        <span className="erp-dev-testing-tier__title">{tier.level}</span>
+        <div className="erp-dev-testing-tier__identity">
+          <span className="erp-dev-testing-tier__level">{tier.key}</span>
+          <span className="erp-dev-testing-tier__title">{tier.level}</span>
+        </div>
+        <Button
+          size="small"
+          icon={<CopyOutlined />}
+          disabled={!hasCopyText}
+          onClick={() => runCopy(tier.copyText)}
+        >
+          复制
+        </Button>
       </div>
       <div className="erp-dev-testing-tier__type">{tier.changeType}</div>
       <p className="erp-dev-testing-tier__desc">{tier.description}</p>
       <div className="erp-dev-testing-command-tags">
-        {tier.commands.map((command) => (
+        {tier.copyCommands.map((command) => (
           <code key={command}>{command}</code>
         ))}
       </div>
     </article>
+  )
+}
+
+function QuickPreset({ preset }) {
+  return (
+    <button
+      type="button"
+      className="erp-dev-testing-preset"
+      onClick={() => runCopy(preset.commands.join('\n'))}
+    >
+      <span className="erp-dev-testing-preset__head">
+        <span className="erp-dev-testing-preset__label">{preset.label}</span>
+        <CopyOutlined />
+      </span>
+      <span className="erp-dev-testing-preset__desc">{preset.description}</span>
+    </button>
   )
 }
 
@@ -283,10 +317,20 @@ export default function DevTestingPage() {
           </div>
 
           {view === VIEW_TIERS ? (
-            <div className="erp-dev-testing-tier-grid">
-              {tiers.map((tier) => (
-                <TierCard key={tier.key} tier={tier} />
-              ))}
+            <div className="erp-dev-testing-tier-view">
+              <div
+                className="erp-dev-testing-presets"
+                aria-label="常用测试命令预设"
+              >
+                {DEV_TESTING_COPY_PRESETS.map((preset) => (
+                  <QuickPreset key={preset.key} preset={preset} />
+                ))}
+              </div>
+              <div className="erp-dev-testing-tier-grid">
+                {tiers.map((tier) => (
+                  <TierCard key={tier.key} tier={tier} />
+                ))}
+              </div>
             </div>
           ) : null}
 
