@@ -31,7 +31,7 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
       '采购/仓储',
       '生产环节',
       '财务环节',
-      '单据模板',
+      '运营工具',
       '系统管理',
     ]
   )
@@ -39,7 +39,13 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
     ERP_MENU_PERMISSION_GROUPS.find(
       (section) => section.title === '看板中心'
     )?.items.map((item) => item.key),
-    ['/erp/dashboard', '/erp/business-dashboard']
+    ['/erp/dashboard', '/erp/task-board', '/erp/business-dashboard']
+  )
+  assert.deepEqual(
+    ERP_MENU_PERMISSION_GROUPS.find(
+      (section) => section.title === '运营工具'
+    )?.items.map((item) => item.key),
+    ['/erp/print-center', '/erp/operations/exceptions']
   )
 })
 
@@ -155,6 +161,8 @@ test('menuPermissions: 基础资料入口纳入业务角色预设', () => {
 test('menuPermissions: 当前权限项不包含前端文档或开发验收路径', () => {
   const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
 
+  assert(permissionKeys.includes('/erp/task-board'))
+  assert(permissionKeys.includes('/erp/operations/exceptions'))
   assert(permissionKeys.includes('/erp/production/quality-inspections'))
   assert(permissionKeys.includes('/erp/finance/receivables'))
   assert(permissionKeys.includes('/erp/finance/invoices'))

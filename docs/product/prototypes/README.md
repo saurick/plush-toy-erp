@@ -184,7 +184,7 @@
 
 当前推荐的简化理解是：顶部只判断“当前 / 待实现 / 参考资料”；`HTML / PNG` 只表示格式，`截图证据 / Evidence`、`方案对比 / Comparison`、`历史参考 / History` 等细标签只解释来源和用途。不要反过来用 HTML / PNG 文件格式或辅助标签判断资产阶段。
 
-截至 2026-06-10，待实现队列包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html` 和 `business-module-page-standard-v1/task-collab-entry-v2.html`。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现对齐版登记；其余产品内核相关 HTML 仍需按 To Implement Checklist 进入真实页面实现、测试和浏览器回归后，才能改为 Current。
+截至 2026-06-11，待实现队列仍包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html` 和 `business-module-page-standard-v1/task-collab-entry-v2.html`。本轮运行时代码已吸收后台工作台、任务看板、业务看板、模板打印中心、异常 / 阻塞闭环、业务模块标准页、底部协同入口和部分特殊模块变体；但未获用户明确确认前，三个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现对齐版登记。
 
 ## 使用方式
 

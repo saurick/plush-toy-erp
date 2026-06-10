@@ -193,8 +193,9 @@ pnpm smoke:processing-contract-real-login
 - 管理员登录
 - 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色客户配置开发页、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
 - 未登录访问桌面后台的重定向
-- 桌面工作台 / 任务看板，包括协同任务筛选、任务详情抽屉、阻塞原因面板、催办和完成动作
-- 桌面业务看板
+- 桌面工作台、任务看板和异常 / 阻塞闭环，包括协同任务筛选、任务详情抽屉、阻塞原因面板、催办、完成动作和运营工具入口
+- 桌面业务看板和模板打印中心
+- 标准业务模块连续回归，以及材料 BOM、入库通知/检验/入库、库存、出库的只读变体边界
 - 桌面业务页表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗布局 / 弹窗保存、批量删除、协同任务创建和回收站
 - 权限管理
 - 模板打印中心
@@ -217,7 +218,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 当前规则：
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- 桌面侧栏只保留看板、业务分组、单据模板和系统管理。
+- 桌面侧栏只保留看板中心、业务分组、运营工具和系统管理。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/help-center`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径只做兼容重定向，不再作为产品内页面。
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
 - 开发环境额外提供 `http://localhost:5175/__dev` 作为本地开发态入口台账 / 总控；该入口只汇总 `/__dev/docs`、`/__dev/testing`、`/__dev/prototypes`、`/__dev/capability-ledger` 和 `/__dev/customer-config` 等 dev-only 页面，展示入口维护真源、边界标签、治理分组筛选、搜索、跳转、浏览器本地置顶和最近访问记录；入口卡片统一新标签打开，便于保留总控页对照，不改变各子页内部导航。不进入侧栏、seedData、RBAC、后端业务、产品内文档 registry 或 ERP 正式菜单，生产构建不可访问；置顶和最近访问只写浏览器本地偏好，不是后端配置。入口总控使用 `/favicon-dev.svg`，测试入口使用 `/favicon-testing.svg`，只用于区分本地开发页面。
@@ -232,18 +233,18 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台继续只保留一个入口
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code
-- 桌面后台主业务菜单按基础资料、销售链路、采购/仓储、生产和财务收口；各业务页已接入通用业务记录表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗保存、批量删除、workflow 业务状态保存和协同任务池，基础资料页当前暴露客户/供应商和产品入口，并复用 `business_records` 承接 trade-erp 字段口径
+- 桌面后台主业务菜单按基础资料、销售链路、采购/仓储、生产和财务收口；客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，并已复用业务页标准骨架展示标题统计、筛选、当前操作区、明细表和底部协同入口；产品及多数业务模块继续由 `BusinessModulePage` 承接通用业务记录表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗保存、批量删除、workflow 业务状态保存和协同任务池
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端生产环境统一走 `5175` 的 `/m/<role>/tasks`；按角色拆端口只作为本地开发调试入口保留，两者不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
 - 岗位任务页读取真实 workflow API，展示任务、预警、通知和进度，并按当前端口角色支持处理、阻塞、完成三类状态回填
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮
-- 模板打印当前由对应业务页选中记录后带值打开；打印中心保留默认样例和模板核对入口
+- 模板打印当前由对应业务页选中记录后带值打开；打印中心保留默认样例、模板目录、纸面预览、字段映射和模板核对入口
 - 扩展硬件链路、PDA、条码枪、图片识别继续 deferred
-- `docs/product/prototypes/admin-command-center-v1/` 已按当前实现对齐版承接到运行时：`/erp/dashboard`、`/erp/business-dashboard`、`/erp/print-center` 和任务详情抽屉分别承接任务看板、业务看板、模板打印中心和异常 / 阻塞闭环；原型仍只作 as-built 参考，不是运行时真源。
-- `/erp/dashboard` 任务看板的关键词、状态、角色、到期和来源筛选使用 URL query 保存，支持复制链接、刷新恢复和一键清空；首屏按原型式四泳道展示本页待办、阻塞异常、今日到期和已完成协同，这些筛选和分组只影响当前页面展示，不写后端用户偏好、WorkflowUsecase 或事实表。
-- `docs/product/prototypes/business-module-page-standard-v1/` 已按当前实现对齐版承接到运行时：业务模块标准页由 `BusinessModulePage` 和共享业务列表组件承接，协同入口由共享协同面板承接；当前 `/__dev/prototypes` 没有待实现队列项，后续新增待实现 HTML 仍按 prototype checklist 吸收。
-- 当前业务页、岗位任务端页面、桌面任务看板、业务看板和模板预览已经齐入口；通用业务记录已落盘，采购合同 / 加工合同已支持业务页带值打开，桌面任务看板只处理 Workflow 协同任务，不直接写库存、出货、应收、开票、付款或其他事实表；Excel 导入、打印留档回写和细分业务专表继续 deferred
+- `docs/product/prototypes/admin-command-center-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`/erp/dashboard` 是后台首页 / 工作台，`/erp/task-board` 是任务看板，`/erp/business-dashboard` 是业务看板，`/erp/print-center` 是模板打印中心，`/erp/operations/exceptions` 是异常 / 阻塞闭环；但未获用户明确确认前，不能把该资产改成 Current。
+- `/erp/task-board` 任务看板的关键词、状态、角色、到期和来源筛选使用 URL query 保存，支持复制链接、刷新恢复和一键清空；首屏按原型式四泳道展示本页待办、阻塞异常、今日到期和已完成协同，这些筛选和分组只影响当前页面展示，不写后端用户偏好、WorkflowUsecase 或事实表。
+- `docs/product/prototypes/business-module-page-standard-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`BusinessModulePage` 和共享业务列表组件承接通用业务页骨架，协同入口由共享协同面板承接；客户档案、供应商档案和销售订单 V1 页面也已复用同一标准页骨架；材料 BOM、入库通知/检验/入库、库存和出库额外补充只读变体区，强调 BOM、质检 / 入库、库存事实和出库事实边界。`/__dev/prototypes` 仍保留待实现队列，未获用户明确确认前不清空队列、不晋级 Current。
+- 当前业务页、岗位任务端页面、桌面工作台、任务看板、异常闭环、业务看板和模板预览已经齐入口；通用业务记录已落盘，采购合同 / 加工合同已支持业务页带值打开，桌面任务看板只处理 Workflow 协同任务，不直接写库存、出货、应收、开票、付款或其他事实表；Excel 导入、打印留档回写和细分业务专表继续 deferred
 
 ## 桌面业务弹窗约定
 

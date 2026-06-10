@@ -405,6 +405,7 @@ export function BusinessDataTable({
   dataSource,
   scroll,
   rowSelection,
+  rowClassName,
   onRow,
   onChange,
   pagination,
@@ -419,6 +420,7 @@ export function BusinessDataTable({
         dataSource={dataSource}
         scroll={scroll}
         rowSelection={rowSelection}
+        rowClassName={rowClassName}
         onRow={onRow}
         onChange={onChange}
         pagination={pagination}

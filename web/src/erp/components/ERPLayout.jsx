@@ -54,6 +54,7 @@ const { Paragraph, Text } = Typography
 const navIconRegistry = {
   'workspace-home': <AppstoreOutlined />,
   'global-dashboard': <DashboardOutlined />,
+  'task-board': <ScheduleOutlined />,
   'business-dashboard': <AppstoreOutlined />,
   customers: <ApartmentOutlined />,
   suppliers: <ApartmentOutlined />,
@@ -72,13 +73,14 @@ const navIconRegistry = {
   reconciliation: <WalletOutlined />,
   payables: <WalletOutlined />,
   'print-center': <PrinterOutlined />,
+  'exception-flow': <AlertOutlined />,
   'permission-center': <SettingOutlined />,
 }
 
 const DEFAULT_DESKTOP_ENTRY = {
-  label: '任务看板',
+  label: '工作台',
   path: '/erp/dashboard',
-  description: '按协同任务状态看待处理、处理中、阻塞、退回和超时任务。',
+  description: '聚合今日待办、阻塞、业务摘要、打印入口和常用业务模块。',
 }
 const BUSINESS_MODULE_PATHS = new Set(
   businessModuleDefinitions.map((moduleItem) => moduleItem.path)

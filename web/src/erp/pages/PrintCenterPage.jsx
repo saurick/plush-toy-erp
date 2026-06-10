@@ -73,6 +73,18 @@ export default function PrintCenterPage() {
   const supportsWorkspace = isSupportedPrintWorkspaceTemplate(
     activeTemplate?.key
   )
+  const activePreviewLines = activeTemplate?.previewLines || []
+  const activeFieldTruth = activeTemplate?.fieldTruth || []
+  const activeSample = activeTemplate?.sample || {}
+  const previewSummary = [
+    activeSample.contractNo
+      ? `合同编号：${activeSample.contractNo}`
+      : `模板：${activeTemplate?.title || '-'}`,
+    activeSample.supplierName
+      ? `供应商：${activeSample.supplierName}`
+      : `场景：${activeTemplate?.scene || '-'}`,
+    activeTemplate?.layout || activeTemplate?.output || '固定打印模板',
+  ]
 
   const handleOpenEditablePrint = async () => {
     try {
@@ -205,6 +217,60 @@ export default function PrintCenterPage() {
                 )
               })}
             </div>
+          </div>
+          <div className="erp-print-center-preview-panel">
+            <div className="erp-print-center-nav-header">
+              <Text className="erp-print-center-nav-title">纸面预览</Text>
+              <Text className="erp-print-center-nav-description">
+                固定浅色打印口径；业务带值从对应业务页进入，打印中心只展示正式模板的默认样例。
+              </Text>
+            </div>
+            <div className="erp-print-center-paper-preview">
+              <Text className="erp-print-center-paper-title">
+                {activeTemplate.title}
+              </Text>
+              {previewSummary.map((line) => (
+                <div className="erp-print-center-paper-line" key={line}>
+                  {line}
+                </div>
+              ))}
+              <div className="erp-print-center-paper-section">
+                {activePreviewLines.length > 0
+                  ? activePreviewLines.map((line) => (
+                    <span key={line}>{line}</span>
+                    ))
+                  : activeTemplate.tags?.map((line) => (
+                    <span key={line}>{line}</span>
+                    ))}
+              </div>
+              <div className="erp-print-center-paper-stamp">模板预览</div>
+            </div>
+          </div>
+          <div className="erp-print-center-mapping-panel">
+            <div className="erp-print-center-nav-header">
+              <Text className="erp-print-center-nav-title">字段映射</Text>
+              <Text className="erp-print-center-nav-description">
+                这里只展示现有模板元数据；字段真源仍以打印模板配置、业务页带值和独立打印窗口为准。
+              </Text>
+            </div>
+            <Space direction="vertical" size={10} style={{ width: '100%' }}>
+              {activeFieldTruth.slice(0, 5).map((item) => (
+                <div className="erp-print-center-map-row" key={item}>
+                  <Text>{item}</Text>
+                  <Text type="success">已定义</Text>
+                </div>
+              ))}
+              {activeFieldTruth.length === 0 ? (
+                <Text type="secondary">当前模板未登记额外字段说明。</Text>
+              ) : null}
+              <Button
+                type="primary"
+                icon={<PrinterOutlined />}
+                onClick={handleOpenEditablePrint}
+              >
+                打开当前模板
+              </Button>
+            </Space>
           </div>
         </div>
       </Card>

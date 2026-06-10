@@ -91,12 +91,15 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
   {
     key: 'boss',
     label: '老板 / 管理层',
-    description: '看全链路业务页和打印中心，不含权限管理。',
+    description:
+      '看工作台、看板、异常闭环、全链路业务页和打印中心，不含权限管理。',
     mobileRolePermissions: buildMobileRolePreset(['boss']),
     permissions: buildPreset([
       '/erp/dashboard',
+      '/erp/task-board',
       '/erp/business-dashboard',
       '/erp/print-center',
+      '/erp/operations/exceptions',
       ...businessModulePaths,
     ]),
   },
@@ -107,8 +110,10 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     mobileRolePermissions: buildMobileRolePreset(['sales']),
     permissions: buildPreset([
       '/erp/dashboard',
+      '/erp/task-board',
       '/erp/business-dashboard',
       '/erp/print-center',
+      '/erp/operations/exceptions',
       ...masterModulePaths,
       '/erp/sales/project-orders/sales-orders',
       '/erp/warehouse/shipping-release',
@@ -121,7 +126,9 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     mobileRolePermissions: buildMobileRolePreset(['pmc']),
     permissions: buildPreset([
       '/erp/dashboard',
+      '/erp/task-board',
       '/erp/business-dashboard',
+      '/erp/operations/exceptions',
       ...masterModulePaths,
       '/erp/purchase/material-bom',
       '/erp/purchase/accessories',
@@ -141,7 +148,9 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     mobileRolePermissions: buildMobileRolePreset(['production']),
     permissions: buildPreset([
       '/erp/dashboard',
+      '/erp/task-board',
       '/erp/business-dashboard',
+      '/erp/operations/exceptions',
       ...masterModulePaths,
       '/erp/warehouse/inbound',
       '/erp/production/scheduling',
@@ -157,8 +166,10 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     mobileRolePermissions: buildMobileRolePreset(['purchase']),
     permissions: buildPreset([
       '/erp/dashboard',
+      '/erp/task-board',
       '/erp/business-dashboard',
       '/erp/print-center',
+      '/erp/operations/exceptions',
       ...masterModulePaths,
       '/erp/purchase/material-bom',
       '/erp/purchase/accessories',
@@ -173,7 +184,9 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     mobileRolePermissions: buildMobileRolePreset(['warehouse']),
     permissions: buildPreset([
       '/erp/dashboard',
+      '/erp/task-board',
       '/erp/business-dashboard',
+      '/erp/operations/exceptions',
       ...masterModulePaths,
       '/erp/warehouse/inbound',
       '/erp/warehouse/inventory',
@@ -188,7 +201,9 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     mobileRolePermissions: buildMobileRolePreset(['quality']),
     permissions: buildPreset([
       '/erp/dashboard',
+      '/erp/task-board',
       '/erp/business-dashboard',
+      '/erp/operations/exceptions',
       ...masterModulePaths,
       '/erp/warehouse/inbound',
       '/erp/warehouse/inventory',
@@ -204,8 +219,10 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     mobileRolePermissions: buildMobileRolePreset(['finance']),
     permissions: buildPreset([
       '/erp/dashboard',
+      '/erp/task-board',
       '/erp/business-dashboard',
       '/erp/print-center',
+      '/erp/operations/exceptions',
       ...masterModulePaths,
       '/erp/purchase/processing-contracts',
       '/erp/warehouse/shipping-release',

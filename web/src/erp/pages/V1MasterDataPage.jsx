@@ -9,23 +9,31 @@ import {
 } from '@ant-design/icons'
 import {
   Button,
-  Card,
   Descriptions,
   Drawer,
-  Empty,
   Form,
   Input,
   Modal,
   Popconfirm,
   Space,
   Switch,
-  Table,
   Tag,
-  Typography,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import {
+  BusinessDataTable,
+  BusinessFilterPanel,
+  CollaborationTaskPanel,
+  BusinessListToolbar,
+  BusinessPageLayout,
+  PageHeaderCard,
+  SearchInput,
+  SelectFilter,
+  SelectionActionBar,
+  ToolbarButton,
+} from '../components/business-list/BusinessListLayout.jsx'
 import {
   createContact,
   createCustomer,
@@ -47,8 +55,6 @@ import {
   formatUnixDate,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
-
-const { Paragraph, Text, Title } = Typography
 
 const PAGE_CONFIG = Object.freeze({
   customers: {
@@ -92,6 +98,11 @@ const PAGE_CONFIG = Object.freeze({
       '正式 suppliers 表页面，只维护供应商 / 加工厂交易主体，不写采购入库、质检、库存或财务事实。',
   },
 })
+
+const ACTIVE_FILTER_OPTIONS = Object.freeze([
+  { label: '全部主体', value: 'all' },
+  { label: '仅看启用', value: 'active' },
+])
 
 function activeTag(active) {
   return active === false ? (
@@ -548,113 +559,223 @@ export default function V1MasterDataPage({ type }) {
     [canDisableContact, canSetPrimaryContact, canUpdateContact]
   )
 
+  const activeRecordCount = useMemo(
+    () => records.filter((record) => record.is_active !== false).length,
+    [records]
+  )
+  const selectedRecordDisplayText = useMemo(() => {
+    if (!selectedRecord) return '请先选择一个主体'
+    return `${selectedRecord.code || selectedRecord.id} / ${
+      selectedRecord.name || '未命名主体'
+    }`
+  }, [selectedRecord])
+  const selectedRecordSummaryItems = useMemo(() => {
+    if (!selectedRecord) return []
+    const items = [
+      {
+        key: 'status',
+        label: '状态',
+        value: selectedRecord.is_active === false ? '停用' : '启用',
+      },
+      {
+        key: 'short-name',
+        label: '简称',
+        value: selectedRecord.short_name || '-',
+      },
+      {
+        key: 'contacts',
+        label: '联系人',
+        value: contacts.length,
+      },
+    ]
+    if (type === 'suppliers') {
+      items.splice(2, 0, {
+        key: 'supplier-type',
+        label: '类型',
+        value: selectedRecord.supplier_type || '-',
+      })
+    }
+    return items
+  }, [contacts.length, selectedRecord, type])
+
   return (
-    <Space direction="vertical" size={16} className="erp-dashboard-page">
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space className="erp-dashboard-heading-row" align="start">
-          <div>
-            <Title level={4} className="erp-dashboard-title">
-              {config.title}
-            </Title>
-            <Paragraph type="secondary" className="erp-dashboard-summary">
-              {config.summary}
-            </Paragraph>
+    <BusinessPageLayout className="erp-v1-master-data-page">
+      <PageHeaderCard
+        compact
+        sectionTitle="基础资料"
+        title={config.title}
+        description={config.summary}
+        tags={
+          <div className="erp-business-module-chip-row">
+            <Tag color="green">正式 MasterData</Tag>
+            <Tag>只维护交易主体</Tag>
           </div>
-          <Space wrap>
-            <Button
+        }
+        stats={[
+          { key: 'total', label: '总主体', value: total },
+          { key: 'current', label: '当前结果', value: records.length },
+          { key: 'active', label: '启用主体', value: activeRecordCount },
+          { key: 'selected', label: '已选主体', value: selectedRecord ? 1 : 0 },
+        ]}
+      />
+
+      <BusinessFilterPanel compact>
+        <SearchInput
+          placeholder="搜索编号、名称、简称"
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          onPressEnter={loadRecords}
+        />
+        <SelectFilter
+          className="erp-business-filter-control--status"
+          options={ACTIVE_FILTER_OPTIONS}
+          value={activeOnly ? 'active' : 'all'}
+          onChange={(nextValue) => setActiveOnly(nextValue === 'active')}
+        />
+      </BusinessFilterPanel>
+
+      <BusinessListToolbar
+        stats={[
+          { key: 'current', label: '当前结果', value: records.length },
+          { key: 'contacts', label: '当前联系人', value: contacts.length },
+          { key: 'selected', label: '已选主体', value: selectedRecord ? 1 : 0 },
+        ]}
+        actions={
+          <>
+            <ToolbarButton
               icon={<ReloadOutlined />}
               onClick={loadRecords}
               loading={loading}
             >
               刷新
-            </Button>
+            </ToolbarButton>
             {canCreate ? (
-              <Button
+              <ToolbarButton
                 type="primary"
+                className="erp-business-list-toolbar__primary-action"
                 icon={<PlusOutlined />}
                 onClick={openCreateRecord}
               >
-                新建
-              </Button>
+                新建主体
+              </ToolbarButton>
             ) : null}
-          </Space>
-        </Space>
-      </Card>
+          </>
+        }
+      />
 
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" size={12} className="erp-dashboard-block">
-          <Space wrap>
-            <Input.Search
-              allowClear
-              value={keyword}
-              placeholder="搜索编号、名称、简称"
-              onChange={(event) => setKeyword(event.target.value)}
-              onSearch={loadRecords}
-              style={{ width: 280 }}
-            />
-            <Switch checked={activeOnly} onChange={setActiveOnly} />
-            <Text type="secondary">仅看启用</Text>
-            <Tag>共 {total} 条</Tag>
-          </Space>
-          <Table
-            rowKey="id"
-            size="middle"
-            loading={loading}
-            columns={recordColumns}
-            dataSource={records}
-            scroll={{ x: 980 }}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
-            rowClassName={(record) =>
-              record.id === selectedRecord?.id ? 'ant-table-row-selected' : ''
+      <SelectionActionBar
+        selectedCount={selectedRecord ? 1 : 0}
+        selectedLabel={selectedRecordDisplayText}
+        summaryItems={selectedRecordSummaryItems}
+        boundaryText={config.summary}
+      >
+        <Button
+          type="link"
+          size="small"
+          disabled={!selectedRecord}
+          onClick={() => {
+            setSelectedRecord(null)
+            setContacts([])
+          }}
+        >
+          清空已选
+        </Button>
+        <Button
+          size="small"
+          disabled={!selectedRecord}
+          onClick={() => setDetailOpen(true)}
+        >
+          查看详情
+        </Button>
+        {canUpdate ? (
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            disabled={!selectedRecord}
+            onClick={() => openEditRecord(selectedRecord)}
+          >
+            编辑主体
+          </Button>
+        ) : null}
+        {canDisable ? (
+          <Popconfirm
+            title={
+              selectedRecord?.is_active === false ? '确认启用？' : '确认停用？'
             }
-            onRow={(record) => ({
-              onClick: () => setSelectedRecord(record),
-            })}
-          />
-        </Space>
-      </Card>
+            onConfirm={() => toggleRecordActive(selectedRecord)}
+            disabled={!selectedRecord}
+          >
+            <Button
+              size="small"
+              disabled={!selectedRecord}
+              icon={
+                selectedRecord?.is_active === false ? (
+                  <CheckCircleOutlined />
+                ) : (
+                  <StopOutlined />
+                )
+              }
+            >
+              {selectedRecord?.is_active === false ? '启用' : '停用'}
+            </Button>
+          </Popconfirm>
+        ) : null}
+      </SelectionActionBar>
 
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" size={12} className="erp-dashboard-block">
-          <Space className="erp-dashboard-heading-row" align="start">
-            <div>
-              <Title level={5} className="erp-dashboard-section-title">
-                联系人
-              </Title>
-              <Paragraph type="secondary" className="erp-dashboard-summary">
-                {selectedRecord?.name
-                  ? `当前主体：${selectedRecord.name}`
-                  : '选择客户或供应商后查看联系人。'}
-              </Paragraph>
-            </div>
-            {canCreateContact ? (
-              <Button
-                icon={<PlusOutlined />}
-                onClick={openCreateContact}
-                disabled={!selectedRecord}
-              >
-                新建联系人
-              </Button>
-            ) : null}
-          </Space>
-          {selectedRecord ? (
-            <Table
-              rowKey="id"
-              size="middle"
-              loading={contactLoading}
-              columns={contactColumns}
-              dataSource={contacts}
-              scroll={{ x: 1080 }}
-              pagination={false}
-            />
-          ) : (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="尚未选择主体"
-            />
-          )}
-        </Space>
-      </Card>
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        columns={recordColumns}
+        dataSource={records}
+        scroll={{ x: 980 }}
+        pagination={{ pageSize: 10, showSizeChanger: false }}
+        emptyDescription="暂无客户或供应商主体记录"
+        rowClassName={(record) =>
+          record.id === selectedRecord?.id ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () => setSelectedRecord(record),
+        })}
+      />
+
+      <BusinessListToolbar
+        stats={[
+          {
+            key: 'owner',
+            label: '联系人主体',
+            value: selectedRecord?.name || '未选择',
+          },
+          { key: 'contacts', label: '联系人', value: contacts.length },
+        ]}
+        actions={
+          canCreateContact ? (
+            <ToolbarButton
+              icon={<PlusOutlined />}
+              onClick={openCreateContact}
+              disabled={!selectedRecord}
+            >
+              新建联系人
+            </ToolbarButton>
+          ) : null
+        }
+      />
+      <BusinessDataTable
+        rowKey="id"
+        loading={selectedRecord ? contactLoading : false}
+        columns={contactColumns}
+        dataSource={selectedRecord ? contacts : []}
+        scroll={{ x: 1080 }}
+        pagination={false}
+        emptyDescription={
+          selectedRecord ? '当前主体暂无联系人' : '尚未选择主体'
+        }
+      />
+
+      <CollaborationTaskPanel
+        tasks={[]}
+        selectedTasks={[]}
+        selectedRecordLabel={selectedRecord?.name || ''}
+      />
 
       <Modal
         title={editingRecord?.id ? '编辑主数据' : '新建主数据'}
@@ -724,6 +845,6 @@ export default function V1MasterDataPage({ type }) {
           </Descriptions>
         ) : null}
       </Drawer>
-    </Space>
+    </BusinessPageLayout>
   )
 }

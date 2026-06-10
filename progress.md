@@ -12,12 +12,31 @@
 
 ## 当前活跃事项
 
-- `/erp/dashboard` 已收回为更贴近原型的 Workflow 任务看板首屏：标题、筛选条、本页待办 / 阻塞异常 / 今日到期 / 已完成四泳道、分页表格、详情抽屉、阻塞原因、催办和完成动作进入真实前端运行时。
-- `BusinessModulePage` 已把筛选区、表格工具栏、已选记录操作条、分页和业务页协同入口收口到标准页结构；协同入口只处理 Workflow 任务，不写事实层。
-- `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板打印中心入口。
-- 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增正式原型菜单。
+- `/erp/dashboard` 已作为后台首页 / 工作台首屏：聚合今日焦点、业务状态摘要、常用入口、角色提醒和运营工具，不写事实层；`/erp/task-board` 独立承接 Workflow 任务看板。
+- `BusinessModulePage` 已把筛选区、表格工具栏、已选记录操作条、分页和业务页协同入口收口到标准页结构；协同入口只处理 Workflow 任务，不写事实层。`材料 BOM`、`入库通知/检验/入库`、`库存` 和 `出库` 已补只读特殊变体区，强调 BOM、质检 / 入库、库存和出库事实边界。
+- `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板目录、纸面预览、字段映射和可编辑打印窗口入口；`/erp/operations/exceptions` 作为异常 / 阻塞闭环入口。
+- 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收或评审原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增未评审后端 API、schema、migration、权限码或 Fact 写入。
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
 - `docs/product/prototypes` 当前待实现队列包含后台工作台与看板、业务模块标准页和协同入口三个 HTML 原型；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现对齐版。
+
+## 2026-06-11 00:33 CST
+
+- 完成：在不晋级原型资产状态的前提下，把后台工作台与看板原型主要吸收到运行时：`/erp/dashboard` 改为后台首页 / 工作台，新增正式侧栏入口 `/erp/task-board`、`/erp/operations/exceptions`，保留 `/erp/business-dashboard` 和 `/erp/print-center`；看板中心包含工作台、任务看板、业务看板，运营工具包含模板打印中心和异常 / 阻塞闭环。
+- 完成：继续吸收业务模块标准页母版。`客户档案`、`供应商档案`、`销售订单` V1 页面补底部协同入口；`产品`、`辅材/包材采购`、`加工合同/委外下单`、`待出货/出货放行` 继续复用标准业务页；`材料 BOM`、`入库通知/检验/入库`、`库存` 和 `出库` 补只读特殊变体区，不把库存、出库、质检或入库事实塞进前端展示层或 Workflow。
+- 完成：模板打印中心补纸面预览和字段映射区；暗色主题下纸面预览固定浅色交付口径。同步 `docs/current-source-of-truth.md`、`web/README.md`、三个原型 README 和本进度记录；`docs/product/prototypes` 三个产品内核 HTML 仍是 `To Implement`，等待用户明确确认后才可评审是否晋级 Current。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/styleL1.mjs`、目标 `STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-task-board-desktop,erp-dashboard-mobile,erp-task-board-mobile,erp-dashboard-dark-desktop,erp-task-board-dark-wide-desktop,erp-exception-flow-desktop,erp-business-dashboard-desktop,erp-business-dashboard-mobile,print-center-desktop,print-center-dark-desktop,business-menu-groups-desktop,business-standard-module-shells-desktop,business-special-variant-shells-desktop,business-module-workflow-actions,business-processing-contracts-desktop,business-module-material-bom-modal-style pnpm --dir web style:l1`、完整 `pnpm --dir web style:l1` 和 `git diff --check` 均通过；完整 L1 当前通过 54 个场景，`pnpm test` 当前通过 339 项。关键截图已生成到 `web/output/playwright/style-l1/`。
+- 下一步：如果用户确认运行时差异可接受，再单独评审是否把 `admin-command-center-v1` 和 `business-module-page-standard-v1` 相关 HTML 晋级 Current；否则继续保持 To Implement 队列并按差异继续微调。
+- 阻塞/风险：本轮未新增 schema、migration、后端 API、权限码、菜单外新模块、WorkflowUsecase 或 Fact usecase；库存、出库、质检 / 入库仍只是前端只读变体和业务记录协同入口，不代表真实库存扣减、入库过账或出货事实已经实现。
+
+## 2026-06-10 23:26 CST
+
+- 完成：在不晋级原型资产状态的前提下，继续吸收后台业务模块标准页母版。`客户档案`、`供应商档案` 和 `销售订单` V1 页面已复用现有 `business-list` 共享骨架，补齐标题统计、筛选工具、表格工具、当前操作区和明细表；仍走正式 MasterData / SalesOrder JSON-RPC、既有 RBAC 和现有路由，不接 `business_records` 协同池。
+- 完成：`BusinessDataTable` 增加 `rowClassName` 透传以保留 V1 页面选中行高亮；`BusinessModulePage` 既有标准页母版继续覆盖产品、辅材/包材采购、加工合同/委外下单和待出货/出货放行。材料 BOM 通过既有 BOM 明细弹窗变体回归；入库通知/检验/入库保持标准页 + 质检/入库动作边界；库存和出库只完成独立变体评审，本轮不硬套新结构、不新增事实写入。
+- 完成：同步 `docs/current-source-of-truth.md` 和 `web/README.md`，把后台工作台、业务模块标准页和协同入口原型口径修正为仍处于 `待实现 / To Implement`；运行时代码只是局部吸收，未获用户明确确认前不清空待实现队列、不改为 Current。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop,business-menu-groups-desktop,business-module-workflow-actions,business-processing-contracts-desktop,business-reconciliation-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=business-module-material-bom-modal-style,business-module-toolbar-mobile-dropdown pnpm --dir web style:l1`、完整 `pnpm --dir web style:l1` 和 `git diff --check` 均通过；完整 L1 当前通过 49 个场景，`pnpm test` 当前通过 339 项。
+- 验证：Browser 在 `http://localhost:5175/erp/master/partners/customers` 确认客户页已登录真实渲染，标题统计、筛选、当前操作区、联系人表、console warn/error 为空；在 `http://localhost:5175/erp/sales/project-orders/sales-orders` 确认销售订单页标题、当前操作区、事实边界提示、无横向溢出，并通过点击“清空已选”验证恢复态。Browser 截图接口在本地页超时，本轮以 DOM / console / box metrics 和完整 L1 作为视觉证据。
+- 下一步：若继续推进，应单独评审库存和出库的独立变体信息架构，尤其是库存余额 / 流水 / 批次 / 出库事实动作的边界；在明确安全实现路径前，不把库存扣减、出货或财务事实塞进 Workflow 或前端展示层。
+- 阻塞/风险：本轮未改后端、schema、migration、Ent、数据库表、后端 API、RBAC 权限码、seedData、正式菜单、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送；`docs/product/prototypes` 三个产品内核 HTML 仍是 To Implement，尚未完成可晋级 Current 的用户确认。
 
 ## 2026-06-10 23:01 CST
 

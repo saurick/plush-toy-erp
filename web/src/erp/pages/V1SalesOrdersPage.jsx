@@ -7,10 +7,8 @@ import {
 } from '@ant-design/icons'
 import {
   Button,
-  Card,
   Descriptions,
   Drawer,
-  Empty,
   Form,
   Input,
   InputNumber,
@@ -18,13 +16,23 @@ import {
   Popconfirm,
   Select,
   Space,
-  Table,
   Tag,
-  Typography,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import {
+  BusinessDataTable,
+  BusinessFilterPanel,
+  CollaborationTaskPanel,
+  BusinessListToolbar,
+  BusinessPageLayout,
+  PageHeaderCard,
+  SearchInput,
+  SelectFilter,
+  SelectionActionBar,
+  ToolbarButton,
+} from '../components/business-list/BusinessListLayout.jsx'
 import {
   activateSalesOrder,
   addSalesOrderItem,
@@ -51,8 +59,6 @@ import {
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
-
-const { Paragraph, Text, Title } = Typography
 
 const STATUS_FILTER_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -589,118 +595,220 @@ export default function V1SalesOrdersPage() {
     [canCancelItem, canUpdateItem]
   )
 
+  const activeOrderCount = useMemo(
+    () =>
+      orders.filter((order) => String(order.lifecycle_status) === 'active')
+        .length,
+    [orders]
+  )
+  const openLineCount = useMemo(
+    () => items.filter((item) => String(item.line_status) === 'open').length,
+    [items]
+  )
+  const selectedOrderDisplayText = useMemo(() => {
+    if (!selectedOrder) return '请先选择销售订单'
+    const customerName =
+      selectedOrder.customer_snapshot?.name ||
+      `客户 ID ${selectedOrder.customer_id}`
+    return `${selectedOrder.order_no || selectedOrder.id} / ${customerName}`
+  }, [selectedOrder])
+  const selectedOrderSummaryItems = useMemo(() => {
+    if (!selectedOrder) return []
+    return [
+      {
+        key: 'status',
+        label: '生命周期',
+        value: statusText(
+          selectedOrder.lifecycle_status,
+          SALES_ORDER_STATUS_LABELS
+        ),
+      },
+      {
+        key: 'customer-order-no',
+        label: '客户订单号',
+        value: selectedOrder.customer_order_no || '-',
+      },
+      {
+        key: 'planned-delivery-date',
+        label: '计划交付',
+        value: formatUnixDate(selectedOrder.planned_delivery_date),
+      },
+      {
+        key: 'lines',
+        label: '订单行',
+        value: items.length,
+      },
+    ]
+  }, [items.length, selectedOrder])
+
   return (
-    <Space direction="vertical" size={16} className="erp-dashboard-page">
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space className="erp-dashboard-heading-row" align="start">
-          <div>
-            <Title level={4} className="erp-dashboard-title">
-              销售订单
-            </Title>
-            <Paragraph type="secondary" className="erp-dashboard-summary">
-              销售订单只表示 Source Document /
-              客户订单承诺，不代表出货、库存扣减、应收、发票或收款已经发生。
-            </Paragraph>
+    <BusinessPageLayout className="erp-v1-sales-orders-page">
+      <PageHeaderCard
+        compact
+        sectionTitle="销售链路"
+        title="销售订单"
+        description="销售订单只表示 Source Document / 客户订单承诺，不代表出货、库存扣减、应收、发票或收款已经发生。"
+        tags={
+          <div className="erp-business-module-chip-row">
+            <Tag color="green">正式 sales_orders</Tag>
+            <Tag>不写出货 / 库存 / 财务事实</Tag>
           </div>
-          <Space wrap>
-            <Button
+        }
+        stats={[
+          { key: 'total', label: '总订单', value: total },
+          { key: 'current', label: '当前结果', value: orders.length },
+          { key: 'active', label: '已生效', value: activeOrderCount },
+          { key: 'selected', label: '已选订单', value: selectedOrder ? 1 : 0 },
+        ]}
+      />
+
+      <BusinessFilterPanel compact>
+        <SearchInput
+          placeholder="搜索订单号、客户订单号"
+          value={keyword}
+          onChange={(event) => setKeyword(event.target.value)}
+          onPressEnter={loadOrders}
+        />
+        <SelectFilter
+          className="erp-business-filter-control--status"
+          options={STATUS_FILTER_OPTIONS}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+      </BusinessFilterPanel>
+
+      <BusinessListToolbar
+        stats={[
+          { key: 'current', label: '当前结果', value: orders.length },
+          { key: 'lines', label: '当前订单行', value: items.length },
+          { key: 'selected', label: '已选订单', value: selectedOrder ? 1 : 0 },
+        ]}
+        actions={
+          <>
+            <ToolbarButton
               icon={<ReloadOutlined />}
               onClick={loadOrders}
               loading={loading}
             >
               刷新
-            </Button>
+            </ToolbarButton>
             {canCreateOrder ? (
-              <Button
+              <ToolbarButton
                 type="primary"
+                className="erp-business-list-toolbar__primary-action"
                 icon={<PlusOutlined />}
                 onClick={openCreateOrder}
               >
                 新建订单
-              </Button>
+              </ToolbarButton>
             ) : null}
-          </Space>
-        </Space>
-      </Card>
+          </>
+        }
+      />
 
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" size={12} className="erp-dashboard-block">
-          <Space wrap>
-            <Input.Search
-              allowClear
-              value={keyword}
-              placeholder="搜索订单号、客户订单号"
-              onChange={(event) => setKeyword(event.target.value)}
-              onSearch={loadOrders}
-              style={{ width: 280 }}
-            />
-            <Select
-              value={statusFilter}
-              options={STATUS_FILTER_OPTIONS}
-              onChange={setStatusFilter}
-              style={{ width: 140 }}
-            />
-            <Tag>共 {total} 条</Tag>
-          </Space>
-          <Table
-            rowKey="id"
-            size="middle"
-            loading={loading}
-            columns={orderColumns}
-            dataSource={orders}
-            scroll={{ x: 1240 }}
-            pagination={{ pageSize: 10, showSizeChanger: false }}
-            rowClassName={(record) =>
-              record.id === selectedOrder?.id ? 'ant-table-row-selected' : ''
-            }
-            onRow={(record) => ({
-              onClick: () => setSelectedOrder(record),
-            })}
-          />
-        </Space>
-      </Card>
+      <SelectionActionBar
+        selectedCount={selectedOrder ? 1 : 0}
+        selectedLabel={selectedOrderDisplayText}
+        summaryItems={selectedOrderSummaryItems}
+        boundaryText="当前操作只维护客户订单承诺和订单行，不生成出货、库存、应收、发票或收款事实。"
+      >
+        <Button
+          type="link"
+          size="small"
+          disabled={!selectedOrder}
+          onClick={() => {
+            setSelectedOrder(null)
+            setItems([])
+          }}
+        >
+          清空已选
+        </Button>
+        <Button
+          size="small"
+          disabled={!selectedOrder}
+          onClick={() => setDetailOpen(true)}
+        >
+          查看详情
+        </Button>
+        {canUpdateOrder ? (
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            disabled={!selectedOrder}
+            onClick={() => openEditOrder(selectedOrder)}
+          >
+            编辑订单
+          </Button>
+        ) : null}
+        {LIFECYCLE_ACTIONS.filter((action) =>
+          hasActionPermission(adminProfile, action.permission)
+        ).map((action) => (
+          <Button
+            key={action.key}
+            size="small"
+            disabled={!selectedOrder}
+            onClick={() => runLifecycleAction(action, selectedOrder)}
+          >
+            {action.label}
+          </Button>
+        ))}
+      </SelectionActionBar>
 
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" size={12} className="erp-dashboard-block">
-          <Space className="erp-dashboard-heading-row" align="start">
-            <div>
-              <Title level={5} className="erp-dashboard-section-title">
-                销售订单行
-              </Title>
-              <Paragraph type="secondary" className="erp-dashboard-summary">
-                {selectedOrder?.order_no
-                  ? `当前订单：${selectedOrder.order_no}`
-                  : '选择销售订单后查看明细行。'}
-              </Paragraph>
-            </div>
-            {canCreateItem ? (
-              <Button
-                icon={<PlusOutlined />}
-                onClick={openCreateItem}
-                disabled={!selectedOrder}
-              >
-                新增订单行
-              </Button>
-            ) : null}
-          </Space>
-          {selectedOrder ? (
-            <Table
-              rowKey="id"
-              size="middle"
-              loading={itemLoading}
-              columns={itemColumns}
-              dataSource={items}
-              scroll={{ x: 1420 }}
-              pagination={false}
-            />
-          ) : (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="尚未选择销售订单"
-            />
-          )}
-        </Space>
-      </Card>
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        columns={orderColumns}
+        dataSource={orders}
+        scroll={{ x: 1240 }}
+        pagination={{ pageSize: 10, showSizeChanger: false }}
+        emptyDescription="暂无销售订单"
+        rowClassName={(record) =>
+          record.id === selectedOrder?.id ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () => setSelectedOrder(record),
+        })}
+      />
+
+      <BusinessListToolbar
+        stats={[
+          {
+            key: 'order',
+            label: '明细订单',
+            value: selectedOrder?.order_no || '未选择',
+          },
+          { key: 'lines', label: '订单行', value: items.length },
+          { key: 'open-lines', label: '未关闭行', value: openLineCount },
+        ]}
+        actions={
+          canCreateItem ? (
+            <ToolbarButton
+              icon={<PlusOutlined />}
+              onClick={openCreateItem}
+              disabled={!selectedOrder}
+            >
+              新增订单行
+            </ToolbarButton>
+          ) : null
+        }
+      />
+      <BusinessDataTable
+        rowKey="id"
+        loading={selectedOrder ? itemLoading : false}
+        columns={itemColumns}
+        dataSource={selectedOrder ? items : []}
+        scroll={{ x: 1420 }}
+        pagination={false}
+        emptyDescription={
+          selectedOrder ? '当前订单暂无订单行' : '尚未选择销售订单'
+        }
+      />
+
+      <CollaborationTaskPanel
+        tasks={[]}
+        selectedTasks={[]}
+        selectedRecordLabel={selectedOrder?.order_no || ''}
+      />
 
       <Modal
         title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
@@ -762,11 +870,11 @@ export default function V1SalesOrdersPage() {
             </Descriptions.Item>
           </Descriptions>
         ) : null}
-        <Paragraph type="secondary" style={{ marginTop: 16 }}>
+        <p className="erp-business-selection-action-bar__hint">
           当前页面不展示已发货数量，不生成出货、库存预留、库存流水、发票、应收或收款。出货事实后续由
           ShipmentUsecase 接入。
-        </Paragraph>
+        </p>
       </Drawer>
-    </Space>
+    </BusinessPageLayout>
   )
 }

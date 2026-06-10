@@ -256,7 +256,18 @@ export default function ERPRouter() {
           }
         >
           <Route index element={<DesktopEntryRedirect />} />
-          <Route path="dashboard" element={<DashboardPage />} />
+          <Route
+            path="dashboard"
+            element={<DashboardPage initialView="workbench" />}
+          />
+          <Route
+            path="task-board"
+            element={<DashboardPage initialView="task-board" />}
+          />
+          <Route
+            path="operations/exceptions"
+            element={<DashboardPage initialView="exception-flow" />}
+          />
           <Route
             path="business-dashboard"
             element={<BusinessDashboardPage />}

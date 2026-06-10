@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import {
+  Alert,
   AutoComplete,
   Button,
   Card,
@@ -257,6 +258,43 @@ const ACTIVE_APPROVAL_TASK_STATUS_KEYS = new Set([
   'ready',
   'processing',
 ])
+const MODULE_VARIANT_PANELS = Object.freeze({
+  'material-bom': {
+    label: '标准页 + BOM 明细变体',
+    title: 'BOM 版本、物料明细和损耗口径先聚合到资料层',
+    description:
+      '材料分析明细是 BOM 真源，采购汇总只是下游派生；页面继续复用标准筛选和协同入口，但把 BOM 版本、物料明细、损耗和组装部位单独露出。',
+    lanes: ['产品归属 / 版本', '主料明细 / 损耗', '采购派生 / 下游'],
+    boundary: '不把采购汇总倒灌成 BOM 明细，不新增 BOM 事实写入。',
+  },
+  inbound: {
+    label: '标准页 + 到仓 / IQC / 入库变体',
+    title: '到仓通知、质检结论和允许入库是三段边界',
+    description:
+      '入库页同时承接主辅料到仓、委外回货和成品回仓；质检结论只代表 Quality / Workflow 边界，真实库存增加仍由库存事实 usecase 负责。',
+    lanes: ['到仓通知', 'IQC / 质量判定', '仓库允许入库'],
+    boundary:
+      '质检完成不等于库存入账，入库协同完成也不等于 purchase_receipt posted。',
+  },
+  inventory: {
+    label: '独立库存观察变体',
+    title: '库存余额、批次和流水只读分区，不前端伪造可用量',
+    description:
+      '库存页优先呈现余额、批次和流水的事实边界；当前仍复用业务记录入口承接说明和协同，不在前端计算可用量、锁定量或批次扣减。',
+    lanes: ['库存余额', '批次状态', '库存流水'],
+    boundary:
+      '真实数量只来自 InventoryUsecase、inventory_txns 和 inventory_balances。',
+  },
+  outbound: {
+    label: '独立出库变体',
+    title: '出库动作必须从待出货放行进入事实边界',
+    description:
+      '出库页聚焦来源放行、仓库确认和后续对账的分段结构；当前业务记录只保存协同和单据快照，不在页面层直接扣减库存。',
+    lanes: ['放行来源', '仓库确认出库', '后续对账触发'],
+    boundary:
+      '出库记录不会在前端直接扣减库存，也不会把 shipping_released 写成 shipped。',
+  },
+})
 const TASK_STATUS_BY_BUSINESS_STATUS = Object.freeze({
   blocked: 'blocked',
   cancelled: 'cancelled',
@@ -313,6 +351,50 @@ function getActiveTableSorter(sorter) {
     return sorter.find((item) => item?.order) || null
   }
   return sorter?.order ? sorter : null
+}
+
+function BusinessModuleVariantPanel({
+  moduleKey,
+  activeRecordCount,
+  workflowTaskCount,
+}) {
+  const config = MODULE_VARIANT_PANELS[moduleKey]
+  if (!config) return null
+
+  return (
+    <Card className="erp-business-module-variant-card" variant="borderless">
+      <div className="erp-business-module-variant-grid">
+        <div className="erp-business-module-variant-main">
+          <Text type="secondary">{config.label}</Text>
+          <h2>{config.title}</h2>
+          <p>{config.description}</p>
+          <div className="erp-business-module-variant-lanes">
+            {config.lanes.map((lane) => (
+              <span key={lane}>{lane}</span>
+            ))}
+          </div>
+        </div>
+        <div className="erp-business-module-variant-side">
+          <div className="erp-business-module-variant-metrics">
+            <div className="erp-business-module-variant-metric">
+              <Text type="secondary">当前记录</Text>
+              <strong>{activeRecordCount}</strong>
+            </div>
+            <div className="erp-business-module-variant-metric">
+              <Text type="secondary">本页协同</Text>
+              <strong>{workflowTaskCount}</strong>
+            </div>
+          </div>
+          <Alert
+            showIcon
+            type="info"
+            message="事实边界"
+            description={config.boundary}
+          />
+        </div>
+      </div>
+    </Card>
+  )
 }
 
 function buildColumnOrderStorageKey(moduleKey) {
@@ -3450,6 +3532,12 @@ export default function BusinessModulePage({ moduleItem }) {
           onChange={handleCreatedSortOrderChange}
         />
       </BusinessFilterPanel>
+
+      <BusinessModuleVariantPanel
+        moduleKey={moduleItem.key}
+        activeRecordCount={activeRecords.length}
+        workflowTaskCount={tasks.length}
+      />
 
       <BusinessListToolbar
         stats={[

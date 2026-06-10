@@ -59,8 +59,15 @@ export function getRoleWorkbench(roleKey) {
 const navItemRegistry = {
   'global-dashboard': {
     key: 'global-dashboard',
-    label: '任务看板',
+    label: '工作台',
     path: '/erp/dashboard',
+    shortLabel: '工作台',
+    description: '聚合今日待办、阻塞、业务摘要、打印入口和常用业务模块。',
+  },
+  'task-board': {
+    key: 'task-board',
+    label: '任务看板',
+    path: '/erp/task-board',
     shortLabel: '任务',
     description: '按协同任务状态看待处理、处理中、阻塞、退回和超时任务。',
   },
@@ -77,6 +84,13 @@ const navItemRegistry = {
     path: '/erp/print-center',
     shortLabel: '打印',
     description: '统一查看辅料采购合同和加工合同的固定打印模板。',
+  },
+  'exception-flow': {
+    key: 'exception-flow',
+    label: '异常 / 阻塞闭环',
+    path: '/erp/operations/exceptions',
+    shortLabel: '异常',
+    description: '集中查看阻塞、催办、处理、验证和关闭的 Workflow 协同链路。',
   },
   'permission-center': {
     key: 'permission-center',
@@ -95,13 +109,17 @@ function getDefaultNavigationSections() {
       title: '看板中心',
       items: [
         navItemRegistry['global-dashboard'],
+        navItemRegistry['task-board'],
         navItemRegistry['business-dashboard'],
       ],
     },
     ...businessNavigationSections,
     {
-      title: '单据模板',
-      items: [navItemRegistry['print-center']],
+      title: '运营工具',
+      items: [
+        navItemRegistry['print-center'],
+        navItemRegistry['exception-flow'],
+      ],
     },
     {
       title: '系统管理',

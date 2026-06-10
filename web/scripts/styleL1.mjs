@@ -147,7 +147,7 @@ const scenarios = [
       await page.locator('#password').fill('style-l1-password')
       await page.getByRole('button', { name: /^登\s*录$/ }).click()
       await waitForPath(page, '/erp/dashboard')
-      await expectHeading(page, '任务看板')
+      await expectHeading(page, '后台首页 / 工作台')
 
       const rememberedEntry = await page.evaluate(() =>
         window.localStorage.getItem('erp:last_entry_target')
@@ -192,6 +192,42 @@ const scenarios = [
   {
     name: 'erp-dashboard-desktop',
     path: '/erp/dashboard',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectText(page, '毛绒玩具 ERP')
+      await expectText(page, '超级管理员')
+      await expectText(page, 'style-l1-admin')
+      await expectText(page, '看板中心')
+      await expectHeading(page, '后台首页 / 工作台')
+      await expectText(page, '今天先处理协同卡点')
+      await expectText(page, '今日焦点')
+      await expectText(page, '业务状态摘要')
+      await expectText(page, '常用入口')
+      await expectText(page, '角色提醒')
+      await expectText(page, '运营工具')
+      await expectButton(page, '看全部任务')
+      await assertShellRefreshButton(page, {
+        scenarioName: 'erp-dashboard-desktop',
+        expectVisible: true,
+      })
+      await page.getByRole('button', { name: '看全部任务' }).click()
+      await waitForPath(page, '/erp/task-board')
+      await expectHeading(page, '任务看板')
+      await page.goBack()
+      await waitForPath(page, '/erp/dashboard')
+      await expectHeading(page, '后台首页 / 工作台')
+      await page.getByRole('button', { name: '异常 / 阻塞闭环' }).last().click()
+      await waitForPath(page, '/erp/operations/exceptions')
+      await expectHeading(page, '异常 / 阻塞闭环')
+      await page.goBack()
+      await waitForPath(page, '/erp/dashboard')
+      await expectHeading(page, '后台首页 / 工作台')
+    },
+  },
+  {
+    name: 'erp-task-board-desktop',
+    path: '/erp/task-board',
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
@@ -250,7 +286,7 @@ const scenarios = [
       await page.getByText('全部角色').click()
       await page.getByTitle('仓库', { exact: true }).click()
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await waitForPath(page, '/erp/dashboard')
+      await waitForPath(page, '/erp/task-board')
       assert.match(
         page.url(),
         /[?&]q=OUT-DASH-NAV(?:&|$)/,
@@ -299,7 +335,29 @@ const scenarios = [
       await waitForPath(page, '/erp/warehouse/shipping-release')
       await expectText(page, '待出货/出货放行')
       await page.goBack()
-      await waitForPath(page, '/erp/dashboard')
+      await waitForPath(page, '/erp/task-board')
+      await expectHeading(page, '任务看板')
+    },
+  },
+  {
+    name: 'erp-exception-flow-desktop',
+    path: '/erp/operations/exceptions',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectText(page, '毛绒玩具 ERP')
+      await expectText(page, '超级管理员')
+      await expectText(page, '运营工具')
+      await expectHeading(page, '异常 / 阻塞闭环')
+      await expectText(page, '阻塞记录')
+      await expectText(page, '责任分派')
+      await expectText(page, '处理跟进')
+      await expectText(page, '验证恢复')
+      await expectText(page, '关闭归档')
+      await expectText(page, '闭环队列')
+      await expectButton(page, '回任务看板')
+      await page.getByRole('button', { name: '回任务看板' }).click()
+      await waitForPath(page, '/erp/task-board')
       await expectHeading(page, '任务看板')
     },
   },
@@ -312,13 +370,14 @@ const scenarios = [
       await expectText(page, '毛绒玩具 ERP')
       await expectText(page, '超级管理员')
       await expectText(page, '看板中心')
-      await expectHeading(page, '业务看板')
+      await expectHeading(page, '按业务模块看运行状态，不把摘要当事实真源')
       await expectText(page, '业务记录总数')
       await expectText(page, '业务关注统计')
       await expectText(page, '严重预警数')
       await expectText(page, '一般预警数')
       await expectText(page, '计划物控关注事项')
       await expectText(page, '业务状态分布')
+      await expectText(page, '模块健康明细')
       await expectText(page, '记录数')
       await expectButton(page, '去任务看板')
       await assertShellRefreshButton(page, {
@@ -326,11 +385,11 @@ const scenarios = [
         expectVisible: true,
       })
       await page.getByRole('button', { name: '去任务看板' }).click()
-      await waitForPath(page, '/erp/dashboard')
+      await waitForPath(page, '/erp/task-board')
       await expectHeading(page, '任务看板')
       await page.goBack()
       await waitForPath(page, '/erp/business-dashboard')
-      await expectHeading(page, '业务看板')
+      await expectHeading(page, '按业务模块看运行状态，不把摘要当事实真源')
     },
   },
   {
@@ -384,6 +443,21 @@ const scenarios = [
     verify: async (page) => {
       await expectText(page, '超级管理员')
       await expectText(page, '毛绒 ERP 管理后台')
+      await expectText(page, '后台首页 / 工作台')
+      await expectText(page, '今天先处理协同卡点')
+      await expectText(page, '今日焦点')
+      await expectText(page, '业务状态摘要')
+      await expectText(page, '运营工具')
+    },
+  },
+  {
+    name: 'erp-task-board-mobile',
+    path: '/erp/task-board',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectText(page, '超级管理员')
+      await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '任务看板')
       await expectText(page, '本页待办')
       await expectText(page, '今日到期')
@@ -398,7 +472,9 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
-      await expectText(page, '任务看板')
+      await expectText(page, '后台首页 / 工作台')
+      await expectText(page, '今日焦点')
+      await expectText(page, '业务状态摘要')
       await assertERPThemeMode(page, {
         scenarioName: 'erp-dashboard-dark-desktop',
         expectedMode: 'dark',
@@ -412,9 +488,6 @@ const scenarios = [
         scenarioName: 'erp-dashboard-dark-desktop',
         selector: '.erp-dashboard-card',
       })
-      await assertDashboardTaskBoardLayout(page, {
-        scenarioName: 'erp-dashboard-dark-desktop',
-      })
       await assertDarkThemeContrast(page, {
         scenarioName: 'erp-dashboard-dark-desktop',
         selector: '.erp-admin-shell',
@@ -422,8 +495,8 @@ const scenarios = [
     },
   },
   {
-    name: 'erp-dashboard-dark-wide-desktop',
-    path: '/erp/dashboard',
+    name: 'erp-task-board-dark-wide-desktop',
+    path: '/erp/task-board',
     auth: 'admin',
     themeMode: 'dark',
     viewport: { width: 2048, height: 1024 },
@@ -464,16 +537,16 @@ const scenarios = [
       await page.getByRole('button', { name: /刷新任务/ }).click()
       await expectText(page, '宽屏重叠回归任务')
       await assertERPThemeMode(page, {
-        scenarioName: 'erp-dashboard-dark-wide-desktop',
+        scenarioName: 'erp-task-board-dark-wide-desktop',
         expectedMode: 'dark',
         expectedEffectiveTheme: 'dark',
       })
       await page.locator('.erp-dashboard-table-card').scrollIntoViewIfNeeded()
       await assertDashboardTaskBoardLayout(page, {
-        scenarioName: 'erp-dashboard-dark-wide-desktop',
+        scenarioName: 'erp-task-board-dark-wide-desktop',
       })
       await assertDarkThemeContrast(page, {
-        scenarioName: 'erp-dashboard-dark-wide-desktop',
+        scenarioName: 'erp-task-board-dark-wide-desktop',
         selector: '.erp-admin-shell',
       })
     },
@@ -527,7 +600,10 @@ const scenarios = [
     viewport: { width: 2048, height: 1024 },
     verify: async (page) => {
       await expectHeading(page, '客户档案')
-      await expectText(page, '新建')
+      await expectText(page, '正式 MasterData')
+      await expectText(page, '当前操作')
+      await expectText(page, '当前联系人')
+      await expectText(page, '新建主体')
       await assertERPThemeMode(page, {
         scenarioName: 'business-module-dark-customers-desktop',
         expectedMode: 'dark',
@@ -535,29 +611,30 @@ const scenarios = [
       })
       await assertDarkThemeContrast(page, {
         scenarioName: 'business-module-dark-customers-desktop',
-        selector: '.erp-dashboard-page',
+        selector: '.erp-business-page-layout',
       })
       await assertDarkThemeNeutralInteractions(page, {
         scenarioName: 'business-module-dark-customers-desktop',
         checks: [
           {
             label: '主数据搜索输入 hover',
-            selector: '.erp-dashboard-page .ant-input-search',
+            selector: '.erp-business-page-layout .erp-business-filter-control',
             action: 'hover',
           },
           {
             label: '主数据搜索输入 focus',
-            selector: '.erp-dashboard-page .ant-input',
+            selector: '.erp-business-page-layout .erp-business-filter-control',
             action: 'click',
           },
           {
             label: '主数据普通按钮 hover',
-            selector: '.erp-dashboard-page .ant-btn:not(.ant-btn-primary)',
+            selector:
+              '.erp-business-page-layout .ant-btn:not(.ant-btn-primary)',
             action: 'hover',
           },
           {
             label: '主数据表头 hover',
-            selector: '.erp-dashboard-page .ant-table-thead > tr > th',
+            selector: '.erp-business-page-layout .ant-table-thead > tr > th',
             action: 'hover',
             index: 1,
           },
@@ -756,7 +833,7 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
-      await expectHeading(page, '任务看板')
+      await expectHeading(page, '后台首页 / 工作台')
       await gotoScenarioPath(page, '/m/sales/tasks', {
         waitUntil: 'domcontentloaded',
       })
@@ -1519,6 +1596,7 @@ const scenarios = [
       await expectText(page, '超级管理员')
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '业务看板')
+      await expectText(page, '按业务模块看运行状态')
       await expectText(page, '业务关注统计')
       await expectText(page, '业务状态分布')
     },
@@ -1809,6 +1887,52 @@ const scenarios = [
     },
   },
   {
+    name: 'business-special-variant-shells-desktop',
+    path: '/erp/purchase/material-bom',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '材料 BOM')
+      await expectText(page, '标准页 + BOM 明细变体')
+      await expectText(page, 'BOM 版本、物料明细和损耗口径')
+      await expectText(page, '不新增 BOM 事实写入')
+      await assertNoHorizontalOverflow(page, 'business-special-bom-variant')
+
+      await gotoScenarioPath(page, '/erp/warehouse/inbound', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '入库通知/检验/入库')
+      await expectText(page, '标准页 + 到仓 / IQC / 入库变体')
+      await expectText(page, '到仓通知、质检结论和允许入库是三段边界')
+      await expectText(page, '质检完成不等于库存入账')
+      await assertNoHorizontalOverflow(page, 'business-special-inbound-variant')
+
+      await gotoScenarioPath(page, '/erp/warehouse/inventory', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '库存')
+      await expectText(page, '独立库存观察变体')
+      await expectText(page, '库存余额、批次和流水只读分区')
+      await expectText(page, '真实数量只来自 InventoryUsecase')
+      await assertNoHorizontalOverflow(
+        page,
+        'business-special-inventory-variant'
+      )
+
+      await gotoScenarioPath(page, '/erp/warehouse/outbound', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '出库')
+      await expectText(page, '独立出库变体')
+      await expectText(page, '出库动作必须从待出货放行进入事实边界')
+      await expectText(page, '出库记录不会在前端直接扣减库存')
+      await assertNoHorizontalOverflow(
+        page,
+        'business-special-outbound-variant'
+      )
+    },
+  },
+  {
     name: 'business-module-derived-item-amount',
     path: '/erp/purchase/accessories',
     auth: 'admin',
@@ -2083,6 +2207,9 @@ const scenarios = [
       await expectText(page, '加工合同')
       await expectText(page, '当前模板')
       await expectText(page, '模板数量')
+      await expectText(page, '纸面预览')
+      await expectText(page, '字段映射')
+      await expectText(page, '打开当前模板')
       await assertTextAbsent(page, '页面结构')
       await assertTextAbsent(page, '适用场景')
       await assertTextAbsent(page, '版式特点')
@@ -2103,6 +2230,8 @@ const scenarios = [
       await expectText(page, '模板目录')
       await expectText(page, '采购合同')
       await expectText(page, '加工合同')
+      await expectText(page, '纸面预览')
+      await expectText(page, '字段映射')
       await assertERPThemeMode(page, {
         scenarioName: 'print-center-dark-desktop',
         expectedMode: 'dark',
@@ -2442,6 +2571,13 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectButton(page, '新建订单')
+      await expectText(page, '正式 sales_orders')
+      await expectText(page, '当前操作')
+      await expectText(page, '当前订单行')
+      await expectText(page, '不写出货 / 库存 / 财务事实')
+      await expectText(page, '工作台')
+      await expectText(page, '任务看板')
+      await expectText(page, '业务看板')
       await expectText(page, '基础资料')
       await expectText(page, '客户档案')
       await expectText(page, '供应商档案')
@@ -2451,7 +2587,9 @@ const scenarios = [
       await expectText(page, '采购/仓储')
       await expectText(page, '生产环节')
       await expectText(page, '财务环节')
-      await expectText(page, '单据模板')
+      await expectText(page, '运营工具')
+      await expectText(page, '模板打印中心')
+      await expectText(page, '异常 / 阻塞闭环')
       await page.locator('.erp-admin-menu').evaluate((node) => {
         node.scrollTop = node.scrollHeight
       })
@@ -2506,6 +2644,64 @@ const scenarios = [
       await assertBusinessCollaborationPanelCollapsedByDefault(page, {
         scenarioName: 'business-processing-contracts-desktop',
       })
+    },
+  },
+  {
+    name: 'business-standard-module-shells-desktop',
+    path: '/erp/master/partners/suppliers',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '供应商档案')
+      await expectText(page, '正式 MasterData')
+      await expectText(page, '当前操作')
+      await expectText(page, '本页协同入口')
+      await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
+
+      await gotoScenarioPath(page, '/erp/master/products', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '产品')
+      await expectText(page, '导出当前结果')
+      await expectText(page, '本页协同入口')
+      await assertNoHorizontalOverflow(page, 'business-standard-products')
+
+      await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '销售订单')
+      await expectText(page, '正式 sales_orders')
+      await expectText(page, '当前操作')
+      await expectText(page, '当前订单行')
+      await expectText(page, '本页协同入口')
+      await assertNoHorizontalOverflow(page, 'business-standard-sales-orders')
+
+      await gotoScenarioPath(page, '/erp/purchase/accessories', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '辅材/包材采购')
+      await expectText(page, '新建记录')
+      await expectText(page, '本页协同入口')
+      await assertNoHorizontalOverflow(page, 'business-standard-accessories')
+
+      await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '加工合同/委外下单')
+      await expectText(page, '新建记录')
+      await expectText(page, '本页协同入口')
+      await assertNoHorizontalOverflow(page, 'business-standard-processing')
+
+      await gotoScenarioPath(page, '/erp/warehouse/shipping-release', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '待出货/出货放行')
+      await expectText(page, '新建记录')
+      await expectText(page, '本页协同入口')
+      await assertNoHorizontalOverflow(
+        page,
+        'business-standard-shipping-release'
+      )
     },
   },
   {
