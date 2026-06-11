@@ -1320,6 +1320,13 @@ const scenarios = [
     themeMode: 'dark',
     viewport: { width: 1536, height: 900 },
     verify: async (page) => {
+      await page.evaluate(() => {
+        window.localStorage.removeItem('plush_erp_dev_prototype_selected_key')
+        window.localStorage.removeItem(
+          'plush_erp_dev_prototype_status_filter'
+        )
+      })
+      await page.reload({ waitUntil: 'domcontentloaded' })
       await expectHeading(page, '产品原型查看器 / Prototype Viewer')
       await expectText(page, '待实现 / To Implement')
       await expectText(page, '参考资料 / Reference')
@@ -1406,6 +1413,55 @@ const scenarios = [
       assert(
         implementMetrics.scrollWidth <= implementMetrics.clientWidth + 1,
         `原型查看器待实现筛选不应横向溢出: ${JSON.stringify(implementMetrics)}`
+      )
+
+      await page
+        .locator(
+          '[data-dev-prototype-key="business-task-collab-entry"] .erp-dev-prototypes-card__body'
+        )
+        .click()
+      await page.waitForFunction(
+        () =>
+          window.localStorage.getItem(
+            'plush_erp_dev_prototype_selected_key'
+          ) === 'business-task-collab-entry'
+      )
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await expectHeading(page, '产品原型查看器 / Prototype Viewer')
+      const restoredSelectionMetrics = await page.evaluate(() => ({
+        activeText:
+          document
+            .querySelector('.erp-dev-prototypes-filter__item--active')
+            ?.textContent?.replace(/\s+/g, ' ')
+            .trim() || '',
+        activeCardKey:
+          document
+            .querySelector('.erp-dev-prototypes-card--active')
+            ?.getAttribute('data-dev-prototype-key') || '',
+        readerPath:
+          document
+            .querySelector('.erp-dev-prototypes-reader__path')
+            ?.textContent?.trim() || '',
+        storedFilter:
+          window.localStorage.getItem(
+            'plush_erp_dev_prototype_status_filter'
+          ) || '',
+        storedSelected:
+          window.localStorage.getItem(
+            'plush_erp_dev_prototype_selected_key'
+          ) || '',
+      }))
+      assert.deepEqual(
+        restoredSelectionMetrics,
+        {
+          activeText: '待实现 / To Implement',
+          activeCardKey: 'business-task-collab-entry',
+          readerPath:
+            'business-module-page-standard-v1/task-collab-entry-v2.html',
+          storedFilter: 'to-implement',
+          storedSelected: 'business-task-collab-entry',
+        },
+        `原型查看器刷新后应恢复左侧筛选和当前资产: ${JSON.stringify(restoredSelectionMetrics)}`
       )
 
       await page

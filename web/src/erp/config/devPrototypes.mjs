@@ -3,6 +3,10 @@ export const DEV_PROTOTYPE_PINNED_STORAGE_KEY =
   'plush_erp_dev_prototype_pinned_keys'
 export const DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY =
   'plush_erp_dev_prototype_expanded_groups'
+export const DEV_PROTOTYPE_SELECTED_STORAGE_KEY =
+  'plush_erp_dev_prototype_selected_key'
+export const DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY =
+  'plush_erp_dev_prototype_status_filter'
 
 export const DEV_PROTOTYPE_STATUSES = Object.freeze({
   CURRENT: '当前实现对齐版 / Current',
@@ -244,6 +248,22 @@ export function filterDevPrototypeItems(
     const keywordMatched = !query || item.searchText?.includes(query)
     return statusMatched && keywordMatched
   })
+}
+
+export function normalizeDevPrototypeStatusFilter(
+  status = DEV_PROTOTYPE_FILTERS.ALL
+) {
+  const filter = String(status || DEV_PROTOTYPE_FILTERS.ALL)
+  return DEV_PROTOTYPE_FILTER_OPTIONS.some((option) => option.value === filter)
+    ? filter
+    : DEV_PROTOTYPE_FILTERS.ALL
+}
+
+export function normalizeDevPrototypeSelectedKey(selectedKey = '', items = []) {
+  const fallbackKey = items[0]?.key || ''
+  const itemKey = String(selectedKey || '')
+  if (!itemKey) return fallbackKey
+  return items.some((item) => item.key === itemKey) ? itemKey : fallbackKey
 }
 
 export function normalizeDevPrototypePinnedKeys(pinnedKeys = [], items = []) {

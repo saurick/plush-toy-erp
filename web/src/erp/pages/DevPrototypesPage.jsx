@@ -16,13 +16,18 @@ import { Button, Empty, Input, Space, Tag, Typography } from 'antd'
 import {
   DEV_PROTOTYPE_EXPANDED_GROUPS_STORAGE_KEY,
   DEV_PROTOTYPE_FILTER_OPTIONS,
+  DEV_PROTOTYPE_FILTERS,
   DEV_PROTOTYPE_PINNED_STORAGE_KEY,
+  DEV_PROTOTYPE_SELECTED_STORAGE_KEY,
+  DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY,
   applyDevPrototypePinnedState,
   buildDevPrototypeItems,
   filterDevPrototypeItems,
   groupDevPrototypeItemsByDirectory,
   normalizeDevPrototypeExpandedGroupKeys,
   normalizeDevPrototypePinnedKeys,
+  normalizeDevPrototypeSelectedKey,
+  normalizeDevPrototypeStatusFilter,
 } from '../config/devPrototypes.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -75,6 +80,27 @@ function writeStoredStringArray(storageKey, value) {
 
   try {
     window.localStorage?.setItem(storageKey, JSON.stringify(value))
+  } catch {
+    // 本地偏好不可用时不影响原型查看器主路径。
+  }
+}
+
+function readStoredString(storageKey) {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const rawValue = window.localStorage?.getItem(storageKey)
+    return typeof rawValue === 'string' && rawValue ? rawValue : null
+  } catch {
+    return null
+  }
+}
+
+function writeStoredString(storageKey, value) {
+  if (typeof window === 'undefined') return
+
+  try {
+    window.localStorage?.setItem(storageKey, value)
   } catch {
     // 本地偏好不可用时不影响原型查看器主路径。
   }
@@ -223,7 +249,12 @@ export default function DevPrototypesPage() {
     () => buildDevPrototypeItems({ htmlModules, imageModules }),
     []
   )
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState(() =>
+    normalizeDevPrototypeStatusFilter(
+      readStoredString(DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY) ||
+        DEV_PROTOTYPE_FILTERS.ALL
+    )
+  )
   const [keyword, setKeyword] = useState('')
   const [pinnedKeys, setPinnedKeys] = useState(() =>
     normalizeDevPrototypePinnedKeys(
@@ -279,7 +310,12 @@ export default function DevPrototypesPage() {
   const visibleGroupsExpanded =
     visibleGroupKeys.length > 0 &&
     visibleGroupKeys.every((groupKey) => expandedGroupKeySet.has(groupKey))
-  const [selectedKey, setSelectedKey] = useState(items[0]?.key || '')
+  const [selectedKey, setSelectedKey] = useState(() =>
+    normalizeDevPrototypeSelectedKey(
+      readStoredString(DEV_PROTOTYPE_SELECTED_STORAGE_KEY) || '',
+      items
+    )
+  )
   const [fullscreenItem, setFullscreenItem] = useState(null)
   const selectedItem =
     visibleItems.find((item) => item.key === selectedKey) ||
@@ -301,6 +337,14 @@ export default function DevPrototypesPage() {
         items
       )
     })
+  }
+
+  const selectStatusFilter = (filter) => {
+    setStatusFilter(normalizeDevPrototypeStatusFilter(filter))
+  }
+
+  const selectPrototypeAsset = (itemKey) => {
+    setSelectedKey(normalizeDevPrototypeSelectedKey(itemKey, items))
   }
 
   const toggleDirectoryGroup = (groupKey) => {
@@ -341,6 +385,36 @@ export default function DevPrototypesPage() {
   React.useEffect(() => {
     writeStoredStringArray(DEV_PROTOTYPE_PINNED_STORAGE_KEY, pinnedKeys)
   }, [pinnedKeys])
+
+  React.useEffect(() => {
+    const normalizedStatusFilter =
+      normalizeDevPrototypeStatusFilter(statusFilter)
+    if (normalizedStatusFilter !== statusFilter) {
+      setStatusFilter(normalizedStatusFilter)
+      return
+    }
+    writeStoredString(
+      DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY,
+      normalizedStatusFilter
+    )
+  }, [statusFilter])
+
+  React.useEffect(() => {
+    const normalizedSelectedKey = normalizeDevPrototypeSelectedKey(
+      selectedKey,
+      items
+    )
+    if (normalizedSelectedKey !== selectedKey) {
+      setSelectedKey(normalizedSelectedKey)
+      return
+    }
+    if (normalizedSelectedKey) {
+      writeStoredString(
+        DEV_PROTOTYPE_SELECTED_STORAGE_KEY,
+        normalizedSelectedKey
+      )
+    }
+  }, [items, selectedKey])
 
   React.useEffect(() => {
     if (storedExpandedGroupKeys === null) return
@@ -423,7 +497,7 @@ export default function DevPrototypesPage() {
                     : 'erp-dev-prototypes-filter__item'
                 }
                 aria-pressed={statusFilter === option.value}
-                onClick={() => setStatusFilter(option.value)}
+                onClick={() => selectStatusFilter(option.value)}
               >
                 {option.label}
               </button>
@@ -466,7 +540,7 @@ export default function DevPrototypesPage() {
                           key={item.key}
                           item={item}
                           selected={selectedItem?.key === item.key}
-                          onSelect={setSelectedKey}
+                          onSelect={selectPrototypeAsset}
                           onTogglePinned={togglePinned}
                         />
                       ))}
@@ -504,7 +578,7 @@ export default function DevPrototypesPage() {
                               key={item.key}
                               item={item}
                               selected={selectedItem?.key === item.key}
-                              onSelect={setSelectedKey}
+                              onSelect={selectPrototypeAsset}
                               onTogglePinned={togglePinned}
                             />
                           ))}

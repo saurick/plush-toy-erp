@@ -19,6 +19,14 @@
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
 - `docs/product/prototypes` 当前待实现队列包含极简后台工作台、极简业务模块标准页和业务页轻量协同入口三个 HTML 原型；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现对齐版。
 
+## 2026-06-11 14:59 CST
+
+- 完成：为 `/__dev/prototypes` 左侧筛选和当前打开资产补浏览器本地缓存。刷新后会恢复上次筛选、当前选中的原型资产；无效或已删除的缓存 key 会回落到当前 registry 的第一个有效资产。置顶和目录展开仍沿用原有本地偏好。
+- 完成：同步 `docs/current-source-of-truth.md`、`web/README.md` 和 `docs/product/prototypes/README.md` 的 dev-only 行为说明，并补 `devPrototypes` 单元测试与 `style:l1` 刷新恢复断言。
+- 验证：`node --test web/src/erp/config/devPrototypes.test.mjs`、`git diff --check -- web/src/erp/config/devPrototypes.mjs web/src/erp/config/devPrototypes.test.mjs web/src/erp/pages/DevPrototypesPage.jsx web/scripts/styleL1.mjs web/README.md docs/current-source-of-truth.md docs/product/prototypes/README.md progress.md`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；浏览器实测 `/__dev/prototypes` 选择 `business-task-collab-entry` 后刷新，左侧筛选、当前卡片和右侧预览路径均保持。
+- 下一步：如后续继续调整原型查看器，可继续复用浏览器本地偏好；若要把偏好变成团队共享配置，需另做正式设计，不应从 `/__dev` 页面直接写后端配置。
+- 阻塞/风险：本轮只改 dev-only 原型查看器前端状态和说明文档；未改正式菜单、RBAC、后端 API、schema、migration、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
+
 ## 2026-06-11 14:06 CST
 
 - 完成：按 Product Design 方向重做三个待实现 HTML 原型。`admin-command-center-v1/index.html` 从“工作台 / 任务看板 / 业务看板 / 打印 / 异常”五视图演示收敛为极简今日处理台；`business-module-page-standard-v1/index.html` 收敛为标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口；`task-collab-entry-v2.html` 从独立候选页面改为业务页内轻量协同组件候选。

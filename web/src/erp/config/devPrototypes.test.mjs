@@ -8,7 +8,9 @@ import {
   DEV_PROTOTYPE_FILTER_OPTIONS,
   DEV_PROTOTYPE_FILTERS,
   DEV_PROTOTYPE_PINNED_STORAGE_KEY,
+  DEV_PROTOTYPE_SELECTED_STORAGE_KEY,
   DEV_PROTOTYPE_STATUSES,
+  DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY,
   applyDevPrototypePinnedState,
   buildDevPrototypeItems,
   filterDevPrototypeItems,
@@ -16,6 +18,8 @@ import {
   isDevPrototypesEnabled,
   normalizeDevPrototypeExpandedGroupKeys,
   normalizeDevPrototypePinnedKeys,
+  normalizeDevPrototypeSelectedKey,
+  normalizeDevPrototypeStatusFilter,
 } from './devPrototypes.mjs'
 
 test('devPrototypes: 只通过开发态独立路径暴露', () => {
@@ -159,6 +163,36 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
     filterDevPrototypeItems(items, { keyword: '../unsafe' }).length,
     0
   )
+})
+
+test('devPrototypes: 支持筛选和当前资产本地缓存归一化', () => {
+  const items = buildDevPrototypeItems()
+
+  assert.equal(
+    DEV_PROTOTYPE_SELECTED_STORAGE_KEY,
+    'plush_erp_dev_prototype_selected_key'
+  )
+  assert.equal(
+    DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY,
+    'plush_erp_dev_prototype_status_filter'
+  )
+  assert.equal(
+    normalizeDevPrototypeStatusFilter(DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT),
+    DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT
+  )
+  assert.equal(
+    normalizeDevPrototypeStatusFilter('missing-filter'),
+    DEV_PROTOTYPE_FILTERS.ALL
+  )
+  assert.equal(
+    normalizeDevPrototypeSelectedKey('mobile-role-tasks-implemented', items),
+    'mobile-role-tasks-implemented'
+  )
+  assert.equal(
+    normalizeDevPrototypeSelectedKey('missing-prototype', items),
+    items[0].key
+  )
+  assert.equal(normalizeDevPrototypeSelectedKey('', []), '')
 })
 
 test('devPrototypes: 支持置顶资产并清理无效 pin key', () => {
