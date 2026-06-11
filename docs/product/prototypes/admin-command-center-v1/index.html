@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>极简后台工作台原型</title>
+    <title>后台工作台样板</title>
     <style>
       :root {
         color-scheme: light;
@@ -312,7 +312,8 @@
         padding: 0 10px;
       }
 
-      .tab.active {
+      .tab.active,
+      .tab[aria-selected="true"] {
         border-color: var(--blue);
         background: var(--blue-soft);
         color: #1457b7;
@@ -516,7 +517,7 @@
     <div class="app">
       <aside class="side" aria-label="后台导航">
         <div class="brand">
-          <div class="mark">永</div>
+          <div class="mark">样</div>
           <div>
             <strong>毛绒 ERP</strong>
             <span>工作台样板 / To Implement</span>
@@ -580,12 +581,42 @@
               <div class="panel-head">
                 <h3>今日队列</h3>
                 <div class="tabs" role="tablist" aria-label="任务筛选">
-                  <button class="tab active" type="button" data-filter="all">全部</button>
-                  <button class="tab" type="button" data-filter="todo">待处理</button>
-                  <button class="tab" type="button" data-filter="blocked">阻塞</button>
+                  <button
+                    class="tab active"
+                    id="tab-all"
+                    role="tab"
+                    type="button"
+                    data-filter="all"
+                    aria-controls="taskList"
+                    aria-selected="true"
+                  >
+                    全部
+                  </button>
+                  <button
+                    class="tab"
+                    id="tab-todo"
+                    role="tab"
+                    type="button"
+                    data-filter="todo"
+                    aria-controls="taskList"
+                    aria-selected="false"
+                  >
+                    待处理
+                  </button>
+                  <button
+                    class="tab"
+                    id="tab-blocked"
+                    role="tab"
+                    type="button"
+                    data-filter="blocked"
+                    aria-controls="taskList"
+                    aria-selected="false"
+                  >
+                    阻塞
+                  </button>
                 </div>
               </div>
-              <div class="queue" id="taskList"></div>
+              <div class="queue" id="taskList" role="tabpanel" aria-labelledby="tab-all"></div>
             </section>
 
             <aside class="panel detail" aria-label="当前任务详情">
@@ -732,7 +763,10 @@
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
           tabs.forEach((item) => item.classList.remove("active"));
+          tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
           tab.classList.add("active");
+          tab.setAttribute("aria-selected", "true");
+          list.setAttribute("aria-labelledby", tab.id);
           activeFilter = tab.dataset.filter;
           const nextTask = visibleTasks()[0] || tasks[0];
           selectTask(nextTask);

@@ -29,7 +29,7 @@ test('devPrototypes: 只通过开发态独立路径暴露', () => {
   assert(!DEV_PROTOTYPES_ROUTE.startsWith('/erp/'))
 })
 
-test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
+test('devPrototypes: 登记当前原型与样板资产并区分类型和状态', () => {
   assert.equal(DEV_PROTOTYPE_ASSETS.length, 13)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'HTML').length,
@@ -38,6 +38,11 @@ test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'PNG').length,
     6
+  )
+  assert(
+    DEV_PROTOTYPE_ASSETS.every(
+      (item) => typeof item.appliesTo === 'string' && item.appliesTo.length > 0
+    )
   )
 
   const statuses = new Set(
@@ -76,6 +81,18 @@ test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find(
+      (item) => item.key === 'business-task-collab-entry'
+    )?.statuses.includes(DEV_PROTOTYPE_STATUSES.COMPARISON),
+    false
+  )
+  assert.match(
+    DEV_PROTOTYPE_ASSETS.find(
+      (item) => item.key === 'business-task-collab-entry'
+    )?.appliesTo || '',
+    /不是独立菜单/
+  )
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.find(
       (item) => item.key === 'business-direction-sidebar'
     )?.statuses[0],
     DEV_PROTOTYPE_STATUSES.DRAFT
@@ -86,9 +103,9 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const items = buildDevPrototypeItems({
     htmlModules: {
       '../../../../docs/product/prototypes/admin-command-center-v1/index.html':
-        '<!doctype html><title>极简后台工作台原型</title>',
+        '<!doctype html><title>后台工作台样板</title>',
       '../../../../docs/product/prototypes/business-module-page-standard-v1/index.html':
-        '<!doctype html><title>极简业务模块标准页原型</title>',
+        '<!doctype html><title>业务模块标准页样板</title>',
       '../../../../docs/product/prototypes/business-detail-page-standard-v1/index.html':
         '<!doctype html><title>业务详情页标准样板</title>',
       '../../../../docs/product/prototypes/business-form-page-standard-v1/index.html':
@@ -122,9 +139,9 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   )
 
   assert.equal(commandCenterPrototype?.available, true)
-  assert.match(commandCenterPrototype?.source || '', /极简后台工作台原型/)
+  assert.match(commandCenterPrototype?.source || '', /后台工作台样板/)
   assert.equal(businessPrototype?.available, true)
-  assert.match(businessPrototype?.source || '', /极简业务模块标准页原型/)
+  assert.match(businessPrototype?.source || '', /业务模块标准页样板/)
   assert.equal(detailPrototype?.available, true)
   assert.match(detailPrototype?.source || '', /业务详情页标准样板/)
   assert.equal(formPrototype?.available, true)
@@ -169,6 +186,12 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
       status: DEV_PROTOTYPE_FILTERS.CURRENT,
       keyword: '岗位任务端',
     }).some((item) => item.key === 'mobile-role-tasks-implemented')
+  )
+  assert(
+    filterDevPrototypeItems(items, {
+      status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
+      keyword: '销售订单',
+    }).some((item) => item.key === 'business-module-standard-page')
   )
   assert.deepEqual(
     filterDevPrototypeItems(items, {

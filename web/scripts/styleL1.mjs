@@ -900,13 +900,55 @@ const scenarios = [
     verify: async (page) => {
       await page.evaluate(() => {
         window.localStorage.removeItem('plush_erp_dev_docs_expanded_dirs')
-        window.localStorage.removeItem('plush_erp_dev_docs_selected_path')
+        window.localStorage.setItem(
+          'plush_erp_dev_docs_selected_path',
+          'docs/product/implementation-governance.md'
+        )
       })
       await page.reload({ waitUntil: 'domcontentloaded' })
       await expectHeading(page, '开发文档查看器 / Dev Docs Viewer')
       await expectText(page, '目录树 / Directory Tree')
-      await expectText(page, '毛绒玩具 ERP / plush-toy-erp')
-      await expectText(page, '目录结构')
+      await expectText(page, '模块实施治理 / Implementation Governance')
+      await expectText(page, '标准闭环图 / Standard Delivery Gate Diagram')
+      await page
+        .locator('.erp-markdown-mermaid[data-mermaid-status="rendered"] svg')
+        .first()
+        .waitFor({ state: 'visible', timeout: 12000 })
+      const mermaidMetrics = await page.evaluate(() => {
+        const diagram = document.querySelector(
+          '.erp-markdown-mermaid[data-mermaid-status="rendered"] svg'
+        )
+        const sourceBlocks = [...document.querySelectorAll('pre code')].filter(
+          (node) => node.textContent.includes('flowchart LR')
+        )
+        const diagramRect = diagram?.getBoundingClientRect()
+        const containerRect = document
+          .querySelector('.erp-markdown-mermaid')
+          ?.getBoundingClientRect()
+        return {
+          rendered: Boolean(diagram),
+          width: diagramRect?.width || 0,
+          height: diagramRect?.height || 0,
+          containerWidth: containerRect?.width || 0,
+          sourceBlockCount: sourceBlocks.length,
+        }
+      })
+      assert.equal(
+        mermaidMetrics.rendered,
+        true,
+        `Mermaid 图表应渲染为 SVG: ${JSON.stringify(mermaidMetrics)}`
+      )
+      assert.ok(
+        mermaidMetrics.width > 240 && mermaidMetrics.height > 80,
+        `Mermaid SVG 应有稳定可见尺寸: ${JSON.stringify(mermaidMetrics)}`
+      )
+      assert.equal(
+        mermaidMetrics.sourceBlockCount,
+        0,
+        `Mermaid 源码块不应继续作为普通代码块展示: ${JSON.stringify(
+          mermaidMetrics
+        )}`
+      )
       const productDir = page.locator('[data-dev-doc-dir="docs/product"]')
       const warehouseDir = page.locator('[data-dev-doc-dir="docs/warehouse"]')
       assert.equal(
@@ -1325,9 +1367,10 @@ const scenarios = [
         window.localStorage.removeItem('plush_erp_dev_prototype_status_filter')
       })
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectHeading(page, '产品原型查看器 / Prototype Viewer')
+      await expectHeading(page, '产品原型与样板查看器 / Prototype Viewer')
       await expectText(page, '待实现 / To Implement')
       await expectText(page, '参考资料 / Reference')
+      await expectText(page, '参照范围只说明可借鉴的页面 / 菜单类型')
       await expectText(page, '顶部筛选只用于判断当前、待实现和参考资料')
       await assertERPThemeMode(page, {
         scenarioName: 'dev-prototypes-dark-desktop',
@@ -1338,7 +1381,7 @@ const scenarios = [
       await page
         .getByRole('button', { name: '当前实现 / Current', exact: true })
         .click()
-      await expectText(page, '岗位任务端当前实现对齐版原型')
+      await expectText(page, '岗位任务端当前实现参考')
       const currentMetrics = await page.evaluate(() => ({
         activeText:
           document
@@ -1351,7 +1394,7 @@ const scenarios = [
           document.querySelectorAll(
             '.erp-dev-prototypes-list .erp-dev-prototypes-status'
           )
-        ).filter((item) => item.textContent?.includes('当前实现对齐版')).length,
+        ).filter((item) => item.textContent?.includes('当前实现')).length,
         scrollWidth: document.documentElement.scrollWidth,
         clientWidth: document.documentElement.clientWidth,
       }))
@@ -1381,12 +1424,13 @@ const scenarios = [
           exact: true,
         })
         .click()
-      await expectText(page, '极简后台工作台原型')
-      await expectText(page, '极简业务模块标准页原型')
-      await expectText(page, '业务页轻量协同入口候选')
+      await expectText(page, '后台工作台样板')
+      await expectText(page, '业务模块标准页样板')
+      await expectText(page, '业务页协同入口组件样板')
       await expectText(page, '业务详情页标准样板')
       await expectText(page, '新建 / 编辑表单标准样板')
       await expectText(page, '弹窗 / 抽屉动作标准样板')
+      await expectText(page, '参照范围：客户档案、供应商档案、产品、销售订单')
       const implementMetrics = await page.evaluate(() => ({
         activeText:
           document
@@ -1395,6 +1439,9 @@ const scenarios = [
             .trim() || '',
         visibleCards: document.querySelectorAll('.erp-dev-prototypes-card')
           .length,
+        appliesCount: document.querySelectorAll(
+          '.erp-dev-prototypes-card__applies'
+        ).length,
         visibleTitles: Array.from(
           document.querySelectorAll('.erp-dev-prototypes-card__title')
         ).map((item) => item.textContent?.trim() || ''),
@@ -1409,7 +1456,12 @@ const scenarios = [
       assert.equal(
         implementMetrics.visibleCards,
         6,
-        `原型查看器待实现筛选应展示 6 个产品内核 HTML 原型: ${JSON.stringify(implementMetrics)}`
+        `原型查看器待实现筛选应展示 6 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
+      )
+      assert.equal(
+        implementMetrics.appliesCount,
+        6,
+        `原型查看器待实现筛选应为每张卡片展示参照范围: ${JSON.stringify(implementMetrics)}`
       )
       assert(
         implementMetrics.scrollWidth <= implementMetrics.clientWidth + 1,
@@ -1428,7 +1480,7 @@ const scenarios = [
           ) === 'business-task-collab-entry'
       )
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectHeading(page, '产品原型查看器 / Prototype Viewer')
+      await expectHeading(page, '产品原型与样板查看器 / Prototype Viewer')
       const restoredSelectionMetrics = await page.evaluate(() => ({
         activeText:
           document
@@ -1443,6 +1495,11 @@ const scenarios = [
           document
             .querySelector('.erp-dev-prototypes-reader__path')
             ?.textContent?.trim() || '',
+        readerApplies:
+          document
+            .querySelector('.erp-dev-prototypes-reader__applies')
+            ?.textContent?.replace(/\s+/g, ' ')
+            .trim() || '',
         storedFilter:
           window.localStorage.getItem(
             'plush_erp_dev_prototype_status_filter'
@@ -1458,6 +1515,8 @@ const scenarios = [
           activeCardKey: 'business-task-collab-entry',
           readerPath:
             'business-module-page-standard-v1/task-collab-entry-v2.html',
+          readerApplies:
+            '参照范围：嵌入有 Workflow 协同任务的业务页可参照；它是页内组件，不是独立菜单、路由或权限入口。',
           storedFilter: 'to-implement',
           storedSelected: 'business-task-collab-entry',
         },

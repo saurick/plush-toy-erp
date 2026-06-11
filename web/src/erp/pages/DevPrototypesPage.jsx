@@ -140,6 +140,11 @@ function PrototypeAssetCard({ item, selected, onSelect, onTogglePinned }) {
         <span className="erp-dev-prototypes-card__desc">
           {item.description}
         </span>
+        {item.appliesTo ? (
+          <span className="erp-dev-prototypes-card__applies">
+            参照范围：{item.appliesTo}
+          </span>
+        ) : null}
       </button>
       <button
         type="button"
@@ -164,7 +169,7 @@ function PrototypePreview({ item, fullscreen = false }) {
   if (!item) {
     return (
       <div className="erp-dev-prototypes-preview__empty">
-        <Empty description="请选择一个原型资产 / Select a prototype asset" />
+        <Empty description="请选择一个样板或参考资料" />
       </div>
     )
   }
@@ -457,14 +462,15 @@ export default function DevPrototypesPage() {
           <Space align="center" size={10} wrap>
             <AppstoreOutlined className="erp-dev-prototypes-header__icon" />
             <Title level={3} className="erp-dev-prototypes-title">
-              产品原型查看器 / Prototype Viewer
+              产品原型与样板查看器 / Prototype Viewer
             </Title>
             <Tag color="green">DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-prototypes-summary">
-            只浏览 docs/product/prototypes 下的 HTML 原型、PNG 方案图和截图证据
-            / preview prototype assets only；不进入 ERP
-            菜单、权限、seedData、后端业务或开发文档 registry。
+            只查看 docs/product/prototypes 下的 HTML 样板、PNG
+            方案图和截图证据；参照范围只说明可借鉴的页面 /
+            菜单类型，不是正式菜单映射中心；不进入 ERP
+            菜单、权限、seedData、后端业务或正式文档入口。
           </Paragraph>
         </div>
         <div className="erp-dev-prototypes-header__stats">
@@ -482,7 +488,7 @@ export default function DevPrototypesPage() {
             allowClear
             value={keyword}
             prefix={<SearchOutlined />}
-            placeholder="搜索名称、目录、用途"
+            placeholder="搜索名称、目录、用途、参照范围"
             className="erp-dev-prototypes-search"
             onChange={(event) => setKeyword(event.target.value)}
           />
@@ -520,13 +526,13 @@ export default function DevPrototypesPage() {
             </Button>
           </div>
 
-          <div className="erp-dev-prototypes-list" aria-label="产品原型资产">
+          <div className="erp-dev-prototypes-list" aria-label="产品原型与样板">
             {visibleItems.length > 0 ? (
               <>
                 {pinnedItems.length > 0 ? (
                   <section
                     className="erp-dev-prototypes-pinned"
-                    aria-label="置顶原型资产"
+                    aria-label="置顶原型与样板"
                   >
                     <div className="erp-dev-prototypes-list-section__head">
                       <span>
@@ -554,7 +560,7 @@ export default function DevPrototypesPage() {
                     <section
                       key={group.key}
                       className="erp-dev-prototypes-group"
-                      aria-label={`${group.directory} 原型资产`}
+                      aria-label={`${group.directory} 原型与样板`}
                     >
                       <button
                         type="button"
@@ -591,7 +597,7 @@ export default function DevPrototypesPage() {
             ) : (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="没有匹配的原型资产 / No matching prototype assets"
+                description="没有匹配的样板或参考资料"
               />
             )}
           </div>
@@ -642,6 +648,11 @@ export default function DevPrototypesPage() {
 
           <div className="erp-dev-prototypes-reader__info">
             <Text>{selectedItem?.description}</Text>
+            {selectedItem?.appliesTo ? (
+              <Text className="erp-dev-prototypes-reader__applies">
+                参照范围：{selectedItem.appliesTo}
+              </Text>
+            ) : null}
             <Text type="secondary">
               <FolderOpenOutlined /> {selectedItem?.directory}
             </Text>

@@ -18,7 +18,58 @@
 - `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板目录、纸面预览、字段映射和可编辑打印窗口入口；`/erp/operations/exceptions` 作为异常 / 阻塞闭环入口。
 - 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收或评审原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增未评审后端 API、schema、migration、权限码或 Fact 写入。
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
-- `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、业务模块列表页、业务详情页、新建 / 编辑表单、业务页轻量协同入口和弹窗 / 抽屉动作六个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现对齐版。
+- `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、业务模块列表页、业务详情页、新建 / 编辑表单、业务页协同入口组件和弹窗 / 抽屉动作六个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
+- 原型查看器和原型 README 已补“参照范围”口径：参照范围只说明可借鉴的页面 / 菜单类型，不是正式菜单、路由、权限或 seedData 映射表；真正对应关系必须在进入真实实现任务时回到代码、菜单配置和 RBAC 重新核对。
+
+## 2026-06-11 15:51 CST
+
+- 完成：为 `/__dev/docs` Markdown 查看器补 Mermaid 图表渲染。`mermaid` fenced code block 现在会在只读 dev-only 查看器中渲染为 SVG；普通代码块仍走原有 `<pre><code>` 展示，Mermaid 渲染失败时保留源码兜底。
+- 完成：同步 `docs/current-source-of-truth.md` 和 `web/README.md` 的 `/__dev/docs` 行为说明，并补 `style:l1` 对 `docs/product/implementation-governance.md` Mermaid 图表的 SVG 渲染断言。
+- 验证：`git diff --check`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1`、`pnpm --dir web style:l1` 均通过；in-app Browser 打开 `http://localhost:5175/__dev/docs` 验证 `docs/product/implementation-governance.md` 已渲染 Mermaid SVG，普通源码块不再显示 `flowchart LR`，console warn/error 为空。
+- 下一步：如后续要支持更多 Markdown 扩展，仍应只在 dev-only 查看器或共享 Markdown 渲染层评审，不恢复产品内 docs registry。
+- 阻塞/风险：本轮不接 ERP 菜单、seedData、RBAC、后端 API、schema / migration、生产构建、部署、提交或推送；当前工作区仍有一批非本轮原型相关未提交改动，未回退。
+
+## 2026-06-11 15:46 CST
+
+- 完成：按 Product Design review 修正 To Implement 样板质量问题：表单底部动作区改为不覆盖字段的静态尾部确认区，动作抽屉打开时锁定背景滚动，工作台和详情页 tab 补 `tablist / tab / tabpanel` 与 `aria-selected` 同步，Core 样板里的 yoyoosun 客户锚点收敛为中性样例数据。
+- 完成：同步 `docs/product/prototypes/README.md`、工作台 / 详情页 / 表单页 / 动作浮层 README 的验收口径；六个 HTML 仍保持 To Implement，不晋级 Current。
+- 验证：`git diff --check`、6 个 HTML 内联脚本语法检查、关键字扫描、Playwright 静态服务验证 1280px / 390px 无横向溢出；表单 footer overlap 为 0，移动抽屉 `bodyOverflow=hidden`，工作台 / 详情页 tab aria 状态随点击更新。`node --test web/src/erp/config/devPrototypes.test.mjs` 通过。验证截图保存在 `output/playwright/product-design-next-step-20260611/`。
+- 下一步：若要进入真实页面吸收，仍需按 To Implement Checklist 回到当前运行时代码、共享组件、正式菜单、RBAC、theme token、API 和测试边界；不得直接复制静态原型。
+- 阻塞/风险：本轮只改 To Implement 原型和说明文档；未改正式运行时代码、正式菜单业务语义、后端 API、schema / migration、RBAC、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。静态服务下 console 仅有 favicon 404，不作为原型脚本错误。
+
+## 2026-06-11 15:45 CST
+
+- 完成：在 `docs/product/prototypes/README.md` 补“参照关系 / 对应关系”规则，明确 To Implement 原型只说明页面骨架、信息层级和交互参照，不是正式菜单映射表；真正对应到菜单、路由、权限和 seedData 只能在进入真实实现任务时重新核对。
+- 完成：为 `/__dev/prototypes` 的 `devPrototypes` registry 补 `appliesTo` 参照范围字段，并在左侧卡片、右侧详情和搜索里展示 / 使用；协同入口明确是页内组件，不是独立菜单、路由或权限入口。
+- 完成：同步静态 `docs/product/prototypes/index.html`、`web/README.md` 和 `docs/current-source-of-truth.md` 的 dev-only 边界说明，强调参照范围不是正式菜单中心。
+- 验证：`node --test web/src/erp/config/devPrototypes.test.mjs`、`git diff --check`、静态 `docs/product/prototypes/index.html` 内联脚本语法检查、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web style:l1` 均通过；in-app Browser 打开 `http://localhost:5175/__dev/prototypes` 验证桌面 1280px 和移动 390px 无横向溢出，13 张卡片均有参照范围，待实现筛选为 6 张卡片，协同入口右侧显示“不是独立菜单、路由或权限入口”。
+- 下一步：如后续要把某个原型吸收到真实页面，先按 To Implement Checklist 指定目标页面 / 共享组件 / 路由，再核对当前代码、正式菜单、客户菜单配置、RBAC、theme token、API 和测试边界。
+- 阻塞/风险：本轮没有把原型查看器接入正式菜单、seedData、RBAC、后端 API、schema / migration、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；工作区还保留同一批原型 HTML 的相邻未提交改动，未在本轮回退。
+
+## 2026-06-11 15:28 CST
+
+- 完成：在 `docs/product/prototypes/README.md` 新增“原型作用与布局准确度”说明，明确原型是正式开发前的设计决策工具，用于确认页面骨架、信息层级、关键交互、视觉密度和 Workflow / Fact 边界。
+- 完成：补充原型不是第二套系统，也不是完整需求、字段全集、API、权限、菜单、schema、migration 或测试真源；真实实现仍必须回到正式文档、代码、API、RBAC、theme token、migration 和测试。
+- 完成：明确原型不要求像素级完美，但 Draft / To Implement / Current 三个阶段分别有不同布局准确度要求；默认按页面类型和关键差异做原型，不逐菜单复制设计。
+- 验证：`git diff --check -- docs/product/prototypes/README.md progress.md` 通过。
+- 下一步：如后续继续新增原型资产，应按本说明写清阶段、归属、吸收范围和不吸收范围；同类页面优先复用标准样板。
+- 阻塞/风险：本轮只补原型 README 和 progress 说明；未改运行时代码、正式菜单、后端 API、RBAC、schema / migration、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-11 15:28 CST（文案清理）
+
+- 完成：全局检查 `/__dev/prototypes` 和 `docs/product/prototypes/index.html` 的当前可见文案，把阶段标签统一为“待实现 / 当前实现”，把当前卡片标题收敛为“样板 / 参考”，移除当前卡片里的“待吸收实现”“候选”“方案对比”和开发文档 registry 口径。
+- 完成：同步 `devPrototypes` registry、静态查看器、相关 README、`task-collab-entry-v2.html`、岗位任务端当前实现参考页和 `style:l1` 断言；保留历史流水中的旧词作为演进记录，不再作为当前口径。
+- 验证：`node --test web/src/erp/config/devPrototypes.test.mjs`、`git diff --check`、8 个相关 HTML 内联脚本语法检查、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1` 均通过；Playwright 打开 `/__dev/prototypes` 验证 1280px 与 390px 视口无横向溢出、关键文案可见、13 张卡片正常；关键字扫描确认当前原型查看器和样板资产不再出现“待吸收实现”“候选”“当前实现对齐版”等旧口径。
+- 下一步：若还要继续压缩可见中英混排，可单独评审是否保留顶部英文标签；当前先保持筛选标签和 Dev Only 标识不变。
+- 阻塞/风险：本轮只改原型资产、dev-only 原型查看器页面 / 登记、静态查看器、说明文档和断言；未改正式运行时代码、正式菜单业务语义、后端 API、schema / migration、RBAC、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-11 15:20 CST
+
+- 完成：修正 To Implement 原型查看器里的标题口径，把用户可见的“极简后台工作台原型”“极简业务模块标准页原型”改为“后台工作台样板”“业务模块标准页样板”；同步 HTML `<title>`、静态 `docs/product/prototypes/index.html`、`devPrototypes` registry、单测和 `style:l1` 断言。
+- 完成：保留 `docs/product/prototypes/README.md` 中“极简不等于简陋”的设计原则说明，但不再把“极简”作为当前资产标题或卡片标题，避免误读为另起一套后台设计。
+- 验证：`node --test web/src/erp/config/devPrototypes.test.mjs`、`git diff --check`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1` 均通过；`rg` 确认当前资产标题和 viewer 卡片标题不再包含“极简”。
+- 下一步：如需要把本次标题修正提交推送，可按当前差异单独提交；若继续调整原型文案，应优先使用“标准样板 / 参照规则 / 常用入口”这类中性口径。
+- 阻塞/风险：本轮只改标题和说明口径；未改正式运行时代码、正式菜单业务语义、后端 API、schema / migration、RBAC、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。
 
 ## 2026-06-11 15:08 CST
 

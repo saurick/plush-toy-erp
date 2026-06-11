@@ -393,7 +393,8 @@
         padding: 0 10px;
       }
 
-      .tab.active {
+      .tab.active,
+      .tab[aria-selected="true"] {
         border-color: var(--blue);
         background: var(--blue-soft);
         color: var(--blue);
@@ -447,7 +448,7 @@
     <div class="app">
       <aside class="side" aria-label="后台导航">
         <div class="brand">
-          <div class="mark">永</div>
+          <div class="mark">样</div>
           <div>
             <strong>毛绒 ERP</strong>
             <span>详情页标准样板</span>
@@ -502,7 +503,7 @@
               <section class="panel section" aria-label="基础信息">
                 <h3>基础信息</h3>
                 <div class="kv">
-                  <div><span>客户</span><strong>永绅样例客户</strong></div>
+                  <div><span>客户</span><strong>样例客户 A</strong></div>
                   <div><span>产品</span><strong>毛绒挂件 A / 蓝色款</strong></div>
                   <div><span>数量</span><strong>3,000 pcs</strong></div>
                   <div><span>交期</span><strong>2026-06-18</strong></div>
@@ -560,10 +561,30 @@
               </div>
               <div class="action-panel">
                 <div class="tabs" role="tablist" aria-label="动作区类型">
-                  <button class="tab active" type="button" data-panel="workflow">Workflow 协同动作</button>
-                  <button class="tab" type="button" data-panel="fact">Fact 事实动作</button>
+                  <button
+                    class="tab active"
+                    id="tab-workflow"
+                    role="tab"
+                    type="button"
+                    data-panel="workflow"
+                    aria-controls="actionCopy"
+                    aria-selected="true"
+                  >
+                    Workflow 协同动作
+                  </button>
+                  <button
+                    class="tab"
+                    id="tab-fact"
+                    role="tab"
+                    type="button"
+                    data-panel="fact"
+                    aria-controls="actionCopy"
+                    aria-selected="false"
+                  >
+                    Fact 事实动作
+                  </button>
                 </div>
-                <div class="action-copy" id="actionCopy">
+                <div class="action-copy" id="actionCopy" role="tabpanel" aria-labelledby="tab-workflow">
                   <strong>处理协同任务</strong>
                   <p class="summary">可完成、阻塞、驳回或催办当前任务；这些动作只写 Workflow 任务和协同状态，不写库存、出货、财务、开票或收付款事实。</p>
                   <div class="actions">
@@ -624,7 +645,10 @@
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
           tabs.forEach((item) => item.classList.remove("active"));
+          tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
           tab.classList.add("active");
+          tab.setAttribute("aria-selected", "true");
+          actionCopy.setAttribute("aria-labelledby", tab.id);
           renderPanel(tab.dataset.panel);
         });
       });

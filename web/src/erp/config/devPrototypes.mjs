@@ -9,8 +9,8 @@ export const DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY =
   'plush_erp_dev_prototype_status_filter'
 
 export const DEV_PROTOTYPE_STATUSES = Object.freeze({
-  CURRENT: '当前实现对齐版 / Current',
-  TO_IMPLEMENT: '待吸收实现 / To Implement',
+  CURRENT: '当前实现 / Current',
+  TO_IMPLEMENT: '待实现 / To Implement',
   DRAFT: '起草阶段 / Draft',
   HISTORY: '历史参考 / History',
   EVIDENCE: '截图证据 / Evidence',
@@ -46,7 +46,7 @@ export const DEV_PROTOTYPE_FILTER_OPTIONS = Object.freeze([
 export const DEV_PROTOTYPE_ASSETS = Object.freeze([
   {
     key: 'admin-command-center',
-    title: '极简后台工作台原型',
+    title: '后台工作台样板',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'admin-command-center-v1/',
@@ -54,10 +54,12 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'admin-command-center-v1/README.md',
     description:
       '把工作台收敛为登录后的今日处理台：今日队列、当前任务详情和少量常用业务对象入口。',
+    appliesTo:
+      '后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；常用入口不是正式菜单替代表。',
   },
   {
     key: 'business-module-standard-page',
-    title: '极简业务模块标准页原型',
+    title: '业务模块标准页样板',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'business-module-page-standard-v1/',
@@ -65,20 +67,21 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'business-module-page-standard-v1/README.md',
     description:
       '保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。',
+    appliesTo:
+      '客户档案、供应商档案、产品、销售订单、辅材 / 包材采购、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。',
   },
   {
     key: 'business-task-collab-entry',
-    title: '业务页轻量协同入口候选',
+    title: '业务页协同入口组件样板',
     type: 'HTML',
-    statuses: [
-      DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT,
-      DEV_PROTOTYPE_STATUSES.COMPARISON,
-    ],
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'business-module-page-standard-v1/',
     assetPath: 'business-module-page-standard-v1/task-collab-entry-v2.html',
     readmePath: 'business-module-page-standard-v1/README.md',
     description:
-      '把协同入口收敛为业务页内组件：收起保留风险提示，展开处理本页相关任务。',
+      '作为业务页内组件样板：收起保留风险提示，展开处理本页相关任务。',
+    appliesTo:
+      '嵌入有 Workflow 协同任务的业务页可参照；它是页内组件，不是独立菜单、路由或权限入口。',
   },
   {
     key: 'business-detail-standard-page',
@@ -90,6 +93,8 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'business-detail-page-standard-v1/README.md',
     description:
       '覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。',
+    appliesTo:
+      '销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照；字段和动作仍由各自 API / usecase / RBAC 决定。',
   },
   {
     key: 'business-form-standard-page',
@@ -101,6 +106,8 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'business-form-page-standard-v1/README.md',
     description:
       '覆盖字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值和缺值 / 残值防护。',
+    appliesTo:
+      '客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；字段真源以 schema、API 和保存 usecase 为准。',
   },
   {
     key: 'action-modal-drawer-standard',
@@ -112,6 +119,8 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'action-modal-drawer-standard-v1/README.md',
     description:
       '覆盖审批、驳回、阻塞、冲正、关闭任务、危险确认和 reason 必填表达。',
+    appliesTo:
+      '审批、驳回、阻塞、冲正、关闭任务、过账 / 取消等动作浮层可参照；动作可见性、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。',
   },
   {
     key: 'business-direction-sidebar',
@@ -123,6 +132,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       'business-module-page-standard-v1/images/direction-1-current-record-sidebar.png',
     readmePath: 'business-module-page-standard-v1/README.md',
     description: '早期协同入口方向图，用于追溯为何不采用右侧侧栏作为默认骨架。',
+    appliesTo: '仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。',
   },
   {
     key: 'business-direction-flowbar',
@@ -135,6 +145,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'business-module-page-standard-v1/README.md',
     description:
       '早期协同入口方向图，用于比较流程条和抽屉结构的占位与理解成本。',
+    appliesTo: '仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。',
   },
   {
     key: 'business-direction-bottom-table',
@@ -146,10 +157,11 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       'business-module-page-standard-v1/images/direction-3-bottom-task-table.png',
     readmePath: 'business-module-page-standard-v1/README.md',
     description: '早期协同入口方向图，用于说明长表格下方入口的可见性问题。',
+    appliesTo: '仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。',
   },
   {
     key: 'mobile-role-tasks-implemented',
-    title: '岗位任务端当前实现对齐版原型',
+    title: '岗位任务端当前实现参考',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.CURRENT],
     directory: 'mobile-role-tasks-v1/',
@@ -157,6 +169,8 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'mobile-role-tasks-v1/README.md',
     description:
       '覆盖待办 / 已办 / 消息 / 我的、主筛选、分批展开、任务详情、现场留痕、原因面板和底部动作栏。',
+    appliesTo:
+      '岗位任务端 `/m/<role>/tasks` 当前实现参考；岗位入口按任务和职责投影，不复制桌面菜单树。',
   },
   {
     key: 'mobile-role-tasks-list',
@@ -169,6 +183,8 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'mobile-role-tasks-v1/README.md',
     description:
       '保留岗位胶囊、刷新、同步信息、指标、筛选、任务列表和底部导航的早期方向证据。',
+    appliesTo:
+      '仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。',
   },
   {
     key: 'mobile-role-task-detail',
@@ -181,6 +197,8 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'mobile-role-tasks-v1/README.md',
     description:
       '保留任务关键信息、风险提示、关联单据、最近动态、原因输入和底部动作栏的早期方向证据。',
+    appliesTo:
+      '仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。',
   },
   {
     key: 'mobile-role-risk-dashboard',
@@ -193,6 +211,8 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'mobile-role-tasks-v1/README.md',
     description:
       '保留今日必须处理、卡点、等待他人、催办和已完成等分组的早期方向证据。',
+    appliesTo:
+      '仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。',
   },
 ])
 
@@ -251,6 +271,7 @@ export function buildDevPrototypeItems({
         asset.assetPath,
         asset.readmePath,
         asset.description,
+        asset.appliesTo,
         ...asset.statuses,
       ]
         .join(' ')

@@ -6,14 +6,14 @@
 
 | 文件 | 说明 |
 | --- | --- |
-| `implemented-reference.html` | 当前实现对齐版原型：覆盖待办 / 已办 / 消息 / 我的、主筛选、分批展开、任务详情、现场留痕、原因面板和底部动作栏。 |
+| `implemented-reference.html` | 当前实现参考：覆盖待办 / 已办 / 消息 / 我的、主筛选、分批展开、任务详情、现场留痕、原因面板和底部动作栏。 |
 | `images/mobile-role-tasks-list-reference.png` | 早期视觉方向 / 历史参考：待办列表页参考，包含岗位胶囊、刷新、同步信息、四项指标、筛选、任务列表和底部导航。 |
 | `images/mobile-role-task-detail-reference.png` | 早期视觉方向 / 历史参考：任务详情页参考，包含任务关键信息、风险提示、关联单据、最近动态、原因输入和底部动作栏。 |
 | `images/mobile-role-risk-dashboard-reference.png` | 早期视觉方向 / 历史参考：风险分组页参考，包含今日必须处理、卡点、等待他人、催办和已完成等分组。 |
 
 ## HTML 口径
 
-当前补充一个“当前实现对齐版”HTML，不把三张 PNG 分别机械转成三份 HTML。
+当前补充一个“当前实现参考”HTML，不把三张 PNG 分别机械转成三份 HTML。
 
 原因：
 

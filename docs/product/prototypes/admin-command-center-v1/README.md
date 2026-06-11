@@ -1,6 +1,6 @@
-# 极简后台工作台原型 / Minimal Admin Workbench Prototype
+# 后台工作台样板 / Admin Workbench Pattern
 
-本目录保存后台首页 / 工作台的极简交互原型，用于重新确认“工作台到底做什么”和“哪些入口不应继续并列放大”。
+本目录保存后台首页 / 工作台的 To Implement 标准样板，用于重新确认“工作台到底做什么”和“哪些入口不应继续并列放大”。
 
 ## 文件
 
@@ -17,7 +17,7 @@
 
 ## 待实现吸收状态
 
-截至 2026-06-11，本原型仍按 `待吸收实现 / To Implement` 登记。本轮只是继续完善原型体系：保留今日队列、当前任务详情和少量常用业务对象入口，并把侧栏示意改回贴近 `seedData.mjs` 与 `yoyoosun` 客户菜单的常用入口 / 快捷入口表达。当前运行时已经有 `/erp/dashboard`、`/erp/task-board`、`/erp/business-dashboard`、`/erp/print-center` 和 `/erp/operations/exceptions`，但是否进一步合并、隐藏或改名仍需后续正式菜单评审。未获用户明确确认前，不能把本资产改成 `当前实现 / Current`。
+截至 2026-06-11，本原型仍按 `待实现 / To Implement` 登记。本轮只是继续完善原型体系：保留今日队列、当前任务详情和少量常用业务对象入口，并把侧栏示意改回贴近 `seedData.mjs` 与 `yoyoosun` 客户菜单的常用入口 / 快捷入口表达。当前运行时已经有 `/erp/dashboard`、`/erp/task-board`、`/erp/business-dashboard`、`/erp/print-center` 和 `/erp/operations/exceptions`，但是否进一步合并、隐藏或改名仍需后续正式菜单评审。未获用户明确确认前，不能把本资产改成 `当前实现 / Current`。
 
 | 原型区域 | 当前运行时参考路径 | 尚待人工确认点 | 边界 |
 | --- | --- | --- | --- |
@@ -37,6 +37,7 @@
 ## 验收关注点
 
 - 今日队列筛选可切换，当前任务详情随选择变化。
+- 今日队列筛选需要有明确的 `tablist / tab / tabpanel` 状态语义，当前选中项应同步 `aria-selected`。
 - 常用入口数量克制，首屏不重复铺开完整菜单，且明确不是新的正式菜单结构。
 - 桌面宽屏和移动窄屏不出现横向溢出。
 - 文案避免把 Workflow 任务状态误写成事实层过账结果。

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>产品原型资产查看器</title>
+    <title>产品原型与样板查看器</title>
     <style>
       :root {
         color-scheme: light;
@@ -315,6 +315,13 @@
         color: var(--muted);
       }
 
+      .applies {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
       .actions {
         display: flex;
         flex-wrap: wrap;
@@ -520,27 +527,27 @@
     <main class="page">
       <div class="topbar">
         <div>
-          <h1>产品原型资产查看器</h1>
+          <h1>产品原型与样板查看器</h1>
           <p class="summary">
             本页只索引 <strong>docs/product/prototypes</strong> 下的 HTML
-            原型、PNG 方案图和截图证据。它不接后端、不进 ERP
-            正式菜单、不接权限、不跑构建，也不替代正式文档真源。
+            样板、PNG 方案图和截图证据。它不接后端、不进 ERP
+            正式菜单、不接权限、不跑构建，也不替代正式文档真源；参照范围只说明可借鉴的页面 / 菜单类型，不是正式菜单映射中心。
           </p>
         </div>
         <aside class="meta" aria-label="资产统计">
-          <div class="meta-row"><span>HTML 原型</span><strong>7</strong></div>
+          <div class="meta-row"><span>HTML 样板</span><strong>7</strong></div>
           <div class="meta-row"><span>PNG / 截图</span><strong>6</strong></div>
           <div class="meta-row"><span>维护方式</span><strong>手工登记</strong></div>
         </aside>
       </div>
 
-      <div class="toolbar" aria-label="筛选原型资产">
+      <div class="toolbar" aria-label="筛选原型与样板">
         <input
           class="search"
           id="assetSearch"
           type="search"
-          placeholder="搜索名称、目录、用途"
-          aria-label="搜索名称、目录、用途"
+          placeholder="搜索名称、目录、用途、参照范围"
+          aria-label="搜索名称、目录、用途、参照范围"
         />
         <div class="filters" aria-label="按资产分类筛选">
           <button class="filter" type="button" data-filter="all" aria-pressed="true">全部 / All</button>
@@ -556,22 +563,23 @@
       <section class="section" aria-labelledby="admin-heading">
         <div class="section-head">
           <div>
-            <h2 id="admin-heading">极简后台工作台 / Minimal Admin Workbench</h2>
+            <h2 id="admin-heading">后台工作台样板 / Admin Workbench Pattern</h2>
             <p class="section-note">用于评审工作台作为今日处理台的首屏信息和少量入口，不再铺开五个并列视图。</p>
           </div>
           <a class="open-readme" href="admin-command-center-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-category="to-implement" data-status="待吸收实现" data-text="极简 后台工作台 HTML admin-command-center-v1 今日队列 当前任务 常用业务对象 待吸收实现">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="后台工作台 样板 HTML admin-command-center-v1 今日队列 当前任务 常用业务对象 待实现 后台首页 工作台 任务看板 业务看板 模板打印 异常闭环">
             <div class="name">
-              <p class="asset-title">极简后台工作台原型</p>
+              <p class="asset-title">后台工作台样板</p>
               <div class="dir">admin-command-center-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
-            <div class="badges"><span class="badge badge-implement">待吸收实现</span></div>
+            <div class="badges"><span class="badge badge-implement">待实现</span></div>
             <p class="purpose">把工作台收敛为登录后的今日处理台：今日队列、当前任务详情和少量常用业务对象入口。</p>
+            <p class="applies">参照范围：后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；常用入口不是正式菜单替代表。</p>
             <div class="actions">
-              <a class="action primary" href="admin-command-center-v1/index.html">打开 HTML 原型</a>
+              <a class="action primary" href="admin-command-center-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="admin-command-center-v1/README.md">打开说明</a>
             </div>
           </article>
@@ -587,33 +595,34 @@
           <a class="open-readme" href="business-module-page-standard-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-category="to-implement" data-status="待吸收实现" data-text="极简 业务模块标准页 HTML business-module-page-standard-v1 标题摘要 少量筛选 表格 当前记录 协同入口 待吸收实现">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务模块标准页 样板 HTML business-module-page-standard-v1 标题摘要 少量筛选 表格 当前记录 协同入口 待实现 客户档案 供应商档案 产品 销售订单 采购 库存 出货 生产 质检 财务 发票">
             <div class="name">
-              <p class="asset-title">极简业务模块标准页原型</p>
+              <p class="asset-title">业务模块标准页样板</p>
               <div class="dir">business-module-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
-            <div class="badges"><span class="badge badge-implement">待吸收实现</span></div>
+            <div class="badges"><span class="badge badge-implement">待实现</span></div>
             <p class="purpose">保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。</p>
+            <p class="applies">参照范围：客户档案、供应商档案、产品、销售订单、辅材 / 包材采购、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。</p>
             <div class="actions">
-              <a class="action primary" href="business-module-page-standard-v1/index.html">打开 HTML 原型</a>
+              <a class="action primary" href="business-module-page-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="business-module-page-standard-v1/README.md">打开说明</a>
             </div>
           </article>
 
-          <article class="asset" data-category="to-implement" data-status="待吸收实现 方案对比" data-text="业务页 轻量协同入口 候选 HTML task-collab-entry-v2 收起 展开 本页任务 待吸收实现">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务页 协同入口 组件样板 HTML task-collab-entry-v2 收起 展开 本页任务 待实现 Workflow 页内组件 不是独立菜单">
             <div class="name">
-              <p class="asset-title">业务页轻量协同入口候选</p>
+              <p class="asset-title">业务页协同入口组件样板</p>
               <div class="dir">business-module-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges">
-              <span class="badge badge-implement">待吸收实现</span>
-              <span class="badge badge-compare">方案对比</span>
+              <span class="badge badge-implement">待实现</span>
             </div>
-            <p class="purpose">用于表达收起保留风险提示、展开处理本页任务；不作为独立业务入口。</p>
+            <p class="purpose">作为业务页内组件样板：收起保留风险提示、展开处理本页任务；不作为独立业务入口。</p>
+            <p class="applies">参照范围：嵌入有 Workflow 协同任务的业务页可参照；它是页内组件，不是独立菜单、路由或权限入口。</p>
             <div class="actions">
-              <a class="action primary" href="business-module-page-standard-v1/task-collab-entry-v2.html">打开 HTML 原型</a>
+              <a class="action primary" href="business-module-page-standard-v1/task-collab-entry-v2.html">打开 HTML 样板</a>
               <a class="action" href="business-module-page-standard-v1/README.md">打开说明</a>
             </div>
           </article>
@@ -629,6 +638,7 @@
               <span class="badge badge-compare">方案对比</span>
             </div>
             <p class="purpose">早期协同入口方向图，用于追溯为何不采用右侧侧栏作为默认骨架。</p>
+            <p class="applies">参照范围：仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/images/direction-1-current-record-sidebar.png">查看 PNG / 截图</a>
               <a class="action" href="business-module-page-standard-v1/images/">打开目录</a>
@@ -646,6 +656,7 @@
               <span class="badge badge-compare">方案对比</span>
             </div>
             <p class="purpose">早期协同入口方向图，用于比较流程条和抽屉结构的占位与理解成本。</p>
+            <p class="applies">参照范围：仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/images/direction-2-flowbar-task-drawer.png">查看 PNG / 截图</a>
               <a class="action" href="business-module-page-standard-v1/images/">打开目录</a>
@@ -663,6 +674,7 @@
               <span class="badge badge-compare">方案对比</span>
             </div>
             <p class="purpose">早期协同入口方向图，用于说明长表格下方入口的可见性问题。</p>
+            <p class="applies">参照范围：仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/images/direction-3-bottom-task-table.png">查看 PNG / 截图</a>
               <a class="action" href="business-module-page-standard-v1/images/">打开目录</a>
@@ -680,44 +692,47 @@
           <a class="open-readme" href="README.md">查看总说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-category="to-implement" data-status="待吸收实现" data-text="业务详情页 标准样板 HTML business-detail-page-standard-v1 基础信息 状态 关联单据 操作记录 附件 Workflow Fact 待吸收实现">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务详情页 标准样板 HTML business-detail-page-standard-v1 基础信息 状态 关联单据 操作记录 附件 Workflow Fact 待实现 销售订单 客户 供应商 产品 采购入库 库存批次 质检 出货 财务">
             <div class="name">
               <p class="asset-title">业务详情页标准样板</p>
               <div class="dir">business-detail-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
-            <div class="badges"><span class="badge badge-implement">待吸收实现</span></div>
+            <div class="badges"><span class="badge badge-implement">待实现</span></div>
             <p class="purpose">覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。</p>
+            <p class="applies">参照范围：销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照；字段和动作仍由各自 API / usecase / RBAC 决定。</p>
             <div class="actions">
-              <a class="action primary" href="business-detail-page-standard-v1/index.html">打开 HTML 原型</a>
+              <a class="action primary" href="business-detail-page-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="business-detail-page-standard-v1/README.md">打开说明</a>
             </div>
           </article>
 
-          <article class="asset" data-category="to-implement" data-status="待吸收实现" data-text="新建 编辑 表单 标准样板 HTML business-form-page-standard-v1 字段分组 必填 校验 来源带值 清值 残值防护 待吸收实现">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="新建 编辑 表单 标准样板 HTML business-form-page-standard-v1 字段分组 必填 校验 来源带值 清值 残值防护 待实现 客户 供应商 联系人 销售订单 采购 库存 质检 财务">
             <div class="name">
               <p class="asset-title">新建 / 编辑表单标准样板</p>
               <div class="dir">business-form-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
-            <div class="badges"><span class="badge badge-implement">待吸收实现</span></div>
+            <div class="badges"><span class="badge badge-implement">待实现</span></div>
             <p class="purpose">覆盖字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值和缺值 / 残值防护。</p>
+            <p class="applies">参照范围：客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；字段真源以 schema、API 和保存 usecase 为准。</p>
             <div class="actions">
-              <a class="action primary" href="business-form-page-standard-v1/index.html">打开 HTML 原型</a>
+              <a class="action primary" href="business-form-page-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="business-form-page-standard-v1/README.md">打开说明</a>
             </div>
           </article>
 
-          <article class="asset" data-category="to-implement" data-status="待吸收实现" data-text="弹窗 抽屉 动作 标准样板 HTML action-modal-drawer-standard-v1 审批 驳回 阻塞 冲正 关闭任务 危险确认 reason 必填 待吸收实现">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="弹窗 抽屉 动作 标准样板 HTML action-modal-drawer-standard-v1 审批 驳回 阻塞 冲正 关闭任务 危险确认 reason 必填 待实现 过账 取消 权限 幂等">
             <div class="name">
               <p class="asset-title">弹窗 / 抽屉动作标准样板</p>
               <div class="dir">action-modal-drawer-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
-            <div class="badges"><span class="badge badge-implement">待吸收实现</span></div>
+            <div class="badges"><span class="badge badge-implement">待实现</span></div>
             <p class="purpose">覆盖审批、驳回、阻塞、冲正、关闭任务、危险确认和 reason 必填表达。</p>
+            <p class="applies">参照范围：审批、驳回、阻塞、冲正、关闭任务、过账 / 取消等动作浮层可参照；动作可见性、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。</p>
             <div class="actions">
-              <a class="action primary" href="action-modal-drawer-standard-v1/index.html">打开 HTML 原型</a>
+              <a class="action primary" href="action-modal-drawer-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="action-modal-drawer-standard-v1/README.md">打开说明</a>
             </div>
           </article>
@@ -728,21 +743,22 @@
         <div class="section-head">
           <div>
             <h2 id="mobile-heading">岗位任务端 / Mobile Role Tasks</h2>
-            <p class="section-note">用于追溯岗位任务端改版方向、当前实现对齐形态和早期视觉参考。</p>
+            <p class="section-note">用于追溯岗位任务端改版方向、当前实现参考和早期视觉参考。</p>
           </div>
           <a class="open-readme" href="mobile-role-tasks-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-category="current" data-status="当前实现对齐版" data-text="岗位任务端 当前实现对齐版 HTML implemented-reference 待办 已办 消息 我的 筛选 详情 现场留痕 原因面板 动作栏">
+          <article class="asset" data-category="current" data-status="当前实现" data-text="岗位任务端 当前实现参考 HTML implemented-reference 待办 已办 消息 我的 筛选 详情 现场留痕 原因面板 动作栏 mobile role tasks">
             <div class="name">
-              <p class="asset-title">岗位任务端当前实现对齐版原型</p>
+              <p class="asset-title">岗位任务端当前实现参考</p>
               <div class="dir">mobile-role-tasks-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
-            <div class="badges"><span class="badge badge-current">当前实现对齐版</span></div>
+            <div class="badges"><span class="badge badge-current">当前实现</span></div>
             <p class="purpose">覆盖待办 / 已办 / 消息 / 我的、主筛选、分批展开、任务详情、现场留痕、原因面板和底部动作栏。</p>
+            <p class="applies">参照范围：岗位任务端 <code>/m/&lt;role&gt;/tasks</code> 当前实现参考；岗位入口按任务和职责投影，不复制桌面菜单树。</p>
             <div class="actions">
-              <a class="action primary" href="mobile-role-tasks-v1/implemented-reference.html">打开 HTML 原型</a>
+              <a class="action primary" href="mobile-role-tasks-v1/implemented-reference.html">打开 HTML 参考</a>
               <a class="action" href="mobile-role-tasks-v1/README.md">打开说明</a>
             </div>
           </article>
@@ -758,6 +774,7 @@
               <span class="badge badge-evidence">截图证据</span>
             </div>
             <p class="purpose">保留岗位胶囊、刷新、同步信息、指标、筛选、任务列表和底部导航的早期方向证据。</p>
+            <p class="applies">参照范围：仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。</p>
             <div class="actions">
               <a class="action primary" href="mobile-role-tasks-v1/images/mobile-role-tasks-list-reference.png">查看 PNG / 截图</a>
               <a class="action" href="mobile-role-tasks-v1/images/">打开目录</a>
@@ -775,6 +792,7 @@
               <span class="badge badge-evidence">截图证据</span>
             </div>
             <p class="purpose">保留任务关键信息、风险提示、关联单据、最近动态、原因输入和底部动作栏的早期方向证据。</p>
+            <p class="applies">参照范围：仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。</p>
             <div class="actions">
               <a class="action primary" href="mobile-role-tasks-v1/images/mobile-role-task-detail-reference.png">查看 PNG / 截图</a>
               <a class="action" href="mobile-role-tasks-v1/images/">打开目录</a>
@@ -792,6 +810,7 @@
               <span class="badge badge-evidence">截图证据</span>
             </div>
             <p class="purpose">保留今日必须处理、卡点、等待他人、催办和已完成等分组的早期方向证据。</p>
+            <p class="applies">参照范围：仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。</p>
             <div class="actions">
               <a class="action primary" href="mobile-role-tasks-v1/images/mobile-role-risk-dashboard-reference.png">查看 PNG / 截图</a>
               <a class="action" href="mobile-role-tasks-v1/images/">打开目录</a>
@@ -800,13 +819,14 @@
         </div>
       </section>
 
-      <p class="empty" id="emptyState">没有匹配的原型资产。</p>
+      <p class="empty" id="emptyState">没有匹配的样板或参考资料。</p>
 
       <section class="rules" aria-labelledby="rules-heading">
         <h2 id="rules-heading">维护规则</h2>
         <ul>
           <li>新增资产时优先放在清晰的子目录，并同步补充本页和对应 README。</li>
-          <li>HTML 原型可直接用浏览器打开；PNG 只作为起草阶段、方案图、截图证据、方案对比或历史参考。</li>
+          <li>HTML 样板可直接用浏览器打开；PNG 只作为起草阶段、方案图、截图证据、方案对比或历史参考。</li>
+          <li>卡片里的参照范围只说明可借鉴的页面 / 菜单类型，不是正式菜单、路由、权限或 seedData 映射表。</li>
           <li>真实页面落地后，以 <code>web/src</code> 运行时代码、自动化测试和浏览器回归为准。</li>
           <li>本页不接后端、不进 ERP 正式菜单、不接权限、不跑构建。</li>
         </ul>
@@ -816,7 +836,7 @@
     <div class="preview-dialog" id="previewDialog" role="dialog" aria-modal="true" aria-labelledby="previewTitle" hidden>
       <div class="preview-bar">
         <div class="preview-title">
-          <strong id="previewTitle">原型全屏预览</strong>
+          <strong id="previewTitle">全屏预览</strong>
           <span id="previewPath"></span>
         </div>
         <button class="preview-close" id="previewClose" type="button">关闭</button>
@@ -909,7 +929,7 @@
 
         for (const asset of assets) {
           const category = asset.dataset.category || "";
-          const text = (asset.dataset.text || "").toLowerCase();
+          const text = `${asset.dataset.text || ""} ${asset.textContent || ""}`.toLowerCase();
           const statusMatches = currentFilter === "all" || category === currentFilter;
           const textMatches = !query || text.includes(query);
           const visible = statusMatches && textMatches;

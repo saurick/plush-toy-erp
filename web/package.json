@@ -9,6 +9,7 @@
     "axios": "^1.7.7",
     "crypto-js": "^4.2.0",
     "jwt-decode": "^4.0.0",
+    "mermaid": "^11.15.0",
     "mobx": "^6.13.3",
     "mobx-react-lite": "^4.0.7",
     "normalize.css": "^8.0.1",

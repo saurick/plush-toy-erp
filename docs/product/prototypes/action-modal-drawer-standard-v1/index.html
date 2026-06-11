@@ -60,6 +60,10 @@
           "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
+      body.overlay-open {
+        overflow: hidden;
+      }
+
       button,
       textarea {
         font: inherit;
@@ -238,6 +242,7 @@
         z-index: 10;
         display: none;
         background: var(--overlay);
+        overscroll-behavior: contain;
       }
 
       .drawer-backdrop.open,
@@ -520,14 +525,18 @@
         reason.removeAttribute("aria-invalid");
         reasonField.classList.remove("invalid");
         drawerHint.textContent = "提交前会校验 reason。";
+        document.body.classList.add("overlay-open");
         drawerBackdrop.classList.add("open");
         drawerBackdrop.setAttribute("aria-hidden", "false");
         reason.focus();
       }
 
       function closeDrawer() {
+        dangerModal.classList.remove("open");
+        dangerModal.setAttribute("aria-hidden", "true");
         drawerBackdrop.classList.remove("open");
         drawerBackdrop.setAttribute("aria-hidden", "true");
+        document.body.classList.remove("overlay-open");
       }
 
       function validateAndSubmit() {

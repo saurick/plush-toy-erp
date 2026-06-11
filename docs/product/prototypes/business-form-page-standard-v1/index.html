@@ -371,16 +371,13 @@
       }
 
       .footer {
-        position: sticky;
-        bottom: 0;
-        z-index: 3;
         display: flex;
         justify-content: space-between;
         gap: 12px;
         align-items: center;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: color-mix(in srgb, var(--panel) 96%, transparent);
+        background: var(--panel);
         box-shadow: var(--shadow);
         padding: 12px 14px;
       }
@@ -427,7 +424,7 @@
     <div class="app">
       <aside class="side" aria-label="后台导航">
         <div class="brand">
-          <div class="mark">永</div>
+          <div class="mark">样</div>
           <div>
             <strong>毛绒 ERP</strong>
             <span>表单页标准样板</span>
@@ -498,7 +495,7 @@
                   <div class="fields">
                     <div class="field" data-field="customer">
                       <label class="required" for="customer">客户</label>
-                      <input id="customer" value="永绅样例客户" />
+                      <input id="customer" value="样例客户 A" />
                       <span class="error">客户必填，不能用旧来源残值代替。</span>
                     </div>
                     <div class="field" data-field="orderNo">
@@ -588,7 +585,7 @@
 
     <script>
       const defaults = {
-        customer: "永绅样例客户",
+        customer: "样例客户 A",
         orderNo: "SO-202606-018",
         product: "毛绒挂件 A",
         quantity: "3000",
@@ -611,7 +608,7 @@
           guard:
             "来源切换已清空产品、数量、交期和附件。缺值不能用上一来源残值回补。",
           values: {
-            customer: "永绅样例客户",
+            customer: "样例客户 A",
             orderNo: "",
             product: "",
             quantity: "",

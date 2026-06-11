@@ -1,6 +1,185 @@
-import React from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Remarkable } from 'remarkable'
 import RemarkableReactRenderer from 'remarkable-react'
+
+const MERMAID_THEME_CONFIG = {
+  light: {
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#eef7ef',
+      primaryTextColor: '#173f2a',
+      primaryBorderColor: '#8cc49a',
+      lineColor: '#2f6f4e',
+      secondaryColor: '#f8fbf8',
+      tertiaryColor: '#ffffff',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    },
+  },
+  dark: {
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#16351f',
+      primaryTextColor: '#e5edf5',
+      primaryBorderColor: '#3f7d53',
+      lineColor: '#86efac',
+      secondaryColor: '#0f172a',
+      tertiaryColor: '#111827',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    },
+  },
+}
+
+let mermaidRenderSequence = 0
+
+function getCurrentERPTheme() {
+  if (typeof document === 'undefined') {
+    return 'light'
+  }
+  return document.documentElement.dataset.erpTheme === 'dark' ? 'dark' : 'light'
+}
+
+function useCurrentERPTheme() {
+  const [theme, setTheme] = useState(getCurrentERPTheme)
+
+  useEffect(() => {
+    if (
+      typeof document === 'undefined' ||
+      typeof MutationObserver === 'undefined'
+    ) {
+      return undefined
+    }
+
+    const root = document.documentElement
+    const syncTheme = () => {
+      setTheme(getCurrentERPTheme())
+    }
+    const observer = new MutationObserver(syncTheme)
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ['data-erp-theme'],
+    })
+    syncTheme()
+    return () => observer.disconnect()
+  }, [])
+
+  return theme
+}
+
+/* eslint-disable react/no-danger */
+function MermaidDiagram({ chart }) {
+  const theme = useCurrentERPTheme()
+  const diagramId = useMemo(() => {
+    mermaidRenderSequence += 1
+    return `erp-markdown-mermaid-${mermaidRenderSequence}`
+  }, [])
+  const [renderState, setRenderState] = useState({
+    status: 'loading',
+    svg: '',
+    error: '',
+  })
+
+  useEffect(() => {
+    const source = String(chart || '').trim()
+    let cancelled = false
+
+    if (!source) {
+      setRenderState({ status: 'empty', svg: '', error: '' })
+      return undefined
+    }
+
+    async function renderMermaid() {
+      setRenderState({ status: 'loading', svg: '', error: '' })
+      try {
+        const mermaidModule = await import('mermaid')
+        const mermaid = mermaidModule.default || mermaidModule
+        const renderTheme =
+          MERMAID_THEME_CONFIG[theme] || MERMAID_THEME_CONFIG.light
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: 'strict',
+          flowchart: {
+            htmlLabels: true,
+            curve: 'basis',
+          },
+          ...renderTheme,
+        })
+        const renderId = `${diagramId}-${theme}-${Date.now()}`
+        const { svg } = await mermaid.render(renderId, source)
+        if (!cancelled) {
+          setRenderState({ status: 'rendered', svg, error: '' })
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setRenderState({
+            status: 'error',
+            svg: '',
+            error:
+              error instanceof Error && error.message
+                ? error.message
+                : 'Mermaid 图表渲染失败',
+          })
+        }
+      }
+    }
+
+    renderMermaid()
+    return () => {
+      cancelled = true
+    }
+  }, [chart, diagramId, theme])
+
+  if (renderState.status === 'empty') {
+    return null
+  }
+
+  return (
+    <div
+      className={
+        renderState.status === 'error'
+          ? 'erp-markdown-mermaid erp-markdown-mermaid--error'
+          : 'erp-markdown-mermaid'
+      }
+      data-mermaid-status={renderState.status}
+    >
+      {renderState.status === 'loading' ? (
+        <div className="erp-markdown-mermaid__loading">
+          正在渲染 Mermaid 图表...
+        </div>
+      ) : null}
+      {renderState.status === 'rendered' ? (
+        // Mermaid returns the rendered SVG; securityLevel=strict is set above.
+        <div
+          className="erp-markdown-mermaid__canvas"
+          dangerouslySetInnerHTML={{ __html: renderState.svg }}
+        />
+      ) : null}
+      {renderState.status === 'error' ? (
+        <>
+          <div className="erp-markdown-mermaid__error" role="alert">
+            Mermaid 图表渲染失败，已保留源码：{renderState.error}
+          </div>
+          <pre className="erp-markdown-mermaid__source">
+            <code>{String(chart || '')}</code>
+          </pre>
+        </>
+      ) : null}
+    </div>
+  )
+}
+/* eslint-enable react/no-danger */
+
+function MarkdownPre({ type, params, content, children }) {
+  const language = String(params || '')
+    .trim()
+    .split(/\s+/)[0]
+    .toLowerCase()
+
+  if (type === 'fence' && language === 'mermaid') {
+    return <MermaidDiagram chart={content} />
+  }
+
+  return <pre>{children}</pre>
+}
 
 const stripHeadingMarkdown = (rawTitle = '') =>
   String(rawTitle || '')
@@ -99,7 +278,11 @@ const addHeadingIds = (node, headingQueue) => {
 // Markdown md展示
 export const Markdown = ({ source }) => {
   const md = new Remarkable()
-  md.renderer = new RemarkableReactRenderer()
+  md.renderer = new RemarkableReactRenderer({
+    components: {
+      pre: MarkdownPre,
+    },
+  })
   const headingQueue = extractMarkdownHeadings(source, [1, 2, 3, 4, 5, 6])
   return React.Children.map(md.render(source), (node) =>
     addHeadingIds(node, headingQueue)
