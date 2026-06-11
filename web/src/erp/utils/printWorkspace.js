@@ -341,6 +341,41 @@ export function readPrintWorkspaceWindowState(stateID, storageLike) {
   }
 }
 
+export function canOpenPrintWorkspaceFromWindowState(
+  templateKey,
+  searchParamsLike,
+  storageLike
+) {
+  const stateID = resolvePrintWorkspaceStateID(searchParamsLike)
+  const payload = readPrintWorkspaceWindowState(stateID, storageLike)
+
+  return (
+    normalizeTemplateKey(payload?.templateKey) ===
+      normalizeTemplateKey(templateKey) && Boolean(payload?.workspaceURL)
+  )
+}
+
+export function persistPrintWorkspaceDraftSnapshot(
+  storageKey,
+  draft,
+  storageLike
+) {
+  const normalizedStorageKey = String(storageKey || '').trim()
+  const storage =
+    storageLike || (typeof window !== 'undefined' ? window.localStorage : null)
+
+  if (!normalizedStorageKey || !storage) {
+    return false
+  }
+
+  try {
+    storage.setItem(normalizedStorageKey, JSON.stringify(draft))
+    return true
+  } catch (error) {
+    return false
+  }
+}
+
 export function syncPrintWorkspaceShellHistory(stateID) {
   if (
     typeof window === 'undefined' ||

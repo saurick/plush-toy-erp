@@ -535,7 +535,7 @@
           </p>
         </div>
         <aside class="meta" aria-label="资产统计">
-          <div class="meta-row"><span>HTML 样板</span><strong>7</strong></div>
+          <div class="meta-row"><span>HTML 样板</span><strong>8</strong></div>
           <div class="meta-row"><span>PNG / 截图</span><strong>6</strong></div>
           <div class="meta-row"><span>维护方式</span><strong>手工登记</strong></div>
         </aside>
@@ -586,6 +586,32 @@
         </div>
       </section>
 
+      <section class="section" aria-labelledby="print-heading">
+        <div class="section-head">
+          <div>
+            <h2 id="print-heading">模板打印中心 / Print Template Center</h2>
+            <p class="section-note">用于评审模板导航、纸面预览和打印窗口入口，不把打印中心做成字段配置页。</p>
+          </div>
+          <a class="open-readme" href="print-template-center-v1/README.md">打开说明</a>
+        </div>
+        <div class="asset-list">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="模板打印中心 样板 HTML print-template-center-v1 采购合同 加工合同 模板导航 纸面预览 打印窗口 字段编辑 待实现">
+            <div class="name">
+              <p class="asset-title">模板打印中心样板</p>
+              <div class="dir">print-template-center-v1/</div>
+            </div>
+            <span class="type type-html">HTML</span>
+            <div class="badges"><span class="badge badge-implement">待实现</span></div>
+            <p class="purpose">保留模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。</p>
+            <p class="applies">参照范围：模板打印中心可参照；只表达采购合同和加工合同两套正式模板入口，不新增样品确认单、字段映射配置、后端 API、RBAC 或 Fact 写入。</p>
+            <div class="actions">
+              <a class="action primary" href="print-template-center-v1/index.html">打开 HTML 样板</a>
+              <a class="action" href="print-template-center-v1/README.md">打开说明</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section class="section" aria-labelledby="business-heading">
         <div class="section-head">
           <div>
@@ -595,14 +621,14 @@
           <a class="open-readme" href="business-module-page-standard-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务模块标准页 样板 HTML business-module-page-standard-v1 标题摘要 少量筛选 表格 当前记录 协同入口 待实现 客户档案 供应商档案 产品 销售订单 采购 库存 出货 生产 质检 财务 发票">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务模块标准页 样板 HTML business-module-page-standard-v1 标题摘要 独立筛选 结果工具条 表格 当前记录 主表分页 协同入口 待实现 客户档案 供应商档案 产品 销售订单 采购 库存 出货 生产 质检 财务 发票">
             <div class="name">
               <p class="asset-title">业务模块标准页样板</p>
               <div class="dir">business-module-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。</p>
+            <p class="purpose">保留标题摘要、独立筛选条、结果工具条、表格、当前记录操作条、主表分页和底部轻量协同入口。</p>
             <p class="applies">参照范围：客户档案、供应商档案、产品、销售订单、辅材 / 包材采购、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/index.html">打开 HTML 样板</a>
@@ -707,15 +733,15 @@
             </div>
           </article>
 
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="新建 编辑 表单 标准样板 HTML business-form-page-standard-v1 字段分组 必填 校验 来源带值 清值 残值防护 待实现 客户 供应商 联系人 销售订单 采购 库存 质检 财务">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="新建 编辑 表单 标准样板 HTML business-form-page-standard-v1 首个落地对象 字段分组 必填 校验 来源带值 清值 新增 编辑 只读 残值防护 待实现 客户 供应商 联系人 销售订单 采购 库存 质检 财务">
             <div class="name">
               <p class="asset-title">新建 / 编辑表单标准样板</p>
               <div class="dir">business-form-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">覆盖字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值和缺值 / 残值防护。</p>
-            <p class="applies">参照范围：客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；字段真源以 schema、API 和保存 usecase 为准。</p>
+            <p class="purpose">覆盖首个落地对象、字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。</p>
+            <p class="applies">参照范围：客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；真实落地建议先收窄到销售订单，字段真源以 schema、API、RBAC 和保存 usecase 为准。</p>
             <div class="actions">
               <a class="action primary" href="business-form-page-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="business-form-page-standard-v1/README.md">打开说明</a>

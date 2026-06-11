@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { message } from '@/common/utils/antdApp'
+import { message, modal } from '@/common/utils/antdApp'
 import {
   applyDetailCellMerge,
+  buildBlankMaterialPurchaseContractDraft,
   MATERIAL_PURCHASE_DETAIL_COLUMNS,
   MATERIAL_PURCHASE_MAX_ROWS,
   buildMaterialPurchaseContractDraft,
@@ -23,7 +24,10 @@ import {
   openPdfPreviewFromElement,
   warmupPdfPreviewFromElement,
 } from '../../utils/printPdf.mjs'
-import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../../utils/printWorkspace.js'
+import {
+  MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+  persistPrintWorkspaceDraftSnapshot,
+} from '../../utils/printWorkspace.js'
 import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
@@ -218,7 +222,7 @@ export default function MaterialPurchaseContractWorkbench({
     if (!draftStorageKey || typeof window === 'undefined') {
       return
     }
-    window.localStorage.setItem(draftStorageKey, JSON.stringify(draft))
+    persistPrintWorkspaceDraftSnapshot(draftStorageKey, draft)
   }, [draft, draftStorageKey])
 
   useEffect(() => {
@@ -542,6 +546,28 @@ export default function MaterialPurchaseContractWorkbench({
     setToolbarStatus('已恢复为实拍对照样例。')
   }
 
+  const handleBlankDraft = () => {
+    modal.confirm({
+      title: '生成空白采购合同',
+      content:
+        '将清空当前窗口中的字段值和明细，保留模板结构与合同条款。此操作不会修改业务记录。',
+      okText: '生成空白模板',
+      cancelText: '取消',
+      onOk: () => {
+        setDraft((currentDraft) =>
+          buildBlankMaterialPurchaseContractDraft(currentDraft)
+        )
+        setFormulaVisible(false)
+        setRowSelectionMode(false)
+        resetRowSelection()
+        setCellSelectionMode(false)
+        resetCellSelection()
+        setToolbarStatus('已生成空白采购合同，模板结构和合同条款已保留。')
+        message.success('已生成空白采购合同')
+      },
+    })
+  }
+
   const getToolbarButtonClassName = ({
     active = false,
     primary = false,
@@ -861,6 +887,13 @@ export default function MaterialPurchaseContractWorkbench({
               onClick={handleResetDraft}
             >
               恢复样例
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName()}
+              onClick={handleBlankDraft}
+            >
+              空白模板
             </button>
           </div>
 

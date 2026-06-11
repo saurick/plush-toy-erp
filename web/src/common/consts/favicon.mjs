@@ -4,6 +4,7 @@ import { DEV_DOCS_ROUTE } from '../../erp/config/devDocs.mjs'
 import { DEV_HUB_ROUTE } from '../../erp/config/devHub.mjs'
 import { DEV_PROTOTYPES_ROUTE } from '../../erp/config/devPrototypes.mjs'
 import { DEV_TESTING_ROUTE } from '../../erp/config/devTesting.mjs'
+import { getPrintTemplateByKey } from '../../erp/config/printTemplates.mjs'
 
 export const ERP_FAVICON_VARIANTS = Object.freeze({
   admin: Object.freeze({
@@ -75,6 +76,49 @@ function buildCustomerFaviconVariant(href = '') {
   })
 }
 
+function escapeSVGText(text = '') {
+  return String(text)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+function getFirstVisibleGlyph(text = '', fallback = '模') {
+  return (
+    Array.from(String(text || '').trim()).find((glyph) => glyph.trim()) ||
+    fallback
+  )
+}
+
+function buildPrintTemplateFaviconHref(glyph) {
+  const safeGlyph = escapeSVGText(getFirstVisibleGlyph(glyph))
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Print template favicon"><rect width="256" height="256" rx="52" fill="#7c3f12"/><rect x="46" y="42" width="164" height="172" rx="24" fill="#fff7ed"/><path d="M78 82h100M78 120h100M78 158h66" stroke="#fed7aa" stroke-width="14" stroke-linecap="round"/><text x="128" y="165" text-anchor="middle" font-family="Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif" font-size="92" font-weight="700" fill="#7c2d12">${safeGlyph}</text></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
+function resolvePrintTemplateKeyFromPath(pathname = '') {
+  const match = normalizePathname(pathname).match(
+    /^\/erp\/print-workspace\/([^/]+)\/?$/
+  )
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
+function buildPrintTemplateFaviconVariant(pathname = '') {
+  const templateKey = resolvePrintTemplateKeyFromPath(pathname)
+  const template = getPrintTemplateByKey(templateKey)
+  if (!template) {
+    return null
+  }
+
+  const glyph = getFirstVisibleGlyph(template.shortTitle || template.title)
+  return Object.freeze({
+    key: `print-template:${template.key}`,
+    href: buildPrintTemplateFaviconHref(glyph),
+    type: 'image/svg+xml',
+    glyph,
+  })
+}
+
 export function resolveERPFavicon(pathname = '', options = {}) {
   const normalizedPathname = normalizePathname(pathname)
   const normalizedFromPathname = options.fromPathname
@@ -100,6 +144,11 @@ export function resolveERPFavicon(pathname = '', options = {}) {
   }
   if (normalizedPathname === DEV_CUSTOMER_CONFIG_ROUTE) {
     return ERP_FAVICON_VARIANTS.customerConfig
+  }
+  const printTemplateFavicon =
+    buildPrintTemplateFaviconVariant(normalizedPathname)
+  if (printTemplateFavicon) {
+    return printTemplateFavicon
   }
   const customerFavicon = buildCustomerFaviconVariant(
     options.customerFaviconHref

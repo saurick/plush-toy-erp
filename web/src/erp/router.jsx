@@ -29,6 +29,7 @@ import {
   resolveMobileTasksPath,
 } from './config/entryConfig.mjs'
 import { getAllowedMobileRoleKeys } from './utils/mobileRolePermissions.mjs'
+import { canOpenPrintWorkspaceFromWindowState } from './utils/printWorkspace.js'
 
 const AdminUsersPage = lazy(() => import('@/pages/AdminUsers'))
 const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
@@ -115,6 +116,25 @@ function RouteLoadingFallback() {
       fullscreen
       className="loading-page--erp"
     />
+  )
+}
+
+function PrintWorkspaceRoute() {
+  const { templateKey } = useParams()
+  const location = useLocation()
+  const canRestoreFromWindowState = canOpenPrintWorkspaceFromWindowState(
+    templateKey,
+    location.search
+  )
+
+  if (canRestoreFromWindowState) {
+    return <PrintWorkspacePage />
+  }
+
+  return (
+    <AuthGuard requireAdmin>
+      <PrintWorkspacePage />
+    </AuthGuard>
   )
 }
 
@@ -334,11 +354,7 @@ export default function ERPRouter() {
 
         <Route
           path="/erp/print-workspace/:templateKey"
-          element={
-            <AuthGuard requireAdmin>
-              <PrintWorkspacePage />
-            </AuthGuard>
-          }
+          element={<PrintWorkspaceRoute />}
         />
 
         <Route

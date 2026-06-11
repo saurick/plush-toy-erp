@@ -189,6 +189,11 @@
         color: #fff;
       }
 
+      .btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.58;
+      }
+
       .btn.text {
         border-color: transparent;
         background: transparent;
@@ -273,9 +278,36 @@
         color: var(--red);
       }
 
+      .review-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        border-top: 1px solid var(--line);
+        padding: 14px 18px;
+      }
+
+      .review-card {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 11px;
+      }
+
+      .review-card strong,
+      .review-card span {
+        display: block;
+      }
+
+      .review-card span {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 4px;
+      }
+
       .source-strip {
         display: grid;
-        grid-template-columns: minmax(220px, 340px) minmax(0, 1fr);
+        grid-template-columns: minmax(210px, 300px) minmax(180px, 240px) minmax(0, 1fr);
         gap: 12px;
         align-items: start;
         border-top: 1px solid var(--line);
@@ -347,6 +379,13 @@
         resize: vertical;
       }
 
+      input:disabled,
+      select:disabled,
+      textarea:disabled {
+        cursor: not-allowed;
+        opacity: 0.72;
+      }
+
       [aria-invalid="true"] {
         border-color: var(--red);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent);
@@ -368,6 +407,11 @@
         background: var(--amber-soft);
         color: var(--amber);
         padding: 12px;
+      }
+
+      .guard ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
       }
 
       .footer {
@@ -393,6 +437,7 @@
 
         .topbar,
         .hero,
+        .review-grid,
         .source-strip,
         .footer {
           grid-template-columns: 1fr;
@@ -452,7 +497,7 @@
           <div class="actions">
             <button class="btn">取消</button>
             <button class="btn" id="resetForm" type="button">重置</button>
-            <button class="btn primary" id="saveForm" type="button">保存草稿</button>
+            <button class="btn primary save-action" id="saveForm" type="button">保存草稿</button>
           </div>
         </header>
 
@@ -462,15 +507,34 @@
               <div class="hero">
                 <div>
                   <div class="crumb">ERP / 标准表单页 / To Implement</div>
-                  <h2>销售订单草稿</h2>
+                  <h2>销售订单表单样板</h2>
                   <p class="summary">
-                    表单页按来源、客户、明细和交付信息分组。来源带值、切换来源后的清值和缺值 / 残值防护必须在保存前可见。
+                    首个真实落地对象建议收窄到销售订单新建 / 编辑；同类表单只复用页面骨架、状态表达和残值 / 缺值防护方式。
                   </p>
                 </div>
                 <div class="tags">
                   <span class="tag blue">字段分组</span>
                   <span class="tag amber">残值防护</span>
                   <span class="tag green">不改 schema</span>
+                </div>
+              </div>
+
+              <div class="review-grid" aria-label="进入真实实现前确认项">
+                <div class="review-card">
+                  <strong>首个落地对象</strong>
+                  <span>先以销售订单表单验证骨架，不同时铺开到所有菜单。</span>
+                </div>
+                <div class="review-card">
+                  <strong>字段真源</strong>
+                  <span>字段、默认值、保存规则回到 schema、API 和 usecase。</span>
+                </div>
+                <div class="review-card">
+                  <strong>状态覆盖</strong>
+                  <span>新增、编辑、只读、无权限和保存失败都要可解释。</span>
+                </div>
+                <div class="review-card">
+                  <strong>不吸收内容</strong>
+                  <span>不吸收静态数据、dev-only 外壳、假客户或后端事实。</span>
                 </div>
               </div>
 
@@ -483,6 +547,15 @@
                     <option value="empty">无来源 / 手工草稿</option>
                   </select>
                   <small>切换来源时，来源快照字段必须同步替换或清空。</small>
+                </div>
+                <div class="field">
+                  <label for="formMode">页面状态</label>
+                  <select id="formMode">
+                    <option value="create">新增草稿</option>
+                    <option value="edit">编辑草稿</option>
+                    <option value="readonly">已提交只读</option>
+                  </select>
+                  <small id="modeNote">新增态允许保存草稿；真实权限由 RBAC 和 usecase 决定。</small>
                 </div>
                 <div class="source-note" id="sourceNote">
                   已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件引用，避免旧值残留。
@@ -555,7 +628,9 @@
                       <select id="status">
                         <option>草稿</option>
                         <option>待提交</option>
+                        <option>已提交只读</option>
                       </select>
+                      <small>已提交或无权限时只读展示，不能继续本地保存。</small>
                     </div>
                     <div class="field" style="grid-column: 1 / -1">
                       <label for="remark">备注</label>
@@ -565,7 +640,12 @@
                 </section>
 
                 <div class="guard" id="guard">
-                  当前来源已带出 4 个字段。保存前检查：切换来源后旧产品、旧数量、旧交期和旧附件不得继续残留。
+                  当前来源已带出 4 个字段。保存前检查：
+                  <ul>
+                    <li>切换来源后旧产品、旧数量、旧交期和旧附件不得继续残留。</li>
+                    <li>缺值不能由前端伪造，必须由人工输入或真实接口回补。</li>
+                    <li>只读或无权限状态不得继续提交保存动作。</li>
+                  </ul>
                 </div>
               </form>
             </section>
@@ -575,7 +655,7 @@
               <div class="actions">
                 <button class="btn">取消</button>
                 <button class="btn" id="footerReset" type="button">重置</button>
-                <button class="btn primary" id="footerSave" type="button">保存草稿</button>
+                <button class="btn primary save-action" id="footerSave" type="button">保存草稿</button>
               </div>
             </div>
           </div>
@@ -635,10 +715,29 @@
       };
 
       const source = document.querySelector("#source");
+      const formMode = document.querySelector("#formMode");
       const sourceNote = document.querySelector("#sourceNote");
       const guard = document.querySelector("#guard");
+      const modeNote = document.querySelector("#modeNote");
       const footerState = document.querySelector("#footerState");
       const requiredFields = ["customer", "orderNo", "product", "quantity", "dueDate"];
+      const editableFieldIds = [
+        "customer",
+        "orderNo",
+        "owner",
+        "product",
+        "quantity",
+        "dueDate",
+        "warehouse",
+        "attachment",
+        "status",
+        "remark",
+      ];
+      const modeNotes = {
+        create: "新增态允许保存草稿；真实权限由 RBAC 和 usecase 决定。",
+        edit: "编辑态允许覆盖草稿字段；已提交事实不得在前端直接改写。",
+        readonly: "只读态用于已提交或无权限记录；页面保留回显但关闭保存动作。",
+      };
 
       function setValue(id, value) {
         const field = document.querySelector(`#${id}`);
@@ -661,6 +760,28 @@
         guard.textContent = data.guard;
         footerState.textContent = "来源已切换，保存前需重新校验必填与残值。";
         clearErrors();
+        applyMode(formMode.value);
+      }
+
+      function applyMode(name) {
+        const readonly = name === "readonly";
+        editableFieldIds.forEach((id) => {
+          const field = document.querySelector(`#${id}`);
+          if (field) field.disabled = readonly;
+        });
+        document.querySelectorAll(".save-action").forEach((button) => {
+          button.disabled = readonly;
+          button.textContent = readonly ? "只读不可保存" : "保存草稿";
+        });
+        modeNote.textContent = modeNotes[name] || modeNotes.create;
+        if (readonly) {
+          clearErrors();
+          footerState.textContent = "当前为只读示例：真实保存入口应由权限和状态共同关闭。";
+        } else if (name === "edit") {
+          footerState.textContent = "当前为编辑示例：保存前仍需校验字段真源和残值清理。";
+        } else {
+          footerState.textContent = "当前为新增示例：保存前需校验必填与来源清值。";
+        }
       }
 
       function validateForm() {
@@ -679,16 +800,20 @@
       }
 
       source.addEventListener("change", () => applySource(source.value));
+      formMode.addEventListener("change", () => applyMode(formMode.value));
       document.querySelector("#saveForm").addEventListener("click", validateForm);
       document.querySelector("#footerSave").addEventListener("click", validateForm);
       document.querySelector("#resetForm").addEventListener("click", () => {
         source.value = "sales";
+        formMode.value = "create";
         applySource("sales");
       });
       document.querySelector("#footerReset").addEventListener("click", () => {
         source.value = "sales";
+        formMode.value = "create";
         applySource("sales");
       });
+      applyMode(formMode.value);
     </script>
   </body>
 </html>

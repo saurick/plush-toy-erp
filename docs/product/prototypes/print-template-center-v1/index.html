@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>模板打印中心样板</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #eef4ef;
+        --panel: #ffffff;
+        --panel-soft: #f8fbf8;
+        --line: #dbe7df;
+        --line-strong: #c7d8cf;
+        --text: #172033;
+        --muted: #68778b;
+        --green: #188545;
+        --green-strong: #14733b;
+        --green-soft: #edf8f1;
+        --blue: #2468c9;
+        --blue-soft: #edf4ff;
+        --amber: #a15b10;
+        --amber-soft: #fff6e8;
+        --shadow: 0 10px 28px rgb(15 23 42 / 8%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #101827;
+          --panel: #182235;
+          --panel-soft: #202c42;
+          --line: #334157;
+          --line-strong: #46566f;
+          --text: #edf3fb;
+          --muted: #aab7ca;
+          --green: #7dd8ad;
+          --green-strong: #5fc991;
+          --green-soft: #193b2b;
+          --blue: #8bb5ff;
+          --blue-soft: #1f3556;
+          --amber: #f0bd67;
+          --amber-soft: #463214;
+          --shadow: 0 18px 44px rgb(0 0 0 / 28%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .app {
+        min-height: 100vh;
+        padding: 8px;
+      }
+
+      .shell {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgb(255 255 255 / 94%);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .panel {
+          background: rgb(24 34 53 / 94%);
+        }
+      }
+
+      .header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: center;
+        padding: 14px 18px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      h1 {
+        margin-top: 2px;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      .summary {
+        max-width: 860px;
+        margin-top: 6px;
+        color: var(--muted);
+      }
+
+      .header-actions,
+      .chips,
+      .paper-meta,
+      .launch-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .header-actions {
+        justify-content: flex-end;
+      }
+
+      .chip {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-weight: 650;
+        padding: 0 10px;
+        white-space: nowrap;
+      }
+
+      .chip.green {
+        border-color: #a7d8bd;
+        background: var(--green-soft);
+        color: var(--green-strong);
+      }
+
+      .btn {
+        min-height: 36px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        font-weight: 700;
+        padding: 0 12px;
+      }
+
+      .btn.primary {
+        border-color: var(--green);
+        background: var(--green);
+        color: #fff;
+      }
+
+      .btn.ghost {
+        background: var(--panel-soft);
+        color: var(--muted);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(260px, 0.76fr) minmax(440px, 1.64fr);
+        gap: 8px;
+      }
+
+      .template-list {
+        display: grid;
+        align-content: start;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .template-card {
+        width: 100%;
+        min-height: 112px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        text-align: left;
+        padding: 13px;
+      }
+
+      .template-card[aria-pressed="true"] {
+        border-color: #99c9ad;
+        background: linear-gradient(180deg, var(--green-soft), var(--panel));
+        box-shadow: inset 3px 0 0 var(--green);
+      }
+
+      .template-card h2 {
+        font-size: 18px;
+        line-height: 1.25;
+      }
+
+      .template-card p {
+        margin-top: 6px;
+        color: var(--muted);
+      }
+
+      .template-card .chips {
+        margin-top: 10px;
+      }
+
+      .preview {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-height: 660px;
+      }
+
+      .preview-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel-soft);
+        padding: 12px 16px;
+      }
+
+      .preview-head h2 {
+        font-size: 20px;
+      }
+
+      .paper-meta {
+        margin-top: 6px;
+        color: var(--muted);
+      }
+
+      .paper-stage {
+        min-width: 0;
+        overflow: auto;
+        padding: 18px;
+      }
+
+      .paper {
+        width: min(760px, 100%);
+        min-height: 930px;
+        margin: 0 auto;
+        border: 1px solid #d8dee7;
+        border-radius: 6px;
+        background: #fff;
+        color: #111827;
+        box-shadow: 0 12px 30px rgb(15 23 42 / 15%);
+        padding: 30px;
+      }
+
+      .paper-title {
+        text-align: center;
+      }
+
+      .paper-title h3 {
+        font-size: 24px;
+        letter-spacing: 0;
+      }
+
+      .paper-title p {
+        margin-top: 6px;
+        color: #5f6b7a;
+      }
+
+      .paper-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 14px;
+        margin-top: 24px;
+      }
+
+      .paper-field {
+        display: grid;
+        grid-template-columns: 90px minmax(0, 1fr);
+        gap: 8px;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 7px;
+      }
+
+      .paper-field span {
+        color: #64748b;
+      }
+
+      .paper-table {
+        width: 100%;
+        margin-top: 24px;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+
+      .paper-table th,
+      .paper-table td {
+        border: 1px solid #d7dee8;
+        padding: 9px 8px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .paper-table th {
+        background: #f8fafc;
+        color: #334155;
+      }
+
+      .paper-note {
+        display: grid;
+        gap: 8px;
+        margin-top: 24px;
+        color: #334155;
+      }
+
+      .paper-sign {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin-top: 40px;
+      }
+
+      .paper-sign div {
+        border-top: 1px solid #cbd5e1;
+        padding-top: 8px;
+        color: #475569;
+      }
+
+      .launch-panel {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 20;
+        width: min(420px, calc(100vw - 36px));
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 18px 42px rgb(15 23 42 / 18%);
+        padding: 14px;
+      }
+
+      .launch-panel[hidden] {
+        display: none;
+      }
+
+      .launch-panel h2 {
+        font-size: 16px;
+      }
+
+      .launch-panel p {
+        margin-top: 6px;
+        color: var(--muted);
+      }
+
+      .launch-actions {
+        justify-content: flex-end;
+        margin-top: 12px;
+      }
+
+      @media (max-width: 980px) {
+        .header,
+        .preview-head,
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .header-actions {
+          justify-content: flex-start;
+        }
+
+        .preview {
+          min-height: auto;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .app {
+          padding: 6px;
+        }
+
+        .header,
+        .preview-head {
+          padding: 12px;
+        }
+
+        h1 {
+          font-size: 21px;
+        }
+
+        .paper-stage {
+          padding: 10px;
+        }
+
+        .paper {
+          min-height: 760px;
+          padding: 18px;
+        }
+
+        .paper-grid,
+        .paper-sign {
+          grid-template-columns: 1fr;
+        }
+
+        .paper-field {
+          grid-template-columns: 78px minmax(0, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="shell">
+        <header class="panel header">
+          <div>
+            <div class="eyebrow">运营工具 / 打印</div>
+            <h1>模板打印中心</h1>
+            <p class="summary">
+              选择当前要打印的模板，检查纸面预览后进入独立打印窗口；字段编辑、明细确认和浏览器打印都在打印窗口完成。
+            </p>
+          </div>
+          <div class="header-actions">
+            <span class="chip green" id="sourceChip">默认样例</span>
+            <button class="btn ghost" type="button" id="resetButton">恢复默认</button>
+            <button class="btn primary" type="button" id="printButton">打开打印窗口</button>
+          </div>
+        </header>
+
+        <section class="workspace" aria-label="模板打印中心工作区">
+          <aside class="panel template-list" aria-label="模板导航">
+            <button class="template-card" type="button" data-template="material" aria-pressed="true">
+              <h2>采购合同</h2>
+              <p>适用于辅材 / 包材采购。业务页选中记录后可带值打开。</p>
+              <div class="chips">
+                <span class="chip green">正式模板</span>
+                <span class="chip">纸面预览</span>
+              </div>
+            </button>
+            <button class="template-card" type="button" data-template="processing" aria-pressed="false">
+              <h2>加工合同</h2>
+              <p>适用于委外加工 / 外发订单。明细行在独立打印窗口确认。</p>
+              <div class="chips">
+                <span class="chip green">正式模板</span>
+                <span class="chip">业务带值</span>
+              </div>
+            </button>
+          </aside>
+
+          <section class="panel preview" aria-label="纸面预览">
+            <div class="preview-head">
+              <div>
+                <div class="eyebrow" id="previewEyebrow">当前模板</div>
+                <h2 id="previewTitle">采购合同</h2>
+                <div class="paper-meta">
+                  <span id="recordLabel">样例单据 PC-2026-0601</span>
+                  <span>固定浅色纸面</span>
+                  <span>字段编辑在打印窗口内完成</span>
+                </div>
+              </div>
+              <button class="btn primary" type="button" id="previewPrintButton">打印当前模板</button>
+            </div>
+
+            <div class="paper-stage">
+              <article class="paper" aria-label="合同纸面预览">
+                <div class="paper-title">
+                  <h3 id="paperTitle">采购合同</h3>
+                  <p id="paperSubtitle">Purchase Contract</p>
+                </div>
+                <div class="paper-grid" id="paperFields"></div>
+                <table class="paper-table">
+                  <thead>
+                    <tr id="paperTableHead"></tr>
+                  </thead>
+                  <tbody id="paperTableBody"></tbody>
+                </table>
+                <div class="paper-note" id="paperNotes"></div>
+                <div class="paper-sign">
+                  <div>制单</div>
+                  <div>审核</div>
+                  <div>确认</div>
+                </div>
+              </article>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <section class="launch-panel" id="launchPanel" hidden aria-live="polite">
+      <h2 id="launchTitle">已准备打开打印窗口</h2>
+      <p id="launchCopy">独立窗口会承接字段编辑、明细确认和浏览器打印。</p>
+      <div class="launch-actions">
+        <button class="btn ghost" type="button" id="closeLaunchButton">关闭</button>
+        <button class="btn primary" type="button">进入打印窗口</button>
+      </div>
+    </section>
+
+    <script>
+      const templates = {
+        material: {
+          title: '采购合同',
+          subtitle: 'Purchase Contract',
+          source: '默认样例',
+          record: '样例单据 PC-2026-0601',
+          fields: [
+            ['合同编号', 'PC-2026-0601'],
+            ['供应商', '华东辅料供应商'],
+            ['采购日期', '2026-06-11'],
+            ['交付仓库', '辅料仓'],
+            ['经办人', '采购一组'],
+            ['结算方式', '月结 30 天'],
+          ],
+          columns: ['物料', '规格', '数量', '单价', '金额'],
+          rows: [
+            ['短毛绒面料', '米白 / 1.6m', '320 米', '18.50', '5,920.00'],
+            ['PP 棉', 'A级 / 15kg', '24 包', '168.00', '4,032.00'],
+            ['吊牌', '通用款', '2,000 张', '0.18', '360.00'],
+          ],
+          notes: ['交期按双方确认的采购计划执行。', '纸面预览只表达版式，实际字段以独立打印窗口和业务带值为准。'],
+        },
+        processing: {
+          title: '加工合同',
+          subtitle: 'Processing Contract',
+          source: '业务带值样例',
+          record: '样例单据 OC-2026-0608',
+          fields: [
+            ['合同编号', 'OC-2026-0608'],
+            ['加工方', '南通外发加工厂'],
+            ['产品', '海獭玩偶 28cm'],
+            ['计划交期', '2026-06-28'],
+            ['经办人', '生产协调'],
+            ['结算方式', '验收后结算'],
+          ],
+          columns: ['工序 / 产品', '颜色', '数量', '单价', '备注'],
+          rows: [
+            ['缝制加工', '浅棕', '1,200 只', '6.80', '含返修'],
+            ['填充整形', '浅棕', '1,200 只', '2.10', '按质检标准'],
+            ['包装入袋', '透明袋', '1,200 只', '0.45', '随货清点'],
+          ],
+          notes: ['加工方按样品和工艺单执行。', '明细行、条款和签章栏在独立打印窗口确认。'],
+        },
+      }
+
+      const cards = Array.from(document.querySelectorAll('.template-card'))
+      const sourceChip = document.getElementById('sourceChip')
+      const previewTitle = document.getElementById('previewTitle')
+      const recordLabel = document.getElementById('recordLabel')
+      const paperTitle = document.getElementById('paperTitle')
+      const paperSubtitle = document.getElementById('paperSubtitle')
+      const paperFields = document.getElementById('paperFields')
+      const paperTableHead = document.getElementById('paperTableHead')
+      const paperTableBody = document.getElementById('paperTableBody')
+      const paperNotes = document.getElementById('paperNotes')
+      const launchPanel = document.getElementById('launchPanel')
+      const launchTitle = document.getElementById('launchTitle')
+      const launchCopy = document.getElementById('launchCopy')
+
+      let currentTemplateKey = 'material'
+
+      function renderTemplate(key) {
+        const template = templates[key]
+        currentTemplateKey = key
+        cards.forEach((card) => {
+          card.setAttribute('aria-pressed', String(card.dataset.template === key))
+        })
+        sourceChip.textContent = template.source
+        previewTitle.textContent = template.title
+        recordLabel.textContent = template.record
+        paperTitle.textContent = template.title
+        paperSubtitle.textContent = template.subtitle
+        paperFields.innerHTML = template.fields
+          .map(
+            ([label, value]) =>
+              `<div class="paper-field"><span>${label}</span><strong>${value}</strong></div>`
+          )
+          .join('')
+        paperTableHead.innerHTML = template.columns
+          .map((column) => `<th>${column}</th>`)
+          .join('')
+        paperTableBody.innerHTML = template.rows
+          .map(
+            (row) =>
+              `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`
+          )
+          .join('')
+        paperNotes.innerHTML = template.notes
+          .map((note) => `<p>${note}</p>`)
+          .join('')
+        launchPanel.hidden = true
+      }
+
+      function showLaunchPanel() {
+        const template = templates[currentTemplateKey]
+        launchTitle.textContent = `已准备打开${template.title}打印窗口`
+        launchCopy.textContent =
+          '独立窗口会承接字段编辑、明细确认和浏览器打印；本页只保留模板选择和纸面预览。'
+        launchPanel.hidden = false
+      }
+
+      cards.forEach((card) => {
+        card.addEventListener('click', () => renderTemplate(card.dataset.template))
+      })
+
+      document.getElementById('resetButton').addEventListener('click', () => {
+        renderTemplate('material')
+      })
+      document.getElementById('printButton').addEventListener('click', showLaunchPanel)
+      document
+        .getElementById('previewPrintButton')
+        .addEventListener('click', showLaunchPanel)
+      document
+        .getElementById('closeLaunchButton')
+        .addEventListener('click', () => {
+          launchPanel.hidden = true
+        })
+
+      renderTemplate(currentTemplateKey)
+    </script>
+  </body>
+</html>

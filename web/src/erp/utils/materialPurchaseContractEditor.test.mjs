@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   applyDetailCellMerge,
+  buildBlankMaterialPurchaseContractDraft,
   buildMaterialPurchaseContractDraft,
   computeMaterialPurchaseTotals,
   deleteMaterialPurchaseLine,
@@ -121,14 +122,60 @@ test('materialPurchaseContractEditor: 采购金额提交时会清洗非法字符
 
 test('materialPurchaseContractEditor: 草稿会保留独立签字字段且默认不带印章', () => {
   const draft = buildMaterialPurchaseContractDraft({
-    buyerContact: '郭伟锋',
-    buyerSigner: '郭细云',
+    buyerContact: '采购负责人',
+    buyerSigner: '签字人',
   })
 
-  assert.equal(draft.buyerContact, '郭伟锋')
-  assert.equal(draft.buyerSigner, '郭细云')
+  assert.equal(draft.buyerContact, '采购负责人')
+  assert.equal(draft.buyerSigner, '签字人')
   assert.equal(draft.supplierSigner, '')
   assert.equal(draft.buyerStampVisible, false)
+})
+
+test('materialPurchaseContractEditor: 空白模板清空示例字段和明细但保留合同条款', () => {
+  const blankDraft = buildBlankMaterialPurchaseContractDraft({
+    ...sampleDraft,
+    supplierName: '示例供应商',
+    buyerCompany: '本公司',
+    buyerSigner: '签字人',
+    clauses: {
+      delivery: ['保留来货要求'],
+      contract: ['保留合同约定'],
+      settlement: ['保留结算方式'],
+    },
+    merges: [
+      {
+        rowStart: 0,
+        rowEnd: 0,
+        colStart: 0,
+        colEnd: 1,
+      },
+    ],
+  })
+
+  assert.equal(blankDraft.contractNo, '')
+  assert.equal(blankDraft.supplierName, '')
+  assert.equal(blankDraft.buyerCompany, '')
+  assert.equal(blankDraft.buyerSigner, '')
+  assert.equal(blankDraft.lines.length, 1)
+  assert.deepEqual(blankDraft.lines[0], {
+    contractNo: '',
+    productOrderNo: '',
+    productNo: '',
+    productName: '',
+    materialName: '',
+    vendorCode: '',
+    spec: '',
+    unit: '',
+    unitPrice: '',
+    quantity: '',
+    amount: '',
+    remark: '',
+  })
+  assert.deepEqual(blankDraft.clauses.delivery, ['保留来货要求'])
+  assert.deepEqual(blankDraft.clauses.contract, ['保留合同约定'])
+  assert.deepEqual(blankDraft.clauses.settlement, ['保留结算方式'])
+  assert.deepEqual(blankDraft.merges, [])
 })
 
 test('FL_material_purchase_merge__clears_covered_cell_stale_value materialPurchaseContractEditor: 合并选区后会清空被覆盖单元格，拆分后可恢复独立结构', () => {

@@ -4278,8 +4278,7 @@
 
 .erp-print-center-nav-description,
 .erp-print-center-note-text,
-.erp-print-center-workbench-note,
-.erp-print-center-mapping-note {
+.erp-print-center-workbench-note {
   color: #6d7b70;
   line-height: 1.6;
 }
@@ -4304,17 +4303,13 @@
 
 .erp-print-center-workbench {
   display: grid;
-  grid-template-columns: minmax(260px, 0.9fr) minmax(340px, 1.4fr) minmax(
-      280px,
-      1fr
-    );
+  grid-template-columns: minmax(260px, 0.8fr) minmax(420px, 1.6fr);
   gap: 14px;
   align-items: stretch;
 }
 
 .erp-print-center-nav-panel,
-.erp-print-center-preview-panel,
-.erp-print-center-mapping-panel {
+.erp-print-center-preview-panel {
   min-width: 0;
   padding: 16px;
   border: 1px solid #e3eee6;
@@ -4470,28 +4465,6 @@
   letter-spacing: 0.16em;
 }
 
-.erp-print-center-map-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: start;
-  padding: 10px 12px;
-  border: 1px solid #e3eee6;
-  border-radius: 12px;
-  background: #fbfdfb;
-}
-
-.erp-print-center-map-row .ant-tag {
-  margin-inline-end: 0;
-  white-space: normal;
-  text-align: right;
-}
-
-.erp-print-center-mapping-note {
-  display: block;
-  font-size: 12px;
-}
-
 @media screen and (max-width: 1200px) {
   .erp-command-center-shell {
     grid-template-columns: 1fr;
@@ -4520,10 +4493,6 @@
   }
 
   .erp-print-center-paper-section {
-    grid-template-columns: 1fr;
-  }
-
-  .erp-print-center-map-row {
     grid-template-columns: 1fr;
   }
 }
@@ -5107,6 +5076,7 @@
 .erp-processing-contract-meta__value,
 .erp-processing-contract-table__cell,
 .erp-processing-contract-clauses__editable,
+.erp-processing-contract-signature__name-value,
 .erp-processing-contract-signature__date-value {
   outline: none;
 }
@@ -5201,7 +5171,15 @@
 }
 
 .erp-processing-contract-signature__label {
+  display: flex;
+  gap: 1.4mm;
+  align-items: baseline;
   font-weight: 600;
+}
+
+.erp-processing-contract-signature__name-value {
+  min-width: 34mm;
+  font-weight: 400;
 }
 
 .erp-processing-contract-signature__date {
@@ -5280,6 +5258,7 @@
 
 .erp-processing-contract-meta__value:focus,
 .erp-processing-contract-clauses__editable:focus,
+.erp-processing-contract-signature__name-value:focus,
 .erp-processing-contract-signature__date-value:focus {
   outline: 1px dashed rgb(47 143 75 / 72%);
   outline-offset: 1px;
@@ -6486,6 +6465,7 @@
   .erp-processing-contract-table td,
   .erp-processing-contract-table__cell,
   .erp-processing-contract-clauses__editable,
+  .erp-processing-contract-signature__name-value,
   .erp-processing-contract-signature__date-value {
     outline: 0;
     box-shadow: none;
@@ -6497,6 +6477,7 @@
   .erp-processing-contract-table td:focus-within,
   .erp-processing-contract-table__cell:focus,
   .erp-processing-contract-clauses__editable:focus,
+  .erp-processing-contract-signature__name-value:focus,
   .erp-processing-contract-signature__date-value:focus {
     outline: 0;
     background: transparent;
@@ -7640,6 +7621,46 @@
 .erp-business-collaboration-task-panel--expanded
   .erp-business-module-task-card__head {
   flex: none;
+}
+
+.erp-business-collaboration-task-panel__summary {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.erp-business-collaboration-task-panel__summary-item {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #e2ece4;
+  border-radius: 999px;
+  background: #f8fbf8;
+  padding: 3px 9px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.erp-business-collaboration-task-panel__summary-item strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #17231c;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-business-collaboration-task-panel__summary-item--blue {
+  border-color: #cfe0ff;
+  background: #f0f6ff;
+}
+
+.erp-business-collaboration-task-panel__summary-item--red {
+  border-color: #ffd6d9;
+  background: #fff1f2;
 }
 
 .erp-business-collaboration-task-panel__panel {
@@ -9143,6 +9164,7 @@
 [data-erp-theme='dark'] .erp-business-page-header-card__stats > div,
 [data-erp-theme='dark'] .erp-business-list-toolbar__stat,
 [data-erp-theme='dark'] .erp-business-selection-action-bar__summary-item,
+[data-erp-theme='dark'] .erp-business-collaboration-task-panel__summary-item,
 [data-erp-theme='dark'] .erp-business-module-summary-chip,
 [data-erp-theme='dark'] .erp-permission-checklist__header {
   border-color: var(--erp-border);
@@ -9150,10 +9172,23 @@
   color: var(--erp-text);
 }
 
+[data-erp-theme='dark'] .erp-business-selection-action-bar__summary-item strong,
 [data-erp-theme='dark']
-  .erp-business-selection-action-bar__summary-item
+  .erp-business-collaboration-task-panel__summary-item
   strong {
   color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-business-collaboration-task-panel__summary-item--blue {
+  border-color: #31558f;
+  background: #13233a;
+}
+
+[data-erp-theme='dark']
+  .erp-business-collaboration-task-panel__summary-item--red {
+  border-color: #7f2d35;
+  background: #3a1820;
 }
 
 [data-erp-theme='dark'] .erp-role-template-card:hover,
@@ -9963,18 +9998,11 @@
 
 [data-erp-theme='dark'] .erp-print-center-nav-panel,
 [data-erp-theme='dark'] .erp-print-center-preview-panel,
-[data-erp-theme='dark'] .erp-print-center-mapping-panel,
 [data-erp-theme='dark'] .erp-print-center-note-item,
 [data-erp-theme='dark'] .erp-print-center-template-btn,
 [data-erp-theme='dark'] .erp-print-template-card {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
-  color: var(--erp-text);
-}
-
-[data-erp-theme='dark'] .erp-print-center-map-row {
-  border-color: var(--erp-border-strong);
-  background: #0f172a;
   color: var(--erp-text);
 }
 
@@ -10009,8 +10037,7 @@
 [data-erp-theme='dark'] .erp-print-center-nav-title,
 [data-erp-theme='dark'] .erp-print-center-nav-description,
 [data-erp-theme='dark'] .erp-print-center-note-text,
-[data-erp-theme='dark'] .erp-print-center-workbench-note,
-[data-erp-theme='dark'] .erp-print-center-mapping-note {
+[data-erp-theme='dark'] .erp-print-center-workbench-note {
   color: var(--erp-text-muted);
 }
 

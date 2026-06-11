@@ -15,11 +15,115 @@
 
 - `/erp/dashboard` 已作为后台首页 / 工作台首屏：聚合今日焦点、业务状态摘要、常用入口、角色提醒和运营工具，不写事实层；`/erp/task-board` 独立承接 Workflow 任务看板。
 - `BusinessModulePage` 已把筛选区、表格工具栏、已选记录操作条、分页和业务页协同入口收口到标准页结构；协同入口只处理 Workflow 任务，不写事实层。`材料 BOM`、`入库通知/检验/入库`、`库存` 和 `出库` 已补只读特殊变体区，强调 BOM、质检 / 入库、库存和出库事实边界。
-- `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板目录、纸面预览、字段映射和可编辑打印窗口入口；`/erp/operations/exceptions` 作为异常 / 阻塞闭环入口。
+- `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板目录、纸面预览和可编辑打印窗口入口；字段编辑、明细确认和纸面微调回到独立打印窗口；`/erp/operations/exceptions` 作为异常 / 阻塞闭环入口。
 - 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收或评审原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增未评审后端 API、schema、migration、权限码或 Fact 写入。
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
 - `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、业务模块列表页、业务详情页、新建 / 编辑表单、业务页协同入口组件和弹窗 / 抽屉动作六个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
 - 原型查看器和原型 README 已补“参照范围”口径：参照范围只说明可借鉴的页面 / 菜单类型，不是正式菜单、路由、权限或 seedData 映射表；真正对应关系必须在进入真实实现任务时回到代码、菜单配置和 RBAC 重新核对。
+
+## 2026-06-11 18:38 CST
+
+- 完成：修复采购 / 加工打印编辑页在浏览器 localStorage 满额时白屏的问题。根因是工作台 effect 直接 `localStorage.setItem` 保存草稿，遇到 `QuotaExceededError` 会抛到 React 渲染链路并卸载页面。
+- 完成：新增 `persistPrintWorkspaceDraftSnapshot` 作为打印草稿安全写入 helper；采购合同和加工合同编辑页都改为尽力保存，写入失败时不抛异常、不阻断页面显示。读取草稿仍沿用现有 try/catch 兜底。
+- 验证：`node --test web/src/erp/utils/printWorkspace.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing pnpm --dir web style:l1`、`git diff --check` 均通过。Playwright 模拟打印草稿 key 写入抛 `QuotaExceededError`，采购合同编辑页仍显示，未再出现该异常导致的白屏。
+- 下一步：如要进一步降低浏览器存储压力，可单独评审旧打印窗口 state / draft 的清理策略；当前先保证满额时页面可用。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；localStorage 满额时最新草稿可能无法持久化到浏览器，但当前页面内容和打印操作不应因此崩溃。
+
+## 2026-06-11 18:32 CST
+
+- 完成：修复独立打印编辑页在无同源 admin 登录态时被 `/admin-login` 拦截导致“无法显示”的问题。新增打印窗口本地状态守卫：仅当 URL 带 `state`，且本机 localStorage 中存在未过期、templateKey 匹配、带 workspaceURL 的打印窗口状态时，允许 `/erp/print-workspace/:templateKey` 绕过 admin 登录守卫并恢复编辑页。
+- 完成：保持普通裸访问安全边界。没有 `state`、state 缺失 / 过期、或 templateKey 不匹配时，仍走原有 `AuthGuard requireAdmin`，直接访问打印编辑路由会回到 `/admin-login`。
+- 验证：`node --test web/src/erp/utils/printWorkspace.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-processing pnpm --dir web style:l1`、`git diff --check` 均通过。Playwright 验证无 admin token 但有合法本地 `state` 时加工合同编辑页可显示，普通无 `state` 直接访问仍跳 `/admin-login`。
+- 下一步：如后续要让远端分享链接也能打开打印快照，应另做权限和快照签名设计；当前能力只面向同一浏览器本地打印窗口恢复，不是公开分享入口。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；仅调整前端打印窗口路由守卫与本地窗口状态判断。
+
+## 2026-06-11 18:20 CST
+
+- 完成：重新复核 `docs/product/prototypes/admin-command-center-v1/` 和原型 README。当前没有独立完整打印中心原型，`admin-command-center-v1` 仍是 To Implement 的工作台 / 总控页参考，不应继续让运行时打印中心保留无真实配置能力的静态 `字段映射` 右栏。
+- 完成：移除打印中心 `字段映射` 整栏、静态 `buildPrintMappingRows`、对应 Ant Tag import 和暗色 / 响应式 CSS 覆盖；打印中心收回为两栏：左侧模板导航，右侧纸面预览，顶部保留 `打印当前模板`。
+- 完成：同步 `README.md`、`web/README.md`、`docs/current-source-of-truth.md`、`docs/erp-print-template-field-behavior.md` 和 `commandCenter` 文案；`style:l1` 打印中心浅色 / 暗色场景改为断言字段映射不存在且页面保持两栏。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-center-desktop,print-center-dark-desktop pnpm --dir web style:l1` 和 `git diff --check` 均通过。Browser 打开 `http://localhost:5175/erp/print-center`，确认页面 title 为 `毛绒 ERP 桌面后台`、console warn/error 为空、默认态只有模板导航和纸面预览两栏、`字段映射` 不存在、点击 `加工合同` 后 URL 更新为 `?template=processing-contract` 且纸面标题切换；390x844 移动视口下两栏收为单列且 `scrollWidth=clientWidth=390`。
+- 下一步：如果后续需要真正的字段映射配置，应先做独立打印模板配置设计和字段真源评审，不在打印中心用静态标签冒充配置能力。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-11 18:19 CST
+
+- 完成：修复加工合同编辑 / 打印纸面签名栏空值。根因是纸面签章区只渲染甲乙双方日期，没有渲染 `buyerSigner` / `supplierSigner`；现已在纸面预览和左侧字段面板补齐甲方签名、乙方签名，默认样例显示中性 `签字人` / `受托方签字人`。
+- 完成：调整 `style:l1` 加工合同可编辑表格断言。默认样例现在不再为了测试保留空白可编辑格；回归脚本改为在默认值填满时临时使用零宽探针验证空值布局，继续覆盖用户手动清空后的居中和光标位置。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-processing pnpm --dir web style:l1`、`git diff --check` 均通过；Browser 验证加工合同工作台签名栏显示 `签字人` / `受托方签字人`，不出现永绅或旧手机号，console warn/error 为空。
+- 下一步：如后续要接真实签署人，应从业务记录、企业资料配置或客户打印模板带值，不在 Product Core 默认样例写客户真实姓名。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；业务页带值路径缺少真实签署人时仍保持空白，避免把默认样例残值写入真实业务打印。
+
+## 2026-06-11 18:18 CST
+
+- 完成：压缩 `business-module-page-standard-v1/index.html` 待实现标准页首屏高度。保留标题摘要、筛选、结果工具条、当前操作条和分页，但降低 hero、指标卡、筛选控件、按钮、当前操作条和分页控件高度，让表格在低高度桌面视口中露出。
+- 完成：同步 `docs/product/prototypes/business-module-page-standard-v1/README.md`，明确标题、筛选、工具条和当前操作区默认使用紧凑首屏密度，避免常见低高度屏幕把表格完全挤出首屏。
+- 验证：内联脚本语法检查通过；`git diff --check -- docs/product/prototypes/business-module-page-standard-v1/index.html docs/product/prototypes/business-module-page-standard-v1/README.md progress.md` 通过；Playwright 静态服务验证 2048x536 视口下表格首行可见、页面级无横向溢出，点击首行后动作启用，清空已选恢复 0 选中，390x844 移动视口页面级 `scrollWidth === clientWidth`。静态服务仅有 favicon 404，不是脚本错误。
+- 下一步：如后续要继续压缩，应优先评审是否把摘要或筛选设为折叠，而不是删除 Workflow / Fact 边界提示。
+- 阻塞/风险：本轮只改原型 HTML、原型说明和 progress；未改正式运行时代码、正式菜单、后端 API、RBAC、schema / migration、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。移动端因筛选项纵向堆叠，首屏不强制露出表格。
+
+## 2026-06-11 18:17 CST
+
+- 完成：移除打印中心顶部 `字段核对` 按钮；该按钮只跳转到 `/erp/print-center/:templateKey` 兼容入口，当前主动作已是独立编辑打印窗口，字段口径已在打印中心右侧字段映射和模板工作台左侧字段面板内展示。
+- 完成：同步 `README.md`、`web/README.md`、`docs/current-source-of-truth.md` 和 `docs/erp-print-template-field-behavior.md`，不再写“模板核对入口 / 字段核对”作为打印中心主入口；`style:l1` 打印中心场景改为断言 `字段核对` 不出现。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-center-desktop,print-center-dark-desktop pnpm --dir web style:l1`、`git diff --check` 均通过；关键字扫描确认运行时代码和正式说明中只剩 `style:l1` 的 `字段核对` 不存在断言与本条 progress 记录。
+- 下一步：保留 `/erp/print-center/:templateKey` 兼容路由和既有直接路径回归；如后续确认旧直达路径也不再需要，应单独评审路由、权限归属和兼容风险后移除。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-11 18:16 CST
+
+- 完成：继续补齐打印模板编辑页里可见空白。采购合同明细补厂商料号、规格、单价、金额、备注和乙方签字日期；加工合同明细补加工厂商、备注和乙方签字日期。附件上传位仍保持空白，不伪造文件附件。
+- 完成：同步 `printTemplates` 和 `processingContractTemplate` 测试断言，确保默认样例的明细字段不再留空；业务页带值草稿测试仍覆盖缺少真实字段时不沿用默认样例残值。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、关键字扫描均通过；Browser 验证采购合同和加工合同工作台可见空 input、空 contenteditable 与纸面 `&nbsp;` 空白块均为 0，console warn/error 为空。
+- 下一步：如还要补真实附件或企业真实电话 / 地址，应走客户配置包、客户打印模板或企业资料配置，不在 Product Core 默认样例中伪造真实文件和客户信息。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；附件位没有补样例文件，因为当前没有通用附件真源。
+
+## 2026-06-11 18:11 CST
+
+- 完成：补齐打印模板中心默认样例字段。采购合同默认样例新增 `示例供应商`、供应商联系人 / 电话 / 地址、`采购负责人`、公司联系电话 / 地址、签字人和供应商签字人；加工合同默认样例新增 `示例加工厂`、加工厂联系人 / 电话 / 地址、`委外负责人`、公司联系电话 / 地址。
+- 完成：修正业务页带值打印草稿边界。业务记录缺少真实联系人、电话、地址、签字人时保持空白，不沿用打印中心中性样例；只保留 `本公司` 作为公司侧通用占位。同步字段链路 catalog 和正式打印模板行为文档。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、关键字扫描均通过；Browser 验证 `/erp/print-center`、采购合同编辑工作台和加工合同编辑工作台左侧字段面板 / 右侧纸面均显示中性样例值，不出现永绅、旧联系人或旧手机号，console warn/error 为空。
+- 下一步：如后续要把 `本公司`、公司电话或地址接成真实企业信息，应走客户配置包 / 客户打印模板或企业资料配置，不在 Product Core 默认样例里写真实客户信息。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；业务页带值路径仍依赖现有业务记录 payload，缺值不会自动补造真实信息。
+
+## 2026-06-11 18:10 CST
+
+- 完成：修正 `business-module-page-standard-v1/index.html` 待实现标准页漏项，以辅材 / 包材采购为代表样例补回当前真实业务页骨架：标题摘要、独立筛选条、结果工具条、空选中当前操作区、点击行后动作启用、主表分页和底部轻量协同入口。
+- 完成：同步 `docs/product/prototypes/README.md`、`docs/product/prototypes/business-module-page-standard-v1/README.md` 和静态 `docs/product/prototypes/index.html` 的登记口径，明确业务模块标准页不再额外放置菜单侧栏，避免把菜单示意误读为新的正式菜单。
+- 验证：内联脚本语法检查通过；`git diff --check -- docs/product/prototypes/business-module-page-standard-v1/index.html docs/product/prototypes/business-module-page-standard-v1/README.md docs/product/prototypes/README.md docs/product/prototypes/index.html progress.md` 通过；Playwright 静态服务验证默认态 0 选中、点击首行后动作启用、清空已选恢复禁用、分页显示 `共 3 条 / 8 条/页`，390px 移动视口页面级 `scrollWidth === clientWidth`。静态服务仅有 favicon 404，不是脚本错误。
+- 下一步：如后续要把该样板吸收到真实页面，仍需按 To Implement Checklist 回到运行时代码、共享组件、正式菜单、RBAC、theme token、API 和测试边界核对。
+- 阻塞/风险：本轮只改原型 HTML、原型说明和 progress；未改正式运行时代码、正式菜单、后端 API、RBAC、schema / migration、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-11 18:08 CST
+
+- 完成：移除打印中心左侧 `样品确认单` 禁用候选模板入口；运行时模板导航只展示 `采购合同` 和 `加工合同` 两套已启用正式模板，说明文案改为当前仅开放正式模板。
+- 完成：同步 `style:l1` 打印中心浅色 / 暗色场景断言，要求页面不再出现 `样品确认单` 和 `候选模板 / 未启用`；同步 `docs/current-source-of-truth.md` 的打印中心口径，明确样品确认单暂不作为运行时候选入口、正式模板目录、模板引擎或后端事实。
+- 验证：关键字扫描确认运行时代码不再包含候选模板常量；`pnpm --dir web lint`、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=print-center-desktop,print-center-dark-desktop pnpm --dir web style:l1` 和 `git diff --check` 通过。`pnpm --dir web test` 仍有 1 个既有字段联动目录期望失败：真实测试 case 是 `FL_print_templates_sample__uses_generic_sample_values_without_customer_identity`，latest/catalog 期望仍是旧名 `FL_print_templates_sample__keeps_supplier_snapshot_fields_blank_by_default`，不属于本轮样品确认单入口移除。
+- 下一步：如后续确实要做样品确认单，应先补正式模板样本、字段真源和模板目录设计，再按正式模板接入。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-11 18:04 CST
+
+- 完成：清理产品核心打印模板默认样例里的永绅客户信息。采购合同和加工合同默认买方 / 委托方公司改为中性 `本公司`，联系人、电话、地址、签字人默认留空；sourceFiles 不再暴露本机永绅原始资料路径。
+- 完成：补 `printTemplates`、`processingContractTemplate` 和采购合同编辑器单测，锁住核心默认样例不包含客户专属公司名、本机路径、旧联系人和旧手机号；同步 `docs/erp-print-template-field-behavior.md` 说明客户专属信息只能来自业务草稿、客户配置包、客户打印模板或客户交付资料边界。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、相关单测、关键字扫描和 `git diff --check` 均通过；Browser 验证 `/erp/print-center`、采购合同编辑工作台和加工合同编辑工作台默认显示 `本公司`，不再出现永绅、旧联系人或旧手机号，console warn/error 为空。
+- 下一步：如后续需要 yoyoosun 正式交付模板默认带公司信息，应通过客户配置包 / 客户打印模板边界单独接入，不回写 Product Core 默认模板。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；工作区仍有本轮开始前已存在的原型 / 样式相关未提交改动，未纳入本轮成果。
+
+## 2026-06-11 18:02 CST
+
+- 完成：开始吸收 To Implement 的业务模块列表页 / 业务页协同入口样板到真实运行时共享组件。`CollaborationTaskPanel` 收起态新增当前记录、本页待办和阻塞异常摘要；展开态任务分类补 `tablist / tab / tabpanel`、`aria-selected`、`aria-controls` 和方向键 / Home / End 切换，保持默认收起、展开、桌面拖拽和 Workflow-only 边界。
+- 完成：同步 `web/src/erp/styles/app.css` 浅色 / 暗色摘要样式，并在 `web/scripts/styleL1.mjs` 的业务模块回归里锁住收起摘要、tab 语义、tabpanel 绑定、展开 / 收起、拖拽和无横向溢出。
+- 验证：`node --test web/src/erp/utils/businessCollaborationTasks.test.mjs web/src/erp/config/devPrototypes.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`STYLE_L1_SCENARIOS=business-module-workflow-actions,business-menu-groups-desktop pnpm --dir web style:l1`、`git diff --check` 均通过。
+- 下一步：继续吸收时可转向业务详情页或表单页样板；若要把任一 To Implement 资产改成 Current，仍需用户明确确认，并按 README 的 To Implement -> Current 门禁同步登记。
+- 阻塞/风险：本轮未改正式菜单、seedData、RBAC、后端 API、schema / migration、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；协同入口仍只展示和处理 Workflow 任务，不写库存、出货、财务、开票或收付款事实。
+
+## 2026-06-11 17:54 CST
+
+- 完成：在 `docs/product/prototypes/README.md` 的“原型作用与布局准确度”下补充“原型重点关注项”，将大致布局、交互路径、信息层级、状态表达、视觉密度和实现边界收口为评审维度。
+- 验证：`git diff --check -- docs/product/prototypes/README.md progress.md` 通过。
+- 下一步：继续新增或评审原型时，优先按这些维度判断是否足够清楚；不要把它扩展成字段全集、菜单全集或新业务真源。
+- 阻塞/风险：本轮只补原型 README 和 progress 说明；未改运行时代码、正式菜单、后端 API、RBAC、schema / migration、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送。
 
 ## 2026-06-11 17:29 CST
 
@@ -144,3 +248,43 @@
 - 验证：`node --test web/src/erp/config/devPrototypes.test.mjs`、HTML 内联脚本语法抽取检查、`git diff --check -- docs/product/prototypes web/src/erp/config/devPrototypes.mjs web/src/erp/config/devPrototypes.test.mjs web/scripts/styleL1.mjs`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；浏览器验证 `/__dev/prototypes` 新标题可见、旧标题不再出现、无横向溢出，三个静态 HTML 在 1280px 和 390px 视口均无横向溢出，基础交互可切换且 console warn/error 为空。
 - 下一步：如果继续推进正式 UI，应先评审客户首版菜单是否进一步隐藏独立任务看板 / 业务看板 / 异常入口，并把工作台运行时按极简原型吸收；吸收前仍需回到正式菜单、RBAC、theme token、测试和浏览器回归。
 - 阻塞/风险：本轮只改原型资产、dev-only 原型登记和说明文档；未改正式菜单、运行时代码、后端 API、schema、migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
+
+## 2026-06-11 19:19 CST
+
+- 完成：按 Product Design brief 补齐 `docs/product/prototypes/print-template-center-v1/` 待实现原型。新 HTML 样板保持模板打印中心的轻量两栏方向：左侧采购合同 / 加工合同模板导航，右侧固定浅色纸面预览，打印窗口入口负责字段编辑和明细确认；不恢复字段映射栏，不新增样品确认单候选。
+- 完成：同步 `/__dev/prototypes` registry、`devPrototypes` 测试、`style:l1` 待实现数量断言、静态原型查看器、原型总 README、`docs/current-source-of-truth.md`、`web/README.md` 和 `docs/document-inventory.md`；`print-template-center-v1` 登记为 `To Implement / Core`，未晋级 Current。
+- 验证：`node --test web/src/erp/config/devPrototypes.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1`、`git diff --check -- docs/product/prototypes docs/current-source-of-truth.md docs/document-inventory.md web/README.md web/src/erp/config/devPrototypes.mjs web/src/erp/config/devPrototypes.test.mjs web/scripts/styleL1.mjs progress.md` 均通过；浏览器验证 `/__dev/prototypes` 待实现筛选展示 7 个样板、新卡片可选中、iframe 中模板切换到加工合同后纸面标题和来源状态更新、打印当前模板后出现独立打印窗口提示，桌面和 390px 移动视口查看器无横向溢出。
+- 下一步：若要吸收到真实 `/erp/print-center`，需单独按 To Implement 吸收流程核对现有 `printTemplates`、独立打印窗口、主题 token、浅色 / 暗色和浏览器回归；未获用户确认前不把该原型改为 Current。
+- 阻塞/风险：本轮只新增原型资产、dev-only 原型登记和正式文档口径；未改正式 ERP 菜单、后端 API、RBAC、schema、migration、模板引擎、字段配置能力、Fact 写入、生产构建、部署、提交或推送。浏览器移动回归中出现一条 Vite HMR WebSocket 连接失败日志，属于当前本地 dev server 连接噪声，不影响原型脚本和页面渲染判断。
+
+## 2026-06-11 19:33 CST
+
+- 完成：采购合同和加工合同独立打印编辑窗口新增 `空白模板` 按钮。点击前会确认；确认后只清空当前窗口草稿里的字段值、明细值和合并状态，保留模板结构与合同条款；加工合同同时清空纸样 / 图样附件快照。
+- 完成：新增采购 / 加工空白模板 helper 和单测，锁住“清值但保留条款”的边界；同步 `docs/erp-print-template-field-behavior.md` 说明该动作不修改业务记录、模板配置、后端事实或其他窗口草稿。
+- 验证：`node --test web/src/erp/utils/materialPurchaseContractEditor.test.mjs web/src/erp/data/processingContractTemplate.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing pnpm --dir web style:l1`、`git diff --check` 均通过；Browser 在 `http://localhost:5175` 验证采购合同和加工合同 `空白模板` 确认后字段 / 明细清空、条款保留、无横向溢出、console warn/error 为空。
+- 下一步：若后续要做更细的“只清当前字段但保留明细”或“按业务类型清空部分字段”，应单独做字段分组评审，不把本按钮扩成隐式规则。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、生产构建、部署、提交或推送；`空白模板` 在业务记录带值窗口中也会清当前草稿值，但不会反写业务记录。
+
+## 2026-06-11 20:02 CST
+
+- 完成：收口加工合同独立打印编辑窗口的成功反馈。纸样 / 图样附件上传、清空附件位、恢复样例和空白模板生成不再触发全局 `message.success`，改由当前打印窗口工具栏状态和附件上传条自身状态承接，避免成功提示在页面顶部堆叠遮挡。
+- 完成：保留错误和非法操作的全局 `message.error` / `message.warning`，确保 PDF 生成失败、附件处理失败、插删行或合并拆分非法时仍有明显反馈；未改采购合同、打印中心入口、PDF / 打印输出、草稿真源、后端 API、schema、migration、RBAC、WorkflowUsecase 或 Fact usecase。
+- 验证：`rg -n "message\\.success|已同步\\$\\{slot\\.title\\}|已清空\\$\\{slot\\.title\\}|已恢复默认加工合同样例|已生成空白加工合同" web/src/erp/pages/ProcessingContractPrintWorkspacePage.jsx` 确认本页只剩工具栏状态文本；`pnpm exec stylelint "src/erp/styles/app.css"`、`pnpm test`、`STYLE_L1_SCENARIOS=print-workspace-processing ERP_STYLE_L1_SYNC_PUBLIC_QA=0 pnpm style:l1` 均通过。
+- 下一步：如后续要统一采购合同或其他业务页的成功反馈，应按具体页面评估哪些是全局反馈、哪些是窗口内状态，不要一刀切删除错误 / 阻塞提示。
+- 阻塞/风险：本轮未运行会自动 `--fix` 全目录的 `pnpm lint`，因为当前工作区已有大量非本轮未提交改动；已用针对文件的静态搜索、stylelint、全量前端单测和加工合同 L1 场景覆盖本次改动。
+
+## 2026-06-11 20:30 CST
+
+- 完成：打印模板独立编辑窗口 favicon 改为按模板标题首字生成动态 SVG。`/erp/print-workspace/material-purchase-contract` 使用 `采`，`/erp/print-workspace/processing-contract` 使用 `加`；打印中心、后台、任务端和 dev-only 页面继续沿用原有 route-aware favicon 规则。
+- 完成：新增 favicon 单测，锁住打印工作台在客户品牌 favicon 存在时仍优先显示模板字图标，避免独立编辑窗口退回通用后台或客户品牌图标。
+- 验证：`node --test src/common/consts/favicon.test.mjs`、`pnpm exec eslint --ext .js --ext .jsx src/common/consts/favicon.mjs src/common/consts/favicon.test.mjs`、`pnpm test`、`git diff --check -- web/src/common/consts/favicon.mjs web/src/common/consts/favicon.test.mjs` 均通过；Browser 验证采购 / 加工独立编辑窗口的 `link[rel~="icon"]` 分别包含 `采` / `加` 的 SVG data URL，页面 title 分别为 `采购合同打印窗口` / `加工合同打印窗口`，console warn/error 为空。
+- 下一步：若后续新增更多正式打印模板，只要登记进 `printTemplateCatalog` 并使用 `/erp/print-workspace/:templateKey`，favicon 会按模板 `shortTitle/title` 首字自动生成。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、打印模板字段、PDF 输出、生产构建、部署、提交或推送；未运行 `pnpm lint` 全目录脚本，因为该脚本会 `--fix src/`，当前工作区已有大量非本轮未提交改动。
+
+## 2026-06-11 20:31 CST
+
+- 完成：完善 `business-form-page-standard-v1` 待实现表单样板。首屏新增首个落地对象、字段真源、状态覆盖和不吸收内容四项确认；页面支持新增、编辑、只读三种状态；只读状态会关闭保存按钮并禁用可编辑字段；无来源切换会清空客户、订单、产品、数量、交期和附件，避免旧来源残值。
+- 完成：同步 `business-form-page-standard-v1/README.md`、静态原型查看器、`/__dev/prototypes` registry、`devPrototypes` 单测、原型总 README 和 `style:l1` 待实现筛选断言。该资产仍保持 `To Implement / Core`，未晋级 Current。
+- 验证：`pnpm --dir web test -- --runInBand web/src/erp/config/devPrototypes.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web style:l1` 均通过；Playwright 直接打开静态 HTML 验证桌面无横向溢出、只读状态关闭两个保存按钮、无来源保存触发 5 个必填错误、390px 移动视口无横向溢出。
+- 下一步：若要吸收到真实页面，应先选定一个目标页面，建议从销售订单新建 / 编辑开始；吸收前必须回到真实 React / AntD 组件、API、RBAC、theme token、字段真源和浏览器回归。
+- 阻塞/风险：本轮只改原型资产、dev-only 原型登记、说明文档和测试断言；未改正式 ERP 页面、正式菜单、后端 API、schema / migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。当前工作区已有多处非本轮未提交改动，本轮未回退或整理。

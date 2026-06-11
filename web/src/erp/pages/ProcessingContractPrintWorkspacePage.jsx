@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { message } from '@/common/utils/antdApp'
+import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import ProcessingContractPaper from '../components/print/ProcessingContractPaper.jsx'
 import PrintWorkspaceShell from '../components/print/PrintWorkspaceShell.jsx'
 import {
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   createEmptyProcessingAttachment,
+  createBlankProcessingContractDraft,
   createProcessingContractDraft,
   normalizeProcessingContractAttachments,
   normalizeProcessingLine,
@@ -30,6 +31,7 @@ import {
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
+  persistPrintWorkspaceDraftSnapshot,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
@@ -245,7 +247,7 @@ export default function ProcessingContractPrintWorkspacePage() {
   }, [draftStorageKey, resetDraftOnOpen, sourceTag, templateKey])
 
   useEffect(() => {
-    window.localStorage.setItem(draftStorageKey, JSON.stringify(contract))
+    persistPrintWorkspaceDraftSnapshot(draftStorageKey, contract)
   }, [contract, draftStorageKey])
 
   useEffect(() => {
@@ -580,8 +582,7 @@ export default function ProcessingContractPrintWorkspacePage() {
           [slot.key]: snapshot,
         },
       }))
-      setToolbarStatus(`已同步${slot.title}到右侧附件位。`)
-      message.success(`已同步${slot.title}：${file.name}`)
+      setToolbarStatus(`已同步${slot.title}到右侧附件位：${file.name}`)
     } catch (error) {
       setToolbarStatus(`上传${slot.title}失败。`)
       message.error(getActionErrorMessage(error, `处理${slot.title}`))
@@ -597,7 +598,6 @@ export default function ProcessingContractPrintWorkspacePage() {
       },
     }))
     setToolbarStatus(`已清空${slot.title}。`)
-    message.success(`已清空${slot.title}`)
   }
 
   const resetDraft = () => {
@@ -608,7 +608,26 @@ export default function ProcessingContractPrintWorkspacePage() {
     resetCellSelection()
     setShowFormula(false)
     setToolbarStatus('已恢复默认加工合同样例。')
-    message.success('已恢复默认加工合同样例')
+  }
+
+  const handleBlankDraft = () => {
+    modal.confirm({
+      title: '生成空白加工合同',
+      content:
+        '将清空当前窗口中的字段值、明细和附件，保留模板结构与合同条款。此操作不会修改业务记录。',
+      okText: '生成空白模板',
+      cancelText: '取消',
+      onOk: () => {
+        setContract((current) => createBlankProcessingContractDraft(current))
+        setSelectedLineIndex(null)
+        setRowSelectionMode(false)
+        setCellSelectionMode(false)
+        resetCellSelection()
+        setShowFormula(false)
+        setBusyAction('')
+        setToolbarStatus('已生成空白加工合同，模板结构和合同条款已保留。')
+      },
+    })
   }
 
   const getToolbarButtonClassName = ({
@@ -695,6 +714,18 @@ export default function ProcessingContractPrintWorkspacePage() {
       multiline: true,
       rows: 3,
       onChange: (value) => setField('buyerAddress', value),
+    },
+    {
+      key: 'buyerSigner',
+      label: '甲方签名',
+      value: contract.buyerSigner,
+      onChange: (value) => setField('buyerSigner', value),
+    },
+    {
+      key: 'supplierSigner',
+      label: '乙方签名',
+      value: contract.supplierSigner,
+      onChange: (value) => setField('supplierSigner', value),
     },
     {
       key: 'buyerSignDateText',
@@ -983,6 +1014,13 @@ export default function ProcessingContractPrintWorkspacePage() {
               onClick={resetDraft}
             >
               恢复样例
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName()}
+              onClick={handleBlankDraft}
+            >
+              空白模板
             </button>
           </div>
 

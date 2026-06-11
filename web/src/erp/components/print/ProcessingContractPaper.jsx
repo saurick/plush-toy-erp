@@ -422,6 +422,12 @@ export default function ProcessingContractPaper({
         <div className="erp-processing-contract-signature__block">
           <div className="erp-processing-contract-signature__label">
             甲方（委托方）：
+            <EditableText
+              value={contract.buyerSigner}
+              className="erp-processing-contract-signature__name-value"
+              disabled={templateModesActive}
+              onCommit={(value) => onFieldChange('buyerSigner', value)}
+            />
           </div>
           <div className="erp-processing-contract-signature__date">
             日期：
@@ -436,6 +442,12 @@ export default function ProcessingContractPaper({
         <div className="erp-processing-contract-signature__block">
           <div className="erp-processing-contract-signature__label">
             乙方（受托方）：
+            <EditableText
+              value={contract.supplierSigner}
+              className="erp-processing-contract-signature__name-value"
+              disabled={templateModesActive}
+              onCommit={(value) => onFieldChange('supplierSigner', value)}
+            />
           </div>
           <div className="erp-processing-contract-signature__date">
             日期：

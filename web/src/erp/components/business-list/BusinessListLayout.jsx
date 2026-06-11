@@ -449,6 +449,7 @@ export function CollaborationTaskPanel({
   const [panelHeight, setPanelHeight] = React.useState(null)
   const [isResizing, setIsResizing] = React.useState(false)
   const resizeStateRef = React.useRef(null)
+  const tabIDPrefix = React.useId().replace(/:/g, '')
   const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
   const roleLabels = roleLabelMap || new Map()
   const taskPanelModel = buildBusinessCollaborationTaskPanelModel({
@@ -537,6 +538,63 @@ export function CollaborationTaskPanel({
   ]
   const activeTab =
     tabItems.find((item) => item.key === activeTaskTab) || tabItems[0]
+  const activeTabIndex = Math.max(
+    0,
+    tabItems.findIndex((item) => item.key === activeTab.key)
+  )
+  const activeTabPanelID = `${tabIDPrefix}-${activeTab.key}-panel`
+  const activeTabID = `${tabIDPrefix}-${activeTab.key}-tab`
+  const hasFocusedRecord = Boolean(
+    selectedRecordLabel &&
+      !/^(?:请先|已选择)/u.test(String(selectedRecordLabel).trim())
+  )
+  const summaryItems = [
+    {
+      key: 'current',
+      label: '当前记录',
+      value: selectedRecordLabel || '未选择',
+      tone: hasFocusedRecord ? 'blue' : 'muted',
+    },
+    {
+      key: 'todo',
+      label: '本页待办',
+      value: taskPanelModel.activeTaskCount,
+      tone: taskPanelModel.activeTaskCount > 0 ? 'blue' : 'muted',
+    },
+    {
+      key: 'blocked',
+      label: '阻塞异常',
+      value: taskPanelModel.blockedTaskCount,
+      tone: taskPanelModel.blockedTaskCount > 0 ? 'red' : 'muted',
+    },
+  ]
+  const handleTabKeyDown = React.useCallback(
+    (event) => {
+      const keyToOffset = {
+        ArrowRight: 1,
+        ArrowDown: 1,
+        ArrowLeft: -1,
+        ArrowUp: -1,
+      }
+      if (event.key === 'Home') {
+        setActiveTaskTab(tabItems[0].key)
+        event.preventDefault()
+        return
+      }
+      if (event.key === 'End') {
+        setActiveTaskTab(tabItems[tabItems.length - 1].key)
+        event.preventDefault()
+        return
+      }
+      const offset = keyToOffset[event.key]
+      if (!offset) return
+      const nextIndex =
+        (activeTabIndex + offset + tabItems.length) % tabItems.length
+      setActiveTaskTab(tabItems[nextIndex].key)
+      event.preventDefault()
+    },
+    [activeTabIndex, tabItems]
+  )
   const renderTaskList = (items, emptyText) => {
     if (items.length === 0) {
       return (
@@ -675,13 +733,39 @@ export function CollaborationTaskPanel({
           </Button>
         </Space>
       </div>
+      <div
+        className="erp-business-collaboration-task-panel__summary"
+        aria-live="polite"
+      >
+        {summaryItems.map((item) => (
+          <span
+            key={item.key}
+            className={joinClassNames(
+              'erp-business-collaboration-task-panel__summary-item',
+              `erp-business-collaboration-task-panel__summary-item--${item.tone}`
+            )}
+          >
+            <Text type="secondary">{item.label}</Text>
+            <strong>{item.value}</strong>
+          </span>
+        ))}
+      </div>
       {expanded ? (
         <div className="erp-business-collaboration-task-panel__panel">
-          <div className="erp-business-collaboration-task-panel__tabs">
+          <div
+            className="erp-business-collaboration-task-panel__tabs"
+            role="tablist"
+            aria-label="本页协同任务分类"
+          >
             {tabItems.map((item) => (
               <button
                 key={item.key}
                 type="button"
+                id={`${tabIDPrefix}-${item.key}-tab`}
+                role="tab"
+                aria-selected={item.key === activeTab.key}
+                aria-controls={`${tabIDPrefix}-${item.key}-panel`}
+                tabIndex={item.key === activeTab.key ? 0 : -1}
                 className={joinClassNames(
                   'erp-business-collaboration-task-panel__tab',
                   item.key === activeTab.key
@@ -689,6 +773,7 @@ export function CollaborationTaskPanel({
                     : ''
                 )}
                 onClick={() => setActiveTaskTab(item.key)}
+                onKeyDown={handleTabKeyDown}
               >
                 <span>{item.label}</span>
                 <strong>{item.count}</strong>
@@ -703,7 +788,12 @@ export function CollaborationTaskPanel({
                 : '按当前业务模块读取现有 workflow 任务'}
             </Text>
           </div>
-          <div className="erp-business-collaboration-task-panel__list erp-business-module-task-list">
+          <div
+            id={activeTabPanelID}
+            className="erp-business-collaboration-task-panel__list erp-business-module-task-list"
+            role="tabpanel"
+            aria-labelledby={activeTabID}
+          >
             {renderTaskList(activeTab.items, activeTab.emptyText)}
           </div>
         </div>

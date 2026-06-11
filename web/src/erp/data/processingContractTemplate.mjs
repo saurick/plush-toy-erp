@@ -75,12 +75,12 @@ const defaultLines = [
     productNo: '23233',
     productName: '10cm PN吊饰',
     processName: '面*1',
-    supplierAlias: '',
+    supplierAlias: '示例加工厂',
     processCategory: '电绣',
     unit: '片',
     unitPrice: '0.2',
     quantity: '9024',
-    remark: '',
+    remark: '头部工序',
   },
   {
     contractNo: 'B25060808',
@@ -88,12 +88,12 @@ const defaultLines = [
     productNo: '23233',
     productName: '10cm PN吊饰',
     processName: '耳*2',
-    supplierAlias: '',
+    supplierAlias: '示例加工厂',
     processCategory: '电绣',
     unit: '对',
     unitPrice: '0.1',
     quantity: '9024',
-    remark: '',
+    remark: '耳部工序',
   },
   {
     contractNo: 'B25060808',
@@ -101,12 +101,12 @@ const defaultLines = [
     productNo: '23233',
     productName: '10cm PN吊饰',
     processName: '底*1',
-    supplierAlias: '',
+    supplierAlias: '示例加工厂',
     processCategory: '电绣',
     unit: '片',
     unitPrice: '0.15',
     quantity: '9024',
-    remark: '',
+    remark: '底部工序',
   },
 ]
 
@@ -135,8 +135,8 @@ export const processingContractTemplateMeta = {
     '条款 / 签章 / 页底附件位',
   ],
   sourceFiles: [
-    '/Users/simon/Downloads/永绅erp/原文件/模板-材料与加工合同.xlsx（B类加工合同 / B类汇总表 / 加工厂商）',
-    '/Users/simon/Downloads/永绅erp/原文件/9.3加工合同-子淳.pdf',
+    '客户来源样本：模板-材料与加工合同.xlsx（B类加工合同 / B类汇总表 / 加工厂商）',
+    '客户来源样本：加工合同纸面 PDF',
   ],
   fieldTruth: [
     '合同编号、下单日期、回货日期、加工方名称、委托单位都属于合同头快照，不回写主数据。',
@@ -306,6 +306,17 @@ export function normalizeProcessingContractAttachments(attachments = {}) {
   }, {})
 }
 
+export function normalizeProcessingContractClauses(clauses = {}) {
+  const source = clauses && typeof clauses === 'object' ? clauses : {}
+
+  return Object.keys(defaultClauses).reduce((state, groupKey) => {
+    state[groupKey] = Array.isArray(source[groupKey])
+      ? source[groupKey].map((item) => normalizeText(item)).filter(Boolean)
+      : [...defaultClauses[groupKey]]
+    return state
+  }, {})
+}
+
 export function calculateProcessingContractTotals(lines = []) {
   let totalQuantity = 0
   let totalAmount = 0
@@ -340,19 +351,47 @@ export function createProcessingContractDraft() {
     contractNo: 'B25060808',
     orderDateText: '250608',
     returnDateText: '2025-06-11',
+    supplierName: '示例加工厂',
+    supplierContact: '加工厂联系人',
+    supplierPhone: '加工厂联系电话',
+    supplierAddress: '加工厂地址',
+    buyerCompany: '本公司',
+    buyerContact: '委外负责人',
+    buyerPhone: '公司联系电话',
+    buyerAddress: '公司地址',
+    buyerSigner: '签字人',
+    supplierSigner: '受托方签字人',
+    buyerSignDateText: '2025-06-08',
+    supplierSignDateText: '2025-06-08',
+    attachments: createEmptyProcessingAttachments(),
+    lines: defaultLines.map((line) => normalizeProcessingLine(line)),
+    clauses: normalizeProcessingContractClauses(),
+    merges: [],
+  }
+}
+
+export function createBlankProcessingContractDraft(draft = {}) {
+  return {
+    ...createProcessingContractDraft(),
+    draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
+    contractNo: '',
+    orderDateText: '',
+    returnDateText: '',
     supplierName: '',
     supplierContact: '',
     supplierPhone: '',
     supplierAddress: '',
-    buyerCompany: '永绅',
+    buyerCompany: '',
     buyerContact: '',
-    buyerPhone: '13694972987',
-    buyerAddress: '东莞茶山',
-    buyerSignDateText: '2025-06-08',
+    buyerPhone: '',
+    buyerAddress: '',
+    buyerSigner: '',
+    supplierSigner: '',
+    buyerSignDateText: '',
     supplierSignDateText: '',
     attachments: createEmptyProcessingAttachments(),
-    lines: defaultLines.map((line) => normalizeProcessingLine(line)),
-    clauses: structuredClone(defaultClauses),
+    lines: [normalizeProcessingLine(createEmptyProcessingLine())],
+    clauses: normalizeProcessingContractClauses(draft?.clauses),
     merges: [],
   }
 }

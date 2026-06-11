@@ -1883,11 +1883,13 @@ const scenarios = [
         .click()
       await expectText(page, '后台工作台样板')
       await expectText(page, '业务模块标准页样板')
+      await expectText(page, '模板打印中心样板')
       await expectText(page, '业务页协同入口组件样板')
       await expectText(page, '业务详情页标准样板')
       await expectText(page, '新建 / 编辑表单标准样板')
       await expectText(page, '弹窗 / 抽屉动作标准样板')
       await expectText(page, '参照范围：客户档案、供应商档案、产品、销售订单')
+      await expectText(page, '真实落地建议先收窄到销售订单')
       const implementMetrics = await page.evaluate(() => ({
         activeText:
           document
@@ -1912,12 +1914,12 @@ const scenarios = [
       )
       assert.equal(
         implementMetrics.visibleCards,
-        6,
-        `原型查看器待实现筛选应展示 6 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
+        7,
+        `原型查看器待实现筛选应展示 7 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
       )
       assert.equal(
         implementMetrics.appliesCount,
-        6,
+        7,
         `原型查看器待实现筛选应为每张卡片展示参照范围: ${JSON.stringify(implementMetrics)}`
       )
       assert(
@@ -2618,31 +2620,22 @@ const scenarios = [
       await expectText(page, '模板')
       await expectText(page, '采购合同')
       await expectText(page, '加工合同')
-      await expectText(page, '样品确认单')
-      await expectText(page, '候选模板 / 未启用')
+      await assertTextAbsent(page, '样品确认单')
+      await assertTextAbsent(page, '候选模板 / 未启用')
       await expectText(page, '纸面预览')
-      await expectText(page, '字段映射')
-      await expectText(page, '字段核对')
+      await assertTextAbsent(page, '字段映射')
+      await assertTextAbsent(page, '字段核对')
       await assertTextAbsent(page, '运营中枢')
       await assertTextAbsent(page, '模板数量')
       await assertTextAbsent(page, '示例记录')
       await assertTextAbsent(page, '打开可编辑打印窗口')
       await assertTextAbsent(page, '打开当前模板')
-      const candidateTemplateButton = page.getByRole('button', {
-        name: /样品确认单/,
-      })
-      assert.equal(
-        await candidateTemplateButton.isDisabled(),
-        true,
-        '样品确认单候选模板不应开放打印动作'
-      )
       const printCenterLayout = await page.evaluate(() => {
         const root = document.querySelector('.erp-print-center-page')
         const workbench = document.querySelector('.erp-print-center-workbench')
         const panels = [
           '.erp-print-center-nav-panel',
           '.erp-print-center-preview-panel',
-          '.erp-print-center-mapping-panel',
         ].map((selector) => document.querySelector(selector))
 
         return {
@@ -2675,8 +2668,8 @@ const scenarios = [
       )
       assert.equal(
         printCenterLayout.panelCount,
-        3,
-        `打印中心应保持三栏工作台: ${JSON.stringify(printCenterLayout)}`
+        2,
+        `打印中心应保持模板导航和纸面预览两栏: ${JSON.stringify(printCenterLayout)}`
       )
       await page
         .locator('.erp-print-center-template-list')
@@ -2708,9 +2701,9 @@ const scenarios = [
       await expectText(page, '模板')
       await expectText(page, '采购合同')
       await expectText(page, '加工合同')
-      await expectText(page, '样品确认单')
+      await assertTextAbsent(page, '样品确认单')
       await expectText(page, '纸面预览')
-      await expectText(page, '字段映射')
+      await assertTextAbsent(page, '字段映射')
       await assertTextAbsent(page, '运营中枢')
       await assertTextAbsent(page, '示例记录')
       await assertERPThemeMode(page, {
@@ -5775,7 +5768,15 @@ async function assertContractTableEditableAlignment(
       const filledNode = editableNodes.find(
         (node) => normalizeText(node) !== ''
       )
-      const emptyNode = editableNodes.find((node) => normalizeText(node) === '')
+      let emptyNode = editableNodes.find((node) => normalizeText(node) === '')
+      let restoredText = null
+
+      if (!emptyNode && filledNode) {
+        emptyNode =
+          editableNodes.find((node) => node !== filledNode) || filledNode
+        restoredText = emptyNode.textContent
+        emptyNode.textContent = '\u200b'
+      }
 
       const focusEmptyCaret = (node) => {
         if (!node) {
@@ -5811,13 +5812,19 @@ async function assertContractTableEditableAlignment(
         }
       }
 
-      return {
+      const result = {
         hasTable: Boolean(table),
         editableCount: editableNodes.length,
         filledStyle: filledNode ? extractStyle(filledNode) : null,
         emptyStyle: emptyNode ? extractStyle(emptyNode) : null,
         emptyCaretOffset: focusEmptyCaret(emptyNode),
       }
+
+      if (restoredText !== null && emptyNode) {
+        emptyNode.textContent = restoredText
+      }
+
+      return result
     },
     {
       resolvedTableSelector: tableSelector,
@@ -8923,6 +8930,11 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       tabCount: node.querySelectorAll(
         '.erp-business-collaboration-task-panel__tab'
       ).length,
+      summaryItems: [
+        ...node.querySelectorAll(
+          '.erp-business-collaboration-task-panel__summary-item'
+        ),
+      ].map((item) => String(item.textContent || '').trim()),
       scrollWidth: node.scrollWidth,
       clientWidth: node.clientWidth,
     }
@@ -8943,6 +8955,15 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     0,
     `${scenarioName} 默认收起态不应显示任务 tab: ${JSON.stringify(collapsedMetrics)}`
   )
+  const collapsedSummaryText = collapsedMetrics.summaryItems.map(compactText)
+  assert(
+    collapsedSummaryText[0]?.startsWith('当前记录') &&
+      collapsedSummaryText[1]?.startsWith('本页待办') &&
+      collapsedSummaryText[2]?.startsWith('阻塞异常'),
+    `${scenarioName} 默认收起态应保留当前记录和风险摘要: ${JSON.stringify(
+      collapsedMetrics
+    )}`
+  )
   assert(
     compactText(collapsedMetrics.toggleText).includes('展开'),
     `${scenarioName} 默认收起态按钮应提示展开: ${JSON.stringify(collapsedMetrics)}`
@@ -8959,15 +8980,33 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
 
   const expandedMetrics = await panel.evaluate((node) => {
     const toggleButton = node.querySelector('button[aria-expanded]')
+    const tabList = node.querySelector(
+      '.erp-business-collaboration-task-panel__tabs'
+    )
+    const tabPanel = node.querySelector(
+      '.erp-business-collaboration-task-panel__list'
+    )
     return {
       ariaExpanded: toggleButton?.getAttribute('aria-expanded') || null,
       toggleText: String(toggleButton?.textContent || '').trim(),
       hasExpandedPanel: Boolean(
         node.querySelector('.erp-business-collaboration-task-panel__panel')
       ),
+      tabListRole: tabList?.getAttribute('role') || '',
+      tabListLabel: tabList?.getAttribute('aria-label') || '',
       tabTexts: [
         ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
       ].map((item) => String(item.textContent || '').trim()),
+      tabA11y: [
+        ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
+      ].map((item) => ({
+        role: item.getAttribute('role') || '',
+        selected: item.getAttribute('aria-selected') || '',
+        controls: item.getAttribute('aria-controls') || '',
+        id: item.id || '',
+      })),
+      tabPanelRole: tabPanel?.getAttribute('role') || '',
+      tabPanelLabelledBy: tabPanel?.getAttribute('aria-labelledby') || '',
       scrollWidth: node.scrollWidth,
       clientWidth: node.clientWidth,
     }
@@ -8984,6 +9023,39 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     ),
     ['本页待办', '当前记录', '阻塞异常', '已完成'],
     `${scenarioName} 展开后任务 tab 不完整: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert.equal(
+    expandedMetrics.tabListRole,
+    'tablist',
+    `${scenarioName} 协同任务分类缺少 tablist 语义: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert.equal(
+    expandedMetrics.tabListLabel,
+    '本页协同任务分类',
+    `${scenarioName} 协同任务分类 aria-label 不正确: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert(
+    expandedMetrics.tabA11y.every((item) => item.role === 'tab'),
+    `${scenarioName} 协同任务分类按钮缺少 tab 语义: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert.equal(
+    expandedMetrics.tabA11y.filter((item) => item.selected === 'true').length,
+    1,
+    `${scenarioName} 协同任务分类应只有一个 aria-selected=true: ${JSON.stringify(
+      expandedMetrics
+    )}`
+  )
+  assert.equal(
+    expandedMetrics.tabPanelRole,
+    'tabpanel',
+    `${scenarioName} 协同任务列表缺少 tabpanel 语义: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert.equal(
+    expandedMetrics.tabPanelLabelledBy,
+    expandedMetrics.tabA11y.find((item) => item.selected === 'true')?.id,
+    `${scenarioName} 协同任务 tabpanel 未绑定当前 tab: ${JSON.stringify(
+      expandedMetrics
+    )}`
   )
   assert(
     compactText(expandedMetrics.toggleText).includes('收起'),

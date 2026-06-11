@@ -30,6 +30,15 @@
 
 原型不是第二套系统，也不是完整需求、字段全集、API、权限、菜单、schema、migration 或测试真源。真实实现仍必须回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、当前代码、真实 API、RBAC、theme token、migration 和自动化测试。
 
+原型重点关注以下评审维度：
+
+- 大致布局：首屏结构、主内容区、侧栏、筛选、表格、详情和动作区怎么放。
+- 交互路径：用户怎么筛选、查看、处理、展开、收起、确认、驳回和阻塞。
+- 信息层级：什么最重要，什么次要，什么应该收起或弱化。
+- 状态表达：待处理、已完成、阻塞、风险、空态和错误态怎么让人看懂。
+- 视觉密度：页面是清爽、拥挤、空洞，还是适合 ERP 日常操作。
+- 实现边界：哪些只是展示样板，哪些不能升级成 API、权限、菜单或业务事实。
+
 原型不要求完美展示每个像素，但必须足够准确地表达布局决策：
 
 - 起草阶段 / Draft：用于判断方向、层级、密度和入口是否合理，不要求贴近真实页面。
@@ -172,10 +181,11 @@
 | --- | --- | --- | --- |
 | `index.html` | Current | Evidence | 产品原型与样板查看器，可直接用浏览器 `file://` 打开，用于筛选和访问本目录下的 HTML 样板、PNG 方案图和截图证据。 |
 | `admin-command-center-v1/index.html` | To Implement | Core | 后台工作台标准样板，把工作台收敛为登录后的今日处理台：今日队列、当前任务详情和少量常用业务对象入口。 |
-| `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页样板，保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。 |
+| `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页样板，保留标题摘要、独立筛选条、结果工具条、表格、当前记录操作条、主表分页和底部轻量协同入口。 |
 | `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement | Core | 业务页协同入口组件样板，用于表达“收起保留风险提示、展开处理本页任务”，不作为独立业务入口。 |
+| `print-template-center-v1/index.html` | To Implement | Core | 模板打印中心样板，覆盖模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。 |
 | `business-detail-page-standard-v1/index.html` | To Implement | Core | 业务详情页标准样板，覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。 |
-| `business-form-page-standard-v1/index.html` | To Implement | Core | 新建 / 编辑表单标准样板，覆盖字段分组、必填校验、保存 / 取消 / 重置、来源带值、清值和缺值 / 残值防护。 |
+| `business-form-page-standard-v1/index.html` | To Implement | Core | 新建 / 编辑表单标准样板，覆盖首个落地对象、字段分组、必填校验、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。 |
 | `action-modal-drawer-standard-v1/index.html` | To Implement | Core | 弹窗 / 抽屉动作标准样板，覆盖审批、驳回、阻塞、冲正、关闭任务、危险确认和 reason 必填表达。 |
 | `business-module-page-standard-v1/images/` | Reference | Exploration / Evidence | 早期三张协同入口方向图，用于追溯方案比较。 |
 | `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前实现参考，用于说明真实页面吸收早期 PNG 后的 as-built 形态。 |
@@ -192,15 +202,16 @@
 | 工作台 / 总控页 | `admin-command-center-v1/index.html` | 后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；常用入口必须标注为快捷入口。 | 不替代正式菜单，不把快捷入口写成新的菜单结构。 |
 | 业务模块列表页 / 标准业务页 | `business-module-page-standard-v1/index.html` | 客户档案、供应商档案、产品、销售订单、辅材 / 包材采购、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。 | 不要求每个菜单复制一份原型，不自动新增未实现菜单。 |
 | 业务详情页 | `business-detail-page-standard-v1/index.html` | 销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照。 | 不替代字段真源、状态机、关联单据真源或允许动作。 |
-| 新建 / 编辑表单页 | `business-form-page-standard-v1/index.html` | 客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照。 | 不替代 schema、API、保存 usecase、字段默认值和残值 / 缺值防护规则。 |
+| 新建 / 编辑表单页 | `business-form-page-standard-v1/index.html` | 客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；进入真实实现时建议先收窄到销售订单验证骨架。 | 不替代 schema、API、RBAC、保存 usecase、字段默认值和残值 / 缺值防护规则。 |
 | 协同任务入口 / 处理组件 | `business-module-page-standard-v1/task-collab-entry-v2.html` | 嵌入有 Workflow 协同任务的业务页可参照。 | 不是独立菜单、路由或权限入口，不把 Workflow 任务完成写成 Fact 过账。 |
 | 弹窗 / 抽屉动作 | `action-modal-drawer-standard-v1/index.html` | 审批、驳回、阻塞、冲正、关闭任务、过账 / 取消等动作浮层可参照。 | 不替代后端权限、幂等、状态边界、reason 校验或事实约束。 |
 | 岗位任务端 | `mobile-role-tasks-v1/implemented-reference.html` | 岗位任务端 `/m/<role>/tasks` 当前实现参考。 | 不复制桌面菜单树，不作为新岗位入口设计。 |
-| 打印 / 导入 / 导出 / 帮助 / 开发验收 | 暂无独立完整页面 | 本轮只写作辅助动作参照规则：入口弱化，不喧宾夺主；真实能力仍回到正式页面、工具或 dev-only 入口。 | 不因为暂无原型就自动阻塞已有正式能力，也不把 dev-only 入口写成产品菜单。 |
+| 模板打印中心 | `print-template-center-v1/index.html` | 模板打印中心可参照，重点是模板导航、纸面预览和打印窗口入口。 | 不替代正式打印模板、业务字段真源、独立打印窗口、后端 API、RBAC 或 Fact 写入。 |
+| 导入 / 导出 / 帮助 / 开发验收 | 暂无独立完整页面 | 本轮只写作辅助动作参照规则：入口弱化，不喧宾夺主；真实能力仍回到正式页面、工具或 dev-only 入口。 | 不因为暂无原型就自动阻塞已有正式能力，也不把 dev-only 入口写成产品菜单。 |
 
 同类菜单默认参照上述样板，不单独设计。可参照标准列表页的菜单包括客户档案、供应商档案、产品、销售订单、辅材/包材采购、加工合同/委外下单、入库通知/检验/入库、库存、待出货/出货放行、出库、生产排单、生产进度、延期/返工/异常、品质检验、对账/结算、待付款/应付提醒、应收/开票登记和发票登记。只有当某个菜单存在独特业务流程、独特信息结构或关键交互差异时，再单独做原型评审。
 
-To Implement 不能替代正式菜单、权限、路由、业务语义或 Workflow / Fact 真源。原型里的侧栏只作为常用入口 / 快捷入口示意，名称和分组必须贴近 `seedData.mjs` 与 `yoyoosun` 客户菜单；如果后续要减少正式菜单入口，必须另做菜单评审，并同步检查菜单配置、后端内置菜单、权限码、导航 seed、测试断言和帮助 / 培训文档。
+To Implement 不能替代正式菜单、权限、路由、业务语义或 Workflow / Fact 真源。工作台等总控原型里的入口只作为常用入口 / 快捷入口示意，名称和分组必须贴近 `seedData.mjs` 与 `yoyoosun` 客户菜单；业务模块标准页默认不再额外放置菜单侧栏。如果后续要减少正式菜单入口，必须另做菜单评审，并同步检查菜单配置、后端内置菜单、权限码、导航 seed、测试断言和帮助 / 培训文档。
 
 Core 样板中的订单号、客户、产品、数量、日期、任务和附件均为中性样例数据，只用于表达布局和状态；客户专属品牌、客户名称、菜单差异和字段习惯仍应进入客户配置、seed/demo、打印模板或 `docs/customers/<customer-key>/`，不得作为产品内核默认值。
 
@@ -234,7 +245,7 @@ Core 样板中的订单号、客户、产品、数量、日期、任务和附件
 
 当前推荐的简化理解是：顶部只判断“当前 / 待实现 / 参考资料”；`HTML / PNG` 只表示格式，`截图证据 / Evidence`、`方案对比 / Comparison`、`历史参考 / History` 等细标签只解释来源和用途。不要反过来用 HTML / PNG 文件格式或辅助标签判断资产阶段。
 
-截至 2026-06-11，待实现队列包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。本轮继续保持三个既有 HTML 的 To Implement 状态，并补齐详情页、表单页和弹窗 / 抽屉动作三个后台标准样板；工作台和业务模块标准页的侧栏只作为贴近当前真实菜单的常用入口 / 快捷入口示意，不替代 seedData、客户菜单、路由或 RBAC。本轮只调整原型、样板资产和登记口径，不改变运行时代码、正式菜单、后端 API、RBAC、schema、migration 或 Fact 语义。未获用户明确确认前，六个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现参考登记。
+截至 2026-06-11，待实现队列包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`print-template-center-v1/index.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。本轮补齐模板打印中心独立 To Implement 样板；工作台里的入口只作为贴近当前真实菜单的常用入口 / 快捷入口示意，不替代 seedData、客户菜单、路由或 RBAC；业务模块标准页已对齐当前真实列表页的独立筛选条、结果工具条、空选中当前操作区、选中后动作启用和主表分页形态；模板打印中心样板只表达采购合同 / 加工合同模板导航、纸面预览和打印窗口入口，不新增样品确认单、字段映射配置或后端能力。本轮只调整原型、样板资产和登记口径，不改变运行时代码、正式菜单、后端 API、RBAC、schema、migration 或 Fact 语义。未获用户明确确认前，七个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现参考登记。
 
 ## 使用方式
 

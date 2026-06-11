@@ -30,10 +30,10 @@ test('devPrototypes: 只通过开发态独立路径暴露', () => {
 })
 
 test('devPrototypes: 登记当前原型与样板资产并区分类型和状态', () => {
-  assert.equal(DEV_PROTOTYPE_ASSETS.length, 13)
+  assert.equal(DEV_PROTOTYPE_ASSETS.length, 14)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'HTML').length,
-    7
+    8
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'PNG').length,
@@ -57,7 +57,7 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     DEV_PROTOTYPE_ASSETS.filter((item) =>
       item.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)
     ).length,
-    6
+    7
   )
   assert.deepEqual(
     DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => option.value),
@@ -78,6 +78,28 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
       (item) => item.key === 'business-task-collab-entry'
     )?.statuses[0],
     DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
+  )
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'print-template-center')
+      ?.statuses[0],
+    DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
+  )
+  assert.match(
+    DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'print-template-center')
+      ?.appliesTo || '',
+    /不新增样品确认单/
+  )
+  assert.match(
+    DEV_PROTOTYPE_ASSETS.find(
+      (item) => item.key === 'business-form-standard-page'
+    )?.description || '',
+    /只读状态/
+  )
+  assert.match(
+    DEV_PROTOTYPE_ASSETS.find(
+      (item) => item.key === 'business-form-standard-page'
+    )?.appliesTo || '',
+    /先收窄到销售订单/
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find(
@@ -106,6 +128,8 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
         '<!doctype html><title>后台工作台样板</title>',
       '../../../../docs/product/prototypes/business-module-page-standard-v1/index.html':
         '<!doctype html><title>业务模块标准页样板</title>',
+      '../../../../docs/product/prototypes/print-template-center-v1/index.html':
+        '<!doctype html><title>模板打印中心样板</title>',
       '../../../../docs/product/prototypes/business-detail-page-standard-v1/index.html':
         '<!doctype html><title>业务详情页标准样板</title>',
       '../../../../docs/product/prototypes/business-form-page-standard-v1/index.html':
@@ -131,6 +155,9 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const detailPrototype = items.find(
     (item) => item.key === 'business-detail-standard-page'
   )
+  const printPrototype = items.find(
+    (item) => item.key === 'print-template-center'
+  )
   const formPrototype = items.find(
     (item) => item.key === 'business-form-standard-page'
   )
@@ -142,6 +169,8 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   assert.match(commandCenterPrototype?.source || '', /后台工作台样板/)
   assert.equal(businessPrototype?.available, true)
   assert.match(businessPrototype?.source || '', /业务模块标准页样板/)
+  assert.equal(printPrototype?.available, true)
+  assert.match(printPrototype?.source || '', /模板打印中心样板/)
   assert.equal(detailPrototype?.available, true)
   assert.match(detailPrototype?.source || '', /业务详情页标准样板/)
   assert.equal(formPrototype?.available, true)
@@ -193,6 +222,18 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
       keyword: '销售订单',
     }).some((item) => item.key === 'business-module-standard-page')
   )
+  assert(
+    filterDevPrototypeItems(items, {
+      status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
+      keyword: '只读状态',
+    }).some((item) => item.key === 'business-form-standard-page')
+  )
+  assert(
+    filterDevPrototypeItems(items, {
+      status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
+      keyword: '打印窗口',
+    }).some((item) => item.key === 'print-template-center')
+  )
   assert.deepEqual(
     filterDevPrototypeItems(items, {
       status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
@@ -200,6 +241,7 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
     [
       'admin-command-center',
       'business-module-standard-page',
+      'print-template-center',
       'business-task-collab-entry',
       'business-detail-standard-page',
       'business-form-standard-page',
@@ -292,6 +334,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
     [
       'admin-command-center-v1/',
       'business-module-page-standard-v1/',
+      'print-template-center-v1/',
       'business-detail-page-standard-v1/',
       'business-form-page-standard-v1/',
       'action-modal-drawer-standard-v1/',
@@ -302,7 +345,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
   )
   assert.deepEqual(
     groups.map((group) => group.items.length),
-    [1, 2, 1, 1, 1, 3, 1, 3]
+    [1, 2, 1, 1, 1, 1, 3, 1, 3]
   )
 
   assert.deepEqual(

@@ -11,8 +11,10 @@ import {
   buildPrintWorkspacePath,
   buildPrintWorkspaceShellURL,
   buildPrintWorkspaceWindowStateStorageKey,
+  canOpenPrintWorkspaceFromWindowState,
   persistPrintWorkspaceWindowHTML,
   persistPrintWorkspaceWindowState,
+  persistPrintWorkspaceDraftSnapshot,
   readPrintWorkspaceWindowState,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceEntrySource,
@@ -147,6 +149,90 @@ test('printWorkspace: 窗口状态持久化后可按 TTL 读取，过期时自�
     Date.now = originalNow
     globalThis.window = originalWindow
   }
+})
+
+test('printWorkspace: 独立编辑页仅允许匹配本地窗口状态绕过登录守卫', () => {
+  const storage = new Map()
+  const originalNow = Date.now
+  Date.now = () => 1_000
+  const storageLike = {
+    setItem(key, value) {
+      storage.set(key, value)
+    },
+    getItem(key) {
+      return storage.get(key) || null
+    },
+    removeItem(key) {
+      storage.delete(key)
+    },
+  }
+
+  storageLike.setItem(
+    buildPrintWorkspaceWindowStateStorageKey('window-guard-1'),
+    JSON.stringify({
+      version: 1,
+      updatedAt: 1_000,
+      templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+      workspaceURL:
+        'http://127.0.0.1:4173/erp/print-workspace/processing-contract?state=window-guard-1',
+    })
+  )
+
+  try {
+    assert.equal(
+      canOpenPrintWorkspaceFromWindowState(
+        PROCESSING_CONTRACT_TEMPLATE_KEY,
+        '?state=window-guard-1',
+        storageLike
+      ),
+      true
+    )
+    assert.equal(
+      canOpenPrintWorkspaceFromWindowState(
+        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+        '?state=window-guard-1',
+        storageLike
+      ),
+      false
+    )
+    assert.equal(
+      canOpenPrintWorkspaceFromWindowState(
+        PROCESSING_CONTRACT_TEMPLATE_KEY,
+        '',
+        storageLike
+      ),
+      false
+    )
+
+    Date.now = () => 24 * 60 * 60 * 1000 + 1_001
+    assert.equal(
+      canOpenPrintWorkspaceFromWindowState(
+        PROCESSING_CONTRACT_TEMPLATE_KEY,
+        '?state=window-guard-1',
+        storageLike
+      ),
+      false
+    )
+  } finally {
+    Date.now = originalNow
+  }
+})
+
+test('printWorkspace: 草稿写入 localStorage 满额时不抛异常', () => {
+  const storageLike = {
+    setItem() {
+      throw new DOMException('quota exceeded', 'QuotaExceededError')
+    },
+  }
+
+  assert.equal(
+    persistPrintWorkspaceDraftSnapshot(
+      '__plush_erp_print_workspace_draft__:material-purchase-contract:quota',
+      { contractNo: 'A26022832' },
+      storageLike
+    ),
+    false
+  )
 })
 
 test('FL_print_workspace_window_snapshot__persists_current_html_snapshot printWorkspace: 工作台可把整窗 HTML 快照落到窗口状态里', async () => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Space, Tag, Typography } from 'antd'
-import { FileSearchOutlined, PrinterOutlined } from '@ant-design/icons'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Button, Card, Space, Typography } from 'antd'
+import { PrinterOutlined } from '@ant-design/icons'
+import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { printTemplateCatalog } from '../config/printTemplates.mjs'
@@ -16,57 +16,15 @@ import {
 
 const { Paragraph, Text, Title } = Typography
 
-const PRINT_CENTER_CANDIDATE_TEMPLATES = Object.freeze([
-  {
-    key: 'sample-confirmation-candidate',
-    title: '样品确认单',
-    category: '候选模板',
-    stateText: '候选模板 / 未启用',
-    summary: '缺少正式模板样本和字段真源，本轮只保留导航占位。',
-    enabled: false,
-  },
-])
-
 function buildTemplateNavItems() {
-  return [
-    ...printTemplateCatalog.map((template) => ({
-      ...template,
-      stateText: '正式模板 / 已启用',
-      enabled: true,
-    })),
-    ...PRINT_CENTER_CANDIDATE_TEMPLATES,
-  ]
-}
-
-function buildPrintMappingRows(template = {}) {
-  const sample = template.sample || {}
-  return [
-    {
-      label: '合同编号 / 单号',
-      state: sample.contractNo ? '默认样例' : '字段已定义',
-      color: 'success',
-    },
-    {
-      label: '供应商 / 客户',
-      state:
-        sample.supplierName || sample.buyerCompany ? '样例字段' : '按业务带值',
-      color: 'success',
-    },
-    {
-      label: '产品 / 明细行',
-      state: '来自明细行',
-      color: 'processing',
-    },
-    {
-      label: '条款 / 签章栏',
-      state: '手工确认',
-      color: 'default',
-    },
-  ]
+  return printTemplateCatalog.map((template) => ({
+    ...template,
+    stateText: '正式模板 / 已启用',
+    enabled: true,
+  }))
 }
 
 export default function PrintCenterPage() {
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTemplateKey = String(searchParams.get('template') || '').trim()
   const requestedEntrySource = resolvePrintWorkspaceEntrySource(searchParams)
@@ -107,10 +65,6 @@ export default function PrintCenterPage() {
   )
   const activePreviewLines = activeTemplate?.previewLines || []
   const activeSample = activeTemplate?.sample || {}
-  const activeMappingRows = useMemo(
-    () => buildPrintMappingRows(activeTemplate),
-    [activeTemplate]
-  )
   const previewSummary = [
     activeSample.contractNo
       ? `合同编号：${activeSample.contractNo}`
@@ -135,12 +89,6 @@ export default function PrintCenterPage() {
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.set('template', template.key)
     setSearchParams(nextSearchParams, { replace: true })
-  }
-
-  const openTemplateCheck = () => {
-    if (activeTemplate?.key) {
-      navigate(`/erp/print-center/${activeTemplate.key}`)
-    }
   }
 
   const handleOpenEditablePrint = async () => {
@@ -175,13 +123,10 @@ export default function PrintCenterPage() {
               模板打印中心
             </Title>
             <Paragraph className="erp-print-center-nav-description">
-              轻量工作台：模板选择、字段映射、纸面预览和打印窗口入口。
+              轻量工作台：模板选择、纸面预览和打印窗口入口。
             </Paragraph>
           </div>
           <Space wrap>
-            <Button icon={<FileSearchOutlined />} onClick={openTemplateCheck}>
-              字段核对
-            </Button>
             <Button
               type="primary"
               icon={<PrinterOutlined />}
@@ -199,7 +144,7 @@ export default function PrintCenterPage() {
             <div className="erp-print-center-nav-header">
               <Text className="erp-print-center-nav-title">模板</Text>
               <Text className="erp-print-center-nav-description">
-                正式模板可切换；候选模板暂不开放打印。
+                当前仅开放已启用的正式模板。
               </Text>
             </div>
             <div
@@ -274,25 +219,6 @@ export default function PrintCenterPage() {
               </div>
               <div className="erp-print-center-paper-stamp">模板预览</div>
             </div>
-          </div>
-          <div className="erp-print-center-mapping-panel">
-            <div className="erp-print-center-nav-header">
-              <Text className="erp-print-center-nav-title">字段映射</Text>
-              <Text className="erp-print-center-nav-description">
-                这里只展示现有模板的关键字段状态。
-              </Text>
-            </div>
-            <Space direction="vertical" size={10} style={{ width: '100%' }}>
-              {activeMappingRows.map((item) => (
-                <div className="erp-print-center-map-row" key={item.label}>
-                  <Text>{item.label}</Text>
-                  <Tag color={item.color}>{item.state}</Tag>
-                </div>
-              ))}
-              <Text className="erp-print-center-mapping-note">
-                字段真源仍以打印模板配置、业务页带值和独立打印窗口为准；本页不编辑模板、不反写业务记录。
-              </Text>
-            </Space>
           </div>
         </div>
       </Card>

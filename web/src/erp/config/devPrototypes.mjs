@@ -71,6 +71,19 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '客户档案、供应商档案、产品、销售订单、辅材 / 包材采购、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。',
   },
   {
+    key: 'print-template-center',
+    title: '模板打印中心样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'print-template-center-v1/',
+    assetPath: 'print-template-center-v1/index.html',
+    readmePath: 'print-template-center-v1/README.md',
+    description:
+      '保留模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。',
+    appliesTo:
+      '模板打印中心可参照；只表达采购合同和加工合同两套正式模板入口，不新增样品确认单、字段映射配置、后端 API、RBAC 或 Fact 写入。',
+  },
+  {
     key: 'business-task-collab-entry',
     title: '业务页协同入口组件样板',
     type: 'HTML',
@@ -105,9 +118,9 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-form-page-standard-v1/index.html',
     readmePath: 'business-form-page-standard-v1/README.md',
     description:
-      '覆盖字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值和缺值 / 残值防护。',
+      '覆盖首个落地对象、字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。',
     appliesTo:
-      '客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；字段真源以 schema、API 和保存 usecase 为准。',
+      '客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；真实落地建议先收窄到销售订单，字段真源以 schema、API、RBAC 和保存 usecase 为准。',
   },
   {
     key: 'action-modal-drawer-standard',

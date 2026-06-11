@@ -60,7 +60,7 @@ function createDocumentStub(existingLinks = []) {
   }
 }
 
-test('favicon: routes resolve to separate admin, tasks, dev, testing, docs, capability ledger, prototype and customer config icons', () => {
+test('favicon: routes resolve to separate admin, tasks, dev, testing, docs, capability ledger, prototype, customer config and print template icons', () => {
   assert.equal(resolveERPFavicon('/erp/dashboard'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(resolveERPFavicon('/admin-login'), ERP_FAVICON_VARIANTS.admin)
   assert.equal(
@@ -87,6 +87,26 @@ test('favicon: routes resolve to separate admin, tasks, dev, testing, docs, capa
     resolveERPFavicon('/__dev/customer-config'),
     ERP_FAVICON_VARIANTS.customerConfig
   )
+
+  const materialTemplateFavicon = resolveERPFavicon(
+    '/erp/print-workspace/material-purchase-contract'
+  )
+  assert.equal(
+    materialTemplateFavicon.key,
+    'print-template:material-purchase-contract'
+  )
+  assert.equal(materialTemplateFavicon.glyph, '采')
+  assert.equal(materialTemplateFavicon.type, 'image/svg+xml')
+  assert.match(materialTemplateFavicon.href, /^data:image\/svg\+xml,/)
+
+  const processingTemplateFavicon = resolveERPFavicon(
+    '/erp/print-workspace/processing-contract'
+  )
+  assert.equal(
+    processingTemplateFavicon.key,
+    'print-template:processing-contract'
+  )
+  assert.equal(processingTemplateFavicon.glyph, '加')
 })
 
 test('favicon: mobile login redirect keeps the task icon by source route', () => {
@@ -135,6 +155,16 @@ test('favicon: customer favicon overrides customer-facing admin and task routes'
     }),
     ERP_FAVICON_VARIANTS.testing
   )
+})
+
+test('favicon: print workspace keeps template glyph before customer branding', () => {
+  const result = resolveERPFavicon('/erp/print-workspace/processing-contract', {
+    customerFaviconHref: '/favicon-yoyoosun.svg',
+  })
+
+  assert.equal(result.key, 'print-template:processing-contract')
+  assert.equal(result.glyph, '加')
+  assert.match(decodeURIComponent(result.href), />加<\/text>/)
 })
 
 test('favicon: runtime update keeps a single active icon link', () => {

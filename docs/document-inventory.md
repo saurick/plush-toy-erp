@@ -107,8 +107,12 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/phase12-saas-review.md` | Phase 12 SaaS 单独评审 / Phase 12 SaaS Review |
 | `docs/product/prototypes/README.md` | 产品原型资产 / Product Prototype Assets |
 | `docs/product/prototypes/admin-command-center-v1/README.md` | 后台工作台与看板原型 / Admin Command Center Prototype |
+| `docs/product/prototypes/action-modal-drawer-standard-v1/README.md` | 弹窗 / 抽屉动作标准样板 / Action Modal And Drawer Standard Prototype |
+| `docs/product/prototypes/business-detail-page-standard-v1/README.md` | 业务详情页标准样板 / Business Detail Page Standard Prototype |
+| `docs/product/prototypes/business-form-page-standard-v1/README.md` | 新建 / 编辑表单标准样板 / Business Form Page Standard Prototype |
 | `docs/product/prototypes/business-module-page-standard-v1/README.md` | 业务模块标准页原型 / Business Module Page Standard Prototype |
 | `docs/product/prototypes/mobile-role-tasks-v1/README.md` | 岗位任务端原型 / Mobile Role Tasks Prototype |
+| `docs/product/prototypes/print-template-center-v1/README.md` | 模板打印中心原型 / Print Template Center Prototype |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |
 | `docs/product/product-delivery-ledgers.md` | 产品台账索引 / Product Delivery Ledgers Index |
 | `docs/product/product-principles.md` | 产品原则 / Product Principles |

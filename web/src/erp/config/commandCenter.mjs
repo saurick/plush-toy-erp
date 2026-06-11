@@ -33,7 +33,7 @@ export const commandCenterGroups = Object.freeze([
         label: '模板打印中心',
         shortLabel: '打印',
         path: '/erp/print-center',
-        description: '模板选择、字段映射、纸面预览和打印窗口入口。',
+        description: '模板选择、纸面预览和打印窗口入口。',
       },
       {
         key: 'exception-flow',

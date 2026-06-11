@@ -61,8 +61,8 @@ export const FIELD_LINKAGE_SCENARIO_CATALOG = [
     label: '打印窗口快照持久化',
   },
   {
-    key: 'default_sample_clears_unverified_party',
-    label: '默认样例不伪造供应商 / 加工商资料',
+    key: 'default_sample_uses_generic_party_values',
+    label: '默认样例使用中性交易方展示值',
   },
   {
     key: 'contract_terms_excluded_from_business_scope',
@@ -215,7 +215,7 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     category: '合同头快照',
     risk: 'P0',
     docLabels: ['加工方联系人 / 地址'],
-    requiredScenarioKeys: ['default_sample_clears_unverified_party'],
+    requiredScenarioKeys: ['default_sample_uses_generic_party_values'],
   },
   {
     fieldKey: 'attachmentSnapshot',
@@ -640,10 +640,10 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
   },
   {
     caseId:
-      'FL_print_templates_sample__keeps_supplier_snapshot_fields_blank_by_default',
-    title: '打印模板默认样例不伪造供应商 / 加工商资料',
+      'FL_print_templates_sample__uses_generic_sample_values_without_customer_identity',
+    title: '打印模板默认样例使用中性展示值且不带客户身份',
     fieldKeys: ['processorContactAddress'],
-    scenarioKey: 'default_sample_clears_unverified_party',
+    scenarioKey: 'default_sample_uses_generic_party_values',
     layer: 'web',
     testFile: 'web/src/erp/config/printTemplates.test.mjs',
   },

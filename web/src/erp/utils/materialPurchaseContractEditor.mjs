@@ -259,6 +259,31 @@ export const buildMaterialPurchaseContractDraft = (sample = {}) => {
   }
 }
 
+export const buildBlankMaterialPurchaseContractDraft = (draft = {}) => {
+  const normalizedDraft = buildMaterialPurchaseContractDraft(draft)
+  return {
+    ...normalizedDraft,
+    contractNo: '',
+    orderDateText: '',
+    returnDateText: '',
+    supplierName: '',
+    supplierContact: '',
+    supplierPhone: '',
+    supplierAddress: '',
+    buyerCompany: '',
+    buyerContact: '',
+    buyerPhone: '',
+    buyerAddress: '',
+    buyerSigner: '',
+    supplierSigner: '',
+    signDateText: '',
+    supplierSignDateText: '',
+    lines: [normalizeMaterialPurchaseLine(createEmptyMaterialPurchaseLine())],
+    buyerStampVisible: false,
+    merges: [],
+  }
+}
+
 export const computeMaterialPurchaseTotals = (lines = []) => {
   let quantityTotal = 0
   let amountTotal = 0
