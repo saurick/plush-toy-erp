@@ -222,11 +222,11 @@ workflow done
 
 ### 当前已实现：协同业务状态 / Implemented Business Workflow Status
 
-写入 usecase：`WorkflowUsecase.UpdateTaskStatus`、`WorkflowUsecase.UpsertBusinessState`、`BusinessRecordUsecase.CreateRecord / UpdateRecord`。这些状态不是事实。`shipped / reconciling / settled` 当前只是协同业务 key，不代表真实出货、应收、开票、付款或结算事实已经落地。
+写入 usecase：`WorkflowUsecase.UpdateTaskStatus`、`WorkflowUsecase.UpsertBusinessState`。`business_records.business_status_key` 只保留为 legacy/archive 历史快照字段，普通 `BusinessRecordUsecase.CreateRecord / UpdateRecord` 已冻结为只读 archive，不再作为正式协同业务状态写入入口。这些状态不是事实。`shipped / reconciling / settled` 即使出现在旧快照中，也不代表真实出货、应收、开票、付款或结算事实已经落地。
 
 | canonical key | 中文显示 | 所属对象 / 字段 | 写入 usecase | 是否已实现 | 是否事实 | 允许流转 | 终态保护 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `project_pending` | 立项待确认 | `workflow_business_states.business_status_key` / `business_records.business_status_key` | `WorkflowUsecase` / `BusinessRecordUsecase` | 是 | 否 | -> `project_approved / blocked / cancelled` | 否 |
+| `project_pending` | 立项待确认 | `workflow_business_states.business_status_key`；旧 `business_records.business_status_key` 仅 archive | `WorkflowUsecase`；旧快照只读 | 是 | 否 | -> `project_approved / blocked / cancelled` | 否 |
 | `project_approved` | 立项已放行 | 同上 | 同上 | 是 | 否 | -> `engineering_preparing / material_preparing / blocked / cancelled` | 否 |
 | `engineering_preparing` | 资料准备中 | 同上 | 同上 | 是 | 否 | -> `material_preparing / blocked / cancelled` | 否 |
 | `material_preparing` | 齐套准备中 | 同上 | 同上 | 是 | 否 | -> `iqc_pending / production_ready / blocked / cancelled` | 否 |
@@ -239,13 +239,13 @@ workflow done
 | `warehouse_inbound_pending` | 待确认入库 | 同上 | 同上 | 是 | 否 | -> `inbound_done / blocked / cancelled` | 否 |
 | `inbound_done` | 已入库 | 同上 | 同上 | 是 | 否 | -> `material_preparing / production_ready / shipment_pending / closed` | 对部分 workflow 特殊规则不再重复触发 |
 | `shipment_pending` | 待出货 | 同上 | 同上 | 是 | 否 | -> `shipped / blocked / cancelled` | 否 |
-| `shipping_released` | 已放行待出库 | 同上 | `WorkflowUsecase.UpdateTaskStatus` / `BusinessRecordUsecase` | 是 | 否 | -> `shipped / blocked / cancelled` | 对 `shipment_release` 特殊规则不再触发 |
-| `shipped` | 已出货 | 同上 | `BusinessRecordUsecase` / 前端协同状态流转 | 是，仅协同 key | 否，真实 fact 未实现 | -> `reconciling / closed` | 对 `shipment_release` 特殊规则不再触发 |
-| `reconciling` | 对账中 | 同上 | `BusinessRecordUsecase` / 前端协同状态流转 | 是，仅协同 key | 否，真实 finance fact 未实现 | -> `settled / blocked / closed` | 否 |
-| `settled` | 已结算 | 同上 | `BusinessRecordUsecase` / 前端协同状态流转 | 是，仅协同 key | 否，真实结算 fact 未实现 | -> `closed` | 否 |
-| `blocked` | 业务阻塞 | 同上 | `WorkflowUsecase` / `BusinessRecordUsecase` | 是 | 否 | -> `material_preparing / production_ready / production_processing / qc_pending / warehouse_processing / shipment_pending / reconciling / cancelled` | 否；原因必填 |
-| `cancelled` | 业务取消 | 同上 | `BusinessRecordUsecase` / 前端协同状态流转 | 是 | 否 | -> `closed` | 原因必填 |
-| `closed` | 业务归档 | 同上 | `BusinessRecordUsecase` / 前端协同状态流转 | 是 | 否 | 无后续 | 业务层归档态 |
+| `shipping_released` | 已放行待出库 | 同上 | `WorkflowUsecase.UpdateTaskStatus` | 是 | 否 | -> `shipped / blocked / cancelled` | 对 `shipment_release` 特殊规则不再触发 |
+| `shipped` | 已出货 | 同上 | 后续 ShipmentUsecase / projection，旧快照只读 | 是，仅旧协同 key / 未来派生结果 | 否，不能由 workflow 或 archive 伪造 | -> `reconciling / closed` | 对 `shipment_release` 特殊规则不再触发 |
+| `reconciling` | 对账中 | 同上 | 后续 FinanceUsecase / projection，旧快照只读 | 是，仅旧协同 key / 未来派生结果 | 否，不能由旧快照生成 finance fact | -> `settled / blocked / closed` | 否 |
+| `settled` | 已结算 | 同上 | 后续 FinanceUsecase / projection，旧快照只读 | 是，仅旧协同 key / 未来派生结果 | 否，不能由旧快照生成结算 fact | -> `closed` | 否 |
+| `blocked` | 业务阻塞 | 同上 | `WorkflowUsecase`；旧快照只读 | 是 | 否 | -> `material_preparing / production_ready / production_processing / qc_pending / warehouse_processing / shipment_pending / reconciling / cancelled` | 否；原因必填 |
+| `cancelled` | 业务取消 | 同上 | 后续领域 usecase；旧快照只读 | 是 | 否 | -> `closed` | 原因必填 |
+| `closed` | 业务归档 | 同上 | 后续领域 usecase；旧快照只读 | 是 | 否 | 无后续 | 业务层归档态 |
 
 ### 当前已实现：业务对象生命周期状态 / Implemented Business Object Lifecycle
 
@@ -288,6 +288,8 @@ workflow done
 | `HOLD` | 冻结 | `inventory_lots.status` | `InventoryUsecase.ChangeInventoryLotStatus`；质检提交也会写 | 是 | 是 | -> `ACTIVE / REJECTED` | 否 |
 | `REJECTED` | 不合格 | `inventory_lots.status` | `InventoryUsecase.ChangeInventoryLotStatus`；质检拒收也会写 | 是 | 是 | -> `ACTIVE / HOLD`；采购退货允许扣减 | 否 |
 | `DISABLED` | 停用 | `inventory_lots.status` | `InventoryUsecase.ChangeInventoryLotStatus` | 是 | 是 | 无后续；只有无正余额才可进入 | 是 |
+
+采购入库外部入口当前是 `purchase` JSON-RPC 域，公开 API 只调用 `InventoryUsecase` 和采购入库事实表，不从 `business_records` 创建正式入库事实；Workflow 的 `warehouse_inbound` 任务完成仍只代表协同完成，不自动等同 `purchase_receipts.POSTED`。
 
 ### 当前已实现：事实流水类型 / Implemented Fact Transaction Type
 

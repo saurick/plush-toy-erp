@@ -78,7 +78,7 @@ grep -R "ChangeUsecase\|change_records" server web docs || true
 | MasterData | customers / suppliers / contacts 的 create、update、get、list、active guard、唯一性和 contacts owner / primary guard |
 | Sales Order | 只作为 Source Document / Business Commitment；测试 customer / product / unit active guard、数量金额 guard、生命周期 guard，不写 shipment / inventory / finance |
 | Workflow | `done / blocked / rejected`、reason trim、旧原因清理、幂等、settled 终态保护、同名非目标任务不触发、`shipment_release done -> shipping_released` 且不等于 `shipped` |
-| Inventory / Purchase / Quality | 事实流水、余额、批次状态、采购入库 / 退货 / 调整、来料质检状态机、REVERSAL、终态保护、防负数和事务失败边界 |
+| Inventory / Purchase / Quality | 事实流水、余额、批次状态、采购入库 / 退货 / 调整、来料质检状态机、REVERSAL、终态保护、防负数和事务失败边界；采购入库 JSON-RPC / RBAC 需覆盖创建草稿、加行、过账、重复过账幂等、取消冲正、读取 / 列表和 Dashboard inbound projection |
 | API / RBAC | 权限码、角色、未登录、disabled admin、无权限、super admin、owner_role_key、assignee_id、task_status_key；前端隐藏菜单不是安全边界 |
 | Frontend / Menu / Seed | API client contract、默认态、按钮权限、路由可打开、seed navigation、旧帮助中心和开发验收路径兼容重定向 |
 | Import dry-run | source parsing、field classification、duplicate / conflict / unresolved、forbidden facts、no-write、人工确认清单、输出 evidence 可审阅 |

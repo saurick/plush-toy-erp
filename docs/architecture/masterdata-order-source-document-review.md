@@ -43,7 +43,7 @@ Workflow 记录协同许可。
 
 ## business_records 定位
 
-`business_records / business_record_items` 当前仍有价值，但它们不是所有业务对象的长期 Product Core 真源。
+`business_records / business_record_items` 当前仍有 legacy/archive 价值，但它们不是任何正式业务对象的可写 Product Core 真源。
 
 可以继续承担：
 
@@ -51,8 +51,8 @@ Workflow 记录协同许可。
 - demo / seed / QA debug。
 - source snapshot。
 - 调研入口。
-- 尚未拆专表前的通用业务记录。
-- 历史页面的表格 / 弹窗保存快照。
+- 早期尚未拆专表前的通用业务记录历史快照。
+- 历史页面的表格查询、字段口径参考和打印带值候选。
 
 不能长期承担：
 
@@ -66,7 +66,7 @@ Workflow 记录协同许可。
 
 ```text
 business_records 可以继续作为兼容层、demo、seed、source snapshot、调研入口。
-business_records 不能长期替代正式 customers / suppliers / orders / inventory / shipment / finance facts。
+business_records 普通业务写入口已经冻结为只读 archive，不能替代正式 customers / suppliers / orders / inventory / shipment / finance facts。
 ```
 
 ## V1 推荐起点
@@ -115,7 +115,7 @@ V1 不应直接从 Workflow 推导库存、出货、财务事实。
 
 ## 避免从 UI 菜单反推业务完成度
 
-前端菜单和 `business_records` 页面只能说明当前有入口或快照保存能力，不能证明对应领域模型已经完成。判断完成度必须回到：
+前端菜单和 `business_records` 页面只能说明当前有入口、历史快照或字段参考，不能证明对应领域模型已经完成。判断完成度必须回到：
 
 1. Ent schema / migration 是否存在。
 2. usecase / repo 是否有状态机、幂等、事务和冲正。

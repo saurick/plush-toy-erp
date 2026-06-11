@@ -358,3 +358,30 @@
 - 验证：`git diff --check -- docs/README.md progress.md` 通过；`rg` 已确认 `docs/README.md` 的可视化图索引包含五张 Mermaid 图、对应正式文档路径和不替代 current-source / 代码 / migration / 测试的边界说明。
 - 下一步：建议停止继续扩图；后续新增图应由正式能力变化、边界变化或新客户资料归属变化触发，而不是为了形式补齐。
 - 阻塞/风险：当前工作区已有非本轮改动；本轮只改 docs 入口索引和 progress，不改运行时代码、后端、前端、脚本、配置、部署或 current-source。
+
+## 2026-06-11 02:47 CST
+
+- 完成：按开发期破坏兼容口径冻结 `business_records`。普通 `business` JSON-RPC 的 `create_record / update_record / delete_records / restore_record` 全量返回 archive read-only；`BusinessRecordUsecase` 和 repo 层同步阻断 create / update / delete / restore；内置普通业务角色不再默认授予 `business.record.create / business.record.update`。
+- 完成：`business.dashboard_stats` 改为只读领域 projection，不再读取 `business_records`；移除旧 `BusinessRecordUsecase.DashboardStats` 和 repo count 入口，后端测试覆盖 `businessUC=nil` 时 dashboard 仍从 MasterData / SalesOrder / Phase8 usecase 汇总。
+- 完成：前端 mock server 的业务写入同样返回 archive read-only，mock dashboard 改为显式 projection 模块列表；同步更新 `docs/current-source-of-truth.md`、business-records cutover / audit / risk / transition 文档、module boundary、roadmap、capability ledger、README、客户交付 / 培训说明和早期架构评审中的旧口径。
+- 验证：`cd server && go test ./internal/biz ./internal/data` 通过；`cd server && go test ./...` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端测试 339 项通过；`rg` 已复扫非 archive 文档和源码中的旧 `business_records` 写入 / Dashboard 统计口径。
+- 下一步：单独评审旧数据迁移、物理归档或删除边界；如要继续推进销售、采购、库存、生产、委外、出货、财务，只能通过各自领域表 / usecase / API / RBAC / projection 补齐，不再回到 `business_records`。
+- 阻塞/风险：本轮未做 schema / migration、真实库 backfill、客户库 / 生产库迁移、物理删除、客户可见归档页或旧 UI 只读体验回归；debug seed 仍可显式创建带 debug 标记的 archive fixture，但不属于正式业务事实写入。
+
+## 2026-06-11 03:20 CST
+
+- 完成：旧 `BusinessModulePage` 前端运行时改为 legacy/archive 只读体验；新建、保存、状态流转、删除、恢复、手工创建协同任务，以及从 archive 记录继续派生 IQC、委外、成品、应收、开票、应付、对账等旧链路动作均加按钮禁用和 handler 守卫；双击记录只进入归档查看，表单整体 disabled。
+- 完成：移动岗位任务端不再导入或调用 `updateBusinessRecord`，任务完成后只继续更新 Workflow 任务流和 Workflow 状态投影，不再回写 `business_records` 状态；新增源码级测试锁住桌面旧入口 archive 只读和移动端不回写边界。
+- 完成：同步 `docs/current-source-of-truth.md`、`web/README.md`、`docs/product/capability-ledger.md` 和 `docs/product/business-records-cutover-plan.md`，明确旧页面只读和移动端不回写 `business_records`。
+- 验证：`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端测试 341 项通过；`STYLE_L1_SCENARIOS=business-module-dark-products-modal-desktop,business-module-workflow-actions,business-module-material-bom-modal-style,business-module-derived-item-amount pnpm style:l1` 通过 4 个 archive 只读场景；`cd web && pnpm style:l1` 全量通过 54 个场景；`git diff --check` 通过；`rg` 确认 `BusinessModulePage.jsx` 和 `MobileRoleTasksPage.jsx` 不再直接调用 `createBusinessRecord / updateBusinessRecord / deleteBusinessRecords / restoreBusinessRecord`。
+- 下一步：继续推进销售、采购、库存、生产、外协、出货、财务时，只能补对应领域表 / usecase / API / RBAC / projection；旧数据迁移、物理归档、客户可见归档页仍需单独评审。
+- 阻塞/风险：本轮未做 schema / migration、真实库 backfill、客户库 / 生产库迁移、物理删除或客户可见归档页；旧 archive 列表仍保留查询、导出、打印带值候选和关联跳转，不代表领域事实完整落地。
+
+## 2026-06-11 10:24 CST
+
+- 完成：补齐采购入库最小领域 API 闭环。`InventoryUsecase` 新增采购入库列表过滤入口，repo 支持按状态 / 关键字分页查询；新增 `purchase` JSON-RPC 域，覆盖 `create_purchase_receipt_draft / add_purchase_receipt_item / post_purchase_receipt / cancel_purchase_receipt / get_purchase_receipt / list_purchase_receipts`，公开入库 API 显式拒绝 `business_record_id`。
+- 完成：采购入库 API 已接 RBAC。草稿创建和加行要求 `purchase.receipt.create`，读取 / 列表要求 `purchase.receipt.read` 或 `warehouse.inbound.read`，过账 / 取消允许 `purchase.receipt.create` 或 `warehouse.inbound.confirm`；过账仍只写采购入库事实和 `inventory_txns.IN`，取消已过账入库通过 `REVERSAL` 冲正，不通过 Workflow 或 `business_records` 写库存事实。
+- 完成：`business.dashboard_stats` 的 inbound projection 新增读取 PurchaseReceipt 领域汇总；同步 `README.md`、`server/README.md`、`docs/current-source-of-truth.md`、`docs/product/capability-ledger.md`、`docs/product/test-strategy.md`、`docs/architecture/order-purchase-boundary-review.md` 和 `docs/architecture/status-workflow-fact-boundary.md`。
+- 验证：`cd server && go test ./internal/data -run 'TestJsonrpcData_PurchaseReceipt|TestInventoryRepo_PurchaseReceiptLifecycle|TestInventoryRepo_PurchaseReceiptTraceProtection'` 通过；`cd server && go test ./internal/biz ./internal/data` 通过；`cd server && go test ./...` 通过；`git diff --check` 通过；`rg` 已复扫采购入库 API / RBAC / projection 关键口径和旧“未接 API”表述。
+- 下一步：采购退货、采购入库调整、来料质检、批次状态变更如果要继续外部化，应按同样方式分别补领域 API / RBAC / projection / 测试；采购入库正式 UI 和 future purchase_order 关联需单独评审。
+- 阻塞/风险：本轮未新增 schema / migration，未做前端采购入库页面、真实客户数据导入 / backfill、目标环境部署或 `business_records` 旧数据迁移；Workflow `warehouse_inbound` 任务完成仍不自动等同采购入库过账。

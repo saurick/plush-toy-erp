@@ -31,7 +31,7 @@ Schema Source of Truth / Schema 真源: No / 否
 | `/erp/master/partners` / 旧 `partners` | 已退出产品内路由、菜单、重定向和权限别名 | 不再用于新增客户或供应商 |
 | `/erp/sales/project-orders` / 旧 `project-orders` | 已退出产品内路由、菜单、重定向和权限别名；普通 `business` API 写入已冻结 | 不再用于新增销售订单或款式订单 |
 
-旧 `business_records` 表仍存在，用于兼容层、source snapshot、debug/demo 和其他尚未退出的通用模块。当前不要把“旧入口已退出”理解成 `business_records` 表、所有历史记录或所有通用模块已经删除。
+旧 `business_records` 表仍存在，用于兼容层、source snapshot、debug/demo、历史记录查询和字段取值参考；普通业务写入已经冻结为只读 archive。当前不要把“旧入口已退出”理解成 `business_records` 表、所有历史记录已经删除，也不要把只读 archive 误当成新的正式业务入口。
 
 ## 3. 菜单配置边界
 

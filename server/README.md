@@ -18,7 +18,7 @@
 
 ## 开发验收 debug 能力
 
-后端 JSON-RPC `debug` 域可生成和清理开发验收调试数据。前端业务链路调试页已移除，这组接口只作为受权限保护的后端调试能力保留：
+后端 JSON-RPC `debug` 域可生成和清理开发验收调试数据。前端业务链路调试页已移除，这组接口只作为受权限保护的后端调试能力保留；普通 `business` 域的 `business_records` 写入口已冻结为 legacy/archive 只读，不作为正式业务写入通道：
 
 - `debug.capabilities`：返回当前环境、seed / cleanup / 业务数据清空是否允许和禁用原因
 - `debug.rebuild_business_chain_scenario`：生成带 debugRunId 标记的调试数据
@@ -26,6 +26,19 @@
 - `debug.clear_business_data`：清空本项目当前 SQL 连接中的业务链路、采购入库、库存、BOM、物料、成品、仓库和单位业务表
 
 这些接口默认面向当前 SQL 连接开启。可用 `ERP_DEBUG_SEED_ENABLED=false` 或 `ERP_DEBUG_CLEANUP_ENABLED=false` 显式关闭写操作；清理类能力仍要求 `ERP_DEBUG_CLEANUP_SCOPE=debug_run`。业务数据清空不删除账号、权限、管理员偏好、配置和数据库结构。后端还会校验管理员身份和 debug 权限。
+
+## 业务领域 JSON-RPC / Domain JSON-RPC
+
+采购入库已接入独立 `purchase` JSON-RPC 域，当前只覆盖既有 `purchase_receipts / purchase_receipt_items` 事实主路径：
+
+- `create_purchase_receipt_draft`
+- `add_purchase_receipt_item`
+- `post_purchase_receipt`
+- `cancel_purchase_receipt`
+- `get_purchase_receipt`
+- `list_purchase_receipts`
+
+这组接口走 `InventoryUsecase` 和既有采购入库事实表，过账写 `inventory_txns.IN`，取消已过账入库写 `REVERSAL`。公开入库 API 不接受 `business_record_id` 作为正式事实来源；`purchase.receipt.create / purchase.receipt.read / warehouse.inbound.confirm` 只控制采购入库 API 权限，不代表 Workflow 任务完成会自动过账库存事实。
 
 ## 快速开始
 

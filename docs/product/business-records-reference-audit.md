@@ -1,20 +1,20 @@
 Doc Type / 文档类型: Business Records Reference Audit / business_records 引用审计
 Status / 状态: Audit / 审计
-Runtime Implemented / 运行时已实现: Partial / 部分
+Runtime Implemented / 运行时已实现: Yes / 是
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 业务记录引用审计 / business_records Reference Audit
 
-本审计记录当前仓库中 `business_records / business_record_items / business_record_events` 的引用面和过渡建议；当前已同步删除旧路径权限别名，并冻结 `partners / project-orders` 普通业务 API 写操作。本审计不执行 schema、migration、seedData、真实数据迁移或删除。
+本审计记录当前仓库中 `business_records / business_record_items / business_record_events` 的引用面和过渡建议；当前已同步删除旧路径权限别名，并将普通 `business` API 写操作全量冻结为 legacy/archive 只读。本审计不执行 schema、migration、seedData、真实数据迁移或删除。
 
 结论先行：
 
-- `business_records` 仍是兼容层、demo、seed、source snapshot、调研入口和旧页面承载层。
-- `business_records` 不再适合作为正式 `customers / suppliers / contacts / sales_orders / sales_order_items` 的长期可写真源。
+- `business_records` 仍是兼容层、demo、seed、source snapshot、调研入口和旧页面承载层，但普通业务 API 只允许查询。
+- `business_records` 不再作为任何正式业务对象的可写真源。
 - `business_records` 不得替代库存、采购入库、采购退货、采购入库调整、批次、质检、出货或财务事实真源。
-- 与 V1 正式模型重叠的旧前端入口已不再保留产品路由、菜单权限别名或旧路径重定向；普通 `business` JSON-RPC 已拒绝 `partners / project-orders` create / update / delete / restore；历史数据后续应进入迁移 dry-run、归档或人工确认流程，不能双写。
+- 与 V1 正式模型重叠的旧前端入口已不再保留产品路由、菜单权限别名或旧路径重定向；普通 `business` JSON-RPC 已拒绝全部模块 create / update / delete / restore；历史数据后续应进入迁移 dry-run、归档或人工确认流程，不能双写。
 
 ## 引用审计清单
 
@@ -23,14 +23,14 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `server/internal/data/model/schema/business_record.go` | `business_records` Ent schema，保存 module、单号、标题、状态、客户/供应商/产品/物料/仓库快照、数量、金额、日期、payload 和软删除信息 | runtime / compatibility / source snapshot | 是，partners / products / project-orders 与 V1 MasterData / Source Document 重叠 | keep；不得改 schema；后续重叠领域只作为 snapshot / audit source |
 | `server/internal/data/model/schema/business_record_item.go` | `business_record_items` Ent schema，保存通用明细、联系人明细、产品 / 物料 / 数量 / 金额快照和 payload | runtime / compatibility / source snapshot | 是，partners 联系人和 project-orders 明细与 contacts / sales_order_items 重叠 | keep；后续只作为 source snapshot，迁移前需 dry-run |
 | `server/internal/data/model/schema/business_record_event.go` | 记录通用业务记录创建、更新、删除、恢复等事件 | runtime / audit / compatibility | 间接重叠 | keep；仅作历史审计线索，不替代 V1 usecase 审计 |
-| `server/internal/data/model/ent/businessrecord*`、`businessrecorditem*`、`businessrecordevent*` | Ent generated code，承接当前 runtime 查询和写入 | generated runtime | 是 | keep；本轮不得改 generated code |
+| `server/internal/data/model/ent/businessrecord*`、`businessrecorditem*`、`businessrecordevent*` | Ent generated code，承接 legacy/archive 查询、历史夹具和 archive guard 需要；普通业务写入不再以 generated code 作为正式入口 | generated runtime | 是 | keep；本轮不得改 generated code |
 | `server/internal/data/model/migrate/20260423090005_migrate.sql`、`20260425153557_migrate.sql`、`20260426033346_migrate.sql`、`20260426095103_migrate.sql` | 历史 migration 中包含 `business_records` 及其与采购事实的兼容关系 | migration / compatibility | 是 | keep；不得改历史 migration；后续只追加新迁移，不能回写 |
-| `server/internal/biz/business_record.go` | 通用业务记录模块列表、编号前缀、字段模型、创建 / 更新 / 删除 / 恢复 usecase；`partners / project-orders` 已标记为 retired module 并禁止普通写操作 | runtime / compatibility | 是，模块中包含 `partners`、`products`、`project-orders` | keep；重叠旧模块只保留查询 / 审计，不允许普通业务写入 |
-| `server/internal/data/business_record_repo.go` | `business_records` repo 查询、创建、更新、软删除、恢复和明细替换；对已 retired 的 `partners / project-orders` 现有记录阻断 update / delete / restore | runtime / compatibility | 是 | keep；不得用于向 V1 模型双写 |
-| `server/internal/data/jsonrpc_business.go` | `business` JSON-RPC 域：dashboard、list、create、update、delete、restore；旧模块写入返回“旧业务记录入口已停用，请使用正式 V1 入口” | API / compatibility | 是 | keep non-retired modules；旧重叠模块普通写入已冻结 |
+| `server/internal/biz/business_record.go` | 通用业务记录模块列表、编号前缀、字段模型和只读 archive guard；普通 create / update / delete / restore usecase 全量拒绝 | runtime / compatibility | 是，模块中包含 `partners`、`products`、`project-orders` 等旧快照 | keep；只保留查询 / 审计，不允许普通业务写入 |
+| `server/internal/data/business_record_repo.go` | `business_records` repo 只保留 legacy/archive 查询；创建、更新、软删除、恢复均受 archive read-only guard 保护 | runtime / compatibility | 是 | keep；不得用于向领域模型双写 |
+| `server/internal/data/jsonrpc_business.go` | `business` JSON-RPC 域：`list_records` 查询 legacy/archive；`dashboard_stats` 只读领域 usecase 投影；create / update / delete / restore 返回 archive readonly | API / compatibility | 是 | keep archive read；普通写入已冻结 |
 | `server/internal/data/jsonrpc.go` | 注册 `business` JSON-RPC 域 | API / compatibility | 间接重叠 | keep |
 | `server/internal/biz/rbac.go`、`server/internal/biz/rbac_test.go` | `business.record.*` 权限仍保护通用业务记录 API | RBAC / compatibility | 间接重叠 | keep；不得把菜单隐藏当安全边界 |
-| `server/internal/biz/debug_seed.go`、`server/internal/data/debug_seed_repo.go`、`server/internal/data/jsonrpc_debug.go` | debug seed / cleanup / 业务链路调试复用 `business_records`、workflow 表和 debug 标记 | seed/demo / QA / compatibility | 间接重叠 | keep as demo；必须保持 debug 标记和权限边界 |
+| `server/internal/biz/debug_seed.go`、`server/internal/data/debug_seed_repo.go`、`server/internal/data/jsonrpc_debug.go` | debug seed / cleanup 可显式创建和清理带 debug 标记的 archive fixture；不属于正式业务事实写入 | seed/demo / QA / compatibility | 间接重叠 | keep as demo；必须保持 debug 标记、权限边界和非正式事实口径 |
 | `server/internal/biz/purchase_receipt.go`、`purchase_return.go`、`purchase_receipt_adjustment.go` | 采购事实对象保留可选 `business_record_id` 兼容来源快照 | compatibility / source snapshot | 不与 V1 MasterData / Sales Order 直接重叠，但与旧业务快照有关 | keep；不得反向把 `business_records` 当采购事实真源 |
 | `server/internal/data/purchase_receipt_repo.go`、`purchase_return_repo.go`、`purchase_receipt_adjustment_repo.go` | 采购事实 repo 处理可选 `business_record` edge / id | compatibility / source snapshot | 间接重叠 | keep；后续只保留 source reference |
 | `server/internal/biz/business_record_test.go`、`server/internal/data/business_record_repo_test.go` | 覆盖通用记录 module guard、编号、软删除、查询等行为 | test / compatibility | 是 | keep；后续只读化时需新增或调整测试 |

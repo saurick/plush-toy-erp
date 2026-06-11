@@ -1,6 +1,8 @@
 # 行业专表 Ent Schema 评审 / Industry Schema Review
 
-> 结论：当前不应马上拆行业专表，也不应生成 migration。`business_records + workflow_tasks + workflow_task_events + workflow_business_states` 仍足以承接 v1 闭环验证。下一轮如果要推进 schema，应先定义字段真源和一致性策略，再优先评审库存流水/余额和 AR/AP 财务明细。
+> 当前状态：本文是早期行业专表评审记录。`business_records` 普通业务写入口已在开发期冻结为 legacy/archive 只读，当前实现真源以 `docs/current-source-of-truth.md`、领域 usecase、Ent schema 和测试为准；本文中“保留兼容写入 / 通用表足以承接 v1 闭环验证”的旧口径不再作为当前主路径。
+
+> 旧结论：当前不应马上拆行业专表，也不应生成 migration。下一轮如果要推进 schema，应先定义字段真源和一致性策略，再优先评审库存流水/余额和 AR/AP 财务明细。
 
 ## 1. 当前通用表模式
 
@@ -80,7 +82,7 @@
 - 不做复杂报表。
 - 不做外部系统集成。
 
-边界：`business_records` 可以继续承接“单据快照和流程验证”，但不应长期承担库存余额、财务核销、唯一票号、成本毛利等强约束事实。
+边界：`business_records` 当前只作为 legacy/archive 历史快照、字段取值候选和显式 debug fixture；不再承接正式流程验证或普通业务写入，更不能承担库存余额、财务核销、唯一票号、成本毛利等强约束事实。
 
 ## 6. 分阶段迁移路线
 
@@ -109,7 +111,7 @@
 
 | 风险 | 影响 |
 | --- | --- |
-| 现有前端业务模块强依赖 `business_records` | 详情、列表、保存、打印和调试页都要兼容 |
+| 现有前端业务模块仍引用 `business_records` | 详情、列表、打印和调试页要按 legacy/archive 查询或字段带值候选处理，不能继续保存正式业务记录 |
 | 现有 workflow `source_type/source_id` 依赖通用记录 | 任务详情加载和岗位任务端跳转要改造 |
 | 测试数据迁移 | 旧样本如果没有专表字段，会出现缺值 |
 | 文档入口同步 | 正式文档、验收说明和 debug seed 说明需要同时更新 |
@@ -119,8 +121,8 @@
 
 ## 9. 回滚策略
 
-- 保留 `business_records` 兼容写入，直到专表读写稳定。
-- 专表先双写或只读验证，不直接切断旧路径。
+- `business_records` 兼容写入已经切断，普通业务写入口保持只读 archive。
+- 专表按领域 usecase 直接承接正式写入；如需迁移旧数据，先做 dry-run 和人工确认，不做双写兜底。
 - `workflow_tasks.source_type/source_id` 保持旧路径直到迁移完成。
 - 每个阶段都有测试和回滚点。
 - 如果专表规则异常，关闭新写入入口，恢复读取 `business_records` 快照。

@@ -131,34 +131,6 @@ func (r *businessRecordRepo) listBusinessRecordsWithMemoryFilter(ctx context.Con
 	return records[filter.Offset:end], total, nil
 }
 
-func (r *businessRecordRepo) CountBusinessRecordsByModuleAndStatus(ctx context.Context) ([]biz.BusinessRecordModuleStatusCount, error) {
-	type statusCountRow struct {
-		ModuleKey         string `json:"module_key,omitempty"`
-		BusinessStatusKey string `json:"business_status_key,omitempty"`
-		Count             int    `json:"count,omitempty"`
-	}
-
-	rows := make([]statusCountRow, 0)
-	err := r.data.postgres.BusinessRecord.Query().
-		Where(businessrecord.DeletedAtIsNil()).
-		GroupBy(businessrecord.FieldModuleKey, businessrecord.FieldBusinessStatusKey).
-		Aggregate(ent.Count()).
-		Scan(ctx, &rows)
-	if err != nil {
-		return nil, err
-	}
-
-	out := make([]biz.BusinessRecordModuleStatusCount, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, biz.BusinessRecordModuleStatusCount{
-			ModuleKey:         row.ModuleKey,
-			BusinessStatusKey: row.BusinessStatusKey,
-			Count:             row.Count,
-		})
-	}
-	return out, nil
-}
-
 func applyBusinessRecordDateFilter(query *ent.BusinessRecordQuery, filter biz.BusinessRecordFilter) *ent.BusinessRecordQuery {
 	if filter.DateFilterKey == "" || (filter.DateRangeStart == "" && filter.DateRangeEnd == "") {
 		return query
@@ -397,164 +369,31 @@ func parseBusinessRecordDateEnd(value string) (time.Time, bool) {
 }
 
 func (r *businessRecordRepo) CreateBusinessRecord(ctx context.Context, in *biz.BusinessRecordMutation, actorID int) (*biz.BusinessRecord, error) {
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return nil, err
+	if in == nil || !biz.IsValidBusinessRecordModule(in.ModuleKey) {
+		return nil, biz.ErrBadParam
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
-
-	builder := tx.BusinessRecord.Create().
-		SetModuleKey(in.ModuleKey).
-		SetNillableDocumentNo(in.DocumentNo).
-		SetTitle(in.Title).
-		SetBusinessStatusKey(in.BusinessStatusKey).
-		SetOwnerRoleKey(in.OwnerRoleKey).
-		SetNillableSourceNo(in.SourceNo).
-		SetNillableCustomerName(in.CustomerName).
-		SetNillableSupplierName(in.SupplierName).
-		SetNillableStyleNo(in.StyleNo).
-		SetNillableProductNo(in.ProductNo).
-		SetNillableProductName(in.ProductName).
-		SetNillableMaterialName(in.MaterialName).
-		SetNillableWarehouseLocation(in.WarehouseLocation).
-		SetNillableQuantity(in.Quantity).
-		SetNillableUnit(in.Unit).
-		SetNillableAmount(in.Amount).
-		SetNillableDocumentDate(in.DocumentDate).
-		SetNillableDueDate(in.DueDate).
-		SetPayload(in.Payload)
-	if actorID > 0 {
-		builder.SetCreatedBy(actorID).SetUpdatedBy(actorID)
-	}
-
-	row, err := builder.Save(ctx)
-	if err != nil {
-		if ent.IsConstraintError(err) {
-			return nil, biz.ErrBusinessRecordExists
-		}
-		return nil, err
-	}
-
-	if in.DocumentNo == nil {
-		generatedNo := fmt.Sprintf("%s%06d", biz.BusinessRecordDocumentPrefix(in.ModuleKey), row.ID)
-		update := tx.BusinessRecord.UpdateOneID(row.ID).
-			SetDocumentNo(generatedNo)
-		if row.Title == "未命名单据" {
-			update.SetTitle(generatedNo)
-		}
-		row, err = update.Save(ctx)
-		if err != nil {
-			if ent.IsConstraintError(err) {
-				return nil, biz.ErrBusinessRecordExists
-			}
-			return nil, err
-		}
-	}
-
-	if err := replaceBusinessRecordItems(ctx, tx, row.ID, row.ModuleKey, in.Items); err != nil {
-		return nil, err
-	}
-	if err := createBusinessRecordEvent(ctx, tx, row.ID, row.ModuleKey, "created", nil, &row.BusinessStatusKey, actorID, "", ""); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-
-	out := entBusinessRecordToBiz(row)
-	out.Items = businessRecordItemMutationsToBiz(row.ID, row.ModuleKey, in.Items)
-	return out, nil
+	return nil, biz.ErrBusinessRecordArchiveReadOnly
 }
 
 func (r *businessRecordRepo) UpdateBusinessRecord(ctx context.Context, id int, in *biz.BusinessRecordMutation, actorID int) (*biz.BusinessRecord, error) {
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return nil, err
+	if id <= 0 || in == nil {
+		return nil, biz.ErrBadParam
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
-
-	current, err := tx.BusinessRecord.Get(ctx, id)
+	_, err := r.data.postgres.BusinessRecord.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrBusinessRecordNotFound
 		}
 		return nil, err
 	}
-	if in.ExpectedRowVersion > 0 && current.RowVersion != in.ExpectedRowVersion {
-		return nil, biz.ErrBusinessRecordVersionConflict
-	}
-	if biz.IsRetiredBusinessRecordModule(current.ModuleKey) {
-		return nil, biz.ErrBusinessRecordModuleRetired
-	}
-	moduleKey := in.ModuleKey
-	if moduleKey == "" {
-		moduleKey = current.ModuleKey
-	}
-	if biz.IsRetiredBusinessRecordModule(moduleKey) {
-		return nil, biz.ErrBusinessRecordModuleRetired
-	}
-
-	update := tx.BusinessRecord.UpdateOneID(id).
-		SetModuleKey(moduleKey).
-		SetTitle(in.Title).
-		SetBusinessStatusKey(in.BusinessStatusKey).
-		SetOwnerRoleKey(in.OwnerRoleKey).
-		SetPayload(in.Payload).
-		AddRowVersion(1)
-	setBusinessRecordString(update, "document_no", in.DocumentNo)
-	setBusinessRecordString(update, "source_no", in.SourceNo)
-	setBusinessRecordString(update, "customer_name", in.CustomerName)
-	setBusinessRecordString(update, "supplier_name", in.SupplierName)
-	setBusinessRecordString(update, "style_no", in.StyleNo)
-	setBusinessRecordString(update, "product_no", in.ProductNo)
-	setBusinessRecordString(update, "product_name", in.ProductName)
-	setBusinessRecordString(update, "material_name", in.MaterialName)
-	setBusinessRecordString(update, "warehouse_location", in.WarehouseLocation)
-	setBusinessRecordString(update, "unit", in.Unit)
-	setBusinessRecordString(update, "document_date", in.DocumentDate)
-	setBusinessRecordString(update, "due_date", in.DueDate)
-	setBusinessRecordFloat(update, "quantity", in.Quantity)
-	setBusinessRecordFloat(update, "amount", in.Amount)
-	if actorID > 0 {
-		update.SetUpdatedBy(actorID)
-	}
-
-	row, err := update.Save(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrBusinessRecordNotFound
-		}
-		if ent.IsConstraintError(err) {
-			return nil, biz.ErrBusinessRecordExists
-		}
-		return nil, err
-	}
-
-	if err := replaceBusinessRecordItems(ctx, tx, row.ID, row.ModuleKey, in.Items); err != nil {
-		return nil, err
-	}
-	if err := createBusinessRecordEvent(ctx, tx, row.ID, row.ModuleKey, "updated", &current.BusinessStatusKey, &row.BusinessStatusKey, actorID, "", ""); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-
-	out := entBusinessRecordToBiz(row)
-	out.Items = businessRecordItemMutationsToBiz(row.ID, row.ModuleKey, in.Items)
-	return out, nil
+	return nil, biz.ErrBusinessRecordArchiveReadOnly
 }
 
 func (r *businessRecordRepo) DeleteBusinessRecords(ctx context.Context, ids []int, deleteReason string, actorID int) (int, error) {
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return 0, err
+	if len(ids) == 0 {
+		return 0, biz.ErrBadParam
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
-
-	rows, err := tx.BusinessRecord.Query().
+	rows, err := r.data.postgres.BusinessRecord.Query().
 		Where(
 			businessrecord.IDIn(ids...),
 			businessrecord.DeletedAtIsNil(),
@@ -566,94 +405,21 @@ func (r *businessRecordRepo) DeleteBusinessRecords(ctx context.Context, ids []in
 	if len(rows) == 0 {
 		return 0, nil
 	}
-	if hasRetiredBusinessRecordRows(rows) {
-		return 0, biz.ErrBusinessRecordModuleRetired
-	}
-
-	now := time.Now()
-	update := tx.BusinessRecord.Update().
-		Where(
-			businessrecord.IDIn(ids...),
-			businessrecord.DeletedAtIsNil(),
-		).
-		SetDeletedAt(now).
-		SetDeleteReason(deleteReason).
-		AddRowVersion(1)
-	if actorID > 0 {
-		update.SetDeletedBy(actorID).SetUpdatedBy(actorID)
-	}
-	affected, err := update.Save(ctx)
-	if err != nil {
-		return 0, err
-	}
-	for _, row := range rows {
-		if err := createBusinessRecordEvent(ctx, tx, row.ID, row.ModuleKey, "deleted", &row.BusinessStatusKey, &row.BusinessStatusKey, actorID, "", deleteReason); err != nil {
-			return 0, err
-		}
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, err
-	}
-	tx = nil
-	return affected, nil
+	return 0, biz.ErrBusinessRecordArchiveReadOnly
 }
 
 func (r *businessRecordRepo) RestoreBusinessRecord(ctx context.Context, id int, actorID int) (*biz.BusinessRecord, error) {
-	tx, err := r.data.postgres.Tx(ctx)
-	if err != nil {
-		return nil, err
+	if id <= 0 {
+		return nil, biz.ErrBadParam
 	}
-	defer rollbackEntTx(ctx, tx, r.log)
-
-	current, err := tx.BusinessRecord.Get(ctx, id)
+	_, err := r.data.postgres.BusinessRecord.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrBusinessRecordNotFound
 		}
 		return nil, err
 	}
-	if biz.IsRetiredBusinessRecordModule(current.ModuleKey) {
-		return nil, biz.ErrBusinessRecordModuleRetired
-	}
-	update := tx.BusinessRecord.UpdateOneID(id).
-		ClearDeletedAt().
-		ClearDeletedBy().
-		ClearDeleteReason().
-		AddRowVersion(1)
-	if actorID > 0 {
-		update.SetUpdatedBy(actorID)
-	}
-	row, err := update.Save(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrBusinessRecordNotFound
-		}
-		return nil, err
-	}
-	if err := createBusinessRecordEvent(ctx, tx, row.ID, row.ModuleKey, "restored", &current.BusinessStatusKey, &row.BusinessStatusKey, actorID, "", ""); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-
-	out := entBusinessRecordToBiz(row)
-	itemsByRecordID, err := r.loadBusinessRecordItems(ctx, []*ent.BusinessRecord{row})
-	if err != nil {
-		return nil, err
-	}
-	out.Items = itemsByRecordID[row.ID]
-	return out, nil
-}
-
-func hasRetiredBusinessRecordRows(rows []*ent.BusinessRecord) bool {
-	for _, row := range rows {
-		if row != nil && biz.IsRetiredBusinessRecordModule(row.ModuleKey) {
-			return true
-		}
-	}
-	return false
+	return nil, biz.ErrBusinessRecordArchiveReadOnly
 }
 
 func (r *businessRecordRepo) loadBusinessRecordItems(ctx context.Context, rows []*ent.BusinessRecord) (map[int][]*biz.BusinessRecordItem, error) {
@@ -704,121 +470,6 @@ func replaceBusinessRecordItems(ctx context.Context, tx *ent.Tx, recordID int, m
 		}
 	}
 	return nil
-}
-
-func createBusinessRecordEvent(ctx context.Context, tx *ent.Tx, recordID int, moduleKey string, actionKey string, fromStatus *string, toStatus *string, actorID int, actorRoleKey string, note string) error {
-	builder := tx.BusinessRecordEvent.Create().
-		SetRecordID(recordID).
-		SetModuleKey(moduleKey).
-		SetActionKey(actionKey).
-		SetNillableFromStatusKey(fromStatus).
-		SetNillableToStatusKey(toStatus).
-		SetPayload(map[string]any{})
-	if actorID > 0 {
-		builder.SetActorID(actorID)
-	}
-	if actorRoleKey != "" {
-		builder.SetActorRoleKey(actorRoleKey)
-	}
-	if note != "" {
-		builder.SetNote(note)
-	}
-	_, err := builder.Save(ctx)
-	return err
-}
-
-func setBusinessRecordString(update *ent.BusinessRecordUpdateOne, fieldName string, value *string) {
-	switch fieldName {
-	case "document_no":
-		if value == nil {
-			update.ClearDocumentNo()
-		} else {
-			update.SetDocumentNo(*value)
-		}
-	case "source_no":
-		if value == nil {
-			update.ClearSourceNo()
-		} else {
-			update.SetSourceNo(*value)
-		}
-	case "customer_name":
-		if value == nil {
-			update.ClearCustomerName()
-		} else {
-			update.SetCustomerName(*value)
-		}
-	case "supplier_name":
-		if value == nil {
-			update.ClearSupplierName()
-		} else {
-			update.SetSupplierName(*value)
-		}
-	case "style_no":
-		if value == nil {
-			update.ClearStyleNo()
-		} else {
-			update.SetStyleNo(*value)
-		}
-	case "product_no":
-		if value == nil {
-			update.ClearProductNo()
-		} else {
-			update.SetProductNo(*value)
-		}
-	case "product_name":
-		if value == nil {
-			update.ClearProductName()
-		} else {
-			update.SetProductName(*value)
-		}
-	case "material_name":
-		if value == nil {
-			update.ClearMaterialName()
-		} else {
-			update.SetMaterialName(*value)
-		}
-	case "warehouse_location":
-		if value == nil {
-			update.ClearWarehouseLocation()
-		} else {
-			update.SetWarehouseLocation(*value)
-		}
-	case "unit":
-		if value == nil {
-			update.ClearUnit()
-		} else {
-			update.SetUnit(*value)
-		}
-	case "document_date":
-		if value == nil {
-			update.ClearDocumentDate()
-		} else {
-			update.SetDocumentDate(*value)
-		}
-	case "due_date":
-		if value == nil {
-			update.ClearDueDate()
-		} else {
-			update.SetDueDate(*value)
-		}
-	}
-}
-
-func setBusinessRecordFloat(update *ent.BusinessRecordUpdateOne, fieldName string, value *float64) {
-	switch fieldName {
-	case "quantity":
-		if value == nil {
-			update.ClearQuantity()
-		} else {
-			update.SetQuantity(*value)
-		}
-	case "amount":
-		if value == nil {
-			update.ClearAmount()
-		} else {
-			update.SetAmount(*value)
-		}
-	}
 }
 
 func entBusinessRecordToBiz(row *ent.BusinessRecord) *biz.BusinessRecord {
@@ -879,26 +530,4 @@ func entBusinessRecordItemToBiz(row *ent.BusinessRecordItem) *biz.BusinessRecord
 		CreatedAt:         row.CreatedAt,
 		UpdatedAt:         row.UpdatedAt,
 	}
-}
-
-func businessRecordItemMutationsToBiz(recordID int, moduleKey string, items []*biz.BusinessRecordItemMutation) []*biz.BusinessRecordItem {
-	out := make([]*biz.BusinessRecordItem, 0, len(items))
-	for _, item := range items {
-		out = append(out, &biz.BusinessRecordItem{
-			RecordID:          recordID,
-			ModuleKey:         moduleKey,
-			LineNo:            item.LineNo,
-			ItemName:          item.ItemName,
-			MaterialName:      item.MaterialName,
-			Spec:              item.Spec,
-			Unit:              item.Unit,
-			Quantity:          item.Quantity,
-			UnitPrice:         item.UnitPrice,
-			Amount:            item.Amount,
-			SupplierName:      item.SupplierName,
-			WarehouseLocation: item.WarehouseLocation,
-			Payload:           item.Payload,
-		})
-	}
-	return out
 }

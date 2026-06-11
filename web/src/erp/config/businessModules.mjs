@@ -46,7 +46,7 @@ const businessModules = [
     ],
     boundaries: [
       '当前不把“款式编号 = SKU”硬并到一个字段里。',
-      '当前仍复用 business_records 的产品资料页，不新增与现有 products 事实表重复的产品主档 schema。',
+      '旧 products 业务页只作为 legacy/archive 参考；正式产品资料能力复用现有 products 领域表，不再通过 business_records 写入。',
     ],
   },
   {

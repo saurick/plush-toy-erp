@@ -3,11 +3,143 @@
 let originalFetch = null
 let mockWorkflowTaskID = 1
 let mockWorkflowBusinessStateID = 1
-let mockBusinessRecordID = 1
-let mockBusinessRecordItemID = 1
 const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
-const mockBusinessRecords = []
+const mockBusinessRecords = [
+  {
+    id: 9001,
+    module_key: 'products',
+    document_no: 'ARCH-PROD-001',
+    title: 'Archive 样品小熊',
+    product_no: 'SKU-ARCH-001',
+    product_name: 'Archive 样品小熊',
+    customer_name: 'Archive 客户',
+    quantity: 1,
+    unit: '只',
+    amount: 0,
+    business_status_key: 'closed',
+    owner_role_key: 'business',
+    payload: { archive_fixture: true },
+    items: [],
+    created_at: 1714000000,
+    updated_at: 1714000000,
+  },
+  {
+    id: 9002,
+    module_key: 'material-bom',
+    document_no: 'ARCH-BOM-001',
+    title: 'Archive 小熊 BOM',
+    product_name: 'Archive 样品小熊',
+    material_name: 'PP 棉',
+    quantity: 3,
+    unit: 'kg',
+    amount: 37.5,
+    business_status_key: 'closed',
+    owner_role_key: 'pmc',
+    payload: { archive_fixture: true },
+    items: [
+      {
+        id: 1,
+        name: 'PP 棉',
+        quantity: 3,
+        unit: 'kg',
+        amount: 37.5,
+        payload: { archive_fixture: true },
+      },
+    ],
+    created_at: 1714000100,
+    updated_at: 1714000100,
+  },
+  {
+    id: 9003,
+    module_key: 'accessories-purchase',
+    document_no: 'ARCH-PUR-001',
+    title: 'Archive 辅料采购',
+    supplier_name: 'Archive 供应商',
+    material_name: 'PP 棉',
+    purchase_date: '2026-04-28',
+    return_date: '2026-04-30',
+    quantity: 3,
+    unit: 'kg',
+    amount: 37.5,
+    business_status_key: 'closed',
+    owner_role_key: 'purchase',
+    payload: {
+      archive_fixture: true,
+      purchase_date: '2026-04-28',
+      return_date: '2026-04-30',
+    },
+    items: [
+      {
+        id: 1,
+        name: 'PP 棉',
+        quantity: 3,
+        unit: 'kg',
+        unit_price: 12.5,
+        amount: 37.5,
+        payload: { archive_fixture: true },
+      },
+    ],
+    created_at: 1714000200,
+    updated_at: 1714000200,
+  },
+  {
+    id: 9004,
+    module_key: 'processing-contracts',
+    document_no: 'ARCH-PC-001',
+    title: 'Archive 委外加工',
+    supplier_name: 'Archive 加工商',
+    product_name: 'Archive 样品小熊',
+    quantity: 100,
+    unit: '只',
+    amount: 1200,
+    business_status_key: 'closed',
+    owner_role_key: 'production',
+    payload: { archive_fixture: true },
+    items: [],
+    created_at: 1714000300,
+    updated_at: 1714000300,
+  },
+  {
+    id: 9005,
+    module_key: 'shipping-release',
+    document_no: 'ARCH-OUT-001',
+    title: 'Archive 出货放行',
+    source_no: 'SO-ARCH-001',
+    customer_name: 'Archive 客户',
+    product_name: 'Archive 样品小熊',
+    quantity: 60,
+    unit: '箱',
+    amount: 3600,
+    business_status_key: 'shipping_released',
+    owner_role_key: 'warehouse',
+    payload: { archive_fixture: true, shipment_release_result: 'done' },
+    items: [],
+    created_at: 1714000400,
+    updated_at: 1714000400,
+  },
+]
+const mockBusinessDashboardProjectionModuleKeys = [
+  'customers',
+  'suppliers',
+  'products',
+  'sales-orders',
+  'material-bom',
+  'accessories-purchase',
+  'processing-contracts',
+  'inbound',
+  'inventory',
+  'shipping-release',
+  'outbound',
+  'production-scheduling',
+  'production-progress',
+  'production-exceptions',
+  'quality-inspections',
+  'reconciliation',
+  'payables',
+  'receivables',
+  'invoices',
+]
 
 const mockPermissions = [
   { permission_key: 'system.user.read', name: '查看管理员', module: 'system' },
@@ -466,90 +598,12 @@ function sortBusinessRecords(records, sortOrder = 'desc') {
   })
 }
 
-function buildBusinessDashboardStats() {
-  const moduleStats = new Map()
-  mockBusinessRecords.forEach((record) => {
-    if (record.deleted_at) {
-      return
-    }
-    const moduleKey = String(record.module_key || '').trim()
-    const statusKey = String(record.business_status_key || '').trim()
-    if (!moduleKey || !statusKey) {
-      return
-    }
-    const stats = moduleStats.get(moduleKey) || {
-      module_key: moduleKey,
-      total: 0,
-      status_counts: {},
-    }
-    stats.total += 1
-    stats.status_counts[statusKey] =
-      Number(stats.status_counts[statusKey] || 0) + 1
-    moduleStats.set(moduleKey, stats)
-  })
-  return Array.from(moduleStats.values())
-}
-
-function makeBusinessRecord(params, existing = {}) {
-  const now = nowUnix()
-  const items = Array.isArray(params.items)
-    ? params.items.map((item, index) => ({
-        id: item.id || mockBusinessRecordItemID++,
-        record_id: existing.id || mockBusinessRecordID,
-        module_key:
-          params.module_key || existing.module_key || 'project-orders',
-        line_no: Number(item.line_no || index + 1),
-        item_name: item.item_name || '',
-        material_name: item.material_name || '',
-        spec: item.spec || '',
-        unit: item.unit || '',
-        quantity: item.quantity ?? null,
-        unit_price: item.unit_price ?? null,
-        amount: item.amount ?? null,
-        supplier_name: item.supplier_name || '',
-        warehouse_location: item.warehouse_location || '',
-        payload: item.payload || {},
-        created_at: existing.created_at || now,
-        updated_at: now,
-      }))
-    : existing.items || []
-  return {
-    id: existing.id || mockBusinessRecordID++,
-    module_key: params.module_key || existing.module_key || 'project-orders',
-    document_no:
-      params.document_no ||
-      existing.document_no ||
-      `BR${String(mockBusinessRecordID).padStart(6, '0')}`,
-    title: params.title || existing.title || '模拟业务记录',
-    business_status_key:
-      params.business_status_key ||
-      existing.business_status_key ||
-      'project_pending',
-    owner_role_key: params.owner_role_key || existing.owner_role_key || 'sales',
-    source_no: params.source_no || '',
-    customer_name: params.customer_name || '',
-    supplier_name: params.supplier_name || '',
-    style_no: params.style_no || '',
-    product_no: params.product_no || '',
-    product_name: params.product_name || '',
-    material_name: params.material_name || '',
-    warehouse_location: params.warehouse_location || '',
-    quantity: params.quantity ?? null,
-    unit: params.unit || '',
-    amount: params.amount ?? null,
-    document_date: params.document_date || '',
-    due_date: params.due_date || '',
-    payload: params.payload || {},
-    items,
-    row_version: Number(existing.row_version || 0) + 1,
-    created_by: existing.created_by || 1,
-    updated_by: 1,
-    created_at: existing.created_at || now,
-    updated_at: now,
-    deleted_at: existing.deleted_at || null,
-    deleted_by: existing.deleted_by || null,
-    delete_reason: existing.delete_reason || '',
-  }
+function buildBusinessDashboardProjectionStats() {
+  return mockBusinessDashboardProjectionModuleKeys.map((moduleKey) => ({
+    module_key: moduleKey,
+    total: 0,
+    status_counts: {},
+  }))
 }
 
 // 构造一个 JSON-RPC 业务错误响应（code != 0）
@@ -846,7 +900,7 @@ export function setupJsonRpcMockServer() {
           jsonrpc: '2.0',
           id,
           result: makeBizResult({
-            modules: buildBusinessDashboardStats(),
+            modules: buildBusinessDashboardProjectionStats(),
           }),
           error: '',
         }
@@ -868,65 +922,19 @@ export function setupJsonRpcMockServer() {
           }),
           error: '',
         }
-      } else if (method === 'create_record') {
-        const record = makeBusinessRecord(params)
-        mockBusinessRecords.unshift(record)
-        responseBody = {
-          jsonrpc: '2.0',
+      } else if (
+        [
+          'create_record',
+          'update_record',
+          'delete_records',
+          'restore_record',
+        ].includes(method)
+      ) {
+        responseBody = makeJsonRpcBizError(
           id,
-          result: makeBizResult({ record }),
-          error: '',
-        }
-      } else if (method === 'update_record') {
-        const record = mockBusinessRecords.find(
-          (item) => Number(item.id) === Number(params.id)
+          400,
+          'business_records 已归档为只读，请使用对应领域入口'
         )
-        if (!record) {
-          responseBody = makeJsonRpcBizError(id, 40010, '业务记录不存在')
-        } else {
-          Object.assign(record, makeBusinessRecord(params, record))
-          responseBody = {
-            jsonrpc: '2.0',
-            id,
-            result: makeBizResult({ record }),
-            error: '',
-          }
-        }
-      } else if (method === 'delete_records') {
-        const ids = Array.isArray(params.ids) ? params.ids.map(Number) : []
-        let affected = 0
-        mockBusinessRecords.forEach((record) => {
-          if (ids.includes(Number(record.id)) && !record.deleted_at) {
-            record.deleted_at = nowUnix()
-            record.deleted_by = 1
-            record.delete_reason = params.delete_reason || '业务页删除'
-            affected += 1
-          }
-        })
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({ affected }),
-          error: '',
-        }
-      } else if (method === 'restore_record') {
-        const record = mockBusinessRecords.find(
-          (item) => Number(item.id) === Number(params.id)
-        )
-        if (!record) {
-          responseBody = makeJsonRpcBizError(id, 40010, '业务记录不存在')
-        } else {
-          record.deleted_at = null
-          record.deleted_by = null
-          record.delete_reason = ''
-          record.updated_at = nowUnix()
-          responseBody = {
-            jsonrpc: '2.0',
-            id,
-            result: makeBizResult({ record }),
-            error: '',
-          }
-        }
       } else {
         responseBody = makeJsonRpcBizError(
           id,

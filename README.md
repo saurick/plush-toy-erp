@@ -7,7 +7,7 @@
 | 路径 | 职责 |
 | --- | --- |
 | `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择、生产单端口 `/m/<role>/tasks` 岗位任务端路径，以及本地开发用的按角色移动端调试入口，内部目录职责见 [`web/README.md`](web/README.md) |
-| `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、通用业务记录、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
+| `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、领域 usecase、`business_records` legacy/archive 查询、采购入库 `purchase` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
 | `config/` | 行业模板、客户配置包和 Phase 11 私有化复制模板落点；当前已有 yoyoosun 前端品牌 / 桌面菜单展示配置 loader，不代表 SaaS tenant，也不改变后端 RBAC、schema 或事实规则 |
@@ -18,7 +18,7 @@
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
 - 当前数据库默认命中 `192.168.0.106:5432/plush_erp`
-- 当前账号表、工作流协同表和首版通用业务记录表已通过 Ent + Atlas 落地；Phase 2A 最小库存事实专表、Phase 2B 最小 BOM + 批次库存、Phase 2C 采购入库和 Phase 2D-A 采购退货 schema 已生成 migration；具体目标库是否已 apply 仍以 `make migrate_status` 为准
+- 当前账号表、工作流协同表和首版通用业务记录表已通过 Ent + Atlas 落地；`business_records` 普通业务写入口已冻结为 legacy/archive 只读；Phase 2A 最小库存事实专表、Phase 2B 最小 BOM + 批次库存、Phase 2C 采购入库和 Phase 2D-A 采购退货 schema 已生成 migration；采购入库已接入独立 `purchase` JSON-RPC / RBAC 和业务看板入库 projection；具体目标库是否已 apply 仍以 `make migrate_status` 为准
 - 采购、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM 当前只落最小主数据，不生成采购、生产或成本
 - 业务链路调试 seed / cleanup / 业务数据清空仅作为开发验收能力接入后端 `debug` JSON-RPC 域，默认面向当前 SQL 连接开启，可通过 `ERP_DEBUG_*` 环境变量显式关闭，并受管理员权限和业务链路调试菜单权限保护；业务数据清空按本项目当前业务表 allowlist 执行，不删除账号、权限、管理员偏好、配置和数据库结构；按 debugRunId 清理还会校验 debug 数据标记
 - 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred

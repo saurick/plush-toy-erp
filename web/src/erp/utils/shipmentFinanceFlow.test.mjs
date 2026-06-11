@@ -246,3 +246,31 @@ test('BusinessModulePage: 手动应收入口不再把 shipment_release done 当�
     /if \(!alreadyShipped && !shipmentTaskDone\)/
   )
 })
+
+test('BusinessModulePage: business_records 旧入口保持 archive 只读', () => {
+  assert.match(
+    businessModulePageSource,
+    /const BUSINESS_RECORD_ARCHIVE_READONLY = true/
+  )
+  assert.match(businessModulePageSource, /Legacy archive：只读查询/)
+  assert.match(
+    businessModulePageSource,
+    /function warnBusinessRecordArchiveReadonly\(\)/
+  )
+  assert.match(
+    businessModulePageSource,
+    /disabled=\{BUSINESS_RECORD_ARCHIVE_READONLY\}/
+  )
+  assert.match(
+    businessModulePageSource,
+    /title=\{BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE\}/
+  )
+  assert.match(
+    businessModulePageSource,
+    /<Form[\s\S]*disabled=\{BUSINESS_RECORD_ARCHIVE_READONLY\}/
+  )
+  assert.doesNotMatch(businessModulePageSource, /createBusinessRecord\s*\(/)
+  assert.doesNotMatch(businessModulePageSource, /updateBusinessRecord\s*\(/)
+  assert.doesNotMatch(businessModulePageSource, /deleteBusinessRecords\s*\(/)
+  assert.doesNotMatch(businessModulePageSource, /restoreBusinessRecord\s*\(/)
+})

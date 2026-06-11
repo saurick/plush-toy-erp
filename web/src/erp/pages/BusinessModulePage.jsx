@@ -50,13 +50,7 @@ import { message } from '@/common/utils/antdApp'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
-import {
-  createBusinessRecord,
-  deleteBusinessRecords,
-  listBusinessRecords,
-  restoreBusinessRecord,
-  updateBusinessRecord,
-} from '../api/businessRecordApi.mjs'
+import { listBusinessRecords } from '../api/businessRecordApi.mjs'
 import {
   createWorkflowTask,
   listWorkflowTasks,
@@ -258,6 +252,9 @@ const ACTIVE_APPROVAL_TASK_STATUS_KEYS = new Set([
   'ready',
   'processing',
 ])
+const BUSINESS_RECORD_ARCHIVE_READONLY = true
+const BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE =
+  'business_records 已归档为 legacy/archive 只读，请使用销售、采购、库存、生产、外协、出货或财务领域入口。'
 const MODULE_VARIANT_PANELS = Object.freeze({
   'material-bom': {
     label: '标准页 + BOM 明细变体',
@@ -280,7 +277,7 @@ const MODULE_VARIANT_PANELS = Object.freeze({
     label: '独立库存观察变体',
     title: '库存余额、批次和流水只读分区，不前端伪造可用量',
     description:
-      '库存页优先呈现余额、批次和流水的事实边界；当前仍复用业务记录入口承接说明和协同，不在前端计算可用量、锁定量或批次扣减。',
+      '库存页优先呈现余额、批次和流水的事实边界；旧业务记录入口仅保留 archive 查询和字段参考，不在前端计算可用量、锁定量或批次扣减。',
     lanes: ['库存余额', '批次状态', '库存流水'],
     boundary:
       '真实数量只来自 InventoryUsecase、inventory_txns 和 inventory_balances。',
@@ -289,7 +286,7 @@ const MODULE_VARIANT_PANELS = Object.freeze({
     label: '独立出库变体',
     title: '出库动作必须从待出货放行进入事实边界',
     description:
-      '出库页聚焦来源放行、仓库确认和后续对账的分段结构；当前业务记录只保存协同和单据快照，不在页面层直接扣减库存。',
+      '出库页聚焦来源放行、仓库确认和后续对账的分段结构；旧业务记录只作为 archive 快照查看，不在页面层直接扣减库存。',
     lanes: ['放行来源', '仓库确认出库', '后续对账触发'],
     boundary:
       '出库记录不会在前端直接扣减库存，也不会把 shipping_released 写成 shipped。',
@@ -344,6 +341,15 @@ function fromAntTableSortOrder(sortOrder) {
   if (sortOrder === 'ascend') return 'asc'
   if (sortOrder === 'descend') return 'desc'
   return ''
+}
+
+function warnBusinessRecordArchiveReadonly() {
+  message.warning(BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE)
+  return true
+}
+
+async function rejectBusinessRecordArchiveMutation() {
+  throw new Error(BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE)
 }
 
 function getActiveTableSorter(sorter) {
@@ -1506,6 +1512,7 @@ export default function BusinessModulePage({ moduleItem }) {
     [selectedRecord?.business_status_key]
   )
   const isBusinessStatusTransitionDisabled =
+    BUSINESS_RECORD_ARCHIVE_READONLY ||
     !selectedRecord ||
     businessStatusSaving ||
     businessStatusTransitionMenuItems.length === 0
@@ -2118,6 +2125,10 @@ export default function BusinessModulePage({ moduleItem }) {
   }, [definition, form, moduleItem])
 
   const openCreateModal = async () => {
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     setEditingRecord(null)
     const initialSourceModuleKey = sourcePrefillAllowedKeys.has(
       moduleTableNavigationQuery.sourceKey
@@ -2272,6 +2283,10 @@ export default function BusinessModulePage({ moduleItem }) {
   }
 
   const saveRecord = async () => {
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     setSaving(true)
     try {
       const values = await form.validateFields()
@@ -2281,9 +2296,7 @@ export default function BusinessModulePage({ moduleItem }) {
         definition,
         editingRecord
       )
-      const savedRecord = editingRecord
-        ? await updateBusinessRecord(params)
-        : await createBusinessRecord(params)
+      const savedRecord = await rejectBusinessRecordArchiveMutation(params)
       await syncWorkflowStateForRecord(savedRecord)
       message.success(editingRecord ? '业务记录已更新' : '业务记录已创建')
       setModalOpen(false)
@@ -2303,6 +2316,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const updateSelectedBusinessStatus = async (nextStatusKey, options = {}) => {
     if (!selectedRecord || !nextStatusKey) return false
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return false
+    }
     const reason = String(options.reason || '').trim()
     const params = buildBusinessRecordStatusUpdateParams(
       selectedRecord,
@@ -2314,7 +2331,7 @@ export default function BusinessModulePage({ moduleItem }) {
     if (!params) return false
     setBusinessStatusSaving(true)
     try {
-      const savedRecord = await updateBusinessRecord(params)
+      const savedRecord = await rejectBusinessRecordArchiveMutation(params)
       await syncWorkflowStateForRecord(savedRecord, { reason })
       await syncWorkflowTasksForBusinessStatus(
         savedRecord,
@@ -2343,6 +2360,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const handleBusinessStatusSelect = (nextStatusKey) => {
     if (!nextStatusKey) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (requiresBusinessStatusReason(nextStatusKey)) {
       setPendingStatusKey(nextStatusKey)
       statusReasonForm.setFieldsValue({ reason: '' })
@@ -2397,6 +2418,10 @@ export default function BusinessModulePage({ moduleItem }) {
   }, [])
 
   const openBatchDeleteModal = useCallback(() => {
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (selectedRowKeys.length === 0) {
       message.warning('请先勾选要删除的业务记录')
       return
@@ -2412,8 +2437,12 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const deleteSelectedRecord = async () => {
     if (!selectedRecord) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     try {
-      await deleteBusinessRecords({
+      await rejectBusinessRecordArchiveMutation({
         ids: [selectedRecord.id],
         delete_reason: '业务页删除',
       })
@@ -2431,6 +2460,11 @@ export default function BusinessModulePage({ moduleItem }) {
   }
 
   const confirmBatchDeleteRecords = useCallback(async () => {
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      setBatchDeleteModalOpen(false)
+      return
+    }
     const deleteIDs = selectedRowKeys.filter(Boolean)
     if (deleteIDs.length === 0) {
       setBatchDeleteModalOpen(false)
@@ -2438,7 +2472,7 @@ export default function BusinessModulePage({ moduleItem }) {
     }
     setBatchDeleteSubmitting(true)
     try {
-      const result = await deleteBusinessRecords({
+      const result = await rejectBusinessRecordArchiveMutation({
         ids: deleteIDs,
         delete_reason: batchDeleteReason.trim() || '业务页批量删除',
       })
@@ -2477,10 +2511,14 @@ export default function BusinessModulePage({ moduleItem }) {
     async (ids) => {
       const restoreIDs = ids.filter(Boolean)
       if (restoreIDs.length === 0) return
+      if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+        warnBusinessRecordArchiveReadonly()
+        return
+      }
       setRecycleRestoring(true)
       try {
         const results = await Promise.allSettled(
-          restoreIDs.map((id) => restoreBusinessRecord({ id }))
+          restoreIDs.map((id) => rejectBusinessRecordArchiveMutation({ id }))
         )
         const restoredRecords = results
           .filter((result) => result.status === 'fulfilled' && result.value?.id)
@@ -2566,6 +2604,8 @@ export default function BusinessModulePage({ moduleItem }) {
           <Button
             size="small"
             icon={<RollbackOutlined />}
+            disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+            title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
             onClick={() => restoreRecycleRecords([record.id])}
           >
             恢复
@@ -2578,6 +2618,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const createTaskForSelectedRecord = async () => {
     if (!selectedRecord) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     try {
       const task = await createWorkflowTask({
         task_code: `${moduleItem.key}-${selectedRecord.id}-${Date.now()}`,
@@ -2608,6 +2652,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedOrderForApproval = async () => {
     if (!selectedRecord || !isProjectOrderModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (selectedRecord.business_status_key === ORDER_APPROVED_STATUS_KEY) {
       message.info('当前订单已放行，无需重复提交审批')
       return
@@ -2655,6 +2703,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedArrivalForIqc = async () => {
     if (!selectedRecord || !isPurchaseInboundFlowModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (selectedActiveIqcTask) {
       message.warning('已有 IQC 任务')
       return
@@ -2669,7 +2721,7 @@ export default function BusinessModulePage({ moduleItem }) {
         definition
       )
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const taskParams = buildIqcTaskFromArrivalRecord({
         ...savedRecord,
@@ -2706,6 +2758,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedProcessingContractForOutsourceTracking = async () => {
     if (!selectedRecord || !isProcessingContractsModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (
       selectedActiveOutsourceReturnTrackingTask ||
       hasActiveOutsourceReturnTrackingTaskForRecord(tasks, {
@@ -2727,7 +2783,7 @@ export default function BusinessModulePage({ moduleItem }) {
         { reason: '委外发料后进入加工中，开始跟踪回货' }
       )
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const taskParams = buildOutsourceReturnTrackingTask({
         ...savedRecord,
@@ -2770,6 +2826,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedInboundForOutsourceReturnQc = async () => {
     if (!selectedRecord || !isInboundModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (
       selectedActiveOutsourceReturnQcTask ||
       hasActiveOutsourceReturnQcTaskForRecord(tasks, {
@@ -2791,7 +2851,7 @@ export default function BusinessModulePage({ moduleItem }) {
         { reason: '委外回货通知进入品质检验' }
       )
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const taskParams = buildOutsourceReturnQcTask(
         {
@@ -2836,6 +2896,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedProductionForFinishedGoodsQc = async () => {
     if (!selectedRecord || !isProductionProgressModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (
       selectedActiveFinishedGoodsQcTask ||
       hasActiveFinishedGoodsQcTaskForRecord(tasks, {
@@ -2864,7 +2928,7 @@ export default function BusinessModulePage({ moduleItem }) {
         }
       }
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const taskParams = buildFinishedGoodsQcTask({
         ...savedRecord,
@@ -2908,6 +2972,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedShipmentForReceivableRegistration = async () => {
     if (!selectedRecord || !isShipmentFinanceActionModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (
       selectedActiveReceivableRegistrationTask ||
       hasActiveReceivableRegistrationTaskForRecord(tasks, {
@@ -2947,7 +3015,7 @@ export default function BusinessModulePage({ moduleItem }) {
         }
       }
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const taskParams = buildReceivableRegistrationTask(
         {
@@ -2998,6 +3066,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedReceivableForInvoiceRegistration = async () => {
     if (!selectedRecord || !isReceivablesModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (selectedActiveReceivableRegistrationTask) {
       message.warning('请先完成当前应收登记任务')
       return
@@ -3023,7 +3095,7 @@ export default function BusinessModulePage({ moduleItem }) {
         { reason: '应收登记完成后进入开票登记' }
       )
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const taskParams = buildInvoiceRegistrationTask(
         {
@@ -3069,6 +3141,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedPurchaseForPayableRegistration = async () => {
     if (!selectedRecord || !isPurchasePayableActionModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     const recordForCheck = {
       ...selectedRecord,
       module_key: moduleItem.key,
@@ -3114,7 +3190,7 @@ export default function BusinessModulePage({ moduleItem }) {
         }
       }
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const payableRecord = {
         ...savedRecord,
@@ -3169,6 +3245,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedOutsourceForPayableRegistration = async () => {
     if (!selectedRecord || !isOutsourcePayableActionModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     const hasCompletedOutsourceInboundTask =
       latestSelectedOutsourceWarehouseInboundTask?.task_status_key === 'done'
     const recordForCheck = {
@@ -3218,7 +3298,7 @@ export default function BusinessModulePage({ moduleItem }) {
         }
       }
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const payableRecord = {
         ...savedRecord,
@@ -3275,6 +3355,10 @@ export default function BusinessModulePage({ moduleItem }) {
 
   const submitSelectedPayableForReconciliation = async () => {
     if (!selectedRecord || !isPayablesModule) return
+    if (BUSINESS_RECORD_ARCHIVE_READONLY) {
+      warnBusinessRecordArchiveReadonly()
+      return
+    }
     if (selectedActivePayableRegistrationTask) {
       message.warning('请先完成当前应付登记任务')
       return
@@ -3325,7 +3409,7 @@ export default function BusinessModulePage({ moduleItem }) {
         }
       }
       const savedRecord = statusParams
-        ? await updateBusinessRecord(statusParams)
+        ? await rejectBusinessRecordArchiveMutation(statusParams)
         : selectedRecord
       const reconciliationRecord = {
         ...savedRecord,
@@ -3460,9 +3544,7 @@ export default function BusinessModulePage({ moduleItem }) {
         description={moduleItem.description}
         tags={
           <div className="erp-business-module-chip-row">
-            <Tag color="green">
-              状态流程：单据保存 → 协同任务 → 业务状态回写
-            </Tag>
+            <Tag color="default">Legacy archive：只读查询 / 打印带值候选</Tag>
             {moduleTaskAlerts.length > 0 ? (
               <Tag
                 color={
@@ -3576,9 +3658,11 @@ export default function BusinessModulePage({ moduleItem }) {
               type="primary"
               className="erp-business-list-toolbar__primary-action"
               icon={<PlusOutlined />}
+              disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+              title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
               onClick={openCreateModal}
             >
-              新建记录
+              归档只读
             </ToolbarButton>
           </>
         }
@@ -3605,7 +3689,7 @@ export default function BusinessModulePage({ moduleItem }) {
               icon={<EditOutlined />}
               onClick={openEditModal}
             >
-              编辑
+              查看
             </Button>
             {printTemplate ? (
               <Button
@@ -3648,7 +3732,12 @@ export default function BusinessModulePage({ moduleItem }) {
                 </Button>
               </Dropdown>
             )}
-            <Button size="small" onClick={createTaskForSelectedRecord}>
+            <Button
+              size="small"
+              disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+              title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
+              onClick={createTaskForSelectedRecord}
+            >
               创建协同任务
             </Button>
             {isProjectOrderModule ? (
@@ -3657,6 +3746,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<SendOutlined />}
                   loading={orderApprovalSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedOrderForApproval}
                 >
                   提交审批
@@ -3678,6 +3769,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<ExperimentOutlined />}
                   loading={iqcSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedArrivalForIqc}
                 >
                   发起 IQC
@@ -3703,6 +3796,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<SendOutlined />}
                   loading={outsourceReturnSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedProcessingContractForOutsourceTracking}
                 >
                   发起委外回货跟踪
@@ -3734,6 +3829,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<ExperimentOutlined />}
                   loading={finishedGoodsSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedProductionForFinishedGoodsQc}
                 >
                   发起成品抽检
@@ -3778,6 +3875,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<ExperimentOutlined />}
                   loading={outsourceReturnSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedInboundForOutsourceReturnQc}
                 >
                   发起委外回货检验
@@ -3800,6 +3899,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<SendOutlined />}
                   loading={payableReconciliationSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedPurchaseForPayableRegistration}
                 >
                   发起采购应付登记
@@ -3840,6 +3941,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<SendOutlined />}
                   loading={payableReconciliationSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedOutsourceForPayableRegistration}
                 >
                   发起委外应付登记
@@ -3880,6 +3983,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<SendOutlined />}
                   loading={shipmentFinanceSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedShipmentForReceivableRegistration}
                 >
                   发起应收登记
@@ -3919,6 +4024,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<SendOutlined />}
                   loading={shipmentFinanceSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedReceivableForInvoiceRegistration}
                 >
                   发起开票登记
@@ -3982,6 +4089,8 @@ export default function BusinessModulePage({ moduleItem }) {
                   size="small"
                   icon={<SendOutlined />}
                   loading={payableReconciliationSubmitting}
+                  disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                  title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
                   onClick={submitSelectedPayableForReconciliation}
                 >
                   发起对账
@@ -4045,6 +4154,7 @@ export default function BusinessModulePage({ moduleItem }) {
                 size="small"
                 loading={businessStatusSaving}
                 disabled={isBusinessStatusTransitionDisabled}
+                title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
               >
                 <span>流转</span>
                 <DownOutlined />
@@ -4057,7 +4167,13 @@ export default function BusinessModulePage({ moduleItem }) {
               cancelText="取消"
               onConfirm={deleteSelectedRecord}
             >
-              <Button size="small" danger icon={<DeleteOutlined />}>
+              <Button
+                size="small"
+                danger
+                disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+                title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
+                icon={<DeleteOutlined />}
+              >
                 删除
               </Button>
             </Popconfirm>
@@ -4065,6 +4181,8 @@ export default function BusinessModulePage({ moduleItem }) {
               size="small"
               danger
               icon={<DeleteOutlined />}
+              disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+              title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
               onClick={openBatchDeleteModal}
             >
               批量删除
@@ -4073,7 +4191,7 @@ export default function BusinessModulePage({ moduleItem }) {
         ) : selectedRowKeys.length === 0 ? (
           <>
             <Button size="small" disabled icon={<EditOutlined />}>
-              编辑
+              查看
             </Button>
             {printTemplate ? (
               <Button size="small" disabled icon={<PrinterOutlined />}>
@@ -4108,12 +4226,14 @@ export default function BusinessModulePage({ moduleItem }) {
               type="secondary"
               className="erp-business-selection-action-bar__hint"
             >
-              多选记录可批量删除；保留 1 条后可编辑、流转和创建协同任务。
+              归档记录只读；可导出、打印或查看关联表格。
             </Text>
             <Button
               size="small"
               danger
               icon={<DeleteOutlined />}
+              disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
+              title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
               onClick={openBatchDeleteModal}
             >
               批量删除
@@ -4176,7 +4296,8 @@ export default function BusinessModulePage({ moduleItem }) {
         okButtonProps={{
           danger: true,
           loading: batchDeleteSubmitting,
-          disabled: selectedRowKeys.length === 0,
+          disabled:
+            BUSINESS_RECORD_ARCHIVE_READONLY || selectedRowKeys.length === 0,
         }}
         destroyOnHidden
       >
@@ -4213,7 +4334,11 @@ export default function BusinessModulePage({ moduleItem }) {
           <Space wrap>
             <Button
               icon={<RollbackOutlined />}
-              disabled={recycleSelectedRowKeys.length === 0}
+              disabled={
+                BUSINESS_RECORD_ARCHIVE_READONLY ||
+                recycleSelectedRowKeys.length === 0
+              }
+              title={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
               loading={recycleRestoring}
               onClick={() => restoreRecycleRecords(recycleSelectedRowKeys)}
             >
@@ -4466,7 +4591,9 @@ export default function BusinessModulePage({ moduleItem }) {
       </Modal>
 
       <Modal
-        title={`${editingRecord ? '编辑' : '新建'}：${moduleItem.title}`}
+        title={`${editingRecord ? '归档查看' : '新建已停用'}：${
+          moduleItem.title
+        }`}
         open={modalOpen}
         width="92vw"
         centered
@@ -4475,12 +4602,22 @@ export default function BusinessModulePage({ moduleItem }) {
         confirmLoading={saving}
         onOk={saveRecord}
         onCancel={() => setModalOpen(false)}
-        okText="确定"
+        okButtonProps={{ disabled: BUSINESS_RECORD_ARCHIVE_READONLY }}
+        okText={BUSINESS_RECORD_ARCHIVE_READONLY ? '只读归档' : '确定'}
         cancelText="取消"
       >
+        {BUSINESS_RECORD_ARCHIVE_READONLY ? (
+          <Alert
+            type="info"
+            showIcon
+            message={BUSINESS_RECORD_ARCHIVE_READONLY_MESSAGE}
+            style={{ marginBottom: 16 }}
+          />
+        ) : null}
         <Form
           form={form}
           layout="vertical"
+          disabled={BUSINESS_RECORD_ARCHIVE_READONLY}
           className="erp-business-record-form"
         >
           <Row gutter={12}>
@@ -4765,6 +4902,7 @@ export default function BusinessModulePage({ moduleItem }) {
         }}
         okText="确认流转"
         cancelText="取消"
+        okButtonProps={{ disabled: BUSINESS_RECORD_ARCHIVE_READONLY }}
       >
         <Form form={statusReasonForm} layout="vertical">
           <Form.Item

@@ -560,7 +560,11 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '产品')
       await expectText(page, '导出当前结果')
+      await expectText(page, 'ARCH-PROD-001')
       await expectText(page, '本页协同入口')
+      await assertBusinessArchiveReadonlyToolbar(page, {
+        scenarioName: 'business-module-dark-products-modal-desktop',
+      })
       await assertBusinessCollaborationPanelCollapsedByDefault(page, {
         scenarioName: 'business-module-dark-products-modal-desktop',
       })
@@ -579,7 +583,10 @@ const scenarios = [
       await assertDarkThemeNeutralInteractions(page, {
         scenarioName: 'business-module-dark-products-modal-desktop',
       })
-      await page.getByRole('button', { name: '新建记录' }).click()
+      await openBusinessArchiveRecordModal(page, {
+        scenarioName: 'business-module-dark-products-modal-desktop',
+        recordText: 'ARCH-PROD-001',
+      })
       await assertBusinessRecordModalLayout(page, {
         scenarioName: 'business-module-dark-products-modal',
         minModalWidth: 1200,
@@ -1608,7 +1615,11 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '辅材/包材采购')
-      await expectText(page, '新建记录')
+      await expectText(page, '归档只读')
+      await expectText(page, 'ARCH-PUR-001')
+      await assertBusinessArchiveReadonlyToolbar(page, {
+        scenarioName: 'business-module-workflow-actions',
+      })
       await assertBusinessModuleToolbarControlStyle(page, {
         scenarioName: 'business-module-workflow-actions',
       })
@@ -1636,129 +1647,38 @@ const scenarios = [
         expectSelectionAction: true,
       })
 
-      await page.getByRole('button', { name: '新建记录' }).click()
-      await assertBusinessRecordModalLayout(page, {
-        scenarioName: 'business-module-create-modal',
-        minModalWidth: 1200,
-        expectCompactGrid: true,
-      })
-      await assertBusinessRecordItemCardLayout(page, {
-        scenarioName: 'business-module-create-modal',
-      })
-      const createDialog = page.getByRole('dialog', {
-        name: '新建：辅材/包材采购',
-      })
-      await createDialog
-        .getByRole('textbox', { name: '采购单号', exact: true })
-        .fill('PUR-L1-WF-001')
-      await createDialog
-        .getByRole('textbox', { name: '* 供应商' })
-        .fill('联调供应商')
-      await createDialog.getByLabel('采购事项').fill('辅料采购流程回归')
       await page
-        .locator(
-          '.erp-business-record-item-grid input[placeholder="辅材 / 包材名称"]'
-        )
-        .fill('PP 棉')
-      const itemGrid = page.locator('.erp-business-record-item-grid')
-      await itemGrid
-        .locator('.erp-item-field-stack')
-        .filter({ hasText: '采购数量' })
-        .locator('.ant-input-number-input')
-        .fill('2')
-      await page
-        .locator('.erp-business-record-item-grid input[placeholder="单位"]')
-        .fill('pcs')
-      await page
-        .locator('.erp-business-record-item-grid input[aria-label="单位 pcs"]')
-        .waitFor({ state: 'visible', timeout: 10_000 })
-      await itemGrid
-        .locator('.erp-item-field-stack')
-        .filter({ hasText: '金额' })
-        .locator('.ant-input-number-input')
-        .fill('39.8')
-      await page
-        .locator('.erp-business-record-item-grid input[aria-label="单位 CNY"]')
+        .locator('.erp-business-module-table-card .ant-table-tbody tr')
+        .filter({ hasText: 'ARCH-PUR-001' })
         .first()
-        .waitFor({ state: 'visible', timeout: 10_000 })
-      await expectText(page, '数量合计 2')
-      await expectText(page, '金额合计 39.80')
-      await createDialog.getByRole('button', { name: /确\s*定/ }).click()
-      await expectText(page, 'PUR-L1-WF-001')
-      await expectText(page, '1 行')
-      await expectText(page, '39.80')
-
-      await businessActionToolbar
-        .getByRole('button', { name: /流转业务状态|流转/ })
         .click()
-      const approveStatusItem = page
-        .locator(
-          '.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item'
-        )
-        .filter({ hasText: 'IQC 待检' })
-        .first()
-      await approveStatusItem.waitFor({ state: 'visible', timeout: 10_000 })
-      await assertOpenDropdownInViewport(page, {
-        scenarioName: 'business-module-workflow-actions-approve-menu',
-      })
-      await approveStatusItem.evaluate((element) => element.click())
-      await expectText(page, '业务状态已更新为：IQC 待检')
-      await expectText(page, 'IQC 待检')
-
-      await page.getByRole('button', { name: '创建协同任务' }).click()
-      const collaborationPanel = page
-        .locator('.erp-business-collaboration-task-panel')
-        .first()
-      await collaborationPanel
-        .locator('button[aria-expanded="false"]')
-        .first()
-        .evaluate((button) => button.click())
-      await collaborationPanel
-        .locator('.erp-business-collaboration-task-panel__panel')
-        .waitFor({ state: 'visible', timeout: 10_000 })
-      await collaborationPanel
-        .locator('.erp-business-collaboration-task-panel__tab')
-        .filter({ hasText: '当前记录' })
-        .first()
-        .evaluate((button) => button.click())
-      await expectText(page, '辅材/包材采购：辅料采购流程回归')
-      await expectText(page, '可执行')
-      await expectText(page, '当前操作')
-      await expectText(page, '业务状态')
-      await expectText(page, '主责')
-      await expectText(page, '当前记录协同')
-      await expectText(page, '当前区域只提供记录操作和 Workflow 协同')
-
-      await businessActionToolbar
-        .getByRole('button', { name: /流转业务状态|流转/ })
-        .click()
-      const blockedStatusItem = page
-        .locator(
-          '.ant-dropdown:not(.ant-dropdown-hidden) .ant-dropdown-menu-item'
-        )
-        .filter({ hasText: '业务阻塞' })
-        .first()
-      await blockedStatusItem.waitFor({ state: 'visible', timeout: 10_000 })
-      await assertOpenDropdownInViewport(page, {
-        scenarioName: 'business-module-workflow-actions-blocked-menu',
-      })
-      await blockedStatusItem.evaluate((element) => element.click())
-      await expectText(page, '流转业务状态：业务阻塞')
-      const statusReasonDialog = page.locator(
-        '.erp-business-status-reason-modal:visible'
+      const readonlyButtons = await businessActionToolbar.evaluate((element) =>
+        Array.from(element.querySelectorAll('button')).map((button) => ({
+          text: String(button.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim(),
+          ariaLabel: button.getAttribute('aria-label') || '',
+          disabled: button.disabled,
+        }))
       )
-      await statusReasonDialog.waitFor({ state: 'visible', timeout: 10_000 })
-      await assertAntdModalCentered(
-        page,
-        statusReasonDialog,
-        'business-status-reason-modal'
+      for (const label of ['创建协同任务', '删除', '批量删除']) {
+        const button = readonlyButtons.find((item) => item.text === label)
+        assert(
+          button?.disabled,
+          `business-module-workflow-actions ${label} 应保持只读禁用: ${JSON.stringify(
+            readonlyButtons
+          )}`
+        )
+      }
+      const flowButton = readonlyButtons.find(
+        (item) => item.text === '流转' || item.ariaLabel === '流转业务状态'
       )
-      await page.getByLabel('原因说明').fill('资料未齐，等待客户确认')
-      await page.getByRole('button', { name: '确认流转' }).click()
-      await expectText(page, '业务状态已更新为：业务阻塞')
-      await expectText(page, '业务阻塞')
-      await expectText(page, '阻塞')
-      await expectText(page, '资料未齐，等待客户确认')
+      assert(
+        flowButton?.disabled,
+        `business-module-workflow-actions 流转应保持只读禁用: ${JSON.stringify(
+          readonlyButtons
+        )}`
+      )
       await assertBusinessModuleCompactWorkspace(page, {
         scenarioName: 'business-module-workflow-actions-filled',
         expectSelectionAction: true,
@@ -1768,37 +1688,18 @@ const scenarios = [
         expectedMode: 'active',
       })
       await assertTextAbsent(page, '返回当前记录')
-
-      await page.getByRole('button', { name: '批量删除' }).click()
-      const batchDeleteDialog = page.getByRole('dialog', {
-        name: '批量删除记录',
+      const archiveDialog = await openBusinessArchiveRecordModal(page, {
+        scenarioName: 'business-module-workflow-actions-archive-modal',
+        recordText: 'ARCH-PUR-001',
       })
-      await batchDeleteDialog.waitFor({ state: 'visible', timeout: 10_000 })
-      await assertAntdModalCentered(
-        page,
-        batchDeleteDialog,
-        'business-module-batch-delete-modal'
-      )
-      await batchDeleteDialog.getByText('已选择 1 条记录').waitFor({
-        state: 'visible',
-        timeout: 10_000,
+      await assertBusinessRecordModalLayout(page, {
+        scenarioName: 'business-module-workflow-actions-archive-modal',
+        minModalWidth: 1200,
+        expectCompactGrid: true,
+        expectReadonly: true,
       })
-      await assertBatchDeleteModalCountLayout(page, {
-        scenarioName: 'business-module-batch-delete-modal-empty',
-        screenshotName: 'business-module-batch-delete-modal-open',
-      })
-      await batchDeleteDialog
-        .getByPlaceholder('请输入删除原因（可选）')
-        .fill('L1 批量删除回归')
-      await assertBatchDeleteModalCountLayout(page, {
-        scenarioName: 'business-module-batch-delete-modal-filled',
-      })
-      await assertVisibleModalInputFocusStyle(page, {
-        scenarioName: 'business-module-batch-delete-modal-focus',
-        modalText: '批量删除记录',
-      })
-      await batchDeleteDialog.getByRole('button', { name: '确认删除' }).click()
-      await expectText(page, '已批量移入回收站 1 条')
+      await archiveDialog.locator('.ant-modal-close').click()
+      await archiveDialog.waitFor({ state: 'hidden', timeout: 10_000 })
 
       await page.getByRole('button', { name: '回收站' }).click()
       const recycleDialog = page.getByRole('dialog', { name: '回收站' })
@@ -1808,28 +1709,12 @@ const scenarios = [
         recycleDialog,
         'business-module-recycle-modal'
       )
-      await recycleDialog.getByText('PUR-L1-WF-001').waitFor({
-        state: 'visible',
-        timeout: 10_000,
-      })
-      await recycleDialog.getByText('L1 批量删除回归').waitFor({
-        state: 'visible',
-        timeout: 10_000,
-      })
-      await recycleDialog
-        .locator('.ant-table-tbody tr')
-        .filter({ hasText: 'PUR-L1-WF-001' })
-        .locator('button')
-        .last()
-        .click()
-      await expectText(page, '业务记录已恢复')
       await recycleDialog.getByText('回收站暂无记录').waitFor({
         state: 'visible',
         timeout: 10_000,
       })
       await recycleDialog.locator('.ant-modal-close').click()
       await recycleDialog.waitFor({ state: 'hidden', timeout: 10_000 })
-      await assertTextAbsent(page, '返回当前记录')
     },
   },
   {
@@ -1855,32 +1740,24 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '材料 BOM')
-      await page.getByRole('button', { name: '新建记录' }).click()
-      const bomDialog = page.getByRole('dialog', {
-        name: '新建：材料 BOM',
+      await expectText(page, 'ARCH-BOM-001')
+      await assertBusinessArchiveReadonlyToolbar(page, {
+        scenarioName: 'business-module-material-bom-modal-style',
       })
-      await bomDialog.waitFor({ state: 'visible', timeout: 10_000 })
+      const bomDialog = await openBusinessArchiveRecordModal(page, {
+        scenarioName: 'business-module-material-bom-modal-style',
+        recordText: 'ARCH-BOM-001',
+      })
       await assertBusinessRecordModalLayout(page, {
         scenarioName: 'business-module-material-bom-modal-style',
         minModalWidth: 1200,
         expectCompactGrid: true,
+        expectReadonly: true,
       })
       await assertBusinessRecordItemCardLayout(page, {
         scenarioName: 'business-module-material-bom-modal-style',
       })
       await expectText(page, 'BOM 明细')
-      await expectText(page, '添加条目')
-      await expectText(page, '已录入 1 条')
-      await bomDialog.getByRole('button', { name: '复制条目 1' }).click()
-      await expectText(page, '条目 2')
-      await expectText(page, '已录入 2 条')
-      await bomDialog.getByRole('button', { name: '删除条目 2' }).click()
-      await assertTextAbsent(page, '条目 2')
-      await expectText(page, '已录入 1 条')
-      await bomDialog.getByRole('button', { name: '添加条目' }).click()
-      await expectText(page, '条目 2')
-      await bomDialog.getByRole('button', { name: '删除条目 2' }).click()
-      await assertTextAbsent(page, '条目 2')
       await expectText(page, '已录入 1 条')
       await bomDialog.locator('.ant-modal-close').click()
       await bomDialog.waitFor({ state: 'hidden', timeout: 10_000 })
@@ -1939,40 +1816,10 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '辅材/包材采购')
-
-      await page.getByRole('button', { name: '新建记录' }).click()
-      const purchaseDialog = page.getByRole('dialog', {
-        name: '新建：辅材/包材采购',
+      await assertBusinessArchiveReadonlyToolbar(page, {
+        scenarioName: 'business-module-derived-item-amount',
       })
-      await purchaseDialog.waitFor({ state: 'visible', timeout: 10_000 })
-      await purchaseDialog.getByLabel('采购单号').fill('PUR-L1-001')
-      await purchaseDialog.getByLabel('采购事项').fill('辅料采购自动汇总')
-      await purchaseDialog
-        .getByRole('textbox', { name: '* 供应商' })
-        .fill('联调供应商')
-      await purchaseDialog.getByLabel('回货日期').fill('2026-04-28')
-      await page
-        .locator(
-          '.erp-business-record-item-grid input[placeholder="辅材 / 包材名称"]'
-        )
-        .fill('PP 棉')
-      await page
-        .locator('.erp-business-record-item-grid .ant-input-number-input')
-        .nth(0)
-        .fill('3')
-      await page
-        .locator('.erp-business-record-item-grid .ant-input-number-input')
-        .nth(1)
-        .fill('12.5')
-      await expectText(page, '数量合计 3')
-      await expectText(page, '金额合计 37.50')
-
-      await page
-        .locator('.erp-business-record-modal:visible')
-        .getByRole('button', { name: /确\s*定/ })
-        .click()
-      await expectText(page, 'PUR-L1-001')
-      await expectText(page, '辅料采购自动汇总')
+      await expectText(page, 'ARCH-PUR-001')
       await expectText(page, '37.50')
       await expectText(page, '1 行')
 
@@ -1986,13 +1833,7 @@ const scenarios = [
       )
       const purchaseRecordRow = page
         .locator('.erp-business-module-table-card .ant-table-tbody tr')
-        .filter({ hasText: 'PUR-L1-001' })
-      await toolbarDateInputs.nth(0).fill('2026-05-01')
-      await purchaseRecordRow.waitFor({
-        state: 'hidden',
-        timeout: 10_000,
-      })
-      await toolbarDateInputs.nth(0).fill('2026-04-01')
+        .filter({ hasText: 'ARCH-PUR-001' })
       await purchaseRecordRow.waitFor({
         state: 'visible',
         timeout: 10_000,
@@ -2017,8 +1858,8 @@ const scenarios = [
         await printWindow.waitForLoadState('domcontentloaded')
         await expectText(printWindow, '采购合同')
         await expectText(printWindow, '业务记录带值')
-        await expectText(printWindow, 'PUR-L1-001')
-        await expectText(printWindow, '联调供应商')
+        await expectText(printWindow, 'ARCH-PUR-001')
+        await expectText(printWindow, 'Archive 供应商')
         await expectText(printWindow, 'PP 棉')
       } finally {
         await printWindow.close()
@@ -2705,7 +2546,10 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '加工合同/委外下单')
       await expectText(page, '委外加工订单号')
-      await expectText(page, '新建记录')
+      await expectText(page, '归档只读')
+      await assertBusinessArchiveReadonlyToolbar(page, {
+        scenarioName: 'business-processing-contracts-desktop',
+      })
       await assertBusinessSelectionActionBarEmpty(page, {
         scenarioName: 'business-processing-contracts-desktop',
       })
@@ -2749,7 +2593,7 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '辅材/包材采购')
-      await expectText(page, '新建记录')
+      await expectText(page, '归档只读')
       await expectText(page, '本页协同入口')
       await assertNoHorizontalOverflow(page, 'business-standard-accessories')
 
@@ -2757,7 +2601,7 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '加工合同/委外下单')
-      await expectText(page, '新建记录')
+      await expectText(page, '归档只读')
       await expectText(page, '本页协同入口')
       await assertNoHorizontalOverflow(page, 'business-standard-processing')
 
@@ -2765,7 +2609,7 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '待出货/出货放行')
-      await expectText(page, '新建记录')
+      await expectText(page, '归档只读')
       await expectText(page, '本页协同入口')
       await assertNoHorizontalOverflow(
         page,
@@ -3707,10 +3551,122 @@ async function installAdminRpcMocks(page) {
 
   const workflowTasks = []
   const workflowBusinessStates = []
-  const businessRecords = []
+  const businessRecords = [
+    {
+      id: 9001,
+      module_key: 'products',
+      document_no: 'ARCH-PROD-001',
+      title: 'Archive 样品小熊',
+      product_no: 'SKU-ARCH-001',
+      product_name: 'Archive 样品小熊',
+      customer_name: 'Archive 客户',
+      quantity: 1,
+      unit: '只',
+      amount: 0,
+      business_status_key: 'closed',
+      owner_role_key: 'business',
+      payload: { archive_fixture: true },
+      items: [],
+      created_at: 1714000000,
+      updated_at: 1714000000,
+    },
+    {
+      id: 9002,
+      module_key: 'material-bom',
+      document_no: 'ARCH-BOM-001',
+      title: 'Archive 小熊 BOM',
+      product_name: 'Archive 样品小熊',
+      material_name: 'PP 棉',
+      quantity: 3,
+      unit: 'kg',
+      amount: 37.5,
+      business_status_key: 'closed',
+      owner_role_key: 'pmc',
+      payload: { archive_fixture: true },
+      items: [
+        {
+          id: 1,
+          name: 'PP 棉',
+          quantity: 3,
+          unit: 'kg',
+          amount: 37.5,
+          payload: { archive_fixture: true },
+        },
+      ],
+      created_at: 1714000100,
+      updated_at: 1714000100,
+    },
+    {
+      id: 9003,
+      module_key: 'accessories-purchase',
+      document_no: 'ARCH-PUR-001',
+      title: 'Archive 辅料采购',
+      supplier_name: 'Archive 供应商',
+      material_name: 'PP 棉',
+      purchase_date: '2026-04-28',
+      return_date: '2026-04-30',
+      quantity: 3,
+      unit: 'kg',
+      amount: 37.5,
+      business_status_key: 'closed',
+      owner_role_key: 'purchase',
+      payload: {
+        archive_fixture: true,
+        purchase_date: '2026-04-28',
+        return_date: '2026-04-30',
+      },
+      items: [
+        {
+          id: 1,
+          name: 'PP 棉',
+          quantity: 3,
+          unit: 'kg',
+          unit_price: 12.5,
+          amount: 37.5,
+          payload: { archive_fixture: true },
+        },
+      ],
+      created_at: 1714000200,
+      updated_at: 1714000200,
+    },
+    {
+      id: 9004,
+      module_key: 'processing-contracts',
+      document_no: 'ARCH-PC-001',
+      title: 'Archive 委外加工',
+      supplier_name: 'Archive 加工商',
+      product_name: 'Archive 样品小熊',
+      quantity: 100,
+      unit: '只',
+      amount: 1200,
+      business_status_key: 'closed',
+      owner_role_key: 'production',
+      payload: { archive_fixture: true },
+      items: [],
+      created_at: 1714000300,
+      updated_at: 1714000300,
+    },
+    {
+      id: 9005,
+      module_key: 'shipping-release',
+      document_no: 'ARCH-OUT-001',
+      title: 'Archive 出货放行',
+      source_no: 'SO-ARCH-001',
+      customer_name: 'Archive 客户',
+      product_name: 'Archive 样品小熊',
+      quantity: 60,
+      unit: '箱',
+      amount: 3600,
+      business_status_key: 'shipping_released',
+      owner_role_key: 'warehouse',
+      payload: { archive_fixture: true, shipment_release_result: 'done' },
+      items: [],
+      created_at: 1714000400,
+      updated_at: 1714000400,
+    },
+  ]
   let workflowTaskID = 1
   let workflowBusinessStateID = 1
-  let businessRecordID = 1
   const nowUnix = () => Math.floor(Date.now() / 1000)
   const normalizeDateFilterValue = (value) => {
     if (value === null || value === undefined || value === '') return ''
@@ -3797,75 +3753,24 @@ async function installAdminRpcMocks(page) {
         }
         break
       }
-      case 'create_record': {
-        const record = {
-          id: businessRecordID++,
-          module_key: params.module_key || 'project-orders',
-          document_no: params.document_no || `STYLE-L1-${businessRecordID}`,
-          title: params.title || '毛绒熊立项',
-          source_no: params.source_no || '',
-          customer_name: params.customer_name || '',
-          supplier_name: params.supplier_name || '',
-          style_no: params.style_no || '',
-          product_no: params.product_no || '',
-          product_name: params.product_name || '',
-          material_name: params.material_name || '',
-          warehouse_location: params.warehouse_location || '',
-          quantity: params.quantity || null,
-          unit: params.unit || '',
-          amount: params.amount || null,
-          document_date: params.document_date || '',
-          due_date: params.due_date || '',
-          business_status_key: params.business_status_key || 'project_pending',
-          owner_role_key: params.owner_role_key || 'business',
-          payload: params.payload || {},
-          items: params.items || [],
-          row_version: 1,
-          created_at: nowUnix(),
-          updated_at: nowUnix(),
-          deleted_at: null,
-        }
-        businessRecords.unshift(record)
-        data = { record }
-        break
-      }
-      case 'update_record': {
-        const record = businessRecords.find(
-          (item) => Number(item.id) === Number(params.id)
-        )
-        if (record) {
-          Object.assign(record, {
-            ...params,
-            row_version: Number(record.row_version || 0) + 1,
-            updated_at: nowUnix(),
-          })
-        }
-        data = { record }
-        break
-      }
-      case 'delete_records': {
-        const ids = Array.isArray(params.ids) ? params.ids.map(Number) : []
-        let affected = 0
-        businessRecords.forEach((record) => {
-          if (ids.includes(Number(record.id)) && !record.deleted_at) {
-            record.deleted_at = nowUnix()
-            record.delete_reason = params.delete_reason || '业务页删除'
-            affected += 1
-          }
+      case 'create_record':
+      case 'update_record':
+      case 'delete_records':
+      case 'restore_record':
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              code: 400,
+              message: 'business_records 已归档为只读，请使用对应领域入口',
+              data: null,
+            },
+          }),
         })
-        data = { affected }
-        break
-      }
-      case 'restore_record': {
-        const record = businessRecords.find(
-          (item) => Number(item.id) === Number(params.id)
-        )
-        if (record) {
-          record.deleted_at = null
-        }
-        data = { record }
-        break
-      }
+        return
       default:
         data = {}
         break
@@ -4145,7 +4050,7 @@ async function assertBusinessSelectionActionBarEmpty(page, { scenarioName }) {
 
   const disabledButtonChecks = [
     { label: '清空已选' },
-    { label: '编辑' },
+    { label: '查看' },
     { label: '关联表格' },
     { label: '创建协同任务' },
     { label: '流转', ariaLabel: '流转业务状态' },
@@ -4179,6 +4084,67 @@ async function assertBusinessSelectionActionBarEmpty(page, { scenarioName }) {
     scenarioName,
     expectedMode: 'empty',
   })
+}
+
+async function assertBusinessArchiveReadonlyToolbar(page, { scenarioName }) {
+  const archiveButton = page.getByRole('button', { name: '归档只读' })
+  await archiveButton.waitFor({ state: 'visible', timeout: 10_000 })
+  assert.equal(
+    await archiveButton.isDisabled(),
+    true,
+    `${scenarioName} 旧业务页新建入口应禁用为归档只读`
+  )
+}
+
+async function openBusinessArchiveRecordModal(
+  page,
+  { scenarioName, recordText }
+) {
+  const row = page
+    .locator('.erp-business-module-table-card .ant-table-tbody tr')
+    .filter({ hasText: recordText })
+    .first()
+  await row.waitFor({ state: 'visible', timeout: 10_000 })
+  await row.click()
+  await page
+    .locator('.erp-business-module-current-action')
+    .getByRole('button', { name: '查看' })
+    .click()
+  const dialog = page.locator('.erp-business-record-modal:visible').last()
+  await dialog.waitFor({ state: 'visible', timeout: 10_000 })
+  await expectText(page, '归档查看')
+  await expectText(page, 'business_records 已归档为 legacy/archive 只读')
+
+  const readonlyMetrics = await dialog.evaluate((element) => {
+    const disabledControls = element.querySelectorAll(
+      'input:disabled, textarea:disabled, button:disabled, .ant-select-disabled, .ant-input-number-disabled'
+    )
+    const okButton = Array.from(
+      element.querySelectorAll('.ant-modal-footer button')
+    ).find((button) =>
+      String(button.textContent || '')
+        .replace(/\s+/g, '')
+        .includes('只读归档')
+    )
+    return {
+      disabledControlCount: disabledControls.length,
+      okButtonText: okButton?.textContent?.replace(/\s+/g, ' ').trim() || '',
+      okButtonDisabled: Boolean(okButton?.disabled),
+    }
+  })
+  assert(
+    readonlyMetrics.disabledControlCount > 0,
+    `${scenarioName} 归档查看弹窗应存在禁用表单控件: ${JSON.stringify(
+      readonlyMetrics
+    )}`
+  )
+  assert.equal(
+    readonlyMetrics.okButtonDisabled,
+    true,
+    `${scenarioName} 归档查看确认按钮应禁用: ${JSON.stringify(readonlyMetrics)}`
+  )
+
+  return dialog
 }
 
 async function assertBusinessSelectionActionBarBoxModel(
@@ -6546,7 +6512,13 @@ async function assertVisibleModalInputFocusStyle(
 
 async function assertBusinessRecordModalLayout(
   page,
-  { scenarioName, minModalWidth, expectCompactGrid, expectDarkChrome = false }
+  {
+    scenarioName,
+    minModalWidth,
+    expectCompactGrid,
+    expectDarkChrome = false,
+    expectReadonly = false,
+  }
 ) {
   await page
     .locator('.erp-business-record-modal:visible .ant-modal-content')
@@ -6611,6 +6583,15 @@ async function assertBusinessRecordModalLayout(
             ),
             isTextareaAffixWrapper: Boolean(
               control.className.includes('ant-input-textarea-affix-wrapper')
+            ),
+            disabled: Boolean(
+              control.matches(':disabled') ||
+                control.className.includes(
+                  'ant-input-affix-wrapper-disabled'
+                ) ||
+                control.closest(
+                  '.ant-select-disabled, .ant-input-number-disabled, .ant-picker-disabled'
+                )
             ),
             width: rect.width,
             height: rect.height,
@@ -6806,7 +6787,9 @@ async function assertBusinessRecordModalLayout(
     assertDarkItemSummaryMetrics(metrics, scenarioName)
   } else {
     assertTradeLikeModalControls(metrics, scenarioName)
-    await assertBusinessRecordModalFocusStyle(page, scenarioName)
+    if (!expectReadonly) {
+      await assertBusinessRecordModalFocusStyle(page, scenarioName)
+    }
   }
 
   if (!expectCompactGrid) {
@@ -7528,7 +7511,10 @@ function assertTradeLikeModalControls(metrics, scenarioName) {
       `${scenarioName} 弹窗控件边框未统一到 AntD 浅灰 / ERP 绿色焦点态: ${JSON.stringify(control)}`
     )
     assert(
-      control.backgroundColor === 'rgb(255, 255, 255)',
+      control.disabled
+        ? control.backgroundColor === 'rgb(255, 255, 255)' ||
+            isLightReadonlyDisabledBackground(control.backgroundColor)
+        : control.backgroundColor === 'rgb(255, 255, 255)',
       `${scenarioName} 弹窗控件背景未统一为白底输入框: ${JSON.stringify(control)}`
     )
   })
@@ -7546,8 +7532,9 @@ function assertTradeLikeModalControls(metrics, scenarioName) {
     )
   })
 
-  const primaryButtons = visibleControls.filter((control) =>
-    control.className.includes('ant-btn-primary')
+  const primaryButtons = visibleControls.filter(
+    (control) =>
+      control.className.includes('ant-btn-primary') && !control.disabled
   )
   primaryButtons.forEach((control) => {
     assert(
@@ -7577,7 +7564,10 @@ function assertDarkModalControls(metrics, scenarioName) {
   )
   fieldControls.forEach((control) => {
     assert(
-      isDarkControlBackground(control.backgroundColor),
+      control.disabled
+        ? isDarkControlBackground(control.backgroundColor) ||
+            isDarkReadonlyDisabledBackground(control.backgroundColor)
+        : isDarkControlBackground(control.backgroundColor),
       `${scenarioName} 暗色弹窗控件未使用深色输入面: ${JSON.stringify(control)}`
     )
     assert(
@@ -7591,8 +7581,9 @@ function assertDarkModalControls(metrics, scenarioName) {
     )
   })
 
-  const primaryButtons = visibleControls.filter((control) =>
-    control.className.includes('ant-btn-primary')
+  const primaryButtons = visibleControls.filter(
+    (control) =>
+      control.className.includes('ant-btn-primary') && !control.disabled
   )
   primaryButtons.forEach((control) => {
     assert(
@@ -7664,6 +7655,36 @@ function isDarkControlBackground(color) {
   if (!match) return false
   const [, red, green, blue] = match.map(Number)
   return red <= 32 && green <= 44 && blue <= 64
+}
+
+function isDarkReadonlyDisabledBackground(color) {
+  const match = String(color || '').match(
+    /rgba\((\d+),\s*(\d+),\s*(\d+),\s*([.\d]+)\)/i
+  )
+  if (!match) return false
+  const [, red, green, blue, alpha] = match
+  return (
+    Number(red) >= 240 &&
+    Number(green) >= 240 &&
+    Number(blue) >= 240 &&
+    Number(alpha) > 0 &&
+    Number(alpha) <= 0.16
+  )
+}
+
+function isLightReadonlyDisabledBackground(color) {
+  const match = String(color || '').match(
+    /rgba\((\d+),\s*(\d+),\s*(\d+),\s*([.\d]+)\)/i
+  )
+  if (!match) return false
+  const [, red, green, blue, alpha] = match
+  return (
+    Number(red) <= 16 &&
+    Number(green) <= 16 &&
+    Number(blue) <= 16 &&
+    Number(alpha) > 0 &&
+    Number(alpha) <= 0.08
+  )
 }
 
 function isDarkNeutralBorderColor(color) {

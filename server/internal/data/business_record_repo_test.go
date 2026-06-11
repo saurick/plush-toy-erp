@@ -22,7 +22,7 @@ func mustCloseEntClient(t *testing.T, client interface{ Close() error }) {
 	}
 }
 
-func TestBusinessRecordRepo_CreateUpdateDeleteRestore(t *testing.T) {
+func TestBusinessRecordRepo_ArchiveListAndMutationDenied(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:business_record_repo?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
@@ -32,37 +32,30 @@ func TestBusinessRecordRepo_CreateUpdateDeleteRestore(t *testing.T) {
 		log.NewStdLogger(io.Discard),
 	)
 
-	documentNo := "PO-TEST-001"
 	supplierName := "联调供应商"
-	amount := 128.5
+	created, err := client.BusinessRecord.Create().
+		SetModuleKey("accessories-purchase").
+		SetDocumentNo("AP-ARCHIVE-001").
+		SetTitle("采购测试单").
+		SetBusinessStatusKey("project_pending").
+		SetOwnerRoleKey("purchase").
+		SetSupplierName(supplierName).
+		SetPayload(map[string]any{"scene": "archive-fixture"}).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create archive fixture failed: %v", err)
+	}
 	itemName := "测试辅料"
 	quantity := 3.0
-	created, err := repo.CreateBusinessRecord(ctx, &biz.BusinessRecordMutation{
-		ModuleKey:         "accessories-purchase",
-		DocumentNo:        &documentNo,
-		Title:             "采购测试单",
-		BusinessStatusKey: "procurement_preparing",
-		OwnerRoleKey:      "purchase",
-		SupplierName:      &supplierName,
-		Amount:            &amount,
-		Payload:           map[string]any{"scene": "repo-test"},
-		Items: []*biz.BusinessRecordItemMutation{
-			{
-				LineNo:   1,
-				ItemName: &itemName,
-				Quantity: &quantity,
-				Payload:  map[string]any{"line": "first"},
-			},
-		},
-	}, 7)
-	if err != nil {
-		t.Fatalf("create record failed: %v", err)
-	}
-	if created.ID <= 0 {
-		t.Fatalf("expected created id")
-	}
-	if created.RowVersion != 1 {
-		t.Fatalf("expected row_version 1, got %d", created.RowVersion)
+	if _, err := client.BusinessRecordItem.Create().
+		SetRecordID(created.ID).
+		SetModuleKey(created.ModuleKey).
+		SetLineNo(1).
+		SetItemName(itemName).
+		SetQuantity(quantity).
+		SetPayload(map[string]any{"line": "first"}).
+		Save(ctx); err != nil {
+		t.Fatalf("create archive item fixture failed: %v", err)
 	}
 
 	rows, total, err := repo.ListBusinessRecords(ctx, biz.BusinessRecordFilter{
@@ -80,91 +73,44 @@ func TestBusinessRecordRepo_CreateUpdateDeleteRestore(t *testing.T) {
 		t.Fatalf("expected one item, got %d", len(rows[0].Items))
 	}
 
-	newTitle := "采购测试单-已更新"
-	updated, err := repo.UpdateBusinessRecord(ctx, created.ID, &biz.BusinessRecordMutation{
-		ModuleKey:          "accessories-purchase",
-		DocumentNo:         &documentNo,
-		Title:              newTitle,
-		BusinessStatusKey:  "procurement_ordered",
-		OwnerRoleKey:       "purchase",
-		Payload:            map[string]any{"scene": "repo-test-updated"},
-		ExpectedRowVersion: created.RowVersion,
-	}, 8)
-	if err != nil {
-		t.Fatalf("update record failed: %v", err)
-	}
-	if updated.RowVersion != created.RowVersion+1 {
-		t.Fatalf("expected row_version increment, got %d", updated.RowVersion)
-	}
-	if updated.SupplierName != nil {
-		t.Fatalf("expected supplier_name cleared, got %q", *updated.SupplierName)
-	}
-	if updated.Amount != nil {
-		t.Fatalf("expected amount cleared, got %v", *updated.Amount)
-	}
-	if len(updated.Items) != 0 {
-		t.Fatalf("expected items replaced with empty slice, got %d", len(updated.Items))
+	documentNo := "AP-ARCHIVE-002"
+	_, err = repo.CreateBusinessRecord(ctx, &biz.BusinessRecordMutation{
+		ModuleKey:         "accessories-purchase",
+		DocumentNo:        &documentNo,
+		Title:             "采购测试单新增",
+		BusinessStatusKey: "project_pending",
+		OwnerRoleKey:      "purchase",
+		Payload:           map[string]any{},
+	}, 7)
+	if !errors.Is(err, biz.ErrBusinessRecordArchiveReadOnly) {
+		t.Fatalf("expected archive create denied, got %v", err)
 	}
 
 	_, err = repo.UpdateBusinessRecord(ctx, created.ID, &biz.BusinessRecordMutation{
-		ModuleKey:          "accessories-purchase",
-		DocumentNo:         &documentNo,
-		Title:              newTitle,
-		BusinessStatusKey:  "procurement_ordered",
-		OwnerRoleKey:       "purchase",
-		Payload:            map[string]any{},
-		ExpectedRowVersion: created.RowVersion,
+		ModuleKey:         "accessories-purchase",
+		DocumentNo:        &documentNo,
+		Title:             "采购测试单-已更新",
+		BusinessStatusKey: "project_pending",
+		OwnerRoleKey:      "purchase",
+		Payload:           map[string]any{},
 	}, 8)
-	if !errors.Is(err, biz.ErrBusinessRecordVersionConflict) {
-		t.Fatalf("expected version conflict, got %v", err)
+	if !errors.Is(err, biz.ErrBusinessRecordArchiveReadOnly) {
+		t.Fatalf("expected archive update denied, got %v", err)
 	}
 
 	affected, err := repo.DeleteBusinessRecords(ctx, []int{created.ID}, "repo test", 9)
-	if err != nil {
-		t.Fatalf("delete record failed: %v", err)
+	if !errors.Is(err, biz.ErrBusinessRecordArchiveReadOnly) {
+		t.Fatalf("expected archive delete denied, got %v", err)
 	}
-	if affected != 1 {
-		t.Fatalf("expected one deleted record, got %d", affected)
+	if affected != 0 {
+		t.Fatalf("expected no archive records deleted, got %d", affected)
 	}
-	_, total, err = repo.ListBusinessRecords(ctx, biz.BusinessRecordFilter{
-		ModuleKey: "accessories-purchase",
-		Limit:     20,
-	})
-	if err != nil {
-		t.Fatalf("list after delete failed: %v", err)
+	if _, err := client.BusinessRecord.UpdateOneID(created.ID).SetDeletedAt(time.Now()).Save(ctx); err != nil {
+		t.Fatalf("mark archive record deleted failed: %v", err)
 	}
-	if total != 0 {
-		t.Fatalf("expected deleted record hidden, got total=%d", total)
-	}
-	deletedRows, deletedTotal, err := repo.ListBusinessRecords(ctx, biz.BusinessRecordFilter{
-		ModuleKey:   "accessories-purchase",
-		DeletedOnly: true,
-		Limit:       20,
-	})
-	if err != nil {
-		t.Fatalf("list deleted records failed: %v", err)
-	}
-	if deletedTotal != 1 || len(deletedRows) != 1 {
-		t.Fatalf("expected one deleted record, total=%d len=%d", deletedTotal, len(deletedRows))
-	}
-	if deletedRows[0].DeletedAt == nil {
-		t.Fatalf("expected recycle query to return deleted record")
-	}
-
-	restored, err := repo.RestoreBusinessRecord(ctx, created.ID, 10)
-	if err != nil {
-		t.Fatalf("restore record failed: %v", err)
-	}
-	if restored.DeletedAt != nil {
-		t.Fatalf("expected deleted_at cleared")
-	}
-
-	events, err := client.BusinessRecordEvent.Query().All(ctx)
-	if err != nil {
-		t.Fatalf("query events failed: %v", err)
-	}
-	if len(events) != 4 {
-		t.Fatalf("expected 4 business record events, got %d", len(events))
+	_, err = repo.RestoreBusinessRecord(ctx, created.ID, 10)
+	if !errors.Is(err, biz.ErrBusinessRecordArchiveReadOnly) {
+		t.Fatalf("expected archive restore denied, got %v", err)
 	}
 }
 
@@ -228,9 +174,9 @@ func TestBusinessRecordRepo_RetiredModulesAreReadOnly(t *testing.T) {
 	}
 }
 
-func TestBusinessRecordRepo_CountBusinessRecordsByModuleAndStatus(t *testing.T) {
+func TestBusinessRecordRepo_ListRecordsByStatusKeys(t *testing.T) {
 	ctx := context.Background()
-	client := enttest.Open(t, dialect.SQLite, "file:business_record_repo_dashboard?mode=memory&cache=shared&_fk=1")
+	client := enttest.Open(t, dialect.SQLite, "file:business_record_repo_status_keys?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
 
 	repo := NewBusinessRecordRepo(
@@ -240,41 +186,24 @@ func TestBusinessRecordRepo_CountBusinessRecordsByModuleAndStatus(t *testing.T) 
 
 	createRecord := func(moduleKey string, title string, statusKey string) int {
 		t.Helper()
-		record, err := repo.CreateBusinessRecord(ctx, &biz.BusinessRecordMutation{
-			ModuleKey:         moduleKey,
-			Title:             title,
-			BusinessStatusKey: statusKey,
-			OwnerRoleKey:      "sales",
-		}, 7)
+		record, err := client.BusinessRecord.Create().
+			SetModuleKey(moduleKey).
+			SetTitle(title).
+			SetBusinessStatusKey(statusKey).
+			SetOwnerRoleKey("sales").
+			SetPayload(map[string]any{}).
+			Save(ctx)
 		if err != nil {
-			t.Fatalf("create %s failed: %v", title, err)
+			t.Fatalf("create %s fixture failed: %v", title, err)
 		}
 		return record.ID
 	}
 
 	createRecord("project-orders", "立项待确认", "project_pending")
 	createRecord("project-orders", "立项阻塞", "blocked")
-	deletedID := createRecord("accessories-purchase", "已删采购", "blocked")
-	if _, err := repo.DeleteBusinessRecords(ctx, []int{deletedID}, "dashboard test", 8); err != nil {
-		t.Fatalf("delete dashboard record failed: %v", err)
-	}
-
-	rows, err := repo.CountBusinessRecordsByModuleAndStatus(ctx)
-	if err != nil {
-		t.Fatalf("count dashboard stats failed: %v", err)
-	}
-	counts := map[string]int{}
-	for _, row := range rows {
-		counts[row.ModuleKey+"|"+row.BusinessStatusKey] = row.Count
-	}
-	if counts["project-orders|project_pending"] != 1 {
-		t.Fatalf("expected project pending count 1, got %d", counts["project-orders|project_pending"])
-	}
-	if counts["project-orders|blocked"] != 1 {
-		t.Fatalf("expected project blocked count 1, got %d", counts["project-orders|blocked"])
-	}
-	if counts["accessories-purchase|blocked"] != 0 {
-		t.Fatalf("deleted record should not be counted, got %d", counts["accessories-purchase|blocked"])
+	deletedID := createRecord("project-orders", "已删阻塞", "blocked")
+	if _, err := client.BusinessRecord.UpdateOneID(deletedID).SetDeletedAt(time.Now()).Save(ctx); err != nil {
+		t.Fatalf("mark deleted status fixture failed: %v", err)
 	}
 
 	filteredRows, total, err := repo.ListBusinessRecords(ctx, biz.BusinessRecordFilter{
@@ -302,14 +231,15 @@ func TestBusinessRecordRepo_ListRecordsByDateRange(t *testing.T) {
 
 	makeRecord := func(title string, documentDate string, dueDate string) {
 		t.Helper()
-		_, err := repo.CreateBusinessRecord(ctx, &biz.BusinessRecordMutation{
-			ModuleKey:         "project-orders",
-			Title:             title,
-			BusinessStatusKey: "project_pending",
-			OwnerRoleKey:      "sales",
-			DocumentDate:      &documentDate,
-			DueDate:           &dueDate,
-		}, 7)
+		_, err := client.BusinessRecord.Create().
+			SetModuleKey("project-orders").
+			SetTitle(title).
+			SetBusinessStatusKey("project_pending").
+			SetOwnerRoleKey("sales").
+			SetDocumentDate(documentDate).
+			SetDueDate(dueDate).
+			SetPayload(map[string]any{}).
+			Save(ctx)
 		if err != nil {
 			t.Fatalf("create %s failed: %v", title, err)
 		}
@@ -359,43 +289,46 @@ func TestBusinessRecordRepo_ListRecordsByPayloadAndItemPayload(t *testing.T) {
 
 	materialName := "长毛绒"
 	quantity := 120.0
-	if _, err := repo.CreateBusinessRecord(ctx, &biz.BusinessRecordMutation{
-		ModuleKey:         "material-bom",
-		Title:             "夜樱烬色 BOM",
-		BusinessStatusKey: "engineering_preparing",
-		OwnerRoleKey:      "purchase",
-		Payload: map[string]any{
+	record, err := client.BusinessRecord.Create().
+		SetModuleKey("material-bom").
+		SetTitle("夜樱烬色 BOM").
+		SetBusinessStatusKey("engineering_preparing").
+		SetOwnerRoleKey("purchase").
+		SetPayload(map[string]any{
 			"source_date":      "2026-01-19",
 			"designer_name":    "成慧怡",
 			"product_order_no": "SLO26029",
 			"color_card_ref":   "色卡 A",
-		},
-		Items: []*biz.BusinessRecordItemMutation{
-			{
-				LineNo:       1,
-				MaterialName: &materialName,
-				Quantity:     &quantity,
-				Payload: map[string]any{
-					"supplier_item_no":     "YS-001",
-					"assembly_part":        "耳朵",
-					"process_prepare_note": "激光加工",
-				},
-			},
-		},
-	}, 7); err != nil {
+		}).
+		Save(ctx)
+	if err != nil {
 		t.Fatalf("create payload record failed: %v", err)
 	}
-	if _, err := repo.CreateBusinessRecord(ctx, &biz.BusinessRecordMutation{
-		ModuleKey:         "material-bom",
-		Title:             "抱抱猴子 BOM",
-		BusinessStatusKey: "engineering_preparing",
-		OwnerRoleKey:      "purchase",
-		Payload: map[string]any{
+	if _, err := client.BusinessRecordItem.Create().
+		SetRecordID(record.ID).
+		SetModuleKey(record.ModuleKey).
+		SetLineNo(1).
+		SetMaterialName(materialName).
+		SetQuantity(quantity).
+		SetPayload(map[string]any{
+			"supplier_item_no":     "YS-001",
+			"assembly_part":        "耳朵",
+			"process_prepare_note": "激光加工",
+		}).
+		Save(ctx); err != nil {
+		t.Fatalf("create payload item fixture failed: %v", err)
+	}
+	if _, err := client.BusinessRecord.Create().
+		SetModuleKey("material-bom").
+		SetTitle("抱抱猴子 BOM").
+		SetBusinessStatusKey("engineering_preparing").
+		SetOwnerRoleKey("purchase").
+		SetPayload(map[string]any{
 			"source_date":      "2026-04-10",
 			"designer_name":    "成慧怡",
 			"product_order_no": "SLO26204",
-		},
-	}, 7); err != nil {
+		}).
+		Save(ctx); err != nil {
 		t.Fatalf("create second payload record failed: %v", err)
 	}
 

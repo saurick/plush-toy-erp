@@ -62,6 +62,18 @@ test('purchaseInboundFlow: 到货记录能生成 quality IQC 任务', () => {
   assert(task.payload.related_documents.some((item) => item.includes('供应商')))
 })
 
+test('MobileRoleTasksPage: 岗位任务完成不再回写 business_records 状态', () => {
+  assert.doesNotMatch(mobileRoleTasksPageSource, /updateBusinessRecord\s*\(/)
+  assert.doesNotMatch(
+    mobileRoleTasksPageSource,
+    /buildBusinessRecordStatusUpdateParams/
+  )
+  assert.match(
+    mobileRoleTasksPageSource,
+    /const updateBusinessRecordStatusForTask = async \(\) => null/
+  )
+})
+
 test('purchaseInboundFlow: IQC 合格能生成 warehouse 入库任务', () => {
   const iqcTask = buildIqcTaskFromArrivalRecord(arrivalRecord(), {
     nowMs: NOW_MS,

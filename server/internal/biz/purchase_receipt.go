@@ -62,6 +62,13 @@ type PurchaseReceiptItemCreate struct {
 	Note         *string
 }
 
+type PurchaseReceiptFilter struct {
+	Status  string
+	Keyword string
+	Limit   int
+	Offset  int
+}
+
 func (uc *InventoryUsecase) CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -103,6 +110,17 @@ func (uc *InventoryUsecase) GetPurchaseReceipt(ctx context.Context, id int) (*Pu
 		return nil, ErrBadParam
 	}
 	return uc.repo.GetPurchaseReceipt(ctx, id)
+}
+
+func (uc *InventoryUsecase) ListPurchaseReceipts(ctx context.Context, filter PurchaseReceiptFilter) ([]*PurchaseReceipt, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizePurchaseReceiptFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListPurchaseReceipts(ctx, normalized)
 }
 
 func IsValidPurchaseReceiptStatus(value string) bool {
@@ -153,6 +171,21 @@ func normalizePurchaseReceiptItemCreate(in PurchaseReceiptItemCreate) (PurchaseR
 		in.UnitID <= 0 ||
 		in.Quantity.Cmp(decimal.Zero) <= 0 {
 		return PurchaseReceiptItemCreate{}, ErrBadParam
+	}
+	return in, nil
+}
+
+func normalizePurchaseReceiptFilter(in PurchaseReceiptFilter) (PurchaseReceiptFilter, error) {
+	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.Status != "" && !IsValidPurchaseReceiptStatus(in.Status) {
+		return PurchaseReceiptFilter{}, ErrBadParam
+	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+	if in.Offset < 0 {
+		in.Offset = 0
 	}
 	return in, nil
 }

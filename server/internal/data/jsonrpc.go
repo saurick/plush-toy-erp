@@ -39,6 +39,7 @@ type JsonrpcData struct {
 	debugUC       *biz.DebugUsecase
 	masterDataUC  *biz.MasterDataUsecase
 	salesOrderUC  *biz.SalesOrderUsecase
+	inventoryUC   *biz.InventoryUsecase
 	phase8UC      *biz.Phase8Usecase
 	authSMS       authSMSRuntimeConfig
 
@@ -91,6 +92,7 @@ func NewJsonrpcData(
 	debugUC := biz.NewDebugUsecase(NewDebugSeedRepo(data, logger), newDebugSafetyConfig(c))
 	masterDataUC := biz.NewMasterDataUsecase(NewMasterDataRepo(data, logger))
 	salesOrderUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
+	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
 	phase8UC := biz.NewPhase8Usecase(NewPhase8Repo(data, logger))
 	authSMS := newAuthSMSRuntimeConfig(c)
 
@@ -109,6 +111,7 @@ func NewJsonrpcData(
 		debugUC:       debugUC,
 		masterDataUC:  masterDataUC,
 		salesOrderUC:  salesOrderUC,
+		inventoryUC:   inventoryUC,
 		phase8UC:      phase8UC,
 		authSMS:       authSMS,
 		adminReader:   adminAuthRepo,
@@ -158,6 +161,8 @@ func (d *JsonrpcData) Handle(
 		return d.handleMasterData(ctx, method, id, params)
 	case "sales_order":
 		return d.handleSalesOrder(ctx, method, id, params)
+	case "purchase":
+		return d.handlePurchase(ctx, method, id, params)
 	case "phase8":
 		return d.handlePhase8(ctx, method, id, params)
 	case "debug":

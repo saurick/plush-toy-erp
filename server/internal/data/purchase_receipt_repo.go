@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 
 	"entgo.io/ent/dialect"
@@ -263,6 +264,40 @@ func (r *inventoryRepo) GetPurchaseReceipt(ctx context.Context, id int) (*biz.Pu
 		return nil, err
 	}
 	return purchaseReceiptWithItems(ctx, r.data.postgres, receipt)
+}
+
+func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.PurchaseReceiptFilter) ([]*biz.PurchaseReceipt, int, error) {
+	query := r.data.postgres.PurchaseReceipt.Query()
+	if filter.Status != "" {
+		query = query.Where(purchasereceipt.Status(filter.Status))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(purchasereceipt.Or(
+			purchasereceipt.ReceiptNoContainsFold(filter.Keyword),
+			purchasereceipt.SupplierNameContainsFold(filter.Keyword),
+		))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.
+		Order(ent.Desc(purchasereceipt.FieldReceivedAt), ent.Desc(purchasereceipt.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.PurchaseReceipt, 0, len(rows))
+	for _, row := range rows {
+		item, err := purchaseReceiptWithItems(ctx, r.data.postgres, row)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, item)
+	}
+	return out, total, nil
 }
 
 func (r *inventoryRepo) applyInventoryTxnAndUpdateBalanceInTx(ctx context.Context, tx *inventoryDBTx, in *biz.InventoryTxnCreate) (*biz.InventoryTxnApplyResult, error) {

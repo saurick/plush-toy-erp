@@ -64,50 +64,72 @@ func TestNormalizeBusinessRecordFilterAllowsPayloadDateFields(t *testing.T) {
 	}
 }
 
-func TestBusinessRecordUsecaseRejectsRetiredModuleWrites(t *testing.T) {
+func TestBusinessRecordUsecaseTreatsArchiveAsReadOnly(t *testing.T) {
 	ctx := context.Background()
-	uc := NewBusinessRecordUsecase(&businessRecordRepoSpy{})
 
-	for _, moduleKey := range []string{"partners", "project-orders"} {
+	for _, moduleKey := range ListBusinessRecordModuleKeys() {
 		t.Run("create_"+moduleKey, func(t *testing.T) {
+			repo := &businessRecordRepoSpy{}
+			uc := NewBusinessRecordUsecase(repo)
 			_, err := uc.CreateRecord(ctx, &BusinessRecordMutation{
 				ModuleKey:         moduleKey,
-				Title:             "旧入口写入",
+				Title:             "archive 写入",
 				BusinessStatusKey: "project_pending",
 				OwnerRoleKey:      "sales",
 				Payload:           map[string]any{},
 			}, 1)
-			if !errors.Is(err, ErrBusinessRecordModuleRetired) {
-				t.Fatalf("expected retired module error, got %v", err)
+			if !errors.Is(err, ErrBusinessRecordArchiveReadOnly) {
+				t.Fatalf("expected archive read-only error, got %v", err)
+			}
+			if repo.createCalled {
+				t.Fatalf("archive write should not call repo create")
 			}
 		})
 
 		t.Run("update_"+moduleKey, func(t *testing.T) {
+			repo := &businessRecordRepoSpy{}
+			uc := NewBusinessRecordUsecase(repo)
 			_, err := uc.UpdateRecord(ctx, 1, &BusinessRecordMutation{
 				ModuleKey:         moduleKey,
-				Title:             "旧入口更新",
+				Title:             "archive 更新",
 				BusinessStatusKey: "project_pending",
 				OwnerRoleKey:      "sales",
 				Payload:           map[string]any{},
 			}, 1)
-			if !errors.Is(err, ErrBusinessRecordModuleRetired) {
-				t.Fatalf("expected retired module error, got %v", err)
+			if !errors.Is(err, ErrBusinessRecordArchiveReadOnly) {
+				t.Fatalf("expected archive read-only error, got %v", err)
+			}
+			if repo.updateCalled {
+				t.Fatalf("archive write should not call repo update")
 			}
 		})
+	}
+
+	repo := &businessRecordRepoSpy{}
+	uc := NewBusinessRecordUsecase(repo)
+	if _, err := uc.DeleteRecords(ctx, []int{1}, "archive cleanup", 1); !errors.Is(err, ErrBusinessRecordArchiveReadOnly) {
+		t.Fatalf("expected archive read-only delete error, got %v", err)
+	}
+	if repo.deleteCalled {
+		t.Fatalf("archive write should not call repo delete")
+	}
+	if _, err := uc.RestoreRecord(ctx, 1, 1); !errors.Is(err, ErrBusinessRecordArchiveReadOnly) {
+		t.Fatalf("expected archive read-only restore error, got %v", err)
+	}
+	if repo.restoreCalled {
+		t.Fatalf("archive write should not call repo restore")
 	}
 }
 
 type businessRecordRepoSpy struct {
-	createCalled bool
-	updateCalled bool
+	createCalled  bool
+	updateCalled  bool
+	deleteCalled  bool
+	restoreCalled bool
 }
 
 func (r *businessRecordRepoSpy) ListBusinessRecords(context.Context, BusinessRecordFilter) ([]*BusinessRecord, int, error) {
 	return nil, 0, nil
-}
-
-func (r *businessRecordRepoSpy) CountBusinessRecordsByModuleAndStatus(context.Context) ([]BusinessRecordModuleStatusCount, error) {
-	return nil, nil
 }
 
 func (r *businessRecordRepoSpy) CreateBusinessRecord(context.Context, *BusinessRecordMutation, int) (*BusinessRecord, error) {
@@ -121,9 +143,11 @@ func (r *businessRecordRepoSpy) UpdateBusinessRecord(context.Context, int, *Busi
 }
 
 func (r *businessRecordRepoSpy) DeleteBusinessRecords(context.Context, []int, string, int) (int, error) {
+	r.deleteCalled = true
 	return 0, nil
 }
 
 func (r *businessRecordRepoSpy) RestoreBusinessRecord(context.Context, int, int) (*BusinessRecord, error) {
+	r.restoreCalled = true
 	return &BusinessRecord{}, nil
 }

@@ -267,7 +267,7 @@ MVP 原则：
 * 客户菜单配置。
 * 后端动作权限。
 * 业务帮助文档。
-* 旧 `business_records` 重叠入口删除、隐藏或退出正式写路径；已由 V1 承接的旧路径不再保留产品内路由、重定向或权限别名，普通 `business` API 已冻结 `partners / project-orders` 写操作。
+* 旧 `business_records` 重叠入口删除、隐藏或退出正式写路径；已由 V1 承接的旧路径不再保留产品内路由、重定向或权限别名，普通 `business` API 已全量冻结 `business_records` create / update / delete / restore。
 * 旧数据是否迁移、保留或只作为审计线索。
 
 不做：

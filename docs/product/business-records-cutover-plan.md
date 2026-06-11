@@ -1,23 +1,23 @@
 Doc Type / 文档类型: Business Records Cutover Plan / business_records 切换计划
-Status / 状态: Draft Plan / 草案计划
-Runtime Implemented / 运行时已实现: Partial / 部分
+Status / 状态: Active Cutover Boundary / 当前切换边界
+Runtime Implemented / 运行时已实现: Yes / 是
 Ent Schema Implemented / Ent Schema 已实现: No / 否
 Migration Implemented / Migration 已实现: No / 否
 Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 业务记录切换计划 / business_records Cutover Plan
 
-本计划只设计 `business_records` 兼容层的分阶段切换，不执行切换、迁移、删除或双写。
+本计划记录 `business_records` 兼容层的切换边界。当前开发期已经选择破坏兼容：普通业务 API 写入全量冻结，历史表只作为 legacy/archive 查询层保留；本文仍不执行旧数据迁移、物理删除或 backfill。
 
 ## Stage 0: 当前状态
 
 当前状态：
 
-- `business_records` 继续存在。
+- `business_records` 继续存在，但普通业务写入口已经冻结为只读 archive。
 - V1 正式模型已具备 schema、migration、repo/usecase、API/RBAC 和 UI。
-- `business_records` 仍可能承载 demo、source snapshot、seed、debug、旧测试和其他尚未退出的通用模块。
+- `business_records` 只允许承载 legacy/archive 查询、source snapshot、seed/debug 显式夹具和旧数据审计，不再承接正式业务写入。
 - V1 页面已存在，桌面正式菜单、dashboard、前后端菜单权限已切到 `客户档案`、`供应商档案`、`销售订单`。
-- 旧 `partners / project-orders` 路径不再承载旧通用业务页、旧路径重定向或权限别名；普通 `business` JSON-RPC 已冻结这两个模块的 create / update / delete / restore；其他旧模块和旧数据迁移 / 归档仍未处理。
+- 旧 `partners / project-orders` 路径不再承载旧通用业务页、旧路径重定向或权限别名；普通 `business` JSON-RPC 已冻结全部模块的 create / update / delete / restore；旧数据迁移、物理删除和客户库清理仍未处理。
 
 ## 真实库统计与清理 / Live DB Audit + Cleanup 2026-06-08
 
@@ -41,7 +41,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 保持边界：
 
 - 不删除 `business_records`。
-- 不删除 `business_records` 表、schema 或通用 API；当前只冻结已被 V1 替代的旧模块写操作。
+- 不删除 `business_records` 表、schema 或 legacy/archive 查询 API；当前冻结全部普通业务写操作。
 - 不做 V1 数据迁移或 backfill。
 - 不从旧记录生成库存、出货或财务事实。
 
@@ -57,7 +57,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 目标：
 
 - 新 V1 页面作为正式客户、供应商、联系人和销售订单入口。
-- `business_records` 相关重叠入口不得继续新增核心功能。
+- `business_records` 相关入口不得继续新增核心功能，也不得继续作为临时正式写入落点。
 - 不做自动迁移。
 - 不删除旧数据。
 
@@ -66,7 +66,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 项目 | 规则 |
 |---|---|
 | 正式写入 | V1 MasterData / SalesOrder usecase |
-| 旧入口 | `partners / project-orders` 不作为旧入口保留，也不保留旧路径重定向或权限别名；普通业务 API 不允许继续写这两个旧模块；其他旧入口按各自领域后续评审 |
+| 旧入口 | 普通业务 API 不允许继续写任何 `business_records` 模块；旧页面只能作为 legacy/archive 查询、字段口径参考或打印带值候选，运行时已禁用新建、保存、流转、删除、恢复、手工创建协同任务和从 archive 记录继续派生旧链路动作 |
 | 数据关系 | 旧记录只作为 source snapshot，不作为 V1 父表 |
 | 禁止 | 同一业务动作同时写 V1 和 `business_records` |
 
@@ -80,7 +80,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 目标：
 
-- `partners / project-orders` 旧路径已退出旧通用业务页，且不再保留产品内重定向或权限别名；普通业务 API 已拒绝这两个旧模块的 create / update / delete / restore；其他重叠领域按后续评审转为只读、demo 或直接退出。
+- `business_records` 旧通用写路径已整体退出；普通业务 API 已拒绝全部模块的 create / update / delete / restore；其他重叠领域按后续评审转为领域表、只读、demo 或直接退出。
 - seed / demo 数据明确标记。
 - 用户操作引导到 V1 页面。
 
@@ -159,17 +159,16 @@ dry-run 输出：
 
 目标：
 
-- 只在引用清零、数据完成迁移、客户确认后执行。
-- 保留历史查询或归档方案。
+- 当前开发期已提前执行运行时 archive 边界，保留历史查询。
 - 不让旧入口继续被误认为正式入口。
+- 旧数据迁移、物理删除和客户库清理仍需另开任务。
 
-deprecated 条件：
+当前已生效：
 
-- UI 写入口已经关闭。
-- seedData / Dashboard / mobile / tests 不再依赖旧写入。
-- debug seed 和 QA 已有替代或明确保留 demo 边界。
-- 历史数据归档查看可用。
-- 客户确认不再使用旧入口新增正式记录。
+- 普通 `business` JSON-RPC `create_record / update_record / delete_records / restore_record` 全量拒绝。
+- 内置角色不再默认授予 `business.record.create / business.record.update`。
+- 业务看板 `dashboard_stats` 只读领域 usecase 投影，不读 `business_records`。
+- debug seed 和 cleanup 保留显式 debug 边界，不能升级为正式业务写入口。
 
 archive / delete 条件：
 
@@ -183,5 +182,5 @@ archive / delete 条件：
 | 下一步 | 为什么 |
 |---|---|
 | yoyoosun customer import dry-run / strategy | 先基于本 data map 做 dry-run/import 设计，分类 永绅 yoyoosun 样本字段 |
-| business_records migration / archive decision | 正式菜单、Dashboard 和菜单权限已指向 V1 入口，`partners / project-orders` 旧路径不再保留产品内路由、重定向或权限别名，普通业务 API 已冻结旧模块写入；下一步应单独评审旧数据迁移、归档或删除边界 |
+| business_records migration / archive decision | 正式菜单、Dashboard 和菜单权限已指向领域入口，`business_records` 普通业务写入口已整体冻结；下一步应单独评审旧数据迁移、物理归档或删除边界 |
 | customer menu config review | 在正式入口基础上继续评审客户菜单配置，不把客户菜单开关当 RBAC 或事实规则 |

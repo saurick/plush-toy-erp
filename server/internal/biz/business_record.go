@@ -11,7 +11,8 @@ var (
 	ErrBusinessRecordNotFound        = errors.New("business record not found")
 	ErrBusinessRecordExists          = errors.New("business record already exists")
 	ErrBusinessRecordVersionConflict = errors.New("business record version conflict")
-	ErrBusinessRecordModuleRetired   = errors.New("business record module retired")
+	ErrBusinessRecordArchiveReadOnly = errors.New("business record archive is read-only")
+	ErrBusinessRecordModuleRetired   = ErrBusinessRecordArchiveReadOnly
 )
 
 var businessRecordModuleKeyOrder = []string{
@@ -58,11 +59,6 @@ var businessRecordModulePrefixes = map[string]string{
 
 var businessRecordModuleSet = buildBusinessRecordModuleSet()
 
-var retiredBusinessRecordModuleSet = map[string]struct{}{
-	"partners":       {},
-	"project-orders": {},
-}
-
 func buildBusinessRecordModuleSet() map[string]struct{} {
 	out := make(map[string]struct{}, len(businessRecordModulePrefixes))
 	for key := range businessRecordModulePrefixes {
@@ -77,8 +73,7 @@ func IsValidBusinessRecordModule(key string) bool {
 }
 
 func IsRetiredBusinessRecordModule(key string) bool {
-	_, ok := retiredBusinessRecordModuleSet[strings.TrimSpace(key)]
-	return ok
+	return IsValidBusinessRecordModule(key)
 }
 
 func ListBusinessRecordModuleKeys() []string {
@@ -199,12 +194,6 @@ type BusinessRecordItemMutation struct {
 	Payload           map[string]any
 }
 
-type BusinessRecordModuleStatusCount struct {
-	ModuleKey         string
-	BusinessStatusKey string
-	Count             int
-}
-
 type BusinessDashboardModuleStats struct {
 	ModuleKey    string
 	TotalRecords int
@@ -213,7 +202,6 @@ type BusinessDashboardModuleStats struct {
 
 type BusinessRecordRepo interface {
 	ListBusinessRecords(ctx context.Context, filter BusinessRecordFilter) ([]*BusinessRecord, int, error)
-	CountBusinessRecordsByModuleAndStatus(ctx context.Context) ([]BusinessRecordModuleStatusCount, error)
 	CreateBusinessRecord(ctx context.Context, in *BusinessRecordMutation, actorID int) (*BusinessRecord, error)
 	UpdateBusinessRecord(ctx context.Context, id int, in *BusinessRecordMutation, actorID int) (*BusinessRecord, error)
 	DeleteBusinessRecords(ctx context.Context, ids []int, deleteReason string, actorID int) (int, error)
@@ -239,75 +227,26 @@ func (uc *BusinessRecordUsecase) ListRecords(ctx context.Context, filter Busines
 	return uc.repo.ListBusinessRecords(ctx, filter)
 }
 
-func (uc *BusinessRecordUsecase) DashboardStats(ctx context.Context) ([]BusinessDashboardModuleStats, error) {
-	if uc == nil || uc.repo == nil {
-		return nil, ErrBadParam
-	}
-	rows, err := uc.repo.CountBusinessRecordsByModuleAndStatus(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	statsByModule := make(map[string]*BusinessDashboardModuleStats, len(businessRecordModuleKeyOrder))
-	for _, moduleKey := range businessRecordModuleKeyOrder {
-		statsByModule[moduleKey] = &BusinessDashboardModuleStats{
-			ModuleKey:    moduleKey,
-			StatusCounts: map[string]int{},
-		}
-	}
-	for _, row := range rows {
-		moduleKey := strings.TrimSpace(row.ModuleKey)
-		statusKey := strings.TrimSpace(row.BusinessStatusKey)
-		if row.Count <= 0 || !IsValidBusinessRecordModule(moduleKey) || statusKey == "" {
-			continue
-		}
-		stats := statsByModule[moduleKey]
-		stats.TotalRecords += row.Count
-		stats.StatusCounts[statusKey] += row.Count
-	}
-
-	out := make([]BusinessDashboardModuleStats, 0, len(businessRecordModuleKeyOrder))
-	for _, moduleKey := range businessRecordModuleKeyOrder {
-		stats := statsByModule[moduleKey]
-		statusCounts := make(map[string]int, len(stats.StatusCounts))
-		for key, count := range stats.StatusCounts {
-			statusCounts[key] = count
-		}
-		out = append(out, BusinessDashboardModuleStats{
-			ModuleKey:    stats.ModuleKey,
-			TotalRecords: stats.TotalRecords,
-			StatusCounts: statusCounts,
-		})
-	}
-	return out, nil
-}
-
 func (uc *BusinessRecordUsecase) CreateRecord(ctx context.Context, in *BusinessRecordMutation, actorID int) (*BusinessRecord, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
-	normalized, err := normalizeBusinessRecordMutation(*in, true)
+	_, err := normalizeBusinessRecordMutation(*in, true)
 	if err != nil {
 		return nil, err
 	}
-	if IsRetiredBusinessRecordModule(normalized.ModuleKey) {
-		return nil, ErrBusinessRecordModuleRetired
-	}
-	return uc.repo.CreateBusinessRecord(ctx, &normalized, actorID)
+	return nil, ErrBusinessRecordArchiveReadOnly
 }
 
 func (uc *BusinessRecordUsecase) UpdateRecord(ctx context.Context, id int, in *BusinessRecordMutation, actorID int) (*BusinessRecord, error) {
 	if uc == nil || uc.repo == nil || in == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
-	normalized, err := normalizeBusinessRecordMutation(*in, false)
+	_, err := normalizeBusinessRecordMutation(*in, false)
 	if err != nil {
 		return nil, err
 	}
-	if IsRetiredBusinessRecordModule(normalized.ModuleKey) {
-		return nil, ErrBusinessRecordModuleRetired
-	}
-	return uc.repo.UpdateBusinessRecord(ctx, id, &normalized, actorID)
+	return nil, ErrBusinessRecordArchiveReadOnly
 }
 
 func (uc *BusinessRecordUsecase) DeleteRecords(ctx context.Context, ids []int, deleteReason string, actorID int) (int, error) {
@@ -318,14 +257,14 @@ func (uc *BusinessRecordUsecase) DeleteRecords(ctx context.Context, ids []int, d
 	if len(normalizedIDs) == 0 {
 		return 0, ErrBadParam
 	}
-	return uc.repo.DeleteBusinessRecords(ctx, normalizedIDs, strings.TrimSpace(deleteReason), actorID)
+	return 0, ErrBusinessRecordArchiveReadOnly
 }
 
 func (uc *BusinessRecordUsecase) RestoreRecord(ctx context.Context, id int, actorID int) (*BusinessRecord, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
-	return uc.repo.RestoreBusinessRecord(ctx, id, actorID)
+	return nil, ErrBusinessRecordArchiveReadOnly
 }
 
 func normalizeBusinessRecordFilter(filter BusinessRecordFilter) BusinessRecordFilter {

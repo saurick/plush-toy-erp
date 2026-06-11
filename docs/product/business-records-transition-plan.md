@@ -68,7 +68,7 @@ business_records 不能长期替代正式 customers / suppliers / sales_orders /
 
 ## products 页面过渡
 
-现有 `products` Ent schema 已是成品主数据真源。products 页面如果仍通过 `business_records` 保存，只能作为兼容 / source snapshot：
+现有 `products` Ent schema 已是成品主数据真源。products 旧页面如仍读取 `business_records`，只能作为兼容 / source snapshot，不再通过普通业务 API 保存：
 
 1. 不得新增与 existing `products` schema 语义重复的第二套 Product Core 表。
 2. 新正式产品能力应复用 existing `products`。
@@ -104,9 +104,9 @@ business_records 不能长期替代正式 customers / suppliers / sales_orders /
 - 通用产品规则。
 - 核心状态机规则。
 
-## 停止给 business_records 增加新核心能力的时机
+## 停止给 business_records 增加新核心能力
 
-当某个 overlapping domain 的正式模型完成以下条件后，应停止继续在 `business_records` 新增该领域核心业务能力：
+当前已经停止继续在 `business_records` 新增核心能力，并且普通 `business` API 写入已整体冻结。下面条件只保留为历史上判断某个 overlapping domain 是否具备退出条件的审计清单：
 
 1. Ent schema + migration 已落地。
 2. repo/usecase 有状态机、幂等、审计和测试。

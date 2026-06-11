@@ -30,13 +30,7 @@ import {
   upsertWorkflowBusinessState,
   urgeWorkflowTask,
 } from '../../api/workflowApi.mjs'
-import {
-  listBusinessRecords,
-  updateBusinessRecord,
-} from '../../api/businessRecordApi.mjs'
-import { getBusinessModule } from '../../config/businessModules.mjs'
-import { getBusinessRecordDefinition } from '../../config/businessRecordDefinitions.mjs'
-import { buildBusinessRecordStatusUpdateParams } from '../../utils/businessRecordForm.mjs'
+import { listBusinessRecords } from '../../api/businessRecordApi.mjs'
 import {
   buildMobileTaskListForRole,
   buildMobileTaskSummary,
@@ -111,7 +105,6 @@ import {
 import { mobileTheme } from '../theme'
 
 const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
-
 const MOBILE_ROLE_LABELS = {
   boss: '老板',
   business: '业务',
@@ -748,29 +741,7 @@ export default function MobileRoleTasksPage() {
     )
   }
 
-  const updateBusinessRecordStatusForTask = async (
-    task,
-    record,
-    nextStatusKey,
-    reason
-  ) => {
-    const sourceType = String(task.source_type || '').trim()
-    const moduleItem = getBusinessModule(sourceType) || {
-      key: sourceType,
-      title: sourceType,
-      sectionKey: '',
-    }
-    const definition = getBusinessRecordDefinition(sourceType) || {}
-    const params = buildBusinessRecordStatusUpdateParams(
-      record,
-      nextStatusKey,
-      moduleItem,
-      definition,
-      { reason }
-    )
-    if (!params) return null
-    return updateBusinessRecord(params)
-  }
+  const updateBusinessRecordStatusForTask = async () => null
 
   const hasActiveTaskForSource = async (task, taskGroup) => {
     const data = await listWorkflowTasks({

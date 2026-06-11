@@ -272,6 +272,7 @@ type InventoryRepo interface {
 	PostPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
 	CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
 	GetPurchaseReceipt(ctx context.Context, id int) (*PurchaseReceipt, error)
+	ListPurchaseReceipts(ctx context.Context, filter PurchaseReceiptFilter) ([]*PurchaseReceipt, int, error)
 	CreatePurchaseReturnDraft(ctx context.Context, in *PurchaseReturnCreate) (*PurchaseReturn, error)
 	AddPurchaseReturnItem(ctx context.Context, in *PurchaseReturnItemCreate) (*PurchaseReturnItem, error)
 	PostPurchaseReturn(ctx context.Context, returnID int) (*PurchaseReturn, error)

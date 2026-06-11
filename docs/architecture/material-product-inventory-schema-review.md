@@ -1,6 +1,8 @@
 # 材料、成品、BOM 与库存专表 Schema 评审
 
-> 结论：本轮只做设计评审，不改 Ent schema，不生成 migration。当前 `business_records / business_record_items` 继续作为通用单据快照和 v1 流程兼容层；后续库存流水、库存余额和财务事实不能长期依赖通用快照，必须逐步收口到专表。
+> 当前状态：本文是早期 schema 评审记录。`business_records / business_record_items` 普通业务写入口已冻结为 legacy/archive 只读；当前实现真源以 `docs/current-source-of-truth.md`、领域 usecase、Ent schema 和测试为准。
+
+> 旧结论：本轮只做设计评审，不改 Ent schema，不生成 migration。后续库存流水、库存余额和财务事实不能长期依赖通用快照，必须逐步收口到专表。
 
 ## 1. 评审依据
 
@@ -8,7 +10,7 @@
 
 | 类型 | 文件 / 范围 | 关键结论 |
 | --- | --- | --- |
-| 当前真源 | `docs/current-source-of-truth.md` | 当前业务保存层真源是 `business_records`、`business_record_items`、`business_record_events`、`workflow_tasks`、`workflow_task_events`、`workflow_business_states`；后续专表继续按真实样本和 Ent + Atlas 推进。 |
+| 当前真源 | `docs/current-source-of-truth.md` | 当前正式写入必须走领域 usecase 和领域表；`business_records` 只保留 legacy/archive 查询、source snapshot 和 debug/seed 显式夹具边界。 |
 | 已有行业表评审 | `docs/architecture/industry-schema-review.md` | 不建议一次性拆完整 ERP；应先评审强一致瓶颈表，尤其库存流水 / 余额和财务明细。 |
 | 通用单据 schema | `server/internal/data/model/schema/business_record*.go` | 表头和明细主要是字符串、`payload` 和 `float`，适合通用快照，不适合长期承接库存数量、金额和强约束事实。 |
 | workflow schema | `server/internal/data/model/schema/workflow_*.go` | `workflow_tasks` 与 `workflow_business_states` 通过 `source_type/source_id` 关联业务来源，当前多数来源仍指向通用业务记录。 |
@@ -21,9 +23,9 @@
 | --- | --- | --- | --- |
 | `admin_users` | 后台管理员、超级管理员标记和 ERP 偏好；角色与权限由 RBAC 关联表承接 | 否，账号真源 | 不参与材料、BOM 和库存事实建模。 |
 | `users` | 普通用户账号基线 | 否，账号真源 | 当前与行业专表无直接关系。 |
-| `business_records` | v1 通用业务单据表头，保存模块、单据号、标题、业务状态、角色、客户 / 供应商 / 产品 / 材料 / 仓库等快照字段和 `payload` | 是 v1 通用单据快照真源，不是长期库存 / 财务事实真源 | 专表落地后继续保留为单据快照、打印 / 调试兼容层，可通过 `payload` 或后续映射字段关联专表 ID。 |
-| `business_record_items` | v1 通用业务单据明细，保存材料 / 规格 / 单位 / 数量 / 单价 / 金额等快照字段和 `payload` | 是 v1 明细快照真源，不是长期 BOM / 库存事实真源 | 专表落地后可作为历史明细快照和回补来源；不能直接替代 BOM 行、库存流水行或财务核销行。 |
-| `business_record_events` | 通用单据创建、更新、删除、恢复和 debug seed / cleanup 等事件 | 是通用单据审计事件，不是库存流水 | 继续记录单据层事件；库存增减必须进入 `inventory_txns`。 |
+| `business_records` | legacy/archive 表头，保存旧模块、单据号、标题、业务状态、角色、客户 / 供应商 / 产品 / 材料 / 仓库等历史快照字段和 `payload` | 否；只读历史快照，不是当前正式业务事实真源 | 专表落地后继续保留为历史快照、打印取值候选和调试兼容层；普通业务写入已冻结，正式能力必须走领域表。 |
+| `business_record_items` | legacy/archive 明细，保存材料 / 规格 / 单位 / 数量 / 单价 / 金额等历史快照字段和 `payload` | 否；只读历史明细快照，不是长期 BOM / 库存事实真源 | 专表落地后可作为历史明细快照和回补来源；不能直接替代 BOM 行、库存流水行或财务核销行。 |
+| `business_record_events` | 旧通用单据创建、更新、删除、恢复和 debug seed / cleanup 等历史事件 | 否；是 archive 审计线索，不是库存流水 | 只保留历史审计价值；库存增减必须进入 `inventory_txns`。 |
 | `workflow_tasks` | 协同任务、责任角色、任务状态、来源对象、催办和处理 payload | 是任务事实 | 后续 `source_type/source_id` 可逐步从通用单据迁到专表，但不应一次性迁移全部入口。 |
 | `workflow_task_events` | 任务创建、状态变化、催办、升级等事件 | 是任务事件事实 | 继续作为 workflow 审计；不替代库存、财务和质量事实流水。 |
 | `workflow_business_states` | 每个业务来源当前业务状态快照，唯一键是 `source_type + source_id` | 是业务状态快照，不是业务对象本身 | 后续可指向专表对象，也可在兼容期继续指向 `business_records`。 |
@@ -34,7 +36,7 @@
 | 层 | 职责 | 不承担 |
 | --- | --- | --- |
 | workflow 表 | 任务、任务事件、当前业务状态和催办 / 阻塞协同 | 不保存库存真实数量，不做财务核销，不替代 BOM 版本。 |
-| `business_records / business_record_items` | 通用单据快照、v1 表格 / 弹窗保存、打印取值和调试验收 | 不长期承接材料主档、成品主档、库存流水、库存余额、BOM 强版本和财务强事实。 |
+| `business_records / business_record_items` | legacy/archive 查询、历史快照、打印取值候选和显式 debug fixture | 不承接正式业务写入、材料主档、成品主档、库存流水、库存余额、BOM 强版本和财务强事实。 |
 | 后续专表 | 材料、成品、BOM、库存流水、库存余额、预留和后续财务核销等强约束事实 | 不替代通用单据快照的兼容价值，不一次性覆盖完整 ERP。 |
 
 ## 3. 第一批候选专表总览
@@ -53,7 +55,7 @@
 | `warehouses` | 仓库主档，区分原料仓、辅料仓、半成品仓、成品仓、委外在途等 | `warehouse_code`、`name`、`warehouse_type`、`status`、`manager_role_key`、`payload`、`deleted_at` | `id bigint` | `warehouse_code`；`name` 未删除范围内唯一 | `warehouse_type`；`status` | 否，主数据 | 允许软删除；有库存余额或流水时只停用 | `business_records.warehouse_location` 是文本快照；后续库存事实必须引用 `warehouse_id` | P1 |
 | `warehouse_locations` | 库位 / 区位 / 货架，支持仓库内精细定位 | `warehouse_id`、`location_code`、`name`、`parent_id`、`location_type`、`status`、`deleted_at` | `id bigint` | `warehouse_id + location_code` | `warehouse_id`；`parent_id`；`status` | 否，主数据 | 允许软删除；有余额时只停用 | 通用记录中的库位文本不反向覆盖库位主档；可作为历史快照显示 | P2，复杂库位未稳定前可先建默认库位 |
 | `inventory_lots` | 批次 / 批号 / 质量状态载体，连接入库批次、供应商批号和成品批次 | `lot_no`、`item_type`、`material_id`、`product_id`、`supplier_id`、`quality_status`、`source_type`、`source_id`、`source_line_id`、`received_at`、`payload` | `id bigint` | `item_type + item_id + lot_no`；必要时 `source_type + source_id + source_line_id` | `lot_no`；`material_id`；`product_id`；`quality_status`；`source_type + source_id` | 是，批次身份事实 | 不建议软删除；错误用作废状态 | 通用入库记录可作为来源快照；批次专表保存可追溯身份 | P2，先支持无批次或默认批次也要预留字段 |
-| `inventory_txns` | 库存事实流水，所有入库、出库、调整、转移、预留释放影响都以追加流水记录 | `txn_no`、`occurred_at`、`item_type`、`material_id`、`product_id`、`warehouse_id`、`location_id`、`lot_id`、`txn_type`、`direction`、`quantity numeric`、`unit_id`、`source_type`、`source_id`、`source_line_id`、`idempotency_key`、`reversal_of_txn_id`、`created_by`、`payload` | 当前草案 `id bigint`；大规模分区时建议主键包含 `occurred_at`，如 `(occurred_at, id)` | `txn_no`；`idempotency_key`；必要时 `source_type + source_id + source_line_id + txn_type` 防重复 | 详见库存专项章节 | 是，库存历史事实主真源 | 不允许软删除，不允许物理改历史事实；错误用冲正流水 | 可由 `business_records`、未来采购 / 生产 / 出货专表触发；`source_type/source_id/source_line_id` 保存来源，不把通用快照当库存事实 | P1，库存专表核心 |
+| `inventory_txns` | 库存事实流水，所有入库、出库、调整、转移、预留释放影响都以追加流水记录 | `txn_no`、`occurred_at`、`item_type`、`material_id`、`product_id`、`warehouse_id`、`location_id`、`lot_id`、`txn_type`、`direction`、`quantity numeric`、`unit_id`、`source_type`、`source_id`、`source_line_id`、`idempotency_key`、`reversal_of_txn_id`、`created_by`、`payload` | 当前草案 `id bigint`；大规模分区时建议主键包含 `occurred_at`，如 `(occurred_at, id)` | `txn_no`；`idempotency_key`；必要时 `source_type + source_id + source_line_id + txn_type` 防重复 | 详见库存专项章节 | 是，库存历史事实主真源 | 不允许软删除，不允许物理改历史事实；错误用冲正流水 | 只能由库存 / 采购 / 生产 / 出货等领域 usecase 触发；`business_records` 最多作为迁移来源线索，不能触发库存事实 | P1，库存专表核心 |
 | `inventory_balances` | 当前库存余额 / 查询加速表，按物料或成品、仓库、库位、批次聚合当前可用量和预留量 | `item_type`、`material_id`、`product_id`、`warehouse_id`、`location_id`、`lot_id`、`unit_id`、`qty_on_hand numeric`、`qty_reserved numeric`、`qty_available numeric`、`last_txn_id`、`last_txn_occurred_at`、`version`、`updated_at` | `id bigint` | `item_type + item_id + warehouse_id + location_id + lot_id + unit_id`，`lot_id` 为空时需用 `NULLS NOT DISTINCT` 或显式默认批次 | `item_type + item_id`；`warehouse_id + location_id`；`qty_available` partial | 是，当前余额事实 / 可重算加速表 | 不允许软删除；余额为 0 也可保留或归档，但不能手工删改掩盖流水 | 余额来自专表流水，通用库存记录只能作为旧数据回补线索 | P1，库存查询核心 |
 | `stock_reservations` | 库存预留 / 占用，支持出货、生产领料、委外发料前锁定库存 | `reservation_no`、`status`、`item_type`、`material_id`、`product_id`、`warehouse_id`、`location_id`、`lot_id`、`unit_id`、`reserved_qty numeric`、`source_type`、`source_id`、`source_line_id`、`idempotency_key`、`expires_at`、`released_at`、`payload` | `id bigint` | `reservation_no`；`idempotency_key`；可选 active 范围内 `source_type + source_id + source_line_id + item/location/lot` | `status`；`source_type + source_id`；`item_type + item_id`；`expires_at` | 是，库存占用事实 | 不允许物理删除；取消 / 释放 / 过期走状态和释放流水 | 可由通用出货 / 生产任务先触发，后续迁到订单 / 领料 / 出货专表来源 | P2，出货和领料扣减前推进 |
 
@@ -199,7 +201,7 @@
 
 | 风险 | 影响 | 建议控制 |
 | --- | --- | --- |
-| 前端通用 `business_records` 依赖 | 桌面业务页、弹窗、列表、Dashboard、打印入口和岗位任务详情都依赖当前通用记录结构 | 专表落地后保留通用记录写入和读取；先只把库存查询切专表，不直接替换所有业务详情。 |
+| 前端通用 `business_records` 依赖 | 旧桌面业务页、打印入口和岗位任务详情曾依赖通用记录结构 | 专表落地后只保留 legacy/archive 查询和字段取值候选；Dashboard 读领域投影，普通业务写入不再保留通用记录入口。 |
 | workflow `source_type/source_id` 迁移 | 当前任务和业务状态通常指向通用单据。直接改指向会影响岗位任务端跳转、任务列表、状态回显和 debug 数据清理 | 兼容期允许 workflow 继续指向 `business_records`；专表 ID 先放 payload 或映射表，等单链路稳定后再迁 source。 |
 | 旧数据回补 | 老 `business_records/items` 里有快照字段、payload 字段和 `float` 数量，缺少强主档 ID、批次、库位和幂等键 | 回补只能按既定口径补真实存在的字段；缺主档 ID 时建立待确认清单，不伪造材料 / 成品 / 批次。 |
 | 调试 seed / cleanup 兼容 | debug seed 当前创建通用记录、任务和业务状态；cleanup 根据 debugRunId 和 DBG 前缀清理 | 专表双写阶段的 debug 数据必须也带 debugRunId 和来源标记；cleanup 才能安全清理或归档。 |
@@ -212,7 +214,7 @@
 
 | 决策 | 推荐 |
 | --- | --- |
-| 是否删除或替代 `business_records` | 不删除，不替代。当前它仍是 v1 通用单据快照、兼容层、打印取值和调试验收基础。 |
+| 是否删除或替代 `business_records` | 暂不物理删除，但普通业务写入已冻结。当前它只作为 legacy/archive 快照、兼容层、打印取值候选和调试夹具基础。 |
 | 专表落地后 `business_records` 的角色 | 保留为单据快照和历史兼容层；可以记录专表 ID、来源摘要和打印快照，但不再承担库存和财务事实真源。 |
 | 库存事实真源 | 最终以 `inventory_txns` 为历史事实主真源，错误通过冲正；`inventory_balances` 是当前余额 / 查询加速表，必须能由流水校验。 |
 | 财务事实真源 | 后续应以 AR/AP/发票/核销专表为真源；当前不在本轮落表，避免库存底座未稳时提前扩大范围。 |
