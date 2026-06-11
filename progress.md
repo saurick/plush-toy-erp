@@ -21,6 +21,45 @@
 - `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、业务模块列表页、业务详情页、新建 / 编辑表单、业务页协同入口组件和弹窗 / 抽屉动作六个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
 - 原型查看器和原型 README 已补“参照范围”口径：参照范围只说明可借鉴的页面 / 菜单类型，不是正式菜单、路由、权限或 seedData 映射表；真正对应关系必须在进入真实实现任务时回到代码、菜单配置和 RBAC 重新核对。
 
+## 2026-06-11 17:29 CST
+
+- 完成：为 `/__dev/docs` Mermaid 图表补当前页面全屏查看按钮；打开后图表卡片变为深色 fixed overlay，默认 140% 放大，保留适配宽度、缩小、放大、重置和退出全屏控件，退出后回到原页面内 100% 状态。
+- 完成：同步 `docs/current-source-of-truth.md` 和 `web/README.md` 的 `/__dev/docs` Mermaid 控件说明，并在 `dev-docs-dark-desktop` L1 场景增加全屏打开 / 退出 / 盒模型断言。
+- 验证：`git diff --check`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1`、`pnpm --dir web style:l1` 均通过；Browser 在 `http://localhost:5175/__dev/docs` 的 `docs/product/implementation-governance.md` 实测全屏前 100% 宽 838，打开后 fixed dialog、140%、画布宽 1738.8 / 视口宽 1244、退出后回到 100%，console warn/error 为 0，并已截取全屏态截图。
+- 下一步：如后续需要拖拽平移、导出 SVG/PNG 或新标签独立查看，应继续保持在 dev-only Mermaid 图表容器内单独评审。
+- 阻塞/风险：本轮未新增独立路由，避免图表源码 / 渲染状态跨页面传递带来的额外复杂度；不接 ERP 菜单、seedData、RBAC、后端 API、schema / migration、生产构建、部署、提交或推送。
+
+## 2026-06-11 17:13 CST
+
+- 完成：为 `/__dev/docs` 右侧章节导航新增展开 / 收起按钮。默认展开为自动换行、不横向滚动；收起后变为单行横向滚动，便于节省纵向空间；展开 / 收起状态写浏览器本地偏好，刷新后恢复。
+- 完成：同步 `docs/current-source-of-truth.md` 和 `web/README.md` 的 `/__dev/docs` 行为说明，新增 `plush_erp_dev_docs_toc_expanded` 本地偏好 key，并补 `dev-docs-dark-desktop` L1 场景对默认展开、收起滚动、刷新恢复和重新展开的 DOM / box 模型断言。
+- 验证：`git diff --check`、`pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web exec node --test src/erp/config/devDocs.test.mjs`、`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1`、`pnpm --dir web test`、`STYLE_L1_PORT=4441 pnpm --dir web style:l1` 均通过；Browser 打开 `http://localhost:5175/__dev/docs` 选择 `docs/product/implementation-governance.md`，实测展开态 `flexWrap=wrap`、`scrollWidth=clientWidth=908`、16 个标签换为 6 行且无标签溢出，收起态 `flexWrap=nowrap`、`overflowX=auto`、`scrollWidth=3565 > clientWidth=908`、刷新后保持收起，再展开恢复无横向溢出，console warn/error 为空。
+- 下一步：若后续觉得按钮文案太长，可只收敛为图标 + tooltip，但仍应保留 L1 的展开 / 收起 / 刷新恢复断言。
+- 阻塞/风险：本轮仍只改 `/__dev/docs` 本地开发查看器，不接 ERP 菜单、seedData、RBAC、后端 API、schema / migration、生产构建、部署、提交或推送；当前工作区仍包含相邻 Mermaid 缩放控件改动，已在同一轮验证但不是章节导航展开 / 收起方案的核心改动。
+
+## 2026-06-11 17:11 CST
+
+- 完成：收口 `/__dev/docs` Mermaid 图表缩放工具条验证；缩小现在会真实减少画布宽度，放大和重置也同步更新百分比标签与 `data-mermaid-zoom` 状态。
+- 验证：`git diff --check`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1`、`pnpm --dir web style:l1` 均通过；Browser 在 `http://localhost:5175/__dev/docs` 的 `docs/product/implementation-governance.md` 实测 Mermaid 图表 100% 宽 838、缩小 80% 宽 670.4、重置 100% 宽 838、放大 120% 宽 1005.6，console warn/error 为 0。
+- 下一步：如后续需要拖拽平移或独立全屏预览，应继续保持在 dev-only Mermaid 图表容器内评审。
+- 阻塞/风险：Browser 截图捕获曾在最终复核时超时，已改用 DOM / box 模型读数和 console 检查收口；本轮不接 ERP 菜单、seedData、RBAC、后端 API、schema / migration、生产构建、部署、提交或推送。
+
+## 2026-06-11 16:55 CST
+
+- 完成：将 `/__dev/docs` 右侧章节导航从横向滚动改为自动换行展示；章节按钮按可用宽度排布，长标题在按钮内部换行，不再依赖 `overflow-x: auto` 或省略裁切。
+- 完成：同步 `docs/current-source-of-truth.md` 和 `web/README.md` 的 `/__dev/docs` 章节标签行为说明，并在 `dev-docs-dark-desktop` L1 场景补章节导航盒模型断言，防止退回横向滚动。
+- 验证：`git diff --check`、`pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1`、`STYLE_L1_PORT=4439 pnpm --dir web style:l1` 均通过；Browser 打开 `http://localhost:5175/__dev/docs` 选择 `docs/product/implementation-governance.md`，实测 16 个章节标签换为 6 行，`scrollWidth=clientWidth=908`，标签溢出 / 裁切数量为 0，页面无横向溢出且 console warn/error 为空。
+- 下一步：如后续继续调整章节导航，可继续在 `dev-docs-dark-desktop` 场景补对应 DOM / box 模型断言。
+- 阻塞/风险：本轮不接 ERP 菜单、seedData、RBAC、后端 API、schema / migration、生产构建、部署、提交或推送；当前工作区还包含相邻 Mermaid 缩放控件改动，已在同一轮验证但不是本次章节导航问题的核心改动。
+
+## 2026-06-11 16:49 CST
+
+- 完成：为 `/__dev/docs` Mermaid 图表补本地临时缩放工具条，提供适配宽度、缩小、放大和重置 100% 四个图标按钮；缩放只作用于当前图表容器，不写 localStorage、不改 Markdown 源码、不进入正式菜单或后端。
+- 完成：同步 `docs/current-source-of-truth.md` 和 `web/README.md` 的 `/__dev/docs` 行为说明，并补 `style:l1` 对 Mermaid 缩放按钮和放大 / 重置效果的 DOM 断言。
+- 验证：`git diff --check`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=dev-docs-dark-desktop pnpm --dir web style:l1`、`STYLE_L1_PORT=4439 pnpm --dir web style:l1` 均通过。
+- 下一步：若后续需要拖拽平移或全屏预览，应继续保持在 dev-only Mermaid 图表容器内评审，不恢复产品内 docs registry。
+- 阻塞/风险：本轮不接 ERP 菜单、seedData、RBAC、后端 API、schema / migration、生产构建、部署、提交或推送。
+
 ## 2026-06-11 15:51 CST
 
 - 完成：为 `/__dev/docs` Markdown 查看器补 Mermaid 图表渲染。`mermaid` fenced code block 现在会在只读 dev-only 查看器中渲染为 SVG；普通代码块仍走原有 `<pre><code>` 展示，Mermaid 渲染失败时保留源码兜底。

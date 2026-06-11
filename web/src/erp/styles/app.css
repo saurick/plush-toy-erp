@@ -1554,18 +1554,30 @@
   color: #2b8a3e;
 }
 
+.erp-dev-docs-toc-shell {
+  flex: 0 0 auto;
+  border-bottom: 1px solid #edf2ee;
+}
+
+.erp-dev-docs-toc-shell__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+
 .erp-dev-docs-toc {
   display: flex;
-  flex: 0 0 auto;
+  flex-wrap: wrap;
   gap: 8px;
-  overflow-x: auto;
-  border-bottom: 1px solid #edf2ee;
   padding: 10px 16px;
 }
 
 .erp-dev-docs-toc__tag {
-  flex: 0 0 auto;
-  max-width: 280px;
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 360px;
   border: 1px solid #d6e2d8;
   border-radius: 8px;
   background: #fff;
@@ -1573,10 +1585,23 @@
   color: #1f2937;
   font-size: 13px;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.erp-dev-docs-toc--collapsed {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.erp-dev-docs-toc--collapsed .erp-dev-docs-toc__tag {
+  flex: 0 0 auto;
+  max-width: 280px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer;
 }
 
 .erp-dev-docs-toc__tag:hover,
@@ -1643,23 +1668,146 @@
 }
 
 .erp-dev-docs-markdown .erp-markdown-mermaid {
-  overflow: auto;
+  overflow: hidden;
   margin: 16px 0;
   border: 1px solid #dce8dd;
   border-radius: 12px;
   background: #f8fbf8;
-  padding: 16px;
+  padding: 12px;
+}
+
+.erp-dev-docs-markdown .erp-markdown-mermaid--fullscreen {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: #020617;
+  padding: 18px;
+}
+
+.erp-dev-docs-markdown .erp-markdown-mermaid__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.erp-dev-docs-markdown
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__toolbar {
+  flex: 0 0 auto;
+  margin-bottom: 14px;
+  border: 1px solid rgb(148 163 184 / 24%);
+  border-radius: 12px;
+  background: rgb(15 23 42 / 84%);
+  padding: 10px;
+}
+
+.erp-dev-docs-markdown .erp-markdown-mermaid__tool {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cfe0d2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #173f2a;
+  cursor: pointer;
+}
+
+.erp-dev-docs-markdown
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__tool {
+  width: 40px;
+  height: 40px;
+  border-color: rgb(148 163 184 / 32%);
+  background: #111827;
+  color: #e5edf5;
+  font-size: 18px;
+}
+
+.erp-dev-docs-markdown .erp-markdown-mermaid__tool:hover,
+.erp-dev-docs-markdown .erp-markdown-mermaid__tool:focus-visible {
+  border-color: #2b8a3e;
+  background: #eef7ef;
+  outline: 0;
+}
+
+.erp-dev-docs-markdown .erp-markdown-mermaid__tool:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.erp-dev-docs-markdown
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__tool:hover,
+.erp-dev-docs-markdown
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__tool:focus-visible {
+  border-color: #86efac;
+  background: rgb(22 101 52 / 34%);
+  color: #bbf7d0;
+}
+
+.erp-dev-docs-markdown .erp-markdown-mermaid__zoom-label {
+  min-width: 44px;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
+}
+
+.erp-dev-docs-markdown
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__zoom-label {
+  min-width: 56px;
+  color: #e5edf5;
+  font-size: 14px;
+}
+
+.erp-dev-docs-markdown .erp-markdown-mermaid__viewport {
+  overflow: auto;
+  border-radius: 10px;
+}
+
+.erp-dev-docs-markdown
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  border: 1px solid rgb(148 163 184 / 18%);
+  border-radius: 14px;
+  background: #020617;
+  overscroll-behavior: contain;
 }
 
 .erp-dev-docs-markdown .erp-markdown-mermaid__canvas {
   display: flex;
-  min-width: 100%;
+  width: calc(var(--mermaid-zoom, 1) * 100%);
+  min-width: 0;
+  margin: 0 auto;
   justify-content: center;
+}
+
+.erp-dev-docs-markdown
+  .erp-markdown-mermaid--fullscreen
+  .erp-markdown-mermaid__canvas {
+  min-height: 100%;
+  align-items: center;
+  padding: 28px 0;
 }
 
 .erp-dev-docs-markdown .erp-markdown-mermaid__canvas svg {
   display: block;
-  max-width: 100%;
+  width: 100%;
+  /* Mermaid injects inline max-width; zoom needs to override that generated cap. */
+  max-width: none !important;
   height: auto;
 }
 
@@ -8394,7 +8542,7 @@
 [data-erp-theme='dark'] .erp-admin-brand,
 [data-erp-theme='dark'] .erp-admin-header,
 [data-erp-theme='dark'] .erp-dev-docs-reader__toolbar,
-[data-erp-theme='dark'] .erp-dev-docs-toc {
+[data-erp-theme='dark'] .erp-dev-docs-toc-shell {
   border-color: var(--erp-border);
 }
 
@@ -9268,6 +9416,29 @@
 [data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid {
   border-color: var(--erp-border);
   background: #0f172a;
+}
+
+[data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid__tool {
+  border-color: var(--erp-border);
+  background: #111827;
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-dev-docs-markdown
+  .erp-markdown-mermaid__tool:hover,
+[data-erp-theme='dark']
+  .erp-dev-docs-markdown
+  .erp-markdown-mermaid__tool:focus-visible {
+  border-color: var(--erp-interactive-border-focus);
+  background: var(--erp-interactive-bg-hover);
+  color: #86efac;
+}
+
+[data-erp-theme='dark']
+  .erp-dev-docs-markdown
+  .erp-markdown-mermaid__zoom-label {
+  color: var(--erp-text-muted);
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-markdown .erp-markdown-mermaid__loading,

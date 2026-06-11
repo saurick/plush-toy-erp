@@ -19,6 +19,7 @@ import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
   DEV_DOCS_PINNED_STORAGE_KEY,
   DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
+  DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
   applyDevDocsPinnedState,
   buildDevDocsItems,
   buildDevDocsTree,
@@ -118,6 +119,24 @@ function readExpandedKeys(availableKeys = []) {
     )
   } catch (error) {
     return defaultKeys
+  }
+}
+
+function readTocExpanded() {
+  if (typeof window === 'undefined') {
+    return true
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(
+      DEV_DOCS_TOC_EXPANDED_STORAGE_KEY
+    )
+    if (rawValue === null) {
+      return true
+    }
+    return rawValue !== 'false'
+  } catch (error) {
+    return true
   }
 }
 
@@ -235,6 +254,7 @@ export default function DevDocsPage() {
   const [expandedKeys, setExpandedKeys] = useState(
     () => new Set(readExpandedKeys(allDirectoryKeys))
   )
+  const [tocExpanded, setTocExpanded] = useState(() => readTocExpanded())
   const markdownRef = useRef(null)
 
   const docsWithSearchText = useMemo(
@@ -317,6 +337,20 @@ export default function DevDocsPage() {
       // 目录展开偏好写入失败时不影响 dev docs 主路径浏览。
     }
   }, [allDirectoryKeys, expandedKeys])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return
+    }
+    try {
+      window.localStorage.setItem(
+        DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
+        tocExpanded ? 'true' : 'false'
+      )
+    } catch (error) {
+      // 章节导航偏好写入失败时不影响 dev docs 主路径浏览。
+    }
+  }, [tocExpanded])
 
   useEffect(() => {
     markdownRef.current?.scrollTo({ top: 0 })
@@ -638,18 +672,39 @@ export default function DevDocsPage() {
           </div>
 
           {headings.length > 0 ? (
-            <div className="erp-dev-docs-toc" aria-label="文档章节">
-              {headings.slice(0, 16).map((heading) => (
-                <button
-                  type="button"
-                  key={heading.id}
-                  className="erp-dev-docs-toc__tag"
-                  data-dev-doc-heading-id={heading.id}
-                  onClick={() => scrollToHeading(heading.id)}
+            <div className="erp-dev-docs-toc-shell">
+              <div className="erp-dev-docs-toc-shell__head">
+                <Text strong>章节 / Sections</Text>
+                <Button
+                  size="small"
+                  type="text"
+                  data-dev-doc-toc-toggle
+                  aria-expanded={tocExpanded}
+                  onClick={() => setTocExpanded((current) => !current)}
                 >
-                  {heading.title}
-                </button>
-              ))}
+                  {tocExpanded ? '收起 / Scroll' : '展开 / Wrap'}
+                </Button>
+              </div>
+              <div
+                className={
+                  tocExpanded
+                    ? 'erp-dev-docs-toc erp-dev-docs-toc--expanded'
+                    : 'erp-dev-docs-toc erp-dev-docs-toc--collapsed'
+                }
+                aria-label="文档章节"
+              >
+                {headings.slice(0, 16).map((heading) => (
+                  <button
+                    type="button"
+                    key={heading.id}
+                    className="erp-dev-docs-toc__tag"
+                    data-dev-doc-heading-id={heading.id}
+                    onClick={() => scrollToHeading(heading.id)}
+                  >
+                    {heading.title}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : null}
 

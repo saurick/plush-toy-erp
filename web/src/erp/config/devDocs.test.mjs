@@ -5,6 +5,7 @@ import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
   DEV_DOCS_ROUTE,
   DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
+  DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
   applyDevDocsPinnedState,
   buildDevDocsItems,
   buildDevDocsTree,
@@ -34,6 +35,10 @@ function findDirectory(nodes, path) {
 
 test('devDocs: 只通过开发态独立路径暴露', () => {
   assert.equal(DEV_DOCS_ROUTE, '/__dev/docs')
+  assert.equal(
+    DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
+    'plush_erp_dev_docs_toc_expanded'
+  )
   assert.equal(isDevDocsEnabled({ DEV: true }), true)
   assert.equal(isDevDocsEnabled({ DEV: false }), false)
   assert.equal(isDevDocsEnabled({}), false)

@@ -15,6 +15,8 @@ export const DEV_DOCS_SELECTED_PATH_STORAGE_KEY =
   'plush_erp_dev_docs_selected_path'
 export const DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY =
   'plush_erp_dev_docs_expanded_dirs'
+export const DEV_DOCS_TOC_EXPANDED_STORAGE_KEY =
+  'plush_erp_dev_docs_toc_expanded'
 
 export function isDevDocsEnabled(env = import.meta.env) {
   return env?.DEV === true

@@ -1,4 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ArrowsAltOutlined,
+  FullscreenOutlined,
+  FullscreenExitOutlined,
+  OneToOneOutlined,
+  ZoomInOutlined,
+  ZoomOutOutlined,
+} from '@ant-design/icons'
 import { Remarkable } from 'remarkable'
 import RemarkableReactRenderer from 'remarkable-react'
 
@@ -30,6 +38,14 @@ const MERMAID_THEME_CONFIG = {
 }
 
 let mermaidRenderSequence = 0
+
+const MERMAID_ZOOM = {
+  min: 0.6,
+  max: 2.4,
+  step: 0.2,
+  defaultValue: 1,
+  fullscreenDefaultValue: 1.4,
+}
 
 function getCurrentERPTheme() {
   if (typeof document === 'undefined') {
@@ -72,11 +88,47 @@ function MermaidDiagram({ chart }) {
     mermaidRenderSequence += 1
     return `erp-markdown-mermaid-${mermaidRenderSequence}`
   }, [])
+  const [zoom, setZoom] = useState(MERMAID_ZOOM.defaultValue)
+  const [fullscreenZoom, setFullscreenZoom] = useState(
+    MERMAID_ZOOM.fullscreenDefaultValue
+  )
+  const [fullscreenOpen, setFullscreenOpen] = useState(false)
+  const fullscreenExitRef = useRef(null)
   const [renderState, setRenderState] = useState({
     status: 'loading',
     svg: '',
     error: '',
   })
+
+  const activeZoom = fullscreenOpen ? fullscreenZoom : zoom
+  const zoomPercent = Math.round(activeZoom * 100)
+
+  useEffect(() => {
+    setZoom(MERMAID_ZOOM.defaultValue)
+    setFullscreenZoom(MERMAID_ZOOM.fullscreenDefaultValue)
+    setFullscreenOpen(false)
+  }, [chart])
+
+  useEffect(() => {
+    if (!fullscreenOpen || typeof document === 'undefined') {
+      return undefined
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        setFullscreenOpen(false)
+      }
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    window.setTimeout(() => fullscreenExitRef.current?.focus(), 0)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [fullscreenOpen])
 
   useEffect(() => {
     const source = String(chart || '').trim()
@@ -132,14 +184,38 @@ function MermaidDiagram({ chart }) {
     return null
   }
 
+  const setNextZoom = (nextZoom) => {
+    const normalizedZoom = Math.min(
+      MERMAID_ZOOM.max,
+      Math.max(MERMAID_ZOOM.min, Number(nextZoom) || MERMAID_ZOOM.defaultValue)
+    )
+    const nextValue = Number(normalizedZoom.toFixed(2))
+    if (fullscreenOpen) {
+      setFullscreenZoom(nextValue)
+      return
+    }
+    setZoom(nextValue)
+  }
+
+  const openFullscreen = () => {
+    setFullscreenZoom(Math.max(zoom, MERMAID_ZOOM.fullscreenDefaultValue))
+    setFullscreenOpen(true)
+  }
+
   return (
     <div
-      className={
-        renderState.status === 'error'
-          ? 'erp-markdown-mermaid erp-markdown-mermaid--error'
-          : 'erp-markdown-mermaid'
-      }
+      className={[
+        'erp-markdown-mermaid',
+        renderState.status === 'error' ? 'erp-markdown-mermaid--error' : '',
+        fullscreenOpen ? 'erp-markdown-mermaid--fullscreen' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       data-mermaid-status={renderState.status}
+      data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}
+      role={fullscreenOpen ? 'dialog' : undefined}
+      aria-modal={fullscreenOpen ? 'true' : undefined}
+      aria-label={fullscreenOpen ? 'Mermaid 图表全屏查看' : undefined}
     >
       {renderState.status === 'loading' ? (
         <div className="erp-markdown-mermaid__loading">
@@ -147,11 +223,94 @@ function MermaidDiagram({ chart }) {
         </div>
       ) : null}
       {renderState.status === 'rendered' ? (
-        // Mermaid returns the rendered SVG; securityLevel=strict is set above.
-        <div
-          className="erp-markdown-mermaid__canvas"
-          dangerouslySetInnerHTML={{ __html: renderState.svg }}
-        />
+        <>
+          <div
+            className="erp-markdown-mermaid__toolbar"
+            aria-label="Mermaid 图表工具"
+          >
+            <button
+              type="button"
+              className="erp-markdown-mermaid__tool"
+              data-mermaid-zoom-action="fit"
+              title="适配宽度"
+              aria-label="适配 Mermaid 图表宽度"
+              onClick={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
+            >
+              <FullscreenOutlined />
+            </button>
+            <button
+              type="button"
+              className="erp-markdown-mermaid__tool"
+              data-mermaid-zoom-action="zoom-out"
+              title="缩小"
+              aria-label="缩小 Mermaid 图表"
+              disabled={activeZoom <= MERMAID_ZOOM.min}
+              onClick={() => setNextZoom(activeZoom - MERMAID_ZOOM.step)}
+            >
+              <ZoomOutOutlined />
+            </button>
+            <span
+              className="erp-markdown-mermaid__zoom-label"
+              data-mermaid-zoom-label
+            >
+              {zoomPercent}%
+            </span>
+            <button
+              type="button"
+              className="erp-markdown-mermaid__tool"
+              data-mermaid-zoom-action="zoom-in"
+              title="放大"
+              aria-label="放大 Mermaid 图表"
+              disabled={activeZoom >= MERMAID_ZOOM.max}
+              onClick={() => setNextZoom(activeZoom + MERMAID_ZOOM.step)}
+            >
+              <ZoomInOutlined />
+            </button>
+            <button
+              type="button"
+              className="erp-markdown-mermaid__tool"
+              data-mermaid-zoom-action="reset"
+              title="重置 100%"
+              aria-label="重置 Mermaid 图表为 100%"
+              onClick={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
+            >
+              <OneToOneOutlined />
+            </button>
+            {fullscreenOpen ? (
+              <button
+                ref={fullscreenExitRef}
+                type="button"
+                className="erp-markdown-mermaid__tool"
+                data-mermaid-fullscreen-action="close"
+                title="退出全屏"
+                aria-label="退出 Mermaid 图表全屏"
+                onClick={() => setFullscreenOpen(false)}
+              >
+                <FullscreenExitOutlined />
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="erp-markdown-mermaid__tool"
+                data-mermaid-fullscreen-action="open"
+                title="全屏查看"
+                aria-label="全屏查看 Mermaid 图表"
+                onClick={openFullscreen}
+              >
+                <ArrowsAltOutlined />
+              </button>
+            )}
+          </div>
+          <div className="erp-markdown-mermaid__viewport">
+            <div
+              className="erp-markdown-mermaid__canvas"
+              data-mermaid-zoom={zoomPercent}
+              style={{ '--mermaid-zoom': activeZoom }}
+              // Mermaid returns the rendered SVG; securityLevel=strict is set above.
+              dangerouslySetInnerHTML={{ __html: renderState.svg }}
+            />
+          </div>
+        </>
       ) : null}
       {renderState.status === 'error' ? (
         <>

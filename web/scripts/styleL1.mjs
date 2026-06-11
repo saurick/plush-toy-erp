@@ -900,6 +900,7 @@ const scenarios = [
     verify: async (page) => {
       await page.evaluate(() => {
         window.localStorage.removeItem('plush_erp_dev_docs_expanded_dirs')
+        window.localStorage.removeItem('plush_erp_dev_docs_toc_expanded')
         window.localStorage.setItem(
           'plush_erp_dev_docs_selected_path',
           'docs/product/implementation-governance.md'
@@ -911,12 +912,13 @@ const scenarios = [
       await expectText(page, '模块实施治理 / Implementation Governance')
       await expectText(page, '标准闭环图 / Standard Delivery Gate Diagram')
       await page
-        .locator('.erp-markdown-mermaid[data-mermaid-status="rendered"] svg')
-        .first()
+        .locator(
+          '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
+        )
         .waitFor({ state: 'visible', timeout: 12000 })
       const mermaidMetrics = await page.evaluate(() => {
         const diagram = document.querySelector(
-          '.erp-markdown-mermaid[data-mermaid-status="rendered"] svg'
+          '.erp-markdown-mermaid[data-mermaid-status="rendered"] .erp-markdown-mermaid__canvas > svg'
         )
         const sourceBlocks = [...document.querySelectorAll('pre code')].filter(
           (node) => node.textContent.includes('flowchart LR')
@@ -947,6 +949,461 @@ const scenarios = [
         0,
         `Mermaid 源码块不应继续作为普通代码块展示: ${JSON.stringify(
           mermaidMetrics
+        )}`
+      )
+      const mermaidZoomInitial = await page.evaluate(() => {
+        const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
+        const canvasRect = canvas?.getBoundingClientRect()
+        return {
+          actions: [
+            ...document.querySelectorAll('[data-mermaid-zoom-action]'),
+          ].map((node) => node.getAttribute('data-mermaid-zoom-action')),
+          label:
+            document
+              .querySelector('[data-mermaid-zoom-label]')
+              ?.textContent?.trim() || '',
+          zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          canvasWidth: canvasRect?.width || 0,
+        }
+      })
+      assert.deepEqual(
+        mermaidZoomInitial.actions,
+        ['fit', 'zoom-out', 'zoom-in', 'reset'],
+        `Mermaid 工具条应提供适配、缩小、放大和重置按钮: ${JSON.stringify(
+          mermaidZoomInitial
+        )}`
+      )
+      assert.equal(
+        mermaidZoomInitial.zoom,
+        '100',
+        `Mermaid 初始缩放应为 100%: ${JSON.stringify(mermaidZoomInitial)}`
+      )
+      assert.equal(
+        mermaidZoomInitial.label,
+        '100%',
+        `Mermaid 初始缩放标签应为 100%: ${JSON.stringify(mermaidZoomInitial)}`
+      )
+      await page.locator('[data-mermaid-zoom-action="zoom-out"]').click()
+      const mermaidZoomOut = await page.evaluate(() => {
+        const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
+        const canvasRect = canvas?.getBoundingClientRect()
+        return {
+          label:
+            document
+              .querySelector('[data-mermaid-zoom-label]')
+              ?.textContent?.trim() || '',
+          zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          canvasWidth: canvasRect?.width || 0,
+        }
+      })
+      assert.equal(
+        mermaidZoomOut.zoom,
+        '80',
+        `Mermaid 点击缩小后应变为 80%: ${JSON.stringify(mermaidZoomOut)}`
+      )
+      assert.ok(
+        mermaidZoomOut.canvasWidth < mermaidZoomInitial.canvasWidth,
+        `Mermaid 缩小后图表宽度应减少: ${JSON.stringify({
+          before: mermaidZoomInitial,
+          after: mermaidZoomOut,
+        })}`
+      )
+      await page.locator('[data-mermaid-zoom-action="reset"]').click()
+      const mermaidZoomResetFromOut = await page.evaluate(() => {
+        const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
+        const canvasRect = canvas?.getBoundingClientRect()
+        return {
+          label:
+            document
+              .querySelector('[data-mermaid-zoom-label]')
+              ?.textContent?.trim() || '',
+          zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          canvasWidth: canvasRect?.width || 0,
+        }
+      })
+      assert.equal(
+        mermaidZoomResetFromOut.zoom,
+        '100',
+        `Mermaid 缩小后重置应回到 100%: ${JSON.stringify(
+          mermaidZoomResetFromOut
+        )}`
+      )
+      await page.locator('[data-mermaid-zoom-action="zoom-in"]').click()
+      const mermaidZoomIn = await page.evaluate(() => {
+        const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
+        const canvasRect = canvas?.getBoundingClientRect()
+        return {
+          label:
+            document
+              .querySelector('[data-mermaid-zoom-label]')
+              ?.textContent?.trim() || '',
+          zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          canvasWidth: canvasRect?.width || 0,
+        }
+      })
+      assert.equal(
+        mermaidZoomIn.zoom,
+        '120',
+        `Mermaid 点击放大后应变为 120%: ${JSON.stringify(mermaidZoomIn)}`
+      )
+      assert.ok(
+        mermaidZoomIn.canvasWidth > mermaidZoomResetFromOut.canvasWidth,
+        `Mermaid 放大后图表宽度应增加: ${JSON.stringify({
+          before: mermaidZoomResetFromOut,
+          after: mermaidZoomIn,
+        })}`
+      )
+      await page.locator('[data-mermaid-zoom-action="reset"]').click()
+      const mermaidZoomReset = await page.evaluate(() => {
+        const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
+        const canvasRect = canvas?.getBoundingClientRect()
+        return {
+          label:
+            document
+              .querySelector('[data-mermaid-zoom-label]')
+              ?.textContent?.trim() || '',
+          zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          canvasWidth: canvasRect?.width || 0,
+        }
+      })
+      assert.equal(
+        mermaidZoomReset.zoom,
+        '100',
+        `Mermaid 重置后应回到 100%: ${JSON.stringify(mermaidZoomReset)}`
+      )
+      assert.equal(
+        mermaidZoomReset.label,
+        '100%',
+        `Mermaid 重置后标签应回到 100%: ${JSON.stringify(mermaidZoomReset)}`
+      )
+      const fullscreenOpenButton = page.locator(
+        '[data-mermaid-fullscreen-action="open"]'
+      )
+      assert.equal(
+        await fullscreenOpenButton.count(),
+        1,
+        'Mermaid 全屏查看按钮应唯一'
+      )
+      await fullscreenOpenButton.click()
+      const mermaidFullscreenOpen = await page.evaluate(() => {
+        const shell = document.querySelector('.erp-markdown-mermaid')
+        const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
+        const viewport = document.querySelector(
+          '.erp-markdown-mermaid__viewport'
+        )
+        const shellRect = shell?.getBoundingClientRect()
+        const canvasRect = canvas?.getBoundingClientRect()
+        const viewportRect = viewport?.getBoundingClientRect()
+        const shellStyle = shell ? window.getComputedStyle(shell) : null
+        return {
+          fullscreen: shell?.getAttribute('data-mermaid-fullscreen') || '',
+          role: shell?.getAttribute('role') || '',
+          ariaModal: shell?.getAttribute('aria-modal') || '',
+          position: shellStyle?.position || '',
+          shellWidth: shellRect?.width || 0,
+          shellHeight: shellRect?.height || 0,
+          viewportWidth: viewportRect?.width || 0,
+          canvasWidth: canvasRect?.width || 0,
+          zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          label:
+            document
+              .querySelector('[data-mermaid-zoom-label]')
+              ?.textContent?.trim() || '',
+          openButtonCount: document.querySelectorAll(
+            '[data-mermaid-fullscreen-action="open"]'
+          ).length,
+          closeButtonCount: document.querySelectorAll(
+            '[data-mermaid-fullscreen-action="close"]'
+          ).length,
+        }
+      })
+      assert.equal(
+        mermaidFullscreenOpen.fullscreen,
+        'true',
+        `Mermaid 点击全屏后应进入全屏态: ${JSON.stringify(
+          mermaidFullscreenOpen
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenOpen.position,
+        'fixed',
+        `Mermaid 全屏态应固定覆盖页面: ${JSON.stringify(mermaidFullscreenOpen)}`
+      )
+      assert.equal(
+        mermaidFullscreenOpen.role,
+        'dialog',
+        `Mermaid 全屏态应声明 dialog: ${JSON.stringify(mermaidFullscreenOpen)}`
+      )
+      assert.equal(
+        mermaidFullscreenOpen.ariaModal,
+        'true',
+        `Mermaid 全屏态应声明 aria-modal: ${JSON.stringify(
+          mermaidFullscreenOpen
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenOpen.zoom,
+        '140',
+        `Mermaid 全屏态默认应放大到 140%: ${JSON.stringify(
+          mermaidFullscreenOpen
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenOpen.label,
+        '140%',
+        `Mermaid 全屏态缩放标签应显示 140%: ${JSON.stringify(
+          mermaidFullscreenOpen
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenOpen.openButtonCount,
+        0,
+        `Mermaid 全屏态不应继续显示打开全屏按钮: ${JSON.stringify(
+          mermaidFullscreenOpen
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenOpen.closeButtonCount,
+        1,
+        `Mermaid 全屏态应显示退出全屏按钮: ${JSON.stringify(
+          mermaidFullscreenOpen
+        )}`
+      )
+      assert.ok(
+        mermaidFullscreenOpen.canvasWidth > mermaidFullscreenOpen.viewportWidth,
+        `Mermaid 全屏态默认应形成放大视图: ${JSON.stringify(
+          mermaidFullscreenOpen
+        )}`
+      )
+      await page.locator('[data-mermaid-fullscreen-action="close"]').click()
+      const mermaidFullscreenClosed = await page.evaluate(() => {
+        const shell = document.querySelector('.erp-markdown-mermaid')
+        const canvas = document.querySelector('.erp-markdown-mermaid__canvas')
+        return {
+          fullscreen: shell?.getAttribute('data-mermaid-fullscreen') || '',
+          role: shell?.getAttribute('role') || '',
+          zoom: canvas?.getAttribute('data-mermaid-zoom') || '',
+          label:
+            document
+              .querySelector('[data-mermaid-zoom-label]')
+              ?.textContent?.trim() || '',
+          openButtonCount: document.querySelectorAll(
+            '[data-mermaid-fullscreen-action="open"]'
+          ).length,
+          closeButtonCount: document.querySelectorAll(
+            '[data-mermaid-fullscreen-action="close"]'
+          ).length,
+        }
+      })
+      assert.equal(
+        mermaidFullscreenClosed.fullscreen,
+        'false',
+        `Mermaid 退出全屏后应回到页面内状态: ${JSON.stringify(
+          mermaidFullscreenClosed
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenClosed.role,
+        '',
+        `Mermaid 退出全屏后不应保留 dialog role: ${JSON.stringify(
+          mermaidFullscreenClosed
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenClosed.zoom,
+        '100',
+        `Mermaid 退出全屏后页面内缩放应保持 100%: ${JSON.stringify(
+          mermaidFullscreenClosed
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenClosed.openButtonCount,
+        1,
+        `Mermaid 退出全屏后应恢复打开全屏按钮: ${JSON.stringify(
+          mermaidFullscreenClosed
+        )}`
+      )
+      assert.equal(
+        mermaidFullscreenClosed.closeButtonCount,
+        0,
+        `Mermaid 退出全屏后不应保留退出按钮: ${JSON.stringify(
+          mermaidFullscreenClosed
+        )}`
+      )
+      const readTocMetrics = async () =>
+        page.evaluate(() => {
+          const toc = document.querySelector('.erp-dev-docs-toc')
+          const toggle = document.querySelector('[data-dev-doc-toc-toggle]')
+          const tags = [...document.querySelectorAll('.erp-dev-docs-toc__tag')]
+          const tocRect = toc?.getBoundingClientRect()
+          const tocStyle = toc ? window.getComputedStyle(toc) : null
+          const rowTops = [
+            ...new Set(
+              tags.map((tag) => Math.round(tag.getBoundingClientRect().top))
+            ),
+          ]
+          const tagSpillCount = tags.filter((tag) => {
+            const rect = tag.getBoundingClientRect()
+            return (
+              tocRect &&
+              (rect.left < tocRect.left - 1 || rect.right > tocRect.right + 1)
+            )
+          }).length
+          const tagClipCount = tags.filter(
+            (tag) => tag.scrollWidth > tag.clientWidth + 1
+          ).length
+          return {
+            exists: Boolean(toc),
+            toggleText: toggle?.textContent?.trim() || '',
+            toggleExpanded: toggle?.getAttribute('aria-expanded') || '',
+            storageValue:
+              window.localStorage.getItem('plush_erp_dev_docs_toc_expanded') ||
+              '',
+            className: toc?.className || '',
+            tagCount: tags.length,
+            rowCount: rowTops.length,
+            flexWrap: tocStyle?.flexWrap || '',
+            overflowX: tocStyle?.overflowX || '',
+            clientWidth: toc?.clientWidth || 0,
+            scrollWidth: toc?.scrollWidth || 0,
+            clientHeight: toc?.clientHeight || 0,
+            scrollHeight: toc?.scrollHeight || 0,
+            tagSpillCount,
+            tagClipCount,
+          }
+        })
+      const expandedTocMetrics = await readTocMetrics()
+      assert.equal(
+        expandedTocMetrics.exists,
+        true,
+        `章节导航应存在: ${JSON.stringify(expandedTocMetrics)}`
+      )
+      assert.ok(
+        expandedTocMetrics.tagCount >= 8,
+        `实施治理文档应保留多章节导航: ${JSON.stringify(expandedTocMetrics)}`
+      )
+      assert.equal(
+        expandedTocMetrics.toggleText,
+        '收起 / Scroll',
+        `章节导航默认展开时按钮应提示收起: ${JSON.stringify(
+          expandedTocMetrics
+        )}`
+      )
+      assert.equal(
+        expandedTocMetrics.toggleExpanded,
+        'true',
+        `章节导航默认应为展开态: ${JSON.stringify(expandedTocMetrics)}`
+      )
+      assert.equal(
+        expandedTocMetrics.flexWrap,
+        'wrap',
+        `章节导航展开态应换行展示: ${JSON.stringify(expandedTocMetrics)}`
+      )
+      assert.notEqual(
+        expandedTocMetrics.overflowX,
+        'auto',
+        `章节导航展开态不应横向滚动: ${JSON.stringify(expandedTocMetrics)}`
+      )
+      assert.ok(
+        expandedTocMetrics.scrollWidth <= expandedTocMetrics.clientWidth + 1,
+        `章节导航展开态不应产生自身横向溢出: ${JSON.stringify(
+          expandedTocMetrics
+        )}`
+      )
+      assert.equal(
+        expandedTocMetrics.tagSpillCount,
+        0,
+        `章节导航展开态标签不应溢出容器: ${JSON.stringify(expandedTocMetrics)}`
+      )
+      assert.equal(
+        expandedTocMetrics.tagClipCount,
+        0,
+        `章节导航展开态标签不应被裁切: ${JSON.stringify(expandedTocMetrics)}`
+      )
+      assert.ok(
+        expandedTocMetrics.rowCount > 1,
+        `多章节导航默认应自动换成多行: ${JSON.stringify(expandedTocMetrics)}`
+      )
+      await page.locator('[data-dev-doc-toc-toggle]').click()
+      const collapsedTocMetrics = await readTocMetrics()
+      assert.equal(
+        collapsedTocMetrics.toggleText,
+        '展开 / Wrap',
+        `章节导航收起后按钮应提示展开: ${JSON.stringify(collapsedTocMetrics)}`
+      )
+      assert.equal(
+        collapsedTocMetrics.toggleExpanded,
+        'false',
+        `章节导航收起后 aria-expanded 应为 false: ${JSON.stringify(
+          collapsedTocMetrics
+        )}`
+      )
+      assert.equal(
+        collapsedTocMetrics.storageValue,
+        'false',
+        `章节导航收起状态应写入本地缓存: ${JSON.stringify(collapsedTocMetrics)}`
+      )
+      assert.equal(
+        collapsedTocMetrics.flexWrap,
+        'nowrap',
+        `章节导航收起态应回到单行: ${JSON.stringify(collapsedTocMetrics)}`
+      )
+      assert.equal(
+        collapsedTocMetrics.overflowX,
+        'auto',
+        `章节导航收起态应由自身接管横向滚动: ${JSON.stringify(
+          collapsedTocMetrics
+        )}`
+      )
+      assert.ok(
+        collapsedTocMetrics.scrollWidth > collapsedTocMetrics.clientWidth + 8,
+        `章节导航收起态应形成可滚动内容宽度: ${JSON.stringify(
+          collapsedTocMetrics
+        )}`
+      )
+      assert.equal(
+        collapsedTocMetrics.rowCount,
+        1,
+        `章节导航收起态应保持单行: ${JSON.stringify(collapsedTocMetrics)}`
+      )
+      await page.reload({ waitUntil: 'domcontentloaded' })
+      await expectHeading(page, '开发文档查看器 / Dev Docs Viewer')
+      const persistedCollapsedTocMetrics = await readTocMetrics()
+      assert.equal(
+        persistedCollapsedTocMetrics.storageValue,
+        'false',
+        `章节导航刷新后应保留收起缓存: ${JSON.stringify(
+          persistedCollapsedTocMetrics
+        )}`
+      )
+      assert.equal(
+        persistedCollapsedTocMetrics.flexWrap,
+        'nowrap',
+        `章节导航刷新后应恢复收起单行: ${JSON.stringify(
+          persistedCollapsedTocMetrics
+        )}`
+      )
+      await page.locator('[data-dev-doc-toc-toggle]').click()
+      const restoredExpandedTocMetrics = await readTocMetrics()
+      assert.equal(
+        restoredExpandedTocMetrics.storageValue,
+        'true',
+        `章节导航展开状态应写入本地缓存: ${JSON.stringify(
+          restoredExpandedTocMetrics
+        )}`
+      )
+      assert.equal(
+        restoredExpandedTocMetrics.flexWrap,
+        'wrap',
+        `章节导航重新展开后应恢复换行: ${JSON.stringify(
+          restoredExpandedTocMetrics
+        )}`
+      )
+      assert.ok(
+        restoredExpandedTocMetrics.scrollWidth <=
+          restoredExpandedTocMetrics.clientWidth + 1,
+        `章节导航重新展开后不应横向溢出: ${JSON.stringify(
+          restoredExpandedTocMetrics
         )}`
       )
       const productDir = page.locator('[data-dev-doc-dir="docs/product"]')
