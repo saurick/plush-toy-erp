@@ -147,9 +147,9 @@
 | 路径 | 阶段 | 归属 | 用途 |
 | --- | --- | --- | --- |
 | `index.html` | Current | Evidence | 产品原型资产查看器，可直接用浏览器 `file://` 打开，用于筛选和访问本目录下的 HTML 原型、PNG 方案图和截图证据。 |
-| `admin-command-center-v1/index.html` | To Implement | Core | 后台工作台与看板待实现原型，覆盖工作台、任务看板、业务看板、模板打印中心和异常 / 阻塞闭环。 |
-| `business-module-page-standard-v1/index.html` | To Implement | Core | 业务模块标准页待实现原型，覆盖标题统计、筛选、表格工具、选中记录操作条、分页和底部协同入口。 |
-| `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement / Reference | Core / Exploration | 协同入口候选待实现原型 + 方案对比参考，用于对比底部常驻入口、展开面板、任务分组和桌面端高度拖拽手柄。 |
+| `admin-command-center-v1/index.html` | To Implement | Core | 极简后台工作台待实现原型，把工作台收敛为登录后的今日处理台：今日队列、当前任务详情和少量常用业务对象入口。 |
+| `business-module-page-standard-v1/index.html` | To Implement | Core | 极简业务模块标准页待实现原型，保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。 |
+| `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement / Reference | Core / Exploration | 业务页轻量协同入口组件候选 + 方案对比参考，用于表达“收起保留风险提示、展开处理本页任务”，不作为独立业务入口。 |
 | `business-module-page-standard-v1/images/` | Reference | Exploration / Evidence | 早期三张协同入口方向图，用于追溯方案比较。 |
 | `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前实现对齐版原型，用于说明真实页面吸收早期 PNG 后的 as-built 形态。 |
 | `mobile-role-tasks-v1/images/` | Reference | Exploration / Evidence | 岗位任务端改版三张 PNG 原型图，作为早期视觉方向和历史参考。 |
@@ -184,7 +184,7 @@
 
 当前推荐的简化理解是：顶部只判断“当前 / 待实现 / 参考资料”；`HTML / PNG` 只表示格式，`截图证据 / Evidence`、`方案对比 / Comparison`、`历史参考 / History` 等细标签只解释来源和用途。不要反过来用 HTML / PNG 文件格式或辅助标签判断资产阶段。
 
-截至 2026-06-11，待实现队列仍包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html` 和 `business-module-page-standard-v1/task-collab-entry-v2.html`。本轮运行时代码已吸收后台工作台、任务看板、业务看板、模板打印中心、异常 / 阻塞闭环、业务模块标准页、底部协同入口和部分特殊模块变体；模板打印中心按原型式轻量三栏保留模板导航、纸面预览、字段映射和模板核对入口，样品确认单只作为未启用候选入口保留。未获用户明确确认前，三个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现对齐版登记。
+截至 2026-06-11，待实现队列仍包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html` 和 `business-module-page-standard-v1/task-collab-entry-v2.html`。本轮已按 Product Design 方向把三个待实现 HTML 重做为极简版本：工作台不再强调五个并列视图，业务模块标准页减少统计和按钮密度，协同入口从“独立候选页面”收敛为业务页内组件候选。本轮只调整原型资产和登记口径，不改变运行时代码、正式菜单、后端 API、RBAC、schema、migration 或 Fact 语义。未获用户明确确认前，三个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现对齐版登记。
 
 ## 使用方式
 

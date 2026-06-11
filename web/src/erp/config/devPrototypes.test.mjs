@@ -82,9 +82,9 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const items = buildDevPrototypeItems({
     htmlModules: {
       '../../../../docs/product/prototypes/admin-command-center-v1/index.html':
-        '<!doctype html><title>后台工作台与看板原型</title>',
+        '<!doctype html><title>极简后台工作台原型</title>',
       '../../../../docs/product/prototypes/business-module-page-standard-v1/index.html':
-        '<!doctype html><title>业务模块标准页原型</title>',
+        '<!doctype html><title>极简业务模块标准页原型</title>',
       '../../../../docs/product/prototypes/mobile-role-tasks-v1/implemented-reference.html':
         '<!doctype html><title>岗位任务端</title>',
     },
@@ -103,9 +103,9 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const mobileList = items.find((item) => item.key === 'mobile-role-tasks-list')
 
   assert.equal(commandCenterPrototype?.available, true)
-  assert.match(commandCenterPrototype?.source || '', /后台工作台与看板原型/)
+  assert.match(commandCenterPrototype?.source || '', /极简后台工作台原型/)
   assert.equal(businessPrototype?.available, true)
-  assert.match(businessPrototype?.source || '', /业务模块标准页原型/)
+  assert.match(businessPrototype?.source || '', /极简业务模块标准页原型/)
   assert.equal(mobileList?.available, true)
   assert.equal(mobileList?.url, '/assets/mobile-role-tasks-list-reference.png')
 })

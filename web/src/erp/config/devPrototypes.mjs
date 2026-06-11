@@ -42,29 +42,29 @@ export const DEV_PROTOTYPE_FILTER_OPTIONS = Object.freeze([
 export const DEV_PROTOTYPE_ASSETS = Object.freeze([
   {
     key: 'admin-command-center',
-    title: '后台工作台与看板整套原型',
+    title: '极简后台工作台原型',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'admin-command-center-v1/',
     assetPath: 'admin-command-center-v1/index.html',
     readmePath: 'admin-command-center-v1/README.md',
     description:
-      '覆盖工作台、任务看板、业务看板、模板打印中心和异常 / 阻塞闭环五个视图。',
+      '把工作台收敛为登录后的今日处理台：今日队列、当前任务详情和少量常用业务对象入口。',
   },
   {
     key: 'business-module-standard-page',
-    title: '业务模块标准页整页原型',
+    title: '极简业务模块标准页原型',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'business-module-page-standard-v1/',
     assetPath: 'business-module-page-standard-v1/index.html',
     readmePath: 'business-module-page-standard-v1/README.md',
     description:
-      '覆盖标题统计、筛选、表格工具、选中记录操作条、主表分页和底部常驻协同入口。',
+      '保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。',
   },
   {
     key: 'business-task-collab-entry',
-    title: '协同入口独立候选原型',
+    title: '业务页轻量协同入口候选',
     type: 'HTML',
     statuses: [
       DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT,
@@ -74,7 +74,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-module-page-standard-v1/task-collab-entry-v2.html',
     readmePath: 'business-module-page-standard-v1/README.md',
     description:
-      '用于对比底部常驻入口、展开面板、本页待办任务分组和桌面端高度拖拽手柄。',
+      '把协同入口收敛为业务页内组件：收起保留风险提示，展开处理本页相关任务。',
   },
   {
     key: 'business-direction-sidebar',

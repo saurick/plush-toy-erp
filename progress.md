@@ -17,7 +17,15 @@
 - `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板目录、纸面预览、字段映射和可编辑打印窗口入口；`/erp/operations/exceptions` 作为异常 / 阻塞闭环入口。
 - 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收或评审原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增未评审后端 API、schema、migration、权限码或 Fact 写入。
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
-- `docs/product/prototypes` 当前待实现队列包含后台工作台与看板、业务模块标准页和协同入口三个 HTML 原型；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现对齐版。
+- `docs/product/prototypes` 当前待实现队列包含极简后台工作台、极简业务模块标准页和业务页轻量协同入口三个 HTML 原型；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现对齐版。
+
+## 2026-06-11 14:06 CST
+
+- 完成：按 Product Design 方向重做三个待实现 HTML 原型。`admin-command-center-v1/index.html` 从“工作台 / 任务看板 / 业务看板 / 打印 / 异常”五视图演示收敛为极简今日处理台；`business-module-page-standard-v1/index.html` 收敛为标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口；`task-collab-entry-v2.html` 从独立候选页面改为业务页内轻量协同组件候选。
+- 完成：同步 `/__dev/prototypes` registry、静态 `docs/product/prototypes/index.html`、原型总 README、两个子 README、`devPrototypes` 测试和 `style:l1` 原型查看器断言；三个 HTML 仍保持 `To Implement`，不晋级 Current。
+- 验证：`node --test web/src/erp/config/devPrototypes.test.mjs`、HTML 内联脚本语法抽取检查、`git diff --check -- docs/product/prototypes web/src/erp/config/devPrototypes.mjs web/src/erp/config/devPrototypes.test.mjs web/scripts/styleL1.mjs`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；浏览器验证 `/__dev/prototypes` 新标题可见、旧标题不再出现、无横向溢出，三个静态 HTML 在 1280px 和 390px 视口均无横向溢出，基础交互可切换且 console warn/error 为空。
+- 下一步：如果继续推进正式 UI，应先评审客户首版菜单是否进一步隐藏独立任务看板 / 业务看板 / 异常入口，并把工作台运行时按极简原型吸收；吸收前仍需回到正式菜单、RBAC、theme token、测试和浏览器回归。
+- 阻塞/风险：本轮只改原型资产、dev-only 原型登记和说明文档；未改正式菜单、运行时代码、后端 API、schema、migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。
 
 ## 2026-06-11 00:33 CST
 

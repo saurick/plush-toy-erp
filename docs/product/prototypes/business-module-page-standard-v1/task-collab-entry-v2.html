@@ -3,26 +3,26 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>应收/开票登记 - 协同入口原型</title>
+    <title>轻量协同入口候选原型</title>
     <style>
       :root {
-        --bg: #f4f8f4;
-        --sidebar: #eef7ef;
-        --surface: #fff;
-        --surface-soft: #f8fbf8;
-        --border: #dce7df;
-        --border-strong: #c8d9cc;
-        --text: #172033;
-        --muted: #64748b;
-        --green: #23915a;
-        --green-soft: #e8f6ee;
-        --blue: #1f72e8;
-        --blue-soft: #eaf3ff;
-        --red: #d9363e;
-        --red-soft: #fff0f0;
-        --amber: #d78300;
-        --amber-soft: #fff7e6;
-        --shadow: 0 10px 28px rgb(15 23 42 / 8%);
+        color-scheme: light;
+        --bg: #f6f8fb;
+        --panel: #ffffff;
+        --panel-soft: #f9fbfd;
+        --line: #dde5ef;
+        --line-strong: #c4d0df;
+        --text: #142033;
+        --muted: #66758a;
+        --blue: #1f6fe5;
+        --blue-soft: #eef5ff;
+        --green: #20845a;
+        --green-soft: #edf8f2;
+        --amber: #b66a09;
+        --amber-soft: #fff7e8;
+        --red: #ca3f46;
+        --red-soft: #fff1f2;
+        --shadow: 0 14px 34px rgb(15 23 42 / 8%);
       }
 
       * {
@@ -31,943 +31,442 @@
 
       body {
         margin: 0;
-        color: var(--text);
         background: var(--bg);
+        color: var(--text);
         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
           "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
       button,
-      input,
       select {
         font: inherit;
       }
 
-      .app {
-        display: grid;
-        grid-template-columns: 236px minmax(0, 1fr);
-        min-height: 100vh;
-      }
-
-      .sidebar {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        min-width: 0;
-        border-right: 1px solid var(--border);
-        background: linear-gradient(180deg, #f4fbf5 0%, var(--sidebar) 100%);
-        padding: 18px 14px;
-      }
-
-      .brand {
-        display: grid;
-        grid-template-columns: 38px minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        min-width: 0;
-      }
-
-      .logo {
-        display: grid;
-        place-items: center;
-        width: 38px;
-        height: 38px;
-        border-radius: 10px;
-        color: #fff;
-        background: #2367a5;
-        font-weight: 700;
-        font-size: 20px;
-      }
-
-      .brand strong,
-      .brand span {
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .brand span {
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .nav-section {
-        display: grid;
-        gap: 6px;
-      }
-
-      .section-title {
-        color: #789083;
-        font-size: 12px;
-        padding: 8px 10px 2px;
-      }
-
-      .nav-item {
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        min-height: 38px;
-        border-radius: 9px;
-        padding: 0 12px;
-        color: #1f2937;
-        white-space: nowrap;
-      }
-
-      .nav-item.active {
-        color: #137143;
-        background: #cfe2d2;
-        font-weight: 600;
-      }
-
-      .main {
-        display: grid;
-        grid-template-rows: 64px minmax(0, 1fr);
-        min-width: 0;
-      }
-
-      .topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border-bottom: 1px solid var(--border);
-        background: rgb(255 255 255 / 92%);
-        padding: 0 18px;
-      }
-
-      .topbar h1 {
-        margin: 0;
-        font-size: 17px;
-      }
-
-      .top-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .btn {
-        border: 1px solid var(--border-strong);
-        border-radius: 8px;
-        background: var(--surface);
-        color: var(--text);
-        min-height: 32px;
-        padding: 0 12px;
+      button {
         cursor: pointer;
       }
 
-      .btn.primary {
-        border-color: var(--green);
-        background: var(--green);
-        color: #fff;
-      }
-
-      .btn.ghost {
-        color: var(--blue);
-        border-color: #b9d7ff;
-        background: #f7fbff;
-      }
-
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 24px;
-        border: 1px solid #ffd58a;
-        border-radius: 7px;
-        color: #b26a00;
-        background: #fff8e8;
-        padding: 0 9px;
-        font-size: 12px;
-      }
-
-      .content {
-        position: relative;
-        min-width: 0;
-        overflow: hidden;
-        padding: 14px 16px 76px;
-      }
-
-      .page-shell {
+      .page {
         display: grid;
-        gap: 10px;
-        height: 100%;
-        min-height: 0;
+        gap: 16px;
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 24px;
       }
 
-      .page-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 14px;
+      .hero,
+      .mock-page,
+      .dock {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
       }
 
-      .page-head h2 {
-        margin: 0;
-        font-size: 21px;
-      }
-
-      .filters,
-      .workflow,
-      .table-card,
-      .kpis {
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        background: var(--surface);
-      }
-
-      .kpis {
+      .hero {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 0;
-        overflow: hidden;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: start;
+        padding: 18px;
       }
 
-      .kpi {
-        min-width: 0;
-        border-right: 1px solid var(--border);
-        padding: 10px 12px;
-      }
-
-      .kpi:last-child {
-        border-right: 0;
-      }
-
-      .kpi span {
-        display: block;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .kpi strong {
-        display: block;
-        margin-top: 2px;
-        font-size: 18px;
-      }
-
-      .filters {
-        display: grid;
-        grid-template-columns: 1.3fr 1fr 1fr 1fr auto auto;
-        gap: 10px;
-        padding: 12px;
-      }
-
-      .field {
-        display: grid;
-        gap: 4px;
-        min-width: 0;
-      }
-
+      .eyebrow,
+      .muted,
       .field label {
         color: var(--muted);
         font-size: 12px;
       }
 
-      .field input,
-      .field select {
-        width: 100%;
-        min-height: 34px;
-        border: 1px solid var(--border-strong);
-        border-radius: 8px;
-        background: #fff;
-        padding: 0 10px;
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
       }
 
-      .workflow {
+      h1 {
+        margin-bottom: 8px;
+        font-size: 26px;
+        line-height: 1.2;
+      }
+
+      p {
+        color: var(--muted);
+      }
+
+      .actions,
+      .chips,
+      .filters {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn {
+        min-height: 34px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: #fff;
+        color: #213149;
+        padding: 0 12px;
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn.text {
+        border-color: transparent;
+        background: transparent;
+        color: var(--blue);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tag.blue {
+        background: var(--blue-soft);
+        color: #1457b7;
+      }
+
+      .tag.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .tag.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .tag.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .mock-page {
+        overflow: hidden;
+      }
+
+      .mock-head {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 12px;
-        align-items: center;
-        padding: 12px;
+        align-items: start;
+        border-bottom: 1px solid var(--line);
+        padding: 16px;
       }
 
-      .steps {
+      .filters {
+        border-bottom: 1px solid var(--line);
+        padding: 12px 16px;
+      }
+
+      .field {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 8px;
-        min-width: 0;
+        gap: 4px;
       }
 
-      .step {
-        display: grid;
-        gap: 5px;
-        min-width: 0;
-        border-left: 3px solid var(--border-strong);
-        padding-left: 10px;
+      select {
+        height: 34px;
+        min-width: 150px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: #fff;
+        color: var(--text);
+        padding: 0 10px;
       }
 
-      .step.active {
-        border-left-color: var(--blue);
-      }
-
-      .step.done {
-        border-left-color: var(--green);
-      }
-
-      .step.blocked {
-        border-left-color: var(--red);
-      }
-
-      .step-title {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        min-width: 0;
-        font-weight: 600;
-      }
-
-      .step-title span:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .note {
-        grid-column: 1 / -1;
-        color: #8a651f;
-        background: var(--amber-soft);
-        border: 1px solid #ffe1a6;
-        border-radius: 8px;
-        padding: 6px 9px;
-        font-size: 12px;
-      }
-
-      .table-card {
-        min-height: 0;
-        overflow: hidden;
-      }
-
-      .table-wrap {
-        height: 100%;
-        min-height: 0;
+      .table {
         overflow: auto;
       }
 
       table {
         width: 100%;
+        min-width: 760px;
         border-collapse: collapse;
         table-layout: fixed;
       }
 
       th,
       td {
-        overflow: hidden;
-        border-bottom: 1px solid #edf1ee;
-        padding: 10px 11px;
+        border-bottom: 1px solid var(--line);
+        padding: 11px 12px;
         text-align: left;
+      }
+
+      th {
+        background: #f8fafc;
+        color: #4c5f76;
+        font-size: 12px;
+      }
+
+      td {
+        overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
-      th {
-        position: sticky;
-        top: 0;
-        z-index: 1;
-        color: #334155;
-        background: #fafcfb;
-        font-weight: 600;
-      }
-
       tr.selected td {
-        background: #eef8f0;
-      }
-
-      .tag {
-        display: inline-flex;
-        align-items: center;
-        min-height: 22px;
-        border-radius: 7px;
-        border: 1px solid var(--border);
-        padding: 0 7px;
-        font-size: 12px;
-        white-space: nowrap;
-      }
-
-      .tag.green {
-        color: #16803f;
-        background: var(--green-soft);
-        border-color: #a6dfb8;
-      }
-
-      .tag.blue {
-        color: var(--blue);
         background: var(--blue-soft);
-        border-color: #b9d7ff;
-      }
-
-      .tag.red {
-        color: var(--red);
-        background: var(--red-soft);
-        border-color: #ffb8b8;
-      }
-
-      .tag.amber {
-        color: var(--amber);
-        background: var(--amber-soft);
-        border-color: #ffd891;
-      }
-
-      .tag.gray {
-        color: #64748b;
-        background: #f4f6f8;
-        border-color: #d9e0e7;
-      }
-
-      .pager {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 9px 12px;
-        background: #fff;
       }
 
       .dock {
-        --dock-body-height: 360px;
-        position: absolute;
-        right: 16px;
-        bottom: 12px;
-        left: 16px;
-        z-index: 5;
-        border: 1px solid var(--border-strong);
-        border-radius: 12px;
-        background: var(--surface);
-        box-shadow: var(--shadow);
+        position: sticky;
+        bottom: 16px;
         overflow: hidden;
+      }
+
+      .dock-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        min-height: 54px;
+        padding: 0 14px;
+      }
+
+      .dock-title {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        min-width: 0;
+      }
+
+      .dock-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(260px, 0.45fr);
+        gap: 14px;
+        border-top: 1px solid var(--line);
+        background: var(--panel-soft);
+        padding: 14px;
       }
 
       .dock.collapsed .dock-body {
         display: none;
       }
 
-      .dock-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        min-height: 56px;
-        padding: 9px 12px;
-      }
-
-      .dock-title {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-width: 0;
-      }
-
-      .dock-title strong {
-        font-size: 15px;
-      }
-
-      .dock-summary {
-        display: flex;
-        flex-wrap: wrap;
+      .task-list {
+        display: grid;
         gap: 8px;
-        min-width: 0;
       }
 
-      .dock-actions {
-        display: flex;
-        align-items: center;
+      .task {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 10px;
-        flex-shrink: 0;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 10px;
       }
 
-      .switch {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--muted);
-        font-size: 12px;
+      .task[aria-selected="true"] {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px rgb(31 111 229 / 10%);
+      }
+
+      .task strong,
+      .task span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
         white-space: nowrap;
       }
 
-      .switch input {
-        accent-color: var(--green);
-      }
-
-      .dock-body {
-        display: flex;
-        height: var(--dock-body-height);
-        min-height: 320px;
-        max-height: calc(100vh - 180px);
-        flex-direction: column;
-        border-top: 1px solid var(--border);
-      }
-
-      .dock-resize {
-        display: flex;
-        width: 100%;
-        height: 14px;
-        align-items: center;
-        justify-content: center;
-        margin: 5px 0 2px;
-        border: 0;
-        background: transparent;
-        cursor: ns-resize;
-        touch-action: none;
-      }
-
-      .dock-resize span {
-        width: 64px;
-        height: 5px;
-        border-radius: 999px;
-        background: #94a3b8;
-        box-shadow: 0 1px 3px rgb(15 23 42 / 16%);
-      }
-
-      .dock-resize:hover span,
-      .dock-resize:focus-visible span,
-      .dock.resizing .dock-resize span {
-        background: #475569;
-      }
-
-      .dock-note {
-        margin: 0 12px 4px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .tabs {
-        flex: 0 0 auto;
-        display: flex;
-        gap: 4px;
-        padding: 8px 12px 0;
-      }
-
-      .tab {
-        border: 1px solid var(--border);
-        border-bottom-color: transparent;
-        border-radius: 8px 8px 0 0;
-        background: #f7faf8;
-        color: #334155;
-        min-height: 34px;
-        padding: 0 12px;
-        cursor: pointer;
-      }
-
-      .tab.active {
-        color: var(--green);
+      .detail {
+        border: 1px solid var(--line);
+        border-radius: 8px;
         background: #fff;
-        border-color: #abd9bb;
-        font-weight: 600;
+        padding: 12px;
       }
 
-      .task-table {
-        min-height: 0;
-        flex: 1;
-        overflow: auto;
-        padding: 0 12px 10px;
+      .detail h3 {
+        margin-bottom: 8px;
       }
 
-      .task-table table {
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        overflow: hidden;
-      }
-
-      .task-table th,
-      .task-table td {
-        padding: 8px 10px;
-      }
-
-      .task-title {
-        display: grid;
-        gap: 1px;
-      }
-
-      .task-title small {
-        color: var(--muted);
-      }
-
-      .hidden {
-        display: none;
-      }
-
-      @media (max-width: 1100px) {
-        .app {
-          grid-template-columns: 74px minmax(0, 1fr);
+      @media (max-width: 760px) {
+        .page {
+          padding: 14px;
         }
 
-        .brand div:last-child,
-        .nav-item span,
-        .section-title {
-          display: none;
+        .hero,
+        .mock-head,
+        .dock-head,
+        .dock-body,
+        .task {
+          grid-template-columns: 1fr;
         }
 
-        .filters,
-        .kpis {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .workflow {
-          grid-template-columns: minmax(0, 1fr);
-        }
-
-        .steps {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .dock {
+          bottom: 8px;
         }
       }
     </style>
   </head>
   <body>
-    <div class="app">
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="logo">永</div>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <div class="eyebrow">组件候选 / 嵌入业务页底部</div>
+          <h1>协同入口只做一件事：处理本页相关任务。</h1>
+          <p>
+            不再做独立页面，不复制完整任务看板，也不承担事实写入。
+            它只是业务模块页里的轻量任务条：展开看本页待办，收起保留风险提示。
+          </p>
+        </div>
+        <div class="chips">
+          <span class="tag blue">本页待办 3</span>
+          <span class="tag red">阻塞 1</span>
+          <span class="tag amber">今日到期 2</span>
+        </div>
+      </section>
+
+      <section class="mock-page" aria-label="业务页示意">
+        <div class="mock-head">
           <div>
-            <strong>东莞市永绅玩具有限公司</strong>
-            <span>毛绒 ERP 管理后台</span>
+            <div class="eyebrow">ERP / 销售链路</div>
+            <h2>销售订单</h2>
+            <p>主页面保持业务对象优先，协同入口只占用页面底部。</p>
+          </div>
+          <button class="btn primary">新建订单</button>
+        </div>
+
+        <div class="filters">
+          <div class="field">
+            <label>状态</label>
+            <select><option>全部</option><option>执行中</option></select>
+          </div>
+          <div class="field">
+            <label>负责人</label>
+            <select><option>全部</option><option>业务</option></select>
+          </div>
+          <button class="btn">重置</button>
+          <button class="btn primary">查询</button>
+        </div>
+
+        <div class="table">
+          <table>
+            <thead>
+              <tr>
+                <th>订单号</th>
+                <th>客户</th>
+                <th>交期</th>
+                <th>状态</th>
+                <th>当前任务</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="selected">
+                <td>SO-202606-018</td>
+                <td>永绅样例客户</td>
+                <td>2026-06-18</td>
+                <td><span class="tag green">执行中</span></td>
+                <td>交期确认</td>
+              </tr>
+              <tr>
+                <td>SO-202606-017</td>
+                <td>东莞样例客户</td>
+                <td>2026-06-20</td>
+                <td><span class="tag amber">待确认</span></td>
+                <td>资料补齐</td>
+              </tr>
+              <tr>
+                <td>SO-202606-015</td>
+                <td>香港样例客户</td>
+                <td>2026-06-25</td>
+                <td><span class="tag red">阻塞</span></td>
+                <td>入库异常</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="dock" id="dock" aria-label="本页协同入口">
+        <div class="dock-head">
+          <div class="dock-title">
+            <strong>本页协同</strong>
+            <span class="tag blue">待办 3</span>
+            <span class="tag red">阻塞 1</span>
+            <span class="muted">只显示当前页面相关任务</span>
+          </div>
+          <div class="actions">
+            <button class="btn text" id="toggle" type="button">收起</button>
+            <button class="btn primary">处理当前任务</button>
           </div>
         </div>
-        <nav class="nav-section">
-          <div class="nav-item">▧ <span>加工合同/委外下单</span></div>
-          <div class="nav-item">▤ <span>入库通知/检验/入库</span></div>
-          <div class="nav-item">⌂ <span>库存</span></div>
-          <div class="nav-item">☷ <span>待出货/出货放行</span></div>
-          <div class="nav-item">⇥ <span>出库</span></div>
-        </nav>
-        <nav class="nav-section">
-          <div class="section-title">生产环节</div>
-          <div class="nav-item">▦ <span>生产排单</span></div>
-          <div class="nav-item">◴ <span>生产进度</span></div>
-          <div class="nav-item">⚑ <span>延期/返工/异常</span></div>
-          <div class="nav-item">▣ <span>品质检验</span></div>
-        </nav>
-        <nav class="nav-section">
-          <div class="section-title">财务环节</div>
-          <div class="nav-item">▤ <span>对账/结算</span></div>
-          <div class="nav-item">▤ <span>待付款/应付提醒</span></div>
-          <div class="nav-item active">▣ <span>应收/开票登记</span></div>
-          <div class="nav-item">▧ <span>发票登记</span></div>
-        </nav>
-        <nav class="nav-section">
-          <div class="section-title">系统管理</div>
-          <div class="nav-item">⚙ <span>权限管理</span></div>
-        </nav>
-      </aside>
-
-      <main class="main">
-        <header class="topbar">
-          <h1>毛绒 ERP 管理后台</h1>
-          <div class="top-actions">
-            <button class="btn">⟳ 刷新当前页</button>
-            <button class="btn">☼</button>
-            <span class="badge">超级管理员</span>
-            <span>admin</span>
-            <button class="btn">退出</button>
-          </div>
-        </header>
-
-        <section class="content">
-          <div class="page-shell">
-            <div class="page-head">
-              <h2>应收/开票登记</h2>
-              <div class="top-actions">
-                <button class="btn">导出</button>
-                <button class="btn primary">新增应收单</button>
-              </div>
+        <div class="dock-body">
+          <div class="task-list" id="tasks"></div>
+          <aside class="detail">
+            <div class="eyebrow">当前任务</div>
+            <h3 id="detailTitle">交期确认</h3>
+            <p id="detailCopy">确认客户交期后，后续出货和财务事实仍回到正式 usecase。</p>
+            <div class="actions">
+              <button class="btn primary">处理</button>
+              <button class="btn">记录阻塞</button>
+              <button class="btn">催办</button>
             </div>
-
-            <div class="kpis">
-              <div class="kpi"><span>本页记录</span><strong>68</strong></div>
-              <div class="kpi"><span>待应收</span><strong>18</strong></div>
-              <div class="kpi"><span>待开票</span><strong>11</strong></div>
-              <div class="kpi"><span>阻塞异常</span><strong>3</strong></div>
-              <div class="kpi"><span>今日到期</span><strong>5</strong></div>
-              <div class="kpi"><span>应收金额</span><strong>¥286,400</strong></div>
-            </div>
-
-            <div class="filters">
-              <div class="field">
-                <label>单据日期</label>
-                <input value="2026-06-01  ~  2026-06-08" />
-              </div>
-              <div class="field">
-                <label>客户</label>
-                <select><option>全部客户</option></select>
-              </div>
-              <div class="field">
-                <label>收款状态</label>
-                <select><option>全部</option></select>
-              </div>
-              <div class="field">
-                <label>开票状态</label>
-                <select><option>全部</option></select>
-              </div>
-              <button class="btn">重置</button>
-              <button class="btn primary">查询</button>
-            </div>
-
-            <section class="workflow">
-              <div class="steps">
-                <div class="step done">
-                  <div class="step-title">
-                    <span>出货确认</span><span class="tag green">已确认</span>
-                  </div>
-                  <span class="muted">SO-20260528-0123</span>
-                </div>
-                <div class="step done">
-                  <div class="step-title">
-                    <span>应收登记</span><span class="tag green">已登记</span>
-                  </div>
-                  <span class="muted">财务完成金额核对</span>
-                </div>
-                <div class="step active">
-                  <div class="step-title">
-                    <span>开票登记</span><span class="tag blue">可执行</span>
-                  </div>
-                  <span class="muted">当前步骤，由财务处理</span>
-                </div>
-                <div class="step">
-                  <div class="step-title">
-                    <span>对账确认</span><span class="tag gray">未开始</span>
-                  </div>
-                  <span class="muted">开票登记后进入</span>
-                </div>
-              </div>
-              <button class="btn primary">处理开票登记</button>
-              <div class="note">
-                协同状态不代表已开票、已收款或已生成凭证；财务事实以后续正式单据与事实层为准。
-              </div>
-            </section>
-
-            <section class="table-card">
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th style="width: 110px">应收单号</th>
-                      <th style="width: 130px">来源单号</th>
-                      <th style="width: 100px">客户</th>
-                      <th>产品名称</th>
-                      <th style="width: 70px">数量</th>
-                      <th style="width: 100px">应收金额</th>
-                      <th style="width: 100px">已收金额</th>
-                      <th style="width: 90px">收款状态</th>
-                      <th style="width: 90px">开票状态</th>
-                      <th style="width: 90px">业务状态</th>
-                      <th style="width: 70px">负责人</th>
-                    </tr>
-                  </thead>
-                  <tbody id="recordRows"></tbody>
-                </table>
-              </div>
-              <div class="pager">
-                <span>共 68 条</span>
-                <span>‹ 1 2 3 4 5 ›　20 条/页</span>
-              </div>
-            </section>
-          </div>
-
-          <section class="dock" id="dock">
-            <div class="dock-head">
-              <div class="dock-title">
-                <strong>协同待办</strong>
-                <div class="dock-summary">
-                  <span class="tag blue">本页待办 12</span>
-                  <span class="tag red">阻塞 3</span>
-                  <span class="tag amber">今日到期 5</span>
-                  <span class="tag gray">已隐藏调试任务</span>
-                </div>
-              </div>
-              <div class="dock-actions">
-                <label class="switch">
-                  <input type="checkbox" id="debugToggle" /> 显示调试任务
-                </label>
-                <button class="btn" id="toggleDock">收起</button>
-              </div>
-            </div>
-            <div class="dock-body">
-              <button class="dock-resize" id="dockResize" type="button" aria-label="桌面端可上下拖动调整协同入口高度">
-                <span aria-hidden="true"></span>
-              </button>
-              <p class="dock-note">桌面端展开后可拖动横杆临时调整高度；高度不缓存，刷新后回到默认值，移动端不启用拖拽。</p>
-              <div class="tabs">
-                <button class="tab active" data-tab="todo">本页待办</button>
-                <button class="tab" data-tab="current">当前记录</button>
-                <button class="tab" data-tab="blocked">阻塞异常</button>
-                <button class="tab" data-tab="done">已完成</button>
-              </div>
-              <div class="task-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>任务</th>
-                      <th style="width: 150px">来源单号</th>
-                      <th style="width: 150px">关联记录</th>
-                      <th style="width: 90px">状态</th>
-                      <th style="width: 80px">负责人</th>
-                      <th style="width: 130px">到期</th>
-                      <th style="width: 210px">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody id="taskRows"></tbody>
-                </table>
-              </div>
-            </div>
-          </section>
-        </section>
-      </main>
-    </div>
+          </aside>
+        </div>
+      </section>
+    </main>
 
     <script>
-      const recordRows = document.querySelector("#recordRows");
-      const taskRows = document.querySelector("#taskRows");
-      const dock = document.querySelector("#dock");
-      const dockResize = document.querySelector("#dockResize");
-      const toggleDock = document.querySelector("#toggleDock");
-      const debugToggle = document.querySelector("#debugToggle");
-      const tabs = [...document.querySelectorAll(".tab")];
-      let activeTab = "todo";
-      let resizeState = null;
-
-      function clampDockHeight(value) {
-        const minHeight = 320;
-        const maxHeight = Math.max(minHeight, window.innerHeight - 180);
-        return Math.min(Math.max(value, minHeight), maxHeight);
-      }
-
-      const records = Array.from({ length: 24 }, (_, index) => {
-        const id = index + 1;
-        const customers = ["测试客户 C", "测试客户 A", "测试客户 B", "测试客户 D"];
-        const products = ["测试款抱枕", "毛绒玩具套装", "卡通公仔", "玩具挂件"];
-        const paid = index % 5 === 0 ? "已收款" : index % 3 === 0 ? "部分收款" : "未收款";
-        const invoice = index % 4 === 0 ? "已开票" : "未开票";
-        return {
-          ar: `AR-202606${String(8 - (index % 8)).padStart(2, "0")}-${String(id).padStart(4, "0")}`,
-          so: `SO-202605${String(28 - (index % 20)).padStart(2, "0")}-${String(123 - index).padStart(4, "0")}`,
-          customer: customers[index % customers.length],
-          product: products[index % products.length],
-          qty: [300, 200, 150, 120, 180, 100, 220, 500][index % 8],
-          amount: [21000, 14000, 9750, 8640, 11700, 6800, 15840, 18500][index % 8],
-          paidAmount: paid === "已收款" ? [21000, 14000, 9750, 8640][index % 4] : paid === "部分收款" ? 5000 : 0,
-          paid,
-          invoice,
-          status: index % 6 === 0 ? "已完成" : "对账中",
-          owner: index % 7 === 0 ? "会计" : "财务",
-        };
-      });
-
       const tasks = [
-        ["应收对账", "请核对应收金额与订单金额是否一致", "SO-20260528-0123", "AR-20260608-0001", "待处理", "财务", "今天 18:00", "todo"],
-        ["开票申请", "确认收款情况后发起开票", "SO-20260527-0098", "AR-20260607-0002", "待处理", "财务", "1天后到期", "current"],
-        ["收款跟进", "跟进客户收款进度", "SO-20260526-0080", "AR-20260606-0003", "阻塞", "财务", "已逾期2天", "blocked"],
-        ["客户确认对账", "请与客户确认对账结果", "SO-20260522-0042", "AR-20260602-0007", "待处理", "财务", "2天后到期", "todo"],
-        ["开票信息审核", "审核客户开票资料", "SO-20260521-0038", "AR-20260601-0008", "待处理", "会计", "3天后到期", "todo"],
-        ["应收登记", "财务于 10:23 完成", "SO-20260520-0032", "AR-20260531-0009", "已完成", "财务", "2026-06-08", "done"],
-        ["[DEBUG] 仓库预警样本 23", "调试任务默认隐藏", "DBG-RUN-20260605", "DBG-AR-23", "待处理", "仓库", "今天 12:00", "debug"],
+        ["交期确认", "SO-202606-018 / 业务 / 今天 18:00", "待处理", "blue", "确认客户交期后，后续出货和财务事实仍回到正式 usecase。"],
+        ["资料补齐", "SO-202606-017 / 业务 / 明天 10:00", "待处理", "amber", "补齐订单资料，不在协同入口里创建产品或库存事实。"],
+        ["入库异常", "SO-202606-015 / 仓库 / 已超时", "阻塞", "red", "记录阻塞原因并转回入库管理，不能直接把任务完成当库存入账。"],
       ];
 
-      function tagFor(value) {
-        if (value === "未收款" || value === "阻塞") return "red";
-        if (value === "部分收款" || value.includes("到期")) return "amber";
-        if (value === "待处理" || value === "可执行") return "blue";
-        if (value === "已收款" || value === "已开票" || value === "已完成") return "green";
-        return "gray";
-      }
+      const taskList = document.querySelector("#tasks");
+      const detailTitle = document.querySelector("#detailTitle");
+      const detailCopy = document.querySelector("#detailCopy");
 
-      function renderRecords() {
-        recordRows.innerHTML = records
-          .map(
-            (item, index) => `
-              <tr class="${index === 0 ? "selected" : ""}">
-                <td>${item.ar}</td>
-                <td>${item.so}</td>
-                <td>${item.customer}</td>
-                <td>${item.product}</td>
-                <td>${item.qty}</td>
-                <td>${item.amount.toLocaleString()}</td>
-                <td>${item.paidAmount ? item.paidAmount.toLocaleString() : "-"}</td>
-                <td><span class="tag ${tagFor(item.paid)}">${item.paid}</span></td>
-                <td><span class="tag ${tagFor(item.invoice)}">${item.invoice}</span></td>
-                <td><span class="tag green">${item.status}</span></td>
-                <td>${item.owner}</td>
-              </tr>
-            `
-          )
-          .join("");
-      }
-
-      function renderTasks() {
-        const showDebug = debugToggle.checked;
-        const visible = tasks.filter((item) => {
-          if (item[7] === "debug" && !showDebug) return false;
-          if (activeTab === "todo") return ["todo", "current"].includes(item[7]);
-          if (activeTab === "current") return item[7] === "current";
-          if (activeTab === "blocked") return item[7] === "blocked";
-          if (activeTab === "done") return item[7] === "done";
-          return true;
+      function renderTasks(selectedIndex = 0) {
+        taskList.innerHTML = "";
+        tasks.forEach((task, index) => {
+          const button = document.createElement("button");
+          button.className = "task";
+          button.type = "button";
+          button.setAttribute("aria-selected", String(index === selectedIndex));
+          button.innerHTML = `
+            <span>
+              <strong>${task[0]}</strong>
+              <span class="muted">${task[1]}</span>
+            </span>
+            <span class="tag ${task[3]}">${task[2]}</span>
+          `;
+          button.addEventListener("click", () => {
+            detailTitle.textContent = task[0];
+            detailCopy.textContent = task[4];
+            renderTasks(index);
+          });
+          taskList.appendChild(button);
         });
-        taskRows.innerHTML = visible
-          .map(
-            (item) => `
-              <tr>
-                <td><span class="task-title"><strong>${item[0]}</strong><small>${item[1]}</small></span></td>
-                <td>${item[2]}</td>
-                <td>${item[3]}</td>
-                <td><span class="tag ${tagFor(item[4])}">${item[4]}</span></td>
-                <td>${item[5]}</td>
-                <td><span class="${item[6].includes("逾期") ? "tag red" : ""}">${item[6]}</span></td>
-                <td>
-                  <button class="btn primary">处理</button>
-                  <button class="btn ghost">催办</button>
-                  <button class="btn">查看</button>
-                </td>
-              </tr>
-            `
-          )
-          .join("");
       }
 
-      toggleDock.addEventListener("click", () => {
+      document.querySelector("#toggle").addEventListener("click", (event) => {
+        const dock = document.querySelector("#dock");
         dock.classList.toggle("collapsed");
-        toggleDock.textContent = dock.classList.contains("collapsed") ? "展开" : "收起";
+        event.currentTarget.textContent = dock.classList.contains("collapsed")
+          ? "展开"
+          : "收起";
       });
 
-      dockResize.addEventListener("pointerdown", (event) => {
-        if (dock.classList.contains("collapsed") || event.button !== 0) return;
-        const currentHeight = dock.querySelector(".dock-body").getBoundingClientRect().height;
-        resizeState = {
-          pointerId: event.pointerId,
-          startY: event.clientY,
-          startHeight: currentHeight,
-        };
-        dock.classList.add("resizing");
-        dockResize.setPointerCapture(event.pointerId);
-        event.preventDefault();
-      });
-
-      dockResize.addEventListener("pointermove", (event) => {
-        if (!resizeState || resizeState.pointerId !== event.pointerId) return;
-        const nextHeight = clampDockHeight(resizeState.startHeight + resizeState.startY - event.clientY);
-        dock.style.setProperty("--dock-body-height", `${nextHeight}px`);
-        event.preventDefault();
-      });
-
-      function stopDockResize(event) {
-        if (resizeState && resizeState.pointerId === event.pointerId) {
-          dockResize.releasePointerCapture(event.pointerId);
-        }
-        resizeState = null;
-        dock.classList.remove("resizing");
-      }
-
-      dockResize.addEventListener("pointerup", stopDockResize);
-      dockResize.addEventListener("pointercancel", stopDockResize);
-
-      tabs.forEach((tab) => {
-        tab.addEventListener("click", () => {
-          tabs.forEach((item) => item.classList.remove("active"));
-          tab.classList.add("active");
-          activeTab = tab.dataset.tab;
-          renderTasks();
-        });
-      });
-
-      debugToggle.addEventListener("change", renderTasks);
-
-      renderRecords();
       renderTasks();
     </script>
   </body>

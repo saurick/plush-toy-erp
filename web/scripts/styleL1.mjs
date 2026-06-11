@@ -1376,9 +1376,9 @@ const scenarios = [
           exact: true,
         })
         .click()
-      await expectText(page, '后台工作台与看板整套原型')
-      await expectText(page, '业务模块标准页整页原型')
-      await expectText(page, '协同入口独立候选原型')
+      await expectText(page, '极简后台工作台原型')
+      await expectText(page, '极简业务模块标准页原型')
+      await expectText(page, '业务页轻量协同入口候选')
       const implementMetrics = await page.evaluate(() => ({
         activeText:
           document
