@@ -1322,9 +1322,7 @@ const scenarios = [
     verify: async (page) => {
       await page.evaluate(() => {
         window.localStorage.removeItem('plush_erp_dev_prototype_selected_key')
-        window.localStorage.removeItem(
-          'plush_erp_dev_prototype_status_filter'
-        )
+        window.localStorage.removeItem('plush_erp_dev_prototype_status_filter')
       })
       await page.reload({ waitUntil: 'domcontentloaded' })
       await expectHeading(page, '产品原型查看器 / Prototype Viewer')
@@ -1386,6 +1384,9 @@ const scenarios = [
       await expectText(page, '极简后台工作台原型')
       await expectText(page, '极简业务模块标准页原型')
       await expectText(page, '业务页轻量协同入口候选')
+      await expectText(page, '业务详情页标准样板')
+      await expectText(page, '新建 / 编辑表单标准样板')
+      await expectText(page, '弹窗 / 抽屉动作标准样板')
       const implementMetrics = await page.evaluate(() => ({
         activeText:
           document
@@ -1407,8 +1408,8 @@ const scenarios = [
       )
       assert.equal(
         implementMetrics.visibleCards,
-        3,
-        `原型查看器待实现筛选应展示 3 个产品内核 HTML 原型: ${JSON.stringify(implementMetrics)}`
+        6,
+        `原型查看器待实现筛选应展示 6 个产品内核 HTML 原型: ${JSON.stringify(implementMetrics)}`
       )
       assert(
         implementMetrics.scrollWidth <= implementMetrics.clientWidth + 1,
@@ -1447,9 +1448,8 @@ const scenarios = [
             'plush_erp_dev_prototype_status_filter'
           ) || '',
         storedSelected:
-          window.localStorage.getItem(
-            'plush_erp_dev_prototype_selected_key'
-          ) || '',
+          window.localStorage.getItem('plush_erp_dev_prototype_selected_key') ||
+          '',
       }))
       assert.deepEqual(
         restoredSelectionMetrics,

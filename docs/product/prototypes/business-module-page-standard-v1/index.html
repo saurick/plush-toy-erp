@@ -25,6 +25,28 @@
         --shadow: 0 12px 30px rgb(15 23 42 / 7%);
       }
 
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #111827;
+          --panel: #182235;
+          --panel-soft: #202c42;
+          --line: #334157;
+          --line-strong: #46566f;
+          --text: #edf3fb;
+          --muted: #aab7ca;
+          --blue: #75a7ff;
+          --blue-soft: #1f3556;
+          --green: #7dd8ad;
+          --green-soft: #183b2d;
+          --amber: #f0bd67;
+          --amber-soft: #463214;
+          --red: #ff9aa2;
+          --red-soft: #4a2228;
+          --shadow: 0 18px 44px rgb(0 0 0 / 28%);
+        }
+      }
+
       * {
         box-sizing: border-box;
       }
@@ -98,6 +120,16 @@
 
       .nav-title {
         padding: 12px 10px 6px;
+      }
+
+      .nav-note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 12px;
+        padding: 10px;
       }
 
       .nav-item {
@@ -392,6 +424,31 @@
         display: none;
       }
 
+      @media (prefers-color-scheme: dark) {
+        .side,
+        .topbar,
+        .btn,
+        input,
+        select,
+        .collab,
+        th {
+          background: var(--panel);
+          color: var(--text);
+        }
+
+        .nav-item,
+        .btn,
+        input,
+        select {
+          color: var(--text);
+        }
+
+        .nav-item.active,
+        .tag.blue {
+          color: var(--blue);
+        }
+      }
+
       @media (max-width: 900px) {
         .app {
           grid-template-columns: 1fr;
@@ -438,18 +495,29 @@
           <div class="mark">永</div>
           <div>
             <strong>毛绒 ERP</strong>
-            <span>业务模块标准页</span>
+            <span>列表页样板 / To Implement</span>
           </div>
         </div>
-        <div class="nav-title">核心入口</div>
+        <div class="nav-note">
+          以下为常用入口 / 快捷入口示意，贴近 seedData 与 yoyoosun 客户菜单；不是替代正式菜单。
+        </div>
+        <div class="nav-title">看板中心</div>
         <div class="nav-item">工作台</div>
+        <div class="nav-item">业务看板</div>
+        <div class="nav-title">基础资料</div>
         <div class="nav-item">客户档案</div>
+        <div class="nav-item">供应商档案</div>
+        <div class="nav-item">产品</div>
+        <div class="nav-title">销售链路</div>
         <div class="nav-item active">销售订单</div>
-        <div class="nav-item">入库管理</div>
-        <div class="nav-item">库存台账</div>
-        <div class="nav-title">工具</div>
+        <div class="nav-title">采购/仓储</div>
+        <div class="nav-item">入库通知/检验/入库</div>
+        <div class="nav-item">库存</div>
+        <div class="nav-item">待出货/出货放行</div>
+        <div class="nav-title">单据模板</div>
         <div class="nav-item">单据模板</div>
-        <div class="nav-item">权限配置</div>
+        <div class="nav-title">系统管理</div>
+        <div class="nav-item">权限管理</div>
       </aside>
 
       <main class="main">
@@ -470,7 +538,7 @@
                   <h2>销售订单</h2>
                   <p class="summary">
                     页面只围绕一个业务对象：筛选订单、查看明细、处理当前记录和进入协同任务。
-                    出货、库存、财务事实不在本页伪造。
+                    左侧只是常用入口参照，出货、库存、财务事实不在本页伪造。
                   </p>
                 </div>
                 <div class="stats" aria-label="订单摘要">

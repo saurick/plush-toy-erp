@@ -81,6 +81,39 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '把协同入口收敛为业务页内组件：收起保留风险提示，展开处理本页相关任务。',
   },
   {
+    key: 'business-detail-standard-page',
+    title: '业务详情页标准样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'business-detail-page-standard-v1/',
+    assetPath: 'business-detail-page-standard-v1/index.html',
+    readmePath: 'business-detail-page-standard-v1/README.md',
+    description:
+      '覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。',
+  },
+  {
+    key: 'business-form-standard-page',
+    title: '新建 / 编辑表单标准样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'business-form-page-standard-v1/',
+    assetPath: 'business-form-page-standard-v1/index.html',
+    readmePath: 'business-form-page-standard-v1/README.md',
+    description:
+      '覆盖字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值和缺值 / 残值防护。',
+  },
+  {
+    key: 'action-modal-drawer-standard',
+    title: '弹窗 / 抽屉动作标准样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'action-modal-drawer-standard-v1/',
+    assetPath: 'action-modal-drawer-standard-v1/index.html',
+    readmePath: 'action-modal-drawer-standard-v1/README.md',
+    description:
+      '覆盖审批、驳回、阻塞、冲正、关闭任务、危险确认和 reason 必填表达。',
+  },
+  {
     key: 'business-direction-sidebar',
     title: '方向 1：右侧当前记录协同侧栏',
     type: 'PNG',

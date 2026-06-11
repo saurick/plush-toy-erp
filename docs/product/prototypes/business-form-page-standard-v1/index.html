@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>新建编辑表单标准样板</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f5f7fb;
+        --panel: #ffffff;
+        --panel-soft: #f9fbfd;
+        --line: #dbe4ef;
+        --line-strong: #bfccdc;
+        --text: #152033;
+        --muted: #65758b;
+        --blue: #1f6fe5;
+        --blue-soft: #edf5ff;
+        --green: #1f7a55;
+        --green-soft: #edf8f2;
+        --amber: #a86107;
+        --amber-soft: #fff7e8;
+        --red: #c43d45;
+        --red-soft: #fff1f2;
+        --shadow: 0 14px 34px rgb(15 23 42 / 8%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111827;
+          --panel: #182235;
+          --panel-soft: #202c42;
+          --line: #334157;
+          --line-strong: #46566f;
+          --text: #edf3fb;
+          --muted: #aab7ca;
+          --blue: #75a7ff;
+          --blue-soft: #1f3556;
+          --green: #7dd8ad;
+          --green-soft: #183b2d;
+          --amber: #f0bd67;
+          --amber-soft: #463214;
+          --red: #ff9aa2;
+          --red-soft: #4a2228;
+          --shadow: 0 18px 44px rgb(0 0 0 / 28%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 240px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .side {
+        border-right: 1px solid var(--line);
+        background: var(--panel);
+        padding: 18px 12px;
+      }
+
+      .brand {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: #225f99;
+        color: #fff;
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      .brand strong,
+      .brand span,
+      .nav-item {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span,
+      .nav-title,
+      .muted,
+      .crumb,
+      .field small {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav-note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 12px;
+        padding: 10px;
+      }
+
+      .nav-title {
+        padding: 12px 10px 6px;
+      }
+
+      .nav-item {
+        min-height: 36px;
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+
+      .nav-item.active {
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 700;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        padding: 14px 22px;
+      }
+
+      .topbar h1 {
+        margin: 2px 0 0;
+        font-size: 18px;
+      }
+
+      .actions,
+      .tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn {
+        min-height: 34px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 12px;
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn.text {
+        border-color: transparent;
+        background: transparent;
+        color: var(--blue);
+      }
+
+      .content {
+        padding: 20px 22px 100px;
+      }
+
+      .page {
+        display: grid;
+        gap: 14px;
+        max-width: 1180px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        padding: 18px;
+      }
+
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h2 {
+        margin-bottom: 8px;
+        font-size: 24px;
+        line-height: 1.22;
+      }
+
+      h3 {
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
+      .summary {
+        max-width: 760px;
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tag.blue {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .tag.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .tag.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .tag.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .source-strip {
+        display: grid;
+        grid-template-columns: minmax(220px, 340px) minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+        border-top: 1px solid var(--line);
+        background: var(--panel-soft);
+        padding: 14px 18px;
+      }
+
+      .source-note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 11px;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 14px;
+        padding: 16px 18px;
+      }
+
+      .group {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 14px;
+      }
+
+      .fields {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .field label {
+        font-weight: 650;
+      }
+
+      .required::after {
+        color: var(--red);
+        content: " *";
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        outline: none;
+        padding: 8px 10px;
+      }
+
+      input,
+      select {
+        min-height: 36px;
+      }
+
+      textarea {
+        min-height: 82px;
+        resize: vertical;
+      }
+
+      [aria-invalid="true"] {
+        border-color: var(--red);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent);
+      }
+
+      .error {
+        display: none;
+        color: var(--red);
+        font-size: 12px;
+      }
+
+      .field.invalid .error {
+        display: block;
+      }
+
+      .guard {
+        border: 1px solid var(--amber);
+        border-radius: 8px;
+        background: var(--amber-soft);
+        color: var(--amber);
+        padding: 12px;
+      }
+
+      .footer {
+        position: sticky;
+        bottom: 0;
+        z-index: 3;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--panel) 96%, transparent);
+        box-shadow: var(--shadow);
+        padding: 12px 14px;
+      }
+
+      @media (max-width: 920px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .side {
+          display: none;
+        }
+
+        .topbar,
+        .hero,
+        .source-strip,
+        .footer {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          position: static;
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 14px 16px;
+        }
+
+        .content {
+          padding: 14px 14px 96px;
+        }
+
+        .fields {
+          grid-template-columns: 1fr;
+        }
+
+        .footer {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="side" aria-label="后台导航">
+        <div class="brand">
+          <div class="mark">永</div>
+          <div>
+            <strong>毛绒 ERP</strong>
+            <span>表单页标准样板</span>
+          </div>
+        </div>
+        <div class="nav-note">以下为常用入口 / 快捷入口示意，不替代 seedData 或 yoyoosun 客户菜单。</div>
+        <div class="nav-title">看板中心</div>
+        <div class="nav-item">工作台</div>
+        <div class="nav-title">基础资料</div>
+        <div class="nav-item">客户档案</div>
+        <div class="nav-item">供应商档案</div>
+        <div class="nav-title">销售链路</div>
+        <div class="nav-item active">销售订单</div>
+        <div class="nav-title">采购/仓储</div>
+        <div class="nav-item">入库通知/检验/入库</div>
+        <div class="nav-item">库存</div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <div class="crumb">销售链路 / 销售订单 / 新建草稿</div>
+            <h1>新建 / 编辑表单样板</h1>
+          </div>
+          <div class="actions">
+            <button class="btn">取消</button>
+            <button class="btn" id="resetForm" type="button">重置</button>
+            <button class="btn primary" id="saveForm" type="button">保存草稿</button>
+          </div>
+        </header>
+
+        <section class="content">
+          <div class="page">
+            <section class="panel">
+              <div class="hero">
+                <div>
+                  <div class="crumb">ERP / 标准表单页 / To Implement</div>
+                  <h2>销售订单草稿</h2>
+                  <p class="summary">
+                    表单页按来源、客户、明细和交付信息分组。来源带值、切换来源后的清值和缺值 / 残值防护必须在保存前可见。
+                  </p>
+                </div>
+                <div class="tags">
+                  <span class="tag blue">字段分组</span>
+                  <span class="tag amber">残值防护</span>
+                  <span class="tag green">不改 schema</span>
+                </div>
+              </div>
+
+              <div class="source-strip">
+                <div class="field">
+                  <label for="source">来源单据</label>
+                  <select id="source">
+                    <option value="sales">销售订单 SO-202606-018</option>
+                    <option value="customer">客户档案 CUST-009</option>
+                    <option value="empty">无来源 / 手工草稿</option>
+                  </select>
+                  <small>切换来源时，来源快照字段必须同步替换或清空。</small>
+                </div>
+                <div class="source-note" id="sourceNote">
+                  已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件引用，避免旧值残留。
+                </div>
+              </div>
+
+              <form class="form-grid" id="form" novalidate>
+                <section class="group">
+                  <h3>基础信息</h3>
+                  <div class="fields">
+                    <div class="field" data-field="customer">
+                      <label class="required" for="customer">客户</label>
+                      <input id="customer" value="永绅样例客户" />
+                      <span class="error">客户必填，不能用旧来源残值代替。</span>
+                    </div>
+                    <div class="field" data-field="orderNo">
+                      <label class="required" for="orderNo">订单号</label>
+                      <input id="orderNo" value="SO-202606-018" />
+                      <span class="error">订单号必填。</span>
+                    </div>
+                    <div class="field">
+                      <label for="owner">负责人</label>
+                      <select id="owner">
+                        <option>业务</option>
+                        <option>PMC</option>
+                        <option>采购</option>
+                      </select>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="group">
+                  <h3>明细信息</h3>
+                  <div class="fields">
+                    <div class="field" data-field="product">
+                      <label class="required" for="product">产品</label>
+                      <input id="product" value="毛绒挂件 A" />
+                      <span class="error">产品必填；来源缺失时不要伪造值。</span>
+                    </div>
+                    <div class="field" data-field="quantity">
+                      <label class="required" for="quantity">数量</label>
+                      <input id="quantity" value="3000" inputmode="numeric" />
+                      <span class="error">数量必填且需要来自当前来源或人工输入。</span>
+                    </div>
+                    <div class="field" data-field="dueDate">
+                      <label class="required" for="dueDate">交期</label>
+                      <input id="dueDate" value="2026-06-18" />
+                      <span class="error">交期必填。</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="group">
+                  <h3>交付与备注</h3>
+                  <div class="fields">
+                    <div class="field">
+                      <label for="warehouse">目标仓库</label>
+                      <select id="warehouse">
+                        <option>成品仓</option>
+                        <option>材料仓</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="attachment">附件引用</label>
+                      <input id="attachment" value="blue-hanger-spec-v3.pdf" />
+                      <small>附件引用随来源切换清空，不在原型中实现上传。</small>
+                    </div>
+                    <div class="field">
+                      <label for="status">状态</label>
+                      <select id="status">
+                        <option>草稿</option>
+                        <option>待提交</option>
+                      </select>
+                    </div>
+                    <div class="field" style="grid-column: 1 / -1">
+                      <label for="remark">备注</label>
+                      <textarea id="remark">示例备注只用于原型，不作为正式字段真源。</textarea>
+                    </div>
+                  </div>
+                </section>
+
+                <div class="guard" id="guard">
+                  当前来源已带出 4 个字段。保存前检查：切换来源后旧产品、旧数量、旧交期和旧附件不得继续残留。
+                </div>
+              </form>
+            </section>
+
+            <div class="footer">
+              <span class="muted" id="footerState">尚未保存，当前为 To Implement 原型状态。</span>
+              <div class="actions">
+                <button class="btn">取消</button>
+                <button class="btn" id="footerReset" type="button">重置</button>
+                <button class="btn primary" id="footerSave" type="button">保存草稿</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const defaults = {
+        customer: "永绅样例客户",
+        orderNo: "SO-202606-018",
+        product: "毛绒挂件 A",
+        quantity: "3000",
+        dueDate: "2026-06-18",
+        attachment: "blue-hanger-spec-v3.pdf",
+        remark: "示例备注只用于原型，不作为正式字段真源。",
+      };
+
+      const sourceData = {
+        sales: {
+          note:
+            "已从销售订单带出客户、产品、数量和交期。若切换来源，将清空产品、数量、交期和附件引用，避免旧值残留。",
+          guard:
+            "当前来源已带出 4 个字段。保存前检查：切换来源后旧产品、旧数量、旧交期和旧附件不得继续残留。",
+          values: defaults,
+        },
+        customer: {
+          note:
+            "已从客户档案带出客户名称，但产品、数量、交期和附件没有真源，必须清空后人工填写。",
+          guard:
+            "来源切换已清空产品、数量、交期和附件。缺值不能用上一来源残值回补。",
+          values: {
+            customer: "永绅样例客户",
+            orderNo: "",
+            product: "",
+            quantity: "",
+            dueDate: "",
+            attachment: "",
+            remark: "客户来源只带出客户，不带出订单明细。",
+          },
+        },
+        empty: {
+          note:
+            "当前为手工草稿，没有上游来源。页面只展示必填缺值，不伪造客户、产品、数量或交期。",
+          guard:
+            "无来源状态下所有必填值都必须人工输入；不得继续显示旧来源快照。",
+          values: {
+            customer: "",
+            orderNo: "",
+            product: "",
+            quantity: "",
+            dueDate: "",
+            attachment: "",
+            remark: "",
+          },
+        },
+      };
+
+      const source = document.querySelector("#source");
+      const sourceNote = document.querySelector("#sourceNote");
+      const guard = document.querySelector("#guard");
+      const footerState = document.querySelector("#footerState");
+      const requiredFields = ["customer", "orderNo", "product", "quantity", "dueDate"];
+
+      function setValue(id, value) {
+        const field = document.querySelector(`#${id}`);
+        if (field) field.value = value;
+      }
+
+      function clearErrors() {
+        requiredFields.forEach((id) => {
+          const input = document.querySelector(`#${id}`);
+          const wrap = document.querySelector(`[data-field="${id}"]`);
+          input?.removeAttribute("aria-invalid");
+          wrap?.classList.remove("invalid");
+        });
+      }
+
+      function applySource(name) {
+        const data = sourceData[name] || sourceData.sales;
+        Object.entries(data.values).forEach(([key, value]) => setValue(key, value));
+        sourceNote.textContent = data.note;
+        guard.textContent = data.guard;
+        footerState.textContent = "来源已切换，保存前需重新校验必填与残值。";
+        clearErrors();
+      }
+
+      function validateForm() {
+        let valid = true;
+        requiredFields.forEach((id) => {
+          const input = document.querySelector(`#${id}`);
+          const wrap = document.querySelector(`[data-field="${id}"]`);
+          const hasValue = Boolean(input?.value.trim());
+          input?.setAttribute("aria-invalid", String(!hasValue));
+          wrap?.classList.toggle("invalid", !hasValue);
+          valid = valid && hasValue;
+        });
+        footerState.textContent = valid
+          ? "示例校验通过：真实保存仍需调用正式 API 和 RBAC 守卫。"
+          : "存在必填缺值或来源清值后的空字段，请补齐后再保存。";
+      }
+
+      source.addEventListener("change", () => applySource(source.value));
+      document.querySelector("#saveForm").addEventListener("click", validateForm);
+      document.querySelector("#footerSave").addEventListener("click", validateForm);
+      document.querySelector("#resetForm").addEventListener("click", () => {
+        source.value = "sales";
+        applySource("sales");
+      });
+      document.querySelector("#footerReset").addEventListener("click", () => {
+        source.value = "sales";
+        applySource("sales");
+      });
+    </script>
+  </body>
+</html>

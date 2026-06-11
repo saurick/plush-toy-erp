@@ -24,6 +24,16 @@
 
 涉及原型的新需求先判断处于哪个阶段、属于哪个归属，再决定使用 Product Design 插件、Codex 原型维护，还是正式工程实现。
 
+### 设计简化原则 / Simplification Principles
+
+原型和 UI 简化默认遵循简约易用原则：少入口、少重复、少装饰，优先让用户快速找到今日任务、当前业务对象和下一步动作。不要为了视觉效果堆叠大屏式指标、重复看板、冗余说明、过多卡片或花哨装饰。
+
+极简不等于简陋。原型和 UI 在减少入口、减少信息和减少装饰的同时，仍必须保持视觉完成度：布局均衡、层级清楚、间距合理、对齐稳定、字体大小克制、按钮层级明确、状态颜色有语义且不过度使用。好看是验收条件之一，但“好看”应通过清晰布局、合理留白、一致组件、稳定节奏、适当对比和符合 ERP 场景的专业感实现；难看、拥挤、空洞、比例失衡、文字层级混乱、按钮过多、卡片堆叠、对齐不齐、移动端横向溢出，都不能因为“极简”而被接受。
+
+简化 UI 只能简化信息呈现和交互路径，不能擅自改变业务语义和当前真源。正式菜单、客户菜单配置、权限、路由、Workflow / Fact 边界、字段口径和后端能力仍以仓库当前真源为准。原型里如果需要突出少量高频入口，应标明这是“快捷入口 / 常用入口”，不能把它写成替代正式菜单的新结构。
+
+待实现原型必须尽量贴近当前真实菜单和运行时结构；如果设计目标是减少正式入口，应单独做菜单评审，明确隐藏、排序、改名或合并的依据，而不是在原型里凭空换一套菜单。
+
 阶段和归属是两个维度，不能混用：
 
 - 阶段说明这个资产在生命周期里处于哪里，例如起草、待实现、当前实现或参考资料。
@@ -150,9 +160,30 @@
 | `admin-command-center-v1/index.html` | To Implement | Core | 极简后台工作台待实现原型，把工作台收敛为登录后的今日处理台：今日队列、当前任务详情和少量常用业务对象入口。 |
 | `business-module-page-standard-v1/index.html` | To Implement | Core | 极简业务模块标准页待实现原型，保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。 |
 | `business-module-page-standard-v1/task-collab-entry-v2.html` | To Implement / Reference | Core / Exploration | 业务页轻量协同入口组件候选 + 方案对比参考，用于表达“收起保留风险提示、展开处理本页任务”，不作为独立业务入口。 |
+| `business-detail-page-standard-v1/index.html` | To Implement | Core | 业务详情页标准样板，覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。 |
+| `business-form-page-standard-v1/index.html` | To Implement | Core | 新建 / 编辑表单标准样板，覆盖字段分组、必填校验、保存 / 取消 / 重置、来源带值、清值和缺值 / 残值防护。 |
+| `action-modal-drawer-standard-v1/index.html` | To Implement | Core | 弹窗 / 抽屉动作标准样板，覆盖审批、驳回、阻塞、冲正、关闭任务、危险确认和 reason 必填表达。 |
 | `business-module-page-standard-v1/images/` | Reference | Exploration / Evidence | 早期三张协同入口方向图，用于追溯方案比较。 |
 | `mobile-role-tasks-v1/implemented-reference.html` | Current | Core | 岗位任务端当前实现对齐版原型，用于说明真实页面吸收早期 PNG 后的 as-built 形态。 |
 | `mobile-role-tasks-v1/images/` | Reference | Exploration / Evidence | 岗位任务端改版三张 PNG 原型图，作为早期视觉方向和历史参考。 |
+
+## 后台标准样板 / Backoffice Standard Patterns
+
+本轮 To Implement 原型体系按页面类型补齐，不逐菜单单独设计。标准样板如下：
+
+| 页面类型 | 标准样板 | 参照规则 |
+| --- | --- | --- |
+| 工作台 / 总控页 | `admin-command-center-v1/index.html` | 登录后第一屏只做今日队列、当前任务和常用入口；常用入口必须标注为快捷入口，不替代正式菜单。 |
+| 业务模块列表页 / 标准业务页 | `business-module-page-standard-v1/index.html` | 同类列表页复用标题摘要、筛选、表格、分页、当前记录操作条和底部协同入口。 |
+| 业务详情页 | `business-detail-page-standard-v1/index.html` | 同类详情页复用基础信息、状态、关联单据、操作记录、附件区和 Workflow / Fact 动作分区。 |
+| 新建 / 编辑表单页 | `business-form-page-standard-v1/index.html` | 同类表单页复用字段分组、必填校验、来源带值、切换清值和保存前防残值提示。 |
+| 协同任务入口 / 处理组件 | `business-module-page-standard-v1/task-collab-entry-v2.html` | 作为业务页内组件候选，不作为独立业务入口，不进入正式菜单。 |
+| 弹窗 / 抽屉动作 | `action-modal-drawer-standard-v1/index.html` | 同类动作浮层复用标题、说明、主次按钮、reason 必填和危险二次确认。 |
+| 打印 / 导入 / 导出 / 帮助 / 开发验收 | 暂无独立完整页面 | 本轮只写作辅助动作参照规则：入口弱化，不喧宾夺主；真实能力仍回到正式页面、工具或 dev-only 入口。 |
+
+同类菜单默认参照上述样板，不单独设计。可参照标准列表页的菜单包括客户档案、供应商档案、产品、销售订单、辅材/包材采购、加工合同/委外下单、入库通知/检验/入库、库存、待出货/出货放行、出库、生产排单、生产进度、延期/返工/异常、品质检验、对账/结算、待付款/应付提醒、应收/开票登记和发票登记。只有当某个菜单存在独特业务流程、独特信息结构或关键交互差异时，再单独做原型评审。
+
+To Implement 不能替代正式菜单、权限、路由、业务语义或 Workflow / Fact 真源。原型里的侧栏只作为常用入口 / 快捷入口示意，名称和分组必须贴近 `seedData.mjs` 与 `yoyoosun` 客户菜单；如果后续要减少正式菜单入口，必须另做菜单评审。
 
 ## 资产状态
 
@@ -184,12 +215,12 @@
 
 当前推荐的简化理解是：顶部只判断“当前 / 待实现 / 参考资料”；`HTML / PNG` 只表示格式，`截图证据 / Evidence`、`方案对比 / Comparison`、`历史参考 / History` 等细标签只解释来源和用途。不要反过来用 HTML / PNG 文件格式或辅助标签判断资产阶段。
 
-截至 2026-06-11，待实现队列仍包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html` 和 `business-module-page-standard-v1/task-collab-entry-v2.html`。本轮已按 Product Design 方向把三个待实现 HTML 重做为极简版本：工作台不再强调五个并列视图，业务模块标准页减少统计和按钮密度，协同入口从“独立候选页面”收敛为业务页内组件候选。本轮只调整原型资产和登记口径，不改变运行时代码、正式菜单、后端 API、RBAC、schema、migration 或 Fact 语义。未获用户明确确认前，三个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现对齐版登记。
+截至 2026-06-11，待实现队列包含 `admin-command-center-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。本轮继续保持三个既有 HTML 的 To Implement 状态，并补齐详情页、表单页和弹窗 / 抽屉动作三个后台标准样板；工作台和业务模块标准页的侧栏只作为贴近当前真实菜单的常用入口 / 快捷入口示意，不替代 seedData、客户菜单、路由或 RBAC。本轮只调整原型资产和登记口径，不改变运行时代码、正式菜单、后端 API、RBAC、schema、migration 或 Fact 语义。未获用户明确确认前，六个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现对齐版登记。
 
 ## 使用方式
 
 直接用浏览器打开本目录的 `index.html`，或在本地前端开发环境访问 `http://localhost:5175/__dev/prototypes`。两个查看器都只做资产浏览和全屏预览；PNG 资产通过 `index.html`、`/__dev/prototypes` 或所在 `images/` 目录访问。开发态 `/__dev/prototypes` 额外提供目录分组折叠、上次筛选、当前打开资产和置顶状态的浏览器本地偏好，用于原型数量增加后的日常查找；这些偏好不写入后端、不改变资产状态，也不进入正式菜单或权限体系。
 
-实现时优先把共性能力收口到业务列表页共享组件，而不是每个模块单独复制原型结构。采购合同、应收 / 开票、发票登记、出库、入库通知等“列表 + 单据操作 + 协同入口”的页面可先套用标准页；库存余额、库存流水、生产排单、生产进度、质检等信息结构明显不同的页面应单独评审变体。
+实现时优先把共性能力收口到共享页面骨架、共享业务列表组件、共享详情布局、共享表单分组和共享动作浮层，而不是每个模块单独复制原型结构。采购合同、应收 / 开票、发票登记、出库、入库通知等“列表 + 单据操作 + 协同入口”的页面可先套用标准页；详情型、表单型和动作浮层默认参照本轮新增样板；库存余额、库存流水、生产排单、生产进度、质检等信息结构明显不同的页面应单独评审变体。
 
 维护 `index.html` 时保持手工登记和相对链接，不新增依赖或构建工具；新增资产后同步补充名称、类型、状态、所属目录、用途和打开入口。全屏预览只能作为查看辅助，不改变资产状态或正式实现口径。

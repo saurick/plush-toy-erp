@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>业务详情页标准样板</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f5f7fb;
+        --panel: #ffffff;
+        --panel-soft: #f9fbfd;
+        --line: #dbe4ef;
+        --line-strong: #bfccdc;
+        --text: #152033;
+        --muted: #65758b;
+        --blue: #1f6fe5;
+        --blue-soft: #edf5ff;
+        --green: #1f7a55;
+        --green-soft: #edf8f2;
+        --amber: #a86107;
+        --amber-soft: #fff7e8;
+        --red: #c43d45;
+        --red-soft: #fff1f2;
+        --shadow: 0 14px 34px rgb(15 23 42 / 8%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111827;
+          --panel: #182235;
+          --panel-soft: #202c42;
+          --line: #334157;
+          --line-strong: #46566f;
+          --text: #edf3fb;
+          --muted: #aab7ca;
+          --blue: #75a7ff;
+          --blue-soft: #1f3556;
+          --green: #7dd8ad;
+          --green-soft: #183b2d;
+          --amber: #f0bd67;
+          --amber-soft: #463214;
+          --red: #ff9aa2;
+          --red-soft: #4a2228;
+          --shadow: 0 18px 44px rgb(0 0 0 / 28%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 240px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .side {
+        border-right: 1px solid var(--line);
+        background: var(--panel);
+        padding: 18px 12px;
+      }
+
+      .brand {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .mark {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: #225f99;
+        color: #fff;
+        font-size: 20px;
+        font-weight: 760;
+      }
+
+      .brand strong,
+      .brand span,
+      .nav-item {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span,
+      .nav-title,
+      .muted,
+      .crumb {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav-note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 12px;
+        padding: 10px;
+      }
+
+      .nav-title {
+        padding: 12px 10px 6px;
+      }
+
+      .nav-item {
+        min-height: 36px;
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+
+      .nav-item.active {
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 700;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        padding: 14px 22px;
+      }
+
+      .topbar h1 {
+        margin: 2px 0 0;
+        font-size: 18px;
+      }
+
+      .actions,
+      .tags,
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn {
+        min-height: 34px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 12px;
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn.danger {
+        border-color: var(--red);
+        color: var(--red);
+      }
+
+      .btn.text {
+        border-color: transparent;
+        background: transparent;
+        color: var(--blue);
+      }
+
+      .content {
+        padding: 20px 22px 28px;
+      }
+
+      .page {
+        display: grid;
+        gap: 14px;
+        max-width: 1280px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        padding: 18px;
+      }
+
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h2 {
+        margin-bottom: 8px;
+        font-size: 24px;
+        line-height: 1.22;
+      }
+
+      h3 {
+        margin-bottom: 10px;
+        font-size: 16px;
+      }
+
+      .summary {
+        max-width: 780px;
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tag.blue {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .tag.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .tag.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .tag.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+        gap: 14px;
+      }
+
+      .section {
+        padding: 16px;
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .kv div,
+      .timeline li,
+      .file,
+      .link-row {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 11px;
+      }
+
+      .kv span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .kv strong,
+      .file strong,
+      .link-row strong {
+        display: block;
+        margin-top: 3px;
+        overflow-wrap: anywhere;
+      }
+
+      .state-rail {
+        display: grid;
+        gap: 8px;
+      }
+
+      .state {
+        display: grid;
+        grid-template-columns: 10px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: var(--line-strong);
+        margin-top: 5px;
+      }
+
+      .state.done .dot {
+        background: var(--green);
+      }
+
+      .state.current .dot {
+        background: var(--blue);
+      }
+
+      .state.blocked .dot {
+        background: var(--red);
+      }
+
+      .link-list,
+      .files {
+        display: grid;
+        gap: 8px;
+      }
+
+      .link-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 8px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .timeline small {
+        display: block;
+        color: var(--muted);
+      }
+
+      .action-panel {
+        border-top: 1px solid var(--line);
+        background: var(--panel-soft);
+        padding: 14px 16px 16px;
+      }
+
+      .tabs {
+        margin-bottom: 12px;
+      }
+
+      .tab {
+        min-height: 32px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 10px;
+      }
+
+      .tab.active {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 700;
+      }
+
+      .action-copy {
+        min-height: 86px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+      }
+
+      @media (max-width: 920px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .side {
+          display: none;
+        }
+
+        .topbar,
+        .hero,
+        .grid,
+        .link-row {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          position: static;
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 14px 16px;
+        }
+
+        .content {
+          padding: 14px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .kv {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="side" aria-label="后台导航">
+        <div class="brand">
+          <div class="mark">永</div>
+          <div>
+            <strong>毛绒 ERP</strong>
+            <span>详情页标准样板</span>
+          </div>
+        </div>
+        <div class="nav-note">以下为常用入口 / 快捷入口示意，不替代 seedData 或 yoyoosun 客户菜单。</div>
+        <div class="nav-title">看板中心</div>
+        <div class="nav-item">工作台</div>
+        <div class="nav-item">业务看板</div>
+        <div class="nav-title">销售链路</div>
+        <div class="nav-item active">销售订单</div>
+        <div class="nav-title">采购/仓储</div>
+        <div class="nav-item">入库通知/检验/入库</div>
+        <div class="nav-item">库存</div>
+        <div class="nav-item">待出货/出货放行</div>
+        <div class="nav-title">系统管理</div>
+        <div class="nav-item">权限管理</div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <div class="crumb">销售链路 / 销售订单 / SO-202606-018</div>
+            <h1>业务详情页样板</h1>
+          </div>
+          <div class="actions">
+            <button class="btn">导出</button>
+            <button class="btn">打印</button>
+            <button class="btn primary">编辑草稿</button>
+          </div>
+        </header>
+
+        <section class="content">
+          <div class="page">
+            <section class="panel hero">
+              <div>
+                <div class="crumb">ERP / 标准详情页 / To Implement</div>
+                <h2>销售订单 SO-202606-018</h2>
+                <p class="summary">
+                  详情页先让用户看清业务对象、状态、关联链路和下一步动作。
+                  Workflow 协同动作与库存、出货、财务等 Fact 动作分区展示，不混成一种按钮语义。
+                </p>
+              </div>
+              <div class="tags" aria-label="状态">
+                <span class="tag green">订单 active</span>
+                <span class="tag amber">协同待处理</span>
+                <span class="tag blue">非事实过账</span>
+              </div>
+            </section>
+
+            <div class="grid">
+              <section class="panel section" aria-label="基础信息">
+                <h3>基础信息</h3>
+                <div class="kv">
+                  <div><span>客户</span><strong>永绅样例客户</strong></div>
+                  <div><span>产品</span><strong>毛绒挂件 A / 蓝色款</strong></div>
+                  <div><span>数量</span><strong>3,000 pcs</strong></div>
+                  <div><span>交期</span><strong>2026-06-18</strong></div>
+                  <div><span>负责人</span><strong>业务 / PMC</strong></div>
+                  <div><span>字段来源</span><strong>销售订单主表 + 明细行</strong></div>
+                </div>
+              </section>
+
+              <section class="panel section" aria-label="业务状态">
+                <h3>业务状态</h3>
+                <div class="state-rail">
+                  <div class="state done">
+                    <span class="dot"></span>
+                    <div><strong>订单已提交</strong><div class="muted">来源单据成立，不写出货或库存事实。</div></div>
+                  </div>
+                  <div class="state current">
+                    <span class="dot"></span>
+                    <div><strong>执行中</strong><div class="muted">可进入协同任务、排产、采购或出货前检查。</div></div>
+                  </div>
+                  <div class="state blocked">
+                    <span class="dot"></span>
+                    <div><strong>协同阻塞待处理</strong><div class="muted">只代表任务卡点，不代表订单事实失败。</div></div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel section" aria-label="关联单据">
+                <h3>关联单据</h3>
+                <div class="link-list">
+                  <div class="link-row"><strong>材料 BOM / BOM-26029</strong><span class="tag blue">资料层</span></div>
+                  <div class="link-row"><strong>入库通知 / INB-202606-009</strong><span class="tag amber">协同中</span></div>
+                  <div class="link-row"><strong>库存批次 / LOT-PLUSH-008</strong><span class="tag green">事实查询</span></div>
+                  <div class="link-row"><strong>出货放行 / 待创建</strong><span class="tag red">不能伪造</span></div>
+                </div>
+              </section>
+
+              <section class="panel section" aria-label="附件区">
+                <h3>附件区</h3>
+                <div class="files">
+                  <div class="file"><span class="muted">图纸</span><strong>blue-hanger-spec-v3.pdf</strong></div>
+                  <div class="file"><span class="muted">合同</span><strong>purchase-contract-preview.pdf</strong></div>
+                  <div class="file"><span class="muted">质检照片</span><strong>待上传，不在原型中实现附件服务</strong></div>
+                </div>
+              </section>
+            </div>
+
+            <section class="panel" aria-label="操作记录和动作区">
+              <div class="section">
+                <h3>操作记录</h3>
+                <ol class="timeline">
+                  <li><strong>业务提交销售订单</strong><small>2026-06-11 09:24 / 只写销售订单状态。</small></li>
+                  <li><strong>PMC 标记齐套风险</strong><small>2026-06-11 10:18 / 生成 Workflow 协同任务。</small></li>
+                  <li><strong>仓库反馈入库异常</strong><small>2026-06-11 14:05 / 任务阻塞，不等于库存事实失败。</small></li>
+                </ol>
+              </div>
+              <div class="action-panel">
+                <div class="tabs" role="tablist" aria-label="动作区类型">
+                  <button class="tab active" type="button" data-panel="workflow">Workflow 协同动作</button>
+                  <button class="tab" type="button" data-panel="fact">Fact 事实动作</button>
+                </div>
+                <div class="action-copy" id="actionCopy">
+                  <strong>处理协同任务</strong>
+                  <p class="summary">可完成、阻塞、驳回或催办当前任务；这些动作只写 Workflow 任务和协同状态，不写库存、出货、财务、开票或收付款事实。</p>
+                  <div class="actions">
+                    <button class="btn primary">完成任务</button>
+                    <button class="btn">记录阻塞</button>
+                    <button class="btn">催办</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const tabs = Array.from(document.querySelectorAll(".tab"));
+      const actionCopy = document.querySelector("#actionCopy");
+
+      const panels = {
+        workflow: {
+          title: "处理协同任务",
+          copy:
+            "可完成、阻塞、驳回或催办当前任务；这些动作只写 Workflow 任务和协同状态，不写库存、出货、财务、开票或收付款事实。",
+          buttons: ["完成任务", "记录阻塞", "催办"],
+          kind: "primary",
+        },
+        fact: {
+          title: "进入事实动作",
+          copy:
+            "库存入账、出货发货、财务登记必须回到对应 Fact usecase；详情页只给出入口和状态提示，不能由任务完成自动触发。",
+          buttons: ["打开入库单", "打开出货事实", "查看财务登记"],
+          kind: "danger",
+        },
+      };
+
+      function renderPanel(name) {
+        const panel = panels[name] || panels.workflow;
+        actionCopy.innerHTML = `
+          <strong>${panel.title}</strong>
+          <p class="summary">${panel.copy}</p>
+          <div class="actions">
+            ${panel.buttons
+              .map((label, index) => {
+                const className =
+                  index === 0
+                    ? panel.kind === "danger"
+                      ? "btn danger"
+                      : "btn primary"
+                    : "btn";
+                return `<button class="${className}">${label}</button>`;
+              })
+              .join("")}
+          </div>
+        `;
+      }
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          tabs.forEach((item) => item.classList.remove("active"));
+          tab.classList.add("active");
+          renderPanel(tab.dataset.panel);
+        });
+      });
+    </script>
+  </body>
+</html>

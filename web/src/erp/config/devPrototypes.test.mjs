@@ -30,10 +30,10 @@ test('devPrototypes: 只通过开发态独立路径暴露', () => {
 })
 
 test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
-  assert.equal(DEV_PROTOTYPE_ASSETS.length, 10)
+  assert.equal(DEV_PROTOTYPE_ASSETS.length, 13)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'HTML').length,
-    4
+    7
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'PNG').length,
@@ -52,7 +52,7 @@ test('devPrototypes: 登记当前原型资产并区分类型和状态', () => {
     DEV_PROTOTYPE_ASSETS.filter((item) =>
       item.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)
     ).length,
-    3
+    6
   )
   assert.deepEqual(
     DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => option.value),
@@ -89,6 +89,12 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
         '<!doctype html><title>极简后台工作台原型</title>',
       '../../../../docs/product/prototypes/business-module-page-standard-v1/index.html':
         '<!doctype html><title>极简业务模块标准页原型</title>',
+      '../../../../docs/product/prototypes/business-detail-page-standard-v1/index.html':
+        '<!doctype html><title>业务详情页标准样板</title>',
+      '../../../../docs/product/prototypes/business-form-page-standard-v1/index.html':
+        '<!doctype html><title>新建编辑表单标准样板</title>',
+      '../../../../docs/product/prototypes/action-modal-drawer-standard-v1/index.html':
+        '<!doctype html><title>弹窗抽屉动作标准样板</title>',
       '../../../../docs/product/prototypes/mobile-role-tasks-v1/implemented-reference.html':
         '<!doctype html><title>岗位任务端</title>',
     },
@@ -105,11 +111,26 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
     (item) => item.key === 'admin-command-center'
   )
   const mobileList = items.find((item) => item.key === 'mobile-role-tasks-list')
+  const detailPrototype = items.find(
+    (item) => item.key === 'business-detail-standard-page'
+  )
+  const formPrototype = items.find(
+    (item) => item.key === 'business-form-standard-page'
+  )
+  const actionPrototype = items.find(
+    (item) => item.key === 'action-modal-drawer-standard'
+  )
 
   assert.equal(commandCenterPrototype?.available, true)
   assert.match(commandCenterPrototype?.source || '', /极简后台工作台原型/)
   assert.equal(businessPrototype?.available, true)
   assert.match(businessPrototype?.source || '', /极简业务模块标准页原型/)
+  assert.equal(detailPrototype?.available, true)
+  assert.match(detailPrototype?.source || '', /业务详情页标准样板/)
+  assert.equal(formPrototype?.available, true)
+  assert.match(formPrototype?.source || '', /新建编辑表单标准样板/)
+  assert.equal(actionPrototype?.available, true)
+  assert.match(actionPrototype?.source || '', /弹窗抽屉动作标准样板/)
   assert.equal(mobileList?.available, true)
   assert.equal(mobileList?.url, '/assets/mobile-role-tasks-list-reference.png')
 })
@@ -157,6 +178,9 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
       'admin-command-center',
       'business-module-standard-page',
       'business-task-collab-entry',
+      'business-detail-standard-page',
+      'business-form-standard-page',
+      'action-modal-drawer-standard',
     ]
   )
   assert.equal(
@@ -245,6 +269,9 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
     [
       'admin-command-center-v1/',
       'business-module-page-standard-v1/',
+      'business-detail-page-standard-v1/',
+      'business-form-page-standard-v1/',
+      'action-modal-drawer-standard-v1/',
       'business-module-page-standard-v1/images/',
       'mobile-role-tasks-v1/',
       'mobile-role-tasks-v1/images/',
@@ -252,7 +279,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
   )
   assert.deepEqual(
     groups.map((group) => group.items.length),
-    [1, 2, 3, 1, 3]
+    [1, 2, 1, 1, 1, 3, 1, 3]
   )
 
   assert.deepEqual(

@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>弹窗抽屉动作标准样板</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f5f7fb;
+        --panel: #ffffff;
+        --panel-soft: #f9fbfd;
+        --line: #dbe4ef;
+        --line-strong: #bfccdc;
+        --text: #152033;
+        --muted: #65758b;
+        --blue: #1f6fe5;
+        --blue-soft: #edf5ff;
+        --green: #1f7a55;
+        --green-soft: #edf8f2;
+        --amber: #a86107;
+        --amber-soft: #fff7e8;
+        --red: #c43d45;
+        --red-soft: #fff1f2;
+        --shadow: 0 14px 34px rgb(15 23 42 / 8%);
+        --overlay: rgb(15 23 42 / 44%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111827;
+          --panel: #182235;
+          --panel-soft: #202c42;
+          --line: #334157;
+          --line-strong: #46566f;
+          --text: #edf3fb;
+          --muted: #aab7ca;
+          --blue: #75a7ff;
+          --blue-soft: #1f3556;
+          --green: #7dd8ad;
+          --green-soft: #183b2d;
+          --amber: #f0bd67;
+          --amber-soft: #463214;
+          --red: #ff9aa2;
+          --red-soft: #4a2228;
+          --shadow: 0 18px 44px rgb(0 0 0 / 28%);
+          --overlay: rgb(0 0 0 / 58%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .page {
+        display: grid;
+        gap: 14px;
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        padding: 18px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: 26px;
+        line-height: 1.2;
+      }
+
+      h2 {
+        margin-bottom: 8px;
+        font-size: 18px;
+      }
+
+      .summary,
+      .muted,
+      .eyebrow {
+        color: var(--muted);
+      }
+
+      .eyebrow,
+      .muted {
+        font-size: 12px;
+      }
+
+      .summary {
+        max-width: 760px;
+        margin-bottom: 0;
+      }
+
+      .actions,
+      .tags,
+      .action-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn {
+        min-height: 34px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 12px;
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn.danger {
+        border-color: var(--red);
+        background: var(--red);
+        color: #fff;
+      }
+
+      .btn.text {
+        border-color: transparent;
+        background: transparent;
+        color: var(--blue);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .tag.blue {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .tag.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .tag.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .tag.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .surface {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 0.42fr);
+        gap: 14px;
+        padding: 16px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 14px;
+      }
+
+      .action-grid {
+        align-items: stretch;
+      }
+
+      .action-card {
+        flex: 1 1 180px;
+        min-height: 104px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 12px;
+        text-align: left;
+      }
+
+      .action-card strong,
+      .action-card span {
+        display: block;
+      }
+
+      .action-card span {
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .drawer-backdrop,
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        display: none;
+        background: var(--overlay);
+      }
+
+      .drawer-backdrop.open,
+      .modal-backdrop.open {
+        display: block;
+      }
+
+      .drawer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        width: min(480px, 100%);
+        height: 100%;
+        background: var(--panel);
+        box-shadow: -18px 0 44px rgb(0 0 0 / 24%);
+      }
+
+      .drawer-head,
+      .drawer-foot,
+      .modal-foot {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+      }
+
+      .drawer-foot,
+      .modal-foot {
+        border-top: 1px solid var(--line);
+        border-bottom: 0;
+      }
+
+      .drawer-body {
+        overflow: auto;
+        padding: 16px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+        margin-top: 14px;
+      }
+
+      textarea {
+        min-height: 112px;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 10px;
+        resize: vertical;
+      }
+
+      textarea[aria-invalid="true"] {
+        border-color: var(--red);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent);
+      }
+
+      .error {
+        display: none;
+        color: var(--red);
+        font-size: 12px;
+      }
+
+      .field.invalid .error {
+        display: block;
+      }
+
+      .modal {
+        width: min(420px, calc(100% - 28px));
+        margin: 12vh auto 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .modal-body {
+        padding: 16px;
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          padding: 14px;
+        }
+
+        .hero,
+        .surface {
+          grid-template-columns: 1fr;
+        }
+
+        .drawer {
+          width: 100%;
+        }
+
+        .drawer-head,
+        .drawer-foot,
+        .modal-foot {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="panel hero">
+        <div>
+          <div class="eyebrow">ERP / 动作浮层标准样板 / To Implement</div>
+          <h1>弹窗 / 抽屉只承接当前动作。</h1>
+          <p class="summary">
+            审批、驳回、阻塞、关闭任务走 Workflow 语义；冲正、取消过账等事实动作必须有更强确认。
+            reason 必填、空字符串无效等只在原型表达，不修改真实 WorkflowUsecase。
+          </p>
+        </div>
+        <div class="tags">
+          <span class="tag blue">抽屉动作</span>
+          <span class="tag amber">原因必填</span>
+          <span class="tag red">危险确认</span>
+        </div>
+      </section>
+
+      <section class="panel surface">
+        <div class="card">
+          <h2>当前业务对象</h2>
+          <p class="summary">
+            SO-202606-018 / 入库异常协同任务。这里展示页面内动作入口形态，真实页面仍由 RBAC 和后端状态决定按钮可见性。
+          </p>
+          <div class="action-grid" aria-label="动作入口">
+            <button class="action-card" data-action="approve" type="button">
+              <strong>审批通过</strong>
+              <span>Workflow done，需要处理说明。</span>
+            </button>
+            <button class="action-card" data-action="reject" type="button">
+              <strong>驳回</strong>
+              <span>Workflow rejected，reason 必填。</span>
+            </button>
+            <button class="action-card" data-action="block" type="button">
+              <strong>记录阻塞</strong>
+              <span>Workflow blocked，空白原因无效。</span>
+            </button>
+            <button class="action-card" data-action="reverse" type="button">
+              <strong>冲正确认</strong>
+              <span>Fact reversal，必须二次确认。</span>
+            </button>
+            <button class="action-card" data-action="close" type="button">
+              <strong>关闭任务</strong>
+              <span>关闭协同任务，不等于事实过账。</span>
+            </button>
+          </div>
+        </div>
+
+        <aside class="card">
+          <h2>参照规则</h2>
+          <p class="muted">主按钮只做当前动作，次按钮取消或返回；危险动作必须明确影响范围。</p>
+          <p class="muted">打印、导入、导出、帮助和开发验收入口不放进动作浮层主流程。</p>
+          <p class="muted">Workflow 与 Fact 动作可以共享浮层组件，但文案、确认强度和提交目标必须分清。</p>
+        </aside>
+      </section>
+    </main>
+
+    <div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true">
+      <section class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+        <header class="drawer-head">
+          <div>
+            <div class="eyebrow" id="drawerKind">Workflow 动作</div>
+            <h2 id="drawerTitle">审批通过</h2>
+          </div>
+          <button class="btn text" id="drawerClose" type="button">关闭</button>
+        </header>
+        <div class="drawer-body">
+          <p class="summary" id="drawerCopy">
+            完成当前协同任务，只写 Workflow 任务和协同状态，不写库存、出货、财务或开票事实。
+          </p>
+          <div class="field" id="reasonField">
+            <label for="reason">处理原因 / 说明</label>
+            <textarea id="reason" placeholder="请输入原因，空字符串和全空格无效"></textarea>
+            <span class="error">原因必填，空字符串或全空格无效。</span>
+          </div>
+        </div>
+        <footer class="drawer-foot">
+          <span class="muted" id="drawerHint">提交前会校验 reason。</span>
+          <div class="actions">
+            <button class="btn" id="drawerCancel" type="button">取消</button>
+            <button class="btn primary" id="drawerSubmit" type="button">提交动作</button>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <div class="modal-backdrop" id="dangerModal" aria-hidden="true">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-body">
+          <div class="eyebrow">危险操作确认</div>
+          <h2 id="modalTitle">确认执行危险动作？</h2>
+          <p class="summary" id="modalCopy">
+            该动作可能写入事实冲正或关闭关键任务。请确认影响范围已经核对。
+          </p>
+        </div>
+        <footer class="modal-foot">
+          <span class="muted">原型只表达确认强度，不执行真实提交。</span>
+          <div class="actions">
+            <button class="btn" id="modalCancel" type="button">返回修改</button>
+            <button class="btn danger" id="modalConfirm" type="button">确认执行</button>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <script>
+      const actionMeta = {
+        approve: {
+          title: "审批通过",
+          kind: "Workflow 动作",
+          copy:
+            "完成当前协同任务，只写 Workflow 任务和协同状态，不写库存、出货、财务或开票事实。",
+          dangerous: false,
+          button: "提交通过",
+        },
+        reject: {
+          title: "驳回",
+          kind: "Workflow 动作",
+          copy:
+            "驳回当前协同任务，reason 必填；旧 rejected_reason / blocked_reason 的清理属于真实 usecase 测试范围。",
+          dangerous: false,
+          button: "提交驳回",
+        },
+        block: {
+          title: "记录阻塞",
+          kind: "Workflow 动作",
+          copy:
+            "记录 blocked 原因并保留当前业务对象状态边界；阻塞不等于库存、出货或财务事实失败。",
+          dangerous: false,
+          button: "提交阻塞",
+        },
+        reverse: {
+          title: "冲正确认",
+          kind: "Fact 事实动作",
+          copy:
+            "冲正必须回到对应 Fact usecase，并说明影响的库存流水、出货或财务事实；不能由 Workflow 任务自动触发。",
+          dangerous: true,
+          button: "继续冲正",
+        },
+        close: {
+          title: "关闭任务",
+          kind: "Workflow 动作",
+          copy:
+            "关闭协同任务只代表任务不再处理，不代表业务事实已过账。危险关闭需要二次确认。",
+          dangerous: true,
+          button: "继续关闭",
+        },
+      };
+
+      const drawerBackdrop = document.querySelector("#drawerBackdrop");
+      const dangerModal = document.querySelector("#dangerModal");
+      const drawerTitle = document.querySelector("#drawerTitle");
+      const drawerKind = document.querySelector("#drawerKind");
+      const drawerCopy = document.querySelector("#drawerCopy");
+      const drawerSubmit = document.querySelector("#drawerSubmit");
+      const reason = document.querySelector("#reason");
+      const reasonField = document.querySelector("#reasonField");
+      const drawerHint = document.querySelector("#drawerHint");
+      const modalTitle = document.querySelector("#modalTitle");
+      const modalCopy = document.querySelector("#modalCopy");
+      let currentAction = actionMeta.approve;
+
+      function openDrawer(actionKey) {
+        currentAction = actionMeta[actionKey] || actionMeta.approve;
+        drawerTitle.textContent = currentAction.title;
+        drawerKind.textContent = currentAction.kind;
+        drawerCopy.textContent = currentAction.copy;
+        drawerSubmit.textContent = currentAction.button;
+        drawerSubmit.className = currentAction.dangerous ? "btn danger" : "btn primary";
+        reason.value = "";
+        reason.removeAttribute("aria-invalid");
+        reasonField.classList.remove("invalid");
+        drawerHint.textContent = "提交前会校验 reason。";
+        drawerBackdrop.classList.add("open");
+        drawerBackdrop.setAttribute("aria-hidden", "false");
+        reason.focus();
+      }
+
+      function closeDrawer() {
+        drawerBackdrop.classList.remove("open");
+        drawerBackdrop.setAttribute("aria-hidden", "true");
+      }
+
+      function validateAndSubmit() {
+        const valid = Boolean(reason.value.trim());
+        reason.setAttribute("aria-invalid", String(!valid));
+        reasonField.classList.toggle("invalid", !valid);
+        if (!valid) {
+          drawerHint.textContent = "原因为空，不能提交。";
+          return;
+        }
+        if (currentAction.dangerous) {
+          modalTitle.textContent = `确认${currentAction.title}？`;
+          modalCopy.textContent = currentAction.copy;
+          dangerModal.classList.add("open");
+          dangerModal.setAttribute("aria-hidden", "false");
+          return;
+        }
+        drawerHint.textContent = "原型提交成功：真实动作仍需后端权限和状态校验。";
+      }
+
+      document.querySelectorAll("[data-action]").forEach((button) => {
+        button.addEventListener("click", () => openDrawer(button.dataset.action));
+      });
+      document.querySelector("#drawerClose").addEventListener("click", closeDrawer);
+      document.querySelector("#drawerCancel").addEventListener("click", closeDrawer);
+      drawerSubmit.addEventListener("click", validateAndSubmit);
+      document.querySelector("#modalCancel").addEventListener("click", () => {
+        dangerModal.classList.remove("open");
+        dangerModal.setAttribute("aria-hidden", "true");
+      });
+      document.querySelector("#modalConfirm").addEventListener("click", () => {
+        dangerModal.classList.remove("open");
+        dangerModal.setAttribute("aria-hidden", "true");
+        drawerHint.textContent = "危险确认已通过：原型不执行真实提交。";
+      });
+    </script>
+  </body>
+</html>
