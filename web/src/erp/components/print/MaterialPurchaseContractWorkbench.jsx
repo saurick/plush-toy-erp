@@ -22,7 +22,6 @@ import PrintWorkspaceShell from './PrintWorkspaceShell.jsx'
 import {
   downloadPdfFromElement,
   openPdfPreviewFromElement,
-  warmupPdfPreviewFromElement,
 } from '../../utils/printPdf.mjs'
 import {
   MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
@@ -39,7 +38,6 @@ const CLAUSE_SECTIONS = [
   { key: 'contract', title: '二、合同约定' },
   { key: 'settlement', title: '三、结算方式' },
 ]
-const PDF_PREVIEW_WARMUP_DELAY_MS = 450
 
 function EditableText({
   value,
@@ -243,34 +241,6 @@ export default function MaterialPurchaseContractWorkbench({
     observeNodeRef: paperRef,
     suspended: pdfAction !== '',
   })
-
-  useEffect(() => {
-    if (pdfAction || !paperRef.current) {
-      return undefined
-    }
-
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      if (cancelled || !paperRef.current) {
-        return
-      }
-
-      syncPrintPageMarginForPaper(paperRef.current, {
-        stageWrapElement: stageWrapRef.current,
-        paperContinuedClass: 'erp-material-contract-paper--continued',
-      })
-      warmupPdfPreviewFromElement(paperRef.current, {
-        title: '采购合同 PDF 预览',
-        fileName: 'material-purchase-contract-preview.pdf',
-        templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-      }).catch(() => {})
-    }, PDF_PREVIEW_WARMUP_DELAY_MS)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [draft, pdfAction])
 
   const totals = useMemo(
     () => computeMaterialPurchaseTotals(draft.lines),

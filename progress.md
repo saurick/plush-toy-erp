@@ -288,3 +288,33 @@
 - 验证：`pnpm --dir web test -- --runInBand web/src/erp/config/devPrototypes.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web style:l1` 均通过；Playwright 直接打开静态 HTML 验证桌面无横向溢出、只读状态关闭两个保存按钮、无来源保存触发 5 个必填错误、390px 移动视口无横向溢出。
 - 下一步：若要吸收到真实页面，应先选定一个目标页面，建议从销售订单新建 / 编辑开始；吸收前必须回到真实 React / AntD 组件、API、RBAC、theme token、字段真源和浏览器回归。
 - 阻塞/风险：本轮只改原型资产、dev-only 原型登记、说明文档和测试断言；未改正式 ERP 页面、正式菜单、后端 API、schema / migration、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。当前工作区已有多处非本轮未提交改动，本轮未回退或整理。
+
+## 2026-06-11 21:16 CST
+
+- 完成：将 `docs/reference/imported-notes/` 下 3 个 imported note 正文 Markdown 文件改为中文文件名，并同步更新 imported-notes README、文档清单和两处活跃产品文档引用；保留 `README.md` 原名。
+- 验证：`rg --files docs/reference/imported-notes` 确认目录内正文文件已是中文文件名；按旧英文正文文件名扫描活跃文档后，仅剩原文档里的 Desktop 来源路径，不是仓库内断链。
+- 下一步：如后续要继续把文档 H1 或内部标题统一为中文主体 + English anchor，可单独做正文口径整理。
+- 阻塞/风险：本轮只改文档文件名和活跃引用；未改 runtime、schema、migration、API、UI、菜单、RBAC、WorkflowUsecase、Fact usecase、部署、提交或推送；历史归档里的旧路径保留原样，不改写历史记录。
+
+## 2026-06-11 21:49 CST
+
+- 完成：按空目录审计结果清理不再保留的占位目录和本地空目录，已将 `docs/assets/`、`web/src/erp/mobile/roles/`、`web/src/erp/modules/`、`web/src/erp/docs/`、旧空页目录 `web/src/pages/AdminGuide|AdminHierarchy|AdminMenu/`、`tmp/spreadsheets/template_material_contract/` 和 `web/output/playwright/*` 空输出目录移动到系统废纸篓；保留 `server/internal/core/` 和 `deployments/` 作为仍需正式评审或客户部署资料边界的目录。
+- 完成：同步更新 `docs/document-inventory.md`，删除已清理的 `docs/assets/mobile-role-tasks/README.md`、`web/src/erp/mobile/roles/README.md` 和 `web/src/erp/modules/README.md` 索引。
+- 下一步：如果要把未来架构规划交给 GPT，只应提供 `server/internal/core/`、`web/src/erp/mobile/roles/` 和 `web/src/erp/modules/` 这类“未来分层是否还需要”的问题；不要把已下线的 `web/src/erp/docs/`、旧 Admin 空页或本地输出目录作为规划输入。
+- 阻塞/风险：本轮只做目录清理和文档清单同步；未迁移 `core` 代码、未改变 runtime、路由、菜单、RBAC、后端 API、schema、migration、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。当前工作区已有非本轮文档重命名和修改，本轮未回退或整理。
+
+## 2026-06-11 22:18 CST
+
+- 完成：排查在线预览卡顿并对齐 `trade-erp` 的更轻主路径。移除采购合同和加工合同打印工作台打开 / 草稿变化后的自动 PDF 预热，不再在页面启动 450ms 后后台克隆 DOM、内联样式 / 图片并请求 `/templates/render-pdf`；在线 PDF 改为用户点击“在线预览 PDF”时按需生成。
+- 完成：清理无调用方的 `warmupPdfPreviewFromElement` 和对应单测，避免后台预热重新变成隐藏主路径；同时将 Vite 构建拆包策略对齐 `trade-erp`，取消手工 `vendor` 聚合 chunk，交给 Rollup 自动拆包并保留 1200KB chunk warning 阈值。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web build`、`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing pnpm --dir web style:l1` 均通过；本地 preview `http://127.0.0.1:4173/admin-login` 通过 Browser 检查，页面身份正确、DOM 非空、console warn/error 为空。
+- 下一步：如仍觉得点击“在线预览 PDF”后的服务端生成时间偏长，应单独排查 `/templates/render-pdf` 后端渲染、模板图片体积和 Chromium 队列；不要重新加页面打开阶段的后台自动预热。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、PDF 服务端渲染逻辑、生产部署、提交或推送；Browser 截图 API 在本环境超时，已改用 DOM / console / L1 回归作为证据。当前工作区已有非本轮文档改动，本轮未回退或整理。
+
+## 2026-06-11 22:35 CST
+
+- 完成：将 `/Users/simon/Desktop/gpt给出的一些方案` 下两批 GPT 参考资料复制归档到 `docs/reference/第一次20260519/` 和 `docs/reference/第二次20260611/`；跳过 `.DS_Store`，并按用户纠正确认桌面原路径仍保留一份副本。
+- 完成：按“重复资料不保留”的要求，将旧 `docs/reference/imported-notes/` 移到系统废纸篓；同步更新 `README.md`、`docs/current-source-of-truth.md`、`docs/reference/README.md` 和 `docs/document-inventory.md`，撤掉旧 imported-notes 入口，保留 Reference Only 边界。
+- 验证：`find docs/reference -maxdepth 3 -type f | sort` 确认 17 个实际资料文件已归档；桌面 `/Users/simon/Desktop/gpt给出的一些方案` 已恢复同批次副本；`rg -n "docs/reference/imported-notes|reference/imported|Imported Design Notes|imported design notes|imported note" README.md docs/current-source-of-truth.md docs/document-inventory.md docs/reference/README.md` 无匹配；`git diff --check -- README.md docs/current-source-of-truth.md docs/reference/README.md docs/document-inventory.md progress.md docs/reference` 通过。
+- 下一步：如后续要把某份 GPT 方案吸收到正式路线、架构或实现任务，必须先按当前仓库真源复核，不能直接把 `docs/reference/*` 当执行规格。
+- 阻塞/风险：本轮只做参考资料归档、重复目录删除和索引同步；未改 runtime、schema、migration、API、UI、菜单、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。当前工作区已有其他非本轮未提交改动，本轮未回退或整理。

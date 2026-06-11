@@ -537,33 +537,6 @@ test('printPdf: 相同预览快照的并发请求复用同一个渲染结果', a
   }
 })
 
-test('printPdf: 活跃编辑节点存在时跳过后台预热', () => {
-  const documentLike = new FakeDocument()
-  const body = documentLike.createElement('body')
-  const root = documentLike.createElement('div')
-  const input = documentLike.createElement('input')
-  const contentEditable = documentLike.createElement('span')
-  const button = documentLike.createElement('button')
-  contentEditable.setAttribute('contenteditable', 'true')
-  root.appendChild(input)
-  root.appendChild(contentEditable)
-  root.appendChild(button)
-  body.appendChild(root)
-  documentLike.body = body
-
-  documentLike.activeElement = input
-  assert.equal(__TEST_ONLY__.shouldSkipPdfPreviewWarmup(root), true)
-
-  documentLike.activeElement = contentEditable
-  assert.equal(__TEST_ONLY__.shouldSkipPdfPreviewWarmup(root), true)
-
-  documentLike.activeElement = button
-  assert.equal(__TEST_ONLY__.shouldSkipPdfPreviewWarmup(root), false)
-
-  documentLike.activeElement = body
-  assert.equal(__TEST_ONLY__.shouldSkipPdfPreviewWarmup(root), false)
-})
-
 test('printPdf: 仅预览模式会对大图快照开启降载', () => {
   assert.deepEqual(__TEST_ONLY__.normalizeServerPdfSnapshotOptions(), {
     snapshotMode: '',

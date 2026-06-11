@@ -141,7 +141,7 @@ pnpm style:l1
 - 永绅 yoyoosun 客户差异台账：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delta-ledger.md`
 - 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md`
 - 永绅 yoyoosun 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/README.md`
-- imported design notes：`/Users/simon/projects/plush-toy-erp/docs/reference/imported-notes/README.md`
+- 外部参考资料：`/Users/simon/projects/plush-toy-erp/docs/reference/README.md`
 - architecture 历史评审归档：`/Users/simon/projects/plush-toy-erp/docs/archive/architecture-history/README.md`
 - 工作流主任务树 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/task-flow-v1.md`
 - 通知 / 预警 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/notification-alert-v1.md`

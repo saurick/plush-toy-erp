@@ -19,7 +19,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 
 - `docs/product/*` 和 `docs/architecture/*` 是正式产品 / 架构评审文档；当前不再镜像到前端文档中心。
 - `docs/archive/*`、`progress.md` 只用于历史追溯；原 `docs/changes/*` 历史文件已删除，当前状态回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、代码和测试交叉确认。
-- `docs/reference/imported-notes/*` 是外部输入，必须先经过正式文档和代码复核。
+- `docs/reference/*` 是外部输入，必须先经过正式文档和代码复核；按来源批次归档的参考资料不是 runtime、schema 或当前实现真源。
 - README / server docs / config docs / deployment docs 是目录、运行、部署或子系统维护说明。
 - `docs/` 下长期维护目录的 `README.md` 只维护目录职责、非真源边界和更新规则，不维护每篇文档正文细节。
 - 新增、删除、重命名长期维护 Markdown 文档，或调整文档用途、归属分类、入口状态时，必须同步更新本文。
@@ -56,12 +56,6 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/deployment-conventions.md` | 部署真源约定 / Deployment Conventions |
 | `docs/erp-print-template-field-behavior.md` | 打印模板字段与编辑行为清单 / ERP Print Template Field Behavior |
 | `docs/erp-print-template-implementation.md` | 打印模板实现原理 / ERP Print Template Implementation |
-
-### 设计资产
-
-| 路径 | 标题 / 当前用途 |
-| --- | --- |
-| `docs/assets/mobile-role-tasks/README.md` | 移动端岗位任务页原型资产 / Mobile Role Tasks Prototype Assets |
 
 ### 架构评审
 
@@ -200,18 +194,23 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
 | `docs/reference/README.md` | 参考资料 / Reference |
-| `docs/reference/imported-notes/README.md` | 外部设计输入 / Imported Design Notes |
-| `docs/reference/imported-notes/erp_plush_productization_config_permission_workflow_state_design.md` | 毛绒玩具 ERP 产品化配置、权限、流程与状态设计总结 |
-| `docs/reference/imported-notes/erp_status_workflow_context.md` | 状态分层、状态机、Workflow 与业务事实设计总结 / ERP Status Workflow Context |
-| `docs/reference/imported-notes/plush-toy-erp-from-0-to-1-plan.md` | 外部导入说明：毛绒玩具 ERP 从 0 到 1 重构方案 / Imported Note: Plush Toy ERP From 0 To 1 Plan |
+| `docs/reference/第一次20260519/ERP产品化架构重构方案.md` | GPT 第一批参考：ERP 产品化架构重构方案 |
+| `docs/reference/第一次20260519/毛绒玩具ERP产品化配置权限流程状态设计总结.md` | GPT 第一批参考：毛绒玩具 ERP 产品化配置、权限、流程与状态设计总结 |
+| `docs/reference/第一次20260519/毛绒玩具ERP从0到1重构方案.md` | GPT 第一批参考：毛绒玩具 ERP 从 0 到 1 重构方案 |
+| `docs/reference/第一次20260519/状态分层工作流与业务事实设计总结.md` | GPT 第一批参考：状态分层、工作流与业务事实设计总结 |
+| `docs/reference/第一次20260519/自动化测试计划.md` | GPT 第一批参考：自动化测试计划 |
+| `docs/reference/第二次20260611/deployments:yoyoosun私有化部署资料包规范.md` | GPT 第二批参考：yoyoosun 私有化部署资料包规范 |
+| `docs/reference/第二次20260611/server:internal:core 分层、保留与迁移规范.md` | GPT 第二批参考：server/internal/core 分层、保留与迁移规范 |
+| `docs/reference/第二次20260611/产品核心菜单与页面功能规格.md` | GPT 第二批参考：产品核心菜单与页面功能规格 |
+| `docs/reference/第二次20260611/客户配置与部署指南.md` | GPT 第二批参考：客户配置与部署指南 |
+| `docs/reference/第二次20260611/自动化测试方案.md` | GPT 第二批参考：自动化测试方案 |
+| `docs/reference/第二次20260611/项目完善路线图.md` | GPT 第二批参考：项目完善路线图 |
 
 ### 前端 / 后端 / 脚本说明
 
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
 | `web/README.md` | web 前端说明 |
-| `web/src/erp/mobile/roles/README.md` | 移动端角色骨架 / Mobile Roles Skeleton |
-| `web/src/erp/modules/README.md` | ERP 模块骨架 / ERP Modules Skeleton |
 | `server/README.md` | server 后端说明 |
 | `server/deploy/README.md` | server/deploy 说明 |
 | `server/deploy/compose/prod/README.md` | Compose 部署说明 |

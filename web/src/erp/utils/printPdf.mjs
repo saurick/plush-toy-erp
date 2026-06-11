@@ -504,42 +504,6 @@ async function flushActiveEditorBeforeOutput(doc) {
   await waitForSnapshotCommit(win)
 }
 
-function isEditableElement(element) {
-  if (!element) {
-    return false
-  }
-
-  const tagName = String(element.tagName || '').toLowerCase()
-  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-    return true
-  }
-  if (element.isContentEditable) {
-    return true
-  }
-
-  const rawContentEditable = element.getAttribute?.('contenteditable')
-  if (rawContentEditable == null) {
-    return false
-  }
-  const contentEditable = String(rawContentEditable).toLowerCase()
-  return contentEditable === '' || contentEditable === 'true'
-}
-
-function shouldSkipPdfPreviewWarmup(element) {
-  const doc = element?.ownerDocument
-  const activeElement = doc?.activeElement
-  if (!element || !activeElement || activeElement === doc.body) {
-    return false
-  }
-  if (
-    typeof element.contains === 'function' &&
-    !element.contains(activeElement)
-  ) {
-    return false
-  }
-  return isEditableElement(activeElement)
-}
-
 function shouldOptimizeServerPdfImageSource(src, options = {}) {
   const normalizedSrc = String(src || '').trim()
   if (!normalizedSrc) {
@@ -1086,18 +1050,6 @@ export const createServerPdfBlobFromElement = async (element, options = {}) => {
   return requestServerPdfBlob(snapshotHTML, options)
 }
 
-export const warmupPdfPreviewFromElement = async (element, options = {}) => {
-  if (!element || shouldSkipPdfPreviewWarmup(element)) {
-    return { status: 'skipped' }
-  }
-
-  const blob = await createServerPdfBlobFromElement(element, {
-    ...options,
-    snapshotMode: SERVER_PDF_PREVIEW_SNAPSHOT_MODE,
-  })
-  return { blob, status: 'ready' }
-}
-
 export const openPdfPreviewFromElement = async (element, options = {}) => {
   const { title } = normalizeServerPdfRequestOptions(options)
   const { blob, previewURL } = await openPdfPreviewWindowFromBlob(
@@ -1130,7 +1082,6 @@ export const __TEST_ONLY__ = {
   writeCachedPdfPreviewBlob,
   requestPdfPreviewBlobWithCache,
   resetPdfPreviewBlobCacheForTest,
-  shouldSkipPdfPreviewWarmup,
   buildServerPdfTargetSelector,
   isolateServerPdfSnapshotToTarget,
   normalizeServerPdfSnapshotRuntimeState,

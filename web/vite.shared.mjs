@@ -35,16 +35,13 @@ export function createERPViteConfig(appId) {
         minify: 'esbuild',
         cssMinify: 'esbuild',
         target: 'es2018',
+        chunkSizeWarningLimit: 1200,
         rollupOptions: {
           output: {
             entryFileNames: 'assets/[name].[hash].js',
             chunkFileNames: 'assets/[name].[hash].js',
             assetFileNames: 'assets/[name].[hash].[ext]',
-            manualChunks(id) {
-              if (id.includes('node_modules')) {
-                return 'vendor'
-              }
-            },
+            // 交给 Rollup 自动拆包，避免手工 vendor 分组把 antd 等运行时依赖压成一个大 chunk。
           },
         },
       },

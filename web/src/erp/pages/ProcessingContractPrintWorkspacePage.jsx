@@ -16,7 +16,6 @@ import {
 import {
   downloadPdfFromElement,
   openPdfPreviewFromElement,
-  warmupPdfPreviewFromElement,
 } from '../utils/printPdf.mjs'
 import {
   PROCESSING_CONTRACT_MAX_ROWS,
@@ -48,7 +47,6 @@ import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSna
 
 const DRAFT_STORAGE_KEY = '__plush_erp_processing_contract_print_draft__'
 const ATTACHMENT_ACCEPT = 'image/*,.svg'
-const PDF_PREVIEW_WARMUP_DELAY_MS = 450
 
 function readFileAsDataURL(file) {
   return new Promise((resolve, reject) => {
@@ -268,34 +266,6 @@ export default function ProcessingContractPrintWorkspacePage() {
     observeNodeRef: paperRef,
     suspended: busyAction !== '',
   })
-
-  useEffect(() => {
-    if (busyAction || !paperRef.current) {
-      return undefined
-    }
-
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      if (cancelled || !paperRef.current) {
-        return
-      }
-
-      syncPrintPageMarginForPaper(paperRef.current, {
-        stageWrapElement: stageWrapRef.current,
-        paperContinuedClass: 'erp-processing-contract-paper--continued',
-      })
-      warmupPdfPreviewFromElement(paperRef.current, {
-        title: '加工合同 PDF 预览',
-        fileName: 'processing-contract-preview.pdf',
-        templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
-      }).catch(() => {})
-    }, PDF_PREVIEW_WARMUP_DELAY_MS)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [busyAction, contract])
 
   if (templateKey !== PROCESSING_CONTRACT_TEMPLATE_KEY) {
     return <Navigate to="/erp/print-center" replace />
