@@ -1882,6 +1882,7 @@ const scenarios = [
         })
         .click()
       await expectText(page, '后台工作台样板')
+      await expectText(page, '产品核心菜单覆盖样板')
       await expectText(page, '业务模块标准页样板')
       await expectText(page, '模板打印中心样板')
       await expectText(page, '业务页协同入口组件样板')
@@ -1889,6 +1890,7 @@ const scenarios = [
       await expectText(page, '新建 / 编辑表单标准样板')
       await expectText(page, '弹窗 / 抽屉动作标准样板')
       await expectText(page, '参照范围：客户档案、供应商档案、产品、销售订单')
+      await expectText(page, '51 个二级菜单')
       await expectText(page, '真实落地建议先收窄到销售订单')
       const implementMetrics = await page.evaluate(() => ({
         activeText:
@@ -1914,12 +1916,12 @@ const scenarios = [
       )
       assert.equal(
         implementMetrics.visibleCards,
-        7,
-        `原型查看器待实现筛选应展示 7 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
+        8,
+        `原型查看器待实现筛选应展示 8 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
       )
       assert.equal(
         implementMetrics.appliesCount,
-        7,
+        8,
         `原型查看器待实现筛选应为每张卡片展示参照范围: ${JSON.stringify(implementMetrics)}`
       )
       assert(
@@ -2789,6 +2791,20 @@ const scenarios = [
         editableSelector:
           '.erp-processing-contract-table tbody td [contenteditable="true"]',
         editableScenarioLabel: '加工合同弹窗刷新恢复',
+      })
+    },
+  },
+  {
+    name: 'print-center-processing-preview-popup',
+    path: '/erp/print-center?template=processing-contract',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await assertPrintCenterPreviewPopup(page, {
+        expectedWorkspaceTitle: '加工合同',
+        buttonName: '在线预览 PDF',
+        title: '加工合同 PDF 预览',
+        screenshotName: 'print-center-processing-preview-popup-window',
       })
     },
   },
@@ -5164,6 +5180,30 @@ async function assertPrintPreviewPopup(
       title,
       { timeout: 30_000 }
     )
+    const popupState = await popup.evaluate(() => {
+      const iframe = document.querySelector('iframe.pdf-preview-frame')
+      return {
+        bodyText: document.body?.textContent?.trim() || '',
+        iframeCount: document.querySelectorAll('iframe.pdf-preview-frame')
+          .length,
+        iframeSrc: iframe?.getAttribute('src') || '',
+      }
+    })
+    assert.equal(
+      popupState.iframeCount,
+      1,
+      `${title} 预览窗口应只包含一个 PDF iframe: ${JSON.stringify(popupState)}`
+    )
+    assert.match(
+      popupState.iframeSrc,
+      /^blob:/,
+      `${title} 预览窗口 iframe 应指向 blob PDF: ${JSON.stringify(popupState)}`
+    )
+    assert.doesNotMatch(
+      popupState.bodyText,
+      /正在等待 PDF 预览结果|PDF 预览不存在或已过期/,
+      `${title} 预览窗口不应停留在等待或过期状态: ${JSON.stringify(popupState)}`
+    )
     assert.deepEqual(popupErrors, [], `${title} 预览窗口出现控制台或运行时错误`)
 
     if (screenshotName) {
@@ -5174,6 +5214,64 @@ async function assertPrintPreviewPopup(
   } finally {
     if (!popup.isClosed()) {
       await popup.close()
+    }
+  }
+}
+
+async function assertPrintCenterPreviewPopup(
+  page,
+  { expectedWorkspaceTitle, buttonName, title, screenshotName }
+) {
+  const [workspacePopup] = await Promise.all([
+    page.waitForEvent('popup', { timeout: 10_000 }),
+    page.getByRole('button', { name: '打印当前模板' }).click(),
+  ])
+  const mockToken = createMockAdminToken()
+  await installAdminRpcMocks(workspacePopup)
+  await workspacePopup.addInitScript((token) => {
+    localStorage.setItem('admin_access_token', token)
+  }, mockToken)
+  const workspacePopupErrors = []
+
+  workspacePopup.on('console', (message) => {
+    if (message.type() === 'error') {
+      const text = message.text()
+      if (!isIgnorableDevServerError(text)) {
+        workspacePopupErrors.push(`workspace popup console error: ${text}`)
+      }
+    }
+  })
+  workspacePopup.on('pageerror', (error) => {
+    workspacePopupErrors.push(`workspace popup page error: ${error.message}`)
+  })
+
+  try {
+    await workspacePopup.waitForLoadState('domcontentloaded')
+    await setPopupAdminToken(workspacePopup, mockToken)
+    await workspacePopup
+      .getByText(expectedWorkspaceTitle, { exact: false })
+      .first()
+      .waitFor({
+        state: 'visible',
+        timeout: 15_000,
+      })
+    await workspacePopup
+      .getByRole('button', { name: buttonName })
+      .waitFor({ state: 'visible', timeout: 15_000 })
+
+    await assertPrintPreviewPopup(workspacePopup, {
+      buttonName,
+      title,
+      screenshotName,
+    })
+    assert.deepEqual(
+      workspacePopupErrors,
+      [],
+      `${expectedWorkspaceTitle} 打印中心弹窗出现控制台或运行时错误`
+    )
+  } finally {
+    if (!workspacePopup.isClosed()) {
+      await workspacePopup.close()
     }
   }
 }

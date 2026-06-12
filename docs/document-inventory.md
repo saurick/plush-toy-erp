@@ -44,7 +44,33 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `config/industry-templates/plush/README.md` | 毛绒行业模板骨架 |
 | `config/private-deployment-template/README.md` | 多客户私有化复制模板说明 |
 | `deployments/README.md` | 客户私有化部署资料目录说明 |
-| `deployments/yoyoosun/README.md` | 永绅 yoyoosun 客户部署资料未来落点 |
+| `deployments/yoyoosun/README.md` | 永绅 yoyoosun 私有化部署资料包入口 / Yoyoosun Private Deployment Package |
+| `deployments/yoyoosun/env/secrets.required.md` | 永绅 yoyoosun 部署必需 Secret 说明 / Required Secrets |
+| `deployments/yoyoosun/runbooks/00-overview.md` | 永绅 yoyoosun 部署总览 / Deployment Overview |
+| `deployments/yoyoosun/runbooks/01-first-deploy.md` | 永绅 yoyoosun 首次部署 runbook / First Deploy |
+| `deployments/yoyoosun/runbooks/02-upgrade.md` | 永绅 yoyoosun 升级 runbook / Upgrade |
+| `deployments/yoyoosun/runbooks/03-rollback.md` | 永绅 yoyoosun 回滚 runbook / Rollback |
+| `deployments/yoyoosun/runbooks/04-backup-restore.md` | 永绅 yoyoosun 备份恢复 runbook / Backup And Restore |
+| `deployments/yoyoosun/runbooks/05-migration.md` | 永绅 yoyoosun Migration runbook |
+| `deployments/yoyoosun/runbooks/06-import-apply.md` | 永绅 yoyoosun 导入执行边界 runbook / Import Apply Boundary |
+| `deployments/yoyoosun/runbooks/07-incident-response.md` | 永绅 yoyoosun 故障处理 runbook / Incident Response |
+| `deployments/yoyoosun/runbooks/08-daily-ops.md` | 永绅 yoyoosun 日常运维 runbook / Daily Operations |
+| `deployments/yoyoosun/checklists/pre-deploy-checklist.md` | 永绅 yoyoosun 部署前检查清单 / Pre-deploy Checklist |
+| `deployments/yoyoosun/checklists/post-deploy-checklist.md` | 永绅 yoyoosun 部署后检查清单 / Post-deploy Checklist |
+| `deployments/yoyoosun/checklists/smoke-test-checklist.md` | 永绅 yoyoosun Smoke 检查清单 / Smoke Test Checklist |
+| `deployments/yoyoosun/checklists/security-checklist.md` | 永绅 yoyoosun 安全检查清单 / Security Checklist |
+| `deployments/yoyoosun/checklists/backup-restore-checklist.md` | 永绅 yoyoosun 备份恢复检查清单 / Backup Restore Checklist |
+| `deployments/yoyoosun/checklists/upgrade-checklist.md` | 永绅 yoyoosun 升级检查清单 / Upgrade Checklist |
+| `deployments/yoyoosun/checklists/rollback-checklist.md` | 永绅 yoyoosun 回滚检查清单 / Rollback Checklist |
+| `deployments/yoyoosun/checklists/weekly-inspection-checklist.md` | 永绅 yoyoosun 每周巡检清单 / Weekly Inspection Checklist |
+| `deployments/yoyoosun/checklists/monthly-inspection-checklist.md` | 永绅 yoyoosun 每月巡检清单 / Monthly Inspection Checklist |
+| `deployments/yoyoosun/evidence/README.md` | 永绅 yoyoosun Evidence 说明 / Evidence Guide |
+| `deployments/yoyoosun/evidence/releases/README.md` | 永绅 yoyoosun 发布记录说明 / Release Evidence |
+| `deployments/yoyoosun/evidence/releases/release-evidence-template.md` | 永绅 yoyoosun 发布证据模板 / Release Evidence Template |
+| `deployments/yoyoosun/evidence/migrations/migration-evidence-template.md` | 永绅 yoyoosun 迁移证据模板 / Migration Evidence Template |
+| `deployments/yoyoosun/evidence/backups/backup-evidence-template.md` | 永绅 yoyoosun 备份证据模板 / Backup Evidence Template |
+| `deployments/yoyoosun/reports/README.md` | 永绅 yoyoosun 运行报告说明 / Runtime Reports |
+| `deployments/yoyoosun/scripts/README.md` | 永绅 yoyoosun 部署辅助脚本说明 / Deployment Helper Scripts |
 
 ### docs 根入口与当前真源
 
@@ -105,6 +131,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/prototypes/business-detail-page-standard-v1/README.md` | 业务详情页标准样板 / Business Detail Page Standard Prototype |
 | `docs/product/prototypes/business-form-page-standard-v1/README.md` | 新建 / 编辑表单标准样板 / Business Form Page Standard Prototype |
 | `docs/product/prototypes/business-module-page-standard-v1/README.md` | 业务模块标准页原型 / Business Module Page Standard Prototype |
+| `docs/product/prototypes/core-menu-coverage-v1/README.md` | 产品核心菜单覆盖样板 / Core Menu Coverage Pattern |
 | `docs/product/prototypes/mobile-role-tasks-v1/README.md` | 岗位任务端原型 / Mobile Role Tasks Prototype |
 | `docs/product/prototypes/print-template-center-v1/README.md` | 模板打印中心原型 / Print Template Center Prototype |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |

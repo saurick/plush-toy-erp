@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/inventorytxn"
@@ -169,7 +170,7 @@ func (r *phase8Repo) AddShipmentItem(ctx context.Context, in *biz.ShipmentItemCr
 		}
 		return nil, err
 	}
-	if parent.Status != biz.ShipmentStatusDraft {
+	if !corestatus.CanAddShipmentItem(parent.Status) {
 		return nil, biz.ErrBadParam
 	}
 	row, err := r.data.postgres.ShipmentItem.Create().
@@ -472,26 +473,28 @@ func (r *phase8Repo) shipShipment(ctx context.Context, id int, cancel bool) (*bi
 		return nil, biz.ErrBadParam
 	}
 	if cancel {
-		if parent.Status == biz.ShipmentStatusCancelled {
-			return commitShipment(ctx, tx, parent)
-		}
-		if parent.Status != biz.ShipmentStatusShipped {
+		transition, ok := corestatus.CancelShippedShipment(parent.Status)
+		if !ok {
 			return nil, biz.ErrBadParam
+		}
+		if !transition.Changed {
+			return commitShipment(ctx, tx, parent)
 		}
 		for _, item := range items {
 			if err := r.applyShipmentItemInventory(ctx, tx, parent, item, true); err != nil {
 				return nil, err
 			}
 		}
-		if err := updatePhase8Status(ctx, tx, "shipments", id, biz.ShipmentStatusCancelled, "shipped_at", nil); err != nil {
+		if err := updatePhase8Status(ctx, tx, "shipments", id, transition.Target, "shipped_at", nil); err != nil {
 			return nil, err
 		}
 	} else {
-		if parent.Status == biz.ShipmentStatusShipped {
-			return commitShipment(ctx, tx, parent)
-		}
-		if parent.Status != biz.ShipmentStatusDraft {
+		transition, ok := corestatus.ShipShipment(parent.Status)
+		if !ok {
 			return nil, biz.ErrBadParam
+		}
+		if !transition.Changed {
+			return commitShipment(ctx, tx, parent)
 		}
 		for _, item := range items {
 			if err := r.applyShipmentItemInventory(ctx, tx, parent, item, false); err != nil {
@@ -499,7 +502,7 @@ func (r *phase8Repo) shipShipment(ctx context.Context, id int, cancel bool) (*bi
 			}
 		}
 		now := time.Now()
-		if err := updatePhase8Status(ctx, tx, "shipments", id, biz.ShipmentStatusShipped, "shipped_at", &now); err != nil {
+		if err := updatePhase8Status(ctx, tx, "shipments", id, transition.Target, "shipped_at", &now); err != nil {
 			return nil, err
 		}
 	}

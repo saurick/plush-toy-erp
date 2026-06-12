@@ -160,11 +160,11 @@
         }
 
         const readPersistedHTML = async () => {
-          const indexedDBHTML = await readPersistedHTMLFromIndexedDB()
-          if (indexedDBHTML) {
-            return indexedDBHTML
+          const storageHTML = readPersistedHTMLFromStorage()
+          if (storageHTML) {
+            return storageHTML
           }
-          return readPersistedHTMLFromStorage()
+          return readPersistedHTMLFromIndexedDB()
         }
 
         const cleanupWaiters = () => {

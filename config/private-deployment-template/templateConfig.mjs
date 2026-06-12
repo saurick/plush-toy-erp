@@ -53,10 +53,28 @@ export const privateDeploymentPackageTemplate = Object.freeze({
   ]),
   requiredDeploymentDocs: Object.freeze([
     "README.md",
-    "env-checklist.md",
-    "release-runbook.md",
-    "backup-restore.md",
-    "acceptance-checklist.md",
+    "env/.env.example",
+    "env/secrets.required.md",
+    "compose/docker-compose.example.yml",
+    "runbooks/01-first-deploy.md",
+    "runbooks/02-upgrade.md",
+    "runbooks/03-rollback.md",
+    "runbooks/04-backup-restore.md",
+    "runbooks/05-migration.md",
+    "runbooks/06-import-apply.md",
+    "runbooks/07-incident-response.md",
+    "runbooks/08-daily-ops.md",
+    "checklists/pre-deploy-checklist.md",
+    "checklists/post-deploy-checklist.md",
+    "checklists/smoke-test-checklist.md",
+    "checklists/security-checklist.md",
+    "checklists/backup-restore-checklist.md",
+    "checklists/upgrade-checklist.md",
+    "checklists/rollback-checklist.md",
+    "evidence/README.md",
+    "evidence/releases/release-evidence-template.md",
+    "evidence/migrations/migration-evidence-template.md",
+    "evidence/backups/backup-evidence-template.md",
   ]),
   reusableSources: Object.freeze([
     {
@@ -91,4 +109,3 @@ export const privateDeploymentPackageTemplate = Object.freeze({
     "post-deploy smoke covers health, ready, desktop route, RBAC and simulated closure where applicable",
   ]),
 });
-

@@ -125,6 +125,7 @@ async function verifyProcessingContractPreviewPopup(page) {
     await popup
       .locator('iframe.pdf-preview-frame')
       .waitFor({ state: 'visible', timeout: 15_000 })
+    await assertPdfPreviewPopupReady(popup)
 
     const previewLatencyMs = Date.now() - previewStartedAt
     assert.ok(
@@ -146,6 +147,23 @@ async function verifyProcessingContractPreviewPopup(page) {
       await popup.close()
     }
   }
+}
+
+async function assertPdfPreviewPopupReady(popup) {
+  await popup.waitForTimeout(500)
+  const state = await popup.evaluate(() => {
+    const iframe = document.querySelector('iframe.pdf-preview-frame')
+    return {
+      bodyText: document.body?.textContent?.trim() || '',
+      iframeSrc: iframe?.getAttribute('src') || '',
+      iframeCount: document.querySelectorAll('iframe.pdf-preview-frame').length,
+    }
+  })
+
+  assert.equal(state.iframeCount, 1)
+  assert.match(state.iframeSrc, /^blob:/)
+  assert.doesNotMatch(state.bodyText, /正在等待 PDF 预览结果/)
+  assert.doesNotMatch(state.bodyText, /PDF 预览不存在或已过期/)
 }
 
 async function expectProcessingContractValues(page, expected) {

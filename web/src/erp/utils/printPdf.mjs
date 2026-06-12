@@ -293,57 +293,33 @@ async function persistPdfPreviewHTML(stateID, html) {
     return false
   }
 
-  const savedToIndexedDB = await persistPdfPreviewHTMLToIndexedDB(record)
   const savedToStorage = persistPdfPreviewHTMLToStorage(record)
-  return savedToIndexedDB || savedToStorage
-}
+  if (savedToStorage) {
+    persistPdfPreviewHTMLToIndexedDB(record).catch(() => {})
+    return true
+  }
 
-function persistPdfPreviewHTMLInBackground(stateID, html) {
-  persistPdfPreviewHTML(stateID, html).catch(() => {})
+  return persistPdfPreviewHTMLToIndexedDB(record)
 }
 
 function resetPdfPreviewStateDatabaseForTest() {
   pdfPreviewStateDatabasePromise = null
 }
 
-function writePdfPreviewWindowDocument(previewWindow, previewHTML) {
-  if (!previewWindow || previewWindow.closed) {
-    return false
-  }
-
-  try {
-    previewWindow.document.open()
-    previewWindow.document.write(previewHTML)
-    previewWindow.document.close()
-    return true
-  } catch (error) {
-    return false
-  }
-}
-
-function restorePdfPreviewWindow(
-  previewWindow,
-  previewShellURL,
-  previewHTML,
-  persisted
-) {
+function restorePdfPreviewShellWindow(previewWindow, previewShellURL) {
   if (!previewWindow || previewWindow.closed) {
     return
   }
 
-  if (writePdfPreviewWindowDocument(previewWindow, previewHTML)) {
-    previewWindow.focus()
-    return
+  const restoreFromShell =
+    previewWindow[PDF_PREVIEW_SHELL_RESTORE_FUNCTION_NAME]
+  if (typeof restoreFromShell === 'function') {
+    restoreFromShell()
   }
-
-  if (persisted) {
-    const restoreFromShell =
-      previewWindow[PDF_PREVIEW_SHELL_RESTORE_FUNCTION_NAME]
-    if (typeof restoreFromShell === 'function') {
-      restoreFromShell()
-    } else if (previewWindow.location) {
-      previewWindow.location.replace(previewShellURL)
-    }
+  if (previewWindow.location?.replace) {
+    previewWindow.location.replace(previewShellURL)
+  } else if (previewWindow.location) {
+    previewWindow.location.href = previewShellURL
   }
 
   previewWindow.focus()
@@ -359,19 +335,11 @@ async function restorePdfPreviewWindowWithPersistence(
     return
   }
 
-  if (writePdfPreviewWindowDocument(previewWindow, previewHTML)) {
-    previewWindow.focus()
-    persistPdfPreviewHTMLInBackground(previewStateID, previewHTML)
-    return
-  }
-
   const persisted = await persistPdfPreviewHTML(previewStateID, previewHTML)
-  restorePdfPreviewWindow(
-    previewWindow,
-    previewShellURL,
-    previewHTML,
-    persisted
-  )
+  if (!persisted) {
+    throw new Error('PDF 预览初始化失败，请关闭后重试。')
+  }
+  restorePdfPreviewShellWindow(previewWindow, previewShellURL)
 }
 
 function hashPdfPreviewSnapshotHTML(snapshotHTML) {

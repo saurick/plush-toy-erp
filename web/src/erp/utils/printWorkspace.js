@@ -298,11 +298,20 @@ export function persistPrintWorkspaceWindowHTML(stateID, payload = {}) {
     }
   }
 
+  if (savedToStorage) {
+    persistPrintWorkspaceWindowStateRecordToIndexedDB(
+      normalizedStateID,
+      undefined,
+      payload
+    ).catch(() => {})
+    return Promise.resolve(true)
+  }
+
   return persistPrintWorkspaceWindowStateRecordToIndexedDB(
     normalizedStateID,
     undefined,
     payload
-  ).then((savedToIndexedDB) => savedToStorage || savedToIndexedDB)
+  )
 }
 
 export function readPrintWorkspaceWindowState(stateID, storageLike) {

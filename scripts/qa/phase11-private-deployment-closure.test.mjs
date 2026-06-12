@@ -19,8 +19,8 @@ test("phase11 private deployment closure writes simulation-only evidence", () =>
   assert.equal(result.report.simulatedAcceptance.industryTemplateStillCandidate, true);
   assert.equal(result.report.finalDecision.phase11ClosedBySimulation, true);
   assert(result.report.packageChecklist.packageRoots.includes("docs/customers/<customer-key>/"));
-  assert(result.report.packageChecklist.deploymentDocs.includes("release-runbook.md"));
+  assert(result.report.packageChecklist.deploymentDocs.includes("runbooks/01-first-deploy.md"));
+  assert(result.report.packageChecklist.deploymentDocs.includes("evidence/releases/release-evidence-template.md"));
   assert(fs.existsSync(result.jsonPath));
   assert(fs.existsSync(result.mdPath));
 });
-

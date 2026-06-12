@@ -1,0 +1,25 @@
+# yoyoosun 服务配置样例。当前运行时主配置仍以 server/deploy/compose/prod 和服务端配置文件为准。
+server:
+  http:
+    addr: "0.0.0.0:8300"
+  grpc:
+    addr: "0.0.0.0:9300"
+
+data:
+  database:
+    driver: postgres
+    source: "${POSTGRES_DSN}"
+
+auth:
+  jwt:
+    secret: "${APP_JWT_SECRET}"
+
+debug:
+  env: prod
+  seed_enabled: false
+  cleanup_enabled: false
+  cleanup_scope: debug_run
+
+pdf:
+  chrome_path: "/usr/bin/chromium"
+  render_concurrency: 2

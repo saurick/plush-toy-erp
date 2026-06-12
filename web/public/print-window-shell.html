@@ -147,11 +147,11 @@
         }
 
         const readPersistedState = async () => {
-          const indexedDBPayload = await readPersistedStateFromIndexedDB()
-          if (indexedDBPayload) {
-            return indexedDBPayload
+          const storagePayload = readPersistedStateFromStorage()
+          if (storagePayload) {
+            return storagePayload
           }
-          return readPersistedStateFromStorage()
+          return readPersistedStateFromIndexedDB()
         }
 
         window[RESTORE_FUNCTION_NAME] = async () => {

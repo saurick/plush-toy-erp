@@ -1,0 +1,102 @@
+name: plush-toy-erp-yoyoosun
+
+# 参考样例：当前唯一部署主路径仍是 server/deploy/compose/prod。
+# 真实发布优先同步 prod compose，再用受控 .env 覆盖镜像、端口和数据目录。
+
+x-web-app-common: &web-app-common
+  image: "${WEB_IMAGE:-plush-toy-erp-web:<release-tag>}"
+  restart: always
+  depends_on:
+    app-server:
+      condition: service_started
+  environment: &web-app-environment
+    TZ: "${TZ:-Asia/Shanghai}"
+    API_ORIGIN: "${WEB_API_ORIGIN:-http://app-server:8300}"
+    PROXY_PREFIXES: "${WEB_PROXY_PREFIXES:-/rpc,/templates}"
+    PROXY_TIMEOUT_MS: "${WEB_PROXY_TIMEOUT_MS:-30000}"
+  mem_limit: "${WEB_MEM_LIMIT:-96m}"
+  mem_reservation: "${WEB_MEM_RESERVATION:-48m}"
+  healthcheck:
+    test:
+      [
+        "CMD-SHELL",
+        "node -e \"fetch('http://127.0.0.1:' + (process.env.PORT || '5175') + '/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))\"",
+      ]
+    interval: 5s
+    timeout: 3s
+    retries: 20
+    start_period: 10s
+  networks: {}
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: "${PROJECT_SLUG:-plush-toy-erp-yoyoosun}-postgres"
+    restart: always
+    ports:
+      - "${POSTGRES_PORT:-5435}:5432"
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-this-prod-postgres-password}"
+      POSTGRES_DB: "${POSTGRES_DB:-plush_erp}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+    volumes:
+      - "${POSTGRES_DATA_DIR:-/data/plush-toy-erp-yoyoosun/postgres}:/var/lib/postgresql"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    networks: {}
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: "${PROJECT_SLUG:-plush-toy-erp-yoyoosun}-jaeger"
+    restart: always
+    environment:
+      PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: "true"
+      METRICS_STORAGE_TYPE: prometheus
+      PROMETHEUS_SERVER_URL: "${PROMETHEUS_SERVER_URL:-http://host.docker.internal:3004}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: "${JAEGER_MEM_LIMIT:-96m}"
+    mem_reservation: "${JAEGER_MEM_RESERVATION:-48m}"
+    networks: {}
+
+  app-server:
+    image: "${APP_IMAGE:-plush-toy-erp-server:<release-tag>}"
+    container_name: "${PROJECT_SLUG:-plush-toy-erp-yoyoosun}-server"
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_started
+    ports:
+      - "${APP_HTTP_PORT:-8300}:8300"
+      - "${APP_GRPC_PORT:-9300}:9300"
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+      POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
+      TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
+      APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"
+      APP_ADMIN_USERNAME: "${APP_ADMIN_USERNAME:-admin}"
+      ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"
+      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-2}"
+      ERP_DEBUG_ENV: "${ERP_DEBUG_ENV:-prod}"
+      ERP_DEBUG_SEED_ENABLED: "${ERP_DEBUG_SEED_ENABLED:-false}"
+      ERP_DEBUG_CLEANUP_ENABLED: "${ERP_DEBUG_CLEANUP_ENABLED:-false}"
+      ERP_DEBUG_CLEANUP_SCOPE: "${ERP_DEBUG_CLEANUP_SCOPE:-debug_run}"
+    mem_limit: "${APP_MEM_LIMIT:-896m}"
+    mem_reservation: "${APP_MEM_RESERVATION:-384m}"
+    networks: {}
+
+  web-desktop:
+    <<: *web-app-common
+    container_name: "${PROJECT_SLUG:-plush-toy-erp-yoyoosun}-web-desktop"
+    ports:
+      - "${WEB_DESKTOP_PORT:-5175}:5175"
+    environment:
+      <<: *web-app-environment
+      APP_ID: desktop
+      PORT: "5175"

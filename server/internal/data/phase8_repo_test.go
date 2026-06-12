@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"io"
 	"testing"
 
@@ -183,6 +184,9 @@ func TestPhase8Repo_ShipShipmentAndCancelWritesOutboundReversal(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("add shipment item failed: %v", err)
 	}
+	if _, err := repo.CancelShippedShipment(ctx, shipment.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("cancel draft shipment error = %v, want ErrBadParam", err)
+	}
 	shipped, err := repo.ShipShipment(ctx, shipment.ID)
 	if err != nil {
 		t.Fatalf("ship shipment failed: %v", err)
@@ -190,12 +194,32 @@ func TestPhase8Repo_ShipShipmentAndCancelWritesOutboundReversal(t *testing.T) {
 	if shipped.Status != biz.ShipmentStatusShipped {
 		t.Fatalf("expected SHIPPED, got %s", shipped.Status)
 	}
+	repeatedShipped, err := repo.ShipShipment(ctx, shipment.ID)
+	if err != nil {
+		t.Fatalf("repeat ship shipment failed: %v", err)
+	}
+	if repeatedShipped.Status != biz.ShipmentStatusShipped {
+		t.Fatalf("expected repeated ship to stay SHIPPED, got %s", repeatedShipped.Status)
+	}
+	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ShipmentSourceType)).CountX(ctx); count != 1 {
+		t.Fatalf("expected one outbound shipment txn after repeated ship, got %d", count)
+	}
 	cancelled, err := repo.CancelShippedShipment(ctx, shipment.ID)
 	if err != nil {
 		t.Fatalf("cancel shipped shipment failed: %v", err)
 	}
 	if cancelled.Status != biz.ShipmentStatusCancelled {
 		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
+	}
+	repeatedCancelled, err := repo.CancelShippedShipment(ctx, shipment.ID)
+	if err != nil {
+		t.Fatalf("repeat cancel shipment failed: %v", err)
+	}
+	if repeatedCancelled.Status != biz.ShipmentStatusCancelled {
+		t.Fatalf("expected repeated cancel to stay CANCELLED, got %s", repeatedCancelled.Status)
+	}
+	if _, err := repo.ShipShipment(ctx, shipment.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("ship cancelled shipment error = %v, want ErrBadParam", err)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ShipmentSourceType)).CountX(ctx); count != 2 {
 		t.Fatalf("expected outbound + reversal shipment txns, got %d", count)

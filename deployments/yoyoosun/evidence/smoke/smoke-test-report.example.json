@@ -1,0 +1,44 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "customer-trial",
+  "releaseVersion": "<release-version>",
+  "generatedAt": "2026-06-12T00:00:00.000Z",
+  "operatorRole": "deployment-operator",
+  "summary": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "name": "web-healthz",
+      "status": "pass",
+      "target": "https://erp.example.invalid/healthz"
+    },
+    {
+      "name": "server-healthz",
+      "status": "pass",
+      "target": "http://127.0.0.1:8300/healthz"
+    },
+    {
+      "name": "server-readyz",
+      "status": "pass",
+      "target": "http://127.0.0.1:8300/readyz"
+    },
+    {
+      "name": "login-page",
+      "status": "pass",
+      "target": "https://erp.example.invalid/admin-login"
+    },
+    {
+      "name": "mobile-role-route",
+      "status": "pass",
+      "target": "https://erp.example.invalid/m/warehouse/tasks"
+    }
+  ],
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "notes": "Sample only. Replace targets with sanitized aliases before committing real reports."
+  }
+}

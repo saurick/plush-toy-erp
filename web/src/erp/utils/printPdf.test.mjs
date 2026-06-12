@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { __TEST_ONLY__, openPdfPreviewWindowFromBlob } from './printPdf.mjs'
 
@@ -343,12 +344,66 @@ test('printPdf: PDF 预览状态优先落 IndexedDB，localStorage 满额时仍�
   }
 })
 
-test('printPdf: PDF 生成完成后直接写入当前预览窗口', async () => {
+test('printPdf: PDF 预览结果会先同步写入 localStorage，避免壳页一直等待 IndexedDB', () => {
+  const originalWindow = globalThis.window
+  const storage = new Map()
+
+  globalThis.window = {
+    indexedDB: {
+      open: () => ({}),
+    },
+    localStorage: {
+      setItem: (key, value) => {
+        storage.set(String(key), String(value))
+      },
+    },
+  }
+
+  try {
+    __TEST_ONLY__
+      .persistPdfPreviewHTML(
+        'preview-local-first',
+        '<!doctype html><html><body>PDF 已生成</body></html>'
+      )
+      .catch(() => {})
+
+    assert.equal(storage.size, 1)
+    const payload = JSON.parse(Array.from(storage.values())[0])
+    assert.equal(payload.stateID, 'preview-local-first')
+    assert.match(payload.html, /PDF 已生成/)
+  } finally {
+    __TEST_ONLY__.resetPdfPreviewStateDatabaseForTest()
+    if (typeof originalWindow === 'undefined') {
+      delete globalThis.window
+    } else {
+      globalThis.window = originalWindow
+    }
+  }
+})
+
+test('printPdf: PDF 预览壳页恢复时优先读取 localStorage，再回退 IndexedDB', async () => {
+  const shellHTML = await readFile(
+    new URL('../../../public/pdf-preview-shell.html', import.meta.url),
+    'utf8'
+  )
+  const storageReadIndex = shellHTML.indexOf(
+    'const storageHTML = readPersistedHTMLFromStorage()'
+  )
+  const indexedDBReadIndex = shellHTML.indexOf(
+    'return readPersistedHTMLFromIndexedDB()'
+  )
+
+  assert.ok(storageReadIndex > 0)
+  assert.ok(indexedDBReadIndex > storageReadIndex)
+})
+
+test('printPdf: PDF 生成完成后先写入壳页 state，再驱动预览壳页恢复', async () => {
   const originalWindow = globalThis.window
   const originalCreateObjectURL = URL.createObjectURL
   const originalRevokeObjectURL = URL.revokeObjectURL
   const storage = new Map()
   const writes = []
+  const replacements = []
   let restoreCalls = 0
   let focusCalls = 0
   const previewWindow = {
@@ -371,7 +426,9 @@ test('printPdf: PDF 生成完成后直接写入当前预览窗口', async () => 
       },
     },
     location: {
-      replace: () => {},
+      replace: (url) => {
+        replacements.push(String(url))
+      },
     },
   }
 
@@ -402,17 +459,20 @@ test('printPdf: PDF 生成完成后直接写入当前预览窗口', async () => 
       }),
       new Promise((_, reject) => {
         setTimeout(() => {
-          reject(new Error('直接写入预览窗口不应等待 IndexedDB 持久化'))
+          reject(new Error('预览壳页恢复不应等待 IndexedDB 持久化'))
         }, 50)
       }),
     ])
 
-    assert.equal(restoreCalls, 0)
+    assert.equal(restoreCalls, 1)
     assert.equal(focusCalls, 1)
-    assert.equal(writes[0], 'open')
-    assert.match(writes[1], /加工合同 PDF 预览/)
-    assert.match(writes[1], /blob:preview-direct/)
-    assert.equal(writes[2], 'close')
+    assert.deepEqual(writes, [])
+    assert.equal(replacements.length, 1)
+    assert.match(replacements[0], /\/pdf-preview-shell\.html\?state=/)
+    assert.equal(storage.size, 1)
+    const payload = JSON.parse(Array.from(storage.values())[0])
+    assert.match(payload.html, /加工合同 PDF 预览/)
+    assert.match(payload.html, /blob:preview-direct/)
   } finally {
     __TEST_ONLY__.resetPdfPreviewStateDatabaseForTest()
     URL.createObjectURL = originalCreateObjectURL

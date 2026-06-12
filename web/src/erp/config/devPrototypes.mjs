@@ -58,6 +58,19 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；常用入口不是正式菜单替代表。',
   },
   {
+    key: 'core-menu-coverage',
+    title: '产品核心菜单覆盖样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'core-menu-coverage-v1/',
+    assetPath: 'core-menu-coverage-v1/index.html',
+    readmePath: 'core-menu-coverage-v1/README.md',
+    description:
+      '把 20260611 参考规格中的 51 个二级菜单收口为可筛选内容矩阵，标注页面类型、事实源、关键字段、动作和边界。',
+    appliesTo:
+      '用于逐菜单核对页面内容覆盖，并映射到现有列表页、详情页、表单页、动作浮层、工作台、报表、导入和移动任务样板；不是正式菜单承诺。',
+  },
+  {
     key: 'business-module-standard-page',
     title: '业务模块标准页样板',
     type: 'HTML',

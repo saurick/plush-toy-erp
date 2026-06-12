@@ -28,3 +28,19 @@ server/deploy/compose/prod
 - 不执行真实客户数据导入；没有审批和备份 evidence 时只能本地模拟。
 - 不新增 `tenant_id`、SaaS、多租户、license 或 billing。
 
+## 当前 yoyoosun 资料包
+
+`deployments/yoyoosun/` 已按私有化交付资料包维护：
+
+- `env/`：环境变量和服务配置样例，只允许 placeholder。
+- `compose/`：参考 Compose / Nginx 样例，不替代 `server/deploy/compose/prod`。
+- `runbooks/`：首次部署、升级、回滚、备份恢复、migration、导入边界、故障处理和巡检。
+- `checklists/`：部署、smoke、安全、备份恢复、升级、回滚和巡检清单。
+- `evidence/`：发布、migration、备份和 smoke evidence 模板。
+- `scripts/`：薄脚本，只做资料包 env / smoke / evidence / backup evidence 检查。
+
+调整后执行：
+
+```bash
+node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun
+```

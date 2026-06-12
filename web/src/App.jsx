@@ -1,5 +1,5 @@
 // web/src/App.jsx
-import React, { useEffect } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { App as AntdApp, ConfigProvider, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -9,13 +9,14 @@ import { appAlert } from '@/common/components/modal/alertBridge'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
 import { getActiveERPBrand } from '@/common/consts/brand'
 import { applyERPFavicon } from '@/common/consts/favicon.mjs'
-import ERPRouter from '@/erp/router'
-import MobileRoleRouter from '@/erp/mobile/router'
 import {
   ERPWorkspaceProvider,
   useERPWorkspace,
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
+
+const ERPRouter = lazy(() => import('@/erp/router'))
+const MobileRoleRouter = lazy(() => import('@/erp/mobile/router'))
 
 function AppContent() {
   const location = useLocation()
@@ -75,7 +76,9 @@ function AppContent() {
       <Helmet>
         <title>{appTitle}</title>
       </Helmet>
-      {isDesktopApp ? <ERPRouter /> : <MobileRoleRouter />}
+      <Suspense fallback={null}>
+        {isDesktopApp ? <ERPRouter /> : <MobileRoleRouter />}
+      </Suspense>
     </>
   )
 }

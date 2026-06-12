@@ -1,0 +1,14 @@
+{
+  "customerCode": "yoyoosun",
+  "timezone": "Asia/Shanghai",
+  "apiOrigin": "/rpc",
+  "templateProxyPrefix": "/templates",
+  "entry": {
+    "desktop": "/erp/dashboard",
+    "mobile": "/m/{role}/tasks"
+  },
+  "security": {
+    "publicRegisterEnabled": false,
+    "showSecretsInUi": false
+  }
+}

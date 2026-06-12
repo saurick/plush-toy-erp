@@ -1,41 +1,75 @@
-# 永绅 yoyoosun 客户部署 / Yoyoosun Deployment
+# 永绅 yoyoosun 私有化部署资料包 / Yoyoosun Private Deployment Package
 
-本目录记录 永绅 yoyoosun 私有化部署实例资料。
+本目录保存 yoyoosun 私有化部署的可交付资料：配置样例、Compose 样例、runbook、检查清单、发布 evidence 模板和轻量校验脚本。
 
-当前 Phase 0 不修改 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`，不新增多租户部署，不改变发布流程。
+它不是第二套部署主路径。当前唯一部署真源仍是：
 
-Phase 8 目标环境发布和内部模拟验收手册已记录在：
+```text
+server/deploy/compose/prod
+```
 
-- `/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/phase8-target-release-acceptance.md`
+## 当前边界 / Current Boundaries
 
-该手册只承接发布步骤、migration、健康检查、Phase 8 页面验收、内部模拟事实闭环和 evidence 模板；当前唯一部署主路径仍是 `server/deploy/compose/prod`。
+| 项目 | 当前口径 |
+| --- | --- |
+| customerCode | `yoyoosun` |
+| deploymentType | private / customer-trial candidate |
+| timezone | `Asia/Shanghai` |
+| database | PostgreSQL |
+| front-end entry | single `web-desktop` service, port `5175`; mobile roles use `/m/<role>/tasks` |
+| backend | HTTP `8300`, gRPC `9300` |
+| migration | host Atlas at `/usr/local/bin/atlas` through `server/deploy/compose/prod/migrate_online.sh` |
+| build boundary | build images locally or in CI; target server only runs `docker load`, Compose, migration and smoke |
 
-2026-06-08 Phase 8 当前目标环境发布和内部模拟事实闭环 evidence：
+## 目录说明 / Package Contents
 
-- `/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md`
+| 路径 | 用途 |
+| --- | --- |
+| `env/` | `.env.example`、服务配置样例和必需 secret 说明，只能使用 placeholder |
+| `compose/` | yoyoosun 私有化部署参考 Compose / Nginx 样例，不替代 `server/deploy/compose/prod` |
+| `runbooks/` | 首次部署、升级、回滚、备份恢复、migration、导入、故障处理和日常运维 |
+| `checklists/` | 部署前后、smoke、安全、备份恢复、升级、回滚和巡检清单 |
+| `evidence/` | 发布、migration、备份、smoke evidence 模板；只记录 hash、版本、状态和脱敏摘要 |
+| `reports/` | 本地生成的最新检查报告落点；真实报告提交前必须脱敏 |
+| `scripts/` | 针对本资料包的薄脚本，只做 env 校验、smoke、evidence 收集和备份恢复检查 |
 
-该 evidence 表示目标环境已加载新镜像、migration 已到最新、健康检查、只读路由 smoke、目标试用账号 RBAC 核对、登录态只读 API smoke 和 `SIM-YOYOOSUN-PHASE8` 内部模拟事实写入闭环通过。客户使用确认属于交付后的业务确认，不作为 Phase 8 完成阻塞。
+## 敏感信息规则 / Sensitive Data Rules
 
-未来可放：
+本目录禁止提交：
 
-- env 样例和填写说明。
-- compose override。
-- 备份恢复。
-- 发布清单。
-- 巡检清单。
-- 客户培训和交付记录。
+- 真实 `.env`、数据库密码、JWT secret、管理员密码、token、私钥或证书私钥。
+- 数据库 dump、生产备份文件、附件原件或未加密备份。
+- 客户原始 Excel / PDF / JPG / PNG 或未脱敏截图。
+- 包含手机号、地址、价格、订单明细、token 或完整连接串的日志。
+- 长期有效下载链接、对象存储 access key、备份加密 key。
 
-Phase 11 已新增私有化客户包模板：
+客户原始资料仍归档在 `docs/customers/yoyoosun/raw-source-files/` 并按客户资料边界管理；真实备份、生产 `.env` 和签署文件应放受控外部存储。
 
-- `/Users/simon/projects/plush-toy-erp/config/private-deployment-template/templateConfig.mjs`
-- `/Users/simon/projects/plush-toy-erp/docs/product/private-deployment-package-review.md`
-- `/Users/simon/projects/plush-toy-erp/scripts/qa/private-deployment-boundaries.mjs`
-- `/Users/simon/projects/plush-toy-erp/scripts/qa/phase11-private-deployment-closure.mjs`
+## 常用入口 / Common Entrypoints
 
-该模板只说明新增客户时如何准备 `docs/customers/<customer-key>/`、`config/customers/<customer-key>/` 和 `deployments/<customer-key>/`，不创建真实第二客户、不执行真实导入、不新增 `tenant_id`，也不改变当前 yoyoosun 部署主路径。
+- 部署总览：`runbooks/00-overview.md`
+- 首次部署：`runbooks/01-first-deploy.md`
+- 升级：`runbooks/02-upgrade.md`
+- 回滚：`runbooks/03-rollback.md`
+- 备份恢复：`runbooks/04-backup-restore.md`
+- 导入执行边界：`runbooks/06-import-apply.md`
+- 部署前检查：`checklists/pre-deploy-checklist.md`
+- smoke 检查：`checklists/smoke-test-checklist.md`
+- 安全检查：`checklists/security-checklist.md`
+- 发布 evidence 模板：`evidence/releases/release-evidence-template.md`
 
-部署边界：
+## 校验 / Validation
 
-- 当前唯一部署真源仍是 `server/deploy/compose/prod`。
-- 低配服务器只负责加载已构建产物、启动服务、执行 migration 和部署后检查。
-- Atlas migration 仍使用宿主机 `/usr/local/bin/atlas`。
+```bash
+node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun
+bash deployments/yoyoosun/scripts/verify-env.sh --example
+```
+
+`deployment-package-lint` 会检查资料包必需文件、禁止文件类型、真实 secret 高风险模式和基础样例结构。
+
+## 仍不做 / Out Of Scope
+
+- 不新增 `tenant_id`、SaaS、多租户、license、billing 或客户工单系统。
+- 不 fork 核心代码、schema、migration、usecase、RBAC、Workflow 或 Fact 规则。
+- 不在目标服务器执行 `docker build`、`pnpm build`、`go build` 或 `make build_server`。
+- 不执行 yoyoosun 真实客户数据导入；没有审批、备份 evidence 和单独数据治理任务时，只能做 dry-run / 模拟闭环。

@@ -7,6 +7,9 @@ import (
 	"strings"
 	"time"
 
+	corestatus "server/internal/core/status"
+	"server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -26,9 +29,9 @@ const (
 	OutsourcingFactReturnReceipt = "RETURN_RECEIPT"
 
 	ShipmentSourceType      = "SHIPMENT"
-	ShipmentStatusDraft     = "DRAFT"
-	ShipmentStatusShipped   = "SHIPPED"
-	ShipmentStatusCancelled = "CANCELLED"
+	ShipmentStatusDraft     = corestatus.ShipmentDraft
+	ShipmentStatusShipped   = corestatus.ShipmentShipped
+	ShipmentStatusCancelled = corestatus.ShipmentCancelled
 
 	StockReservationStatusActive    = "ACTIVE"
 	StockReservationStatusReleased  = "RELEASED"
@@ -480,7 +483,11 @@ func normalizePhase8FactMutation(in *Phase8FactMutation, allowedTypes map[string
 	out.SubjectType = strings.ToUpper(strings.TrimSpace(out.SubjectType))
 	out.SourceType = normalizeOptionalUpperString(out.SourceType)
 	out.Note = normalizeOptionalString(out.Note)
-	out.IdempotencyKey = strings.TrimSpace(out.IdempotencyKey)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
 	if out.LotID != nil && *out.LotID <= 0 {
 		out.LotID = nil
 	}
@@ -499,9 +506,10 @@ func normalizePhase8FactMutation(in *Phase8FactMutation, allowedTypes map[string
 	if out.FactNo == "" ||
 		out.SubjectID <= 0 ||
 		out.WarehouseID <= 0 ||
-		out.UnitID <= 0 ||
-		out.Quantity.Cmp(decimal.Zero) <= 0 ||
-		out.IdempotencyKey == "" {
+		out.UnitID <= 0 {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
 		return nil, ErrBadParam
 	}
 	if out.OccurredAt.IsZero() {
@@ -518,14 +526,18 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	out.ShipmentNo = strings.TrimSpace(out.ShipmentNo)
 	out.CustomerSnapshot = normalizeOptionalString(out.CustomerSnapshot)
 	out.Note = normalizeOptionalString(out.Note)
-	out.IdempotencyKey = strings.TrimSpace(out.IdempotencyKey)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
 	if out.SalesOrderID != nil && *out.SalesOrderID <= 0 {
 		out.SalesOrderID = nil
 	}
 	if out.CustomerID != nil && *out.CustomerID <= 0 {
 		out.CustomerID = nil
 	}
-	if out.ShipmentNo == "" || out.IdempotencyKey == "" {
+	if out.ShipmentNo == "" {
 		return nil, ErrBadParam
 	}
 	return &out, nil
@@ -543,7 +555,10 @@ func normalizeShipmentItemCreate(in *ShipmentItemCreate) (*ShipmentItemCreate, e
 	if out.LotID != nil && *out.LotID <= 0 {
 		out.LotID = nil
 	}
-	if out.ShipmentID <= 0 || out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 || out.Quantity.Cmp(decimal.Zero) <= 0 {
+	if out.ShipmentID <= 0 || out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
 		return nil, ErrBadParam
 	}
 	return &out, nil
@@ -555,8 +570,12 @@ func normalizeStockReservationCreate(in *StockReservationCreate) (*StockReservat
 	}
 	out := *in
 	out.ReservationNo = strings.TrimSpace(out.ReservationNo)
-	out.IdempotencyKey = strings.TrimSpace(out.IdempotencyKey)
 	out.Note = normalizeOptionalString(out.Note)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
 	if out.SalesOrderID != nil && *out.SalesOrderID <= 0 {
 		out.SalesOrderID = nil
 	}
@@ -569,7 +588,10 @@ func normalizeStockReservationCreate(in *StockReservationCreate) (*StockReservat
 	if out.ReservedAt.IsZero() {
 		out.ReservedAt = time.Now()
 	}
-	if out.ReservationNo == "" || out.IdempotencyKey == "" || out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 || out.Quantity.Cmp(decimal.Zero) <= 0 {
+	if out.ReservationNo == "" || out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
 		return nil, ErrBadParam
 	}
 	return &out, nil
@@ -586,7 +608,11 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	out.Currency = strings.ToUpper(strings.TrimSpace(out.Currency))
 	out.SourceType = normalizeOptionalUpperString(out.SourceType)
 	out.Note = normalizeOptionalString(out.Note)
-	out.IdempotencyKey = strings.TrimSpace(out.IdempotencyKey)
+	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
+	if err != nil {
+		return nil, ErrBadParam
+	}
+	out.IdempotencyKey = idempotencyKey.String()
 	if out.CounterpartyID != nil && *out.CounterpartyID <= 0 {
 		out.CounterpartyID = nil
 	}
@@ -605,7 +631,10 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	if _, ok := financeCounterpartyTypes[out.CounterpartyType]; !ok {
 		return nil, ErrBadParam
 	}
-	if out.FactNo == "" || out.IdempotencyKey == "" || out.Amount.Cmp(decimal.Zero) <= 0 {
+	if out.FactNo == "" {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewPositiveMoney(out.Amount); err != nil {
 		return nil, ErrBadParam
 	}
 	if out.OccurredAt.IsZero() {

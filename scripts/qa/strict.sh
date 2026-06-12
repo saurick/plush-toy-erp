@@ -11,19 +11,21 @@ print_help() {
 
 检查内容:
   1) db-guard + secrets
-  2) industry-template-boundaries
-  3) private-deployment-boundaries
-  4) customer-config-boundaries
-  5) customer-import-tooling
-  6) phase7-simulated-trial-data
-  7) phase8-simulated-fact-closure
-  8) phase9-simulated-mobile-closure
-  9) phase10-industry-template-closure
-  10) phase11-private-deployment-closure
-  11) shellcheck + shfmt（可选）
-  12) govulncheck（可选）
-  13) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  14) server: go test ./... + make build
+  2) core-boundary
+  3) industry-template-boundaries
+  4) private-deployment-boundaries
+  5) deployment-package-lint
+  6) customer-config-boundaries
+  7) customer-import-tooling
+  8) phase7-simulated-trial-data
+  9) phase8-simulated-fact-closure
+  10) phase9-simulated-mobile-closure
+  11) phase10-industry-template-closure
+  12) phase11-private-deployment-closure
+  13) shellcheck + shfmt（可选）
+  14) govulncheck（可选）
+  15) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  16) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -68,6 +70,11 @@ if [ -x "$ROOT_DIR/scripts/qa/secrets.sh" ]; then
   bash "$ROOT_DIR/scripts/qa/secrets.sh"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/core-boundary.test.mjs" ]; then
+  echo "[qa:strict] 运行 core 边界测试"
+  node --test "$ROOT_DIR/scripts/qa/core-boundary.test.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
   echo "[qa:strict] 运行 Phase 10 行业模板候选边界检查"
   node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
@@ -76,6 +83,16 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs" ]; then
   echo "[qa:strict] 运行 Phase 11 多客户私有化复制边界检查"
   node "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/deploy/deployment-package-lint.mjs" ]; then
+  echo "[qa:strict] 运行客户私有化部署资料包检查"
+  node "$ROOT_DIR/scripts/deploy/deployment-package-lint.mjs" --customer yoyoosun
+fi
+
+if [ -f "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs" ]; then
+  echo "[qa:strict] 运行客户私有化部署资料包检查测试"
+  node --test "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then

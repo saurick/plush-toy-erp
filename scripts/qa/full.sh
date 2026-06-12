@@ -12,8 +12,10 @@ print_help() {
 检查内容:
   error-code-sync: 前端生成错误码同步检查
   error-codes: 统一错误码魔法数字检查
+  core-boundary: server/internal/core 纯领域规则边界检查
   industry-template-boundaries: Phase 10 行业模板候选边界检查
   private-deployment-boundaries: Phase 11 多客户私有化复制边界检查
+  deployment-package-lint: 客户私有化部署资料包结构和敏感文件检查
   customer-config-boundaries: 客户配置草案边界检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
   phase7-simulated-trial-data: Phase 7 模拟数据工具测试
@@ -71,6 +73,11 @@ if [ -x "$ROOT_DIR/scripts/qa/error-codes.sh" ]; then
   bash "$ROOT_DIR/scripts/qa/error-codes.sh"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/core-boundary.test.mjs" ]; then
+  echo "[qa:full] 运行 core 边界测试"
+  node --test "$ROOT_DIR/scripts/qa/core-boundary.test.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
   echo "[qa:full] 运行 Phase 10 行业模板候选边界检查"
   node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
@@ -79,6 +86,16 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs" ]; then
   echo "[qa:full] 运行 Phase 11 多客户私有化复制边界检查"
   node "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/deploy/deployment-package-lint.mjs" ]; then
+  echo "[qa:full] 运行客户私有化部署资料包检查"
+  node "$ROOT_DIR/scripts/deploy/deployment-package-lint.mjs" --customer yoyoosun
+fi
+
+if [ -f "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs" ]; then
+  echo "[qa:full] 运行客户私有化部署资料包检查测试"
+  node --test "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then

@@ -318,3 +318,81 @@
 - 验证：`find docs/reference -maxdepth 3 -type f | sort` 确认 17 个实际资料文件已归档；桌面 `/Users/simon/Desktop/gpt给出的一些方案` 已恢复同批次副本；`rg -n "docs/reference/imported-notes|reference/imported|Imported Design Notes|imported design notes|imported note" README.md docs/current-source-of-truth.md docs/document-inventory.md docs/reference/README.md` 无匹配；`git diff --check -- README.md docs/current-source-of-truth.md docs/reference/README.md docs/document-inventory.md progress.md docs/reference` 通过。
 - 下一步：如后续要把某份 GPT 方案吸收到正式路线、架构或实现任务，必须先按当前仓库真源复核，不能直接把 `docs/reference/*` 当执行规格。
 - 阻塞/风险：本轮只做参考资料归档、重复目录删除和索引同步；未改 runtime、schema、migration、API、UI、菜单、RBAC、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。当前工作区已有其他非本轮未提交改动，本轮未回退或整理。
+
+## 2026-06-11 23:10 CST
+
+- 完成：继续排查在线预览和浏览器启动卡顿。保留上一轮移除 PDF 自动预热的主路径修复，并进一步将 `App.jsx` 的桌面 / 岗位任务端 router 改为按当前 app 类型懒加载，避免桌面预览首屏静态拉取 `src/erp/mobile/router.jsx` 和移动端入口代码。
+- 完成：修正真实登录 smoke 的当前页面断言：登录成功等待标题改为当前 `后台首页 / 工作台`；采购合同示例保留两行材料，金额联动 smoke 的合计期望同步为 `483.45` 和 `2360.00`。
+- 验证：桌面登录页资源检查确认不再请求 `src/erp/mobile/*`；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web build`、`pnpm --dir web build:mobile:boss` 均通过；L1 覆盖 `root-redirect-desktop`、`admin-login-theme-modes-desktop`、`print-workspace-material`、`print-workspace-processing`、`print-workspace-material-preview-popup`、`print-workspace-processing-preview-popup` 均通过；真实 5175 登录 smoke 中采购合同在线预览约 `1399ms`、加工合同在线预览约 `1390ms`，均低于 `10000ms` 阈值。
+- 下一步：如后续还要继续压首屏体积，可评审 `antd` / `mobileRolePermissions` 等共享依赖拆包；当前不再把移动端入口放进桌面首屏，也不再恢复页面打开时的 PDF 后台预热。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、PDF 服务端渲染逻辑、部署、提交或推送；当前工作区仍有非本轮文档 / 目录清理改动，本轮未回退或整理。
+
+## 2026-06-12 16:15 CST
+
+- 完成：按 `docs/reference/第二次20260611/server:internal:core 分层、保留与迁移规范.md` 的 CORE-01 收口 `server/internal/core` 边界。`server/internal/core/README.md` 明确 core 只放无 IO 纯产品规则，不作为第二套 `biz/data`、JSON-RPC 或 runtime；新增最小 `doc.go` 让 `go test ./internal/core/...` 成为稳定可执行入口。
+- 完成：新增 `scripts/qa/core-boundary.test.mjs`，扫描 core import 和源码危险模式，阻止 `internal/biz`、`internal/data`、`internal/service`、Ent、SQL、HTTP、Kratos transport、配置、环境变量和文件系统依赖进入 core；并接入 `scripts/qa/fast.sh`、`full.sh`、`strict.sh`。
+- 完成：同步 `scripts/README.md`、`docs/product/test-strategy.md`、`server/README.md` 和 `docs/current-source-of-truth.md`，明确 core 当前只是边界 / 骨架 / guard，不迁移业务逻辑、不改 schema / migration、不改变 `biz/data` 主路径。
+- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/...` 通过；`bash -n scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh` 通过；`find scripts -name '*.test.mjs' -print0 | xargs -0 node --test` 通过 56 项；本轮触达文件 `git diff --check` 通过。
+- 下一步：后续如继续 CORE-02，应只迁移已被 `biz` 实际消费的值对象 / 领域错误，并同步删除重复校验，避免把未使用抽象提前塞进 core。
+- 阻塞/风险：本轮不迁移状态机、计算器或 usecase，不接 JSON-RPC / API / DB / customer config，不新增 Ent schema 或 Atlas migration；未运行完整 `scripts/qa/fast.sh`，因为该脚本会执行前端 `pnpm lint --fix`，当前工作区已有非本轮前端未提交改动。
+
+## 2026-06-12 16:34 CST
+
+- 完成：继续 CORE-02，但按用户要求只迁移当前 `biz` 已明确重复且可测试覆盖的纯校验。新增 `server/internal/core/errors` 和 `server/internal/core/value`，当前只包含正数数量、非负 / 正数金额、幂等键及对应领域错误。
+- 完成：将 `sales_order`、`purchase_receipt`、`purchase_return`、`purchase_receipt_adjustment`、`inventory` 和 Phase 8 事实 / 出货 / 预留 / 财务输入里的重复 quantity / money / idempotency 校验改为调用 `core/value`；对外仍保持 `ErrBadParam`，不改变 JSON-RPC 错误口径。
+- 完成：同步 `server/internal/core/README.md`、`docs/current-source-of-truth.md` 和 `server/README.md`，明确 core 已有第一批值对象 / 领域错误，但仍不承载状态机、计算器、应用编排、runtime、schema 或 migration。
+- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/...` 通过；`cd server && go test ./internal/biz` 通过；本轮 core / biz 触达文件 `git diff --check` 通过。
+- 下一步：如果继续迁移，应先找 `biz` 中已重复且已有测试或能补测试的具体规则；`SourceRef` 和 `Percentage` 暂未迁移，因为当前 source id 清理和 loss_rate 口径还不是多处一致的独立纯规则。
+- 阻塞/风险：本轮没有迁移状态机、库存可用量计算、BOM 展开、采购收货状态计算、schema、migration、JSON-RPC、service、data repo 或前端；没有运行完整 `scripts/qa/fast.sh`，因为当前工作区已有大量非本轮未提交改动且 fast 会执行前端 `pnpm lint --fix`。
+
+## 2026-06-12 16:20 CST
+
+- 完成：继续排查本地 Chrome 在线预览停在“正在等待 PDF 预览结果...”的问题。定位为预览壳页和结果写入之间存在竞态：PDF 生成完成后若 Chrome 仍在完成壳页导航，直接写入窗口可能被后续壳页覆盖；旧持久化顺序又先等待 IndexedDB，导致 localStorage 兜底没有及时写入，壳页只能继续等待。
+- 完成：调整 `printPdf.mjs` 的 PDF 预览结果持久化顺序，先同步写入 localStorage，再后台写 IndexedDB；即使窗口被壳页导航覆盖，壳页也能立刻从同源 localStorage 恢复 PDF 结果。新增单测覆盖 IndexedDB 未返回时 localStorage 仍先有结果。
+- 完成：加强采购合同和加工合同真实登录 smoke：弹窗出现 iframe 后继续等待并断言窗口不再包含“正在等待 PDF 预览结果...”或过期提示，且 iframe 指向 `blob:` PDF，避免测试过早通过。
+- 验证：`pnpm --dir web exec node --test src/erp/utils/printPdf.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web build` 均通过；`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过；真实 5175 smoke 中采购合同在线预览约 `1917ms`、加工合同在线预览约 `2431ms`，并通过新增的非等待壳页断言。
+- 下一步：本地 Chrome 已经停在旧的等待壳页时，需要关闭该旧预览页并从工作台重新点“在线预览 PDF”，让新代码重新打开预览窗口；不要在旧等待页上刷新验证。
+- 阻塞/风险：Chrome 插件当前只暴露到 ChatGPT 标签，AppleScript 又被本机 Chrome 禁止执行页面 JS，因此未直接读取用户截图页的 localStorage；已通过当前代码路径、壳页文案、真实 5175 smoke 和新增断言复现并锁住对应竞态。未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、PDF 服务端渲染逻辑、部署、提交或推送。
+
+## 2026-06-12 16:27 CST
+
+- 完成：按用户无痕 Chrome 仍停在“正在等待 PDF 预览结果...”继续对照 `trade-erp`。确认 `trade-erp` 的 PDF 预览不是直接 `document.write` 弹窗，而是先把 PDF iframe HTML 写入 state，再驱动 `/pdf-preview-shell.html?state=...` 壳页恢复。
+- 完成：将本项目 `printPdf.mjs` 对齐为同一主路径：不再依赖直接写入弹窗；PDF 生成成功或失败后先持久化预览 HTML，localStorage 成功即立即返回并后台补写 IndexedDB，然后调用壳页恢复函数并 `location.replace(previewShellURL)`。这样无痕 / 本地 Chrome 即使壳页导航较慢，也会从 state 恢复，不会被直接写窗口竞态覆盖回等待页。
+- 完成：更新 `printPdf` 单测，把旧“直接写入当前预览窗口”断言改为“先写 state 再驱动壳页恢复”，并断言不会调用 `document.write`；保留 localStorage 先行、IndexedDB 兜底、生成失败错误页等覆盖。真实登录 smoke 继续断言弹窗最终不是等待壳页且 iframe 为 `blob:`。
+- 验证：`pnpm --dir web exec node --test src/erp/utils/printPdf.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web build` 均通过；合同预览 L1 四场景通过；真实 5175 smoke 中采购合同在线预览约 `1897ms`、加工合同在线预览约 `1901ms`；`cd server && go test ./internal/server -run 'TemplatePDF|RenderPDF|PDF'` 通过，确认本轮不需要改服务端 PDF 渲染代码。
+- 下一步：验证本地 Chrome / 无痕时，必须关闭旧等待页并重新从工作台点击“在线预览 PDF”；旧等待页本身没有新 state，刷新它仍不是有效验证。
+- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、PDF 服务端渲染逻辑、部署、提交或推送；当前工作区有其他非本轮部署 / core / 文档现场，本轮未回退或整理。
+
+## 2026-06-12 16:40 CST
+
+- 完成：按 `docs/reference/第二次20260611/` 的部署资料包参考稿，并以仓库当前真源复核后，补齐 `deployments/yoyoosun/` 私有化部署资料包：env / server / web 配置样例、Compose / Nginx 样例、首次部署 / 升级 / 回滚 / 备份恢复 / migration / 导入边界 / 故障处理 / 日常运维 runbook、部署 / smoke / 安全 / 备份恢复 / 升级 / 回滚 / 周月巡检清单、发布 / migration / 备份 / smoke evidence 模板和薄脚本。
+- 完成：新增 `scripts/deploy/deployment-package-lint.mjs` 与单测，并接入 `scripts/qa/fast.sh`、`scripts/qa/full.sh`、`scripts/qa/strict.sh`；同步 `deployments/README.md`、`scripts/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/product/private-deployment-package-review.md` 和 `config/private-deployment-template/templateConfig.mjs`，明确 yoyoosun 资料包已落地但不替代 `server/deploy/compose/prod`。
+- 验证：`node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun`、`node --test scripts/deploy/deployment-package-lint.test.mjs`、`bash deployments/yoyoosun/scripts/verify-env.sh --example`、`bash deployments/yoyoosun/scripts/verify-backup-restore.sh --evidence deployments/yoyoosun/evidence/backups/backup-evidence-template.md`、`bash -n deployments/yoyoosun/scripts/verify-env.sh deployments/yoyoosun/scripts/run-smoke.sh deployments/yoyoosun/scripts/collect-evidence.sh deployments/yoyoosun/scripts/verify-backup-restore.sh scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh`、`node scripts/qa/private-deployment-boundaries.mjs`、`node --test scripts/qa/phase11-private-deployment-closure.test.mjs`、`node scripts/qa/phase11-private-deployment-closure.mjs --out output/customers/yoyoosun/phase11-private-deployment-closure`、本轮路径 `git diff --check` 均通过；`find deployments/yoyoosun` 确认未出现真实 `.env`、证书、dump、备份或客户 raw 文件。
+- 下一步：如要进入真实客户试用发布，应另行执行受控 `.env` 校验、目标机 `docker load`、host Atlas migration、health / RBAC / 浏览器 smoke 和发布后清理；真实客户数据导入仍需单独数据治理任务和客户审批。
+- 阻塞/风险：本轮只做部署资料包、文档和本地 lint；未改后端 API、schema / migration、RBAC、WorkflowUsecase、Fact usecase、生产部署主路径、真实 `.env`、真实备份、客户 raw files、真实导入、提交或推送。当前工作区已有非本轮前端、core 和 `progress.md` 改动，本轮未回退或整理。
+
+## 2026-06-12 16:31 CST
+
+- 完成：读取 `docs/reference/第二次20260611/产品核心菜单与页面功能规格.md` 及同目录路线图、客户配置、测试、部署和 core 边界参考稿，并按仓库当前真源复核后，新增 `docs/product/prototypes/core-menu-coverage-v1/` 待实现原型：把 20260611 参考规格中的 15 个一级菜单、51 个二级菜单收口为可筛选内容矩阵，逐菜单标注页面类型、事实源、关键字段、核心动作和 Workflow / Fact / RBAC / 导入边界。
+- 完成：同步原型目录说明、静态原型索引、`/__dev/prototypes` 资产登记、dev prototype 单测、L1 场景和 `docs/document-inventory.md`；新增原型目录级 favicon，避免静态浏览器回归出现 `/favicon.ico` 404 噪音。新增样板保持 To Implement，不升级 Current，也不替代当前 `seedData.mjs`、客户菜单配置、路由、RBAC、schema、API 或正式产品真源。
+- 验证：`rg -o "\{ group:" docs/product/prototypes/core-menu-coverage-v1/index.html | wc -l` 确认为 51；`cd web && node --test src/erp/config/devPrototypes.test.mjs` 通过；`cd web && pnpm test -- --run src/erp/config/devPrototypes.test.mjs` 实际按当前脚本跑完整前端测试，347 项通过；`cd web && pnpm lint`、`cd web && pnpm css`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm style:l1` 通过；临时静态服务 + Playwright 断言通过静态索引、新原型页、51 卡片、库存分组、Legacy 搜索、空状态恢复和 1440 / 390 视口横向溢出检查；本轮路径 `git diff --check` 通过。
+- 下一步：后续如要把某个菜单从覆盖矩阵推进到真实页面，应按该菜单对应的 schema / API / RBAC / seedData / 客户菜单配置单独立项，并复用列表页、详情页、表单页、动作浮层、工作台、报表、导入或移动任务标准样板，不把参考稿直接当正式菜单实现规格。
+- 阻塞/风险：本轮只做 Reference Only 的 To Implement 原型覆盖、登记、静态文档和 dev-only 验证；未改后端 API、schema / migration、RBAC、WorkflowUsecase、Fact usecase、正式运行时菜单、客户菜单、生产构建、部署、提交或推送。当前工作区已有非本轮部署资料包、core、PDF 预览和其他文档 / 前端改动，本轮未回退、整理或纳入成果。
+
+## 2026-06-12 16:43 CST
+
+- 完成：按用户指定入口 `http://localhost:5175/erp/print-center?template=processing-contract` 继续排查打印中心到 PDF 预览全过程。定位到前端壳页恢复仍先等待 IndexedDB：即使 PDF 结果已经同步写入 localStorage，`pdf-preview-shell.html` 也会先卡在 IndexedDB；`print-window-shell.html` 同类恢复顺序也会拖慢打印中心打开工作台。
+- 完成：调整 `/pdf-preview-shell.html` 和 `/print-window-shell.html` 的恢复主路径为先读同源 localStorage，缺失时再回退 IndexedDB；同步让 `persistPrintWorkspaceWindowHTML` 在 localStorage 写入成功后立即返回，后台补写 IndexedDB，避免本地 Chrome / 无痕窗口被 IndexedDB 阻塞。
+- 完成：新增 `style:l1` 场景 `print-center-processing-preview-popup`，覆盖 `print-center?template=processing-contract -> 打印当前模板 -> 在线预览 PDF -> PDF 壳页 iframe blob`，明确断言弹窗不再停留在“正在等待 PDF 预览结果...”或“PDF 预览不存在或已过期”。
+- 验证：Browser 插件可打开 `localhost:5175` 指定入口并确认页面身份 / DOM / console；插件弹窗捕获能力不足，已用 Playwright exact-flow 回归兜底。`pnpm --dir web exec node --test src/erp/utils/printPdf.test.mjs src/erp/utils/printWorkspace.test.mjs`、`STYLE_L1_BASE_URL=http://localhost:5175 STYLE_L1_SCENARIOS=print-center-processing-preview-popup pnpm --dir web style:l1`、`pnpm --dir web lint && pnpm --dir web css && pnpm --dir web test && pnpm --dir web build`、`cd server && go test ./internal/server -run 'TemplatePDF|RenderPDF|PDF'` 均通过。
+- 下一步：本地 Chrome / 无痕验证时必须关闭旧的等待 / 过期 PDF 标签页，再从打印中心重新点“打印当前模板”和“在线预览 PDF”；旧标签页没有新的 state 写入，刷新旧页不算有效验证。
+- 阻塞/风险：本轮不需要改后端 PDF 渲染代码、API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、部署、提交或推送；当前工作区已有非本轮部署资料包、core、原型和文档现场，本轮未回退或整理。
+
+## 2026-06-12 17:22 CST
+
+- 完成：继续 CORE-03，但只按当前仓库真实状态迁移出货状态机。新增 `server/internal/core/status`，当前只定义 `DRAFT / SHIPPED / CANCELLED`，合法迁移为 `DRAFT -> SHIPPED` 和 `SHIPPED -> CANCELLED`；重复发货在 `SHIPPED` 上幂等返回，重复取消在 `CANCELLED` 上幂等返回，`DRAFT` 取消和 `CANCELLED` 再发货仍拒绝。
+- 完成：`biz` 的出货状态常量改为引用 `core/status`，`data` 事务内的出货状态判断改为调用 `core/status` 纯判断；库存流水、冲正、行锁、事务、Ent 查询和对外 `ErrBadParam` 仍保留在 `data/biz` 主路径，`core` 不 import `data/ent/sql`。
+- 完成：补 `core/status` 单测和 Phase 8 repo 重复动作测试；同步 `server/internal/core/README.md`、`server/README.md` 和 `docs/current-source-of-truth.md`，明确本轮未新增 READY / CLOSED / CANCELLED_AFTER_SHIPPED，未改 schema / migration / JSON-RPC / 前端。
+- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/... ./internal/biz ./internal/data` 通过；本轮触达文件 `git diff --check` 通过。
+- 下一步：如继续 CORE 状态机迁移，应先选当前代码中已稳定、已测试且没有 schema/API 语义扩展的单一状态机，不能顺手引入未来状态或改 JSON-RPC。
+- 阻塞/风险：当前仍有部署资料包、PDF 预览和原型等并行现场未收口；本轮未提交、未推送，也未整理这些非 CORE-03 改动。

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import {
@@ -149,6 +150,59 @@ test('printWorkspace: 窗口状态持久化后可按 TTL 读取，过期时自�
     Date.now = originalNow
     globalThis.window = originalWindow
   }
+})
+
+test('printWorkspace: 窗口 HTML 写入 localStorage 后不等待 IndexedDB', async () => {
+  const originalWindow = globalThis.window
+  const storage = new Map()
+  globalThis.window = {
+    indexedDB: {
+      open: () => ({}),
+    },
+    localStorage: {
+      setItem(key, value) {
+        storage.set(String(key), String(value))
+      },
+    },
+  }
+
+  try {
+    const saved = await Promise.race([
+      persistPrintWorkspaceWindowHTML('window-local-first', {
+        windowHTML: '<!doctype html><html><body>打印窗口</body></html>',
+      }),
+      new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('窗口状态持久化不应等待 IndexedDB'))
+        }, 50)
+      }),
+    ])
+
+    assert.equal(saved, true)
+    assert.equal(storage.size, 1)
+  } finally {
+    if (typeof originalWindow === 'undefined') {
+      delete globalThis.window
+    } else {
+      globalThis.window = originalWindow
+    }
+  }
+})
+
+test('printWorkspace: 打印窗口壳页恢复时优先读取 localStorage，再回退 IndexedDB', async () => {
+  const shellHTML = await readFile(
+    new URL('../../../public/print-window-shell.html', import.meta.url),
+    'utf8'
+  )
+  const storageReadIndex = shellHTML.indexOf(
+    'const storagePayload = readPersistedStateFromStorage()'
+  )
+  const indexedDBReadIndex = shellHTML.indexOf(
+    'return readPersistedStateFromIndexedDB()'
+  )
+
+  assert.ok(storageReadIndex > 0)
+  assert.ok(indexedDBReadIndex > storageReadIndex)
 })
 
 test('printWorkspace: 独立编辑页仅允许匹配本地窗口状态绕过登录守卫', () => {

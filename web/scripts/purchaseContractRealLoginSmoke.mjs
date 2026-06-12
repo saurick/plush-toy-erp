@@ -102,14 +102,14 @@ async function verifyPurchaseContractAmountEditing(page) {
   await amountInput.fill('123.45')
   await expectMaterialContractAmounts(page, {
     rowAmount: '123.45',
-    totalAmount: '123.45',
+    totalAmount: '483.45',
   })
 
   await quantityInput.fill('4000')
   await unitPriceInput.fill('0.5')
   await expectMaterialContractAmounts(page, {
     rowAmount: '2000.00',
-    totalAmount: '2000.00',
+    totalAmount: '2360.00',
   })
 }
 
@@ -128,6 +128,7 @@ async function verifyPurchaseContractPreviewPopup(page) {
     await popup
       .locator('iframe.pdf-preview-frame')
       .waitFor({ state: 'visible', timeout: 15_000 })
+    await assertPdfPreviewPopupReady(popup)
 
     const previewLatencyMs = Date.now() - previewStartedAt
     assert.ok(
@@ -149,6 +150,23 @@ async function verifyPurchaseContractPreviewPopup(page) {
       await popup.close()
     }
   }
+}
+
+async function assertPdfPreviewPopupReady(popup) {
+  await popup.waitForTimeout(500)
+  const state = await popup.evaluate(() => {
+    const iframe = document.querySelector('iframe.pdf-preview-frame')
+    return {
+      bodyText: document.body?.textContent?.trim() || '',
+      iframeSrc: iframe?.getAttribute('src') || '',
+      iframeCount: document.querySelectorAll('iframe.pdf-preview-frame').length,
+    }
+  })
+
+  assert.equal(state.iframeCount, 1)
+  assert.match(state.iframeSrc, /^blob:/)
+  assert.doesNotMatch(state.bodyText, /正在等待 PDF 预览结果/)
+  assert.doesNotMatch(state.bodyText, /PDF 预览不存在或已过期/)
 }
 
 async function expectMaterialContractAmounts(page, expected) {

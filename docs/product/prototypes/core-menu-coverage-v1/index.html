@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <title>产品核心菜单覆盖样板</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f1f5f3;
+        --surface: #ffffff;
+        --surface-soft: #f8faf9;
+        --surface-strong: #edf3f1;
+        --line: #d7e2dc;
+        --line-strong: #bccdc4;
+        --text: #172033;
+        --muted: #64748b;
+        --green: #147348;
+        --green-soft: #e8f5ee;
+        --blue: #1d62b7;
+        --blue-soft: #e8f1ff;
+        --amber: #a65f00;
+        --amber-soft: #fff4df;
+        --red: #be3d46;
+        --red-soft: #fff0f2;
+        --violet: #6252b5;
+        --violet-soft: #f1eeff;
+        --shadow: 0 14px 34px rgb(15 23 42 / 8%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #101827;
+          --surface: #182235;
+          --surface-soft: #202c42;
+          --surface-strong: #24344c;
+          --line: #344257;
+          --line-strong: #51627a;
+          --text: #eef4fc;
+          --muted: #aeb9ca;
+          --green: #7bd8ad;
+          --green-soft: #193c2b;
+          --blue: #8bbcf4;
+          --blue-soft: #19314d;
+          --amber: #f0bd67;
+          --amber-soft: #463214;
+          --red: #ff9aa2;
+          --red-soft: #4b2228;
+          --violet: #b4a8ff;
+          --violet-soft: #302a55;
+          --shadow: 0 18px 42px rgb(0 0 0 / 28%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .page {
+        width: min(1360px, calc(100% - 24px));
+        margin: 0 auto;
+        padding: 18px 0 32px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: end;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        padding: 18px;
+      }
+
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 26px;
+        line-height: 1.22;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        max-width: 880px;
+        margin-top: 8px;
+        color: var(--muted);
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(96px, 1fr));
+        gap: 8px;
+      }
+
+      .stat {
+        min-width: 104px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-soft);
+        padding: 10px 12px;
+      }
+
+      .stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .stat strong {
+        display: block;
+        margin-top: 2px;
+        font-size: 22px;
+        line-height: 1.1;
+      }
+
+      .notice {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 12px 14px;
+      }
+
+      .note strong {
+        display: block;
+        margin-bottom: 3px;
+      }
+
+      .note span {
+        color: var(--muted);
+      }
+
+      .toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 8;
+        display: grid;
+        grid-template-columns: minmax(220px, 340px) 150px minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: rgb(255 255 255 / 94%);
+        box-shadow: var(--shadow);
+        padding: 10px;
+        backdrop-filter: blur(10px);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .toolbar {
+          background: rgb(24 34 53 / 95%);
+        }
+      }
+
+      .search,
+      .select {
+        width: 100%;
+        min-height: 38px;
+        border: 1px solid var(--line-strong);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text);
+        padding: 0 11px;
+        outline: none;
+      }
+
+      .search:focus,
+      .select:focus {
+        border-color: #719dcf;
+        box-shadow: 0 0 0 3px rgb(29 98 183 / 12%);
+      }
+
+      .filter-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+      }
+
+      .filter {
+        min-height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--surface-soft);
+        color: var(--text);
+        padding: 0 10px;
+      }
+
+      .filter[aria-pressed="true"] {
+        border-color: #6f9acf;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 700;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+        gap: 12px;
+        margin-top: 12px;
+        align-items: start;
+      }
+
+      .panel {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .panel-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface-soft);
+        padding: 12px 14px;
+      }
+
+      .panel-head h2 {
+        font-size: 17px;
+      }
+
+      .panel-head p {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .count {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--muted);
+        padding: 5px 10px;
+      }
+
+      .menu-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .card {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        color: inherit;
+        text-align: left;
+        padding: 11px;
+      }
+
+      .card[aria-selected="true"] {
+        border-color: #6f9acf;
+        background: var(--blue-soft);
+        box-shadow: inset 0 0 0 1px rgb(29 98 183 / 18%);
+      }
+
+      .card-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .title {
+        display: block;
+        font-size: 16px;
+        font-weight: 750;
+        line-height: 1.3;
+      }
+
+      .group {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        margin-top: 8px;
+      }
+
+      .pill {
+        display: inline-flex;
+        min-height: 24px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        padding: 0 8px;
+        font-size: 12px;
+        line-height: 1.2;
+      }
+
+      .pill.p1 {
+        border-color: rgb(20 115 72 / 28%);
+        background: var(--green-soft);
+        color: var(--green);
+        font-weight: 700;
+      }
+
+      .pill.p2 {
+        border-color: rgb(166 95 0 / 28%);
+        background: var(--amber-soft);
+        color: var(--amber);
+        font-weight: 700;
+      }
+
+      .pill.batch-a {
+        border-color: rgb(98 82 181 / 28%);
+        background: var(--violet-soft);
+        color: var(--violet);
+      }
+
+      .pill.deferred {
+        border-color: rgb(190 61 70 / 28%);
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .card-summary {
+        margin-top: 8px;
+        color: var(--muted);
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+      }
+
+      .detail {
+        position: sticky;
+        top: 86px;
+      }
+
+      .detail-body {
+        display: grid;
+        gap: 11px;
+        padding: 14px;
+      }
+
+      .detail-title-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .detail h2 {
+        font-size: 22px;
+        line-height: 1.25;
+      }
+
+      .detail-section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-soft);
+        padding: 11px;
+      }
+
+      .detail-section h3 {
+        margin-bottom: 7px;
+        font-size: 14px;
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 6px 10px;
+      }
+
+      .kv dt {
+        color: var(--muted);
+      }
+
+      .kv dd {
+        margin: 0;
+        min-width: 0;
+      }
+
+      .list {
+        display: grid;
+        gap: 5px;
+        padding: 0;
+        margin: 0;
+        list-style: none;
+      }
+
+      .list li {
+        position: relative;
+        padding-left: 13px;
+      }
+
+      .list li::before {
+        position: absolute;
+        left: 0;
+        color: var(--green);
+        content: "•";
+      }
+
+      .pattern-map {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .pattern {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 10px;
+      }
+
+      .pattern strong {
+        display: block;
+      }
+
+      .pattern span {
+        display: block;
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .empty {
+        display: none;
+        padding: 36px 14px;
+        color: var(--muted);
+        text-align: center;
+      }
+
+      .empty.is-visible {
+        display: block;
+      }
+
+      @media (max-width: 1080px) {
+        .hero,
+        .layout,
+        .notice {
+          grid-template-columns: 1fr;
+        }
+
+        .detail {
+          position: static;
+        }
+
+        .toolbar {
+          grid-template-columns: 1fr;
+        }
+
+        .pattern-map {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 720px) {
+        .page {
+          width: min(100% - 16px, 560px);
+          padding-top: 8px;
+        }
+
+        .hero,
+        .note,
+        .panel-head,
+        .detail-body {
+          padding: 12px;
+        }
+
+        .stats,
+        .menu-grid,
+        .pattern-map {
+          grid-template-columns: 1fr;
+        }
+
+        h1 {
+          font-size: 22px;
+        }
+
+        .detail h2 {
+          font-size: 20px;
+        }
+
+        .kv {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">To Implement · Core prototype coverage</p>
+          <h1>产品核心菜单覆盖样板</h1>
+          <p class="summary">
+            基于 20260611 参考规格，把每个二级菜单都放进同一个可筛选的内容矩阵：先看业务事实、页面类型、关键字段和动作边界，再决定复用哪个页面样板。当前正式菜单仍以运行时配置和 RBAC 为准。
+          </p>
+        </div>
+        <div class="stats" aria-label="覆盖统计">
+          <div class="stat"><span>一级菜单</span><strong>15</strong></div>
+          <div class="stat"><span>二级菜单</span><strong>51</strong></div>
+          <div class="stat"><span>资产状态</span><strong>To Implement</strong></div>
+        </div>
+      </section>
+
+      <section class="notice" aria-label="边界说明">
+        <p class="note">
+          <strong>Reference Only</strong>
+          <span>菜单内容来自 `docs/reference/第二次20260611/产品核心菜单与页面功能规格.md`，用于补齐原型覆盖，不替代当前真源。</span>
+        </p>
+        <p class="note">
+          <strong>不逐菜单复制页面</strong>
+          <span>每个菜单都给出内容，但真实设计继续复用列表、详情、表单、动作浮层、工作台、报表、导入和移动任务样板。</span>
+        </p>
+      </section>
+
+      <section class="toolbar" aria-label="筛选产品核心菜单">
+        <input
+          id="searchInput"
+          class="search"
+          type="search"
+          placeholder="搜索菜单、字段、事实源、动作"
+          aria-label="搜索菜单、字段、事实源、动作"
+        />
+        <select id="batchSelect" class="select" aria-label="按原型优先级筛选">
+          <option value="all">全部批次</option>
+          <option value="第一批">第一批必须画</option>
+          <option value="第二批">第二批再画</option>
+          <option value="未列入">覆盖但未列入批次</option>
+        </select>
+        <div class="filter-group" id="groupFilters" aria-label="按一级菜单筛选"></div>
+      </section>
+
+      <section class="layout">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>菜单内容矩阵</h2>
+              <p>点击任一菜单查看页面内容、事实源和实现边界。</p>
+            </div>
+            <span class="count" id="resultCount">0 / 51</span>
+          </div>
+          <div class="menu-grid" id="menuGrid"></div>
+          <p class="empty" id="emptyState">没有匹配的菜单。</p>
+        </div>
+
+        <aside class="panel detail" aria-live="polite">
+          <div class="panel-head">
+            <div>
+              <h2>选中菜单详情</h2>
+              <p>字段和动作是原型输入，真实落地必须再核对 schema / API / RBAC。</p>
+            </div>
+          </div>
+          <div class="detail-body" id="detailBody"></div>
+        </aside>
+      </section>
+
+      <section class="pattern-map" aria-label="对应标准样板">
+        <div class="pattern">
+          <strong>列表页</strong>
+          <span>业务模块标准页，覆盖筛选、表格、分页和当前记录操作。</span>
+        </div>
+        <div class="pattern">
+          <strong>详情页</strong>
+          <span>业务详情页，覆盖状态、明细、关联单据、附件和审计。</span>
+        </div>
+        <div class="pattern">
+          <strong>动作浮层</strong>
+          <span>弹窗 / 抽屉样板，覆盖审批、阻塞、冲正、关闭和 reason。</span>
+        </div>
+        <div class="pattern">
+          <strong>工作台 / 报表 / 导入</strong>
+          <span>总控、看板和导入类页面保持独立评审，不挤入业务列表骨架。</span>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const groups = [
+        "全部",
+        "首页",
+        "我的待办",
+        "主数据",
+        "销售管理",
+        "采购管理",
+        "质检管理",
+        "库存管理",
+        "生产管理",
+        "外协管理",
+        "出货管理",
+        "财务业务",
+        "数据导入",
+        "报表看板",
+        "系统管理",
+        "历史归档",
+      ];
+
+      const menus = [
+        { group: "首页", name: "ERP 总览", priority: "P1", batch: "第一批", pattern: "工作台 / 报表", fact: "Dashboard projection / workflow_tasks / fact projections", users: "管理层、业务、PMC", fields: ["日期范围", "业务角色", "客户", "风险类型"], actions: ["查看今日待办", "跳转风险对象", "切换角色视角"], boundary: "只读汇总，不作为库存、出货或财务事实真源。" },
+        { group: "首页", name: "异常提醒", priority: "P1", batch: "未列入", pattern: "工作台 / 动作浮层", fact: "workflow_tasks / exception projections", users: "管理层、责任角色", fields: ["异常编号", "异常类型", "严重程度", "关联单据", "责任人", "状态"], actions: ["处理异常", "转交", "关闭", "查看审计"], boundary: "异常关闭只代表协同闭环，不自动修正事实表。" },
+        { group: "我的待办", name: "我的任务", priority: "P1", batch: "第一批", pattern: "工作台 / 移动任务 / 动作浮层", fact: "workflow_tasks / workflow_task_events", users: "所有岗位", fields: ["任务编号", "任务类型", "关联业务对象", "优先级", "状态", "截止时间"], actions: ["查看", "处理", "转交", "评论", "完成", "驳回"], boundary: "任务完成不等于库存、出货、财务等事实过账。" },
+        { group: "我的待办", name: "我发起的", priority: "P2", batch: "未列入", pattern: "列表页 / 详情页", fact: "workflow_tasks / workflow_task_events", users: "流程发起人", fields: ["流程编号", "流程类型", "关联单据", "当前节点", "当前处理人", "状态"], actions: ["查看流程", "催办", "撤回候选", "查看记录"], boundary: "只追踪协同流程，不绕过当前处理人的权限和状态边界。" },
+        { group: "主数据", name: "客户管理", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 详情页", fact: "customers / contacts", users: "业务、财务、管理员", fields: ["客户编号", "客户名称", "客户简称", "客户类型", "税号", "默认联系人", "状态"], actions: ["新建客户", "编辑", "停用", "维护联系人"], boundary: "只维护交易主体，不生成订单、出货、库存或财务事实。" },
+        { group: "主数据", name: "供应商管理", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 详情页", fact: "suppliers / contacts", users: "采购、财务、管理员", fields: ["供应商编号", "供应商名称", "供应商类型", "默认付款方式", "联系人", "质量等级", "状态"], actions: ["新建供应商", "编辑", "停用", "设主联系人"], boundary: "供应商启停不替代采购、质检、库存或应付事实判断。" },
+        { group: "主数据", name: "联系人管理", priority: "P1", batch: "未列入", pattern: "列表页 / 表单页", fact: "contacts", users: "业务、采购、财务", fields: ["联系人姓名", "所属对象类型", "所属对象", "职位", "手机", "邮箱", "是否默认"], actions: ["新建联系人", "编辑", "设为默认", "禁用"], boundary: "联系人必须归属客户或供应商；不能成为独立业务事实来源。" },
+        { group: "主数据", name: "产品管理", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 详情页", fact: "products", users: "业务、PMC、生产", fields: ["产品编号", "产品名称", "产品类别", "客户", "默认单位", "SKU 数量", "是否有 BOM"], actions: ["新建产品", "编辑", "查看 SKU", "关联 BOM"], boundary: "产品主档不直接表达库存数量、生产事实或客户订单承诺。" },
+        { group: "主数据", name: "SKU 管理", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 详情页", fact: "product_skus", users: "业务、仓库、生产", fields: ["SKU 编码", "SKU 名称", "所属产品", "规格", "条码", "客户 SKU", "当前库存"], actions: ["新建 SKU", "编辑规格", "停用", "查看库存"], boundary: "当前仓库尚未把 SKU 接成正式运行时事实；落地前需 schema/API 评审。" },
+        { group: "主数据", name: "物料管理", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 详情页", fact: "materials", users: "采购、PMC、仓库", fields: ["物料编号", "物料名称", "物料类别", "默认单位", "默认供应商", "安全库存"], actions: ["新建物料", "编辑", "停用", "查看 BOM 使用"], boundary: "物料主数据不等于采购事实或库存事实。" },
+        { group: "主数据", name: "单位管理", priority: "P1", batch: "未列入", pattern: "列表页 / 表单页", fact: "units", users: "管理员、业务维护", fields: ["单位编码", "单位名称", "单位类型", "基准单位", "换算比例", "状态"], actions: ["新建单位", "编辑换算", "停用"], boundary: "单位换算影响数量链路，真实落地必须有统一换算规则和测试。" },
+        { group: "主数据", name: "仓库库位", priority: "P1", batch: "未列入", pattern: "列表页 / 表单页 / 详情页", fact: "warehouses / warehouse_locations", users: "仓库、管理员", fields: ["仓库编码", "仓库名称", "仓库类型", "库位编码", "负责人", "状态"], actions: ["新建仓库", "维护库位", "停用"], boundary: "仓库/库位是库存事实维度，不直接修改库存余额。" },
+        { group: "主数据", name: "BOM 管理", priority: "P1", batch: "第一批", pattern: "列表页 / 详情页 / 表单页", fact: "bom_headers / bom_items", users: "工程、采购、PMC", fields: ["BOM 编码", "产品/SKU", "版本", "物料", "用量", "损耗率", "状态"], actions: ["新建 BOM", "复制", "激活", "归档"], boundary: "BOM 是产品结构，不直接写库存、采购订单或成本事实。" },
+        { group: "销售管理", name: "销售订单", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 详情页", fact: "sales_orders / sales_order_items", users: "业务、PMC、财务", fields: ["订单号", "客户", "客户订单号", "订单日期", "计划交付", "生命周期"], actions: ["新建订单", "提交", "激活", "关闭", "取消"], boundary: "销售订单只记录客户承诺，不生成出货、库存预留、应收或发票事实。" },
+        { group: "销售管理", name: "销售订单明细", priority: "P2", batch: "未列入", pattern: "详情页 / 表格子表", fact: "sales_order_items", users: "业务、PMC、仓库", fields: ["行号", "产品/SKU", "颜色", "订单数量", "单价", "金额", "行状态"], actions: ["新增行", "编辑行", "取消行", "查看交付"], boundary: "明细进度不等于出货事实；交付数量须由 shipment 事实决定。" },
+        { group: "采购管理", name: "采购需求", priority: "P2", batch: "未列入", pattern: "列表页 / 报表", fact: "purchase planning projection", users: "采购、PMC", fields: ["需求编号", "来源 BOM/库存", "物料", "需求数量", "建议供应商", "缺料日期"], actions: ["生成建议", "合并需求", "转采购订单"], boundary: "采购需求是计划，不等于采购承诺或入库事实。" },
+        { group: "采购管理", name: "采购订单", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 详情页", fact: "purchase_orders / purchase_order_items", users: "采购、财务", fields: ["采购单号", "供应商", "状态", "下单日期", "预计到货", "总金额"], actions: ["新建采购单", "审核", "关闭", "复制", "打印"], boundary: "采购订单表达采购承诺，不等于收货、入库或应付事实。" },
+        { group: "采购管理", name: "采购收货", priority: "P1", batch: "第一批", pattern: "列表页 / 动作浮层 / 详情页", fact: "purchase_receipts / purchase_receipt_items / inventory_txns", users: "采购、仓库、质检", fields: ["收货单号", "采购订单", "供应商", "收货日期", "物料", "收货数量", "状态"], actions: ["创建草稿", "添加明细", "过账收货", "取消收货"], boundary: "采购收货过账才写库存 IN；Workflow 入库任务完成不自动过账库存。" },
+        { group: "采购管理", name: "采购退货", priority: "P2", batch: "未列入", pattern: "列表页 / 动作浮层 / 详情页", fact: "purchase_returns / purchase_return_items / inventory_txns", users: "采购、仓库、质检", fields: ["退货单号", "原入库行", "供应商", "批次", "退货数量", "状态"], actions: ["创建退货", "过账退货", "取消退货"], boundary: "退货扣减库存须受原入库可退数量和批次状态守卫约束。" },
+        { group: "质检管理", name: "质检任务", priority: "P1", batch: "第一批", pattern: "列表页 / 移动任务 / 动作浮层", fact: "workflow_tasks / quality_inspections", users: "品质、仓库", fields: ["任务编号", "待检对象", "检验类型", "数量", "截止时间", "状态"], actions: ["开始检验", "登记结果", "阻塞", "退回"], boundary: "质检任务是协同入口；质检判定事实由 QualityUsecase 维护。" },
+        { group: "质检管理", name: "质检记录", priority: "P1", batch: "未列入", pattern: "列表页 / 详情页 / 表单页", fact: "quality_inspections", users: "品质、采购、仓库", fields: ["检验单号", "来源单据", "检验类型", "检验数量", "不良数量", "判定", "批次状态"], actions: ["提交", "判定通过", "拒收", "取消草稿"], boundary: "质检改变批次状态但不写 inventory_txns，不替代采购退货。" },
+        { group: "库存管理", name: "库存余额", priority: "P1", batch: "第一批", pattern: "列表页 / 报表", fact: "inventory_balances", users: "仓库、采购、PMC", fields: ["仓库", "SKU/物料", "批次", "库存数量", "已预留", "可用量"], actions: ["筛选库存", "查看流水", "查看批次", "导出"], boundary: "余额是查询加速表，库存事实真源仍是 inventory_txns。" },
+        { group: "库存管理", name: "库存批次", priority: "P1", batch: "第二批", pattern: "列表页 / 详情页", fact: "inventory_lots", users: "仓库、质检", fields: ["批次号", "来源单据", "物料/SKU", "仓库", "数量", "批次状态"], actions: ["查看批次", "查看质检", "禁用候选", "追溯来源"], boundary: "批次状态影响扣减规则，不能靠前端隐藏按钮兜底。" },
+        { group: "库存管理", name: "库存流水", priority: "P1", batch: "第一批", pattern: "列表页 / 详情页", fact: "inventory_txns", users: "仓库、财务、审计", fields: ["流水号", "类型", "来源单据", "仓库", "批次", "数量", "业务时间"], actions: ["查看流水", "查看来源", "导出", "审计"], boundary: "历史流水不可直接修改，错误通过 REVERSAL 或调整事实修正。" },
+        { group: "库存管理", name: "库存预留", priority: "P1", batch: "第一批", pattern: "列表页 / 动作浮层", fact: "stock_reservations / inventory_balances", users: "业务、仓库、PMC", fields: ["预留单号", "销售订单", "SKU", "预留数量", "可用量", "状态"], actions: ["创建预留", "取消预留", "查看占用"], boundary: "预留必须防超预留和并发重复，不写库存流水。" },
+        { group: "库存管理", name: "库存调整", priority: "P2", batch: "第二批", pattern: "列表页 / 动作浮层", fact: "inventory_txns / adjustment documents", users: "仓库、管理员", fields: ["调整单号", "仓库", "SKU/物料", "批次", "调整数量", "原因", "状态"], actions: ["创建调整", "审核", "过账", "冲正"], boundary: "调整必须有原因和审计，不允许直接改余额。" },
+        { group: "库存管理", name: "库存调拨", priority: "P2", batch: "第二批", pattern: "列表页 / 表单页 / 动作浮层", fact: "transfer documents / inventory_txns", users: "仓库", fields: ["调拨单号", "调出仓库", "调入仓库", "SKU/物料", "批次", "数量", "状态"], actions: ["创建调拨", "确认出库", "确认入库", "取消"], boundary: "调拨涉及双边库存变化，必须由后端事务保证一致。" },
+        { group: "生产管理", name: "生产任务", priority: "P1", batch: "第一批", pattern: "列表页 / 详情页 / 表单页", fact: "production_facts / production task documents", users: "PMC、生产", fields: ["生产任务号", "来源销售订单", "SKU", "计划数量", "已完工数量", "负责人", "状态"], actions: ["创建任务", "排程", "开工", "关闭"], boundary: "生产任务是生产安排，不等于领料或成品入库事实。" },
+        { group: "生产管理", name: "生产上报", priority: "P1", batch: "第二批", pattern: "表单页 / 移动任务 / 动作浮层", fact: "production_facts", users: "生产、PMC", fields: ["上报单号", "生产任务", "合格数量", "不良数量", "损耗数量", "是否完工"], actions: ["提交上报", "确认完工", "记录不良", "查看审计"], boundary: "上报记录生产事实，但成品入库仍需库存事实路径。" },
+        { group: "生产管理", name: "生产领料", priority: "P2", batch: "第二批", pattern: "列表页 / 动作浮层", fact: "production issue documents / inventory_txns", users: "生产、仓库", fields: ["领料单号", "生产任务", "物料", "BOM 需求", "实领数量", "仓库/库位", "批次"], actions: ["创建领料", "确认发料", "冲正"], boundary: "领料必须按库存事实扣减，不从 Workflow 任务直接扣库存。" },
+        { group: "外协管理", name: "外协任务", priority: "P1", batch: "第一批", pattern: "列表页 / 详情页 / 表单页", fact: "outsourcing_facts / outsourcing task documents", users: "采购、PMC、外协", fields: ["外协任务号", "外协厂", "来源销售订单", "加工对象", "计划数量", "已发料", "已回货", "状态"], actions: ["创建任务", "派发", "关闭", "查看进度"], boundary: "外协任务表达安排，不等于外协发料或回货事实。" },
+        { group: "外协管理", name: "外协发料", priority: "P1", batch: "第二批", pattern: "列表页 / 动作浮层", fact: "outsourcing_facts / inventory_txns", users: "采购、仓库", fields: ["发料单号", "外协任务", "外协厂", "发料日期", "物料", "数量", "批次"], actions: ["创建发料", "确认发料", "取消 / 冲正"], boundary: "发料给外协厂必须写库存 OUT，不由协同任务自动完成。" },
+        { group: "外协管理", name: "外协回货", priority: "P1", batch: "第二批", pattern: "列表页 / 动作浮层 / 质检任务", fact: "outsourcing_facts / quality_inspections / inventory_txns", users: "采购、仓库、品质", fields: ["回货单号", "外协任务", "外协厂", "回货数量", "是否需要质检", "状态"], actions: ["登记回货", "派生质检", "确认入库", "退回"], boundary: "回货、质检、入库分层处理；质检通过不等于库存已入账。" },
+        { group: "出货管理", name: "出货单", priority: "P1", batch: "第一批", pattern: "列表页 / 详情页 / 动作浮层", fact: "shipments / shipment_items / inventory_txns", users: "业务、仓库、财务", fields: ["出货单号", "销售订单", "客户", "出货日期", "出货仓库", "总数量", "物流单号", "状态"], actions: ["创建出货单", "确认发货", "取消已发货", "打印"], boundary: "shipped 后才是出货事实；出货放行 shipping_released 不等于 shipped。" },
+        { group: "出货管理", name: "装箱/发货明细", priority: "P2", batch: "第二批", pattern: "详情页 / 表格子表", fact: "shipment_items / packing details", users: "仓库、业务", fields: ["出货单", "箱号", "SKU", "数量", "箱数", "毛重", "净重", "体积"], actions: ["维护装箱", "导出明细", "打印清单"], boundary: "装箱明细服务出货，不单独改变库存事实。" },
+        { group: "财务业务", name: "应收事实", priority: "P1", batch: "第一批", pattern: "列表页 / 详情页 / 动作浮层", fact: "finance_facts", users: "财务、业务、老板", fields: ["应收编号", "客户", "来源类型", "来源单据", "应收金额", "已收金额", "到期日", "状态"], actions: ["创建应收", "确认", "关闭", "查看来源"], boundary: "应收至少基于真实出货或对账，不从 Workflow 任务自动生成。" },
+        { group: "财务业务", name: "应付事实", priority: "P1", batch: "第一批", pattern: "列表页 / 详情页 / 动作浮层", fact: "finance_facts", users: "财务、采购、老板", fields: ["应付编号", "供应商", "来源类型", "来源单据", "应付金额", "已付金额", "到期日", "状态"], actions: ["创建应付", "确认", "关闭", "查看来源"], boundary: "应付至少基于采购入库、委外结算或对账，不由菜单存在决定。" },
+        { group: "财务业务", name: "收付款记录", priority: "P2", batch: "第二批", pattern: "列表页 / 表单页 / 动作浮层", fact: "finance_facts / payment records", users: "财务", fields: ["记录编号", "类型", "关联应收/应付", "对象", "金额", "付款方式", "交易日期", "状态"], actions: ["登记收款", "登记付款", "核销", "作废"], boundary: "收付款事实必须关联应收/应付，不替代发票或总账。" },
+        { group: "数据导入", name: "导入任务", priority: "P1", batch: "第一批", pattern: "导入工作台 / 列表页", fact: "import jobs / reports", users: "管理员、实施", fields: ["导入任务号", "客户", "导入类型", "文件数量", "状态", "dry-run 结果", "成功/失败数量"], actions: ["创建任务", "dry-run", "查看报告", "apply 候选"], boundary: "当前真实客户数据导入不可执行；dry-run 和 evidence 不等于 import approval。" },
+        { group: "数据导入", name: "导入预检", priority: "P1", batch: "未列入", pattern: "导入工作台 / 报告页", fact: "dry-run reports", users: "管理员、实施、客户确认人", fields: ["检查项", "结果", "影响行数", "错误样例", "建议动作", "是否阻塞 apply"], actions: ["查看检查", "定位源文件", "导出报告"], boundary: "预检只说明可执行性，不直接写数据库。" },
+        { group: "数据导入", name: "未匹配队列", priority: "P1", batch: "第一批", pattern: "导入工作台 / 动作浮层", fact: "unresolved queue", users: "实施、业务确认人", fields: ["队列编号", "导入任务", "对象类型", "原始值", "建议匹配", "置信度", "处理方式", "状态"], actions: ["匹配已有", "新建候选", "忽略", "标记阻塞"], boundary: "处理 unresolved 仍需人工确认和 dry-run 复核，不自动变成真实导入。" },
+        { group: "报表看板", name: "订单看板", priority: "P2", batch: "第二批", pattern: "报表看板", fact: "sales / purchase / production projections", users: "管理层、业务、PMC", fields: ["销售订单总数", "待确认订单", "生产中订单", "部分出货订单", "逾期订单"], actions: ["筛选客户", "钻取订单", "导出"], boundary: "报表读取事实和投影，不写业务事实。" },
+        { group: "报表看板", name: "库存看板", priority: "P2", batch: "第二批", pattern: "报表看板", fact: "inventory_balances / lots / reservations", users: "仓库、采购、管理层", fields: ["库存总 SKU 数", "低库存", "缺料", "待检库存", "不良库存", "可用库存"], actions: ["筛选仓库", "钻取库存", "导出"], boundary: "库存看板不替代库存流水和批次状态真源。" },
+        { group: "报表看板", name: "交付看板", priority: "P2", batch: "第二批", pattern: "报表看板", fact: "production / outsourcing / shipment projections", users: "老板、PMC、业务", fields: ["待生产任务", "生产逾期任务", "外协未回货", "待出货单", "今日发货"], actions: ["筛选风险", "钻取任务", "导出"], boundary: "交付风险展示不自动改变生产、外协或出货状态。" },
+        { group: "系统管理", name: "用户管理", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 动作浮层", fact: "admin_users / admin_user_roles", users: "管理员", fields: ["用户名", "昵称", "手机", "邮箱", "角色", "状态", "最后登录时间"], actions: ["新建用户", "禁用", "重置密码", "分配角色"], boundary: "账号管理必须由后端 RBAC 强制，前端隐藏不是安全边界。" },
+        { group: "系统管理", name: "角色权限", priority: "P1", batch: "第一批", pattern: "列表页 / 表单页 / 矩阵", fact: "roles / permissions / role_permissions", users: "管理员", fields: ["角色编码", "角色名称", "权限列表", "数据范围", "状态"], actions: ["新建角色", "分配权限", "停用角色", "查看审计"], boundary: "权限码真源在后端；菜单可见不替代动作权限。" },
+        { group: "系统管理", name: "审计日志", priority: "P1", batch: "第一批", pattern: "列表页 / 详情页", fact: "audit_events / workflow_task_events", users: "管理员、审计", fields: ["审计 ID", "操作人", "操作类型", "业务对象", "变更前", "变更后", "IP", "结果"], actions: ["筛选审计", "查看详情", "导出"], boundary: "审计日志不可被普通业务动作静默绕过或删除。" },
+        { group: "系统管理", name: "客户配置", priority: "P2", batch: "第二批", pattern: "客户配置查看 / 表单页", fact: "config/customers/<key>", users: "管理员、实施", fields: ["客户名称", "Logo", "系统标题", "菜单开关", "字段别名", "默认币种", "行业模板"], actions: ["修改品牌", "配置菜单", "导出客户包", "导入客户包"], boundary: "客户配置不新增 tenant_id，不污染核心 usecase / schema / RBAC。" },
+        { group: "系统管理", name: "系统配置", priority: "P1", batch: "第二批", pattern: "运维配置页", fact: "runtime config / preflight report", users: "管理员、运维", fields: ["APP_ENV", "JWT secret 状态", "public register", "SMS mock", "debug seed", "CORS origins", "SQL args tracing"], actions: ["查看配置状态", "导出检查报告", "查看 preflight"], boundary: "UI 不显示 secret 明文，生产危险配置必须由启动前检查拦截。" },
+        { group: "系统管理", name: "备份恢复", priority: "P1", batch: "第二批", pattern: "运维页 / 报告页", fact: "backup evidence / migration status", users: "管理员、运维", fields: ["备份编号", "备份时间", "备份类型", "数据库版本", "文件大小", "校验 hash", "状态"], actions: ["创建备份", "验证备份", "恢复演练", "查看 migration"], boundary: "不把真实备份、secret 或敏感日志提交进仓库。" },
+        { group: "历史归档", name: "Legacy Archive", priority: "P2", batch: "第二批", pattern: "只读列表 / 详情页", fact: "business_records legacy/archive", users: "管理员、实施、审计", fields: ["记录 ID", "原模块", "标题", "历史状态", "原始数据 JSON", "迁移状态"], actions: ["只读查看", "搜索", "查看 JSON", "标记迁移候选"], boundary: "Legacy Archive 禁止新建和编辑正式字段，不作为 dashboard 正式数据源。" },
+      ];
+
+      const grid = document.querySelector("#menuGrid");
+      const detailBody = document.querySelector("#detailBody");
+      const resultCount = document.querySelector("#resultCount");
+      const emptyState = document.querySelector("#emptyState");
+      const searchInput = document.querySelector("#searchInput");
+      const batchSelect = document.querySelector("#batchSelect");
+      const groupFilters = document.querySelector("#groupFilters");
+      let activeGroup = "全部";
+      let selectedName = menus[0].name;
+
+      function textOf(menu) {
+        return [
+          menu.group,
+          menu.name,
+          menu.priority,
+          menu.batch,
+          menu.pattern,
+          menu.fact,
+          menu.users,
+          ...menu.fields,
+          ...menu.actions,
+          menu.boundary,
+        ]
+          .join(" ")
+          .toLowerCase();
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function pillClass(menu) {
+        if (menu.batch === "第一批") return "pill batch-a";
+        if (menu.batch === "第二批") return "pill p2";
+        return "pill deferred";
+      }
+
+      function renderFilters() {
+        groupFilters.innerHTML = groups
+          .map(
+            (group) =>
+              `<button class="filter" type="button" data-group="${escapeHtml(group)}" aria-pressed="${group === activeGroup}">${escapeHtml(group)}</button>`
+          )
+          .join("");
+        groupFilters.querySelectorAll("button").forEach((button) => {
+          button.addEventListener("click", () => {
+            activeGroup = button.dataset.group || "全部";
+            render();
+          });
+        });
+      }
+
+      function filterMenus() {
+        const query = searchInput.value.trim().toLowerCase();
+        const batch = batchSelect.value;
+        return menus.filter((menu) => {
+          const groupMatched = activeGroup === "全部" || menu.group === activeGroup;
+          const batchMatched = batch === "all" || menu.batch === batch;
+          const queryMatched = !query || textOf(menu).includes(query);
+          return groupMatched && batchMatched && queryMatched;
+        });
+      }
+
+      function renderCards(items) {
+        grid.innerHTML = items
+          .map(
+            (menu) => `<button class="card" type="button" data-name="${escapeHtml(menu.name)}" aria-selected="${menu.name === selectedName}">
+              <span class="card-top">
+                <span>
+                  <span class="title">${escapeHtml(menu.name)}</span>
+                  <span class="group">${escapeHtml(menu.group)} · ${escapeHtml(menu.users)}</span>
+                </span>
+                <span class="pill ${menu.priority === "P1" ? "p1" : "p2"}">${escapeHtml(menu.priority)}</span>
+              </span>
+              <span class="pill-row">
+                <span class="${pillClass(menu)}">${escapeHtml(menu.batch)}</span>
+                <span class="pill">${escapeHtml(menu.pattern)}</span>
+              </span>
+              <span class="card-summary">${escapeHtml(menu.boundary)}</span>
+            </button>`
+          )
+          .join("");
+        grid.querySelectorAll(".card").forEach((card) => {
+          card.addEventListener("click", () => {
+            selectedName = card.dataset.name || selectedName;
+            render();
+          });
+        });
+      }
+
+      function renderDetail(menu) {
+        detailBody.innerHTML = `
+          <div class="detail-title-row">
+            <div>
+              <p class="eyebrow">${escapeHtml(menu.group)} · ${escapeHtml(menu.batch)}</p>
+              <h2>${escapeHtml(menu.name)}</h2>
+            </div>
+            <span class="pill ${menu.priority === "P1" ? "p1" : "p2"}">${escapeHtml(menu.priority)}</span>
+          </div>
+          <div class="detail-section">
+            <h3>页面定位</h3>
+            <dl class="kv">
+              <dt>页面样板</dt><dd>${escapeHtml(menu.pattern)}</dd>
+              <dt>事实源</dt><dd>${escapeHtml(menu.fact)}</dd>
+              <dt>主要用户</dt><dd>${escapeHtml(menu.users)}</dd>
+            </dl>
+          </div>
+          <div class="detail-section">
+            <h3>关键字段</h3>
+            <ul class="list">${menu.fields.map((field) => `<li>${escapeHtml(field)}</li>`).join("")}</ul>
+          </div>
+          <div class="detail-section">
+            <h3>核心动作</h3>
+            <ul class="list">${menu.actions.map((action) => `<li>${escapeHtml(action)}</li>`).join("")}</ul>
+          </div>
+          <div class="detail-section">
+            <h3>实现边界</h3>
+            <p>${escapeHtml(menu.boundary)}</p>
+          </div>
+        `;
+      }
+
+      function render() {
+        renderFilters();
+        const items = filterMenus();
+        if (!items.some((menu) => menu.name === selectedName)) {
+          selectedName = items[0]?.name || menus[0].name;
+        }
+        renderCards(items);
+        const selected = menus.find((menu) => menu.name === selectedName) || menus[0];
+        renderDetail(selected);
+        emptyState.classList.toggle("is-visible", items.length === 0);
+        resultCount.textContent = `${items.length} / ${menus.length}`;
+      }
+
+      searchInput.addEventListener("input", render);
+      batchSelect.addEventListener("change", render);
+      render();
+    </script>
+  </body>
+</html>

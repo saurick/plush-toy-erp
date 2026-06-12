@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -148,17 +150,19 @@ func normalizePurchaseReturnItemCreate(in PurchaseReturnItemCreate) (PurchaseRet
 	if in.LotID != nil && *in.LotID <= 0 {
 		in.LotID = nil
 	}
-	if in.UnitPrice != nil && in.UnitPrice.Cmp(decimal.Zero) < 0 {
+	if err := value.ValidateOptionalNonNegativeMoney(in.UnitPrice); err != nil {
 		return PurchaseReturnItemCreate{}, ErrBadParam
 	}
-	if in.Amount != nil && in.Amount.Cmp(decimal.Zero) < 0 {
+	if err := value.ValidateOptionalNonNegativeMoney(in.Amount); err != nil {
 		return PurchaseReturnItemCreate{}, ErrBadParam
 	}
 	if in.ReturnID <= 0 ||
 		in.MaterialID <= 0 ||
 		in.WarehouseID <= 0 ||
-		in.UnitID <= 0 ||
-		in.Quantity.Cmp(decimal.Zero) <= 0 {
+		in.UnitID <= 0 {
+		return PurchaseReturnItemCreate{}, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {
 		return PurchaseReturnItemCreate{}, ErrBadParam
 	}
 	return in, nil

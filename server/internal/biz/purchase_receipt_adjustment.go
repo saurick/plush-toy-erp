@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -154,8 +156,10 @@ func normalizePurchaseReceiptAdjustmentItemCreate(in PurchaseReceiptAdjustmentIt
 		!IsValidPurchaseReceiptAdjustmentType(in.AdjustType) ||
 		in.MaterialID <= 0 ||
 		in.WarehouseID <= 0 ||
-		in.UnitID <= 0 ||
-		in.Quantity.Cmp(decimal.Zero) <= 0 {
+		in.UnitID <= 0 {
+		return PurchaseReceiptAdjustmentItemCreate{}, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {
 		return PurchaseReceiptAdjustmentItemCreate{}, ErrBadParam
 	}
 	if isPurchaseReceiptCorrectionType(in.AdjustType) && in.CorrectionGroup == nil {

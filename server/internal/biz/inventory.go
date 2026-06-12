@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -422,8 +424,12 @@ func normalizeInventoryTxnCreate(in InventoryTxnCreate) (InventoryTxnCreate, err
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
 	in.TxnType = strings.ToUpper(strings.TrimSpace(in.TxnType))
 	in.SourceType = strings.ToUpper(strings.TrimSpace(in.SourceType))
-	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
 	in.Note = normalizeOptionalString(in.Note)
+	idempotencyKey, err := value.NewIdempotencyKey(in.IdempotencyKey)
+	if err != nil {
+		return InventoryTxnCreate{}, ErrBadParam
+	}
+	in.IdempotencyKey = idempotencyKey.String()
 	if in.OccurredAt.IsZero() {
 		in.OccurredAt = time.Now()
 	}
@@ -447,9 +453,10 @@ func normalizeInventoryTxnCreate(in InventoryTxnCreate) (InventoryTxnCreate, err
 		in.SubjectID <= 0 ||
 		in.WarehouseID <= 0 ||
 		in.UnitID <= 0 ||
-		in.SourceType == "" ||
-		in.IdempotencyKey == "" ||
-		in.Quantity.Cmp(decimal.Zero) <= 0 {
+		in.SourceType == "" {
+		return InventoryTxnCreate{}, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {
 		return InventoryTxnCreate{}, ErrBadParam
 	}
 	if in.Direction != 1 && in.Direction != -1 {
@@ -563,8 +570,10 @@ func normalizeBOMItemCreate(in BOMItemCreate) (BOMItemCreate, error) {
 	if in.BOMHeaderID <= 0 ||
 		in.MaterialID <= 0 ||
 		in.UnitID <= 0 ||
-		in.Quantity.Cmp(decimal.Zero) <= 0 ||
 		in.LossRate.Cmp(decimal.Zero) < 0 {
+		return BOMItemCreate{}, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {
 		return BOMItemCreate{}, ErrBadParam
 	}
 	return in, nil

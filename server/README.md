@@ -116,6 +116,7 @@ server/
 ├── docs/
 ├── internal/
 │   ├── biz/
+│   ├── core/
 │   ├── data/
 │   ├── server/
 │   └── service/
@@ -131,6 +132,7 @@ server/
 | `internal/server/` | HTTP/gRPC/JSON-RPC 接入、中间件与路由装配 |
 | `internal/service/` | 接口适配层，负责 DTO 转换与调用编排 |
 | `internal/biz/` | 业务规约与 UseCase 真源 |
+| `internal/core/` | 纯产品领域规则层，当前承载无 IO 的值对象、领域错误、出货三态状态机和边界守卫；后续其他状态机、计算器或 policy 迁入前必须先评审，不接 runtime / DB / transport |
 | `internal/data/` | 数据访问、外部依赖与持久化实现 |
 | `internal/conf/` | 配置结构定义与加载相关代码 |
 | `internal/errcode/` | 服务端错误码目录真源 |

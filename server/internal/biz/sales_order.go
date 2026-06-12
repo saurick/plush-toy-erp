@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -364,13 +366,13 @@ func normalizeSalesOrderItemMutation(in SalesOrderItemMutation) (SalesOrderItemM
 	if in.SalesOrderID <= 0 || in.LineNo <= 0 || in.ProductID <= 0 || in.UnitID <= 0 {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
-	if !in.OrderedQuantity.IsPositive() {
+	if _, err := value.NewPositiveQuantity(in.OrderedQuantity); err != nil {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
-	if in.UnitPrice != nil && in.UnitPrice.IsNegative() {
+	if err := value.ValidateOptionalNonNegativeMoney(in.UnitPrice); err != nil {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
-	if in.Amount != nil && in.Amount.IsNegative() {
+	if err := value.ValidateOptionalNonNegativeMoney(in.Amount); err != nil {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
 	return in, nil
