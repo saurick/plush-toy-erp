@@ -2,7 +2,7 @@
 
 `server/internal/core` 只承载稳定、纯粹、可复用、无 IO 的产品领域规则。它不是第二套 `biz`，不是第二套 `data`，也不是 JSON-RPC、HTTP 或部署入口。
 
-当前状态：已建立边界文档、import guard、第一批低风险值对象 / 领域错误，以及当前出货三态状态机：`DRAFT -> SHIPPED`、`SHIPPED -> CANCELLED`，并保留重复发货 / 重复取消的既有幂等语义。已替换 `biz` 中明确重复的纯校验和出货状态判断；其他状态机、计算器或应用编排不迁入；不接 runtime，不改 schema / migration，不改变 `server/internal/biz`、`server/internal/data` 或 JSON-RPC 主路径。
+当前状态：已建立边界文档、import guard、第一批低风险值对象 / 领域错误、当前出货三态状态机、当前库存批次 `ACTIVE / HOLD / REJECTED / DISABLED` 状态机、采购入库 / 采购退货 / 采购入库调整单 `DRAFT / POSTED / CANCELLED` 过账单据状态机、来料质检 `DRAFT / SUBMITTED / PASSED / REJECTED / CANCELLED` 状态机、销售订单 `draft / submitted / active / closed / canceled` 生命周期状态机，以及当前库存可用量纯计算：`available = balance - active_reserved`。已替换 `biz/data` 中明确重复的纯校验、出货状态判断、库存批次状态迁移判断、采购过账单据重复动作判断、质检状态判断、销售订单生命周期判断和库存预留可用量公式；其他状态机、计算器或应用编排不迁入；不接 runtime，不改 schema / migration，不改变 JSON-RPC / 前端主路径。
 
 ## 允许放入
 
@@ -11,9 +11,9 @@
 | 类型 | 示例 | 约束 |
 | --- | --- | --- |
 | 值对象 | 已有 `Quantity`、`Money`、`IdempotencyKey`；后续候选 `Percentage`、`SourceRef` | 只做基础校验和规范化 |
-| 状态机 | 已有 `ShipmentStatus`；后续候选 `PurchaseReceiptStatus`、`BOMStatus`、`FinanceFactStatus` | 只判断状态迁移是否合法 |
+| 状态机 | 已有 `ShipmentStatus`、`InventoryLotStatus`、`PurchaseReceiptStatus`、`PurchaseReturnStatus`、`PurchaseReceiptAdjustmentStatus`、`QualityInspectionStatus`、`SalesOrderLifecycleStatus`；后续候选 `BOMStatus`、`FinanceFactStatus` | 只判断状态迁移是否合法 |
 | 业务不变量 | 防负库存、BOM item 数量、出货数量、财务事实重复来源 | 只判断规则，不加载或保存数据 |
-| 纯计算器 | 库存可用量、BOM 展开需求、收货状态、结算状态 | 公式只能有一处真源 |
+| 纯计算器 | 已有库存可用量；后续候选 BOM 展开需求、收货状态、结算状态 | 公式只能有一处真源 |
 | 领域错误 | 已有 `ErrInvalidQuantity`、`ErrInvalidMoney`、`ErrInvalidIdempotencyKey`；后续候选 `ErrInvalidStatusTransition`、`ErrInsufficientInventory` | 表达领域规则失败，不负责 transport 映射 |
 | 领域事件定义 | `ShipmentShipped`、`InventoryReserved` | 只定义结构，不发布、不持久化 |
 | Policy 类型 | 超收、超发、负库存、自动归档旧 BOM | 由 `biz` 构造 policy，`core` 只消费参数 |

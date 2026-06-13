@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"server/internal/biz"
+	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/purchasereturnitem"
 
@@ -28,27 +28,13 @@ func (r *inventoryRepo) CreatePurchaseReturnDraft(ctx context.Context, in *biz.P
 			}
 			return nil, err
 		}
-		if receipt.Status != biz.PurchaseReceiptStatusPosted {
+		if !corestatus.IsPurchaseReceiptPosted(receipt.Status) {
 			return nil, biz.ErrBadParam
-		}
-	}
-	if in.BusinessRecordID != nil {
-		if _, err := r.data.postgres.BusinessRecord.Query().
-			Where(
-				businessrecord.ID(*in.BusinessRecordID),
-				businessrecord.DeletedAtIsNil(),
-			).
-			Only(ctx); err != nil {
-			if ent.IsNotFound(err) {
-				return nil, biz.ErrBadParam
-			}
-			return nil, err
 		}
 	}
 	row, err := r.data.postgres.PurchaseReturn.Create().
 		SetReturnNo(in.ReturnNo).
 		SetNillablePurchaseReceiptID(in.PurchaseReceiptID).
-		SetNillableBusinessRecordID(in.BusinessRecordID).
 		SetSupplierName(in.SupplierName).
 		SetStatus(biz.PurchaseReturnStatusDraft).
 		SetReturnedAt(in.ReturnedAt).
@@ -68,7 +54,7 @@ func (r *inventoryRepo) AddPurchaseReturnItem(ctx context.Context, in *biz.Purch
 		}
 		return nil, err
 	}
-	if purchaseReturn.Status != biz.PurchaseReturnStatusDraft {
+	if !corestatus.CanAddPurchaseReturnItem(purchaseReturn.Status) {
 		return nil, biz.ErrBadParam
 	}
 	if err := validatePurchaseReturnItemReferences(ctx, r.data.postgres, purchaseReturn.PurchaseReceiptID, in); err != nil {
@@ -110,7 +96,11 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (*
 		}
 		return nil, err
 	}
-	if purchaseReturn.Status == biz.PurchaseReturnStatusPosted {
+	transition, ok := corestatus.PostPurchaseReturn(purchaseReturn.Status)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		out, err := purchaseReturnWithItems(ctx, tx.client, purchaseReturn)
 		if err != nil {
 			return nil, err
@@ -120,9 +110,6 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (*
 		}
 		tx = nil
 		return out, nil
-	}
-	if purchaseReturn.Status != biz.PurchaseReturnStatusDraft {
-		return nil, biz.ErrBadParam
 	}
 
 	items, err := tx.client.PurchaseReturnItem.Query().
@@ -201,7 +188,11 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 		}
 		return nil, err
 	}
-	if purchaseReturn.Status == biz.PurchaseReturnStatusCancelled {
+	transition, ok := corestatus.CancelPurchaseReturn(purchaseReturn.Status)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		out, err := purchaseReturnWithItems(ctx, tx.client, purchaseReturn)
 		if err != nil {
 			return nil, err
@@ -211,9 +202,6 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 		}
 		tx = nil
 		return out, nil
-	}
-	if purchaseReturn.Status != biz.PurchaseReturnStatusPosted {
-		return nil, biz.ErrBadParam
 	}
 
 	items, err := tx.client.PurchaseReturnItem.Query().
@@ -336,7 +324,7 @@ func validatePurchaseReturnItemReferences(ctx context.Context, client *ent.Clien
 		}
 		return err
 	}
-	if receipt.Status != biz.PurchaseReceiptStatusPosted ||
+	if !corestatus.IsPurchaseReceiptPosted(receipt.Status) ||
 		receiptItem.MaterialID != in.MaterialID ||
 		receiptItem.WarehouseID != in.WarehouseID ||
 		receiptItem.UnitID != in.UnitID ||
@@ -488,7 +476,6 @@ func entPurchaseReturnToBiz(row *ent.PurchaseReturn, items []*ent.PurchaseReturn
 		ID:                row.ID,
 		ReturnNo:          row.ReturnNo,
 		PurchaseReceiptID: row.PurchaseReceiptID,
-		BusinessRecordID:  row.BusinessRecordID,
 		SupplierName:      row.SupplierName,
 		Status:            row.Status,
 		ReturnedAt:        row.ReturnedAt,

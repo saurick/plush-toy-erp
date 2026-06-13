@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -28,20 +27,6 @@ type PurchaseReceiptCreate struct {
 // SetReceiptNo sets the "receipt_no" field.
 func (_c *PurchaseReceiptCreate) SetReceiptNo(v string) *PurchaseReceiptCreate {
 	_c.mutation.SetReceiptNo(v)
-	return _c
-}
-
-// SetBusinessRecordID sets the "business_record_id" field.
-func (_c *PurchaseReceiptCreate) SetBusinessRecordID(v int) *PurchaseReceiptCreate {
-	_c.mutation.SetBusinessRecordID(v)
-	return _c
-}
-
-// SetNillableBusinessRecordID sets the "business_record_id" field if the given value is not nil.
-func (_c *PurchaseReceiptCreate) SetNillableBusinessRecordID(v *int) *PurchaseReceiptCreate {
-	if v != nil {
-		_c.SetBusinessRecordID(*v)
-	}
 	return _c
 }
 
@@ -125,11 +110,6 @@ func (_c *PurchaseReceiptCreate) SetNillableUpdatedAt(v *time.Time) *PurchaseRec
 		_c.SetUpdatedAt(*v)
 	}
 	return _c
-}
-
-// SetBusinessRecord sets the "business_record" edge to the BusinessRecord entity.
-func (_c *PurchaseReceiptCreate) SetBusinessRecord(v *BusinessRecord) *PurchaseReceiptCreate {
-	return _c.SetBusinessRecordID(v.ID)
 }
 
 // AddPurchaseReturnIDs adds the "purchase_returns" edge to the PurchaseReturn entity by IDs.
@@ -260,11 +240,6 @@ func (_c *PurchaseReceiptCreate) check() error {
 			return &ValidationError{Name: "receipt_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.receipt_no": %w`, err)}
 		}
 	}
-	if v, ok := _c.mutation.BusinessRecordID(); ok {
-		if err := purchasereceipt.BusinessRecordIDValidator(v); err != nil {
-			return &ValidationError{Name: "business_record_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceipt.business_record_id": %w`, err)}
-		}
-	}
 	if _, ok := _c.mutation.SupplierName(); !ok {
 		return &ValidationError{Name: "supplier_name", err: errors.New(`ent: missing required field "PurchaseReceipt.supplier_name"`)}
 	}
@@ -352,23 +327,6 @@ func (_c *PurchaseReceiptCreate) createSpec() (*PurchaseReceipt, *sqlgraph.Creat
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(purchasereceipt.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
-	}
-	if nodes := _c.mutation.BusinessRecordIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereceipt.BusinessRecordTable,
-			Columns: []string{purchasereceipt.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.BusinessRecordID = &nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.PurchaseReturnsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

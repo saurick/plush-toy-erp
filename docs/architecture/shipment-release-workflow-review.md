@@ -24,7 +24,7 @@
 | `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | warehouse 岗位任务端对 `shipment_release done / blocked / rejected` 只调用 `updateWorkflowTaskStatus`，随后 `loadTasks()` 刷新；已移除本地 `shipped` 推进、warehouse / finance 状态 upsert 和 `receivable_registration` 创建。 | 真实岗位任务端动作不再保留旧前端双写路径。 |
 | `web/src/erp/utils/finishedGoodsFlow.mjs` | `buildShipmentReleaseTask` 保留给 seed / test / demo / 未来出货专项辅助；`resolveFinishedGoodsTaskBusinessStatus` 对 `shipment_release done` 返回 `shipping_released`。 | helper 不再把放行完成解释成真实 `shipped`。 |
 | `web/src/erp/utils/shipmentFinanceFlow.mjs` | 继续保留 `shipped -> receivable_registration -> invoice_registration` 的辅助构造。 | 只能基于真实 `shipped` 或手动财务入口使用，不由 `shipment_release done` 自动调用。 |
-| `web/src/erp/pages/BusinessModulePage.jsx` | 手动应收 / 开票入口本轮不迁，但发起应收不再把最新 `shipment_release done` 当成真实 `shipped`。 | 财务入口不扩大 shipment_release 语义。 |
+| 旧 `BusinessModulePage` 手动财务入口 | 旧通用业务页曾有手动应收 / 开票入口；当前页面已退出旧记录运行时。 | 财务专项不能回退到旧通用页，也不能扩大 shipment_release 语义。 |
 
 ## 3. 三个分支语义
 

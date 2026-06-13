@@ -5,7 +5,7 @@
 ## 1. 当前结论
 
 - 当前正式模板只有 `采购合同`、`加工合同` 两套。
-- 两套模板都通过同一条“业务页或打印中心 -> 独立弹窗 -> 右侧纸面 DOM 输出 PDF / 打印”的主链打开；业务页入口会先把当前选中业务记录映射成窗口级打印草稿，打印中心入口仍按默认样例进入。
+- 两套模板当前通过“打印中心 -> 独立弹窗 -> 右侧纸面 DOM 输出 PDF / 打印”的主链打开；旧业务页选中 `business_records` 带值入口已退出。后续若从采购、委外或其他领域页带值打印，必须由对应领域模型显式生成打印草稿输入。
 - 这条主链已收口为：先开壳页、再进入模板工作台、窗口级 `state` 隔离草稿、工作台稳定后持续回写整窗 HTML 快照，刷新时优先由壳页直接恢复当前窗口。
 - 当前正文继续由 React 工作台渲染，不是 builder + 独立静态 runtime，但分页运行时已经统一收口到共享 `printPageMargin` 主链。
 
@@ -13,7 +13,6 @@
 
 | 层 | 当前文件 | 职责 |
 | --- | --- | --- |
-| 业务页打印入口 | `web/src/erp/pages/BusinessModulePage.jsx` + `web/src/erp/utils/businessRecordPrintDraft.mjs` | 在辅材/包材采购、加工合同/委外下单页选中记录后生成带值草稿并打开独立弹窗 |
 | 打印中心入口 | `web/src/erp/pages/PrintCenterPage.jsx` | 选模板、按默认样例打开独立弹窗 |
 | 共享窗口状态真源 | `web/src/erp/utils/printWorkspace.js` | 生成窗口 `state`、构建弹窗 URL、维护 shell URL、窗口级草稿 key 与整窗 HTML 快照持久化 |
 | 壳页 | `web/public/print-window-shell.html` | 优先恢复当前窗口的整窗 HTML 快照；快照缺失时回退到对应模板工作台 |
@@ -25,18 +24,9 @@
 
 ## 3. 当前打开链路
 
-### 3.1 从业务页打开
+### 3.1 从领域页带值打开
 
-`BusinessModulePage` 在 `辅材/包材采购` 和 `加工合同/委外下单` 两个业务页显示合同打印按钮：
-
-1. 用户先选中一条业务记录
-2. `businessRecordPrintDraft.mjs` 按当前业务记录和明细行生成对应合同草稿
-3. `openPrintWorkspaceWindow(templateKey, { entrySource: 'business', initialDraft })` 生成窗口级 `stateID`
-4. 前端把 `initialDraft` 写入当前窗口专属草稿 key
-5. 再打开 `/print-window-shell.html?state=:stateID`
-6. 工作台按窗口级草稿恢复，进入可编辑打印窗口
-
-当前只做“业务记录 -> 打印草稿”的前端带值，不反向回写业务记录，也不生成后端打印 DTO。
+旧 `BusinessModulePage -> businessRecordPrintDraft.mjs` 链路已随 `business_records` 删除退出运行时。后续如果采购、委外或出货领域页需要带值打印，必须先定义对应领域模型到打印草稿的字段映射，再调用 `openPrintWorkspaceWindow(templateKey, { entrySource: 'business', initialDraft })` 生成窗口级 `stateID`，不能恢复旧通用业务记录作为打印草稿真源。
 
 ### 3.2 从打印中心打开
 

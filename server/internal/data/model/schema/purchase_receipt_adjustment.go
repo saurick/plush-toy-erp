@@ -19,7 +19,6 @@ type PurchaseReceiptAdjustment struct {
 var purchaseReceiptAdjustmentLockedFields = map[string]struct{}{
 	"adjustment_no":       {},
 	"purchase_receipt_id": {},
-	"business_record_id":  {},
 	"status":              {},
 	"adjusted_at":         {},
 	"posted_at":           {},
@@ -48,10 +47,6 @@ func (PurchaseReceiptAdjustment) Fields() []ent.Field {
 			NotEmpty().
 			MaxLen(64),
 		field.Int("purchase_receipt_id").
-			Positive(),
-		field.Int("business_record_id").
-			Optional().
-			Nillable().
 			Positive(),
 		field.String("reason").
 			Optional().
@@ -86,10 +81,6 @@ func (PurchaseReceiptAdjustment) Edges() []ent.Edge {
 			Required().
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
-		edge.From("business_record", BusinessRecord.Type).
-			Ref("purchase_receipt_adjustments").
-			Field("business_record_id").
-			Unique(),
 		edge.To("items", PurchaseReceiptAdjustmentItem.Type),
 	}
 }
@@ -98,7 +89,6 @@ func (PurchaseReceiptAdjustment) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("adjustment_no").Unique(),
 		index.Fields("purchase_receipt_id"),
-		index.Fields("business_record_id"),
 		index.Fields("status"),
 		index.Fields("adjusted_at"),
 	}

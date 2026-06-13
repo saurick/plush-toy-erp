@@ -65,11 +65,6 @@ func PurchaseReceiptID(v int) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldEQ(FieldPurchaseReceiptID, v))
 }
 
-// BusinessRecordID applies equality check predicate on the "business_record_id" field. It's identical to BusinessRecordIDEQ.
-func BusinessRecordID(v int) predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(sql.FieldEQ(FieldBusinessRecordID, v))
-}
-
 // SupplierName applies equality check predicate on the "supplier_name" field. It's identical to SupplierNameEQ.
 func SupplierName(v string) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldEQ(FieldSupplierName, v))
@@ -198,36 +193,6 @@ func PurchaseReceiptIDIsNil() predicate.PurchaseReturn {
 // PurchaseReceiptIDNotNil applies the NotNil predicate on the "purchase_receipt_id" field.
 func PurchaseReceiptIDNotNil() predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(sql.FieldNotNull(FieldPurchaseReceiptID))
-}
-
-// BusinessRecordIDEQ applies the EQ predicate on the "business_record_id" field.
-func BusinessRecordIDEQ(v int) predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(sql.FieldEQ(FieldBusinessRecordID, v))
-}
-
-// BusinessRecordIDNEQ applies the NEQ predicate on the "business_record_id" field.
-func BusinessRecordIDNEQ(v int) predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(sql.FieldNEQ(FieldBusinessRecordID, v))
-}
-
-// BusinessRecordIDIn applies the In predicate on the "business_record_id" field.
-func BusinessRecordIDIn(vs ...int) predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(sql.FieldIn(FieldBusinessRecordID, vs...))
-}
-
-// BusinessRecordIDNotIn applies the NotIn predicate on the "business_record_id" field.
-func BusinessRecordIDNotIn(vs ...int) predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(sql.FieldNotIn(FieldBusinessRecordID, vs...))
-}
-
-// BusinessRecordIDIsNil applies the IsNil predicate on the "business_record_id" field.
-func BusinessRecordIDIsNil() predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(sql.FieldIsNull(FieldBusinessRecordID))
-}
-
-// BusinessRecordIDNotNil applies the NotNil predicate on the "business_record_id" field.
-func BusinessRecordIDNotNil() predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(sql.FieldNotNull(FieldBusinessRecordID))
 }
 
 // SupplierNameEQ applies the EQ predicate on the "supplier_name" field.
@@ -620,29 +585,6 @@ func HasPurchaseReceipt() predicate.PurchaseReturn {
 func HasPurchaseReceiptWith(preds ...predicate.PurchaseReceipt) predicate.PurchaseReturn {
 	return predicate.PurchaseReturn(func(s *sql.Selector) {
 		step := newPurchaseReceiptStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
-// HasBusinessRecord applies the HasEdge predicate on the "business_record" edge.
-func HasBusinessRecord() predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, BusinessRecordTable, BusinessRecordColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasBusinessRecordWith applies the HasEdge predicate on the "business_record" edge with a given conditions (other predicates).
-func HasBusinessRecordWith(preds ...predicate.BusinessRecord) predicate.PurchaseReturn {
-	return predicate.PurchaseReturn(func(s *sql.Selector) {
-		step := newBusinessRecordStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

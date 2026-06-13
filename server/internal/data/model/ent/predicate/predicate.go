@@ -18,15 +18,6 @@ type BOMHeader func(*sql.Selector)
 // BOMItem is the predicate function for bomitem builders.
 type BOMItem func(*sql.Selector)
 
-// BusinessRecord is the predicate function for businessrecord builders.
-type BusinessRecord func(*sql.Selector)
-
-// BusinessRecordEvent is the predicate function for businessrecordevent builders.
-type BusinessRecordEvent func(*sql.Selector)
-
-// BusinessRecordItem is the predicate function for businessrecorditem builders.
-type BusinessRecordItem func(*sql.Selector)
-
 // Contact is the predicate function for contact builders.
 type Contact func(*sql.Selector)
 

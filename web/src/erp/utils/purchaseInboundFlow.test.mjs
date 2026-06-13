@@ -70,7 +70,7 @@ test('MobileRoleTasksPage: 岗位任务完成不再回写 business_records 状�
   )
   assert.match(
     mobileRoleTasksPageSource,
-    /const updateBusinessRecordStatusForTask = async \(\) => null/
+    /const updateSourceStatusForTask = async \(\) => null/
   )
 })
 

@@ -1,160 +1,28 @@
-# 行业专表 Ent Schema 评审 / Industry Schema Review
+# 行业专表早期评审记录 / Industry Schema Review
 
-> 当前状态：本文是早期行业专表评审记录。`business_records` 普通业务写入口已在开发期冻结为 legacy/archive 只读，当前实现真源以 `docs/current-source-of-truth.md`、领域 usecase、Ent schema 和测试为准；本文中“保留兼容写入 / 通用表足以承接 v1 闭环验证”的旧口径不再作为当前主路径。
+> 当前状态：本文是早期行业专表评审记录，已经被后续领域表实现和 `business_records` 删除闭环替代。当前实现真源以 `docs/current-source-of-truth.md`、领域 usecase、Ent schema、Atlas migration 和测试为准。
 
-> 旧结论：当前不应马上拆行业专表，也不应生成 migration。下一轮如果要推进 schema，应先定义字段真源和一致性策略，再优先评审库存流水/余额和 AR/AP 财务明细。
+## 当前结论
 
-## 1. 当前通用表模式
+- 旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除。
+- 本文历史上关于“继续使用通用表承接 v1 闭环 / 保留 legacy archive 查询 / 从旧表迁 workflow source”的阶段性建议不再作为当前主路径。
+- 生产、委外、出货、库存预留和财务最小事实能力已进入 Phase 8 事实 usecase；库存、采购、批次、BOM、质检、MasterData 和 SalesOrder 也已分别由领域表承接。
+- Workflow 只负责协同任务、任务事件和业务状态投影；事实必须由对应 Fact usecase 写入。
 
-当前业务保存层主要使用：
+## 仍有效的边界
 
-- `business_records`
-- `business_record_items`
-- `business_record_events`
-- `workflow_tasks`
-- `workflow_task_events`
-- `workflow_business_states`
-
-### 优点
-
-- 快速承接多模块。
-- 字段变化成本低。
-- 适合 v1 验证。
-- 不需要频繁 migration。
-- 旧数据、正式文档、debug seed 和岗位任务可以共享同一套来源字段。
-
-### 缺点
-
-- 类型约束弱，很多关键字段藏在 payload。
-- 复杂查询难，跨单据查询依赖约定字段。
-- 金额、数量、库存、财务一致性难由数据库强约束保证。
-- 后续报表和性能会受影响。
-- 很多 payload 字段难以建立唯一约束、范围约束和外键约束。
-- 业务状态、任务和真实业务对象之间缺少专表级引用。
-
-## 2. 行业专表候选
-
-| 范围 | 候选表 |
+| 边界 | 当前口径 |
 | --- | --- |
-| 订单侧 | `project_order` / `sales_order`、`order_item`、`order_change` |
-| 工程/BOM | `product_style`、`material_bom`、`material_requirement` |
-| 采购侧 | `purchase_order`、`purchase_order_item`、`supplier_delivery` |
-| 委外侧 | `outsource_order`、`outsource_issue`、`outsource_return`、`outsource_rework` |
-| 生产侧 | `production_order`、`production_task`、`production_progress`、`rework_order` |
-| 仓库侧 | `inbound_order`、`outbound_order`、`inventory_txn`、`inventory_balance`、`inventory_adjustment`、`inventory_check` |
-| 品质侧 | `quality_inspection`、`quality_inspection_item`、`defect_record` |
-| 财务侧 | `ar_receivable`、`ar_invoice`、`ap_payable`、`ap_reconciliation`、`payment_record`、`receipt_record` |
-| 通知/审计 | `notification`、`notification_recipient`、`audit_log` |
+| Workflow / Fact | `workflow task done` 不等于库存、出货、财务或质检事实落账 |
+| Dashboard | 只读领域投影，不反向驱动业务事实 |
+| Import / Evidence | 删除前 JSONL evidence 只能作为人工审计线索，不是 import source 或 runtime source |
+| Product Core | 客户样本、旧截图、旧字段和历史文档不能直接升级为通用 schema |
+| 旧表恢复 | 不恢复 `business_records` 作为兼容层、debug fixture、source snapshot 或通用事实表 |
 
-## 3. 拆表优先级建议
+## 当前参考入口
 
-| 优先级 | 范围 | 结论 |
-| --- | --- | --- |
-| P0 暂不拆 | 订单审批流程、正式文档、debug seed、催办 v1、状态字典、角色权限矩阵 | 当前用通用表更稳，拆表收益不足 |
-| P1 优先评审但不马上落表 | `inventory_txn`、`inventory_balance`、`ar_receivable`、`ar_invoice`、`ap_payable`、`ap_reconciliation` | 最容易成为强一致和报表瓶颈，应先评审字段真源 |
-| P2 后续评审 | `purchase_order`、`outsource_order`、`production_order`、`quality_inspection` | 业务字段仍有变化，等 P1 口径稳定后推进 |
-| P3 更后 | `notification`、`notification_recipient`、`audit_log`、`cost_snapshot`、`margin_analysis` | 当前 v1 不需要立即落表 |
-
-## 4. 什么时候必须考虑拆表
-
-满足任意条件时，应进入专表评审：
-
-- 需要强一致库存余额。
-- 需要库存流水可追溯。
-- 需要财务金额强约束。
-- 需要唯一发票号。
-- 需要付款/收款核销。
-- 需要跨单据复杂查询。
-- 需要高频报表。
-- 需要索引优化。
-- 需要并发写入控制。
-- 需要外部系统集成。
-
-## 5. 什么时候继续使用 business_records
-
-适合继续使用 `business_records` 的场景：
-
-- 业务字段仍不稳定。
-- 只是流程验证。
-- 只是正式文档或验收调试样本。
-- 只是任务提醒。
-- 没有强一致计算。
-- 不做复杂报表。
-- 不做外部系统集成。
-
-边界：`business_records` 当前只作为 legacy/archive 历史快照、字段取值候选和显式 debug fixture；不再承接正式流程验证或普通业务写入，更不能承担库存余额、财务核销、唯一票号、成本毛利等强约束事实。
-
-## 6. 分阶段迁移路线
-
-| 阶段 | 目标 | 不做什么 |
-| --- | --- | --- |
-| Phase 0：当前状态 | `business_records + workflow_tasks` 承接 v1 闭环 | 不拆行业专表 |
-| Phase 1：定义真源字段 | 明确订单、库存、财务、品质字段口径，输出字段草案和一致性策略 | 不立即 migration |
-| Phase 2：只拆库存流水和财务明细 | 评审 `inventory_txn / inventory_balance / ar_receivable / ar_invoice / ap_payable / ap_reconciliation` | 不一次性拆采购、委外、生产全套 |
-| Phase 3：拆采购、委外、生产、品质专表 | 评审 `purchase_order / outsource_order / production_order / quality_inspection` | 不改回旧项目模型 |
-| Phase 4：迁移 workflow source 关联 | `workflow_tasks.source_type/source_id` 指向专表，保留 `business_records` 兼容层或视图层 | 不直接删除旧路径 |
-
-## 7. 拆表后的数据一致性策略
-
-| 主题 | 策略 |
-| --- | --- |
-| 唯一真源 | 专表落地后，库存和财务事实以专表为真源，`business_records` 只保留兼容快照 |
-| 双写阶段 | 先在后端 usecase 内双写或只读校验，不由前端分别写两套事实 |
-| 幂等 | 使用稳定业务 key、来源单据和任务组保证重复点击不会重复写事实 |
-| 事务 | 同一业务动作内写专表、任务、事件和业务状态，避免半成功 |
-| 回补 | 老数据按 `source_type/source_id/source_no` 回补，不能伪造真源不存在的值 |
-| 对账 | 每个阶段提供数据校验脚本，比较通用记录快照和专表事实 |
-| 读路径 | 报表和详情逐步切到专表，列表可以先保留兼容读 |
-| 审计 | 关键事实变化写业务事件和任务事件，保留 actor、role、reason 和 payload 摘要 |
-
-## 8. 迁移风险
-
-| 风险 | 影响 |
-| --- | --- |
-| 现有前端业务模块仍引用 `business_records` | 详情、列表、打印和调试页要按 legacy/archive 查询或字段带值候选处理，不能继续保存正式业务记录 |
-| 现有 workflow `source_type/source_id` 依赖通用记录 | 任务详情加载和岗位任务端跳转要改造 |
-| 测试数据迁移 | 旧样本如果没有专表字段，会出现缺值 |
-| 文档入口同步 | 正式文档、验收说明和 debug seed 说明需要同时更新 |
-| Dashboard 统计改造 | 当前按任务和业务状态聚合，专表后要区分事实统计和任务统计 |
-| 岗位任务详情加载改造 | 任务来源可能从 `business_records` 变成专表 |
-| 旧记录兼容 | 历史单据不能因为没有专表行而不可查 |
-
-## 9. 回滚策略
-
-- `business_records` 兼容写入已经切断，普通业务写入口保持只读 archive。
-- 专表按领域 usecase 直接承接正式写入；如需迁移旧数据，先做 dry-run 和人工确认，不做双写兜底。
-- `workflow_tasks.source_type/source_id` 保持旧路径直到迁移完成。
-- 每个阶段都有测试和回滚点。
-- 如果专表规则异常，关闭新写入入口，恢复读取 `business_records` 快照。
-- 不在同一阶段同时改 schema、workflow 编排、Dashboard、移动端详情和打印取值。
-
-## 10. 决策矩阵
-
-| 方案 | 优点 | 缺点 | 结论 |
-| --- | --- | --- | --- |
-| 继续完全通用表 | 迁移风险最低，适合 v1 | 强约束、报表和并发能力不足 | 短期可维持 |
-| 立即拆所有行业专表 | 类型约束最强 | migration 风险高，字段未稳定，前端改动大 | 不建议 |
-| 先评审 P1 专表草案 | 聚焦库存和财务核心瓶颈 | 需要字段真源和一致性设计 | 推荐 |
-| 先拆通知表 | 通知中心更完整 | 当前 v1 可用任务事件承接，收益低于库存财务 | 暂缓 |
-
-## 11. 推荐结论
-
-本轮不改 Ent schema，不生成 migration。下一步只建议做设计评审：
-
-1. 先设计 `inventory_txn / inventory_balance` 草案，但不 migration。
-2. 再设计 `ar_receivable / ar_invoice / ap_payable / ap_reconciliation` 草案，但不 migration。
-3. 同步定义业务字段真源、旧数据回补策略和 workflow source 迁移策略。
-4. 等后端 workflow usecase 至少试迁一条规则后，再进入专表落地更稳。
-
-当前仍继续使用 `business_records` 的边界是：只承接 v1 主干闭环、单据快照、任务提醒、正式文档示例和调试验收，不承诺真实库存余额、财务核销、唯一发票号和完整报表性能。
-
-## 12. 本轮明确不做
-
-- 不新增 `production_order / purchase_order / outsource_order / inventory_txn / inventory_balance / ar_receivable / ar_invoice / ap_payable / settlement` 等表。
-- 不生成 migration。
-- 不跑 `make data`。
-- 不跑 `make migrate_status`。
-- 不删除 `business_records / workflow_tasks` 现有路径。
-- 不做通知中心落表。
-- 不做真实库存余额。
-- 不做财务总账、凭证、纳税申报、固定资产、低值易耗品。
+- 当前真源：`docs/current-source-of-truth.md`
+- 模块边界：`docs/product/module-boundaries.md`
+- Phase 8 事实层：`docs/architecture/phase8-fact-expansion-review.md`
+- Workflow / Fact 状态边界：`docs/architecture/status-workflow-fact-boundary.md`
+- 删除完成记录：`docs/product/business-records-cutover-plan.md`

@@ -201,7 +201,21 @@ type DebugRecordPlan struct {
 	DocumentDate      *string
 	DueDate           *string
 	Payload           map[string]any
-	Items             []*BusinessRecordItemMutation
+	Items             []*DebugRecordItemPlan
+}
+
+type DebugRecordItemPlan struct {
+	LineNo            int
+	ItemName          *string
+	MaterialName      *string
+	Spec              *string
+	Unit              *string
+	Quantity          *float64
+	UnitPrice         *float64
+	Amount            *float64
+	SupplierName      *string
+	WarehouseLocation *string
+	Payload           map[string]any
 }
 
 type DebugTaskPlan struct {
@@ -910,14 +924,14 @@ func (s debugBusinessChainScenario) buildPlan(debugRunID string, now time.Time) 
 				"record_ref":  template.ref,
 				"document_no": documentNo,
 			}),
-			Items: make([]*BusinessRecordItemMutation, 0, len(template.items)),
+			Items: make([]*DebugRecordItemPlan, 0, len(template.items)),
 		}
 		for itemIndex, item := range template.items {
 			itemPayload := basePayload(map[string]any{
 				"record_ref": template.ref,
 				"line_no":    itemIndex + 1,
 			})
-			record.Items = append(record.Items, &BusinessRecordItemMutation{
+			record.Items = append(record.Items, &DebugRecordItemPlan{
 				LineNo:            itemIndex + 1,
 				ItemName:          optionalDebugString(item.itemName),
 				MaterialName:      optionalDebugString(item.materialName),

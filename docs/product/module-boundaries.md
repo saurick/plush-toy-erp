@@ -8,7 +8,7 @@
 | `shipment_release done -> shipping_released` | 出货放行只表示已放行 / 可发货 / 待出库 |
 | `shipping_released != shipped` | 已放行不等于已出库、已发货、已扣库存 |
 | Quality task done != quality_inspection passed | 协同任务完成不等于质检事实判定通过 |
-| `business_records` 只读 legacy/archive | 它是历史快照和兼容查询层，不再承接正式业务写入，也不是库存、出货、财务事实真源 |
+| `business_records` 已退出运行时 | 旧三表已删除；不得恢复为历史快照、兼容查询层或库存、出货、财务事实真源 |
 | Dashboard 只读 projection | 看板只能读取领域表、领域 usecase 汇总或 projection，不反向驱动业务事实或状态机 |
 | 永绅 yoyoosun 客户资料不等于 Product Core | 只有经过架构评审并通用化的能力才能进入产品内核 |
 
@@ -91,13 +91,13 @@ Fact 层记录真实业务发生：
 
 事实层必须有状态机、幂等、审计和冲正边界，不能靠 UI 状态或 workflow payload 伪造。
 
-## Legacy Archive / business_records
+## 旧业务记录表族 / Retired business_records
 
-`business_records / business_record_items / business_record_events` 当前只作为 legacy/archive 保留：
+`business_records / business_record_items / business_record_events` 已退出当前 schema 和运行时：
 
-- 可用于历史快照查询、旧数据审计、source snapshot 和显式 debug / seed 夹具。
-- 普通 `business` JSON-RPC 写接口必须拒绝 create / update / delete / restore。
+- 不再作为历史快照查询、兼容查询、source snapshot、debug seed 或正式写入入口。
+- 普通 `business` JSON-RPC 只保留 `dashboard_stats`；旧记录方法不得恢复。
 - 新销售、采购、库存、生产、外协、出货和财务能力必须走领域表、repo/usecase、API、RBAC 和测试。
-- 业务看板只能读领域投影，不读 `business_records` 作为事实或状态统计来源。
+- 业务看板只能读领域投影，不读旧通用记录作为事实或状态统计来源。
 
-保留表结构不等于保留正式写路径。后续是否迁移、物理归档或删除旧数据，必须另开任务并先做备份、引用审计和回归。
+删除前 JSONL evidence 只能作为当前开发库迁移证据。若未来确需客户可见历史归档，必须另建只读归档模型并先评审，不能复活旧三表。

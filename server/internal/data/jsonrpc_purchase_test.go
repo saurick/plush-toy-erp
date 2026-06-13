@@ -51,9 +51,6 @@ func TestJsonrpcData_PurchaseReceiptAPIClosesInboundInventoryFact(t *testing.T) 
 	}
 	receiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id")
 
-	if count := client.BusinessRecord.Query().CountX(ctx); count != 0 {
-		t.Fatalf("purchase receipt JSON-RPC must not write business_records, got %d", count)
-	}
 	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
 		t.Fatalf("draft purchase receipt must not write inventory txns, got %d", count)
 	}

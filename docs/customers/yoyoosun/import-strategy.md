@@ -39,7 +39,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 先人工确认                | 所有 Medium/Low confidence、重复、冲突、deferred 和 永绅 yoyoosun 专属字段必须人工确认。                                                                                                 |
 | 不自动生成 deferred facts | `product_skus`、`purchase_orders`、`shipments`、`stock_reservations`、inventory facts、finance facts 全部禁止自动生成。                                                                  |
 | 不绕过 V1 usecase         | import execution loader 必须走 V1 MasterData / SalesOrder JSON-RPC API 或已有正式 usecase，不直接写表绕过校验。                                                                          |
-| 不双写                    | import execution 不得同时写 V1 和 `business_records` 作为两个正式真源。                                                                                                                  |
+| 不双写                    | import execution 不得恢复旧 `business_records`，也不得同时写 V1 和任何旧通用记录替代表。                                                                                                 |
 | 受控执行                  | 真实执行必须有 dry-run package、approval、backup evidence、显式 `--execute`、确认短语、目标后端和管理员凭据。                                                                            |
 
 ## 目标模型策略 / Target Model Strategy
@@ -103,7 +103,7 @@ node scripts/import/customerImportExecute.mjs \
 6. 真实执行必须使用 `CUSTOMER_IMPORT_ADMIN_TOKEN` 或 `CUSTOMER_IMPORT_ADMIN_USERNAME` / `CUSTOMER_IMPORT_ADMIN_PASSWORD` 通过后端鉴权。
 7. 导入后必须保留 execution report 和对账结果。
 8. 不修改 seedData 或 docs registry 作为导入的必要条件。
-9. 不删除或覆盖 `business_records` 历史快照。
+9. 不恢复、覆盖或依赖旧 `business_records`；删除前 JSONL evidence 只作人工审计线索。
 10. 不绕过 V1 MasterData / SalesOrder usecase 或已有正式 fact usecase。
 
 ## 非目标 / Out Of Scope

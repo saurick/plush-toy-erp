@@ -40,7 +40,7 @@ import {
   updateWorkflowTaskStatus,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
-import { getBusinessDashboardStats } from '../api/businessRecordApi.mjs'
+import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
 import {
   commandCenterViews,
   getCommandCenterView,
@@ -662,7 +662,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   今天先处理协同卡点，再进入具体业务模块
                 </Title>
                 <Paragraph className="erp-dashboard-summary">
-                  工作台只做跨模块聚合和入口分发：把今日必须处理、跨角色阻塞、业务记录摘要、打印入口和常用业务入口放在第一屏。
+                  工作台只做跨模块聚合和入口分发：把今日必须处理、跨角色阻塞、业务对象摘要、打印入口和常用业务入口放在第一屏。
                 </Paragraph>
                 <Space wrap>
                   <Tag color="blue">
@@ -673,7 +673,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     今日/超时 {workflowStats.dueSoon + workflowStats.overdue}
                   </Tag>
                   <Tag color="green">
-                    业务记录 {businessSummary.totalRecords}
+                    业务对象 {businessSummary.totalRecords}
                   </Tag>
                   <Tag>只展示运营与协同状态，不写事实层</Tag>
                 </Space>

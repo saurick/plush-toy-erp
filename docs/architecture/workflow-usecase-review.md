@@ -9,7 +9,7 @@
 | 层级 | 当前事实 |
 | --- | --- |
 | 前端工具函数 | `orderApprovalFlow.mjs`、`purchaseInboundFlow.mjs`、`outsourceReturnFlow.mjs` 和 `finishedGoodsFlow.mjs` 仍保留字段口径、seed、demo 和测试辅助；老板审批后的工程资料 / 补资料派生、IQC 后的仓库入库 / 来料异常处理派生、委外回货检验后的委外入库 / 返工补做派生、成品抽检后的成品入库 / 成品返工派生已由后端 usecase 执行；成品入库和出货放行完成 / 阻塞 / 退回的业务状态也已由后端执行。`finishedGoodsFlow.mjs` 的 `buildShipmentReleaseTask` 仅保留 seed / test / demo / 未来出货专项辅助口径，不是真实运行时派生入口。`shipmentFinanceFlow.mjs` 只服务 seed / test / demo / 手动财务入口和未来财务专项辅助，真实 `shipment_release done` 动作不再调用它派生应收或开票 |
-| 桌面业务页 | `BusinessModulePage.jsx` 负责手动发起审批、IQC、委外回货、成品抽检、应收、开票、应付和对账等任务，并同步 `workflow_business_states` |
+| 桌面业务页 | `BusinessModulePage.jsx` 已退出旧通用业务记录运行时，不再手动发起旧链路任务；后续审批、IQC、委外、成品、出货和财务动作必须回到正式领域页面、Workflow API 或专项 usecase 评审 |
 | 岗位任务页 | `MobileRoleTasksPage.jsx` 对老板审批、IQC、采购 `warehouse_inbound`、委外 `outsource_return_qc`、成品 `finished_goods_qc`、成品 `finished_goods_inbound` 和 `shipment_release` 任务只调用 `update_task_status` 并刷新任务列表；委外回货跟踪、委外入库完成、财务登记和对账等未迁闭环仍在 `update_task_status` 之后按任务类型创建下游任务并补写业务状态 |
 | 后端 workflow usecase | `server/internal/biz/workflow.go` 校验任务状态、业务状态、催办动作和基础参数；对老板审批、IQC、采购 `warehouse_inbound`、委外 `outsource_return_qc`、成品 `finished_goods_qc`、成品 `finished_goods_inbound` 和 `shipment_release` 任务的 `done / blocked / rejected` 执行最小 workflow rule，并构造业务状态或下游任务派生意图 |
 | 后端 repo | `workflow_repo.go` 在事务内创建任务和 `created` 事件，更新任务状态和 `status_changed` 事件，催办和升级写 `workflow_task_events`；老板审批、IQC、委外回货检验和成品抽检规则会在同一事务内 upsert `workflow_business_states` 并幂等创建下游任务，采购 `warehouse_inbound`、成品 `finished_goods_inbound` 和 `shipment_release` 规则只 upsert `workflow_business_states`，其余业务状态 upsert 仍可通过单独接口写入 |
@@ -22,7 +22,7 @@
 
 | 闭环 | 前端编排位置 | 当前下游任务 |
 | --- | --- | --- |
-| 订单提交 -> 老板审批 -> 工程资料任务 | `orderApprovalFlow.mjs`、`BusinessModulePage.jsx`、`MobileRoleTasksPage.jsx` | 老板审批、工程资料、订单资料补充 |
+| 订单提交 -> 老板审批 -> 工程资料任务 | `orderApprovalFlow.mjs`、正式订单入口、`MobileRoleTasksPage.jsx` | 老板审批、工程资料、订单资料补充 |
 | 采购到货 -> IQC -> 入库 | `purchaseInboundFlow.mjs`、桌面发起动作、后端 IQC 状态派生 | IQC、仓库入库、来料不良处理 |
 | 委外发料 -> 回货 -> 检验 -> 入库 | `outsourceReturnFlow.mjs`、桌面和岗位任务端动作 | 委外回货跟踪、回货检验、委外入库、委外返工 |
 | 成品完工 -> 成品抽检 -> 成品入库 -> 出货放行 | `finishedGoodsFlow.mjs` 仅保留 seed/test/demo/展示辅助；桌面发起抽检，后端处理成品抽检派生、成品入库状态推进和出货放行状态推进；`buildShipmentReleaseTask` 不再被真实成品入库完成动作调用 | 成品抽检、成品入库、成品返工；既有 `shipment_release` 完成后只进入 `shipping_released` |
@@ -153,7 +153,7 @@
 - 不需要立刻冻结所有业务字段和行业专表。
 - 前端按钮、正式文档、调试样本和岗位任务端验收可以快速同步。
 - 后端表结构稳定，当前只需要承接任务、事件和业务状态。
-- 迁移风险低，旧数据继续通过 `business_records` 和 `workflow_tasks` 可查。
+- 迁移风险已从旧表兼容转为删除后边界守卫：旧 `business_records` 不再可查，当前只通过 Workflow 表和领域事实表承接运行时。
 
 ## 6. 当前前后端边界的风险
 

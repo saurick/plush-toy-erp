@@ -108,12 +108,12 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | 路径 | 标题 / 当前用途 |
 | --- | --- |
 | `docs/product/README.md` | 产品与路线 / Product Docs |
-| `docs/product/business-records-cutover-plan.md` | 业务记录切换计划 / business_records Cutover Plan |
-| `docs/product/business-records-data-map-draft.md` | 业务记录数据映射草案 / business_records Data Map Draft |
-| `docs/product/business-records-reference-audit.md` | 业务记录引用审计 / business_records Reference Audit |
-| `docs/product/business-records-risk-register.md` | 业务记录风险登记 / business_records Risk Register |
-| `docs/product/business-records-transition-audit.md` | 业务记录过渡审计 / business_records Transition Audit |
-| `docs/product/business-records-transition-plan.md` | 业务记录过渡计划 / business_records Transition Plan |
+| `docs/product/business-records-cutover-plan.md` | 业务记录删除完成记录 / business_records Cutover Record |
+| `docs/product/business-records-data-map-draft.md` | 业务记录删除前 evidence 映射草案 / business_records Evidence Map Draft |
+| `docs/product/business-records-reference-audit.md` | 业务记录删除后引用审计 / business_records Reference Audit |
+| `docs/product/business-records-risk-register.md` | 业务记录删除后风险登记 / business_records Risk Register |
+| `docs/product/business-records-transition-audit.md` | 业务记录过渡审计历史记录 / business_records Transition Audit |
+| `docs/product/business-records-transition-plan.md` | 业务记录过渡历史记录 / business_records Transition Record |
 | `docs/product/capability-ledger.md` | 产品能力进度台账 / Product Capability Ledger |
 | `docs/product/config-permission-policy.md` | 配置与权限策略 / Config And Permission Policy |
 | `docs/product/customer-delta-policy.md` | 客户差异策略 / Customer Delta Policy |
@@ -121,6 +121,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/domain-model-v1.md` | 领域模型 V1 / Domain Model V1 |
 | `docs/product/formal-menu-entry-plan.md` | 正式产品入口与菜单配置计划 / Formal Menu Entry Plan |
 | `docs/product/implementation-governance.md` | 模块实施治理 / Implementation Governance |
+| `docs/product/menu-mapping-review-v1.md` | 菜单映射评审表 / Menu Mapping Review |
 | `docs/product/migration-readiness-checklist.md` | 迁移准备检查清单 / Migration Readiness Checklist |
 | `docs/product/module-boundaries.md` | 模块边界 / Module Boundaries |
 | `docs/product/mobile-role-tasks-redesign.md` | 移动端岗位任务页改版 / Mobile Role Tasks Redesign |
@@ -132,6 +133,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/prototypes/business-form-page-standard-v1/README.md` | 新建 / 编辑表单标准样板 / Business Form Page Standard Prototype |
 | `docs/product/prototypes/business-module-page-standard-v1/README.md` | 业务模块标准页原型 / Business Module Page Standard Prototype |
 | `docs/product/prototypes/core-menu-coverage-v1/README.md` | 产品核心菜单覆盖样板 / Core Menu Coverage Pattern |
+| `docs/product/prototypes/formal-menu-candidate-v1/README.md` | 正式菜单候选原型 / Formal Menu Candidate Prototype |
 | `docs/product/prototypes/mobile-role-tasks-v1/README.md` | 岗位任务端原型 / Mobile Role Tasks Prototype |
 | `docs/product/prototypes/print-template-center-v1/README.md` | 模板打印中心原型 / Print Template Center Prototype |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |

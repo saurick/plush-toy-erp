@@ -336,7 +336,7 @@ export function buildDevTestingDocs(markdownModules = {}) {
     const category = classifyTestingDoc(path, source)
 
     byPath.set(path, {
-      key: path.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+      key: path,
       path,
       title,
       category,

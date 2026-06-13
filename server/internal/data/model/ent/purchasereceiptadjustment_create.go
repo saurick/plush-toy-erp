@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
@@ -32,20 +31,6 @@ func (_c *PurchaseReceiptAdjustmentCreate) SetAdjustmentNo(v string) *PurchaseRe
 // SetPurchaseReceiptID sets the "purchase_receipt_id" field.
 func (_c *PurchaseReceiptAdjustmentCreate) SetPurchaseReceiptID(v int) *PurchaseReceiptAdjustmentCreate {
 	_c.mutation.SetPurchaseReceiptID(v)
-	return _c
-}
-
-// SetBusinessRecordID sets the "business_record_id" field.
-func (_c *PurchaseReceiptAdjustmentCreate) SetBusinessRecordID(v int) *PurchaseReceiptAdjustmentCreate {
-	_c.mutation.SetBusinessRecordID(v)
-	return _c
-}
-
-// SetNillableBusinessRecordID sets the "business_record_id" field if the given value is not nil.
-func (_c *PurchaseReceiptAdjustmentCreate) SetNillableBusinessRecordID(v *int) *PurchaseReceiptAdjustmentCreate {
-	if v != nil {
-		_c.SetBusinessRecordID(*v)
-	}
 	return _c
 }
 
@@ -144,11 +129,6 @@ func (_c *PurchaseReceiptAdjustmentCreate) SetPurchaseReceipt(v *PurchaseReceipt
 	return _c.SetPurchaseReceiptID(v.ID)
 }
 
-// SetBusinessRecord sets the "business_record" edge to the BusinessRecord entity.
-func (_c *PurchaseReceiptAdjustmentCreate) SetBusinessRecord(v *BusinessRecord) *PurchaseReceiptAdjustmentCreate {
-	return _c.SetBusinessRecordID(v.ID)
-}
-
 // AddItemIDs adds the "items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
 func (_c *PurchaseReceiptAdjustmentCreate) AddItemIDs(ids ...int) *PurchaseReceiptAdjustmentCreate {
 	_c.mutation.AddItemIDs(ids...)
@@ -238,11 +218,6 @@ func (_c *PurchaseReceiptAdjustmentCreate) check() error {
 	if v, ok := _c.mutation.PurchaseReceiptID(); ok {
 		if err := purchasereceiptadjustment.PurchaseReceiptIDValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.purchase_receipt_id": %w`, err)}
-		}
-	}
-	if v, ok := _c.mutation.BusinessRecordID(); ok {
-		if err := purchasereceiptadjustment.BusinessRecordIDValidator(v); err != nil {
-			return &ValidationError{Name: "business_record_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.business_record_id": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.Reason(); ok {
@@ -348,23 +323,6 @@ func (_c *PurchaseReceiptAdjustmentCreate) createSpec() (*PurchaseReceiptAdjustm
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.PurchaseReceiptID = nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.BusinessRecordIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereceiptadjustment.BusinessRecordTable,
-			Columns: []string{purchasereceiptadjustment.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.BusinessRecordID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ItemsIDs(); len(nodes) > 0 {

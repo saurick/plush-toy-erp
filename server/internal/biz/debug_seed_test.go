@@ -62,11 +62,10 @@ func (r *fakeDebugRepo) ClearBusinessData(_ context.Context) (*DebugBusinessData
 	r.cleared = true
 	return &DebugBusinessDataClearResult{
 		DeletedCounts: map[string]int{
-			"business_records": 2,
-			"workflow_tasks":   1,
+			"workflow_tasks": 1,
 		},
-		DeletedTotal:      3,
-		ClearedTableNames: []string{"workflow_tasks", "business_records"},
+		DeletedTotal:      1,
+		ClearedTableNames: []string{"workflow_tasks"},
 	}, nil
 }
 
@@ -178,7 +177,7 @@ func TestDebugUsecase_ClearBusinessDataUsesCleanupGuard(t *testing.T) {
 	if !repo.cleared {
 		t.Fatalf("expected repo clear to be called")
 	}
-	if result.DeletedTotal != 3 || result.DeletedCounts["business_records"] != 2 {
+	if result.DeletedTotal != 1 || result.DeletedCounts["workflow_tasks"] != 1 {
 		t.Fatalf("unexpected clear result %#v", result)
 	}
 }

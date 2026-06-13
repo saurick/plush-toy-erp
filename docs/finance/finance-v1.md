@@ -2,7 +2,7 @@
 
 ## 当前做什么
 
-财务 v1 围绕 `business_records + workflow_tasks` 做业务结算事实记录，不做完整会计系统。
+财务 v1 当前围绕 `workflow_tasks / workflow_business_states` 协同状态和后续领域事实 usecase 做结算动作评审，不做完整会计系统。旧 `business_records` 表族已删除，不再作为财务快照或业务结算事实记录底座。
 
 | 能力 | 当前落点 |
 | --- | --- |
@@ -15,7 +15,7 @@
 | 采购入库 / 委外回货后应付 | `inbound` / `processing-contracts` 触发，落 `payables` |
 | 税率 / 税额 / 含税金额 / 不含税金额 | `receivables.payload`、`invoices.payload` |
 | 收款状态 / 付款状态 | `receivables.payload.receivable_status`、`payables` 状态和 payload |
-| 异常费用备注 | `payload.settlement_note` 或业务记录备注 |
+| 异常费用备注 | `payload.settlement_note` 或后续财务领域模型备注 |
 
 ## 应收登记
 

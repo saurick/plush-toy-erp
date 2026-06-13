@@ -2,7 +2,7 @@
 
 ## 适用范围
 
-本文定义当前 `business_records + workflow_tasks` 上的行业核心 v1 主任务树。任务是协同层，不是业务事实真源；业务事实仍落在对应业务记录、业务记录事件、任务事件和业务状态快照里。
+本文定义当前 `workflow_tasks / workflow_task_events / workflow_business_states` 上的行业核心 v1 主任务树。任务是协同层，不是业务事实真源；业务事实必须落在对应领域 usecase 和事实表里。旧 `business_records` 表族和 `business_record_events` 已删除，不再作为任务树底座或审计事件表。
 
 本轮只定义 T1 到 T8，不定义 T9 资产管理，也不把固定资产、低值易耗品、折旧、总账、凭证或税务申报纳入主链。
 
@@ -63,7 +63,7 @@ flowchart LR
 - PMC 可以看全链路卡点、超时、阻塞和关键路径，但不能替仓库、品质、财务伪造完成事实。
 - 品质负责检验结论和放行；仓库负责收发存事实；财务负责应收、应付、发票和对账事实。
 - `workflow_tasks.owner_role_key` 决定任务进入哪个角色池，`assignee_id` 决定具体处理人。
-- 任务完成必须留下 `workflow_task_events`；业务记录创建、编辑、删除、恢复必须留下 `business_record_events`。
+- 任务完成必须留下 `workflow_task_events`；领域业务动作必须留下对应领域审计线索，不得恢复旧 `business_record_events` 作为通用事件表。
 - v1 不做拖拽流程设计器。任务树先用文档和配置稳定，再评审是否需要后台可配置流程。
 
 ## 第一条真实闭环：订单提交 -> 老板审批 -> 工程资料任务

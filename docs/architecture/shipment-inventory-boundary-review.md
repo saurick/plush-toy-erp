@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | `product_id` | 当前 `shipment_release` 主要只有 `product_no / product_name` 展示快照。 | 缺失。真实出库必须指向 `products.id`。 |
 | `sku_id` | 当前没有稳定 SKU 专表和字段。 | 缺失。若后续有 SKU，要先定义 SKU 与 product 的关系。 |
-| `product_no / product_name` | `finishedGoodsFlow`、`businessRecordDefinitions` 和 debug seed 有文本快照。 | 只能用于回显，不可作为库存主体真源。 |
+| `product_no / product_name` | `finishedGoodsFlow` 和 debug seed 有展示快照；旧 `businessRecordDefinitions` 已删除。 | 只能用于回显，不可作为库存主体真源。 |
 | `quantity` | 有展示数量或待出货数量。 | 只是快照；还缺最终出货行数量、部分出货、短溢装和 decimal 规则。 |
 | `unit_id` | 库存流水必填，但 shipment payload 只有 `unit` 文本。 | 缺失。 |
 | `unit` | 有文本快照。 | 只能显示，不能替代 `unit_id`。 |

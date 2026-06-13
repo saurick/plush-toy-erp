@@ -19,8 +19,6 @@ const (
 	FieldReturnNo = "return_no"
 	// FieldPurchaseReceiptID holds the string denoting the purchase_receipt_id field in the database.
 	FieldPurchaseReceiptID = "purchase_receipt_id"
-	// FieldBusinessRecordID holds the string denoting the business_record_id field in the database.
-	FieldBusinessRecordID = "business_record_id"
 	// FieldSupplierName holds the string denoting the supplier_name field in the database.
 	FieldSupplierName = "supplier_name"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -37,8 +35,6 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgePurchaseReceipt holds the string denoting the purchase_receipt edge name in mutations.
 	EdgePurchaseReceipt = "purchase_receipt"
-	// EdgeBusinessRecord holds the string denoting the business_record edge name in mutations.
-	EdgeBusinessRecord = "business_record"
 	// EdgeItems holds the string denoting the items edge name in mutations.
 	EdgeItems = "items"
 	// Table holds the table name of the purchasereturn in the database.
@@ -50,13 +46,6 @@ const (
 	PurchaseReceiptInverseTable = "purchase_receipts"
 	// PurchaseReceiptColumn is the table column denoting the purchase_receipt relation/edge.
 	PurchaseReceiptColumn = "purchase_receipt_id"
-	// BusinessRecordTable is the table that holds the business_record relation/edge.
-	BusinessRecordTable = "purchase_returns"
-	// BusinessRecordInverseTable is the table name for the BusinessRecord entity.
-	// It exists in this package in order to avoid circular dependency with the "businessrecord" package.
-	BusinessRecordInverseTable = "business_records"
-	// BusinessRecordColumn is the table column denoting the business_record relation/edge.
-	BusinessRecordColumn = "business_record_id"
 	// ItemsTable is the table that holds the items relation/edge.
 	ItemsTable = "purchase_return_items"
 	// ItemsInverseTable is the table name for the PurchaseReturnItem entity.
@@ -71,7 +60,6 @@ var Columns = []string{
 	FieldID,
 	FieldReturnNo,
 	FieldPurchaseReceiptID,
-	FieldBusinessRecordID,
 	FieldSupplierName,
 	FieldStatus,
 	FieldReturnedAt,
@@ -102,8 +90,6 @@ var (
 	ReturnNoValidator func(string) error
 	// PurchaseReceiptIDValidator is a validator for the "purchase_receipt_id" field. It is called by the builders before save.
 	PurchaseReceiptIDValidator func(int) error
-	// BusinessRecordIDValidator is a validator for the "business_record_id" field. It is called by the builders before save.
-	BusinessRecordIDValidator func(int) error
 	// SupplierNameValidator is a validator for the "supplier_name" field. It is called by the builders before save.
 	SupplierNameValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -136,11 +122,6 @@ func ByReturnNo(opts ...sql.OrderTermOption) OrderOption {
 // ByPurchaseReceiptID orders the results by the purchase_receipt_id field.
 func ByPurchaseReceiptID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPurchaseReceiptID, opts...).ToFunc()
-}
-
-// ByBusinessRecordID orders the results by the business_record_id field.
-func ByBusinessRecordID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBusinessRecordID, opts...).ToFunc()
 }
 
 // BySupplierName orders the results by the supplier_name field.
@@ -185,13 +166,6 @@ func ByPurchaseReceiptField(field string, opts ...sql.OrderTermOption) OrderOpti
 	}
 }
 
-// ByBusinessRecordField orders the results by business_record field.
-func ByBusinessRecordField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newBusinessRecordStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // ByItemsCount orders the results by items count.
 func ByItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -210,13 +184,6 @@ func newPurchaseReceiptStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PurchaseReceiptInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, PurchaseReceiptTable, PurchaseReceiptColumn),
-	)
-}
-func newBusinessRecordStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(BusinessRecordInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, BusinessRecordTable, BusinessRecordColumn),
 	)
 }
 func newItemsStep() *sqlgraph.Step {

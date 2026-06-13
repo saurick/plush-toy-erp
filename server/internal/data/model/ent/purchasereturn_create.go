@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -39,20 +38,6 @@ func (_c *PurchaseReturnCreate) SetPurchaseReceiptID(v int) *PurchaseReturnCreat
 func (_c *PurchaseReturnCreate) SetNillablePurchaseReceiptID(v *int) *PurchaseReturnCreate {
 	if v != nil {
 		_c.SetPurchaseReceiptID(*v)
-	}
-	return _c
-}
-
-// SetBusinessRecordID sets the "business_record_id" field.
-func (_c *PurchaseReturnCreate) SetBusinessRecordID(v int) *PurchaseReturnCreate {
-	_c.mutation.SetBusinessRecordID(v)
-	return _c
-}
-
-// SetNillableBusinessRecordID sets the "business_record_id" field if the given value is not nil.
-func (_c *PurchaseReturnCreate) SetNillableBusinessRecordID(v *int) *PurchaseReturnCreate {
-	if v != nil {
-		_c.SetBusinessRecordID(*v)
 	}
 	return _c
 }
@@ -144,11 +129,6 @@ func (_c *PurchaseReturnCreate) SetPurchaseReceipt(v *PurchaseReceipt) *Purchase
 	return _c.SetPurchaseReceiptID(v.ID)
 }
 
-// SetBusinessRecord sets the "business_record" edge to the BusinessRecord entity.
-func (_c *PurchaseReturnCreate) SetBusinessRecord(v *BusinessRecord) *PurchaseReturnCreate {
-	return _c.SetBusinessRecordID(v.ID)
-}
-
 // AddItemIDs adds the "items" edge to the PurchaseReturnItem entity by IDs.
 func (_c *PurchaseReturnCreate) AddItemIDs(ids ...int) *PurchaseReturnCreate {
 	_c.mutation.AddItemIDs(ids...)
@@ -235,11 +215,6 @@ func (_c *PurchaseReturnCreate) check() error {
 	if v, ok := _c.mutation.PurchaseReceiptID(); ok {
 		if err := purchasereturn.PurchaseReceiptIDValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.purchase_receipt_id": %w`, err)}
-		}
-	}
-	if v, ok := _c.mutation.BusinessRecordID(); ok {
-		if err := purchasereturn.BusinessRecordIDValidator(v); err != nil {
-			return &ValidationError{Name: "business_record_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.business_record_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.SupplierName(); !ok {
@@ -345,23 +320,6 @@ func (_c *PurchaseReturnCreate) createSpec() (*PurchaseReturn, *sqlgraph.CreateS
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.PurchaseReceiptID = &nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.BusinessRecordIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereturn.BusinessRecordTable,
-			Columns: []string{purchasereturn.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.BusinessRecordID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.ItemsIDs(); len(nodes) > 0 {

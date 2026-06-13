@@ -18,7 +18,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import CommandCenterNav from '../components/CommandCenterNav.jsx'
-import { getBusinessDashboardStats } from '../api/businessRecordApi.mjs'
+import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   dashboardModules,
@@ -97,7 +97,7 @@ export default function BusinessDashboardPage() {
     () => [
       {
         key: 'totalRecords',
-        title: '业务记录总数',
+        title: '业务对象总数',
         value: summary.totalRecords,
       },
       {
@@ -231,11 +231,11 @@ export default function BusinessDashboardPage() {
                   按业务模块看运行状态，不把摘要当事实真源
                 </Title>
                 <Paragraph type="secondary" className="erp-dashboard-summary">
-                  业务看板用于经营和协同观察：显示业务记录数量、异常分布、即将到期任务和模块入口；真实库存、出货和财务事实仍由各自
+                  业务看板用于经营和协同观察：显示业务对象数量、异常分布、即将到期任务和模块入口；真实库存、出货和财务事实仍由各自
                   usecase 与事实表负责。
                 </Paragraph>
                 <Space wrap>
-                  <Tag color="green">业务记录 {summary.totalRecords}</Tag>
+                  <Tag color="green">业务对象 {summary.totalRecords}</Tag>
                   <Tag color="orange">推进中 {summary.activeCount}</Tag>
                   <Tag color="red">阻塞/取消 {summary.blockedCount}</Tag>
                   <Tag color="blue">完成比例 {summary.completionRatio}%</Tag>
@@ -282,7 +282,7 @@ export default function BusinessDashboardPage() {
         type="info"
         showIcon
         message="业务看板只做运营摘要"
-        description="本页统计业务记录和协同状态，用于发现模块风险和跳转业务列表；不作为库存、出货、财务、发票或收付款事实真源。"
+        description="本页统计业务对象和协同状态，用于发现模块风险和跳转业务列表；不作为库存、出货、财务、发票或收付款事实真源。"
       />
 
       <Row gutter={[12, 12]}>

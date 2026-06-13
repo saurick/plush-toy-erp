@@ -41,18 +41,9 @@ Workflow 记录协同许可。
 结果可以缓存，但不能伪造事实。
 ```
 
-## business_records 定位
+## 旧 business_records 定位
 
-`business_records / business_record_items` 当前仍有 legacy/archive 价值，但它们不是任何正式业务对象的可写 Product Core 真源。
-
-可以继续承担：
-
-- 兼容层。
-- demo / seed / QA debug。
-- source snapshot。
-- 调研入口。
-- 早期尚未拆专表前的通用业务记录历史快照。
-- 历史页面的表格查询、字段口径参考和打印带值候选。
+旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除。它们不是任何正式业务对象的可写 Product Core 真源，也不再承担兼容层、demo / seed / QA debug、source snapshot、调研入口、历史页面查询或打印带值候选。
 
 不能长期承担：
 
@@ -64,10 +55,7 @@ Workflow 记录协同许可。
 - AR/AP、invoice、payment 财务事实。
 - Product Core 的字段唯一真源。
 
-```text
-business_records 可以继续作为兼容层、demo、seed、source snapshot、调研入口。
-business_records 普通业务写入口已经冻结为只读 archive，不能替代正式 customers / suppliers / orders / inventory / shipment / finance facts。
-```
+删除前 JSONL evidence 只作为当前开发库迁移证据，不能替代正式 customers / suppliers / orders / inventory / shipment / finance facts，也不能作为 import/backfill 自动来源。
 
 ## V1 推荐起点
 
@@ -81,7 +69,7 @@ V1 应优先评审正式：
 
 原因：
 
-1. 当前主流程需要稳定客户、供应商、联系人和订单源单据，避免继续让 `business_records` 影子承接所有主档关系。
+1. 当前主流程需要稳定客户、供应商、联系人和订单源单据，避免恢复旧 `business_records` 影子承接主档关系。
 2. 现有库存、BOM、采购入库、采购退货、采购入库调整和来料质检已经有专表，Phase 1 不应重复设计这些事实对象。
 3. `sales_order` 是业务承诺，后续可被 BOM、采购需求、生产、出货和财务引用，但它本身不是出货或库存事实。
 

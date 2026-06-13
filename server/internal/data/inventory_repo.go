@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
@@ -95,7 +96,7 @@ func (r *inventoryRepo) ChangeInventoryLotStatus(ctx context.Context, lotID int,
 	if err != nil {
 		return nil, err
 	}
-	if !biz.IsInventoryLotStatusTransitionAllowed(lot.Status, newStatus, hasBalance) {
+	if !corestatus.CanChangeInventoryLotStatus(lot.Status, newStatus, hasBalance) {
 		return nil, biz.ErrBadParam
 	}
 	if lot.Status != newStatus {

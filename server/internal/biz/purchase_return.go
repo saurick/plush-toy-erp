@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	corestatus "server/internal/core/status"
 	"server/internal/core/value"
 
 	"github.com/shopspring/decimal"
@@ -15,7 +16,6 @@ type PurchaseReturn struct {
 	ID                int
 	ReturnNo          string
 	PurchaseReceiptID *int
-	BusinessRecordID  *int
 	SupplierName      string
 	Status            string
 	ReturnedAt        time.Time
@@ -46,7 +46,6 @@ type PurchaseReturnItem struct {
 type PurchaseReturnCreate struct {
 	ReturnNo          string
 	PurchaseReceiptID *int
-	BusinessRecordID  *int
 	SupplierName      string
 	ReturnedAt        time.Time
 	Note              *string
@@ -110,8 +109,7 @@ func (uc *InventoryUsecase) GetPurchaseReturn(ctx context.Context, id int) (*Pur
 }
 
 func IsValidPurchaseReturnStatus(value string) bool {
-	_, ok := purchaseReturnStatuses[strings.ToUpper(strings.TrimSpace(value))]
-	return ok
+	return corestatus.IsPurchaseReturnStatus(value)
 }
 
 func PurchaseReturnOutboundIdempotencyKey(returnID, itemID int) string {
@@ -128,9 +126,6 @@ func normalizePurchaseReturnCreate(in PurchaseReturnCreate) (PurchaseReturnCreat
 	in.Note = normalizeOptionalString(in.Note)
 	if in.PurchaseReceiptID != nil && *in.PurchaseReceiptID <= 0 {
 		in.PurchaseReceiptID = nil
-	}
-	if in.BusinessRecordID != nil && *in.BusinessRecordID <= 0 {
-		in.BusinessRecordID = nil
 	}
 	if in.ReturnedAt.IsZero() {
 		in.ReturnedAt = time.Now()

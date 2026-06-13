@@ -6,21 +6,22 @@ import (
 	"strings"
 	"time"
 
+	corestatus "server/internal/core/status"
 	"server/internal/core/value"
 
 	"github.com/shopspring/decimal"
 )
 
 const (
-	SalesOrderStatusDraft     = "draft"
-	SalesOrderStatusSubmitted = "submitted"
-	SalesOrderStatusActive    = "active"
-	SalesOrderStatusClosed    = "closed"
-	SalesOrderStatusCanceled  = "canceled"
+	SalesOrderStatusDraft     = corestatus.SalesOrderDraft
+	SalesOrderStatusSubmitted = corestatus.SalesOrderSubmitted
+	SalesOrderStatusActive    = corestatus.SalesOrderActive
+	SalesOrderStatusClosed    = corestatus.SalesOrderClosed
+	SalesOrderStatusCanceled  = corestatus.SalesOrderCanceled
 
-	SalesOrderItemStatusOpen     = "open"
-	SalesOrderItemStatusClosed   = "closed"
-	SalesOrderItemStatusCanceled = "canceled"
+	SalesOrderItemStatusOpen     = corestatus.SalesOrderItemOpen
+	SalesOrderItemStatusClosed   = corestatus.SalesOrderItemClosed
+	SalesOrderItemStatusCanceled = corestatus.SalesOrderItemCanceled
 )
 
 var (
@@ -31,21 +32,6 @@ var (
 	ErrUnitNotFound           = errors.New("unit not found")
 	ErrUnitInactive           = errors.New("unit inactive")
 	ErrCustomerInactive       = errors.New("customer inactive")
-)
-
-var (
-	salesOrderStatuses = map[string]struct{}{
-		SalesOrderStatusDraft:     {},
-		SalesOrderStatusSubmitted: {},
-		SalesOrderStatusActive:    {},
-		SalesOrderStatusClosed:    {},
-		SalesOrderStatusCanceled:  {},
-	}
-	salesOrderItemStatuses = map[string]struct{}{
-		SalesOrderItemStatusOpen:     {},
-		SalesOrderItemStatusClosed:   {},
-		SalesOrderItemStatusCanceled: {},
-	}
 )
 
 type SalesOrder struct {
@@ -414,34 +400,17 @@ func normalizeSalesOrderItemFilter(in SalesOrderItemFilter) (SalesOrderItemFilte
 }
 
 func IsValidSalesOrderStatus(value string) bool {
-	_, ok := salesOrderStatuses[strings.ToLower(strings.TrimSpace(value))]
-	return ok
+	return corestatus.IsSalesOrderStatus(value)
 }
 
 func IsValidSalesOrderItemStatus(value string) bool {
-	_, ok := salesOrderItemStatuses[strings.ToLower(strings.TrimSpace(value))]
-	return ok
+	return corestatus.IsSalesOrderItemStatus(value)
 }
 
 func IsSalesOrderLifecycleTransitionAllowed(current string, next string) bool {
-	current = strings.ToLower(strings.TrimSpace(current))
-	next = strings.ToLower(strings.TrimSpace(next))
-	if current == next {
-		return true
-	}
-	switch current {
-	case SalesOrderStatusDraft:
-		return next == SalesOrderStatusSubmitted || next == SalesOrderStatusCanceled
-	case SalesOrderStatusSubmitted:
-		return next == SalesOrderStatusActive || next == SalesOrderStatusCanceled
-	case SalesOrderStatusActive:
-		return next == SalesOrderStatusClosed || next == SalesOrderStatusCanceled
-	default:
-		return false
-	}
+	return corestatus.CanChangeSalesOrderLifecycle(current, next)
 }
 
 func isSalesOrderSettled(status string) bool {
-	status = strings.ToLower(strings.TrimSpace(status))
-	return status == SalesOrderStatusClosed || status == SalesOrderStatusCanceled
+	return corestatus.IsSalesOrderSettled(status)
 }

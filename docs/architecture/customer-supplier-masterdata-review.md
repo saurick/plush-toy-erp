@@ -7,7 +7,7 @@
 原因：
 
 - 当前代码处于正式客户 / 供应商主数据起步阶段，分表更直观，迁移和权限边界更容易验收。
-- `business_records` 的 partners 页面只是当前主档快照和兼容入口，不应继续长期承担正式主数据。
+- 旧 `business_records` partners 页面已退出运行时，旧表族已删除；不得恢复为正式主数据入口。
 - future finance 需要客户、供应商、开票资料、结算条件，但 V1 可以先把 finance 相关字段评审为可选或后置，避免把 永绅 yoyoosun 样本字段硬写进 Product Core。
 
 本文件是评审文档，不改 Ent schema，不生成 migration。
@@ -45,14 +45,14 @@
 | future `shipments` | 出货事实可引用 customer / address snapshot，但真实 shipped 由 shipment facts 和 inventory_txns 支撑 |
 | future AR/AP | 应收 / 应付应引用客户 / 供应商，但生成时机必须由 shipped / receipt / invoice / payment 评审确定 |
 
-## 与 business_records partners 页关系
+## 与旧 business_records partners 页关系
 
-现有 partners 页面可以继续作为兼容层、source snapshot 和数据整理入口。正式主数据落地后，应避免两套主数据同时对外写入：
+旧 partners 通用页面和旧表族已退出当前运行时。正式主数据落地后，必须避免恢复两套主数据同时对外写入：
 
 1. 新建 / 编辑正式客户供应商应进入 `customers / suppliers / contacts` usecase。
-2. `business_records` 中的 partners 数据只能迁移、引用或作为历史快照，不再作为长期唯一真源。
-3. 迁移前必须评审 document_no、partner type、联系人明细、付款周期、税号和地址的 backfill 策略。
-4. UI 不应从 partners 菜单存在反推正式主数据已完成。
+2. 删除前 JSONL evidence 只能作为人工审计或导入 dry-run 线索，不作为长期唯一真源或自动 backfill 来源。
+3. 如未来需要从历史 evidence 补数据，必须先评审 document_no、partner type、联系人明细、付款周期、税号和地址的 backfill 策略。
+4. UI 不应从旧 partners 菜单或旧 evidence 反推正式主数据已完成。
 
 ## 是否共用 partner 模型
 

@@ -162,152 +162,6 @@ var (
 			},
 		},
 	}
-	// BusinessRecordsColumns holds the columns for the "business_records" table.
-	BusinessRecordsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "module_key", Type: field.TypeString, Size: 64},
-		{Name: "document_no", Type: field.TypeString, Nullable: true, Size: 128},
-		{Name: "title", Type: field.TypeString, Size: 255},
-		{Name: "business_status_key", Type: field.TypeString, Size: 64},
-		{Name: "owner_role_key", Type: field.TypeString, Size: 32},
-		{Name: "source_no", Type: field.TypeString, Nullable: true, Size: 128},
-		{Name: "customer_name", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "supplier_name", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "style_no", Type: field.TypeString, Nullable: true, Size: 128},
-		{Name: "product_no", Type: field.TypeString, Nullable: true, Size: 128},
-		{Name: "product_name", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "material_name", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "warehouse_location", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "quantity", Type: field.TypeFloat64, Nullable: true},
-		{Name: "unit", Type: field.TypeString, Nullable: true, Size: 32},
-		{Name: "amount", Type: field.TypeFloat64, Nullable: true},
-		{Name: "document_date", Type: field.TypeString, Nullable: true, Size: 32},
-		{Name: "due_date", Type: field.TypeString, Nullable: true, Size: 32},
-		{Name: "payload", Type: field.TypeJSON, Nullable: true},
-		{Name: "row_version", Type: field.TypeInt64, Default: 1},
-		{Name: "created_by", Type: field.TypeInt, Nullable: true},
-		{Name: "updated_by", Type: field.TypeInt, Nullable: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "deleted_at", Type: field.TypeTime, Nullable: true},
-		{Name: "deleted_by", Type: field.TypeInt, Nullable: true},
-		{Name: "delete_reason", Type: field.TypeString, Nullable: true, Size: 255},
-	}
-	// BusinessRecordsTable holds the schema information for the "business_records" table.
-	BusinessRecordsTable = &schema.Table{
-		Name:       "business_records",
-		Columns:    BusinessRecordsColumns,
-		PrimaryKey: []*schema.Column{BusinessRecordsColumns[0]},
-		Indexes: []*schema.Index{
-			{
-				Name:    "businessrecord_module_key",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordsColumns[1]},
-			},
-			{
-				Name:    "businessrecord_module_key_business_status_key",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordsColumns[1], BusinessRecordsColumns[4]},
-			},
-			{
-				Name:    "businessrecord_module_key_owner_role_key",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordsColumns[1], BusinessRecordsColumns[5]},
-			},
-			{
-				Name:    "businessrecord_module_key_deleted_at",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordsColumns[1], BusinessRecordsColumns[25]},
-			},
-			{
-				Name:    "businessrecord_module_key_document_no",
-				Unique:  true,
-				Columns: []*schema.Column{BusinessRecordsColumns[1], BusinessRecordsColumns[2]},
-				Annotation: &entsql.IndexAnnotation{
-					Where: "deleted_at IS NULL AND document_no IS NOT NULL AND document_no <> ''",
-				},
-			},
-		},
-	}
-	// BusinessRecordEventsColumns holds the columns for the "business_record_events" table.
-	BusinessRecordEventsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "record_id", Type: field.TypeInt, Nullable: true},
-		{Name: "module_key", Type: field.TypeString, Size: 64},
-		{Name: "action_key", Type: field.TypeString, Size: 64},
-		{Name: "from_status_key", Type: field.TypeString, Nullable: true, Size: 64},
-		{Name: "to_status_key", Type: field.TypeString, Nullable: true, Size: 64},
-		{Name: "actor_id", Type: field.TypeInt, Nullable: true},
-		{Name: "actor_role_key", Type: field.TypeString, Nullable: true, Size: 32},
-		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "payload", Type: field.TypeJSON, Nullable: true},
-		{Name: "created_at", Type: field.TypeTime},
-	}
-	// BusinessRecordEventsTable holds the schema information for the "business_record_events" table.
-	BusinessRecordEventsTable = &schema.Table{
-		Name:       "business_record_events",
-		Columns:    BusinessRecordEventsColumns,
-		PrimaryKey: []*schema.Column{BusinessRecordEventsColumns[0]},
-		Indexes: []*schema.Index{
-			{
-				Name:    "businessrecordevent_record_id",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordEventsColumns[1]},
-			},
-			{
-				Name:    "businessrecordevent_module_key_action_key",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordEventsColumns[2], BusinessRecordEventsColumns[3]},
-			},
-			{
-				Name:    "businessrecordevent_created_at",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordEventsColumns[10]},
-			},
-		},
-	}
-	// BusinessRecordItemsColumns holds the columns for the "business_record_items" table.
-	BusinessRecordItemsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "record_id", Type: field.TypeInt},
-		{Name: "module_key", Type: field.TypeString, Size: 64},
-		{Name: "line_no", Type: field.TypeInt, Default: 1},
-		{Name: "item_name", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "material_name", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "spec", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "unit", Type: field.TypeString, Nullable: true, Size: 32},
-		{Name: "quantity", Type: field.TypeFloat64, Nullable: true},
-		{Name: "unit_price", Type: field.TypeFloat64, Nullable: true},
-		{Name: "amount", Type: field.TypeFloat64, Nullable: true},
-		{Name: "supplier_name", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "warehouse_location", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "payload", Type: field.TypeJSON, Nullable: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-	}
-	// BusinessRecordItemsTable holds the schema information for the "business_record_items" table.
-	BusinessRecordItemsTable = &schema.Table{
-		Name:       "business_record_items",
-		Columns:    BusinessRecordItemsColumns,
-		PrimaryKey: []*schema.Column{BusinessRecordItemsColumns[0]},
-		Indexes: []*schema.Index{
-			{
-				Name:    "businessrecorditem_record_id",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordItemsColumns[1]},
-			},
-			{
-				Name:    "businessrecorditem_module_key",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordItemsColumns[2]},
-			},
-			{
-				Name:    "businessrecorditem_record_id_line_no",
-				Unique:  false,
-				Columns: []*schema.Column{BusinessRecordItemsColumns[1], BusinessRecordItemsColumns[3]},
-			},
-		},
-	}
 	// ContactsColumns holds the columns for the "contacts" table.
 	ContactsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -917,31 +771,17 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "business_record_id", Type: field.TypeInt, Nullable: true},
 	}
 	// PurchaseReceiptsTable holds the schema information for the "purchase_receipts" table.
 	PurchaseReceiptsTable = &schema.Table{
 		Name:       "purchase_receipts",
 		Columns:    PurchaseReceiptsColumns,
 		PrimaryKey: []*schema.Column{PurchaseReceiptsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "purchase_receipts_business_records_purchase_receipts",
-				Columns:    []*schema.Column{PurchaseReceiptsColumns[9]},
-				RefColumns: []*schema.Column{BusinessRecordsColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "purchasereceipt_receipt_no",
 				Unique:  true,
 				Columns: []*schema.Column{PurchaseReceiptsColumns[1]},
-			},
-			{
-				Name:    "purchasereceipt_business_record_id",
-				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptsColumns[9]},
 			},
 			{
 				Name:    "purchasereceipt_supplier_name",
@@ -971,7 +811,6 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "business_record_id", Type: field.TypeInt, Nullable: true},
 		{Name: "purchase_receipt_id", Type: field.TypeInt},
 	}
 	// PurchaseReceiptAdjustmentsTable holds the schema information for the "purchase_receipt_adjustments" table.
@@ -981,14 +820,8 @@ var (
 		PrimaryKey: []*schema.Column{PurchaseReceiptAdjustmentsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "purchase_receipt_adjustments_business_records_purchase_receipt_adjustments",
-				Columns:    []*schema.Column{PurchaseReceiptAdjustmentsColumns[9]},
-				RefColumns: []*schema.Column{BusinessRecordsColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-			{
 				Symbol:     "purchase_receipt_adjustments_purchase_receipts_purchase_receipt_adjustments",
-				Columns:    []*schema.Column{PurchaseReceiptAdjustmentsColumns[10]},
+				Columns:    []*schema.Column{PurchaseReceiptAdjustmentsColumns[9]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1001,11 +834,6 @@ var (
 			},
 			{
 				Name:    "purchasereceiptadjustment_purchase_receipt_id",
-				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[10]},
-			},
-			{
-				Name:    "purchasereceiptadjustment_business_record_id",
 				Unique:  false,
 				Columns: []*schema.Column{PurchaseReceiptAdjustmentsColumns[9]},
 			},
@@ -1213,7 +1041,6 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "business_record_id", Type: field.TypeInt, Nullable: true},
 		{Name: "purchase_receipt_id", Type: field.TypeInt, Nullable: true},
 	}
 	// PurchaseReturnsTable holds the schema information for the "purchase_returns" table.
@@ -1223,14 +1050,8 @@ var (
 		PrimaryKey: []*schema.Column{PurchaseReturnsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "purchase_returns_business_records_purchase_returns",
-				Columns:    []*schema.Column{PurchaseReturnsColumns[9]},
-				RefColumns: []*schema.Column{BusinessRecordsColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-			{
 				Symbol:     "purchase_returns_purchase_receipts_purchase_returns",
-				Columns:    []*schema.Column{PurchaseReturnsColumns[10]},
+				Columns:    []*schema.Column{PurchaseReturnsColumns[9]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1243,11 +1064,6 @@ var (
 			},
 			{
 				Name:    "purchasereturn_purchase_receipt_id",
-				Unique:  false,
-				Columns: []*schema.Column{PurchaseReturnsColumns[10]},
-			},
-			{
-				Name:    "purchasereturn_business_record_id",
 				Unique:  false,
 				Columns: []*schema.Column{PurchaseReturnsColumns[9]},
 			},
@@ -2142,9 +1958,6 @@ var (
 		AdminUserRolesTable,
 		BomHeadersTable,
 		BomItemsTable,
-		BusinessRecordsTable,
-		BusinessRecordEventsTable,
-		BusinessRecordItemsTable,
 		ContactsTable,
 		CustomersTable,
 		FinanceFactsTable,
@@ -2229,9 +2042,7 @@ func init() {
 		"production_facts_subject_allowed":   "subject_type IN ('MATERIAL', 'PRODUCT')",
 		"production_facts_type_allowed":      "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK')",
 	}
-	PurchaseReceiptsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
-	PurchaseReceiptAdjustmentsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
-	PurchaseReceiptAdjustmentsTable.ForeignKeys[1].RefTable = PurchaseReceiptsTable
+	PurchaseReceiptAdjustmentsTable.ForeignKeys[0].RefTable = PurchaseReceiptsTable
 	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[1].RefTable = MaterialsTable
 	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptAdjustmentsTable
@@ -2253,8 +2064,7 @@ func init() {
 		"purchase_receipt_items_quantity_positive":       "quantity > 0",
 		"purchase_receipt_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 	}
-	PurchaseReturnsTable.ForeignKeys[0].RefTable = BusinessRecordsTable
-	PurchaseReturnsTable.ForeignKeys[1].RefTable = PurchaseReceiptsTable
+	PurchaseReturnsTable.ForeignKeys[0].RefTable = PurchaseReceiptsTable
 	PurchaseReturnItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	PurchaseReturnItemsTable.ForeignKeys[1].RefTable = MaterialsTable
 	PurchaseReturnItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptItemsTable

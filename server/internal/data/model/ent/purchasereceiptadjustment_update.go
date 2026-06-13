@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
@@ -56,26 +55,6 @@ func (_u *PurchaseReceiptAdjustmentUpdate) SetNillablePurchaseReceiptID(v *int) 
 	if v != nil {
 		_u.SetPurchaseReceiptID(*v)
 	}
-	return _u
-}
-
-// SetBusinessRecordID sets the "business_record_id" field.
-func (_u *PurchaseReceiptAdjustmentUpdate) SetBusinessRecordID(v int) *PurchaseReceiptAdjustmentUpdate {
-	_u.mutation.SetBusinessRecordID(v)
-	return _u
-}
-
-// SetNillableBusinessRecordID sets the "business_record_id" field if the given value is not nil.
-func (_u *PurchaseReceiptAdjustmentUpdate) SetNillableBusinessRecordID(v *int) *PurchaseReceiptAdjustmentUpdate {
-	if v != nil {
-		_u.SetBusinessRecordID(*v)
-	}
-	return _u
-}
-
-// ClearBusinessRecordID clears the value of the "business_record_id" field.
-func (_u *PurchaseReceiptAdjustmentUpdate) ClearBusinessRecordID() *PurchaseReceiptAdjustmentUpdate {
-	_u.mutation.ClearBusinessRecordID()
 	return _u
 }
 
@@ -178,11 +157,6 @@ func (_u *PurchaseReceiptAdjustmentUpdate) SetPurchaseReceipt(v *PurchaseReceipt
 	return _u.SetPurchaseReceiptID(v.ID)
 }
 
-// SetBusinessRecord sets the "business_record" edge to the BusinessRecord entity.
-func (_u *PurchaseReceiptAdjustmentUpdate) SetBusinessRecord(v *BusinessRecord) *PurchaseReceiptAdjustmentUpdate {
-	return _u.SetBusinessRecordID(v.ID)
-}
-
 // AddItemIDs adds the "items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
 func (_u *PurchaseReceiptAdjustmentUpdate) AddItemIDs(ids ...int) *PurchaseReceiptAdjustmentUpdate {
 	_u.mutation.AddItemIDs(ids...)
@@ -206,12 +180,6 @@ func (_u *PurchaseReceiptAdjustmentUpdate) Mutation() *PurchaseReceiptAdjustment
 // ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_u *PurchaseReceiptAdjustmentUpdate) ClearPurchaseReceipt() *PurchaseReceiptAdjustmentUpdate {
 	_u.mutation.ClearPurchaseReceipt()
-	return _u
-}
-
-// ClearBusinessRecord clears the "business_record" edge to the BusinessRecord entity.
-func (_u *PurchaseReceiptAdjustmentUpdate) ClearBusinessRecord() *PurchaseReceiptAdjustmentUpdate {
-	_u.mutation.ClearBusinessRecord()
 	return _u
 }
 
@@ -288,11 +256,6 @@ func (_u *PurchaseReceiptAdjustmentUpdate) check() error {
 	if v, ok := _u.mutation.PurchaseReceiptID(); ok {
 		if err := purchasereceiptadjustment.PurchaseReceiptIDValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.purchase_receipt_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.BusinessRecordID(); ok {
-		if err := purchasereceiptadjustment.BusinessRecordIDValidator(v); err != nil {
-			return &ValidationError{Name: "business_record_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.business_record_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Reason(); ok {
@@ -380,35 +343,6 @@ func (_u *PurchaseReceiptAdjustmentUpdate) sqlSave(ctx context.Context) (_node i
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.BusinessRecordCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereceiptadjustment.BusinessRecordTable,
-			Columns: []string{purchasereceiptadjustment.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.BusinessRecordIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereceiptadjustment.BusinessRecordTable,
-			Columns: []string{purchasereceiptadjustment.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -506,26 +440,6 @@ func (_u *PurchaseReceiptAdjustmentUpdateOne) SetNillablePurchaseReceiptID(v *in
 	if v != nil {
 		_u.SetPurchaseReceiptID(*v)
 	}
-	return _u
-}
-
-// SetBusinessRecordID sets the "business_record_id" field.
-func (_u *PurchaseReceiptAdjustmentUpdateOne) SetBusinessRecordID(v int) *PurchaseReceiptAdjustmentUpdateOne {
-	_u.mutation.SetBusinessRecordID(v)
-	return _u
-}
-
-// SetNillableBusinessRecordID sets the "business_record_id" field if the given value is not nil.
-func (_u *PurchaseReceiptAdjustmentUpdateOne) SetNillableBusinessRecordID(v *int) *PurchaseReceiptAdjustmentUpdateOne {
-	if v != nil {
-		_u.SetBusinessRecordID(*v)
-	}
-	return _u
-}
-
-// ClearBusinessRecordID clears the value of the "business_record_id" field.
-func (_u *PurchaseReceiptAdjustmentUpdateOne) ClearBusinessRecordID() *PurchaseReceiptAdjustmentUpdateOne {
-	_u.mutation.ClearBusinessRecordID()
 	return _u
 }
 
@@ -628,11 +542,6 @@ func (_u *PurchaseReceiptAdjustmentUpdateOne) SetPurchaseReceipt(v *PurchaseRece
 	return _u.SetPurchaseReceiptID(v.ID)
 }
 
-// SetBusinessRecord sets the "business_record" edge to the BusinessRecord entity.
-func (_u *PurchaseReceiptAdjustmentUpdateOne) SetBusinessRecord(v *BusinessRecord) *PurchaseReceiptAdjustmentUpdateOne {
-	return _u.SetBusinessRecordID(v.ID)
-}
-
 // AddItemIDs adds the "items" edge to the PurchaseReceiptAdjustmentItem entity by IDs.
 func (_u *PurchaseReceiptAdjustmentUpdateOne) AddItemIDs(ids ...int) *PurchaseReceiptAdjustmentUpdateOne {
 	_u.mutation.AddItemIDs(ids...)
@@ -656,12 +565,6 @@ func (_u *PurchaseReceiptAdjustmentUpdateOne) Mutation() *PurchaseReceiptAdjustm
 // ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_u *PurchaseReceiptAdjustmentUpdateOne) ClearPurchaseReceipt() *PurchaseReceiptAdjustmentUpdateOne {
 	_u.mutation.ClearPurchaseReceipt()
-	return _u
-}
-
-// ClearBusinessRecord clears the "business_record" edge to the BusinessRecord entity.
-func (_u *PurchaseReceiptAdjustmentUpdateOne) ClearBusinessRecord() *PurchaseReceiptAdjustmentUpdateOne {
-	_u.mutation.ClearBusinessRecord()
 	return _u
 }
 
@@ -751,11 +654,6 @@ func (_u *PurchaseReceiptAdjustmentUpdateOne) check() error {
 	if v, ok := _u.mutation.PurchaseReceiptID(); ok {
 		if err := purchasereceiptadjustment.PurchaseReceiptIDValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.purchase_receipt_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.BusinessRecordID(); ok {
-		if err := purchasereceiptadjustment.BusinessRecordIDValidator(v); err != nil {
-			return &ValidationError{Name: "business_record_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptAdjustment.business_record_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.Reason(); ok {
@@ -860,35 +758,6 @@ func (_u *PurchaseReceiptAdjustmentUpdateOne) sqlSave(ctx context.Context) (_nod
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.BusinessRecordCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereceiptadjustment.BusinessRecordTable,
-			Columns: []string{purchasereceiptadjustment.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.BusinessRecordIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereceiptadjustment.BusinessRecordTable,
-			Columns: []string{purchasereceiptadjustment.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -35,7 +35,6 @@ type JsonrpcData struct {
 	adminManageUC *biz.AdminManageUsecase
 	userAdminUC   *biz.UserAdminUsecase
 	workflowUC    *biz.WorkflowUsecase
-	businessUC    *biz.BusinessRecordUsecase
 	debugUC       *biz.DebugUsecase
 	masterDataUC  *biz.MasterDataUsecase
 	salesOrderUC  *biz.SalesOrderUsecase
@@ -88,7 +87,6 @@ func NewJsonrpcData(
 	adminManageUC := biz.NewAdminManageUsecase(adminManageRepo, logger, tracerProvider)
 	userAdminUC := biz.NewUserAdminUsecase(userAdminRepo, logger, tracerProvider)
 	workflowUC := biz.NewWorkflowUsecase(NewWorkflowRepo(data, logger))
-	businessUC := biz.NewBusinessRecordUsecase(NewBusinessRecordRepo(data, logger))
 	debugUC := biz.NewDebugUsecase(NewDebugSeedRepo(data, logger), newDebugSafetyConfig(c))
 	masterDataUC := biz.NewMasterDataUsecase(NewMasterDataRepo(data, logger))
 	salesOrderUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
@@ -107,7 +105,6 @@ func NewJsonrpcData(
 		adminManageUC: adminManageUC,
 		userAdminUC:   userAdminUC,
 		workflowUC:    workflowUC,
-		businessUC:    businessUC,
 		debugUC:       debugUC,
 		masterDataUC:  masterDataUC,
 		salesOrderUC:  salesOrderUC,

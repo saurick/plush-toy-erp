@@ -19,7 +19,6 @@ type PurchaseReturn struct {
 var purchaseReturnLockedFields = map[string]struct{}{
 	"return_no":           {},
 	"purchase_receipt_id": {},
-	"business_record_id":  {},
 	"supplier_name":       {},
 	"status":              {},
 	"returned_at":         {},
@@ -49,10 +48,6 @@ func (PurchaseReturn) Fields() []ent.Field {
 			NotEmpty().
 			MaxLen(64),
 		field.Int("purchase_receipt_id").
-			Optional().
-			Nillable().
-			Positive(),
-		field.Int("business_record_id").
 			Optional().
 			Nillable().
 			Positive(),
@@ -87,10 +82,6 @@ func (PurchaseReturn) Edges() []ent.Edge {
 			Field("purchase_receipt_id").
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
-		edge.From("business_record", BusinessRecord.Type).
-			Ref("purchase_returns").
-			Field("business_record_id").
-			Unique(),
 		edge.To("items", PurchaseReturnItem.Type),
 	}
 }
@@ -99,7 +90,6 @@ func (PurchaseReturn) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("return_no").Unique(),
 		index.Fields("purchase_receipt_id"),
-		index.Fields("business_record_id"),
 		index.Fields("status"),
 		index.Fields("returned_at"),
 	}

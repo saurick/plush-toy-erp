@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/qualityinspection"
 
@@ -46,15 +47,16 @@ func (r *inventoryRepo) SubmitQualityInspection(ctx context.Context, inspectionI
 	if err != nil {
 		return nil, err
 	}
-	if row.Status == biz.QualityInspectionStatusSubmitted {
+	transition, ok := corestatus.SubmitQualityInspection(row.Status)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
 		}
 		tx = nil
 		return entQualityInspectionToBiz(row), nil
-	}
-	if row.Status != biz.QualityInspectionStatusDraft {
-		return nil, biz.ErrBadParam
 	}
 	if err := validateQualityInspectionReferences(ctx, tx.client, qualityInspectionCreateFromEnt(row)); err != nil {
 		return nil, err
@@ -139,7 +141,11 @@ func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionI
 	if err != nil {
 		return nil, err
 	}
-	if row.Status == biz.QualityInspectionStatusCancelled {
+	transition, ok := corestatus.CancelQualityInspection(row.Status)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
 		}
@@ -184,8 +190,6 @@ func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionI
 				return nil, err
 			}
 		}
-	default:
-		return nil, biz.ErrBadParam
 	}
 	row, err = tx.client.QualityInspection.Get(ctx, row.ID)
 	if err != nil {
@@ -223,15 +227,16 @@ func (r *inventoryRepo) decideSubmittedQualityInspection(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
-	if row.Status == targetInspectionStatus {
+	transition, ok := corestatus.DecideQualityInspection(row.Status, targetInspectionStatus)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
 		}
 		tx = nil
 		return entQualityInspectionToBiz(row), nil
-	}
-	if row.Status != biz.QualityInspectionStatusSubmitted {
-		return nil, biz.ErrBadParam
 	}
 	if err := lockInventoryLot(ctx, tx, row.InventoryLotID); err != nil {
 		return nil, err
@@ -284,7 +289,7 @@ func validateQualityInspectionReferences(ctx context.Context, client *ent.Client
 		}
 		return err
 	}
-	if receipt.Status != biz.PurchaseReceiptStatusPosted {
+	if !corestatus.IsPurchaseReceiptPosted(receipt.Status) {
 		return biz.ErrBadParam
 	}
 	lot, err := client.InventoryLot.Get(ctx, in.InventoryLotID)

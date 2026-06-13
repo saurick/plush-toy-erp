@@ -4,7 +4,7 @@ import test from 'node:test'
 import { getPermissionModuleTitle } from './permissionModuleLabels.mjs'
 
 test('permissionModuleLabels: 内置权限模块显示中文并保留英文 key', () => {
-  assert.equal(getPermissionModuleTitle('business'), '业务记录 (business)')
+  assert.equal(getPermissionModuleTitle('business'), '业务看板 (business)')
   assert.equal(getPermissionModuleTitle('debug'), '调试能力 (debug)')
   assert.equal(getPermissionModuleTitle('masterdata'), '主数据 (masterdata)')
   assert.equal(getPermissionModuleTitle('mobile'), '岗位任务端 (mobile)')

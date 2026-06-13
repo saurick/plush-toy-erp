@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"server/internal/biz"
+	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/purchasereceipt"
@@ -19,22 +19,8 @@ import (
 )
 
 func (r *inventoryRepo) CreatePurchaseReceiptDraft(ctx context.Context, in *biz.PurchaseReceiptCreate) (*biz.PurchaseReceipt, error) {
-	if in.BusinessRecordID != nil {
-		if _, err := r.data.postgres.BusinessRecord.Query().
-			Where(
-				businessrecord.ID(*in.BusinessRecordID),
-				businessrecord.DeletedAtIsNil(),
-			).
-			Only(ctx); err != nil {
-			if ent.IsNotFound(err) {
-				return nil, biz.ErrBadParam
-			}
-			return nil, err
-		}
-	}
 	row, err := r.data.postgres.PurchaseReceipt.Create().
 		SetReceiptNo(in.ReceiptNo).
-		SetNillableBusinessRecordID(in.BusinessRecordID).
 		SetSupplierName(in.SupplierName).
 		SetStatus(biz.PurchaseReceiptStatusDraft).
 		SetReceivedAt(in.ReceivedAt).
@@ -54,7 +40,7 @@ func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.Purc
 		}
 		return nil, err
 	}
-	if receipt.Status != biz.PurchaseReceiptStatusDraft {
+	if !corestatus.CanAddPurchaseReceiptItem(receipt.Status) {
 		return nil, biz.ErrBadParam
 	}
 	if err := validatePurchaseReceiptItemReferences(ctx, r.data.postgres, in); err != nil {
@@ -96,7 +82,11 @@ func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) 
 		}
 		return nil, err
 	}
-	if receipt.Status == biz.PurchaseReceiptStatusPosted {
+	transition, ok := corestatus.PostPurchaseReceipt(receipt.Status)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
 		if err != nil {
 			return nil, err
@@ -106,9 +96,6 @@ func (r *inventoryRepo) PostPurchaseReceipt(ctx context.Context, receiptID int) 
 		}
 		tx = nil
 		return out, nil
-	}
-	if receipt.Status != biz.PurchaseReceiptStatusDraft {
-		return nil, biz.ErrBadParam
 	}
 
 	items, err := tx.client.PurchaseReceiptItem.Query().
@@ -183,7 +170,11 @@ func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receipt
 		}
 		return nil, err
 	}
-	if receipt.Status == biz.PurchaseReceiptStatusCancelled {
+	transition, ok := corestatus.CancelPurchaseReceipt(receipt.Status)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
 		if err != nil {
 			return nil, err
@@ -193,9 +184,6 @@ func (r *inventoryRepo) CancelPostedPurchaseReceipt(ctx context.Context, receipt
 		}
 		tx = nil
 		return out, nil
-	}
-	if receipt.Status != biz.PurchaseReceiptStatusPosted {
-		return nil, biz.ErrBadParam
 	}
 	items, err := tx.client.PurchaseReceiptItem.Query().
 		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
@@ -486,16 +474,15 @@ func entPurchaseReceiptToBiz(row *ent.PurchaseReceipt, items []*ent.PurchaseRece
 		return nil
 	}
 	out := &biz.PurchaseReceipt{
-		ID:               row.ID,
-		ReceiptNo:        row.ReceiptNo,
-		BusinessRecordID: row.BusinessRecordID,
-		SupplierName:     row.SupplierName,
-		Status:           row.Status,
-		ReceivedAt:       row.ReceivedAt,
-		PostedAt:         row.PostedAt,
-		Note:             row.Note,
-		CreatedAt:        row.CreatedAt,
-		UpdatedAt:        row.UpdatedAt,
+		ID:           row.ID,
+		ReceiptNo:    row.ReceiptNo,
+		SupplierName: row.SupplierName,
+		Status:       row.Status,
+		ReceivedAt:   row.ReceivedAt,
+		PostedAt:     row.PostedAt,
+		Note:         row.Note,
+		CreatedAt:    row.CreatedAt,
+		UpdatedAt:    row.UpdatedAt,
 	}
 	if len(items) > 0 {
 		out.Items = make([]*biz.PurchaseReceiptItem, 0, len(items))

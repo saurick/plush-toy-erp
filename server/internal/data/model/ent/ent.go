@@ -11,9 +11,6 @@ import (
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
-	"server/internal/data/model/ent/businessrecord"
-	"server/internal/data/model/ent/businessrecordevent"
-	"server/internal/data/model/ent/businessrecorditem"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/financefact"
@@ -115,9 +112,6 @@ func checkColumn(t, c string) error {
 			adminuserrole.Table:                 adminuserrole.ValidColumn,
 			bomheader.Table:                     bomheader.ValidColumn,
 			bomitem.Table:                       bomitem.ValidColumn,
-			businessrecord.Table:                businessrecord.ValidColumn,
-			businessrecordevent.Table:           businessrecordevent.ValidColumn,
-			businessrecorditem.Table:            businessrecorditem.ValidColumn,
 			contact.Table:                       contact.ValidColumn,
 			customer.Table:                      customer.ValidColumn,
 			financefact.Table:                   financefact.ValidColumn,

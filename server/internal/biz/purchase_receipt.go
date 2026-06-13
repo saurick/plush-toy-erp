@@ -6,23 +6,23 @@ import (
 	"strings"
 	"time"
 
+	corestatus "server/internal/core/status"
 	"server/internal/core/value"
 
 	"github.com/shopspring/decimal"
 )
 
 type PurchaseReceipt struct {
-	ID               int
-	ReceiptNo        string
-	BusinessRecordID *int
-	SupplierName     string
-	Status           string
-	ReceivedAt       time.Time
-	PostedAt         *time.Time
-	Note             *string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	Items            []*PurchaseReceiptItem
+	ID           int
+	ReceiptNo    string
+	SupplierName string
+	Status       string
+	ReceivedAt   time.Time
+	PostedAt     *time.Time
+	Note         *string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	Items        []*PurchaseReceiptItem
 }
 
 type PurchaseReceiptItem struct {
@@ -43,11 +43,10 @@ type PurchaseReceiptItem struct {
 }
 
 type PurchaseReceiptCreate struct {
-	ReceiptNo        string
-	BusinessRecordID *int
-	SupplierName     string
-	ReceivedAt       time.Time
-	Note             *string
+	ReceiptNo    string
+	SupplierName string
+	ReceivedAt   time.Time
+	Note         *string
 }
 
 type PurchaseReceiptItemCreate struct {
@@ -126,8 +125,7 @@ func (uc *InventoryUsecase) ListPurchaseReceipts(ctx context.Context, filter Pur
 }
 
 func IsValidPurchaseReceiptStatus(value string) bool {
-	_, ok := purchaseReceiptStatuses[strings.ToUpper(strings.TrimSpace(value))]
-	return ok
+	return corestatus.IsPurchaseReceiptStatus(value)
 }
 
 func PurchaseReceiptInboundIdempotencyKey(receiptID, itemID int) string {
@@ -142,9 +140,6 @@ func normalizePurchaseReceiptCreate(in PurchaseReceiptCreate) (PurchaseReceiptCr
 	in.ReceiptNo = strings.TrimSpace(in.ReceiptNo)
 	in.SupplierName = strings.TrimSpace(in.SupplierName)
 	in.Note = normalizeOptionalString(in.Note)
-	if in.BusinessRecordID != nil && *in.BusinessRecordID <= 0 {
-		in.BusinessRecordID = nil
-	}
 	if in.ReceivedAt.IsZero() {
 		in.ReceivedAt = time.Now()
 	}

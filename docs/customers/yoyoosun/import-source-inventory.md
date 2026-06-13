@@ -26,10 +26,10 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | 委外加工汇总表 | Customer Material / Data Import Source / Print Template Input | Product / Purchase / Outsourcing | outsourcing, suppliers, finance | 仅 dry-run | suppliers / contacts 候选；future outsourcing source document candidate | Medium | 是 | 委外加工订单号、厂家、工序、金额先作为 source snapshot，不自动写 future outsourcing facts。 |
 | `web/src/erp/config/seedData.mjs` | Demo Seed / QA Debug / Source Snapshot | Frontend / QA | dashboard, flow, demo materials | 否 | 无直接导入目标 | Medium | 是 | 本轮禁止修改；seed/demo 只作演示和字段线索，不能导入正式数据。 |
 | `web/src/erp/config/businessModules.mjs` | Source Snapshot / QA Debug | Frontend / Product | module clues | 否 | 无直接导入目标 | Medium | 是 | 记录旧兼容页面和样本来源；不能证明正式模型已完成。 |
-| `web/src/erp/config/businessRecordDefinitions.mjs` | Source Snapshot / Data Map clue | Frontend / Product | business_records fields | 否 | dry-run field mapping clue | Medium | 是 | 可辅助识别旧通用记录字段；不得继续扩展重叠领域核心字段。 |
+| 旧 `businessRecordDefinitions.mjs` 删除前历史实现 | Retired Source Snapshot clue | Frontend / Product | business_records fields | 否 | 无运行时导入目标 | Low | 是 | 源码文件已删除；如需追溯只能看 Git 历史或删除前 evidence，不得继续扩展重叠领域核心字段。 |
 | `docs/product/business-records-data-map-draft.md` | Source Snapshot / Data Import Source | Product / Data Import | partners, products, project-orders | 是，仅作为 dry-run 设计输入 | V1 MasterData / Sales Order 候选 | High | 是 | 009 输出的映射草案是本轮 data map 输入，不是迁移执行。 |
-| `docs/product/business-records-reference-audit.md` | Audit / Source Snapshot | Product | business_records references | 否 | 无直接导入目标 | High | 是 | 用于确认兼容层引用面和旧入口风险。 |
-| `business_records` 旧数据或旧入口 | Source Snapshot / Demo Seed / QA Debug / Data Import Source | Product / Data Import | partners, products, project-orders, purchase, shipment, finance | 仅 dry-run | customers / suppliers / contacts / sales_orders / sales_order_items / existing products/materials/warehouses 候选 | Medium | 是 | 不删除、不迁移、不双写；不能作为长期事实真源。 |
+| `docs/product/business-records-reference-audit.md` | Audit / Deletion Boundary | Product | retired business_records references | 否 | 无直接导入目标 | High | 是 | 用于确认旧表族已删除和哪些字符串只是边界守卫。 |
+| 删除前 `business_records` JSONL evidence | Retired Evidence Only | Product / Data Import | partners, products, project-orders, purchase, shipment, finance | 否 | 无自动导入目标 | Medium | 是 | 只作为当前 dev DB 删除前证据；不得直接迁移、双写或生成长期事实真源。 |
 | V1 customers 页面和 API | V1 formal model | MasterData | customers | 是，未来 import execution 才可写 | `customers` | High | 是 | 当前 dry-run 不写入；后续真实 loader 必须走 V1 usecase。 |
 | V1 suppliers 页面和 API | V1 formal model | MasterData | suppliers | 是，未来 import execution 才可写 | `suppliers` | High | 是 | 当前 dry-run 不写入；加工厂 / 供应商分类不清时必须 unresolved。 |
 | V1 contacts 页面和 API | V1 formal model | MasterData | contacts | 是，未来 import execution 才可写 | `contacts` | High | 是 | owner_type + owner_id 必须先唯一确认。 |
@@ -41,6 +41,6 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 - `yoyoosun` 客户资料只能作为 Customer Material、Demo Seed、Industry Template Candidate、Print Template Input 或 Data Import Source。
 - 原始 Excel 可通过 `scripts/import/customerSourceExtract.mjs` 生成本地 `output/customers/yoyoosun/source-extract/*` evidence；该输出不纳入 git，不是真实导入批准。
 - `config/customers/yoyoosun/importConfig.mjs` 是从提取 evidence、产品核心边界和客户台账人工收口后的配置草案；只记录统计、字段分组、review queue 和 forbidden targets，不嵌入 raw rows、不接 loader、不执行真实导入。
-- `business_records` 只能作为兼容层、demo、seed、source snapshot 和调研入口。
+- 旧 `business_records` 表族已删除；删除前 JSONL evidence 只能作为人工审计线索，不能作为兼容层、demo、seed、source snapshot、调研入口或自动导入来源。
 - 本轮 import source inventory 不是 migration plan，也不是 loader spec。
 - 任何涉及 shipment、inventory 或 finance facts 的来源只能进入 deferred / forbidden review，不得自动导入。

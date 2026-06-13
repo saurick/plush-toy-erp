@@ -4,7 +4,6 @@ package ent
 
 import (
 	"fmt"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/purchasereceipt"
 	"strings"
 	"time"
@@ -20,8 +19,6 @@ type PurchaseReceipt struct {
 	ID int `json:"id,omitempty"`
 	// ReceiptNo holds the value of the "receipt_no" field.
 	ReceiptNo string `json:"receipt_no,omitempty"`
-	// BusinessRecordID holds the value of the "business_record_id" field.
-	BusinessRecordID *int `json:"business_record_id,omitempty"`
 	// SupplierName holds the value of the "supplier_name" field.
 	SupplierName string `json:"supplier_name,omitempty"`
 	// Status holds the value of the "status" field.
@@ -44,8 +41,6 @@ type PurchaseReceipt struct {
 
 // PurchaseReceiptEdges holds the relations/edges for other nodes in the graph.
 type PurchaseReceiptEdges struct {
-	// BusinessRecord holds the value of the business_record edge.
-	BusinessRecord *BusinessRecord `json:"business_record,omitempty"`
 	// PurchaseReturns holds the value of the purchase_returns edge.
 	PurchaseReturns []*PurchaseReturn `json:"purchase_returns,omitempty"`
 	// PurchaseReceiptAdjustments holds the value of the purchase_receipt_adjustments edge.
@@ -56,24 +51,13 @@ type PurchaseReceiptEdges struct {
 	Items []*PurchaseReceiptItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
-}
-
-// BusinessRecordOrErr returns the BusinessRecord value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e PurchaseReceiptEdges) BusinessRecordOrErr() (*BusinessRecord, error) {
-	if e.BusinessRecord != nil {
-		return e.BusinessRecord, nil
-	} else if e.loadedTypes[0] {
-		return nil, &NotFoundError{label: businessrecord.Label}
-	}
-	return nil, &NotLoadedError{edge: "business_record"}
+	loadedTypes [4]bool
 }
 
 // PurchaseReturnsOrErr returns the PurchaseReturns value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptEdges) PurchaseReturnsOrErr() ([]*PurchaseReturn, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[0] {
 		return e.PurchaseReturns, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_returns"}
@@ -82,7 +66,7 @@ func (e PurchaseReceiptEdges) PurchaseReturnsOrErr() ([]*PurchaseReturn, error) 
 // PurchaseReceiptAdjustmentsOrErr returns the PurchaseReceiptAdjustments value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptEdges) PurchaseReceiptAdjustmentsOrErr() ([]*PurchaseReceiptAdjustment, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[1] {
 		return e.PurchaseReceiptAdjustments, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustments"}
@@ -91,7 +75,7 @@ func (e PurchaseReceiptEdges) PurchaseReceiptAdjustmentsOrErr() ([]*PurchaseRece
 // QualityInspectionsOrErr returns the QualityInspections value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[2] {
 		return e.QualityInspections, nil
 	}
 	return nil, &NotLoadedError{edge: "quality_inspections"}
@@ -100,7 +84,7 @@ func (e PurchaseReceiptEdges) QualityInspectionsOrErr() ([]*QualityInspection, e
 // ItemsOrErr returns the Items value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptEdges) ItemsOrErr() ([]*PurchaseReceiptItem, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[3] {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
@@ -111,7 +95,7 @@ func (*PurchaseReceipt) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case purchasereceipt.FieldID, purchasereceipt.FieldBusinessRecordID:
+		case purchasereceipt.FieldID:
 			values[i] = new(sql.NullInt64)
 		case purchasereceipt.FieldReceiptNo, purchasereceipt.FieldSupplierName, purchasereceipt.FieldStatus, purchasereceipt.FieldNote:
 			values[i] = new(sql.NullString)
@@ -143,13 +127,6 @@ func (_m *PurchaseReceipt) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field receipt_no", values[i])
 			} else if value.Valid {
 				_m.ReceiptNo = value.String
-			}
-		case purchasereceipt.FieldBusinessRecordID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field business_record_id", values[i])
-			} else if value.Valid {
-				_m.BusinessRecordID = new(int)
-				*_m.BusinessRecordID = int(value.Int64)
 			}
 		case purchasereceipt.FieldSupplierName:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -208,11 +185,6 @@ func (_m *PurchaseReceipt) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
-// QueryBusinessRecord queries the "business_record" edge of the PurchaseReceipt entity.
-func (_m *PurchaseReceipt) QueryBusinessRecord() *BusinessRecordQuery {
-	return NewPurchaseReceiptClient(_m.config).QueryBusinessRecord(_m)
-}
-
 // QueryPurchaseReturns queries the "purchase_returns" edge of the PurchaseReceipt entity.
 func (_m *PurchaseReceipt) QueryPurchaseReturns() *PurchaseReturnQuery {
 	return NewPurchaseReceiptClient(_m.config).QueryPurchaseReturns(_m)
@@ -258,11 +230,6 @@ func (_m *PurchaseReceipt) String() string {
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
 	builder.WriteString("receipt_no=")
 	builder.WriteString(_m.ReceiptNo)
-	builder.WriteString(", ")
-	if v := _m.BusinessRecordID; v != nil {
-		builder.WriteString("business_record_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
 	builder.WriteString(", ")
 	builder.WriteString("supplier_name=")
 	builder.WriteString(_m.SupplierName)

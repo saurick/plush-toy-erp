@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	corestatus "server/internal/core/status"
 	"server/internal/core/value"
 
 	"github.com/shopspring/decimal"
@@ -40,29 +41,29 @@ const (
 	InventoryTxnTransferOut = "TRANSFER_OUT"
 	InventoryTxnReversal    = "REVERSAL"
 
-	InventoryLotActive   = "ACTIVE"
-	InventoryLotHold     = "HOLD"
-	InventoryLotRejected = "REJECTED"
-	InventoryLotDisabled = "DISABLED"
+	InventoryLotActive   = corestatus.InventoryLotActive
+	InventoryLotHold     = corestatus.InventoryLotHold
+	InventoryLotRejected = corestatus.InventoryLotRejected
+	InventoryLotDisabled = corestatus.InventoryLotDisabled
 
 	BOMStatusDraft    = "DRAFT"
 	BOMStatusActive   = "ACTIVE"
 	BOMStatusDisabled = "DISABLED"
 
 	PurchaseReceiptSourceType      = "PURCHASE_RECEIPT"
-	PurchaseReceiptStatusDraft     = "DRAFT"
-	PurchaseReceiptStatusPosted    = "POSTED"
-	PurchaseReceiptStatusCancelled = "CANCELLED"
+	PurchaseReceiptStatusDraft     = corestatus.PurchaseReceiptDraft
+	PurchaseReceiptStatusPosted    = corestatus.PurchaseReceiptPosted
+	PurchaseReceiptStatusCancelled = corestatus.PurchaseReceiptCancelled
 
 	PurchaseReturnSourceType      = "PURCHASE_RETURN"
-	PurchaseReturnStatusDraft     = "DRAFT"
-	PurchaseReturnStatusPosted    = "POSTED"
-	PurchaseReturnStatusCancelled = "CANCELLED"
+	PurchaseReturnStatusDraft     = corestatus.PurchaseReturnDraft
+	PurchaseReturnStatusPosted    = corestatus.PurchaseReturnPosted
+	PurchaseReturnStatusCancelled = corestatus.PurchaseReturnCancelled
 
 	PurchaseReceiptAdjustmentSourceType      = "PURCHASE_RECEIPT_ADJUSTMENT"
-	PurchaseReceiptAdjustmentStatusDraft     = "DRAFT"
-	PurchaseReceiptAdjustmentStatusPosted    = "POSTED"
-	PurchaseReceiptAdjustmentStatusCancelled = "CANCELLED"
+	PurchaseReceiptAdjustmentStatusDraft     = corestatus.PurchaseReceiptAdjustmentDraft
+	PurchaseReceiptAdjustmentStatusPosted    = corestatus.PurchaseReceiptAdjustmentPosted
+	PurchaseReceiptAdjustmentStatusCancelled = corestatus.PurchaseReceiptAdjustmentCancelled
 
 	PurchaseReceiptAdjustmentQuantityIncrease       = "QUANTITY_INCREASE"
 	PurchaseReceiptAdjustmentQuantityDecrease       = "QUANTITY_DECREASE"
@@ -86,31 +87,10 @@ var (
 		InventoryTxnTransferOut: {},
 		InventoryTxnReversal:    {},
 	}
-	inventoryLotStatuses = map[string]struct{}{
-		InventoryLotActive:   {},
-		InventoryLotHold:     {},
-		InventoryLotRejected: {},
-		InventoryLotDisabled: {},
-	}
 	bomStatuses = map[string]struct{}{
 		BOMStatusDraft:    {},
 		BOMStatusActive:   {},
 		BOMStatusDisabled: {},
-	}
-	purchaseReceiptStatuses = map[string]struct{}{
-		PurchaseReceiptStatusDraft:     {},
-		PurchaseReceiptStatusPosted:    {},
-		PurchaseReceiptStatusCancelled: {},
-	}
-	purchaseReturnStatuses = map[string]struct{}{
-		PurchaseReturnStatusDraft:     {},
-		PurchaseReturnStatusPosted:    {},
-		PurchaseReturnStatusCancelled: {},
-	}
-	purchaseReceiptAdjustmentStatuses = map[string]struct{}{
-		PurchaseReceiptAdjustmentStatusDraft:     {},
-		PurchaseReceiptAdjustmentStatusPosted:    {},
-		PurchaseReceiptAdjustmentStatusCancelled: {},
 	}
 	purchaseReceiptAdjustmentTypes = map[string]struct{}{
 		PurchaseReceiptAdjustmentQuantityIncrease:       {},
@@ -497,35 +477,11 @@ func IsValidInventoryTxnType(value string) bool {
 }
 
 func IsValidInventoryLotStatus(value string) bool {
-	_, ok := inventoryLotStatuses[strings.ToUpper(strings.TrimSpace(value))]
-	return ok
+	return corestatus.IsInventoryLotStatus(value)
 }
 
 func IsInventoryLotStatusTransitionAllowed(currentStatus, newStatus string, hasPositiveBalance bool) bool {
-	currentStatus = strings.ToUpper(strings.TrimSpace(currentStatus))
-	newStatus = strings.ToUpper(strings.TrimSpace(newStatus))
-	if !IsValidInventoryLotStatus(currentStatus) || !IsValidInventoryLotStatus(newStatus) {
-		return false
-	}
-	if currentStatus == newStatus {
-		return true
-	}
-	if currentStatus == InventoryLotDisabled {
-		return false
-	}
-	if newStatus == InventoryLotDisabled {
-		return !hasPositiveBalance
-	}
-	switch currentStatus {
-	case InventoryLotActive:
-		return newStatus == InventoryLotHold
-	case InventoryLotHold:
-		return newStatus == InventoryLotActive || newStatus == InventoryLotRejected
-	case InventoryLotRejected:
-		return newStatus == InventoryLotActive || newStatus == InventoryLotHold
-	default:
-		return false
-	}
+	return corestatus.CanChangeInventoryLotStatus(currentStatus, newStatus, hasPositiveBalance)
 }
 
 func IsValidBOMStatus(value string) bool {

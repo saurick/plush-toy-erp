@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	corestatus "server/internal/core/status"
 	"server/internal/core/value"
 
 	"github.com/shopspring/decimal"
@@ -15,7 +16,6 @@ type PurchaseReceiptAdjustment struct {
 	ID                int
 	AdjustmentNo      string
 	PurchaseReceiptID int
-	BusinessRecordID  *int
 	Reason            *string
 	Status            string
 	AdjustedAt        time.Time
@@ -46,7 +46,6 @@ type PurchaseReceiptAdjustmentItem struct {
 type PurchaseReceiptAdjustmentCreate struct {
 	AdjustmentNo      string
 	PurchaseReceiptID int
-	BusinessRecordID  *int
 	Reason            *string
 	AdjustedAt        time.Time
 	Note              *string
@@ -110,8 +109,7 @@ func (uc *InventoryUsecase) GetPurchaseReceiptAdjustment(ctx context.Context, id
 }
 
 func IsValidPurchaseReceiptAdjustmentStatus(value string) bool {
-	_, ok := purchaseReceiptAdjustmentStatuses[strings.ToUpper(strings.TrimSpace(value))]
-	return ok
+	return corestatus.IsPurchaseReceiptAdjustmentStatus(value)
 }
 
 func IsValidPurchaseReceiptAdjustmentType(value string) bool {
@@ -131,9 +129,6 @@ func normalizePurchaseReceiptAdjustmentCreate(in PurchaseReceiptAdjustmentCreate
 	in.AdjustmentNo = strings.TrimSpace(in.AdjustmentNo)
 	in.Reason = normalizeOptionalString(in.Reason)
 	in.Note = normalizeOptionalString(in.Note)
-	if in.BusinessRecordID != nil && *in.BusinessRecordID <= 0 {
-		in.BusinessRecordID = nil
-	}
 	if in.AdjustedAt.IsZero() {
 		in.AdjustedAt = time.Now()
 	}

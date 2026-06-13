@@ -15,9 +15,6 @@ import (
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
-	"server/internal/data/model/ent/businessrecord"
-	"server/internal/data/model/ent/businessrecordevent"
-	"server/internal/data/model/ent/businessrecorditem"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/financefact"
@@ -70,12 +67,6 @@ type Client struct {
 	BOMHeader *BOMHeaderClient
 	// BOMItem is the client for interacting with the BOMItem builders.
 	BOMItem *BOMItemClient
-	// BusinessRecord is the client for interacting with the BusinessRecord builders.
-	BusinessRecord *BusinessRecordClient
-	// BusinessRecordEvent is the client for interacting with the BusinessRecordEvent builders.
-	BusinessRecordEvent *BusinessRecordEventClient
-	// BusinessRecordItem is the client for interacting with the BusinessRecordItem builders.
-	BusinessRecordItem *BusinessRecordItemClient
 	// Contact is the client for interacting with the Contact builders.
 	Contact *ContactClient
 	// Customer is the client for interacting with the Customer builders.
@@ -155,9 +146,6 @@ func (c *Client) init() {
 	c.AdminUserRole = NewAdminUserRoleClient(c.config)
 	c.BOMHeader = NewBOMHeaderClient(c.config)
 	c.BOMItem = NewBOMItemClient(c.config)
-	c.BusinessRecord = NewBusinessRecordClient(c.config)
-	c.BusinessRecordEvent = NewBusinessRecordEventClient(c.config)
-	c.BusinessRecordItem = NewBusinessRecordItemClient(c.config)
 	c.Contact = NewContactClient(c.config)
 	c.Customer = NewCustomerClient(c.config)
 	c.FinanceFact = NewFinanceFactClient(c.config)
@@ -286,9 +274,6 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		AdminUserRole:                 NewAdminUserRoleClient(cfg),
 		BOMHeader:                     NewBOMHeaderClient(cfg),
 		BOMItem:                       NewBOMItemClient(cfg),
-		BusinessRecord:                NewBusinessRecordClient(cfg),
-		BusinessRecordEvent:           NewBusinessRecordEventClient(cfg),
-		BusinessRecordItem:            NewBusinessRecordItemClient(cfg),
 		Contact:                       NewContactClient(cfg),
 		Customer:                      NewCustomerClient(cfg),
 		FinanceFact:                   NewFinanceFactClient(cfg),
@@ -344,9 +329,6 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		AdminUserRole:                 NewAdminUserRoleClient(cfg),
 		BOMHeader:                     NewBOMHeaderClient(cfg),
 		BOMItem:                       NewBOMItemClient(cfg),
-		BusinessRecord:                NewBusinessRecordClient(cfg),
-		BusinessRecordEvent:           NewBusinessRecordEventClient(cfg),
-		BusinessRecordItem:            NewBusinessRecordItemClient(cfg),
 		Contact:                       NewContactClient(cfg),
 		Customer:                      NewCustomerClient(cfg),
 		FinanceFact:                   NewFinanceFactClient(cfg),
@@ -408,8 +390,7 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.BusinessRecord,
-		c.BusinessRecordEvent, c.BusinessRecordItem, c.Contact, c.Customer,
+		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.Contact, c.Customer,
 		c.FinanceFact, c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
 		c.OutsourcingFact, c.Permission, c.Product, c.ProductionFact,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
@@ -427,8 +408,7 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.BusinessRecord,
-		c.BusinessRecordEvent, c.BusinessRecordItem, c.Contact, c.Customer,
+		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.Contact, c.Customer,
 		c.FinanceFact, c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
 		c.OutsourcingFact, c.Permission, c.Product, c.ProductionFact,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
@@ -453,12 +433,6 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BOMHeader.mutate(ctx, m)
 	case *BOMItemMutation:
 		return c.BOMItem.mutate(ctx, m)
-	case *BusinessRecordMutation:
-		return c.BusinessRecord.mutate(ctx, m)
-	case *BusinessRecordEventMutation:
-		return c.BusinessRecordEvent.mutate(ctx, m)
-	case *BusinessRecordItemMutation:
-		return c.BusinessRecordItem.mutate(ctx, m)
 	case *ContactMutation:
 		return c.Contact.mutate(ctx, m)
 	case *CustomerMutation:
@@ -1137,453 +1111,6 @@ func (c *BOMItemClient) mutate(ctx context.Context, m *BOMItemMutation) (Value, 
 		return (&BOMItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown BOMItem mutation op: %q", m.Op())
-	}
-}
-
-// BusinessRecordClient is a client for the BusinessRecord schema.
-type BusinessRecordClient struct {
-	config
-}
-
-// NewBusinessRecordClient returns a client for the BusinessRecord from the given config.
-func NewBusinessRecordClient(c config) *BusinessRecordClient {
-	return &BusinessRecordClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `businessrecord.Hooks(f(g(h())))`.
-func (c *BusinessRecordClient) Use(hooks ...Hook) {
-	c.hooks.BusinessRecord = append(c.hooks.BusinessRecord, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `businessrecord.Intercept(f(g(h())))`.
-func (c *BusinessRecordClient) Intercept(interceptors ...Interceptor) {
-	c.inters.BusinessRecord = append(c.inters.BusinessRecord, interceptors...)
-}
-
-// Create returns a builder for creating a BusinessRecord entity.
-func (c *BusinessRecordClient) Create() *BusinessRecordCreate {
-	mutation := newBusinessRecordMutation(c.config, OpCreate)
-	return &BusinessRecordCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of BusinessRecord entities.
-func (c *BusinessRecordClient) CreateBulk(builders ...*BusinessRecordCreate) *BusinessRecordCreateBulk {
-	return &BusinessRecordCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *BusinessRecordClient) MapCreateBulk(slice any, setFunc func(*BusinessRecordCreate, int)) *BusinessRecordCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &BusinessRecordCreateBulk{err: fmt.Errorf("calling to BusinessRecordClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*BusinessRecordCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &BusinessRecordCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for BusinessRecord.
-func (c *BusinessRecordClient) Update() *BusinessRecordUpdate {
-	mutation := newBusinessRecordMutation(c.config, OpUpdate)
-	return &BusinessRecordUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *BusinessRecordClient) UpdateOne(_m *BusinessRecord) *BusinessRecordUpdateOne {
-	mutation := newBusinessRecordMutation(c.config, OpUpdateOne, withBusinessRecord(_m))
-	return &BusinessRecordUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *BusinessRecordClient) UpdateOneID(id int) *BusinessRecordUpdateOne {
-	mutation := newBusinessRecordMutation(c.config, OpUpdateOne, withBusinessRecordID(id))
-	return &BusinessRecordUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for BusinessRecord.
-func (c *BusinessRecordClient) Delete() *BusinessRecordDelete {
-	mutation := newBusinessRecordMutation(c.config, OpDelete)
-	return &BusinessRecordDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *BusinessRecordClient) DeleteOne(_m *BusinessRecord) *BusinessRecordDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *BusinessRecordClient) DeleteOneID(id int) *BusinessRecordDeleteOne {
-	builder := c.Delete().Where(businessrecord.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &BusinessRecordDeleteOne{builder}
-}
-
-// Query returns a query builder for BusinessRecord.
-func (c *BusinessRecordClient) Query() *BusinessRecordQuery {
-	return &BusinessRecordQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeBusinessRecord},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a BusinessRecord entity by its id.
-func (c *BusinessRecordClient) Get(ctx context.Context, id int) (*BusinessRecord, error) {
-	return c.Query().Where(businessrecord.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *BusinessRecordClient) GetX(ctx context.Context, id int) *BusinessRecord {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QueryPurchaseReceipts queries the purchase_receipts edge of a BusinessRecord.
-func (c *BusinessRecordClient) QueryPurchaseReceipts(_m *BusinessRecord) *PurchaseReceiptQuery {
-	query := (&PurchaseReceiptClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(businessrecord.Table, businessrecord.FieldID, id),
-			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, businessrecord.PurchaseReceiptsTable, businessrecord.PurchaseReceiptsColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryPurchaseReturns queries the purchase_returns edge of a BusinessRecord.
-func (c *BusinessRecordClient) QueryPurchaseReturns(_m *BusinessRecord) *PurchaseReturnQuery {
-	query := (&PurchaseReturnClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(businessrecord.Table, businessrecord.FieldID, id),
-			sqlgraph.To(purchasereturn.Table, purchasereturn.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, businessrecord.PurchaseReturnsTable, businessrecord.PurchaseReturnsColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryPurchaseReceiptAdjustments queries the purchase_receipt_adjustments edge of a BusinessRecord.
-func (c *BusinessRecordClient) QueryPurchaseReceiptAdjustments(_m *BusinessRecord) *PurchaseReceiptAdjustmentQuery {
-	query := (&PurchaseReceiptAdjustmentClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(businessrecord.Table, businessrecord.FieldID, id),
-			sqlgraph.To(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, businessrecord.PurchaseReceiptAdjustmentsTable, businessrecord.PurchaseReceiptAdjustmentsColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *BusinessRecordClient) Hooks() []Hook {
-	return c.hooks.BusinessRecord
-}
-
-// Interceptors returns the client interceptors.
-func (c *BusinessRecordClient) Interceptors() []Interceptor {
-	return c.inters.BusinessRecord
-}
-
-func (c *BusinessRecordClient) mutate(ctx context.Context, m *BusinessRecordMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&BusinessRecordCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&BusinessRecordUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&BusinessRecordUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&BusinessRecordDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown BusinessRecord mutation op: %q", m.Op())
-	}
-}
-
-// BusinessRecordEventClient is a client for the BusinessRecordEvent schema.
-type BusinessRecordEventClient struct {
-	config
-}
-
-// NewBusinessRecordEventClient returns a client for the BusinessRecordEvent from the given config.
-func NewBusinessRecordEventClient(c config) *BusinessRecordEventClient {
-	return &BusinessRecordEventClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `businessrecordevent.Hooks(f(g(h())))`.
-func (c *BusinessRecordEventClient) Use(hooks ...Hook) {
-	c.hooks.BusinessRecordEvent = append(c.hooks.BusinessRecordEvent, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `businessrecordevent.Intercept(f(g(h())))`.
-func (c *BusinessRecordEventClient) Intercept(interceptors ...Interceptor) {
-	c.inters.BusinessRecordEvent = append(c.inters.BusinessRecordEvent, interceptors...)
-}
-
-// Create returns a builder for creating a BusinessRecordEvent entity.
-func (c *BusinessRecordEventClient) Create() *BusinessRecordEventCreate {
-	mutation := newBusinessRecordEventMutation(c.config, OpCreate)
-	return &BusinessRecordEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of BusinessRecordEvent entities.
-func (c *BusinessRecordEventClient) CreateBulk(builders ...*BusinessRecordEventCreate) *BusinessRecordEventCreateBulk {
-	return &BusinessRecordEventCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *BusinessRecordEventClient) MapCreateBulk(slice any, setFunc func(*BusinessRecordEventCreate, int)) *BusinessRecordEventCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &BusinessRecordEventCreateBulk{err: fmt.Errorf("calling to BusinessRecordEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*BusinessRecordEventCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &BusinessRecordEventCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for BusinessRecordEvent.
-func (c *BusinessRecordEventClient) Update() *BusinessRecordEventUpdate {
-	mutation := newBusinessRecordEventMutation(c.config, OpUpdate)
-	return &BusinessRecordEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *BusinessRecordEventClient) UpdateOne(_m *BusinessRecordEvent) *BusinessRecordEventUpdateOne {
-	mutation := newBusinessRecordEventMutation(c.config, OpUpdateOne, withBusinessRecordEvent(_m))
-	return &BusinessRecordEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *BusinessRecordEventClient) UpdateOneID(id int) *BusinessRecordEventUpdateOne {
-	mutation := newBusinessRecordEventMutation(c.config, OpUpdateOne, withBusinessRecordEventID(id))
-	return &BusinessRecordEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for BusinessRecordEvent.
-func (c *BusinessRecordEventClient) Delete() *BusinessRecordEventDelete {
-	mutation := newBusinessRecordEventMutation(c.config, OpDelete)
-	return &BusinessRecordEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *BusinessRecordEventClient) DeleteOne(_m *BusinessRecordEvent) *BusinessRecordEventDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *BusinessRecordEventClient) DeleteOneID(id int) *BusinessRecordEventDeleteOne {
-	builder := c.Delete().Where(businessrecordevent.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &BusinessRecordEventDeleteOne{builder}
-}
-
-// Query returns a query builder for BusinessRecordEvent.
-func (c *BusinessRecordEventClient) Query() *BusinessRecordEventQuery {
-	return &BusinessRecordEventQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeBusinessRecordEvent},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a BusinessRecordEvent entity by its id.
-func (c *BusinessRecordEventClient) Get(ctx context.Context, id int) (*BusinessRecordEvent, error) {
-	return c.Query().Where(businessrecordevent.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *BusinessRecordEventClient) GetX(ctx context.Context, id int) *BusinessRecordEvent {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// Hooks returns the client hooks.
-func (c *BusinessRecordEventClient) Hooks() []Hook {
-	return c.hooks.BusinessRecordEvent
-}
-
-// Interceptors returns the client interceptors.
-func (c *BusinessRecordEventClient) Interceptors() []Interceptor {
-	return c.inters.BusinessRecordEvent
-}
-
-func (c *BusinessRecordEventClient) mutate(ctx context.Context, m *BusinessRecordEventMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&BusinessRecordEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&BusinessRecordEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&BusinessRecordEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&BusinessRecordEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown BusinessRecordEvent mutation op: %q", m.Op())
-	}
-}
-
-// BusinessRecordItemClient is a client for the BusinessRecordItem schema.
-type BusinessRecordItemClient struct {
-	config
-}
-
-// NewBusinessRecordItemClient returns a client for the BusinessRecordItem from the given config.
-func NewBusinessRecordItemClient(c config) *BusinessRecordItemClient {
-	return &BusinessRecordItemClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `businessrecorditem.Hooks(f(g(h())))`.
-func (c *BusinessRecordItemClient) Use(hooks ...Hook) {
-	c.hooks.BusinessRecordItem = append(c.hooks.BusinessRecordItem, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `businessrecorditem.Intercept(f(g(h())))`.
-func (c *BusinessRecordItemClient) Intercept(interceptors ...Interceptor) {
-	c.inters.BusinessRecordItem = append(c.inters.BusinessRecordItem, interceptors...)
-}
-
-// Create returns a builder for creating a BusinessRecordItem entity.
-func (c *BusinessRecordItemClient) Create() *BusinessRecordItemCreate {
-	mutation := newBusinessRecordItemMutation(c.config, OpCreate)
-	return &BusinessRecordItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of BusinessRecordItem entities.
-func (c *BusinessRecordItemClient) CreateBulk(builders ...*BusinessRecordItemCreate) *BusinessRecordItemCreateBulk {
-	return &BusinessRecordItemCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *BusinessRecordItemClient) MapCreateBulk(slice any, setFunc func(*BusinessRecordItemCreate, int)) *BusinessRecordItemCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &BusinessRecordItemCreateBulk{err: fmt.Errorf("calling to BusinessRecordItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*BusinessRecordItemCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &BusinessRecordItemCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for BusinessRecordItem.
-func (c *BusinessRecordItemClient) Update() *BusinessRecordItemUpdate {
-	mutation := newBusinessRecordItemMutation(c.config, OpUpdate)
-	return &BusinessRecordItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *BusinessRecordItemClient) UpdateOne(_m *BusinessRecordItem) *BusinessRecordItemUpdateOne {
-	mutation := newBusinessRecordItemMutation(c.config, OpUpdateOne, withBusinessRecordItem(_m))
-	return &BusinessRecordItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *BusinessRecordItemClient) UpdateOneID(id int) *BusinessRecordItemUpdateOne {
-	mutation := newBusinessRecordItemMutation(c.config, OpUpdateOne, withBusinessRecordItemID(id))
-	return &BusinessRecordItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for BusinessRecordItem.
-func (c *BusinessRecordItemClient) Delete() *BusinessRecordItemDelete {
-	mutation := newBusinessRecordItemMutation(c.config, OpDelete)
-	return &BusinessRecordItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *BusinessRecordItemClient) DeleteOne(_m *BusinessRecordItem) *BusinessRecordItemDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *BusinessRecordItemClient) DeleteOneID(id int) *BusinessRecordItemDeleteOne {
-	builder := c.Delete().Where(businessrecorditem.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &BusinessRecordItemDeleteOne{builder}
-}
-
-// Query returns a query builder for BusinessRecordItem.
-func (c *BusinessRecordItemClient) Query() *BusinessRecordItemQuery {
-	return &BusinessRecordItemQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeBusinessRecordItem},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a BusinessRecordItem entity by its id.
-func (c *BusinessRecordItemClient) Get(ctx context.Context, id int) (*BusinessRecordItem, error) {
-	return c.Query().Where(businessrecorditem.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *BusinessRecordItemClient) GetX(ctx context.Context, id int) *BusinessRecordItem {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// Hooks returns the client hooks.
-func (c *BusinessRecordItemClient) Hooks() []Hook {
-	return c.hooks.BusinessRecordItem
-}
-
-// Interceptors returns the client interceptors.
-func (c *BusinessRecordItemClient) Interceptors() []Interceptor {
-	return c.inters.BusinessRecordItem
-}
-
-func (c *BusinessRecordItemClient) mutate(ctx context.Context, m *BusinessRecordItemMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&BusinessRecordItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&BusinessRecordItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&BusinessRecordItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&BusinessRecordItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown BusinessRecordItem mutation op: %q", m.Op())
 	}
 }
 
@@ -3707,22 +3234,6 @@ func (c *PurchaseReceiptClient) GetX(ctx context.Context, id int) *PurchaseRecei
 	return obj
 }
 
-// QueryBusinessRecord queries the business_record edge of a PurchaseReceipt.
-func (c *PurchaseReceiptClient) QueryBusinessRecord(_m *PurchaseReceipt) *BusinessRecordQuery {
-	query := (&BusinessRecordClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(purchasereceipt.Table, purchasereceipt.FieldID, id),
-			sqlgraph.To(businessrecord.Table, businessrecord.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceipt.BusinessRecordTable, purchasereceipt.BusinessRecordColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
 // QueryPurchaseReturns queries the purchase_returns edge of a PurchaseReceipt.
 func (c *PurchaseReceiptClient) QueryPurchaseReturns(_m *PurchaseReceipt) *PurchaseReturnQuery {
 	query := (&PurchaseReturnClient{config: c.config}).Query()
@@ -3930,22 +3441,6 @@ func (c *PurchaseReceiptAdjustmentClient) QueryPurchaseReceipt(_m *PurchaseRecei
 			sqlgraph.From(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID, id),
 			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustment.PurchaseReceiptTable, purchasereceiptadjustment.PurchaseReceiptColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryBusinessRecord queries the business_record edge of a PurchaseReceiptAdjustment.
-func (c *PurchaseReceiptAdjustmentClient) QueryBusinessRecord(_m *PurchaseReceiptAdjustment) *BusinessRecordQuery {
-	query := (&BusinessRecordClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID, id),
-			sqlgraph.To(businessrecord.Table, businessrecord.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustment.BusinessRecordTable, purchasereceiptadjustment.BusinessRecordColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -4604,22 +4099,6 @@ func (c *PurchaseReturnClient) QueryPurchaseReceipt(_m *PurchaseReturn) *Purchas
 			sqlgraph.From(purchasereturn.Table, purchasereturn.FieldID, id),
 			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, purchasereturn.PurchaseReceiptTable, purchasereturn.PurchaseReceiptColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryBusinessRecord queries the business_record edge of a PurchaseReturn.
-func (c *PurchaseReturnClient) QueryBusinessRecord(_m *PurchaseReturn) *BusinessRecordQuery {
-	query := (&BusinessRecordClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(purchasereturn.Table, purchasereturn.FieldID, id),
-			sqlgraph.To(businessrecord.Table, businessrecord.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, purchasereturn.BusinessRecordTable, purchasereturn.BusinessRecordColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -7749,8 +7228,7 @@ func (c *WorkflowTaskEventClient) mutate(ctx context.Context, m *WorkflowTaskEve
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessRecord,
-		BusinessRecordEvent, BusinessRecordItem, Contact, Customer, FinanceFact,
+		AdminUser, AdminUserRole, BOMHeader, BOMItem, Contact, Customer, FinanceFact,
 		InventoryBalance, InventoryLot, InventoryTxn, Material, OutsourcingFact,
 		Permission, Product, ProductionFact, PurchaseReceipt,
 		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
@@ -7760,8 +7238,7 @@ type (
 		WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
-		AdminUser, AdminUserRole, BOMHeader, BOMItem, BusinessRecord,
-		BusinessRecordEvent, BusinessRecordItem, Contact, Customer, FinanceFact,
+		AdminUser, AdminUserRole, BOMHeader, BOMItem, Contact, Customer, FinanceFact,
 		InventoryBalance, InventoryLot, InventoryTxn, Material, OutsourcingFact,
 		Permission, Product, ProductionFact, PurchaseReceipt,
 		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,

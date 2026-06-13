@@ -4,14 +4,16 @@ import (
 	"context"
 	"strings"
 	"time"
+
+	corestatus "server/internal/core/status"
 )
 
 const (
-	QualityInspectionStatusDraft     = "DRAFT"
-	QualityInspectionStatusSubmitted = "SUBMITTED"
-	QualityInspectionStatusPassed    = "PASSED"
-	QualityInspectionStatusRejected  = "REJECTED"
-	QualityInspectionStatusCancelled = "CANCELLED"
+	QualityInspectionStatusDraft     = corestatus.QualityInspectionDraft
+	QualityInspectionStatusSubmitted = corestatus.QualityInspectionSubmitted
+	QualityInspectionStatusPassed    = corestatus.QualityInspectionPassed
+	QualityInspectionStatusRejected  = corestatus.QualityInspectionRejected
+	QualityInspectionStatusCancelled = corestatus.QualityInspectionCancelled
 
 	QualityInspectionResultPass       = "PASS"
 	QualityInspectionResultReject     = "REJECT"
@@ -19,13 +21,6 @@ const (
 )
 
 var (
-	qualityInspectionStatuses = map[string]struct{}{
-		QualityInspectionStatusDraft:     {},
-		QualityInspectionStatusSubmitted: {},
-		QualityInspectionStatusPassed:    {},
-		QualityInspectionStatusRejected:  {},
-		QualityInspectionStatusCancelled: {},
-	}
 	qualityInspectionResults = map[string]struct{}{
 		QualityInspectionResultPass:       {},
 		QualityInspectionResultReject:     {},
@@ -132,8 +127,7 @@ func (uc *InventoryUsecase) GetQualityInspection(ctx context.Context, id int) (*
 }
 
 func IsValidQualityInspectionStatus(value string) bool {
-	_, ok := qualityInspectionStatuses[strings.ToUpper(strings.TrimSpace(value))]
-	return ok
+	return corestatus.IsQualityInspectionStatus(value)
 }
 
 func IsValidQualityInspectionResult(value string) bool {

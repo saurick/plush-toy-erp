@@ -17,12 +17,11 @@ type PurchaseReceipt struct {
 }
 
 var purchaseReceiptLockedFields = map[string]struct{}{
-	"receipt_no":         {},
-	"business_record_id": {},
-	"supplier_name":      {},
-	"status":             {},
-	"received_at":        {},
-	"posted_at":          {},
+	"receipt_no":    {},
+	"supplier_name": {},
+	"status":        {},
+	"received_at":   {},
+	"posted_at":     {},
 }
 
 func (PurchaseReceipt) Hooks() []ent.Hook {
@@ -47,10 +46,6 @@ func (PurchaseReceipt) Fields() []ent.Field {
 		field.String("receipt_no").
 			NotEmpty().
 			MaxLen(64),
-		field.Int("business_record_id").
-			Optional().
-			Nillable().
-			Positive(),
 		field.String("supplier_name").
 			NotEmpty().
 			MaxLen(255),
@@ -77,10 +72,6 @@ func (PurchaseReceipt) Fields() []ent.Field {
 
 func (PurchaseReceipt) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.From("business_record", BusinessRecord.Type).
-			Ref("purchase_receipts").
-			Field("business_record_id").
-			Unique(),
 		edge.To("purchase_returns", PurchaseReturn.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_receipt_adjustments", PurchaseReceiptAdjustment.Type).
@@ -94,7 +85,6 @@ func (PurchaseReceipt) Edges() []ent.Edge {
 func (PurchaseReceipt) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("receipt_no").Unique(),
-		index.Fields("business_record_id"),
 		index.Fields("supplier_name"),
 		index.Fields("status"),
 		index.Fields("received_at"),

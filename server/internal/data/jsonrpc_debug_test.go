@@ -32,22 +32,19 @@ func (s stubDebugJSONRPCRepo) SeedBusinessChainDebugData(_ context.Context, plan
 
 func (s stubDebugJSONRPCRepo) CleanupBusinessChainDebugData(_ context.Context, in biz.DebugBusinessChainCleanupInput) (*biz.DebugBusinessChainCleanupResult, error) {
 	return &biz.DebugBusinessChainCleanupResult{
-		DebugRunID: in.DebugRunID,
-		DryRun:     in.DryRun,
-		MatchedRecords: []biz.DebugMatchedRecord{
-			{ID: 1, ModuleKey: "project-orders", DocumentNo: "DBG-RUN-API-ORDENG-01"},
-		},
+		DebugRunID:     in.DebugRunID,
+		DryRun:         in.DryRun,
+		MatchedRecords: []biz.DebugMatchedRecord{},
 	}, nil
 }
 
 func (s stubDebugJSONRPCRepo) ClearBusinessData(_ context.Context) (*biz.DebugBusinessDataClearResult, error) {
 	return &biz.DebugBusinessDataClearResult{
 		DeletedCounts: map[string]int{
-			"business_records": 4,
-			"workflow_tasks":   2,
+			"workflow_tasks": 2,
 		},
-		DeletedTotal:      6,
-		ClearedTableNames: []string{"workflow_tasks", "business_records"},
+		DeletedTotal:      2,
+		ClearedTableNames: []string{"workflow_tasks"},
 	}, nil
 }
 
@@ -154,11 +151,11 @@ func TestJsonrpcData_DebugClearBusinessDataReturnsCounts(t *testing.T) {
 		t.Fatalf("expected OK, got %#v", res)
 	}
 	data := res.Data.AsMap()
-	if data["deletedTotal"] != float64(6) {
+	if data["deletedTotal"] != float64(2) {
 		t.Fatalf("unexpected deletedTotal %#v", data)
 	}
 	counts, ok := data["deletedCounts"].(map[string]any)
-	if !ok || counts["business_records"] != float64(4) {
+	if !ok || counts["workflow_tasks"] != float64(2) {
 		t.Fatalf("unexpected deletedCounts %#v", data["deletedCounts"])
 	}
 }

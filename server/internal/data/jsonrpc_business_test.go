@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"io"
-	"strings"
 	"testing"
 
 	"server/internal/biz"
@@ -79,34 +78,18 @@ func testNumberValue(value any) float64 {
 	}
 }
 
-func TestJsonrpcData_BusinessRecordWriteRejectedAsArchiveReadOnly(t *testing.T) {
-	repo := &businessJSONRPCRepoSpy{}
+func TestJsonrpcData_BusinessRecordMethodsAreRetired(t *testing.T) {
 	j := &JsonrpcData{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.business.test")),
-		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionBusinessRecordCreate)},
-		businessUC:  biz.NewBusinessRecordUsecase(repo),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey})},
 	}
-	params := mustJSONRPCStruct(t, map[string]any{
-		"module_key":          "accessories-purchase",
-		"title":               "旧业务记录写入",
-		"business_status_key": "project_pending",
-		"owner_role_key":      "purchase",
-		"payload":             map[string]any{},
-		"items":               []any{},
-	})
 
-	_, res, err := j.handleBusiness(workflowJSONRPCAdminContext(), "create_record", "1", params)
+	_, res, err := j.handleBusiness(workflowJSONRPCAdminContext(), "list_records", "1", nil)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if res == nil || res.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid param archive guard, got %#v", res)
-	}
-	if !strings.Contains(res.Message, "只读") {
-		t.Fatalf("expected read-only message, got %q", res.Message)
-	}
-	if repo.createCalled {
-		t.Fatalf("archive write should not call repo create")
+	if res == nil || res.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("expected retired method to be unknown, got %#v", res)
 	}
 }
 
@@ -202,29 +185,4 @@ func (s *stubBusinessDashboardPhase8Repo) CancelPostedFinanceFact(context.Contex
 
 func (s *stubBusinessDashboardPhase8Repo) ListFinanceFacts(context.Context, biz.Phase8Filter) ([]*biz.FinanceFact, int, error) {
 	return nil, 6, nil
-}
-
-type businessJSONRPCRepoSpy struct {
-	createCalled bool
-}
-
-func (r *businessJSONRPCRepoSpy) ListBusinessRecords(context.Context, biz.BusinessRecordFilter) ([]*biz.BusinessRecord, int, error) {
-	return nil, 0, nil
-}
-
-func (r *businessJSONRPCRepoSpy) CreateBusinessRecord(context.Context, *biz.BusinessRecordMutation, int) (*biz.BusinessRecord, error) {
-	r.createCalled = true
-	return &biz.BusinessRecord{}, nil
-}
-
-func (r *businessJSONRPCRepoSpy) UpdateBusinessRecord(context.Context, int, *biz.BusinessRecordMutation, int) (*biz.BusinessRecord, error) {
-	return &biz.BusinessRecord{}, nil
-}
-
-func (r *businessJSONRPCRepoSpy) DeleteBusinessRecords(context.Context, []int, string, int) (int, error) {
-	return 0, nil
-}
-
-func (r *businessJSONRPCRepoSpy) RestoreBusinessRecord(context.Context, int, int) (*biz.BusinessRecord, error) {
-	return &biz.BusinessRecord{}, nil
 }

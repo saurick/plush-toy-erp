@@ -267,15 +267,15 @@ MVP 原则：
 * 客户菜单配置。
 * 后端动作权限。
 * 业务帮助文档。
-* 旧 `business_records` 重叠入口删除、隐藏或退出正式写路径；已由 V1 承接的旧路径不再保留产品内路由、重定向或权限别名，普通 `business` API 已全量冻结 `business_records` create / update / delete / restore。
-* 旧数据是否迁移、保留或只作为审计线索。
+* 旧 `business_records` 重叠入口和旧表族已删除；已由 V1 承接的旧路径不再保留产品内路由、重定向或权限别名，普通 `business` API 只保留 `dashboard_stats`。
+* 删除前 JSONL evidence 是否需要进入客户可见历史归档，需另行评审；当前不自动迁移或恢复旧表。
 
 不做：
 
 * 不把旧入口保留为正式业务写入口。
 * 不为已由 V1 承接的旧入口保留兼容只读页。
 * 不承诺旧入口只读归档页，除非后续单独评审。
-* 不双写 V1 正式表和 `business_records`。
+* 不双写 V1 正式表和删除前 JSONL evidence，也不恢复旧 `business_records` 表族。
 * 不靠前端隐藏菜单当安全边界。
 
 ## 8. Phase 6：客户数据 dry-run 与 loader 设计

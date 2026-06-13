@@ -134,6 +134,25 @@ test('devTesting: 从 docs Markdown 中筛出测试相关文档', () => {
   assert.equal(docs[1].commandCount, 1)
 })
 
+test('devTesting: 文档 key 使用完整路径避免中文目录下文件名碰撞', () => {
+  const docs = buildDevTestingDocs({
+    '../../../../docs/product/test-strategy.md': strategyMarkdown,
+    '../../../../docs/reference/第一次20260519/自动化测试计划.md':
+      deliveryEvidenceMarkdown,
+    '../../../../docs/reference/第一次20260519/状态分层工作流与业务事实设计总结.md':
+      deliveryEvidenceMarkdown,
+  })
+  const keys = docs.map((item) => item.key)
+
+  assert.equal(new Set(keys).size, keys.length)
+  assert(keys.includes('docs/reference/第一次20260519/自动化测试计划.md'))
+  assert(
+    keys.includes(
+      'docs/reference/第一次20260519/状态分层工作流与业务事实设计总结.md'
+    )
+  )
+})
+
 test('devTesting: 支持分类和关键词筛选并汇总', () => {
   const docs = buildDevTestingDocs({
     '../../../../docs/product/test-strategy.md': strategyMarkdown,

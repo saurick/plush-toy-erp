@@ -67,7 +67,7 @@ shipped_quantity = sum(valid shipment_items.quantity by sales_order_item_id)
 - cancel posted receipt 通过 `REVERSAL` 回退库存。
 - 行级关联 material / warehouse / unit / lot。
 - 独立 `purchase` JSON-RPC 域负责创建草稿、加行、过账、取消、读取和列表；公开入库 API 不接受 `business_record_id` 作为正式事实来源。
-- 旧 `business_records` 只能作为 legacy/archive 历史快照或兼容查询线索，不替代采购入库事实。
+- 旧 `business_records` 表族已删除；删除前 JSONL evidence 只能作为人工审计线索，不替代采购入库事实，也不能作为采购 API 来源。
 
 future `purchase_orders` 与现有 receipt 的关系应是：
 

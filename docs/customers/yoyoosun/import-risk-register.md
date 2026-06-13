@@ -26,11 +26,11 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 |---|---|---|---|---|---:|
 | 永绅 yoyoosun 客户字段污染 Product Core | 客户专属字段变成通用必填字段，后续产品化失败 | `docs/customers/yoyoosun/*` 明确 yoyoosun 不是 Product Core 真源 | 字段先分类；yoyoosun-only 字段默认 Customer Material / Customer Config / Print Template Input | Productization | 是 |
 | Excel 字段语义不清 | 错误映射客户、供应商、产品、材料、订单或金额 | 009 data map 和 yoyoosun docs 均要求人工确认 | dry-run 输出 unmapped fields 和 unresolved queue | Data Import | 是 |
-| 同名客户 / 供应商 / 产品重复 | 合并错主体或创建重复主数据 | `business_records` partners/products 与 V1 模型重叠 | duplicate code/name queue；人工确认后才导入 | MasterData | 是 |
+| 同名客户 / 供应商 / 产品重复 | 合并错主体或创建重复主数据 | 删除前 JSONL evidence、客户原始资料和 V1 模型可能存在同名主体 | duplicate code/name queue；人工确认后才导入 | MasterData | 是 |
 | 产品与 `product_skus` 混淆 | 把颜色、尺寸、包装版本误写入 product core 或自动建 SKU | `product_skus` 在 V1 cutline 中为 Draft Only | SKU 类字段 deferred，不自动创建 | Product / Sales | 是 |
 | 订单样本误当 `sales_orders` 正式数据 | 旧 project-orders 状态或样本订单污染正式 Source Document | 009 说明 project-orders 只能作 source snapshot | 只生成 dry-run preview；customer/product/unit 唯一匹配后才候选 | Sales / Data | 是 |
-| 业务快照误当事实 | 从旧快照生成库存、出货或财务记录 | `business_records` 是 source snapshot，不是事实真源 | forbidden auto-import list 强制 block | Architecture / Data | 是 |
-| `business_records` 与 V1 双真源 | 同一客户、供应商或订单两边可写导致准绳不清 | 重叠旧路径已重定向到 V1，但旧数据仍未迁移或归档 | 禁止双写；future migration/archive task 单独处理 | Product / UI / API | 是 |
+| 业务快照误当事实 | 从删除前 evidence 或旧样本生成库存、出货或财务记录 | 旧 `business_records` 表族已删除，evidence 不是事实真源 | forbidden auto-import list 强制 block | Architecture / Data | 是 |
+| 旧 `business_records` 被恢复成双真源 | 同一客户、供应商或订单两边可写导致准绳不清 | 旧表族已删除；当前只允许 V1 / 领域 usecase 写入 | 禁止恢复旧表；future archive task 单独处理 | Product / UI / API | 是 |
 | seedData 被误当正式数据 | demo seed 污染客户正式资料 | seedData 是 Demo Seed / QA Debug | dry-run 排除 demo/debug 或单独标记 | QA / Data Import | 是 |
 | 自动生成出货 / 库存 / 财务事实 | 造成 shipped、库存余额、应收应付错误 | `shipping_released != shipped`，finance facts deferred | shipment/inventory/finance 全部 Forbidden Auto Import | Workflow / Fact | 是 |
 | migration / import 无回滚 | 导入错误后无法恢复 | 当前 dry-run draft 不实现真实导入或 loader | future Stage 6 必须先有备份、rollback、forward-fix 和对账 | Ops / Data | 是 |
@@ -49,7 +49,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 |---:|---|---|
 | P0 | 从旧快照自动生成 shipment / inventory / finance facts | Forbidden Auto Import + block queue |
 | P0 | 永绅 yoyoosun 字段污染 Product Core | field classification + Product layer strategy |
-| P0 | `business_records` 与 V1 双真源 | no runtime changes in dry-run draft；future cutover 单独实现任务 |
+| P0 | 旧 `business_records` 被恢复成双真源 | 旧表族已删除；dry-run 不允许恢复 runtime |
 | P0 | dry-run 报告被误当真实导入批准 | `validation-summary.canExecuteRealImport=false` + `dry-run-report.md` No real import |
 | P0 | freeze evidence 被误当真实导入批准 | `freeze-metadata.canExecuteRealImport=false` + `source-snapshot-manual-review-checklist.md` import-not-approved conclusion |
 | P1 | SKU / purchase order 过早落地 | deferred domain policy |

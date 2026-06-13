@@ -7,7 +7,6 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"math"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
@@ -27,7 +26,6 @@ type PurchaseReceiptAdjustmentQuery struct {
 	inters              []Interceptor
 	predicates          []predicate.PurchaseReceiptAdjustment
 	withPurchaseReceipt *PurchaseReceiptQuery
-	withBusinessRecord  *BusinessRecordQuery
 	withItems           *PurchaseReceiptAdjustmentItemQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -80,28 +78,6 @@ func (_q *PurchaseReceiptAdjustmentQuery) QueryPurchaseReceipt() *PurchaseReceip
 			sqlgraph.From(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID, selector),
 			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustment.PurchaseReceiptTable, purchasereceiptadjustment.PurchaseReceiptColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryBusinessRecord chains the current query on the "business_record" edge.
-func (_q *PurchaseReceiptAdjustmentQuery) QueryBusinessRecord() *BusinessRecordQuery {
-	query := (&BusinessRecordClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(purchasereceiptadjustment.Table, purchasereceiptadjustment.FieldID, selector),
-			sqlgraph.To(businessrecord.Table, businessrecord.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptadjustment.BusinessRecordTable, purchasereceiptadjustment.BusinessRecordColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -324,7 +300,6 @@ func (_q *PurchaseReceiptAdjustmentQuery) Clone() *PurchaseReceiptAdjustmentQuer
 		inters:              append([]Interceptor{}, _q.inters...),
 		predicates:          append([]predicate.PurchaseReceiptAdjustment{}, _q.predicates...),
 		withPurchaseReceipt: _q.withPurchaseReceipt.Clone(),
-		withBusinessRecord:  _q.withBusinessRecord.Clone(),
 		withItems:           _q.withItems.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
@@ -340,17 +315,6 @@ func (_q *PurchaseReceiptAdjustmentQuery) WithPurchaseReceipt(opts ...func(*Purc
 		opt(query)
 	}
 	_q.withPurchaseReceipt = query
-	return _q
-}
-
-// WithBusinessRecord tells the query-builder to eager-load the nodes that are connected to
-// the "business_record" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *PurchaseReceiptAdjustmentQuery) WithBusinessRecord(opts ...func(*BusinessRecordQuery)) *PurchaseReceiptAdjustmentQuery {
-	query := (&BusinessRecordClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withBusinessRecord = query
 	return _q
 }
 
@@ -443,9 +407,8 @@ func (_q *PurchaseReceiptAdjustmentQuery) sqlAll(ctx context.Context, hooks ...q
 	var (
 		nodes       = []*PurchaseReceiptAdjustment{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [2]bool{
 			_q.withPurchaseReceipt != nil,
-			_q.withBusinessRecord != nil,
 			_q.withItems != nil,
 		}
 	)
@@ -470,12 +433,6 @@ func (_q *PurchaseReceiptAdjustmentQuery) sqlAll(ctx context.Context, hooks ...q
 	if query := _q.withPurchaseReceipt; query != nil {
 		if err := _q.loadPurchaseReceipt(ctx, query, nodes, nil,
 			func(n *PurchaseReceiptAdjustment, e *PurchaseReceipt) { n.Edges.PurchaseReceipt = e }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withBusinessRecord; query != nil {
-		if err := _q.loadBusinessRecord(ctx, query, nodes, nil,
-			func(n *PurchaseReceiptAdjustment, e *BusinessRecord) { n.Edges.BusinessRecord = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -513,38 +470,6 @@ func (_q *PurchaseReceiptAdjustmentQuery) loadPurchaseReceipt(ctx context.Contex
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "purchase_receipt_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
-}
-func (_q *PurchaseReceiptAdjustmentQuery) loadBusinessRecord(ctx context.Context, query *BusinessRecordQuery, nodes []*PurchaseReceiptAdjustment, init func(*PurchaseReceiptAdjustment), assign func(*PurchaseReceiptAdjustment, *BusinessRecord)) error {
-	ids := make([]int, 0, len(nodes))
-	nodeids := make(map[int][]*PurchaseReceiptAdjustment)
-	for i := range nodes {
-		if nodes[i].BusinessRecordID == nil {
-			continue
-		}
-		fk := *nodes[i].BusinessRecordID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(businessrecord.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "business_record_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -610,9 +535,6 @@ func (_q *PurchaseReceiptAdjustmentQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withPurchaseReceipt != nil {
 			_spec.Node.AddColumnOnce(purchasereceiptadjustment.FieldPurchaseReceiptID)
-		}
-		if _q.withBusinessRecord != nil {
-			_spec.Node.AddColumnOnce(purchasereceiptadjustment.FieldBusinessRecordID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

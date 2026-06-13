@@ -34,7 +34,7 @@ Phase 7 不拆 A/B/C/D 或任何字母子阶段，试用目标只能一次性使
 | no finance facts generated                                   |                               是 | AR/AP、invoice、payment、reconciliation 不在 import target                                                                                                                                                      | Draft only                 |
 | no `product_skus` generated unless future review approves    |                               是 | SKU 字段全部 deferred / unresolved                                                                                                                                                                              | Draft only                 |
 | no `purchase_orders` generated unless future review approves |                               是 | purchase order 字段全部 deferred / unresolved                                                                                                                                                                   | Draft only                 |
-| business_records not deleted                                 |                               是 | `business_records` 只作 source snapshot                                                                                                                                                                         | Draft only                 |
+| old business_records runtime not required                    |                               是 | 旧表族已删除；删除前 JSONL evidence 不作为自动导入来源                                                                                                                                                         | Draft only                 |
 | seedData not modified                                        |                               是 | `web/src/erp/config/seedData.mjs` 未改                                                                                                                                                                          | Draft only                 |
 | frontend docs registry not restored                          |                               是 | 产品内 docs registry 已移除，导入任务不恢复 `web/src/erp/config/docs.mjs`                                                                                                                                       | Draft only                 |
 | V1 data preview reviewed                                     |                               是 | customers/suppliers/contacts/orders/items preview                                                                                                                                                               | Draft only                 |
@@ -111,7 +111,7 @@ CUSTOMER_IMPORT_ADMIN_TOKEN=...
 4. forbidden fact generation 清单全部 block。
 5. 备份、回滚、幂等、校验和审计已在单独 implementation task 中设计。
 6. import loader 只走正式 V1 JSON-RPC API / existing usecase，不绕过业务规则。
-7. `business_records` 保留为 source snapshot，不双写。
+7. 不恢复旧 `business_records` 表族，也不把删除前 JSONL evidence 当自动导入来源。
 8. execution report 已生成并归档；当前不进入真实执行或导入后对账。
 
 ## 拒绝条件 / Rejection Criteria
@@ -121,7 +121,7 @@ CUSTOMER_IMPORT_ADMIN_TOKEN=...
 - 需要新增 schema、migration 或 `tenant_id`。
 - 需要创建 `product_skus`、`purchase_orders`、`shipments`、`stock_reservations` 或 finance facts。
 - 需要从旧记录自动生成 shipment / inventory / finance facts。
-- 需要修改 seedData、docs registry、runtime API/UI 或 `business_records` 才能让 dry-run 通过。
+- 需要修改 seedData、docs registry、runtime API/UI，或恢复旧 `business_records` 才能让 dry-run 通过。
 - 永绅 yoyoosun 客户字段被当作 Product Core 必填字段。
 - 模拟数据被当作客户真实数据或导入批准。
 - 真实导入被拆成 Phase 7 的字母子阶段或后续半阶段。

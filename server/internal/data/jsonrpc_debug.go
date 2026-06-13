@@ -205,7 +205,7 @@ func (d *JsonrpcData) mapDebugError(ctx context.Context, err error) *v1.JsonrpcR
 	case errors.Is(err, biz.ErrDebugPayloadMarkerMissing):
 		l.Warnf("[debug] payload marker missing err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "调试数据缺少安全标记"}
-	case errors.Is(err, biz.ErrBusinessRecordExists), errors.Is(err, biz.ErrWorkflowTaskExists):
+	case errors.Is(err, biz.ErrWorkflowTaskExists):
 		l.Warnf("[debug] duplicated debug run err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "debugRunId 已存在，请重新生成"}
 	case errors.Is(err, biz.ErrBadParam):

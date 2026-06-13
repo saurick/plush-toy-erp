@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"server/internal/biz"
+	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
@@ -31,26 +31,12 @@ func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentDraft(ctx context.Context
 		}
 		return nil, err
 	}
-	if receipt.Status != biz.PurchaseReceiptStatusPosted {
+	if !corestatus.IsPurchaseReceiptPosted(receipt.Status) {
 		return nil, biz.ErrBadParam
-	}
-	if in.BusinessRecordID != nil {
-		if _, err := r.data.postgres.BusinessRecord.Query().
-			Where(
-				businessrecord.ID(*in.BusinessRecordID),
-				businessrecord.DeletedAtIsNil(),
-			).
-			Only(ctx); err != nil {
-			if ent.IsNotFound(err) {
-				return nil, biz.ErrBadParam
-			}
-			return nil, err
-		}
 	}
 	row, err := r.data.postgres.PurchaseReceiptAdjustment.Create().
 		SetAdjustmentNo(in.AdjustmentNo).
 		SetPurchaseReceiptID(in.PurchaseReceiptID).
-		SetNillableBusinessRecordID(in.BusinessRecordID).
 		SetNillableReason(in.Reason).
 		SetStatus(biz.PurchaseReceiptAdjustmentStatusDraft).
 		SetAdjustedAt(in.AdjustedAt).
@@ -70,7 +56,7 @@ func (r *inventoryRepo) AddPurchaseReceiptAdjustmentItem(ctx context.Context, in
 		}
 		return nil, err
 	}
-	if adjustment.Status != biz.PurchaseReceiptAdjustmentStatusDraft {
+	if !corestatus.CanAddPurchaseReceiptAdjustmentItem(adjustment.Status) {
 		return nil, biz.ErrBadParam
 	}
 	if err := validatePurchaseReceiptAdjustmentItemReferences(ctx, r.data.postgres, adjustment.PurchaseReceiptID, in); err != nil {
@@ -112,7 +98,11 @@ func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjus
 		}
 		return nil, err
 	}
-	if adjustment.Status == biz.PurchaseReceiptAdjustmentStatusPosted {
+	transition, ok := corestatus.PostPurchaseReceiptAdjustment(adjustment.Status)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		out, err := purchaseReceiptAdjustmentWithItems(ctx, tx.client, adjustment)
 		if err != nil {
 			return nil, err
@@ -122,9 +112,6 @@ func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjus
 		}
 		tx = nil
 		return out, nil
-	}
-	if adjustment.Status != biz.PurchaseReceiptAdjustmentStatusDraft {
-		return nil, biz.ErrBadParam
 	}
 
 	items, err := tx.client.PurchaseReceiptAdjustmentItem.Query().
@@ -210,7 +197,11 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Contex
 		}
 		return nil, err
 	}
-	if adjustment.Status == biz.PurchaseReceiptAdjustmentStatusCancelled {
+	transition, ok := corestatus.CancelPurchaseReceiptAdjustment(adjustment.Status)
+	if !ok {
+		return nil, biz.ErrBadParam
+	}
+	if !transition.Changed {
 		out, err := purchaseReceiptAdjustmentWithItems(ctx, tx.client, adjustment)
 		if err != nil {
 			return nil, err
@@ -220,9 +211,6 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Contex
 		}
 		tx = nil
 		return out, nil
-	}
-	if adjustment.Status != biz.PurchaseReceiptAdjustmentStatusPosted {
-		return nil, biz.ErrBadParam
 	}
 
 	items, err := tx.client.PurchaseReceiptAdjustmentItem.Query().
@@ -349,7 +337,7 @@ func validatePurchaseReceiptAdjustmentItemReferences(ctx context.Context, client
 		}
 		return err
 	}
-	if receipt.Status != biz.PurchaseReceiptStatusPosted ||
+	if !corestatus.IsPurchaseReceiptPosted(receipt.Status) ||
 		receiptItem.MaterialID != in.MaterialID ||
 		receiptItem.UnitID != in.UnitID {
 		return biz.ErrBadParam
@@ -646,7 +634,6 @@ func entPurchaseReceiptAdjustmentToBiz(row *ent.PurchaseReceiptAdjustment, items
 		ID:                row.ID,
 		AdjustmentNo:      row.AdjustmentNo,
 		PurchaseReceiptID: row.PurchaseReceiptID,
-		BusinessRecordID:  row.BusinessRecordID,
 		Reason:            row.Reason,
 		Status:            row.Status,
 		AdjustedAt:        row.AdjustedAt,

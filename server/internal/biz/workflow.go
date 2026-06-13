@@ -93,9 +93,9 @@ var workflowPlanningPhases = []WorkflowStateOption{
 	{Key: "source_locked", Label: "真源已收口", Summary: "先明确当前唯一真源字段、单据和业务节点。"},
 	{Key: "page_defined", Label: "页面已收口", Summary: "菜单、角色入口和工作台卡片范围已确定。"},
 	{Key: "status_defined", Label: "状态已统一", Summary: "任务状态、业务状态和阻塞原因已形成统一字典。"},
-	{Key: "schema_v1_ready", Label: "Schema v1 已落地", Summary: "workflow 和通用业务记录表已通过 Ent + Atlas 生成迁移。"},
+	{Key: "schema_v1_ready", Label: "Schema v1 已落地", Summary: "workflow、V1 主数据和事实层表已通过 Ent + Atlas 管理；旧通用业务记录表族已删除。"},
 	{Key: "api_v1_ready", Label: "API v1 已接通", Summary: "workflow 与 business JSON-RPC 已支持当前表格、弹窗和任务池主路径。"},
-	{Key: "save_link_v1_ready", Label: "保存链路 v1 已接通", Summary: "桌面业务页可保存通用业务记录、写状态快照并创建协同任务。"},
+	{Key: "save_link_v1_ready", Label: "保存链路 v1 已接通", Summary: "正式 V1 页面写对应领域表；Workflow 只写协同任务和状态投影，不再写旧通用业务记录。"},
 }
 
 var (

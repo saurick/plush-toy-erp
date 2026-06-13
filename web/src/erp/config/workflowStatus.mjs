@@ -252,7 +252,8 @@ export const WORKFLOW_PLANNING_PHASES = Object.freeze([
   {
     key: 'schema_v1_ready',
     label: 'Schema v1 已落地',
-    summary: 'workflow 和通用业务记录表已通过 Ent + Atlas 生成迁移。',
+    summary:
+      'workflow、V1 主数据和事实层表已通过 Ent + Atlas 管理；旧通用业务记录表族已删除。',
   },
   {
     key: 'api_v1_ready',
@@ -263,6 +264,7 @@ export const WORKFLOW_PLANNING_PHASES = Object.freeze([
   {
     key: 'save_link_v1_ready',
     label: '保存链路 v1 已接通',
-    summary: '桌面业务页可保存通用业务记录、写状态快照并创建协同任务。',
+    summary:
+      '正式 V1 页面写对应领域表；Workflow 只写协同任务和状态投影，不再写旧通用业务记录。',
   },
 ])

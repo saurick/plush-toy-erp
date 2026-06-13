@@ -9,7 +9,6 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
@@ -47,9 +46,6 @@ var debugBusinessDataClearTables = []string{
 	"inventory_lots",
 	"bom_items",
 	"bom_headers",
-	"business_record_events",
-	"business_record_items",
-	"business_records",
 	"materials",
 	"products",
 	"warehouses",
@@ -68,33 +64,27 @@ func (r *debugSeedRepo) SeedBusinessChainDebugData(ctx context.Context, plan biz
 		rollbackEntTx(ctx, tx, r.log)
 	}()
 
-	recordsByRef := make(map[string]*ent.BusinessRecord, len(plan.Records))
+	recordsByRef := make(map[string]biz.DebugCreatedRecord, len(plan.Records))
 	createdRecords := make([]biz.DebugCreatedRecord, 0, len(plan.Records))
-	for _, recordPlan := range plan.Records {
+	for index, recordPlan := range plan.Records {
 		if !biz.IsDebugPayloadForRun(recordPlan.Payload, plan.DebugRunID, plan.ScenarioKey) {
 			return nil, biz.ErrDebugPayloadMarkerMissing
 		}
-		row, err := createDebugBusinessRecord(ctx, tx, recordPlan, actorID)
-		if err != nil {
-			if ent.IsConstraintError(err) {
-				return nil, biz.ErrBusinessRecordExists
-			}
-			return nil, err
+		record := biz.DebugCreatedRecord{
+			ID:                index + 1,
+			ModuleKey:         recordPlan.ModuleKey,
+			DocumentNo:        recordPlan.DocumentNo,
+			Title:             recordPlan.Title,
+			BusinessStatusKey: recordPlan.BusinessStatusKey,
+			OwnerRoleKey:      recordPlan.OwnerRoleKey,
 		}
-		recordsByRef[recordPlan.Ref] = row
-		createdRecords = append(createdRecords, biz.DebugCreatedRecord{
-			ID:                row.ID,
-			ModuleKey:         row.ModuleKey,
-			DocumentNo:        valueString(row.DocumentNo),
-			Title:             row.Title,
-			BusinessStatusKey: row.BusinessStatusKey,
-			OwnerRoleKey:      row.OwnerRoleKey,
-		})
+		recordsByRef[recordPlan.Ref] = record
+		createdRecords = append(createdRecords, record)
 	}
 
 	for _, statePlan := range plan.BusinessStates {
-		record := recordsByRef[statePlan.RecordRef]
-		if record == nil {
+		record, ok := recordsByRef[statePlan.RecordRef]
+		if !ok {
 			return nil, biz.ErrBadParam
 		}
 		if !biz.IsDebugPayloadForRun(statePlan.Payload, plan.DebugRunID, plan.ScenarioKey) {
@@ -103,7 +93,7 @@ func (r *debugSeedRepo) SeedBusinessChainDebugData(ctx context.Context, plan biz
 		builder := tx.WorkflowBusinessState.Create().
 			SetSourceType(record.ModuleKey).
 			SetSourceID(record.ID).
-			SetNillableSourceNo(record.DocumentNo).
+			SetSourceNo(record.DocumentNo).
 			SetBusinessStatusKey(statePlan.BusinessStatusKey).
 			SetOwnerRoleKey(statePlan.OwnerRoleKey).
 			SetStatusChangedAt(time.Now()).
@@ -118,8 +108,8 @@ func (r *debugSeedRepo) SeedBusinessChainDebugData(ctx context.Context, plan biz
 
 	createdTasks := make([]biz.DebugCreatedTask, 0, len(plan.Tasks))
 	for _, taskPlan := range plan.Tasks {
-		record := recordsByRef[taskPlan.RecordRef]
-		if record == nil {
+		record, ok := recordsByRef[taskPlan.RecordRef]
+		if !ok {
 			return nil, biz.ErrBadParam
 		}
 		if !biz.IsDebugPayloadForRun(taskPlan.Payload, plan.DebugRunID, plan.ScenarioKey) {
@@ -172,62 +162,14 @@ func (r *debugSeedRepo) SeedBusinessChainDebugData(ctx context.Context, plan biz
 	}, nil
 }
 
-func createDebugBusinessRecord(ctx context.Context, tx *ent.Tx, plan biz.DebugRecordPlan, actorID int) (*ent.BusinessRecord, error) {
-	builder := tx.BusinessRecord.Create().
-		SetModuleKey(plan.ModuleKey).
-		SetDocumentNo(plan.DocumentNo).
-		SetTitle(plan.Title).
-		SetBusinessStatusKey(plan.BusinessStatusKey).
-		SetOwnerRoleKey(plan.OwnerRoleKey).
-		SetNillableSourceNo(plan.SourceNo).
-		SetNillableCustomerName(plan.CustomerName).
-		SetNillableSupplierName(plan.SupplierName).
-		SetNillableStyleNo(plan.StyleNo).
-		SetNillableProductNo(plan.ProductNo).
-		SetNillableProductName(plan.ProductName).
-		SetNillableMaterialName(plan.MaterialName).
-		SetNillableWarehouseLocation(plan.WarehouseLocation).
-		SetNillableQuantity(plan.Quantity).
-		SetNillableUnit(plan.Unit).
-		SetNillableAmount(plan.Amount).
-		SetNillableDocumentDate(plan.DocumentDate).
-		SetNillableDueDate(plan.DueDate).
-		SetPayload(plan.Payload)
-	if actorID > 0 {
-		builder.SetCreatedBy(actorID).SetUpdatedBy(actorID)
-	}
-
-	row, err := builder.Save(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := replaceBusinessRecordItems(ctx, tx, row.ID, row.ModuleKey, plan.Items); err != nil {
-		return nil, err
-	}
-	eventBuilder := tx.BusinessRecordEvent.Create().
-		SetRecordID(row.ID).
-		SetModuleKey(row.ModuleKey).
-		SetActionKey("debug_seeded").
-		SetToStatusKey(row.BusinessStatusKey).
-		SetNote("debug seed").
-		SetPayload(plan.Payload)
-	if actorID > 0 {
-		eventBuilder.SetActorID(actorID).SetActorRoleKey("admin")
-	}
-	if _, err := eventBuilder.Save(ctx); err != nil {
-		return nil, err
-	}
-	return row, nil
-}
-
-func createDebugWorkflowTask(ctx context.Context, tx *ent.Tx, plan biz.DebugTaskPlan, record *ent.BusinessRecord, actorID int) (*ent.WorkflowTask, error) {
+func createDebugWorkflowTask(ctx context.Context, tx *ent.Tx, plan biz.DebugTaskPlan, record biz.DebugCreatedRecord, actorID int) (*ent.WorkflowTask, error) {
 	builder := tx.WorkflowTask.Create().
 		SetTaskCode(plan.TaskCode).
 		SetTaskGroup(plan.TaskGroup).
 		SetTaskName(plan.TaskName).
 		SetSourceType(record.ModuleKey).
 		SetSourceID(record.ID).
-		SetNillableSourceNo(record.DocumentNo).
+		SetSourceNo(record.DocumentNo).
 		SetBusinessStatusKey(plan.BusinessStatusKey).
 		SetTaskStatusKey(plan.TaskStatusKey).
 		SetOwnerRoleKey(plan.OwnerRoleKey).
@@ -291,43 +233,6 @@ func (r *debugSeedRepo) CleanupBusinessChainDebugData(ctx context.Context, in bi
 	defer func() {
 		rollbackEntTx(ctx, tx, r.log)
 	}()
-
-	recordIDs := make([]int, 0, len(matches.records))
-	for _, row := range matches.records {
-		recordIDs = append(recordIDs, row.ID)
-	}
-	if len(recordIDs) > 0 {
-		now := time.Now()
-		affected, err := tx.BusinessRecord.Update().
-			Where(
-				businessrecord.IDIn(recordIDs...),
-				businessrecord.DeletedAtIsNil(),
-			).
-			SetDeletedAt(now).
-			SetDeleteReason(fmt.Sprintf("debug cleanup run=%s scenario=%s", in.DebugRunID, in.ScenarioKey)).
-			AddRowVersion(1).
-			Save(ctx)
-		if err != nil {
-			return nil, err
-		}
-		_ = affected
-		for _, row := range matches.records {
-			payload := copyMap(row.Payload)
-			payload["debug_cleanup_at"] = now.UTC().Format(time.RFC3339)
-			eventBuilder := tx.BusinessRecordEvent.Create().
-				SetRecordID(row.ID).
-				SetModuleKey(row.ModuleKey).
-				SetActionKey("debug_cleanup").
-				SetFromStatusKey(row.BusinessStatusKey).
-				SetToStatusKey(row.BusinessStatusKey).
-				SetNote("debug cleanup").
-				SetPayload(payload)
-			if _, err := eventBuilder.Save(ctx); err != nil {
-				return nil, err
-			}
-		}
-		result.ArchivedRecords = append([]biz.DebugMatchedRecord(nil), result.MatchedRecords...)
-	}
 
 	taskIDs := make([]int, 0, len(matches.tasks))
 	for _, row := range matches.tasks {
@@ -480,7 +385,6 @@ func rollbackSQLTx(ctx context.Context, tx *stdsql.Tx, logger *log.Helper) {
 }
 
 type debugCleanupMatches struct {
-	records        []*ent.BusinessRecord
 	tasks          []*ent.WorkflowTask
 	businessStates []*ent.WorkflowBusinessState
 	skippedItems   []biz.DebugCleanupSkippedItem
@@ -488,30 +392,6 @@ type debugCleanupMatches struct {
 
 func (r *debugSeedRepo) loadDebugCleanupMatches(ctx context.Context, prefix string, debugRunID string, scenarioKey string) (*debugCleanupMatches, error) {
 	out := &debugCleanupMatches{}
-
-	recordRows, err := r.data.postgres.BusinessRecord.Query().
-		Where(
-			businessrecord.DeletedAtIsNil(),
-			businessrecord.Or(
-				businessrecord.DocumentNoHasPrefix(prefix),
-				businessrecord.SourceNoHasPrefix(prefix),
-			),
-		).
-		All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, row := range recordRows {
-		if biz.IsDebugPayloadForRun(row.Payload, debugRunID, scenarioKey) {
-			out.records = append(out.records, row)
-			continue
-		}
-		out.skippedItems = append(out.skippedItems, biz.DebugCleanupSkippedItem{
-			Type:   "business_record",
-			ID:     row.ID,
-			Reason: "匹配 DBG 前缀但缺少本次 debug_run_id / scenario_key 标记，已跳过",
-		})
-	}
 
 	taskRows, err := r.data.postgres.WorkflowTask.Query().
 		Where(
@@ -561,18 +441,10 @@ func (m *debugCleanupMatches) toResult(in biz.DebugBusinessChainCleanupInput) *b
 		DebugRunID:            in.DebugRunID,
 		ScenarioKey:           in.ScenarioKey,
 		DryRun:                in.DryRun,
-		MatchedRecords:        make([]biz.DebugMatchedRecord, 0, len(m.records)),
+		MatchedRecords:        []biz.DebugMatchedRecord{},
 		MatchedTasks:          make([]biz.DebugMatchedTask, 0, len(m.tasks)),
 		MatchedBusinessStates: make([]biz.DebugMatchedBusinessState, 0, len(m.businessStates)),
 		SkippedItems:          append([]biz.DebugCleanupSkippedItem(nil), m.skippedItems...),
-	}
-	for _, row := range m.records {
-		result.MatchedRecords = append(result.MatchedRecords, biz.DebugMatchedRecord{
-			ID:         row.ID,
-			ModuleKey:  row.ModuleKey,
-			DocumentNo: valueString(row.DocumentNo),
-			Title:      row.Title,
-		})
 	}
 	for _, row := range m.tasks {
 		result.MatchedTasks = append(result.MatchedTasks, biz.DebugMatchedTask{

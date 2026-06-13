@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereturn"
@@ -62,26 +61,6 @@ func (_u *PurchaseReturnUpdate) SetNillablePurchaseReceiptID(v *int) *PurchaseRe
 // ClearPurchaseReceiptID clears the value of the "purchase_receipt_id" field.
 func (_u *PurchaseReturnUpdate) ClearPurchaseReceiptID() *PurchaseReturnUpdate {
 	_u.mutation.ClearPurchaseReceiptID()
-	return _u
-}
-
-// SetBusinessRecordID sets the "business_record_id" field.
-func (_u *PurchaseReturnUpdate) SetBusinessRecordID(v int) *PurchaseReturnUpdate {
-	_u.mutation.SetBusinessRecordID(v)
-	return _u
-}
-
-// SetNillableBusinessRecordID sets the "business_record_id" field if the given value is not nil.
-func (_u *PurchaseReturnUpdate) SetNillableBusinessRecordID(v *int) *PurchaseReturnUpdate {
-	if v != nil {
-		_u.SetBusinessRecordID(*v)
-	}
-	return _u
-}
-
-// ClearBusinessRecordID clears the value of the "business_record_id" field.
-func (_u *PurchaseReturnUpdate) ClearBusinessRecordID() *PurchaseReturnUpdate {
-	_u.mutation.ClearBusinessRecordID()
 	return _u
 }
 
@@ -178,11 +157,6 @@ func (_u *PurchaseReturnUpdate) SetPurchaseReceipt(v *PurchaseReceipt) *Purchase
 	return _u.SetPurchaseReceiptID(v.ID)
 }
 
-// SetBusinessRecord sets the "business_record" edge to the BusinessRecord entity.
-func (_u *PurchaseReturnUpdate) SetBusinessRecord(v *BusinessRecord) *PurchaseReturnUpdate {
-	return _u.SetBusinessRecordID(v.ID)
-}
-
 // AddItemIDs adds the "items" edge to the PurchaseReturnItem entity by IDs.
 func (_u *PurchaseReturnUpdate) AddItemIDs(ids ...int) *PurchaseReturnUpdate {
 	_u.mutation.AddItemIDs(ids...)
@@ -206,12 +180,6 @@ func (_u *PurchaseReturnUpdate) Mutation() *PurchaseReturnMutation {
 // ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_u *PurchaseReturnUpdate) ClearPurchaseReceipt() *PurchaseReturnUpdate {
 	_u.mutation.ClearPurchaseReceipt()
-	return _u
-}
-
-// ClearBusinessRecord clears the "business_record" edge to the BusinessRecord entity.
-func (_u *PurchaseReturnUpdate) ClearBusinessRecord() *PurchaseReturnUpdate {
-	_u.mutation.ClearBusinessRecord()
 	return _u
 }
 
@@ -288,11 +256,6 @@ func (_u *PurchaseReturnUpdate) check() error {
 	if v, ok := _u.mutation.PurchaseReceiptID(); ok {
 		if err := purchasereturn.PurchaseReceiptIDValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.purchase_receipt_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.BusinessRecordID(); ok {
-		if err := purchasereturn.BusinessRecordIDValidator(v); err != nil {
-			return &ValidationError{Name: "business_record_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.business_record_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.SupplierName(); ok {
@@ -374,35 +337,6 @@ func (_u *PurchaseReturnUpdate) sqlSave(ctx context.Context) (_node int, err err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.BusinessRecordCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereturn.BusinessRecordTable,
-			Columns: []string{purchasereturn.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.BusinessRecordIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereturn.BusinessRecordTable,
-			Columns: []string{purchasereturn.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -509,26 +443,6 @@ func (_u *PurchaseReturnUpdateOne) ClearPurchaseReceiptID() *PurchaseReturnUpdat
 	return _u
 }
 
-// SetBusinessRecordID sets the "business_record_id" field.
-func (_u *PurchaseReturnUpdateOne) SetBusinessRecordID(v int) *PurchaseReturnUpdateOne {
-	_u.mutation.SetBusinessRecordID(v)
-	return _u
-}
-
-// SetNillableBusinessRecordID sets the "business_record_id" field if the given value is not nil.
-func (_u *PurchaseReturnUpdateOne) SetNillableBusinessRecordID(v *int) *PurchaseReturnUpdateOne {
-	if v != nil {
-		_u.SetBusinessRecordID(*v)
-	}
-	return _u
-}
-
-// ClearBusinessRecordID clears the value of the "business_record_id" field.
-func (_u *PurchaseReturnUpdateOne) ClearBusinessRecordID() *PurchaseReturnUpdateOne {
-	_u.mutation.ClearBusinessRecordID()
-	return _u
-}
-
 // SetSupplierName sets the "supplier_name" field.
 func (_u *PurchaseReturnUpdateOne) SetSupplierName(v string) *PurchaseReturnUpdateOne {
 	_u.mutation.SetSupplierName(v)
@@ -622,11 +536,6 @@ func (_u *PurchaseReturnUpdateOne) SetPurchaseReceipt(v *PurchaseReceipt) *Purch
 	return _u.SetPurchaseReceiptID(v.ID)
 }
 
-// SetBusinessRecord sets the "business_record" edge to the BusinessRecord entity.
-func (_u *PurchaseReturnUpdateOne) SetBusinessRecord(v *BusinessRecord) *PurchaseReturnUpdateOne {
-	return _u.SetBusinessRecordID(v.ID)
-}
-
 // AddItemIDs adds the "items" edge to the PurchaseReturnItem entity by IDs.
 func (_u *PurchaseReturnUpdateOne) AddItemIDs(ids ...int) *PurchaseReturnUpdateOne {
 	_u.mutation.AddItemIDs(ids...)
@@ -650,12 +559,6 @@ func (_u *PurchaseReturnUpdateOne) Mutation() *PurchaseReturnMutation {
 // ClearPurchaseReceipt clears the "purchase_receipt" edge to the PurchaseReceipt entity.
 func (_u *PurchaseReturnUpdateOne) ClearPurchaseReceipt() *PurchaseReturnUpdateOne {
 	_u.mutation.ClearPurchaseReceipt()
-	return _u
-}
-
-// ClearBusinessRecord clears the "business_record" edge to the BusinessRecord entity.
-func (_u *PurchaseReturnUpdateOne) ClearBusinessRecord() *PurchaseReturnUpdateOne {
-	_u.mutation.ClearBusinessRecord()
 	return _u
 }
 
@@ -745,11 +648,6 @@ func (_u *PurchaseReturnUpdateOne) check() error {
 	if v, ok := _u.mutation.PurchaseReceiptID(); ok {
 		if err := purchasereturn.PurchaseReceiptIDValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.purchase_receipt_id": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.BusinessRecordID(); ok {
-		if err := purchasereturn.BusinessRecordIDValidator(v); err != nil {
-			return &ValidationError{Name: "business_record_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReturn.business_record_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.SupplierName(); ok {
@@ -848,35 +746,6 @@ func (_u *PurchaseReturnUpdateOne) sqlSave(ctx context.Context) (_node *Purchase
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.BusinessRecordCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereturn.BusinessRecordTable,
-			Columns: []string{purchasereturn.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.BusinessRecordIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   purchasereturn.BusinessRecordTable,
-			Columns: []string{purchasereturn.BusinessRecordColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(businessrecord.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/core/calc"
 	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/financefact"
@@ -785,7 +786,7 @@ func ensureStockAvailableForReservation(ctx context.Context, client *ent.Client,
 	for _, row := range active {
 		reserved = reserved.Add(row.Quantity)
 	}
-	if balance.Quantity.Sub(reserved).Cmp(in.Quantity) < 0 {
+	if !calc.HasInventoryAvailableQuantity(balance.Quantity, reserved, in.Quantity) {
 		return biz.ErrInventoryInsufficientStock
 	}
 	return nil

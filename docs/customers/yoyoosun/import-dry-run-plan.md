@@ -83,7 +83,7 @@ node scripts/import/customerImportDryRun.mjs \
 - 不是真实导入。
 - 不写 DB。
 - 不改 schema / migration / API / UI / seedData / docs registry。
-- 不做 `business_records` runtime cutover。
+- 不依赖旧 `business_records` runtime；旧表族已删除，删除前 JSONL evidence 只作人工审计线索。
 - output 是 evidence，不是 import approval。
 - 真实 import execution 必须另有备份、回滚、幂等、对账、客户确认和正式 usecase 边界。
 
@@ -101,7 +101,7 @@ node scripts/import/customerImportExecute.mjs \
 
 ## 阶段 0：来源收集 / Stage 0: Source Collection
 
-目标：收集来源文件、seed、`business_records` 快照和 V1 现有数据引用，只读扫描，不写数据库。
+目标：收集来源文件、seed、删除前 JSONL evidence 和 V1 现有数据引用，只读扫描，不写数据库。
 
 输入：
 
@@ -109,9 +109,8 @@ node scripts/import/customerImportExecute.mjs \
 - `docs/customers/yoyoosun/*`。
 - `web/src/erp/config/seedData.mjs`。
 - `web/src/erp/config/businessModules.mjs`。
-- `web/src/erp/config/businessRecordDefinitions.mjs`。
 - `docs/product/business-records-data-map-draft.md`。
-- `business_records` 旧数据快照。
+- 删除前 `business_records` JSONL evidence（仅人工审计线索，不自动导入）。
 - V1 customers / suppliers / contacts / sales_orders / sales_order_items 当前数据快照。
 - existing products / materials / units / warehouses / BOM 当前数据快照。
 
@@ -242,7 +241,7 @@ skipped rows 包含：
 - unresolved queue empty or approved。
 - no forbidden facts generated。
 - no `tenant_id` introduced。
-- `business_records` not deleted。
+- old `business_records` runtime not required。
 - seedData not modified。
 - V1 data preview reviewed。
 - backup plan prepared。
@@ -265,7 +264,7 @@ Stage 6 必须满足：
 - 有备份、回滚、校验、幂等和审计。
 - 有客户确认和 approval JSON。
 - 有 `CUSTOMER_IMPORT_CONFIRM=EXECUTE_YOYOOSUN_IMPORT` 和显式 `--execute`。
-- 禁止双写 `business_records`。
+- 禁止恢复或双写旧 `business_records` 表族。
 - 禁止直接写 schema 外字段。
 - 禁止自动生成 shipments、stock reservations、inventory_txns、AR/AP、invoice、payment。
 - 导入前后对账，并保留 source reference。

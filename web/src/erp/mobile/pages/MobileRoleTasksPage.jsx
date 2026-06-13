@@ -30,7 +30,6 @@ import {
   upsertWorkflowBusinessState,
   urgeWorkflowTask,
 } from '../../api/workflowApi.mjs'
-import { listBusinessRecords } from '../../api/businessRecordApi.mjs'
 import {
   buildMobileTaskListForRole,
   buildMobileTaskSummary,
@@ -727,21 +726,30 @@ export default function MobileRoleTasksPage() {
     loadTasks()
   }, [loadTasks])
 
-  const loadBusinessRecordForTask = async (task) => {
+  const buildSourceSnapshotForTask = async (task) => {
     const sourceType = String(task.source_type || '').trim()
     if (!sourceType) return null
-    const data = await listBusinessRecords({
+    const payload =
+      task.payload && typeof task.payload === 'object' ? task.payload : {}
+    return {
+      id: task.source_id,
       module_key: sourceType,
-      limit: 200,
-    })
-    return (
-      (data.records || []).find(
-        (record) => String(record.id) === String(task.source_id)
-      ) || null
-    )
+      document_no: task.source_no || payload.document_no || '',
+      title:
+        payload.record_title ||
+        payload.title ||
+        task.task_name ||
+        task.source_no ||
+        '',
+      business_status_key:
+        task.business_status_key || payload.business_status_key || '',
+      owner_role_key: task.owner_role_key || payload.owner_role_key || '',
+      source_no: task.source_no || payload.source_no || '',
+      payload,
+    }
   }
 
-  const updateBusinessRecordStatusForTask = async () => null
+  const updateSourceStatusForTask = async () => null
 
   const hasActiveTaskForSource = async (task, taskGroup) => {
     const data = await listWorkflowTasks({
@@ -757,12 +765,12 @@ export default function MobileRoleTasksPage() {
   }
 
   const completeOutsourceReturnTrackingTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应加工合同或委外回货记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
+      (await updateSourceStatusForTask(
         task,
         record,
         OUTSOURCE_QC_PENDING_STATUS_KEY,
@@ -800,12 +808,12 @@ export default function MobileRoleTasksPage() {
   }
 
   const completeOutsourceWarehouseInboundTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应加工合同或委外回货记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
+      (await updateSourceStatusForTask(
         task,
         record,
         OUTSOURCE_INBOUND_DONE_STATUS_KEY,
@@ -871,12 +879,12 @@ export default function MobileRoleTasksPage() {
   }
 
   const completeOutsourceReworkTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应加工合同或委外回货记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
+      (await updateSourceStatusForTask(
         task,
         record,
         OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY,
@@ -899,12 +907,12 @@ export default function MobileRoleTasksPage() {
   }
 
   const completeFinishedGoodsReworkTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应生产进度记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
+      (await updateSourceStatusForTask(
         task,
         record,
         FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY,
@@ -927,12 +935,12 @@ export default function MobileRoleTasksPage() {
   }
 
   const completeReceivableRegistrationTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应出货或应收登记记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
+      (await updateSourceStatusForTask(
         task,
         record,
         FINANCE_RECONCILING_STATUS_KEY,
@@ -971,12 +979,12 @@ export default function MobileRoleTasksPage() {
   }
 
   const completeInvoiceRegistrationTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应应收或开票登记记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
+      (await updateSourceStatusForTask(
         task,
         record,
         FINANCE_RECONCILING_STATUS_KEY,
@@ -999,12 +1007,12 @@ export default function MobileRoleTasksPage() {
   }
 
   const completePayableRegistrationTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应采购、委外或应付登记记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
+      (await updateSourceStatusForTask(
         task,
         record,
         PAYABLE_RECONCILING_STATUS_KEY,
@@ -1050,12 +1058,12 @@ export default function MobileRoleTasksPage() {
   }
 
   const completePayableReconciliationTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应采购、委外或对账记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
+      (await updateSourceStatusForTask(
         task,
         record,
         PAYABLE_SETTLED_STATUS_KEY,
@@ -1077,17 +1085,13 @@ export default function MobileRoleTasksPage() {
   }
 
   const blockFinanceTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应财务登记记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
-        task,
-        record,
-        'blocked',
-        reason
-      )) || record
+      (await updateSourceStatusForTask(task, record, 'blocked', reason)) ||
+      record
     const state = buildFinanceBlockedState(
       {
         ...savedRecord,
@@ -1102,17 +1106,13 @@ export default function MobileRoleTasksPage() {
   }
 
   const blockPayableFinanceTask = async (task, reason) => {
-    const record = await loadBusinessRecordForTask(task)
+    const record = await buildSourceSnapshotForTask(task)
     if (!record) {
       throw new Error('未找到对应应付或对账记录')
     }
     const savedRecord =
-      (await updateBusinessRecordStatusForTask(
-        task,
-        record,
-        'blocked',
-        reason
-      )) || record
+      (await updateSourceStatusForTask(task, record, 'blocked', reason)) ||
+      record
     const state = buildPayableBlockedState(
       {
         ...savedRecord,

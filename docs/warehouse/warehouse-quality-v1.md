@@ -15,7 +15,7 @@
 | 成品入库 | `inbound` + `inventory` |
 | 出货出库 | `shipping-release` + `outbound` |
 | 库存余额 | `inventory` |
-| 库存流水 | 当前通过业务记录和事件追踪，后续再评审库存专表 |
+| 库存流水 | `inventory_txns`；当前余额 / 查询加速为 `inventory_balances` |
 | 异常件 | `production-exceptions` 或 `quality-inspections` 关联记录 |
 
 ## 品质 v1

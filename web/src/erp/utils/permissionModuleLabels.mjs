@@ -1,5 +1,5 @@
 const permissionModuleLabels = Object.freeze({
-  business: '业务记录',
+  business: '业务看板',
   debug: '调试能力',
   erp: '后台功能',
   finance: '财务',

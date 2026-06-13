@@ -9,7 +9,7 @@
 | 图片 / 截图 | Customer Material / QA Debug | 可帮助识别页面、字段和流程线索；不作为唯一真源 |
 | seed / demo 数据 | Demo Seed / QA Debug | 只用于开发验收和演示，不替代真实业务事实 |
 | print template | Print Template Input | 只作客户打印样本和字段来源记录；默认 Deferred，待多客户重复后再评审是否模板化 |
-| business_records 快照 | Source Snapshot / Data Import Source / Demo Seed | 可作为 dry-run 来源和历史快照，不是长期事实真源 |
+| 删除前 business_records JSONL evidence | Retired Evidence Only | 只作为当前开发库删除前证据和人工审计线索，不是 dry-run 自动来源、Demo Seed 或长期事实真源 |
 | V1 正式页面当前数据 | Data Import Target Preview | 只作为 future import preview 的目标模型参照；当前 dry-run 不写数据库 |
 
 使用规则：

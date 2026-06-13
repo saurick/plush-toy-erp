@@ -197,7 +197,7 @@ func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 	admin := &AdminUser{
 		ID:          2,
 		Username:    "operator",
-		Permissions: []string{PermissionCustomerRead, PermissionSupplierRead, PermissionSalesOrderRead, PermissionBusinessRecordRead},
+		Permissions: []string{PermissionCustomerRead, PermissionSupplierRead, PermissionSalesOrderRead, PermissionWarehouseInventoryRead},
 	}
 
 	paths := map[string]struct{}{}

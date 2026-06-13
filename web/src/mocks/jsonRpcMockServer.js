@@ -5,120 +5,6 @@ let mockWorkflowTaskID = 1
 let mockWorkflowBusinessStateID = 1
 const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
-const mockBusinessRecords = [
-  {
-    id: 9001,
-    module_key: 'products',
-    document_no: 'ARCH-PROD-001',
-    title: 'Archive 样品小熊',
-    product_no: 'SKU-ARCH-001',
-    product_name: 'Archive 样品小熊',
-    customer_name: 'Archive 客户',
-    quantity: 1,
-    unit: '只',
-    amount: 0,
-    business_status_key: 'closed',
-    owner_role_key: 'business',
-    payload: { archive_fixture: true },
-    items: [],
-    created_at: 1714000000,
-    updated_at: 1714000000,
-  },
-  {
-    id: 9002,
-    module_key: 'material-bom',
-    document_no: 'ARCH-BOM-001',
-    title: 'Archive 小熊 BOM',
-    product_name: 'Archive 样品小熊',
-    material_name: 'PP 棉',
-    quantity: 3,
-    unit: 'kg',
-    amount: 37.5,
-    business_status_key: 'closed',
-    owner_role_key: 'pmc',
-    payload: { archive_fixture: true },
-    items: [
-      {
-        id: 1,
-        name: 'PP 棉',
-        quantity: 3,
-        unit: 'kg',
-        amount: 37.5,
-        payload: { archive_fixture: true },
-      },
-    ],
-    created_at: 1714000100,
-    updated_at: 1714000100,
-  },
-  {
-    id: 9003,
-    module_key: 'accessories-purchase',
-    document_no: 'ARCH-PUR-001',
-    title: 'Archive 辅料采购',
-    supplier_name: 'Archive 供应商',
-    material_name: 'PP 棉',
-    purchase_date: '2026-04-28',
-    return_date: '2026-04-30',
-    quantity: 3,
-    unit: 'kg',
-    amount: 37.5,
-    business_status_key: 'closed',
-    owner_role_key: 'purchase',
-    payload: {
-      archive_fixture: true,
-      purchase_date: '2026-04-28',
-      return_date: '2026-04-30',
-    },
-    items: [
-      {
-        id: 1,
-        name: 'PP 棉',
-        quantity: 3,
-        unit: 'kg',
-        unit_price: 12.5,
-        amount: 37.5,
-        payload: { archive_fixture: true },
-      },
-    ],
-    created_at: 1714000200,
-    updated_at: 1714000200,
-  },
-  {
-    id: 9004,
-    module_key: 'processing-contracts',
-    document_no: 'ARCH-PC-001',
-    title: 'Archive 委外加工',
-    supplier_name: 'Archive 加工商',
-    product_name: 'Archive 样品小熊',
-    quantity: 100,
-    unit: '只',
-    amount: 1200,
-    business_status_key: 'closed',
-    owner_role_key: 'production',
-    payload: { archive_fixture: true },
-    items: [],
-    created_at: 1714000300,
-    updated_at: 1714000300,
-  },
-  {
-    id: 9005,
-    module_key: 'shipping-release',
-    document_no: 'ARCH-OUT-001',
-    title: 'Archive 出货放行',
-    source_no: 'SO-ARCH-001',
-    customer_name: 'Archive 客户',
-    product_name: 'Archive 样品小熊',
-    quantity: 60,
-    unit: '箱',
-    amount: 3600,
-    business_status_key: 'shipping_released',
-    owner_role_key: 'warehouse',
-    payload: { archive_fixture: true, shipment_release_result: 'done' },
-    items: [],
-    created_at: 1714000400,
-    updated_at: 1714000400,
-  },
-]
 const mockBusinessDashboardProjectionModuleKeys = [
   'customers',
   'suppliers',
@@ -166,11 +52,6 @@ const mockPermissions = [
   },
   { permission_key: 'erp.dashboard.read', name: '查看任务看板', module: 'erp' },
   {
-    permission_key: 'business.record.read',
-    name: '查看业务记录',
-    module: 'business',
-  },
-  {
     permission_key: 'workflow.task.read',
     name: '查看协同任务',
     module: 'workflow',
@@ -210,7 +91,6 @@ const mockRoles = [
     name: '业务',
     permissions: [
       'erp.dashboard.read',
-      'business.record.read',
       'workflow.task.read',
       'mobile.sales.access',
     ],
@@ -220,7 +100,6 @@ const mockRoles = [
     name: '采购',
     permissions: [
       'erp.dashboard.read',
-      'business.record.read',
       'workflow.task.read',
       'mobile.purchase.access',
     ],
@@ -484,118 +363,6 @@ function matchWorkflowFilter(item, params) {
     (!params.business_status_key ||
       item.business_status_key === params.business_status_key)
   )
-}
-
-function normalizeMockDateFilterValue(value) {
-  if (value === null || value === undefined || value === '') {
-    return ''
-  }
-  const text = String(value).trim()
-  if (/^\d+$/.test(text)) {
-    const date = new Date(Number(text) * 1000)
-    if (Number.isNaN(date.getTime())) return ''
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-      2,
-      '0'
-    )}-${String(date.getDate()).padStart(2, '0')}`
-  }
-  const matched = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/)
-  if (matched) {
-    return `${matched[1]}-${String(Number(matched[2])).padStart(
-      2,
-      '0'
-    )}-${String(Number(matched[3])).padStart(2, '0')}`
-  }
-  const date = new Date(text)
-  if (Number.isNaN(date.getTime())) return ''
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-    2,
-    '0'
-  )}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-function normalizeMockStringList(values) {
-  const source = Array.isArray(values) ? values : [values]
-  const seen = new Set()
-  return source
-    .flatMap((value) =>
-      String(value ?? '')
-        .split(',')
-        .map((item) => item.trim())
-    )
-    .filter((value) => {
-      if (!value || seen.has(value)) {
-        return false
-      }
-      seen.add(value)
-      return true
-    })
-}
-
-function matchBusinessRecordFilter(item, params) {
-  const keyword = String(params.keyword || '')
-    .trim()
-    .toLowerCase()
-  const businessStatusKeys = normalizeMockStringList(
-    params.business_status_keys
-  )
-  const dateFilterKey = String(params.date_filter_key || '').trim()
-  const dateRangeStart = normalizeMockDateFilterValue(params.date_range_start)
-  const dateRangeEnd = normalizeMockDateFilterValue(params.date_range_end)
-  const recordDateValue = normalizeMockDateFilterValue(item?.[dateFilterKey])
-  const startMatched = dateRangeStart
-    ? Boolean(recordDateValue) && recordDateValue >= dateRangeStart
-    : true
-  const endMatched = dateRangeEnd
-    ? Boolean(recordDateValue) && recordDateValue <= dateRangeEnd
-    : true
-  const keywordMatched =
-    !keyword ||
-    [
-      item.document_no,
-      item.title,
-      item.source_no,
-      item.customer_name,
-      item.supplier_name,
-      item.style_no,
-      item.product_no,
-      item.product_name,
-      item.material_name,
-      item.warehouse_location,
-    ]
-      .filter(Boolean)
-      .some((value) => String(value).toLowerCase().includes(keyword))
-
-  return (
-    (!params.module_key || item.module_key === params.module_key) &&
-    (businessStatusKeys.length > 0
-      ? businessStatusKeys.includes(item.business_status_key)
-      : !params.business_status_key ||
-        item.business_status_key === params.business_status_key) &&
-    (!params.owner_role_key || item.owner_role_key === params.owner_role_key) &&
-    (params.deleted_only
-      ? Boolean(item.deleted_at)
-      : params.include_deleted || !item.deleted_at) &&
-    startMatched &&
-    endMatched &&
-    keywordMatched
-  )
-}
-
-function sortBusinessRecords(records, sortOrder = 'desc') {
-  const normalizedOrder = sortOrder === 'asc' ? 'asc' : 'desc'
-  return [...records].sort((left, right) => {
-    const leftCreatedAt = Number(left?.created_at || 0)
-    const rightCreatedAt = Number(right?.created_at || 0)
-    if (leftCreatedAt !== rightCreatedAt) {
-      return normalizedOrder === 'asc'
-        ? leftCreatedAt - rightCreatedAt
-        : rightCreatedAt - leftCreatedAt
-    }
-    const leftID = Number(left?.id || 0)
-    const rightID = Number(right?.id || 0)
-    return normalizedOrder === 'asc' ? leftID - rightID : rightID - leftID
-  })
 }
 
 function buildBusinessDashboardProjectionStats() {
@@ -904,37 +671,6 @@ export function setupJsonRpcMockServer() {
           }),
           error: '',
         }
-      } else if (method === 'list_records') {
-        const records = sortBusinessRecords(
-          mockBusinessRecords.filter((item) =>
-            matchBusinessRecordFilter(item, params)
-          ),
-          params.sort_order
-        )
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({
-            records,
-            total: records.length,
-            limit: Number(params.limit || 50),
-            offset: Number(params.offset || 0),
-          }),
-          error: '',
-        }
-      } else if (
-        [
-          'create_record',
-          'update_record',
-          'delete_records',
-          'restore_record',
-        ].includes(method)
-      ) {
-        responseBody = makeJsonRpcBizError(
-          id,
-          400,
-          'business_records 已归档为只读，请使用对应领域入口'
-        )
       } else {
         responseBody = makeJsonRpcBizError(
           id,

@@ -37,7 +37,7 @@ Phase 8 不拆任何字母子阶段，也不再把生产、委外、出货、库
 
 | 项目 | 结论 |
 | --- | --- |
-| 唯一真源 | `production_facts` + `Phase8Usecase`；workflow task、`workflow_business_states` 和 `business_records` 都不是生产事实真源 |
+| 唯一真源 | `production_facts` + `Phase8Usecase`；workflow task、`workflow_business_states` 和旧 `business_records` 删除前 evidence 都不是生产事实真源 |
 | 已落事实类型 | `MATERIAL_ISSUE`、`FINISHED_GOODS_RECEIPT`、`REWORK` |
 | 状态边界 | `DRAFT` / `POSTED` / `CANCELLED`；受保护字段不可直接更新，已过账只能取消冲正 |
 | 库存影响 | 生产领料和返工写 `inventory_txns.OUT`；成品入库写 `inventory_txns.IN` 并维护余额 |

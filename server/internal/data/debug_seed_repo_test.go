@@ -7,7 +7,6 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/businessrecord"
 	"server/internal/data/model/ent/workflowbusinessstate"
 	"server/internal/data/model/ent/workflowtask"
 
@@ -45,11 +44,10 @@ func TestDebugSeedRepo_CleanupDryRunDoesNotMutateAndCleanupOnlyDebugData(t *test
 	if err != nil {
 		t.Fatalf("prefix failed: %v", err)
 	}
-	beforeRecords := countActiveDebugRecords(t, ctx, client, prefix)
 	beforeTasks := countDebugTasks(t, ctx, client, prefix)
 	beforeStates := countDebugStates(t, ctx, client, prefix)
-	if beforeRecords == 0 || beforeTasks == 0 || beforeStates == 0 {
-		t.Fatalf("expected debug rows before cleanup, records=%d tasks=%d states=%d", beforeRecords, beforeTasks, beforeStates)
+	if beforeTasks == 0 || beforeStates == 0 {
+		t.Fatalf("expected debug rows before cleanup, tasks=%d states=%d", beforeTasks, beforeStates)
 	}
 
 	preview, err := uc.CleanupBusinessChainScenario(ctx, biz.DebugBusinessChainCleanupInput{
@@ -60,11 +58,8 @@ func TestDebugSeedRepo_CleanupDryRunDoesNotMutateAndCleanupOnlyDebugData(t *test
 	if err != nil {
 		t.Fatalf("dry run cleanup failed: %v", err)
 	}
-	if !preview.DryRun || len(preview.MatchedRecords) != beforeRecords || len(preview.MatchedTasks) != beforeTasks {
+	if !preview.DryRun || len(preview.MatchedRecords) != 0 || len(preview.MatchedTasks) != beforeTasks {
 		t.Fatalf("unexpected dry run result %#v", preview)
-	}
-	if after := countActiveDebugRecords(t, ctx, client, prefix); after != beforeRecords {
-		t.Fatalf("dry run mutated business records: before=%d after=%d", beforeRecords, after)
 	}
 	if after := countDebugTasks(t, ctx, client, prefix); after != beforeTasks {
 		t.Fatalf("dry run mutated tasks: before=%d after=%d", beforeTasks, after)
@@ -78,14 +73,11 @@ func TestDebugSeedRepo_CleanupDryRunDoesNotMutateAndCleanupOnlyDebugData(t *test
 	if err != nil {
 		t.Fatalf("cleanup failed: %v", err)
 	}
-	if len(cleanup.ArchivedRecords) != beforeRecords {
-		t.Fatalf("expected archived records=%d, got %#v", beforeRecords, cleanup.ArchivedRecords)
+	if len(cleanup.ArchivedRecords) != 0 {
+		t.Fatalf("expected no archived business records, got %#v", cleanup.ArchivedRecords)
 	}
 	if len(cleanup.DeletedTasks) != beforeTasks || cleanup.DeletedBusinessStates != beforeStates {
 		t.Fatalf("unexpected cleanup task/state counts %#v", cleanup)
-	}
-	if after := countActiveDebugRecords(t, ctx, client, prefix); after != 0 {
-		t.Fatalf("expected active debug records archived, got %d", after)
 	}
 	if after := countDebugTasks(t, ctx, client, prefix); after != 0 {
 		t.Fatalf("expected debug tasks deleted, got %d", after)
@@ -116,10 +108,6 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	}, 7); err != nil {
 		t.Fatalf("seed failed: %v", err)
 	}
-	if records, err := client.BusinessRecord.Query().Count(ctx); err != nil || records == 0 {
-		t.Fatalf("expected business records before clear, count=%d err=%v", records, err)
-	}
-
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(
 		data,
 		log.NewStdLogger(io.Discard),
@@ -154,7 +142,6 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		}
 	}
 	if result.DeletedTotal == 0 ||
-		result.DeletedCounts["business_records"] == 0 ||
 		result.DeletedCounts["inventory_txns"] == 0 ||
 		result.DeletedCounts["bom_headers"] == 0 ||
 		result.DeletedCounts["purchase_receipts"] == 0 {
@@ -169,9 +156,6 @@ func assertProjectBusinessTablesEmpty(t *testing.T, ctx context.Context, client 
 		name  string
 		count func(context.Context) (int, error)
 	}{
-		{"business_records", client.BusinessRecord.Query().Count},
-		{"business_record_items", client.BusinessRecordItem.Query().Count},
-		{"business_record_events", client.BusinessRecordEvent.Query().Count},
 		{"workflow_tasks", client.WorkflowTask.Query().Count},
 		{"workflow_task_events", client.WorkflowTaskEvent.Query().Count},
 		{"workflow_business_states", client.WorkflowBusinessState.Query().Count},
@@ -198,20 +182,6 @@ func assertProjectBusinessTablesEmpty(t *testing.T, ctx context.Context, client 
 			t.Fatalf("expected %s empty, got %d", check.name, count)
 		}
 	}
-}
-
-func countActiveDebugRecords(t *testing.T, ctx context.Context, client *ent.Client, prefix string) int {
-	t.Helper()
-	count, err := client.BusinessRecord.Query().
-		Where(
-			businessrecord.DeletedAtIsNil(),
-			businessrecord.DocumentNoHasPrefix(prefix),
-		).
-		Count(ctx)
-	if err != nil {
-		t.Fatalf("count active debug records failed: %v", err)
-	}
-	return count
 }
 
 func countDebugTasks(t *testing.T, ctx context.Context, client *ent.Client, prefix string) int {

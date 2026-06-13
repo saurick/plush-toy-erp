@@ -26,7 +26,7 @@
 | `server/internal/data/inventory_repo.go:150-223`、`278-298` | `ApplyInventoryTxnAndUpdateBalance` 在库存事务内写流水并更新余额；负向扣减通过条件更新防负库存。 | 可以作为 `ShipmentUsecase.PostOutbound` 的底层能力，但跨 usecase 需要统一事务边界。 |
 | `server/internal/data/model/schema/inventory_txn.go:19-29`、`124-130` | `inventory_txns` 不可更新 / 删除，`idempotency_key` 唯一，`reversal_of_txn_id` 唯一。 | 出货错误应追加 `REVERSAL`，不能改历史流水；重复出库要靠稳定幂等键。 |
 | `server/internal/data/model/schema/inventory_balance.go:17-36` | `inventory_balances` 当前只有账面 `quantity`，没有 `reserved_qty / frozen_qty / available_qty`。 | 当前只能在实际 OUT 时防负库存，不能严格承诺可用量。 |
-| `web/src/erp/config/businessRecordDefinitions.mjs:528-589` | `shipping-release` 和 `outbound` 通用记录只有单号、客户、产品名称、数量、仓位等展示字段。 | 通用业务记录不是正式 shipment / outbound 行事实真源。 |
+| 旧 `businessRecordDefinitions.mjs` 历史实现 | `shipping-release` 和 `outbound` 通用记录曾只有单号、客户、产品名称、数量、仓位等展示字段；该文件已随旧通用记录运行时删除。 | 删除前旧通用记录不是正式 shipment / outbound 行事实真源。 |
 
 ## 3. 是否建议新增 ShipmentUsecase
 
@@ -182,9 +182,7 @@
 | `web/src/erp/utils/finishedGoodsFlow.mjs` | `resolveFinishedGoodsTaskBusinessStatus` 把 `shipment_release done` 映射为 `shipping_released`。 | helper 可用于 seed / test / demo / 展示辅助，但不再把放行当作 shipped。 |
 | `web/src/erp/utils/shipmentFinanceFlow.mjs:162-170` | 认定 `business_status_key=shipped`、`payload.shipment_result=shipped` 或 `payload.shipped=true` 为已出货。 | 只能基于真实 `shipped` 事实触发财务。 |
 | `web/src/erp/utils/shipmentFinanceFlow.mjs:235-298` | 构造 `receivable_registration` 和 `invoice_registration` 任务。 | 财务事实专表评审前仅作为前端 v1 编排。 |
-| `web/src/erp/pages/BusinessModulePage.jsx` | 手动发起应收不再允许最新 `shipment_release` 已 `done` 作为真实 `shipped` 前置。 | 本轮不迁手动财务入口，但避免扩大 shipment_release 语义。 |
-| `web/src/erp/pages/BusinessModulePage.jsx:2599-2658` | 手动发起开票：从应收记录推进到 `reconciling` 并创建开票任务。 | 等 AR / invoice 专项评审后迁移。 |
-| `web/src/erp/pages/BusinessModulePage.jsx:3470-3517` | 桌面按钮展示“发起应收登记 / 发起开票登记”。 | 本轮只记录，不移除。 |
+| 旧 `BusinessModulePage` 手动财务入口 | 旧通用业务页曾承担手动应收 / 开票入口；当前页面已退出旧记录运行时。 | 后续 AR / invoice 专项评审不能回退到旧通用页。 |
 | `server/internal/biz/debug_seed.go:636-690` | debug seed 生成 `shipping-release`、`outbound`、`shipment_release`、`warehouse_outbound`、应收、开票样本。 | 仅开发验收样本，不是运行时真源。 |
 | `web/src/erp/config/seedData.mjs:2224-2248` | 帮助 / 演示导航仍有“生产到出货”和“出货到应收/开票”条目。 | 只作为展示辅助，不是后端事实。 |
 

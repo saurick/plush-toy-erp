@@ -23,8 +23,9 @@ workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作
 | 系统 | `system.user.read/create/update/disable` | 管理员账号读取、创建、更新和启停 |
 | 系统 | `system.role.read/create/update/delete` | 角色读取、创建、更新和删除 |
 | 系统 | `system.permission.manage` | 给角色分配权限 |
-| 桌面入口 | `erp.dashboard.read`、`erp.print_template.read`、`erp.help_center.read`、`erp.business_chain_debug.read` | 后台菜单和页面入口 |
-| 业务记录 | `business.record.read/create/update/delete` | 通用业务记录读写删 |
+| 桌面入口 | `erp.dashboard.read`、`erp.print_template.read`、`erp.business_chain_debug.read` | 后台菜单和页面入口 |
+| 主数据 | `customer.*`、`supplier.*`、`contact.*` | 客户、供应商和联系人 V1 动作权限 |
+| 销售订单 | `sales_order.*`、`sales_order_item.*` | 销售订单和订单行 V1 动作权限 |
 | 工作流 | `workflow.task.read/create/update/assign/approve/reject/complete` | 任务查询、创建、更新、指派、审批、驳回和完成 |
 | 采购入库 / 退货 | `purchase.receipt.read/create`、`purchase.return.read/create` | 当前为后端 usecase/repo 权限码预留；外部 JSON-RPC/API 接入时必须加对应守卫 |
 | 岗位任务端 | `mobile.<role>.access` | 岗位任务端角色入口，例如 `mobile.sales.access` |
@@ -35,8 +36,8 @@ workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作
 | 角色 | 定位 | 默认权限范围 | 任务处理边界 |
 | --- | --- | --- | --- |
 | `boss` | 管理层、审批和风险查看 | 全局 read、审批、报表和看板；不默认给 `debug.business.clear` | 可处理老板角色池或指派给自己的任务；关注高风险不等于替其他角色完成事实 |
-| `sales` | 销售 / 业务跟进 | 销售链路、客户订单、出货协同、业务记录读写、基础 workflow 权限、销售岗位任务端 | 只能处理 `owner_role_key=sales` 或 `assignee_id=自己` 的任务 |
-| `purchase` | 采购 | 采购单、采购收货、采购退货、采购异常、业务记录读写、采购岗位任务端 | 只能处理 `owner_role_key=purchase` 或 `assignee_id=自己` 的任务 |
+| `sales` | 销售 / 业务跟进 | 销售链路、客户订单、出货协同、基础 workflow 权限、销售岗位任务端 | 只能处理 `owner_role_key=sales` 或 `assignee_id=自己` 的任务 |
+| `purchase` | 采购 | 采购单、采购收货、采购退货、采购异常、采购岗位任务端 | 只能处理 `owner_role_key=purchase` 或 `assignee_id=自己` 的任务 |
 | `warehouse` | 仓库 | 库存、入库、出库、盘点、仓库岗位任务端 | 只能处理 `owner_role_key=warehouse` 或 `assignee_id=自己` 的任务 |
 | `quality` | 品质 | IQC、成品抽检、异常处理、返工复检、品质岗位任务端 | 只能处理 `owner_role_key=quality` 或 `assignee_id=自己` 的任务 |
 | `finance` | 财务 | 应收、应付、收付款、对账、财务报表、财务岗位任务端 | 只能处理 `owner_role_key=finance` 或 `assignee_id=自己` 的任务 |
@@ -47,7 +48,7 @@ workflow 任务处理有两层校验：RBAC 只判断“能不能做这类动作
 
 ## 操作边界
 
-- 可删除是受控能力，业务记录删除应写事件和原因，不等于绕过审计物理删除。
+- 旧通用业务记录删除入口已退出；领域事实单据的取消、冲正、删除限制和审计要求由对应 usecase 与表结构定义，不能用旧 `business.record.*` 权限推导。
 - 可审批必须同时满足权限码、业务归属和状态条件，不能只靠 `admin` 角色推导。
 - 可催办必须写入 `workflow_task_events`，不能只是页面红点或备注。
 - 可打印和可导出只表示入口权限，导出字段和数据范围仍要按后续数据权限规则收口。

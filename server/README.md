@@ -18,7 +18,7 @@
 
 ## 开发验收 debug 能力
 
-后端 JSON-RPC `debug` 域可生成和清理开发验收调试数据。前端业务链路调试页已移除，这组接口只作为受权限保护的后端调试能力保留；普通 `business` 域的 `business_records` 写入口已冻结为 legacy/archive 只读，不作为正式业务写入通道：
+后端 JSON-RPC `debug` 域可生成和清理开发验收调试数据。前端业务链路调试页已移除，这组接口只作为受权限保护的后端调试能力保留；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，debug seed / cleanup 不再写旧通用业务记录：
 
 - `debug.capabilities`：返回当前环境、seed / cleanup / 业务数据清空是否允许和禁用原因
 - `debug.rebuild_business_chain_scenario`：生成带 debugRunId 标记的调试数据
@@ -39,6 +39,8 @@
 - `list_purchase_receipts`
 
 这组接口走 `InventoryUsecase` 和既有采购入库事实表，过账写 `inventory_txns.IN`，取消已过账入库写 `REVERSAL`。公开入库 API 不接受 `business_record_id` 作为正式事实来源；`purchase.receipt.create / purchase.receipt.read / warehouse.inbound.confirm` 只控制采购入库 API 权限，不代表 Workflow 任务完成会自动过账库存事实。
+
+普通 `business` JSON-RPC 域当前只保留业务看板 `dashboard_stats`。旧 `list_records / create_record / update_record / delete_records / restore_record` 已退出运行时，不能恢复为事实或历史快照查询入口。
 
 ## 快速开始
 
@@ -132,7 +134,7 @@ server/
 | `internal/server/` | HTTP/gRPC/JSON-RPC 接入、中间件与路由装配 |
 | `internal/service/` | 接口适配层，负责 DTO 转换与调用编排 |
 | `internal/biz/` | 业务规约与 UseCase 真源 |
-| `internal/core/` | 纯产品领域规则层，当前承载无 IO 的值对象、领域错误、出货三态状态机和边界守卫；后续其他状态机、计算器或 policy 迁入前必须先评审，不接 runtime / DB / transport |
+| `internal/core/` | 纯产品领域规则层，当前承载无 IO 的值对象、领域错误、出货三态、库存批次、采购过账单据、来料质检、销售订单生命周期等状态机、库存可用量计算和边界守卫；后续其他状态机、计算器或 policy 迁入前必须先评审，不接 runtime / DB / transport |
 | `internal/data/` | 数据访问、外部依赖与持久化实现 |
 | `internal/conf/` | 配置结构定义与加载相关代码 |
 | `internal/errcode/` | 服务端错误码目录真源 |
