@@ -71,6 +71,19 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '用于逐菜单核对页面内容覆盖，并映射到现有列表页、详情页、表单页、动作浮层、工作台、报表、导入和移动任务样板；不是正式菜单承诺。',
   },
   {
+    key: 'formal-menu-candidate',
+    title: '正式菜单候选原型',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'formal-menu-candidate-v1/',
+    assetPath: 'formal-menu-candidate-v1/index.html',
+    readmePath: 'formal-menu-candidate-v1/README.md',
+    description:
+      '把内部 51 项菜单覆盖压缩成 12 个高频主入口，说明哪些细项应进入 tab、筛选、动作或详情区。',
+    appliesTo:
+      '用于评审正式左侧导航候选：工作台、任务、主数据、销售、采购入库质检、库存、生产外协、出货、财务、报表、导入和系统；不改当前运行时菜单。',
+  },
+  {
     key: 'business-module-standard-page',
     title: '业务模块标准页样板',
     type: 'HTML',

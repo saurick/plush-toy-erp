@@ -27,7 +27,7 @@ const admins = [
     permissions: [
       { permission_key: 'warehouse.inbound.read', name: '查看入库' },
     ],
-    menus: [{ path: '/erp/warehouse/inbound', label: '入库通知/检验/入库' }],
+    menus: [{ path: '/erp/business-dashboard', label: '业务看板' }],
   },
   {
     id: 3,
@@ -37,7 +37,7 @@ const admins = [
     disabled: true,
     roles: [{ role_key: 'finance', name: '财务' }],
     permissions: [{ permission_key: 'finance.payable.read', name: '查看应付' }],
-    menus: [{ path: '/erp/finance/payables', label: '待付款/应付提醒' }],
+    menus: [{ path: '/erp/print-center', label: '模板打印中心' }],
   },
 ]
 
@@ -86,24 +86,26 @@ test('permissionCenterSearch: 管理员状态筛选区分启用、禁用和超�
 test('permissionCenterSearch: 权限搜索保留分组层级并支持按分组名展开', () => {
   const groups = [
     {
-      title: '采购/仓储',
+      title: '基础资料',
       items: [
-        { key: '/erp/purchase/accessories', label: '辅材/包材采购' },
-        { key: '/erp/warehouse/inbound', label: '仓库入库' },
+        { key: '/erp/master/partners/customers', label: '客户档案' },
+        { key: '/erp/master/partners/suppliers', label: '供应商档案' },
       ],
     },
     {
-      title: '财务环节',
-      items: [{ key: '/erp/finance/payables', label: '应付登记' }],
+      title: '销售链路',
+      items: [
+        { key: '/erp/sales/project-orders/sales-orders', label: '销售订单' },
+      ],
     },
   ]
 
-  assert.deepEqual(filterPermissionGroups(groups, '入库'), [
+  assert.deepEqual(filterPermissionGroups(groups, '供应'), [
     {
-      title: '采购/仓储',
-      items: [{ key: '/erp/warehouse/inbound', label: '仓库入库' }],
+      title: '基础资料',
+      items: [{ key: '/erp/master/partners/suppliers', label: '供应商档案' }],
     },
   ])
 
-  assert.deepEqual(filterPermissionGroups(groups, '财务'), [groups[1]])
+  assert.deepEqual(filterPermissionGroups(groups, '销售'), [groups[1]])
 })

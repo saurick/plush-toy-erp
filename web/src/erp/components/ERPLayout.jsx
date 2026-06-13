@@ -46,7 +46,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import { getNavigationSections } from '../config/seedData.mjs'
-import { businessModuleDefinitions } from '../config/businessModules.mjs'
 
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
@@ -82,10 +81,6 @@ const DEFAULT_DESKTOP_ENTRY = {
   path: '/erp/dashboard',
   description: '聚合今日待办、阻塞、业务摘要、打印入口和常用业务模块。',
 }
-const BUSINESS_MODULE_PATHS = new Set(
-  businessModuleDefinitions.map((moduleItem) => moduleItem.path)
-)
-
 function buildCurrentEntry({ navigationSections, locationPath }) {
   const items = navigationSections.flatMap((section) => section.items)
   const exactMatch = items.find((item) => item.path === locationPath)
@@ -264,11 +259,7 @@ export default function ERPLayout() {
   )
 
   const selectedKeys = currentEntry?.path ? [currentEntry.path] : []
-  const isBusinessModulePage =
-    BUSINESS_MODULE_PATHS.has(location.pathname) ||
-    BUSINESS_MODULE_PATHS.has(currentEntry?.path)
   const hidePageHead =
-    isBusinessModulePage ||
     currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path ||
     currentEntry?.path === '/erp/business-dashboard'
 

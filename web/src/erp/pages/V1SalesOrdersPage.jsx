@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  DownloadOutlined,
   EditOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SettingOutlined,
   StopOutlined,
+  VerticalAlignBottomOutlined,
+  VerticalAlignTopOutlined,
 } from '@ant-design/icons'
 import {
   Button,
@@ -17,6 +21,7 @@ import {
   Select,
   Space,
   Tag,
+  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -47,6 +52,7 @@ import {
   updateSalesOrder,
   updateSalesOrderItem,
 } from '../api/masterDataOrderApi.mjs'
+import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   SALES_ORDER_ITEM_STATUS_LABELS,
   SALES_ORDER_STATUS_COLORS,
@@ -59,6 +65,13 @@ import {
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  applyModuleColumnOrder,
+  buildModuleColumnOrder,
+  getModuleColumnKey,
+  repositionModuleColumnOrder,
+  sanitizeModuleColumnOrder,
+} from '../utils/moduleTableColumns.mjs'
 
 const STATUS_FILTER_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -95,6 +108,219 @@ const LIFECYCLE_ACTIONS = [
     run: cancelSalesOrder,
   },
 ]
+
+const SALES_ORDERS_MODULE_KEY = 'sales-orders'
+const SALES_ORDER_ITEMS_MODULE_KEY = 'sales-order-items'
+const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
+
+function getColumnLabel(column = {}) {
+  return String(column.exportTitle || column.title || column.key || '').trim()
+}
+
+function renderColumnHeader(column, onOpenColumnOrder) {
+  const label = getColumnLabel(column)
+  return (
+    <span className="erp-module-column-header">
+      <span className="erp-module-column-header-text">{label}</span>
+      <Tooltip title="调整列顺序">
+        <Button
+          type="text"
+          size="small"
+          className="erp-module-column-header-trigger"
+          icon={<SettingOutlined />}
+          aria-label={`${label} 列设置`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onOpenColumnOrder?.()
+          }}
+        />
+      </Tooltip>
+    </span>
+  )
+}
+
+function readStoredColumnOrder(moduleKey) {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  try {
+    const raw = window.localStorage.getItem(
+      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+    )
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredColumnOrder(moduleKey, order = []) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+  if (!Array.isArray(order) || order.length === 0) {
+    window.localStorage.removeItem(storageKey)
+    return
+  }
+  window.localStorage.setItem(storageKey, JSON.stringify(order))
+}
+
+function getPreferredColumnOrder({
+  adminProfile,
+  moduleKey,
+  columns,
+  localOrder,
+}) {
+  if (Array.isArray(localOrder)) {
+    return sanitizeModuleColumnOrder(localOrder, columns)
+  }
+
+  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
+  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
+  if (sanitizedAccountOrder.length > 0) {
+    return sanitizedAccountOrder
+  }
+  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
+}
+
+function csvEscape(value) {
+  const text = String(value ?? '')
+  if (/[",\n\r]/u.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`
+  }
+  return text
+}
+
+function downloadCSV({ filename, columns, rows }) {
+  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
+  const body = rows.map((row) =>
+    columns.map((column) => {
+      const rawValue =
+        typeof column.exportValue === 'function'
+          ? column.exportValue(row)
+          : row?.[column.dataIndex]
+      return csvEscape(rawValue)
+    })
+  )
+  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], {
+    type: 'text/csv;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+function ColumnOrderModal({
+  open,
+  columns = [],
+  order = [],
+  saving = false,
+  moduleTitle = '',
+  onChange,
+  onReset,
+  onClose,
+}) {
+  const normalizedOrder = useMemo(() => {
+    const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
+    return sanitizedOrder.length > 0
+      ? sanitizedOrder
+      : buildModuleColumnOrder(columns)
+  }, [columns, order])
+  const orderedColumns = useMemo(
+    () => applyModuleColumnOrder(columns, normalizedOrder),
+    [columns, normalizedOrder]
+  )
+
+  return (
+    <Modal
+      title="调整列表列顺序"
+      open={open}
+      onCancel={onClose}
+      destroyOnHidden={false}
+      footer={
+        <Space wrap>
+          <Button disabled={saving} onClick={onReset}>
+            恢复默认
+          </Button>
+          <Button type="primary" loading={saving} onClick={onClose}>
+            完成
+          </Button>
+        </Space>
+      }
+    >
+      <div
+        className="erp-business-column-order-modal"
+        role="list"
+        aria-label={`${moduleTitle || '列表'}列顺序`}
+      >
+        {orderedColumns.map((column, index) => {
+          const key = getModuleColumnKey(column, index)
+          const label = getColumnLabel(column)
+          return (
+            <div
+              key={key}
+              className="erp-business-column-order-modal__row"
+              role="listitem"
+            >
+              <span className="erp-business-column-order-modal__label">
+                {label}
+              </span>
+              <Space size={4}>
+                <Tooltip title="移到最前">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<VerticalAlignTopOutlined />}
+                    aria-label={`${label} 移到最前`}
+                    disabled={saving || index === 0}
+                    onClick={() =>
+                      onChange?.(
+                        repositionModuleColumnOrder(
+                          normalizedOrder,
+                          columns,
+                          key,
+                          0
+                        )
+                      )
+                    }
+                  />
+                </Tooltip>
+                <Tooltip title="移到最后">
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<VerticalAlignBottomOutlined />}
+                    aria-label={`${label} 移到最后`}
+                    disabled={saving || index === orderedColumns.length - 1}
+                    onClick={() =>
+                      onChange?.(
+                        repositionModuleColumnOrder(
+                          normalizedOrder,
+                          columns,
+                          key,
+                          orderedColumns.length - 1
+                        )
+                      )
+                    }
+                  />
+                </Tooltip>
+              </Space>
+            </div>
+          )
+        })}
+      </div>
+    </Modal>
+  )
+}
 
 function salesOrderStatusTag(status) {
   const key = String(status || '').trim()
@@ -232,6 +458,10 @@ export default function V1SalesOrdersPage() {
   const [detailOpen, setDetailOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
   const [editingItem, setEditingItem] = useState(null)
+  const [orderColumnOrder, setOrderColumnOrder] = useState(null)
+  const [itemColumnOrder, setItemColumnOrder] = useState(null)
+  const [columnOrderTarget, setColumnOrderTarget] = useState(null)
+  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [orderForm] = Form.useForm()
   const [itemForm] = Form.useForm()
 
@@ -437,163 +667,323 @@ export default function V1SalesOrdersPage() {
     }
   }
 
-  const orderColumns = useMemo(
+  const persistColumnOrder = useCallback(
+    async ({ moduleKey, columns, nextOrder, setLocalOrder }) => {
+      const sanitizedOrder = sanitizeModuleColumnOrder(nextOrder, columns)
+      setLocalOrder(sanitizedOrder)
+      writeStoredColumnOrder(moduleKey, sanitizedOrder)
+      setColumnOrderSaving(true)
+      try {
+        const erpPreferences = await setERPColumnOrder({
+          module_key: moduleKey,
+          order: sanitizedOrder,
+        })
+        outletContext?.updateAdminERPPreferences?.(erpPreferences)
+        message.success(
+          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
+        )
+      } catch (error) {
+        message.warning(
+          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
+        )
+      } finally {
+        setColumnOrderSaving(false)
+      }
+    },
+    [outletContext]
+  )
+
+  const orderDataColumns = useMemo(
     () => [
-      { title: '订单号', dataIndex: 'order_no', width: 160 },
+      {
+        title: '订单号',
+        exportTitle: '订单号',
+        dataIndex: 'order_no',
+        width: 160,
+      },
       {
         title: '客户',
+        exportTitle: '客户',
         dataIndex: 'customer_snapshot',
         width: 180,
         render: (value, record) =>
           value?.name || `客户 ID ${record.customer_id}`,
+        exportValue: (record) =>
+          record?.customer_snapshot?.name ||
+          (record?.customer_id ? `客户 ID ${record.customer_id}` : ''),
       },
       {
         title: '客户订单号',
+        exportTitle: '客户订单号',
         dataIndex: 'customer_order_no',
         width: 150,
         render: (value) => value || '-',
       },
       {
         title: '订单日期',
+        exportTitle: '订单日期',
         dataIndex: 'order_date',
         width: 120,
         render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record?.order_date),
       },
       {
         title: '计划交付',
+        exportTitle: '计划交付',
         dataIndex: 'planned_delivery_date',
         width: 120,
         render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
       },
       {
         title: '生命周期',
+        exportTitle: '生命周期',
         dataIndex: 'lifecycle_status',
         width: 120,
         render: salesOrderStatusTag,
-      },
-      {
-        title: '操作',
-        key: 'actions',
-        width: 360,
-        fixed: 'right',
-        render: (_, order) => (
-          <Space size={6} wrap>
-            <Button
-              size="small"
-              onClick={() => {
-                setSelectedOrder(order)
-                setDetailOpen(true)
-              }}
-            >
-              查看
-            </Button>
-            {canUpdateOrder ? (
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => openEditOrder(order)}
-              >
-                编辑
-              </Button>
-            ) : null}
-            {LIFECYCLE_ACTIONS.filter((action) =>
-              hasActionPermission(adminProfile, action.permission)
-            ).map((action) => (
-              <Button
-                key={action.key}
-                size="small"
-                onClick={() => runLifecycleAction(action, order)}
-              >
-                {action.label}
-              </Button>
-            ))}
-          </Space>
-        ),
+        exportValue: (record) =>
+          statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS),
       },
     ],
+    []
+  )
+
+  const effectiveOrderColumnOrder = useMemo(
+    () =>
+      getPreferredColumnOrder({
+        adminProfile,
+        moduleKey: SALES_ORDERS_MODULE_KEY,
+        columns: orderDataColumns,
+        localOrder: orderColumnOrder,
+      }),
+    [adminProfile, orderColumnOrder, orderDataColumns]
+  )
+
+  const visibleOrderDataColumns = useMemo(
+    () => applyModuleColumnOrder(orderDataColumns, effectiveOrderColumnOrder),
+    [effectiveOrderColumnOrder, orderDataColumns]
+  )
+
+  const orderActionColumn = useMemo(
+    () => ({
+      title: '操作',
+      key: 'actions',
+      width: 360,
+      fixed: 'right',
+      render: (_, order) => (
+        <Space size={6} wrap>
+          <Button
+            size="small"
+            onClick={() => {
+              setSelectedOrder(order)
+              setDetailOpen(true)
+            }}
+          >
+            查看
+          </Button>
+          {canUpdateOrder ? (
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => openEditOrder(order)}
+            >
+              编辑
+            </Button>
+          ) : null}
+          {LIFECYCLE_ACTIONS.filter((action) =>
+            hasActionPermission(adminProfile, action.permission)
+          ).map((action) => (
+            <Button
+              key={action.key}
+              size="small"
+              onClick={() => runLifecycleAction(action, order)}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </Space>
+      ),
+    }),
     [adminProfile, canUpdateOrder]
   )
 
-  const itemColumns = useMemo(
+  const orderColumns = useMemo(
     () => [
-      { title: '行号', dataIndex: 'line_no', width: 80 },
-      { title: '产品 ID', dataIndex: 'product_id', width: 90 },
-      { title: '单位 ID', dataIndex: 'unit_id', width: 90 },
+      ...visibleOrderDataColumns.map((column) => ({
+        ...column,
+        title: renderColumnHeader(column, () => setColumnOrderTarget('orders')),
+      })),
+      orderActionColumn,
+    ],
+    [orderActionColumn, visibleOrderDataColumns]
+  )
+
+  const itemDataColumns = useMemo(
+    () => [
+      {
+        title: '行号',
+        exportTitle: '行号',
+        dataIndex: 'line_no',
+        width: 80,
+      },
+      {
+        title: '产品 ID',
+        exportTitle: '产品 ID',
+        dataIndex: 'product_id',
+        width: 90,
+      },
+      {
+        title: '单位 ID',
+        exportTitle: '单位 ID',
+        dataIndex: 'unit_id',
+        width: 90,
+      },
       {
         title: '产品编号',
+        exportTitle: '产品编号',
         dataIndex: 'product_code_snapshot',
         width: 140,
         render: (value) => value || '-',
       },
       {
         title: '产品名称',
+        exportTitle: '产品名称',
         dataIndex: 'product_name_snapshot',
         width: 180,
         render: (value) => value || '-',
       },
       {
         title: '颜色',
+        exportTitle: '颜色',
         dataIndex: 'color_snapshot',
         width: 100,
         render: (value) => value || '-',
       },
-      { title: '订单数量', dataIndex: 'ordered_quantity', width: 120 },
+      {
+        title: '订单数量',
+        exportTitle: '订单数量',
+        dataIndex: 'ordered_quantity',
+        width: 120,
+      },
       {
         title: '单价',
+        exportTitle: '单价',
         dataIndex: 'unit_price',
         width: 100,
         render: (value) => value || '-',
       },
       {
         title: '金额',
+        exportTitle: '金额',
         dataIndex: 'amount',
         width: 100,
         render: (value) => value || '-',
       },
       {
         title: '计划交付',
+        exportTitle: '计划交付',
         dataIndex: 'planned_delivery_date',
         width: 120,
         render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
       },
       {
         title: '行状态',
+        exportTitle: '行状态',
         dataIndex: 'line_status',
         width: 100,
         render: lineStatusTag,
-      },
-      {
-        title: '操作',
-        key: 'actions',
-        width: 180,
-        fixed: 'right',
-        render: (_, item) => (
-          <Space size={6} wrap>
-            {canUpdateItem ? (
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => openEditItem(item)}
-              >
-                编辑
-              </Button>
-            ) : null}
-            {canCancelItem ? (
-              <Popconfirm
-                title="确认取消该订单行？"
-                onConfirm={() => cancelItem(item)}
-              >
-                <Button size="small" icon={<StopOutlined />}>
-                  取消
-                </Button>
-              </Popconfirm>
-            ) : null}
-          </Space>
-        ),
+        exportValue: (record) =>
+          statusText(record?.line_status, SALES_ORDER_ITEM_STATUS_LABELS),
       },
     ],
+    []
+  )
+
+  const effectiveItemColumnOrder = useMemo(
+    () =>
+      getPreferredColumnOrder({
+        adminProfile,
+        moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
+        columns: itemDataColumns,
+        localOrder: itemColumnOrder,
+      }),
+    [adminProfile, itemColumnOrder, itemDataColumns]
+  )
+
+  const visibleItemDataColumns = useMemo(
+    () => applyModuleColumnOrder(itemDataColumns, effectiveItemColumnOrder),
+    [effectiveItemColumnOrder, itemDataColumns]
+  )
+
+  const itemActionColumn = useMemo(
+    () => ({
+      title: '操作',
+      key: 'actions',
+      width: 180,
+      fixed: 'right',
+      render: (_, item) => (
+        <Space size={6} wrap>
+          {canUpdateItem ? (
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => openEditItem(item)}
+            >
+              编辑
+            </Button>
+          ) : null}
+          {canCancelItem ? (
+            <Popconfirm
+              title="确认取消该订单行？"
+              onConfirm={() => cancelItem(item)}
+            >
+              <Button size="small" icon={<StopOutlined />}>
+                取消
+              </Button>
+            </Popconfirm>
+          ) : null}
+        </Space>
+      ),
+    }),
     [canCancelItem, canUpdateItem]
   )
+
+  const itemColumns = useMemo(
+    () => [
+      ...visibleItemDataColumns.map((column) => ({
+        ...column,
+        title: renderColumnHeader(column, () => setColumnOrderTarget('items')),
+      })),
+      itemActionColumn,
+    ],
+    [itemActionColumn, visibleItemDataColumns]
+  )
+
+  const exportOrders = useCallback(() => {
+    if (orders.length === 0) return
+    downloadCSV({
+      filename: `sales-orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      columns: visibleOrderDataColumns,
+      rows: orders,
+    })
+  }, [orders, visibleOrderDataColumns])
+
+  const exportItems = useCallback(() => {
+    if (!selectedOrder || items.length === 0) return
+    const orderNo = String(
+      selectedOrder.order_no || selectedOrder.id || 'order'
+    )
+      .trim()
+      .replace(/[^\w.-]+/g, '-')
+    downloadCSV({
+      filename: `sales-order-items-${orderNo}-${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`,
+      columns: visibleItemDataColumns,
+      rows: items,
+    })
+  }, [items, selectedOrder, visibleItemDataColumns])
 
   const activeOrderCount = useMemo(
     () =>
@@ -692,6 +1082,19 @@ export default function V1SalesOrdersPage() {
             >
               刷新
             </ToolbarButton>
+            <ToolbarButton
+              icon={<DownloadOutlined />}
+              disabled={orders.length === 0}
+              onClick={exportOrders}
+            >
+              导出当前结果
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={() => setColumnOrderTarget('orders')}
+            >
+              列顺序
+            </ToolbarButton>
             {canCreateOrder ? (
               <ToolbarButton
                 type="primary"
@@ -781,15 +1184,30 @@ export default function V1SalesOrdersPage() {
           { key: 'open-lines', label: '未关闭行', value: openLineCount },
         ]}
         actions={
-          canCreateItem ? (
+          <>
             <ToolbarButton
-              icon={<PlusOutlined />}
-              onClick={openCreateItem}
-              disabled={!selectedOrder}
+              icon={<DownloadOutlined />}
+              disabled={!selectedOrder || items.length === 0}
+              onClick={exportItems}
             >
-              新增订单行
+              导出订单行
             </ToolbarButton>
-          ) : null
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={() => setColumnOrderTarget('items')}
+            >
+              订单行列顺序
+            </ToolbarButton>
+            {canCreateItem ? (
+              <ToolbarButton
+                icon={<PlusOutlined />}
+                onClick={openCreateItem}
+                disabled={!selectedOrder}
+              >
+                新增订单行
+              </ToolbarButton>
+            ) : null}
+          </>
         }
       />
       <BusinessDataTable
@@ -808,6 +1226,56 @@ export default function V1SalesOrdersPage() {
         tasks={[]}
         selectedTasks={[]}
         selectedRecordLabel={selectedOrder?.order_no || ''}
+      />
+
+      <ColumnOrderModal
+        open={columnOrderTarget === 'orders'}
+        moduleTitle="销售订单列表"
+        columns={orderDataColumns}
+        order={effectiveOrderColumnOrder}
+        saving={columnOrderSaving}
+        onChange={(nextOrder) =>
+          persistColumnOrder({
+            moduleKey: SALES_ORDERS_MODULE_KEY,
+            columns: orderDataColumns,
+            nextOrder,
+            setLocalOrder: setOrderColumnOrder,
+          })
+        }
+        onReset={() =>
+          persistColumnOrder({
+            moduleKey: SALES_ORDERS_MODULE_KEY,
+            columns: orderDataColumns,
+            nextOrder: [],
+            setLocalOrder: setOrderColumnOrder,
+          })
+        }
+        onClose={() => setColumnOrderTarget(null)}
+      />
+
+      <ColumnOrderModal
+        open={columnOrderTarget === 'items'}
+        moduleTitle="销售订单行列表"
+        columns={itemDataColumns}
+        order={effectiveItemColumnOrder}
+        saving={columnOrderSaving}
+        onChange={(nextOrder) =>
+          persistColumnOrder({
+            moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
+            columns: itemDataColumns,
+            nextOrder,
+            setLocalOrder: setItemColumnOrder,
+          })
+        }
+        onReset={() =>
+          persistColumnOrder({
+            moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
+            columns: itemDataColumns,
+            nextOrder: [],
+            setLocalOrder: setItemColumnOrder,
+          })
+        }
+        onClose={() => setColumnOrderTarget(null)}
       />
 
       <Modal

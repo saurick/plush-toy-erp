@@ -16,7 +16,7 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 - 普通 `business` JSON-RPC 域只保留 `dashboard_stats`，旧记录方法已退出运行时。
 - debug seed / cleanup 不再写旧表族。
 - 采购事实对象和 schema 已移除 `business_record_id` 兼容字段；公开采购 API 仍拒绝输入 `business_record_id`，这是防恢复守卫，不是兼容来源。
-- 前端 `BusinessModulePage` 只保留退出提示；移动端任务详情不再请求旧记录 source。
+- 前端 `BusinessModulePage`、旧通用业务模块路由和旧入口退出页已删除；移动端任务详情不再请求旧记录 source。
 
 ## 删除或替换的引用
 
@@ -31,11 +31,11 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 | `server/internal/data/debug_seed_repo.go` | 已改为只写 Workflow 调试数据 |
 | `purchase_receipts / purchase_returns / purchase_receipt_adjustments` schema | 已删除 `business_record_id` 字段和外键 |
 | `web/src/erp/api/businessRecordApi.mjs` | 已删除，改为 `businessDashboardApi.mjs` |
-| `web/src/erp/pages/BusinessModulePage.jsx` | 改为旧入口退出页，不请求旧 API |
+| `web/src/erp/pages/BusinessModulePage.jsx` | 已删除；旧模块 URL 由前端通配路由回到业务看板 |
 | `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | 改为从任务 payload / source 字段构造详情快照 |
 | `web/src/erp/config/businessRecordDefinitions.mjs` 和旧通用记录 helper/tests | 已删除 |
 | `web/src/mocks/jsonRpcMockServer.js` | 仅保留 `business.dashboard_stats` mock |
-| `web/scripts/styleL1.mjs` | 旧通用记录表单场景已改为退出页断言 |
+| `web/scripts/styleL1.mjs` | 旧通用记录表单和旧入口页场景已删除；保留正式 V1 页面和旧菜单入口负向断言 |
 
 ## 有意保留的字符串 / Guarded References
 

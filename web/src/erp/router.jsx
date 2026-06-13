@@ -12,13 +12,13 @@ import AuthGuard from '@/common/auth/AuthGuard'
 import { getStoredAdminProfile } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import ERPLayout from './components/ERPLayout.jsx'
-import { businessModuleDefinitions } from './config/businessModules.mjs'
 import { DEV_CAPABILITY_LEDGER_ROUTE } from './config/devCapabilityLedger.mjs'
 import { DEV_CUSTOMER_CONFIG_ROUTE } from './config/devCustomerConfig.mjs'
 import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
 import { DEV_HUB_ROUTE } from './config/devHub.mjs'
 import { DEV_PROTOTYPES_ROUTE } from './config/devPrototypes.mjs'
 import { DEV_TESTING_ROUTE } from './config/devTesting.mjs'
+import { getFormalBusinessShellModules } from './config/businessModules.mjs'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
@@ -36,7 +36,6 @@ const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
 const LoginPage = lazy(() => import('@/pages/Login'))
 const RegisterPage = lazy(() => import('@/pages/Register'))
 const EntrySelectionPage = lazy(() => import('./pages/EntrySelectionPage'))
-const BusinessModulePage = lazy(() => import('./pages/BusinessModulePage'))
 const BusinessDashboardPage = lazy(
   () => import('./pages/BusinessDashboardPage')
 )
@@ -49,7 +48,10 @@ const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
 const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
-const Phase8FactsPage = lazy(() => import('./pages/Phase8FactsPage'))
+const FormalBusinessModulePage = lazy(
+  () => import('./pages/FormalBusinessModulePage.jsx')
+)
+const OperationalFactsPage = lazy(() => import('./pages/OperationalFactsPage'))
 const MobileAppLayout = lazy(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazy(
   () => import('./mobile/pages/MobileRoleTasksPage')
@@ -73,6 +75,11 @@ const DevTestingPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevTestingPage.jsx'))
   : null
 const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
+const formalBusinessShellModules = getFormalBusinessShellModules()
+
+function stripERPRoutePrefix(path = '') {
+  return String(path || '').replace(/^\/erp\//u, '')
+}
 
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
@@ -292,13 +299,6 @@ export default function ERPRouter() {
             path="business-dashboard"
             element={<BusinessDashboardPage />}
           />
-          {businessModuleDefinitions.map((moduleItem) => (
-            <Route
-              key={moduleItem.key}
-              path={moduleItem.route}
-              element={<BusinessModulePage moduleItem={moduleItem} />}
-            />
-          ))}
           <Route
             path="master/partners/customers"
             element={<V1MasterDataPage type="customers" />}
@@ -311,7 +311,14 @@ export default function ERPRouter() {
             path="sales/project-orders/sales-orders"
             element={<V1SalesOrdersPage />}
           />
-          <Route path="phase8/facts" element={<Phase8FactsPage />} />
+          {formalBusinessShellModules.map((moduleItem) => (
+            <Route
+              key={moduleItem.key}
+              path={stripERPRoutePrefix(moduleItem.path)}
+              element={<FormalBusinessModulePage moduleKey={moduleItem.key} />}
+            />
+          ))}
+          <Route path="operations/facts" element={<OperationalFactsPage />} />
           <Route
             path="flows/overview"
             element={<Navigate to="/erp/dashboard" replace />}
@@ -349,6 +356,10 @@ export default function ERPRouter() {
           <Route
             path="changes/current"
             element={<Navigate to="/erp/dashboard" replace />}
+          />
+          <Route
+            path="*"
+            element={<Navigate to="/erp/business-dashboard" replace />}
           />
         </Route>
 

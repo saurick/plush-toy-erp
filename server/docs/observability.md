@@ -18,6 +18,8 @@
 - gRPC 服务已接入 tracing middleware
 - 自定义健康检查和静态路由已走统一观测包装，会补 span、recover 和收尾日志
 - `biz.auth`、`biz.useradmin` 等关键 usecase 已显式创建 span
+- SQL tracing 保留 SQL span 的耗时、错误和链路关系，但不记录 SQL text、语句模板、bind args 或 SQL 参数值，避免客户、账号、手机号、业务 payload 或密码哈希进入 Jaeger。
+- 业务 trace attribute 只记录 ID、数量、状态、耗时或已脱敏值；不记录用户名、账号搜索词、手机号明文、密码哈希、token 或业务 payload 明文。
 - 启动时会打一条 `startup-span`，方便排查进程是否成功初始化 tracer provider
 
 ### 健康检查
@@ -29,7 +31,7 @@
 其中：
 
 - `/healthz` 只做浅检查
-- `/readyz` 当前只检查 PostgreSQL 连通性
+- `/readyz` 当前检查 PostgreSQL 连通性和 PDF 启动预热状态；PDF 异步预热完成前返回未就绪
 - 健康检查路由已有最小回归测试
 
 ### 启动韧性
@@ -51,11 +53,11 @@
 
 - Compose 当前保留 PostgreSQL `healthcheck`
 - 业务容器默认依赖 `/healthz`、`/readyz` 作为发布后 smoke 检查入口
-- Compose 默认同时拉起 Jaeger，便于本地和单机部署直接查看 trace
+- Compose 默认同时拉起 Jaeger，便于本地和单机部署查看 trace；Jaeger 宿主机端口默认只绑定 `127.0.0.1`，远程查看优先使用 SSH tunnel。
 
 ## 后续常见补法
 
-- 如果项目长期跑在 Kubernetes，优先把 `readyz` 扩展到真实依赖，并为失败响应补更细的 JSON 细节
+- 如果项目长期跑在 Kubernetes，优先按真实依赖继续扩展 `readyz`，并为失败响应补更细的 JSON 细节
 - 如果项目依赖 Redis、MQ、OSS、第三方 API，再把这些依赖纳入 `/readyz`
 - 如果项目有统一日志平台，优先把关键 JSON-RPC 链路改成结构化字段日志
 

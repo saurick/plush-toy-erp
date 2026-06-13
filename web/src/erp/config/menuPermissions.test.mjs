@@ -26,11 +26,16 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
     ERP_MENU_PERMISSION_GROUPS.map((section) => section.title),
     [
       '看板中心',
-      '基础资料',
-      '销售链路',
-      '采购/仓储',
-      '生产环节',
-      '财务环节',
+      '主数据',
+      '销售管理',
+      '产品工程',
+      '采购管理',
+      '质检管理',
+      '库存管理',
+      '委外管理',
+      '生产管理',
+      '出货管理',
+      '财务业务',
       '运营工具',
       '系统管理',
     ]
@@ -125,7 +130,7 @@ test('menuPermissions: 旧帮助与文档路径不再生成独立权限项', () 
   assert.equal(resolveMenuPermissionKey('/erp/qa/reports'), '/erp/dashboard')
 })
 
-test('menuPermissions: 基础资料入口纳入业务角色预设', () => {
+test('menuPermissions: 主数据与正式业务入口纳入角色预设', () => {
   const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
   assert(permissionKeys.includes('/erp/master/partners/customers'))
   assert(permissionKeys.includes('/erp/master/partners/suppliers'))
@@ -133,6 +138,12 @@ test('menuPermissions: 基础资料入口纳入业务角色预设', () => {
   assert(!permissionKeys.includes('/erp/master/partners'))
   assert(!permissionKeys.includes('/erp/sales/project-orders'))
   assert(permissionKeys.includes('/erp/sales/project-orders/sales-orders'))
+  assert(permissionKeys.includes('/erp/purchase/material-bom'))
+  assert(permissionKeys.includes('/erp/purchase/accessories'))
+  assert(permissionKeys.includes('/erp/warehouse/inbound'))
+  assert(permissionKeys.includes('/erp/warehouse/inventory'))
+  assert(permissionKeys.includes('/erp/production/quality-inspections'))
+  assert(permissionKeys.includes('/erp/finance/receivables'))
 
   ERP_PERMISSION_PRESETS.filter((preset) => preset.key !== 'admin').forEach(
     (preset) => {
@@ -143,10 +154,6 @@ test('menuPermissions: 基础资料入口纳入业务角色预设', () => {
       assert(
         preset.permissions.includes('/erp/master/partners/suppliers'),
         `expected ${preset.key} to include suppliers`
-      )
-      assert(
-        preset.permissions.includes('/erp/master/products'),
-        `expected ${preset.key} to include products`
       )
     }
   )
@@ -166,7 +173,7 @@ test('menuPermissions: 当前权限项不包含前端文档或开发验收路径
   assert(permissionKeys.includes('/erp/production/quality-inspections'))
   assert(permissionKeys.includes('/erp/finance/receivables'))
   assert(permissionKeys.includes('/erp/finance/invoices'))
-  assert(!permissionKeys.includes('/erp/phase8/facts'))
+  assert(!permissionKeys.includes('/erp/operations/facts'))
   assert(!permissionKeys.some((key) => key.startsWith('/erp/docs/')))
   assert(!permissionKeys.some((key) => key.startsWith('/erp/qa/')))
   assert(!permissionKeys.includes('/erp/help-center'))

@@ -9,14 +9,14 @@
 | `scripts/bootstrap.sh`                                 | 安装依赖、启用 hooks、跑快速自检                                                                                  | 新机器 / 首次拉仓库                                        |
 | `scripts/project-scan.sh`                              | 扫描项目名、默认密钥、部署地址和页面文案残留                                                                      | 改名后 / 配置收口后                                        |
 | `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                     | 需要多角色登录 / 岗位任务端验收                            |
-| `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出 Phase 7 / Phase 8 可复用 ID                    | 需要产品主数据、BOM 或 Phase 8 前置 ID 的本地 / 试用演练前 |
+| `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出 Phase 7 / 业务事实模拟可复用 ID                | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前 |
 | `scripts/seed-phase7-sim-masterdata.sh`                | 显式生成 Phase 7 模拟产品 / 单位主数据，供模拟销售订单行引用                                                      | Phase 7 试用环境演练前                                     |
 | `scripts/import/customerSourceExtract.mjs`             | 只读提取永绅 yoyoosun 原始 Excel，生成本地 source snapshot、空 existing preview、配置候选和报告                  | yoyoosun 原始文件整理成导入前 evidence                     |
 | `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence                              | yoyoosun 导入前 source freeze / 人工 review evidence       |
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
 | `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；Phase 7 不执行真实导入                                       | import tooling 自检 / 非 Phase 7 的单独数据治理评审        |
 | `scripts/qa/phase7-simulated-trial-data.mjs`           | Phase 7 模拟试用数据入口，只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据                             | Phase 7 试用环境演练                                       |
-| `scripts/qa/phase8-simulated-fact-closure.mjs`         | Phase 8 模拟事实闭环入口，只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路                            | Phase 8 内部模拟验收 / 目标环境事实闭环回归                |
+| `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟闭环入口，只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路                              | 业务事实内部模拟验收 / 目标环境事实回归                  |
 | `scripts/qa/phase9-simulated-mobile-closure.mjs`       | Phase 9 模拟岗位任务闭环入口，只创建和更新显式模拟 workflow 任务，覆盖审批 / 质检 / 入库 / 出货放行异常和现场留痕 | Phase 9 岗位任务端回归 / 目标环境移动任务闭环验收          |
 | `scripts/qa/industry-template-boundaries.mjs`          | Phase 10 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                      | Phase 10 行业模板调整后                                    |
 | `scripts/qa/phase10-industry-template-closure.mjs`      | Phase 10 行业模板模拟闭环入口，只读取候选配置并生成 evidence 报告                                                | Phase 10 行业模板回归 / 目标环境发布前                     |
@@ -196,7 +196,7 @@ node scripts/qa/phase7-simulated-trial-data.mjs \
 
 若要把模拟数据写入本地或目标试用环境，只能显式 `--apply`，并提供已有活跃产品和单位 ID。该脚本会先按稳定模拟编号查找已有记录，缺失才通过 V1 JSON-RPC 创建；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不创建出货、库存或财务事实：
 
-如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `phase7_args` 和 `phase8_args` 可直接传给后续模拟脚本：
+如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `phase7_args` 和 `operational_fact_args` 可直接传给后续模拟脚本：
 
 ```bash
 bash scripts/seed-core-demo-data.sh
@@ -223,29 +223,29 @@ PHASE7_SIM_PASSWORD='replace-with-demo-password' \
 
 默认岗位账号模式会用 `demo_sales` 写客户、联系人和销售订单，用 `demo_purchase` 写供应商和供应商联系人。若目标环境提供了具备全部 V1 权限的账号，也可以改用 `PHASE7_SIM_ADMIN_TOKEN` 或 `PHASE7_SIM_ADMIN_USERNAME` / `PHASE7_SIM_ADMIN_PASSWORD`。
 
-Phase 8 只允许模拟事实闭环验收，不执行真实客户数据导入。先生成报告，确认模拟范围：
+业务事实模拟脚本只允许模拟事实闭环验收，不执行真实客户数据导入。先生成报告，确认模拟范围：
 
 ```bash
-node scripts/qa/phase8-simulated-fact-closure.mjs \
+node scripts/qa/operational-fact-simulated-closure.mjs \
   --product-id 1 \
   --unit-id 1 \
   --warehouse-id 1 \
-  --out output/customers/yoyoosun/phase8-simulated-fact-closure
+  --out output/customers/yoyoosun/operational-fact-simulated-closure
 ```
 
-若要写入本地或目标试用环境，只能显式 `--apply`，并提供已有模拟产品、单位和仓库 ID。缺少这些前置 ID 时先执行 `bash scripts/seed-core-demo-data.sh`，并复用输出中的 `phase8_args`。该脚本使用 `demo_pmc`、`demo_purchase`、`demo_warehouse` 和 `demo_finance` 角色账号覆盖生产、库存预留、委外、出货和财务五条 Phase 8 最小事实链；所有编号固定带 `SIM-YOYOOSUN-PHASE8` 前缀，不写真实客户数据，不执行 import，不绕过 `Phase8Usecase` 直接写事实表：
+若要写入本地或目标试用环境，只能显式 `--apply`，并提供已有模拟产品、单位和仓库 ID。缺少这些前置 ID 时先执行 `bash scripts/seed-core-demo-data.sh`，并复用输出中的 `operational_fact_args`。该脚本使用 `demo_pmc`、`demo_purchase`、`demo_warehouse` 和 `demo_finance` 角色账号覆盖生产、库存预留、委外、出货和财务五条最小事实链；所有编号固定带 `SIM-YOYOOSUN-OPFACT` 前缀，不写真实客户数据，不执行 import，不绕过 `OperationalFactUsecase` 直接写事实表：
 
 ```bash
-PHASE8_SIM_CONFIRM=APPLY_SIMULATED_PHASE8_FACTS \
-PHASE8_SIM_PASSWORD='replace-with-demo-password' \
-  node scripts/qa/phase8-simulated-fact-closure.mjs \
+OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS \
+OPERATIONAL_FACT_SIM_PASSWORD='replace-with-demo-password' \
+  node scripts/qa/operational-fact-simulated-closure.mjs \
     --apply \
     --backend-url http://127.0.0.1:8300 \
     --product-id 1 \
     --unit-id 1 \
     --warehouse-id 1 \
     --run-id target-yyyymmdd-closure \
-    --out output/customers/yoyoosun/phase8-simulated-fact-closure-target
+    --out output/customers/yoyoosun/operational-fact-simulated-closure-target
 ```
 
 Phase 9 只允许模拟岗位任务闭环验收，不执行真实客户数据导入，也不写生产、出货、库存、预留或财务事实。先生成报告，确认模拟范围：
@@ -255,7 +255,7 @@ node scripts/qa/phase9-simulated-mobile-closure.mjs \
   --out output/customers/yoyoosun/phase9-simulated-mobile-closure
 ```
 
-若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-PHASE9` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality` 和 `demo_warehouse` 分别处理老板审批、成品抽检、仓库入库确认、出货放行异常上报和现场留痕 evidence；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 Phase 8 fact usecase：
+若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-PHASE9` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality` 和 `demo_warehouse` 分别处理老板审批、成品抽检、仓库入库确认、出货放行异常上报和现场留痕 evidence；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
 
 ```bash
 PHASE9_SIM_CONFIRM=APPLY_SIMULATED_PHASE9_MOBILE_TASKS \

@@ -578,11 +578,11 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		coverageStatus: "partial",
 		partial:        true,
 		warnings: []string{
-			"当前只复用通用业务记录和协同任务，不代表工程 BOM 专表已经落地。",
+			"当前只生成 Workflow 调试任务和状态投影，不代表工程 BOM 专表已经落地。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "订单/款式立项", Path: "/erp/sales/project-orders", Reason: "核对订单调试单据和业务状态"},
-			{Label: "任务看板", Path: "/erp/dashboard", Reason: "核对工程资料任务是否进入 PMC / 相关角色池"},
+			{Label: "销售订单", Path: "/erp/sales/project-orders/sales-orders", Reason: "核对订单调试单据和业务状态"},
+			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对工程资料任务是否进入 PMC / 相关角色池"},
 		},
 		records: []debugRecordTemplate{
 			{ref: "order", moduleKey: "project-orders", title: "订单审批通过，待工程资料", statusKey: "engineering_preparing", ownerRoleKey: "sales", customerName: "调试客户 A", styleNo: "DBG-STYLE-A", productNo: "DBG-TOY-A", productName: "调试款毛绒熊", quantity: 1200, unit: "只", amount: 57600, dueOffsetDays: 21},
@@ -606,8 +606,8 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成库存流水和库存余额，只生成采购、IQC 与入库调试记录。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "辅材/包材采购", Path: "/erp/purchase/accessories", Reason: "核对采购到货调试单据"},
-			{Label: "入库通知/检验/入库", Path: "/erp/warehouse/inbound", Reason: "核对 IQC 与仓库入库任务"},
+			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对采购到货调试状态投影"},
+			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对 IQC 与仓库入库任务"},
 		},
 		records: []debugRecordTemplate{
 			{ref: "purchase", moduleKey: "accessories-purchase", title: "辅材到货待 IQC", statusKey: "iqc_pending", ownerRoleKey: "purchase", supplierName: "调试辅料供应商", materialName: "调试塑料眼睛", quantity: 5000, unit: "对", amount: 1500, dueOffsetDays: 2, items: []debugItemTemplate{{itemName: "塑料眼睛", materialName: "黑色 12mm", unit: "对", quantity: 5000, unitPrice: 0.3, amount: 1500, supplierName: "调试辅料供应商"}}},
@@ -632,8 +632,8 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成委外专表和委外成本结算，只生成加工合同、回货检验和入库调试记录。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "加工合同/委外下单", Path: "/erp/purchase/processing-contracts", Reason: "核对委外回货来源"},
-			{Label: "入库通知/检验/入库", Path: "/erp/warehouse/inbound", Reason: "核对委外回货检验和入库"},
+			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对委外回货状态投影"},
+			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对委外回货检验和入库任务"},
 		},
 		records: []debugRecordTemplate{
 			{ref: "contract", moduleKey: "processing-contracts", title: "委外加工回货待检", statusKey: "qc_pending", ownerRoleKey: "purchase", supplierName: "调试加工厂", productName: "调试款毛绒兔半成品", quantity: 800, unit: "只", amount: 9600, dueOffsetDays: 4},
@@ -658,9 +658,8 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成 production_order、shipment_order 或 inventory_txn 专表数据。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "生产进度", Path: "/erp/production/progress", Reason: "核对成品完工调试记录"},
-			{Label: "待出货/出货放行", Path: "/erp/warehouse/shipping-release", Reason: "核对出货放行任务"},
-			{Label: "出库", Path: "/erp/warehouse/outbound", Reason: "核对出库事实快照"},
+			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对生产到出货状态投影"},
+			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对成品抽检和出货放行任务"},
 		},
 		records: []debugRecordTemplate{
 			{ref: "progress", moduleKey: "production-progress", title: "成品完工待抽检", statusKey: "qc_pending", ownerRoleKey: "production", customerName: "调试客户 B", productName: "调试款毛绒狗", quantity: 600, unit: "只", amount: 33000, dueOffsetDays: 2},
@@ -688,9 +687,8 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成 ar_receivable、ar_invoice、总账或凭证专表。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "出库", Path: "/erp/warehouse/outbound", Reason: "核对出货来源"},
-			{Label: "应收", Path: "/erp/finance/receivables", Reason: "核对应收登记调试记录"},
-			{Label: "开票", Path: "/erp/finance/invoices", Reason: "核对开票登记调试记录"},
+			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对出货到财务状态投影"},
+			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对应收和开票协同任务"},
 		},
 		records: []debugRecordTemplate{
 			{ref: "outbound", moduleKey: "outbound", title: "客户出货已完成", statusKey: "shipped", ownerRoleKey: "warehouse", customerName: "调试客户 C", productName: "调试款抱枕", quantity: 300, unit: "只", amount: 21000, dueOffsetDays: -1},
@@ -717,8 +715,8 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 			"当前不生成 ap_payable、ap_reconciliation 或付款流水专表。",
 		},
 		nextCheckpoints: []DebugCheckpoint{
-			{Label: "待付款/应付提醒", Path: "/erp/finance/payables", Reason: "核对应付登记调试记录"},
-			{Label: "对账/结算", Path: "/erp/finance/reconciliation", Reason: "核对供应商或加工厂对账状态"},
+			{Label: "业务看板", Path: "/erp/business-dashboard", Reason: "核对应付和对账状态投影"},
+			{Label: "任务看板", Path: "/erp/task-board", Reason: "核对应付登记和对账协同任务"},
 		},
 		records: []debugRecordTemplate{
 			{ref: "payable", moduleKey: "payables", title: "采购/委外应付登记", statusKey: "reconciling", ownerRoleKey: "finance", supplierName: "调试综合供应商", materialName: "辅料与委外加工费", quantity: 1, unit: "批", amount: 26800, dueOffsetDays: 3},

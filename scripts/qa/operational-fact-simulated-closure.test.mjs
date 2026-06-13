@@ -6,9 +6,9 @@ import {
   buildTimestampRunId,
   parseCliArgs,
   sanitizeRunId,
-} from "./phase8-simulated-fact-closure.mjs";
+} from "./operational-fact-simulated-closure.mjs";
 
-test("phase8 simulated closure plan marks data as simulated and excludes customer acceptance blocker", () => {
+test("operational fact simulated closure plan marks data as simulated and excludes customer acceptance blocker", () => {
   const options = parseCliArgs([
     "--product-id",
     "1",
@@ -21,23 +21,23 @@ test("phase8 simulated closure plan marks data as simulated and excludes custome
   ]);
   const plan = buildPlan(options);
 
-  assert.equal(plan.phase, "Phase 8");
+  assert.equal(plan.scope, "Operational Facts");
   assert.equal(plan.simulatedOnly, true);
   assert.equal(plan.realCustomerImport, false);
-  assert.equal(plan.customerAcceptanceRequiredForPhaseClosure, false);
+  assert.equal(plan.customerAcceptanceRequiredForClosure, false);
   assert.deepEqual(plan.ids, {
     productId: 1,
     unitId: 2,
     warehouseId: 3,
   });
-  assert.match(plan.records.productionReceipt.fact_no, /^SIM-YOYOOSUN-PHASE8-/u);
+  assert.match(plan.records.productionReceipt.fact_no, /^SIM-YOYOOSUN-OPFACT-/u);
   assert.equal(plan.records.productionReceipt.fact_type, "FINISHED_GOODS_RECEIPT");
   assert.equal(plan.records.outsourcingIssue.fact_type, "MATERIAL_ISSUE");
   assert.equal(plan.records.financeSettle.fact_type, "RECEIVABLE");
   assert.equal(plan.records.financeCancel.fact_type, "INVOICE");
 });
 
-test("phase8 simulated closure refuses real import style flags", () => {
+test("operational fact simulated closure refuses real import style flags", () => {
   assert.throws(
     () =>
       parseCliArgs([
@@ -53,7 +53,7 @@ test("phase8 simulated closure refuses real import style flags", () => {
   );
 });
 
-test("phase8 simulated closure requires positive ids", () => {
+test("operational fact simulated closure requires positive ids", () => {
   assert.throws(
     () =>
       buildPlan({
@@ -66,7 +66,7 @@ test("phase8 simulated closure requires positive ids", () => {
   );
 });
 
-test("phase8 simulated closure normalizes run ids", () => {
+test("operational fact simulated closure normalizes run ids", () => {
   assert.equal(sanitizeRunId("  a/b c  "), "A-B-C");
   assert.equal(
     buildTimestampRunId(new Date("2026-06-08T12:34:56.789Z")),

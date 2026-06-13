@@ -12,11 +12,16 @@ const PERMISSION_ALIAS_MAP = Object.freeze({
 })
 
 const BUSINESS_SECTION_TITLES = Object.freeze([
-  '基础资料',
-  '销售链路',
-  '采购/仓储',
-  '生产环节',
-  '财务环节',
+  '主数据',
+  '销售管理',
+  '产品工程',
+  '采购管理',
+  '质检管理',
+  '库存管理',
+  '委外管理',
+  '生产管理',
+  '出货管理',
+  '财务业务',
 ])
 
 const rawPermissionGroups = getNavigationSections()
@@ -63,7 +68,16 @@ function collectSectionPaths(sectionTitles = []) {
   )
 }
 
-const masterModulePaths = collectSectionPaths(['基础资料'])
+const masterModulePaths = collectSectionPaths(['主数据'])
+const salesModulePaths = collectSectionPaths(['销售管理'])
+const engineeringModulePaths = collectSectionPaths(['产品工程'])
+const purchaseModulePaths = collectSectionPaths(['采购管理'])
+const qualityModulePaths = collectSectionPaths(['质检管理'])
+const warehouseModulePaths = collectSectionPaths(['库存管理'])
+const outsourcingModulePaths = collectSectionPaths(['委外管理'])
+const productionModulePaths = collectSectionPaths(['生产管理'])
+const shipmentModulePaths = collectSectionPaths(['出货管理'])
+const financeModulePaths = collectSectionPaths(['财务业务'])
 const businessModulePaths = collectSectionPaths(BUSINESS_SECTION_TITLES)
 
 function normalizePermissionAlias(path = '') {
@@ -92,7 +106,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'boss',
     label: '老板 / 管理层',
     description:
-      '看工作台、看板、异常闭环、全链路业务页和打印中心，不含权限管理。',
+      '看工作台、任务看板、业务看板、正式业务入口、异常闭环和打印中心，不含权限管理。',
     mobileRolePermissions: buildMobileRolePreset(['boss']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -106,7 +120,8 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
   {
     key: 'sales',
     label: '业务',
-    description: '保留立项、待出货和打印中心。',
+    description:
+      '保留主数据、销售订单、出货放行、应收跟进、任务看板、业务看板、异常闭环和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['sales']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -115,14 +130,17 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/print-center',
       '/erp/operations/exceptions',
       ...masterModulePaths,
-      '/erp/sales/project-orders/sales-orders',
+      ...salesModulePaths,
       '/erp/warehouse/shipping-release',
+      '/erp/finance/receivables',
+      '/erp/finance/invoices',
     ]),
   },
   {
     key: 'pmc',
     label: 'PMC',
-    description: '保留齐套、排产、进度、异常及必要的采购跟进入口。',
+    description:
+      '保留任务看板、业务看板、主数据、产品工程、采购、库存、生产、委外、出货和异常闭环。',
     mobileRolePermissions: buildMobileRolePreset(['pmc']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -130,21 +148,19 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/business-dashboard',
       '/erp/operations/exceptions',
       ...masterModulePaths,
-      '/erp/purchase/material-bom',
-      '/erp/purchase/accessories',
-      '/erp/purchase/processing-contracts',
-      '/erp/warehouse/inbound',
-      '/erp/warehouse/shipping-release',
-      '/erp/production/scheduling',
-      '/erp/production/progress',
-      '/erp/production/exceptions',
-      '/erp/production/quality-inspections',
+      ...engineeringModulePaths,
+      ...purchaseModulePaths,
+      ...warehouseModulePaths,
+      ...outsourcingModulePaths,
+      ...productionModulePaths,
+      ...shipmentModulePaths,
     ]),
   },
   {
     key: 'production',
     label: '生产经理',
-    description: '保留排单、进度、返工异常和送检协同入口。',
+    description:
+      '保留任务看板、业务看板、主数据、产品工程、委外、生产、质检和异常闭环。',
     mobileRolePermissions: buildMobileRolePreset(['production']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -152,17 +168,17 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/business-dashboard',
       '/erp/operations/exceptions',
       ...masterModulePaths,
-      '/erp/warehouse/inbound',
-      '/erp/production/scheduling',
-      '/erp/production/progress',
-      '/erp/production/exceptions',
-      '/erp/production/quality-inspections',
+      ...engineeringModulePaths,
+      ...qualityModulePaths,
+      ...outsourcingModulePaths,
+      ...productionModulePaths,
     ]),
   },
   {
     key: 'purchase',
     label: '采购',
-    description: '保留主料、辅包材、加工合同、入库协同和打印中心。',
+    description:
+      '保留任务看板、业务看板、主数据、产品工程、采购、入库、来料质检、委外和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['purchase']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -171,16 +187,18 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/print-center',
       '/erp/operations/exceptions',
       ...masterModulePaths,
-      '/erp/purchase/material-bom',
-      '/erp/purchase/accessories',
-      '/erp/purchase/processing-contracts',
+      ...engineeringModulePaths,
+      ...purchaseModulePaths,
       '/erp/warehouse/inbound',
+      ...qualityModulePaths,
+      ...outsourcingModulePaths,
     ]),
   },
   {
     key: 'warehouse',
     label: '仓库',
-    description: '保留收货、库存、待出货和出库入口。',
+    description:
+      '保留任务看板、业务看板、主数据、入库、库存、出货、出库、来料质检和异常闭环。',
     mobileRolePermissions: buildMobileRolePreset(['warehouse']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -188,16 +206,16 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/business-dashboard',
       '/erp/operations/exceptions',
       ...masterModulePaths,
-      '/erp/warehouse/inbound',
-      '/erp/warehouse/inventory',
-      '/erp/warehouse/shipping-release',
-      '/erp/warehouse/outbound',
+      ...qualityModulePaths,
+      ...warehouseModulePaths,
+      ...shipmentModulePaths,
     ]),
   },
   {
     key: 'quality',
     label: '品质',
-    description: '保留检验、异常、待出货质检协同入口。',
+    description:
+      '保留任务看板、业务看板、主数据、入库、来料质检、生产异常、出货放行和异常闭环。',
     mobileRolePermissions: buildMobileRolePreset(['quality']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -206,16 +224,16 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/operations/exceptions',
       ...masterModulePaths,
       '/erp/warehouse/inbound',
-      '/erp/warehouse/inventory',
-      '/erp/warehouse/shipping-release',
-      '/erp/production/quality-inspections',
+      ...qualityModulePaths,
       '/erp/production/exceptions',
+      '/erp/warehouse/shipping-release',
     ]),
   },
   {
     key: 'finance',
     label: '财务',
-    description: '保留放行、对账、待付款和打印中心入口。',
+    description:
+      '保留任务看板、业务看板、主数据、委外、出货、财务业务、异常闭环和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['finance']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -224,12 +242,9 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       '/erp/print-center',
       '/erp/operations/exceptions',
       ...masterModulePaths,
-      '/erp/purchase/processing-contracts',
-      '/erp/warehouse/shipping-release',
-      '/erp/finance/reconciliation',
-      '/erp/finance/payables',
-      '/erp/finance/receivables',
-      '/erp/finance/invoices',
+      ...outsourcingModulePaths,
+      ...shipmentModulePaths,
+      ...financeModulePaths,
     ]),
   },
 ])

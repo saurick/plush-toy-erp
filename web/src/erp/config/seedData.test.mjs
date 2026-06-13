@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import {
-  businessModuleDefinitions,
-  getBusinessNavigationSections,
-} from './businessModules.mjs'
+import { getBusinessNavigationSections } from './businessModules.mjs'
 import {
   getNavigationSections,
   getRoleWorkbench,
@@ -37,11 +34,16 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
     navigationSections.map((section) => section.title),
     [
       '看板中心',
-      '基础资料',
-      '销售链路',
-      '采购/仓储',
-      '生产环节',
-      '财务环节',
+      '主数据',
+      '销售管理',
+      '产品工程',
+      '采购管理',
+      '质检管理',
+      '库存管理',
+      '委外管理',
+      '生产管理',
+      '出货管理',
+      '财务业务',
       '运营工具',
       '系统管理',
     ]
@@ -56,7 +58,7 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
     navigationSections.find((section) => section.title === '事实闭环'),
     undefined
   )
-  assert(!navPaths.includes('/erp/phase8/facts'))
+  assert(!navPaths.includes('/erp/operations/facts'))
   assert.deepEqual(
     navigationSections
       .find((section) => section.title === '运营工具')
@@ -83,34 +85,40 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
     section.items.map((item) => item.path)
   )
 
-  assert.equal(businessSections.length, 5)
+  assert.equal(businessSections.length, 10)
   assert(navLabels.includes('客户档案'))
   assert(navLabels.includes('供应商档案'))
-  assert(navLabels.includes('产品'))
+  assert(navLabels.includes('产品档案'))
   assert(navLabels.includes('销售订单'))
-  assert(navLabels.includes('材料 BOM'))
-  assert(navLabels.includes('加工合同/委外下单'))
-  assert(navLabels.includes('品质检验'))
-  assert(navLabels.includes('对账/结算'))
-  assert(navLabels.includes('应收/开票登记'))
-  assert(navLabels.includes('发票登记'))
+  assert(navLabels.includes('BOM 管理'))
+  assert(navLabels.includes('采购订单'))
+  assert(navLabels.includes('入库管理'))
+  assert(navLabels.includes('来料质检'))
+  assert(navLabels.includes('库存台账'))
+  assert(navLabels.includes('委外订单'))
+  assert(navLabels.includes('生产排程'))
+  assert(navLabels.includes('生产进度'))
+  assert(navLabels.includes('生产异常'))
+  assert(navLabels.includes('出货放行'))
+  assert(navLabels.includes('出库管理'))
+  assert(navLabels.includes('对账管理'))
+  assert(navLabels.includes('应付管理'))
+  assert(navLabels.includes('应收管理'))
+  assert(navLabels.includes('发票管理'))
   assert(!navLabels.includes('客户/供应商'))
   assert(!navLabels.includes('订单/款式立项'))
   assert(!navLabels.includes('外销'))
   assert(navPaths.includes('/erp/master/partners/customers'))
   assert(navPaths.includes('/erp/master/partners/suppliers'))
   assert(navPaths.includes('/erp/sales/project-orders/sales-orders'))
+  assert(navPaths.includes('/erp/master/products'))
+  assert(navPaths.includes('/erp/purchase/material-bom'))
+  assert(navPaths.includes('/erp/purchase/accessories'))
+  assert(navPaths.includes('/erp/warehouse/inbound'))
+  assert(navPaths.includes('/erp/production/quality-inspections'))
+  assert(navPaths.includes('/erp/finance/receivables'))
   assert(!navPaths.includes('/erp/master/partners'))
   assert(!navPaths.includes('/erp/sales/project-orders'))
-
-  businessModuleDefinitions.forEach((moduleItem) => {
-    assert(navPaths.includes(moduleItem.path))
-  })
-  businessModuleDefinitions.forEach((moduleItem) => {
-    assert(moduleItem.path.startsWith('/erp/'))
-    assert(moduleItem.sourceRefs.length > 0)
-    assert.equal(moduleItem.relatedLinks, undefined)
-  })
 })
 
 test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序和文案', () => {

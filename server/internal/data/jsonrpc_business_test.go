@@ -13,11 +13,11 @@ import (
 
 func TestJsonrpcData_BusinessDashboardStatsReadsDomainProjection(t *testing.T) {
 	j := &JsonrpcData{
-		log:          log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.business.test")),
-		adminReader:  stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionERPDashboardRead)},
-		masterDataUC: biz.NewMasterDataUsecase(&stubMasterDataJSONRPCRepo{}),
-		salesOrderUC: biz.NewSalesOrderUsecase(&stubSalesOrderJSONRPCRepo{}),
-		phase8UC:     biz.NewPhase8Usecase(&stubBusinessDashboardPhase8Repo{}),
+		log:               log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "data.jsonrpc.business.test")),
+		adminReader:       stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionERPDashboardRead)},
+		masterDataUC:      biz.NewMasterDataUsecase(&stubMasterDataJSONRPCRepo{}),
+		salesOrderUC:      biz.NewSalesOrderUsecase(&stubSalesOrderJSONRPCRepo{}),
+		operationalFactUC: biz.NewOperationalFactUsecase(&stubBusinessDashboardOperationalFactRepo{}),
 	}
 
 	_, res, err := j.handleBusiness(workflowJSONRPCAdminContext(), "dashboard_stats", "1", nil)
@@ -93,96 +93,96 @@ func TestJsonrpcData_BusinessRecordMethodsAreRetired(t *testing.T) {
 	}
 }
 
-type stubBusinessDashboardPhase8Repo struct{}
+type stubBusinessDashboardOperationalFactRepo struct{}
 
-func (s *stubBusinessDashboardPhase8Repo) CreateProductionFactDraft(context.Context, *biz.Phase8FactMutation) (*biz.ProductionFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CreateProductionFactDraft(context.Context, *biz.OperationalFactMutation) (*biz.ProductionFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) PostProductionFact(context.Context, int) (*biz.ProductionFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) PostProductionFact(context.Context, int) (*biz.ProductionFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) CancelPostedProductionFact(context.Context, int) (*biz.ProductionFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedProductionFact(context.Context, int) (*biz.ProductionFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) ListProductionFacts(context.Context, biz.Phase8Filter) ([]*biz.ProductionFact, int, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) ListProductionFacts(context.Context, biz.OperationalFactFilter) ([]*biz.ProductionFact, int, error) {
 	return nil, 4, nil
 }
 
-func (s *stubBusinessDashboardPhase8Repo) CreateOutsourcingFactDraft(context.Context, *biz.Phase8FactMutation) (*biz.OutsourcingFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CreateOutsourcingFactDraft(context.Context, *biz.OperationalFactMutation) (*biz.OutsourcingFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) PostOutsourcingFact(context.Context, int) (*biz.OutsourcingFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) PostOutsourcingFact(context.Context, int) (*biz.OutsourcingFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) CancelPostedOutsourcingFact(context.Context, int) (*biz.OutsourcingFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedOutsourcingFact(context.Context, int) (*biz.OutsourcingFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) ListOutsourcingFacts(context.Context, biz.Phase8Filter) ([]*biz.OutsourcingFact, int, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) ListOutsourcingFacts(context.Context, biz.OperationalFactFilter) ([]*biz.OutsourcingFact, int, error) {
 	return nil, 2, nil
 }
 
-func (s *stubBusinessDashboardPhase8Repo) CreateShipmentDraft(context.Context, *biz.ShipmentCreate) (*biz.Shipment, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CreateShipmentDraft(context.Context, *biz.ShipmentCreate) (*biz.Shipment, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) AddShipmentItem(context.Context, *biz.ShipmentItemCreate) (*biz.ShipmentItem, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) AddShipmentItem(context.Context, *biz.ShipmentItemCreate) (*biz.ShipmentItem, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) ShipShipment(context.Context, int) (*biz.Shipment, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) ShipShipment(context.Context, int) (*biz.Shipment, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) CancelShippedShipment(context.Context, int) (*biz.Shipment, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CancelShippedShipment(context.Context, int) (*biz.Shipment, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) GetShipment(context.Context, int) (*biz.Shipment, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) GetShipment(context.Context, int) (*biz.Shipment, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) ListShipments(context.Context, biz.Phase8Filter) ([]*biz.Shipment, int, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) ListShipments(context.Context, biz.OperationalFactFilter) ([]*biz.Shipment, int, error) {
 	return nil, 3, nil
 }
 
-func (s *stubBusinessDashboardPhase8Repo) CreateStockReservation(context.Context, *biz.StockReservationCreate) (*biz.StockReservation, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CreateStockReservation(context.Context, *biz.StockReservationCreate) (*biz.StockReservation, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) ReleaseStockReservation(context.Context, int) (*biz.StockReservation, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) ReleaseStockReservation(context.Context, int) (*biz.StockReservation, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) ConsumeStockReservation(context.Context, int) (*biz.StockReservation, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) ConsumeStockReservation(context.Context, int) (*biz.StockReservation, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) ListStockReservations(context.Context, biz.Phase8Filter) ([]*biz.StockReservation, int, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) ListStockReservations(context.Context, biz.OperationalFactFilter) ([]*biz.StockReservation, int, error) {
 	return nil, 5, nil
 }
 
-func (s *stubBusinessDashboardPhase8Repo) CreateFinanceFactDraft(context.Context, *biz.FinanceFactCreate) (*biz.FinanceFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CreateFinanceFactDraft(context.Context, *biz.FinanceFactCreate) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) PostFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) PostFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) SettleFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) SettleFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) CancelPostedFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) CancelPostedFinanceFact(context.Context, int) (*biz.FinanceFact, error) {
 	return nil, biz.ErrBadParam
 }
 
-func (s *stubBusinessDashboardPhase8Repo) ListFinanceFacts(context.Context, biz.Phase8Filter) ([]*biz.FinanceFact, int, error) {
+func (s *stubBusinessDashboardOperationalFactRepo) ListFinanceFacts(context.Context, biz.OperationalFactFilter) ([]*biz.FinanceFact, int, error) {
 	return nil, 6, nil
 }

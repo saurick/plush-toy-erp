@@ -20,8 +20,11 @@ import {
 } from '../../utils/materialPurchaseContractEditor.mjs'
 import PrintWorkspaceShell from './PrintWorkspaceShell.jsx'
 import {
+  PDF_ACTION_UI_STALE_TIMEOUT_MS,
   downloadPdfFromElement,
   openPdfPreviewFromElement,
+  preloadPdfPreviewFromElement,
+  schedulePdfPreviewWarmup,
 } from '../../utils/printPdf.mjs'
 import {
   MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
@@ -197,6 +200,8 @@ export default function MaterialPurchaseContractWorkbench({
     resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag)
   )
   const [pdfAction, setPdfAction] = useState('')
+  const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
+  const pdfPreviewPreloadRef = useRef(null)
   const paperRef = useRef(null)
   const stageWrapRef = useRef(null)
 
@@ -213,6 +218,8 @@ export default function MaterialPurchaseContractWorkbench({
     setMergeSelectionAnchor(null)
     setMergeSelectionFocus(null)
     setActiveCell(null)
+    setPdfAction('')
+    setPdfActionStartedAt(0)
     setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
   }, [draftStorageKey, resetDraftOnOpen, sourceTag, template])
 
@@ -241,6 +248,32 @@ export default function MaterialPurchaseContractWorkbench({
     observeNodeRef: paperRef,
     suspended: pdfAction !== '',
   })
+
+  useEffect(() => {
+    if (!pdfAction || typeof window === 'undefined') {
+      return undefined
+    }
+
+    const startedAt = Number(pdfActionStartedAt)
+    const elapsed =
+      Number.isFinite(startedAt) && startedAt > 0
+        ? Date.now() - startedAt
+        : PDF_ACTION_UI_STALE_TIMEOUT_MS
+    const remainingMs = Math.max(0, PDF_ACTION_UI_STALE_TIMEOUT_MS - elapsed)
+    const timeoutID = window.setTimeout(() => {
+      setPdfAction('')
+      setPdfActionStartedAt(0)
+      setToolbarStatus(
+        pdfAction === 'download'
+          ? 'PDF 下载等待超时，请重新点击下载 PDF。'
+          : 'PDF 预览等待超时，请重新点击在线预览 PDF。'
+      )
+    }, remainingMs)
+
+    return () => {
+      window.clearTimeout(timeoutID)
+    }
+  }, [pdfAction, pdfActionStartedAt])
 
   const totals = useMemo(
     () => computeMaterialPurchaseTotals(draft.lines),
@@ -454,11 +487,48 @@ export default function MaterialPurchaseContractWorkbench({
       paperContinuedClass: 'erp-material-contract-paper--continued',
     })
 
+  const warmupPreviewPDF = () => {
+    if (!paperRef.current || pdfAction || pdfPreviewPreloadRef.current) {
+      return
+    }
+
+    syncPrintRuntimeMargin()
+    const preloadPromise = preloadPdfPreviewFromElement(paperRef.current, {
+      title: '采购合同 PDF 预览',
+      fileName: buildPdfFileName(),
+      templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+    })
+      .catch(() => null)
+      .finally(() => {
+        if (pdfPreviewPreloadRef.current === preloadPromise) {
+          pdfPreviewPreloadRef.current = null
+        }
+      })
+    pdfPreviewPreloadRef.current = preloadPromise
+  }
+
+  useEffect(() => {
+    pdfPreviewPreloadRef.current = null
+  }, [draft])
+
+  useEffect(
+    () => schedulePdfPreviewWarmup(warmupPreviewPDF),
+    [draft, pdfAction]
+  )
+
+  useEffect(
+    () => () => {
+      pdfPreviewPreloadRef.current = null
+    },
+    []
+  )
+
   const handlePreviewPDF = async () => {
     if (!paperRef.current) {
       return
     }
     syncPrintRuntimeMargin()
+    setPdfActionStartedAt(Date.now())
     setPdfAction('preview')
     try {
       await openPdfPreviewFromElement(paperRef.current, {
@@ -473,6 +543,7 @@ export default function MaterialPurchaseContractWorkbench({
       message.error(errorMessage)
     } finally {
       setPdfAction('')
+      setPdfActionStartedAt(0)
     }
   }
 
@@ -481,6 +552,7 @@ export default function MaterialPurchaseContractWorkbench({
       return
     }
     syncPrintRuntimeMargin()
+    setPdfActionStartedAt(Date.now())
     setPdfAction('download')
     try {
       await downloadPdfFromElement(paperRef.current, {
@@ -495,6 +567,7 @@ export default function MaterialPurchaseContractWorkbench({
       message.error(errorMessage)
     } finally {
       setPdfAction('')
+      setPdfActionStartedAt(0)
     }
   }
 
@@ -872,6 +945,8 @@ export default function MaterialPurchaseContractWorkbench({
               type="button"
               className={getToolbarButtonClassName()}
               onClick={handlePreviewPDF}
+              onFocus={warmupPreviewPDF}
+              onMouseEnter={warmupPreviewPDF}
               disabled={pdfAction !== ''}
             >
               {pdfAction === 'preview' ? '生成中…' : '在线预览 PDF'}

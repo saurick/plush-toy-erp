@@ -2,10 +2,12 @@ import { AUTH_SCOPE, getToken } from '../../common/auth/auth.js'
 
 const DEFAULT_PDF_FILE_NAME = 'print-template.pdf'
 const DEFAULT_PDF_PREVIEW_TITLE = 'PDF 预览'
-const DEFAULT_PDF_PREVIEW_WINDOW_FEATURES = 'width=1120,height=820'
+const DEFAULT_PDF_PREVIEW_WINDOW_FEATURES = ''
 const DEFAULT_PDF_TEMPLATE_KEY = 'print-template'
 const PDF_PREVIEW_URL_REVOKE_DELAY_MS = 60_000
 const PDF_DOWNLOAD_URL_REVOKE_DELAY_MS = 1_000
+const PDF_PREVIEW_AUTO_PRELOAD_DELAY_MS = 250
+const PDF_PREVIEW_AUTO_PRELOAD_IDLE_TIMEOUT_MS = 750
 const PDF_PREVIEW_SHELL_PATH = '/pdf-preview-shell.html'
 const PDF_PREVIEW_STATE_STORAGE_KEY_PREFIX = '__plush_erp_pdf_preview_state__'
 const PDF_PREVIEW_STATE_VERSION = 1
@@ -21,6 +23,8 @@ const SERVER_PDF_RENDER_TIMEOUT_MS = 30_000
 const SERVER_PDF_QUEUE_WAIT_TIMEOUT_MS = 15_000
 const SERVER_PDF_REQUEST_TIMEOUT_MS =
   SERVER_PDF_RENDER_TIMEOUT_MS + SERVER_PDF_QUEUE_WAIT_TIMEOUT_MS
+export const PDF_ACTION_UI_STALE_TIMEOUT_MS =
+  SERVER_PDF_REQUEST_TIMEOUT_MS + 5_000
 const SERVER_PDF_TARGET_ATTRIBUTE = 'data-server-pdf-root'
 const SERVER_PDF_PREVIEW_SNAPSHOT_MODE = 'preview'
 const PREVIEW_SNAPSHOT_IMAGE_INLINE_TIMEOUT_MS = 8_000
@@ -32,6 +36,26 @@ const SERVER_PDF_SELECTION_CLASS_NAMES = [
   'erp-processing-contract-table__row--selected',
 ]
 const SERVER_PDF_PRINT_PREPARING_CLASS_NAMES = ['erp-print-shell--preparing']
+const SERVER_PDF_STYLESHEET_RULE_TOKENS = [
+  'data-server-pdf-root',
+  'erp-contract-table',
+  'erp-material-contract',
+  'erp-print-clauses',
+  'erp-print-meta-grid',
+  'erp-print-paper',
+  'erp-print-shell',
+  'erp-print-signature',
+  'erp-print-table',
+  'erp-processing-contract',
+  'erp-production-report',
+  'erp-summary-sheet',
+]
+const SERVER_PDF_BASE_STYLE_SELECTORS = new Set([
+  'html',
+  'body',
+  'html, body',
+  'body, html',
+])
 
 const escapePreviewHTML = (raw) =>
   String(raw ?? '')
@@ -323,6 +347,30 @@ function restorePdfPreviewShellWindow(previewWindow, previewShellURL) {
   }
 
   previewWindow.focus()
+}
+
+function openPdfPreviewShellWindow(previewShellURL, features) {
+  const normalizedFeatures = String(features || '').trim()
+  if (normalizedFeatures) {
+    return window.open(previewShellURL, '_blank', normalizedFeatures)
+  }
+  return window.open(previewShellURL, '_blank')
+}
+
+function writePdfPreviewWindowHTML(previewWindow, html) {
+  if (!previewWindow || previewWindow.closed) {
+    return false
+  }
+
+  try {
+    previewWindow.document.open()
+    previewWindow.document.write(html)
+    previewWindow.document.close()
+    previewWindow.focus()
+    return true
+  } catch (error) {
+    return false
+  }
 }
 
 async function restorePdfPreviewWindowWithPersistence(
@@ -718,7 +766,7 @@ function readServerPdfStylesheetText(sourceDocument) {
     }
 
     const cssText = cssRules
-      .map((rule) => String(rule?.cssText || '').trim())
+      .map((rule) => serializeServerPdfCssRule(rule))
       .filter(Boolean)
       .join('\n')
     if (!cssText) {
@@ -730,6 +778,83 @@ function readServerPdfStylesheetText(sourceDocument) {
   })
 
   return chunks.join('\n\n')
+}
+
+function getNestedCssRules(rule) {
+  try {
+    return Array.from(rule?.cssRules || [])
+  } catch (error) {
+    return []
+  }
+}
+
+function getCssAtRuleHeader(rule, fallbackText = '') {
+  const cssText = String(rule?.cssText || fallbackText || '').trim()
+  const header = cssText.match(/^([^{}]+)\{/)?.[1]?.trim()
+  if (header) {
+    return header
+  }
+
+  const conditionText =
+    String(rule?.conditionText || '').trim() ||
+    String(rule?.media?.mediaText || '').trim()
+  const name = cssText.match(/^@[-\w]+/)?.[0] || ''
+  if (name && conditionText) {
+    return `${name} ${conditionText}`
+  }
+  return ''
+}
+
+function isServerPdfBaseStyleRule(rule) {
+  const selectorText = String(rule?.selectorText || '')
+    .trim()
+    .toLowerCase()
+  return SERVER_PDF_BASE_STYLE_SELECTORS.has(selectorText)
+}
+
+function isServerPdfRelevantStyleRule(rule) {
+  if (isServerPdfBaseStyleRule(rule)) {
+    return true
+  }
+
+  const ruleText = [
+    String(rule?.selectorText || ''),
+    String(rule?.cssText || ''),
+  ].join('\n')
+  return SERVER_PDF_STYLESHEET_RULE_TOKENS.some((token) =>
+    ruleText.includes(token)
+  )
+}
+
+function serializeServerPdfCssRule(rule) {
+  const cssText = String(rule?.cssText || '').trim()
+  if (!cssText) {
+    return ''
+  }
+
+  if (/^@page\b/i.test(cssText)) {
+    return cssText
+  }
+
+  const nestedRules = getNestedCssRules(rule)
+  if (nestedRules.length > 0) {
+    const nestedCssText = nestedRules
+      .map((nestedRule) => serializeServerPdfCssRule(nestedRule))
+      .filter(Boolean)
+      .join('\n')
+    if (!nestedCssText) {
+      return ''
+    }
+
+    const header = getCssAtRuleHeader(rule, cssText)
+    return header ? `${header} {\n${nestedCssText}\n}` : nestedCssText
+  }
+
+  if (cssText.startsWith('@')) {
+    return ''
+  }
+
+  return isServerPdfRelevantStyleRule(rule) ? cssText : ''
 }
 
 function inlineServerPdfStylesheets(clonedRoot, sourceDocument) {
@@ -749,6 +874,55 @@ function inlineServerPdfStylesheets(clonedRoot, sourceDocument) {
   style.textContent = cssText
   head.appendChild(style)
   return true
+}
+
+function createMinimalServerPdfSnapshotRoot(element) {
+  const sourceDocument = element?.ownerDocument
+  if (
+    !sourceDocument?.implementation?.createHTMLDocument ||
+    typeof element.cloneNode !== 'function'
+  ) {
+    return null
+  }
+
+  const snapshotDocument = sourceDocument.implementation.createHTMLDocument('')
+  const snapshotRoot = snapshotDocument.documentElement
+  const sourceLang =
+    sourceDocument.documentElement?.getAttribute?.('lang') || 'zh-CN'
+  if (sourceLang) {
+    snapshotRoot.setAttribute('lang', sourceLang)
+  }
+
+  const metaCharset = snapshotDocument.createElement('meta')
+  metaCharset.setAttribute('charset', 'utf-8')
+  snapshotDocument.head.appendChild(metaCharset)
+
+  const metaViewport = snapshotDocument.createElement('meta')
+  metaViewport.setAttribute('name', 'viewport')
+  metaViewport.setAttribute('content', 'width=device-width, initial-scale=1')
+  snapshotDocument.head.appendChild(metaViewport)
+
+  const targetClone =
+    typeof snapshotDocument.importNode === 'function'
+      ? snapshotDocument.importNode(element, true)
+      : element.cloneNode(true)
+  targetClone.setAttribute(SERVER_PDF_TARGET_ATTRIBUTE, 'true')
+  snapshotDocument.body.replaceChildren(targetClone)
+  return snapshotRoot
+}
+
+function createLegacyServerPdfSnapshotRoot(element) {
+  const sourceDocument = element?.ownerDocument
+  if (!sourceDocument?.documentElement) {
+    return null
+  }
+
+  element.setAttribute(SERVER_PDF_TARGET_ATTRIBUTE, 'true')
+  try {
+    return sourceDocument.documentElement.cloneNode(true)
+  } finally {
+    element.removeAttribute(SERVER_PDF_TARGET_ATTRIBUTE)
+  }
 }
 
 function buildServerPdfTargetSelector() {
@@ -821,13 +995,13 @@ async function buildServerPdfSnapshotHTMLFromElement(element, options = {}) {
   const doc = element.ownerDocument
   await flushActiveEditorBeforeOutput(doc)
 
-  element.setAttribute(SERVER_PDF_TARGET_ATTRIBUTE, 'true')
-  let clonedRoot
-  try {
-    clonedRoot = doc.documentElement.cloneNode(true)
-  } finally {
-    element.removeAttribute(SERVER_PDF_TARGET_ATTRIBUTE)
+  const clonedRoot =
+    createMinimalServerPdfSnapshotRoot(element) ||
+    createLegacyServerPdfSnapshotRoot(element)
+  if (!clonedRoot) {
+    throw new Error('未找到可导出的打印区域。')
   }
+
   inlineServerPdfStylesheets(clonedRoot, doc)
   normalizeServerPdfSnapshotRuntimeState(clonedRoot)
   if (isolateServerPdfSnapshotToTarget(clonedRoot)) {
@@ -932,7 +1106,7 @@ export const openPdfPreviewWindowFromBlob = async (
 
   const previewStateID = createPdfPreviewStateID()
   const previewShellURL = buildPdfPreviewShellURL(previewStateID)
-  const previewWindow = window.open(previewShellURL, '_blank', features)
+  const previewWindow = openPdfPreviewShellWindow(previewShellURL, features)
   if (!previewWindow) {
     throw new Error('浏览器拦截了 PDF 预览弹窗，请允许弹窗后重试')
   }
@@ -947,12 +1121,15 @@ export const openPdfPreviewWindowFromBlob = async (
       title,
       pdfURL: previewURL,
     })
-    await restorePdfPreviewWindowWithPersistence(
-      previewWindow,
-      previewShellURL,
-      previewStateID,
-      previewHTML
-    )
+    const wrotePreview = writePdfPreviewWindowHTML(previewWindow, previewHTML)
+    if (!wrotePreview) {
+      await restorePdfPreviewWindowWithPersistence(
+        previewWindow,
+        previewShellURL,
+        previewStateID,
+        previewHTML
+      )
+    }
 
     window.setTimeout(() => {
       URL.revokeObjectURL(previewURL)
@@ -1031,6 +1208,55 @@ export const openPdfPreviewFromElement = async (element, options = {}) => {
   return { blob, previewURL }
 }
 
+export const preloadPdfPreviewFromElement = async (element, options = {}) => {
+  return createServerPdfBlobFromElement(element, {
+    ...options,
+    snapshotMode: SERVER_PDF_PREVIEW_SNAPSHOT_MODE,
+  })
+}
+
+export const schedulePdfPreviewWarmup = (callback, options = {}) => {
+  if (typeof window === 'undefined' || typeof callback !== 'function') {
+    return () => {}
+  }
+
+  const delayMs = Number.isFinite(Number(options.delayMs))
+    ? Math.max(0, Number(options.delayMs))
+    : PDF_PREVIEW_AUTO_PRELOAD_DELAY_MS
+  const idleTimeoutMs = Number.isFinite(Number(options.idleTimeoutMs))
+    ? Math.max(0, Number(options.idleTimeoutMs))
+    : PDF_PREVIEW_AUTO_PRELOAD_IDLE_TIMEOUT_MS
+  let cancelled = false
+  let idleID = 0
+  let delayID = window.setTimeout(() => {
+    delayID = 0
+    const runWarmup = () => {
+      if (!cancelled) {
+        callback()
+      }
+    }
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleID = window.requestIdleCallback(runWarmup, {
+        timeout: idleTimeoutMs,
+      })
+      return
+    }
+
+    runWarmup()
+  }, delayMs)
+
+  return () => {
+    cancelled = true
+    if (delayID) {
+      window.clearTimeout(delayID)
+    }
+    if (idleID && typeof window.cancelIdleCallback === 'function') {
+      window.cancelIdleCallback(idleID)
+    }
+  }
+}
+
 export const downloadPdfFromElement = async (element, options = {}) => {
   const { fileName } = normalizeServerPdfRequestOptions(options)
   return downloadPdfFromBlob(
@@ -1054,6 +1280,7 @@ export const __TEST_ONLY__ = {
   isolateServerPdfSnapshotToTarget,
   normalizeServerPdfSnapshotRuntimeState,
   normalizeServerPdfSnapshotOptions,
+  createMinimalServerPdfSnapshotRoot,
   inlineServerPdfStylesheets,
   shouldOptimizeServerPdfImageSource,
   applyServerPdfLayoutOverrides,

@@ -79,7 +79,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       label: "生产经理",
       classification: "industry_default_candidate",
       evidence: "phase9-target-release-evidence-2026-06-09.md",
-      boundary: "负责生产排程、进度和返工协同；生产事实仍由 Phase8Usecase 写入。",
+      boundary: "负责生产排程、进度和返工协同；生产事实仍由 OperationalFactUsecase 写入。",
     },
   ]),
   desktopMenuTemplate: Object.freeze({
@@ -87,39 +87,50 @@ export const plushIndustryTemplateConfig = Object.freeze({
     sections: Object.freeze([
       {
         title: "看板中心",
-        items: Object.freeze(["global-dashboard", "business-dashboard"]),
+        items: Object.freeze(["global-dashboard", "task-board", "business-dashboard"]),
       },
       {
-        title: "基础资料",
+        title: "主数据",
         items: Object.freeze(["customers", "suppliers", "products"]),
       },
       {
-        title: "销售链路",
+        title: "销售管理",
         items: Object.freeze(["sales-orders"]),
       },
       {
-        title: "采购/仓储",
-        items: Object.freeze([
-          "material-bom",
-          "accessories-purchase",
-          "processing-contracts",
-          "inbound",
-          "inventory",
-          "shipping-release",
-          "outbound",
-        ]),
+        title: "产品工程",
+        items: Object.freeze(["material-bom"]),
       },
       {
-        title: "生产环节",
+        title: "采购管理",
+        items: Object.freeze(["accessories-purchase"]),
+      },
+      {
+        title: "质检管理",
+        items: Object.freeze(["quality-inspections"]),
+      },
+      {
+        title: "库存管理",
+        items: Object.freeze(["inbound", "inventory"]),
+      },
+      {
+        title: "委外管理",
+        items: Object.freeze(["processing-contracts"]),
+      },
+      {
+        title: "生产管理",
         items: Object.freeze([
           "production-scheduling",
           "production-progress",
           "production-exceptions",
-          "quality-inspections",
         ]),
       },
       {
-        title: "财务环节",
+        title: "出货管理",
+        items: Object.freeze(["shipping-release", "outbound"]),
+      },
+      {
+        title: "财务业务",
         items: Object.freeze([
           "reconciliation",
           "payables",
@@ -128,8 +139,8 @@ export const plushIndustryTemplateConfig = Object.freeze({
         ]),
       },
       {
-        title: "单据模板",
-        items: Object.freeze(["print-center"]),
+        title: "运营工具",
+        items: Object.freeze(["print-center", "exception-flow"]),
         classification: "customer_sample_only",
         boundary: "当前只保留既有两套模板入口；不把单客户合同样式升成行业默认模板。",
       },
@@ -322,7 +333,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       key: "fact_closure",
       label: "事实闭环模拟验收",
       classification: "industry_default_candidate",
-      command: "scripts/qa/phase8-simulated-fact-closure.mjs",
+      command: "scripts/qa/operational-fact-simulated-closure.mjs",
     },
     {
       key: "mobile_workflow",

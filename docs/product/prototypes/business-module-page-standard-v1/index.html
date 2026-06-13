@@ -97,7 +97,7 @@
         grid-template-columns: minmax(0, 1fr) auto;
         gap: 14px;
         align-items: center;
-        padding: 12px 18px;
+        padding: 12px 16px;
       }
 
       .eyebrow {
@@ -168,14 +168,14 @@
 
       .stat {
         display: grid;
-        min-width: 118px;
-        min-height: 54px;
+        min-width: 112px;
+        min-height: 50px;
         align-content: center;
         gap: 2px;
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: 8px;
         background: var(--panel-soft);
-        padding: 7px 12px;
+        padding: 7px 10px;
       }
 
       .stat span,
@@ -272,7 +272,7 @@
       }
 
       .toolbar {
-        padding: 8px 14px;
+        padding: 8px 12px;
       }
 
       .toolbar-row {
@@ -280,7 +280,7 @@
       }
 
       .toolbar-stats {
-        flex: 1 1 340px;
+        flex: 1 1 260px;
       }
 
       .toolbar-actions {
@@ -290,13 +290,13 @@
 
       .pill {
         display: inline-flex;
-        min-height: 34px;
+        min-height: 30px;
         align-items: center;
         gap: 6px;
         border: 1px solid var(--line);
         border-radius: 999px;
         background: var(--panel-soft);
-        padding: 0 12px;
+        padding: 0 10px;
         white-space: nowrap;
       }
 
@@ -347,34 +347,52 @@
       }
 
       .selection {
-        padding: 9px 14px;
+        padding: 8px 12px;
       }
 
       .selection-row {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: start;
+        gap: 10px;
+        align-items: center;
       }
 
       .selection-copy {
-        display: grid;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
         min-width: 0;
-        gap: 6px;
+        gap: 8px;
+        overflow: hidden;
       }
 
-      .selection-primary strong {
-        font-size: 15px;
+      .selection-title {
+        font-size: 14px;
+        font-weight: 800;
       }
 
-      .selection-hint {
+      .selection-summary {
+        overflow: hidden;
+        min-width: 0;
+        max-width: 100%;
         color: #2f3b4e;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .selection-summary.empty {
+        color: var(--muted);
         font-weight: 650;
       }
 
       .selection-actions {
         justify-content: flex-end;
-        max-width: 840px;
+        max-width: 680px;
+      }
+
+      .selection:not(.has-selection) .selection-actions {
+        display: none;
       }
 
       .table-panel {
@@ -541,8 +559,12 @@
           color: var(--text);
         }
 
-        .selection-hint {
+        .selection-summary {
           color: var(--text);
+        }
+
+        .selection-summary.empty {
+          color: var(--muted);
         }
       }
 
@@ -553,10 +575,38 @@
           grid-template-columns: 1fr;
         }
 
+        .selection {
+          padding: 6px 10px;
+        }
+
+        .selection-row {
+          gap: 6px;
+        }
+
+        .selection-copy {
+          flex-wrap: nowrap;
+          gap: 6px;
+        }
+
+        .selection-title {
+          flex: 0 0 auto;
+        }
+
+        .selection-summary {
+          flex: 1 1 auto;
+        }
+
         .stats,
         .toolbar-actions,
         .selection-actions {
           justify-content: flex-start;
+        }
+
+        .selection-actions {
+          flex-wrap: nowrap;
+          max-width: 100%;
+          overflow-x: auto;
+          padding-bottom: 2px;
         }
 
         .filter-panel {
@@ -622,14 +672,12 @@
                 辅材/包材采购页承接独立采购表里的材料品名、规格、数量、单价和下单信息，用于包装材料和辅材的下单与跟催。
               </p>
               <div class="chips">
-                <span class="chip">Legacy archive：只读查询 / 打印带值候选</span>
                 <span class="chip red">当前预警 5：任务阻塞</span>
               </div>
             </div>
             <div class="stats" aria-label="页面摘要">
-              <div class="stat"><span>总记录</span><strong>3</strong></div>
               <div class="stat"><span>当前结果</span><strong>3</strong></div>
-              <div class="stat"><span>已选记录</span><strong id="headerSelected">0</strong></div>
+              <div class="stat"><span>金额合计</span><strong>4,500</strong></div>
             </div>
           </div>
         </section>
@@ -664,39 +712,33 @@
           <div class="toolbar-row">
             <div class="toolbar-stats">
               <span class="pill">当前结果 <strong>3</strong></span>
-              <span class="pill">已选记录 <strong id="toolbarSelected">0</strong></span>
               <span class="pill">金额合计 <strong>4500</strong></span>
             </div>
             <div class="toolbar-actions">
               <button class="btn">导出当前结果</button>
               <button class="btn">列顺序</button>
               <button class="btn">回收站</button>
-              <button class="btn primary" disabled>+ 归档只读</button>
+              <button class="btn primary">+ 新建记录</button>
             </div>
           </div>
         </section>
 
-        <section class="panel selection" aria-label="当前记录操作">
+        <section class="panel selection" id="selectionBar" aria-label="当前记录操作">
           <div class="selection-row">
             <div class="selection-copy">
-              <div class="selection-primary">
-                <strong>当前操作</strong>
-                <span class="pill selection-hint" id="selectedLabel">请先单击或勾选一条记录</span>
-                <span class="pill">已选 <strong id="actionSelected">0</strong> 条</span>
-              </div>
-              <p class="muted">
-                当前区域只提供记录操作和 Workflow 协同，不代表事实层已完成。
-              </p>
+              <span class="selection-title">当前记录</span>
+              <span class="selection-summary empty" id="selectedSummary">
+                选择一行后可查看详情和处理动作
+              </span>
             </div>
             <div class="selection-actions">
-              <button class="btn link small" id="clearSelection" disabled>清空已选</button>
-              <button class="btn small action-button" disabled>查看</button>
-              <button class="btn small action-button" disabled>打印采购合同</button>
-              <button class="btn small action-button" disabled>关联表格</button>
-              <button class="btn small action-button" disabled>创建协同任务</button>
-              <button class="btn small action-button" disabled>流转 ⌄</button>
-              <button class="btn small danger action-button" disabled>删除</button>
-              <button class="btn small danger action-button" disabled>批量删除</button>
+              <button class="btn link small" id="clearSelection">清空</button>
+              <button class="btn small action-button">查看</button>
+              <button class="btn small action-button">编辑</button>
+              <button class="btn small action-button">打印</button>
+              <button class="btn small action-button">协同</button>
+              <button class="btn small action-button">更多 ⌄</button>
+              <button class="btn small danger action-button">删除</button>
             </div>
           </div>
         </section>
@@ -737,8 +779,8 @@
               <strong>本页协同</strong>
               <div class="collab-summary">
                 <span class="pill">当前记录 <strong id="collabRecord">未选择</strong></span>
-                <span class="pill">本页待办 <strong>5</strong></span>
-                <span class="pill">阻塞异常 <strong>1</strong></span>
+                <span class="pill">待办 <strong>5</strong></span>
+                <span class="pill">阻塞 <strong>1</strong></span>
               </div>
             </div>
             <div class="toolbar-actions">
@@ -749,7 +791,7 @@
           <div class="collab-body">
             <div>
               <strong id="collabTitle">选择一条记录后查看本页相关任务</strong>
-              <div class="muted" id="collabMeta">Workflow 协同只关闭任务，不写库存、出货或财务事实。</div>
+              <div class="muted" id="collabMeta">协同任务只处理本页跟进，不替代采购、库存或财务事实。</div>
             </div>
             <div class="toolbar-actions">
               <button class="btn small action-button" disabled>记录阻塞</button>
@@ -798,10 +840,8 @@
       ];
 
       const rows = document.querySelector("#rows");
-      const headerSelected = document.querySelector("#headerSelected");
-      const toolbarSelected = document.querySelector("#toolbarSelected");
-      const actionSelected = document.querySelector("#actionSelected");
-      const selectedLabel = document.querySelector("#selectedLabel");
+      const selectionBar = document.querySelector("#selectionBar");
+      const selectedSummary = document.querySelector("#selectedSummary");
       const clearSelection = document.querySelector("#clearSelection");
       const actionButtons = document.querySelectorAll(".action-button");
       const collab = document.querySelector("#collab");
@@ -838,25 +878,22 @@
 
       function syncSelection() {
         const hasSelection = selectedIndex >= 0;
-        const count = hasSelection ? 1 : 0;
-        headerSelected.textContent = count;
-        toolbarSelected.textContent = count;
-        actionSelected.textContent = count;
-        clearSelection.disabled = !hasSelection;
+        selectionBar.classList.toggle("has-selection", hasSelection);
+        selectedSummary.classList.toggle("empty", !hasSelection);
         actionButtons.forEach((button) => {
           button.disabled = !hasSelection;
         });
 
         if (!hasSelection) {
-          selectedLabel.textContent = "请先单击或勾选一条记录";
+          selectedSummary.textContent = "选择一行后可查看详情和处理动作";
           collabRecord.textContent = "未选择";
           collabTitle.textContent = "选择一条记录后查看本页相关任务";
-          collabMeta.textContent = "Workflow 协同只关闭任务，不写库存、出货或财务事实。";
+          collabMeta.textContent = "协同任务只处理本页跟进，不替代采购、库存或财务事实。";
           return;
         }
 
         const record = records[selectedIndex];
-        selectedLabel.textContent = record.no;
+        selectedSummary.textContent = `已选 1 条 · ${record.no} · ${record.name} · ${record.task}`;
         collabRecord.textContent = record.no;
         collabTitle.textContent = `${record.task}待处理`;
         collabMeta.textContent = `${record.no} / 采购 / 回货日期 ${record.date}`;

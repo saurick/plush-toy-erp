@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import { buildWorkflowTaskAlert } from './workflowDashboardStats.mjs'
@@ -19,10 +18,6 @@ import {
 
 const NOW_MS = Date.parse('2026-04-25T00:00:00Z')
 const NOW_SECONDS = Math.floor(NOW_MS / 1000)
-const businessModulePageSource = readFileSync(
-  new URL('../pages/BusinessModulePage.jsx', import.meta.url),
-  'utf8'
-)
 
 function shipmentRecord(overrides = {}) {
   return {
@@ -232,14 +227,4 @@ test('shipmentFinanceFlow: 已存在未完成应收或开票任务时按记录�
     ),
     false
   )
-})
-
-test('BusinessModulePage: 旧通用记录页退出运行时', () => {
-  assert.match(businessModulePageSource, /入口已退出旧通用记录/)
-  assert.match(businessModulePageSource, /不得恢复\s*business_records/)
-  assert.doesNotMatch(businessModulePageSource, /listBusinessRecords/)
-  assert.doesNotMatch(businessModulePageSource, /createBusinessRecord\s*\(/)
-  assert.doesNotMatch(businessModulePageSource, /updateBusinessRecord\s*\(/)
-  assert.doesNotMatch(businessModulePageSource, /deleteBusinessRecords\s*\(/)
-  assert.doesNotMatch(businessModulePageSource, /restoreBusinessRecord\s*\(/)
 })

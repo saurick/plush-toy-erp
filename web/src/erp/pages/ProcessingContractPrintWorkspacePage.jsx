@@ -14,8 +14,11 @@ import {
   processingContractAttachmentSlots,
 } from '../data/processingContractTemplate.mjs'
 import {
+  PDF_ACTION_UI_STALE_TIMEOUT_MS,
   downloadPdfFromElement,
   openPdfPreviewFromElement,
+  preloadPdfPreviewFromElement,
+  schedulePdfPreviewWarmup,
 } from '../utils/printPdf.mjs'
 import {
   PROCESSING_CONTRACT_MAX_ROWS,
@@ -218,6 +221,8 @@ export default function ProcessingContractPrintWorkspacePage() {
   const [activeCell, setActiveCell] = useState(null)
   const [showFormula, setShowFormula] = useState(false)
   const [busyAction, setBusyAction] = useState('')
+  const [busyActionStartedAt, setBusyActionStartedAt] = useState(0)
+  const pdfPreviewPreloadRef = useRef(null)
   const [toolbarStatus, setToolbarStatus] = useState(() =>
     resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag)
   )
@@ -241,6 +246,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     setActiveCell(null)
     setShowFormula(false)
     setBusyAction('')
+    setBusyActionStartedAt(0)
     setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
   }, [draftStorageKey, resetDraftOnOpen, sourceTag, templateKey])
 
@@ -267,9 +273,31 @@ export default function ProcessingContractPrintWorkspacePage() {
     suspended: busyAction !== '',
   })
 
-  if (templateKey !== PROCESSING_CONTRACT_TEMPLATE_KEY) {
-    return <Navigate to="/erp/print-center" replace />
-  }
+  useEffect(() => {
+    if (!busyAction || typeof window === 'undefined') {
+      return undefined
+    }
+
+    const startedAt = Number(busyActionStartedAt)
+    const elapsed =
+      Number.isFinite(startedAt) && startedAt > 0
+        ? Date.now() - startedAt
+        : PDF_ACTION_UI_STALE_TIMEOUT_MS
+    const remainingMs = Math.max(0, PDF_ACTION_UI_STALE_TIMEOUT_MS - elapsed)
+    const timeoutID = window.setTimeout(() => {
+      setBusyAction('')
+      setBusyActionStartedAt(0)
+      setToolbarStatus(
+        busyAction === 'download'
+          ? 'PDF 下载等待超时，请重新点击下载 PDF。'
+          : 'PDF 预览等待超时，请重新点击在线预览 PDF。'
+      )
+    }, remainingMs)
+
+    return () => {
+      window.clearTimeout(timeoutID)
+    }
+  }, [busyAction, busyActionStartedAt])
 
   const mergeSelection = normalizeCellSelection(
     mergeSelectionAnchor,
@@ -447,6 +475,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       stageWrapElement: stageWrapRef.current,
       paperContinuedClass: 'erp-processing-contract-paper--continued',
     })
+    setBusyActionStartedAt(Date.now())
     setBusyAction(actionKey)
     try {
       await runner()
@@ -454,7 +483,51 @@ export default function ProcessingContractPrintWorkspacePage() {
       message.error(getActionErrorMessage(error, '生成 PDF'))
     } finally {
       setBusyAction('')
+      setBusyActionStartedAt(0)
     }
+  }
+
+  const warmupPreviewPdf = () => {
+    if (!paperRef.current || busyAction || pdfPreviewPreloadRef.current) {
+      return
+    }
+
+    syncPrintPageMarginForPaper(paperRef.current, {
+      stageWrapElement: stageWrapRef.current,
+      paperContinuedClass: 'erp-processing-contract-paper--continued',
+    })
+    const preloadPromise = preloadPdfPreviewFromElement(paperRef.current, {
+      title: '加工合同 PDF 预览',
+      fileName: formatExportFileName(),
+      templateKey: PROCESSING_CONTRACT_TEMPLATE_KEY,
+    })
+      .catch(() => null)
+      .finally(() => {
+        if (pdfPreviewPreloadRef.current === preloadPromise) {
+          pdfPreviewPreloadRef.current = null
+        }
+      })
+    pdfPreviewPreloadRef.current = preloadPromise
+  }
+
+  useEffect(() => {
+    pdfPreviewPreloadRef.current = null
+  }, [contract])
+
+  useEffect(
+    () => schedulePdfPreviewWarmup(warmupPreviewPdf),
+    [contract, busyAction]
+  )
+
+  useEffect(
+    () => () => {
+      pdfPreviewPreloadRef.current = null
+    },
+    []
+  )
+
+  if (templateKey !== PROCESSING_CONTRACT_TEMPLATE_KEY) {
+    return <Navigate to="/erp/print-center" replace />
   }
 
   const handlePreviewPdf = () =>
@@ -999,6 +1072,8 @@ export default function ProcessingContractPrintWorkspacePage() {
               type="button"
               className={getToolbarButtonClassName()}
               onClick={handlePreviewPdf}
+              onFocus={warmupPreviewPdf}
+              onMouseEnter={warmupPreviewPdf}
               disabled={busyAction !== ''}
             >
               {busyAction === 'preview' ? '生成中…' : '在线预览 PDF'}

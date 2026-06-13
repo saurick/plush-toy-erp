@@ -70,7 +70,7 @@ test('orderApprovalFlow: 老板审批通过后生成工程资料任务', () => {
   assert.equal(task.owner_role_key, 'engineering')
   assert.equal(task.priority, 2)
   assert.equal(task.payload.next_module_key, 'material-bom')
-  assert.equal(task.payload.entry_path, '/erp/purchase/material-bom')
+  assert.equal(task.payload.entry_path, '/erp/business-dashboard')
   assert.equal(task.payload.critical_path, true)
   assert.match(task.payload.complete_condition, /BOM/)
   assert(task.payload.related_documents.some((item) => item.includes('BOM')))

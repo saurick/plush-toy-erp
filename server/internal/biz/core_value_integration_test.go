@@ -140,8 +140,8 @@ func TestNormalizeSalesOrderItemUsesCoreMoneyAndQuantityGuards(t *testing.T) {
 	}
 }
 
-func TestNormalizePhase8InputsUseCoreValueGuards(t *testing.T) {
-	fact := &Phase8FactMutation{
+func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
+	fact := &OperationalFactMutation{
 		FactNo:         "  PF-1  ",
 		FactType:       ProductionFactMaterialIssue,
 		SubjectType:    InventorySubjectMaterial,
@@ -151,15 +151,15 @@ func TestNormalizePhase8InputsUseCoreValueGuards(t *testing.T) {
 		Quantity:       decimal.NewFromInt(4),
 		IdempotencyKey: "  PRODUCTION_FACT:1:1:OUT  ",
 	}
-	normalizedFact, err := normalizePhase8FactMutation(fact, productionFactTypes)
+	normalizedFact, err := normalizeOperationalFactMutation(fact, productionFactTypes)
 	if err != nil {
-		t.Fatalf("normalizePhase8FactMutation() error = %v", err)
+		t.Fatalf("normalizeOperationalFactMutation() error = %v", err)
 	}
 	if normalizedFact.IdempotencyKey != "PRODUCTION_FACT:1:1:OUT" {
-		t.Fatalf("expected phase8 idempotency key trimmed, got %q", normalizedFact.IdempotencyKey)
+		t.Fatalf("expected operational fact idempotency key trimmed, got %q", normalizedFact.IdempotencyKey)
 	}
 	fact.Quantity = decimal.Zero
-	if _, err := normalizePhase8FactMutation(fact, productionFactTypes); !errors.Is(err, ErrBadParam) {
+	if _, err := normalizeOperationalFactMutation(fact, productionFactTypes); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected zero production quantity rejected, got %v", err)
 	}
 

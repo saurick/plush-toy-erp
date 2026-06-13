@@ -79,7 +79,7 @@ func main() {
 		result.PrimaryWarehouseID,
 	)
 	fmt.Printf("phase7_args=--product-id %d --unit-id %d\n", result.PrimaryProductID, result.PrimaryUnitID)
-	fmt.Printf("phase8_args=--product-id %d --unit-id %d --warehouse-id %d\n",
+	fmt.Printf("operational_fact_args=--product-id %d --unit-id %d --warehouse-id %d\n",
 		result.PrimaryProductID,
 		result.PrimaryUnitID,
 		result.PrimaryWarehouseID,

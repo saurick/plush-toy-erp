@@ -18,7 +18,7 @@ print_help() {
   6) customer-config-boundaries
   7) customer-import-tooling
   8) phase7-simulated-trial-data
-  9) phase8-simulated-fact-closure
+  9) operational-fact-simulated-closure
   10) phase9-simulated-mobile-closure
   11) phase10-industry-template-closure
   12) phase11-private-deployment-closure
@@ -112,9 +112,9 @@ if [ -f "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase8-simulated-fact-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行 Phase 8 模拟事实闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase8-simulated-fact-closure.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs" ]; then
+  echo "[qa:strict] 运行 业务事实模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs" ]; then

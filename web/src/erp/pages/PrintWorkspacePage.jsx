@@ -1,7 +1,12 @@
-import React from 'react'
+import React, { lazy } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
-import MaterialPurchaseContractPrintWorkspacePage from './MaterialPurchaseContractPrintWorkspacePage.jsx'
-import ProcessingContractPrintWorkspacePage from './ProcessingContractPrintWorkspacePage.jsx'
+
+const MaterialPurchaseContractPrintWorkspacePage = lazy(
+  () => import('./MaterialPurchaseContractPrintWorkspacePage.jsx')
+)
+const ProcessingContractPrintWorkspacePage = lazy(
+  () => import('./ProcessingContractPrintWorkspacePage.jsx')
+)
 
 export default function PrintWorkspacePage() {
   const { templateKey } = useParams()

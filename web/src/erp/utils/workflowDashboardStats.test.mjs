@@ -44,13 +44,13 @@ test('dashboardTaskDisplay: 看板任务来源回显不直接露出英文模块 
     task: task({ source_id: 12 }),
   })
 
-  assert.equal(sourceLabel, '待出货/出货放行 第 9 条')
-  assert.equal(alertSourceLabel, '加工合同/委外下单 第 12 条')
+  assert.equal(sourceLabel, '出货放行协同 第 9 条')
+  assert.equal(alertSourceLabel, '委外协同 第 12 条')
   assert(!sourceLabel.includes('shipping-release'))
   assert(!alertSourceLabel.includes('processing-contracts'))
 })
 
-test('dashboardTaskDisplay: 看板任务导航优先进入中文业务页并带单号筛选', () => {
+test('dashboardTaskDisplay: 看板任务导航不再进入旧业务页', () => {
   const entryPath = resolveWorkflowTaskEntryPath(
     task({
       source_type: 'shipping-release',
@@ -63,17 +63,28 @@ test('dashboardTaskDisplay: 看板任务导航优先进入中文业务页并带�
     source_no: 'PO-001',
     task: task({
       source_id: 12,
-      payload: { entry_path: '/erp/purchase/material-bom' },
+      payload: { entry_path: '/erp/legacy/removed' },
     }),
   })
+  const formalEntryPath = resolveWorkflowTaskEntryPath(
+    task({
+      source_type: 'sales-orders',
+      source_no: 'SO-001',
+      payload: { entry_path: '/erp/sales/project-orders/sales-orders' },
+    })
+  )
 
   assert.equal(
     entryPath,
-    '/erp/warehouse/shipping-release?link_keyword=OUT-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
+    '/erp/business-dashboard?link_keyword=OUT-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
   )
   assert.equal(
     payloadEntryPath,
-    '/erp/purchase/material-bom?link_keyword=PO-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
+    '/erp/business-dashboard?link_keyword=PO-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
+  )
+  assert.equal(
+    formalEntryPath,
+    '/erp/sales/project-orders/sales-orders?link_keyword=SO-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
   )
 })
 

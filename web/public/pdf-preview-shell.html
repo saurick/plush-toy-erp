@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PDF 预览加载中</title>
+    <title>PDF 预览生成中</title>
     <style>
       html,
       body {
@@ -44,10 +44,14 @@
         let pollTimer = 0
         let stateDatabasePromise = null
 
-        const setStatus = (text) => {
+        const setStatus = (text, title) => {
           const status = document.getElementById('pdf-preview-shell-status')
           if (status) {
             status.textContent = text
+          }
+          const resolvedTitle = String(title || '').trim()
+          if (resolvedTitle) {
+            document.title = resolvedTitle
           }
         }
 
@@ -212,11 +216,14 @@
         }
 
         if (!storageKey) {
-          setStatus('PDF 预览链接缺少状态参数，请返回工作台重新打开。')
+          setStatus(
+            'PDF 预览链接缺少状态参数，请返回工作台重新打开。',
+            'PDF 预览无法打开'
+          )
           return
         }
 
-        setStatus('正在等待 PDF 预览结果...')
+        setStatus('正在等待 PDF 预览结果...', 'PDF 预览生成中')
         window.addEventListener('storage', handleStorage)
         pollTimer = window.setInterval(() => {
           void restoreNow()
@@ -226,7 +233,10 @@
             return
           }
           cleanupWaiters()
-          setStatus('PDF 预览不存在或已过期，请返回工作台重新打开。')
+          setStatus(
+            'PDF 预览不存在或已过期，请返回工作台重新打开。',
+            'PDF 预览已过期'
+          )
         }, DEFAULT_WAIT_TIMEOUT_MS)
         void restoreNow()
       })()

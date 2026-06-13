@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"server/internal/conf"
@@ -177,6 +178,23 @@ func buildTraceSampler(ratio float64) tracesdk.Sampler {
 	return tracesdk.ParentBased(tracesdk.TraceIDRatioBased(normalizeTraceRatio(ratio)))
 }
 
+func resolveTraceEnvOverrides(traceEndpoint string, traceRatio float64, getenv func(string) string) (string, float64, error) {
+	if getenv == nil {
+		return traceEndpoint, traceRatio, nil
+	}
+	if v := strings.TrimSpace(getenv("TRACE_ENDPOINT")); v != "" {
+		traceEndpoint = v
+	}
+	if v := strings.TrimSpace(getenv("TRACE_RATIO")); v != "" {
+		ratio, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return traceEndpoint, traceRatio, fmt.Errorf("parse TRACE_RATIO=%q: %w", v, err)
+		}
+		traceRatio = normalizeTraceRatio(ratio)
+	}
+	return traceEndpoint, traceRatio, nil
+}
+
 // 初始化 TracerProvider：优先远端 OTLP（异步 Batch），失败或未配置就本地 provider。
 func initTracerProvider(traceName, traceEndpoint string, traceRatio float64, baseLogger log.Logger) *tracesdk.TracerProvider {
 	helper := log.NewHelper(baseLogger)
@@ -278,15 +296,20 @@ func main() {
 		traceEndpoint = bc.Trace.Jaeger.Endpoint
 		traceRatio = bc.Trace.Jaeger.Ratio
 	}
-	if v := strings.TrimSpace(os.Getenv("TRACE_ENDPOINT")); v != "" {
-		// 关键兜底：当前默认走仓库自带 jaeger，只有接外部 tracing 或排查特殊问题时才覆盖。
-		traceEndpoint = v
+	var traceEnvErr error
+	traceEndpoint, traceRatio, traceEnvErr = resolveTraceEnvOverrides(traceEndpoint, traceRatio, os.Getenv)
+	if traceEnvErr != nil {
+		log.NewHelper(logger).Warnw(
+			"msg", "invalid trace env override ignored",
+			"error", traceEnvErr,
+		)
 	}
 
 	// ===== 4. 初始化后台任务组 =====
 	cleanupTaskGroup := taskgroup.Init()
 	defer cleanupTaskGroup()
 	defer appserver.CleanupTemplatePDFResources()
+	appserver.StartTemplatePDFWarmupAsync(logger)
 
 	// ===== 5. 初始化 OpenTelemetry（带兜底，不会因为没连上 Jaeger 就阻塞） =====
 	tp := initTracerProvider(traceName, traceEndpoint, traceRatio, logger)

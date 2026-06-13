@@ -137,28 +137,28 @@ func (d *JsonrpcData) businessDashboardProjectionStats(ctx context.Context) ([]b
 		}
 	}
 
-	if d.phase8UC != nil {
-		if _, total, err := d.phase8UC.ListOutsourcingFacts(ctx, biz.Phase8Filter{Limit: 1}); err != nil {
+	if d.operationalFactUC != nil {
+		if _, total, err := d.operationalFactUC.ListOutsourcingFacts(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
 			setTotal("processing-contracts", total)
 		}
-		if _, total, err := d.phase8UC.ListStockReservations(ctx, biz.Phase8Filter{Limit: 1}); err != nil {
+		if _, total, err := d.operationalFactUC.ListStockReservations(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
 			setTotal("inventory", total)
 		}
-		if _, total, err := d.phase8UC.ListShipments(ctx, biz.Phase8Filter{Limit: 1}); err != nil {
+		if _, total, err := d.operationalFactUC.ListShipments(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
 			setTotal("outbound", total)
 		}
-		if _, total, err := d.phase8UC.ListProductionFacts(ctx, biz.Phase8Filter{Limit: 1}); err != nil {
+		if _, total, err := d.operationalFactUC.ListProductionFacts(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
 			setTotal("production-progress", total)
 		}
-		if _, total, err := d.phase8UC.ListFinanceFacts(ctx, biz.Phase8Filter{Limit: 1}); err != nil {
+		if _, total, err := d.operationalFactUC.ListFinanceFacts(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
 			setTotal("reconciliation", total)

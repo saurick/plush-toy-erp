@@ -18,7 +18,7 @@
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
 - 当前数据库默认命中 `192.168.0.106:5432/plush_erp`
-- 当前账号表、工作流协同表、库存 / 采购 / 质检 / Phase 8 事实表和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购入库已接入独立 `purchase` JSON-RPC / RBAC 和业务看板入库 projection；具体目标库是否已 apply 仍以 `make migrate_status` 为准
+- 当前账号表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购入库已接入独立 `purchase` JSON-RPC / RBAC 和业务看板入库 projection；具体目标库是否已 apply 仍以 `make migrate_status` 为准
 - 采购、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM 当前只落最小主数据，不生成采购、生产或成本
 - 业务链路调试 seed / cleanup / 业务数据清空仅作为开发验收能力接入后端 `debug` JSON-RPC 域，默认面向当前 SQL 连接开启，可通过 `ERP_DEBUG_*` 环境变量显式关闭，并受管理员权限和业务链路调试菜单权限保护；业务数据清空按本项目当前业务表 allowlist 执行，不删除账号、权限、管理员偏好、配置和数据库结构；按 debugRunId 清理还会校验 debug 数据标记
 - 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred

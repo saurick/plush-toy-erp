@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func (d *JsonrpcData) handlePhase8(
+func (d *JsonrpcData) handleOperationalFact(
 	ctx context.Context,
 	method, id string,
 	params *structpb.Struct,
@@ -25,7 +25,7 @@ func (d *JsonrpcData) handlePhase8(
 	if _, res := d.requireAdmin(ctx); res != nil {
 		return id, res, nil
 	}
-	if d.phase8UC == nil {
+	if d.operationalFactUC == nil {
 		return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
 	}
 
@@ -34,31 +34,31 @@ func (d *JsonrpcData) handlePhase8(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanCreate, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
-		in, ok := phase8FactMutationFromParams(pm)
+		in, ok := operationalFactMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.phase8UC.CreateProductionFactDraft(ctx, in)
-		return id, phase8ProductionFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CreateProductionFactDraft(ctx, in)
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "post_production_fact", "postProductionFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.PostProductionFact(ctx, getInt(pm, "id", 0))
-		return id, phase8ProductionFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.PostProductionFact(ctx, getInt(pm, "id", 0))
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "cancel_production_fact", "cancelProductionFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.CancelPostedProductionFact(ctx, getInt(pm, "id", 0))
-		return id, phase8ProductionFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CancelPostedProductionFact(ctx, getInt(pm, "id", 0))
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "list_production_facts", "listProductionFacts":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.phase8UC.ListProductionFacts(ctx, phase8FilterFromParams(pm))
+		items, total, err := d.operationalFactUC.ListProductionFacts(ctx, operationalFactFilterFromParams(pm))
 		if err != nil {
-			return id, d.mapPhase8Error(ctx, err), nil
+			return id, d.mapOperationalFactError(ctx, err), nil
 		}
 		return id, okData(map[string]any{"production_facts": productionFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
 
@@ -66,31 +66,31 @@ func (d *JsonrpcData) handlePhase8(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseOrderCreate, biz.PermissionPurchaseOrderUpdate); res != nil {
 			return id, res, nil
 		}
-		in, ok := phase8FactMutationFromParams(pm)
+		in, ok := operationalFactMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.phase8UC.CreateOutsourcingFactDraft(ctx, in)
-		return id, phase8OutsourcingFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CreateOutsourcingFactDraft(ctx, in)
+		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "post_outsourcing_fact", "postOutsourcingFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseOrderUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.PostOutsourcingFact(ctx, getInt(pm, "id", 0))
-		return id, phase8OutsourcingFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.PostOutsourcingFact(ctx, getInt(pm, "id", 0))
+		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "cancel_outsourcing_fact", "cancelOutsourcingFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseOrderUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.CancelPostedOutsourcingFact(ctx, getInt(pm, "id", 0))
-		return id, phase8OutsourcingFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CancelPostedOutsourcingFact(ctx, getInt(pm, "id", 0))
+		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "list_outsourcing_facts", "listOutsourcingFacts":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseOrderRead, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.phase8UC.ListOutsourcingFacts(ctx, phase8FilterFromParams(pm))
+		items, total, err := d.operationalFactUC.ListOutsourcingFacts(ctx, operationalFactFilterFromParams(pm))
 		if err != nil {
-			return id, d.mapPhase8Error(ctx, err), nil
+			return id, d.mapOperationalFactError(ctx, err), nil
 		}
 		return id, okData(map[string]any{"outsourcing_facts": outsourcingFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
 
@@ -98,8 +98,8 @@ func (d *JsonrpcData) handlePhase8(
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.CreateShipmentDraft(ctx, shipmentCreateFromParams(pm))
-		return id, phase8ShipmentResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CreateShipmentDraft(ctx, shipmentCreateFromParams(pm))
+		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "add_shipment_item", "addShipmentItem":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
@@ -108,27 +108,27 @@ func (d *JsonrpcData) handlePhase8(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.phase8UC.AddShipmentItem(ctx, in)
-		return id, phase8ShipmentItemResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.AddShipmentItem(ctx, in)
+		return id, operationalFactShipmentItemResult(ctx, d, item, err), nil
 	case "ship_shipment", "shipShipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.ShipShipment(ctx, getInt(pm, "id", 0))
-		return id, phase8ShipmentResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.ShipShipment(ctx, getInt(pm, "id", 0))
+		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "cancel_shipment", "cancelShipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.CancelShippedShipment(ctx, getInt(pm, "id", 0))
-		return id, phase8ShipmentResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CancelShippedShipment(ctx, getInt(pm, "id", 0))
+		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "list_shipments", "listShipments":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.phase8UC.ListShipments(ctx, phase8FilterFromParams(pm))
+		items, total, err := d.operationalFactUC.ListShipments(ctx, operationalFactFilterFromParams(pm))
 		if err != nil {
-			return id, d.mapPhase8Error(ctx, err), nil
+			return id, d.mapOperationalFactError(ctx, err), nil
 		}
 		return id, okData(map[string]any{"shipments": shipmentsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
 
@@ -140,27 +140,27 @@ func (d *JsonrpcData) handlePhase8(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.phase8UC.CreateStockReservation(ctx, in)
-		return id, phase8StockReservationResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CreateStockReservation(ctx, in)
+		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "release_stock_reservation", "releaseStockReservation":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.ReleaseStockReservation(ctx, getInt(pm, "id", 0))
-		return id, phase8StockReservationResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.ReleaseStockReservation(ctx, getInt(pm, "id", 0))
+		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "consume_stock_reservation", "consumeStockReservation":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.ConsumeStockReservation(ctx, getInt(pm, "id", 0))
-		return id, phase8StockReservationResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.ConsumeStockReservation(ctx, getInt(pm, "id", 0))
+		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
 	case "list_stock_reservations", "listStockReservations":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionWarehouseInventoryRead, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.phase8UC.ListStockReservations(ctx, phase8FilterFromParams(pm))
+		items, total, err := d.operationalFactUC.ListStockReservations(ctx, operationalFactFilterFromParams(pm))
 		if err != nil {
-			return id, d.mapPhase8Error(ctx, err), nil
+			return id, d.mapOperationalFactError(ctx, err), nil
 		}
 		return id, okData(map[string]any{"stock_reservations": stockReservationsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
 
@@ -172,41 +172,41 @@ func (d *JsonrpcData) handlePhase8(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.phase8UC.CreateFinanceFactDraft(ctx, in)
-		return id, phase8FinanceFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CreateFinanceFactDraft(ctx, in)
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "post_finance_fact", "postFinanceFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableConfirm, biz.PermissionFinancePayableConfirm); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.PostFinanceFact(ctx, getInt(pm, "id", 0))
-		return id, phase8FinanceFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.PostFinanceFact(ctx, getInt(pm, "id", 0))
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "settle_finance_fact", "settleFinanceFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableConfirm, biz.PermissionFinancePayableConfirm); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.SettleFinanceFact(ctx, getInt(pm, "id", 0))
-		return id, phase8FinanceFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.SettleFinanceFact(ctx, getInt(pm, "id", 0))
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "cancel_finance_fact", "cancelFinanceFact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableConfirm, biz.PermissionFinancePayableConfirm); res != nil {
 			return id, res, nil
 		}
-		item, err := d.phase8UC.CancelPostedFinanceFact(ctx, getInt(pm, "id", 0))
-		return id, phase8FinanceFactResult(ctx, d, item, err), nil
+		item, err := d.operationalFactUC.CancelPostedFinanceFact(ctx, getInt(pm, "id", 0))
+		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "list_finance_facts", "listFinanceFacts":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionFinanceReceivableRead, biz.PermissionFinancePayableRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.phase8UC.ListFinanceFacts(ctx, phase8FilterFromParams(pm))
+		items, total, err := d.operationalFactUC.ListFinanceFacts(ctx, operationalFactFilterFromParams(pm))
 		if err != nil {
-			return id, d.mapPhase8Error(ctx, err), nil
+			return id, d.mapOperationalFactError(ctx, err), nil
 		}
 		return id, okData(map[string]any{"finance_facts": financeFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
 	default:
-		return id, &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知 phase8 接口 method=%s", method)}, nil
+		return id, &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知业务事实接口 method=%s", method)}, nil
 	}
 }
 
-func phase8FactMutationFromParams(pm map[string]any) (*biz.Phase8FactMutation, bool) {
+func operationalFactMutationFromParams(pm map[string]any) (*biz.OperationalFactMutation, bool) {
 	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
 	if !ok {
 		return nil, false
@@ -215,7 +215,7 @@ func phase8FactMutationFromParams(pm map[string]any) (*biz.Phase8FactMutation, b
 	if !ok {
 		return nil, false
 	}
-	return &biz.Phase8FactMutation{
+	return &biz.OperationalFactMutation{
 		FactNo:         getString(pm, "fact_no"),
 		FactType:       getString(pm, "fact_type"),
 		SubjectType:    getString(pm, "subject_type"),
@@ -314,8 +314,8 @@ func financeFactCreateFromParams(pm map[string]any) (*biz.FinanceFactCreate, boo
 	}, true
 }
 
-func phase8FilterFromParams(pm map[string]any) biz.Phase8Filter {
-	return biz.Phase8Filter{Status: getString(pm, "status"), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
+func operationalFactFilterFromParams(pm map[string]any) biz.OperationalFactFilter {
+	return biz.OperationalFactFilter{Status: getString(pm, "status"), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
 }
 
 func getOptionalInt(pm map[string]any, key string) *int {
@@ -341,53 +341,53 @@ func okData(data map[string]any) *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(data)}
 }
 
-func phase8ProductionFactResult(ctx context.Context, d *JsonrpcData, item *biz.ProductionFact, err error) *v1.JsonrpcResult {
+func operationalFactProductionFactResult(ctx context.Context, d *JsonrpcData, item *biz.ProductionFact, err error) *v1.JsonrpcResult {
 	if err != nil {
-		return d.mapPhase8Error(ctx, err)
+		return d.mapOperationalFactError(ctx, err)
 	}
 	return okData(map[string]any{"production_fact": productionFactToAny(item)})
 }
 
-func phase8OutsourcingFactResult(ctx context.Context, d *JsonrpcData, item *biz.OutsourcingFact, err error) *v1.JsonrpcResult {
+func operationalFactOutsourcingFactResult(ctx context.Context, d *JsonrpcData, item *biz.OutsourcingFact, err error) *v1.JsonrpcResult {
 	if err != nil {
-		return d.mapPhase8Error(ctx, err)
+		return d.mapOperationalFactError(ctx, err)
 	}
 	return okData(map[string]any{"outsourcing_fact": outsourcingFactToAny(item)})
 }
 
-func phase8ShipmentResult(ctx context.Context, d *JsonrpcData, item *biz.Shipment, err error) *v1.JsonrpcResult {
+func operationalFactShipmentResult(ctx context.Context, d *JsonrpcData, item *biz.Shipment, err error) *v1.JsonrpcResult {
 	if err != nil {
-		return d.mapPhase8Error(ctx, err)
+		return d.mapOperationalFactError(ctx, err)
 	}
 	return okData(map[string]any{"shipment": shipmentToAny(item)})
 }
 
-func phase8ShipmentItemResult(ctx context.Context, d *JsonrpcData, item *biz.ShipmentItem, err error) *v1.JsonrpcResult {
+func operationalFactShipmentItemResult(ctx context.Context, d *JsonrpcData, item *biz.ShipmentItem, err error) *v1.JsonrpcResult {
 	if err != nil {
-		return d.mapPhase8Error(ctx, err)
+		return d.mapOperationalFactError(ctx, err)
 	}
 	return okData(map[string]any{"shipment_item": shipmentItemToAny(item)})
 }
 
-func phase8StockReservationResult(ctx context.Context, d *JsonrpcData, item *biz.StockReservation, err error) *v1.JsonrpcResult {
+func operationalFactStockReservationResult(ctx context.Context, d *JsonrpcData, item *biz.StockReservation, err error) *v1.JsonrpcResult {
 	if err != nil {
-		return d.mapPhase8Error(ctx, err)
+		return d.mapOperationalFactError(ctx, err)
 	}
 	return okData(map[string]any{"stock_reservation": stockReservationToAny(item)})
 }
 
-func phase8FinanceFactResult(ctx context.Context, d *JsonrpcData, item *biz.FinanceFact, err error) *v1.JsonrpcResult {
+func operationalFactFinanceFactResult(ctx context.Context, d *JsonrpcData, item *biz.FinanceFact, err error) *v1.JsonrpcResult {
 	if err != nil {
-		return d.mapPhase8Error(ctx, err)
+		return d.mapOperationalFactError(ctx, err)
 	}
 	return okData(map[string]any{"finance_fact": financeFactToAny(item)})
 }
 
-func (d *JsonrpcData) mapPhase8Error(ctx context.Context, err error) *v1.JsonrpcResult {
+func (d *JsonrpcData) mapOperationalFactError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrBadParam):
-		l.Warnf("[phase8] invalid param err=%v", err)
+		l.Warnf("[operational_fact] invalid param err=%v", err)
 		return invalidParamResult()
 	case errors.Is(err, biz.ErrInventoryInsufficientStock):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足"}
@@ -404,7 +404,7 @@ func (d *JsonrpcData) mapPhase8Error(ctx context.Context, err error) *v1.Jsonrpc
 	case errors.Is(err, biz.ErrFinanceFactNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "财务事实不存在"}
 	default:
-		l.Errorf("[phase8] internal err=%v", err)
+		l.Errorf("[operational_fact] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}
 }

@@ -22,6 +22,10 @@ type readinessPinger interface {
 	PingContext(ctx context.Context) error
 }
 
+type templatePDFWarmupReadiness interface {
+	TemplatePDFWarmupReady() (bool, string, error)
+}
+
 type statusCapturingResponseWriter struct {
 	stdhttp.ResponseWriter
 	status int
@@ -168,7 +172,13 @@ func newObservedHTTPHandler(
 	})
 }
 
-func registerHealthRoutes(srv *httpx.Server, logger log.Logger, tp *sdktrace.TracerProvider, postgres readinessPinger) {
+func registerHealthRoutes(
+	srv *httpx.Server,
+	logger log.Logger,
+	tp *sdktrace.TracerProvider,
+	postgres readinessPinger,
+	pdfWarmup templatePDFWarmupReadiness,
+) {
 	healthLogger := log.NewHelper(log.With(logger, "logger.name", "server.http.health"))
 
 	srv.Handle("/ping", newObservedHTTPHandler(logger, tp, "server.http.ping", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
@@ -182,7 +192,6 @@ func registerHealthRoutes(srv *httpx.Server, logger log.Logger, tp *sdktrace.Tra
 	srv.Handle("/readyz", newObservedHTTPHandler(logger, tp, "server.http.readyz", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		if postgres != nil {
 			if err := postgres.PingContext(ctx); err != nil {
-				// 关键兜底：当前 readiness 只检查 Postgres 这一项通用硬依赖，避免把未来业务依赖预埋进来。
 				healthLogger.WithContext(ctx).Warnw(
 					"msg", "dependency not ready",
 					"operation", "server.http.readyz",
@@ -193,6 +202,29 @@ func registerHealthRoutes(srv *httpx.Server, logger log.Logger, tp *sdktrace.Tra
 					"error", err.Error(),
 				)
 				writePlainText(w, stdhttp.StatusServiceUnavailable, "postgres not ready")
+				return
+			}
+		}
+
+		if pdfWarmup != nil {
+			ready, body, err := pdfWarmup.TemplatePDFWarmupReady()
+			if !ready {
+				if body == "" {
+					body = "pdf warmup not ready"
+				}
+				logFields := []interface{}{
+					"msg", "dependency not ready",
+					"operation", "server.http.readyz",
+					"component", "template_pdf_warmup",
+					"status", stdhttp.StatusServiceUnavailable,
+					"request_id", requestIDFromRequest(r),
+					"trace_id", traceIDFromContext(ctx),
+				}
+				if err != nil {
+					logFields = append(logFields, "error", err.Error())
+				}
+				healthLogger.WithContext(ctx).Warnw(logFields...)
+				writePlainText(w, stdhttp.StatusServiceUnavailable, body)
 				return
 			}
 		}

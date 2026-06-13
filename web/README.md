@@ -195,8 +195,8 @@ pnpm smoke:processing-contract-real-login
 - 未登录访问桌面后台的重定向
 - 桌面工作台、任务看板和异常 / 阻塞闭环，包括协同任务筛选、任务详情抽屉、阻塞原因面板、催办、完成动作和运营工具入口
 - 桌面业务看板和模板打印中心
-- 标准业务模块连续回归，以及材料 BOM、入库通知/检验/入库、库存、出库的只读变体边界
-- 桌面业务页表格 / 日期范围筛选 / 列顺序账号偏好 / 弹窗布局 / 弹窗保存、批量删除、协同任务创建和回收站
+- 当前正式业务页连续回归，包括客户档案、供应商档案和销售订单 V1 页面
+- 当前正式业务页表格、筛选、列顺序账号偏好、弹窗布局和协同入口
 - 权限管理
 - 模板打印中心
 - 采购合同打印工作台
@@ -233,7 +233,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台继续只保留一个入口
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code
-- 桌面后台主业务菜单按基础资料、销售链路、采购/仓储、生产和财务收口；客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，并已复用业务页标准骨架展示标题统计、筛选、当前操作区、明细表和底部协同入口；产品及多数旧业务模块仍可能由 `BusinessModulePage` 承接 legacy/archive 列表、日期范围筛选、列顺序账号偏好、字段口径参考和打印带值候选，但运行时已禁用新建、保存、状态流转、删除、恢复、手工创建协同任务和从 archive 记录继续派生旧链路动作，普通 `business` API 也已拒绝保存、批量删除、恢复和通过 `business_records` 写 workflow 业务状态
+- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API。产品档案、BOM、采购、入库、质检、库存、委外、生产、出货和财务入口当前是正式页面壳，复用业务页标准骨架展示标题统计、筛选、当前操作区、表格、列顺序、导出、详情和底部协同入口；这些页面不读取或写入旧 `business_records`，真实写入仍待对应领域 usecase / schema / API / RBAC / 审计 / 测试接入。旧通用业务页、旧业务模块路由和旧入口退出页已删除。
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端生产环境统一走 `5175` 的 `/m/<role>/tasks`；按角色拆端口只作为本地开发调试入口保留，两者不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
@@ -244,7 +244,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - `docs/product/prototypes/admin-command-center-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`/erp/dashboard` 是后台首页 / 工作台，`/erp/task-board` 是任务看板，`/erp/business-dashboard` 是业务看板，`/erp/print-center` 是模板打印中心，`/erp/operations/exceptions` 是异常 / 阻塞闭环；工作台和业务看板保留后台运营中枢导航。未获用户明确确认前，不能把该资产改成 Current。
 - `docs/product/prototypes/print-template-center-v1/` 按 `待实现 / To Implement` 登记，补齐模板打印中心独立样板；当前运行时已按原型复核后的轻量两栏保留模板导航 / 预览和打印窗口入口，字段编辑回到独立打印窗口。该原型不新增样品确认单、字段映射配置、后端 API、RBAC、schema、migration 或 Fact 写入。
 - `/erp/task-board` 任务看板的关键词、状态、角色、到期和来源筛选使用 URL query 保存，支持复制链接、刷新恢复和一键清空；首屏按原型式四泳道展示本页待办、阻塞异常、今日到期和已完成协同，这些筛选和分组只影响当前页面展示，不写后端用户偏好、WorkflowUsecase 或事实表。
-- `docs/product/prototypes/business-module-page-standard-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`BusinessModulePage` 和共享业务列表组件承接通用业务页骨架，协同入口由共享协同面板承接；客户档案、供应商档案和销售订单 V1 页面也已复用同一标准页骨架；材料 BOM、入库通知/检验/入库、库存和出库额外补充只读变体区，强调 BOM、质检 / 入库、库存事实和出库事实边界。`/__dev/prototypes` 仍保留待实现队列，未获用户明确确认前不清空队列、不晋级 Current。
+- `docs/product/prototypes/business-module-page-standard-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时只保留客户档案、供应商档案和销售订单 V1 页面复用业务页骨架；旧 `BusinessModulePage`、旧通用业务页路由和旧只读变体页已删除。`/__dev/prototypes` 仍保留待实现队列，未获用户明确确认前不清空队列、不晋级 Current。
 - 当前业务页、岗位任务端页面、桌面工作台、任务看板、异常闭环、业务看板和模板预览已经齐入口；通用业务记录已落盘，采购合同 / 加工合同已支持业务页带值打开，桌面任务看板只处理 Workflow 协同任务，不直接写库存、出货、应收、开票、付款或其他事实表；Excel 导入、打印留档回写和细分业务专表继续 deferred
 
 ## 桌面业务弹窗约定

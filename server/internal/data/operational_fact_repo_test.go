@@ -13,13 +13,13 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func TestPhase8Repo_ProductionFactPostAndCancelWritesInventoryReversal(t *testing.T) {
+func TestOperationalFactRepo_ProductionFactPostAndCancelWritesInventoryReversal(t *testing.T) {
 	ctx := context.Background()
-	data, client := openInventoryRepoTestData(t, "phase8_production_fact")
+	data, client := openInventoryRepoTestData(t, "operational_fact_production")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	repo := NewPhase8Repo(data, log.NewStdLogger(io.Discard))
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
-	fact, err := repo.CreateProductionFactDraft(ctx, &biz.Phase8FactMutation{
+	fact, err := repo.CreateProductionFactDraft(ctx, &biz.OperationalFactMutation{
 		FactNo:         "PF-001",
 		FactType:       biz.ProductionFactFinishedGoodsReceipt,
 		SubjectType:    biz.InventorySubjectProduct,
@@ -36,7 +36,7 @@ func TestPhase8Repo_ProductionFactPostAndCancelWritesInventoryReversal(t *testin
 	if err != nil {
 		t.Fatalf("post production fact failed: %v", err)
 	}
-	if posted.Status != biz.Phase8StatusPosted {
+	if posted.Status != biz.OperationalFactStatusPosted {
 		t.Fatalf("expected POSTED, got %s", posted.Status)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionFactSourceType)).CountX(ctx); count != 1 {
@@ -46,7 +46,7 @@ func TestPhase8Repo_ProductionFactPostAndCancelWritesInventoryReversal(t *testin
 	if err != nil {
 		t.Fatalf("cancel production fact failed: %v", err)
 	}
-	if cancelled.Status != biz.Phase8StatusCancelled {
+	if cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ProductionFactSourceType)).CountX(ctx); count != 2 {
@@ -54,12 +54,12 @@ func TestPhase8Repo_ProductionFactPostAndCancelWritesInventoryReversal(t *testin
 	}
 }
 
-func TestPhase8Repo_StockReservationChecksAvailableQuantity(t *testing.T) {
+func TestOperationalFactRepo_StockReservationChecksAvailableQuantity(t *testing.T) {
 	ctx := context.Background()
-	data, client := openInventoryRepoTestData(t, "phase8_stock_reservation")
+	data, client := openInventoryRepoTestData(t, "operational_fact_reservation")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
-	repo := NewPhase8Repo(data, log.NewStdLogger(io.Discard))
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
@@ -96,12 +96,12 @@ func TestPhase8Repo_StockReservationChecksAvailableQuantity(t *testing.T) {
 	}
 }
 
-func TestPhase8Repo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T) {
+func TestOperationalFactRepo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T) {
 	ctx := context.Background()
-	data, client := openInventoryRepoTestData(t, "phase8_outsourcing_no_lot")
+	data, client := openInventoryRepoTestData(t, "operational_fact_outsourcing")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
-	repo := NewPhase8Repo(data, log.NewStdLogger(io.Discard))
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,
@@ -116,7 +116,7 @@ func TestPhase8Repo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T
 	}); err != nil {
 		t.Fatalf("seed product inventory failed: %v", err)
 	}
-	fact, err := repo.CreateOutsourcingFactDraft(ctx, &biz.Phase8FactMutation{
+	fact, err := repo.CreateOutsourcingFactDraft(ctx, &biz.OperationalFactMutation{
 		FactNo:         "OF-001",
 		FactType:       biz.OutsourcingFactMaterialIssue,
 		SubjectType:    biz.InventorySubjectProduct,
@@ -133,14 +133,14 @@ func TestPhase8Repo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T
 	if err != nil {
 		t.Fatalf("post outsourcing fact failed: %v", err)
 	}
-	if posted.Status != biz.Phase8StatusPosted {
+	if posted.Status != biz.OperationalFactStatusPosted {
 		t.Fatalf("expected POSTED, got %s", posted.Status)
 	}
 	cancelled, err := repo.CancelPostedOutsourcingFact(ctx, fact.ID)
 	if err != nil {
 		t.Fatalf("cancel outsourcing fact failed: %v", err)
 	}
-	if cancelled.Status != biz.Phase8StatusCancelled {
+	if cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType)).CountX(ctx); count != 2 {
@@ -148,12 +148,12 @@ func TestPhase8Repo_OutsourcingMaterialIssueWithoutLotPostAndCancel(t *testing.T
 	}
 }
 
-func TestPhase8Repo_ShipShipmentAndCancelWritesOutboundReversal(t *testing.T) {
+func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *testing.T) {
 	ctx := context.Background()
-	data, client := openInventoryRepoTestData(t, "phase8_shipment")
+	data, client := openInventoryRepoTestData(t, "operational_fact_shipment")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
-	repo := NewPhase8Repo(data, log.NewStdLogger(io.Discard))
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:    biz.InventorySubjectProduct,

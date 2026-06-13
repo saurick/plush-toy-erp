@@ -76,11 +76,7 @@ func (uc *AdminAuthUsecase) Tracer(opts ...trace.TracerOption) trace.Tracer {
 }
 
 func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string) (token string, expireAt time.Time, u *AdminUser, err error) {
-	ctx, span := uc.Tracer().Start(ctx, "admin_auth.login",
-		trace.WithAttributes(
-			attribute.String("admin_auth.username", username),
-		),
-	)
+	ctx, span := uc.Tracer().Start(ctx, "admin_auth.login")
 	defer span.End()
 
 	l := uc.log.WithContext(ctx)

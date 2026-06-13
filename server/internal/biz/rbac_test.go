@@ -195,9 +195,24 @@ func TestAdminVisibleMenusFiltersByPermissionCode(t *testing.T) {
 
 func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 	admin := &AdminUser{
-		ID:          2,
-		Username:    "operator",
-		Permissions: []string{PermissionCustomerRead, PermissionSupplierRead, PermissionSalesOrderRead, PermissionWarehouseInventoryRead},
+		ID:       2,
+		Username: "operator",
+		Permissions: []string{
+			PermissionCustomerRead,
+			PermissionSupplierRead,
+			PermissionSalesOrderRead,
+			PermissionPurchaseOrderRead,
+			PermissionPurchaseReceiptRead,
+			PermissionWarehouseInventoryRead,
+			PermissionWarehouseInboundRead,
+			PermissionWarehouseOutboundRead,
+			PermissionQualityInspectionRead,
+			PermissionFinancePayableRead,
+			PermissionFinanceReceivableRead,
+			PermissionFinanceReportRead,
+			PermissionPMCPlanRead,
+			PermissionPMCRiskRead,
+		},
 	}
 
 	paths := map[string]struct{}{}
@@ -210,11 +225,23 @@ func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 	if _, ok := paths["/erp/master/partners/suppliers"]; !ok {
 		t.Fatalf("expected suppliers formal master data menu")
 	}
-	if _, ok := paths["/erp/master/products"]; !ok {
-		t.Fatalf("expected products master data menu")
-	}
 	if _, ok := paths["/erp/sales/project-orders/sales-orders"]; !ok {
 		t.Fatalf("expected sales orders formal source document menu")
+	}
+	if _, ok := paths["/erp/master/products"]; !ok {
+		t.Fatalf("expected products formal shell menu")
+	}
+	if _, ok := paths["/erp/purchase/material-bom"]; !ok {
+		t.Fatalf("expected BOM formal shell menu")
+	}
+	if _, ok := paths["/erp/warehouse/inbound"]; !ok {
+		t.Fatalf("expected inbound formal shell menu")
+	}
+	if _, ok := paths["/erp/production/quality-inspections"]; !ok {
+		t.Fatalf("expected quality inspection formal shell menu")
+	}
+	if _, ok := paths["/erp/finance/receivables"]; !ok {
+		t.Fatalf("expected receivables formal shell menu")
 	}
 	if _, ok := paths["/erp/master/partners"]; ok {
 		t.Fatalf("old partners business_records entry must not be a visible formal menu")
@@ -241,8 +268,11 @@ func TestAdminMenusOmitRetiredFrontendDocsAndQAPaths(t *testing.T) {
 		if strings.HasPrefix(menu.Path, "/erp/qa/") {
 			t.Fatalf("QA menu must not be registered: %s", menu.Path)
 		}
-		if menu.Key == "phase8-facts" || menu.Path == "/erp/phase8/facts" {
-			t.Fatalf("phase8 internal facts page must not be registered as a menu")
+		if menu.Key == "operational-facts" || menu.Path == "/erp/operations/facts" {
+			t.Fatalf("operational fact internal page must not be registered as a menu")
+		}
+		if menu.Path == "/erp/master/partners" || menu.Path == "/erp/sales/project-orders" {
+			t.Fatalf("old business_records overlap path must not be registered: %s", menu.Path)
 		}
 	}
 }

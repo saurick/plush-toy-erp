@@ -19,8 +19,8 @@ trace:
     # endpoint: http://127.0.0.1:4318/v1/traces
     # gRPC endpoint
     # endpoint: http://127.0.0.1:4317
-    # 采集率,ratio>=1表示采集所有
-    ratio: 1
+    # 生产默认低采样；排障时可通过 TRACE_RATIO 临时调高，ratio>=1 表示采集所有。
+    ratio: 0.1
 
 # 数据相关
 data:

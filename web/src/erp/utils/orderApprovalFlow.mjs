@@ -203,7 +203,7 @@ export function buildEngineeringTaskFromApprovedOrder(
         includeMaterialBom: true,
       }),
       next_module_key: MATERIAL_BOM_MODULE_KEY,
-      entry_path: '/erp/purchase/material-bom',
+      entry_path: '/erp/business-dashboard',
       critical_path: true,
     },
   }

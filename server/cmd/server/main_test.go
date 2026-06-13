@@ -36,6 +36,51 @@ func TestNormalizeTraceRatio(t *testing.T) {
 	}
 }
 
+func TestResolveTraceEnvOverrides(t *testing.T) {
+	t.Parallel()
+
+	getenv := func(key string) string {
+		switch key {
+		case "TRACE_ENDPOINT":
+			return " jaeger:4318 "
+		case "TRACE_RATIO":
+			return "0.05"
+		default:
+			return ""
+		}
+	}
+	endpoint, ratio, err := resolveTraceEnvOverrides("127.0.0.1:4318", 1, getenv)
+	if err != nil {
+		t.Fatalf("resolveTraceEnvOverrides returned error: %v", err)
+	}
+	if endpoint != "jaeger:4318" {
+		t.Fatalf("endpoint = %q, want jaeger:4318", endpoint)
+	}
+	if ratio != 0.05 {
+		t.Fatalf("ratio = %v, want 0.05", ratio)
+	}
+}
+
+func TestResolveTraceEnvOverridesRejectsInvalidRatio(t *testing.T) {
+	t.Parallel()
+
+	endpoint, ratio, err := resolveTraceEnvOverrides("127.0.0.1:4318", 0.1, func(key string) string {
+		if key == "TRACE_RATIO" {
+			return "not-a-number"
+		}
+		return ""
+	})
+	if err == nil {
+		t.Fatal("expected invalid TRACE_RATIO error")
+	}
+	if endpoint != "127.0.0.1:4318" {
+		t.Fatalf("endpoint = %q, want original endpoint", endpoint)
+	}
+	if ratio != 0.1 {
+		t.Fatalf("ratio = %v, want original ratio", ratio)
+	}
+}
+
 func TestBuildTraceSamplerHonorsParentDecision(t *testing.T) {
 	t.Parallel()
 

@@ -49,10 +49,13 @@
 
 - `traceName` 为空时，会回退到 `cmd/server/main.go` 里的默认服务名。
 - `endpoint` 为空时，服务仍能启动，只是使用本地无 exporter 的 tracer provider。
+- `ratio` 会被夹到 `[0,1]`；生产默认低采样，排障时可临时调高，`1` 表示全量采样。
 - 当前通过 OTLP HTTP exporter 发 trace，仓库默认内置 Jaeger 作为 tracing 存储和查询入口。
 - 宿主机本地调试当前默认连 `192.168.0.106:4318`；若本机 Jaeger VM IP 变化，需同步改 dev 本地配置。
 - 宿主机线上进程当前默认连 `127.0.0.1:4318`。
 - Compose 里的 `app-server` 容器仍通过 `TRACE_ENDPOINT=jaeger:4318` 走容器网络，不读宿主机的 `127.0.0.1`。
+- Compose 里的 `TRACE_RATIO` 可覆盖 `trace.jaeger.ratio`，默认 `0.1`。
+- Compose 里的 Jaeger 宿主机端口默认由 `JAEGER_BIND_ADDR=127.0.0.1` 只绑定 loopback；需要远程查看时优先使用 SSH tunnel。
 - 如果后续改用其他 OTLP 兼容后端，只需替换 endpoint 和服务名即可。
 
 ## `data.postgres`
@@ -64,6 +67,7 @@
 
 - 这是当前仓库唯一真正运行时必需的数据依赖。
 - `debug=true` 时会输出更多 SQL 调试信息，更适合开发环境。
+- `data.postgres.debug` 只控制 Ent SQL debug 日志；SQL trace 独立接入 `otelsql`，当前不写入 SQL text、语句模板、bind args 或 SQL 参数值。
 - 本地开发默认 DSN 已收口到共享 PG `192.168.0.106:5432/plush_erp`。
 - 若你在数据库客户端里使用的是 `zos_test_user` 等其他账号，应该通过 `server/configs/dev/config.local.yaml` 或环境变量覆盖用户名和密码，而不是改公共仓库默认值。
 
@@ -142,6 +146,7 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 | --- | --- | --- |
 | `ERP_PDF_CHROME_PATH` | `/usr/bin/chromium` | Chrome / Chromium 可执行文件路径；本地开发可留空由服务自动探测系统 Chrome |
 | `ERP_PDF_RENDER_CONCURRENCY` | `2` | 同时渲染 PDF 的上限；低配服务器优先通过降低并发控制内存峰值 |
+| `ERP_PDF_WARMUP_ENABLED` | `true` | 服务启动后异步跑一次中文合同 PDF 渲染，提前启动共享 Chromium 并加载 CJK 字体；`/readyz` 在预热完成前保持未就绪，避免首个真实预览请求承担冷启动成本；排障或极低内存场景可设为 `false` |
 
 安全边界：
 
@@ -170,7 +175,7 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 - 生产环境：
   - `log.debug=false`
   - `data.postgres.debug=false`
-  - `trace.jaeger.ratio` 按观测成本控制
+  - `trace.jaeger.ratio=0.1` 或按观测成本调整
 
 ## 额外建议
 

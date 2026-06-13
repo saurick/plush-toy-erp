@@ -4,9 +4,9 @@
 
 | 类型 | 真源 | 用途 |
 | --- | --- | --- |
-| 业务记录事件 | `business_record_events` | 记录业务记录创建、编辑、删除、恢复等事实变化 |
 | 任务状态事件 | `workflow_task_events` | 记录任务创建、状态流转、阻塞、完成、退回和后续催办 |
 | 业务状态快照 | `workflow_business_states` | 保存来源单据当前业务状态、负责人和阻塞原因 |
+| 领域事件 | 各领域 usecase / 未来专项审计表 | 记录采购、库存、质检、出货、财务等真实业务动作；旧 `business_record_events` 已删除 |
 | 服务日志 | 结构化日志 | 排查接口、服务和外部依赖问题 |
 | trace / request_id | 请求链路上下文 | 串联一次请求经过的服务调用和错误定位 |
 
@@ -16,16 +16,13 @@
 - 审计日志不允许普通编辑删除；更正只能追加新事件或走受控恢复 / 作废动作。
 - `trace_id` / `request_id` 用于排查请求链路，业务审计不能依赖 trace 是否存在。
 - 移动端处理任务必须留下 `workflow_task_events`。
-- 业务记录创建、编辑、删除、恢复必须留下 `business_record_events`。
+- 领域业务动作必须留下对应领域审计线索；不得恢复旧 `business_record_events` 作为通用审计表。
 - 角色绑定、角色权限变更、打印带值打开应记录或预留审计入口。
 
 ## 当前事件口径
 
 | 动作 | 事件表 | 说明 |
 | --- | --- | --- |
-| 新建业务记录 | `business_record_events` | 记录模块、记录 ID、操作者和 payload |
-| 编辑业务记录 | `business_record_events` | 记录更新事件和业务状态变化说明 |
-| 删除 / 恢复业务记录 | `business_record_events` | 删除进入回收站，恢复追加事件 |
 | 创建协同任务 | `workflow_task_events` | 当前事件类型为创建类事件 |
 | 任务处理 / 阻塞 / 完成 / 退回 | `workflow_task_events` | 记录 from / to 状态、原因、角色和 payload |
 | 催办 / 升级任务 | `workflow_task_events` | 事件类型为 `urge_task`、`urge_role`、`urge_assignee`、`escalate_to_pmc` 或 `escalate_to_boss`，from / to 状态保持一致 |
@@ -70,6 +67,8 @@
 
 - 服务端日志优先结构化字段，禁止输出密码、密钥、完整 token 等敏感明文。
 - 关键链路应保留 request_id 或 trace_id，方便从页面报错追到服务日志。
+- SQL trace 不记录 SQL text、语句模板、bind args 或 SQL 参数值；如需定位数据问题，应通过受控业务 ID、request_id、trace_id 和审计事件串联，不把客户资料、账号、手机号、业务 payload、密码哈希等值写进 trace attribute。
+- 业务 trace attribute 不记录用户名、账号搜索词、手机号明文、密码哈希、token 或业务 payload 明文；可使用 ID、数量、状态、耗时或已脱敏值。
 - `/healthz` 和 `/readyz` 继续作为基础健康检查；`/readyz` 默认只检查 PostgreSQL 这种硬依赖。
 - 业务审计查询应优先按业务单据、任务 ID、来源单号和操作者定位，不依赖分布式 trace 是否完整。
 

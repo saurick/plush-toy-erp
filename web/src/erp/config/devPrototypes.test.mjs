@@ -30,10 +30,10 @@ test('devPrototypes: 只通过开发态独立路径暴露', () => {
 })
 
 test('devPrototypes: 登记当前原型与样板资产并区分类型和状态', () => {
-  assert.equal(DEV_PROTOTYPE_ASSETS.length, 15)
+  assert.equal(DEV_PROTOTYPE_ASSETS.length, 16)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'HTML').length,
-    9
+    10
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'PNG').length,
@@ -57,7 +57,7 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     DEV_PROTOTYPE_ASSETS.filter((item) =>
       item.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)
     ).length,
-    8
+    9
   )
   assert.deepEqual(
     DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => option.value),
@@ -82,6 +82,16 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'core-menu-coverage')
       ?.description || '',
     /51 个二级菜单/
+  )
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'formal-menu-candidate')
+      ?.statuses[0],
+    DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
+  )
+  assert.match(
+    DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'formal-menu-candidate')
+      ?.description || '',
+    /12 个高频主入口/
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find(
@@ -138,6 +148,8 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
         '<!doctype html><title>后台工作台样板</title>',
       '../../../../docs/product/prototypes/core-menu-coverage-v1/index.html':
         '<!doctype html><title>产品核心菜单覆盖样板</title>',
+      '../../../../docs/product/prototypes/formal-menu-candidate-v1/index.html':
+        '<!doctype html><title>正式菜单候选原型</title>',
       '../../../../docs/product/prototypes/business-module-page-standard-v1/index.html':
         '<!doctype html><title>业务模块标准页样板</title>',
       '../../../../docs/product/prototypes/print-template-center-v1/index.html':
@@ -167,6 +179,9 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const menuCoveragePrototype = items.find(
     (item) => item.key === 'core-menu-coverage'
   )
+  const formalMenuPrototype = items.find(
+    (item) => item.key === 'formal-menu-candidate'
+  )
   const detailPrototype = items.find(
     (item) => item.key === 'business-detail-standard-page'
   )
@@ -184,6 +199,8 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   assert.match(commandCenterPrototype?.source || '', /后台工作台样板/)
   assert.equal(menuCoveragePrototype?.available, true)
   assert.match(menuCoveragePrototype?.source || '', /产品核心菜单覆盖样板/)
+  assert.equal(formalMenuPrototype?.available, true)
+  assert.match(formalMenuPrototype?.source || '', /正式菜单候选原型/)
   assert.equal(businessPrototype?.available, true)
   assert.match(businessPrototype?.source || '', /业务模块标准页样板/)
   assert.equal(printPrototype?.available, true)
@@ -242,6 +259,12 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
   assert(
     filterDevPrototypeItems(items, {
       status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
+      keyword: '12 个高频主入口',
+    }).some((item) => item.key === 'formal-menu-candidate')
+  )
+  assert(
+    filterDevPrototypeItems(items, {
+      status: DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT,
       keyword: '销售订单',
     }).some((item) => item.key === 'business-module-standard-page')
   )
@@ -264,6 +287,7 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
     [
       'admin-command-center',
       'core-menu-coverage',
+      'formal-menu-candidate',
       'business-module-standard-page',
       'print-template-center',
       'business-task-collab-entry',
@@ -358,6 +382,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
     [
       'admin-command-center-v1/',
       'core-menu-coverage-v1/',
+      'formal-menu-candidate-v1/',
       'business-module-page-standard-v1/',
       'print-template-center-v1/',
       'business-detail-page-standard-v1/',
@@ -370,7 +395,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
   )
   assert.deepEqual(
     groups.map((group) => group.items.length),
-    [1, 1, 2, 1, 1, 1, 1, 3, 1, 3]
+    [1, 1, 1, 2, 1, 1, 1, 1, 3, 1, 3]
   )
 
   assert.deepEqual(

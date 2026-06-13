@@ -1,4 +1,4 @@
-// 首页只需要模块键和标题，单独拆一份轻量配置，避免把整份业务页定义打进首屏。
+// 首页只保留当前已经落地的正式业务对象入口。
 export const dashboardModules = Object.freeze([
   {
     key: 'customers',
@@ -10,78 +10,10 @@ export const dashboardModules = Object.freeze([
     title: '供应商档案',
     path: '/erp/master/partners/suppliers',
   },
-  { key: 'products', title: '产品', path: '/erp/master/products' },
   {
     key: 'sales-orders',
     title: '销售订单',
     path: '/erp/sales/project-orders/sales-orders',
-  },
-  {
-    key: 'material-bom',
-    title: '材料 BOM',
-    path: '/erp/purchase/material-bom',
-  },
-  {
-    key: 'accessories-purchase',
-    title: '辅材/包材采购',
-    path: '/erp/purchase/accessories',
-  },
-  {
-    key: 'processing-contracts',
-    title: '加工合同/委外下单',
-    path: '/erp/purchase/processing-contracts',
-  },
-  {
-    key: 'inbound',
-    title: '入库通知/检验/入库',
-    path: '/erp/warehouse/inbound',
-  },
-  { key: 'inventory', title: '库存', path: '/erp/warehouse/inventory' },
-  {
-    key: 'shipping-release',
-    title: '待出货/出货放行',
-    path: '/erp/warehouse/shipping-release',
-  },
-  { key: 'outbound', title: '出库', path: '/erp/warehouse/outbound' },
-  {
-    key: 'production-scheduling',
-    title: '生产排单',
-    path: '/erp/production/scheduling',
-  },
-  {
-    key: 'production-progress',
-    title: '生产进度',
-    path: '/erp/production/progress',
-  },
-  {
-    key: 'production-exceptions',
-    title: '延期/返工/异常',
-    path: '/erp/production/exceptions',
-  },
-  {
-    key: 'quality-inspections',
-    title: '品质检验',
-    path: '/erp/production/quality-inspections',
-  },
-  {
-    key: 'reconciliation',
-    title: '对账/结算',
-    path: '/erp/finance/reconciliation',
-  },
-  {
-    key: 'payables',
-    title: '待付款/应付提醒',
-    path: '/erp/finance/payables',
-  },
-  {
-    key: 'receivables',
-    title: '应收/开票登记',
-    path: '/erp/finance/receivables',
-  },
-  {
-    key: 'invoices',
-    title: '发票登记',
-    path: '/erp/finance/invoices',
   },
 ])
 
@@ -123,7 +55,7 @@ export const dashboardStatusGroups = Object.freeze([
   },
   {
     key: 'finance',
-    title: '对账/结算',
+    title: '财务协同',
     statusKeys: Object.freeze(['reconciling', 'settled']),
   },
   {

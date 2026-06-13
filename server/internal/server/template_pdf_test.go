@@ -108,6 +108,105 @@ func TestResolveTemplatePDFRenderConcurrency(t *testing.T) {
 	}
 }
 
+func TestResolveTemplatePDFWarmupEnabled(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		raw  string
+		want bool
+	}{
+		{raw: "", want: true},
+		{raw: "true", want: true},
+		{raw: "1", want: true},
+		{raw: "on", want: true},
+		{raw: "false", want: false},
+		{raw: "0", want: false},
+		{raw: "off", want: false},
+		{raw: "no", want: false},
+		{raw: "unexpected", want: true},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.raw, func(t *testing.T) {
+			t.Parallel()
+			if got := resolveTemplatePDFWarmupEnabled(tc.raw); got != tc.want {
+				t.Fatalf("resolveTemplatePDFWarmupEnabled(%q) = %v, want %v", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTemplatePDFWarmupStateReadyTransitions(t *testing.T) {
+	t.Parallel()
+
+	state := newTemplatePDFWarmupState()
+	if ready, body, err := state.TemplatePDFWarmupReady(); ready || body != "pdf warmup not ready" || err != nil {
+		t.Fatalf("initial readiness = (%v, %q, %v), want not ready", ready, body, err)
+	}
+
+	if !state.beginRun() {
+		t.Fatal("beginRun() = false, want true")
+	}
+	if ready, body, err := state.TemplatePDFWarmupReady(); ready || body != "pdf warmup not ready" || err != nil {
+		t.Fatalf("running readiness = (%v, %q, %v), want not ready", ready, body, err)
+	}
+
+	state.finishRun(templatePDFWarmupReady, nil)
+	if ready, body, err := state.TemplatePDFWarmupReady(); !ready || body != "" || err != nil {
+		t.Fatalf("ready readiness = (%v, %q, %v), want ready", ready, body, err)
+	}
+}
+
+func TestTemplatePDFWarmupStateFailedAndDisabled(t *testing.T) {
+	t.Parallel()
+
+	state := newTemplatePDFWarmupState()
+	if !state.beginRun() {
+		t.Fatal("beginRun() = false, want true")
+	}
+	warmupErr := errors.New("chromium missing")
+	state.finishRun(templatePDFWarmupFailed, warmupErr)
+	if ready, body, err := state.TemplatePDFWarmupReady(); ready || body != "pdf warmup failed" || !errors.Is(err, warmupErr) {
+		t.Fatalf("failed readiness = (%v, %q, %v), want failed", ready, body, err)
+	}
+
+	state.setDisabled()
+	if ready, body, err := state.TemplatePDFWarmupReady(); !ready || body != "" || err != nil {
+		t.Fatalf("disabled readiness = (%v, %q, %v), want ready", ready, body, err)
+	}
+}
+
+func TestTemplatePDFWarmupStateWaitIfRunning(t *testing.T) {
+	t.Parallel()
+
+	state := newTemplatePDFWarmupState()
+	if wait, err := state.WaitIfRunning(context.Background()); wait != 0 || err != nil {
+		t.Fatalf("WaitIfRunning(pending) = (%s, %v), want no wait", wait, err)
+	}
+
+	if !state.beginRun() {
+		t.Fatal("beginRun() = false, want true")
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := state.WaitIfRunning(context.Background())
+		done <- err
+	}()
+
+	time.Sleep(10 * time.Millisecond)
+	state.finishRun(templatePDFWarmupReady, nil)
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("WaitIfRunning() error = %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("WaitIfRunning() did not return after warmup finished")
+	}
+}
+
 func TestResolveTemplatePDFChromeExecPath(t *testing.T) {
 	t.Parallel()
 

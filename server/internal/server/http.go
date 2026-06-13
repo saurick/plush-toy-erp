@@ -60,7 +60,7 @@ func NewHTTPServer(
 	// 这里用的是 protoc --go-http_out 生成的注册函数
 	v1.RegisterJsonrpcHTTPServer(srv, jsonrpcSvc)
 
-	registerHealthRoutes(srv, logger, tp, data.SQLDB())
+	registerHealthRoutes(srv, logger, tp, data.SQLDB(), sharedTemplatePDFWarmupState)
 	registerTemplatePDFHandler(srv, logger, tp, dc)
 	registerStaticHandler(srv, logger, tp)
 

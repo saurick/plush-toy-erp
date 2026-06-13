@@ -96,11 +96,7 @@ func (uc *AuthUsecase) Tracer(opts ...trace.TracerOption) trace.Tracer {
 // ======================
 
 func (uc *AuthUsecase) Register(ctx context.Context, username, password string) (token string, expireAt time.Time, u *User, err error) {
-	ctx, span := uc.Tracer().Start(ctx, "auth.register",
-		trace.WithAttributes(
-			attribute.String("auth.username", username),
-		),
-	)
+	ctx, span := uc.Tracer().Start(ctx, "auth.register")
 	defer span.End()
 
 	l := uc.log.WithContext(ctx)
@@ -183,11 +179,7 @@ func (uc *AuthUsecase) Register(ctx context.Context, username, password string) 
 // ======================
 
 func (uc *AuthUsecase) Login(ctx context.Context, username, password string) (token string, expireAt time.Time, u *User, err error) {
-	ctx, span := uc.Tracer().Start(ctx, "auth.login",
-		trace.WithAttributes(
-			attribute.String("auth.username", username),
-		),
-	)
+	ctx, span := uc.Tracer().Start(ctx, "auth.login")
 	defer span.End()
 
 	l := uc.log.WithContext(ctx)

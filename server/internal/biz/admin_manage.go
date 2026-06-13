@@ -165,7 +165,6 @@ func (uc *AdminManageUsecase) Create(
 ) (created *AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_manage.create",
 		trace.WithAttributes(
-			attribute.String("admin.username", strings.TrimSpace(username)),
 			attribute.Int("admin.role_count", len(roleKeys)),
 		),
 	)

@@ -1,629 +1,424 @@
-import {
-  MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
-  PRINT_WORKSPACE_ENTRY_SOURCE,
-  PROCESSING_CONTRACT_TEMPLATE_KEY,
-  buildPrintCenterPath,
-} from '../utils/printWorkspace.js'
+const businessSectionMeta = Object.freeze([
+  { key: 'master', title: '主数据' },
+  { key: 'sales', title: '销售管理' },
+  { key: 'engineering', title: '产品工程' },
+  { key: 'purchase', title: '采购管理' },
+  { key: 'quality', title: '质检管理' },
+  { key: 'warehouse', title: '库存管理' },
+  { key: 'outsourcing', title: '委外管理' },
+  { key: 'production', title: '生产管理' },
+  { key: 'shipment', title: '出货管理' },
+  { key: 'finance', title: '财务业务' },
+])
 
-const businessSectionMeta = [
-  { key: 'master', title: '基础资料' },
-  { key: 'sales', title: '销售链路' },
-  { key: 'purchase', title: '采购/仓储' },
-  { key: 'production', title: '生产环节' },
-  { key: 'finance', title: '财务环节' },
-]
+const businessSectionTitleMap = new Map(
+  businessSectionMeta.map((section) => [section.key, section.title])
+)
 
-const businessModules = [
+export const businessModuleDefinitions = Object.freeze([
+  {
+    key: 'customers',
+    sectionKey: 'master',
+    label: '客户档案',
+    title: '客户档案',
+    path: '/erp/master/partners/customers',
+    shortLabel: '客户',
+    pageKind: 'formal-v1',
+    description:
+      '正式 customers 表入口，只维护客户交易主体；联系人随客户详情维护。',
+    primaryEntity: 'customers',
+    boundary:
+      '客户是 MasterData 交易主体，不写销售订单、出货、应收或收款事实。',
+  },
+  {
+    key: 'suppliers',
+    sectionKey: 'master',
+    label: '供应商档案',
+    title: '供应商档案',
+    path: '/erp/master/partners/suppliers',
+    shortLabel: '供应商',
+    pageKind: 'formal-v1',
+    description:
+      '正式 suppliers 表入口，只维护供应商 / 加工厂交易主体；联系人随供应商详情维护。',
+    primaryEntity: 'suppliers',
+    boundary:
+      '供应商 / 加工厂是 MasterData 主体，不直接等同采购、委外或应付事实。',
+  },
   {
     key: 'products',
-    title: '产品',
-    route: 'master/products',
     sectionKey: 'master',
-    status: 'source_grounded',
-    owner: '业务 + 采购 + PMC',
-    summary:
-      '当前产品页承接毛绒产品基础资料、产品资料编号、分类、规格/图号、中英文描述和附件引用，同时保留款式、SKU、色卡与作业指导引用。',
+    label: '产品档案',
+    title: '产品档案',
+    path: '/erp/master/products',
+    shortLabel: '产品',
+    pageKind: 'formal-shell',
     description:
-      '产品页先承接产品资料编号、分类、规格描述和当前毛绒业务所需的款式 / SKU / 附件引用，作为 BOM、加工合同、生产单和仓库收发的共同产品入口。',
+      '产品 SPU / 款式主档入口；先恢复产品资料列表体验，SKU / 颜色尺寸后续按字段真源评审。',
+    primaryEntity: 'products',
+    factSource: 'products',
+    boundary:
+      '产品档案不等于 SKU 全量模型、库存、BOM 或生产事实；真实写入必须走产品领域 usecase。',
+    sourceRefs: ['products', 'product_skus（后续评审）'],
     currentScope: [
-      '展示产品资料编号、产品分类、海关编码、规格/图号、中文描述、英文描述和附件引用。',
-      '继续保留款式编号、产品编号 / SKU、颜色、设计师、色卡、图片和作业指导书引用。',
-      '明确产品页与订单/款式立项、BOM、加工合同之间的字段关系。',
+      '产品编号、名称、分类、默认单位',
+      '产品状态和业务责任人',
+      'SKU / 规格后续在详情内承载',
     ],
-    keyFields: [
-      '产品资料编号、产品分类、海关编码',
-      '规格/图号、中文描述、英文描述',
-      '附件（图纸等）、色卡、图片、作业指导书引用',
-      '款式编号、产品编号 / SKU',
-    ],
-    upstream: ['材料分析明细表', '加工合同 PDF', '生产订单总表截图'],
-    downstream: ['材料 BOM', '加工合同/委外下单', '生产排单'],
-    mobileFocus: ['业务核对款式', '采购确认物料归属', '生产查看颜色款'],
-    sourceRefs: [
-      '26029 / 26204 材料分析表：款式编号、产品名称、颜色、数量。',
-      '加工合同 PDF：产品编号、产品名称。',
-      '生产订单总表截图：客户订单号、产品编号、产品名称、类别。',
-    ],
-    boundaries: [
-      '当前不把“款式编号 = SKU”硬并到一个字段里。',
-      '旧 products 通用业务记录入口已退出；正式产品资料能力复用现有 products 领域表，不再通过 business_records 写入。',
-    ],
+  },
+  {
+    key: 'sales-orders',
+    sectionKey: 'sales',
+    label: '销售订单',
+    title: '销售订单',
+    path: '/erp/sales/project-orders/sales-orders',
+    shortLabel: '销售订单',
+    pageKind: 'formal-v1',
+    description:
+      '正式 sales_orders 表入口，只记录客户订单承诺，不写出货、库存或财务事实。',
+    primaryEntity: 'sales_orders',
+    boundary:
+      '销售订单是 Source Document / Business Commitment，不直接生成出货、库存、应收、发票或收付款事实。',
   },
   {
     key: 'material-bom',
-    title: '材料 BOM',
-    route: 'purchase/material-bom',
-    sectionKey: 'purchase',
-    status: 'source_grounded',
-    owner: '业务 + 采购',
-    summary: '当前主料 BOM 完全以材料分析明细表为真源，不让采购汇总倒灌覆盖。',
+    sectionKey: 'engineering',
+    label: 'BOM 管理',
+    title: 'BOM 管理',
+    path: '/erp/purchase/material-bom',
+    shortLabel: 'BOM',
+    pageKind: 'formal-shell',
     description:
-      '材料 BOM 页负责承接主料明细、损耗、组装部位、加工方式和版本信息，是主料采购汇总与加工分析的上游真源。',
-    currentScope: [
-      '先收主料明细、单位用量、总用量含损耗、组装部位和加工程序。',
-      '明确材料分析汇总表只是 BOM 派生层，不反向覆盖明细真源。',
-      '把色卡、作业指导书和附件视作 BOM 的资料层，不塞进备注兜底。',
-    ],
-    keyFields: [
-      '物料名称 / 厂商料号 / 规格 / 单位',
-      '组装部位 / 单位用量 / 损耗 / 总用量',
-      '工艺说明 / 色卡 / 作业指导书',
-    ],
-    upstream: ['订单/款式立项', '产品'],
-    downstream: ['辅材/包材采购', '加工合同/委外下单', '打印模板中心'],
-    mobileFocus: ['采购看缺料', '业务核对资料版本'],
-    sourceRefs: [
-      '26029 材料分析明细：物料名称、规格、组装部位、单位用量、总用量含损耗。',
-      '26204 材料分析明细：材料类别、颜色、损耗%、加工方式。',
-      '材料分析汇总表：采购派生层，不是反向真源。',
-    ],
-    boundaries: [
-      '旧通用业务记录保存已退出；后续 BOM 写入必须回到 BOM 领域表、领域 API 和测试。',
-      '辅材 / 包材不会混到主料 BOM 页里。',
-    ],
+      'BOM 是产品结构和用量真源；物料、损耗和版本状态应回到 BOM 领域能力。',
+    primaryEntity: 'bom_headers / bom_items',
+    factSource: 'bom_headers, bom_items, materials',
+    boundary:
+      'BOM 管理不等于采购需求、采购入库或库存余额；同一产品 ACTIVE BOM 约束由后端事实层保证。',
+    sourceRefs: ['bom_headers', 'bom_items', 'materials', 'products'],
+    currentScope: ['产品结构版本', '材料用量和损耗率', 'BOM 状态与生效边界'],
   },
   {
     key: 'accessories-purchase',
-    title: '辅材/包材采购',
-    route: 'purchase/accessories',
     sectionKey: 'purchase',
-    status: 'source_grounded',
-    owner: '采购',
-    summary: '辅材/包材采购保留独立页面，不再和主料 BOM 或加工合同混成一张表。',
+    label: '采购订单',
+    title: '采购订单',
+    path: '/erp/purchase/accessories',
+    shortLabel: '采购',
+    pageKind: 'formal-shell',
     description:
-      '辅材/包材采购页承接独立采购表里的材料品名、规格、数量、单价和下单信息，用于包装材料和辅材的下单与跟催。',
-    currentScope: [
-      '展示辅材 / 包材采购清单的独立来源和字段口径。',
-      '把下单人、联系电话和金额公式列挂到采购快照层。',
-      '为包装材料打单、到仓和后续结算保留统一入口。',
-    ],
-    keyFields: [
-      '产品订单编号 / 产品编号 / 产品名称',
-      '材料品名 / 厂商料号或供应商名 / 规格 / 单位',
-      '采购数量 / 单价 / 金额 / 下单人 / 联系电话',
-    ],
-    upstream: ['订单/款式立项', '客户/供应商'],
-    downstream: ['入库通知/检验/入库', '待付款/应付提醒'],
-    mobileFocus: ['缺料确认', '到料提醒', '辅包材确认'],
+      '采购订单入口承接采购需求、供应商、物料和交期协同；完整采购订单模型后续评审。',
+    primaryEntity: 'purchase_orders（后续评审）',
+    factSource:
+      'purchase_receipts / purchase_returns 已有事实，采购订单主模型待评审',
+    boundary: '采购订单表达采购承诺，不等于采购收货、入库、退货或应付事实。',
     sourceRefs: [
-      '辅材、包材 成慧怡.xlsx：产品订单编号、材料品名、规格、采购数量、单价、下单人。',
-      '正式汇报版 PDF：包装材料独立支线，需要单独下单、到仓、检验和领用。',
+      'suppliers',
+      'materials',
+      'purchase_receipts',
+      'purchase_returns',
     ],
-    boundaries: [
-      '当前不把厂商料号缺失时的供应商简称强行标准化成主档码。',
-      '金额公式列只作为快照口径，不在页面里假装已完成财务核算。',
-    ],
-  },
-  {
-    key: 'processing-contracts',
-    title: '加工合同/委外下单',
-    route: 'purchase/processing-contracts',
-    sectionKey: 'purchase',
-    status: 'source_grounded',
-    owner: '采购 + 财务',
-    summary: '本项目正式承接的是委外加工合同和加工汇总，不是外贸采购合同。',
-    description:
-      '加工合同/委外下单页承接合同头、合同行、工序类别、单价、数量、金额、回货日期和结算条款，是委外加工和回签的主入口。',
-    currentScope: [
-      '先收合同编号、加工方、委托单位、工序类别、单价、数量和金额。',
-      '合同 PDF 作为正式打印快照，汇总表作为历史台账 / 导入源。',
-      '把纸样图片和附件明确为合同附件层，不继续沉在备注里。',
-    ],
-    keyFields: [
-      '合同编号 / 下单日期 / 回货日期',
-      '加工方 / 委托单位 / 联系人 / 联系电话',
-      '工序名称 / 工序类别 / 单价 / 数量 / 金额 / 备注',
-      '结算方式 / 合同条款 / 附图附件',
-    ],
-    upstream: ['客户/供应商', '产品', '材料 BOM'],
-    downstream: ['生产排单', '对账/结算', '打印模板中心'],
-    mobileFocus: ['单价确认', '加工厂回签', '结算节点提醒'],
-    sourceRefs: [
-      '9.3 加工合同 PDF：合同头、合同行、回货日期、结算方式、附件图样。',
-      '加工 成慧怡.xlsx：委外加工订单号、加工项目、厂家名称、工序类别、单价、数量、加工金额。',
-      '加工厂商资料：厂家简称、厂家全称、联系人、开票字段。',
-    ],
-    boundaries: [
-      '当前不把供应商采购字段和委外加工字段混成一个模型。',
-      '旧通用业务记录保存和业务页带值打印已退出；后续合同写入和带值打印必须走领域表或打印草稿输入评审。',
-    ],
+    currentScope: ['供应商与物料', '采购数量和交期', '采购收货 / 退货下游追溯'],
   },
   {
     key: 'inbound',
-    title: '入库通知/检验/入库',
-    route: 'warehouse/inbound',
-    sectionKey: 'purchase',
-    status: 'seeded',
-    owner: '仓库 + 品质',
-    summary: '当前入口统一承接主辅料到仓、IQC 和成品回仓三种入库场景。',
+    sectionKey: 'warehouse',
+    label: '入库管理',
+    title: '入库管理',
+    path: '/erp/warehouse/inbound',
+    shortLabel: '入库',
+    pageKind: 'formal-shell',
     description:
-      '入库通知/检验/入库页负责挂接主料、辅料、包材和成品的到仓、IQC、检验结论与允许入库节点，是库存真实增加前的检查页。',
-    currentScope: [
-      '统一挂主料到仓、辅包材到仓、成品回仓三类入库通知。',
-      '先明确仓库 + 品质 IQC 的流程位置与字段口径。',
-      '为后续允许入库、库存增加和异常件处理留统一上游入口。',
-    ],
-    keyFields: [
-      '来源单据 / 到仓日期 / 供应商或车间',
-      '物料或成品 / 数量 / 单位',
-      'IQC 结果 / 检验备注 / 是否允许入库',
-    ],
-    upstream: ['辅材/包材采购', '加工合同/委外下单', '生产进度'],
-    downstream: ['库存', '待出货/出货放行'],
-    mobileFocus: ['收货确认', 'IQC 结果回填', '异常件处理'],
+      '入库管理承接采购收货、待检、退货和入库确认视图；真实库存变化由采购 / 库存 usecase 写入。',
+    primaryEntity: 'purchase_receipts / purchase_receipt_items',
+    factSource: 'purchase_receipts, purchase_receipt_items, inventory_txns',
+    boundary:
+      '入库通知、检验和入库确认是流程视角；warehouse_inbound done 不等于 purchase_receipt posted。',
     sourceRefs: [
-      '正式汇报版 PDF：主料 / 辅料到仓后经过仓库 + 品质 IQC。',
-      '正式汇报版 PDF：车缝 / 手工完成后成品回仓并检验。',
+      'purchase_receipts',
+      'purchase_returns',
+      'inventory_lots',
+      'inventory_txns',
     ],
-    boundaries: [
-      '旧通用业务记录保存已退出；入库事实必须走采购、库存、质检或后续领域 usecase。',
-      '扩展硬件链路、PDA、条码枪继续 deferred，不在本页假装可用。',
+    currentScope: ['待收货', '待质检', '已入库', '退货 / 调整追溯'],
+  },
+  {
+    key: 'quality-inspections',
+    sectionKey: 'quality',
+    label: '来料质检',
+    title: '来料质检',
+    path: '/erp/production/quality-inspections',
+    shortLabel: '质检',
+    pageKind: 'formal-shell',
+    description:
+      '来料质检入口对应 quality_inspections 判定和批次状态变化，任务完成不替代质检事实。',
+    primaryEntity: 'quality_inspections',
+    factSource: 'quality_inspections, inventory_lots',
+    boundary:
+      '质检状态变化不写 inventory_txns；不合格退供应商仍走 purchase_returns。',
+    sourceRefs: ['quality_inspections', 'inventory_lots', 'purchase_receipts'],
+    currentScope: [
+      '待检批次',
+      '质检判定',
+      '批次 HOLD / ACTIVE / REJECTED 状态',
     ],
   },
   {
     key: 'inventory',
-    title: '库存',
-    route: 'warehouse/inventory',
-    sectionKey: 'purchase',
-    status: 'seeded',
-    owner: '仓库',
-    summary:
-      '当前库存口径承接主辅料、包装材料和成品仓的多类型库存，不只是一张发货库存表。',
+    sectionKey: 'warehouse',
+    label: '库存台账',
+    title: '库存台账',
+    path: '/erp/warehouse/inventory',
+    shortLabel: '库存',
+    pageKind: 'formal-shell',
     description:
-      '库存页负责承接允许入库后的库存快照，明确主料、辅包材、成品库存和待出货占用的查看口径。',
-    currentScope: [
-      '查看主料、辅材、包材和成品的库存占位与可用量。',
-      '明确库存是入库、出库、待出货放行的共享中枢。',
-      '为后续锁定量、异常件和出货占用预留结构说明。',
-    ],
-    keyFields: [
-      '仓库 / 货位',
-      '物料或成品名称 / 规格 / 单位',
-      '库存数量 / 待出货占用 / 可用量',
-    ],
-    upstream: ['入库通知/检验/入库'],
-    downstream: ['待出货/出货放行', '出库'],
-    mobileFocus: ['查看可用库存', '确认备料', '核对异常件'],
-    sourceRefs: [
-      '正式汇报版 PDF：到仓、入库、成品仓和发货放行已经明确是同一条库存链路。',
-      '生产订单总表截图：未出货数与出货日期需要和库存联动查看。',
-    ],
-    boundaries: [
-      '当前不伪造实时库存算法，只先把页面与字段口径补齐。',
-      '不会把外销独占库存口径搬进当前库存模型。',
-    ],
+      '库存台账统一查看库存余额、批次和流水；库存事实以库存流水、余额和批次状态为准。',
+    primaryEntity: 'inventory_balances / inventory_txns / inventory_lots',
+    factSource: 'inventory_txns, inventory_balances, inventory_lots',
+    boundary:
+      '库存台账是事实视图，不允许前端本地伪造入库、出库、预留、调拨或调整事实。',
+    sourceRefs: ['inventory_txns', 'inventory_balances', 'inventory_lots'],
+    currentScope: ['库存余额', '库存批次', '库存流水', '盘点 / 调整后续动作'],
   },
   {
-    key: 'shipping-release',
-    title: '待出货/出货放行',
-    route: 'warehouse/shipping-release',
-    sectionKey: 'purchase',
-    status: 'seeded',
-    owner: '业务 + 仓库 + 财务',
-    summary:
-      '待出货/出货放行关注的是待出货、放行和发货前检查，而不是外贸出运单。',
+    key: 'processing-contracts',
+    sectionKey: 'outsourcing',
+    label: '委外订单',
+    title: '委外订单',
+    path: '/erp/purchase/processing-contracts',
+    shortLabel: '委外',
+    pageKind: 'formal-shell',
     description:
-      '待出货/出货放行页负责在客户确认、仓库出货单和财务放行之间做发货前检查，统一看待出货数量、放行状态和发货准备。',
+      '委外订单承接外发加工安排、合同打印和回货协同；委外发料 / 回货事实后续单独评审。',
+    primaryEntity: 'outsourcing_orders（后续评审）',
+    factSource: 'workflow_tasks / print templates 当前承载，委外事实待评审',
+    boundary:
+      '委外合同和任务不等于发料、回货、库存或应付事实；合同打印快照不替代结算事实。',
+    sourceRefs: ['suppliers', 'workflow_tasks', 'print templates'],
     currentScope: [
-      '集中展示待出货订单、成品可发状态和发货前检查节点。',
-      '把业务确认、仓库出货单和财务放行三方动作挂到同一页。',
-      '为后续出库和打印留统一上游入口。',
-    ],
-    keyFields: [
-      '客户 / 订单 / 款式 / 出货日期',
-      '待出货数量 / 成品库存 / 放行状态',
-      '业务确认 / 仓库确认 / 财务放行',
-    ],
-    upstream: ['库存', '生产进度'],
-    downstream: ['出库', '打印模板中心'],
-    mobileFocus: ['待出货检查', '发货前确认', '异常放行提醒'],
-    sourceRefs: [
-      '正式汇报版 PDF：业务确认 + 仓库出货单 + 财务放行后发货。',
-      '生产订单总表截图：出货日期、未出货数。',
-    ],
-    boundaries: [
-      '当前不引入外贸运输、港口、发票号字段。',
-      '发货单、物流单等正式模板仍以后续样本为准，本页先补流程入口。',
-    ],
-  },
-  {
-    key: 'outbound',
-    title: '出库',
-    route: 'warehouse/outbound',
-    sectionKey: 'purchase',
-    status: 'seeded',
-    owner: '仓库',
-    summary: '当前出库服务的是待出货放行后的仓库发货，不和外贸出运字段耦合。',
-    description:
-      '出库页负责承接待出货放行后的真实出库动作，明确出库数量、仓位、关联订单和备注，是库存扣减的正式入口。',
-    currentScope: [
-      '统一挂发货出库、备料出库和异常返还出库的主入口。',
-      '为后续库存扣减、待出货闭环和成品仓核对留统一页面。',
-      '旧通用业务记录保存已退出；出库事实必须走库存 / 出货领域 usecase，不在前端保存旧记录。',
-    ],
-    keyFields: [
-      '关联订单 / 待出货来源',
-      '产品 / 数量 / 仓库 / 货位',
-      '出库日期 / 备注 / 经手人',
-    ],
-    upstream: ['待出货/出货放行', '库存'],
-    downstream: ['对账/结算'],
-    mobileFocus: ['仓库确认出库', '发货异常上报'],
-    sourceRefs: [
-      '正式汇报版 PDF：仓库出货单是发货前正式节点之一。',
-      '生产订单总表截图：未出货数需要和出库动作联动。',
-    ],
-    boundaries: [
-      '当前不会照搬发票号、来源外销号等外贸字段。',
-      '库存扣减仍以后续库存专表和状态迁移为准；本页不再保存旧出库业务记录。',
+      '委外供应商',
+      '加工内容',
+      '交期和合同状态',
+      '发料 / 回货后续动作',
     ],
   },
   {
     key: 'production-scheduling',
-    title: '生产排单',
-    route: 'production/scheduling',
     sectionKey: 'production',
-    status: 'source_grounded',
-    owner: 'PMC + 生产经理',
-    summary:
-      '这是毛绒 ERP 当前最明确的业务页之一：根据正式汇报版 PDF 已能确认排单、齐套和车缝 / 手工 / 内外发决策入口。',
+    label: '生产排程',
+    title: '生产排程',
+    path: '/erp/production/scheduling',
+    shortLabel: '排程',
+    pageKind: 'formal-shell',
     description:
-      '生产排单页负责承接齐套、排产、车缝 / 手工 / 内外发决策和今日排产，是生产侧的正式业务入口。',
-    currentScope: [
-      '集中展示待排单订单、齐套状态和生产经理决策节点。',
-      '把 PMC 与生产经理的桌面职责落成独立业务页，而不是继续停在汇报图。',
-      '为移动端今日排产和进度回填留统一上游入口。',
-    ],
-    keyFields: [
-      '订单 / 款式 / 数量 / 交期',
-      '齐套状态 / 排单日期 / 负责人',
-      '车缝 / 手工 / 内外发决策',
-    ],
-    upstream: ['订单/款式立项', '材料 BOM', '加工合同/委外下单'],
-    downstream: ['生产进度', '延期/返工/异常', '入库通知/检验/入库'],
-    mobileFocus: ['今日排产', '任务分派', '齐套提醒'],
-    sourceRefs: [
-      '正式汇报版 PDF 第 4 页：PMC 全流程跟进，生产经理决定车缝 / 手工 / 内外发。',
-      '正式汇报版 PDF 第 7 页：PMC 看板、生产经理看板。',
-    ],
-    boundaries: [
-      '当前不接工时采集、设备采集或现场硬件链路。',
-      '排单页先承接流程和字段，不抢跑到实时产能算法。',
-    ],
+      '生产排程是计划与任务协同入口，不代表生产完工、领料或成品入库事实。',
+    primaryEntity: 'production_orders（后续评审）',
+    factSource:
+      'workflow_tasks / pmc plan permissions 当前承载，生产事实待评审',
+    boundary:
+      '生产排程只表达计划和协同任务；完工、领料和成品入库必须由领域 usecase 写事实。',
+    sourceRefs: ['workflow_tasks', 'sales_orders', 'bom_headers'],
+    currentScope: ['订单齐套', '生产计划', '责任角色', '延期风险'],
   },
   {
     key: 'production-progress',
-    title: '生产进度',
-    route: 'production/progress',
     sectionKey: 'production',
-    status: 'source_grounded',
-    owner: 'PMC + 生产',
-    summary:
-      '借助正式汇报版 PDF 和生产订单总表截图，生产进度页可以先落成真实业务页，而不是继续把“进度回填”埋在移动端口径里。',
+    label: '生产进度',
+    title: '生产进度',
+    path: '/erp/production/progress',
+    shortLabel: '进度',
+    pageKind: 'formal-shell',
     description:
-      '生产进度页负责承接在制数量、未出货数、工序进度和进度回填，统一给桌面后台和移动端查看。',
+      '生产进度用于跟进过程状态和上报计划；上报不等于库存、出货或财务事实。',
+    primaryEntity: 'production_progress（后续评审）',
+    factSource: 'workflow_tasks / operational facts 当前承载，生产事实待评审',
+    boundary:
+      '进度回填是过程状态，不自动写成品入库、库存扣减、出货或应收事实。',
+    sourceRefs: ['workflow_tasks', 'operational facts', 'sales_orders'],
     currentScope: [
-      '先挂在制进度、生产数量、未出货数和回填动作。',
-      '把桌面端总览和移动端“今日进度回填”对齐到同一页口径。',
-      '为延期、返工和异常页提供统一上游状态。',
-    ],
-    keyFields: [
-      '订单数量 / 生产数量 / 未出货数',
-      '当前工序 / 责任人 / 最新回填时间',
-      '交期状态 / 是否延期',
-    ],
-    upstream: ['生产排单'],
-    downstream: ['延期/返工/异常', '待出货/出货放行'],
-    mobileFocus: ['进度回填', '交期预警', '完工确认'],
-    sourceRefs: [
-      '生产订单总表截图：订单数量、生产数量、未出货数、单价、类别。',
-      '正式汇报版 PDF 第 7 页：PMC / 生产经理移动端重点。',
-    ],
-    boundaries: [
-      '当前进度页先承接信息结构，不伪造实时报工与现场采集。',
-      '返工和异常不会继续沉在备注，会拆到独立页承接。',
+      '开工 / 进行中 / 完工视图',
+      '异常回填',
+      '生产经理和 PMC 跟进',
     ],
   },
   {
     key: 'production-exceptions',
-    title: '延期/返工/异常',
-    route: 'production/exceptions',
     sectionKey: 'production',
-    status: 'source_grounded',
-    owner: 'PMC + 生产经理 + 管理层',
-    summary:
-      '当前真源已经明确返工和异常不能继续沉在备注里，所以独立补一页，避免业务问题没有固定入口。',
+    label: '生产异常',
+    title: '生产异常',
+    path: '/erp/production/exceptions',
+    shortLabel: '异常',
+    pageKind: 'formal-shell',
     description:
-      '延期/返工/异常页承接延期原因、返工记录、异常任务和责任归属，是管理层、PMC 与生产协同的异常中心。',
-    currentScope: [
-      '集中挂延期原因、返工记录、异常件和待处理任务。',
-      '给老板、PMC、生产经理提供统一异常视图。',
-      '为后续统计和移动端异常上报预留正式入口。',
-    ],
-    keyFields: [
-      '异常类型 / 发生时间 / 责任角色',
-      '延期原因 / 返工说明 / 当前状态',
-      '影响订单 / 款式 / 数量',
-    ],
-    upstream: ['生产排单', '生产进度'],
-    downstream: ['待出货/出货放行', '对账/结算'],
-    mobileFocus: ['延期原因上报', '返工确认', '异常任务处理'],
+      '生产异常用于延期、返工和阻塞协同；异常闭环仍属于 Workflow / 协同层。',
+    primaryEntity: 'workflow_tasks / workflow_task_events',
+    factSource: 'workflow_tasks, workflow_task_events',
+    boundary:
+      '异常处理不直接改变生产、库存、出货或财务事实，也不新增客户工单系统。',
     sourceRefs: [
-      '正式汇报版 PDF 第 7 页：外发延期、异常任务、返工异常。',
-      '正式汇报版 PDF 第 4 页：老板视角要看延期预警与异常订单。',
+      'workflow_tasks',
+      'workflow_task_events',
+      'workflow_business_states',
     ],
-    boundaries: [
-      '旧通用业务记录保存已退出；异常协同只保留 Workflow 任务和状态投影，复杂异常工单系统继续后续拆。',
-      '不会再把异常长期放在生产备注或聊天记录里。',
-    ],
+    currentScope: ['延期', '返工', '阻塞', '退回和催办'],
   },
   {
-    key: 'quality-inspections',
-    title: '品质检验',
-    route: 'production/quality-inspections',
-    sectionKey: 'production',
-    status: 'seeded',
-    owner: '品质 + 仓库 + 生产经理',
-    summary:
-      '品质检验独立承接 IQC、委外回货检验、成品抽检、返工复检和放行结论，不让 PMC 或仓库代填质量事实。',
+    key: 'shipping-release',
+    sectionKey: 'shipment',
+    label: '出货放行',
+    title: '出货放行',
+    path: '/erp/warehouse/shipping-release',
+    shortLabel: '放行',
+    pageKind: 'formal-shell',
     description:
-      '品质检验页负责记录来料、委外回货和成品的检验结果、不良原因、返工要求和放行决策，是仓库入库与出货放行前的质量事实入口。',
-    currentScope: [
-      '覆盖 IQC、委外回货检验、成品抽检、返工复检和品质放行。',
-      '记录检验类型、检验结论、不良数量、不良原因、返工要求和放行决策。',
-      '与入库、库存、生产异常和出货放行保持关联，但不替代仓库收发存事实。',
-    ],
-    keyFields: [
-      '检验单号 / 来源单号 / 检验类型',
-      '供应商 / 客户 / 款式 / 产品 / 物料',
-      '检验数量 / 不良数量 / 不良原因',
-      '返工要求 / 放行决策 / 复检结论',
-    ],
-    upstream: ['入库通知/检验/入库', '加工合同/委外下单', '生产进度'],
-    downstream: ['库存', '延期/返工/异常', '待出货/出货放行'],
-    mobileFocus: ['IQC 待检', '不良登记', '返工复检', '放行 / 退回反馈'],
+      '出货放行用于销售、仓库、品质和财务在发货前确认条件；放行不等于真实 shipped。',
+    primaryEntity: 'shipments（后续评审）',
+    factSource: 'workflow_business_states 当前承载，ShipmentUsecase 待评审',
+    boundary:
+      'shipping_released 不等于 shipped，不自动扣库存、生成应收、开票或收付款事实。',
     sourceRefs: [
-      '正式汇报版 PDF：主料 / 辅料到仓后经过仓库 + 品质 IQC。',
-      '正式汇报版 PDF：委外回货和成品回仓后需要检验，再进入入库和出货放行。',
-      '生产异常口径：返工和质量异常必须形成可追踪任务，不继续沉在备注。',
+      'workflow_business_states',
+      'sales_orders',
+      'inventory_balances',
     ],
-    boundaries: [
-      '本轮不做复杂 AQL 算法，只记录当前检验事实和结论。',
-      '本轮不做图片识别、PDA、条码枪或硬件扫码。',
-      '品质只负责检验结论和放行，不代替仓库确认入库 / 出库数量。',
-    ],
+    currentScope: ['待放行订单', '缺料 / 质检 / 财务风险', '放行后出库下游'],
+  },
+  {
+    key: 'outbound',
+    sectionKey: 'shipment',
+    label: '出库管理',
+    title: '出库管理',
+    path: '/erp/warehouse/outbound',
+    shortLabel: '出库',
+    pageKind: 'formal-shell',
+    description:
+      '出库管理是库存扣减和发货确认候选入口；真实出库必须由 Inventory / Shipment usecase 控制。',
+    primaryEntity: 'inventory_txns / shipments（后续评审）',
+    factSource: 'inventory_txns 当前为库存事实流水',
+    boundary:
+      '出库才可能触发库存扣减事实；不能把出货放行或任务完成当成出库事实。',
+    sourceRefs: ['inventory_txns', 'inventory_balances', 'sales_orders'],
+    currentScope: ['待出库', '已出库', '缺料风险', '出库冲正后续评审'],
   },
   {
     key: 'reconciliation',
-    title: '对账/结算',
-    route: 'finance/reconciliation',
     sectionKey: 'finance',
-    status: 'source_grounded',
-    owner: '财务',
-    summary:
-      '当前财务页根据加工合同和辅包材金额样本，先落对账/结算这一层更贴合工厂业务的页面。',
-    description:
-      '对账/结算页承接加工费、辅包材采购金额、对账周期、异常费用和应付确认，是当前毛绒 ERP 财务链的正式入口。',
-    currentScope: [
-      '先挂加工费、辅包材费用、对账周期和结算提醒。',
-      '把合同里的结算条款和 Excel 里的金额快照收口到同一页。',
-      '为后续正式结算单与对账单样本接入留统一入口。',
-    ],
-    keyFields: [
-      '结算对象 / 结算期间',
-      '加工费 / 采购金额 / 异常费用',
-      '对账状态 / 付款状态 / 备注',
-    ],
-    upstream: ['加工合同/委外下单', '辅材/包材采购', '出库'],
-    downstream: ['待付款/应付提醒'],
-    mobileFocus: ['待对账提醒', '异常费用确认', '结算提醒'],
+    label: '对账管理',
+    title: '对账管理',
+    path: '/erp/finance/reconciliation',
+    shortLabel: '对账',
+    pageKind: 'formal-shell',
+    description: '对账管理承接应收、应付和收付款核对入口；对账不是总账凭证。',
+    primaryEntity: 'finance_facts（后续评审）',
+    factSource: 'finance fact usecase 待评审',
+    boundary: '对账 / 结算不自动写付款、应收、应付、发票或总账事实。',
     sourceRefs: [
-      '加工合同 PDF：对账周期、结算方式、付款条款。',
-      '加工汇总 Excel：加工金额公式列。',
-      '辅材、包材采购表：金额、下单人、联系电话。',
+      'sales_orders',
+      'purchase_receipts',
+      'workflow_business_states',
     ],
-    boundaries: [
-      '当前还缺正式对账单 / 结算单样本，不假装账务模型已经完整。',
-      '不会把结汇、水单认领概念硬套进当前财务页。',
-    ],
+    currentScope: ['应收核对', '应付核对', '差异处理', '收付款后续记录'],
   },
   {
     key: 'payables',
-    title: '待付款/应付提醒',
-    route: 'finance/payables',
     sectionKey: 'finance',
-    status: 'seeded',
-    owner: '财务 + 管理层',
-    summary: '待付款/应付提醒承接毛绒工厂当前最现实的支付关注点。',
+    label: '应付管理',
+    title: '应付管理',
+    path: '/erp/finance/payables',
+    shortLabel: '应付',
+    pageKind: 'formal-shell',
     description:
-      '待付款/应付提醒页负责汇总加工费、辅包材采购和异常费用的待付款提醒，作为财务岗位任务端和管理层的跟进页。',
-    currentScope: [
-      '集中展示待付款、付款节奏和异常费用提醒。',
-      '为财务岗位任务端“待付款 / 异常费用 / 结算提醒”补齐桌面端对应页面。',
-      '后续若拿到正式付款单样本，可在本页继续细化。',
-    ],
-    keyFields: [
-      '结算对象 / 到期日期 / 待付金额',
-      '费用类型 / 优先级 / 当前处理人',
-      '异常说明 / 付款备注',
-    ],
-    upstream: ['对账/结算'],
-    downstream: ['打印模板中心'],
-    mobileFocus: ['待付款提醒', '异常费用提醒', '老板查看风险'],
-    sourceRefs: [
-      '正式汇报版 PDF：老板与财务都要看待结算与异常费用。',
-      '加工合同条款：次月对账、付款周期。',
-      '辅包材与加工汇总金额列：当前待付款提醒的金额来源。',
-    ],
-    boundaries: [
-      '当前没有正式付款审批单样本，本页先作为提醒页，不伪装成完整审批流。',
-      '不会引入不属于当前业务的收汇 / 水单认领字段。',
-    ],
+      '应付管理用于采购、委外和费用来源的应付提醒；完整应付事实后续评审。',
+    primaryEntity: 'finance_payables（后续评审）',
+    factSource: 'finance fact usecase 待评审',
+    boundary:
+      '待付款提醒不是付款事实或审批事实，应付来源必须回到采购、委外或对账事实。',
+    sourceRefs: ['purchase_receipts', 'suppliers', 'processing contracts'],
+    currentScope: ['待确认应付', '供应商对账', '付款提醒', '差异说明'],
   },
   {
     key: 'receivables',
-    title: '应收/开票登记',
-    route: 'finance/receivables',
     sectionKey: 'finance',
-    status: 'seeded',
-    owner: '财务 + 业务',
-    summary:
-      '应收/开票登记承接出货后的客户应收金额、收款状态、开票状态和异常金额，不进入总账或凭证。',
+    label: '应收管理',
+    title: '应收管理',
+    path: '/erp/finance/receivables',
+    shortLabel: '应收',
+    pageKind: 'formal-shell',
     description:
-      '应收/开票登记页后续负责把出货后的客户应收、含税金额、不含税金额、税额、已收金额和结算备注落到财务领域模型；当前不再写旧通用业务记录。',
-    currentScope: [
-      '覆盖出货后应收、客户应收金额、收款状态、异常金额和开票状态。',
-      '记录税率、税额、含税金额、不含税金额、已收金额和结算说明。',
-      '与待出货 / 出库、对账 / 结算和发票登记关联查看。',
-    ],
-    keyFields: [
-      '应收单号 / 来源出货单 / 客户',
-      '产品 / 数量 / 应收金额',
-      '税率 / 税额 / 含税金额 / 不含税金额',
-      '已收金额 / 收款状态 / 开票状态 / 异常备注',
-    ],
-    upstream: ['出库', '待出货/出货放行', '对账/结算'],
-    downstream: ['发票登记', '打印模板中心'],
-    mobileFocus: ['待收款提醒', '异常金额确认', '老板查看财务风险'],
+      '应收管理用于出货后应收确认和开票登记前置视图；完整应收事实后续评审。',
+    primaryEntity: 'finance_receivables（后续评审）',
+    factSource: 'finance fact usecase 待评审',
+    boundary:
+      '应收至少应在真实 shipped 后评审，不由销售订单、出货放行或任务完成直接生成。',
     sourceRefs: [
-      '正式汇报版 PDF：发货前需要财务放行，发货后进入结算关注。',
-      '生产订单总表截图：出货日期和未出货数是应收触发的重要业务快照。',
-      '当前财务链路：对账 / 结算和待付款已落入口，应收需要独立补齐。',
+      'sales_orders',
+      'shipments（后续评审）',
+      'workflow_business_states',
     ],
-    boundaries: [
-      '本轮不做总账、凭证、纳税申报或多账簿。',
-      '应收登记只记录业务应收事实和状态，不伪造会计分录。',
-    ],
+    currentScope: ['待确认应收', '客户对账', '开票状态', '回款风险'],
   },
   {
     key: 'invoices',
-    title: '发票登记',
-    route: 'finance/invoices',
     sectionKey: 'finance',
-    status: 'seeded',
-    owner: '财务',
-    summary:
-      '发票登记只登记销项和进项发票快照，包含发票号、类型、金额、税率、税额、日期和状态，不做税务申报。',
+    label: '发票管理',
+    title: '发票管理',
+    path: '/erp/finance/invoices',
+    shortLabel: '发票',
+    pageKind: 'formal-shell',
     description:
-      '发票登记页负责维护销项发票和进项发票的登记信息，关联应收、应付、对账和采购 / 委外来源单，作为财务追踪入口。',
-    currentScope: [
-      '覆盖销项发票和进项发票登记。',
-      '记录发票号、发票类型、含税金额、不含税金额、税率、税额、开票日期和发票状态。',
-      '关联客户、供应商、来源单号、收票日期和登记备注。',
-    ],
-    keyFields: [
-      '发票号 / 发票类型 / 发票方向',
-      '客户 / 供应商 / 来源单号',
-      '含税金额 / 不含税金额 / 税率 / 税额',
-      '开票日期 / 收票日期 / 发票状态',
-    ],
-    upstream: ['应收/开票登记', '待付款/应付提醒', '对账/结算'],
-    downstream: ['打印模板中心'],
-    mobileFocus: ['待开票', '待收票', '发票异常提醒'],
+      '发票管理记录业务开票状态和发票信息；不替代税控、查验或纳税申报。',
+    primaryEntity: 'invoices（后续评审）',
+    factSource: 'finance fact usecase 待评审',
+    boundary: '发票登记是财务业务快照，不提前接入税务平台或复杂会计账簿。',
     sourceRefs: [
-      '加工厂商资料包含开票字段，但当前只作为结算对象线索，不直接建税务模型。',
-      '辅材 / 包材与加工汇总金额列为进项发票登记提供业务来源。',
-      '出货后应收为销项发票登记提供业务来源。',
+      'finance receivables/payables（后续评审）',
+      'sales_orders',
+      'suppliers',
     ],
-    boundaries: [
-      '本轮不做税务申报、复杂会计科目或凭证。',
-      '发票登记是财务业务快照，不替代发票查验平台或税控系统。',
-    ],
+    currentScope: ['待开票', '已开票', '异常发票', '发票附件后续评审'],
   },
-]
-
-const formalNavigationItemsBySection = Object.freeze({
-  master: [
-    {
-      key: 'customers',
-      label: '客户档案',
-      path: '/erp/master/partners/customers',
-      shortLabel: '客户',
-      description:
-        '正式 customers 表入口，只维护客户交易主体；联系人随客户详情维护。',
-    },
-    {
-      key: 'suppliers',
-      label: '供应商档案',
-      path: '/erp/master/partners/suppliers',
-      shortLabel: '供应商',
-      description:
-        '正式 suppliers 表入口，只维护供应商 / 加工厂交易主体；联系人随供应商详情维护。',
-    },
-  ],
-  sales: [
-    {
-      key: 'sales-orders',
-      label: '销售订单',
-      path: '/erp/sales/project-orders/sales-orders',
-      shortLabel: '销售订单',
-      description:
-        '正式 sales_orders 表入口，只记录客户订单承诺，不写出货、库存或财务事实。',
-    },
-  ],
-})
-
-export const businessModuleDefinitions = businessModules.map((moduleItem) => {
-  const sectionTitle =
-    businessSectionMeta.find((section) => section.key === moduleItem.sectionKey)
-      ?.title || moduleItem.sectionKey
-
-  return {
-    ...moduleItem,
-    sectionTitle,
-    path: `/erp/${moduleItem.route}`,
-    navigationLabel: moduleItem.title,
-    navigationDescription: moduleItem.summary,
-  }
-})
+])
 
 const businessModuleMap = new Map(
-  businessModuleDefinitions.map((moduleItem) => [moduleItem.key, moduleItem])
+  businessModuleDefinitions.map((moduleItem) => [
+    moduleItem.key,
+    {
+      ...moduleItem,
+      sectionTitle: businessSectionTitleMap.get(moduleItem.sectionKey) || '',
+    },
+  ])
 )
 
 export function getBusinessModule(moduleKey) {
-  return businessModuleMap.get(moduleKey) || null
+  return businessModuleMap.get(String(moduleKey || '').trim()) || null
+}
+
+export function getFormalBusinessShellModules() {
+  return businessModuleDefinitions
+    .filter((moduleItem) => moduleItem.pageKind === 'formal-shell')
+    .map((moduleItem) => getBusinessModule(moduleItem.key))
+    .filter(Boolean)
+    .map((moduleItem) => ({ ...moduleItem }))
 }
 
 export function getBusinessNavigationSections() {
   return businessSectionMeta
-    .filter((section) => section.visibleInNavigation !== false)
-    .map((section) => ({
-      title: section.title,
-      items: [
-        ...(formalNavigationItemsBySection[section.key] || []),
-        ...businessModuleDefinitions
-          .filter((moduleItem) => moduleItem.sectionKey === section.key)
-          .map((moduleItem) => ({
-            key: moduleItem.key,
-            label: moduleItem.navigationLabel,
-            path: moduleItem.path,
-            shortLabel: moduleItem.navigationLabel,
-            description: moduleItem.navigationDescription,
-          })),
-      ],
-    }))
-    .filter((section) => section.items.length > 0)
+    .map((section) => {
+      const items = businessModuleDefinitions.filter(
+        (item) => item.sectionKey === section.key
+      )
+      if (items.length === 0) {
+        return null
+      }
+
+      return {
+        key: section.key,
+        title: section.title,
+        items: items.map((item) => ({
+          ...item,
+          sectionTitle: section.title,
+        })),
+      }
+    })
+    .filter(Boolean)
 }
 
 export const businessNavigationSections = getBusinessNavigationSections()

@@ -1075,7 +1075,7 @@ func buildEngineeringTaskFromApprovedOrder(current *WorkflowTask) *WorkflowTaskC
 				includeMaterialBOM: true,
 			}),
 			"next_module_key": workflowMaterialBOMModuleKey,
-			"entry_path":      "/erp/purchase/material-bom",
+			"entry_path":      "/erp/business-dashboard",
 			"critical_path":   true,
 		},
 	}

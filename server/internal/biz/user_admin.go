@@ -70,7 +70,6 @@ func (uc *UserAdminUsecase) List(
 		trace.WithAttributes(
 			attribute.Int("useradmin.limit", limit),
 			attribute.Int("useradmin.offset", offset),
-			attribute.String("useradmin.search_username", strings.TrimSpace(searchUsername)),
 		),
 	)
 	defer span.End()

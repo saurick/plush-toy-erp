@@ -52,10 +52,20 @@ func (p stubReadinessPinger) PingContext(context.Context) error {
 	return p.err
 }
 
+type stubTemplatePDFWarmupReadiness struct {
+	ready bool
+	body  string
+	err   error
+}
+
+func (s stubTemplatePDFWarmupReadiness) TemplatePDFWarmupReady() (bool, string, error) {
+	return s.ready, s.body, s.err
+}
+
 func TestRegisterHealthRoutesHealthzOK(t *testing.T) {
 	logger := &captureLogger{}
 	srv := httpx.NewServer()
-	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), nil)
+	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	req.Header.Set("X-Request-Id", "req-healthz")
@@ -81,7 +91,7 @@ func TestRegisterHealthRoutesHealthzOK(t *testing.T) {
 func TestRegisterHealthRoutesReadyzOK(t *testing.T) {
 	logger := &captureLogger{}
 	srv := httpx.NewServer()
-	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), stubReadinessPinger{})
+	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), stubReadinessPinger{}, stubTemplatePDFWarmupReadiness{ready: true})
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	recorder := httptest.NewRecorder()
@@ -98,7 +108,7 @@ func TestRegisterHealthRoutesReadyzOK(t *testing.T) {
 func TestRegisterHealthRoutesReadyzFailureLogsStructuredWarning(t *testing.T) {
 	logger := &captureLogger{}
 	srv := httpx.NewServer()
-	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), stubReadinessPinger{err: errors.New("dial tcp postgres: i/o timeout")})
+	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), stubReadinessPinger{err: errors.New("dial tcp postgres: i/o timeout")}, stubTemplatePDFWarmupReadiness{ready: true})
 
 	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	req.Header.Set("X-Request-Id", "req-readyz")
@@ -123,5 +133,75 @@ func TestRegisterHealthRoutesReadyzFailureLogsStructuredWarning(t *testing.T) {
 			fmt.Sprint(entry.fields["trace_id"]) != ""
 	}) {
 		t.Fatalf("expected structured readiness warning log, got %+v", logger.entries)
+	}
+}
+
+func TestRegisterHealthRoutesReadyzPDFWarmupNotReady(t *testing.T) {
+	logger := &captureLogger{}
+	srv := httpx.NewServer()
+	registerHealthRoutes(
+		srv,
+		logger,
+		sdktrace.NewTracerProvider(),
+		stubReadinessPinger{},
+		stubTemplatePDFWarmupReadiness{ready: false, body: "pdf warmup not ready"},
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	req.Header.Set("X-Request-Id", "req-pdf-warmup")
+	recorder := httptest.NewRecorder()
+	srv.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("readyz status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
+	}
+	if body := strings.TrimSpace(recorder.Body.String()); body != "pdf warmup not ready" {
+		t.Fatalf("readyz body = %q, want %q", body, "pdf warmup not ready")
+	}
+
+	if !logger.hasEntry(func(entry captureLogEntry) bool {
+		return entry.level == "WARN" &&
+			fmt.Sprint(entry.fields["msg"]) == "dependency not ready" &&
+			fmt.Sprint(entry.fields["operation"]) == "server.http.readyz" &&
+			fmt.Sprint(entry.fields["component"]) == "template_pdf_warmup" &&
+			fmt.Sprint(entry.fields["status"]) == "503" &&
+			fmt.Sprint(entry.fields["request_id"]) == "req-pdf-warmup"
+	}) {
+		t.Fatalf("expected structured pdf warmup warning log, got %+v", logger.entries)
+	}
+}
+
+func TestRegisterHealthRoutesReadyzPDFWarmupFailed(t *testing.T) {
+	logger := &captureLogger{}
+	srv := httpx.NewServer()
+	registerHealthRoutes(
+		srv,
+		logger,
+		sdktrace.NewTracerProvider(),
+		stubReadinessPinger{},
+		stubTemplatePDFWarmupReadiness{
+			ready: false,
+			body:  "pdf warmup failed",
+			err:   errors.New("chromium not found"),
+		},
+	)
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	recorder := httptest.NewRecorder()
+	srv.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("readyz status = %d, want %d", recorder.Code, http.StatusServiceUnavailable)
+	}
+	if body := strings.TrimSpace(recorder.Body.String()); body != "pdf warmup failed" {
+		t.Fatalf("readyz body = %q, want %q", body, "pdf warmup failed")
+	}
+
+	if !logger.hasEntry(func(entry captureLogEntry) bool {
+		return entry.level == "WARN" &&
+			fmt.Sprint(entry.fields["component"]) == "template_pdf_warmup" &&
+			fmt.Sprint(entry.fields["error"]) == "chromium not found"
+	}) {
+		t.Fatalf("expected structured pdf warmup failure log, got %+v", logger.entries)
 	}
 }

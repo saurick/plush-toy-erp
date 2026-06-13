@@ -7,9 +7,9 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR =
-  "output/customers/yoyoosun/phase8-simulated-fact-closure";
-const SIMULATION_PREFIX = "SIM-YOYOOSUN-PHASE8";
-const CONFIRM_PHRASE = "APPLY_SIMULATED_PHASE8_FACTS";
+  "output/customers/yoyoosun/operational-fact-simulated-closure";
+const SIMULATION_PREFIX = "SIM-YOYOOSUN-OPFACT";
+const CONFIRM_PHRASE = "APPLY_SIMULATED_OPERATIONAL_FACTS";
 const FORBIDDEN_ARG_PATTERN =
   /--(?:execute|import|real|real-import|customer-data)/u;
 
@@ -20,19 +20,19 @@ const ROLE_USERS = {
   finance: "demo_finance",
 };
 
-const USAGE = `Phase 8 simulated fact closure
+const USAGE = `Operational fact simulated closure
 
 Usage:
-  node scripts/qa/phase8-simulated-fact-closure.mjs
+  node scripts/qa/operational-fact-simulated-closure.mjs
 
 Report-only mode:
-  node scripts/qa/phase8-simulated-fact-closure.mjs \\
+  node scripts/qa/operational-fact-simulated-closure.mjs \\
     --product-id 1 --unit-id 1 --warehouse-id 1
 
-Apply simulated Phase 8 fact data through JSON-RPC:
-  PHASE8_SIM_CONFIRM=APPLY_SIMULATED_PHASE8_FACTS \\
-  PHASE8_SIM_PASSWORD='replace-with-password' \\
-    node scripts/qa/phase8-simulated-fact-closure.mjs \\
+Apply simulated operational fact data through JSON-RPC:
+  OPERATIONAL_FACT_SIM_CONFIRM=APPLY_SIMULATED_OPERATIONAL_FACTS \\
+  OPERATIONAL_FACT_SIM_PASSWORD='replace-with-password' \\
+    node scripts/qa/operational-fact-simulated-closure.mjs \\
       --apply \\
       --backend-url http://127.0.0.1:8300 \\
       --product-id 1 \\
@@ -40,7 +40,7 @@ Apply simulated Phase 8 fact data through JSON-RPC:
       --warehouse-id 1
 
 Options:
-  --apply                Write simulated records through /rpc/phase8.
+  --apply                Write simulated records through /rpc/operational_fact.
   --backend-url <url>    Backend base URL. Default ${DEFAULT_BACKEND_URL}.
   --out <dir>            Output report directory. Default ${DEFAULT_OUT_DIR}.
   --product-id <id>      Active product ID used for simulated fact lines.
@@ -52,11 +52,11 @@ Options:
 Apply credentials:
   The script uses role demo accounts by default:
   ${ROLE_USERS.pmc}, ${ROLE_USERS.purchase}, ${ROLE_USERS.warehouse}, ${ROLE_USERS.finance}.
-  Set PHASE8_SIM_PASSWORD, TRIAL_ACCOUNT_PASSWORD, or ERP_ROLE_DEMO_PASSWORD.
+  Set OPERATIONAL_FACT_SIM_PASSWORD, TRIAL_ACCOUNT_PASSWORD, or ERP_ROLE_DEMO_PASSWORD.
 
-This script only writes explicitly marked simulated Phase 8 records. It never imports
+This script only writes explicitly marked simulated operational fact records. It never imports
 real customer data, never writes business_records directly, never creates schema or
-migrations, and never turns customer acceptance into a Phase 8 completion blocker.`;
+migrations, and never turns customer acceptance into an operational fact completion blocker.`;
 
 class CliError extends Error {
   constructor(message, exitCode = 1) {
@@ -100,14 +100,14 @@ function parseCliArgs(argv) {
     apply: false,
     help: false,
     out: DEFAULT_OUT_DIR,
-    backendURL: process.env.PHASE8_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
-    runId: process.env.PHASE8_SIM_RUN_ID || buildTimestampRunId(),
+    backendURL: process.env.OPERATIONAL_FACT_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
+    runId: process.env.OPERATIONAL_FACT_SIM_RUN_ID || buildTimestampRunId(),
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (FORBIDDEN_ARG_PATTERN.test(token)) {
       throw new CliError(
-        `Phase 8 simulated closure refuses real import style flag: ${token}`,
+        `Operational fact simulated closure refuses real import style flag: ${token}`,
         2,
       );
     }
@@ -193,10 +193,10 @@ function buildPlan(options) {
   const prefix = `${SIMULATION_PREFIX}-${options.runId}`;
   return {
     customerKey: "yoyoosun",
-    phase: "Phase 8",
+    scope: "Operational Facts",
     simulatedOnly: true,
     realCustomerImport: false,
-    customerAcceptanceRequiredForPhaseClosure: false,
+    customerAcceptanceRequiredForClosure: false,
     simulationPrefix: SIMULATION_PREFIX,
     runId: options.runId,
     backendURL: options.backendURL,
@@ -210,9 +210,9 @@ function buildPlan(options) {
         warehouse_id: ids.warehouseId,
         unit_id: ids.unitId,
         quantity: "20",
-        source_type: "SIMULATED_PHASE8",
+        source_type: "SIMULATED_OPERATIONAL_FACT",
         idempotency_key: `${prefix}:PRODUCTION:RECEIPT`,
-        note: "Phase 8 simulated closure stock seed; not real customer data.",
+        note: "Operational fact simulated closure stock seed; not real customer data.",
       },
       outsourcingIssue: {
         fact_no: `${prefix}-OUT-MAT`,
@@ -222,10 +222,10 @@ function buildPlan(options) {
         warehouse_id: ids.warehouseId,
         unit_id: ids.unitId,
         quantity: "2",
-        supplier_name: "Phase 8 模拟委外供应商",
-        source_type: "SIMULATED_PHASE8",
+        supplier_name: "模拟委外供应商",
+        source_type: "SIMULATED_OPERATIONAL_FACT",
         idempotency_key: `${prefix}:OUTSOURCING:ISSUE`,
-        note: "Phase 8 simulated outsourcing issue; not real customer data.",
+        note: "Operational fact simulated outsourcing issue; not real customer data.",
       },
       stockReservationRelease: {
         reservation_no: `${prefix}-RSV-REL`,
@@ -234,7 +234,7 @@ function buildPlan(options) {
         unit_id: ids.unitId,
         quantity: "1",
         idempotency_key: `${prefix}:RESERVATION:RELEASE`,
-        note: "Phase 8 simulated reservation release path.",
+        note: "Operational fact simulated reservation release path.",
       },
       stockReservationConsume: {
         reservation_no: `${prefix}-RSV-CON`,
@@ -243,20 +243,20 @@ function buildPlan(options) {
         unit_id: ids.unitId,
         quantity: "1",
         idempotency_key: `${prefix}:RESERVATION:CONSUME`,
-        note: "Phase 8 simulated reservation consume path.",
+        note: "Operational fact simulated reservation consume path.",
       },
       shipment: {
         shipment_no: `${prefix}-SHP`,
-        customer_snapshot: "Phase 8 simulated shipment customer",
+        customer_snapshot: "Operational fact simulated shipment customer",
         idempotency_key: `${prefix}:SHIPMENT`,
-        note: "Phase 8 simulated shipment; not real customer data.",
+        note: "Operational fact simulated shipment; not real customer data.",
       },
       shipmentItem: {
         product_id: ids.productId,
         warehouse_id: ids.warehouseId,
         unit_id: ids.unitId,
         quantity: "3",
-        note: "Phase 8 simulated shipment line.",
+        note: "Operational fact simulated shipment line.",
       },
       financeSettle: {
         fact_no: `${prefix}-FIN-SET`,
@@ -264,9 +264,9 @@ function buildPlan(options) {
         counterparty_type: "OTHER",
         amount: "128.50",
         currency: "CNY",
-        source_type: "SIMULATED_PHASE8",
+        source_type: "SIMULATED_OPERATIONAL_FACT",
         idempotency_key: `${prefix}:FINANCE:SETTLE`,
-        note: "Phase 8 simulated finance settle path.",
+        note: "Operational fact simulated finance settle path.",
       },
       financeCancel: {
         fact_no: `${prefix}-FIN-CAN`,
@@ -274,9 +274,9 @@ function buildPlan(options) {
         counterparty_type: "OTHER",
         amount: "36.80",
         currency: "CNY",
-        source_type: "SIMULATED_PHASE8",
+        source_type: "SIMULATED_OPERATIONAL_FACT",
         idempotency_key: `${prefix}:FINANCE:CANCEL`,
-        note: "Phase 8 simulated finance cancel path.",
+        note: "Operational fact simulated finance cancel path.",
       },
     },
   };
@@ -296,7 +296,7 @@ async function rpcCall({ backendURL, domain, method, params = {}, token }) {
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
-      id: `phase8-sim-${method}-${Date.now()}`,
+      id: `operational-fact-sim-${method}-${Date.now()}`,
       method,
       params,
     }),
@@ -350,7 +350,7 @@ async function applyPlan(plan, tokens) {
   const call = async (label, role, method, params, pick, expectedStatus) => {
     const data = await rpcCall({
       backendURL,
-      domain: "phase8",
+      domain: "operational_fact",
       method,
       params,
       token: tokens[role],
@@ -535,14 +535,14 @@ async function applyPlan(plan, tokens) {
 
 function buildMarkdownReport(report) {
   const lines = [
-    "# Phase 8 Simulated Fact Closure Report",
+    "# Operational Fact Simulated Closure Report",
     "",
     `- mode: ${report.mode}`,
     `- backend: ${report.plan.backendURL}`,
     `- runId: ${report.plan.runId}`,
     `- simulatedOnly: ${report.plan.simulatedOnly}`,
     `- realCustomerImport: ${report.plan.realCustomerImport}`,
-    `- customerAcceptanceRequiredForPhaseClosure: ${report.plan.customerAcceptanceRequiredForPhaseClosure}`,
+    `- customerAcceptanceRequiredForClosure: ${report.plan.customerAcceptanceRequiredForClosure}`,
     "",
     "## IDs",
     "",
@@ -564,7 +564,7 @@ function buildMarkdownReport(report) {
     "",
     "## Boundary",
     "",
-    "- This report is simulated Phase 8 evidence only.",
+    "- This report is simulated operational fact evidence only.",
     "- It is not real customer data import and not customer sign-off.",
   );
   return `${lines.join("\n")}\n`;
@@ -572,10 +572,10 @@ function buildMarkdownReport(report) {
 
 async function writeReports(outDir, report) {
   await mkdir(outDir, { recursive: true });
-  const jsonPath = path.join(outDir, "phase8-simulated-fact-closure-report.json");
+  const jsonPath = path.join(outDir, "operational-fact-simulated-closure-report.json");
   const markdownPath = path.join(
     outDir,
-    "phase8-simulated-fact-closure-report.md",
+    "operational-fact-simulated-closure-report.md",
   );
   await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   await writeFile(markdownPath, buildMarkdownReport(report));
@@ -590,27 +590,27 @@ async function main() {
   }
   const plan = buildPlan(options);
   const report = {
-    mode: options.apply ? "apply-simulated-phase8-facts" : "report-only",
+    mode: options.apply ? "apply-simulated-operational-facts" : "report-only",
     generatedAt: new Date().toISOString(),
     plan,
     steps: [],
   };
 
   if (options.apply) {
-    if (process.env.PHASE8_SIM_CONFIRM !== CONFIRM_PHRASE) {
+    if (process.env.OPERATIONAL_FACT_SIM_CONFIRM !== CONFIRM_PHRASE) {
       throw new CliError(
-        `apply requires PHASE8_SIM_CONFIRM=${CONFIRM_PHRASE}`,
+        `apply requires OPERATIONAL_FACT_SIM_CONFIRM=${CONFIRM_PHRASE}`,
         2,
       );
     }
     const password = optionalText(
-      process.env.PHASE8_SIM_PASSWORD ||
+      process.env.OPERATIONAL_FACT_SIM_PASSWORD ||
         process.env.TRIAL_ACCOUNT_PASSWORD ||
         process.env.ERP_ROLE_DEMO_PASSWORD,
     );
     if (!password) {
       throw new CliError(
-        "apply requires PHASE8_SIM_PASSWORD, TRIAL_ACCOUNT_PASSWORD, or ERP_ROLE_DEMO_PASSWORD",
+        "apply requires OPERATIONAL_FACT_SIM_PASSWORD, TRIAL_ACCOUNT_PASSWORD, or ERP_ROLE_DEMO_PASSWORD",
         2,
       );
     }
@@ -620,14 +620,14 @@ async function main() {
 
   const output = await writeReports(options.out, report);
   process.stdout.write(
-    `[qa:phase8-simulated-fact-closure] ${report.mode} complete. json=${output.jsonPath} md=${output.markdownPath}\n`,
+    `[qa:operational-fact-simulated-closure] ${report.mode} complete. json=${output.jsonPath} md=${output.markdownPath}\n`,
   );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
     process.stderr.write(
-      `[qa:phase8-simulated-fact-closure][fatal] ${error?.stack || error?.message || error}\n`,
+      `[qa:operational-fact-simulated-closure][fatal] ${error?.stack || error?.message || error}\n`,
     );
     process.exitCode = error instanceof CliError ? error.exitCode : 1;
   });

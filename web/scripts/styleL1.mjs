@@ -332,8 +332,8 @@ const scenarios = [
       await page
         .getByRole('button', { name: '看板跳转测试任务', exact: true })
         .click()
-      await waitForPath(page, '/erp/warehouse/shipping-release')
-      await expectText(page, '待出货/出货放行')
+      await waitForPath(page, '/erp/business-dashboard')
+      await expectHeading(page, '按业务模块看运行状态，不把摘要当事实真源')
       await page.goBack()
       await waitForPath(page, '/erp/task-board')
       await expectHeading(page, '任务看板')
@@ -548,28 +548,6 @@ const scenarios = [
       await assertDarkThemeContrast(page, {
         scenarioName: 'erp-task-board-dark-wide-desktop',
         selector: '.erp-admin-shell',
-      })
-    },
-  },
-  {
-    name: 'business-module-dark-products-modal-desktop',
-    path: '/erp/master/products',
-    auth: 'admin',
-    themeMode: 'dark',
-    viewport: { width: 2048, height: 1024 },
-    verify: async (page) => {
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-module-dark-products-modal-desktop',
-        moduleTitle: '产品',
-      })
-      await assertERPThemeMode(page, {
-        scenarioName: 'business-module-dark-products-modal-desktop',
-        expectedMode: 'dark',
-        expectedEffectiveTheme: 'dark',
-      })
-      await assertDarkThemeContrast(page, {
-        scenarioName: 'business-module-dark-products-modal-desktop',
-        selector: '.erp-business-module-retired',
       })
     },
   },
@@ -1552,7 +1530,7 @@ const scenarios = [
         .filter({ hasText: '菜单品牌 / Menu Brand' })
         .click()
       await expectText(page, '东莞市永绅玩具有限公司')
-      await expectText(page, '采购/仓储')
+      await expectText(page, '运营工具')
       const metrics = await page.evaluate(() => {
         const panel = document.querySelector('.erp-dev-customer-panel-grid')
         const style = panel ? getComputedStyle(panel) : null
@@ -2158,90 +2136,6 @@ const scenarios = [
       await expectText(page, '按业务模块看运行状态')
       await expectText(page, '业务关注统计')
       await expectText(page, '业务状态分布')
-    },
-  },
-  {
-    name: 'business-module-workflow-actions',
-    path: '/erp/purchase/accessories',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-module-workflow-actions',
-        moduleTitle: '辅材/包材采购',
-      })
-    },
-  },
-  {
-    name: 'business-module-toolbar-mobile-dropdown',
-    path: '/erp/purchase/accessories',
-    auth: 'admin',
-    viewport: { width: 470, height: 680 },
-    verify: async (page) => {
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-module-toolbar-mobile-dropdown',
-        moduleTitle: '辅材/包材采购',
-      })
-    },
-  },
-  {
-    name: 'business-module-material-bom-modal-style',
-    path: '/erp/purchase/material-bom',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-module-material-bom-modal-style',
-        moduleTitle: '材料 BOM',
-      })
-    },
-  },
-  {
-    name: 'business-special-variant-shells-desktop',
-    path: '/erp/purchase/material-bom',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-special-bom-variant',
-        moduleTitle: '材料 BOM',
-      })
-
-      await gotoScenarioPath(page, '/erp/warehouse/inbound', {
-        waitUntil: 'domcontentloaded',
-      })
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-special-inbound-variant',
-        moduleTitle: '入库通知/检验/入库',
-      })
-
-      await gotoScenarioPath(page, '/erp/warehouse/inventory', {
-        waitUntil: 'domcontentloaded',
-      })
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-special-inventory-variant',
-        moduleTitle: '库存',
-      })
-
-      await gotoScenarioPath(page, '/erp/warehouse/outbound', {
-        waitUntil: 'domcontentloaded',
-      })
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-special-outbound-variant',
-        moduleTitle: '出库',
-      })
-    },
-  },
-  {
-    name: 'business-module-derived-item-amount',
-    path: '/erp/purchase/accessories',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-module-derived-item-amount',
-        moduleTitle: '辅材/包材采购',
-      })
     },
   },
   {
@@ -2871,18 +2765,38 @@ const scenarios = [
       await expectText(page, '工作台')
       await expectText(page, '任务看板')
       await expectText(page, '业务看板')
-      await expectText(page, '基础资料')
+      await expectText(page, '主数据')
       await expectText(page, '客户档案')
       await expectText(page, '供应商档案')
-      await expectText(page, '产品')
-      await expectText(page, '销售链路')
+      await expectText(page, '产品档案')
+      await expectText(page, '销售管理')
       await expectText(page, '销售订单')
-      await expectText(page, '采购/仓储')
-      await expectText(page, '生产环节')
-      await expectText(page, '财务环节')
+      await expectText(page, '产品工程')
+      await expectText(page, 'BOM 管理')
+      await expectText(page, '采购管理')
+      await expectText(page, '采购订单')
+      await expectText(page, '质检管理')
+      await expectText(page, '来料质检')
+      await expectText(page, '库存管理')
+      await expectText(page, '入库管理')
+      await expectText(page, '库存台账')
+      await expectText(page, '委外管理')
+      await expectText(page, '委外订单')
+      await expectText(page, '生产管理')
+      await expectText(page, '生产排程')
+      await expectText(page, '出货管理')
+      await expectText(page, '出货放行')
+      await expectText(page, '财务业务')
+      await expectText(page, '应收管理')
+      await expectText(page, '导出当前结果')
+      await expectText(page, '列顺序')
       await expectText(page, '运营工具')
       await expectText(page, '模板打印中心')
       await expectText(page, '异常 / 阻塞闭环')
+      await verifyBusinessModuleColumnOrderDialog(page, {
+        moduleKey: 'sales-orders',
+        heading: '销售订单',
+      })
       await page.locator('.erp-admin-menu').evaluate((node) => {
         node.scrollTop = node.scrollHeight
       })
@@ -2899,6 +2813,13 @@ const scenarios = [
         0,
         '侧栏不应再显示旧“订单/款式立项”正式入口'
       )
+      for (const retiredGroup of ['采购/仓储', '生产环节', '财务环节']) {
+        assert.equal(
+          await page.getByText(retiredGroup, { exact: true }).count(),
+          0,
+          `侧栏不应再显示旧“${retiredGroup}”组合业务分组`
+        )
+      }
       assert.equal(
         await page.getByText('流程与真源', { exact: true }).count(),
         0,
@@ -2922,19 +2843,7 @@ const scenarios = [
     },
   },
   {
-    name: 'business-processing-contracts-desktop',
-    path: '/erp/purchase/processing-contracts',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await assertBusinessModuleRetiredPage(page, {
-        scenarioName: 'business-processing-contracts-desktop',
-        moduleTitle: '加工合同/委外下单',
-      })
-    },
-  },
-  {
-    name: 'business-standard-module-shells-desktop',
+    name: 'business-formal-module-shells-desktop',
     path: '/erp/master/partners/suppliers',
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
@@ -2945,13 +2854,14 @@ const scenarios = [
       await expectText(page, '本页协同入口')
       await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
 
-      await gotoScenarioPath(page, '/erp/master/products', {
+      await gotoScenarioPath(page, '/erp/master/partners/customers', {
         waitUntil: 'domcontentloaded',
       })
-      await expectHeading(page, '产品')
-      await expectText(page, '导出当前结果')
+      await expectHeading(page, '客户档案')
+      await expectText(page, '正式 MasterData')
+      await expectText(page, '当前操作')
       await expectText(page, '本页协同入口')
-      await assertNoHorizontalOverflow(page, 'business-standard-products')
+      await assertNoHorizontalOverflow(page, 'business-standard-customers')
 
       await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
         waitUntil: 'domcontentloaded',
@@ -2963,47 +2873,42 @@ const scenarios = [
       await expectText(page, '本页协同入口')
       await assertNoHorizontalOverflow(page, 'business-standard-sales-orders')
 
-      await gotoScenarioPath(page, '/erp/purchase/accessories', {
+      await gotoScenarioPath(page, '/erp/master/products', {
         waitUntil: 'domcontentloaded',
       })
-      await expectHeading(page, '辅材/包材采购')
-      await expectText(page, '归档只读')
+      await expectHeading(page, '产品档案')
+      await expectText(page, '正式新入口')
+      await expectText(page, '领域 API 待接入')
+      await expectText(page, '不读取 business_records')
+      await expectText(page, '当前操作')
       await expectText(page, '本页协同入口')
-      await assertNoHorizontalOverflow(page, 'business-standard-accessories')
+      await verifyBusinessModuleColumnOrderDialog(page, {
+        moduleKey: 'products',
+        heading: '产品档案',
+      })
+      await assertNoHorizontalOverflow(page, 'business-standard-products')
 
-      await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+      await gotoScenarioPath(page, '/erp/purchase/material-bom', {
         waitUntil: 'domcontentloaded',
       })
-      await expectHeading(page, '加工合同/委外下单')
-      await expectText(page, '归档只读')
+      await expectHeading(page, 'BOM 管理')
+      await expectText(page, '正式新入口')
+      await expectText(page, '领域 API 待接入')
+      await expectText(page, '不读取 business_records')
+      await expectText(page, '当前操作')
       await expectText(page, '本页协同入口')
-      await assertNoHorizontalOverflow(page, 'business-standard-processing')
+      await assertNoHorizontalOverflow(page, 'business-standard-bom')
 
-      await gotoScenarioPath(page, '/erp/warehouse/shipping-release', {
+      await gotoScenarioPath(page, '/erp/finance/receivables', {
         waitUntil: 'domcontentloaded',
       })
-      await expectHeading(page, '待出货/出货放行')
-      await expectText(page, '归档只读')
+      await expectHeading(page, '应收管理')
+      await expectText(page, '正式新入口')
+      await expectText(page, '领域 API 待接入')
+      await expectText(page, '不读取 business_records')
+      await expectText(page, '当前操作')
       await expectText(page, '本页协同入口')
-      await assertNoHorizontalOverflow(
-        page,
-        'business-standard-shipping-release'
-      )
-    },
-  },
-  {
-    name: 'business-reconciliation-desktop',
-    path: '/erp/finance/reconciliation',
-    auth: 'admin',
-    viewport: { width: 1440, height: 900 },
-    verify: async (page) => {
-      await expectHeading(page, '对账/结算')
-      await expectText(page, '对账单号')
-      await expectText(page, '导出当前结果')
-      await expectText(page, '本页协同入口')
-      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
-        scenarioName: 'business-reconciliation-desktop',
-      })
+      await assertNoHorizontalOverflow(page, 'business-standard-receivables')
     },
   },
 ]
@@ -4247,16 +4152,6 @@ async function assertBusinessSelectionActionBarEmpty(page, { scenarioName }) {
   })
 }
 
-async function assertBusinessModuleRetiredPage(
-  page,
-  { scenarioName, moduleTitle }
-) {
-  await expectText(page, `${moduleTitle}入口已退出旧通用记录`)
-  await expectText(page, 'business_records 表族已进入删除流程')
-  await expectText(page, '不得恢复')
-  await assertNoHorizontalOverflow(page, scenarioName)
-}
-
 async function assertBusinessSelectionActionBarBoxModel(
   page,
   { scenarioName, expectedMode }
@@ -4482,10 +4377,10 @@ async function verifyBusinessModuleColumnOrderDialog(
   { moduleKey = 'project-orders', heading = '订单/款式立项' } = {}
 ) {
   const storageKey = `erp.module.column-order.${moduleKey}`
-  await page
+  const primaryToolbarActions = page
     .locator('.erp-business-module-toolbar__actions')
-    .getByRole('button', { name: /列顺序/ })
-    .click()
+    .first()
+  await primaryToolbarActions.getByRole('button', { name: /列顺序/ }).click()
   const dialog = page.getByRole('dialog', { name: '调整列表列顺序' })
   await dialog.waitFor({ state: 'visible', timeout: 10_000 })
   await assertAntdModalCentered(page, dialog, 'business-column-order-modal')
@@ -4565,10 +4460,7 @@ async function verifyBusinessModuleColumnOrderDialog(
   }, storageKey)
   await page.reload({ waitUntil: 'networkidle' })
   await expectHeading(page, heading)
-  await page
-    .locator('.erp-business-module-toolbar__actions')
-    .getByRole('button', { name: /列顺序/ })
-    .click()
+  await primaryToolbarActions.getByRole('button', { name: /列顺序/ }).click()
   await dialog.waitFor({ state: 'visible', timeout: 10_000 })
   await assertAntdModalCentered(
     page,

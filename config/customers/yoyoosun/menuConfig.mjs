@@ -11,44 +11,55 @@ export const yoyoosunMenuConfig = Object.freeze({
     sections: [
       {
         title: "看板中心",
-        items: ["global-dashboard", "business-dashboard"],
+        items: ["global-dashboard", "task-board", "business-dashboard"],
       },
       {
-        title: "基础资料",
+        title: "主数据",
         items: ["customers", "suppliers", "products"],
       },
       {
-        title: "销售链路",
+        title: "销售管理",
         items: ["sales-orders"],
       },
       {
-        title: "采购/仓储",
-        items: [
-          "material-bom",
-          "accessories-purchase",
-          "processing-contracts",
-          "inbound",
-          "inventory",
-          "shipping-release",
-          "outbound",
-        ],
+        title: "产品工程",
+        items: ["material-bom"],
       },
       {
-        title: "生产环节",
+        title: "采购管理",
+        items: ["accessories-purchase"],
+      },
+      {
+        title: "质检管理",
+        items: ["quality-inspections"],
+      },
+      {
+        title: "库存管理",
+        items: ["inbound", "inventory"],
+      },
+      {
+        title: "委外管理",
+        items: ["processing-contracts"],
+      },
+      {
+        title: "生产管理",
         items: [
           "production-scheduling",
           "production-progress",
           "production-exceptions",
-          "quality-inspections",
         ],
       },
       {
-        title: "财务环节",
+        title: "出货管理",
+        items: ["shipping-release", "outbound"],
+      },
+      {
+        title: "财务业务",
         items: ["reconciliation", "payables", "receivables", "invoices"],
       },
       {
-        title: "单据模板",
-        items: ["print-center"],
+        title: "运营工具",
+        items: ["print-center", "exception-flow"],
       },
       {
         title: "系统管理",

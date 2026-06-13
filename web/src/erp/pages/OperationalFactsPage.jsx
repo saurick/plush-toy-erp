@@ -48,7 +48,7 @@ import {
   releaseStockReservation,
   settleFinanceFact,
   shipShipment,
-} from '../api/phase8Api.mjs'
+} from '../api/operationalFactApi.mjs'
 import {
   compactParams,
   formatUnixDate,
@@ -496,7 +496,7 @@ function FinanceFormFields() {
   )
 }
 
-export default function Phase8FactsPage() {
+export default function OperationalFactsPage() {
   const outletContext = useOutletContext()
   const adminProfile = outletContext?.adminProfile || {}
   const [activeKey, setActiveKey] = useState('production')
@@ -1016,7 +1016,7 @@ export default function Phase8FactsPage() {
       <Card className="erp-dashboard-card" variant="borderless">
         <Space direction="vertical" size={8}>
           <Title level={2} className="erp-dashboard-title">
-            Phase 8 事实闭环
+            业务事实处理
           </Title>
           <Paragraph className="erp-dashboard-summary">
             统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端
@@ -1072,7 +1072,7 @@ export default function Phase8FactsPage() {
             dataSource={activeRows}
             loading={loading}
             locale={{
-              emptyText: <Empty description="暂无 Phase 8 事实记录" />,
+              emptyText: <Empty description="暂无业务事实记录" />,
             }}
             pagination={false}
             scroll={{ x: 1320 }}

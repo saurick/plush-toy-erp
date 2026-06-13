@@ -94,7 +94,7 @@ export const privateDeploymentPackageTemplate = Object.freeze({
     },
     {
       key: "phase-simulation-tools",
-      path: "scripts/qa/phase7-*.mjs scripts/qa/phase8-*.mjs scripts/qa/phase9-*.mjs",
+      path: "scripts/qa/phase7-*.mjs scripts/qa/operational-fact-*.mjs scripts/qa/phase9-*.mjs",
       boundary: "simulation only; all generated data must use explicit SIM prefixes",
     },
   ]),

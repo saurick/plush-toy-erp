@@ -120,6 +120,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/customer-instance-policy.md` | 客户实例策略 / Customer Instance Policy |
 | `docs/product/domain-model-v1.md` | 领域模型 V1 / Domain Model V1 |
 | `docs/product/formal-menu-entry-plan.md` | 正式产品入口与菜单配置计划 / Formal Menu Entry Plan |
+| `docs/product/formal-menu-runtime-implementation-plan-v1.md` | 正式菜单运行时实施拆分清单 / Formal Menu Runtime Implementation Plan |
 | `docs/product/implementation-governance.md` | 模块实施治理 / Implementation Governance |
 | `docs/product/menu-mapping-review-v1.md` | 菜单映射评审表 / Menu Mapping Review |
 | `docs/product/migration-readiness-checklist.md` | 迁移准备检查清单 / Migration Readiness Checklist |

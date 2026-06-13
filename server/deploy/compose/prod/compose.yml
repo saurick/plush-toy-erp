@@ -53,16 +53,16 @@ services:
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-jaeger"
     restart: always
     ports:
-      - "${JAEGER_5775_PORT:-15775}:5775/udp"
-      - "${JAEGER_6831_PORT:-16831}:6831/udp"
-      - "${JAEGER_6832_PORT:-16832}:6832/udp"
-      - "${JAEGER_5778_PORT:-15778}:5778"
-      - "${JAEGER_UI_PORT:-16687}:16686"
-      - "${JAEGER_14268_PORT:-24268}:14268"
-      - "${JAEGER_14250_PORT:-24250}:14250"
-      - "${JAEGER_9411_PORT:-19411}:9411"
-      - "${JAEGER_OTLP_GRPC_PORT:-14317}:4317"
-      - "${JAEGER_OTLP_HTTP_PORT:-14318}:4318"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_5775_PORT:-15775}:5775/udp"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_6831_PORT:-16831}:6831/udp"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_6832_PORT:-16832}:6832/udp"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_5778_PORT:-15778}:5778"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_UI_PORT:-16687}:16686"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_14268_PORT:-24268}:14268"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_14250_PORT:-24250}:14250"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_9411_PORT:-19411}:9411"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_OTLP_GRPC_PORT:-14317}:4317"
+      - "${JAEGER_BIND_ADDR:-127.0.0.1}:${JAEGER_OTLP_HTTP_PORT:-14318}:4318"
     environment:
       PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: true
       METRICS_STORAGE_TYPE: prometheus
@@ -89,9 +89,11 @@ services:
       TZ: "${TZ:-Asia/Shanghai}"
       ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"
       ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-2}"
+      ERP_PDF_WARMUP_ENABLED: "${ERP_PDF_WARMUP_ENABLED:-true}"
       # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。
       POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
+      TRACE_RATIO: "${TRACE_RATIO:-0.1}"
       APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"
       APP_ADMIN_USERNAME: "${APP_ADMIN_USERNAME:-admin}"
       # 默认不注入 APP_ADMIN_PASSWORD，避免环境变量长期覆盖配置文件里的管理员初始化口径。

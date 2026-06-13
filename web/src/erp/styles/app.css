@@ -7533,6 +7533,30 @@
   background: rgb(15 23 42 / 8%);
 }
 
+.erp-business-column-order-modal {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-business-column-order-modal__row {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e2ece4;
+  border-radius: 8px;
+  background: #f8fbf8;
+  padding: 6px 8px 6px 12px;
+}
+
+.erp-business-column-order-modal__label {
+  min-width: 0;
+  color: #17231c;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .erp-business-module-table-card .ant-table-row {
   cursor: pointer;
 }
@@ -9141,6 +9165,7 @@
 [data-erp-theme='dark'] .erp-business-page-header-card h1,
 [data-erp-theme='dark'] .erp-business-page-header-card__stats strong,
 [data-erp-theme='dark'] .erp-business-list-toolbar__stat strong,
+[data-erp-theme='dark'] .erp-business-column-order-modal__label,
 [data-erp-theme='dark'] .erp-role-center-metrics strong,
 [data-erp-theme='dark'] .erp-business-selection-action-bar__copy,
 [data-erp-theme='dark'] .erp-business-module-select-popup .ant-select-item,
@@ -9166,6 +9191,7 @@
 [data-erp-theme='dark'] .erp-business-selection-action-bar__summary-item,
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel__summary-item,
 [data-erp-theme='dark'] .erp-business-module-summary-chip,
+[data-erp-theme='dark'] .erp-business-column-order-modal__row,
 [data-erp-theme='dark'] .erp-permission-checklist__header {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);

@@ -443,7 +443,7 @@ func TestWorkflowUsecase_BossApprovalDoneDerivesEngineeringTask(t *testing.T) {
 		t.Fatalf("expected project order source, got %s/%d", task.SourceType, task.SourceID)
 	}
 	if task.Payload["next_module_key"] != workflowMaterialBOMModuleKey ||
-		task.Payload["entry_path"] != "/erp/purchase/material-bom" {
+		task.Payload["entry_path"] != "/erp/business-dashboard" {
 		t.Fatalf("expected engineering task entry payload, got %#v", task.Payload)
 	}
 }

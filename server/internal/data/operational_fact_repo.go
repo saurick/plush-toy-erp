@@ -24,27 +24,27 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-type phase8Repo struct {
+type operationalFactRepo struct {
 	data *Data
 	log  *log.Helper
 	inv  *inventoryRepo
 }
 
-func NewPhase8Repo(d *Data, logger log.Logger) *phase8Repo {
-	return &phase8Repo{
+func NewOperationalFactRepo(d *Data, logger log.Logger) *operationalFactRepo {
+	return &operationalFactRepo{
 		data: d,
-		log:  log.NewHelper(log.With(logger, "module", "data.phase8_repo")),
+		log:  log.NewHelper(log.With(logger, "module", "data.operational_fact_repo")),
 		inv:  NewInventoryRepo(d, logger),
 	}
 }
 
-var _ biz.Phase8Repo = (*phase8Repo)(nil)
+var _ biz.OperationalFactRepo = (*operationalFactRepo)(nil)
 
-func (r *phase8Repo) CreateProductionFactDraft(ctx context.Context, in *biz.Phase8FactMutation) (*biz.ProductionFact, error) {
+func (r *operationalFactRepo) CreateProductionFactDraft(ctx context.Context, in *biz.OperationalFactMutation) (*biz.ProductionFact, error) {
 	row, err := r.data.postgres.ProductionFact.Create().
 		SetFactNo(in.FactNo).
 		SetFactType(in.FactType).
-		SetStatus(biz.Phase8StatusDraft).
+		SetStatus(biz.OperationalFactStatusDraft).
 		SetSubjectType(in.SubjectType).
 		SetSubjectID(in.SubjectID).
 		SetWarehouseID(in.WarehouseID).
@@ -64,15 +64,15 @@ func (r *phase8Repo) CreateProductionFactDraft(ctx context.Context, in *biz.Phas
 	return entProductionFactToBiz(row), nil
 }
 
-func (r *phase8Repo) PostProductionFact(ctx context.Context, id int) (*biz.ProductionFact, error) {
+func (r *operationalFactRepo) PostProductionFact(ctx context.Context, id int) (*biz.ProductionFact, error) {
 	return r.postProductionFact(ctx, id, false)
 }
 
-func (r *phase8Repo) CancelPostedProductionFact(ctx context.Context, id int) (*biz.ProductionFact, error) {
+func (r *operationalFactRepo) CancelPostedProductionFact(ctx context.Context, id int) (*biz.ProductionFact, error) {
 	return r.postProductionFact(ctx, id, true)
 }
 
-func (r *phase8Repo) ListProductionFacts(ctx context.Context, filter biz.Phase8Filter) ([]*biz.ProductionFact, int, error) {
+func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.ProductionFact, int, error) {
 	q := r.data.postgres.ProductionFact.Query()
 	if filter.Status != "" {
 		q = q.Where(productionfact.Status(filter.Status))
@@ -92,11 +92,11 @@ func (r *phase8Repo) ListProductionFacts(ctx context.Context, filter biz.Phase8F
 	return out, total, nil
 }
 
-func (r *phase8Repo) CreateOutsourcingFactDraft(ctx context.Context, in *biz.Phase8FactMutation) (*biz.OutsourcingFact, error) {
+func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in *biz.OperationalFactMutation) (*biz.OutsourcingFact, error) {
 	row, err := r.data.postgres.OutsourcingFact.Create().
 		SetFactNo(in.FactNo).
 		SetFactType(in.FactType).
-		SetStatus(biz.Phase8StatusDraft).
+		SetStatus(biz.OperationalFactStatusDraft).
 		SetSubjectType(in.SubjectType).
 		SetSubjectID(in.SubjectID).
 		SetWarehouseID(in.WarehouseID).
@@ -118,15 +118,15 @@ func (r *phase8Repo) CreateOutsourcingFactDraft(ctx context.Context, in *biz.Pha
 	return entOutsourcingFactToBiz(row), nil
 }
 
-func (r *phase8Repo) PostOutsourcingFact(ctx context.Context, id int) (*biz.OutsourcingFact, error) {
+func (r *operationalFactRepo) PostOutsourcingFact(ctx context.Context, id int) (*biz.OutsourcingFact, error) {
 	return r.postOutsourcingFact(ctx, id, false)
 }
 
-func (r *phase8Repo) CancelPostedOutsourcingFact(ctx context.Context, id int) (*biz.OutsourcingFact, error) {
+func (r *operationalFactRepo) CancelPostedOutsourcingFact(ctx context.Context, id int) (*biz.OutsourcingFact, error) {
 	return r.postOutsourcingFact(ctx, id, true)
 }
 
-func (r *phase8Repo) ListOutsourcingFacts(ctx context.Context, filter biz.Phase8Filter) ([]*biz.OutsourcingFact, int, error) {
+func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.OutsourcingFact, int, error) {
 	q := r.data.postgres.OutsourcingFact.Query()
 	if filter.Status != "" {
 		q = q.Where(outsourcingfact.Status(filter.Status))
@@ -146,7 +146,7 @@ func (r *phase8Repo) ListOutsourcingFacts(ctx context.Context, filter biz.Phase8
 	return out, total, nil
 }
 
-func (r *phase8Repo) CreateShipmentDraft(ctx context.Context, in *biz.ShipmentCreate) (*biz.Shipment, error) {
+func (r *operationalFactRepo) CreateShipmentDraft(ctx context.Context, in *biz.ShipmentCreate) (*biz.Shipment, error) {
 	row, err := r.data.postgres.Shipment.Create().
 		SetShipmentNo(in.ShipmentNo).
 		SetNillableSalesOrderID(in.SalesOrderID).
@@ -163,7 +163,7 @@ func (r *phase8Repo) CreateShipmentDraft(ctx context.Context, in *biz.ShipmentCr
 	return shipmentWithItems(ctx, r.data.postgres, row)
 }
 
-func (r *phase8Repo) AddShipmentItem(ctx context.Context, in *biz.ShipmentItemCreate) (*biz.ShipmentItem, error) {
+func (r *operationalFactRepo) AddShipmentItem(ctx context.Context, in *biz.ShipmentItemCreate) (*biz.ShipmentItem, error) {
 	parent, err := r.data.postgres.Shipment.Get(ctx, in.ShipmentID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -190,15 +190,15 @@ func (r *phase8Repo) AddShipmentItem(ctx context.Context, in *biz.ShipmentItemCr
 	return entShipmentItemToBiz(row), nil
 }
 
-func (r *phase8Repo) ShipShipment(ctx context.Context, id int) (*biz.Shipment, error) {
+func (r *operationalFactRepo) ShipShipment(ctx context.Context, id int) (*biz.Shipment, error) {
 	return r.shipShipment(ctx, id, false)
 }
 
-func (r *phase8Repo) CancelShippedShipment(ctx context.Context, id int) (*biz.Shipment, error) {
+func (r *operationalFactRepo) CancelShippedShipment(ctx context.Context, id int) (*biz.Shipment, error) {
 	return r.shipShipment(ctx, id, true)
 }
 
-func (r *phase8Repo) GetShipment(ctx context.Context, id int) (*biz.Shipment, error) {
+func (r *operationalFactRepo) GetShipment(ctx context.Context, id int) (*biz.Shipment, error) {
 	row, err := r.data.postgres.Shipment.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -209,7 +209,7 @@ func (r *phase8Repo) GetShipment(ctx context.Context, id int) (*biz.Shipment, er
 	return shipmentWithItems(ctx, r.data.postgres, row)
 }
 
-func (r *phase8Repo) ListShipments(ctx context.Context, filter biz.Phase8Filter) ([]*biz.Shipment, int, error) {
+func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.Shipment, int, error) {
 	q := r.data.postgres.Shipment.Query()
 	if filter.Status != "" {
 		q = q.Where(shipment.Status(filter.Status))
@@ -233,7 +233,7 @@ func (r *phase8Repo) ListShipments(ctx context.Context, filter biz.Phase8Filter)
 	return out, total, nil
 }
 
-func (r *phase8Repo) CreateStockReservation(ctx context.Context, in *biz.StockReservationCreate) (*biz.StockReservation, error) {
+func (r *operationalFactRepo) CreateStockReservation(ctx context.Context, in *biz.StockReservationCreate) (*biz.StockReservation, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
@@ -266,15 +266,15 @@ func (r *phase8Repo) CreateStockReservation(ctx context.Context, in *biz.StockRe
 	return entStockReservationToBiz(row), nil
 }
 
-func (r *phase8Repo) ReleaseStockReservation(ctx context.Context, id int) (*biz.StockReservation, error) {
+func (r *operationalFactRepo) ReleaseStockReservation(ctx context.Context, id int) (*biz.StockReservation, error) {
 	return r.changeStockReservationStatus(ctx, id, biz.StockReservationStatusReleased)
 }
 
-func (r *phase8Repo) ConsumeStockReservation(ctx context.Context, id int) (*biz.StockReservation, error) {
+func (r *operationalFactRepo) ConsumeStockReservation(ctx context.Context, id int) (*biz.StockReservation, error) {
 	return r.changeStockReservationStatus(ctx, id, biz.StockReservationStatusConsumed)
 }
 
-func (r *phase8Repo) ListStockReservations(ctx context.Context, filter biz.Phase8Filter) ([]*biz.StockReservation, int, error) {
+func (r *operationalFactRepo) ListStockReservations(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.StockReservation, int, error) {
 	q := r.data.postgres.StockReservation.Query()
 	if filter.Status != "" {
 		q = q.Where(stockreservation.Status(filter.Status))
@@ -294,11 +294,11 @@ func (r *phase8Repo) ListStockReservations(ctx context.Context, filter biz.Phase
 	return out, total, nil
 }
 
-func (r *phase8Repo) CreateFinanceFactDraft(ctx context.Context, in *biz.FinanceFactCreate) (*biz.FinanceFact, error) {
+func (r *operationalFactRepo) CreateFinanceFactDraft(ctx context.Context, in *biz.FinanceFactCreate) (*biz.FinanceFact, error) {
 	row, err := r.data.postgres.FinanceFact.Create().
 		SetFactNo(in.FactNo).
 		SetFactType(in.FactType).
-		SetStatus(biz.Phase8StatusDraft).
+		SetStatus(biz.OperationalFactStatusDraft).
 		SetCounterpartyType(in.CounterpartyType).
 		SetNillableCounterpartyID(in.CounterpartyID).
 		SetAmount(in.Amount).
@@ -316,19 +316,19 @@ func (r *phase8Repo) CreateFinanceFactDraft(ctx context.Context, in *biz.Finance
 	return entFinanceFactToBiz(row), nil
 }
 
-func (r *phase8Repo) PostFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
-	return r.changeFinanceFactStatus(ctx, id, biz.Phase8StatusPosted)
+func (r *operationalFactRepo) PostFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
+	return r.changeFinanceFactStatus(ctx, id, biz.OperationalFactStatusPosted)
 }
 
-func (r *phase8Repo) SettleFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
-	return r.changeFinanceFactStatus(ctx, id, biz.Phase8StatusSettled)
+func (r *operationalFactRepo) SettleFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
+	return r.changeFinanceFactStatus(ctx, id, biz.OperationalFactStatusSettled)
 }
 
-func (r *phase8Repo) CancelPostedFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
-	return r.changeFinanceFactStatus(ctx, id, biz.Phase8StatusCancelled)
+func (r *operationalFactRepo) CancelPostedFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
+	return r.changeFinanceFactStatus(ctx, id, biz.OperationalFactStatusCancelled)
 }
 
-func (r *phase8Repo) ListFinanceFacts(ctx context.Context, filter biz.Phase8Filter) ([]*biz.FinanceFact, int, error) {
+func (r *operationalFactRepo) ListFinanceFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.FinanceFact, int, error) {
 	q := r.data.postgres.FinanceFact.Query()
 	if filter.Status != "" {
 		q = q.Where(financefact.Status(filter.Status))
@@ -348,13 +348,13 @@ func (r *phase8Repo) ListFinanceFacts(ctx context.Context, filter biz.Phase8Filt
 	return out, total, nil
 }
 
-func (r *phase8Repo) postProductionFact(ctx context.Context, id int, cancel bool) (*biz.ProductionFact, error) {
+func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, cancel bool) (*biz.ProductionFact, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockPhase8Row(ctx, tx, "production_facts", id, biz.ErrProductionFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "production_facts", id, biz.ErrProductionFactNotFound); err != nil {
 		return nil, err
 	}
 	row, err := tx.client.ProductionFact.Get(ctx, id)
@@ -365,30 +365,30 @@ func (r *phase8Repo) postProductionFact(ctx context.Context, id int, cancel bool
 		return nil, err
 	}
 	if cancel {
-		if row.Status == biz.Phase8StatusCancelled {
+		if row.Status == biz.OperationalFactStatusCancelled {
 			return commitProductionFact(ctx, tx, row)
 		}
-		if row.Status != biz.Phase8StatusPosted {
+		if row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
 		if err := r.applyProductionFactInventory(ctx, tx, row, true); err != nil {
 			return nil, err
 		}
-		if err := updatePhase8Status(ctx, tx, "production_facts", id, biz.Phase8StatusCancelled, "posted_at", nil); err != nil {
+		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
 			return nil, err
 		}
 	} else {
-		if row.Status == biz.Phase8StatusPosted {
+		if row.Status == biz.OperationalFactStatusPosted {
 			return commitProductionFact(ctx, tx, row)
 		}
-		if row.Status != biz.Phase8StatusDraft {
+		if row.Status != biz.OperationalFactStatusDraft {
 			return nil, biz.ErrBadParam
 		}
 		if err := r.applyProductionFactInventory(ctx, tx, row, false); err != nil {
 			return nil, err
 		}
 		now := time.Now()
-		if err := updatePhase8Status(ctx, tx, "production_facts", id, biz.Phase8StatusPosted, "posted_at", &now); err != nil {
+		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
 			return nil, err
 		}
 	}
@@ -399,13 +399,13 @@ func (r *phase8Repo) postProductionFact(ctx context.Context, id int, cancel bool
 	return commitProductionFact(ctx, tx, row)
 }
 
-func (r *phase8Repo) postOutsourcingFact(ctx context.Context, id int, cancel bool) (*biz.OutsourcingFact, error) {
+func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, cancel bool) (*biz.OutsourcingFact, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockPhase8Row(ctx, tx, "outsourcing_facts", id, biz.ErrOutsourcingFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "outsourcing_facts", id, biz.ErrOutsourcingFactNotFound); err != nil {
 		return nil, err
 	}
 	row, err := tx.client.OutsourcingFact.Get(ctx, id)
@@ -416,30 +416,30 @@ func (r *phase8Repo) postOutsourcingFact(ctx context.Context, id int, cancel boo
 		return nil, err
 	}
 	if cancel {
-		if row.Status == biz.Phase8StatusCancelled {
+		if row.Status == biz.OperationalFactStatusCancelled {
 			return commitOutsourcingFact(ctx, tx, row)
 		}
-		if row.Status != biz.Phase8StatusPosted {
+		if row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
 		if err := r.applyOutsourcingFactInventory(ctx, tx, row, true); err != nil {
 			return nil, err
 		}
-		if err := updatePhase8Status(ctx, tx, "outsourcing_facts", id, biz.Phase8StatusCancelled, "posted_at", nil); err != nil {
+		if err := updateOperationalFactStatus(ctx, tx, "outsourcing_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
 			return nil, err
 		}
 	} else {
-		if row.Status == biz.Phase8StatusPosted {
+		if row.Status == biz.OperationalFactStatusPosted {
 			return commitOutsourcingFact(ctx, tx, row)
 		}
-		if row.Status != biz.Phase8StatusDraft {
+		if row.Status != biz.OperationalFactStatusDraft {
 			return nil, biz.ErrBadParam
 		}
 		if err := r.applyOutsourcingFactInventory(ctx, tx, row, false); err != nil {
 			return nil, err
 		}
 		now := time.Now()
-		if err := updatePhase8Status(ctx, tx, "outsourcing_facts", id, biz.Phase8StatusPosted, "posted_at", &now); err != nil {
+		if err := updateOperationalFactStatus(ctx, tx, "outsourcing_facts", id, biz.OperationalFactStatusPosted, "posted_at", &now); err != nil {
 			return nil, err
 		}
 	}
@@ -450,13 +450,13 @@ func (r *phase8Repo) postOutsourcingFact(ctx context.Context, id int, cancel boo
 	return commitOutsourcingFact(ctx, tx, row)
 }
 
-func (r *phase8Repo) shipShipment(ctx context.Context, id int, cancel bool) (*biz.Shipment, error) {
+func (r *operationalFactRepo) shipShipment(ctx context.Context, id int, cancel bool) (*biz.Shipment, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockPhase8Row(ctx, tx, "shipments", id, biz.ErrShipmentNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "shipments", id, biz.ErrShipmentNotFound); err != nil {
 		return nil, err
 	}
 	parent, err := tx.client.Shipment.Get(ctx, id)
@@ -486,7 +486,7 @@ func (r *phase8Repo) shipShipment(ctx context.Context, id int, cancel bool) (*bi
 				return nil, err
 			}
 		}
-		if err := updatePhase8Status(ctx, tx, "shipments", id, transition.Target, "shipped_at", nil); err != nil {
+		if err := updateOperationalFactStatus(ctx, tx, "shipments", id, transition.Target, "shipped_at", nil); err != nil {
 			return nil, err
 		}
 	} else {
@@ -503,7 +503,7 @@ func (r *phase8Repo) shipShipment(ctx context.Context, id int, cancel bool) (*bi
 			}
 		}
 		now := time.Now()
-		if err := updatePhase8Status(ctx, tx, "shipments", id, transition.Target, "shipped_at", &now); err != nil {
+		if err := updateOperationalFactStatus(ctx, tx, "shipments", id, transition.Target, "shipped_at", &now); err != nil {
 			return nil, err
 		}
 	}
@@ -514,13 +514,13 @@ func (r *phase8Repo) shipShipment(ctx context.Context, id int, cancel bool) (*bi
 	return commitShipment(ctx, tx, parent)
 }
 
-func (r *phase8Repo) changeStockReservationStatus(ctx context.Context, id int, status string) (*biz.StockReservation, error) {
+func (r *operationalFactRepo) changeStockReservationStatus(ctx context.Context, id int, status string) (*biz.StockReservation, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockPhase8Row(ctx, tx, "stock_reservations", id, biz.ErrStockReservationNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "stock_reservations", id, biz.ErrStockReservationNotFound); err != nil {
 		return nil, err
 	}
 	row, err := tx.client.StockReservation.Get(ctx, id)
@@ -539,7 +539,7 @@ func (r *phase8Repo) changeStockReservationStatus(ctx context.Context, id int, s
 	}
 	now := time.Now()
 	if row.Status != status {
-		if err := updatePhase8Status(ctx, tx, "stock_reservations", id, status, tsField, &now); err != nil {
+		if err := updateOperationalFactStatus(ctx, tx, "stock_reservations", id, status, tsField, &now); err != nil {
 			return nil, err
 		}
 		row, err = tx.client.StockReservation.Get(ctx, id)
@@ -554,13 +554,13 @@ func (r *phase8Repo) changeStockReservationStatus(ctx context.Context, id int, s
 	return entStockReservationToBiz(row), nil
 }
 
-func (r *phase8Repo) changeFinanceFactStatus(ctx context.Context, id int, status string) (*biz.FinanceFact, error) {
+func (r *operationalFactRepo) changeFinanceFactStatus(ctx context.Context, id int, status string) (*biz.FinanceFact, error) {
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-	if err := lockPhase8Row(ctx, tx, "finance_facts", id, biz.ErrFinanceFactNotFound); err != nil {
+	if err := lockOperationalFactRow(ctx, tx, "finance_facts", id, biz.ErrFinanceFactNotFound); err != nil {
 		return nil, err
 	}
 	row, err := tx.client.FinanceFact.Get(ctx, id)
@@ -571,16 +571,16 @@ func (r *phase8Repo) changeFinanceFactStatus(ctx context.Context, id int, status
 		return nil, err
 	}
 	switch status {
-	case biz.Phase8StatusPosted:
-		if row.Status != biz.Phase8StatusDraft && row.Status != biz.Phase8StatusPosted {
+	case biz.OperationalFactStatusPosted:
+		if row.Status != biz.OperationalFactStatusDraft && row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
-	case biz.Phase8StatusSettled:
-		if row.Status != biz.Phase8StatusPosted && row.Status != biz.Phase8StatusSettled {
+	case biz.OperationalFactStatusSettled:
+		if row.Status != biz.OperationalFactStatusPosted && row.Status != biz.OperationalFactStatusSettled {
 			return nil, biz.ErrBadParam
 		}
-	case biz.Phase8StatusCancelled:
-		if row.Status != biz.Phase8StatusPosted && row.Status != biz.Phase8StatusCancelled {
+	case biz.OperationalFactStatusCancelled:
+		if row.Status != biz.OperationalFactStatusPosted && row.Status != biz.OperationalFactStatusCancelled {
 			return nil, biz.ErrBadParam
 		}
 	default:
@@ -588,11 +588,11 @@ func (r *phase8Repo) changeFinanceFactStatus(ctx context.Context, id int, status
 	}
 	if row.Status != status {
 		tsField := "posted_at"
-		if status == biz.Phase8StatusSettled {
+		if status == biz.OperationalFactStatusSettled {
 			tsField = "settled_at"
 		}
 		now := time.Now()
-		if err := updatePhase8Status(ctx, tx, "finance_facts", id, status, tsField, &now); err != nil {
+		if err := updateOperationalFactStatus(ctx, tx, "finance_facts", id, status, tsField, &now); err != nil {
 			return nil, err
 		}
 		row, err = tx.client.FinanceFact.Get(ctx, id)
@@ -607,9 +607,9 @@ func (r *phase8Repo) changeFinanceFactStatus(ctx context.Context, id int, status
 	return entFinanceFactToBiz(row), nil
 }
 
-func (r *phase8Repo) applyProductionFactInventory(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, cancel bool) error {
+func (r *operationalFactRepo) applyProductionFactInventory(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionFact, cancel bool) error {
 	direction, txnType := productionFactInventoryDirection(row.FactType)
-	return r.applyPhase8Inventory(ctx, tx, phase8InventoryArgs{
+	return r.applyOperationalFactInventory(ctx, tx, operationalFactInventoryArgs{
 		sourceType:   biz.ProductionFactSourceType,
 		sourceID:     row.ID,
 		sourceLineID: row.ID,
@@ -626,9 +626,9 @@ func (r *phase8Repo) applyProductionFactInventory(ctx context.Context, tx *inven
 	})
 }
 
-func (r *phase8Repo) applyOutsourcingFactInventory(ctx context.Context, tx *inventoryDBTx, row *ent.OutsourcingFact, cancel bool) error {
+func (r *operationalFactRepo) applyOutsourcingFactInventory(ctx context.Context, tx *inventoryDBTx, row *ent.OutsourcingFact, cancel bool) error {
 	direction, txnType := outsourcingFactInventoryDirection(row.FactType)
-	return r.applyPhase8Inventory(ctx, tx, phase8InventoryArgs{
+	return r.applyOperationalFactInventory(ctx, tx, operationalFactInventoryArgs{
 		sourceType:   biz.OutsourcingFactSourceType,
 		sourceID:     row.ID,
 		sourceLineID: row.ID,
@@ -645,8 +645,8 @@ func (r *phase8Repo) applyOutsourcingFactInventory(ctx context.Context, tx *inve
 	})
 }
 
-func (r *phase8Repo) applyShipmentItemInventory(ctx context.Context, tx *inventoryDBTx, parent *ent.Shipment, item *ent.ShipmentItem, cancel bool) error {
-	return r.applyPhase8Inventory(ctx, tx, phase8InventoryArgs{
+func (r *operationalFactRepo) applyShipmentItemInventory(ctx context.Context, tx *inventoryDBTx, parent *ent.Shipment, item *ent.ShipmentItem, cancel bool) error {
+	return r.applyOperationalFactInventory(ctx, tx, operationalFactInventoryArgs{
 		sourceType:   biz.ShipmentSourceType,
 		sourceID:     parent.ID,
 		sourceLineID: item.ID,
@@ -663,7 +663,7 @@ func (r *phase8Repo) applyShipmentItemInventory(ctx context.Context, tx *invento
 	})
 }
 
-type phase8InventoryArgs struct {
+type operationalFactInventoryArgs struct {
 	sourceType   string
 	sourceID     int
 	sourceLineID int
@@ -679,12 +679,12 @@ type phase8InventoryArgs struct {
 	cancel       bool
 }
 
-func (r *phase8Repo) applyPhase8Inventory(ctx context.Context, tx *inventoryDBTx, in phase8InventoryArgs) error {
+func (r *operationalFactRepo) applyOperationalFactInventory(ctx context.Context, tx *inventoryDBTx, in operationalFactInventoryArgs) error {
 	sourceID := in.sourceID
 	sourceLineID := in.sourceLineID
 	if in.cancel {
 		original, err := tx.client.InventoryTxn.Query().
-			Where(inventorytxn.IdempotencyKey(biz.Phase8InventoryIdempotencyKey(in.sourceType, sourceID, sourceLineID, "POST"))).
+			Where(inventorytxn.IdempotencyKey(biz.OperationalFactInventoryIdempotencyKey(in.sourceType, sourceID, sourceLineID, "POST"))).
 			Only(ctx)
 		if err != nil {
 			if ent.IsNotFound(err) {
@@ -705,7 +705,7 @@ func (r *phase8Repo) applyPhase8Inventory(ctx context.Context, tx *inventoryDBTx
 			SourceType:      in.sourceType,
 			SourceID:        &sourceID,
 			SourceLineID:    &sourceLineID,
-			IdempotencyKey:  biz.Phase8InventoryIdempotencyKey(in.sourceType, sourceID, sourceLineID, "REVERSAL"),
+			IdempotencyKey:  biz.OperationalFactInventoryIdempotencyKey(in.sourceType, sourceID, sourceLineID, "REVERSAL"),
 			ReversalOfTxnID: &reversalOf,
 			OccurredAt:      time.Now(),
 		})
@@ -723,7 +723,7 @@ func (r *phase8Repo) applyPhase8Inventory(ctx context.Context, tx *inventoryDBTx
 		SourceType:     in.sourceType,
 		SourceID:       &sourceID,
 		SourceLineID:   &sourceLineID,
-		IdempotencyKey: biz.Phase8InventoryIdempotencyKey(in.sourceType, sourceID, sourceLineID, "POST"),
+		IdempotencyKey: biz.OperationalFactInventoryIdempotencyKey(in.sourceType, sourceID, sourceLineID, "POST"),
 		OccurredAt:     in.occurredAt,
 	})
 	return err
@@ -792,7 +792,7 @@ func ensureStockAvailableForReservation(ctx context.Context, client *ent.Client,
 	return nil
 }
 
-func lockPhase8Row(ctx context.Context, tx *inventoryDBTx, table string, id int, notFound error) error {
+func lockOperationalFactRow(ctx context.Context, tx *inventoryDBTx, table string, id int, notFound error) error {
 	if tx.dialect != dialect.Postgres {
 		return nil
 	}
@@ -807,7 +807,7 @@ func lockPhase8Row(ctx context.Context, tx *inventoryDBTx, table string, id int,
 	return nil
 }
 
-func updatePhase8Status(ctx context.Context, tx *inventoryDBTx, table string, id int, status string, timeField string, timeValue *time.Time) error {
+func updateOperationalFactStatus(ctx context.Context, tx *inventoryDBTx, table string, id int, status string, timeField string, timeValue *time.Time) error {
 	p := inventorySQLPlaceholders(tx.dialect, 4)
 	if timeValue == nil {
 		query := fmt.Sprintf(`UPDATE %s SET status = %s, updated_at = %s WHERE id = %s`, table, p[0], p[1], p[2])

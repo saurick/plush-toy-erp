@@ -19,7 +19,7 @@ print_help() {
   customer-config-boundaries: 客户配置草案边界检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
   phase7-simulated-trial-data: Phase 7 模拟数据工具测试
-  phase8-simulated-fact-closure: Phase 8 模拟事实闭环工具测试
+  operational-fact-simulated-closure: 业务事实模拟闭环工具测试
   phase9-simulated-mobile-closure: Phase 9 模拟岗位任务闭环工具测试
   phase10-industry-template-closure: Phase 10 行业模板模拟闭环工具测试
   phase11-private-deployment-closure: Phase 11 多客户私有化复制模拟闭环工具测试
@@ -111,9 +111,9 @@ if [ -f "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase8-simulated-fact-closure.test.mjs" ]; then
-  echo "[qa:fast] 运行 Phase 8 模拟事实闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase8-simulated-fact-closure.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs" ]; then
+  echo "[qa:fast] 运行 业务事实模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs" ]; then

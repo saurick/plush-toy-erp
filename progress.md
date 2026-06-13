@@ -236,3 +236,101 @@
 - 完成：补齐 `docs/product/formal-menu-entry-plan.md` 的对应评审表元信息，并把 `docs/product/prototypes/formal-menu-candidate-v1/README.md` 的来源与进入实现前置条件显式指向菜单映射评审表，避免后续把 12 个候选入口或 51 个覆盖项直接当 runtime 菜单改造指令。
 - 下一步：如果进入真实菜单实现，应从 `menu-mapping-review-v1.md` 逐项拆出 `seedData / customerMenuConfig / businessModules / 路由 / RBAC / 测试 / 正式文档` 影响清单，再分小闭环改运行时，不在同轮做菜单大重构。
 - 阻塞/风险：本轮只做文档链接与进度记录；未改正式侧边栏、客户菜单配置、导航 seed、路由、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、测试断言、提交或推送。当前工作区仍有大量非本轮 docs / server / web 并行改动，本轮未回退或整理。
+
+## 2026-06-13 14:30 CST
+
+- 完成：继续正式菜单下一步，新增 `docs/product/formal-menu-runtime-implementation-plan-v1.md`，把真实菜单改造拆成 R0 前后端菜单真源一致性、R1 低风险命名清理、R2 客户显隐决策、R3 页面内 tab / 动作吸收、R4 新能力入口评审五批。
+- 完成：在实施清单中记录当前前端默认导航与后端 `BuiltinAdminMenus()` 的已知差异：后端 `/erp/dashboard` 仍标成 `任务看板`、缺少 `/erp/task-board` 和 `/erp/operations/exceptions` 独立菜单、`业务看板 / 应收/开票登记 / 发票登记` 标签口径不一致。R0 建议先只修后端内置菜单与当前前端正式入口的差异，不改前端导航和客户菜单。
+- 完成：同步 `docs/product/formal-menu-entry-plan.md`、`docs/product/menu-mapping-review-v1.md` 和 `docs/document-inventory.md`，把实施拆分清单作为进入真实运行时菜单实现前的前置文档。
+- 下一步：如继续执行代码，优先做 R0：只改 `server/internal/biz/rbac.go` 和对应后端测试，把后端内置菜单对齐当前前端默认菜单；不混入前端命名、客户显隐、路由或新能力入口。
+- 阻塞/风险：本轮仍只做正式文档，不改运行时菜单、客户配置、路由、权限码、API、schema / migration、WorkflowUsecase、Fact usecase、测试断言、提交或推送。R0 中 `exception-flow` 应使用哪个 required permission 仍需实现时回到当前 RBAC 和页面动作确认。
+
+## 2026-06-13 14:29 CST
+
+- 完成：按“Jaeger / trace 都放到 133”继续收口运行时。确认 `plush-toy-erp` 已使用 133 本机 Compose Jaeger，端口只监听 `127.0.0.1`；`TRACE_RATIO=0.1` 仍生效。
+- 完成：停止状态下的 `frpc-saurick-jaeger` 进一步执行 `docker update --restart=no`，避免 Docker 自身重启后重新拉起该外部 Jaeger 隧道；远端 `8.218.4.199:18214` 验证超时不可达。
+- 完成：重建 133 上 `webapp-template-demo-jaeger` 与 `trade-erp-jaeger`，保持原容器名、network 和 `jaeger` alias，仅把宿主机端口从 `0.0.0.0` 收紧为 `127.0.0.1`；两者 all-in-one 内存 trace 随容器重建清空。重启 `trade-erp-server` 以重新建立到新 trade Jaeger 的 OTLP 连接。
+- 验证：`ss -ltnup` 中 `16687 / 16688 / 16689 / 14317 / 14318 / 24317 / 24318 / 34317 / 34318` 均只监听 `127.0.0.1`，公网 / 全网卡绑定检查为空；`127.0.0.1:16687` 返回 plush service，`127.0.0.1:16688` 返回 trade service，`127.0.0.1:16689` 返回 webapp-template service；plush `/healthz` / `/readyz` / web `/healthz` 通过，trade `/healthz` / `/readyz` 通过。
+- 完成：`/opt/webapp-template-demo/compose.yml` 可写，已追加 `JAEGER_BIND_ADDR` loopback 默认值并备份到 `/tmp/webapp-template-demo-compose.yml.20260613T063046.loopback-jaeger.bak`，后续用该 compose 重建 webapp-template Jaeger 时仍默认只绑定 `127.0.0.1`。
+- 下一步：若要把剩余配置层也永久固化，需要用 root / Dockge 权限修改 `/data/dockge/stacks/frpc-saurick-ui/compose.yaml`、`/data/frp/frpc-saurick-ui/jaeger.toml` 和 `/root/deploy/trade-erp/*`；当前 SSH 用户无免密 sudo，不能直接改这些 root-owned 文件。
+- 阻塞/风险：内网 `192.168.0.106:16686` 仍可访问且仍有旧 services，这是 106 自身的 Jaeger；133 已不再转发它，但无法通过 133 清理 106 本机存储。`trade-erp` 的 loopback 绑定目前已在 Docker 运行时生效，但 root-owned compose / env 主配置尚未持久化，后续 root/Dockge 重新部署可能覆盖运行时改动。
+
+## 2026-06-13 14:42 CST
+
+- 完成：继续处理“在线预览还是慢”。对照 `trade-erp` 后确认两边都采用“预览壳页 + PDF iframe”的基本模式，下载快是因为下载只拿 Blob 并触发文件保存，在线预览还要同步打开标签、生成 PDF、写入预览页并启动浏览器 PDF viewer。
+- 完成：进一步压短 plush 在线预览主路径：生成成功后直接写入已打开预览标签，失败时才回退壳页状态恢复；服务端 PDF 快照保留最小纸面 DOM 和过滤后的纸面 CSS；采购合同和加工合同页增加空闲预热调度，页面稳定后低优先级生成预览 Blob，hover / focus 继续触发预热，草稿变化会失效旧预热引用。
+- 完成：两个合同页补 PDF action 超时释放，避免异常请求或旧 HMR 状态把按钮长期卡在“生成中...”；真实登录 smoke 的弹窗断言兼容直接写入后的 iframe 预览状态。
+- 验证：`node --test web/src/erp/utils/printPdf.test.mjs web/src/erp/utils/printWorkspace.test.mjs` 通过 30 项；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过，前端 305 项通过；`pnpm --dir web build` 通过；`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过 4 个场景。
+- 验证：真实管理员登录 smoke 通过，采购合同在线预览 `1329ms`、加工合同在线预览 `1229ms`；临时空闲预热探针显示页面稳定约 3 秒后再点击，采购合同 `108ms`、加工合同 `112ms` 进入 PDF iframe。内置浏览器只读打开 `/pdf-preview-shell.html` 成功，缺状态参数时显示“PDF 预览链接缺少状态参数”，console error 为空；截图接口在当前会话超时，未作为证据。
+- 下一步：若用户仍认为刚编辑完立刻点的 `1.2s` 也不可接受，下一步应优先看后端 Chromium 渲染池、字体 / PDF viewer 冷启动和是否需要保存后后台预生成；不建议继续在前端增加临时兜底或额外壳页层。
+- 阻塞/风险：本轮未改后端 PDF render handler、API、schema / migration、RBAC、seed、WorkflowUsecase / Fact usecase、部署、提交或推送。当前工作区仍有 docs / server / 原型 / trace / business_records 等并行改动，本轮只围绕 PDF 预览链路和进度记录收口，未回退或整理无关现场。
+
+## 2026-06-13 14:57 CST
+
+- 完成：继续处理“第一次打开依然非常慢”。确认根因是服务端 `/templates/render-pdf` 首个真实请求才启动共享 Headless Chromium，导致用户第一次预览承担 Chrome 进程启动、DevTools 连接、字体 / 页面首次加载和 `PrintToPDF` 冷启动成本。
+- 完成：后端新增 `WarmupTemplatePDFResourcesAsync`，服务启动后默认异步跑一次最小 PDF 渲染，提前启动并热身共享 Chromium；预热复用现有 `renderTemplateHTMLToPDF` 和 `sharedTemplatePDFRenderGate`，不新增第二套渲染逻辑，也不绕过 `ERP_PDF_RENDER_CONCURRENCY`。新增 `ERP_PDF_WARMUP_ENABLED` 环境变量，默认开启，极低内存排障可设为 `false`。
+- 完成：前端页面空闲预热从 `800ms + idle timeout 2500ms` 调整为 `250ms + idle timeout 750ms`，让刷新后打开打印页约 1 秒内更容易完成预览 Blob 预生成；同步 `server/docs/config.md`、`server/docs/runtime.md`、生产 Compose、`.env.example` 和生产部署 README。
+- 验证：`go test ./internal/server`、`go test ./cmd/server` 通过；`node --test web/src/erp/utils/printPdf.test.mjs web/src/erp/utils/printWorkspace.test.mjs` 通过 30 项；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过，前端 305 项通过；`pnpm --dir web build` 通过；定向 `STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过 4 个场景；`docker compose -f server/deploy/compose/prod/compose.yml config` 展开后包含 `ERP_PDF_WARMUP_ENABLED=true`。
+- 验证：当前旧后端进程下顺序真实登录 smoke 仍通过，采购合同在线预览 `1758ms`、加工合同在线预览 `3240ms`；这组 smoke 未重启后端，不能证明服务启动预热效果。临时前端预热探针显示打开页面后等待 `1300ms` 再点击，采购合同 `150ms`、加工合同 `129ms` 进入 PDF iframe。内置浏览器打开 `/pdf-preview-shell.html` 的只读检查通过，页面非空、无 console error / warn，并成功截图。
+- 下一步：要验证服务端启动预热对客户环境的首次预览效果，需要部署或本地重启后端新版本后观察日志 `template pdf warmup success`，再从无 PDF 请求的冷进程做一次首次在线预览计时。
+- 阻塞/风险：本轮不改 PDF API、schema / migration、RBAC、业务 usecase、Workflow / Fact、前端路由和菜单；未重启当前 8300 后端，真实登录 smoke 仍跑在旧后端进程上。当前工作区仍有多轮 docs / server / 原型 / operational fact 等并行改动，本轮未回退或整理无关现场，未提交或推送。
+
+## 2026-06-13 14:51 CST
+
+- 完成：按“运行时不应继续存在 Phase 8 概念”收口主路径命名，服务端 usecase / repo / JSON-RPC 域名改为 `OperationalFactUsecase`、`operational_fact` 和业务事实口径；前端页面、API helper、路由标题与 QA 模拟闭环脚本同步改为 `OperationalFactsPage`、`operationalFactApi`、`operations/facts`、`operational-fact-simulated-closure`。旧 `/erp/phase8/facts` 不再作为运行时页面入口。
+- 完成：同步 `README.md`、`docs/current-source-of-truth.md`、`docs/product/capability-ledger.md`、`scripts/README.md` 与部署 / 行业模板配置，把 Phase 8 保留为历史路线图 / 能力阶段描述，不再作为运行时 API、代码包、页面或脚本主概念。
+- 验证：`cd server && go test ./internal/biz ./internal/data ./cmd/seed-core-demo-data` 通过；`cd server && go test ./...` 通过；`node --test scripts/qa/operational-fact-simulated-closure.test.mjs` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端 305 项通过；`git diff --check` 通过。浏览器验证 `/erp/operations/facts` 显示“业务事实处理”且无 `Phase 8` 文案，旧 `/erp/phase8/facts` 跳转到 dashboard 且无 console error。
+- 下一步：后续如继续清理，只建议处理正式文档中的历史 Phase / roadmap 表述，不再碰运行时代码；若要删除历史证据文件名或路线图段落，需单独按文档归档规则评审。
+- 阻塞/风险：本轮未改 schema / migration、RBAC 码位、菜单 seed、客户数据、部署运行时或生产库；`Phase 8` 仍作为历史阶段名称存在于 roadmap、能力台账和历史 evidence 文件名中。当前工作区仍有多轮并行改动，本轮没有回退、整理、提交或推送无关现场。
+
+## 2026-06-13 15:17 CST
+
+- 完成：继续清退 `business_records` 旧入口相关运行时。删除前端旧 `BusinessModulePage` 和 `linkedNavigation` 入口链路；前端路由不再动态注册旧业务模块页，未知 `/erp/*` 回到 `/erp/business-dashboard`；业务导航、首页模块卡片、菜单权限预设、yoyoosun 菜单配置、行业模板候选和试用账号 smoke 预期均收敛到当前正式入口：工作台、任务看板、业务看板、客户档案、供应商档案、销售订单、打印中心、异常闭环和权限管理。
+- 完成：后端 `BuiltinAdminMenus()` 对齐当前正式入口，移除产品、采购、仓储、生产、财务旧页面路径；Workflow 工程资料派生任务和前端本地 helper 不再写 `/erp/purchase/material-bom`，统一回业务看板。debug seed 的下一步检查入口不再指向旧业务页；任务来源展示改为协同来源文案，不再把旧页面标题当入口标题。
+- 完成：同步 `docs/current-source-of-truth.md`、`web/README.md`、business_records 引用审计和风险登记，把“旧页面保留退出提示”改为“旧页面、旧路由和旧入口退出页已删除”。L1、菜单权限、seedData、RBAC 和 smoke 测试增加旧菜单 / 旧路径负向断言。
+- 验证：`cd server && go test ./internal/biz ./internal/data` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端 304 项通过；`STYLE_L1_PORT=4198 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop,dev-customer-config-mobile pnpm style:l1` 通过 3 个场景；残留扫描显示运行时旧路径只剩负向测试断言。
+- 下一步：如果后续要清理候选评审文档中的历史路径表格，应作为单独文档归档 / 改写任务处理，不能误删 Workflow source_type、历史 evidence 或领域语义里的材料 BOM / 产品字段。
+- 阻塞/风险：本轮不改 schema / migration、不改生产库、不恢复旧表族；`processing-contracts / shipping-release` 等仍作为 Workflow source_type 和测试语义存在，不代表旧页面入口。当前工作区仍有部署、PDF、operational fact、原型等并行改动，本轮未回退、整理、提交或推送无关现场。
+
+## 2026-06-13 17:11 CST
+
+- 完成：按“迁移成熟交互，不恢复旧入口”处理现有销售订单正式页。`/erp/sales/project-orders/sales-orders` 的销售订单主表和订单行表新增列顺序入口、表头列设置触发、当前结果 CSV 导出和订单行 CSV 导出；列顺序优先同步后端账号偏好，失败时保留本地缓存兜底；操作列继续固定在右侧，不参与导出或列顺序调整。
+- 完成：新增前端 `set_erp_column_order` 偏好 API helper，并补齐列顺序弹窗浅色 / 暗色样式；L1 回归脚本收紧销售订单主表列顺序验证，覆盖打开弹窗、移动列、写本地缓存、同步账号偏好以及清本地缓存后从账号偏好恢复。
+- 验证：`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，前端 304 项通过；`STYLE_L1_PORT=4199 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop pnpm style:l1` 通过 2 个场景；`git diff --check` 通过。
+- 下一步：如继续补回旧页面里的成熟表格体验，应按同一模式迁移到客户档案、供应商档案和后续事实层正式页；不要恢复 `BusinessModulePage`、旧菜单、旧路由或 `business_records` 运行时依赖。
+- 阻塞/风险：本轮未改 schema / migration、后端业务 usecase、正式菜单 seed、RBAC 码位或生产库；CSV 导出目前是前端当前结果导出，不是服务端全量导出。当前工作区仍有部署、PDF、operational fact、business_records 清退等并行改动，本轮未回退、整理、提交或推送无关现场。
+
+## 2026-06-13 17:28 CST
+
+- 完成：按“业务页面原型应更紧凑、只保留必要信息”的方向，收紧 `business-module-page-standard-v1/index.html`。顶部去掉重复的总记录 / 已选记录统计和 Legacy archive 标签，只保留当前结果、金额合计和当前预警；工具条去掉已选记录重复计数和 disabled 归档按钮，保留导出、列顺序、回收站和新建记录。
+- 完成：当前记录操作区从“大块说明 + 多个禁用按钮”改为紧凑单行摘要。未选中时只显示“选择一行后可查看详情和处理动作”，不展示灰色操作按钮；选中后显示“已选 1 条 · 编号 · 品名 · 当前任务”，并只提供清空、查看、编辑、打印、协同、更多、删除等必要动作。同步更新原型 README，把架构边界说明收口为文档和轻提示，不再作为页面 tag 堆叠。
+- 验证：内联脚本语法检查通过；`git diff --check -- docs/product/prototypes/business-module-page-standard-v1/index.html docs/product/prototypes/README.md` 通过；旧冗余标识扫描无命中。通过本地静态服务和 in-app Browser 验证默认态、选中态、移动宽度：桌面默认操作条 39px、选中 52px；移动默认 35px、选中 87px；页面无横向溢出，表格横向滚动限制在表格容器内。
+- 下一步：如果继续推进正式页面吸收，应先选定客户档案 / 供应商档案 / 销售订单中的一个真实页面做小闭环，按当前 API、RBAC、theme token 和测试约束迁移这套紧凑操作条，不直接复制原型假数据。
+- 阻塞/风险：本轮只改 To Implement 原型和原型 README，不改 `web/src` 真实运行时代码、正式菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。当前工作区仍有大量非本轮并行改动，本轮未回退或整理。
+
+## 2026-06-13 17:33 CST
+
+- 完成：继续处理“重启服务器后首次在线预览仍要 10 秒”。确认旧异步预热虽然会启动共享 Chromium，但服务已经开始对外监听，用户首次点击仍可能抢在预热完成前；同时最小 ASCII 预热没有覆盖中文合同的 CJK 字体冷加载。
+- 完成：将服务端 PDF 预热改为启动期同步执行，`app-server` 在监听 HTTP / gRPC 前先跑通一次中文合同表格 PDF 渲染；预热仍复用 `renderTemplateHTMLToPDF`、共享 Chromium manager 和 `ERP_PDF_RENDER_CONCURRENCY`，不新增第二套渲染主路径。`ERP_PDF_WARMUP_ENABLED=false` 仍可在极低内存排障时关闭。
+- 完成：同步 `server/docs/config.md`、`server/docs/runtime.md` 和生产 Compose README，把 PDF 预热口径从“启动后异步最小渲染”改为“启动期同步中文合同预热”。
+- 验证：`cd server && go test ./internal/server` 通过；`cd server && go test ./cmd/server` 通过；本地重建并重启 `server/bin/server-dev` 后，日志显示 `template pdf warmup success` 用时 `2312ms`，且发生在 `[HTTP] server listening on: [::]:8300` 之前。冷进程首个真实预览探针通过：采购合同首开 `490ms`、加工合同 `358ms`，`/templates/render-pdf` 均返回 200。正式真实登录 smoke 通过：采购合同在线预览 `3056ms`、加工合同在线预览 `2568ms`。
+- 下一步：发布到客户 / 生产环境时必须重新构建服务端镜像并重启服务；重启后先看日志 `template pdf warmup success`，再做首个在线预览计时。
+- 阻塞/风险：本轮不改 PDF API、schema / migration、RBAC、Workflow / Fact、前端路由或菜单。启动期会额外消耗约 2-3 秒完成 PDF 预热，用来换取用户首次预览不再承担 10 秒级冷启动；若目标机器 Chromium 或 CJK 字体异常，预热会记录 warning 并继续启动，首个预览仍需按日志排障。
+
+## 2026-06-13 17:42 CST
+
+- 完成：按 `docs/reference/第二次20260611` 的产品核心菜单建议恢复产品核心入口，但不恢复旧 `BusinessModulePage`、旧 `business_records` 表族或旧 JSON-RPC 记录方法。前端业务菜单调整为主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理和财务业务；客户 / 供应商 / 销售订单继续走现有 V1 页面，其余入口走新的 `FormalBusinessModulePage` 正式页面壳。
+- 完成：正式页面壳补回列表页基础体验：标题统计、筛选、当前操作区、表格、表头列设置、列顺序账号偏好 / localStorage 兜底、当前结果 CSV 导出、详情抽屉、动作接入说明和协同入口；页面明确标记“领域 API 待接入”和“不读取 business_records”。
+- 完成：同步前端菜单权限预设、后端 `BuiltinAdminMenus()`、yoyoosun 客户菜单、毛绒行业模板候选、`seedData / menuPermissions / devCustomerConfig / rbac` 测试和 `style:l1` 业务菜单场景；同步 `docs/current-source-of-truth.md`、`web/README.md`、`formal-menu-entry-plan.md`、`menu-mapping-review-v1.md` 和 `formal-menu-runtime-implementation-plan-v1.md`。
+- 验证：已通过 `cd web && node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs src/erp/config/devCustomerConfig.test.mjs`；已通过 `cd server && go test ./internal/biz`；已通过 `cd web && pnpm lint && pnpm css && pnpm test`，前端 304 项通过；已通过 `STYLE_L1_PORT=4202 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop pnpm style:l1`；已通过 `git diff --check`。
+- 下一步：若继续推进真实能力，建议一次只选一个领域入口（例如库存台账或来料质检）接入正式 API、字段动作、审计和测试；不建议一次性把采购、库存、生产、出货和财务写入都补进同一轮。
+- 阻塞/风险：本轮只恢复菜单入口和正式页面壳，不新增 Ent schema、Atlas migration、权限码、采购 / 库存 / 生产 / 出货 / 财务写入 API 或真实导入；页面示例行是接入清单，不是业务事实数据。当前工作区仍有多轮并行改动，本轮未回退、整理、提交或推送无关现场。
+
+## 2026-06-13 17:56 CST
+
+- 完成：按“服务器启动成功后异步预热到准备状态”调整 PDF 冷启动方案。服务启动后异步执行中文合同 PDF warmup，`/healthz` 继续表示进程存活，`/readyz` 在 PostgreSQL 和 PDF warmup 都准备好后才返回 `ready`。
+- 完成：新增 `templatePDFWarmupState`，记录 pending / running / ready / failed / disabled；`/templates/render-pdf` 如果遇到 warmup 正在运行，会先等待 warmup 结束再进入渲染队列，避免首个用户请求和后台预热抢同一套 Chromium 冷启动资源。`ERP_PDF_WARMUP_ENABLED=false` 仍会直接视为 PDF warmup ready。
+- 完成：同步 `server/docs/config.md`、`server/docs/runtime.md`、`server/docs/observability.md` 和生产 Compose README，把口径从“启动期同步预热”改成“启动后异步预热，readyz 门控准备态”。
+- 验证：`cd server && go test ./internal/server` 通过；`cd server && go test ./cmd/server` 通过；重建并用 detached `screen` 启动 `server/bin/server-dev` 后，日志显示 `[HTTP] server listening` / `[gRPC] server listening` 在 `17:55:52`，`template pdf warmup success` 在 `17:55:54`，确认预热已异步化；随后 `healthz=ok`、`readyz=ready`。真实登录 smoke 通过：采购合同在线预览 `3233ms`，加工合同在线预览 `3130ms`。
+- 下一步：生产部署时应让网关 / Compose healthcheck / 发布脚本以 `/readyz` 判断是否切流；如果直接绕过 readyz 打到服务，首个请求会等待正在运行的 warmup，但仍建议按 readyz 放流。
+- 阻塞/风险：本轮不改 PDF API、schema / migration、RBAC、Workflow / Fact、前端路由或菜单；warmup 失败时 `/readyz` 会保持 503 并返回 `pdf warmup failed`，需要检查 Chromium / CJK 字体 / 内存配置，或在极低内存排障时显式关闭 `ERP_PDF_WARMUP_ENABLED`。

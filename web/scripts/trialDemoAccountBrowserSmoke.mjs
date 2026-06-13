@@ -31,6 +31,21 @@ const password = String(
 const oldEntryLabels = [
   '客户/供应商',
   '订单/款式立项',
+  '产品',
+  '材料 BOM',
+  '辅材/包材采购',
+  '加工合同/委外下单',
+  '入库通知/检验/入库',
+  '库存',
+  '待出货/出货放行',
+  '出库',
+  '生产排单',
+  '生产进度',
+  '延期/返工/异常',
+  '品质检验',
+  '对账/结算',
+  '待付款/应付提醒',
+  '应收/开票登记',
   '帮助中心',
   '开发与验收',
   '高级文档',
@@ -39,35 +54,48 @@ const oldEntryLabels = [
 const desktopAccounts = [
   {
     username: 'demo_boss',
-    expectedMenus: ['工作台', '客户档案', '供应商档案', '销售订单'],
+    expectedMenus: [
+      '工作台',
+      '任务看板',
+      '业务看板',
+      '客户档案',
+      '供应商档案',
+      '销售订单',
+    ],
   },
   {
     username: 'demo_sales',
-    expectedMenus: ['工作台', '客户档案', '销售订单'],
+    expectedMenus: ['工作台', '任务看板', '业务看板', '客户档案', '销售订单'],
   },
   {
     username: 'demo_purchase',
-    expectedMenus: ['工作台', '供应商档案', '材料 BOM'],
+    expectedMenus: [
+      '工作台',
+      '任务看板',
+      '业务看板',
+      '供应商档案',
+      '模板打印中心',
+    ],
   },
   {
     username: 'demo_production',
-    expectedMenus: ['工作台', '生产排单', '生产进度'],
+    expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
   },
   {
     username: 'demo_warehouse',
-    expectedMenus: ['工作台', '库存', '出库'],
+    expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
   },
   {
     username: 'demo_quality',
-    expectedMenus: ['工作台', '品质检验'],
+    expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
   },
   {
     username: 'demo_finance',
-    expectedMenus: ['工作台', '对账/结算', '应收/开票登记'],
+    expectedMenus: ['工作台', '任务看板', '业务看板', '模板打印中心'],
   },
   {
     username: 'demo_pmc',
-    expectedMenus: ['工作台', '生产排单', '延期/返工/异常'],
+    expectedMenus: ['工作台', '任务看板', '业务看板', '异常 / 阻塞闭环'],
   },
   {
     username: 'demo_admin',

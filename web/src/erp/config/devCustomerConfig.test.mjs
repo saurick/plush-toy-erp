@@ -30,9 +30,29 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert.equal(summary.customerKey, 'yoyoosun')
   assert.equal(summary.brand.companyName, '东莞市永绅玩具有限公司')
   assert.equal(summary.runtimeStatus, 'runtime_frontend_only')
-  assert.equal(summary.sectionCount, 8)
-  assert.equal(summary.itemCount, 23)
+  assert.equal(summary.sectionCount, 13)
+  assert.equal(summary.itemCount, 25)
+  assert.deepEqual(
+    summary.sections.map((section) => section.title),
+    [
+      '看板中心',
+      '主数据',
+      '销售管理',
+      '产品工程',
+      '采购管理',
+      '质检管理',
+      '库存管理',
+      '委外管理',
+      '生产管理',
+      '出货管理',
+      '财务业务',
+      '运营工具',
+      '系统管理',
+    ]
+  )
   assert(summary.sections.some((section) => section.title === '系统管理'))
+  assert(summary.sections.some((section) => section.title === '库存管理'))
+  assert(!summary.sections.some((section) => section.title === '采购/仓储'))
 })
 
 test('devCustomerConfig: 默认客户包为 yoyoosun', () => {

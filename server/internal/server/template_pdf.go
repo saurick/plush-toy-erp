@@ -44,6 +44,8 @@ const (
 	templatePDFQueueWaitTimeout         = 15 * time.Second
 	templatePDFAssetWaitMax             = 350 * time.Millisecond
 	templatePDFAssetPollStep            = 25 * time.Millisecond
+	templatePDFWarmupTimeout            = 15 * time.Second
+	templatePDFWarmupWaitTimeout        = 15 * time.Second
 	templatePDFViewportWidth            = 1440
 	templatePDFViewportHeight           = 900
 )
@@ -55,6 +57,7 @@ var (
 
 var sharedTemplatePDFChromeManager = newTemplatePDFChromeManager(launchTemplatePDFChrome)
 var sharedTemplatePDFRenderGate = newTemplatePDFRenderGate(resolveTemplatePDFRenderConcurrency(os.Getenv("ERP_PDF_RENDER_CONCURRENCY")))
+var sharedTemplatePDFWarmupState = newTemplatePDFWarmupState()
 
 const templatePDFReadyCheckJS = `(function () {
   var imagesReady = Array.from(document.images || []).every(function (img) {
@@ -63,6 +66,45 @@ const templatePDFReadyCheckJS = `(function () {
   var fontsReady = !document.fonts || document.fonts.status === 'loaded';
   return document.readyState === 'complete' && imagesReady && fontsReady;
 })()`
+
+const templatePDFWarmupHTML = `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      body { margin: 0; font-family: "Noto Sans CJK SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif; }
+      .paper { width: 210mm; min-height: 297mm; box-sizing: border-box; padding: 12mm; }
+      h1 { margin: 0 0 8mm; font-size: 18pt; text-align: center; }
+      table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+      th, td { border: 1px solid #111827; padding: 4mm 3mm; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <main class="paper">
+      <h1>采购合同 / 委外加工合同预热</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>物料名称</th>
+            <th>规格型号</th>
+            <th>数量</th>
+            <th>单价</th>
+            <th>金额</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>毛绒玩具面料</td>
+            <td>中文字体预热</td>
+            <td>1000</td>
+            <td>1.23</td>
+            <td>1230.00</td>
+          </tr>
+        </tbody>
+      </table>
+    </main>
+  </body>
+</html>`
 
 type renderTemplatePDFRequest struct {
 	Title       string `json:"title"`
@@ -97,9 +139,172 @@ type templatePDFChromeRuntime struct {
 	waitErr     error
 }
 
+type templatePDFWarmupStatus string
+
+const (
+	templatePDFWarmupPending  templatePDFWarmupStatus = "pending"
+	templatePDFWarmupRunning  templatePDFWarmupStatus = "running"
+	templatePDFWarmupReady    templatePDFWarmupStatus = "ready"
+	templatePDFWarmupFailed   templatePDFWarmupStatus = "failed"
+	templatePDFWarmupDisabled templatePDFWarmupStatus = "disabled"
+)
+
+type templatePDFWarmupState struct {
+	mu     sync.RWMutex
+	status templatePDFWarmupStatus
+	err    error
+	done   chan struct{}
+}
+
 // CleanupTemplatePDFResources 在进程退出前显式回收共享 Chromium，避免调试端口和临时目录残留。
 func CleanupTemplatePDFResources() {
 	sharedTemplatePDFChromeManager.Close()
+}
+
+// StartTemplatePDFWarmupAsync 在服务启动后后台跑通一次 PDF 渲染；readyz 会在预热完成前保持未就绪。
+func StartTemplatePDFWarmupAsync(logger log.Logger) {
+	sharedTemplatePDFWarmupState.StartAsync(
+		logger,
+		resolveTemplatePDFWarmupEnabled(os.Getenv("ERP_PDF_WARMUP_ENABLED")),
+		warmupTemplatePDFResources,
+	)
+}
+
+func newTemplatePDFWarmupState() *templatePDFWarmupState {
+	return &templatePDFWarmupState{status: templatePDFWarmupPending}
+}
+
+func (s *templatePDFWarmupState) StartAsync(
+	logger log.Logger,
+	enabled bool,
+	run func(ctx context.Context) error,
+) {
+	helper := log.NewHelper(log.With(logger, "logger.name", "server.template_pdf"))
+	if !enabled {
+		s.setDisabled()
+		helper.Infow("msg", "template pdf warmup disabled")
+		return
+	}
+	if run == nil {
+		run = warmupTemplatePDFResources
+	}
+	if !s.beginRun() {
+		return
+	}
+
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), templatePDFWarmupTimeout)
+		defer cancel()
+
+		startedAt := time.Now()
+		if err := run(ctx); err != nil {
+			s.finishRun(templatePDFWarmupFailed, err)
+			helper.Warnw(
+				"msg", "template pdf warmup failed",
+				"duration_ms", time.Since(startedAt).Milliseconds(),
+				"err", err.Error(),
+			)
+			return
+		}
+
+		s.finishRun(templatePDFWarmupReady, nil)
+		helper.Infow(
+			"msg", "template pdf warmup success",
+			"duration_ms", time.Since(startedAt).Milliseconds(),
+		)
+	}()
+}
+
+func (s *templatePDFWarmupState) beginRun() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch s.status {
+	case templatePDFWarmupRunning, templatePDFWarmupReady, templatePDFWarmupDisabled:
+		return false
+	default:
+		s.status = templatePDFWarmupRunning
+		s.err = nil
+		s.done = make(chan struct{})
+		return true
+	}
+}
+
+func (s *templatePDFWarmupState) finishRun(status templatePDFWarmupStatus, err error) {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.status != templatePDFWarmupRunning {
+		return
+	}
+	s.status = status
+	s.err = err
+	if s.done != nil {
+		close(s.done)
+		s.done = nil
+	}
+}
+
+func (s *templatePDFWarmupState) setDisabled() {
+	if s == nil {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.status == templatePDFWarmupRunning && s.done != nil {
+		close(s.done)
+	}
+	s.status = templatePDFWarmupDisabled
+	s.err = nil
+	s.done = nil
+}
+
+func (s *templatePDFWarmupState) TemplatePDFWarmupReady() (bool, string, error) {
+	if s == nil {
+		return true, "", nil
+	}
+	s.mu.RLock()
+	status := s.status
+	err := s.err
+	s.mu.RUnlock()
+
+	switch status {
+	case templatePDFWarmupReady, templatePDFWarmupDisabled:
+		return true, "", nil
+	case templatePDFWarmupFailed:
+		return false, "pdf warmup failed", err
+	default:
+		return false, "pdf warmup not ready", nil
+	}
+}
+
+func (s *templatePDFWarmupState) WaitIfRunning(ctx context.Context) (time.Duration, error) {
+	if s == nil {
+		return 0, nil
+	}
+
+	s.mu.RLock()
+	if s.status != templatePDFWarmupRunning || s.done == nil {
+		s.mu.RUnlock()
+		return 0, nil
+	}
+	done := s.done
+	s.mu.RUnlock()
+
+	startedAt := time.Now()
+	select {
+	case <-done:
+		return time.Since(startedAt), nil
+	case <-ctx.Done():
+		return time.Since(startedAt), ctx.Err()
+	}
 }
 
 func newAdminRequestVerifier(dc *conf.Data) *adminRequestVerifier {
@@ -201,6 +406,28 @@ func resolveTemplatePDFRenderConcurrency(raw string) int {
 	return limit
 }
 
+func resolveTemplatePDFWarmupEnabled(raw string) bool {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return true
+	}
+}
+
+func warmupTemplatePDFResources(ctx context.Context) error {
+	releaseRenderSlot, _, err := sharedTemplatePDFRenderGate.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer releaseRenderSlot()
+
+	_, err = renderTemplateHTMLToPDF(ctx, templatePDFWarmupHTML, "", 1)
+	return err
+}
+
 func registerTemplatePDFHandler(
 	srv *httpx.Server,
 	logger log.Logger,
@@ -280,6 +507,23 @@ func registerTemplatePDFHandler(
 			attribute.Int("template_pdf.html_size", len(req.HTML)),
 			attribute.Int("template_pdf.render_concurrency", sharedTemplatePDFRenderGate.Limit()),
 		)
+
+		warmupWaitCtx, warmupWaitCancel := context.WithTimeout(ctx, templatePDFWarmupWaitTimeout)
+		warmupWait, warmupWaitErr := sharedTemplatePDFWarmupState.WaitIfRunning(warmupWaitCtx)
+		warmupWaitCancel()
+		if warmupWait > 0 {
+			span.SetAttributes(attribute.Int64("template_pdf.warmup_wait_ms", warmupWait.Milliseconds()))
+		}
+		if warmupWaitErr != nil {
+			l.Warnw(
+				"msg", "template pdf warmup wait skipped",
+				"request_id", requestID,
+				"trace_id", traceID,
+				"template_key", req.TemplateKey,
+				"warmup_wait_ms", warmupWait.Milliseconds(),
+				"err", warmupWaitErr.Error(),
+			)
+		}
 
 		queueCtx, queueCancel := context.WithTimeout(ctx, templatePDFQueueWaitTimeout)
 		defer queueCancel()

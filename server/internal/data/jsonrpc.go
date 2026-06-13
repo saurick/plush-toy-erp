@@ -30,17 +30,17 @@ type JsonrpcData struct {
 	log  *log.Helper
 	cfg  *conf.Data
 
-	authUC        *biz.AuthUsecase
-	adminAuthUC   *biz.AdminAuthUsecase
-	adminManageUC *biz.AdminManageUsecase
-	userAdminUC   *biz.UserAdminUsecase
-	workflowUC    *biz.WorkflowUsecase
-	debugUC       *biz.DebugUsecase
-	masterDataUC  *biz.MasterDataUsecase
-	salesOrderUC  *biz.SalesOrderUsecase
-	inventoryUC   *biz.InventoryUsecase
-	phase8UC      *biz.Phase8Usecase
-	authSMS       authSMSRuntimeConfig
+	authUC            *biz.AuthUsecase
+	adminAuthUC       *biz.AdminAuthUsecase
+	adminManageUC     *biz.AdminManageUsecase
+	userAdminUC       *biz.UserAdminUsecase
+	workflowUC        *biz.WorkflowUsecase
+	debugUC           *biz.DebugUsecase
+	masterDataUC      *biz.MasterDataUsecase
+	salesOrderUC      *biz.SalesOrderUsecase
+	inventoryUC       *biz.InventoryUsecase
+	operationalFactUC *biz.OperationalFactUsecase
+	authSMS           authSMSRuntimeConfig
 
 	adminReader adminAccountReader
 }
@@ -91,27 +91,27 @@ func NewJsonrpcData(
 	masterDataUC := biz.NewMasterDataUsecase(NewMasterDataRepo(data, logger))
 	salesOrderUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
-	phase8UC := biz.NewPhase8Usecase(NewPhase8Repo(data, logger))
+	operationalFactUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	authSMS := newAuthSMSRuntimeConfig(c)
 
 	helper.Info("JsonrpcData created (auth/admin auth/user admin usecases constructed inside)")
 
 	return &JsonrpcData{
-		data:          data,
-		log:           helper,
-		cfg:           c,
-		authUC:        authUC,
-		adminAuthUC:   adminAuthUC,
-		adminManageUC: adminManageUC,
-		userAdminUC:   userAdminUC,
-		workflowUC:    workflowUC,
-		debugUC:       debugUC,
-		masterDataUC:  masterDataUC,
-		salesOrderUC:  salesOrderUC,
-		inventoryUC:   inventoryUC,
-		phase8UC:      phase8UC,
-		authSMS:       authSMS,
-		adminReader:   adminAuthRepo,
+		data:              data,
+		log:               helper,
+		cfg:               c,
+		authUC:            authUC,
+		adminAuthUC:       adminAuthUC,
+		adminManageUC:     adminManageUC,
+		userAdminUC:       userAdminUC,
+		workflowUC:        workflowUC,
+		debugUC:           debugUC,
+		masterDataUC:      masterDataUC,
+		salesOrderUC:      salesOrderUC,
+		inventoryUC:       inventoryUC,
+		operationalFactUC: operationalFactUC,
+		authSMS:           authSMS,
+		adminReader:       adminAuthRepo,
 	}
 }
 
@@ -160,8 +160,8 @@ func (d *JsonrpcData) Handle(
 		return d.handleSalesOrder(ctx, method, id, params)
 	case "purchase":
 		return d.handlePurchase(ctx, method, id, params)
-	case "phase8":
-		return d.handlePhase8(ctx, method, id, params)
+	case "operational_fact":
+		return d.handleOperationalFact(ctx, method, id, params)
 	case "debug":
 		return d.handleDebug(ctx, method, id, params)
 	default:

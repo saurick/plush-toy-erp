@@ -14,10 +14,10 @@ import (
 )
 
 const (
-	Phase8StatusDraft     = "DRAFT"
-	Phase8StatusPosted    = "POSTED"
-	Phase8StatusCancelled = "CANCELLED"
-	Phase8StatusSettled   = "SETTLED"
+	OperationalFactStatusDraft     = "DRAFT"
+	OperationalFactStatusPosted    = "POSTED"
+	OperationalFactStatusCancelled = "CANCELLED"
+	OperationalFactStatusSettled   = "SETTLED"
 
 	ProductionFactSourceType           = "PRODUCTION_FACT"
 	ProductionFactMaterialIssue        = "MATERIAL_ISSUE"
@@ -174,7 +174,7 @@ type FinanceFact struct {
 	UpdatedAt        time.Time
 }
 
-type Phase8FactMutation struct {
+type OperationalFactMutation struct {
 	FactNo         string
 	FactType       string
 	SubjectType    string
@@ -243,81 +243,81 @@ type FinanceFactCreate struct {
 	Note             *string
 }
 
-type Phase8Filter struct {
+type OperationalFactFilter struct {
 	Status string
 	Limit  int
 	Offset int
 }
 
-type Phase8Repo interface {
-	CreateProductionFactDraft(ctx context.Context, in *Phase8FactMutation) (*ProductionFact, error)
+type OperationalFactRepo interface {
+	CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error)
 	PostProductionFact(ctx context.Context, id int) (*ProductionFact, error)
 	CancelPostedProductionFact(ctx context.Context, id int) (*ProductionFact, error)
-	ListProductionFacts(ctx context.Context, filter Phase8Filter) ([]*ProductionFact, int, error)
+	ListProductionFacts(ctx context.Context, filter OperationalFactFilter) ([]*ProductionFact, int, error)
 
-	CreateOutsourcingFactDraft(ctx context.Context, in *Phase8FactMutation) (*OutsourcingFact, error)
+	CreateOutsourcingFactDraft(ctx context.Context, in *OperationalFactMutation) (*OutsourcingFact, error)
 	PostOutsourcingFact(ctx context.Context, id int) (*OutsourcingFact, error)
 	CancelPostedOutsourcingFact(ctx context.Context, id int) (*OutsourcingFact, error)
-	ListOutsourcingFacts(ctx context.Context, filter Phase8Filter) ([]*OutsourcingFact, int, error)
+	ListOutsourcingFacts(ctx context.Context, filter OperationalFactFilter) ([]*OutsourcingFact, int, error)
 
 	CreateShipmentDraft(ctx context.Context, in *ShipmentCreate) (*Shipment, error)
 	AddShipmentItem(ctx context.Context, in *ShipmentItemCreate) (*ShipmentItem, error)
 	ShipShipment(ctx context.Context, id int) (*Shipment, error)
 	CancelShippedShipment(ctx context.Context, id int) (*Shipment, error)
 	GetShipment(ctx context.Context, id int) (*Shipment, error)
-	ListShipments(ctx context.Context, filter Phase8Filter) ([]*Shipment, int, error)
+	ListShipments(ctx context.Context, filter OperationalFactFilter) ([]*Shipment, int, error)
 
 	CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error)
 	ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error)
 	ConsumeStockReservation(ctx context.Context, id int) (*StockReservation, error)
-	ListStockReservations(ctx context.Context, filter Phase8Filter) ([]*StockReservation, int, error)
+	ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error)
 
 	CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error)
 	PostFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
 	SettleFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
 	CancelPostedFinanceFact(ctx context.Context, id int) (*FinanceFact, error)
-	ListFinanceFacts(ctx context.Context, filter Phase8Filter) ([]*FinanceFact, int, error)
+	ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error)
 }
 
-type Phase8Usecase struct {
-	repo Phase8Repo
+type OperationalFactUsecase struct {
+	repo OperationalFactRepo
 }
 
-func NewPhase8Usecase(repo Phase8Repo) *Phase8Usecase {
-	return &Phase8Usecase{repo: repo}
+func NewOperationalFactUsecase(repo OperationalFactRepo) *OperationalFactUsecase {
+	return &OperationalFactUsecase{repo: repo}
 }
 
-func (uc *Phase8Usecase) CreateProductionFactDraft(ctx context.Context, in *Phase8FactMutation) (*ProductionFact, error) {
-	normalized, err := normalizePhase8FactMutation(in, productionFactTypes)
+func (uc *OperationalFactUsecase) CreateProductionFactDraft(ctx context.Context, in *OperationalFactMutation) (*ProductionFact, error) {
+	normalized, err := normalizeOperationalFactMutation(in, productionFactTypes)
 	if err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateProductionFactDraft(ctx, normalized)
 }
 
-func (uc *Phase8Usecase) PostProductionFact(ctx context.Context, id int) (*ProductionFact, error) {
+func (uc *OperationalFactUsecase) PostProductionFact(ctx context.Context, id int) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.PostProductionFact(ctx, id)
 }
 
-func (uc *Phase8Usecase) CancelPostedProductionFact(ctx context.Context, id int) (*ProductionFact, error) {
+func (uc *OperationalFactUsecase) CancelPostedProductionFact(ctx context.Context, id int) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.CancelPostedProductionFact(ctx, id)
 }
 
-func (uc *Phase8Usecase) ListProductionFacts(ctx context.Context, filter Phase8Filter) ([]*ProductionFact, int, error) {
+func (uc *OperationalFactUsecase) ListProductionFacts(ctx context.Context, filter OperationalFactFilter) ([]*ProductionFact, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListProductionFacts(ctx, normalizePhase8Filter(filter))
+	return uc.repo.ListProductionFacts(ctx, normalizeOperationalFactFilter(filter))
 }
 
-func (uc *Phase8Usecase) CreateOutsourcingFactDraft(ctx context.Context, in *Phase8FactMutation) (*OutsourcingFact, error) {
-	normalized, err := normalizePhase8FactMutation(in, outsourcingFactTypes)
+func (uc *OperationalFactUsecase) CreateOutsourcingFactDraft(ctx context.Context, in *OperationalFactMutation) (*OutsourcingFact, error) {
+	normalized, err := normalizeOperationalFactMutation(in, outsourcingFactTypes)
 	if err != nil {
 		return nil, err
 	}
@@ -325,28 +325,28 @@ func (uc *Phase8Usecase) CreateOutsourcingFactDraft(ctx context.Context, in *Pha
 	return uc.repo.CreateOutsourcingFactDraft(ctx, normalized)
 }
 
-func (uc *Phase8Usecase) PostOutsourcingFact(ctx context.Context, id int) (*OutsourcingFact, error) {
+func (uc *OperationalFactUsecase) PostOutsourcingFact(ctx context.Context, id int) (*OutsourcingFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.PostOutsourcingFact(ctx, id)
 }
 
-func (uc *Phase8Usecase) CancelPostedOutsourcingFact(ctx context.Context, id int) (*OutsourcingFact, error) {
+func (uc *OperationalFactUsecase) CancelPostedOutsourcingFact(ctx context.Context, id int) (*OutsourcingFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.CancelPostedOutsourcingFact(ctx, id)
 }
 
-func (uc *Phase8Usecase) ListOutsourcingFacts(ctx context.Context, filter Phase8Filter) ([]*OutsourcingFact, int, error) {
+func (uc *OperationalFactUsecase) ListOutsourcingFacts(ctx context.Context, filter OperationalFactFilter) ([]*OutsourcingFact, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListOutsourcingFacts(ctx, normalizePhase8Filter(filter))
+	return uc.repo.ListOutsourcingFacts(ctx, normalizeOperationalFactFilter(filter))
 }
 
-func (uc *Phase8Usecase) CreateShipmentDraft(ctx context.Context, in *ShipmentCreate) (*Shipment, error) {
+func (uc *OperationalFactUsecase) CreateShipmentDraft(ctx context.Context, in *ShipmentCreate) (*Shipment, error) {
 	normalized, err := normalizeShipmentCreate(in)
 	if err != nil {
 		return nil, err
@@ -354,7 +354,7 @@ func (uc *Phase8Usecase) CreateShipmentDraft(ctx context.Context, in *ShipmentCr
 	return uc.repo.CreateShipmentDraft(ctx, normalized)
 }
 
-func (uc *Phase8Usecase) AddShipmentItem(ctx context.Context, in *ShipmentItemCreate) (*ShipmentItem, error) {
+func (uc *OperationalFactUsecase) AddShipmentItem(ctx context.Context, in *ShipmentItemCreate) (*ShipmentItem, error) {
 	normalized, err := normalizeShipmentItemCreate(in)
 	if err != nil {
 		return nil, err
@@ -362,28 +362,28 @@ func (uc *Phase8Usecase) AddShipmentItem(ctx context.Context, in *ShipmentItemCr
 	return uc.repo.AddShipmentItem(ctx, normalized)
 }
 
-func (uc *Phase8Usecase) ShipShipment(ctx context.Context, id int) (*Shipment, error) {
+func (uc *OperationalFactUsecase) ShipShipment(ctx context.Context, id int) (*Shipment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.ShipShipment(ctx, id)
 }
 
-func (uc *Phase8Usecase) CancelShippedShipment(ctx context.Context, id int) (*Shipment, error) {
+func (uc *OperationalFactUsecase) CancelShippedShipment(ctx context.Context, id int) (*Shipment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.CancelShippedShipment(ctx, id)
 }
 
-func (uc *Phase8Usecase) ListShipments(ctx context.Context, filter Phase8Filter) ([]*Shipment, int, error) {
+func (uc *OperationalFactUsecase) ListShipments(ctx context.Context, filter OperationalFactFilter) ([]*Shipment, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListShipments(ctx, normalizePhase8Filter(filter))
+	return uc.repo.ListShipments(ctx, normalizeOperationalFactFilter(filter))
 }
 
-func (uc *Phase8Usecase) CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error) {
+func (uc *OperationalFactUsecase) CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error) {
 	normalized, err := normalizeStockReservationCreate(in)
 	if err != nil {
 		return nil, err
@@ -391,28 +391,28 @@ func (uc *Phase8Usecase) CreateStockReservation(ctx context.Context, in *StockRe
 	return uc.repo.CreateStockReservation(ctx, normalized)
 }
 
-func (uc *Phase8Usecase) ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error) {
+func (uc *OperationalFactUsecase) ReleaseStockReservation(ctx context.Context, id int) (*StockReservation, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.ReleaseStockReservation(ctx, id)
 }
 
-func (uc *Phase8Usecase) ConsumeStockReservation(ctx context.Context, id int) (*StockReservation, error) {
+func (uc *OperationalFactUsecase) ConsumeStockReservation(ctx context.Context, id int) (*StockReservation, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.ConsumeStockReservation(ctx, id)
 }
 
-func (uc *Phase8Usecase) ListStockReservations(ctx context.Context, filter Phase8Filter) ([]*StockReservation, int, error) {
+func (uc *OperationalFactUsecase) ListStockReservations(ctx context.Context, filter OperationalFactFilter) ([]*StockReservation, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListStockReservations(ctx, normalizePhase8Filter(filter))
+	return uc.repo.ListStockReservations(ctx, normalizeOperationalFactFilter(filter))
 }
 
-func (uc *Phase8Usecase) CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error) {
+func (uc *OperationalFactUsecase) CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error) {
 	normalized, err := normalizeFinanceFactCreate(in)
 	if err != nil {
 		return nil, err
@@ -420,32 +420,32 @@ func (uc *Phase8Usecase) CreateFinanceFactDraft(ctx context.Context, in *Finance
 	return uc.repo.CreateFinanceFactDraft(ctx, normalized)
 }
 
-func (uc *Phase8Usecase) PostFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
+func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.PostFinanceFact(ctx, id)
 }
 
-func (uc *Phase8Usecase) SettleFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
+func (uc *OperationalFactUsecase) SettleFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.SettleFinanceFact(ctx, id)
 }
 
-func (uc *Phase8Usecase) CancelPostedFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
+func (uc *OperationalFactUsecase) CancelPostedFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.CancelPostedFinanceFact(ctx, id)
 }
 
-func (uc *Phase8Usecase) ListFinanceFacts(ctx context.Context, filter Phase8Filter) ([]*FinanceFact, int, error) {
+func (uc *OperationalFactUsecase) ListFinanceFacts(ctx context.Context, filter OperationalFactFilter) ([]*FinanceFact, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListFinanceFacts(ctx, normalizePhase8Filter(filter))
+	return uc.repo.ListFinanceFacts(ctx, normalizeOperationalFactFilter(filter))
 }
 
 var productionFactTypes = map[string]struct{}{
@@ -473,7 +473,7 @@ var financeCounterpartyTypes = map[string]struct{}{
 	FinanceCounterpartyOther:    {},
 }
 
-func normalizePhase8FactMutation(in *Phase8FactMutation, allowedTypes map[string]struct{}) (*Phase8FactMutation, error) {
+func normalizeOperationalFactMutation(in *OperationalFactMutation, allowedTypes map[string]struct{}) (*OperationalFactMutation, error) {
 	if in == nil {
 		return nil, ErrBadParam
 	}
@@ -643,7 +643,7 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	return &out, nil
 }
 
-func normalizePhase8Filter(in Phase8Filter) Phase8Filter {
+func normalizeOperationalFactFilter(in OperationalFactFilter) OperationalFactFilter {
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
@@ -663,6 +663,6 @@ func normalizeOptionalUpperString(value *string) *string {
 	return &upper
 }
 
-func Phase8InventoryIdempotencyKey(sourceType string, sourceID int, sourceLineID int, action string) string {
+func OperationalFactInventoryIdempotencyKey(sourceType string, sourceID int, sourceLineID int, action string) string {
 	return fmt.Sprintf("%s:%d:%d:%s", sourceType, sourceID, sourceLineID, action)
 }

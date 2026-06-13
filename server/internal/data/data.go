@@ -4,7 +4,6 @@ package data
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"fmt"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 // ProviderSet 是 data 层对外暴露的依赖注入集合。
@@ -63,6 +61,18 @@ const (
 	postgresReadyTimeout  = 60 * time.Second
 	postgresRetryInterval = 2 * time.Second
 )
+
+func postgresSQLSpanOptions() otelsql.SpanOptions {
+	// SQL text and bind args may contain customer data, credentials, or business payloads; keep them out of traces.
+	return otelsql.SpanOptions{
+		DisableQuery:         true,
+		OmitConnResetSession: true,
+		OmitConnPrepare:      true,
+		OmitConnQuery:        false,
+		OmitRows:             true,
+		OmitConnectorConnect: true,
+	}
+}
 
 type pingContexter interface {
 	PingContext(ctx context.Context) error
@@ -109,30 +119,7 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	db, err := otelsql.Open(
 		postgresDriverName,
 		c.Postgres.Dsn,
-		otelsql.WithSpanOptions(otelsql.SpanOptions{
-			OmitConnResetSession: true,
-			OmitConnPrepare:      true,
-			OmitConnQuery:        false,
-			OmitRows:             true,
-			OmitConnectorConnect: true,
-		}),
-		otelsql.WithAttributesGetter(func(
-			ctx context.Context,
-			method otelsql.Method,
-			query string,
-			args []driver.NamedValue,
-		) []attribute.KeyValue {
-			attrs := make([]attribute.KeyValue, 0, 1+len(args))
-			attrs = append(attrs, attribute.String("db.statement", query))
-			for _, a := range args {
-				key := fmt.Sprintf("db.sql.arg.%d", a.Ordinal)
-				if a.Name != "" {
-					key = "db.sql.arg." + a.Name
-				}
-				attrs = append(attrs, attribute.String(key, fmt.Sprint(a.Value)))
-			}
-			return attrs
-		}),
+		otelsql.WithSpanOptions(postgresSQLSpanOptions()),
 	)
 	if err != nil {
 		l.Errorf("failed to open postgres connection: %v", err)
