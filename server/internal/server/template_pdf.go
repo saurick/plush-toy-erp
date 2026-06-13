@@ -192,6 +192,12 @@ func (s *templatePDFWarmupState) StartAsync(
 		return
 	}
 
+	helper.Infow(
+		"msg", "template pdf warmup started",
+		"timeout_ms", templatePDFWarmupTimeout.Milliseconds(),
+		"render_concurrency", sharedTemplatePDFRenderGate.Limit(),
+	)
+
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), templatePDFWarmupTimeout)
 		defer cancel()
