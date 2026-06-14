@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>业务管理中心样板</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f9;
+        --panel: #fff;
+        --soft: #f8fafc;
+        --tint: #eef6ff;
+        --line: #dbe4ef;
+        --line-strong: #bdcad9;
+        --text: #172033;
+        --muted: #66758a;
+        --blue: #1d67d8;
+        --green: #197250;
+        --amber: #a85f00;
+        --red: #bd3440;
+        --blue-soft: #eaf3ff;
+        --green-soft: #eaf7f1;
+        --amber-soft: #fff4df;
+        --red-soft: #fff0f2;
+        --shadow: 0 16px 36px rgb(15 23 42 / 8%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #101722;
+          --panel: #182233;
+          --soft: #202b3d;
+          --tint: #1c304d;
+          --line: #334157;
+          --line-strong: #4a5a72;
+          --text: #eef4fb;
+          --muted: #a9b6c8;
+          --blue: #76a8ff;
+          --green: #7ad7aa;
+          --amber: #f2bd65;
+          --red: #ff9aa3;
+          --blue-soft: #1f3556;
+          --green-soft: #183b2d;
+          --amber-soft: #463214;
+          --red-soft: #4a2229;
+          --shadow: 0 18px 42px rgb(0 0 0 / 28%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: 58px minmax(0, 1fr);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        border-bottom: 1px solid var(--line);
+        background: rgb(255 255 255 / 94%);
+        padding: 0 22px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .mark {
+        display: grid;
+        flex: 0 0 auto;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: #245f98;
+        color: #fff;
+        font-weight: 760;
+      }
+
+      .brand strong,
+      .brand span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span,
+      .muted,
+      .object span,
+      .detail-note,
+      .stat span,
+      .handoff p {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .btn {
+        min-height: 34px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 12px;
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn.text {
+        border-color: transparent;
+        background: transparent;
+        color: var(--blue);
+        padding-inline: 4px;
+      }
+
+      .content {
+        min-height: 0;
+        overflow: auto;
+        padding: 20px 22px 24px;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
+        gap: 16px;
+        max-width: 1320px;
+        margin: 0 auto;
+      }
+
+      .hero,
+      .panel,
+      .detail,
+      .risk,
+      .handoff {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+        gap: 18px;
+        padding: 20px;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 10px;
+        max-width: 780px;
+        font-size: 28px;
+        line-height: 1.18;
+      }
+
+      h2,
+      h3 {
+        margin-bottom: 0;
+      }
+
+      .summary {
+        max-width: 800px;
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .stats {
+        display: grid;
+        gap: 10px;
+      }
+
+      .stat {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 10px;
+      }
+
+      .stat > strong:first-child {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--blue);
+        font-size: 20px;
+      }
+
+      .panel,
+      .detail {
+        overflow: hidden;
+      }
+
+      .panel-head,
+      .detail-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+      }
+
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .tab {
+        min-height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 10px;
+      }
+
+      .tab[aria-selected="true"] {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 700;
+      }
+
+      .object-list {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .object {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+        text-align: left;
+      }
+
+      .object[aria-selected="true"] {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px rgb(31 111 229 / 11%);
+      }
+
+      .object strong,
+      .object span {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .tag.blue {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .tag.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .tag.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .tag.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .detail-body {
+        display: grid;
+        gap: 14px;
+        padding: 16px;
+      }
+
+      .why,
+      .detail-grid {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 12px;
+      }
+
+      .why {
+        background: var(--tint);
+      }
+
+      .why span {
+        display: block;
+        margin-top: 4px;
+      }
+
+      .detail-grid {
+        display: grid;
+        gap: 8px;
+      }
+
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .detail-row span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .detail-row strong {
+        text-align: right;
+      }
+
+      .lower {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
+        gap: 16px;
+      }
+
+      .risk,
+      .handoff {
+        padding: 16px;
+      }
+
+      .risk-grid,
+      .handoff-grid {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .risk-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .risk-card,
+      .handoff-row {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 10px;
+      }
+
+      .risk-card strong,
+      .risk-card span {
+        display: block;
+        overflow-wrap: anywhere;
+      }
+
+      .risk-card span {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .handoff-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        margin-top: 5px;
+        border-radius: 50%;
+        background: var(--blue);
+      }
+
+      .dot.red {
+        background: var(--red);
+      }
+
+      .dot.amber {
+        background: var(--amber);
+      }
+
+      .dot.green {
+        background: var(--green);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .topbar {
+          background: rgb(24 34 51 / 94%);
+        }
+      }
+
+      @media (max-width: 1040px) {
+        .workspace,
+        .hero,
+        .lower {
+          grid-template-columns: 1fr;
+        }
+
+        .risk-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 700px) {
+        .app {
+          grid-template-rows: auto minmax(0, 1fr);
+          height: auto;
+          min-height: 100vh;
+          overflow: visible;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 14px 16px;
+        }
+
+        .content {
+          overflow: visible;
+          padding: 14px;
+        }
+
+        h1 {
+          font-size: 22px;
+        }
+
+        .object {
+          grid-template-columns: 1fr;
+        }
+
+        .risk-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">业</div>
+          <div>
+            <strong>业务管理中心样板</strong>
+            <span>To Implement / 业务对象总控，不是模块堆叠</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn">刷新摘要</button>
+          <button class="btn primary">进入当前对象</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="workspace">
+          <section class="hero" aria-label="业务管理入口意义">
+            <div>
+              <div class="eyebrow">Business / 对象总控</div>
+              <h1>业务管理菜单只做一件事：帮用户选对业务对象和处理路径。</h1>
+              <p class="summary">
+                这里不把所有模块铺成大菜单，也不恢复旧 business_records。业务管理只按链路聚合对象、风险和入口，真实字段、动作和过账仍回到标准业务页。
+              </p>
+            </div>
+            <div class="stats">
+              <div class="stat"><strong>1</strong><div><strong>先选链路</strong><span>客户订单、采购入库、库存出货或财务。</span></div></div>
+              <div class="stat"><strong>2</strong><div><strong>再选对象</strong><span>进入销售订单、入库、库存、出货等标准页。</span></div></div>
+              <div class="stat"><strong>3</strong><div><strong>最后做动作</strong><span>保存、过账、冲正和导出都回到目标页。</span></div></div>
+            </div>
+          </section>
+
+          <section class="panel" aria-label="业务链路对象">
+            <div class="panel-head">
+              <div>
+                <div class="eyebrow">业务链路</div>
+                <h2>按链路管理，不按菜单堆叠</h2>
+              </div>
+              <div class="tabs" role="tablist" aria-label="业务链路">
+                <button class="tab" id="tab-sales" type="button" role="tab" data-filter="sales" aria-controls="objectList" aria-selected="true">客户与订单</button>
+                <button class="tab" id="tab-inbound" type="button" role="tab" data-filter="inbound" aria-controls="objectList" aria-selected="false">采购入库质检</button>
+                <button class="tab" id="tab-stock" type="button" role="tab" data-filter="stock" aria-controls="objectList" aria-selected="false">库存出货</button>
+                <button class="tab" id="tab-finance" type="button" role="tab" data-filter="finance" aria-controls="objectList" aria-selected="false">财务对账</button>
+              </div>
+            </div>
+            <div class="object-list" id="objectList" role="tabpanel" aria-labelledby="tab-sales"></div>
+          </section>
+
+          <aside class="detail" aria-label="当前业务对象">
+            <div class="detail-head">
+              <div>
+                <div class="eyebrow">当前对象</div>
+                <h2 id="detailTitle">销售订单</h2>
+              </div>
+              <span class="tag green" id="detailTag">V1</span>
+            </div>
+            <div class="detail-body">
+              <div class="why">
+                <strong id="detailWhy">承接客户订单、交期和明细承诺。</strong>
+                <span id="detailNext">下一步：进入销售订单标准页，查看列表、详情和明细。</span>
+              </div>
+              <div class="detail-grid">
+                <div class="detail-row"><span>页面类型</span><strong id="detailPattern">标准列表 + 详情</strong></div>
+                <div class="detail-row"><span>事实边界</span><strong id="detailFact">不写库存 / 出货 / 财务</strong></div>
+                <div class="detail-row"><span>能力状态</span><strong id="detailStatus">已接 V1</strong></div>
+                <div class="detail-row"><span>建议入口</span><strong id="detailEntry">销售订单</strong></div>
+              </div>
+              <p class="detail-note" id="detailBoundary">销售订单表达客户承诺，不自动生成出货、库存预留、应收或发票事实。</p>
+              <div class="actions">
+                <button class="btn primary">进入标准页</button>
+                <button class="btn">查看详情样板</button>
+                <button class="btn text">查看关联任务</button>
+              </div>
+            </div>
+          </aside>
+
+          <div class="lower">
+            <section class="risk" aria-label="链路风险摘要">
+              <div>
+                <div class="eyebrow">只读摘要</div>
+                <h3>业务管理只提示风险，不在这里写事实</h3>
+                <div class="muted">风险卡只作为跳转和筛选线索，不能替代业务页状态机。</div>
+              </div>
+              <div class="risk-grid">
+                <div class="risk-card"><strong>交期风险</strong><span>订单未确认交期时，提示进入销售订单或任务中心。</span></div>
+                <div class="risk-card"><strong>入库风险</strong><span>质检或入库阻塞时，提示进入入库 / 质检对象。</span></div>
+                <div class="risk-card"><strong>事实风险</strong><span>库存、出货、财务动作必须由对应 usecase 完成。</span></div>
+              </div>
+            </section>
+
+            <section class="handoff" aria-label="业务管理边界">
+              <div>
+                <div class="eyebrow">边界</div>
+                <h3>业务管理不是第二套业务系统</h3>
+              </div>
+              <div class="handoff-grid">
+                <div class="handoff-row"><span class="dot red"></span><div><strong>不恢复 business_records</strong><p>不查询、不写入旧通用业务记录，也不把它作为对象总控真源。</p></div></div>
+                <div class="handoff-row"><span class="dot amber"></span><div><strong>不提前承诺未接能力</strong><p>入口壳可以展示方向，但必须标明待接 API / usecase。</p></div></div>
+                <div class="handoff-row"><span class="dot green"></span><div><strong>不替代正式菜单</strong><p>是否新增或合并左侧菜单，仍要单独评审 seed、客户菜单和 RBAC。</p></div></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const objects = [
+        {
+          id: "sales-order",
+          filter: "sales",
+          title: "销售订单",
+          meta: "客户承诺 / 交期 / 明细",
+          tag: "green",
+          status: "已接 V1",
+          pattern: "标准列表 + 详情",
+          fact: "不写库存 / 出货 / 财务",
+          entry: "销售订单",
+          why: "承接客户订单、交期和明细承诺。",
+          next: "下一步：进入销售订单标准页，查看列表、详情和明细。",
+          boundary: "销售订单表达客户承诺，不自动生成出货、库存预留、应收或发票事实。",
+        },
+        {
+          id: "customer-supplier",
+          filter: "sales",
+          title: "客户 / 供应商档案",
+          meta: "主数据 / 联系人 / 启停",
+          tag: "green",
+          status: "已接 V1",
+          pattern: "标准列表 + 表单",
+          fact: "不写订单 / 采购事实",
+          entry: "客户档案 / 供应商档案",
+          why: "承接业务对象基础资料和联系人。",
+          next: "下一步：进入对应主数据页面维护基础资料。",
+          boundary: "主数据不直接生成销售、采购、库存、生产或财务事实。",
+        },
+        {
+          id: "inbound-quality",
+          filter: "inbound",
+          title: "入库通知/检验/入库",
+          meta: "到仓 / 质检 / 入库协同",
+          tag: "amber",
+          status: "入口壳 + 部分事实",
+          pattern: "标准列表 + 动作浮层",
+          fact: "采购入库事实另走 usecase",
+          entry: "入库管理 / 来料质检",
+          why: "把到仓、质检和入库继续放在同一条处理链路里。",
+          next: "下一步：进入入库或质检页面，按状态处理。",
+          boundary: "Workflow 入库任务完成不等于 purchase_receipt posted，也不等于库存已入账。",
+        },
+        {
+          id: "purchase-order",
+          filter: "inbound",
+          title: "采购订单",
+          meta: "采购承诺 / 供应商 / 到货",
+          tag: "amber",
+          status: "待接 API",
+          pattern: "标准列表 + 表单",
+          fact: "不等于采购收货",
+          entry: "采购订单",
+          why: "表达采购承诺，给收货和质检提供来源。",
+          next: "下一步：保持入口壳，后续单独评审采购订单 schema / API。",
+          boundary: "采购订单不是入库事实，不能用菜单提前承诺完整采购闭环。",
+        },
+        {
+          id: "inventory",
+          filter: "stock",
+          title: "库存台账",
+          meta: "余额 / 批次 / 流水",
+          tag: "green",
+          status: "事实真源已存在",
+          pattern: "台账列表 + 详情",
+          fact: "inventory_txns / balances / lots",
+          entry: "库存台账",
+          why: "库存管理应从台账进入，按余额、批次和流水追溯。",
+          next: "下一步：进入库存台账查看事实投影。",
+          boundary: "库存事实不能直接改余额，错误需走调整或 REVERSAL。",
+        },
+        {
+          id: "shipment",
+          filter: "stock",
+          title: "出货 / 出库",
+          meta: "放行 / 装箱 / 发货",
+          tag: "amber",
+          status: "入口壳",
+          pattern: "标准列表 + 动作浮层",
+          fact: "Shipment / Inventory 待接",
+          entry: "出货放行 / 出库管理",
+          why: "交付链路需要区分放行、装箱、真实出货和库存扣减。",
+          next: "下一步：进入出货或出库页面查看当前状态。",
+          boundary: "shipping_released 不等于 shipped；真实出货和扣库存必须走事实层。",
+        },
+        {
+          id: "receivable",
+          filter: "finance",
+          title: "应收 / 发票",
+          meta: "应收事实 / 开票登记",
+          tag: "amber",
+          status: "入口壳",
+          pattern: "标准列表 + 详情",
+          fact: "至少基于真实 shipped",
+          entry: "应收管理 / 发票管理",
+          why: "财务管理应从真实业务事实派生，而不是从任务完成派生。",
+          next: "下一步：进入财务页面查看待接能力和边界提示。",
+          boundary: "应收至少应在真实出货或对账后评审，不能由出货放行或任务完成直接生成。",
+        },
+        {
+          id: "payable",
+          filter: "finance",
+          title: "应付 / 对账",
+          meta: "采购 / 委外 / 付款提醒",
+          tag: "amber",
+          status: "入口壳",
+          pattern: "标准列表 + 对账视图",
+          fact: "待接 Finance usecase",
+          entry: "应付管理 / 对账管理",
+          why: "应付来源需要采购入库、委外结算或对账确认。",
+          next: "下一步：进入财务对账页面查看来源和状态。",
+          boundary: "待付款提醒不是付款事实，也不是完整付款审批流。",
+        },
+      ];
+
+      let activeFilter = "sales";
+      let selectedId = objects[0].id;
+      const list = document.querySelector("#objectList");
+      const tabs = [...document.querySelectorAll(".tab")];
+
+      function visibleObjects() {
+        return objects.filter((object) => object.filter === activeFilter);
+      }
+
+      function setText(selector, value) {
+        document.querySelector(selector).textContent = value;
+      }
+
+      function updateDetail(object) {
+        setText("#detailTitle", object.title);
+        setText("#detailTag", object.status);
+        setText("#detailWhy", object.why);
+        setText("#detailNext", object.next);
+        setText("#detailPattern", object.pattern);
+        setText("#detailFact", object.fact);
+        setText("#detailStatus", object.status);
+        setText("#detailEntry", object.entry);
+        setText("#detailBoundary", object.boundary);
+        document.querySelector("#detailTag").className = `tag ${object.tag}`;
+      }
+
+      function selectObject(object) {
+        selectedId = object.id;
+        updateDetail(object);
+        renderObjects();
+      }
+
+      function renderObjects() {
+        list.innerHTML = "";
+        visibleObjects().forEach((object) => {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "object";
+          item.setAttribute("aria-selected", String(object.id === selectedId));
+          item.innerHTML = `<span><strong>${object.title}</strong><span>${object.meta}</span></span><span class="tag ${object.tag}">${object.status}</span>`;
+          item.addEventListener("click", () => selectObject(object));
+          list.appendChild(item);
+        });
+      }
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
+          tab.setAttribute("aria-selected", "true");
+          activeFilter = tab.dataset.filter;
+          list.setAttribute("aria-labelledby", tab.id);
+          selectObject(visibleObjects()[0] || objects[0]);
+        });
+      });
+
+      updateDetail(objects[0]);
+      renderObjects();
+    </script>
+  </body>
+</html>

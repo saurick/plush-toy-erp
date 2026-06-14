@@ -23,6 +23,7 @@
         --amber-soft: #fff7e8;
         --disabled: #b8c0c9;
         --shadow: 0 8px 24px rgb(15 23 42 / 8%);
+        --overlay: rgb(15 23 42 / 42%);
       }
 
       @media (prefers-color-scheme: dark) {
@@ -44,6 +45,7 @@
           --amber-soft: #463214;
           --disabled: #6c7686;
           --shadow: 0 18px 44px rgb(0 0 0 / 28%);
+          --overlay: rgb(0 0 0 / 58%);
         }
       }
 
@@ -125,41 +127,16 @@
         font-size: 14px;
       }
 
-      .chips,
       .stats,
       .toolbar-row,
-      .toolbar-stats,
       .toolbar-actions,
-      .selection-primary,
+      .create-actions,
       .selection-actions,
       .pagination {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 8px;
-      }
-
-      .chips {
-        margin-top: 8px;
-      }
-
-      .chip {
-        display: inline-flex;
-        min-height: 26px;
-        align-items: center;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        background: #fff;
-        color: #2c3442;
-        padding: 0 10px;
-        white-space: nowrap;
-      }
-
-      .chip.red {
-        border-color: #ffb6bd;
-        background: var(--red-soft);
-        color: var(--red);
-        font-weight: 700;
       }
 
       .stats {
@@ -189,17 +166,22 @@
         line-height: 1.1;
       }
 
-      .filter-panel {
+      .workbench {
         display: grid;
-        grid-template-columns: minmax(240px, 2fr) minmax(420px, 2.8fr) minmax(220px, 2fr) minmax(140px, 0.8fr);
+        gap: 12px;
+        padding: 14px 16px 12px;
+      }
+
+      .workbench-filters {
+        display: grid;
+        grid-template-columns: minmax(280px, 1.7fr) minmax(132px, 0.75fr) repeat(2, minmax(150px, 0.8fr)) minmax(180px, 1fr) minmax(170px, 1fr);
         gap: 10px;
-        padding: 8px 14px;
       }
 
       .search,
       .select,
-      .date-filter {
-        min-height: 44px;
+      .date-input {
+        min-height: 42px;
         border: 1px solid var(--line-strong);
         border-radius: 12px;
         background: #fff;
@@ -227,40 +209,8 @@
         outline: 0;
       }
 
-      .date-filter {
-        display: grid;
-        grid-template-columns: 172px minmax(0, 1fr);
-        align-items: stretch;
-        overflow: hidden;
-      }
-
-      .date-type {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border-right: 1px solid var(--line);
-        background: var(--panel-soft);
-        padding: 0 14px;
-        font-weight: 700;
-      }
-
-      .date-range {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-        align-items: center;
-        gap: 10px;
-        padding: 0 16px;
-        color: var(--muted);
-        font-size: 18px;
-        font-weight: 600;
-      }
-
-      .date-range span {
-        color: #7f8b99;
-        font-size: 14px;
-      }
-
-      .select {
+      .select,
+      .date-input {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -271,20 +221,18 @@
         font-weight: 700;
       }
 
-      .toolbar {
-        padding: 8px 12px;
-      }
-
       .toolbar-row {
         justify-content: space-between;
-      }
-
-      .toolbar-stats {
-        flex: 1 1 260px;
+        gap: 14px;
       }
 
       .toolbar-actions {
-        flex: 1 1 420px;
+        flex: 1 1 520px;
+        justify-content: flex-start;
+      }
+
+      .create-actions {
+        flex: 0 0 auto;
         justify-content: flex-end;
       }
 
@@ -323,11 +271,13 @@
         border-color: var(--green);
         background: var(--green);
         color: #fff;
+        box-shadow: 0 2px 4px rgb(20 115 59 / 24%);
       }
 
       .btn.small {
-        min-height: 34px;
+        min-height: 30px;
         padding: 0 10px;
+        font-size: 13px;
       }
 
       .btn.link {
@@ -337,6 +287,7 @@
       }
 
       .btn.danger {
+        border-color: #ff6b72;
         color: #b4232c;
       }
 
@@ -346,15 +297,14 @@
         color: var(--disabled);
       }
 
-      .selection {
-        padding: 8px 12px;
-      }
-
       .selection-row {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 10px;
+        gap: 12px;
         align-items: center;
+        border-top: 1px dashed var(--line);
+        min-height: 48px;
+        padding-top: 10px;
       }
 
       .selection-copy {
@@ -386,13 +336,21 @@
         font-weight: 650;
       }
 
-      .selection-actions {
-        justify-content: flex-end;
-        max-width: 680px;
+      .selection-summary:not(.empty) {
+        display: inline-flex;
+        min-height: 30px;
+        align-items: center;
+        border: 1px solid #9be27a;
+        border-radius: 999px;
+        background: #efffe8;
+        color: var(--green);
+        padding: 0 12px;
+        font-weight: 800;
       }
 
-      .selection:not(.has-selection) .selection-actions {
-        display: none;
+      .selection-actions {
+        justify-content: flex-end;
+        max-width: 900px;
       }
 
       .table-panel {
@@ -423,6 +381,61 @@
         color: #4c5f76;
         font-size: 12px;
         font-weight: 800;
+      }
+
+      .th-inner {
+        display: grid;
+        min-width: 0;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .th-title {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .column-menu {
+        display: inline-grid;
+        width: 24px;
+        height: 28px;
+        place-items: center;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #6b7c93;
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .sort-stack {
+        display: inline-grid;
+        width: 22px;
+        height: 28px;
+        align-content: center;
+        justify-items: center;
+        gap: 3px;
+        color: #b7bec8;
+      }
+
+      .sort-stack::before,
+      .sort-stack::after {
+        display: block;
+        width: 0;
+        height: 0;
+        content: "";
+        border-right: 6px solid transparent;
+        border-left: 6px solid transparent;
+      }
+
+      .sort-stack::before {
+        border-bottom: 8px solid currentcolor;
+      }
+
+      .sort-stack::after {
+        border-top: 8px solid currentcolor;
       }
 
       td {
@@ -507,52 +520,101 @@
         line-height: 1;
       }
 
-      .collab {
-        position: sticky;
-        bottom: 12px;
-        z-index: 3;
-        border-color: #cfe3d3;
-        box-shadow: 0 18px 42px rgb(27 51 36 / 14%);
+      .modal-layer {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: var(--overlay);
+        padding: 24px;
       }
 
-      .collab-head {
+      body.show-recycle .modal-layer {
         display: flex;
+      }
+
+      .recycle-modal {
+        display: grid;
+        width: min(980px, calc(100vw - 48px));
+        max-height: calc(100vh - 64px);
+        grid-template-rows: auto auto minmax(0, 1fr);
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel);
+        box-shadow: 0 18px 48px rgb(15 23 42 / 18%);
+      }
+
+      .modal-head {
+        display: flex;
+        align-items: center;
         justify-content: space-between;
         gap: 12px;
-        align-items: center;
-        padding: 10px 14px;
+        padding: 18px 22px 10px;
       }
 
-      .collab-summary {
+      .modal-title {
+        font-size: 20px;
+        font-weight: 850;
+      }
+
+      .modal-close {
+        width: 34px;
+        height: 34px;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-size: 34px;
+        line-height: 1;
+      }
+
+      .modal-toolbar {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 8px;
+        align-items: center;
+        gap: 10px;
+        padding: 0 22px 12px;
       }
 
-      .collab-body {
+      .modal-body {
+        overflow: auto;
+        padding: 0 22px 22px;
+      }
+
+      .recycle-modal table {
+        min-width: 860px;
+      }
+
+      .empty-recycle {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 12px;
-        border-top: 1px solid var(--line);
-        padding: 10px 14px;
-      }
-
-      .collab.collapsed .collab-body {
-        display: none;
+        min-height: 220px;
+        place-items: center;
+        border-bottom: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 16px;
+        font-weight: 750;
       }
 
       @media (prefers-color-scheme: dark) {
         .panel,
-        .chip,
         .search,
         .select,
-        .date-filter,
+        .date-input,
         .btn,
         .page-size,
         th {
           background: var(--panel);
           color: var(--text);
+        }
+
+        .column-menu {
+          color: var(--muted);
+        }
+
+        .sort-stack {
+          color: #6f7e91;
         }
 
         td {
@@ -570,13 +632,13 @@
 
       @media (max-width: 980px) {
         .header,
-        .selection-row,
-        .collab-body {
+        .toolbar-row,
+        .selection-row {
           grid-template-columns: 1fr;
         }
 
-        .selection {
-          padding: 6px 10px;
+        .toolbar-row {
+          display: grid;
         }
 
         .selection-row {
@@ -598,6 +660,7 @@
 
         .stats,
         .toolbar-actions,
+        .create-actions,
         .selection-actions {
           justify-content: flex-start;
         }
@@ -609,22 +672,17 @@
           padding-bottom: 2px;
         }
 
-        .filter-panel {
+        .workbench-filters {
           grid-template-columns: 1fr;
         }
 
-        .date-filter {
-          grid-template-columns: 1fr;
+        .modal-layer {
+          padding: 12px;
         }
 
-        .date-type {
-          min-height: 38px;
-          border-right: 0;
-          border-bottom: 1px solid var(--line);
-        }
-
-        .date-range {
-          min-height: 44px;
+        .recycle-modal {
+          width: 100%;
+          max-height: calc(100vh - 24px);
         }
       }
 
@@ -639,6 +697,14 @@
 
         .stat {
           min-width: 104px;
+        }
+
+        .workbench-filters {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .workbench-filters .search {
+          grid-column: 1 / -1;
         }
 
         .pagination {
@@ -671,9 +737,6 @@
               <p class="summary">
                 辅材/包材采购页承接独立采购表里的材料品名、规格、数量、单价和下单信息，用于包装材料和辅材的下单与跟催。
               </p>
-              <div class="chips">
-                <span class="chip red">当前预警 5：任务阻塞</span>
-              </div>
             </div>
             <div class="stats" aria-label="页面摘要">
               <div class="stat"><span>当前结果</span><strong>3</strong></div>
@@ -682,62 +745,59 @@
           </div>
         </section>
 
-        <section class="panel filter-panel" aria-label="筛选条件">
-          <label class="search">
-            <span aria-hidden="true">⌕</span>
-            <input value="" placeholder="搜编号/名称/客户/合同" />
-          </label>
-          <div class="date-filter" aria-label="日期范围筛选">
-            <div class="date-type">
-              <span>回货日期</span>
+        <section class="panel workbench" aria-label="筛选与当前操作">
+          <div class="workbench-filters">
+            <label class="search">
+              <span aria-hidden="true">⌕</span>
+              <input value="" placeholder="搜编号/名称/客户/合同" />
+            </label>
+            <div class="select">
+              <span>签约日期</span>
               <span aria-hidden="true">⌄</span>
             </div>
-            <div class="date-range">
-              <strong>yyyy/mm/dd</strong>
-              <span>-</span>
-              <strong>yyyy/mm/dd</strong>
+            <div class="date-input">
+              <span>yyyy/mm/dd</span>
+              <span aria-hidden="true">▣</span>
+            </div>
+            <div class="date-input">
+              <span>yyyy/mm/dd</span>
+              <span aria-hidden="true">▣</span>
+            </div>
+            <div class="select">
+              <span>按状态箱筛选</span>
+              <span aria-hidden="true">⌄</span>
+            </div>
+            <div class="select">
+              <span>最新优先</span>
+              <span aria-hidden="true">⌄</span>
             </div>
           </div>
-          <div class="select">
-            <span>按业务状态筛选</span>
-            <span aria-hidden="true">⌄</span>
-          </div>
-          <div class="select">
-            <span>最新优先</span>
-            <span aria-hidden="true">⌄</span>
-          </div>
-        </section>
-
-        <section class="panel toolbar" aria-label="结果操作">
           <div class="toolbar-row">
-            <div class="toolbar-stats">
-              <span class="pill">当前结果 <strong>3</strong></span>
-              <span class="pill">金额合计 <strong>4500</strong></span>
-            </div>
             <div class="toolbar-actions">
               <button class="btn">导出当前结果</button>
-              <button class="btn">列顺序</button>
-              <button class="btn">回收站</button>
+              <button class="btn">⚙ 列顺序</button>
+              <button class="btn danger">♲ 批量删除</button>
+              <button class="btn" id="openRecycle" type="button">回收站</button>
+            </div>
+            <div class="create-actions">
               <button class="btn primary">+ 新建记录</button>
             </div>
           </div>
-        </section>
-
-        <section class="panel selection" id="selectionBar" aria-label="当前记录操作">
-          <div class="selection-row">
+          <div class="selection-row" id="selectionBar">
             <div class="selection-copy">
-              <span class="selection-title">当前记录</span>
+              <span class="selection-title">当前操作</span>
               <span class="selection-summary empty" id="selectedSummary">
-                选择一行后可查看详情和处理动作
+                请选择一条记录
               </span>
             </div>
             <div class="selection-actions">
-              <button class="btn link small" id="clearSelection">清空</button>
-              <button class="btn small action-button">查看</button>
+              <button class="btn link small" id="clearSelection">清空已选</button>
               <button class="btn small action-button">编辑</button>
-              <button class="btn small action-button">打印</button>
-              <button class="btn small action-button">协同</button>
-              <button class="btn small action-button">更多 ⌄</button>
+              <button class="btn small action-button">关联表格 ⌄</button>
+              <button class="btn small action-button">流转 ⌄</button>
+              <button class="btn small action-button">复制</button>
+              <button class="btn small primary action-button">生成入库通知</button>
+              <button class="btn small action-button">打印采购合同</button>
               <button class="btn small danger action-button">删除</button>
             </div>
           </div>
@@ -749,14 +809,62 @@
               <thead>
                 <tr>
                   <th style="width: 52px">选中</th>
-                  <th style="width: 150px">采购编号</th>
-                  <th>材料品名</th>
-                  <th style="width: 130px">规格</th>
-                  <th style="width: 110px">数量</th>
-                  <th style="width: 120px">单价</th>
-                  <th style="width: 130px">回货日期</th>
-                  <th style="width: 120px">状态</th>
-                  <th style="width: 150px">当前任务</th>
+                  <th style="width: 150px">
+                    <span class="th-inner">
+                      <span class="th-title">采购编号</span>
+                      <button class="column-menu" type="button" aria-label="调整采购编号列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按采购编号排序"></span>
+                    </span>
+                  </th>
+                  <th>
+                    <span class="th-inner">
+                      <span class="th-title">材料品名</span>
+                      <button class="column-menu" type="button" aria-label="调整材料品名列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按材料品名排序"></span>
+                    </span>
+                  </th>
+                  <th style="width: 130px">
+                    <span class="th-inner">
+                      <span class="th-title">规格</span>
+                      <button class="column-menu" type="button" aria-label="调整规格列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按规格排序"></span>
+                    </span>
+                  </th>
+                  <th style="width: 110px">
+                    <span class="th-inner">
+                      <span class="th-title">数量</span>
+                      <button class="column-menu" type="button" aria-label="调整数量列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按数量排序"></span>
+                    </span>
+                  </th>
+                  <th style="width: 120px">
+                    <span class="th-inner">
+                      <span class="th-title">单价</span>
+                      <button class="column-menu" type="button" aria-label="调整单价列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按单价排序"></span>
+                    </span>
+                  </th>
+                  <th style="width: 130px">
+                    <span class="th-inner">
+                      <span class="th-title">回货日期</span>
+                      <button class="column-menu" type="button" aria-label="调整回货日期列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按回货日期排序"></span>
+                    </span>
+                  </th>
+                  <th style="width: 120px">
+                    <span class="th-inner">
+                      <span class="th-title">状态</span>
+                      <button class="column-menu" type="button" aria-label="调整状态列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按状态排序"></span>
+                    </span>
+                  </th>
+                  <th style="width: 150px">
+                    <span class="th-inner">
+                      <span class="th-title">当前任务</span>
+                      <button class="column-menu" type="button" aria-label="调整当前任务列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按当前任务排序"></span>
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody id="rows"></tbody>
@@ -772,40 +880,45 @@
             </div>
           </div>
         </section>
-
-        <section class="panel collab collapsed" id="collab" aria-label="本页协同">
-          <div class="collab-head">
-            <div>
-              <strong>本页协同</strong>
-              <div class="collab-summary">
-                <span class="pill">当前记录 <strong id="collabRecord">未选择</strong></span>
-                <span class="pill">待办 <strong>5</strong></span>
-                <span class="pill">阻塞 <strong>1</strong></span>
-              </div>
-            </div>
-            <div class="toolbar-actions">
-              <button class="btn small" id="toggleCollab" type="button">展开</button>
-              <button class="btn small primary action-button" disabled>处理当前任务</button>
-            </div>
-          </div>
-          <div class="collab-body">
-            <div>
-              <strong id="collabTitle">选择一条记录后查看本页相关任务</strong>
-              <div class="muted" id="collabMeta">协同任务只处理本页跟进，不替代采购、库存或财务事实。</div>
-            </div>
-            <div class="toolbar-actions">
-              <button class="btn small action-button" disabled>记录阻塞</button>
-              <button class="btn small action-button" disabled>催办</button>
-            </div>
-          </div>
-        </section>
       </div>
     </main>
+
+    <div class="modal-layer" role="presentation">
+      <section class="recycle-modal" role="dialog" aria-modal="true" aria-labelledby="recycleTitle">
+        <header class="modal-head">
+          <h2 class="modal-title" id="recycleTitle">回收站</h2>
+          <button class="modal-close" id="closeRecycle" type="button" aria-label="关闭">×</button>
+        </header>
+        <div class="modal-toolbar">
+          <button class="btn" disabled type="button">↩ 批量恢复</button>
+          <button class="btn" type="button">⟳ 刷新</button>
+          <span class="muted">已选择 0 条回收站记录</span>
+        </div>
+        <div class="modal-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 52px">选中</th>
+                  <th style="width: 150px">单据编号</th>
+                  <th>标题</th>
+                  <th style="width: 150px">业务状态</th>
+                  <th style="width: 160px">删除时间</th>
+                  <th style="width: 150px">删除原因</th>
+                  <th style="width: 150px">操作</th>
+                </tr>
+              </thead>
+            </table>
+          </div>
+          <div class="empty-recycle">回收站暂无记录</div>
+        </div>
+      </section>
+    </div>
 
     <script>
       const records = [
         {
-          no: "MP-202606-003",
+          no: "KSC260404001",
           name: "双层防潮袋",
           spec: "680 x 920",
           qty: "1,200",
@@ -816,7 +929,7 @@
           task: "供应商确认",
         },
         {
-          no: "MP-202606-002",
+          no: "KSC260404002",
           name: "五层外箱",
           spec: "60 x 45 x 38",
           qty: "600",
@@ -827,7 +940,7 @@
           task: "回货跟进",
         },
         {
-          no: "MP-202606-001",
+          no: "KSC260404003",
           name: "吊牌棉绳",
           spec: "本白 2mm",
           qty: "3,000",
@@ -844,11 +957,9 @@
       const selectedSummary = document.querySelector("#selectedSummary");
       const clearSelection = document.querySelector("#clearSelection");
       const actionButtons = document.querySelectorAll(".action-button");
-      const collab = document.querySelector("#collab");
-      const collabRecord = document.querySelector("#collabRecord");
-      const collabTitle = document.querySelector("#collabTitle");
-      const collabMeta = document.querySelector("#collabMeta");
-      let selectedIndex = -1;
+      const openRecycle = document.querySelector("#openRecycle");
+      const closeRecycle = document.querySelector("#closeRecycle");
+      let selectedIndex = 0;
 
       function renderRows() {
         rows.innerHTML = "";
@@ -883,20 +994,15 @@
         actionButtons.forEach((button) => {
           button.disabled = !hasSelection;
         });
+        clearSelection.disabled = !hasSelection;
 
         if (!hasSelection) {
-          selectedSummary.textContent = "选择一行后可查看详情和处理动作";
-          collabRecord.textContent = "未选择";
-          collabTitle.textContent = "选择一条记录后查看本页相关任务";
-          collabMeta.textContent = "协同任务只处理本页跟进，不替代采购、库存或财务事实。";
+          selectedSummary.textContent = "请选择一条记录";
           return;
         }
 
         const record = records[selectedIndex];
-        selectedSummary.textContent = `已选 1 条 · ${record.no} · ${record.name} · ${record.task}`;
-        collabRecord.textContent = record.no;
-        collabTitle.textContent = `${record.task}待处理`;
-        collabMeta.textContent = `${record.no} / 采购 / 回货日期 ${record.date}`;
+        selectedSummary.textContent = record.no;
       }
 
       clearSelection.addEventListener("click", () => {
@@ -905,11 +1011,12 @@
         syncSelection();
       });
 
-      document.querySelector("#toggleCollab").addEventListener("click", (event) => {
-        collab.classList.toggle("collapsed");
-        event.currentTarget.textContent = collab.classList.contains("collapsed")
-          ? "展开"
-          : "收起";
+      openRecycle.addEventListener("click", () => {
+        document.body.classList.add("show-recycle");
+      });
+
+      closeRecycle.addEventListener("click", () => {
+        document.body.classList.remove("show-recycle");
       });
 
       renderRows();

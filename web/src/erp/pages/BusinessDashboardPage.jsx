@@ -1,23 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  Card,
-  Col,
-  Progress,
-  Row,
-  Space,
-  Spin,
-  Statistic,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
+import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Button, Card, Space, Spin, Table, Tag, Typography } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import CommandCenterNav from '../components/CommandCenterNav.jsx'
 import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
@@ -219,205 +205,46 @@ export default function BusinessDashboardPage() {
   )
 
   return (
-    <Space direction="vertical" size={16} className="erp-dashboard-page">
+    <Space
+      direction="vertical"
+      size={10}
+      className="erp-dashboard-page erp-business-dashboard-page"
+    >
       <Card className="erp-dashboard-card" variant="borderless">
-        <div className="erp-command-center-shell">
-          <CommandCenterNav activeKey="business-board" />
-          <div className="erp-command-center-shell-main">
-            <div className="erp-business-board-hero">
-              <div className="erp-business-board-hero-main">
-                <Text type="secondary">ERP / 业务看板</Text>
-                <Title level={4} className="erp-dashboard-title">
-                  按业务模块看运行状态，不把摘要当事实真源
-                </Title>
-                <Paragraph type="secondary" className="erp-dashboard-summary">
-                  业务看板用于经营和协同观察：显示业务对象数量、异常分布、即将到期任务和模块入口；真实库存、出货和财务事实仍由各自
-                  usecase 与事实表负责。
-                </Paragraph>
-                <Space wrap>
-                  <Tag color="green">业务对象 {summary.totalRecords}</Tag>
-                  <Tag color="orange">推进中 {summary.activeCount}</Tag>
-                  <Tag color="red">阻塞/取消 {summary.blockedCount}</Tag>
-                  <Tag color="blue">完成比例 {summary.completionRatio}%</Tag>
-                </Space>
-              </div>
-              <div className="erp-business-board-hero-side">
-                <Button
-                  icon={<ArrowLeftOutlined />}
-                  onClick={openTaskDashboard}
-                >
-                  去任务看板
-                </Button>
-                <div
-                  className="erp-business-board-mini-chart"
-                  aria-label="模块记录分布"
-                >
-                  {moduleRows.slice(0, 7).map((row) => (
-                    <span
-                      className="erp-business-board-mini-bar"
-                      key={row.key}
-                      style={{
-                        '--erp-business-board-bar-height': `${Math.max(
-                          12,
-                          summary.totalRecords
-                            ? Math.round(
-                                (row.count / summary.totalRecords) * 100
-                              )
-                            : 12
-                        )}%`,
-                      }}
-                      title={`${row.module}: ${row.count}`}
-                    >
-                      {row.module.slice(0, 2)}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+        <div className="erp-business-board-hero erp-business-board-hero--compact">
+          <div className="erp-business-board-hero-main">
+            <Text type="secondary">ERP / 业务看板</Text>
+            <Title level={4} className="erp-dashboard-title">
+              业务看板
+            </Title>
+            <Paragraph type="secondary" className="erp-dashboard-summary">
+              按模块查看当前结果、阻塞预警和下一步入口。
+            </Paragraph>
+          </div>
+          <div className="erp-business-board-actions">
+            <Button
+              icon={<ReloadOutlined />}
+              loading={loading}
+              onClick={loadDashboardStats}
+            >
+              刷新业务数据
+            </Button>
+            <Button icon={<ArrowLeftOutlined />} onClick={openTaskDashboard}>
+              任务看板
+            </Button>
           </div>
         </div>
-      </Card>
-
-      <Alert
-        type="info"
-        showIcon
-        message="业务看板只做运营摘要"
-        description="本页统计业务对象和协同状态，用于发现模块风险和跳转业务列表；不作为库存、出货、财务、发票或收付款事实真源。"
-      />
-
-      <Row gutter={[12, 12]}>
-        {businessMetricCards.map((item) => (
-          <Col xs={24} sm={12} lg={6} key={item.key}>
-            <Card className="erp-dashboard-card" variant="borderless">
-              <Statistic
-                title={item.title}
-                value={item.value}
-                suffix={item.suffix}
-                valueStyle={item.color ? { color: item.color } : undefined}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
-
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" className="erp-dashboard-block" size={12}>
-          <Title level={5} className="erp-dashboard-section-title">
-            业务关注统计
-          </Title>
-          <Row gutter={[12, 12]}>
-            {businessFocusCards.map((item) => (
-              <Col xs={12} md={8} xl={6} key={item.key}>
-                <Card
-                  size="small"
-                  variant="borderless"
-                  className="erp-dashboard-status-card"
-                >
-                  <Statistic
-                    title={item.title}
-                    value={item.value}
-                    valueStyle={item.color ? { color: item.color } : undefined}
-                  />
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </Space>
-      </Card>
-
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" className="erp-dashboard-block" size={12}>
-          <Title level={5} className="erp-dashboard-section-title">
-            业务预警
-          </Title>
-          <Row gutter={[12, 12]}>
-            {workflowAlertGroups.map((group) => {
-              const alerts = workflowStats.buckets?.[group.key] || []
-              return (
-                <Col xs={24} md={12} xl={8} key={group.key}>
-                  <Card
-                    size="small"
-                    variant="borderless"
-                    className="erp-dashboard-status-card"
-                  >
-                    <Space
-                      direction="vertical"
-                      className="erp-dashboard-block"
-                      size={8}
-                    >
-                      <Space>
-                        <Tag color={alerts.length > 0 ? 'red' : 'default'}>
-                          {alerts.length}
-                        </Tag>
-                        <Text strong>{group.title}</Text>
-                      </Space>
-                      {alerts.slice(0, 3).map((alert) => (
-                        <div key={`${group.key}-${alert.task_id}`}>
-                          <Button
-                            type="link"
-                            size="small"
-                            className="erp-dashboard-link-button"
-                            disabled={!resolveWorkflowAlertEntryPath(alert)}
-                            onClick={() => openAlertEntry(alert)}
-                          >
-                            {alert.alert_label}
-                          </Button>
-                          <Paragraph
-                            type="secondary"
-                            className="erp-dashboard-summary"
-                          >
-                            {alert.task_name} /{' '}
-                            {formatWorkflowAlertSource(alert)}
-                          </Paragraph>
-                        </div>
-                      ))}
-                      {alerts.length === 0 ? (
-                        <Text type="secondary">暂无</Text>
-                      ) : null}
-                    </Space>
-                  </Card>
-                </Col>
-              )
-            })}
-          </Row>
-        </Space>
-      </Card>
-
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" className="erp-dashboard-block" size={8}>
-          <Title level={5} className="erp-dashboard-section-title">
-            业务状态分布
-          </Title>
-          <Row gutter={[12, 12]}>
-            {dashboardStatusGroups.map((group) => {
-              const count = summary.statusGroupCount[group.key] || 0
-              return (
-                <Col xs={24} md={12} lg={8} key={group.key}>
-                  <Card
-                    size="small"
-                    variant="borderless"
-                    className="erp-dashboard-status-card"
-                  >
-                    <Space
-                      direction="vertical"
-                      className="erp-dashboard-block"
-                      size={6}
-                    >
-                      <Tag>{group.title}</Tag>
-                      <Progress
-                        percent={
-                          summary.totalRecords
-                            ? Math.round((count / summary.totalRecords) * 100)
-                            : 0
-                        }
-                      />
-                    </Space>
-                  </Card>
-                </Col>
-              )
-            })}
-          </Row>
-        </Space>
+        <div className="erp-business-board-summary-grid">
+          {businessMetricCards.map((item) => (
+            <div className="erp-business-board-summary-card" key={item.key}>
+              <Text type="secondary">{item.title}</Text>
+              <strong style={item.color ? { color: item.color } : undefined}>
+                {item.value}
+                {item.suffix || ''}
+              </strong>
+            </div>
+          ))}
+        </div>
       </Card>
 
       <Card
@@ -440,6 +267,8 @@ export default function BusinessDashboardPage() {
               dataIndex: 'module',
               fixed: 'left',
               width: 220,
+              sorter: (a, b) =>
+                String(a.module).localeCompare(String(b.module)),
               render: (value, record) =>
                 renderModuleEntryButton(
                   value,
@@ -452,6 +281,7 @@ export default function BusinessDashboardPage() {
               title: '记录数',
               dataIndex: 'count',
               width: 100,
+              sorter: (a, b) => Number(a.count || 0) - Number(b.count || 0),
               render: (value, record) =>
                 renderModuleEntryButton(
                   value,
@@ -465,6 +295,9 @@ export default function BusinessDashboardPage() {
               dataIndex: ['statusGroupCounts', group.key],
               width: 118,
               align: 'center',
+              sorter: (a, b) =>
+                Number(a.statusGroupCounts?.[group.key] || 0) -
+                Number(b.statusGroupCounts?.[group.key] || 0),
               render: (value, record) =>
                 renderModuleEntryButton(
                   value,
@@ -475,6 +308,107 @@ export default function BusinessDashboardPage() {
             })),
           ]}
           dataSource={moduleRows}
+        />
+      </Card>
+
+      <div className="erp-business-board-lower-grid">
+        <Card className="erp-dashboard-card" variant="borderless">
+          <Space direction="vertical" className="erp-dashboard-block" size={8}>
+            <Title level={5} className="erp-dashboard-section-title">
+              业务状态分布
+            </Title>
+            <div className="erp-business-board-status-list">
+              {dashboardStatusGroups.map((group) => {
+                const count = summary.statusGroupCount[group.key] || 0
+                const percent = summary.totalRecords
+                  ? Math.round((count / summary.totalRecords) * 100)
+                  : 0
+                return (
+                  <div
+                    className="erp-business-board-status-row"
+                    key={group.key}
+                  >
+                    <span>{group.title}</span>
+                    <strong>{count}</strong>
+                    <i style={{ width: `${Math.max(percent, 4)}%` }} />
+                  </div>
+                )
+              })}
+            </div>
+          </Space>
+        </Card>
+
+        <Card className="erp-dashboard-card" variant="borderless">
+          <Space direction="vertical" className="erp-dashboard-block" size={8}>
+            <Title level={5} className="erp-dashboard-section-title">
+              业务预警
+            </Title>
+            <div className="erp-business-board-alert-grid">
+              {workflowAlertGroups.slice(0, 6).map((group) => {
+                const alerts = workflowStats.buckets?.[group.key] || []
+                return (
+                  <div
+                    className="erp-business-board-alert-item"
+                    key={group.key}
+                  >
+                    <div>
+                      <Text strong>{group.title}</Text>
+                      <strong className="erp-business-board-alert-count">
+                        {alerts.length}
+                      </strong>
+                    </div>
+                    {alerts.slice(0, 1).map((alert) => (
+                      <Button
+                        key={`${group.key}-${alert.task_id}`}
+                        type="link"
+                        size="small"
+                        className="erp-dashboard-link-button"
+                        disabled={!resolveWorkflowAlertEntryPath(alert)}
+                        onClick={() => openAlertEntry(alert)}
+                      >
+                        {alert.alert_label} / {formatWorkflowAlertSource(alert)}
+                      </Button>
+                    ))}
+                    {alerts.length === 0 ? (
+                      <Text type="secondary">暂无</Text>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          </Space>
+        </Card>
+      </div>
+
+      <Card
+        className="erp-dashboard-card erp-dashboard-table-card"
+        variant="borderless"
+        title="业务关注统计"
+      >
+        <Table
+          size="small"
+          pagination={false}
+          rowKey="key"
+          scroll={{ x: 760 }}
+          columns={[
+            {
+              title: '关注项',
+              dataIndex: 'title',
+              width: 280,
+            },
+            {
+              title: '数量',
+              dataIndex: 'value',
+              width: 120,
+              sorter: (a, b) => Number(a.value || 0) - Number(b.value || 0),
+              render: (value, record) => (
+                <strong style={record.color ? { color: record.color } : null}>
+                  {value}
+                </strong>
+              ),
+            },
+          ]}
+          dataSource={businessFocusCards}
         />
       </Card>
     </Space>

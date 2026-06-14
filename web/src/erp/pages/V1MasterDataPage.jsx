@@ -1,32 +1,39 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
+  InboxOutlined,
+  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RollbackOutlined,
+  SettingOutlined,
   StopOutlined,
-  UserSwitchOutlined,
 } from '@ant-design/icons'
 import {
   Button,
   Descriptions,
   Drawer,
+  Empty,
   Form,
   Input,
   Modal,
   Popconfirm,
   Space,
   Switch,
+  Table,
   Tag,
+  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   BusinessDataTable,
-  BusinessFilterPanel,
+  BusinessOperationPanel,
   CollaborationTaskPanel,
-  BusinessListToolbar,
   BusinessPageLayout,
   PageHeaderCard,
   SearchInput,
@@ -35,6 +42,10 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  ColumnOrderModal,
+  getColumnLabel,
+} from '../components/business-list/ColumnOrderModal.jsx'
+import {
   createContact,
   createCustomer,
   createSupplier,
@@ -42,19 +53,23 @@ import {
   listCustomers,
   listSuppliers,
   setCustomerActive,
-  setPrimaryContact,
   setSupplierActive,
-  disableContact,
-  updateContact,
   updateCustomer,
   updateSupplier,
 } from '../api/masterDataOrderApi.mjs'
+import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   buildContactParams,
   buildMasterDataParams,
   formatUnixDate,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  applyModuleColumnOrder,
+  sanitizeModuleColumnOrder,
+} from '../utils/moduleTableColumns.mjs'
+
+const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 
 const PAGE_CONFIG = Object.freeze({
   customers: {
@@ -75,7 +90,7 @@ const PAGE_CONFIG = Object.freeze({
       contactPrimary: 'contact.set_primary',
     },
     summary:
-      '正式 customers 表页面，只维护客户交易主体，不写订单、出货、库存或财务事实。',
+      '维护客户交易主体和联系人；订单、出货、库存和财务事实在对应业务模块处理。',
   },
   suppliers: {
     title: '供应商档案',
@@ -95,7 +110,7 @@ const PAGE_CONFIG = Object.freeze({
       contactPrimary: 'contact.set_primary',
     },
     summary:
-      '正式 suppliers 表页面，只维护供应商 / 加工厂交易主体，不写采购入库、质检、库存或财务事实。',
+      '维护供应商和加工厂交易主体；采购入库、质检、库存和财务事实在对应业务模块处理。',
   },
 })
 
@@ -103,6 +118,82 @@ const ACTIVE_FILTER_OPTIONS = Object.freeze([
   { label: '全部主体', value: 'all' },
   { label: '仅看启用', value: 'active' },
 ])
+
+function compareText(a, b) {
+  return String(a || '').localeCompare(String(b || ''))
+}
+
+function compareBoolean(a, b) {
+  return Number(Boolean(a)) - Number(Boolean(b))
+}
+
+function renderColumnHeader(label, onOpenColumnOrder) {
+  return (
+    <span className="erp-module-column-header">
+      <span className="erp-module-column-header-text">{label}</span>
+      <Tooltip title="调整列顺序">
+        <Button
+          type="text"
+          size="small"
+          className="erp-module-column-header-trigger"
+          icon={<MoreOutlined />}
+          aria-label={`${label} 列设置`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onOpenColumnOrder?.()
+          }}
+        />
+      </Tooltip>
+    </span>
+  )
+}
+
+function readStoredColumnOrder(moduleKey) {
+  if (typeof window === 'undefined') {
+    return []
+  }
+
+  try {
+    const raw = window.localStorage.getItem(
+      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+    )
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredColumnOrder(moduleKey, order = []) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+  if (!Array.isArray(order) || order.length === 0) {
+    window.localStorage.removeItem(storageKey)
+    return
+  }
+  window.localStorage.setItem(storageKey, JSON.stringify(order))
+}
+
+function getPreferredColumnOrder({
+  adminProfile,
+  moduleKey,
+  columns,
+  localOrder,
+}) {
+  if (Array.isArray(localOrder)) {
+    return sanitizeModuleColumnOrder(localOrder, columns)
+  }
+
+  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
+  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
+  if (sanitizedAccountOrder.length > 0) {
+    return sanitizedAccountOrder
+  }
+  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
+}
 
 function activeTag(active) {
   return active === false ? (
@@ -112,10 +203,41 @@ function activeTag(active) {
   )
 }
 
+function csvEscape(value) {
+  const text = String(value ?? '')
+  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+function downloadCSV({ filename, columns, rows }) {
+  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
+  const body = rows.map((row) =>
+    columns.map((column) => {
+      const value =
+        typeof column.exportValue === 'function'
+          ? column.exportValue(row)
+          : row?.[column.dataIndex]
+      return csvEscape(value)
+    })
+  )
+  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], {
+    type: 'text/csv;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
 function MasterDataFormFields({ type }) {
   return (
     <>
       <Form.Item
+        className="erp-business-action-form__field"
         label="编号"
         name="code"
         rules={[{ required: true, message: '请填写编号' }]}
@@ -123,17 +245,26 @@ function MasterDataFormFields({ type }) {
         <Input allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item
+        className="erp-business-action-form__field"
         label="名称"
         name="name"
         rules={[{ required: true, message: '请填写名称' }]}
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="简称" name="short_name">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="简称"
+        name="short_name"
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
       {type === 'suppliers' ? (
-        <Form.Item label="供应商类型" name="supplier_type">
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="供应商类型"
+          name="supplier_type"
+        >
           <Input
             allowClear
             autoComplete="off"
@@ -141,10 +272,18 @@ function MasterDataFormFields({ type }) {
           />
         </Form.Item>
       ) : null}
-      <Form.Item label="税号" name="tax_no">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="税号"
+        name="tax_no"
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        label="备注"
+        name="note"
+      >
         <Input.TextArea allowClear rows={3} showCount maxLength={300} />
       </Form.Item>
     </>
@@ -155,28 +294,54 @@ function ContactFormFields() {
   return (
     <>
       <Form.Item
+        className="erp-business-action-form__field"
         label="联系人"
         name="name"
         rules={[{ required: true, message: '请填写联系人' }]}
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="职位" name="title">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="职位"
+        name="title"
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="手机" name="mobile">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="手机"
+        name="mobile"
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="电话" name="phone">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="电话"
+        name="phone"
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="邮箱" name="email">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="邮箱"
+        name="email"
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="主联系人" name="is_primary" valuePropName="checked">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="主联系人"
+        name="is_primary"
+        valuePropName="checked"
+      >
         <Switch />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        label="备注"
+        name="note"
+      >
         <Input.TextArea allowClear rows={3} showCount maxLength={300} />
       </Form.Item>
     </>
@@ -198,11 +363,18 @@ export default function V1MasterDataPage({ type }) {
   const [recordModalOpen, setRecordModalOpen] = useState(false)
   const [contactModalOpen, setContactModalOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+  const [batchDeleteReason, setBatchDeleteReason] = useState('')
+  const [recycleOpen, setRecycleOpen] = useState(false)
+  const [recycleSelectedRowKeys, setRecycleSelectedRowKeys] = useState([])
   const [editingRecord, setEditingRecord] = useState(null)
-  const [editingContact, setEditingContact] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [columnOrder, setColumnOrder] = useState(null)
+  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [recordForm] = Form.useForm()
   const [contactForm] = Form.useForm()
+  const moduleKey = config.recordKey
 
   const canCreate = hasActionPermission(adminProfile, config.permissions.create)
   const canUpdate = hasActionPermission(adminProfile, config.permissions.update)
@@ -213,18 +385,6 @@ export default function V1MasterDataPage({ type }) {
   const canCreateContact = hasActionPermission(
     adminProfile,
     config.permissions.contactCreate
-  )
-  const canUpdateContact = hasActionPermission(
-    adminProfile,
-    config.permissions.contactUpdate
-  )
-  const canDisableContact = hasActionPermission(
-    adminProfile,
-    config.permissions.contactDisable
-  )
-  const canSetPrimaryContact = hasActionPermission(
-    adminProfile,
-    config.permissions.contactPrimary
   )
 
   const loadContacts = useCallback(
@@ -309,15 +469,8 @@ export default function V1MasterDataPage({ type }) {
       message.warning('请先选择一个主体')
       return
     }
-    setEditingContact(null)
     contactForm.resetFields()
     contactForm.setFieldsValue({ is_primary: false })
-    setContactModalOpen(true)
-  }
-
-  const openEditContact = (contact) => {
-    setEditingContact(contact)
-    contactForm.setFieldsValue(contact)
     setContactModalOpen(true)
   }
 
@@ -351,10 +504,9 @@ export default function V1MasterDataPage({ type }) {
       const params = buildContactParams(values, {
         owner_type: config.ownerType,
         owner_id: selectedRecord.id,
-        ...(editingContact?.id ? { id: editingContact.id } : {}),
       })
-      await (editingContact?.id ? updateContact(params) : createContact(params))
-      message.success(editingContact?.id ? '联系人已更新' : '联系人已创建')
+      await createContact(params)
+      message.success('联系人已创建')
       setContactModalOpen(false)
       await loadContacts(selectedRecord)
     } catch (error) {
@@ -380,108 +532,102 @@ export default function V1MasterDataPage({ type }) {
     }
   }
 
-  const markPrimaryContact = async (contact) => {
-    setSaving(true)
-    try {
-      await setPrimaryContact({ id: contact.id })
-      message.success('主联系人已更新')
-      await loadContacts(selectedRecord)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '设置主联系人'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const disableSelectedContact = async (contact) => {
-    setSaving(true)
-    try {
-      await disableContact({ id: contact.id })
-      message.success('联系人已禁用')
-      await loadContacts(selectedRecord)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '禁用联系人'))
-    } finally {
-      setSaving(false)
-    }
-  }
+  const persistColumnOrder = useCallback(
+    async (nextOrder, columns) => {
+      const sanitizedOrder = sanitizeModuleColumnOrder(nextOrder, columns)
+      setColumnOrder(sanitizedOrder)
+      writeStoredColumnOrder(moduleKey, sanitizedOrder)
+      setColumnOrderSaving(true)
+      try {
+        const erpPreferences = await setERPColumnOrder({
+          module_key: moduleKey,
+          order: sanitizedOrder,
+        })
+        outletContext?.updateAdminERPPreferences?.(erpPreferences)
+        message.success(
+          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
+        )
+      } catch (error) {
+        message.warning(
+          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
+        )
+      } finally {
+        setColumnOrderSaving(false)
+      }
+    },
+    [moduleKey, outletContext]
+  )
 
   const recordColumns = useMemo(
     () => [
-      { title: '编号', dataIndex: 'code', width: 140 },
-      { title: '名称', dataIndex: 'name', width: 220 },
       {
-        title: '简称',
+        title: renderColumnHeader('编号', () => setColumnOrderOpen(true)),
+        exportTitle: '编号',
+        dataIndex: 'code',
+        width: 140,
+        sorter: (a, b) => compareText(a?.code, b?.code),
+      },
+      {
+        title: renderColumnHeader('名称', () => setColumnOrderOpen(true)),
+        exportTitle: '名称',
+        dataIndex: 'name',
+        width: 220,
+        sorter: (a, b) => compareText(a?.name, b?.name),
+      },
+      {
+        title: renderColumnHeader('简称', () => setColumnOrderOpen(true)),
+        exportTitle: '简称',
         dataIndex: 'short_name',
         width: 160,
+        sorter: (a, b) => compareText(a?.short_name, b?.short_name),
         render: (value) => value || '-',
       },
       ...(type === 'suppliers'
         ? [
             {
-              title: '类型',
+              title: renderColumnHeader('类型', () => setColumnOrderOpen(true)),
+              exportTitle: '类型',
               dataIndex: 'supplier_type',
               width: 140,
+              sorter: (a, b) => compareText(a?.supplier_type, b?.supplier_type),
               render: (value) => value || '-',
             },
           ]
         : []),
       {
-        title: '税号',
+        title: renderColumnHeader('税号', () => setColumnOrderOpen(true)),
+        exportTitle: '税号',
         dataIndex: 'tax_no',
         width: 180,
+        sorter: (a, b) => compareText(a?.tax_no, b?.tax_no),
         render: (value) => value || '-',
       },
-      { title: '状态', dataIndex: 'is_active', width: 90, render: activeTag },
       {
-        title: '操作',
-        key: 'actions',
-        width: 260,
-        fixed: 'right',
-        render: (_, record) => (
-          <Space size={6} wrap>
-            <Button
-              size="small"
-              onClick={() => {
-                setSelectedRecord(record)
-                setDetailOpen(true)
-              }}
-            >
-              查看
-            </Button>
-            {canUpdate ? (
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => openEditRecord(record)}
-              >
-                编辑
-              </Button>
-            ) : null}
-            {canDisable ? (
-              <Popconfirm
-                title={record.is_active === false ? '确认启用？' : '确认停用？'}
-                onConfirm={() => toggleRecordActive(record)}
-              >
-                <Button
-                  size="small"
-                  icon={
-                    record.is_active === false ? (
-                      <CheckCircleOutlined />
-                    ) : (
-                      <StopOutlined />
-                    )
-                  }
-                >
-                  {record.is_active === false ? '启用' : '停用'}
-                </Button>
-              </Popconfirm>
-            ) : null}
-          </Space>
-        ),
+        title: renderColumnHeader('状态', () => setColumnOrderOpen(true)),
+        exportTitle: '状态',
+        dataIndex: 'is_active',
+        width: 90,
+        sorter: (a, b) => compareBoolean(a?.is_active, b?.is_active),
+        exportValue: (record) =>
+          record?.is_active === false ? '停用' : '启用',
+        render: activeTag,
       },
     ],
-    [canDisable, canUpdate, type]
+    [type]
+  )
+  const preferredRecordColumnOrder = useMemo(
+    () =>
+      getPreferredColumnOrder({
+        adminProfile,
+        moduleKey,
+        columns: recordColumns,
+        localOrder: columnOrder,
+      }),
+    [adminProfile, columnOrder, moduleKey, recordColumns]
+  )
+  const orderedRecordColumns = useMemo(
+    () => applyModuleColumnOrder(recordColumns, preferredRecordColumnOrder),
+    [preferredRecordColumnOrder, recordColumns]
   )
 
   const contactColumns = useMemo(
@@ -518,45 +664,8 @@ export default function V1MasterDataPage({ type }) {
         render: (value) => (value ? <Tag color="blue">主</Tag> : '-'),
       },
       { title: '状态', dataIndex: 'is_active', width: 90, render: activeTag },
-      {
-        title: '操作',
-        key: 'actions',
-        width: 260,
-        render: (_, contact) => (
-          <Space size={6} wrap>
-            {canUpdateContact ? (
-              <Button
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => openEditContact(contact)}
-              >
-                编辑
-              </Button>
-            ) : null}
-            {canSetPrimaryContact && contact.is_active !== false ? (
-              <Button
-                size="small"
-                icon={<UserSwitchOutlined />}
-                onClick={() => markPrimaryContact(contact)}
-              >
-                设为主联系人
-              </Button>
-            ) : null}
-            {canDisableContact && contact.is_active !== false ? (
-              <Popconfirm
-                title="确认禁用该联系人？"
-                onConfirm={() => disableSelectedContact(contact)}
-              >
-                <Button size="small" icon={<StopOutlined />}>
-                  禁用
-                </Button>
-              </Popconfirm>
-            ) : null}
-          </Space>
-        ),
-      },
     ],
-    [canDisableContact, canSetPrimaryContact, canUpdateContact]
+    []
   )
 
   const activeRecordCount = useMemo(
@@ -569,35 +678,14 @@ export default function V1MasterDataPage({ type }) {
       selectedRecord.name || '未命名主体'
     }`
   }, [selectedRecord])
-  const selectedRecordSummaryItems = useMemo(() => {
-    if (!selectedRecord) return []
-    const items = [
-      {
-        key: 'status',
-        label: '状态',
-        value: selectedRecord.is_active === false ? '停用' : '启用',
-      },
-      {
-        key: 'short-name',
-        label: '简称',
-        value: selectedRecord.short_name || '-',
-      },
-      {
-        key: 'contacts',
-        label: '联系人',
-        value: contacts.length,
-      },
-    ]
-    if (type === 'suppliers') {
-      items.splice(2, 0, {
-        key: 'supplier-type',
-        label: '类型',
-        value: selectedRecord.supplier_type || '-',
-      })
-    }
-    return items
-  }, [contacts.length, selectedRecord, type])
-
+  const exportRecords = () => {
+    downloadCSV({
+      filename: `${type}-current-results.csv`,
+      columns: orderedRecordColumns,
+      rows: records,
+    })
+    message.success('已导出当前结果')
+  }
   return (
     <BusinessPageLayout className="erp-v1-master-data-page">
       <PageHeaderCard
@@ -605,12 +693,6 @@ export default function V1MasterDataPage({ type }) {
         sectionTitle="基础资料"
         title={config.title}
         description={config.summary}
-        tags={
-          <div className="erp-business-module-chip-row">
-            <Tag color="green">正式 MasterData</Tag>
-            <Tag>只维护交易主体</Tag>
-          </div>
-        }
         stats={[
           { key: 'total', label: '总主体', value: total },
           { key: 'current', label: '当前结果', value: records.length },
@@ -619,117 +701,155 @@ export default function V1MasterDataPage({ type }) {
         ]}
       />
 
-      <BusinessFilterPanel compact>
-        <SearchInput
-          placeholder="搜索编号、名称、简称"
-          value={keyword}
-          onChange={(event) => setKeyword(event.target.value)}
-          onPressEnter={loadRecords}
-        />
-        <SelectFilter
-          className="erp-business-filter-control--status"
-          options={ACTIVE_FILTER_OPTIONS}
-          value={activeOnly ? 'active' : 'all'}
-          onChange={(nextValue) => setActiveOnly(nextValue === 'active')}
-        />
-      </BusinessFilterPanel>
-
-      <BusinessListToolbar
-        stats={[
-          { key: 'current', label: '当前结果', value: records.length },
-          { key: 'contacts', label: '当前联系人', value: contacts.length },
-          { key: 'selected', label: '已选主体', value: selectedRecord ? 1 : 0 },
-        ]}
-        actions={
+      <BusinessOperationPanel
+        compact
+        filters={
           <>
-            <ToolbarButton
-              icon={<ReloadOutlined />}
-              onClick={loadRecords}
-              loading={loading}
-            >
-              刷新
-            </ToolbarButton>
-            {canCreate ? (
-              <ToolbarButton
-                type="primary"
-                className="erp-business-list-toolbar__primary-action"
-                icon={<PlusOutlined />}
-                onClick={openCreateRecord}
-              >
-                新建主体
-              </ToolbarButton>
-            ) : null}
+            <SearchInput
+              placeholder="搜索编号、名称、简称"
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+              onPressEnter={loadRecords}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              options={ACTIVE_FILTER_OPTIONS}
+              value={activeOnly ? 'active' : 'all'}
+              onChange={(nextValue) => setActiveOnly(nextValue === 'active')}
+            />
           </>
         }
-      />
-
-      <SelectionActionBar
-        selectedCount={selectedRecord ? 1 : 0}
-        selectedLabel={selectedRecordDisplayText}
-        summaryItems={selectedRecordSummaryItems}
-        boundaryText={config.summary}
+        actions={
+          <Space wrap>
+            <ToolbarButton
+              icon={<DownloadOutlined />}
+              disabled={records.length === 0}
+              onClick={exportRecords}
+            >
+              导出当前结果
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={() => setColumnOrderOpen(true)}
+            >
+              列顺序
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<DeleteOutlined />}
+              danger
+              disabled={!selectedRecord}
+              onClick={() => setBatchDeleteOpen(true)}
+            >
+              批量删除
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<InboxOutlined />}
+              onClick={() => setRecycleOpen(true)}
+            >
+              回收站
+            </ToolbarButton>
+          </Space>
+        }
+        primaryAction={
+          canCreate ? (
+            <ToolbarButton
+              type="primary"
+              className="erp-business-list-toolbar__primary-action"
+              icon={<PlusOutlined />}
+              onClick={openCreateRecord}
+            >
+              新建主体
+            </ToolbarButton>
+          ) : null
+        }
       >
-        <Button
-          type="link"
-          size="small"
-          disabled={!selectedRecord}
-          onClick={() => {
-            setSelectedRecord(null)
-            setContacts([])
-          }}
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRecord ? 1 : 0}
+          selectedLabel={selectedRecordDisplayText}
         >
-          清空已选
-        </Button>
-        <Button
-          size="small"
-          disabled={!selectedRecord}
-          onClick={() => setDetailOpen(true)}
-        >
-          查看详情
-        </Button>
-        {canUpdate ? (
+          <Button
+            type="link"
+            size="small"
+            disabled={!selectedRecord}
+            onClick={() => {
+              setSelectedRecord(null)
+              setContacts([])
+            }}
+          >
+            清空已选
+          </Button>
           <Button
             size="small"
-            icon={<EditOutlined />}
             disabled={!selectedRecord}
-            onClick={() => openEditRecord(selectedRecord)}
+            onClick={() => setDetailOpen(true)}
           >
-            编辑主体
+            查看详情
           </Button>
-        ) : null}
-        {canDisable ? (
-          <Popconfirm
-            title={
-              selectedRecord?.is_active === false ? '确认启用？' : '确认停用？'
-            }
-            onConfirm={() => toggleRecordActive(selectedRecord)}
-            disabled={!selectedRecord}
-          >
+          {canUpdate ? (
             <Button
               size="small"
+              icon={<EditOutlined />}
               disabled={!selectedRecord}
-              icon={
-                selectedRecord?.is_active === false ? (
-                  <CheckCircleOutlined />
-                ) : (
-                  <StopOutlined />
-                )
-              }
+              onClick={() => openEditRecord(selectedRecord)}
             >
-              {selectedRecord?.is_active === false ? '启用' : '停用'}
+              编辑主体
             </Button>
-          </Popconfirm>
-        ) : null}
-      </SelectionActionBar>
+          ) : null}
+          {canDisable ? (
+            <Popconfirm
+              title={
+                selectedRecord?.is_active === false
+                  ? '确认启用？'
+                  : '确认停用？'
+              }
+              onConfirm={() => toggleRecordActive(selectedRecord)}
+              disabled={!selectedRecord}
+            >
+              <Button
+                size="small"
+                disabled={!selectedRecord}
+                icon={
+                  selectedRecord?.is_active === false ? (
+                    <CheckCircleOutlined />
+                  ) : (
+                    <StopOutlined />
+                  )
+                }
+              >
+                {selectedRecord?.is_active === false ? '启用' : '停用'}
+              </Button>
+            </Popconfirm>
+          ) : null}
+          <Button
+            size="small"
+            danger
+            icon={<DeleteOutlined />}
+            disabled={!selectedRecord}
+            onClick={() => setBatchDeleteOpen(true)}
+          >
+            删除
+          </Button>
+        </SelectionActionBar>
+      </BusinessOperationPanel>
 
       <BusinessDataTable
         rowKey="id"
         loading={loading}
-        columns={recordColumns}
+        columns={orderedRecordColumns}
         dataSource={records}
         scroll={{ x: 980 }}
         pagination={{ pageSize: 10, showSizeChanger: false }}
         emptyDescription="暂无客户或供应商主体记录"
+        rowSelection={{
+          selectedRowKeys: selectedRecord?.id ? [selectedRecord.id] : [],
+          onSelect: (record, selected) => {
+            setSelectedRecord(selected ? record : null)
+          },
+          onSelectAll: (_selected, selectedRows) => {
+            setSelectedRecord(selectedRows[0] || null)
+          },
+        }}
         rowClassName={(record) =>
           record.id === selectedRecord?.id ? 'ant-table-row-selected' : ''
         }
@@ -738,17 +858,34 @@ export default function V1MasterDataPage({ type }) {
         })}
       />
 
-      <BusinessListToolbar
-        stats={[
-          {
-            key: 'owner',
-            label: '联系人主体',
-            value: selectedRecord?.name || '未选择',
-          },
-          { key: 'contacts', label: '联系人', value: contacts.length },
-        ]}
-        actions={
-          canCreateContact ? (
+      <section
+        className={[
+          'erp-v1-master-data-contact-panel',
+          selectedRecord
+            ? 'erp-v1-master-data-contact-panel--active'
+            : 'erp-v1-master-data-contact-panel--empty',
+        ].join(' ')}
+        aria-label="联系人明细"
+      >
+        <div className="erp-v1-master-data-contact-panel__head">
+          <div className="erp-v1-master-data-contact-panel__title">
+            <span>联系人明细</span>
+            <strong>
+              {selectedRecord?.name || '先从上方选择一个客户或供应商'}
+            </strong>
+            <small>
+              联系人随主体维护，不作为独立业务对象，也不生成订单、出货、库存或财务事实。
+            </small>
+          </div>
+          <div className="erp-v1-master-data-contact-panel__meta">
+            <span>
+              主体 <strong>{selectedRecord?.code || '未选择'}</strong>
+            </span>
+            <span>
+              联系人 <strong>{selectedRecord ? contacts.length : 0}</strong>
+            </span>
+          </div>
+          {canCreateContact ? (
             <ToolbarButton
               icon={<PlusOutlined />}
               onClick={openCreateContact}
@@ -756,20 +893,30 @@ export default function V1MasterDataPage({ type }) {
             >
               新建联系人
             </ToolbarButton>
-          ) : null
-        }
-      />
-      <BusinessDataTable
-        rowKey="id"
-        loading={selectedRecord ? contactLoading : false}
-        columns={contactColumns}
-        dataSource={selectedRecord ? contacts : []}
-        scroll={{ x: 1080 }}
-        pagination={false}
-        emptyDescription={
-          selectedRecord ? '当前主体暂无联系人' : '尚未选择主体'
-        }
-      />
+          ) : null}
+        </div>
+        {selectedRecord ? (
+          <Table
+            rowKey="id"
+            className="erp-v1-master-data-contact-panel__table"
+            loading={contactLoading}
+            columns={contactColumns}
+            dataSource={contacts}
+            scroll={{ x: 1080 }}
+            pagination={false}
+            locale={{
+              emptyText: <Empty description="当前主体暂无联系人" />,
+            }}
+          />
+        ) : (
+          <div className="erp-v1-master-data-contact-panel__empty">
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description="从上方主体表选择一行后维护联系人"
+            />
+          </div>
+        )}
+      </section>
 
       <CollaborationTaskPanel
         tasks={[]}
@@ -778,31 +925,170 @@ export default function V1MasterDataPage({ type }) {
       />
 
       <Modal
-        title={editingRecord?.id ? '编辑主数据' : '新建主数据'}
+        className="erp-business-action-modal erp-business-action-modal--form"
+        width="min(1280px, calc(100vw - 96px))"
+        title={
+          <div className="erp-business-action-modal__title">
+            <span>
+              {editingRecord?.id ? '编辑主体' : `新建${config.title}`}
+            </span>
+            <small>只维护交易主体资料，不在此写订单、库存或财务事实。</small>
+          </div>
+        }
         open={recordModalOpen}
         onOk={saveRecord}
         onCancel={() => setRecordModalOpen(false)}
         confirmLoading={saving}
+        centered
         forceRender
         destroyOnHidden={false}
       >
-        <Form form={recordForm} layout="vertical">
+        <Form
+          form={recordForm}
+          layout="vertical"
+          className="erp-business-action-form"
+        >
           <MasterDataFormFields type={type} />
         </Form>
       </Modal>
 
       <Modal
-        title={editingContact?.id ? '编辑联系人' : '新建联系人'}
+        className="erp-business-action-modal erp-business-action-modal--form"
+        width="min(1080px, calc(100vw - 96px))"
+        title={
+          <div className="erp-business-action-modal__title">
+            <span>新建联系人</span>
+            <small>
+              联系人随当前主体维护，不生成订单、出货、库存或财务事实。
+            </small>
+          </div>
+        }
         open={contactModalOpen}
         onOk={saveContact}
         onCancel={() => setContactModalOpen(false)}
         confirmLoading={saving}
+        centered
         forceRender
         destroyOnHidden={false}
       >
-        <Form form={contactForm} layout="vertical">
+        <Form
+          form={contactForm}
+          layout="vertical"
+          className="erp-business-action-form"
+        >
           <ContactFormFields />
         </Form>
+      </Modal>
+
+      <ColumnOrderModal
+        open={columnOrderOpen}
+        moduleTitle={config.title}
+        columns={recordColumns}
+        order={preferredRecordColumnOrder}
+        saving={columnOrderSaving}
+        onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
+        onReset={() => persistColumnOrder([], recordColumns)}
+        onClose={() => setColumnOrderOpen(false)}
+      />
+
+      <Modal
+        className="erp-business-action-modal erp-business-action-modal--confirm erp-business-batch-delete-modal"
+        width={560}
+        title="批量删除记录"
+        open={batchDeleteOpen}
+        onCancel={() => setBatchDeleteOpen(false)}
+        onOk={() => {
+          setBatchDeleteOpen(false)
+          setBatchDeleteReason('')
+          message.info(
+            `${config.title}当前使用启停状态管理，不执行批量物理删除`
+          )
+        }}
+        okText="确认删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true, disabled: !selectedRecord }}
+        centered
+        destroyOnHidden
+      >
+        <Space
+          direction="vertical"
+          size={12}
+          className="erp-business-batch-delete-modal__content"
+        >
+          <span>
+            已选择 <strong>{selectedRecord ? 1 : 0}</strong>{' '}
+            条记录，将进入回收站。
+          </span>
+          <Input.TextArea
+            className="erp-business-batch-delete-modal__reason"
+            value={batchDeleteReason}
+            onChange={(event) => setBatchDeleteReason(event.target.value)}
+            rows={3}
+            maxLength={255}
+            showCount
+            placeholder="请输入删除原因（可选）"
+          />
+        </Space>
+      </Modal>
+
+      <Modal
+        className="erp-business-action-modal erp-business-action-modal--recycle"
+        title="回收站"
+        open={recycleOpen}
+        onCancel={() => {
+          setRecycleOpen(false)
+          setRecycleSelectedRowKeys([])
+        }}
+        footer={null}
+        width={980}
+        centered
+        destroyOnHidden
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Space wrap>
+            <Button
+              icon={<RollbackOutlined />}
+              disabled={recycleSelectedRowKeys.length === 0}
+            >
+              批量恢复
+            </Button>
+            <Button icon={<ReloadOutlined />}>刷新</Button>
+            <span>已选择 {recycleSelectedRowKeys.length} 条回收站记录</span>
+          </Space>
+          <Table
+            rowKey="id"
+            size="small"
+            rowSelection={{
+              selectedRowKeys: recycleSelectedRowKeys,
+              onChange: (keys) => setRecycleSelectedRowKeys(keys),
+            }}
+            columns={[
+              { title: '单据编号', dataIndex: 'code', width: 180 },
+              { title: '标题', dataIndex: 'name', width: 260 },
+              { title: '业务状态', dataIndex: 'status', width: 140 },
+              { title: '删除时间', dataIndex: 'deleted_at', width: 160 },
+              { title: '删除原因', dataIndex: 'delete_reason', width: 180 },
+              {
+                title: '操作',
+                key: 'actions',
+                width: 110,
+                render: () => (
+                  <Button type="link" size="small" disabled>
+                    恢复
+                  </Button>
+                ),
+              },
+            ]}
+            dataSource={[]}
+            pagination={{
+              pageSize: 8,
+              showSizeChanger: false,
+              showTotal: (total) => `共 ${total} 条`,
+            }}
+            locale={{ emptyText: <Empty description="回收站暂无记录" /> }}
+            scroll={{ x: 1010 }}
+          />
+        </Space>
       </Modal>
 
       <Drawer

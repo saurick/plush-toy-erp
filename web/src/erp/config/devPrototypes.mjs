@@ -53,9 +53,9 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'admin-command-center-v1/index.html',
     readmePath: 'admin-command-center-v1/README.md',
     description:
-      '把工作台收敛为登录后的今日处理台：今日队列、当前任务详情和少量常用业务对象入口。',
+      '把工作台收敛为登录后的今日处理台：今日焦点、优先队列、当前处理卡、相关对象快捷入口和交接边界。',
     appliesTo:
-      '后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；常用入口不是正式菜单替代表。',
+      '后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；相关对象快捷入口不是正式菜单替代表。',
   },
   {
     key: 'core-menu-coverage',
@@ -69,6 +69,32 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '把 20260611 参考规格中的 51 个二级菜单收口为可筛选内容矩阵，标注页面类型、事实源、关键字段、动作和边界。',
     appliesTo:
       '用于逐菜单核对页面内容覆盖，并映射到现有列表页、详情页、表单页、动作浮层、工作台、报表、导入和移动任务样板；不是正式菜单承诺。',
+  },
+  {
+    key: 'task-command-center',
+    title: '任务中心样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'task-command-center-v1/',
+    assetPath: 'task-command-center-v1/index.html',
+    readmePath: 'task-command-center-v1/README.md',
+    description:
+      '把任务菜单收敛为职责处理台：待我处理、我发起的、阻塞交接、当前任务详情和关联业务对象。',
+    appliesTo:
+      '我的任务、任务看板、异常 / 阻塞闭环、岗位任务端和业务页协同入口可参照；不复制业务菜单树，不把任务完成写成事实过账。',
+  },
+  {
+    key: 'business-management-center',
+    title: '业务管理中心样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'business-management-center-v1/',
+    assetPath: 'business-management-center-v1/index.html',
+    readmePath: 'business-management-center-v1/README.md',
+    description:
+      '把业务管理菜单收敛为业务对象总控：按链路选择对象、查看风险、进入标准业务页或详情页。',
+    appliesTo:
+      '业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；不恢复 business_records，不承诺未接 API 已完成。',
   },
   {
     key: 'formal-menu-candidate',
@@ -144,22 +170,22 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-form-page-standard-v1/index.html',
     readmePath: 'business-form-page-standard-v1/README.md',
     description:
-      '覆盖首个落地对象、字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。',
+      '覆盖页面级新建 / 编辑骨架、字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。',
     appliesTo:
-      '客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；真实落地建议先收窄到销售订单，字段真源以 schema、API、RBAC 和保存 usecase 为准。',
+      '客户、供应商、联系人、销售订单、采购、库存、质检和财务等页面级新建 / 编辑表单可参照；来源导入、明细行、回收站、列顺序和危险确认回到业务弹窗样板。',
   },
   {
     key: 'action-modal-drawer-standard',
-    title: '弹窗 / 抽屉动作标准样板',
+    title: '业务弹窗标准样板',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'action-modal-drawer-standard-v1/',
     assetPath: 'action-modal-drawer-standard-v1/index.html',
     readmePath: 'action-modal-drawer-standard-v1/README.md',
     description:
-      '覆盖审批、驳回、阻塞、冲正、关闭任务、危险确认和 reason 必填表达。',
+      '覆盖单据补录、来源导入、明细行、回收站、列顺序、删除确认和危险确认。',
     appliesTo:
-      '审批、驳回、阻塞、冲正、关闭任务、过账 / 取消等动作浮层可参照；动作可见性、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。',
+      '出货、采购、质检、库存、财务等列表页局部动作浮层可参照；完整新建 / 编辑页回到表单页样板，字段真源、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。',
   },
   {
     key: 'business-direction-sidebar',

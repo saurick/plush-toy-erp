@@ -247,7 +247,38 @@
       .dock {
         position: sticky;
         bottom: 16px;
+        height: var(--dock-height, 320px);
+        display: flex;
+        flex-direction: column;
         overflow: hidden;
+      }
+
+      .dock-grip {
+        display: flex;
+        height: 14px;
+        align-items: center;
+        justify-content: center;
+        margin: 7px 0 -1px;
+        border-radius: 999px;
+        cursor: ns-resize;
+        touch-action: none;
+        user-select: none;
+      }
+
+      .dock-grip span {
+        width: 64px;
+        height: 5px;
+        border-radius: 999px;
+        background: #94a3b8;
+        box-shadow: 0 1px 3px rgb(15 23 42 / 16%);
+      }
+
+      .dock.collapsed .dock-grip {
+        display: none;
+      }
+
+      .dock.collapsed {
+        height: auto;
       }
 
       .dock-head {
@@ -270,9 +301,12 @@
       .dock-body {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(260px, 0.45fr);
+        min-height: 0;
+        flex: 1 1 auto;
         gap: 14px;
         border-top: 1px solid var(--line);
         background: var(--panel-soft);
+        overflow: auto;
         padding: 14px;
       }
 
@@ -434,6 +468,18 @@
       </section>
 
       <section class="dock" id="dock" aria-label="本页协同入口">
+        <div
+          class="dock-grip"
+          role="separator"
+          aria-label="拖动调整本页协同高度"
+          aria-orientation="horizontal"
+          aria-valuemin="320"
+          aria-valuemax="560"
+          aria-valuenow="320"
+          tabindex="0"
+        >
+          <span></span>
+        </div>
         <div class="dock-head">
           <div class="dock-title">
             <strong>本页协同</strong>
@@ -472,6 +518,18 @@
       const taskList = document.querySelector("#tasks");
       const detailTitle = document.querySelector("#detailTitle");
       const detailCopy = document.querySelector("#detailCopy");
+      const dock = document.querySelector("#dock");
+      const dockGrip = document.querySelector(".dock-grip");
+      const minDockHeight = 320;
+      const maxDockHeight = 560;
+      let dockHeight = 320;
+      let dragState = null;
+
+      function applyDockHeight(nextHeight) {
+        dockHeight = Math.min(Math.max(nextHeight, minDockHeight), maxDockHeight);
+        dock.style.setProperty("--dock-height", `${dockHeight}px`);
+        dockGrip.setAttribute("aria-valuenow", String(dockHeight));
+      }
 
       function renderTasks(selectedIndex = 0) {
         taskList.innerHTML = "";
@@ -497,12 +555,37 @@
       }
 
       document.querySelector("#toggle").addEventListener("click", (event) => {
-        const dock = document.querySelector("#dock");
         dock.classList.toggle("collapsed");
         event.currentTarget.textContent = dock.classList.contains("collapsed")
           ? "展开"
           : "收起";
       });
+
+      dockGrip.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        dragState = {
+          pointerId: event.pointerId,
+          startY: event.clientY,
+          startHeight: dockHeight,
+        };
+        dockGrip.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+      });
+
+      dockGrip.addEventListener("pointermove", (event) => {
+        if (!dragState || dragState.pointerId !== event.pointerId) return;
+        applyDockHeight(dragState.startHeight + dragState.startY - event.clientY);
+        event.preventDefault();
+      });
+
+      function finishDockDrag(event) {
+        if (!dragState || dragState.pointerId !== event.pointerId) return;
+        dockGrip.releasePointerCapture?.(event.pointerId);
+        dragState = null;
+      }
+
+      dockGrip.addEventListener("pointerup", finishDockDrag);
+      dockGrip.addEventListener("pointercancel", finishDockDrag);
 
       renderTasks();
     </script>

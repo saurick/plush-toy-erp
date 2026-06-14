@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>任务中心样板</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f6f9;
+        --panel: #fff;
+        --soft: #f8fafc;
+        --tint: #eef6ff;
+        --line: #dbe4ef;
+        --line-strong: #bdcad9;
+        --text: #172033;
+        --muted: #66758a;
+        --blue: #1d67d8;
+        --green: #197250;
+        --amber: #a85f00;
+        --red: #bd3440;
+        --blue-soft: #eaf3ff;
+        --green-soft: #eaf7f1;
+        --amber-soft: #fff4df;
+        --red-soft: #fff0f2;
+        --shadow: 0 16px 36px rgb(15 23 42 / 8%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #101722;
+          --panel: #182233;
+          --soft: #202b3d;
+          --tint: #1c304d;
+          --line: #334157;
+          --line-strong: #4a5a72;
+          --text: #eef4fb;
+          --muted: #a9b6c8;
+          --blue: #76a8ff;
+          --green: #7ad7aa;
+          --amber: #f2bd65;
+          --red: #ff9aa3;
+          --blue-soft: #1f3556;
+          --green-soft: #183b2d;
+          --amber-soft: #463214;
+          --red-soft: #4a2229;
+          --shadow: 0 18px 42px rgb(0 0 0 / 28%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: 58px minmax(0, 1fr);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        border-bottom: 1px solid var(--line);
+        background: rgb(255 255 255 / 94%);
+        padding: 0 22px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .mark {
+        display: grid;
+        flex: 0 0 auto;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: #245f98;
+        color: #fff;
+        font-weight: 760;
+      }
+
+      .brand strong,
+      .brand span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span,
+      .muted,
+      .task span,
+      .detail-note,
+      .route span,
+      .handoff p {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .btn {
+        min-height: 34px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 12px;
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn.text {
+        border-color: transparent;
+        background: transparent;
+        color: var(--blue);
+        padding-inline: 4px;
+      }
+
+      .content {
+        min-height: 0;
+        overflow: auto;
+        padding: 20px 22px 24px;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
+        gap: 16px;
+        max-width: 1320px;
+        margin: 0 auto;
+      }
+
+      .hero,
+      .panel,
+      .detail,
+      .routes,
+      .handoff {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+        gap: 18px;
+        padding: 20px;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 10px;
+        max-width: 760px;
+        font-size: 28px;
+        line-height: 1.18;
+      }
+
+      h2,
+      h3 {
+        margin-bottom: 0;
+      }
+
+      .summary {
+        max-width: 780px;
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .rule-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .rule {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 10px 12px;
+      }
+
+      .rule strong,
+      .rule span {
+        display: block;
+        overflow-wrap: anywhere;
+      }
+
+      .rule span {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .panel,
+      .detail {
+        overflow: hidden;
+      }
+
+      .panel-head,
+      .detail-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+      }
+
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .tab {
+        min-height: 30px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 10px;
+      }
+
+      .tab[aria-selected="true"] {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 700;
+      }
+
+      .queue {
+        display: grid;
+        gap: 10px;
+        padding: 14px;
+      }
+
+      .task {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+        text-align: left;
+      }
+
+      .task[aria-selected="true"] {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px rgb(31 111 229 / 11%);
+      }
+
+      .task strong,
+      .task span {
+        display: block;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .tag.blue {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .tag.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .tag.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .tag.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .detail-body {
+        display: grid;
+        gap: 14px;
+        padding: 16px;
+      }
+
+      .why,
+      .detail-grid {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 12px;
+      }
+
+      .why {
+        background: var(--tint);
+      }
+
+      .why span {
+        display: block;
+        margin-top: 4px;
+      }
+
+      .detail-grid {
+        display: grid;
+        gap: 8px;
+      }
+
+      .detail-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .detail-row span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .detail-row strong {
+        text-align: right;
+      }
+
+      .lower {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
+        gap: 16px;
+      }
+
+      .routes,
+      .handoff {
+        padding: 16px;
+      }
+
+      .route-grid,
+      .handoff-grid {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .route-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .route {
+        min-height: 94px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 12px;
+        text-align: left;
+      }
+
+      .route[data-related="true"] {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .route strong,
+      .route span,
+      .handoff strong,
+      .handoff p {
+        display: block;
+        overflow-wrap: anywhere;
+      }
+
+      .handoff-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 10px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        margin-top: 5px;
+        border-radius: 50%;
+        background: var(--blue);
+      }
+
+      .dot.red {
+        background: var(--red);
+      }
+
+      .dot.amber {
+        background: var(--amber);
+      }
+
+      .dot.green {
+        background: var(--green);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .topbar {
+          background: rgb(24 34 51 / 94%);
+        }
+      }
+
+      @media (max-width: 1040px) {
+        .workspace,
+        .hero,
+        .lower {
+          grid-template-columns: 1fr;
+        }
+
+        .route-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 700px) {
+        .app {
+          grid-template-rows: auto minmax(0, 1fr);
+          height: auto;
+          min-height: 100vh;
+          overflow: visible;
+        }
+
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 14px 16px;
+        }
+
+        .content {
+          overflow: visible;
+          padding: 14px;
+        }
+
+        h1 {
+          font-size: 22px;
+        }
+
+        .task {
+          grid-template-columns: 1fr;
+        }
+
+        .route-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">任</div>
+          <div>
+            <strong>任务中心样板</strong>
+            <span>To Implement / 职责处理台，不是业务菜单</span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="btn">刷新任务</button>
+          <button class="btn primary">处理当前任务</button>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="workspace">
+          <section class="hero" aria-label="任务入口意义">
+            <div>
+              <div class="eyebrow">Workflow / 职责处理台</div>
+              <h1>任务菜单只做一件事：把跨模块的待办按责任人收回来。</h1>
+              <p class="summary">
+                任务中心不复制销售、采购、库存、出货或财务菜单。它只处理待我动作、我发起的跟进和阻塞交接，再把用户带回真实业务对象。
+              </p>
+            </div>
+            <div class="rule-list">
+              <div class="rule"><strong>待我处理</strong><span>当前角色必须继续推进的任务。</span></div>
+              <div class="rule"><strong>我发起的</strong><span>我创建或关注的任务，主要用于跟进卡点。</span></div>
+              <div class="rule"><strong>阻塞交接</strong><span>记录原因、改派、催办，不直接修改业务事实。</span></div>
+            </div>
+          </section>
+
+          <section class="panel" aria-label="任务队列">
+            <div class="panel-head">
+              <div>
+                <div class="eyebrow">任务队列</div>
+                <h2>按职责看，不按菜单看</h2>
+              </div>
+              <div class="tabs" role="tablist" aria-label="任务视角">
+                <button class="tab" id="tab-mine" type="button" role="tab" data-filter="mine" aria-controls="taskList" aria-selected="true">待我处理</button>
+                <button class="tab" id="tab-started" type="button" role="tab" data-filter="started" aria-controls="taskList" aria-selected="false">我发起的</button>
+                <button class="tab" id="tab-blocked" type="button" role="tab" data-filter="blocked" aria-controls="taskList" aria-selected="false">阻塞交接</button>
+              </div>
+            </div>
+            <div class="queue" id="taskList" role="tabpanel" aria-labelledby="tab-mine"></div>
+          </section>
+
+          <aside class="detail" aria-label="当前任务详情">
+            <div class="detail-head">
+              <div>
+                <div class="eyebrow">当前任务</div>
+                <h2 id="detailTitle">入库异常待确认</h2>
+              </div>
+              <span class="tag red" id="detailTag">阻塞</span>
+            </div>
+            <div class="detail-body">
+              <div class="why">
+                <strong id="detailWhy">质检原因未补齐，仓库不能继续入库。</strong>
+                <span id="detailNext">下一步：补充阻塞原因，转回入库通知/检验/入库页面继续处理。</span>
+              </div>
+              <div class="detail-grid">
+                <div class="detail-row"><span>关联对象</span><strong id="detailObject">入库通知/检验/入库</strong></div>
+                <div class="detail-row"><span>责任角色</span><strong id="detailRole">品质 / 仓库</strong></div>
+                <div class="detail-row"><span>任务状态</span><strong id="detailStatus">阻塞</strong></div>
+                <div class="detail-row"><span>建议动作</span><strong id="detailAction">记录阻塞</strong></div>
+              </div>
+              <p class="detail-note" id="detailBoundary">任务状态只写 Workflow；质检判定、入库过账和库存流水必须回到事实层 usecase。</p>
+              <div class="actions">
+                <button class="btn primary">执行建议动作</button>
+                <button class="btn">改派</button>
+                <button class="btn text">打开关联对象</button>
+              </div>
+            </div>
+          </aside>
+
+          <div class="lower">
+            <section class="routes" aria-label="关联业务对象">
+              <div>
+                <div class="eyebrow">任务上下文</div>
+                <h3>关联业务对象，不是任务菜单子项</h3>
+                <div class="muted">高亮表示当前任务需要跳转的对象。对象页面仍由正式菜单、路由和 RBAC 决定。</div>
+              </div>
+              <div class="route-grid">
+                <button class="route" data-route="sales"><strong>销售订单</strong><span>客户承诺、交期、明细。</span></button>
+                <button class="route" data-route="inbound"><strong>入库通知/检验/入库</strong><span>到仓、质检、入库协同。</span></button>
+                <button class="route" data-route="shipment"><strong>出货放行</strong><span>放行、装箱、发货前检查。</span></button>
+                <button class="route" data-route="print"><strong>单据模板</strong><span>采购合同、加工合同打印。</span></button>
+              </div>
+            </section>
+
+            <section class="handoff" aria-label="任务边界">
+              <div>
+                <div class="eyebrow">边界</div>
+                <h3>任务能推进协同，不能伪造事实</h3>
+              </div>
+              <div class="handoff-grid">
+                <div class="handoff-row"><span class="dot red"></span><div><strong>完成任务</strong><p>只代表协同闭环，不等于库存、出货或财务已过账。</p></div></div>
+                <div class="handoff-row"><span class="dot amber"></span><div><strong>阻塞 / 驳回</strong><p>必须记录原因，并保留可审计任务事件。</p></div></div>
+                <div class="handoff-row"><span class="dot green"></span><div><strong>打开对象</strong><p>只是跳转到业务页面，字段保存和事实动作仍由对应 usecase 处理。</p></div></div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const tasks = [
+        {
+          id: "inbound-blocked",
+          filter: "mine",
+          title: "入库异常待确认",
+          meta: "入库通知/检验/入库 / 品质 / 已超时",
+          object: "入库通知/检验/入库",
+          role: "品质 / 仓库",
+          status: "阻塞",
+          action: "记录阻塞",
+          tag: "red",
+          routes: ["inbound"],
+          why: "质检原因未补齐，仓库不能继续入库。",
+          next: "下一步：补充阻塞原因，转回入库通知/检验/入库页面继续处理。",
+          boundary: "任务状态只写 Workflow；质检判定、入库过账和库存流水必须回到事实层 usecase。",
+        },
+        {
+          id: "shipment-release",
+          filter: "mine",
+          title: "出货放行待处理",
+          meta: "出货放行 / 业务 / 今天 16:00",
+          object: "出货放行",
+          role: "业务 / 仓库",
+          status: "待处理",
+          action: "处理放行任务",
+          tag: "blue",
+          routes: ["shipment", "sales"],
+          why: "发货节点临近，需要确认是否允许进入出货执行。",
+          next: "下一步：打开出货放行对象，核对装箱和交付状态。",
+          boundary: "shipping_released 不等于 shipped；真实出货必须由 Shipment / Inventory 主路径确认。",
+        },
+        {
+          id: "purchase-sign",
+          filter: "started",
+          title: "采购合同回签未完成",
+          meta: "单据模板 / 采购 / 我发起",
+          object: "单据模板",
+          role: "采购",
+          status: "跟进中",
+          action: "催办",
+          tag: "amber",
+          routes: ["print"],
+          why: "合同未回签会影响后续到货跟进。",
+          next: "下一步：催办责任人，必要时打开单据模板确认纸面快照。",
+          boundary: "打印和合同快照不反向写采购、库存或财务事实。",
+        },
+        {
+          id: "sales-date",
+          filter: "started",
+          title: "销售订单交期等待确认",
+          meta: "销售订单 / 业务 / 我关注",
+          object: "销售订单",
+          role: "业务",
+          status: "等待确认",
+          action: "查看进展",
+          tag: "green",
+          routes: ["sales"],
+          why: "交期未确认会让采购、生产和出货优先级失真。",
+          next: "下一步：打开销售订单查看关联任务和交期字段。",
+          boundary: "销售订单表达客户承诺，不自动生成出货、库存或财务事实。",
+        },
+        {
+          id: "quality-reason",
+          filter: "blocked",
+          title: "等待品质补充返工原因",
+          meta: "质检任务 / 品质 / 阻塞交接",
+          object: "入库通知/检验/入库",
+          role: "品质",
+          status: "等待他人",
+          action: "催办 / 改派",
+          tag: "amber",
+          routes: ["inbound"],
+          why: "原因缺失时不能让后续角色误判为已闭环。",
+          next: "下一步：催办品质角色，或按权限改派给可处理人员。",
+          boundary: "等待态只说明协同未完成，不代表事实表被修改或回滚。",
+        },
+      ];
+
+      let activeFilter = "mine";
+      let selectedId = tasks[0].id;
+      const list = document.querySelector("#taskList");
+      const tabs = [...document.querySelectorAll(".tab")];
+      const routes = [...document.querySelectorAll(".route")];
+
+      function visibleTasks() {
+        return tasks.filter((task) => task.filter === activeFilter);
+      }
+
+      function setText(selector, value) {
+        document.querySelector(selector).textContent = value;
+      }
+
+      function updateDetail(task) {
+        setText("#detailTitle", task.title);
+        setText("#detailTag", task.status);
+        setText("#detailWhy", task.why);
+        setText("#detailNext", task.next);
+        setText("#detailObject", task.object);
+        setText("#detailRole", task.role);
+        setText("#detailStatus", task.status);
+        setText("#detailAction", task.action);
+        setText("#detailBoundary", task.boundary);
+        document.querySelector("#detailTag").className = `tag ${task.tag}`;
+        routes.forEach((route) => {
+          route.dataset.related = String(task.routes.includes(route.dataset.route));
+        });
+      }
+
+      function selectTask(task) {
+        selectedId = task.id;
+        updateDetail(task);
+        renderTasks();
+      }
+
+      function renderTasks() {
+        list.innerHTML = "";
+        visibleTasks().forEach((task) => {
+          const item = document.createElement("button");
+          item.type = "button";
+          item.className = "task";
+          item.setAttribute("aria-selected", String(task.id === selectedId));
+          item.innerHTML = `<span><strong>${task.title}</strong><span>${task.meta}</span></span><span class="tag ${task.tag}">${task.status}</span>`;
+          item.addEventListener("click", () => selectTask(task));
+          list.appendChild(item);
+        });
+      }
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => {
+          tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
+          tab.setAttribute("aria-selected", "true");
+          activeFilter = tab.dataset.filter;
+          list.setAttribute("aria-labelledby", tab.id);
+          selectTask(visibleTasks()[0] || tasks[0]);
+        });
+      });
+
+      updateDetail(tasks[0]);
+      renderTasks();
+    </script>
+  </body>
+</html>

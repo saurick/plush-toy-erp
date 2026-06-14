@@ -3,47 +3,43 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>弹窗抽屉动作标准样板</title>
+    <title>业务弹窗标准样板</title>
     <style>
       :root {
         color-scheme: light dark;
-        --bg: #f5f7fb;
+        --bg: #eef4ef;
         --panel: #ffffff;
-        --panel-soft: #f9fbfd;
-        --line: #dbe4ef;
-        --line-strong: #bfccdc;
-        --text: #152033;
-        --muted: #65758b;
-        --blue: #1f6fe5;
-        --blue-soft: #edf5ff;
-        --green: #1f7a55;
-        --green-soft: #edf8f2;
-        --amber: #a86107;
-        --amber-soft: #fff7e8;
-        --red: #c43d45;
+        --panel-soft: #f8faf9;
+        --panel-wash: #f3f7f4;
+        --line: #dde6e0;
+        --line-strong: #cbd8d1;
+        --text: #172033;
+        --muted: #6b7788;
+        --green: #198754;
+        --green-strong: #137243;
+        --red: #ef4444;
         --red-soft: #fff1f2;
-        --shadow: 0 14px 34px rgb(15 23 42 / 8%);
-        --overlay: rgb(15 23 42 / 44%);
+        --purple: #7c3aed;
+        --shadow: 0 18px 48px rgb(15 23 42 / 18%);
+        --overlay: rgb(15 23 42 / 42%);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg: #111827;
+          --bg: #101827;
           --panel: #182235;
           --panel-soft: #202c42;
+          --panel-wash: #152033;
           --line: #334157;
           --line-strong: #46566f;
           --text: #edf3fb;
           --muted: #aab7ca;
-          --blue: #75a7ff;
-          --blue-soft: #1f3556;
-          --green: #7dd8ad;
-          --green-soft: #183b2d;
-          --amber: #f0bd67;
-          --amber-soft: #463214;
+          --green: #75d6a2;
+          --green-strong: #5fc991;
           --red: #ff9aa2;
           --red-soft: #4a2228;
-          --shadow: 0 18px 44px rgb(0 0 0 / 28%);
+          --purple: #b69cff;
+          --shadow: 0 24px 54px rgb(0 0 0 / 34%);
           --overlay: rgb(0 0 0 / 58%);
         }
       }
@@ -53,524 +49,992 @@
       }
 
       body {
+        min-height: 100vh;
         margin: 0;
         background: var(--bg);
         color: var(--text);
-        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+        font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI",
           "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
-      body.overlay-open {
-        overflow: hidden;
-      }
-
       button,
+      input,
       textarea {
         font: inherit;
       }
 
-      button {
-        cursor: pointer;
+      .shell {
+        min-height: 100vh;
+        padding: 16px;
       }
 
-      .page {
+      .mock-page {
         display: grid;
-        gap: 14px;
-        max-width: 1120px;
+        gap: 10px;
+        max-width: 1280px;
         margin: 0 auto;
-        padding: 24px;
       }
 
-      .panel {
+      .mock-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: 0 10px 24px rgb(15 23 42 / 7%);
+        padding: 14px;
+      }
+
+      .mock-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .mock-title {
+        margin: 0;
+        font-size: 22px;
+      }
+
+      .hint {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-weight: 650;
+      }
+
+      .mock-actions,
+      .switcher {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .mock-table {
+        min-height: 380px;
+        overflow: hidden;
+        background:
+          linear-gradient(var(--line) 1px, transparent 1px) 0 48px / 100% 54px,
+          linear-gradient(90deg, var(--line) 1px, transparent 1px) 0 0 / 146px
+            100%;
+      }
+
+      .btn {
+        display: inline-flex;
+        min-height: 32px;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        font-weight: 650;
+        padding: 0 12px;
+        white-space: nowrap;
+      }
+
+      .btn.primary {
+        border-color: var(--green);
+        background: var(--green);
+        color: #fff;
+      }
+
+      .btn.danger {
+        border-color: #ffb6bd;
+        color: var(--red);
+      }
+
+      .btn.ghost {
+        background: transparent;
+      }
+
+      .btn:disabled {
+        cursor: not-allowed;
+        color: var(--muted);
+        opacity: 0.58;
+      }
+
+      .switcher {
+        position: fixed;
+        z-index: 20;
+        top: 14px;
+        right: 18px;
+        max-width: calc(100vw - 36px);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--panel) 92%, transparent);
+        box-shadow: 0 10px 28px rgb(15 23 42 / 12%);
+        padding: 6px;
+        backdrop-filter: blur(8px);
+      }
+
+      .switcher button {
+        min-height: 28px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--muted);
+        font-weight: 700;
+        padding: 0 9px;
+      }
+
+      body[data-modal="form"] .switcher [data-target="form"],
+      body[data-modal="import"] .switcher [data-target="import"],
+      body[data-modal="recycle"] .switcher [data-target="recycle"],
+      body[data-modal="columns"] .switcher [data-target="columns"],
+      body[data-modal="confirm"] .switcher [data-target="confirm"] {
+        background: var(--green);
+        color: #fff;
+      }
+
+      .overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--overlay);
+        padding: 28px;
+      }
+
+      .modal,
+      .popover {
+        display: none;
+      }
+
+      body[data-modal="form"] .modal.form,
+      body[data-modal="import"] .modal.import,
+      body[data-modal="recycle"] .modal.recycle,
+      body[data-modal="columns"] .modal.columns,
+      body[data-modal="confirm"] .popover.confirm {
+        display: grid;
+      }
+
+      .modal {
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        overflow: hidden;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--panel);
         box-shadow: var(--shadow);
       }
 
-      .hero {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 16px;
-        padding: 18px;
+      .modal.form {
+        width: min(1720px, calc(100vw - 96px));
+        max-height: calc(100vh - 72px);
       }
 
-      h1,
-      h2,
-      h3,
-      p {
-        margin-top: 0;
+      .modal.import,
+      .modal.recycle {
+        width: min(980px, calc(100vw - 64px));
+        max-height: calc(100vh - 88px);
       }
 
-      h1 {
-        margin-bottom: 8px;
-        font-size: 26px;
-        line-height: 1.2;
+      .modal.columns {
+        width: min(720px, calc(100vw - 64px));
+        max-height: calc(100vh - 64px);
       }
 
-      h2 {
-        margin-bottom: 8px;
-        font-size: 18px;
-      }
-
-      .summary,
-      .muted,
-      .eyebrow {
-        color: var(--muted);
-      }
-
-      .eyebrow,
-      .muted {
-        font-size: 12px;
-      }
-
-      .summary {
-        max-width: 760px;
-        margin-bottom: 0;
-      }
-
-      .actions,
-      .tags,
-      .action-grid {
+      .modal-head {
         display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: center;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 22px 8px;
       }
 
-      .btn {
-        min-height: 34px;
+      .modal-title {
+        margin: 0;
+        font-size: 18px;
+        line-height: 1.25;
+      }
+
+      .modal-subtitle {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-weight: 650;
+      }
+
+      .close {
+        width: 32px;
+        height: 32px;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-size: 28px;
+        line-height: 1;
+      }
+
+      .modal-body {
+        overflow: auto;
+        padding: 0 22px 16px;
+      }
+
+      .modal-foot {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        border-top: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        padding: 12px 22px 14px;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        column-gap: 14px;
+        row-gap: 14px;
+      }
+
+      .field {
+        display: grid;
+        min-width: 0;
+        gap: 7px;
+      }
+
+      .field.full {
+        grid-column: 1 / -1;
+      }
+
+      .field.span-2 {
+        grid-column: span 2;
+      }
+
+      label {
+        color: #273344;
+        font-weight: 700;
+      }
+
+      .required,
+      .danger-text {
+        color: var(--red);
+      }
+
+      input,
+      textarea,
+      .select-like,
+      .unit-input {
+        width: 100%;
+        min-width: 0;
+        min-height: 36px;
         border: 1px solid var(--line-strong);
-        border-radius: 7px;
+        border-radius: 8px;
         background: var(--panel);
         color: var(--text);
         padding: 0 12px;
       }
 
-      .btn.primary {
-        border-color: var(--blue);
-        background: var(--blue);
-        color: #fff;
+      input[disabled] {
+        background: var(--panel-soft);
+        color: var(--muted);
       }
 
-      .btn.danger {
-        border-color: var(--red);
-        background: var(--red);
-        color: #fff;
+      textarea {
+        min-height: 78px;
+        padding: 9px 12px;
+        resize: vertical;
       }
 
-      .btn.text {
-        border-color: transparent;
-        background: transparent;
-        color: var(--blue);
-      }
-
-      .tag {
-        display: inline-flex;
+      .select-like {
+        display: flex;
         align-items: center;
-        min-height: 24px;
-        border-radius: 999px;
-        padding: 0 9px;
-        font-size: 12px;
+        justify-content: space-between;
+        color: var(--muted);
+      }
+
+      .source-row,
+      .compact-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .source-warning {
+        color: var(--red);
         font-weight: 700;
       }
 
-      .tag.blue {
-        background: var(--blue-soft);
-        color: var(--blue);
+      .source-note {
+        color: var(--muted);
       }
 
-      .tag.green {
-        background: var(--green-soft);
-        color: var(--green);
+      .badge,
+      .status-pill {
+        display: inline-flex;
+        min-height: 26px;
+        align-items: center;
+        border-radius: 7px;
+        padding: 0 10px;
+        font-weight: 700;
       }
 
-      .tag.amber {
-        background: var(--amber-soft);
-        color: var(--amber);
-      }
-
-      .tag.red {
+      .badge {
+        border: 1px solid #ffb6bd;
         background: var(--red-soft);
         color: var(--red);
       }
 
-      .surface {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(280px, 0.42fr);
-        gap: 14px;
-        padding: 16px;
-      }
-
-      .card {
-        border: 1px solid var(--line);
-        border-radius: 8px;
+      .status-pill {
+        border: 1px solid var(--line-strong);
         background: var(--panel-soft);
-        padding: 14px;
+        color: var(--muted);
       }
 
-      .action-grid {
-        align-items: stretch;
+      .status-pill.purple {
+        border-color: color-mix(in srgb, var(--purple) 45%, var(--line));
+        color: var(--purple);
       }
 
-      .action-card {
-        flex: 1 1 180px;
-        min-height: 104px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
-        color: var(--text);
-        padding: 12px;
-        text-align: left;
+      .unit-input {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        overflow: hidden;
+        padding: 0;
       }
 
-      .action-card strong,
-      .action-card span {
-        display: block;
+      .unit-input input {
+        min-height: 34px;
+        border: 0;
+        border-radius: 0;
       }
 
-      .action-card span {
-        margin-top: 6px;
+      .unit {
+        display: inline-flex;
+        min-width: 46px;
+        align-items: center;
+        justify-content: center;
+        border-left: 1px solid var(--line);
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .count {
+        justify-self: end;
+        margin-top: -2px;
         color: var(--muted);
         font-size: 12px;
       }
 
-      .drawer-backdrop,
-      .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        z-index: 10;
-        display: none;
-        background: var(--overlay);
-        overscroll-behavior: contain;
-      }
-
-      .drawer-backdrop.open,
-      .modal-backdrop.open {
-        display: block;
-      }
-
-      .drawer {
-        position: absolute;
-        top: 0;
-        right: 0;
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr) auto;
-        width: min(480px, 100%);
-        height: 100%;
-        background: var(--panel);
-        box-shadow: -18px 0 44px rgb(0 0 0 / 24%);
-      }
-
-      .drawer-head,
-      .drawer-foot,
-      .modal-foot {
+      .section-head {
         display: flex;
-        justify-content: space-between;
-        gap: 12px;
+        flex-wrap: wrap;
         align-items: center;
-        border-bottom: 1px solid var(--line);
-        padding: 14px 16px;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 18px 0 10px;
       }
 
-      .drawer-foot,
-      .modal-foot {
-        border-top: 1px solid var(--line);
+      .section-title {
+        margin: 0;
+        font-size: 15px;
+      }
+
+      .totals {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .line-card {
+        display: grid;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-wash);
+        padding: 12px;
+      }
+
+      .line-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 1.4fr 1.2fr 76px 92px 92px 96px 1fr;
+        gap: 10px;
+      }
+
+      .table-wrap {
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 10px 12px;
+        text-align: left;
+        white-space: nowrap;
+      }
+
+      th {
+        background: var(--panel-soft);
+        color: #273344;
+        font-weight: 750;
+      }
+
+      td {
+        color: var(--text);
+      }
+
+      tr:last-child td {
         border-bottom: 0;
       }
 
-      .drawer-body {
-        overflow: auto;
-        padding: 16px;
-      }
-
-      .field {
+      .search-row {
         display: grid;
-        gap: 6px;
-        margin-top: 14px;
+        grid-template-columns: minmax(220px, 1fr) auto;
+        gap: 10px;
+        margin-bottom: 12px;
       }
 
-      textarea {
-        min-height: 112px;
-        border: 1px solid var(--line-strong);
+      .pagination {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-weight: 650;
+      }
+
+      .order-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .order-row {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) repeat(4, auto);
+        gap: 8px;
+        align-items: center;
+        border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--panel);
-        color: var(--text);
-        padding: 10px;
-        resize: vertical;
+        background: var(--panel-soft);
+        padding: 8px;
       }
 
-      textarea[aria-invalid="true"] {
-        border-color: var(--red);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 18%, transparent);
+      .order-index {
+        color: var(--muted);
+        font-weight: 800;
+        text-align: center;
       }
 
-      .error {
-        display: none;
-        color: var(--red);
-        font-size: 12px;
-      }
-
-      .field.invalid .error {
-        display: block;
-      }
-
-      .modal {
-        width: min(420px, calc(100% - 28px));
-        margin: 12vh auto 0;
+      .popover {
+        position: fixed;
+        right: 32px;
+        top: 410px;
+        width: 176px;
+        min-height: 100px;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--panel);
-        box-shadow: var(--shadow);
-        overflow: hidden;
+        box-shadow: 0 14px 34px rgb(15 23 42 / 22%);
+        padding: 12px;
       }
 
-      .modal-body {
-        padding: 16px;
+      .popover-title {
+        margin: 0 0 12px;
+        font-weight: 750;
       }
 
-      @media (max-width: 760px) {
-        .page {
+      .popover-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .popover::after {
+        position: absolute;
+        right: 34px;
+        bottom: -6px;
+        width: 10px;
+        height: 10px;
+        content: "";
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+        transform: rotate(45deg);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        label,
+        th {
+          color: var(--text);
+        }
+      }
+
+      @media (max-width: 980px) {
+        .overlay {
+          align-items: stretch;
           padding: 14px;
         }
 
-        .hero,
-        .surface {
+        .modal.form,
+        .modal.import,
+        .modal.recycle,
+        .modal.columns {
+          width: 100%;
+          max-height: none;
+        }
+
+        .form-grid,
+        .line-grid,
+        .search-row,
+        .order-row {
           grid-template-columns: 1fr;
         }
 
-        .drawer {
-          width: 100%;
+        .field.full,
+        .field.span-2 {
+          grid-column: auto;
         }
 
-        .drawer-head,
-        .drawer-foot,
-        .modal-foot {
-          align-items: flex-start;
-          flex-direction: column;
+        .switcher {
+          left: 12px;
+          right: 12px;
+          justify-content: center;
+        }
+
+        .popover {
+          left: 18px;
+          right: 18px;
+          top: auto;
+          bottom: 24px;
+          width: auto;
         }
       }
     </style>
   </head>
-  <body>
-    <main class="page">
-      <section class="panel hero">
-        <div>
-          <div class="eyebrow">ERP / 动作浮层标准样板 / To Implement</div>
-          <h1>弹窗 / 抽屉只承接当前动作。</h1>
-          <p class="summary">
-            审批、驳回、阻塞、关闭任务走 Workflow 语义；冲正、取消过账等事实动作必须有更强确认。
-            reason 必填、空字符串无效等只在原型表达，不修改真实 WorkflowUsecase。
-          </p>
-        </div>
-        <div class="tags">
-          <span class="tag blue">抽屉动作</span>
-          <span class="tag amber">原因必填</span>
-          <span class="tag red">危险确认</span>
-        </div>
-      </section>
+  <body data-modal="form">
+    <nav class="switcher" aria-label="弹窗状态">
+      <button type="button" data-target="form">单据补录</button>
+      <button type="button" data-target="import">来源导入</button>
+      <button type="button" data-target="recycle">回收站</button>
+      <button type="button" data-target="columns">列顺序</button>
+      <button type="button" data-target="confirm">删除确认</button>
+    </nav>
 
-      <section class="panel surface">
-        <div class="card">
-          <h2>当前业务对象</h2>
-          <p class="summary">
-            SO-202606-018 / 入库异常协同任务。这里展示页面内动作入口形态，真实页面仍由 RBAC 和后端状态决定按钮可见性。
-          </p>
-          <div class="action-grid" aria-label="动作入口">
-            <button class="action-card" data-action="approve" type="button">
-              <strong>审批通过</strong>
-              <span>Workflow done，需要处理说明。</span>
-            </button>
-            <button class="action-card" data-action="reject" type="button">
-              <strong>驳回</strong>
-              <span>Workflow rejected，reason 必填。</span>
-            </button>
-            <button class="action-card" data-action="block" type="button">
-              <strong>记录阻塞</strong>
-              <span>Workflow blocked，空白原因无效。</span>
-            </button>
-            <button class="action-card" data-action="reverse" type="button">
-              <strong>冲正确认</strong>
-              <span>Fact reversal，必须二次确认。</span>
-            </button>
-            <button class="action-card" data-action="close" type="button">
-              <strong>关闭任务</strong>
-              <span>关闭协同任务，不等于事实过账。</span>
-            </button>
+    <main class="shell" aria-hidden="true">
+      <div class="mock-page">
+        <section class="mock-panel mock-toolbar">
+          <div>
+            <p class="hint">出货 / 业务单据</p>
+            <h1 class="mock-title">出货单</h1>
           </div>
-        </div>
-
-        <aside class="card">
-          <h2>参照规则</h2>
-          <p class="muted">主按钮只做当前动作，次按钮取消或返回；危险动作必须明确影响范围。</p>
-          <p class="muted">打印、导入、导出、帮助和开发验收入口不放进动作浮层主流程。</p>
-          <p class="muted">Workflow 与 Fact 动作可以共享浮层组件，但文案、确认强度和提交目标必须分清。</p>
-        </aside>
-      </section>
+          <div class="mock-actions">
+            <button class="btn ghost">导出当前结果</button>
+            <button class="btn">列顺序</button>
+            <button class="btn">回收站</button>
+            <button class="btn primary">新建记录</button>
+          </div>
+        </section>
+        <section class="mock-panel mock-toolbar">
+          <strong>当前操作</strong>
+          <div class="mock-actions">
+            <button class="btn">编辑</button>
+            <button class="btn">流转</button>
+            <button class="btn">生成出库</button>
+            <button class="btn">打印商业发票</button>
+            <button class="btn danger">删除</button>
+          </div>
+        </section>
+        <section class="mock-panel mock-table"></section>
+      </div>
     </main>
 
-    <div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true">
-      <section class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
-        <header class="drawer-head">
+    <div class="overlay">
+      <section class="modal form" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+        <header class="modal-head">
           <div>
-            <div class="eyebrow" id="drawerKind">Workflow 动作</div>
-            <h2 id="drawerTitle">审批通过</h2>
+            <h2 class="modal-title" id="formTitle">补录：出货单局部动作</h2>
+            <p class="modal-subtitle">已关联来源单据，只补录当前动作需要的运输、收货和明细行信息；整页新建 / 编辑回到表单页样板。</p>
           </div>
-          <button class="btn text" id="drawerClose" type="button">关闭</button>
+          <button class="close" type="button" aria-label="关闭">×</button>
         </header>
-        <div class="drawer-body">
-          <p class="summary" id="drawerCopy">
-            完成当前协同任务，只写 Workflow 任务和协同状态，不写库存、出货、财务或开票事实。
-          </p>
-          <div class="field" id="reasonField">
-            <label for="reason">处理原因 / 说明</label>
-            <textarea id="reason" placeholder="请输入原因，空字符串和全空格无效"></textarea>
-            <span class="error">原因必填，空字符串或全空格无效。</span>
+
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field">
+              <label>从来源单据导入</label>
+              <div class="source-row">
+                <button class="btn" type="button">从来源单据导入</button>
+                <span class="status-pill">已关联来源</span>
+              </div>
+              <span class="source-note">SO-202606-018</span>
+            </div>
+            <div class="field">
+              <label>客户名称</label>
+              <input value="上海样品客户" disabled />
+            </div>
+            <div class="field">
+              <label>币种（跟随来源）</label>
+              <input value="USD" disabled />
+            </div>
+
+            <div class="field">
+              <label><span class="required">*</span> 起运地</label>
+              <div class="select-like">宁波仓 <span>⌄</span></div>
+            </div>
+            <div class="field">
+              <label><span class="required">*</span> 目的地</label>
+              <div class="select-like">客户指定仓 <span>⌄</span></div>
+            </div>
+            <div class="field">
+              <label>目的港（CFR/CIF）</label>
+              <input />
+            </div>
+
+            <div class="field full">
+              <label><span class="required">*</span> 收货地址（SHIP TO）</label>
+              <textarea>SAME AS SOLD TO</textarea>
+              <span class="count">15 / 300</span>
+            </div>
+
+            <div class="field">
+              <label>Incoterms</label>
+              <div class="select-like">请选择或输入 <span>⌄</span></div>
+            </div>
+            <div class="field">
+              <label>付款方式</label>
+              <div class="select-like">请选择或输入 <span>⌄</span></div>
+            </div>
+            <div class="field">
+              <label><span class="required">*</span> 运输方式</label>
+              <div class="select-like">快递 <span>⌄</span></div>
+            </div>
+
+            <div class="field">
+              <label>快件付款方式</label>
+              <div class="select-like"><span></span><span>⌄</span></div>
+            </div>
+            <div class="field">
+              <label>到付账号</label>
+              <div class="select-like">请选择或输入 <span>⌄</span></div>
+            </div>
+            <div class="field">
+              <label><span class="required">*</span> 运抵国</label>
+              <div class="select-like">请选择或输入 <span>⌄</span></div>
+            </div>
+
+            <div class="field">
+              <label><span class="required">*</span> 业务员</label>
+              <div class="select-like">业务员03 <span>⌄</span></div>
+            </div>
+            <div class="field">
+              <label>客户是否长期拖欠货款</label>
+              <div class="select-like">否 <span>⌄</span></div>
+            </div>
+            <div class="field">
+              <label>是否报关</label>
+              <div class="select-like">否 <span>⌄</span></div>
+            </div>
+
+            <div class="field">
+              <label>提单/运单号</label>
+              <input />
+            </div>
+            <div class="field">
+              <label>提单/运单日期</label>
+              <div class="select-like">yyyy/mm/dd <span>▣</span></div>
+            </div>
+            <div class="field">
+              <label>进仓发货日期</label>
+              <div class="select-like">yyyy/mm/dd <span>▣</span></div>
+            </div>
+
+            <div class="field">
+              <label>总件数（纸箱数）</label>
+              <div class="unit-input"><input value="14" /><span class="unit">箱</span></div>
+            </div>
+            <div class="field">
+              <label>总净重</label>
+              <div class="unit-input"><input /><span class="unit">KGS</span></div>
+            </div>
+            <div class="field">
+              <label>总毛重</label>
+              <div class="unit-input"><input /><span class="unit">KGS</span></div>
+            </div>
+
+            <div class="field">
+              <label>总体积</label>
+              <div class="unit-input"><input /><span class="unit">M3</span></div>
+            </div>
+            <div class="field">
+              <label>运费</label>
+              <div class="unit-input"><input /><span class="unit">USD</span></div>
+            </div>
+            <div class="field">
+              <label>附件（进仓通知 / 随货发票）</label>
+              <button class="btn" type="button">上传附件</button>
+            </div>
+
+            <div class="field full">
+              <label>备注（收件人详细信息）</label>
+              <textarea></textarea>
+              <span class="count">0 / 300</span>
+            </div>
+          </div>
+
+          <div class="section-head">
+            <div>
+              <h3 class="section-title"><span class="required">*</span> 明细行（产品 / 物料）</h3>
+              <p class="hint">按单据类型显示产品、物料、仓库或批次字段，只保留当前动作必要列。</p>
+            </div>
+            <button class="btn" type="button">添加明细行</button>
+          </div>
+
+          <div class="line-card">
+            <strong>明细行 1</strong>
+            <div class="line-grid">
+              <div class="field">
+                <label>来源行</label>
+                <input value="SO-202606-018 / 1" />
+              </div>
+              <div class="field">
+                <label>产品 / 物料</label>
+                <input value="毛绒挂件 A" />
+              </div>
+              <div class="field">
+                <label>规格 / SKU</label>
+                <input value="12cm / 白色" />
+              </div>
+              <div class="field">
+                <label>单位</label>
+                <input value="个" />
+              </div>
+              <div class="field">
+                <label>数量</label>
+                <input value="120" />
+              </div>
+              <div class="field">
+                <label>单价</label>
+                <input value="18.00" />
+              </div>
+              <div class="field">
+                <label>金额</label>
+                <input value="2160.00" />
+              </div>
+              <div class="field">
+                <label>仓库 / 批次</label>
+                <input value="成品仓 / 待分配" />
+              </div>
+            </div>
+          </div>
+
+          <div class="section-head">
+            <div class="totals">
+              <span class="status-pill">明细 1 行</span>
+              <span class="status-pill">数量合计 120</span>
+              <span class="status-pill">金额合计 2,160.00</span>
+            </div>
+            <div class="field" style="min-width: 220px">
+              <label>状态箱</label>
+              <div class="select-like">草稿箱 <span>⌄</span></div>
+            </div>
           </div>
         </div>
-        <footer class="drawer-foot">
-          <span class="muted" id="drawerHint">提交前会校验 reason。</span>
-          <div class="actions">
-            <button class="btn" id="drawerCancel" type="button">取消</button>
-            <button class="btn primary" id="drawerSubmit" type="button">提交动作</button>
-          </div>
+
+        <footer class="modal-foot">
+          <button class="btn" type="button">取消</button>
+          <button class="btn primary" type="button">确定</button>
         </footer>
       </section>
-    </div>
 
-    <div class="modal-backdrop" id="dangerModal" aria-hidden="true">
-      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <section class="modal import" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+        <header class="modal-head">
+          <div>
+            <h2 class="modal-title" id="importTitle">从来源单据导入明细</h2>
+            <p class="modal-subtitle">
+              只导入当前动作需要的来源行；库存、批次和数量上限仍由正式 usecase 校验。
+            </p>
+          </div>
+          <button class="close" type="button" aria-label="关闭">×</button>
+        </header>
         <div class="modal-body">
-          <div class="eyebrow">危险操作确认</div>
-          <h2 id="modalTitle">确认执行危险动作？</h2>
-          <p class="summary" id="modalCopy">
-            该动作可能写入事实冲正或关闭关键任务。请确认影响范围已经核对。
-          </p>
+          <div class="search-row">
+            <input placeholder="搜索要导入的记录" />
+            <button class="btn" type="button">查看计算口径</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>来源单号</th>
+                  <th>业务对象</th>
+                  <th>客户 / 供应商</th>
+                  <th>明细行</th>
+                  <th>可导入数量</th>
+                  <th>限制说明</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input type="checkbox" disabled /></td>
+                  <td>SO-202606-016</td>
+                  <td>销售订单</td>
+                  <td>上海样品客户</td>
+                  <td>3</td>
+                  <td>0</td>
+                  <td>已全部生成出货</td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>SO-202606-018</td>
+                  <td>销售订单</td>
+                  <td>上海样品客户</td>
+                  <td>1</td>
+                  <td>120</td>
+                  <td>-</td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox" disabled /></td>
+                  <td>PR-202606-003</td>
+                  <td>采购入库</td>
+                  <td>辅料供应商 A</td>
+                  <td>2</td>
+                  <td>待质检</td>
+                  <td>当前动作不可导入</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination">共 40 条  1 / 5</div>
         </div>
         <footer class="modal-foot">
-          <span class="muted">原型只表达确认强度，不执行真实提交。</span>
-          <div class="actions">
-            <button class="btn" id="modalCancel" type="button">返回修改</button>
-            <button class="btn danger" id="modalConfirm" type="button">确认执行</button>
-          </div>
+          <button class="btn" type="button">取消</button>
+          <button class="btn primary" type="button">导入</button>
         </footer>
       </section>
+
+      <section class="modal recycle" role="dialog" aria-modal="true" aria-labelledby="recycleTitle">
+        <header class="modal-head">
+          <div>
+            <h2 class="modal-title" id="recycleTitle">回收站</h2>
+          </div>
+          <button class="close" type="button" aria-label="关闭">×</button>
+        </header>
+        <div class="modal-body">
+          <div class="compact-toolbar" style="margin-bottom: 12px">
+            <button class="btn" disabled type="button">批量恢复</button>
+            <button class="btn" type="button">刷新</button>
+            <button class="btn danger" type="button">清空回收站</button>
+            <span class="source-note">已选择 0 条回收站记录</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th></th>
+                  <th>记录标识</th>
+                  <th>状态箱</th>
+                  <th>删除时间</th>
+                  <th>删除原因</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>KSIN260419905</td>
+                  <td><span class="status-pill purple">免批</span></td>
+                  <td>2026-04-27 12:07</td>
+                  <td>-</td>
+                  <td><button class="btn" type="button">恢复</button> <button class="btn danger" type="button">彻底删除</button></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox" /></td>
+                  <td>KSIN260419906</td>
+                  <td><span class="status-pill">草稿箱</span></td>
+                  <td>2026-04-27 12:07</td>
+                  <td>-</td>
+                  <td><button class="btn" type="button">恢复</button> <button class="btn danger" type="button">彻底删除</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination">共 4 条  1</div>
+        </div>
+      </section>
+
+      <section class="modal columns" role="dialog" aria-modal="true" aria-labelledby="columnsTitle">
+        <header class="modal-head">
+          <div>
+            <h2 class="modal-title" id="columnsTitle">调整列表列顺序</h2>
+            <p class="modal-subtitle">当前模块列顺序跟随管理员账号保存，表头菜单也可快捷调整。</p>
+          </div>
+          <button class="close" type="button" aria-label="关闭">×</button>
+        </header>
+        <div class="modal-body">
+          <div class="order-list">
+            <div class="order-row">
+              <span class="order-index">1</span>
+              <strong>客户</strong>
+              <button class="btn" type="button">移到最前</button>
+              <button class="btn" type="button">上移</button>
+              <button class="btn" type="button">下移</button>
+              <button class="btn" type="button">移到最后</button>
+            </div>
+            <div class="order-row">
+              <span class="order-index">2</span>
+              <strong>报关编号</strong>
+              <button class="btn" type="button">移到最前</button>
+              <button class="btn" type="button">上移</button>
+              <button class="btn" type="button">下移</button>
+              <button class="btn" type="button">移到最后</button>
+            </div>
+            <div class="order-row">
+              <span class="order-index">3</span>
+              <strong>制单日期</strong>
+              <button class="btn" type="button">移到最前</button>
+              <button class="btn" type="button">上移</button>
+              <button class="btn" type="button">下移</button>
+              <button class="btn" type="button">移到最后</button>
+            </div>
+            <div class="order-row">
+              <span class="order-index">4</span>
+              <strong>发货日期</strong>
+              <button class="btn" type="button">移到最前</button>
+              <button class="btn" type="button">上移</button>
+              <button class="btn" type="button">下移</button>
+              <button class="btn" type="button">移到最后</button>
+            </div>
+            <div class="order-row">
+              <span class="order-index">5</span>
+              <strong>订单号（汇总）</strong>
+              <button class="btn" type="button">移到最前</button>
+              <button class="btn" type="button">上移</button>
+              <button class="btn" type="button">下移</button>
+              <button class="btn" type="button">移到最后</button>
+            </div>
+          </div>
+        </div>
+        <footer class="modal-foot">
+          <button class="btn" type="button">恢复默认</button>
+          <button class="btn primary" type="button">完成</button>
+        </footer>
+      </section>
+
+      <div class="popover confirm" role="tooltip">
+        <p class="popover-title">确认删除该记录？</p>
+        <div class="popover-actions">
+          <button class="btn" type="button">取消</button>
+          <button class="btn danger" type="button">删除</button>
+        </div>
+      </div>
     </div>
 
     <script>
-      const actionMeta = {
-        approve: {
-          title: "审批通过",
-          kind: "Workflow 动作",
-          copy:
-            "完成当前协同任务，只写 Workflow 任务和协同状态，不写库存、出货、财务或开票事实。",
-          dangerous: false,
-          button: "提交通过",
-        },
-        reject: {
-          title: "驳回",
-          kind: "Workflow 动作",
-          copy:
-            "驳回当前协同任务，reason 必填；旧 rejected_reason / blocked_reason 的清理属于真实 usecase 测试范围。",
-          dangerous: false,
-          button: "提交驳回",
-        },
-        block: {
-          title: "记录阻塞",
-          kind: "Workflow 动作",
-          copy:
-            "记录 blocked 原因并保留当前业务对象状态边界；阻塞不等于库存、出货或财务事实失败。",
-          dangerous: false,
-          button: "提交阻塞",
-        },
-        reverse: {
-          title: "冲正确认",
-          kind: "Fact 事实动作",
-          copy:
-            "冲正必须回到对应 Fact usecase，并说明影响的库存流水、出货或财务事实；不能由 Workflow 任务自动触发。",
-          dangerous: true,
-          button: "继续冲正",
-        },
-        close: {
-          title: "关闭任务",
-          kind: "Workflow 动作",
-          copy:
-            "关闭协同任务只代表任务不再处理，不代表业务事实已过账。危险关闭需要二次确认。",
-          dangerous: true,
-          button: "继续关闭",
-        },
-      };
-
-      const drawerBackdrop = document.querySelector("#drawerBackdrop");
-      const dangerModal = document.querySelector("#dangerModal");
-      const drawerTitle = document.querySelector("#drawerTitle");
-      const drawerKind = document.querySelector("#drawerKind");
-      const drawerCopy = document.querySelector("#drawerCopy");
-      const drawerSubmit = document.querySelector("#drawerSubmit");
-      const reason = document.querySelector("#reason");
-      const reasonField = document.querySelector("#reasonField");
-      const drawerHint = document.querySelector("#drawerHint");
-      const modalTitle = document.querySelector("#modalTitle");
-      const modalCopy = document.querySelector("#modalCopy");
-      let currentAction = actionMeta.approve;
-
-      function openDrawer(actionKey) {
-        currentAction = actionMeta[actionKey] || actionMeta.approve;
-        drawerTitle.textContent = currentAction.title;
-        drawerKind.textContent = currentAction.kind;
-        drawerCopy.textContent = currentAction.copy;
-        drawerSubmit.textContent = currentAction.button;
-        drawerSubmit.className = currentAction.dangerous ? "btn danger" : "btn primary";
-        reason.value = "";
-        reason.removeAttribute("aria-invalid");
-        reasonField.classList.remove("invalid");
-        drawerHint.textContent = "提交前会校验 reason。";
-        document.body.classList.add("overlay-open");
-        drawerBackdrop.classList.add("open");
-        drawerBackdrop.setAttribute("aria-hidden", "false");
-        reason.focus();
-      }
-
-      function closeDrawer() {
-        dangerModal.classList.remove("open");
-        dangerModal.setAttribute("aria-hidden", "true");
-        drawerBackdrop.classList.remove("open");
-        drawerBackdrop.setAttribute("aria-hidden", "true");
-        document.body.classList.remove("overlay-open");
-      }
-
-      function validateAndSubmit() {
-        const valid = Boolean(reason.value.trim());
-        reason.setAttribute("aria-invalid", String(!valid));
-        reasonField.classList.toggle("invalid", !valid);
-        if (!valid) {
-          drawerHint.textContent = "原因为空，不能提交。";
-          return;
-        }
-        if (currentAction.dangerous) {
-          modalTitle.textContent = `确认${currentAction.title}？`;
-          modalCopy.textContent = currentAction.copy;
-          dangerModal.classList.add("open");
-          dangerModal.setAttribute("aria-hidden", "false");
-          return;
-        }
-        drawerHint.textContent = "原型提交成功：真实动作仍需后端权限和状态校验。";
-      }
-
-      document.querySelectorAll("[data-action]").forEach((button) => {
-        button.addEventListener("click", () => openDrawer(button.dataset.action));
-      });
-      document.querySelector("#drawerClose").addEventListener("click", closeDrawer);
-      document.querySelector("#drawerCancel").addEventListener("click", closeDrawer);
-      drawerSubmit.addEventListener("click", validateAndSubmit);
-      document.querySelector("#modalCancel").addEventListener("click", () => {
-        dangerModal.classList.remove("open");
-        dangerModal.setAttribute("aria-hidden", "true");
-      });
-      document.querySelector("#modalConfirm").addEventListener("click", () => {
-        dangerModal.classList.remove("open");
-        dangerModal.setAttribute("aria-hidden", "true");
-        drawerHint.textContent = "危险确认已通过：原型不执行真实提交。";
+      const buttons = document.querySelectorAll(".switcher [data-target]");
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          document.body.dataset.modal = button.dataset.target;
+        });
       });
     </script>
   </body>

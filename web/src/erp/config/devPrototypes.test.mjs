@@ -30,10 +30,10 @@ test('devPrototypes: 只通过开发态独立路径暴露', () => {
 })
 
 test('devPrototypes: 登记当前原型与样板资产并区分类型和状态', () => {
-  assert.equal(DEV_PROTOTYPE_ASSETS.length, 16)
+  assert.equal(DEV_PROTOTYPE_ASSETS.length, 18)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'HTML').length,
-    10
+    12
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'PNG').length,
@@ -57,7 +57,7 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     DEV_PROTOTYPE_ASSETS.filter((item) =>
       item.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)
     ).length,
-    9
+    11
   )
   assert.deepEqual(
     DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => option.value),
@@ -119,8 +119,12 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     DEV_PROTOTYPE_ASSETS.find(
       (item) => item.key === 'business-form-standard-page'
     )?.appliesTo || '',
-    /先收窄到销售订单/
+    /回到业务弹窗样板/
   )
+  const actionModal = DEV_PROTOTYPE_ASSETS.find(
+    (item) => item.key === 'action-modal-drawer-standard'
+  )
+  assert.match(actionModal?.appliesTo || '', /后端 usecase \/ RBAC 决定/)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find(
       (item) => item.key === 'business-task-collab-entry'
@@ -287,6 +291,8 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
     [
       'admin-command-center',
       'core-menu-coverage',
+      'task-command-center',
+      'business-management-center',
       'formal-menu-candidate',
       'business-module-standard-page',
       'print-template-center',
@@ -382,6 +388,8 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
     [
       'admin-command-center-v1/',
       'core-menu-coverage-v1/',
+      'task-command-center-v1/',
+      'business-management-center-v1/',
       'formal-menu-candidate-v1/',
       'business-module-page-standard-v1/',
       'print-template-center-v1/',
@@ -395,7 +403,7 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
   )
   assert.deepEqual(
     groups.map((group) => group.items.length),
-    [1, 1, 1, 2, 1, 1, 1, 1, 3, 1, 3]
+    [1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 3, 1, 3]
   )
 
   assert.deepEqual(

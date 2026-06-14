@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertOutlined,
   ApartmentOutlined,
@@ -33,10 +33,12 @@ import { isAuthFailureCode } from '@/common/consts/errorCodes'
 import {
   AUTH_SCOPE,
   getCurrentUser,
+  getLoginPath,
   getStoredAdminProfile,
   logout,
   persistAuthMeta,
 } from '@/common/auth/auth'
+import { authBus } from '@/common/auth/authBus'
 import { getActiveERPBrand } from '@/common/consts/brand'
 import { Loading } from '@/common/components/loading'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
@@ -46,6 +48,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import { getNavigationSections } from '../config/seedData.mjs'
+import { getAdminProfileSyncErrorAction } from '../utils/adminProfileSync.mjs'
 
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
@@ -129,6 +132,9 @@ export default function ERPLayout() {
   const [adminProfile, setAdminProfile] = useState(() =>
     getStoredAdminProfile()
   )
+  const adminProfileRef = useRef(adminProfile)
+  const profileSyncErrorNotifiedRef = useRef(false)
+  const profileSessionUnavailableHandledRef = useRef(false)
   const [refreshingCurrentPage, setRefreshingCurrentPage] = useState(false)
   const [pageRefreshHandler, setPageRefreshHandler] = useState(null)
 
@@ -183,8 +189,39 @@ export default function ERPLayout() {
         )
       }
       setAdminProfile(nextProfile)
+      profileSyncErrorNotifiedRef.current = false
     } catch (error) {
+      const syncErrorAction = getAdminProfileSyncErrorAction(error, {
+        hasCachedProfile: Boolean(adminProfileRef.current),
+        alreadyNotified: profileSyncErrorNotifiedRef.current,
+      })
+      if (syncErrorAction === 'reauth') {
+        if (profileSessionUnavailableHandledRef.current) {
+          return
+        }
+        profileSessionUnavailableHandledRef.current = true
+        logout(AUTH_SCOPE.ADMIN)
+        setAdminProfile(null)
+        authBus.emitUnauthorized?.({
+          from: {
+            pathname: window.location.pathname,
+            search: window.location.search,
+            hash: window.location.hash,
+          },
+          message: getActionErrorMessage(error, '同步管理员权限'),
+          loginPath: getLoginPath(AUTH_SCOPE.ADMIN),
+        })
+        return
+      }
+      if (syncErrorAction === 'keep_cached') {
+        console.warn('管理员权限同步失败，继续使用本地缓存 profile', error)
+        return
+      }
+      if (syncErrorAction === 'silent') {
+        return
+      }
       if (!isAuthFailureCode(error?.code)) {
+        profileSyncErrorNotifiedRef.current = true
         message.error(getActionErrorMessage(error, '同步管理员权限'))
       }
     } finally {
@@ -195,6 +232,10 @@ export default function ERPLayout() {
   useEffect(() => {
     loadProfile()
   }, [loadProfile])
+
+  useEffect(() => {
+    adminProfileRef.current = adminProfile
+  }, [adminProfile])
 
   const isSuperAdmin = adminProfile?.is_super_admin === true
   const allowedMenuPaths = useMemo(
@@ -259,9 +300,23 @@ export default function ERPLayout() {
   )
 
   const selectedKeys = currentEntry?.path ? [currentEntry.path] : []
+  const hideCurrentEntryPageHead = [
+    '/erp/master/',
+    '/erp/sales/',
+    '/erp/product/',
+    '/erp/purchase/',
+    '/erp/quality/',
+    '/erp/inventory/',
+    '/erp/production/',
+    '/erp/warehouse/',
+    '/erp/shipments/',
+    '/erp/finance/',
+  ].some((prefix) => currentEntry?.path?.startsWith(prefix))
   const hidePageHead =
     currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path ||
-    currentEntry?.path === '/erp/business-dashboard'
+    currentEntry?.path === '/erp/task-board' ||
+    currentEntry?.path === '/erp/business-dashboard' ||
+    hideCurrentEntryPageHead
 
   const registerPageRefresh = useCallback((handler) => {
     if (typeof handler !== 'function') {

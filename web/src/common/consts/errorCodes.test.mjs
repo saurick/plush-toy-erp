@@ -46,10 +46,15 @@ function loadErrorCodesModule(extraExports = []) {
 
 const {
   RpcErrorCode,
+  ADMIN_SESSION_UNAVAILABLE_ERROR_CODES,
   AUTH_FAILURE_ERROR_CODES,
+  isAdminSessionUnavailableCode,
   isAuthFailureCode,
   DEFAULT_RPC_ERROR_MESSAGES,
-} = loadErrorCodesModule()
+} = loadErrorCodesModule([
+  'ADMIN_SESSION_UNAVAILABLE_ERROR_CODES',
+  'isAdminSessionUnavailableCode',
+])
 
 test('errorCodes: 所有错误码保持唯一', () => {
   const values = Object.values(RpcErrorCode)
@@ -70,6 +75,30 @@ test('errorCodes: 仅登录态失效错误触发重新登录', () => {
   assert.equal(isAuthFailureCode(RpcErrorCode.AUTH_INVALID), true)
   assert.equal(isAuthFailureCode(RpcErrorCode.PERMISSION_DENIED), false)
   assert.equal(isAuthFailureCode(RpcErrorCode.ADMIN_DISABLED), false)
+})
+
+test('errorCodes: 后台 profile 同步单独识别当前管理员会话不可用', () => {
+  assert.deepEqual(
+    [...ADMIN_SESSION_UNAVAILABLE_ERROR_CODES],
+    [
+      RpcErrorCode.HTTP_UNAUTHORIZED,
+      RpcErrorCode.ADMIN_REQUIRED,
+      RpcErrorCode.ADMIN_DISABLED,
+      RpcErrorCode.ADMIN_NOT_FOUND,
+      RpcErrorCode.AUTH_CURRENT_USER_FAILED,
+    ]
+  )
+  assert.equal(isAdminSessionUnavailableCode(RpcErrorCode.ADMIN_REQUIRED), true)
+  assert.equal(isAdminSessionUnavailableCode(RpcErrorCode.ADMIN_DISABLED), true)
+  assert.equal(
+    isAdminSessionUnavailableCode(RpcErrorCode.ADMIN_NOT_FOUND),
+    true
+  )
+  assert.equal(
+    isAdminSessionUnavailableCode(RpcErrorCode.PERMISSION_DENIED),
+    false
+  )
+  assert.equal(isAdminSessionUnavailableCode(RpcErrorCode.AUTH_REQUIRED), false)
 })
 
 test('errorCodes: 默认文案覆盖核心鉴权错误', () => {

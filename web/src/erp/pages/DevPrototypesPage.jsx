@@ -137,14 +137,6 @@ function PrototypeAssetCard({ item, selected, onSelect, onTogglePinned }) {
           <PrototypeStatusTags statuses={item.statuses} />
         </span>
         <span className="erp-dev-prototypes-card__dir">{item.directory}</span>
-        <span className="erp-dev-prototypes-card__desc">
-          {item.description}
-        </span>
-        {item.appliesTo ? (
-          <span className="erp-dev-prototypes-card__applies">
-            参照范围：{item.appliesTo}
-          </span>
-        ) : null}
       </button>
       <button
         type="button"

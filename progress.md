@@ -11,326 +11,229 @@
 - `docs/archive/progress-2026-06-10-before-style-l1-stabilization.md`：归档 2026-06-08 23:55 CST 至 2026-06-10 17:34 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 378 行 / 82385 bytes，超过 80KB 阈值；本轮修完整 `style:l1` 稳定性前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-11-before-ui-simplification-rules.md`：归档截至 2026-06-11 14:06 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 395 行 / 80005 bytes，接近并按项目约定视为达到 80KB 归档边界；本轮补 UI 极简不改语义规则前先保留完整现场，再收缩当前入口。
 - `docs/archive/progress-2026-06-12-before-formal-menu-candidate-prototype.md`：归档截至 2026-06-12 18:29 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 425 行 / 81740 bytes，超过 80KB 阈值；本轮补正式菜单候选原型前先保留完整现场，再收缩当前入口。
+- `docs/archive/progress-2026-06-13-before-workbench-prototype-redesign.md`：归档截至 2026-06-13 19:59 CST 的过程记录快照。归档原因：当前 `progress.md` 达到 385 行 / 81720 bytes，达到 80KB 归档边界；本轮重做工作台原型前先保留完整现场，再收缩当前入口。
 
 ## 当前活跃事项
 
-- `/erp/dashboard` 已作为后台首页 / 工作台首屏：聚合今日焦点、业务状态摘要、常用入口、角色提醒和运营工具，不写事实层；`/erp/task-board` 独立承接 Workflow 任务看板。
-- `BusinessModulePage` 已把筛选区、表格工具栏、已选记录操作条、分页和业务页协同入口收口到标准页结构；协同入口只处理 Workflow 任务，不写事实层。`材料 BOM`、`入库通知/检验/入库`、`库存` 和 `出库` 已补只读特殊变体区，强调 BOM、质检 / 入库、库存和出库事实边界。
+- `/erp/dashboard` 已作为后台首页 / 工作台首屏：聚合今日必须处理、跨角色阻塞、业务对象、完成率、当前处理、今日焦点、业务状态摘要、业务对象分布、角色提醒和阻塞交接，不再内嵌“看板中心 / 运营工具”卡片导航，也不把核心区域做成跳转入口集合；`/erp/task-board` 独立承接 Workflow 任务看板。
+- `BusinessListLayout` 已承接正式业务页共享骨架；`客户档案`、`供应商档案` 和 `销售订单` 使用 V1 页面，`产品档案`、`BOM 管理`、采购、入库、质检、库存、委外、生产、出货和财务等 16 个 `formal-shell` 菜单统一使用 `FormalBusinessModulePage`。共享骨架已收口紧凑筛选、列表统计、列顺序、列排序、导出、批量删除、回收站、行点击选中、当前操作和协同入口；协同入口只处理 Workflow 任务，不写事实层。
 - `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板目录、纸面预览和可编辑打印窗口入口；字段编辑、明细确认和纸面微调回到独立打印窗口；`/erp/operations/exceptions` 作为异常 / 阻塞闭环入口。
 - 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收或评审原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增未评审后端 API、schema、migration、权限码或 Fact 写入。
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
-- `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、产品核心菜单覆盖矩阵、正式菜单候选导航、业务模块列表页、业务详情页、新建 / 编辑表单、业务页协同入口组件、弹窗 / 抽屉动作和模板打印中心九个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
-- 原型查看器和原型 README 已补“参照范围”口径：`core-menu-coverage-v1` 是内部覆盖矩阵，`formal-menu-candidate-v1` 是正式菜单候选原型；两者都不是正式菜单、路由、权限或 seedData 映射表，真正对应关系必须在进入真实实现任务时回到代码、菜单配置和 RBAC 重新核对。
-
-## 2026-06-12 19:10 CST
-
-- 完成：新增 `docs/product/menu-mapping-review-v1.md` 菜单映射评审表，只做评审文档 / 原型资料，把当前产品默认菜单、yoyoosun 默认前端菜单、`formal-menu-candidate-v1` 的 12 个候选主入口和 `core-menu-coverage-v1` 的 51 个内部覆盖细项放到同一张映射里。
-- 完成：评审表逐项拆出后续若采纳时可能涉及的文案、分组 / 排序、显示 / 隐藏、路由、权限、后端 seed、测试和正式文档影响，并明确哪些细项只应放页面内 tab、筛选、动作或详情区，不进入正式左侧菜单；同步 `docs/document-inventory.md` 和 `docs/product/prototypes/README.md` 引用。
-- 下一步：如果要把候选入口吸收到真实菜单，应另行进入运行时实现任务，逐项改 `seedData.mjs`、客户菜单配置、`menuPermissions.mjs`、测试和正式文档，并做菜单 / 权限 / 页面回归。
-- 阻塞/风险：本轮未改正式运行时菜单、路由、RBAC、后端 API、schema、migration、seedData、客户菜单配置、测试、部署、提交或推送；当前工作区已有大量非本轮现场，本轮只追加文档和引用，不判断这些现场是否可发布。
-
-## 2026-06-12 16:15 CST
-
-- 完成：按 `docs/reference/第二次20260611/server:internal:core 分层、保留与迁移规范.md` 的 CORE-01 收口 `server/internal/core` 边界。`server/internal/core/README.md` 明确 core 只放无 IO 纯产品规则，不作为第二套 `biz/data`、JSON-RPC 或 runtime；新增最小 `doc.go` 让 `go test ./internal/core/...` 成为稳定可执行入口。
-- 完成：新增 `scripts/qa/core-boundary.test.mjs`，扫描 core import 和源码危险模式，阻止 `internal/biz`、`internal/data`、`internal/service`、Ent、SQL、HTTP、Kratos transport、配置、环境变量和文件系统依赖进入 core；并接入 `scripts/qa/fast.sh`、`full.sh`、`strict.sh`。
-- 完成：同步 `scripts/README.md`、`docs/product/test-strategy.md`、`server/README.md` 和 `docs/current-source-of-truth.md`，明确 core 当前只是边界 / 骨架 / guard，不迁移业务逻辑、不改 schema / migration、不改变 `biz/data` 主路径。
-- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/...` 通过；`bash -n scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh` 通过；`find scripts -name '*.test.mjs' -print0 | xargs -0 node --test` 通过 56 项；本轮触达文件 `git diff --check` 通过。
-- 下一步：后续如继续 CORE-02，应只迁移已被 `biz` 实际消费的值对象 / 领域错误，并同步删除重复校验，避免把未使用抽象提前塞进 core。
-- 阻塞/风险：本轮不迁移状态机、计算器或 usecase，不接 JSON-RPC / API / DB / customer config，不新增 Ent schema 或 Atlas migration；未运行完整 `scripts/qa/fast.sh`，因为该脚本会执行前端 `pnpm lint --fix`，当前工作区已有非本轮前端未提交改动。
-
-## 2026-06-12 16:34 CST
-
-- 完成：继续 CORE-02，但按用户要求只迁移当前 `biz` 已明确重复且可测试覆盖的纯校验。新增 `server/internal/core/errors` 和 `server/internal/core/value`，当前只包含正数数量、非负 / 正数金额、幂等键及对应领域错误。
-- 完成：将 `sales_order`、`purchase_receipt`、`purchase_return`、`purchase_receipt_adjustment`、`inventory` 和 Phase 8 事实 / 出货 / 预留 / 财务输入里的重复 quantity / money / idempotency 校验改为调用 `core/value`；对外仍保持 `ErrBadParam`，不改变 JSON-RPC 错误口径。
-- 完成：同步 `server/internal/core/README.md`、`docs/current-source-of-truth.md` 和 `server/README.md`，明确 core 已有第一批值对象 / 领域错误，但仍不承载状态机、计算器、应用编排、runtime、schema 或 migration。
-- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/...` 通过；`cd server && go test ./internal/biz` 通过；本轮 core / biz 触达文件 `git diff --check` 通过。
-- 下一步：如果继续迁移，应先找 `biz` 中已重复且已有测试或能补测试的具体规则；`SourceRef` 和 `Percentage` 暂未迁移，因为当前 source id 清理和 loss_rate 口径还不是多处一致的独立纯规则。
-- 阻塞/风险：本轮没有迁移状态机、库存可用量计算、BOM 展开、采购收货状态计算、schema、migration、JSON-RPC、service、data repo 或前端；没有运行完整 `scripts/qa/fast.sh`，因为当前工作区已有大量非本轮未提交改动且 fast 会执行前端 `pnpm lint --fix`。
-
-## 2026-06-12 16:20 CST
-
-- 完成：继续排查本地 Chrome 在线预览停在“正在等待 PDF 预览结果...”的问题。定位为预览壳页和结果写入之间存在竞态：PDF 生成完成后若 Chrome 仍在完成壳页导航，直接写入窗口可能被后续壳页覆盖；旧持久化顺序又先等待 IndexedDB，导致 localStorage 兜底没有及时写入，壳页只能继续等待。
-- 完成：调整 `printPdf.mjs` 的 PDF 预览结果持久化顺序，先同步写入 localStorage，再后台写 IndexedDB；即使窗口被壳页导航覆盖，壳页也能立刻从同源 localStorage 恢复 PDF 结果。新增单测覆盖 IndexedDB 未返回时 localStorage 仍先有结果。
-- 完成：加强采购合同和加工合同真实登录 smoke：弹窗出现 iframe 后继续等待并断言窗口不再包含“正在等待 PDF 预览结果...”或过期提示，且 iframe 指向 `blob:` PDF，避免测试过早通过。
-- 验证：`pnpm --dir web exec node --test src/erp/utils/printPdf.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web build` 均通过；`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过；真实 5175 smoke 中采购合同在线预览约 `1917ms`、加工合同在线预览约 `2431ms`，并通过新增的非等待壳页断言。
-- 下一步：本地 Chrome 已经停在旧的等待壳页时，需要关闭该旧预览页并从工作台重新点“在线预览 PDF”，让新代码重新打开预览窗口；不要在旧等待页上刷新验证。
-- 阻塞/风险：Chrome 插件当前只暴露到 ChatGPT 标签，AppleScript 又被本机 Chrome 禁止执行页面 JS，因此未直接读取用户截图页的 localStorage；已通过当前代码路径、壳页文案、真实 5175 smoke 和新增断言复现并锁住对应竞态。未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、PDF 服务端渲染逻辑、部署、提交或推送。
-
-## 2026-06-12 16:27 CST
-
-- 完成：按用户无痕 Chrome 仍停在“正在等待 PDF 预览结果...”继续对照 `trade-erp`。确认 `trade-erp` 的 PDF 预览不是直接 `document.write` 弹窗，而是先把 PDF iframe HTML 写入 state，再驱动 `/pdf-preview-shell.html?state=...` 壳页恢复。
-- 完成：将本项目 `printPdf.mjs` 对齐为同一主路径：不再依赖直接写入弹窗；PDF 生成成功或失败后先持久化预览 HTML，localStorage 成功即立即返回并后台补写 IndexedDB，然后调用壳页恢复函数并 `location.replace(previewShellURL)`。这样无痕 / 本地 Chrome 即使壳页导航较慢，也会从 state 恢复，不会被直接写窗口竞态覆盖回等待页。
-- 完成：更新 `printPdf` 单测，把旧“直接写入当前预览窗口”断言改为“先写 state 再驱动壳页恢复”，并断言不会调用 `document.write`；保留 localStorage 先行、IndexedDB 兜底、生成失败错误页等覆盖。真实登录 smoke 继续断言弹窗最终不是等待壳页且 iframe 为 `blob:`。
-- 验证：`pnpm --dir web exec node --test src/erp/utils/printPdf.test.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web build` 均通过；合同预览 L1 四场景通过；真实 5175 smoke 中采购合同在线预览约 `1897ms`、加工合同在线预览约 `1901ms`；`cd server && go test ./internal/server -run 'TemplatePDF|RenderPDF|PDF'` 通过，确认本轮不需要改服务端 PDF 渲染代码。
-- 下一步：验证本地 Chrome / 无痕时，必须关闭旧等待页并重新从工作台点击“在线预览 PDF”；旧等待页本身没有新 state，刷新它仍不是有效验证。
-- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、PDF 服务端渲染逻辑、部署、提交或推送；当前工作区有其他非本轮部署 / core / 文档现场，本轮未回退或整理。
-
-## 2026-06-12 16:40 CST
-
-- 完成：按 `docs/reference/第二次20260611/` 的部署资料包参考稿，并以仓库当前真源复核后，补齐 `deployments/yoyoosun/` 私有化部署资料包：env / server / web 配置样例、Compose / Nginx 样例、首次部署 / 升级 / 回滚 / 备份恢复 / migration / 导入边界 / 故障处理 / 日常运维 runbook、部署 / smoke / 安全 / 备份恢复 / 升级 / 回滚 / 周月巡检清单、发布 / migration / 备份 / smoke evidence 模板和薄脚本。
-- 完成：新增 `scripts/deploy/deployment-package-lint.mjs` 与单测，并接入 `scripts/qa/fast.sh`、`scripts/qa/full.sh`、`scripts/qa/strict.sh`；同步 `deployments/README.md`、`scripts/README.md`、`docs/document-inventory.md`、`docs/current-source-of-truth.md`、`docs/product/private-deployment-package-review.md` 和 `config/private-deployment-template/templateConfig.mjs`，明确 yoyoosun 资料包已落地但不替代 `server/deploy/compose/prod`。
-- 验证：`node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun`、`node --test scripts/deploy/deployment-package-lint.test.mjs`、`bash deployments/yoyoosun/scripts/verify-env.sh --example`、`bash deployments/yoyoosun/scripts/verify-backup-restore.sh --evidence deployments/yoyoosun/evidence/backups/backup-evidence-template.md`、`bash -n deployments/yoyoosun/scripts/verify-env.sh deployments/yoyoosun/scripts/run-smoke.sh deployments/yoyoosun/scripts/collect-evidence.sh deployments/yoyoosun/scripts/verify-backup-restore.sh scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh`、`node scripts/qa/private-deployment-boundaries.mjs`、`node --test scripts/qa/phase11-private-deployment-closure.test.mjs`、`node scripts/qa/phase11-private-deployment-closure.mjs --out output/customers/yoyoosun/phase11-private-deployment-closure`、本轮路径 `git diff --check` 均通过；`find deployments/yoyoosun` 确认未出现真实 `.env`、证书、dump、备份或客户 raw 文件。
-- 下一步：如要进入真实客户试用发布，应另行执行受控 `.env` 校验、目标机 `docker load`、host Atlas migration、health / RBAC / 浏览器 smoke 和发布后清理；真实客户数据导入仍需单独数据治理任务和客户审批。
-- 阻塞/风险：本轮只做部署资料包、文档和本地 lint；未改后端 API、schema / migration、RBAC、WorkflowUsecase、Fact usecase、生产部署主路径、真实 `.env`、真实备份、客户 raw files、真实导入、提交或推送。当前工作区已有非本轮前端、core 和 `progress.md` 改动，本轮未回退或整理。
-
-## 2026-06-12 16:31 CST
-
-- 完成：读取 `docs/reference/第二次20260611/产品核心菜单与页面功能规格.md` 及同目录路线图、客户配置、测试、部署和 core 边界参考稿，并按仓库当前真源复核后，新增 `docs/product/prototypes/core-menu-coverage-v1/` 待实现原型：把 20260611 参考规格中的 15 个一级菜单、51 个二级菜单收口为可筛选内容矩阵，逐菜单标注页面类型、事实源、关键字段、核心动作和 Workflow / Fact / RBAC / 导入边界。
-- 完成：同步原型目录说明、静态原型索引、`/__dev/prototypes` 资产登记、dev prototype 单测、L1 场景和 `docs/document-inventory.md`；新增原型目录级 favicon，避免静态浏览器回归出现 `/favicon.ico` 404 噪音。新增样板保持 To Implement，不升级 Current，也不替代当前 `seedData.mjs`、客户菜单配置、路由、RBAC、schema、API 或正式产品真源。
-- 验证：`rg -o "\{ group:" docs/product/prototypes/core-menu-coverage-v1/index.html | wc -l` 确认为 51；`cd web && node --test src/erp/config/devPrototypes.test.mjs` 通过；`cd web && pnpm test -- --run src/erp/config/devPrototypes.test.mjs` 实际按当前脚本跑完整前端测试，347 项通过；`cd web && pnpm lint`、`cd web && pnpm css`、`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm style:l1` 通过；临时静态服务 + Playwright 断言通过静态索引、新原型页、51 卡片、库存分组、Legacy 搜索、空状态恢复和 1440 / 390 视口横向溢出检查；本轮路径 `git diff --check` 通过。
-- 下一步：后续如要把某个菜单从覆盖矩阵推进到真实页面，应按该菜单对应的 schema / API / RBAC / seedData / 客户菜单配置单独立项，并复用列表页、详情页、表单页、动作浮层、工作台、报表、导入或移动任务标准样板，不把参考稿直接当正式菜单实现规格。
-- 阻塞/风险：本轮只做 Reference Only 的 To Implement 原型覆盖、登记、静态文档和 dev-only 验证；未改后端 API、schema / migration、RBAC、WorkflowUsecase、Fact usecase、正式运行时菜单、客户菜单、生产构建、部署、提交或推送。当前工作区已有非本轮部署资料包、core、PDF 预览和其他文档 / 前端改动，本轮未回退、整理或纳入成果。
-
-## 2026-06-12 16:43 CST
-
-- 完成：按用户指定入口 `http://localhost:5175/erp/print-center?template=processing-contract` 继续排查打印中心到 PDF 预览全过程。定位到前端壳页恢复仍先等待 IndexedDB：即使 PDF 结果已经同步写入 localStorage，`pdf-preview-shell.html` 也会先卡在 IndexedDB；`print-window-shell.html` 同类恢复顺序也会拖慢打印中心打开工作台。
-- 完成：调整 `/pdf-preview-shell.html` 和 `/print-window-shell.html` 的恢复主路径为先读同源 localStorage，缺失时再回退 IndexedDB；同步让 `persistPrintWorkspaceWindowHTML` 在 localStorage 写入成功后立即返回，后台补写 IndexedDB，避免本地 Chrome / 无痕窗口被 IndexedDB 阻塞。
-- 完成：新增 `style:l1` 场景 `print-center-processing-preview-popup`，覆盖 `print-center?template=processing-contract -> 打印当前模板 -> 在线预览 PDF -> PDF 壳页 iframe blob`，明确断言弹窗不再停留在“正在等待 PDF 预览结果...”或“PDF 预览不存在或已过期”。
-- 验证：Browser 插件可打开 `localhost:5175` 指定入口并确认页面身份 / DOM / console；插件弹窗捕获能力不足，已用 Playwright exact-flow 回归兜底。`pnpm --dir web exec node --test src/erp/utils/printPdf.test.mjs src/erp/utils/printWorkspace.test.mjs`、`STYLE_L1_BASE_URL=http://localhost:5175 STYLE_L1_SCENARIOS=print-center-processing-preview-popup pnpm --dir web style:l1`、`pnpm --dir web lint && pnpm --dir web css && pnpm --dir web test && pnpm --dir web build`、`cd server && go test ./internal/server -run 'TemplatePDF|RenderPDF|PDF'` 均通过。
-- 下一步：本地 Chrome / 无痕验证时必须关闭旧的等待 / 过期 PDF 标签页，再从打印中心重新点“打印当前模板”和“在线预览 PDF”；旧标签页没有新的 state 写入，刷新旧页不算有效验证。
-- 阻塞/风险：本轮不需要改后端 PDF 渲染代码、API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、部署、提交或推送；当前工作区已有非本轮部署资料包、core、原型和文档现场，本轮未回退或整理。
-
-## 2026-06-12 17:22 CST
-
-- 完成：继续 CORE-03，但只按当前仓库真实状态迁移出货状态机。新增 `server/internal/core/status`，当前只定义 `DRAFT / SHIPPED / CANCELLED`，合法迁移为 `DRAFT -> SHIPPED` 和 `SHIPPED -> CANCELLED`；重复发货在 `SHIPPED` 上幂等返回，重复取消在 `CANCELLED` 上幂等返回，`DRAFT` 取消和 `CANCELLED` 再发货仍拒绝。
-- 完成：`biz` 的出货状态常量改为引用 `core/status`，`data` 事务内的出货状态判断改为调用 `core/status` 纯判断；库存流水、冲正、行锁、事务、Ent 查询和对外 `ErrBadParam` 仍保留在 `data/biz` 主路径，`core` 不 import `data/ent/sql`。
-- 完成：补 `core/status` 单测和 Phase 8 repo 重复动作测试；同步 `server/internal/core/README.md`、`server/README.md` 和 `docs/current-source-of-truth.md`，明确本轮未新增 READY / CLOSED / CANCELLED_AFTER_SHIPPED，未改 schema / migration / JSON-RPC / 前端。
-- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/... ./internal/biz ./internal/data` 通过；本轮触达文件 `git diff --check` 通过。
-- 下一步：如继续 CORE 状态机迁移，应先选当前代码中已稳定、已测试且没有 schema/API 语义扩展的单一状态机，不能顺手引入未来状态或改 JSON-RPC。
-- 阻塞/风险：当前仍有部署资料包、PDF 预览和原型等并行现场未收口；本轮未提交、未推送，也未整理这些非 CORE-03 改动。
-
-## 2026-06-12 17:46 CST
-
-- 完成：继续 CORE-04，但只迁移当前库存预留路径已存在的库存可用量纯公式。新增 `server/internal/core/calc`，当前公式为 `available = balance - active_reserved`，并提供 `HasInventoryAvailableQuantity` 判断请求数量是否可用。
-- 完成：`server/internal/data/phase8_repo.go` 的 `ensureStockAvailableForReservation` 保留 Ent 查询、ACTIVE 预留汇总、事务和 `ErrInventoryInsufficientStock` 映射，只把最终可用量公式改为调用 `core/calc`；未新增字段、未改 schema / migration、未改 JSON-RPC、未改前端。
-- 完成：补 `core/calc` 单测，覆盖无预留、扣减 ACTIVE 预留、超额预留为负可用量、刚好够用和不足等当前语义；同步 `server/internal/core/README.md`、`server/README.md` 和 `docs/current-source-of-truth.md`。
-- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/... ./internal/biz ./internal/data` 通过；本轮触达文件 `git diff --check` 通过。
-- 下一步：如继续迁移计算器，应先确认当前代码已有稳定公式和测试覆盖，避免提前迁移 BOM 展开、采购收货状态或结算状态等尚未收敛的规则。
-- 阻塞/风险：本轮没有把 ACTIVE 预留查询、库存余额读取、事务锁、错误映射或库存流水迁入 core；core 仍不 import data / Ent / SQL。
-
-## 2026-06-12 18:25 CST
-
-- 完成：修复 SQL tracing 参数泄漏风险。`otelsql` 自定义 attribute getter 不再写入 `db.sql.arg.*` 或任何 bind args 参数值，只保留 SQL 语句模板 `db.statement` 用于链路定位。
-- 完成：新增 `server/internal/data/data_sql_trace_test.go`，覆盖带用户名和密码哈希参数的 SQL trace attributes 不包含参数 key 或参数值；同步 `server/docs/observability.md`、`server/docs/config.md` 和 `docs/observability/log-trace-audit-v1.md`，明确 SQL trace 不记录 bind args / SQL 参数值。
-- 验证：`cd server && go test ./internal/data -run TestPostgresSQLTraceAttributesDoNotExposeArgs` 通过；`cd server && go test ./internal/data` 通过。
-- 下一步：已在 18:49 CST 继续收紧为不记录 SQL text / 语句模板，只保留 SQL span 耗时、错误和链路关系。
-- 阻塞/风险：本轮未改 schema / migration、JSON-RPC、业务 usecase、RBAC、前端、部署和采样率；`data.postgres.debug=true` 的开发 SQL debug 日志仍是单独日志路径，生产默认 `false`。
-
-## 2026-06-12 18:49 CST
-
-- 完成：继续收紧 SQL tracing 敏感面。`otelsql` span options 已开启 `DisableQuery=true`，SQL span 仍保留耗时、错误和链路关系，但不再记录 SQL text、语句模板、bind args 或 SQL 参数值。
-- 完成：更新 `server/internal/data/data_sql_trace_test.go`，锁住 SQL query text 禁用且 query span 不被整体关闭；同步 `server/docs/observability.md`、`server/docs/config.md` 和 `docs/observability/log-trace-audit-v1.md` 到“不记录 SQL text / 模板 / 参数”的口径。
-- 验证：`cd server && go test ./internal/data -run TestPostgresSQLSpanOptionsDoNotRecordQueryText` 通过；`cd server && go test ./internal/data` 通过。
-- 下一步：如后续还要加强生产观测边界，应单独评审 trace 采样率、Jaeger 端口暴露和 retention / access control，不与本轮代码级脱敏混在一起。
-- 阻塞/风险：本轮未改 trace endpoint、采样率、Jaeger Compose、schema / migration、JSON-RPC、业务 usecase、RBAC、前端、部署、提交或推送；开发环境 `data.postgres.debug=true` 的 Ent SQL debug 日志仍是单独日志路径。
-
-## 2026-06-12 18:52 CST
-
-- 完成：继续收紧生产观测暴露面。`server/deploy/compose/prod/compose.yml` 的 Jaeger 宿主机端口现在统一通过 `JAEGER_BIND_ADDR` 绑定，默认值为 `127.0.0.1`，避免 UI、OTLP 和兼容端口默认监听所有网卡。
-- 完成：同步 `server/deploy/compose/prod/.env.example`、`server/deploy/compose/prod/README.md`、`server/docs/observability.md` 和 `server/docs/config.md`，明确远程查看 Jaeger 优先使用 SSH tunnel；`app-server` 仍通过容器网络 `TRACE_ENDPOINT=jaeger:4318` 上报 trace。
-- 验证：`docker compose -f server/deploy/compose/prod/compose.yml config` 通过；展开后的 Jaeger 10 个宿主机端口均显示 `host_ip: 127.0.0.1`。
-- 下一步：如继续治理生产 trace，应单独评审采样率、Jaeger 数据保留时间和 UI 访问控制；这些属于运行策略，不在本轮 Compose 默认绑定收紧中混改。
-- 阻塞/风险：本轮没有部署到目标机，没有重启 Compose，也没有改 trace endpoint、采样率、业务代码、schema / migration、前端、提交或推送。
-
-## 2026-06-12 18:59 CST
-
-- 完成：继续收紧业务 trace attribute。移除 `auth.register`、`auth.login`、`admin_auth.login`、`admin_manage.create` 和 `useradmin.list` 中的用户名 / 账号搜索词明文 trace attribute；保留用户 / 管理员 ID、数量、状态和已脱敏手机号等低敏定位信息。
-- 完成：新增 `server/internal/biz/trace_attributes_test.go`，扫描相关生产 biz 文件，阻止 `auth.username`、`admin_auth.username`、`admin.username` 和 `useradmin.search_username` 这类可识别账号 attribute 回流；同步 `server/docs/observability.md` 和 `docs/observability/log-trace-audit-v1.md`。
-- 验证：`cd server && go test ./internal/biz -run TestTraceAttributesDoNotExposeUserIdentifiers` 通过；`cd server && go test ./internal/biz` 通过。
-- 下一步：如继续治理 trace 内容，应按模块逐步审查非 auth 业务 span，优先识别客户名、供应商名、订单 payload、附件名等可能出现在 attribute / event 的明文。
-- 阻塞/风险：本轮只处理 trace attribute，不改变业务日志、鉴权逻辑、错误码、schema / migration、JSON-RPC、前端、部署、提交或推送；日志链路仍按原有结构化 / 文本日志口径保留用户名排障信息。
-
-## 2026-06-12 18:29 CST
-
-- 完成：继续排查在线 PDF 预览打开后浏览器卡顿，并对照 `trade-erp` 的实现。确认后端 `/templates/render-pdf` 已是共享 Chromium、并发闸门和超时队列主路径，不是每次预览重新启动浏览器；本轮未改后端 PDF handler。
-- 完成：前端打印工作台按模板二次 lazy：`PrintWorkspacePage` 不再静态加载采购合同和加工合同两套大页面。构建结果中 `PrintWorkspacePage` 从约 `63.73KB` 降到约 `1.01KB`，采购 / 加工工作台拆为独立按需 chunk。
-- 完成：PDF 服务端快照从“clone 整个 React 页面再裁剪”改为优先构造只包含纸面目标区域的最小 HTML，并继续内联当前样式、固定浅色纸面口径、清理运行时状态；旧整页 clone 仅作为极端浏览器环境兜底。
-- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`（351 项）、`pnpm --dir web build`、`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 均通过；`cd server && go test ./internal/server -run 'TestParseRenderTemplatePDFRequest|TestTemplatePDFChromeManager|TestResolveTemplatePDF|TestInjectTemplatePDFBaseTag|TestBuildRenderPDF|TestFetchTemplatePDF'` 和 `cd server && go test ./...` 通过。
-- 验证：真实管理员登录 smoke 通过，采购合同在线预览约 `1876ms`，加工合同在线预览约 `1918ms`，均低于 `10000ms` 阈值。Browser 插件可读取本地页面 DOM、页面标题和 console，但点击预览时插件连接中断，重连后 in-app Browser 不可用；已用仓库 Playwright smoke 覆盖同一真实交互。
-- 下一步：如果后续继续优化体感卡顿，优先看打印工作台内部编辑器是否还有可拆分的重型控件或图片压缩路径，不要改后端 PDF 主路径或引入新的 fallback。
-- 阻塞/风险：本轮未改后端 API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、部署、提交或推送；当前工作区已有非本轮 docs / server core / SQL tracing 等并行现场，本轮未回退或整理。
-
-## 2026-06-12 18:32 CST
-
-- 完成：按用户确认新增 `docs/product/prototypes/formal-menu-candidate-v1/` 正式菜单候选原型，在 `core-menu-coverage-v1` 内部 51 项覆盖矩阵之上，压缩为 12 个高频主入口：工作台、我的任务 / 任务看板、客户 / 供应商 / 产品 / BOM、销售订单、采购 / 入库 / 质检、库存、生产 / 外协、出货、财务对账、报表、数据导入和系统管理。
-- 完成：每个候选入口标注吸收的内部细项、页面内 tab / 筛选 / 动作 / 详情区承载方式和实现边界；同步 `docs/product/prototypes/README.md`、静态 `index.html`、`/__dev/prototypes` 资产登记、dev prototype 单测、L1 场景、`docs/document-inventory.md` 和 `docs/product/formal-menu-entry-plan.md` 元信息。因 `progress.md` 超过 80KB，先归档到 `docs/archive/progress-2026-06-12-before-formal-menu-candidate-prototype.md` 再追加本轮记录。
-- 验证：`rg -o 'title:' docs/product/prototypes/formal-menu-candidate-v1/index.html | wc -l` 确认为 12；`cd web && node --test src/erp/config/devPrototypes.test.mjs` 通过；`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test` 通过 351 项；`STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm style:l1` 通过；临时静态服务 + Playwright 断言通过静态索引、新原型页、12 卡片、51 覆盖数、库存流水 / 采购收货 / Legacy 搜索、空状态恢复和 1440 / 390 视口横向溢出检查；本轮路径 `git diff --check` 通过。
-- 下一步：如要从候选原型进入正式菜单改造，先做 `当前菜单项 -> 候选入口 -> 细项页内承载 -> seedData / 客户菜单 / RBAC / 路由 / 测试` 的映射评审，不直接把 51 项或 12 项原型写入运行时菜单。
-- 阻塞/风险：本轮只做 To Implement 原型、登记、静态文档和 dev-only 验证；未改正式侧边栏、运行时菜单、客户菜单配置、路由、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、生产构建、部署、提交或推送。当前工作区仍有非本轮 docs / server core / SQL tracing / PDF 预览等并行现场，本轮未回退或整理。
-
-## 2026-06-12 18:56 CST
-
-- 完成：继续排查用户反馈“依然很慢”。真实 Chrome 标签中发现一个旧 `pdf-preview-shell.html` 标签已经显示“PDF 预览不存在或已过期”，但标题仍停留在“PDF 预览加载中”；这会被误判为仍在生成。已改壳页状态同步更新标题，缺 state 显示“PDF 预览无法打开”，过期 state 显示“PDF 预览已过期”。
-- 完成：按 `trade-erp` 的预览打开方式收口，PDF 在线预览默认改为 `window.open(url, '_blank')` 普通新标签，不再传 `width=1120,height=820` 窗口特性，避免 Chrome 按 popup 窗口承接 PDF 预览导致体感卡顿；仍保留显式 `features` 参数作为调用方主动选择的兼容入口。
-- 验证：`node --test web/src/erp/utils/printPdf.test.mjs` 通过 17 项，并新增默认只传两个 `window.open` 参数的断言；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`（351 项）、`pnpm --dir web build` 通过；`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过；真实管理员登录 smoke 通过，采购合同在线预览约 `2913ms`，加工合同在线预览约 `2403ms`。
-- 下一步：验证时需要关闭或忽略旧的过期 PDF 标签，从打印工作台重新点“在线预览 PDF”；旧 state 标签刷新不会生成新 PDF。
-- 阻塞/风险：本轮未改后端 PDF handler、API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、部署、提交或推送；当前工作区仍有非本轮 docs / server / 原型 / 部署现场，本轮未回退或整理。
-
-## 2026-06-12 18:58 CST
-
-- 完成：针对用户询问 `public.business_records` 能否删除，完成下一步只读删除前置审计，并同步 `docs/product/business-records-cutover-plan.md` 与 `docs/product/business-records-reference-audit.md`。当前结论是表族已是 legacy/archive 只读兼容层，但仍不能直接删。
-- 完成：只读统计当前 dev DB：`business_records` 49 行、`business_record_items` 3 行、`business_record_events` 55 行；三张采购事实表的 `business_record_id` 非空引用均为 0，但外键仍存在；旧业务 `source_type` 的 `workflow_tasks` 仍有 5382 行、`workflow_business_states` 仍有 49 行。
-- 验证：本轮没有执行 `DROP TABLE`、cleanup、migration、backfill 或真实数据写入；仅执行 `SELECT` 统计、代码引用检查和文档更新。`git diff --check -- docs/product/business-records-cutover-plan.md docs/product/business-records-reference-audit.md progress.md` 通过。
-- 下一步：如果继续推进删除，应先做 runtime dependency removal：替换 debug seed / cleanup、legacy/archive read API、前端旧通用页、移动端 source 查询和采购兼容外键，再追加 Ent + Atlas migration。
-- 阻塞/风险：当前工作区已有多轮非本轮 docs / server / web 改动，本轮只追加 business_records 删除前置审计文档和 progress，不回退、不整理、不纳入其他现场；当前 dev DB 调试数据结论不能套用到客户库或生产库。
-
-## 2026-06-12 19:02 CST
-
-- 完成：继续 CORE-05，只迁移当前已有且被 `inventory_repo_test` 覆盖的库存批次状态机。新增 `server/internal/core/status/inventory_lot.go`，状态只包含 `ACTIVE / HOLD / REJECTED / DISABLED`，迁移语义保持同状态幂等、`ACTIVE -> HOLD`、`HOLD -> ACTIVE / REJECTED`、`REJECTED -> ACTIVE / HOLD`、无正库存余额时可转 `DISABLED`、`DISABLED` 不可恢复。
-- 完成：`biz` 保留批次状态常量和 `IsValidInventoryLotStatus` / `IsInventoryLotStatusTransitionAllowed` 兼容入口，但底层调用 `core/status`；`data` 的 `ChangeInventoryLotStatus` 保留锁行、读取批次、查询正库存余额、事务和错误映射，只把状态迁移判断改为调用 `core/status`。
-- 完成：补 `core/status` 单测覆盖状态值、规范化、非法状态、幂等、允许迁移、禁止迁移和正库存余额禁止停用；同步 `server/internal/core/README.md`、`server/README.md` 和 `docs/current-source-of-truth.md`。
-- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/... ./internal/biz ./internal/data` 通过；本轮 CORE-05 触达文件 `git diff --check` 通过。
-- 下一步：如继续 CORE 状态迁移，应继续选择当前代码已有、已测试且不需要 schema/API/前端变更的单一状态机；不要把库存余额查询、库存流水写入或扣减策略整体迁入 core。
-- 阻塞/风险：当前工作区仍有部署、观测、business_records 审计、PDF 预览、原型和前端等并行现场，本轮未回退、未整理、未提交；CORE-05 未改 schema / migration、JSON-RPC、前端，也未把库存余额查询迁入 core。
-
-## 2026-06-12 19:06 CST
-
-- 完成：继续收口 trace 敏感数据治理。SQL tracing 保持跨度、耗时和错误语义，但明确禁用 SQL text / 语句模板 / bind args / SQL 参数写入 trace；认证、管理员和用户管理业务 span 移除用户名与账号搜索词明文 attribute，保留 ID、数量、状态、时间和已脱敏手机号等低敏信息。
-- 完成：生产 Compose 的 Jaeger 宿主机端口默认绑定 `127.0.0.1`，远程查看要求走 SSH tunnel；生产 trace 默认采样从全量降为 `0.1`，并新增 `TRACE_RATIO` 环境变量覆盖，便于排障临时调高后恢复低采样。
-- 完成：同步 `server/docs/observability.md`、`server/docs/config.md`、`docs/observability/log-trace-audit-v1.md`、`server/deploy/compose/prod/README.md` 和 `.env.example`，写清 trace attribute 红线、SQL trace 边界、Jaeger 端口绑定和采样策略。
-- 验证：补充 `server/internal/data/data_sql_trace_test.go`、`server/internal/biz/trace_attributes_test.go` 和 `server/cmd/server/main_test.go` 覆盖 SQL trace 禁写查询、敏感业务 attribute 守卫、`TRACE_RATIO` 覆盖和采样归一化；`docker compose -f server/deploy/compose/prod/compose.yml config` 通过，展开后 `TRACE_RATIO=0.1` 且 Jaeger 端口均为 `127.0.0.1`；本轮文件 `git diff --check` 通过；静态检查确认旧敏感 trace key 只剩在守卫测试的 forbidden list。
-- 下一步：部署到目标机后必须确认实际 `.env` 没有覆盖 `JAEGER_BIND_ADDR=0.0.0.0` 或过高 `TRACE_RATIO`，并根据目标 Jaeger 存储方式清理或轮转旧 trace 数据。
-- 阻塞/风险：本轮只改 trace 内容、采样配置、Compose 端口绑定和文档；未清理目标机既有 Jaeger 数据、未执行部署重启、未改日志字段口径、未改 schema / migration、业务 usecase、前端、提交或推送。当前工作区仍有多轮并行改动，`go test ./cmd/server`、`go test ./internal/data -run TestPostgresSQLSpanOptionsDoNotRecordQueryText` 和 `go test ./internal/biz -run TestTraceAttributesDoNotExposeUserIdentifiers` 均先被非本轮的 `BusinessRecord`、`BusinessRecordItemMutation`、`normalizeOptionalString` 等未定义符号阻断，本轮不回退、不整理无关现场。
-
-## 2026-06-12 19:15 CST
-
-- 完成：用临时 detached worktree 从当前 `HEAD` 只应用 trace 加固补丁，避免主工作区并行改动污染部署产物；在临时 worktree 中验证 `go test ./cmd/server`、`go test ./internal/data -run TestPostgresSQLSpanOptionsDoNotRecordQueryText`、`go test ./internal/biz -run TestTraceAttributesDoNotExposeUserIdentifiers` 均通过，并确认 Compose 展开后 `TRACE_RATIO=0.1`、Jaeger host_ip 为 `127.0.0.1`。
-- 完成：本地构建并上传 `plush-toy-erp-server:20260612T111023Z-6d2a491aaa01-trace-hardening-amd64` 到目标机 `192.168.0.133`；目标机只执行 `docker load`、更新 `compose.yml` 和 `.env` 的 `APP_IMAGE` / `TRACE_RATIO` / `JAEGER_BIND_ADDR`，随后重建 `jaeger` 与 `app-server`，未在目标机执行构建。
-- 完成：部署后 `app-server` 运行新镜像，环境中 `TRACE_ENDPOINT=jaeger:4318`、`TRACE_RATIO=0.1`；`/healthz`、`/readyz` 和 web `/healthz` 均通过；Jaeger 宿主机端口已只监听 `127.0.0.1`，从 `192.168.0.133:16687` 访问失败符合预期。重建 Jaeger all-in-one 后，当前 Compose Jaeger 的旧内存 trace 已随容器重建清空。
-- 完成：发现并停止目标机上独立的 `frpc-saurick-jaeger` 容器；该隧道原本把共享 Jaeger `192.168.0.106:16686` 暴露到远端 `8.218.4.199:18214`，且共享 Jaeger services 包含 `plush-toy-erp-server.service`。停止后远端 `8.218.4.199:18214` 已超时不可达。
-- 验证：部署前后记录 `df -h /`、`docker system df`、`docker ps --format '{{.Names}} {{.Status}} {{.Image}}'`；删除 `/tmp` 上传镜像包，执行 `docker builder prune -f` 与 dangling-only `docker image prune -f`。因磁盘仍充足且需要保留回滚能力，未执行 `docker image prune -a -f`，上一版 server 镜像 `20260611T022040-af97b4f-customer-config-amd64` 保留为回滚点。
-- 下一步：如要彻底清理共享 Jaeger 的旧 trace，需要获得 `192.168.0.106` 的运维入口并重启或轮转该 Jaeger；当前 SSH 到 `192.168.0.106:22` 被拒绝，只能先切断远端 FRP 暴露链路。
-- 阻塞/风险：本轮未执行数据库 migration、未重启 web、未提交或推送代码；共享 Jaeger 在内网 `192.168.0.106:16686` 仍可访问且仍包含 plush service，外部 FRP 已停但内网旧 trace 数据尚未清理。
-
-## 2026-06-12 19:16 CST
-
-- 完成：继续处理用户反馈“还是慢，还是卡”。为采购合同和加工合同打印页补 PDF action watchdog：记录本次预览 / 下载开始时间，正常完成后释放按钮；如果旧 HMR 或异常请求遗留 `生成中...` 状态，下一次渲染会按超时过期释放并提示重新点击，避免旧打印窗口长期卡死。
-- 完成：服务端 PDF 快照内联 CSS 改为按 rule 过滤，只保留合同纸面、打印表格、打印媒体和基础 body 规则；不再把整份后台 app.css 发给 `/templates/render-pdf`。保留最小纸面快照和 `_blank` 普通新标签预览主路径，后端 PDF handler / API / schema 未改。
-- 验证：`node --test web/src/erp/utils/printPdf.test.mjs web/src/erp/utils/printWorkspace.test.mjs` 通过 30 项；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web build` 通过；`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过；真实管理员登录 smoke 通过，采购合同和加工合同在线预览均约 `2394ms`。
-- 验证：临时 Playwright 探针显示采购合同 `/templates/render-pdf` request body `44326` bytes、接口 `942ms`、点击到 iframe `1684ms`；加工合同 request body `43384` bytes、接口 `840ms`、点击到 iframe `1666ms`；两者前端 long task 均为空，按钮恢复为可点击。真实 Chrome 现有加工合同打印窗口已从旧 `生成中...` 状态恢复，实际点击到 PDF iframe `1559ms`，相关标签 console warn/error 为空，测试新开的 PDF 标签已关闭。
-- 下一步：如果后续继续追求更低延迟，优先看后端 Chromium 渲染耗时和图片降载策略；当前前端主线程卡顿和大 CSS 快照已经收敛，不建议继续在前端叠 fallback。
-- 阻塞/风险：本轮未改后端 PDF handler、API、schema / migration、RBAC、seedData、WorkflowUsecase / Fact usecase、部署、提交或推送；`pnpm --dir web test` 当前 350/351 通过，唯一失败是非本轮 `business_records` 旧入口只读断言缺少 `BUSINESS_RECORD_ARCHIVE_READONLY` 常量，属于并行业务记录删除现场。本轮运行 `pnpm lint --fix` 时自动清理了 `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` 中一个已不用且已失效的 `listBusinessRecords` import，其余并行现场未整理。
-
-## 2026-06-12 19:17 CST
-
-- 完成：按当前仓库真实状态继续 CORE 收口，只迁移已有代码中已稳定、被多处使用且已有测试覆盖的纯状态规则。新增采购入库 / 采购退货 / 采购入库调整单 `DRAFT / POSTED / CANCELLED` 过账单据状态机、来料质检 `DRAFT / SUBMITTED / PASSED / REJECTED / CANCELLED` 状态机、销售订单 `draft / submitted / active / closed / canceled` 生命周期状态机；未新增未来状态。
-- 完成：`biz` 保留兼容常量和校验入口但底层调用 `core/status`；`data` 的采购过账、取消、加行、质检提交 / 判定 / 取消和原入库已过账判断改为调用 `core/status` 纯判断。事务、行锁、Ent 查询、库存流水、冲正、批次状态副作用、引用校验和错误映射仍保留在 `data/biz` 主路径。
-- 完成：补 `core/status` 表驱动单测；同步 `server/internal/core/README.md`、`server/README.md` 和 `docs/current-source-of-truth.md`，明确本轮不改 schema / migration、JSON-RPC、前端，也不迁库存余额查询、状态查询或应用编排。
-- 验证：`node --test scripts/qa/core-boundary.test.mjs` 通过；`cd server && go test ./internal/core/...` 通过；`cd server && go test ./internal/core/... ./internal/biz ./internal/data` 中 `core` 全部通过，但 `biz/data` 仍被并行 `business_records` 删除现场和 `normalizeOptionalString` 缺失阻断，失败点在本轮 CORE 修改前已存在。
-- 下一步：继续 CORE 时只考虑有当前测试覆盖且不牵涉 schema/API/前端的纯规则；BOM 状态、库存流水类型、原入库有效数量查询、库存余额查询和 Workflow 业务状态本轮均不应硬迁。
-- 阻塞/风险：当前工作区仍有部署 / 观测、PDF 预览、原型、business_records、前端等并行现场，本轮未回退、未整理、未提交、未推送。
-
-## 2026-06-12 20:01 CST
-
-- 完成：完成旧 `business_records / business_record_items / business_record_events` 表族删除闭环。删除前已把 dev DB 三表 evidence 导出到 `output/business-records-delete-20260612/`，数量为 `business_records=49`、`business_record_items=3`、`business_record_events=55`；随后通过 Ent + Atlas 生成并应用 `20260612112337` migration，删除旧三表和采购事实表上的 `business_record_id` 兼容列。
-- 完成：移除后端 `BusinessRecordUsecase`、repo、Ent schema/generated code、旧 JSON-RPC 运行时方法、旧 `business.record.*` 权限和角色授予；`business` JSON-RPC 仅保留只读 `dashboard_stats`，旧 `list_records / create_record / update_record / delete_records / restore_record` 按 unknown method 处理。debug seed / cleanup 不再写旧业务记录，只生成 Workflow 调试任务、任务事件和业务状态投影；采购 API 保留 `business_record_id` 拒绝守卫。
-- 完成：前端旧通用业务记录 API、表单、明细、打印草稿和 master selection helper 已删除；`BusinessModulePage` 只保留退出提示和正式入口引导；工作台 / 业务看板改读 `businessDashboardApi`，岗位任务端 source snapshot 只来自任务自身字段和 payload。同步更新 current source、能力台账、roadmap、权限矩阵、打印模板文档、客户资料文档和 business_records 删除记录，避免继续把旧表族当运行时真源。
-- 验证：`cd server && make migrate_status` 显示当前版本 `20260612112337`、pending `0`；SQL 验证旧三表 `to_regclass` 均为空，`purchase_receipts / purchase_returns / purchase_receipt_adjustments.business_record_id` 均不存在。`cd server && go test ./...` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端 305 项通过；`node scripts/qa/erp-field-linkage.mjs` 通过；残留扫描确认旧 usecase/repo/API/helper 只剩负向测试、退出提示、删除文档和 API 边界守卫。
-- 验证：`STYLE_L1_PORT=4174 STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-business-dashboard-desktop,dev-testing-dark-desktop,business-module-dark-products-modal-desktop,business-module-workflow-actions pnpm style:l1` 通过 5 个场景；`print-workspace-material-shell-refresh` 和 `print-workspace-material-preview-popup` 单场景分别通过。完整全量 `pnpm style:l1` 已执行多轮，过程中发现并修复 dev testing 重复 key 与打印弹窗标题选择器问题；全量长跑仍在打印预览链路出现偶发超时，但相关单场景已通过，本轮不继续扩大为打印链路稳定性重构。
-- 下一步：如要部署到客户 / 生产库，必须先做目标库独立备份和 migration plan，再执行 `20260612112337`；如未来确需历史查看，只能另建只读归档模型并先做评审，不能恢复旧 `business_records` 运行时。
-- 阻塞/风险：本轮已删除当前 dev DB 旧表族；JSONL evidence 只是删除前审计证据，不是运行时真源。未对客户库或生产库执行 migration，未提交或推送。当前主工作区仍包含多轮并行改动，本轮没有回退、整理或提交无关现场。
-
-## 2026-06-13 14:16 CST
-
-- 完成：继续菜单原型下一步收口，确认 `docs/product/menu-mapping-review-v1.md` 已作为菜单映射评审表存在，并已覆盖当前产品默认菜单、yoyoosun 前端菜单、`formal-menu-candidate-v1` 的 12 个候选主入口和 `core-menu-coverage-v1` 的 51 个内部覆盖细项。
-- 完成：补齐 `docs/product/formal-menu-entry-plan.md` 的对应评审表元信息，并把 `docs/product/prototypes/formal-menu-candidate-v1/README.md` 的来源与进入实现前置条件显式指向菜单映射评审表，避免后续把 12 个候选入口或 51 个覆盖项直接当 runtime 菜单改造指令。
-- 下一步：如果进入真实菜单实现，应从 `menu-mapping-review-v1.md` 逐项拆出 `seedData / customerMenuConfig / businessModules / 路由 / RBAC / 测试 / 正式文档` 影响清单，再分小闭环改运行时，不在同轮做菜单大重构。
-- 阻塞/风险：本轮只做文档链接与进度记录；未改正式侧边栏、客户菜单配置、导航 seed、路由、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、测试断言、提交或推送。当前工作区仍有大量非本轮 docs / server / web 并行改动，本轮未回退或整理。
-
-## 2026-06-13 14:30 CST
-
-- 完成：继续正式菜单下一步，新增 `docs/product/formal-menu-runtime-implementation-plan-v1.md`，把真实菜单改造拆成 R0 前后端菜单真源一致性、R1 低风险命名清理、R2 客户显隐决策、R3 页面内 tab / 动作吸收、R4 新能力入口评审五批。
-- 完成：在实施清单中记录当前前端默认导航与后端 `BuiltinAdminMenus()` 的已知差异：后端 `/erp/dashboard` 仍标成 `任务看板`、缺少 `/erp/task-board` 和 `/erp/operations/exceptions` 独立菜单、`业务看板 / 应收/开票登记 / 发票登记` 标签口径不一致。R0 建议先只修后端内置菜单与当前前端正式入口的差异，不改前端导航和客户菜单。
-- 完成：同步 `docs/product/formal-menu-entry-plan.md`、`docs/product/menu-mapping-review-v1.md` 和 `docs/document-inventory.md`，把实施拆分清单作为进入真实运行时菜单实现前的前置文档。
-- 下一步：如继续执行代码，优先做 R0：只改 `server/internal/biz/rbac.go` 和对应后端测试，把后端内置菜单对齐当前前端默认菜单；不混入前端命名、客户显隐、路由或新能力入口。
-- 阻塞/风险：本轮仍只做正式文档，不改运行时菜单、客户配置、路由、权限码、API、schema / migration、WorkflowUsecase、Fact usecase、测试断言、提交或推送。R0 中 `exception-flow` 应使用哪个 required permission 仍需实现时回到当前 RBAC 和页面动作确认。
-
-## 2026-06-13 14:29 CST
-
-- 完成：按“Jaeger / trace 都放到 133”继续收口运行时。确认 `plush-toy-erp` 已使用 133 本机 Compose Jaeger，端口只监听 `127.0.0.1`；`TRACE_RATIO=0.1` 仍生效。
-- 完成：停止状态下的 `frpc-saurick-jaeger` 进一步执行 `docker update --restart=no`，避免 Docker 自身重启后重新拉起该外部 Jaeger 隧道；远端 `8.218.4.199:18214` 验证超时不可达。
-- 完成：重建 133 上 `webapp-template-demo-jaeger` 与 `trade-erp-jaeger`，保持原容器名、network 和 `jaeger` alias，仅把宿主机端口从 `0.0.0.0` 收紧为 `127.0.0.1`；两者 all-in-one 内存 trace 随容器重建清空。重启 `trade-erp-server` 以重新建立到新 trade Jaeger 的 OTLP 连接。
-- 验证：`ss -ltnup` 中 `16687 / 16688 / 16689 / 14317 / 14318 / 24317 / 24318 / 34317 / 34318` 均只监听 `127.0.0.1`，公网 / 全网卡绑定检查为空；`127.0.0.1:16687` 返回 plush service，`127.0.0.1:16688` 返回 trade service，`127.0.0.1:16689` 返回 webapp-template service；plush `/healthz` / `/readyz` / web `/healthz` 通过，trade `/healthz` / `/readyz` 通过。
-- 完成：`/opt/webapp-template-demo/compose.yml` 可写，已追加 `JAEGER_BIND_ADDR` loopback 默认值并备份到 `/tmp/webapp-template-demo-compose.yml.20260613T063046.loopback-jaeger.bak`，后续用该 compose 重建 webapp-template Jaeger 时仍默认只绑定 `127.0.0.1`。
-- 下一步：若要把剩余配置层也永久固化，需要用 root / Dockge 权限修改 `/data/dockge/stacks/frpc-saurick-ui/compose.yaml`、`/data/frp/frpc-saurick-ui/jaeger.toml` 和 `/root/deploy/trade-erp/*`；当前 SSH 用户无免密 sudo，不能直接改这些 root-owned 文件。
-- 阻塞/风险：内网 `192.168.0.106:16686` 仍可访问且仍有旧 services，这是 106 自身的 Jaeger；133 已不再转发它，但无法通过 133 清理 106 本机存储。`trade-erp` 的 loopback 绑定目前已在 Docker 运行时生效，但 root-owned compose / env 主配置尚未持久化，后续 root/Dockge 重新部署可能覆盖运行时改动。
-
-## 2026-06-13 14:42 CST
-
-- 完成：继续处理“在线预览还是慢”。对照 `trade-erp` 后确认两边都采用“预览壳页 + PDF iframe”的基本模式，下载快是因为下载只拿 Blob 并触发文件保存，在线预览还要同步打开标签、生成 PDF、写入预览页并启动浏览器 PDF viewer。
-- 完成：进一步压短 plush 在线预览主路径：生成成功后直接写入已打开预览标签，失败时才回退壳页状态恢复；服务端 PDF 快照保留最小纸面 DOM 和过滤后的纸面 CSS；采购合同和加工合同页增加空闲预热调度，页面稳定后低优先级生成预览 Blob，hover / focus 继续触发预热，草稿变化会失效旧预热引用。
-- 完成：两个合同页补 PDF action 超时释放，避免异常请求或旧 HMR 状态把按钮长期卡在“生成中...”；真实登录 smoke 的弹窗断言兼容直接写入后的 iframe 预览状态。
-- 验证：`node --test web/src/erp/utils/printPdf.test.mjs web/src/erp/utils/printWorkspace.test.mjs` 通过 30 项；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过，前端 305 项通过；`pnpm --dir web build` 通过；`STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过 4 个场景。
-- 验证：真实管理员登录 smoke 通过，采购合同在线预览 `1329ms`、加工合同在线预览 `1229ms`；临时空闲预热探针显示页面稳定约 3 秒后再点击，采购合同 `108ms`、加工合同 `112ms` 进入 PDF iframe。内置浏览器只读打开 `/pdf-preview-shell.html` 成功，缺状态参数时显示“PDF 预览链接缺少状态参数”，console error 为空；截图接口在当前会话超时，未作为证据。
-- 下一步：若用户仍认为刚编辑完立刻点的 `1.2s` 也不可接受，下一步应优先看后端 Chromium 渲染池、字体 / PDF viewer 冷启动和是否需要保存后后台预生成；不建议继续在前端增加临时兜底或额外壳页层。
-- 阻塞/风险：本轮未改后端 PDF render handler、API、schema / migration、RBAC、seed、WorkflowUsecase / Fact usecase、部署、提交或推送。当前工作区仍有 docs / server / 原型 / trace / business_records 等并行改动，本轮只围绕 PDF 预览链路和进度记录收口，未回退或整理无关现场。
-
-## 2026-06-13 14:57 CST
-
-- 完成：继续处理“第一次打开依然非常慢”。确认根因是服务端 `/templates/render-pdf` 首个真实请求才启动共享 Headless Chromium，导致用户第一次预览承担 Chrome 进程启动、DevTools 连接、字体 / 页面首次加载和 `PrintToPDF` 冷启动成本。
-- 完成：后端新增 `WarmupTemplatePDFResourcesAsync`，服务启动后默认异步跑一次最小 PDF 渲染，提前启动并热身共享 Chromium；预热复用现有 `renderTemplateHTMLToPDF` 和 `sharedTemplatePDFRenderGate`，不新增第二套渲染逻辑，也不绕过 `ERP_PDF_RENDER_CONCURRENCY`。新增 `ERP_PDF_WARMUP_ENABLED` 环境变量，默认开启，极低内存排障可设为 `false`。
-- 完成：前端页面空闲预热从 `800ms + idle timeout 2500ms` 调整为 `250ms + idle timeout 750ms`，让刷新后打开打印页约 1 秒内更容易完成预览 Blob 预生成；同步 `server/docs/config.md`、`server/docs/runtime.md`、生产 Compose、`.env.example` 和生产部署 README。
-- 验证：`go test ./internal/server`、`go test ./cmd/server` 通过；`node --test web/src/erp/utils/printPdf.test.mjs web/src/erp/utils/printWorkspace.test.mjs` 通过 30 项；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过，前端 305 项通过；`pnpm --dir web build` 通过；定向 `STYLE_L1_SCENARIOS=print-workspace-material,print-workspace-processing,print-workspace-material-preview-popup,print-workspace-processing-preview-popup pnpm --dir web style:l1` 通过 4 个场景；`docker compose -f server/deploy/compose/prod/compose.yml config` 展开后包含 `ERP_PDF_WARMUP_ENABLED=true`。
-- 验证：当前旧后端进程下顺序真实登录 smoke 仍通过，采购合同在线预览 `1758ms`、加工合同在线预览 `3240ms`；这组 smoke 未重启后端，不能证明服务启动预热效果。临时前端预热探针显示打开页面后等待 `1300ms` 再点击，采购合同 `150ms`、加工合同 `129ms` 进入 PDF iframe。内置浏览器打开 `/pdf-preview-shell.html` 的只读检查通过，页面非空、无 console error / warn，并成功截图。
-- 下一步：要验证服务端启动预热对客户环境的首次预览效果，需要部署或本地重启后端新版本后观察日志 `template pdf warmup success`，再从无 PDF 请求的冷进程做一次首次在线预览计时。
-- 阻塞/风险：本轮不改 PDF API、schema / migration、RBAC、业务 usecase、Workflow / Fact、前端路由和菜单；未重启当前 8300 后端，真实登录 smoke 仍跑在旧后端进程上。当前工作区仍有多轮 docs / server / 原型 / operational fact 等并行改动，本轮未回退或整理无关现场，未提交或推送。
-
-## 2026-06-13 14:51 CST
-
-- 完成：按“运行时不应继续存在 Phase 8 概念”收口主路径命名，服务端 usecase / repo / JSON-RPC 域名改为 `OperationalFactUsecase`、`operational_fact` 和业务事实口径；前端页面、API helper、路由标题与 QA 模拟闭环脚本同步改为 `OperationalFactsPage`、`operationalFactApi`、`operations/facts`、`operational-fact-simulated-closure`。旧 `/erp/phase8/facts` 不再作为运行时页面入口。
-- 完成：同步 `README.md`、`docs/current-source-of-truth.md`、`docs/product/capability-ledger.md`、`scripts/README.md` 与部署 / 行业模板配置，把 Phase 8 保留为历史路线图 / 能力阶段描述，不再作为运行时 API、代码包、页面或脚本主概念。
-- 验证：`cd server && go test ./internal/biz ./internal/data ./cmd/seed-core-demo-data` 通过；`cd server && go test ./...` 通过；`node --test scripts/qa/operational-fact-simulated-closure.test.mjs` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端 305 项通过；`git diff --check` 通过。浏览器验证 `/erp/operations/facts` 显示“业务事实处理”且无 `Phase 8` 文案，旧 `/erp/phase8/facts` 跳转到 dashboard 且无 console error。
-- 下一步：后续如继续清理，只建议处理正式文档中的历史 Phase / roadmap 表述，不再碰运行时代码；若要删除历史证据文件名或路线图段落，需单独按文档归档规则评审。
-- 阻塞/风险：本轮未改 schema / migration、RBAC 码位、菜单 seed、客户数据、部署运行时或生产库；`Phase 8` 仍作为历史阶段名称存在于 roadmap、能力台账和历史 evidence 文件名中。当前工作区仍有多轮并行改动，本轮没有回退、整理、提交或推送无关现场。
-
-## 2026-06-13 15:17 CST
-
-- 完成：继续清退 `business_records` 旧入口相关运行时。删除前端旧 `BusinessModulePage` 和 `linkedNavigation` 入口链路；前端路由不再动态注册旧业务模块页，未知 `/erp/*` 回到 `/erp/business-dashboard`；业务导航、首页模块卡片、菜单权限预设、yoyoosun 菜单配置、行业模板候选和试用账号 smoke 预期均收敛到当前正式入口：工作台、任务看板、业务看板、客户档案、供应商档案、销售订单、打印中心、异常闭环和权限管理。
-- 完成：后端 `BuiltinAdminMenus()` 对齐当前正式入口，移除产品、采购、仓储、生产、财务旧页面路径；Workflow 工程资料派生任务和前端本地 helper 不再写 `/erp/purchase/material-bom`，统一回业务看板。debug seed 的下一步检查入口不再指向旧业务页；任务来源展示改为协同来源文案，不再把旧页面标题当入口标题。
-- 完成：同步 `docs/current-source-of-truth.md`、`web/README.md`、business_records 引用审计和风险登记，把“旧页面保留退出提示”改为“旧页面、旧路由和旧入口退出页已删除”。L1、菜单权限、seedData、RBAC 和 smoke 测试增加旧菜单 / 旧路径负向断言。
-- 验证：`cd server && go test ./internal/biz ./internal/data` 通过；`cd web && pnpm lint && pnpm css && pnpm test` 通过，前端 304 项通过；`STYLE_L1_PORT=4198 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop,dev-customer-config-mobile pnpm style:l1` 通过 3 个场景；残留扫描显示运行时旧路径只剩负向测试断言。
-- 下一步：如果后续要清理候选评审文档中的历史路径表格，应作为单独文档归档 / 改写任务处理，不能误删 Workflow source_type、历史 evidence 或领域语义里的材料 BOM / 产品字段。
-- 阻塞/风险：本轮不改 schema / migration、不改生产库、不恢复旧表族；`processing-contracts / shipping-release` 等仍作为 Workflow source_type 和测试语义存在，不代表旧页面入口。当前工作区仍有部署、PDF、operational fact、原型等并行改动，本轮未回退、整理、提交或推送无关现场。
-
-## 2026-06-13 17:11 CST
-
-- 完成：按“迁移成熟交互，不恢复旧入口”处理现有销售订单正式页。`/erp/sales/project-orders/sales-orders` 的销售订单主表和订单行表新增列顺序入口、表头列设置触发、当前结果 CSV 导出和订单行 CSV 导出；列顺序优先同步后端账号偏好，失败时保留本地缓存兜底；操作列继续固定在右侧，不参与导出或列顺序调整。
-- 完成：新增前端 `set_erp_column_order` 偏好 API helper，并补齐列顺序弹窗浅色 / 暗色样式；L1 回归脚本收紧销售订单主表列顺序验证，覆盖打开弹窗、移动列、写本地缓存、同步账号偏好以及清本地缓存后从账号偏好恢复。
-- 验证：`cd web && pnpm lint` 通过；`cd web && pnpm css` 通过；`cd web && pnpm test` 通过，前端 304 项通过；`STYLE_L1_PORT=4199 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop pnpm style:l1` 通过 2 个场景；`git diff --check` 通过。
-- 下一步：如继续补回旧页面里的成熟表格体验，应按同一模式迁移到客户档案、供应商档案和后续事实层正式页；不要恢复 `BusinessModulePage`、旧菜单、旧路由或 `business_records` 运行时依赖。
-- 阻塞/风险：本轮未改 schema / migration、后端业务 usecase、正式菜单 seed、RBAC 码位或生产库；CSV 导出目前是前端当前结果导出，不是服务端全量导出。当前工作区仍有部署、PDF、operational fact、business_records 清退等并行改动，本轮未回退、整理、提交或推送无关现场。
-
-## 2026-06-13 17:28 CST
-
-- 完成：按“业务页面原型应更紧凑、只保留必要信息”的方向，收紧 `business-module-page-standard-v1/index.html`。顶部去掉重复的总记录 / 已选记录统计和 Legacy archive 标签，只保留当前结果、金额合计和当前预警；工具条去掉已选记录重复计数和 disabled 归档按钮，保留导出、列顺序、回收站和新建记录。
-- 完成：当前记录操作区从“大块说明 + 多个禁用按钮”改为紧凑单行摘要。未选中时只显示“选择一行后可查看详情和处理动作”，不展示灰色操作按钮；选中后显示“已选 1 条 · 编号 · 品名 · 当前任务”，并只提供清空、查看、编辑、打印、协同、更多、删除等必要动作。同步更新原型 README，把架构边界说明收口为文档和轻提示，不再作为页面 tag 堆叠。
-- 验证：内联脚本语法检查通过；`git diff --check -- docs/product/prototypes/business-module-page-standard-v1/index.html docs/product/prototypes/README.md` 通过；旧冗余标识扫描无命中。通过本地静态服务和 in-app Browser 验证默认态、选中态、移动宽度：桌面默认操作条 39px、选中 52px；移动默认 35px、选中 87px；页面无横向溢出，表格横向滚动限制在表格容器内。
-- 下一步：如果继续推进正式页面吸收，应先选定客户档案 / 供应商档案 / 销售订单中的一个真实页面做小闭环，按当前 API、RBAC、theme token 和测试约束迁移这套紧凑操作条，不直接复制原型假数据。
-- 阻塞/风险：本轮只改 To Implement 原型和原型 README，不改 `web/src` 真实运行时代码、正式菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。当前工作区仍有大量非本轮并行改动，本轮未回退或整理。
-
-## 2026-06-13 17:33 CST
-
-- 完成：继续处理“重启服务器后首次在线预览仍要 10 秒”。确认旧异步预热虽然会启动共享 Chromium，但服务已经开始对外监听，用户首次点击仍可能抢在预热完成前；同时最小 ASCII 预热没有覆盖中文合同的 CJK 字体冷加载。
-- 完成：将服务端 PDF 预热改为启动期同步执行，`app-server` 在监听 HTTP / gRPC 前先跑通一次中文合同表格 PDF 渲染；预热仍复用 `renderTemplateHTMLToPDF`、共享 Chromium manager 和 `ERP_PDF_RENDER_CONCURRENCY`，不新增第二套渲染主路径。`ERP_PDF_WARMUP_ENABLED=false` 仍可在极低内存排障时关闭。
-- 完成：同步 `server/docs/config.md`、`server/docs/runtime.md` 和生产 Compose README，把 PDF 预热口径从“启动后异步最小渲染”改为“启动期同步中文合同预热”。
-- 验证：`cd server && go test ./internal/server` 通过；`cd server && go test ./cmd/server` 通过；本地重建并重启 `server/bin/server-dev` 后，日志显示 `template pdf warmup success` 用时 `2312ms`，且发生在 `[HTTP] server listening on: [::]:8300` 之前。冷进程首个真实预览探针通过：采购合同首开 `490ms`、加工合同 `358ms`，`/templates/render-pdf` 均返回 200。正式真实登录 smoke 通过：采购合同在线预览 `3056ms`、加工合同在线预览 `2568ms`。
-- 下一步：发布到客户 / 生产环境时必须重新构建服务端镜像并重启服务；重启后先看日志 `template pdf warmup success`，再做首个在线预览计时。
-- 阻塞/风险：本轮不改 PDF API、schema / migration、RBAC、Workflow / Fact、前端路由或菜单。启动期会额外消耗约 2-3 秒完成 PDF 预热，用来换取用户首次预览不再承担 10 秒级冷启动；若目标机器 Chromium 或 CJK 字体异常，预热会记录 warning 并继续启动，首个预览仍需按日志排障。
-
-## 2026-06-13 17:42 CST
-
-- 完成：按 `docs/reference/第二次20260611` 的产品核心菜单建议恢复产品核心入口，但不恢复旧 `BusinessModulePage`、旧 `business_records` 表族或旧 JSON-RPC 记录方法。前端业务菜单调整为主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理和财务业务；客户 / 供应商 / 销售订单继续走现有 V1 页面，其余入口走新的 `FormalBusinessModulePage` 正式页面壳。
-- 完成：正式页面壳补回列表页基础体验：标题统计、筛选、当前操作区、表格、表头列设置、列顺序账号偏好 / localStorage 兜底、当前结果 CSV 导出、详情抽屉、动作接入说明和协同入口；页面明确标记“领域 API 待接入”和“不读取 business_records”。
-- 完成：同步前端菜单权限预设、后端 `BuiltinAdminMenus()`、yoyoosun 客户菜单、毛绒行业模板候选、`seedData / menuPermissions / devCustomerConfig / rbac` 测试和 `style:l1` 业务菜单场景；同步 `docs/current-source-of-truth.md`、`web/README.md`、`formal-menu-entry-plan.md`、`menu-mapping-review-v1.md` 和 `formal-menu-runtime-implementation-plan-v1.md`。
-- 验证：已通过 `cd web && node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs src/erp/config/devCustomerConfig.test.mjs`；已通过 `cd server && go test ./internal/biz`；已通过 `cd web && pnpm lint && pnpm css && pnpm test`，前端 304 项通过；已通过 `STYLE_L1_PORT=4202 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop pnpm style:l1`；已通过 `git diff --check`。
-- 下一步：若继续推进真实能力，建议一次只选一个领域入口（例如库存台账或来料质检）接入正式 API、字段动作、审计和测试；不建议一次性把采购、库存、生产、出货和财务写入都补进同一轮。
-- 阻塞/风险：本轮只恢复菜单入口和正式页面壳，不新增 Ent schema、Atlas migration、权限码、采购 / 库存 / 生产 / 出货 / 财务写入 API 或真实导入；页面示例行是接入清单，不是业务事实数据。当前工作区仍有多轮并行改动，本轮未回退、整理、提交或推送无关现场。
-
-## 2026-06-13 17:56 CST
-
-- 完成：按“服务器启动成功后异步预热到准备状态”调整 PDF 冷启动方案。服务启动后异步执行中文合同 PDF warmup，`/healthz` 继续表示进程存活，`/readyz` 在 PostgreSQL 和 PDF warmup 都准备好后才返回 `ready`。
-- 完成：新增 `templatePDFWarmupState`，记录 pending / running / ready / failed / disabled；`/templates/render-pdf` 如果遇到 warmup 正在运行，会先等待 warmup 结束再进入渲染队列，避免首个用户请求和后台预热抢同一套 Chromium 冷启动资源。`ERP_PDF_WARMUP_ENABLED=false` 仍会直接视为 PDF warmup ready。
-- 完成：同步 `server/docs/config.md`、`server/docs/runtime.md`、`server/docs/observability.md` 和生产 Compose README，把口径从“启动期同步预热”改成“启动后异步预热，readyz 门控准备态”。
-- 验证：`cd server && go test ./internal/server` 通过；`cd server && go test ./cmd/server` 通过；重建并用 detached `screen` 启动 `server/bin/server-dev` 后，日志显示 `[HTTP] server listening` / `[gRPC] server listening` 在 `17:55:52`，`template pdf warmup success` 在 `17:55:54`，确认预热已异步化；随后 `healthz=ok`、`readyz=ready`。真实登录 smoke 通过：采购合同在线预览 `3233ms`，加工合同在线预览 `3130ms`。
-- 下一步：生产部署时应让网关 / Compose healthcheck / 发布脚本以 `/readyz` 判断是否切流；如果直接绕过 readyz 打到服务，首个请求会等待正在运行的 warmup，但仍建议按 readyz 放流。
-- 阻塞/风险：本轮不改 PDF API、schema / migration、RBAC、Workflow / Fact、前端路由或菜单；warmup 失败时 `/readyz` 会保持 503 并返回 `pdf warmup failed`，需要检查 Chromium / CJK 字体 / 内存配置，或在极低内存排障时显式关闭 `ERP_PDF_WARMUP_ENABLED`。
+- `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、任务中心、业务管理中心、产品核心菜单覆盖矩阵、正式菜单候选导航、业务模块列表页、业务详情页、页面级新建 / 编辑表单、业务页协同入口组件、业务弹窗和模板打印中心十一个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
+- 原型查看器和原型 README 已补“参照范围”口径：`admin-command-center-v1` 是判断型工作台样板，`core-menu-coverage-v1` 是内部覆盖矩阵，`formal-menu-candidate-v1` 是正式菜单候选原型；它们都不是正式菜单、路由、权限或 seedData 映射表，真正对应关系必须在进入真实实现任务时回到代码、菜单配置和 RBAC 重新核对。
+
+## 2026-06-14 00:52 CST
+
+- 完成：继续从工作台推进到产品核心业务菜单共享页。按 `trade-erp` 已验证业务页结构和当前原型口径，把 `FormalBusinessModulePage` 从工程说明式壳页改为紧凑业务工作台：筛选 + 导出 / 列顺序 / 批量删除 / 回收站 / 新建，当前操作行按模块展示编辑、关联表格、流转、生成 / 更新、打印、删除和详情；行点击可直接选中，表头保留列顺序入口并补列排序。`客户档案`、`供应商档案` 和 `销售订单` 去掉顶部技术 tag 和选中区冗余摘要，选中条只保留必要当前对象和操作。
+- 完成：同步 `docs/current-source-of-truth.md` 和 `web/src/erp/config/seedData.mjs`，移除“工作台保留后台运营中枢导航”和“打印入口 / 常用业务模块”旧口径，记录 formal-shell 业务页已吸收列顺序、排序、回收站和选中行操作但不承诺后端写入 API 已完成。同步更新 `web/scripts/styleL1.mjs`，不再断言已删除的“正式新入口 / 领域 API / 不读取 business_records / 正式 MasterData”标签。
+- 完成：菜单覆盖核对通过：`businessModuleDefinitions` 当前 19 个产品核心业务菜单，其中 3 个 `formal-v1`、16 个 `formal-shell`，路径无缺失、无重复；`formal-shell` 由路由动态注册到 `FormalBusinessModulePage`，因此本轮共享页改动一次覆盖产品核心业务菜单。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过，测试 308 条通过；配置级菜单覆盖 Node 检查通过；`STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop,erp-dashboard-desktop,erp-task-board-desktop,erp-business-dashboard-desktop pnpm --dir web style:l1` 通过 5 个场景；修正暗色客户页旧断言后，`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop pnpm --dir web style:l1` 通过；最终全量 `pnpm --dir web style:l1` 通过 47 个场景；`git diff --check -- web/src/erp/components/business-list/BusinessListLayout.jsx web/src/erp/pages/FormalBusinessModulePage.jsx web/src/erp/pages/V1MasterDataPage.jsx web/src/erp/pages/V1SalesOrdersPage.jsx web/src/erp/config/seedData.mjs web/scripts/styleL1.mjs docs/current-source-of-truth.md` 通过。
+- 下一步：若继续推进“真实完成”，应逐个 fact / masterdata 模块补后端 usecase、JSON-RPC、RBAC、保存 / 删除 / 回收站真实数据和测试；不能把当前 formal-shell 的预留按钮当成事实写入已经完成。
+- 阻塞/风险：133 线上 `https://admin.yoyoosun.net/` 当前只能公开确认到登录入口，业务页需要登录态，本轮未把未登录页面当业务页真源；参考来源为本地 `trade-erp` 的业务页交互、用户截图、当前原型和仓库正式文档。本轮不改 schema、migration、后端 API、RBAC、WorkflowUsecase、Fact usecase、正式原型阶段登记、提交或推送。
+
+## 2026-06-13 19:59 CST
+
+- 完成：因 `progress.md` 达到 385 行 / 81720 bytes，先归档到 `docs/archive/progress-2026-06-13-before-workbench-prototype-redesign.md`，再收缩当前文件，保留归档索引、当前活跃事项和本轮记录。
+- 完成：按“工作台一定要有意义”的要求，重做 `admin-command-center-v1/index.html`。新原型去掉类似正式菜单的侧栏，把工作台收敛为判断型首屏：今日焦点、优先队列、当前处理卡、相关对象快捷入口和 Workflow / Fact 交接边界；相关对象快捷入口会随当前处理卡高亮，明确不替代正式菜单。
+- 完成：同步 `admin-command-center-v1/README.md`、`docs/product/prototypes/README.md`、`docs/product/prototypes/index.html` 和 `web/src/erp/config/devPrototypes.mjs`，把登记口径从旧的“今日队列 / 当前任务详情 / 常用业务对象入口”更新为新结构，并继续保持 `To Implement`。
+- 验证：内联脚本语法检查通过；旧文案残留扫描无命中；`git diff --check -- docs/product/prototypes/admin-command-center-v1/index.html docs/product/prototypes/admin-command-center-v1/README.md docs/product/prototypes/README.md docs/product/prototypes/index.html web/src/erp/config/devPrototypes.mjs` 通过。通过系统 Chrome + Playwright 打开 `http://127.0.0.1:8765/docs/product/prototypes/admin-command-center-v1/index.html` 验证桌面 1366px 和移动 390px：无页面级横向溢出，tab 切换后当前处理卡与快捷入口高亮同步，移动端 topbar 按钮未被裁切。
+- 下一步：如果要吸收到真实 `/erp/dashboard`，应单独进入 Current 实现任务，按现有 Workflow API、菜单 / RBAC、theme token、浅色 / 暗色和 `style:l1` 做浏览器回归；不要直接复制原型静态任务、固定数字或快捷入口结构到运行时。
+- 阻塞/风险：本轮只改 To Implement 原型、原型登记文案和过程记录；不改正式运行时代码、正式菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。当前工作区仍有非本轮改动，本轮未回退、整理或提交这些无关现场。
+
+## 2026-06-13 20:15 CST
+
+- 完成：按“任务和业务管理菜单也一定要有意义”的要求，新增 `docs/product/prototypes/task-command-center-v1/` 和 `docs/product/prototypes/business-management-center-v1/` 两个 To Implement 原型。任务中心收敛为职责处理台：待我处理、我发起的、阻塞交接、当前任务详情和关联业务对象；业务管理中心收敛为业务对象总控：按链路选择对象、查看风险、进入标准业务页或详情页。
+- 完成：同步 `docs/product/prototypes/README.md`、`docs/product/prototypes/index.html`、`web/src/erp/config/devPrototypes.mjs` 和 `docs/document-inventory.md`，把两个新原型登记到静态查看器、`/__dev/prototypes` registry 和文档清单；继续保持 To Implement，不改 Current。
+- 验证：`node --check web/src/erp/config/devPrototypes.mjs` 通过；两个新 HTML 和原型查看器内联脚本语法检查通过；`git diff --check -- docs/product/prototypes/task-command-center-v1 docs/product/prototypes/business-management-center-v1 docs/product/prototypes/README.md docs/product/prototypes/index.html web/src/erp/config/devPrototypes.mjs docs/document-inventory.md` 通过。通过系统 Chrome + Playwright 验证两个新原型桌面 1366px 和移动 390px：tab 切换后详情同步，topbar 未裁切，无页面级横向溢出；业务管理移动端统计卡标题误命中数字样式的问题已修复并复验通过。
+- 下一步：如果后续吸收到真实 `/erp/task-board` 或新增业务管理运行时入口，应分别单独进入 Current 实现任务，按当前 Workflow API、业务页共享组件、菜单 / RBAC、theme token、浅色 / 暗色和 `style:l1` 做回归；不要把原型静态任务、静态对象、链路顺序或快捷入口直接写成运行时真源。
+- 阻塞/风险：本轮只新增 To Implement 原型、原型登记文案、文档清单和过程记录；不改正式运行时代码、正式菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。当前工作区仍有非本轮改动，本轮未回退、整理或提交这些无关现场。
+
+## 2026-06-13 20:22 CST
+
+- 完成：补 PDF 启动异步预热开始日志。启动 warmup 时现在会记录 `template pdf warmup started`，并带 `timeout_ms`、`render_concurrency`；完成、失败、禁用日志继续分别使用 `template pdf warmup success`、`template pdf warmup failed`、`template pdf warmup disabled`。
+- 验证：`cd server && go test ./internal/server` 通过。
+- 下一步：重启服务后可按 started -> success / failed 的日志顺序确认 PDF 预热是否启动和是否进入 ready。
+- 阻塞/风险：本轮只补启动日志，不改 PDF 渲染语义、readyz 规则、API、schema / migration、RBAC、前端页面或部署配置。
+
+## 2026-06-13 20:30 CST
+
+- 完成：按“待实现原型中重复的部分，按照新的来”收口表单和浮层样板边界。`action-modal-drawer-standard-v1` 作为较新的业务弹窗样板，承接单据补录、来源导入、明细行、回收站、列顺序、删除确认和危险确认；`business-form-page-standard-v1` 收窄为页面级新建 / 编辑表单骨架、字段分组和残值 / 缺值防护。
+- 完成：同步 `docs/product/prototypes/README.md`、静态查看器 `docs/product/prototypes/index.html`、`web/src/erp/config/devPrototypes.mjs` 以及两个样板 README / HTML 首屏文案，移除旧的“审批 / reason 必填”作为业务弹窗主摘要，避免两个 To Implement 卡片继续看起来重复。
+- 验证：`node --check web/src/erp/config/devPrototypes.mjs` 通过；三个 HTML 内联脚本语法检查通过；定向 `git diff --check` 通过。通过 Playwright CLI 打开临时静态服务，验证业务弹窗桌面 1366px 和移动 390px 下单据补录、来源导入、回收站、列顺序、删除确认均无横向溢出；表单页和原型查看器卡片摘要在桌面 / 移动下无横向溢出，console 无 error / warn。
+- 下一步：后续若吸收到真实页面，应先选定一个业务列表页或一个页面级表单做 Current 实现；不要把新版弹窗样板里的静态字段、来源行或删除策略直接写成运行时真源。
+- 阻塞/风险：本轮只改 To Implement 原型和原型登记文案，不改正式运行时代码、正式菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。当前工作区仍有多轮非本轮改动，本轮未回退、整理或提交这些无关现场。
+
+## 2026-06-13 20:38 CST
+
+- 完成：继续收口 `business-module-page-standard-v1/index.html` 的选中行操作区，把按钮改成模块动作示例：编辑、关联单据、流转、生成出库、打印单据、删除；同步 `docs/product/prototypes/README.md` 明确这些按钮是出货 / 出库类示例，真实页面必须按各模块业务动作调整，不作为所有页面固定按钮。
+- 验证：业务模块原型内联脚本语法检查通过；`git diff --check -- docs/product/prototypes/business-module-page-standard-v1/index.html docs/product/prototypes/README.md` 通过。通过浏览器打开本地原型并验证桌面选中态和 390px 移动端：选中后动作行可见，页面级横向溢出为 false，移动端操作区不撑宽页面。
+- 下一步：如果要吸收到真实业务页，应按客户、产品、采购、入库、库存、出货、财务等模块分别定义允许动作和按钮顺序，再回到共享业务页组件、权限、API 和 theme token 做 Current 实现。
+- 阻塞/风险：本轮仍只改 To Implement 原型和原型 README，不改正式运行时页面、正式菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。
+
+## 2026-06-14 00:52 CST
+
+- 完成：按反馈继续收口真实工作台和任务中心，不再保留 DashboardPage 内部的“运营中枢 / 看板中心 / 运营工具”卡片式二级导航；工作台页面不再把核心区域做成跳转入口集合，改为展示今日必须处理、跨角色阻塞、业务对象、完成率、当前处理、今日焦点、业务状态摘要、业务对象分布、角色提醒和阻塞交接。
+- 完成：任务中心移除不必要的“看业务状态 / 打印中心”泛跳转动作，只保留刷新、清空筛选、任务筛选、泳道、当前任务处理和关联对象入口；异常闭环页面补回内容区标题，不依赖已删除的内部导航标题。
+- 完成：同步 `style:l1` 断言，去掉对“常用入口 / 运营工具 / 看全部任务 / 看业务状态”等旧跳转型文案的依赖；保留业务页列顺序弹窗可点击状态等待修正。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；`STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-dashboard-mobile,erp-dashboard-dark-desktop,erp-task-board-desktop,erp-task-board-mobile,erp-task-board-dark-wide-desktop,erp-exception-flow-desktop,business-menu-groups-desktop pnpm --dir web style:l1` 通过 8 个核心场景；全量 `pnpm --dir web style:l1` 通过 47 个场景；`git diff --check -- web/src/erp/pages/DashboardPage.jsx web/src/erp/styles/app.css web/scripts/styleL1.mjs progress.md` 通过。
+- 下一步：如果继续要求“所有正式业务菜单逐页定制”，应基于共享业务页骨架和每个模块字段 / 动作差异继续做，但本轮已先把截图指出的工作台内导航、无意义跳转入口和任务中心泛跳转问题收口到真实运行时。
+- 阻塞/风险：本轮仍不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、正式菜单配置、原型阶段登记、提交或推送；工作区仍有其他既有原型/配置改动，本轮未回退或整理。
+
+## 2026-06-14 00:20 CST
+
+- 完成：继续从产品核心入口推进，将任务中心原型吸收到真实 `/erp/task-board`。任务看板首屏改为更紧凑的“按职责处理任务，再回到真实业务对象”结构：四个入口覆盖待我处理、发起来源、阻塞交接和当前结果；右侧当前任务区直接提供处理完成、标记阻塞和关联对象入口；下方保留现有筛选、四个泳道和任务处理明细表。
+- 完成：同步补齐任务中心浅色 / 暗色 / 移动端样式，去掉重复筛选动作，只保留一个稳定的清空筛选入口；修正 `style:l1` 列顺序弹窗回归脚本第二次点击前未等待 saving 解除的问题，改为等待可点击的“移到最后”按钮。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；`STYLE_L1_SCENARIOS=erp-task-board-desktop,erp-task-board-mobile,erp-task-board-dark-wide-desktop pnpm --dir web style:l1` 通过；`STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm --dir web style:l1` 通过；`STYLE_L1_SCENARIOS=admin-login-theme-modes-desktop,admin-login-mobile-source-desktop-choice,auth-expired-alert-mobile,erp-dashboard-redirect,erp-dashboard-desktop,erp-task-board-desktop,erp-command-center-focus-desktop,erp-dashboard-mobile,erp-task-board-mobile,erp-task-board-dark-wide-desktop pnpm --dir web style:l1` 实际验证 9 个匹配场景并通过；`node --check web/scripts/styleL1.mjs` 与 `git diff --check -- web/src/erp/pages/DashboardPage.jsx web/src/erp/styles/app.css web/scripts/styleL1.mjs progress.md` 通过。
+- 下一步：产品核心所有菜单还没有全部做完；下一块建议继续做业务管理中心 / 业务模块标准页吸收到真实业务页共享骨架，再逐步覆盖主数据、销售、采购、库存、出货、财务等正式二级菜单。
+- 阻塞/风险：本轮不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、正式菜单配置、原型阶段登记、提交或推送。全量 `pnpm --dir web style:l1` 连续两次在全量运行时卡在 `erp-dashboard-desktop` 等待标题，但该场景单跑通过，前段核心子集也通过；记录为全量脚本跨场景偶发/启动顺序风险，未作为任务中心页面失败处理。
+
+## 2026-06-13 21:16 CST
+
+- 完成：从工作台开始吸收 To Implement 原型到真实 `/erp/dashboard`。工作台首屏改为紧凑的“今日判断 + 当前处理 + 指标入口”结构：四个关键指标可直达任务看板、异常闭环、业务看板和打印中心；右侧当前处理卡读取今日焦点任务，提供处理、标记阻塞和查看关联记录入口；下方继续保留今日焦点、业务状态摘要、常用入口、角色提醒和运营工具。
+- 完成：参考 `trade-erp` 和当前测试服中较好的紧凑卡片 / 指标点击 / 入口分流交互，只吸收布局和交互密度；没有恢复旧 `business_records`、旧外销业务语义、旧菜单真源或旧接口。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；`STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-dashboard-mobile,erp-dashboard-dark-desktop pnpm --dir web style:l1` 通过；首次全量 `pnpm --dir web style:l1` 在业务模块列顺序同步等待处偶发超时，单独复跑 `business-menu-groups-desktop` 通过，第二次全量 `pnpm --dir web style:l1` 通过 47 个场景。
+- 下一步：继续按同一节奏推进任务中心 Current 吸收，再推进业务模块标准页共享骨架；不要一轮把所有菜单页面做成半成品。
+- 阻塞/风险：本轮只改真实工作台页面和样式，不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、正式菜单配置、原型阶段登记、提交或推送；工作区仍有其他既有改动，本轮未回退或整理。
+
+## 2026-06-13 20:56 CST
+
+- 完成：移除原型查看器列表 / 菜单侧 `action-modal-drawer-standard-v1` 的重复长参照范围文案。`/__dev/prototypes` 左侧卡片现在只显示标题、状态、路径和短摘要；右侧详情仍保留完整参照范围和后端 usecase / RBAC 边界说明。同步静态查看器 `docs/product/prototypes/index.html` 删除同一卡片的 `参照范围` 段落。
+- 完成：补齐 `web/src/erp/config/devPrototypes.test.mjs` 对当前 18 个原型资产、11 个 To Implement 资产、两个新增原型目录和业务弹窗列表隐藏开关的断言，避免原型登记测试继续按旧资产数量失败。
+- 验证：`cd web && node --test src/erp/config/devPrototypes.test.mjs` 通过；`cd web && node --check src/erp/config/devPrototypes.mjs` 通过；静态原型索引脚本检查确认业务弹窗卡片不再包含 `参照范围：出货、采购`。通过内置浏览器打开 `http://localhost:5175/__dev/prototypes`，点击业务弹窗标准样板后确认左侧卡片无长参照范围，右侧详情仍包含完整参照范围和后端边界说明。
+- 下一步：如果还要继续精简原型列表，可按同一规则只保留菜单卡片短摘要，把完整适用范围放在详情区和 README。
+- 阻塞/风险：本轮只改 dev-only 原型查看器、静态原型索引、原型配置测试和过程记录；不改正式运行时菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。`pnpm exec eslint ...` 对 `DevPrototypesPage.jsx` 返回 0 但提示该 JSX 文件被当前 ESLint 配置忽略，未作为有效 lint 验证依据。
+
+## 2026-06-13 21:24 CST
+
+- 完成：纠正上一轮只处理单张卡片的问题，改为全局移除原型查看器左侧列表 / 菜单卡片里的 `参照范围` 文案。`/__dev/prototypes` 卡片现在统一只保留标题、状态、目录和短摘要；右侧详情区继续展示完整参照范围。同步静态查看器 `docs/product/prototypes/index.html`，批量移除所有资产卡片的 `<p class="applies">` 段落。
+- 完成：移除临时的单卡 `showAppliesInList` 开关和对应测试断言，避免把全局展示规则误做成单个资产特例；`appliesTo` 数据本身继续保留，用于详情区、搜索和 README 口径。
+- 验证：`cd web && node --test src/erp/config/devPrototypes.test.mjs` 通过；`cd web && node --check src/erp/config/devPrototypes.mjs` 通过；静态索引检查确认不存在 `class="applies"` 段落；`git diff --check` 通过。通过内置浏览器打开 `http://localhost:5175/__dev/prototypes` 并点击后台工作台样板，确认左侧所有卡片均无 `参照范围`，右侧详情仍保留完整参照范围。
+- 下一步：如果仍觉得卡片摘要偏长，可继续按“列表短摘要、详情完整说明”的规则压缩 `description`，但不改 `appliesTo` 真源说明。
+- 阻塞/风险：本轮仍只改 dev-only 原型查看器、静态原型索引、原型配置测试和过程记录；不改正式运行时菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。
+
+## 2026-06-13 21:45 CST
+
+- 完成：继续压缩原型查看器左侧卡片，把摘要 `description` 也从列表卡片中移除。`/__dev/prototypes` 左侧卡片现在只保留标题、HTML / PNG 标签、阶段状态和目录路径；完整摘要和参照范围仍在右侧详情区。同步静态查看器 `docs/product/prototypes/index.html`，移除所有资产卡片的 `purpose` 段落并把资产行从 5 列收紧为 4 列。
+- 完成：清理 `web/src/erp/styles/app.css` 中已失效的卡片摘要 / 参照范围选择器，并同步 `web/scripts/styleL1.mjs` 的 dev prototype 场景断言，改为检查 11 个待实现卡片、卡片无摘要 / 参照范围、右侧详情保留完整说明。
+- 验证：`cd web && node --test src/erp/config/devPrototypes.test.mjs` 通过；`cd web && node --check src/erp/config/devPrototypes.mjs` 和 `node --check scripts/styleL1.mjs` 通过；`cd web && pnpm css` 通过；静态索引检查确认无 `class="purpose"` / `class="applies"`；`git diff --check` 通过。通过内置浏览器打开 `http://localhost:5175/__dev/prototypes` 验证左侧卡片只剩索引信息，样例卡片高度约 95px，无页面级横向溢出，右侧详情仍保留摘要和参照范围。
+- 下一步：如果还要进一步减少滚动，下一步应评审是否去掉每个目录分组头或改成扁平列表；不要再往卡片里加说明文案。
+- 阻塞/风险：`pnpm style:l1` 已通过 dev prototype 场景，但后续在业务模块列顺序弹窗场景等待 `/admin` 同步响应超时失败；该失败点不在本轮原型卡片范围内，本轮未顺手修改业务模块列顺序逻辑或测试。
+
+## 2026-06-13 22:06 CST
+
+- 完成：按截图重排 `business-module-page-standard-v1/index.html` 的工作台区域，改成筛选一行、页面级动作一行、当前操作一行；按钮文案对齐采购合同场景：导出当前结果、列顺序、批量删除、回收站、新建记录、清空已选、关联表格、生成入库通知、打印采购合同等。
+- 完成：默认选中第一条采购合同示例记录 `KSC260404001`，打开原型即可看到截图里的当前操作态；该示例仍只服务辅材 / 包材采购模块，不作为所有业务模块固定动作。
+- 验证：业务模块原型内联脚本语法检查通过；`git diff --check -- docs/product/prototypes/business-module-page-standard-v1/index.html` 通过。通过本地 Playwright 打开 `http://127.0.0.1:8811/docs/product/prototypes/business-module-page-standard-v1/index.html` 验证 2048px 桌面和 390px 移动端：页面级横向溢出为 false，移动端操作区仅内部轻微横向滚动。
+- 下一步：如果继续做真实页面吸收，应按模块分别定义选中行允许动作，不把本次采购合同动作照搬到客户、产品、库存、财务等页面。
+- 阻塞/风险：本轮只改 To Implement 原型和过程记录，不改正式运行时页面、正式菜单、客户菜单配置、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、提交或推送。
+
+## 2026-06-14 01:38 CST
+
+- 完成：继续按 trade-erp 已验证交互收口真实业务页。`/erp/business-dashboard` 去掉旧 CommandCenter 说明壳，改成紧凑业务看板：顶部只保留业务摘要和刷新 / 任务看板入口，主体优先展示模块健康明细、业务状态分布、业务预警和业务关注统计。
+- 完成：业务模块页隐藏 ERPLayout 自动生成的重复页面说明卡，保留面包屑和页面自身紧凑顶部；销售订单页将筛选、刷新、导出、列顺序、批量删除、回收站和新建订单合并到同一操作区，选中行操作补删除，主表列补排序和列设置入口。
+- 完成：客户 / 供应商 V1 页主表补列设置入口、列排序和行内删除入口；业务页筛选卡与当前操作卡视觉上连成一组；同步 `style:l1` 断言，避免继续校验旧的“正式 MasterData / 当前订单行 / 旧业务看板长标题”等冗余文案。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过；目标 `STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop,erp-business-dashboard-desktop,business-module-dark-customers-desktop pnpm --dir web style:l1` 通过；全量 `pnpm --dir web style:l1` 通过 47 个场景；`git diff --check` 通过。
+- 下一步：如果继续逐页深化，应从每个 formal-shell 模块的真实字段和真实动作矩阵开始，按模块替换默认“新建记录 / 生成资料 / 打印”等占位动作，不把某个截图按钮组固定成所有页面通用动作。
+- 阻塞/风险：本轮仍不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、真实删除 / 回收站持久化能力或部署；回收站和批量删除在 V1 / formal-shell 中按原型交互展示，不伪造成已落地后端事实能力。
+
+## 2026-06-14 09:21 CST
+
+- 完成：继续把业务页真实运行时按“业务模块标准页样板”收口。V1 客户 / 供应商、销售订单和 formal-shell 业务页改为独立的顶部摘要、筛选区、结果工具条、当前操作条、业务表格和协同入口，不再把筛选输入、统计 tag 和操作按钮挤在同一层里；页面文案改成当前模块业务口径，去掉旧的英文真源说明式文案。
+- 完成：把“业务弹窗标准样板”落到真实 V1 表单和业务操作弹窗。新建客户、新建销售订单使用宽弹窗、多列字段、标题说明和底部确认 / 取消；列顺序、批量删除、回收站统一接入 `erp-business-action-modal` 标准类；回收站保留批量恢复、刷新、选择计数、标准列和空状态。
+- 完成：补强 `style:l1`，新增真实打开弹窗后的自动断言和单独截图：`business-v1-customers-form-modal.png`、`business-v1-sales-order-form-modal.png`、`business-formal-products-recycle-modal.png`、`business-column-order-modal.png`。断言覆盖弹窗居中、标准类、表单网格、必要字段数量、回收站按钮 / 列、横向溢出和空状态。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过；全量 `pnpm --dir web style:l1` 通过 47 个场景；`git diff --check` 通过。
+- 下一步：如果继续深化，应该按每个正式模块的真实业务字段和动作矩阵逐页替换 formal-shell 默认占位动作；不要把采购 / 出货截图里的按钮组照搬到客户、产品、库存或财务页。
+- 阻塞/风险：本轮只落地前端页面布局、样式、文案和交互回归；不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、真实删除 / 回收站持久化、部署、提交或推送。回收站和批量删除仍是前端交互样板 / 读模型边界，不伪造成已接入后端事实能力。
+
+## 2026-06-14 09:47 CST
+
+- 完成：按用户截图继续校正业务页中间操作区。新增共享 `BusinessOperationPanel`，将筛选、左侧工具按钮、右侧新建按钮和当前操作合并为一个整体 Card；只在当前操作上方保留一条虚线分隔，不再拆成筛选 / 工具 / 当前操作三个盒子。
+- 完成：V1 客户 / 供应商、销售订单和 `FormalBusinessModulePage` 均切换到整体操作盒；业务操作盒内移除重复“刷新”按钮，保留壳层“刷新当前页”；新建按钮固定在右侧，其余导出、列顺序、批量删除、回收站在左侧；底部当前操作按钮压成更小尺寸。
+- 完成：同步校对 `business-module-page-standard-v1` 原型：操作区保留一个整体 box、无刷新按钮、新建在右侧、当前操作上方 1px dashed、未选中时底部动作按钮可见但禁用，避免原型继续误导真实实现。
+- 完成：更新 `style:l1` 业务页断言，改为检查整体操作盒、禁止旧三段 Card、禁止操作盒内刷新、检查虚线分隔、列顺序和回收站从新操作盒打开；同步修正协同区当前文案为“本页协同”。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,business-module-dark-customers-desktop,business-menu-groups-desktop pnpm --dir web style:l1` 通过；全量 `pnpm --dir web style:l1` 通过 47 个场景；原型静态 Playwright 截图和 DOM 检查确认 operation box 高度 182px、当前操作分隔为 1px dashed、无刷新按钮、新建按钮在右侧；`node --check web/scripts/styleL1.mjs` 和 `git diff --check` 通过。
+- 下一步：继续深化时只应按各业务模块真实字段 / 动作矩阵替换按钮文案和可用性，不再改回三段式工具区；如果要减少顶部摘要统计，也应单独评审，不和操作区结构混在一起。
+- 阻塞/风险：本轮仍只改前端共享组件、业务页样式、业务页回归脚本和 To Implement 原型；不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、真实删除 / 回收站持久化、部署、提交或推送。
+
+## 2026-06-14 09:45 CST
+
+- 完成：按业务页协同入口原型继续收口真实 `CollaborationTaskPanel`。收起态改为贴底单行摘要，标题为“本页协同”，只保留当前记录、本页待办、阻塞异常和展开按钮；展开态只保留本页待办、当前记录、阻塞异常三类实际 Workflow 视图，删除桌面高度拖拽手柄和“已完成”浏览型 tab。
+- 完成：同步浅色 / 暗色 / 移动端样式。协同入口抵消后台内容区底部 padding 后贴近视口底部；窄屏下隐藏长边界说明，展开按钮固定在可见位置，摘要和标签只在内部横向滚动，不撑宽页面。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过；全量 `pnpm --dir web style:l1` 通过 47 个场景。通过内置浏览器验证 `/erp/sales/project-orders/sales-orders`：桌面收起态面板 54px、头部 28px、底部间距 4px；展开态面板 194px、无拖拽手柄、无已完成 tab、任务列表可滚动；暗色态颜色走暗色 token；390px 移动端收起态 54px、展开态 320px、无页面横向溢出、展开按钮可见。
+- 下一步：后续如果真实 workflow 任务数量和任务详情增加，应继续复用现有 Workflow payload / action 回调，不在协同入口里补造库存、出货、财务、开票或收付款事实。
+- 阻塞/风险：本轮不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、菜单配置、原型阶段登记、部署、提交或推送。内置浏览器截图能力本轮仍在 `Page.captureScreenshot` 超时，视觉证据以 DOM / 盒模型 / 控制台检查为准。
+
+## 2026-06-14 10:02 CST
+
+- 完成：修正正式业务页顶部统计卡换行问题。`erp-business-page-header-card__stats` 在桌面态改为固定单行 flex，四个统计项等宽压缩并禁止标签换行；窄屏保留允许换行和无横向溢出的响应式边界。
+- 完成：补强 `style:l1` 业务页断言，`business-formal-module-shells-desktop` 现在检查 formal 业务页顶部统计保留 `总记录 / 当前结果 / 待处理 / 已选记录` 四项、桌面同一行、标签 `nowrap`、容器无内部横向溢出、页面无横向溢出。
+- 验证：`pnpm --dir web css`、`node --check web/scripts/styleL1.mjs`、`git diff --check -- web/src/erp/styles/app.css web/scripts/styleL1.mjs`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,business-module-dark-customers-desktop pnpm --dir web style:l1`、`pnpm --dir web lint`、`pnpm --dir web test`、`git diff --check` 均通过。通过内置浏览器验证 `/erp/master/products`：1440px 下四个统计卡同 top、每项 119px、`flex-wrap: nowrap`、无横向溢出；选中一条记录后 `已选记录` 更新为 1 仍同排；390px 移动视口无横向溢出。
+- 下一步：如果后续继续压缩业务页头部，应单独评审是否减少统计项，不要用 CSS 换行掩盖信息密度问题。
+- 阻塞/风险：全量 `pnpm --dir web style:l1` 仍失败在既有打印工作台场景 `print-workspace-material`，错误为采购合同头部信息行数读到 0，单独重跑该场景同样失败；该失败不在本轮业务页统计卡路径，本轮未顺手修改打印工作台。本轮只改业务页头部统计样式和回归断言；不改业务字段、保存、打印、导出、后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、部署、提交或推送。当前工作区仍有多处既有未提交改动，本轮未回退或整理。
+
+## 2026-06-14 10:10 CST
+
+- 完成：按截图把 V1 客户 / 供应商页的联系人区域从第二个并列表格收口为主表下方的内嵌“联系人明细”面板。未选主体时只显示轻量空态和禁用的新建联系人按钮；选中主体后才展示联系人表格和联系人数量，继续保持联系人随 `CUSTOMER / SUPPLIER` 主体维护的主从边界。
+- 完成：补齐联系人明细面板浅色、暗色和窄屏样式，控制标题、说明、统计 chip、按钮和表格的换行 / 省略 / 溢出边界；同步 `style:l1` 客户页断言，覆盖联系人明细文案和新建联系人弹窗。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop pnpm --dir web style:l1` 均通过；内置浏览器验证 `/erp/master/partners/customers` 空数据状态：页面标题正确、console 无 warn/error、联系人面板 1 个、面板内无第二个业务表格 Card、`新建联系人` 禁用、主内容无横向溢出。
+- 下一步：如果后续要支持联系人编辑、设为主联系人或停用，应复用当前主体选中态和后端 `contact.*` API，不把联系人提升为独立主入口或独立事实。
+- 阻塞/风险：本轮不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、真实客户 / 联系人数据或菜单配置。目标组合场景 `STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,business-module-dark-customers-desktop pnpm --dir web style:l1` 仍在既有产品页列顺序同步等待处超时；该失败不在客户 / 联系人路径，本轮未顺手修改产品页列顺序逻辑。
+
+## 2026-06-14 10:12 CST
+
+- 完成：按“业务弹窗标准样板”继续收口真实业务页弹窗共享样式。`erp-business-action-modal` 统一了弹窗圆角、分隔线、头部 / 内容 / 底部布局、滚动边界、表格容器、移动端宽度和暗色 token；formal-shell、V1 销售订单、V1 客户 / 供应商的表单、列顺序、批量删除和回收站弹窗均走同一套外观基线。
+- 完成：修复产品页列顺序弹窗连续操作回归超时。列顺序弹窗里的“移到最前 / 移到最后”图标按钮改为 `title` + `aria-label`，不再用 Ant Tooltip 包裹连续点击按钮，避免 Tooltip 浮层截获下一次点击；按钮语义提示仍保留。
+- 验证：`pnpm --dir web css`、`pnpm --dir web lint`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 均通过。目标回归覆盖客户 / 联系人 / 销售订单表单弹窗、产品回收站弹窗、列顺序弹窗默认态、交互态、账号偏好同步和 reload 后恢复态。
+- 下一步：后续逐页深化时继续按各模块真实字段和动作矩阵替换占位动作；不要把出货或采购截图里的按钮组无差别套到客户、产品、库存或财务页。
+- 阻塞/风险：本轮只改前端弹窗样式、列顺序按钮提示方式和过程记录；不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、真实删除 / 回收站持久化、部署、提交或推送。当前工作区仍有多处既有未提交改动，本轮未回退或整理。
+
+## 2026-06-14 10:15 CST
+
+- 完成：按线上 `admin.yoyoosun.net` 的正式业务页参考，恢复业务页协同入口展开态顶部的灰蓝色粗横杠视觉握柄。真实运行时只补视觉提示，不恢复旧版桌面高度拖拽，也不恢复“已完成”浏览型 tab；收起态仍只保留一行摘要。
+- 完成：同步 `business-module-page-standard-v1/task-collab-entry-v2.html` 原型和 README：展开态展示 64px × 5px 横杠，收起态隐藏横杠，避免原型违背“一行收起”的产品要求。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过；`STYLE_L1_BASE_URL=http://localhost:5175 STYLE_L1_SCENARIOS=business-menu-groups-desktop,business-formal-module-shells-desktop,business-module-dark-customers-desktop pnpm --dir web style:l1` 通过 3 个业务页相关场景；`git diff --check -- web/src/erp/components/business-list/BusinessListLayout.jsx web/src/erp/styles/app.css docs/product/prototypes/business-module-page-standard-v1/task-collab-entry-v2.html docs/product/prototypes/business-module-page-standard-v1/README.md progress.md` 通过。
+- 验证：通过内置浏览器和 Playwright 盒模型检查 `/erp/sales/project-orders/sales-orders`：桌面收起态 54px、底部间距 4px、无横杠；展开态横杠 64px × 5px、握柄高度 14px、无拖拽手柄、无“已完成”tab、无横向溢出；390px 移动端收起态 54px，展开态横杠 64px × 5px，浅色 / 暗色均通过；原型 HTML 展开态有横杠、收起态横杠 display none。
+- 下一步：如果后续还要校准协同入口视觉，应继续以“收起一行、展开只处理本页 Workflow”为边界，不把协同入口扩展成任务看板或事实处理入口。
+- 阻塞/风险：全量 `pnpm --dir web style:l1` 本轮两次失败于脚本自启 `4173` dev server 连接断开 / 端口残留，不是本次协同入口断言失败；已清理本轮遗留的 `4173` 进程，并用现有 `5175` 服务完成受影响业务页定向回归。本轮不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、菜单配置、部署、提交或推送。
+
+## 2026-06-14 10:18 CST
+
+- 完成：按 trade-erp 表头和用户截图继续校准业务主表。正式业务样板、V1 客户 / 供应商、V1 销售订单主表全部去掉右侧行内“操作”列；主表左侧改为受控勾选列，数据列不设置 `fixed`，查看 / 编辑 / 删除 / 流转等动作只保留在选中后的“当前操作”栏。
+- 完成：业务主表表头列设置入口从齿轮改为竖向三点，继续保留 Ant Table 排序箭头；联系人明细和订单行明细也去掉行尾操作列，避免和主表当前操作栏重复。`style:l1` 新增主表断言：不得出现“操作”表头、不得出现 Ant 固定列 class、每个数据列必须有列顺序入口和排序入口；列顺序回归开始前清理对应 localStorage，避免历史顺序残留导致连续移动列误判。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/styleL1.mjs`、`git diff --check` 通过；`STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm --dir web style:l1` 通过 1 个场景；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,business-module-dark-customers-desktop,business-menu-groups-desktop pnpm --dir web style:l1` 通过 3 个业务页场景。截图检查 `business-menu-groups-desktop.png`、`business-module-dark-customers-desktop.png` 确认主表左侧勾选列、右侧无“操作”列、表头有竖向三点和排序箭头。
+- 下一步：如果后续要恢复联系人或订单行编辑 / 停用 / 取消，应设计为明细区选中态或弹窗内明细操作，不要重新把“操作”列塞回业务主表右侧。
+- 阻塞/风险：全量 `pnpm --dir web style:l1` 本轮两次失败于非业务页浏览器上下文被关闭：一次在 `permission-center-desktop`，单独复跑该场景通过；一次在 `erp-dashboard-redirect` 截图阶段关闭。业务页专项回归均通过。本轮不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、真实回收站持久化、部署、提交或推送。
+
+## 2026-06-14 10:20 CST
+
+- 完成：按截图收掉 `/erp/task-board` 顶部由 `ERPLayout` 自动生成的独立“任务看板”说明 box；任务看板页面继续使用本体内的任务中心标题、统计、筛选、泳道和明细表，不把 seed 菜单说明重复合并到下方。
+- 完成：补强 `style:l1` 任务看板布局断言，明确 `/erp/task-board` 不应再渲染 `.erp-admin-page-head` 独立页面说明卡，同时保留筛选区、四个泳道、表格横向滚动和页面无横向溢出检查。
+- 验证：`pnpm --dir web css`、`node --check web/scripts/styleL1.mjs`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=erp-task-board-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=erp-task-board-desktop,erp-task-board-mobile,erp-task-board-dark-wide-desktop pnpm --dir web style:l1`、`git diff --check -- web/src/erp/components/ERPLayout.jsx web/scripts/styleL1.mjs` 均通过。
+- 下一步：如继续压缩任务看板信息密度，应优先评审任务中心本体内的标题、统计和筛选组合，不再恢复壳层说明卡。
+- 阻塞/风险：`pnpm --dir web lint` 当前失败在既有 `web/src/erp/components/business-list/BusinessListLayout.jsx` 可访问性规则 `jsx-a11y/no-noninteractive-element-interactions` / `jsx-a11y/no-noninteractive-tabindex`，不在本轮任务看板壳层路径，本轮未顺手修改；执行过程中工作区已有大量非本轮未提交改动，并新增非本轮未跟踪 `web/src/erp/components/business-list/ColumnOrderModal.jsx`，本轮未纳入。
+
+## 2026-06-14 10:27 CST
+
+- 完成：按用户截图收口业务页列顺序弹窗。新增共享 `ColumnOrderModal`，formal-shell、销售订单主表 / 订单行、客户 / 供应商主数据页统一使用同一套弹窗；弹窗补齐账号保存说明、序号、`移到最前 / 上移 / 下移 / 移到最后` 四类动作按钮、首尾边界禁用、恢复默认和完成按钮。
+- 完成：主数据页列顺序从旧的禁用“置顶 / 置底”占位改为真实偏好保存；表格展示和导出共用当前列顺序，状态列导出继续输出“启用 / 停用”，不把 React 标签对象写进 CSV。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web style:l1` 均通过，全量 L1 覆盖 47 个场景；in-app Browser 打开 `/erp/master/products` 验证列顺序弹窗 8 行、每行 4 个按钮、说明文案存在、首列上移 / 移到最前禁用、末列下移 / 移到最后禁用，行宽无横向溢出。
+- 下一步：如继续吸收业务弹窗标准样板，可再检查回收站、批量删除和详情抽屉是否仍有旧文案、占位按钮或页面间分叉。
+- 阻塞/风险：本轮只改前端列顺序弹窗、主数据列顺序偏好、样式和 L1 回归断言；不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、真实业务写入或菜单配置。in-app Browser 截图捕获接口本次超时；`style:l1` 已生成列顺序弹窗截图并通过。
+
+## 2026-06-14 10:29 CST
+
+- 完成：把业务页协同入口顶部粗横杠升级为真实 `CollaborationPanelResizeHandle` 组件。展开态可拖动调整入口高度，当前高度保存在 React state 中，收起再展开保持；刷新页面后恢复默认 320px，不写 localStorage，避免临时手动高度变成长期偏好。
+- 完成：协同入口展开态改为组件自有 `__body` 高度容器和内部滚动列表，不再依赖 AntD `.ant-card-body` 选择器；拖动握柄使用真实 button、`ns-resize` 光标、键盘上下 / Home / End 调整，横杠仍保持 64px × 5px。同步原型 HTML 和 README，原型也能拖动并保留收起单行。
+- 完成：修正 `style:l1` 协同入口断言为当前三类 Workflow tab：本页待办、当前记录、阻塞异常；保留桌面拖高 / 拖低 / 最小高度 / 内部滚动边界断言，避免后续再误删拖动能力。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过；`STYLE_L1_BASE_URL=http://127.0.0.1:5175 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,business-menu-groups-desktop,business-module-dark-customers-desktop pnpm --dir web style:l1` 通过 3 个业务页相关场景；`git diff --check -- web/src/erp/components/business-list/BusinessListLayout.jsx web/src/erp/styles/app.css web/scripts/styleL1.mjs docs/product/prototypes/business-module-page-standard-v1/task-collab-entry-v2.html docs/product/prototypes/business-module-page-standard-v1/README.md progress.md` 通过。
+- 验证：Playwright 盒模型检查 `/erp/sales/project-orders/sales-orders`：桌面收起态 54px；展开默认 `__body` 320px；向上拖动后 460px；向下拖动后 370px；收起再展开仍为 370px；刷新后恢复 320px；无“已完成”tab、无横向溢出、console 无 error / warning。390px 移动视口收起态 54px、展开 320px、拖高到 400px、无横向溢出。原型 HTML 展开 320px、拖高 400px、收起态隐藏握柄且高度 56px。
+- 下一步：后续如果要把高度长期记忆到浏览器本地，应单独评审是否需要 per-page key、清除入口和移动端上限；当前按用户要求只缓存到刷新前。
+- 阻塞/风险：内置浏览器在点击协同入口时出现底层 CDP `Runtime.evaluate` 超时，已按前端调试流程降级到项目 Playwright 完成同路径验证；本轮不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、菜单配置、部署、提交或推送。
+
+## 2026-06-14 10:50 CST
+
+- 完成：按截图压缩正式业务页模块间距。`ERPLayout` 将 `/erp/production/*` 和 `/erp/warehouse/*` 纳入业务页头隐藏范围，去掉生产进度等正式业务页上方重复的壳层说明 box；业务页共享 layout 的模块 gap 从 10px 收到 6px，并同步压缩 header / 操作区 / 表格卡片的内部 padding 和操作区内部 gap。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web style:l1` 均通过，全量 L1 通过 47 个场景。通过内置浏览器验证 `/erp/production/progress`：桌面默认态无 `.erp-admin-page-head`，业务卡片间距为 6px，页面无横向溢出；选中第一条记录后操作按钮启用，操作区到表格仍为 6px；清空选择后恢复未选中态；390px 移动视口无重复页头、无横向溢出，业务卡片间距保持 6px。
+- 下一步：如果后续还觉得业务页头部信息密度偏高，应单独评审是否减少统计项或合并标题信息，不要再通过恢复壳层页头或增加外层 Card 解决。
+- 阻塞/风险：本轮只改前端共享业务页布局和过程记录；不改后端 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、菜单配置、业务字段、打印、导出、部署、提交或推送。内置浏览器截图接口本轮仍出现 `Page.captureScreenshot` 超时；本轮视觉验收以 DOM / 盒模型 / 控制台和 `style:l1` 回归为准。

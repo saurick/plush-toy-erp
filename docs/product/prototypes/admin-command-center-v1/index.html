@@ -7,43 +7,45 @@
     <style>
       :root {
         color-scheme: light;
-        --bg: #f6f8fb;
+        --bg: #f4f6f9;
         --panel: #ffffff;
-        --panel-soft: #f9fbfd;
-        --line: #dde5ef;
-        --line-strong: #c4d0df;
-        --text: #142033;
+        --panel-soft: #f8fafc;
+        --panel-tint: #f2f7ff;
+        --line: #dbe3ee;
+        --line-strong: #bdcad9;
+        --text: #172033;
         --muted: #66758a;
-        --blue: #1f6fe5;
-        --blue-soft: #eef5ff;
-        --green: #20845a;
-        --green-soft: #edf8f2;
-        --amber: #b66a09;
-        --amber-soft: #fff7e8;
-        --red: #ca3f46;
-        --red-soft: #fff1f2;
-        --shadow: 0 14px 34px rgb(15 23 42 / 8%);
+        --blue: #1d67d8;
+        --blue-soft: #eaf3ff;
+        --green: #197250;
+        --green-soft: #eaf7f1;
+        --amber: #a85f00;
+        --amber-soft: #fff4df;
+        --red: #bd3440;
+        --red-soft: #fff0f2;
+        --shadow: 0 16px 36px rgb(15 23 42 / 8%);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
           color-scheme: dark;
-          --bg: #111827;
-          --panel: #182235;
-          --panel-soft: #202c42;
+          --bg: #101722;
+          --panel: #182233;
+          --panel-soft: #202b3d;
+          --panel-tint: #1c304d;
           --line: #334157;
-          --line-strong: #46566f;
-          --text: #edf3fb;
-          --muted: #aab7ca;
-          --blue: #75a7ff;
+          --line-strong: #4a5a72;
+          --text: #eef4fb;
+          --muted: #a9b6c8;
+          --blue: #76a8ff;
           --blue-soft: #1f3556;
-          --green: #7dd8ad;
+          --green: #7ad7aa;
           --green-soft: #183b2d;
-          --amber: #f0bd67;
+          --amber: #f2bd65;
           --amber-soft: #463214;
-          --red: #ff9aa2;
-          --red-soft: #4a2228;
-          --shadow: 0 18px 44px rgb(0 0 0 / 28%);
+          --red: #ff9aa3;
+          --red-soft: #4a2229;
+          --shadow: 0 18px 42px rgb(0 0 0 / 28%);
         }
       }
 
@@ -60,7 +62,6 @@
       }
 
       button,
-      input,
       select {
         font: inherit;
       }
@@ -71,110 +72,60 @@
 
       .app {
         display: grid;
-        grid-template-columns: 232px minmax(0, 1fr);
+        grid-template-rows: 58px minmax(0, 1fr);
         height: 100vh;
         min-width: 0;
         overflow: hidden;
-      }
-
-      .side {
-        border-right: 1px solid var(--line);
-        background: #fbfcfe;
-        padding: 18px 12px;
-        overflow: auto;
-      }
-
-      .brand {
-        display: grid;
-        grid-template-columns: 40px minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        margin-bottom: 18px;
-      }
-
-      .mark {
-        display: grid;
-        place-items: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        background: #225f99;
-        color: #fff;
-        font-size: 20px;
-        font-weight: 760;
-      }
-
-      .brand strong,
-      .brand span,
-      .nav-item {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .brand span {
-        display: block;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .nav-group {
-        margin-top: 16px;
-      }
-
-      .nav-title {
-        color: var(--muted);
-        font-size: 12px;
-        padding: 0 10px 6px;
-      }
-
-      .nav-item {
-        display: flex;
-        align-items: center;
-        min-height: 36px;
-        border-radius: 8px;
-        padding: 0 10px;
-        color: #263449;
-      }
-
-      .nav-note {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-soft);
-        color: var(--muted);
-        font-size: 12px;
-        margin-bottom: 12px;
-        padding: 10px;
-      }
-
-      .nav-item.active {
-        background: var(--blue-soft);
-        color: #1557b7;
-        font-weight: 700;
-      }
-
-      .main {
-        display: grid;
-        grid-template-rows: 58px minmax(0, 1fr);
-        min-width: 0;
-        min-height: 0;
       }
 
       .topbar {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 16px;
         border-bottom: 1px solid var(--line);
         background: rgb(255 255 255 / 94%);
         padding: 0 22px;
       }
 
-      .topbar h1 {
-        margin: 0;
-        font-size: 18px;
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
       }
 
+      .mark {
+        display: grid;
+        flex: 0 0 auto;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        background: #245f98;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 760;
+      }
+
+      .brand-text {
+        min-width: 0;
+      }
+
+      .brand strong,
+      .brand span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .top-actions,
       .actions {
         display: flex;
         flex-wrap: wrap;
@@ -186,8 +137,8 @@
         min-height: 34px;
         border: 1px solid var(--line-strong);
         border-radius: 7px;
-        background: #fff;
-        color: #213149;
+        background: var(--panel);
+        color: var(--text);
         padding: 0 12px;
       }
 
@@ -201,6 +152,7 @@
         border-color: transparent;
         background: transparent;
         color: var(--blue);
+        padding-inline: 4px;
       }
 
       .content {
@@ -212,25 +164,26 @@
 
       .workspace {
         display: grid;
-        grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
         gap: 16px;
-        max-width: 1280px;
+        max-width: 1320px;
+        margin: 0 auto;
       }
 
-      .hero,
-      .panel {
+      .focus,
+      .panel,
+      .detail {
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--panel);
         box-shadow: var(--shadow);
       }
 
-      .hero {
+      .focus {
         grid-column: 1 / -1;
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
         gap: 18px;
-        align-items: start;
         padding: 20px;
       }
 
@@ -239,56 +192,75 @@
         font-size: 12px;
       }
 
-      .hero h2,
-      .panel h3,
-      .detail h3 {
+      .focus h1,
+      .panel h2,
+      .detail h2,
+      .lane h3,
+      .handoff h3 {
         margin: 0;
       }
 
-      .hero h2 {
-        max-width: 720px;
-        font-size: 26px;
-        line-height: 1.2;
+      .focus h1 {
+        margin-top: 4px;
+        max-width: 760px;
+        font-size: 28px;
+        line-height: 1.18;
       }
 
       .summary {
-        margin: 8px 0 0;
-        max-width: 760px;
+        margin: 10px 0 0;
+        max-width: 800px;
         color: var(--muted);
       }
 
-      .metrics {
+      .focus-list {
         display: grid;
-        grid-template-columns: repeat(3, minmax(100px, 1fr));
         gap: 10px;
-        min-width: 320px;
+        align-content: start;
       }
 
-      .metric {
+      .focus-item {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--panel-soft);
-        padding: 12px;
+        padding: 10px;
       }
 
-      .metric span {
+      .focus-count {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--blue);
+        font-size: 20px;
+        font-weight: 780;
+      }
+
+      .focus-item strong,
+      .focus-item span {
         display: block;
+        overflow-wrap: anywhere;
+      }
+
+      .focus-item span {
         color: var(--muted);
         font-size: 12px;
       }
 
-      .metric strong {
-        display: block;
-        margin-top: 4px;
-        font-size: 24px;
-      }
-
-      .panel {
+      .panel,
+      .detail {
         min-width: 0;
         overflow: hidden;
       }
 
-      .panel-head {
+      .panel-head,
+      .detail-head {
         display: flex;
         justify-content: space-between;
         gap: 12px;
@@ -307,16 +279,15 @@
         min-height: 30px;
         border: 1px solid var(--line);
         border-radius: 7px;
-        background: #fff;
-        color: #2b3b52;
+        background: var(--panel);
+        color: var(--text);
         padding: 0 10px;
       }
 
-      .tab.active,
       .tab[aria-selected="true"] {
         border-color: var(--blue);
         background: var(--blue-soft);
-        color: #1457b7;
+        color: var(--blue);
         font-weight: 700;
       }
 
@@ -333,18 +304,19 @@
         align-items: center;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: #fff;
+        background: var(--panel);
         padding: 12px;
+        text-align: left;
       }
 
       .task[aria-selected="true"] {
         border-color: var(--blue);
-        box-shadow: 0 0 0 3px rgb(31 111 229 / 10%);
+        box-shadow: 0 0 0 3px rgb(31 111 229 / 11%);
       }
 
       .task-title {
         display: grid;
-        gap: 3px;
+        gap: 4px;
         min-width: 0;
       }
 
@@ -356,8 +328,11 @@
       }
 
       .task-title span,
-      .note,
-      .detail-row span {
+      .detail-note,
+      .detail-row span,
+      .shortcut span,
+      .handoff p,
+      .lane-meta {
         color: var(--muted);
         font-size: 12px;
       }
@@ -365,16 +340,18 @@
       .tag {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         min-height: 24px;
         border-radius: 999px;
         padding: 0 9px;
         font-size: 12px;
         font-weight: 700;
+        white-space: nowrap;
       }
 
       .tag.blue {
         background: var(--blue-soft);
-        color: #1457b7;
+        color: var(--blue);
       }
 
       .tag.green {
@@ -394,20 +371,41 @@
 
       .detail {
         display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .detail-body {
+        display: grid;
         gap: 14px;
+        align-content: start;
         padding: 16px;
       }
 
-      .detail-card {
+      .why {
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--panel-soft);
+        background: var(--panel-tint);
         padding: 12px;
+      }
+
+      .why strong,
+      .why span {
+        display: block;
+      }
+
+      .why span {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
       }
 
       .detail-grid {
         display: grid;
         gap: 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 12px;
       }
 
       .detail-row {
@@ -416,64 +414,131 @@
         gap: 12px;
       }
 
-      .quick-links {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-        padding: 14px;
+      .detail-row strong {
+        text-align: right;
       }
 
-      .quick-link {
-        min-height: 74px;
+      .detail-note {
+        margin: 0;
+      }
+
+      .lower {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
+        gap: 16px;
+      }
+
+      .lane {
+        display: grid;
+        gap: 10px;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: #fff;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+
+      .shortcut-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .shortcut {
+        min-height: 96px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
         padding: 12px;
         text-align: left;
       }
 
-      .quick-link strong,
-      .quick-link span {
-        display: block;
+      .shortcut[data-related="true"] {
+        border-color: var(--blue);
+        background: var(--blue-soft);
       }
 
-      .quick-link span {
+      .shortcut strong,
+      .shortcut span {
+        display: block;
+        overflow-wrap: anywhere;
+      }
+
+      .shortcut span {
         margin-top: 4px;
-        color: var(--muted);
-        font-size: 12px;
+      }
+
+      .handoff {
+        display: grid;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+
+      .handoff-grid {
+        display: grid;
+        gap: 8px;
+      }
+
+      .handoff-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        padding: 10px;
+      }
+
+      .dot {
+        width: 10px;
+        height: 10px;
+        margin-top: 5px;
+        border-radius: 50%;
+        background: var(--blue);
+      }
+
+      .dot.red {
+        background: var(--red);
+      }
+
+      .dot.amber {
+        background: var(--amber);
+      }
+
+      .dot.green {
+        background: var(--green);
       }
 
       @media (prefers-color-scheme: dark) {
-        .side,
-        .topbar,
-        .metric,
-        .task,
-        .quick-link,
-        .btn,
-        .tab,
-        .detail-card {
-          background: var(--panel);
-          color: var(--text);
-        }
-
-        .nav-item {
-          color: var(--text);
-        }
-
-        .nav-item.active,
-        .tab.active,
-        .tag.blue {
-          color: var(--blue);
+        .topbar {
+          background: rgb(24 34 51 / 94%);
         }
       }
 
-      @media (max-width: 900px) {
-        .app {
+      @media (max-width: 1040px) {
+        .workspace,
+        .focus,
+        .lower {
           grid-template-columns: 1fr;
         }
 
-        .side {
-          display: none;
+        .shortcut-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 700px) {
+        .app {
+          grid-template-rows: auto minmax(0, 1fr);
+          height: auto;
+          min-height: 100vh;
+          overflow: visible;
         }
 
         .topbar {
@@ -484,30 +549,19 @@
         }
 
         .content {
+          overflow: visible;
           padding: 14px;
         }
 
-        .workspace,
-        .hero {
-          grid-template-columns: 1fr;
-        }
-
-        .metrics {
-          min-width: 0;
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .quick-links {
-          grid-template-columns: 1fr;
-        }
-      }
-
-      @media (max-width: 560px) {
-        .metrics {
-          grid-template-columns: 1fr;
+        .focus h1 {
+          font-size: 22px;
         }
 
         .task {
+          grid-template-columns: 1fr;
+        }
+
+        .shortcut-grid {
           grid-template-columns: 1fr;
         }
       }
@@ -515,234 +569,319 @@
   </head>
   <body>
     <div class="app">
-      <aside class="side" aria-label="后台导航">
+      <header class="topbar">
         <div class="brand">
           <div class="mark">样</div>
-          <div>
-            <strong>毛绒 ERP</strong>
-            <span>工作台样板 / To Implement</span>
+          <div class="brand-text">
+            <strong>后台工作台样板</strong>
+            <span>To Implement / 今日处理台，不是正式菜单</span>
           </div>
         </div>
-        <div class="nav-note">
-          以下为常用入口 / 快捷入口示意，名称和分组贴近 seedData 与 yoyoosun 客户菜单，不替代正式菜单、路由或 RBAC。
+        <div class="top-actions">
+          <button class="btn">刷新队列</button>
+          <button class="btn primary">处理当前任务</button>
         </div>
-        <div class="nav-group">
-          <div class="nav-title">看板中心</div>
-          <div class="nav-item active">工作台</div>
-          <div class="nav-item">业务看板</div>
-        </div>
-        <div class="nav-group">
-          <div class="nav-title">基础资料</div>
-          <div class="nav-item">客户档案</div>
-          <div class="nav-item">供应商档案</div>
-          <div class="nav-item">产品</div>
-        </div>
-        <div class="nav-group">
-          <div class="nav-title">销售 / 采购仓储常用入口</div>
-          <div class="nav-item">销售订单</div>
-          <div class="nav-item">入库通知/检验/入库</div>
-          <div class="nav-item">库存</div>
-          <div class="nav-item">单据模板</div>
-        </div>
-        <div class="nav-group">
-          <div class="nav-title">系统管理</div>
-          <div class="nav-item">权限管理</div>
-        </div>
-      </aside>
+      </header>
 
-      <main class="main">
-        <header class="topbar">
-          <h1>工作台</h1>
-          <div class="actions">
-            <button class="btn">刷新</button>
-            <button class="btn primary">处理当前任务</button>
-          </div>
-        </header>
-
-        <section class="content">
-          <div class="workspace">
-            <section class="hero">
-              <div>
-                <div class="eyebrow">ERP / 今日处理台</div>
-                <h2>先处理卡点，再进入具体业务单据。</h2>
-                <p class="summary">
-                  工作台只保留首屏判断和入口分发：今日待办、阻塞风险、常用业务对象。
-                  常用入口只做快捷入口，详细列表、事实过账和打印编辑都回到对应页面。
-                </p>
-              </div>
-              <div class="metrics" aria-label="今日摘要">
-                <div class="metric"><span>待处理</span><strong>4</strong></div>
-                <div class="metric"><span>阻塞</span><strong>1</strong></div>
-                <div class="metric"><span>今日到期</span><strong>2</strong></div>
-              </div>
-            </section>
-
-            <section class="panel" aria-label="今日队列">
-              <div class="panel-head">
-                <h3>今日队列</h3>
-                <div class="tabs" role="tablist" aria-label="任务筛选">
-                  <button
-                    class="tab active"
-                    id="tab-all"
-                    role="tab"
-                    type="button"
-                    data-filter="all"
-                    aria-controls="taskList"
-                    aria-selected="true"
-                  >
-                    全部
-                  </button>
-                  <button
-                    class="tab"
-                    id="tab-todo"
-                    role="tab"
-                    type="button"
-                    data-filter="todo"
-                    aria-controls="taskList"
-                    aria-selected="false"
-                  >
-                    待处理
-                  </button>
-                  <button
-                    class="tab"
-                    id="tab-blocked"
-                    role="tab"
-                    type="button"
-                    data-filter="blocked"
-                    aria-controls="taskList"
-                    aria-selected="false"
-                  >
-                    阻塞
-                  </button>
+      <main class="content">
+        <div class="workspace">
+          <section class="focus" aria-label="今日焦点">
+            <div>
+              <div class="eyebrow">ERP / 今日先后顺序</div>
+              <h1>工作台只做一件事：把今天最该处理的业务对象推到眼前。</h1>
+              <p class="summary">
+                这里不复制完整菜单，也不直接写库存、出货、财务或打印事实。
+                它只帮助用户判断优先级、理解卡点影响，并进入对应业务页面继续处理。
+              </p>
+            </div>
+            <div class="focus-list" aria-label="首屏判断">
+              <div class="focus-item">
+                <div class="focus-count">2</div>
+                <div>
+                  <strong>先清阻塞</strong>
+                  <span>影响入库、交期或后续开票的事项排在最前。</span>
                 </div>
               </div>
-              <div class="queue" id="taskList" role="tabpanel" aria-labelledby="tab-all"></div>
-            </section>
-
-            <aside class="panel detail" aria-label="当前任务详情">
-              <div>
-                <div class="eyebrow">当前选择</div>
-                <h3 id="detailTitle">采购合同待回签</h3>
-              </div>
-              <div class="detail-card">
-                <div class="detail-grid">
-                  <div class="detail-row"><span>来源</span><strong id="detailSource">采购合同</strong></div>
-                  <div class="detail-row"><span>责任角色</span><strong id="detailRole">采购</strong></div>
-                  <div class="detail-row"><span>状态</span><strong id="detailStatus">待处理</strong></div>
-                  <div class="detail-row"><span>到期</span><strong id="detailDue">今天 18:00</strong></div>
+              <div class="focus-item">
+                <div class="focus-count">3</div>
+                <div>
+                  <strong>再处理待我动作</strong>
+                  <span>只展示需要当前角色继续推进的任务。</span>
                 </div>
               </div>
-              <p class="note" id="detailNote">
-                进入合同页面处理回签；工作台不直接修改采购事实或财务事实。
+              <div class="focus-item">
+                <div class="focus-count">4</div>
+                <div>
+                  <strong>最后进入相关对象</strong>
+                  <span>快捷入口随当前任务高亮，不作为新菜单结构。</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" aria-label="优先处理队列">
+            <div class="panel-head">
+              <div>
+                <div class="eyebrow">优先队列</div>
+                <h2>今天先处理</h2>
+              </div>
+              <div class="tabs" role="tablist" aria-label="任务筛选">
+                <button
+                  class="tab"
+                  id="tab-priority"
+                  role="tab"
+                  type="button"
+                  data-filter="priority"
+                  aria-controls="taskList"
+                  aria-selected="true"
+                >
+                  影响交付
+                </button>
+                <button
+                  class="tab"
+                  id="tab-mine"
+                  role="tab"
+                  type="button"
+                  data-filter="mine"
+                  aria-controls="taskList"
+                  aria-selected="false"
+                >
+                  待我处理
+                </button>
+                <button
+                  class="tab"
+                  id="tab-waiting"
+                  role="tab"
+                  type="button"
+                  data-filter="waiting"
+                  aria-controls="taskList"
+                  aria-selected="false"
+                >
+                  等待他人
+                </button>
+              </div>
+            </div>
+            <div class="queue" id="taskList" role="tabpanel" aria-labelledby="tab-priority"></div>
+          </section>
+
+          <aside class="detail" aria-label="当前处理卡">
+            <div class="detail-head">
+              <div>
+                <div class="eyebrow">当前处理卡</div>
+                <h2 id="detailTitle">入库质检被阻塞</h2>
+              </div>
+              <span class="tag red" id="detailTag">阻塞</span>
+            </div>
+            <div class="detail-body">
+              <div class="why">
+                <strong id="detailWhy">影响本批产品入库，销售订单交期无法确认。</strong>
+                <span id="detailNext">下一步：进入入库通知/检验/入库，补充阻塞原因并重新推进。</span>
+              </div>
+              <div class="detail-grid">
+                <div class="detail-row"><span>业务对象</span><strong id="detailSource">入库通知/检验/入库</strong></div>
+                <div class="detail-row"><span>责任角色</span><strong id="detailRole">品质 / 仓库</strong></div>
+                <div class="detail-row"><span>到期</span><strong id="detailDue">已超时 2 小时</strong></div>
+                <div class="detail-row"><span>建议入口</span><strong id="detailEntry">入库通知/检验/入库</strong></div>
+              </div>
+              <p class="detail-note" id="detailBoundary">
+                工作台只做协同提醒；质检完成不等于库存已经入账，库存事实仍由正式 usecase 处理。
               </p>
               <div class="actions">
-                <button class="btn primary">进入业务单据</button>
+                <button class="btn primary">进入建议入口</button>
                 <button class="btn">记录阻塞</button>
-                <button class="btn text">查看全部任务</button>
+                <button class="btn text">查看任务看板</button>
               </div>
-            </aside>
+            </div>
+          </aside>
 
-            <section class="panel">
-              <div class="panel-head">
-                <h3>常用业务对象</h3>
-                <span class="tag green">快捷入口</span>
+          <div class="lower">
+            <section class="lane" aria-label="相关业务对象">
+              <div>
+                <div class="eyebrow">随当前任务变化</div>
+                <h3>相关业务对象快捷入口</h3>
+                <div class="lane-meta">
+                  只放能继续处理当前事项的对象。高亮表示与当前处理卡直接相关，不替代左侧正式菜单。
+                </div>
               </div>
-              <div class="quick-links">
-                <button class="quick-link">
+              <div class="shortcut-grid">
+                <button class="shortcut" data-shortcut="sales">
                   <strong>销售订单</strong>
-                  <span>客户订单、交期和明细承诺</span>
+                  <span>交期、客户承诺、订单明细</span>
                 </button>
-                <button class="quick-link">
+                <button class="shortcut" data-shortcut="inbound">
                   <strong>入库通知/检验/入库</strong>
-                  <span>到仓、质检和入库确认</span>
+                  <span>到仓、质检、入库协同</span>
                 </button>
-                <button class="quick-link">
+                <button class="shortcut" data-shortcut="inventory">
                   <strong>库存</strong>
-                  <span>余额、批次和流水查看</span>
+                  <span>余额、批次、流水查看</span>
                 </button>
-                <button class="quick-link">
+                <button class="shortcut" data-shortcut="print">
                   <strong>单据模板</strong>
                   <span>采购合同、加工合同打印</span>
                 </button>
               </div>
             </section>
+
+            <section class="handoff" aria-label="交接摘要">
+              <div>
+                <div class="eyebrow">工作台边界</div>
+                <h3>看得到，但不在这里做事实过账</h3>
+              </div>
+              <div class="handoff-grid">
+                <div class="handoff-row">
+                  <span class="dot red"></span>
+                  <div>
+                    <strong>Workflow 任务</strong>
+                    <p>可提醒、跳转、记录阻塞；任务完成不等于库存或出货事实完成。</p>
+                  </div>
+                </div>
+                <div class="handoff-row">
+                  <span class="dot amber"></span>
+                  <div>
+                    <strong>业务对象</strong>
+                    <p>只做快捷入口和上下文高亮；字段、保存、导出仍回到对应页面。</p>
+                  </div>
+                </div>
+                <div class="handoff-row">
+                  <span class="dot green"></span>
+                  <div>
+                    <strong>正式菜单</strong>
+                    <p>仍由 seedData、客户菜单配置和 RBAC 决定；本页不反推菜单结构。</p>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
+        </div>
       </main>
     </div>
 
     <script>
       const tasks = [
         {
-          id: "purchase-sign",
-          title: "采购合同待回签",
-          source: "采购合同",
-          role: "采购",
-          status: "待处理",
-          due: "今天 18:00",
-          kind: "todo",
-          tag: "blue",
-          note: "进入合同页面处理回签；工作台不直接修改采购事实或财务事实。",
-        },
-        {
           id: "warehouse-blocked",
           title: "入库质检被阻塞",
           source: "入库通知/检验/入库",
           role: "品质 / 仓库",
           status: "阻塞",
-          due: "已超时",
-          kind: "blocked",
+          due: "已超时 2 小时",
+          filter: "priority",
           tag: "red",
-          note: "需要补齐检验原因并重新推进；任务状态不等于库存已入账。",
+          related: ["inbound", "inventory"],
+          why: "影响本批产品入库，销售订单交期无法确认。",
+          next: "下一步：进入入库通知/检验/入库，补充阻塞原因并重新推进。",
+          boundary:
+            "工作台只做协同提醒；质检完成不等于库存已经入账，库存事实仍由正式 usecase 处理。",
+        },
+        {
+          id: "shipment-risk",
+          title: "出货放行前缺装箱确认",
+          source: "出货管理",
+          role: "仓库 / 业务",
+          status: "影响交付",
+          due: "今天 16:00",
+          filter: "priority",
+          tag: "amber",
+          related: ["sales", "inventory"],
+          why: "客户交付节点临近，缺装箱确认会影响后续发货。",
+          next: "下一步：进入出货或销售订单页面核对关联对象。",
+          boundary:
+            "shipment_release done 不是 shipped；真实出货必须由事实层主路径确认。",
+        },
+        {
+          id: "purchase-sign",
+          title: "采购合同待回签",
+          source: "单据模板",
+          role: "采购",
+          status: "待我处理",
+          due: "今天 18:00",
+          filter: "mine",
+          tag: "blue",
+          related: ["print"],
+          why: "合同未回签会影响后续到货跟进和供应商确认。",
+          next: "下一步：进入单据模板，打开采购合同打印窗口继续处理。",
+          boundary:
+            "打印和纸面快照不反向写采购、库存或财务事实。",
         },
         {
           id: "sales-confirm",
           title: "销售订单交期确认",
           source: "销售订单",
           role: "业务",
-          status: "待处理",
+          status: "待我处理",
           due: "明天 10:00",
-          kind: "todo",
-          tag: "amber",
-          note: "进入销售订单核对交期，后续出货和财务事实另走正式 usecase。",
+          filter: "mine",
+          tag: "green",
+          related: ["sales"],
+          why: "交期未确认会让采购、生产和出货优先级失真。",
+          next: "下一步：进入销售订单，核对客户承诺和关联任务。",
+          boundary:
+            "工作台只提示协同动作；订单字段保存仍走销售订单页面和对应 API。",
         },
         {
-          id: "print-contract",
-          title: "加工合同待打印",
-          source: "单据模板",
-          role: "采购",
-          status: "可处理",
+          id: "quality-waiting",
+          title: "等待品质补充返工原因",
+          source: "质检管理",
+          role: "品质",
+          status: "等待他人",
           due: "今天",
-          kind: "todo",
-          tag: "green",
-          note: "进入打印中心编辑纸面快照；打印不反向写业务事实。",
+          filter: "waiting",
+          tag: "amber",
+          related: ["inbound"],
+          why: "原因缺失时不能让后续角色误判为已闭环。",
+          next: "下一步：查看任务看板或催办责任角色。",
+          boundary:
+            "等待态只说明协同还未完成，不代表事实表被修改或回滚。",
         },
       ];
 
       let selectedId = tasks[0].id;
-      let activeFilter = "all";
+      let activeFilter = "priority";
 
-      const list = document.querySelector("#taskList");
+      const taskList = document.querySelector("#taskList");
       const tabs = [...document.querySelectorAll(".tab")];
+      const shortcuts = [...document.querySelectorAll(".shortcut")];
 
       function visibleTasks() {
-        if (activeFilter === "all") return tasks;
-        return tasks.filter((task) => task.kind === activeFilter);
+        return tasks.filter((task) => task.filter === activeFilter);
+      }
+
+      function selectedTask() {
+        return tasks.find((task) => task.id === selectedId) || tasks[0];
+      }
+
+      function setText(selector, value) {
+        document.querySelector(selector).textContent = value;
+      }
+
+      function updateDetail(task) {
+        setText("#detailTitle", task.title);
+        setText("#detailTag", task.status);
+        setText("#detailWhy", task.why);
+        setText("#detailNext", task.next);
+        setText("#detailSource", task.source);
+        setText("#detailRole", task.role);
+        setText("#detailDue", task.due);
+        setText("#detailEntry", task.source);
+        setText("#detailBoundary", task.boundary);
+        const tag = document.querySelector("#detailTag");
+        tag.className = `tag ${task.tag}`;
+        shortcuts.forEach((shortcut) => {
+          shortcut.dataset.related = String(
+            task.related.includes(shortcut.dataset.shortcut),
+          );
+        });
       }
 
       function selectTask(task) {
         selectedId = task.id;
-        document.querySelector("#detailTitle").textContent = task.title;
-        document.querySelector("#detailSource").textContent = task.source;
-        document.querySelector("#detailRole").textContent = task.role;
-        document.querySelector("#detailStatus").textContent = task.status;
-        document.querySelector("#detailDue").textContent = task.due;
-        document.querySelector("#detailNote").textContent = task.note;
+        updateDetail(task);
         renderTasks();
       }
 
       function renderTasks() {
-        list.innerHTML = "";
+        taskList.innerHTML = "";
         visibleTasks().forEach((task) => {
           const button = document.createElement("button");
           button.className = "task";
@@ -756,23 +895,21 @@
             <span class="tag ${task.tag}">${task.status}</span>
           `;
           button.addEventListener("click", () => selectTask(task));
-          list.appendChild(button);
+          taskList.appendChild(button);
         });
       }
 
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
-          tabs.forEach((item) => item.classList.remove("active"));
           tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
-          tab.classList.add("active");
           tab.setAttribute("aria-selected", "true");
-          list.setAttribute("aria-labelledby", tab.id);
+          taskList.setAttribute("aria-labelledby", tab.id);
           activeFilter = tab.dataset.filter;
-          const nextTask = visibleTasks()[0] || tasks[0];
-          selectTask(nextTask);
+          selectTask(visibleTasks()[0] || selectedTask());
         });
       });
 
+      updateDetail(selectedTask());
       renderTasks();
     </script>
   </body>

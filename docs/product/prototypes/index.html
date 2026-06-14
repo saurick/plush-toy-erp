@@ -219,7 +219,7 @@
 
       .asset {
         display: grid;
-        grid-template-columns: 1.2fr 90px 190px 1fr 210px;
+        grid-template-columns: minmax(0, 1.2fr) 90px 190px 210px;
         gap: 14px;
         align-items: center;
         border-bottom: 1px solid var(--line);
@@ -310,19 +310,6 @@
         background: var(--purple-soft);
         color: var(--purple);
       }
-
-      .purpose {
-        margin: 0;
-        color: var(--muted);
-      }
-
-      .applies {
-        margin: 0;
-        color: var(--muted);
-        font-size: 12px;
-        line-height: 1.45;
-      }
-
       .actions {
         display: flex;
         flex-wrap: wrap;
@@ -536,7 +523,7 @@
           </p>
         </div>
         <aside class="meta" aria-label="资产统计">
-          <div class="meta-row"><span>HTML 样板</span><strong>10</strong></div>
+          <div class="meta-row"><span>HTML 样板</span><strong>12</strong></div>
           <div class="meta-row"><span>PNG / 截图</span><strong>6</strong></div>
           <div class="meta-row"><span>维护方式</span><strong>手工登记</strong></div>
         </aside>
@@ -565,23 +552,69 @@
         <div class="section-head">
           <div>
             <h2 id="admin-heading">后台工作台样板 / Admin Workbench Pattern</h2>
-            <p class="section-note">用于评审工作台作为今日处理台的首屏信息和少量入口，不再铺开五个并列视图。</p>
+            <p class="section-note">用于评审工作台作为今日处理台的首屏判断：先处理什么、为什么重要、进入哪个相关对象。</p>
           </div>
           <a class="open-readme" href="admin-command-center-v1/README.md">打开说明</a>
         </div>
         <div class="asset-list">
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="后台工作台 样板 HTML admin-command-center-v1 今日队列 当前任务 常用业务对象 待实现 后台首页 工作台 任务看板 业务看板 模板打印 异常闭环">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="后台工作台 样板 HTML admin-command-center-v1 今日焦点 优先队列 当前处理卡 相关对象快捷入口 交接边界 待实现 后台首页 工作台 任务看板 业务看板 模板打印 异常闭环">
             <div class="name">
               <p class="asset-title">后台工作台样板</p>
               <div class="dir">admin-command-center-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">把工作台收敛为登录后的今日处理台：今日队列、当前任务详情和少量常用业务对象入口。</p>
-            <p class="applies">参照范围：后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；常用入口不是正式菜单替代表。</p>
             <div class="actions">
               <a class="action primary" href="admin-command-center-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="admin-command-center-v1/README.md">打开说明</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="task-center-heading">
+        <div class="section-head">
+          <div>
+            <h2 id="task-center-heading">任务中心样板 / Task Command Center Pattern</h2>
+            <p class="section-note">用于评审任务入口作为职责处理台：谁要处理、谁发起、哪里阻塞、跳回哪个业务对象。</p>
+          </div>
+          <a class="open-readme" href="task-command-center-v1/README.md">打开说明</a>
+        </div>
+        <div class="asset-list">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="任务中心 样板 HTML task-command-center-v1 我的任务 任务看板 待我处理 我发起的 阻塞交接 当前任务 关联业务对象 Workflow 职责处理台 待实现">
+            <div class="name">
+              <p class="asset-title">任务中心样板</p>
+              <div class="dir">task-command-center-v1/</div>
+            </div>
+            <span class="type type-html">HTML</span>
+            <div class="badges"><span class="badge badge-implement">待实现</span></div>
+            <div class="actions">
+              <a class="action primary" href="task-command-center-v1/index.html">打开 HTML 样板</a>
+              <a class="action" href="task-command-center-v1/README.md">打开说明</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="business-management-heading">
+        <div class="section-head">
+          <div>
+            <h2 id="business-management-heading">业务管理中心样板 / Business Management Center Pattern</h2>
+            <p class="section-note">用于评审业务管理入口作为对象总控：按链路选对象、看风险、进入标准业务页。</p>
+          </div>
+          <a class="open-readme" href="business-management-center-v1/README.md">打开说明</a>
+        </div>
+        <div class="asset-list">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务管理中心 样板 HTML business-management-center-v1 业务管理 业务对象总控 客户与订单 采购入库质检 库存出货 财务对账 标准业务页 风险摘要 待实现">
+            <div class="name">
+              <p class="asset-title">业务管理中心样板</p>
+              <div class="dir">business-management-center-v1/</div>
+            </div>
+            <span class="type type-html">HTML</span>
+            <div class="badges"><span class="badge badge-implement">待实现</span></div>
+            <div class="actions">
+              <a class="action primary" href="business-management-center-v1/index.html">打开 HTML 样板</a>
+              <a class="action" href="business-management-center-v1/README.md">打开说明</a>
             </div>
           </article>
         </div>
@@ -603,8 +636,6 @@
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">把 20260611 参考规格中的 51 个二级菜单收口为可筛选内容矩阵，标注页面类型、事实源、关键字段、动作和边界。</p>
-            <p class="applies">参照范围：用于逐菜单核对页面内容覆盖，并映射到现有列表页、详情页、表单页、动作浮层、工作台、报表、导入和移动任务样板；不是正式菜单承诺。</p>
             <div class="actions">
               <a class="action primary" href="core-menu-coverage-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="core-menu-coverage-v1/README.md">打开说明</a>
@@ -629,8 +660,6 @@
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">把内部 51 项菜单覆盖压缩成 12 个高频主入口，说明哪些细项应进入 tab、筛选、动作或详情区。</p>
-            <p class="applies">参照范围：用于评审正式左侧导航候选；不改当前运行时菜单、路由、RBAC、客户菜单配置、后端 API 或 schema。</p>
             <div class="actions">
               <a class="action primary" href="formal-menu-candidate-v1/index.html">打开 HTML 原型</a>
               <a class="action" href="formal-menu-candidate-v1/README.md">打开说明</a>
@@ -655,8 +684,6 @@
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">保留模板导航、纸面预览和打印窗口入口；字段编辑和明细确认回到独立打印窗口。</p>
-            <p class="applies">参照范围：模板打印中心可参照；只表达采购合同和加工合同两套正式模板入口，不新增样品确认单、字段映射配置、后端 API、RBAC 或 Fact 写入。</p>
             <div class="actions">
               <a class="action primary" href="print-template-center-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="print-template-center-v1/README.md">打开说明</a>
@@ -681,8 +708,6 @@
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">保留标题摘要、独立筛选条、结果工具条、表格、当前记录操作条、主表分页和底部轻量协同入口。</p>
-            <p class="applies">参照范围：客户档案、供应商档案、产品、销售订单、辅材 / 包材采购、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="business-module-page-standard-v1/README.md">打开说明</a>
@@ -698,8 +723,6 @@
             <div class="badges">
               <span class="badge badge-implement">待实现</span>
             </div>
-            <p class="purpose">作为业务页内组件样板：收起保留风险提示、展开处理本页任务；不作为独立业务入口。</p>
-            <p class="applies">参照范围：嵌入有 Workflow 协同任务的业务页可参照；它是页内组件，不是独立菜单、路由或权限入口。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/task-collab-entry-v2.html">打开 HTML 样板</a>
               <a class="action" href="business-module-page-standard-v1/README.md">打开说明</a>
@@ -716,8 +739,6 @@
               <span class="badge badge-draft">起草阶段</span>
               <span class="badge badge-compare">方案对比</span>
             </div>
-            <p class="purpose">早期协同入口方向图，用于追溯为何不采用右侧侧栏作为默认骨架。</p>
-            <p class="applies">参照范围：仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/images/direction-1-current-record-sidebar.png">查看 PNG / 截图</a>
               <a class="action" href="business-module-page-standard-v1/images/">打开目录</a>
@@ -734,8 +755,6 @@
               <span class="badge badge-draft">起草阶段</span>
               <span class="badge badge-compare">方案对比</span>
             </div>
-            <p class="purpose">早期协同入口方向图，用于比较流程条和抽屉结构的占位与理解成本。</p>
-            <p class="applies">参照范围：仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/images/direction-2-flowbar-task-drawer.png">查看 PNG / 截图</a>
               <a class="action" href="business-module-page-standard-v1/images/">打开目录</a>
@@ -752,8 +771,6 @@
               <span class="badge badge-draft">起草阶段</span>
               <span class="badge badge-compare">方案对比</span>
             </div>
-            <p class="purpose">早期协同入口方向图，用于说明长表格下方入口的可见性问题。</p>
-            <p class="applies">参照范围：仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。</p>
             <div class="actions">
               <a class="action primary" href="business-module-page-standard-v1/images/direction-3-bottom-task-table.png">查看 PNG / 截图</a>
               <a class="action" href="business-module-page-standard-v1/images/">打开目录</a>
@@ -778,38 +795,32 @@
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">覆盖基础信息、业务状态、关联单据、操作记录、附件区，并区分 Workflow 协同动作和 Fact 事实动作。</p>
-            <p class="applies">参照范围：销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照；字段和动作仍由各自 API / usecase / RBAC 决定。</p>
             <div class="actions">
               <a class="action primary" href="business-detail-page-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="business-detail-page-standard-v1/README.md">打开说明</a>
             </div>
           </article>
 
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="新建 编辑 表单 标准样板 HTML business-form-page-standard-v1 首个落地对象 字段分组 必填 校验 来源带值 清值 新增 编辑 只读 残值防护 待实现 客户 供应商 联系人 销售订单 采购 库存 质检 财务">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="新建 编辑 表单 标准样板 HTML business-form-page-standard-v1 页面级 首个落地对象 字段分组 必填 校验 来源带值 清值 新增 编辑 只读 残值防护 待实现 客户 供应商 联系人 销售订单 采购 库存 质检 财务">
             <div class="name">
               <p class="asset-title">新建 / 编辑表单标准样板</p>
               <div class="dir">business-form-page-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">覆盖首个落地对象、字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。</p>
-            <p class="applies">参照范围：客户、供应商、联系人、销售订单、采购、库存、质检和财务等新建 / 编辑表单可参照；真实落地建议先收窄到销售订单，字段真源以 schema、API、RBAC 和保存 usecase 为准。</p>
             <div class="actions">
               <a class="action primary" href="business-form-page-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="business-form-page-standard-v1/README.md">打开说明</a>
             </div>
           </article>
 
-          <article class="asset" data-category="to-implement" data-status="待实现" data-text="弹窗 抽屉 动作 标准样板 HTML action-modal-drawer-standard-v1 审批 驳回 阻塞 冲正 关闭任务 危险确认 reason 必填 待实现 过账 取消 权限 幂等">
+          <article class="asset" data-category="to-implement" data-status="待实现" data-text="业务 弹窗 抽屉 动作 标准样板 HTML action-modal-drawer-standard-v1 单据补录 来源导入 明细行 回收站 列顺序 删除确认 危险确认 待实现 出货 采购 质检 库存 财务 权限 幂等">
             <div class="name">
-              <p class="asset-title">弹窗 / 抽屉动作标准样板</p>
+              <p class="asset-title">业务弹窗标准样板</p>
               <div class="dir">action-modal-drawer-standard-v1/</div>
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-implement">待实现</span></div>
-            <p class="purpose">覆盖审批、驳回、阻塞、冲正、关闭任务、危险确认和 reason 必填表达。</p>
-            <p class="applies">参照范围：审批、驳回、阻塞、冲正、关闭任务、过账 / 取消等动作浮层可参照；动作可见性、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。</p>
             <div class="actions">
               <a class="action primary" href="action-modal-drawer-standard-v1/index.html">打开 HTML 样板</a>
               <a class="action" href="action-modal-drawer-standard-v1/README.md">打开说明</a>
@@ -834,8 +845,6 @@
             </div>
             <span class="type type-html">HTML</span>
             <div class="badges"><span class="badge badge-current">当前实现</span></div>
-            <p class="purpose">覆盖待办 / 已办 / 消息 / 我的、主筛选、分批展开、任务详情、现场留痕、原因面板和底部动作栏。</p>
-            <p class="applies">参照范围：岗位任务端 <code>/m/&lt;role&gt;/tasks</code> 当前实现参考；岗位入口按任务和职责投影，不复制桌面菜单树。</p>
             <div class="actions">
               <a class="action primary" href="mobile-role-tasks-v1/implemented-reference.html">打开 HTML 参考</a>
               <a class="action" href="mobile-role-tasks-v1/README.md">打开说明</a>
@@ -852,8 +861,6 @@
               <span class="badge badge-history">历史参考</span>
               <span class="badge badge-evidence">截图证据</span>
             </div>
-            <p class="purpose">保留岗位胶囊、刷新、同步信息、指标、筛选、任务列表和底部导航的早期方向证据。</p>
-            <p class="applies">参照范围：仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。</p>
             <div class="actions">
               <a class="action primary" href="mobile-role-tasks-v1/images/mobile-role-tasks-list-reference.png">查看 PNG / 截图</a>
               <a class="action" href="mobile-role-tasks-v1/images/">打开目录</a>
@@ -870,8 +877,6 @@
               <span class="badge badge-history">历史参考</span>
               <span class="badge badge-evidence">截图证据</span>
             </div>
-            <p class="purpose">保留任务关键信息、风险提示、关联单据、最近动态、原因输入和底部动作栏的早期方向证据。</p>
-            <p class="applies">参照范围：仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。</p>
             <div class="actions">
               <a class="action primary" href="mobile-role-tasks-v1/images/mobile-role-task-detail-reference.png">查看 PNG / 截图</a>
               <a class="action" href="mobile-role-tasks-v1/images/">打开目录</a>
@@ -888,8 +893,6 @@
               <span class="badge badge-history">历史参考</span>
               <span class="badge badge-evidence">截图证据</span>
             </div>
-            <p class="purpose">保留今日必须处理、卡点、等待他人、催办和已完成等分组的早期方向证据。</p>
-            <p class="applies">参照范围：仅为岗位任务端早期视觉参考；当前实现以 HTML 参考和运行时代码为准。</p>
             <div class="actions">
               <a class="action primary" href="mobile-role-tasks-v1/images/mobile-role-risk-dashboard-reference.png">查看 PNG / 截图</a>
               <a class="action" href="mobile-role-tasks-v1/images/">打开目录</a>

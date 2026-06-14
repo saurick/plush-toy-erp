@@ -1,11 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertOutlined,
-  ArrowRightOutlined,
   CloseCircleOutlined,
-  ExclamationCircleOutlined,
-  FileSearchOutlined,
-  PrinterOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
 import {
@@ -34,19 +30,13 @@ import {
 } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import CommandCenterNav from '../components/CommandCenterNav.jsx'
 import {
   listWorkflowTasks,
   updateWorkflowTaskStatus,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
-import {
-  commandCenterViews,
-  getCommandCenterView,
-} from '../config/commandCenter.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
-import { printTemplateStats } from '../config/printTemplates.mjs'
 import {
   formatWorkflowTaskSource,
   resolveWorkflowTaskEntryPath,
@@ -153,6 +143,10 @@ function buildSourceOptions(tasks = []) {
       label: sourceType,
     })),
   ]
+}
+
+function hasWorkflowTaskSource(task = {}) {
+  return Boolean(String(task.source_type || task.source_no || '').trim())
 }
 
 function TaskLane({ lane, onOpenTask, onOpenAction }) {
@@ -332,8 +326,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const selectedTaskEntryPath = selectedTask
     ? resolveWorkflowTaskEntryPath(selectedTask)
     : ''
-  const activeViewMeta =
-    getCommandCenterView(activeView) || commandCenterViews[0]
   const activeExceptionStep =
     EXCEPTION_FLOW_STEPS.find((step) => step.key === exceptionStepKey) ||
     EXCEPTION_FLOW_STEPS[0]
@@ -372,6 +364,48 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         .slice(0, 8),
     [workflowTasks]
   )
+  const taskCenterAssignedCount = useMemo(
+    () =>
+      workflowTasks.filter((task) =>
+        ['pending', 'ready', 'processing'].includes(getTaskStatusKey(task))
+      ).length,
+    [workflowTasks]
+  )
+  const taskCenterSourceCount = useMemo(
+    () => workflowTasks.filter((task) => hasWorkflowTaskSource(task)).length,
+    [workflowTasks]
+  )
+  const taskCenterBlockedCount = useMemo(
+    () =>
+      workflowTasks.filter((task) => {
+        const statusKey = getTaskStatusKey(task)
+        return (
+          ['blocked', 'rejected'].includes(statusKey) ||
+          Boolean(getWorkflowTaskReason(task))
+        )
+      }).length,
+    [workflowTasks]
+  )
+  const taskCenterCurrentTask = useMemo(
+    () =>
+      filteredTasks.find((task) => !isTerminalWorkflowTask(task)) ||
+      filteredTasks[0] ||
+      null,
+    [filteredTasks]
+  )
+  const taskCenterCurrentStatusMeta = taskCenterCurrentTask
+    ? getWorkflowTaskStatusMeta(taskCenterCurrentTask)
+    : null
+  const taskCenterCurrentEntryPath = taskCenterCurrentTask
+    ? resolveWorkflowTaskEntryPath(taskCenterCurrentTask)
+    : ''
+  const currentFocusTask = todayFocusTasks[0] || exceptionTasks[0] || null
+  const currentFocusTaskStatusMeta = currentFocusTask
+    ? getWorkflowTaskStatusMeta(currentFocusTask)
+    : null
+  const currentFocusTaskEntryPath = currentFocusTask
+    ? resolveWorkflowTaskEntryPath(currentFocusTask)
+    : ''
   const roleReminderCards = useMemo(
     () => [
       { key: 'finance', title: '财务', value: workflowStats.financePending },
@@ -407,6 +441,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       })),
     [businessSummary]
   )
+  const workbenchBusinessRows = useMemo(() => {
+    const sortedRows = moduleRows.slice().sort((left, right) => {
+      const countDiff = Number(right.count || 0) - Number(left.count || 0)
+      if (countDiff !== 0) return countDiff
+      return String(left.module || '').localeCompare(String(right.module || ''))
+    })
+    return sortedRows.slice(0, 5)
+  }, [moduleRows])
 
   const updateFilter = (key, value) => {
     setSearchParams(
@@ -422,25 +464,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setSearchParams(writeWorkflowTaskBoardFiltersToSearch(searchParams), {
       replace: true,
     })
-  }
-
-  const openCommandCenterView = (viewKey) => {
-    const viewMeta = getCommandCenterView(viewKey)
-    if (!viewMeta) return
-    if (['workbench', 'task-board', 'exception-flow'].includes(viewKey)) {
-      setActiveView(viewKey)
-    }
-    if (viewMeta.path) {
-      navigate(viewMeta.path)
-    }
-  }
-
-  const openBusinessDashboard = () => {
-    navigate('/erp/business-dashboard')
-  }
-
-  const openPrintCenter = () => {
-    navigate('/erp/print-center')
   }
 
   const openTaskEntry = (task) => {
@@ -611,111 +634,123 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       size={16}
       className="erp-dashboard-page erp-command-center-page"
     >
-      <Card
-        className="erp-dashboard-card erp-command-center-nav-card"
-        variant="borderless"
-      >
-        <div className="erp-command-center-shell">
-          <CommandCenterNav
-            activeKey={activeView}
-            onSelect={(item) => openCommandCenterView(item.key)}
-          />
-          <Space
-            direction="vertical"
-            size={12}
-            className="erp-dashboard-block erp-command-center-shell-main"
-          >
-            <Space className="erp-dashboard-heading-row" align="start">
-              <div>
-                <Text type="secondary">ERP / 运营中枢</Text>
-                <Title level={4} className="erp-dashboard-section-title">
-                  {activeViewMeta.label}
-                </Title>
-                <Paragraph type="secondary" className="erp-dashboard-summary">
-                  吸收后台工作台原型的五个视图；所有动作仍回到现有
-                  Workflow、业务页和打印工作台，不写库存、出货、财务或发票事实。
-                </Paragraph>
-              </div>
-              <Button
-                icon={<ReloadOutlined />}
-                loading={loading}
-                onClick={loadDashboardStats}
-              >
-                刷新运营数据
-              </Button>
-            </Space>
-          </Space>
-        </div>
-      </Card>
-
       {activeView === 'workbench' ? (
         <>
           <Card
-            className="erp-dashboard-card erp-command-center-hero-card"
+            className="erp-dashboard-card erp-command-center-hero-card erp-workbench-overview-card"
             variant="borderless"
             loading={loading}
           >
-            <div className="erp-command-center-hero">
-              <div className="erp-command-center-hero-main">
-                <Text type="secondary">ERP / 工作台</Text>
-                <Title level={3} className="erp-command-center-hero-title">
-                  今天先处理协同卡点，再进入具体业务模块
-                </Title>
-                <Paragraph className="erp-dashboard-summary">
-                  工作台只做跨模块聚合和入口分发：把今日必须处理、跨角色阻塞、业务对象摘要、打印入口和常用业务入口放在第一屏。
-                </Paragraph>
-                <Space wrap>
-                  <Tag color="blue">
-                    本页待办 {workflowStats.pending + workflowStats.processing}
-                  </Tag>
-                  <Tag color="red">阻塞 {workflowStats.blocked}</Tag>
-                  <Tag color="orange">
-                    今日/超时 {workflowStats.dueSoon + workflowStats.overdue}
-                  </Tag>
-                  <Tag color="green">
-                    业务对象 {businessSummary.totalRecords}
-                  </Tag>
-                  <Tag>只展示运营与协同状态，不写事实层</Tag>
-                </Space>
+            <div className="erp-workbench-overview">
+              <div className="erp-workbench-summary">
+                <div>
+                  <Text type="secondary">ERP / 工作台</Text>
+                  <Title level={3} className="erp-command-center-hero-title">
+                    后台首页 / 工作台
+                  </Title>
+                  <Paragraph className="erp-dashboard-summary">
+                    今天先处理协同卡点，再看业务对象状态和角色负载；这里展示判断依据，不重复做菜单跳转。
+                  </Paragraph>
+                </div>
+                <div
+                  className="erp-workbench-metrics"
+                  aria-label="工作台关键指标"
+                >
+                  <div className="erp-workbench-metric">
+                    <span>今日必须处理</span>
+                    <strong>
+                      {workflowStats.pending + workflowStats.processing}
+                    </strong>
+                  </div>
+                  <div className="erp-workbench-metric erp-workbench-metric--danger">
+                    <span>跨角色阻塞</span>
+                    <strong>{workflowStats.blocked}</strong>
+                  </div>
+                  <div className="erp-workbench-metric">
+                    <span>业务对象</span>
+                    <strong>{businessSummary.totalRecords}</strong>
+                  </div>
+                  <div className="erp-workbench-metric">
+                    <span>完成率</span>
+                    <strong>{businessSummary.completionRatio}%</strong>
+                  </div>
+                </div>
               </div>
-              <Row
-                gutter={[12, 12]}
-                className="erp-command-center-hero-metrics"
-              >
-                <Col xs={24} sm={8}>
-                  <Statistic
-                    title="今日必须处理"
-                    value={workflowStats.pending + workflowStats.processing}
+
+              <section className="erp-workbench-current" aria-label="当前处理">
+                <div className="erp-workbench-current-head">
+                  <Text type="secondary">当前处理</Text>
+                  {currentFocusTaskStatusMeta ? (
+                    <Tag color={currentFocusTaskStatusMeta.color}>
+                      {currentFocusTaskStatusMeta.label}
+                    </Tag>
+                  ) : (
+                    <Tag>无待处理</Tag>
+                  )}
+                </div>
+                {currentFocusTask ? (
+                  <>
+                    <Title level={5} className="erp-workbench-current-title">
+                      {currentFocusTask.task_name || '未命名任务'}
+                    </Title>
+                    <Text
+                      type="secondary"
+                      className="erp-workbench-current-meta"
+                    >
+                      {formatWorkflowTaskSource(currentFocusTask)} /{' '}
+                      {getWorkflowTaskDueLabel(currentFocusTask)}
+                    </Text>
+                    {getWorkflowTaskReason(currentFocusTask) ? (
+                      <Text
+                        type="danger"
+                        className="erp-workbench-current-meta"
+                      >
+                        {getWorkflowTaskReason(currentFocusTask)}
+                      </Text>
+                    ) : null}
+                    <Space wrap className="erp-workbench-current-actions">
+                      <Button
+                        size="small"
+                        type="primary"
+                        onClick={() => openTaskDrawer(currentFocusTask)}
+                      >
+                        处理
+                      </Button>
+                      <Button
+                        size="small"
+                        danger
+                        disabled={isTerminalWorkflowTask(currentFocusTask)}
+                        onClick={() =>
+                          openTaskDrawer(currentFocusTask, 'block')
+                        }
+                      >
+                        标记阻塞
+                      </Button>
+                      <Button
+                        size="small"
+                        disabled={!currentFocusTaskEntryPath}
+                        onClick={() => openTaskEntry(currentFocusTask)}
+                      >
+                        查看关联记录
+                      </Button>
+                    </Space>
+                  </>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="暂无需要优先处理的任务"
                   />
-                </Col>
-                <Col xs={24} sm={8}>
-                  <Statistic title="跨角色阻塞" value={workflowStats.blocked} />
-                </Col>
-                <Col xs={24} sm={8}>
-                  <Statistic
-                    title="正式打印模板"
-                    value={printTemplateStats.total}
-                    suffix="套"
-                  />
-                </Col>
-              </Row>
+                )}
+              </section>
             </div>
           </Card>
 
-          <Row gutter={[16, 16]}>
-            <Col xs={24} xl={12}>
+          <Row gutter={[12, 12]}>
+            <Col xs={24} xl={14}>
               <Card
                 className="erp-dashboard-card erp-command-center-focus-card"
                 variant="borderless"
                 title="今日焦点"
-                extra={
-                  <Button
-                    size="small"
-                    onClick={() => openCommandCenterView('task-board')}
-                  >
-                    看全部任务
-                  </Button>
-                }
               >
                 <Space
                   direction="vertical"
@@ -744,7 +779,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             <Button
                               size="small"
                               type="primary"
-                              onClick={() => openTaskDrawer(task)}
+                              onClick={() => openTaskDrawer(task, 'complete')}
                             >
                               处理
                             </Button>
@@ -761,16 +796,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 </Space>
               </Card>
             </Col>
-            <Col xs={24} xl={12}>
+            <Col xs={24} xl={10}>
               <Card
                 className="erp-dashboard-card erp-command-center-health-card"
                 variant="borderless"
                 title="业务状态摘要"
-                extra={
-                  <Button size="small" onClick={openBusinessDashboard}>
-                    看业务看板
-                  </Button>
-                }
               >
                 <Space
                   direction="vertical"
@@ -800,26 +830,40 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             </Col>
           </Row>
 
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={8}>
+          <Row gutter={[12, 12]}>
+            <Col xs={24} lg={10}>
               <Card
                 className="erp-dashboard-card"
                 variant="borderless"
-                title="常用入口"
+                title="业务对象分布"
               >
-                <Space wrap>
-                  {dashboardModules.slice(0, 8).map((moduleItem) => (
-                    <Button
-                      key={moduleItem.key}
-                      onClick={() => navigate(moduleItem.path)}
-                    >
-                      {moduleItem.title}
-                    </Button>
+                <Space
+                  direction="vertical"
+                  size={10}
+                  className="erp-dashboard-block"
+                >
+                  {workbenchBusinessRows.map((row) => (
+                    <div className="erp-workbench-object-row" key={row.key}>
+                      <div>
+                        <Text strong>{row.module}</Text>
+                        <Text type="secondary">
+                          推进中{' '}
+                          {row.statusGroupCounts.project +
+                            row.statusGroupCounts.material +
+                            row.statusGroupCounts.production +
+                            row.statusGroupCounts.warehouse +
+                            row.statusGroupCounts.finance}
+                        </Text>
+                      </div>
+                      <Tag color={row.count > 0 ? 'blue' : 'default'}>
+                        {row.count}
+                      </Tag>
+                    </div>
                   ))}
                 </Space>
               </Card>
             </Col>
-            <Col xs={24} lg={8}>
+            <Col xs={24} lg={7}>
               <Card
                 className="erp-dashboard-card"
                 variant="borderless"
@@ -840,28 +884,36 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 </Row>
               </Card>
             </Col>
-            <Col xs={24} lg={8}>
+            <Col xs={24} lg={7}>
               <Card
                 className="erp-dashboard-card"
                 variant="borderless"
-                title="运营工具"
+                title="阻塞交接"
               >
-                <Space direction="vertical" className="erp-dashboard-block">
-                  <Button icon={<PrinterOutlined />} onClick={openPrintCenter}>
-                    模板打印中心
-                  </Button>
-                  <Button
-                    icon={<ExclamationCircleOutlined />}
-                    onClick={() => openCommandCenterView('exception-flow')}
-                  >
-                    异常 / 阻塞闭环
-                  </Button>
-                  <Alert
-                    type="info"
-                    showIcon
-                    message="边界"
-                    description="运营工具只组织协同和打印入口，不绕过业务页、WorkflowUsecase 或事实层。"
-                  />
+                <Space
+                  direction="vertical"
+                  size={10}
+                  className="erp-dashboard-block"
+                >
+                  {exceptionTasks.length > 0 ? (
+                    exceptionTasks.slice(0, 4).map((task) => (
+                      <div
+                        className="erp-workbench-blocked-row"
+                        key={task.id || task.task_code}
+                      >
+                        <Text strong>{task.task_name || '未命名任务'}</Text>
+                        <Text type="danger">
+                          {getWorkflowTaskReason(task) ||
+                            formatWorkflowTaskSource(task)}
+                        </Text>
+                      </div>
+                    ))
+                  ) : (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description="暂无阻塞任务"
+                    />
+                  )}
                 </Space>
               </Card>
             </Col>
@@ -881,45 +933,147 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               className="erp-dashboard-block"
               size={14}
             >
-              <Space className="erp-dashboard-heading-row" align="start">
-                <div>
-                  <Title level={4} className="erp-dashboard-section-title">
-                    任务看板
-                  </Title>
-                  <Paragraph type="secondary" className="erp-dashboard-summary">
-                    协同层总览。任务完成不代表库存、出货、财务或发票事实已过账。
-                  </Paragraph>
-                </div>
-                <Space wrap className="erp-dashboard-task-board-actions">
-                  <Button
-                    icon={<ReloadOutlined />}
-                    onClick={loadDashboardStats}
+              <div className="erp-task-center-overview">
+                <section className="erp-task-center-summary">
+                  <div>
+                    <Text type="secondary">ERP / 任务中心</Text>
+                    <Title level={3} className="erp-command-center-hero-title">
+                      任务看板
+                    </Title>
+                    <Paragraph className="erp-dashboard-summary">
+                      按职责处理任务，再回到真实业务对象；完成任务不代表库存、出货、财务或发票事实已过账。
+                    </Paragraph>
+                  </div>
+                  <div
+                    className="erp-task-center-metrics"
+                    aria-label="任务中心入口"
                   >
-                    刷新任务
-                  </Button>
-                  <Button
-                    icon={<ArrowRightOutlined />}
-                    onClick={openBusinessDashboard}
-                  >
-                    看业务状态
-                  </Button>
-                  <Button icon={<PrinterOutlined />} onClick={openPrintCenter}>
-                    去打印中心
-                  </Button>
-                </Space>
-              </Space>
-              <Space wrap>
-                <Tag color="blue">
-                  本页待办 {workflowStats.pending + workflowStats.processing}
-                </Tag>
-                <Tag color="red">阻塞 {workflowStats.blocked}</Tag>
-                <Tag color="orange">
-                  到期 {workflowStats.dueSoon + workflowStats.overdue}
-                </Tag>
-                <Tag color="green">已完成 {workflowStats.done}</Tag>
-                <Tag color={hasActiveFilters ? 'green' : 'default'}>
-                  {hasActiveFilters ? '筛选已生效' : '全部任务'}
-                </Tag>
+                    <button
+                      type="button"
+                      className="erp-task-center-metric"
+                      onClick={() => updateFilter('status', 'pending')}
+                    >
+                      <span>待我处理</span>
+                      <strong>{taskCenterAssignedCount}</strong>
+                    </button>
+                    <button
+                      type="button"
+                      className="erp-task-center-metric"
+                      onClick={() => updateFilter('status', 'all')}
+                    >
+                      <span>发起来源</span>
+                      <strong>{taskCenterSourceCount}</strong>
+                    </button>
+                    <button
+                      type="button"
+                      className="erp-task-center-metric erp-task-center-metric--danger"
+                      onClick={() => updateFilter('status', 'blocked')}
+                    >
+                      <span>阻塞交接</span>
+                      <strong>{taskCenterBlockedCount}</strong>
+                    </button>
+                    <button
+                      type="button"
+                      className="erp-task-center-metric"
+                      onClick={clearFilters}
+                    >
+                      <span>当前结果</span>
+                      <strong>{filteredTasks.length}</strong>
+                    </button>
+                  </div>
+                </section>
+
+                <section
+                  className="erp-task-center-current"
+                  aria-label="当前任务"
+                >
+                  <div className="erp-task-center-current-head">
+                    <Text type="secondary">当前任务</Text>
+                    {taskCenterCurrentStatusMeta ? (
+                      <Tag color={taskCenterCurrentStatusMeta.color}>
+                        {taskCenterCurrentStatusMeta.label}
+                      </Tag>
+                    ) : (
+                      <Tag>暂无任务</Tag>
+                    )}
+                  </div>
+                  {taskCenterCurrentTask ? (
+                    <>
+                      <Title
+                        level={5}
+                        className="erp-task-center-current-title"
+                      >
+                        {taskCenterCurrentTask.task_name || '未命名任务'}
+                      </Title>
+                      <Text
+                        type="secondary"
+                        className="erp-task-center-current-meta"
+                      >
+                        {formatWorkflowTaskSource(taskCenterCurrentTask)} /{' '}
+                        {getWorkflowTaskDueLabel(taskCenterCurrentTask)}
+                      </Text>
+                      {getWorkflowTaskReason(taskCenterCurrentTask) ? (
+                        <Text
+                          type="danger"
+                          className="erp-task-center-current-meta"
+                        >
+                          {getWorkflowTaskReason(taskCenterCurrentTask)}
+                        </Text>
+                      ) : null}
+                      <Space wrap className="erp-task-center-current-actions">
+                        <Button
+                          size="small"
+                          type="primary"
+                          disabled={isTerminalWorkflowTask(
+                            taskCenterCurrentTask
+                          )}
+                          onClick={() =>
+                            openTaskDrawer(taskCenterCurrentTask, 'complete')
+                          }
+                        >
+                          处理完成
+                        </Button>
+                        <Button
+                          size="small"
+                          danger
+                          disabled={isTerminalWorkflowTask(
+                            taskCenterCurrentTask
+                          )}
+                          onClick={() =>
+                            openTaskDrawer(taskCenterCurrentTask, 'block')
+                          }
+                        >
+                          标记阻塞
+                        </Button>
+                        <Button
+                          size="small"
+                          disabled={!taskCenterCurrentEntryPath}
+                          onClick={() => openTaskEntry(taskCenterCurrentTask)}
+                        >
+                          关联对象
+                        </Button>
+                      </Space>
+                    </>
+                  ) : (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description="暂无任务"
+                    />
+                  )}
+                </section>
+              </div>
+
+              <Space wrap className="erp-task-center-actions">
+                <Button icon={<ReloadOutlined />} onClick={loadDashboardStats}>
+                  刷新任务
+                </Button>
+                <Button
+                  icon={<CloseCircleOutlined />}
+                  disabled={!hasActiveFilters}
+                  onClick={clearFilters}
+                >
+                  清空筛选
+                </Button>
               </Space>
               <div className="erp-task-board-filters">
                 <Input.Search
@@ -950,13 +1104,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   options={sourceOptions}
                   onChange={(value) => updateFilter('sourceType', value)}
                 />
-                <Button
-                  icon={<CloseCircleOutlined />}
-                  disabled={!hasActiveFilters}
-                  onClick={clearFilters}
-                >
-                  清空筛选
-                </Button>
               </div>
               <div className="erp-task-board-lanes" aria-label="任务看板泳道">
                 {taskLanes.map((lane) => (
@@ -975,14 +1122,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             className="erp-dashboard-card erp-dashboard-table-card"
             variant="borderless"
             title="任务处理明细"
-            extra={
-              <Button
-                icon={<FileSearchOutlined />}
-                onClick={openBusinessDashboard}
-              >
-                打开业务状态
-              </Button>
-            }
           >
             <Table
               size="middle"
@@ -1010,13 +1149,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           <Card
             className="erp-dashboard-card erp-command-center-exception-card"
             variant="borderless"
-            title="异常 / 阻塞闭环"
             extra={
-              <Button onClick={() => openCommandCenterView('task-board')}>
+              <Button onClick={() => navigate('/erp/task-board')}>
                 回任务看板
               </Button>
             }
           >
+            <Text type="secondary">ERP / 异常处理</Text>
+            <Title level={3} className="erp-command-center-hero-title">
+              异常 / 阻塞闭环
+            </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
               定义阻塞、责任分派、处理跟进、验证恢复和关闭归档的用户路径；所有状态更新仍通过
               Workflow 任务动作完成。

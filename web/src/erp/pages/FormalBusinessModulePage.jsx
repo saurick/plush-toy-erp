@@ -1,23 +1,41 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  DeleteOutlined,
   DownloadOutlined,
-  EyeOutlined,
+  DownOutlined,
+  EditOutlined,
+  InboxOutlined,
   InfoCircleOutlined,
+  LinkOutlined,
+  MoreOutlined,
   PlusOutlined,
+  PrinterOutlined,
   ReloadOutlined,
+  RollbackOutlined,
   SettingOutlined,
-  VerticalAlignBottomOutlined,
-  VerticalAlignTopOutlined,
+  SwapOutlined,
 } from '@ant-design/icons'
-import { Button, Descriptions, Drawer, Modal, Space, Tag, Tooltip } from 'antd'
+import {
+  Button,
+  Descriptions,
+  Drawer,
+  Dropdown,
+  Empty,
+  Input,
+  Modal,
+  Popconfirm,
+  Space,
+  Table,
+  Tag,
+  Tooltip,
+} from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   BusinessDataTable,
-  BusinessFilterPanel,
-  BusinessListToolbar,
+  BusinessOperationPanel,
   BusinessPageLayout,
   CollaborationTaskPanel,
   PageHeaderCard,
@@ -26,12 +44,13 @@ import {
   SelectionActionBar,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import {
+  ColumnOrderModal,
+  getColumnLabel,
+} from '../components/business-list/ColumnOrderModal.jsx'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import {
   applyModuleColumnOrder,
-  buildModuleColumnOrder,
-  getModuleColumnKey,
-  repositionModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
 
@@ -39,9 +58,9 @@ const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 
 const STATUS_OPTIONS = Object.freeze([
   { label: '全部状态', value: '' },
-  { label: '待接入', value: 'pending_api', color: 'blue' },
-  { label: '待评审', value: 'review_required', color: 'gold' },
-  { label: '已收口', value: 'source_grounded', color: 'green' },
+  { label: '待处理', value: 'pending_api', color: 'blue' },
+  { label: '待确认', value: 'review_required', color: 'gold' },
+  { label: '可查看', value: 'source_grounded', color: 'green' },
 ])
 
 const OWNER_ROLE_LABELS = Object.freeze({
@@ -63,9 +82,43 @@ const OWNER_ROLE_LABELS = Object.freeze({
   invoices: '财务',
 })
 
-function getColumnLabel(column = {}) {
-  return String(column.exportTitle || column.title || column.key || '').trim()
-}
+const MODULE_CREATE_LABELS = Object.freeze({
+  products: '新建产品',
+  'material-bom': '新建BOM',
+  'accessories-purchase': '新建采购订单',
+  inbound: '新建入库',
+  'quality-inspections': '新建质检单',
+  inventory: '新建库存调整',
+  'processing-contracts': '新建委外订单',
+  'production-scheduling': '新建排程',
+  'production-progress': '新建进度记录',
+  'production-exceptions': '新建异常',
+  'shipping-release': '新建放行单',
+  outbound: '新建出库',
+  reconciliation: '新建对账',
+  payables: '新建应付',
+  receivables: '新建应收',
+  invoices: '新建发票',
+})
+
+const MODULE_PRIMARY_ACTION_LABELS = Object.freeze({
+  products: '生成产品资料',
+  'material-bom': '生成BOM',
+  'accessories-purchase': '生成采购合同',
+  inbound: '生成入库单',
+  'quality-inspections': '生成质检结论',
+  inventory: '生成库存调整',
+  'processing-contracts': '生成委外合同',
+  'production-scheduling': '生成生产任务',
+  'production-progress': '更新进度',
+  'production-exceptions': '关闭异常',
+  'shipping-release': '生成出货放行',
+  outbound: '生成出库',
+  reconciliation: '生成对账单',
+  payables: '生成应付',
+  receivables: '生成应收',
+  invoices: '生成发票',
+})
 
 function renderColumnHeader(column, onOpenColumnOrder) {
   const label = getColumnLabel(column)
@@ -77,7 +130,7 @@ function renderColumnHeader(column, onOpenColumnOrder) {
           type="text"
           size="small"
           className="erp-module-column-header-trigger"
-          icon={<SettingOutlined />}
+          icon={<MoreOutlined />}
           aria-label={`${label} 列设置`}
           onClick={(event) => {
             event.stopPropagation()
@@ -175,6 +228,10 @@ function statusTag(status) {
   return <Tag color={option.color || 'default'}>{option.label}</Tag>
 }
 
+function compareText(a, b) {
+  return String(a || '').localeCompare(String(b || ''), 'zh-Hans-CN')
+}
+
 function buildFormalShellRows(moduleItem) {
   const scopeItems = Array.isArray(moduleItem?.currentScope)
     ? moduleItem.currentScope
@@ -187,36 +244,36 @@ function buildFormalShellRows(moduleItem) {
   return [
     {
       id: `${moduleItem.key}-source`,
-      document_no: `${moduleItem.key.toUpperCase()}-SOURCE`,
-      title: `${moduleItem.title}真源评审`,
+      document_no: `${moduleItem.key.toUpperCase()}-001`,
+      title: `${moduleItem.title}列表视图`,
       business_status: 'source_grounded',
       owner_role: ownerRole,
       source_refs: refs,
-      next_action: '按领域 usecase 接入读写 API',
+      next_action: '查看详情或调整列顺序',
       updated_at: '2026-06-13',
       scope: scopeItems[0] || moduleItem.primaryEntity || moduleItem.title,
     },
     {
       id: `${moduleItem.key}-review`,
-      document_no: `${moduleItem.key.toUpperCase()}-REVIEW`,
-      title: `${moduleItem.title}页面字段清单`,
+      document_no: `${moduleItem.key.toUpperCase()}-002`,
+      title: `${moduleItem.title}字段确认`,
       business_status: 'review_required',
       owner_role: ownerRole,
       source_refs: moduleItem.primaryEntity || refs,
-      next_action: '补字段、动作和审计边界评审',
+      next_action: '确认字段和详情页内容',
       updated_at: '2026-06-13',
       scope: scopeItems[1] || moduleItem.boundary || '字段和动作待评审',
     },
     {
       id: `${moduleItem.key}-api`,
-      document_no: `${moduleItem.key.toUpperCase()}-API`,
-      title: `${moduleItem.title}领域 API 接入`,
+      document_no: `${moduleItem.key.toUpperCase()}-003`,
+      title: `${moduleItem.title}操作配置`,
       business_status: 'pending_api',
       owner_role: ownerRole,
       source_refs: moduleItem.factSource || refs,
-      next_action: '后续补 schema / API / RBAC / 测试闭环',
+      next_action: '接入新建、编辑、流转和打印',
       updated_at: '2026-06-13',
-      scope: scopeItems[2] || '运行时写入待接入正式领域能力',
+      scope: scopeItems[2] || '操作入口待接入',
     },
   ]
 }
@@ -240,109 +297,6 @@ function recordMatchesKeyword(record, keyword) {
     String(value || '')
       .toLowerCase()
       .includes(query)
-  )
-}
-
-function ColumnOrderModal({
-  open,
-  columns = [],
-  order = [],
-  saving = false,
-  moduleTitle = '',
-  onChange,
-  onReset,
-  onClose,
-}) {
-  const normalizedOrder = useMemo(() => {
-    const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
-    return sanitizedOrder.length > 0
-      ? sanitizedOrder
-      : buildModuleColumnOrder(columns)
-  }, [columns, order])
-  const orderedColumns = useMemo(
-    () => applyModuleColumnOrder(columns, normalizedOrder),
-    [columns, normalizedOrder]
-  )
-
-  return (
-    <Modal
-      title="调整列表列顺序"
-      open={open}
-      onCancel={onClose}
-      destroyOnHidden={false}
-      footer={
-        <Space wrap>
-          <Button disabled={saving} onClick={onReset}>
-            恢复默认
-          </Button>
-          <Button type="primary" loading={saving} onClick={onClose}>
-            完成
-          </Button>
-        </Space>
-      }
-    >
-      <div
-        className="erp-business-column-order-modal"
-        role="list"
-        aria-label={`${moduleTitle || '列表'}列顺序`}
-      >
-        {orderedColumns.map((column, index) => {
-          const key = getModuleColumnKey(column, index)
-          const label = getColumnLabel(column)
-          return (
-            <div
-              key={key}
-              className="erp-business-column-order-modal__row"
-              role="listitem"
-            >
-              <span className="erp-business-column-order-modal__label">
-                {label}
-              </span>
-              <Space size={4}>
-                <Tooltip title="移到最前">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<VerticalAlignTopOutlined />}
-                    aria-label={`${label} 移到最前`}
-                    disabled={saving || index === 0}
-                    onClick={() =>
-                      onChange?.(
-                        repositionModuleColumnOrder(
-                          normalizedOrder,
-                          columns,
-                          key,
-                          0
-                        )
-                      )
-                    }
-                  />
-                </Tooltip>
-                <Tooltip title="移到最后">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<VerticalAlignBottomOutlined />}
-                    aria-label={`${label} 移到最后`}
-                    disabled={saving || index === orderedColumns.length - 1}
-                    onClick={() =>
-                      onChange?.(
-                        repositionModuleColumnOrder(
-                          normalizedOrder,
-                          columns,
-                          key,
-                          orderedColumns.length - 1
-                        )
-                      )
-                    }
-                  />
-                </Tooltip>
-              </Space>
-            </div>
-          )
-        })}
-      </div>
-    </Modal>
   )
 }
 
@@ -384,7 +338,11 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [detailRecord, setDetailRecord] = useState(null)
-  const [actionOpen, setActionOpen] = useState(false)
+  const [actionModal, setActionModal] = useState(null)
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+  const [batchDeleteReason, setBatchDeleteReason] = useState('')
+  const [recycleOpen, setRecycleOpen] = useState(false)
+  const [recycleSelectedRowKeys, setRecycleSelectedRowKeys] = useState([])
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
@@ -444,12 +402,14 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         exportTitle: '业务编号',
         dataIndex: 'document_no',
         width: 180,
+        sorter: (a, b) => compareText(a.document_no, b.document_no),
       },
       {
         title: '标题',
         exportTitle: '标题',
         dataIndex: 'title',
         width: 220,
+        sorter: (a, b) => compareText(a.title, b.title),
       },
       {
         title: '状态',
@@ -457,6 +417,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         dataIndex: 'business_status',
         width: 120,
         render: statusTag,
+        sorter: (a, b) => compareText(a.business_status, b.business_status),
         exportValue: (record) =>
           STATUS_OPTIONS.find((item) => item.value === record.business_status)
             ?.label || record.business_status,
@@ -466,59 +427,42 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         exportTitle: '责任角色',
         dataIndex: 'owner_role',
         width: 160,
+        sorter: (a, b) => compareText(a.owner_role, b.owner_role),
       },
       {
-        title: '真源 / 依赖',
-        exportTitle: '真源 / 依赖',
+        title: '来源',
+        exportTitle: '来源',
         dataIndex: 'source_refs',
         width: 260,
+        sorter: (a, b) => compareText(a.source_refs, b.source_refs),
       },
       {
-        title: '当前范围',
-        exportTitle: '当前范围',
+        title: '内容',
+        exportTitle: '内容',
         dataIndex: 'scope',
         width: 260,
+        sorter: (a, b) => compareText(a.scope, b.scope),
       },
       {
         title: '下一步',
         exportTitle: '下一步',
         dataIndex: 'next_action',
         width: 240,
+        sorter: (a, b) => compareText(a.next_action, b.next_action),
       },
       {
         title: '更新时间',
         exportTitle: '更新时间',
         dataIndex: 'updated_at',
         width: 130,
-      },
-      {
-        title: '操作',
-        key: 'actions',
-        fixed: 'right',
-        width: 130,
-        render: (_, record) => (
-          <Button
-            type="link"
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={(event) => {
-              event.stopPropagation()
-              setDetailRecord(record)
-            }}
-          >
-            查看详情
-          </Button>
-        ),
+        sorter: (a, b) => compareText(a.updated_at, b.updated_at),
       },
     ].map((column, index) => ({
       ...column,
-      title:
-        column.key === 'actions'
-          ? column.title
-          : renderColumnHeader(
-              { ...column, key: column.key || column.dataIndex },
-              openColumnOrder
-            ),
+      title: renderColumnHeader(
+        { ...column, key: column.key || column.dataIndex },
+        openColumnOrder
+      ),
       key: column.key || column.dataIndex || `column-${index}`,
     }))
   }, [])
@@ -576,16 +520,55 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     message.success('已导出当前结果')
   }
 
-  const openActionHint = () => {
-    setActionOpen(true)
+  const openActionHint = (actionLabel) => {
+    setActionModal({
+      title: actionLabel || MODULE_CREATE_LABELS[moduleItem.key] || '新建记录',
+      record: selectedRows[0] || null,
+    })
   }
 
   const selectedLabel =
     selectedRows.length === 1
-      ? selectedRows[0].title
+      ? `${selectedRows[0].document_no} / ${selectedRows[0].title}`
       : selectedRows.length > 1
         ? `已选择 ${selectedRows.length} 条${moduleItem.shortLabel || '记录'}`
-        : `未选择${moduleItem.shortLabel || '记录'}`
+        : `请先选择一条${moduleItem.shortLabel || '记录'}`
+  const singleSelectedRecord =
+    selectedRows.length === 1 ? selectedRows[0] : null
+  const createLabel = MODULE_CREATE_LABELS[moduleItem.key] || '新建记录'
+  const primaryActionLabel =
+    MODULE_PRIMARY_ACTION_LABELS[moduleItem.key] || '生成下游记录'
+  const linkedMenuItems = [
+    { key: 'source', label: '来源记录' },
+    { key: 'downstream', label: '下游记录' },
+  ]
+  const transitionMenuItems = [
+    { key: 'submit', label: '提交' },
+    { key: 'approve', label: '确认' },
+    { key: 'return', label: '退回' },
+  ]
+  const recycleColumns = [
+    { title: '单据编号', dataIndex: 'document_no', width: 180 },
+    { title: '标题', dataIndex: 'title', width: 260 },
+    {
+      title: '业务状态',
+      dataIndex: 'business_status',
+      width: 120,
+      render: statusTag,
+    },
+    { title: '删除时间', dataIndex: 'deleted_at', width: 160 },
+    { title: '删除原因', dataIndex: 'delete_reason', width: 180 },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 110,
+      render: () => (
+        <Button type="link" size="small" disabled>
+          恢复
+        </Button>
+      ),
+    },
+  ]
 
   return (
     <BusinessPageLayout className="erp-formal-business-module-page">
@@ -593,37 +576,39 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         sectionTitle={moduleItem.sectionTitle || '正式业务入口'}
         title={moduleItem.title}
         description={moduleItem.description}
-        tags={
-          <Space wrap>
-            <Tag color="green">正式新入口</Tag>
-            <Tag color="blue">领域 API 待接入</Tag>
-            <Tag>不读取 business_records</Tag>
-          </Space>
-        }
         stats={[
-          { key: 'rows', label: '当前结果', value: filteredRows.length },
-          { key: 'selected', label: '已选', value: selectedRowKeys.length },
+          { key: 'total', label: '总记录', value: rows.length },
+          { key: 'current', label: '当前结果', value: filteredRows.length },
           {
-            key: 'refs',
-            label: '真源引用',
-            value: moduleItem.sourceRefs?.length || 1,
+            key: 'pending',
+            label: '待处理',
+            value: rows.filter(
+              (record) => record.business_status === 'pending_api'
+            ).length,
           },
+          { key: 'selected', label: '已选记录', value: selectedRowKeys.length },
         ]}
-        summary={moduleItem.boundary}
       />
 
-      <BusinessFilterPanel
-        summary={`当前页面先恢复 ${moduleItem.title} 的产品核心入口和列表体验。`}
+      <BusinessOperationPanel
+        filters={
+          <>
+            <SearchInput
+              value={keyword}
+              placeholder={`搜索${moduleItem.shortLabel || moduleItem.title}、编号、责任人`}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            <SelectFilter
+              value={statusFilter}
+              allowClear
+              placeholder="全部状态"
+              options={STATUS_OPTIONS}
+              onChange={(value) => setStatusFilter(value || '')}
+            />
+          </>
+        }
         actions={
           <Space wrap>
-            <ToolbarButton
-              icon={<ReloadOutlined />}
-              onClick={() =>
-                message.info(`${moduleItem.title}暂无远端 API，已保留当前筛选`)
-              }
-            >
-              刷新
-            </ToolbarButton>
             <ToolbarButton
               icon={<DownloadOutlined />}
               onClick={exportRows}
@@ -638,88 +623,149 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               列顺序
             </ToolbarButton>
             <ToolbarButton
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={openActionHint}
+              icon={<DeleteOutlined />}
+              danger
+              disabled={selectedRowKeys.length === 0}
+              onClick={() => setBatchDeleteOpen(true)}
             >
-              新建草稿
+              批量删除
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<InboxOutlined />}
+              onClick={() => setRecycleOpen(true)}
+            >
+              回收站
             </ToolbarButton>
           </Space>
         }
-      >
-        <SearchInput
-          value={keyword}
-          placeholder={`搜索${moduleItem.shortLabel || moduleItem.title}、真源或下一步`}
-          onChange={(event) => setKeyword(event.target.value)}
-        />
-        <SelectFilter
-          value={statusFilter}
-          allowClear
-          placeholder="状态"
-          options={STATUS_OPTIONS}
-          onChange={(value) => setStatusFilter(value || '')}
-        />
-      </BusinessFilterPanel>
-
-      <BusinessListToolbar
-        stats={[
-          { key: 'all', label: '样例行', value: rows.length },
-          { key: 'filtered', label: '筛选结果', value: filteredRows.length },
-          {
-            key: 'pending',
-            label: '待接入 API',
-            value: rows.filter(
-              (record) => record.business_status === 'pending_api'
-            ).length,
-          },
-        ]}
-        actions={
-          <Space wrap>
-            <Tag color="blue">{moduleItem.primaryEntity}</Tag>
-            <Tag>Workflow / Fact 分层守卫</Tag>
-          </Space>
+        primaryAction={
+          <ToolbarButton
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => openActionHint(createLabel)}
+          >
+            {createLabel}
+          </ToolbarButton>
         }
-      />
-
-      <SelectionActionBar
-        selectedCount={selectedRowKeys.length}
-        selectedLabel={selectedLabel}
-        summaryItems={[
-          { key: 'module', label: '模块', value: moduleItem.title },
-          {
-            key: 'source',
-            label: '真源',
-            value: moduleItem.primaryEntity || '待评审',
-          },
-        ]}
-        collaborationItems={[
-          { key: 'boundary', label: '边界', value: '不写旧表', color: 'green' },
-        ]}
-        boundaryText="当前操作只恢复页面交互；真实写入必须走领域 usecase、schema、API、RBAC 和审计。"
       >
-        <Button
-          icon={<InfoCircleOutlined />}
-          disabled={selectedRowKeys.length === 0}
-          onClick={() => setDetailRecord(selectedRows[0] || null)}
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRowKeys.length}
+          selectedLabel={selectedLabel}
         >
-          查看选中
-        </Button>
-        <Button type="primary" onClick={openActionHint}>
-          接入动作说明
-        </Button>
-      </SelectionActionBar>
+          {selectedRowKeys.length > 0 ? (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => setSelectedRowKeys([])}
+            >
+              清空已选
+            </Button>
+          ) : null}
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            disabled={!singleSelectedRecord}
+            onClick={() => openActionHint('编辑')}
+          >
+            编辑
+          </Button>
+          <Dropdown
+            menu={{
+              items: linkedMenuItems,
+              onClick: ({ key }) =>
+                openActionHint(key === 'source' ? '来源记录' : '下游记录'),
+            }}
+            disabled={!singleSelectedRecord}
+            trigger={['click']}
+          >
+            <Button
+              size="small"
+              icon={<LinkOutlined />}
+              disabled={!singleSelectedRecord}
+            >
+              关联表格 <DownOutlined />
+            </Button>
+          </Dropdown>
+          <Dropdown
+            menu={{
+              items: transitionMenuItems,
+              onClick: ({ key }) => {
+                const label =
+                  transitionMenuItems.find((item) => item.key === key)?.label ||
+                  '流转'
+                openActionHint(label)
+              },
+            }}
+            disabled={!singleSelectedRecord}
+            trigger={['click']}
+          >
+            <Button
+              size="small"
+              icon={<SwapOutlined />}
+              disabled={!singleSelectedRecord}
+            >
+              流转 <DownOutlined />
+            </Button>
+          </Dropdown>
+          <Button
+            size="small"
+            type="primary"
+            disabled={!singleSelectedRecord}
+            onClick={() => openActionHint(primaryActionLabel)}
+          >
+            {primaryActionLabel}
+          </Button>
+          <Button
+            size="small"
+            icon={<PrinterOutlined />}
+            disabled={!singleSelectedRecord}
+            onClick={() => openActionHint('打印')}
+          >
+            打印
+          </Button>
+          <Popconfirm
+            title="确认删除该记录？"
+            okText="删除"
+            cancelText="取消"
+            disabled={!singleSelectedRecord}
+            onConfirm={() => openActionHint('删除')}
+          >
+            <Button
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              disabled={!singleSelectedRecord}
+            >
+              删除
+            </Button>
+          </Popconfirm>
+          <Button
+            size="small"
+            icon={<InfoCircleOutlined />}
+            disabled={!singleSelectedRecord}
+            onClick={() => setDetailRecord(singleSelectedRecord)}
+          >
+            详情
+          </Button>
+        </SelectionActionBar>
+      </BusinessOperationPanel>
 
       <BusinessDataTable
         rowKey="id"
         columns={orderedColumns}
         dataSource={filteredRows}
         scroll={{ x: 1450 }}
-        emptyDescription="暂无匹配记录；当前页面只展示正式入口壳和接入清单。"
+        emptyDescription="暂无匹配记录"
         rowSelection={{
           selectedRowKeys,
           onChange: (nextKeys) => setSelectedRowKeys(nextKeys),
         }}
+        rowClassName={(record) =>
+          selectedRowKeys.includes(record.id) ? 'ant-table-row-selected' : ''
+        }
         onRow={(record) => ({
+          onClick: () => setSelectedRowKeys([record.id]),
           onDoubleClick: () => setDetailRecord(record),
         })}
         pagination={{
@@ -748,16 +794,121 @@ export default function FormalBusinessModulePage({ moduleKey }) {
       </Drawer>
 
       <Modal
-        title={`${moduleItem.title}动作待接入领域 API`}
-        open={actionOpen}
-        onCancel={() => setActionOpen(false)}
+        className="erp-business-action-modal erp-business-action-modal--confirm"
+        width={560}
+        title={actionModal?.title || '操作'}
+        open={Boolean(actionModal)}
+        onCancel={() => setActionModal(null)}
         footer={
-          <Button type="primary" onClick={() => setActionOpen(false)}>
-            知道了
+          <Button type="primary" onClick={() => setActionModal(null)}>
+            确定
           </Button>
         }
+        centered
+        destroyOnHidden
       >
-        <ModuleBoundaryDescriptions moduleItem={moduleItem} />
+        <Descriptions bordered column={1} size="small">
+          <Descriptions.Item label="当前模块">
+            {moduleItem.title}
+          </Descriptions.Item>
+          <Descriptions.Item label="当前记录">
+            {actionModal?.record?.document_no || selectedLabel}
+          </Descriptions.Item>
+          <Descriptions.Item label="保存位置">
+            {moduleItem.primaryEntity || moduleItem.title}
+          </Descriptions.Item>
+        </Descriptions>
+      </Modal>
+
+      <Modal
+        className="erp-business-action-modal erp-business-action-modal--confirm erp-business-batch-delete-modal"
+        width={560}
+        title="批量删除记录"
+        open={batchDeleteOpen}
+        onCancel={() => setBatchDeleteOpen(false)}
+        onOk={() => {
+          setBatchDeleteOpen(false)
+          setBatchDeleteReason('')
+          message.info(`${moduleItem.title}删除动作待接入正式数据后启用`)
+        }}
+        okText="确认删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true, disabled: selectedRowKeys.length === 0 }}
+        centered
+        destroyOnHidden
+      >
+        <Space
+          direction="vertical"
+          size={12}
+          className="erp-business-batch-delete-modal__content"
+        >
+          <span>
+            已选择 <strong>{selectedRowKeys.length}</strong>{' '}
+            条记录，将进入回收站。
+          </span>
+          <Input.TextArea
+            className="erp-business-batch-delete-modal__reason"
+            value={batchDeleteReason}
+            onChange={(event) => setBatchDeleteReason(event.target.value)}
+            rows={3}
+            maxLength={255}
+            showCount
+            placeholder="请输入删除原因（可选）"
+          />
+        </Space>
+      </Modal>
+
+      <Modal
+        className="erp-business-action-modal erp-business-action-modal--recycle"
+        title="回收站"
+        open={recycleOpen}
+        onCancel={() => {
+          setRecycleOpen(false)
+          setRecycleSelectedRowKeys([])
+        }}
+        footer={null}
+        width={980}
+        centered
+        destroyOnHidden
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Space wrap>
+            <Button
+              icon={<RollbackOutlined />}
+              disabled={recycleSelectedRowKeys.length === 0}
+            >
+              批量恢复
+            </Button>
+            <Button icon={<ReloadOutlined />}>刷新</Button>
+            <span>已选择 {recycleSelectedRowKeys.length} 条回收站记录</span>
+            {recycleSelectedRowKeys.length > 0 ? (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => setRecycleSelectedRowKeys([])}
+              >
+                清空已选
+              </Button>
+            ) : null}
+          </Space>
+          <Table
+            rowKey="id"
+            size="small"
+            rowSelection={{
+              selectedRowKeys: recycleSelectedRowKeys,
+              onChange: (keys) => setRecycleSelectedRowKeys(keys),
+            }}
+            columns={recycleColumns}
+            dataSource={[]}
+            pagination={{
+              pageSize: 8,
+              showSizeChanger: false,
+              showTotal: (total) => `共 ${total} 条`,
+            }}
+            locale={{ emptyText: <Empty description="回收站暂无记录" /> }}
+            scroll={{ x: 1010 }}
+          />
+        </Space>
       </Modal>
 
       <ColumnOrderModal

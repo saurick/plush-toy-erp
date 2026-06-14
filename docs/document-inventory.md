@@ -132,11 +132,13 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/prototypes/action-modal-drawer-standard-v1/README.md` | 弹窗 / 抽屉动作标准样板 / Action Modal And Drawer Standard Prototype |
 | `docs/product/prototypes/business-detail-page-standard-v1/README.md` | 业务详情页标准样板 / Business Detail Page Standard Prototype |
 | `docs/product/prototypes/business-form-page-standard-v1/README.md` | 新建 / 编辑表单标准样板 / Business Form Page Standard Prototype |
+| `docs/product/prototypes/business-management-center-v1/README.md` | 业务管理中心样板 / Business Management Center Pattern |
 | `docs/product/prototypes/business-module-page-standard-v1/README.md` | 业务模块标准页原型 / Business Module Page Standard Prototype |
 | `docs/product/prototypes/core-menu-coverage-v1/README.md` | 产品核心菜单覆盖样板 / Core Menu Coverage Pattern |
 | `docs/product/prototypes/formal-menu-candidate-v1/README.md` | 正式菜单候选原型 / Formal Menu Candidate Prototype |
 | `docs/product/prototypes/mobile-role-tasks-v1/README.md` | 岗位任务端原型 / Mobile Role Tasks Prototype |
 | `docs/product/prototypes/print-template-center-v1/README.md` | 模板打印中心原型 / Print Template Center Prototype |
+| `docs/product/prototypes/task-command-center-v1/README.md` | 任务中心样板 / Task Command Center Pattern |
 | `docs/product/product-completion-roadmap.md` | 产品完成路线图 / Product Completion Roadmap |
 | `docs/product/product-delivery-ledgers.md` | 产品台账索引 / Product Delivery Ledgers Index |
 | `docs/product/product-principles.md` | 产品原则 / Product Principles |

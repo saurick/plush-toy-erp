@@ -9,9 +9,21 @@ export const AUTH_FAILURE_ERROR_CODES = Object.freeze([
   RpcErrorCode.AUTH_REQUIRED,
 ])
 
+export const ADMIN_SESSION_UNAVAILABLE_ERROR_CODES = Object.freeze([
+  RpcErrorCode.HTTP_UNAUTHORIZED,
+  RpcErrorCode.ADMIN_REQUIRED,
+  RpcErrorCode.ADMIN_DISABLED,
+  RpcErrorCode.ADMIN_NOT_FOUND,
+  RpcErrorCode.AUTH_CURRENT_USER_FAILED,
+])
+
 // 仅登录态失效错误会触发登出，权限不足必须保留当前会话。
 export function isAuthFailureCode(code) {
   return AUTH_FAILURE_ERROR_CODES.includes(Number(code))
+}
+
+export function isAdminSessionUnavailableCode(code) {
+  return ADMIN_SESSION_UNAVAILABLE_ERROR_CODES.includes(Number(code))
 }
 
 export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
