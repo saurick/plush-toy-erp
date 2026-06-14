@@ -8444,6 +8444,36 @@
   white-space: nowrap;
 }
 
+.erp-business-selection-action-bar__tag.ant-tag[tabindex] {
+  cursor: pointer;
+}
+
+.erp-business-selection-action-bar__tag.ant-tag[tabindex]:focus-visible {
+  outline: 2px solid rgb(34 197 94 / 0.5);
+  outline-offset: 2px;
+}
+
+.erp-business-selected-items-popover .ant-popover-inner {
+  max-width: min(520px, calc(100vw - 48px));
+}
+
+.erp-business-selected-items-popover__items {
+  display: flex;
+  max-width: 100%;
+  min-width: min(320px, calc(100vw - 96px));
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+
+.erp-business-selected-items-popover__item.ant-tag {
+  max-width: 100%;
+  margin-inline-end: 0;
+  border-radius: 8px;
+  padding: 4px 12px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .erp-business-selection-action-bar__summary-item {
   display: inline-flex;
   min-width: 0;
@@ -10520,6 +10550,16 @@
   border-color: var(--erp-border);
   background: rgb(17 24 39 / 0.58);
   color: var(--erp-text-subtle);
+}
+
+[data-erp-theme='dark'] .ant-btn.ant-btn-link,
+[data-erp-theme='dark'] .ant-btn.ant-btn-text,
+[data-erp-theme='dark'] .ant-btn.ant-btn-link:disabled,
+[data-erp-theme='dark'] .ant-btn.ant-btn-link.ant-btn-disabled,
+[data-erp-theme='dark'] .ant-btn.ant-btn-text:disabled,
+[data-erp-theme='dark'] .ant-btn.ant-btn-text.ant-btn-disabled {
+  border-color: transparent;
+  background: transparent;
 }
 
 [data-erp-theme='dark'] .ant-empty-description,

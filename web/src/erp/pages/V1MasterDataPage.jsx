@@ -5,7 +5,6 @@ import {
   DownloadOutlined,
   EditOutlined,
   InboxOutlined,
-  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   RollbackOutlined,
@@ -21,11 +20,11 @@ import {
   Input,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Switch,
   Table,
   Tag,
-  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -42,6 +41,7 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  ColumnOrderHeaderMenu,
   ColumnOrderModal,
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
@@ -121,33 +121,25 @@ const ACTIVE_FILTER_OPTIONS = Object.freeze([
   { label: '仅看启用', value: 'active' },
 ])
 
+const SUPPLIER_TYPE_OPTIONS = Object.freeze([
+  { label: '原辅料供应商', value: 'material' },
+  { label: '委外加工厂', value: 'outsourcing' },
+  { label: '服务供应商', value: 'service' },
+  { label: '综合供应商', value: 'mixed' },
+])
+
+const SUPPLIER_TYPE_LABELS = Object.freeze(
+  Object.fromEntries(
+    SUPPLIER_TYPE_OPTIONS.map((item) => [item.value, item.label])
+  )
+)
+
 function compareText(a, b) {
   return String(a || '').localeCompare(String(b || ''))
 }
 
 function compareBoolean(a, b) {
   return Number(Boolean(a)) - Number(Boolean(b))
-}
-
-function renderColumnHeader(label, onOpenColumnOrder) {
-  return (
-    <span className="erp-module-column-header">
-      <span className="erp-module-column-header-text">{label}</span>
-      <Tooltip title="调整列顺序">
-        <Button
-          type="text"
-          size="small"
-          className="erp-module-column-header-trigger"
-          icon={<MoreOutlined />}
-          aria-label={`${label} 列设置`}
-          onClick={(event) => {
-            event.stopPropagation()
-            onOpenColumnOrder?.()
-          }}
-        />
-      </Tooltip>
-    </span>
-  )
 }
 
 function readStoredColumnOrder(moduleKey) {
@@ -267,10 +259,10 @@ function MasterDataFormFields({ type }) {
           label="供应商类型"
           name="supplier_type"
         >
-          <Input
+          <Select
             allowClear
-            autoComplete="off"
-            placeholder="如：加工厂、辅材供应商"
+            options={SUPPLIER_TYPE_OPTIONS}
+            placeholder="请选择供应商类型"
           />
         </Form.Item>
       ) : null}
@@ -566,21 +558,21 @@ export default function V1MasterDataPage({ type }) {
   const recordColumns = useMemo(
     () => [
       {
-        title: renderColumnHeader('编号', () => setColumnOrderOpen(true)),
+        title: '编号',
         exportTitle: '编号',
         dataIndex: 'code',
         width: 140,
         sorter: (a, b) => compareText(a?.code, b?.code),
       },
       {
-        title: renderColumnHeader('名称', () => setColumnOrderOpen(true)),
+        title: '名称',
         exportTitle: '名称',
         dataIndex: 'name',
         width: 220,
         sorter: (a, b) => compareText(a?.name, b?.name),
       },
       {
-        title: renderColumnHeader('简称', () => setColumnOrderOpen(true)),
+        title: '简称',
         exportTitle: '简称',
         dataIndex: 'short_name',
         width: 160,
@@ -590,17 +582,21 @@ export default function V1MasterDataPage({ type }) {
       ...(type === 'suppliers'
         ? [
             {
-              title: renderColumnHeader('类型', () => setColumnOrderOpen(true)),
+              title: '类型',
               exportTitle: '类型',
               dataIndex: 'supplier_type',
               width: 140,
               sorter: (a, b) => compareText(a?.supplier_type, b?.supplier_type),
-              render: (value) => value || '-',
+              render: (value) => SUPPLIER_TYPE_LABELS[value] || value || '-',
+              exportValue: (record) =>
+                SUPPLIER_TYPE_LABELS[record?.supplier_type] ||
+                record?.supplier_type ||
+                '',
             },
           ]
         : []),
       {
-        title: renderColumnHeader('税号', () => setColumnOrderOpen(true)),
+        title: '税号',
         exportTitle: '税号',
         dataIndex: 'tax_no',
         width: 180,
@@ -608,7 +604,7 @@ export default function V1MasterDataPage({ type }) {
         render: (value) => value || '-',
       },
       {
-        title: renderColumnHeader('状态', () => setColumnOrderOpen(true)),
+        title: '状态',
         exportTitle: '状态',
         dataIndex: 'is_active',
         width: 90,
@@ -618,7 +614,7 @@ export default function V1MasterDataPage({ type }) {
         render: activeTag,
       },
       {
-        title: renderColumnHeader('创建时间', () => setColumnOrderOpen(true)),
+        title: '创建时间',
         exportTitle: '创建时间',
         dataIndex: 'created_at',
         width: 160,
@@ -628,7 +624,7 @@ export default function V1MasterDataPage({ type }) {
         exportValue: (record) => formatUnixDateTime(record?.created_at),
       },
       {
-        title: renderColumnHeader('更新时间', () => setColumnOrderOpen(true)),
+        title: '更新时间',
         exportTitle: '更新时间',
         dataIndex: 'updated_at',
         width: 160,
@@ -651,8 +647,30 @@ export default function V1MasterDataPage({ type }) {
     [adminProfile, columnOrder, moduleKey, recordColumns]
   )
   const orderedRecordColumns = useMemo(
-    () => applyModuleColumnOrder(recordColumns, preferredRecordColumnOrder),
-    [preferredRecordColumnOrder, recordColumns]
+    () =>
+      applyModuleColumnOrder(recordColumns, preferredRecordColumnOrder).map(
+        (column) => ({
+          ...column,
+          title: (
+            <ColumnOrderHeaderMenu
+              column={column}
+              columns={recordColumns}
+              order={preferredRecordColumnOrder}
+              saving={columnOrderSaving}
+              onChange={(nextOrder) =>
+                persistColumnOrder(nextOrder, recordColumns)
+              }
+              onOpenPanel={() => setColumnOrderOpen(true)}
+            />
+          ),
+        })
+      ),
+    [
+      columnOrderSaving,
+      persistColumnOrder,
+      preferredRecordColumnOrder,
+      recordColumns,
+    ]
   )
 
   const contactColumns = useMemo(
@@ -1095,7 +1113,7 @@ export default function V1MasterDataPage({ type }) {
             }}
             columns={[
               { title: '单据编号', dataIndex: 'code', width: 180 },
-              { title: '标题', dataIndex: 'name', width: 260 },
+              { title: '名称', dataIndex: 'name', width: 260 },
               { title: '业务状态', dataIndex: 'status', width: 140 },
               { title: '删除时间', dataIndex: 'deleted_at', width: 160 },
               { title: '删除原因', dataIndex: 'delete_reason', width: 180 },
@@ -1141,7 +1159,9 @@ export default function V1MasterDataPage({ type }) {
             </Descriptions.Item>
             {type === 'suppliers' ? (
               <Descriptions.Item label="供应商类型">
-                {selectedRecord.supplier_type || '-'}
+                {SUPPLIER_TYPE_LABELS[selectedRecord.supplier_type] ||
+                  selectedRecord.supplier_type ||
+                  '-'}
               </Descriptions.Item>
             ) : null}
             <Descriptions.Item label="税号">

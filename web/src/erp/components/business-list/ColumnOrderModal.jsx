@@ -1,11 +1,17 @@
 import React, { useMemo } from 'react'
 import {
+  ArrowLeftOutlined,
   ArrowDownOutlined,
+  ArrowRightOutlined,
   ArrowUpOutlined,
+  DoubleLeftOutlined,
+  DoubleRightOutlined,
+  MoreOutlined,
+  SettingOutlined,
   VerticalAlignBottomOutlined,
   VerticalAlignTopOutlined,
 } from '@ant-design/icons'
-import { Button, Modal, Space } from 'antd'
+import { Button, Dropdown, Modal, Space } from 'antd'
 import {
   applyModuleColumnOrder,
   buildModuleColumnOrder,
@@ -17,6 +23,133 @@ import {
 
 export function getColumnLabel(column = {}) {
   return String(column.exportTitle || column.title || column.key || '').trim()
+}
+
+export function ColumnOrderHeaderMenu({
+  column = {},
+  columns = [],
+  order = [],
+  saving = false,
+  onChange,
+  onOpenPanel,
+}) {
+  const label = getColumnLabel(column) || '当前列'
+  const normalizedOrder = useMemo(() => {
+    const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
+    return sanitizedOrder.length > 0
+      ? sanitizedOrder
+      : buildModuleColumnOrder(columns)
+  }, [columns, order])
+  const columnKey = useMemo(() => {
+    const directKey = getModuleColumnKey(column)
+    const matchedIndex = columns.findIndex(
+      (item, index) => getModuleColumnKey(item, index) === directKey
+    )
+    return getModuleColumnKey(column, matchedIndex >= 0 ? matchedIndex : 0)
+  }, [column, columns])
+  const currentIndex = normalizedOrder.indexOf(columnKey)
+  const isFirst = currentIndex <= 0
+  const isLast = currentIndex < 0 || currentIndex >= normalizedOrder.length - 1
+  const updateOrder = (nextOrder) => {
+    if (saving) {
+      return
+    }
+    onChange?.(nextOrder)
+  }
+
+  return (
+    <span className="erp-module-column-header">
+      <span className="erp-module-column-header-text">{label}</span>
+      <Dropdown
+        trigger={['click']}
+        destroyOnHidden
+        menu={{
+          items: [
+            {
+              key: 'move-left',
+              icon: <ArrowLeftOutlined />,
+              label: '左移一列',
+              disabled: saving || isFirst,
+            },
+            {
+              key: 'move-right',
+              icon: <ArrowRightOutlined />,
+              label: '右移一列',
+              disabled: saving || isLast,
+            },
+            { type: 'divider' },
+            {
+              key: 'move-first',
+              icon: <DoubleLeftOutlined />,
+              label: '移到最前',
+              disabled: saving || isFirst,
+            },
+            {
+              key: 'move-last',
+              icon: <DoubleRightOutlined />,
+              label: '移到最后',
+              disabled: saving || isLast,
+            },
+            { type: 'divider' },
+            {
+              key: 'open-panel',
+              icon: <SettingOutlined />,
+              label: '打开列顺序面板',
+            },
+          ],
+          onClick: ({ key, domEvent }) => {
+            domEvent?.stopPropagation?.()
+            if (key === 'move-left') {
+              updateOrder(
+                moveModuleColumnOrder(normalizedOrder, columns, columnKey, -1)
+              )
+              return
+            }
+            if (key === 'move-right') {
+              updateOrder(
+                moveModuleColumnOrder(normalizedOrder, columns, columnKey, 1)
+              )
+              return
+            }
+            if (key === 'move-first') {
+              updateOrder(
+                repositionModuleColumnOrder(
+                  normalizedOrder,
+                  columns,
+                  columnKey,
+                  0
+                )
+              )
+              return
+            }
+            if (key === 'move-last') {
+              updateOrder(
+                repositionModuleColumnOrder(
+                  normalizedOrder,
+                  columns,
+                  columnKey,
+                  normalizedOrder.length - 1
+                )
+              )
+              return
+            }
+            onOpenPanel?.()
+          },
+        }}
+      >
+        <Button
+          type="text"
+          size="small"
+          className="erp-module-column-header-trigger"
+          icon={<MoreOutlined />}
+          aria-label={`${label} 列设置`}
+          title="调整列顺序"
+          onClick={(event) => event.stopPropagation()}
+          disabled={saving && normalizedOrder.length <= 1}
+        />
+      </Dropdown>
+    </span>
+  )
 }
 
 export function ColumnOrderModal({

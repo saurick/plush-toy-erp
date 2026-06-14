@@ -7,7 +7,6 @@ import {
   InboxOutlined,
   InfoCircleOutlined,
   LinkOutlined,
-  MoreOutlined,
   PlusOutlined,
   PrinterOutlined,
   ReloadOutlined,
@@ -28,7 +27,6 @@ import {
   Space,
   Table,
   Tag,
-  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -46,6 +44,7 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  ColumnOrderHeaderMenu,
   ColumnOrderModal,
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
@@ -122,28 +121,6 @@ const MODULE_PRIMARY_ACTION_LABELS = Object.freeze({
 })
 
 const BUSINESS_FORM_MODAL_WIDTH = 'min(1120px, calc(100vw - 96px))'
-
-function renderColumnHeader(column, onOpenColumnOrder) {
-  const label = getColumnLabel(column)
-  return (
-    <span className="erp-module-column-header">
-      <span className="erp-module-column-header-text">{label}</span>
-      <Tooltip title="调整列顺序">
-        <Button
-          type="text"
-          size="small"
-          className="erp-module-column-header-trigger"
-          icon={<MoreOutlined />}
-          aria-label={`${label} 列设置`}
-          onClick={(event) => {
-            event.stopPropagation()
-            onOpenColumnOrder?.()
-          }}
-        />
-      </Tooltip>
-    </span>
-  )
-}
 
 function readStoredColumnOrder(moduleKey) {
   if (typeof window === 'undefined') {
@@ -252,7 +229,6 @@ function buildFormalShellRows(moduleItem) {
       business_status: 'source_grounded',
       owner_role: ownerRole,
       source_refs: refs,
-      next_action: '查看详情或调整列顺序',
       created_at: '2026-06-13',
       updated_at: '2026-06-13',
       scope: scopeItems[0] || moduleItem.primaryEntity || moduleItem.title,
@@ -264,7 +240,6 @@ function buildFormalShellRows(moduleItem) {
       business_status: 'review_required',
       owner_role: ownerRole,
       source_refs: moduleItem.primaryEntity || refs,
-      next_action: '确认字段和详情页内容',
       created_at: '2026-06-13',
       updated_at: '2026-06-13',
       scope: scopeItems[1] || moduleItem.boundary || '字段和动作待评审',
@@ -276,7 +251,6 @@ function buildFormalShellRows(moduleItem) {
       business_status: 'pending_api',
       owner_role: ownerRole,
       source_refs: moduleItem.factSource || refs,
-      next_action: '接入新建、编辑、流转和打印',
       created_at: '2026-06-13',
       updated_at: '2026-06-13',
       scope: scopeItems[2] || '操作入口待接入',
@@ -297,7 +271,6 @@ function recordMatchesKeyword(record, keyword) {
     record.title,
     record.owner_role,
     record.source_refs,
-    record.next_action,
     record.scope,
   ].some((value) =>
     String(value || '')
@@ -370,7 +343,7 @@ function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
           readOnly
         />
       </Form.Item>
-      <Form.Item label="标题" className="erp-business-action-form__field">
+      <Form.Item label="业务对象" className="erp-business-action-form__field">
         <Input
           value={valueOrPlaceholder(
             record?.title,
@@ -509,85 +482,75 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     [moduleItem?.key, outletContext]
   )
 
-  const dataColumns = useMemo(() => {
-    const openColumnOrder = () => setColumnOrderOpen(true)
-    return [
-      {
-        title: '业务编号',
-        exportTitle: '业务编号',
-        dataIndex: 'document_no',
-        width: 180,
-        sorter: (a, b) => compareText(a.document_no, b.document_no),
-      },
-      {
-        title: '标题',
-        exportTitle: '标题',
-        dataIndex: 'title',
-        width: 220,
-        sorter: (a, b) => compareText(a.title, b.title),
-      },
-      {
-        title: '状态',
-        exportTitle: '状态',
-        dataIndex: 'business_status',
-        width: 120,
-        render: statusTag,
-        sorter: (a, b) => compareText(a.business_status, b.business_status),
-        exportValue: (record) =>
-          STATUS_OPTIONS.find((item) => item.value === record.business_status)
-            ?.label || record.business_status,
-      },
-      {
-        title: '责任角色',
-        exportTitle: '责任角色',
-        dataIndex: 'owner_role',
-        width: 160,
-        sorter: (a, b) => compareText(a.owner_role, b.owner_role),
-      },
-      {
-        title: '来源',
-        exportTitle: '来源',
-        dataIndex: 'source_refs',
-        width: 260,
-        sorter: (a, b) => compareText(a.source_refs, b.source_refs),
-      },
-      {
-        title: '内容',
-        exportTitle: '内容',
-        dataIndex: 'scope',
-        width: 260,
-        sorter: (a, b) => compareText(a.scope, b.scope),
-      },
-      {
-        title: '下一步',
-        exportTitle: '下一步',
-        dataIndex: 'next_action',
-        width: 240,
-        sorter: (a, b) => compareText(a.next_action, b.next_action),
-      },
-      {
-        title: '创建时间',
-        exportTitle: '创建时间',
-        dataIndex: 'created_at',
-        width: 130,
-        sorter: (a, b) => compareText(a.created_at, b.created_at),
-      },
-      {
-        title: '更新时间',
-        exportTitle: '更新时间',
-        dataIndex: 'updated_at',
-        width: 130,
-        sorter: (a, b) => compareText(a.updated_at, b.updated_at),
-      },
-    ].map((column, index) => ({
-      ...column,
-      title: renderColumnHeader(
-        { ...column, key: column.key || column.dataIndex },
-        openColumnOrder
-      ),
-      key: column.key || column.dataIndex || `column-${index}`,
-    }))
-  }, [])
+  const dataColumns = useMemo(
+    () =>
+      [
+        {
+          title: '业务编号',
+          exportTitle: '业务编号',
+          dataIndex: 'document_no',
+          width: 180,
+          sorter: (a, b) => compareText(a.document_no, b.document_no),
+        },
+        {
+          title: '业务对象',
+          exportTitle: '业务对象',
+          dataIndex: 'title',
+          width: 220,
+          sorter: (a, b) => compareText(a.title, b.title),
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'business_status',
+          width: 120,
+          render: statusTag,
+          sorter: (a, b) => compareText(a.business_status, b.business_status),
+          exportValue: (record) =>
+            STATUS_OPTIONS.find((item) => item.value === record.business_status)
+              ?.label || record.business_status,
+        },
+        {
+          title: '责任角色',
+          exportTitle: '责任角色',
+          dataIndex: 'owner_role',
+          width: 160,
+          sorter: (a, b) => compareText(a.owner_role, b.owner_role),
+        },
+        {
+          title: '来源',
+          exportTitle: '来源',
+          dataIndex: 'source_refs',
+          width: 260,
+          sorter: (a, b) => compareText(a.source_refs, b.source_refs),
+        },
+        {
+          title: '字段范围',
+          exportTitle: '字段范围',
+          dataIndex: 'scope',
+          width: 260,
+          sorter: (a, b) => compareText(a.scope, b.scope),
+        },
+        {
+          title: '创建时间',
+          exportTitle: '创建时间',
+          dataIndex: 'created_at',
+          width: 130,
+          sorter: (a, b) => compareText(a.created_at, b.created_at),
+        },
+        {
+          title: '更新时间',
+          exportTitle: '更新时间',
+          dataIndex: 'updated_at',
+          width: 130,
+          sorter: (a, b) => compareText(a.updated_at, b.updated_at),
+        },
+      ].map((column, index) => ({
+        ...column,
+        key: column.key || column.dataIndex || `column-${index}`,
+      })),
+    []
+  )
 
   const preferredColumnOrder = useMemo(
     () =>
@@ -600,8 +563,25 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     [adminProfile, columnOrder, dataColumns, moduleItem?.key]
   )
   const orderedColumns = useMemo(
-    () => applyModuleColumnOrder(dataColumns, preferredColumnOrder),
-    [dataColumns, preferredColumnOrder]
+    () =>
+      applyModuleColumnOrder(dataColumns, preferredColumnOrder).map(
+        (column) => ({
+          ...column,
+          title: (
+            <ColumnOrderHeaderMenu
+              column={column}
+              columns={dataColumns}
+              order={preferredColumnOrder}
+              saving={columnOrderSaving}
+              onChange={(nextOrder) =>
+                persistColumnOrder(nextOrder, dataColumns)
+              }
+              onOpenPanel={() => setColumnOrderOpen(true)}
+            />
+          ),
+        })
+      ),
+    [columnOrderSaving, dataColumns, persistColumnOrder, preferredColumnOrder]
   )
 
   useEffect(() => {
@@ -670,6 +650,11 @@ export default function FormalBusinessModulePage({ moduleKey }) {
       : selectedRows.length > 1
         ? `已选择 ${selectedRows.length} 条${moduleItem.shortLabel || '记录'}`
         : `请先选择一条${moduleItem.shortLabel || '记录'}`
+  const selectedSummaryItems = selectedRows.map((record) => ({
+    key: record.id,
+    label: record.document_no || record.title,
+    title: record.title,
+  }))
   const singleSelectedRecord =
     selectedRows.length === 1 ? selectedRows[0] : null
   const createLabel = MODULE_CREATE_LABELS[moduleItem.key] || '新建记录'
@@ -686,7 +671,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   ]
   const recycleColumns = [
     { title: '单据编号', dataIndex: 'document_no', width: 180 },
-    { title: '标题', dataIndex: 'title', width: 260 },
+    { title: '业务对象', dataIndex: 'title', width: 260 },
     {
       title: '业务状态',
       dataIndex: 'business_status',
@@ -788,6 +773,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
           embedded
           selectedCount={selectedRowKeys.length}
           selectedLabel={selectedLabel}
+          selectedItems={selectedSummaryItems}
         >
           {selectedRowKeys.length > 0 ? (
             <Button
@@ -891,7 +877,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         rowKey="id"
         columns={orderedColumns}
         dataSource={filteredRows}
-        scroll={{ x: 1580 }}
+        scroll={{ x: 1340 }}
         emptyDescription="暂无匹配记录"
         rowSelection={{
           selectedRowKeys,

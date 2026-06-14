@@ -4,7 +4,6 @@ import {
   DownloadOutlined,
   EditOutlined,
   InboxOutlined,
-  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   RollbackOutlined,
@@ -23,7 +22,6 @@ import {
   Space,
   Table,
   Tag,
-  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -40,6 +38,7 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  ColumnOrderHeaderMenu,
   ColumnOrderModal,
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
@@ -63,6 +62,7 @@ import {
   SALES_ORDER_STATUS_COLORS,
   SALES_ORDER_STATUS_LABELS,
   buildCustomerSnapshot,
+  deriveSalesOrderItemAmount,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
   formatUnixDate,
@@ -117,28 +117,6 @@ const SALES_ORDER_ITEMS_MODULE_KEY = 'sales-order-items'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const OPEN_LINE_STATUS = 'open'
 const BUSINESS_FORM_MODAL_WIDTH = 'min(960px, calc(100vw - 96px))'
-
-function renderColumnHeader(column, onOpenColumnOrder) {
-  const label = getColumnLabel(column)
-  return (
-    <span className="erp-module-column-header">
-      <span className="erp-module-column-header-text">{label}</span>
-      <Tooltip title="调整列顺序">
-        <Button
-          type="text"
-          size="small"
-          className="erp-module-column-header-trigger"
-          icon={<MoreOutlined />}
-          aria-label={`${label} 列设置`}
-          onClick={(event) => {
-            event.stopPropagation()
-            onOpenColumnOrder?.()
-          }}
-        />
-      </Tooltip>
-    </span>
-  )
-}
 
 function readStoredColumnOrder(moduleKey) {
   if (typeof window === 'undefined') {
@@ -423,9 +401,11 @@ function SalesOrderItemsFormSection({
                           />
                         </Form.Item>
                         <Form.Item
-                          label="产品 ID"
+                          label="产品引用 ID"
                           name={[field.name, 'product_id']}
-                          rules={[{ required: true, message: '请填写产品 ID' }]}
+                          rules={[
+                            { required: true, message: '请填写产品引用 ID' },
+                          ]}
                         >
                           <InputNumber
                             min={1}
@@ -435,9 +415,11 @@ function SalesOrderItemsFormSection({
                           />
                         </Form.Item>
                         <Form.Item
-                          label="单位 ID"
+                          label="单位引用 ID"
                           name={[field.name, 'unit_id']}
-                          rules={[{ required: true, message: '请填写单位 ID' }]}
+                          rules={[
+                            { required: true, message: '请填写单位引用 ID' },
+                          ]}
                         >
                           <InputNumber
                             min={1}
@@ -506,12 +488,30 @@ function SalesOrderItemsFormSection({
                             disabled={!canEditLine}
                           />
                         </Form.Item>
-                        <Form.Item label="金额" name={[field.name, 'amount']}>
-                          <Input
-                            allowClear
-                            autoComplete="off"
-                            disabled={!canEditLine}
-                          />
+                        <Form.Item
+                          noStyle
+                          shouldUpdate={(previous, current) =>
+                            previous?.items?.[field.name]?.ordered_quantity !==
+                              current?.items?.[field.name]?.ordered_quantity ||
+                            previous?.items?.[field.name]?.unit_price !==
+                              current?.items?.[field.name]?.unit_price ||
+                            previous?.items?.[field.name]?.amount !==
+                              current?.items?.[field.name]?.amount
+                          }
+                        >
+                          {({ getFieldValue }) => {
+                            const line = getFieldValue(['items', field.name])
+                            return (
+                              <Form.Item label="金额">
+                                <Input
+                                  value={deriveSalesOrderItemAmount(line) || ''}
+                                  disabled
+                                  readOnly
+                                  placeholder="数量 × 单价自动计算"
+                                />
+                              </Form.Item>
+                            )
+                          }}
                         </Form.Item>
                         <Form.Item
                           label="计划交付日期"
@@ -931,9 +931,31 @@ export default function V1SalesOrdersPage() {
     () =>
       visibleOrderDataColumns.map((column) => ({
         ...column,
-        title: renderColumnHeader(column, () => setColumnOrderTarget('orders')),
+        title: (
+          <ColumnOrderHeaderMenu
+            column={column}
+            columns={orderDataColumns}
+            order={effectiveOrderColumnOrder}
+            saving={columnOrderSaving}
+            onChange={(nextOrder) =>
+              persistColumnOrder({
+                moduleKey: SALES_ORDERS_MODULE_KEY,
+                columns: orderDataColumns,
+                nextOrder,
+                setLocalOrder: setOrderColumnOrder,
+              })
+            }
+            onOpenPanel={() => setColumnOrderTarget('orders')}
+          />
+        ),
       })),
-    [visibleOrderDataColumns]
+    [
+      columnOrderSaving,
+      effectiveOrderColumnOrder,
+      orderDataColumns,
+      persistColumnOrder,
+      visibleOrderDataColumns,
+    ]
   )
 
   const itemDataColumns = useMemo(
@@ -944,20 +966,6 @@ export default function V1SalesOrdersPage() {
         dataIndex: 'line_no',
         width: 80,
         sorter: (a, b) => compareNumber(a?.line_no, b?.line_no),
-      },
-      {
-        title: '产品 ID',
-        exportTitle: '产品 ID',
-        dataIndex: 'product_id',
-        width: 90,
-        sorter: (a, b) => compareNumber(a?.product_id, b?.product_id),
-      },
-      {
-        title: '单位 ID',
-        exportTitle: '单位 ID',
-        dataIndex: 'unit_id',
-        width: 90,
-        sorter: (a, b) => compareNumber(a?.unit_id, b?.unit_id),
       },
       {
         title: '产品编号',
@@ -1007,7 +1015,8 @@ export default function V1SalesOrdersPage() {
         dataIndex: 'amount',
         width: 100,
         sorter: (a, b) => compareNumber(a?.amount, b?.amount),
-        render: (value) => value || '-',
+        render: (value, record) => deriveSalesOrderItemAmount(record) || '-',
+        exportValue: (record) => deriveSalesOrderItemAmount(record) || '',
       },
       {
         title: '计划交付',
@@ -1071,9 +1080,31 @@ export default function V1SalesOrdersPage() {
     () =>
       visibleItemDataColumns.map((column) => ({
         ...column,
-        title: getColumnLabel(column),
+        title: (
+          <ColumnOrderHeaderMenu
+            column={column}
+            columns={itemDataColumns}
+            order={effectiveItemColumnOrder}
+            saving={columnOrderSaving}
+            onChange={(nextOrder) =>
+              persistColumnOrder({
+                moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
+                columns: itemDataColumns,
+                nextOrder,
+                setLocalOrder: setItemColumnOrder,
+              })
+            }
+            onOpenPanel={() => setColumnOrderTarget('items')}
+          />
+        ),
       })),
-    [visibleItemDataColumns]
+    [
+      columnOrderSaving,
+      effectiveItemColumnOrder,
+      itemDataColumns,
+      persistColumnOrder,
+      visibleItemDataColumns,
+    ]
   )
 
   const exportOrders = useCallback(() => {
@@ -1449,7 +1480,7 @@ export default function V1SalesOrdersPage() {
             }}
             columns={[
               { title: '单据编号', dataIndex: 'code', width: 180 },
-              { title: '标题', dataIndex: 'name', width: 260 },
+              { title: '名称', dataIndex: 'name', width: 260 },
               { title: '业务状态', dataIndex: 'status', width: 140 },
               { title: '删除时间', dataIndex: 'deleted_at', width: 160 },
               { title: '删除原因', dataIndex: 'delete_reason', width: 180 },

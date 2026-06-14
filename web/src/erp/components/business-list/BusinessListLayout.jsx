@@ -10,6 +10,7 @@ import {
   Card,
   Empty,
   Input,
+  Popover,
   Select,
   Space,
   Table,
@@ -398,6 +399,7 @@ export function BusinessOperationPanel({
 export function SelectionActionBar({
   selectedCount,
   selectedLabel,
+  selectedItems = [],
   summaryItems = [],
   collaborationItems = [],
   boundaryText = '',
@@ -417,12 +419,11 @@ export function SelectionActionBar({
       <div className="erp-business-selection-action-bar__copy erp-business-module-selection-block">
         <div className="erp-business-selection-action-bar__primary">
           <Text strong>当前操作</Text>
-          <Tag
-            className="erp-business-selection-action-bar__tag erp-business-module-selection-tag"
-            color={hasSelection ? 'green' : 'default'}
-          >
-            {selectedLabel || `已选择 ${selectedCount} 条记录`}
-          </Tag>
+          <SelectedItemsSummaryTag
+            selectedCount={selectedCount}
+            selectedLabel={selectedLabel}
+            selectedItems={selectedItems}
+          />
         </div>
         {summaryItems.length > 0 ? (
           <div className="erp-business-selection-action-bar__summary">
@@ -469,6 +470,59 @@ export function SelectionActionBar({
   }
 
   return <Card className={className}>{content}</Card>
+}
+
+export function SelectedItemsSummaryTag({
+  selectedCount,
+  selectedLabel,
+  selectedItems = [],
+}) {
+  const hasSelection = Number(selectedCount) > 0
+  const items = selectedItems
+    .map((item, index) => ({
+      key: item?.key ?? item?.id ?? `${item?.label || 'item'}-${index}`,
+      label: String(item?.label ?? item?.name ?? item?.title ?? '').trim(),
+      title: String(item?.title ?? item?.description ?? '').trim(),
+    }))
+    .filter((item) => item.label)
+  const label = selectedLabel || `已选择 ${selectedCount} 条记录`
+  const tag = (
+    <Tag
+      tabIndex={hasSelection && items.length > 0 ? 0 : undefined}
+      className="erp-business-selection-action-bar__tag erp-business-module-selection-tag"
+      color={hasSelection ? 'green' : 'default'}
+    >
+      {label}
+    </Tag>
+  )
+
+  if (!hasSelection || items.length === 0) {
+    return tag
+  }
+
+  return (
+    <Popover
+      trigger={['hover', 'click', 'focus']}
+      placement="bottomLeft"
+      overlayClassName="erp-business-selected-items-popover"
+      title={`已选 ${selectedCount} 条`}
+      content={
+        <div className="erp-business-selected-items-popover__items">
+          {items.map((item) => (
+            <Tag
+              key={item.key}
+              title={item.title || item.label}
+              className="erp-business-selected-items-popover__item"
+            >
+              {item.label}
+            </Tag>
+          ))}
+        </div>
+      }
+    >
+      {tag}
+    </Popover>
+  )
 }
 
 export function BusinessDataTable({

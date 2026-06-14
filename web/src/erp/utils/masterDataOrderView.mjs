@@ -43,6 +43,24 @@ export function trimOptional(value) {
   return text || undefined
 }
 
+export function deriveSalesOrderItemAmount(values = {}) {
+  const quantityText = String(values.ordered_quantity ?? '').trim()
+  const unitPriceText = String(values.unit_price ?? '').trim()
+  const quantity = Number(quantityText)
+  const unitPrice = Number(unitPriceText)
+  if (
+    quantityText !== '' &&
+    unitPriceText !== '' &&
+    Number.isFinite(quantity) &&
+    quantity >= 0 &&
+    Number.isFinite(unitPrice) &&
+    unitPrice >= 0
+  ) {
+    return (quantity * unitPrice).toFixed(2)
+  }
+  return trimOptional(values.amount)
+}
+
 export function compactParams(values = {}) {
   return Object.fromEntries(
     Object.entries(values).filter(([, value]) => value !== undefined)
@@ -153,7 +171,7 @@ export function buildSalesOrderItemParams(values = {}, extra = {}) {
     color_snapshot: trimOptional(values.color_snapshot),
     ordered_quantity: trimOptional(values.ordered_quantity),
     unit_price: trimOptional(values.unit_price),
-    amount: trimOptional(values.amount),
+    amount: deriveSalesOrderItemAmount(values),
     planned_delivery_date: trimOptional(values.planned_delivery_date),
     note: trimOptional(values.note),
   })

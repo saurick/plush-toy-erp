@@ -176,7 +176,7 @@ export const businessModuleDefinitions = Object.freeze([
     boundary:
       '库存台账是事实视图，不允许前端本地伪造入库、出库、预留、调拨或调整事实。',
     sourceRefs: ['inventory_txns', 'inventory_balances', 'inventory_lots'],
-    currentScope: ['库存余额', '库存批次', '库存流水', '盘点 / 调整后续动作'],
+    currentScope: ['库存余额', '库存批次', '库存流水', '盘点 / 调整边界'],
   },
   {
     key: 'processing-contracts',
@@ -197,7 +197,7 @@ export const businessModuleDefinitions = Object.freeze([
       '委外供应商',
       '加工内容',
       '交期和合同状态',
-      '发料 / 回货后续动作',
+      '发料 / 回货追溯',
     ],
   },
   {
@@ -279,7 +279,7 @@ export const businessModuleDefinitions = Object.freeze([
       'sales_orders',
       'inventory_balances',
     ],
-    currentScope: ['待放行订单', '缺料 / 质检 / 财务风险', '放行后出库下游'],
+    currentScope: ['待放行订单', '缺料 / 质检 / 财务风险', '放行后出库状态'],
   },
   {
     key: 'outbound',
@@ -296,7 +296,7 @@ export const businessModuleDefinitions = Object.freeze([
     boundary:
       '出库才可能触发库存扣减事实；不能把出货放行或任务完成当成出库事实。',
     sourceRefs: ['inventory_txns', 'inventory_balances', 'sales_orders'],
-    currentScope: ['待出库', '已出库', '缺料风险', '出库冲正后续评审'],
+    currentScope: ['待出库', '已出库', '缺料风险', '出库冲正边界'],
   },
   {
     key: 'reconciliation',
@@ -315,7 +315,7 @@ export const businessModuleDefinitions = Object.freeze([
       'purchase_receipts',
       'workflow_business_states',
     ],
-    currentScope: ['应收核对', '应付核对', '差异处理', '收付款后续记录'],
+    currentScope: ['应收核对', '应付核对', '差异处理', '收付款关联记录'],
   },
   {
     key: 'payables',
@@ -373,7 +373,7 @@ export const businessModuleDefinitions = Object.freeze([
       'sales_orders',
       'suppliers',
     ],
-    currentScope: ['待开票', '已开票', '异常发票', '发票附件后续评审'],
+    currentScope: ['待开票', '已开票', '异常发票', '发票附件记录'],
   },
 ])
 

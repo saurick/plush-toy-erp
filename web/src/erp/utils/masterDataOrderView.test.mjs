@@ -6,6 +6,7 @@ import {
   buildMasterDataParams,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
+  deriveSalesOrderItemAmount,
   formatUnixDateTime,
   hasActionPermission,
   statusText,
@@ -68,7 +69,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       unit_id: '1',
       product_name_snapshot: ' 玩具 ',
       ordered_quantity: '12.50',
-      unit_price: '',
+      unit_price: ' 3.20 ',
     }),
     {
       line_no: 2,
@@ -76,7 +77,36 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       unit_id: 1,
       product_name_snapshot: '玩具',
       ordered_quantity: '12.50',
+      unit_price: '3.20',
+      amount: '40.00',
     }
+  )
+})
+
+test('masterDataOrderView: sales order item amount derives from quantity and unit price', () => {
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '12.5',
+      unit_price: '3.2',
+      amount: '999',
+    }),
+    '40.00'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '',
+      unit_price: '3.2',
+      amount: ' 88 ',
+    }),
+    '88'
+  )
+  assert.equal(
+    deriveSalesOrderItemAmount({
+      ordered_quantity: '-1',
+      unit_price: '3.2',
+      amount: '',
+    }),
+    undefined
   )
 })
 

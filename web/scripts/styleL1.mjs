@@ -435,6 +435,9 @@ const scenarios = [
       await assertNoDashboardCenterLocalRefreshButton(page, {
         scenarioName: 'erp-business-dashboard-dark-desktop',
       })
+      await assertDarkDashboardLinkButtonsUnboxed(page, {
+        scenarioName: 'erp-business-dashboard-dark-desktop',
+      })
       await assertThemeReadable(page, {
         scenarioName: 'erp-business-dashboard-dark-desktop',
         selector: '.erp-business-board-summary-card',
@@ -3094,6 +3097,11 @@ const scenarios = [
         drawerTitleText: '销售订单详情',
         detailMatchText: 'SO-STYLE-L1',
         scenarioName: 'business-v1-sales-orders',
+        afterDetailOpen: async () => {
+          await assertSalesOrderItemHeadersHideInternalIds(page, {
+            scenarioName: 'business-v1-sales-orders',
+          })
+        },
       })
 
       await gotoScenarioPath(page, '/erp/master/products', {
@@ -3136,6 +3144,10 @@ const scenarios = [
         scenarioName: 'business-standard-bom',
       })
       await assertBusinessHeaderStatsSingleLine(page, 'business-standard-bom')
+      await verifyBusinessSelectedItemsPopover(page, {
+        scenarioName: 'business-standard-bom',
+        expectedCount: 3,
+      })
       await assertNoHorizontalOverflow(page, 'business-standard-bom')
 
       await gotoScenarioPath(page, '/erp/warehouse/inventory', {
@@ -4538,6 +4550,94 @@ async function assertBusinessSelectionActionBarBoxModel(
   )
 }
 
+async function verifyBusinessSelectedItemsPopover(
+  page,
+  { scenarioName, expectedCount }
+) {
+  const rowCheckboxes = page.locator(
+    '.erp-business-data-table-card .ant-table-tbody .ant-table-selection-column .ant-checkbox-input'
+  )
+  const checkboxCount = await rowCheckboxes.count()
+  assert(
+    checkboxCount >= expectedCount,
+    `${scenarioName} 缺少多选明细样本: ${checkboxCount}`
+  )
+
+  for (let index = 0; index < expectedCount; index += 1) {
+    await rowCheckboxes.nth(index).click()
+  }
+
+  const actionBar = page.locator('.erp-business-module-current-action')
+  const selectionTag = actionBar.locator(
+    '.erp-business-selection-action-bar__tag'
+  )
+  await selectionTag.waitFor({ state: 'visible', timeout: 10_000 })
+  await selectionTag
+    .getByText(`已选择 ${expectedCount} 条BOM`)
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await assertBusinessSelectionActionBarBoxModel(page, {
+    scenarioName,
+    expectedMode: 'active',
+  })
+
+  await selectionTag.click()
+  const popover = page.locator('.erp-business-selected-items-popover').last()
+  await popover.waitFor({ state: 'visible', timeout: 10_000 })
+
+  const metrics = await page.evaluate(() => {
+    const popover = document.querySelector(
+      '.erp-business-selected-items-popover'
+    )
+    const actionBar = document.querySelector(
+      '.erp-business-module-current-action'
+    )
+    const tag = actionBar?.querySelector(
+      '.erp-business-selection-action-bar__tag'
+    )
+    const popoverRect = popover?.getBoundingClientRect()
+    const tagRect = tag?.getBoundingClientRect()
+    return {
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+      popover: popoverRect
+        ? {
+            width: popoverRect.width,
+            height: popoverRect.height,
+            left: popoverRect.left,
+            right: popoverRect.right,
+          }
+        : null,
+      tag: tagRect
+        ? {
+            width: tagRect.width,
+            height: tagRect.height,
+          }
+        : null,
+      chips: Array.from(
+        document.querySelectorAll('.erp-business-selected-items-popover__item')
+      ).map((node) => String(node.textContent || '').trim()),
+    }
+  })
+
+  assert(
+    metrics.popover && metrics.popover.width > 0 && metrics.popover.height > 0,
+    `${scenarioName} 已选明细浮层尺寸异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.tag?.width > 0 && metrics.tag?.height > 0,
+    `${scenarioName} 已选摘要 tag 尺寸异常: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    metrics.chips,
+    ['MATERIAL-BOM-001', 'MATERIAL-BOM-002', 'MATERIAL-BOM-003'],
+    `${scenarioName} 已选明细应展示全部 BOM 编号: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.documentWidth <= metrics.viewportWidth + 2,
+    `${scenarioName} 已选明细浮层导致页面横向溢出: ${JSON.stringify(metrics)}`
+  )
+}
+
 async function assertOpenDropdownInViewport(page, { scenarioName }) {
   const metrics = await page.evaluate(() => {
     const dropdown = document.querySelector(
@@ -4855,6 +4955,66 @@ async function assertDashboardMetricInteractionSemantics(
   }
 }
 
+async function assertDarkDashboardLinkButtonsUnboxed(page, { scenarioName }) {
+  const metrics = await page.evaluate(() => {
+    const buttons = Array.from(
+      document.querySelectorAll(
+        '.erp-business-dashboard-page .erp-dashboard-table-card .erp-dashboard-link-button.ant-btn'
+      )
+    )
+      .slice(0, 16)
+      .map((button) => {
+        const style = window.getComputedStyle(button)
+        const rect = button.getBoundingClientRect()
+        return {
+          text: String(button.textContent || '').trim(),
+          disabled: button.disabled,
+          backgroundColor: style.backgroundColor,
+          borderColor: style.borderColor,
+          borderStyle: style.borderStyle,
+          borderWidth: style.borderWidth,
+          className: String(button.className || ''),
+          cursor: style.cursor,
+          height: rect.height,
+          width: rect.width,
+        }
+      })
+
+    return {
+      effectiveTheme: document.documentElement.dataset.erpTheme || '',
+      buttons,
+    }
+  })
+
+  assert.equal(
+    metrics.effectiveTheme,
+    'dark',
+    `${scenarioName} link 按钮无框断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.buttons.some((button) => button.text === '客户档案') &&
+      metrics.buttons.some((button) => button.text === '0'),
+    `${scenarioName} 缺少业务看板模块或数字 link 按钮样本: ${JSON.stringify(metrics)}`
+  )
+
+  for (const button of metrics.buttons) {
+    assert(
+      button.width > 0 && button.height > 0,
+      `${scenarioName} link 按钮尺寸异常: ${JSON.stringify(button)}`
+    )
+    assert(
+      isTransparentColor(button.backgroundColor),
+      `${scenarioName} link 按钮默认态不应有暗色底框: ${JSON.stringify(button)}`
+    )
+    assert(
+      button.borderStyle === 'none' ||
+        Number.parseFloat(button.borderWidth) === 0 ||
+        isTransparentColor(button.borderColor),
+      `${scenarioName} link 按钮默认态不应有可见边框: ${JSON.stringify(button)}`
+    )
+  }
+}
+
 async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
   const refreshButton = page
     .locator('.mobile-role-tasks-page header button')
@@ -4912,6 +5072,7 @@ async function verifyBusinessModuleColumnOrderDialog(
   await page.evaluate((key) => {
     window.localStorage.removeItem(key)
   }, storageKey)
+  await verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey })
   const primaryToolbarActions = page
     .locator('.erp-business-operation-panel__actions')
     .first()
@@ -5054,6 +5215,85 @@ async function verifyBusinessModuleColumnOrderDialog(
   await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
+async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
+  const headerLabelsBefore = await readBusinessModuleHeaderLabels(page)
+  assert(
+    headerLabelsBefore.length >= 2,
+    `表头列顺序菜单缺少可调整列样本: ${JSON.stringify(headerLabelsBefore)}`
+  )
+  assert(
+    !headerLabelsBefore.includes('下一步'),
+    `正式业务页列表不应展示施工型“下一步”列: ${JSON.stringify(headerLabelsBefore)}`
+  )
+
+  const headerTriggers = page.locator(
+    '.erp-business-data-table-card .erp-module-column-header-trigger'
+  )
+  await headerTriggers.nth(1).click()
+
+  const menu = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)').last()
+  await menu
+    .getByText('左移一列')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await menu
+    .getByText('右移一列')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await menu
+    .getByText('移到最前')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await menu
+    .getByText('移到最后')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await menu
+    .getByText('打开列顺序面板')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  assert.equal(
+    await page.getByRole('dialog', { name: '调整列表列顺序' }).count(),
+    0,
+    '点击表头列设置应先打开快捷菜单，不应直接弹出列顺序面板'
+  )
+
+  const quickMoveSync = waitForAdminColumnOrderSync(page)
+  await menu.getByText('左移一列').click()
+  await quickMoveSync
+  await page.waitForFunction(
+    ({ expectedFirstLabel }) => {
+      const firstLabel = document.querySelector(
+        '.erp-business-data-table-card .erp-module-column-header-text'
+      )
+      return String(firstLabel?.textContent || '').trim() === expectedFirstLabel
+    },
+    { expectedFirstLabel: headerLabelsBefore[1] }
+  )
+
+  const storedOrder = await page.evaluate((key) => {
+    return window.localStorage.getItem(key)
+  }, storageKey)
+  assert(Boolean(storedOrder), '表头快捷调整后未写入本地缓存兜底')
+
+  await headerTriggers.first().click()
+  await menu
+    .getByText('打开列顺序面板')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  await menu.getByText('打开列顺序面板').click()
+  const dialog = page.getByRole('dialog', { name: '调整列表列顺序' })
+  await dialog.waitFor({ state: 'visible', timeout: 10_000 })
+  await dialog.locator('.ant-modal-close').click()
+  await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
+}
+
+async function readBusinessModuleHeaderLabels(page) {
+  return page.evaluate(() =>
+    Array.from(
+      document.querySelectorAll(
+        '.erp-business-data-table-card .erp-module-column-header-text'
+      )
+    )
+      .map((node) => String(node.textContent || '').trim())
+      .filter(Boolean)
+  )
+}
+
 async function verifyBusinessActionFormModal(
   page,
   { buttonName, titleText, minFieldCount = 4, screenshotName }
@@ -5194,7 +5434,7 @@ async function verifyBusinessRecycleModal(page, { screenshotName }) {
   }
   for (const expected of [
     '单据编号',
-    '标题',
+    '业务对象',
     '业务状态',
     '删除时间',
     '删除原因',
@@ -5218,7 +5458,14 @@ async function verifyBusinessRecycleModal(page, { screenshotName }) {
 
 async function verifyBusinessRowDoubleClickEditModal(
   page,
-  { rowText, titleText, drawerTitleText, detailMatchText, scenarioName }
+  {
+    rowText,
+    titleText,
+    drawerTitleText,
+    detailMatchText,
+    scenarioName,
+    afterDetailOpen,
+  }
 ) {
   const row = page
     .locator('.erp-business-data-table-card .ant-table-tbody tr')
@@ -5281,6 +5528,9 @@ async function verifyBusinessRowDoubleClickEditModal(
   await page.getByRole('button', { name: '查看详情' }).click()
   await expectText(page, drawerTitleText)
   await expectText(page, detailMatchText)
+  if (afterDetailOpen) {
+    await afterDetailOpen()
+  }
 
   const drawerMetrics = await page.evaluate(
     ({ expectedDrawerTitle }) => {
@@ -9917,6 +10167,45 @@ async function assertBusinessHeaderStatsSingleLine(page, scenarioName) {
     metrics.bodyScrollWidth <= metrics.viewportWidth + 2 &&
       metrics.docScrollWidth <= metrics.viewportWidth + 2,
     `${scenarioName} 业务页头部统计修复后不应产生页面横向溢出: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertSalesOrderItemHeadersHideInternalIds(
+  page,
+  { scenarioName }
+) {
+  const metrics = await page.evaluate(() => {
+    const tables = Array.from(document.querySelectorAll('.ant-table'))
+    const targetTable = tables.find((table) =>
+      String(table.textContent || '').includes('产品编号')
+    )
+    const headerTexts = targetTable
+      ? Array.from(targetTable.querySelectorAll('thead th'))
+          .map((node) =>
+            String(node.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim()
+          )
+          .filter(Boolean)
+      : []
+
+    return {
+      hasTargetTable: Boolean(targetTable),
+      headerTexts,
+      forbiddenHeaders: headerTexts.filter((text) =>
+        ['产品 ID', '单位 ID'].includes(text)
+      ),
+    }
+  })
+
+  assert(
+    metrics.hasTargetTable,
+    `${scenarioName} 缺少订单行表格: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.forbiddenHeaders.length,
+    0,
+    `${scenarioName} 订单行列表不应暴露内部产品/单位 ID 列: ${JSON.stringify(metrics)}`
   )
 }
 

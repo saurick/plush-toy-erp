@@ -96,3 +96,46 @@
 - 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 均通过，前端单测 309 个用例通过；另用 Playwright mock JSON-RPC 在 `http://localhost:5175/erp/sales/project-orders/sales-orders` 覆盖浅色和暗色两种主题，验证主页面只剩一个业务表格、新建表单可新增订单行、编辑表单可回显订单行、详情抽屉可查看订单行且页面无横向溢出。`pnpm --dir web style:l1` 全量本轮未通过，失败点在 `business-formal-module-shells-desktop` 里查找非销售订单目标文案“当前页面仍是正式入口壳”，未作为本轮销售订单目标验收通过项。
 - 下一步：如果后续要消除“订单头保存成功但订单行保存失败”的局部风险，应新增后端事务型 `create/update sales order with items` JSON-RPC 主路径，再把前端顺序调用收口到该接口。
 - 阻塞/风险：本轮不改 Ent schema、migration、RBAC、WorkflowUsecase、Shipment / Inventory / Finance fact usecase、菜单 seed、部署、提交或推送；订单行保存当前仍复用既有多个 JSON-RPC 顺序提交，异常时会提示“销售订单已保存，订单行保存失败”。当前工作区还有多处非本轮未提交改动，本轮未回退、未整理。
+
+## 2026-06-14 21:39 CST
+
+- 完成：修复暗色模式下业务看板文字和数字像“套圈”的视觉问题。暗色全局按钮样式继续保留普通按钮边框，但 `ant-btn-link` / `ant-btn-text` 默认态恢复透明背景和透明边框；业务看板模块名和数字 link 按钮不再被全局非 primary 按钮边框误伤。
+- 完成：`style:l1` 在 `erp-business-dashboard-dark-desktop` 场景新增 link 按钮无框断言，覆盖模块名和数字 `0` 的默认态 computed style，防止后续暗色按钮规则再次把 link 按钮渲染成小框。
+- 验证：浏览器直连 `http://localhost:5175/erp/business-dashboard` 并切到暗色主题，确认 `客户档案` 和数字 `0` 的按钮 `backgroundColor` 与 `borderColor` 均为透明，`textShadow` 为 `none`；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=erp-business-dashboard-dark-desktop pnpm --dir web style:l1`、`STYLE_L1_SCENARIOS=business-module-dark-customers-desktop pnpm --dir web style:l1`、`pnpm --dir web style:l1` 均通过；前端单测 309 个用例通过，全量 L1 48 个场景通过。
+- 下一步：后续新增暗色主题全局按钮覆盖时，必须显式区分 default / primary / link / text 语义；link/text 默认态应保持文本链接视觉，只在 hover / focus 时显示必要交互反馈。
+- 阻塞/风险：本轮只改暗色主题按钮默认视觉和业务看板 L1 断言；不改业务看板数据、菜单、RBAC、JSON-RPC、schema / migration、WorkflowUsecase、Fact usecase、部署、提交或推送。完整 L1 第一次运行时遇到 `V1MasterDataPage.jsx` HMR 瞬时 `renderColumnHeader is not defined`，失败场景单独重跑和完整 L1 第二次均已通过；当前工作区仍有多处非本轮未提交改动，本轮未回退、未整理。
+
+## 2026-06-14 21:43 CST
+
+- 完成：业务列表表头列顺序入口改为先打开快捷菜单，提供左移一列、右移一列、移到最前、移到最后和打开列顺序面板；工具栏列顺序按钮仍直接打开完整面板。共享实现收口到 `ColumnOrderHeaderMenu`，客户档案、供应商档案、销售订单、销售订单行和 formal-shell 业务页复用同一交互，列顺序保存仍走现有管理员账号偏好和 localStorage 兜底。
+- 完成：`style:l1` 的列顺序回归新增表头菜单断言，覆盖点击表头不会直接弹完整面板、快捷左移会写入本地缓存和菜单入口仍能打开完整面板。
+- 验证：`node --check web/scripts/styleL1.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web style:l1` 均通过；前端单测 309 个用例通过，全量 L1 48 个场景通过。另用 in-app Browser 打开 `http://localhost:5175/erp/sales/project-orders/sales-orders`，确认销售订单表头菜单显示五个动作、未直接弹面板、菜单内“打开列顺序面板”可进入完整面板，控制台无 warn/error。
+- 下一步：如果后续要让列顺序菜单支持隐藏列、固定列或拖拽排序，应先评审账号偏好结构和导出字段口径，避免把展示偏好误写成业务事实。
+- 阻塞/风险：本轮不改后端偏好字段、RBAC、菜单、schema / migration、WorkflowUsecase、Fact usecase、部署、提交或推送。浅色主题的完整人工截图未单独保存；默认 / 浅色相关路径由全量 `style:l1` 和 CSS 检查覆盖，in-app Browser 本次实际截图在暗色主题下完成。
+
+## 2026-06-14 21:46 CST
+
+- 完成：排查产品核心正式业务页的“下一步”列来源，确认是 `FormalBusinessModulePage` 的 formal-shell 共用列配置影响所有产品核心入口壳；已删除 `next_action` 样例字段、`下一步` 列、搜索索引和导出列，并缩回表格横向滚动宽度。
+- 完成：把正式业务模块字段范围里的施工型“后续动作 / 后续记录 / 后续评审”文案收口为业务对象和边界口径，例如库存改为“盘点 / 调整边界”、委外改为“发料 / 回货追溯”、出库改为“出库冲正边界”。
+- 完成：`style:l1` 的业务页列顺序回归新增表头断言，正式业务页列表表头不得再出现“下一步”列；开发能力台账和过程文档中的“下一步”仍保留，不作为客户业务页真源。
+- 验证：`rg` 确认 `web/src/erp/pages`、`web/src/erp/config` 和 `web/scripts` 中已无 formal-shell 的 `next_action` 和“下一步”列配置；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 均通过；前端单测 309 个用例通过，目标 L1 场景覆盖供应商、客户、销售订单、产品档案、BOM、库存台账和应收管理。
+- 下一步：如果后续继续清理产品核心页面语义，应优先按“稳定业务对象 / 状态 / 真源 / 边界”检查正式入口壳，不再把施工计划或实现待办写进客户业务列表列。
+- 阻塞/风险：本轮不改真实 API、RBAC、schema / migration、WorkflowUsecase、Fact usecase、客户菜单配置、部署、提交或推送；采购、库存、质检、生产、委外、出货和财务 formal-shell 仍是入口壳，真实写入能力仍需逐模块评审和实现。
+
+## 2026-06-14 22:00 CST
+
+- 完成：把“已选项摘要 + 已选明细 Popover”抽成 `SelectedItemsSummaryTag` 展示组件，并让 `SelectionActionBar` 通过 `selectedItems` 传入明细；正式业务入口壳在 BOM 多选时继续显示简洁摘要 `已选择 3 条BOM`，点击 / hover / focus 后展示全部已选 BOM 编号。
+- 完成：补齐已选明细 Popover 样式，明细 chip 可换行且不撑宽操作条；目标 L1 场景新增 BOM 多选断言，覆盖摘要 tag、Popover 明细、操作条盒模型和横向溢出。
+- 验证：`node --check web/scripts/styleL1.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`pnpm --dir web style:l1` 均通过；前端单测 309 个用例通过，全量 L1 48 个场景通过。另用 in-app Browser 打开 `http://localhost:5175/erp/purchase/material-bom`，选中 3 条 BOM 后确认摘要为 `已选择 3 条BOM`，Popover 展示 `MATERIAL-BOM-001 / MATERIAL-BOM-002 / MATERIAL-BOM-003`，控制台无 warn/error，页面无横向溢出；Browser 全页截图接口超时，裁剪截图成功。
+- 下一步：后续若客户档案、销售订单或其他单选 / 多选页也需要核对已选明细，可复用 `selectedItems` 入参接入，不应在各页面重复写 Popover。
+- 阻塞/风险：本轮不改后端 BOM usecase、schema / migration、RBAC、菜单、导出字段、Workflow / Fact 边界、部署、提交或推送；正式业务入口壳仍是样例数据页面，Popover 展示的是当前列表行编号，不代表真实 BOM 领域 API 已接入。当前工作区仍有多处非本轮未提交改动，本轮未回退、未整理。
+
+## 2026-06-14 22:18 CST
+
+- 完成：全局排查业务页表单和列表列后，先收口确定有真源约束的问题：供应商类型从自由输入改为后端允许的 `material / outsourcing / service / mixed` 枚举，并在列表、详情和导出中展示中文标签。
+- 完成：销售订单行列表不再默认暴露 `产品 ID / 单位 ID` 内部列；弹窗中的必需字段改名为“产品引用 ID / 单位引用 ID”，明确当前保存接口仍依赖引用 ID。订单行金额改为按“订单数量 × 单价”派生显示和提交，避免继续手填金额造成数量、单价、金额不一致；缺数量或缺单价时保留既有金额快照，不伪造 `0.00`。
+- 完成：正式业务入口壳的通用“标题 / 内容”列和弹窗字段改为“业务对象 / 字段范围”，回收站占位列同步改成“业务对象 / 名称”，避免把施工壳层字段误看成产品核心通用字段。
+- 完成：`style:l1` 新增销售订单详情抽屉订单行列头守卫，防止业务列表重新暴露 `产品 ID / 单位 ID`；回收站列头断言同步到“业务对象”。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test -- masterDataOrderView` 均通过；该 test 命令实际跑完整前端单测 310 个用例。`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，覆盖供应商、客户、销售订单、产品档案、BOM、库存台账和应收管理业务页。
+- 下一步：销售订单行真正消除“产品引用 ID / 单位引用 ID”的用户可见输入，需要新增或接入产品档案和单位档案的选择 API，再让弹窗按产品选择自动带出产品编号、产品名称和默认单位；本轮没有在前端硬造假选项。
+- 阻塞/风险：本轮不改后端 Product / Unit API、Ent schema、migration、RBAC、WorkflowUsecase、Fact usecase、客户菜单配置、部署、提交或推送；`OperationalFactsPage` 是内部事实验证页，仍保留产品 / 单位 ID 输入，不按客户业务页口径隐藏。当前工作区仍有多处非本轮未提交改动，本轮未回退、未整理。
