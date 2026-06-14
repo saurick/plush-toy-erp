@@ -136,6 +136,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/prototypes/business-module-page-standard-v1/README.md` | 业务模块标准页原型 / Business Module Page Standard Prototype |
 | `docs/product/prototypes/core-menu-coverage-v1/README.md` | 产品核心菜单覆盖样板 / Core Menu Coverage Pattern |
 | `docs/product/prototypes/formal-menu-candidate-v1/README.md` | 正式菜单候选原型 / Formal Menu Candidate Prototype |
+| `docs/product/prototypes/metric-card-interaction-standard-v1/README.md` | 指标卡交互语义样板 / Metric Card Interaction Standard |
 | `docs/product/prototypes/mobile-role-tasks-v1/README.md` | 岗位任务端原型 / Mobile Role Tasks Prototype |
 | `docs/product/prototypes/print-template-center-v1/README.md` | 模板打印中心原型 / Print Template Center Prototype |
 | `docs/product/prototypes/task-command-center-v1/README.md` | 任务中心样板 / Task Command Center Pattern |
@@ -220,6 +221,11 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md` | 移动端任务页改版前过程记录归档 / Progress Archive 2026-06-05 Before Mobile Task Redesign |
 | `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md` | 旧 business_records debug cleanup 前过程记录归档 / Progress Archive 2026-06-08 Before Business Records Debug Cleanup |
 | `docs/archive/progress-2026-06-09-before-brand-config.md` | 前端品牌客户配置化前过程记录归档 / Progress Archive 2026-06-09 Before Brand Config |
+| `docs/archive/progress-2026-06-10-before-style-l1-stabilization.md` | style:l1 稳定化前过程记录归档 / Progress Archive 2026-06-10 Before Style L1 Stabilization |
+| `docs/archive/progress-2026-06-11-before-ui-simplification-rules.md` | UI 简化规则补充前过程记录归档 / Progress Archive 2026-06-11 Before UI Simplification Rules |
+| `docs/archive/progress-2026-06-12-before-formal-menu-candidate-prototype.md` | 正式菜单候选原型前过程记录归档 / Progress Archive 2026-06-12 Before Formal Menu Candidate Prototype |
+| `docs/archive/progress-2026-06-13-before-workbench-prototype-redesign.md` | 工作台原型重做前过程记录归档 / Progress Archive 2026-06-13 Before Workbench Prototype Redesign |
+| `docs/archive/progress-2026-06-14-before-business-modal-alignment.md` | 业务新建 / 编辑弹窗统一前过程记录归档 / Progress Archive 2026-06-14 Before Business Modal Alignment |
 
 ### 外部参考
 

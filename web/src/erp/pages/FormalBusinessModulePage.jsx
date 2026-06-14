@@ -21,6 +21,7 @@ import {
   Drawer,
   Dropdown,
   Empty,
+  Form,
   Input,
   Modal,
   Popconfirm,
@@ -119,6 +120,8 @@ const MODULE_PRIMARY_ACTION_LABELS = Object.freeze({
   receivables: '生成应收',
   invoices: '生成发票',
 })
+
+const BUSINESS_FORM_MODAL_WIDTH = 'min(1120px, calc(100vw - 96px))'
 
 function renderColumnHeader(column, onOpenColumnOrder) {
   const label = getColumnLabel(column)
@@ -250,6 +253,7 @@ function buildFormalShellRows(moduleItem) {
       owner_role: ownerRole,
       source_refs: refs,
       next_action: '查看详情或调整列顺序',
+      created_at: '2026-06-13',
       updated_at: '2026-06-13',
       scope: scopeItems[0] || moduleItem.primaryEntity || moduleItem.title,
     },
@@ -261,6 +265,7 @@ function buildFormalShellRows(moduleItem) {
       owner_role: ownerRole,
       source_refs: moduleItem.primaryEntity || refs,
       next_action: '确认字段和详情页内容',
+      created_at: '2026-06-13',
       updated_at: '2026-06-13',
       scope: scopeItems[1] || moduleItem.boundary || '字段和动作待评审',
     },
@@ -272,6 +277,7 @@ function buildFormalShellRows(moduleItem) {
       owner_role: ownerRole,
       source_refs: moduleItem.factSource || refs,
       next_action: '接入新建、编辑、流转和打印',
+      created_at: '2026-06-13',
       updated_at: '2026-06-13',
       scope: scopeItems[2] || '操作入口待接入',
     },
@@ -315,6 +321,12 @@ function ModuleBoundaryDescriptions({ moduleItem, record }) {
       <Descriptions.Item label="主事实 / 真源">
         {moduleItem.factSource || moduleItem.primaryEntity || '领域真源待评审'}
       </Descriptions.Item>
+      <Descriptions.Item label="创建时间">
+        {record?.created_at || '-'}
+      </Descriptions.Item>
+      <Descriptions.Item label="更新时间">
+        {record?.updated_at || '-'}
+      </Descriptions.Item>
       <Descriptions.Item label="字段范围">
         {(moduleItem.currentScope || []).join('；') || '字段清单待评审'}
       </Descriptions.Item>
@@ -327,6 +339,109 @@ function ModuleBoundaryDescriptions({ moduleItem, record }) {
         business_records；旧表族不作为运行时真源。
       </Descriptions.Item>
     </Descriptions>
+  )
+}
+
+function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
+  const record = actionModal?.record || null
+  const statusOption = record
+    ? STATUS_OPTIONS.find((item) => item.value === record.business_status)
+    : null
+  const fieldScope =
+    (moduleItem.currentScope || []).join('；') ||
+    record?.scope ||
+    '字段清单待评审'
+  const boundaryText = [
+    '当前页面仍是正式入口壳；真实保存必须接入领域 usecase、API 和 RBAC 后启用，不能从前端本地伪造事实。',
+    moduleItem.boundary ? `模块边界：${moduleItem.boundary}` : '',
+    '不读取、不创建、不更新、不删除 business_records；旧表族不作为运行时真源。',
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const valueOrPlaceholder = (value, placeholder = '待接入领域 API 后生成') =>
+    value || placeholder
+
+  return (
+    <Form layout="vertical" className="erp-business-action-form">
+      <Form.Item label="业务编号" className="erp-business-action-form__field">
+        <Input
+          value={valueOrPlaceholder(record?.document_no)}
+          disabled
+          readOnly
+        />
+      </Form.Item>
+      <Form.Item label="标题" className="erp-business-action-form__field">
+        <Input
+          value={valueOrPlaceholder(
+            record?.title,
+            actionModal?.title || selectedLabel
+          )}
+          disabled
+          readOnly
+        />
+      </Form.Item>
+      <Form.Item label="当前状态" className="erp-business-action-form__field">
+        <Input value={statusOption?.label || '新建草稿'} disabled readOnly />
+      </Form.Item>
+      <Form.Item label="责任角色" className="erp-business-action-form__field">
+        <Input
+          value={
+            record?.owner_role ||
+            OWNER_ROLE_LABELS[moduleItem.key] ||
+            '业务负责人'
+          }
+          disabled
+          readOnly
+        />
+      </Form.Item>
+      <Form.Item
+        label="主事实 / 真源"
+        className="erp-business-action-form__field"
+      >
+        <Input
+          value={
+            moduleItem.factSource ||
+            moduleItem.primaryEntity ||
+            '领域真源待评审'
+          }
+          disabled
+          readOnly
+        />
+      </Form.Item>
+      <Form.Item label="来源表" className="erp-business-action-form__field">
+        <Input
+          value={
+            record?.source_refs ||
+            (moduleItem.sourceRefs || []).join(' / ') ||
+            moduleItem.title
+          }
+          disabled
+          readOnly
+        />
+      </Form.Item>
+      <Form.Item
+        label="字段范围"
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+      >
+        <Input.TextArea
+          value={fieldScope}
+          disabled
+          readOnly
+          autoSize={{ minRows: 2, maxRows: 4 }}
+        />
+      </Form.Item>
+      <Form.Item
+        label="当前边界"
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+      >
+        <Input.TextArea
+          value={boundaryText}
+          disabled
+          readOnly
+          autoSize={{ minRows: 3, maxRows: 5 }}
+        />
+      </Form.Item>
+    </Form>
   )
 }
 
@@ -451,6 +566,13 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         sorter: (a, b) => compareText(a.next_action, b.next_action),
       },
       {
+        title: '创建时间',
+        exportTitle: '创建时间',
+        dataIndex: 'created_at',
+        width: 130,
+        sorter: (a, b) => compareText(a.created_at, b.created_at),
+      },
+      {
         title: '更新时间',
         exportTitle: '更新时间',
         dataIndex: 'updated_at',
@@ -502,7 +624,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     return (
       <BusinessPageLayout>
         <PageHeaderCard
-          sectionTitle="正式业务入口"
           title="模块未登记"
           description="当前路由没有匹配的产品菜单定义。"
           tags={<Tag color="red">未登记</Tag>}
@@ -520,11 +641,27 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     message.success('已导出当前结果')
   }
 
-  const openActionHint = (actionLabel) => {
+  const openActionHint = (
+    actionLabel,
+    record = selectedRows[0] || null,
+    variant = 'confirm'
+  ) => {
     setActionModal({
       title: actionLabel || MODULE_CREATE_LABELS[moduleItem.key] || '新建记录',
-      record: selectedRows[0] || null,
+      record,
+      variant,
     })
+  }
+
+  const openCreateActionHint = () => {
+    openActionHint(createLabel, null, 'form')
+  }
+
+  const openEditActionHint = (record) => {
+    if (record?.id) {
+      setSelectedRowKeys([record.id])
+    }
+    openActionHint(`编辑${moduleItem.shortLabel || ''}`, record || null, 'form')
   }
 
   const selectedLabel =
@@ -573,7 +710,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   return (
     <BusinessPageLayout className="erp-formal-business-module-page">
       <PageHeaderCard
-        sectionTitle={moduleItem.sectionTitle || '正式业务入口'}
         title={moduleItem.title}
         description={moduleItem.description}
         stats={[
@@ -642,7 +778,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
           <ToolbarButton
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => openActionHint(createLabel)}
+            onClick={openCreateActionHint}
           >
             {createLabel}
           </ToolbarButton>
@@ -666,7 +802,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
             size="small"
             icon={<EditOutlined />}
             disabled={!singleSelectedRecord}
-            onClick={() => openActionHint('编辑')}
+            onClick={() => openEditActionHint(singleSelectedRecord)}
           >
             编辑
           </Button>
@@ -755,7 +891,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         rowKey="id"
         columns={orderedColumns}
         dataSource={filteredRows}
-        scroll={{ x: 1450 }}
+        scroll={{ x: 1580 }}
         emptyDescription="暂无匹配记录"
         rowSelection={{
           selectedRowKeys,
@@ -766,7 +902,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         }
         onRow={(record) => ({
           onClick: () => setSelectedRowKeys([record.id]),
-          onDoubleClick: () => setDetailRecord(record),
+          onDoubleClick: () => openEditActionHint(record),
         })}
         pagination={{
           pageSize: 10,
@@ -794,30 +930,70 @@ export default function FormalBusinessModulePage({ moduleKey }) {
       </Drawer>
 
       <Modal
-        className="erp-business-action-modal erp-business-action-modal--confirm"
-        width={560}
-        title={actionModal?.title || '操作'}
+        className={`erp-business-action-modal ${
+          actionModal?.variant === 'form'
+            ? 'erp-business-action-modal--form'
+            : 'erp-business-action-modal--confirm'
+        }`}
+        width={
+          actionModal?.variant === 'form' ? BUSINESS_FORM_MODAL_WIDTH : 560
+        }
+        title={
+          actionModal?.variant === 'form' ? (
+            <div className="erp-business-action-modal__title">
+              <span>{actionModal?.title || '操作'}</span>
+              <small>
+                当前只展示正式入口表单样式；真实保存需接入领域 usecase、API 和
+                RBAC。
+              </small>
+            </div>
+          ) : (
+            actionModal?.title || '操作'
+          )
+        }
         open={Boolean(actionModal)}
         onCancel={() => setActionModal(null)}
+        maskClosable={false}
         footer={
-          <Button type="primary" onClick={() => setActionModal(null)}>
-            确定
-          </Button>
+          actionModal?.variant === 'form' ? (
+            <>
+              <Button onClick={() => setActionModal(null)}>关闭</Button>
+              <Button type="primary" disabled>
+                待接入后启用
+              </Button>
+            </>
+          ) : (
+            <Button type="primary" onClick={() => setActionModal(null)}>
+              确定
+            </Button>
+          )
         }
         centered
         destroyOnHidden
       >
-        <Descriptions bordered column={1} size="small">
-          <Descriptions.Item label="当前模块">
-            {moduleItem.title}
-          </Descriptions.Item>
-          <Descriptions.Item label="当前记录">
-            {actionModal?.record?.document_no || selectedLabel}
-          </Descriptions.Item>
-          <Descriptions.Item label="保存位置">
-            {moduleItem.primaryEntity || moduleItem.title}
-          </Descriptions.Item>
-        </Descriptions>
+        {actionModal?.variant === 'form' ? (
+          <FormalShellActionForm
+            moduleItem={moduleItem}
+            actionModal={actionModal}
+            selectedLabel={selectedLabel}
+          />
+        ) : (
+          <Descriptions bordered column={1} size="small">
+            <Descriptions.Item label="当前模块">
+              {moduleItem.title}
+            </Descriptions.Item>
+            <Descriptions.Item label="当前记录">
+              {actionModal?.record?.document_no || selectedLabel}
+            </Descriptions.Item>
+            <Descriptions.Item label="保存位置">
+              {moduleItem.primaryEntity || moduleItem.title}
+            </Descriptions.Item>
+            <Descriptions.Item label="当前边界">
+              当前页面仍是正式入口壳；真实保存必须接入领域 usecase、API 和 RBAC
+              后启用，不能从前端本地伪造事实。
+            </Descriptions.Item>
+          </Descriptions>
+        )}
       </Modal>
 
       <Modal

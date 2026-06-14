@@ -32,7 +32,6 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   CollaborationTaskPanel,
-  BusinessListToolbar,
   BusinessPageLayout,
   PageHeaderCard,
   SearchInput,
@@ -53,8 +52,10 @@ import {
   listCustomers,
   listSalesOrderItems,
   listSalesOrders,
+  removeSalesOrderItem,
   submitSalesOrder,
   updateSalesOrder,
+  updateSalesOrderItem,
 } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
@@ -65,6 +66,7 @@ import {
   buildSalesOrderItemParams,
   buildSalesOrderParams,
   formatUnixDate,
+  formatUnixDateTime,
   hasActionPermission,
   statusText,
   unixToDateInputValue,
@@ -113,6 +115,8 @@ const LIFECYCLE_ACTIONS = [
 const SALES_ORDERS_MODULE_KEY = 'sales-orders'
 const SALES_ORDER_ITEMS_MODULE_KEY = 'sales-order-items'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
+const OPEN_LINE_STATUS = 'open'
+const BUSINESS_FORM_MODAL_WIDTH = 'min(960px, calc(100vw - 96px))'
 
 function renderColumnHeader(column, onOpenColumnOrder) {
   const label = getColumnLabel(column)
@@ -238,6 +242,47 @@ function lineStatusTag(status) {
   return <Tag>{statusText(key, SALES_ORDER_ITEM_STATUS_LABELS)}</Tag>
 }
 
+function createBlankOrderLine(lineNo = 1) {
+  return {
+    line_no: lineNo,
+    product_id: undefined,
+    unit_id: undefined,
+    product_code_snapshot: '',
+    product_name_snapshot: '',
+    color_snapshot: '',
+    ordered_quantity: '',
+    unit_price: '',
+    amount: '',
+    planned_delivery_date: '',
+    note: '',
+  }
+}
+
+function normalizeSalesOrderItemFormValue(item = {}) {
+  return {
+    id: item.id,
+    line_no: item.line_no,
+    product_id: item.product_id,
+    unit_id: item.unit_id,
+    product_code_snapshot: item.product_code_snapshot || '',
+    product_name_snapshot: item.product_name_snapshot || '',
+    color_snapshot: item.color_snapshot || '',
+    ordered_quantity: item.ordered_quantity || '',
+    unit_price: item.unit_price || '',
+    amount: item.amount || '',
+    planned_delivery_date: unixToDateInputValue(item.planned_delivery_date),
+    note: item.note || '',
+  }
+}
+
+function getNextLineNo(lines = []) {
+  const maxLineNo = lines.reduce((maxValue, line) => {
+    const lineNo = Number(line?.line_no || 0)
+    return Number.isFinite(lineNo) ? Math.max(maxValue, lineNo) : maxValue
+  }, 0)
+  return maxLineNo + 1
+}
+
 function SalesOrderFormFields({ customers }) {
   return (
     <>
@@ -297,92 +342,206 @@ function SalesOrderFormFields({ customers }) {
   )
 }
 
-function SalesOrderItemFormFields() {
+function SalesOrderItemsFormSection({
+  form,
+  canCreateItem,
+  canUpdateItem,
+  canCancelItem,
+}) {
   return (
-    <>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="行号"
-        name="line_no"
-        rules={[{ required: true, message: '请填写行号' }]}
-      >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="产品 ID"
-        name="product_id"
-        rules={[{ required: true, message: '请填写产品 ID' }]}
-      >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="单位 ID"
-        name="unit_id"
-        rules={[{ required: true, message: '请填写单位 ID' }]}
-      >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="产品编号快照"
-        name="product_code_snapshot"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="产品名称快照"
-        name="product_name_snapshot"
-        rules={[{ required: true, message: '请填写产品名称快照' }]}
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="颜色快照"
-        name="color_snapshot"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="订单数量"
-        name="ordered_quantity"
-        rules={[{ required: true, message: '请填写订单数量' }]}
-      >
-        <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="单价"
-        name="unit_price"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="金额"
-        name="amount"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="计划交付日期"
-        name="planned_delivery_date"
-      >
-        <Input type="date" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="备注"
-        name="note"
-      >
-        <Input.TextArea allowClear rows={3} showCount maxLength={300} />
-      </Form.Item>
-    </>
+    <section className="erp-sales-order-lines-form">
+      <Form.List name="items">
+        {(fields, { add, remove }) => (
+          <>
+            <div className="erp-sales-order-lines-form__head">
+              <div>
+                <strong>订单行</strong>
+                <span>同一个销售订单内维护多条客户承诺明细。</span>
+              </div>
+              <Button
+                icon={<PlusOutlined />}
+                disabled={!canCreateItem}
+                onClick={() => {
+                  const currentLines = form.getFieldValue('items') || []
+                  add(createBlankOrderLine(getNextLineNo(currentLines)))
+                }}
+              >
+                新增一行
+              </Button>
+            </div>
+            {fields.length === 0 ? (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="暂无订单行，可在同一表单内新增"
+              />
+            ) : (
+              <div className="erp-sales-order-lines-form__list">
+                {fields.map((field, index) => {
+                  const lineId = form.getFieldValue(['items', field.name, 'id'])
+                  const isExistingLine = Boolean(lineId)
+                  const canEditLine = isExistingLine
+                    ? canUpdateItem
+                    : canCreateItem
+                  const canRemoveLine = isExistingLine
+                    ? canCancelItem
+                    : canCreateItem
+
+                  return (
+                    <div
+                      key={field.key}
+                      className="erp-sales-order-lines-form__row"
+                    >
+                      <div className="erp-sales-order-lines-form__row-head">
+                        <Space wrap size={8}>
+                          <strong>第 {index + 1} 行</strong>
+                          {isExistingLine ? <Tag>已保存</Tag> : <Tag>新增</Tag>}
+                        </Space>
+                        <Button
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          disabled={!canRemoveLine}
+                          onClick={() => remove(field.name)}
+                        >
+                          移除
+                        </Button>
+                      </div>
+                      <div className="erp-sales-order-lines-form__grid">
+                        <Form.Item name={[field.name, 'id']} hidden>
+                          <Input />
+                        </Form.Item>
+                        <Form.Item
+                          label="行号"
+                          name={[field.name, 'line_no']}
+                          rules={[{ required: true, message: '请填写行号' }]}
+                        >
+                          <InputNumber
+                            min={1}
+                            precision={0}
+                            disabled={!canEditLine}
+                            style={{ width: '100%' }}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label="产品 ID"
+                          name={[field.name, 'product_id']}
+                          rules={[{ required: true, message: '请填写产品 ID' }]}
+                        >
+                          <InputNumber
+                            min={1}
+                            precision={0}
+                            disabled={!canEditLine}
+                            style={{ width: '100%' }}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label="单位 ID"
+                          name={[field.name, 'unit_id']}
+                          rules={[{ required: true, message: '请填写单位 ID' }]}
+                        >
+                          <InputNumber
+                            min={1}
+                            precision={0}
+                            disabled={!canEditLine}
+                            style={{ width: '100%' }}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label="产品编号快照"
+                          name={[field.name, 'product_code_snapshot']}
+                        >
+                          <Input
+                            allowClear
+                            autoComplete="off"
+                            disabled={!canEditLine}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label="产品名称快照"
+                          name={[field.name, 'product_name_snapshot']}
+                          rules={[
+                            {
+                              required: true,
+                              message: '请填写产品名称快照',
+                            },
+                          ]}
+                        >
+                          <Input
+                            allowClear
+                            autoComplete="off"
+                            disabled={!canEditLine}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label="颜色快照"
+                          name={[field.name, 'color_snapshot']}
+                        >
+                          <Input
+                            allowClear
+                            autoComplete="off"
+                            disabled={!canEditLine}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label="订单数量"
+                          name={[field.name, 'ordered_quantity']}
+                          rules={[
+                            { required: true, message: '请填写订单数量' },
+                          ]}
+                        >
+                          <Input
+                            allowClear
+                            autoComplete="off"
+                            disabled={!canEditLine}
+                            placeholder="decimal，如 120.5"
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label="单价"
+                          name={[field.name, 'unit_price']}
+                        >
+                          <Input
+                            allowClear
+                            autoComplete="off"
+                            disabled={!canEditLine}
+                          />
+                        </Form.Item>
+                        <Form.Item label="金额" name={[field.name, 'amount']}>
+                          <Input
+                            allowClear
+                            autoComplete="off"
+                            disabled={!canEditLine}
+                          />
+                        </Form.Item>
+                        <Form.Item
+                          label="计划交付日期"
+                          name={[field.name, 'planned_delivery_date']}
+                        >
+                          <Input type="date" disabled={!canEditLine} />
+                        </Form.Item>
+                        <Form.Item
+                          className="erp-sales-order-lines-form__field--full"
+                          label="备注"
+                          name={[field.name, 'note']}
+                        >
+                          <Input.TextArea
+                            allowClear
+                            rows={2}
+                            showCount
+                            maxLength={300}
+                            disabled={!canEditLine}
+                          />
+                        </Form.Item>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </Form.List>
+    </section>
   )
 }
 
@@ -400,9 +559,9 @@ export default function V1SalesOrdersPage() {
   const [total, setTotal] = useState(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
-  const [itemModalOpen, setItemModalOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
+  const [orderFormOriginalItems, setOrderFormOriginalItems] = useState([])
   const [orderColumnOrder, setOrderColumnOrder] = useState(null)
   const [itemColumnOrder, setItemColumnOrder] = useState(null)
   const [columnOrderTarget, setColumnOrderTarget] = useState(null)
@@ -412,13 +571,20 @@ export default function V1SalesOrdersPage() {
   const [recycleOpen, setRecycleOpen] = useState(false)
   const [recycleSelectedRowKeys, setRecycleSelectedRowKeys] = useState([])
   const [orderForm] = Form.useForm()
-  const [itemForm] = Form.useForm()
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
   const canCreateItem = hasActionPermission(
     adminProfile,
     'sales_order_item.create'
+  )
+  const canUpdateItem = hasActionPermission(
+    adminProfile,
+    'sales_order_item.update'
+  )
+  const canCancelItem = hasActionPermission(
+    adminProfile,
+    'sales_order_item.cancel'
   )
 
   const loadCustomers = useCallback(async () => {
@@ -496,37 +662,95 @@ export default function V1SalesOrdersPage() {
 
   const openCreateOrder = () => {
     setEditingOrder(null)
+    setOrderFormOriginalItems([])
     orderForm.resetFields()
     orderForm.setFieldsValue({
       order_date: new Date().toISOString().slice(0, 10),
+      items: [],
     })
     setOrderModalOpen(true)
   }
 
-  const openEditOrder = (order) => {
+  const openEditOrder = async (order) => {
+    if (!order?.id) return
+    setSelectedOrder(order)
+    setDetailOpen(false)
     setEditingOrder(order)
     orderForm.setFieldsValue({
       ...order,
       order_date: unixToDateInputValue(order.order_date),
       planned_delivery_date: unixToDateInputValue(order.planned_delivery_date),
+      items: [],
     })
     setOrderModalOpen(true)
+    setItemLoading(true)
+    try {
+      const result = await listSalesOrderItems({
+        sales_order_id: order.id,
+        limit: 200,
+      })
+      const nextItems = Array.isArray(result?.sales_order_items)
+        ? result.sales_order_items
+        : []
+      setItems(nextItems)
+      const openItems = nextItems.filter(
+        (item) => String(item?.line_status) === OPEN_LINE_STATUS
+      )
+      setOrderFormOriginalItems(openItems)
+      orderForm.setFieldsValue({
+        ...order,
+        order_date: unixToDateInputValue(order.order_date),
+        planned_delivery_date: unixToDateInputValue(
+          order.planned_delivery_date
+        ),
+        items: openItems.map(normalizeSalesOrderItemFormValue),
+      })
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载订单行'))
+      setOrderFormOriginalItems([])
+    } finally {
+      setItemLoading(false)
+    }
   }
 
-  const openCreateItem = () => {
-    if (!selectedOrder?.id) {
-      message.warning('请先选择销售订单')
+  const syncOrderFormItems = async (orderId, formItems = []) => {
+    const submittedItems = Array.isArray(formItems) ? formItems : []
+    const existingOpenItems = Array.isArray(orderFormOriginalItems)
+      ? orderFormOriginalItems
+      : []
+    const submittedIds = new Set()
+
+    for (const item of submittedItems) {
+      const itemId = Number(item?.id || 0)
+      const params = buildSalesOrderItemParams(item, {
+        sales_order_id: orderId,
+      })
+      if (itemId > 0) {
+        submittedIds.add(itemId)
+        if (canUpdateItem) {
+          await updateSalesOrderItem({ ...params, id: itemId })
+        }
+      } else if (canCreateItem) {
+        await addSalesOrderItem(params)
+      }
+    }
+
+    if (!canCancelItem) {
       return
     }
-    itemForm.resetFields()
-    itemForm.setFieldsValue({ line_no: items.length + 1 })
-    setItemModalOpen(true)
+
+    for (const existingItem of existingOpenItems) {
+      if (!submittedIds.has(existingItem.id)) {
+        await removeSalesOrderItem({ id: existingItem.id })
+      }
+    }
   }
 
   const saveOrder = async () => {
     const values = await orderForm.validateFields()
     const customer = customers.find((item) => item.id === values.customer_id)
     setSaving(true)
+    let saved = null
     try {
       const params = buildSalesOrderParams(
         {
@@ -535,34 +759,31 @@ export default function V1SalesOrdersPage() {
         },
         editingOrder?.id ? { id: editingOrder.id } : {}
       )
-      const saved = editingOrder?.id
+      saved = editingOrder?.id
         ? await updateSalesOrder(params)
         : await createSalesOrder(params)
-      message.success(editingOrder?.id ? '销售订单已更新' : '销售订单已创建')
+      if (saved?.id) {
+        await syncOrderFormItems(saved.id, values.items)
+      }
+      message.success(
+        editingOrder?.id ? '销售订单与订单行已更新' : '销售订单已创建'
+      )
       setOrderModalOpen(false)
       setSelectedOrder(saved || selectedOrder)
       await loadOrders()
+      await loadItems(saved || selectedOrder)
     } catch (error) {
-      message.error(getActionErrorMessage(error, '保存销售订单'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const saveItem = async () => {
-    if (!selectedOrder?.id) return
-    const values = await itemForm.validateFields()
-    setSaving(true)
-    try {
-      const params = buildSalesOrderItemParams(values, {
-        sales_order_id: selectedOrder.id,
-      })
-      await addSalesOrderItem(params)
-      message.success('订单行已新增')
-      setItemModalOpen(false)
-      await loadItems(selectedOrder)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '保存订单行'))
+      message.error(
+        getActionErrorMessage(
+          error,
+          saved ? '销售订单已保存，订单行保存失败' : '保存销售订单'
+        )
+      )
+      if (saved?.id) {
+        setSelectedOrder(saved)
+        await loadOrders()
+        await loadItems(saved)
+      }
     } finally {
       setSaving(false)
     }
@@ -667,6 +888,24 @@ export default function V1SalesOrdersPage() {
         render: salesOrderStatusTag,
         exportValue: (record) =>
           statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS),
+      },
+      {
+        title: '创建时间',
+        exportTitle: '创建时间',
+        dataIndex: 'created_at',
+        width: 160,
+        sorter: (a, b) => compareNumber(a?.created_at, b?.created_at),
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.created_at),
+      },
+      {
+        title: '更新时间',
+        exportTitle: '更新时间',
+        dataIndex: 'updated_at',
+        width: 160,
+        sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
     ],
     []
@@ -790,6 +1029,24 @@ export default function V1SalesOrdersPage() {
         exportValue: (record) =>
           statusText(record?.line_status, SALES_ORDER_ITEM_STATUS_LABELS),
       },
+      {
+        title: '创建时间',
+        exportTitle: '创建时间',
+        dataIndex: 'created_at',
+        width: 160,
+        sorter: (a, b) => compareNumber(a?.created_at, b?.created_at),
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.created_at),
+      },
+      {
+        title: '更新时间',
+        exportTitle: '更新时间',
+        dataIndex: 'updated_at',
+        width: 160,
+        sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.updated_at),
+      },
     ],
     []
   )
@@ -810,11 +1067,11 @@ export default function V1SalesOrdersPage() {
     [effectiveItemColumnOrder, itemDataColumns]
   )
 
-  const itemColumns = useMemo(
+  const readonlyItemColumns = useMemo(
     () =>
       visibleItemDataColumns.map((column) => ({
         ...column,
-        title: renderColumnHeader(column, () => setColumnOrderTarget('items')),
+        title: getColumnLabel(column),
       })),
     [visibleItemDataColumns]
   )
@@ -865,7 +1122,6 @@ export default function V1SalesOrdersPage() {
     <BusinessPageLayout className="erp-v1-sales-orders-page">
       <PageHeaderCard
         compact
-        sectionTitle="销售链路"
         title="销售订单"
         description="维护客户订单承诺和订单行；出货、库存、应收、发票和收款在对应业务模块处理。"
         stats={[
@@ -961,6 +1217,14 @@ export default function V1SalesOrdersPage() {
           >
             查看详情
           </Button>
+          <Button
+            size="small"
+            icon={<DownloadOutlined />}
+            disabled={!selectedOrder || items.length === 0}
+            onClick={exportItems}
+          >
+            导出订单行
+          </Button>
           {canUpdateOrder ? (
             <Button
               size="small"
@@ -1000,7 +1264,7 @@ export default function V1SalesOrdersPage() {
         loading={loading}
         columns={orderColumns}
         dataSource={orders}
-        scroll={{ x: 1240 }}
+        scroll={{ x: 1560 }}
         pagination={{ pageSize: 10, showSizeChanger: false }}
         emptyDescription="暂无销售订单"
         rowSelection={{
@@ -1017,56 +1281,12 @@ export default function V1SalesOrdersPage() {
         }
         onRow={(record) => ({
           onClick: () => setSelectedOrder(record),
-        })}
-      />
-
-      <BusinessListToolbar
-        stats={[
-          {
-            key: 'order',
-            label: '明细订单',
-            value: selectedOrder?.order_no || '未选择',
+          onDoubleClick: () => {
+            if (canUpdateOrder) {
+              openEditOrder(record)
+            }
           },
-          { key: 'lines', label: '订单行', value: items.length },
-          { key: 'open-lines', label: '未关闭行', value: openLineCount },
-        ]}
-        actions={
-          <>
-            <ToolbarButton
-              icon={<DownloadOutlined />}
-              disabled={!selectedOrder || items.length === 0}
-              onClick={exportItems}
-            >
-              导出订单行
-            </ToolbarButton>
-            <ToolbarButton
-              icon={<SettingOutlined />}
-              onClick={() => setColumnOrderTarget('items')}
-            >
-              订单行列顺序
-            </ToolbarButton>
-            {canCreateItem ? (
-              <ToolbarButton
-                icon={<PlusOutlined />}
-                onClick={openCreateItem}
-                disabled={!selectedOrder}
-              >
-                新增订单行
-              </ToolbarButton>
-            ) : null}
-          </>
-        }
-      />
-      <BusinessDataTable
-        rowKey="id"
-        loading={selectedOrder ? itemLoading : false}
-        columns={itemColumns}
-        dataSource={selectedOrder ? items : []}
-        scroll={{ x: 1420 }}
-        pagination={false}
-        emptyDescription={
-          selectedOrder ? '当前订单暂无订单行' : '尚未选择销售订单'
-        }
+        })}
       />
 
       <CollaborationTaskPanel
@@ -1127,7 +1347,7 @@ export default function V1SalesOrdersPage() {
 
       <Modal
         className="erp-business-action-modal erp-business-action-modal--form"
-        width="min(1280px, calc(100vw - 96px))"
+        width={BUSINESS_FORM_MODAL_WIDTH}
         title={
           <div className="erp-business-action-modal__title">
             <span>{editingOrder?.id ? '编辑销售订单' : '新建销售订单'}</span>
@@ -1137,6 +1357,7 @@ export default function V1SalesOrdersPage() {
         open={orderModalOpen}
         onOk={saveOrder}
         onCancel={() => setOrderModalOpen(false)}
+        maskClosable={false}
         confirmLoading={saving}
         centered
         forceRender
@@ -1148,34 +1369,12 @@ export default function V1SalesOrdersPage() {
           className="erp-business-action-form"
         >
           <SalesOrderFormFields customers={customers} />
-        </Form>
-      </Modal>
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
-        width="min(1280px, calc(100vw - 96px))"
-        title={
-          <div className="erp-business-action-modal__title">
-            <span>新增订单行</span>
-            <small>
-              订单行只记录客户承诺明细，不生成出货、库存或财务事实。
-            </small>
-          </div>
-        }
-        open={itemModalOpen}
-        onOk={saveItem}
-        onCancel={() => setItemModalOpen(false)}
-        confirmLoading={saving}
-        centered
-        forceRender
-        destroyOnHidden={false}
-      >
-        <Form
-          form={itemForm}
-          layout="vertical"
-          className="erp-business-action-form"
-        >
-          <SalesOrderItemFormFields />
+          <SalesOrderItemsFormSection
+            form={orderForm}
+            canCreateItem={canCreateItem}
+            canUpdateItem={canUpdateItem}
+            canCancelItem={canCancelItem}
+          />
         </Form>
       </Modal>
 
@@ -1286,7 +1485,7 @@ export default function V1SalesOrdersPage() {
 
       <Drawer
         title="销售订单详情"
-        width={560}
+        width={920}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
       >
@@ -1311,11 +1510,52 @@ export default function V1SalesOrdersPage() {
             <Descriptions.Item label="生命周期">
               {salesOrderStatusTag(selectedOrder.lifecycle_status)}
             </Descriptions.Item>
+            <Descriptions.Item label="创建时间">
+              {formatUnixDateTime(selectedOrder.created_at)}
+            </Descriptions.Item>
+            <Descriptions.Item label="更新时间">
+              {formatUnixDateTime(selectedOrder.updated_at)}
+            </Descriptions.Item>
             <Descriptions.Item label="备注">
               {selectedOrder.note || '-'}
             </Descriptions.Item>
           </Descriptions>
         ) : null}
+        <div className="erp-sales-order-detail-lines">
+          <div className="erp-sales-order-detail-lines__head">
+            <strong>订单行</strong>
+            <Space wrap size={8}>
+              <Tag>共 {items.length} 行</Tag>
+              <Tag>未关闭 {openLineCount} 行</Tag>
+              <Button
+                size="small"
+                icon={<SettingOutlined />}
+                onClick={() => setColumnOrderTarget('items')}
+              >
+                列顺序
+              </Button>
+            </Space>
+          </div>
+          <Table
+            rowKey="id"
+            size="small"
+            loading={selectedOrder ? itemLoading : false}
+            columns={readonlyItemColumns}
+            dataSource={selectedOrder ? items : []}
+            pagination={false}
+            scroll={{ x: 1740 }}
+            locale={{
+              emptyText: (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={
+                    selectedOrder ? '当前订单暂无订单行' : '尚未选择销售订单'
+                  }
+                />
+              ),
+            }}
+          />
+        </div>
         <p className="erp-business-selection-action-bar__hint">
           当前页面不展示已发货数量，不生成出货、库存预留、库存流水、发票、应收或收款。出货事实后续由
           ShipmentUsecase 接入。

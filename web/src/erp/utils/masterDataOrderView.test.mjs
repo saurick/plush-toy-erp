@@ -6,6 +6,7 @@ import {
   buildMasterDataParams,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
+  formatUnixDateTime,
   hasActionPermission,
   statusText,
   unixToDateInputValue,
@@ -92,4 +93,6 @@ test('masterDataOrderView: status display and snapshots are read models only', (
     { id: 9, code: 'C009', name: '客户九' }
   )
   assert.equal(unixToDateInputValue(1780185600), '2026-05-31')
+  assert.equal(formatUnixDateTime(0), '-')
+  assert.match(formatUnixDateTime(1780185600), /2026.*05.*31/)
 })

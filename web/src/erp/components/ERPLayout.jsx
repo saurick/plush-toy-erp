@@ -84,6 +84,15 @@ const DEFAULT_DESKTOP_ENTRY = {
   path: '/erp/dashboard',
   description: '聚合今日待办、阻塞、业务摘要、打印入口和常用业务模块。',
 }
+
+const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
+  DEFAULT_DESKTOP_ENTRY.path,
+  '/erp/task-board',
+  '/erp/business-dashboard',
+  '/erp/operations/exceptions',
+  '/erp/print-center',
+  '/erp/system/permissions',
+])
 function buildCurrentEntry({ navigationSections, locationPath }) {
   const items = navigationSections.flatMap((section) => section.items)
   const exactMatch = items.find((item) => item.path === locationPath)
@@ -313,9 +322,7 @@ export default function ERPLayout() {
     '/erp/finance/',
   ].some((prefix) => currentEntry?.path?.startsWith(prefix))
   const hidePageHead =
-    currentEntry?.path === DEFAULT_DESKTOP_ENTRY.path ||
-    currentEntry?.path === '/erp/task-board' ||
-    currentEntry?.path === '/erp/business-dashboard' ||
+    SELF_CONTAINED_PAGE_HEAD_PATHS.has(currentEntry?.path) ||
     hideCurrentEntryPageHead
 
   const registerPageRefresh = useCallback((handler) => {

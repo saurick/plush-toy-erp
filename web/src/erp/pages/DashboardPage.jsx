@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertOutlined,
+  ArrowRightOutlined,
   CloseCircleOutlined,
-  ReloadOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -16,9 +16,9 @@ import {
   Progress,
   Row,
   Select,
+  Segmented,
   Space,
   Spin,
-  Statistic,
   Table,
   Tag,
   Typography,
@@ -118,6 +118,21 @@ const TASK_ACTION_META = Object.freeze({
     requireReason: true,
   },
 })
+
+const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
+  { key: 'actionable', label: '待我处理' },
+  { key: 'risk', label: '阻塞/逾期' },
+  { key: 'waiting', label: '等待交接' },
+  { key: 'closed', label: '已归档' },
+])
+
+const WORKBENCH_ROLE_ROWS = Object.freeze([
+  { key: 'warehouse', label: '仓库' },
+  { key: 'quality', label: '品质' },
+  { key: 'pmc', label: 'PMC' },
+  { key: 'finance', label: '财务' },
+  { key: 'boss', label: '老板' },
+])
 
 function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
@@ -227,6 +242,40 @@ function TaskLane({ lane, onOpenTask, onOpenAction }) {
   )
 }
 
+function TaskMetricAction({
+  label,
+  value,
+  actionLabel,
+  active = false,
+  danger = false,
+  onClick,
+}) {
+  return (
+    <button
+      type="button"
+      className={[
+        'erp-task-center-metric',
+        danger ? 'erp-task-center-metric--danger' : '',
+        active ? 'erp-task-center-metric--active' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      <span className="erp-task-center-metric__head">
+        <span>{label}</span>
+        <ArrowRightOutlined
+          aria-hidden="true"
+          className="erp-task-center-metric__icon"
+        />
+      </span>
+      <strong>{value}</strong>
+      <small>{actionLabel}</small>
+    </button>
+  )
+}
+
 export default function DashboardPage({ initialView = 'workbench' }) {
   const [loading, setLoading] = useState(false)
   const [workflowTasks, setWorkflowTasks] = useState([])
@@ -236,6 +285,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [actionReason, setActionReason] = useState('')
   const [actionSaving, setActionSaving] = useState(false)
   const [activeView, setActiveView] = useState(initialView)
+  const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
+  const [selectedWorkbenchTaskId, setSelectedWorkbenchTaskId] = useState('')
   const [exceptionStepKey, setExceptionStepKey] = useState(
     EXCEPTION_FLOW_STEPS[0].key
   )
@@ -400,11 +451,65 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     ? resolveWorkflowTaskEntryPath(taskCenterCurrentTask)
     : ''
   const currentFocusTask = todayFocusTasks[0] || exceptionTasks[0] || null
-  const currentFocusTaskStatusMeta = currentFocusTask
-    ? getWorkflowTaskStatusMeta(currentFocusTask)
+  const workbenchQueueGroups = useMemo(() => {
+    const groups = {
+      actionable: [],
+      risk: [],
+      waiting: [],
+      closed: [],
+    }
+    workflowTasks.forEach((task) => {
+      const statusKey = getTaskStatusKey(task)
+      const dueStatus = getWorkflowTaskDueStatus(task)
+      const hasReason = Boolean(getWorkflowTaskReason(task))
+      if (isTerminalWorkflowTask(task)) {
+        groups.closed.push(task)
+        return
+      }
+      if (
+        ['blocked', 'rejected'].includes(statusKey) ||
+        dueStatus === 'overdue' ||
+        hasReason
+      ) {
+        groups.risk.push(task)
+        return
+      }
+      if (['pending', 'ready', 'processing'].includes(statusKey)) {
+        groups.actionable.push(task)
+        return
+      }
+      groups.waiting.push(task)
+    })
+
+    Object.values(groups).forEach((items) => {
+      items.sort((left, right) => {
+        const leftDue = Number(left.due_at || Number.MAX_SAFE_INTEGER)
+        const rightDue = Number(right.due_at || Number.MAX_SAFE_INTEGER)
+        if (leftDue !== rightDue) return leftDue - rightDue
+        return String(left.task_name || '').localeCompare(
+          String(right.task_name || '')
+        )
+      })
+    })
+    return groups
+  }, [workflowTasks])
+  const workbenchQueueTasks =
+    workbenchQueueGroups[workbenchQueueKey] || workbenchQueueGroups.actionable
+  const selectedWorkbenchTask = useMemo(() => {
+    if (workbenchQueueTasks.length === 0) {
+      return currentFocusTask
+    }
+    return (
+      workbenchQueueTasks.find(
+        (task) => String(task.id || task.task_code) === selectedWorkbenchTaskId
+      ) || workbenchQueueTasks[0]
+    )
+  }, [currentFocusTask, selectedWorkbenchTaskId, workbenchQueueTasks])
+  const selectedWorkbenchStatusMeta = selectedWorkbenchTask
+    ? getWorkflowTaskStatusMeta(selectedWorkbenchTask)
     : null
-  const currentFocusTaskEntryPath = currentFocusTask
-    ? resolveWorkflowTaskEntryPath(currentFocusTask)
+  const selectedWorkbenchEntryPath = selectedWorkbenchTask
+    ? resolveWorkflowTaskEntryPath(selectedWorkbenchTask)
     : ''
   const roleReminderCards = useMemo(
     () => [
@@ -418,6 +523,36 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       { key: 'quality', title: '品质', value: workflowStats.qualityPending },
     ],
     [workflowStats]
+  )
+  const workbenchRoleRows = useMemo(
+    () =>
+      WORKBENCH_ROLE_ROWS.map((role) => {
+        const roleTasks = workflowTasks.filter(
+          (task) => getTaskOwnerRoleKey(task) === role.key
+        )
+        const active = roleTasks.filter(
+          (task) => !isTerminalWorkflowTask(task)
+        ).length
+        const blocked = roleTasks.filter((task) => {
+          const statusKey = getTaskStatusKey(task)
+          return (
+            ['blocked', 'rejected'].includes(statusKey) ||
+            Boolean(getWorkflowTaskReason(task))
+          )
+        }).length
+        const overdue = roleTasks.filter(
+          (task) =>
+            !isTerminalWorkflowTask(task) &&
+            getWorkflowTaskDueStatus(task) === 'overdue'
+        ).length
+        return {
+          ...role,
+          active,
+          blocked,
+          overdue,
+        }
+      }).filter((row) => row.active > 0 || row.blocked > 0 || row.overdue > 0),
+    [workflowTasks]
   )
   const businessSummaryRows = useMemo(
     () =>
@@ -536,6 +671,84 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
   }
 
+  const workbenchTaskColumns = [
+    {
+      title: '优先级',
+      dataIndex: 'task_status_key',
+      width: 88,
+      render: (_, record) => {
+        const dueStatus = getWorkflowTaskDueStatus(record)
+        const statusMeta = getWorkflowTaskStatusMeta(record)
+        const color =
+          dueStatus === 'overdue'
+            ? 'red'
+            : dueStatus === 'due_soon'
+              ? 'orange'
+              : statusMeta.color
+        return (
+          <Tag color={color}>
+            {dueStatus === 'overdue' ? '逾期' : statusMeta.label}
+          </Tag>
+        )
+      },
+    },
+    {
+      title: '任务 / 业务对象',
+      dataIndex: 'task_name',
+      render: (value, record) => (
+        <div className="erp-workbench-task-cell">
+          <Text strong>{value || '未命名任务'}</Text>
+          <Text type="secondary">{formatWorkflowTaskSource(record)}</Text>
+        </div>
+      ),
+    },
+    {
+      title: '负责',
+      dataIndex: 'owner_role_key',
+      width: 90,
+      render: (_, record) => getTaskOwnerRoleKey(record) || '-',
+    },
+    {
+      title: '到期 / SLA',
+      dataIndex: 'due_at',
+      width: 132,
+      render: (_, record) => {
+        const dueStatus = getWorkflowTaskDueStatus(record)
+        return (
+          <Tag
+            color={
+              dueStatus === 'overdue'
+                ? 'red'
+                : dueStatus === 'due_soon'
+                  ? 'orange'
+                  : 'green'
+            }
+          >
+            {getWorkflowTaskDueLabel(record)}
+          </Tag>
+        )
+      },
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 112,
+      render: (_, record) => (
+        <Button
+          size="small"
+          type="primary"
+          disabled={isTerminalWorkflowTask(record)}
+          onClick={(event) => {
+            event.stopPropagation()
+            openTaskDrawer(record, 'complete')
+          }}
+        >
+          处理
+        </Button>
+      ),
+    },
+  ]
+
   const taskColumns = [
     {
       title: '任务',
@@ -637,174 +850,265 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       {activeView === 'workbench' ? (
         <>
           <Card
-            className="erp-dashboard-card erp-command-center-hero-card erp-workbench-overview-card"
+            className="erp-dashboard-card erp-workbench-command-card"
             variant="borderless"
             loading={loading}
           >
-            <div className="erp-workbench-overview">
-              <div className="erp-workbench-summary">
+            <div className="erp-workbench-command">
+              <div className="erp-workbench-command-head">
                 <div>
-                  <Text type="secondary">ERP / 工作台</Text>
                   <Title level={3} className="erp-command-center-hero-title">
                     后台首页 / 工作台
                   </Title>
                   <Paragraph className="erp-dashboard-summary">
-                    今天先处理协同卡点，再看业务对象状态和角色负载；这里展示判断依据，不重复做菜单跳转。
+                    先处理协同卡点，再核对业务对象脉搏；任务完成只关闭
+                    Workflow，不代表库存、出货、财务或发票事实过账。
                   </Paragraph>
-                </div>
-                <div
-                  className="erp-workbench-metrics"
-                  aria-label="工作台关键指标"
-                >
-                  <div className="erp-workbench-metric">
-                    <span>今日必须处理</span>
-                    <strong>
-                      {workflowStats.pending + workflowStats.processing}
-                    </strong>
-                  </div>
-                  <div className="erp-workbench-metric erp-workbench-metric--danger">
-                    <span>跨角色阻塞</span>
-                    <strong>{workflowStats.blocked}</strong>
-                  </div>
-                  <div className="erp-workbench-metric">
-                    <span>业务对象</span>
-                    <strong>{businessSummary.totalRecords}</strong>
-                  </div>
-                  <div className="erp-workbench-metric">
-                    <span>完成率</span>
-                    <strong>{businessSummary.completionRatio}%</strong>
-                  </div>
                 </div>
               </div>
 
-              <section className="erp-workbench-current" aria-label="当前处理">
-                <div className="erp-workbench-current-head">
-                  <Text type="secondary">当前处理</Text>
-                  {currentFocusTaskStatusMeta ? (
-                    <Tag color={currentFocusTaskStatusMeta.color}>
-                      {currentFocusTaskStatusMeta.label}
-                    </Tag>
-                  ) : (
-                    <Tag>无待处理</Tag>
-                  )}
+              <div
+                className="erp-workbench-kpi-strip"
+                aria-label="工作台关键指标"
+              >
+                <div className="erp-workbench-kpi">
+                  <span>待处理</span>
+                  <strong>
+                    {workflowStats.pending + workflowStats.processing}
+                  </strong>
+                  <small>当前可推进</small>
                 </div>
-                {currentFocusTask ? (
-                  <>
-                    <Title level={5} className="erp-workbench-current-title">
-                      {currentFocusTask.task_name || '未命名任务'}
-                    </Title>
-                    <Text
-                      type="secondary"
-                      className="erp-workbench-current-meta"
-                    >
-                      {formatWorkflowTaskSource(currentFocusTask)} /{' '}
-                      {getWorkflowTaskDueLabel(currentFocusTask)}
-                    </Text>
-                    {getWorkflowTaskReason(currentFocusTask) ? (
-                      <Text
-                        type="danger"
-                        className="erp-workbench-current-meta"
-                      >
-                        {getWorkflowTaskReason(currentFocusTask)}
+                <div className="erp-workbench-kpi erp-workbench-kpi--danger">
+                  <span>阻塞/逾期</span>
+                  <strong>
+                    {workflowStats.blocked + workflowStats.overdue}
+                  </strong>
+                  <small>需交接说明</small>
+                </div>
+                <div className="erp-workbench-kpi">
+                  <span>等待交接</span>
+                  <strong>{workbenchQueueGroups.waiting.length}</strong>
+                  <small>非终态任务</small>
+                </div>
+                <div className="erp-workbench-kpi">
+                  <span>业务对象</span>
+                  <strong>{businessSummary.totalRecords}</strong>
+                  <small>只读摘要</small>
+                </div>
+                <div className="erp-workbench-kpi">
+                  <span>本轮完成率</span>
+                  <strong>{businessSummary.completionRatio}%</strong>
+                  <small>来自看板投影</small>
+                </div>
+              </div>
+
+              <div className="erp-workbench-main-grid">
+                <section
+                  className="erp-workbench-panel erp-workbench-queue-panel"
+                  aria-label="优先处理队列"
+                >
+                  <div className="erp-workbench-panel-head">
+                    <div>
+                      <Title level={5}>优先处理队列</Title>
+                      <Text type="secondary">
+                        按任务状态、SLA 和阻塞原因排序；点击行查看右侧上下文。
                       </Text>
-                    ) : null}
-                    <Space wrap className="erp-workbench-current-actions">
-                      <Button
-                        size="small"
-                        type="primary"
-                        onClick={() => openTaskDrawer(currentFocusTask)}
-                      >
-                        处理
-                      </Button>
-                      <Button
-                        size="small"
-                        danger
-                        disabled={isTerminalWorkflowTask(currentFocusTask)}
-                        onClick={() =>
-                          openTaskDrawer(currentFocusTask, 'block')
-                        }
-                      >
-                        标记阻塞
-                      </Button>
-                      <Button
-                        size="small"
-                        disabled={!currentFocusTaskEntryPath}
-                        onClick={() => openTaskEntry(currentFocusTask)}
-                      >
-                        查看关联记录
-                      </Button>
-                    </Space>
-                  </>
-                ) : (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="暂无需要优先处理的任务"
+                    </div>
+                    <Segmented
+                      size="small"
+                      value={workbenchQueueKey}
+                      onChange={setWorkbenchQueueKey}
+                      options={WORKBENCH_QUEUE_OPTIONS.map((option) => ({
+                        value: option.key,
+                        label: `${option.label} ${
+                          workbenchQueueGroups[option.key]?.length || 0
+                        }`,
+                      }))}
+                    />
+                  </div>
+                  <Table
+                    size="small"
+                    rowKey={(record) => record.id || record.task_code}
+                    columns={workbenchTaskColumns}
+                    dataSource={workbenchQueueTasks}
+                    pagination={false}
+                    scroll={{ x: 760 }}
+                    rowClassName={(record) =>
+                      String(record.id || record.task_code) ===
+                      String(
+                        selectedWorkbenchTask?.id ||
+                          selectedWorkbenchTask?.task_code ||
+                          ''
+                      )
+                        ? 'erp-workbench-task-row--active'
+                        : ''
+                    }
+                    onRow={(record) => ({
+                      onClick: () =>
+                        setSelectedWorkbenchTaskId(
+                          String(record.id || record.task_code || '')
+                        ),
+                    })}
+                    locale={{
+                      emptyText: (
+                        <Empty
+                          image={Empty.PRESENTED_IMAGE_SIMPLE}
+                          description="当前队列暂无任务"
+                        />
+                      ),
+                    }}
                   />
-                )}
-              </section>
+                </section>
+
+                <aside className="erp-workbench-side-stack">
+                  <section
+                    className="erp-workbench-panel erp-workbench-task-detail"
+                    aria-label="任务详情"
+                  >
+                    <div className="erp-workbench-panel-head">
+                      <div>
+                        <Title level={5}>任务详情</Title>
+                        <Text type="secondary">当前处理上下文</Text>
+                      </div>
+                      {selectedWorkbenchStatusMeta ? (
+                        <Tag color={selectedWorkbenchStatusMeta.color}>
+                          {selectedWorkbenchStatusMeta.label}
+                        </Tag>
+                      ) : (
+                        <Tag>暂无任务</Tag>
+                      )}
+                    </div>
+                    {selectedWorkbenchTask ? (
+                      <Space
+                        direction="vertical"
+                        size={10}
+                        className="erp-dashboard-block"
+                      >
+                        <Title level={4} className="erp-workbench-detail-title">
+                          {selectedWorkbenchTask.task_name || '未命名任务'}
+                        </Title>
+                        <Descriptions size="small" column={1}>
+                          <Descriptions.Item label="来源">
+                            {formatWorkflowTaskSource(selectedWorkbenchTask)}
+                          </Descriptions.Item>
+                          <Descriptions.Item label="负责角色">
+                            {getTaskOwnerRoleKey(selectedWorkbenchTask) || '-'}
+                          </Descriptions.Item>
+                          <Descriptions.Item label="到期">
+                            {getWorkflowTaskDueLabel(selectedWorkbenchTask)}
+                          </Descriptions.Item>
+                          <Descriptions.Item label="阻塞/备注">
+                            {getWorkflowTaskReason(selectedWorkbenchTask) ||
+                              '-'}
+                          </Descriptions.Item>
+                        </Descriptions>
+                        <Space wrap>
+                          <Button
+                            type="primary"
+                            disabled={isTerminalWorkflowTask(
+                              selectedWorkbenchTask
+                            )}
+                            onClick={() =>
+                              openTaskDrawer(selectedWorkbenchTask, 'complete')
+                            }
+                          >
+                            处理任务
+                          </Button>
+                          <Button
+                            danger
+                            disabled={isTerminalWorkflowTask(
+                              selectedWorkbenchTask
+                            )}
+                            onClick={() =>
+                              openTaskDrawer(selectedWorkbenchTask, 'block')
+                            }
+                          >
+                            标记阻塞
+                          </Button>
+                          <Button
+                            disabled={!selectedWorkbenchEntryPath}
+                            onClick={() => openTaskEntry(selectedWorkbenchTask)}
+                          >
+                            关联记录
+                          </Button>
+                        </Space>
+                      </Space>
+                    ) : (
+                      <Empty
+                        image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        description="暂无可处理任务"
+                      />
+                    )}
+                  </section>
+
+                  <section
+                    className="erp-workbench-panel erp-workbench-object-pulse"
+                    aria-label="业务对象脉搏"
+                  >
+                    <div className="erp-workbench-panel-head">
+                      <div>
+                        <Title level={5}>业务对象脉搏</Title>
+                        <Text type="secondary">
+                          Workflow 摘要，不代表事实已过账。
+                        </Text>
+                      </div>
+                      <Button
+                        size="small"
+                        type="link"
+                        onClick={() => navigate('/erp/business-dashboard')}
+                      >
+                        查看全部
+                      </Button>
+                    </div>
+                    <div className="erp-workbench-object-list">
+                      {workbenchBusinessRows.map((row) => {
+                        const activeCount =
+                          row.statusGroupCounts.project +
+                          row.statusGroupCounts.material +
+                          row.statusGroupCounts.production +
+                          row.statusGroupCounts.warehouse +
+                          row.statusGroupCounts.finance
+                        const blockedCount = row.statusGroupCounts.blocked || 0
+                        return (
+                          <button
+                            type="button"
+                            className="erp-workbench-object-pulse-row"
+                            key={row.key}
+                            onClick={() => row.path && navigate(row.path)}
+                            aria-label={`进入${row.module}，记录 ${row.count}，推进 ${activeCount}`}
+                          >
+                            <span>{row.module}</span>
+                            <strong>{row.count}</strong>
+                            <small>推进 {activeCount}</small>
+                            <Tag color={blockedCount > 0 ? 'red' : 'green'}>
+                              {blockedCount > 0
+                                ? `阻塞 ${blockedCount}`
+                                : '健康'}
+                            </Tag>
+                            <ArrowRightOutlined
+                              aria-hidden="true"
+                              className="erp-workbench-object-pulse-row__icon"
+                            />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </section>
+                </aside>
+              </div>
             </div>
           </Card>
 
           <Row gutter={[12, 12]}>
-            <Col xs={24} xl={14}>
+            <Col xs={24} xl={12}>
               <Card
-                className="erp-dashboard-card erp-command-center-focus-card"
+                className="erp-dashboard-card erp-workbench-summary-card"
                 variant="borderless"
-                title="今日焦点"
+                title="流程状态总览"
               >
                 <Space
                   direction="vertical"
                   size={10}
-                  className="erp-dashboard-block"
-                >
-                  {todayFocusTasks.length > 0 ? (
-                    todayFocusTasks.map((task) => {
-                      const statusMeta = getWorkflowTaskStatusMeta(task)
-                      return (
-                        <div
-                          className="erp-command-center-focus-item"
-                          key={task.id || task.task_code}
-                        >
-                          <div className="erp-command-center-focus-copy">
-                            <Text strong>{task.task_name || '未命名任务'}</Text>
-                            <Text type="secondary">
-                              {formatWorkflowTaskSource(task)} /{' '}
-                              {getWorkflowTaskDueLabel(task)}
-                            </Text>
-                          </div>
-                          <Space wrap>
-                            <Tag color={statusMeta.color}>
-                              {statusMeta.label}
-                            </Tag>
-                            <Button
-                              size="small"
-                              type="primary"
-                              onClick={() => openTaskDrawer(task, 'complete')}
-                            >
-                              处理
-                            </Button>
-                          </Space>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="暂无待处理焦点"
-                    />
-                  )}
-                </Space>
-              </Card>
-            </Col>
-            <Col xs={24} xl={10}>
-              <Card
-                className="erp-dashboard-card erp-command-center-health-card"
-                variant="borderless"
-                title="业务状态摘要"
-              >
-                <Space
-                  direction="vertical"
-                  size={12}
                   className="erp-dashboard-block"
                 >
                   {businessSummaryRows.map((row) => (
@@ -828,93 +1132,35 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 </Space>
               </Card>
             </Col>
-          </Row>
-
-          <Row gutter={[12, 12]}>
-            <Col xs={24} lg={10}>
+            <Col xs={24} xl={12}>
               <Card
-                className="erp-dashboard-card"
+                className="erp-dashboard-card erp-workbench-summary-card"
                 variant="borderless"
-                title="业务对象分布"
+                title="角色工作负载"
               >
-                <Space
-                  direction="vertical"
-                  size={10}
-                  className="erp-dashboard-block"
-                >
-                  {workbenchBusinessRows.map((row) => (
-                    <div className="erp-workbench-object-row" key={row.key}>
-                      <div>
-                        <Text strong>{row.module}</Text>
-                        <Text type="secondary">
-                          推进中{' '}
-                          {row.statusGroupCounts.project +
-                            row.statusGroupCounts.material +
-                            row.statusGroupCounts.production +
-                            row.statusGroupCounts.warehouse +
-                            row.statusGroupCounts.finance}
-                        </Text>
-                      </div>
-                      <Tag color={row.count > 0 ? 'blue' : 'default'}>
-                        {row.count}
+                <div className="erp-workbench-role-list">
+                  {(workbenchRoleRows.length > 0
+                    ? workbenchRoleRows
+                    : roleReminderCards.map((item) => ({
+                        key: item.key,
+                        label: item.title,
+                        active: item.value,
+                        blocked: 0,
+                        overdue: 0,
+                      }))
+                  ).map((row) => (
+                    <div className="erp-workbench-role-row" key={row.key}>
+                      <Text strong>{row.label}</Text>
+                      <Text type="secondary">待处理 {row.active}</Text>
+                      <Text type={row.blocked > 0 ? 'danger' : 'secondary'}>
+                        阻塞 {row.blocked}
+                      </Text>
+                      <Tag color={row.overdue > 0 ? 'red' : 'green'}>
+                        逾期 {row.overdue}
                       </Tag>
                     </div>
                   ))}
-                </Space>
-              </Card>
-            </Col>
-            <Col xs={24} lg={7}>
-              <Card
-                className="erp-dashboard-card"
-                variant="borderless"
-                title="角色提醒"
-              >
-                <Row gutter={[10, 10]}>
-                  {roleReminderCards.map((item) => (
-                    <Col xs={12} key={item.key}>
-                      <Card
-                        size="small"
-                        className="erp-dashboard-status-card"
-                        variant="borderless"
-                      >
-                        <Statistic title={item.title} value={item.value} />
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              </Card>
-            </Col>
-            <Col xs={24} lg={7}>
-              <Card
-                className="erp-dashboard-card"
-                variant="borderless"
-                title="阻塞交接"
-              >
-                <Space
-                  direction="vertical"
-                  size={10}
-                  className="erp-dashboard-block"
-                >
-                  {exceptionTasks.length > 0 ? (
-                    exceptionTasks.slice(0, 4).map((task) => (
-                      <div
-                        className="erp-workbench-blocked-row"
-                        key={task.id || task.task_code}
-                      >
-                        <Text strong>{task.task_name || '未命名任务'}</Text>
-                        <Text type="danger">
-                          {getWorkflowTaskReason(task) ||
-                            formatWorkflowTaskSource(task)}
-                        </Text>
-                      </div>
-                    ))
-                  ) : (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="暂无阻塞任务"
-                    />
-                  )}
-                </Space>
+                </div>
               </Card>
             </Col>
           </Row>
@@ -936,7 +1182,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               <div className="erp-task-center-overview">
                 <section className="erp-task-center-summary">
                   <div>
-                    <Text type="secondary">ERP / 任务中心</Text>
                     <Title level={3} className="erp-command-center-hero-title">
                       任务看板
                     </Title>
@@ -948,38 +1193,34 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     className="erp-task-center-metrics"
                     aria-label="任务中心入口"
                   >
-                    <button
-                      type="button"
-                      className="erp-task-center-metric"
+                    <TaskMetricAction
+                      label="待我处理"
+                      value={taskCenterAssignedCount}
+                      actionLabel="点击筛选待处理"
+                      active={filters.status === 'pending'}
                       onClick={() => updateFilter('status', 'pending')}
-                    >
-                      <span>待我处理</span>
-                      <strong>{taskCenterAssignedCount}</strong>
-                    </button>
-                    <button
-                      type="button"
-                      className="erp-task-center-metric"
+                    />
+                    <TaskMetricAction
+                      label="发起来源"
+                      value={taskCenterSourceCount}
+                      actionLabel="查看全部来源"
                       onClick={() => updateFilter('status', 'all')}
-                    >
-                      <span>发起来源</span>
-                      <strong>{taskCenterSourceCount}</strong>
-                    </button>
-                    <button
-                      type="button"
-                      className="erp-task-center-metric erp-task-center-metric--danger"
+                    />
+                    <TaskMetricAction
+                      label="阻塞交接"
+                      value={taskCenterBlockedCount}
+                      actionLabel="点击筛选阻塞"
+                      active={filters.status === 'blocked'}
+                      danger
                       onClick={() => updateFilter('status', 'blocked')}
-                    >
-                      <span>阻塞交接</span>
-                      <strong>{taskCenterBlockedCount}</strong>
-                    </button>
-                    <button
-                      type="button"
-                      className="erp-task-center-metric"
+                    />
+                    <TaskMetricAction
+                      label="当前结果"
+                      value={filteredTasks.length}
+                      actionLabel="清空筛选"
+                      active={!hasActiveFilters}
                       onClick={clearFilters}
-                    >
-                      <span>当前结果</span>
-                      <strong>{filteredTasks.length}</strong>
-                    </button>
+                    />
                   </div>
                 </section>
 
@@ -1064,9 +1305,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               </div>
 
               <Space wrap className="erp-task-center-actions">
-                <Button icon={<ReloadOutlined />} onClick={loadDashboardStats}>
-                  刷新任务
-                </Button>
                 <Button
                   icon={<CloseCircleOutlined />}
                   disabled={!hasActiveFilters}
@@ -1149,13 +1387,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           <Card
             className="erp-dashboard-card erp-command-center-exception-card"
             variant="borderless"
-            extra={
-              <Button onClick={() => navigate('/erp/task-board')}>
-                回任务看板
-              </Button>
-            }
           >
-            <Text type="secondary">ERP / 异常处理</Text>
             <Title level={3} className="erp-command-center-hero-title">
               异常 / 阻塞闭环
             </Title>

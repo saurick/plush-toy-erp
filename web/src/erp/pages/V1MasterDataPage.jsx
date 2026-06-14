@@ -62,6 +62,7 @@ import {
   buildContactParams,
   buildMasterDataParams,
   formatUnixDate,
+  formatUnixDateTime,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
 import {
@@ -70,6 +71,7 @@ import {
 } from '../utils/moduleTableColumns.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
+const BUSINESS_FORM_MODAL_WIDTH = 'min(960px, calc(100vw - 96px))'
 
 const PAGE_CONFIG = Object.freeze({
   customers: {
@@ -459,6 +461,9 @@ export default function V1MasterDataPage({ type }) {
   }
 
   const openEditRecord = (record) => {
+    if (!record?.id) return
+    setSelectedRecord(record)
+    setDetailOpen(false)
     setEditingRecord(record)
     recordForm.setFieldsValue(record)
     setRecordModalOpen(true)
@@ -612,6 +617,26 @@ export default function V1MasterDataPage({ type }) {
           record?.is_active === false ? '停用' : '启用',
         render: activeTag,
       },
+      {
+        title: renderColumnHeader('创建时间', () => setColumnOrderOpen(true)),
+        exportTitle: '创建时间',
+        dataIndex: 'created_at',
+        width: 160,
+        sorter: (a, b) =>
+          Number(a?.created_at || 0) - Number(b?.created_at || 0),
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.created_at),
+      },
+      {
+        title: renderColumnHeader('更新时间', () => setColumnOrderOpen(true)),
+        exportTitle: '更新时间',
+        dataIndex: 'updated_at',
+        width: 160,
+        sorter: (a, b) =>
+          Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.updated_at),
+      },
     ],
     [type]
   )
@@ -690,7 +715,6 @@ export default function V1MasterDataPage({ type }) {
     <BusinessPageLayout className="erp-v1-master-data-page">
       <PageHeaderCard
         compact
-        sectionTitle="基础资料"
         title={config.title}
         description={config.summary}
         stats={[
@@ -838,7 +862,7 @@ export default function V1MasterDataPage({ type }) {
         loading={loading}
         columns={orderedRecordColumns}
         dataSource={records}
-        scroll={{ x: 980 }}
+        scroll={{ x: 1300 }}
         pagination={{ pageSize: 10, showSizeChanger: false }}
         emptyDescription="暂无客户或供应商主体记录"
         rowSelection={{
@@ -855,6 +879,11 @@ export default function V1MasterDataPage({ type }) {
         }
         onRow={(record) => ({
           onClick: () => setSelectedRecord(record),
+          onDoubleClick: () => {
+            if (canUpdate) {
+              openEditRecord(record)
+            }
+          },
         })}
       />
 
@@ -926,7 +955,7 @@ export default function V1MasterDataPage({ type }) {
 
       <Modal
         className="erp-business-action-modal erp-business-action-modal--form"
-        width="min(1280px, calc(100vw - 96px))"
+        width={BUSINESS_FORM_MODAL_WIDTH}
         title={
           <div className="erp-business-action-modal__title">
             <span>
@@ -938,6 +967,7 @@ export default function V1MasterDataPage({ type }) {
         open={recordModalOpen}
         onOk={saveRecord}
         onCancel={() => setRecordModalOpen(false)}
+        maskClosable={false}
         confirmLoading={saving}
         centered
         forceRender
@@ -954,7 +984,7 @@ export default function V1MasterDataPage({ type }) {
 
       <Modal
         className="erp-business-action-modal erp-business-action-modal--form"
-        width="min(1080px, calc(100vw - 96px))"
+        width={BUSINESS_FORM_MODAL_WIDTH}
         title={
           <div className="erp-business-action-modal__title">
             <span>新建联系人</span>
@@ -966,6 +996,7 @@ export default function V1MasterDataPage({ type }) {
         open={contactModalOpen}
         onOk={saveContact}
         onCancel={() => setContactModalOpen(false)}
+        maskClosable={false}
         confirmLoading={saving}
         centered
         forceRender
@@ -1119,11 +1150,11 @@ export default function V1MasterDataPage({ type }) {
             <Descriptions.Item label="状态">
               {activeTag(selectedRecord.is_active)}
             </Descriptions.Item>
-            <Descriptions.Item label="创建日期">
-              {formatUnixDate(selectedRecord.created_at)}
+            <Descriptions.Item label="创建时间">
+              {formatUnixDateTime(selectedRecord.created_at)}
             </Descriptions.Item>
-            <Descriptions.Item label="更新日期">
-              {formatUnixDate(selectedRecord.updated_at)}
+            <Descriptions.Item label="更新时间">
+              {formatUnixDateTime(selectedRecord.updated_at)}
             </Descriptions.Item>
             <Descriptions.Item label="备注">
               {selectedRecord.note || '-'}

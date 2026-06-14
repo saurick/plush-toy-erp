@@ -97,6 +97,19 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；不恢复 business_records，不承诺未接 API 已完成。',
   },
   {
+    key: 'metric-card-interaction-standard',
+    title: '指标卡交互语义样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'metric-card-interaction-standard-v1/',
+    assetPath: 'metric-card-interaction-standard-v1/index.html',
+    readmePath: 'metric-card-interaction-standard-v1/README.md',
+    description:
+      '统一只读统计卡、可点击动作卡和筛选统计卡的默认态、hover / focus、选中态和恢复态。',
+    appliesTo:
+      '后台首页、任务看板、业务看板、业务页标题摘要和同类 KPI / 数字入口可参照；先区分只读、动作和筛选三类语义。',
+  },
+  {
     key: 'formal-menu-candidate',
     title: '正式菜单候选原型',
     type: 'HTML',

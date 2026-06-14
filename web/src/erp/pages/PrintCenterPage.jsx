@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Space, Typography } from 'antd'
-import { PrinterOutlined } from '@ant-design/icons'
+import { ArrowRightOutlined, PrinterOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -169,8 +169,14 @@ export default function PrintCenterPage() {
                     <span className="erp-print-center-template-title">
                       {template.title}
                     </span>
-                    <span className="erp-print-center-template-meta">
-                      {template.stateText}
+                    <span className="erp-print-center-template-row">
+                      <span className="erp-print-center-template-meta">
+                        {template.stateText}
+                      </span>
+                      <span className="erp-print-center-template-action">
+                        {isActive ? '当前模板' : '选择'}
+                        <ArrowRightOutlined aria-hidden="true" />
+                      </span>
                     </span>
                   </button>
                 )

@@ -29,6 +29,10 @@ const { Text } = Typography
 const COLLABORATION_PANEL_DEFAULT_HEIGHT = 320
 const COLLABORATION_PANEL_MIN_HEIGHT = 320
 const COLLABORATION_PANEL_MAX_HEIGHT = 560
+const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
+const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 132
+const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 72
+const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
 const DEFAULT_TASK_STATUS_LABELS = new Map([
   ['pending', '待处理'],
   ['ready', '可执行'],
@@ -46,6 +50,42 @@ function joinClassNames(...items) {
 
 function clampNumber(value, minValue, maxValue) {
   return Math.min(Math.max(value, minValue), maxValue)
+}
+
+function resolveBusinessTableColumnWidth(column = {}) {
+  if (Number.isFinite(column.width)) {
+    return Math.max(column.width, BUSINESS_TABLE_MIN_COLUMN_WIDTH)
+  }
+
+  if (typeof column.width === 'string') {
+    const pixelWidth = Number.parseFloat(column.width)
+    if (Number.isFinite(pixelWidth) && column.width.trim().endsWith('px')) {
+      return Math.max(pixelWidth, BUSINESS_TABLE_MIN_COLUMN_WIDTH)
+    }
+  }
+
+  return BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH
+}
+
+function resolveBusinessTableScrollX({ columns = [], rowSelection, scrollX }) {
+  const estimatedColumnsWidth = columns.reduce(
+    (total, column) => total + resolveBusinessTableColumnWidth(column),
+    rowSelection ? BUSINESS_TABLE_SELECTION_COLUMN_WIDTH : 0
+  )
+  const estimatedScrollX = Math.max(
+    BUSINESS_TABLE_DEFAULT_SCROLL_X,
+    estimatedColumnsWidth
+  )
+
+  if (Number.isFinite(scrollX)) {
+    return Math.max(scrollX, estimatedScrollX)
+  }
+
+  if (scrollX === true || scrollX == null) {
+    return estimatedScrollX
+  }
+
+  return scrollX
 }
 
 function resolveCollaborationPanelMaxHeight() {
@@ -66,7 +106,6 @@ export function BusinessPageLayout({ children, className = '' }) {
 }
 
 export function PageHeaderCard({
-  sectionTitle,
   title,
   description,
   tags = null,
@@ -84,7 +123,6 @@ export function PageHeaderCard({
       <div className="erp-business-page-header-card__grid erp-business-module-hero__grid">
         <div className="erp-business-page-header-card__main erp-business-module-hero__main">
           <div>
-            <Text type="secondary">{sectionTitle}</Text>
             <h1>{title}</h1>
             <p>{description}</p>
           </div>
@@ -97,8 +135,15 @@ export function PageHeaderCard({
         {stats.length > 0 ? (
           <div className="erp-business-page-header-card__stats erp-business-module-stats">
             {stats.map((item) => (
-              <div key={item.key || item.label}>
-                <Text type="secondary">{item.label}</Text>
+              <div
+                key={item.key || item.label}
+                className="erp-business-page-header-card__stat erp-metric-readonly-card"
+                aria-label={`${item.label} ${item.value}，只读摘要`}
+              >
+                <div className="erp-business-page-header-card__stat-head">
+                  <Text type="secondary">{item.label}</Text>
+                  <span className="erp-metric-readonly-card__badge">摘要</span>
+                </div>
                 <strong>{item.value}</strong>
               </div>
             ))}
@@ -227,7 +272,7 @@ export function SelectFilter({
     <Select
       ref={selectRef}
       className={joinClassNames(
-        'erp-business-filter-control erp-business-filter-control--select',
+        'erp-business-filter-control erp-business-filter-control--select erp-business-filter-control--compact-select',
         className
       )}
       value={value}
@@ -439,6 +484,21 @@ export function BusinessDataTable({
   pagination,
   emptyDescription = '暂无业务记录，点击“新建记录”开始落盘',
 }) {
+  const resolvedScroll = React.useMemo(() => {
+    const baseScroll =
+      scroll && typeof scroll === 'object' && !Array.isArray(scroll)
+        ? scroll
+        : {}
+    return {
+      ...baseScroll,
+      x: resolveBusinessTableScrollX({
+        columns,
+        rowSelection,
+        scrollX: baseScroll.x,
+      }),
+    }
+  }, [columns, rowSelection, scroll])
+
   return (
     <Card className="erp-business-data-table-card erp-business-module-table-card">
       <Table
@@ -446,7 +506,7 @@ export function BusinessDataTable({
         rowKey={rowKey}
         columns={columns}
         dataSource={dataSource}
-        scroll={scroll}
+        scroll={resolvedScroll}
         rowSelection={rowSelection}
         rowClassName={rowClassName}
         onRow={onRow}

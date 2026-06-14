@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>指标卡交互语义样板 / Metric Card Interaction Standard</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f4f7f5;
+        --panel: #ffffff;
+        --panel-soft: #f8fbf8;
+        --border: #dce7df;
+        --border-strong: #b9cbe5;
+        --text: #17231c;
+        --muted: #667085;
+        --primary: #2d64a7;
+        --danger: #b42318;
+        --shadow: 0 12px 28px rgb(30 64 54 / 0.08);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        font-family:
+          Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+        background: var(--bg);
+      }
+
+      main {
+        display: grid;
+        gap: 18px;
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 24px 0 36px;
+      }
+
+      header,
+      section {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: start;
+        padding: 20px;
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 24px;
+        line-height: 1.25;
+      }
+
+      h2 {
+        font-size: 16px;
+        line-height: 1.35;
+      }
+
+      p,
+      small {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        color: #385269;
+        font-size: 12px;
+        border: 1px solid #d8e1ed;
+        border-radius: 999px;
+        background: #f8fbff;
+        padding: 0 9px;
+      }
+
+      section {
+        display: grid;
+        gap: 14px;
+        padding: 18px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(150px, 1fr));
+        gap: 10px;
+      }
+
+      .metric-readonly,
+      .metric-action,
+      .metric-filter {
+        min-width: 0;
+        min-height: 88px;
+        border-radius: 8px;
+        padding: 12px 14px;
+      }
+
+      .metric-readonly {
+        display: grid;
+        gap: 5px;
+        align-content: center;
+        border: 1px solid var(--border);
+        background: var(--panel-soft);
+        cursor: default;
+      }
+
+      .metric-readonly__head,
+      .metric-action__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .metric-readonly__head span:first-child,
+      .metric-action__head span:first-child {
+        min-width: 0;
+        color: var(--muted);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
+      .metric-readonly__head span:last-child {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 11px;
+        border: 1px solid #d8e1ed;
+        border-radius: 999px;
+        background: #fff;
+        padding: 0 7px;
+      }
+
+      strong {
+        font-size: 28px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .metric-action,
+      .metric-filter {
+        display: grid;
+        gap: 6px;
+        color: var(--text);
+        text-align: left;
+        border: 1px solid var(--border-strong);
+        background: linear-gradient(180deg, #fff 0%, #f7fbff 100%);
+        cursor: pointer;
+        transition:
+          border-color 0.18s ease,
+          box-shadow 0.18s ease,
+          transform 0.18s ease,
+          background 0.18s ease;
+      }
+
+      .metric-action:hover,
+      .metric-action:focus-visible,
+      .metric-filter:hover,
+      .metric-filter:focus-visible {
+        border-color: var(--primary);
+        background: #f4f8ff;
+        outline: none;
+        box-shadow: 0 0 0 3px rgb(45 100 167 / 0.14);
+        transform: translateY(-1px);
+      }
+
+      .metric-filter[aria-pressed="true"] {
+        border-color: var(--primary);
+        background: #edf5ff;
+        box-shadow: inset 3px 0 0 var(--primary);
+      }
+
+      .metric-action__icon {
+        color: var(--primary);
+        font-size: 13px;
+      }
+
+      .metric-action small,
+      .metric-filter small {
+        color: var(--muted);
+      }
+
+      .metric-danger,
+      .metric-danger strong {
+        color: var(--danger);
+      }
+
+      .comparison {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .rule {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fbfcfe;
+        padding: 12px;
+      }
+
+      .rule strong {
+        font-size: 15px;
+        line-height: 1.35;
+      }
+
+      @media (max-width: 780px) {
+        main {
+          width: min(100vw - 20px, 520px);
+          padding-top: 12px;
+        }
+
+        header,
+        .comparison {
+          grid-template-columns: 1fr;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <p>Backoffice Component Standard</p>
+          <h1>指标卡交互语义样板</h1>
+          <p>
+            同一类数据展示先区分语义：只读摘要保持安静，可点击入口默认露出动作信号，筛选型指标必须有选中态和恢复态。
+          </p>
+        </div>
+        <span class="badge">To Implement / Core</span>
+      </header>
+
+      <section aria-labelledby="readonly-heading">
+        <div>
+          <h2 id="readonly-heading">只读统计卡</h2>
+          <p>用于业务看板摘要。没有 pointer 光标、没有 hover 抬升、没有按钮角色，默认显示“摘要”。</p>
+        </div>
+        <div class="grid" aria-label="只读统计卡示例">
+          <div class="metric-readonly" aria-label="业务对象总数 128，只读摘要">
+            <div class="metric-readonly__head"><span>业务对象总数</span><span>摘要</span></div>
+            <strong>128</strong>
+          </div>
+          <div class="metric-readonly" aria-label="推进中记录数 42，只读摘要">
+            <div class="metric-readonly__head"><span>推进中记录数</span><span>摘要</span></div>
+            <strong>42</strong>
+          </div>
+          <div class="metric-readonly" aria-label="阻塞记录数 6，只读摘要">
+            <div class="metric-readonly__head"><span>阻塞记录数</span><span>摘要</span></div>
+            <strong class="metric-danger">6</strong>
+          </div>
+          <div class="metric-readonly" aria-label="业务完成比例 63%，只读摘要">
+            <div class="metric-readonly__head"><span>业务完成比例</span><span>摘要</span></div>
+            <strong>63%</strong>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="filter-heading">
+        <div>
+          <h2 id="filter-heading">筛选统计卡</h2>
+          <p>用于任务看板。它是真实 button，默认有动作提示、进入箭头和 `aria-pressed` 选中态。</p>
+        </div>
+        <div class="grid" aria-label="筛选统计卡示例">
+          <button class="metric-filter" type="button" aria-pressed="false">
+            <span class="metric-action__head"><span>待我处理</span><span class="metric-action__icon">查看</span></span>
+            <strong>12</strong>
+            <small>点击筛选待处理</small>
+          </button>
+          <button class="metric-filter" type="button" aria-pressed="false">
+            <span class="metric-action__head"><span>发起来源</span><span class="metric-action__icon">查看</span></span>
+            <strong>26</strong>
+            <small>查看全部来源</small>
+          </button>
+          <button class="metric-filter metric-danger" type="button" aria-pressed="true">
+            <span class="metric-action__head"><span>阻塞交接</span><span class="metric-action__icon">筛选</span></span>
+            <strong>4</strong>
+            <small>点击筛选阻塞</small>
+          </button>
+          <button class="metric-filter" type="button" aria-pressed="false">
+            <span class="metric-action__head"><span>当前结果</span><span class="metric-action__icon">恢复</span></span>
+            <strong>18</strong>
+            <small>清空筛选</small>
+          </button>
+        </div>
+      </section>
+
+      <section aria-labelledby="action-heading">
+        <div>
+          <h2 id="action-heading">进入动作卡 / 行级入口</h2>
+          <p>用于业务对象脉搏、关联对象入口或详情入口。默认露出动作信号，不把整块静默卡片偷偷变成可点。</p>
+        </div>
+        <div class="grid" aria-label="动作入口示例">
+          <button class="metric-action" type="button">
+            <span class="metric-action__head"><span>销售订单</span><span class="metric-action__icon">进入</span></span>
+            <strong>38</strong>
+            <small>查看订单列表</small>
+          </button>
+          <button class="metric-action" type="button">
+            <span class="metric-action__head"><span>来料质检</span><span class="metric-action__icon">进入</span></span>
+            <strong>9</strong>
+            <small>处理待检任务</small>
+          </button>
+        </div>
+      </section>
+
+      <section aria-labelledby="rules-heading">
+        <div>
+          <h2 id="rules-heading">实现规则</h2>
+          <p>真实页面吸收时按语义选组件，不按视觉相似度偷懒复用。</p>
+        </div>
+        <div class="comparison">
+          <div class="rule">
+            <strong>只读</strong>
+            <small>div、default 光标、摘要角标、无 hover 抬升。</small>
+          </div>
+          <div class="rule">
+            <strong>动作</strong>
+            <small>button / link、pointer 光标、动作提示、focus ring、进入信号。</small>
+          </div>
+          <div class="rule">
+            <strong>筛选</strong>
+            <small>button、`aria-pressed`、选中态、恢复态、URL / 状态同步。</small>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

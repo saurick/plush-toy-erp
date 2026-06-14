@@ -2,15 +2,24 @@ import assert from 'node:assert/strict'
 import { Buffer } from 'node:buffer'
 import test from 'node:test'
 
-import { AUTH_SCOPE, getStoredAdminProfile, persistAuth } from './auth.js'
+import {
+  AUTH_SCOPE,
+  getAuthMeta,
+  getStoredAdminProfile,
+  persistAuth,
+  persistAuthMeta,
+} from './auth.js'
 
-function createStorage() {
+function createStorage({ rejectSetItemKeys = new Set() } = {}) {
   const store = new Map()
   return {
     getItem(key) {
       return store.has(key) ? store.get(key) : null
     },
     setItem(key, value) {
+      if (rejectSetItemKeys.has(key)) {
+        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      }
       store.set(key, String(value))
     },
     removeItem(key) {
@@ -22,10 +31,10 @@ function createStorage() {
   }
 }
 
-function installStorage() {
+function installStorage(options) {
   Object.defineProperty(globalThis, 'localStorage', {
     configurable: true,
-    value: createStorage(),
+    value: createStorage(options),
   })
   Object.defineProperty(globalThis, 'sessionStorage', {
     configurable: true,
@@ -90,5 +99,32 @@ test('auth: 显式 is_super_admin=true 仍保留超级管理员身份和 RBAC �
   assert.deepEqual(profile.permissions, ['system.user.read'])
   assert.deepEqual(profile.menus, [
     { path: '/erp/system/permissions', label: '权限管理' },
+  ])
+})
+
+test('auth: 管理员元数据本地缓存满额时不阻断 profile 同步', () => {
+  installStorage({
+    rejectSetItemKeys: new Set(['admin_menus']),
+  })
+
+  assert.doesNotThrow(() => {
+    persistAuthMeta(
+      {
+        user_id: 1,
+        username: 'root',
+        is_super_admin: true,
+        roles: [{ role_key: 'admin', name: '系统管理员' }],
+        permissions: ['system.user.read'],
+        menus: [{ path: '/erp/system/permissions', label: '权限管理' }],
+        erp_preferences: { column_orders: {} },
+      },
+      AUTH_SCOPE.ADMIN
+    )
+  })
+
+  assert.equal(getAuthMeta(AUTH_SCOPE.ADMIN, 'username'), 'root')
+  assert.deepEqual(getAuthMeta(AUTH_SCOPE.ADMIN, 'menus'), null)
+  assert.deepEqual(getAuthMeta(AUTH_SCOPE.ADMIN, 'permissions'), [
+    'system.user.read',
   ])
 })

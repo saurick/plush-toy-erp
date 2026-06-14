@@ -52,6 +52,7 @@ import {
 import {
   compactParams,
   formatUnixDate,
+  formatUnixDateTime,
   hasActionPermission,
   trimOptional,
 } from '../utils/masterDataOrderView.mjs'
@@ -798,6 +799,13 @@ export default function OperationalFactsPage() {
         ),
     },
     {
+      title: '创建时间',
+      dataIndex: 'created_at',
+      width: 160,
+      render: formatUnixDateTime,
+      sorter: (a, b) => Number(a?.created_at || 0) - Number(b?.created_at || 0),
+    },
+    {
       title: '备注',
       dataIndex: 'note',
       ellipsis: true,
@@ -1075,7 +1083,7 @@ export default function OperationalFactsPage() {
               emptyText: <Empty description="暂无业务事实记录" />,
             }}
             pagination={false}
-            scroll={{ x: 1320 }}
+            scroll={{ x: 1480 }}
           />
         </Space>
       </Card>

@@ -44,6 +44,24 @@ function getScopedMetaKey(scope, key) {
   return `${scope}_${key}`
 }
 
+function setStorageItem(storage, key, value) {
+  try {
+    storage.setItem(key, value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function removeStorageItem(storage, key) {
+  try {
+    storage.removeItem(key)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function migrateLegacyUserToken() {
   const userKey = TOKEN_KEYS[AUTH_SCOPE.USER]
   const current = localStorage.getItem(userKey)
@@ -81,24 +99,25 @@ export function setToken(token, scope = AUTH_SCOPE.USER) {
 function setScopedMeta(scope, data) {
   META_KEYS.forEach((key) => {
     const value = data?.[key]
+    const storageKey = getScopedMetaKey(scope, key)
     if (value != null && value !== '') {
       const serialized = JSON_META_KEYS.has(key)
         ? JSON.stringify(value)
         : String(value)
-      localStorage.setItem(getScopedMetaKey(scope, key), serialized)
+      setStorageItem(localStorage, storageKey, serialized)
     } else {
-      localStorage.removeItem(getScopedMetaKey(scope, key))
+      removeStorageItem(localStorage, storageKey)
     }
   })
   LEGACY_META_KEYS.forEach((key) => {
-    localStorage.removeItem(getScopedMetaKey(scope, key))
+    removeStorageItem(localStorage, getScopedMetaKey(scope, key))
   })
 }
 
 function clearScopedMeta(scope) {
   const keys = [...META_KEYS, ...LEGACY_META_KEYS]
   keys.forEach((key) => {
-    localStorage.removeItem(getScopedMetaKey(scope, key))
+    removeStorageItem(localStorage, getScopedMetaKey(scope, key))
   })
 }
 

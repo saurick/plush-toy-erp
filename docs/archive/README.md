@@ -13,3 +13,8 @@
 | `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md` | 移动端任务页改版前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md` | 旧 `business_records` debug cleanup 前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-06-09-before-brand-config.md` | 前端品牌客户配置化前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-10-before-style-l1-stabilization.md` | `style:l1` 稳定化前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-11-before-ui-simplification-rules.md` | UI 简化规则补充前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-12-before-formal-menu-candidate-prototype.md` | 正式菜单候选原型前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-13-before-workbench-prototype-redesign.md` | 工作台原型重做前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-14-before-business-modal-alignment.md` | 业务新建 / 编辑弹窗统一前的 `progress.md` 过程记录归档 |

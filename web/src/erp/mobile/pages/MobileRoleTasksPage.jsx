@@ -17,6 +17,7 @@ import {
   CaretRightOutlined,
   ReloadOutlined,
   ArrowUpOutlined,
+  ArrowRightOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import { message } from '@/common/utils/antdApp'
@@ -2074,6 +2075,7 @@ export default function MobileRoleTasksPage() {
               key={item.label}
               type="button"
               data-testid={item.testID}
+              aria-label={`查看${item.label}任务`}
               className={`${mobileTheme.metricCard} mobile-role-mine-metric-button`}
               onClick={() =>
                 openTaskBucket({
@@ -2083,8 +2085,14 @@ export default function MobileRoleTasksPage() {
                 })
               }
             >
+              <span className="mobile-role-mine-metric-button__head">
+                <span>{item.label}</span>
+                <ArrowRightOutlined aria-hidden="true" />
+              </span>
               <div className={mobileTheme.metricValue}>{item.value}</div>
-              <div className={mobileTheme.metricLabel}>{item.label}</div>
+              <small className="mobile-role-mine-metric-button__hint">
+                查看任务
+              </small>
             </button>
           ))}
         </section>

@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Button, Card, Space, Spin, Table, Tag, Typography } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -180,10 +179,6 @@ export default function BusinessDashboardPage() {
     navigate(query ? `${record.path}?${query}` : record.path)
   }
 
-  const openTaskDashboard = () => {
-    navigate('/erp/task-board')
-  }
-
   const openAlertEntry = (alert) => {
     const entryPath = resolveWorkflowAlertEntryPath(alert)
     if (entryPath) {
@@ -213,7 +208,6 @@ export default function BusinessDashboardPage() {
       <Card className="erp-dashboard-card" variant="borderless">
         <div className="erp-business-board-hero erp-business-board-hero--compact">
           <div className="erp-business-board-hero-main">
-            <Text type="secondary">ERP / 业务看板</Text>
             <Title level={4} className="erp-dashboard-title">
               业务看板
             </Title>
@@ -221,23 +215,18 @@ export default function BusinessDashboardPage() {
               按模块查看当前结果、阻塞预警和下一步入口。
             </Paragraph>
           </div>
-          <div className="erp-business-board-actions">
-            <Button
-              icon={<ReloadOutlined />}
-              loading={loading}
-              onClick={loadDashboardStats}
-            >
-              刷新业务数据
-            </Button>
-            <Button icon={<ArrowLeftOutlined />} onClick={openTaskDashboard}>
-              任务看板
-            </Button>
-          </div>
         </div>
         <div className="erp-business-board-summary-grid">
           {businessMetricCards.map((item) => (
-            <div className="erp-business-board-summary-card" key={item.key}>
-              <Text type="secondary">{item.title}</Text>
+            <div
+              className="erp-business-board-summary-card erp-metric-readonly-card"
+              key={item.key}
+              aria-label={`${item.title} ${item.value}${item.suffix || ''}，只读摘要`}
+            >
+              <div className="erp-metric-readonly-card__head">
+                <Text type="secondary">{item.title}</Text>
+                <span className="erp-metric-readonly-card__badge">摘要</span>
+              </div>
               <strong style={item.color ? { color: item.color } : undefined}>
                 {item.value}
                 {item.suffix || ''}
