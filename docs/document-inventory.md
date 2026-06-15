@@ -171,12 +171,6 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/import-source-inventory.md` | 永绅 yoyoosun 客户导入来源清单 / Yoyoosun Customer Import Source Inventory |
 | `docs/customers/yoyoosun/import-strategy.md` | 永绅 yoyoosun 客户导入策略 / Yoyoosun Customer Import Strategy |
 | `docs/customers/yoyoosun/import-unresolved-queue.md` | 永绅 yoyoosun 客户导入待确认队列 / Yoyoosun Customer Import Unresolved Queue |
-| `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md` | 试用模拟数据验收历史记录 / Simulated Trial Acceptance History |
-| `docs/customers/yoyoosun/phase8-target-release-acceptance.md` | 业务事实目标环境发布与内部模拟验收历史记录 / Operational Fact Target Release Acceptance History |
-| `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md` | 业务事实目标环境发布证据 2026-06-08 / Operational Fact Target Release Evidence 2026-06-08 |
-| `docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md` | 岗位任务端目标环境发布证据 2026-06-09 / Mobile Workflow Target Release Evidence 2026-06-09 |
-| `docs/customers/yoyoosun/phase10-target-release-evidence-2026-06-09.md` | 行业模板目标环境发布证据 2026-06-09 / Industry Template Target Release Evidence 2026-06-09 |
-| `docs/customers/yoyoosun/phase11-target-release-evidence-2026-06-09.md` | 私有化客户包目标环境发布证据 2026-06-09 / Private Deployment Package Target Release Evidence 2026-06-09 |
 | `docs/customers/yoyoosun/question-backlog.md` | 问题待办 / Question Backlog |
 | `docs/customers/yoyoosun/real-dry-run-evidence.md` | 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
 | `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |
@@ -211,12 +205,20 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | --- | --- |
 | `docs/archive/README.md` | 归档 / Archive |
 | `docs/archive/architecture-history/README.md` | 架构历史评审归档 / Architecture History Archive |
-| `docs/archive/architecture-history/phase-2b-bom-lot-schema-review.md` | 库存批次与 BOM Schema 历史评审归档 / Phase 2B BOM And Inventory Lot Schema Review |
-| `docs/archive/architecture-history/phase-2c-purchase-receipt-review.md` | 采购入库最小闭环历史评审归档 / Phase 2C Purchase Receipt Review |
-| `docs/archive/architecture-history/phase-2d-purchase-receipt-adjustment-review.md` | 采购入库差异与入库后更正历史评审归档 / Phase 2D-B Purchase Receipt Adjustment Review |
-| `docs/archive/architecture-history/phase-2d-purchase-return-quality-review.md` | 采购退货、入库差异与来料质检入口历史评审归档 / Phase 2D Purchase Return And Quality Review |
-| `docs/archive/architecture-history/phase-2d-quality-inspection-entry-review.md` | 来料质检入口、批次状态与冻结库存边界历史评审归档 / Phase 2D-C Quality Inspection Entry Review |
-| `docs/archive/architecture-history/phase-2d-quality-inspection-schema-review.md` | 来料质检最小主表历史评审归档 / Phase 2D-C2 quality_inspections Schema Review |
+| `docs/archive/customer-evidence/README.md` | 客户历史证据归档 / Customer Evidence Archive |
+| `docs/archive/customer-evidence/yoyoosun/README.md` | 永绅 yoyoosun 历史证据归档 / Yoyoosun Evidence Archive |
+| `docs/archive/customer-evidence/yoyoosun/simulated-trial-acceptance.md` | 试用模拟数据验收历史记录 / Simulated Trial Acceptance History |
+| `docs/archive/customer-evidence/yoyoosun/operational-fact-target-release-acceptance.md` | 业务事实目标环境发布与内部模拟验收历史记录 / Operational Fact Target Release Acceptance History |
+| `docs/archive/customer-evidence/yoyoosun/operational-fact-target-release-evidence-2026-06-08.md` | 业务事实目标环境发布证据 2026-06-08 / Operational Fact Target Release Evidence 2026-06-08 |
+| `docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md` | 岗位任务端目标环境发布证据 2026-06-09 / Mobile Workflow Target Release Evidence 2026-06-09 |
+| `docs/archive/customer-evidence/yoyoosun/industry-template-target-release-evidence-2026-06-09.md` | 行业模板目标环境发布证据 2026-06-09 / Industry Template Target Release Evidence 2026-06-09 |
+| `docs/archive/customer-evidence/yoyoosun/private-deployment-target-release-evidence-2026-06-09.md` | 私有化客户包目标环境发布证据 2026-06-09 / Private Deployment Package Target Release Evidence 2026-06-09 |
+| `docs/archive/architecture-history/bom-lot-schema-review.md` | 库存批次与 BOM Schema 历史评审归档 / BOM And Inventory Lot Schema Review |
+| `docs/archive/architecture-history/purchase-receipt-review.md` | 采购入库最小闭环历史评审归档 / Purchase Receipt Review |
+| `docs/archive/architecture-history/purchase-receipt-adjustment-review.md` | 采购入库差异与入库后更正历史评审归档 / Purchase Receipt Adjustment Review |
+| `docs/archive/architecture-history/purchase-return-quality-review.md` | 采购退货、入库差异与来料质检入口历史评审归档 / Purchase Return And Quality Review |
+| `docs/archive/architecture-history/quality-inspection-entry-review.md` | 来料质检入口、批次状态与冻结库存边界历史评审归档 / Quality Inspection Entry Review |
+| `docs/archive/architecture-history/quality-inspection-schema-review.md` | 来料质检最小主表历史评审归档 / quality_inspections Schema Review |
 | `docs/archive/progress-2026-06-02-before-print-template-defer.md` | 过程记录归档 / Progress Archive 2026-06-02 Before Print Template Defer |
 | `docs/archive/progress-2026-06-05-before-mobile-task-redesign.md` | 移动端任务页改版前过程记录归档 / Progress Archive 2026-06-05 Before Mobile Task Redesign |
 | `docs/archive/progress-2026-06-08-before-business-records-debug-cleanup.md` | 旧 business_records debug cleanup 前过程记录归档 / Progress Archive 2026-06-08 Before Business Records Debug Cleanup |
@@ -241,6 +243,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/reference/第二次20260611/server:internal:core 分层、保留与迁移规范.md` | GPT 第二批参考：server/internal/core 分层、保留与迁移规范 |
 | `docs/reference/第二次20260611/产品核心菜单与页面功能规格.md` | GPT 第二批参考：产品核心菜单与页面功能规格 |
 | `docs/reference/第二次20260611/客户配置与部署指南.md` | GPT 第二批参考：客户配置与部署指南 |
+| `docs/reference/第二次20260611/测试数据构造规范.md` | GPT 第二批参考：测试数据构造规范 |
 | `docs/reference/第二次20260611/自动化测试方案.md` | GPT 第二批参考：自动化测试方案 |
 | `docs/reference/第二次20260611/项目完善路线图.md` | GPT 第二批参考：项目完善路线图 |
 

@@ -209,3 +209,66 @@
 - 验证：`node scripts/qa/industry-template-closure.mjs --out /tmp/plush-industry-template-closure` 与 `node scripts/qa/private-deployment-package-closure.mjs --out /tmp/plush-private-deployment-package-closure` 通过；`progress.md` 追加前未达到归档阈值。
 - 下一步：后续判断项目进展默认看 capability ledger、current-source-of-truth、代码、测试和目标环境 evidence；历史 phase 文件只作为追溯证据，不作为新任务拆分依据。
 - 阻塞/风险：本轮未重命名历史客户 evidence 文件，也未清理旧 Phase 2A/2B/2C/2D PostgreSQL 防呆脚本；当前工作区仍有大量非本轮既有改动，本轮未回退、整理、提交或推送。
+
+## 2026-06-15 03:49 CST
+
+- 完成：把活跃文档中的 Phase 规划框架继续收口为能力路线、里程碑、功能闭环和测试证据口径；同步更新 `docs/current-source-of-truth.md`、`docs/product/product-completion-roadmap.md`、`docs/product/implementation-governance.md`、客户资料、导入验收、测试策略、README 和前端开发测试入口。
+- 完成：将客户历史验收 / release evidence 从 `docs/customers/yoyoosun/phase*.md` 改名并归档到 `docs/archive/customer-evidence/yoyoosun/`，新增归档 README，并同步 `docs/document-inventory.md`、客户 README、交付矩阵、能力台账和 current-source 引用。
+- 完成：将旧架构归档文件从 `phase-2*.md` 改成 BOM、采购入库、采购退货、采购调整和来料质检等能力名，并同步归档 README 和文档清单。
+- 完成：新增能力命名的 PostgreSQL 防呆脚本包装层和 Make target：`inventory-*`、`bom_lot-*`、`purchase_receipt-*`、`purchase_return-*`；旧 `phase2*` target 保留为兼容入口但不再作为文档推荐入口。
+- 验证：已确认 `docs` 文件名级搜索无 `phase / px` 命中；排除 `docs/archive/**` 和 `docs/reference/**` 后，活跃文档、README 和前端开发测试配置无 `phase / phasex / px` 命中。
+- 下一步：如要继续彻底清理代码内部历史命名，可单独评审旧 `phase2*` Make target、环境变量、DB 名和测试 source_type 的兼容迁移；本轮未强行删除兼容入口。
+- 阻塞/风险：归档 evidence 正文中仍可能保留当时真实镜像 tag、输出路径和命令里的旧命名；这些属于历史证据，不作为当前执行口径。
+
+## 2026-06-15 04:06 CST
+
+- 完成：按截图建议将 `docs/reference/第二次20260611/` 中高风险旧规划、测试、菜单、数据构造和部署资料移出 reference 主入口，归档到 `docs/archive/reference-high-risk/2026-06-11/`；配套 PDF 一并移动，避免继续作为可直接读取的 reference 输入。
+- 完成：新增 `docs/archive/reference-high-risk/README.md` 和 `docs/archive/reference-high-risk/2026-06-11/README.md`，明确这些资料只作历史追溯，不作为当前任务、路线、API、测试、部署、菜单、schema、migration 或 runtime 真源。
+- 完成：同步 `docs/reference/README.md`、`docs/archive/README.md`、`docs/document-inventory.md` 和相关原型 README 引用；`docs/reference/第二次20260611/` 当前只保留 `server:internal:core 分层、保留与迁移规范.md` 与 `客户配置与部署指南.md` 两份相对低风险参考。
+- 验证：已确认 5 份高风险 Markdown 及对应 PDF 均在 `docs/archive/reference-high-risk/2026-06-11/`，原 `docs/reference/第二次20260611/` 不再保留这些文件。
+- 下一步：如后续继续收紧 reference，可再评审第一批 `20260519` 两份保留参考是否只需 README 标注，或是否也应迁入高风险归档。
+- 阻塞/风险：归档资料正文仍保留原始旧阶段、旧 API、旧路径和旧命令内容，属于历史证据；不能据此恢复旧实现或规划。
+
+## 2026-06-15 04:18 CST
+
+- 完成：按用户确认“reference 里很多东西值得参考”的判断，将刚才移入 `docs/archive/reference-high-risk/2026-06-11/` 的 5 份第二批参考 Markdown 及配套 PDF 全部移回 `docs/reference/第二次20260611/`。
+- 完成：撤销 `docs/archive/reference-high-risk/` 归档入口和文档清单归档条目；`docs/reference/README.md` 保留更强读取边界，明确 reference 可作为产品讨论、方案比较和历史设计输入，但不能直接作为当前任务、阶段、API、测试、部署、菜单或路线真源。
+- 完成：同步 `docs/document-inventory.md` 和相关原型 README，将这些资料恢复为 GPT 第二批 reference 输入，并强调必须回到 current-source、正式产品文档、代码和测试复核。
+- 验证：`docs/reference/第二次20260611/` 已恢复 5 份参考资料及 PDF；`docs/archive/reference-high-risk/` 已为空并移除。
+- 下一步：后续 AI 读取 reference 时，应先看 `docs/reference/README.md` 的边界说明；真正执行仍以 current-source、能力台账、代码和测试为准。
+- 阻塞/风险：reference 正文仍保留旧阶段、旧 API、旧路径和旧命令内容；这些只能作为参考输入，不能直接恢复为当前实现。
+
+## 2026-06-15 17:24 CST
+
+- 完成：评审 `docs/reference/第二次20260611/agents.md` 与 `No Phase Runtime Policy.md`，未原样复制 reference，而是将可吸收规则写入当前真源：`AGENTS.md` 新增“不按 Phase 组织新任务”和“禁止新增 runtime phase 命名”约束，`docs/product/implementation-governance.md` 新增 Runtime Phase 命名冻结小节。
+- 完成：收紧 `scripts/qa/phase-label-boundaries.mjs`，从只扫内容扩展为扫描路径和内容，并纳入 `scripts`、`server/Makefile`、`server/README.md`；仅为当前已知 `phase2*` PostgreSQL 本地验收兼容入口设置精确例外，避免 reference 规则与现有兼容现场冲突。
+- 完成：同步 `scripts/README.md`，登记 phase label 边界守卫的用途和兼容边界。
+- 验证：`node scripts/qa/phase-label-boundaries.mjs`、`node --check scripts/qa/phase-label-boundaries.mjs` 与 `bash scripts/qa/fast.sh` 通过。
+- 下一步：若要彻底消除旧 `phase2*` PostgreSQL 测试 / Make target / DB env 命名，需要单独评审兼容迁移、命令替换和历史 evidence 追溯，不在普通功能任务中顺手清理。
+- 阻塞/风险：本轮没有移动或删除新增的 reference Markdown/PDF；`AGENTS.md.pdf` 和 `No Phase Runtime Policy.pdf` 仍只是 reference 附件，不作为正式真源。
+
+## 2026-06-15 17:40 CST
+
+- 完成：按“规则、限制和普通文档分层”做文档治理扫描，排除 `docs/archive/**` 与 `docs/reference/**` 历史原文后统计活跃 Markdown 中的负面限制词密度，确认高命中文档集中在 `AGENTS.md`、原型 README、菜单计划、current-source、实施治理和状态 / 架构评审。
+- 完成：新增 `docs/README.md` 文档治理原则，明确规则文档、真源索引、产品 / 架构设计、原型 / 样板、客户 / 交付资料、参考 / 归档的写法差异：普通文档优先写用途、正式真源和吸收路径，红线集中在规则文档或自动化守卫。
+- 完成：将 `AGENTS.md`、`docs/product/implementation-governance.md` 中刚纳入的 no-phase 口径从“禁止清单”改成“命名主路径 + 自动化守卫 + 兼容边界”；将 `docs/product/prototypes/README.md` 的“禁止照搬 / 不代表”结构改成“升级前确认 / 吸收边界 / 正式吸收边界”；将 `docs/product/formal-menu-entry-plan.md` 和 `docs/current-source-of-truth.md` 入口处改为正向真源描述。
+- 验证：`git diff --check -- AGENTS.md docs/README.md docs/current-source-of-truth.md docs/product/implementation-governance.md docs/product/prototypes/README.md docs/product/formal-menu-entry-plan.md` 通过；`node scripts/qa/phase-label-boundaries.mjs` 通过。
+- 下一步：后续新增或改正文档时，优先按 `docs/README.md` 的文档类型选择写法；若普通说明文档需要反复写红线，应优先考虑是否应收口到 AGENTS / governance / test-strategy / deploy conventions 或脚本守卫。
+- 阻塞/风险：本轮没有全量重写 102 份活跃 Markdown；大量业务边界、状态机、真实导入、RBAC 和部署相关红线仍保留在规则 / 真源 / 架构类文档中，因为这些属于已知高风险误判点。
+
+## 2026-06-15 17:57 CST
+
+- 完成：按用户要求将“文档写作与规则分层”提升到全局 `/Users/simon/.codex/AGENTS.md` 的“注释与文档”章节，只写通用元规则：普通文档写目标、职责、真源、主路径和验收方式；限制、红线和禁止项优先收口到项目级 AGENTS、治理文档、测试策略、部署约定或自动化 hook / QA 脚本。
+- 完成：全局规则未加入 plush-toy-erp 专属业务细节；Workflow / Fact、真实导入、phase 兼容、yoyoosun 等仍由本仓库 `AGENTS.md` 和正式文档维护。
+- 验证：已确认新增内容位于 `/Users/simon/.codex/AGENTS.md:191` 附近。
+- 下一步：后续其他项目也可复用该全局元规则；项目专属红线仍放项目级规则或脚本。
+- 阻塞/风险：全局 AGENTS 不在本仓库 git 管理内，本轮无法用仓库 diff 展示该文件变更。
+
+## 2026-06-15 17:52 CST
+
+- 完成：处理前端私有 npm registry token 明文入库问题，移除 `web/.npmrc` 与 `web/.yarnrc.yml` 中的 Font Awesome registry/auth 配置；当前 `web/package.json` 与 lockfile 未使用 `@fortawesome` 私有依赖，仓库不再保留无用私有 registry token 配置。
+- 完成：更新 `.gitignore`，忽略本地 npm / yarn registry token 覆盖文件，并保留 tracked `web/.npmrc` / `web/.yarnrc.yml` 作为无密钥包管理器配置。
+- 完成：增强 `scripts/qa/secrets.sh`，将 tracked npm/yarn 配置纳入常规扫描，并让疑似密钥泄露默认阻断；同时增加 npm registry token 明文配置的专门检查，避免只扫 diff 时漏掉既有 tracked 配置。
+- 验证：`bash -n scripts/qa/secrets.sh`、`bash scripts/qa/secrets.sh`、`pnpm config get node-linker` 均通过；已确认 tracked npm/yarn 配置中不再存在 auth token 关键字段或 UUID 形式 token 残留。
+- 下一步：必须在对应 npm / Font Awesome registry 后台撤销已泄露 token 并重新生成；如后续确实需要私有包，优先通过本机全局 npmrc、CI/CD Secret 或安装步骤临时注入，不写入仓库。
+- 阻塞/风险：该 token 已存在于 2026-04-17 初始提交历史中；本轮没有重写 git 历史，历史清理需要单独确认协作成本、远端影响和所有克隆的同步方式。

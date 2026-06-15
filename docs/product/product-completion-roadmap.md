@@ -20,7 +20,7 @@
 | --- | --- | --- |
 | `docs/product/product-completion-roadmap.md` | 重新做项目的阶段路线、边界、结果 | 当前代码、测试、schema、migration |
 | `docs/product/product-delivery-ledgers.md` | 产品能力成熟度、客户交付状态、客户差异分类 | roadmap 和当前实现真源 |
-| `docs/product/implementation-governance.md` | 模块实施门禁、Phase 与 Architecture Layer 区分、实施任务拆分规则 | roadmap、当前实现真源和测试结果 |
+| `docs/product/implementation-governance.md` | 模块实施门禁、实施顺序与 Architecture Layer 区分、实施任务拆分规则 | roadmap、当前实现真源和测试结果 |
 | `docs/current-source-of-truth.md` | 当前仓库实现和阅读顺序 | 产品长期路线 |
 | `docs/product/formal-menu-entry-plan.md` | 正式菜单、客户菜单配置和旧入口退出规划 | runtime 菜单实现 |
 | `docs/customers/<customer-key>/` | 单客户资料、问题、差异、导入 evidence | Product Core 规则 |
@@ -29,7 +29,7 @@
 
 * 修改本文的阶段、顺序或产品目标时，应检查产品台账是否需要同步。
 * 修改台账中的能力成熟度、客户交付状态或客户差异分类后，如影响长期路线，应回写本文。
-* 拆新模块实现任务前，应先读 `docs/product/implementation-governance.md`，确认 Phase、Architecture Layer、门禁和允许范围。
+* 拆新模块实现任务前，应先读 `docs/product/implementation-governance.md`，确认实施顺序、Architecture Layer、门禁和允许范围。
 * 未有代码、测试或当前真源证据的能力，不应在本文写成“已完成”或“可交付”。
 * 本文允许描述“未来应做”，但不允许暗示 runtime、schema、API 或 UI 已经实现。
 
@@ -108,7 +108,7 @@
 
 ## 1. 总体路线总表
 
-| Phase | 阶段 | 目标 | 关键产物 | 不做 |
+| 里程碑 | 阶段 | 目标 | 关键产物 | 不做 |
 | ---: | --- | --- | --- | --- |
 | 0 | 产品重启与边界收口 | 重新确认产品定位、分层、禁止项和执行纪律 | 产品原则、分层说明、状态边界、测试策略、任务拆分规则 | 不写业务 runtime |
 | 1 | 客户资料治理 | 把客户资料变成线索、问题、差异和导入输入 | source materials、question backlog、delta ledger、customer config draft | 不把客户样本写进 schema |
@@ -124,7 +124,7 @@
 | 11 | 多客户私有化复制 | 新客户主要靠配置、导入和部署上线 | customer package、deployment runbook、upgrade checklist | 不长期 fork |
 | 12 | SaaS 单独评审 | 私有化多客户成熟后再评审 SaaS | tenant isolation design、billing / license review、ops console design | 不提前污染当前 schema |
 
-## 2. Phase 0：产品重启与边界收口
+## 2. 里程碑 0：产品重启与边界收口
 
 目标：先把项目重新做的边界收住，避免一开始就陷入旧实现、旧菜单或单客户样本。
 
@@ -152,7 +152,7 @@
 * 后续任何客户资料都能先分类，再决定是否进入 Product Core。
 * 后续任何 workflow 需求都不会直接写事实。
 
-## 3. Phase 1：客户资料治理
+## 3. 里程碑 1：客户资料治理
 
 目标：把 yoyoosun 或未来客户提供的 Excel、PDF、截图、口头需求转成可追踪输入，而不是直接进入代码。
 
@@ -186,7 +186,7 @@
 * 不自动生成出货、库存或财务事实。
 * 不把合同格式抽成通用模板引擎。
 
-## 4. Phase 2：MVP cutline 与领域模型
+## 4. 里程碑 2：MVP cutline 与领域模型
 
 目标：定义第一版产品到底先打通什么，并明确哪些只是 Draft / Deferred。
 
@@ -212,7 +212,7 @@ MVP 原则：
 * 不让页面菜单看起来比能力更成熟。
 * 不通过字段残值或快照伪造事实。
 
-## 5. Phase 3：MasterData + Source Document MVP
+## 5. 里程碑 3：MasterData + Source Document MVP
 
 目标：让产品具备最小正式业务基础。
 
@@ -234,7 +234,7 @@ MVP 原则：
 * UI 只展示和提交业务动作，不补造后端事实。
 * 测试覆盖正常、非法状态、权限、重复提交和边界输入。
 
-## 6. Phase 4：采购 / 质检 / 库存事实基础
+## 6. 里程碑 4：采购 / 质检 / 库存事实基础
 
 目标：建立可信库存基础，而不是让订单或 workflow 直接改变库存。
 
@@ -257,7 +257,7 @@ MVP 原则：
 * 批次状态和库存余额是不同约束，必须同时满足。
 * 采购订单如果后续实现，也只是采购承诺，不替代入库事实。
 
-## 7. Phase 5：正式产品入口与旧入口退出
+## 7. 里程碑 5：正式产品入口与旧入口退出
 
 目标：让客户看到正式产品能力，而不是继续在旧兼容入口里写重叠数据。当前仍处于开发阶段，尚未进入甲方正式测试；与正式 V1 能力重叠的旧入口不保留产品内可见兼容页面、只读兼容页、旧路径重定向或权限别名。
 
@@ -278,7 +278,7 @@ MVP 原则：
 * 不双写 V1 正式表和删除前 JSONL evidence，也不恢复旧 `business_records` 表族。
 * 不靠前端隐藏菜单当安全边界。
 
-## 8. Phase 6：客户数据 dry-run 与 loader 设计
+## 8. 里程碑 6：客户数据 dry-run 与 loader 设计
 
 目标：在真实导入前先做可复查、可阻断、可回滚的导入设计。
 
@@ -321,13 +321,13 @@ MVP 原则：
 | trial rehearsal | 本地 dev DB 已用模拟数据验证账号、RBAC、菜单、V1 页面和岗位任务端入口；目标客户环境复跑仍待执行 |
 | training | 按岗位培训 |
 | trial run | 小范围模拟数据试用 |
-| acceptance | `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md` 已记录本地模拟试用通过，并作为当前 试用模拟 关闭口径；真实导入不可执行，目标客户环境验收转为交付后续 |
+| acceptance | `docs/archive/customer-evidence/yoyoosun/simulated-trial-acceptance.md` 已记录本地模拟试用通过，并作为当前 试用模拟 关闭口径；真实导入不可执行，目标客户环境验收转为交付后续 |
 
 完成口径：
 
 * 目标试用环境或本地等价环境可访问。
 * migration 状态与当前服务匹配。
-* 模拟数据已标记为 seed / fixture / demo，不冒充客户真实数据；优先保留模拟主数据 seed 输出和 `phase7-simulated-trial-report.json` 作为 evidence。
+* 模拟数据已标记为 seed / fixture / demo，不冒充客户真实数据；优先保留模拟主数据 seed 输出和 试用模拟数据报告 作为 evidence。
 * 试用账号、RBAC、菜单、V1 页面和岗位任务端回归通过。
 * 培训说明已覆盖销售订单、导入、出货、库存和财务边界。
 * 验收记录明确剩余问题、阻塞和下一轮任务。
@@ -347,7 +347,7 @@ MVP 原则：
 
 ## 10. 业务事实扩展：生产 / 委外 / 出货 / 财务事实扩展
 
-目标：补齐 ERP 主干闭环。业务事实扩展 不拆任何字母子阶段；`docs/architecture/operational-fact-expansion-review.md` 已作为统一 review 一次覆盖生产、委外、出货、库存预留和财务五条事实链。当前本地实现已落 schema / migration、repo / usecase、API / RBAC、最小 UI 和测试；2026-06-08 已按 `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md` 发布到当前目标环境，并通过健康检查、前端路由、未登录鉴权 smoke、目标试用账号 RBAC 核对、登录态 业务事实扩展 只读 API smoke 和 `SIM-YOYOOSUN-PHASE8` 内部模拟事实写入闭环。业务事实扩展 按内部模拟事实闭环关闭；客户使用确认属于交付后的业务确认，不作为业务事实完成阻塞。后续不先扩大到打印、报表、核销、物流退货或自动派生，除非按增强任务重新评审。
+目标：补齐 ERP 主干闭环。业务事实扩展 不拆任何字母子阶段；`docs/architecture/operational-fact-expansion-review.md` 已作为统一 review 一次覆盖生产、委外、出货、库存预留和财务五条事实链。当前本地实现已落 schema / migration、repo / usecase、API / RBAC、最小 UI 和测试；2026-06-08 已按 `docs/archive/customer-evidence/yoyoosun/operational-fact-target-release-evidence-2026-06-08.md` 发布到当前目标环境，并通过健康检查、前端路由、未登录鉴权 smoke、目标试用账号 RBAC 核对、登录态 业务事实扩展 只读 API smoke 和 `SIM-YOYOOSUN-OPFACT` 内部模拟事实写入闭环。业务事实扩展 按内部模拟事实闭环关闭；客户使用确认属于交付后的业务确认，不作为业务事实完成阻塞。后续不先扩大到打印、报表、核销、物流退货或自动派生，除非按增强任务重新评审。
 
 范围项：
 
@@ -377,7 +377,7 @@ MVP 原则：
 
 ## 11. 岗位任务端：岗位任务端与岗位协同
 
-目标：把高频岗位任务投影到移动端，减少现场回填和等待。2026-06-09 已按 `docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md` 发布到当前目标环境，并通过健康检查、仓库岗位任务端目标路由 smoke、目标试用账号 RBAC 核对和 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 内部模拟 workflow 闭环。岗位任务端按内部模拟岗位任务闭环关闭；客户使用确认属于交付后的业务确认，不作为岗位任务端完成阻塞。
+目标：把高频岗位任务投影到移动端，减少现场回填和等待。2026-06-09 已按 `docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md` 发布到当前目标环境，并通过健康检查、仓库岗位任务端目标路由 smoke、目标试用账号 RBAC 核对和 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 内部模拟 workflow 闭环。岗位任务端按内部模拟岗位任务闭环关闭；客户使用确认属于交付后的业务确认，不作为岗位任务端完成阻塞。
 
 已完成范围：
 
@@ -495,16 +495,16 @@ workspace checkpoint
 -> allowed / forbidden path confirmation
 ```
 
-建议下一步不再复用旧编号，按 Phase 拆：
+建议下一步不再复用旧编号，按 里程碑 拆：
 
 ```text
-Phase 0 docs-only reset
--> Phase 1 customer source governance
--> Phase 2 MVP cutline and domain model review
--> Phase 3 MasterData + Source Document MVP
--> Phase 4 Purchase / Quality / Inventory fact foundation
--> Phase 5 Formal product entry and legacy exit
--> Phase 6 Customer import loader design
+里程碑 0 docs-only reset
+-> 里程碑 1 customer source governance
+-> 里程碑 2 MVP cutline and domain model review
+-> 里程碑 3 MasterData + Source Document MVP
+-> 里程碑 4 Purchase / Quality / Inventory fact foundation
+-> 里程碑 5 Formal product entry and legacy exit
+-> 里程碑 6 Customer import loader design
 -> 试用模拟 Simulated data trial deployment and acceptance
 -> 业务事实扩展 Production / Outsourcing / Shipment / Finance facts
 -> 岗位任务端 Mobile task workflow simulation and target release
@@ -516,7 +516,7 @@ Phase 0 docs-only reset
 如果目标是尽快重新开工：
 
 ```text
-Phase 0 docs-only reset
+里程碑 0 docs-only reset
 ```
 
 这轮只更新产品原则、分层、状态边界、客户配置、交付骨架、测试策略和任务拆分规则；不改 runtime、schema、migration、API、RBAC、UI、seedData，不恢复产品内 docs registry，也不做 loader。
@@ -524,22 +524,22 @@ Phase 0 docs-only reset
 如果目标是尽快给 yoyoosun 试用：
 
 ```text
-Phase 0 docs-only reset
--> Phase 1 yoyoosun source governance
--> Phase 2 MVP cutline
--> Phase 3 MasterData + Sales Order MVP
--> Phase 5 Formal product entry
--> Phase 6 import loader design
+里程碑 0 docs-only reset
+-> 里程碑 1 yoyoosun source governance
+-> 里程碑 2 MVP cutline
+-> 里程碑 3 MasterData + Sales Order MVP
+-> 里程碑 5 Formal product entry
+-> 里程碑 6 import loader design
 -> 试用模拟 simulated data trial rehearsal and acceptance
 ```
 
 如果目标是尽快完善产品内核：
 
 ```text
-Phase 0 docs-only reset
--> Phase 2 domain model review
--> Phase 3 MasterData + Source Document MVP
--> Phase 4 Purchase / Quality / Inventory facts
+里程碑 0 docs-only reset
+-> 里程碑 2 domain model review
+-> 里程碑 3 MasterData + Source Document MVP
+-> 里程碑 4 Purchase / Quality / Inventory facts
 -> 业务事实扩展 Shipment and Finance facts
 ```
 

@@ -41,11 +41,11 @@
 | T0 静态检查 | 所有改动 | `git status --short`；`git diff --stat`；`git diff --check`；`git ls-files --others --exclude-standard` | 用于确认工作区、空白错误、未跟踪文件和并行现场 |
 | T1 文档 / 规划 | roadmap、cutline、audit、risk register、客户资料、任务说明 | T0 + 相关边界 grep | 不改 runtime / schema / 前端配置时，一般不跑 Go / pnpm 测试 |
 | T2 Schema / Migration | Ent schema、generated code、Atlas migration | `cd server && make print_db_url`；`cd server && make data`；`cd server && make migrate_status`；`cd server && go test ./internal/data/model/schema`；`cd server && go test ./internal/biz ./internal/data` | `migrate_status` pending 不是自动失败，但必须说明目标库是否已 apply |
-| T3 Repo / Usecase / Core | `internal/core`、`internal/biz`、`internal/data`、状态机、guard、事务、事实层规则 | `node --test scripts/qa/core-boundary.test.mjs`；`cd server && go test ./internal/core/... ./internal/biz ./internal/data`；必要时加 `-count=1` 和 Phase PG target | `core` 只放纯产品规则，业务编排在 usecase / repo 锁住，API 和 UI 不复制业务规则 |
+| T3 Repo / Usecase / Core | `internal/core`、`internal/biz`、`internal/data`、状态机、guard、事务、事实层规则 | `node --test scripts/qa/core-boundary.test.mjs`；`cd server && go test ./internal/core/... ./internal/biz ./internal/data`；必要时加 `-count=1` 和领域 PG 防呆测试 | `core` 只放纯产品规则，业务编排在 usecase / repo 锁住，API 和 UI 不复制业务规则 |
 | T4 API / RBAC | JSON-RPC / HTTP handler、auth、permission code、角色矩阵、错误码 | `cd server && go test ./internal/biz ./internal/data ./internal/service ./internal/server`；改错误码时跑 `scripts/qa/error-code-sync.sh` 和 `scripts/qa/error-codes.sh` | 必须覆盖未登录、disabled admin、无权限、有权限、super admin 和 owner / assignee / status 边界 |
 | T5 Frontend UI / 样式 | 页面、路由、API client、菜单、seed、表单、样式 | `cd web && pnpm lint`；`cd web && pnpm css`；`cd web && pnpm test`；`cd web && pnpm style:l1` | 触达共享组件、布局、断点或页面状态时，必须做浏览器级默认态、交互态、恢复态和相邻区域回归 |
 | T6 Import dry-run / freeze | `scripts/import/**`、yoyoosun source snapshot、dry-run evidence | `node --test scripts/import/customerImportDryRun.test.mjs scripts/import/customerSourceSnapshotFreezeCheck.test.mjs`；必要时运行 dry-run / freeze CLI 生成本地 `output/**` evidence | 当前阶段必须保持 no-write，不连接 DB，不写正式表，不写 `business_records` |
-| T7 业务事实 / E2E | 库存、采购、质检、未来出货、财务、生产、委外真实事实 | 当前已有事实层按 T3 + Phase PG target；完整 E2E 后续再设计 | 不存在稳定 runner 时，不得把手工点按或未来命令写成已自动化 |
+| T7 业务事实 / E2E | 库存、采购、质检、未来出货、财务、生产、委外真实事实 | 当前已有事实层按 T3 + 领域 PG 防呆测试；完整 E2E 后续再设计 | 不存在稳定 runner 时，不得把手工点按或未来命令写成已自动化 |
 | T8 部署 / 发布 / 回滚 | Compose、发布脚本、migration apply、私有化交付 | `bash scripts/qa/full.sh` 或 `bash scripts/qa/strict.sh`；按部署文档做 migration、health、smoke、清理 | 低配服务器不做构建；备份 / 恢复 / 回滚脚本若不存在，必须先设计再声称覆盖 |
 
 ## 4. 静态边界检查
@@ -140,14 +140,14 @@ make data
 make migrate_status
 ```
 
-Phase PG 防呆集成测试按对应阶段选择，不要无关全跑：
+领域 PG 防呆集成测试按对应能力选择，不要无关全跑：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/server
-make phase2a_pg_test
-make phase2b_pg_test
-make phase2c_pg_test
-make phase2d_pg_test
+make inventory_pg_test
+make bom_lot_pg_test
+make purchase_receipt_pg_test
+make purchase_return_pg_test
 ```
 
 yoyoosun import dry-run / freeze 工具测试：

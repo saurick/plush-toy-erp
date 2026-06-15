@@ -1,18 +1,16 @@
 # 正式产品入口与菜单配置计划 / Formal Menu Entry Plan
 
 - 文档类型：产品路线配套计划
-- 状态：规划输入，不是 runtime 真源
+- 状态：规划输入；runtime 真源为当前菜单配置、路由、RBAC、代码和测试
 - 对应 roadmap 能力：`正式产品入口与旧入口退出`
 - 对应建议路线：`013 v1-formal-menu-and-legacy-entry-exit`
-- 对应原型：`docs/product/prototypes/formal-menu-candidate-v1/index.html`（To Implement，用于评审正式菜单候选，不是 runtime 真源）
-- 对应评审表：`docs/product/menu-mapping-review-v1.md`（用于对齐当前运行时菜单、正式候选主入口和 51 个内部覆盖细项，不是 runtime 真源）
-- 对应实施拆分：`docs/product/formal-menu-runtime-implementation-plan-v1.md`（用于拆分真实菜单、RBAC 和测试影响，不是 runtime 真源）
+- 对应原型：`docs/product/prototypes/formal-menu-candidate-v1/index.html`（To Implement，用于评审正式菜单候选）
+- 对应评审表：`docs/product/menu-mapping-review-v1.md`（用于对齐当前运行时菜单、正式候选主入口和 51 个内部覆盖细项）
+- 对应实施拆分：`docs/product/formal-menu-runtime-implementation-plan-v1.md`（用于拆分真实菜单、RBAC 和测试影响）
 
 ## 0. 文档目的
 
-本文只承接正式产品入口、行业默认菜单候选、客户菜单配置和旧入口退出的规划细节。
-
-本文不是产品总路线图，不替代 `docs/product/product-completion-roadmap.md`。本文也不是当前菜单 runtime、seedData、权限码、路由或前端实现真源；当前产品内 docs registry 已下线，任何实际修改仍必须拆成具体实现任务。
+本文承接正式产品入口、行业默认菜单候选、客户菜单配置和旧入口退出的规划细节。产品总路线图看 `docs/product/product-completion-roadmap.md`；当前菜单 runtime、seedData、权限码、路由和前端实现真源回到当前代码、配置、RBAC 和测试。当前产品内 docs registry 已下线，实际修改按具体实现任务拆分。
 
 ## 1. 产品目标
 

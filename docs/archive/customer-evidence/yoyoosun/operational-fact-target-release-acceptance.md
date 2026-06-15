@@ -13,7 +13,7 @@ Schema Source of Truth / Schema 真源: No / 否
 
 Phase 8 下一步不是继续扩大功能，而是先完成目标环境发布与内部模拟事实闭环。
 
-2026-06-08 已按 `phase8-target-release-evidence-2026-06-08.md` 完成目标环境发布、试用账号 RBAC、登录态只读 smoke 和内部模拟事实写入闭环。客户使用确认属于交付后的业务确认，不作为 Phase 8 完成阻塞；仍禁止写成客户已签收、真实客户数据已导入或完整业务交付。
+2026-06-08 已按 `operational-fact-target-release-evidence-2026-06-08.md` 完成目标环境发布、试用账号 RBAC、登录态只读 smoke 和内部模拟事实写入闭环。客户使用确认属于交付后的业务确认，不作为 Phase 8 完成阻塞；仍禁止写成客户已签收、真实客户数据已导入或完整业务交付。
 
 ## 2. 范围 / Scope
 
@@ -25,7 +25,7 @@ Phase 8 下一步不是继续扩大功能，而是先完成目标环境发布与
 | migration | 使用目标宿主机 `/usr/local/bin/atlas` 和 `migrate_online.sh` 执行状态检查与 apply |
 | 健康检查 | `/healthz`、`/readyz`、Compose 状态、容器日志 |
 | Phase 8 页面验收 | `/erp/phase8/facts` 五个事实页签加载、权限、空态或数据态 |
-| 内部模拟事实验收 | 使用显式 `SIM-YOYOOSUN-PHASE8` 模拟主数据和 QA 脚本覆盖五条事实链 |
+| 内部模拟事实验收 | 使用显式 `SIM-YOYOOSUN-OPFACT` 模拟主数据和 QA 脚本覆盖五条事实链 |
 | 事实边界验收 | 确认 `shipping_released != shipped`，Workflow 不写库存、出货或财务事实 |
 | Evidence | 记录非敏感命令结果、提交版本、镜像标签、migration 状态、验收结论和剩余问题 |
 

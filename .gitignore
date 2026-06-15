@@ -1,5 +1,16 @@
 .cursor/
 .DS_Store
+
+# 本地私有 registry token 文件禁止入库；tracked web 配置只允许环境变量占位。
+.npmrc
+.yarnrc.yml
+!web/.npmrc
+!web/.yarnrc.yml
+*.npmrc.local
+*.yarnrc.local.yml
+web/.npmrc.local
+web/.yarnrc.local.yml
+
 web/node_modules/
 web/build/
 web/.vite-cache/

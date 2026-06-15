@@ -30,9 +30,9 @@
 - `docs/current-source-of-truth.md`。
 - `config/customers/<customer-key>/` 和 `deployments/<customer-key>/` 是否需要对应说明。
 
-## Phase 11 私有化复制
+## 私有化客户包复制
 
-新增客户前先复用 Phase 11 私有化客户包模板：
+新增客户前先复用私有化客户包模板：
 
 ```text
 docs/customers/<customer-key>/
@@ -40,4 +40,4 @@ config/customers/<customer-key>/
 deployments/<customer-key>/
 ```
 
-`SIM-PRIVATE-PHASE11` 只用于本地模拟 evidence，不得创建为正式客户目录。真实导入仍需单独数据治理评审；没有客户确认、备份 evidence、unresolved queue 清零和回滚方案时，只能做本地模拟。
+`SIM-PRIVATE-DEPLOYMENT` 只用于本地模拟 evidence，不得创建为正式客户目录。真实导入仍需单独数据治理评审；没有客户确认、备份 evidence、unresolved queue 清零和回滚方案时，只能做本地模拟。

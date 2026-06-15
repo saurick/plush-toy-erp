@@ -24,16 +24,18 @@
 | `scripts/qa/private-deployment-package-closure.mjs`     | 多客户私有化复制模拟闭环入口，只读取模板并生成 evidence 报告                                                   | 私有化客户包回归 / 目标环境发布前                          |
 | `scripts/deploy/deployment-package-lint.mjs`           | 客户私有化部署资料包检查，确保 `deployments/yoyoosun` 必需文件齐全且不含真实 env、备份、raw files 或 secret       | 调整客户部署资料包后                                       |
 | `scripts/qa/core-boundary.test.mjs`                    | 自动扫描 `server/internal/core`，防止纯产品规则层 import `biz/data/service`、Ent、SQL、HTTP、配置或文件系统依赖 | 调整 `server/internal/core` 后                              |
-| `scripts/phase2b-pg.sh`                                | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口                                               | 验证 Phase 2B schema 和批次库存行为                        |
-| `scripts/phase2c-pg.sh`                                | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口                                                     | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
-| `scripts/phase2d-pg.sh`                                | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                   | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
+| `scripts/qa/phase-label-boundaries.mjs`                | 自动扫描活跃实现路径，阻止新增 runtime 阶段编号命名；仅允许当前旧 PostgreSQL 本地验收兼容入口                     | 调整命名、脚本、API、运行时代码或治理文档后                 |
+| `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、冲正和防负库存                         |
+| `scripts/bom-lot-pg.sh`                                | BOM 与批次库存本地 PostgreSQL migration / 集成测试防呆入口                                                       | 验证 BOM schema 和批次库存行为                            |
+| `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
+| `scripts/purchase-return-pg.sh`                        | 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
-| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入、模拟数据工具和阶段标签边界守卫                                                       | 日常开发                                                   |
+| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入、模拟数据工具和历史阶段标签边界守卫                                                       | 日常开发                                                   |
 | `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界                                         | 生成试用 / 演示账号后                                      |
 | `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界                             | 调整客户配置草案后                                         |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入、模拟数据工具和阶段标签边界守卫                                                           | 提交前 / 推送前                                            |
-| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入、模拟数据工具和阶段标签边界守卫                                                           | 发版前                                                     |
+| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入、模拟数据工具和历史阶段标签边界守卫                                                           | 提交前 / 推送前                                            |
+| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入、模拟数据工具和历史阶段标签边界守卫                                                           | 发版前                                                     |
 | `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
 | `scripts/qa/error-code-sync.sh`                        | 校验前后端错误码同步                                                                                              | 改错误码后                                                 |
 | `scripts/qa/error-codes.sh`                            | 阻止业务代码裸写已注册错误码                                                                                      | 改接口 / 鉴权 / 前端错误处理后                             |

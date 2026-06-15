@@ -64,7 +64,7 @@ const DEV_TESTING_TIER_COPY_FALLBACKS = Object.freeze({
     '# T7 当前没有完整业务 E2E runner；按触达事实层选择下列当前可用检查，不要伪造全链路自动化。',
     'cd /Users/simon/projects/plush-toy-erp/server',
     'go test ./internal/biz ./internal/data',
-    '# 如本轮明确触达对应 Phase PG，再按阶段选择 make phase2a_pg_test / phase2b_pg_test / phase2c_pg_test / phase2d_pg_test',
+    '# 如本轮明确触达对应库存、BOM、采购入库或采购退货 PG 防呆测试，再按领域选择 server Makefile 中的对应 target',
   ],
   T8: [
     'cd /Users/simon/projects/plush-toy-erp',
@@ -195,7 +195,7 @@ function extractInlineCommands(value = '') {
   return [...String(value || '').matchAll(/`([^`]+)`/g)]
     .map((match) => stripMarkdownInline(match[1]))
     .filter((command) => {
-      return /^(cd|pnpm|npm|node|bash|go|make|git|grep|docker|APP_ID=|STYLE_|TRIAL_|PHASE|CUSTOMER_)/.test(
+      return /^(cd|pnpm|npm|node|bash|go|make|git|grep|docker|APP_ID=|STYLE_|TRIAL_|CUSTOMER_)/.test(
         command
       )
     })

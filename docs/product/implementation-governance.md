@@ -8,31 +8,31 @@
 
 ## 0. 文档目的 / Purpose
 
-本文用于固化 `plush-toy-erp` 重新做项目后的施工规则：模块不是按聊天里的临时顺序直接进入实现，而是先确认 Phase、Architecture Layer、模块类型、当前门禁和允许修改范围。
+本文用于固化 `plush-toy-erp` 重新做项目后的施工规则：模块不是按聊天里的临时顺序直接进入实现，而是先确认实施顺序、Architecture Layer、模块类型、当前门禁和允许修改范围。
 
-本文不是 runtime 真源。涉及当前行为、表结构、权限、API、UI、测试结果或客户真实数据导入时，仍必须回到当前代码、Ent schema、Atlas migration、测试、`docs/current-source-of-truth.md` 和本轮具体任务说明交叉确认。
+本文负责实施治理。涉及当前行为、表结构、权限、API、UI、测试结果或客户真实数据导入时，正式判断回到当前代码、Ent schema、Atlas migration、测试、`docs/current-source-of-truth.md` 和本轮具体任务说明交叉确认。
 
-本文也不是 roadmap。Roadmap 回答“产品按什么阶段推进”，本文回答“某个阶段进入实现前要满足什么治理条件”。
+本文也不是 roadmap。Roadmap 回答“产品按什么能力路线推进”，本文回答“某个能力闭环进入实现前要满足什么治理条件”。
 
-## 1. Phase 与 Architecture Layer / Phase And Architecture Layer
+## 1. 实施顺序与 Architecture Layer / Implementation Order And Architecture Layer
 
-Phase 负责实施顺序，Architecture Layer 负责职责边界。两者必须同时判断，不能互相替代。
+实施顺序负责先后安排，Architecture Layer 负责职责边界。两者必须同时判断，不能互相替代。
 
 | 概念 | 回答的问题 | 不回答的问题 |
 | --- | --- | --- |
-| Phase / 实施阶段 | 先做什么、后做什么、当前阶段产出什么结果 | 某个字段、状态或事实应该归哪个层负责 |
+| 实施顺序 / 能力里程碑 | 先做什么、后做什么、当前阶段产出什么结果 | 某个字段、状态或事实应该归哪个层负责 |
 | Architecture Layer / 架构层 | 谁是真源、谁能写事实、谁负责权限和展示边界 | 当前阶段是否应该立即实现 |
 
-一个 Phase 可以涉及多个 Architecture Layer。例如一个采购模块 Phase 可能同时触达 MasterData、Source Document、Fact、Workflow、RBAC、API、UI 和测试。Phase 只是施工批次，不是放宽边界的理由。
+一个能力里程碑可以涉及多个 Architecture Layer。例如一个采购模块里程碑可能同时触达 MasterData、Source Document、Fact、Workflow、RBAC、API、UI 和测试。里程碑只是施工批次，不是放宽边界的理由。
 
-任何 Phase 交付都不能破坏 Workflow / Fact / MasterData / RBAC 边界：
+任何里程碑交付都不能破坏 Workflow / Fact / MasterData / RBAC 边界：
 
 - Workflow 只负责协同任务、业务状态推进和必要的下游协同任务派生。
 - Fact 负责采购、库存、质检、生产、出货、财务等真实业务事实。
 - MasterData 负责客户、供应商、联系人、材料、产品、单位、仓库、BOM 等稳定基础资料。
 - RBAC 是后端动作权限和职责边界，不由菜单隐藏替代。
 
-如果某个 Phase 需要跨层推进，必须先在 docs-only review 或正式设计文档中写清每一层的职责、真源、禁止项和测试层级，再拆后续实现任务。
+如果某个里程碑需要跨层推进，必须先在 docs-only review 或正式设计文档中写清每一层的职责、真源、禁止项和测试层级，再拆后续实现任务。
 
 ## 2. 标准模块开发闭环 / Standard Module Delivery Loop
 
@@ -168,8 +168,22 @@ dry-run 或 freeze evidence 进入真实导入前，必须确认：
 - 不从 dry-run / freeze evidence 直接执行真实导入。
 - 不把试用模拟拆成 A/B/C/D 等字母子阶段；当前 yoyoosun 不执行真实客户数据导入，只能用模拟数据一次性完成试用环境演练和验收。
 - 不把业务事实本地实现写成目标客户环境已 migration / 已上线 / 已完成客户交付。
-- 不为某个阶段交付而重复设计已存在的事实真源、权限真源或客户配置边界；后续默认看能力、测试、evidence 和真源边界。
+- 不为某个能力里程碑交付而重复设计已存在的事实真源、权限真源或客户配置边界；后续默认看能力、测试、evidence 和真源边界。
 - 不把 docs-only 评审、roadmap、产品台账或聊天结论当成 runtime 实现证据。
+
+### 5.1 Runtime 命名主路径 / Runtime Naming Main Path
+
+本项目后续按能力闭环和真实业务领域组织开发、交付和测试。运行时代码、API、菜单、路由、测试、部署主路径和客户可见文档统一使用业务领域命名；历史阶段编号只作为归档检索标签存在。
+
+推荐命名主路径：
+
+- 领域：`shipment`、`inventory`、`purchase`、`quality`、`production`、`outsourcing`、`finance`、`bom`、`masterdata`、`workflow`。
+- 任务：能力里程碑、功能闭环、测试用例、验收标准、交付资料。
+- API / 测试：围绕业务动作和事实源命名，例如出货确认、库存预留、采购入库、质检判定和财务事实。
+
+`scripts/qa/phase-label-boundaries.mjs` 负责拦截新增阶段编号命名，避免后续 AI 或维护者把历史阶段误读成正式领域、API domain、页面模块或测试结构。
+
+当前仍存在的 `phase2*` PostgreSQL 本地验收脚本、测试环境变量、测试数据库名和兼容 Make target，只作为历史兼容边界保留；文档推荐入口已经改用 `inventory-*`、`bom_lot-*`、`purchase_receipt-*` 和 `purchase_return-*`。如后续要彻底删除这些兼容入口，必须单独评审命令替换、CI / 本地脚本影响、历史 evidence 可追溯性和回滚风险，不在普通功能任务中顺手清理。
 
 ## 6. 实施任务拆分规则 / Implementation Task Split Rules
 
@@ -199,7 +213,7 @@ dry-run 或 freeze evidence 进入真实导入前，必须确认：
 
 每次拆分前至少回答：
 
-1. 当前属于哪个 Phase？
+1. 当前属于哪个能力里程碑或功能闭环？
 2. 触达哪些 Architecture Layer？
 3. 模块类型是什么，适用强度到哪一级？
 4. 当前从哪个门禁进入哪个门禁？

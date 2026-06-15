@@ -103,7 +103,7 @@ docker image prune -f: 0B
 
 ## 边界
 
-- `SIM-PRIVATE-PHASE11` 只用于本地 evidence，不创建正式客户目录。
+- `SIM-PRIVATE-DEPLOYMENT` 只用于本地 evidence，不创建正式客户目录。
 - 真实客户数据导入仍不可执行；如遇真实导入需求，只能先本地模拟并另开数据治理评审。
 - 目标服务器只加载本地已构建镜像，不执行构建命令。
 - 本轮未改 schema、migration、RBAC、WorkflowUsecase、Fact usecase、客户菜单 runtime loader 或真实导入 loader 写库语义。

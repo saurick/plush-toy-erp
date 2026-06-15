@@ -7,9 +7,9 @@ Current Implementation Source of Truth / 当前实现真源: No / 否
 
 # 永绅 yoyoosun 客户导入验收清单 / Yoyoosun Customer Import Acceptance Checklist
 
-本清单用于 永绅 yoyoosun 客户导入前的 dry-run、freeze、approval 和 execution gate 验收。当前已具备 dry-run draft、CLI dry-run package、source snapshot freeze checker、sanitized freeze fixtures、freeze evidence、real dry-run evidence、manual review checklist 和受控 import execution loader。当前没有可直接执行的客户真实数据，Phase 7 中执行器只允许用于报告模式和门禁校验，不执行真实写入。
+本清单用于 永绅 yoyoosun 客户导入前的 dry-run、freeze、approval 和 execution gate 验收。当前已具备 dry-run draft、CLI dry-run package、source snapshot freeze checker、sanitized freeze fixtures、freeze evidence、real dry-run evidence、manual review checklist 和受控 import execution loader。当前没有可直接执行的客户真实数据，试用模拟中执行器只允许用于报告模式和门禁校验，不执行真实写入。
 
-Phase 7 不拆 A/B/C/D 或任何字母子阶段，试用目标只能一次性使用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据做环境、账号、菜单、V1 页面和岗位任务端演练；本清单中的 execution loader 不应被用于把模拟数据写成客户真实导入结果。
+试用模拟不拆 A/B/C/D 或任何字母子阶段，试用目标只能一次性使用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据做环境、账号、菜单、V1 页面和岗位任务端演练；本清单中的 execution loader 不应被用于把模拟数据写成客户真实导入结果。
 
 ## 检查清单 / Checklist
 
@@ -54,7 +54,7 @@ node scripts/import/customerImportDryRun.mjs \
   --format json,md
 ```
 
-`validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。当前 Phase 7 不执行真实导入；人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和 execution loader 门禁只能作为未来另开数据治理评审的输入，不能改变当前只能模拟的试用目标。
+`validation-summary.json` 中 `canExecuteRealImport` 必须始终为 `false`。当前试用模拟不执行真实导入；人工确认、数据库备份、回滚 / forward-fix 方案、客户 sign-off 和 execution loader 门禁只能作为未来另开数据治理评审的输入，不能改变当前只能模拟的试用目标。
 
 ## 冻结证据 / Freeze Evidence
 
@@ -91,7 +91,7 @@ node scripts/import/customerImportExecute.mjs \
   --out output/customers/yoyoosun/import-execution
 ```
 
-没有 `--execute` 时，报告中的 `executed` 必须为 `false`。当前 Phase 7 禁止真实写入；以下变量只描述执行器历史门禁形态，不代表当前允许使用：
+没有 `--execute` 时，报告中的 `executed` 必须为 `false`。当前试用模拟禁止真实写入；以下变量只描述执行器历史门禁形态，不代表当前允许使用：
 
 ```bash
 CUSTOMER_IMPORT_CONFIRM=EXECUTE_YOYOOSUN_IMPORT
@@ -99,7 +99,7 @@ CUSTOMER_IMPORT_ADMIN_TOKEN=...
 # or CUSTOMER_IMPORT_ADMIN_USERNAME / CUSTOMER_IMPORT_ADMIN_PASSWORD
 ```
 
-即使显式传入 `--backend-url` 或 `CUSTOMER_IMPORT_BACKEND_URL`，当前也不得在 Phase 7 执行真实写入。不要把 sample approval fixture 当客户批准。
+即使显式传入 `--backend-url` 或 `CUSTOMER_IMPORT_BACKEND_URL`，当前也不得在试用模拟中执行真实写入。不要把 sample approval fixture 当客户批准。
 
 ## 导入前门禁 / Pre-import Gate
 
@@ -124,7 +124,7 @@ CUSTOMER_IMPORT_ADMIN_TOKEN=...
 - 需要修改 seedData、docs registry、runtime API/UI，或恢复旧 `business_records` 才能让 dry-run 通过。
 - 永绅 yoyoosun 客户字段被当作 Product Core 必填字段。
 - 模拟数据被当作客户真实数据或导入批准。
-- 真实导入被拆成 Phase 7 的字母子阶段或后续半阶段。
+- 真实导入被拆成试用模拟的字母子阶段或后续半阶段。
 - unresolved queue 中还有 block 项。
 - freeze evidence 或 real dry-run evidence 被误读为真实导入批准。
 - 缺少 approval、backup evidence、确认短语、目标后端或管理员凭据。

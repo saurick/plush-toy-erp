@@ -74,40 +74,40 @@ make build
 go run ./cmd/seed-core-demo-data --help
 ```
 
-Phase 2A 库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_phase2a_test`：
+库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_phase2a_test`：
 
 ```bash
-make phase2a_pg_createdb
-make phase2a_migrate_status
-make phase2a_migrate_apply
-make phase2a_pg_test
+make inventory_pg_createdb
+make inventory_migrate_status
+make inventory_migrate_apply
+make inventory_pg_test
 ```
 
-Phase 2B BOM + 批次库存 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2b_test`：
+BOM + 批次库存 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2b_test`：
 
 ```bash
-make phase2b_pg_createdb
-make phase2b_migrate_status
-make phase2b_migrate_apply
-make phase2b_pg_test
+make bom_lot_pg_createdb
+make bom_lot_migrate_status
+make bom_lot_migrate_apply
+make bom_lot_pg_test
 ```
 
-Phase 2C 采购入库 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2c_test`：
+采购入库 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2c_test`：
 
 ```bash
-make phase2c_pg_createdb
-make phase2c_migrate_status
-make phase2c_migrate_apply
-make phase2c_pg_test
+make purchase_receipt_pg_createdb
+make purchase_receipt_migrate_status
+make purchase_receipt_migrate_apply
+make purchase_receipt_pg_test
 ```
 
-Phase 2D-A 采购退货 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2d_test`：
+采购退货 PostgreSQL 本地验收使用独立防呆 target，默认库名为 `plush_erp_phase2d_test`：
 
 ```bash
-make phase2d_pg_createdb
-make phase2d_migrate_status
-make phase2d_migrate_apply
-make phase2d_pg_test
+make purchase_return_pg_createdb
+make purchase_return_migrate_status
+make purchase_return_migrate_apply
+make purchase_return_pg_test
 ```
 
 ## 迁移说明

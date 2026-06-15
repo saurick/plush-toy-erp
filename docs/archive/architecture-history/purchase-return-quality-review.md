@@ -8,8 +8,8 @@
 | --- | --- | --- |
 | 当前真源 | `README.md`、`docs/current-source-of-truth.md` | Phase 2A / 2B / 2C 已形成库存、批次和采购入库最小闭环；`inventory_txns` 是库存事实流水真源，`inventory_balances` 是当前余额 / 查询加速表，`inventory_lots` 是批次追溯真源。 |
 | Phase 2A | `docs/current-source-of-truth.md`、`docs/architecture/material-product-inventory-schema-review.md` | 库存事实用追加流水表达，余额同事务更新，错误用 `REVERSAL` 冲正，不直接改历史流水。 |
-| Phase 2B | `docs/archive/architecture-history/phase-2b-bom-lot-schema-review.md` | 批次进入 `inventory_txns.lot_id` 和 `inventory_balances.lot_id`；批次库存和非批次库存分开聚合、分开扣减，不能互相抵扣。 |
-| Phase 2C | `docs/archive/architecture-history/phase-2c-purchase-receipt-review.md` | `purchase_receipts / purchase_receipt_items` 是采购入库专表真源；过账写 `IN`，取消已过账入库写 `REVERSAL`。 |
+| Phase 2B | `docs/archive/architecture-history/bom-lot-schema-review.md` | 批次进入 `inventory_txns.lot_id` 和 `inventory_balances.lot_id`；批次库存和非批次库存分开聚合、分开扣减，不能互相抵扣。 |
+| Phase 2C | `docs/archive/architecture-history/purchase-receipt-review.md` | `purchase_receipts / purchase_receipt_items` 是采购入库专表真源；过账写 `IN`，取消已过账入库写 `REVERSAL`。 |
 | 当前实现 | `server/internal/biz/inventory.go`、`server/internal/biz/purchase_receipt.go`、`server/internal/data/inventory_repo.go`、`server/internal/data/purchase_receipt_repo.go` | `ApplyInventoryTxnAndUpdateBalance` 负责幂等流水和余额更新；`CancelPostedPurchaseReceipt` 是整单取消，按原入库流水逐条冲正。 |
 | 当前 schema / 测试 | `server/internal/data/model/schema/*.go`、`server/internal/data/inventory_repo_test.go`、`server/internal/data/inventory_postgres_test.go` | `inventory_txns` 不可更新 / 删除；`purchase_receipts / purchase_receipt_items` 禁止普通删除，过账 / 取消后关键字段不可改；测试已覆盖 source 追溯、批次隔离和取消冲正。 |
 

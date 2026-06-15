@@ -11,7 +11,7 @@ print_help() {
 
 行为:
   未安装 gitleaks: 默认仅提示并跳过；SECRETS_STRICT=1 时阻断
-  检测到疑似泄露: 默认提示不阻断；SECRETS_STRICT=1 时阻断
+  检测到疑似泄露: 阻断
 
 环境变量:
   SKIP_SECRETS_SCAN=1   跳过检查
@@ -57,9 +57,14 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 files=()
+append_file() {
+  local f="$1"
+  [[ -n "$f" ]] && files+=("$f")
+}
+
 if [[ "$staged_only" == "1" ]]; then
   while IFS= read -r f; do
-    [[ -n "$f" ]] && files+=("$f")
+    append_file "$f"
   done < <(git diff --cached --name-only --diff-filter=ACMR)
 else
   range="${QA_BASE_RANGE:-}"
@@ -70,18 +75,24 @@ else
 
   if [[ -n "$range" ]]; then
     while IFS= read -r f; do
-      [[ -n "$f" ]] && files+=("$f")
+      append_file "$f"
     done < <(git diff --name-only "$range")
   fi
 
   while IFS= read -r f; do
-    [[ -n "$f" ]] && files+=("$f")
+    append_file "$f"
   done < <(git diff --name-only)
 
   while IFS= read -r f; do
-    [[ -n "$f" ]] && files+=("$f")
+    append_file "$f"
   done < <(git diff --name-only --cached)
 fi
+
+for f in .npmrc .yarnrc.yml web/.npmrc web/.yarnrc.yml; do
+  if git ls-files --error-unmatch "$f" >/dev/null 2>&1 || [[ -f "$ROOT_DIR/$f" ]]; then
+    append_file "$f"
+  fi
+done
 
 if [[ "${#files[@]}" -eq 0 ]]; then
   echo "[qa:secrets] 未检测到待扫描变更，跳过"
@@ -115,15 +126,32 @@ if [[ -z "$(find "$tmp_dir" -type f -print -quit)" ]]; then
   exit 0
 fi
 
+# shellcheck disable=SC2016
+npm_token_hits="$(
+  find "$tmp_dir" -type f \( -name ".npmrc" -o -name ".yarnrc.yml" \) -print0 |
+    xargs -0 awk '
+      /_authToken[[:space:]]*=/ || /npmAuthToken[[:space:]]*:/ {
+        value = $0
+        sub(/^.*(_authToken[[:space:]]*=|npmAuthToken[[:space:]]*:)[[:space:]]*/, "", value)
+        gsub(/["'\''`]/, "", value)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        if (value != "" && value !~ /^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$/ && value !~ /^<[^>]+>$/) {
+          print FILENAME ":" FNR
+        }
+      }
+    ' 2>/dev/null || true
+)"
+
+if [[ -n "$npm_token_hits" ]]; then
+  echo "[qa:secrets] 检测到 npm registry token 明文配置:"
+  printf "%s\n" "$npm_token_hits" | sed "s#^$tmp_dir/##"
+  exit 1
+fi
+
 if gitleaks detect --source "$tmp_dir" --no-banner --redact >/dev/null 2>&1; then
   echo "[qa:secrets] 通过"
   exit 0
 fi
 
-if [[ "$strict" == "1" ]]; then
-  echo "[qa:secrets] 检测到疑似密钥泄露（SECRETS_STRICT=1，阻断）"
-  exit 1
-fi
-
-echo "[qa:secrets] 检测到疑似密钥泄露（默认仅提示，不阻断）"
-exit 0
+echo "[qa:secrets] 检测到疑似密钥泄露"
+exit 1

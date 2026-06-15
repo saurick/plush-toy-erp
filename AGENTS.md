@@ -39,7 +39,7 @@
 
 - 本仓库不再使用单独执行规格目录、短任务模板或本地审查报告目录作为执行工作流。
 - GPT / ChatGPT 只作为需求澄清、架构讨论和方案比较的辅助输入；长期规则、当前状态和实施边界必须回到本仓库文件、真实代码、migration、测试和当前工作区确认。
-- `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源，用于判断产品长期 Phase、候选任务顺序和下一步大方向；它不替代 `docs/current-source-of-truth.md`、代码、migration、测试或本轮用户要求。
+- `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源，用于判断产品长期能力路线、候选任务顺序和下一步大方向；它不替代 `docs/current-source-of-truth.md`、代码、migration、测试或本轮用户要求。
 - Roadmap 可以在执行过程中根据代码现状、客户反馈、验收结果、风险发现或 AI 规划复盘显式调整；调整时必须直接修改 roadmap，并写清调整原因、影响阶段、新的下一步，以及哪些旧编号或旧路线不再复用。
 - 试用模拟当前规则：不拆 A/B/C/D 或任何字母子阶段；当前没有可直接执行的 yoyoosun 客户真实数据，只能一次性用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据完成试用环境、账号、RBAC、菜单、V1 页面、岗位任务端和培训验收。真实客户数据导入在当前条件下不可执行，也不能作为后续半阶段、隐藏目标或完成条件；模拟数据不得写成真实导入、客户字段确认、出货、库存或财务事实。
 - 复杂实现应按 `docs/product/implementation-governance.md` 拆为可验证任务。任务边界可以写在当前会话、正式设计文档、roadmap 或台账中；不要恢复额外长期施工单目录。
@@ -48,6 +48,8 @@
 - 普通任务不生成、不覆盖、也不要求本地审查报告。如用户需要审查材料，应直接在最终回复或用户明确指定的正式文档中说明目标、范围、修改文件、验证命令和风险。
 - 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/product/*`、`docs/architecture/*`、`docs/current-source-of-truth.md`、代码和测试。
 - plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和客户资料边界，仍以本文件和正式产品 / 架构文档为准。当前永绅客户稳定 key 是 `yoyoosun`，不要恢复 `current` 客户目录或导入工作区别名。
+- 新任务组织主路径：按能力闭环、业务事实源、测试用例、验收标准和交付资料拆分；当前产品结构、代码结构、接口结构、菜单结构、测试结构和客户语言都使用真实业务领域命名。历史阶段编号只作为归档检索标签。
+- Runtime 命名主路径：使用 `shipment`、`inventory`、`purchase`、`quality`、`finance`、`workflow` 等业务领域词。新增运行时代码、API、路由、菜单、测试和配置由 `scripts/qa/phase-label-boundaries.mjs` 守卫阶段编号残留；已有 `phase2*` PostgreSQL 本地验收脚本、测试环境变量和数据库名只作为历史兼容入口保留，彻底迁移必须作为单独任务评审。
 - 处理任务时禁止：
   - 新增 `tenant_id`。
   - 实现 SaaS 多租户。
@@ -358,7 +360,7 @@ plush-toy-erp 不是“每个角色一套独立系统”。当前产品形态是
 - 生成迁移后执行：`cd /Users/simon/projects/plush-toy-erp/server && make data && make migrate_status`
 - 若服务逻辑依赖新表/新列，发布前先确认目标库 migration 已落地。
 - 不要因为文档、前端导航、产品内帮助入口、开发验收总控页面改动而运行或生成 migration。
-- 不要把与当前任务无关的 Phase 2A / 2B / 2C / 2D 现场文件清理、回退或纳入本轮，除非任务明确要求。
+- 不要把与当前任务无关的 库存事实、BOM 批次、采购入库、采购退货、采购调整和来料质检 现场文件清理、回退或纳入本轮，除非任务明确要求。
 
 ## 前端与样式
 
