@@ -283,7 +283,10 @@ export function extractDevTestingCommandBlocks(
 
 function classifyTestingDoc(path = '', source = '') {
   if (path === DEV_TESTING_STRATEGY_SOURCE_PATH) return '测试策略'
-  if (path.includes('/phase') && /evidence|验收|发布|smoke/i.test(source)) {
+  if (
+    /release-evidence|target-release-evidence/i.test(path) ||
+    /Release Evidence|发布证据|发布验收/.test(source)
+  ) {
     return '发布验收'
   }
   if (path.includes('/import-') || path.includes('/source-snapshot')) {

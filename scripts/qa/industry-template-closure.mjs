@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { plushIndustryTemplateConfig } from "../../config/industry-templates/plush/templateConfig.mjs";
 
-const DEFAULT_OUT_DIR = "output/customers/yoyoosun/phase10-industry-template-closure";
+const DEFAULT_OUT_DIR = "output/customers/yoyoosun/industry-template-closure";
 
 function parseArgs(argv) {
   const options = {
@@ -32,10 +32,10 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`Usage:
-  node scripts/qa/phase10-industry-template-closure.mjs [--out <dir>]
+  node scripts/qa/industry-template-closure.mjs [--out <dir>]
 
 Purpose:
-  Generate Phase 10 industry template simulation evidence.
+  Generate industry template simulation evidence.
 
 Boundaries:
   - reads only config/industry-templates/plush/templateConfig.mjs
@@ -64,7 +64,7 @@ function createReport(config) {
     generatedAt: new Date().toISOString(),
     host: os.hostname(),
     templateKey: config.templateKey,
-    phase: config.phase,
+    reviewMilestone: config.reviewMilestone,
     status: config.status,
     runtimeEnabled: config.runtimeEnabled,
     sourcePolicy: config.sourcePolicy,
@@ -108,14 +108,14 @@ function createReport(config) {
 }
 
 function renderMarkdown(report) {
-  return `# Phase 10 行业模板模拟闭环报告 / Phase 10 Industry Template Simulation Report
+  return `# 行业模板模拟闭环报告 / Industry Template Simulation Report
 
 ## 摘要
 
 | 项目 | 结果 |
 | --- | --- |
 | templateKey | ${report.templateKey} |
-| phase | ${report.phase} |
+| reviewMilestone | ${report.reviewMilestone} |
 | status | ${report.status} |
 | runtimeEnabled | ${report.runtimeEnabled} |
 | roles | ${report.summary.roles} |
@@ -154,13 +154,13 @@ ${report.deferredItems.map((item) => `- ${item}`).join("\n")}
 `;
 }
 
-export function runPhase10IndustryTemplateClosure(options) {
+export function runIndustryTemplateClosure(options) {
   const report = createReport(plushIndustryTemplateConfig);
   const outDir = path.resolve(options.out || DEFAULT_OUT_DIR);
   fs.mkdirSync(outDir, { recursive: true });
 
-  const jsonPath = path.join(outDir, "phase10-industry-template-report.json");
-  const mdPath = path.join(outDir, "phase10-industry-template-report.md");
+  const jsonPath = path.join(outDir, "industry-template-report.json");
+  const mdPath = path.join(outDir, "industry-template-report.md");
   fs.writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   fs.writeFileSync(mdPath, renderMarkdown(report));
 
@@ -181,12 +181,12 @@ if (isCli) {
       printHelp();
       process.exit(0);
     }
-    const result = runPhase10IndustryTemplateClosure(options);
+    const result = runIndustryTemplateClosure(options);
     console.log(
-      `phase10 industry template closure ok: ${result.report.templateKey}, roles=${result.report.summary.roles}, menuSections=${result.report.summary.desktopMenuSections}, out=${result.outDir}`,
+      `industry template closure ok: ${result.report.templateKey}, roles=${result.report.summary.roles}, menuSections=${result.report.summary.desktopMenuSections}, out=${result.outDir}`,
     );
   } catch (error) {
-    console.error(`[phase10-industry-template-closure] ${error.message}`);
+    console.error(`[industry-template-closure] ${error.message}`);
     process.exit(1);
   }
 }

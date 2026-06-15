@@ -18,6 +18,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
   Select,
@@ -48,13 +49,17 @@ import {
 import {
   createContact,
   createCustomer,
+  createMaterial,
   createSupplier,
   listContactsByOwner,
   listCustomers,
+  listMaterials,
   listSuppliers,
   setCustomerActive,
+  setMaterialActive,
   setSupplierActive,
   updateCustomer,
+  updateMaterial,
   updateSupplier,
 } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
@@ -91,6 +96,8 @@ const PAGE_CONFIG = Object.freeze({
       contactDisable: 'contact.disable',
       contactPrimary: 'contact.set_primary',
     },
+    entityLabel: '主体',
+    formBoundary: '只维护交易主体资料，不在此写订单、库存或财务事实。',
     summary:
       '维护客户交易主体和联系人；订单、出货、库存和财务事实在对应业务模块处理。',
   },
@@ -111,15 +118,29 @@ const PAGE_CONFIG = Object.freeze({
       contactDisable: 'contact.disable',
       contactPrimary: 'contact.set_primary',
     },
+    entityLabel: '主体',
+    formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务事实。',
     summary:
       '维护供应商和加工厂交易主体；采购入库、质检、库存和财务事实在对应业务模块处理。',
   },
+  materials: {
+    title: '材料档案',
+    recordKey: 'materials',
+    list: listMaterials,
+    create: createMaterial,
+    update: updateMaterial,
+    setActive: setMaterialActive,
+    permissions: {
+      create: 'material.create',
+      update: 'material.update',
+      disable: 'material.disable',
+    },
+    entityLabel: '材料',
+    formBoundary: '只维护材料主数据，不在此写采购、库存、质检或 BOM 用量。',
+    summary:
+      '维护材料主数据；采购订单、库存余额、来料质检和 BOM 用量在对应业务模块处理。',
+  },
 })
-
-const ACTIVE_FILTER_OPTIONS = Object.freeze([
-  { label: '全部主体', value: 'all' },
-  { label: '仅看启用', value: 'active' },
-])
 
 const SUPPLIER_TYPE_OPTIONS = Object.freeze([
   { label: '原辅料供应商', value: 'material' },
@@ -246,13 +267,15 @@ function MasterDataFormFields({ type }) {
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="简称"
-        name="short_name"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
+      {type === 'materials' ? null : (
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="简称"
+          name="short_name"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+      )}
       {type === 'suppliers' ? (
         <Form.Item
           className="erp-business-action-form__field"
@@ -266,13 +289,47 @@ function MasterDataFormFields({ type }) {
           />
         </Form.Item>
       ) : null}
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="税号"
-        name="tax_no"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
+      {type === 'materials' ? (
+        <>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="分类"
+            name="category"
+          >
+            <Input allowClear autoComplete="off" />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="规格"
+            name="spec"
+          >
+            <Input allowClear autoComplete="off" />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="颜色"
+            name="color"
+          >
+            <Input allowClear autoComplete="off" />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="默认单位 ID"
+            name="default_unit_id"
+            rules={[{ required: true, message: '请填写默认单位 ID' }]}
+          >
+            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+        </>
+      ) : (
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="税号"
+          name="tax_no"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+      )}
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
@@ -369,6 +426,8 @@ export default function V1MasterDataPage({ type }) {
   const [recordForm] = Form.useForm()
   const [contactForm] = Form.useForm()
   const moduleKey = config.recordKey
+  const supportsContacts = Boolean(config.ownerType)
+  const entityLabel = config.entityLabel || '主体'
 
   const canCreate = hasActionPermission(adminProfile, config.permissions.create)
   const canUpdate = hasActionPermission(adminProfile, config.permissions.update)
@@ -383,7 +442,7 @@ export default function V1MasterDataPage({ type }) {
 
   const loadContacts = useCallback(
     async (record) => {
-      if (!record?.id) {
+      if (!supportsContacts || !record?.id) {
         setContacts([])
         return
       }
@@ -401,7 +460,7 @@ export default function V1MasterDataPage({ type }) {
         setContactLoading(false)
       }
     },
-    [config.ownerType]
+    [config.ownerType, supportsContacts]
   )
 
   const loadRecords = useCallback(async () => {
@@ -462,8 +521,11 @@ export default function V1MasterDataPage({ type }) {
   }
 
   const openCreateContact = () => {
+    if (!supportsContacts) {
+      return
+    }
     if (!selectedRecord?.id) {
-      message.warning('请先选择一个主体')
+      message.warning(`请先选择一个${entityLabel}`)
       return
     }
     contactForm.resetFields()
@@ -494,7 +556,7 @@ export default function V1MasterDataPage({ type }) {
   }
 
   const saveContact = async () => {
-    if (!selectedRecord?.id) return
+    if (!supportsContacts || !selectedRecord?.id) return
     const values = await contactForm.validateFields()
     setSaving(true)
     try {
@@ -571,14 +633,55 @@ export default function V1MasterDataPage({ type }) {
         width: 220,
         sorter: (a, b) => compareText(a?.name, b?.name),
       },
-      {
-        title: '简称',
-        exportTitle: '简称',
-        dataIndex: 'short_name',
-        width: 160,
-        sorter: (a, b) => compareText(a?.short_name, b?.short_name),
-        render: (value) => value || '-',
-      },
+      ...(type === 'materials'
+        ? []
+        : [
+            {
+              title: '简称',
+              exportTitle: '简称',
+              dataIndex: 'short_name',
+              width: 160,
+              sorter: (a, b) => compareText(a?.short_name, b?.short_name),
+              render: (value) => value || '-',
+            },
+          ]),
+      ...(type === 'materials'
+        ? [
+            {
+              title: '分类',
+              exportTitle: '分类',
+              dataIndex: 'category',
+              width: 140,
+              sorter: (a, b) => compareText(a?.category, b?.category),
+              render: (value) => value || '-',
+            },
+            {
+              title: '规格',
+              exportTitle: '规格',
+              dataIndex: 'spec',
+              width: 180,
+              sorter: (a, b) => compareText(a?.spec, b?.spec),
+              render: (value) => value || '-',
+            },
+            {
+              title: '颜色',
+              exportTitle: '颜色',
+              dataIndex: 'color',
+              width: 120,
+              sorter: (a, b) => compareText(a?.color, b?.color),
+              render: (value) => value || '-',
+            },
+            {
+              title: '默认单位 ID',
+              exportTitle: '默认单位 ID',
+              dataIndex: 'default_unit_id',
+              width: 130,
+              sorter: (a, b) =>
+                Number(a?.default_unit_id || 0) -
+                Number(b?.default_unit_id || 0),
+            },
+          ]
+        : []),
       ...(type === 'suppliers'
         ? [
             {
@@ -595,14 +698,18 @@ export default function V1MasterDataPage({ type }) {
             },
           ]
         : []),
-      {
-        title: '税号',
-        exportTitle: '税号',
-        dataIndex: 'tax_no',
-        width: 180,
-        sorter: (a, b) => compareText(a?.tax_no, b?.tax_no),
-        render: (value) => value || '-',
-      },
+      ...(type === 'materials'
+        ? []
+        : [
+            {
+              title: '税号',
+              exportTitle: '税号',
+              dataIndex: 'tax_no',
+              width: 180,
+              sorter: (a, b) => compareText(a?.tax_no, b?.tax_no),
+              render: (value) => value || '-',
+            },
+          ]),
       {
         title: '状态',
         exportTitle: '状态',
@@ -716,11 +823,11 @@ export default function V1MasterDataPage({ type }) {
     [records]
   )
   const selectedRecordDisplayText = useMemo(() => {
-    if (!selectedRecord) return '请先选择一个主体'
+    if (!selectedRecord) return `请先选择一个${entityLabel}`
     return `${selectedRecord.code || selectedRecord.id} / ${
-      selectedRecord.name || '未命名主体'
+      selectedRecord.name || `未命名${entityLabel}`
     }`
-  }, [selectedRecord])
+  }, [entityLabel, selectedRecord])
   const exportRecords = () => {
     downloadCSV({
       filename: `${type}-current-results.csv`,
@@ -736,10 +843,18 @@ export default function V1MasterDataPage({ type }) {
         title={config.title}
         description={config.summary}
         stats={[
-          { key: 'total', label: '总主体', value: total },
+          { key: 'total', label: `总${entityLabel}`, value: total },
           { key: 'current', label: '当前结果', value: records.length },
-          { key: 'active', label: '启用主体', value: activeRecordCount },
-          { key: 'selected', label: '已选主体', value: selectedRecord ? 1 : 0 },
+          {
+            key: 'active',
+            label: `启用${entityLabel}`,
+            value: activeRecordCount,
+          },
+          {
+            key: 'selected',
+            label: `已选${entityLabel}`,
+            value: selectedRecord ? 1 : 0,
+          },
         ]}
       />
 
@@ -748,14 +863,21 @@ export default function V1MasterDataPage({ type }) {
         filters={
           <>
             <SearchInput
-              placeholder="搜索编号、名称、简称"
+              placeholder={
+                type === 'materials'
+                  ? '搜索编号、名称、分类、规格、颜色'
+                  : '搜索编号、名称、简称'
+              }
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               onPressEnter={loadRecords}
             />
             <SelectFilter
               className="erp-business-filter-control--status"
-              options={ACTIVE_FILTER_OPTIONS}
+              options={[
+                { label: `全部${entityLabel}`, value: 'all' },
+                { label: `仅看启用${entityLabel}`, value: 'active' },
+              ]}
               value={activeOnly ? 'active' : 'all'}
               onChange={(nextValue) => setActiveOnly(nextValue === 'active')}
             />
@@ -800,7 +922,7 @@ export default function V1MasterDataPage({ type }) {
               icon={<PlusOutlined />}
               onClick={openCreateRecord}
             >
-              新建主体
+              新建{entityLabel}
             </ToolbarButton>
           ) : null
         }
@@ -835,7 +957,7 @@ export default function V1MasterDataPage({ type }) {
               disabled={!selectedRecord}
               onClick={() => openEditRecord(selectedRecord)}
             >
-              编辑主体
+              编辑{entityLabel}
             </Button>
           ) : null}
           {canDisable ? (
@@ -882,7 +1004,7 @@ export default function V1MasterDataPage({ type }) {
         dataSource={records}
         scroll={{ x: 1300 }}
         pagination={{ pageSize: 10, showSizeChanger: false }}
-        emptyDescription="暂无客户或供应商主体记录"
+        emptyDescription={`暂无${entityLabel}记录`}
         rowSelection={{
           selectedRowKeys: selectedRecord?.id ? [selectedRecord.id] : [],
           onSelect: (record, selected) => {
@@ -905,65 +1027,67 @@ export default function V1MasterDataPage({ type }) {
         })}
       />
 
-      <section
-        className={[
-          'erp-v1-master-data-contact-panel',
-          selectedRecord
-            ? 'erp-v1-master-data-contact-panel--active'
-            : 'erp-v1-master-data-contact-panel--empty',
-        ].join(' ')}
-        aria-label="联系人明细"
-      >
-        <div className="erp-v1-master-data-contact-panel__head">
-          <div className="erp-v1-master-data-contact-panel__title">
-            <span>联系人明细</span>
-            <strong>
-              {selectedRecord?.name || '先从上方选择一个客户或供应商'}
-            </strong>
-            <small>
-              联系人随主体维护，不作为独立业务对象，也不生成订单、出货、库存或财务事实。
-            </small>
+      {supportsContacts ? (
+        <section
+          className={[
+            'erp-v1-master-data-contact-panel',
+            selectedRecord
+              ? 'erp-v1-master-data-contact-panel--active'
+              : 'erp-v1-master-data-contact-panel--empty',
+          ].join(' ')}
+          aria-label="联系人明细"
+        >
+          <div className="erp-v1-master-data-contact-panel__head">
+            <div className="erp-v1-master-data-contact-panel__title">
+              <span>联系人明细</span>
+              <strong>
+                {selectedRecord?.name || '先从上方选择一个客户或供应商'}
+              </strong>
+              <small>
+                联系人随主体维护，不作为独立业务对象，也不生成订单、出货、库存或财务事实。
+              </small>
+            </div>
+            <div className="erp-v1-master-data-contact-panel__meta">
+              <span>
+                主体 <strong>{selectedRecord?.code || '未选择'}</strong>
+              </span>
+              <span>
+                联系人 <strong>{selectedRecord ? contacts.length : 0}</strong>
+              </span>
+            </div>
+            {canCreateContact ? (
+              <ToolbarButton
+                icon={<PlusOutlined />}
+                onClick={openCreateContact}
+                disabled={!selectedRecord}
+              >
+                新建联系人
+              </ToolbarButton>
+            ) : null}
           </div>
-          <div className="erp-v1-master-data-contact-panel__meta">
-            <span>
-              主体 <strong>{selectedRecord?.code || '未选择'}</strong>
-            </span>
-            <span>
-              联系人 <strong>{selectedRecord ? contacts.length : 0}</strong>
-            </span>
-          </div>
-          {canCreateContact ? (
-            <ToolbarButton
-              icon={<PlusOutlined />}
-              onClick={openCreateContact}
-              disabled={!selectedRecord}
-            >
-              新建联系人
-            </ToolbarButton>
-          ) : null}
-        </div>
-        {selectedRecord ? (
-          <Table
-            rowKey="id"
-            className="erp-v1-master-data-contact-panel__table"
-            loading={contactLoading}
-            columns={contactColumns}
-            dataSource={contacts}
-            scroll={{ x: 1080 }}
-            pagination={false}
-            locale={{
-              emptyText: <Empty description="当前主体暂无联系人" />,
-            }}
-          />
-        ) : (
-          <div className="erp-v1-master-data-contact-panel__empty">
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="从上方主体表选择一行后维护联系人"
+          {selectedRecord ? (
+            <Table
+              rowKey="id"
+              className="erp-v1-master-data-contact-panel__table"
+              loading={contactLoading}
+              columns={contactColumns}
+              dataSource={contacts}
+              scroll={{ x: 1080 }}
+              pagination={false}
+              locale={{
+                emptyText: <Empty description="当前主体暂无联系人" />,
+              }}
             />
-          </div>
-        )}
-      </section>
+          ) : (
+            <div className="erp-v1-master-data-contact-panel__empty">
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="从上方主体表选择一行后维护联系人"
+              />
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <CollaborationTaskPanel
         tasks={[]}
@@ -977,9 +1101,9 @@ export default function V1MasterDataPage({ type }) {
         title={
           <div className="erp-business-action-modal__title">
             <span>
-              {editingRecord?.id ? '编辑主体' : `新建${config.title}`}
+              {editingRecord?.id ? `编辑${entityLabel}` : `新建${config.title}`}
             </span>
-            <small>只维护交易主体资料，不在此写订单、库存或财务事实。</small>
+            <small>{config.formBoundary}</small>
           </div>
         }
         open={recordModalOpen}
@@ -1011,7 +1135,7 @@ export default function V1MasterDataPage({ type }) {
             </small>
           </div>
         }
-        open={contactModalOpen}
+        open={supportsContacts && contactModalOpen}
         onOk={saveContact}
         onCancel={() => setContactModalOpen(false)}
         maskClosable={false}
@@ -1141,7 +1265,7 @@ export default function V1MasterDataPage({ type }) {
       </Modal>
 
       <Drawer
-        title="主数据详情"
+        title={`${config.title}详情`}
         width={520}
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
@@ -1154,9 +1278,26 @@ export default function V1MasterDataPage({ type }) {
             <Descriptions.Item label="名称">
               {selectedRecord.name}
             </Descriptions.Item>
-            <Descriptions.Item label="简称">
-              {selectedRecord.short_name || '-'}
-            </Descriptions.Item>
+            {type === 'materials' ? (
+              <>
+                <Descriptions.Item label="分类">
+                  {selectedRecord.category || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="规格">
+                  {selectedRecord.spec || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="颜色">
+                  {selectedRecord.color || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="默认单位 ID">
+                  {selectedRecord.default_unit_id || '-'}
+                </Descriptions.Item>
+              </>
+            ) : (
+              <Descriptions.Item label="简称">
+                {selectedRecord.short_name || '-'}
+              </Descriptions.Item>
+            )}
             {type === 'suppliers' ? (
               <Descriptions.Item label="供应商类型">
                 {SUPPLIER_TYPE_LABELS[selectedRecord.supplier_type] ||
@@ -1164,9 +1305,11 @@ export default function V1MasterDataPage({ type }) {
                   '-'}
               </Descriptions.Item>
             ) : null}
-            <Descriptions.Item label="税号">
-              {selectedRecord.tax_no || '-'}
-            </Descriptions.Item>
+            {type === 'materials' ? null : (
+              <Descriptions.Item label="税号">
+                {selectedRecord.tax_no || '-'}
+              </Descriptions.Item>
+            )}
             <Descriptions.Item label="状态">
               {activeTag(selectedRecord.is_active)}
             </Descriptions.Item>

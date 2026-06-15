@@ -139,3 +139,73 @@
 - 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test -- masterDataOrderView` 均通过；该 test 命令实际跑完整前端单测 310 个用例。`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，覆盖供应商、客户、销售订单、产品档案、BOM、库存台账和应收管理业务页。
 - 下一步：销售订单行真正消除“产品引用 ID / 单位引用 ID”的用户可见输入，需要新增或接入产品档案和单位档案的选择 API，再让弹窗按产品选择自动带出产品编号、产品名称和默认单位；本轮没有在前端硬造假选项。
 - 阻塞/风险：本轮不改后端 Product / Unit API、Ent schema、migration、RBAC、WorkflowUsecase、Fact usecase、客户菜单配置、部署、提交或推送；`OperationalFactsPage` 是内部事实验证页，仍保留产品 / 单位 ID 输入，不按客户业务页口径隐藏。当前工作区仍有多处非本轮未提交改动，本轮未回退、未整理。
+
+## 2026-06-14 22:54 CST
+
+- 完成：在产品核心补齐 `材料档案` 主数据入口，新增 `/erp/master/materials` 菜单、路由、V1 页面配置、yoyoosun 与行业模板菜单配置；页面复用主数据维护体验，支持材料编号、名称、分类、规格、颜色、默认单位 ID 和启停状态。
+- 完成：后端补齐 `materials` 的 MasterData usecase、Ent repo、JSON-RPC API 和 RBAC 权限码 `material.read/create/update/disable`；默认单位校验复用现有 `units` 真源，不新增单位菜单、不写采购、库存、质检或 BOM 事实。
+- 完成：同步更新 `docs/current-source-of-truth.md`、`docs/product/capability-ledger.md` 和相关菜单 / API / 视图测试，明确材料档案只作为材料主数据，采购、库存、质检和 BOM 用量仍由对应领域 usecase 承载。
+- 验证：`go test ./...`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web style:l1`、`git diff --check` 均通过；前端单测 310 个用例通过，全量 L1 48 个场景通过。
+- 下一步：如果后续要让材料选择更易用，应先接入单位下拉或单位档案 V1 入口，再评审产品、仓库、BOM 的主数据页面吸收顺序；不要在采购、库存或 BOM 页面硬造材料快照。
+- 阻塞/风险：本轮不改 Ent schema / migration，因为 `materials` 和 `units` 真源表已存在；不实现采购订单、库存流水、质检单、BOM 用量、产品档案、单位档案或仓库档案页面；不提交、不推送。
+
+## 2026-06-14 23:05 CST
+
+- 完成：销售订单列表新增服务端日期区间筛选和排序参数，支持按 `订单日期 / 计划交付` 过滤，并按 `更新时间 / 订单日期 / 计划交付` 受控排序；JSON-RPC 参数解析会拒绝非法日期，后端 repo 用 Ent 字段白名单查询，不做前端本地假筛选。
+- 完成：销售订单筛选栏新增日期区间控件和排序控件；桌面筛选控件收窄到同一行，日期组内部保持不拆行，窄屏按整控件换行以避免横向溢出。
+- 验证：`go test ./internal/data`、`go test ./internal/data -run 'TestSalesOrderRepoOrderLifecycleAndList|TestJsonrpcData_SalesOrderListAcceptsDateAndSortFilters'`、`pnpm --dir web lint`、`pnpm --dir web css` 均通过。用本地 Chrome + mocked JSON-RPC 打开 `/erp/sales/project-orders/sales-orders`，验证 1440 桌面浅色 / 暗色四个筛选控件同一行、日期组 `nowrap`、无横向溢出；390 移动视口按整控件纵向排列且无横向溢出。
+- 下一步：后续采购、入库、质检、生产、出货和财务模块接入真实领域 API 后，可按各自真源日期字段复用同一筛选模式；主数据页默认不加日期筛选，创建 / 更新时间继续作为列排序或高级筛选候选。
+- 阻塞/风险：本轮不改主数据日期筛选、不改正式入口壳样例筛选、不改 schema / migration、WorkflowUsecase、Fact usecase、菜单或部署。`pnpm --dir web test` 仍受当前工作区既有 `devCustomerConfig` 菜单数量断言影响失败（期望 25、实际 26）；`pnpm --dir web style:l1` 仍受既有 `business-formal-module-shells-desktop` 找不到“主数据详情”影响失败，本轮已用目标页面浏览器盒模型回归补充验证。
+
+## 2026-06-14 23:06 CST
+
+- 完成：正式业务入口壳的“新建 / 编辑”弹窗不再所有模块共用同一组字段；新增 `getFormalShellFormFieldLabels`，按产品核心模块分别展示产品、BOM、采购、入库、质检、库存、委外、生产、出货和财务字段。
+- 完成：`FormalBusinessModulePage` 表单拆成通用壳层字段和“产品核心字段”两段；字段仍是只读占位，明确等待领域 API / usecase / RBAC 接入后才允许真实保存，不从前端本地伪造事实。
+- 完成：补齐浅色 / 暗色样式和回归断言；`businessModuleNavigation` 测试锁住 formal-shell 模块必须声明差异化核心字段，且 `材料档案` 作为正式 V1 页不再走壳层字段配置。
+- 验证：`pnpm --dir web exec eslint --ext .js --ext .jsx src/erp/config/businessModules.mjs src/erp/pages/FormalBusinessModulePage.jsx src/erp/utils/businessModuleNavigation.test.mjs scripts/styleL1.mjs`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_PORT=4174 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1`、`git diff --check` 均通过；前端单测 311 个用例通过，目标 L1 覆盖 BOM、库存和应收弹窗字段文本及库存双击编辑弹窗。
+- 下一步：后续要让采购、库存、质检、生产、出货和财务弹窗真正可保存，必须逐模块补领域 usecase、API、RBAC 和事实真源测试；不能把当前只读字段配置当成写入模型。
+- 阻塞/风险：本轮只修正式入口壳的弹窗字段展示和回归，不改 schema / migration、WorkflowUsecase、Fact usecase、真实保存 API、客户菜单、部署、提交或推送；当前工作区仍有多处非本轮未提交改动，本轮未回退、未整理。
+
+## 2026-06-14 23:09 CST
+
+- 完成：复验销售订单日期筛选和排序改动仍在，前端控件、后端 filter、JSON-RPC 参数、Ent repo 查询和目标测试用例均保留；日期筛选桌面不拆行，小屏按整控件换行。
+- 验证：`pnpm --dir web lint`、`pnpm --dir web css`、`git diff --check -- server/internal/biz/sales_order.go server/internal/data/sales_order_repo.go server/internal/data/jsonrpc_masterdata_order.go server/internal/data/jsonrpc_masterdata_order_test.go server/internal/data/sales_order_repo_test.go web/src/erp/pages/V1SalesOrdersPage.jsx web/src/erp/styles/app.css progress.md` 均通过。
+- 下一步：后续可在采购、入库、质检、生产、出货和财务模块接入真实领域 API 后，按各自真源日期字段复用该筛选模式；主数据页默认仍不加日期筛选。
+- 阻塞/风险：当前 `go test ./internal/data` 被未跟踪文件 `server/internal/data/jsonrpc_operational_fact_test.go` 的未使用 `context` import 挡住；该文件不属于本轮销售订单筛选改动，本轮未修改或回退。
+
+## 2026-06-14 23:22 CST
+
+- 完成：补齐 Product Core 的 `出货单` 正式入口，菜单归属 `出货管理`，路由为 `/erp/warehouse/shipments`；`出货放行`、`出库管理`、`出货单` 三个入口并存，不替换、不合并。前端新增 `ShipmentsPage`，复用现有 `operational_fact` JSON-RPC，支持出货单列表、详情、新建草稿、添加明细、确认出货和取消已出货冲正。
+- 完成：后端把 shipment JSON-RPC 权限从旧的销售订单 / 出库权限收口到 `shipment.read/create/ship/cancel`，RBAC 内置权限、角色菜单、客户菜单和行业模板同步补齐；确认出货仍由 `OperationalFactUsecase.ShipShipment` 写 `shipments / shipment_items` 与 `inventory_txns.OUT`，取消已出货走 `CancelShippedShipment` 写 `REVERSAL`，不新增 schema / migration / tenant_id。
+- 完成：同步更新 `README.md`、`server/README.md`、`docs/current-source-of-truth.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/capability-ledger.md`，明确 `shipping_released != shipped`，只有出货单 `SHIPPED` 才是真实 Shipment Fact；装箱、物流追踪、签收、退货、打印、自动应收 / 开票保留 P2。
+- 验证：`go test ./internal/biz -run 'TestBuiltinRoleWorkflowPermissionMatrix|TestAdminVisibleMenusUsesFormalV1Entries|TestAdminMenusOmitRetiredFrontendDocsAndQAPaths|TestNormalizeAdminMenuPermissionsRedirectsRetiredFrontendPaths|TestCoreValueIntegration|Test.*Shipment'`、`go test ./internal/data -run 'TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal|TestJsonrpcData_ShipmentAPIRequiresDedicatedShipmentPermissions|TestJsonrpcData_WorkflowUpdateTaskStatusTriggersShipmentReleaseBusinessState|TestJsonrpcData_WorkflowUpdateTaskStatusRejectsNonWarehouseShipmentRelease|TestJsonrpcData_WorkflowUpdateTaskStatusAllowsSuperAdminShipmentRelease'`、`go test ./internal/core/status -run Shipment` 均通过。
+- 验证：`pnpm --dir web test -- menuPermissions seedData devCustomerConfig businessModuleNavigation`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`pnpm --dir web style:l1`、`git diff --check` 均通过；前端单测 311 个用例通过，全量 L1 48 个场景通过。
+- 验证：in-app Browser 打开 `http://localhost:5176/erp/warehouse/shipments`，真实登录后确认 `出货管理` 下存在 `出货放行 / 出库管理 / 出货单` 三个入口；`出货放行` 页面文案仍是可发货 / 协同口径，`出库管理` 页面文案仍是库存出库口径，`出货单` 页面显示 Shipment Fact 边界说明和列表；浅色、暗色默认态均无横向溢出。
+- 下一步：P2 再评审装箱 / 发货明细、物流追踪、签收、退货、打印、自动应收 / 开票，以及出货单与销售订单、仓库批次选择器的更完整业务闭环。
+- 阻塞/风险：当前工作区仍有多处非本轮既有改动，本轮未回退、未整理、未提交；本轮不改 Ent schema / migration、不新增事实表、不在 WorkflowUsecase 写库存或出货事实、不把 workflow payload 当事实真源。
+
+## 2026-06-15 01:55 CST
+
+- 完成：在 `AGENTS.md` 的产品化与客户差异隔离约束中补充角色系统边界：plush-toy-erp 不是“每个角色一套独立系统”，而是同一套 Product Core 通过客户菜单配置、RBAC 权限码、岗位任务端入口和 Workflow 任务责任投影出不同角色工作界面。
+- 完成：明确菜单显隐和岗位入口只影响可见性与操作入口，不改变后端 usecase、schema、Workflow / Fact 边界或事实落账规则，避免后续误读为按角色分叉系统、SaaS tenant 或低代码流程系统。
+- 验证：`progress.md` 当前未达到归档阈值；本轮为文档规则小改，未运行前后端测试。
+- 下一步：如后续继续扩展客户配置或岗位任务端，应优先复用该规则，并回到 RBAC、Workflow / Fact 和客户配置正式文档核对。
+- 阻塞/风险：当前工作区已有大量非本轮改动，本轮只修改 `AGENTS.md` 和 `progress.md`，未回退、整理、提交或推送其他现场内容。
+
+## 2026-06-15 02:08 CST
+
+- 完成：在 `AGENTS.md` 的角色投影规则后补充权限码边界：权限码不是通用 UI 配置系统，而是表达业务能力访问、敏感动作执行和后端本次操作授权。
+- 完成：明确权限码可以辅助前端隐藏菜单、入口和业务动作按钮，但不应默认扩展为每个字段、普通按钮或文案一个权限码；字段显示、字段命名、客户叫法、菜单文案和低风险展示差异优先走客户配置、字段显示配置或页面配置。
+- 验证：`progress.md` 当前未达到归档阈值；本轮为文档规则小改，未运行前后端测试。
+- 下一步：后续新增权限码时，应优先服务真实业务动作、敏感数据、审批、冲正、出货、库存、财务和后端 usecase 校验，不把 RBAC 膨胀成低代码 UI 配置层。
+- 阻塞/风险：当前工作区已有大量非本轮改动，本轮只修改 `AGENTS.md` 和 `progress.md`，未回退、整理、提交或推送其他现场内容。
+
+## 2026-06-15 03:18 CST
+
+- 完成：把活跃 QA、配置、架构评审和产品化文档中的 Phase 7/8/9/10/11/12 执行口径收口为能力、测试和 evidence 口径；保留客户历史 evidence 文件名作为追溯记录，不再把阶段号作为当前实施目标。
+- 完成：重命名试用、岗位任务、行业模板、私有化客户包和业务事实评审相关脚本 / 文档入口；新增 `scripts/qa/phase-label-boundaries.mjs` 并接入 `fast/full/strict`，阻止 active config、QA 脚本、运行时代码和 architecture 文档继续出现新的阶段号主路径。
+- 完成：`scripts/seed-phase7-sim-masterdata.sh` 与 `server/cmd/seed-phase7-sim-masterdata` 收口为 `seed-trial-sim-masterdata`，模拟 key 改为 `SIM-YOYOOSUN-TRIAL`；SaaS docs-only 评审入口改为 `docs/product/saas-entry-review.md`。
+- 验证：`node --check scripts/qa/phase-label-boundaries.mjs scripts/qa/trial-simulated-data.mjs scripts/qa/mobile-workflow-simulated-closure.mjs scripts/qa/industry-template-closure.mjs scripts/qa/private-deployment-package-closure.mjs`、`node --test scripts/qa/trial-simulated-data.test.mjs scripts/qa/mobile-workflow-simulated-closure.test.mjs scripts/qa/industry-template-closure.test.mjs scripts/qa/private-deployment-package-closure.test.mjs`、`bash -n scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh scripts/seed-trial-sim-masterdata.sh`、`go test ./cmd/seed-trial-sim-masterdata ./cmd/seed-core-demo-data`、`node scripts/qa/phase-label-boundaries.mjs && node scripts/qa/industry-template-boundaries.mjs && node scripts/qa/private-deployment-boundaries.mjs` 均通过。
+- 验证：`node scripts/qa/industry-template-closure.mjs --out /tmp/plush-industry-template-closure` 与 `node scripts/qa/private-deployment-package-closure.mjs --out /tmp/plush-private-deployment-package-closure` 通过；`progress.md` 追加前未达到归档阈值。
+- 下一步：后续判断项目进展默认看 capability ledger、current-source-of-truth、代码、测试和目标环境 evidence；历史 phase 文件只作为追溯证据，不作为新任务拆分依据。
+- 阻塞/风险：本轮未重命名历史客户 evidence 文件，也未清理旧 Phase 2A/2B/2C/2D PostgreSQL 防呆脚本；当前工作区仍有大量非本轮既有改动，本轮未回退、整理、提交或推送。

@@ -94,7 +94,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/architecture/masterdata-order-source-document-review.md` | 主数据 / 源单据 / 事实边界评审 / MasterData / Source Document / Fact Review |
 | `docs/architecture/material-product-inventory-schema-review.md` | 材料、成品、BOM 与库存专表 Schema 评审 |
 | `docs/architecture/order-purchase-boundary-review.md` | 订单 / 采购边界评审 / Order / Purchase Boundary Review |
-| `docs/architecture/phase8-fact-expansion-review.md` | Phase 8 事实层扩展总评审 / Phase 8 Fact Expansion Review |
+| `docs/architecture/operational-fact-expansion-review.md` | 业务事实扩展总评审 / Operational Fact Expansion Review |
 | `docs/architecture/product-sku-bom-boundary-review.md` | 产品 / SKU / BOM 边界评审 / Product / SKU / BOM Boundary Review |
 | `docs/architecture/shipment-inventory-boundary-review.md` | 出货事实与库存边界评审 / Shipment / Inventory Boundary Review |
 | `docs/architecture/shipment-release-workflow-review.md` | 出货放行 Workflow Usecase 评审 / Shipment Release Workflow Usecase Review |
@@ -126,7 +126,7 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/product/migration-readiness-checklist.md` | 迁移准备检查清单 / Migration Readiness Checklist |
 | `docs/product/module-boundaries.md` | 模块边界 / Module Boundaries |
 | `docs/product/mobile-role-tasks-redesign.md` | 移动端岗位任务页改版 / Mobile Role Tasks Redesign |
-| `docs/product/phase12-saas-review.md` | Phase 12 SaaS 单独评审 / Phase 12 SaaS Review |
+| `docs/product/saas-entry-review.md` | SaaS 进入门禁评审 / SaaS Entry Review |
 | `docs/product/prototypes/README.md` | 产品原型资产 / Product Prototype Assets |
 | `docs/product/prototypes/admin-command-center-v1/README.md` | 后台工作台与看板原型 / Admin Command Center Prototype |
 | `docs/product/prototypes/action-modal-drawer-standard-v1/README.md` | 弹窗 / 抽屉动作标准样板 / Action Modal And Drawer Standard Prototype |
@@ -171,12 +171,12 @@ Notes / 备注: 本文只用于查找和人工审查当前仓库 Markdown 文档
 | `docs/customers/yoyoosun/import-source-inventory.md` | 永绅 yoyoosun 客户导入来源清单 / Yoyoosun Customer Import Source Inventory |
 | `docs/customers/yoyoosun/import-strategy.md` | 永绅 yoyoosun 客户导入策略 / Yoyoosun Customer Import Strategy |
 | `docs/customers/yoyoosun/import-unresolved-queue.md` | 永绅 yoyoosun 客户导入待确认队列 / Yoyoosun Customer Import Unresolved Queue |
-| `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md` | Phase 7 模拟数据试用验收记录 / Phase 7 Simulated Trial Acceptance |
-| `docs/customers/yoyoosun/phase8-target-release-acceptance.md` | Phase 8 目标环境发布与内部模拟验收 / Phase 8 Target Release And Internal Simulated Acceptance |
-| `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md` | Phase 8 目标环境发布证据 2026-06-08 / Phase 8 Target Release Evidence 2026-06-08 |
-| `docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md` | Phase 9 目标环境发布证据 2026-06-09 / Phase 9 Target Release Evidence 2026-06-09 |
-| `docs/customers/yoyoosun/phase10-target-release-evidence-2026-06-09.md` | Phase 10 目标环境发布证据 2026-06-09 / Phase 10 Target Release Evidence 2026-06-09 |
-| `docs/customers/yoyoosun/phase11-target-release-evidence-2026-06-09.md` | Phase 11 目标环境发布证据 2026-06-09 / Phase 11 Target Release Evidence 2026-06-09 |
+| `docs/customers/yoyoosun/phase7-simulated-trial-acceptance.md` | 试用模拟数据验收历史记录 / Simulated Trial Acceptance History |
+| `docs/customers/yoyoosun/phase8-target-release-acceptance.md` | 业务事实目标环境发布与内部模拟验收历史记录 / Operational Fact Target Release Acceptance History |
+| `docs/customers/yoyoosun/phase8-target-release-evidence-2026-06-08.md` | 业务事实目标环境发布证据 2026-06-08 / Operational Fact Target Release Evidence 2026-06-08 |
+| `docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md` | 岗位任务端目标环境发布证据 2026-06-09 / Mobile Workflow Target Release Evidence 2026-06-09 |
+| `docs/customers/yoyoosun/phase10-target-release-evidence-2026-06-09.md` | 行业模板目标环境发布证据 2026-06-09 / Industry Template Target Release Evidence 2026-06-09 |
+| `docs/customers/yoyoosun/phase11-target-release-evidence-2026-06-09.md` | 私有化客户包目标环境发布证据 2026-06-09 / Private Deployment Package Target Release Evidence 2026-06-09 |
 | `docs/customers/yoyoosun/question-backlog.md` | 问题待办 / Question Backlog |
 | `docs/customers/yoyoosun/real-dry-run-evidence.md` | 永绅 yoyoosun 真实 dry-run evidence / Yoyoosun Real Dry-run Evidence |
 | `docs/customers/yoyoosun/requirement-clues.md` | 需求线索 / Requirement Clues |

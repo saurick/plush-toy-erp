@@ -9,31 +9,31 @@
 | `scripts/bootstrap.sh`                                 | 安装依赖、启用 hooks、跑快速自检                                                                                  | 新机器 / 首次拉仓库                                        |
 | `scripts/project-scan.sh`                              | 扫描项目名、默认密钥、部署地址和页面文案残留                                                                      | 改名后 / 配置收口后                                        |
 | `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                     | 需要多角色登录 / 岗位任务端验收                            |
-| `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出 Phase 7 / 业务事实模拟可复用 ID                | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前 |
-| `scripts/seed-phase7-sim-masterdata.sh`                | 显式生成 Phase 7 模拟产品 / 单位主数据，供模拟销售订单行引用                                                      | Phase 7 试用环境演练前                                     |
+| `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出试用模拟 / 业务事实模拟可复用 ID                | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前 |
+| `scripts/seed-trial-sim-masterdata.sh`                | 显式生成试用模拟产品 / 单位主数据，供模拟销售订单行引用                                                          | 试用环境模拟演练前                                         |
 | `scripts/import/customerSourceExtract.mjs`             | 只读提取永绅 yoyoosun 原始 Excel，生成本地 source snapshot、空 existing preview、配置候选和报告                  | yoyoosun 原始文件整理成导入前 evidence                     |
 | `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence                              | yoyoosun 导入前 source freeze / 人工 review evidence       |
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
-| `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；Phase 7 不执行真实导入                                       | import tooling 自检 / 非 Phase 7 的单独数据治理评审        |
-| `scripts/qa/phase7-simulated-trial-data.mjs`           | Phase 7 模拟试用数据入口，只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据                             | Phase 7 试用环境演练                                       |
+| `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；当前没有可执行客户真实数据时不执行真实导入                  | import tooling 自检 / 单独数据治理评审                    |
+| `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据                                     | 试用环境演练                                               |
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟闭环入口，只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路                              | 业务事实内部模拟验收 / 目标环境事实回归                  |
-| `scripts/qa/phase9-simulated-mobile-closure.mjs`       | Phase 9 模拟岗位任务闭环入口，只创建和更新显式模拟 workflow 任务，覆盖审批 / 质检 / 入库 / 出货放行异常和现场留痕 | Phase 9 岗位任务端回归 / 目标环境移动任务闭环验收          |
-| `scripts/qa/industry-template-boundaries.mjs`          | Phase 10 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                      | Phase 10 行业模板调整后                                    |
-| `scripts/qa/phase10-industry-template-closure.mjs`      | Phase 10 行业模板模拟闭环入口，只读取候选配置并生成 evidence 报告                                                | Phase 10 行业模板回归 / 目标环境发布前                     |
-| `scripts/qa/private-deployment-boundaries.mjs`         | Phase 11 多客户私有化复制边界检查，确保客户包模板不变成 SaaS、tenant、代码分叉或真实导入入口                     | Phase 11 私有化客户包模板调整后                            |
-| `scripts/qa/phase11-private-deployment-closure.mjs`     | Phase 11 多客户私有化复制模拟闭环入口，只读取模板并生成 evidence 报告                                           | Phase 11 私有化客户包回归 / 目标环境发布前                 |
+| `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，只创建和更新显式模拟 workflow 任务，覆盖审批 / 质检 / 入库 / 出货放行异常和现场留痕         | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
+| `scripts/qa/industry-template-boundaries.mjs`          | 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                              | 行业模板调整后                                             |
+| `scripts/qa/industry-template-closure.mjs`      | 行业模板模拟闭环入口，只读取候选配置并生成 evidence 报告                                                        | 行业模板回归 / 目标环境发布前                              |
+| `scripts/qa/private-deployment-boundaries.mjs`         | 多客户私有化复制边界检查，确保客户包模板不变成 SaaS、tenant、代码分叉或真实导入入口                             | 私有化客户包模板调整后                                     |
+| `scripts/qa/private-deployment-package-closure.mjs`     | 多客户私有化复制模拟闭环入口，只读取模板并生成 evidence 报告                                                   | 私有化客户包回归 / 目标环境发布前                          |
 | `scripts/deploy/deployment-package-lint.mjs`           | 客户私有化部署资料包检查，确保 `deployments/yoyoosun` 必需文件齐全且不含真实 env、备份、raw files 或 secret       | 调整客户部署资料包后                                       |
 | `scripts/qa/core-boundary.test.mjs`                    | 自动扫描 `server/internal/core`，防止纯产品规则层 import `biz/data/service`、Ent、SQL、HTTP、配置或文件系统依赖 | 调整 `server/internal/core` 后                              |
 | `scripts/phase2b-pg.sh`                                | Phase 2B BOM + 批次库存本地 PostgreSQL migration / 集成测试防呆入口                                               | 验证 Phase 2B schema 和批次库存行为                        |
 | `scripts/phase2c-pg.sh`                                | Phase 2C 采购入库本地 PostgreSQL migration / 集成测试防呆入口                                                     | 验证采购入库 schema、IN 入库、REVERSAL 取消和批次追溯      |
 | `scripts/phase2d-pg.sh`                                | Phase 2D-A 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                   | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
-| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入和 Phase 7 模拟数据工具测试                                                             | 日常开发                                                   |
+| `scripts/qa/fast.sh`                                   | 高频快速检查，包含客户导入、模拟数据工具和阶段标签边界守卫                                                       | 日常开发                                                   |
 | `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界                                         | 生成试用 / 演示账号后                                      |
 | `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界                             | 调整客户配置草案后                                         |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入和 Phase 7 模拟数据工具测试                                                                 | 提交前 / 推送前                                            |
-| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入和 Phase 7 模拟数据工具测试                                                                 | 发版前                                                     |
+| `scripts/qa/full.sh`                                   | 全量检查，包含客户导入、模拟数据工具和阶段标签边界守卫                                                           | 提交前 / 推送前                                            |
+| `scripts/qa/strict.sh`                                 | 严格检查，包含客户导入、模拟数据工具和阶段标签边界守卫                                                           | 发版前                                                     |
 | `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
 | `scripts/qa/error-code-sync.sh`                        | 校验前后端错误码同步                                                                                              | 改错误码后                                                 |
 | `scripts/qa/error-codes.sh`                            | 阻止业务代码裸写已注册错误码                                                                                      | 改接口 / 鉴权 / 前端错误处理后                             |
@@ -170,7 +170,7 @@ node scripts/import/customerImportExecute.mjs \
 
 该命令会生成 `import-execution-report.json` 和 `import-execution-report.md`，并校验 approval、backup evidence、unresolved block、forbidden auto-import 和 supported target。没有 `--execute` 时不会连接数据库或后端。
 
-当前 Phase 7 没有可执行客户真实数据，不使用该 loader 执行真实导入。即使未来另开数据治理评审，真实写入也只能显式开启，并且只走 JSON-RPC V1 API，不直接写表、不写 `business_records`、不生成 schema / migration，也不创建出货、库存或财务事实：
+当前 yoyoosun 没有可执行客户真实数据，不使用该 loader 执行真实导入。即使未来另开数据治理评审，真实写入也只能显式开启，并且只走 JSON-RPC V1 API，不直接写表、不写 `business_records`、不生成 schema / migration，也不创建出货、库存或财务事实：
 
 ```bash
 CUSTOMER_IMPORT_CONFIRM=EXECUTE_YOYOOSUN_IMPORT \
@@ -185,43 +185,43 @@ CUSTOMER_IMPORT_ADMIN_PASSWORD='replace-with-password' \
     --execute
 ```
 
-执行前必须已有客户确认、数据库备份、rollback / forward-fix 方案和目标环境信息；不要把 fixture approval 当真实客户批准。Phase 7 不满足这些条件，不能执行该真实写入命令。
+执行前必须已有客户确认、数据库备份、rollback / forward-fix 方案和目标环境信息；不要把 fixture approval 当真实客户批准。当前 yoyoosun 不满足这些条件，不能执行该真实写入命令。
 
-Phase 7 只允许模拟数据试用。先生成报告，确认模拟数据边界：
+试用数据入口只允许模拟数据试用。先生成报告，确认模拟数据边界：
 
 ```bash
-node scripts/qa/phase7-simulated-trial-data.mjs \
-  --out output/customers/yoyoosun/phase7-simulated-trial
+node scripts/qa/trial-simulated-data.mjs \
+  --out output/customers/yoyoosun/trial-simulated-data
 ```
 
 若要把模拟数据写入本地或目标试用环境，只能显式 `--apply`，并提供已有活跃产品和单位 ID。该脚本会先按稳定模拟编号查找已有记录，缺失才通过 V1 JSON-RPC 创建；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不创建出货、库存或财务事实：
 
-如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `phase7_args` 和 `operational_fact_args` 可直接传给后续模拟脚本：
+如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `trial_sim_args` 和 `operational_fact_args` 可直接传给后续模拟脚本：
 
 ```bash
 bash scripts/seed-core-demo-data.sh
 ```
 
-如果只需要旧 Phase 7 最小产品 / 单位前置数据，也可继续使用 Phase 7 专用 seed。该 seed 只写 `units` 和 `products` 两个 MasterData 表，编码固定带 `SIM-YOYOOSUN-PHASE7` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实：
+如果只需要最小产品 / 单位前置数据，也可使用试用模拟 seed。该 seed 只写 `units` 和 `products` 两个 MasterData 表，编码固定带 `SIM-YOYOOSUN-TRIAL` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实：
 
 ```bash
-bash scripts/seed-phase7-sim-masterdata.sh
+bash scripts/seed-trial-sim-masterdata.sh
 ```
 
 输出中的 `unit_id` 和 `product_id` 可传给后续模拟数据脚本。
 
 ```bash
-PHASE7_SIM_CONFIRM=APPLY_SIMULATED_PHASE7_DATA \
-PHASE7_SIM_PASSWORD='replace-with-demo-password' \
-  node scripts/qa/phase7-simulated-trial-data.mjs \
+TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA \
+TRIAL_SIM_PASSWORD='replace-with-demo-password' \
+  node scripts/qa/trial-simulated-data.mjs \
     --apply \
     --backend-url http://127.0.0.1:8300 \
     --product-id 1 \
     --unit-id 1 \
-    --out output/customers/yoyoosun/phase7-simulated-trial
+    --out output/customers/yoyoosun/trial-simulated-data
 ```
 
-默认岗位账号模式会用 `demo_sales` 写客户、联系人和销售订单，用 `demo_purchase` 写供应商和供应商联系人。若目标环境提供了具备全部 V1 权限的账号，也可以改用 `PHASE7_SIM_ADMIN_TOKEN` 或 `PHASE7_SIM_ADMIN_USERNAME` / `PHASE7_SIM_ADMIN_PASSWORD`。
+默认岗位账号模式会用 `demo_sales` 写客户、联系人和销售订单，用 `demo_purchase` 写供应商和供应商联系人。若目标环境提供了具备全部 V1 权限的账号，也可以改用 `TRIAL_SIM_ADMIN_TOKEN` 或 `TRIAL_SIM_ADMIN_USERNAME` / `TRIAL_SIM_ADMIN_PASSWORD`。
 
 业务事实模拟脚本只允许模拟事实闭环验收，不执行真实客户数据导入。先生成报告，确认模拟范围：
 
@@ -248,26 +248,26 @@ OPERATIONAL_FACT_SIM_PASSWORD='replace-with-demo-password' \
     --out output/customers/yoyoosun/operational-fact-simulated-closure-target
 ```
 
-Phase 9 只允许模拟岗位任务闭环验收，不执行真实客户数据导入，也不写生产、出货、库存、预留或财务事实。先生成报告，确认模拟范围：
+岗位任务闭环只允许模拟验收，不执行真实客户数据导入，也不写生产、出货、库存、预留或财务事实。先生成报告，确认模拟范围：
 
 ```bash
-node scripts/qa/phase9-simulated-mobile-closure.mjs \
-  --out output/customers/yoyoosun/phase9-simulated-mobile-closure
+node scripts/qa/mobile-workflow-simulated-closure.mjs \
+  --out output/customers/yoyoosun/mobile-workflow-simulated-closure
 ```
 
-若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-PHASE9` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality` 和 `demo_warehouse` 分别处理老板审批、成品抽检、仓库入库确认、出货放行异常上报和现场留痕 evidence；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
+若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality` 和 `demo_warehouse` 分别处理老板审批、成品抽检、仓库入库确认、出货放行异常上报和现场留痕 evidence；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
 
 ```bash
-PHASE9_SIM_CONFIRM=APPLY_SIMULATED_PHASE9_MOBILE_TASKS \
-PHASE9_SIM_PASSWORD='replace-with-demo-password' \
-  node scripts/qa/phase9-simulated-mobile-closure.mjs \
+MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS \
+MOBILE_WORKFLOW_SIM_PASSWORD='replace-with-demo-password' \
+  node scripts/qa/mobile-workflow-simulated-closure.mjs \
     --apply \
     --backend-url http://127.0.0.1:8300 \
     --run-id target-yyyymmdd-mobile \
-    --out output/customers/yoyoosun/phase9-simulated-mobile-closure-target
+    --out output/customers/yoyoosun/mobile-workflow-simulated-closure-target
 ```
 
-Phase 10 只允许行业模板候选模拟闭环验收，不执行真实客户数据导入，不写业务表，不把单客户样本直接升成行业默认。先运行边界守卫：
+行业模板候选只允许模拟闭环验收，不执行真实客户数据导入，不写业务表，不把单客户样本直接升成行业默认。先运行边界守卫：
 
 ```bash
 node scripts/qa/industry-template-boundaries.mjs
@@ -276,11 +276,11 @@ node scripts/qa/industry-template-boundaries.mjs
 再生成本地 evidence 报告：
 
 ```bash
-node scripts/qa/phase10-industry-template-closure.mjs \
-  --out output/customers/yoyoosun/phase10-industry-template-closure
+node scripts/qa/industry-template-closure.mjs \
+  --out output/customers/yoyoosun/industry-template-closure
 ```
 
-Phase 11 只允许多客户私有化复制包模拟闭环验收，不创建真实客户目录，不执行真实客户数据导入，不复制核心 schema / migration / usecase / RBAC，也不在目标服务器构建。先运行边界守卫：
+多客户私有化复制包只允许模拟闭环验收，不创建真实客户目录，不执行真实客户数据导入，不复制核心 schema / migration / usecase / RBAC，也不在目标服务器构建。先运行边界守卫：
 
 ```bash
 node scripts/qa/private-deployment-boundaries.mjs
@@ -296,11 +296,11 @@ node --test scripts/deploy/deployment-package-lint.test.mjs
 再生成本地 evidence 报告：
 
 ```bash
-node scripts/qa/phase11-private-deployment-closure.mjs \
-  --out output/customers/yoyoosun/phase11-private-deployment-closure
+node scripts/qa/private-deployment-package-closure.mjs \
+  --out output/customers/yoyoosun/private-deployment-package-closure
 ```
 
-`SIM-PRIVATE-PHASE11` 只是模拟 customer key，不得创建为正式 `docs/customers/`、`config/customers/` 或 `deployments/` 目录。真实新增客户前必须先确认稳定 customer key、客户资料入仓边界、导入 dry-run / unresolved queue、部署地址、备份恢复和验收清单。
+`SIM-PRIVATE-DEPLOYMENT` 只是模拟 customer key，不得创建为正式 `docs/customers/`、`config/customers/` 或 `deployments/` 目录。真实新增客户前必须先确认稳定 customer key、客户资料入仓边界、导入 dry-run / unresolved queue、部署地址、备份恢复和验收清单。
 
 ### 1. 初始化环境
 

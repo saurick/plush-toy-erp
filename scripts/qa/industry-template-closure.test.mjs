@@ -3,11 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { runPhase10IndustryTemplateClosure } from "./phase10-industry-template-closure.mjs";
+import { runIndustryTemplateClosure } from "./industry-template-closure.mjs";
 
-test("phase10 industry template closure writes dry-run-only evidence", () => {
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), "phase10-template-"));
-  const result = runPhase10IndustryTemplateClosure({ out });
+test("industry-template industry template closure writes dry-run-only evidence", () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "industry-template-template-"));
+  const result = runIndustryTemplateClosure({ out });
 
   assert.equal(result.report.templateKey, "plush");
   assert.equal(result.report.runtimeEnabled, false);

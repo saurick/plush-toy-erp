@@ -101,9 +101,9 @@ flowchart LR
 | Delivery / Import | dry-run evidence、freeze、manual review、真实导入批准、回滚 | dry-run / freeze 不等于 real import approval |
 | Customer Config | 客户配置包、菜单开关、字段显示、编号规则、初始化模板 | 不把单客户资料直接提升为 Product Core |
 
-当前 yoyoosun Phase 7 只有模拟数据试用目标：不拆 A/B/C/D 或任何字母子阶段，不执行真实客户数据导入。Phase 7 必须一次性用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据完成试用环境、账号、RBAC、菜单、V1 页面、岗位任务端和培训验收；真实导入不作为当前阶段目标、后续半阶段或完成条件。
+当前 yoyoosun 只有模拟数据试用目标：不拆 A/B/C/D 或任何字母子阶段，不执行真实客户数据导入。试用模拟必须一次性用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据完成试用环境、账号、RBAC、菜单、V1 页面、岗位任务端和培训验收；真实导入不作为隐藏目标、后续半阶段或完成条件。
 
-Phase 8 已按“不拆任何字母子阶段”的口径完成本地统一实现闭环。`docs/architecture/phase8-fact-expansion-review.md` 已一次性覆盖生产事实、委外事实、出货事实、库存预留和财务事实五条事实链；当前代码已落 schema / migration、repo / usecase、API / RBAC、最小 UI 和测试。后续继续扩展打印、报表、核销、客户配置、目标环境发布或客户验收时，仍必须按具体实现闭环控制允许路径、禁止路径和验收命令。
+业务事实扩展已完成本地统一实现闭环。`docs/architecture/operational-fact-expansion-review.md` 已一次性覆盖生产事实、委外事实、出货事实、库存预留和财务事实五条事实链；当前代码已落 schema / migration、repo / usecase、API / RBAC、最小 UI 和测试。后续继续扩展打印、报表、核销、客户配置、目标环境发布或客户验收时，仍必须按具体实现闭环控制允许路径、禁止路径和验收命令。
 
 ## 4. 进入下一阶段的门禁 / Stage Gates
 
@@ -157,7 +157,7 @@ dry-run 或 freeze evidence 进入真实导入前，必须确认：
 - `canExecuteRealImport=false` 或等价保护没有被绕过。
 - real import loader、DB 写入、回滚、审计和验收属于单独评审和单独实现任务。
 
-当前 yoyoosun 不进入真实导入门禁：没有可执行客户真实数据时，只能按模拟数据试用演练完成 Phase 7。不得为了“补齐 Phase 7”绕过 `canExecuteRealImport=false`、执行 import loader 写库、把模拟数据当真实客户数据，或把真实导入拆成 Phase 7 的字母子阶段。
+当前 yoyoosun 不进入真实导入门禁：没有可执行客户真实数据时，只能按模拟数据试用演练完成验收。不得为了“补齐阶段”绕过 `canExecuteRealImport=false`、执行 import loader 写库、把模拟数据当真实客户数据，或把真实导入拆成隐藏子阶段。
 
 ## 5. 明确禁止项 / Prohibitions
 
@@ -166,9 +166,9 @@ dry-run 或 freeze evidence 进入真实导入前，必须确认：
 - 不把 `shipping_released` 当成 `shipped`，也不把 workflow task `done` 当成 fact posted。
 - 不把菜单隐藏、前端路由隐藏或按钮不可见当成 RBAC。
 - 不从 dry-run / freeze evidence 直接执行真实导入。
-- 不把 Phase 7 拆成 A/B/C/D 等字母子阶段；当前 yoyoosun Phase 7 不执行真实客户数据导入，只能用模拟数据一次性完成试用环境演练和验收。
-- 不把 Phase 8 本地实现写成目标客户环境已 migration / 已上线 / 已完成客户交付。
-- 不为某个 Phase 交付而重复设计已存在的事实真源、权限真源或客户配置边界。
+- 不把试用模拟拆成 A/B/C/D 等字母子阶段；当前 yoyoosun 不执行真实客户数据导入，只能用模拟数据一次性完成试用环境演练和验收。
+- 不把业务事实本地实现写成目标客户环境已 migration / 已上线 / 已完成客户交付。
+- 不为某个阶段交付而重复设计已存在的事实真源、权限真源或客户配置边界；后续默认看能力、测试、evidence 和真源边界。
 - 不把 docs-only 评审、roadmap、产品台账或聊天结论当成 runtime 实现证据。
 
 ## 6. 实施任务拆分规则 / Implementation Task Split Rules

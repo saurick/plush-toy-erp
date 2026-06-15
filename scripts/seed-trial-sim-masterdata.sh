@@ -5,5 +5,5 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 (
   cd "$ROOT_DIR/server"
-  go run ./cmd/seed-phase7-sim-masterdata "$@"
+  go run ./cmd/seed-trial-sim-masterdata "$@"
 )

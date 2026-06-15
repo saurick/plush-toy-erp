@@ -7268,6 +7268,14 @@
   grid-column: 1 / -1;
 }
 
+.erp-business-action-form__section-title {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: #5d6a7a;
+  font-size: 13px;
+  font-weight: 750;
+}
+
 .erp-business-action-form .ant-form-item-label {
   padding-bottom: 7px;
 }
@@ -8045,27 +8053,38 @@
 }
 
 .erp-business-filter-control--sort.ant-select {
-  flex: 0 0 136px;
-  min-width: 136px;
+  flex: 0 0 160px;
+  min-width: 160px;
 }
 
 @media screen and (min-width: 769px) {
   .erp-business-operation-panel__filters
     > .erp-business-filter-control--search.ant-input-affix-wrapper {
-    flex: 0 1 340px;
-    max-width: 420px;
+    flex: 0 1 260px;
+    max-width: 300px;
   }
 
   .erp-business-operation-panel__filters
     > .erp-business-filter-control--compact-select.ant-select {
-    flex: 0 0 180px;
-    width: 180px;
+    flex: 0 0 150px;
+    width: 150px;
     max-width: 220px;
   }
 
   .erp-business-operation-panel__filters
     > .erp-business-filter-control--status.ant-select {
-    flex-basis: 180px;
+    flex-basis: 150px;
+  }
+
+  .erp-business-operation-panel__filters
+    > .erp-business-filter-control--sort.ant-select {
+    flex-basis: 160px;
+    width: 160px;
+  }
+
+  .erp-business-operation-panel__filters > .erp-business-date-range-filter {
+    flex: 0 0 420px;
+    max-width: 420px;
   }
 }
 
@@ -8182,6 +8201,7 @@
   min-width: 420px;
   max-width: 540px;
   align-items: stretch;
+  white-space: nowrap;
   overflow: visible;
   border: 1px solid var(--erp-business-control-border);
   background: #fff;
@@ -9410,6 +9430,10 @@
   }
 
   .erp-business-action-form__field--full.ant-form-item {
+    grid-column: auto;
+  }
+
+  .erp-business-action-form__section-title {
     grid-column: auto;
   }
 
@@ -10692,6 +10716,10 @@
 
 [data-erp-theme='dark'] .erp-business-action-form .ant-form-item-label > label {
   color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-business-action-form__section-title {
+  color: var(--erp-text-muted);
 }
 
 [data-erp-theme='dark']

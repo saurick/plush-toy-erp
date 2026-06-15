@@ -68,6 +68,31 @@ export async function setSupplierActive(params = {}) {
   return dataOf(result)?.supplier || null
 }
 
+export async function listMaterials(params = {}) {
+  const result = await masterDataRpc.call('list_materials', params)
+  return dataOf(result)
+}
+
+export async function createMaterial(params = {}) {
+  const result = await masterDataRpc.call('create_material', params)
+  return dataOf(result)?.material || null
+}
+
+export async function updateMaterial(params = {}) {
+  const result = await masterDataRpc.call('update_material', params)
+  return dataOf(result)?.material || null
+}
+
+export async function getMaterial(params = {}) {
+  const result = await masterDataRpc.call('get_material', params)
+  return dataOf(result)?.material || null
+}
+
+export async function setMaterialActive(params = {}) {
+  const result = await masterDataRpc.call('set_material_active', params)
+  return dataOf(result)?.material || null
+}
+
 export async function listContactsByOwner(params = {}) {
   const result = await masterDataRpc.call('list_contacts_by_owner', params)
   return dataOf(result)

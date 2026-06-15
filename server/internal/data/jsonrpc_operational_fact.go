@@ -95,13 +95,13 @@ func (d *JsonrpcData) handleOperationalFact(
 		return id, okData(map[string]any{"outsourcing_facts": outsourcingFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
 
 	case "create_shipment", "createShipment":
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseOutboundConfirm); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.CreateShipmentDraft(ctx, shipmentCreateFromParams(pm))
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "add_shipment_item", "addShipmentItem":
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseOutboundConfirm); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
 		}
 		in, ok := shipmentItemCreateFromParams(pm)
@@ -111,19 +111,19 @@ func (d *JsonrpcData) handleOperationalFact(
 		item, err := d.operationalFactUC.AddShipmentItem(ctx, in)
 		return id, operationalFactShipmentItemResult(ctx, d, item, err), nil
 	case "ship_shipment", "shipShipment":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundConfirm); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentShip); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.ShipShipment(ctx, getInt(pm, "id", 0))
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "cancel_shipment", "cancelShipment":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundConfirm); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCancel); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.CancelShippedShipment(ctx, getInt(pm, "id", 0))
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "list_shipments", "listShipments":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseOutboundRead); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {
 			return id, res, nil
 		}
 		items, total, err := d.operationalFactUC.ListShipments(ctx, operationalFactFilterFromParams(pm))

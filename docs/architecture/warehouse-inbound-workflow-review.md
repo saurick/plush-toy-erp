@@ -28,7 +28,7 @@
 | `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx` | 仓库岗位任务端采购 `warehouse_inbound done / blocked / rejected` 后只调用 `update_task_status` 并刷新任务列表，不再本地 upsert `inbound_done/blocked`，也不再创建采购应付登记任务。 | 当前前端没有写库存；应付登记后续必须按 payable usecase 单独评审。 |
 | `web/src/erp/utils/purchaseInboundFlow.mjs` | `warehouse_inbound` 任务 payload 只带 `material_name/product_name/quantity/unit` 等展示快照，不带结构化 `material_id/product_id/unit_id/warehouse_id/lot_id/source_line_id`。 | 这些字段不足以可靠写库存事实表。 |
 | `server/internal/data/model/schema/inventory_txn.go` | 已有 `subject_type/subject_id/warehouse_id/lot_id/txn_type/direction/quantity/unit_id/source_type/source_id/source_line_id/idempotency_key/reversal_of_txn_id`。 | schema 能承接最小库存事实，但 workflow 入库任务还没有稳定来源映射。 |
-| `server/internal/data/model/schema/inventory_balance.go` | 余额按 `subject_type + subject_id + warehouse_id + unit_id + nullable lot_id` 聚合，Phase 2B 已用 partial unique index 区分批次 / 非批次余额。 | 余额维度足够表达批次或非批次入库，但需要明确仓库、单位和批次来源。 |
+| `server/internal/data/model/schema/inventory_balance.go` | 余额按 `subject_type + subject_id + warehouse_id + unit_id + nullable lot_id` 聚合，BOM 与批次库存底座 已用 partial unique index 区分批次 / 非批次余额。 | 余额维度足够表达批次或非批次入库，但需要明确仓库、单位和批次来源。 |
 | `server/internal/data/model/schema/inventory_lot.go` | 批次按 `subject_type + subject_id + lot_no` 唯一，不做物理删除。 | 如果真实入库要落批次，必须先确定批号来源和缺批号策略。 |
 
 ## 3. `done` 边界
@@ -86,16 +86,16 @@
 | 单位来源 | payload 只有 `unit` 文本；库存写入需要结构化 `unit_id` 和单位精度。 |
 | 仓库 / 库位来源 | 现有库存 schema 有 `warehouse_id`，没有 `warehouse_locations`；任务 payload 未提供稳定 `warehouse_id`。 |
 | 物料 / 成品来源 | 库存写入需要 `subject_type + subject_id`，当前任务只有 `material_name/product_name` 快照文本。 |
-| 批次来源 | Phase 2B 有 `inventory_lots`，但入库任务未定义 `lot_id/lot_no/batch_no` 来源、缺批号策略和质量状态映射。 |
+| 批次来源 | BOM 与批次库存底座 有 `inventory_lots`，但入库任务未定义 `lot_id/lot_no/batch_no` 来源、缺批号策略和质量状态映射。 |
 | 来源行粒度 | `inventory_txns` 需要 `source_type + source_id + source_line_id` 或稳定幂等键；当前任务只有表头 `source_id`。 |
 | 重复 done | 库存写入必须通过 `idempotency_key` 防重复；workflow 当前应用层幂等只覆盖派生任务，不覆盖库存事实。 |
 | 取消 / 冲正 | 已入库后撤回不能改历史流水，必须定义 `REVERSAL` 触发条件、权限和原流水定位。 |
-| 负库存 | Phase 2A 默认禁止负库存；是否允许仓库级负库存仍未形成业务配置。 |
+| 负库存 | 库存事实底座 默认禁止负库存；是否允许仓库级负库存仍未形成业务配置。 |
 | decimal 精度 | schema 使用 decimal/numeric，但入库来源还未定义按单位精度 rounding / scale。 |
 | 并发余额 | `InventoryUsecase` 已有同事务流水 + 原子余额更新能力，但 workflow transaction 与 inventory transaction 还没有统一事务边界。 |
 | DB 幂等 / 锁 | 库存已有 `idempotency_key` unique；workflow 派生任务仍是应用层查询后创建。若把库存接进 workflow，需要明确 DB unique constraint、advisory lock 或统一事务策略。 |
 
-Phase 2A / 2B 的库存 schema 已经能表达最小库存事实，但还不能单靠 `warehouse_inbound` 任务直接推导真实入库。缺的是业务来源映射、入库确认行、幂等键生成、冲正策略和 workflow 与 inventory 的事务边界，不是再补一个简单写表分支。
+库存事实底座 / 2B 的库存 schema 已经能表达最小库存事实，但还不能单靠 `warehouse_inbound` 任务直接推导真实入库。缺的是业务来源映射、入库确认行、幂等键生成、冲正策略和 workflow 与 inventory 的事务边界，不是再补一个简单写表分支。
 
 ## 6. 三个方案对比
 

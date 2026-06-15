@@ -78,7 +78,7 @@ func main() {
 		result.PrimaryProductID,
 		result.PrimaryWarehouseID,
 	)
-	fmt.Printf("phase7_args=--product-id %d --unit-id %d\n", result.PrimaryProductID, result.PrimaryUnitID)
+	fmt.Printf("trial_sim_args=--product-id %d --unit-id %d\n", result.PrimaryProductID, result.PrimaryUnitID)
 	fmt.Printf("operational_fact_args=--product-id %d --unit-id %d --warehouse-id %d\n",
 		result.PrimaryProductID,
 		result.PrimaryUnitID,

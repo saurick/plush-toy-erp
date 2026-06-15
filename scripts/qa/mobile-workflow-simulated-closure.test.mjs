@@ -6,18 +6,18 @@ import {
   buildTimestampRunId,
   parseCliArgs,
   sanitizeRunId,
-} from "./phase9-simulated-mobile-closure.mjs";
+} from "./mobile-workflow-simulated-closure.mjs";
 
-test("phase9 simulated mobile closure plan stays simulated and workflow-only", () => {
+test("mobile workflow simulated mobile closure plan stays simulated and workflow-only", () => {
   const options = parseCliArgs(["--run-id", "demo run"]);
   const plan = buildPlan(options);
 
-  assert.equal(plan.phase, "Phase 9");
+  assert.equal(plan.scenario, "mobile-workflow-simulated-closure");
   assert.equal(plan.simulatedOnly, true);
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.factPosting, false);
-  assert.equal(plan.customerAcceptanceRequiredForPhaseClosure, false);
-  assert.match(plan.tasks.approval.task_code, /^SIM-YOYOOSUN-PHASE9-/u);
+  assert.equal(plan.customerAcceptanceRequiredForClosure, false);
+  assert.match(plan.tasks.approval.task_code, /^SIM-YOYOOSUN-MOBILE-WORKFLOW-/u);
   assert.equal(plan.tasks.approval.task_group, "order_approval");
   assert.equal(plan.tasks.quality.task_group, "finished_goods_qc");
   assert.equal(plan.tasks.warehouseInbound.task_group, "warehouse_inbound");
@@ -28,16 +28,16 @@ test("phase9 simulated mobile closure plan stays simulated and workflow-only", (
   );
 });
 
-test("phase9 simulated mobile closure refuses real import flags", () => {
+test("mobile workflow simulated mobile closure refuses real import flags", () => {
   assert.throws(() => parseCliArgs(["--real-import"]), /refuses real import/u);
 });
 
-test("phase9 simulated mobile closure action payload records evidence and exception", () => {
+test("mobile workflow simulated mobile closure action payload records evidence and exception", () => {
   const plan = buildPlan(parseCliArgs(["--run-id", "mobile evidence"]));
 
   assert.deepEqual(
     plan.actions.qualityDone.payload.mobile_action_evidence_refs,
-    ["SIM-YOYOOSUN-PHASE9-MOBILE-EVIDENCE-PHOTO-QC"],
+    ["SIM-YOYOOSUN-MOBILE-WORKFLOW-MOBILE-EVIDENCE-PHOTO-QC"],
   );
   assert.equal(
     plan.actions.shipmentReleaseBlocked.payload.mobile_exception_report
@@ -50,7 +50,7 @@ test("phase9 simulated mobile closure action payload records evidence and except
   );
 });
 
-test("phase9 simulated mobile closure normalizes run ids", () => {
+test("mobile workflow simulated mobile closure normalizes run ids", () => {
   assert.equal(sanitizeRunId("  a/b c  "), "A-B-C");
   assert.equal(
     buildTimestampRunId(new Date("2026-06-09T12:34:56.789Z")),

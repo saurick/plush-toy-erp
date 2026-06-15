@@ -12,17 +12,18 @@ print_help() {
 检查内容:
   error-code-sync: 前端生成错误码同步检查
   error-codes: 统一错误码魔法数字检查
+  phase-label-boundaries: 活跃实现路径禁止使用编号 Phase 标签
   core-boundary: server/internal/core 纯领域规则边界检查
-  industry-template-boundaries: Phase 10 行业模板候选边界检查
-  private-deployment-boundaries: Phase 11 多客户私有化复制边界检查
+  industry-template-boundaries: 行业模板候选边界检查
+  private-deployment-boundaries: 多客户私有化复制边界检查
   deployment-package-lint: 客户私有化部署资料包结构和敏感文件检查
   customer-config-boundaries: 客户配置草案边界检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
-  phase7-simulated-trial-data: Phase 7 模拟数据工具测试
+  trial-simulated-data: 试用模拟数据工具测试
   operational-fact-simulated-closure: 业务事实模拟闭环工具测试
-  phase9-simulated-mobile-closure: Phase 9 模拟岗位任务闭环工具测试
-  phase10-industry-template-closure: Phase 10 行业模板模拟闭环工具测试
-  phase11-private-deployment-closure: Phase 11 多客户私有化复制模拟闭环工具测试
+  mobile-workflow-simulated-closure: 岗位任务端模拟闭环工具测试
+  industry-template-closure: 行业模板模拟闭环工具测试
+  private-deployment-package-closure: 多客户私有化复制模拟闭环工具测试
   web: pnpm lint -> pnpm css
   server: go test ./internal/... ./pkg/...（存在即测）
 
@@ -74,13 +75,18 @@ if [ -f "$ROOT_DIR/scripts/qa/core-boundary.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/core-boundary.test.mjs"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs" ]; then
+  echo "[qa:fast] 运行活跃路径 Phase 标签边界检查"
+  node "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
-  echo "[qa:fast] 运行 Phase 10 行业模板候选边界检查"
+  echo "[qa:fast] 运行行业模板候选边界检查"
   node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs" ]; then
-  echo "[qa:fast] 运行 Phase 11 多客户私有化复制边界检查"
+  echo "[qa:fast] 运行多客户私有化复制边界检查"
   node "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs"
 fi
 
@@ -106,9 +112,9 @@ if ls "$ROOT_DIR"/scripts/import/*.test.mjs >/dev/null 2>&1; then
   done
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs" ]; then
-  echo "[qa:fast] 运行 Phase 7 模拟数据工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs" ]; then
+  echo "[qa:fast] 运行试用模拟数据工具测试"
+  node --test "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs" ]; then
@@ -116,19 +122,19 @@ if [ -f "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs" ]; th
   node --test "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs" ]; then
-  echo "[qa:fast] 运行 Phase 9 模拟岗位任务闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs" ]; then
+  echo "[qa:fast] 运行岗位任务端模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs" ]; then
-  echo "[qa:fast] 运行 Phase 10 行业模板模拟闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/industry-template-closure.test.mjs" ]; then
+  echo "[qa:fast] 运行行业模板模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/industry-template-closure.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase11-private-deployment-closure.test.mjs" ]; then
-  echo "[qa:fast] 运行 Phase 11 多客户私有化复制模拟闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase11-private-deployment-closure.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/private-deployment-package-closure.test.mjs" ]; then
+  echo "[qa:fast] 运行多客户私有化复制模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/private-deployment-package-closure.test.mjs"
 fi
 
 echo "[qa:fast] 运行 web 快速检查"

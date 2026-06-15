@@ -48,7 +48,10 @@ import {
   ColumnOrderModal,
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
-import { getBusinessModule } from '../config/businessModules.mjs'
+import {
+  getBusinessModule,
+  getFormalShellFormFieldLabels,
+} from '../config/businessModules.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
@@ -320,10 +323,8 @@ function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
   const statusOption = record
     ? STATUS_OPTIONS.find((item) => item.value === record.business_status)
     : null
-  const fieldScope =
-    (moduleItem.currentScope || []).join('；') ||
-    record?.scope ||
-    '字段清单待评审'
+  const coreFieldLabels = getFormalShellFormFieldLabels(moduleItem.key)
+  const fieldScope = (moduleItem.currentScope || []).join('；') || record?.scope
   const boundaryText = [
     '当前页面仍是正式入口壳；真实保存必须接入领域 usecase、API 和 RBAC 后启用，不能从前端本地伪造事实。',
     moduleItem.boundary ? `模块边界：${moduleItem.boundary}` : '',
@@ -333,76 +334,81 @@ function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
     .join(' ')
   const valueOrPlaceholder = (value, placeholder = '待接入领域 API 后生成') =>
     value || placeholder
+  const shellFields = [
+    {
+      label: '当前记录',
+      value: valueOrPlaceholder(
+        record?.title,
+        actionModal?.title || selectedLabel
+      ),
+    },
+    {
+      label: '当前状态',
+      value: statusOption?.label || '新建草稿',
+    },
+    {
+      label: '主事实 / 真源',
+      value:
+        moduleItem.factSource || moduleItem.primaryEntity || '领域真源待评审',
+    },
+    {
+      label: '来源表',
+      value:
+        record?.source_refs ||
+        (moduleItem.sourceRefs || []).join(' / ') ||
+        moduleItem.title,
+    },
+  ]
+  const scopedCoreFields =
+    coreFieldLabels.length > 0
+      ? coreFieldLabels.map((label) => ({
+          label,
+          value: valueOrPlaceholder(null),
+        }))
+      : [
+          {
+            label: '字段范围',
+            value: fieldScope || '字段清单待评审',
+            type: 'textarea',
+          },
+        ]
 
   return (
     <Form layout="vertical" className="erp-business-action-form">
-      <Form.Item label="业务编号" className="erp-business-action-form__field">
-        <Input
-          value={valueOrPlaceholder(record?.document_no)}
-          disabled
-          readOnly
-        />
-      </Form.Item>
-      <Form.Item label="业务对象" className="erp-business-action-form__field">
-        <Input
-          value={valueOrPlaceholder(
-            record?.title,
-            actionModal?.title || selectedLabel
+      {shellFields.map((field) => (
+        <Form.Item
+          key={field.label}
+          label={field.label}
+          className="erp-business-action-form__field"
+        >
+          <Input value={field.value} disabled readOnly />
+        </Form.Item>
+      ))}
+      <div className="erp-business-action-form__section-title">
+        产品核心字段
+      </div>
+      {scopedCoreFields.map((field) => (
+        <Form.Item
+          key={field.label}
+          label={field.label}
+          className={`erp-business-action-form__field${
+            field.type === 'textarea'
+              ? ' erp-business-action-form__field--full'
+              : ''
+          }`}
+        >
+          {field.type === 'textarea' ? (
+            <Input.TextArea
+              value={field.value}
+              disabled
+              readOnly
+              autoSize={{ minRows: 2, maxRows: 4 }}
+            />
+          ) : (
+            <Input value={field.value} disabled readOnly />
           )}
-          disabled
-          readOnly
-        />
-      </Form.Item>
-      <Form.Item label="当前状态" className="erp-business-action-form__field">
-        <Input value={statusOption?.label || '新建草稿'} disabled readOnly />
-      </Form.Item>
-      <Form.Item label="责任角色" className="erp-business-action-form__field">
-        <Input
-          value={
-            record?.owner_role ||
-            OWNER_ROLE_LABELS[moduleItem.key] ||
-            '业务负责人'
-          }
-          disabled
-          readOnly
-        />
-      </Form.Item>
-      <Form.Item
-        label="主事实 / 真源"
-        className="erp-business-action-form__field"
-      >
-        <Input
-          value={
-            moduleItem.factSource ||
-            moduleItem.primaryEntity ||
-            '领域真源待评审'
-          }
-          disabled
-          readOnly
-        />
-      </Form.Item>
-      <Form.Item label="来源表" className="erp-business-action-form__field">
-        <Input
-          value={
-            record?.source_refs ||
-            (moduleItem.sourceRefs || []).join(' / ') ||
-            moduleItem.title
-          }
-          disabled
-          readOnly
-        />
-      </Form.Item>
-      <Form.Item
-        label="字段范围"
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-      >
-        <Input.TextArea
-          value={fieldScope}
-          disabled
-          readOnly
-          autoSize={{ minRows: 2, maxRows: 4 }}
-        />
-      </Form.Item>
+        </Form.Item>
+      ))}
       <Form.Item
         label="当前边界"
         className="erp-business-action-form__field erp-business-action-form__field--full"

@@ -9,6 +9,7 @@ import (
 type masterDataRepoStub struct {
 	customers map[int]bool
 	suppliers map[int]bool
+	units     map[int]bool
 	created   *ContactMutation
 	updated   *ContactMutation
 }
@@ -48,6 +49,30 @@ func (s *masterDataRepoStub) SetSupplierActive(context.Context, int, bool) (*Sup
 }
 func (s *masterDataRepoStub) SupplierExists(_ context.Context, id int) (bool, error) {
 	return s.suppliers[id], nil
+}
+func (s *masterDataRepoStub) CreateMaterial(context.Context, *MaterialMutation) (*Material, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) UpdateMaterial(context.Context, int, *MaterialMutation) (*Material, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) GetMaterial(context.Context, int) (*Material, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) ListMaterials(context.Context, MasterDataFilter) ([]*Material, int, error) {
+	return nil, 0, nil
+}
+func (s *masterDataRepoStub) SetMaterialActive(context.Context, int, bool) (*Material, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) UnitIsActive(_ context.Context, id int) (bool, error) {
+	if s.units == nil {
+		return false, ErrUnitNotFound
+	}
+	if _, ok := s.units[id]; !ok {
+		return false, ErrUnitNotFound
+	}
+	return s.units[id], nil
 }
 func (s *masterDataRepoStub) CreateContact(_ context.Context, in *ContactMutation) (*Contact, error) {
 	cp := *in
@@ -129,6 +154,17 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	}
 	if supplierInput.SupplierType == nil || *supplierInput.SupplierType != "material" {
 		t.Fatalf("expected supplier type trimmed, got %#v", supplierInput.SupplierType)
+	}
+	category := " 填充 "
+	materialInput, err := normalizeMaterialMutation(MaterialMutation{Code: " M-001 ", Name: " PP 棉 ", Category: &category, DefaultUnitID: 10})
+	if err != nil {
+		t.Fatalf("expected material mutation valid, got %v", err)
+	}
+	if materialInput.Code != "M-001" || materialInput.Name != "PP 棉" || materialInput.Category == nil || *materialInput.Category != "填充" {
+		t.Fatalf("expected normalized material, got %#v", materialInput)
+	}
+	if _, err := normalizeMaterialMutation(MaterialMutation{Code: "M-001", Name: "PP 棉"}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected missing material unit rejected, got %v", err)
 	}
 	contactInput, err := normalizeContactMutation(ContactMutation{OwnerType: "supplier", OwnerID: 20, Name: " 联系人 "})
 	if err != nil {

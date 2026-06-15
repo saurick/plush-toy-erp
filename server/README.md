@@ -42,6 +42,16 @@
 
 普通 `business` JSON-RPC 域当前只保留业务看板 `dashboard_stats`。旧 `list_records / create_record / update_record / delete_records / restore_record` 已退出运行时，不能恢复为事实或历史快照查询入口。
 
+`operational_fact` JSON-RPC 当前承载生产、委外、出货、库存预留和财务事实的最小运行入口。shipment 主路径复用 `shipments / shipment_items / inventory_txns`，提供：
+
+- `create_shipment`
+- `add_shipment_item`
+- `ship_shipment`
+- `cancel_shipment`
+- `list_shipments`
+
+这组接口使用 `shipment.read / shipment.create / shipment.ship / shipment.cancel` 动作权限。`ship_shipment` 才把出货单推进到 `SHIPPED` 并写库存 `OUT`，`cancel_shipment` 只允许取消已出货单并写 `REVERSAL`；`shipment_release done` 不会自动调用这些接口。
+
 ## 快速开始
 
 ```bash

@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/unit"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
 )
 
@@ -101,11 +102,14 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 	if filter.LifecycleStatus != "" {
 		query = query.Where(salesorder.LifecycleStatus(filter.LifecycleStatus))
 	}
+	if filter.DateField != "" {
+		query = applySalesOrderDateRange(query, filter)
+	}
 	total, err := query.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(salesorder.FieldID)).
+	rows, err := query.Order(salesOrderSortOrder(filter), salesorder.ByID(sql.OrderDesc())).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
 		All(ctx)
@@ -113,6 +117,41 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 		return nil, 0, err
 	}
 	return entSalesOrdersToBiz(rows), total, nil
+}
+
+func applySalesOrderDateRange(query *ent.SalesOrderQuery, filter biz.SalesOrderFilter) *ent.SalesOrderQuery {
+	switch filter.DateField {
+	case "planned_delivery_date":
+		if filter.DateFrom != nil {
+			query = query.Where(salesorder.PlannedDeliveryDateGTE(*filter.DateFrom))
+		}
+		if filter.DateTo != nil {
+			query = query.Where(salesorder.PlannedDeliveryDateLTE(*filter.DateTo))
+		}
+	default:
+		if filter.DateFrom != nil {
+			query = query.Where(salesorder.OrderDateGTE(*filter.DateFrom))
+		}
+		if filter.DateTo != nil {
+			query = query.Where(salesorder.OrderDateLTE(*filter.DateTo))
+		}
+	}
+	return query
+}
+
+func salesOrderSortOrder(filter biz.SalesOrderFilter) salesorder.OrderOption {
+	options := []sql.OrderTermOption{}
+	if filter.SortDirection == "desc" {
+		options = append(options, sql.OrderDesc())
+	}
+
+	switch filter.SortBy {
+	case "order_date":
+		return salesorder.ByOrderDate(options...)
+	case "planned_delivery_date":
+		return salesorder.ByPlannedDeliveryDate(options...)
+	}
+	return salesorder.ByUpdatedAt(options...)
 }
 
 func (r *salesOrderRepo) UpdateSalesOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*biz.SalesOrder, error) {

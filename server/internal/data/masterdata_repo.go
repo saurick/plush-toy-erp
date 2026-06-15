@@ -7,7 +7,9 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/supplier"
+	"server/internal/data/model/ent/unit"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -214,6 +216,109 @@ func (r *masterDataRepo) SetSupplierActive(ctx context.Context, id int, active b
 
 func (r *masterDataRepo) SupplierExists(ctx context.Context, id int) (bool, error) {
 	return r.data.postgres.Supplier.Query().Where(supplier.ID(id)).Exist(ctx)
+}
+
+func (r *masterDataRepo) CreateMaterial(ctx context.Context, in *biz.MaterialMutation) (*biz.Material, error) {
+	row, err := r.data.postgres.Material.Create().
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetNillableCategory(in.Category).
+		SetNillableSpec(in.Spec).
+		SetNillableColor(in.Color).
+		SetDefaultUnitID(in.DefaultUnitID).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entMaterialToBiz(row), nil
+}
+
+func (r *masterDataRepo) UpdateMaterial(ctx context.Context, id int, in *biz.MaterialMutation) (*biz.Material, error) {
+	update := r.data.postgres.Material.UpdateOneID(id).
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetDefaultUnitID(in.DefaultUnitID)
+	if in.Category == nil {
+		update.ClearCategory()
+	} else {
+		update.SetCategory(*in.Category)
+	}
+	if in.Spec == nil {
+		update.ClearSpec()
+	} else {
+		update.SetSpec(*in.Spec)
+	}
+	if in.Color == nil {
+		update.ClearColor()
+	} else {
+		update.SetColor(*in.Color)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrMaterialNotFound
+		}
+		return nil, err
+	}
+	return entMaterialToBiz(row), nil
+}
+
+func (r *masterDataRepo) GetMaterial(ctx context.Context, id int) (*biz.Material, error) {
+	row, err := r.data.postgres.Material.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrMaterialNotFound
+		}
+		return nil, err
+	}
+	return entMaterialToBiz(row), nil
+}
+
+func (r *masterDataRepo) ListMaterials(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Material, int, error) {
+	query := r.data.postgres.Material.Query()
+	if filter.Keyword != "" {
+		query = query.Where(material.Or(
+			material.CodeContains(filter.Keyword),
+			material.NameContains(filter.Keyword),
+			material.CategoryContains(filter.Keyword),
+			material.SpecContains(filter.Keyword),
+			material.ColorContains(filter.Keyword),
+		))
+	}
+	if filter.ActiveOnly {
+		query = query.Where(material.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Asc(material.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entMaterialsToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) SetMaterialActive(ctx context.Context, id int, active bool) (*biz.Material, error) {
+	row, err := r.data.postgres.Material.UpdateOneID(id).SetIsActive(active).Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrMaterialNotFound
+		}
+		return nil, err
+	}
+	return entMaterialToBiz(row), nil
+}
+
+func (r *masterDataRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
+	row, err := r.data.postgres.Unit.Query().Where(unit.ID(id)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrUnitNotFound
+		}
+		return false, err
+	}
+	return row.IsActive, nil
 }
 
 func (r *masterDataRepo) CreateContact(ctx context.Context, in *biz.ContactMutation) (*biz.Contact, error) {
@@ -454,6 +559,32 @@ func entSuppliersToBiz(rows []*ent.Supplier) []*biz.Supplier {
 	out := make([]*biz.Supplier, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, entSupplierToBiz(row))
+	}
+	return out
+}
+
+func entMaterialToBiz(row *ent.Material) *biz.Material {
+	if row == nil {
+		return nil
+	}
+	return &biz.Material{
+		ID:            row.ID,
+		Code:          row.Code,
+		Name:          row.Name,
+		Category:      row.Category,
+		Spec:          row.Spec,
+		Color:         row.Color,
+		DefaultUnitID: row.DefaultUnitID,
+		IsActive:      row.IsActive,
+		CreatedAt:     row.CreatedAt,
+		UpdatedAt:     row.UpdatedAt,
+	}
+}
+
+func entMaterialsToBiz(rows []*ent.Material) []*biz.Material {
+	out := make([]*biz.Material, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entMaterialToBiz(row))
 	}
 	return out
 }

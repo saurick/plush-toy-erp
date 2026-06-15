@@ -6,7 +6,7 @@
 
 - 旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除。
 - 本文历史上关于“继续使用通用表承接 v1 闭环 / 保留 legacy archive 查询 / 从旧表迁 workflow source”的阶段性建议不再作为当前主路径。
-- 生产、委外、出货、库存预留和财务最小事实能力已进入 Phase 8 事实 usecase；库存、采购、批次、BOM、质检、MasterData 和 SalesOrder 也已分别由领域表承接。
+- 生产、委外、出货、库存预留和财务最小事实能力已进入 operational fact usecase；库存、采购、批次、BOM、质检、MasterData 和 SalesOrder 也已分别由领域表承接。
 - Workflow 只负责协同任务、任务事件和业务状态投影；事实必须由对应 Fact usecase 写入。
 
 ## 仍有效的边界
@@ -23,6 +23,6 @@
 
 - 当前真源：`docs/current-source-of-truth.md`
 - 模块边界：`docs/product/module-boundaries.md`
-- Phase 8 事实层：`docs/architecture/phase8-fact-expansion-review.md`
+- 业务事实扩展：`docs/architecture/operational-fact-expansion-review.md`
 - Workflow / Fact 状态边界：`docs/architecture/status-workflow-fact-boundary.md`
 - 删除完成记录：`docs/product/business-records-cutover-plan.md`

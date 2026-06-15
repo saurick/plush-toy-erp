@@ -126,8 +126,8 @@ const COUNTERPARTY_TYPES = [
 const ACTION_PERMISSIONS = Object.freeze({
   productionWrite: ['pmc.plan.update', 'warehouse.adjustment.create'],
   outsourcingWrite: ['purchase.order.update', 'warehouse.adjustment.create'],
-  shipmentWrite: ['sales_order.update', 'warehouse.outbound.confirm'],
-  shipmentConfirm: ['warehouse.outbound.confirm'],
+  shipmentWrite: ['shipment.create'],
+  shipmentConfirm: ['shipment.ship', 'shipment.cancel'],
   reservationWrite: ['sales_order.update', 'warehouse.outbound.confirm'],
   financeWrite: ['finance.receivable.confirm', 'finance.payable.confirm'],
 })

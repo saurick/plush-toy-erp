@@ -96,6 +96,11 @@ type SalesOrderFilter struct {
 	Keyword         string
 	CustomerID      int
 	LifecycleStatus string
+	DateField       string
+	DateFrom        *time.Time
+	DateTo          *time.Time
+	SortBy          string
+	SortDirection   string
 	Limit           int
 	Offset          int
 }
@@ -367,10 +372,38 @@ func normalizeSalesOrderItemMutation(in SalesOrderItemMutation) (SalesOrderItemM
 func normalizeSalesOrderFilter(in SalesOrderFilter) (SalesOrderFilter, error) {
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	in.LifecycleStatus = strings.ToLower(strings.TrimSpace(in.LifecycleStatus))
+	in.DateField = strings.TrimSpace(in.DateField)
+	in.SortBy = strings.TrimSpace(in.SortBy)
+	in.SortDirection = strings.ToLower(strings.TrimSpace(in.SortDirection))
 	if in.LifecycleStatus != "" && !IsValidSalesOrderStatus(in.LifecycleStatus) {
 		return SalesOrderFilter{}, ErrBadParam
 	}
 	if in.CustomerID < 0 {
+		return SalesOrderFilter{}, ErrBadParam
+	}
+	switch in.DateField {
+	case "", "order_date", "planned_delivery_date":
+	default:
+		return SalesOrderFilter{}, ErrBadParam
+	}
+	if in.DateField == "" && (in.DateFrom != nil || in.DateTo != nil) {
+		in.DateField = "order_date"
+	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
+		return SalesOrderFilter{}, ErrBadParam
+	}
+	switch in.SortBy {
+	case "":
+		in.SortBy = "updated_at"
+	case "order_date", "planned_delivery_date", "updated_at":
+	default:
+		return SalesOrderFilter{}, ErrBadParam
+	}
+	switch in.SortDirection {
+	case "":
+		in.SortDirection = "desc"
+	case "asc", "desc":
+	default:
 		return SalesOrderFilter{}, ErrBadParam
 	}
 	if in.Limit <= 0 || in.Limit > 200 {

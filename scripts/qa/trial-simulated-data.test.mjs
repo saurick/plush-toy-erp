@@ -10,10 +10,10 @@ import {
   assertDatasetBoundary,
   buildSimulatedDataset,
   parseCliArgs,
-  runPhase7SimulatedTrialData,
-} from "./phase7-simulated-trial-data.mjs";
+  runTrialSimulatedData,
+} from "./trial-simulated-data.mjs";
 
-test("phase7 simulated dataset is explicitly simulated and excludes fact domains", () => {
+test("trial simulated dataset is explicitly simulated and excludes fact domains", () => {
   const dataset = buildSimulatedDataset({ productId: 1, unitId: 2 });
 
   assert.equal(dataset.simulatedOnly, true);
@@ -31,7 +31,7 @@ test("phase7 simulated dataset is explicitly simulated and excludes fact domains
   );
 });
 
-test("phase7 CLI refuses real import style flags", () => {
+test("trial CLI refuses real import style flags", () => {
   assert.throws(
     () => parseCliArgs(["--execute"]),
     /refuses real import style flag/u,
@@ -42,15 +42,15 @@ test("phase7 CLI refuses real import style flags", () => {
   );
 });
 
-test("phase7 report-only mode writes a simulated report without backend calls", async () => {
-  const out = await mkdtemp(path.join(tmpdir(), "phase7-sim-"));
+test("trial report-only mode writes a simulated report without backend calls", async () => {
+  const out = await mkdtemp(path.join(tmpdir(), "trial-sim-"));
   try {
-    const report = await runPhase7SimulatedTrialData({
+    const report = await runTrialSimulatedData({
       ...parseCliArgs(["--out", out]),
     });
     const saved = JSON.parse(
       await readFile(
-        path.join(out, "phase7-simulated-trial-report.json"),
+        path.join(out, "trial-simulated-data-report.json"),
         "utf8",
       ),
     );
@@ -64,14 +64,14 @@ test("phase7 report-only mode writes a simulated report without backend calls", 
   }
 });
 
-test("phase7 apply requires explicit simulated confirmation", async () => {
-  const out = await mkdtemp(path.join(tmpdir(), "phase7-sim-"));
-  const previousConfirm = process.env.PHASE7_SIM_CONFIRM;
-  delete process.env.PHASE7_SIM_CONFIRM;
+test("trial apply requires explicit simulated confirmation", async () => {
+  const out = await mkdtemp(path.join(tmpdir(), "trial-sim-"));
+  const previousConfirm = process.env.TRIAL_SIM_CONFIRM;
+  delete process.env.TRIAL_SIM_CONFIRM;
   try {
     await assert.rejects(
       () =>
-        runPhase7SimulatedTrialData(
+        runTrialSimulatedData(
           parseCliArgs([
             "--apply",
             "--out",
@@ -82,24 +82,24 @@ test("phase7 apply requires explicit simulated confirmation", async () => {
             "2",
           ]),
         ),
-      /PHASE7_SIM_CONFIRM/u,
+      /TRIAL_SIM_CONFIRM/u,
     );
   } finally {
     if (previousConfirm === undefined) {
-      delete process.env.PHASE7_SIM_CONFIRM;
+      delete process.env.TRIAL_SIM_CONFIRM;
     } else {
-      process.env.PHASE7_SIM_CONFIRM = previousConfirm;
+      process.env.TRIAL_SIM_CONFIRM = previousConfirm;
     }
     await rm(out, { recursive: true, force: true });
   }
 });
 
-test("phase7 apply uses only V1 masterdata and sales_order RPC methods", async () => {
-  const out = await mkdtemp(path.join(tmpdir(), "phase7-sim-"));
-  const previousConfirm = process.env.PHASE7_SIM_CONFIRM;
-  const previousToken = process.env.PHASE7_SIM_ADMIN_TOKEN;
-  process.env.PHASE7_SIM_CONFIRM = CONFIRM_PHRASE;
-  process.env.PHASE7_SIM_ADMIN_TOKEN = "test-token";
+test("trial apply uses only V1 masterdata and sales_order RPC methods", async () => {
+  const out = await mkdtemp(path.join(tmpdir(), "trial-sim-"));
+  const previousConfirm = process.env.TRIAL_SIM_CONFIRM;
+  const previousToken = process.env.TRIAL_SIM_ADMIN_TOKEN;
+  process.env.TRIAL_SIM_CONFIRM = CONFIRM_PHRASE;
+  process.env.TRIAL_SIM_ADMIN_TOKEN = "test-token";
   const calls = [];
   const counters = {
     customer: 10,
@@ -137,7 +137,7 @@ test("phase7 apply uses only V1 masterdata and sales_order RPC methods", async (
     };
   };
   try {
-    const report = await runPhase7SimulatedTrialData(
+    const report = await runTrialSimulatedData(
       parseCliArgs([
         "--apply",
         "--out",
@@ -179,14 +179,14 @@ test("phase7 apply uses only V1 masterdata and sales_order RPC methods", async (
     assert.equal(calls.at(-1).params.unit_id, 2);
   } finally {
     if (previousConfirm === undefined) {
-      delete process.env.PHASE7_SIM_CONFIRM;
+      delete process.env.TRIAL_SIM_CONFIRM;
     } else {
-      process.env.PHASE7_SIM_CONFIRM = previousConfirm;
+      process.env.TRIAL_SIM_CONFIRM = previousConfirm;
     }
     if (previousToken === undefined) {
-      delete process.env.PHASE7_SIM_ADMIN_TOKEN;
+      delete process.env.TRIAL_SIM_ADMIN_TOKEN;
     } else {
-      process.env.PHASE7_SIM_ADMIN_TOKEN = previousToken;
+      process.env.TRIAL_SIM_ADMIN_TOKEN = previousToken;
     }
     await rm(out, { recursive: true, force: true });
   }

@@ -9,7 +9,7 @@ Schema Source of Truth / Schema 真源: No / 否
 
 本文禁止记录真实密码、短信验证码、token、私钥、数据库连接串、客户真实账号密钥或生产地址中的敏感凭据。真实密码只通过本地 shell 环境变量输入。
 
-当前没有可直接执行的客户真实数据。Phase 7 不拆 A/B/C/D 或任何字母子阶段，本 runbook 默认一次性按模拟数据试用演练执行：可使用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据验证环境、账号、RBAC、菜单、V1 页面、岗位任务端入口和培训口径。模拟数据不等于真实 import，不代表客户字段已确认，也不生成出货、库存或财务事实。
+当前没有可直接执行的客户真实数据。试用模拟 不拆 A/B/C/D 或任何字母子阶段，本 runbook 默认一次性按模拟数据试用演练执行：可使用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据验证环境、账号、RBAC、菜单、V1 页面、岗位任务端入口和培训口径。模拟数据不等于真实 import，不代表客户字段已确认，也不生成出货、库存或财务事实。
 
 ## 1. 适用范围
 
@@ -21,13 +21,13 @@ Schema Source of Truth / Schema 真源: No / 否
 | 桌面菜单 | yoyoosun 菜单配置下正式入口可见，旧 `partners / project-orders` 入口不可见 |
 | 岗位任务端 | 8 个岗位账号能进入对应 `/m/<role>/tasks` |
 | 拒绝态 | 无岗位权限账号访问岗位任务端时被拒绝 |
-| 模拟数据 | 用 `scripts/qa/phase7-simulated-trial-data.mjs` 或等价 seed / fixture / 手工样本验证 V1 页面和培训口径 |
+| 模拟数据 | 用 `scripts/qa/trial-simulated-data.mjs` 或等价 seed / fixture / 手工样本验证 V1 页面和培训口径 |
 
 本 runbook 不覆盖：
 
 - 真实数据导入。
 - 把模拟数据转成真实导入结论。
-- 把真实导入拆成 Phase 7 的字母子阶段或后续半阶段。
+- 把真实导入拆成 试用模拟 的字母子阶段或后续半阶段。
 - 新建 schema / migration。
 - 生产部署或回滚。
 - 库存、出货、财务、生产或委外事实闭环。
@@ -43,7 +43,7 @@ Schema Source of Truth / Schema 真源: No / 否
 4. 已按授权流程创建或更新试用账号；普通业务试用账号不使用 `is_super_admin=true`，不分配 `debug_operator`。
 5. 已取得本次核对用的临时密码，但不要写入仓库、文档、聊天记录或截图。
 6. yoyoosun 菜单配置仍只作为前端菜单配置，不替代后端 RBAC 或事实规则。
-7. 若需要页面数据演练，优先使用 `scripts/qa/phase7-simulated-trial-data.mjs` 生成或写入模拟数据；等价 seed、fixture 或手工样本也必须在证据中标记为模拟数据。
+7. 若需要页面数据演练，优先使用 `scripts/qa/trial-simulated-data.mjs` 生成或写入模拟数据；等价 seed、fixture 或手工样本也必须在证据中标记为模拟数据。
 
 如果目标环境还没有试用账号，先在该环境按授权流程执行账号创建 / seed。常规客户试用账号不要生成 `demo_debug`。
 
@@ -94,49 +94,49 @@ TRIAL_ACCOUNT_BACKEND_URL="${TRIAL_ACCOUNT_BACKEND_URL}" \
 
 若失败，先修账号、角色和权限绑定；不要通过前端隐藏菜单绕过。
 
-### 4.3 Phase 7 模拟数据准备
+### 4.3 试用模拟 模拟数据准备
 
 先生成模拟数据报告，不连接后端：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/scripts/qa/phase7-simulated-trial-data.mjs \
-  --out output/customers/yoyoosun/phase7-simulated-trial
+node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-simulated-data.mjs \
+  --out output/customers/yoyoosun/trial-simulated-data
 ```
 
 若目标试用环境需要真实页面中可见的模拟客户、供应商、联系人和销售订单数据，再显式写入模拟数据。写入前必须确认目标环境已有一个可用于销售订单行的活跃产品 ID 和单位 ID；该脚本不会创建产品、单位、库存、出货或财务事实。
 
-如果当前环境缺少核心演示基础资料，优先 seed core demo 数据。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`bom_headers` 和 `bom_items`，编码带 `SIM-PLUSH-CORE` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `phase7_args` 可直接传给下面的 Phase 7 模拟数据写入命令：
+如果当前环境缺少核心演示基础资料，优先 seed core demo 数据。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`bom_headers` 和 `bom_items`，编码带 `SIM-PLUSH-CORE` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `trial_sim_args` 可直接传给下面的 试用模拟 模拟数据写入命令：
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/seed-core-demo-data.sh
 ```
 
-如果只需要旧 Phase 7 最小产品 / 单位前置数据，也可继续使用 Phase 7 专用 seed。该 seed 只写 `units` 和 `products`，编码带 `SIM-YOYOOSUN-PHASE7` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实：
+如果只需要旧 试用模拟 最小产品 / 单位前置数据，也可继续使用 试用模拟 专用 seed。该 seed 只写 `units` 和 `products`，编码带 `SIM-YOYOOSUN-TRIAL` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存、出货或财务事实：
 
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/seed-phase7-sim-masterdata.sh
+bash /Users/simon/projects/plush-toy-erp/scripts/seed-trial-sim-masterdata.sh
 ```
 
 记录输出中的 `product_id` 和 `unit_id`，再传给下面的模拟数据写入命令。
 
 ```bash
-PHASE7_SIM_CONFIRM=APPLY_SIMULATED_PHASE7_DATA \
-PHASE7_SIM_PASSWORD="${TRIAL_ACCOUNT_PASSWORD}" \
-  node /Users/simon/projects/plush-toy-erp/scripts/qa/phase7-simulated-trial-data.mjs \
+TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA \
+TRIAL_SIM_PASSWORD="${TRIAL_ACCOUNT_PASSWORD}" \
+  node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-simulated-data.mjs \
     --apply \
     --backend-url "${TRIAL_ACCOUNT_BACKEND_URL}" \
     --product-id 1 \
     --unit-id 1 \
-    --out output/customers/yoyoosun/phase7-simulated-trial
+    --out output/customers/yoyoosun/trial-simulated-data
 ```
 
-默认岗位账号模式会用 `demo_sales` 写客户、联系人和销售订单，用 `demo_purchase` 写供应商和供应商联系人。若目标环境提供了具备全部 V1 权限的账号，也可以改用 `PHASE7_SIM_ADMIN_TOKEN` 或 `PHASE7_SIM_ADMIN_USERNAME` / `PHASE7_SIM_ADMIN_PASSWORD`。
+默认岗位账号模式会用 `demo_sales` 写客户、联系人和销售订单，用 `demo_purchase` 写供应商和供应商联系人。若目标环境提供了具备全部 V1 权限的账号，也可以改用 `TRIAL_SIM_ADMIN_TOKEN` 或 `TRIAL_SIM_ADMIN_USERNAME` / `TRIAL_SIM_ADMIN_PASSWORD`。
 
 通过标准：
 
-- 输出 `phase7-simulated-trial-report.json`，且 `simulatedOnly=true`、`realCustomerImport=false`。
-- 写入模式下通过 Phase 7 seed 准备模拟产品 / 单位，再只通过 `/rpc/masterdata` 和 `/rpc/sales_order` 创建或复用模拟客户、供应商、联系人、销售订单和销售订单行。
-- 模拟编号前缀为 `SIM-YOYOOSUN-PHASE7`。
+- 输出 `trial-simulated-data-report.json`，且 `simulatedOnly=true`、`realCustomerImport=false`。
+- 写入模式下通过 试用模拟 seed 准备模拟产品 / 单位，再只通过 `/rpc/masterdata` 和 `/rpc/sales_order` 创建或复用模拟客户、供应商、联系人、销售订单和销售订单行。
+- 模拟编号前缀为 `SIM-YOYOOSUN-TRIAL`。
 - 未执行真实 import，未写 `business_records`，未生成 schema / migration。
 - 未创建 shipment、inventory、finance、invoice、payment、receivable 或 payable fact。
 
@@ -200,7 +200,7 @@ web/output/playwright/trial-demo-account-browser-smoke/
 | migration 未到当前服务版本 | 先处理 migration，不继续试用 |
 | 试用账号需要 `is_super_admin=true` 才能通过 | 修角色权限，不用 super admin 冒充业务账号 |
 | 普通试用账号含 `debug.*` 权限 | 立即移除 debug 权限 |
-| 需要导入真实客户数据才能继续 | 停止 Phase 7；当前只能模拟，真实导入另开数据治理评审 |
+| 需要导入真实客户数据才能继续 | 停止 试用模拟；当前只能模拟，真实导入另开数据治理评审 |
 | 模拟数据脚本要求产品 / 单位 ID 但目标环境没有活跃记录 | 先准备可演示的产品和单位主数据，不伪造订单行或绕过 usecase 校验 |
 | 有岗位权限的账号不能进入对应岗位任务端 | 修 `mobile.<role>.access` 或入口配置 |
 | 无岗位权限账号可以进入岗位任务端 | 停止试用，排查 AuthGuard / `mobile.<role>.access` |
@@ -218,6 +218,6 @@ web/output/playwright/trial-demo-account-browser-smoke/
 | 销售订单字段 | 客户订单号、款号、颜色、尺寸、交期字段不够 | Source Document 字段评审 |
 | 出货 / 库存 | 希望销售订单后直接出货或扣库存 | Shipment / Inventory usecase 评审 |
 | 财务 | 希望出货后生成应收、发票或收款 | Finance usecase 评审 |
-| 数据导入 | 试用人员提出真实客户 / 供应商 / 订单数据导入诉求 | 当前 Phase 7 blocked；另开数据治理评审，不在本阶段执行真实导入 |
+| 数据导入 | 试用人员提出真实客户 / 供应商 / 订单数据导入诉求 | 当前 试用模拟 blocked；另开数据治理评审，不在本阶段执行真实导入 |
 
 只有经过正式评审确认属于 Product Core 的反馈，才进入 schema、runtime、API 或 UI 实现任务。

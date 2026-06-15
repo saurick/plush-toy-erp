@@ -1,6 +1,7 @@
 export const V1_ROUTE_PATHS = Object.freeze({
   customers: '/erp/master/partners/customers',
   suppliers: '/erp/master/partners/suppliers',
+  materials: '/erp/master/materials',
   salesOrders: '/erp/sales/project-orders/sales-orders',
 })
 
@@ -127,6 +128,13 @@ export function buildMasterDataParams(values = {}, extra = {}) {
     short_name: trimOptional(values.short_name),
     supplier_type: trimOptional(values.supplier_type),
     tax_no: trimOptional(values.tax_no),
+    category: trimOptional(values.category),
+    spec: trimOptional(values.spec),
+    color: trimOptional(values.color),
+    default_unit_id:
+      values.default_unit_id === undefined
+        ? undefined
+        : Number(values.default_unit_id || 0),
     note: trimOptional(values.note),
   })
 }

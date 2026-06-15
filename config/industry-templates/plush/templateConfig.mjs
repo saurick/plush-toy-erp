@@ -1,7 +1,7 @@
 export const plushIndustryTemplateConfig = Object.freeze({
   templateKey: "plush",
   label: "毛绒玩具行业模板",
-  phase: "Phase 10",
+  reviewMilestone: "industry-template-candidate",
   status: "candidate",
   runtimeEnabled: false,
   scope:
@@ -29,7 +29,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       key: "boss",
       label: "老板 / 管理层",
       classification: "industry_default_candidate",
-      evidence: "phase9-target-release-evidence-2026-06-09.md",
+      evidence: "mobile-workflow-target-release-evidence",
       boundary: "只作为管理层审批和全链路查看候选；不绕过 RBAC 或任务 owner / assignee 守卫。",
     },
     {
@@ -50,35 +50,35 @@ export const plushIndustryTemplateConfig = Object.freeze({
       key: "warehouse",
       label: "仓库",
       classification: "industry_default_candidate",
-      evidence: "phase9-target-release-evidence-2026-06-09.md",
+      evidence: "mobile-workflow-target-release-evidence",
       boundary: "负责收货、库存、入库确认和出货放行协同；岗位任务 done 不写库存事实。",
     },
     {
       key: "quality",
       label: "品质",
       classification: "industry_default_candidate",
-      evidence: "phase9-target-release-evidence-2026-06-09.md",
+      evidence: "mobile-workflow-target-release-evidence",
       boundary: "负责检验协同；quality task done 不等于 quality_inspections 判定。",
     },
     {
       key: "finance",
       label: "财务",
       classification: "industry_default_candidate",
-      evidence: "phase8-target-release-evidence-2026-06-08.md",
+      evidence: "operational-fact-target-release-evidence",
       boundary: "负责对账、应收、应付、发票和收付款状态；不能从出货放行直接生成财务事实。",
     },
     {
       key: "pmc",
       label: "PMC",
       classification: "industry_default_candidate",
-      evidence: "phase9-target-release-evidence-2026-06-09.md",
+      evidence: "mobile-workflow-target-release-evidence",
       boundary: "负责齐套、排产、异常分发和催办；不替其他角色写事实。",
     },
     {
       key: "production",
       label: "生产经理",
       classification: "industry_default_candidate",
-      evidence: "phase9-target-release-evidence-2026-06-09.md",
+      evidence: "mobile-workflow-target-release-evidence",
       boundary: "负责生产排程、进度和返工协同；生产事实仍由 OperationalFactUsecase 写入。",
     },
   ]),
@@ -91,7 +91,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       },
       {
         title: "主数据",
-        items: Object.freeze(["customers", "suppliers", "products"]),
+        items: Object.freeze(["customers", "suppliers", "products", "materials"]),
       },
       {
         title: "销售管理",
@@ -127,7 +127,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       },
       {
         title: "出货管理",
-        items: Object.freeze(["shipping-release", "outbound"]),
+        items: Object.freeze(["shipping-release", "outbound", "shipments"]),
       },
       {
         title: "财务业务",
@@ -189,7 +189,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       roles: Object.freeze(["warehouse", "quality", "production"]),
       classification: "deferred",
       factBoundary: "not_delivered",
-      note: "Phase 9 只交付 evidence 文本和 refs；真实附件服务、对象存储和扫码另评审。",
+      note: "当前只交付 evidence 文本和 refs；真实附件服务、对象存储和扫码另评审。",
     },
   ]),
   fieldDisplayTemplate: Object.freeze([
@@ -327,7 +327,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       key: "masterdata_source_document",
       label: "主数据和销售订单演练",
       classification: "industry_default_candidate",
-      command: "scripts/qa/phase7-simulated-trial-data.mjs",
+      command: "scripts/qa/trial-simulated-data.mjs",
     },
     {
       key: "fact_closure",
@@ -339,7 +339,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       key: "mobile_workflow",
       label: "岗位任务端模拟验收",
       classification: "industry_default_candidate",
-      command: "scripts/qa/phase9-simulated-mobile-closure.mjs",
+      command: "scripts/qa/mobile-workflow-simulated-closure.mjs",
     },
   ]),
   deferredItems: Object.freeze([

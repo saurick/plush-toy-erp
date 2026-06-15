@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	simulationPrefix = "SIM-YOYOOSUN-PHASE7"
+	simulationPrefix = "SIM-YOYOOSUN-TRIAL"
 	defaultUnitCode  = simulationPrefix + "-PCS"
 	defaultProduct   = simulationPrefix + "-PRODUCT"
 )
@@ -32,9 +32,9 @@ type bootstrapConfig struct {
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
 	unitCode := flag.String("unit-code", defaultUnitCode, "simulated unit code")
-	unitName := flag.String("unit-name", "Phase 7 模拟单位", "simulated unit name")
+	unitName := flag.String("unit-name", "试用模拟单位", "simulated unit name")
 	productCode := flag.String("product-code", defaultProduct, "simulated product code")
-	productName := flag.String("product-name", "Phase 7 模拟产品", "simulated product name")
+	productName := flag.String("product-name", "试用模拟产品", "simulated product name")
 	allowProd := flag.Bool("allow-prod", false, "allow seeding when config path or environment looks like production")
 	timeout := flag.Duration("timeout", 15*time.Second, "database operation timeout")
 	flag.Parse()
@@ -76,7 +76,7 @@ func main() {
 		fail("seed simulated product failed: %v", err)
 	}
 
-	fmt.Printf("phase7 simulated masterdata seed completed prefix=%s unit_id=%d product_id=%d\n", simulationPrefix, unitID, productID)
+	fmt.Printf("trial simulated masterdata seed completed prefix=%s unit_id=%d product_id=%d\n", simulationPrefix, unitID, productID)
 	fmt.Println("simulated_only=true real_customer_import=false no_business_records=true no_shipment_inventory_finance_facts=true")
 }
 
@@ -188,11 +188,11 @@ func guardProduction(confPath string, allowProd bool) error {
 	}
 	normalizedConf := filepath.ToSlash(strings.ToLower(confPath))
 	if strings.Contains(normalizedConf, "/prod/") || strings.Contains(normalizedConf, "configs/prod") {
-		return fmt.Errorf("refuse to seed Phase 7 simulated masterdata with prod config; pass --allow-prod only for an intentional controlled operation")
+		return fmt.Errorf("refuse to seed trial simulated masterdata with prod config; pass --allow-prod only for an intentional controlled operation")
 	}
 	for _, key := range []string{"APP_ENV", "ERP_ENV", "GO_ENV"} {
 		if strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "prod") || strings.EqualFold(strings.TrimSpace(os.Getenv(key)), "production") {
-			return fmt.Errorf("refuse to seed Phase 7 simulated masterdata when %s=%s; pass --allow-prod only for an intentional controlled operation", key, os.Getenv(key))
+			return fmt.Errorf("refuse to seed trial simulated masterdata when %s=%s; pass --allow-prod only for an intentional controlled operation", key, os.Getenv(key))
 		}
 	}
 	return nil

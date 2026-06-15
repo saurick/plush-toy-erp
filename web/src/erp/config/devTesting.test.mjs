@@ -42,7 +42,7 @@ pnpm style:l1
 `
 
 const deliveryEvidenceMarkdown = `
-# Phase 9 目标环境发布证据 / Phase 9 Target Release Evidence
+# 岗位任务端目标环境发布证据 / Mobile Workflow Target Release Evidence
 
 本记录包含 smoke、RBAC 和内部模拟 workflow 闭环验收。
 
@@ -116,7 +116,7 @@ test('devTesting: 提取 fenced command blocks 并保留章节上下文', () => 
 test('devTesting: 从 docs Markdown 中筛出测试相关文档', () => {
   const docs = buildDevTestingDocs({
     '../../../../docs/product/test-strategy.md': strategyMarkdown,
-    '../../../../docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md':
+    '../../../../docs/customers/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
       deliveryEvidenceMarkdown,
     '../../../../docs/product/product-principles.md': unrelatedMarkdown,
     '../../../README.md': deliveryEvidenceMarkdown,
@@ -126,7 +126,7 @@ test('devTesting: 从 docs Markdown 中筛出测试相关文档', () => {
     docs.map((item) => item.path),
     [
       'docs/product/test-strategy.md',
-      'docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md',
+      'docs/customers/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md',
     ]
   )
   assert.equal(docs[0].category, '测试策略')
@@ -156,7 +156,7 @@ test('devTesting: 文档 key 使用完整路径避免中文目录下文件名碰
 test('devTesting: 支持分类和关键词筛选并汇总', () => {
   const docs = buildDevTestingDocs({
     '../../../../docs/product/test-strategy.md': strategyMarkdown,
-    '../../../../docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md':
+    '../../../../docs/customers/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
       deliveryEvidenceMarkdown,
   })
   const tiers = parseDevTestingStrategyTiers(strategyMarkdown)
@@ -172,7 +172,9 @@ test('devTesting: 支持分类和关键词筛选并汇总', () => {
   )
   assert.deepEqual(
     filterDevTestingDocs(docs, { keyword: 'trial' }).map((item) => item.path),
-    ['docs/customers/yoyoosun/phase9-target-release-evidence-2026-06-09.md']
+    [
+      'docs/customers/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md',
+    ]
   )
   assert.deepEqual(
     filterDevTestingDocs(docs, { category: '测试策略' }).map(

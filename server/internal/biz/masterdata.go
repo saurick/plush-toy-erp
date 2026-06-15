@@ -15,6 +15,7 @@ const (
 var (
 	ErrCustomerNotFound = errors.New("customer not found")
 	ErrSupplierNotFound = errors.New("supplier not found")
+	ErrMaterialNotFound = errors.New("material not found")
 	ErrContactNotFound  = errors.New("contact not found")
 )
 
@@ -48,6 +49,19 @@ type Supplier struct {
 	UpdatedAt    time.Time
 }
 
+type Material struct {
+	ID            int
+	Code          string
+	Name          string
+	Category      *string
+	Spec          *string
+	Color         *string
+	DefaultUnitID int
+	IsActive      bool
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type Contact struct {
 	ID        int
 	OwnerType string
@@ -79,6 +93,15 @@ type SupplierMutation struct {
 	SupplierType *string
 	TaxNo        *string
 	Note         *string
+}
+
+type MaterialMutation struct {
+	Code          string
+	Name          string
+	Category      *string
+	Spec          *string
+	Color         *string
+	DefaultUnitID int
 }
 
 type ContactMutation struct {
@@ -122,6 +145,13 @@ type MasterDataRepo interface {
 	ListSuppliers(ctx context.Context, filter MasterDataFilter) ([]*Supplier, int, error)
 	SetSupplierActive(ctx context.Context, id int, active bool) (*Supplier, error)
 	SupplierExists(ctx context.Context, id int) (bool, error)
+
+	CreateMaterial(ctx context.Context, in *MaterialMutation) (*Material, error)
+	UpdateMaterial(ctx context.Context, id int, in *MaterialMutation) (*Material, error)
+	GetMaterial(ctx context.Context, id int) (*Material, error)
+	ListMaterials(ctx context.Context, filter MasterDataFilter) ([]*Material, int, error)
+	SetMaterialActive(ctx context.Context, id int, active bool) (*Material, error)
+	UnitIsActive(ctx context.Context, id int) (bool, error)
 
 	CreateContact(ctx context.Context, in *ContactMutation) (*Contact, error)
 	UpdateContact(ctx context.Context, id int, in *ContactMutation) (*Contact, error)
@@ -225,6 +255,55 @@ func (uc *MasterDataUsecase) SetSupplierActive(ctx context.Context, id int, acti
 	return uc.repo.SetSupplierActive(ctx, id, active)
 }
 
+func (uc *MasterDataUsecase) CreateMaterial(ctx context.Context, in *MaterialMutation) (*Material, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeMaterialMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateMaterialDefaultUnit(ctx, normalized.DefaultUnitID); err != nil {
+		return nil, err
+	}
+	return uc.repo.CreateMaterial(ctx, &normalized)
+}
+
+func (uc *MasterDataUsecase) UpdateMaterial(ctx context.Context, id int, in *MaterialMutation) (*Material, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeMaterialMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateMaterialDefaultUnit(ctx, normalized.DefaultUnitID); err != nil {
+		return nil, err
+	}
+	return uc.repo.UpdateMaterial(ctx, id, &normalized)
+}
+
+func (uc *MasterDataUsecase) GetMaterial(ctx context.Context, id int) (*Material, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.GetMaterial(ctx, id)
+}
+
+func (uc *MasterDataUsecase) ListMaterials(ctx context.Context, filter MasterDataFilter) ([]*Material, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	return uc.repo.ListMaterials(ctx, normalizeMasterDataFilter(filter))
+}
+
+func (uc *MasterDataUsecase) SetMaterialActive(ctx context.Context, id int, active bool) (*Material, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.SetMaterialActive(ctx, id, active)
+}
+
 func (uc *MasterDataUsecase) CreateContact(ctx context.Context, in *ContactMutation) (*Contact, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -309,6 +388,20 @@ func (uc *MasterDataUsecase) validateContactOwner(ctx context.Context, ownerType
 	return nil
 }
 
+func (uc *MasterDataUsecase) validateMaterialDefaultUnit(ctx context.Context, unitID int) error {
+	if unitID <= 0 {
+		return ErrBadParam
+	}
+	active, err := uc.repo.UnitIsActive(ctx, unitID)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return ErrUnitInactive
+	}
+	return nil
+}
+
 func normalizeCustomerMutation(in CustomerMutation) (CustomerMutation, error) {
 	in.Code = strings.TrimSpace(in.Code)
 	in.Name = strings.TrimSpace(in.Name)
@@ -330,6 +423,18 @@ func normalizeSupplierMutation(in SupplierMutation) (SupplierMutation, error) {
 	in.Note = normalizeOptionalString(in.Note)
 	if in.Code == "" || in.Name == "" {
 		return SupplierMutation{}, ErrBadParam
+	}
+	return in, nil
+}
+
+func normalizeMaterialMutation(in MaterialMutation) (MaterialMutation, error) {
+	in.Code = strings.TrimSpace(in.Code)
+	in.Name = strings.TrimSpace(in.Name)
+	in.Category = normalizeOptionalString(in.Category)
+	in.Spec = normalizeOptionalString(in.Spec)
+	in.Color = normalizeOptionalString(in.Color)
+	if in.Code == "" || in.Name == "" || in.DefaultUnitID <= 0 {
+		return MaterialMutation{}, ErrBadParam
 	}
 	return in, nil
 }

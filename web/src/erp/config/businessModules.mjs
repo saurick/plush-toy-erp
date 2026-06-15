@@ -15,6 +15,131 @@ const businessSectionTitleMap = new Map(
   businessSectionMeta.map((section) => [section.key, section.title])
 )
 
+const formalShellFormFieldLabelsByModuleKey = Object.freeze({
+  products: [
+    '产品编号',
+    '产品名称',
+    '产品分类',
+    '默认单位',
+    '产品状态',
+    'SKU / 规格',
+  ],
+  'material-bom': [
+    '产品',
+    'BOM 版本',
+    '材料',
+    '材料用量',
+    '损耗率',
+    'BOM 状态',
+  ],
+  'accessories-purchase': [
+    '采购单号',
+    '供应商',
+    '物料',
+    '采购数量',
+    '交期',
+    '收货 / 退货追溯',
+  ],
+  inbound: ['入库单号', '来源采购', '物料批次', '仓库', '入库数量', '质检状态'],
+  'quality-inspections': [
+    '质检单号',
+    '采购入库单',
+    '材料批次',
+    '抽检数量',
+    '判定',
+    '批次状态',
+  ],
+  inventory: ['物料 / 产品', '仓库', '批次', '当前余额', '可用量', '最近流水'],
+  'processing-contracts': [
+    '委外单号',
+    '加工厂',
+    '产品 / 工序',
+    '交期',
+    '合同状态',
+    '发料 / 回货',
+  ],
+  'production-scheduling': [
+    '销售订单',
+    '产品 / BOM',
+    '排程日期',
+    '生产负责人',
+    '齐套状态',
+    '延期风险',
+  ],
+  'production-progress': [
+    '生产任务',
+    '当前工序',
+    '完工数量',
+    '进度状态',
+    '成品入库状态',
+    '异常原因',
+  ],
+  'production-exceptions': [
+    '异常编号',
+    '来源任务',
+    '责任角色',
+    '异常类型',
+    '处理结论',
+    '阻塞 / 返工原因',
+  ],
+  'shipping-release': [
+    '销售订单',
+    '出货批次',
+    '库存检查',
+    '质检检查',
+    '财务检查',
+    '放行结论',
+  ],
+  outbound: [
+    '出库单号',
+    '来源出货',
+    '仓库 / 批次',
+    '出库数量',
+    '出库状态',
+    '冲正边界',
+  ],
+  shipments: [
+    '出货单号',
+    '销售订单',
+    '客户',
+    '出货明细',
+    'SHIPPED 状态',
+    '库存 OUT / REVERSAL',
+  ],
+  reconciliation: [
+    '对账对象',
+    '来源单据',
+    '应收 / 应付金额',
+    '差异金额',
+    '对账状态',
+    '差异原因',
+  ],
+  payables: [
+    '供应商 / 加工厂',
+    '来源单据',
+    '应付金额',
+    '付款提醒日',
+    '应付状态',
+    '结算说明',
+  ],
+  receivables: [
+    '客户',
+    '来源出货',
+    '应收金额',
+    '开票状态',
+    '应收状态',
+    '回款风险',
+  ],
+  invoices: [
+    '发票号码',
+    '客户 / 供应商',
+    '来源业务',
+    '开票金额',
+    '发票状态',
+    '发票附件',
+  ],
+})
+
 export const businessModuleDefinitions = Object.freeze([
   {
     key: 'customers',
@@ -63,6 +188,27 @@ export const businessModuleDefinitions = Object.freeze([
       '产品编号、名称、分类、默认单位',
       '产品状态和业务责任人',
       'SKU / 规格后续在详情内承载',
+    ],
+  },
+  {
+    key: 'materials',
+    sectionKey: 'master',
+    label: '材料档案',
+    title: '材料档案',
+    path: '/erp/master/materials',
+    shortLabel: '材料',
+    pageKind: 'formal-v1',
+    description:
+      '正式 materials 表入口，只维护材料主数据；采购、库存、质检和 BOM 用量在对应模块处理。',
+    primaryEntity: 'materials',
+    factSource: 'materials',
+    boundary:
+      '材料档案不等于采购订单、库存余额、来料质检或 BOM 用量；真实事实仍由对应领域 usecase 写入。',
+    sourceRefs: ['materials', 'units'],
+    currentScope: [
+      '材料编号、名称、分类、规格、颜色',
+      '默认单位和启停状态',
+      '采购、库存、质检、BOM 只引用材料主数据',
     ],
   },
   {
@@ -299,6 +445,27 @@ export const businessModuleDefinitions = Object.freeze([
     currentScope: ['待出库', '已出库', '缺料风险', '出库冲正边界'],
   },
   {
+    key: 'shipments',
+    sectionKey: 'shipment',
+    label: '出货单',
+    title: '出货单',
+    path: '/erp/warehouse/shipments',
+    shortLabel: '出货',
+    pageKind: 'formal-v1',
+    description:
+      '正式 shipments / shipment_items 出货事实入口；确认出货才写库存 OUT，取消已出货写 REVERSAL。',
+    primaryEntity: 'shipments / shipment_items',
+    factSource: 'shipments, shipment_items, inventory_txns',
+    boundary:
+      '出货放行只表示可发货，出库管理表达库存出库事实；只有出货单 SHIPPED 才是真实出货事实。',
+    sourceRefs: ['shipments', 'shipment_items', 'inventory_txns'],
+    currentScope: [
+      '出货单列表和明细查看',
+      '新建草稿和添加商品明细',
+      '确认出货写 OUT，取消已出货写 REVERSAL',
+    ],
+  },
+  {
     key: 'reconciliation',
     sectionKey: 'finance',
     label: '对账管理',
@@ -397,6 +564,11 @@ export function getFormalBusinessShellModules() {
     .map((moduleItem) => getBusinessModule(moduleItem.key))
     .filter(Boolean)
     .map((moduleItem) => ({ ...moduleItem }))
+}
+
+export function getFormalShellFormFieldLabels(moduleKey = '') {
+  const key = String(moduleKey || '').trim()
+  return [...(formalShellFormFieldLabelsByModuleKey[key] || [])]
 }
 
 export function getBusinessNavigationSections() {

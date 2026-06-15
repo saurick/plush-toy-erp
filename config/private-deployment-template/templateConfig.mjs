@@ -1,10 +1,10 @@
 export const privateDeploymentPackageTemplate = Object.freeze({
   templateKey: "private-customer-package",
   label: "多客户私有化复制包模板",
-  phase: "Phase 11",
+  reviewMilestone: "private-deployment-package-candidate",
   status: "template_candidate",
   runtimeEnabled: false,
-  simulatedCustomerKey: "SIM-PRIVATE-PHASE11",
+  simulatedCustomerKey: "SIM-PRIVATE-DEPLOYMENT",
   scope:
     "Prepare private customer package boundaries for docs, config and deployment reuse. This template is not a runtime loader and must not create a real customer package by itself.",
   sourcePolicy: Object.freeze({
@@ -93,8 +93,8 @@ export const privateDeploymentPackageTemplate = Object.freeze({
       boundary: "dry-run and evidence only unless a separate data governance task approves real import",
     },
     {
-      key: "phase-simulation-tools",
-      path: "scripts/qa/phase7-*.mjs scripts/qa/operational-fact-*.mjs scripts/qa/phase9-*.mjs",
+      key: "simulation-tools",
+      path: "scripts/qa/trial-*.mjs scripts/qa/operational-fact-*.mjs scripts/qa/mobile-workflow-*.mjs",
       boundary: "simulation only; all generated data must use explicit SIM prefixes",
     },
   ]),

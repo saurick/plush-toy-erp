@@ -53,7 +53,7 @@
 | 单位和精度来源 | 当前只有 `unit` 文本；库存写入需要结构化 `unit_id` 和 decimal 精度 / rounding 规则。 |
 | 成品主体来源 | 库存流水需要 `subject_type=PRODUCT + subject_id`；当前只有 `product_no/product_name` 快照，没有稳定 `finished_product_id / product_id / sku_id`。 |
 | 仓库 / 库位来源 | 库存写入需要 `warehouse_id`；当前成品入库任务没有稳定 `warehouse_id`，且项目仍未落 `warehouse_locations`。 |
-| 批次来源 | Phase 2B 已有 `inventory_lots`，但成品入库没有定义 `lot_id / lot_no / batch_no / production_lot_no` 来源和缺批次策略。 |
+| 批次来源 | BOM 与批次库存底座 已有 `inventory_lots`，但成品入库没有定义 `lot_id / lot_no / batch_no / production_lot_no` 来源和缺批次策略。 |
 | 来源行和幂等键 | `inventory_txns` 需要 `source_type + source_id + source_line_id` 或稳定 `idempotency_key`；当前 workflow 任务只有表头来源，缺少成品入库来源行。 |
 | 重复 done 防重 | workflow 派生任务的应用层幂等不等于库存事实幂等；库存必须使用 `inventory_txns.idempotency_key` 唯一约束。 |
 | 取消 / 冲正策略 | 库存错误必须追加 `REVERSAL`，不能改历史流水；第六条尚未定义从任务撤回到原流水定位和冲正的路径。 |
@@ -61,7 +61,7 @@
 | 并发余额更新 | `InventoryUsecase` 已能同事务写流水和余额，但 workflow transaction 与 inventory transaction 的边界尚未统一。 |
 | DB 约束 / 锁 | 若 workflow 和 inventory 合并，必须明确库存幂等 unique、业务来源 unique、必要的 DB lock 或 advisory lock。 |
 
-采购入库之所以能过账，是因为 Phase 2C 已有 `purchase_receipts / purchase_receipt_items` 作为来源头和来源行，并用 `purchase_receipt_items.id` 生成 `source_line_id` 和幂等键。成品入库目前还没有等价的生产完工 / 成品入库专表或确认行，所以不能把 workflow payload 当库存真源。
+采购入库之所以能过账，是因为 采购入库事实底座 已有 `purchase_receipts / purchase_receipt_items` 作为来源头和来源行，并用 `purchase_receipt_items.id` 生成 `source_line_id` 和幂等键。成品入库目前还没有等价的生产完工 / 成品入库专表或确认行，所以不能把 workflow payload 当库存真源。
 
 ## 5. 为什么不派生 `shipment_release`
 

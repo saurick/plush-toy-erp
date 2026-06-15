@@ -31,6 +31,7 @@ import {
   BusinessOperationPanel,
   CollaborationTaskPanel,
   BusinessPageLayout,
+  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -85,6 +86,20 @@ const STATUS_FILTER_OPTIONS = [
   { label: '已取消', value: 'canceled' },
 ]
 
+const DATE_FILTER_OPTIONS = [
+  { label: '订单日期', value: 'order_date' },
+  { label: '计划交付', value: 'planned_delivery_date' },
+]
+
+const SORT_FILTER_OPTIONS = [
+  { label: '最新优先', value: 'updated_at:desc' },
+  { label: '最早优先', value: 'updated_at:asc' },
+  { label: '订单日期新到旧', value: 'order_date:desc' },
+  { label: '订单日期旧到新', value: 'order_date:asc' },
+  { label: '交付日期新到旧', value: 'planned_delivery_date:desc' },
+  { label: '交付日期旧到新', value: 'planned_delivery_date:asc' },
+]
+
 const LIFECYCLE_ACTIONS = [
   {
     key: 'submit',
@@ -117,6 +132,12 @@ const SALES_ORDER_ITEMS_MODULE_KEY = 'sales-order-items'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const OPEN_LINE_STATUS = 'open'
 const BUSINESS_FORM_MODAL_WIDTH = 'min(960px, calc(100vw - 96px))'
+
+function parseSortFilterValue(value = 'updated_at:desc') {
+  const [sortBy = 'updated_at', sortDirection = 'desc'] =
+    String(value).split(':')
+  return { sortBy, sortDirection }
+}
 
 function readStoredColumnOrder(moduleKey) {
   if (typeof window === 'undefined') {
@@ -553,6 +574,10 @@ export default function V1SalesOrdersPage() {
   const [saving, setSaving] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [dateFilterField, setDateFilterField] = useState('order_date')
+  const [dateFilterStart, setDateFilterStart] = useState('')
+  const [dateFilterEnd, setDateFilterEnd] = useState('')
+  const [sortFilter, setSortFilter] = useState('updated_at:desc')
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState([])
   const [customers, setCustomers] = useState([])
@@ -620,9 +645,15 @@ export default function V1SalesOrdersPage() {
   const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
+      const { sortBy, sortDirection } = parseSortFilterValue(sortFilter)
       const result = await listSalesOrders({
         keyword,
         lifecycle_status: statusFilter,
+        date_field: dateFilterField,
+        date_from: dateFilterStart || undefined,
+        date_to: dateFilterEnd || undefined,
+        sort_by: sortBy,
+        sort_direction: sortDirection,
         limit: 100,
       })
       const nextOrders = Array.isArray(result?.sales_orders)
@@ -645,7 +676,14 @@ export default function V1SalesOrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [keyword, statusFilter])
+  }, [
+    dateFilterEnd,
+    dateFilterField,
+    dateFilterStart,
+    keyword,
+    sortFilter,
+    statusFilter,
+  ])
 
   useEffect(() => {
     loadCustomers()
@@ -1178,6 +1216,21 @@ export default function V1SalesOrdersPage() {
               options={STATUS_FILTER_OPTIONS}
               value={statusFilter}
               onChange={setStatusFilter}
+            />
+            <DateRangeFilter
+              options={DATE_FILTER_OPTIONS}
+              value={dateFilterField}
+              onTypeChange={setDateFilterField}
+              startValue={dateFilterStart}
+              endValue={dateFilterEnd}
+              onStartChange={setDateFilterStart}
+              onEndChange={setDateFilterEnd}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--sort"
+              options={SORT_FILTER_OPTIONS}
+              value={sortFilter}
+              onChange={setSortFilter}
             />
           </>
         }

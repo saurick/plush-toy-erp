@@ -132,6 +132,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
       ...masterModulePaths,
       ...salesModulePaths,
       '/erp/warehouse/shipping-release',
+      '/erp/warehouse/shipments',
       '/erp/finance/receivables',
       '/erp/finance/invoices',
     ]),

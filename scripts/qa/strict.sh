@@ -11,21 +11,22 @@ print_help() {
 
 检查内容:
   1) db-guard + secrets
-  2) core-boundary
-  3) industry-template-boundaries
-  4) private-deployment-boundaries
-  5) deployment-package-lint
-  6) customer-config-boundaries
-  7) customer-import-tooling
-  8) phase7-simulated-trial-data
-  9) operational-fact-simulated-closure
-  10) phase9-simulated-mobile-closure
-  11) phase10-industry-template-closure
-  12) phase11-private-deployment-closure
-  13) shellcheck + shfmt（可选）
-  14) govulncheck（可选）
-  15) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  16) server: go test ./... + make build
+  2) phase-label-boundaries
+  3) core-boundary
+  4) industry-template-boundaries
+  5) private-deployment-boundaries
+  6) deployment-package-lint
+  7) customer-config-boundaries
+  8) customer-import-tooling
+  9) trial-simulated-data
+  10) operational-fact-simulated-closure
+  11) mobile-workflow-simulated-closure
+  12) industry-template-closure
+  13) private-deployment-package-closure
+  14) shellcheck + shfmt（可选）
+  15) govulncheck（可选）
+  16) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  17) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -75,13 +76,18 @@ if [ -f "$ROOT_DIR/scripts/qa/core-boundary.test.mjs" ]; then
   node --test "$ROOT_DIR/scripts/qa/core-boundary.test.mjs"
 fi
 
+if [ -f "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs" ]; then
+  echo "[qa:strict] 运行活跃路径 Phase 标签边界检查"
+  node "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs"
+fi
+
 if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
-  echo "[qa:strict] 运行 Phase 10 行业模板候选边界检查"
+  echo "[qa:strict] 运行行业模板候选边界检查"
   node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs" ]; then
-  echo "[qa:strict] 运行 Phase 11 多客户私有化复制边界检查"
+  echo "[qa:strict] 运行多客户私有化复制边界检查"
   node "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs"
 fi
 
@@ -107,9 +113,9 @@ if ls "$ROOT_DIR"/scripts/import/*.test.mjs >/dev/null 2>&1; then
   done
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs" ]; then
-  echo "[qa:strict] 运行 Phase 7 模拟数据工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase7-simulated-trial-data.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs" ]; then
+  echo "[qa:strict] 运行试用模拟数据工具测试"
+  node --test "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs" ]; then
@@ -117,19 +123,19 @@ if [ -f "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs" ]; th
   node --test "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行 Phase 9 模拟岗位任务闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase9-simulated-mobile-closure.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs" ]; then
+  echo "[qa:strict] 运行岗位任务端模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行 Phase 10 行业模板模拟闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase10-industry-template-closure.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/industry-template-closure.test.mjs" ]; then
+  echo "[qa:strict] 运行行业模板模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/industry-template-closure.test.mjs"
 fi
 
-if [ -f "$ROOT_DIR/scripts/qa/phase11-private-deployment-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行 Phase 11 多客户私有化复制模拟闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/phase11-private-deployment-closure.test.mjs"
+if [ -f "$ROOT_DIR/scripts/qa/private-deployment-package-closure.test.mjs" ]; then
+  echo "[qa:strict] 运行多客户私有化复制模拟闭环工具测试"
+  node --test "$ROOT_DIR/scripts/qa/private-deployment-package-closure.test.mjs"
 fi
 
 if [[ "${STRICT_SKIP_SHELLCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/shellcheck.sh" ]; then

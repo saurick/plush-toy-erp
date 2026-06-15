@@ -64,6 +64,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
+				PermissionShipmentRead,
 				PermissionMobileBossAccess,
 			},
 			omits: []string{PermissionWorkflowTaskComplete, PermissionDebugBusinessClear},
@@ -86,6 +87,9 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
 				PermissionWorkflowTaskReject,
+				PermissionShipmentRead,
+				PermissionShipmentShip,
+				PermissionShipmentCancel,
 				PermissionMobileWarehouseAccess,
 			},
 			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
@@ -107,6 +111,9 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionMaterialRead,
+				PermissionMaterialCreate,
+				PermissionMaterialUpdate,
 				PermissionMobilePurchaseAccess,
 			},
 			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
@@ -118,6 +125,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
 				PermissionWorkflowTaskReject,
+				PermissionShipmentRead,
 				PermissionMobileFinanceAccess,
 			},
 			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
@@ -128,6 +136,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,
+				PermissionShipmentRead,
 				PermissionMobilePMCAccess,
 			},
 			omits: []string{PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
@@ -139,6 +148,8 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionShipmentRead,
+				PermissionShipmentCreate,
 				PermissionMobileSalesAccess,
 			},
 			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
@@ -200,12 +211,14 @@ func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 		Permissions: []string{
 			PermissionCustomerRead,
 			PermissionSupplierRead,
+			PermissionMaterialRead,
 			PermissionSalesOrderRead,
 			PermissionPurchaseOrderRead,
 			PermissionPurchaseReceiptRead,
 			PermissionWarehouseInventoryRead,
 			PermissionWarehouseInboundRead,
 			PermissionWarehouseOutboundRead,
+			PermissionShipmentRead,
 			PermissionQualityInspectionRead,
 			PermissionFinancePayableRead,
 			PermissionFinanceReceivableRead,
@@ -231,6 +244,9 @@ func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 	if _, ok := paths["/erp/master/products"]; !ok {
 		t.Fatalf("expected products formal shell menu")
 	}
+	if _, ok := paths["/erp/master/materials"]; !ok {
+		t.Fatalf("expected materials formal master data menu")
+	}
 	if _, ok := paths["/erp/purchase/material-bom"]; !ok {
 		t.Fatalf("expected BOM formal shell menu")
 	}
@@ -242,6 +258,9 @@ func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 	}
 	if _, ok := paths["/erp/finance/receivables"]; !ok {
 		t.Fatalf("expected receivables formal shell menu")
+	}
+	if _, ok := paths["/erp/warehouse/shipments"]; !ok {
+		t.Fatalf("expected shipments formal fact menu")
 	}
 	if _, ok := paths["/erp/master/partners"]; ok {
 		t.Fatalf("old partners business_records entry must not be a visible formal menu")

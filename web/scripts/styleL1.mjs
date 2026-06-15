@@ -3035,7 +3035,7 @@ const scenarios = [
       await verifyBusinessRowDoubleClickEditModal(page, {
         rowText: '样式供应商',
         titleText: '编辑主体',
-        drawerTitleText: '主数据详情',
+        drawerTitleText: '供应商档案详情',
         detailMatchText: '样式供应商',
         scenarioName: 'business-v1-suppliers',
       })
@@ -3068,7 +3068,7 @@ const scenarios = [
       await verifyBusinessRowDoubleClickEditModal(page, {
         rowText: '暗色客户',
         titleText: '编辑主体',
-        drawerTitleText: '主数据详情',
+        drawerTitleText: '客户档案详情',
         detailMatchText: '暗色客户',
         scenarioName: 'business-v1-customers',
       })
@@ -3148,6 +3148,13 @@ const scenarios = [
         scenarioName: 'business-standard-bom',
         expectedCount: 3,
       })
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建BOM',
+        titleText: '新建BOM',
+        minFieldCount: 10,
+        screenshotName: 'business-formal-bom-create-form-modal',
+        expectedTexts: ['BOM 版本', '材料用量', '损耗率'],
+      })
       await assertNoHorizontalOverflow(page, 'business-standard-bom')
 
       await gotoScenarioPath(page, '/erp/warehouse/inventory', {
@@ -3159,11 +3166,13 @@ const scenarios = [
         titleText: '新建库存调整',
         minFieldCount: 8,
         screenshotName: 'business-formal-inventory-create-form-modal',
+        expectedTexts: ['当前余额', '可用量', '最近流水'],
       })
       await verifyFormalShellRowDoubleClickEditModal(page, {
         rowText: 'INVENTORY-002',
         moduleTitle: '库存台账',
         scenarioName: 'business-standard-inventory',
+        expectedTexts: ['当前余额', '可用量', '最近流水'],
       })
       await assertNoHorizontalOverflow(page, 'business-standard-inventory')
 
@@ -3177,6 +3186,13 @@ const scenarios = [
       await expectText(page, '生成应收')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建应收',
+        titleText: '新建应收',
+        minFieldCount: 10,
+        screenshotName: 'business-formal-receivables-create-form-modal',
+        expectedTexts: ['来源出货', '应收金额', '回款风险'],
+      })
       await assertNoHorizontalOverflow(page, 'business-standard-receivables')
     },
   },
@@ -5296,7 +5312,13 @@ async function readBusinessModuleHeaderLabels(page) {
 
 async function verifyBusinessActionFormModal(
   page,
-  { buttonName, titleText, minFieldCount = 4, screenshotName }
+  {
+    buttonName,
+    titleText,
+    minFieldCount = 4,
+    screenshotName,
+    expectedTexts = [],
+  }
 ) {
   await page.getByRole('button', { name: buttonName }).click()
   const modal = page
@@ -5329,6 +5351,9 @@ async function verifyBusinessActionFormModal(
     })
     return {
       className: String(node.className || ''),
+      textContent: String(node.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim(),
       titleText: title?.textContent?.replace(/\s+/g, ' ').trim() || '',
       hasSubtitle: Boolean(title?.querySelector('small')),
       body: body
@@ -5362,6 +5387,12 @@ async function verifyBusinessActionFormModal(
     metrics.fieldItemCount >= minFieldCount,
     `${screenshotName} 表单字段数量不足: ${JSON.stringify(metrics)}`
   )
+  for (const expectedText of expectedTexts) {
+    assert(
+      metrics.textContent.includes(expectedText),
+      `${screenshotName} 缺少产品核心字段 ${expectedText}: ${JSON.stringify(metrics)}`
+    )
+  }
   assert(
     metrics.gridTemplateColumns.split(' ').length >= 2,
     `${screenshotName} 桌面表单未使用多列表格化布局: ${JSON.stringify(metrics)}`
@@ -9430,7 +9461,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
 
 async function verifyFormalShellRowDoubleClickEditModal(
   page,
-  { rowText, moduleTitle, scenarioName }
+  { rowText, moduleTitle, scenarioName, expectedTexts = [] }
 ) {
   const row = page
     .locator('.erp-business-data-table-card .ant-table-tbody tr')
@@ -9468,6 +9499,14 @@ async function verifyFormalShellRowDoubleClickEditModal(
       visibleFormModals: Array.from(
         document.querySelectorAll('.erp-business-action-modal--form.ant-modal')
       ).filter(isVisible).length,
+      textContent: Array.from(
+        document.querySelectorAll('.erp-business-action-modal--form.ant-modal')
+      )
+        .filter(isVisible)
+        .map((node) => String(node.textContent || ''))
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim(),
       formFieldCount: document.querySelectorAll(
         '.erp-business-action-modal--form .erp-business-action-form__field'
       ).length,
@@ -9496,6 +9535,12 @@ async function verifyFormalShellRowDoubleClickEditModal(
     modalMetrics.formFieldCount >= 8,
     `${scenarioName} 正式业务壳编辑弹窗字段不足: ${JSON.stringify(modalMetrics)}`
   )
+  for (const expectedText of expectedTexts) {
+    assert(
+      modalMetrics.textContent.includes(expectedText),
+      `${scenarioName} 编辑弹窗缺少产品核心字段 ${expectedText}: ${JSON.stringify(modalMetrics)}`
+    )
+  }
 
   await modal.locator('.ant-modal-close').click({ force: true })
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })

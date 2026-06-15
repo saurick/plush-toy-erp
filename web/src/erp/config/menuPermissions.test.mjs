@@ -135,6 +135,7 @@ test('menuPermissions: 主数据与正式业务入口纳入角色预设', () => 
   assert(permissionKeys.includes('/erp/master/partners/customers'))
   assert(permissionKeys.includes('/erp/master/partners/suppliers'))
   assert(permissionKeys.includes('/erp/master/products'))
+  assert(permissionKeys.includes('/erp/master/materials'))
   assert(!permissionKeys.includes('/erp/master/partners'))
   assert(!permissionKeys.includes('/erp/sales/project-orders'))
   assert(permissionKeys.includes('/erp/sales/project-orders/sales-orders'))
@@ -142,6 +143,7 @@ test('menuPermissions: 主数据与正式业务入口纳入角色预设', () => 
   assert(permissionKeys.includes('/erp/purchase/accessories'))
   assert(permissionKeys.includes('/erp/warehouse/inbound'))
   assert(permissionKeys.includes('/erp/warehouse/inventory'))
+  assert(permissionKeys.includes('/erp/warehouse/shipments'))
   assert(permissionKeys.includes('/erp/production/quality-inspections'))
   assert(permissionKeys.includes('/erp/finance/receivables'))
 
@@ -155,6 +157,10 @@ test('menuPermissions: 主数据与正式业务入口纳入角色预设', () => 
         preset.permissions.includes('/erp/master/partners/suppliers'),
         `expected ${preset.key} to include suppliers`
       )
+      assert(
+        preset.permissions.includes('/erp/master/materials'),
+        `expected ${preset.key} to include materials`
+      )
     }
   )
   const salesPreset = ERP_PERMISSION_PRESETS.find(
@@ -163,6 +169,7 @@ test('menuPermissions: 主数据与正式业务入口纳入角色预设', () => 
   assert(
     salesPreset.permissions.includes('/erp/sales/project-orders/sales-orders')
   )
+  assert(salesPreset.permissions.includes('/erp/warehouse/shipments'))
 })
 
 test('menuPermissions: 当前权限项不包含前端文档或开发验收路径', () => {

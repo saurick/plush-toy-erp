@@ -1,6 +1,6 @@
 # 材料 / 产品 / 库存 schema 早期评审记录 / Material Product Inventory Schema Review
 
-> 当前状态：本文是早期 schema 评审记录，已经被后续 Ent schema、Atlas migration、InventoryUsecase、Purchase/Quality/Phase 8 fact usecase 和 `business_records` 删除闭环替代。当前实现真源以 `docs/current-source-of-truth.md`、领域 usecase、Ent schema 和测试为准。
+> 当前状态：本文是早期 schema 评审记录，已经被后续 Ent schema、Atlas migration、InventoryUsecase、Purchase/Quality/operational fact usecase 和 `business_records` 删除闭环替代。当前实现真源以 `docs/current-source-of-truth.md`、领域 usecase、Ent schema 和测试为准。
 
 ## 当前结论
 
@@ -9,7 +9,7 @@
 - 当前库存事实真源是 `inventory_txns`；`inventory_balances` 是当前余额 / 查询加速表；`inventory_lots` 是批次追溯和批次可用性状态真源。
 - 当前主数据和工程资料底座包括 `units`、`materials`、`products`、`warehouses`、`bom_headers`、`bom_items`。
 - 当前采购和质检最小事实包括 `purchase_receipts`、`purchase_returns`、`purchase_receipt_adjustments`、`quality_inspections`。
-- 当前 Phase 8 最小事实包括 `production_facts`、`outsourcing_facts`、`shipments`、`shipment_items`、`stock_reservations`、`finance_facts`。
+- 当前业务事实最小实现包括 `production_facts`、`outsourcing_facts`、`shipments`、`shipment_items`、`stock_reservations`、`finance_facts`。
 
 ## 仍有效的设计边界
 
@@ -28,5 +28,5 @@
 - 模块边界：`docs/product/module-boundaries.md`
 - 订单 / 采购边界：`docs/architecture/order-purchase-boundary-review.md`
 - 状态 / Workflow / Fact 边界：`docs/architecture/status-workflow-fact-boundary.md`
-- Phase 8 事实层：`docs/architecture/phase8-fact-expansion-review.md`
+- 业务事实扩展：`docs/architecture/operational-fact-expansion-review.md`
 - 删除完成记录：`docs/product/business-records-cutover-plan.md`

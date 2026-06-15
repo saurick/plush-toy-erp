@@ -2,7 +2,7 @@
 
 ## 结论
 
-现有 `products / materials / units / warehouses / bom_headers / bom_items` 已经是当前最小主数据与工程资料真源。Phase 1 可以提出 `product_skus` 和 BOM version 扩展草案，但不得重复设计已存在的 `products / materials / units / bom_*`，也不得把 永绅 yoyoosun 客户 Excel 字段直接写成 Product Core 必填字段。
+现有 `products / materials / units / warehouses / bom_headers / bom_items` 已经是当前最小主数据与工程资料真源。早期 V1 可以提出 `product_skus` 和 BOM version 扩展草案，但不得重复设计已存在的 `products / materials / units / bom_*`，也不得把 永绅 yoyoosun 客户 Excel 字段直接写成 Product Core 必填字段。
 
 ```text
 BOM 是工程资料 / 物料需求来源。
@@ -60,7 +60,7 @@ SKU 不应承接：
 
 ## BOM 按 product 还是 sku
 
-当前已实现的 BOM 是按 `product_id`。Phase 1 推荐：
+当前已实现的 BOM 是按 `product_id`。早期 V1 推荐：
 
 - V1 保持现有 product-level BOM 作为主路径。
 - 如果同一产品不同颜色 / 尺寸的材料用量、颜色、包装差异会影响采购需求，则评审 BOM header 可选 `product_sku_id`。

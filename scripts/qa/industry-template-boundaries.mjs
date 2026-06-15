@@ -72,7 +72,11 @@ function collectNavigationItemKeys() {
 
 function validateTemplate(config) {
   assert(config.templateKey === "plush", "templateKey must stay plush");
-  assert(config.phase === "Phase 10", "phase must stay Phase 10");
+  assert(
+    config.reviewMilestone === "industry-template-candidate",
+    "reviewMilestone must stay industry-template-candidate",
+  );
+  assert(config["phase"] === undefined, "phase must not be used in active templates");
   assert(config.status === "candidate", "status must stay candidate");
   assert(config.runtimeEnabled === false, "runtimeEnabled must stay false");
 

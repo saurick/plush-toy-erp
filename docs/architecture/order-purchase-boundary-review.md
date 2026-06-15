@@ -2,7 +2,7 @@
 
 ## 结论
 
-`sales_order` 是业务源单据，不是出货事实。`purchase_order` 是采购承诺，不是采购入库事实。当前已经存在的 `purchase_receipts / purchase_returns / purchase_receipt_adjustments + inventory_txns` 承担采购入库、退货、调整和库存落账事实；Phase 1 不应重复设计这些事实表。
+`sales_order` 是业务源单据，不是出货事实。`purchase_order` 是采购承诺，不是采购入库事实。当前已经存在的 `purchase_receipts / purchase_returns / purchase_receipt_adjustments + inventory_txns` 承担采购入库、退货、调整和库存落账事实；早期 V1 不应重复设计这些事实表。
 
 ```text
 sales_order = 业务承诺。

@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { privateDeploymentPackageTemplate } from "../../config/private-deployment-template/templateConfig.mjs";
 import { plushIndustryTemplateConfig } from "../../config/industry-templates/plush/templateConfig.mjs";
 
-const DEFAULT_OUT_DIR = "output/customers/yoyoosun/phase11-private-deployment-closure";
+const DEFAULT_OUT_DIR = "output/customers/yoyoosun/private-deployment-package-closure";
 
 function parseArgs(argv) {
   const options = { out: DEFAULT_OUT_DIR };
@@ -31,10 +31,10 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.log(`Usage:
-  node scripts/qa/phase11-private-deployment-closure.mjs [--out <dir>]
+  node scripts/qa/private-deployment-package-closure.mjs [--out <dir>]
 
 Purpose:
-  Generate Phase 11 private deployment package simulation evidence.
+  Generate private deployment package simulation evidence.
 
 Boundaries:
   - reads only private deployment and industry template configs
@@ -68,7 +68,7 @@ function createReport(packageTemplate, industryTemplate) {
   return {
     generatedAt: new Date().toISOString(),
     host: os.hostname(),
-    phase: packageTemplate.phase,
+    reviewMilestone: packageTemplate.reviewMilestone,
     templateKey: packageTemplate.templateKey,
     status: packageTemplate.status,
     runtimeEnabled: packageTemplate.runtimeEnabled,
@@ -94,8 +94,8 @@ function createReport(packageTemplate, industryTemplate) {
     },
     simulatedAcceptance: acceptance,
     finalDecision: {
-      phase11ClosedBySimulation: Object.values(acceptance).every(Boolean),
-      nextStep: "post-delivery customer usage feedback or Phase 12 SaaS review only after private deployments mature",
+      closedBySimulation: Object.values(acceptance).every(Boolean),
+      nextStep: "post-delivery customer usage feedback or SaaS review only after private deployments mature",
       stillNotAllowed: [
         "real customer data import",
         "tenant_id",
@@ -114,13 +114,13 @@ function renderMarkdown(report) {
     .map(([key, value]) => `| ${key} | ${value ? "PASS" : "FAIL"} |`)
     .join("\n");
 
-  return `# Phase 11 多客户私有化复制模拟闭环报告 / Phase 11 Private Deployment Package Simulation Report
+  return `# 多客户私有化复制模拟闭环报告 / Private Deployment Package Simulation Report
 
 ## 摘要
 
 | 项目 | 结果 |
 | --- | --- |
-| phase | ${report.phase} |
+| reviewMilestone | ${report.reviewMilestone} |
 | templateKey | ${report.templateKey} |
 | status | ${report.status} |
 | runtimeEnabled | ${report.runtimeEnabled} |
@@ -151,13 +151,13 @@ ${report.finalDecision.stillNotAllowed.map((item) => `- ${item}`).join("\n")}
 `;
 }
 
-export function runPhase11PrivateDeploymentClosure(options) {
+export function runPrivateDeploymentPackageClosure(options) {
   const report = createReport(privateDeploymentPackageTemplate, plushIndustryTemplateConfig);
   const outDir = path.resolve(options.out || DEFAULT_OUT_DIR);
   fs.mkdirSync(outDir, { recursive: true });
 
-  const jsonPath = path.join(outDir, "phase11-private-deployment-report.json");
-  const mdPath = path.join(outDir, "phase11-private-deployment-report.md");
+  const jsonPath = path.join(outDir, "private-deployment-package-report.json");
+  const mdPath = path.join(outDir, "private-deployment-package-report.md");
   fs.writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   fs.writeFileSync(mdPath, renderMarkdown(report));
 
@@ -178,13 +178,12 @@ if (isCli) {
       printHelp();
       process.exit(0);
     }
-    const result = runPhase11PrivateDeploymentClosure(options);
+    const result = runPrivateDeploymentPackageClosure(options);
     console.log(
-      `phase11 private deployment closure ok: ${result.report.templateKey}, packageRoots=${result.report.summary.packageRoots}, simulatedKey=${result.report.simulatedCustomerKey}, out=${result.outDir}`,
+      `private deployment package closure ok: ${result.report.templateKey}, packageRoots=${result.report.summary.packageRoots}, simulatedKey=${result.report.simulatedCustomerKey}, out=${result.outDir}`,
     );
   } catch (error) {
-    console.error(`[phase11-private-deployment-closure] ${error.message}`);
+    console.error(`[private-deployment-package-closure] ${error.message}`);
     process.exit(1);
   }
 }
-

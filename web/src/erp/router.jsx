@@ -48,6 +48,7 @@ const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
 const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
+const ShipmentsPage = lazy(() => import('./pages/ShipmentsPage.jsx'))
 const FormalBusinessModulePage = lazy(
   () => import('./pages/FormalBusinessModulePage.jsx')
 )
@@ -308,9 +309,14 @@ export default function ERPRouter() {
             element={<V1MasterDataPage type="suppliers" />}
           />
           <Route
+            path="master/materials"
+            element={<V1MasterDataPage type="materials" />}
+          />
+          <Route
             path="sales/project-orders/sales-orders"
             element={<V1SalesOrdersPage />}
           />
+          <Route path="warehouse/shipments" element={<ShipmentsPage />} />
           {formalBusinessShellModules.map((moduleItem) => (
             <Route
               key={moduleItem.key}

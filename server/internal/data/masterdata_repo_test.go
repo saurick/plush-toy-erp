@@ -96,6 +96,69 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	}
 }
 
+func TestMasterDataRepoMaterialCRUDAndUnitGuard(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openMasterDataRepoTest(t, "masterdata_repo_materials")
+	defer mustCloseEntClient(t, client)
+
+	unitRow, err := client.Unit.Create().SetCode("PCS").SetName("个").Save(ctx)
+	if err != nil {
+		t.Fatalf("create unit failed: %v", err)
+	}
+	category := "填充"
+	spec := "7D"
+	color := "白色"
+	material, err := uc.CreateMaterial(ctx, &biz.MaterialMutation{
+		Code:          "M-001",
+		Name:          "PP 棉",
+		Category:      &category,
+		Spec:          &spec,
+		Color:         &color,
+		DefaultUnitID: unitRow.ID,
+	})
+	if err != nil {
+		t.Fatalf("create material failed: %v", err)
+	}
+	if material.DefaultUnitID != unitRow.ID || material.Category == nil || *material.Category != category {
+		t.Fatalf("expected material fields retained, got %#v", material)
+	}
+	if _, err := uc.CreateMaterial(ctx, &biz.MaterialMutation{Code: "M-001", Name: "重复材料", DefaultUnitID: unitRow.ID}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected duplicate material code rejected, got %v", err)
+	}
+	if _, err := uc.CreateMaterial(ctx, &biz.MaterialMutation{Code: "M-002", Name: "缺单位", DefaultUnitID: 999999}); !errors.Is(err, biz.ErrUnitNotFound) {
+		t.Fatalf("expected missing unit rejected, got %v", err)
+	}
+
+	updated, err := uc.UpdateMaterial(ctx, material.ID, &biz.MaterialMutation{
+		Code:          "M-001-A",
+		Name:          "PP 棉 A",
+		DefaultUnitID: unitRow.ID,
+	})
+	if err != nil {
+		t.Fatalf("update material failed: %v", err)
+	}
+	if updated.Category != nil || updated.Spec != nil || updated.Color != nil {
+		t.Fatalf("expected optional material fields cleared, got %#v", updated)
+	}
+	if _, err := uc.SetMaterialActive(ctx, material.ID, false); err != nil {
+		t.Fatalf("disable material failed: %v", err)
+	}
+	list, total, err := uc.ListMaterials(ctx, biz.MasterDataFilter{Keyword: "PP", Limit: 20})
+	if err != nil {
+		t.Fatalf("list materials failed: %v", err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("expected one material, total=%d len=%d", total, len(list))
+	}
+	activeList, activeTotal, err := uc.ListMaterials(ctx, biz.MasterDataFilter{ActiveOnly: true})
+	if err != nil {
+		t.Fatalf("list active materials failed: %v", err)
+	}
+	if activeTotal != 0 || len(activeList) != 0 {
+		t.Fatalf("expected inactive material filtered out, total=%d len=%d", activeTotal, len(activeList))
+	}
+}
+
 func TestMasterDataRepoContactOwnerGuardAndPrimaryStrategy(t *testing.T) {
 	ctx := context.Background()
 	uc, client := openMasterDataRepoTest(t, "masterdata_repo_contacts")

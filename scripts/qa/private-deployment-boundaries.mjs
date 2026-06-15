@@ -6,9 +6,9 @@ import { privateDeploymentPackageTemplate } from "../../config/private-deploymen
 import { plushIndustryTemplateConfig } from "../../config/industry-templates/plush/templateConfig.mjs";
 
 const FORBIDDEN_SIMULATED_DIRS = [
-  "docs/customers/SIM-PRIVATE-PHASE11",
-  "config/customers/SIM-PRIVATE-PHASE11",
-  "deployments/SIM-PRIVATE-PHASE11",
+  "docs/customers/SIM-PRIVATE-DEPLOYMENT",
+  "config/customers/SIM-PRIVATE-DEPLOYMENT",
+  "deployments/SIM-PRIVATE-DEPLOYMENT",
 ];
 
 function assert(condition, message) {
@@ -33,10 +33,14 @@ function assertPathExists(repoRoot, relativePath) {
 
 function validateTemplate(config, repoRoot = process.cwd()) {
   assert(config.templateKey === "private-customer-package", "templateKey must stay private-customer-package");
-  assert(config.phase === "Phase 11", "phase must stay Phase 11");
+  assert(
+    config.reviewMilestone === "private-deployment-package-candidate",
+    "reviewMilestone must stay private-deployment-package-candidate",
+  );
+  assert(config["phase"] === undefined, "phase must not be used in active templates");
   assert(config.status === "template_candidate", "status must stay template_candidate");
   assert(config.runtimeEnabled === false, "runtimeEnabled must stay false");
-  assert(config.simulatedCustomerKey === "SIM-PRIVATE-PHASE11", "simulatedCustomerKey must stay simulation-only");
+  assert(config.simulatedCustomerKey === "SIM-PRIVATE-DEPLOYMENT", "simulatedCustomerKey must stay simulation-only");
 
   assert(config.sourcePolicy?.industryTemplateKey === "plush", "industryTemplateKey must stay plush");
   assert(config.sourcePolicy?.industryTemplateMustRemainCandidate === true, "industry template must remain candidate");
@@ -93,4 +97,3 @@ console.log(
 );
 
 export { validateTemplate };
-

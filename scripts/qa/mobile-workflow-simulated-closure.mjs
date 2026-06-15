@@ -7,9 +7,9 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR =
-  "output/customers/yoyoosun/phase9-simulated-mobile-closure";
-const SIMULATION_PREFIX = "SIM-YOYOOSUN-PHASE9";
-const CONFIRM_PHRASE = "APPLY_SIMULATED_PHASE9_MOBILE_TASKS";
+  "output/customers/yoyoosun/mobile-workflow-simulated-closure";
+const SIMULATION_PREFIX = "SIM-YOYOOSUN-MOBILE-WORKFLOW";
+const CONFIRM_PHRASE = "APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS";
 const FORBIDDEN_ARG_PATTERN =
   /--(?:execute|import|real|real-import|customer-data)/u;
 
@@ -20,15 +20,15 @@ const ROLE_USERS = {
   warehouse: "demo_warehouse",
 };
 
-const USAGE = `Phase 9 simulated mobile task closure
+const USAGE = `Mobile workflow simulated closure
 
 Usage:
-  node scripts/qa/phase9-simulated-mobile-closure.mjs
+  node scripts/qa/mobile-workflow-simulated-closure.mjs
 
-Apply simulated Phase 9 workflow tasks through JSON-RPC:
-  PHASE9_SIM_CONFIRM=APPLY_SIMULATED_PHASE9_MOBILE_TASKS \\
-  PHASE9_SIM_PASSWORD='replace-with-password' \\
-    node scripts/qa/phase9-simulated-mobile-closure.mjs \\
+Apply simulated mobile workflow tasks through JSON-RPC:
+  MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS \\
+  MOBILE_WORKFLOW_SIM_PASSWORD='replace-with-password' \\
+    node scripts/qa/mobile-workflow-simulated-closure.mjs \\
       --apply \\
       --backend-url http://127.0.0.1:8300
 
@@ -39,7 +39,7 @@ Options:
   --run-id <text>      Optional unique run suffix. Default timestamp.
   --help               Print this help.
 
-This script only writes explicitly marked simulated Phase 9 workflow tasks. It never
+This script only writes explicitly marked simulated mobile workflow tasks. It never
 imports real customer data, never writes business_records directly, never creates
 schema or migrations, and never posts production, shipment, inventory, reservation,
 or finance facts.`;
@@ -97,14 +97,14 @@ function parseCliArgs(argv) {
     apply: false,
     help: false,
     out: DEFAULT_OUT_DIR,
-    backendURL: process.env.PHASE9_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
-    runId: process.env.PHASE9_SIM_RUN_ID || buildTimestampRunId(),
+    backendURL: process.env.MOBILE_WORKFLOW_SIM_BACKEND_URL || DEFAULT_BACKEND_URL,
+    runId: process.env.MOBILE_WORKFLOW_SIM_RUN_ID || buildTimestampRunId(),
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (FORBIDDEN_ARG_PATTERN.test(token)) {
       throw new CliError(
-        `Phase 9 simulated mobile closure refuses real import style flag: ${token}`,
+        `Mobile workflow simulated closure refuses real import style flag: ${token}`,
         2,
       );
     }
@@ -194,10 +194,10 @@ function buildTask(prefix, task) {
     payload: {
       simulated_only: true,
       simulation_prefix: SIMULATION_PREFIX,
-      phase9_mobile_task: true,
-      customer_name: "Phase 9 模拟客户",
-      style_no: "PHASE9-MOBILE",
-      product_name: "Phase 9 模拟产品",
+      mobile_workflow_task: true,
+      customer_name: "Mobile workflow 模拟客户",
+      style_no: "MOBILE-WORKFLOW",
+      product_name: "Mobile workflow 模拟产品",
       quantity: "24",
       unit: "pcs",
       critical_path: true,
@@ -214,11 +214,11 @@ function buildPlan(options) {
   const dueAt = nowSec + 86400;
   return {
     customerKey: "yoyoosun",
-    phase: "Phase 9",
+    scenario: "mobile-workflow-simulated-closure",
     simulatedOnly: true,
     realCustomerImport: false,
     factPosting: false,
-    customerAcceptanceRequiredForPhaseClosure: false,
+    customerAcceptanceRequiredForClosure: false,
     simulationPrefix: SIMULATION_PREFIX,
     runId: options.runId,
     backendURL: options.backendURL,
@@ -226,7 +226,7 @@ function buildPlan(options) {
       approval: buildTask(prefix, {
         code: "APPROVAL",
         group: "order_approval",
-        name: "Phase 9 模拟老板审批",
+        name: "Mobile workflow 模拟老板审批",
         sourceType: "project-orders",
         sourceId: 910001,
         sourceNo: "SO-APPROVAL",
@@ -242,7 +242,7 @@ function buildPlan(options) {
       quality: buildTask(prefix, {
         code: "QC",
         group: "finished_goods_qc",
-        name: "Phase 9 模拟成品抽检",
+        name: "Mobile workflow 模拟成品抽检",
         sourceType: "production-progress",
         sourceId: 910002,
         sourceNo: "QC",
@@ -258,7 +258,7 @@ function buildPlan(options) {
       warehouseInbound: buildTask(prefix, {
         code: "WH-IN",
         group: "warehouse_inbound",
-        name: "Phase 9 模拟仓库入库确认",
+        name: "Mobile workflow 模拟仓库入库确认",
         sourceType: "accessories-purchase",
         sourceId: 910003,
         sourceNo: "WH-IN",
@@ -267,13 +267,13 @@ function buildPlan(options) {
         dueAt,
         completeCondition: "仓库在岗位任务端确认入库数量、库位和经手人。",
         payload: {
-          material_name: "Phase 9 模拟辅料",
+          material_name: "Mobile workflow 模拟辅料",
         },
       }),
       shipmentRelease: buildTask(prefix, {
         code: "SHIP-REL",
         group: "shipment_release",
-        name: "Phase 9 模拟出货放行异常",
+        name: "Mobile workflow 模拟出货放行异常",
         sourceType: "shipping-release",
         sourceId: 910004,
         sourceNo: "SHIP-REL",
@@ -326,11 +326,11 @@ function buildPlan(options) {
       shipmentReleaseBlocked: {
         role: "warehouse",
         nextStatus: "blocked",
-        reason: "Phase 9 模拟出货唛头未确认，只做本地模拟异常上报。",
+        reason: "Mobile workflow 模拟出货唛头未确认，只做本地模拟异常上报。",
         payload: evidence(
           "blocked",
           "warehouse",
-          "Phase 9 模拟出货唛头未确认，只做本地模拟异常上报。",
+          "Mobile workflow 模拟出货唛头未确认，只做本地模拟异常上报。",
           [`${prefix}-PHOTO-SHIP-EXCEPTION`],
           nowSec,
         ),
@@ -355,7 +355,7 @@ async function rpcCall({ backendURL, domain, method, params = {}, token }) {
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
-        id: `phase9-sim-${method}-${Date.now()}`,
+        id: `mobile-workflow-sim-${method}-${Date.now()}`,
         method,
         params,
       }),
@@ -478,7 +478,7 @@ async function applyPlan(plan, tokens) {
 
 function buildMarkdownReport(report) {
   const lines = [
-    "# Phase 9 Simulated Mobile Task Closure Report",
+    "# Mobile Workflow Simulated Closure Report",
     "",
     `- mode: ${report.mode}`,
     `- backend: ${report.plan.backendURL}`,
@@ -486,7 +486,7 @@ function buildMarkdownReport(report) {
     `- simulatedOnly: ${report.plan.simulatedOnly}`,
     `- realCustomerImport: ${report.plan.realCustomerImport}`,
     `- factPosting: ${report.plan.factPosting}`,
-    `- customerAcceptanceRequiredForPhaseClosure: ${report.plan.customerAcceptanceRequiredForPhaseClosure}`,
+    `- customerAcceptanceRequiredForClosure: ${report.plan.customerAcceptanceRequiredForClosure}`,
     "",
     "## Steps",
     "",
@@ -504,7 +504,7 @@ function buildMarkdownReport(report) {
     "",
     "## Boundary",
     "",
-    "- This report is simulated Phase 9 workflow evidence only.",
+    "- This report is simulated mobile workflow evidence only.",
     "- It is not real customer data import and not customer sign-off.",
     "- It does not post production, shipment, inventory, reservation, or finance facts.",
   );
@@ -515,11 +515,11 @@ async function writeReports(outDir, report) {
   await mkdir(outDir, { recursive: true });
   const jsonPath = path.join(
     outDir,
-    "phase9-simulated-mobile-closure-report.json",
+    "mobile-workflow-simulated-closure-report.json",
   );
   const markdownPath = path.join(
     outDir,
-    "phase9-simulated-mobile-closure-report.md",
+    "mobile-workflow-simulated-closure-report.md",
   );
   await writeFile(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   await writeFile(markdownPath, buildMarkdownReport(report));
@@ -534,27 +534,27 @@ async function main() {
   }
   const plan = buildPlan(options);
   const report = {
-    mode: options.apply ? "apply-simulated-phase9-mobile-tasks" : "report-only",
+    mode: options.apply ? "apply-simulated-mobile-workflow-mobile-tasks" : "report-only",
     generatedAt: new Date().toISOString(),
     plan,
     steps: [],
   };
 
   if (options.apply) {
-    if (process.env.PHASE9_SIM_CONFIRM !== CONFIRM_PHRASE) {
+    if (process.env.MOBILE_WORKFLOW_SIM_CONFIRM !== CONFIRM_PHRASE) {
       throw new CliError(
-        `apply requires PHASE9_SIM_CONFIRM=${CONFIRM_PHRASE}`,
+        `apply requires MOBILE_WORKFLOW_SIM_CONFIRM=${CONFIRM_PHRASE}`,
         2,
       );
     }
     const password = optionalText(
-      process.env.PHASE9_SIM_PASSWORD ||
+      process.env.MOBILE_WORKFLOW_SIM_PASSWORD ||
         process.env.TRIAL_ACCOUNT_PASSWORD ||
         process.env.ERP_ROLE_DEMO_PASSWORD,
     );
     if (!password) {
       throw new CliError(
-        "apply requires PHASE9_SIM_PASSWORD, TRIAL_ACCOUNT_PASSWORD, or ERP_ROLE_DEMO_PASSWORD",
+        "apply requires MOBILE_WORKFLOW_SIM_PASSWORD, TRIAL_ACCOUNT_PASSWORD, or ERP_ROLE_DEMO_PASSWORD",
         2,
       );
     }
@@ -564,14 +564,14 @@ async function main() {
 
   const output = await writeReports(options.out, report);
   process.stdout.write(
-    `[qa:phase9-simulated-mobile-closure] ${report.mode} complete. json=${output.jsonPath} md=${output.markdownPath}\n`,
+    `[qa:mobile-workflow-simulated-closure] ${report.mode} complete. json=${output.jsonPath} md=${output.markdownPath}\n`,
   );
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main().catch((error) => {
     process.stderr.write(
-      `[qa:phase9-simulated-mobile-closure][fatal] ${error?.stack || error?.message || error}\n`,
+      `[qa:mobile-workflow-simulated-closure][fatal] ${error?.stack || error?.message || error}\n`,
     );
     process.exitCode = error instanceof CliError ? error.exitCode : 1;
   });

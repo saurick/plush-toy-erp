@@ -74,6 +74,50 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 		t.Fatalf("expected updated order in list, total=%d rows=%#v", total, list)
 	}
 
+	nextOrderDate := orderDate.AddDate(0, 0, 7)
+	nextPlannedDate := orderDate.AddDate(0, 0, 21)
+	nextOrder, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo:             "SO-002",
+		CustomerID:          customer.ID,
+		CustomerSnapshot:    map[string]any{"name": customer.Name},
+		OrderDate:           nextOrderDate,
+		PlannedDeliveryDate: &nextPlannedDate,
+	})
+	if err != nil {
+		t.Fatalf("create second sales order failed: %v", err)
+	}
+	datedList, datedTotal, err := uc.ListSalesOrders(ctx, biz.SalesOrderFilter{
+		DateField: "order_date",
+		DateFrom:  &nextOrderDate,
+		DateTo:    &nextOrderDate,
+		Limit:     20,
+	})
+	if err != nil {
+		t.Fatalf("list sales orders by date range failed: %v", err)
+	}
+	if datedTotal != 1 || len(datedList) != 1 || datedList[0].ID != nextOrder.ID {
+		t.Fatalf("expected second order in date range, total=%d rows=%#v", datedTotal, datedList)
+	}
+	sortedList, _, err := uc.ListSalesOrders(ctx, biz.SalesOrderFilter{
+		SortBy:        "order_date",
+		SortDirection: "asc",
+		Limit:         20,
+	})
+	if err != nil {
+		t.Fatalf("list sales orders sorted by order date failed: %v", err)
+	}
+	if len(sortedList) < 2 || sortedList[0].ID != order.ID || sortedList[1].ID != nextOrder.ID {
+		t.Fatalf("expected order_date asc sort, got %#v", sortedList)
+	}
+	if _, _, err := uc.ListSalesOrders(ctx, biz.SalesOrderFilter{
+		DateField: "order_date",
+		DateFrom:  &nextOrderDate,
+		DateTo:    &orderDate,
+		Limit:     20,
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected reversed date range rejected, got %v", err)
+	}
+
 	submitted, err := uc.SubmitSalesOrder(ctx, order.ID)
 	if err != nil {
 		t.Fatalf("submit sales order failed: %v", err)

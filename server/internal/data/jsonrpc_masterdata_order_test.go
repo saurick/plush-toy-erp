@@ -17,6 +17,7 @@ import (
 type stubMasterDataJSONRPCRepo struct {
 	customerExists bool
 	supplierExists bool
+	unitActive     bool
 	createdContact *biz.ContactMutation
 }
 
@@ -68,6 +69,33 @@ func (s *stubMasterDataJSONRPCRepo) SupplierExists(context.Context, int) (bool, 
 	return s.supplierExists, nil
 }
 
+func (s *stubMasterDataJSONRPCRepo) CreateMaterial(_ context.Context, in *biz.MaterialMutation) (*biz.Material, error) {
+	return &biz.Material{ID: 1, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true}, nil
+}
+
+func (s *stubMasterDataJSONRPCRepo) UpdateMaterial(_ context.Context, id int, in *biz.MaterialMutation) (*biz.Material, error) {
+	return &biz.Material{ID: id, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true}, nil
+}
+
+func (s *stubMasterDataJSONRPCRepo) GetMaterial(_ context.Context, id int) (*biz.Material, error) {
+	return &biz.Material{ID: id, Code: "M001", Name: "材料", DefaultUnitID: 1, IsActive: true}, nil
+}
+
+func (s *stubMasterDataJSONRPCRepo) ListMaterials(context.Context, biz.MasterDataFilter) ([]*biz.Material, int, error) {
+	return []*biz.Material{{ID: 1, Code: "M001", Name: "材料", DefaultUnitID: 1, IsActive: true}}, 1, nil
+}
+
+func (s *stubMasterDataJSONRPCRepo) SetMaterialActive(_ context.Context, id int, active bool) (*biz.Material, error) {
+	return &biz.Material{ID: id, Code: "M001", Name: "材料", DefaultUnitID: 1, IsActive: active}, nil
+}
+
+func (s *stubMasterDataJSONRPCRepo) UnitIsActive(context.Context, int) (bool, error) {
+	if !s.unitActive {
+		return false, biz.ErrUnitNotFound
+	}
+	return true, nil
+}
+
 func (s *stubMasterDataJSONRPCRepo) CreateContact(_ context.Context, in *biz.ContactMutation) (*biz.Contact, error) {
 	s.createdContact = in
 	return &biz.Contact{ID: 1, OwnerType: in.OwnerType, OwnerID: in.OwnerID, Name: in.Name, IsActive: true, IsPrimary: in.IsPrimary}, nil
@@ -94,10 +122,11 @@ func (s *stubMasterDataJSONRPCRepo) DisableContact(_ context.Context, id int) (*
 }
 
 type stubSalesOrderJSONRPCRepo struct {
-	customerActive bool
-	productActive  bool
-	unitActive     bool
-	addedItem      *biz.SalesOrderItemMutation
+	customerActive       bool
+	productActive        bool
+	unitActive           bool
+	addedItem            *biz.SalesOrderItemMutation
+	lastSalesOrderFilter biz.SalesOrderFilter
 }
 
 func (s *stubSalesOrderJSONRPCRepo) CreateSalesOrder(_ context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
@@ -112,7 +141,8 @@ func (s *stubSalesOrderJSONRPCRepo) GetSalesOrder(_ context.Context, id int) (*b
 	return &biz.SalesOrder{ID: id, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft}, nil
 }
 
-func (s *stubSalesOrderJSONRPCRepo) ListSalesOrders(context.Context, biz.SalesOrderFilter) ([]*biz.SalesOrder, int, error) {
+func (s *stubSalesOrderJSONRPCRepo) ListSalesOrders(_ context.Context, filter biz.SalesOrderFilter) ([]*biz.SalesOrder, int, error) {
+	s.lastSalesOrderFilter = filter
 	return []*biz.SalesOrder{{ID: 1, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft}}, 1, nil
 }
 
@@ -250,6 +280,41 @@ func TestJsonrpcData_ContactAPIUsesUsecaseOwnerGuard(t *testing.T) {
 	}
 }
 
+func TestJsonrpcData_MaterialAPIRequiresPermissionAndValidUnit(t *testing.T) {
+	params := mustJSONRPCStruct(t, map[string]any{
+		"code":            "M001",
+		"name":            "PP 棉",
+		"default_unit_id": float64(1),
+	})
+
+	j := newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{unitActive: true}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialRead))
+	_, deniedRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_material", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if deniedRes == nil || deniedRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected permission denied, got %#v", deniedRes)
+	}
+
+	j = newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{unitActive: false}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialCreate))
+	_, invalidUnitRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_material", "2", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if invalidUnitRes == nil || invalidUnitRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for missing unit, got %#v", invalidUnitRes)
+	}
+
+	j = newMasterDataJSONRPCTestData(&stubMasterDataJSONRPCRepo{unitActive: true}, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialCreate))
+	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_material", "3", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if okRes == nil || okRes.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", okRes)
+	}
+}
+
 func TestJsonrpcData_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb(t *testing.T) {
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
 	j := newSalesOrderJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
@@ -273,6 +338,46 @@ func TestJsonrpcData_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb(t *te
 	}
 	if unknownRes == nil || unknownRes.Code != errcode.UnknownMethod.Code {
 		t.Fatalf("shipment verb must not be exposed by sales order API, got %#v", unknownRes)
+	}
+}
+
+func TestJsonrpcData_SalesOrderListAcceptsDateAndSortFilters(t *testing.T) {
+	repo := &stubSalesOrderJSONRPCRepo{}
+	j := newSalesOrderJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderRead))
+	params := mustJSONRPCStruct(t, map[string]any{
+		"date_field":     "order_date",
+		"date_from":      "2026-06-01",
+		"date_to":        "2026-06-30",
+		"sort_by":        "order_date",
+		"sort_direction": "asc",
+	})
+
+	_, res, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "list_sales_orders", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", res)
+	}
+	if repo.lastSalesOrderFilter.DateField != "order_date" ||
+		repo.lastSalesOrderFilter.DateFrom == nil ||
+		repo.lastSalesOrderFilter.DateTo == nil ||
+		repo.lastSalesOrderFilter.SortBy != "order_date" ||
+		repo.lastSalesOrderFilter.SortDirection != "asc" {
+		t.Fatalf("expected date and sort filters forwarded, got %#v", repo.lastSalesOrderFilter)
+	}
+
+	_, invalidRes, err := j.handleSalesOrder(
+		workflowJSONRPCAdminContext(),
+		"list_sales_orders",
+		"2",
+		mustJSONRPCStruct(t, map[string]any{"date_from": "not-a-date"}),
+	)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if invalidRes == nil || invalidRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for bad date filter, got %#v", invalidRes)
 	}
 }
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  V1_ROUTE_PATHS,
   buildCustomerSnapshot,
   buildMasterDataParams,
   buildSalesOrderItemParams,
@@ -35,6 +36,8 @@ test('masterDataOrderView: action permissions keep super admin shortcut', () => 
 })
 
 test('masterDataOrderView: params trim optional values without adding facts', () => {
+  assert.equal(V1_ROUTE_PATHS.materials, '/erp/master/materials')
+
   assert.deepEqual(
     buildMasterDataParams({
       code: ' C001 ',
@@ -44,6 +47,27 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       note: ' 备注 ',
     }),
     { code: 'C001', name: '客户 A', note: '备注' }
+  )
+
+  assert.deepEqual(
+    buildMasterDataParams({
+      code: ' MAT001 ',
+      name: ' 面料 ',
+      category: ' fabric ',
+      spec: ' 75D ',
+      color: ' 米白 ',
+      default_unit_id: '2',
+      tax_no: ' ',
+      note: '',
+    }),
+    {
+      code: 'MAT001',
+      name: '面料',
+      category: 'fabric',
+      spec: '75D',
+      color: '米白',
+      default_unit_id: 2,
+    }
   )
 
   assert.deepEqual(
