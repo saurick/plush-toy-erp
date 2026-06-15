@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -31,6 +32,7 @@ type MaterialQuery struct {
 	predicates                         []predicate.Material
 	withDefaultUnit                    *UnitQuery
 	withBomItems                       *BOMItemQuery
+	withPurchaseOrderItems             *PurchaseOrderItemQuery
 	withPurchaseReceiptItems           *PurchaseReceiptItemQuery
 	withPurchaseReturnItems            *PurchaseReturnItemQuery
 	withPurchaseReceiptAdjustmentItems *PurchaseReceiptAdjustmentItemQuery
@@ -108,6 +110,28 @@ func (_q *MaterialQuery) QueryBomItems() *BOMItemQuery {
 			sqlgraph.From(material.Table, material.FieldID, selector),
 			sqlgraph.To(bomitem.Table, bomitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, material.BomItemsTable, material.BomItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPurchaseOrderItems chains the current query on the "purchase_order_items" edge.
+func (_q *MaterialQuery) QueryPurchaseOrderItems() *PurchaseOrderItemQuery {
+	query := (&PurchaseOrderItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(material.Table, material.FieldID, selector),
+			sqlgraph.To(purchaseorderitem.Table, purchaseorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, material.PurchaseOrderItemsTable, material.PurchaseOrderItemsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -397,6 +421,7 @@ func (_q *MaterialQuery) Clone() *MaterialQuery {
 		predicates:                         append([]predicate.Material{}, _q.predicates...),
 		withDefaultUnit:                    _q.withDefaultUnit.Clone(),
 		withBomItems:                       _q.withBomItems.Clone(),
+		withPurchaseOrderItems:             _q.withPurchaseOrderItems.Clone(),
 		withPurchaseReceiptItems:           _q.withPurchaseReceiptItems.Clone(),
 		withPurchaseReturnItems:            _q.withPurchaseReturnItems.Clone(),
 		withPurchaseReceiptAdjustmentItems: _q.withPurchaseReceiptAdjustmentItems.Clone(),
@@ -426,6 +451,17 @@ func (_q *MaterialQuery) WithBomItems(opts ...func(*BOMItemQuery)) *MaterialQuer
 		opt(query)
 	}
 	_q.withBomItems = query
+	return _q
+}
+
+// WithPurchaseOrderItems tells the query-builder to eager-load the nodes that are connected to
+// the "purchase_order_items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *MaterialQuery) WithPurchaseOrderItems(opts ...func(*PurchaseOrderItemQuery)) *MaterialQuery {
+	query := (&PurchaseOrderItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPurchaseOrderItems = query
 	return _q
 }
 
@@ -551,9 +587,10 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 	var (
 		nodes       = []*Material{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [7]bool{
 			_q.withDefaultUnit != nil,
 			_q.withBomItems != nil,
+			_q.withPurchaseOrderItems != nil,
 			_q.withPurchaseReceiptItems != nil,
 			_q.withPurchaseReturnItems != nil,
 			_q.withPurchaseReceiptAdjustmentItems != nil,
@@ -588,6 +625,15 @@ func (_q *MaterialQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Mat
 		if err := _q.loadBomItems(ctx, query, nodes,
 			func(n *Material) { n.Edges.BomItems = []*BOMItem{} },
 			func(n *Material, e *BOMItem) { n.Edges.BomItems = append(n.Edges.BomItems, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPurchaseOrderItems; query != nil {
+		if err := _q.loadPurchaseOrderItems(ctx, query, nodes,
+			func(n *Material) { n.Edges.PurchaseOrderItems = []*PurchaseOrderItem{} },
+			func(n *Material, e *PurchaseOrderItem) {
+				n.Edges.PurchaseOrderItems = append(n.Edges.PurchaseOrderItems, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -674,6 +720,36 @@ func (_q *MaterialQuery) loadBomItems(ctx context.Context, query *BOMItemQuery, 
 	}
 	query.Where(predicate.BOMItem(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(material.BomItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.MaterialID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "material_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *MaterialQuery) loadPurchaseOrderItems(ctx context.Context, query *PurchaseOrderItemQuery, nodes []*Material, init func(*Material), assign func(*Material, *PurchaseOrderItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Material)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(purchaseorderitem.FieldMaterialID)
+	}
+	query.Where(predicate.PurchaseOrderItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(material.PurchaseOrderItemsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

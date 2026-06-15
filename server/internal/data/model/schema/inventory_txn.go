@@ -31,6 +31,7 @@ func (InventoryTxn) Hooks() []ent.Hook {
 
 func (InventoryTxn) Fields() []ent.Field {
 	return []ent.Field{
+		// subject_* identifies the stock object; inventory_txns are immutable stock movement facts.
 		field.String("subject_type").
 			NotEmpty().
 			MaxLen(16).
@@ -56,6 +57,7 @@ func (InventoryTxn) Fields() []ent.Field {
 		field.Int("unit_id").
 			Positive().
 			Immutable(),
+		// source_* links the business document line that caused this movement; it is not a generic record store.
 		field.String("source_type").
 			NotEmpty().
 			MaxLen(64).

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -146,6 +147,21 @@ func (_c *MaterialCreate) AddBomItems(v ...*BOMItem) *MaterialCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddBomItemIDs(ids...)
+}
+
+// AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
+func (_c *MaterialCreate) AddPurchaseOrderItemIDs(ids ...int) *MaterialCreate {
+	_c.mutation.AddPurchaseOrderItemIDs(ids...)
+	return _c
+}
+
+// AddPurchaseOrderItems adds the "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_c *MaterialCreate) AddPurchaseOrderItems(v ...*PurchaseOrderItem) *MaterialCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPurchaseOrderItemIDs(ids...)
 }
 
 // AddPurchaseReceiptItemIDs adds the "purchase_receipt_items" edge to the PurchaseReceiptItem entity by IDs.
@@ -394,6 +410,22 @@ func (_c *MaterialCreate) createSpec() (*Material, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PurchaseOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.PurchaseOrderItemsTable,
+			Columns: []string{material.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -255,7 +255,7 @@ export default function DevTestingPage() {
             icon={<CheckCircleOutlined />}
             label="测试层级 / Tiers"
             value={summary.tierCount}
-            note="来自 test-strategy"
+            note="来自自动化测试策略"
             tone="primary"
           />
           <MetricTile

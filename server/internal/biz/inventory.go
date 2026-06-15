@@ -17,6 +17,8 @@ var (
 	ErrInventoryBalanceNotFound              = errors.New("inventory balance not found")
 	ErrInventoryLotNotFound                  = errors.New("inventory lot not found")
 	ErrBOMHeaderNotFound                     = errors.New("bom header not found")
+	ErrBOMItemNotFound                       = errors.New("bom item not found")
+	ErrBOMActiveImmutable                    = errors.New("active bom must be copied before edit")
 	ErrPurchaseReceiptNotFound               = errors.New("purchase receipt not found")
 	ErrPurchaseReceiptItemNotFound           = errors.New("purchase receipt item not found")
 	ErrPurchaseReturnNotFound                = errors.New("purchase return not found")
@@ -48,6 +50,7 @@ const (
 
 	BOMStatusDraft    = "DRAFT"
 	BOMStatusActive   = "ACTIVE"
+	BOMStatusArchived = "ARCHIVED"
 	BOMStatusDisabled = "DISABLED"
 
 	PurchaseReceiptSourceType      = "PURCHASE_RECEIPT"
@@ -90,6 +93,7 @@ var (
 	bomStatuses = map[string]struct{}{
 		BOMStatusDraft:    {},
 		BOMStatusActive:   {},
+		BOMStatusArchived: {},
 		BOMStatusDisabled: {},
 	}
 	purchaseReceiptAdjustmentTypes = map[string]struct{}{
@@ -222,6 +226,13 @@ type BOMHeaderCreate struct {
 	Note          *string
 }
 
+type BOMHeaderUpdate struct {
+	Version       string
+	EffectiveFrom *time.Time
+	EffectiveTo   *time.Time
+	Note          *string
+}
+
 type BOMItemCreate struct {
 	BOMHeaderID int
 	MaterialID  int
@@ -230,6 +241,28 @@ type BOMItemCreate struct {
 	LossRate    decimal.Decimal
 	Position    *string
 	Note        *string
+}
+
+type BOMItemUpdate struct {
+	MaterialID int
+	Quantity   decimal.Decimal
+	UnitID     int
+	LossRate   decimal.Decimal
+	Position   *string
+	Note       *string
+}
+
+type BOMHeaderFilter struct {
+	ProductID int
+	Status    string
+	Keyword   string
+	Limit     int
+	Offset    int
+}
+
+type BOMVersionDetail struct {
+	Header *BOMHeader
+	Items  []*BOMItem
 }
 
 type InventoryTxnApplyResult struct {
@@ -247,8 +280,17 @@ type InventoryRepo interface {
 	GetInventoryBalance(ctx context.Context, key InventoryBalanceKey) (*InventoryBalance, error)
 	CreateBOMHeader(ctx context.Context, in *BOMHeaderCreate) (*BOMHeader, error)
 	CreateBOMItem(ctx context.Context, in *BOMItemCreate) (*BOMItem, error)
+	UpdateBOMDraftHeader(ctx context.Context, id int, in *BOMHeaderUpdate) (*BOMHeader, error)
+	UpdateBOMDraftItem(ctx context.Context, id int, in *BOMItemUpdate) (*BOMItem, error)
+	DeleteBOMDraftItem(ctx context.Context, id int) error
+	ListBOMHeaders(ctx context.Context, filter BOMHeaderFilter) ([]*BOMHeader, int, error)
+	GetBOMHeader(ctx context.Context, id int) (*BOMHeader, error)
+	ListBOMItemsByHeader(ctx context.Context, bomHeaderID int) ([]*BOMItem, error)
 	ListBOMItemsByProduct(ctx context.Context, productID int) ([]*BOMItem, error)
 	GetActiveBOMByProduct(ctx context.Context, productID int) (*BOMHeader, error)
+	CopyBOMVersion(ctx context.Context, sourceHeaderID int, in *BOMHeaderCreate) (*BOMVersionDetail, error)
+	ActivateBOMVersion(ctx context.Context, id int) (*BOMVersionDetail, error)
+	ArchiveBOMVersion(ctx context.Context, id int) (*BOMHeader, error)
 	CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error)
 	AddPurchaseReceiptItem(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, error)
 	PostPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
@@ -366,6 +408,68 @@ func (uc *InventoryUsecase) CreateBOMItem(ctx context.Context, in *BOMItemCreate
 	return uc.repo.CreateBOMItem(ctx, &normalized)
 }
 
+func (uc *InventoryUsecase) UpdateBOMDraftHeader(ctx context.Context, id int, in *BOMHeaderUpdate) (*BOMHeader, error) {
+	if uc == nil || uc.repo == nil || in == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeBOMHeaderUpdate(*in)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.UpdateBOMDraftHeader(ctx, id, &normalized)
+}
+
+func (uc *InventoryUsecase) UpdateBOMDraftItem(ctx context.Context, id int, in *BOMItemUpdate) (*BOMItem, error) {
+	if uc == nil || uc.repo == nil || in == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeBOMItemUpdate(*in)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.UpdateBOMDraftItem(ctx, id, &normalized)
+}
+
+func (uc *InventoryUsecase) DeleteBOMDraftItem(ctx context.Context, id int) error {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return ErrBadParam
+	}
+	return uc.repo.DeleteBOMDraftItem(ctx, id)
+}
+
+func (uc *InventoryUsecase) ListBOMHeaders(ctx context.Context, filter BOMHeaderFilter) ([]*BOMHeader, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
+	if filter.Status != "" && !IsValidBOMStatus(filter.Status) {
+		return nil, 0, ErrBadParam
+	}
+	if filter.Limit <= 0 || filter.Limit > 200 {
+		filter.Limit = 50
+	}
+	if filter.Offset < 0 {
+		filter.Offset = 0
+	}
+	return uc.repo.ListBOMHeaders(ctx, filter)
+}
+
+func (uc *InventoryUsecase) GetBOMVersion(ctx context.Context, id int) (*BOMVersionDetail, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	header, err := uc.repo.GetBOMHeader(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	items, err := uc.repo.ListBOMItemsByHeader(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &BOMVersionDetail{Header: header, Items: items}, nil
+}
+
 func (uc *InventoryUsecase) ListBOMItemsByProduct(ctx context.Context, productID int) ([]*BOMItem, error) {
 	if uc == nil || uc.repo == nil || productID <= 0 {
 		return nil, ErrBadParam
@@ -378,6 +482,32 @@ func (uc *InventoryUsecase) GetActiveBOMByProduct(ctx context.Context, productID
 		return nil, ErrBadParam
 	}
 	return uc.repo.GetActiveBOMByProduct(ctx, productID)
+}
+
+func (uc *InventoryUsecase) CopyBOMVersion(ctx context.Context, sourceHeaderID int, in *BOMHeaderCreate) (*BOMVersionDetail, error) {
+	if uc == nil || uc.repo == nil || in == nil || sourceHeaderID <= 0 {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeBOMHeaderCreate(*in)
+	if err != nil {
+		return nil, err
+	}
+	normalized.Status = BOMStatusDraft
+	return uc.repo.CopyBOMVersion(ctx, sourceHeaderID, &normalized)
+}
+
+func (uc *InventoryUsecase) ActivateBOMVersion(ctx context.Context, id int) (*BOMVersionDetail, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.ActivateBOMVersion(ctx, id)
+}
+
+func (uc *InventoryUsecase) ArchiveBOMVersion(ctx context.Context, id int) (*BOMHeader, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.ArchiveBOMVersion(ctx, id)
 }
 
 func normalizeInventoryLotCreate(in InventoryLotCreate) (InventoryLotCreate, error) {
@@ -520,6 +650,18 @@ func normalizeBOMHeaderCreate(in BOMHeaderCreate) (BOMHeaderCreate, error) {
 	return in, nil
 }
 
+func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) (BOMHeaderUpdate, error) {
+	in.Version = strings.TrimSpace(in.Version)
+	in.Note = normalizeOptionalString(in.Note)
+	if in.Version == "" {
+		return BOMHeaderUpdate{}, ErrBadParam
+	}
+	if in.EffectiveFrom != nil && in.EffectiveTo != nil && !in.EffectiveFrom.Before(*in.EffectiveTo) {
+		return BOMHeaderUpdate{}, ErrBadParam
+	}
+	return in, nil
+}
+
 func normalizeBOMItemCreate(in BOMItemCreate) (BOMItemCreate, error) {
 	in.Position = normalizeOptionalString(in.Position)
 	in.Note = normalizeOptionalString(in.Note)
@@ -531,6 +673,20 @@ func normalizeBOMItemCreate(in BOMItemCreate) (BOMItemCreate, error) {
 	}
 	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {
 		return BOMItemCreate{}, ErrBadParam
+	}
+	return in, nil
+}
+
+func normalizeBOMItemUpdate(in BOMItemUpdate) (BOMItemUpdate, error) {
+	in.Position = normalizeOptionalString(in.Position)
+	in.Note = normalizeOptionalString(in.Note)
+	if in.MaterialID <= 0 ||
+		in.UnitID <= 0 ||
+		in.LossRate.Cmp(decimal.Zero) < 0 {
+		return BOMItemUpdate{}, ErrBadParam
+	}
+	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {
+		return BOMItemUpdate{}, ErrBadParam
 	}
 	return in, nil
 }

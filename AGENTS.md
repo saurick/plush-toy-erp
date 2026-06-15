@@ -17,36 +17,36 @@
 遇到新任务时，优先按下面顺序收敛真源：
 
 1. `/Users/simon/projects/plush-toy-erp/README.md`
-2. `/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
+2. `/Users/simon/projects/plush-toy-erp/docs/当前真源与交接顺序.md`
 3. `/Users/simon/projects/plush-toy-erp/server/README.md`
 4. `/Users/simon/projects/plush-toy-erp/server/deploy/README.md`
 5. `/Users/simon/projects/plush-toy-erp/scripts/README.md`
 
 如果任务已经明确落在某个子系统，再继续读对应专题文档，不要先凭印象补丁。
 
-历史 changes 文档不作为当前状态、当前能力或当前禁止事项的最终真源；当前状态必须以 `docs/current-source-of-truth.md`、正式能力账本（如后续新增 `docs/capability-ledger.md` 或等价文档）、当前代码和当前测试交叉确认为准。若历史记录与当前代码 / 测试 / 真源索引冲突，优先按当前代码、测试和真源索引收敛。
+历史 changes 文档不作为当前状态、当前能力或当前禁止事项的最终真源；当前状态必须以 `docs/当前真源与交接顺序.md`、正式能力账本（如后续新增 `docs/产品能力进度台账.md` 或等价文档）、当前代码和当前测试交叉确认为准。若历史记录与当前代码 / 测试 / 真源索引冲突，优先按当前代码、测试和真源索引收敛。
 
 常见专题文档包括但不限于：
 
-- Workflow 协同层：`docs/architecture/workflow-usecase-review.md`
-- Shipment / 出货边界：`docs/architecture/shipment-release-workflow-review.md`、`docs/architecture/shipment-inventory-boundary-review.md`、`docs/architecture/shipment-usecase-review.md`
-- Inventory / Purchase / BOM / Quality 事实层：`docs/current-source-of-truth.md`、`docs/architecture/material-product-inventory-schema-review.md`、`docs/architecture/product-sku-bom-boundary-review.md`、`docs/architecture/order-purchase-boundary-review.md`
-- 开发与验收 / 帮助文档：`docs/product/test-strategy.md`、`web/README.md`、`scripts/README.md`
+- Workflow 协同层：`docs/architecture/工作流用例统一编排评审.md`
+- Shipment / 出货边界：`docs/architecture/出货放行工作流用例评审.md`、`docs/architecture/出货事实与库存边界评审.md`、`docs/architecture/出货事实最小模型评审.md`
+- Inventory / Purchase / BOM / Quality 事实层：`docs/当前真源与交接顺序.md`、`docs/architecture/材料成品物料清单与库存专表模型评审.md`、`docs/architecture/产品款号物料清单边界评审.md`、`docs/architecture/订单采购边界评审.md`
+- 开发与验收 / 帮助文档：`docs/product/自动化测试策略.md`、`web/README.md`、`scripts/README.md`
 
-如果后续新增 `docs/architecture/project-boundary-map.md`、`docs/architecture/system-layer-progress.md` 或等价正式文档，涉及系统层级、产品化、客户差异、部署交付、下一步规划时必须同步阅读。
+如果后续新增 `docs/architecture/项目边界地图.md`、`docs/architecture/系统分层进度.md` 或等价正式文档，涉及系统层级、产品化、客户差异、部署交付、下一步规划时必须同步阅读。
 
 ## 实施协作与任务边界
 
 - 本仓库不再使用单独执行规格目录、短任务模板或本地审查报告目录作为执行工作流。
 - GPT / ChatGPT 只作为需求澄清、架构讨论和方案比较的辅助输入；长期规则、当前状态和实施边界必须回到本仓库文件、真实代码、migration、测试和当前工作区确认。
-- `docs/product/product-completion-roadmap.md` 是产品完成路线图的可演进规划真源，用于判断产品长期能力路线、候选任务顺序和下一步大方向；它不替代 `docs/current-source-of-truth.md`、代码、migration、测试或本轮用户要求。
+- `docs/product/产品完成路线图.md` 是产品完成路线图的可演进规划真源，用于判断产品长期能力路线、候选任务顺序和下一步大方向；它不替代 `docs/当前真源与交接顺序.md`、代码、migration、测试或本轮用户要求。
 - Roadmap 可以在执行过程中根据代码现状、客户反馈、验收结果、风险发现或 AI 规划复盘显式调整；调整时必须直接修改 roadmap，并写清调整原因、影响阶段、新的下一步，以及哪些旧编号或旧路线不再复用。
 - 试用模拟当前规则：不拆 A/B/C/D 或任何字母子阶段；当前没有可直接执行的 yoyoosun 客户真实数据，只能一次性用 seed、fixture 或手工构造的模拟客户、供应商、联系人和销售订单数据完成试用环境、账号、RBAC、菜单、V1 页面、岗位任务端和培训验收。真实客户数据导入在当前条件下不可执行，也不能作为后续半阶段、隐藏目标或完成条件；模拟数据不得写成真实导入、客户字段确认、出货、库存或财务事实。
-- 复杂实现应按 `docs/product/implementation-governance.md` 拆为可验证任务。任务边界可以写在当前会话、正式设计文档、roadmap 或台账中；不要恢复额外长期施工单目录。
+- 复杂实现应按 `docs/product/模块实施治理.md` 拆为可验证任务。任务边界可以写在当前会话、正式设计文档、roadmap 或台账中；不要恢复额外长期施工单目录。
 - 每个非平凡任务都必须先明确本轮目标、允许修改路径、禁止修改路径、明确不做的内容、验收命令、停止条件和剩余风险；不要让本文件代替具体任务的测试选择。
 - 任务开始和收口时都必须检查工作区状态。若运行期间出现其他会话写入的非本轮路径改动，Codex 只能记录并隔离这些改动，不得回退、删除、格式化、提交或写成本轮成果；需要提交时必须按本轮允许路径精确 stage。
 - 普通任务不生成、不覆盖、也不要求本地审查报告。如用户需要审查材料，应直接在最终回复或用户明确指定的正式文档中说明目标、范围、修改文件、验证命令和风险。
-- 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/product/*`、`docs/architecture/*`、`docs/current-source-of-truth.md`、代码和测试。
+- 所有长期规则以仓库文件为准，不依赖 ChatGPT 或 Codex 聊天记忆。长期规则优先参考：本文件、`docs/product/*`、`docs/architecture/*`、`docs/当前真源与交接顺序.md`、代码和测试。
 - plush-toy-erp 的产品边界、Workflow / Fact 边界、`tenant_id` 禁止项和客户资料边界，仍以本文件和正式产品 / 架构文档为准。当前永绅客户稳定 key 是 `yoyoosun`，不要恢复 `current` 客户目录或导入工作区别名。
 - 新任务组织主路径：按能力闭环、业务事实源、测试用例、验收标准和交付资料拆分；当前产品结构、代码结构、接口结构、菜单结构、测试结构和客户语言都使用真实业务领域命名。历史阶段编号只作为归档检索标签。
 - Runtime 命名主路径：使用 `shipment`、`inventory`、`purchase`、`quality`、`finance`、`workflow` 等业务领域词。新增运行时代码、API、路由、菜单、测试和配置由 `scripts/qa/phase-label-boundaries.mjs` 守卫阶段编号残留；已有 `phase2*` PostgreSQL 本地验收脚本、测试环境变量和数据库名只作为历史兼容入口保留，彻底迁移必须作为单独任务评审。
@@ -70,7 +70,7 @@
 - 优先保留稳定、可维护、可观测的实现。
 - 能复用现有能力就不要额外造层。
 - 注释只写设计意图、边界条件和兼容性兜底，避免补丁口吻。
-- 代码行为、目录结构、脚本名称、部署方式、配置字段、客户 key 或正式文档口径变化时，必须同轮检查并按需更新相关 README、docs、`docs/current-source-of-truth.md`、`docs/document-inventory.md`、产品 / 架构文档、帮助文档和 `progress.md`。
+- 代码行为、目录结构、脚本名称、部署方式、配置字段、客户 key 或正式文档口径变化时，必须同轮检查并按需更新相关 README、docs、`docs/当前真源与交接顺序.md`、`docs/文档清单.md`、产品 / 架构文档、帮助文档和 `progress.md`。
 - 自动化测试通过是必要条件，不是充分条件；还必须确认架构边界、业务真源、权限边界、文档口径和产品化约束没有被破坏。
 - 不要为了让当前页面或当前测试通过而引入长期不可维护的特殊分支、局部兜底、重复真源或隐藏兼容路径。
 
@@ -184,11 +184,11 @@ RBAC / API 改动必须覆盖：
 
 当改动以下内容时，必须同步检查并按需更新：
 
-- `docs/current-source-of-truth.md`
-- `docs/architecture/project-boundary-map.md` 或等价边界文档
-- `docs/architecture/system-layer-progress.md` 或等价分层进度文档
-- `docs/product/product-delivery-ledgers.md`
-- `docs/product/test-strategy.md`
+- `docs/当前真源与交接顺序.md`
+- `docs/architecture/项目边界地图.md` 或等价边界文档
+- `docs/architecture/系统分层进度.md` 或等价分层进度文档
+- `docs/product/产品台账索引.md`
+- `docs/product/自动化测试策略.md`
 
 必须同步检查的改动包括：
 
@@ -327,9 +327,13 @@ plush-toy-erp 不是“每个角色一套独立系统”。当前产品形态是
 
 - 当本仓库新增、删除、重命名仓库一级目录，或新增/调整需要长期维护的关键子系统目录时，必须同步检查并按需更新相关目录说明文档，避免代码结构已变化而 `README / docs` 仍停留在旧口径。
 - `docs/` 下长期维护且容易误读职责的目录应有对应 `README.md`。新增、删除、重命名长期维护文档，或改变文档职责、归属目录、入口状态、真源状态时，必须同步检查该目录 README 是否需要更新；只改正文且不改变目录职责或入口状态时，通常不需要更新目录 README。
-- 当新增、删除、重命名长期维护的 Markdown 文档，或调整文档用途、归属目录、是否属于产品内入口 / 外部参考 / 归档 / 任务说明等分类时，必须同步更新 `docs/document-inventory.md`。
-- 只修改现有文档正文内容、措辞、局部结论或表格数据，且不改变该文档的标题、职责、分类、路径或入口状态时，通常不需要更新 `docs/document-inventory.md`；若修改导致清单中的“标题 / 当前用途”失真，则必须同步更新。
-- `docs/document-inventory.md` 的“标题 / 当前用途”列应使用中文主体 + English anchor；即使原文档标题为英文，也要补中文说明，方便人工审查时快速理解，不把清单退化成英文文件名索引。
+- 当新增、删除、重命名长期维护的 Markdown 文档，或调整文档用途、归属目录、是否属于产品内入口 / 外部参考 / 归档 / 任务说明等分类时，必须同步更新 `docs/文档清单.md`。
+- 只修改现有文档正文内容、措辞、局部结论或表格数据，且不改变该文档的标题、职责、分类、路径或入口状态时，通常不需要更新 `docs/文档清单.md`；若修改导致清单中的“标题 / 当前用途”失真，则必须同步更新。
+- 长期维护 Markdown 文档默认使用中文文件名，方便人工在文件树中直接识别用途；英文名、英文术语和稳定 anchor 应放在 H1、metadata、摘要、正文或 `docs/文档清单.md` 中保留，用于检索、对照和跨工具引用。
+- 新增文档、重命名文档或调整文档职责时，必须同步修正相关 README、`docs/文档清单.md`、正文引用、原型入口、脚本引用和测试断言；不能只改文件名让引用断链。
+- 不要求机械中文改名的例外包括：`README.md`、`AGENTS.md`、`CHANGELOG.md` 等约定文件名；`docs/archive/**` 中作为历史证据的旧文件；`docs/reference/**` 中需要保持外部输入原貌的资料；被脚本、URL、原型查看器、生成流程或外部链接稳定引用且未完成迁移评审的文件；以及代码包名、API、表名、配置 key、状态 key 等必须保持英文稳定锚点的技术对象。
+- 现有英文文件名文档应按目录分批重命名并逐批验证；不要为了文件名治理在同一轮一次性重命名整个 `docs/`，除非用户明确要求并接受引用迁移、清单更新和回归成本。
+- `docs/文档清单.md` 的“标题 / 当前用途”列应使用中文主体 + English anchor；即使原文档标题为英文，也要补中文说明，方便人工审查时快速理解，不把清单退化成英文文件名索引。
 - 长期维护 Markdown 文档的 H1 标题和用于阅读的主要章节标题，也应优先使用中文主体 + English anchor；项目名、包名、工具名、表名、API 路径等英文专名可以保留，但应按需要补中文用途或语义说明，方便人工审查时直接理解文档职责。外部导入原文、归档日期标题、纯代码锚点可保留原样。
 - 根 `README.md` 只维护仓库级目录导航；`web/README.md`、`server/README.md` 等子目录 `README` 维护各自内部目录职责，不在多处重复展开同一份内部目录树。
 - 生成产物、缓存、依赖目录或临时目录（如 `build/`、`output/`、`tmp/`、`node_modules/`、`bin/`）默认不要求更新目录说明，除非它们已经成为正式入口或长期维护对象。
@@ -361,6 +365,8 @@ plush-toy-erp 不是“每个角色一套独立系统”。当前产品形态是
 - 若服务逻辑依赖新表/新列，发布前先确认目标库 migration 已落地。
 - 不要因为文档、前端导航、产品内帮助入口、开发验收总控页面改动而运行或生成 migration。
 - 不要把与当前任务无关的 库存事实、BOM 批次、采购入库、采购退货、采购调整和来料质检 现场文件清理、回退或纳入本轮，除非任务明确要求。
+- `server/internal/data/model/schema` 注释只补关键业务边界，不做全量机械注释。普通字段优先靠命名、Ent 约束、DB check、hook、usecase 和测试表达；只有字段容易被误判为真源 / 快照 / 派生、涉及 Workflow / Fact 边界、状态机、不可变事实、冲正、历史兼容、跨模块追溯、删除限制、金额 / 数量精度或 SKU 过渡口径时，才补最小必要注释。
+- schema 注释必须描述当前行为、设计意图和边界条件，禁止保留“新增 / 修复 / 关键修复”等补丁历史口吻。若只是维护者阅读提示，优先使用 Go 注释，避免为说明文字触发 Ent 生成产物或 Atlas migration；只有确实需要数据库可见字段说明时，才评审使用 Ent `Comment(...)` 并同步 migration。
 
 ## 前端与样式
 
@@ -389,7 +395,7 @@ plush-toy-erp 不是“每个角色一套独立系统”。当前产品形态是
 - `待实现 / To Implement` 晋级为 `当前实现 / Current` 必须有用户明确确认。Codex 不能仅凭自己完成了代码、测试、浏览器回归或“部分承接”就擅自把资产状态、registry、静态索引或 README 改成 Current；未获确认时，只能在 `progress.md` 或最终回复中建议候选晋级，并保留待实现队列。
 - `HTML / PNG` 只表示资产格式；`当前实现 / 待实现 / 起草阶段 / 参考资料` 是主阶段；`方案对比 / 截图证据 / 历史参考` 只作为辅助标签和追溯信息，不作为顶部筛选分类或实现承诺。
 - 原型不能替代仓库真源。进入正式实现时，Codex 必须回到真实代码、现有共享组件、API、RBAC、菜单、theme token、正式文档、测试和浏览器回归；不得直接复制静态原型数据、绕过权限 / 菜单边界，或把 Workflow 原型动作写成库存、出货、财务、应收、开票或收付款事实。
-- 原型结论改变业务能力、菜单入口、Workflow / Fact 边界、交付状态或产品化口径时，必须同步检查 `docs/current-source-of-truth.md`、相关产品 / 架构文档、`web/README.md` 和 `progress.md`，不能只改原型文件。
+- 原型结论改变业务能力、菜单入口、Workflow / Fact 边界、交付状态或产品化口径时，必须同步检查 `docs/当前真源与交接顺序.md`、相关产品 / 架构文档、`web/README.md` 和 `progress.md`，不能只改原型文件。
 
 ## Ant Design 表单实例约定
 

@@ -5,6 +5,7 @@ package ent
 import (
 	"fmt"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/unit"
@@ -27,6 +28,8 @@ type SalesOrderItem struct {
 	LineNo int `json:"line_no,omitempty"`
 	// ProductID holds the value of the "product_id" field.
 	ProductID int `json:"product_id,omitempty"`
+	// ProductSkuID holds the value of the "product_sku_id" field.
+	ProductSkuID *int `json:"product_sku_id,omitempty"`
 	// UnitID holds the value of the "unit_id" field.
 	UnitID int `json:"unit_id,omitempty"`
 	// ProductCodeSnapshot holds the value of the "product_code_snapshot" field.
@@ -63,6 +66,8 @@ type SalesOrderItemEdges struct {
 	SalesOrder *SalesOrder `json:"sales_order,omitempty"`
 	// Product holds the value of the product edge.
 	Product *Product `json:"product,omitempty"`
+	// ProductSku holds the value of the product_sku edge.
+	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// Unit holds the value of the unit edge.
 	Unit *Unit `json:"unit,omitempty"`
 	// ShipmentItems holds the value of the shipment_items edge.
@@ -71,7 +76,7 @@ type SalesOrderItemEdges struct {
 	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [6]bool
 }
 
 // SalesOrderOrErr returns the SalesOrder value or an error if the edge
@@ -96,12 +101,23 @@ func (e SalesOrderItemEdges) ProductOrErr() (*Product, error) {
 	return nil, &NotLoadedError{edge: "product"}
 }
 
+// ProductSkuOrErr returns the ProductSku value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e SalesOrderItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
+	if e.ProductSku != nil {
+		return e.ProductSku, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: productsku.Label}
+	}
+	return nil, &NotLoadedError{edge: "product_sku"}
+}
+
 // UnitOrErr returns the Unit value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e SalesOrderItemEdges) UnitOrErr() (*Unit, error) {
 	if e.Unit != nil {
 		return e.Unit, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
@@ -110,7 +126,7 @@ func (e SalesOrderItemEdges) UnitOrErr() (*Unit, error) {
 // ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e SalesOrderItemEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.ShipmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "shipment_items"}
@@ -119,7 +135,7 @@ func (e SalesOrderItemEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
 // StockReservationsOrErr returns the StockReservations value or an error if the edge
 // was not loaded in eager-loading.
 func (e SalesOrderItemEdges) StockReservationsOrErr() ([]*StockReservation, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[5] {
 		return e.StockReservations, nil
 	}
 	return nil, &NotLoadedError{edge: "stock_reservations"}
@@ -134,7 +150,7 @@ func (*SalesOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case salesorderitem.FieldOrderedQuantity:
 			values[i] = new(decimal.Decimal)
-		case salesorderitem.FieldID, salesorderitem.FieldSalesOrderID, salesorderitem.FieldLineNo, salesorderitem.FieldProductID, salesorderitem.FieldUnitID:
+		case salesorderitem.FieldID, salesorderitem.FieldSalesOrderID, salesorderitem.FieldLineNo, salesorderitem.FieldProductID, salesorderitem.FieldProductSkuID, salesorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
 		case salesorderitem.FieldProductCodeSnapshot, salesorderitem.FieldProductNameSnapshot, salesorderitem.FieldColorSnapshot, salesorderitem.FieldLineStatus, salesorderitem.FieldNote:
 			values[i] = new(sql.NullString)
@@ -178,6 +194,13 @@ func (_m *SalesOrderItem) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field product_id", values[i])
 			} else if value.Valid {
 				_m.ProductID = int(value.Int64)
+			}
+		case salesorderitem.FieldProductSkuID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field product_sku_id", values[i])
+			} else if value.Valid {
+				_m.ProductSkuID = new(int)
+				*_m.ProductSkuID = int(value.Int64)
 			}
 		case salesorderitem.FieldUnitID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -281,6 +304,11 @@ func (_m *SalesOrderItem) QueryProduct() *ProductQuery {
 	return NewSalesOrderItemClient(_m.config).QueryProduct(_m)
 }
 
+// QueryProductSku queries the "product_sku" edge of the SalesOrderItem entity.
+func (_m *SalesOrderItem) QueryProductSku() *ProductSKUQuery {
+	return NewSalesOrderItemClient(_m.config).QueryProductSku(_m)
+}
+
 // QueryUnit queries the "unit" edge of the SalesOrderItem entity.
 func (_m *SalesOrderItem) QueryUnit() *UnitQuery {
 	return NewSalesOrderItemClient(_m.config).QueryUnit(_m)
@@ -327,6 +355,11 @@ func (_m *SalesOrderItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("product_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ProductID))
+	builder.WriteString(", ")
+	if v := _m.ProductSkuID; v != nil {
+		builder.WriteString("product_sku_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("unit_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UnitID))

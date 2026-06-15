@@ -20,6 +20,8 @@ const (
 	FieldLineNo = "line_no"
 	// FieldProductID holds the string denoting the product_id field in the database.
 	FieldProductID = "product_id"
+	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
+	FieldProductSkuID = "product_sku_id"
 	// FieldUnitID holds the string denoting the unit_id field in the database.
 	FieldUnitID = "unit_id"
 	// FieldProductCodeSnapshot holds the string denoting the product_code_snapshot field in the database.
@@ -48,6 +50,8 @@ const (
 	EdgeSalesOrder = "sales_order"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
+	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
+	EdgeProductSku = "product_sku"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
 	EdgeUnit = "unit"
 	// EdgeShipmentItems holds the string denoting the shipment_items edge name in mutations.
@@ -70,6 +74,13 @@ const (
 	ProductInverseTable = "products"
 	// ProductColumn is the table column denoting the product relation/edge.
 	ProductColumn = "product_id"
+	// ProductSkuTable is the table that holds the product_sku relation/edge.
+	ProductSkuTable = "sales_order_items"
+	// ProductSkuInverseTable is the table name for the ProductSKU entity.
+	// It exists in this package in order to avoid circular dependency with the "productsku" package.
+	ProductSkuInverseTable = "product_skus"
+	// ProductSkuColumn is the table column denoting the product_sku relation/edge.
+	ProductSkuColumn = "product_sku_id"
 	// UnitTable is the table that holds the unit relation/edge.
 	UnitTable = "sales_order_items"
 	// UnitInverseTable is the table name for the Unit entity.
@@ -99,6 +110,7 @@ var Columns = []string{
 	FieldSalesOrderID,
 	FieldLineNo,
 	FieldProductID,
+	FieldProductSkuID,
 	FieldUnitID,
 	FieldProductCodeSnapshot,
 	FieldProductNameSnapshot,
@@ -130,6 +142,8 @@ var (
 	LineNoValidator func(int) error
 	// ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
 	ProductIDValidator func(int) error
+	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
+	ProductSkuIDValidator func(int) error
 	// UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
 	UnitIDValidator func(int) error
 	// ProductCodeSnapshotValidator is a validator for the "product_code_snapshot" field. It is called by the builders before save.
@@ -173,6 +187,11 @@ func ByLineNo(opts ...sql.OrderTermOption) OrderOption {
 // ByProductID orders the results by the product_id field.
 func ByProductID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductID, opts...).ToFunc()
+}
+
+// ByProductSkuID orders the results by the product_sku_id field.
+func ByProductSkuID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductSkuID, opts...).ToFunc()
 }
 
 // ByUnitID orders the results by the unit_id field.
@@ -249,6 +268,13 @@ func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByProductSkuField orders the results by product_sku field.
+func ByProductSkuField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductSkuStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByUnitField orders the results by unit field.
 func ByUnitField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -295,6 +321,13 @@ func newProductStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ProductInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, ProductTable, ProductColumn),
+	)
+}
+func newProductSkuStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductSkuInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ProductSkuTable, ProductSkuColumn),
 	)
 }
 func newUnitStep() *sqlgraph.Step {

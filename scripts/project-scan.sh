@@ -152,7 +152,7 @@ IDENTITY_HITS="$(
     README.md \
     AGENTS.md \
     docs/README.md \
-    docs/current-source-of-truth.md \
+    docs/当前真源与交接顺序.md \
     server/README.md \
     server/docs/k8s.md \
     web/package.json \
@@ -207,7 +207,7 @@ DOC_HITS="$(
     AGENTS.md \
     README.md \
     docs/README.md \
-    docs/current-source-of-truth.md \
+    docs/当前真源与交接顺序.md \
     scripts/README.md \
     server/README.md \
     server/deploy/README.md \

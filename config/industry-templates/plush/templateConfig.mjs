@@ -36,14 +36,14 @@ export const plushIndustryTemplateConfig = Object.freeze({
       key: "sales",
       label: "业务",
       classification: "industry_default_candidate",
-      evidence: "trial-account-role-menu-checklist.md",
+      evidence: "试用账号角色菜单核对清单.md",
       boundary: "负责客户、销售订单和交期协同；销售订单不等于出货事实。",
     },
     {
       key: "purchase",
       label: "采购",
       classification: "industry_default_candidate",
-      evidence: "trial-account-role-menu-checklist.md",
+      evidence: "试用账号角色菜单核对清单.md",
       boundary: "负责采购协同和入库跟进；采购承诺不替代 purchase_receipts 事实。",
     },
     {

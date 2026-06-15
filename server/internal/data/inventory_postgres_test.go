@@ -609,17 +609,10 @@ func TestPhase2BPostgresBOMConstraints(t *testing.T) {
 	header, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
 		ProductID: fixtures.productID,
 		Version:   "V1",
-		Status:    biz.BOMStatusActive,
+		Status:    biz.BOMStatusDraft,
 	})
 	if err != nil {
-		t.Fatalf("create postgres active bom header failed: %v", err)
-	}
-	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "V2",
-		Status:    biz.BOMStatusActive,
-	}); !ent.IsConstraintError(err) {
-		t.Fatalf("expected postgres one ACTIVE BOM per product constraint, got %v", err)
+		t.Fatalf("create postgres draft bom header failed: %v", err)
 	}
 	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
 		ProductID: fixtures.productID,
@@ -641,6 +634,25 @@ func TestPhase2BPostgresBOMConstraints(t *testing.T) {
 	}
 	assertDecimalEqual(t, item.Quantity, "1.25")
 	assertDecimalEqual(t, item.LossRate, "0.10")
+	if _, err := uc.ActivateBOMVersion(ctx, header.ID); err != nil {
+		t.Fatalf("activate postgres bom failed: %v", err)
+	}
+	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
+		ProductID: fixtures.productID,
+		Version:   "V3",
+		Status:    biz.BOMStatusActive,
+	}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected postgres one ACTIVE BOM per product constraint, got %v", err)
+	}
+	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
+		BOMHeaderID: header.ID,
+		MaterialID:  fixtures.materialID,
+		Quantity:    mustDecimal(t, "1"),
+		UnitID:      fixtures.unitID,
+		LossRate:    decimal.Zero,
+	}); !errors.Is(err, biz.ErrBOMActiveImmutable) {
+		t.Fatalf("expected active BOM item mutation to be rejected, got %v", err)
+	}
 
 	if _, err := client.BOMItem.Create().
 		SetBomHeaderID(header.ID).

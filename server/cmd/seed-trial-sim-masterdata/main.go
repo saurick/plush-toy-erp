@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/devdbguard"
+
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"gopkg.in/yaml.v3"
 )
@@ -53,6 +55,9 @@ func main() {
 	dsn, err = normalizePostgresURL(dsn)
 	if err != nil {
 		fail("parse postgres dsn failed: %v", err)
+	}
+	if err := devdbguard.RequireLocalDevDSN(*confPath, dsn, os.Getenv); err != nil {
+		fail("%v", err)
 	}
 
 	db, err := sql.Open("pgx", dsn)

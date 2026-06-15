@@ -48,8 +48,17 @@ type Permission func(*sql.Selector)
 // Product is the predicate function for product builders.
 type Product func(*sql.Selector)
 
+// ProductSKU is the predicate function for productsku builders.
+type ProductSKU func(*sql.Selector)
+
 // ProductionFact is the predicate function for productionfact builders.
 type ProductionFact func(*sql.Selector)
+
+// PurchaseOrder is the predicate function for purchaseorder builders.
+type PurchaseOrder func(*sql.Selector)
+
+// PurchaseOrderItem is the predicate function for purchaseorderitem builders.
+type PurchaseOrderItem func(*sql.Selector)
 
 // PurchaseReceipt is the predicate function for purchasereceipt builders.
 type PurchaseReceipt func(*sql.Selector)

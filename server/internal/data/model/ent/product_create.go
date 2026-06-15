@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/unit"
@@ -115,6 +116,21 @@ func (_c *ProductCreate) SetNillableUpdatedAt(v *time.Time) *ProductCreate {
 // SetDefaultUnit sets the "default_unit" edge to the Unit entity.
 func (_c *ProductCreate) SetDefaultUnit(v *Unit) *ProductCreate {
 	return _c.SetDefaultUnitID(v.ID)
+}
+
+// AddProductSkuIDs adds the "product_skus" edge to the ProductSKU entity by IDs.
+func (_c *ProductCreate) AddProductSkuIDs(ids ...int) *ProductCreate {
+	_c.mutation.AddProductSkuIDs(ids...)
+	return _c
+}
+
+// AddProductSkus adds the "product_skus" edges to the ProductSKU entity.
+func (_c *ProductCreate) AddProductSkus(v ...*ProductSKU) *ProductCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductSkuIDs(ids...)
 }
 
 // AddBomHeaderIDs adds the "bom_headers" edge to the BOMHeader entity by IDs.
@@ -328,6 +344,22 @@ func (_c *ProductCreate) createSpec() (*Product, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.DefaultUnitID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductSkusIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ProductSkusTable,
+			Columns: []string{product.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.BomHeadersIDs(); len(nodes) > 0 {

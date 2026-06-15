@@ -1,6 +1,6 @@
 # 数据层说明 / Data
 
-`data` 层负责数据库、外部依赖和 JSON-RPC 入口聚合，不承载业务决策本身。
+`data` 层负责数据库、外部依赖和 repo 适配，不承载业务决策或 JSON-RPC 分发。
 
 当前仓库默认保留：
 
@@ -8,7 +8,7 @@
 - Ent ORM 访问
 - 用户 / 管理员鉴权 repo
 - 后台账号目录 repo
-- JSON-RPC 入口聚合
+- Workflow / MasterData / Order / Inventory / OperationalFact 等业务 repo
 
 数据库变更前，必须先读：
 

@@ -285,6 +285,141 @@ func (r *salesOrderRepo) ListSalesOrderItems(ctx context.Context, filter biz.Sal
 	return entSalesOrderItemsToBiz(rows), total, nil
 }
 
+func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in *biz.SalesOrderMutation, items []*biz.SalesOrderItemSaveMutation) (*biz.SalesOrderWithItems, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if tx != nil {
+			rollbackEntTx(ctx, tx, r.log)
+		}
+	}()
+
+	var orderRow *ent.SalesOrder
+	if id > 0 {
+		update := tx.SalesOrder.UpdateOneID(id).
+			SetOrderNo(in.OrderNo).
+			SetCustomerID(in.CustomerID).
+			SetCustomerSnapshot(in.CustomerSnapshot).
+			SetOrderDate(in.OrderDate)
+		if in.CustomerOrderNo == nil {
+			update.ClearCustomerOrderNo()
+		} else {
+			update.SetCustomerOrderNo(*in.CustomerOrderNo)
+		}
+		if in.PlannedDeliveryDate == nil {
+			update.ClearPlannedDeliveryDate()
+		} else {
+			update.SetPlannedDeliveryDate(*in.PlannedDeliveryDate)
+		}
+		if in.Note == nil {
+			update.ClearNote()
+		} else {
+			update.SetNote(*in.Note)
+		}
+		orderRow, err = update.Save(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, biz.ErrSalesOrderNotFound
+			}
+			return nil, err
+		}
+	} else {
+		orderRow, err = tx.SalesOrder.Create().
+			SetOrderNo(in.OrderNo).
+			SetCustomerID(in.CustomerID).
+			SetNillableCustomerOrderNo(in.CustomerOrderNo).
+			SetCustomerSnapshot(in.CustomerSnapshot).
+			SetOrderDate(in.OrderDate).
+			SetNillablePlannedDeliveryDate(in.PlannedDeliveryDate).
+			SetLifecycleStatus(biz.SalesOrderStatusDraft).
+			SetNillableNote(in.Note).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	existingOpenItems, err := tx.SalesOrderItem.Query().
+		Where(
+			salesorderitem.SalesOrderID(orderRow.ID),
+			salesorderitem.LineStatus(biz.SalesOrderItemStatusOpen),
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	submittedIDs := map[int]struct{}{}
+	for _, item := range items {
+		mutation := item.SalesOrderItemMutation
+		mutation.SalesOrderID = orderRow.ID
+		if item.ID > 0 {
+			current, err := tx.SalesOrderItem.Query().
+				Where(salesorderitem.ID(item.ID), salesorderitem.SalesOrderID(orderRow.ID)).
+				Only(ctx)
+			if err != nil {
+				if ent.IsNotFound(err) {
+					return nil, biz.ErrSalesOrderItemNotFound
+				}
+				return nil, err
+			}
+			if current.LineStatus == biz.SalesOrderItemStatusCanceled || current.LineStatus == biz.SalesOrderItemStatusClosed {
+				return nil, biz.ErrBadParam
+			}
+			if _, err := saveSalesOrderItemUpdate(ctx, tx, item.ID, &mutation); err != nil {
+				return nil, err
+			}
+			submittedIDs[item.ID] = struct{}{}
+			continue
+		}
+		if _, err := tx.SalesOrderItem.Create().
+			SetSalesOrderID(mutation.SalesOrderID).
+			SetLineNo(mutation.LineNo).
+			SetProductID(mutation.ProductID).
+			SetUnitID(mutation.UnitID).
+			SetNillableProductCodeSnapshot(mutation.ProductCodeSnapshot).
+			SetNillableProductNameSnapshot(mutation.ProductNameSnapshot).
+			SetNillableColorSnapshot(mutation.ColorSnapshot).
+			SetOrderedQuantity(mutation.OrderedQuantity).
+			SetNillableUnitPrice(mutation.UnitPrice).
+			SetNillableAmount(mutation.Amount).
+			SetNillablePlannedDeliveryDate(mutation.PlannedDeliveryDate).
+			SetLineStatus(biz.SalesOrderItemStatusOpen).
+			SetNillableNote(mutation.Note).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	for _, existing := range existingOpenItems {
+		if _, ok := submittedIDs[existing.ID]; ok {
+			continue
+		}
+		if _, err := tx.SalesOrderItem.UpdateOneID(existing.ID).
+			SetLineStatus(biz.SalesOrderItemStatusCanceled).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+
+	itemRows, err := tx.SalesOrderItem.Query().
+		Where(salesorderitem.SalesOrderID(orderRow.ID)).
+		Order(ent.Asc(salesorderitem.FieldLineNo), ent.Asc(salesorderitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return &biz.SalesOrderWithItems{
+		Order: entSalesOrderToBiz(orderRow),
+		Items: entSalesOrderItemsToBiz(itemRows),
+	}, nil
+}
+
 func (r *salesOrderRepo) CustomerIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Customer.Query().
 		Where(customer.ID(id)).
@@ -322,6 +457,58 @@ func (r *salesOrderRepo) UnitIsActive(ctx context.Context, id int) (bool, error)
 		return false, err
 	}
 	return row.IsActive, nil
+}
+
+func saveSalesOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in *biz.SalesOrderItemMutation) (*ent.SalesOrderItem, error) {
+	update := tx.SalesOrderItem.UpdateOneID(id).
+		SetSalesOrderID(in.SalesOrderID).
+		SetLineNo(in.LineNo).
+		SetProductID(in.ProductID).
+		SetUnitID(in.UnitID).
+		SetOrderedQuantity(in.OrderedQuantity)
+	if in.ProductCodeSnapshot == nil {
+		update.ClearProductCodeSnapshot()
+	} else {
+		update.SetProductCodeSnapshot(*in.ProductCodeSnapshot)
+	}
+	if in.ProductNameSnapshot == nil {
+		update.ClearProductNameSnapshot()
+	} else {
+		update.SetProductNameSnapshot(*in.ProductNameSnapshot)
+	}
+	if in.ColorSnapshot == nil {
+		update.ClearColorSnapshot()
+	} else {
+		update.SetColorSnapshot(*in.ColorSnapshot)
+	}
+	if in.UnitPrice == nil {
+		update.ClearUnitPrice()
+	} else {
+		update.SetUnitPrice(*in.UnitPrice)
+	}
+	if in.Amount == nil {
+		update.ClearAmount()
+	} else {
+		update.SetAmount(*in.Amount)
+	}
+	if in.PlannedDeliveryDate == nil {
+		update.ClearPlannedDeliveryDate()
+	} else {
+		update.SetPlannedDeliveryDate(*in.PlannedDeliveryDate)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderItemNotFound
+		}
+		return nil, err
+	}
+	return row, nil
 }
 
 func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {

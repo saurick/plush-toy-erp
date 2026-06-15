@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
@@ -50,6 +51,20 @@ func (_c *ShipmentItemCreate) SetNillableSalesOrderItemID(v *int) *ShipmentItemC
 // SetProductID sets the "product_id" field.
 func (_c *ShipmentItemCreate) SetProductID(v int) *ShipmentItemCreate {
 	_c.mutation.SetProductID(v)
+	return _c
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_c *ShipmentItemCreate) SetProductSkuID(v int) *ShipmentItemCreate {
+	_c.mutation.SetProductSkuID(v)
+	return _c
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_c *ShipmentItemCreate) SetNillableProductSkuID(v *int) *ShipmentItemCreate {
+	if v != nil {
+		_c.SetProductSkuID(*v)
+	}
 	return _c
 }
 
@@ -140,6 +155,11 @@ func (_c *ShipmentItemCreate) SetSalesOrderItem(v *SalesOrderItem) *ShipmentItem
 // SetProduct sets the "product" edge to the Product entity.
 func (_c *ShipmentItemCreate) SetProduct(v *Product) *ShipmentItemCreate {
 	return _c.SetProductID(v.ID)
+}
+
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_c *ShipmentItemCreate) SetProductSku(v *ProductSKU) *ShipmentItemCreate {
+	return _c.SetProductSkuID(v.ID)
 }
 
 // SetWarehouse sets the "warehouse" edge to the Warehouse entity.
@@ -246,6 +266,11 @@ func (_c *ShipmentItemCreate) check() error {
 	if v, ok := _c.mutation.ProductID(); ok {
 		if err := shipmentitem.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.product_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProductSkuID(); ok {
+		if err := shipmentitem.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.product_sku_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.WarehouseID(); !ok {
@@ -386,6 +411,23 @@ func (_c *ShipmentItemCreate) createSpec() (*ShipmentItem, *sqlgraph.CreateSpec)
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.ProductID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   shipmentitem.ProductSkuTable,
+			Columns: []string{shipmentitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProductSkuID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.WarehouseIDs(); len(nodes) > 0 {

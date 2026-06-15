@@ -3,6 +3,7 @@ export const V1_ROUTE_PATHS = Object.freeze({
   suppliers: '/erp/master/partners/suppliers',
   materials: '/erp/master/materials',
   salesOrders: '/erp/sales/project-orders/sales-orders',
+  purchaseOrders: '/erp/purchase/accessories',
 })
 
 export const SALES_ORDER_STATUS_LABELS = Object.freeze({
@@ -27,6 +28,28 @@ export const SALES_ORDER_ITEM_STATUS_LABELS = Object.freeze({
   canceled: '已取消',
 })
 
+export const PURCHASE_ORDER_STATUS_LABELS = Object.freeze({
+  draft: '草稿',
+  submitted: '已提交',
+  approved: '已审核',
+  closed: '已关闭',
+  canceled: '已取消',
+})
+
+export const PURCHASE_ORDER_STATUS_COLORS = Object.freeze({
+  draft: 'default',
+  submitted: 'blue',
+  approved: 'green',
+  closed: 'purple',
+  canceled: 'red',
+})
+
+export const PURCHASE_ORDER_ITEM_STATUS_LABELS = Object.freeze({
+  open: '未关闭',
+  closed: '已关闭',
+  canceled: '已取消',
+})
+
 export function hasActionPermission(admin = {}, permissionKey = '') {
   if (!permissionKey) {
     return false
@@ -46,6 +69,24 @@ export function trimOptional(value) {
 
 export function deriveSalesOrderItemAmount(values = {}) {
   const quantityText = String(values.ordered_quantity ?? '').trim()
+  const unitPriceText = String(values.unit_price ?? '').trim()
+  const quantity = Number(quantityText)
+  const unitPrice = Number(unitPriceText)
+  if (
+    quantityText !== '' &&
+    unitPriceText !== '' &&
+    Number.isFinite(quantity) &&
+    quantity >= 0 &&
+    Number.isFinite(unitPrice) &&
+    unitPrice >= 0
+  ) {
+    return (quantity * unitPrice).toFixed(2)
+  }
+  return trimOptional(values.amount)
+}
+
+export function derivePurchaseOrderItemAmount(values = {}) {
+  const quantityText = String(values.purchased_quantity ?? '').trim()
   const unitPriceText = String(values.unit_price ?? '').trim()
   const quantity = Number(quantityText)
   const unitPrice = Number(unitPriceText)
@@ -120,6 +161,18 @@ export function buildCustomerSnapshot(customer = {}) {
   })
 }
 
+export function buildSupplierSnapshot(supplier = {}) {
+  if (!supplier?.id) {
+    return {}
+  }
+  return compactParams({
+    id: supplier.id,
+    code: trimOptional(supplier.code),
+    name: trimOptional(supplier.name),
+    short_name: trimOptional(supplier.short_name),
+  })
+}
+
 export function buildMasterDataParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,
@@ -136,6 +189,25 @@ export function buildMasterDataParams(values = {}, extra = {}) {
         ? undefined
         : Number(values.default_unit_id || 0),
     note: trimOptional(values.note),
+  })
+}
+
+export function buildProductSKUParams(values = {}, extra = {}) {
+  return compactParams({
+    ...extra,
+    product_id: Number(values.product_id || 0),
+    sku_code: trimOptional(values.sku_code),
+    sku_name: trimOptional(values.sku_name),
+    barcode: trimOptional(values.barcode),
+    customer_sku: trimOptional(values.customer_sku),
+    color: trimOptional(values.color),
+    color_no: trimOptional(values.color_no),
+    size: trimOptional(values.size),
+    packaging_version: trimOptional(values.packaging_version),
+    default_unit_id:
+      values.default_unit_id === undefined || values.default_unit_id === null
+        ? undefined
+        : Number(values.default_unit_id || 0),
   })
 }
 
@@ -181,6 +253,39 @@ export function buildSalesOrderItemParams(values = {}, extra = {}) {
     unit_price: trimOptional(values.unit_price),
     amount: deriveSalesOrderItemAmount(values),
     planned_delivery_date: trimOptional(values.planned_delivery_date),
+    note: trimOptional(values.note),
+  })
+}
+
+export function buildPurchaseOrderParams(values = {}, extra = {}) {
+  return compactParams({
+    ...extra,
+    purchase_order_no: trimOptional(values.purchase_order_no),
+    supplier_id: Number(values.supplier_id || 0),
+    supplier_purchase_order_no: trimOptional(values.supplier_purchase_order_no),
+    supplier_snapshot:
+      values.supplier_snapshot && typeof values.supplier_snapshot === 'object'
+        ? values.supplier_snapshot
+        : {},
+    purchase_date: trimOptional(values.purchase_date),
+    expected_arrival_date: trimOptional(values.expected_arrival_date),
+    note: trimOptional(values.note),
+  })
+}
+
+export function buildPurchaseOrderItemParams(values = {}, extra = {}) {
+  return compactParams({
+    ...extra,
+    line_no: Number(values.line_no || 0),
+    material_id: Number(values.material_id || 0),
+    unit_id: Number(values.unit_id || 0),
+    material_code_snapshot: trimOptional(values.material_code_snapshot),
+    material_name_snapshot: trimOptional(values.material_name_snapshot),
+    color_snapshot: trimOptional(values.color_snapshot),
+    purchased_quantity: trimOptional(values.purchased_quantity),
+    unit_price: trimOptional(values.unit_price),
+    amount: derivePurchaseOrderItemAmount(values),
+    expected_arrival_date: trimOptional(values.expected_arrival_date),
     note: trimOptional(values.note),
   })
 }

@@ -32,6 +32,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeDefaultUnit holds the string denoting the default_unit edge name in mutations.
 	EdgeDefaultUnit = "default_unit"
+	// EdgeProductSkus holds the string denoting the product_skus edge name in mutations.
+	EdgeProductSkus = "product_skus"
 	// EdgeBomHeaders holds the string denoting the bom_headers edge name in mutations.
 	EdgeBomHeaders = "bom_headers"
 	// EdgeShipmentItems holds the string denoting the shipment_items edge name in mutations.
@@ -47,6 +49,13 @@ const (
 	DefaultUnitInverseTable = "units"
 	// DefaultUnitColumn is the table column denoting the default_unit relation/edge.
 	DefaultUnitColumn = "default_unit_id"
+	// ProductSkusTable is the table that holds the product_skus relation/edge.
+	ProductSkusTable = "product_skus"
+	// ProductSkusInverseTable is the table name for the ProductSKU entity.
+	// It exists in this package in order to avoid circular dependency with the "productsku" package.
+	ProductSkusInverseTable = "product_skus"
+	// ProductSkusColumn is the table column denoting the product_skus relation/edge.
+	ProductSkusColumn = "product_id"
 	// BomHeadersTable is the table that holds the bom_headers relation/edge.
 	BomHeadersTable = "bom_headers"
 	// BomHeadersInverseTable is the table name for the BOMHeader entity.
@@ -169,6 +178,20 @@ func ByDefaultUnitField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByProductSkusCount orders the results by product_skus count.
+func ByProductSkusCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProductSkusStep(), opts...)
+	}
+}
+
+// ByProductSkus orders the results by product_skus terms.
+func ByProductSkus(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductSkusStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByBomHeadersCount orders the results by bom_headers count.
 func ByBomHeadersCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -215,6 +238,13 @@ func newDefaultUnitStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(DefaultUnitInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, DefaultUnitTable, DefaultUnitColumn),
+	)
+}
+func newProductSkusStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductSkusInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ProductSkusTable, ProductSkusColumn),
 	)
 }
 func newBomHeadersStep() *sqlgraph.Step {

@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -110,6 +111,26 @@ func (_u *PurchaseReceiptItemUpdate) SetNillableLotID(v *int) *PurchaseReceiptIt
 // ClearLotID clears the value of the "lot_id" field.
 func (_u *PurchaseReceiptItemUpdate) ClearLotID() *PurchaseReceiptItemUpdate {
 	_u.mutation.ClearLotID()
+	return _u
+}
+
+// SetPurchaseOrderItemID sets the "purchase_order_item_id" field.
+func (_u *PurchaseReceiptItemUpdate) SetPurchaseOrderItemID(v int) *PurchaseReceiptItemUpdate {
+	_u.mutation.SetPurchaseOrderItemID(v)
+	return _u
+}
+
+// SetNillablePurchaseOrderItemID sets the "purchase_order_item_id" field if the given value is not nil.
+func (_u *PurchaseReceiptItemUpdate) SetNillablePurchaseOrderItemID(v *int) *PurchaseReceiptItemUpdate {
+	if v != nil {
+		_u.SetPurchaseOrderItemID(*v)
+	}
+	return _u
+}
+
+// ClearPurchaseOrderItemID clears the value of the "purchase_order_item_id" field.
+func (_u *PurchaseReceiptItemUpdate) ClearPurchaseOrderItemID() *PurchaseReceiptItemUpdate {
+	_u.mutation.ClearPurchaseOrderItemID()
 	return _u
 }
 
@@ -272,6 +293,11 @@ func (_u *PurchaseReceiptItemUpdate) SetInventoryLot(v *InventoryLot) *PurchaseR
 	return _u.SetInventoryLotID(v.ID)
 }
 
+// SetPurchaseOrderItem sets the "purchase_order_item" edge to the PurchaseOrderItem entity.
+func (_u *PurchaseReceiptItemUpdate) SetPurchaseOrderItem(v *PurchaseOrderItem) *PurchaseReceiptItemUpdate {
+	return _u.SetPurchaseOrderItemID(v.ID)
+}
+
 // AddPurchaseReturnItemIDs adds the "purchase_return_items" edge to the PurchaseReturnItem entity by IDs.
 func (_u *PurchaseReceiptItemUpdate) AddPurchaseReturnItemIDs(ids ...int) *PurchaseReceiptItemUpdate {
 	_u.mutation.AddPurchaseReturnItemIDs(ids...)
@@ -349,6 +375,12 @@ func (_u *PurchaseReceiptItemUpdate) ClearUnit() *PurchaseReceiptItemUpdate {
 // ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
 func (_u *PurchaseReceiptItemUpdate) ClearInventoryLot() *PurchaseReceiptItemUpdate {
 	_u.mutation.ClearInventoryLot()
+	return _u
+}
+
+// ClearPurchaseOrderItem clears the "purchase_order_item" edge to the PurchaseOrderItem entity.
+func (_u *PurchaseReceiptItemUpdate) ClearPurchaseOrderItem() *PurchaseReceiptItemUpdate {
+	_u.mutation.ClearPurchaseOrderItem()
 	return _u
 }
 
@@ -482,6 +514,11 @@ func (_u *PurchaseReceiptItemUpdate) check() error {
 	if v, ok := _u.mutation.LotID(); ok {
 		if err := purchasereceiptitem.LotIDValidator(v); err != nil {
 			return &ValidationError{Name: "lot_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.lot_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PurchaseOrderItemID(); ok {
+		if err := purchasereceiptitem.PurchaseOrderItemIDValidator(v); err != nil {
+			return &ValidationError{Name: "purchase_order_item_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.purchase_order_item_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.LotNo(); ok {
@@ -700,6 +737,35 @@ func (_u *PurchaseReceiptItemUpdate) sqlSave(ctx context.Context) (_node int, er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseOrderItemCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceiptitem.PurchaseOrderItemTable,
+			Columns: []string{purchasereceiptitem.PurchaseOrderItemColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseOrderItemIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceiptitem.PurchaseOrderItemTable,
+			Columns: []string{purchasereceiptitem.PurchaseOrderItemColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -938,6 +1004,26 @@ func (_u *PurchaseReceiptItemUpdateOne) ClearLotID() *PurchaseReceiptItemUpdateO
 	return _u
 }
 
+// SetPurchaseOrderItemID sets the "purchase_order_item_id" field.
+func (_u *PurchaseReceiptItemUpdateOne) SetPurchaseOrderItemID(v int) *PurchaseReceiptItemUpdateOne {
+	_u.mutation.SetPurchaseOrderItemID(v)
+	return _u
+}
+
+// SetNillablePurchaseOrderItemID sets the "purchase_order_item_id" field if the given value is not nil.
+func (_u *PurchaseReceiptItemUpdateOne) SetNillablePurchaseOrderItemID(v *int) *PurchaseReceiptItemUpdateOne {
+	if v != nil {
+		_u.SetPurchaseOrderItemID(*v)
+	}
+	return _u
+}
+
+// ClearPurchaseOrderItemID clears the value of the "purchase_order_item_id" field.
+func (_u *PurchaseReceiptItemUpdateOne) ClearPurchaseOrderItemID() *PurchaseReceiptItemUpdateOne {
+	_u.mutation.ClearPurchaseOrderItemID()
+	return _u
+}
+
 // SetLotNo sets the "lot_no" field.
 func (_u *PurchaseReceiptItemUpdateOne) SetLotNo(v string) *PurchaseReceiptItemUpdateOne {
 	_u.mutation.SetLotNo(v)
@@ -1097,6 +1183,11 @@ func (_u *PurchaseReceiptItemUpdateOne) SetInventoryLot(v *InventoryLot) *Purcha
 	return _u.SetInventoryLotID(v.ID)
 }
 
+// SetPurchaseOrderItem sets the "purchase_order_item" edge to the PurchaseOrderItem entity.
+func (_u *PurchaseReceiptItemUpdateOne) SetPurchaseOrderItem(v *PurchaseOrderItem) *PurchaseReceiptItemUpdateOne {
+	return _u.SetPurchaseOrderItemID(v.ID)
+}
+
 // AddPurchaseReturnItemIDs adds the "purchase_return_items" edge to the PurchaseReturnItem entity by IDs.
 func (_u *PurchaseReceiptItemUpdateOne) AddPurchaseReturnItemIDs(ids ...int) *PurchaseReceiptItemUpdateOne {
 	_u.mutation.AddPurchaseReturnItemIDs(ids...)
@@ -1174,6 +1265,12 @@ func (_u *PurchaseReceiptItemUpdateOne) ClearUnit() *PurchaseReceiptItemUpdateOn
 // ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
 func (_u *PurchaseReceiptItemUpdateOne) ClearInventoryLot() *PurchaseReceiptItemUpdateOne {
 	_u.mutation.ClearInventoryLot()
+	return _u
+}
+
+// ClearPurchaseOrderItem clears the "purchase_order_item" edge to the PurchaseOrderItem entity.
+func (_u *PurchaseReceiptItemUpdateOne) ClearPurchaseOrderItem() *PurchaseReceiptItemUpdateOne {
+	_u.mutation.ClearPurchaseOrderItem()
 	return _u
 }
 
@@ -1320,6 +1417,11 @@ func (_u *PurchaseReceiptItemUpdateOne) check() error {
 	if v, ok := _u.mutation.LotID(); ok {
 		if err := purchasereceiptitem.LotIDValidator(v); err != nil {
 			return &ValidationError{Name: "lot_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.lot_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PurchaseOrderItemID(); ok {
+		if err := purchasereceiptitem.PurchaseOrderItemIDValidator(v); err != nil {
+			return &ValidationError{Name: "purchase_order_item_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.purchase_order_item_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.LotNo(); ok {
@@ -1555,6 +1657,35 @@ func (_u *PurchaseReceiptItemUpdateOne) sqlSave(ctx context.Context) (_node *Pur
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseOrderItemCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceiptitem.PurchaseOrderItemTable,
+			Columns: []string{purchasereceiptitem.PurchaseOrderItemColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseOrderItemIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceiptitem.PurchaseOrderItemTable,
+			Columns: []string{purchasereceiptitem.PurchaseOrderItemColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

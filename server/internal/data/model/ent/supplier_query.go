@@ -4,9 +4,11 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/supplier"
 
 	"entgo.io/ent"
@@ -18,10 +20,11 @@ import (
 // SupplierQuery is the builder for querying Supplier entities.
 type SupplierQuery struct {
 	config
-	ctx        *QueryContext
-	order      []supplier.OrderOption
-	inters     []Interceptor
-	predicates []predicate.Supplier
+	ctx                *QueryContext
+	order              []supplier.OrderOption
+	inters             []Interceptor
+	predicates         []predicate.Supplier
+	withPurchaseOrders *PurchaseOrderQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +59,28 @@ func (_q *SupplierQuery) Unique(unique bool) *SupplierQuery {
 func (_q *SupplierQuery) Order(o ...supplier.OrderOption) *SupplierQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryPurchaseOrders chains the current query on the "purchase_orders" edge.
+func (_q *SupplierQuery) QueryPurchaseOrders() *PurchaseOrderQuery {
+	query := (&PurchaseOrderClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(supplier.Table, supplier.FieldID, selector),
+			sqlgraph.To(purchaseorder.Table, purchaseorder.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, supplier.PurchaseOrdersTable, supplier.PurchaseOrdersColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first Supplier entity from the query.
@@ -245,15 +270,27 @@ func (_q *SupplierQuery) Clone() *SupplierQuery {
 		return nil
 	}
 	return &SupplierQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]supplier.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.Supplier{}, _q.predicates...),
+		config:             _q.config,
+		ctx:                _q.ctx.Clone(),
+		order:              append([]supplier.OrderOption{}, _q.order...),
+		inters:             append([]Interceptor{}, _q.inters...),
+		predicates:         append([]predicate.Supplier{}, _q.predicates...),
+		withPurchaseOrders: _q.withPurchaseOrders.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithPurchaseOrders tells the query-builder to eager-load the nodes that are connected to
+// the "purchase_orders" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SupplierQuery) WithPurchaseOrders(opts ...func(*PurchaseOrderQuery)) *SupplierQuery {
+	query := (&PurchaseOrderClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPurchaseOrders = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -332,8 +369,11 @@ func (_q *SupplierQuery) prepareQuery(ctx context.Context) error {
 
 func (_q *SupplierQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Supplier, error) {
 	var (
-		nodes = []*Supplier{}
-		_spec = _q.querySpec()
+		nodes       = []*Supplier{}
+		_spec       = _q.querySpec()
+		loadedTypes = [1]bool{
+			_q.withPurchaseOrders != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Supplier).scanValues(nil, columns)
@@ -341,6 +381,7 @@ func (_q *SupplierQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Sup
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &Supplier{config: _q.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +393,45 @@ func (_q *SupplierQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Sup
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withPurchaseOrders; query != nil {
+		if err := _q.loadPurchaseOrders(ctx, query, nodes,
+			func(n *Supplier) { n.Edges.PurchaseOrders = []*PurchaseOrder{} },
+			func(n *Supplier, e *PurchaseOrder) { n.Edges.PurchaseOrders = append(n.Edges.PurchaseOrders, e) }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (_q *SupplierQuery) loadPurchaseOrders(ctx context.Context, query *PurchaseOrderQuery, nodes []*Supplier, init func(*Supplier), assign func(*Supplier, *PurchaseOrder)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Supplier)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(purchaseorder.FieldSupplierID)
+	}
+	query.Where(predicate.PurchaseOrder(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(supplier.PurchaseOrdersColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.SupplierID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "supplier_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
 }
 
 func (_q *SupplierQuery) sqlCount(ctx context.Context) (int, error) {

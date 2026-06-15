@@ -159,6 +159,75 @@ func TestMasterDataRepoMaterialCRUDAndUnitGuard(t *testing.T) {
 	}
 }
 
+func TestMasterDataRepoProductSKUCRUDAndGuards(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openMasterDataRepoTest(t, "masterdata_repo_product_skus")
+	defer mustCloseEntClient(t, client)
+
+	unitRow, err := client.Unit.Create().SetCode("PCS").SetName("个").Save(ctx)
+	if err != nil {
+		t.Fatalf("create unit failed: %v", err)
+	}
+	productRow, err := client.Product.Create().
+		SetCode("P-001").
+		SetName("毛绒熊").
+		SetDefaultUnitID(unitRow.ID).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create product failed: %v", err)
+	}
+	skuName := "红色小号"
+	color := "红色"
+	defaultUnitID := unitRow.ID
+	sku, err := uc.CreateProductSKU(ctx, &biz.ProductSKUMutation{
+		ProductID:     productRow.ID,
+		SKUCode:       "SKU-RED-S",
+		SKUName:       &skuName,
+		Color:         &color,
+		DefaultUnitID: &defaultUnitID,
+	})
+	if err != nil {
+		t.Fatalf("create product sku failed: %v", err)
+	}
+	if sku.ProductID != productRow.ID || sku.SKUName == nil || *sku.SKUName != skuName {
+		t.Fatalf("expected sku fields retained, got %#v", sku)
+	}
+	if _, err := uc.CreateProductSKU(ctx, &biz.ProductSKUMutation{ProductID: productRow.ID, SKUCode: "SKU-RED-S"}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected duplicate sku code rejected, got %v", err)
+	}
+	if _, err := uc.CreateProductSKU(ctx, &biz.ProductSKUMutation{ProductID: 999999, SKUCode: "SKU-MISSING"}); !errors.Is(err, biz.ErrProductNotFound) {
+		t.Fatalf("expected missing product rejected, got %v", err)
+	}
+
+	updated, err := uc.UpdateProductSKU(ctx, sku.ID, &biz.ProductSKUMutation{
+		ProductID: productRow.ID,
+		SKUCode:   "SKU-RED-S-A",
+	})
+	if err != nil {
+		t.Fatalf("update product sku failed: %v", err)
+	}
+	if updated.SKUName != nil || updated.Color != nil || updated.DefaultUnitID != nil {
+		t.Fatalf("expected optional sku fields cleared, got %#v", updated)
+	}
+	if _, err := uc.SetProductSKUActive(ctx, sku.ID, false); err != nil {
+		t.Fatalf("disable product sku failed: %v", err)
+	}
+	list, total, err := uc.ListProductSKUs(ctx, biz.ProductSKUFilter{Keyword: "RED", Limit: 20})
+	if err != nil {
+		t.Fatalf("list product skus failed: %v", err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("expected one sku, total=%d len=%d", total, len(list))
+	}
+	activeList, activeTotal, err := uc.ListProductSKUs(ctx, biz.ProductSKUFilter{ActiveOnly: true})
+	if err != nil {
+		t.Fatalf("list active product skus failed: %v", err)
+	}
+	if activeTotal != 0 || len(activeList) != 0 {
+		t.Fatalf("expected inactive sku filtered out, total=%d len=%d", activeTotal, len(activeList))
+	}
+}
+
 func TestMasterDataRepoContactOwnerGuardAndPrimaryStrategy(t *testing.T) {
 	ctx := context.Background()
 	uc, client := openMasterDataRepoTest(t, "masterdata_repo_contacts")

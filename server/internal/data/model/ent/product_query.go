@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/unit"
@@ -28,6 +29,7 @@ type ProductQuery struct {
 	inters                []Interceptor
 	predicates            []predicate.Product
 	withDefaultUnit       *UnitQuery
+	withProductSkus       *ProductSKUQuery
 	withBomHeaders        *BOMHeaderQuery
 	withShipmentItems     *ShipmentItemQuery
 	withStockReservations *StockReservationQuery
@@ -82,6 +84,28 @@ func (_q *ProductQuery) QueryDefaultUnit() *UnitQuery {
 			sqlgraph.From(product.Table, product.FieldID, selector),
 			sqlgraph.To(unit.Table, unit.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, product.DefaultUnitTable, product.DefaultUnitColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductSkus chains the current query on the "product_skus" edge.
+func (_q *ProductQuery) QueryProductSkus() *ProductSKUQuery {
+	query := (&ProductSKUClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(product.Table, product.FieldID, selector),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, product.ProductSkusTable, product.ProductSkusColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -348,6 +372,7 @@ func (_q *ProductQuery) Clone() *ProductQuery {
 		inters:                append([]Interceptor{}, _q.inters...),
 		predicates:            append([]predicate.Product{}, _q.predicates...),
 		withDefaultUnit:       _q.withDefaultUnit.Clone(),
+		withProductSkus:       _q.withProductSkus.Clone(),
 		withBomHeaders:        _q.withBomHeaders.Clone(),
 		withShipmentItems:     _q.withShipmentItems.Clone(),
 		withStockReservations: _q.withStockReservations.Clone(),
@@ -365,6 +390,17 @@ func (_q *ProductQuery) WithDefaultUnit(opts ...func(*UnitQuery)) *ProductQuery 
 		opt(query)
 	}
 	_q.withDefaultUnit = query
+	return _q
+}
+
+// WithProductSkus tells the query-builder to eager-load the nodes that are connected to
+// the "product_skus" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductQuery) WithProductSkus(opts ...func(*ProductSKUQuery)) *ProductQuery {
+	query := (&ProductSKUClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductSkus = query
 	return _q
 }
 
@@ -479,8 +515,9 @@ func (_q *ProductQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Prod
 	var (
 		nodes       = []*Product{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			_q.withDefaultUnit != nil,
+			_q.withProductSkus != nil,
 			_q.withBomHeaders != nil,
 			_q.withShipmentItems != nil,
 			_q.withStockReservations != nil,
@@ -507,6 +544,13 @@ func (_q *ProductQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Prod
 	if query := _q.withDefaultUnit; query != nil {
 		if err := _q.loadDefaultUnit(ctx, query, nodes, nil,
 			func(n *Product, e *Unit) { n.Edges.DefaultUnit = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductSkus; query != nil {
+		if err := _q.loadProductSkus(ctx, query, nodes,
+			func(n *Product) { n.Edges.ProductSkus = []*ProductSKU{} },
+			func(n *Product, e *ProductSKU) { n.Edges.ProductSkus = append(n.Edges.ProductSkus, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -562,6 +606,36 @@ func (_q *ProductQuery) loadDefaultUnit(ctx context.Context, query *UnitQuery, n
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (_q *ProductQuery) loadProductSkus(ctx context.Context, query *ProductSKUQuery, nodes []*Product, init func(*Product), assign func(*Product, *ProductSKU)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Product)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productsku.FieldProductID)
+	}
+	query.Where(predicate.ProductSKU(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(product.ProductSkusColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

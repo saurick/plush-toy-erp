@@ -36,6 +36,8 @@ const (
 	EdgeDefaultUnit = "default_unit"
 	// EdgeBomItems holds the string denoting the bom_items edge name in mutations.
 	EdgeBomItems = "bom_items"
+	// EdgePurchaseOrderItems holds the string denoting the purchase_order_items edge name in mutations.
+	EdgePurchaseOrderItems = "purchase_order_items"
 	// EdgePurchaseReceiptItems holds the string denoting the purchase_receipt_items edge name in mutations.
 	EdgePurchaseReceiptItems = "purchase_receipt_items"
 	// EdgePurchaseReturnItems holds the string denoting the purchase_return_items edge name in mutations.
@@ -60,6 +62,13 @@ const (
 	BomItemsInverseTable = "bom_items"
 	// BomItemsColumn is the table column denoting the bom_items relation/edge.
 	BomItemsColumn = "material_id"
+	// PurchaseOrderItemsTable is the table that holds the purchase_order_items relation/edge.
+	PurchaseOrderItemsTable = "purchase_order_items"
+	// PurchaseOrderItemsInverseTable is the table name for the PurchaseOrderItem entity.
+	// It exists in this package in order to avoid circular dependency with the "purchaseorderitem" package.
+	PurchaseOrderItemsInverseTable = "purchase_order_items"
+	// PurchaseOrderItemsColumn is the table column denoting the purchase_order_items relation/edge.
+	PurchaseOrderItemsColumn = "material_id"
 	// PurchaseReceiptItemsTable is the table that holds the purchase_receipt_items relation/edge.
 	PurchaseReceiptItemsTable = "purchase_receipt_items"
 	// PurchaseReceiptItemsInverseTable is the table name for the PurchaseReceiptItem entity.
@@ -211,6 +220,20 @@ func ByBomItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByPurchaseOrderItemsCount orders the results by purchase_order_items count.
+func ByPurchaseOrderItemsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPurchaseOrderItemsStep(), opts...)
+	}
+}
+
+// ByPurchaseOrderItems orders the results by purchase_order_items terms.
+func ByPurchaseOrderItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseOrderItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByPurchaseReceiptItemsCount orders the results by purchase_receipt_items count.
 func ByPurchaseReceiptItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -278,6 +301,13 @@ func newBomItemsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(BomItemsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, BomItemsTable, BomItemsColumn),
+	)
+}
+func newPurchaseOrderItemsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseOrderItemsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseOrderItemsTable, PurchaseOrderItemsColumn),
 	)
 }
 func newPurchaseReceiptItemsStep() *sqlgraph.Step {

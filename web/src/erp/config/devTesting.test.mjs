@@ -61,7 +61,7 @@ test('devTesting: 只通过开发态独立路径暴露', () => {
   assert.equal(DEV_TESTING_ROUTE, '/__dev/testing')
   assert.equal(
     DEV_TESTING_STRATEGY_SOURCE_PATH,
-    'docs/product/test-strategy.md'
+    'docs/product/自动化测试策略.md'
   )
   assert.equal(isDevTestingEnabled({ DEV: true }), true)
   assert.equal(isDevTestingEnabled({ DEV: false }), false)
@@ -115,18 +115,18 @@ test('devTesting: 提取 fenced command blocks 并保留章节上下文', () => 
 
 test('devTesting: 从 docs Markdown 中筛出测试相关文档', () => {
   const docs = buildDevTestingDocs({
-    '../../../../docs/product/test-strategy.md': strategyMarkdown,
-    '../../../../docs/customers/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
+    '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
+    '../../../../docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
       deliveryEvidenceMarkdown,
-    '../../../../docs/product/product-principles.md': unrelatedMarkdown,
+    '../../../../docs/product/产品原则.md': unrelatedMarkdown,
     '../../../README.md': deliveryEvidenceMarkdown,
   })
 
   assert.deepEqual(
     docs.map((item) => item.path),
     [
-      'docs/product/test-strategy.md',
-      'docs/customers/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md',
+      'docs/product/自动化测试策略.md',
+      'docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md',
     ]
   )
   assert.equal(docs[0].category, '测试策略')
@@ -136,7 +136,7 @@ test('devTesting: 从 docs Markdown 中筛出测试相关文档', () => {
 
 test('devTesting: 文档 key 使用完整路径避免中文目录下文件名碰撞', () => {
   const docs = buildDevTestingDocs({
-    '../../../../docs/product/test-strategy.md': strategyMarkdown,
+    '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
     '../../../../docs/reference/第一次20260519/自动化测试计划.md':
       deliveryEvidenceMarkdown,
     '../../../../docs/reference/第一次20260519/状态分层工作流与业务事实设计总结.md':
@@ -155,8 +155,8 @@ test('devTesting: 文档 key 使用完整路径避免中文目录下文件名碰
 
 test('devTesting: 支持分类和关键词筛选并汇总', () => {
   const docs = buildDevTestingDocs({
-    '../../../../docs/product/test-strategy.md': strategyMarkdown,
-    '../../../../docs/customers/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
+    '../../../../docs/product/自动化测试策略.md': strategyMarkdown,
+    '../../../../docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md':
       deliveryEvidenceMarkdown,
   })
   const tiers = parseDevTestingStrategyTiers(strategyMarkdown)
@@ -173,13 +173,13 @@ test('devTesting: 支持分类和关键词筛选并汇总', () => {
   assert.deepEqual(
     filterDevTestingDocs(docs, { keyword: 'trial' }).map((item) => item.path),
     [
-      'docs/customers/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md',
+      'docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md',
     ]
   )
   assert.deepEqual(
     filterDevTestingDocs(docs, { category: '测试策略' }).map(
       (item) => item.path
     ),
-    ['docs/product/test-strategy.md']
+    ['docs/product/自动化测试策略.md']
   )
 })

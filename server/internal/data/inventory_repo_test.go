@@ -1236,13 +1236,13 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	header, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
 		ProductID: fixtures.productID,
 		Version:   "V1",
-		Status:    biz.BOMStatusActive,
+		Status:    biz.BOMStatusDraft,
 	})
 	if err != nil {
 		t.Fatalf("create bom header failed: %v", err)
 	}
-	if header.Status != biz.BOMStatusActive {
-		t.Fatalf("expected active bom header, got %s", header.Status)
+	if header.Status != biz.BOMStatusDraft {
+		t.Fatalf("expected draft bom header, got %s", header.Status)
 	}
 	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
 		ProductID: fixtures.productID,
@@ -1251,18 +1251,12 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	}); !ent.IsConstraintError(err) {
 		t.Fatalf("expected product/version unique constraint, got %v", err)
 	}
-	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "V2",
-		Status:    biz.BOMStatusActive,
-	}); !ent.IsConstraintError(err) {
-		t.Fatalf("expected one ACTIVE BOM per product constraint, got %v", err)
-	}
-	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
+	draftHeader, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
 		ProductID: fixtures.productID,
 		Version:   "V2",
 		Status:    biz.BOMStatusDraft,
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("expected draft BOM with different version to be allowed, got %v", err)
 	}
 
@@ -1281,6 +1275,30 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	assertDecimalEqual(t, item.Quantity, "1.250000")
 	assertDecimalEqual(t, item.LossRate, "0.100000")
 
+	activated, err := uc.ActivateBOMVersion(ctx, header.ID)
+	if err != nil {
+		t.Fatalf("activate bom failed: %v", err)
+	}
+	if activated.Header.Status != biz.BOMStatusActive || len(activated.Items) != 1 {
+		t.Fatalf("expected active bom with one item, got %#v", activated)
+	}
+	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
+		ProductID: fixtures.productID,
+		Version:   "V3",
+		Status:    biz.BOMStatusActive,
+	}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected one ACTIVE BOM per product constraint, got %v", err)
+	}
+	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
+		BOMHeaderID: header.ID,
+		MaterialID:  fixtures.materialID,
+		Quantity:    mustDecimal(t, "1"),
+		UnitID:      fixtures.unitID,
+		LossRate:    decimal.Zero,
+	}); !errors.Is(err, biz.ErrBOMActiveImmutable) {
+		t.Fatalf("expected active BOM item mutation to be rejected, got %v", err)
+	}
+
 	activeHeader, err := uc.GetActiveBOMByProduct(ctx, fixtures.productID)
 	if err != nil {
 		t.Fatalf("get active bom failed: %v", err)
@@ -1298,7 +1316,7 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	}
 
 	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: header.ID,
+		BOMHeaderID: draftHeader.ID,
 		MaterialID:  fixtures.materialID,
 		Quantity:    decimal.Zero,
 		UnitID:      fixtures.unitID,
@@ -1308,7 +1326,7 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	}
 
 	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: header.ID,
+		BOMHeaderID: draftHeader.ID,
 		MaterialID:  fixtures.materialID,
 		Quantity:    mustDecimal(t, "1"),
 		UnitID:      fixtures.unitID,
@@ -1318,7 +1336,7 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	}
 
 	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: header.ID,
+		BOMHeaderID: draftHeader.ID,
 		MaterialID:  999999,
 		Quantity:    mustDecimal(t, "1"),
 		UnitID:      fixtures.unitID,
@@ -1328,7 +1346,7 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	}
 
 	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: header.ID,
+		BOMHeaderID: draftHeader.ID,
 		MaterialID:  fixtures.materialID,
 		Quantity:    mustDecimal(t, "1"),
 		UnitID:      999999,

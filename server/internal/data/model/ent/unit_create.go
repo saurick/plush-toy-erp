@@ -13,6 +13,8 @@ import (
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productsku"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -130,6 +132,21 @@ func (_c *UnitCreate) AddProducts(v ...*Product) *UnitCreate {
 	return _c.AddProductIDs(ids...)
 }
 
+// AddProductSkuIDs adds the "product_skus" edge to the ProductSKU entity by IDs.
+func (_c *UnitCreate) AddProductSkuIDs(ids ...int) *UnitCreate {
+	_c.mutation.AddProductSkuIDs(ids...)
+	return _c
+}
+
+// AddProductSkus adds the "product_skus" edges to the ProductSKU entity.
+func (_c *UnitCreate) AddProductSkus(v ...*ProductSKU) *UnitCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductSkuIDs(ids...)
+}
+
 // AddInventoryTxnIDs adds the "inventory_txns" edge to the InventoryTxn entity by IDs.
 func (_c *UnitCreate) AddInventoryTxnIDs(ids ...int) *UnitCreate {
 	_c.mutation.AddInventoryTxnIDs(ids...)
@@ -173,6 +190,21 @@ func (_c *UnitCreate) AddBomItems(v ...*BOMItem) *UnitCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddBomItemIDs(ids...)
+}
+
+// AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
+func (_c *UnitCreate) AddPurchaseOrderItemIDs(ids ...int) *UnitCreate {
+	_c.mutation.AddPurchaseOrderItemIDs(ids...)
+	return _c
+}
+
+// AddPurchaseOrderItems adds the "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_c *UnitCreate) AddPurchaseOrderItems(v ...*PurchaseOrderItem) *UnitCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPurchaseOrderItemIDs(ids...)
 }
 
 // AddPurchaseReceiptItemIDs adds the "purchase_receipt_items" edge to the PurchaseReceiptItem entity by IDs.
@@ -450,6 +482,22 @@ func (_c *UnitCreate) createSpec() (*Unit, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
+	if nodes := _c.mutation.ProductSkusIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.ProductSkusTable,
+			Columns: []string{unit.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
 	if nodes := _c.mutation.InventoryTxnsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -491,6 +539,22 @@ func (_c *UnitCreate) createSpec() (*Unit, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PurchaseOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.PurchaseOrderItemsTable,
+			Columns: []string{unit.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

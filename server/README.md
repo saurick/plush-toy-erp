@@ -12,7 +12,7 @@
 执行链路：`server -> service -> biz -> data`
 
 - `server`：HTTP / gRPC / JSON-RPC 接入层
-- `service`：DTO 转换与调用编排
+- `service`：DTO 转换、JSON-RPC URL / method 分发、入口级鉴权与调用编排
 - `biz`：业务规约与 UseCase
 - `data`：数据库与外部依赖访问
 
@@ -41,6 +41,14 @@
 这组接口走 `InventoryUsecase` 和既有采购入库事实表，过账写 `inventory_txns.IN`，取消已过账入库写 `REVERSAL`。公开入库 API 不接受 `business_record_id` 作为正式事实来源；`purchase.receipt.create / purchase.receipt.read / warehouse.inbound.confirm` 只控制采购入库 API 权限，不代表 Workflow 任务完成会自动过账库存事实。
 
 普通 `business` JSON-RPC 域当前只保留业务看板 `dashboard_stats`。旧 `list_records / create_record / update_record / delete_records / restore_record` 已退出运行时，不能恢复为事实或历史快照查询入口。
+
+`masterdata` JSON-RPC 域承载客户、供应商、联系人、材料和 SKU 主数据维护。SKU 使用 `create_product_sku / update_product_sku / get_product_sku / list_product_skus / set_product_sku_active`，只维护产品规格主数据和启停状态，校验归属产品与可选默认单位，不写订单、库存、BOM、生产、出货或财务事实。
+
+`sales_order` JSON-RPC 域承载销售订单 Source Document / Business Commitment 主路径。订单表单保存应优先使用 `save_sales_order_with_items`，在一个后端事务中完成订单头创建 / 更新、订单行新增 / 更新以及缺失开放行取消；任一步失败会整体回滚，不由前端串联多个订单行接口拼装一次保存流程。原有 `create_sales_order / update_sales_order / add_sales_order_item / update_sales_order_item / remove_sales_order_item` 仍保留为底层单对象能力，不写库存、出货、预留、财务、发票或收付款事实。
+
+`purchase_order` JSON-RPC 域承载采购订单 Source Document / Purchase Commitment 主路径。采购订单表单保存应优先使用 `save_purchase_order_with_items`，在一个后端事务中完成订单头创建 / 更新、订单行新增 / 更新以及缺失开放行取消；同时支持 `submit_purchase_order / approve_purchase_order / close_purchase_order / cancel_purchase_order / get_purchase_order / list_purchase_orders / list_purchase_order_items`。采购订单只表达供应商采购承诺，采购入库行可选关联 `purchase_order_item_id` 做来源追溯；它不写库存、批次、应付、发票或付款事实。
+
+`bom` JSON-RPC 域承载 BOM Version / 工程资料主路径。当前支持 `list_bom_versions / get_bom_version / create_bom_draft / update_bom_draft / add_bom_item / update_bom_item / delete_bom_item / copy_bom_version / activate_bom_version / archive_bom_version`。BOM 草稿可维护头信息和明细；激活会归档同产品旧 `ACTIVE` 版本，已激活 BOM 不允许直接改头或明细，改版应复制新草稿后再激活。该域只维护工程资料，不生成采购需求、采购订单、库存流水、生产任务、成本、应付、发票或付款事实。
 
 `operational_fact` JSON-RPC 当前承载生产、委外、出货、库存预留和财务事实的最小运行入口。shipment 主路径复用 `shipments / shipment_items / inventory_txns`，提供：
 
@@ -73,6 +81,8 @@ go test ./...
 make build
 go run ./cmd/seed-core-demo-data --help
 ```
+
+本地开发默认只使用 `192.168.0.106:5432/plush_erp`。`192.168.0.133:5435/plush_erp` 是测试 / 目标环境库，不应通过 `config.local.yaml` 静默混入本地 `make run`、seed 或 migration；确需对测试库执行一次性操作时，必须显式设置 `ERP_ALLOW_TEST_DB_AS_DEV=1` 并在命令里写清目标。
 
 库存事实 PostgreSQL 本地验收使用专用防呆 target，默认库名为 `plush_erp_phase2a_test`：
 
@@ -114,6 +124,7 @@ make purchase_return_pg_test
 
 - `make migrate_apply` 默认读取 `server/configs/dev/config.yaml`
 - 若存在 `config.local.yaml`，会覆盖本地私有 DSN
+- dev 配置解析到 `192.168.0.133` 或 `5435` 会被防呆拦截，避免把测试 / 目标环境当成本地开发库迁移
 - 只有显式设置 `USE_ENV_DB_URL=1` 时才使用环境变量 `DB_URL`
 - 发布依赖新 schema 的服务前，先确认目标库 migration 已落地
 
@@ -144,7 +155,7 @@ server/
 | `internal/server/` | HTTP/gRPC/JSON-RPC 接入、中间件与路由装配 |
 | `internal/service/` | 接口适配层，负责 DTO 转换与调用编排 |
 | `internal/biz/` | 业务规约与 UseCase 真源 |
-| `internal/core/` | 纯产品领域规则层，当前承载无 IO 的值对象、领域错误、出货三态、库存批次、采购过账单据、来料质检、销售订单生命周期等状态机、库存可用量计算和边界守卫；后续其他状态机、计算器或 policy 迁入前必须先评审，不接 runtime / DB / transport |
+| `internal/core/` | 纯产品领域规则层，当前承载无 IO 的值对象、领域错误、出货三态、库存批次、采购过账单据、采购订单、来料质检、销售订单生命周期等状态机、库存可用量计算和边界守卫；后续其他状态机、计算器或 policy 迁入前必须先评审，不接 runtime / DB / transport |
 | `internal/data/` | 数据访问、外部依赖与持久化实现 |
 | `internal/conf/` | 配置结构定义与加载相关代码 |
 | `internal/errcode/` | 服务端错误码目录真源 |

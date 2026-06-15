@@ -10,6 +10,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/enttest"
+	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 
 	"entgo.io/ent/dialect"
@@ -242,6 +243,86 @@ func TestSalesOrderRepoItemGuardsAndCancel(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected one canceled line, got %d", count)
+	}
+}
+
+func TestSalesOrderRepoSaveWithItemsRollsBackOnItemFailure(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openSalesOrderRepoTest(t, "sales_order_repo_save_rollback")
+	defer mustCloseEntClient(t, client)
+
+	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SO-TX-ROLLBACK", true)
+	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-SO-TX-ROLLBACK", true)
+	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "PRD-SO-TX-ROLLBACK", true)
+	orderDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	qty := decimal.NewFromInt(10)
+
+	_, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
+		OrderNo:    "SO-TX-ROLLBACK",
+		CustomerID: customer.ID,
+		OrderDate:  orderDate,
+	}, []*biz.SalesOrderItemSaveMutation{
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+	})
+	if err == nil {
+		t.Fatalf("expected duplicate line failure")
+	}
+	count, countErr := client.SalesOrder.Query().
+		Where(salesorder.OrderNo("SO-TX-ROLLBACK")).
+		Count(ctx)
+	if countErr != nil {
+		t.Fatalf("count sales order after rollback failed: %v", countErr)
+	}
+	if count != 0 {
+		t.Fatalf("expected transaction rollback to remove order header, got count=%d", count)
+	}
+}
+
+func TestSalesOrderRepoSaveWithItemsUpdatesAndCancelsMissingOpenLines(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openSalesOrderRepoTest(t, "sales_order_repo_save_update")
+	defer mustCloseEntClient(t, client)
+
+	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SO-TX-UPDATE", true)
+	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-SO-TX-UPDATE", true)
+	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "PRD-SO-TX-UPDATE", true)
+	orderDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	qty := decimal.NewFromInt(10)
+	order, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
+		OrderNo:    "SO-TX-UPDATE",
+		CustomerID: customer.ID,
+		OrderDate:  orderDate,
+	}, []*biz.SalesOrderItemSaveMutation{
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
+	})
+	if err != nil {
+		t.Fatalf("create order with items failed: %v", err)
+	}
+	if len(order.Items) != 2 {
+		t.Fatalf("expected two initial items, got %#v", order.Items)
+	}
+
+	updatedQty := decimal.NewFromInt(12)
+	result, err := uc.SaveSalesOrderWithItems(ctx, order.Order.ID, &biz.SalesOrderMutation{
+		OrderNo:    "SO-TX-UPDATE-A",
+		CustomerID: customer.ID,
+		OrderDate:  orderDate,
+	}, []*biz.SalesOrderItemSaveMutation{
+		{ID: order.Items[0].ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: updatedQty}},
+	})
+	if err != nil {
+		t.Fatalf("update order with items failed: %v", err)
+	}
+	if result.Order.OrderNo != "SO-TX-UPDATE-A" || len(result.Items) != 2 {
+		t.Fatalf("expected updated order and two historical lines, got %#v", result)
+	}
+	if result.Items[0].LineStatus != biz.SalesOrderItemStatusOpen || !result.Items[0].OrderedQuantity.Equal(updatedQty) {
+		t.Fatalf("expected first line updated and open, got %#v", result.Items[0])
+	}
+	if result.Items[1].LineStatus != biz.SalesOrderItemStatusCanceled {
+		t.Fatalf("expected omitted open line canceled, got %#v", result.Items[1])
 	}
 }
 

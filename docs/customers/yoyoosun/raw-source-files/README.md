@@ -9,7 +9,7 @@
 - 这些文件不是 SaaS runtime tenant 资料，不新增 `tenant_id`。
 - 这些文件不代表真实 import / backfill 已批准。
 - 这些文件不直接写 `business_records`，也不生成库存、出货、财务或委外事实。
-- 后续功能实现必须先回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、代码和测试交叉确认。
+- 后续功能实现必须先回到 `docs/当前真源与交接顺序.md`、正式产品 / 架构文档、代码和测试交叉确认。
 
 ## 文件清单 / File Inventory
 
@@ -27,7 +27,7 @@
 | `yoyoosun-purchase-contract-order-photo-20260421.jpeg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与 `source-copy` `.jpg` 为同一张照片的另一份源文件 |
 | `yoyoosun-purchase-contract-order-photo-20260421-source-copy.jpg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与主 `.jpeg` 为同一张照片的另一份源文件 |
 
-更完整的用途分类、checksum、禁止事项和后续落点见 `../raw-source-file-archive-review.md`。
+更完整的用途分类、checksum、禁止事项和后续落点见 `../原始客户文件归档评审.md`。
 
 ## 后续新增规则 / Future File Rule
 

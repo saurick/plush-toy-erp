@@ -8,6 +8,8 @@ import (
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 
@@ -321,6 +323,146 @@ func (r *masterDataRepo) UnitIsActive(ctx context.Context, id int) (bool, error)
 	return row.IsActive, nil
 }
 
+func (r *masterDataRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
+	row, err := r.data.postgres.Product.Query().Where(product.ID(id)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrProductNotFound
+		}
+		return false, err
+	}
+	return row.IsActive, nil
+}
+
+func (r *masterDataRepo) CreateProductSKU(ctx context.Context, in *biz.ProductSKUMutation) (*biz.ProductSKU, error) {
+	create := r.data.postgres.ProductSKU.Create().
+		SetProductID(in.ProductID).
+		SetSkuCode(in.SKUCode).
+		SetNillableSkuName(in.SKUName).
+		SetNillableBarcode(in.Barcode).
+		SetNillableCustomerSku(in.CustomerSKU).
+		SetNillableColor(in.Color).
+		SetNillableColorNo(in.ColorNo).
+		SetNillableSize(in.Size).
+		SetNillablePackagingVersion(in.PackagingVersion).
+		SetNillableDefaultUnitID(in.DefaultUnitID)
+	row, err := create.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entProductSKUToBiz(row), nil
+}
+
+func (r *masterDataRepo) UpdateProductSKU(ctx context.Context, id int, in *biz.ProductSKUMutation) (*biz.ProductSKU, error) {
+	update := r.data.postgres.ProductSKU.UpdateOneID(id).
+		SetProductID(in.ProductID).
+		SetSkuCode(in.SKUCode)
+	if in.SKUName == nil {
+		update.ClearSkuName()
+	} else {
+		update.SetSkuName(*in.SKUName)
+	}
+	if in.Barcode == nil {
+		update.ClearBarcode()
+	} else {
+		update.SetBarcode(*in.Barcode)
+	}
+	if in.CustomerSKU == nil {
+		update.ClearCustomerSku()
+	} else {
+		update.SetCustomerSku(*in.CustomerSKU)
+	}
+	if in.Color == nil {
+		update.ClearColor()
+	} else {
+		update.SetColor(*in.Color)
+	}
+	if in.ColorNo == nil {
+		update.ClearColorNo()
+	} else {
+		update.SetColorNo(*in.ColorNo)
+	}
+	if in.Size == nil {
+		update.ClearSize()
+	} else {
+		update.SetSize(*in.Size)
+	}
+	if in.PackagingVersion == nil {
+		update.ClearPackagingVersion()
+	} else {
+		update.SetPackagingVersion(*in.PackagingVersion)
+	}
+	if in.DefaultUnitID == nil {
+		update.ClearDefaultUnitID()
+	} else {
+		update.SetDefaultUnitID(*in.DefaultUnitID)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductSKUNotFound
+		}
+		return nil, err
+	}
+	return entProductSKUToBiz(row), nil
+}
+
+func (r *masterDataRepo) GetProductSKU(ctx context.Context, id int) (*biz.ProductSKU, error) {
+	row, err := r.data.postgres.ProductSKU.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductSKUNotFound
+		}
+		return nil, err
+	}
+	return entProductSKUToBiz(row), nil
+}
+
+func (r *masterDataRepo) ListProductSKUs(ctx context.Context, filter biz.ProductSKUFilter) ([]*biz.ProductSKU, int, error) {
+	query := r.data.postgres.ProductSKU.Query()
+	if filter.ProductID > 0 {
+		query = query.Where(productsku.ProductID(filter.ProductID))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(productsku.Or(
+			productsku.SkuCodeContains(filter.Keyword),
+			productsku.SkuNameContains(filter.Keyword),
+			productsku.BarcodeContains(filter.Keyword),
+			productsku.CustomerSkuContains(filter.Keyword),
+			productsku.ColorContains(filter.Keyword),
+			productsku.ColorNoContains(filter.Keyword),
+			productsku.SizeContains(filter.Keyword),
+			productsku.PackagingVersionContains(filter.Keyword),
+		))
+	}
+	if filter.ActiveOnly {
+		query = query.Where(productsku.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Asc(productsku.FieldProductID), ent.Asc(productsku.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entProductSKUsToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) SetProductSKUActive(ctx context.Context, id int, active bool) (*biz.ProductSKU, error) {
+	row, err := r.data.postgres.ProductSKU.UpdateOneID(id).SetIsActive(active).Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductSKUNotFound
+		}
+		return nil, err
+	}
+	return entProductSKUToBiz(row), nil
+}
+
 func (r *masterDataRepo) CreateContact(ctx context.Context, in *biz.ContactMutation) (*biz.Contact, error) {
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
@@ -585,6 +727,36 @@ func entMaterialsToBiz(rows []*ent.Material) []*biz.Material {
 	out := make([]*biz.Material, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, entMaterialToBiz(row))
+	}
+	return out
+}
+
+func entProductSKUToBiz(row *ent.ProductSKU) *biz.ProductSKU {
+	if row == nil {
+		return nil
+	}
+	return &biz.ProductSKU{
+		ID:               row.ID,
+		ProductID:        row.ProductID,
+		SKUCode:          row.SkuCode,
+		SKUName:          row.SkuName,
+		Barcode:          row.Barcode,
+		CustomerSKU:      row.CustomerSku,
+		Color:            row.Color,
+		ColorNo:          row.ColorNo,
+		Size:             row.Size,
+		PackagingVersion: row.PackagingVersion,
+		DefaultUnitID:    row.DefaultUnitID,
+		IsActive:         row.IsActive,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
+	}
+}
+
+func entProductSKUsToBiz(rows []*ent.ProductSKU) []*biz.ProductSKU {
+	out := make([]*biz.ProductSKU, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entProductSKUToBiz(row))
 	}
 	return out
 }

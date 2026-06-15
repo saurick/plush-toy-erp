@@ -33,7 +33,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     title: '测试入口 / Test Entry',
     group: '验证治理 / QA',
     route: DEV_TESTING_ROUTE,
-    source: 'docs/product/test-strategy.md',
+    source: 'docs/product/自动化测试策略.md',
     truthSource: '测试策略文档 / Test strategy',
     status: '策略索引 / Strategy index',
     guardrails: Object.freeze([
@@ -65,7 +65,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     title: '能力台账 / Capability Ledger',
     group: '产品治理 / Product Governance',
     route: DEV_CAPABILITY_LEDGER_ROUTE,
-    source: 'docs/product/capability-ledger.md',
+    source: 'docs/product/产品能力进度台账.md',
     truthSource: '能力 / 交付台账 Markdown / Ledger Markdown',
     status: '台账只读 / Read-only ledger',
     guardrails: Object.freeze([

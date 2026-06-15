@@ -955,7 +955,7 @@ const scenarios = [
         window.localStorage.removeItem('plush_erp_dev_docs_toc_expanded')
         window.localStorage.setItem(
           'plush_erp_dev_docs_selected_path',
-          'docs/product/implementation-governance.md'
+          'docs/product/模块实施治理.md'
         )
       })
       await page.reload({ waitUntil: 'domcontentloaded' })
@@ -1496,14 +1496,14 @@ const scenarios = [
       )
       assert.equal(
         await page
-          .locator('[data-dev-doc-key="docs-product-test-strategy-md"]')
+          .locator('[data-dev-doc-key="doc:docs/product/自动化测试策略.md"]')
           .count(),
         1,
         '刷新后产品目录内文档应保持可见'
       )
       assert.equal(
         await page
-          .locator('[data-dev-doc-key="docs-warehouse-README-md"]')
+          .locator('[data-dev-doc-key="doc:docs/warehouse/README.md"]')
           .count(),
         1,
         '刷新后仓库目录内文档应保持可见'
@@ -2127,7 +2127,7 @@ const scenarios = [
       await expectHeading(page, '开发测试入口 / Dev Test Entry')
       await expectText(page, '测试分层 / Tiers')
       await expectText(page, '命令入口 / Commands')
-      await expectText(page, 'docs/product/test-strategy.md')
+      await expectText(page, 'docs/product/自动化测试策略.md')
       const defaultMetrics = await page.evaluate(() => {
         const root = document.querySelector('.erp-dev-testing-page')
         return {
@@ -3108,53 +3108,58 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '产品档案')
-      await expectButton(page, '新建产品')
+      await expectButton(page, '新建SKU')
       await expectText(page, '批量删除')
       await expectText(page, '回收站')
-      await expectText(page, '生成产品资料')
+      await expectText(page, 'SKU-STYLE-L1')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-standard-products',
       })
-      await assertBusinessHeaderStatsSingleLine(
-        page,
-        'business-standard-products'
-      )
+      await assertBusinessHeaderStatsSingleLine(page, {
+        scenarioName: 'business-standard-products',
+        expectedLabels: ['总SKU', '当前结果', '启用SKU', '已选SKU'],
+      })
       await verifyBusinessRecycleModal(page, {
         screenshotName: 'business-formal-products-recycle-modal',
+        expectedColumns: [
+          '单据编号',
+          '名称',
+          '业务状态',
+          '删除时间',
+          '删除原因',
+        ],
       })
       await verifyBusinessModuleColumnOrderDialog(page, {
-        moduleKey: 'products',
+        moduleKey: 'product_skus',
         heading: '产品档案',
       })
+      await page.getByRole('button', { name: '新建SKU' }).click()
+      await expectText(page, '新建产品档案')
+      await expectText(page, 'SKU 编号')
+      await expectText(page, '产品 ID')
+      await page.keyboard.press('Escape')
       await assertNoHorizontalOverflow(page, 'business-standard-products')
 
       await gotoScenarioPath(page, '/erp/purchase/material-bom', {
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, 'BOM 管理')
-      await expectButton(page, '新建BOM')
-      await expectText(page, '批量删除')
-      await expectText(page, '回收站')
-      await expectText(page, '生成BOM')
+      await expectButton(page, '新建草稿')
+      await expectText(page, '工程资料版本')
+      await expectText(page, 'BOM-STYLE-L1')
+      await expectText(page, '已激活')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-standard-bom',
       })
-      await assertBusinessHeaderStatsSingleLine(page, 'business-standard-bom')
-      await verifyBusinessSelectedItemsPopover(page, {
-        scenarioName: 'business-standard-bom',
-        expectedCount: 3,
-      })
-      await verifyBusinessActionFormModal(page, {
-        buttonName: '新建BOM',
-        titleText: '新建BOM',
-        minFieldCount: 10,
-        screenshotName: 'business-formal-bom-create-form-modal',
-        expectedTexts: ['BOM 版本', '材料用量', '损耗率'],
-      })
+      await page.getByRole('button', { name: '新建草稿' }).click()
+      await expectText(page, '新建 BOM 草稿')
+      await expectText(page, 'BOM 版本')
+      await expectText(page, '产品 ID')
+      await page.keyboard.press('Escape')
       await assertNoHorizontalOverflow(page, 'business-standard-bom')
 
       await gotoScenarioPath(page, '/erp/warehouse/inventory', {
@@ -3516,7 +3521,7 @@ async function runScenarioOnce(browser, scenario) {
     await gotoScenarioPath(page, scenario.path, {
       waitUntil: 'domcontentloaded',
     })
-    await waitForScenarioDocumentReady(page)
+    await waitForScenarioDocumentReady(page, errors)
     await delay(300)
 
     if (scenario.expectPath) {
@@ -3539,16 +3544,33 @@ async function runScenarioOnce(browser, scenario) {
   }
 }
 
-async function waitForScenarioDocumentReady(page) {
+async function waitForScenarioDocumentReady(page, errors = []) {
   await page.waitForLoadState('domcontentloaded', { timeout: 20_000 })
-  await page.waitForFunction(
-    () =>
-      document.readyState !== 'loading' &&
-      document.body &&
-      document.body.innerText.trim().length > 0,
-    null,
-    { timeout: 20_000 }
-  )
+  try {
+    await page.waitForFunction(
+      () =>
+        document.readyState !== 'loading' &&
+        document.body &&
+        document.body.innerText.trim().length > 0,
+      null,
+      { timeout: 20_000 }
+    )
+  } catch (error) {
+    const snapshot = await page.evaluate(() => ({
+      url: window.location.href,
+      readyState: document.readyState,
+      bodyText: document.body?.innerText?.slice(0, 500) || '',
+      html: document.body?.innerHTML?.slice(0, 500) || '',
+      resources: performance
+        .getEntriesByType('resource')
+        .map((item) => item.name)
+        .filter((name) => name.includes('/src/') || name.includes('/rpc/'))
+        .slice(0, 20),
+    }))
+    throw new Error(
+      `${error.message}\n[style:l1] document snapshot=${JSON.stringify(snapshot)}\n[style:l1] collected errors=${JSON.stringify(errors)}`
+    )
+  }
 }
 
 function isRetryableScenarioFailure(error) {
@@ -3976,6 +3998,23 @@ async function installAdminRpcMocks(page) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const productSKU = {
+      id: 1,
+      product_id: 1,
+      sku_code: 'SKU-STYLE-L1',
+      sku_name: '样式产品 SKU',
+      barcode: '690000000001',
+      customer_sku: 'CUS-SKU-STYLE',
+      color: '米白',
+      color_no: 'C01',
+      size: 'M',
+      packaging_version: '基础包装',
+      default_unit_id: 1,
+      is_active: true,
+      note: '',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
 
     let data = {}
     switch (method) {
@@ -3987,6 +4026,9 @@ async function installAdminRpcMocks(page) {
         break
       case 'list_contacts_by_owner':
         data = { contacts: [contact], total: 1, limit: 100, offset: 0 }
+        break
+      case 'list_product_skus':
+        data = { product_skus: [productSKU], total: 1, limit: 100, offset: 0 }
         break
       case 'create_customer':
       case 'update_customer':
@@ -4005,6 +4047,12 @@ async function installAdminRpcMocks(page) {
       case 'set_primary_contact':
       case 'disable_contact':
         data = { contact: { ...contact, ...params } }
+        break
+      case 'create_product_sku':
+      case 'update_product_sku':
+      case 'set_product_sku_active':
+      case 'get_product_sku':
+        data = { product_sku: { ...productSKU, ...params } }
         break
       default:
         data = {}
@@ -4086,6 +4134,94 @@ async function installAdminRpcMocks(page) {
       case 'update_sales_order_item':
       case 'remove_sales_order_item':
         data = { sales_order_item: { ...salesOrderItem, ...params } }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
+
+  await page.route('**/rpc/bom', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    const bomVersion = {
+      id: 1,
+      product_id: 1,
+      version: 'BOM-STYLE-L1',
+      status: 'ACTIVE',
+      effective_from: nowUnix(),
+      effective_to: null,
+      note: '样式回归 BOM',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const bomDraft = {
+      ...bomVersion,
+      id: 2,
+      version: params.version || 'BOM-STYLE-DRAFT',
+      status: 'DRAFT',
+      note: params.note || '',
+    }
+    const bomItem = {
+      id: 1,
+      bom_header_id: 1,
+      material_id: 1,
+      quantity: '2.5000',
+      unit_id: 1,
+      loss_rate: '0.0300',
+      position: '面料',
+      note: '主料',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_bom_versions':
+        data = {
+          bom_versions: [bomVersion, bomDraft],
+          total: 2,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'get_bom_version':
+        data = { bom_version: bomVersion, bom_items: [bomItem] }
+        break
+      case 'create_bom_draft':
+      case 'update_bom_draft':
+      case 'copy_bom_version':
+        data = { bom_version: { ...bomDraft, ...params }, bom_items: [bomItem] }
+        break
+      case 'add_bom_item':
+      case 'update_bom_item':
+        data = { bom_item: { ...bomItem, ...params } }
+        break
+      case 'delete_bom_item':
+        data = {}
+        break
+      case 'activate_bom_version':
+        data = {
+          bom_version: { ...bomDraft, status: 'ACTIVE' },
+          bom_items: [bomItem],
+        }
+        break
+      case 'archive_bom_version':
+        data = { bom_version: { ...bomVersion, status: 'ARCHIVED' } }
         break
       default:
         data = {}
@@ -5411,7 +5547,19 @@ async function verifyBusinessActionFormModal(
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
-async function verifyBusinessRecycleModal(page, { screenshotName }) {
+async function verifyBusinessRecycleModal(
+  page,
+  {
+    screenshotName,
+    expectedColumns = [
+      '单据编号',
+      '业务对象',
+      '业务状态',
+      '删除时间',
+      '删除原因',
+    ],
+  }
+) {
   const toolbar = page.locator('.erp-business-operation-panel').first()
   await toolbar.getByRole('button', { name: '回收站' }).click()
   const modal = page
@@ -5463,13 +5611,7 @@ async function verifyBusinessRecycleModal(page, { screenshotName }) {
       `${screenshotName} 回收站缺少按钮 ${expected}: ${JSON.stringify(metrics)}`
     )
   }
-  for (const expected of [
-    '单据编号',
-    '业务对象',
-    '业务状态',
-    '删除时间',
-    '删除原因',
-  ]) {
+  for (const expected of expectedColumns) {
     assert(
       metrics.headers.some((header) => header.includes(expected)),
       `${screenshotName} 回收站缺少列 ${expected}: ${JSON.stringify(metrics)}`
@@ -10090,7 +10232,13 @@ async function assertBusinessHeaderHasNoSectionTitle(page, { scenarioName }) {
   )
 }
 
-async function assertBusinessHeaderStatsSingleLine(page, scenarioName) {
+async function assertBusinessHeaderStatsSingleLine(
+  page,
+  {
+    scenarioName,
+    expectedLabels = ['总记录', '当前结果', '待处理', '已选记录'],
+  }
+) {
   const metrics = await page.evaluate(() => {
     const stats = document.querySelector('.erp-business-module-stats')
     const statsRect = stats?.getBoundingClientRect()
@@ -10156,7 +10304,7 @@ async function assertBusinessHeaderStatsSingleLine(page, scenarioName) {
     metrics.tiles.map((tile) =>
       tile.text.replace(/摘要/gu, '').replace(/\d+$/u, '')
     ),
-    ['总记录', '当前结果', '待处理', '已选记录'],
+    expectedLabels,
     `${scenarioName} 业务页头部统计项不符合当前口径: ${JSON.stringify(metrics)}`
   )
   assert(

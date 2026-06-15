@@ -22,6 +22,6 @@
 新增、删除、重命名财务文档，或改变财务事实边界时，必须同步检查：
 
 - 本 README。
-- `docs/document-inventory.md`。
-- `docs/product/product-completion-roadmap.md`。
-- `docs/current-source-of-truth.md`。
+- `docs/文档清单.md`。
+- `docs/product/产品完成路线图.md`。
+- `docs/当前真源与交接顺序.md`。

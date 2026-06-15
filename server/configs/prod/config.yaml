@@ -50,7 +50,8 @@ data:
       mode: "disabled"
     admin:
       username: "admin"
-      password: "change-this-prod-admin-password"
+      # 留空表示不自动创建 bootstrap admin；新库首次初始化时通过 APP_ADMIN_PASSWORD 临时注入。
+      password: ""
 
 # notify:
 #   telegram:

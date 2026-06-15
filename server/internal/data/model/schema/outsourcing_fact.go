@@ -68,6 +68,7 @@ func (OutsourcingFact) Annotations() []schema.Annotation {
 
 func (OutsourcingFact) Fields() []ent.Field {
 	return []ent.Field{
+		// Operational facts are domain facts that may post inventory_txns through usecase actions.
 		field.String("fact_no").NotEmpty().MaxLen(64),
 		field.String("fact_type").NotEmpty().MaxLen(32),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
@@ -78,7 +79,9 @@ func (OutsourcingFact) Fields() []ent.Field {
 		field.Int("lot_id").Optional().Nillable().Positive(),
 		decimalQuantityField("quantity"),
 		field.Int("supplier_id").Optional().Nillable().Positive(),
+		// Supplier name is an outsourcing-time snapshot; Supplier remains the master truth when linked.
 		field.String("supplier_name").Optional().Nillable().MaxLen(255),
+		// source_* keeps source-document traceability; it is not a replacement for business_records.
 		field.String("source_type").Optional().Nillable().MaxLen(64),
 		field.Int("source_id").Optional().Nillable().Positive(),
 		field.Int("source_line_id").Optional().Nillable().Positive(),

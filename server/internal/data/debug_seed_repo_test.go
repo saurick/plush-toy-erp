@@ -116,7 +116,7 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	header, err := inventoryUC.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
 		ProductID: fixtures.productID,
 		Version:   "debug-clear-v1",
-		Status:    biz.BOMStatusActive,
+		Status:    biz.BOMStatusDraft,
 	})
 	if err != nil {
 		t.Fatalf("create bom header failed: %v", err)
@@ -129,6 +129,9 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		LossRate:    mustDecimal(t, "0.02"),
 	}); err != nil {
 		t.Fatalf("create bom item failed: %v", err)
+	}
+	if _, err := inventoryUC.ActivateBOMVersion(ctx, header.ID); err != nil {
+		t.Fatalf("activate bom failed: %v", err)
 	}
 	createAndPostPurchaseReceipt(t, ctx, inventoryUC, "DBG-PR-CLEAR-001", fixtures, stringPtr("DBG-LOT-CLEAR-001"), mustDecimal(t, "8"))
 

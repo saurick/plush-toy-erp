@@ -1,5 +1,5 @@
 export const DEV_TESTING_ROUTE = '/__dev/testing'
-export const DEV_TESTING_STRATEGY_SOURCE_PATH = 'docs/product/test-strategy.md'
+export const DEV_TESTING_STRATEGY_SOURCE_PATH = 'docs/product/自动化测试策略.md'
 
 export const DEV_TESTING_DOC_KEYWORDS = Object.freeze([
   '测试',

@@ -54,6 +54,7 @@ func (Material) Edges() []ent.Edge {
 			Required().
 			Unique(),
 		edge.To("bom_items", BOMItem.Type),
+		edge.To("purchase_order_items", PurchaseOrderItem.Type),
 		edge.To("purchase_receipt_items", PurchaseReceiptItem.Type),
 		edge.To("purchase_return_items", PurchaseReturnItem.Type),
 		edge.To("purchase_receipt_adjustment_items", PurchaseReceiptAdjustmentItem.Type),

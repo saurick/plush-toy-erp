@@ -22,6 +22,10 @@ type AdminAuthRepo interface {
 	UpdateAdminLastLogin(ctx context.Context, id int, t time.Time) error
 }
 
+type AdminAccountReader interface {
+	GetAdminByID(ctx context.Context, id int) (*AdminUser, error)
+}
+
 type AdminUser struct {
 	ID             int
 	Username       string

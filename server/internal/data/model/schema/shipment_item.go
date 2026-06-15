@@ -21,6 +21,7 @@ var shipmentItemLockedFields = map[string]struct{}{
 	"shipment_id":         {},
 	"sales_order_item_id": {},
 	"product_id":          {},
+	"product_sku_id":      {},
 	"warehouse_id":        {},
 	"unit_id":             {},
 	"lot_id":              {},
@@ -58,7 +59,9 @@ func (ShipmentItem) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("shipment_id").Positive(),
 		field.Int("sales_order_item_id").Optional().Nillable().Positive(),
+		// product_id remains required for shipment facts; SKU is optional traceability.
 		field.Int("product_id").Positive(),
+		field.Int("product_sku_id").Optional().Nillable().Positive(),
 		field.Int("warehouse_id").Positive(),
 		field.Int("unit_id").Positive(),
 		field.Int("lot_id").Optional().Nillable().Positive(),
@@ -74,6 +77,7 @@ func (ShipmentItem) Edges() []ent.Edge {
 		edge.From("shipment", Shipment.Type).Ref("items").Field("shipment_id").Required().Unique(),
 		edge.From("sales_order_item", SalesOrderItem.Type).Ref("shipment_items").Field("sales_order_item_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("product", Product.Type).Ref("shipment_items").Field("product_id").Required().Unique(),
+		edge.From("product_sku", ProductSKU.Type).Ref("shipment_items").Field("product_sku_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("warehouse", Warehouse.Type).Ref("shipment_items").Field("warehouse_id").Required().Unique(),
 		edge.From("unit", Unit.Type).Ref("shipment_items").Field("unit_id").Required().Unique(),
 		edge.From("inventory_lot", InventoryLot.Type).Ref("shipment_items").Field("lot_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
@@ -84,6 +88,7 @@ func (ShipmentItem) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("shipment_id"),
 		index.Fields("sales_order_item_id"),
+		index.Fields("product_sku_id"),
 		index.Fields("product_id", "warehouse_id", "lot_id"),
 	}
 }

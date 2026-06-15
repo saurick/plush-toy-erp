@@ -6,7 +6,7 @@
 
 - `docs/customers/<customer-key>/` 客户专属资料。
 - 客户原始资料说明、需求线索、问题清单、决策日志和差异台账。
-- 客户交付矩阵 `delivery-matrix.md` 和客户差异台账 `delta-ledger.md`。
+- 客户交付矩阵 `客户交付矩阵.md` 和客户差异台账 `客户差异台账.md`。
 - 客户导入 dry-run、freeze evidence、人工 review checklist 和导入风险登记。
 
 ## 不放什么
@@ -26,8 +26,8 @@
 
 - 本 README。
 - 对应 `docs/customers/<customer-key>/README.md`。
-- `docs/document-inventory.md`。
-- `docs/current-source-of-truth.md`。
+- `docs/文档清单.md`。
+- `docs/当前真源与交接顺序.md`。
 - `config/customers/<customer-key>/` 和 `deployments/<customer-key>/` 是否需要对应说明。
 
 ## 私有化客户包复制

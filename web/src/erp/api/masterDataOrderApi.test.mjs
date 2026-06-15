@@ -11,10 +11,11 @@ const source = readFileSync(
 test('masterDataOrderApi: V1 API client uses 007 JSON-RPC urls', () => {
   assert.match(source, /url:\s*'masterdata'/)
   assert.match(source, /url:\s*'sales_order'/)
+  assert.match(source, /url:\s*'purchase_order'/)
   assert.match(source, /authScope:\s*AUTH_SCOPE\.ADMIN/)
 })
 
-test('masterDataOrderApi: masterdata methods cover customers suppliers contacts', () => {
+test('masterDataOrderApi: masterdata methods cover customers suppliers sku contacts', () => {
   for (const methodName of [
     'list_customers',
     'create_customer',
@@ -26,13 +27,18 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers contacts'
     'update_supplier',
     'get_supplier',
     'set_supplier_active',
+    'list_product_skus',
+    'create_product_sku',
+    'update_product_sku',
+    'get_product_sku',
+    'set_product_sku_active',
     'list_contacts_by_owner',
     'create_contact',
     'update_contact',
     'set_primary_contact',
     'disable_contact',
   ]) {
-    assert.match(source, new RegExp(`call\\('${methodName}'`))
+    assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
 })
 
@@ -41,6 +47,7 @@ test('masterDataOrderApi: sales order methods do not expose shipment or finance 
     'list_sales_orders',
     'create_sales_order',
     'update_sales_order',
+    'save_sales_order_with_items',
     'get_sales_order',
     'submit_sales_order',
     'activate_sales_order',
@@ -51,7 +58,7 @@ test('masterDataOrderApi: sales order methods do not expose shipment or finance 
     'update_sales_order_item',
     'remove_sales_order_item',
   ]) {
-    assert.match(source, new RegExp(`call\\('${methodName}'`))
+    assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
 
   const forbiddenActionNames = [
@@ -61,6 +68,34 @@ test('masterDataOrderApi: sales order methods do not expose shipment or finance 
     ['reserve', 'Stock'],
     ['deduct', 'Inventory'],
     ['receive', 'Payment'],
+  ].map((parts) => parts.join(''))
+
+  forbiddenActionNames.forEach((actionName) => {
+    assert.doesNotMatch(source, new RegExp(actionName))
+  })
+})
+
+test('masterDataOrderApi: purchase order methods do not expose receipt inventory or finance actions', () => {
+  for (const methodName of [
+    'list_purchase_orders',
+    'save_purchase_order_with_items',
+    'get_purchase_order',
+    'submit_purchase_order',
+    'approve_purchase_order',
+    'close_purchase_order',
+    'cancel_purchase_order',
+    'list_purchase_order_items',
+  ]) {
+    assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
+  }
+
+  const forbiddenActionNames = [
+    ['post', 'Purchase', 'Receipt'],
+    ['receive', 'Inventory'],
+    ['deduct', 'Inventory'],
+    ['generate', 'Payable'],
+    ['generate', 'Invoice'],
+    ['pay', 'Supplier'],
   ].map((parts) => parts.join(''))
 
   forbiddenActionNames.forEach((actionName) => {

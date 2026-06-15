@@ -16,6 +16,7 @@ type InventoryBalance struct {
 
 func (InventoryBalance) Fields() []ent.Field {
 	return []ent.Field{
+		// Balances are query projections derived from inventory_txns, not editable stock facts.
 		field.String("subject_type").
 			NotEmpty().
 			MaxLen(16),
@@ -58,6 +59,7 @@ func (InventoryBalance) Edges() []ent.Edge {
 
 func (InventoryBalance) Indexes() []ent.Index {
 	return []ent.Index{
+		// PostgreSQL treats NULLs as distinct, so non-lot and lot balances need separate uniqueness guards.
 		index.Fields("subject_type", "subject_id", "warehouse_id", "unit_id").
 			Unique().
 			Annotations(

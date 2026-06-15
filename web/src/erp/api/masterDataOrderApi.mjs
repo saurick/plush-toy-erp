@@ -14,6 +14,12 @@ const salesOrderRpc = new JsonRpc({
   authScope: AUTH_SCOPE.ADMIN,
 })
 
+const purchaseOrderRpc = new JsonRpc({
+  url: 'purchase_order',
+  basePath: ADMIN_BASE_PATH,
+  authScope: AUTH_SCOPE.ADMIN,
+})
+
 function dataOf(result) {
   return result?.data || {}
 }
@@ -93,6 +99,31 @@ export async function setMaterialActive(params = {}) {
   return dataOf(result)?.material || null
 }
 
+export async function listProductSKUs(params = {}) {
+  const result = await masterDataRpc.call('list_product_skus', params)
+  return dataOf(result)
+}
+
+export async function createProductSKU(params = {}) {
+  const result = await masterDataRpc.call('create_product_sku', params)
+  return dataOf(result)?.product_sku || null
+}
+
+export async function updateProductSKU(params = {}) {
+  const result = await masterDataRpc.call('update_product_sku', params)
+  return dataOf(result)?.product_sku || null
+}
+
+export async function getProductSKU(params = {}) {
+  const result = await masterDataRpc.call('get_product_sku', params)
+  return dataOf(result)?.product_sku || null
+}
+
+export async function setProductSKUActive(params = {}) {
+  const result = await masterDataRpc.call('set_product_sku_active', params)
+  return dataOf(result)?.product_sku || null
+}
+
 export async function listContactsByOwner(params = {}) {
   const result = await masterDataRpc.call('list_contacts_by_owner', params)
   return dataOf(result)
@@ -131,6 +162,11 @@ export async function createSalesOrder(params = {}) {
 export async function updateSalesOrder(params = {}) {
   const result = await salesOrderRpc.call('update_sales_order', params)
   return dataOf(result)?.sales_order || null
+}
+
+export async function saveSalesOrderWithItems(params = {}) {
+  const result = await salesOrderRpc.call('save_sales_order_with_items', params)
+  return dataOf(result)
 }
 
 export async function getSalesOrder(params = {}) {
@@ -176,4 +212,50 @@ export async function updateSalesOrderItem(params = {}) {
 export async function removeSalesOrderItem(params = {}) {
   const result = await salesOrderRpc.call('remove_sales_order_item', params)
   return dataOf(result)?.sales_order_item || null
+}
+
+export async function listPurchaseOrders(params = {}) {
+  const result = await purchaseOrderRpc.call('list_purchase_orders', params)
+  return dataOf(result)
+}
+
+export async function savePurchaseOrderWithItems(params = {}) {
+  const result = await purchaseOrderRpc.call(
+    'save_purchase_order_with_items',
+    params
+  )
+  return dataOf(result)
+}
+
+export async function getPurchaseOrder(params = {}) {
+  const result = await purchaseOrderRpc.call('get_purchase_order', params)
+  return dataOf(result)?.purchase_order || null
+}
+
+export async function submitPurchaseOrder(params = {}) {
+  const result = await purchaseOrderRpc.call('submit_purchase_order', params)
+  return dataOf(result)?.purchase_order || null
+}
+
+export async function approvePurchaseOrder(params = {}) {
+  const result = await purchaseOrderRpc.call('approve_purchase_order', params)
+  return dataOf(result)?.purchase_order || null
+}
+
+export async function closePurchaseOrder(params = {}) {
+  const result = await purchaseOrderRpc.call('close_purchase_order', params)
+  return dataOf(result)?.purchase_order || null
+}
+
+export async function cancelPurchaseOrder(params = {}) {
+  const result = await purchaseOrderRpc.call('cancel_purchase_order', params)
+  return dataOf(result)?.purchase_order || null
+}
+
+export async function listPurchaseOrderItems(params = {}) {
+  const result = await purchaseOrderRpc.call(
+    'list_purchase_order_items',
+    params
+  )
+  return dataOf(result)
 }

@@ -22,6 +22,7 @@ print_help() {
   trial-simulated-data: 试用模拟数据工具测试
   operational-fact-simulated-closure: 业务事实模拟闭环工具测试
   mobile-workflow-simulated-closure: 岗位任务端模拟闭环工具测试
+  mvp-closure: ERP MVP 闭环验收工具测试
   industry-template-closure: 行业模板模拟闭环工具测试
   private-deployment-package-closure: 多客户私有化复制模拟闭环工具测试
   web: pnpm lint -> pnpm css -> (若存在 test 脚本则 pnpm test) -> pnpm build
@@ -129,6 +130,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs" ]; then
   echo "[qa:full] 运行岗位任务端模拟闭环工具测试"
   node --test "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs" ]; then
+  echo "[qa:full] 运行 ERP MVP 闭环验收工具测试"
+  node --test "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/industry-template-closure.test.mjs" ]; then

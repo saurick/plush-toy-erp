@@ -2,7 +2,7 @@
 
 - 阶段：待实现 / To Implement
 - 类型：HTML 原型样板
-- 来源：`docs/reference/第二次20260611/产品核心菜单与页面功能规格.md`、`docs/product/formal-menu-entry-plan.md`、`docs/product/menu-mapping-review-v1.md`、当前运行时菜单截图与已有原型样板
+- 来源：`docs/reference/第二次20260611/产品核心菜单与页面功能规格.md`、`docs/product/正式产品入口与菜单配置计划.md`、`docs/product/菜单映射评审表.md`、当前运行时菜单截图与已有原型样板
 - 边界：Reference Only，不替代当前 `seedData.mjs`、客户菜单配置、路由、RBAC、schema、API、WorkflowUsecase 或 Fact usecase
 
 ## 目标
@@ -11,7 +11,7 @@
 
 它不是正式菜单改造实现，也不代表要一次性重构当前侧边栏。
 
-进入真实菜单、路由、seed 或权限实现前，必须先按 `docs/product/menu-mapping-review-v1.md` 完成当前运行时菜单、12 个候选主入口和 51 个内部覆盖细项的映射评审。
+进入真实菜单、路由、seed 或权限实现前，必须先按 `docs/product/菜单映射评审表.md` 完成当前运行时菜单、12 个候选主入口和 51 个内部覆盖细项的映射评审。
 
 ## 候选入口
 

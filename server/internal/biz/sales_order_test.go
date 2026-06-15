@@ -17,6 +17,8 @@ type salesOrderRepoStub struct {
 	unitActive     map[int]bool
 	createdOrder   *SalesOrderMutation
 	createdItem    *SalesOrderItemMutation
+	savedOrderID   int
+	savedItems     []*SalesOrderItemSaveMutation
 	nextStatus     string
 }
 
@@ -73,6 +75,17 @@ func (s *salesOrderRepoStub) UpdateSalesOrderItemStatus(_ context.Context, id in
 
 func (s *salesOrderRepoStub) ListSalesOrderItems(context.Context, SalesOrderItemFilter) ([]*SalesOrderItem, int, error) {
 	return nil, 0, nil
+}
+
+func (s *salesOrderRepoStub) SaveSalesOrderWithItems(_ context.Context, id int, order *SalesOrderMutation, items []*SalesOrderItemSaveMutation) (*SalesOrderWithItems, error) {
+	s.savedOrderID = id
+	cp := *order
+	s.createdOrder = &cp
+	s.savedItems = items
+	return &SalesOrderWithItems{
+		Order: &SalesOrder{ID: 1, OrderNo: order.OrderNo, CustomerID: order.CustomerID, LifecycleStatus: SalesOrderStatusDraft},
+		Items: []*SalesOrderItem{{ID: 1, SalesOrderID: 1, LineNo: items[0].LineNo, ProductID: items[0].ProductID, UnitID: items[0].UnitID, OrderedQuantity: items[0].OrderedQuantity, LineStatus: SalesOrderItemStatusOpen}},
+	}, nil
 }
 
 func (s *salesOrderRepoStub) CustomerIsActive(_ context.Context, id int) (bool, error) {
@@ -222,5 +235,56 @@ func TestSalesOrderUsecaseItemGuards(t *testing.T) {
 	}
 	if removed.LineStatus != SalesOrderItemStatusCanceled {
 		t.Fatalf("expected removed item canceled, got %#v", removed)
+	}
+}
+
+func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
+	ctx := context.Background()
+	repo := &salesOrderRepoStub{
+		orders: map[int]*SalesOrder{
+			1: {ID: 1, LifecycleStatus: SalesOrderStatusDraft},
+			2: {ID: 2, LifecycleStatus: SalesOrderStatusClosed},
+		},
+		items: map[int]*SalesOrderItem{
+			10: {ID: 10, SalesOrderID: 1, LineStatus: SalesOrderItemStatusOpen},
+			20: {ID: 20, SalesOrderID: 2, LineStatus: SalesOrderItemStatusOpen},
+		},
+		customerActive: map[int]bool{1000: true},
+		productActive:  map[int]bool{100: true},
+		unitActive:     map[int]bool{200: true},
+	}
+	uc := NewSalesOrderUsecase(repo)
+	orderDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	qty := decimal.NewFromInt(6)
+
+	result, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{
+		OrderNo:    " SO-TX-001 ",
+		CustomerID: 1000,
+		OrderDate:  orderDate,
+	}, []*SalesOrderItemSaveMutation{
+		{ID: 10, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},
+	})
+	if err != nil {
+		t.Fatalf("save sales order with items failed: %v", err)
+	}
+	if result.Order.OrderNo != "SO-TX-001" || repo.createdOrder.OrderNo != "SO-TX-001" {
+		t.Fatalf("expected normalized order, got result=%#v mutation=%#v", result.Order, repo.createdOrder)
+	}
+	if len(repo.savedItems) != 1 || repo.savedItems[0].SalesOrderID != 1 {
+		t.Fatalf("expected item bound to order 1, got %#v", repo.savedItems)
+	}
+
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 2, &SalesOrderMutation{OrderNo: "SO-CLOSED", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected closed order save rejected, got %v", err)
+	}
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-WRONG-ITEM", CustomerID: 1000, OrderDate: orderDate}, []*SalesOrderItemSaveMutation{
+		{ID: 20, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},
+	}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected foreign order item rejected, got %v", err)
+	}
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 0, &SalesOrderMutation{OrderNo: "SO-NEW", CustomerID: 1000, OrderDate: orderDate}, []*SalesOrderItemSaveMutation{
+		{ID: 10, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},
+	}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected existing item on new order rejected, got %v", err)
 	}
 }

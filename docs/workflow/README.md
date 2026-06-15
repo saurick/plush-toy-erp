@@ -16,13 +16,13 @@
 
 ## 是否是真源
 
-本目录描述 workflow 协同方向，不表示事实已经发生。Workflow task `done` 不等于 Fact posted，具体 runtime 行为仍以代码、测试和 `docs/current-source-of-truth.md` 为准。
+本目录描述 workflow 协同方向，不表示事实已经发生。Workflow task `done` 不等于 Fact posted，具体 runtime 行为仍以代码、测试和 `docs/当前真源与交接顺序.md` 为准。
 
 ## 更新规则
 
 新增、删除、重命名 workflow 长期文档，或改变任务树、通知、预警口径时，必须同步检查：
 
 - 本 README。
-- `docs/document-inventory.md`。
-- `docs/architecture/workflow-usecase-review.md`。
-- `docs/current-source-of-truth.md`。
+- `docs/文档清单.md`。
+- `docs/architecture/工作流用例统一编排评审.md`。
+- `docs/当前真源与交接顺序.md`。

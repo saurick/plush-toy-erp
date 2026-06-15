@@ -22,6 +22,9 @@ import (
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productsku"
+	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
@@ -122,7 +125,10 @@ func checkColumn(t, c string) error {
 			outsourcingfact.Table:               outsourcingfact.ValidColumn,
 			permission.Table:                    permission.ValidColumn,
 			product.Table:                       product.ValidColumn,
+			productsku.Table:                    productsku.ValidColumn,
 			productionfact.Table:                productionfact.ValidColumn,
+			purchaseorder.Table:                 purchaseorder.ValidColumn,
+			purchaseorderitem.Table:             purchaseorderitem.ValidColumn,
 			purchasereceipt.Table:               purchasereceipt.ValidColumn,
 			purchasereceiptadjustment.Table:     purchasereceiptadjustment.ValidColumn,
 			purchasereceiptadjustmentitem.Table: purchasereceiptadjustmentitem.ValidColumn,

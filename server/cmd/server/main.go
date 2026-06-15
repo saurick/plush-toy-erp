@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"server/internal/conf"
+	"server/internal/devdbguard"
 	appserver "server/internal/server"
 	"server/pkg/logger"
 	"server/pkg/taskgroup"
@@ -144,6 +145,61 @@ func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) {
 		dataCfg.Auth.Admin.Password = v
 		helper.Info("admin password overridden from env")
 	}
+}
+
+func isProductionRuntime(confPath string, getenv func(string) string) bool {
+	normalizedPath := filepath.ToSlash(filepath.Clean(strings.TrimSpace(confPath)))
+	if strings.Contains(normalizedPath, "/configs/prod/") || strings.HasPrefix(normalizedPath, "configs/prod/") {
+		return true
+	}
+	if getenv == nil {
+		return false
+	}
+	for _, key := range []string{"APP_ENV", "ERP_ENV", "GO_ENV", "ERP_DEBUG_ENV"} {
+		value := strings.ToLower(strings.TrimSpace(getenv(key)))
+		if value == "prod" || value == "production" {
+			return true
+		}
+	}
+	return false
+}
+
+func containsRuntimePlaceholder(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	for _, marker := range []string{"change-this", "placeholder", "replace-with", "<release-tag>"} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, getenv func(string) string) error {
+	if !isProductionRuntime(confPath, getenv) {
+		return nil
+	}
+	if dataCfg == nil {
+		return fmt.Errorf("production preflight failed: data config is nil")
+	}
+	if dataCfg.Postgres == nil || strings.TrimSpace(dataCfg.Postgres.Dsn) == "" {
+		return fmt.Errorf("production preflight failed: POSTGRES_DSN is required")
+	}
+	if containsRuntimePlaceholder(dataCfg.Postgres.Dsn) {
+		return fmt.Errorf("production preflight failed: POSTGRES_DSN still contains placeholder")
+	}
+	if dataCfg.Auth == nil || strings.TrimSpace(dataCfg.Auth.JwtSecret) == "" {
+		return fmt.Errorf("production preflight failed: APP_JWT_SECRET is required")
+	}
+	if containsRuntimePlaceholder(dataCfg.Auth.JwtSecret) {
+		return fmt.Errorf("production preflight failed: APP_JWT_SECRET still contains placeholder")
+	}
+	if len(strings.TrimSpace(dataCfg.Auth.JwtSecret)) < 32 {
+		return fmt.Errorf("production preflight failed: APP_JWT_SECRET must be at least 32 characters")
+	}
+	if dataCfg.Auth.Admin != nil && containsRuntimePlaceholder(dataCfg.Auth.Admin.Password) {
+		return fmt.Errorf("production preflight failed: APP_ADMIN_PASSWORD still contains placeholder")
+	}
+	return nil
 }
 
 func buildConfigSources(confPath string) []config.Source {
@@ -340,6 +396,15 @@ func main() {
 		panic(fmt.Errorf("bootstrap data config is nil, please check %s", confPath))
 	}
 	overrideFromEnv(dataCfg, logger)
+	if dataCfg.Postgres == nil {
+		panic(fmt.Errorf("bootstrap data postgres config is nil, please check %s", confPath))
+	}
+	if err := devdbguard.RequireLocalDevDSN(confPath, dataCfg.Postgres.Dsn, os.Getenv); err != nil {
+		panic(err)
+	}
+	if err := validateProductionBootstrapConfig(confPath, dataCfg, os.Getenv); err != nil {
+		panic(err)
+	}
 
 	// ===== 7. 组装应用（wireApp） =====
 	// 这里 wireApp 里用到的 TracerProvider 类型要记得是 *tracesdk.TracerProvider

@@ -18,11 +18,13 @@
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据                                     | 试用环境演练                                               |
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟闭环入口，只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路                              | 业务事实内部模拟验收 / 目标环境事实回归                  |
 | `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，只创建和更新显式模拟 workflow 任务，覆盖审批 / 质检 / 入库 / 出货放行异常和现场留痕         | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
+| `scripts/qa/mvp-closure.mjs`                    | ERP MVP 闭环验收入口，默认只生成计划和本地 evidence，可选运行现有 no-write report-only 工具                     | MVP 主链路验收口径收口 / 试用前证据整理                  |
 | `scripts/qa/industry-template-boundaries.mjs`          | 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                              | 行业模板调整后                                             |
 | `scripts/qa/industry-template-closure.mjs`      | 行业模板模拟闭环入口，只读取候选配置并生成 evidence 报告                                                        | 行业模板回归 / 目标环境发布前                              |
 | `scripts/qa/private-deployment-boundaries.mjs`         | 多客户私有化复制边界检查，确保客户包模板不变成 SaaS、tenant、代码分叉或真实导入入口                             | 私有化客户包模板调整后                                     |
 | `scripts/qa/private-deployment-package-closure.mjs`     | 多客户私有化复制模拟闭环入口，只读取模板并生成 evidence 报告                                                   | 私有化客户包回归 / 目标环境发布前                          |
 | `scripts/deploy/deployment-package-lint.mjs`           | 客户私有化部署资料包检查，确保 `deployments/yoyoosun` 必需文件齐全且不含真实 env、备份、raw files 或 secret       | 调整客户部署资料包后                                       |
+| `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、Compose、migration 脚本、Jaeger loopback 和低配部署边界                   | 每次生产发布 / 部署后运行态复核前                          |
 | `scripts/qa/core-boundary.test.mjs`                    | 自动扫描 `server/internal/core`，防止纯产品规则层 import `biz/data/service`、Ent、SQL、HTTP、配置或文件系统依赖 | 调整 `server/internal/core` 后                              |
 | `scripts/qa/phase-label-boundaries.mjs`                | 自动扫描活跃实现路径，阻止新增 runtime 阶段编号命名；仅允许当前旧 PostgreSQL 本地验收兼容入口                     | 调整命名、脚本、API、运行时代码或治理文档后                 |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、冲正和防负库存                         |
@@ -269,6 +271,26 @@ MOBILE_WORKFLOW_SIM_PASSWORD='replace-with-demo-password' \
     --out output/customers/yoyoosun/mobile-workflow-simulated-closure-target
 ```
 
+ERP MVP 闭环验收入口用于把上述试用数据、业务事实、岗位任务端和前端回归串成同一份验收计划。默认只生成本地 evidence，不连接数据库、不调用后端、不写库，也不替代领域测试、浏览器回归或部署 smoke：
+
+```bash
+node scripts/qa/mvp-closure.mjs \
+  --out output/customers/yoyoosun/mvp-closure
+```
+
+如需同时运行现有 no-write report-only 子工具，显式传入模拟产品、单位和仓库 ID。该模式仍不传递 `--apply`，不会写入模拟数据：
+
+```bash
+node scripts/qa/mvp-closure.mjs \
+  --run-report-tools \
+  --product-id 1 \
+  --unit-id 1 \
+  --warehouse-id 1 \
+  --out output/customers/yoyoosun/mvp-closure
+```
+
+真正写入本地或目标试用环境时，仍必须分别调用 `trial-simulated-data.mjs`、`operational-fact-simulated-closure.mjs` 或 `mobile-workflow-simulated-closure.mjs` 的 `--apply` 路径，并提供对应确认环境变量。
+
 行业模板候选只允许模拟闭环验收，不执行真实客户数据导入，不写业务表，不把单客户样本直接升成行业默认。先运行边界守卫：
 
 ```bash
@@ -437,6 +459,15 @@ bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/qa/strict.sh
 ```
+
+生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足：
+
+```bash
+bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh \
+  --env-file /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod/.env
+```
+
+发布完成后可追加 `--runtime`，检查 Compose 服务和 `/healthz` / `/readyz`。
 
 ## 关键说明
 

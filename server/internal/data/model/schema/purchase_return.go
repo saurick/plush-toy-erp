@@ -51,6 +51,7 @@ func (PurchaseReturn) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Positive(),
+		// Supplier name is a return-time snapshot; Supplier remains the master truth when linked elsewhere.
 		field.String("supplier_name").
 			NotEmpty().
 			MaxLen(255),

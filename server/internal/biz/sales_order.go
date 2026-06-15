@@ -92,6 +92,16 @@ type SalesOrderItemMutation struct {
 	Note                *string
 }
 
+type SalesOrderItemSaveMutation struct {
+	ID int
+	SalesOrderItemMutation
+}
+
+type SalesOrderWithItems struct {
+	Order *SalesOrder
+	Items []*SalesOrderItem
+}
+
 type SalesOrderFilter struct {
 	Keyword         string
 	CustomerID      int
@@ -124,6 +134,7 @@ type SalesOrderRepo interface {
 	GetSalesOrderItem(ctx context.Context, id int) (*SalesOrderItem, error)
 	UpdateSalesOrderItemStatus(ctx context.Context, id int, lineStatus string) (*SalesOrderItem, error)
 	ListSalesOrderItems(ctx context.Context, filter SalesOrderItemFilter) ([]*SalesOrderItem, int, error)
+	SaveSalesOrderWithItems(ctx context.Context, id int, order *SalesOrderMutation, items []*SalesOrderItemSaveMutation) (*SalesOrderWithItems, error)
 
 	CustomerIsActive(ctx context.Context, id int) (bool, error)
 	ProductIsActive(ctx context.Context, id int) (bool, error)
@@ -268,6 +279,74 @@ func (uc *SalesOrderUsecase) RemoveSalesOrderItem(ctx context.Context, id int) (
 	return uc.repo.UpdateSalesOrderItemStatus(ctx, id, SalesOrderItemStatusCanceled)
 }
 
+func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int, order *SalesOrderMutation, items []*SalesOrderItemSaveMutation) (*SalesOrderWithItems, error) {
+	if uc == nil || uc.repo == nil || id < 0 || order == nil {
+		return nil, ErrBadParam
+	}
+	if id > 0 {
+		current, err := uc.repo.GetSalesOrder(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if isSalesOrderSettled(current.LifecycleStatus) {
+			return nil, ErrBadParam
+		}
+	}
+	normalizedOrder, err := normalizeSalesOrderMutation(*order)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateCustomerActive(ctx, normalizedOrder.CustomerID); err != nil {
+		return nil, err
+	}
+
+	normalizedItems := make([]*SalesOrderItemSaveMutation, 0, len(items))
+	seenIDs := map[int]struct{}{}
+	for _, item := range items {
+		if item == nil || item.ID < 0 {
+			return nil, ErrBadParam
+		}
+		if id == 0 && item.ID > 0 {
+			return nil, ErrBadParam
+		}
+		if item.ID > 0 {
+			if _, ok := seenIDs[item.ID]; ok {
+				return nil, ErrBadParam
+			}
+			seenIDs[item.ID] = struct{}{}
+			current, err := uc.repo.GetSalesOrderItem(ctx, item.ID)
+			if err != nil {
+				return nil, err
+			}
+			if current.SalesOrderID != id || current.LineStatus == SalesOrderItemStatusCanceled || current.LineStatus == SalesOrderItemStatusClosed {
+				return nil, ErrBadParam
+			}
+		}
+		mutation := item.SalesOrderItemMutation
+		if id > 0 {
+			if mutation.SalesOrderID != 0 && mutation.SalesOrderID != id {
+				return nil, ErrBadParam
+			}
+			mutation.SalesOrderID = id
+		} else {
+			mutation.SalesOrderID = 0
+		}
+		normalizedItem, err := normalizeSalesOrderItemFields(mutation)
+		if err != nil {
+			return nil, err
+		}
+		if err := uc.validateProductAndUnitActive(ctx, normalizedItem.ProductID, normalizedItem.UnitID); err != nil {
+			return nil, err
+		}
+		normalizedItems = append(normalizedItems, &SalesOrderItemSaveMutation{
+			ID:                     item.ID,
+			SalesOrderItemMutation: normalizedItem,
+		})
+	}
+
+	return uc.repo.SaveSalesOrderWithItems(ctx, id, &normalizedOrder, normalizedItems)
+}
+
 func (uc *SalesOrderUsecase) ListSalesOrderItems(ctx context.Context, filter SalesOrderItemFilter) ([]*SalesOrderItem, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
@@ -350,11 +429,22 @@ func normalizeSalesOrderMutation(in SalesOrderMutation) (SalesOrderMutation, err
 }
 
 func normalizeSalesOrderItemMutation(in SalesOrderItemMutation) (SalesOrderItemMutation, error) {
+	in, err := normalizeSalesOrderItemFields(in)
+	if err != nil {
+		return SalesOrderItemMutation{}, err
+	}
+	if in.SalesOrderID <= 0 {
+		return SalesOrderItemMutation{}, ErrBadParam
+	}
+	return in, nil
+}
+
+func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMutation, error) {
 	in.ProductCodeSnapshot = normalizeOptionalString(in.ProductCodeSnapshot)
 	in.ProductNameSnapshot = normalizeOptionalString(in.ProductNameSnapshot)
 	in.ColorSnapshot = normalizeOptionalString(in.ColorSnapshot)
 	in.Note = normalizeOptionalString(in.Note)
-	if in.SalesOrderID <= 0 || in.LineNo <= 0 || in.ProductID <= 0 || in.UnitID <= 0 {
+	if in.SalesOrderID < 0 || in.LineNo <= 0 || in.ProductID <= 0 || in.UnitID <= 0 {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}
 	if _, err := value.NewPositiveQuantity(in.OrderedQuantity); err != nil {

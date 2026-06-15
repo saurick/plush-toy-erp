@@ -21,6 +21,8 @@ const (
 	FieldSalesOrderItemID = "sales_order_item_id"
 	// FieldProductID holds the string denoting the product_id field in the database.
 	FieldProductID = "product_id"
+	// FieldProductSkuID holds the string denoting the product_sku_id field in the database.
+	FieldProductSkuID = "product_sku_id"
 	// FieldWarehouseID holds the string denoting the warehouse_id field in the database.
 	FieldWarehouseID = "warehouse_id"
 	// FieldUnitID holds the string denoting the unit_id field in the database.
@@ -41,6 +43,8 @@ const (
 	EdgeSalesOrderItem = "sales_order_item"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
+	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
+	EdgeProductSku = "product_sku"
 	// EdgeWarehouse holds the string denoting the warehouse edge name in mutations.
 	EdgeWarehouse = "warehouse"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
@@ -70,6 +74,13 @@ const (
 	ProductInverseTable = "products"
 	// ProductColumn is the table column denoting the product relation/edge.
 	ProductColumn = "product_id"
+	// ProductSkuTable is the table that holds the product_sku relation/edge.
+	ProductSkuTable = "shipment_items"
+	// ProductSkuInverseTable is the table name for the ProductSKU entity.
+	// It exists in this package in order to avoid circular dependency with the "productsku" package.
+	ProductSkuInverseTable = "product_skus"
+	// ProductSkuColumn is the table column denoting the product_sku relation/edge.
+	ProductSkuColumn = "product_sku_id"
 	// WarehouseTable is the table that holds the warehouse relation/edge.
 	WarehouseTable = "shipment_items"
 	// WarehouseInverseTable is the table name for the Warehouse entity.
@@ -99,6 +110,7 @@ var Columns = []string{
 	FieldShipmentID,
 	FieldSalesOrderItemID,
 	FieldProductID,
+	FieldProductSkuID,
 	FieldWarehouseID,
 	FieldUnitID,
 	FieldLotID,
@@ -131,6 +143,8 @@ var (
 	SalesOrderItemIDValidator func(int) error
 	// ProductIDValidator is a validator for the "product_id" field. It is called by the builders before save.
 	ProductIDValidator func(int) error
+	// ProductSkuIDValidator is a validator for the "product_sku_id" field. It is called by the builders before save.
+	ProductSkuIDValidator func(int) error
 	// WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
 	WarehouseIDValidator func(int) error
 	// UnitIDValidator is a validator for the "unit_id" field. It is called by the builders before save.
@@ -168,6 +182,11 @@ func BySalesOrderItemID(opts ...sql.OrderTermOption) OrderOption {
 // ByProductID orders the results by the product_id field.
 func ByProductID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductID, opts...).ToFunc()
+}
+
+// ByProductSkuID orders the results by the product_sku_id field.
+func ByProductSkuID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductSkuID, opts...).ToFunc()
 }
 
 // ByWarehouseID orders the results by the warehouse_id field.
@@ -226,6 +245,13 @@ func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
+// ByProductSkuField orders the results by product_sku field.
+func ByProductSkuField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductSkuStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByWarehouseField orders the results by warehouse field.
 func ByWarehouseField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -265,6 +291,13 @@ func newProductStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ProductInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, ProductTable, ProductColumn),
+	)
+}
+func newProductSkuStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductSkuInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ProductSkuTable, ProductSkuColumn),
 	)
 }
 func newWarehouseStep() *sqlgraph.Step {

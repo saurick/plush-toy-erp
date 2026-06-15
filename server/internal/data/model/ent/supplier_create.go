@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/supplier"
 	"time"
 
@@ -128,6 +129,21 @@ func (_c *SupplierCreate) SetNillableUpdatedAt(v *time.Time) *SupplierCreate {
 		_c.SetUpdatedAt(*v)
 	}
 	return _c
+}
+
+// AddPurchaseOrderIDs adds the "purchase_orders" edge to the PurchaseOrder entity by IDs.
+func (_c *SupplierCreate) AddPurchaseOrderIDs(ids ...int) *SupplierCreate {
+	_c.mutation.AddPurchaseOrderIDs(ids...)
+	return _c
+}
+
+// AddPurchaseOrders adds the "purchase_orders" edges to the PurchaseOrder entity.
+func (_c *SupplierCreate) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPurchaseOrderIDs(ids...)
 }
 
 // Mutation returns the SupplierMutation object of the builder.
@@ -287,6 +303,22 @@ func (_c *SupplierCreate) createSpec() (*Supplier, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(supplier.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.PurchaseOrdersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseOrdersTable,
+			Columns: []string{supplier.PurchaseOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

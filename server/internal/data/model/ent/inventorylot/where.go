@@ -65,6 +65,11 @@ func SubjectID(v int) predicate.InventoryLot {
 	return predicate.InventoryLot(sql.FieldEQ(FieldSubjectID, v))
 }
 
+// ProductSkuID applies equality check predicate on the "product_sku_id" field. It's identical to ProductSkuIDEQ.
+func ProductSkuID(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldProductSkuID, v))
+}
+
 // LotNo applies equality check predicate on the "lot_no" field. It's identical to LotNoEQ.
 func LotNo(v string) predicate.InventoryLot {
 	return predicate.InventoryLot(sql.FieldEQ(FieldLotNo, v))
@@ -213,6 +218,36 @@ func SubjectIDLT(v int) predicate.InventoryLot {
 // SubjectIDLTE applies the LTE predicate on the "subject_id" field.
 func SubjectIDLTE(v int) predicate.InventoryLot {
 	return predicate.InventoryLot(sql.FieldLTE(FieldSubjectID, v))
+}
+
+// ProductSkuIDEQ applies the EQ predicate on the "product_sku_id" field.
+func ProductSkuIDEQ(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDNEQ applies the NEQ predicate on the "product_sku_id" field.
+func ProductSkuIDNEQ(v int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDIn applies the In predicate on the "product_sku_id" field.
+func ProductSkuIDIn(vs ...int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDNotIn applies the NotIn predicate on the "product_sku_id" field.
+func ProductSkuIDNotIn(vs ...int) predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDIsNil applies the IsNil predicate on the "product_sku_id" field.
+func ProductSkuIDIsNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldIsNull(FieldProductSkuID))
+}
+
+// ProductSkuIDNotNil applies the NotNil predicate on the "product_sku_id" field.
+func ProductSkuIDNotNil() predicate.InventoryLot {
+	return predicate.InventoryLot(sql.FieldNotNull(FieldProductSkuID))
 }
 
 // LotNoEQ applies the EQ predicate on the "lot_no" field.
@@ -813,6 +848,29 @@ func HasInventoryBalances() predicate.InventoryLot {
 func HasInventoryBalancesWith(preds ...predicate.InventoryBalance) predicate.InventoryLot {
 	return predicate.InventoryLot(func(s *sql.Selector) {
 		step := newInventoryBalancesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductSku applies the HasEdge predicate on the "product_sku" edge.
+func HasProductSku() predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ProductSkuTable, ProductSkuColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductSkuWith applies the HasEdge predicate on the "product_sku" edge with a given conditions (other predicates).
+func HasProductSkuWith(preds ...predicate.ProductSKU) predicate.InventoryLot {
+	return predicate.InventoryLot(func(s *sql.Selector) {
+		step := newProductSkuStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

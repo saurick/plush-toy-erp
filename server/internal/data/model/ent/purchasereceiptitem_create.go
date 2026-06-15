@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -63,6 +64,20 @@ func (_c *PurchaseReceiptItemCreate) SetLotID(v int) *PurchaseReceiptItemCreate 
 func (_c *PurchaseReceiptItemCreate) SetNillableLotID(v *int) *PurchaseReceiptItemCreate {
 	if v != nil {
 		_c.SetLotID(*v)
+	}
+	return _c
+}
+
+// SetPurchaseOrderItemID sets the "purchase_order_item_id" field.
+func (_c *PurchaseReceiptItemCreate) SetPurchaseOrderItemID(v int) *PurchaseReceiptItemCreate {
+	_c.mutation.SetPurchaseOrderItemID(v)
+	return _c
+}
+
+// SetNillablePurchaseOrderItemID sets the "purchase_order_item_id" field if the given value is not nil.
+func (_c *PurchaseReceiptItemCreate) SetNillablePurchaseOrderItemID(v *int) *PurchaseReceiptItemCreate {
+	if v != nil {
+		_c.SetPurchaseOrderItemID(*v)
 	}
 	return _c
 }
@@ -210,6 +225,11 @@ func (_c *PurchaseReceiptItemCreate) SetInventoryLot(v *InventoryLot) *PurchaseR
 	return _c.SetInventoryLotID(v.ID)
 }
 
+// SetPurchaseOrderItem sets the "purchase_order_item" edge to the PurchaseOrderItem entity.
+func (_c *PurchaseReceiptItemCreate) SetPurchaseOrderItem(v *PurchaseOrderItem) *PurchaseReceiptItemCreate {
+	return _c.SetPurchaseOrderItemID(v.ID)
+}
+
 // AddPurchaseReturnItemIDs adds the "purchase_return_items" edge to the PurchaseReturnItem entity by IDs.
 func (_c *PurchaseReceiptItemCreate) AddPurchaseReturnItemIDs(ids ...int) *PurchaseReceiptItemCreate {
 	_c.mutation.AddPurchaseReturnItemIDs(ids...)
@@ -346,6 +366,11 @@ func (_c *PurchaseReceiptItemCreate) check() error {
 	if v, ok := _c.mutation.LotID(); ok {
 		if err := purchasereceiptitem.LotIDValidator(v); err != nil {
 			return &ValidationError{Name: "lot_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.lot_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.PurchaseOrderItemID(); ok {
+		if err := purchasereceiptitem.PurchaseOrderItemIDValidator(v); err != nil {
+			return &ValidationError{Name: "purchase_order_item_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.purchase_order_item_id": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.LotNo(); ok {
@@ -525,6 +550,23 @@ func (_c *PurchaseReceiptItemCreate) createSpec() (*PurchaseReceiptItem, *sqlgra
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.LotID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PurchaseOrderItemIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchasereceiptitem.PurchaseOrderItemTable,
+			Columns: []string{purchasereceiptitem.PurchaseOrderItemColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.PurchaseOrderItemID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.PurchaseReturnItemsIDs(); len(nodes) > 0 {

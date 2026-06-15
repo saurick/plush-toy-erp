@@ -377,17 +377,31 @@ var (
 		{Name: "received_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 	}
 	// InventoryLotsTable holds the schema information for the "inventory_lots" table.
 	InventoryLotsTable = &schema.Table{
 		Name:       "inventory_lots",
 		Columns:    InventoryLotsColumns,
 		PrimaryKey: []*schema.Column{InventoryLotsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "inventory_lots_product_skus_inventory_lots",
+				Columns:    []*schema.Column{InventoryLotsColumns[12]},
+				RefColumns: []*schema.Column{ProductSkusColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "inventorylot_subject_type_subject_id_lot_no",
 				Unique:  true,
 				Columns: []*schema.Column{InventoryLotsColumns[1], InventoryLotsColumns[2], InventoryLotsColumns[3]},
+			},
+			{
+				Name:    "inventorylot_product_sku_id",
+				Unique:  false,
+				Columns: []*schema.Column{InventoryLotsColumns[12]},
 			},
 			{
 				Name:    "inventorylot_supplier_lot_no",
@@ -685,6 +699,88 @@ var (
 			},
 		},
 	}
+	// ProductSkusColumns holds the columns for the "product_skus" table.
+	ProductSkusColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "sku_code", Type: field.TypeString, Size: 64},
+		{Name: "sku_name", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "barcode", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "customer_sku", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "color", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "color_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "size", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "packaging_version", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "product_id", Type: field.TypeInt},
+		{Name: "default_unit_id", Type: field.TypeInt, Nullable: true},
+	}
+	// ProductSkusTable holds the schema information for the "product_skus" table.
+	ProductSkusTable = &schema.Table{
+		Name:       "product_skus",
+		Columns:    ProductSkusColumns,
+		PrimaryKey: []*schema.Column{ProductSkusColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "product_skus_products_product_skus",
+				Columns:    []*schema.Column{ProductSkusColumns[12]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "product_skus_units_product_skus",
+				Columns:    []*schema.Column{ProductSkusColumns[13]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productsku_sku_code",
+				Unique:  true,
+				Columns: []*schema.Column{ProductSkusColumns[1]},
+			},
+			{
+				Name:    "productsku_product_id_sku_code",
+				Unique:  true,
+				Columns: []*schema.Column{ProductSkusColumns[12], ProductSkusColumns[1]},
+			},
+			{
+				Name:    "productsku_barcode",
+				Unique:  true,
+				Columns: []*schema.Column{ProductSkusColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "barcode IS NOT NULL AND barcode <> ''",
+				},
+			},
+			{
+				Name:    "productsku_product_id_is_active",
+				Unique:  false,
+				Columns: []*schema.Column{ProductSkusColumns[12], ProductSkusColumns[9]},
+			},
+			{
+				Name:    "productsku_customer_sku",
+				Unique:  false,
+				Columns: []*schema.Column{ProductSkusColumns[4]},
+			},
+			{
+				Name:    "productsku_color",
+				Unique:  false,
+				Columns: []*schema.Column{ProductSkusColumns[5]},
+			},
+			{
+				Name:    "productsku_color_no",
+				Unique:  false,
+				Columns: []*schema.Column{ProductSkusColumns[6]},
+			},
+			{
+				Name:    "productsku_size",
+				Unique:  false,
+				Columns: []*schema.Column{ProductSkusColumns[7]},
+			},
+		},
+	}
 	// ProductionFactsColumns holds the columns for the "production_facts" table.
 	ProductionFactsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -757,6 +853,138 @@ var (
 				Name:    "productionfact_subject_type_subject_id_warehouse_id_lot_id",
 				Unique:  false,
 				Columns: []*schema.Column{ProductionFactsColumns[4], ProductionFactsColumns[5], ProductionFactsColumns[18], ProductionFactsColumns[16]},
+			},
+		},
+	}
+	// PurchaseOrdersColumns holds the columns for the "purchase_orders" table.
+	PurchaseOrdersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "purchase_order_no", Type: field.TypeString, Size: 64},
+		{Name: "supplier_purchase_order_no", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "supplier_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "purchase_date", Type: field.TypeTime},
+		{Name: "expected_arrival_date", Type: field.TypeTime, Nullable: true},
+		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "supplier_id", Type: field.TypeInt},
+	}
+	// PurchaseOrdersTable holds the schema information for the "purchase_orders" table.
+	PurchaseOrdersTable = &schema.Table{
+		Name:       "purchase_orders",
+		Columns:    PurchaseOrdersColumns,
+		PrimaryKey: []*schema.Column{PurchaseOrdersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_orders_suppliers_purchase_orders",
+				Columns:    []*schema.Column{PurchaseOrdersColumns[10]},
+				RefColumns: []*schema.Column{SuppliersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchaseorder_purchase_order_no",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseOrdersColumns[1]},
+			},
+			{
+				Name:    "purchaseorder_supplier_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[10]},
+			},
+			{
+				Name:    "purchaseorder_supplier_purchase_order_no",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[2]},
+			},
+			{
+				Name:    "purchaseorder_lifecycle_status",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[6]},
+			},
+			{
+				Name:    "purchaseorder_purchase_date",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[4]},
+			},
+			{
+				Name:    "purchaseorder_expected_arrival_date",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[5]},
+			},
+		},
+	}
+	// PurchaseOrderItemsColumns holds the columns for the "purchase_order_items" table.
+	PurchaseOrderItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "line_no", Type: field.TypeInt},
+		{Name: "material_code_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "material_name_snapshot", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "color_snapshot", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "purchased_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "expected_arrival_date", Type: field.TypeTime, Nullable: true},
+		{Name: "line_status", Type: field.TypeString, Size: 32, Default: "open"},
+		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "material_id", Type: field.TypeInt},
+		{Name: "purchase_order_id", Type: field.TypeInt},
+		{Name: "unit_id", Type: field.TypeInt},
+	}
+	// PurchaseOrderItemsTable holds the schema information for the "purchase_order_items" table.
+	PurchaseOrderItemsTable = &schema.Table{
+		Name:       "purchase_order_items",
+		Columns:    PurchaseOrderItemsColumns,
+		PrimaryKey: []*schema.Column{PurchaseOrderItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "purchase_order_items_materials_purchase_order_items",
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[13]},
+				RefColumns: []*schema.Column{MaterialsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_order_items_purchase_orders_items",
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[14]},
+				RefColumns: []*schema.Column{PurchaseOrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_order_items_units_purchase_order_items",
+				Columns:    []*schema.Column{PurchaseOrderItemsColumns[15]},
+				RefColumns: []*schema.Column{UnitsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchaseorderitem_purchase_order_id_line_no",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[14], PurchaseOrderItemsColumns[1]},
+			},
+			{
+				Name:    "purchaseorderitem_material_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[13]},
+			},
+			{
+				Name:    "purchaseorderitem_unit_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[15]},
+			},
+			{
+				Name:    "purchaseorderitem_line_status",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[9]},
+			},
+			{
+				Name:    "purchaseorderitem_expected_arrival_date",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrderItemsColumns[8]},
 			},
 		},
 	}
@@ -958,6 +1186,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
 		{Name: "material_id", Type: field.TypeInt},
+		{Name: "purchase_order_item_id", Type: field.TypeInt, Nullable: true},
 		{Name: "receipt_id", Type: field.TypeInt},
 		{Name: "unit_id", Type: field.TypeInt},
 		{Name: "warehouse_id", Type: field.TypeInt},
@@ -981,20 +1210,26 @@ var (
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "purchase_receipt_items_purchase_receipts_items",
+				Symbol:     "purchase_receipt_items_purchase_order_items_purchase_receipt_items",
 				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[11]},
+				RefColumns: []*schema.Column{PurchaseOrderItemsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "purchase_receipt_items_purchase_receipts_items",
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[12]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_units_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[12]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[13]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_warehouses_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[13]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[14]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1003,7 +1238,7 @@ var (
 			{
 				Name:    "purchasereceiptitem_receipt_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[11]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[12]},
 			},
 			{
 				Name:    "purchasereceiptitem_material_id",
@@ -1013,7 +1248,7 @@ var (
 			{
 				Name:    "purchasereceiptitem_warehouse_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[13]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14]},
 			},
 			{
 				Name:    "purchasereceiptitem_lot_id",
@@ -1021,9 +1256,14 @@ var (
 				Columns: []*schema.Column{PurchaseReceiptItemsColumns[9]},
 			},
 			{
+				Name:    "purchasereceiptitem_purchase_order_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[11]},
+			},
+			{
 				Name:    "purchasereceiptitem_receipt_id_source_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[11], PurchaseReceiptItemsColumns[5]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[12], PurchaseReceiptItemsColumns[5]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "source_line_no IS NOT NULL AND source_line_no <> ''",
 				},
@@ -1416,6 +1656,7 @@ var (
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sales_order_id", Type: field.TypeInt},
 		{Name: "product_id", Type: field.TypeInt},
 		{Name: "unit_id", Type: field.TypeInt},
@@ -1427,20 +1668,26 @@ var (
 		PrimaryKey: []*schema.Column{SalesOrderItemsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "sales_order_items_sales_orders_items",
+				Symbol:     "sales_order_items_product_skus_sales_order_items",
 				Columns:    []*schema.Column{SalesOrderItemsColumns[13]},
+				RefColumns: []*schema.Column{ProductSkusColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "sales_order_items_sales_orders_items",
+				Columns:    []*schema.Column{SalesOrderItemsColumns[14]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "sales_order_items_products_product",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[14]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[15]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "sales_order_items_units_unit",
-				Columns:    []*schema.Column{SalesOrderItemsColumns[15]},
+				Columns:    []*schema.Column{SalesOrderItemsColumns[16]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1449,17 +1696,22 @@ var (
 			{
 				Name:    "salesorderitem_sales_order_id_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{SalesOrderItemsColumns[13], SalesOrderItemsColumns[1]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[14], SalesOrderItemsColumns[1]},
 			},
 			{
 				Name:    "salesorderitem_product_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[14]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[15]},
+			},
+			{
+				Name:    "salesorderitem_product_sku_id",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrderItemsColumns[13]},
 			},
 			{
 				Name:    "salesorderitem_unit_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrderItemsColumns[15]},
+				Columns: []*schema.Column{SalesOrderItemsColumns[16]},
 			},
 			{
 				Name:    "salesorderitem_line_status",
@@ -1544,6 +1796,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
 		{Name: "product_id", Type: field.TypeInt},
+		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sales_order_item_id", Type: field.TypeInt, Nullable: true},
 		{Name: "shipment_id", Type: field.TypeInt},
 		{Name: "unit_id", Type: field.TypeInt},
@@ -1568,26 +1821,32 @@ var (
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "shipment_items_sales_order_items_shipment_items",
+				Symbol:     "shipment_items_product_skus_shipment_items",
 				Columns:    []*schema.Column{ShipmentItemsColumns[7]},
+				RefColumns: []*schema.Column{ProductSkusColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "shipment_items_sales_order_items_shipment_items",
+				Columns:    []*schema.Column{ShipmentItemsColumns[8]},
 				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipment_items_shipments_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[8]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[9]},
 				RefColumns: []*schema.Column{ShipmentsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_units_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[9]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[10]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_warehouses_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[10]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[11]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1596,17 +1855,22 @@ var (
 			{
 				Name:    "shipmentitem_shipment_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[8]},
+				Columns: []*schema.Column{ShipmentItemsColumns[9]},
 			},
 			{
 				Name:    "shipmentitem_sales_order_item_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentItemsColumns[8]},
+			},
+			{
+				Name:    "shipmentitem_product_sku_id",
 				Unique:  false,
 				Columns: []*schema.Column{ShipmentItemsColumns[7]},
 			},
 			{
 				Name:    "shipmentitem_product_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[6], ShipmentItemsColumns[10], ShipmentItemsColumns[5]},
+				Columns: []*schema.Column{ShipmentItemsColumns[6], ShipmentItemsColumns[11], ShipmentItemsColumns[5]},
 			},
 		},
 	}
@@ -1625,6 +1889,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "lot_id", Type: field.TypeInt, Nullable: true},
 		{Name: "product_id", Type: field.TypeInt},
+		{Name: "product_sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sales_order_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sales_order_item_id", Type: field.TypeInt, Nullable: true},
 		{Name: "unit_id", Type: field.TypeInt},
@@ -1649,26 +1914,32 @@ var (
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "stock_reservations_sales_orders_stock_reservations",
+				Symbol:     "stock_reservations_product_skus_stock_reservations",
 				Columns:    []*schema.Column{StockReservationsColumns[13]},
+				RefColumns: []*schema.Column{ProductSkusColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "stock_reservations_sales_orders_stock_reservations",
+				Columns:    []*schema.Column{StockReservationsColumns[14]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "stock_reservations_sales_order_items_stock_reservations",
-				Columns:    []*schema.Column{StockReservationsColumns[14]},
+				Columns:    []*schema.Column{StockReservationsColumns[15]},
 				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "stock_reservations_units_stock_reservations",
-				Columns:    []*schema.Column{StockReservationsColumns[15]},
+				Columns:    []*schema.Column{StockReservationsColumns[16]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "stock_reservations_warehouses_stock_reservations",
-				Columns:    []*schema.Column{StockReservationsColumns[16]},
+				Columns:    []*schema.Column{StockReservationsColumns[17]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1692,17 +1963,22 @@ var (
 			{
 				Name:    "stockreservation_sales_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{StockReservationsColumns[13]},
+				Columns: []*schema.Column{StockReservationsColumns[14]},
 			},
 			{
 				Name:    "stockreservation_sales_order_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{StockReservationsColumns[14]},
+				Columns: []*schema.Column{StockReservationsColumns[15]},
+			},
+			{
+				Name:    "stockreservation_product_sku_id",
+				Unique:  false,
+				Columns: []*schema.Column{StockReservationsColumns[13]},
 			},
 			{
 				Name:    "stockreservation_product_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{StockReservationsColumns[12], StockReservationsColumns[16], StockReservationsColumns[11]},
+				Columns: []*schema.Column{StockReservationsColumns[12], StockReservationsColumns[17], StockReservationsColumns[11]},
 			},
 		},
 	}
@@ -1968,7 +2244,10 @@ var (
 		OutsourcingFactsTable,
 		PermissionsTable,
 		ProductsTable,
+		ProductSkusTable,
 		ProductionFactsTable,
+		PurchaseOrdersTable,
+		PurchaseOrderItemsTable,
 		PurchaseReceiptsTable,
 		PurchaseReceiptAdjustmentsTable,
 		PurchaseReceiptAdjustmentItemsTable,
@@ -2017,6 +2296,7 @@ func init() {
 	InventoryBalancesTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	InventoryBalancesTable.ForeignKeys[1].RefTable = UnitsTable
 	InventoryBalancesTable.ForeignKeys[2].RefTable = WarehousesTable
+	InventoryLotsTable.ForeignKeys[0].RefTable = ProductSkusTable
 	InventoryTxnsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	InventoryTxnsTable.ForeignKeys[1].RefTable = UnitsTable
 	InventoryTxnsTable.ForeignKeys[2].RefTable = WarehousesTable
@@ -2032,6 +2312,11 @@ func init() {
 		"outsourcing_facts_type_allowed":      "fact_type IN ('MATERIAL_ISSUE', 'RETURN_RECEIPT')",
 	}
 	ProductsTable.ForeignKeys[0].RefTable = UnitsTable
+	ProductSkusTable.ForeignKeys[0].RefTable = ProductsTable
+	ProductSkusTable.ForeignKeys[1].RefTable = UnitsTable
+	ProductSkusTable.Annotation = &entsql.Annotation{
+		Table: "product_skus",
+	}
 	ProductionFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ProductionFactsTable.ForeignKeys[1].RefTable = UnitsTable
 	ProductionFactsTable.ForeignKeys[2].RefTable = WarehousesTable
@@ -2041,6 +2326,22 @@ func init() {
 		"production_facts_status_allowed":    "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
 		"production_facts_subject_allowed":   "subject_type IN ('MATERIAL', 'PRODUCT')",
 		"production_facts_type_allowed":      "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK')",
+	}
+	PurchaseOrdersTable.ForeignKeys[0].RefTable = SuppliersTable
+	PurchaseOrdersTable.Annotation = &entsql.Annotation{}
+	PurchaseOrdersTable.Annotation.Checks = map[string]string{
+		"purchase_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'approved', 'closed', 'canceled')",
+	}
+	PurchaseOrderItemsTable.ForeignKeys[0].RefTable = MaterialsTable
+	PurchaseOrderItemsTable.ForeignKeys[1].RefTable = PurchaseOrdersTable
+	PurchaseOrderItemsTable.ForeignKeys[2].RefTable = UnitsTable
+	PurchaseOrderItemsTable.Annotation = &entsql.Annotation{}
+	PurchaseOrderItemsTable.Annotation.Checks = map[string]string{
+		"purchase_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
+		"purchase_order_items_line_no_positive":        "line_no > 0",
+		"purchase_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
+		"purchase_order_items_purchased_qty_positive":  "purchased_quantity > 0",
+		"purchase_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 	}
 	PurchaseReceiptAdjustmentsTable.ForeignKeys[0].RefTable = PurchaseReceiptsTable
 	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
@@ -2055,9 +2356,10 @@ func init() {
 	}
 	PurchaseReceiptItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	PurchaseReceiptItemsTable.ForeignKeys[1].RefTable = MaterialsTable
-	PurchaseReceiptItemsTable.ForeignKeys[2].RefTable = PurchaseReceiptsTable
-	PurchaseReceiptItemsTable.ForeignKeys[3].RefTable = UnitsTable
-	PurchaseReceiptItemsTable.ForeignKeys[4].RefTable = WarehousesTable
+	PurchaseReceiptItemsTable.ForeignKeys[2].RefTable = PurchaseOrderItemsTable
+	PurchaseReceiptItemsTable.ForeignKeys[3].RefTable = PurchaseReceiptsTable
+	PurchaseReceiptItemsTable.ForeignKeys[4].RefTable = UnitsTable
+	PurchaseReceiptItemsTable.ForeignKeys[5].RefTable = WarehousesTable
 	PurchaseReceiptItemsTable.Annotation = &entsql.Annotation{}
 	PurchaseReceiptItemsTable.Annotation.Checks = map[string]string{
 		"purchase_receipt_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
@@ -2087,9 +2389,10 @@ func init() {
 	SalesOrdersTable.Annotation.Checks = map[string]string{
 		"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
 	}
-	SalesOrderItemsTable.ForeignKeys[0].RefTable = SalesOrdersTable
-	SalesOrderItemsTable.ForeignKeys[1].RefTable = ProductsTable
-	SalesOrderItemsTable.ForeignKeys[2].RefTable = UnitsTable
+	SalesOrderItemsTable.ForeignKeys[0].RefTable = ProductSkusTable
+	SalesOrderItemsTable.ForeignKeys[1].RefTable = SalesOrdersTable
+	SalesOrderItemsTable.ForeignKeys[2].RefTable = ProductsTable
+	SalesOrderItemsTable.ForeignKeys[3].RefTable = UnitsTable
 	SalesOrderItemsTable.Annotation = &entsql.Annotation{}
 	SalesOrderItemsTable.Annotation.Checks = map[string]string{
 		"sales_order_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
@@ -2106,20 +2409,22 @@ func init() {
 	}
 	ShipmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ShipmentItemsTable.ForeignKeys[1].RefTable = ProductsTable
-	ShipmentItemsTable.ForeignKeys[2].RefTable = SalesOrderItemsTable
-	ShipmentItemsTable.ForeignKeys[3].RefTable = ShipmentsTable
-	ShipmentItemsTable.ForeignKeys[4].RefTable = UnitsTable
-	ShipmentItemsTable.ForeignKeys[5].RefTable = WarehousesTable
+	ShipmentItemsTable.ForeignKeys[2].RefTable = ProductSkusTable
+	ShipmentItemsTable.ForeignKeys[3].RefTable = SalesOrderItemsTable
+	ShipmentItemsTable.ForeignKeys[4].RefTable = ShipmentsTable
+	ShipmentItemsTable.ForeignKeys[5].RefTable = UnitsTable
+	ShipmentItemsTable.ForeignKeys[6].RefTable = WarehousesTable
 	ShipmentItemsTable.Annotation = &entsql.Annotation{}
 	ShipmentItemsTable.Annotation.Checks = map[string]string{
 		"shipment_items_quantity_positive": "quantity > 0",
 	}
 	StockReservationsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	StockReservationsTable.ForeignKeys[1].RefTable = ProductsTable
-	StockReservationsTable.ForeignKeys[2].RefTable = SalesOrdersTable
-	StockReservationsTable.ForeignKeys[3].RefTable = SalesOrderItemsTable
-	StockReservationsTable.ForeignKeys[4].RefTable = UnitsTable
-	StockReservationsTable.ForeignKeys[5].RefTable = WarehousesTable
+	StockReservationsTable.ForeignKeys[2].RefTable = ProductSkusTable
+	StockReservationsTable.ForeignKeys[3].RefTable = SalesOrdersTable
+	StockReservationsTable.ForeignKeys[4].RefTable = SalesOrderItemsTable
+	StockReservationsTable.ForeignKeys[5].RefTable = UnitsTable
+	StockReservationsTable.ForeignKeys[6].RefTable = WarehousesTable
 	StockReservationsTable.Annotation = &entsql.Annotation{}
 	StockReservationsTable.Annotation.Checks = map[string]string{
 		"stock_reservations_quantity_positive": "quantity > 0",

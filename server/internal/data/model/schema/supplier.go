@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 )
@@ -56,6 +57,12 @@ func (Supplier) Fields() []ent.Field {
 		field.Time("updated_at").
 			Default(time.Now).
 			UpdateDefault(time.Now),
+	}
+}
+
+func (Supplier) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("purchase_orders", PurchaseOrder.Type),
 	}
 }
 

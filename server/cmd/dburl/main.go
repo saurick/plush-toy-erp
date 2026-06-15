@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"server/internal/devdbguard"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -60,6 +61,9 @@ func main() {
 	normalized, err := normalizePostgresURL(dsn)
 	if err != nil {
 		fail("parse postgres dsn failed: %v", err)
+	}
+	if err := devdbguard.RequireLocalDevDSN(*confPath, normalized, os.Getenv); err != nil {
+		fail("%v", err)
 	}
 
 	fmt.Print(normalized)

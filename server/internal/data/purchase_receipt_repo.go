@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 
@@ -52,6 +53,7 @@ func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.Purc
 		SetWarehouseID(in.WarehouseID).
 		SetUnitID(in.UnitID).
 		SetNillableLotID(in.LotID).
+		SetNillablePurchaseOrderItemID(in.PurchaseOrderItemID).
 		SetNillableLotNo(in.LotNo).
 		SetQuantity(in.Quantity).
 		SetNillableUnitPrice(in.UnitPrice).
@@ -342,6 +344,20 @@ func validatePurchaseReceiptItemReferences(ctx context.Context, client *ent.Clie
 		}
 		return err
 	}
+	if in.PurchaseOrderItemID != nil {
+		item, err := client.PurchaseOrderItem.Query().
+			Where(purchaseorderitem.ID(*in.PurchaseOrderItemID)).
+			Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrPurchaseOrderItemNotFound
+			}
+			return err
+		}
+		if item.LineStatus != biz.PurchaseOrderItemStatusOpen || item.MaterialID != in.MaterialID || item.UnitID != in.UnitID {
+			return biz.ErrBadParam
+		}
+	}
 	if in.LotID == nil {
 		return nil
 	}
@@ -498,19 +514,20 @@ func entPurchaseReceiptItemToBiz(row *ent.PurchaseReceiptItem) *biz.PurchaseRece
 		return nil
 	}
 	return &biz.PurchaseReceiptItem{
-		ID:           row.ID,
-		ReceiptID:    row.ReceiptID,
-		MaterialID:   row.MaterialID,
-		WarehouseID:  row.WarehouseID,
-		UnitID:       row.UnitID,
-		LotID:        row.LotID,
-		LotNo:        row.LotNo,
-		Quantity:     row.Quantity,
-		UnitPrice:    row.UnitPrice,
-		Amount:       row.Amount,
-		SourceLineNo: row.SourceLineNo,
-		Note:         row.Note,
-		CreatedAt:    row.CreatedAt,
-		UpdatedAt:    row.UpdatedAt,
+		ID:                  row.ID,
+		ReceiptID:           row.ReceiptID,
+		MaterialID:          row.MaterialID,
+		WarehouseID:         row.WarehouseID,
+		UnitID:              row.UnitID,
+		LotID:               row.LotID,
+		PurchaseOrderItemID: row.PurchaseOrderItemID,
+		LotNo:               row.LotNo,
+		Quantity:            row.Quantity,
+		UnitPrice:           row.UnitPrice,
+		Amount:              row.Amount,
+		SourceLineNo:        row.SourceLineNo,
+		Note:                row.Note,
+		CreatedAt:           row.CreatedAt,
+		UpdatedAt:           row.UpdatedAt,
 	}
 }

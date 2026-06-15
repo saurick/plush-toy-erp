@@ -31,10 +31,15 @@ func (InventoryLot) Hooks() []ent.Hook {
 
 func (InventoryLot) Fields() []ent.Field {
 	return []ent.Field{
+		// subject_* is the batch identity truth; product_sku_id only adds optional specification traceability.
 		field.String("subject_type").
 			NotEmpty().
 			MaxLen(16),
 		field.Int("subject_id").
+			Positive(),
+		field.Int("product_sku_id").
+			Optional().
+			Nillable().
 			Positive(),
 		field.String("lot_no").
 			NotEmpty().
@@ -55,6 +60,7 @@ func (InventoryLot) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(64),
+		// Lot status controls batch availability; quality actions change it without writing inventory_txns.
 		field.String("status").
 			NotEmpty().
 			Default("ACTIVE").
@@ -76,6 +82,11 @@ func (InventoryLot) Edges() []ent.Edge {
 		edge.To("inventory_txns", InventoryTxn.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("inventory_balances", InventoryBalance.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("product_sku", ProductSKU.Type).
+			Ref("inventory_lots").
+			Field("product_sku_id").
+			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_receipt_items", PurchaseReceiptItem.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
@@ -99,6 +110,7 @@ func (InventoryLot) Edges() []ent.Edge {
 func (InventoryLot) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("subject_type", "subject_id", "lot_no").Unique(),
+		index.Fields("product_sku_id"),
 		index.Fields("supplier_lot_no"),
 		index.Fields("color_no"),
 		index.Fields("dye_lot_no"),

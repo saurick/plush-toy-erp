@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"server/internal/conf"
+
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
@@ -78,6 +80,51 @@ func TestResolveTraceEnvOverridesRejectsInvalidRatio(t *testing.T) {
 	}
 	if ratio != 0.1 {
 		t.Fatalf("ratio = %v, want original ratio", ratio)
+	}
+}
+
+func TestValidateProductionBootstrapConfigRejectsPlaceholders(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "change-this-prod-jwt-secret",
+			Admin:     &conf.Data_Auth_Admin{Password: ""},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(string) string { return "" }); err == nil {
+		t.Fatal("expected production placeholder config to be rejected")
+	}
+}
+
+func TestValidateProductionBootstrapConfigAllowsBlankBootstrapAdminPassword(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "0123456789abcdef0123456789abcdef",
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(string) string { return "" }); err != nil {
+		t.Fatalf("expected production config with blank bootstrap admin password to pass, got %v", err)
+	}
+}
+
+func TestValidateProductionBootstrapConfigSkipsDevConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:change-this-dev-password@127.0.0.1:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "change-this-dev-jwt-secret",
+			Admin:     &conf.Data_Auth_Admin{Password: "change-this-dev-admin-password"},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/dev/config.yaml", cfg, func(string) string { return "" }); err != nil {
+		t.Fatalf("expected dev config to skip production gate, got %v", err)
 	}
 }
 

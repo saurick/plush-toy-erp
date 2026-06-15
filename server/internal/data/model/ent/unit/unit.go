@@ -30,12 +30,16 @@ const (
 	EdgeMaterials = "materials"
 	// EdgeProducts holds the string denoting the products edge name in mutations.
 	EdgeProducts = "products"
+	// EdgeProductSkus holds the string denoting the product_skus edge name in mutations.
+	EdgeProductSkus = "product_skus"
 	// EdgeInventoryTxns holds the string denoting the inventory_txns edge name in mutations.
 	EdgeInventoryTxns = "inventory_txns"
 	// EdgeInventoryBalances holds the string denoting the inventory_balances edge name in mutations.
 	EdgeInventoryBalances = "inventory_balances"
 	// EdgeBomItems holds the string denoting the bom_items edge name in mutations.
 	EdgeBomItems = "bom_items"
+	// EdgePurchaseOrderItems holds the string denoting the purchase_order_items edge name in mutations.
+	EdgePurchaseOrderItems = "purchase_order_items"
 	// EdgePurchaseReceiptItems holds the string denoting the purchase_receipt_items edge name in mutations.
 	EdgePurchaseReceiptItems = "purchase_receipt_items"
 	// EdgePurchaseReturnItems holds the string denoting the purchase_return_items edge name in mutations.
@@ -66,6 +70,13 @@ const (
 	ProductsInverseTable = "products"
 	// ProductsColumn is the table column denoting the products relation/edge.
 	ProductsColumn = "default_unit_id"
+	// ProductSkusTable is the table that holds the product_skus relation/edge.
+	ProductSkusTable = "product_skus"
+	// ProductSkusInverseTable is the table name for the ProductSKU entity.
+	// It exists in this package in order to avoid circular dependency with the "productsku" package.
+	ProductSkusInverseTable = "product_skus"
+	// ProductSkusColumn is the table column denoting the product_skus relation/edge.
+	ProductSkusColumn = "default_unit_id"
 	// InventoryTxnsTable is the table that holds the inventory_txns relation/edge.
 	InventoryTxnsTable = "inventory_txns"
 	// InventoryTxnsInverseTable is the table name for the InventoryTxn entity.
@@ -87,6 +98,13 @@ const (
 	BomItemsInverseTable = "bom_items"
 	// BomItemsColumn is the table column denoting the bom_items relation/edge.
 	BomItemsColumn = "unit_id"
+	// PurchaseOrderItemsTable is the table that holds the purchase_order_items relation/edge.
+	PurchaseOrderItemsTable = "purchase_order_items"
+	// PurchaseOrderItemsInverseTable is the table name for the PurchaseOrderItem entity.
+	// It exists in this package in order to avoid circular dependency with the "purchaseorderitem" package.
+	PurchaseOrderItemsInverseTable = "purchase_order_items"
+	// PurchaseOrderItemsColumn is the table column denoting the purchase_order_items relation/edge.
+	PurchaseOrderItemsColumn = "unit_id"
 	// PurchaseReceiptItemsTable is the table that holds the purchase_receipt_items relation/edge.
 	PurchaseReceiptItemsTable = "purchase_receipt_items"
 	// PurchaseReceiptItemsInverseTable is the table name for the PurchaseReceiptItem entity.
@@ -244,6 +262,20 @@ func ByProducts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByProductSkusCount orders the results by product_skus count.
+func ByProductSkusCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProductSkusStep(), opts...)
+	}
+}
+
+// ByProductSkus orders the results by product_skus terms.
+func ByProductSkus(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductSkusStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByInventoryTxnsCount orders the results by inventory_txns count.
 func ByInventoryTxnsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -283,6 +315,20 @@ func ByBomItemsCount(opts ...sql.OrderTermOption) OrderOption {
 func ByBomItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newBomItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByPurchaseOrderItemsCount orders the results by purchase_order_items count.
+func ByPurchaseOrderItemsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPurchaseOrderItemsStep(), opts...)
+	}
+}
+
+// ByPurchaseOrderItems orders the results by purchase_order_items terms.
+func ByPurchaseOrderItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseOrderItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 
@@ -397,6 +443,13 @@ func newProductsStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.O2M, false, ProductsTable, ProductsColumn),
 	)
 }
+func newProductSkusStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductSkusInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ProductSkusTable, ProductSkusColumn),
+	)
+}
 func newInventoryTxnsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -416,6 +469,13 @@ func newBomItemsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(BomItemsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, BomItemsTable, BomItemsColumn),
+	)
+}
+func newPurchaseOrderItemsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseOrderItemsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseOrderItemsTable, PurchaseOrderItemsColumn),
 	)
 }
 func newPurchaseReceiptItemsStep() *sqlgraph.Step {

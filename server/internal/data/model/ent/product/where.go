@@ -508,6 +508,29 @@ func HasDefaultUnitWith(preds ...predicate.Unit) predicate.Product {
 	})
 }
 
+// HasProductSkus applies the HasEdge predicate on the "product_skus" edge.
+func HasProductSkus() predicate.Product {
+	return predicate.Product(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ProductSkusTable, ProductSkusColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductSkusWith applies the HasEdge predicate on the "product_skus" edge with a given conditions (other predicates).
+func HasProductSkusWith(preds ...predicate.ProductSKU) predicate.Product {
+	return predicate.Product(func(s *sql.Selector) {
+		step := newProductSkusStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasBomHeaders applies the HasEdge predicate on the "bom_headers" edge.
 func HasBomHeaders() predicate.Product {
 	return predicate.Product(func(s *sql.Selector) {

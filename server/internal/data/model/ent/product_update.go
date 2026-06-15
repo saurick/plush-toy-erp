@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/unit"
@@ -139,6 +140,21 @@ func (_u *ProductUpdate) SetDefaultUnit(v *Unit) *ProductUpdate {
 	return _u.SetDefaultUnitID(v.ID)
 }
 
+// AddProductSkuIDs adds the "product_skus" edge to the ProductSKU entity by IDs.
+func (_u *ProductUpdate) AddProductSkuIDs(ids ...int) *ProductUpdate {
+	_u.mutation.AddProductSkuIDs(ids...)
+	return _u
+}
+
+// AddProductSkus adds the "product_skus" edges to the ProductSKU entity.
+func (_u *ProductUpdate) AddProductSkus(v ...*ProductSKU) *ProductUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductSkuIDs(ids...)
+}
+
 // AddBomHeaderIDs adds the "bom_headers" edge to the BOMHeader entity by IDs.
 func (_u *ProductUpdate) AddBomHeaderIDs(ids ...int) *ProductUpdate {
 	_u.mutation.AddBomHeaderIDs(ids...)
@@ -193,6 +209,27 @@ func (_u *ProductUpdate) Mutation() *ProductMutation {
 func (_u *ProductUpdate) ClearDefaultUnit() *ProductUpdate {
 	_u.mutation.ClearDefaultUnit()
 	return _u
+}
+
+// ClearProductSkus clears all "product_skus" edges to the ProductSKU entity.
+func (_u *ProductUpdate) ClearProductSkus() *ProductUpdate {
+	_u.mutation.ClearProductSkus()
+	return _u
+}
+
+// RemoveProductSkuIDs removes the "product_skus" edge to ProductSKU entities by IDs.
+func (_u *ProductUpdate) RemoveProductSkuIDs(ids ...int) *ProductUpdate {
+	_u.mutation.RemoveProductSkuIDs(ids...)
+	return _u
+}
+
+// RemoveProductSkus removes "product_skus" edges to ProductSKU entities.
+func (_u *ProductUpdate) RemoveProductSkus(v ...*ProductSKU) *ProductUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductSkuIDs(ids...)
 }
 
 // ClearBomHeaders clears all "bom_headers" edges to the BOMHeader entity.
@@ -385,6 +422,51 @@ func (_u *ProductUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkusCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ProductSkusTable,
+			Columns: []string{product.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductSkusIDs(); len(nodes) > 0 && !_u.mutation.ProductSkusCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ProductSkusTable,
+			Columns: []string{product.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkusIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ProductSkusTable,
+			Columns: []string{product.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -654,6 +736,21 @@ func (_u *ProductUpdateOne) SetDefaultUnit(v *Unit) *ProductUpdateOne {
 	return _u.SetDefaultUnitID(v.ID)
 }
 
+// AddProductSkuIDs adds the "product_skus" edge to the ProductSKU entity by IDs.
+func (_u *ProductUpdateOne) AddProductSkuIDs(ids ...int) *ProductUpdateOne {
+	_u.mutation.AddProductSkuIDs(ids...)
+	return _u
+}
+
+// AddProductSkus adds the "product_skus" edges to the ProductSKU entity.
+func (_u *ProductUpdateOne) AddProductSkus(v ...*ProductSKU) *ProductUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductSkuIDs(ids...)
+}
+
 // AddBomHeaderIDs adds the "bom_headers" edge to the BOMHeader entity by IDs.
 func (_u *ProductUpdateOne) AddBomHeaderIDs(ids ...int) *ProductUpdateOne {
 	_u.mutation.AddBomHeaderIDs(ids...)
@@ -708,6 +805,27 @@ func (_u *ProductUpdateOne) Mutation() *ProductMutation {
 func (_u *ProductUpdateOne) ClearDefaultUnit() *ProductUpdateOne {
 	_u.mutation.ClearDefaultUnit()
 	return _u
+}
+
+// ClearProductSkus clears all "product_skus" edges to the ProductSKU entity.
+func (_u *ProductUpdateOne) ClearProductSkus() *ProductUpdateOne {
+	_u.mutation.ClearProductSkus()
+	return _u
+}
+
+// RemoveProductSkuIDs removes the "product_skus" edge to ProductSKU entities by IDs.
+func (_u *ProductUpdateOne) RemoveProductSkuIDs(ids ...int) *ProductUpdateOne {
+	_u.mutation.RemoveProductSkuIDs(ids...)
+	return _u
+}
+
+// RemoveProductSkus removes "product_skus" edges to ProductSKU entities.
+func (_u *ProductUpdateOne) RemoveProductSkus(v ...*ProductSKU) *ProductUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductSkuIDs(ids...)
 }
 
 // ClearBomHeaders clears all "bom_headers" edges to the BOMHeader entity.
@@ -930,6 +1048,51 @@ func (_u *ProductUpdateOne) sqlSave(ctx context.Context) (_node *Product, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkusCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ProductSkusTable,
+			Columns: []string{product.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductSkusIDs(); len(nodes) > 0 && !_u.mutation.ProductSkusCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ProductSkusTable,
+			Columns: []string{product.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkusIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ProductSkusTable,
+			Columns: []string{product.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -44,6 +44,8 @@ type Product struct {
 type ProductEdges struct {
 	// DefaultUnit holds the value of the default_unit edge.
 	DefaultUnit *Unit `json:"default_unit,omitempty"`
+	// ProductSkus holds the value of the product_skus edge.
+	ProductSkus []*ProductSKU `json:"product_skus,omitempty"`
 	// BomHeaders holds the value of the bom_headers edge.
 	BomHeaders []*BOMHeader `json:"bom_headers,omitempty"`
 	// ShipmentItems holds the value of the shipment_items edge.
@@ -52,7 +54,7 @@ type ProductEdges struct {
 	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // DefaultUnitOrErr returns the DefaultUnit value or an error if the edge
@@ -66,10 +68,19 @@ func (e ProductEdges) DefaultUnitOrErr() (*Unit, error) {
 	return nil, &NotLoadedError{edge: "default_unit"}
 }
 
+// ProductSkusOrErr returns the ProductSkus value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductEdges) ProductSkusOrErr() ([]*ProductSKU, error) {
+	if e.loadedTypes[1] {
+		return e.ProductSkus, nil
+	}
+	return nil, &NotLoadedError{edge: "product_skus"}
+}
+
 // BomHeadersOrErr returns the BomHeaders value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductEdges) BomHeadersOrErr() ([]*BOMHeader, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.BomHeaders, nil
 	}
 	return nil, &NotLoadedError{edge: "bom_headers"}
@@ -78,7 +89,7 @@ func (e ProductEdges) BomHeadersOrErr() ([]*BOMHeader, error) {
 // ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.ShipmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "shipment_items"}
@@ -87,7 +98,7 @@ func (e ProductEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
 // StockReservationsOrErr returns the StockReservations value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductEdges) StockReservationsOrErr() ([]*StockReservation, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.StockReservations, nil
 	}
 	return nil, &NotLoadedError{edge: "stock_reservations"}
@@ -193,6 +204,11 @@ func (_m *Product) Value(name string) (ent.Value, error) {
 // QueryDefaultUnit queries the "default_unit" edge of the Product entity.
 func (_m *Product) QueryDefaultUnit() *UnitQuery {
 	return NewProductClient(_m.config).QueryDefaultUnit(_m)
+}
+
+// QueryProductSkus queries the "product_skus" edge of the Product entity.
+func (_m *Product) QueryProductSkus() *ProductSKUQuery {
+	return NewProductClient(_m.config).QueryProductSkus(_m)
 }
 
 // QueryBomHeaders queries the "bom_headers" edge of the Product entity.

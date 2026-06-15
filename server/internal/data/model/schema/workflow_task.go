@@ -24,6 +24,7 @@ func (WorkflowTask) Fields() []ent.Field {
 		field.String("task_name").
 			NotEmpty().
 			MaxLen(128),
+		// source_* points to the workflow source object; it must not be treated as a fact ledger.
 		field.String("source_type").
 			NotEmpty().
 			MaxLen(64).
@@ -67,6 +68,7 @@ func (WorkflowTask) Fields() []ent.Field {
 		field.Time("closed_at").
 			Optional().
 			Nillable(),
+		// Payload is a workflow display/action snapshot, not inventory, shipment or finance truth.
 		field.JSON("payload", map[string]any{}).
 			Optional(),
 		field.Int("created_by").

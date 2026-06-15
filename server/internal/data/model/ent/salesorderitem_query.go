@@ -9,6 +9,7 @@ import (
 	"math"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipmentitem"
@@ -30,6 +31,7 @@ type SalesOrderItemQuery struct {
 	predicates            []predicate.SalesOrderItem
 	withSalesOrder        *SalesOrderQuery
 	withProduct           *ProductQuery
+	withProductSku        *ProductSKUQuery
 	withUnit              *UnitQuery
 	withShipmentItems     *ShipmentItemQuery
 	withStockReservations *StockReservationQuery
@@ -106,6 +108,28 @@ func (_q *SalesOrderItemQuery) QueryProduct() *ProductQuery {
 			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, selector),
 			sqlgraph.To(product.Table, product.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, salesorderitem.ProductTable, salesorderitem.ProductColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductSku chains the current query on the "product_sku" edge.
+func (_q *SalesOrderItemQuery) QueryProductSku() *ProductSKUQuery {
+	query := (&ProductSKUClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesorderitem.Table, salesorderitem.FieldID, selector),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, salesorderitem.ProductSkuTable, salesorderitem.ProductSkuColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -373,6 +397,7 @@ func (_q *SalesOrderItemQuery) Clone() *SalesOrderItemQuery {
 		predicates:            append([]predicate.SalesOrderItem{}, _q.predicates...),
 		withSalesOrder:        _q.withSalesOrder.Clone(),
 		withProduct:           _q.withProduct.Clone(),
+		withProductSku:        _q.withProductSku.Clone(),
 		withUnit:              _q.withUnit.Clone(),
 		withShipmentItems:     _q.withShipmentItems.Clone(),
 		withStockReservations: _q.withStockReservations.Clone(),
@@ -401,6 +426,17 @@ func (_q *SalesOrderItemQuery) WithProduct(opts ...func(*ProductQuery)) *SalesOr
 		opt(query)
 	}
 	_q.withProduct = query
+	return _q
+}
+
+// WithProductSku tells the query-builder to eager-load the nodes that are connected to
+// the "product_sku" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SalesOrderItemQuery) WithProductSku(opts ...func(*ProductSKUQuery)) *SalesOrderItemQuery {
+	query := (&ProductSKUClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductSku = query
 	return _q
 }
 
@@ -515,9 +551,10 @@ func (_q *SalesOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	var (
 		nodes       = []*SalesOrderItem{}
 		_spec       = _q.querySpec()
-		loadedTypes = [5]bool{
+		loadedTypes = [6]bool{
 			_q.withSalesOrder != nil,
 			_q.withProduct != nil,
+			_q.withProductSku != nil,
 			_q.withUnit != nil,
 			_q.withShipmentItems != nil,
 			_q.withStockReservations != nil,
@@ -550,6 +587,12 @@ func (_q *SalesOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	if query := _q.withProduct; query != nil {
 		if err := _q.loadProduct(ctx, query, nodes, nil,
 			func(n *SalesOrderItem, e *Product) { n.Edges.Product = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductSku; query != nil {
+		if err := _q.loadProductSku(ctx, query, nodes, nil,
+			func(n *SalesOrderItem, e *ProductSKU) { n.Edges.ProductSku = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -629,6 +672,38 @@ func (_q *SalesOrderItemQuery) loadProduct(ctx context.Context, query *ProductQu
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "product_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *SalesOrderItemQuery) loadProductSku(ctx context.Context, query *ProductSKUQuery, nodes []*SalesOrderItem, init func(*SalesOrderItem), assign func(*SalesOrderItem, *ProductSKU)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*SalesOrderItem)
+	for i := range nodes {
+		if nodes[i].ProductSkuID == nil {
+			continue
+		}
+		fk := *nodes[i].ProductSkuID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(productsku.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "product_sku_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -762,6 +837,9 @@ func (_q *SalesOrderItemQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withProduct != nil {
 			_spec.Node.AddColumnOnce(salesorderitem.FieldProductID)
+		}
+		if _q.withProductSku != nil {
+			_spec.Node.AddColumnOnce(salesorderitem.FieldProductSkuID)
 		}
 		if _q.withUnit != nil {
 			_spec.Node.AddColumnOnce(salesorderitem.FieldUnitID)

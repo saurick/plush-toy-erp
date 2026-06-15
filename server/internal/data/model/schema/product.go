@@ -49,6 +49,7 @@ func (Product) Edges() []ent.Edge {
 			Field("default_unit_id").
 			Required().
 			Unique(),
+		edge.To("product_skus", ProductSKU.Type),
 		edge.To("bom_headers", BOMHeader.Type),
 		edge.To("shipment_items", ShipmentItem.Type),
 		edge.To("stock_reservations", StockReservation.Type),

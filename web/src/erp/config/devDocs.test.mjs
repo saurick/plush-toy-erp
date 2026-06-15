@@ -49,9 +49,8 @@ test('devDocs: 全量开发文档列表不恢复产品内文档 registry', () =>
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',
     '../../../README.md': '# 前端 README',
-    '../../../../docs/current-source-of-truth.md': '# 当前真源与交接顺序',
-    '../../../../docs/product/product-completion-roadmap.md':
-      '# 产品完成路线图',
+    '../../../../docs/当前真源与交接顺序.md': '# 当前真源与交接顺序',
+    '../../../../docs/product/产品完成路线图.md': '# 产品完成路线图',
     '../../../../docs/archive/progress-2026-06-02-before-print-template-defer.md':
       '# 过程记录归档',
     '../../../../docs/customers/yoyoosun/README.md': '# 永绅客户资料边界',
@@ -61,16 +60,20 @@ test('devDocs: 全量开发文档列表不恢复产品内文档 registry', () =>
   const paths = docs.map((item) => item.path)
 
   assert.equal(new Set(keys).size, keys.length)
+  assert.equal(
+    docs.find((item) => item.path === 'docs/product/产品完成路线图.md')?.key,
+    'doc:docs/product/产品完成路线图.md'
+  )
   assert(paths.includes('README.md'))
   assert(paths.includes('web/README.md'))
-  assert(paths.includes('docs/current-source-of-truth.md'))
+  assert(paths.includes('docs/当前真源与交接顺序.md'))
   assert(
     paths.includes(
       'docs/archive/progress-2026-06-02-before-print-template-defer.md'
     )
   )
   assert(paths.includes('docs/customers/yoyoosun/README.md'))
-  assert(paths.includes('docs/product/product-completion-roadmap.md'))
+  assert(paths.includes('docs/product/产品完成路线图.md'))
   assert(!paths.some((path) => path.startsWith('web/src/erp/docs/')))
   assert(!paths.some((path) => path.includes('docs.mjs')))
   assert.equal(
@@ -96,12 +99,9 @@ test('devDocs: 全量开发文档列表不恢复产品内文档 registry', () =>
 test('devDocs: 按仓库路径生成目录树', () => {
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',
-    '../../../../docs/product/product-completion-roadmap.md':
-      '# 产品完成路线图',
-    '../../../../docs/customers/yoyoosun/import-strategy.md':
-      '# yoyoosun 导入策略',
-    '../../../../docs/customers/yoyoosun/source-materials.md':
-      '# yoyoosun 来源资料',
+    '../../../../docs/product/产品完成路线图.md': '# 产品完成路线图',
+    '../../../../docs/customers/yoyoosun/导入策略.md': '# yoyoosun 导入策略',
+    '../../../../docs/customers/yoyoosun/来源材料.md': '# yoyoosun 来源资料',
     '../../../../docs/archive/progress-2026-06.md': '# 过程归档',
   })
 
@@ -117,18 +117,22 @@ test('devDocs: 按仓库路径生成目录树', () => {
     customerDir?.children.some(
       (node) =>
         node.type === 'document' &&
-        node.path === 'docs/customers/yoyoosun/import-strategy.md'
+        node.path === 'docs/customers/yoyoosun/导入策略.md'
     )
   )
 })
 
 test('devDocs: 支持按标题、路径和正文索引筛选', () => {
   const items = [
-    { title: '当前真源', path: 'docs/current-source-of-truth.md' },
-    { title: '测试策略', path: 'docs/product/test-strategy.md' },
+    {
+      title: '当前真源',
+      path: 'docs/当前真源与交接顺序.md',
+      searchText: 'Current Source Of Truth',
+    },
+    { title: '测试策略', path: 'docs/product/自动化测试策略.md' },
     {
       title: '路线图',
-      path: 'docs/product/product-completion-roadmap.md',
+      path: 'docs/product/产品完成路线图.md',
       searchText: 'Phase V1',
     },
   ]
@@ -146,33 +150,32 @@ test('devDocs: 支持按标题、路径和正文索引筛选', () => {
 test('devDocs: 支持本地置顶路径归一化和排序', () => {
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',
-    '../../../../docs/current-source-of-truth.md': '# 当前真源与交接顺序',
-    '../../../../docs/product/product-completion-roadmap.md':
-      '# 产品完成路线图',
+    '../../../../docs/当前真源与交接顺序.md': '# 当前真源与交接顺序',
+    '../../../../docs/product/产品完成路线图.md': '# 产品完成路线图',
     '../../../../docs/archive/progress-2026-06.md': '# 过程归档',
   })
 
   assert.deepEqual(getDefaultDevDocsPinnedPaths(docs), [
     'README.md',
-    'docs/current-source-of-truth.md',
-    'docs/product/product-completion-roadmap.md',
+    'docs/当前真源与交接顺序.md',
+    'docs/product/产品完成路线图.md',
   ])
   assert.deepEqual(
     normalizeDevDocsPinnedPaths(
       [
-        'docs/product/product-completion-roadmap.md',
+        'docs/product/产品完成路线图.md',
         'missing.md',
-        'docs/product/product-completion-roadmap.md',
+        'docs/product/产品完成路线图.md',
         '../unsafe.txt',
       ],
       docs
     ),
-    ['docs/product/product-completion-roadmap.md']
+    ['docs/product/产品完成路线图.md']
   )
 
   const docsWithPinned = applyDevDocsPinnedState(docs, [
     'docs/archive/progress-2026-06.md',
-    'docs/current-source-of-truth.md',
+    'docs/当前真源与交接顺序.md',
   ])
   const sortedPaths = sortDevDocsItemsByPinned(docsWithPinned).map(
     (item) => item.path
@@ -180,15 +183,15 @@ test('devDocs: 支持本地置顶路径归一化和排序', () => {
 
   assert.deepEqual(sortedPaths.slice(0, 2), [
     'docs/archive/progress-2026-06.md',
-    'docs/current-source-of-truth.md',
+    'docs/当前真源与交接顺序.md',
   ])
 })
 
 test('devDocs: 支持刷新后恢复当前文档路径', () => {
   const docs = buildDevDocsItems({
     '../../../../README.md': '# 仓库 README',
-    '../../../../docs/current-source-of-truth.md': '# 当前真源与交接顺序',
-    '../../../../docs/product/test-strategy.md': '# 自动化测试策略',
+    '../../../../docs/当前真源与交接顺序.md': '# 当前真源与交接顺序',
+    '../../../../docs/product/自动化测试策略.md': '# 自动化测试策略',
   })
 
   assert.equal(
@@ -196,8 +199,8 @@ test('devDocs: 支持刷新后恢复当前文档路径', () => {
     'plush_erp_dev_docs_selected_path'
   )
   assert.equal(
-    normalizeDevDocsSelectedPath('docs/product/test-strategy.md', docs),
-    'docs/product/test-strategy.md'
+    normalizeDevDocsSelectedPath('docs/product/自动化测试策略.md', docs),
+    'docs/product/自动化测试策略.md'
   )
   assert.equal(
     normalizeDevDocsSelectedPath('docs/product/missing.md', docs),
@@ -217,7 +220,7 @@ test('devDocs: 支持刷新后恢复目录展开状态', () => {
         'dir:docs',
         'dir:docs/product',
         'dir:docs/product',
-        'doc:docs/product/test-strategy.md',
+        'doc:docs/product/自动化测试策略.md',
         '../unsafe',
         'dir:missing',
       ],

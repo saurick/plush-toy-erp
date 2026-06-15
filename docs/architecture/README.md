@@ -17,13 +17,13 @@
 
 ## 是否是真源
 
-本目录是架构边界和设计评审入口，但不直接替代当前代码、Ent schema、Atlas migration、测试或 `docs/current-source-of-truth.md`。评审文档写了方案，不等于 runtime 已实现。
+本目录是架构边界和设计评审入口，但不直接替代当前代码、Ent schema、Atlas migration、测试或 `docs/当前真源与交接顺序.md`。评审文档写了方案，不等于 runtime 已实现。
 
 ## 更新规则
 
 新增、删除、重命名本目录长期维护文档，或改变某篇文档是否属于活跃架构入口时，必须同步检查：
 
 - 本 README。
-- `docs/document-inventory.md`。
-- `docs/current-source-of-truth.md`。
+- `docs/文档清单.md`。
+- `docs/当前真源与交接顺序.md`。
 - 相关产品路线或台账文档。

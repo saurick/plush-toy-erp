@@ -7,7 +7,7 @@
 | 路径 | 职责 |
 | --- | --- |
 | `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择、生产单端口 `/m/<role>/tasks` 岗位任务端路径，以及本地开发用的按角色移动端调试入口，内部目录职责见 [`web/README.md`](web/README.md) |
-| `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、领域 usecase、业务看板 `dashboard_stats`、采购入库 `purchase` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
+| `server/` | Kratos + Ent + Atlas 后端，当前承载账号、鉴权、错误码、工作流协同、领域 usecase、业务看板 `dashboard_stats`、采购订单 `purchase_order` JSON-RPC 域、采购入库 `purchase` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
 | `config/` | 行业模板、客户配置包和私有化复制模板落点；当前已有 yoyoosun 前端品牌 / 桌面菜单展示配置 loader，不代表 SaaS tenant，也不改变后端 RBAC、schema 或事实规则 |
@@ -17,10 +17,10 @@
 
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
-- 当前数据库默认命中 `192.168.0.106:5432/plush_erp`
-- 当前账号表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购入库已接入独立 `purchase` JSON-RPC / RBAC 和业务看板入库 projection；具体目标库是否已 apply 仍以 `make migrate_status` 为准
+- 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库
+- 当前账号表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单已接入独立 `purchase_order` JSON-RPC / RBAC 和 V1 页面，BOM 管理已接入独立 `bom` JSON-RPC / RBAC 和 V1 页面，采购入库已接入独立 `purchase` JSON-RPC / RBAC 和业务看板入库 projection，采购入库行可选关联采购订单行做来源追溯；`product_skus` 当前是 schema 真源，API / UI / 导入自动创建仍待后续闭环；具体目标库是否已 apply 仍以 `make migrate_status` 为准
 - `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；`出货放行` 只表示可发货，`出库管理` 只表达库存出库视角，只有出货单 `SHIPPED` 才是真实出货事实
-- 采购、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM 当前只落最小主数据，不生成采购、生产或成本
+- 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本
 - 业务链路调试 seed / cleanup / 业务数据清空仅作为开发验收能力接入后端 `debug` JSON-RPC 域，默认面向当前 SQL 连接开启，可通过 `ERP_DEBUG_*` 环境变量显式关闭，并受管理员权限和业务链路调试菜单权限保护；业务数据清空按本项目当前业务表 allowlist 执行，不删除账号、权限、管理员偏好、配置和数据库结构；按 debugRunId 清理还会校验 debug 数据标记
 - 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred
 - 模板打印当前只保留采购合同、加工合同两套正式模板；对应业务页已支持选中记录带值打开，打印中心保留默认样例、纸面预览和打印窗口入口
@@ -98,7 +98,8 @@ make run
 
 - HTTP：`8300`
 - gRPC：`9300`
-- PostgreSQL Compose 宿主机映射：`5435`
+- 本地开发 PostgreSQL：`192.168.0.106:5432/plush_erp`
+- 测试 / 目标环境 PostgreSQL：`192.168.0.133:5435/plush_erp`，只在显式测试服发布、测试服回归或目标环境验收时使用
 
 ## 当前不做
 
@@ -130,31 +131,31 @@ pnpm style:l1
 ## 文档索引
 
 - 协作约定：`/Users/simon/projects/plush-toy-erp/AGENTS.md`
-- 阅读顺序与真源：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
-- 文档清单：`/Users/simon/projects/plush-toy-erp/docs/document-inventory.md`
-- 0 到 1 产品架构：`/Users/simon/projects/plush-toy-erp/docs/product/zero-to-one-architecture.md`
-- 产品完成路线图：`/Users/simon/projects/plush-toy-erp/docs/product/product-completion-roadmap.md`
-- 自动化测试策略：`/Users/simon/projects/plush-toy-erp/docs/product/test-strategy.md`
-- 正式产品入口与菜单配置计划：`/Users/simon/projects/plush-toy-erp/docs/product/formal-menu-entry-plan.md`
-- 产品台账索引：`/Users/simon/projects/plush-toy-erp/docs/product/product-delivery-ledgers.md`
-- 产品能力进度台账：`/Users/simon/projects/plush-toy-erp/docs/product/capability-ledger.md`
-- 永绅 yoyoosun 客户交付矩阵：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delivery-matrix.md`
-- 永绅 yoyoosun 客户差异台账：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/delta-ledger.md`
-- 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/status-workflow-fact-boundary.md`
+- 阅读顺序与真源：`/Users/simon/projects/plush-toy-erp/docs/当前真源与交接顺序.md`
+- 文档清单：`/Users/simon/projects/plush-toy-erp/docs/文档清单.md`
+- 0 到 1 产品架构：`/Users/simon/projects/plush-toy-erp/docs/product/零到一产品架构.md`
+- 产品完成路线图：`/Users/simon/projects/plush-toy-erp/docs/product/产品完成路线图.md`
+- 自动化测试策略：`/Users/simon/projects/plush-toy-erp/docs/product/自动化测试策略.md`
+- 正式产品入口与菜单配置计划：`/Users/simon/projects/plush-toy-erp/docs/product/正式产品入口与菜单配置计划.md`
+- 产品台账索引：`/Users/simon/projects/plush-toy-erp/docs/product/产品台账索引.md`
+- 产品能力进度台账：`/Users/simon/projects/plush-toy-erp/docs/product/产品能力进度台账.md`
+- 永绅 yoyoosun 客户交付矩阵：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/客户交付矩阵.md`
+- 永绅 yoyoosun 客户差异台账：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/客户差异台账.md`
+- 状态 / Workflow / Fact 边界：`/Users/simon/projects/plush-toy-erp/docs/architecture/状态工作流事实边界.md`
 - 永绅 yoyoosun 客户资料边界：`/Users/simon/projects/plush-toy-erp/docs/customers/yoyoosun/README.md`
 - 外部参考资料：`/Users/simon/projects/plush-toy-erp/docs/reference/README.md`
 - architecture 历史评审归档：`/Users/simon/projects/plush-toy-erp/docs/archive/architecture-history/README.md`
-- 工作流主任务树 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/task-flow-v1.md`
-- 通知 / 预警 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/notification-alert-v1.md`
-- 角色权限矩阵 v1：`/Users/simon/projects/plush-toy-erp/docs/roles/role-permission-matrix-v1.md`
-- 财务 v1：`/Users/simon/projects/plush-toy-erp/docs/finance/finance-v1.md`
-- 仓库与品质 v1：`/Users/simon/projects/plush-toy-erp/docs/warehouse/warehouse-quality-v1.md`
-- 日志 / 审计 / Trace v1：`/Users/simon/projects/plush-toy-erp/docs/observability/log-trace-audit-v1.md`
-- Workflow usecase 评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/workflow-usecase-review.md`
-- 行业专表 Schema 评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/industry-schema-review.md`
-- 打印模板字段与编辑行为：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-field-behavior.md`
-- 打印模板实现原理：`/Users/simon/projects/plush-toy-erp/docs/erp-print-template-implementation.md`
-- 当前真源索引：`/Users/simon/projects/plush-toy-erp/docs/current-source-of-truth.md`
+- 工作流主任务树 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/工作流主任务树第一版.md`
+- 通知 / 预警 v1：`/Users/simon/projects/plush-toy-erp/docs/workflow/通知预警催办与升级第一版.md`
+- 角色权限矩阵 v1：`/Users/simon/projects/plush-toy-erp/docs/roles/角色权限矩阵第一版.md`
+- 财务 v1：`/Users/simon/projects/plush-toy-erp/docs/finance/财务第一版.md`
+- 仓库与品质 v1：`/Users/simon/projects/plush-toy-erp/docs/warehouse/仓库与品质第一版.md`
+- 日志 / 审计 / Trace v1：`/Users/simon/projects/plush-toy-erp/docs/observability/日志链路追踪审计第一版.md`
+- Workflow usecase 评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/工作流用例统一编排评审.md`
+- 行业专表 Schema 评审：`/Users/simon/projects/plush-toy-erp/docs/architecture/行业专表模型评审.md`
+- 打印模板字段与编辑行为：`/Users/simon/projects/plush-toy-erp/docs/打印模板字段与编辑行为清单.md`
+- 打印模板实现原理：`/Users/simon/projects/plush-toy-erp/docs/打印模板实现原理.md`
+- 当前真源索引：`/Users/simon/projects/plush-toy-erp/docs/当前真源与交接顺序.md`
 - 前端说明：`/Users/simon/projects/plush-toy-erp/web/README.md`
 - 后端说明：`/Users/simon/projects/plush-toy-erp/server/README.md`
 

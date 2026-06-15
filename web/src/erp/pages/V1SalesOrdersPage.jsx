@@ -45,17 +45,13 @@ import {
 } from '../components/business-list/ColumnOrderModal.jsx'
 import {
   activateSalesOrder,
-  addSalesOrderItem,
   cancelSalesOrder,
   closeSalesOrder,
-  createSalesOrder,
   listCustomers,
   listSalesOrderItems,
   listSalesOrders,
-  removeSalesOrderItem,
+  saveSalesOrderWithItems,
   submitSalesOrder,
-  updateSalesOrder,
-  updateSalesOrderItem,
 } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
@@ -586,7 +582,6 @@ export default function V1SalesOrdersPage() {
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
-  const [orderFormOriginalItems, setOrderFormOriginalItems] = useState([])
   const [orderColumnOrder, setOrderColumnOrder] = useState(null)
   const [itemColumnOrder, setItemColumnOrder] = useState(null)
   const [columnOrderTarget, setColumnOrderTarget] = useState(null)
@@ -700,7 +695,6 @@ export default function V1SalesOrdersPage() {
 
   const openCreateOrder = () => {
     setEditingOrder(null)
-    setOrderFormOriginalItems([])
     orderForm.resetFields()
     orderForm.setFieldsValue({
       order_date: new Date().toISOString().slice(0, 10),
@@ -734,7 +728,6 @@ export default function V1SalesOrdersPage() {
       const openItems = nextItems.filter(
         (item) => String(item?.line_status) === OPEN_LINE_STATUS
       )
-      setOrderFormOriginalItems(openItems)
       orderForm.setFieldsValue({
         ...order,
         order_date: unixToDateInputValue(order.order_date),
@@ -745,42 +738,8 @@ export default function V1SalesOrdersPage() {
       })
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载订单行'))
-      setOrderFormOriginalItems([])
     } finally {
       setItemLoading(false)
-    }
-  }
-
-  const syncOrderFormItems = async (orderId, formItems = []) => {
-    const submittedItems = Array.isArray(formItems) ? formItems : []
-    const existingOpenItems = Array.isArray(orderFormOriginalItems)
-      ? orderFormOriginalItems
-      : []
-    const submittedIds = new Set()
-
-    for (const item of submittedItems) {
-      const itemId = Number(item?.id || 0)
-      const params = buildSalesOrderItemParams(item, {
-        sales_order_id: orderId,
-      })
-      if (itemId > 0) {
-        submittedIds.add(itemId)
-        if (canUpdateItem) {
-          await updateSalesOrderItem({ ...params, id: itemId })
-        }
-      } else if (canCreateItem) {
-        await addSalesOrderItem(params)
-      }
-    }
-
-    if (!canCancelItem) {
-      return
-    }
-
-    for (const existingItem of existingOpenItems) {
-      if (!submittedIds.has(existingItem.id)) {
-        await removeSalesOrderItem({ id: existingItem.id })
-      }
     }
   }
 
@@ -788,7 +747,6 @@ export default function V1SalesOrdersPage() {
     const values = await orderForm.validateFields()
     const customer = customers.find((item) => item.id === values.customer_id)
     setSaving(true)
-    let saved = null
     try {
       const params = buildSalesOrderParams(
         {
@@ -797,31 +755,32 @@ export default function V1SalesOrdersPage() {
         },
         editingOrder?.id ? { id: editingOrder.id } : {}
       )
-      saved = editingOrder?.id
-        ? await updateSalesOrder(params)
-        : await createSalesOrder(params)
-      if (saved?.id) {
-        await syncOrderFormItems(saved.id, values.items)
-      }
+      const result = await saveSalesOrderWithItems({
+        ...params,
+        items: (Array.isArray(values.items) ? values.items : []).map((item) =>
+          buildSalesOrderItemParams(item, item?.id ? { id: item.id } : {})
+        ),
+      })
+      const saved = result?.sales_order || null
+      const savedItems = Array.isArray(result?.sales_order_items)
+        ? result.sales_order_items
+        : []
       message.success(
         editingOrder?.id ? '销售订单与订单行已更新' : '销售订单已创建'
       )
       setOrderModalOpen(false)
       setSelectedOrder(saved || selectedOrder)
-      await loadOrders()
-      await loadItems(saved || selectedOrder)
-    } catch (error) {
-      message.error(
-        getActionErrorMessage(
-          error,
-          saved ? '销售订单已保存，订单行保存失败' : '保存销售订单'
-        )
-      )
-      if (saved?.id) {
-        setSelectedOrder(saved)
+      setItems(savedItems)
+      try {
         await loadOrders()
-        await loadItems(saved)
+        if (saved?.id) {
+          await loadItems(saved)
+        }
+      } catch (refreshError) {
+        message.warning(getActionErrorMessage(refreshError, '刷新销售订单列表'))
       }
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '保存销售订单与订单行'))
     } finally {
       setSaving(false)
     }

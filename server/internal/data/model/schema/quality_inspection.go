@@ -72,6 +72,7 @@ func (QualityInspection) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(32),
+		// Used only to restore a lot when cancelling SUBMITTED inspection; quality decisions do not write stock txns.
 		field.String("original_lot_status").
 			Default("").
 			MaxLen(32),
@@ -139,6 +140,7 @@ func (QualityInspection) Indexes() []ent.Index {
 		index.Fields("warehouse_id"),
 		index.Fields("status"),
 		index.Fields("inspected_at"),
+		// Only one in-flight inspection may hold the same lot at SUBMITTED status.
 		index.Fields("inventory_lot_id").
 			Unique().
 			StorageKey("qualityinspection_inventory_lot_id_submitted").

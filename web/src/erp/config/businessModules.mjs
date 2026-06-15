@@ -176,18 +176,18 @@ export const businessModuleDefinitions = Object.freeze([
     title: '产品档案',
     path: '/erp/master/products',
     shortLabel: '产品',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '产品 SPU / 款式主档入口；先恢复产品资料列表体验，SKU / 颜色尺寸后续按字段真源评审。',
-    primaryEntity: 'products',
-    factSource: 'products',
+      '产品 SKU / 规格主数据入口；SKU 归属产品，维护颜色、尺码、条码、客户 SKU 和包装版本。',
+    primaryEntity: 'product_skus',
+    factSource: 'product_skus',
     boundary:
-      '产品档案不等于 SKU 全量模型、库存、BOM 或生产事实；真实写入必须走产品领域 usecase。',
-    sourceRefs: ['products', 'product_skus（后续评审）'],
+      '产品档案维护 SKU 主数据，不等于库存、BOM、订单、生产或出货事实；真实事实写入必须走对应领域 usecase。',
+    sourceRefs: ['products', 'product_skus'],
     currentScope: [
-      '产品编号、名称、分类、默认单位',
-      '产品状态和业务责任人',
-      'SKU / 规格后续在详情内承载',
+      'SKU 编号、条码、客户 SKU、颜色、色号、尺码、包装版本',
+      'SKU 归属产品和可选默认单位',
+      'SKU 状态启停',
     ],
   },
   {
@@ -232,7 +232,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: 'BOM 管理',
     path: '/erp/purchase/material-bom',
     shortLabel: 'BOM',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
       'BOM 是产品结构和用量真源；物料、损耗和版本状态应回到 BOM 领域能力。',
     primaryEntity: 'bom_headers / bom_items',

@@ -29,11 +29,11 @@ var ProviderSet = wire.NewSet(
 	NewAuthRepo,
 	wire.Bind(new(biz.AuthRepo), new(*authRepo)),
 	NewTokenGenerator,
-	biz.NewAuthUsecase,
 
 	// admin auth / manage
 	NewAdminAuthRepo,
 	wire.Bind(new(biz.AdminAuthRepo), new(*adminAuthRepo)),
+	wire.Bind(new(biz.AdminAccountReader), new(*adminAuthRepo)),
 	NewAdminTokenGenerator,
 	NewAdminManageRepo,
 	wire.Bind(new(biz.AdminManageRepo), new(*adminManageRepo)),
@@ -42,12 +42,25 @@ var ProviderSet = wire.NewSet(
 	NewUserAdminRepo,
 	wire.Bind(new(biz.UserAdminRepo), new(*userAdminRepo)),
 
-	// jsonrpc
-	NewJsonrpcData,
-	wire.Bind(new(biz.JsonrpcRepo), new(*JsonrpcData)),
+	// domain repos
+	NewWorkflowRepo,
+	wire.Bind(new(biz.WorkflowRepo), new(*workflowRepo)),
+	NewDebugSeedRepo,
+	wire.Bind(new(biz.DebugRepo), new(*debugSeedRepo)),
+	NewDebugSafetyConfig,
+	NewMasterDataRepo,
+	wire.Bind(new(biz.MasterDataRepo), new(*masterDataRepo)),
+	NewSalesOrderRepo,
+	wire.Bind(new(biz.SalesOrderRepo), new(*salesOrderRepo)),
+	NewPurchaseOrderRepo,
+	wire.Bind(new(biz.PurchaseOrderRepo), new(*purchaseOrderRepo)),
+	NewInventoryRepo,
+	wire.Bind(new(biz.InventoryRepo), new(*inventoryRepo)),
+	NewOperationalFactRepo,
+	wire.Bind(new(biz.OperationalFactRepo), new(*operationalFactRepo)),
 )
 
-// Data 聚合所有外部资源（DB、JsonrpcData 等）。
+// Data 聚合 DB 等外部资源。
 type Data struct {
 	log        *log.Helper
 	postgres   *ent.Client
@@ -109,6 +122,15 @@ func waitForPostgresReady(ctx context.Context, pinger pingContexter, interval ti
 // SQLDB 返回底层 DB，用于健康检查与原生 SQL 查询。
 func (d *Data) SQLDB() *sql.DB {
 	return d.sqldb
+}
+
+// NewDataForTesting 为跨包测试包装 Ent client，避免为了 repo 测试启动 Postgres。
+func NewDataForTesting(client *ent.Client, db *sql.DB) *Data {
+	return &Data{
+		postgres:   client,
+		sqldb:      db,
+		sqlDialect: dialect.SQLite,
+	}
 }
 
 // NewData 由 wire 调用，用来统一管理资源和 cleanup。

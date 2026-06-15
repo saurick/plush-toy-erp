@@ -14,6 +14,8 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productsku"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -139,6 +141,21 @@ func (_u *UnitUpdate) AddProducts(v ...*Product) *UnitUpdate {
 	return _u.AddProductIDs(ids...)
 }
 
+// AddProductSkuIDs adds the "product_skus" edge to the ProductSKU entity by IDs.
+func (_u *UnitUpdate) AddProductSkuIDs(ids ...int) *UnitUpdate {
+	_u.mutation.AddProductSkuIDs(ids...)
+	return _u
+}
+
+// AddProductSkus adds the "product_skus" edges to the ProductSKU entity.
+func (_u *UnitUpdate) AddProductSkus(v ...*ProductSKU) *UnitUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductSkuIDs(ids...)
+}
+
 // AddInventoryTxnIDs adds the "inventory_txns" edge to the InventoryTxn entity by IDs.
 func (_u *UnitUpdate) AddInventoryTxnIDs(ids ...int) *UnitUpdate {
 	_u.mutation.AddInventoryTxnIDs(ids...)
@@ -182,6 +199,21 @@ func (_u *UnitUpdate) AddBomItems(v ...*BOMItem) *UnitUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.AddBomItemIDs(ids...)
+}
+
+// AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
+func (_u *UnitUpdate) AddPurchaseOrderItemIDs(ids ...int) *UnitUpdate {
+	_u.mutation.AddPurchaseOrderItemIDs(ids...)
+	return _u
+}
+
+// AddPurchaseOrderItems adds the "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_u *UnitUpdate) AddPurchaseOrderItems(v ...*PurchaseOrderItem) *UnitUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseOrderItemIDs(ids...)
 }
 
 // AddPurchaseReceiptItemIDs adds the "purchase_receipt_items" edge to the PurchaseReceiptItem entity by IDs.
@@ -336,6 +368,27 @@ func (_u *UnitUpdate) RemoveProducts(v ...*Product) *UnitUpdate {
 	return _u.RemoveProductIDs(ids...)
 }
 
+// ClearProductSkus clears all "product_skus" edges to the ProductSKU entity.
+func (_u *UnitUpdate) ClearProductSkus() *UnitUpdate {
+	_u.mutation.ClearProductSkus()
+	return _u
+}
+
+// RemoveProductSkuIDs removes the "product_skus" edge to ProductSKU entities by IDs.
+func (_u *UnitUpdate) RemoveProductSkuIDs(ids ...int) *UnitUpdate {
+	_u.mutation.RemoveProductSkuIDs(ids...)
+	return _u
+}
+
+// RemoveProductSkus removes "product_skus" edges to ProductSKU entities.
+func (_u *UnitUpdate) RemoveProductSkus(v ...*ProductSKU) *UnitUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductSkuIDs(ids...)
+}
+
 // ClearInventoryTxns clears all "inventory_txns" edges to the InventoryTxn entity.
 func (_u *UnitUpdate) ClearInventoryTxns() *UnitUpdate {
 	_u.mutation.ClearInventoryTxns()
@@ -397,6 +450,27 @@ func (_u *UnitUpdate) RemoveBomItems(v ...*BOMItem) *UnitUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveBomItemIDs(ids...)
+}
+
+// ClearPurchaseOrderItems clears all "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_u *UnitUpdate) ClearPurchaseOrderItems() *UnitUpdate {
+	_u.mutation.ClearPurchaseOrderItems()
+	return _u
+}
+
+// RemovePurchaseOrderItemIDs removes the "purchase_order_items" edge to PurchaseOrderItem entities by IDs.
+func (_u *UnitUpdate) RemovePurchaseOrderItemIDs(ids ...int) *UnitUpdate {
+	_u.mutation.RemovePurchaseOrderItemIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseOrderItems removes "purchase_order_items" edges to PurchaseOrderItem entities.
+func (_u *UnitUpdate) RemovePurchaseOrderItems(v ...*PurchaseOrderItem) *UnitUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseOrderItemIDs(ids...)
 }
 
 // ClearPurchaseReceiptItems clears all "purchase_receipt_items" edges to the PurchaseReceiptItem entity.
@@ -722,6 +796,51 @@ func (_u *UnitUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ProductSkusCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.ProductSkusTable,
+			Columns: []string{unit.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductSkusIDs(); len(nodes) > 0 && !_u.mutation.ProductSkusCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.ProductSkusTable,
+			Columns: []string{unit.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkusIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.ProductSkusTable,
+			Columns: []string{unit.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.InventoryTxnsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -850,6 +969,51 @@ func (_u *UnitUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.PurchaseOrderItemsTable,
+			Columns: []string{unit.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseOrderItemsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.PurchaseOrderItemsTable,
+			Columns: []string{unit.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.PurchaseOrderItemsTable,
+			Columns: []string{unit.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1291,6 +1455,21 @@ func (_u *UnitUpdateOne) AddProducts(v ...*Product) *UnitUpdateOne {
 	return _u.AddProductIDs(ids...)
 }
 
+// AddProductSkuIDs adds the "product_skus" edge to the ProductSKU entity by IDs.
+func (_u *UnitUpdateOne) AddProductSkuIDs(ids ...int) *UnitUpdateOne {
+	_u.mutation.AddProductSkuIDs(ids...)
+	return _u
+}
+
+// AddProductSkus adds the "product_skus" edges to the ProductSKU entity.
+func (_u *UnitUpdateOne) AddProductSkus(v ...*ProductSKU) *UnitUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductSkuIDs(ids...)
+}
+
 // AddInventoryTxnIDs adds the "inventory_txns" edge to the InventoryTxn entity by IDs.
 func (_u *UnitUpdateOne) AddInventoryTxnIDs(ids ...int) *UnitUpdateOne {
 	_u.mutation.AddInventoryTxnIDs(ids...)
@@ -1334,6 +1513,21 @@ func (_u *UnitUpdateOne) AddBomItems(v ...*BOMItem) *UnitUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.AddBomItemIDs(ids...)
+}
+
+// AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
+func (_u *UnitUpdateOne) AddPurchaseOrderItemIDs(ids ...int) *UnitUpdateOne {
+	_u.mutation.AddPurchaseOrderItemIDs(ids...)
+	return _u
+}
+
+// AddPurchaseOrderItems adds the "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_u *UnitUpdateOne) AddPurchaseOrderItems(v ...*PurchaseOrderItem) *UnitUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseOrderItemIDs(ids...)
 }
 
 // AddPurchaseReceiptItemIDs adds the "purchase_receipt_items" edge to the PurchaseReceiptItem entity by IDs.
@@ -1488,6 +1682,27 @@ func (_u *UnitUpdateOne) RemoveProducts(v ...*Product) *UnitUpdateOne {
 	return _u.RemoveProductIDs(ids...)
 }
 
+// ClearProductSkus clears all "product_skus" edges to the ProductSKU entity.
+func (_u *UnitUpdateOne) ClearProductSkus() *UnitUpdateOne {
+	_u.mutation.ClearProductSkus()
+	return _u
+}
+
+// RemoveProductSkuIDs removes the "product_skus" edge to ProductSKU entities by IDs.
+func (_u *UnitUpdateOne) RemoveProductSkuIDs(ids ...int) *UnitUpdateOne {
+	_u.mutation.RemoveProductSkuIDs(ids...)
+	return _u
+}
+
+// RemoveProductSkus removes "product_skus" edges to ProductSKU entities.
+func (_u *UnitUpdateOne) RemoveProductSkus(v ...*ProductSKU) *UnitUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductSkuIDs(ids...)
+}
+
 // ClearInventoryTxns clears all "inventory_txns" edges to the InventoryTxn entity.
 func (_u *UnitUpdateOne) ClearInventoryTxns() *UnitUpdateOne {
 	_u.mutation.ClearInventoryTxns()
@@ -1549,6 +1764,27 @@ func (_u *UnitUpdateOne) RemoveBomItems(v ...*BOMItem) *UnitUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveBomItemIDs(ids...)
+}
+
+// ClearPurchaseOrderItems clears all "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_u *UnitUpdateOne) ClearPurchaseOrderItems() *UnitUpdateOne {
+	_u.mutation.ClearPurchaseOrderItems()
+	return _u
+}
+
+// RemovePurchaseOrderItemIDs removes the "purchase_order_items" edge to PurchaseOrderItem entities by IDs.
+func (_u *UnitUpdateOne) RemovePurchaseOrderItemIDs(ids ...int) *UnitUpdateOne {
+	_u.mutation.RemovePurchaseOrderItemIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseOrderItems removes "purchase_order_items" edges to PurchaseOrderItem entities.
+func (_u *UnitUpdateOne) RemovePurchaseOrderItems(v ...*PurchaseOrderItem) *UnitUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseOrderItemIDs(ids...)
 }
 
 // ClearPurchaseReceiptItems clears all "purchase_receipt_items" edges to the PurchaseReceiptItem entity.
@@ -1904,6 +2140,51 @@ func (_u *UnitUpdateOne) sqlSave(ctx context.Context) (_node *Unit, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ProductSkusCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.ProductSkusTable,
+			Columns: []string{unit.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductSkusIDs(); len(nodes) > 0 && !_u.mutation.ProductSkusCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.ProductSkusTable,
+			Columns: []string{unit.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkusIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.ProductSkusTable,
+			Columns: []string{unit.ProductSkusColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.InventoryTxnsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -2032,6 +2313,51 @@ func (_u *UnitUpdateOne) sqlSave(ctx context.Context) (_node *Unit, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.PurchaseOrderItemsTable,
+			Columns: []string{unit.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseOrderItemsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.PurchaseOrderItemsTable,
+			Columns: []string{unit.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.PurchaseOrderItemsTable,
+			Columns: []string{unit.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

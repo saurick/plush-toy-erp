@@ -13,10 +13,11 @@ const (
 )
 
 var (
-	ErrCustomerNotFound = errors.New("customer not found")
-	ErrSupplierNotFound = errors.New("supplier not found")
-	ErrMaterialNotFound = errors.New("material not found")
-	ErrContactNotFound  = errors.New("contact not found")
+	ErrCustomerNotFound   = errors.New("customer not found")
+	ErrSupplierNotFound   = errors.New("supplier not found")
+	ErrMaterialNotFound   = errors.New("material not found")
+	ErrProductSKUNotFound = errors.New("product sku not found")
+	ErrContactNotFound    = errors.New("contact not found")
 )
 
 var contactOwnerTypes = map[string]struct{}{
@@ -62,6 +63,23 @@ type Material struct {
 	UpdatedAt     time.Time
 }
 
+type ProductSKU struct {
+	ID               int
+	ProductID        int
+	SKUCode          string
+	SKUName          *string
+	Barcode          *string
+	CustomerSKU      *string
+	Color            *string
+	ColorNo          *string
+	Size             *string
+	PackagingVersion *string
+	DefaultUnitID    *int
+	IsActive         bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type Contact struct {
 	ID        int
 	OwnerType string
@@ -104,6 +122,19 @@ type MaterialMutation struct {
 	DefaultUnitID int
 }
 
+type ProductSKUMutation struct {
+	ProductID        int
+	SKUCode          string
+	SKUName          *string
+	Barcode          *string
+	CustomerSKU      *string
+	Color            *string
+	ColorNo          *string
+	Size             *string
+	PackagingVersion *string
+	DefaultUnitID    *int
+}
+
 type ContactMutation struct {
 	OwnerType string
 	OwnerID   int
@@ -131,6 +162,14 @@ type ContactFilter struct {
 	Offset     int
 }
 
+type ProductSKUFilter struct {
+	ProductID  int
+	Keyword    string
+	ActiveOnly bool
+	Limit      int
+	Offset     int
+}
+
 type MasterDataRepo interface {
 	CreateCustomer(ctx context.Context, in *CustomerMutation) (*Customer, error)
 	UpdateCustomer(ctx context.Context, id int, in *CustomerMutation) (*Customer, error)
@@ -152,6 +191,13 @@ type MasterDataRepo interface {
 	ListMaterials(ctx context.Context, filter MasterDataFilter) ([]*Material, int, error)
 	SetMaterialActive(ctx context.Context, id int, active bool) (*Material, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
+
+	CreateProductSKU(ctx context.Context, in *ProductSKUMutation) (*ProductSKU, error)
+	UpdateProductSKU(ctx context.Context, id int, in *ProductSKUMutation) (*ProductSKU, error)
+	GetProductSKU(ctx context.Context, id int) (*ProductSKU, error)
+	ListProductSKUs(ctx context.Context, filter ProductSKUFilter) ([]*ProductSKU, int, error)
+	SetProductSKUActive(ctx context.Context, id int, active bool) (*ProductSKU, error)
+	ProductIsActive(ctx context.Context, id int) (bool, error)
 
 	CreateContact(ctx context.Context, in *ContactMutation) (*Contact, error)
 	UpdateContact(ctx context.Context, id int, in *ContactMutation) (*Contact, error)
@@ -304,6 +350,55 @@ func (uc *MasterDataUsecase) SetMaterialActive(ctx context.Context, id int, acti
 	return uc.repo.SetMaterialActive(ctx, id, active)
 }
 
+func (uc *MasterDataUsecase) CreateProductSKU(ctx context.Context, in *ProductSKUMutation) (*ProductSKU, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductSKUMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateProductSKURefs(ctx, normalized); err != nil {
+		return nil, err
+	}
+	return uc.repo.CreateProductSKU(ctx, &normalized)
+}
+
+func (uc *MasterDataUsecase) UpdateProductSKU(ctx context.Context, id int, in *ProductSKUMutation) (*ProductSKU, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductSKUMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateProductSKURefs(ctx, normalized); err != nil {
+		return nil, err
+	}
+	return uc.repo.UpdateProductSKU(ctx, id, &normalized)
+}
+
+func (uc *MasterDataUsecase) GetProductSKU(ctx context.Context, id int) (*ProductSKU, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.GetProductSKU(ctx, id)
+}
+
+func (uc *MasterDataUsecase) ListProductSKUs(ctx context.Context, filter ProductSKUFilter) ([]*ProductSKU, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	return uc.repo.ListProductSKUs(ctx, normalizeProductSKUFilter(filter))
+}
+
+func (uc *MasterDataUsecase) SetProductSKUActive(ctx context.Context, id int, active bool) (*ProductSKU, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.SetProductSKUActive(ctx, id, active)
+}
+
 func (uc *MasterDataUsecase) CreateContact(ctx context.Context, in *ContactMutation) (*Contact, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -402,6 +497,27 @@ func (uc *MasterDataUsecase) validateMaterialDefaultUnit(ctx context.Context, un
 	return nil
 }
 
+func (uc *MasterDataUsecase) validateProductSKURefs(ctx context.Context, in ProductSKUMutation) error {
+	productActive, err := uc.repo.ProductIsActive(ctx, in.ProductID)
+	if err != nil {
+		return err
+	}
+	if !productActive {
+		return ErrProductInactive
+	}
+	if in.DefaultUnitID == nil {
+		return nil
+	}
+	active, err := uc.repo.UnitIsActive(ctx, *in.DefaultUnitID)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return ErrUnitInactive
+	}
+	return nil
+}
+
 func normalizeCustomerMutation(in CustomerMutation) (CustomerMutation, error) {
 	in.Code = strings.TrimSpace(in.Code)
 	in.Name = strings.TrimSpace(in.Name)
@@ -439,6 +555,24 @@ func normalizeMaterialMutation(in MaterialMutation) (MaterialMutation, error) {
 	return in, nil
 }
 
+func normalizeProductSKUMutation(in ProductSKUMutation) (ProductSKUMutation, error) {
+	in.SKUCode = strings.TrimSpace(in.SKUCode)
+	in.SKUName = normalizeOptionalString(in.SKUName)
+	in.Barcode = normalizeOptionalString(in.Barcode)
+	in.CustomerSKU = normalizeOptionalString(in.CustomerSKU)
+	in.Color = normalizeOptionalString(in.Color)
+	in.ColorNo = normalizeOptionalString(in.ColorNo)
+	in.Size = normalizeOptionalString(in.Size)
+	in.PackagingVersion = normalizeOptionalString(in.PackagingVersion)
+	if in.DefaultUnitID != nil && *in.DefaultUnitID <= 0 {
+		in.DefaultUnitID = nil
+	}
+	if in.ProductID <= 0 || in.SKUCode == "" {
+		return ProductSKUMutation{}, ErrBadParam
+	}
+	return in, nil
+}
+
 func normalizeContactMutation(in ContactMutation) (ContactMutation, error) {
 	in.OwnerType = strings.ToUpper(strings.TrimSpace(in.OwnerType))
 	in.Name = strings.TrimSpace(in.Name)
@@ -455,6 +589,20 @@ func normalizeContactMutation(in ContactMutation) (ContactMutation, error) {
 
 func normalizeMasterDataFilter(in MasterDataFilter) MasterDataFilter {
 	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+	if in.Offset < 0 {
+		in.Offset = 0
+	}
+	return in
+}
+
+func normalizeProductSKUFilter(in ProductSKUFilter) ProductSKUFilter {
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.ProductID < 0 {
+		in.ProductID = 0
+	}
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
 	}

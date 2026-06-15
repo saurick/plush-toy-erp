@@ -1,10 +1,10 @@
 export const DEV_CAPABILITY_LEDGER_ROUTE = '/__dev/capability-ledger'
 export const DEV_CAPABILITY_LEDGER_SOURCE_PATH =
-  'docs/product/capability-ledger.md'
+  'docs/product/产品能力进度台账.md'
 export const DEV_CUSTOMER_DELIVERY_MATRIX_SOURCE_PATH =
-  'docs/customers/yoyoosun/delivery-matrix.md'
+  'docs/customers/yoyoosun/客户交付矩阵.md'
 export const DEV_CUSTOMER_DELTA_LEDGER_SOURCE_PATH =
-  'docs/customers/yoyoosun/delta-ledger.md'
+  'docs/customers/yoyoosun/客户差异台账.md'
 
 const CAPABILITY_LEDGER_SECTION_HEADING = '## 4. 产品能力进度台账'
 const CUSTOMER_DELIVERY_MATRIX_SECTION_HEADING = '## 6. 客户交付矩阵：yoyoosun'

@@ -7,11 +7,13 @@ import (
 )
 
 type masterDataRepoStub struct {
-	customers map[int]bool
-	suppliers map[int]bool
-	units     map[int]bool
-	created   *ContactMutation
-	updated   *ContactMutation
+	customers  map[int]bool
+	suppliers  map[int]bool
+	products   map[int]bool
+	units      map[int]bool
+	createdSKU *ProductSKUMutation
+	created    *ContactMutation
+	updated    *ContactMutation
 }
 
 func (s *masterDataRepoStub) CreateCustomer(context.Context, *CustomerMutation) (*Customer, error) {
@@ -73,6 +75,32 @@ func (s *masterDataRepoStub) UnitIsActive(_ context.Context, id int) (bool, erro
 		return false, ErrUnitNotFound
 	}
 	return s.units[id], nil
+}
+func (s *masterDataRepoStub) ProductIsActive(_ context.Context, id int) (bool, error) {
+	if s.products == nil {
+		return false, ErrProductNotFound
+	}
+	if _, ok := s.products[id]; !ok {
+		return false, ErrProductNotFound
+	}
+	return s.products[id], nil
+}
+func (s *masterDataRepoStub) CreateProductSKU(_ context.Context, in *ProductSKUMutation) (*ProductSKU, error) {
+	cp := *in
+	s.createdSKU = &cp
+	return &ProductSKU{ID: 1, ProductID: in.ProductID, SKUCode: in.SKUCode, DefaultUnitID: in.DefaultUnitID, IsActive: true}, nil
+}
+func (s *masterDataRepoStub) UpdateProductSKU(context.Context, int, *ProductSKUMutation) (*ProductSKU, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) GetProductSKU(context.Context, int) (*ProductSKU, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) ListProductSKUs(context.Context, ProductSKUFilter) ([]*ProductSKU, int, error) {
+	return nil, 0, nil
+}
+func (s *masterDataRepoStub) SetProductSKUActive(context.Context, int, bool) (*ProductSKU, error) {
+	return nil, nil
 }
 func (s *masterDataRepoStub) CreateContact(_ context.Context, in *ContactMutation) (*Contact, error) {
 	cp := *in
@@ -172,5 +200,48 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	}
 	if contactInput.OwnerType != ContactOwnerSupplier || contactInput.Name != "联系人" {
 		t.Fatalf("expected normalized contact, got %#v", contactInput)
+	}
+}
+
+func TestMasterDataUsecaseProductSKUGuardsProductAndUnit(t *testing.T) {
+	ctx := context.Background()
+	unitID := 3
+	skuName := "  红色小号  "
+	emptyBarcode := " "
+	repo := &masterDataRepoStub{
+		products: map[int]bool{7: true, 8: false},
+		units:    map[int]bool{unitID: true, 4: false},
+	}
+	uc := NewMasterDataUsecase(repo)
+
+	sku, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{
+		ProductID:     7,
+		SKUCode:       " SKU-RED-S ",
+		SKUName:       &skuName,
+		Barcode:       &emptyBarcode,
+		DefaultUnitID: &unitID,
+	})
+	if err != nil {
+		t.Fatalf("expected product sku valid, got %v", err)
+	}
+	if sku.SKUCode != "SKU-RED-S" || repo.createdSKU.SKUName == nil || *repo.createdSKU.SKUName != "红色小号" {
+		t.Fatalf("expected normalized sku mutation, got sku=%#v mutation=%#v", sku, repo.createdSKU)
+	}
+	if repo.createdSKU.Barcode != nil {
+		t.Fatalf("expected blank barcode cleared, got %#v", repo.createdSKU.Barcode)
+	}
+
+	if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 8, SKUCode: "SKU-X"}); !errors.Is(err, ErrProductInactive) {
+		t.Fatalf("expected inactive product rejected, got %v", err)
+	}
+	if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 999, SKUCode: "SKU-X"}); !errors.Is(err, ErrProductNotFound) {
+		t.Fatalf("expected missing product rejected, got %v", err)
+	}
+	inactiveUnitID := 4
+	if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 7, SKUCode: "SKU-X", DefaultUnitID: &inactiveUnitID}); !errors.Is(err, ErrUnitInactive) {
+		t.Fatalf("expected inactive unit rejected, got %v", err)
+	}
+	if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 7}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected empty sku code rejected, got %v", err)
 	}
 }

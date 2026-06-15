@@ -26,20 +26,21 @@ type PurchaseReceipt struct {
 }
 
 type PurchaseReceiptItem struct {
-	ID           int
-	ReceiptID    int
-	MaterialID   int
-	WarehouseID  int
-	UnitID       int
-	LotID        *int
-	LotNo        *string
-	Quantity     decimal.Decimal
-	UnitPrice    *decimal.Decimal
-	Amount       *decimal.Decimal
-	SourceLineNo *string
-	Note         *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID                  int
+	ReceiptID           int
+	MaterialID          int
+	WarehouseID         int
+	UnitID              int
+	LotID               *int
+	PurchaseOrderItemID *int
+	LotNo               *string
+	Quantity            decimal.Decimal
+	UnitPrice           *decimal.Decimal
+	Amount              *decimal.Decimal
+	SourceLineNo        *string
+	Note                *string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 type PurchaseReceiptCreate struct {
@@ -50,17 +51,18 @@ type PurchaseReceiptCreate struct {
 }
 
 type PurchaseReceiptItemCreate struct {
-	ReceiptID    int
-	MaterialID   int
-	WarehouseID  int
-	UnitID       int
-	LotID        *int
-	LotNo        *string
-	Quantity     decimal.Decimal
-	UnitPrice    *decimal.Decimal
-	Amount       *decimal.Decimal
-	SourceLineNo *string
-	Note         *string
+	ReceiptID           int
+	MaterialID          int
+	WarehouseID         int
+	UnitID              int
+	LotID               *int
+	PurchaseOrderItemID *int
+	LotNo               *string
+	Quantity            decimal.Decimal
+	UnitPrice           *decimal.Decimal
+	Amount              *decimal.Decimal
+	SourceLineNo        *string
+	Note                *string
 }
 
 type PurchaseReceiptFilter struct {
@@ -155,6 +157,9 @@ func normalizePurchaseReceiptItemCreate(in PurchaseReceiptItemCreate) (PurchaseR
 	in.Note = normalizeOptionalString(in.Note)
 	if in.LotID != nil && *in.LotID <= 0 {
 		in.LotID = nil
+	}
+	if in.PurchaseOrderItemID != nil && *in.PurchaseOrderItemID <= 0 {
+		in.PurchaseOrderItemID = nil
 	}
 	if err := value.ValidateOptionalNonNegativeMoney(in.UnitPrice); err != nil {
 		return PurchaseReceiptItemCreate{}, ErrBadParam

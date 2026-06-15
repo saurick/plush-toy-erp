@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"server/internal/data"
+	"server/internal/devdbguard"
 
 	"github.com/go-kratos/kratos/v2/log"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -46,6 +47,9 @@ func main() {
 	dsn, err = normalizePostgresURL(dsn)
 	if err != nil {
 		fail("parse postgres dsn failed: %v", err)
+	}
+	if err := devdbguard.RequireLocalDevDSN(*confPath, dsn, os.Getenv); err != nil {
+		fail("%v", err)
 	}
 
 	effectivePassword := strings.TrimSpace(*password)

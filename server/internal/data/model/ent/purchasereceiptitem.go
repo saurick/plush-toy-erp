@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/unit"
@@ -33,6 +34,8 @@ type PurchaseReceiptItem struct {
 	UnitID int `json:"unit_id,omitempty"`
 	// LotID holds the value of the "lot_id" field.
 	LotID *int `json:"lot_id,omitempty"`
+	// PurchaseOrderItemID holds the value of the "purchase_order_item_id" field.
+	PurchaseOrderItemID *int `json:"purchase_order_item_id,omitempty"`
 	// LotNo holds the value of the "lot_no" field.
 	LotNo *string `json:"lot_no,omitempty"`
 	// Quantity holds the value of the "quantity" field.
@@ -67,6 +70,8 @@ type PurchaseReceiptItemEdges struct {
 	Unit *Unit `json:"unit,omitempty"`
 	// InventoryLot holds the value of the inventory_lot edge.
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
+	// PurchaseOrderItem holds the value of the purchase_order_item edge.
+	PurchaseOrderItem *PurchaseOrderItem `json:"purchase_order_item,omitempty"`
 	// PurchaseReturnItems holds the value of the purchase_return_items edge.
 	PurchaseReturnItems []*PurchaseReturnItem `json:"purchase_return_items,omitempty"`
 	// PurchaseReceiptAdjustmentItems holds the value of the purchase_receipt_adjustment_items edge.
@@ -75,7 +80,7 @@ type PurchaseReceiptItemEdges struct {
 	QualityInspections []*QualityInspection `json:"quality_inspections,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [9]bool
 }
 
 // ReceiptOrErr returns the Receipt value or an error if the edge
@@ -133,10 +138,21 @@ func (e PurchaseReceiptItemEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	return nil, &NotLoadedError{edge: "inventory_lot"}
 }
 
+// PurchaseOrderItemOrErr returns the PurchaseOrderItem value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e PurchaseReceiptItemEdges) PurchaseOrderItemOrErr() (*PurchaseOrderItem, error) {
+	if e.PurchaseOrderItem != nil {
+		return e.PurchaseOrderItem, nil
+	} else if e.loadedTypes[5] {
+		return nil, &NotFoundError{label: purchaseorderitem.Label}
+	}
+	return nil, &NotLoadedError{edge: "purchase_order_item"}
+}
+
 // PurchaseReturnItemsOrErr returns the PurchaseReturnItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptItemEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[6] {
 		return e.PurchaseReturnItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_return_items"}
@@ -145,7 +161,7 @@ func (e PurchaseReceiptItemEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnI
 // PurchaseReceiptAdjustmentItemsOrErr returns the PurchaseReceiptAdjustmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptItemEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceiptAdjustmentItem, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.PurchaseReceiptAdjustmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustment_items"}
@@ -154,7 +170,7 @@ func (e PurchaseReceiptItemEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*Purc
 // QualityInspectionsOrErr returns the QualityInspections value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptItemEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[8] {
 		return e.QualityInspections, nil
 	}
 	return nil, &NotLoadedError{edge: "quality_inspections"}
@@ -169,7 +185,7 @@ func (*PurchaseReceiptItem) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case purchasereceiptitem.FieldQuantity:
 			values[i] = new(decimal.Decimal)
-		case purchasereceiptitem.FieldID, purchasereceiptitem.FieldReceiptID, purchasereceiptitem.FieldMaterialID, purchasereceiptitem.FieldWarehouseID, purchasereceiptitem.FieldUnitID, purchasereceiptitem.FieldLotID:
+		case purchasereceiptitem.FieldID, purchasereceiptitem.FieldReceiptID, purchasereceiptitem.FieldMaterialID, purchasereceiptitem.FieldWarehouseID, purchasereceiptitem.FieldUnitID, purchasereceiptitem.FieldLotID, purchasereceiptitem.FieldPurchaseOrderItemID:
 			values[i] = new(sql.NullInt64)
 		case purchasereceiptitem.FieldLotNo, purchasereceiptitem.FieldSourceLineNo, purchasereceiptitem.FieldNote:
 			values[i] = new(sql.NullString)
@@ -226,6 +242,13 @@ func (_m *PurchaseReceiptItem) assignValues(columns []string, values []any) erro
 			} else if value.Valid {
 				_m.LotID = new(int)
 				*_m.LotID = int(value.Int64)
+			}
+		case purchasereceiptitem.FieldPurchaseOrderItemID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field purchase_order_item_id", values[i])
+			} else if value.Valid {
+				_m.PurchaseOrderItemID = new(int)
+				*_m.PurchaseOrderItemID = int(value.Int64)
 			}
 		case purchasereceiptitem.FieldLotNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -318,6 +341,11 @@ func (_m *PurchaseReceiptItem) QueryInventoryLot() *InventoryLotQuery {
 	return NewPurchaseReceiptItemClient(_m.config).QueryInventoryLot(_m)
 }
 
+// QueryPurchaseOrderItem queries the "purchase_order_item" edge of the PurchaseReceiptItem entity.
+func (_m *PurchaseReceiptItem) QueryPurchaseOrderItem() *PurchaseOrderItemQuery {
+	return NewPurchaseReceiptItemClient(_m.config).QueryPurchaseOrderItem(_m)
+}
+
 // QueryPurchaseReturnItems queries the "purchase_return_items" edge of the PurchaseReceiptItem entity.
 func (_m *PurchaseReceiptItem) QueryPurchaseReturnItems() *PurchaseReturnItemQuery {
 	return NewPurchaseReceiptItemClient(_m.config).QueryPurchaseReturnItems(_m)
@@ -370,6 +398,11 @@ func (_m *PurchaseReceiptItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.LotID; v != nil {
 		builder.WriteString("lot_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.PurchaseOrderItemID; v != nil {
+		builder.WriteString("purchase_order_item_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

@@ -66,6 +66,7 @@ func (ProductionFact) Annotations() []schema.Annotation {
 
 func (ProductionFact) Fields() []ent.Field {
 	return []ent.Field{
+		// Operational facts are domain facts that may post inventory_txns through usecase actions.
 		field.String("fact_no").NotEmpty().MaxLen(64),
 		field.String("fact_type").NotEmpty().MaxLen(32),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
@@ -75,6 +76,7 @@ func (ProductionFact) Fields() []ent.Field {
 		field.Int("unit_id").Positive(),
 		field.Int("lot_id").Optional().Nillable().Positive(),
 		decimalQuantityField("quantity"),
+		// source_* keeps source-document traceability; it is not a replacement for business_records.
 		field.String("source_type").Optional().Nillable().MaxLen(64),
 		field.Int("source_id").Optional().Nillable().Positive(),
 		field.Int("source_line_id").Optional().Nillable().Positive(),

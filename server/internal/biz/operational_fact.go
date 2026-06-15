@@ -413,8 +413,14 @@ func (uc *OperationalFactUsecase) ListStockReservations(ctx context.Context, fil
 }
 
 func (uc *OperationalFactUsecase) CreateFinanceFactDraft(ctx context.Context, in *FinanceFactCreate) (*FinanceFact, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
 	normalized, err := normalizeFinanceFactCreate(in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateFinanceFactSource(ctx, normalized); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateFinanceFactDraft(ctx, normalized)
@@ -641,6 +647,26 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 		out.OccurredAt = time.Now()
 	}
 	return &out, nil
+}
+
+func (uc *OperationalFactUsecase) validateFinanceFactSource(ctx context.Context, in *FinanceFactCreate) error {
+	if in == nil {
+		return ErrBadParam
+	}
+	switch in.FactType {
+	case FinanceFactReceivable, FinanceFactInvoice:
+		if in.SourceType == nil || *in.SourceType != ShipmentSourceType || in.SourceID == nil || *in.SourceID <= 0 {
+			return ErrBadParam
+		}
+		shipment, err := uc.repo.GetShipment(ctx, *in.SourceID)
+		if err != nil {
+			return err
+		}
+		if shipment.Status != ShipmentStatusShipped {
+			return ErrBadParam
+		}
+	}
+	return nil
 }
 
 func normalizeOperationalFactFilter(in OperationalFactFilter) OperationalFactFilter {

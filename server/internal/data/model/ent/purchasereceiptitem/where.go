@@ -81,6 +81,11 @@ func LotID(v int) predicate.PurchaseReceiptItem {
 	return predicate.PurchaseReceiptItem(sql.FieldEQ(FieldLotID, v))
 }
 
+// PurchaseOrderItemID applies equality check predicate on the "purchase_order_item_id" field. It's identical to PurchaseOrderItemIDEQ.
+func PurchaseOrderItemID(v int) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldEQ(FieldPurchaseOrderItemID, v))
+}
+
 // LotNo applies equality check predicate on the "lot_no" field. It's identical to LotNoEQ.
 func LotNo(v string) predicate.PurchaseReceiptItem {
 	return predicate.PurchaseReceiptItem(sql.FieldEQ(FieldLotNo, v))
@@ -229,6 +234,36 @@ func LotIDIsNil() predicate.PurchaseReceiptItem {
 // LotIDNotNil applies the NotNil predicate on the "lot_id" field.
 func LotIDNotNil() predicate.PurchaseReceiptItem {
 	return predicate.PurchaseReceiptItem(sql.FieldNotNull(FieldLotID))
+}
+
+// PurchaseOrderItemIDEQ applies the EQ predicate on the "purchase_order_item_id" field.
+func PurchaseOrderItemIDEQ(v int) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldEQ(FieldPurchaseOrderItemID, v))
+}
+
+// PurchaseOrderItemIDNEQ applies the NEQ predicate on the "purchase_order_item_id" field.
+func PurchaseOrderItemIDNEQ(v int) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldNEQ(FieldPurchaseOrderItemID, v))
+}
+
+// PurchaseOrderItemIDIn applies the In predicate on the "purchase_order_item_id" field.
+func PurchaseOrderItemIDIn(vs ...int) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldIn(FieldPurchaseOrderItemID, vs...))
+}
+
+// PurchaseOrderItemIDNotIn applies the NotIn predicate on the "purchase_order_item_id" field.
+func PurchaseOrderItemIDNotIn(vs ...int) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldNotIn(FieldPurchaseOrderItemID, vs...))
+}
+
+// PurchaseOrderItemIDIsNil applies the IsNil predicate on the "purchase_order_item_id" field.
+func PurchaseOrderItemIDIsNil() predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldIsNull(FieldPurchaseOrderItemID))
+}
+
+// PurchaseOrderItemIDNotNil applies the NotNil predicate on the "purchase_order_item_id" field.
+func PurchaseOrderItemIDNotNil() predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(sql.FieldNotNull(FieldPurchaseOrderItemID))
 }
 
 // LotNoEQ applies the EQ predicate on the "lot_no" field.
@@ -783,6 +818,29 @@ func HasInventoryLot() predicate.PurchaseReceiptItem {
 func HasInventoryLotWith(preds ...predicate.InventoryLot) predicate.PurchaseReceiptItem {
 	return predicate.PurchaseReceiptItem(func(s *sql.Selector) {
 		step := newInventoryLotStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPurchaseOrderItem applies the HasEdge predicate on the "purchase_order_item" edge.
+func HasPurchaseOrderItem() predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, PurchaseOrderItemTable, PurchaseOrderItemColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPurchaseOrderItemWith applies the HasEdge predicate on the "purchase_order_item" edge with a given conditions (other predicates).
+func HasPurchaseOrderItemWith(preds ...predicate.PurchaseOrderItem) predicate.PurchaseReceiptItem {
+	return predicate.PurchaseReceiptItem(func(s *sql.Selector) {
+		step := newPurchaseOrderItemStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

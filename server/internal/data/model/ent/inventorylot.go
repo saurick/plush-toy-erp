@@ -5,6 +5,7 @@ package ent
 import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/productsku"
 	"strings"
 	"time"
 
@@ -21,6 +22,8 @@ type InventoryLot struct {
 	SubjectType string `json:"subject_type,omitempty"`
 	// SubjectID holds the value of the "subject_id" field.
 	SubjectID int `json:"subject_id,omitempty"`
+	// ProductSkuID holds the value of the "product_sku_id" field.
+	ProductSkuID *int `json:"product_sku_id,omitempty"`
 	// LotNo holds the value of the "lot_no" field.
 	LotNo string `json:"lot_no,omitempty"`
 	// SupplierLotNo holds the value of the "supplier_lot_no" field.
@@ -51,6 +54,8 @@ type InventoryLotEdges struct {
 	InventoryTxns []*InventoryTxn `json:"inventory_txns,omitempty"`
 	// InventoryBalances holds the value of the inventory_balances edge.
 	InventoryBalances []*InventoryBalance `json:"inventory_balances,omitempty"`
+	// ProductSku holds the value of the product_sku edge.
+	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// PurchaseReceiptItems holds the value of the purchase_receipt_items edge.
 	PurchaseReceiptItems []*PurchaseReceiptItem `json:"purchase_receipt_items,omitempty"`
 	// PurchaseReturnItems holds the value of the purchase_return_items edge.
@@ -69,7 +74,7 @@ type InventoryLotEdges struct {
 	StockReservations []*StockReservation `json:"stock_reservations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [10]bool
+	loadedTypes [11]bool
 }
 
 // InventoryTxnsOrErr returns the InventoryTxns value or an error if the edge
@@ -90,10 +95,21 @@ func (e InventoryLotEdges) InventoryBalancesOrErr() ([]*InventoryBalance, error)
 	return nil, &NotLoadedError{edge: "inventory_balances"}
 }
 
+// ProductSkuOrErr returns the ProductSku value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e InventoryLotEdges) ProductSkuOrErr() (*ProductSKU, error) {
+	if e.ProductSku != nil {
+		return e.ProductSku, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: productsku.Label}
+	}
+	return nil, &NotLoadedError{edge: "product_sku"}
+}
+
 // PurchaseReceiptItemsOrErr returns the PurchaseReceiptItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e InventoryLotEdges) PurchaseReceiptItemsOrErr() ([]*PurchaseReceiptItem, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.PurchaseReceiptItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_items"}
@@ -102,7 +118,7 @@ func (e InventoryLotEdges) PurchaseReceiptItemsOrErr() ([]*PurchaseReceiptItem, 
 // PurchaseReturnItemsOrErr returns the PurchaseReturnItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e InventoryLotEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.PurchaseReturnItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_return_items"}
@@ -111,7 +127,7 @@ func (e InventoryLotEdges) PurchaseReturnItemsOrErr() ([]*PurchaseReturnItem, er
 // PurchaseReceiptAdjustmentItemsOrErr returns the PurchaseReceiptAdjustmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e InventoryLotEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseReceiptAdjustmentItem, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[5] {
 		return e.PurchaseReceiptAdjustmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_receipt_adjustment_items"}
@@ -120,7 +136,7 @@ func (e InventoryLotEdges) PurchaseReceiptAdjustmentItemsOrErr() ([]*PurchaseRec
 // QualityInspectionsOrErr returns the QualityInspections value or an error if the edge
 // was not loaded in eager-loading.
 func (e InventoryLotEdges) QualityInspectionsOrErr() ([]*QualityInspection, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[6] {
 		return e.QualityInspections, nil
 	}
 	return nil, &NotLoadedError{edge: "quality_inspections"}
@@ -129,7 +145,7 @@ func (e InventoryLotEdges) QualityInspectionsOrErr() ([]*QualityInspection, erro
 // ProductionFactsOrErr returns the ProductionFacts value or an error if the edge
 // was not loaded in eager-loading.
 func (e InventoryLotEdges) ProductionFactsOrErr() ([]*ProductionFact, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.ProductionFacts, nil
 	}
 	return nil, &NotLoadedError{edge: "production_facts"}
@@ -138,7 +154,7 @@ func (e InventoryLotEdges) ProductionFactsOrErr() ([]*ProductionFact, error) {
 // OutsourcingFactsOrErr returns the OutsourcingFacts value or an error if the edge
 // was not loaded in eager-loading.
 func (e InventoryLotEdges) OutsourcingFactsOrErr() ([]*OutsourcingFact, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[8] {
 		return e.OutsourcingFacts, nil
 	}
 	return nil, &NotLoadedError{edge: "outsourcing_facts"}
@@ -147,7 +163,7 @@ func (e InventoryLotEdges) OutsourcingFactsOrErr() ([]*OutsourcingFact, error) {
 // ShipmentItemsOrErr returns the ShipmentItems value or an error if the edge
 // was not loaded in eager-loading.
 func (e InventoryLotEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
-	if e.loadedTypes[8] {
+	if e.loadedTypes[9] {
 		return e.ShipmentItems, nil
 	}
 	return nil, &NotLoadedError{edge: "shipment_items"}
@@ -156,7 +172,7 @@ func (e InventoryLotEdges) ShipmentItemsOrErr() ([]*ShipmentItem, error) {
 // StockReservationsOrErr returns the StockReservations value or an error if the edge
 // was not loaded in eager-loading.
 func (e InventoryLotEdges) StockReservationsOrErr() ([]*StockReservation, error) {
-	if e.loadedTypes[9] {
+	if e.loadedTypes[10] {
 		return e.StockReservations, nil
 	}
 	return nil, &NotLoadedError{edge: "stock_reservations"}
@@ -167,7 +183,7 @@ func (*InventoryLot) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case inventorylot.FieldID, inventorylot.FieldSubjectID:
+		case inventorylot.FieldID, inventorylot.FieldSubjectID, inventorylot.FieldProductSkuID:
 			values[i] = new(sql.NullInt64)
 		case inventorylot.FieldSubjectType, inventorylot.FieldLotNo, inventorylot.FieldSupplierLotNo, inventorylot.FieldColorNo, inventorylot.FieldDyeLotNo, inventorylot.FieldProductionLotNo, inventorylot.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -205,6 +221,13 @@ func (_m *InventoryLot) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field subject_id", values[i])
 			} else if value.Valid {
 				_m.SubjectID = int(value.Int64)
+			}
+		case inventorylot.FieldProductSkuID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field product_sku_id", values[i])
+			} else if value.Valid {
+				_m.ProductSkuID = new(int)
+				*_m.ProductSkuID = int(value.Int64)
 			}
 		case inventorylot.FieldLotNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -288,6 +311,11 @@ func (_m *InventoryLot) QueryInventoryBalances() *InventoryBalanceQuery {
 	return NewInventoryLotClient(_m.config).QueryInventoryBalances(_m)
 }
 
+// QueryProductSku queries the "product_sku" edge of the InventoryLot entity.
+func (_m *InventoryLot) QueryProductSku() *ProductSKUQuery {
+	return NewInventoryLotClient(_m.config).QueryProductSku(_m)
+}
+
 // QueryPurchaseReceiptItems queries the "purchase_receipt_items" edge of the InventoryLot entity.
 func (_m *InventoryLot) QueryPurchaseReceiptItems() *PurchaseReceiptItemQuery {
 	return NewInventoryLotClient(_m.config).QueryPurchaseReceiptItems(_m)
@@ -356,6 +384,11 @@ func (_m *InventoryLot) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("subject_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SubjectID))
+	builder.WriteString(", ")
+	if v := _m.ProductSkuID; v != nil {
+		builder.WriteString("product_sku_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("lot_no=")
 	builder.WriteString(_m.LotNo)

@@ -14,6 +14,7 @@ type WorkflowBusinessState struct {
 
 func (WorkflowBusinessState) Fields() []ent.Field {
 	return []ent.Field{
+		// Workflow state is a coordination projection for a source object, not a posted business fact.
 		field.String("source_type").
 			NotEmpty().
 			MaxLen(64),
@@ -44,6 +45,7 @@ func (WorkflowBusinessState) Fields() []ent.Field {
 			MaxLen(255),
 		field.Time("status_changed_at").
 			Default(time.Now),
+		// Payload preserves workflow context only; fact tables remain the source of posted business truth.
 		field.JSON("payload", map[string]any{}).
 			Optional(),
 		field.Time("created_at").

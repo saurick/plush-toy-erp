@@ -212,7 +212,9 @@ func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 			PermissionCustomerRead,
 			PermissionSupplierRead,
 			PermissionMaterialRead,
+			PermissionProductSKURead,
 			PermissionSalesOrderRead,
+			PermissionBOMRead,
 			PermissionPurchaseOrderRead,
 			PermissionPurchaseReceiptRead,
 			PermissionWarehouseInventoryRead,
@@ -242,13 +244,13 @@ func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 		t.Fatalf("expected sales orders formal source document menu")
 	}
 	if _, ok := paths["/erp/master/products"]; !ok {
-		t.Fatalf("expected products formal shell menu")
+		t.Fatalf("expected product SKU master data menu")
 	}
 	if _, ok := paths["/erp/master/materials"]; !ok {
 		t.Fatalf("expected materials formal master data menu")
 	}
 	if _, ok := paths["/erp/purchase/material-bom"]; !ok {
-		t.Fatalf("expected BOM formal shell menu")
+		t.Fatalf("expected BOM Version menu")
 	}
 	if _, ok := paths["/erp/warehouse/inbound"]; !ok {
 		t.Fatalf("expected inbound formal shell menu")

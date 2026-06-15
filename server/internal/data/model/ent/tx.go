@@ -40,8 +40,14 @@ type Tx struct {
 	Permission *PermissionClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
+	// ProductSKU is the client for interacting with the ProductSKU builders.
+	ProductSKU *ProductSKUClient
 	// ProductionFact is the client for interacting with the ProductionFact builders.
 	ProductionFact *ProductionFactClient
+	// PurchaseOrder is the client for interacting with the PurchaseOrder builders.
+	PurchaseOrder *PurchaseOrderClient
+	// PurchaseOrderItem is the client for interacting with the PurchaseOrderItem builders.
+	PurchaseOrderItem *PurchaseOrderItemClient
 	// PurchaseReceipt is the client for interacting with the PurchaseReceipt builders.
 	PurchaseReceipt *PurchaseReceiptClient
 	// PurchaseReceiptAdjustment is the client for interacting with the PurchaseReceiptAdjustment builders.
@@ -229,7 +235,10 @@ func (tx *Tx) init() {
 	tx.OutsourcingFact = NewOutsourcingFactClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
+	tx.ProductSKU = NewProductSKUClient(tx.config)
 	tx.ProductionFact = NewProductionFactClient(tx.config)
+	tx.PurchaseOrder = NewPurchaseOrderClient(tx.config)
+	tx.PurchaseOrderItem = NewPurchaseOrderItemClient(tx.config)
 	tx.PurchaseReceipt = NewPurchaseReceiptClient(tx.config)
 	tx.PurchaseReceiptAdjustment = NewPurchaseReceiptAdjustmentClient(tx.config)
 	tx.PurchaseReceiptAdjustmentItem = NewPurchaseReceiptAdjustmentItemClient(tx.config)

@@ -15,6 +15,8 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
+	"server/internal/data/model/ent/productsku"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -37,9 +39,11 @@ type UnitQuery struct {
 	predicates                         []predicate.Unit
 	withMaterials                      *MaterialQuery
 	withProducts                       *ProductQuery
+	withProductSkus                    *ProductSKUQuery
 	withInventoryTxns                  *InventoryTxnQuery
 	withInventoryBalances              *InventoryBalanceQuery
 	withBomItems                       *BOMItemQuery
+	withPurchaseOrderItems             *PurchaseOrderItemQuery
 	withPurchaseReceiptItems           *PurchaseReceiptItemQuery
 	withPurchaseReturnItems            *PurchaseReturnItemQuery
 	withPurchaseReceiptAdjustmentItems *PurchaseReceiptAdjustmentItemQuery
@@ -127,6 +131,28 @@ func (_q *UnitQuery) QueryProducts() *ProductQuery {
 	return query
 }
 
+// QueryProductSkus chains the current query on the "product_skus" edge.
+func (_q *UnitQuery) QueryProductSkus() *ProductSKUQuery {
+	query := (&ProductSKUClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(unit.Table, unit.FieldID, selector),
+			sqlgraph.To(productsku.Table, productsku.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, unit.ProductSkusTable, unit.ProductSkusColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
 // QueryInventoryTxns chains the current query on the "inventory_txns" edge.
 func (_q *UnitQuery) QueryInventoryTxns() *InventoryTxnQuery {
 	query := (&InventoryTxnClient{config: _q.config}).Query()
@@ -186,6 +212,28 @@ func (_q *UnitQuery) QueryBomItems() *BOMItemQuery {
 			sqlgraph.From(unit.Table, unit.FieldID, selector),
 			sqlgraph.To(bomitem.Table, bomitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, unit.BomItemsTable, unit.BomItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPurchaseOrderItems chains the current query on the "purchase_order_items" edge.
+func (_q *UnitQuery) QueryPurchaseOrderItems() *PurchaseOrderItemQuery {
+	query := (&PurchaseOrderItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(unit.Table, unit.FieldID, selector),
+			sqlgraph.To(purchaseorderitem.Table, purchaseorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, unit.PurchaseOrderItemsTable, unit.PurchaseOrderItemsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -541,9 +589,11 @@ func (_q *UnitQuery) Clone() *UnitQuery {
 		predicates:                         append([]predicate.Unit{}, _q.predicates...),
 		withMaterials:                      _q.withMaterials.Clone(),
 		withProducts:                       _q.withProducts.Clone(),
+		withProductSkus:                    _q.withProductSkus.Clone(),
 		withInventoryTxns:                  _q.withInventoryTxns.Clone(),
 		withInventoryBalances:              _q.withInventoryBalances.Clone(),
 		withBomItems:                       _q.withBomItems.Clone(),
+		withPurchaseOrderItems:             _q.withPurchaseOrderItems.Clone(),
 		withPurchaseReceiptItems:           _q.withPurchaseReceiptItems.Clone(),
 		withPurchaseReturnItems:            _q.withPurchaseReturnItems.Clone(),
 		withPurchaseReceiptAdjustmentItems: _q.withPurchaseReceiptAdjustmentItems.Clone(),
@@ -579,6 +629,17 @@ func (_q *UnitQuery) WithProducts(opts ...func(*ProductQuery)) *UnitQuery {
 	return _q
 }
 
+// WithProductSkus tells the query-builder to eager-load the nodes that are connected to
+// the "product_skus" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UnitQuery) WithProductSkus(opts ...func(*ProductSKUQuery)) *UnitQuery {
+	query := (&ProductSKUClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductSkus = query
+	return _q
+}
+
 // WithInventoryTxns tells the query-builder to eager-load the nodes that are connected to
 // the "inventory_txns" edge. The optional arguments are used to configure the query builder of the edge.
 func (_q *UnitQuery) WithInventoryTxns(opts ...func(*InventoryTxnQuery)) *UnitQuery {
@@ -609,6 +670,17 @@ func (_q *UnitQuery) WithBomItems(opts ...func(*BOMItemQuery)) *UnitQuery {
 		opt(query)
 	}
 	_q.withBomItems = query
+	return _q
+}
+
+// WithPurchaseOrderItems tells the query-builder to eager-load the nodes that are connected to
+// the "purchase_order_items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UnitQuery) WithPurchaseOrderItems(opts ...func(*PurchaseOrderItemQuery)) *UnitQuery {
+	query := (&PurchaseOrderItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPurchaseOrderItems = query
 	return _q
 }
 
@@ -767,12 +839,14 @@ func (_q *UnitQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Unit, e
 	var (
 		nodes       = []*Unit{}
 		_spec       = _q.querySpec()
-		loadedTypes = [12]bool{
+		loadedTypes = [14]bool{
 			_q.withMaterials != nil,
 			_q.withProducts != nil,
+			_q.withProductSkus != nil,
 			_q.withInventoryTxns != nil,
 			_q.withInventoryBalances != nil,
 			_q.withBomItems != nil,
+			_q.withPurchaseOrderItems != nil,
 			_q.withPurchaseReceiptItems != nil,
 			_q.withPurchaseReturnItems != nil,
 			_q.withPurchaseReceiptAdjustmentItems != nil,
@@ -814,6 +888,13 @@ func (_q *UnitQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Unit, e
 			return nil, err
 		}
 	}
+	if query := _q.withProductSkus; query != nil {
+		if err := _q.loadProductSkus(ctx, query, nodes,
+			func(n *Unit) { n.Edges.ProductSkus = []*ProductSKU{} },
+			func(n *Unit, e *ProductSKU) { n.Edges.ProductSkus = append(n.Edges.ProductSkus, e) }); err != nil {
+			return nil, err
+		}
+	}
 	if query := _q.withInventoryTxns; query != nil {
 		if err := _q.loadInventoryTxns(ctx, query, nodes,
 			func(n *Unit) { n.Edges.InventoryTxns = []*InventoryTxn{} },
@@ -832,6 +913,15 @@ func (_q *UnitQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Unit, e
 		if err := _q.loadBomItems(ctx, query, nodes,
 			func(n *Unit) { n.Edges.BomItems = []*BOMItem{} },
 			func(n *Unit, e *BOMItem) { n.Edges.BomItems = append(n.Edges.BomItems, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPurchaseOrderItems; query != nil {
+		if err := _q.loadPurchaseOrderItems(ctx, query, nodes,
+			func(n *Unit) { n.Edges.PurchaseOrderItems = []*PurchaseOrderItem{} },
+			func(n *Unit, e *PurchaseOrderItem) {
+				n.Edges.PurchaseOrderItems = append(n.Edges.PurchaseOrderItems, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -953,6 +1043,39 @@ func (_q *UnitQuery) loadProducts(ctx context.Context, query *ProductQuery, node
 	}
 	return nil
 }
+func (_q *UnitQuery) loadProductSkus(ctx context.Context, query *ProductSKUQuery, nodes []*Unit, init func(*Unit), assign func(*Unit, *ProductSKU)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Unit)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productsku.FieldDefaultUnitID)
+	}
+	query.Where(predicate.ProductSKU(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(unit.ProductSkusColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.DefaultUnitID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "default_unit_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "default_unit_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
 func (_q *UnitQuery) loadInventoryTxns(ctx context.Context, query *InventoryTxnQuery, nodes []*Unit, init func(*Unit), assign func(*Unit, *InventoryTxn)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[int]*Unit)
@@ -1028,6 +1151,36 @@ func (_q *UnitQuery) loadBomItems(ctx context.Context, query *BOMItemQuery, node
 	}
 	query.Where(predicate.BOMItem(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(unit.BomItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UnitID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "unit_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UnitQuery) loadPurchaseOrderItems(ctx context.Context, query *PurchaseOrderItemQuery, nodes []*Unit, init func(*Unit), assign func(*Unit, *PurchaseOrderItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Unit)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(purchaseorderitem.FieldUnitID)
+	}
+	query.Where(predicate.PurchaseOrderItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(unit.PurchaseOrderItemsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

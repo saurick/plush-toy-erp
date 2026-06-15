@@ -18,16 +18,17 @@ type PurchaseReceiptItem struct {
 }
 
 var purchaseReceiptItemLockedFields = map[string]struct{}{
-	"receipt_id":     {},
-	"material_id":    {},
-	"warehouse_id":   {},
-	"unit_id":        {},
-	"lot_id":         {},
-	"lot_no":         {},
-	"quantity":       {},
-	"unit_price":     {},
-	"amount":         {},
-	"source_line_no": {},
+	"receipt_id":             {},
+	"material_id":            {},
+	"warehouse_id":           {},
+	"unit_id":                {},
+	"lot_id":                 {},
+	"purchase_order_item_id": {},
+	"lot_no":                 {},
+	"quantity":               {},
+	"unit_price":             {},
+	"amount":                 {},
+	"source_line_no":         {},
 }
 
 func (PurchaseReceiptItem) Hooks() []ent.Hook {
@@ -70,6 +71,10 @@ func (PurchaseReceiptItem) Fields() []ent.Field {
 		field.Int("unit_id").
 			Positive(),
 		field.Int("lot_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.Int("purchase_order_item_id").
 			Optional().
 			Nillable().
 			Positive(),
@@ -124,6 +129,11 @@ func (PurchaseReceiptItem) Edges() []ent.Edge {
 			Field("lot_id").
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("purchase_order_item", PurchaseOrderItem.Type).
+			Ref("purchase_receipt_items").
+			Field("purchase_order_item_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_return_items", PurchaseReturnItem.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_receipt_adjustment_items", PurchaseReceiptAdjustmentItem.Type).
@@ -139,6 +149,7 @@ func (PurchaseReceiptItem) Indexes() []ent.Index {
 		index.Fields("material_id"),
 		index.Fields("warehouse_id"),
 		index.Fields("lot_id"),
+		index.Fields("purchase_order_item_id"),
 		index.Fields("receipt_id", "source_line_no").
 			Unique().
 			Annotations(

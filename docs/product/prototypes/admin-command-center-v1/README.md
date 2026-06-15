@@ -31,7 +31,7 @@
 ## 边界
 
 - 本原型自身不接后端、不接权限、不进入 ERP 正式菜单、不进入生产构建。
-- 本原型不替代 `docs/current-source-of-truth.md`、Workflow / Fact 架构文档、schema、migration、API 或测试。
+- 本原型不替代 `docs/当前真源与交接顺序.md`、Workflow / Fact 架构文档、schema、migration、API 或测试。
 - 真实实现时应优先复用后台布局、业务列表共享组件、任务详情面板和打印模板组件，不把 HTML 直接复制进 `web/src`。
 - 如果后续继续扩展任务看板、业务看板或工作台菜单，需要同步评审菜单配置、RBAC 权限码、seed、帮助文档和浏览器回归。
 

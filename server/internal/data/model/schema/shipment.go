@@ -58,6 +58,7 @@ func (Shipment) Fields() []ent.Field {
 		field.String("shipment_no").NotEmpty().MaxLen(64),
 		field.Int("sales_order_id").Optional().Nillable().Positive(),
 		field.Int("customer_id").Optional().Nillable().Positive(),
+		// Snapshot preserves shipment-time display data; Customer remains the master truth.
 		field.String("customer_snapshot").Optional().Nillable().MaxLen(512),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
 		field.String("idempotency_key").NotEmpty().MaxLen(128),

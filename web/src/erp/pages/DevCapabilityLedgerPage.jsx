@@ -32,9 +32,9 @@ import {
   parseCustomerDeliveryMatrixMarkdown,
 } from '../config/devCapabilityLedger.mjs'
 
-import deltaLedgerSource from '../../../../docs/customers/yoyoosun/delta-ledger.md?raw'
-import deliveryMatrixSource from '../../../../docs/customers/yoyoosun/delivery-matrix.md?raw'
-import capabilityLedgerSource from '../../../../docs/product/capability-ledger.md?raw'
+import deltaLedgerSource from '../../../../docs/customers/yoyoosun/客户差异台账.md?raw'
+import deliveryMatrixSource from '../../../../docs/customers/yoyoosun/客户交付矩阵.md?raw'
+import capabilityLedgerSource from '../../../../docs/product/产品能力进度台账.md?raw'
 
 const { Paragraph, Text, Title } = Typography
 

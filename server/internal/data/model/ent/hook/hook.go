@@ -176,6 +176,18 @@ func (f ProductFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, err
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductMutation", m)
 }
 
+// The ProductSKUFunc type is an adapter to allow the use of ordinary
+// function as ProductSKU mutator.
+type ProductSKUFunc func(context.Context, *ent.ProductSKUMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductSKUFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductSKUMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductSKUMutation", m)
+}
+
 // The ProductionFactFunc type is an adapter to allow the use of ordinary
 // function as ProductionFact mutator.
 type ProductionFactFunc func(context.Context, *ent.ProductionFactMutation) (ent.Value, error)
@@ -186,6 +198,30 @@ func (f ProductionFactFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionFactMutation", m)
+}
+
+// The PurchaseOrderFunc type is an adapter to allow the use of ordinary
+// function as PurchaseOrder mutator.
+type PurchaseOrderFunc func(context.Context, *ent.PurchaseOrderMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PurchaseOrderFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PurchaseOrderMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PurchaseOrderMutation", m)
+}
+
+// The PurchaseOrderItemFunc type is an adapter to allow the use of ordinary
+// function as PurchaseOrderItem mutator.
+type PurchaseOrderItemFunc func(context.Context, *ent.PurchaseOrderItemMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PurchaseOrderItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PurchaseOrderItemMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PurchaseOrderItemMutation", m)
 }
 
 // The PurchaseReceiptFunc type is an adapter to allow the use of ordinary

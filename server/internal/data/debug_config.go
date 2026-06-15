@@ -8,7 +8,7 @@ import (
 	"server/internal/conf"
 )
 
-func newDebugSafetyConfig(c *conf.Data) biz.DebugSafetyConfig {
+func NewDebugSafetyConfig(c *conf.Data) biz.DebugSafetyConfig {
 	return newDebugSafetyConfigFromEnv(c, os.Getenv)
 }
 

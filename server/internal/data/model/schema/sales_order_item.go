@@ -35,10 +35,16 @@ func (SalesOrderItem) Fields() []ent.Field {
 			Positive(),
 		field.Int("line_no").
 			Positive(),
+		// product_id is still the runtime primary path; product_sku_id is optional traceability.
 		field.Int("product_id").
+			Positive(),
+		field.Int("product_sku_id").
+			Optional().
+			Nillable().
 			Positive(),
 		field.Int("unit_id").
 			Positive(),
+		// Snapshots preserve order-time display values; Product/ProductSKU stay the master truth.
 		field.String("product_code_snapshot").
 			Optional().
 			Nillable().
@@ -85,6 +91,10 @@ func (SalesOrderItem) Edges() []ent.Edge {
 			Field("product_id").
 			Required().
 			Unique(),
+		edge.From("product_sku", ProductSKU.Type).
+			Ref("sales_order_items").
+			Field("product_sku_id").
+			Unique(),
 		edge.To("unit", Unit.Type).
 			Field("unit_id").
 			Required().
@@ -98,6 +108,7 @@ func (SalesOrderItem) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("sales_order_id", "line_no").Unique(),
 		index.Fields("product_id"),
+		index.Fields("product_sku_id"),
 		index.Fields("unit_id"),
 		index.Fields("line_status"),
 		index.Fields("planned_delivery_date"),

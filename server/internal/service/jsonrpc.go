@@ -7,6 +7,7 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	"server/internal/conf"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -15,14 +16,44 @@ import (
 type JsonrpcService struct {
 	v1.UnimplementedJsonrpcServer
 
-	uc  *biz.JsonrpcUsecase
-	log *log.Helper
+	dispatcher *jsonrpcDispatcher
+	log        *log.Helper
 }
 
-func NewJsonrpcService(uc *biz.JsonrpcUsecase, logger log.Logger) *JsonrpcService {
+func NewJsonrpcService(
+	c *conf.Data,
+	logger log.Logger,
+	authUC *biz.AuthUsecase,
+	adminAuthUC *biz.AdminAuthUsecase,
+	adminManageUC *biz.AdminManageUsecase,
+	userAdminUC *biz.UserAdminUsecase,
+	workflowUC *biz.WorkflowUsecase,
+	debugUC *biz.DebugUsecase,
+	masterDataUC *biz.MasterDataUsecase,
+	salesOrderUC *biz.SalesOrderUsecase,
+	purchaseOrderUC *biz.PurchaseOrderUsecase,
+	inventoryUC *biz.InventoryUsecase,
+	operationalFactUC *biz.OperationalFactUsecase,
+	adminReader biz.AdminAccountReader,
+) *JsonrpcService {
 	return &JsonrpcService{
-		uc:  uc,
-		log: log.NewHelper(logger),
+		dispatcher: newJSONRPCDispatcher(
+			c,
+			logger,
+			authUC,
+			adminAuthUC,
+			adminManageUC,
+			userAdminUC,
+			workflowUC,
+			debugUC,
+			masterDataUC,
+			salesOrderUC,
+			purchaseOrderUC,
+			inventoryUC,
+			operationalFactUC,
+			adminReader,
+		),
+		log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.transport")),
 	}
 }
 
@@ -33,7 +64,7 @@ func (s *JsonrpcService) GetJsonrpc(ctx context.Context, req *v1.GetJsonrpcReque
 		req.GetUrl(), req.GetJsonrpc(), req.GetMethod(), req.GetId(),
 	)
 
-	id, result, bizErr := s.uc.Handle(
+	id, result, bizErr := s.dispatcher.Handle(
 		ctx,
 		req.GetUrl(),
 		req.GetJsonrpc(),
@@ -70,7 +101,7 @@ func (s *JsonrpcService) PostJsonrpc(ctx context.Context, req *v1.PostJsonrpcReq
 		req.GetUrl(), req.GetJsonrpc(), req.GetMethod(), req.GetId(),
 	)
 
-	id, result, bizErr := s.uc.Handle(
+	id, result, bizErr := s.dispatcher.Handle(
 		ctx,
 		req.GetUrl(),
 		req.GetJsonrpc(),

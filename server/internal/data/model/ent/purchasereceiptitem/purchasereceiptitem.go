@@ -25,6 +25,8 @@ const (
 	FieldUnitID = "unit_id"
 	// FieldLotID holds the string denoting the lot_id field in the database.
 	FieldLotID = "lot_id"
+	// FieldPurchaseOrderItemID holds the string denoting the purchase_order_item_id field in the database.
+	FieldPurchaseOrderItemID = "purchase_order_item_id"
 	// FieldLotNo holds the string denoting the lot_no field in the database.
 	FieldLotNo = "lot_no"
 	// FieldQuantity holds the string denoting the quantity field in the database.
@@ -51,6 +53,8 @@ const (
 	EdgeUnit = "unit"
 	// EdgeInventoryLot holds the string denoting the inventory_lot edge name in mutations.
 	EdgeInventoryLot = "inventory_lot"
+	// EdgePurchaseOrderItem holds the string denoting the purchase_order_item edge name in mutations.
+	EdgePurchaseOrderItem = "purchase_order_item"
 	// EdgePurchaseReturnItems holds the string denoting the purchase_return_items edge name in mutations.
 	EdgePurchaseReturnItems = "purchase_return_items"
 	// EdgePurchaseReceiptAdjustmentItems holds the string denoting the purchase_receipt_adjustment_items edge name in mutations.
@@ -94,6 +98,13 @@ const (
 	InventoryLotInverseTable = "inventory_lots"
 	// InventoryLotColumn is the table column denoting the inventory_lot relation/edge.
 	InventoryLotColumn = "lot_id"
+	// PurchaseOrderItemTable is the table that holds the purchase_order_item relation/edge.
+	PurchaseOrderItemTable = "purchase_receipt_items"
+	// PurchaseOrderItemInverseTable is the table name for the PurchaseOrderItem entity.
+	// It exists in this package in order to avoid circular dependency with the "purchaseorderitem" package.
+	PurchaseOrderItemInverseTable = "purchase_order_items"
+	// PurchaseOrderItemColumn is the table column denoting the purchase_order_item relation/edge.
+	PurchaseOrderItemColumn = "purchase_order_item_id"
 	// PurchaseReturnItemsTable is the table that holds the purchase_return_items relation/edge.
 	PurchaseReturnItemsTable = "purchase_return_items"
 	// PurchaseReturnItemsInverseTable is the table name for the PurchaseReturnItem entity.
@@ -125,6 +136,7 @@ var Columns = []string{
 	FieldWarehouseID,
 	FieldUnitID,
 	FieldLotID,
+	FieldPurchaseOrderItemID,
 	FieldLotNo,
 	FieldQuantity,
 	FieldUnitPrice,
@@ -162,6 +174,8 @@ var (
 	UnitIDValidator func(int) error
 	// LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
 	LotIDValidator func(int) error
+	// PurchaseOrderItemIDValidator is a validator for the "purchase_order_item_id" field. It is called by the builders before save.
+	PurchaseOrderItemIDValidator func(int) error
 	// LotNoValidator is a validator for the "lot_no" field. It is called by the builders before save.
 	LotNoValidator func(string) error
 	// SourceLineNoValidator is a validator for the "source_line_no" field. It is called by the builders before save.
@@ -207,6 +221,11 @@ func ByUnitID(opts ...sql.OrderTermOption) OrderOption {
 // ByLotID orders the results by the lot_id field.
 func ByLotID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLotID, opts...).ToFunc()
+}
+
+// ByPurchaseOrderItemID orders the results by the purchase_order_item_id field.
+func ByPurchaseOrderItemID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPurchaseOrderItemID, opts...).ToFunc()
 }
 
 // ByLotNo orders the results by the lot_no field.
@@ -284,6 +303,13 @@ func ByInventoryLotField(field string, opts ...sql.OrderTermOption) OrderOption 
 	}
 }
 
+// ByPurchaseOrderItemField orders the results by purchase_order_item field.
+func ByPurchaseOrderItemField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseOrderItemStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByPurchaseReturnItemsCount orders the results by purchase_return_items count.
 func ByPurchaseReturnItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -358,6 +384,13 @@ func newInventoryLotStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(InventoryLotInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, InventoryLotTable, InventoryLotColumn),
+	)
+}
+func newPurchaseOrderItemStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseOrderItemInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, PurchaseOrderItemTable, PurchaseOrderItemColumn),
 	)
 }
 func newPurchaseReturnItemsStep() *sqlgraph.Step {

@@ -37,11 +37,11 @@ export const yoyoosunImportConfig = Object.freeze({
   globalScan: Object.freeze({
     scanDate: "2026-06-11",
     evidenceInputs: Object.freeze([
-      "docs/current-source-of-truth.md",
-      "docs/product/capability-ledger.md",
-      "docs/customers/yoyoosun/customer-config-draft.md",
-      "docs/customers/yoyoosun/delivery-matrix.md",
-      "docs/customers/yoyoosun/delta-ledger.md",
+      "docs/当前真源与交接顺序.md",
+      "docs/product/产品能力进度台账.md",
+      "docs/customers/yoyoosun/客户配置草案.md",
+      "docs/customers/yoyoosun/客户交付矩阵.md",
+      "docs/customers/yoyoosun/客户差异台账.md",
       "config/customers/yoyoosun/menuConfig.mjs",
       "config/customers/yoyoosun/fieldNumberingConfig.mjs",
       "config/industry-templates/plush/templateConfig.mjs",
@@ -194,7 +194,7 @@ export const yoyoosunImportConfig = Object.freeze({
       label: "采购与委外源单据配置线索",
       classification: "deferred_runtime",
       decision: "deferred",
-      source: "docs/customers/yoyoosun/import-dry-run-tooling.md",
+      source: "docs/customers/yoyoosun/导入试跑工具说明.md",
       appliesTo: Object.freeze(["purchase_orders", "outsourcing"]),
       productCoreImpact: "none",
       guardrail:
@@ -206,7 +206,7 @@ export const yoyoosunImportConfig = Object.freeze({
       label: "采购合同与加工合同打印样本输入",
       classification: "print_template_input",
       decision: "deferred",
-      source: "docs/customers/yoyoosun/raw-source-file-archive-review.md",
+      source: "docs/customers/yoyoosun/原始客户文件归档评审.md",
       appliesTo: Object.freeze(["purchase_contract", "processing_contract"]),
       productCoreImpact: "none",
       guardrail:
@@ -218,7 +218,7 @@ export const yoyoosunImportConfig = Object.freeze({
       label: "角色、权限和岗位任务模板候选",
       classification: "draft_customer_config",
       decision: "review_required",
-      source: "docs/customers/yoyoosun/trial-account-role-menu-checklist.md",
+      source: "docs/customers/yoyoosun/试用账号角色菜单核对清单.md",
       appliesTo: Object.freeze([
         "roles",
         "permissions",

@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/stockreservation"
@@ -114,6 +115,26 @@ func (_u *StockReservationUpdate) SetNillableProductID(v *int) *StockReservation
 	if v != nil {
 		_u.SetProductID(*v)
 	}
+	return _u
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *StockReservationUpdate) SetProductSkuID(v int) *StockReservationUpdate {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *StockReservationUpdate) SetNillableProductSkuID(v *int) *StockReservationUpdate {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *StockReservationUpdate) ClearProductSkuID() *StockReservationUpdate {
+	_u.mutation.ClearProductSkuID()
 	return _u
 }
 
@@ -288,6 +309,11 @@ func (_u *StockReservationUpdate) SetProduct(v *Product) *StockReservationUpdate
 	return _u.SetProductID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *StockReservationUpdate) SetProductSku(v *ProductSKU) *StockReservationUpdate {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetWarehouse sets the "warehouse" edge to the Warehouse entity.
 func (_u *StockReservationUpdate) SetWarehouse(v *Warehouse) *StockReservationUpdate {
 	return _u.SetWarehouseID(v.ID)
@@ -337,6 +363,12 @@ func (_u *StockReservationUpdate) ClearSalesOrderItem() *StockReservationUpdate 
 // ClearProduct clears the "product" edge to the Product entity.
 func (_u *StockReservationUpdate) ClearProduct() *StockReservationUpdate {
 	_u.mutation.ClearProduct()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *StockReservationUpdate) ClearProductSku() *StockReservationUpdate {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -425,6 +457,11 @@ func (_u *StockReservationUpdate) check() error {
 	if v, ok := _u.mutation.ProductID(); ok {
 		if err := stockreservation.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "StockReservation.product_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := stockreservation.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "StockReservation.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -592,6 +629,35 @@ func (_u *StockReservationUpdate) sqlSave(ctx context.Context) (_node int, err e
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   stockreservation.ProductSkuTable,
+			Columns: []string{stockreservation.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   stockreservation.ProductSkuTable,
+			Columns: []string{stockreservation.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -788,6 +854,26 @@ func (_u *StockReservationUpdateOne) SetNillableProductID(v *int) *StockReservat
 	return _u
 }
 
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *StockReservationUpdateOne) SetProductSkuID(v int) *StockReservationUpdateOne {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *StockReservationUpdateOne) SetNillableProductSkuID(v *int) *StockReservationUpdateOne {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *StockReservationUpdateOne) ClearProductSkuID() *StockReservationUpdateOne {
+	_u.mutation.ClearProductSkuID()
+	return _u
+}
+
 // SetWarehouseID sets the "warehouse_id" field.
 func (_u *StockReservationUpdateOne) SetWarehouseID(v int) *StockReservationUpdateOne {
 	_u.mutation.SetWarehouseID(v)
@@ -959,6 +1045,11 @@ func (_u *StockReservationUpdateOne) SetProduct(v *Product) *StockReservationUpd
 	return _u.SetProductID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *StockReservationUpdateOne) SetProductSku(v *ProductSKU) *StockReservationUpdateOne {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetWarehouse sets the "warehouse" edge to the Warehouse entity.
 func (_u *StockReservationUpdateOne) SetWarehouse(v *Warehouse) *StockReservationUpdateOne {
 	return _u.SetWarehouseID(v.ID)
@@ -1008,6 +1099,12 @@ func (_u *StockReservationUpdateOne) ClearSalesOrderItem() *StockReservationUpda
 // ClearProduct clears the "product" edge to the Product entity.
 func (_u *StockReservationUpdateOne) ClearProduct() *StockReservationUpdateOne {
 	_u.mutation.ClearProduct()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *StockReservationUpdateOne) ClearProductSku() *StockReservationUpdateOne {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -1109,6 +1206,11 @@ func (_u *StockReservationUpdateOne) check() error {
 	if v, ok := _u.mutation.ProductID(); ok {
 		if err := stockreservation.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "StockReservation.product_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := stockreservation.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "StockReservation.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -1293,6 +1395,35 @@ func (_u *StockReservationUpdateOne) sqlSave(ctx context.Context) (_node *StockR
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   stockreservation.ProductSkuTable,
+			Columns: []string{stockreservation.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   stockreservation.ProductSkuTable,
+			Columns: []string{stockreservation.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

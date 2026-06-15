@@ -3,11 +3,11 @@ export const DEV_DOCS_ROUTE = '/__dev/docs'
 export const PINNED_DEV_DOC_PATHS = Object.freeze([
   'README.md',
   'web/README.md',
-  'docs/current-source-of-truth.md',
-  'docs/product/implementation-governance.md',
-  'docs/product/product-completion-roadmap.md',
-  'docs/product/product-delivery-ledgers.md',
-  'docs/product/test-strategy.md',
+  'docs/当前真源与交接顺序.md',
+  'docs/product/模块实施治理.md',
+  'docs/product/产品完成路线图.md',
+  'docs/product/产品台账索引.md',
+  'docs/product/自动化测试策略.md',
 ])
 
 export const DEV_DOCS_PINNED_STORAGE_KEY = 'plush_erp_dev_docs_pinned_paths'
@@ -75,8 +75,8 @@ function groupForPath(path = '') {
   if (
     [
       'docs/README.md',
-      'docs/current-source-of-truth.md',
-      'docs/document-inventory.md',
+      'docs/当前真源与交接顺序.md',
+      'docs/文档清单.md',
     ].includes(path)
   ) {
     return '真源'
@@ -109,6 +109,10 @@ function normalizeModuleValue(value) {
   return ''
 }
 
+function keyForPath(path = '') {
+  return `doc:${String(path || '')}`
+}
+
 export function buildDevDocsItems(markdownModules = {}) {
   const defaultPinnedRank = new Map(
     PINNED_DEV_DOC_PATHS.map((path, index) => [path, index])
@@ -122,7 +126,7 @@ export function buildDevDocsItems(markdownModules = {}) {
     }
     const source = normalizeModuleValue(moduleValue)
     byPath.set(path, {
-      key: path.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+      key: keyForPath(path),
       title: titleFromMarkdown(source, path),
       filename: filenameForPath(path),
       path,

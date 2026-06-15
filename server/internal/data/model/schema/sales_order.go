@@ -36,6 +36,7 @@ func (SalesOrder) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(128),
+		// Snapshot preserves order-time display data; Customer remains the master truth.
 		field.JSON("customer_snapshot", map[string]any{}).
 			Optional(),
 		field.Time("order_date"),

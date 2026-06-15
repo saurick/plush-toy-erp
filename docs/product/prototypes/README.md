@@ -5,7 +5,7 @@
 ## 用途与正式真源关系 / Purpose And Source Relationship
 
 - 本目录是设计评审和实现参照目录，用于沉淀页面骨架、信息层级、交互入口、视觉方向和样板资产。
-- 正式运行真源仍在 `web/src`、后端 API、RBAC、Ent schema、migration、测试和 `docs/current-source-of-truth.md`。
+- 正式运行真源仍在 `web/src`、后端 API、RBAC、Ent schema、migration、测试和 `docs/当前真源与交接顺序.md`。
 - `index.html` 是本目录的轻量静态查看器，用于浏览原型、样板和参考资料；本地前端开发环境还提供 dev-only 的 `/__dev/prototypes` 查看器，方便按目录浏览、折叠、置顶和预览资产。
 - 原型进入真实实现时，应回到共享组件、真实数据接口、theme token、RBAC 和项目测试；若结论改变业务能力、菜单入口、Workflow / Fact 边界或交付状态，同步更新对应正式产品 / 架构文档。
 
@@ -26,7 +26,7 @@
 
 原型是正式开发前的设计决策工具，用于确认页面骨架、信息层级、关键交互、视觉密度和 Workflow / Fact 边界。原型应放入足够评审和实现的代表性信息、关键状态和边界样本，不追求覆盖所有字段、所有菜单、所有异常和所有业务规则。
 
-原型是设计决策工具，用于帮助进入正式开发。完整需求、字段全集、API、权限、菜单、schema、migration 和测试真源仍回到 `docs/current-source-of-truth.md`、正式产品 / 架构文档、当前代码、真实 API、RBAC、theme token、migration 和自动化测试。
+原型是设计决策工具，用于帮助进入正式开发。完整需求、字段全集、API、权限、菜单、schema、migration 和测试真源仍回到 `docs/当前真源与交接顺序.md`、正式产品 / 架构文档、当前代码、真实 API、RBAC、theme token、migration 和自动化测试。
 
 原型重点关注以下评审维度：
 
@@ -169,7 +169,7 @@
    - 优先复用现有共享组件、页面结构、API client、权限守卫、菜单入口和 theme token。
    - 按影响范围覆盖浅色、暗色、默认态、交互态、恢复态和相邻区域。
    - 至少做目标页面浏览器级回归；触达共享组件、响应式断点或全局样式时扩大 L1 范围。
-   - 涉及正式口径变化时，同步检查 `docs/current-source-of-truth.md`、相关产品 / 架构文档、`web/README.md` 和 `progress.md`。
+   - 涉及正式口径变化时，同步检查 `docs/当前真源与交接顺序.md`、相关产品 / 架构文档、`web/README.md` 和 `progress.md`。
 
 ## 当前原型
 
@@ -198,7 +198,7 @@
 
 这里的“参照关系”说明后续真实页面可以借鉴哪类骨架、信息层级和交互。正式菜单映射、路由、权限和 seedData 真源回到当前代码、`seedData.mjs`、客户菜单配置、路由和 RBAC；只有当某个原型进入真实实现任务时，才重新核对对应关系。未进入 Current 前，`/__dev/prototypes` 和本目录清单只作为原型中心使用。
 
-`core-menu-coverage-v1/index.html` 例外地逐菜单列出内容，用于把 `docs/reference/第二次20260611/产品核心菜单与页面功能规格.md` 中的 51 个二级菜单映射到下列页面类型样板，方便后续确认菜单内容是否遗漏；该 reference 输入只作原型来源，进入实现前按当前运行时菜单、正式产品文档、schema、API、RBAC 和测试真源复核。`formal-menu-candidate-v1/index.html` 在覆盖矩阵之上再做一层正式菜单候选，把左侧导航压缩为约 12 个高频主入口；它仍是 To Implement 原型，当前正式菜单继续以运行时配置为准。候选菜单进入运行时前，先按 `../menu-mapping-review-v1.md` 对齐当前运行时菜单、正式候选主入口和 51 个内部覆盖细项，再单独评审文案、分组、显隐、路由、权限、seed、测试和正式文档影响。
+`core-menu-coverage-v1/index.html` 例外地逐菜单列出内容，用于把 `docs/reference/第二次20260611/产品核心菜单与页面功能规格.md` 中的 51 个二级菜单映射到下列页面类型样板，方便后续确认菜单内容是否遗漏；该 reference 输入只作原型来源，进入实现前按当前运行时菜单、正式产品文档、schema、API、RBAC 和测试真源复核。`formal-menu-candidate-v1/index.html` 在覆盖矩阵之上再做一层正式菜单候选，把左侧导航压缩为约 12 个高频主入口；它仍是 To Implement 原型，当前正式菜单继续以运行时配置为准。候选菜单进入运行时前，先按 `../菜单映射评审表.md` 对齐当前运行时菜单、正式候选主入口和 51 个内部覆盖细项，再单独评审文案、分组、显隐、路由、权限、seed、测试和正式文档影响。
 
 | 页面类型 | 标准样板 | 参照范围 | 正式吸收边界 |
 | --- | --- | --- | --- |
@@ -207,7 +207,7 @@
 | 业务管理中心 / 对象总控 | `business-management-center-v1/index.html` | 业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；入口按业务链路和对象组织。 | 正式菜单和领域成熟度回到菜单评审、API / schema / RBAC 和能力台账。 |
 | 指标卡交互语义 | `metric-card-interaction-standard-v1/index.html` | 后台首页、任务看板、业务看板、业务页标题摘要和同类 KPI / 数字入口可参照；先区分只读、动作和筛选三类语义。 | 只读、动作和筛选三类语义要在真实控件、焦点态和测试中体现；业务能力由对应 usecase 决定。 |
 | 产品核心菜单覆盖矩阵 | `core-menu-coverage-v1/index.html` | 20260611 参考规格里的首页、我的待办、主数据、销售、采购、质检、库存、生产、外协、出货、财务、数据导入、报表、系统和历史归档二级菜单可用它核对内容覆盖。 | 正式口径回到当前 seedData、客户菜单配置、后端 RBAC、路由、正式菜单承诺和字段真源。 |
-| 正式菜单候选导航 | `formal-menu-candidate-v1/index.html` | 工作台、我的任务 / 任务看板、客户 / 供应商 / 产品 / BOM、销售订单、采购 / 入库 / 质检、库存、生产 / 外协、出货、财务对账、报表、数据导入、系统管理等主入口可用它评审；进入运行时前先对照 `../menu-mapping-review-v1.md`。 | 左侧导航、51 个内部覆盖项、权限和路由进入运行时前，先走菜单配置和路由评审。 |
+| 正式菜单候选导航 | `formal-menu-candidate-v1/index.html` | 工作台、我的任务 / 任务看板、客户 / 供应商 / 产品 / BOM、销售订单、采购 / 入库 / 质检、库存、生产 / 外协、出货、财务对账、报表、数据导入、系统管理等主入口可用它评审；进入运行时前先对照 `../菜单映射评审表.md`。 | 左侧导航、51 个内部覆盖项、权限和路由进入运行时前，先走菜单配置和路由评审。 |
 | 业务模块列表页 / 标准业务页 | `business-module-page-standard-v1/index.html` | 客户档案、供应商档案、产品、销售订单、辅材 / 包材采购、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照；当前操作行按钮是出货 / 出库类动作示例，真实页面应按模块调整。 | 同类菜单复用样板即可；未实现菜单和模块动作进入运行时前按模块评审。 |
 | 业务详情页 | `business-detail-page-standard-v1/index.html` | 销售订单、客户 / 供应商、产品、采购入库、库存批次、质检、出货和财务等需要详情承载的页面可参照。 | 字段真源、状态机、关联单据和允许动作回到对应领域文档、API 和 usecase。 |
 | 新建 / 编辑表单页 | `business-form-page-standard-v1/index.html` | 客户、供应商、联系人、销售订单、采购、库存、质检和财务等页面级新建 / 编辑表单可参照；进入真实实现时建议先收窄到销售订单验证骨架。 | schema、API、RBAC、保存 usecase、字段默认值和残值 / 缺值防护规则回到对应领域主路径；来源导入、明细行、回收站、列顺序和危险确认按样板分工收口。 |
@@ -253,7 +253,7 @@ Core 样板中的订单号、客户、产品、数量、日期、任务和附件
 
 当前推荐的简化理解是：顶部只判断“当前 / 待实现 / 参考资料”；`HTML / PNG` 只表示格式，`截图证据 / Evidence`、`方案对比 / Comparison`、`历史参考 / History` 等细标签只解释来源和用途。不要反过来用 HTML / PNG 文件格式或辅助标签判断资产阶段。
 
-截至 2026-06-14，待实现队列包含 `admin-command-center-v1/index.html`、`task-command-center-v1/index.html`、`business-management-center-v1/index.html`、`metric-card-interaction-standard-v1/index.html`、`core-menu-coverage-v1/index.html`、`formal-menu-candidate-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`print-template-center-v1/index.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。工作台样板已进一步收敛为判断型首屏，只回答今天先处理什么、为什么重要、进入哪个相关对象；任务中心样板把任务菜单收敛为职责处理台，只回答谁该处理、谁发起、哪里阻塞以及应跳转哪个业务对象；业务管理中心样板把业务管理菜单收敛为对象总控，只回答当前业务链路、对象状态、风险和标准页入口；指标卡交互语义样板用于统一只读统计、动作入口和筛选指标的视觉边界。产品核心菜单覆盖样板只把 20260611 参考规格的 51 个二级菜单压成可筛选内容矩阵，帮助后续逐菜单核对字段、动作、事实源和样板归属；正式菜单候选原型再把这些内部覆盖项压缩为约 12 个高频主入口，用于评审左侧导航候选。`../menu-mapping-review-v1.md` 进一步把当前运行时菜单、12 个候选主入口和 51 个内部覆盖细项放到同一张评审表里，用于进入真实菜单实现前拆分文案、分组、显隐、路由、权限、seed、测试和正式文档影响。它们都不改变当前运行时菜单、正式菜单承诺、客户菜单配置、后端 API、RBAC、schema、migration 或 Fact 语义。未获用户明确确认前，十二个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现参考登记。
+截至 2026-06-14，待实现队列包含 `admin-command-center-v1/index.html`、`task-command-center-v1/index.html`、`business-management-center-v1/index.html`、`metric-card-interaction-standard-v1/index.html`、`core-menu-coverage-v1/index.html`、`formal-menu-candidate-v1/index.html`、`business-module-page-standard-v1/index.html`、`business-module-page-standard-v1/task-collab-entry-v2.html`、`print-template-center-v1/index.html`、`business-detail-page-standard-v1/index.html`、`business-form-page-standard-v1/index.html` 和 `action-modal-drawer-standard-v1/index.html`。工作台样板已进一步收敛为判断型首屏，只回答今天先处理什么、为什么重要、进入哪个相关对象；任务中心样板把任务菜单收敛为职责处理台，只回答谁该处理、谁发起、哪里阻塞以及应跳转哪个业务对象；业务管理中心样板把业务管理菜单收敛为对象总控，只回答当前业务链路、对象状态、风险和标准页入口；指标卡交互语义样板用于统一只读统计、动作入口和筛选指标的视觉边界。产品核心菜单覆盖样板只把 20260611 参考规格的 51 个二级菜单压成可筛选内容矩阵，帮助后续逐菜单核对字段、动作、事实源和样板归属；正式菜单候选原型再把这些内部覆盖项压缩为约 12 个高频主入口，用于评审左侧导航候选。`../菜单映射评审表.md` 进一步把当前运行时菜单、12 个候选主入口和 51 个内部覆盖细项放到同一张评审表里，用于进入真实菜单实现前拆分文案、分组、显隐、路由、权限、seed、测试和正式文档影响。它们都不改变当前运行时菜单、正式菜单承诺、客户菜单配置、后端 API、RBAC、schema、migration 或 Fact 语义。未获用户明确确认前，十二个产品内核相关 HTML 继续保留 To Implement，不得改为 Current。只有 `mobile-role-tasks-v1/implemented-reference.html` 按当前实现参考登记。
 
 ## 使用方式
 

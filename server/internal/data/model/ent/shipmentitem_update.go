@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
@@ -80,6 +81,26 @@ func (_u *ShipmentItemUpdate) SetNillableProductID(v *int) *ShipmentItemUpdate {
 	if v != nil {
 		_u.SetProductID(*v)
 	}
+	return _u
+}
+
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *ShipmentItemUpdate) SetProductSkuID(v int) *ShipmentItemUpdate {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *ShipmentItemUpdate) SetNillableProductSkuID(v *int) *ShipmentItemUpdate {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *ShipmentItemUpdate) ClearProductSkuID() *ShipmentItemUpdate {
+	_u.mutation.ClearProductSkuID()
 	return _u
 }
 
@@ -186,6 +207,11 @@ func (_u *ShipmentItemUpdate) SetProduct(v *Product) *ShipmentItemUpdate {
 	return _u.SetProductID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *ShipmentItemUpdate) SetProductSku(v *ProductSKU) *ShipmentItemUpdate {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetWarehouse sets the "warehouse" edge to the Warehouse entity.
 func (_u *ShipmentItemUpdate) SetWarehouse(v *Warehouse) *ShipmentItemUpdate {
 	return _u.SetWarehouseID(v.ID)
@@ -235,6 +261,12 @@ func (_u *ShipmentItemUpdate) ClearSalesOrderItem() *ShipmentItemUpdate {
 // ClearProduct clears the "product" edge to the Product entity.
 func (_u *ShipmentItemUpdate) ClearProduct() *ShipmentItemUpdate {
 	_u.mutation.ClearProduct()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *ShipmentItemUpdate) ClearProductSku() *ShipmentItemUpdate {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -313,6 +345,11 @@ func (_u *ShipmentItemUpdate) check() error {
 	if v, ok := _u.mutation.ProductID(); ok {
 		if err := shipmentitem.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.product_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := shipmentitem.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -454,6 +491,35 @@ func (_u *ShipmentItemUpdate) sqlSave(ctx context.Context) (_node int, err error
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   shipmentitem.ProductSkuTable,
+			Columns: []string{shipmentitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   shipmentitem.ProductSkuTable,
+			Columns: []string{shipmentitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -616,6 +682,26 @@ func (_u *ShipmentItemUpdateOne) SetNillableProductID(v *int) *ShipmentItemUpdat
 	return _u
 }
 
+// SetProductSkuID sets the "product_sku_id" field.
+func (_u *ShipmentItemUpdateOne) SetProductSkuID(v int) *ShipmentItemUpdateOne {
+	_u.mutation.SetProductSkuID(v)
+	return _u
+}
+
+// SetNillableProductSkuID sets the "product_sku_id" field if the given value is not nil.
+func (_u *ShipmentItemUpdateOne) SetNillableProductSkuID(v *int) *ShipmentItemUpdateOne {
+	if v != nil {
+		_u.SetProductSkuID(*v)
+	}
+	return _u
+}
+
+// ClearProductSkuID clears the value of the "product_sku_id" field.
+func (_u *ShipmentItemUpdateOne) ClearProductSkuID() *ShipmentItemUpdateOne {
+	_u.mutation.ClearProductSkuID()
+	return _u
+}
+
 // SetWarehouseID sets the "warehouse_id" field.
 func (_u *ShipmentItemUpdateOne) SetWarehouseID(v int) *ShipmentItemUpdateOne {
 	_u.mutation.SetWarehouseID(v)
@@ -719,6 +805,11 @@ func (_u *ShipmentItemUpdateOne) SetProduct(v *Product) *ShipmentItemUpdateOne {
 	return _u.SetProductID(v.ID)
 }
 
+// SetProductSku sets the "product_sku" edge to the ProductSKU entity.
+func (_u *ShipmentItemUpdateOne) SetProductSku(v *ProductSKU) *ShipmentItemUpdateOne {
+	return _u.SetProductSkuID(v.ID)
+}
+
 // SetWarehouse sets the "warehouse" edge to the Warehouse entity.
 func (_u *ShipmentItemUpdateOne) SetWarehouse(v *Warehouse) *ShipmentItemUpdateOne {
 	return _u.SetWarehouseID(v.ID)
@@ -768,6 +859,12 @@ func (_u *ShipmentItemUpdateOne) ClearSalesOrderItem() *ShipmentItemUpdateOne {
 // ClearProduct clears the "product" edge to the Product entity.
 func (_u *ShipmentItemUpdateOne) ClearProduct() *ShipmentItemUpdateOne {
 	_u.mutation.ClearProduct()
+	return _u
+}
+
+// ClearProductSku clears the "product_sku" edge to the ProductSKU entity.
+func (_u *ShipmentItemUpdateOne) ClearProductSku() *ShipmentItemUpdateOne {
+	_u.mutation.ClearProductSku()
 	return _u
 }
 
@@ -859,6 +956,11 @@ func (_u *ShipmentItemUpdateOne) check() error {
 	if v, ok := _u.mutation.ProductID(); ok {
 		if err := shipmentitem.ProductIDValidator(v); err != nil {
 			return &ValidationError{Name: "product_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.product_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ProductSkuID(); ok {
+		if err := shipmentitem.ProductSkuIDValidator(v); err != nil {
+			return &ValidationError{Name: "product_sku_id", err: fmt.Errorf(`ent: validator failed for field "ShipmentItem.product_sku_id": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.WarehouseID(); ok {
@@ -1017,6 +1119,35 @@ func (_u *ShipmentItemUpdateOne) sqlSave(ctx context.Context) (_node *ShipmentIt
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(product.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductSkuCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   shipmentitem.ProductSkuTable,
+			Columns: []string{shipmentitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductSkuIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   shipmentitem.ProductSkuTable,
+			Columns: []string{shipmentitem.ProductSkuColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

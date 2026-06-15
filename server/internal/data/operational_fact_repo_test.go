@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/inventorytxn"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -223,5 +224,138 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ShipmentSourceType)).CountX(ctx); count != 2 {
 		t.Fatalf("expected outbound + reversal shipment txns, got %d", count)
+	}
+}
+
+func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_finance")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	uc := biz.NewOperationalFactUsecase(repo)
+
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType:    biz.InventorySubjectProduct,
+		SubjectID:      fixtures.productID,
+		WarehouseID:    fixtures.warehouseID,
+		TxnType:        biz.InventoryTxnIn,
+		Direction:      1,
+		Quantity:       decimal.NewFromInt(5),
+		UnitID:         fixtures.unitID,
+		SourceType:     "TEST_SHIPMENT_FINANCE",
+		IdempotencyKey: "TEST_SHIPMENT_FINANCE:IN",
+	}); err != nil {
+		t.Fatalf("seed product inventory failed: %v", err)
+	}
+
+	shipmentSourceType := biz.ShipmentSourceType
+	shippingReleaseSourceType := "SHIPPING-RELEASE"
+	shipment, err := uc.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
+		ShipmentNo:     "SHP-FIN-001",
+		IdempotencyKey: "SHP-FIN-001",
+	})
+	if err != nil {
+		t.Fatalf("create shipment failed: %v", err)
+	}
+	if _, err := uc.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
+		ShipmentID:  shipment.ID,
+		ProductID:   fixtures.productID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+		Quantity:    decimal.NewFromInt(2),
+	}); err != nil {
+		t.Fatalf("add shipment item failed: %v", err)
+	}
+
+	if _, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+		FactNo:           "AR-MISSING-SOURCE",
+		FactType:         biz.FinanceFactReceivable,
+		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		Amount:           decimal.NewFromInt(100),
+		IdempotencyKey:   "AR-MISSING-SOURCE",
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("receivable without shipment source error = %v, want ErrBadParam", err)
+	}
+
+	if _, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+		FactNo:           "AR-WRONG-SOURCE",
+		FactType:         biz.FinanceFactReceivable,
+		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		Amount:           decimal.NewFromInt(100),
+		SourceType:       &shippingReleaseSourceType,
+		SourceID:         &shipment.ID,
+		IdempotencyKey:   "AR-WRONG-SOURCE",
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("receivable from shipping release source error = %v, want ErrBadParam", err)
+	}
+
+	if _, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+		FactNo:           "AR-DRAFT-SHIPMENT",
+		FactType:         biz.FinanceFactReceivable,
+		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		Amount:           decimal.NewFromInt(100),
+		SourceType:       &shipmentSourceType,
+		SourceID:         &shipment.ID,
+		IdempotencyKey:   "AR-DRAFT-SHIPMENT",
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("receivable from draft shipment error = %v, want ErrBadParam", err)
+	}
+
+	shipped, err := uc.ShipShipment(ctx, shipment.ID)
+	if err != nil {
+		t.Fatalf("ship shipment failed: %v", err)
+	}
+	if shipped.Status != biz.ShipmentStatusShipped {
+		t.Fatalf("expected shipment SHIPPED, got %s", shipped.Status)
+	}
+
+	receivable, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+		FactNo:           "AR-SHIPPED-001",
+		FactType:         biz.FinanceFactReceivable,
+		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		Amount:           decimal.NewFromInt(100),
+		SourceType:       &shipmentSourceType,
+		SourceID:         &shipment.ID,
+		IdempotencyKey:   "AR-SHIPPED-001",
+	})
+	if err != nil {
+		t.Fatalf("create receivable from shipped shipment failed: %v", err)
+	}
+	if receivable.Status != biz.OperationalFactStatusDraft || receivable.SourceID == nil || *receivable.SourceID != shipment.ID {
+		t.Fatalf("unexpected receivable fact %#v", receivable)
+	}
+	posted, err := uc.PostFinanceFact(ctx, receivable.ID)
+	if err != nil {
+		t.Fatalf("post receivable failed: %v", err)
+	}
+	if posted.Status != biz.OperationalFactStatusPosted {
+		t.Fatalf("expected posted receivable, got %s", posted.Status)
+	}
+	settled, err := uc.SettleFinanceFact(ctx, receivable.ID)
+	if err != nil {
+		t.Fatalf("settle receivable failed: %v", err)
+	}
+	if settled.Status != biz.OperationalFactStatusSettled {
+		t.Fatalf("expected settled receivable, got %s", settled.Status)
+	}
+
+	invoice, err := uc.CreateFinanceFactDraft(ctx, &biz.FinanceFactCreate{
+		FactNo:           "INV-SHIPPED-001",
+		FactType:         biz.FinanceFactInvoice,
+		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		Amount:           decimal.NewFromInt(100),
+		SourceType:       &shipmentSourceType,
+		SourceID:         &shipment.ID,
+		IdempotencyKey:   "INV-SHIPPED-001",
+	})
+	if err != nil {
+		t.Fatalf("create invoice from shipped shipment failed: %v", err)
+	}
+	if invoice.Status != biz.OperationalFactStatusDraft || invoice.SourceID == nil || *invoice.SourceID != shipment.ID {
+		t.Fatalf("unexpected invoice fact %#v", invoice)
+	}
+	if count := client.FinanceFact.Query().Where(financefact.SourceType(biz.ShipmentSourceType), financefact.SourceID(shipment.ID)).CountX(ctx); count != 2 {
+		t.Fatalf("expected two finance facts linked to shipped shipment, got %d", count)
 	}
 }

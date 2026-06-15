@@ -71,6 +71,11 @@ func ProductID(v int) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldProductID, v))
 }
 
+// ProductSkuID applies equality check predicate on the "product_sku_id" field. It's identical to ProductSkuIDEQ.
+func ProductSkuID(v int) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldProductSkuID, v))
+}
+
 // WarehouseID applies equality check predicate on the "warehouse_id" field. It's identical to WarehouseIDEQ.
 func WarehouseID(v int) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldWarehouseID, v))
@@ -174,6 +179,36 @@ func ProductIDIn(vs ...int) predicate.ShipmentItem {
 // ProductIDNotIn applies the NotIn predicate on the "product_id" field.
 func ProductIDNotIn(vs ...int) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldNotIn(FieldProductID, vs...))
+}
+
+// ProductSkuIDEQ applies the EQ predicate on the "product_sku_id" field.
+func ProductSkuIDEQ(v int) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDNEQ applies the NEQ predicate on the "product_sku_id" field.
+func ProductSkuIDNEQ(v int) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNEQ(FieldProductSkuID, v))
+}
+
+// ProductSkuIDIn applies the In predicate on the "product_sku_id" field.
+func ProductSkuIDIn(vs ...int) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDNotIn applies the NotIn predicate on the "product_sku_id" field.
+func ProductSkuIDNotIn(vs ...int) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotIn(FieldProductSkuID, vs...))
+}
+
+// ProductSkuIDIsNil applies the IsNil predicate on the "product_sku_id" field.
+func ProductSkuIDIsNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIsNull(FieldProductSkuID))
+}
+
+// ProductSkuIDNotNil applies the NotNil predicate on the "product_sku_id" field.
+func ProductSkuIDNotNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotNull(FieldProductSkuID))
 }
 
 // WarehouseIDEQ applies the EQ predicate on the "warehouse_id" field.
@@ -502,6 +537,29 @@ func HasProduct() predicate.ShipmentItem {
 func HasProductWith(preds ...predicate.Product) predicate.ShipmentItem {
 	return predicate.ShipmentItem(func(s *sql.Selector) {
 		step := newProductStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductSku applies the HasEdge predicate on the "product_sku" edge.
+func HasProductSku() predicate.ShipmentItem {
+	return predicate.ShipmentItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ProductSkuTable, ProductSkuColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductSkuWith applies the HasEdge predicate on the "product_sku" edge with a given conditions (other predicates).
+func HasProductSkuWith(preds ...predicate.ProductSKU) predicate.ShipmentItem {
+	return predicate.ShipmentItem(func(s *sql.Selector) {
+		step := newProductSkuStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

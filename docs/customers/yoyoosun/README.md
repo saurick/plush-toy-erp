@@ -36,40 +36,40 @@ flowchart TD
 
 | 路径 | 作用 |
 | --- | --- |
-| `source-materials.md` | 记录永绅 yoyoosun 样本资料类型和用途 |
-| `requirement-clues.md` | 按业务域记录需求线索 |
-| `assumption-register.md` | 记录尚不能开发成规则的假设 |
-| `question-backlog.md` | 用业务人员能看懂的话列待确认问题 |
-| `decision-log.md` | 只记录已经确认的决策 |
-| `customer-config-draft.md` | 记录永绅 yoyoosun 未来可能的配置项 |
-| `delivery-matrix.md` | 记录永绅 yoyoosun 客户交付矩阵 |
-| `delta-ledger.md` | 记录永绅 yoyoosun 客户差异台账 |
-| `delta-register.md` | 记录客户差异项 |
-| `change-request-process.md` | 记录后续需求分类和评审流程 |
-| `import-source-inventory.md` | 记录永绅 yoyoosun 导入来源清单和用途分类 |
-| `import-field-classification.md` | 记录永绅 yoyoosun 字段分类、可导入候选和禁止自动迁移项 |
-| `import-dry-run-plan.md` | 记录永绅 yoyoosun 数据导入 dry-run 阶段设计 |
-| `import-unresolved-queue.md` | 记录导入未决队列类型、阻断规则和处理方式 |
-| `import-acceptance-checklist.md` | 记录 future import execution 前的验收清单 |
-| `import-dry-run-tooling.md` | 记录 dry-run CLI 与 freeze evidence tooling 的用法和边界 |
-| `source-snapshot-freeze.md` | 记录 source snapshot freeze metadata、checksum、风险统计和重跑方式 |
-| `real-dry-run-evidence.md` | 记录 real dry-run evidence package 摘要和 no-real-import 结论 |
-| `source-snapshot-manual-review-checklist.md` | 记录 freeze / dry-run evidence 的人工 review checklist 和 import-not-approved 结论 |
-| `import-strategy.md` | 记录永绅 yoyoosun 导入策略和真实导入前置要求 |
-| `import-risk-register.md` | 记录永绅 yoyoosun 导入风险登记 |
-| `trial-training-note.md` | 记录永绅 yoyoosun 试用培训说明、正式入口和旧入口退出边界 |
-| `trial-account-role-menu-checklist.md` | 记录永绅 yoyoosun 试用账号、角色、菜单和岗位任务端核对清单 |
-| `trial-environment-runbook.md` | 记录永绅 yoyoosun 目标试用环境账号、RBAC、菜单和岗位任务端核对执行步骤 |
+| `来源材料.md` | 记录永绅 yoyoosun 样本资料类型和用途 |
+| `需求线索.md` | 按业务域记录需求线索 |
+| `假设登记.md` | 记录尚不能开发成规则的假设 |
+| `问题待办.md` | 用业务人员能看懂的话列待确认问题 |
+| `决策日志.md` | 只记录已经确认的决策 |
+| `客户配置草案.md` | 记录永绅 yoyoosun 未来可能的配置项 |
+| `客户交付矩阵.md` | 记录永绅 yoyoosun 客户交付矩阵 |
+| `客户差异台账.md` | 记录永绅 yoyoosun 客户差异台账 |
+| `差异登记.md` | 记录客户差异项 |
+| `变更请求流程.md` | 记录后续需求分类和评审流程 |
+| `导入来源清单.md` | 记录永绅 yoyoosun 导入来源清单和用途分类 |
+| `导入字段分类.md` | 记录永绅 yoyoosun 字段分类、可导入候选和禁止自动迁移项 |
+| `导入试跑计划.md` | 记录永绅 yoyoosun 数据导入 dry-run 阶段设计 |
+| `导入待确认队列.md` | 记录导入未决队列类型、阻断规则和处理方式 |
+| `导入验收清单.md` | 记录 future import execution 前的验收清单 |
+| `导入试跑工具说明.md` | 记录 dry-run CLI 与 freeze evidence tooling 的用法和边界 |
+| `来源快照冻结.md` | 记录 source snapshot freeze metadata、checksum、风险统计和重跑方式 |
+| `真实试跑证据.md` | 记录 real dry-run evidence package 摘要和 no-real-import 结论 |
+| `来源快照人工复查清单.md` | 记录 freeze / dry-run evidence 的人工 review checklist 和 import-not-approved 结论 |
+| `导入策略.md` | 记录永绅 yoyoosun 导入策略和真实导入前置要求 |
+| `导入风险登记.md` | 记录永绅 yoyoosun 导入风险登记 |
+| `试用培训说明.md` | 记录永绅 yoyoosun 试用培训说明、正式入口和旧入口退出边界 |
+| `试用账号角色菜单核对清单.md` | 记录永绅 yoyoosun 试用账号、角色、菜单和岗位任务端核对清单 |
+| `试用环境执行手册.md` | 记录永绅 yoyoosun 目标试用环境账号、RBAC、菜单和岗位任务端核对执行步骤 |
 | `docs/archive/customer-evidence/yoyoosun/simulated-trial-acceptance.md` | 记录试用模拟数据验收结果、验证命令和不导入真实数据边界 |
 | `docs/archive/customer-evidence/yoyoosun/operational-fact-target-release-acceptance.md` | 记录业务事实目标环境发布、migration、事实闭环页面验收、内部模拟事实写入验收和 evidence 模板 |
 | `docs/archive/customer-evidence/yoyoosun/operational-fact-target-release-evidence-2026-06-08.md` | 记录 2026-06-08 业务事实目标环境发布 smoke、migration、试用账号 RBAC、登录态只读 API smoke、内部模拟事实写入闭环和剩余交付确认项 |
 | `docs/archive/customer-evidence/yoyoosun/mobile-workflow-target-release-evidence-2026-06-09.md` | 记录 2026-06-09 岗位任务端发布、目标环境 smoke、岗位路由回归和内部模拟 workflow 闭环 |
 | `docs/archive/customer-evidence/yoyoosun/industry-template-target-release-evidence-2026-06-09.md` | 记录 2026-06-09 行业模板沉淀、本地模拟验收、目标环境发布和内部工程入口退出客户菜单的证据 |
 | `docs/archive/customer-evidence/yoyoosun/private-deployment-target-release-evidence-2026-06-09.md` | 记录 2026-06-09 私有化客户包模板、本地模拟验收和目标环境发布证据 |
-| `field-numbering-confirmation-checklist.md` | 记录永绅 yoyoosun 字段显示、字段必填和编号规则的客户确认清单 |
-| `field-numbering-confirmation-result-template.md` | 记录永绅 yoyoosun 字段编号客户确认结果的回写模板和边界 |
+| `字段编号确认清单.md` | 记录永绅 yoyoosun 字段显示、字段必填和编号规则的客户确认清单 |
+| `字段编号确认结果模板.md` | 记录永绅 yoyoosun 字段编号客户确认结果的回写模板和边界 |
 | `raw-source-files/` | 保存永绅 yoyoosun 原始 Excel / PDF / PNG / JPG / JPEG，用于字段、模板、导入、页面和验收溯源 |
-| `raw-source-file-archive-review.md` | 记录永绅 yoyoosun 原始客户文件归档评审、用途分类、checksum 和边界 |
+| `原始客户文件归档评审.md` | 记录永绅 yoyoosun 原始客户文件归档评审、用途分类、checksum 和边界 |
 
 ## 边界 / Boundary
 

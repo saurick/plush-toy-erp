@@ -46,6 +46,7 @@ func (PurchaseReceipt) Fields() []ent.Field {
 		field.String("receipt_no").
 			NotEmpty().
 			MaxLen(64),
+		// Supplier name is a receipt-time snapshot; Supplier remains the master truth when linked elsewhere.
 		field.String("supplier_name").
 			NotEmpty().
 			MaxLen(255),

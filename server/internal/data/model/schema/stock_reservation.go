@@ -23,6 +23,7 @@ var stockReservationLockedFields = map[string]struct{}{
 	"sales_order_id":      {},
 	"sales_order_item_id": {},
 	"product_id":          {},
+	"product_sku_id":      {},
 	"warehouse_id":        {},
 	"unit_id":             {},
 	"lot_id":              {},
@@ -67,7 +68,9 @@ func (StockReservation) Fields() []ent.Field {
 		field.String("status").NotEmpty().Default("ACTIVE").MaxLen(32),
 		field.Int("sales_order_id").Optional().Nillable().Positive(),
 		field.Int("sales_order_item_id").Optional().Nillable().Positive(),
+		// product_id remains required for allocation facts; SKU is optional traceability.
 		field.Int("product_id").Positive(),
+		field.Int("product_sku_id").Optional().Nillable().Positive(),
 		field.Int("warehouse_id").Positive(),
 		field.Int("unit_id").Positive(),
 		field.Int("lot_id").Optional().Nillable().Positive(),
@@ -87,6 +90,7 @@ func (StockReservation) Edges() []ent.Edge {
 		edge.From("sales_order", SalesOrder.Type).Ref("stock_reservations").Field("sales_order_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("sales_order_item", SalesOrderItem.Type).Ref("stock_reservations").Field("sales_order_item_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("product", Product.Type).Ref("stock_reservations").Field("product_id").Required().Unique(),
+		edge.From("product_sku", ProductSKU.Type).Ref("stock_reservations").Field("product_sku_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("warehouse", Warehouse.Type).Ref("stock_reservations").Field("warehouse_id").Required().Unique(),
 		edge.From("unit", Unit.Type).Ref("stock_reservations").Field("unit_id").Required().Unique(),
 		edge.From("inventory_lot", InventoryLot.Type).Ref("stock_reservations").Field("lot_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
@@ -100,6 +104,7 @@ func (StockReservation) Indexes() []ent.Index {
 		index.Fields("status"),
 		index.Fields("sales_order_id"),
 		index.Fields("sales_order_item_id"),
+		index.Fields("product_sku_id"),
 		index.Fields("product_id", "warehouse_id", "lot_id"),
 	}
 }

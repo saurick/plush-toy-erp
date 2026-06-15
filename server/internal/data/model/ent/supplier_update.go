@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/supplier"
 	"time"
 
@@ -156,9 +157,45 @@ func (_u *SupplierUpdate) SetUpdatedAt(v time.Time) *SupplierUpdate {
 	return _u
 }
 
+// AddPurchaseOrderIDs adds the "purchase_orders" edge to the PurchaseOrder entity by IDs.
+func (_u *SupplierUpdate) AddPurchaseOrderIDs(ids ...int) *SupplierUpdate {
+	_u.mutation.AddPurchaseOrderIDs(ids...)
+	return _u
+}
+
+// AddPurchaseOrders adds the "purchase_orders" edges to the PurchaseOrder entity.
+func (_u *SupplierUpdate) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseOrderIDs(ids...)
+}
+
 // Mutation returns the SupplierMutation object of the builder.
 func (_u *SupplierUpdate) Mutation() *SupplierMutation {
 	return _u.mutation
+}
+
+// ClearPurchaseOrders clears all "purchase_orders" edges to the PurchaseOrder entity.
+func (_u *SupplierUpdate) ClearPurchaseOrders() *SupplierUpdate {
+	_u.mutation.ClearPurchaseOrders()
+	return _u
+}
+
+// RemovePurchaseOrderIDs removes the "purchase_orders" edge to PurchaseOrder entities by IDs.
+func (_u *SupplierUpdate) RemovePurchaseOrderIDs(ids ...int) *SupplierUpdate {
+	_u.mutation.RemovePurchaseOrderIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseOrders removes "purchase_orders" edges to PurchaseOrder entities.
+func (_u *SupplierUpdate) RemovePurchaseOrders(v ...*PurchaseOrder) *SupplierUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseOrderIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -279,6 +316,51 @@ func (_u *SupplierUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(supplier.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.PurchaseOrdersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseOrdersTable,
+			Columns: []string{supplier.PurchaseOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseOrdersIDs(); len(nodes) > 0 && !_u.mutation.PurchaseOrdersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseOrdersTable,
+			Columns: []string{supplier.PurchaseOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseOrdersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseOrdersTable,
+			Columns: []string{supplier.PurchaseOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -428,9 +510,45 @@ func (_u *SupplierUpdateOne) SetUpdatedAt(v time.Time) *SupplierUpdateOne {
 	return _u
 }
 
+// AddPurchaseOrderIDs adds the "purchase_orders" edge to the PurchaseOrder entity by IDs.
+func (_u *SupplierUpdateOne) AddPurchaseOrderIDs(ids ...int) *SupplierUpdateOne {
+	_u.mutation.AddPurchaseOrderIDs(ids...)
+	return _u
+}
+
+// AddPurchaseOrders adds the "purchase_orders" edges to the PurchaseOrder entity.
+func (_u *SupplierUpdateOne) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseOrderIDs(ids...)
+}
+
 // Mutation returns the SupplierMutation object of the builder.
 func (_u *SupplierUpdateOne) Mutation() *SupplierMutation {
 	return _u.mutation
+}
+
+// ClearPurchaseOrders clears all "purchase_orders" edges to the PurchaseOrder entity.
+func (_u *SupplierUpdateOne) ClearPurchaseOrders() *SupplierUpdateOne {
+	_u.mutation.ClearPurchaseOrders()
+	return _u
+}
+
+// RemovePurchaseOrderIDs removes the "purchase_orders" edge to PurchaseOrder entities by IDs.
+func (_u *SupplierUpdateOne) RemovePurchaseOrderIDs(ids ...int) *SupplierUpdateOne {
+	_u.mutation.RemovePurchaseOrderIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseOrders removes "purchase_orders" edges to PurchaseOrder entities.
+func (_u *SupplierUpdateOne) RemovePurchaseOrders(v ...*PurchaseOrder) *SupplierUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseOrderIDs(ids...)
 }
 
 // Where appends a list predicates to the SupplierUpdate builder.
@@ -581,6 +699,51 @@ func (_u *SupplierUpdateOne) sqlSave(ctx context.Context) (_node *Supplier, err 
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(supplier.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.PurchaseOrdersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseOrdersTable,
+			Columns: []string{supplier.PurchaseOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseOrdersIDs(); len(nodes) > 0 && !_u.mutation.PurchaseOrdersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseOrdersTable,
+			Columns: []string{supplier.PurchaseOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseOrdersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.PurchaseOrdersTable,
+			Columns: []string{supplier.PurchaseOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &Supplier{config: _u.config}
 	_spec.Assign = _node.assignValues

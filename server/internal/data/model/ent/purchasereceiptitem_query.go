@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -36,6 +37,7 @@ type PurchaseReceiptItemQuery struct {
 	withWarehouse                      *WarehouseQuery
 	withUnit                           *UnitQuery
 	withInventoryLot                   *InventoryLotQuery
+	withPurchaseOrderItem              *PurchaseOrderItemQuery
 	withPurchaseReturnItems            *PurchaseReturnItemQuery
 	withPurchaseReceiptAdjustmentItems *PurchaseReceiptAdjustmentItemQuery
 	withQualityInspections             *QualityInspectionQuery
@@ -178,6 +180,28 @@ func (_q *PurchaseReceiptItemQuery) QueryInventoryLot() *InventoryLotQuery {
 			sqlgraph.From(purchasereceiptitem.Table, purchasereceiptitem.FieldID, selector),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptitem.InventoryLotTable, purchasereceiptitem.InventoryLotColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPurchaseOrderItem chains the current query on the "purchase_order_item" edge.
+func (_q *PurchaseReceiptItemQuery) QueryPurchaseOrderItem() *PurchaseOrderItemQuery {
+	query := (&PurchaseOrderItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceiptitem.Table, purchasereceiptitem.FieldID, selector),
+			sqlgraph.To(purchaseorderitem.Table, purchaseorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchasereceiptitem.PurchaseOrderItemTable, purchasereceiptitem.PurchaseOrderItemColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -448,6 +472,7 @@ func (_q *PurchaseReceiptItemQuery) Clone() *PurchaseReceiptItemQuery {
 		withWarehouse:                      _q.withWarehouse.Clone(),
 		withUnit:                           _q.withUnit.Clone(),
 		withInventoryLot:                   _q.withInventoryLot.Clone(),
+		withPurchaseOrderItem:              _q.withPurchaseOrderItem.Clone(),
 		withPurchaseReturnItems:            _q.withPurchaseReturnItems.Clone(),
 		withPurchaseReceiptAdjustmentItems: _q.withPurchaseReceiptAdjustmentItems.Clone(),
 		withQualityInspections:             _q.withQualityInspections.Clone(),
@@ -509,6 +534,17 @@ func (_q *PurchaseReceiptItemQuery) WithInventoryLot(opts ...func(*InventoryLotQ
 		opt(query)
 	}
 	_q.withInventoryLot = query
+	return _q
+}
+
+// WithPurchaseOrderItem tells the query-builder to eager-load the nodes that are connected to
+// the "purchase_order_item" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *PurchaseReceiptItemQuery) WithPurchaseOrderItem(opts ...func(*PurchaseOrderItemQuery)) *PurchaseReceiptItemQuery {
+	query := (&PurchaseOrderItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPurchaseOrderItem = query
 	return _q
 }
 
@@ -623,12 +659,13 @@ func (_q *PurchaseReceiptItemQuery) sqlAll(ctx context.Context, hooks ...queryHo
 	var (
 		nodes       = []*PurchaseReceiptItem{}
 		_spec       = _q.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [9]bool{
 			_q.withReceipt != nil,
 			_q.withMaterial != nil,
 			_q.withWarehouse != nil,
 			_q.withUnit != nil,
 			_q.withInventoryLot != nil,
+			_q.withPurchaseOrderItem != nil,
 			_q.withPurchaseReturnItems != nil,
 			_q.withPurchaseReceiptAdjustmentItems != nil,
 			_q.withQualityInspections != nil,
@@ -679,6 +716,12 @@ func (_q *PurchaseReceiptItemQuery) sqlAll(ctx context.Context, hooks ...queryHo
 	if query := _q.withInventoryLot; query != nil {
 		if err := _q.loadInventoryLot(ctx, query, nodes, nil,
 			func(n *PurchaseReceiptItem, e *InventoryLot) { n.Edges.InventoryLot = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPurchaseOrderItem; query != nil {
+		if err := _q.loadPurchaseOrderItem(ctx, query, nodes, nil,
+			func(n *PurchaseReceiptItem, e *PurchaseOrderItem) { n.Edges.PurchaseOrderItem = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -862,6 +905,38 @@ func (_q *PurchaseReceiptItemQuery) loadInventoryLot(ctx context.Context, query 
 	}
 	return nil
 }
+func (_q *PurchaseReceiptItemQuery) loadPurchaseOrderItem(ctx context.Context, query *PurchaseOrderItemQuery, nodes []*PurchaseReceiptItem, init func(*PurchaseReceiptItem), assign func(*PurchaseReceiptItem, *PurchaseOrderItem)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*PurchaseReceiptItem)
+	for i := range nodes {
+		if nodes[i].PurchaseOrderItemID == nil {
+			continue
+		}
+		fk := *nodes[i].PurchaseOrderItemID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(purchaseorderitem.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "purchase_order_item_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 func (_q *PurchaseReceiptItemQuery) loadPurchaseReturnItems(ctx context.Context, query *PurchaseReturnItemQuery, nodes []*PurchaseReceiptItem, init func(*PurchaseReceiptItem), assign func(*PurchaseReceiptItem, *PurchaseReturnItem)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[int]*PurchaseReceiptItem)
@@ -998,6 +1073,9 @@ func (_q *PurchaseReceiptItemQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withInventoryLot != nil {
 			_spec.Node.AddColumnOnce(purchasereceiptitem.FieldLotID)
+		}
+		if _q.withPurchaseOrderItem != nil {
+			_spec.Node.AddColumnOnce(purchasereceiptitem.FieldPurchaseOrderItemID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

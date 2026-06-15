@@ -50,22 +50,27 @@ import {
   createContact,
   createCustomer,
   createMaterial,
+  createProductSKU,
   createSupplier,
   listContactsByOwner,
   listCustomers,
   listMaterials,
+  listProductSKUs,
   listSuppliers,
   setCustomerActive,
   setMaterialActive,
+  setProductSKUActive,
   setSupplierActive,
   updateCustomer,
   updateMaterial,
+  updateProductSKU,
   updateSupplier,
 } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   buildContactParams,
   buildMasterDataParams,
+  buildProductSKUParams,
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
@@ -139,6 +144,24 @@ const PAGE_CONFIG = Object.freeze({
     formBoundary: '只维护材料主数据，不在此写采购、库存、质检或 BOM 用量。',
     summary:
       '维护材料主数据；采购订单、库存余额、来料质检和 BOM 用量在对应业务模块处理。',
+  },
+  product_skus: {
+    title: '产品档案',
+    recordKey: 'product_skus',
+    list: listProductSKUs,
+    create: createProductSKU,
+    update: updateProductSKU,
+    setActive: setProductSKUActive,
+    permissions: {
+      create: 'product_sku.create',
+      update: 'product_sku.update',
+      disable: 'product_sku.disable',
+    },
+    entityLabel: 'SKU',
+    formBoundary:
+      '只维护产品规格主数据，不在此写订单、库存、BOM、生产或出货事实。',
+    summary:
+      '维护产品下的 SKU / 规格；产品归属使用 product_id，订单、库存、BOM 和出货事实在对应业务模块处理。',
   },
 })
 
@@ -249,6 +272,85 @@ function downloadCSV({ filename, columns, rows }) {
 }
 
 function MasterDataFormFields({ type }) {
+  if (type === 'product_skus') {
+    return (
+      <>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="产品 ID"
+          name="product_id"
+          rules={[{ required: true, message: '请填写产品 ID' }]}
+        >
+          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="SKU 编号"
+          name="sku_code"
+          rules={[{ required: true, message: '请填写 SKU 编号' }]}
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="SKU 名称"
+          name="sku_name"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="条码"
+          name="barcode"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="客户 SKU"
+          name="customer_sku"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="颜色"
+          name="color"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="色号"
+          name="color_no"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="尺码"
+          name="size"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="包装版本"
+          name="packaging_version"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="默认单位 ID"
+          name="default_unit_id"
+        >
+          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        </Form.Item>
+      </>
+    )
+  }
+
   return (
     <>
       <Form.Item
@@ -399,6 +501,29 @@ function ContactFormFields() {
   )
 }
 
+function getRecordCode(record, type = '') {
+  const source = record || {}
+  return type === 'product_skus' ? source.sku_code : source.code
+}
+
+function getRecordName(record, type = '') {
+  const source = record || {}
+  if (type === 'product_skus') {
+    return source.sku_name || source.customer_sku || source.barcode || ''
+  }
+  return source.name
+}
+
+function getRecordSearchPlaceholder(type = '') {
+  if (type === 'materials') {
+    return '搜索编号、名称、分类、规格、颜色'
+  }
+  if (type === 'product_skus') {
+    return '搜索 SKU、条码、客户 SKU、颜色、色号、尺码、包装版本'
+  }
+  return '搜索编号、名称、简称'
+}
+
 export default function V1MasterDataPage({ type }) {
   const config = PAGE_CONFIG[type] || PAGE_CONFIG.customers
   const outletContext = useOutletContext()
@@ -537,10 +662,11 @@ export default function V1MasterDataPage({ type }) {
     const values = await recordForm.validateFields()
     setSaving(true)
     try {
-      const params = buildMasterDataParams(
-        values,
-        editingRecord?.id ? { id: editingRecord.id } : {}
-      )
+      const extra = editingRecord?.id ? { id: editingRecord.id } : {}
+      const params =
+        type === 'product_skus'
+          ? buildProductSKUParams(values, extra)
+          : buildMasterDataParams(values, extra)
       const saved = editingRecord?.id
         ? await config.update(params)
         : await config.create(params)
@@ -617,8 +743,124 @@ export default function V1MasterDataPage({ type }) {
     [moduleKey, outletContext]
   )
 
-  const recordColumns = useMemo(
-    () => [
+  const recordColumns = useMemo(() => {
+    if (type === 'product_skus') {
+      return [
+        {
+          title: '产品 ID',
+          exportTitle: '产品 ID',
+          dataIndex: 'product_id',
+          width: 110,
+          sorter: (a, b) =>
+            Number(a?.product_id || 0) - Number(b?.product_id || 0),
+        },
+        {
+          title: 'SKU 编号',
+          exportTitle: 'SKU 编号',
+          dataIndex: 'sku_code',
+          width: 160,
+          sorter: (a, b) => compareText(a?.sku_code, b?.sku_code),
+        },
+        {
+          title: 'SKU 名称',
+          exportTitle: 'SKU 名称',
+          dataIndex: 'sku_name',
+          width: 200,
+          sorter: (a, b) => compareText(a?.sku_name, b?.sku_name),
+          render: (value) => value || '-',
+        },
+        {
+          title: '条码',
+          exportTitle: '条码',
+          dataIndex: 'barcode',
+          width: 160,
+          sorter: (a, b) => compareText(a?.barcode, b?.barcode),
+          render: (value) => value || '-',
+        },
+        {
+          title: '客户 SKU',
+          exportTitle: '客户 SKU',
+          dataIndex: 'customer_sku',
+          width: 160,
+          sorter: (a, b) => compareText(a?.customer_sku, b?.customer_sku),
+          render: (value) => value || '-',
+        },
+        {
+          title: '颜色',
+          exportTitle: '颜色',
+          dataIndex: 'color',
+          width: 120,
+          sorter: (a, b) => compareText(a?.color, b?.color),
+          render: (value) => value || '-',
+        },
+        {
+          title: '色号',
+          exportTitle: '色号',
+          dataIndex: 'color_no',
+          width: 120,
+          sorter: (a, b) => compareText(a?.color_no, b?.color_no),
+          render: (value) => value || '-',
+        },
+        {
+          title: '尺码',
+          exportTitle: '尺码',
+          dataIndex: 'size',
+          width: 110,
+          sorter: (a, b) => compareText(a?.size, b?.size),
+          render: (value) => value || '-',
+        },
+        {
+          title: '包装版本',
+          exportTitle: '包装版本',
+          dataIndex: 'packaging_version',
+          width: 140,
+          sorter: (a, b) =>
+            compareText(a?.packaging_version, b?.packaging_version),
+          render: (value) => value || '-',
+        },
+        {
+          title: '默认单位 ID',
+          exportTitle: '默认单位 ID',
+          dataIndex: 'default_unit_id',
+          width: 130,
+          sorter: (a, b) =>
+            Number(a?.default_unit_id || 0) - Number(b?.default_unit_id || 0),
+          render: (value) => value || '-',
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'is_active',
+          width: 90,
+          sorter: (a, b) => compareBoolean(a?.is_active, b?.is_active),
+          exportValue: (record) =>
+            record?.is_active === false ? '停用' : '启用',
+          render: activeTag,
+        },
+        {
+          title: '创建时间',
+          exportTitle: '创建时间',
+          dataIndex: 'created_at',
+          width: 160,
+          sorter: (a, b) =>
+            Number(a?.created_at || 0) - Number(b?.created_at || 0),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.created_at),
+        },
+        {
+          title: '更新时间',
+          exportTitle: '更新时间',
+          dataIndex: 'updated_at',
+          width: 160,
+          sorter: (a, b) =>
+            Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.updated_at),
+        },
+      ]
+    }
+
+    return [
       {
         title: '编号',
         exportTitle: '编号',
@@ -740,9 +982,8 @@ export default function V1MasterDataPage({ type }) {
         render: formatUnixDateTime,
         exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
-    ],
-    [type]
-  )
+    ]
+  }, [type])
   const preferredRecordColumnOrder = useMemo(
     () =>
       getPreferredColumnOrder({
@@ -824,10 +1065,10 @@ export default function V1MasterDataPage({ type }) {
   )
   const selectedRecordDisplayText = useMemo(() => {
     if (!selectedRecord) return `请先选择一个${entityLabel}`
-    return `${selectedRecord.code || selectedRecord.id} / ${
-      selectedRecord.name || `未命名${entityLabel}`
+    return `${getRecordCode(selectedRecord, type) || selectedRecord.id} / ${
+      getRecordName(selectedRecord, type) || `未命名${entityLabel}`
     }`
-  }, [entityLabel, selectedRecord])
+  }, [entityLabel, selectedRecord, type])
   const exportRecords = () => {
     downloadCSV({
       filename: `${type}-current-results.csv`,
@@ -863,11 +1104,7 @@ export default function V1MasterDataPage({ type }) {
         filters={
           <>
             <SearchInput
-              placeholder={
-                type === 'materials'
-                  ? '搜索编号、名称、分类、规格、颜色'
-                  : '搜索编号、名称、简称'
-              }
+              placeholder={getRecordSearchPlaceholder(type)}
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
               onPressEnter={loadRecords}
@@ -1041,7 +1278,8 @@ export default function V1MasterDataPage({ type }) {
             <div className="erp-v1-master-data-contact-panel__title">
               <span>联系人明细</span>
               <strong>
-                {selectedRecord?.name || '先从上方选择一个客户或供应商'}
+                {getRecordName(selectedRecord, type) ||
+                  '先从上方选择一个客户或供应商'}
               </strong>
               <small>
                 联系人随主体维护，不作为独立业务对象，也不生成订单、出货、库存或财务事实。
@@ -1049,7 +1287,10 @@ export default function V1MasterDataPage({ type }) {
             </div>
             <div className="erp-v1-master-data-contact-panel__meta">
               <span>
-                主体 <strong>{selectedRecord?.code || '未选择'}</strong>
+                主体{' '}
+                <strong>
+                  {getRecordCode(selectedRecord, type) || '未选择'}
+                </strong>
               </span>
               <span>
                 联系人 <strong>{selectedRecord ? contacts.length : 0}</strong>
@@ -1092,7 +1333,7 @@ export default function V1MasterDataPage({ type }) {
       <CollaborationTaskPanel
         tasks={[]}
         selectedTasks={[]}
-        selectedRecordLabel={selectedRecord?.name || ''}
+        selectedRecordLabel={getRecordName(selectedRecord, type) || ''}
       />
 
       <Modal
@@ -1272,43 +1513,80 @@ export default function V1MasterDataPage({ type }) {
       >
         {selectedRecord ? (
           <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="编号">
-              {selectedRecord.code}
-            </Descriptions.Item>
-            <Descriptions.Item label="名称">
-              {selectedRecord.name}
-            </Descriptions.Item>
-            {type === 'materials' ? (
+            {type === 'product_skus' ? (
               <>
-                <Descriptions.Item label="分类">
-                  {selectedRecord.category || '-'}
+                <Descriptions.Item label="产品 ID">
+                  {selectedRecord.product_id}
                 </Descriptions.Item>
-                <Descriptions.Item label="规格">
-                  {selectedRecord.spec || '-'}
+                <Descriptions.Item label="SKU 编号">
+                  {selectedRecord.sku_code}
+                </Descriptions.Item>
+                <Descriptions.Item label="SKU 名称">
+                  {selectedRecord.sku_name || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="条码">
+                  {selectedRecord.barcode || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="客户 SKU">
+                  {selectedRecord.customer_sku || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="颜色">
                   {selectedRecord.color || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="色号">
+                  {selectedRecord.color_no || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="尺码">
+                  {selectedRecord.size || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="包装版本">
+                  {selectedRecord.packaging_version || '-'}
                 </Descriptions.Item>
                 <Descriptions.Item label="默认单位 ID">
                   {selectedRecord.default_unit_id || '-'}
                 </Descriptions.Item>
               </>
             ) : (
-              <Descriptions.Item label="简称">
-                {selectedRecord.short_name || '-'}
-              </Descriptions.Item>
-            )}
-            {type === 'suppliers' ? (
-              <Descriptions.Item label="供应商类型">
-                {SUPPLIER_TYPE_LABELS[selectedRecord.supplier_type] ||
-                  selectedRecord.supplier_type ||
-                  '-'}
-              </Descriptions.Item>
-            ) : null}
-            {type === 'materials' ? null : (
-              <Descriptions.Item label="税号">
-                {selectedRecord.tax_no || '-'}
-              </Descriptions.Item>
+              <>
+                <Descriptions.Item label="编号">
+                  {selectedRecord.code}
+                </Descriptions.Item>
+                <Descriptions.Item label="名称">
+                  {selectedRecord.name}
+                </Descriptions.Item>
+                {type === 'materials' ? (
+                  <>
+                    <Descriptions.Item label="分类">
+                      {selectedRecord.category || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="规格">
+                      {selectedRecord.spec || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="颜色">
+                      {selectedRecord.color || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="默认单位 ID">
+                      {selectedRecord.default_unit_id || '-'}
+                    </Descriptions.Item>
+                  </>
+                ) : (
+                  <Descriptions.Item label="简称">
+                    {selectedRecord.short_name || '-'}
+                  </Descriptions.Item>
+                )}
+                {type === 'suppliers' ? (
+                  <Descriptions.Item label="供应商类型">
+                    {SUPPLIER_TYPE_LABELS[selectedRecord.supplier_type] ||
+                      selectedRecord.supplier_type ||
+                      '-'}
+                  </Descriptions.Item>
+                ) : null}
+                {type === 'materials' ? null : (
+                  <Descriptions.Item label="税号">
+                    {selectedRecord.tax_no || '-'}
+                  </Descriptions.Item>
+                )}
+              </>
             )}
             <Descriptions.Item label="状态">
               {activeTag(selectedRecord.is_active)}
@@ -1319,9 +1597,11 @@ export default function V1MasterDataPage({ type }) {
             <Descriptions.Item label="更新时间">
               {formatUnixDateTime(selectedRecord.updated_at)}
             </Descriptions.Item>
-            <Descriptions.Item label="备注">
-              {selectedRecord.note || '-'}
-            </Descriptions.Item>
+            {type === 'product_skus' ? null : (
+              <Descriptions.Item label="备注">
+                {selectedRecord.note || '-'}
+              </Descriptions.Item>
+            )}
           </Descriptions>
         ) : null}
       </Drawer>

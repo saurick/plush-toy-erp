@@ -586,11 +586,15 @@ func (r *inventoryRepo) CreateBOMHeader(ctx context.Context, in *biz.BOMHeaderCr
 }
 
 func (r *inventoryRepo) CreateBOMItem(ctx context.Context, in *biz.BOMItemCreate) (*biz.BOMItem, error) {
-	if _, err := r.data.postgres.BOMHeader.Get(ctx, in.BOMHeaderID); err != nil {
+	header, err := r.data.postgres.BOMHeader.Get(ctx, in.BOMHeaderID)
+	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrBOMHeaderNotFound
 		}
 		return nil, err
+	}
+	if header.Status != biz.BOMStatusDraft {
+		return nil, biz.ErrBOMActiveImmutable
 	}
 	if _, err := r.data.postgres.Material.Get(ctx, in.MaterialID); err != nil {
 		if ent.IsNotFound(err) {
@@ -617,6 +621,176 @@ func (r *inventoryRepo) CreateBOMItem(ctx context.Context, in *biz.BOMItemCreate
 		return nil, err
 	}
 	return entBOMItemToBiz(row), nil
+}
+
+func (r *inventoryRepo) UpdateBOMDraftHeader(ctx context.Context, id int, in *biz.BOMHeaderUpdate) (*biz.BOMHeader, error) {
+	header, err := r.data.postgres.BOMHeader.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBOMHeaderNotFound
+		}
+		return nil, err
+	}
+	if header.Status != biz.BOMStatusDraft {
+		return nil, biz.ErrBOMActiveImmutable
+	}
+	update := r.data.postgres.BOMHeader.UpdateOneID(id).
+		SetVersion(in.Version)
+	if in.EffectiveFrom == nil {
+		update.ClearEffectiveFrom()
+	} else {
+		update.SetEffectiveFrom(*in.EffectiveFrom)
+	}
+	if in.EffectiveTo == nil {
+		update.ClearEffectiveTo()
+	} else {
+		update.SetEffectiveTo(*in.EffectiveTo)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entBOMHeaderToBiz(row), nil
+}
+
+func (r *inventoryRepo) UpdateBOMDraftItem(ctx context.Context, id int, in *biz.BOMItemUpdate) (*biz.BOMItem, error) {
+	item, err := r.data.postgres.BOMItem.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBOMItemNotFound
+		}
+		return nil, err
+	}
+	header, err := r.data.postgres.BOMHeader.Get(ctx, item.BomHeaderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBOMHeaderNotFound
+		}
+		return nil, err
+	}
+	if header.Status != biz.BOMStatusDraft {
+		return nil, biz.ErrBOMActiveImmutable
+	}
+	if _, err := r.data.postgres.Material.Get(ctx, in.MaterialID); err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBadParam
+		}
+		return nil, err
+	}
+	if _, err := r.data.postgres.Unit.Get(ctx, in.UnitID); err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBadParam
+		}
+		return nil, err
+	}
+	update := r.data.postgres.BOMItem.UpdateOneID(id).
+		SetMaterialID(in.MaterialID).
+		SetQuantity(in.Quantity).
+		SetUnitID(in.UnitID).
+		SetLossRate(in.LossRate)
+	if in.Position == nil {
+		update.ClearPosition()
+	} else {
+		update.SetPosition(*in.Position)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entBOMItemToBiz(row), nil
+}
+
+func (r *inventoryRepo) DeleteBOMDraftItem(ctx context.Context, id int) error {
+	item, err := r.data.postgres.BOMItem.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrBOMItemNotFound
+		}
+		return err
+	}
+	header, err := r.data.postgres.BOMHeader.Get(ctx, item.BomHeaderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrBOMHeaderNotFound
+		}
+		return err
+	}
+	if header.Status != biz.BOMStatusDraft {
+		return biz.ErrBOMActiveImmutable
+	}
+	if err := r.data.postgres.BOMItem.DeleteOneID(id).Exec(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrBOMItemNotFound
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeaderFilter) ([]*biz.BOMHeader, int, error) {
+	query := r.data.postgres.BOMHeader.Query()
+	if filter.ProductID > 0 {
+		query = query.Where(bomheader.ProductID(filter.ProductID))
+	}
+	if filter.Status != "" {
+		query = query.Where(bomheader.Status(filter.Status))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(bomheader.VersionContainsFold(filter.Keyword))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.
+		Order(ent.Desc(bomheader.FieldUpdatedAt), ent.Desc(bomheader.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.BOMHeader, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entBOMHeaderToBiz(row))
+	}
+	return out, total, nil
+}
+
+func (r *inventoryRepo) GetBOMHeader(ctx context.Context, id int) (*biz.BOMHeader, error) {
+	row, err := r.data.postgres.BOMHeader.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBOMHeaderNotFound
+		}
+		return nil, err
+	}
+	return entBOMHeaderToBiz(row), nil
+}
+
+func (r *inventoryRepo) ListBOMItemsByHeader(ctx context.Context, bomHeaderID int) ([]*biz.BOMItem, error) {
+	rows, err := r.data.postgres.BOMItem.Query().
+		Where(bomitem.BomHeaderID(bomHeaderID)).
+		Order(ent.Asc(bomitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*biz.BOMItem, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entBOMItemToBiz(row))
+	}
+	return out, nil
 }
 
 func (r *inventoryRepo) ListBOMItemsByProduct(ctx context.Context, productID int) ([]*biz.BOMItem, error) {
@@ -650,6 +824,143 @@ func (r *inventoryRepo) GetActiveBOMByProduct(ctx context.Context, productID int
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrBOMHeaderNotFound
 		}
+		return nil, err
+	}
+	return entBOMHeaderToBiz(row), nil
+}
+
+func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, in *biz.BOMHeaderCreate) (*biz.BOMVersionDetail, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+
+	source, err := tx.BOMHeader.Get(ctx, sourceHeaderID)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBOMHeaderNotFound
+		}
+		return nil, err
+	}
+	if in.ProductID != source.ProductID {
+		return nil, biz.ErrBadParam
+	}
+	sourceItems, err := tx.BOMItem.Query().
+		Where(bomitem.BomHeaderID(sourceHeaderID)).
+		Order(ent.Asc(bomitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	target, err := tx.BOMHeader.Create().
+		SetProductID(source.ProductID).
+		SetVersion(in.Version).
+		SetStatus(biz.BOMStatusDraft).
+		SetNillableEffectiveFrom(in.EffectiveFrom).
+		SetNillableEffectiveTo(in.EffectiveTo).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	copiedItems := make([]*biz.BOMItem, 0, len(sourceItems))
+	for _, sourceItem := range sourceItems {
+		item, err := tx.BOMItem.Create().
+			SetBomHeaderID(target.ID).
+			SetMaterialID(sourceItem.MaterialID).
+			SetQuantity(sourceItem.Quantity).
+			SetUnitID(sourceItem.UnitID).
+			SetLossRate(sourceItem.LossRate).
+			SetNillablePosition(sourceItem.Position).
+			SetNillableNote(sourceItem.Note).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+		copiedItems = append(copiedItems, entBOMItemToBiz(item))
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return &biz.BOMVersionDetail{Header: entBOMHeaderToBiz(target), Items: copiedItems}, nil
+}
+
+func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (*biz.BOMVersionDetail, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+
+	target, err := tx.BOMHeader.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBOMHeaderNotFound
+		}
+		return nil, err
+	}
+	if target.Status == biz.BOMStatusDisabled {
+		return nil, biz.ErrBadParam
+	}
+	items, err := tx.BOMItem.Query().
+		Where(bomitem.BomHeaderID(id)).
+		Order(ent.Asc(bomitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	if target.Status != biz.BOMStatusActive {
+		if _, err := tx.BOMHeader.Update().
+			Where(
+				bomheader.ProductID(target.ProductID),
+				bomheader.Status(biz.BOMStatusActive),
+				bomheader.IDNEQ(id),
+			).
+			SetStatus(biz.BOMStatusArchived).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+		target, err = tx.BOMHeader.UpdateOneID(id).
+			SetStatus(biz.BOMStatusActive).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	outItems := make([]*biz.BOMItem, 0, len(items))
+	for _, item := range items {
+		outItems = append(outItems, entBOMItemToBiz(item))
+	}
+	return &biz.BOMVersionDetail{Header: entBOMHeaderToBiz(target), Items: outItems}, nil
+}
+
+func (r *inventoryRepo) ArchiveBOMVersion(ctx context.Context, id int) (*biz.BOMHeader, error) {
+	row, err := r.data.postgres.BOMHeader.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBOMHeaderNotFound
+		}
+		return nil, err
+	}
+	if row.Status == biz.BOMStatusDisabled {
+		return nil, biz.ErrBadParam
+	}
+	if row.Status == biz.BOMStatusArchived {
+		return entBOMHeaderToBiz(row), nil
+	}
+	row, err = r.data.postgres.BOMHeader.UpdateOneID(id).
+		SetStatus(biz.BOMStatusArchived).
+		Save(ctx)
+	if err != nil {
 		return nil, err
 	}
 	return entBOMHeaderToBiz(row), nil

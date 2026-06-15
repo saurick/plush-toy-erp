@@ -21,12 +21,13 @@ print_help() {
   9) trial-simulated-data
   10) operational-fact-simulated-closure
   11) mobile-workflow-simulated-closure
-  12) industry-template-closure
-  13) private-deployment-package-closure
-  14) shellcheck + shfmt（可选）
-  15) govulncheck（可选）
-  16) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  17) server: go test ./... + make build
+  12) mvp-closure
+  13) industry-template-closure
+  14) private-deployment-package-closure
+  15) shellcheck + shfmt（可选）
+  16) govulncheck（可选）
+  17) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  18) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -126,6 +127,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs" ]; then
   echo "[qa:strict] 运行岗位任务端模拟闭环工具测试"
   node --test "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs" ]; then
+  echo "[qa:strict] 运行 ERP MVP 闭环验收工具测试"
+  node --test "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/industry-template-closure.test.mjs" ]; then

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -31,8 +32,17 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgePurchaseOrders holds the string denoting the purchase_orders edge name in mutations.
+	EdgePurchaseOrders = "purchase_orders"
 	// Table holds the table name of the supplier in the database.
 	Table = "suppliers"
+	// PurchaseOrdersTable is the table that holds the purchase_orders relation/edge.
+	PurchaseOrdersTable = "purchase_orders"
+	// PurchaseOrdersInverseTable is the table name for the PurchaseOrder entity.
+	// It exists in this package in order to avoid circular dependency with the "purchaseorder" package.
+	PurchaseOrdersInverseTable = "purchase_orders"
+	// PurchaseOrdersColumn is the table column denoting the purchase_orders relation/edge.
+	PurchaseOrdersColumn = "supplier_id"
 )
 
 // Columns holds all SQL columns for supplier fields.
@@ -133,4 +143,25 @@ func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdatedAt orders the results by the updated_at field.
 func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
+}
+
+// ByPurchaseOrdersCount orders the results by purchase_orders count.
+func ByPurchaseOrdersCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPurchaseOrdersStep(), opts...)
+	}
+}
+
+// ByPurchaseOrders orders the results by purchase_orders terms.
+func ByPurchaseOrders(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPurchaseOrdersStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newPurchaseOrdersStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PurchaseOrdersInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PurchaseOrdersTable, PurchaseOrdersColumn),
+	)
 }

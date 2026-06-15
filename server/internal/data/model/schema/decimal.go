@@ -25,6 +25,7 @@ func immutableDecimalQuantityField(name string) ent.Field {
 		Immutable()
 }
 
+// decimalRateField uses the same numeric precision as quantities for BOM loss rates and ratios.
 func decimalRateField(name string) ent.Field {
 	return field.Other(name, decimal.Decimal{}).
 		SchemaType(map[string]string{
@@ -33,6 +34,7 @@ func decimalRateField(name string) ent.Field {
 		})
 }
 
+// optionalDecimalField keeps nullable money and quantity snapshots out of float precision.
 func optionalDecimalField(name string) ent.Field {
 	return field.Other(name, decimal.Decimal{}).
 		Optional().

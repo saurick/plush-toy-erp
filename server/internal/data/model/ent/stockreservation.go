@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/stockreservation"
@@ -34,6 +35,8 @@ type StockReservation struct {
 	SalesOrderItemID *int `json:"sales_order_item_id,omitempty"`
 	// ProductID holds the value of the "product_id" field.
 	ProductID int `json:"product_id,omitempty"`
+	// ProductSkuID holds the value of the "product_sku_id" field.
+	ProductSkuID *int `json:"product_sku_id,omitempty"`
 	// WarehouseID holds the value of the "warehouse_id" field.
 	WarehouseID int `json:"warehouse_id,omitempty"`
 	// UnitID holds the value of the "unit_id" field.
@@ -70,6 +73,8 @@ type StockReservationEdges struct {
 	SalesOrderItem *SalesOrderItem `json:"sales_order_item,omitempty"`
 	// Product holds the value of the product edge.
 	Product *Product `json:"product,omitempty"`
+	// ProductSku holds the value of the product_sku edge.
+	ProductSku *ProductSKU `json:"product_sku,omitempty"`
 	// Warehouse holds the value of the warehouse edge.
 	Warehouse *Warehouse `json:"warehouse,omitempty"`
 	// Unit holds the value of the unit edge.
@@ -78,7 +83,7 @@ type StockReservationEdges struct {
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [7]bool
 }
 
 // SalesOrderOrErr returns the SalesOrder value or an error if the edge
@@ -114,12 +119,23 @@ func (e StockReservationEdges) ProductOrErr() (*Product, error) {
 	return nil, &NotLoadedError{edge: "product"}
 }
 
+// ProductSkuOrErr returns the ProductSku value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e StockReservationEdges) ProductSkuOrErr() (*ProductSKU, error) {
+	if e.ProductSku != nil {
+		return e.ProductSku, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: productsku.Label}
+	}
+	return nil, &NotLoadedError{edge: "product_sku"}
+}
+
 // WarehouseOrErr returns the Warehouse value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e StockReservationEdges) WarehouseOrErr() (*Warehouse, error) {
 	if e.Warehouse != nil {
 		return e.Warehouse, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: warehouse.Label}
 	}
 	return nil, &NotLoadedError{edge: "warehouse"}
@@ -130,7 +146,7 @@ func (e StockReservationEdges) WarehouseOrErr() (*Warehouse, error) {
 func (e StockReservationEdges) UnitOrErr() (*Unit, error) {
 	if e.Unit != nil {
 		return e.Unit, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
@@ -141,7 +157,7 @@ func (e StockReservationEdges) UnitOrErr() (*Unit, error) {
 func (e StockReservationEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	if e.InventoryLot != nil {
 		return e.InventoryLot, nil
-	} else if e.loadedTypes[5] {
+	} else if e.loadedTypes[6] {
 		return nil, &NotFoundError{label: inventorylot.Label}
 	}
 	return nil, &NotLoadedError{edge: "inventory_lot"}
@@ -154,7 +170,7 @@ func (*StockReservation) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case stockreservation.FieldQuantity:
 			values[i] = new(decimal.Decimal)
-		case stockreservation.FieldID, stockreservation.FieldSalesOrderID, stockreservation.FieldSalesOrderItemID, stockreservation.FieldProductID, stockreservation.FieldWarehouseID, stockreservation.FieldUnitID, stockreservation.FieldLotID:
+		case stockreservation.FieldID, stockreservation.FieldSalesOrderID, stockreservation.FieldSalesOrderItemID, stockreservation.FieldProductID, stockreservation.FieldProductSkuID, stockreservation.FieldWarehouseID, stockreservation.FieldUnitID, stockreservation.FieldLotID:
 			values[i] = new(sql.NullInt64)
 		case stockreservation.FieldReservationNo, stockreservation.FieldStatus, stockreservation.FieldIdempotencyKey, stockreservation.FieldNote:
 			values[i] = new(sql.NullString)
@@ -212,6 +228,13 @@ func (_m *StockReservation) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field product_id", values[i])
 			} else if value.Valid {
 				_m.ProductID = int(value.Int64)
+			}
+		case stockreservation.FieldProductSkuID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field product_sku_id", values[i])
+			} else if value.Valid {
+				_m.ProductSkuID = new(int)
+				*_m.ProductSkuID = int(value.Int64)
 			}
 		case stockreservation.FieldWarehouseID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -311,6 +334,11 @@ func (_m *StockReservation) QueryProduct() *ProductQuery {
 	return NewStockReservationClient(_m.config).QueryProduct(_m)
 }
 
+// QueryProductSku queries the "product_sku" edge of the StockReservation entity.
+func (_m *StockReservation) QueryProductSku() *ProductSKUQuery {
+	return NewStockReservationClient(_m.config).QueryProductSku(_m)
+}
+
 // QueryWarehouse queries the "warehouse" edge of the StockReservation entity.
 func (_m *StockReservation) QueryWarehouse() *WarehouseQuery {
 	return NewStockReservationClient(_m.config).QueryWarehouse(_m)
@@ -367,6 +395,11 @@ func (_m *StockReservation) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("product_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ProductID))
+	builder.WriteString(", ")
+	if v := _m.ProductSkuID; v != nil {
+		builder.WriteString("product_sku_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("warehouse_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.WarehouseID))

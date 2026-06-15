@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturnitem"
@@ -176,6 +177,21 @@ func (_u *MaterialUpdate) AddBomItems(v ...*BOMItem) *MaterialUpdate {
 	return _u.AddBomItemIDs(ids...)
 }
 
+// AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
+func (_u *MaterialUpdate) AddPurchaseOrderItemIDs(ids ...int) *MaterialUpdate {
+	_u.mutation.AddPurchaseOrderItemIDs(ids...)
+	return _u
+}
+
+// AddPurchaseOrderItems adds the "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_u *MaterialUpdate) AddPurchaseOrderItems(v ...*PurchaseOrderItem) *MaterialUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseOrderItemIDs(ids...)
+}
+
 // AddPurchaseReceiptItemIDs adds the "purchase_receipt_items" edge to the PurchaseReceiptItem entity by IDs.
 func (_u *MaterialUpdate) AddPurchaseReceiptItemIDs(ids ...int) *MaterialUpdate {
 	_u.mutation.AddPurchaseReceiptItemIDs(ids...)
@@ -266,6 +282,27 @@ func (_u *MaterialUpdate) RemoveBomItems(v ...*BOMItem) *MaterialUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveBomItemIDs(ids...)
+}
+
+// ClearPurchaseOrderItems clears all "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_u *MaterialUpdate) ClearPurchaseOrderItems() *MaterialUpdate {
+	_u.mutation.ClearPurchaseOrderItems()
+	return _u
+}
+
+// RemovePurchaseOrderItemIDs removes the "purchase_order_items" edge to PurchaseOrderItem entities by IDs.
+func (_u *MaterialUpdate) RemovePurchaseOrderItemIDs(ids ...int) *MaterialUpdate {
+	_u.mutation.RemovePurchaseOrderItemIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseOrderItems removes "purchase_order_items" edges to PurchaseOrderItem entities.
+func (_u *MaterialUpdate) RemovePurchaseOrderItems(v ...*PurchaseOrderItem) *MaterialUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseOrderItemIDs(ids...)
 }
 
 // ClearPurchaseReceiptItems clears all "purchase_receipt_items" edges to the PurchaseReceiptItem entity.
@@ -535,6 +572,51 @@ func (_u *MaterialUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.PurchaseOrderItemsTable,
+			Columns: []string{material.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseOrderItemsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.PurchaseOrderItemsTable,
+			Columns: []string{material.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.PurchaseOrderItemsTable,
+			Columns: []string{material.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -884,6 +966,21 @@ func (_u *MaterialUpdateOne) AddBomItems(v ...*BOMItem) *MaterialUpdateOne {
 	return _u.AddBomItemIDs(ids...)
 }
 
+// AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
+func (_u *MaterialUpdateOne) AddPurchaseOrderItemIDs(ids ...int) *MaterialUpdateOne {
+	_u.mutation.AddPurchaseOrderItemIDs(ids...)
+	return _u
+}
+
+// AddPurchaseOrderItems adds the "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_u *MaterialUpdateOne) AddPurchaseOrderItems(v ...*PurchaseOrderItem) *MaterialUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPurchaseOrderItemIDs(ids...)
+}
+
 // AddPurchaseReceiptItemIDs adds the "purchase_receipt_items" edge to the PurchaseReceiptItem entity by IDs.
 func (_u *MaterialUpdateOne) AddPurchaseReceiptItemIDs(ids ...int) *MaterialUpdateOne {
 	_u.mutation.AddPurchaseReceiptItemIDs(ids...)
@@ -974,6 +1071,27 @@ func (_u *MaterialUpdateOne) RemoveBomItems(v ...*BOMItem) *MaterialUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveBomItemIDs(ids...)
+}
+
+// ClearPurchaseOrderItems clears all "purchase_order_items" edges to the PurchaseOrderItem entity.
+func (_u *MaterialUpdateOne) ClearPurchaseOrderItems() *MaterialUpdateOne {
+	_u.mutation.ClearPurchaseOrderItems()
+	return _u
+}
+
+// RemovePurchaseOrderItemIDs removes the "purchase_order_items" edge to PurchaseOrderItem entities by IDs.
+func (_u *MaterialUpdateOne) RemovePurchaseOrderItemIDs(ids ...int) *MaterialUpdateOne {
+	_u.mutation.RemovePurchaseOrderItemIDs(ids...)
+	return _u
+}
+
+// RemovePurchaseOrderItems removes "purchase_order_items" edges to PurchaseOrderItem entities.
+func (_u *MaterialUpdateOne) RemovePurchaseOrderItems(v ...*PurchaseOrderItem) *MaterialUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePurchaseOrderItemIDs(ids...)
 }
 
 // ClearPurchaseReceiptItems clears all "purchase_receipt_items" edges to the PurchaseReceiptItem entity.
@@ -1273,6 +1391,51 @@ func (_u *MaterialUpdateOne) sqlSave(ctx context.Context) (_node *Material, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PurchaseOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.PurchaseOrderItemsTable,
+			Columns: []string{material.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPurchaseOrderItemsIDs(); len(nodes) > 0 && !_u.mutation.PurchaseOrderItemsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.PurchaseOrderItemsTable,
+			Columns: []string{material.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PurchaseOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   material.PurchaseOrderItemsTable,
+			Columns: []string{material.PurchaseOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaseorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

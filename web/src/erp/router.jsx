@@ -48,6 +48,10 @@ const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
 const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
+const V1PurchaseOrdersPage = lazy(
+  () => import('./pages/V1PurchaseOrdersPage.jsx')
+)
+const BOMVersionsPage = lazy(() => import('./pages/BOMVersionsPage.jsx'))
 const ShipmentsPage = lazy(() => import('./pages/ShipmentsPage.jsx'))
 const FormalBusinessModulePage = lazy(
   () => import('./pages/FormalBusinessModulePage.jsx')
@@ -76,7 +80,12 @@ const DevTestingPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevTestingPage.jsx'))
   : null
 const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
-const formalBusinessShellModules = getFormalBusinessShellModules()
+const formalBusinessShellModules = getFormalBusinessShellModules().filter(
+  (moduleItem) =>
+    moduleItem.key !== 'products' &&
+    moduleItem.key !== 'material-bom' &&
+    moduleItem.key !== 'accessories-purchase'
+)
 
 function stripERPRoutePrefix(path = '') {
   return String(path || '').replace(/^\/erp\//u, '')
@@ -313,9 +322,18 @@ export default function ERPRouter() {
             element={<V1MasterDataPage type="materials" />}
           />
           <Route
+            path="master/products"
+            element={<V1MasterDataPage type="product_skus" />}
+          />
+          <Route
             path="sales/project-orders/sales-orders"
             element={<V1SalesOrdersPage />}
           />
+          <Route
+            path="purchase/accessories"
+            element={<V1PurchaseOrdersPage />}
+          />
+          <Route path="purchase/material-bom" element={<BOMVersionsPage />} />
           <Route path="warehouse/shipments" element={<ShipmentsPage />} />
           {formalBusinessShellModules.map((moduleItem) => (
             <Route

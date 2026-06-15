@@ -64,6 +64,7 @@ func (FinanceFact) Annotations() []schema.Annotation {
 
 func (FinanceFact) Fields() []ent.Field {
 	return []ent.Field{
+		// Finance facts are posted by finance usecases; Workflow state does not create accounting truth.
 		field.String("fact_no").NotEmpty().MaxLen(64),
 		field.String("fact_type").NotEmpty().MaxLen(32),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
@@ -71,6 +72,7 @@ func (FinanceFact) Fields() []ent.Field {
 		field.Int("counterparty_id").Optional().Nillable().Positive(),
 		decimalQuantityField("amount"),
 		field.String("currency").NotEmpty().Default("CNY").MaxLen(16),
+		// source_* keeps source-document traceability; it is not a replacement for business_records.
 		field.String("source_type").Optional().Nillable().MaxLen(64),
 		field.Int("source_id").Optional().Nillable().Positive(),
 		field.Int("source_line_id").Optional().Nillable().Positive(),
