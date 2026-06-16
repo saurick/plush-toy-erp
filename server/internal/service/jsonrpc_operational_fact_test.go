@@ -3,6 +3,7 @@ package service
 import (
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/errcode"
@@ -111,5 +112,35 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions(t *te
 	}
 	if cancelRes == nil || cancelRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected usecase to run after shipment cancel permission, got %#v", cancelRes)
+	}
+}
+
+func TestOperationalFactShipmentFilterFromParamsParsesDateRange(t *testing.T) {
+	filter, ok := operationalFactShipmentFilterFromParams(mustJSONRPCStruct(t, map[string]any{
+		"status":     "shipped",
+		"date_field": "shipped_at",
+		"date_from":  "2026-06-01",
+		"date_to":    "2026-06-30",
+		"limit":      float64(20),
+	}).AsMap())
+	if !ok {
+		t.Fatal("expected shipment filter params to parse")
+	}
+	if filter.Status != "shipped" || filter.DateField != "shipped_at" || filter.Limit != 20 {
+		t.Fatalf("unexpected filter %#v", filter)
+	}
+	expectedFrom := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	expectedTo := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)
+	if filter.DateFrom == nil || !filter.DateFrom.Equal(expectedFrom) {
+		t.Fatalf("unexpected date_from %#v", filter.DateFrom)
+	}
+	if filter.DateTo == nil || !filter.DateTo.Equal(expectedTo) {
+		t.Fatalf("unexpected date_to %#v", filter.DateTo)
+	}
+
+	if _, ok := operationalFactShipmentFilterFromParams(mustJSONRPCStruct(t, map[string]any{
+		"date_from": "not-a-date",
+	}).AsMap()); ok {
+		t.Fatal("expected invalid shipment date filter to be rejected")
 	}
 }

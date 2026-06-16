@@ -99,6 +99,13 @@ const navItemRegistry = {
     shortLabel: '权限',
     description: '集中管理管理员账号、角色、权限码和启用状态。',
   },
+  'system-audit-logs': {
+    key: 'system-audit-logs',
+    label: '审计日志',
+    path: '/erp/system/audit-logs',
+    shortLabel: '审计',
+    description: '只读查看系统控制面审计事件。',
+  },
 }
 
 export const navigationItemRegistry = navItemRegistry
@@ -123,7 +130,10 @@ function getDefaultNavigationSections() {
     },
     {
       title: '系统管理',
-      items: [navItemRegistry['permission-center']],
+      items: [
+        navItemRegistry['permission-center'],
+        navItemRegistry['system-audit-logs'],
+      ],
     },
   ]
 }

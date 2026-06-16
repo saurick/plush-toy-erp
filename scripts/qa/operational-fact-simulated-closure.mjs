@@ -462,20 +462,16 @@ async function applyPlan(plan, tokens) {
     (data) => data.shipment,
     "SHIPPED",
   );
-  await call(
-    "shipment cancel",
-    "warehouse",
-    "cancel_shipment",
-    { id: shipment.id },
-    (data) => data.shipment,
-    "CANCELLED",
-  );
 
   const financeSettle = await call(
     "finance create settle path",
     "finance",
     "create_finance_fact",
-    records.financeSettle,
+    {
+      ...records.financeSettle,
+      source_type: "SHIPMENT",
+      source_id: shipment.id,
+    },
     (data) => data.finance_fact,
     "DRAFT",
   );
@@ -500,7 +496,11 @@ async function applyPlan(plan, tokens) {
     "finance create cancel path",
     "finance",
     "create_finance_fact",
-    records.financeCancel,
+    {
+      ...records.financeCancel,
+      source_type: "SHIPMENT",
+      source_id: shipment.id,
+    },
     (data) => data.finance_fact,
     "DRAFT",
   );
@@ -518,6 +518,15 @@ async function applyPlan(plan, tokens) {
     "cancel_finance_fact",
     { id: financeCancel.id },
     (data) => data.finance_fact,
+    "CANCELLED",
+  );
+
+  await call(
+    "shipment cancel",
+    "warehouse",
+    "cancel_shipment",
+    { id: shipment.id },
+    (data) => data.shipment,
     "CANCELLED",
   );
 

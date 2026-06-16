@@ -12,6 +12,15 @@ type RuntimeAuditEvent struct {
 	ent.Schema
 }
 
+func (RuntimeAuditEvent) Hooks() []ent.Hook {
+	return []ent.Hook{
+		rejectMutationOps(
+			ent.OpUpdate|ent.OpUpdateOne|ent.OpDelete|ent.OpDeleteOne,
+			"runtime_audit_events are append-only audit records",
+		),
+	}
+}
+
 func (RuntimeAuditEvent) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("event_type").

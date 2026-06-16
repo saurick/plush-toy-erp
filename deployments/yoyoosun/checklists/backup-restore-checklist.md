@@ -16,10 +16,11 @@
 
 - [ ] 恢复目标是隔离测试库或明确恢复窗口。
 - [ ] 恢复前确认 backup id 和 hash。
+- [ ] 已执行 `run-backup-restore-rehearsal.sh` 或等价真实恢复命令。
 - [ ] 恢复后 migration status 正常。
 - [ ] 恢复后 smoke query 通过。
 - [ ] 恢复后 web / server 健康检查通过。
-- [ ] 恢复演练报告已生成。
+- [ ] `backup-restore-report.json` 已生成，并声明 `backupCreated=true`、`restoreCompleted=true`、`migrationStatus=ok`、`smokeQueryStatus=passed`。
 
 ## 收口
 

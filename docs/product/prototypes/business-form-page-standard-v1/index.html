@@ -382,6 +382,144 @@
         resize: vertical;
       }
 
+      .items-section {
+        display: grid;
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        box-shadow: inset 3px 0 0 var(--green);
+        padding: 14px 14px 12px 16px;
+      }
+
+      .import-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+        gap: 12px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 10px 12px;
+      }
+
+      .import-action {
+        display: grid;
+        gap: 6px;
+        justify-items: end;
+      }
+
+      .picker-rule {
+        max-width: 320px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+        text-align: right;
+      }
+
+      .import-copy {
+        display: grid;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .import-copy strong,
+      .items-head strong,
+      .item-head strong {
+        font-size: 15px;
+        font-weight: 780;
+      }
+
+      .import-copy span,
+      .items-head span {
+        overflow: hidden;
+        color: var(--muted);
+        font-size: 12px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .items-head,
+      .item-head,
+      .items-footer {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+        min-width: 0;
+      }
+
+      .item-list {
+        display: grid;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .item-card {
+        display: grid;
+        gap: 12px;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 14px;
+      }
+
+      .item-grid {
+        display: grid;
+        grid-auto-columns: minmax(220px, 1fr);
+        grid-auto-flow: column;
+        gap: 14px 16px;
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 4px;
+        scrollbar-gutter: stable;
+      }
+
+      .item-grid .field {
+        min-width: 220px;
+      }
+
+      .item-grid textarea {
+        height: 36px;
+        min-height: 36px;
+        resize: none;
+      }
+
+      .items-footer {
+        flex-wrap: wrap;
+        border-top: 1px dashed var(--line);
+        padding-top: 10px;
+      }
+
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .stat {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+        min-height: 30px;
+        border: 1px solid color-mix(in srgb, var(--blue) 28%, var(--line));
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+        padding: 4px 10px;
+      }
+
+      .stat strong {
+        color: var(--blue);
+        font-size: 15px;
+        line-height: 1;
+      }
+
       input:disabled,
       select:disabled,
       textarea:disabled {
@@ -461,6 +599,17 @@
           grid-template-columns: 1fr;
         }
 
+        .import-row {
+          grid-template-columns: 1fr;
+        }
+
+        .items-head,
+        .item-head,
+        .items-footer {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
         .footer {
           align-items: flex-start;
           flex-direction: column;
@@ -512,7 +661,7 @@
                   <div class="crumb">ERP / 标准业务弹窗 / To Implement</div>
                   <h2>销售订单业务弹窗样板</h2>
                   <p class="summary">
-                    新建和编辑复用同一个业务弹窗：上方维护主表字段，下方维护订单行、联系人、BOM 明细或其他必要 items；来源导入、回收站和危险确认回到局部动作弹窗。
+                    新建和编辑复用同一个业务弹窗：上方维护主表字段，下方维护订单行、联系人、BOM 明细或其他必要 items；item 区可以从对应业务库导入，回收站和危险确认回到局部动作弹窗。
                   </p>
                 </div>
                 <div class="tags">
@@ -537,7 +686,7 @@
                 </div>
                 <div class="review-card">
                   <strong>不吸收内容</strong>
-                  <span>不吸收静态数据、dev-only 外壳、假客户、后端事实或局部动作弹窗。</span>
+                  <span>不吸收静态数据、dev-only 外壳、假客户、后端事实或危险确认动作。</span>
                 </div>
               </div>
 
@@ -590,23 +739,69 @@
                   </div>
                 </section>
 
-                <section class="group">
-                  <h3>明细信息</h3>
-                  <div class="fields">
-                    <div class="field" data-field="product">
-                      <label class="required" for="product">产品</label>
-                      <input id="product" value="毛绒挂件 A" />
-                      <span class="error">产品必填；来源缺失时不要伪造值。</span>
+                <section class="items-section" aria-label="订单行 items">
+                  <div class="import-row">
+                    <div class="import-copy">
+                      <strong>从来源选择器导入</strong>
+                      <span>第二层只选择产品 / SKU / 来源行，导入后回到本弹窗维护数量、价格和交期。</span>
                     </div>
-                    <div class="field" data-field="quantity">
-                      <label class="required" for="quantity">数量</label>
-                      <input id="quantity" value="3000" inputmode="numeric" />
-                      <span class="error">数量必填且需要来自当前来源或人工输入。</span>
+                    <div class="import-action">
+                      <button class="btn" id="itemImportOpen" type="button">打开来源选择器</button>
+                      <span class="picker-rule">最多两层弹窗；复杂导入在选择器内分步，不再继续弹第三层。</span>
                     </div>
-                    <div class="field" data-field="dueDate">
-                      <label class="required" for="dueDate">交期</label>
-                      <input id="dueDate" value="2026-06-18" />
-                      <span class="error">交期必填。</span>
+                  </div>
+
+                  <div class="items-head">
+                    <div>
+                      <strong>订单行</strong>
+                      <span>明细作为当前业务对象的一部分维护，整体随弹窗保存。</span>
+                    </div>
+                  </div>
+
+                  <div class="item-list" id="itemList">
+                    <article class="item-card">
+                      <div class="item-head">
+                        <strong>条目 1</strong>
+                        <button class="btn text remove-item" type="button" disabled>删除</button>
+                      </div>
+                      <div class="item-grid">
+                        <div class="field" data-field="product">
+                          <label class="required" for="product">产品</label>
+                          <input id="product" value="毛绒挂件 A" />
+                          <span class="error">产品必填；来源缺失时不要伪造值。</span>
+                        </div>
+                        <div class="field" data-field="quantity">
+                          <label class="required" for="quantity">数量</label>
+                          <input id="quantity" value="3000" inputmode="numeric" />
+                          <span class="error">数量必填且需要来自当前来源或人工输入。</span>
+                        </div>
+                        <div class="field" data-field="unitPrice">
+                          <label for="unitPrice">单价</label>
+                          <input id="unitPrice" value="1.50" inputmode="decimal" />
+                        </div>
+                        <div class="field">
+                          <label for="lineAmount">金额</label>
+                          <input id="lineAmount" value="4500.00" disabled />
+                        </div>
+                        <div class="field" data-field="dueDate">
+                          <label class="required" for="dueDate">交期</label>
+                          <input id="dueDate" value="2026-06-18" />
+                          <span class="error">交期必填。</span>
+                        </div>
+                        <div class="field">
+                          <label for="itemNote">备注</label>
+                          <textarea id="itemNote">首条明细默认一行高；更多字段横向滚动。</textarea>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+
+                  <div class="items-footer">
+                    <button class="btn" id="addItem" type="button">+ 添加条目</button>
+                    <div class="stats">
+                      <span class="stat">已录入 <strong id="itemCount">1</strong> 条</span>
+                      <span class="stat">数量合计 <strong id="quantityTotal">3000</strong></span>
+                      <span class="stat">金额合计 <strong id="amountTotal">4500.00</strong></span>
                     </div>
                   </div>
                 </section>
@@ -672,8 +867,11 @@
         orderNo: "SO-202606-018",
         product: "毛绒挂件 A",
         quantity: "3000",
+        unitPrice: "1.50",
+        lineAmount: "4500.00",
         dueDate: "2026-06-18",
         attachment: "blue-hanger-spec-v3.pdf",
+        itemNote: "首条明细默认一行高；更多字段横向滚动。",
         remark: "示例备注只用于原型，不作为正式字段真源。",
       };
 
@@ -695,8 +893,11 @@
             orderNo: "",
             product: "",
             quantity: "",
+            unitPrice: "",
+            lineAmount: "",
             dueDate: "",
             attachment: "",
+            itemNote: "",
             remark: "客户来源只带出客户，不带出订单明细。",
           },
         },
@@ -710,15 +911,39 @@
             orderNo: "",
             product: "",
             quantity: "",
+            unitPrice: "",
+            lineAmount: "",
             dueDate: "",
             attachment: "",
+            itemNote: "",
             remark: "",
           },
         },
       };
 
+      const importProducts = {
+        "toy-a": {
+          product: "毛绒挂件 A",
+          quantity: "3000",
+          unitPrice: "1.50",
+          lineAmount: "4500.00",
+          dueDate: "2026-06-18",
+          itemNote: "从来源选择器带出产品和建议单价，数量仍可按订单调整。",
+        },
+        "toy-b": {
+          product: "毛绒钥匙扣 B",
+          quantity: "1200",
+          unitPrice: "2.20",
+          lineAmount: "2640.00",
+          dueDate: "2026-06-22",
+          itemNote: "第二个产品示例用于确认导入带值和统计刷新。",
+        },
+      };
+
       const source = document.querySelector("#source");
       const formMode = document.querySelector("#formMode");
+      const itemImportOpen = document.querySelector("#itemImportOpen");
+      const itemList = document.querySelector("#itemList");
       const sourceNote = document.querySelector("#sourceNote");
       const guard = document.querySelector("#guard");
       const modeNote = document.querySelector("#modeNote");
@@ -730,10 +955,13 @@
         "owner",
         "product",
         "quantity",
+        "unitPrice",
+        "lineAmount",
         "dueDate",
         "warehouse",
         "attachment",
         "status",
+        "itemNote",
         "remark",
       ];
       const modeNotes = {
@@ -762,6 +990,7 @@
         sourceNote.textContent = data.note;
         guard.textContent = data.guard;
         footerState.textContent = "来源已切换，保存前需重新校验必填与残值。";
+        updateStats();
         clearErrors();
         applyMode(formMode.value);
       }
@@ -802,8 +1031,73 @@
           : "存在必填缺值或来源清值后的空字段，请补齐后再保存。";
       }
 
+      function updateStats() {
+        const cards = Array.from(itemList.querySelectorAll(".item-card"));
+        const quantityTotal = cards.reduce((total, card) => {
+          const value = card.querySelector('[data-stat="quantity"]')?.value || "0";
+          return total + Number(value || 0);
+        }, Number(document.querySelector("#quantity")?.value || 0));
+        const amountTotal = cards.reduce((total, card) => {
+          const value = card.querySelector('[data-stat="amount"]')?.value || "0";
+          return total + Number(value || 0);
+        }, Number(document.querySelector("#lineAmount")?.value || 0));
+        document.querySelector("#itemCount").textContent = String(cards.length);
+        document.querySelector("#quantityTotal").textContent = String(quantityTotal || 0);
+        document.querySelector("#amountTotal").textContent = (amountTotal || 0).toFixed(2);
+      }
+
+      function applyItemImport(value) {
+        const data = importProducts[value];
+        if (!data) return;
+        Object.entries(data).forEach(([key, nextValue]) => setValue(key, nextValue));
+        footerState.textContent = "已从来源选择器带入当前条目字段，保存前仍需检查来源和残值。";
+        updateStats();
+        clearErrors();
+      }
+
+      function addItem() {
+        const nextIndex = itemList.querySelectorAll(".item-card").length + 1;
+        const article = document.createElement("article");
+        article.className = "item-card";
+        article.innerHTML = `
+          <div class="item-head">
+            <strong>条目 ${nextIndex}</strong>
+            <button class="btn text remove-item" type="button">删除</button>
+          </div>
+          <div class="item-grid">
+            <div class="field"><label>产品</label><input value="毛绒钥匙扣 B" /></div>
+            <div class="field"><label>数量</label><input data-stat="quantity" value="1200" inputmode="numeric" /></div>
+            <div class="field"><label>单价</label><input value="2.20" inputmode="decimal" /></div>
+            <div class="field"><label>金额</label><input data-stat="amount" value="2640.00" disabled /></div>
+            <div class="field"><label>交期</label><input value="2026-06-22" /></div>
+            <div class="field"><label>备注</label><textarea>新增条目保持一行高，横向滚动查看更多字段。</textarea></div>
+          </div>
+        `;
+        article.querySelector(".remove-item").addEventListener("click", () => {
+          article.remove();
+          updateStats();
+        });
+        itemList.appendChild(article);
+        footerState.textContent = "已新增条目；横向滚动查看更多明细字段。";
+        updateStats();
+      }
+
       source.addEventListener("change", () => applySource(source.value));
       formMode.addEventListener("change", () => applyMode(formMode.value));
+      itemImportOpen.addEventListener("click", () => applyItemImport("toy-a"));
+      document.querySelector("#addItem").addEventListener("click", addItem);
+      document.querySelector("#quantity").addEventListener("input", () => {
+        const quantity = Number(document.querySelector("#quantity").value || 0);
+        const price = Number(document.querySelector("#unitPrice").value || 0);
+        setValue("lineAmount", (quantity * price).toFixed(2));
+        updateStats();
+      });
+      document.querySelector("#unitPrice").addEventListener("input", () => {
+        const quantity = Number(document.querySelector("#quantity").value || 0);
+        const price = Number(document.querySelector("#unitPrice").value || 0);
+        setValue("lineAmount", (quantity * price).toFixed(2));
+        updateStats();
+      });
       document.querySelector("#saveForm").addEventListener("click", validateForm);
       document.querySelector("#footerSave").addEventListener("click", validateForm);
       document.querySelector("#resetForm").addEventListener("click", () => {
@@ -817,6 +1111,7 @@
         applySource("sales");
       });
       applyMode(formMode.value);
+      updateStats();
     </script>
   </body>
 </html>

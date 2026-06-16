@@ -246,6 +246,7 @@ func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.Oper
 	if filter.Status != "" {
 		q = q.Where(shipment.Status(filter.Status))
 	}
+	q = applyShipmentDateRange(q, filter)
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -263,6 +264,26 @@ func (r *operationalFactRepo) ListShipments(ctx context.Context, filter biz.Oper
 		out = append(out, item)
 	}
 	return out, total, nil
+}
+
+func applyShipmentDateRange(query *ent.ShipmentQuery, filter biz.OperationalFactFilter) *ent.ShipmentQuery {
+	switch filter.DateField {
+	case "shipped_at":
+		if filter.DateFrom != nil {
+			query = query.Where(shipment.ShippedAtGTE(*filter.DateFrom))
+		}
+		if filter.DateTo != nil {
+			query = query.Where(shipment.ShippedAtLTE(*filter.DateTo))
+		}
+	default:
+		if filter.DateFrom != nil {
+			query = query.Where(shipment.PlannedShipAtGTE(*filter.DateFrom))
+		}
+		if filter.DateTo != nil {
+			query = query.Where(shipment.PlannedShipAtLTE(*filter.DateTo))
+		}
+	}
+	return query
 }
 
 func (r *operationalFactRepo) CreateStockReservation(ctx context.Context, in *biz.StockReservationCreate) (*biz.StockReservation, error) {

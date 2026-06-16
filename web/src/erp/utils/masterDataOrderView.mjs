@@ -245,6 +245,7 @@ export function buildSalesOrderItemParams(values = {}, extra = {}) {
     ...extra,
     line_no: Number(values.line_no || 0),
     product_id: Number(values.product_id || 0),
+    product_sku_id: Number(values.product_sku_id || 0),
     unit_id: Number(values.unit_id || 0),
     product_code_snapshot: trimOptional(values.product_code_snapshot),
     product_name_snapshot: trimOptional(values.product_name_snapshot),

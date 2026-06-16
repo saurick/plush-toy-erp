@@ -5,6 +5,8 @@ import {
   V1_ROUTE_PATHS,
   buildCustomerSnapshot,
   buildMasterDataParams,
+  buildPurchaseOrderItemParams,
+  buildPurchaseOrderParams,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
   deriveSalesOrderItemAmount,
@@ -90,6 +92,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     buildSalesOrderItemParams({
       line_no: '2',
       product_id: '5',
+      product_sku_id: '8',
       unit_id: '1',
       product_name_snapshot: ' 玩具 ',
       ordered_quantity: '12.50',
@@ -98,11 +101,49 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
     {
       line_no: 2,
       product_id: 5,
+      product_sku_id: 8,
       unit_id: 1,
       product_name_snapshot: '玩具',
       ordered_quantity: '12.50',
       unit_price: '3.20',
       amount: '40.00',
+    }
+  )
+
+  assert.deepEqual(
+    buildPurchaseOrderParams({
+      purchase_order_no: ' PO001 ',
+      supplier_id: '7',
+      supplier_purchase_order_no: '',
+      supplier_snapshot: { id: 7, name: '供应商 A' },
+      purchase_date: '2026-06-16',
+      expected_arrival_date: '',
+    }),
+    {
+      purchase_order_no: 'PO001',
+      supplier_id: 7,
+      supplier_snapshot: { id: 7, name: '供应商 A' },
+      purchase_date: '2026-06-16',
+    }
+  )
+
+  assert.deepEqual(
+    buildPurchaseOrderItemParams({
+      line_no: '1',
+      material_id: '12',
+      unit_id: '2',
+      material_name_snapshot: ' 面料 ',
+      purchased_quantity: '10',
+      unit_price: '',
+      amount: '',
+      expected_arrival_date: '',
+    }),
+    {
+      line_no: 1,
+      material_id: 12,
+      unit_id: 2,
+      material_name_snapshot: '面料',
+      purchased_quantity: '10',
     }
   )
 })

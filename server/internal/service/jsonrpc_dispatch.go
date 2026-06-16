@@ -1078,6 +1078,31 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}),
 		}, nil
 
+	case "audit_logs":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemAuditRead); res != nil {
+			return id, res, nil
+		}
+		result, err := d.adminManageUC.ListRuntimeAuditEvents(ctx, biz.RuntimeAuditEventListFilter{
+			Source:    getString(pm, "source"),
+			EventType: getString(pm, "event_type"),
+			EventKey:  getString(pm, "event_key"),
+			Limit:     getInt(pm, "limit", 50),
+			Offset:    getInt(pm, "offset", 0),
+		})
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"events": runtimeAuditEventsToAny(result.Events),
+				"total":  result.Total,
+				"limit":  result.Limit,
+				"offset": result.Offset,
+			}),
+		}, nil
+
 	case "set_disabled":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserDisable); res != nil {
 			return id, res, nil

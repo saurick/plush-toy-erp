@@ -8,7 +8,6 @@ import {
   LinkOutlined,
   PlusOutlined,
   PrinterOutlined,
-  ReloadOutlined,
   RollbackOutlined,
   SettingOutlined,
   SwapOutlined,
@@ -991,7 +990,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
             >
               批量恢复
             </Button>
-            <Button icon={<ReloadOutlined />}>刷新</Button>
             <span>已选择 {recycleSelectedRowKeys.length} 条回收站记录</span>
             {recycleSelectedRowKeys.length > 0 ? (
               <Button

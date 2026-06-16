@@ -46,6 +46,7 @@ const REQUIRED_FILES = [
   "scripts/run-smoke.sh",
   "scripts/collect-evidence.sh",
   "scripts/verify-backup-restore.sh",
+  "scripts/run-backup-restore-rehearsal.sh",
 ];
 
 const REQUIRED_ENV_KEYS = [

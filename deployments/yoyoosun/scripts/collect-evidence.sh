@@ -87,7 +87,7 @@ cat >"$output_dir/release-evidence.md" <<EOF
 | import dry-run / apply | 待填写 |  |
 | smoke | 待填写 | smoke-test-report.json |
 | security scan | 待填写 |  |
-| backup restore | 待填写 | backup-evidence.md |
+| backup restore | 待填写 | backup-restore-report.json |
 
 ## 已知限制
 
@@ -146,6 +146,28 @@ cat >"$output_dir/migration-status.txt" <<'EOF'
 Migration Status: 待填写
 Current Version: 待填写
 Pending Files: 待填写
+EOF
+
+cat >"$output_dir/backup-restore-report.json" <<EOF
+{
+  "customerCode": "yoyoosun",
+  "environment": "待填写",
+  "releaseVersion": "$release_version",
+  "backupId": "待填写",
+  "verifiedAt": "待填写",
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "containsDumpContent": false,
+    "containsFullDsn": false
+  },
+  "summary": {
+    "backupCreated": false,
+    "restoreCompleted": false,
+    "migrationStatus": "待填写",
+    "smokeQueryStatus": "待填写"
+  }
+}
 EOF
 
 cat >"$output_dir/smoke-test-report.json" <<EOF

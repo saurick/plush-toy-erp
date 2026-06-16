@@ -249,9 +249,12 @@ type FinanceFactCreate struct {
 }
 
 type OperationalFactFilter struct {
-	Status string
-	Limit  int
-	Offset int
+	Status    string
+	DateField string
+	DateFrom  *time.Time
+	DateTo    *time.Time
+	Limit     int
+	Offset    int
 }
 
 type OperationalFactRepo interface {
@@ -397,7 +400,11 @@ func (uc *OperationalFactUsecase) ListShipments(ctx context.Context, filter Oper
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
-	return uc.repo.ListShipments(ctx, normalizeOperationalFactFilter(filter))
+	normalized, err := normalizeShipmentFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListShipments(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) CreateStockReservation(ctx context.Context, in *StockReservationCreate) (*StockReservation, error) {
@@ -721,6 +728,22 @@ func normalizeOperationalFactFilter(in OperationalFactFilter) OperationalFactFil
 		in.Offset = 0
 	}
 	return in
+}
+
+func normalizeShipmentFilter(in OperationalFactFilter) (OperationalFactFilter, error) {
+	in = normalizeOperationalFactFilter(in)
+	switch in.DateField {
+	case "", "planned_ship_at", "shipped_at":
+	default:
+		return OperationalFactFilter{}, ErrBadParam
+	}
+	if in.DateField == "" && (in.DateFrom != nil || in.DateTo != nil) {
+		in.DateField = "planned_ship_at"
+	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
+		return OperationalFactFilter{}, ErrBadParam
+	}
+	return in, nil
 }
 
 func normalizeOptionalUpperString(value *string) *string {

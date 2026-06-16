@@ -5665,7 +5665,8 @@ func (c *RuntimeAuditEventClient) GetX(ctx context.Context, id int) *RuntimeAudi
 
 // Hooks returns the client hooks.
 func (c *RuntimeAuditEventClient) Hooks() []Hook {
-	return c.hooks.RuntimeAuditEvent
+	hooks := c.hooks.RuntimeAuditEvent
+	return append(hooks[:len(hooks):len(hooks)], runtimeauditevent.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -5798,7 +5799,8 @@ func (c *RuntimeMarkerClient) GetX(ctx context.Context, id int) *RuntimeMarker {
 
 // Hooks returns the client hooks.
 func (c *RuntimeMarkerClient) Hooks() []Hook {
-	return c.hooks.RuntimeMarker
+	hooks := c.hooks.RuntimeMarker
+	return append(hooks[:len(hooks):len(hooks)], runtimemarker.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.

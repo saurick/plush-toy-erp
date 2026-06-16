@@ -23,6 +23,27 @@ import { buildBusinessModuleQuery } from '../utils/businessModuleNavigation.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
+const ACTIVE_STATUS_GROUP_KEYS = Object.freeze([
+  'project',
+  'material',
+  'production',
+  'warehouse',
+  'finance',
+])
+
+function sumStatusGroups(record = {}, keys = []) {
+  return keys.reduce(
+    (total, key) => total + Number(record.statusGroupCounts?.[key] || 0),
+    0
+  )
+}
+
+function statusKeysForGroups(keys = []) {
+  return dashboardStatusGroups
+    .filter((group) => keys.includes(group.key))
+    .flatMap((group) => group.statusKeys)
+}
+
 export default function BusinessDashboardPage() {
   const [loading, setLoading] = useState(false)
   const [moduleStats, setModuleStats] = useState([])
@@ -82,78 +103,23 @@ export default function BusinessDashboardPage() {
     () => [
       {
         key: 'totalRecords',
-        title: '业务对象总数',
+        title: '业务对象',
         value: summary.totalRecords,
       },
       {
         key: 'activeCount',
-        title: '推进中记录数',
+        title: '推进中',
         value: summary.activeCount,
         color: '#1677ff',
       },
       {
         key: 'blockedCount',
-        title: '阻塞/取消记录数',
+        title: '阻塞/取消',
         value: summary.blockedCount,
         color: '#d4380d',
       },
-      {
-        key: 'completionRatio',
-        title: '业务完成比例',
-        value: summary.completionRatio,
-        suffix: '%',
-        color: '#389e0d',
-      },
     ],
     [summary]
-  )
-
-  const businessFocusCards = useMemo(
-    () => [
-      {
-        key: 'pmcFocus',
-        title: '计划物控关注任务数',
-        value: workflowStats.pmcFocus,
-      },
-      {
-        key: 'bossFocus',
-        title: '老板待审批/高风险任务数',
-        value: workflowStats.bossFocus,
-      },
-      {
-        key: 'financePending',
-        title: '财务待处理任务数',
-        value: workflowStats.financePending,
-      },
-      {
-        key: 'qualityPending',
-        title: '品质待检任务数',
-        value: workflowStats.qualityPending,
-      },
-      {
-        key: 'warehousePending',
-        title: '仓库待处理任务数',
-        value: workflowStats.warehousePending,
-      },
-      {
-        key: 'todayAlerts',
-        title: '今日预警数',
-        value: workflowStats.todayAlerts,
-      },
-      {
-        key: 'criticalAlerts',
-        title: '严重预警数',
-        value: workflowStats.criticalAlerts,
-        color: '#cf1322',
-      },
-      {
-        key: 'warningAlerts',
-        title: '一般预警数',
-        value: workflowStats.warningAlerts,
-        color: '#d48806',
-      },
-    ],
-    [workflowStats]
   )
 
   const workflowAlertGroups = useMemo(
@@ -212,7 +178,7 @@ export default function BusinessDashboardPage() {
               业务看板
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
-              按模块查看当前结果、阻塞预警和下一步入口。
+              按模块看对象状态、风险和标准页入口。
             </Paragraph>
           </div>
         </div>
@@ -239,7 +205,7 @@ export default function BusinessDashboardPage() {
       <Card
         className="erp-dashboard-card erp-dashboard-table-card"
         variant="borderless"
-        title="模块健康明细"
+        title="模块健康"
       >
         <Table
           size="middle"
@@ -249,7 +215,7 @@ export default function BusinessDashboardPage() {
           }}
           pagination={false}
           rowKey="key"
-          scroll={{ x: 1120 }}
+          scroll={{ x: 760 }}
           columns={[
             {
               title: '模块',
@@ -279,22 +245,63 @@ export default function BusinessDashboardPage() {
                   !record?.path
                 ),
             },
-            ...dashboardStatusGroups.map((group) => ({
-              title: group.title,
-              dataIndex: ['statusGroupCounts', group.key],
-              width: 118,
+            {
+              title: '推进中',
+              key: 'active',
+              width: 120,
               align: 'center',
               sorter: (a, b) =>
-                Number(a.statusGroupCounts?.[group.key] || 0) -
-                Number(b.statusGroupCounts?.[group.key] || 0),
-              render: (value, record) =>
-                renderModuleEntryButton(
+                sumStatusGroups(a, ACTIVE_STATUS_GROUP_KEYS) -
+                sumStatusGroups(b, ACTIVE_STATUS_GROUP_KEYS),
+              render: (_, record) => {
+                const value = sumStatusGroups(record, ACTIVE_STATUS_GROUP_KEYS)
+                return renderModuleEntryButton(
                   value,
-                  () => openModuleList(record, group.statusKeys),
-                  `查看${record?.module}${group.title}`,
-                  !record?.path || Number(value) <= 0
+                  () =>
+                    openModuleList(
+                      record,
+                      statusKeysForGroups(ACTIVE_STATUS_GROUP_KEYS)
+                    ),
+                  `查看${record?.module}推进中记录`,
+                  !record?.path || value <= 0
+                )
+              },
+            },
+            {
+              title: '风险',
+              key: 'blocked',
+              width: 120,
+              align: 'center',
+              sorter: (a, b) =>
+                Number(a.statusGroupCounts?.blocked || 0) -
+                Number(b.statusGroupCounts?.blocked || 0),
+              render: (_, record) =>
+                renderModuleEntryButton(
+                  record.statusGroupCounts?.blocked || 0,
+                  () =>
+                    openModuleList(
+                      record,
+                      dashboardStatusGroups.find(
+                        (group) => group.key === 'blocked'
+                      )?.statusKeys || []
+                    ),
+                  `查看${record?.module}风险记录`,
+                  !record?.path ||
+                    Number(record.statusGroupCounts?.blocked) <= 0
                 ),
-            })),
+            },
+            {
+              title: '入口',
+              key: 'entry',
+              width: 120,
+              render: (_, record) =>
+                renderModuleEntryButton(
+                  '进入',
+                  () => openModuleList(record),
+                  `进入${record?.module}`,
+                  !record?.path
+                ),
+            },
           ]}
           dataSource={moduleRows}
         />
@@ -330,10 +337,10 @@ export default function BusinessDashboardPage() {
         <Card className="erp-dashboard-card" variant="borderless">
           <Space direction="vertical" className="erp-dashboard-block" size={8}>
             <Title level={5} className="erp-dashboard-section-title">
-              业务预警
+              风险提醒
             </Title>
             <div className="erp-business-board-alert-grid">
-              {workflowAlertGroups.slice(0, 6).map((group) => {
+              {workflowAlertGroups.slice(0, 4).map((group) => {
                 const alerts = workflowStats.buckets?.[group.key] || []
                 return (
                   <div
@@ -368,38 +375,6 @@ export default function BusinessDashboardPage() {
           </Space>
         </Card>
       </div>
-
-      <Card
-        className="erp-dashboard-card erp-dashboard-table-card"
-        variant="borderless"
-        title="业务关注统计"
-      >
-        <Table
-          size="small"
-          pagination={false}
-          rowKey="key"
-          scroll={{ x: 760 }}
-          columns={[
-            {
-              title: '关注项',
-              dataIndex: 'title',
-              width: 280,
-            },
-            {
-              title: '数量',
-              dataIndex: 'value',
-              width: 120,
-              sorter: (a, b) => Number(a.value || 0) - Number(b.value || 0),
-              render: (value, record) => (
-                <strong style={record.color ? { color: record.color } : null}>
-                  {value}
-                </strong>
-              ),
-            },
-          ]}
-          dataSource={businessFocusCards}
-        />
-      </Card>
     </Space>
   )
 }

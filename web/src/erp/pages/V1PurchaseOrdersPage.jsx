@@ -1,9 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
+  InboxOutlined,
   PlusOutlined,
-  ReloadOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import {
   Button,
@@ -14,20 +16,29 @@ import {
   Select,
   Space,
   Tag,
+  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
+  BusinessOperationPanel,
   BusinessDataTable,
+  DateInput,
   DateRangeFilter,
-  BusinessFilterPanel,
   BusinessPageLayout,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
+  SelectionActionBar,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import {
+  ColumnOrderHeaderMenu,
+  ColumnOrderModal,
+  getColumnLabel,
+} from '../components/business-list/ColumnOrderModal.jsx'
+import SourceImportPickerModal from '../components/business-list/SourceImportPickerModal.jsx'
 import {
   approvePurchaseOrder,
   cancelPurchaseOrder,
@@ -39,6 +50,7 @@ import {
   savePurchaseOrderWithItems,
   submitPurchaseOrder,
 } from '../api/masterDataOrderApi.mjs'
+import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   PURCHASE_ORDER_STATUS_COLORS,
   PURCHASE_ORDER_STATUS_LABELS,
@@ -51,6 +63,10 @@ import {
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  applyModuleColumnOrder,
+  sanitizeModuleColumnOrder,
+} from '../utils/moduleTableColumns.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -103,11 +119,89 @@ const LIFECYCLE_ACTIONS = [
 ]
 
 const BUSINESS_FORM_MODAL_WIDTH = 'min(1040px, calc(100vw - 96px))'
+const PURCHASE_ORDERS_MODULE_KEY = 'accessories-purchase'
+const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 
 function parseSortValue(value = 'updated_at:desc') {
   const [sortBy = 'updated_at', sortDirection = 'desc'] =
     String(value).split(':')
   return { sortBy, sortDirection }
+}
+
+function readStoredColumnOrder(moduleKey) {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(
+      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+    )
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredColumnOrder(moduleKey, order = []) {
+  if (typeof window === 'undefined') return
+  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+  if (!Array.isArray(order) || order.length === 0) {
+    window.localStorage.removeItem(storageKey)
+    return
+  }
+  window.localStorage.setItem(storageKey, JSON.stringify(order))
+}
+
+function getPreferredColumnOrder({
+  adminProfile,
+  moduleKey,
+  columns,
+  localOrder,
+}) {
+  if (Array.isArray(localOrder)) {
+    return sanitizeModuleColumnOrder(localOrder, columns)
+  }
+  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
+  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
+  if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
+  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
+}
+
+function csvEscape(value) {
+  const text = String(value ?? '')
+  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+function downloadCSV({ filename, columns, rows }) {
+  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
+  const body = rows.map((row) =>
+    columns.map((column) => {
+      const rawValue =
+        typeof column.exportValue === 'function'
+          ? column.exportValue(row)
+          : row?.[column.dataIndex]
+      return csvEscape(rawValue)
+    })
+  )
+  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], {
+    type: 'text/csv;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+function compareText(a, b) {
+  return String(a || '').localeCompare(String(b || ''))
+}
+
+function compareNumber(a, b) {
+  return Number(a || 0) - Number(b || 0)
 }
 
 function statusTag(status) {
@@ -224,7 +318,10 @@ function materialLabel(material = {}) {
 
 export default function V1PurchaseOrdersPage() {
   const outletContext = useOutletContext()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const [form] = Form.useForm()
   const canCreate = hasActionPermission(adminProfile, 'purchase.order.create')
   const canUpdate = hasActionPermission(adminProfile, 'purchase.order.update')
@@ -235,6 +332,11 @@ export default function V1PurchaseOrdersPage() {
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [selectedRowKeys, setSelectedRowKeys] = useState([])
+  const selectedRowKeysRef = useRef([])
+  const [columnOrder, setColumnOrder] = useState(null)
+  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
+  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [suppliers, setSuppliers] = useState([])
   const [materials, setMaterials] = useState([])
   const [keyword, setKeyword] = useState('')
@@ -246,6 +348,13 @@ export default function V1PurchaseOrdersPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [editingOrder, setEditingOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [materialImportOpen, setMaterialImportOpen] = useState(false)
+
+  const applySelectedRowKeys = useCallback((nextKeys = []) => {
+    const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
+    selectedRowKeysRef.current = normalizedKeys
+    setSelectedRowKeys(normalizedKeys)
+  }, [])
 
   const supplierOptions = useMemo(
     () =>
@@ -268,6 +377,27 @@ export default function V1PurchaseOrdersPage() {
   )
   const watchedItems = Form.useWatch('items', form) || []
   const lineSummary = summarizePurchaseLines(watchedItems)
+  const materialImportColumns = useMemo(
+    () => [
+      {
+        title: '材料编码',
+        dataIndex: 'code',
+        width: 150,
+        searchText: (material) => materialLabel(material),
+      },
+      {
+        title: '材料名称',
+        dataIndex: 'name',
+        width: 190,
+        searchText: (material) => materialLabel(material),
+      },
+      { title: '分类', dataIndex: 'category', width: 120 },
+      { title: '规格', dataIndex: 'spec', width: 170 },
+      { title: '颜色', dataIndex: 'color', width: 110 },
+      { title: '默认单位', dataIndex: 'default_unit_id', width: 100 },
+    ],
+    []
+  )
 
   const loadReferenceData = useCallback(async () => {
     try {
@@ -290,21 +420,32 @@ export default function V1PurchaseOrdersPage() {
         keyword,
         lifecycle_status: status,
         date_field: dateFilterField,
-        date_from: dateFilterStart,
-        date_to: dateFilterEnd,
+        date_from: dateFilterStart || undefined,
+        date_to: dateFilterEnd || undefined,
         sort_by: sortBy,
         sort_direction: sortDirection,
         limit: pagination.pageSize,
         offset: (pagination.current - 1) * pagination.pageSize,
       })
-      setOrders(data?.purchase_orders || [])
+      const nextOrders = data?.purchase_orders || []
+      setOrders(nextOrders)
       setTotal(Number(data?.total || 0))
+      const validKeys = selectedRowKeysRef.current.filter((key) =>
+        nextOrders.some((item) => item.id === key)
+      )
+      applySelectedRowKeys(validKeys)
+      if (validKeys.length === 1) {
+        setSelectedOrder(nextOrders.find((item) => item.id === validKeys[0]))
+      } else {
+        setSelectedOrder(null)
+      }
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载采购订单失败'))
     } finally {
       setLoading(false)
     }
   }, [
+    applySelectedRowKeys,
     dateFilterEnd,
     dateFilterField,
     dateFilterStart,
@@ -341,6 +482,10 @@ export default function V1PurchaseOrdersPage() {
   useEffect(() => {
     loadOrders()
   }, [loadOrders])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(loadOrders)
+  }, [loadOrders, outletContext])
 
   const openCreateModal = () => {
     setEditingOrder(null)
@@ -423,6 +568,7 @@ export default function V1PurchaseOrdersPage() {
       const saved = result?.purchase_order
       if (saved) {
         setSelectedOrder(saved)
+        applySelectedRowKeys([saved.id])
         await loadOrderItems(saved)
       }
       setModalOpen(false)
@@ -440,106 +586,203 @@ export default function V1PurchaseOrdersPage() {
     try {
       const updated = await action.run({ id: record.id })
       message.success(`采购订单已${action.label}`)
-      await loadOrders()
-      if (updated && selectedOrder?.id === updated.id) {
+      if (updated) {
         setSelectedOrder(updated)
+        applySelectedRowKeys([updated.id])
         await loadOrderItems(updated)
       }
+      await loadOrders()
     } catch (error) {
       message.error(getActionErrorMessage(error, `${action.label}采购订单失败`))
     }
   }
 
-  const columns = [
-    {
-      title: '采购单号',
-      dataIndex: 'purchase_order_no',
-      width: 180,
-      fixed: 'left',
+  const resolveSupplierName = useCallback(
+    (record = {}) =>
+      record?.supplier_snapshot?.name ||
+      suppliers.find((item) => item.id === record.supplier_id)?.name ||
+      record.supplier_id ||
+      '未指定供应商',
+    [suppliers]
+  )
+
+  const persistColumnOrder = useCallback(
+    async (nextOrder, columnsForOrder) => {
+      const sanitizedOrder = sanitizeModuleColumnOrder(
+        nextOrder,
+        columnsForOrder
+      )
+      setColumnOrder(sanitizedOrder)
+      writeStoredColumnOrder(PURCHASE_ORDERS_MODULE_KEY, sanitizedOrder)
+      setColumnOrderSaving(true)
+      try {
+        const erpPreferences = await setERPColumnOrder({
+          module_key: PURCHASE_ORDERS_MODULE_KEY,
+          order: sanitizedOrder,
+        })
+        outletContext?.updateAdminERPPreferences?.(erpPreferences)
+        message.success(
+          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
+        )
+      } catch (error) {
+        message.warning(
+          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
+        )
+      } finally {
+        setColumnOrderSaving(false)
+      }
     },
-    {
-      title: '供应商',
-      dataIndex: 'supplier_id',
-      width: 160,
-      render: (value, record) =>
-        record?.supplier_snapshot?.name ||
-        suppliers.find((item) => item.id === value)?.name ||
-        value ||
-        '-',
-    },
-    {
-      title: '状态',
-      dataIndex: 'lifecycle_status',
-      width: 110,
-      render: statusTag,
-    },
-    {
-      title: '采购日期',
-      dataIndex: 'purchase_date',
-      width: 130,
-      render: formatUnixDate,
-    },
-    {
-      title: '预计到货',
-      dataIndex: 'expected_arrival_date',
-      width: 130,
-      render: formatUnixDate,
-    },
-    {
-      title: '更新时间',
-      dataIndex: 'updated_at',
-      width: 160,
-      render: formatUnixDateTime,
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 260,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size={6} wrap>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            disabled={
-              !canUpdate ||
-              ['closed', 'canceled'].includes(record.lifecycle_status)
-            }
-            onClick={() => openEditModal(record)}
-          >
-            编辑
-          </Button>
-          {LIFECYCLE_ACTIONS.map((action) => (
-            <Button
-              key={action.key}
-              size="small"
-              disabled={!hasActionPermission(adminProfile, action.permission)}
-              onClick={() => runLifecycleAction(action, record)}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </Space>
-      ),
-    },
-  ]
+    [outletContext]
+  )
+
+  const dataColumns = useMemo(
+    () => [
+      {
+        title: '采购单号',
+        exportTitle: '采购单号',
+        dataIndex: 'purchase_order_no',
+        width: 180,
+        fixed: 'left',
+        sorter: (a, b) =>
+          compareText(a?.purchase_order_no, b?.purchase_order_no),
+      },
+      {
+        title: '供应商',
+        exportTitle: '供应商',
+        dataIndex: 'supplier_id',
+        width: 160,
+        render: (_value, record) => resolveSupplierName(record),
+        exportValue: (record) => resolveSupplierName(record),
+      },
+      {
+        title: '状态',
+        exportTitle: '状态',
+        dataIndex: 'lifecycle_status',
+        width: 110,
+        render: statusTag,
+        exportValue: (record) =>
+          statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
+      },
+      {
+        title: '采购日期',
+        exportTitle: '采购日期',
+        dataIndex: 'purchase_date',
+        width: 130,
+        sorter: (a, b) => compareNumber(a?.purchase_date, b?.purchase_date),
+        render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record?.purchase_date),
+      },
+      {
+        title: '预计到货',
+        exportTitle: '预计到货',
+        dataIndex: 'expected_arrival_date',
+        width: 130,
+        sorter: (a, b) =>
+          compareNumber(a?.expected_arrival_date, b?.expected_arrival_date),
+        render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record?.expected_arrival_date),
+      },
+      {
+        title: '更新时间',
+        exportTitle: '更新时间',
+        dataIndex: 'updated_at',
+        width: 160,
+        sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.updated_at),
+      },
+    ],
+    [resolveSupplierName]
+  )
+
+  const preferredColumnOrder = useMemo(
+    () =>
+      getPreferredColumnOrder({
+        adminProfile,
+        moduleKey: PURCHASE_ORDERS_MODULE_KEY,
+        columns: dataColumns,
+        localOrder: columnOrder,
+      }),
+    [adminProfile, columnOrder, dataColumns]
+  )
+
+  const visibleDataColumns = useMemo(
+    () => applyModuleColumnOrder(dataColumns, preferredColumnOrder),
+    [dataColumns, preferredColumnOrder]
+  )
+
+  const columns = useMemo(
+    () =>
+      visibleDataColumns.map((column) => ({
+        ...column,
+        title: (
+          <ColumnOrderHeaderMenu
+            column={column}
+            columns={dataColumns}
+            order={preferredColumnOrder}
+            saving={columnOrderSaving}
+            onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
+            onOpenPanel={() => setColumnOrderOpen(true)}
+          />
+        ),
+      })),
+    [
+      columnOrderSaving,
+      dataColumns,
+      persistColumnOrder,
+      preferredColumnOrder,
+      visibleDataColumns,
+    ]
+  )
+
+  const exportOrders = useCallback(() => {
+    if (orders.length === 0) return
+    downloadCSV({
+      filename: `purchase-orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      columns: visibleDataColumns,
+      rows: orders,
+    })
+  }, [orders, visibleDataColumns])
+
+  const selectedOrders = useMemo(
+    () => orders.filter((record) => selectedRowKeys.includes(record.id)),
+    [orders, selectedRowKeys]
+  )
+  const singleSelectedOrder =
+    selectedRowKeys.length === 1 ? selectedOrders[0] || selectedOrder : null
 
   const stats = [
-    { key: 'total', label: '采购订单', value: total },
+    { key: 'total', label: '总订单', value: total },
+    { key: 'current', label: '当前结果', value: orders.length },
     {
       key: 'approved',
       label: '已审核',
       value: orders.filter((item) => item.lifecycle_status === 'approved')
         .length,
     },
-    {
-      key: 'open',
-      label: '未关闭',
-      value: orders.filter((item) =>
-        ['draft', 'submitted', 'approved'].includes(item.lifecycle_status)
-      ).length,
-    },
+    { key: 'selected', label: '已选订单', value: selectedRowKeys.length },
   ]
+  const selectedOrderDisplayText =
+    selectedOrders.length === 1
+      ? `${
+          selectedOrders[0]?.purchase_order_no || selectedOrders[0]?.id
+        } / ${resolveSupplierName(selectedOrders[0])}`
+      : selectedOrders.length > 1
+        ? `已选择 ${selectedOrders.length} 张采购订单`
+        : '请先选择采购订单'
+  const selectedItems = selectedOrders.map((record) => ({
+    key: record.id,
+    label: record.purchase_order_no || `采购订单 ${record.id}`,
+    title: `${resolveSupplierName(record)} / ${
+      PURCHASE_ORDER_STATUS_LABELS[record.lifecycle_status] ||
+      record.lifecycle_status ||
+      '-'
+    }`,
+  }))
+  const selectedOrderCanEdit =
+    singleSelectedOrder &&
+    canUpdate &&
+    !['closed', 'canceled'].includes(singleSelectedOrder.lifecycle_status)
 
   return (
     <BusinessPageLayout className="erp-v1-purchase-orders-page">
@@ -547,70 +790,139 @@ export default function V1PurchaseOrdersPage() {
         title="采购订单"
         description="维护供应商采购承诺；采购订单不写库存，不替代采购入库、退货、质检或应付事实。"
         stats={stats}
-        tags={<Tag color="blue">Source Document</Tag>}
         compact
       />
 
-      <BusinessFilterPanel
+      <BusinessOperationPanel
+        compact
+        filters={
+          <>
+            <SearchInput
+              value={keyword}
+              placeholder="搜索采购单号 / 供应商单号"
+              onChange={(event) => {
+                setPagination((current) => ({ ...current, current: 1 }))
+                setKeyword(event.target.value)
+              }}
+              onPressEnter={loadOrders}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={status}
+              options={STATUS_OPTIONS}
+              onChange={(value) => {
+                setPagination((current) => ({ ...current, current: 1 }))
+                setStatus(value)
+              }}
+            />
+            <DateRangeFilter
+              options={DATE_FILTER_OPTIONS}
+              value={dateFilterField}
+              onTypeChange={(value) => {
+                setPagination((current) => ({ ...current, current: 1 }))
+                setDateFilterField(value || 'purchase_date')
+              }}
+              startValue={dateFilterStart}
+              endValue={dateFilterEnd}
+              onStartChange={(value) => {
+                setPagination((current) => ({ ...current, current: 1 }))
+                setDateFilterStart(value)
+              }}
+              onEndChange={(value) => {
+                setPagination((current) => ({ ...current, current: 1 }))
+                setDateFilterEnd(value)
+              }}
+            />
+            <SelectFilter
+              className="erp-business-filter-control--sort"
+              value={sortValue}
+              options={SORT_OPTIONS}
+              onChange={setSortValue}
+            />
+          </>
+        }
         actions={
           <Space wrap>
-            <ToolbarButton icon={<ReloadOutlined />} onClick={loadOrders}>
-              刷新
-            </ToolbarButton>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              disabled={!canCreate}
-              onClick={openCreateModal}
+            <ToolbarButton
+              icon={<DownloadOutlined />}
+              disabled={orders.length === 0}
+              onClick={exportOrders}
             >
-              新建采购订单
-            </Button>
+              导出当前结果
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={() => setColumnOrderOpen(true)}
+            >
+              列顺序
+            </ToolbarButton>
+            <Tooltip title="采购订单当前没有物理删除或回收站 API；如需退出使用，请走取消或关闭状态。">
+              <span>
+                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
+                  批量删除
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="当前 purchase_order JSON-RPC 没有回收站主路径，列表不做前端假恢复。">
+              <span>
+                <ToolbarButton icon={<InboxOutlined />} disabled>
+                  回收站
+                </ToolbarButton>
+              </span>
+            </Tooltip>
           </Space>
         }
+        primaryAction={
+          <ToolbarButton
+            type="primary"
+            className="erp-business-list-toolbar__primary-action"
+            icon={<PlusOutlined />}
+            disabled={!canCreate}
+            onClick={openCreateModal}
+          >
+            新建采购订单
+          </ToolbarButton>
+        }
       >
-        <SearchInput
-          value={keyword}
-          placeholder="搜索采购单号 / 供应商单号"
-          onChange={(event) => {
-            setPagination((current) => ({ ...current, current: 1 }))
-            setKeyword(event.target.value)
-          }}
-          onSearch={loadOrders}
-        />
-        <SelectFilter
-          className="erp-business-filter-control--status"
-          value={status}
-          options={STATUS_OPTIONS}
-          onChange={(value) => {
-            setPagination((current) => ({ ...current, current: 1 }))
-            setStatus(value)
-          }}
-        />
-        <DateRangeFilter
-          options={DATE_FILTER_OPTIONS}
-          value={dateFilterField}
-          onTypeChange={(value) => {
-            setPagination((current) => ({ ...current, current: 1 }))
-            setDateFilterField(value || 'purchase_date')
-          }}
-          startValue={dateFilterStart}
-          endValue={dateFilterEnd}
-          onStartChange={(value) => {
-            setPagination((current) => ({ ...current, current: 1 }))
-            setDateFilterStart(value)
-          }}
-          onEndChange={(value) => {
-            setPagination((current) => ({ ...current, current: 1 }))
-            setDateFilterEnd(value)
-          }}
-        />
-        <SelectFilter
-          className="erp-business-filter-control--sort"
-          value={sortValue}
-          options={SORT_OPTIONS}
-          onChange={setSortValue}
-        />
-      </BusinessFilterPanel>
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRowKeys.length}
+          selectedLabel={selectedOrderDisplayText}
+          selectedItems={selectedItems}
+        >
+          <Button
+            type="link"
+            size="small"
+            disabled={selectedRowKeys.length === 0}
+            onClick={() => {
+              applySelectedRowKeys([])
+              setSelectedOrder(null)
+            }}
+          >
+            清空已选
+          </Button>
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            disabled={!selectedOrderCanEdit}
+            onClick={() => openEditModal(singleSelectedOrder)}
+          >
+            编辑订单
+          </Button>
+          {LIFECYCLE_ACTIONS.filter((action) =>
+            hasActionPermission(adminProfile, action.permission)
+          ).map((action) => (
+            <Button
+              key={action.key}
+              size="small"
+              disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
+              onClick={() => runLifecycleAction(action, singleSelectedOrder)}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </SelectionActionBar>
+      </BusinessOperationPanel>
 
       <BusinessDataTable
         loading={loading}
@@ -619,12 +931,32 @@ export default function V1PurchaseOrdersPage() {
         dataSource={orders}
         scroll={{ x: 1200 }}
         rowSelection={{
-          type: 'radio',
-          selectedRowKeys: selectedOrder ? [selectedOrder.id] : [],
-          onChange: (_keys, rows) => setSelectedOrder(rows[0] || null),
+          selectedRowKeys,
+          onChange: (nextKeys, nextRows) => {
+            applySelectedRowKeys(nextKeys)
+            const nextSingle = nextKeys.length === 1 ? nextRows[0] : null
+            if (nextSingle?.id) {
+              setSelectedOrder(nextSingle)
+            } else {
+              setSelectedOrder(null)
+            }
+          },
         }}
+        rowClassName={(record) =>
+          selectedRowKeys.includes(record?.id) ? 'ant-table-row-selected' : ''
+        }
         onRow={(record) => ({
-          onClick: () => setSelectedOrder(record),
+          onClick: (event) => {
+            if (
+              event.target?.closest?.(
+                '.ant-checkbox-wrapper, .ant-checkbox, .ant-table-selection-column'
+              )
+            ) {
+              return
+            }
+            applySelectedRowKeys([record.id])
+            setSelectedOrder(record)
+          },
           onDoubleClick: () => openEditModal(record),
         })}
         pagination={{
@@ -635,6 +967,17 @@ export default function V1PurchaseOrdersPage() {
           onChange: (current, pageSize) => setPagination({ current, pageSize }),
         }}
         emptyDescription="暂无采购订单"
+      />
+
+      <ColumnOrderModal
+        open={columnOrderOpen}
+        columns={dataColumns}
+        order={preferredColumnOrder}
+        saving={columnOrderSaving}
+        moduleTitle="采购订单列表"
+        onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
+        onReset={() => persistColumnOrder([], dataColumns)}
+        onClose={() => setColumnOrderOpen(false)}
       />
 
       <Modal
@@ -697,14 +1040,14 @@ export default function V1PurchaseOrdersPage() {
             label="采购日期"
             rules={[{ required: true, message: '请选择采购日期' }]}
           >
-            <Input type="date" />
+            <DateInput />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
             name="expected_arrival_date"
             label="预计到货"
           >
-            <Input type="date" />
+            <DateInput />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
@@ -718,64 +1061,50 @@ export default function V1PurchaseOrdersPage() {
             <Form.List name="items">
               {(fields, { add, remove }) => (
                 <>
+                  <div className="erp-line-items-form__import-row">
+                    <div className="erp-line-items-form__import-copy">
+                      <strong>导入材料</strong>
+                      <span>
+                        从来源选择器导入；数量、单价和预计到货回到采购明细维护。
+                      </span>
+                    </div>
+                    <Button
+                      className="erp-line-items-form__import-button"
+                      onClick={() => setMaterialImportOpen(true)}
+                    >
+                      从材料库导入
+                    </Button>
+                  </div>
+                  <SourceImportPickerModal
+                    open={materialImportOpen}
+                    title="从材料库导入采购明细"
+                    description="这里只选择材料来源；数量、单价和预计到货仍在主弹窗采购明细里维护。"
+                    rows={materials}
+                    columns={materialImportColumns}
+                    getSelectedLabel={(material) =>
+                      material?.material_no ||
+                      material?.name ||
+                      material?.id ||
+                      '-'
+                    }
+                    searchPlaceholder="搜索材料编码、名称、分类、规格或颜色"
+                    emptyDescription="暂无可导入材料"
+                    onCancel={() => setMaterialImportOpen(false)}
+                    onImport={(selectedMaterials) => {
+                      let nextLineNo = getNextLineNo(
+                        form.getFieldValue('items') || []
+                      )
+                      selectedMaterials.forEach((material) => {
+                        add(createLineFromMaterial(material, nextLineNo))
+                        nextLineNo += 1
+                      })
+                      setMaterialImportOpen(false)
+                    }}
+                  />
                   <div className="erp-sales-order-lines-form__head">
                     <div>
                       <strong>采购明细</strong>
                       <span>同一个采购订单内维护多条供应商承诺明细。</span>
-                    </div>
-                    <div className="erp-line-items-form__tools">
-                      <Select
-                        showSearch
-                        allowClear
-                        className="erp-line-items-form__import"
-                        placeholder="从材料库导入"
-                        value={undefined}
-                        options={materialOptions}
-                        optionFilterProp="label"
-                        onChange={(value, option) => {
-                          const currentLines = form.getFieldValue('items') || []
-                          const material =
-                            option?.item ||
-                            materials.find((item) => item.id === value)
-                          if (!material) return
-                          add(
-                            createLineFromMaterial(
-                              material,
-                              getNextLineNo(currentLines)
-                            )
-                          )
-                        }}
-                      />
-                      <Button
-                        icon={<PlusOutlined />}
-                        onClick={() => {
-                          const currentLines = form.getFieldValue('items') || []
-                          add(createBlankLine(getNextLineNo(currentLines)))
-                        }}
-                      >
-                        添加行
-                      </Button>
-                      <div className="erp-line-items-form__stats">
-                        <span className="erp-line-items-form__stat">
-                          已录入
-                          <strong className="erp-line-items-form__stat-value">
-                            {lineSummary.count}
-                          </strong>
-                          条
-                        </span>
-                        <span className="erp-line-items-form__stat">
-                          数量合计
-                          <strong className="erp-line-items-form__stat-value">
-                            {formatSummaryNumber(lineSummary.quantity)}
-                          </strong>
-                        </span>
-                        <span className="erp-line-items-form__stat">
-                          金额合计
-                          <strong className="erp-line-items-form__stat-value">
-                            {formatSummaryNumber(lineSummary.amount, 2)}
-                          </strong>
-                        </span>
-                      </div>
                     </div>
                   </div>
                   <div className="erp-sales-order-lines-form__list">
@@ -878,7 +1207,7 @@ export default function V1PurchaseOrdersPage() {
                             name={[field.name, 'expected_arrival_date']}
                             label="预计到货"
                           >
-                            <Input type="date" />
+                            <DateInput />
                           </Form.Item>
                           <Form.Item name={[field.name, 'note']} label="备注">
                             <Input maxLength={255} />
@@ -886,6 +1215,41 @@ export default function V1PurchaseOrdersPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                  <div className="erp-line-items-form__footer">
+                    <div className="erp-line-items-form__footer-actions">
+                      <Button
+                        type="dashed"
+                        icon={<PlusOutlined />}
+                        onClick={() => {
+                          const currentLines = form.getFieldValue('items') || []
+                          add(createBlankLine(getNextLineNo(currentLines)))
+                        }}
+                      >
+                        添加条目
+                      </Button>
+                    </div>
+                    <div className="erp-line-items-form__stats">
+                      <span className="erp-line-items-form__stat">
+                        已录入
+                        <strong className="erp-line-items-form__stat-value">
+                          {lineSummary.count}
+                        </strong>
+                        条
+                      </span>
+                      <span className="erp-line-items-form__stat">
+                        数量合计
+                        <strong className="erp-line-items-form__stat-value">
+                          {formatSummaryNumber(lineSummary.quantity)}
+                        </strong>
+                      </span>
+                      <span className="erp-line-items-form__stat">
+                        金额合计
+                        <strong className="erp-line-items-form__stat-value">
+                          {formatSummaryNumber(lineSummary.amount, 2)}
+                        </strong>
+                      </span>
+                    </div>
                   </div>
                 </>
               )}

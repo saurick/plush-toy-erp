@@ -75,7 +75,9 @@ func (_c *RuntimeMarkerCreate) Mutation() *RuntimeMarkerMutation {
 
 // Save creates the RuntimeMarker in the database.
 func (_c *RuntimeMarkerCreate) Save(ctx context.Context) (*RuntimeMarker, error) {
-	_c.defaults()
+	if err := _c.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -102,19 +104,26 @@ func (_c *RuntimeMarkerCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (_c *RuntimeMarkerCreate) defaults() {
+func (_c *RuntimeMarkerCreate) defaults() error {
 	if _, ok := _c.mutation.MarkerValue(); !ok {
 		v := runtimemarker.DefaultMarkerValue
 		_c.mutation.SetMarkerValue(v)
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
+		if runtimemarker.DefaultCreatedAt == nil {
+			return fmt.Errorf("ent: uninitialized runtimemarker.DefaultCreatedAt (forgotten import ent/runtime?)")
+		}
 		v := runtimemarker.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
 	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
+		if runtimemarker.DefaultUpdatedAt == nil {
+			return fmt.Errorf("ent: uninitialized runtimemarker.DefaultUpdatedAt (forgotten import ent/runtime?)")
+		}
 		v := runtimemarker.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -32,14 +32,6 @@ const formalShellFormFieldLabelsByModuleKey = Object.freeze({
     '损耗率',
     'BOM 状态',
   ],
-  'accessories-purchase': [
-    '采购单号',
-    '供应商',
-    '物料',
-    '采购数量',
-    '交期',
-    '收货 / 退货追溯',
-  ],
   inbound: ['入库单号', '来源采购', '物料批次', '仓库', '入库数量', '质检状态'],
   'quality-inspections': [
     '质检单号',
@@ -178,11 +170,11 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '产品',
     pageKind: 'formal-v1',
     description:
-      '产品 SKU / 规格主数据入口；SKU 归属产品，维护颜色、尺码、条码、客户 SKU 和包装版本。',
+      '产品规格 / SKU 主数据入口；SKU 归属产品，维护颜色、尺码、条码、客户 SKU 和包装版本。',
     primaryEntity: 'product_skus',
     factSource: 'product_skus',
     boundary:
-      '产品档案维护 SKU 主数据，不等于库存、BOM、订单、生产或出货事实；真实事实写入必须走对应领域 usecase。',
+      '产品档案维护产品规格主数据，不等于库存、BOM、订单、生产或出货事实；真实事实写入必须走对应领域 usecase。',
     sourceRefs: ['products', 'product_skus'],
     currentScope: [
       'SKU 编号、条码、客户 SKU、颜色、色号、尺码、包装版本',
@@ -249,20 +241,26 @@ export const businessModuleDefinitions = Object.freeze([
     title: '采购订单',
     path: '/erp/purchase/accessories',
     shortLabel: '采购',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '采购订单入口承接采购需求、供应商、物料和交期协同；完整采购订单模型后续评审。',
-    primaryEntity: 'purchase_orders（后续评审）',
-    factSource:
-      'purchase_receipts / purchase_returns 已有事实，采购订单主模型待评审',
+      '正式 purchase_orders 表入口，只维护供应商采购承诺和采购明细，不写库存、批次或财务事实。',
+    primaryEntity: 'purchase_orders / purchase_order_items',
+    factSource: 'purchase_orders, purchase_order_items',
     boundary: '采购订单表达采购承诺，不等于采购收货、入库、退货或应付事实。',
     sourceRefs: [
+      'purchase_orders',
+      'purchase_order_items',
       'suppliers',
       'materials',
       'purchase_receipts',
       'purchase_returns',
     ],
-    currentScope: ['供应商与物料', '采购数量和交期', '采购收货 / 退货下游追溯'],
+    currentScope: [
+      '采购订单头和供应商快照',
+      '采购订单明细、材料、数量、单价和预计到货',
+      '提交、审核、关闭、取消生命周期',
+      '采购入库行可选关联采购订单行做追溯',
+    ],
   },
   {
     key: 'inbound',
@@ -460,7 +458,7 @@ export const businessModuleDefinitions = Object.freeze([
       '出货放行只表示可发货，出库管理表达库存出库事实；只有出货单 SHIPPED 才是真实出货事实。',
     sourceRefs: ['shipments', 'shipment_items', 'inventory_txns'],
     currentScope: [
-      '出货单列表和明细查看',
+      '出货单列表和明细维护',
       '新建草稿和添加商品明细',
       '确认出货写 OUT，取消已出货写 REVERSAL',
     ],

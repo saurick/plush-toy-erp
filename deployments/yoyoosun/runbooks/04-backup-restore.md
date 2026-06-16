@@ -26,6 +26,19 @@
 5. 记录 backup evidence，不记录下载链接或 secret。
 6. 定期抽样恢复到测试库。
 
+本地 / 试用前最小恢复演练入口：
+
+```bash
+SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
+  bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
+    --release-version <release-version> \
+    --out output/customers/yoyoosun/backup-restore-rehearsal \
+    --backend-url http://127.0.0.1:8300 \
+    --web-url http://127.0.0.1:5175/erp
+```
+
+该脚本会把 dump 放在 `output/` 下并恢复到临时隔离 PostgreSQL 容器；`output/` 不纳入 git。发布 evidence 只复制脱敏后的 `backup-evidence.md`、`migration-status.txt` 和 `backup-restore-report.json`。
+
 ## 恢复步骤
 
 1. 选择 backup id，并确认 hash。
@@ -35,6 +48,14 @@
 5. 执行 migration status。
 6. 执行 smoke query、健康检查和关键页面 smoke。
 7. 写入恢复演练报告。
+
+恢复演练报告必须至少记录：
+
+- `backupId`、备份大小和 hash。
+- `restoreTarget` alias，不记录完整 DSN。
+- `restoreTestStatus`、`restoreMigrationVersion` 和 `smokeQueryStatus`。
+- backend `healthz / readyz` 和 web 主路径 smoke 状态；如果未运行，必须明确写 `not-run`。
+- 失败项和后续修复项。
 
 ## RPO / RTO
 

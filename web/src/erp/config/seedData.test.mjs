@@ -69,7 +69,7 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
     navigationSections
       .find((section) => section.title === '系统管理')
       ?.items.map((item) => item.path),
-    ['/erp/system/permissions']
+    ['/erp/system/permissions', '/erp/system/audit-logs']
   )
   assert(!navPaths.includes('/erp/help-center'))
   assert(!navPaths.some((path) => path.startsWith('/erp/docs/')))
@@ -136,7 +136,7 @@ test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序
         },
         {
           title: '系统',
-          items: ['permission-center'],
+          items: ['permission-center', 'system-audit-logs'],
         },
       ],
       hiddenItemKeys: ['suppliers'],

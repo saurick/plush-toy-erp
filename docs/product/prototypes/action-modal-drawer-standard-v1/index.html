@@ -359,6 +359,67 @@
         color: var(--muted);
       }
 
+      .picker-rules {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .rule-chip {
+        display: inline-flex;
+        min-height: 28px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel-wash);
+        color: var(--muted);
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 740;
+      }
+
+      .picker-selection {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 1px dashed var(--line);
+        padding-top: 12px;
+      }
+
+      .picker-selection-items {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted);
+      }
+
+      .selected-chip {
+        display: inline-flex;
+        max-width: 240px;
+        min-height: 30px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-wash);
+        color: var(--text);
+        padding: 0 10px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .link-button {
+        border: 0;
+        background: transparent;
+        color: var(--blue);
+        cursor: pointer;
+        font-weight: 740;
+      }
+
       .badge,
       .status-pill {
         display: inline-flex;
@@ -495,11 +556,31 @@
 
       .pagination {
         display: flex;
+        align-items: center;
         justify-content: flex-end;
-        gap: 10px;
+        gap: 12px;
         margin-top: 12px;
         color: var(--muted);
         font-weight: 650;
+      }
+
+      .pagination-pages {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--text);
+        font-size: 20px;
+      }
+
+      .pagination-pages .current {
+        display: inline-flex;
+        width: 28px;
+        height: 28px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--green);
+        border-radius: 999px;
+        color: var(--green);
       }
 
       .order-list {
@@ -613,7 +694,7 @@
   <body data-modal="form">
     <nav class="switcher" aria-label="弹窗状态">
       <button type="button" data-target="form">单据补录</button>
-      <button type="button" data-target="import">来源导入</button>
+      <button type="button" data-target="import">来源选择器</button>
       <button type="button" data-target="recycle">回收站</button>
       <button type="button" data-target="columns">列顺序</button>
       <button type="button" data-target="confirm">删除确认</button>
@@ -848,14 +929,20 @@
       <section class="modal import" role="dialog" aria-modal="true" aria-labelledby="importTitle">
         <header class="modal-head">
           <div>
-            <h2 class="modal-title" id="importTitle">从来源单据导入明细</h2>
+            <h2 class="modal-title" id="importTitle">来源选择器：导入明细</h2>
             <p class="modal-subtitle">
-              只导入当前动作需要的来源行；库存、批次和数量上限仍由正式 usecase 校验。
+              第二层只选择当前动作需要的来源行；导入后回到父弹窗维护数量、仓库、批次和收货信息。
             </p>
           </div>
           <button class="close" type="button" aria-label="关闭">×</button>
         </header>
         <div class="modal-body">
+          <div class="picker-rules" aria-label="来源选择器规则">
+            <span class="rule-chip">第 2 层弹窗</span>
+            <span class="rule-chip">只筛选和选择来源</span>
+            <span class="rule-chip">不编辑本单字段</span>
+            <span class="rule-chip">不再弹第 3 层</span>
+          </div>
           <div class="search-row">
             <input placeholder="搜索要导入的记录" />
             <button class="btn" type="button">查看计算口径</button>
@@ -904,7 +991,25 @@
               </tbody>
             </table>
           </div>
-          <div class="pagination">共 40 条  1 / 5</div>
+          <div class="picker-selection">
+            <div class="picker-selection-items">
+              <strong>已选 1 条：</strong>
+              <span class="selected-chip">SO-202606-018</span>
+            </div>
+            <button class="link-button" type="button">清空已选</button>
+          </div>
+          <div class="pagination">
+            <span>共 40 条</span>
+            <span class="pagination-pages" aria-label="分页">
+              <span>‹</span>
+              <span>1</span>
+              <span>2</span>
+              <span class="current">3</span>
+              <span>4</span>
+              <span>5</span>
+              <span>›</span>
+            </span>
+          </div>
         </div>
         <footer class="modal-foot">
           <button class="btn" type="button">取消</button>
@@ -922,7 +1027,6 @@
         <div class="modal-body">
           <div class="compact-toolbar" style="margin-bottom: 12px">
             <button class="btn" disabled type="button">批量恢复</button>
-            <button class="btn" type="button">刷新</button>
             <button class="btn danger" type="button">清空回收站</button>
             <span class="source-note">已选择 0 条回收站记录</span>
           </div>

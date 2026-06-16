@@ -10,6 +10,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/runtimeauditevent"
 	"server/internal/data/model/ent/user"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -28,6 +29,11 @@ func NewAdminManageRepo(d *Data, logger log.Logger) *adminManageRepo {
 }
 
 var _ biz.AdminManageRepo = (*adminManageRepo)(nil)
+
+const (
+	defaultRuntimeAuditListLimit = 50
+	maxRuntimeAuditListLimit     = 200
+)
 
 func (r *adminManageRepo) toBizAdmin(a *ent.AdminUser) *biz.AdminUser {
 	if a == nil {
@@ -384,6 +390,97 @@ func (r *adminManageRepo) UpdateAdminPasswordHash(ctx context.Context, id int, p
 		return err
 	}
 	return nil
+}
+
+func (r *adminManageRepo) RecordRuntimeAuditEvent(ctx context.Context, event *biz.RuntimeAuditEventCreate) error {
+	if event == nil || strings.TrimSpace(event.EventType) == "" || strings.TrimSpace(event.Source) == "" {
+		return biz.ErrBadParam
+	}
+	payload := event.Payload
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	encodedPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = r.data.postgres.RuntimeAuditEvent.Create().
+		SetEventType(strings.TrimSpace(event.EventType)).
+		SetEventKey(strings.TrimSpace(event.EventKey)).
+		SetSource(strings.TrimSpace(event.Source)).
+		SetPayload(string(encodedPayload)).
+		Save(ctx)
+	return err
+}
+
+func (r *adminManageRepo) ListRuntimeAuditEvents(
+	ctx context.Context,
+	filter biz.RuntimeAuditEventListFilter,
+) (biz.RuntimeAuditEventListResult, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = defaultRuntimeAuditListLimit
+	}
+	if limit > maxRuntimeAuditListLimit {
+		limit = maxRuntimeAuditListLimit
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	query := r.data.postgres.RuntimeAuditEvent.Query()
+	countQuery := r.data.postgres.RuntimeAuditEvent.Query()
+	if source := strings.TrimSpace(filter.Source); source != "" {
+		query = query.Where(runtimeauditevent.Source(source))
+		countQuery = countQuery.Where(runtimeauditevent.Source(source))
+	}
+	if eventType := strings.TrimSpace(filter.EventType); eventType != "" {
+		query = query.Where(runtimeauditevent.EventType(eventType))
+		countQuery = countQuery.Where(runtimeauditevent.EventType(eventType))
+	}
+	if eventKey := strings.TrimSpace(filter.EventKey); eventKey != "" {
+		query = query.Where(runtimeauditevent.EventKey(eventKey))
+		countQuery = countQuery.Where(runtimeauditevent.EventKey(eventKey))
+	}
+
+	total, err := countQuery.Count(ctx)
+	if err != nil {
+		return biz.RuntimeAuditEventListResult{}, err
+	}
+	rows, err := query.
+		Order(ent.Desc(runtimeauditevent.FieldCreatedAt), ent.Desc(runtimeauditevent.FieldID)).
+		Offset(offset).
+		Limit(limit).
+		All(ctx)
+	if err != nil {
+		return biz.RuntimeAuditEventListResult{}, err
+	}
+
+	events := make([]biz.RuntimeAuditEvent, 0, len(rows))
+	for _, row := range rows {
+		payload := map[string]any{}
+		if strings.TrimSpace(row.Payload) != "" {
+			if err := json.Unmarshal([]byte(row.Payload), &payload); err != nil {
+				payload = map[string]any{"_decode_error": "invalid_payload_json"}
+			}
+		}
+		events = append(events, biz.RuntimeAuditEvent{
+			ID:        row.ID,
+			EventType: row.EventType,
+			EventKey:  row.EventKey,
+			Source:    row.Source,
+			Payload:   payload,
+			CreatedAt: row.CreatedAt,
+		})
+	}
+
+	return biz.RuntimeAuditEventListResult{
+		Events: events,
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}, nil
 }
 
 func stringValue(value *string) string {

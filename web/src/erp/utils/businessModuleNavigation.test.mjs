@@ -64,5 +64,11 @@ test('formal business shell: 表单字段按产品核心模块区分', () => {
   assert.ok(getFormalShellFormFieldLabels('receivables').includes('应收金额'))
   assert.equal(getBusinessModule('materials')?.pageKind, 'formal-v1')
   assert.equal(getBusinessModule('material-bom')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('accessories-purchase')?.pageKind, 'formal-v1')
+  assert.equal(
+    formalShellModules.some((item) => item.key === 'accessories-purchase'),
+    false
+  )
   assert.deepEqual(getFormalShellFormFieldLabels('materials'), [])
+  assert.deepEqual(getFormalShellFormFieldLabels('accessories-purchase'), [])
 })

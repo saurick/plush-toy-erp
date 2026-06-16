@@ -31,6 +31,10 @@ const mobileRoleTasksPageSource = readFileSync(
   new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
 )
+const mobileRoleTaskActionsSource = readFileSync(
+  new URL('../mobile/hooks/useMobileRoleTaskActions.js', import.meta.url),
+  'utf8'
+)
 
 function productionRecord(overrides = {}) {
   return {
@@ -153,15 +157,15 @@ test('finishedGoodsFlow: 移动端成品抽检状态动作不再本地创建下�
     false
   )
   assert.match(
-    mobileRoleTasksPageSource,
+    mobileRoleTaskActionsSource,
     /if \(activeRoleKey === 'quality' && isFinishedGoodsQcTask\(task\)\) {[\s\S]{0,80}return[\s\S]{0,20}}/
   )
   assert.match(
-    mobileRoleTasksPageSource,
+    mobileRoleTaskActionsSource,
     /if \(activeRoleKey === 'warehouse' && isFinishedGoodsInboundTask\(task\)\) {[\s\S]{0,80}return[\s\S]{0,20}}/
   )
   assert.match(
-    mobileRoleTasksPageSource,
+    mobileRoleTaskActionsSource,
     /if \(activeRoleKey === 'warehouse' && isShipmentReleaseTask\(task\)\) {[\s\S]{0,80}return[\s\S]{0,20}}/
   )
   assert.equal(

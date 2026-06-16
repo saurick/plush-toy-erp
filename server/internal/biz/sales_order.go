@@ -53,6 +53,7 @@ type SalesOrderItem struct {
 	SalesOrderID        int
 	LineNo              int
 	ProductID           int
+	ProductSkuID        *int
 	UnitID              int
 	ProductCodeSnapshot *string
 	ProductNameSnapshot *string
@@ -81,6 +82,7 @@ type SalesOrderItemMutation struct {
 	SalesOrderID        int
 	LineNo              int
 	ProductID           int
+	ProductSkuID        *int
 	UnitID              int
 	ProductCodeSnapshot *string
 	ProductNameSnapshot *string
@@ -444,6 +446,9 @@ func normalizeSalesOrderItemFields(in SalesOrderItemMutation) (SalesOrderItemMut
 	in.ProductNameSnapshot = normalizeOptionalString(in.ProductNameSnapshot)
 	in.ColorSnapshot = normalizeOptionalString(in.ColorSnapshot)
 	in.Note = normalizeOptionalString(in.Note)
+	if in.ProductSkuID != nil && *in.ProductSkuID <= 0 {
+		return SalesOrderItemMutation{}, ErrBadParam
+	}
 	if in.SalesOrderID < 0 || in.LineNo <= 0 || in.ProductID <= 0 || in.UnitID <= 0 {
 		return SalesOrderItemMutation{}, ErrBadParam
 	}

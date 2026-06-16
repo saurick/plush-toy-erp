@@ -123,6 +123,19 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '用于评审正式左侧导航候选：工作台、任务、主数据、销售、采购入库质检、库存、生产外协、出货、财务、报表、导入和系统；不改当前运行时菜单。',
   },
   {
+    key: 'audit-log-page',
+    title: '审计日志页原型',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'audit-log-page-v1/',
+    assetPath: 'audit-log-page-v1/index.html',
+    readmePath: 'audit-log-page-v1/README.md',
+    description:
+      '把审计日志页从空表壳收敛为系统控制面追踪工具：审计摘要、筛选分组、日志列表、事件详情、空态和风险事件态。',
+    appliesTo:
+      '系统管理 / 审计日志页面可参照；只读追溯账号、角色、权限和初始化事件，不替代业务事实表、后端 API、RBAC 或菜单真源。',
+  },
+  {
     key: 'business-module-standard-page',
     title: '业务模块标准页样板',
     type: 'HTML',
@@ -183,9 +196,9 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-form-page-standard-v1/index.html',
     readmePath: 'business-form-page-standard-v1/README.md',
     description:
-      '覆盖页面级新建 / 编辑骨架、字段分组、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。',
+      '覆盖页面级新建 / 编辑骨架、字段分组、item 区来源选择器入口、横向滚动、明细统计、必填提示、校验错误、保存 / 取消 / 重置、来源带值、清值、新增 / 编辑 / 只读状态和缺值 / 残值防护。',
     appliesTo:
-      '客户、供应商、联系人、销售订单、采购、库存、质检和财务等页面级新建 / 编辑表单可参照；来源导入、明细行、回收站、列顺序和危险确认回到业务弹窗样板。',
+      '客户、供应商、联系人、销售订单、采购、BOM、出货、库存、质检和财务等页面级新建 / 编辑表单可参照；item 区来源选择器入口和明细统计留在本样板，来源选择器本体、回收站、列顺序和危险确认回到局部动作弹窗样板。',
   },
   {
     key: 'action-modal-drawer-standard',
@@ -196,7 +209,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'action-modal-drawer-standard-v1/index.html',
     readmePath: 'action-modal-drawer-standard-v1/README.md',
     description:
-      '覆盖单据补录、来源导入、明细行、回收站、列顺序、删除确认和危险确认。',
+      '覆盖单据补录、来源选择器、明细行、回收站、列顺序、删除确认和危险确认；来源选择器最多作为第二层，保留分页、已选摘要和清空已选，只选择来源不编辑本单字段。',
     appliesTo:
       '出货、采购、质检、库存、财务等列表页局部动作浮层可参照；完整新建 / 编辑页回到表单页样板，字段真源、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。',
   },

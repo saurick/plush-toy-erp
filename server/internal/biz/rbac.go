@@ -13,6 +13,7 @@ const (
 	PermissionSystemRoleDelete       = "system.role.delete"
 	PermissionSystemPermissionRead   = "system.permission.read"
 	PermissionSystemPermissionManage = "system.permission.manage"
+	PermissionSystemAuditRead        = "system.audit.read"
 
 	PermissionERPDashboardRead          = "erp.dashboard.read"
 	PermissionERPPrintTemplateRead      = "erp.print_template.read"
@@ -172,6 +173,7 @@ var builtinPermissions = []PermissionDefinition{
 	{Key: PermissionSystemRoleDelete, Name: "删除角色", Module: "system", Action: "delete", Resource: "role", Builtin: true},
 	{Key: PermissionSystemPermissionRead, Name: "查看权限码", Module: "system", Action: "read", Resource: "permission", Builtin: true},
 	{Key: PermissionSystemPermissionManage, Name: "管理角色权限", Module: "system", Action: "manage", Resource: "permission", Builtin: true},
+	{Key: PermissionSystemAuditRead, Name: "查看系统审计日志", Module: "system", Action: "read", Resource: "audit_log", Builtin: true},
 	{Key: PermissionERPDashboardRead, Name: "查看任务看板", Module: "erp", Action: "read", Resource: "dashboard", Builtin: true},
 	{Key: PermissionERPPrintTemplateRead, Name: "查看打印模板", Module: "erp", Action: "read", Resource: "print_template", Builtin: true},
 	{Key: PermissionERPBusinessChainDebugRead, Name: "查看业务链路调试能力", Module: "erp", Action: "read", Resource: "business_chain_debug", Builtin: true},
@@ -393,7 +395,7 @@ func BuiltinRoles() []RoleDefinition {
 		{Key: FinanceRoleKey, Name: "财务", Description: "应收、应付、收付款和财务报表相关入口，任务处理仍受财务 owner/assignee 约束。", Builtin: true, SortOrder: 60, Permissions: []string{PermissionERPDashboardRead, PermissionERPPrintTemplateRead, PermissionMaterialRead, PermissionProductSKURead, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionFinancePayableRead, PermissionFinancePayableConfirm, PermissionFinanceReceivableRead, PermissionFinanceReceivableConfirm, PermissionFinanceReportRead, PermissionMobileFinanceAccess}},
 		{Key: PMCRoleKey, Name: "PMC", Description: "生产计划、进度和风险跟进；可查看风险，不等于可代替其他角色完成任务。", Builtin: true, SortOrder: 70, Permissions: []string{PermissionERPDashboardRead, PermissionMaterialRead, PermissionMaterialCreate, PermissionMaterialUpdate, PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, PermissionBOMRead, PermissionBOMCreate, PermissionBOMUpdate, PermissionBOMActivate, PermissionShipmentRead, PermissionWorkflowTaskRead, PermissionWorkflowTaskCreate, PermissionWorkflowTaskUpdate, PermissionPMCPlanRead, PermissionPMCPlanCreate, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobilePMCAccess}},
 		{Key: ProductionRoleKey, Name: "生产", Description: "排产、进度、返工和生产异常处理，任务处理仍受生产 owner/assignee 约束。", Builtin: true, SortOrder: 80, Permissions: []string{PermissionERPDashboardRead, PermissionMaterialRead, PermissionProductSKURead, PermissionWorkflowTaskRead, PermissionWorkflowTaskUpdate, PermissionWorkflowTaskComplete, PermissionPMCPlanRead, PermissionPMCPlanUpdate, PermissionPMCRiskRead, PermissionPMCRiskHandle, PermissionMobileProductionAccess}},
-		{Key: AdminRoleKey, Name: "系统管理员", Description: "管理管理员、角色、权限和基础配置，不天然拥有业务事实处理权。", Builtin: true, SortOrder: 90, Permissions: []string{PermissionSystemUserRead, PermissionSystemUserCreate, PermissionSystemUserUpdate, PermissionSystemUserDisable, PermissionSystemRoleRead, PermissionSystemRoleCreate, PermissionSystemRoleUpdate, PermissionSystemRoleDelete, PermissionSystemPermissionRead, PermissionSystemPermissionManage}},
+		{Key: AdminRoleKey, Name: "系统管理员", Description: "管理管理员、角色、权限和基础配置，不天然拥有业务事实处理权。", Builtin: true, SortOrder: 90, Permissions: []string{PermissionSystemUserRead, PermissionSystemUserCreate, PermissionSystemUserUpdate, PermissionSystemUserDisable, PermissionSystemRoleRead, PermissionSystemRoleCreate, PermissionSystemRoleUpdate, PermissionSystemRoleDelete, PermissionSystemPermissionRead, PermissionSystemPermissionManage, PermissionSystemAuditRead}},
 		{Key: DebugOperatorRoleKey, Name: "调试操作员", Description: "仅限 local/dev/test 分配的 debug 操作角色。", Builtin: true, SortOrder: 100, Permissions: []string{PermissionERPBusinessChainDebugRead, PermissionDebugBusinessChainRead, PermissionDebugBusinessChainRun, PermissionDebugSeed, PermissionDebugCleanup, PermissionDebugBusinessClear}},
 	}
 }
@@ -510,6 +512,7 @@ var builtinAdminMenus = []AdminMenu{
 	{Key: "print-center", Label: "模板打印中心", Path: "/erp/print-center", RequiredPermissions: []string{PermissionERPPrintTemplateRead}},
 	{Key: "exception-flow", Label: "异常 / 阻塞闭环", Path: "/erp/operations/exceptions", RequiredPermissions: []string{PermissionWorkflowTaskRead}},
 	{Key: "permission-center", Label: "权限管理", Path: "/erp/system/permissions", RequiredPermissions: []string{PermissionSystemUserRead, PermissionSystemRoleRead}},
+	{Key: "system-audit-logs", Label: "审计日志", Path: "/erp/system/audit-logs", RequiredPermissions: []string{PermissionSystemAuditRead}},
 }
 
 func BuiltinAdminMenus() []AdminMenu {

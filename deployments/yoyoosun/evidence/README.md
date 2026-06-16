@@ -8,6 +8,7 @@
 - migration before / after version。
 - env、客户配置和菜单配置 fingerprint。
 - backup id、大小、hash、存储位置 alias。
+- 备份恢复演练状态、恢复目标 alias、migration status 和 smoke query 状态。
 - smoke 项目、状态、时间和脱敏失败原因。
 - known limitations、acceptance checklist 和操作人角色。
 
@@ -37,7 +38,14 @@ bash deployments/yoyoosun/scripts/collect-evidence.sh \
   --output deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
-客户试用或交付前必须再运行 release evidence gate，确认 release、pre-migration backup、migration、smoke 和 sign-off 字段都不是模板占位：
+客户试用或交付前必须先完成一次真实恢复演练，再运行 release evidence gate，确认 release、pre-migration backup、backup restore、migration、smoke 和 sign-off 字段都不是模板占位：
+
+```bash
+SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
+  bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
+    --release-version <release-version> \
+    --out output/customers/yoyoosun/backup-restore-rehearsal
+```
 
 ```bash
 node scripts/deploy/release-evidence-gate.mjs \

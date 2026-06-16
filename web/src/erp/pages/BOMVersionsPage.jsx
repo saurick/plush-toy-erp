@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CopyOutlined,
@@ -7,7 +7,7 @@ import {
   EditOutlined,
   InboxOutlined,
   PlusOutlined,
-  ReloadOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import {
   Button,
@@ -20,6 +20,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -36,11 +37,13 @@ import {
   updateBOMDraft,
   updateBOMItem,
 } from '../api/bomApi.mjs'
+import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
   CollaborationTaskPanel,
+  DateInput,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -48,11 +51,26 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  ColumnOrderHeaderMenu,
+  ColumnOrderModal,
+} from '../components/business-list/ColumnOrderModal.jsx'
+import {
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  applyModuleColumnOrder,
+  sanitizeModuleColumnOrder,
+} from '../utils/moduleTableColumns.mjs'
+import {
+  createBusinessTablePagination,
+  getBusinessPaginationParams,
+  resetBusinessPaginationCurrent,
+} from '../utils/businessPagination.mjs'
 
+const BOM_MODULE_KEY = 'material-bom'
+const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
   { label: '草稿', value: 'DRAFT' },
@@ -76,6 +94,44 @@ const STATUS_COLORS = {
 }
 
 const BUSINESS_FORM_MODAL_WIDTH = 'min(960px, calc(100vw - 96px))'
+
+function readStoredColumnOrder(moduleKey) {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(
+      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+    )
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredColumnOrder(moduleKey, order = []) {
+  if (typeof window === 'undefined') return
+  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+  if (!Array.isArray(order) || order.length === 0) {
+    window.localStorage.removeItem(storageKey)
+    return
+  }
+  window.localStorage.setItem(storageKey, JSON.stringify(order))
+}
+
+function getPreferredColumnOrder({
+  adminProfile,
+  moduleKey,
+  columns,
+  localOrder,
+}) {
+  if (Array.isArray(localOrder)) {
+    return sanitizeModuleColumnOrder(localOrder, columns)
+  }
+  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
+  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
+  if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
+  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
+}
 
 function statusTag(status) {
   const key = String(status || '')
@@ -105,7 +161,15 @@ function csvEscape(value) {
 }
 
 function downloadCSV({ filename, rows }) {
-  const header = ['产品ID', 'BOM版本', '状态', '生效开始', '生效结束', '备注']
+  const header = [
+    '产品ID',
+    'BOM版本',
+    '状态',
+    '生效开始',
+    '生效结束',
+    '备注',
+    '更新时间',
+  ]
   const body = rows.map((row) => [
     row.product_id,
     row.version,
@@ -113,6 +177,7 @@ function downloadCSV({ filename, rows }) {
     formatUnixDate(row.effective_from),
     formatUnixDate(row.effective_to),
     row.note || '',
+    formatUnixDateTime(row.updated_at),
   ])
   const csv = [header, ...body]
     .map((line) => line.map(csvEscape).join(','))
@@ -185,14 +250,14 @@ function HeaderFormFields({ includeProduct = true, disabled = false }) {
         label="生效开始"
         name="effective_from"
       >
-        <Input type="date" disabled={disabled} />
+        <DateInput disabled={disabled} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         label="生效结束"
         name="effective_to"
       >
-        <Input type="date" disabled={disabled} />
+        <DateInput disabled={disabled} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
@@ -266,7 +331,10 @@ function ItemFormFields() {
 
 export default function BOMVersionsPage() {
   const outletContext = useOutletContext()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -275,7 +343,13 @@ export default function BOMVersionsPage() {
   const [productID, setProductID] = useState()
   const [versions, setVersions] = useState([])
   const [total, setTotal] = useState(0)
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [selectedVersion, setSelectedVersion] = useState(null)
+  const [selectedRowKeys, setSelectedRowKeys] = useState([])
+  const selectedRowKeysRef = useRef([])
+  const [columnOrder, setColumnOrder] = useState(null)
+  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
+  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
   const [itemModalOpen, setItemModalOpen] = useState(false)
@@ -287,8 +361,12 @@ export default function BOMVersionsPage() {
   const canCreate = hasActionPermission(adminProfile, 'bom.create')
   const canUpdate = hasActionPermission(adminProfile, 'bom.update')
   const canActivate = hasActionPermission(adminProfile, 'bom.activate')
-  const selectedIsDraft = selectedVersion?.status === 'DRAFT'
-  const selectedCanEdit = selectedIsDraft && canUpdate
+
+  const applySelectedRowKeys = useCallback((nextKeys = []) => {
+    const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
+    selectedRowKeysRef.current = normalizedKeys
+    setSelectedRowKeys(normalizedKeys)
+  }, [])
 
   const loadDetail = useCallback(async (id) => {
     if (!id) return null
@@ -309,6 +387,7 @@ export default function BOMVersionsPage() {
     if (!canRead) {
       setVersions([])
       setSelectedVersion(null)
+      applySelectedRowKeys([])
       return false
     }
     setLoading(true)
@@ -317,19 +396,19 @@ export default function BOMVersionsPage() {
         keyword,
         status,
         product_id: productID || undefined,
-        limit: 100,
+        ...getBusinessPaginationParams(pagination),
       })
       const nextVersions = Array.isArray(result?.bom_versions)
         ? result.bom_versions
         : []
       setVersions(nextVersions)
       setTotal(Number(result?.total || nextVersions.length || 0))
-      const nextSelected =
-        nextVersions.find((item) => item.id === selectedVersion?.id) ||
-        nextVersions[0] ||
-        null
-      if (nextSelected?.id) {
-        await loadDetail(nextSelected.id)
+      const validKeys = selectedRowKeysRef.current.filter((key) =>
+        nextVersions.some((item) => item.id === key)
+      )
+      applySelectedRowKeys(validKeys)
+      if (validKeys.length === 1) {
+        await loadDetail(validKeys[0])
       } else {
         setSelectedVersion(null)
       }
@@ -340,7 +419,15 @@ export default function BOMVersionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [canRead, keyword, loadDetail, productID, selectedVersion?.id, status])
+  }, [
+    applySelectedRowKeys,
+    canRead,
+    keyword,
+    loadDetail,
+    pagination,
+    productID,
+    status,
+  ])
 
   useEffect(() => {
     loadVersions()
@@ -349,6 +436,41 @@ export default function BOMVersionsPage() {
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadVersions)
   }, [loadVersions, outletContext])
+
+  const selectedVersions = useMemo(
+    () => versions.filter((record) => selectedRowKeys.includes(record.id)),
+    [selectedRowKeys, versions]
+  )
+  const singleSelectedVersion =
+    selectedRowKeys.length === 1 ? selectedVersions[0] || selectedVersion : null
+  const activeActionVersion = singleSelectedVersion
+  const activeActionCanEdit =
+    activeActionVersion?.status === 'DRAFT' && canUpdate
+  const archivableSelectedVersions = selectedVersions.filter(
+    (record) => record?.status !== 'ARCHIVED'
+  )
+  const selectedLabel =
+    selectedVersions.length === 1
+      ? selectedVersions[0]?.version || '已选择 1 条 BOM'
+      : selectedVersions.length > 1
+        ? `已选择 ${selectedVersions.length} 条 BOM`
+        : '未选择 BOM'
+  const selectedItems = selectedVersions.map((record) => ({
+    key: record.id,
+    label: record.version || `BOM ${record.id}`,
+    title: `产品 ID ${record.product_id || '-'} / ${
+      STATUS_LABELS[record.status] || record.status || '-'
+    }`,
+  }))
+  const selectSingleVersion = useCallback(
+    async (record) => {
+      if (!record?.id) return
+      applySelectedRowKeys([record.id])
+      setSelectedVersion(record)
+      await loadDetail(record.id)
+    },
+    [applySelectedRowKeys, loadDetail]
+  )
 
   const openCreate = () => {
     setHeaderMode('create')
@@ -404,12 +526,12 @@ export default function BOMVersionsPage() {
     try {
       if (headerMode === 'copy') {
         await copyBOMVersion(
-          buildHeaderParams(values, { source_id: selectedVersion?.id })
+          buildHeaderParams(values, { source_id: activeActionVersion?.id })
         )
         message.success('BOM 新版本已复制为草稿')
       } else if (headerMode === 'edit') {
         await updateBOMDraft(
-          buildHeaderParams(values, { id: selectedVersion?.id })
+          buildHeaderParams(values, { id: activeActionVersion?.id })
         )
         message.success('BOM 草稿已更新')
       } else {
@@ -426,14 +548,14 @@ export default function BOMVersionsPage() {
   }
 
   const openCreateItem = () => {
-    if (!selectedVersion?.id) {
+    if (!activeActionVersion?.id || selectedRowKeys.length !== 1) {
       message.warning('请先选择一个 BOM 版本')
       return
     }
     setEditingItem(null)
     itemForm.resetFields()
     itemForm.setFieldsValue({
-      bom_header_id: selectedVersion.id,
+      bom_header_id: activeActionVersion.id,
       quantity: '',
       loss_rate: '0',
     })
@@ -467,12 +589,12 @@ export default function BOMVersionsPage() {
         message.success('BOM 明细已更新')
       } else {
         await addBOMItem(
-          buildItemParams(values, { bom_header_id: selectedVersion?.id })
+          buildItemParams(values, { bom_header_id: activeActionVersion?.id })
         )
         message.success('BOM 明细已添加')
       }
       setItemModalOpen(false)
-      await loadDetail(selectedVersion?.id)
+      await loadDetail(activeActionVersion?.id)
       await loadVersions()
     } catch (error) {
       message.error(getActionErrorMessage(error, '保存 BOM 明细'))
@@ -487,7 +609,7 @@ export default function BOMVersionsPage() {
       try {
         await deleteBOMItem({ id: item.id })
         message.success('BOM 明细已删除')
-        await loadDetail(selectedVersion?.id)
+        await loadDetail(activeActionVersion?.id)
         await loadVersions()
       } catch (error) {
         message.error(getActionErrorMessage(error, '删除 BOM 明细'))
@@ -495,16 +617,16 @@ export default function BOMVersionsPage() {
         setSaving(false)
       }
     },
-    [loadDetail, loadVersions, selectedVersion?.id]
+    [activeActionVersion?.id, loadDetail, loadVersions]
   )
 
   const activateSelected = async () => {
-    if (!selectedVersion?.id) return
+    if (!activeActionVersion?.id || selectedRowKeys.length !== 1) return
     setSaving(true)
     try {
-      const next = await activateBOMVersion({ id: selectedVersion.id })
+      const next = await activateBOMVersion({ id: activeActionVersion.id })
       message.success('BOM 版本已激活，旧激活版本已归档')
-      setSelectedVersion(next || selectedVersion)
+      setSelectedVersion(next || activeActionVersion)
       await loadVersions()
     } catch (error) {
       message.error(getActionErrorMessage(error, '激活 BOM 版本'))
@@ -514,11 +636,17 @@ export default function BOMVersionsPage() {
   }
 
   const archiveSelected = async () => {
-    if (!selectedVersion?.id) return
+    if (archivableSelectedVersions.length === 0) return
     setSaving(true)
     try {
-      await archiveBOMVersion({ id: selectedVersion.id })
-      message.success('BOM 版本已归档')
+      for (const record of archivableSelectedVersions) {
+        await archiveBOMVersion({ id: record.id })
+      }
+      message.success(
+        archivableSelectedVersions.length > 1
+          ? `已归档 ${archivableSelectedVersions.length} 个 BOM 版本`
+          : 'BOM 版本已归档'
+      )
       await loadVersions()
     } catch (error) {
       message.error(getActionErrorMessage(error, '归档 BOM 版本'))
@@ -527,10 +655,11 @@ export default function BOMVersionsPage() {
     }
   }
 
-  const columns = useMemo(
+  const dataColumns = useMemo(
     () => [
       {
         title: '产品 ID',
+        exportTitle: '产品 ID',
         dataIndex: 'product_id',
         width: 110,
         sorter: (a, b) =>
@@ -538,6 +667,7 @@ export default function BOMVersionsPage() {
       },
       {
         title: 'BOM 版本',
+        exportTitle: 'BOM 版本',
         dataIndex: 'version',
         width: 180,
         sorter: (a, b) =>
@@ -545,38 +675,116 @@ export default function BOMVersionsPage() {
       },
       {
         title: '状态',
+        exportTitle: '状态',
         dataIndex: 'status',
         width: 110,
         render: statusTag,
+        exportValue: (record) => STATUS_LABELS[record.status] || record.status,
       },
       {
         title: '生效开始',
+        exportTitle: '生效开始',
         dataIndex: 'effective_from',
         width: 130,
         render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record.effective_from),
       },
       {
         title: '生效结束',
+        exportTitle: '生效结束',
         dataIndex: 'effective_to',
         width: 130,
         render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record.effective_to),
       },
       {
         title: '备注',
+        exportTitle: '备注',
         dataIndex: 'note',
         width: 220,
         render: (value) => value || '-',
       },
       {
         title: '更新时间',
+        exportTitle: '更新时间',
         dataIndex: 'updated_at',
         width: 160,
         render: formatUnixDateTime,
         sorter: (a, b) =>
           Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
+        exportValue: (record) => formatUnixDateTime(record.updated_at),
       },
     ],
     []
+  )
+
+  const persistColumnOrder = useCallback(
+    async (nextOrder, columnsForOrder) => {
+      const sanitizedOrder = sanitizeModuleColumnOrder(
+        nextOrder,
+        columnsForOrder
+      )
+      setColumnOrder(sanitizedOrder)
+      writeStoredColumnOrder(BOM_MODULE_KEY, sanitizedOrder)
+      setColumnOrderSaving(true)
+      try {
+        const erpPreferences = await setERPColumnOrder({
+          module_key: BOM_MODULE_KEY,
+          order: sanitizedOrder,
+        })
+        outletContext?.updateAdminERPPreferences?.(erpPreferences)
+        message.success(
+          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
+        )
+      } catch (error) {
+        message.warning(
+          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
+        )
+      } finally {
+        setColumnOrderSaving(false)
+      }
+    },
+    [outletContext]
+  )
+
+  const preferredColumnOrder = useMemo(
+    () =>
+      getPreferredColumnOrder({
+        adminProfile,
+        moduleKey: BOM_MODULE_KEY,
+        columns: dataColumns,
+        localOrder: columnOrder,
+      }),
+    [adminProfile, columnOrder, dataColumns]
+  )
+
+  const orderedDataColumns = useMemo(
+    () => applyModuleColumnOrder(dataColumns, preferredColumnOrder),
+    [dataColumns, preferredColumnOrder]
+  )
+
+  const columns = useMemo(
+    () =>
+      orderedDataColumns.map((column) => ({
+        ...column,
+        title: (
+          <ColumnOrderHeaderMenu
+            column={column}
+            columns={dataColumns}
+            order={preferredColumnOrder}
+            saving={columnOrderSaving}
+            onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
+            onOpenPanel={() => setColumnOrderOpen(true)}
+          />
+        ),
+      })),
+    [
+      columnOrderSaving,
+      dataColumns,
+      orderedDataColumns,
+      persistColumnOrder,
+      preferredColumnOrder,
+    ]
   )
 
   const itemColumns = useMemo(
@@ -603,7 +811,7 @@ export default function BOMVersionsPage() {
         width: 150,
         fixed: 'right',
         render: (_, item) =>
-          selectedCanEdit ? (
+          activeActionCanEdit ? (
             <Space size={8}>
               <Button
                 size="small"
@@ -628,43 +836,38 @@ export default function BOMVersionsPage() {
           ),
       },
     ],
-    [openEditItem, removeItem, selectedCanEdit]
+    [activeActionCanEdit, openEditItem, removeItem]
   )
 
   return (
     <BusinessPageLayout>
       <PageHeaderCard
+        compact
         title="BOM 管理"
-        description="维护产品工程资料版本、材料用量、损耗率和生效边界；BOM 不写库存、不自动生成采购需求。"
-        tags={[
-          <Tag color="blue" key="source">
-            bom_headers / bom_items
-          </Tag>,
-          <Tag color="gold" key="boundary">
-            ACTIVE 不可直接改
-          </Tag>,
-        ]}
+        description="维护产品工程资料版本、材料用量、损耗率和生效边界。"
         stats={[
-          { label: '当前列表', value: total },
+          { key: 'total', label: '总BOM', value: total },
+          { key: 'current', label: '当前结果', value: versions.length },
           {
+            key: 'active',
             label: '已激活',
             value: versions.filter((item) => item.status === 'ACTIVE').length,
           },
-          {
-            label: '草稿',
-            value: versions.filter((item) => item.status === 'DRAFT').length,
-          },
+          { key: 'selected', label: '已选BOM', value: selectedRowKeys.length },
         ]}
-        summary="草稿可维护明细；激活会将同产品旧 ACTIVE 版本归档；已激活版本要改版必须复制新版本。"
       />
 
       <BusinessOperationPanel
+        compact
         filters={
           <>
             <SearchInput
               value={keyword}
               placeholder="搜索 BOM 版本"
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) => {
+                setKeyword(event.target.value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
               onPressEnter={loadVersions}
             />
             <InputNumber
@@ -672,22 +875,25 @@ export default function BOMVersionsPage() {
               precision={0}
               placeholder="产品 ID"
               value={productID}
-              onChange={setProductID}
+              onChange={(nextProductID) => {
+                setProductID(nextProductID)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
               style={{ width: 140 }}
             />
             <SelectFilter
               value={status}
               options={STATUS_OPTIONS}
-              onChange={(nextStatus) => setStatus(nextStatus || '')}
+              onChange={(nextStatus) => {
+                setStatus(nextStatus || '')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
               style={{ width: 140 }}
             />
           </>
         }
         actions={
-          <>
-            <ToolbarButton icon={<ReloadOutlined />} onClick={loadVersions}>
-              刷新
-            </ToolbarButton>
+          <Space wrap>
             <ToolbarButton
               icon={<DownloadOutlined />}
               disabled={versions.length === 0}
@@ -695,36 +901,175 @@ export default function BOMVersionsPage() {
                 downloadCSV({ filename: 'bom-versions.csv', rows: versions })
               }
             >
-              导出
+              导出当前结果
             </ToolbarButton>
             <ToolbarButton
-              type="primary"
-              icon={<PlusOutlined />}
-              disabled={!canCreate}
-              onClick={openCreate}
+              icon={<SettingOutlined />}
+              onClick={() => setColumnOrderOpen(true)}
             >
-              新建草稿
+              列顺序
             </ToolbarButton>
-          </>
+            <Tooltip title="BOM 版本不走物理删除或回收站；需要退出使用时请归档所选版本。">
+              <span>
+                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
+                  批量删除
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="当前 BOM Version API 没有回收站主路径，归档是正式退出方式。">
+              <span>
+                <ToolbarButton icon={<InboxOutlined />} disabled>
+                  回收站
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+          </Space>
         }
-      />
+        primaryAction={
+          <ToolbarButton
+            type="primary"
+            className="erp-business-list-toolbar__primary-action"
+            icon={<PlusOutlined />}
+            disabled={!canCreate}
+            onClick={openCreate}
+          >
+            新建草稿
+          </ToolbarButton>
+        }
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRowKeys.length}
+          selectedLabel={selectedLabel}
+          selectedItems={selectedItems}
+        >
+          <Button
+            type="link"
+            size="small"
+            disabled={selectedRowKeys.length === 0}
+            onClick={() => {
+              applySelectedRowKeys([])
+              setSelectedVersion(null)
+            }}
+          >
+            清空已选
+          </Button>
+          <Button
+            size="small"
+            icon={<InboxOutlined />}
+            disabled={selectedRowKeys.length !== 1}
+            onClick={() => openView(activeActionVersion)}
+          >
+            查看
+          </Button>
+          <Button
+            size="small"
+            icon={<EditOutlined />}
+            disabled={selectedRowKeys.length !== 1 || !activeActionCanEdit}
+            onClick={() => openEdit(activeActionVersion)}
+          >
+            编辑草稿
+          </Button>
+          <Button
+            size="small"
+            icon={<PlusOutlined />}
+            disabled={selectedRowKeys.length !== 1 || !activeActionCanEdit}
+            onClick={openCreateItem}
+          >
+            添加明细
+          </Button>
+          <Button
+            size="small"
+            icon={<CopyOutlined />}
+            disabled={selectedRowKeys.length !== 1 || !canCreate}
+            onClick={() => openCopy(activeActionVersion)}
+          >
+            复制新版本
+          </Button>
+          <Popconfirm
+            title="激活该 BOM 版本？同产品旧 ACTIVE 版本会归档。"
+            okText="激活"
+            cancelText="取消"
+            onConfirm={activateSelected}
+          >
+            <Button
+              size="small"
+              icon={<CheckCircleOutlined />}
+              disabled={
+                selectedRowKeys.length !== 1 ||
+                !activeActionVersion ||
+                !canActivate ||
+                activeActionVersion.status === 'ACTIVE'
+              }
+            >
+              激活
+            </Button>
+          </Popconfirm>
+          <Popconfirm
+            title="归档该 BOM 版本？"
+            okText="归档"
+            cancelText="取消"
+            onConfirm={archiveSelected}
+          >
+            <Button
+              size="small"
+              icon={<InboxOutlined />}
+              disabled={
+                selectedRowKeys.length === 0 ||
+                !canUpdate ||
+                archivableSelectedVersions.length === 0
+              }
+            >
+              {selectedRowKeys.length > 1 ? '归档所选' : '归档'}
+            </Button>
+          </Popconfirm>
+        </SelectionActionBar>
+      </BusinessOperationPanel>
 
       <BusinessDataTable
         loading={loading}
         rowKey="id"
         columns={columns}
         dataSource={versions}
-        pagination={false}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+        })}
         emptyDescription="暂无 BOM 版本"
+        rowSelection={{
+          selectedRowKeys,
+          onChange: (nextKeys, nextRows) => {
+            applySelectedRowKeys(nextKeys)
+            const nextSingle =
+              nextKeys.length === 1
+                ? versions.find(
+                    (record) => String(record.id) === String(nextKeys[0])
+                  ) ||
+                  nextRows[0] ||
+                  null
+                : null
+            if (nextSingle?.id) {
+              setSelectedVersion(nextSingle)
+              loadDetail(nextSingle.id)
+            } else {
+              setSelectedVersion(null)
+            }
+          },
+        }}
         rowClassName={(record) =>
-          record?.id === selectedVersion?.id
-            ? 'erp-business-table-row--selected'
-            : ''
+          selectedRowKeys.includes(record?.id) ? 'ant-table-row-selected' : ''
         }
         onRow={(record) => ({
-          onClick: () => {
-            setSelectedVersion(record)
-            loadDetail(record.id)
+          onClick: (event) => {
+            if (
+              event.target?.closest?.(
+                '.ant-checkbox-wrapper, .ant-checkbox, .ant-table-selection-column'
+              )
+            ) {
+              return
+            }
+            selectSingleVersion(record)
           },
           onDoubleClick: () => {
             if (record.status === 'DRAFT' && canUpdate) {
@@ -736,96 +1081,10 @@ export default function BOMVersionsPage() {
         })}
       />
 
-      <SelectionActionBar
-        selectedCount={selectedVersion?.id ? 1 : 0}
-        selectedLabel={selectedVersion?.version || '未选择 BOM'}
-        summaryItems={
-          selectedVersion
-            ? [
-                {
-                  key: 'status',
-                  label: '状态',
-                  value:
-                    STATUS_LABELS[selectedVersion.status] ||
-                    selectedVersion.status,
-                },
-                {
-                  key: 'product',
-                  label: '产品',
-                  value: selectedVersion.product_id,
-                },
-              ]
-            : []
-        }
-        boundaryText="BOM 只维护工程资料版本，不写库存、不自动生成采购需求。"
-      >
-        <Button
-          icon={<InboxOutlined />}
-          disabled={!selectedVersion}
-          onClick={() => openView()}
-        >
-          查看
-        </Button>
-        <Button
-          icon={<EditOutlined />}
-          disabled={!selectedCanEdit}
-          onClick={() => openEdit()}
-        >
-          编辑草稿
-        </Button>
-        <Button
-          icon={<PlusOutlined />}
-          disabled={!selectedCanEdit}
-          onClick={openCreateItem}
-        >
-          添加明细
-        </Button>
-        <Button
-          icon={<CopyOutlined />}
-          disabled={!selectedVersion || !canCreate}
-          onClick={() => openCopy()}
-        >
-          复制新版本
-        </Button>
-        <Popconfirm
-          title="激活该 BOM 版本？同产品旧 ACTIVE 版本会归档。"
-          okText="激活"
-          cancelText="取消"
-          onConfirm={activateSelected}
-        >
-          <Button
-            icon={<CheckCircleOutlined />}
-            disabled={
-              !selectedVersion ||
-              !canActivate ||
-              selectedVersion.status === 'ACTIVE'
-            }
-          >
-            激活
-          </Button>
-        </Popconfirm>
-        <Popconfirm
-          title="归档该 BOM 版本？"
-          okText="归档"
-          cancelText="取消"
-          onConfirm={archiveSelected}
-        >
-          <Button
-            disabled={
-              !selectedVersion ||
-              !canUpdate ||
-              selectedVersion.status === 'ARCHIVED'
-            }
-          >
-            归档
-          </Button>
-        </Popconfirm>
-      </SelectionActionBar>
-
       <CollaborationTaskPanel
-        moduleKey="material-bom"
-        selectedRecord={selectedVersion}
-        ownerRoleLabel="产品工程 / PMC"
+        tasks={[]}
+        selectedTasks={[]}
+        selectedRecordLabel={selectedVersion?.version || ''}
       />
 
       <Modal
@@ -882,7 +1141,7 @@ export default function BOMVersionsPage() {
                 <Button
                   size="small"
                   icon={<PlusOutlined />}
-                  disabled={!selectedCanEdit}
+                  disabled={!activeActionCanEdit}
                   onClick={openCreateItem}
                 >
                   添加明细
@@ -906,6 +1165,17 @@ export default function BOMVersionsPage() {
           </section>
         )}
       </Modal>
+
+      <ColumnOrderModal
+        open={columnOrderOpen}
+        columns={dataColumns}
+        order={preferredColumnOrder}
+        saving={columnOrderSaving}
+        moduleTitle="BOM 管理列表"
+        onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
+        onReset={() => persistColumnOrder([], dataColumns)}
+        onClose={() => setColumnOrderOpen(false)}
+      />
 
       <Modal
         open={itemModalOpen}

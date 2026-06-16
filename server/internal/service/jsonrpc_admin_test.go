@@ -18,12 +18,14 @@ import (
 type memAdminManageRepoForData struct {
 	admins    map[int]*biz.AdminUser
 	rolePerms map[string][]string
+	auditLogs []biz.RuntimeAuditEvent
 }
 
 func newMemAdminManageRepoForData() *memAdminManageRepoForData {
 	return &memAdminManageRepoForData{
 		admins:    map[int]*biz.AdminUser{},
 		rolePerms: map[string][]string{},
+		auditLogs: []biz.RuntimeAuditEvent{},
 	}
 }
 
@@ -247,6 +249,58 @@ func (r *memAdminManageRepoForData) UpdateAdminPasswordHash(_ context.Context, i
 	return nil
 }
 
+func (r *memAdminManageRepoForData) RecordRuntimeAuditEvent(_ context.Context, event *biz.RuntimeAuditEventCreate) error {
+	if event == nil {
+		return biz.ErrBadParam
+	}
+	r.auditLogs = append(r.auditLogs, biz.RuntimeAuditEvent{
+		ID:        len(r.auditLogs) + 1,
+		EventType: event.EventType,
+		EventKey:  event.EventKey,
+		Source:    event.Source,
+		Payload:   event.Payload,
+		CreatedAt: time.Now(),
+	})
+	return nil
+}
+
+func (r *memAdminManageRepoForData) ListRuntimeAuditEvents(_ context.Context, filter biz.RuntimeAuditEventListFilter) (biz.RuntimeAuditEventListResult, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	filtered := make([]biz.RuntimeAuditEvent, 0, len(r.auditLogs))
+	for _, event := range r.auditLogs {
+		if filter.Source != "" && event.Source != filter.Source {
+			continue
+		}
+		if filter.EventType != "" && event.EventType != filter.EventType {
+			continue
+		}
+		if filter.EventKey != "" && event.EventKey != filter.EventKey {
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	end := offset + limit
+	if offset > len(filtered) {
+		offset = len(filtered)
+	}
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	return biz.RuntimeAuditEventListResult{
+		Events: filtered[offset:end],
+		Total:  len(filtered),
+		Limit:  limit,
+		Offset: offset,
+	}, nil
+}
+
 func TestJsonrpcDispatcher_AdminMe_ReturnsERPPreferences(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	now := time.Now()
@@ -382,5 +436,92 @@ func TestJsonrpcDispatcher_AdminSetERPColumnOrder(t *testing.T) {
 	order := repo.admins[1].ERPPreferences.ColumnOrders["project-orders"]
 	if len(order) != 2 || order[0] != "customer_name" || order[1] != "document_no" {
 		t.Fatalf("unexpected stored order: %#v", repo.admins[1].ERPPreferences.ColumnOrders)
+	}
+}
+
+func TestJsonrpcDispatcher_AdminAuditLogsRequiresPermission(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID:          1,
+		Username:    "admin",
+		Permissions: []string{biz.PermissionSystemUserRead},
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	logger := log.NewStdLogger(io.Discard)
+	j := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+		UserID:   1,
+		Username: "admin",
+		Role:     biz.RoleAdmin,
+	})
+
+	_, res, err := j.handleAdmin(ctx, "audit_logs", "1", nil)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected permission denied, got %+v", res)
+	}
+}
+
+func TestJsonrpcDispatcher_AdminAuditLogsReturnsEvents(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID:          1,
+		Username:    "admin",
+		Permissions: []string{biz.PermissionSystemAuditRead},
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	repo.auditLogs = append(repo.auditLogs, biz.RuntimeAuditEvent{
+		ID:        1,
+		EventType: "admin_control_plane",
+		EventKey:  "admin_user.create",
+		Source:    "admin_manage",
+		Payload: map[string]any{
+			"action": "admin_user.create",
+		},
+		CreatedAt: now,
+	})
+
+	logger := log.NewStdLogger(io.Discard)
+	j := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+		UserID:   1,
+		Username: "admin",
+		Role:     biz.RoleAdmin,
+	})
+	params, _ := structpb.NewStruct(map[string]any{
+		"source": "admin_manage",
+		"limit":  10,
+	})
+
+	_, res, err := j.handleAdmin(ctx, "audit_logs", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected ok result, got %+v", res)
+	}
+	data := res.Data.AsMap()
+	events, ok := data["events"].([]any)
+	if !ok || len(events) != 1 {
+		t.Fatalf("expected one audit event, got %#v", data["events"])
+	}
+	event, ok := events[0].(map[string]any)
+	if !ok || event["event_key"] != "admin_user.create" {
+		t.Fatalf("unexpected audit event payload %#v", events[0])
 	}
 }

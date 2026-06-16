@@ -67,7 +67,8 @@ bash deployments/yoyoosun/scripts/verify-env.sh --example
 ```
 
 `deployment-package-lint` 会检查资料包必需文件、禁止文件类型、真实 secret 高风险模式和基础样例结构。
-`release-evidence-gate` 只在实际发布 / 客户试用交付前执行，检查本次 release evidence、pre-migration backup evidence、migration status、smoke report 和 sign-off checklist 是否已脱敏并填齐；不会读取真实 `.env`、真实备份文件或客户 raw files。
+`run-backup-restore-rehearsal.sh` 用于执行真实备份恢复演练，默认把 dump 和本地 evidence 输出到 `output/`，不纳入 git。
+`release-evidence-gate` 只在实际发布 / 客户试用交付前执行，检查本次 release evidence、pre-migration backup evidence、backup restore report、migration status、smoke report 和 sign-off checklist 是否已脱敏并填齐；不会读取真实 `.env`、真实备份文件或客户 raw files。
 
 ## 仍不做 / Out Of Scope
 

@@ -79,6 +79,7 @@ const navIconRegistry = {
   'print-center': <PrinterOutlined />,
   'exception-flow': <AlertOutlined />,
   'permission-center': <SettingOutlined />,
+  'system-audit-logs': <FileSearchOutlined />,
 }
 
 const DEFAULT_DESKTOP_ENTRY = {
@@ -94,6 +95,7 @@ const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   '/erp/operations/exceptions',
   '/erp/print-center',
   '/erp/system/permissions',
+  '/erp/system/audit-logs',
 ])
 function buildCurrentEntry({ navigationSections, locationPath }) {
   const items = navigationSections.flatMap((section) => section.items)

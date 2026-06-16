@@ -24,6 +24,10 @@ const mobileRoleTasksPageSource = readFileSync(
   new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
 )
+const mobileRoleTaskActionsSource = readFileSync(
+  new URL('../mobile/hooks/useMobileRoleTaskActions.js', import.meta.url),
+  'utf8'
+)
 
 function processingRecord(overrides = {}) {
   return {
@@ -182,7 +186,7 @@ test('outsourceReturnFlow: 移动端回货检验状态动作不再本地创建�
     mobileRoleTasksPageSource.includes('failOutsourceReturnQcTask'),
     false
   )
-  assert.match(mobileRoleTasksPageSource, /await loadTasks\(\)/)
+  assert.match(mobileRoleTaskActionsSource, /await loadTasks\(\)/)
 })
 
 test('outsourceReturnFlow: due_at 使用 Unix 秒，缺编号字段不崩溃', () => {

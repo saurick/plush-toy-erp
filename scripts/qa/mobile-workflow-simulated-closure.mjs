@@ -86,8 +86,8 @@ function sanitizeRunId(value) {
     .replace(/[^A-Z0-9_-]/gu, "-")
     .replace(/-+/gu, "-")
     .replace(/^-|-$/gu, "");
-  if (!text || text.length > 48) {
-    throw new CliError("runId must be 1-48 safe characters");
+  if (!text || text.length > 26) {
+    throw new CliError("runId must be 1-26 safe characters");
   }
   return text;
 }

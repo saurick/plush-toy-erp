@@ -40,6 +40,32 @@ function writeValidEvidence(dir, overrides = {}) {
 `,
   );
   fs.writeFileSync(
+    path.join(dir, "backup-restore-report.json"),
+    JSON.stringify(
+      {
+        customerCode: "yoyoosun",
+        environment: "customer-trial",
+        releaseVersion: overrides.releaseVersion ?? "20260616T1200-test",
+        backupId: "backup-20260616",
+        verifiedAt: "2026-06-16T04:00:00Z",
+        redaction: {
+          containsSecrets: false,
+          containsRawCustomerRows: false,
+          containsDumpContent: false,
+          containsFullDsn: false,
+        },
+        summary: {
+          backupCreated: true,
+          restoreCompleted: true,
+          migrationStatus: "ok",
+          smokeQueryStatus: "passed",
+        },
+      },
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
     path.join(dir, "migration-status.txt"),
     `Migration Status: OK
 Current Version: 20260616000000
@@ -93,7 +119,7 @@ test("release evidence gate accepts filled yoyoosun evidence", () => {
   });
 
   assert.equal(result.customer, "yoyoosun");
-  assert.equal(result.requiredFiles.length, 5);
+  assert.equal(result.requiredFiles.length, 6);
 });
 
 test("release evidence gate rejects placeholders and failed smoke", () => {
@@ -113,5 +139,25 @@ test("release evidence gate rejects placeholders and failed smoke", () => {
         evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
       }),
     /placeholder field: releaseVersion|summary\.failed must be 0/,
+  );
+});
+
+test("release evidence gate rejects missing restore rehearsal success", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-restore-bad-"));
+  const evidenceDir = path.join(root, "deployments/yoyoosun/evidence/releases/2026-06-16");
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.summary.restoreCompleted = false;
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /summary\.restoreCompleted must be true/,
   );
 });

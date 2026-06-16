@@ -172,6 +172,7 @@ func (r *salesOrderRepo) AddSalesOrderItem(ctx context.Context, in *biz.SalesOrd
 		SetSalesOrderID(in.SalesOrderID).
 		SetLineNo(in.LineNo).
 		SetProductID(in.ProductID).
+		SetNillableProductSkuID(in.ProductSkuID).
 		SetUnitID(in.UnitID).
 		SetNillableProductCodeSnapshot(in.ProductCodeSnapshot).
 		SetNillableProductNameSnapshot(in.ProductNameSnapshot).
@@ -196,6 +197,11 @@ func (r *salesOrderRepo) UpdateSalesOrderItem(ctx context.Context, id int, in *b
 		SetProductID(in.ProductID).
 		SetUnitID(in.UnitID).
 		SetOrderedQuantity(in.OrderedQuantity)
+	if in.ProductSkuID == nil {
+		update.ClearProductSkuID()
+	} else {
+		update.SetProductSkuID(*in.ProductSkuID)
+	}
 	if in.ProductCodeSnapshot == nil {
 		update.ClearProductCodeSnapshot()
 	} else {
@@ -377,6 +383,7 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetSalesOrderID(mutation.SalesOrderID).
 			SetLineNo(mutation.LineNo).
 			SetProductID(mutation.ProductID).
+			SetNillableProductSkuID(mutation.ProductSkuID).
 			SetUnitID(mutation.UnitID).
 			SetNillableProductCodeSnapshot(mutation.ProductCodeSnapshot).
 			SetNillableProductNameSnapshot(mutation.ProductNameSnapshot).
@@ -466,6 +473,11 @@ func saveSalesOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in *biz.S
 		SetProductID(in.ProductID).
 		SetUnitID(in.UnitID).
 		SetOrderedQuantity(in.OrderedQuantity)
+	if in.ProductSkuID == nil {
+		update.ClearProductSkuID()
+	} else {
+		update.SetProductSkuID(*in.ProductSkuID)
+	}
 	if in.ProductCodeSnapshot == nil {
 		update.ClearProductCodeSnapshot()
 	} else {
@@ -547,6 +559,7 @@ func entSalesOrderItemToBiz(row *ent.SalesOrderItem) *biz.SalesOrderItem {
 		SalesOrderID:        row.SalesOrderID,
 		LineNo:              row.LineNo,
 		ProductID:           row.ProductID,
+		ProductSkuID:        row.ProductSkuID,
 		UnitID:              row.UnitID,
 		ProductCodeSnapshot: row.ProductCodeSnapshot,
 		ProductNameSnapshot: row.ProductNameSnapshot,

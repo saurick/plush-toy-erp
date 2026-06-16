@@ -5,6 +5,7 @@ package runtimeauditevent
 import (
 	"time"
 
+	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 )
 
@@ -47,7 +48,13 @@ func ValidColumn(column string) bool {
 	return false
 }
 
+// Note that the variables below are initialized by the runtime
+// package on the initialization of the application. Therefore,
+// it should be imported in the main as follows:
+//
+//	import _ "server/internal/data/model/ent/runtime"
 var (
+	Hooks [1]ent.Hook
 	// EventTypeValidator is a validator for the "event_type" field. It is called by the builders before save.
 	EventTypeValidator func(string) error
 	// DefaultEventKey holds the default value on creation for the "event_key" field.

@@ -39,7 +39,7 @@
 | import dry-run / apply |  |  |
 | smoke |  |  |
 | security scan |  |  |
-| backup restore |  |  |
+| backup restore |  | backup-restore-report.json |
 
 ## 已知限制
 

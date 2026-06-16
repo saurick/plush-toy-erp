@@ -2028,6 +2028,8 @@ func init() {
 	rolepermissionDescCreatedAt := rolepermissionFields[2].Descriptor()
 	// rolepermission.DefaultCreatedAt holds the default value on creation for the created_at field.
 	rolepermission.DefaultCreatedAt = rolepermissionDescCreatedAt.Default.(func() time.Time)
+	runtimeauditeventHooks := schema.RuntimeAuditEvent{}.Hooks()
+	runtimeauditevent.Hooks[0] = runtimeauditeventHooks[0]
 	runtimeauditeventFields := schema.RuntimeAuditEvent{}.Fields()
 	_ = runtimeauditeventFields
 	// runtimeauditeventDescEventType is the schema descriptor for event_type field.
@@ -2070,6 +2072,8 @@ func init() {
 	runtimeauditeventDescCreatedAt := runtimeauditeventFields[4].Descriptor()
 	// runtimeauditevent.DefaultCreatedAt holds the default value on creation for the created_at field.
 	runtimeauditevent.DefaultCreatedAt = runtimeauditeventDescCreatedAt.Default.(func() time.Time)
+	runtimemarkerHooks := schema.RuntimeMarker{}.Hooks()
+	runtimemarker.Hooks[0] = runtimemarkerHooks[0]
 	runtimemarkerFields := schema.RuntimeMarker{}.Fields()
 	_ = runtimemarkerFields
 	// runtimemarkerDescMarkerKey is the schema descriptor for marker_key field.

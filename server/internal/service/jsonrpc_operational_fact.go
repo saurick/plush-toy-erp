@@ -136,7 +136,11 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.operationalFactUC.ListShipments(ctx, operationalFactFilterFromParams(pm))
+		filter, ok := operationalFactShipmentFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.operationalFactUC.ListShipments(ctx, filter)
 		if err != nil {
 			return id, d.mapOperationalFactError(ctx, err), nil
 		}
@@ -350,6 +354,22 @@ func financeFactCreateFromParams(pm map[string]any) (*biz.FinanceFactCreate, boo
 
 func operationalFactFilterFromParams(pm map[string]any) biz.OperationalFactFilter {
 	return biz.OperationalFactFilter{Status: getString(pm, "status"), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
+}
+
+func operationalFactShipmentFilterFromParams(pm map[string]any) (biz.OperationalFactFilter, bool) {
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.OperationalFactFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.OperationalFactFilter{}, false
+	}
+	filter := operationalFactFilterFromParams(pm)
+	filter.DateField = getString(pm, "date_field")
+	filter.DateFrom = dateFrom
+	filter.DateTo = dateTo
+	return filter, true
 }
 
 func getOptionalInt(pm map[string]any, key string) *int {

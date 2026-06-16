@@ -39,6 +39,14 @@
 - `data.NewData(...)` 在初始化 PostgreSQL 时会做短暂重试
 - 目标是避免宿主机或数据库刚恢复时，服务因瞬时连接拒绝直接退出
 
+### 运行时与系统控制面审计
+
+- 新库首次生产 bootstrap 管理员时会写入 `runtime_markers` 和 `runtime_audit_events`，用于记录一次性初始化是否完成、重复初始化或同名账号拒绝原因。
+- 管理员创建、角色绑定、账号启停、重置密码和角色权限变更会追加 `runtime_audit_events`，`payload` 只保存 actor、target、before / after 的非敏感摘要，不保存密码、token 或密码 hash。
+- 后台只读入口为 `admin.audit_logs` JSON-RPC 和 `/erp/system/audit-logs` 页面，受 `system.audit.read` 权限控制。
+- `runtime_audit_events` 和 `runtime_markers` 通过 Ent hook 拒绝普通 update / delete；更正只能追加新的受控事件或通过后续专门恢复流程处理。
+- 这组表只承接服务启动安全审计和系统控制面审计，不是采购、库存、质检、出货、财务等业务动作的通用 `audit_events` 事实表。
+
 ## 当前已知盲区
 
 以下点目前仍不算理想，需要后续按真实需求补：

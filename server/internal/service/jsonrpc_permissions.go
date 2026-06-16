@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -248,6 +249,22 @@ func permissionOptionsToAny(items []biz.AdminPermission) []any {
 			"action":         item.Action,
 			"resource":       item.Resource,
 			"builtin":        item.Builtin,
+		})
+	}
+	return out
+}
+
+func runtimeAuditEventsToAny(items []biz.RuntimeAuditEvent) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, map[string]any{
+			"id":             item.ID,
+			"event_type":     item.EventType,
+			"event_key":      item.EventKey,
+			"source":         item.Source,
+			"payload":        item.Payload,
+			"created_at":     item.CreatedAt.Unix(),
+			"created_at_iso": item.CreatedAt.Format(time.RFC3339),
 		})
 	}
 	return out

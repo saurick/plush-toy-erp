@@ -20,6 +20,14 @@ const mobileRoleTasksPageSource = readFileSync(
   new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
 )
+const mobileRoleTaskActionsSource = readFileSync(
+  new URL('../mobile/hooks/useMobileRoleTaskActions.js', import.meta.url),
+  'utf8'
+)
+const mobileRoleTaskModelSource = readFileSync(
+  new URL('../mobile/utils/mobileRoleTaskModel.mjs', import.meta.url),
+  'utf8'
+)
 
 function arrivalRecord(overrides = {}) {
   return {
@@ -69,7 +77,7 @@ test('MobileRoleTasksPage: 岗位任务完成不再回写 business_records 状�
     /buildBusinessRecordStatusUpdateParams/
   )
   assert.match(
-    mobileRoleTasksPageSource,
+    mobileRoleTaskActionsSource,
     /const updateSourceStatusForTask = async \(\) => null/
   )
 })
@@ -143,7 +151,7 @@ test('purchaseInboundFlow: 移动端 IQC 状态动作不再本地创建下游任
     mobileRoleTasksPageSource.includes('runPurchaseInboundFollowUp'),
     false
   )
-  assert.match(mobileRoleTasksPageSource, /await loadTasks\(\)/)
+  assert.match(mobileRoleTaskActionsSource, /await loadTasks\(\)/)
 })
 
 test('purchaseInboundFlow: 移动端采购 warehouse_inbound 状态动作交给后端', () => {
@@ -166,11 +174,11 @@ test('purchaseInboundFlow: 移动端采购 warehouse_inbound 状态动作交给�
     false
   )
   assert.match(
-    mobileRoleTasksPageSource,
+    mobileRoleTaskModelSource,
     /if \(isWarehouseInboundTask\(task\)\) {[\s\S]{0,220}if \(taskStatusKey === 'done'\) return INBOUND_DONE_STATUS_KEY[\s\S]{0,220}if \(\['blocked', 'rejected'\]\.includes\(taskStatusKey\)\) return 'blocked'/
   )
   assert.match(
-    mobileRoleTasksPageSource,
+    mobileRoleTaskModelSource,
     /roleKey === 'warehouse' &&[\s\S]{0,120}isWarehouseInboundTask\(task\)/
   )
 })

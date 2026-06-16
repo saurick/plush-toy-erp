@@ -7,11 +7,12 @@ print_help() {
   bash scripts/qa/db-guard.sh
 
 作用:
-  防止 Ent schema/ent 变更遗漏 migration 文件
+  防止 Ent schema/ent 结构变更遗漏 migration 文件
 
 触发规则:
-  变更包含 server/internal/data/model/schema/* 或 server/internal/data/model/ent/*
+  变更包含 server/internal/data/model/schema/* 中的字段、边、索引或注解等结构性变更
   但不包含 server/internal/data/model/migrate/* 时阻断
+  仅新增 Ent Hook 等非 SQL 结构变更时不要求 migration
 
 环境变量:
   SKIP_DB_GUARD=1    跳过检查
@@ -78,12 +79,39 @@ while IFS= read -r f; do
   [ -n "$f" ] && uniq_files+=("$f")
 done < <(printf "%s\n" "${changed_files[@]}" | sort -u)
 
-need_migration=0
+schema_change=0
+ent_change=0
+schema_requires_migration=0
 has_migration_file=0
+
+schema_change_requires_migration() {
+  local file="$1"
+  local diff_lines
+  diff_lines="$(
+    {
+      if [ -n "$range" ]; then
+        git diff --unified=0 "$range" -- "$file"
+      fi
+      git diff --unified=0 -- "$file"
+      git diff --cached --unified=0 -- "$file"
+    } | sed -n '/^[+-][^+-]/p'
+  )"
+
+  [ -n "$diff_lines" ] || return 1
+
+  printf "%s\n" "$diff_lines" | grep -Eq '^[+-].*(field\.|edge\.|index\.|func \([^)]*\) (Fields|Edges|Indexes|Mixin|Annotations)\(|\.(Unique|Optional|Nillable|Default|DefaultFunc|UpdateDefault|MaxLen|MinLen|Positive|NonNegative|SchemaType|StorageKey|Comment|Annotations|Immutable|GoType|Enum|Values|NotEmpty|Match)\()'
+}
+
 for f in "${uniq_files[@]}"; do
   case "$f" in
-  server/internal/data/model/schema/* | server/internal/data/model/ent/*)
-    need_migration=1
+  server/internal/data/model/schema/*)
+    schema_change=1
+    if schema_change_requires_migration "$f"; then
+      schema_requires_migration=1
+    fi
+    ;;
+  server/internal/data/model/ent/*)
+    ent_change=1
     ;;
   esac
 
@@ -94,8 +122,15 @@ for f in "${uniq_files[@]}"; do
   esac
 done
 
+need_migration=0
+if [ "$schema_requires_migration" -eq 1 ]; then
+  need_migration=1
+elif [ "$ent_change" -eq 1 ] && [ "$schema_change" -eq 0 ]; then
+  need_migration=1
+fi
+
 if [ "$need_migration" -eq 1 ] && [ "$has_migration_file" -eq 0 ]; then
-  echo "[qa:db-guard] 检测到 schema/ent 变更但未发现 migration 变更"
+  echo "[qa:db-guard] 检测到 schema/ent 结构变更但未发现 migration 变更"
   echo "[qa:db-guard] 请先在 /server 执行 make data，并提交生成的迁移文件"
   exit 1
 fi

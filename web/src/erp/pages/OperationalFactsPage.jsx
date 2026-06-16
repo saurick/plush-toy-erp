@@ -3,7 +3,6 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   PlusOutlined,
-  ReloadOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
 import {
@@ -56,8 +55,17 @@ import {
   hasActionPermission,
   trimOptional,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  createBusinessTablePagination,
+  getBusinessPaginationParams,
+} from '../utils/businessPagination.mjs'
+import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
 
 const { Paragraph, Text, Title } = Typography
+const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
+  current: 1,
+  pageSize: 20,
+})
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -310,7 +318,7 @@ function FactFormFields({ typeOptions, includeSupplier = false }) {
         <Input allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item label="发生日期" name="occurred_at">
-        <Input type="date" />
+        <DateInput />
       </Form.Item>
       <Form.Item label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
@@ -346,7 +354,7 @@ function ShipmentFormFields() {
         <Input allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item label="计划出货日期" name="planned_ship_at">
-        <Input type="date" />
+        <DateInput />
       </Form.Item>
       <Form.Item label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
@@ -437,7 +445,7 @@ function ReservationFormFields() {
         <Input allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item label="预留日期" name="reserved_at">
-        <Input type="date" />
+        <DateInput />
       </Form.Item>
       <Form.Item label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
@@ -488,7 +496,7 @@ function FinanceFormFields() {
         <Input allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item label="发生日期" name="occurred_at">
-        <Input type="date" />
+        <DateInput />
       </Form.Item>
       <Form.Item label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
@@ -506,6 +514,7 @@ export default function OperationalFactsPage() {
   const [saving, setSaving] = useState(false)
   const [rowsByKey, setRowsByKey] = useState({})
   const [totalByKey, setTotalByKey] = useState({})
+  const [paginationByKey, setPaginationByKey] = useState({})
   const [createTarget, setCreateTarget] = useState(null)
   const [createForm] = Form.useForm()
   const [shipmentItemOpen, setShipmentItemOpen] = useState(false)
@@ -610,6 +619,8 @@ export default function OperationalFactsPage() {
   const activeConfig = configs[activeKey] || configs.production
   const activeRows = rowsByKey[activeKey] || []
   const activeTotal = totalByKey[activeKey] || 0
+  const activePagination =
+    paginationByKey[activeKey] || DEFAULT_OPERATIONAL_FACT_PAGINATION
   const canWriteActive = hasAnyPermission(
     adminProfile,
     activeConfig.writePermissions
@@ -623,8 +634,12 @@ export default function OperationalFactsPage() {
       }
       setLoading(true)
       try {
+        const pagination = paginationByKey[key] || activePagination
         const data = await config.list(
-          compactParams({ status: statusFilter, limit: 100, offset: 0 })
+          compactParams({
+            status: statusFilter,
+            ...getBusinessPaginationParams(pagination),
+          })
         )
         setRowsByKey((prev) => ({
           ...prev,
@@ -639,12 +654,16 @@ export default function OperationalFactsPage() {
         setLoading(false)
       }
     },
-    [activeKey, configs, statusFilter]
+    [activeKey, activePagination, configs, paginationByKey, statusFilter]
   )
 
   useEffect(() => {
     loadRows(activeKey)
   }, [activeKey, loadRows])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(() => loadRows(activeKey))
+  }, [activeKey, loadRows, outletContext])
 
   const openCreate = () => {
     const today = new Date().toISOString().slice(0, 10)
@@ -1044,15 +1063,17 @@ export default function OperationalFactsPage() {
                 value={statusFilter}
                 options={STATUS_OPTIONS}
                 style={{ width: 160 }}
-                onChange={setStatusFilter}
+                onChange={(nextStatus) => {
+                  setStatusFilter(nextStatus)
+                  setPaginationByKey((prev) => ({
+                    ...prev,
+                    [activeKey]: {
+                      ...(prev[activeKey] || activePagination),
+                      current: 1,
+                    },
+                  }))
+                }}
               />
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => loadRows(activeKey)}
-                loading={loading}
-              >
-                刷新
-              </Button>
             </Space>
             <Button
               type="primary"
@@ -1082,7 +1103,15 @@ export default function OperationalFactsPage() {
             locale={{
               emptyText: <Empty description="暂无业务事实记录" />,
             }}
-            pagination={false}
+            pagination={createBusinessTablePagination({
+              pagination: activePagination,
+              total: activeTotal,
+              onChange: (current, pageSize) =>
+                setPaginationByKey((prev) => ({
+                  ...prev,
+                  [activeKey]: { current, pageSize },
+                })),
+            })}
             scroll={{ x: 1480 }}
           />
         </Space>

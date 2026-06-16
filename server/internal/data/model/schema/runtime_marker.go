@@ -12,6 +12,15 @@ type RuntimeMarker struct {
 	ent.Schema
 }
 
+func (RuntimeMarker) Hooks() []ent.Hook {
+	return []ent.Hook{
+		rejectMutationOps(
+			ent.OpUpdate|ent.OpUpdateOne|ent.OpDelete|ent.OpDeleteOne,
+			"runtime_markers are immutable runtime markers",
+		),
+	}
+}
+
 func (RuntimeMarker) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("marker_key").

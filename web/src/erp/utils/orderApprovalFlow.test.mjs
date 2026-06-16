@@ -16,6 +16,10 @@ const mobileRoleTasksPageSource = readFileSync(
   new URL('../mobile/pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
 )
+const mobileRoleTaskActionsSource = readFileSync(
+  new URL('../mobile/hooks/useMobileRoleTaskActions.js', import.meta.url),
+  'utf8'
+)
 
 function projectOrder(overrides = {}) {
   return {
@@ -126,7 +130,7 @@ test('orderApprovalFlow: 移动端老板审批不再本地创建下游任务', (
     mobileRoleTasksPageSource.includes('runOrderApprovalFollowUp'),
     false
   )
-  assert.match(mobileRoleTasksPageSource, /await loadTasks\(\)/)
+  assert.match(mobileRoleTaskActionsSource, /await loadTasks\(\)/)
 })
 
 test('orderApprovalFlow: due_at 使用 Unix 秒且工程任务默认 24 小时后到期', () => {

@@ -1,6 +1,7 @@
 import React from 'react'
 
 import {
+  CalendarOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   SearchOutlined,
@@ -8,6 +9,7 @@ import {
 import {
   Button,
   Card,
+  DatePicker,
   Empty,
   Input,
   Popover,
@@ -17,6 +19,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import dayjs from 'dayjs'
 import {
   buildBusinessCollaborationTaskPanelModel,
   getBusinessCollaborationTaskReason,
@@ -34,6 +37,8 @@ const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 132
 const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 72
 const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
+const DATE_INPUT_VALUE_FORMAT = 'YYYY-MM-DD'
+const DATE_INPUT_DISPLAY_FORMAT = 'YYYY/MM/DD'
 const DEFAULT_TASK_STATUS_LABELS = new Map([
   ['pending', '待处理'],
   ['ready', '可执行'],
@@ -97,6 +102,83 @@ function resolveCollaborationPanelMaxHeight() {
     Math.min(COLLABORATION_PANEL_MAX_HEIGHT, viewportMaxHeight)
   )
 }
+
+function parseDateInputValue(value) {
+  const normalizedValue = String(value || '')
+    .trim()
+    .replaceAll('/', '-')
+  if (!normalizedValue) return null
+  const parsedValue = dayjs(normalizedValue)
+  return parsedValue.isValid() ? parsedValue : null
+}
+
+export const DateInput = React.forwardRef(
+  (
+    {
+      value,
+      onChange,
+      className = '',
+      disabled = false,
+      placeholder = '选择日期',
+      allowClear = true,
+      onClick,
+      onMouseDown,
+      ...restProps
+    },
+    ref
+  ) => {
+    const [open, setOpen] = React.useState(false)
+    const pickerValue = parseDateInputValue(value)
+    const handleChange = React.useCallback(
+      (nextValue) => {
+        onChange?.(nextValue ? nextValue.format(DATE_INPUT_VALUE_FORMAT) : '')
+      },
+      [onChange]
+    )
+    const handlePointerOpen = React.useCallback(
+      (event) => {
+        if (disabled) return
+        if (event.target?.closest?.('.ant-picker-clear')) return
+        setOpen(true)
+      },
+      [disabled]
+    )
+    const handleClick = React.useCallback(
+      (event) => {
+        handlePointerOpen(event)
+        onClick?.(event)
+      },
+      [handlePointerOpen, onClick]
+    )
+    const handleMouseDown = React.useCallback(
+      (event) => {
+        handlePointerOpen(event)
+        onMouseDown?.(event)
+      },
+      [handlePointerOpen, onMouseDown]
+    )
+
+    return (
+      <DatePicker
+        ref={ref}
+        allowClear={allowClear}
+        className={joinClassNames('erp-business-date-input', className)}
+        disabled={disabled}
+        format={DATE_INPUT_DISPLAY_FORMAT}
+        inputReadOnly
+        open={open}
+        placeholder={placeholder}
+        suffixIcon={<CalendarOutlined />}
+        value={pickerValue}
+        onChange={handleChange}
+        onClick={handleClick}
+        onMouseDown={handleMouseDown}
+        onOpenChange={setOpen}
+        {...restProps}
+      />
+    )
+  }
+)
 
 export function BusinessPageLayout({ children, className = '' }) {
   return (
@@ -298,7 +380,6 @@ export function DateRangeFilter({
   endValue,
   onStartChange,
   onEndChange,
-  onOpenNativeDatePicker,
 }) {
   return (
     <div className="erp-business-filter-control erp-business-date-range-filter erp-business-module-date-filter">
@@ -314,22 +395,20 @@ export function DateRangeFilter({
       />
       <div className="erp-business-date-range-filter__divider" />
       <div className="erp-business-date-range-filter__range">
-        <Input
+        <DateInput
           aria-label="开始日期"
-          title="开始日期"
-          type="date"
+          className="erp-business-date-range-filter__date"
+          placeholder="开始日期"
           value={startValue}
-          onChange={(event) => onStartChange(event.target.value)}
-          onClick={onOpenNativeDatePicker}
+          onChange={onStartChange}
         />
         <span aria-hidden="true">-</span>
-        <Input
+        <DateInput
           aria-label="结束日期"
-          title="结束日期"
-          type="date"
+          className="erp-business-date-range-filter__date"
+          placeholder="结束日期"
           value={endValue}
-          onChange={(event) => onEndChange(event.target.value)}
-          onClick={onOpenNativeDatePicker}
+          onChange={onEndChange}
         />
       </div>
     </div>
@@ -383,7 +462,11 @@ export function BusinessOperationPanel({
       <div className="erp-business-operation-panel__filters">{filters}</div>
       {hasToolbar ? (
         <div className="erp-business-operation-panel__toolbar">
-          <div className="erp-business-operation-panel__actions">{actions}</div>
+          {actions ? (
+            <div className="erp-business-operation-panel__actions">
+              {actions}
+            </div>
+          ) : null}
           {primaryAction ? (
             <div className="erp-business-operation-panel__primary">
               {primaryAction}

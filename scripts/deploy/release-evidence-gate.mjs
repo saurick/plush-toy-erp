@@ -9,6 +9,7 @@ const DEFAULT_CUSTOMER = "yoyoosun";
 const REQUIRED_FILES = {
   release: "release-evidence.md",
   backup: "backup-evidence.md",
+  backupRestore: "backup-restore-report.json",
   migration: "migration-status.txt",
   smoke: "smoke-test-report.json",
   signoff: "release-signoff-checklist.md",
@@ -153,6 +154,51 @@ function validateBackupEvidence(content, errors) {
   );
 }
 
+function validateBackupRestoreReport(content, errors) {
+  let report;
+  try {
+    report = JSON.parse(content);
+  } catch (error) {
+    errors.push(`${REQUIRED_FILES.backupRestore} must be valid JSON: ${error.message}`);
+    return;
+  }
+
+  assert(
+    report.customerCode === DEFAULT_CUSTOMER,
+    `${REQUIRED_FILES.backupRestore} customerCode must be ${DEFAULT_CUSTOMER}`,
+    errors,
+  );
+  assert(isMeaningful(report.backupId), `${REQUIRED_FILES.backupRestore} backupId is missing`, errors);
+  assert(report.summary?.backupCreated === true, `${REQUIRED_FILES.backupRestore} summary.backupCreated must be true`, errors);
+  assert(
+    report.summary?.restoreCompleted === true,
+    `${REQUIRED_FILES.backupRestore} summary.restoreCompleted must be true`,
+    errors,
+  );
+  assert(report.summary?.migrationStatus === "ok", `${REQUIRED_FILES.backupRestore} summary.migrationStatus must be ok`, errors);
+  assert(
+    report.summary?.smokeQueryStatus === "passed",
+    `${REQUIRED_FILES.backupRestore} summary.smokeQueryStatus must be passed`,
+    errors,
+  );
+  assert(report.redaction?.containsSecrets === false, `${REQUIRED_FILES.backupRestore} must declare containsSecrets=false`, errors);
+  assert(
+    report.redaction?.containsRawCustomerRows === false,
+    `${REQUIRED_FILES.backupRestore} must declare containsRawCustomerRows=false`,
+    errors,
+  );
+  assert(
+    report.redaction?.containsDumpContent === false,
+    `${REQUIRED_FILES.backupRestore} must declare containsDumpContent=false`,
+    errors,
+  );
+  assert(
+    report.redaction?.containsFullDsn === false,
+    `${REQUIRED_FILES.backupRestore} must declare containsFullDsn=false`,
+    errors,
+  );
+}
+
 function validateMigrationStatus(content, errors) {
   assert(
     /(Migration Status:\s*OK|Pending Files:\s*0|Already at latest|Current Version:)/i.test(content),
@@ -229,6 +275,7 @@ export function validateReleaseEvidenceGate({
   if (errors.length === 0) {
     const releaseContent = readText(path.join(absoluteDir, REQUIRED_FILES.release));
     const backupContent = readText(path.join(absoluteDir, REQUIRED_FILES.backup));
+    const backupRestoreContent = readText(path.join(absoluteDir, REQUIRED_FILES.backupRestore));
     const migrationContent = readText(path.join(absoluteDir, REQUIRED_FILES.migration));
     const smokeContent = readText(path.join(absoluteDir, REQUIRED_FILES.smoke));
     const signoffContent = readText(path.join(absoluteDir, REQUIRED_FILES.signoff));
@@ -236,6 +283,7 @@ export function validateReleaseEvidenceGate({
     for (const [fileName, content] of [
       [REQUIRED_FILES.release, releaseContent],
       [REQUIRED_FILES.backup, backupContent],
+      [REQUIRED_FILES.backupRestore, backupRestoreContent],
       [REQUIRED_FILES.migration, migrationContent],
       [REQUIRED_FILES.smoke, smokeContent],
       [REQUIRED_FILES.signoff, signoffContent],
@@ -245,6 +293,7 @@ export function validateReleaseEvidenceGate({
 
     validateReleaseEvidence(releaseContent, errors);
     validateBackupEvidence(backupContent, errors);
+    validateBackupRestoreReport(backupRestoreContent, errors);
     validateMigrationStatus(migrationContent, errors);
     validateSmokeReport(smokeContent, errors);
     validateSignoff(signoffContent, errors);

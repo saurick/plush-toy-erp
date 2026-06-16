@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"go.opentelemetry.io/otel"
@@ -29,6 +30,37 @@ type AdminCreate struct {
 	RoleKeys     []string
 }
 
+type RuntimeAuditEventCreate struct {
+	EventType string
+	EventKey  string
+	Source    string
+	Payload   map[string]any
+}
+
+type RuntimeAuditEventListFilter struct {
+	Source    string
+	EventType string
+	EventKey  string
+	Limit     int
+	Offset    int
+}
+
+type RuntimeAuditEvent struct {
+	ID        int
+	EventType string
+	EventKey  string
+	Source    string
+	Payload   map[string]any
+	CreatedAt time.Time
+}
+
+type RuntimeAuditEventListResult struct {
+	Events []RuntimeAuditEvent
+	Total  int
+	Limit  int
+	Offset int
+}
+
 type AdminManageRepo interface {
 	GetAdminByID(ctx context.Context, id int) (*AdminUser, error)
 	GetAdminByUsername(ctx context.Context, username string) (*AdminUser, error)
@@ -44,6 +76,8 @@ type AdminManageRepo interface {
 	UpdateAdminPhone(ctx context.Context, id int, phone string) error
 	SetAdminDisabled(ctx context.Context, id int, disabled bool) error
 	UpdateAdminPasswordHash(ctx context.Context, id int, passwordHash string) error
+	RecordRuntimeAuditEvent(ctx context.Context, event *RuntimeAuditEventCreate) error
+	ListRuntimeAuditEvents(ctx context.Context, filter RuntimeAuditEventListFilter) (RuntimeAuditEventListResult, error)
 }
 
 type AdminManageUsecase struct {
@@ -66,6 +100,11 @@ func NewAdminManageUsecase(repo AdminManageRepo, logger log.Logger, tp *tracesdk
 		tracer: tr,
 	}
 }
+
+const (
+	adminControlAuditEventType = "admin_control_plane"
+	adminControlAuditSource    = "admin_manage"
+)
 
 func (uc *AdminManageUsecase) Tracer() trace.Tracer {
 	if uc.tracer != nil {
@@ -134,6 +173,83 @@ func (uc *AdminManageUsecase) GetCurrent(ctx context.Context) (admin *AdminUser,
 	return admin, nil
 }
 
+func (uc *AdminManageUsecase) recordAdminControlAudit(
+	ctx context.Context,
+	operator *AdminUser,
+	action string,
+	targetType string,
+	targetID int,
+	targetKey string,
+	before map[string]any,
+	after map[string]any,
+) error {
+	if operator == nil {
+		return ErrForbidden
+	}
+	action = strings.TrimSpace(action)
+	targetType = strings.TrimSpace(targetType)
+	targetKey = strings.TrimSpace(targetKey)
+	if action == "" || targetType == "" {
+		return ErrBadParam
+	}
+	payload := map[string]any{
+		"action": action,
+		"actor": map[string]any{
+			"id":       operator.ID,
+			"username": operator.Username,
+		},
+		"target": map[string]any{
+			"type": targetType,
+			"id":   targetID,
+			"key":  targetKey,
+		},
+		"before": before,
+		"after":  after,
+	}
+	return uc.repo.RecordRuntimeAuditEvent(ctx, &RuntimeAuditEventCreate{
+		EventType: adminControlAuditEventType,
+		EventKey:  action,
+		Source:    adminControlAuditSource,
+		Payload:   payload,
+	})
+}
+
+func adminAuditUserSnapshot(admin *AdminUser) map[string]any {
+	if admin == nil {
+		return nil
+	}
+	return map[string]any{
+		"id":             admin.ID,
+		"username":       admin.Username,
+		"phone":          admin.Phone,
+		"role_keys":      AdminRoleKeys(admin),
+		"disabled":       admin.Disabled,
+		"is_super_admin": admin.IsSuperAdmin,
+	}
+}
+
+func adminAuditRoleSnapshot(role *AdminRole) map[string]any {
+	if role == nil {
+		return nil
+	}
+	return map[string]any{
+		"role_key":        role.Key,
+		"name":            role.Name,
+		"disabled":        role.Disabled,
+		"permission_keys": NormalizePermissionKeys(role.Permissions),
+	}
+}
+
+func (uc *AdminManageUsecase) ListRuntimeAuditEvents(
+	ctx context.Context,
+	filter RuntimeAuditEventListFilter,
+) (RuntimeAuditEventListResult, error) {
+	if _, err := uc.requireActiveAdmin(ctx); err != nil {
+		return RuntimeAuditEventListResult{}, err
+	}
+	return uc.repo.ListRuntimeAuditEvents(ctx, filter)
+}
+
 func (uc *AdminManageUsecase) List(ctx context.Context) (list []*AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_manage.list")
 	defer span.End()
@@ -170,7 +286,8 @@ func (uc *AdminManageUsecase) Create(
 	)
 	defer span.End()
 
-	if _, err = uc.requireActiveAdmin(ctx); err != nil {
+	operator, err := uc.requireActiveAdmin(ctx)
+	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -233,6 +350,20 @@ func (uc *AdminManageUsecase) Create(
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
+	if err = uc.recordAdminControlAudit(
+		ctx,
+		operator,
+		"admin_user.create",
+		"admin_user",
+		created.ID,
+		created.Username,
+		nil,
+		adminAuditUserSnapshot(created),
+	); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
 	span.SetStatus(codes.Ok, "OK")
 	return created, nil
 }
@@ -250,7 +381,8 @@ func (uc *AdminManageUsecase) SetRoles(
 	)
 	defer span.End()
 
-	if _, err = uc.requireActiveAdmin(ctx); err != nil {
+	operator, err := uc.requireActiveAdmin(ctx)
+	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -270,6 +402,7 @@ func (uc *AdminManageUsecase) SetRoles(
 		span.SetStatus(codes.Error, ErrNoPermission.Error())
 		return nil, ErrNoPermission
 	}
+	before := adminAuditUserSnapshot(target)
 
 	normalizedRoleKeys := NormalizeAdminRoleKeys(roleKeys)
 	if err = uc.repo.UpdateAdminRoles(ctx, adminID, normalizedRoleKeys); err != nil {
@@ -280,6 +413,20 @@ func (uc *AdminManageUsecase) SetRoles(
 
 	target, err = uc.repo.GetAdminByID(ctx, adminID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if err = uc.recordAdminControlAudit(
+		ctx,
+		operator,
+		"admin_user.roles.set",
+		"admin_user",
+		target.ID,
+		target.Username,
+		before,
+		adminAuditUserSnapshot(target),
+	); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -303,7 +450,8 @@ func (uc *AdminManageUsecase) ListPermissions(ctx context.Context) ([]AdminPermi
 }
 
 func (uc *AdminManageUsecase) SetRolePermissions(ctx context.Context, roleKey string, permissionKeys []string) (*AdminRole, error) {
-	if _, err := uc.requireActiveAdmin(ctx); err != nil {
+	operator, err := uc.requireActiveAdmin(ctx)
+	if err != nil {
 		return nil, err
 	}
 	roleKey = NormalizeRoleKey(roleKey)
@@ -317,10 +465,27 @@ func (uc *AdminManageUsecase) SetRolePermissions(ctx context.Context, roleKey st
 	if role == nil || role.Disabled {
 		return nil, ErrRoleNotFound
 	}
+	before := adminAuditRoleSnapshot(role)
 	if err := uc.repo.UpdateRolePermissions(ctx, roleKey, NormalizePermissionKeys(permissionKeys)); err != nil {
 		return nil, err
 	}
-	return uc.repo.GetRoleByKey(ctx, roleKey)
+	updated, err := uc.repo.GetRoleByKey(ctx, roleKey)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.recordAdminControlAudit(
+		ctx,
+		operator,
+		"role.permissions.set",
+		"role",
+		updated.ID,
+		updated.Key,
+		before,
+		adminAuditRoleSnapshot(updated),
+	); err != nil {
+		return nil, err
+	}
+	return updated, nil
 }
 
 func (uc *AdminManageUsecase) SetPhone(
@@ -333,7 +498,8 @@ func (uc *AdminManageUsecase) SetPhone(
 	)
 	defer span.End()
 
-	if _, err = uc.requireActiveAdmin(ctx); err != nil {
+	operator, err := uc.requireActiveAdmin(ctx)
+	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -353,6 +519,7 @@ func (uc *AdminManageUsecase) SetPhone(
 		span.SetStatus(codes.Error, ErrNoPermission.Error())
 		return nil, ErrNoPermission
 	}
+	before := adminAuditUserSnapshot(target)
 
 	normalizedPhone := ""
 	if strings.TrimSpace(phone) != "" {
@@ -378,6 +545,20 @@ func (uc *AdminManageUsecase) SetPhone(
 	}
 
 	target.Phone = normalizedPhone
+	if err = uc.recordAdminControlAudit(
+		ctx,
+		operator,
+		"admin_user.phone.set",
+		"admin_user",
+		target.ID,
+		target.Username,
+		before,
+		adminAuditUserSnapshot(target),
+	); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
 	span.SetStatus(codes.Ok, "OK")
 	return target, nil
 }
@@ -468,6 +649,7 @@ func (uc *AdminManageUsecase) SetDisabled(
 		span.SetStatus(codes.Error, ErrNoPermission.Error())
 		return nil, ErrNoPermission
 	}
+	before := adminAuditUserSnapshot(target)
 
 	if err = uc.repo.SetAdminDisabled(ctx, adminID, disabled); err != nil {
 		span.RecordError(err)
@@ -476,6 +658,20 @@ func (uc *AdminManageUsecase) SetDisabled(
 	}
 
 	target.Disabled = disabled
+	if err = uc.recordAdminControlAudit(
+		ctx,
+		operator,
+		"admin_user.disabled.set",
+		"admin_user",
+		target.ID,
+		target.Username,
+		before,
+		adminAuditUserSnapshot(target),
+	); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
 	span.SetStatus(codes.Ok, "OK")
 	return target, nil
 }
@@ -490,7 +686,8 @@ func (uc *AdminManageUsecase) ResetPassword(
 	)
 	defer span.End()
 
-	if _, err = uc.requireActiveAdmin(ctx); err != nil {
+	operator, err := uc.requireActiveAdmin(ctx)
+	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
@@ -526,6 +723,20 @@ func (uc *AdminManageUsecase) ResetPassword(
 
 	updated, err = uc.repo.GetAdminByID(ctx, adminID)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return nil, err
+	}
+	if err = uc.recordAdminControlAudit(
+		ctx,
+		operator,
+		"admin_user.password.reset",
+		"admin_user",
+		updated.ID,
+		updated.Username,
+		map[string]any{"password_reset": false},
+		map[string]any{"password_reset": true},
+	); err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err

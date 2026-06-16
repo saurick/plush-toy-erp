@@ -45,6 +45,7 @@ const PrintTemplatePreviewPage = lazy(
 )
 const PrintWorkspacePage = lazy(() => import('./pages/PrintWorkspacePage.jsx'))
 const PermissionCenterPage = lazy(() => import('./pages/PermissionCenterPage'))
+const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage.jsx'))
 const V1MasterDataPage = lazy(() => import('./pages/V1MasterDataPage'))
 const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
 const V1PurchaseOrdersPage = lazy(
@@ -355,6 +356,7 @@ export default function ERPRouter() {
             element={<PrintTemplatePreviewPage />}
           />
           <Route path="system/permissions" element={<PermissionCenterPage />} />
+          <Route path="system/audit-logs" element={<AuditLogsPage />} />
           <Route
             path="mobile-workbenches"
             element={<Navigate to="/erp/dashboard" replace />}

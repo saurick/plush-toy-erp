@@ -147,7 +147,7 @@ const scenarios = [
       await page.locator('#password').fill('style-l1-password')
       await page.getByRole('button', { name: /^登\s*录$/ }).click()
       await waitForPath(page, '/erp/dashboard')
-      await expectHeading(page, '后台首页 / 工作台')
+      await expectHeading(page, '工作台')
 
       const rememberedEntry = await page.evaluate(() =>
         window.localStorage.getItem('erp:last_entry_target')
@@ -199,12 +199,10 @@ const scenarios = [
       await expectText(page, '超级管理员')
       await expectText(page, 'style-l1-admin')
       await expectText(page, '看板中心')
-      await expectHeading(page, '后台首页 / 工作台')
+      await expectHeading(page, '工作台')
       await expectText(page, '优先处理队列')
       await expectText(page, '任务详情')
       await expectText(page, '业务对象脉搏')
-      await expectText(page, '流程状态总览')
-      await expectText(page, '角色工作负载')
       await expectNoButton(page, '任务看板')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-dashboard-desktop',
@@ -232,10 +230,9 @@ const scenarios = [
       await expectText(page, 'style-l1-admin')
       await expectText(page, '看板中心')
       await expectHeading(page, '任务看板')
-      await expectText(page, '本页待办')
-      await expectText(page, '阻塞异常')
-      await expectText(page, '今日到期')
-      await expectText(page, '任务处理明细')
+      await expectText(page, '待我处理')
+      await expectText(page, '阻塞交接')
+      await expectText(page, '当前结果')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-task-board-desktop',
       })
@@ -384,11 +381,10 @@ const scenarios = [
       await expectText(page, '超级管理员')
       await expectText(page, '看板中心')
       await expectHeading(page, '业务看板')
-      await expectText(page, '业务对象总数')
-      await expectText(page, '业务关注统计')
-      await expectText(page, '业务预警')
+      await expectText(page, '业务对象')
+      await expectText(page, '风险提醒')
       await expectText(page, '业务状态分布')
-      await expectText(page, '模块健康明细')
+      await expectText(page, '模块健康')
       await expectText(page, '记录数')
       await expectNoButton(page, '任务看板')
       await assertNoDuplicatedAdminPageTitle(page, {
@@ -416,10 +412,10 @@ const scenarios = [
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
       await expectHeading(page, '业务看板')
-      await expectText(page, '业务对象总数')
-      await expectText(page, '模块健康明细')
+      await expectText(page, '业务对象')
+      await expectText(page, '模块健康')
       await expectText(page, '业务状态分布')
-      await expectText(page, '业务预警')
+      await expectText(page, '风险提醒')
       await assertERPThemeMode(page, {
         scenarioName: 'erp-business-dashboard-dark-desktop',
         expectedMode: 'dark',
@@ -507,7 +503,7 @@ const scenarios = [
     verify: async (page) => {
       await expectText(page, '超级管理员')
       await expectText(page, '毛绒 ERP 管理后台')
-      await expectText(page, '后台首页 / 工作台')
+      await expectText(page, '工作台')
       await expectText(page, '优先处理队列')
       await expectText(page, '任务详情')
       await expectText(page, '业务对象脉搏')
@@ -532,9 +528,8 @@ const scenarios = [
       await expectText(page, '超级管理员')
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '任务看板')
-      await expectText(page, '本页待办')
-      await expectText(page, '今日到期')
-      await expectText(page, '任务处理明细')
+      await expectText(page, '待我处理')
+      await expectText(page, '当前结果')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-task-board-mobile',
       })
@@ -552,7 +547,7 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
-      await expectText(page, '后台首页 / 工作台')
+      await expectText(page, '工作台')
       await expectText(page, '优先处理队列')
       await expectText(page, '业务对象脉搏')
       await expectNoButton(page, '任务看板')
@@ -593,7 +588,7 @@ const scenarios = [
     verify: async (page) => {
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '任务看板')
-      await expectText(page, '本页待办')
+      await expectText(page, '待我处理')
       await page.evaluate(async () => {
         const response = await fetch('/rpc/workflow', {
           method: 'POST',
@@ -641,7 +636,9 @@ const scenarios = [
         expectedMode: 'dark',
         expectedEffectiveTheme: 'dark',
       })
-      await page.locator('.erp-dashboard-table-card').scrollIntoViewIfNeeded()
+      await page
+        .locator('.erp-dashboard-task-board-card')
+        .scrollIntoViewIfNeeded()
       await assertDashboardTaskBoardLayout(page, {
         scenarioName: 'erp-task-board-dark-wide-desktop',
       })
@@ -891,7 +888,7 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
-      await expectHeading(page, '后台首页 / 工作台')
+      await expectHeading(page, '工作台')
       await gotoScenarioPath(page, '/m/sales/tasks', {
         waitUntil: 'domcontentloaded',
       })
@@ -1979,8 +1976,8 @@ const scenarios = [
       )
       assert.equal(
         implementMetrics.visibleCards,
-        12,
-        `原型查看器待实现筛选应展示 12 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
+        13,
+        `原型查看器待实现筛选应展示 13 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
       )
       assert.equal(
         implementMetrics.cardDescriptionCount,
@@ -2257,8 +2254,7 @@ const scenarios = [
       await expectText(page, '超级管理员')
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '业务看板')
-      await expectText(page, '模块健康明细')
-      await expectText(page, '业务关注统计')
+      await expectText(page, '模块健康')
       await expectText(page, '业务状态分布')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-business-dashboard-mobile',
@@ -3021,6 +3017,30 @@ const scenarios = [
     },
   },
   {
+    name: 'material-master-header-desktop',
+    path: '/erp/master/materials',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '材料档案')
+      await expectText(page, '样式材料')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'material-master-header-desktop',
+      })
+      await assertBusinessHeaderHasNoSectionTitle(page, {
+        scenarioName: 'material-master-header-desktop',
+      })
+      await assertBusinessHeaderStatsSingleLine(page, {
+        scenarioName: 'material-master-header-desktop',
+        expectedLabels: ['总材料', '当前结果', '启用材料', '已选材料'],
+      })
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'material-master-header-desktop',
+      })
+      await assertNoHorizontalOverflow(page, 'material-master-header-desktop')
+    },
+  },
+  {
     name: 'purchase-order-date-filter-desktop',
     path: '/erp/purchase/accessories',
     auth: 'admin',
@@ -3030,6 +3050,16 @@ const scenarios = [
       await expectText(page, '采购日期')
       await expectText(page, '预计到货')
       await expectText(page, '新建采购订单')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'purchase-order-date-filter-desktop',
+      })
+      await assertBusinessHeaderStatsSingleLine(page, {
+        scenarioName: 'purchase-order-date-filter-desktop',
+        expectedLabels: ['总订单', '当前结果', '已审核', '已选订单'],
+      })
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'purchase-order-date-filter-desktop',
+      })
       await assertBusinessModuleToolbarControlStyle(page, {
         scenarioName: 'purchase-order-date-filter-desktop',
       })
@@ -3045,7 +3075,115 @@ const scenarios = [
           '数量合计',
           '金额合计',
         ],
+        afterOpen: async (modal) => {
+          await verifySourceImportPicker(page, {
+            parentModal: modal,
+            triggerButton: '从材料库导入',
+            titleText: '从材料库导入采购明细',
+            expectedTexts: ['材料编码', '材料名称', 'MAT-STYLE-L1'],
+            selectText: 'MAT-STYLE-L1',
+            scenarioName: 'purchase-order-source-import-picker',
+          })
+        },
       })
+    },
+  },
+  {
+    name: 'shipment-date-filter-desktop',
+    path: '/erp/warehouse/shipments',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '出货单')
+      await expectText(page, '计划出货')
+      await expectText(page, '实际出货')
+      await expectText(page, '新建草稿')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'shipment-date-filter-desktop',
+      })
+      await assertBusinessHeaderStatsSingleLine(page, {
+        scenarioName: 'shipment-date-filter-desktop',
+        expectedLabels: ['总出货单', '当前结果', '草稿', '已选出货单'],
+      })
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'shipment-date-filter-desktop',
+      })
+      await assertBusinessModuleToolbarControlStyle(page, {
+        scenarioName: 'shipment-date-filter-desktop',
+        requireSearch: false,
+      })
+      await assertNoHorizontalOverflow(page, 'shipment-date-filter-desktop')
+    },
+  },
+  {
+    name: 'shipment-date-filter-mobile',
+    path: '/erp/warehouse/shipments',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectHeading(page, '出货单')
+      await expectText(page, '计划出货')
+      await expectText(page, '实际出货')
+      const metrics = await page.evaluate(() => {
+        const control = document.querySelector(
+          '.erp-business-date-range-filter'
+        )
+        const range = control?.querySelector(
+          '.erp-business-date-range-filter__range'
+        )
+        const inputs = Array.from(
+          control?.querySelectorAll('.erp-business-date-input') || []
+        ).map((input) => {
+          const inputElement = input.querySelector('input') || input
+          const rect = input.getBoundingClientRect()
+          return {
+            width: rect.width,
+            clientWidth: inputElement.clientWidth,
+            scrollWidth: inputElement.scrollWidth,
+          }
+        })
+        return {
+          controlWidth: control?.getBoundingClientRect().width || 0,
+          rangeFlexDirection: range
+            ? getComputedStyle(range).flexDirection
+            : '',
+          inputs,
+        }
+      })
+      assert(
+        metrics.controlWidth > 0 && metrics.controlWidth <= 358,
+        `shipment-date-filter-mobile 日期筛选控件应适配窄屏宽度: ${JSON.stringify(metrics)}`
+      )
+      assert.equal(
+        metrics.rangeFlexDirection,
+        'column',
+        `shipment-date-filter-mobile 起止日期在窄屏应改为上下排列: ${JSON.stringify(metrics)}`
+      )
+      assert(
+        metrics.inputs.length === 2 &&
+          metrics.inputs.every(
+            (item) => item.scrollWidth <= item.clientWidth + 1
+          ),
+        `shipment-date-filter-mobile 日期输入不应裁切: ${JSON.stringify(metrics)}`
+      )
+      await assertNoHorizontalOverflow(page, 'shipment-date-filter-mobile')
+    },
+  },
+  {
+    name: 'textarea-show-count-layout-desktop',
+    path: '/erp/master/partners/suppliers',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '供应商档案')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建供应商',
+        titleText: '新建供应商档案',
+        minFieldCount: 5,
+        screenshotName: 'textarea-show-count-supplier-form-modal',
+        expectedTexts: ['备注', '联系人', '添加条目'],
+      })
+      await assertNoHorizontalOverflow(page, 'textarea-show-count-layout')
     },
   },
   {
@@ -3058,7 +3196,17 @@ const scenarios = [
       await expectButton(page, '新建供应商')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-v1-suppliers',
+      })
       await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建供应商',
+        titleText: '新建供应商档案',
+        minFieldCount: 5,
+        screenshotName: 'business-v1-suppliers-form-modal',
+        expectedTexts: ['供应商类型', '联系人', '添加条目'],
+      })
       await verifyBusinessRowDoubleClickEditModal(page, {
         rowText: '样式供应商',
         titleText: '编辑供应商',
@@ -3077,6 +3225,9 @@ const scenarios = [
       await expectText(page, '当前操作')
       await expectText(page, '暗色客户')
       await expectText(page, '本页协同')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-v1-customers',
+      })
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-v1-customers',
       })
@@ -3106,6 +3257,9 @@ const scenarios = [
       await expectText(page, '当前操作')
       await expectText(page, '订单行')
       await expectText(page, '本页协同')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-v1-sales-orders',
+      })
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-v1-sales-orders',
       })
@@ -3114,6 +3268,18 @@ const scenarios = [
         titleText: '新建销售订单',
         minFieldCount: 6,
         screenshotName: 'business-v1-sales-order-form-modal',
+        expectedTexts: ['SKU / 产品来源', '带出产品 / 单位'],
+        absentTexts: ['产品引用 ID', '单位引用 ID'],
+        afterOpen: async (modal) => {
+          await verifySourceImportPicker(page, {
+            parentModal: modal,
+            triggerButton: '从 SKU 库导入',
+            titleText: '从 SKU 库导入订单行',
+            expectedTexts: ['SKU 编码', '产品名称', 'SKU-STYLE-L1'],
+            selectText: 'SKU-STYLE-L1',
+            scenarioName: 'sales-order-source-import-picker',
+          })
+        },
       })
       await assertNoHorizontalOverflow(page, 'business-standard-sales-orders')
       await verifyBusinessRowDoubleClickEditModal(page, {
@@ -3122,6 +3288,10 @@ const scenarios = [
         scenarioName: 'business-v1-sales-orders',
         afterModalOpen: async () => {
           await expectText(page, '订单行')
+          await expectText(page, 'SKU / 产品来源')
+          await expectText(page, '带出产品 / 单位')
+          await assertTextAbsent(page, '产品引用 ID')
+          await assertTextAbsent(page, '单位引用 ID')
         },
       })
 
@@ -3129,18 +3299,26 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '产品档案')
-      await expectButton(page, '新建SKU')
+      await expectButton(page, '新建产品规格')
       await expectText(page, '批量删除')
       await expectText(page, '回收站')
       await expectText(page, 'SKU-STYLE-L1')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-standard-products',
+      })
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-standard-products',
       })
       await assertBusinessHeaderStatsSingleLine(page, {
         scenarioName: 'business-standard-products',
-        expectedLabels: ['总SKU', '当前结果', '启用SKU', '已选SKU'],
+        expectedLabels: [
+          '总产品规格',
+          '当前结果',
+          '启用产品规格',
+          '已选产品规格',
+        ],
       })
       await verifyBusinessRecycleModal(page, {
         screenshotName: 'business-formal-products-recycle-modal',
@@ -3156,8 +3334,8 @@ const scenarios = [
         moduleKey: 'product_skus',
         heading: '产品档案',
       })
-      await page.getByRole('button', { name: '新建SKU' }).click()
-      await expectText(page, '新建产品档案')
+      await page.getByRole('button', { name: '新建产品规格' }).click()
+      await expectText(page, '新建产品规格')
       await expectText(page, 'SKU 编号')
       await expectText(page, '产品 ID')
       await page.keyboard.press('Escape')
@@ -3173,8 +3351,18 @@ const scenarios = [
       await expectText(page, '已激活')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-standard-bom',
+      })
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'business-standard-bom',
+      })
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-standard-bom',
+      })
+      await assertBusinessHeaderStatsSingleLine(page, {
+        scenarioName: 'business-standard-bom',
+        expectedLabels: ['总BOM', '当前结果', '已激活', '已选BOM'],
       })
       await page.getByRole('button', { name: '新建草稿' }).click()
       await expectText(page, '新建 BOM 草稿')
@@ -3187,6 +3375,9 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '库存台账')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-standard-inventory',
+      })
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建库存',
         titleText: '新建库存调整',
@@ -3199,6 +3390,9 @@ const scenarios = [
         scenarioName: 'business-standard-inventory',
         expectedTexts: ['当前余额', '可用量', '最近流水'],
       })
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'business-standard-inventory',
+      })
       await assertNoHorizontalOverflow(page, 'business-standard-inventory')
 
       await gotoScenarioPath(page, '/erp/warehouse/shipments', {
@@ -3206,19 +3400,37 @@ const scenarios = [
       })
       await expectHeading(page, '出货单')
       await expectButton(page, '新建草稿')
+      await expectText(page, '计划出货')
+      await expectText(page, '实际出货')
       await expectText(page, 'SHIP-STYLE-L1')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-v1-shipments',
+      })
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建草稿',
         titleText: '新建出货单',
         minFieldCount: 12,
         screenshotName: 'business-v1-shipment-create-form-modal',
-        expectedTexts: ['出货明细', '产品 ID', '仓库 ID'],
+        expectedTexts: ['出货明细', '从销售订单导入', '产品 ID', '仓库 ID'],
+        afterOpen: async (modal) => {
+          await verifySourceImportPicker(page, {
+            parentModal: modal,
+            triggerButton: '从销售订单导入',
+            titleText: '从销售订单导入出货明细',
+            expectedTexts: ['销售订单号', '客户', 'SO-STYLE-L1'],
+            scenarioName: 'shipment-source-import-picker',
+          })
+        },
       })
-      await page.getByRole('button', { name: '加行' }).click()
+      await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
+      await page.getByRole('button', { name: '添加明细' }).click()
       await expectText(page, '维护出货明细')
       await expectText(page, '已保存出货明细')
       await expectText(page, '新增出货明细')
       await page.keyboard.press('Escape')
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'business-v1-shipments',
+      })
       await assertNoHorizontalOverflow(page, 'business-v1-shipments')
 
       await gotoScenarioPath(page, '/erp/finance/receivables', {
@@ -3231,6 +3443,9 @@ const scenarios = [
       await expectText(page, '生成应收')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-standard-receivables',
+      })
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建应收',
         titleText: '新建应收',
@@ -4055,6 +4270,19 @@ async function installAdminRpcMocks(page) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const material = {
+      id: 1,
+      code: 'MAT-STYLE-L1',
+      name: '样式材料',
+      category: '面料',
+      spec: '短毛绒 300g',
+      color: '米白',
+      default_unit_id: 1,
+      is_active: true,
+      note: '',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
 
     let data = {}
     switch (method) {
@@ -4069,6 +4297,9 @@ async function installAdminRpcMocks(page) {
         break
       case 'list_product_skus':
         data = { product_skus: [productSKU], total: 1, limit: 100, offset: 0 }
+        break
+      case 'list_materials':
+        data = { materials: [material], total: 1, limit: 100, offset: 0 }
         break
       case 'create_customer':
       case 'update_customer':
@@ -4093,6 +4324,12 @@ async function installAdminRpcMocks(page) {
       case 'set_product_sku_active':
       case 'get_product_sku':
         data = { product_sku: { ...productSKU, ...params } }
+        break
+      case 'create_material':
+      case 'update_material':
+      case 'set_material_active':
+      case 'get_material':
+        data = { material: { ...material, ...params } }
         break
       default:
         data = {}
@@ -5232,8 +5469,8 @@ async function assertDashboardMetricInteractionSemantics(
   if (expectTaskMetrics) {
     assert.equal(
       metrics.taskMetrics.length,
-      4,
-      `${scenarioName} 任务中心应有 4 个动作指标按钮: ${JSON.stringify(metrics)}`
+      3,
+      `${scenarioName} 任务中心应有 3 个动作指标按钮: ${JSON.stringify(metrics)}`
     )
     for (const item of metrics.taskMetrics) {
       assert.equal(
@@ -5274,8 +5511,8 @@ async function assertDashboardMetricInteractionSemantics(
   if (expectBusinessSummary) {
     assert.equal(
       metrics.businessSummary.length,
-      4,
-      `${scenarioName} 业务看板应有 4 个只读摘要卡: ${JSON.stringify(metrics)}`
+      3,
+      `${scenarioName} 业务看板应有 3 个只读摘要卡: ${JSON.stringify(metrics)}`
     )
     for (const item of metrics.businessSummary) {
       assert.equal(
@@ -5654,6 +5891,8 @@ async function verifyBusinessActionFormModal(
     minFieldCount = 4,
     screenshotName,
     expectedTexts = [],
+    absentTexts = [],
+    afterOpen,
   }
 ) {
   await page.getByRole('button', { name: buttonName }).click()
@@ -5674,10 +5913,25 @@ async function verifyBusinessActionFormModal(
     )
     const controls = Array.from(
       node.querySelectorAll(
-        '.erp-business-action-form input, .erp-business-action-form textarea, .erp-business-action-form .ant-select-selector'
+        [
+          '.erp-business-action-form input.ant-input:not([type="hidden"])',
+          '.erp-business-action-form textarea.ant-input',
+          '.erp-business-action-form .ant-input-affix-wrapper',
+          '.erp-business-action-form .ant-input-number',
+          '.erp-business-action-form .ant-picker',
+          '.erp-business-action-form .ant-select-selector',
+        ].join(', ')
       )
     )
       .filter((control) => {
+        if (
+          control.matches('input.ant-input, textarea.ant-input') &&
+          control.closest(
+            '.ant-input-affix-wrapper, .ant-input-number, .ant-picker, .ant-select'
+          )
+        ) {
+          return false
+        }
         const rect = control.getBoundingClientRect()
         const style = window.getComputedStyle(control)
         return (
@@ -5696,6 +5950,120 @@ async function verifyBusinessActionFormModal(
           borderRadius: style.borderRadius,
         }
       })
+    const singleLineControls = Array.from(
+      node.querySelectorAll(
+        [
+          '.erp-business-action-form input.ant-input:not([type="hidden"])',
+          '.erp-business-action-form .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)',
+          '.erp-business-action-form .ant-input-number',
+          '.erp-business-action-form .ant-picker',
+          '.erp-business-action-form .ant-select-single .ant-select-selector',
+        ].join(', ')
+      )
+    )
+      .filter((control) => {
+        if (
+          control.matches('input.ant-input') &&
+          control.closest(
+            '.ant-input-affix-wrapper, .ant-input-number, .ant-picker, .ant-select'
+          )
+        ) {
+          return false
+        }
+        const rect = control.getBoundingClientRect()
+        const style = window.getComputedStyle(control)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        )
+      })
+      .map((control) => {
+        const rect = control.getBoundingClientRect()
+        const style = window.getComputedStyle(control)
+        return {
+          tagName: control.tagName,
+          className: String(control.className || ''),
+          height: rect.height,
+          lineHeight: style.lineHeight,
+        }
+      })
+    const textareaCountLayouts = Array.from(
+      node.querySelectorAll(
+        '.erp-business-action-form .ant-input-textarea-show-count'
+      )
+    )
+      .filter((wrapper) => {
+        const rect = wrapper.getBoundingClientRect()
+        const style = window.getComputedStyle(wrapper)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        )
+      })
+      .map((wrapper) => {
+        const textarea = wrapper.querySelector('textarea.ant-input')
+        const borderNode =
+          wrapper.querySelector('.ant-input-textarea-affix-wrapper') || textarea
+        const count = wrapper.querySelector('.ant-input-data-count')
+        const wrapperRect = wrapper.getBoundingClientRect()
+        const borderRect = borderNode?.getBoundingClientRect()
+        const countRect = count?.getBoundingClientRect()
+        const borderStyle = borderNode
+          ? window.getComputedStyle(borderNode)
+          : null
+        const textareaStyle = textarea
+          ? window.getComputedStyle(textarea)
+          : null
+
+        return {
+          wrapper: {
+            width: wrapperRect.width,
+            height: wrapperRect.height,
+            bottom: wrapperRect.bottom,
+          },
+          border: borderRect
+            ? {
+                top: borderRect.top,
+                right: borderRect.right,
+                bottom: borderRect.bottom,
+                left: borderRect.left,
+                width: borderRect.width,
+                height: borderRect.height,
+                paddingBottom: Number.parseFloat(
+                  borderStyle?.paddingBottom || '0'
+                ),
+              }
+            : null,
+          textarea: textarea
+            ? {
+                clientWidth: textarea.clientWidth,
+                scrollWidth: textarea.scrollWidth,
+                paddingBottom: Number.parseFloat(
+                  textareaStyle?.paddingBottom || '0'
+                ),
+              }
+            : null,
+          count: countRect
+            ? {
+                top: countRect.top,
+                right: countRect.right,
+                bottom: countRect.bottom,
+                left: countRect.left,
+                width: countRect.width,
+                height: countRect.height,
+                text: count.textContent?.replace(/\s+/g, ' ').trim() || '',
+              }
+            : null,
+        }
+      })
+    const controlHeight =
+      Number.parseFloat(
+        formStyle?.getPropertyValue('--erp-control-height') || ''
+      ) || 36
     return {
       className: String(node.className || ''),
       textContent: String(node.textContent || '')
@@ -5715,6 +6083,9 @@ async function verifyBusinessActionFormModal(
         item.classList.contains('erp-business-action-form__field--full')
       ).length,
       controls,
+      controlHeight,
+      singleLineControls,
+      textareaCountLayouts,
     }
   })
 
@@ -5740,6 +6111,15 @@ async function verifyBusinessActionFormModal(
       `${screenshotName} 缺少产品核心字段 ${expectedText}: ${JSON.stringify(metrics)}`
     )
   }
+  for (const absentText of absentTexts) {
+    assert(
+      !metrics.textContent.includes(absentText),
+      `${screenshotName} 不应继续显示旧字段 ${absentText}: ${JSON.stringify(metrics)}`
+    )
+  }
+  if (typeof afterOpen === 'function') {
+    await afterOpen(modal)
+  }
   assert(
     metrics.gridTemplateColumns.split(' ').length >= 2,
     `${screenshotName} 桌面表单未使用多列表格化布局: ${JSON.stringify(metrics)}`
@@ -5750,12 +6130,157 @@ async function verifyBusinessActionFormModal(
     ),
     `${screenshotName} 表单控件尺寸异常: ${JSON.stringify(metrics)}`
   )
+  assert(
+    metrics.singleLineControls.length > 0 &&
+      metrics.singleLineControls.every(
+        (control) => Math.abs(control.height - metrics.controlHeight) <= 1
+      ),
+    `${screenshotName} 单行输入控件高度未统一: ${JSON.stringify(metrics)}`
+  )
+  for (const layout of metrics.textareaCountLayouts) {
+    assert(
+      layout.border && layout.textarea && layout.count,
+      `${screenshotName} 多行输入字数统计缺少边框、textarea 或计数器: ${JSON.stringify(layout)}`
+    )
+    assert(
+      layout.count.top >= layout.border.top + 4 &&
+        layout.count.right <= layout.border.right - 24 &&
+        layout.count.bottom <= layout.border.bottom - 4 &&
+        layout.count.left >= layout.border.left + 8,
+      `${screenshotName} 多行输入字数统计超出输入框边界: ${JSON.stringify(layout)}`
+    )
+    assert(
+      Math.max(layout.border.paddingBottom, layout.textarea.paddingBottom) >=
+        layout.count.height + 6,
+      `${screenshotName} 多行输入字数统计未预留内容底部空间: ${JSON.stringify(layout)}`
+    )
+    assert(
+      layout.textarea.scrollWidth <= layout.textarea.clientWidth + 1,
+      `${screenshotName} 多行输入框出现横向溢出: ${JSON.stringify(layout)}`
+    )
+  }
 
   await modal.screenshot({
     path: path.resolve(outputDir, `${screenshotName}.png`),
   })
   await modal.locator('.ant-modal-close').click({ force: true })
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+}
+
+async function verifySourceImportPicker(
+  page,
+  {
+    parentModal,
+    triggerButton,
+    titleText,
+    expectedTexts = [],
+    selectText,
+    importAndExpectText,
+    scenarioName,
+  }
+) {
+  await parentModal.getByRole('button', { name: triggerButton }).click()
+  const picker = page
+    .locator('.erp-source-import-picker-modal.ant-modal:visible')
+    .last()
+  await picker.waitFor({ state: 'visible', timeout: 10_000 })
+  await expectText(page, titleText)
+  const metrics = await picker.evaluate((node) => {
+    const body = node.querySelector('.ant-modal-body')
+    const table = node.querySelector('.ant-table')
+    const visibleModals = Array.from(
+      document.querySelectorAll('.ant-modal')
+    ).filter((modal) => {
+      const rect = modal.getBoundingClientRect()
+      const style = window.getComputedStyle(modal)
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      )
+    }).length
+    return {
+      textContent: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+      body: body
+        ? {
+            clientWidth: body.clientWidth,
+            scrollWidth: body.scrollWidth,
+          }
+        : null,
+      hasTable: Boolean(table),
+      hasPagination: Boolean(node.querySelector('.ant-pagination')),
+      visibleModalCount: visibleModals,
+    }
+  })
+  assert(
+    metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
+    `${scenarioName} 来源导入选择器出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(metrics.hasTable, `${scenarioName} 来源导入选择器缺少表格`)
+  if (metrics.hasPagination) {
+    assert(
+      metrics.textContent.includes('共') && metrics.textContent.includes('条'),
+      `${scenarioName} 来源导入分页应显示总数: ${JSON.stringify(metrics)}`
+    )
+  }
+  assert(
+    metrics.visibleModalCount <= 2,
+    `${scenarioName} 来源导入不应超过两层弹窗: ${JSON.stringify(metrics)}`
+  )
+  for (const expectedText of expectedTexts) {
+    assert(
+      metrics.textContent.includes(expectedText),
+      `${scenarioName} 来源导入选择器缺少 ${expectedText}: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  if (selectText) {
+    const sourceRow = picker
+      .locator('.ant-table-row')
+      .filter({ hasText: selectText })
+      .first()
+    await sourceRow.waitFor({ state: 'visible', timeout: 10_000 })
+    const selectorControl = sourceRow
+      .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')
+      .first()
+    await selectorControl.click()
+    await expectText(page, '已选 1 条')
+    await expectText(page, '清空已选')
+    const importButton = picker
+      .locator('.erp-source-import-picker__footer-actions .ant-btn-primary')
+      .last()
+    const importDisabled = await importButton.evaluate(
+      (button) => button.disabled
+    )
+    assert.equal(importDisabled, false, `${scenarioName} 导入按钮不应禁用`)
+    await picker.getByRole('button', { name: '清空已选' }).click()
+    await assertTextAbsent(page, '已选 1 条')
+    const clearedImportDisabled = await importButton.evaluate(
+      (button) => button.disabled
+    )
+    assert.equal(
+      clearedImportDisabled,
+      true,
+      `${scenarioName} 清空已选后导入按钮应禁用`
+    )
+    await selectorControl.click()
+    await expectText(page, '已选 1 条')
+    await importButton.click({ force: true })
+    await picker.waitFor({ state: 'hidden', timeout: 10_000 })
+    if (importAndExpectText) {
+      await expectText(page, importAndExpectText)
+    }
+    await parentModal.waitFor({ state: 'visible', timeout: 10_000 })
+    return
+  }
+
+  await picker
+    .locator('.erp-source-import-picker__footer-actions .ant-btn')
+    .first()
+    .click({ force: true })
+  await picker.waitFor({ state: 'hidden', timeout: 10_000 })
+  await parentModal.waitFor({ state: 'visible', timeout: 10_000 })
 }
 
 async function verifyBusinessRecycleModal(
@@ -5816,12 +6341,14 @@ async function verifyBusinessRecycleModal(
     metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
     `${screenshotName} 回收站弹窗出现横向溢出: ${JSON.stringify(metrics)}`
   )
-  for (const expected of ['批量恢复', '刷新']) {
-    assert(
-      metrics.buttons.some((button) => button.includes(expected)),
-      `${screenshotName} 回收站缺少按钮 ${expected}: ${JSON.stringify(metrics)}`
-    )
-  }
+  assert(
+    metrics.buttons.some((button) => button.includes('批量恢复')),
+    `${screenshotName} 回收站缺少按钮 批量恢复: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    !metrics.buttons.some((button) => button === '刷新'),
+    `${screenshotName} 回收站不应重复显示刷新按钮: ${JSON.stringify(metrics)}`
+  )
   for (const expected of expectedColumns) {
     assert(
       metrics.headers.some((header) => header.includes(expected)),
@@ -5948,6 +6475,12 @@ async function assertBusinessPageRefreshEntrypoint(page, { scenarioName }) {
         button.closest('.erp-business-operation-panel') &&
         /^刷新(?:当前页)?$/.test(String(button.textContent || '').trim())
     )
+    const contentRefreshButtons = allButtons.filter(
+      (button) =>
+        button.closest('.erp-admin-content') &&
+        !button.closest('.erp-admin-header') &&
+        String(button.textContent || '').trim() === '刷新'
+    )
     const headerButtons = refreshButtons.filter((button) =>
       button.closest('.erp-admin-header')
     )
@@ -5960,6 +6493,10 @@ async function assertBusinessPageRefreshEntrypoint(page, { scenarioName }) {
       ),
       operationRefreshButtonCount: operationRefreshButtons.length,
       operationRefreshButtonText: operationRefreshButtons.map((button) =>
+        String(button.textContent || '').trim()
+      ),
+      contentRefreshButtonCount: contentRefreshButtons.length,
+      contentRefreshButtonText: contentRefreshButtons.map((button) =>
         String(button.textContent || '').trim()
       ),
     }
@@ -5979,6 +6516,11 @@ async function assertBusinessPageRefreshEntrypoint(page, { scenarioName }) {
     metrics.operationRefreshButtonCount,
     0,
     `${scenarioName} 业务操作盒不应重复显示刷新按钮: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.contentRefreshButtonCount,
+    0,
+    `${scenarioName} 业务内容区不应重复显示局部刷新按钮: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.headerRefreshHasIcon,
@@ -7562,6 +8104,9 @@ async function assertBatchDeleteModalCountLayoutImpl(
             ...textareaRect,
             clientWidth: textarea.clientWidth,
             scrollWidth: textarea.scrollWidth,
+            paddingBottom: Number.parseFloat(
+              window.getComputedStyle(textarea).paddingBottom || '0'
+            ),
           }
         : null,
       count: countRect
@@ -7592,12 +8137,15 @@ async function assertBatchDeleteModalCountLayoutImpl(
     `${scenarioName} 删除原因字数统计文案异常: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.textareaWrapper.marginBottom >= metrics.count.height + 4,
-    `${scenarioName} 删除原因字数统计未预留独立底部空间: ${JSON.stringify(metrics)}`
+    metrics.count.top >= metrics.textarea.top + 4 &&
+      metrics.count.right <= metrics.textarea.right - 24 &&
+      metrics.count.bottom <= metrics.textarea.bottom - 4 &&
+      metrics.count.left >= metrics.textarea.left + 8,
+    `${scenarioName} 删除原因字数统计超出输入框边界: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.textarea.bottom <= metrics.count.top + 2,
-    `${scenarioName} 删除原因字数统计压进了输入框内容区: ${JSON.stringify(metrics)}`
+    metrics.textarea.paddingBottom >= metrics.count.height + 6,
+    `${scenarioName} 删除原因字数统计未预留内容底部空间: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.count.bottom + 8 <= metrics.footer.top,
@@ -8767,17 +9315,44 @@ function sameCSSColor(left, right) {
   )
 }
 
-async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
+async function assertBusinessModuleToolbarControlStyle(
+  page,
+  { scenarioName, requireSearch = true }
+) {
   const metrics = await page.evaluate(() => {
+    const measureTextWidth = (() => {
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+      return (text, font) => {
+        if (!context) return 0
+        context.font = font
+        return context.measureText(text).width
+      }
+    })()
     const readControlFromElement = (element, selector = '') => {
       const rect = element.getBoundingClientRect()
       const style = window.getComputedStyle(element)
+      const text = String(
+        element.textContent || element.getAttribute('placeholder') || ''
+      ).trim()
+      const dateTextInput = element.matches?.('.erp-business-date-input')
+        ? element.querySelector('input')
+        : null
+      const textSource = dateTextInput || element
+      const textSourceStyle = window.getComputedStyle(textSource)
+      const sampleText = element.matches?.('.erp-business-date-input')
+        ? dateTextInput?.value || dateTextInput?.placeholder || 'yyyy/mm/dd'
+        : text
+      const paddingX =
+        Number.parseFloat(textSourceStyle.paddingLeft || '0') +
+        Number.parseFloat(textSourceStyle.paddingRight || '0')
+      const textClientWidth = dateTextInput?.clientWidth || element.clientWidth
+      const textScrollWidth = dateTextInput?.scrollWidth || element.scrollWidth
       return {
         selector,
-        text: String(
-          element.textContent || element.getAttribute('placeholder') || ''
-        ).trim(),
+        text,
         cursor: style.cursor,
+        inputCursor: dateTextInput ? textSourceStyle.cursor : '',
         borderRadius: style.borderRadius,
         borderTopLeftRadius: style.borderTopLeftRadius,
         borderTopRightRadius: style.borderTopRightRadius,
@@ -8789,41 +9364,51 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
         bottom: rect.bottom,
         centerY: rect.top + rect.height / 2,
         width: rect.width,
-        scrollWidth: element.scrollWidth,
-        clientWidth: element.clientWidth,
+        scrollWidth: textScrollWidth,
+        clientWidth: textClientWidth,
+        effectiveTextWidth: Math.max(0, textClientWidth - paddingX),
+        requiredTextWidth: Math.ceil(
+          measureTextWidth(sampleText, style.font) + 6
+        ),
       }
     }
     const readControl = (selector) => {
       const element = document.querySelector(selector)
       return element ? readControlFromElement(element, selector) : null
     }
+    const filterRootSelectors = [
+      '.erp-business-operation-panel__filters',
+      '.erp-business-filter-panel__grid',
+    ]
+    const joinFilterRootSelector = (selector) =>
+      filterRootSelectors.map((root) => `${root} ${selector}`).join(', ')
+    const readFromFilterRoot = (selector) =>
+      readControl(joinFilterRootSelector(selector))
     const dateControls = Array.from(
       document.querySelectorAll(
-        '.erp-business-filter-panel .erp-business-date-range-filter'
+        joinFilterRootSelector('.erp-business-date-range-filter')
       )
     ).map((node) => readControlFromElement(node))
     const selectControls = Array.from(
       document.querySelectorAll(
-        '.erp-business-filter-panel__grid > .ant-select .ant-select-selector'
+        filterRootSelectors
+          .map((root) => `${root} > .ant-select .ant-select-selector`)
+          .join(', ')
       )
     ).map((node) => readControlFromElement(node))
     const filterControls = [
-      readControl('.erp-business-filter-panel .ant-input-affix-wrapper'),
+      readFromFilterRoot('.ant-input-affix-wrapper'),
       ...selectControls,
       ...dateControls,
     ].filter(Boolean)
 
     return {
-      search: readControl(
-        '.erp-business-filter-panel .ant-input-affix-wrapper'
-      ),
-      dateInput: readControl('.erp-business-filter-panel input[type="date"]'),
-      dateControl: readControl(
-        '.erp-business-filter-panel .erp-business-date-range-filter'
-      ),
+      search: readFromFilterRoot('.ant-input-affix-wrapper'),
+      dateInput: readFromFilterRoot('.erp-business-date-input'),
+      dateControl: readFromFilterRoot('.erp-business-date-range-filter'),
       dateInputs: Array.from(
         document.querySelectorAll(
-          '.erp-business-filter-panel input[type="date"]'
+          joinFilterRootSelector('.erp-business-date-input')
         )
       ).map((node) => readControlFromElement(node)),
       dateControls,
@@ -8844,12 +9429,16 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
       statusArrow: readControl(
         '.erp-business-filter-control--status .ant-select-arrow'
       ),
-      actionButton: readControl('.erp-business-module-toolbar .ant-btn'),
+      actionButton: readControl(
+        '.erp-business-operation-panel__toolbar .ant-btn, .erp-business-module-toolbar .ant-btn'
+      ),
     }
   })
 
+  const baselineControl = metrics.search || metrics.statusSelector
   assert(
-    metrics.search &&
+    (!requireSearch || metrics.search) &&
+      baselineControl &&
       metrics.dateInput &&
       metrics.dateControl &&
       metrics.dateInputs.length === 2 &&
@@ -8872,8 +9461,14 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
     `${scenarioName} 起止日期文字出现裁切: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.dateInputs.every((item) => item.width >= 136),
+    metrics.dateInputs.every((item) => item.width >= 160),
     `${scenarioName} 起止日期输入宽度不足以完整显示 yyyy/mm/dd: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.dateInputs.every(
+      (item) => item.effectiveTextWidth >= item.requiredTextWidth
+    ),
+    `${scenarioName} 起止日期可见文本区不足，日期组件会裁切 placeholder: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.dateInputs.every(
@@ -8883,15 +9478,35 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
   )
   assert(
     metrics.filterControls.every(
-      (item) => Math.abs(item.height - metrics.search.height) <= 1
+      (item) => Math.abs(item.height - baselineControl.height) <= 1
     ),
     `${scenarioName} 筛选输入框高度未统一: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.dateInput.cursor,
     'pointer',
-    `${scenarioName} 日期输入 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
+    `${scenarioName} 日期组件 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
   )
+  assert(
+    metrics.dateInputs.every((item) => item.inputCursor === 'pointer'),
+    `${scenarioName} 日期输入框 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
+  )
+  await page
+    .locator('.erp-business-date-range-filter .erp-business-date-input')
+    .first()
+    .click({ position: { x: 16, y: 16 } })
+  const datePanelVisible = await page
+    .waitForSelector(
+      '.ant-picker-dropdown:not(.ant-picker-dropdown-hidden) .ant-picker-panel',
+      { state: 'visible', timeout: 1500 }
+    )
+    .then(() => true)
+    .catch(() => false)
+  assert(
+    datePanelVisible,
+    `${scenarioName} 点击日期输入框文本区域后应打开日期面板`
+  )
+  await page.keyboard.press('Escape')
   assert.equal(
     metrics.actionButton.cursor,
     'pointer',
@@ -8899,32 +9514,34 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
   )
   assert.equal(
     metrics.dateControl.borderTopLeftRadius,
-    metrics.search.borderTopLeftRadius,
-    `${scenarioName} 日期控件左上圆角未对齐搜索框: ${JSON.stringify(metrics)}`
+    baselineControl.borderTopLeftRadius,
+    `${scenarioName} 日期控件左上圆角未对齐筛选控件: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.dateControl.borderBottomLeftRadius,
-    metrics.search.borderBottomLeftRadius,
-    `${scenarioName} 日期控件左下圆角未对齐搜索框: ${JSON.stringify(metrics)}`
+    baselineControl.borderBottomLeftRadius,
+    `${scenarioName} 日期控件左下圆角未对齐筛选控件: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.dateControl.borderTopRightRadius,
-    metrics.search.borderTopRightRadius,
-    `${scenarioName} 日期控件右上圆角未对齐搜索框: ${JSON.stringify(metrics)}`
+    baselineControl.borderTopRightRadius,
+    `${scenarioName} 日期控件右上圆角未对齐筛选控件: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.dateControl.borderBottomRightRadius,
-    metrics.search.borderBottomRightRadius,
-    `${scenarioName} 日期控件右下圆角未对齐搜索框: ${JSON.stringify(metrics)}`
+    baselineControl.borderBottomRightRadius,
+    `${scenarioName} 日期控件右下圆角未对齐筛选控件: ${JSON.stringify(metrics)}`
   )
-  assert.equal(
-    metrics.dateControl.borderColor,
-    metrics.search.borderColor,
-    `${scenarioName} 日期控件边框颜色未对齐搜索框: ${JSON.stringify(metrics)}`
-  )
+  if (metrics.search) {
+    assert.equal(
+      metrics.dateControl.borderColor,
+      metrics.search.borderColor,
+      `${scenarioName} 日期控件边框颜色未对齐搜索框: ${JSON.stringify(metrics)}`
+    )
+  }
   assert(
-    Math.abs(metrics.dateControl.height - metrics.search.height) <= 1,
-    `${scenarioName} 日期控件高度未对齐搜索框: ${JSON.stringify(metrics)}`
+    Math.abs(metrics.dateControl.height - baselineControl.height) <= 1,
+    `${scenarioName} 日期控件高度未对齐筛选控件: ${JSON.stringify(metrics)}`
   )
   assert(
     Math.abs(
@@ -9908,6 +10525,17 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
     const mainGrid = rectOf('.erp-workbench-main-grid')
     const queuePanel = rectOf('.erp-workbench-queue-panel')
     const detailPanel = rectOf('.erp-workbench-task-detail')
+    const detailHead = rectOf(
+      '.erp-workbench-task-detail .erp-workbench-panel-head'
+    )
+    const detailBody = rectOf('.erp-workbench-detail-body')
+    const detailTitle = rectOf('.erp-workbench-detail-title')
+    const detailDescriptions = rectOf(
+      '.erp-workbench-task-detail .ant-descriptions'
+    )
+    const detailActions = rectOf('.erp-workbench-detail-actions')
+    const detailEmpty = rectOf('.erp-workbench-detail-empty')
+    const detailEmptyContent = rectOf('.erp-workbench-detail-empty .ant-empty')
     const objectPulse = rectOf('.erp-workbench-object-pulse')
     const kpis = Array.from(document.querySelectorAll('.erp-workbench-kpi'))
       .map((node) => rectOf(node))
@@ -9931,6 +10559,13 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
       mainGrid,
       queuePanel,
       detailPanel,
+      detailHead,
+      detailBody,
+      detailTitle,
+      detailDescriptions,
+      detailActions,
+      detailEmpty,
+      detailEmptyContent,
       objectPulse,
       kpis,
       roleRows,
@@ -9946,8 +10581,8 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
   )
   assert.equal(
     metrics.kpis.length,
-    5,
-    `${scenarioName} 工作台应保留 5 个紧凑指标: ${JSON.stringify(metrics)}`
+    3,
+    `${scenarioName} 工作台应保留 3 个判断指标: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.queuePanel?.width > 0 &&
@@ -9959,6 +10594,48 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
     !metrics.queueDetailOverlap && !metrics.queuePulseOverlap,
     `${scenarioName} 工作台主列与右侧上下文不应重叠: ${JSON.stringify(metrics)}`
   )
+  assert(
+    metrics.detailHead?.height > 0,
+    `${scenarioName} 工作台任务详情头部应可见: ${JSON.stringify(metrics)}`
+  )
+  if (metrics.detailBody) {
+    assert(
+      metrics.detailTitle?.height > 0 &&
+        metrics.detailDescriptions?.height > 0 &&
+        metrics.detailActions?.height > 0,
+      `${scenarioName} 工作台任务详情正文、字段和动作区应同时可见: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.detailTitle.left >= metrics.detailPanel.left + 12 &&
+        metrics.detailDescriptions.left >= metrics.detailPanel.left + 12 &&
+        metrics.detailActions.left >= metrics.detailPanel.left + 12,
+      `${scenarioName} 工作台任务详情正文不应贴左边框: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.detailTitle.top >= metrics.detailHead.bottom + 12,
+      `${scenarioName} 工作台任务详情标题不应贴住头部分割线: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.detailActions.right <= metrics.detailPanel.right - 12 + 1 &&
+        metrics.detailActions.bottom <= metrics.detailPanel.bottom - 12 + 1,
+      `${scenarioName} 工作台任务详情动作区不应贴边或溢出: ${JSON.stringify(metrics)}`
+    )
+  } else {
+    assert(
+      metrics.detailEmpty?.height > 0,
+      `${scenarioName} 工作台任务详情空态应可见: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.detailEmptyContent?.height > 0 &&
+        metrics.detailEmptyContent.left >= metrics.detailPanel.left + 12 &&
+        metrics.detailEmptyContent.top >= metrics.detailHead.bottom + 12 &&
+        metrics.detailEmptyContent.right <=
+          metrics.detailPanel.right - 12 + 1 &&
+        metrics.detailEmptyContent.bottom <=
+          metrics.detailPanel.bottom - 12 + 1,
+      `${scenarioName} 工作台任务详情空态不应贴边或溢出: ${JSON.stringify(metrics)}`
+    )
+  }
   assert(
     metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 1,
     `${scenarioName} 工作台出现页面级横向溢出: ${JSON.stringify(metrics)}`
@@ -10018,8 +10695,6 @@ async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
     const lanes = rectOf('.erp-task-board-lanes')
     const filters = rectOf('.erp-task-board-filters')
     const tableCard = rectOf('.erp-dashboard-table-card')
-    const tableBody = rectOf('.erp-dashboard-table-card .ant-card-body')
-    const tableContent = rectOf('.erp-dashboard-table-card .ant-table-content')
     const visiblePageHeads = Array.from(
       document.querySelectorAll('.erp-admin-page-head')
     ).filter(isVisible).length
@@ -10056,14 +10731,12 @@ async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
       laneRects,
       overlappingLanePairs,
       tableCard,
-      tableBody,
-      tableContent,
       visiblePageHeads,
     }
   })
 
   assert(
-    metrics.boardCard && metrics.lanes && metrics.filters && metrics.tableCard,
+    metrics.boardCard && metrics.lanes && metrics.filters,
     `${scenarioName} 缺少任务看板布局关键节点: ${JSON.stringify(metrics)}`
   )
   assert(
@@ -10087,11 +10760,10 @@ async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
     0,
     `${scenarioName} 任务看板不应再渲染独立页面说明卡: ${JSON.stringify(metrics)}`
   )
-  assert(
-    metrics.tableCard.overflowX !== 'visible' ||
-      metrics.tableBody?.overflowX !== 'visible' ||
-      metrics.tableContent?.overflowX !== 'visible',
-    `${scenarioName} 任务表格未提供可控横向滚动容器: ${JSON.stringify(metrics)}`
+  assert.equal(
+    metrics.tableCard,
+    null,
+    `${scenarioName} 任务看板不应再重复渲染明细表: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 2,
@@ -10325,6 +10997,33 @@ async function assertNoHorizontalOverflow(page, scenarioName) {
   )
 }
 
+async function assertBusinessMainTableHasNoOperationColumn(
+  page,
+  { scenarioName }
+) {
+  const metrics = await page.evaluate(() => {
+    const tableCard = document.querySelector('.erp-business-data-table-card')
+    const headers = tableCard
+      ? Array.from(tableCard.querySelectorAll('.ant-table-thead th')).map(
+          (node) =>
+            String(node.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim()
+        )
+      : []
+    return { headers }
+  })
+
+  assert(
+    metrics.headers.length > 0,
+    `${scenarioName} 未找到业务主表表头: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    !metrics.headers.includes('操作'),
+    `${scenarioName} 业务主表不应再出现操作列: ${JSON.stringify(metrics)}`
+  )
+}
+
 async function assertBusinessHeaderHasNoSectionTitle(page, { scenarioName }) {
   const metrics = await page.evaluate(() => {
     const isVisible = (node) => {
@@ -10390,6 +11089,12 @@ async function assertBusinessHeaderStatsSingleLine(
   }
 ) {
   const metrics = await page.evaluate(() => {
+    const header = document.querySelector('.erp-business-page-header-card')
+    const headerRect = header?.getBoundingClientRect()
+    const grid = document.querySelector('.erp-business-page-header-card__grid')
+    const gridStyle = grid ? window.getComputedStyle(grid) : null
+    const main = document.querySelector('.erp-business-page-header-card__main')
+    const mainRect = main?.getBoundingClientRect()
     const stats = document.querySelector('.erp-business-module-stats')
     const statsRect = stats?.getBoundingClientRect()
     const statsStyle = stats ? window.getComputedStyle(stats) : null
@@ -10402,15 +11107,15 @@ async function assertBusinessHeaderStatsSingleLine(
       const label = tile.querySelector('.ant-typography')
       const labelRect = label?.getBoundingClientRect()
       const labelStyle = label ? window.getComputedStyle(label) : null
+      const badge = tile.querySelector('.erp-metric-readonly-card__badge')
+      const badgeRect = badge?.getBoundingClientRect()
       const tileStyle = window.getComputedStyle(tile)
       return {
         tagName: tile.tagName,
         role: tile.getAttribute('role'),
         cursor: tileStyle.cursor,
         text: tile.textContent?.replace(/\s+/g, ' ').trim() || '',
-        badge:
-          tile.querySelector('.erp-metric-readonly-card__badge')?.textContent ||
-          '',
+        badge: badge?.textContent || '',
         hasButton: Boolean(tile.querySelector('button')),
         top: rect.top,
         bottom: rect.bottom,
@@ -10423,18 +11128,44 @@ async function assertBusinessHeaderStatsSingleLine(
         labelWhiteSpace: labelStyle?.whiteSpace || '',
         labelTextOverflow: labelStyle?.textOverflow || '',
         labelOverflow: labelStyle?.overflow || '',
+        badgeLabelGap:
+          labelRect && badgeRect ? badgeRect.left - labelRect.right : null,
       }
     })
     return {
       viewportWidth: window.innerWidth,
       bodyScrollWidth: document.body.scrollWidth,
       docScrollWidth: document.documentElement.scrollWidth,
+      header: headerRect
+        ? {
+            left: headerRect.left,
+            right: headerRect.right,
+            width: headerRect.width,
+          }
+        : null,
+      grid: gridStyle
+        ? {
+            gridTemplateColumns: gridStyle.gridTemplateColumns,
+            alignItems: gridStyle.alignItems,
+          }
+        : null,
+      main: mainRect
+        ? {
+            left: mainRect.left,
+            right: mainRect.right,
+            width: mainRect.width,
+          }
+        : null,
       stats: statsRect
         ? {
+            left: statsRect.left,
+            right: statsRect.right,
             width: statsRect.width,
             scrollWidth: stats?.scrollWidth || 0,
             clientWidth: stats?.clientWidth || 0,
             flexWrap: statsStyle?.flexWrap || '',
+            justifySelf: statsStyle?.justifySelf || '',
+            justifyContent: statsStyle?.justifyContent || '',
           }
         : null,
       tiles,
@@ -10445,10 +11176,14 @@ async function assertBusinessHeaderStatsSingleLine(
     metrics.stats,
     `${scenarioName} 缺少业务页头部统计区: ${JSON.stringify(metrics)}`
   )
+  assert(
+    metrics.header,
+    `${scenarioName} 缺少业务页头部卡片: ${JSON.stringify(metrics)}`
+  )
   assert.equal(
     metrics.tiles.length,
-    4,
-    `${scenarioName} formal 业务页统计应保留总记录/当前结果/待处理/已选记录四项: ${JSON.stringify(metrics)}`
+    expectedLabels.length,
+    `${scenarioName} formal 业务页统计项数量不符合当前口径: ${JSON.stringify(metrics)}`
   )
   assert.deepEqual(
     metrics.tiles.map((tile) =>
@@ -10467,6 +11202,31 @@ async function assertBusinessHeaderStatsSingleLine(
         tile.hasButton === false
     ),
     `${scenarioName} 业务页头部统计应保持只读摘要，不应伪装成按钮: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.tiles.every(
+      (tile) =>
+        Number.isFinite(tile.badgeLabelGap) &&
+        tile.badgeLabelGap >= 2 &&
+        tile.badgeLabelGap <= 12
+    ),
+    `${scenarioName} 业务页头部摘要徽标应紧跟指标标签，不应被推到卡片最右: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.grid?.gridTemplateColumns?.split(' ').filter((item) => item.trim())
+      .length >= 2 && metrics.grid?.alignItems === 'center',
+    `${scenarioName} 桌面业务页头部应使用左标题右摘要的两列布局: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.main &&
+      metrics.stats.left >= metrics.main.right + 8 &&
+      metrics.header.right - metrics.stats.right <= 24,
+    `${scenarioName} 桌面业务页头部摘要组应位于标题右侧并贴近右边界: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.stats.justifySelf === 'end' &&
+      metrics.stats.justifyContent === 'end',
+    `${scenarioName} 桌面业务页头部摘要组应由共享布局右对齐: ${JSON.stringify(metrics)}`
   )
   assert.equal(
     metrics.stats.flexWrap,
@@ -10489,7 +11249,7 @@ async function assertBusinessHeaderStatsSingleLine(
         tile.width >= 116 &&
         tile.width <= 150 &&
         tile.height >= 48 &&
-        tile.height <= 68
+        tile.height <= 72
     ),
     `${scenarioName} 业务页头部统计卡尺寸异常: ${JSON.stringify(metrics)}`
   )

@@ -153,6 +153,7 @@ func TestSalesOrderRepoItemGuardsAndCancel(t *testing.T) {
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SO-ITEM", true)
 	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-SO", true)
 	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "PRD-SO-001", true)
+	productSKU := createSalesOrderTestProductSKU(t, ctx, client, product.ID, unit.ID, "SKU-SO-001")
 	inactiveProduct := createSalesOrderTestProduct(t, ctx, client, unit.ID, "PRD-SO-OFF", false)
 	inactiveUnit := createSalesOrderTestUnit(t, ctx, client, "BOX-SO", false)
 	orderDate := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
@@ -173,6 +174,7 @@ func TestSalesOrderRepoItemGuardsAndCancel(t *testing.T) {
 		SalesOrderID:        order.ID,
 		LineNo:              1,
 		ProductID:           product.ID,
+		ProductSkuID:        &productSKU.ID,
 		UnitID:              unit.ID,
 		ProductCodeSnapshot: &codeSnapshot,
 		OrderedQuantity:     qty,
@@ -184,6 +186,9 @@ func TestSalesOrderRepoItemGuardsAndCancel(t *testing.T) {
 	}
 	if item.LineStatus != biz.SalesOrderItemStatusOpen || !item.OrderedQuantity.Equal(qty) {
 		t.Fatalf("expected open ordered item, got %#v", item)
+	}
+	if item.ProductSkuID == nil || *item.ProductSkuID != productSKU.ID {
+		t.Fatalf("expected product SKU traceability saved, got %#v", item)
 	}
 	if _, err := uc.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
 		SalesOrderID:    order.ID,
@@ -226,6 +231,9 @@ func TestSalesOrderRepoItemGuardsAndCancel(t *testing.T) {
 	}
 	if updated.LineNo != 2 || !updated.OrderedQuantity.Equal(updatedQty) || updated.ProductCodeSnapshot != nil || updated.Amount != nil {
 		t.Fatalf("expected item updated and optional fields cleared, got %#v", updated)
+	}
+	if updated.ProductSkuID != nil {
+		t.Fatalf("expected product SKU traceability cleared on update without source, got %#v", updated)
 	}
 
 	removed, err := uc.RemoveSalesOrderItem(ctx, item.ID)
@@ -377,6 +385,21 @@ func createSalesOrderTestProduct(t *testing.T, ctx context.Context, client *ent.
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create test product failed: %v", err)
+	}
+	return row
+}
+
+func createSalesOrderTestProductSKU(t *testing.T, ctx context.Context, client *ent.Client, productID int, unitID int, code string) *ent.ProductSKU {
+	t.Helper()
+	row, err := client.ProductSKU.Create().
+		SetProductID(productID).
+		SetSkuCode(code).
+		SetSkuName(code).
+		SetDefaultUnitID(unitID).
+		SetIsActive(true).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create product SKU failed: %v", err)
 	}
 	return row
 }

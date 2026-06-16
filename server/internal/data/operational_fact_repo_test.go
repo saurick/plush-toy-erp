@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent/financefact"
@@ -263,6 +264,46 @@ func TestOperationalFactRepo_CreateShipmentDraftWithItemsRollsBackWhenItemFails(
 	}
 	if count := client.Shipment.Query().Where(shipment.ShipmentNo("SHP-TX-ROLLBACK-001")).CountX(ctx); count != 0 {
 		t.Fatalf("expected shipment header to rollback after item failure, got %d rows", count)
+	}
+}
+
+func TestOperationalFactRepo_ListShipmentsFiltersByPlannedShipDate(t *testing.T) {
+	ctx := context.Background()
+	data, _ := openInventoryRepoTestData(t, "operational_fact_shipment_date_filter")
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	earlyDate := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	targetDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	lateDate := time.Date(2026, 6, 30, 0, 0, 0, 0, time.UTC)
+
+	for _, item := range []struct {
+		no            string
+		plannedShipAt time.Time
+	}{
+		{no: "SHP-DATE-EARLY", plannedShipAt: earlyDate},
+		{no: "SHP-DATE-TARGET", plannedShipAt: targetDate},
+		{no: "SHP-DATE-LATE", plannedShipAt: lateDate},
+	} {
+		plannedShipAt := item.plannedShipAt
+		if _, err := repo.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
+			ShipmentNo:     item.no,
+			PlannedShipAt:  &plannedShipAt,
+			IdempotencyKey: item.no,
+		}); err != nil {
+			t.Fatalf("create shipment %s failed: %v", item.no, err)
+		}
+	}
+
+	rows, total, err := repo.ListShipments(ctx, biz.OperationalFactFilter{
+		DateField: "planned_ship_at",
+		DateFrom:  &targetDate,
+		DateTo:    &targetDate,
+		Limit:     20,
+	})
+	if err != nil {
+		t.Fatalf("list shipments by planned date failed: %v", err)
+	}
+	if total != 1 || len(rows) != 1 || rows[0].ShipmentNo != "SHP-DATE-TARGET" {
+		t.Fatalf("expected only target planned shipment, total=%d rows=%#v", total, rows)
 	}
 }
 

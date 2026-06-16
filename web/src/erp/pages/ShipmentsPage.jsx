@@ -3,23 +3,18 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   DeleteOutlined,
-  EyeOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
 import {
   Button,
-  Card,
   Empty,
   Form,
   Input,
   InputNumber,
   Modal,
   Popconfirm,
-  Select,
-  Space,
   Table,
   Tag,
-  Typography,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -32,14 +27,34 @@ import {
   shipShipment,
 } from '../api/operationalFactApi.mjs'
 import {
+  listSalesOrderItems,
+  listSalesOrders,
+} from '../api/masterDataOrderApi.mjs'
+import {
+  BusinessDataTable,
+  BusinessOperationPanel,
+  BusinessPageLayout,
+  DateInput,
+  DateRangeFilter,
+  PageHeaderCard,
+  SelectFilter,
+  SelectionActionBar,
+  ToolbarButton,
+} from '../components/business-list/BusinessListLayout.jsx'
+import SourceImportPickerModal from '../components/business-list/SourceImportPickerModal.jsx'
+import {
   compactParams,
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
   trimOptional,
 } from '../utils/masterDataOrderView.mjs'
+import {
+  createBusinessTablePagination,
+  getBusinessPaginationParams,
+  resetBusinessPaginationCurrent,
+} from '../utils/businessPagination.mjs'
 
-const { Paragraph, Text, Title } = Typography
 const BUSINESS_FORM_MODAL_WIDTH = 'min(920px, calc(100vw - 96px))'
 
 const STATUS_OPTIONS = [
@@ -47,6 +62,11 @@ const STATUS_OPTIONS = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已出货', value: 'SHIPPED' },
   { label: '已取消', value: 'CANCELLED' },
+]
+
+const DATE_FILTER_OPTIONS = [
+  { label: '计划出货', value: 'planned_ship_at' },
+  { label: '实际出货', value: 'shipped_at' },
 ]
 
 const STATUS_LABELS = Object.freeze({
@@ -122,6 +142,47 @@ function buildShipmentWithItemsParams(values = {}) {
     ...buildShipmentParams(values),
     items: (values.items || []).map((item) => buildShipmentItemParams(item)),
   }
+}
+
+function salesOrderCustomerText(order = {}) {
+  const snapshot = order.customer_snapshot
+  if (typeof snapshot === 'string') {
+    return snapshot
+  }
+  return (
+    snapshot?.name ||
+    snapshot?.short_name ||
+    snapshot?.code ||
+    (order.customer_id ? `客户 #${order.customer_id}` : '')
+  )
+}
+
+function createShipmentItemFromSalesOrderItem(item, shipmentID) {
+  const sourceItem = item || {}
+  return {
+    shipment_id: shipmentID,
+    sales_order_item_id: sourceItem.id,
+    product_id: sourceItem.product_id,
+    warehouse_id: undefined,
+    lot_id: undefined,
+    unit_id: sourceItem.unit_id,
+    quantity: sourceItem.ordered_quantity || '',
+    note: sourceItem.product_name_snapshot
+      ? `来源销售订单行：${sourceItem.product_name_snapshot}`
+      : '',
+  }
+}
+
+function isBlankShipmentItem(item = {}) {
+  return [
+    item.sales_order_item_id,
+    item.product_id,
+    item.warehouse_id,
+    item.lot_id,
+    item.unit_id,
+    item.quantity,
+    item.note,
+  ].every((value) => value === undefined || value === null || value === '')
 }
 
 function createBlankShipmentItem(shipmentID) {
@@ -208,7 +269,7 @@ function ShipmentFormFields({ disabled = false }) {
         label="计划出货日期"
         name="planned_ship_at"
       >
-        <Input type="date" disabled={disabled} />
+        <DateInput disabled={disabled} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
@@ -333,9 +394,17 @@ export default function ShipmentsPage() {
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [statusFilter, setStatusFilter] = useState('')
+  const [dateFilterField, setDateFilterField] = useState('planned_ship_at')
+  const [dateFilterStart, setDateFilterStart] = useState('')
+  const [dateFilterEnd, setDateFilterEnd] = useState('')
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [selectedRow, setSelectedRow] = useState(null)
   const [shipmentModal, setShipmentModal] = useState(null)
+  const [salesOrderSources, setSalesOrderSources] = useState([])
+  const [sourceLoading, setSourceLoading] = useState(false)
+  const [salesOrderImportOpen, setSalesOrderImportOpen] = useState(false)
   const [shipmentForm] = Form.useForm()
 
   const canCreate = hasPermission(adminProfile, 'shipment.create')
@@ -346,22 +415,44 @@ export default function ShipmentsPage() {
     setLoading(true)
     try {
       const data = await listShipments(
-        compactParams({ status: statusFilter, limit: 100, offset: 0 })
+        compactParams({
+          status: statusFilter,
+          date_field: dateFilterField,
+          date_from: dateFilterStart || undefined,
+          date_to: dateFilterEnd || undefined,
+          ...getBusinessPaginationParams(pagination),
+        })
       )
-      setRows(Array.isArray(data?.shipments) ? data.shipments : [])
+      const nextRows = Array.isArray(data?.shipments) ? data.shipments : []
+      setRows(nextRows)
+      setSelectedRow((current) =>
+        current?.id
+          ? nextRows.find((item) => item.id === current.id) || current
+          : null
+      )
       setTotal(Number(data?.total || 0))
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载出货单'))
     } finally {
       setLoading(false)
     }
-  }, [statusFilter])
+  }, [
+    dateFilterEnd,
+    dateFilterField,
+    dateFilterStart,
+    pagination,
+    statusFilter,
+  ])
 
   useEffect(() => {
     loadRows()
   }, [loadRows])
 
-  const selectedShipment = useMemo(() => {
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(loadRows)
+  }, [loadRows, outletContext])
+
+  const modalSelectedShipment = useMemo(() => {
     const shipment = shipmentModal?.shipment
     if (!shipment?.id) return null
     return rows.find((item) => item.id === shipment.id) || shipment
@@ -370,7 +461,107 @@ export default function ShipmentsPage() {
   const shipmentModalMode = shipmentModal?.mode || ''
   const isCreateModal = shipmentModalMode === 'create'
   const isAppendModal = shipmentModalMode === 'append'
-  const isViewModal = shipmentModalMode === 'view'
+  const salesOrderImportColumns = useMemo(
+    () => [
+      {
+        title: '销售订单号',
+        dataIndex: 'order_no',
+        width: 160,
+        searchText: (order) =>
+          [
+            order.order_no,
+            order.customer_order_no,
+            salesOrderCustomerText(order),
+          ].join(' '),
+      },
+      { title: '客户订单号', dataIndex: 'customer_order_no', width: 140 },
+      {
+        title: '客户',
+        width: 190,
+        render: (_, order) => salesOrderCustomerText(order) || '-',
+        searchText: (order) => salesOrderCustomerText(order),
+      },
+      {
+        title: '状态',
+        dataIndex: 'lifecycle_status',
+        width: 110,
+      },
+      {
+        title: '计划交付',
+        dataIndex: 'planned_delivery_date',
+        width: 120,
+        render: formatUnixDate,
+      },
+    ],
+    []
+  )
+
+  const loadSalesOrderSources = useCallback(async () => {
+    setSourceLoading(true)
+    try {
+      const data = await listSalesOrders({
+        lifecycle_status: 'active',
+        limit: 100,
+      })
+      setSalesOrderSources(
+        Array.isArray(data?.sales_orders) ? data.sales_orders : []
+      )
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载销售订单来源'))
+    } finally {
+      setSourceLoading(false)
+    }
+  }, [])
+
+  const openSalesOrderImport = () => {
+    setSalesOrderImportOpen(true)
+    loadSalesOrderSources()
+  }
+
+  const importSalesOrderToShipment = async (orders = []) => {
+    const sourceOrder = orders[0]
+    if (!sourceOrder?.id) return
+    try {
+      setSourceLoading(true)
+      const data = await listSalesOrderItems({
+        sales_order_id: sourceOrder.id,
+        line_status: 'open',
+        limit: 200,
+      })
+      const sourceItems = Array.isArray(data?.sales_order_items)
+        ? data.sales_order_items
+        : []
+      shipmentForm.setFieldsValue({
+        sales_order_id: sourceOrder.id,
+        customer_id: sourceOrder.customer_id,
+        customer_snapshot: salesOrderCustomerText(sourceOrder),
+      })
+      if (sourceItems.length > 0) {
+        const currentItems = (shipmentForm.getFieldValue('items') || []).filter(
+          (item) => !isBlankShipmentItem(item)
+        )
+        shipmentForm.setFieldsValue({
+          items: [
+            ...currentItems,
+            ...sourceItems.map((item) =>
+              createShipmentItemFromSalesOrderItem(
+                item,
+                modalSelectedShipment?.id
+              )
+            ),
+          ],
+        })
+        message.success('已导入销售订单来源和出货明细')
+      } else {
+        message.warning('已带出销售订单信息，但该订单暂无可导入明细')
+      }
+      setSalesOrderImportOpen(false)
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '导入销售订单来源'))
+    } finally {
+      setSourceLoading(false)
+    }
+  }
 
   const openCreate = () => {
     shipmentForm.resetFields()
@@ -380,15 +571,6 @@ export default function ShipmentsPage() {
       items: [createBlankShipmentItem()],
     })
     setShipmentModal({ mode: 'create', shipment: null })
-  }
-
-  const openView = (shipment) => {
-    shipmentForm.resetFields()
-    shipmentForm.setFieldsValue({
-      ...shipmentFormValues(shipment),
-      items: [],
-    })
-    setShipmentModal({ mode: 'view', shipment })
   }
 
   const openAppendItems = (shipment) => {
@@ -401,6 +583,7 @@ export default function ShipmentsPage() {
   }
 
   const closeShipmentModal = () => {
+    setSalesOrderImportOpen(false)
     setShipmentModal(null)
     shipmentForm.resetFields()
   }
@@ -418,7 +601,6 @@ export default function ShipmentsPage() {
   }
 
   const submitShipmentModal = async () => {
-    if (isViewModal) return
     try {
       const values = await shipmentForm.validateFields()
       setSaving(true)
@@ -426,7 +608,7 @@ export default function ShipmentsPage() {
         await createShipmentWithItems(buildShipmentWithItemsParams(values))
         message.success('出货单草稿和明细已保存')
       } else if (isAppendModal) {
-        await addShipmentItems(selectedShipment?.id, values.items || [])
+        await addShipmentItems(modalSelectedShipment?.id, values.items || [])
         message.success('出货明细已保存')
       }
       closeShipmentModal()
@@ -500,130 +682,188 @@ export default function ShipmentsPage() {
       dataIndex: 'note',
       ellipsis: true,
     },
-    {
-      title: '操作',
-      width: 280,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space wrap>
-          <Button
-            size="small"
-            icon={<EyeOutlined />}
-            onClick={() => openView(record)}
-          >
-            查看
-          </Button>
-          {record.status === 'DRAFT' ? (
-            <Button
-              size="small"
-              icon={<PlusOutlined />}
-              disabled={!canCreate || saving}
-              onClick={() => openAppendItems(record)}
-            >
-              加行
-            </Button>
-          ) : null}
-          {record.status === 'DRAFT' ? (
-            <Popconfirm
-              title="确认出货并写库存 OUT？"
-              onConfirm={() =>
-                runShipmentAction(record, shipShipment, '确认出货')
-              }
-              okText="确认"
-              cancelText="取消"
-            >
-              <Button
-                size="small"
-                type="primary"
-                icon={<CheckCircleOutlined />}
-                disabled={!canShip || saving}
-              >
-                出货
-              </Button>
-            </Popconfirm>
-          ) : null}
-          {record.status === 'SHIPPED' ? (
-            <Popconfirm
-              title="确认取消并写出库冲正？"
-              onConfirm={() =>
-                runShipmentAction(record, cancelShipment, '取消出货')
-              }
-              okText="确认"
-              cancelText="取消"
-            >
-              <Button
-                size="small"
-                danger
-                icon={<CloseCircleOutlined />}
-                disabled={!canCancel || saving}
-              >
-                取消
-              </Button>
-            </Popconfirm>
-          ) : null}
-        </Space>
-      ),
-    },
   ]
+  const selectedRowLabel = selectedRow
+    ? `${selectedRow.shipment_no || selectedRow.id} / ${
+        selectedRow.customer_snapshot ||
+        (selectedRow.customer_id
+          ? `客户 #${selectedRow.customer_id}`
+          : '未指定客户')
+      }`
+    : '请先选择一张出货单'
 
   return (
-    <Space direction="vertical" size={16} className="erp-dashboard-page">
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" size={8}>
-          <Title level={2} className="erp-dashboard-title">
-            出货单
-          </Title>
-          <Paragraph className="erp-dashboard-summary">
-            出货单对应 shipments / shipment_items。出货放行只表示可发货，
-            出库管理只看库存出库事实；只有本页确认出货后的 SHIPPED
-            才是真实出货事实，并由后端写 inventory_txns.OUT。
-          </Paragraph>
-          <Space wrap>
-            <Tag color="gold">出货放行：可发货</Tag>
-            <Tag color="blue">出货单：已出货事实</Tag>
-            <Tag color="green">出库管理：库存出库事实</Tag>
-          </Space>
-        </Space>
-      </Card>
+    <BusinessPageLayout className="erp-v1-shipments-page">
+      <PageHeaderCard
+        compact
+        title="出货单"
+        description="出货单对应 shipments / shipment_items；只有确认出货后的 SHIPPED 才是真实出货事实，并由后端写 inventory_txns.OUT。"
+        tags={[
+          <Tag color="gold" key="release">
+            出货放行：可发货
+          </Tag>,
+          <Tag color="blue" key="shipment">
+            出货单：已出货事实
+          </Tag>,
+          <Tag color="green" key="inventory">
+            出库管理：库存出库事实
+          </Tag>,
+        ]}
+        stats={[
+          { key: 'total', label: '总出货单', value: total },
+          { key: 'current', label: '当前结果', value: rows.length },
+          {
+            key: 'draft',
+            label: '草稿',
+            value: rows.filter((item) => item.status === 'DRAFT').length,
+          },
+          { key: 'selected', label: '已选出货单', value: selectedRow ? 1 : 0 },
+        ]}
+      />
 
-      <Card className="erp-dashboard-table-card" variant="borderless">
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <Space
-            wrap
-            style={{ justifyContent: 'space-between', width: '100%' }}
+      <BusinessOperationPanel
+        compact
+        filters={
+          <>
+            <SelectFilter
+              className="erp-business-filter-control--status"
+              value={statusFilter}
+              options={STATUS_OPTIONS}
+              onChange={(nextStatus) => {
+                setStatusFilter(nextStatus)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <DateRangeFilter
+              options={DATE_FILTER_OPTIONS}
+              value={dateFilterField}
+              onTypeChange={(value) => {
+                setDateFilterField(value || 'planned_ship_at')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              startValue={dateFilterStart}
+              endValue={dateFilterEnd}
+              onStartChange={(nextStart) => {
+                setDateFilterStart(nextStart)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              onEndChange={(nextEnd) => {
+                setDateFilterEnd(nextEnd)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+          </>
+        }
+        primaryAction={
+          <ToolbarButton
+            type="primary"
+            className="erp-business-list-toolbar__primary-action"
+            icon={<PlusOutlined />}
+            disabled={!canCreate}
+            onClick={openCreate}
           >
-            <Space wrap>
-              <Select
-                value={statusFilter}
-                options={STATUS_OPTIONS}
-                style={{ width: 140 }}
-                onChange={setStatusFilter}
-              />
-              <Text type="secondary">共 {total} 条</Text>
-            </Space>
-            <Space wrap>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                disabled={!canCreate}
-                onClick={openCreate}
-              >
-                新建草稿
-              </Button>
-            </Space>
-          </Space>
+            新建草稿
+          </ToolbarButton>
+        }
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedRow ? 1 : 0}
+          selectedLabel={selectedRowLabel}
+        >
+          <Button
+            type="link"
+            size="small"
+            disabled={!selectedRow}
+            onClick={() => setSelectedRow(null)}
+          >
+            清空已选
+          </Button>
+          <Button
+            size="small"
+            icon={<PlusOutlined />}
+            disabled={
+              !selectedRow ||
+              selectedRow.status !== 'DRAFT' ||
+              !canCreate ||
+              saving
+            }
+            onClick={() => openAppendItems(selectedRow)}
+          >
+            添加明细
+          </Button>
+          <Popconfirm
+            title="确认出货并写库存 OUT？"
+            onConfirm={() =>
+              runShipmentAction(selectedRow, shipShipment, '确认出货')
+            }
+            okText="确认"
+            cancelText="取消"
+          >
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              disabled={
+                !selectedRow ||
+                selectedRow.status !== 'DRAFT' ||
+                !canShip ||
+                saving
+              }
+            >
+              出货
+            </Button>
+          </Popconfirm>
+          <Popconfirm
+            title="确认取消并写出库冲正？"
+            onConfirm={() =>
+              runShipmentAction(selectedRow, cancelShipment, '取消出货')
+            }
+            okText="确认"
+            cancelText="取消"
+          >
+            <Button
+              size="small"
+              danger
+              icon={<CloseCircleOutlined />}
+              disabled={
+                !selectedRow ||
+                selectedRow.status !== 'SHIPPED' ||
+                !canCancel ||
+                saving
+              }
+            >
+              取消
+            </Button>
+          </Popconfirm>
+        </SelectionActionBar>
+      </BusinessOperationPanel>
 
-          <Table
-            rowKey="id"
-            loading={loading}
-            dataSource={rows}
-            columns={columns}
-            pagination={{ pageSize: 20, showSizeChanger: false }}
-            locale={{ emptyText: <Empty description="暂无出货单" /> }}
-            scroll={{ x: 1320 }}
-          />
-        </Space>
-      </Card>
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        dataSource={rows}
+        columns={columns}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+        })}
+        emptyDescription="暂无出货单"
+        scroll={{ x: 1320 }}
+        rowSelection={{
+          type: 'radio',
+          selectedRowKeys: selectedRow ? [selectedRow.id] : [],
+          onChange: (_keys, selectedRows) =>
+            setSelectedRow(selectedRows[0] || null),
+        }}
+        rowClassName={(record) =>
+          record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () => setSelectedRow(record),
+        })}
+      />
 
       <Modal
         className="erp-business-action-modal erp-business-action-modal--form"
@@ -634,7 +874,7 @@ export default function ShipmentsPage() {
                 ? '新建出货单'
                 : isAppendModal
                   ? '维护出货明细'
-                  : '查看出货单'}
+                  : '维护出货明细'}
             </span>
             <small>
               出货单弹窗上方维护主表字段，下方维护出货明细；新建保存由后端事务一次写入。
@@ -645,14 +885,9 @@ export default function ShipmentsPage() {
         onCancel={closeShipmentModal}
         onOk={submitShipmentModal}
         okText="保存"
-        cancelText={isViewModal ? '关闭' : '取消'}
+        cancelText="取消"
         confirmLoading={saving}
-        okButtonProps={{ disabled: isViewModal || !canCreate }}
-        footer={
-          isViewModal ? (
-            <Button onClick={closeShipmentModal}>关闭</Button>
-          ) : undefined
-        }
+        okButtonProps={{ disabled: !canCreate }}
         width={BUSINESS_FORM_MODAL_WIDTH}
         centered
         forceRender
@@ -664,71 +899,117 @@ export default function ShipmentsPage() {
           className="erp-business-action-form"
         >
           <ShipmentFormFields disabled={!isCreateModal} />
-          {selectedShipment ? (
+          {modalSelectedShipment ? (
             <section className="erp-master-contact-list erp-shipment-modal-items">
               <div className="erp-master-contact-list__head">
                 <div>
                   <strong>已保存出货明细</strong>
                   <span>当前出货单已保存的明细只读展示。</span>
                 </div>
-                <Tag>{selectedShipment.items?.length || 0} 行</Tag>
+                <Tag>{modalSelectedShipment.items?.length || 0} 行</Tag>
               </div>
-              <ShipmentItemsTable items={selectedShipment.items || []} />
+              <ShipmentItemsTable items={modalSelectedShipment.items || []} />
             </section>
           ) : null}
-          {!isViewModal ? (
-            <Form.List name="items">
-              {(fields, { add, remove }) => (
-                <section className="erp-master-contact-list erp-shipment-modal-items">
-                  <div className="erp-master-contact-list__head">
-                    <div>
-                      <strong>
-                        {isCreateModal ? '出货明细' : '新增出货明细'}
-                      </strong>
-                      <span>
-                        明细随当前弹窗保存；库存 OUT 仍由确认出货动作写入。
-                      </span>
+          <Form.List name="items">
+            {(fields, { add, remove }) => (
+              <section className="erp-master-contact-list erp-shipment-modal-items">
+                <div className="erp-master-contact-list__head">
+                  <div>
+                    <strong>
+                      {isCreateModal ? '出货明细' : '新增出货明细'}
+                    </strong>
+                    <span>
+                      明细随当前弹窗保存；可从销售订单导入来源，库存 OUT
+                      仍由确认出货动作写入。
+                    </span>
+                  </div>
+                </div>
+                <div className="erp-line-items-form__import-row">
+                  <div className="erp-line-items-form__import-copy">
+                    <strong>从销售订单导入</strong>
+                    <span>
+                      先选择销售订单来源；产品、单位和订单行追溯带回主弹窗，仓库
+                      / 批次仍在出货明细里补齐。
+                    </span>
+                  </div>
+                  <Button
+                    className="erp-line-items-form__import-button"
+                    onClick={openSalesOrderImport}
+                  >
+                    从销售订单导入
+                  </Button>
+                </div>
+                <SourceImportPickerModal
+                  open={salesOrderImportOpen}
+                  title="从销售订单导入出货明细"
+                  description="这里只选择来源销售订单；导入后回到主弹窗维护本次出货数量、仓库和批次。"
+                  rows={salesOrderSources}
+                  columns={salesOrderImportColumns}
+                  multiple={false}
+                  loading={sourceLoading}
+                  getSelectedLabel={(order) =>
+                    order?.order_no ||
+                    order?.customer_order_no ||
+                    order?.id ||
+                    '-'
+                  }
+                  searchPlaceholder="搜索销售订单号、客户订单号或客户"
+                  emptyDescription="暂无可导入销售订单"
+                  onCancel={() => setSalesOrderImportOpen(false)}
+                  onImport={importSalesOrderToShipment}
+                />
+                <div className="erp-master-contact-list__items">
+                  {fields.map((field) => (
+                    <div
+                      className="erp-master-contact-list__row"
+                      key={field.key}
+                    >
+                      <div className="erp-master-contact-list__row-head">
+                        <strong>明细 {field.name + 1}</strong>
+                        <Button
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          disabled={fields.length <= 1}
+                          onClick={() => remove(field.name)}
+                        >
+                          删除
+                        </Button>
+                      </div>
+                      <div className="erp-master-contact-list__grid">
+                        <ShipmentItemFormFields field={field} />
+                      </div>
                     </div>
+                  ))}
+                </div>
+                <div className="erp-line-items-form__footer">
+                  <div className="erp-line-items-form__footer-actions">
                     <Button
-                      size="small"
+                      type="dashed"
                       icon={<PlusOutlined />}
                       onClick={() =>
-                        add(createBlankShipmentItem(selectedShipment?.id))
+                        add(createBlankShipmentItem(modalSelectedShipment?.id))
                       }
                     >
-                      添加明细
+                      添加条目
                     </Button>
                   </div>
-                  <div className="erp-master-contact-list__items">
-                    {fields.map((field) => (
-                      <div
-                        className="erp-master-contact-list__row"
-                        key={field.key}
-                      >
-                        <div className="erp-master-contact-list__row-head">
-                          <strong>明细 {field.name + 1}</strong>
-                          <Button
-                            danger
-                            size="small"
-                            icon={<DeleteOutlined />}
-                            disabled={fields.length <= 1}
-                            onClick={() => remove(field.name)}
-                          >
-                            删除
-                          </Button>
-                        </div>
-                        <div className="erp-master-contact-list__grid">
-                          <ShipmentItemFormFields field={field} />
-                        </div>
-                      </div>
-                    ))}
+                  <div className="erp-line-items-form__stats">
+                    <span className="erp-line-items-form__stat">
+                      已录入
+                      <strong className="erp-line-items-form__stat-value">
+                        {fields.length}
+                      </strong>
+                      条
+                    </span>
                   </div>
-                </section>
-              )}
-            </Form.List>
-          ) : null}
+                </div>
+              </section>
+            )}
+          </Form.List>
         </Form>
       </Modal>
-    </Space>
+    </BusinessPageLayout>
   )
 }

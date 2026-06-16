@@ -1,0 +1,1057 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>审计日志页原型</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f3f7f4;
+        --side: #eef6ef;
+        --panel: #ffffff;
+        --panel-soft: #f8fbf9;
+        --line: #d9e4de;
+        --line-strong: #bfcdc5;
+        --text: #172033;
+        --muted: #667588;
+        --green: #17724c;
+        --green-soft: #e9f6ef;
+        --blue: #1d62b7;
+        --blue-soft: #eaf3ff;
+        --amber: #a86107;
+        --amber-soft: #fff5e5;
+        --red: #bd3b45;
+        --red-soft: #fff1f2;
+        --slate-soft: #edf2f1;
+        --shadow: 0 16px 38px rgb(15 23 42 / 8%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101822;
+          --side: #132019;
+          --panel: #182333;
+          --panel-soft: #202d3e;
+          --line: #334254;
+          --line-strong: #4a5a6f;
+          --text: #edf3f8;
+          --muted: #a8b6c8;
+          --green: #7fd8ac;
+          --green-soft: #173a2a;
+          --blue: #79aaff;
+          --blue-soft: #1f3659;
+          --amber: #efbd68;
+          --amber-soft: #463214;
+          --red: #ff9ba4;
+          --red-soft: #4a2229;
+          --slate-soft: #263342;
+          --shadow: 0 18px 44px rgb(0 0 0 / 30%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 240px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .side {
+        border-right: 1px solid var(--line);
+        background: var(--side);
+        padding: 18px 12px;
+      }
+
+      .brand {
+        display: grid;
+        grid-template-columns: 40px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: #225f99;
+        color: #fff;
+        font-size: 19px;
+        font-weight: 760;
+      }
+
+      .brand strong,
+      .brand span,
+      .nav-item {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span,
+      .nav-title,
+      .muted,
+      .crumb {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .nav-title {
+        padding: 12px 10px 6px;
+      }
+
+      .nav-item {
+        min-height: 36px;
+        border-radius: 8px;
+        padding: 8px 10px;
+      }
+
+      .nav-item.active {
+        background: color-mix(in srgb, var(--green-soft) 82%, var(--panel));
+        color: var(--green);
+        font-weight: 720;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        padding: 14px 22px;
+        backdrop-filter: blur(10px);
+      }
+
+      .topbar h1 {
+        margin: 2px 0 0;
+        font-size: 18px;
+        line-height: 1.25;
+      }
+
+      .toolbar-actions,
+      .chips,
+      .row-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn,
+      .chip {
+        min-height: 34px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 12px;
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #fff;
+      }
+
+      .btn.text {
+        border-color: transparent;
+        background: transparent;
+        color: var(--blue);
+      }
+
+      .chip[aria-pressed="true"] {
+        border-color: var(--blue);
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-weight: 700;
+      }
+
+      .content {
+        padding: 20px 22px 32px;
+      }
+
+      .page {
+        display: grid;
+        gap: 14px;
+        max-width: 1440px;
+      }
+
+      .panel {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: center;
+        padding: 18px 20px;
+      }
+
+      .hero h2 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        line-height: 1.25;
+      }
+
+      .hero p {
+        max-width: 760px;
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .scope-note {
+        max-width: 360px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        padding: 10px 12px;
+      }
+
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .metric {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 13px 14px;
+      }
+
+      .metric span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      .metric.risk {
+        border-color: color-mix(in srgb, var(--red) 38%, var(--line));
+        background: var(--red-soft);
+      }
+
+      .filters-panel {
+        padding: 14px;
+      }
+
+      .filters-grid {
+        display: grid;
+        grid-template-columns: 1.1fr 1fr 1fr 1.5fr auto;
+        gap: 10px;
+        align-items: end;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      input,
+      select {
+        width: 100%;
+        min-width: 0;
+        height: 36px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 10px;
+        outline: none;
+      }
+
+      input:focus,
+      select:focus {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 16%, transparent);
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+        gap: 14px;
+        align-items: start;
+      }
+
+      .table-panel {
+        overflow: hidden;
+      }
+
+      .table-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+      }
+
+      .table-head h3,
+      .detail-head h3 {
+        margin: 0;
+        font-size: 16px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 940px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 11px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      tbody tr {
+        background: var(--panel);
+      }
+
+      tbody tr:hover,
+      tbody tr.active {
+        background: color-mix(in srgb, var(--blue-soft) 58%, var(--panel));
+      }
+
+      .event-key,
+      .request-id,
+      .object-text {
+        overflow-wrap: anywhere;
+      }
+
+      .event-key {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .tag {
+        display: inline-flex;
+        max-width: 100%;
+        min-height: 24px;
+        align-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--slate-soft);
+        color: var(--text);
+        font-size: 12px;
+        padding: 2px 8px;
+      }
+
+      .tag.risk-high {
+        border-color: color-mix(in srgb, var(--red) 42%, var(--line));
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .tag.risk-mid {
+        border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .tag.ok {
+        border-color: color-mix(in srgb, var(--green) 35%, var(--line));
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .summary-cell {
+        max-width: 360px;
+        color: var(--muted);
+      }
+
+      .detail {
+        position: sticky;
+        top: 80px;
+        overflow: hidden;
+      }
+
+      .detail-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+      }
+
+      .detail-body {
+        display: grid;
+        gap: 12px;
+        padding: 14px 16px 16px;
+      }
+
+      .detail-kv {
+        display: grid;
+        grid-template-columns: 92px minmax(0, 1fr);
+        gap: 8px;
+        align-items: start;
+      }
+
+      .detail-kv span:first-child {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .code-block {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: var(--text);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+        padding: 10px;
+        white-space: pre-wrap;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 8px;
+        border-left: 2px solid var(--line);
+        margin-left: 6px;
+        padding-left: 12px;
+      }
+
+      .timeline-item strong {
+        display: block;
+      }
+
+      .empty {
+        display: none;
+        min-height: 300px;
+        place-items: center;
+        border-top: 1px solid var(--line);
+        padding: 34px 18px;
+        text-align: center;
+      }
+
+      .empty-card {
+        max-width: 520px;
+      }
+
+      .empty-visual {
+        display: grid;
+        place-items: center;
+        width: 80px;
+        height: 80px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        font-size: 28px;
+        font-weight: 760;
+        margin: 0 auto 14px;
+      }
+
+      .empty h3 {
+        margin: 0 0 8px;
+      }
+
+      .empty p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .table-panel.empty-mode .table-wrap,
+      .table-panel.empty-mode .table-head .muted {
+        display: none;
+      }
+
+      .table-panel.empty-mode .empty {
+        display: grid;
+      }
+
+      .footer-note {
+        border: 1px dashed var(--line-strong);
+        border-radius: 8px;
+        background: var(--panel-soft);
+        color: var(--muted);
+        padding: 12px 14px;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      @media (max-width: 1180px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .side {
+          display: none;
+        }
+
+        .workspace {
+          grid-template-columns: 1fr;
+        }
+
+        .detail {
+          position: static;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .topbar,
+        .hero {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .hero {
+          grid-template-columns: 1fr;
+        }
+
+        .metrics,
+        .filters-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .content {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="side" aria-label="示例导航">
+        <div class="brand">
+          <div class="brand-mark">绒</div>
+          <div>
+            <strong>毛绒玩具 ERP</strong>
+            <span>管理后台</span>
+          </div>
+        </div>
+        <div class="nav-title">生产管理</div>
+        <div class="nav-item">生产排程</div>
+        <div class="nav-item">生产进度</div>
+        <div class="nav-title">出货管理</div>
+        <div class="nav-item">出货放行</div>
+        <div class="nav-item">出货单</div>
+        <div class="nav-title">系统管理</div>
+        <div class="nav-item">权限管理</div>
+        <div class="nav-item active">审计日志</div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <div class="crumb">ERP / 系统管理 / 审计日志</div>
+            <h1>审计日志</h1>
+          </div>
+          <div class="toolbar-actions" aria-label="页面动作">
+            <button class="btn" type="button" id="emptyToggle">查看空态</button>
+            <button class="btn" type="button" id="riskToggle">只看高风险</button>
+            <button class="btn primary" type="button" id="resetButton">恢复默认</button>
+          </div>
+        </header>
+
+        <div class="content">
+          <div class="page">
+            <section class="panel hero" aria-labelledby="page-title">
+              <div>
+                <h2 id="page-title">系统控制面审计追踪</h2>
+                <p>
+                  只读查看账号、角色、权限和启动初始化事件。业务事实仍回到各领域事实表，本页只回答系统管理动作是否可追溯。
+                </p>
+              </div>
+              <div class="scope-note">
+                当前原型只表达页面骨架和交互；真实事件、权限、保留周期和导出策略仍需回到后端 API 与正式文档评审。
+              </div>
+            </section>
+
+            <section class="metrics" aria-label="审计摘要">
+              <article class="metric">
+                <span>近 24 小时事件</span>
+                <strong id="totalMetric">24</strong>
+              </article>
+              <article class="metric risk">
+                <span>高风险事件</span>
+                <strong id="riskMetric">3</strong>
+              </article>
+              <article class="metric">
+                <span>初始化阻止</span>
+                <strong>2</strong>
+              </article>
+              <article class="metric">
+                <span>最近事件</span>
+                <strong>09:42</strong>
+              </article>
+            </section>
+
+            <section class="panel filters-panel" aria-label="筛选审计日志">
+              <div class="chips" aria-label="快速筛选">
+                <button class="chip" type="button" data-quick="all" aria-pressed="true">全部事件</button>
+                <button class="chip" type="button" data-quick="risk" aria-pressed="false">高风险</button>
+                <button class="chip" type="button" data-quick="permission" aria-pressed="false">权限变更</button>
+                <button class="chip" type="button" data-quick="bootstrap" aria-pressed="false">初始化</button>
+              </div>
+              <div class="filters-grid" style="margin-top: 12px">
+                <label>
+                  来源
+                  <select id="sourceFilter">
+                    <option value="">全部来源</option>
+                    <option value="admin_manage">系统管理</option>
+                    <option value="server_bootstrap">启动初始化</option>
+                    <option value="security_guard">安全守卫</option>
+                  </select>
+                </label>
+                <label>
+                  动作
+                  <select id="actionFilter">
+                    <option value="">全部动作</option>
+                    <option value="admin_user">管理员账号</option>
+                    <option value="role.permissions">角色权限</option>
+                    <option value="admin_bootstrap">初始化</option>
+                  </select>
+                </label>
+                <label>
+                  风险
+                  <select id="riskFilter">
+                    <option value="">全部风险</option>
+                    <option value="high">高风险</option>
+                    <option value="mid">普通变更</option>
+                    <option value="ok">系统记录</option>
+                  </select>
+                </label>
+                <label>
+                  搜索对象、操作者或 payload
+                  <input id="keywordFilter" type="search" placeholder="如 admin、role.permissions、request id" />
+                </label>
+                <button class="btn" type="button" id="clearFilters">清空筛选</button>
+              </div>
+            </section>
+
+            <section class="workspace" aria-label="审计日志与事件详情">
+              <div class="panel table-panel" id="tablePanel">
+                <div class="table-head">
+                  <div>
+                    <h3>事件列表</h3>
+                    <span class="muted" id="resultText">当前筛选命中 6 条</span>
+                  </div>
+                  <span class="tag ok">只读</span>
+                </div>
+
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>时间</th>
+                        <th>风险</th>
+                        <th>来源</th>
+                        <th>动作</th>
+                        <th>操作者</th>
+                        <th>对象</th>
+                        <th>摘要</th>
+                      </tr>
+                    </thead>
+                    <tbody id="eventRows">
+                      <tr class="audit-row active" tabindex="0" data-id="evt-001" data-risk="high" data-source="security_guard" data-action="admin_bootstrap.blocked" data-text="admin_bootstrap.blocked security_guard bootstrap root admin 初始化阻止 192.168.0.12">
+                        <td>今天 09:42</td>
+                        <td><span class="tag risk-high">高风险</span></td>
+                        <td><span class="tag">安全守卫</span></td>
+                        <td class="event-key">admin_bootstrap.blocked</td>
+                        <td>system</td>
+                        <td class="object-text">bootstrap / root-admin</td>
+                        <td class="summary-cell">检测到重复初始化请求，已阻止创建第二个超级管理员。</td>
+                      </tr>
+                      <tr class="audit-row" tabindex="0" data-id="evt-002" data-risk="mid" data-source="admin_manage" data-action="role.permissions.set" data-text="role.permissions.set admin_manage 权限 财务主管 admin role finance">
+                        <td>今天 09:18</td>
+                        <td><span class="tag risk-mid">普通变更</span></td>
+                        <td><span class="tag">系统管理</span></td>
+                        <td class="event-key">role.permissions.set</td>
+                        <td>admin</td>
+                        <td class="object-text">role / finance_manager</td>
+                        <td class="summary-cell">财务主管角色新增 invoice.read，移除 debug.access。</td>
+                      </tr>
+                      <tr class="audit-row" tabindex="0" data-id="evt-003" data-risk="high" data-source="admin_manage" data-action="admin_user.disabled.set" data-text="admin_user.disabled.set admin_manage 禁用 debug_operator admin 高风险">
+                        <td>今天 08:51</td>
+                        <td><span class="tag risk-high">高风险</span></td>
+                        <td><span class="tag">系统管理</span></td>
+                        <td class="event-key">admin_user.disabled.set</td>
+                        <td>admin</td>
+                        <td class="object-text">admin_user / debug_operator</td>
+                        <td class="summary-cell">开发调试账号被禁用，原因记录为试用环境收口。</td>
+                      </tr>
+                      <tr class="audit-row" tabindex="0" data-id="evt-004" data-risk="mid" data-source="admin_manage" data-action="admin_user.roles.set" data-text="admin_user.roles.set admin_manage 角色 仓库组 warehouse_user admin">
+                        <td>昨天 18:22</td>
+                        <td><span class="tag risk-mid">普通变更</span></td>
+                        <td><span class="tag">系统管理</span></td>
+                        <td class="event-key">admin_user.roles.set</td>
+                        <td>admin</td>
+                        <td class="object-text">admin_user / warehouse_user</td>
+                        <td class="summary-cell">仓库账号绑定 warehouse_operator 角色，保留只读审计权限。</td>
+                      </tr>
+                      <tr class="audit-row" tabindex="0" data-id="evt-005" data-risk="ok" data-source="server_bootstrap" data-action="admin_bootstrap.completed" data-text="admin_bootstrap.completed server_bootstrap 初始化完成 system">
+                        <td>昨天 09:07</td>
+                        <td><span class="tag ok">系统记录</span></td>
+                        <td><span class="tag">启动初始化</span></td>
+                        <td class="event-key">admin_bootstrap.completed</td>
+                        <td>system</td>
+                        <td class="object-text">bootstrap / admin</td>
+                        <td class="summary-cell">首次管理员初始化完成，后续启动进入阻止保护。</td>
+                      </tr>
+                      <tr class="audit-row" tabindex="0" data-id="evt-006" data-risk="high" data-source="admin_manage" data-action="admin_user.password.reset" data-text="admin_user.password.reset admin_manage 密码重置 admin 高风险 finance_manager">
+                        <td>06-15 17:40</td>
+                        <td><span class="tag risk-high">高风险</span></td>
+                        <td><span class="tag">系统管理</span></td>
+                        <td class="event-key">admin_user.password.reset</td>
+                        <td>admin</td>
+                        <td class="object-text">admin_user / finance_manager</td>
+                        <td class="summary-cell">财务主管账号密码重置，request id 已记录。</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="empty" id="emptyState">
+                  <div class="empty-card">
+                    <div class="empty-visual">0</div>
+                    <h3>当前筛选下没有审计事件</h3>
+                    <p>
+                      可以放宽来源、动作、风险或关键词。没有系统审计事件不代表没有业务事实，业务过账仍需到库存、出货或财务事实页核对。
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <aside class="panel detail" aria-labelledby="detailTitle">
+                <div class="detail-head">
+                  <div>
+                    <h3 id="detailTitle">事件详情</h3>
+                    <span class="muted" id="detailSubtitle">evt-001 / security_guard</span>
+                  </div>
+                  <button class="btn text" type="button" id="closeDetail">收起</button>
+                </div>
+                <div class="detail-body" id="detailBody">
+                  <div class="detail-kv">
+                    <span>事件 key</span>
+                    <strong class="event-key">admin_bootstrap.blocked</strong>
+                  </div>
+                  <div class="detail-kv">
+                    <span>Request ID</span>
+                    <span class="request-id">req-20260616-094212-a1f4</span>
+                  </div>
+                  <div class="detail-kv">
+                    <span>操作者</span>
+                    <span>system / 192.168.0.12</span>
+                  </div>
+                  <div class="detail-kv">
+                    <span>对象</span>
+                    <span>bootstrap / root-admin</span>
+                  </div>
+                  <div>
+                    <span class="muted">变更摘要</span>
+                    <pre class="code-block" id="changeBlock">before: {"bootstrap_completed": true}
+after:  {"blocked": true, "reason": "root admin already exists"}</pre>
+                  </div>
+                  <div>
+                    <span class="muted">追溯链</span>
+                    <div class="timeline" id="timeline">
+                      <div class="timeline-item">
+                        <strong>09:42:12 请求进入</strong>
+                        <span class="muted">admin bootstrap guard 检查 root 管理员。</span>
+                      </div>
+                      <div class="timeline-item">
+                        <strong>09:42:12 写入审计</strong>
+                        <span class="muted">阻止结果记录为系统控制面事件，不写业务事实。</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </section>
+
+            <p class="footer-note">
+              实现边界：本原型不改变审计 API、RBAC、菜单或后端事实。进入真实页面时，应复用当前 `audit_logs` JSON-RPC、现有错误提示 helper、ERP theme token，并补默认态、风险筛选态、空态、详情展开 / 收起和浅暗色回归。
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const details = {
+        "evt-001": {
+          subtitle: "evt-001 / security_guard",
+          key: "admin_bootstrap.blocked",
+          request: "req-20260616-094212-a1f4",
+          actor: "system / 192.168.0.12",
+          target: "bootstrap / root-admin",
+          change:
+            'before: {"bootstrap_completed": true}\nafter:  {"blocked": true, "reason": "root admin already exists"}',
+          steps: [
+            ["09:42:12 请求进入", "admin bootstrap guard 检查 root 管理员。"],
+            ["09:42:12 写入审计", "阻止结果记录为系统控制面事件，不写业务事实。"],
+          ],
+        },
+        "evt-002": {
+          subtitle: "evt-002 / admin_manage",
+          key: "role.permissions.set",
+          request: "req-20260616-091832-b8c2",
+          actor: "admin / 192.168.0.20",
+          target: "role / finance_manager",
+          change:
+            'before: {"permissions": ["finance.read", "debug.access"]}\nafter:  {"permissions": ["finance.read", "invoice.read"]}',
+          steps: [
+            ["09:18:31 权限保存", "角色权限 usecase 校验操作者权限。"],
+            ["09:18:31 写入审计", "记录角色权限前后差异，不记录业务金额事实。"],
+          ],
+        },
+        "evt-003": {
+          subtitle: "evt-003 / admin_manage",
+          key: "admin_user.disabled.set",
+          request: "req-20260616-085103-c7de",
+          actor: "admin / 192.168.0.20",
+          target: "admin_user / debug_operator",
+          change:
+            'before: {"disabled": false}\nafter:  {"disabled": true, "reason": "trial closure"}',
+          steps: [
+            ["08:51:03 禁用账号", "系统管理入口提交账号启停动作。"],
+            ["08:51:03 写入审计", "记录启停原因，后续登录应由鉴权链路拒绝。"],
+          ],
+        },
+        "evt-004": {
+          subtitle: "evt-004 / admin_manage",
+          key: "admin_user.roles.set",
+          request: "req-20260615-182211-e941",
+          actor: "admin / 192.168.0.20",
+          target: "admin_user / warehouse_user",
+          change:
+            'before: {"roles": ["viewer"]}\nafter:  {"roles": ["viewer", "warehouse_operator"]}',
+          steps: [
+            ["18:22:11 角色绑定", "账号角色投影更新。"],
+            ["18:22:11 写入审计", "保留操作者、对象和角色差异。"],
+          ],
+        },
+        "evt-005": {
+          subtitle: "evt-005 / server_bootstrap",
+          key: "admin_bootstrap.completed",
+          request: "req-20260615-090702-f055",
+          actor: "system / localhost",
+          target: "bootstrap / admin",
+          change:
+            'before: {"admin_exists": false}\nafter:  {"admin_exists": true, "bootstrap_completed": true}',
+          steps: [
+            ["09:07:02 初始化完成", "首次管理员创建成功。"],
+            ["09:07:02 写入审计", "记录启动初始化完成，后续请求进入阻止保护。"],
+          ],
+        },
+        "evt-006": {
+          subtitle: "evt-006 / admin_manage",
+          key: "admin_user.password.reset",
+          request: "req-20260615-174005-d23a",
+          actor: "admin / 192.168.0.20",
+          target: "admin_user / finance_manager",
+          change:
+            'before: {"password_version": 3}\nafter:  {"password_version": 4, "force_relogin": true}',
+          steps: [
+            ["17:40:05 重置密码", "系统管理入口提交密码重置。"],
+            ["17:40:05 写入审计", "不记录明文密码，只记录版本和强制重新登录结果。"],
+          ],
+        },
+      };
+
+      const rows = Array.from(document.querySelectorAll(".audit-row"));
+      const tablePanel = document.getElementById("tablePanel");
+      const resultText = document.getElementById("resultText");
+      const totalMetric = document.getElementById("totalMetric");
+      const riskMetric = document.getElementById("riskMetric");
+      const sourceFilter = document.getElementById("sourceFilter");
+      const actionFilter = document.getElementById("actionFilter");
+      const riskFilter = document.getElementById("riskFilter");
+      const keywordFilter = document.getElementById("keywordFilter");
+      const chips = Array.from(document.querySelectorAll("[data-quick]"));
+      const detailSubtitle = document.getElementById("detailSubtitle");
+      const detailBody = document.getElementById("detailBody");
+
+      function renderDetail(id) {
+        const detail = details[id] || details["evt-001"];
+        detailSubtitle.textContent = detail.subtitle;
+        detailBody.innerHTML = `
+          <div class="detail-kv"><span>事件 key</span><strong class="event-key">${detail.key}</strong></div>
+          <div class="detail-kv"><span>Request ID</span><span class="request-id">${detail.request}</span></div>
+          <div class="detail-kv"><span>操作者</span><span>${detail.actor}</span></div>
+          <div class="detail-kv"><span>对象</span><span>${detail.target}</span></div>
+          <div><span class="muted">变更摘要</span><pre class="code-block">${detail.change}</pre></div>
+          <div><span class="muted">追溯链</span><div class="timeline">${detail.steps
+            .map(
+              ([title, text]) =>
+                `<div class="timeline-item"><strong>${title}</strong><span class="muted">${text}</span></div>`
+            )
+            .join("")}</div></div>
+        `;
+      }
+
+      function setActiveRow(row) {
+        rows.forEach((item) => item.classList.toggle("active", item === row));
+        if (row) renderDetail(row.dataset.id);
+      }
+
+      function setQuickFilter(key) {
+        chips.forEach((chip) =>
+          chip.setAttribute("aria-pressed", String(chip.dataset.quick === key))
+        );
+        if (key === "risk") {
+          riskFilter.value = "high";
+        } else if (key === "permission") {
+          actionFilter.value = "role.permissions";
+          riskFilter.value = "";
+        } else if (key === "bootstrap") {
+          actionFilter.value = "admin_bootstrap";
+          riskFilter.value = "";
+        } else {
+          sourceFilter.value = "";
+          actionFilter.value = "";
+          riskFilter.value = "";
+          keywordFilter.value = "";
+        }
+        applyFilters();
+      }
+
+      function applyFilters(forceEmpty = false) {
+        const source = sourceFilter.value;
+        const action = actionFilter.value;
+        const risk = riskFilter.value;
+        const keyword = keywordFilter.value.trim().toLowerCase();
+        let visible = 0;
+        let high = 0;
+        let firstVisible = null;
+
+        rows.forEach((row) => {
+          const matchSource = !source || row.dataset.source === source;
+          const matchAction = !action || row.dataset.action.includes(action);
+          const matchRisk = !risk || row.dataset.risk === risk;
+          const matchKeyword = !keyword || row.dataset.text.includes(keyword);
+          const matched =
+            !forceEmpty && matchSource && matchAction && matchRisk && matchKeyword;
+          row.hidden = !matched;
+          if (matched) {
+            visible += 1;
+            if (row.dataset.risk === "high") high += 1;
+            if (!firstVisible) firstVisible = row;
+          }
+        });
+
+        tablePanel.classList.toggle("empty-mode", visible === 0);
+        resultText.textContent = `当前筛选命中 ${visible} 条`;
+        totalMetric.textContent = String(visible);
+        riskMetric.textContent = String(high);
+        if (firstVisible) setActiveRow(firstVisible);
+      }
+
+      rows.forEach((row) => {
+        row.addEventListener("click", () => setActiveRow(row));
+        row.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setActiveRow(row);
+          }
+        });
+      });
+
+      chips.forEach((chip) => {
+        chip.addEventListener("click", () => setQuickFilter(chip.dataset.quick));
+      });
+
+      [sourceFilter, actionFilter, riskFilter, keywordFilter].forEach((control) => {
+        control.addEventListener("input", () => {
+          chips.forEach((chip) =>
+            chip.setAttribute("aria-pressed", String(chip.dataset.quick === "all"))
+          );
+          applyFilters();
+        });
+      });
+
+      document.getElementById("clearFilters").addEventListener("click", () => {
+        setQuickFilter("all");
+      });
+
+      document.getElementById("riskToggle").addEventListener("click", () => {
+        setQuickFilter("risk");
+      });
+
+      document.getElementById("emptyToggle").addEventListener("click", () => {
+        applyFilters(true);
+      });
+
+      document.getElementById("resetButton").addEventListener("click", () => {
+        setQuickFilter("all");
+      });
+
+      document.getElementById("closeDetail").addEventListener("click", () => {
+        document.querySelector(".detail").hidden = true;
+      });
+
+      document.addEventListener("click", (event) => {
+        if (event.target.closest(".audit-row")) {
+          document.querySelector(".detail").hidden = false;
+        }
+      });
+    </script>
+  </body>
+</html>

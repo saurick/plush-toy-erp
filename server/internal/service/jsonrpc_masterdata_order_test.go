@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 	"time"
@@ -177,11 +178,11 @@ func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrderLifecycle(_ context.Context,
 
 func (s *stubSalesOrderJSONRPCRepo) AddSalesOrderItem(_ context.Context, in *biz.SalesOrderItemMutation) (*biz.SalesOrderItem, error) {
 	s.addedItem = in
-	return &biz.SalesOrderItem{ID: 1, SalesOrderID: in.SalesOrderID, LineNo: in.LineNo, ProductID: in.ProductID, UnitID: in.UnitID, OrderedQuantity: in.OrderedQuantity, LineStatus: biz.SalesOrderItemStatusOpen}, nil
+	return &biz.SalesOrderItem{ID: 1, SalesOrderID: in.SalesOrderID, LineNo: in.LineNo, ProductID: in.ProductID, ProductSkuID: in.ProductSkuID, UnitID: in.UnitID, OrderedQuantity: in.OrderedQuantity, LineStatus: biz.SalesOrderItemStatusOpen}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrderItem(_ context.Context, id int, in *biz.SalesOrderItemMutation) (*biz.SalesOrderItem, error) {
-	return &biz.SalesOrderItem{ID: id, SalesOrderID: in.SalesOrderID, LineNo: in.LineNo, ProductID: in.ProductID, UnitID: in.UnitID, OrderedQuantity: in.OrderedQuantity, LineStatus: biz.SalesOrderItemStatusOpen}, nil
+	return &biz.SalesOrderItem{ID: id, SalesOrderID: in.SalesOrderID, LineNo: in.LineNo, ProductID: in.ProductID, ProductSkuID: in.ProductSkuID, UnitID: in.UnitID, OrderedQuantity: in.OrderedQuantity, LineStatus: biz.SalesOrderItemStatusOpen}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) GetSalesOrderItem(_ context.Context, id int) (*biz.SalesOrderItem, error) {
@@ -212,6 +213,7 @@ func (s *stubSalesOrderJSONRPCRepo) SaveSalesOrderWithItems(_ context.Context, i
 			SalesOrderID:    orderID,
 			LineNo:          item.LineNo,
 			ProductID:       item.ProductID,
+			ProductSkuID:    item.ProductSkuID,
 			UnitID:          item.UnitID,
 			OrderedQuantity: item.OrderedQuantity,
 			LineStatus:      biz.SalesOrderItemStatusOpen,
@@ -504,6 +506,7 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 			map[string]any{
 				"line_no":          float64(1),
 				"product_id":       float64(1),
+				"product_sku_id":   float64(10),
 				"unit_id":          float64(1),
 				"ordered_quantity": "12.5",
 			},
@@ -520,9 +523,17 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 	if len(repo.savedItems) != 1 || repo.savedItems[0].SalesOrderID != 0 {
 		t.Fatalf("expected save usecase to receive one new item before order id binding, got %#v", repo.savedItems)
 	}
+	if repo.savedItems[0].ProductSkuID == nil || *repo.savedItems[0].ProductSkuID != 10 {
+		t.Fatalf("expected product_sku_id forwarded to save usecase, got %#v", repo.savedItems[0])
+	}
 	data := res.Data.AsMap()
-	if data["sales_order"] == nil || len(data["sales_order_items"].([]any)) != 1 {
+	items := data["sales_order_items"].([]any)
+	if data["sales_order"] == nil || len(items) != 1 {
 		t.Fatalf("expected order and items in response, got %#v", data)
+	}
+	item := items[0].(map[string]any)
+	if fmt.Sprint(item["product_sku_id"]) != "10" {
+		t.Fatalf("expected product_sku_id in response, got %#v", item)
 	}
 }
 

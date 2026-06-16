@@ -7,7 +7,6 @@ import {
   EditOutlined,
   InboxOutlined,
   PlusOutlined,
-  ReloadOutlined,
   RollbackOutlined,
   SettingOutlined,
   StopOutlined,
@@ -79,6 +78,11 @@ import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import {
+  createBusinessTablePagination,
+  getBusinessPaginationParams,
+  resetBusinessPaginationCurrent,
+} from '../utils/businessPagination.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const BUSINESS_FORM_MODAL_WIDTH = 'min(1360px, calc(100vw - 96px))'
@@ -157,11 +161,12 @@ const PAGE_CONFIG = Object.freeze({
       update: 'product_sku.update',
       disable: 'product_sku.disable',
     },
-    entityLabel: 'SKU',
+    entityLabel: '产品规格',
+    createTitleLabel: '产品规格',
     formBoundary:
       '只维护产品规格主数据，不在此写订单、库存、BOM、生产或出货事实。',
     summary:
-      '维护产品下的 SKU / 规格；产品归属使用 product_id，订单、库存、BOM 和出货事实在对应业务模块处理。',
+      '维护产品规格 / SKU；产品归属使用 product_id，订单、库存、BOM 和出货事实在对应业务模块处理。',
   },
 })
 
@@ -609,13 +614,26 @@ function ContactFormList({ form, entityLabel }) {
               </div>
             ))}
           </div>
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
-            onClick={() => add({ is_primary: false })}
-          >
-            添加条目
-          </Button>
+          <div className="erp-line-items-form__footer">
+            <div className="erp-line-items-form__footer-actions">
+              <Button
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={() => add({ is_primary: false })}
+              >
+                添加条目
+              </Button>
+            </div>
+            <div className="erp-line-items-form__stats">
+              <span className="erp-line-items-form__stat">
+                已录入
+                <strong className="erp-line-items-form__stat-value">
+                  {fields.length}
+                </strong>
+                条
+              </span>
+            </div>
+          </div>
           <Form.ErrorList errors={errors} />
         </div>
       )}
@@ -659,6 +677,7 @@ export default function V1MasterDataPage({ type }) {
   const [activeOnly, setActiveOnly] = useState(false)
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [contacts, setContacts] = useState([])
   const [recordModalOpen, setRecordModalOpen] = useState(false)
@@ -732,7 +751,7 @@ export default function V1MasterDataPage({ type }) {
       const result = await config.list({
         keyword,
         active_only: activeOnly,
-        limit: 100,
+        ...getBusinessPaginationParams(pagination),
       })
       const nextRecords = Array.isArray(result?.[config.recordKey])
         ? result[config.recordKey]
@@ -754,7 +773,7 @@ export default function V1MasterDataPage({ type }) {
     } finally {
       setLoading(false)
     }
-  }, [activeOnly, config, keyword])
+  }, [activeOnly, config, keyword, pagination])
 
   useEffect(() => {
     loadRecords()
@@ -1217,7 +1236,10 @@ export default function V1MasterDataPage({ type }) {
             <SearchInput
               placeholder={getRecordSearchPlaceholder(type)}
               value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) => {
+                setKeyword(event.target.value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
               onPressEnter={loadRecords}
             />
             <SelectFilter
@@ -1227,7 +1249,10 @@ export default function V1MasterDataPage({ type }) {
                 { label: `仅看启用${entityLabel}`, value: 'active' },
               ]}
               value={activeOnly ? 'active' : 'all'}
-              onChange={(nextValue) => setActiveOnly(nextValue === 'active')}
+              onChange={(nextValue) => {
+                setActiveOnly(nextValue === 'active')
+                resetBusinessPaginationCurrent(setPagination)
+              }}
             />
           </>
         }
@@ -1344,7 +1369,11 @@ export default function V1MasterDataPage({ type }) {
         columns={orderedRecordColumns}
         dataSource={records}
         scroll={{ x: 1300 }}
-        pagination={{ pageSize: 10, showSizeChanger: false }}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+        })}
         emptyDescription={`暂无${entityLabel}记录`}
         rowSelection={{
           selectedRowKeys: selectedRecord?.id ? [selectedRecord.id] : [],
@@ -1380,7 +1409,9 @@ export default function V1MasterDataPage({ type }) {
         title={
           <div className="erp-business-action-modal__title">
             <span>
-              {editingRecord?.id ? `编辑${entityLabel}` : `新建${config.title}`}
+              {editingRecord?.id
+                ? `编辑${entityLabel}`
+                : `新建${config.createTitleLabel || config.title}`}
             </span>
             <small>{config.formBoundary}</small>
           </div>
@@ -1478,7 +1509,6 @@ export default function V1MasterDataPage({ type }) {
             >
               批量恢复
             </Button>
-            <Button icon={<ReloadOutlined />}>刷新</Button>
             <span>已选择 {recycleSelectedRowKeys.length} 条回收站记录</span>
           </Space>
           <Table

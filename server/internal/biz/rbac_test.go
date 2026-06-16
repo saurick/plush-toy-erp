@@ -160,6 +160,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionSystemUserRead,
 				PermissionSystemRoleRead,
 				PermissionSystemPermissionManage,
+				PermissionSystemAuditRead,
 			},
 			omits: []string{PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
 		},

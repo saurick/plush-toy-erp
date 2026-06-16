@@ -17,6 +17,7 @@ type stubAdminManageRepo struct {
 	adminsByName  map[string]*AdminUser
 	adminsByPhone map[string]*AdminUser
 	rolePerms     map[string][]string
+	auditEvents   []RuntimeAuditEvent
 	nextID        int
 }
 
@@ -26,6 +27,7 @@ func newStubAdminManageRepo() *stubAdminManageRepo {
 		adminsByName:  map[string]*AdminUser{},
 		adminsByPhone: map[string]*AdminUser{},
 		rolePerms:     map[string][]string{},
+		auditEvents:   []RuntimeAuditEvent{},
 		nextID:        10,
 	}
 }
@@ -264,6 +266,62 @@ func (r *stubAdminManageRepo) UpdateAdminPasswordHash(_ context.Context, id int,
 	return nil
 }
 
+func (r *stubAdminManageRepo) RecordRuntimeAuditEvent(_ context.Context, event *RuntimeAuditEventCreate) error {
+	if event == nil {
+		return ErrBadParam
+	}
+	payload := map[string]any{}
+	for key, value := range event.Payload {
+		payload[key] = value
+	}
+	r.auditEvents = append(r.auditEvents, RuntimeAuditEvent{
+		ID:        len(r.auditEvents) + 1,
+		EventType: event.EventType,
+		EventKey:  event.EventKey,
+		Source:    event.Source,
+		Payload:   payload,
+		CreatedAt: time.Now(),
+	})
+	return nil
+}
+
+func (r *stubAdminManageRepo) ListRuntimeAuditEvents(_ context.Context, filter RuntimeAuditEventListFilter) (RuntimeAuditEventListResult, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+	filtered := make([]RuntimeAuditEvent, 0, len(r.auditEvents))
+	for _, event := range r.auditEvents {
+		if filter.Source != "" && event.Source != filter.Source {
+			continue
+		}
+		if filter.EventType != "" && event.EventType != filter.EventType {
+			continue
+		}
+		if filter.EventKey != "" && event.EventKey != filter.EventKey {
+			continue
+		}
+		filtered = append(filtered, event)
+	}
+	end := offset + limit
+	if offset > len(filtered) {
+		offset = len(filtered)
+	}
+	if end > len(filtered) {
+		end = len(filtered)
+	}
+	return RuntimeAuditEventListResult{
+		Events: filtered[offset:end],
+		Total:  len(filtered),
+		Limit:  limit,
+		Offset: offset,
+	}, nil
+}
+
 func TestAdminManageUsecase_CreateAssignsRolesForStandardAdmin(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
@@ -288,6 +346,12 @@ func TestAdminManageUsecase_CreateAssignsRolesForStandardAdmin(t *testing.T) {
 	}
 	if !AdminHasPermission(created, PermissionPurchaseOrderRead) {
 		t.Fatalf("expected purchase role to grant purchase permissions")
+	}
+	if len(repo.auditEvents) != 1 {
+		t.Fatalf("expected create audit event, got %d", len(repo.auditEvents))
+	}
+	if repo.auditEvents[0].EventKey != "admin_user.create" {
+		t.Fatalf("unexpected audit event key %q", repo.auditEvents[0].EventKey)
 	}
 }
 
@@ -314,6 +378,19 @@ func TestAdminManageUsecase_ResetPasswordUpdatesStandardAdminHash(t *testing.T) 
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(repo.adminsByID[2].PasswordHash), []byte("new-secret")); err != nil {
 		t.Fatalf("stored hash does not match new password: %v", err)
+	}
+	if len(repo.auditEvents) != 1 {
+		t.Fatalf("expected reset password audit event, got %d", len(repo.auditEvents))
+	}
+	event := repo.auditEvents[0]
+	if event.EventKey != "admin_user.password.reset" {
+		t.Fatalf("unexpected audit event key %q", event.EventKey)
+	}
+	if _, ok := event.Payload["password"]; ok {
+		t.Fatalf("audit payload must not contain password")
+	}
+	if _, ok := event.Payload["password_hash"]; ok {
+		t.Fatalf("audit payload must not contain password hash")
 	}
 }
 
@@ -383,6 +460,36 @@ func TestAdminManageUsecase_SetRolesReplacesUserRoles(t *testing.T) {
 	}
 	if !AdminHasPermission(updated, PermissionWarehouseInventoryRead) {
 		t.Fatalf("expected warehouse permissions to be granted")
+	}
+	if len(repo.auditEvents) != 1 {
+		t.Fatalf("expected set roles audit event, got %d", len(repo.auditEvents))
+	}
+	if repo.auditEvents[0].EventKey != "admin_user.roles.set" {
+		t.Fatalf("unexpected audit event key %q", repo.auditEvents[0].EventKey)
+	}
+}
+
+func TestAdminManageUsecase_SetRolePermissionsRecordsAudit(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{
+		UserID:   1,
+		Username: "root",
+		Role:     RoleAdmin,
+	})
+
+	_, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionWarehouseInventoryRead})
+	if err != nil {
+		t.Fatalf("SetRolePermissions() error = %v", err)
+	}
+	if len(repo.auditEvents) != 1 {
+		t.Fatalf("expected role permission audit event, got %d", len(repo.auditEvents))
+	}
+	if repo.auditEvents[0].EventKey != "role.permissions.set" {
+		t.Fatalf("unexpected audit event key %q", repo.auditEvents[0].EventKey)
 	}
 }
 
