@@ -28,7 +28,7 @@ func NewHTTPServer(
 	dc *conf.Data,
 ) *httpx.Server {
 	var opts = []httpx.ServerOption{
-		httpx.Filter(RequestIDFilter()),
+		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter()),
 		httpx.Middleware(
 			recovery.Recovery(),
 			tracing.Server(tracing.WithTracerProvider(tp)),

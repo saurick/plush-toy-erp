@@ -27,7 +27,6 @@ var (
 type AuthRepo interface {
 	GetUserByUsername(ctx context.Context, username string) (*User, error)
 	GetUserByID(ctx context.Context, id int) (*User, error)
-	CreateUser(ctx context.Context, u *User) (*User, error)
 	UpdateUserLastLogin(ctx context.Context, id int, t time.Time) error
 }
 
@@ -89,89 +88,6 @@ func (uc *AuthUsecase) Tracer(opts ...trace.TracerOption) trace.Tracer {
 		return uc.tracer
 	}
 	return otel.Tracer("biz.auth", opts...)
-}
-
-// ======================
-// 注册
-// ======================
-
-func (uc *AuthUsecase) Register(ctx context.Context, username, password string) (token string, expireAt time.Time, u *User, err error) {
-	ctx, span := uc.Tracer().Start(ctx, "auth.register")
-	defer span.End()
-
-	l := uc.log.WithContext(ctx)
-
-	if username == "" || password == "" {
-		err = errors.New("missing username or password")
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "invalid argument")
-		l.Warnf("Register invalid args username=%q", username)
-		return "", time.Time{}, nil, err
-	}
-
-	l.Infof("Register start username=%s", username)
-
-	// 2) 用户名是否已存在
-	exist, e := uc.repo.GetUserByUsername(ctx, username)
-	if e == nil && exist != nil {
-		err = ErrUserExists
-		span.SetStatus(codes.Error, err.Error())
-		l.Infof("Register user already exists username=%s", username)
-		return "", time.Time{}, nil, err
-	}
-	// 如果 repo 返回 error（比如 not found / db error），这里不强判，交给后续 CreateUser 去兜底（唯一索引）
-
-	// 3) 哈希密码（不打印 password）
-	hash, e := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if e != nil {
-		err = e
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "hash password failed")
-		l.Errorf("Register hash password failed username=%s err=%v", username, err)
-		return "", time.Time{}, nil, err
-	}
-
-	newUser := &User{
-		Username:     username,
-		PasswordHash: string(hash),
-	}
-
-	// 4) 创建用户
-	created, e := uc.repo.CreateUser(ctx, newUser)
-	if e != nil {
-		err = e
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "create user failed")
-		l.Errorf("Register create user failed username=%s err=%v", username, err)
-		return "", time.Time{}, nil, err
-	}
-
-	span.SetAttributes(attribute.Int("auth.user_id", created.ID))
-
-	// 5) 创建 token
-	// 注册出来的用户默认 Role=0（普通用户）
-	created.Role = 0
-	token, expireAt, e = uc.genTok(created.ID, created.Username, created.Role)
-	if e != nil {
-		err = e
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "generate token failed")
-		l.Errorf("Register generate token failed user_id=%d username=%s err=%v", created.ID, created.Username, err)
-		return "", time.Time{}, nil, err
-	}
-
-	span.SetAttributes(attribute.Int64("auth.token_expires_at", expireAt.Unix()))
-
-	// 6) 更新 last_login_at（失败不影响主流程）
-	if e := uc.repo.UpdateUserLastLogin(ctx, created.ID, time.Now()); e != nil {
-		span.RecordError(e)
-		l.Warnf("Register update last_login_at failed user_id=%d err=%v", created.ID, e)
-	}
-
-	span.SetStatus(codes.Ok, "OK")
-	l.Infof("Register success user_id=%d username=%s", created.ID, created.Username)
-
-	return token, expireAt, created, nil
 }
 
 // ======================

@@ -25,6 +25,53 @@
 - `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、任务中心、业务管理中心、产品核心菜单覆盖矩阵、正式菜单候选导航、业务模块列表页、业务详情页、页面级新建 / 编辑表单、业务页协同入口组件、业务弹窗和模板打印中心十一个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
 - 原型查看器和原型 README 已补“参照范围”口径：`admin-command-center-v1` 是判断型工作台样板，`core-menu-coverage-v1` 是内部覆盖矩阵，`formal-menu-candidate-v1` 是正式菜单候选原型；它们都不是正式菜单、路由、权限或 seedData 映射表，真正对应关系必须在进入真实实现任务时回到代码、菜单配置和 RBAC 重新核对。
 
+## 2026-06-16 12:52 CST
+
+- 完成：重排 `docs/product/产品能力进度台账.md`，取消快速查阅表第一列内部编号，改为按“能力 / 所属层 / 成熟度 / 客户可见性 / 下一步”给人查阅。
+- 完成：新增 `docs/product/产品能力证据详情.md`，把原宽表中的当前结果、当前不包含、证据、风险和客户边界拆到按能力名称索引的详情文档；可见正文只按能力名称查阅。
+- 完成：同步 `docs/product/产品台账索引.md`、`docs/product/README.md`、`docs/文档清单.md`，并修正台账内和客户差异台账内 SKU 示例，避免继续写成“只落 schema 未接 API / UI”。
+- 下一步：后续维护台账时先更新主台账的人可读状态，再按需补证据详情；如证据详情继续变大，再按业务域拆分详情。
+- 阻塞/风险：本轮只改正式文档呈现和 SKU 示例口径，不改 runtime、schema、migration、测试、部署或客户交付矩阵。
+
+## 2026-06-16 12:53 CST
+
+- 完成：收口 V1 主数据客户 / 供应商页面的前端称呼，保留客户与供应商作为不同业务入口和后端真源，但不再在按钮、统计和联系人面板里统一显示成泛化“主体”，避免误读为两套重复表单。
+- 下一步：如后续要把客户与供应商进一步合成“往来单位 / 交易主体”单入口，需要单独评审 schema、RBAC、销售 / 采购外键、联系人 owner_type、菜单和迁移，不在本轮文案收口范围内。
+- 阻塞/风险：此条仅记录早先称呼收口；同轮后续已在 13:08 CST 继续完成单页结构收口和 `style:l1` 回归，最终风险以 13:08 CST 记录为准。
+
+## 2026-06-16 13:08 CST
+
+- 完成：进一步收口 V1 客户 / 供应商页单页结构，删除页面底部常驻联系人明细表，把联系人列表和新建联系人入口移入“查看详情”抽屉；主页面只保留一张客户 / 供应商主数据表。
+- 完成：清理已失效的联系人面板 CSS，并同步 `style:l1` 客户 / 供应商场景断言，按“新建客户 / 新建供应商”和详情抽屉联系人入口验证新结构。
+- 下一步：联系人编辑、设为主联系人和停用仍需后续按 masterdata 联系人能力单独补 UI 动作，不回到主页面常驻第二张表。
+- 阻塞/风险：本轮未改后端 schema、API、RBAC、菜单、migration 或真实数据；联系人仍是当前客户 / 供应商的从属明细，不作为独立业务对象。
+
+## 2026-06-16 12:16 CST
+
+- 完成：关闭 P0/P1 硬缺口主路径：生产配置移除 token 形态 Telegram 注释块；个人开发阶段不落 GitHub CI，继续以本地 QA / hooks 为主；后端 HTTP 增加 CSP、Referrer-Policy、X-Content-Type-Options、X-Frame-Options 和 Permissions-Policy 基础安全响应头。
+- 完成：公开自助注册从“生产关闭”改为“运行时删除”：后端移除 `auth.register` 分发和 `AuthUsecase.Register`，`auth.capabilities` 不再返回 `public_register`，生产 Compose / preflight 不再使用 `APP_PUBLIC_REGISTER_ENABLED`，前端删除 `/register` 路由和注册页，登录页不再展示注册链接，正式 API / 配置 / 部署 / 前端 README 同步为不提供公开自助注册。
+- 下一步：SKU 继续只按已修正台账推进；如要进一步降低 token 风险，应单独评审 HttpOnly SameSite Cookie、CSRF、刷新 token 和前端 API client 改造；如要补普通协作账号创建入口，应单独评审受控 `user.create` 权限、流程、审计和测试。
+- 阻塞/风险：本轮未做 SKU API/UI、真实 MVP runner、目标环境部署、生产镜像构建或线上 smoke；后端 CSP 仍保留 inline script/style 兼容现有构建和模板渲染，后续收紧需要前端构建和 PDF 回归。
+
+## 2026-06-16 12:50 CST
+
+- 完成：按用户确认删除公开注册入口，清理后端 register 方法、前端注册路由 / 页面、公开注册 capability、公开注册错误码消费、生产部署开关、preflight 检查和相关正式文档口径；保留测试断言 `register` 返回 UnknownMethod，避免后续误恢复。
+- 下一步：如需要新增普通协作账号，另起受控账号创建任务，不从公开注册入口恢复。
+- 阻塞/风险：未新增普通协作账号创建 API；当前普通用户新增仍依赖既有初始化 / 数据准备路径或后续账号管理能力设计。
+
+## 2026-06-16 12:33 CST
+
+- 完成：按个人开发边界撤回 GitHub CI 落地，删除 `.github/workflows/ci.yml`，并把 `docs/product/自动化测试策略.md` 改回“当前不配置 GitHub CI，后续协作扩大时再评审”的口径。
+- 下一步：继续保留本地 `scripts/qa/fast.sh`、`full.sh`、`strict.sh`、preflight 和 hooks 作为当前质量主路径。
+- 阻塞/风险：未改生产注册关闭、安全响应头、错误码、前端 capabilities 或部署 preflight 收口；后续若需要远端门禁再重新评审 CI。
+
+## 2026-06-16 12:08 CST
+
+- 完成：修正 `docs/product/产品能力进度台账.md` 中 `product_skus` 口径，补齐 masterdata JSON-RPC、`product_sku.*` RBAC 和 `/erp/master/products` SKU 最小维护页面已接入的状态，避免继续被误读为只落 schema。
+- 完成：保留 SKU 当前边界：订单、出货、库存和预留运行时主路径仍未切 SKU；销售订单行 SKU 选择、出货 / 库存 / 预留 SKU 校验、BOM SKU 粒度和导入受控创建 SKU 仍待单独评审。
+- 下一步：后续推进 SKU 时优先评审销售订单行 SKU 选择与快照带值，再评审 BOM SKU 粒度和事实链路 SKU 校验。
+- 阻塞/风险：本轮只修正式产品能力台账口径，不改运行时代码、schema、migration、测试脚本、部署或 git 提交。
+
 ## 2026-06-15 22:59 CST
 
 - 完成：BOM Version 已完成 runtime 闭环并通过最终收口验证：后端 BOM lifecycle / repo / service JSON-RPC / RBAC、前端 BOM API / V1 页面 / 路由、`style:l1` BOM 页面 mock 与断言、正式文档和客户交付矩阵均已同步；BOM 仍只维护产品物料清单版本，不写库存、采购、生产、成本或财务事实。

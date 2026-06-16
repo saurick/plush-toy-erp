@@ -101,7 +101,7 @@ const PAGE_CONFIG = Object.freeze({
       contactDisable: 'contact.disable',
       contactPrimary: 'contact.set_primary',
     },
-    entityLabel: '主体',
+    entityLabel: '客户',
     formBoundary: '只维护交易主体资料，不在此写订单、库存或财务事实。',
     summary:
       '维护客户交易主体和联系人；订单、出货、库存和财务事实在对应业务模块处理。',
@@ -123,7 +123,7 @@ const PAGE_CONFIG = Object.freeze({
       contactDisable: 'contact.disable',
       contactPrimary: 'contact.set_primary',
     },
-    entityLabel: '主体',
+    entityLabel: '供应商',
     formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务事实。',
     summary:
       '维护供应商和加工厂交易主体；采购入库、质检、库存和财务事实在对应业务模块处理。',
@@ -1264,72 +1264,6 @@ export default function V1MasterDataPage({ type }) {
         })}
       />
 
-      {supportsContacts ? (
-        <section
-          className={[
-            'erp-v1-master-data-contact-panel',
-            selectedRecord
-              ? 'erp-v1-master-data-contact-panel--active'
-              : 'erp-v1-master-data-contact-panel--empty',
-          ].join(' ')}
-          aria-label="联系人明细"
-        >
-          <div className="erp-v1-master-data-contact-panel__head">
-            <div className="erp-v1-master-data-contact-panel__title">
-              <span>联系人明细</span>
-              <strong>
-                {getRecordName(selectedRecord, type) ||
-                  '先从上方选择一个客户或供应商'}
-              </strong>
-              <small>
-                联系人随主体维护，不作为独立业务对象，也不生成订单、出货、库存或财务事实。
-              </small>
-            </div>
-            <div className="erp-v1-master-data-contact-panel__meta">
-              <span>
-                主体{' '}
-                <strong>
-                  {getRecordCode(selectedRecord, type) || '未选择'}
-                </strong>
-              </span>
-              <span>
-                联系人 <strong>{selectedRecord ? contacts.length : 0}</strong>
-              </span>
-            </div>
-            {canCreateContact ? (
-              <ToolbarButton
-                icon={<PlusOutlined />}
-                onClick={openCreateContact}
-                disabled={!selectedRecord}
-              >
-                新建联系人
-              </ToolbarButton>
-            ) : null}
-          </div>
-          {selectedRecord ? (
-            <Table
-              rowKey="id"
-              className="erp-v1-master-data-contact-panel__table"
-              loading={contactLoading}
-              columns={contactColumns}
-              dataSource={contacts}
-              scroll={{ x: 1080 }}
-              pagination={false}
-              locale={{
-                emptyText: <Empty description="当前主体暂无联系人" />,
-              }}
-            />
-          ) : (
-            <div className="erp-v1-master-data-contact-panel__empty">
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="从上方主体表选择一行后维护联系人"
-              />
-            </div>
-          )}
-        </section>
-      ) : null}
-
       <CollaborationTaskPanel
         tasks={[]}
         selectedTasks={[]}
@@ -1372,7 +1306,7 @@ export default function V1MasterDataPage({ type }) {
           <div className="erp-business-action-modal__title">
             <span>新建联系人</span>
             <small>
-              联系人随当前主体维护，不生成订单、出货、库存或财务事实。
+              联系人随当前{entityLabel}维护，不生成订单、出货、库存或财务事实。
             </small>
           </div>
         }
@@ -1512,97 +1446,132 @@ export default function V1MasterDataPage({ type }) {
         onClose={() => setDetailOpen(false)}
       >
         {selectedRecord ? (
-          <Descriptions column={1} bordered size="small">
-            {type === 'product_skus' ? (
-              <>
-                <Descriptions.Item label="产品 ID">
-                  {selectedRecord.product_id}
-                </Descriptions.Item>
-                <Descriptions.Item label="SKU 编号">
-                  {selectedRecord.sku_code}
-                </Descriptions.Item>
-                <Descriptions.Item label="SKU 名称">
-                  {selectedRecord.sku_name || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="条码">
-                  {selectedRecord.barcode || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="客户 SKU">
-                  {selectedRecord.customer_sku || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="颜色">
-                  {selectedRecord.color || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="色号">
-                  {selectedRecord.color_no || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="尺码">
-                  {selectedRecord.size || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="包装版本">
-                  {selectedRecord.packaging_version || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="默认单位 ID">
-                  {selectedRecord.default_unit_id || '-'}
-                </Descriptions.Item>
-              </>
-            ) : (
-              <>
-                <Descriptions.Item label="编号">
-                  {selectedRecord.code}
-                </Descriptions.Item>
-                <Descriptions.Item label="名称">
-                  {selectedRecord.name}
-                </Descriptions.Item>
-                {type === 'materials' ? (
-                  <>
-                    <Descriptions.Item label="分类">
-                      {selectedRecord.category || '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="规格">
-                      {selectedRecord.spec || '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="颜色">
-                      {selectedRecord.color || '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="默认单位 ID">
-                      {selectedRecord.default_unit_id || '-'}
-                    </Descriptions.Item>
-                  </>
-                ) : (
-                  <Descriptions.Item label="简称">
-                    {selectedRecord.short_name || '-'}
+          <Space direction="vertical" size={16} style={{ width: '100%' }}>
+            <Descriptions column={1} bordered size="small">
+              {type === 'product_skus' ? (
+                <>
+                  <Descriptions.Item label="产品 ID">
+                    {selectedRecord.product_id}
                   </Descriptions.Item>
-                )}
-                {type === 'suppliers' ? (
-                  <Descriptions.Item label="供应商类型">
-                    {SUPPLIER_TYPE_LABELS[selectedRecord.supplier_type] ||
-                      selectedRecord.supplier_type ||
-                      '-'}
+                  <Descriptions.Item label="SKU 编号">
+                    {selectedRecord.sku_code}
                   </Descriptions.Item>
-                ) : null}
-                {type === 'materials' ? null : (
-                  <Descriptions.Item label="税号">
-                    {selectedRecord.tax_no || '-'}
+                  <Descriptions.Item label="SKU 名称">
+                    {selectedRecord.sku_name || '-'}
                   </Descriptions.Item>
-                )}
-              </>
-            )}
-            <Descriptions.Item label="状态">
-              {activeTag(selectedRecord.is_active)}
-            </Descriptions.Item>
-            <Descriptions.Item label="创建时间">
-              {formatUnixDateTime(selectedRecord.created_at)}
-            </Descriptions.Item>
-            <Descriptions.Item label="更新时间">
-              {formatUnixDateTime(selectedRecord.updated_at)}
-            </Descriptions.Item>
-            {type === 'product_skus' ? null : (
-              <Descriptions.Item label="备注">
-                {selectedRecord.note || '-'}
+                  <Descriptions.Item label="条码">
+                    {selectedRecord.barcode || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="客户 SKU">
+                    {selectedRecord.customer_sku || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="颜色">
+                    {selectedRecord.color || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="色号">
+                    {selectedRecord.color_no || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="尺码">
+                    {selectedRecord.size || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="包装版本">
+                    {selectedRecord.packaging_version || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="默认单位 ID">
+                    {selectedRecord.default_unit_id || '-'}
+                  </Descriptions.Item>
+                </>
+              ) : (
+                <>
+                  <Descriptions.Item label="编号">
+                    {selectedRecord.code}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="名称">
+                    {selectedRecord.name}
+                  </Descriptions.Item>
+                  {type === 'materials' ? (
+                    <>
+                      <Descriptions.Item label="分类">
+                        {selectedRecord.category || '-'}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="规格">
+                        {selectedRecord.spec || '-'}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="颜色">
+                        {selectedRecord.color || '-'}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="默认单位 ID">
+                        {selectedRecord.default_unit_id || '-'}
+                      </Descriptions.Item>
+                    </>
+                  ) : (
+                    <Descriptions.Item label="简称">
+                      {selectedRecord.short_name || '-'}
+                    </Descriptions.Item>
+                  )}
+                  {type === 'suppliers' ? (
+                    <Descriptions.Item label="供应商类型">
+                      {SUPPLIER_TYPE_LABELS[selectedRecord.supplier_type] ||
+                        selectedRecord.supplier_type ||
+                        '-'}
+                    </Descriptions.Item>
+                  ) : null}
+                  {type === 'materials' ? null : (
+                    <Descriptions.Item label="税号">
+                      {selectedRecord.tax_no || '-'}
+                    </Descriptions.Item>
+                  )}
+                </>
+              )}
+              <Descriptions.Item label="状态">
+                {activeTag(selectedRecord.is_active)}
               </Descriptions.Item>
-            )}
-          </Descriptions>
+              <Descriptions.Item label="创建时间">
+                {formatUnixDateTime(selectedRecord.created_at)}
+              </Descriptions.Item>
+              <Descriptions.Item label="更新时间">
+                {formatUnixDateTime(selectedRecord.updated_at)}
+              </Descriptions.Item>
+              {type === 'product_skus' ? null : (
+                <Descriptions.Item label="备注">
+                  {selectedRecord.note || '-'}
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+            {supportsContacts ? (
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Space
+                  align="center"
+                  style={{ justifyContent: 'space-between', width: '100%' }}
+                >
+                  <strong>联系人</strong>
+                  {canCreateContact ? (
+                    <Button
+                      size="small"
+                      icon={<PlusOutlined />}
+                      onClick={openCreateContact}
+                    >
+                      新建联系人
+                    </Button>
+                  ) : null}
+                </Space>
+                <Table
+                  rowKey="id"
+                  size="small"
+                  loading={contactLoading}
+                  columns={contactColumns}
+                  dataSource={contacts}
+                  scroll={{ x: 720 }}
+                  pagination={false}
+                  locale={{
+                    emptyText: (
+                      <Empty description={`当前${entityLabel}暂无联系人`} />
+                    ),
+                  }}
+                />
+              </Space>
+            ) : null}
+          </Space>
         ) : null}
       </Drawer>
     </BusinessPageLayout>

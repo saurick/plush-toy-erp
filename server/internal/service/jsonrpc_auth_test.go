@@ -59,18 +59,10 @@ func TestJsonrpcDispatcher_AuthLogin_OK(t *testing.T) {
 	}
 }
 
-func TestJsonrpcDispatcher_AuthRegister_Success(t *testing.T) {
-	repo := newMemAuthRepoForData()
-
+func TestJsonrpcDispatcher_AuthRegister_Removed(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	authUC := biz.NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok-reg", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
 	j := &jsonrpcDispatcher{
-		log:    log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC: authUC,
+		log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
 	}
 
 	params, _ := structpb.NewStruct(map[string]any{
@@ -80,47 +72,13 @@ func TestJsonrpcDispatcher_AuthRegister_Success(t *testing.T) {
 
 	_, res, err := j.handleAuth(context.Background(), "register", "1", params)
 	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if res == nil || res.Code != 0 {
-		t.Fatalf("expected code=0, got %+v", res)
-	}
-	m := res.Data.AsMap()
-	if m["access_token"] != "tok-reg" {
-		t.Fatalf("expected access_token=tok-reg, got %v", m["access_token"])
-	}
-	if m["username"] != "bob" {
-		t.Fatalf("expected username=bob, got %v", m["username"])
-	}
-}
-
-func TestJsonrpcDispatcher_AuthRegister_MissingArgs(t *testing.T) {
-	repo := newMemAuthRepoForData()
-
-	logger := log.NewStdLogger(io.Discard)
-	tp := tracesdk.NewTracerProvider()
-	authUC := biz.NewAuthUsecase(repo, func(int, string, int8) (string, time.Time, error) {
-		return "tok", time.Now().Add(time.Hour), nil
-	}, logger, tp)
-
-	j := &jsonrpcDispatcher{
-		log:    log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
-		authUC: authUC,
-	}
-
-	params, _ := structpb.NewStruct(map[string]any{
-		"username": "alice",
-	})
-
-	_, res, err := j.handleAuth(context.Background(), "register", "1", params)
-	if err != nil {
 		t.Fatalf("expected nil err (jsonrpc should map to result), got %v", err)
 	}
 	if res == nil {
 		t.Fatalf("expected result not nil")
 	}
-	if res.Code == 0 {
-		t.Fatalf("expected non-zero code for missing args, got %+v", res)
+	if res.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("expected code=%d, got %+v", errcode.UnknownMethod.Code, res)
 	}
 }
 
@@ -241,6 +199,9 @@ func TestJsonrpcDispatcher_AuthCapabilities_SMSModes(t *testing.T) {
 	}
 	if smsLogin["mock_delivery"] != true {
 		t.Fatalf("expected mock_delivery=true, got %#v", smsLogin)
+	}
+	if _, ok := res.Data.AsMap()["public_register"]; ok {
+		t.Fatalf("did not expect public_register capabilities, got %#v", res.Data.AsMap())
 	}
 }
 

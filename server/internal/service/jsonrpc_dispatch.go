@@ -220,7 +220,7 @@ func (d *jsonrpcDispatcher) handleAuth(
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
-			Data:    newDataStruct(authSMSCapabilitiesToMap(d.authSMS)),
+			Data:    newDataStruct(d.authCapabilitiesToMap()),
 		}, nil
 
 	case "login":
@@ -369,32 +369,6 @@ func (d *jsonrpcDispatcher) handleAuth(
 				"token_type":   "Bearer",
 				"issued_at":    time.Now().Unix(),
 			})),
-		}, nil
-
-	case "register":
-		username := getString(pm, "username")
-		password := getString(pm, "password")
-
-		if username == "" || password == "" {
-			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "缺少用户名或密码"}, nil
-		}
-
-		token, expireAt, user, err := d.authUC.Register(ctx, username, password)
-		if err != nil {
-			return id, d.mapAuthError(ctx, err), nil
-		}
-
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: "注册成功",
-			Data: newDataStruct(map[string]any{
-				"user_id":      user.ID,
-				"username":     user.Username,
-				"access_token": token,
-				"expires_at":   expireAt.Unix(),
-				"token_type":   "Bearer",
-				"issued_at":    time.Now().Unix(),
-			}),
 		}, nil
 
 	case "logout":
@@ -750,11 +724,15 @@ func (d *jsonrpcDispatcher) getCurrentAdmin(ctx context.Context, claims *biz.Aut
 	return admin, nil
 }
 
+func (d *jsonrpcDispatcher) authCapabilitiesToMap() map[string]any {
+	return authSMSCapabilitiesToMap(d.authSMS)
+}
+
 func (d *jsonrpcDispatcher) isPublic(url, method string) bool {
 	if url == "system" && (method == "ping" || method == "version") {
 		return true
 	}
-	if url == "auth" && (method == "capabilities" || method == "login" || method == "admin_login" || method == "register" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
+	if url == "auth" && (method == "capabilities" || method == "login" || method == "admin_login" || method == "send_sms_code" || method == "sms_login" || method == "logout") {
 		return true
 	}
 	return false

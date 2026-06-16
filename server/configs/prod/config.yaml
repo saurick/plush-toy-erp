@@ -52,8 +52,3 @@ data:
       username: "admin"
       # 留空表示不自动创建 bootstrap admin；新库首次初始化时通过 APP_ADMIN_PASSWORD 临时注入。
       password: ""
-
-# notify:
-#   telegram:
-#     apiToken: "6835874767:AAHqdz2jT8B_fInZ8ff5EmUT8ndsWVzO--M"
-#     chatId: -4184591934

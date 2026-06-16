@@ -659,10 +659,9 @@ const scenarios = [
     viewport: { width: 2048, height: 1024 },
     verify: async (page) => {
       await expectHeading(page, '客户档案')
-      await expectText(page, '启用主体')
+      await expectText(page, '启用客户')
       await expectText(page, '当前操作')
-      await expectText(page, '联系人明细')
-      await expectText(page, '新建主体')
+      await expectText(page, '新建客户')
       await assertERPThemeMode(page, {
         scenarioName: 'business-module-dark-customers-desktop',
         expectedMode: 'dark',
@@ -3028,13 +3027,13 @@ const scenarios = [
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
       await expectHeading(page, '供应商档案')
-      await expectButton(page, '新建主体')
+      await expectButton(page, '新建供应商')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
       await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
       await verifyBusinessRowDoubleClickEditModal(page, {
         rowText: '样式供应商',
-        titleText: '编辑主体',
+        titleText: '编辑供应商',
         drawerTitleText: '供应商档案详情',
         detailMatchText: '样式供应商',
         scenarioName: 'business-v1-suppliers',
@@ -3044,33 +3043,30 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '客户档案')
-      await expectButton(page, '新建主体')
+      await expectButton(page, '新建客户')
       await expectText(page, '当前操作')
-      await expectText(page, '联系人明细')
       await expectText(page, '暗色客户')
       await expectText(page, '本页协同')
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-v1-customers',
       })
       await verifyBusinessActionFormModal(page, {
-        buttonName: '新建主体',
+        buttonName: '新建客户',
         titleText: '新建客户档案',
         minFieldCount: 5,
         screenshotName: 'business-v1-customers-form-modal',
       })
-      await verifyBusinessActionFormModal(page, {
-        buttonName: '新建联系人',
-        titleText: '新建联系人',
-        minFieldCount: 7,
-        screenshotName: 'business-v1-contact-form-modal',
-      })
       await assertNoHorizontalOverflow(page, 'business-standard-customers')
       await verifyBusinessRowDoubleClickEditModal(page, {
         rowText: '暗色客户',
-        titleText: '编辑主体',
+        titleText: '编辑客户',
         drawerTitleText: '客户档案详情',
         detailMatchText: '暗色客户',
         scenarioName: 'business-v1-customers',
+        afterDetailOpen: async () => {
+          await expectText(page, '联系人')
+          await expectButton(page, '新建联系人')
+        },
       })
 
       await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
@@ -3555,7 +3551,7 @@ async function waitForScenarioDocumentReady(page, errors = []) {
       null,
       { timeout: 20_000 }
     )
-  } catch (error) {
+  } catch {
     const snapshot = await page.evaluate(() => ({
       url: window.location.href,
       readyState: document.readyState,
@@ -5625,8 +5621,15 @@ async function verifyBusinessRecycleModal(
   await modal.screenshot({
     path: path.resolve(outputDir, `${screenshotName}.png`),
   })
-  await modal.locator('.ant-modal-close').click()
-  await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  await modal.locator('.ant-modal-close').click({ force: true })
+  try {
+    await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  } catch {
+    const cancelButton = modal.getByRole('button', { name: '取消' })
+    await cancelButton.click({ force: true }).catch(() => {})
+    await page.keyboard.press('Escape').catch(() => {})
+    await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  }
 }
 
 async function verifyBusinessRowDoubleClickEditModal(

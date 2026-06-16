@@ -33,11 +33,10 @@ HTTP 路由：
 - `admin_login`
 - `send_sms_code`
 - `sms_login`
-- `register`
 - `logout`
 - `me`
 
-用途：用户登录、管理员登录、短信验证码登录、注册、退出和当前登录态查询。
+用途：用户登录、管理员登录、短信验证码登录、退出和当前登录态查询。当前产品不提供公开自助注册方法；协作账号来源回到受控初始化或后续账号管理流程。
 
 ### `user`
 
@@ -66,7 +65,7 @@ HTTP 路由：
 ## 鉴权规则
 
 - `system.*` 默认是公开方法
-- `auth.login`、`auth.admin_login`、`auth.send_sms_code`、`auth.sms_login`、`auth.register`、`auth.logout` 是公开方法
+- `auth.login`、`auth.admin_login`、`auth.send_sms_code`、`auth.sms_login`、`auth.logout` 是公开方法
 - 其他业务域默认要求已登录
 - `user.*` 额外要求管理员登录态
 - `admin.*` 管理操作要求管理员登录态，并按 `system.*` 权限码做动作级校验
@@ -92,7 +91,7 @@ HTTP 路由：
 
 ## 当前默认保留的数据字段
 
-### `auth.login` / `auth.admin_login` / `auth.sms_login` / `auth.register`
+### `auth.login` / `auth.admin_login` / `auth.sms_login`
 
 返回最小登录态信息：
 

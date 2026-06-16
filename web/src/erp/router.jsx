@@ -34,7 +34,6 @@ import { canOpenPrintWorkspaceFromWindowState } from './utils/printWorkspace.js'
 const AdminUsersPage = lazy(() => import('@/pages/AdminUsers'))
 const AdminLoginPage = lazy(() => import('@/pages/AdminLogin'))
 const LoginPage = lazy(() => import('@/pages/Login'))
-const RegisterPage = lazy(() => import('@/pages/Register'))
 const EntrySelectionPage = lazy(() => import('./pages/EntrySelectionPage'))
 const BusinessDashboardPage = lazy(
   () => import('./pages/BusinessDashboardPage')
@@ -247,7 +246,6 @@ export default function ERPRouter() {
         ) : null}
         <Route path="/" element={<RootEntryRedirect />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
         <Route path="/admin-login" element={<AdminLoginPage />} />
         <Route
           path="/entry"

@@ -108,7 +108,19 @@
 | `APP_ADMIN_USERNAME` | 读取配置文件 | 覆盖默认管理员账号 |
 | `APP_ADMIN_PASSWORD` | 空 | 仅在新库首次初始化 bootstrap 管理员时临时注入；已有 `admin` 不会因重启自动改密 |
 
-生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时才临时添加；如果 `admin` 已经存在，重启不会重置旧密码，应通过管理员改密或受控 SQL 更新密码哈希。
+生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时才临时添加；如果 `admin` 已经存在，重启不会重置旧密码，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
+
+## HTTP 安全响应头
+
+后端 HTTP 服务统一写入基础安全响应头，覆盖 JSON-RPC、健康检查、模板 PDF 和后端静态 handler：
+
+- `Content-Security-Policy`
+- `Referrer-Policy: same-origin`
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+
+CSP 当前保留 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`，用于兼容现有前端构建和模板渲染；后续若要收紧到 nonce / hash，应先做前端生产构建和模板 PDF 回归。
 
 ## 角色演示账号 seed
 
@@ -165,6 +177,8 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 - `data.auth.admin.password`
 - `trace.jaeger.traceName`
 - `trace.jaeger.endpoint`
+
+仓库内生产配置只保留占位值，不保留 token 形态样例、真实 webhook token、真实短信供应商 token 或聊天群 ID。需要接入外部通知或短信服务商时，只能通过生产 `.env` / 密钥管理注入，并在日志、trace、文档和测试输出中保持脱敏。
 
 ## 配置选择建议
 

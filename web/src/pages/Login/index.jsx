@@ -302,15 +302,7 @@ export default function LoginPage() {
               </button>
 
               <div className="flex items-center justify-between pt-1 text-sm text-slate-300">
-                <div>
-                  当前系统不会自动创建普通员工账号。{' '}
-                  <Link
-                    className="font-medium text-cyan-200 underline underline-offset-4 transition hover:text-cyan-100"
-                    to="/register"
-                  >
-                    先去注册协作账号
-                  </Link>
-                </div>
+                <div>当前系统不会自动创建普通员工账号。</div>
               </div>
             </div>
           </form>
