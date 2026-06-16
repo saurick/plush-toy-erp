@@ -36,6 +36,7 @@ const REQUIRED_FILES = [
   "evidence/README.md",
   "evidence/releases/README.md",
   "evidence/releases/release-evidence-template.md",
+  "evidence/releases/release-signoff-checklist-template.md",
   "evidence/migrations/migration-evidence-template.md",
   "evidence/backups/backup-evidence-template.md",
   "evidence/smoke/smoke-test-report.example.json",

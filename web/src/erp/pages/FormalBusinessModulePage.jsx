@@ -388,7 +388,10 @@ function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
 
 export default function FormalBusinessModulePage({ moduleKey }) {
   const outletContext = useOutletContext()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const moduleItem = getBusinessModule(moduleKey)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')

@@ -44,3 +44,11 @@ server/deploy/compose/prod
 ```bash
 node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun
 ```
+
+实际发布或客户试用交付前，再对本次已填 evidence 目录执行：
+
+```bash
+node scripts/deploy/release-evidence-gate.mjs \
+  --customer yoyoosun \
+  --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
+```

@@ -6,6 +6,7 @@
 | --- | --- |
 | backupId |  |
 | backupTime |  |
+| backupPurpose |  |
 | environment |  |
 | operatorRole |  |
 | releaseVersion |  |

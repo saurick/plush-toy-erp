@@ -3021,6 +3021,34 @@ const scenarios = [
     },
   },
   {
+    name: 'purchase-order-date-filter-desktop',
+    path: '/erp/purchase/accessories',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '采购订单')
+      await expectText(page, '采购日期')
+      await expectText(page, '预计到货')
+      await expectText(page, '新建采购订单')
+      await assertBusinessModuleToolbarControlStyle(page, {
+        scenarioName: 'purchase-order-date-filter-desktop',
+      })
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建采购订单',
+        titleText: '新建采购订单',
+        minFieldCount: 0,
+        screenshotName: 'business-v1-purchase-order-form-modal',
+        expectedTexts: [
+          '采购明细',
+          '从材料库导入',
+          '已录入',
+          '数量合计',
+          '金额合计',
+        ],
+      })
+    },
+  },
+  {
     name: 'business-formal-module-shells-desktop',
     path: '/erp/master/partners/suppliers',
     auth: 'admin',
@@ -4146,6 +4174,98 @@ async function installAdminRpcMocks(page) {
       case 'update_sales_order_item':
       case 'remove_sales_order_item':
         data = { sales_order_item: { ...salesOrderItem, ...params } }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
+
+  await page.route('**/rpc/purchase_order', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    const purchaseOrder = {
+      id: 1,
+      purchase_order_no: 'PO-STYLE-L1',
+      supplier_id: 1,
+      supplier_snapshot: { id: 1, code: 'SUP-STYLE-L1', name: '样式供应商' },
+      supplier_purchase_order_no: 'SUP-PO-STYLE',
+      purchase_date: nowUnix(),
+      expected_arrival_date: nowUnix() + 86_400 * 7,
+      lifecycle_status: 'draft',
+      note: '',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const purchaseOrderItem = {
+      id: 1,
+      purchase_order_id: 1,
+      line_no: 1,
+      material_id: 1,
+      material_code_snapshot: 'MAT-STYLE-L1',
+      material_name_snapshot: '样式材料',
+      purchased_quantity: '20',
+      unit_id: 1,
+      unit_price: '3.50',
+      amount: '70.00',
+      expected_arrival_date: nowUnix() + 86_400 * 7,
+      line_status: 'open',
+      note: '',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_purchase_orders':
+        data = {
+          purchase_orders: [purchaseOrder],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'list_purchase_order_items':
+        data = {
+          purchase_order_items: [purchaseOrderItem],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'save_purchase_order_with_items':
+        data = {
+          purchase_order: { ...purchaseOrder, ...params },
+          purchase_order_items: [purchaseOrderItem],
+        }
+        break
+      case 'create_purchase_order':
+      case 'update_purchase_order':
+      case 'get_purchase_order':
+      case 'submit_purchase_order':
+      case 'approve_purchase_order':
+      case 'close_purchase_order':
+      case 'cancel_purchase_order':
+        data = { purchase_order: { ...purchaseOrder, ...params } }
+        break
+      case 'add_purchase_order_item':
+      case 'update_purchase_order_item':
+      case 'remove_purchase_order_item':
+        data = { purchase_order_item: { ...purchaseOrderItem, ...params } }
         break
       default:
         data = {}
@@ -8712,6 +8832,9 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
       statusSelector: readControl(
         '.erp-business-filter-control--status .ant-select-selector'
       ),
+      statusSelectionItem: readControl(
+        '.erp-business-filter-control--status .ant-select-selection-item'
+      ),
       statusPlaceholder: readControl(
         '.erp-business-filter-control--status .ant-select-selection-placeholder'
       ),
@@ -8731,7 +8854,7 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
       metrics.dateControl &&
       metrics.dateInputs.length === 2 &&
       metrics.statusSelector &&
-      metrics.statusPlaceholder &&
+      (metrics.statusPlaceholder || metrics.statusSelectionItem) &&
       metrics.statusSearchInput &&
       metrics.statusArrow &&
       metrics.actionButton,
@@ -8751,6 +8874,12 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
   assert(
     metrics.dateInputs.every((item) => item.width >= 136),
     `${scenarioName} 起止日期输入宽度不足以完整显示 yyyy/mm/dd: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.dateInputs.every(
+      (item) => Math.abs(item.centerY - metrics.dateControl.centerY) <= 1
+    ),
+    `${scenarioName} 起止日期输入不应脱离日期范围控件同一行: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.filterControls.every(
@@ -8799,9 +8928,10 @@ async function assertBusinessModuleToolbarControlStyle(page, { scenarioName }) {
   )
   assert(
     Math.abs(
-      metrics.statusPlaceholder.centerY - metrics.statusSelector.centerY
+      (metrics.statusPlaceholder || metrics.statusSelectionItem).centerY -
+        metrics.statusSelector.centerY
     ) <= 1,
-    `${scenarioName} 状态筛选 placeholder 未上下居中: ${JSON.stringify(metrics)}`
+    `${scenarioName} 状态筛选显示值未上下居中: ${JSON.stringify(metrics)}`
   )
   assert(
     Math.abs(

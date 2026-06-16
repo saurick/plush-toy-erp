@@ -22,8 +22,25 @@
 ## 模板
 
 - `releases/release-evidence-template.md`
+- `releases/release-signoff-checklist-template.md`
 - `migrations/migration-evidence-template.md`
 - `backups/backup-evidence-template.md`
 - `smoke/smoke-test-report.example.json`
 
 真实发布记录建议放在 `evidence/releases/<YYYY-MM-DD>/`，提交前必须确认脱敏。
+
+发布 evidence 草稿可用资料包脚本生成：
+
+```bash
+bash deployments/yoyoosun/scripts/collect-evidence.sh \
+  --release-version <release-version> \
+  --output deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
+```
+
+客户试用或交付前必须再运行 release evidence gate，确认 release、pre-migration backup、migration、smoke 和 sign-off 字段都不是模板占位：
+
+```bash
+node scripts/deploy/release-evidence-gate.mjs \
+  --customer yoyoosun \
+  --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
+```

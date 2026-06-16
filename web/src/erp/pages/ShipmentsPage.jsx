@@ -27,7 +27,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   addShipmentItem,
   cancelShipment,
-  createShipment,
+  createShipmentWithItems,
   listShipments,
   shipShipment,
 } from '../api/operationalFactApi.mjs'
@@ -117,6 +117,13 @@ function buildShipmentItemParams(values = {}) {
   })
 }
 
+function buildShipmentWithItemsParams(values = {}) {
+  return {
+    ...buildShipmentParams(values),
+    items: (values.items || []).map((item) => buildShipmentItemParams(item)),
+  }
+}
+
 function createBlankShipmentItem(shipmentID) {
   return {
     shipment_id: shipmentID,
@@ -150,13 +157,18 @@ function ShipmentFormFields({ disabled = false }) {
   return (
     <>
       <Form.Item
+        className="erp-business-action-form__field"
         label="出货单号"
         name="shipment_no"
         rules={[{ required: true, message: '请填写出货单号' }]}
       >
         <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
-      <Form.Item label="销售订单 ID" name="sales_order_id">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="销售订单 ID"
+        name="sales_order_id"
+      >
         <InputNumber
           disabled={disabled}
           min={1}
@@ -164,7 +176,11 @@ function ShipmentFormFields({ disabled = false }) {
           style={{ width: '100%' }}
         />
       </Form.Item>
-      <Form.Item label="客户 ID" name="customer_id">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="客户 ID"
+        name="customer_id"
+      >
         <InputNumber
           disabled={disabled}
           min={1}
@@ -172,20 +188,33 @@ function ShipmentFormFields({ disabled = false }) {
           style={{ width: '100%' }}
         />
       </Form.Item>
-      <Form.Item label="客户快照" name="customer_snapshot">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="客户快照"
+        name="customer_snapshot"
+      >
         <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
       <Form.Item
+        className="erp-business-action-form__field"
         label="幂等键"
         name="idempotency_key"
         rules={[{ required: true, message: '请填写幂等键' }]}
       >
         <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
-      <Form.Item label="计划出货日期" name="planned_ship_at">
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="计划出货日期"
+        name="planned_ship_at"
+      >
         <Input type="date" disabled={disabled} />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        label="备注"
+        name="note"
+      >
         <Input.TextArea
           allowClear
           disabled={disabled}
@@ -205,6 +234,7 @@ function ShipmentItemFormFields({ field, showShipmentID = false }) {
     <>
       {showShipmentID ? (
         <Form.Item
+          className="erp-business-action-form__field"
           label="出货单 ID"
           name={fieldName('shipment_id')}
           rules={[{ required: true, message: '请选择出货单' }]}
@@ -212,10 +242,15 @@ function ShipmentItemFormFields({ field, showShipmentID = false }) {
           <InputNumber min={1} precision={0} style={{ width: '100%' }} />
         </Form.Item>
       ) : null}
-      <Form.Item label="销售订单行 ID" name={fieldName('sales_order_item_id')}>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="销售订单行 ID"
+        name={fieldName('sales_order_item_id')}
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className="erp-business-action-form__field"
         label="产品 ID"
         name={fieldName('product_id')}
         rules={[{ required: true, message: '请填写产品 ID' }]}
@@ -223,16 +258,22 @@ function ShipmentItemFormFields({ field, showShipmentID = false }) {
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className="erp-business-action-form__field"
         label="仓库 ID"
         name={fieldName('warehouse_id')}
         rules={[{ required: true, message: '请填写仓库 ID' }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="批次 ID" name={fieldName('lot_id')}>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="批次 ID"
+        name={fieldName('lot_id')}
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className="erp-business-action-form__field"
         label="单位 ID"
         name={fieldName('unit_id')}
         rules={[{ required: true, message: '请填写单位 ID' }]}
@@ -240,13 +281,18 @@ function ShipmentItemFormFields({ field, showShipmentID = false }) {
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className="erp-business-action-form__field"
         label="数量"
         name={fieldName('quantity')}
         rules={[{ required: true, message: '请填写数量' }]}
       >
         <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
       </Form.Item>
-      <Form.Item label="备注" name={fieldName('note')}>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        label="备注"
+        name={fieldName('note')}
+      >
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
       </Form.Item>
     </>
@@ -377,8 +423,7 @@ export default function ShipmentsPage() {
       const values = await shipmentForm.validateFields()
       setSaving(true)
       if (isCreateModal) {
-        const shipment = await createShipment(buildShipmentParams(values))
-        await addShipmentItems(shipment?.id, values.items || [])
+        await createShipmentWithItems(buildShipmentWithItemsParams(values))
         message.success('出货单草稿和明细已保存')
       } else if (isAppendModal) {
         await addShipmentItems(selectedShipment?.id, values.items || [])
@@ -592,8 +637,7 @@ export default function ShipmentsPage() {
                   : '查看出货单'}
             </span>
             <small>
-              出货单弹窗上方维护主表字段，下方维护出货明细；事实写入仍由后端
-              ShipmentUsecase 处理。
+              出货单弹窗上方维护主表字段，下方维护出货明细；新建保存由后端事务一次写入。
             </small>
           </div>
         }

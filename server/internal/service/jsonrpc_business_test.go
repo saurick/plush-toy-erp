@@ -135,6 +135,10 @@ func (s *stubBusinessDashboardOperationalFactRepo) AddShipmentItem(context.Conte
 	return nil, biz.ErrBadParam
 }
 
+func (s *stubBusinessDashboardOperationalFactRepo) CreateShipmentDraftWithItems(context.Context, *biz.ShipmentCreateWithItems) (*biz.Shipment, error) {
+	return nil, biz.ErrBadParam
+}
+
 func (s *stubBusinessDashboardOperationalFactRepo) ShipShipment(context.Context, int) (*biz.Shipment, error) {
 	return nil, biz.ErrBadParam
 }

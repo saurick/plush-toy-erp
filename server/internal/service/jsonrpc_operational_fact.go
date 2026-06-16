@@ -100,6 +100,16 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		}
 		item, err := d.operationalFactUC.CreateShipmentDraft(ctx, shipmentCreateFromParams(pm))
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
+	case "create_shipment_with_items", "createShipmentWithItems":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
+			return id, res, nil
+		}
+		in, ok := shipmentCreateWithItemsFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreateShipmentDraftWithItems(ctx, in)
+		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "add_shipment_item", "addShipmentItem":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
@@ -262,6 +272,30 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 		LotID:            getOptionalInt(pm, "lot_id"),
 		Quantity:         quantity,
 		Note:             getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWithItems, bool) {
+	rawItems, ok := pm["items"].([]any)
+	if !ok || len(rawItems) == 0 {
+		return nil, false
+	}
+	items := make([]*biz.ShipmentItemCreate, 0, len(rawItems))
+	for _, rawItem := range rawItems {
+		itemParams, ok := rawItem.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		item, ok := shipmentItemCreateFromParams(itemParams)
+		if !ok {
+			return nil, false
+		}
+		item.ShipmentID = 0
+		items = append(items, item)
+	}
+	return &biz.ShipmentCreateWithItems{
+		Shipment: shipmentCreateFromParams(pm),
+		Items:    items,
 	}, true
 }
 

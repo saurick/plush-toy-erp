@@ -109,7 +109,7 @@ function resolveShipmentDate(record = {}) {
   )
 }
 
-export function resolveFinishedGoodsQcDueAt(record = {}, options = {}) {
+export function resolveFinishedGoodsQcDueAt(_record = {}, options = {}) {
   return nowSeconds(options) + 4 * HOUR_SECONDS
 }
 

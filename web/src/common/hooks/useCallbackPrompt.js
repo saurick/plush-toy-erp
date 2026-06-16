@@ -44,7 +44,7 @@ const useCallbackPrompt = (when) => {
 
       setConfirmedNavigation(false)
     }
-  }, [confirmedNavigation, lastLocation])
+  }, [confirmedNavigation, lastLocation, navigate])
 
   useBlocker(handleBlockedNavigation, when)
 

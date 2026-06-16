@@ -214,6 +214,11 @@ type ShipmentItemCreate struct {
 	Note             *string
 }
 
+type ShipmentCreateWithItems struct {
+	Shipment *ShipmentCreate
+	Items    []*ShipmentItemCreate
+}
+
 type StockReservationCreate struct {
 	ReservationNo    string
 	SalesOrderID     *int
@@ -262,6 +267,7 @@ type OperationalFactRepo interface {
 
 	CreateShipmentDraft(ctx context.Context, in *ShipmentCreate) (*Shipment, error)
 	AddShipmentItem(ctx context.Context, in *ShipmentItemCreate) (*ShipmentItem, error)
+	CreateShipmentDraftWithItems(ctx context.Context, in *ShipmentCreateWithItems) (*Shipment, error)
 	ShipShipment(ctx context.Context, id int) (*Shipment, error)
 	CancelShippedShipment(ctx context.Context, id int) (*Shipment, error)
 	GetShipment(ctx context.Context, id int) (*Shipment, error)
@@ -360,6 +366,17 @@ func (uc *OperationalFactUsecase) AddShipmentItem(ctx context.Context, in *Shipm
 		return nil, err
 	}
 	return uc.repo.AddShipmentItem(ctx, normalized)
+}
+
+func (uc *OperationalFactUsecase) CreateShipmentDraftWithItems(ctx context.Context, in *ShipmentCreateWithItems) (*Shipment, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeShipmentCreateWithItems(in)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.CreateShipmentDraftWithItems(ctx, normalized)
 }
 
 func (uc *OperationalFactUsecase) ShipShipment(ctx context.Context, id int) (*Shipment, error) {
@@ -550,6 +567,10 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 }
 
 func normalizeShipmentItemCreate(in *ShipmentItemCreate) (*ShipmentItemCreate, error) {
+	return normalizeShipmentItemCreateWithOptions(in, true)
+}
+
+func normalizeShipmentItemCreateWithOptions(in *ShipmentItemCreate, requireShipmentID bool) (*ShipmentItemCreate, error) {
 	if in == nil {
 		return nil, ErrBadParam
 	}
@@ -561,13 +582,35 @@ func normalizeShipmentItemCreate(in *ShipmentItemCreate) (*ShipmentItemCreate, e
 	if out.LotID != nil && *out.LotID <= 0 {
 		out.LotID = nil
 	}
-	if out.ShipmentID <= 0 || out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 {
+	if (requireShipmentID && out.ShipmentID <= 0) || out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 {
 		return nil, ErrBadParam
 	}
 	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
 		return nil, ErrBadParam
 	}
 	return &out, nil
+}
+
+func normalizeShipmentCreateWithItems(in *ShipmentCreateWithItems) (*ShipmentCreateWithItems, error) {
+	if in == nil || len(in.Items) == 0 {
+		return nil, ErrBadParam
+	}
+	shipment, err := normalizeShipmentCreate(in.Shipment)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]*ShipmentItemCreate, 0, len(in.Items))
+	for _, item := range in.Items {
+		if item == nil {
+			return nil, ErrBadParam
+		}
+		normalizedItem, err := normalizeShipmentItemCreateWithOptions(item, false)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, normalizedItem)
+	}
+	return &ShipmentCreateWithItems{Shipment: shipment, Items: items}, nil
 }
 
 func normalizeStockReservationCreate(in *StockReservationCreate) (*StockReservationCreate, error) {

@@ -153,7 +153,7 @@ export function persistPrintWorkspaceWindowState(stateID, payload = {}) {
       })
     )
     return true
-  } catch (error) {
+  } catch {
     return false
   }
 }
@@ -209,7 +209,7 @@ function openPrintWorkspaceWindowStateDatabase(indexedDBLike) {
         database.onversionchange = () => {
           try {
             database.close()
-          } catch (error) {
+          } catch {
             // 忽略关闭失败，继续保留 localStorage 兜底。
           }
         }
@@ -217,7 +217,7 @@ function openPrintWorkspaceWindowStateDatabase(indexedDBLike) {
       }
       request.onerror = () => resolve(null)
       request.onblocked = () => resolve(null)
-    } catch (error) {
+    } catch {
       resolve(null)
     }
   })
@@ -263,7 +263,7 @@ function persistPrintWorkspaceWindowStateRecordToIndexedDB(
           transaction.oncomplete = () => finalize(true)
           transaction.onerror = () => finalize(false)
           transaction.onabort = () => finalize(false)
-        } catch (error) {
+        } catch {
           resolve(false)
         }
       })
@@ -293,7 +293,7 @@ export function persistPrintWorkspaceWindowHTML(stateID, payload = {}) {
         JSON.stringify(record)
       )
       savedToStorage = true
-    } catch (error) {
+    } catch {
       savedToStorage = false
     }
   }
@@ -345,7 +345,7 @@ export function readPrintWorkspaceWindowState(stateID, storageLike) {
       return null
     }
     return payload
-  } catch (error) {
+  } catch {
     return null
   }
 }
@@ -380,7 +380,7 @@ export function persistPrintWorkspaceDraftSnapshot(
   try {
     storage.setItem(normalizedStorageKey, JSON.stringify(draft))
     return true
-  } catch (error) {
+  } catch {
     return false
   }
 }
@@ -440,7 +440,7 @@ export function openPrintWorkspaceWindow(
         stateID
       )
       window.localStorage.setItem(initialDraftStorageKey, serializedDraft)
-    } catch (error) {
+    } catch (_error) {
       throw new Error('浏览器无法写入打印草稿，请检查存储权限后重试')
     }
   }
@@ -460,7 +460,7 @@ export function openPrintWorkspaceWindow(
     if (initialDraftStorageKey) {
       try {
         window.localStorage.removeItem(initialDraftStorageKey)
-      } catch (error) {
+      } catch {
         // 弹窗被拦截时只尽力清理本次临时草稿，不影响用户重试。
       }
     }

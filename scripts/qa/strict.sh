@@ -16,18 +16,19 @@ print_help() {
   4) industry-template-boundaries
   5) private-deployment-boundaries
   6) deployment-package-lint
-  7) customer-config-boundaries
-  8) customer-import-tooling
-  9) trial-simulated-data
-  10) operational-fact-simulated-closure
-  11) mobile-workflow-simulated-closure
-  12) mvp-closure
-  13) industry-template-closure
-  14) private-deployment-package-closure
-  15) shellcheck + shfmt（可选）
-  16) govulncheck（可选）
-  17) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  18) server: go test ./... + make build
+  7) release-evidence-gate
+  8) customer-config-boundaries
+  9) customer-import-tooling
+  10) trial-simulated-data
+  11) operational-fact-simulated-closure
+  12) mobile-workflow-simulated-closure
+  13) mvp-closure
+  14) industry-template-closure
+  15) private-deployment-package-closure
+  16) shellcheck + shfmt（可选）
+  17) govulncheck（可选）
+  18) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
+  19) server: go test ./... + make build
 
 环境变量:
   SKIP_DB_GUARD=1           跳过 DB 守卫
@@ -100,6 +101,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs" ]; then
   echo "[qa:strict] 运行客户私有化部署资料包检查测试"
   node --test "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/deploy/release-evidence-gate.test.mjs" ]; then
+  echo "[qa:strict] 运行 yoyoosun 发布证据门禁测试"
+  node --test "$ROOT_DIR/scripts/deploy/release-evidence-gate.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then

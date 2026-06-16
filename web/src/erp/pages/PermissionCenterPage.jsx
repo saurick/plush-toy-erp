@@ -449,7 +449,7 @@ export default function PermissionCenterPage() {
       ...prev,
       current: totalPages,
     }))
-  }, [filteredAdmins.length, tablePagination.current, tablePagination.pageSize])
+  }, [filteredAdmins.length, tablePagination])
 
   const closeCreateModal = () => {
     setCreateModalOpen(false)

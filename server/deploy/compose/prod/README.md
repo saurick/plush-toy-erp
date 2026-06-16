@@ -23,10 +23,11 @@ docker compose -f compose.yml up -d
 - `WEB_IMAGE`
 - `APP_JWT_SECRET`
 - `APP_ADMIN_USERNAME`
+- `BOOTSTRAP_ADMIN_ONCE=false`；只有新库首次初始化 bootstrap 管理员时才临时改为 `true`
 
 如果不需要自带 tracing 存储，可以再按需移除 Jaeger 服务和对应环境变量。
 
-生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时才临时添加；如果 `admin` 已经存在，重启不会重置旧密码，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由。
+生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。已有 `admin` 或同名管理员不会被启动逻辑自动提权，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由。
 
 前端生产容器不运行 Vite dev server。`WEB_IMAGE` 是一个前端镜像，Compose 只启动 `web-desktop` 一个前端实例，并通过 `APP_ID=desktop`、`PORT=5175` 固定入口；岗位任务端统一走 `/m/<role>/tasks`，不再启动 8 个 `APP_ID=mobile-*` 生产容器。
 
@@ -45,6 +46,7 @@ export ERP_PDF_RENDER_CONCURRENCY=2
 export ERP_PDF_WARMUP_ENABLED=true
 export APP_JWT_SECRET='replace-with-runtime-secret'
 export APP_ADMIN_USERNAME=admin
+export BOOTSTRAP_ADMIN_ONCE=false
 export ERP_DEBUG_ENV=prod
 export ERP_DEBUG_SEED_ENABLED=false
 export ERP_DEBUG_CLEANUP_ENABLED=false

@@ -81,6 +81,7 @@ services:
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
       APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"
       APP_ADMIN_USERNAME: "${APP_ADMIN_USERNAME:-admin}"
+      BOOTSTRAP_ADMIN_ONCE: "${BOOTSTRAP_ADMIN_ONCE:-false}"
       ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"
       ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-2}"
       ERP_DEBUG_ENV: "${ERP_DEBUG_ENV:-prod}"

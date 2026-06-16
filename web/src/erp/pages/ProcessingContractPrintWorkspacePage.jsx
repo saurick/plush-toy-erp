@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -145,7 +145,7 @@ function loadDraft({
         : createProcessingContractDraft().lines,
       attachments: normalizeProcessingContractAttachments(attachments),
     }
-  } catch (error) {
+  } catch {
     return createProcessingContractDraft()
   }
 }
@@ -487,7 +487,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     }
   }
 
-  const warmupPreviewPdf = () => {
+  const warmupPreviewPdf = useCallback(() => {
     if (!paperRef.current || busyAction || pdfPreviewPreloadRef.current) {
       return
     }
@@ -508,7 +508,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         }
       })
     pdfPreviewPreloadRef.current = preloadPromise
-  }
+  }, [busyAction])
 
   useEffect(() => {
     pdfPreviewPreloadRef.current = null
@@ -516,7 +516,7 @@ export default function ProcessingContractPrintWorkspacePage() {
 
   useEffect(
     () => schedulePdfPreviewWarmup(warmupPreviewPdf),
-    [contract, busyAction]
+    [contract, warmupPreviewPdf]
   )
 
   useEffect(

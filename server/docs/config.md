@@ -91,7 +91,7 @@
 说明：
 
 - 这组字段决定用户 token 签名和默认管理员初始化逻辑。
-- 必须替换仓库里的默认密钥；bootstrap 管理员密码默认留空，只有新库首次初始化时才通过 `APP_ADMIN_PASSWORD` 临时注入。
+- 必须替换仓库里的默认密钥；bootstrap 管理员密码默认留空，只有新库首次初始化时才同时通过 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD` 临时注入。
 - `data.auth.sms.mode` 控制短信登录运行时能力，当前只实现 `disabled` 和 `mock`：
   - `disabled`：关闭短信登录，`auth.capabilities` 返回不可用，`send_sms_code` / `sms_login` 返回 `AuthSMSLoginDisabled`。
   - `mock`：仅用于 local / dev / test，后端返回 `mock_code` 方便本地回归。
@@ -106,9 +106,10 @@
 | `APP_JWT_SECRET` | 读取配置文件 | 覆盖 `data.auth.jwtSecret`，不在日志中输出密钥明文 |
 | `APP_AUTH_SMS_MODE` | 读取配置文件 | 覆盖 `data.auth.sms.mode`，当前支持 `disabled` / `mock`，`provider` 保留但未接入真实服务商 |
 | `APP_ADMIN_USERNAME` | 读取配置文件 | 覆盖默认管理员账号 |
-| `APP_ADMIN_PASSWORD` | 空 | 仅在新库首次初始化 bootstrap 管理员时临时注入；已有 `admin` 不会因重启自动改密 |
+| `BOOTSTRAP_ADMIN_ONCE` | `false` | 仅在新库首次初始化 bootstrap 管理员时临时设为 `true`；成功后写 marker 并恢复为 `false` |
+| `APP_ADMIN_PASSWORD` | 空 | 仅在 `BOOTSTRAP_ADMIN_ONCE=true` 的首次初始化窗口临时注入；已有同名管理员不会被自动提权 |
 
-生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时才临时添加；如果 `admin` 已经存在，重启不会重置旧密码，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
+生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder。Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。如果 `admin` 或同名管理员已经存在，启动逻辑不会重置密码，也不会自动提权，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由，协作账号来源回到受控初始化或后续账号管理流程。
 
 ## HTTP 安全响应头
 

@@ -113,6 +113,61 @@ func TestValidateProductionBootstrapConfigAllowsBlankBootstrapAdminPassword(t *t
 	}
 }
 
+func TestValidateProductionBootstrapConfigRequiresOnceFlagForAdminPassword(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "0123456789abcdef0123456789abcdef",
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: "runtime-admin-password"},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(string) string { return "" }); err == nil {
+		t.Fatal("expected production bootstrap admin password without once flag to be rejected")
+	}
+}
+
+func TestValidateProductionBootstrapConfigRequiresAdminPasswordWhenOnceEnabled(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "0123456789abcdef0123456789abcdef",
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(key string) string {
+		if key == "BOOTSTRAP_ADMIN_ONCE" {
+			return "true"
+		}
+		return ""
+	}); err == nil {
+		t.Fatal("expected BOOTSTRAP_ADMIN_ONCE=true without password to be rejected")
+	}
+}
+
+func TestValidateProductionBootstrapConfigAllowsAdminPasswordWithOnceFlag(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "0123456789abcdef0123456789abcdef",
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: "runtime-admin-password"},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(key string) string {
+		if key == "BOOTSTRAP_ADMIN_ONCE" {
+			return "true"
+		}
+		return ""
+	}); err != nil {
+		t.Fatalf("expected once bootstrap admin password to pass, got %v", err)
+	}
+}
+
 func TestValidateProductionBootstrapConfigSkipsDevConfig(t *testing.T) {
 	t.Parallel()
 

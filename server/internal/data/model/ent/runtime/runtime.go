@@ -30,6 +30,8 @@ import (
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
+	"server/internal/data/model/ent/runtimeauditevent"
+	"server/internal/data/model/ent/runtimemarker"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
@@ -2026,6 +2028,84 @@ func init() {
 	rolepermissionDescCreatedAt := rolepermissionFields[2].Descriptor()
 	// rolepermission.DefaultCreatedAt holds the default value on creation for the created_at field.
 	rolepermission.DefaultCreatedAt = rolepermissionDescCreatedAt.Default.(func() time.Time)
+	runtimeauditeventFields := schema.RuntimeAuditEvent{}.Fields()
+	_ = runtimeauditeventFields
+	// runtimeauditeventDescEventType is the schema descriptor for event_type field.
+	runtimeauditeventDescEventType := runtimeauditeventFields[0].Descriptor()
+	// runtimeauditevent.EventTypeValidator is a validator for the "event_type" field. It is called by the builders before save.
+	runtimeauditevent.EventTypeValidator = func() func(string) error {
+		validators := runtimeauditeventDescEventType.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(event_type string) error {
+			for _, fn := range fns {
+				if err := fn(event_type); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// runtimeauditeventDescEventKey is the schema descriptor for event_key field.
+	runtimeauditeventDescEventKey := runtimeauditeventFields[1].Descriptor()
+	// runtimeauditevent.DefaultEventKey holds the default value on creation for the event_key field.
+	runtimeauditevent.DefaultEventKey = runtimeauditeventDescEventKey.Default.(string)
+	// runtimeauditevent.EventKeyValidator is a validator for the "event_key" field. It is called by the builders before save.
+	runtimeauditevent.EventKeyValidator = runtimeauditeventDescEventKey.Validators[0].(func(string) error)
+	// runtimeauditeventDescSource is the schema descriptor for source field.
+	runtimeauditeventDescSource := runtimeauditeventFields[2].Descriptor()
+	// runtimeauditevent.DefaultSource holds the default value on creation for the source field.
+	runtimeauditevent.DefaultSource = runtimeauditeventDescSource.Default.(string)
+	// runtimeauditevent.SourceValidator is a validator for the "source" field. It is called by the builders before save.
+	runtimeauditevent.SourceValidator = runtimeauditeventDescSource.Validators[0].(func(string) error)
+	// runtimeauditeventDescPayload is the schema descriptor for payload field.
+	runtimeauditeventDescPayload := runtimeauditeventFields[3].Descriptor()
+	// runtimeauditevent.DefaultPayload holds the default value on creation for the payload field.
+	runtimeauditevent.DefaultPayload = runtimeauditeventDescPayload.Default.(string)
+	// runtimeauditevent.PayloadValidator is a validator for the "payload" field. It is called by the builders before save.
+	runtimeauditevent.PayloadValidator = runtimeauditeventDescPayload.Validators[0].(func(string) error)
+	// runtimeauditeventDescCreatedAt is the schema descriptor for created_at field.
+	runtimeauditeventDescCreatedAt := runtimeauditeventFields[4].Descriptor()
+	// runtimeauditevent.DefaultCreatedAt holds the default value on creation for the created_at field.
+	runtimeauditevent.DefaultCreatedAt = runtimeauditeventDescCreatedAt.Default.(func() time.Time)
+	runtimemarkerFields := schema.RuntimeMarker{}.Fields()
+	_ = runtimemarkerFields
+	// runtimemarkerDescMarkerKey is the schema descriptor for marker_key field.
+	runtimemarkerDescMarkerKey := runtimemarkerFields[0].Descriptor()
+	// runtimemarker.MarkerKeyValidator is a validator for the "marker_key" field. It is called by the builders before save.
+	runtimemarker.MarkerKeyValidator = func() func(string) error {
+		validators := runtimemarkerDescMarkerKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(marker_key string) error {
+			for _, fn := range fns {
+				if err := fn(marker_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// runtimemarkerDescMarkerValue is the schema descriptor for marker_value field.
+	runtimemarkerDescMarkerValue := runtimemarkerFields[1].Descriptor()
+	// runtimemarker.DefaultMarkerValue holds the default value on creation for the marker_value field.
+	runtimemarker.DefaultMarkerValue = runtimemarkerDescMarkerValue.Default.(string)
+	// runtimemarker.MarkerValueValidator is a validator for the "marker_value" field. It is called by the builders before save.
+	runtimemarker.MarkerValueValidator = runtimemarkerDescMarkerValue.Validators[0].(func(string) error)
+	// runtimemarkerDescCreatedAt is the schema descriptor for created_at field.
+	runtimemarkerDescCreatedAt := runtimemarkerFields[2].Descriptor()
+	// runtimemarker.DefaultCreatedAt holds the default value on creation for the created_at field.
+	runtimemarker.DefaultCreatedAt = runtimemarkerDescCreatedAt.Default.(func() time.Time)
+	// runtimemarkerDescUpdatedAt is the schema descriptor for updated_at field.
+	runtimemarkerDescUpdatedAt := runtimemarkerFields[3].Descriptor()
+	// runtimemarker.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	runtimemarker.DefaultUpdatedAt = runtimemarkerDescUpdatedAt.Default.(func() time.Time)
+	// runtimemarker.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	runtimemarker.UpdateDefaultUpdatedAt = runtimemarkerDescUpdatedAt.UpdateDefault.(func() time.Time)
 	salesorderFields := schema.SalesOrder{}.Fields()
 	_ = salesorderFields
 	// salesorderDescOrderNo is the schema descriptor for order_no field.

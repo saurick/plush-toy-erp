@@ -683,35 +683,42 @@ export function CollaborationTaskPanel({
   const tabIDPrefix = React.useId().replace(/:/g, '')
   const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
   const roleLabels = roleLabelMap || new Map()
-  const taskPanelModel = buildBusinessCollaborationTaskPanelModel({
-    tasks,
-    selectedTasks,
-  })
-  const tabItems = [
-    {
-      key: 'todo',
-      label: '本页待办',
-      count: taskPanelModel.pageTasks.length,
-      items: taskPanelModel.pageTasks,
-      emptyText: '本页暂无待处理 Workflow 任务。',
-    },
-    {
-      key: 'current',
-      label: '当前记录',
-      count: taskPanelModel.currentRecordTasks.length,
-      items: taskPanelModel.currentRecordTasks,
-      emptyText: selectedRecordLabel
-        ? '当前记录暂无 Workflow 任务。'
-        : '先选择一条业务记录，再查看当前记录协同。',
-    },
-    {
-      key: 'blocked',
-      label: '阻塞异常',
-      count: taskPanelModel.blockedTasks.length,
-      items: taskPanelModel.blockedTasks,
-      emptyText: '暂无阻塞或退回 Workflow 任务。',
-    },
-  ]
+  const taskPanelModel = React.useMemo(
+    () =>
+      buildBusinessCollaborationTaskPanelModel({
+        tasks,
+        selectedTasks,
+      }),
+    [selectedTasks, tasks]
+  )
+  const tabItems = React.useMemo(
+    () => [
+      {
+        key: 'todo',
+        label: '本页待办',
+        count: taskPanelModel.pageTasks.length,
+        items: taskPanelModel.pageTasks,
+        emptyText: '本页暂无待处理 Workflow 任务。',
+      },
+      {
+        key: 'current',
+        label: '当前记录',
+        count: taskPanelModel.currentRecordTasks.length,
+        items: taskPanelModel.currentRecordTasks,
+        emptyText: selectedRecordLabel
+          ? '当前记录暂无 Workflow 任务。'
+          : '先选择一条业务记录，再查看当前记录协同。',
+      },
+      {
+        key: 'blocked',
+        label: '阻塞异常',
+        count: taskPanelModel.blockedTasks.length,
+        items: taskPanelModel.blockedTasks,
+        emptyText: '暂无阻塞或退回 Workflow 任务。',
+      },
+    ],
+    [selectedRecordLabel, taskPanelModel]
+  )
   const activeTab =
     tabItems.find((item) => item.key === activeTaskTab) || tabItems[0]
   const activeTabIndex = Math.max(

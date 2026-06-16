@@ -70,6 +70,7 @@ required_keys=(
   WEB_API_ORIGIN
   APP_JWT_SECRET
   APP_ADMIN_USERNAME
+  BOOTSTRAP_ADMIN_ONCE
   ERP_DEBUG_ENV
   ERP_DEBUG_SEED_ENABLED
   ERP_DEBUG_CLEANUP_ENABLED
@@ -107,6 +108,18 @@ if [[ "$mode" == "runtime" ]]; then
   fi
   if [[ "${values[ERP_DEBUG_CLEANUP_ENABLED]:-}" != "false" ]]; then
     echo "[verify-env] ERP_DEBUG_CLEANUP_ENABLED 必须为 false"
+    exit 1
+  fi
+  if [[ "${values[BOOTSTRAP_ADMIN_ONCE]:-}" != "true" && "${values[BOOTSTRAP_ADMIN_ONCE]:-}" != "false" ]]; then
+    echo "[verify-env] BOOTSTRAP_ADMIN_ONCE 必须为 true 或 false"
+    exit 1
+  fi
+  if [[ -n "${values[APP_ADMIN_PASSWORD]:-}" && "${values[BOOTSTRAP_ADMIN_ONCE]:-}" != "true" ]]; then
+    echo "[verify-env] APP_ADMIN_PASSWORD 只能在 BOOTSTRAP_ADMIN_ONCE=true 的首次初始化窗口临时注入"
+    exit 1
+  fi
+  if [[ "${values[BOOTSTRAP_ADMIN_ONCE]:-}" == "true" && -z "${values[APP_ADMIN_PASSWORD]:-}" ]]; then
+    echo "[verify-env] BOOTSTRAP_ADMIN_ONCE=true 时必须临时注入 APP_ADMIN_PASSWORD"
     exit 1
   fi
 fi

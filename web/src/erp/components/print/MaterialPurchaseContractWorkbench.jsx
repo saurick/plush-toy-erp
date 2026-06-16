@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { message, modal } from '@/common/utils/antdApp'
 import {
   applyDetailCellMerge,
@@ -161,7 +161,7 @@ function loadDraft(template, storageKey, options = {}) {
       clauses: parsedDraft?.clauses || template?.sample?.clauses,
       merges: parsedDraft?.merges || template?.sample?.merges,
     })
-  } catch (error) {
+  } catch {
     return fallbackDraft
   }
 }
@@ -478,16 +478,22 @@ export default function MaterialPurchaseContractWorkbench({
     setToolbarStatus(result.message)
   }
 
-  const buildPdfFileName = () =>
-    `${draft.contractNo || '采购合同'}-${draft.supplierName || '打印稿'}.pdf`
+  const buildPdfFileName = useCallback(
+    () =>
+      `${draft.contractNo || '采购合同'}-${draft.supplierName || '打印稿'}.pdf`,
+    [draft.contractNo, draft.supplierName]
+  )
 
-  const syncPrintRuntimeMargin = () =>
-    syncPrintPageMarginForPaper(paperRef.current, {
-      stageWrapElement: stageWrapRef.current,
-      paperContinuedClass: 'erp-material-contract-paper--continued',
-    })
+  const syncPrintRuntimeMargin = useCallback(
+    () =>
+      syncPrintPageMarginForPaper(paperRef.current, {
+        stageWrapElement: stageWrapRef.current,
+        paperContinuedClass: 'erp-material-contract-paper--continued',
+      }),
+    []
+  )
 
-  const warmupPreviewPDF = () => {
+  const warmupPreviewPDF = useCallback(() => {
     if (!paperRef.current || pdfAction || pdfPreviewPreloadRef.current) {
       return
     }
@@ -505,7 +511,7 @@ export default function MaterialPurchaseContractWorkbench({
         }
       })
     pdfPreviewPreloadRef.current = preloadPromise
-  }
+  }, [buildPdfFileName, pdfAction, syncPrintRuntimeMargin])
 
   useEffect(() => {
     pdfPreviewPreloadRef.current = null
@@ -513,7 +519,7 @@ export default function MaterialPurchaseContractWorkbench({
 
   useEffect(
     () => schedulePdfPreviewWarmup(warmupPreviewPDF),
-    [draft, pdfAction]
+    [draft, warmupPreviewPDF]
   )
 
   useEffect(

@@ -87,6 +87,12 @@ type Role func(*sql.Selector)
 // RolePermission is the predicate function for rolepermission builders.
 type RolePermission func(*sql.Selector)
 
+// RuntimeAuditEvent is the predicate function for runtimeauditevent builders.
+type RuntimeAuditEvent func(*sql.Selector)
+
+// RuntimeMarker is the predicate function for runtimemarker builders.
+type RuntimeMarker func(*sql.Selector)
+
 // SalesOrder is the predicate function for salesorder builders.
 type SalesOrder func(*sql.Selector)
 

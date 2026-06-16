@@ -38,6 +38,8 @@ import (
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
+	"server/internal/data/model/ent/runtimeauditevent"
+	"server/internal/data/model/ent/runtimemarker"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
@@ -116,6 +118,10 @@ type Client struct {
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
 	RolePermission *RolePermissionClient
+	// RuntimeAuditEvent is the client for interacting with the RuntimeAuditEvent builders.
+	RuntimeAuditEvent *RuntimeAuditEventClient
+	// RuntimeMarker is the client for interacting with the RuntimeMarker builders.
+	RuntimeMarker *RuntimeMarkerClient
 	// SalesOrder is the client for interacting with the SalesOrder builders.
 	SalesOrder *SalesOrderClient
 	// SalesOrderItem is the client for interacting with the SalesOrderItem builders.
@@ -178,6 +184,8 @@ func (c *Client) init() {
 	c.QualityInspection = NewQualityInspectionClient(c.config)
 	c.Role = NewRoleClient(c.config)
 	c.RolePermission = NewRolePermissionClient(c.config)
+	c.RuntimeAuditEvent = NewRuntimeAuditEventClient(c.config)
+	c.RuntimeMarker = NewRuntimeMarkerClient(c.config)
 	c.SalesOrder = NewSalesOrderClient(c.config)
 	c.SalesOrderItem = NewSalesOrderItemClient(c.config)
 	c.Shipment = NewShipmentClient(c.config)
@@ -309,6 +317,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		QualityInspection:             NewQualityInspectionClient(cfg),
 		Role:                          NewRoleClient(cfg),
 		RolePermission:                NewRolePermissionClient(cfg),
+		RuntimeAuditEvent:             NewRuntimeAuditEventClient(cfg),
+		RuntimeMarker:                 NewRuntimeMarkerClient(cfg),
 		SalesOrder:                    NewSalesOrderClient(cfg),
 		SalesOrderItem:                NewSalesOrderItemClient(cfg),
 		Shipment:                      NewShipmentClient(cfg),
@@ -367,6 +377,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		QualityInspection:             NewQualityInspectionClient(cfg),
 		Role:                          NewRoleClient(cfg),
 		RolePermission:                NewRolePermissionClient(cfg),
+		RuntimeAuditEvent:             NewRuntimeAuditEventClient(cfg),
+		RuntimeMarker:                 NewRuntimeMarkerClient(cfg),
 		SalesOrder:                    NewSalesOrderClient(cfg),
 		SalesOrderItem:                NewSalesOrderItemClient(cfg),
 		Shipment:                      NewShipmentClient(cfg),
@@ -414,9 +426,10 @@ func (c *Client) Use(hooks ...Hook) {
 		c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
 		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
 		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.Role, c.RolePermission, c.SalesOrder, c.SalesOrderItem,
-		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit, c.User,
-		c.Warehouse, c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.QualityInspection, c.Role, c.RolePermission, c.RuntimeAuditEvent,
+		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
+		c.StockReservation, c.Supplier, c.Unit, c.User, c.Warehouse,
+		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -432,9 +445,10 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
 		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
 		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.Role, c.RolePermission, c.SalesOrder, c.SalesOrderItem,
-		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit, c.User,
-		c.Warehouse, c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.QualityInspection, c.Role, c.RolePermission, c.RuntimeAuditEvent,
+		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
+		c.StockReservation, c.Supplier, c.Unit, c.User, c.Warehouse,
+		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -497,6 +511,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Role.mutate(ctx, m)
 	case *RolePermissionMutation:
 		return c.RolePermission.mutate(ctx, m)
+	case *RuntimeAuditEventMutation:
+		return c.RuntimeAuditEvent.mutate(ctx, m)
+	case *RuntimeMarkerMutation:
+		return c.RuntimeMarker.mutate(ctx, m)
 	case *SalesOrderMutation:
 		return c.SalesOrder.mutate(ctx, m)
 	case *SalesOrderItemMutation:
@@ -5537,6 +5555,272 @@ func (c *RolePermissionClient) mutate(ctx context.Context, m *RolePermissionMuta
 	}
 }
 
+// RuntimeAuditEventClient is a client for the RuntimeAuditEvent schema.
+type RuntimeAuditEventClient struct {
+	config
+}
+
+// NewRuntimeAuditEventClient returns a client for the RuntimeAuditEvent from the given config.
+func NewRuntimeAuditEventClient(c config) *RuntimeAuditEventClient {
+	return &RuntimeAuditEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `runtimeauditevent.Hooks(f(g(h())))`.
+func (c *RuntimeAuditEventClient) Use(hooks ...Hook) {
+	c.hooks.RuntimeAuditEvent = append(c.hooks.RuntimeAuditEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `runtimeauditevent.Intercept(f(g(h())))`.
+func (c *RuntimeAuditEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RuntimeAuditEvent = append(c.inters.RuntimeAuditEvent, interceptors...)
+}
+
+// Create returns a builder for creating a RuntimeAuditEvent entity.
+func (c *RuntimeAuditEventClient) Create() *RuntimeAuditEventCreate {
+	mutation := newRuntimeAuditEventMutation(c.config, OpCreate)
+	return &RuntimeAuditEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RuntimeAuditEvent entities.
+func (c *RuntimeAuditEventClient) CreateBulk(builders ...*RuntimeAuditEventCreate) *RuntimeAuditEventCreateBulk {
+	return &RuntimeAuditEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RuntimeAuditEventClient) MapCreateBulk(slice any, setFunc func(*RuntimeAuditEventCreate, int)) *RuntimeAuditEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RuntimeAuditEventCreateBulk{err: fmt.Errorf("calling to RuntimeAuditEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RuntimeAuditEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RuntimeAuditEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RuntimeAuditEvent.
+func (c *RuntimeAuditEventClient) Update() *RuntimeAuditEventUpdate {
+	mutation := newRuntimeAuditEventMutation(c.config, OpUpdate)
+	return &RuntimeAuditEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RuntimeAuditEventClient) UpdateOne(_m *RuntimeAuditEvent) *RuntimeAuditEventUpdateOne {
+	mutation := newRuntimeAuditEventMutation(c.config, OpUpdateOne, withRuntimeAuditEvent(_m))
+	return &RuntimeAuditEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RuntimeAuditEventClient) UpdateOneID(id int) *RuntimeAuditEventUpdateOne {
+	mutation := newRuntimeAuditEventMutation(c.config, OpUpdateOne, withRuntimeAuditEventID(id))
+	return &RuntimeAuditEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RuntimeAuditEvent.
+func (c *RuntimeAuditEventClient) Delete() *RuntimeAuditEventDelete {
+	mutation := newRuntimeAuditEventMutation(c.config, OpDelete)
+	return &RuntimeAuditEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RuntimeAuditEventClient) DeleteOne(_m *RuntimeAuditEvent) *RuntimeAuditEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RuntimeAuditEventClient) DeleteOneID(id int) *RuntimeAuditEventDeleteOne {
+	builder := c.Delete().Where(runtimeauditevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RuntimeAuditEventDeleteOne{builder}
+}
+
+// Query returns a query builder for RuntimeAuditEvent.
+func (c *RuntimeAuditEventClient) Query() *RuntimeAuditEventQuery {
+	return &RuntimeAuditEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRuntimeAuditEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RuntimeAuditEvent entity by its id.
+func (c *RuntimeAuditEventClient) Get(ctx context.Context, id int) (*RuntimeAuditEvent, error) {
+	return c.Query().Where(runtimeauditevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RuntimeAuditEventClient) GetX(ctx context.Context, id int) *RuntimeAuditEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *RuntimeAuditEventClient) Hooks() []Hook {
+	return c.hooks.RuntimeAuditEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *RuntimeAuditEventClient) Interceptors() []Interceptor {
+	return c.inters.RuntimeAuditEvent
+}
+
+func (c *RuntimeAuditEventClient) mutate(ctx context.Context, m *RuntimeAuditEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RuntimeAuditEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RuntimeAuditEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RuntimeAuditEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RuntimeAuditEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RuntimeAuditEvent mutation op: %q", m.Op())
+	}
+}
+
+// RuntimeMarkerClient is a client for the RuntimeMarker schema.
+type RuntimeMarkerClient struct {
+	config
+}
+
+// NewRuntimeMarkerClient returns a client for the RuntimeMarker from the given config.
+func NewRuntimeMarkerClient(c config) *RuntimeMarkerClient {
+	return &RuntimeMarkerClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `runtimemarker.Hooks(f(g(h())))`.
+func (c *RuntimeMarkerClient) Use(hooks ...Hook) {
+	c.hooks.RuntimeMarker = append(c.hooks.RuntimeMarker, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `runtimemarker.Intercept(f(g(h())))`.
+func (c *RuntimeMarkerClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RuntimeMarker = append(c.inters.RuntimeMarker, interceptors...)
+}
+
+// Create returns a builder for creating a RuntimeMarker entity.
+func (c *RuntimeMarkerClient) Create() *RuntimeMarkerCreate {
+	mutation := newRuntimeMarkerMutation(c.config, OpCreate)
+	return &RuntimeMarkerCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RuntimeMarker entities.
+func (c *RuntimeMarkerClient) CreateBulk(builders ...*RuntimeMarkerCreate) *RuntimeMarkerCreateBulk {
+	return &RuntimeMarkerCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RuntimeMarkerClient) MapCreateBulk(slice any, setFunc func(*RuntimeMarkerCreate, int)) *RuntimeMarkerCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RuntimeMarkerCreateBulk{err: fmt.Errorf("calling to RuntimeMarkerClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RuntimeMarkerCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RuntimeMarkerCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RuntimeMarker.
+func (c *RuntimeMarkerClient) Update() *RuntimeMarkerUpdate {
+	mutation := newRuntimeMarkerMutation(c.config, OpUpdate)
+	return &RuntimeMarkerUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RuntimeMarkerClient) UpdateOne(_m *RuntimeMarker) *RuntimeMarkerUpdateOne {
+	mutation := newRuntimeMarkerMutation(c.config, OpUpdateOne, withRuntimeMarker(_m))
+	return &RuntimeMarkerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RuntimeMarkerClient) UpdateOneID(id int) *RuntimeMarkerUpdateOne {
+	mutation := newRuntimeMarkerMutation(c.config, OpUpdateOne, withRuntimeMarkerID(id))
+	return &RuntimeMarkerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RuntimeMarker.
+func (c *RuntimeMarkerClient) Delete() *RuntimeMarkerDelete {
+	mutation := newRuntimeMarkerMutation(c.config, OpDelete)
+	return &RuntimeMarkerDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RuntimeMarkerClient) DeleteOne(_m *RuntimeMarker) *RuntimeMarkerDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RuntimeMarkerClient) DeleteOneID(id int) *RuntimeMarkerDeleteOne {
+	builder := c.Delete().Where(runtimemarker.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RuntimeMarkerDeleteOne{builder}
+}
+
+// Query returns a query builder for RuntimeMarker.
+func (c *RuntimeMarkerClient) Query() *RuntimeMarkerQuery {
+	return &RuntimeMarkerQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRuntimeMarker},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RuntimeMarker entity by its id.
+func (c *RuntimeMarkerClient) Get(ctx context.Context, id int) (*RuntimeMarker, error) {
+	return c.Query().Where(runtimemarker.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RuntimeMarkerClient) GetX(ctx context.Context, id int) *RuntimeMarker {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *RuntimeMarkerClient) Hooks() []Hook {
+	return c.hooks.RuntimeMarker
+}
+
+// Interceptors returns the client interceptors.
+func (c *RuntimeMarkerClient) Interceptors() []Interceptor {
+	return c.inters.RuntimeMarker
+}
+
+func (c *RuntimeMarkerClient) mutate(ctx context.Context, m *RuntimeMarkerMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RuntimeMarkerCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RuntimeMarkerUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RuntimeMarkerUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RuntimeMarkerDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RuntimeMarker mutation op: %q", m.Op())
+	}
+}
+
 // SalesOrderClient is a client for the SalesOrder schema.
 type SalesOrderClient struct {
 	config
@@ -8008,9 +8292,10 @@ type (
 		Permission, Product, ProductSKU, ProductionFact, PurchaseOrder,
 		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
 		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RolePermission, SalesOrder,
-		SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit, User,
-		Warehouse, WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Hook
+		PurchaseReturnItem, QualityInspection, Role, RolePermission, RuntimeAuditEvent,
+		RuntimeMarker, SalesOrder, SalesOrderItem, Shipment, ShipmentItem,
+		StockReservation, Supplier, Unit, User, Warehouse, WorkflowBusinessState,
+		WorkflowTask, WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
 		AdminUser, AdminUserRole, BOMHeader, BOMItem, Contact, Customer, FinanceFact,
@@ -8018,9 +8303,9 @@ type (
 		Permission, Product, ProductSKU, ProductionFact, PurchaseOrder,
 		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
 		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RolePermission, SalesOrder,
-		SalesOrderItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit, User,
-		Warehouse, WorkflowBusinessState, WorkflowTask,
-		WorkflowTaskEvent []ent.Interceptor
+		PurchaseReturnItem, QualityInspection, Role, RolePermission, RuntimeAuditEvent,
+		RuntimeMarker, SalesOrder, SalesOrderItem, Shipment, ShipmentItem,
+		StockReservation, Supplier, Unit, User, Warehouse, WorkflowBusinessState,
+		WorkflowTask, WorkflowTaskEvent []ent.Interceptor
 	}
 )

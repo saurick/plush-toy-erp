@@ -64,6 +64,35 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions(t *te
 		t.Fatalf("expected usecase to run after shipment create permission, got %#v", createRes)
 	}
 
+	withItemsParams := mustJSONRPCStruct(t, map[string]any{
+		"shipment_no":     "SHP-JSONRPC-WITH-ITEMS-001",
+		"idempotency_key": "SHP-JSONRPC-WITH-ITEMS-001",
+		"items": []any{
+			map[string]any{
+				"product_id":   1,
+				"warehouse_id": 1,
+				"unit_id":      1,
+				"quantity":     "1",
+			},
+		},
+	})
+	j = newOperationalFactJSONRPCTestData(oldOutboundAdmin)
+	_, createWithItemsRes, err := j.handleOperationalFact(ctx, "create_shipment_with_items", "4a", withItemsParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createWithItemsRes == nil || createWithItemsRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected shipment create-with-items permission denied, got %#v", createWithItemsRes)
+	}
+	j = newOperationalFactJSONRPCTestData(createAdmin)
+	_, createWithItemsRes, err = j.handleOperationalFact(ctx, "create_shipment_with_items", "4b", withItemsParams)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if createWithItemsRes == nil || createWithItemsRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected usecase to run after shipment create-with-items permission, got %#v", createWithItemsRes)
+	}
+
 	shipAdmin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionShipmentShip)
 	j = newOperationalFactJSONRPCTestData(shipAdmin)
 	_, shipRes, err := j.handleOperationalFact(ctx, "ship_shipment", "5", mustJSONRPCStruct(t, map[string]any{"id": 99}))

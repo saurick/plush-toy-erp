@@ -34,6 +34,8 @@ import (
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
 	"server/internal/data/model/ent/rolepermission"
+	"server/internal/data/model/ent/runtimeauditevent"
+	"server/internal/data/model/ent/runtimemarker"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/shipment"
@@ -138,6 +140,8 @@ func checkColumn(t, c string) error {
 			qualityinspection.Table:             qualityinspection.ValidColumn,
 			role.Table:                          role.ValidColumn,
 			rolepermission.Table:                rolepermission.ValidColumn,
+			runtimeauditevent.Table:             runtimeauditevent.ValidColumn,
+			runtimemarker.Table:                 runtimemarker.ValidColumn,
 			salesorder.Table:                    salesorder.ValidColumn,
 			salesorderitem.Table:                salesorderitem.ValidColumn,
 			shipment.Table:                      shipment.ValidColumn,

@@ -13,7 +13,6 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
@@ -21,6 +20,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   BusinessDataTable,
+  DateRangeFilter,
   BusinessFilterPanel,
   BusinessPageLayout,
   PageHeaderCard,
@@ -68,6 +68,11 @@ const SORT_OPTIONS = [
   { label: '采购日期旧到新', value: 'purchase_date:asc' },
   { label: '预计到货新到旧', value: 'expected_arrival_date:desc' },
   { label: '预计到货旧到新', value: 'expected_arrival_date:asc' },
+]
+
+const DATE_FILTER_OPTIONS = [
+  { label: '采购日期', value: 'purchase_date' },
+  { label: '预计到货', value: 'expected_arrival_date' },
 ]
 
 const LIFECYCLE_ACTIONS = [
@@ -134,6 +139,63 @@ function createBlankLine(lineNo = 1) {
   }
 }
 
+function decimalNumber(value) {
+  const numeric = Number(
+    String(value ?? '')
+      .replace(/,/g, '')
+      .trim()
+  )
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+function formatSummaryNumber(value, fractionDigits = 0) {
+  if (!Number.isFinite(value) || value === 0) {
+    return fractionDigits > 0 ? Number(0).toFixed(fractionDigits) : '0'
+  }
+  return fractionDigits > 0
+    ? value.toFixed(fractionDigits)
+    : String(Number(value.toFixed(4)))
+}
+
+function purchaseLineAmount(line = {}) {
+  const explicitAmount = decimalNumber(line.amount)
+  if (explicitAmount > 0) {
+    return explicitAmount
+  }
+  return decimalNumber(line.purchased_quantity) * decimalNumber(line.unit_price)
+}
+
+function summarizePurchaseLines(lines = []) {
+  const items = Array.isArray(lines) ? lines : []
+  return items.reduce(
+    (summary, line) => ({
+      count: summary.count + 1,
+      quantity: summary.quantity + decimalNumber(line?.purchased_quantity),
+      amount: summary.amount + purchaseLineAmount(line),
+    }),
+    { count: 0, quantity: 0, amount: 0 }
+  )
+}
+
+function getNextLineNo(lines = []) {
+  const maxLineNo = lines.reduce((maxValue, line) => {
+    const lineNo = Number(line?.line_no || 0)
+    return Number.isFinite(lineNo) ? Math.max(maxValue, lineNo) : maxValue
+  }, 0)
+  return maxLineNo + 1
+}
+
+function createLineFromMaterial(material = {}, lineNo = 1) {
+  return {
+    ...createBlankLine(lineNo),
+    material_id: material.id,
+    unit_id: material.default_unit_id,
+    material_code_snapshot: material.code || '',
+    material_name_snapshot: material.name || '',
+    color_snapshot: material.color || '',
+  }
+}
+
 function normalizeLine(item = {}) {
   return {
     id: item.id,
@@ -177,6 +239,9 @@ export default function V1PurchaseOrdersPage() {
   const [materials, setMaterials] = useState([])
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
+  const [dateFilterField, setDateFilterField] = useState('purchase_date')
+  const [dateFilterStart, setDateFilterStart] = useState('')
+  const [dateFilterEnd, setDateFilterEnd] = useState('')
   const [sortValue, setSortValue] = useState('updated_at:desc')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [editingOrder, setEditingOrder] = useState(null)
@@ -201,6 +266,8 @@ export default function V1PurchaseOrdersPage() {
       })),
     [materials]
   )
+  const watchedItems = Form.useWatch('items', form) || []
+  const lineSummary = summarizePurchaseLines(watchedItems)
 
   const loadReferenceData = useCallback(async () => {
     try {
@@ -222,6 +289,9 @@ export default function V1PurchaseOrdersPage() {
       const data = await listPurchaseOrders({
         keyword,
         lifecycle_status: status,
+        date_field: dateFilterField,
+        date_from: dateFilterStart,
+        date_to: dateFilterEnd,
         sort_by: sortBy,
         sort_direction: sortDirection,
         limit: pagination.pageSize,
@@ -234,7 +304,15 @@ export default function V1PurchaseOrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [keyword, pagination.current, pagination.pageSize, sortValue, status])
+  }, [
+    dateFilterEnd,
+    dateFilterField,
+    dateFilterStart,
+    keyword,
+    pagination,
+    sortValue,
+    status,
+  ])
 
   const loadOrderItems = useCallback(async (order) => {
     if (!order?.id) {
@@ -500,6 +578,7 @@ export default function V1PurchaseOrdersPage() {
           onSearch={loadOrders}
         />
         <SelectFilter
+          className="erp-business-filter-control--status"
           value={status}
           options={STATUS_OPTIONS}
           onChange={(value) => {
@@ -507,7 +586,26 @@ export default function V1PurchaseOrdersPage() {
             setStatus(value)
           }}
         />
+        <DateRangeFilter
+          options={DATE_FILTER_OPTIONS}
+          value={dateFilterField}
+          onTypeChange={(value) => {
+            setPagination((current) => ({ ...current, current: 1 }))
+            setDateFilterField(value || 'purchase_date')
+          }}
+          startValue={dateFilterStart}
+          endValue={dateFilterEnd}
+          onStartChange={(value) => {
+            setPagination((current) => ({ ...current, current: 1 }))
+            setDateFilterStart(value)
+          }}
+          onEndChange={(value) => {
+            setPagination((current) => ({ ...current, current: 1 }))
+            setDateFilterEnd(value)
+          }}
+        />
         <SelectFilter
+          className="erp-business-filter-control--sort"
           value={sortValue}
           options={SORT_OPTIONS}
           onChange={setSortValue}
@@ -565,152 +663,234 @@ export default function V1PurchaseOrdersPage() {
           <Form.Item name="supplier_snapshot" hidden>
             <Input />
           </Form.Item>
-          <div className="erp-business-form-grid erp-business-form-grid--three">
-            <Form.Item
-              name="purchase_order_no"
-              label="采购单号"
-              rules={[{ required: true, message: '请输入采购单号' }]}
-            >
-              <Input maxLength={64} />
-            </Form.Item>
-            <Form.Item
-              name="supplier_id"
-              label="供应商"
-              rules={[{ required: true, message: '请选择供应商' }]}
-            >
-              <Select
-                showSearch
-                options={supplierOptions}
-                optionFilterProp="label"
-                onChange={handleSupplierChange}
-              />
-            </Form.Item>
-            <Form.Item name="supplier_purchase_order_no" label="供应商单号">
-              <Input maxLength={128} />
-            </Form.Item>
-            <Form.Item
-              name="purchase_date"
-              label="采购日期"
-              rules={[{ required: true, message: '请选择采购日期' }]}
-            >
-              <Input type="date" />
-            </Form.Item>
-            <Form.Item name="expected_arrival_date" label="预计到货">
-              <Input type="date" />
-            </Form.Item>
-            <Form.Item name="note" label="备注">
-              <Input maxLength={255} />
-            </Form.Item>
-          </div>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name="purchase_order_no"
+            label="采购单号"
+            rules={[{ required: true, message: '请输入采购单号' }]}
+          >
+            <Input maxLength={64} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name="supplier_id"
+            label="供应商"
+            rules={[{ required: true, message: '请选择供应商' }]}
+          >
+            <Select
+              showSearch
+              options={supplierOptions}
+              optionFilterProp="label"
+              onChange={handleSupplierChange}
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name="supplier_purchase_order_no"
+            label="供应商单号"
+          >
+            <Input maxLength={128} />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name="purchase_date"
+            label="采购日期"
+            rules={[{ required: true, message: '请选择采购日期' }]}
+          >
+            <Input type="date" />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name="expected_arrival_date"
+            label="预计到货"
+          >
+            <Input type="date" />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            name="note"
+            label="备注"
+          >
+            <Input maxLength={255} />
+          </Form.Item>
 
-          <Form.List name="items">
-            {(fields, { add, remove }) => (
-              <Space direction="vertical" size={12} style={{ width: '100%' }}>
-                <Space>
-                  <strong>采购明细</strong>
-                  <Button
-                    icon={<PlusOutlined />}
-                    onClick={() => add(createBlankLine(fields.length + 1))}
-                  >
-                    添加行
-                  </Button>
-                </Space>
-                {fields.map((field) => (
-                  <div className="erp-business-form-grid" key={field.key}>
-                    <Form.Item name={[field.name, 'id']} hidden>
-                      <Input />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'line_no']}
-                      label="行号"
-                      rules={[{ required: true, message: '请输入行号' }]}
-                    >
-                      <InputNumber
-                        min={1}
-                        precision={0}
-                        style={{ width: '100%' }}
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'material_id']}
-                      label="材料"
-                      rules={[{ required: true, message: '请选择材料' }]}
-                    >
+          <section className="erp-sales-order-lines-form">
+            <Form.List name="items">
+              {(fields, { add, remove }) => (
+                <>
+                  <div className="erp-sales-order-lines-form__head">
+                    <div>
+                      <strong>采购明细</strong>
+                      <span>同一个采购订单内维护多条供应商承诺明细。</span>
+                    </div>
+                    <div className="erp-line-items-form__tools">
                       <Select
                         showSearch
+                        allowClear
+                        className="erp-line-items-form__import"
+                        placeholder="从材料库导入"
+                        value={undefined}
                         options={materialOptions}
                         optionFilterProp="label"
-                        onChange={(value) =>
-                          handleMaterialChange(field.name, value)
-                        }
+                        onChange={(value, option) => {
+                          const currentLines = form.getFieldValue('items') || []
+                          const material =
+                            option?.item ||
+                            materials.find((item) => item.id === value)
+                          if (!material) return
+                          add(
+                            createLineFromMaterial(
+                              material,
+                              getNextLineNo(currentLines)
+                            )
+                          )
+                        }}
                       />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'unit_id']}
-                      label="单位ID"
-                      rules={[{ required: true, message: '请输入单位ID' }]}
-                    >
-                      <InputNumber
-                        min={1}
-                        precision={0}
-                        style={{ width: '100%' }}
-                      />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'material_code_snapshot']}
-                      label="材料编码快照"
-                    >
-                      <Input maxLength={64} />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'material_name_snapshot']}
-                      label="材料名称快照"
-                    >
-                      <Input maxLength={255} />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'color_snapshot']}
-                      label="颜色快照"
-                    >
-                      <Input maxLength={64} />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'purchased_quantity']}
-                      label="采购数量"
-                      rules={[{ required: true, message: '请输入采购数量' }]}
-                    >
-                      <Input />
-                    </Form.Item>
-                    <Form.Item name={[field.name, 'unit_price']} label="单价">
-                      <Input />
-                    </Form.Item>
-                    <Form.Item name={[field.name, 'amount']} label="金额">
-                      <Input placeholder="留空时按数量和单价派生" />
-                    </Form.Item>
-                    <Form.Item
-                      name={[field.name, 'expected_arrival_date']}
-                      label="预计到货"
-                    >
-                      <Input type="date" />
-                    </Form.Item>
-                    <Form.Item name={[field.name, 'note']} label="备注">
-                      <Input maxLength={255} />
-                    </Form.Item>
-                    <Form.Item label="操作">
                       <Button
-                        danger
-                        icon={<DeleteOutlined />}
-                        disabled={fields.length <= 1}
-                        onClick={() => remove(field.name)}
+                        icon={<PlusOutlined />}
+                        onClick={() => {
+                          const currentLines = form.getFieldValue('items') || []
+                          add(createBlankLine(getNextLineNo(currentLines)))
+                        }}
                       >
-                        删除行
+                        添加行
                       </Button>
-                    </Form.Item>
+                      <div className="erp-line-items-form__stats">
+                        <span className="erp-line-items-form__stat">
+                          已录入
+                          <strong className="erp-line-items-form__stat-value">
+                            {lineSummary.count}
+                          </strong>
+                          条
+                        </span>
+                        <span className="erp-line-items-form__stat">
+                          数量合计
+                          <strong className="erp-line-items-form__stat-value">
+                            {formatSummaryNumber(lineSummary.quantity)}
+                          </strong>
+                        </span>
+                        <span className="erp-line-items-form__stat">
+                          金额合计
+                          <strong className="erp-line-items-form__stat-value">
+                            {formatSummaryNumber(lineSummary.amount, 2)}
+                          </strong>
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </Space>
-            )}
-          </Form.List>
+                  <div className="erp-sales-order-lines-form__list">
+                    {fields.map((field, index) => (
+                      <div
+                        className="erp-sales-order-lines-form__row"
+                        key={field.key}
+                      >
+                        <div className="erp-sales-order-lines-form__row-head">
+                          <strong>第 {index + 1} 行</strong>
+                          <Button
+                            danger
+                            type="text"
+                            icon={<DeleteOutlined />}
+                            disabled={fields.length <= 1}
+                            onClick={() => remove(field.name)}
+                          >
+                            删除行
+                          </Button>
+                        </div>
+                        <div className="erp-sales-order-lines-form__grid">
+                          <Form.Item name={[field.name, 'id']} hidden>
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'line_no']}
+                            label="行号"
+                            rules={[{ required: true, message: '请输入行号' }]}
+                          >
+                            <InputNumber
+                              min={1}
+                              precision={0}
+                              style={{ width: '100%' }}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'material_id']}
+                            label="材料"
+                            rules={[{ required: true, message: '请选择材料' }]}
+                          >
+                            <Select
+                              showSearch
+                              options={materialOptions}
+                              optionFilterProp="label"
+                              onChange={(value) =>
+                                handleMaterialChange(field.name, value)
+                              }
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'unit_id']}
+                            label="单位ID"
+                            rules={[
+                              { required: true, message: '请输入单位ID' },
+                            ]}
+                          >
+                            <InputNumber
+                              min={1}
+                              precision={0}
+                              style={{ width: '100%' }}
+                            />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'material_code_snapshot']}
+                            label="材料编码快照"
+                          >
+                            <Input maxLength={64} />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'material_name_snapshot']}
+                            label="材料名称快照"
+                          >
+                            <Input maxLength={255} />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'color_snapshot']}
+                            label="颜色快照"
+                          >
+                            <Input maxLength={64} />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'purchased_quantity']}
+                            label="采购数量"
+                            rules={[
+                              { required: true, message: '请输入采购数量' },
+                            ]}
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'unit_price']}
+                            label="单价"
+                          >
+                            <Input />
+                          </Form.Item>
+                          <Form.Item name={[field.name, 'amount']} label="金额">
+                            <Input placeholder="留空时按数量和单价派生" />
+                          </Form.Item>
+                          <Form.Item
+                            name={[field.name, 'expected_arrival_date']}
+                            label="预计到货"
+                          >
+                            <Input type="date" />
+                          </Form.Item>
+                          <Form.Item name={[field.name, 'note']} label="备注">
+                            <Input maxLength={255} />
+                          </Form.Item>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Form.List>
+          </section>
         </Form>
       </Modal>
     </BusinessPageLayout>

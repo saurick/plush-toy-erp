@@ -440,20 +440,23 @@ export default function BOMVersionsPage() {
     setItemModalOpen(true)
   }
 
-  const openEditItem = (item) => {
-    if (!item?.id) return
-    setEditingItem(item)
-    itemForm.resetFields()
-    itemForm.setFieldsValue({
-      material_id: item.material_id,
-      quantity: item.quantity,
-      unit_id: item.unit_id,
-      loss_rate: item.loss_rate,
-      position: item.position || '',
-      note: item.note || '',
-    })
-    setItemModalOpen(true)
-  }
+  const openEditItem = useCallback(
+    (item) => {
+      if (!item?.id) return
+      setEditingItem(item)
+      itemForm.resetFields()
+      itemForm.setFieldsValue({
+        material_id: item.material_id,
+        quantity: item.quantity,
+        unit_id: item.unit_id,
+        loss_rate: item.loss_rate,
+        position: item.position || '',
+        note: item.note || '',
+      })
+      setItemModalOpen(true)
+    },
+    [itemForm]
+  )
 
   const saveItem = async () => {
     const values = await itemForm.validateFields()
@@ -478,19 +481,22 @@ export default function BOMVersionsPage() {
     }
   }
 
-  const removeItem = async (item) => {
-    setSaving(true)
-    try {
-      await deleteBOMItem({ id: item.id })
-      message.success('BOM 明细已删除')
-      await loadDetail(selectedVersion?.id)
-      await loadVersions()
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '删除 BOM 明细'))
-    } finally {
-      setSaving(false)
-    }
-  }
+  const removeItem = useCallback(
+    async (item) => {
+      setSaving(true)
+      try {
+        await deleteBOMItem({ id: item.id })
+        message.success('BOM 明细已删除')
+        await loadDetail(selectedVersion?.id)
+        await loadVersions()
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '删除 BOM 明细'))
+      } finally {
+        setSaving(false)
+      }
+    },
+    [loadDetail, loadVersions, selectedVersion?.id]
+  )
 
   const activateSelected = async () => {
     if (!selectedVersion?.id) return
@@ -622,7 +628,7 @@ export default function BOMVersionsPage() {
           ),
       },
     ],
-    [selectedCanEdit]
+    [openEditItem, removeItem, selectedCanEdit]
   )
 
   return (

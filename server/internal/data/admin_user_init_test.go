@@ -2,8 +2,10 @@ package data
 
 import (
 	"context"
+	"database/sql"
 	"io"
 	"regexp"
+	"strings"
 	"testing"
 
 	"server/internal/conf"
@@ -54,10 +56,29 @@ func TestInitAdminUsersIfNeededSkipsWhenAdminAlreadyExists(t *testing.T) {
 	)).
 		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectClose()
+
+	err = InitAdminUsersIfNeeded(context.Background(), &Data{sqldb: db}, testAdminInitConfig(), log.NewHelper(log.NewStdLogger(io.Discard)))
+	if err != nil {
+		t.Fatalf("InitAdminUsersIfNeeded() error = %v", err)
+	}
+	mustCloseDB(t, db)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestInitAdminUsersIfNeededDoesNotPromoteExistingBootstrapAdmin(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+
 	mock.ExpectExec(regexp.QuoteMeta(
-		"UPDATE admin_users SET is_super_admin = TRUE, updated_at = $2 WHERE username = $1 AND is_super_admin = FALSE",
+		"INSERT INTO admin_users (username, password_hash, is_super_admin, disabled, created_at, updated_at) VALUES ($1, $2, TRUE, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
 	)).
-		WithArgs("trialadmin", sqlmock.AnyArg()).
+		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectClose()
 
@@ -72,29 +93,144 @@ func TestInitAdminUsersIfNeededSkipsWhenAdminAlreadyExists(t *testing.T) {
 	}
 }
 
-func TestInitAdminUsersIfNeededPromotesExistingBootstrapAdmin(t *testing.T) {
+func TestInitAdminUsersIfNeededProductionRequiresOnceFlag(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New() error = %v", err)
 	}
 
 	mock.ExpectExec(regexp.QuoteMeta(
+		"INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)",
+	)).
+		WithArgs(adminBootstrapEventBlocked, adminBootstrapMarkerKey, adminBootstrapAuditSource, sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectClose()
+
+	err = initAdminUsersIfNeeded(context.Background(), &Data{sqldb: db}, testAdminInitConfig(), log.NewHelper(log.NewStdLogger(io.Discard)), adminBootstrapOptions{
+		production: true,
+		once:       false,
+	})
+	if err == nil || !strings.Contains(err.Error(), "BOOTSTRAP_ADMIN_ONCE=true") {
+		t.Fatalf("expected BOOTSTRAP_ADMIN_ONCE error, got %v", err)
+	}
+	mustCloseDB(t, db)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestInitAdminUsersIfNeededProductionOnceCreatesMarkerAndAudit(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(
+		"SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1",
+	)).
+		WithArgs(adminBootstrapMarkerKey).
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectExec(regexp.QuoteMeta(
+		"INSERT INTO admin_users (username, password_hash, is_super_admin, disabled, created_at, updated_at) VALUES ($1, $2, TRUE, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
+	)).
+		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(
+		"INSERT INTO runtime_markers (marker_key, marker_value, created_at, updated_at) VALUES ($1, $2, $3, $4) ON CONFLICT (marker_key) DO NOTHING",
+	)).
+		WithArgs(adminBootstrapMarkerKey, sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec(regexp.QuoteMeta(
+		"INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)",
+	)).
+		WithArgs(adminBootstrapEventCompleted, adminBootstrapMarkerKey, adminBootstrapAuditSource, sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
+	mock.ExpectClose()
+
+	err = initAdminUsersIfNeeded(context.Background(), &Data{sqldb: db}, testAdminInitConfig(), log.NewHelper(log.NewStdLogger(io.Discard)), adminBootstrapOptions{
+		production: true,
+		once:       true,
+	})
+	if err != nil {
+		t.Fatalf("InitAdminUsersIfNeeded() error = %v", err)
+	}
+	mustCloseDB(t, db)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestInitAdminUsersIfNeededProductionOnceRejectsCompletedMarker(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(
+		"SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1",
+	)).
+		WithArgs(adminBootstrapMarkerKey).
+		WillReturnRows(sqlmock.NewRows([]string{"marker_value"}).AddRow("{}"))
+	mock.ExpectExec(regexp.QuoteMeta(
+		"INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)",
+	)).
+		WithArgs(adminBootstrapEventBlocked, adminBootstrapMarkerKey, adminBootstrapAuditSource, sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	err = initAdminUsersIfNeeded(context.Background(), &Data{sqldb: db}, testAdminInitConfig(), log.NewHelper(log.NewStdLogger(io.Discard)), adminBootstrapOptions{
+		production: true,
+		once:       true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "already completed") {
+		t.Fatalf("expected completed marker error, got %v", err)
+	}
+	_ = db.Close()
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestInitAdminUsersIfNeededProductionOnceRejectsExistingUsername(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(
+		"SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1",
+	)).
+		WithArgs(adminBootstrapMarkerKey).
+		WillReturnError(sql.ErrNoRows)
+	mock.ExpectExec(regexp.QuoteMeta(
 		"INSERT INTO admin_users (username, password_hash, is_super_admin, disabled, created_at, updated_at) VALUES ($1, $2, TRUE, FALSE, $3, $4) ON CONFLICT (username) DO NOTHING",
 	)).
 		WithArgs("trialadmin", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(regexp.QuoteMeta(
-		"UPDATE admin_users SET is_super_admin = TRUE, updated_at = $2 WHERE username = $1 AND is_super_admin = FALSE",
+		"INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)",
 	)).
-		WithArgs("trialadmin", sqlmock.AnyArg()).
+		WithArgs(adminBootstrapEventBlocked, adminBootstrapMarkerKey, adminBootstrapAuditSource, sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectRollback()
 	mock.ExpectClose()
 
-	err = InitAdminUsersIfNeeded(context.Background(), &Data{sqldb: db}, testAdminInitConfig(), log.NewHelper(log.NewStdLogger(io.Discard)))
-	if err != nil {
-		t.Fatalf("InitAdminUsersIfNeeded() error = %v", err)
+	err = initAdminUsersIfNeeded(context.Background(), &Data{sqldb: db}, testAdminInitConfig(), log.NewHelper(log.NewStdLogger(io.Discard)), adminBootstrapOptions{
+		production: true,
+		once:       true,
+	})
+	if err == nil || !strings.Contains(err.Error(), "username already exists") {
+		t.Fatalf("expected existing username error, got %v", err)
 	}
-	mustCloseDB(t, db)
+	_ = db.Close()
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("ExpectationsWereMet() error = %v", err)

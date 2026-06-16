@@ -17,6 +17,7 @@ print_help() {
   industry-template-boundaries: 行业模板候选边界检查
   private-deployment-boundaries: 多客户私有化复制边界检查
   deployment-package-lint: 客户私有化部署资料包结构和敏感文件检查
+  release-evidence-gate: yoyoosun 发布证据门禁工具测试
   customer-config-boundaries: 客户配置草案边界检查
   customer-import-tooling: 客户导入 dry-run / freeze / execution loader 测试
   trial-simulated-data: 试用模拟数据工具测试
@@ -103,6 +104,11 @@ fi
 if [ -f "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs" ]; then
   echo "[qa:full] 运行客户私有化部署资料包检查测试"
   node --test "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs"
+fi
+
+if [ -f "$ROOT_DIR/scripts/deploy/release-evidence-gate.test.mjs" ]; then
+  echo "[qa:full] 运行 yoyoosun 发布证据门禁测试"
+  node --test "$ROOT_DIR/scripts/deploy/release-evidence-gate.test.mjs"
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then

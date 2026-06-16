@@ -1581,6 +1581,54 @@ var (
 			},
 		},
 	}
+	// RuntimeAuditEventsColumns holds the columns for the "runtime_audit_events" table.
+	RuntimeAuditEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "event_type", Type: field.TypeString, Size: 128},
+		{Name: "event_key", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "source", Type: field.TypeString, Size: 128, Default: "server_bootstrap"},
+		{Name: "payload", Type: field.TypeString, Size: 32768, Default: "{}"},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// RuntimeAuditEventsTable holds the schema information for the "runtime_audit_events" table.
+	RuntimeAuditEventsTable = &schema.Table{
+		Name:       "runtime_audit_events",
+		Columns:    RuntimeAuditEventsColumns,
+		PrimaryKey: []*schema.Column{RuntimeAuditEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "runtimeauditevent_event_type_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RuntimeAuditEventsColumns[1], RuntimeAuditEventsColumns[5]},
+			},
+			{
+				Name:    "runtimeauditevent_event_key_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{RuntimeAuditEventsColumns[2], RuntimeAuditEventsColumns[5]},
+			},
+		},
+	}
+	// RuntimeMarkersColumns holds the columns for the "runtime_markers" table.
+	RuntimeMarkersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "marker_key", Type: field.TypeString, Size: 128},
+		{Name: "marker_value", Type: field.TypeString, Size: 4096, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// RuntimeMarkersTable holds the schema information for the "runtime_markers" table.
+	RuntimeMarkersTable = &schema.Table{
+		Name:       "runtime_markers",
+		Columns:    RuntimeMarkersColumns,
+		PrimaryKey: []*schema.Column{RuntimeMarkersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "runtimemarker_marker_key",
+				Unique:  true,
+				Columns: []*schema.Column{RuntimeMarkersColumns[1]},
+			},
+		},
+	}
 	// SalesOrdersColumns holds the columns for the "sales_orders" table.
 	SalesOrdersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -2257,6 +2305,8 @@ var (
 		QualityInspectionsTable,
 		RolesTable,
 		RolePermissionsTable,
+		RuntimeAuditEventsTable,
+		RuntimeMarkersTable,
 		SalesOrdersTable,
 		SalesOrderItemsTable,
 		ShipmentsTable,

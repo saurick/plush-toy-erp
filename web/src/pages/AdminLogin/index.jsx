@@ -26,7 +26,6 @@ import {
   ENTRY_TARGET,
   getEntryConfig,
   isDesktopEntryEnabled,
-  isMobileRoleEntryEnabled,
   isMobileTasksEntryEnabled,
   parseMobileRoleFromPath,
   rememberEntryChoice,

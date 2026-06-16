@@ -14,6 +14,8 @@
 ```bash
 bash deployments/yoyoosun/scripts/verify-env.sh --example
 bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --report output/yoyoosun-smoke.json
+bash deployments/yoyoosun/scripts/collect-evidence.sh --release-version <release-version> --output deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
+node scripts/deploy/release-evidence-gate.mjs --customer yoyoosun --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
 真实生产 `.env`、备份文件、证书私钥和 raw customer files 不得放入本目录。

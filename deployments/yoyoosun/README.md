@@ -62,10 +62,12 @@ server/deploy/compose/prod
 
 ```bash
 node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun
+node scripts/deploy/release-evidence-gate.mjs --customer yoyoosun --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 bash deployments/yoyoosun/scripts/verify-env.sh --example
 ```
 
 `deployment-package-lint` 会检查资料包必需文件、禁止文件类型、真实 secret 高风险模式和基础样例结构。
+`release-evidence-gate` 只在实际发布 / 客户试用交付前执行，检查本次 release evidence、pre-migration backup evidence、migration status、smoke report 和 sign-off checklist 是否已脱敏并填齐；不会读取真实 `.env`、真实备份文件或客户 raw files。
 
 ## 仍不做 / Out Of Scope
 

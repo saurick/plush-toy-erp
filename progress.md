@@ -25,12 +25,116 @@
 - `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、任务中心、业务管理中心、产品核心菜单覆盖矩阵、正式菜单候选导航、业务模块列表页、业务详情页、新建 / 编辑业务表单弹窗、业务页协同入口组件、局部动作弹窗和模板打印中心十一个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
 - 原型查看器和原型 README 已补“参照范围”口径：`admin-command-center-v1` 是判断型工作台样板，`core-menu-coverage-v1` 是内部覆盖矩阵，`formal-menu-candidate-v1` 是正式菜单候选原型；它们都不是正式菜单、路由、权限或 seedData 映射表，真正对应关系必须在进入真实实现任务时回到代码、菜单配置和 RBAC 重新核对。
 
+## 2026-06-16 16:59 CST
+
+- 完成：按 Product Design 原型口径收口业务弹窗控件高度，业务页筛选输入 / 下拉 / 日期输入统一到 36px；业务表单弹窗单行控件统一 36px，textarea 按 3 倍行高，多明细 item 内 textarea 保持单行高度并横向滚动。
+- 完成：销售订单和采购订单新建 / 编辑弹窗补“从 SKU / 材料库导入”、已录入条数、数量合计和金额合计；销售新建默认带 1 条空订单行，采购顶部字段改用共享业务表单网格，采购明细数字输入撑满 item 列宽。
+- 完成：`style:l1` 新增采购订单新建弹窗断言和截图，覆盖表单弹窗、采购明细、导入入口、录入 / 数量 / 金额统计和控件尺寸。
+- 下一步：后续若继续扩展 BOM / 出货等特殊明细弹窗，应按各自真实来源库和字段口径接入导入与统计，不要无脑套 SKU / 材料口径。
+- 阻塞/风险：本轮只改前端业务页交互和样式，不改 schema、migration、后端 API、RBAC 或事实层语义；全量 `pnpm --dir web style:l1` 仍受本地 Vite 连接被拒影响未完整收口，目标销售 / 采购业务场景已单独通过。
+
+## 2026-06-16 16:50 CST
+
+- 完成：新增 `create_shipment_with_items` JSON-RPC 方法，复用 `shipment.create` 权限，在后端事务内一次创建出货单头和明细；任一明细保存失败会整体回滚，不留下半成品草稿。
+- 完成：出货单页面新建弹窗改用组合接口保存，已存在草稿的加行仍保留 `add_shipment_item` 增量接口；同步 `server/README.md` 和当前真源文档出货单口径。
+- 完成：补后端事务回滚、组合接口权限 / 分发测试；为跑通全量相关测试，顺手收口当前工作区已有 admin bootstrap 测试 / env helper 命名冲突和若干前端 lint 未使用变量问题。
+- 下一步：出货单新建事务化已完成；后续若继续推进出货能力，应单独评审经手人审计、库位、冻结、装箱 / 物流 / 签收 / 退货或完整财务闭环，不把 `shipment_release done` 当事实入口。
+- 阻塞/风险：本轮不改 schema、migration、RBAC 权限码、`shipment_release` workflow 规则、库存出库 / 冲正语义或财务事实门禁；lint 仍保留 4 个既有 hooks warning。
+
+## 2026-06-16 16:47 CST
+
+- 完成：新增 `docs/product/业务主链路数据流向与字段来源规则.md`，把订单到产品 / BOM / 材料 / 仓库 / 出货 / 财务的数据流向收口为 MasterData -> Source Document -> Domain Usecase -> Fact -> Derived 的主路径。
+- 完成：明确新建 / 编辑、来源导入、列表、打印和导出字段的来源分级：主数据选择、来源单据带值、动作事实输入、派生展示、客户配置显示、导入候选和人工备注；同步 `docs/product/README.md`、`docs/文档清单.md` 和 `docs/当前真源与交接顺序.md`。
+- 下一步：后续进入 runtime 前，先选一个可验证闭环落地，例如销售订单行产品 / SKU / 单位选择、采购订单到采购入库来源带值，或出货单到销售订单来源带值。
+- 阻塞/风险：本轮只做正式文档治理，不改 schema、migration、repo/usecase、API、RBAC、前端页面或测试；工作区已有大量非本轮改动，本轮未回退、整理或纳入这些改动。
+
+## 2026-06-16 16:49 CST
+
+- 完成：收紧前端 ESLint 基线，打开 `no-unused-vars`，并将 `react-hooks/exhaustive-deps` 从关闭改为 warning；清理现有 unused import / catch 绑定 / 死变量，修正 BOM、采购订单、权限中心、打印预热、共享业务协同面板和后台账号页的 hooks 依赖声明。
+- 完成：验证通过 `pnpm exec eslint --no-fix --ext .js --ext .jsx src/`、`pnpm lint`、`pnpm css`、`pnpm test`、`git diff --check`，并串行补跑 `style:l1` 关键场景：`permission-center-desktop`、`purchase-order-date-filter-desktop`、`business-formal-module-shells-desktop`、`business-module-dark-customers-desktop`、`print-center-desktop`、`print-workspace-material`、`print-workspace-processing`。
+- 下一步：如果后续继续提升质量门禁，可在一段时间 warning 清零稳定后再评审是否把 `react-hooks/exhaustive-deps` 升级为 error。
+- 阻塞/风险：本轮只处理 ESLint 收紧，不改业务字段、schema、migration、RBAC、菜单或部署；当前工作区已有大量非本轮改动，本轮未回退、整理或纳入这些改动。
+
+## 2026-06-16 16:47 CST
+
+- 完成：收口生产 bootstrap 管理员安全闭环，新增 `runtime_markers` 与 `runtime_audit_events` Ent schema / Atlas migration，用于记录一次性 admin bootstrap marker 和启动审计事件。
+- 完成：生产环境只允许在 `BOOTSTRAP_ADMIN_ONCE=true` 且临时注入 `APP_ADMIN_PASSWORD` 时创建初始 super admin；成功后重复 bootstrap 会被 marker 拒绝，已有同名管理员不再被启动逻辑自动提权。
+- 完成：同步生产 Compose、preflight、server config 文档、yoyoosun 部署 env 样例 / 校验脚本和当前真源文档；`production-preflight` 会拦截长期保留 `APP_ADMIN_PASSWORD` 或只开 once flag 不给密码的配置。
+- 验证：`make data` 通过并生成 `20260616084340_migrate.sql`；`go test ./cmd/server ./internal/data -run 'TestValidateProductionBootstrapConfig|TestInitAdminUsersIfNeeded'` 通过；`go test ./cmd/server ./internal/data` 通过；`bash scripts/deploy/production-preflight.sh --example` 通过；`bash deployments/yoyoosun/scripts/verify-env.sh --example` 通过；`bash -n scripts/deploy/production-preflight.sh deployments/yoyoosun/scripts/verify-env.sh` 通过；补充两组负向 preflight 临时 env 检查通过。
+- 下一步：发布前必须先 apply 新 migration，再按首次初始化窗口短暂设置 `BOOTSTRAP_ADMIN_ONCE=true` 与 `APP_ADMIN_PASSWORD`；初始化成功后立即移除密码并恢复 `BOOTSTRAP_ADMIN_ONCE=false`。
+- 阻塞/风险：本轮未对任何真实库执行 migration apply、未构建镜像、未部署目标环境；`make data` 在当前脏工作区生成 Ent 代码，生成产物反映了当时所有 schema 现场，新迁移文件本身只包含两个 runtime 表。
+
+## 2026-06-16 16:39 CST
+
+- 完成：继续扫描当前 dev DB 所有 public 表的 text / varchar / json / jsonb 字段，发现并收口 `Phase 7` 试用模拟主数据残留：客户、供应商、联系人、单位、产品、销售订单、销售订单行和订单快照统一改为 `SIM-YOYOOSUN-TRIAL` / `Trial` 口径。
+- 完成：补清 `workflow_task_events.reason` 中旧 `Phase 9` 原因文本，并将 `output/customers/yoyoosun/phase*` 历史本地 evidence 目录移动到系统回收站；`output/customers/yoyoosun` 当前不再命中编号 Phase 标签。
+- 下一步：如后续需要把 DB 数据扫描变成固定 QA，可单独补一个只读数据边界脚本；当前 `phase-label-boundaries` 仍只负责仓库活跃文件扫描。
+- 阻塞/风险：本轮只处理当前 `192.168.0.106:5432/plush_erp` dev DB 和本机 git-ignored output；其他目标环境、其他开发库或已归档历史 evidence 不在本轮扫描范围。
+
+## 2026-06-16 16:38 CST
+
+- 完成：采购订单页复用共享 `DateRangeFilter`，按已有 `purchase_order` JSON-RPC 查询主路径接入采购日期 / 预计到货日期范围筛选；筛选变化会重置分页并传递 `date_field/date_from/date_to`。
+- 完成：在模块实施治理中补业务列表筛选规则，明确日期筛选按真实业务日期字段和后端支持接入，桌面端日期类型、开始日期和结束日期作为整体控件展示，不逐页机械复制。
+- 完成：`style:l1` 新增 `purchase-order-date-filter-desktop` 场景，验证采购订单页日期筛选整体控件、起止日期同一行、输入不裁切和筛选控件高度对齐；完整 `pnpm --dir web style:l1` 当前 49 个场景通过。
+- 下一步：如后续继续补日期筛选，优先评估出货单、采购入库 / 退货 / 调整、质检单和任务看板；客户、供应商、材料、BOM 等主数据页默认不把日期作为首要筛选。
+- 阻塞/风险：本轮不改 schema、migration、后端 usecase 或其他业务页；采购订单余额、在途统计、采购需求和应付 / 发票联动仍未实现。
+
+## 2026-06-16 16:36 CST
+
+- 完成：继续按参考图修业务表单弹窗 item 形态，联系人、订单明细、出货明细等条目内部字段不再自动换行；条目内容超出时由 item 区域横向滚动承接。
+- 完成：业务弹窗普通输入框从上一轮偏高的 42px 收回到 36px，item 内 textarea 也压回单行高度，避免明细条目被备注字段撑高。
+- 下一步：如后续要进一步压缩主表字段密度，可单独评审主表区列宽和 textarea 高度；本轮只改 item 横向滚动与输入高度。
+- 阻塞/风险：全量 `style:l1` 当前仍被无关 `print-workspace-material` 采购合同头部 pairCount=0 阻塞；目标业务弹窗场景已通过过滤回归。
+
+## 2026-06-16 16:29 CST
+
+- 完成：复核出货幂等当前状态，确认 `operational_fact_repo_test.go` 已覆盖出货单、出货明细、发货、取消冲正、重复发货和重复取消，状态机与 repo 主路径均保持重复动作无副作用。
+- 完成：同步更新 `docs/architecture/出货事实与库存边界评审.md`，移除“shipment 取消还没有专用用例 / 没有正式 shipment 专表”等旧口径，改为当前 `shipments / shipment_items` + `OperationalFactUsecase` + `operational_fact` JSON-RPC 真源。
+- 下一步：出货幂等本身无需继续补；后续若要推进，应聚焦库位、独立冻结、经手人审计、装箱 / 物流 / 签收 / 退货和完整财务闭环，不能回到 `shipment_release done` 直接写事实。
+- 阻塞/风险：本轮只同步正式文档并跑后端相关包测试，不改 runtime、schema、migration、RBAC、菜单或前端样式；当前工作区仍有其他未提交改动，本轮不接管、不回退。
+
+## 2026-06-16 16:26 CST
+
+- 完成：按参考弹窗视觉修补共享业务表单弹窗样式，增强标题栏、输入框边界、焦点态、明细 / 联系人条目区块、底部操作栏和按钮可见性；客户 / 供应商、销售订单、采购订单、BOM、出货单等复用 `erp-business-action-modal` 的页面同步受益。
+- 完成：补齐暗色主题变量和窄屏断点，避免浅色修好后暗色或小屏业务弹窗失真。
+- 下一步：如要继续逼近外部 ERP 参考图，可再单独做一轮字段密度和业务表单排版评审；本轮不改业务字段、后端 API 或权限。
+- 阻塞/风险：工作区中已有多份文档和服务端文件处于修改状态，本轮不接管、不回退；本轮仅验证前端共享弹窗样式相关路径。
+
+## 2026-06-16 16:20 CST
+
+- 完成：定位任务看板仍出现编号 Phase 的原因是 dev DB 中 2026-06-09 旧模拟 workflow 数据残留，而不是当前 `scripts/qa/phase-label-boundaries.mjs` 漏扫代码；已将 `workflow_tasks`、`workflow_business_states` 和 `workflow_task_events` 中旧 `SIM-YOYOOSUN-PHASE9...` / `Phase 9...` / `phase9_mobile_task` 收口为 `SIM-YOYOOSUN-MOBILE-WORKFLOW...`、`Mobile workflow...` 和 `mobile_workflow_task`。
+- 完成：后端 Workflow 创建 / 更新入口增加编号 Phase 标签守卫，拒绝在任务字段、阻塞原因、payload、派生任务或业务状态 payload 中写入新的编号 Phase 标签；同步当前真源文档口径。
+- 下一步：如目标环境或其他 dev DB 仍有同类旧模拟数据，需要在对应库单独执行同样的只针对模拟 workflow 数据的改名收口。
+- 阻塞/风险：本轮不删除任务、不改 schema、migration、RBAC、Workflow / Fact 边界或事实表；页面是否即时消失取决于当前浏览器和接口缓存，刷新任务看板后应读取到已改名数据。
+
+## 2026-06-16 16:20 CST
+
+- 完成：复核 JSON-RPC 分层迁移收口状态，确认 `server/internal/data/jsonrpc*.go` 已不存在，运行时 JSON-RPC dispatch、权限守卫和错误映射位于 `server/internal/service`。
+- 完成：同步修正当前正式文档中的旧 `server/internal/data/jsonrpc_*` 路径和“handler 位于 data 层历史架构”风险口径；`docs/reference` 与 `docs/archive` 作为历史资料不改。
+- 下一步：如后续继续扩展 JSON-RPC 域，按 `service -> biz -> data repo` 主路径新增 service 测试，不恢复 `data.JsonrpcData` 入口。
+- 阻塞/风险：本轮不改 runtime、schema、migration、RBAC 或前端；当前工作区仍有出货单弹窗和 workflow phase-label guard 相关未提交改动。
+
+## 2026-06-16 15:56 CST
+
+- 完成：出货单继续按现有业务弹窗原型修补，`新建草稿` 改为同一弹窗内上方维护出货单主表字段、下方维护出货明细条目；草稿 `加行` 也复用同一弹窗，上方只读回显主表和已保存明细，下方新增明细。
+- 完成：出货单查看改为同一弹窗只读回显，不再保留业务对象抽屉路径；`style:l1` 增加 `/erp/warehouse/shipments` 新建弹窗和加行弹窗断言。
+- 下一步：如后续要把前端 `createShipment` 后顺序 `addShipmentItem` 升级为后端单请求事务保存，需要单独评审 ShipmentUsecase/API 合约。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、Workflow / Fact 边界或后端 usecase；当前后端没有把“创建出货单 + 明细”包成同一个事务请求，明细保存失败时仍按现有 API 失败提示处理。
+
 ## 2026-06-16 14:36 CST
 
 - 完成：全局收口业务对象新建 / 编辑 / 查看交互，移除销售订单、采购订单、BOM、出货单和 formal-shell 入口壳的业务对象详情抽屉路径；销售订单、采购订单继续在同一业务弹窗内维护主表字段和订单 / 采购明细，BOM 查看 / 编辑弹窗下方展示 BOM 明细，出货单详情 / 新建 / 加行改为统一 Modal。
 - 完成：同步原型口径，把 `business-form-page-standard-v1` 改为“新建 / 编辑业务弹窗标准样板”，明确上方主表字段、下方明细 items；`action-modal-drawer-standard-v1` 改为局部动作弹窗口径，并同步原型中心、业务模块标准页 README、当前真源文档和 `style:l1` 断言。
-- 下一步：如后续要把出货单“新建草稿 + 加明细”进一步合成一次性保存，需要先评审后端 ShipmentUsecase/API 合约；当前不在前端伪造合并保存。
+- 下一步：出货单同一弹窗内维护主表和明细已在 15:56 CST 继续补齐；若要进一步改成后端单请求事务保存，需要单独评审 ShipmentUsecase/API 合约。
 - 阻塞/风险：本轮不改 schema、migration、RBAC、Workflow / Fact 边界或后端 usecase；Dashboard 任务详情 Drawer 属于 Workflow 任务处理，不是业务对象表单，本轮按边界保留。
+
+## 2026-06-16 16:49 CST
+
+- 完成：为 yoyoosun 私有化发布补 release evidence gate，新增 `scripts/deploy/release-evidence-gate.mjs` 与单测，检查本次 release evidence、pre-migration backup evidence、migration status、smoke report 和 sign-off checklist 是否脱敏且填齐；草稿 evidence 会被明确拒绝，避免把模板误当真实签收。
+- 完成：补 `release-signoff-checklist` 模板，扩展 `collect-evidence.sh` 生成的 evidence 草稿目录，并同步 yoyoosun 部署资料包 README、evidence README、首次部署 / 升级 runbook、部署前后 checklist、`scripts/README.md` 和 fast/full/strict QA 测试接线。
+- 验证：`node --test scripts/deploy/release-evidence-gate.test.mjs scripts/deploy/deployment-package-lint.test.mjs` 通过；`node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun` 通过；`bash -n deployments/yoyoosun/scripts/collect-evidence.sh deployments/yoyoosun/scripts/verify-backup-restore.sh scripts/qa/fast.sh scripts/qa/full.sh scripts/qa/strict.sh` 通过；临时草稿 evidence 运行 gate 被拒绝，符合预期。
+- 下一步：真实 yoyoosun 发布或客户试用交付前，先填写 `deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/` 下真实脱敏证据，再运行 `node scripts/deploy/release-evidence-gate.mjs --customer yoyoosun --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>`。
+- 阻塞/风险：本轮不生成真实 release evidence、不接触目标服务器、不读取真实 `.env`、不处理真实备份文件、不改变 `server/deploy/compose/prod` 部署主路径；当前仍不能写成客户已签收或 Delivery Ready。
 
 ## 2026-06-16 14:02 CST
 

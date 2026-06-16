@@ -71,7 +71,6 @@ import {
 } from '../../utils/outsourceReturnFlow.mjs'
 import {
   PRODUCTION_PROCESSING_STATUS_KEY as FINISHED_GOODS_PRODUCTION_PROCESSING_STATUS_KEY,
-  QC_FAILED_STATUS_KEY as FINISHED_GOODS_QC_FAILED_STATUS_KEY,
   isFinishedGoodsInboundTask,
   isFinishedGoodsQcTask,
   isFinishedGoodsReworkTask,

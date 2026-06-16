@@ -73,7 +73,7 @@ function readPinnedPaths(docs = []) {
       Array.isArray(parsedValue) ? parsedValue : [],
       docs
     )
-  } catch (error) {
+  } catch {
     return getDefaultDevDocsPinnedPaths(docs)
   }
 }
@@ -91,7 +91,7 @@ function readSelectedKey(docs = []) {
     return (
       docs.find((item) => item.path === selectedPath)?.key || docs[0]?.key || ''
     )
-  } catch (error) {
+  } catch {
     return docs[0]?.key || ''
   }
 }
@@ -117,7 +117,7 @@ function readExpandedKeys(availableKeys = []) {
       Array.isArray(parsedValue) ? parsedValue : [],
       availableKeys
     )
-  } catch (error) {
+  } catch {
     return defaultKeys
   }
 }
@@ -135,7 +135,7 @@ function readTocExpanded() {
       return true
     }
     return rawValue !== 'false'
-  } catch (error) {
+  } catch {
     return true
   }
 }
@@ -303,7 +303,7 @@ export default function DevDocsPage() {
         DEV_DOCS_PINNED_STORAGE_KEY,
         JSON.stringify(normalizeDevDocsPinnedPaths(pinnedPaths, docs))
       )
-    } catch (error) {
+    } catch {
       // 本地偏好写入失败时不影响 dev docs 主路径浏览。
     }
   }, [docs, pinnedPaths])
@@ -317,7 +317,7 @@ export default function DevDocsPage() {
         DEV_DOCS_SELECTED_PATH_STORAGE_KEY,
         normalizeDevDocsSelectedPath(selectedDoc.path, docs)
       )
-    } catch (error) {
+    } catch {
       // 当前文档偏好写入失败时不影响 dev docs 主路径浏览。
     }
   }, [docs, selectedDoc?.path])
@@ -333,7 +333,7 @@ export default function DevDocsPage() {
           normalizeDevDocsExpandedDirKeys([...expandedKeys], allDirectoryKeys)
         )
       )
-    } catch (error) {
+    } catch {
       // 目录展开偏好写入失败时不影响 dev docs 主路径浏览。
     }
   }, [allDirectoryKeys, expandedKeys])
@@ -347,7 +347,7 @@ export default function DevDocsPage() {
         DEV_DOCS_TOC_EXPANDED_STORAGE_KEY,
         tocExpanded ? 'true' : 'false'
       )
-    } catch (error) {
+    } catch {
       // 章节导航偏好写入失败时不影响 dev docs 主路径浏览。
     }
   }, [tocExpanded])
@@ -363,7 +363,7 @@ export default function DevDocsPage() {
     try {
       await navigator.clipboard.writeText(selectedDoc.path)
       message.success('已复制文档路径')
-    } catch (error) {
+    } catch {
       message.error('复制失败，请手动选中文档路径')
     }
   }

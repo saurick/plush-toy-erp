@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '@/common/components/layout/AppShell'
 import { Loading } from '@/common/components/loading'
@@ -62,44 +62,47 @@ export default function AdminUsersPage() {
     resetPassword.length >= PASSWORD_MIN_LENGTH &&
     resetPassword === resetPassword2
 
-  const fetchList = async (targetPage = page, keyword = searchName) => {
-    setErrMsg('')
-    setLoading(true)
-    try {
-      const safePage = Math.max(1, clampInt(targetPage, 1))
-      const offset = (safePage - 1) * PAGE_SIZE
-      const trimmedKeyword = (keyword || '').trim()
+  const fetchList = useCallback(
+    async (targetPage, keyword) => {
+      setErrMsg('')
+      setLoading(true)
+      try {
+        const safePage = Math.max(1, clampInt(targetPage, 1))
+        const offset = (safePage - 1) * PAGE_SIZE
+        const trimmedKeyword = (keyword || '').trim()
 
-      // 当前后台账号页先只保留搜索、查看和账号启停，后续业务字段按真实需求再扩展。
-      const result = await userRpc.call('list', {
-        limit: PAGE_SIZE,
-        offset,
-        search: trimmedKeyword,
-      })
+        // 当前后台账号页先只保留搜索、查看和账号启停，后续业务字段按真实需求再扩展。
+        const result = await userRpc.call('list', {
+          limit: PAGE_SIZE,
+          offset,
+          search: trimmedKeyword,
+        })
 
-      const data = result?.data || result?.result?.data || {}
-      const list = Array.isArray(data?.users) ? data.users : []
-      const nextTotal = clampInt64(data?.total, 0)
+        const data = result?.data || result?.result?.data || {}
+        const list = Array.isArray(data?.users) ? data.users : []
+        const nextTotal = clampInt64(data?.total, 0)
 
-      setItems(list)
-      setTotal(nextTotal)
+        setItems(list)
+        setTotal(nextTotal)
 
-      const nextTotalPages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE))
-      if (safePage > nextTotalPages) {
-        setPage(nextTotalPages)
+        const nextTotalPages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE))
+        if (safePage > nextTotalPages) {
+          setPage(nextTotalPages)
+        }
+      } catch (e) {
+        setErrMsg(getActionErrorMessage(e, '获取用户列表'))
+        setItems([])
+        setTotal(0)
+      } finally {
+        setLoading(false)
       }
-    } catch (e) {
-      setErrMsg(getActionErrorMessage(e, '获取用户列表'))
-      setItems([])
-      setTotal(0)
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    [userRpc]
+  )
 
   useEffect(() => {
     fetchList(page, searchName)
-  }, [page, searchName])
+  }, [fetchList, page, searchName])
 
   const onSearch = (e) => {
     e.preventDefault()

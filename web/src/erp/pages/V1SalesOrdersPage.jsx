@@ -46,6 +46,7 @@ import {
   cancelSalesOrder,
   closeSalesOrder,
   listCustomers,
+  listProductSKUs,
   listSalesOrderItems,
   listSalesOrders,
   saveSalesOrderWithItems,
@@ -221,6 +222,43 @@ function compareNumber(a, b) {
   return Number(a || 0) - Number(b || 0)
 }
 
+function decimalNumber(value) {
+  const numeric = Number(
+    String(value ?? '')
+      .replace(/,/g, '')
+      .trim()
+  )
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+function formatSummaryNumber(value, fractionDigits = 0) {
+  if (!Number.isFinite(value) || value === 0) {
+    return fractionDigits > 0 ? Number(0).toFixed(fractionDigits) : '0'
+  }
+  return fractionDigits > 0
+    ? value.toFixed(fractionDigits)
+    : String(Number(value.toFixed(4)))
+}
+
+function summarizeSalesOrderLines(lines = []) {
+  const items = Array.isArray(lines) ? lines : []
+  return items.reduce(
+    (summary, line) => ({
+      count: summary.count + 1,
+      quantity: summary.quantity + decimalNumber(line?.ordered_quantity),
+      amount:
+        summary.amount + decimalNumber(deriveSalesOrderItemAmount(line) || 0),
+    }),
+    { count: 0, quantity: 0, amount: 0 }
+  )
+}
+
+function skuLabel(sku = {}) {
+  return [sku.sku_code, sku.sku_name || sku.customer_sku || sku.barcode]
+    .filter(Boolean)
+    .join(' / ')
+}
+
 function salesOrderStatusTag(status) {
   const key = String(status || '').trim()
   return (
@@ -248,6 +286,18 @@ function createBlankOrderLine(lineNo = 1) {
     amount: '',
     planned_delivery_date: '',
     note: '',
+  }
+}
+
+function createOrderLineFromSKU(sku = {}, lineNo = 1) {
+  return {
+    ...createBlankOrderLine(lineNo),
+    product_id: sku.product_id,
+    unit_id: sku.default_unit_id,
+    product_code_snapshot: sku.sku_code || '',
+    product_name_snapshot:
+      sku.sku_name || sku.customer_sku || sku.barcode || '',
+    color_snapshot: sku.color || '',
   }
 }
 
@@ -340,7 +390,16 @@ function SalesOrderItemsFormSection({
   canCreateItem,
   canUpdateItem,
   canCancelItem,
+  productSKUs,
 }) {
+  const watchedItems = Form.useWatch('items', form) || []
+  const lineSummary = summarizeSalesOrderLines(watchedItems)
+  const skuOptions = productSKUs.map((sku) => ({
+    label: skuLabel(sku),
+    value: sku.id,
+    sku,
+  }))
+
   return (
     <section className="erp-sales-order-lines-form">
       <Form.List name="items">
@@ -351,16 +410,59 @@ function SalesOrderItemsFormSection({
                 <strong>订单行</strong>
                 <span>同一个销售订单内维护多条客户承诺明细。</span>
               </div>
-              <Button
-                icon={<PlusOutlined />}
-                disabled={!canCreateItem}
-                onClick={() => {
-                  const currentLines = form.getFieldValue('items') || []
-                  add(createBlankOrderLine(getNextLineNo(currentLines)))
-                }}
-              >
-                新增一行
-              </Button>
+              <div className="erp-line-items-form__tools">
+                <Select
+                  showSearch
+                  allowClear
+                  className="erp-line-items-form__import"
+                  placeholder="从 SKU 库导入"
+                  value={undefined}
+                  options={skuOptions}
+                  optionFilterProp="label"
+                  disabled={!canCreateItem}
+                  onChange={(value, option) => {
+                    const currentLines = form.getFieldValue('items') || []
+                    const sku =
+                      option?.sku ||
+                      productSKUs.find((item) => item.id === value)
+                    if (!sku) return
+                    add(
+                      createOrderLineFromSKU(sku, getNextLineNo(currentLines))
+                    )
+                  }}
+                />
+                <Button
+                  icon={<PlusOutlined />}
+                  disabled={!canCreateItem}
+                  onClick={() => {
+                    const currentLines = form.getFieldValue('items') || []
+                    add(createBlankOrderLine(getNextLineNo(currentLines)))
+                  }}
+                >
+                  新增一行
+                </Button>
+                <div className="erp-line-items-form__stats">
+                  <span className="erp-line-items-form__stat">
+                    已录入
+                    <strong className="erp-line-items-form__stat-value">
+                      {lineSummary.count}
+                    </strong>
+                    条
+                  </span>
+                  <span className="erp-line-items-form__stat">
+                    数量合计
+                    <strong className="erp-line-items-form__stat-value">
+                      {formatSummaryNumber(lineSummary.quantity)}
+                    </strong>
+                  </span>
+                  <span className="erp-line-items-form__stat">
+                    金额合计
+                    <strong className="erp-line-items-form__stat-value">
+                      {formatSummaryNumber(lineSummary.amount, 2)}
+                    </strong>
+                  </span>
+                </div>
+              </div>
             </div>
             {fields.length === 0 ? (
               <Empty
@@ -562,7 +664,10 @@ function SalesOrderItemsFormSection({
 
 export default function V1SalesOrdersPage() {
   const outletContext = useOutletContext()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const [loading, setLoading] = useState(false)
   const [itemLoading, setItemLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -588,6 +693,7 @@ export default function V1SalesOrdersPage() {
   const [recycleOpen, setRecycleOpen] = useState(false)
   const [recycleSelectedRowKeys, setRecycleSelectedRowKeys] = useState([])
   const [orderForm] = Form.useForm()
+  const [productSKUs, setProductSKUs] = useState([])
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
@@ -606,10 +712,18 @@ export default function V1SalesOrdersPage() {
 
   const loadCustomers = useCallback(async () => {
     try {
-      const result = await listCustomers({ active_only: true, limit: 200 })
-      setCustomers(Array.isArray(result?.customers) ? result.customers : [])
+      const [customerResult, skuResult] = await Promise.all([
+        listCustomers({ active_only: true, limit: 200 }),
+        listProductSKUs({ active_only: true, limit: 200 }),
+      ])
+      setCustomers(
+        Array.isArray(customerResult?.customers) ? customerResult.customers : []
+      )
+      setProductSKUs(
+        Array.isArray(skuResult?.product_skus) ? skuResult.product_skus : []
+      )
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载客户选项'))
+      message.error(getActionErrorMessage(error, '加载客户和 SKU 选项'))
     }
   }, [])
 
@@ -695,7 +809,7 @@ export default function V1SalesOrdersPage() {
     orderForm.resetFields()
     orderForm.setFieldsValue({
       order_date: new Date().toISOString().slice(0, 10),
-      items: [],
+      items: [createBlankOrderLine(1)],
     })
     setOrderModalOpen(true)
   }
@@ -1371,6 +1485,7 @@ export default function V1SalesOrdersPage() {
             canCreateItem={canCreateItem}
             canUpdateItem={canUpdateItem}
             canCancelItem={canCancelItem}
+            productSKUs={productSKUs}
           />
         </Form>
       </Modal>

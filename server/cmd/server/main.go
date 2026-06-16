@@ -199,6 +199,20 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	if dataCfg.Auth.Admin != nil && containsRuntimePlaceholder(dataCfg.Auth.Admin.Password) {
 		return fmt.Errorf("production preflight failed: APP_ADMIN_PASSWORD still contains placeholder")
 	}
+	adminPassword := ""
+	if dataCfg.Auth.Admin != nil {
+		adminPassword = strings.TrimSpace(dataCfg.Auth.Admin.Password)
+	}
+	bootstrapAdminOnce := strings.ToLower(strings.TrimSpace(getenv("BOOTSTRAP_ADMIN_ONCE")))
+	if bootstrapAdminOnce != "" && bootstrapAdminOnce != "true" && bootstrapAdminOnce != "false" {
+		return fmt.Errorf("production preflight failed: BOOTSTRAP_ADMIN_ONCE must be true or false")
+	}
+	if adminPassword != "" && bootstrapAdminOnce != "true" {
+		return fmt.Errorf("production preflight failed: APP_ADMIN_PASSWORD requires BOOTSTRAP_ADMIN_ONCE=true")
+	}
+	if adminPassword == "" && bootstrapAdminOnce == "true" {
+		return fmt.Errorf("production preflight failed: BOOTSTRAP_ADMIN_ONCE=true requires APP_ADMIN_PASSWORD")
+	}
 	return nil
 }
 

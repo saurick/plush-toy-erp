@@ -68,6 +68,14 @@ export async function createShipment(params = {}) {
   return dataOf(result)?.shipment || null
 }
 
+export async function createShipmentWithItems(params = {}) {
+  const result = await operationalFactRpc.call(
+    'create_shipment_with_items',
+    params
+  )
+  return dataOf(result)?.shipment || null
+}
+
 export async function addShipmentItem(params = {}) {
   const result = await operationalFactRpc.call('add_shipment_item', params)
   return dataOf(result)?.shipment_item || null

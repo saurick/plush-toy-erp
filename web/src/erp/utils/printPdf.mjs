@@ -242,7 +242,7 @@ function openPdfPreviewStateDatabase(indexedDBLike) {
         database.onversionchange = () => {
           try {
             database.close()
-          } catch (error) {
+          } catch {
             // IndexedDB 关闭失败不影响 localStorage 兜底。
           }
         }
@@ -250,7 +250,7 @@ function openPdfPreviewStateDatabase(indexedDBLike) {
       }
       request.onerror = () => resolve(null)
       request.onblocked = () => resolve(null)
-    } catch (error) {
+    } catch {
       resolve(null)
     }
   })
@@ -269,7 +269,7 @@ function persistPdfPreviewHTMLToStorage(record) {
       JSON.stringify(record)
     )
     return true
-  } catch (error) {
+  } catch {
     return false
   }
 }
@@ -305,7 +305,7 @@ async function persistPdfPreviewHTMLToIndexedDB(record, indexedDBLike) {
       transaction.oncomplete = () => finalize(true)
       transaction.onerror = () => finalize(false)
       transaction.onabort = () => finalize(false)
-    } catch (error) {
+    } catch {
       resolve(false)
     }
   })
@@ -368,7 +368,7 @@ function writePdfPreviewWindowHTML(previewWindow, html) {
     previewWindow.document.close()
     previewWindow.focus()
     return true
-  } catch (error) {
+  } catch {
     return false
   }
 }
@@ -587,7 +587,7 @@ async function fetchSnapshotAssetWithTimeout(url, timeoutMs) {
 function resolveSnapshotAssetURL(raw, baseURL) {
   try {
     return String(new URL(String(raw || ''), baseURL || window.location.origin))
-  } catch (error) {
+  } catch {
     return String(raw || '').trim()
   }
 }
@@ -709,7 +709,7 @@ async function optimizeServerPdfSnapshotImages(clonedRoot, options = {}) {
         if (optimizedSource) {
           imageElement.setAttribute('src', optimizedSource)
         }
-      } catch (error) {
+      } catch {
         // 图片降载失败时保留原图，不阻断 PDF 预览主链路。
       }
     })
@@ -758,7 +758,7 @@ function readServerPdfStylesheetText(sourceDocument) {
     let cssRules
     try {
       cssRules = Array.from(styleSheet.cssRules || [])
-    } catch (error) {
+    } catch {
       return
     }
     if (cssRules.length === 0) {
@@ -783,7 +783,7 @@ function readServerPdfStylesheetText(sourceDocument) {
 function getNestedCssRules(rule) {
   try {
     return Array.from(rule?.cssRules || [])
-  } catch (error) {
+  } catch {
     return []
   }
 }
@@ -1022,14 +1022,14 @@ async function readServerErrorMessage(response) {
       if (payload && payload.message) {
         return String(payload.message)
       }
-    } catch (error) {
+    } catch {
       // JSON 解析失败时降级到文本正文。
     }
   }
 
   try {
     return String((await response.text()) || '').trim()
-  } catch (error) {
+  } catch {
     return ''
   }
 }

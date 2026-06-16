@@ -163,6 +163,34 @@ func (r *operationalFactRepo) CreateShipmentDraft(ctx context.Context, in *biz.S
 	return shipmentWithItems(ctx, r.data.postgres, row)
 }
 
+func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, in *biz.ShipmentCreateWithItems) (*biz.Shipment, error) {
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+
+	row, err := tx.client.Shipment.Create().
+		SetShipmentNo(in.Shipment.ShipmentNo).
+		SetNillableSalesOrderID(in.Shipment.SalesOrderID).
+		SetNillableCustomerID(in.Shipment.CustomerID).
+		SetNillableCustomerSnapshot(in.Shipment.CustomerSnapshot).
+		SetStatus(biz.ShipmentStatusDraft).
+		SetIdempotencyKey(in.Shipment.IdempotencyKey).
+		SetNillablePlannedShipAt(in.Shipment.PlannedShipAt).
+		SetNillableNote(in.Shipment.Note).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range in.Items {
+		if _, err := createShipmentItem(ctx, tx.client, row.ID, item); err != nil {
+			return nil, err
+		}
+	}
+	return commitShipment(ctx, tx, row)
+}
+
 func (r *operationalFactRepo) AddShipmentItem(ctx context.Context, in *biz.ShipmentItemCreate) (*biz.ShipmentItem, error) {
 	parent, err := r.data.postgres.Shipment.Get(ctx, in.ShipmentID)
 	if err != nil {
@@ -174,8 +202,16 @@ func (r *operationalFactRepo) AddShipmentItem(ctx context.Context, in *biz.Shipm
 	if !corestatus.CanAddShipmentItem(parent.Status) {
 		return nil, biz.ErrBadParam
 	}
-	row, err := r.data.postgres.ShipmentItem.Create().
-		SetShipmentID(in.ShipmentID).
+	row, err := createShipmentItem(ctx, r.data.postgres, in.ShipmentID, in)
+	if err != nil {
+		return nil, err
+	}
+	return entShipmentItemToBiz(row), nil
+}
+
+func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int, in *biz.ShipmentItemCreate) (*ent.ShipmentItem, error) {
+	return client.ShipmentItem.Create().
+		SetShipmentID(shipmentID).
 		SetNillableSalesOrderItemID(in.SalesOrderItemID).
 		SetProductID(in.ProductID).
 		SetWarehouseID(in.WarehouseID).
@@ -184,10 +220,6 @@ func (r *operationalFactRepo) AddShipmentItem(ctx context.Context, in *biz.Shipm
 		SetQuantity(in.Quantity).
 		SetNillableNote(in.Note).
 		Save(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return entShipmentItemToBiz(row), nil
 }
 
 func (r *operationalFactRepo) ShipShipment(ctx context.Context, id int) (*biz.Shipment, error) {

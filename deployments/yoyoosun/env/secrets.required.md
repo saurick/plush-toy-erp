@@ -9,7 +9,7 @@
 | `POSTGRES_PASSWORD` | PostgreSQL 账号密码 | 生产 `.env` 或 Docker Secret | 上线前固定，泄露后立即轮换 |
 | `POSTGRES_DSN` | 服务端数据库连接串 | 生产 `.env` | 密码变更后同步更新 |
 | `APP_JWT_SECRET` | 登录 token 签名 | 生产 `.env` 或 Secret | 泄露后立即轮换并要求重新登录 |
-| `APP_ADMIN_PASSWORD` | 仅首次初始化管理员时临时使用 | 受控一次性注入 | 首次初始化后移除，不长期保留 |
+| `APP_ADMIN_PASSWORD` | 仅首次初始化管理员时临时使用 | 与 `BOOTSTRAP_ADMIN_ONCE=true` 一起受控一次性注入 | 初始化成功写入 marker 后移除，不长期保留 |
 | `BACKUP_ENCRYPTION_KEY` | 备份加密 | 外部密钥管理或受控文件 | 按备份策略轮换 |
 | `SMS_PROVIDER_SECRET` | 短信服务，如启用 | 外部 Secret | 泄露后立即轮换 |
 | `OBJECT_STORAGE_SECRET` | 对象存储，如启用 | 外部 Secret | 泄露后立即轮换 |

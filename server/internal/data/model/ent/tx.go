@@ -66,6 +66,10 @@ type Tx struct {
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
 	RolePermission *RolePermissionClient
+	// RuntimeAuditEvent is the client for interacting with the RuntimeAuditEvent builders.
+	RuntimeAuditEvent *RuntimeAuditEventClient
+	// RuntimeMarker is the client for interacting with the RuntimeMarker builders.
+	RuntimeMarker *RuntimeMarkerClient
 	// SalesOrder is the client for interacting with the SalesOrder builders.
 	SalesOrder *SalesOrderClient
 	// SalesOrderItem is the client for interacting with the SalesOrderItem builders.
@@ -248,6 +252,8 @@ func (tx *Tx) init() {
 	tx.QualityInspection = NewQualityInspectionClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
+	tx.RuntimeAuditEvent = NewRuntimeAuditEventClient(tx.config)
+	tx.RuntimeMarker = NewRuntimeMarkerClient(tx.config)
 	tx.SalesOrder = NewSalesOrderClient(tx.config)
 	tx.SalesOrderItem = NewSalesOrderItemClient(tx.config)
 	tx.Shipment = NewShipmentClient(tx.config)

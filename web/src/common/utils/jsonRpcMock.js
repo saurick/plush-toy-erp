@@ -3,7 +3,7 @@ export class JsonRpcMock {
     this.url = url
   }
 
-  async call(method, params = {}, options = {}) {
+  async call(method, params = {}) {
     console.log('[MOCK] RPC', this.url, method, params)
     await new Promise((r) => setTimeout(r, 300))
 

@@ -332,6 +332,30 @@ func (f RolePermissionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RolePermissionMutation", m)
 }
 
+// The RuntimeAuditEventFunc type is an adapter to allow the use of ordinary
+// function as RuntimeAuditEvent mutator.
+type RuntimeAuditEventFunc func(context.Context, *ent.RuntimeAuditEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RuntimeAuditEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RuntimeAuditEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RuntimeAuditEventMutation", m)
+}
+
+// The RuntimeMarkerFunc type is an adapter to allow the use of ordinary
+// function as RuntimeMarker mutator.
+type RuntimeMarkerFunc func(context.Context, *ent.RuntimeMarkerMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RuntimeMarkerFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RuntimeMarkerMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RuntimeMarkerMutation", m)
+}
+
 // The SalesOrderFunc type is an adapter to allow the use of ordinary
 // function as SalesOrder mutator.
 type SalesOrderFunc func(context.Context, *ent.SalesOrderMutation) (ent.Value, error)

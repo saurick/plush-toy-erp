@@ -1,11 +1,7 @@
 import {
   applyTableCellMerge,
   cloneDetailCellMerges,
-  findMergeAtCell,
   findRowMergeAtLine,
-  isCellInsideSelection,
-  isMergeTopLeftCell,
-  normalizeCellSelection,
   shiftMergesAfterDelete,
   shiftMergesAfterInsert,
   splitTableCellMerge,

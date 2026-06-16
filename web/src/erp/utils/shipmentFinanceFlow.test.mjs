@@ -17,7 +17,6 @@ import {
 } from './shipmentFinanceFlow.mjs'
 
 const NOW_MS = Date.parse('2026-04-25T00:00:00Z')
-const NOW_SECONDS = Math.floor(NOW_MS / 1000)
 
 function shipmentRecord(overrides = {}) {
   return {

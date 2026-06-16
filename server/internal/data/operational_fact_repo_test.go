@@ -9,6 +9,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/shipment"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -169,21 +170,25 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	}); err != nil {
 		t.Fatalf("seed product inventory failed: %v", err)
 	}
-	shipment, err := repo.CreateShipmentDraft(ctx, &biz.ShipmentCreate{
-		ShipmentNo:     "SHP-001",
-		IdempotencyKey: "SHP-001",
+	shipment, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "SHP-001",
+			IdempotencyKey: "SHP-001",
+		},
+		Items: []*biz.ShipmentItemCreate{
+			{
+				ProductID:   fixtures.productID,
+				WarehouseID: fixtures.warehouseID,
+				UnitID:      fixtures.unitID,
+				Quantity:    decimal.NewFromInt(2),
+			},
+		},
 	})
 	if err != nil {
-		t.Fatalf("create shipment failed: %v", err)
+		t.Fatalf("create shipment with items failed: %v", err)
 	}
-	if _, err := repo.AddShipmentItem(ctx, &biz.ShipmentItemCreate{
-		ShipmentID:  shipment.ID,
-		ProductID:   fixtures.productID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    decimal.NewFromInt(2),
-	}); err != nil {
-		t.Fatalf("add shipment item failed: %v", err)
+	if len(shipment.Items) != 1 {
+		t.Fatalf("expected one shipment item, got %d", len(shipment.Items))
 	}
 	if _, err := repo.CancelShippedShipment(ctx, shipment.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("cancel draft shipment error = %v, want ErrBadParam", err)
@@ -224,6 +229,40 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ShipmentSourceType)).CountX(ctx); count != 2 {
 		t.Fatalf("expected outbound + reversal shipment txns, got %d", count)
+	}
+}
+
+func TestOperationalFactRepo_CreateShipmentDraftWithItemsRollsBackWhenItemFails(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_with_items_rollback")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+
+	_, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "SHP-TX-ROLLBACK-001",
+			IdempotencyKey: "SHP-TX-ROLLBACK-001",
+		},
+		Items: []*biz.ShipmentItemCreate{
+			{
+				ProductID:   fixtures.productID,
+				WarehouseID: fixtures.warehouseID,
+				UnitID:      fixtures.unitID,
+				Quantity:    decimal.NewFromInt(1),
+			},
+			{
+				ProductID:   fixtures.productID,
+				WarehouseID: fixtures.warehouseID,
+				UnitID:      0,
+				Quantity:    decimal.NewFromInt(1),
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected create shipment with invalid item to fail")
+	}
+	if count := client.Shipment.Query().Where(shipment.ShipmentNo("SHP-TX-ROLLBACK-001")).CountX(ctx); count != 0 {
+		t.Fatalf("expected shipment header to rollback after item failure, got %d rows", count)
 	}
 }
 

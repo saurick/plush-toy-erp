@@ -137,6 +137,55 @@ func TestWorkflowUsecase_CreateTaskRejectsInvalidBusinessStatus(t *testing.T) {
 	}
 }
 
+func TestWorkflowUsecase_CreateTaskRejectsNumberedPhaseLabels(t *testing.T) {
+	uc := NewWorkflowUsecase(&stubWorkflowRepo{})
+	sourceNo := "SIM-YOYOOSUN-" + "PHASE" + "9-QC"
+
+	_, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
+		TaskCode:     "SIM-YOYOOSUN-MOBILE-WORKFLOW-QC",
+		TaskGroup:    "finished_goods_qc",
+		TaskName:     "Mobile workflow 模拟成品抽检",
+		SourceType:   "production-progress",
+		SourceID:     1,
+		SourceNo:     &sourceNo,
+		OwnerRoleKey: QualityRoleKey,
+		Payload: map[string]any{
+			"record_title": "Phase" + " 9 模拟产品",
+		},
+	}, 7)
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+}
+
+func TestWorkflowUsecase_UpdateTaskRejectsNumberedPhaseLabels(t *testing.T) {
+	repo := &stubWorkflowRepo{
+		currentTask: &WorkflowTask{
+			ID:            1,
+			TaskGroup:     "generic",
+			TaskName:      "普通任务",
+			SourceType:    "generic-source",
+			SourceID:      1,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  WarehouseRoleKey,
+			Payload:       map[string]any{},
+		},
+	}
+	uc := NewWorkflowUsecase(repo)
+
+	_, err := uc.UpdateTaskStatus(context.Background(), &WorkflowTaskStatusUpdate{
+		ID:            1,
+		TaskStatusKey: "blocked",
+		Reason:        "Phase" + " 9 模拟异常",
+		Payload: map[string]any{
+			"blocked_reason": "Phase" + " 9 模拟异常",
+		},
+	}, 7, WarehouseRoleKey)
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+}
+
 func TestWorkflowBusinessStatesAcceptPurchaseInboundStatuses(t *testing.T) {
 	expectedStatuses := map[string]struct{}{
 		"iqc_pending":               {},

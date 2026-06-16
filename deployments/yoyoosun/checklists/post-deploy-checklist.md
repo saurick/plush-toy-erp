@@ -38,4 +38,5 @@
 
 - [ ] release evidence 完成。
 - [ ] known limitations 更新。
+- [ ] `release-evidence-gate.mjs` 对本次 evidence 目录检查通过。
 - [ ] 客户访问确认或内部试用确认已记录。

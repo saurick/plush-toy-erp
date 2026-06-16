@@ -33,6 +33,13 @@ docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remo
 
 6. 执行 smoke 和日志检查。
 7. 写入 upgrade evidence。
+8. 客户试用或交付前执行 release evidence gate：
+
+```bash
+node scripts/deploy/release-evidence-gate.mjs \
+  --customer yoyoosun \
+  --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
+```
 
 ## 失败处理
 
@@ -48,3 +55,4 @@ docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remo
 - migration version 符合 release 预期。
 - 登录、RBAC、关键只读页面和岗位任务入口 smoke 通过。
 - evidence 只记录版本、hash、状态和脱敏摘要。
+- release evidence gate 通过后才允许把本次 release 写成可继续客户试用。

@@ -110,6 +110,7 @@ required_keys=(
   WEB_API_ORIGIN
   APP_JWT_SECRET
   APP_ADMIN_USERNAME
+  BOOTSTRAP_ADMIN_ONCE
   ERP_DEBUG_ENV
   ERP_DEBUG_SEED_ENABLED
   ERP_DEBUG_CLEANUP_ENABLED
@@ -170,6 +171,7 @@ else
   jaeger_bind_addr="$(value_of JAEGER_BIND_ADDR)"
   postgres_dsn="$(value_of POSTGRES_DSN)"
   app_admin_password="$(value_of APP_ADMIN_PASSWORD)"
+  bootstrap_admin_once="$(value_of BOOTSTRAP_ADMIN_ONCE)"
   trace_ratio="$(value_of TRACE_RATIO)"
 
   [[ "${#app_jwt_secret}" -ge 32 ]] || fail "APP_JWT_SECRET 至少需要 32 字符"
@@ -180,12 +182,17 @@ else
   [[ "$erp_debug_cleanup_enabled" == "false" ]] || fail "ERP_DEBUG_CLEANUP_ENABLED 必须为 false"
   [[ "$jaeger_bind_addr" == "127.0.0.1" ]] || fail "JAEGER_BIND_ADDR 必须为 127.0.0.1，避免 Jaeger 暴露到公网或办公网"
   [[ "$postgres_dsn" == postgres://* || "$postgres_dsn" == postgresql://* ]] || fail "POSTGRES_DSN 必须是 postgres/postgresql URL"
+  [[ "$bootstrap_admin_once" == "true" || "$bootstrap_admin_once" == "false" ]] || fail "BOOTSTRAP_ADMIN_ONCE 必须为 true 或 false"
 
   if [[ -n "$app_admin_password" ]]; then
     if grep -Eiq "$placeholder_pattern" <<<"$app_admin_password"; then
       fail "APP_ADMIN_PASSWORD 仍包含 placeholder"
     fi
     [[ "${#app_admin_password}" -ge 8 ]] || fail "APP_ADMIN_PASSWORD 至少需要 8 字符"
+    [[ "$bootstrap_admin_once" == "true" ]] || fail "APP_ADMIN_PASSWORD 只能在 BOOTSTRAP_ADMIN_ONCE=true 的首次初始化窗口临时注入"
+  fi
+  if [[ "$bootstrap_admin_once" == "true" && -z "$app_admin_password" ]]; then
+    fail "BOOTSTRAP_ADMIN_ONCE=true 时必须临时注入 APP_ADMIN_PASSWORD"
   fi
 
   if ! awk -v ratio="$trace_ratio" 'BEGIN { exit !(ratio + 0 >= 0 && ratio + 0 <= 1) }'; then

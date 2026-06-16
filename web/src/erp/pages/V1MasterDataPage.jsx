@@ -649,7 +649,10 @@ function getRecordSearchPlaceholder(type = '') {
 export default function V1MasterDataPage({ type }) {
   const config = PAGE_CONFIG[type] || PAGE_CONFIG.customers
   const outletContext = useOutletContext()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const [loading, setLoading] = useState(false)
   const [contactLoading, setContactLoading] = useState(false)
   const [keyword, setKeyword] = useState('')

@@ -258,7 +258,7 @@ export class Request {
     try {
       // 解析为json标准响应数据对象
       jsonData = response.json()
-    } catch (e) {
+    } catch {
       jsonData = {
         data: undefined,
         success: false,

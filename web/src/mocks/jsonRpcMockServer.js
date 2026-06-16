@@ -431,7 +431,7 @@ export function setupJsonRpcMockServer() {
     let jsonBody = {}
     try {
       jsonBody = bodyText ? JSON.parse(bodyText) : {}
-    } catch (e) {
+    } catch {
       // body 不是合法 JSON，返回 400
       return new Response(
         JSON.stringify({

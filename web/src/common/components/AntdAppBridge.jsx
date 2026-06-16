@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { App as AntdApp } from 'antd'
 import { registerAntdAppApis } from '@/common/utils/antdApp'
 

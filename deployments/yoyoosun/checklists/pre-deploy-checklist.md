@@ -15,7 +15,7 @@
 - [ ] `POSTGRES_DSN` 已确认目标库，密码已按 URL 规则编码。
 - [ ] `APP_JWT_SECRET` 非 placeholder。
 - [ ] `POSTGRES_PASSWORD` 非 placeholder。
-- [ ] `APP_ADMIN_PASSWORD` 如需首次初始化，仅一次性注入，不长期保留。
+- [ ] `APP_ADMIN_PASSWORD` 如需首次初始化，仅与 `BOOTSTRAP_ADMIN_ONCE=true` 一起一次性注入；初始化成功后移除并恢复为 `false`。
 - [ ] `ERP_DEBUG_ENV=prod`。
 - [ ] `ERP_DEBUG_SEED_ENABLED=false`。
 - [ ] `ERP_DEBUG_CLEANUP_ENABLED=false`。
@@ -43,7 +43,9 @@
 ## 文档与证据
 
 - [ ] `release-evidence.md` 草稿已创建。
+- [ ] `backup-evidence.md` 已准备，且 backupPurpose 明确为 pre-migration / pre-deploy。
 - [ ] `migration-evidence` 模板已准备。
 - [ ] `backup-evidence` 模板已准备。
 - [ ] `smoke-test-checklist.md` 已确认。
+- [ ] `release-signoff-checklist.md` 已准备。
 - [ ] 资料包 lint 通过。

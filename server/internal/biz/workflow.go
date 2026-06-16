@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -13,6 +14,8 @@ var (
 	ErrWorkflowTaskExists         = errors.New("workflow task already exists")
 	ErrWorkflowBusinessStateFound = errors.New("workflow business state already exists")
 )
+
+var workflowNumberedPhasePattern = regexp.MustCompile(`(?i)\b` + `phase` + `\s*[0-9]+[a-z0-9_-]*`)
 
 const (
 	workflowProjectOrderModuleKey              = "project-orders"
@@ -422,6 +425,9 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 			return nil, err
 		}
 	}
+	if workflowStatusUpdateHasNumberedPhaseLabel(in) {
+		return nil, ErrBadParam
+	}
 	return uc.repo.UpdateWorkflowTaskStatus(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
 }
 
@@ -814,6 +820,9 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 	if in.Payload == nil {
 		in.Payload = map[string]any{}
 	}
+	if workflowCreateHasNumberedPhaseLabel(in) {
+		return WorkflowTaskCreate{}, ErrBadParam
+	}
 	if in.TaskCode == "" || in.TaskGroup == "" || in.TaskName == "" || in.SourceType == "" || in.SourceID <= 0 || in.OwnerRoleKey == "" {
 		return WorkflowTaskCreate{}, ErrBadParam
 	}
@@ -831,6 +840,82 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 		}
 	}
 	return in, nil
+}
+
+func workflowCreateHasNumberedPhaseLabel(in WorkflowTaskCreate) bool {
+	return workflowTextHasNumberedPhaseLabel(
+		in.TaskCode,
+		in.TaskName,
+		workflowStringPtrValue(in.SourceNo),
+		workflowStringPtrValue(in.BlockedReason),
+	) || workflowValueHasNumberedPhaseLabel(in.Payload)
+}
+
+func workflowStatusUpdateHasNumberedPhaseLabel(in *WorkflowTaskStatusUpdate) bool {
+	if in == nil {
+		return false
+	}
+	if workflowTextHasNumberedPhaseLabel(in.BusinessStatusKey, in.Reason) ||
+		workflowValueHasNumberedPhaseLabel(in.Payload) {
+		return true
+	}
+	if in.SideEffects == nil {
+		return false
+	}
+	if in.SideEffects.DerivedTask != nil &&
+		workflowCreateHasNumberedPhaseLabel(*in.SideEffects.DerivedTask) {
+		return true
+	}
+	state := in.SideEffects.BusinessState
+	if state == nil {
+		return false
+	}
+	return workflowTextHasNumberedPhaseLabel(
+		state.SourceType,
+		workflowStringPtrValue(state.SourceNo),
+		state.BusinessStatusKey,
+		workflowStringPtrValue(state.OwnerRoleKey),
+		workflowStringPtrValue(state.BlockedReason),
+	) || workflowValueHasNumberedPhaseLabel(state.Payload)
+}
+
+func workflowStringPtrValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func workflowTextHasNumberedPhaseLabel(values ...string) bool {
+	for _, value := range values {
+		if workflowNumberedPhasePattern.MatchString(value) {
+			return true
+		}
+	}
+	return false
+}
+
+func workflowValueHasNumberedPhaseLabel(value any) bool {
+	switch v := value.(type) {
+	case nil:
+		return false
+	case string:
+		return workflowNumberedPhasePattern.MatchString(v)
+	case map[string]any:
+		for key, item := range v {
+			if workflowNumberedPhasePattern.MatchString(key) ||
+				workflowValueHasNumberedPhaseLabel(item) {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range v {
+			if workflowValueHasNumberedPhaseLabel(item) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func normalizeWorkflowBusinessStateFilter(filter WorkflowBusinessStateFilter) WorkflowBusinessStateFilter {

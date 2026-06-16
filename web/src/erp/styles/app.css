@@ -7156,6 +7156,8 @@
 }
 
 .erp-business-action-modal.ant-modal {
+  --erp-control-height: 36px;
+  --erp-textarea-rows: 3;
   max-width: calc(100vw - 32px);
 }
 
@@ -7164,10 +7166,10 @@
   max-height: calc(100vh - 64px);
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  border: 1px solid var(--erp-business-action-modal-border, #dde6e0);
-  border-radius: 8px;
+  border: 1px solid var(--erp-business-action-modal-border, #d8e3dc);
+  border-radius: 10px;
   background: var(--erp-business-action-modal-bg, #ffffff);
-  box-shadow: 0 18px 48px rgb(15 23 42 / 18%);
+  box-shadow: 0 22px 56px rgb(15 23 42 / 22%);
   padding: 0;
 }
 
@@ -7175,7 +7177,7 @@
   margin-bottom: 0;
   border-bottom: 1px solid var(--erp-business-action-modal-divider, #dde6e0);
   background: var(--erp-business-action-modal-bg, #ffffff);
-  padding: 18px 22px 8px;
+  padding: 18px 24px 14px;
 }
 
 .erp-business-action-modal .ant-modal-title {
@@ -7184,13 +7186,13 @@
 
 .erp-business-action-modal__title {
   display: grid;
-  gap: 6px;
+  gap: 5px;
   padding-inline-end: 32px;
 }
 
 .erp-business-action-modal__title span {
   color: #172033;
-  font-size: 18px;
+  font-size: 19px;
   font-weight: 750;
 }
 
@@ -7207,7 +7209,7 @@
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   background: var(--erp-business-action-modal-bg, #ffffff);
-  padding: 14px 22px 16px;
+  padding: 18px 24px 20px;
 }
 
 .erp-business-action-modal .ant-modal-footer {
@@ -7218,12 +7220,9 @@
   gap: 8px;
   margin-top: 0;
   border-top: 1px solid var(--erp-business-action-modal-divider, #dde6e0);
-  background: color-mix(
-    in srgb,
-    var(--erp-business-action-modal-bg, #ffffff) 94%,
-    transparent
-  );
-  padding: 12px 22px 14px;
+  background: var(--erp-business-action-modal-bg, #ffffff);
+  box-shadow: 0 -8px 18px rgb(15 23 42 / 4%);
+  padding: 14px 24px 16px;
 }
 
 .erp-business-action-modal .ant-modal-close {
@@ -7244,19 +7243,21 @@
 }
 
 .erp-business-action-modal .ant-btn {
-  min-height: 32px;
+  min-height: 34px;
   border-radius: 7px;
   font-weight: 650;
+  padding-inline: 16px;
 }
 
 .erp-business-action-modal .ant-btn-primary {
   box-shadow: none;
+  min-width: 82px;
 }
 
 .erp-business-action-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 16px 18px;
 }
 
 .erp-business-action-form .ant-form-item {
@@ -7277,28 +7278,30 @@
 }
 
 .erp-business-action-form .ant-form-item-label {
-  padding-bottom: 7px;
+  padding-bottom: 8px;
 }
 
 .erp-business-action-form .ant-form-item-label > label {
   color: #273344;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 720;
+  line-height: 1.25;
 }
 
 .erp-sales-order-lines-form {
   display: grid;
   grid-column: 1 / -1;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
-  border: 1px solid var(--erp-sales-order-lines-border, #dde6e0);
+  border: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
   border-radius: 8px;
-  background: var(--erp-sales-order-lines-bg, #f8fbf8);
-  padding: 14px;
+  background: var(--erp-sales-order-lines-bg, #f8fbf9);
+  padding: 16px;
 }
 
 .erp-sales-order-lines-form__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
@@ -7312,13 +7315,57 @@
 
 .erp-sales-order-lines-form__head strong {
   color: var(--erp-sales-order-lines-title, #172033);
-  font-weight: 760;
+  font-size: 15px;
+  font-weight: 780;
 }
 
 .erp-sales-order-lines-form__head span {
   color: var(--erp-sales-order-lines-text-muted, #6b7788);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.erp-line-items-form__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-line-items-form__import.ant-select {
+  flex: 0 1 210px;
+  min-width: 180px;
+}
+
+.erp-line-items-form__stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.erp-line-items-form__stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-height: 30px;
+  border: 1px solid var(--erp-line-items-stat-border, #cfe0ff);
+  border-radius: 999px;
+  background: var(--erp-line-items-stat-bg, #f3f8ff);
+  color: var(--erp-line-items-stat-text, #6b7788);
+  font-size: 12px;
+  font-weight: 650;
+  padding: 4px 10px;
+}
+
+.erp-line-items-form__stat-value {
+  color: var(--erp-line-items-stat-value, #2563eb);
+  font-size: 15px;
+  font-weight: 780;
+  line-height: 1;
 }
 
 .erp-sales-order-lines-form__list {
@@ -7329,12 +7376,13 @@
 
 .erp-sales-order-lines-form__row {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
-  border: 1px solid var(--erp-sales-order-lines-border, #dde6e0);
+  border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
   border-radius: 8px;
   background: var(--erp-business-action-modal-bg, #ffffff);
-  padding: 12px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  padding: 14px;
 }
 
 .erp-sales-order-lines-form__row-head {
@@ -7347,29 +7395,42 @@
 
 .erp-sales-order-lines-form__grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-auto-columns: minmax(220px, 1fr);
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  gap: 14px 16px;
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-gutter: stable;
 }
 
 .erp-sales-order-lines-form__grid .ant-form-item {
-  min-width: 0;
+  min-width: 220px;
   margin-bottom: 0;
 }
 
 .erp-sales-order-lines-form__field--full.ant-form-item {
-  grid-column: 1 / -1;
+  grid-column: auto;
+  min-width: 260px;
+}
+
+.erp-sales-order-lines-form__grid
+  .erp-business-action-form__field--full.ant-form-item {
+  grid-column: auto;
+  min-width: 260px;
 }
 
 .erp-master-contact-list {
   display: grid;
   grid-column: 1 / -1;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
-  border: 1px solid var(--erp-sales-order-lines-border, #dde6e0);
+  border: 1px solid var(--erp-sales-order-lines-border, #d7e2dc);
   border-radius: 8px;
-  background: var(--erp-sales-order-lines-bg, #f8fbf8);
-  padding: 14px;
+  background: var(--erp-sales-order-lines-bg, #f8fbf9);
+  padding: 16px;
 }
 
 .erp-master-contact-list__head {
@@ -7389,7 +7450,8 @@
 .erp-master-contact-list__head strong,
 .erp-master-contact-list__row-head strong {
   color: var(--erp-sales-order-lines-title, #172033);
-  font-weight: 760;
+  font-size: 15px;
+  font-weight: 780;
 }
 
 .erp-master-contact-list__head span {
@@ -7406,12 +7468,13 @@
 
 .erp-master-contact-list__row {
   display: grid;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
-  border: 1px solid var(--erp-sales-order-lines-border, #dde6e0);
+  border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
   border-radius: 8px;
   background: var(--erp-business-action-modal-bg, #ffffff);
-  padding: 12px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
+  padding: 14px;
 }
 
 .erp-master-contact-list__row-head {
@@ -7424,18 +7487,31 @@
 
 .erp-master-contact-list__grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
+  grid-auto-columns: minmax(220px, 1fr);
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  gap: 14px 16px;
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-gutter: stable;
 }
 
 .erp-master-contact-list__grid .ant-form-item {
-  min-width: 0;
+  min-width: 220px;
   margin-bottom: 0;
 }
 
 .erp-master-contact-list__field--full.ant-form-item {
-  grid-column: 1 / -1;
+  grid-column: auto;
+  min-width: 260px;
+}
+
+.erp-master-contact-list__grid
+  .erp-business-action-form__field--full.ant-form-item {
+  grid-column: auto;
+  min-width: 260px;
 }
 
 .erp-bom-modal-items {
@@ -7445,19 +7521,65 @@
 .erp-business-action-form :where(.ant-input, .ant-input-number, .ant-picker),
 .erp-business-action-form :where(.ant-input-affix-wrapper),
 :where(.erp-business-action-form) .ant-select-selector {
-  min-height: 36px;
-  border-color: #cbd8d1;
+  min-height: var(--erp-control-height, 36px);
+  border-color: var(--erp-business-action-field-border, #becdc4);
   border-radius: 8px;
+  background: var(--erp-business-action-field-bg, #ffffff);
+  box-shadow: inset 0 1px 0 rgb(15 23 42 / 2%);
+}
+
+.erp-business-action-form
+  :where(
+    .ant-input,
+    .ant-input-number,
+    .ant-picker,
+    .ant-input-affix-wrapper
+  ):hover {
+  border-color: #8fb6a1;
+}
+
+.erp-business-action-form
+  :where(
+    .ant-input:focus,
+    .ant-input-focused,
+    .ant-input-number-focused,
+    .ant-picker-focused,
+    .ant-input-affix-wrapper-focused
+  ) {
+  border-color: #2f8f4e;
+  box-shadow: 0 0 0 3px rgb(47 143 78 / 12%);
 }
 
 .erp-business-action-form :where(input.ant-input:not([type='hidden'])) {
-  height: 36px;
+  height: var(--erp-control-height, 36px);
   border-radius: 8px;
 }
 
+.erp-business-action-form :where(.ant-input-number-input) {
+  height: calc(var(--erp-control-height, 36px) - 2px);
+}
+
+.erp-business-action-form :where(.ant-select-single) {
+  min-height: var(--erp-control-height, 36px);
+}
+
+.erp-business-action-form :where(.ant-select-single .ant-select-selector) {
+  align-items: center;
+}
+
 .erp-business-action-form :where(textarea.ant-input) {
-  min-height: 74px;
+  min-height: calc(
+    var(--erp-control-height, 36px) * var(--erp-textarea-rows, 3)
+  );
   border-radius: 8px;
+  padding-block: 9px;
+}
+
+.erp-sales-order-lines-form__grid :where(textarea.ant-input),
+.erp-master-contact-list__grid :where(textarea.ant-input) {
+  height: var(--erp-control-height, 36px);
+  min-height: var(--erp-control-height, 36px);
+  resize: none;
 }
 
 .erp-business-action-form :where(.ant-input[disabled], .ant-input-disabled),
@@ -7771,7 +7893,7 @@
 }
 
 .erp-business-page-layout {
-  --erp-business-control-height: 38px;
+  --erp-business-control-height: 36px;
   --erp-business-card-radius: 8px;
   --erp-business-card-border: #dfe9e1;
   --erp-business-control-border: #d8e2dc;
@@ -9394,8 +9516,20 @@
     padding-inline: 16px;
   }
 
+  .erp-business-action-modal .ant-modal-header {
+    padding-top: 16px;
+    padding-bottom: 12px;
+  }
+
+  .erp-business-action-modal .ant-modal-body {
+    padding-top: 16px;
+    padding-bottom: 18px;
+  }
+
   .erp-business-action-modal .ant-modal-footer {
     justify-content: stretch;
+    padding-top: 12px;
+    padding-bottom: 14px;
   }
 
   .erp-business-action-modal .ant-modal-footer .ant-btn {
@@ -9430,14 +9564,6 @@
   .erp-master-contact-list__row-head {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .erp-sales-order-lines-form__grid {
-    grid-template-columns: 1fr;
-  }
-
-  .erp-master-contact-list__grid {
-    grid-template-columns: 1fr;
   }
 
   .erp-sales-order-lines-form__field--full.ant-form-item {
@@ -10472,8 +10598,15 @@
   --erp-business-action-modal-bg: var(--erp-modal-bg);
   --erp-business-action-modal-border: var(--erp-modal-border);
   --erp-business-action-modal-divider: var(--erp-modal-divider);
+  --erp-business-action-field-bg: #0f172a;
+  --erp-business-action-field-border: var(--erp-border-strong);
+  --erp-line-items-stat-bg: rgb(37 99 235 / 14%);
+  --erp-line-items-stat-border: rgb(96 165 250 / 34%);
+  --erp-line-items-stat-text: var(--erp-text-muted);
+  --erp-line-items-stat-value: #93c5fd;
   --erp-sales-order-lines-bg: var(--erp-modal-bg-soft);
   --erp-sales-order-lines-border: var(--erp-modal-divider);
+  --erp-sales-order-lines-row-border: var(--erp-border);
   --erp-sales-order-lines-title: var(--erp-text);
   --erp-sales-order-lines-text-muted: var(--erp-text-muted);
 }
@@ -10703,6 +10836,30 @@
   border-color: var(--erp-border-strong);
   background: #0f172a;
   color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-business-action-form
+  :where(
+    .ant-input,
+    .ant-input-number,
+    .ant-picker,
+    .ant-input-affix-wrapper
+  ):hover {
+  border-color: var(--erp-interactive-border-hover);
+}
+
+[data-erp-theme='dark']
+  .erp-business-action-form
+  :where(
+    .ant-input:focus,
+    .ant-input-focused,
+    .ant-input-number-focused,
+    .ant-picker-focused,
+    .ant-input-affix-wrapper-focused
+  ) {
+  border-color: var(--erp-interactive-border-focus);
+  box-shadow: var(--erp-focus-ring);
 }
 
 [data-erp-theme='dark']
