@@ -2,18 +2,18 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DeleteOutlined,
   EyeOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
 import {
   Button,
   Card,
-  Descriptions,
-  Drawer,
   Empty,
   Form,
   Input,
   InputNumber,
+  Modal,
   Popconfirm,
   Select,
   Space,
@@ -40,6 +40,7 @@ import {
 } from '../utils/masterDataOrderView.mjs'
 
 const { Paragraph, Text, Title } = Typography
+const BUSINESS_FORM_MODAL_WIDTH = 'min(920px, calc(100vw - 96px))'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -116,7 +117,36 @@ function buildShipmentItemParams(values = {}) {
   })
 }
 
-function ShipmentFormFields() {
+function createBlankShipmentItem(shipmentID) {
+  return {
+    shipment_id: shipmentID,
+    sales_order_item_id: undefined,
+    product_id: undefined,
+    warehouse_id: undefined,
+    lot_id: undefined,
+    unit_id: undefined,
+    quantity: '',
+    note: '',
+  }
+}
+
+function shipmentFormValues(shipment = {}) {
+  const plannedShipAt = Number(shipment.planned_ship_at || 0)
+  return {
+    shipment_no: shipment.shipment_no || '',
+    sales_order_id: shipment.sales_order_id,
+    customer_id: shipment.customer_id,
+    customer_snapshot: shipment.customer_snapshot || '',
+    idempotency_key: shipment.idempotency_key || '',
+    planned_ship_at:
+      plannedShipAt > 0
+        ? new Date(plannedShipAt * 1000).toISOString().slice(0, 10)
+        : '',
+    note: shipment.note || '',
+  }
+}
+
+function ShipmentFormFields({ disabled = false }) {
   return (
     <>
       <Form.Item
@@ -124,79 +154,99 @@ function ShipmentFormFields() {
         name="shipment_no"
         rules={[{ required: true, message: '请填写出货单号' }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
       <Form.Item label="销售订单 ID" name="sales_order_id">
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <InputNumber
+          disabled={disabled}
+          min={1}
+          precision={0}
+          style={{ width: '100%' }}
+        />
       </Form.Item>
       <Form.Item label="客户 ID" name="customer_id">
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <InputNumber
+          disabled={disabled}
+          min={1}
+          precision={0}
+          style={{ width: '100%' }}
+        />
       </Form.Item>
       <Form.Item label="客户快照" name="customer_snapshot">
-        <Input allowClear autoComplete="off" />
+        <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
       <Form.Item
         label="幂等键"
         name="idempotency_key"
         rules={[{ required: true, message: '请填写幂等键' }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
       <Form.Item label="计划出货日期" name="planned_ship_at">
-        <Input type="date" />
+        <Input type="date" disabled={disabled} />
       </Form.Item>
       <Form.Item label="备注" name="note">
-        <Input.TextArea allowClear rows={3} maxLength={300} showCount />
+        <Input.TextArea
+          allowClear
+          disabled={disabled}
+          rows={3}
+          maxLength={300}
+          showCount
+        />
       </Form.Item>
     </>
   )
 }
 
-function ShipmentItemFormFields() {
+function ShipmentItemFormFields({ field, showShipmentID = false }) {
+  const namePrefix = field ? field.name : undefined
+  const fieldName = (key) => (field ? [namePrefix, key] : key)
   return (
     <>
-      <Form.Item
-        label="出货单 ID"
-        name="shipment_id"
-        rules={[{ required: true, message: '请选择出货单' }]}
-      >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item label="销售订单行 ID" name="sales_order_item_id">
+      {showShipmentID ? (
+        <Form.Item
+          label="出货单 ID"
+          name={fieldName('shipment_id')}
+          rules={[{ required: true, message: '请选择出货单' }]}
+        >
+          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        </Form.Item>
+      ) : null}
+      <Form.Item label="销售订单行 ID" name={fieldName('sales_order_item_id')}>
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         label="产品 ID"
-        name="product_id"
+        name={fieldName('product_id')}
         rules={[{ required: true, message: '请填写产品 ID' }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         label="仓库 ID"
-        name="warehouse_id"
+        name={fieldName('warehouse_id')}
         rules={[{ required: true, message: '请填写仓库 ID' }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="批次 ID" name="lot_id">
+      <Form.Item label="批次 ID" name={fieldName('lot_id')}>
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         label="单位 ID"
-        name="unit_id"
+        name={fieldName('unit_id')}
         rules={[{ required: true, message: '请填写单位 ID' }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         label="数量"
-        name="quantity"
+        name={fieldName('quantity')}
         rules={[{ required: true, message: '请填写数量' }]}
       >
         <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item label="备注" name={fieldName('note')}>
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
       </Form.Item>
     </>
@@ -239,11 +289,8 @@ export default function ShipmentsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [createOpen, setCreateOpen] = useState(false)
-  const [itemOpen, setItemOpen] = useState(false)
-  const [detailShipment, setDetailShipment] = useState(null)
-  const [createForm] = Form.useForm()
-  const [itemForm] = Form.useForm()
+  const [shipmentModal, setShipmentModal] = useState(null)
+  const [shipmentForm] = Form.useForm()
 
   const canCreate = hasPermission(adminProfile, 'shipment.create')
   const canShip = hasPermission(adminProfile, 'shipment.ship')
@@ -268,67 +315,82 @@ export default function ShipmentsPage() {
     loadRows()
   }, [loadRows])
 
-  const selectedDetail = useMemo(() => {
-    if (!detailShipment?.id) {
-      return null
-    }
-    return rows.find((item) => item.id === detailShipment.id) || detailShipment
-  }, [detailShipment, rows])
+  const selectedShipment = useMemo(() => {
+    const shipment = shipmentModal?.shipment
+    if (!shipment?.id) return null
+    return rows.find((item) => item.id === shipment.id) || shipment
+  }, [rows, shipmentModal?.shipment])
+
+  const shipmentModalMode = shipmentModal?.mode || ''
+  const isCreateModal = shipmentModalMode === 'create'
+  const isAppendModal = shipmentModalMode === 'append'
+  const isViewModal = shipmentModalMode === 'view'
 
   const openCreate = () => {
-    createForm.setFieldsValue({
+    shipmentForm.resetFields()
+    shipmentForm.setFieldsValue({
       idempotency_key: idempotencyKey('shipment'),
       planned_ship_at: new Date().toISOString().slice(0, 10),
+      items: [createBlankShipmentItem()],
     })
-    setCreateOpen(true)
+    setShipmentModal({ mode: 'create', shipment: null })
   }
 
-  const closeCreate = () => {
-    setCreateOpen(false)
-    createForm.resetFields()
+  const openView = (shipment) => {
+    shipmentForm.resetFields()
+    shipmentForm.setFieldsValue({
+      ...shipmentFormValues(shipment),
+      items: [],
+    })
+    setShipmentModal({ mode: 'view', shipment })
   }
 
-  const submitCreate = async () => {
-    try {
-      const values = await createForm.validateFields()
-      setSaving(true)
-      await createShipment(buildShipmentParams(values))
-      message.success('出货单草稿已保存')
-      closeCreate()
-      await loadRows()
-    } catch (error) {
-      if (error?.errorFields) {
-        return
-      }
-      message.error(getActionErrorMessage(error, '新建出货单'))
-    } finally {
-      setSaving(false)
+  const openAppendItems = (shipment) => {
+    shipmentForm.resetFields()
+    shipmentForm.setFieldsValue({
+      ...shipmentFormValues(shipment),
+      items: [createBlankShipmentItem(shipment?.id)],
+    })
+    setShipmentModal({ mode: 'append', shipment })
+  }
+
+  const closeShipmentModal = () => {
+    setShipmentModal(null)
+    shipmentForm.resetFields()
+  }
+
+  const addShipmentItems = async (shipmentID, items = []) => {
+    if (!positiveInt(shipmentID)) {
+      throw new Error('缺少出货单 ID，无法保存出货明细')
+    }
+    const normalizedItems = items.map((item) =>
+      buildShipmentItemParams({ ...item, shipment_id: shipmentID })
+    )
+    for (const item of normalizedItems) {
+      await addShipmentItem(item)
     }
   }
 
-  const openItem = (shipment) => {
-    itemForm.setFieldsValue({ shipment_id: shipment?.id })
-    setItemOpen(true)
-  }
-
-  const closeItem = () => {
-    setItemOpen(false)
-    itemForm.resetFields()
-  }
-
-  const submitItem = async () => {
+  const submitShipmentModal = async () => {
+    if (isViewModal) return
     try {
-      const values = await itemForm.validateFields()
+      const values = await shipmentForm.validateFields()
       setSaving(true)
-      await addShipmentItem(buildShipmentItemParams(values))
-      message.success('出货明细已保存')
-      closeItem()
+      if (isCreateModal) {
+        const shipment = await createShipment(buildShipmentParams(values))
+        await addShipmentItems(shipment?.id, values.items || [])
+        message.success('出货单草稿和明细已保存')
+      } else if (isAppendModal) {
+        await addShipmentItems(selectedShipment?.id, values.items || [])
+        message.success('出货明细已保存')
+      }
+      closeShipmentModal()
       await loadRows()
     } catch (error) {
       if (error?.errorFields) {
         return
       }
-      message.error(getActionErrorMessage(error, '保存出货明细'))
+      message.error(getActionErrorMessage(error, '保存出货单'))
     } finally {
       setSaving(false)
     }
@@ -402,16 +464,16 @@ export default function ShipmentsPage() {
           <Button
             size="small"
             icon={<EyeOutlined />}
-            onClick={() => setDetailShipment(record)}
+            onClick={() => openView(record)}
           >
-            详情
+            查看
           </Button>
           {record.status === 'DRAFT' ? (
             <Button
               size="small"
               icon={<PlusOutlined />}
               disabled={!canCreate || saving}
-              onClick={() => openItem(record)}
+              onClick={() => openAppendItems(record)}
             >
               加行
             </Button>
@@ -518,85 +580,111 @@ export default function ShipmentsPage() {
         </Space>
       </Card>
 
-      <Drawer
-        title="出货单明细"
-        open={Boolean(selectedDetail)}
-        onClose={() => setDetailShipment(null)}
-        width={760}
-      >
-        {selectedDetail ? (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="出货单号">
-                {selectedDetail.shipment_no || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="状态">
-                {statusTag(selectedDetail.status)}
-              </Descriptions.Item>
-              <Descriptions.Item label="销售订单">
-                {selectedDetail.sales_order_id || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="客户">
-                {selectedDetail.customer_snapshot ||
-                  selectedDetail.customer_id ||
-                  '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="计划出货">
-                {formatUnixDate(selectedDetail.planned_ship_at)}
-              </Descriptions.Item>
-              <Descriptions.Item label="实际出货">
-                {formatUnixDate(selectedDetail.shipped_at)}
-              </Descriptions.Item>
-              <Descriptions.Item label="备注" span={2}>
-                {selectedDetail.note || '-'}
-              </Descriptions.Item>
-            </Descriptions>
-            <ShipmentItemsTable items={selectedDetail.items || []} />
-          </Space>
-        ) : null}
-      </Drawer>
-
-      <Drawer
-        title="新建出货单草稿"
-        open={createOpen}
-        onClose={closeCreate}
-        width={520}
-        extra={
-          <Button
-            type="primary"
-            loading={saving}
-            disabled={!canCreate}
-            onClick={submitCreate}
-          >
-            保存
-          </Button>
+      <Modal
+        className="erp-business-action-modal erp-business-action-modal--form"
+        title={
+          <div className="erp-business-action-modal__title">
+            <span>
+              {isCreateModal
+                ? '新建出货单'
+                : isAppendModal
+                  ? '维护出货明细'
+                  : '查看出货单'}
+            </span>
+            <small>
+              出货单弹窗上方维护主表字段，下方维护出货明细；事实写入仍由后端
+              ShipmentUsecase 处理。
+            </small>
+          </div>
         }
-      >
-        <Form layout="vertical" form={createForm}>
-          <ShipmentFormFields />
-        </Form>
-      </Drawer>
-
-      <Drawer
-        title="添加出货明细"
-        open={itemOpen}
-        onClose={closeItem}
-        width={520}
-        extra={
-          <Button
-            type="primary"
-            loading={saving}
-            disabled={!canCreate}
-            onClick={submitItem}
-          >
-            保存
-          </Button>
+        open={Boolean(shipmentModal)}
+        onCancel={closeShipmentModal}
+        onOk={submitShipmentModal}
+        okText="保存"
+        cancelText={isViewModal ? '关闭' : '取消'}
+        confirmLoading={saving}
+        okButtonProps={{ disabled: isViewModal || !canCreate }}
+        footer={
+          isViewModal ? (
+            <Button onClick={closeShipmentModal}>关闭</Button>
+          ) : undefined
         }
+        width={BUSINESS_FORM_MODAL_WIDTH}
+        centered
+        forceRender
+        destroyOnHidden={false}
       >
-        <Form layout="vertical" form={itemForm}>
-          <ShipmentItemFormFields />
+        <Form
+          layout="vertical"
+          form={shipmentForm}
+          className="erp-business-action-form"
+        >
+          <ShipmentFormFields disabled={!isCreateModal} />
+          {selectedShipment ? (
+            <section className="erp-master-contact-list erp-shipment-modal-items">
+              <div className="erp-master-contact-list__head">
+                <div>
+                  <strong>已保存出货明细</strong>
+                  <span>当前出货单已保存的明细只读展示。</span>
+                </div>
+                <Tag>{selectedShipment.items?.length || 0} 行</Tag>
+              </div>
+              <ShipmentItemsTable items={selectedShipment.items || []} />
+            </section>
+          ) : null}
+          {!isViewModal ? (
+            <Form.List name="items">
+              {(fields, { add, remove }) => (
+                <section className="erp-master-contact-list erp-shipment-modal-items">
+                  <div className="erp-master-contact-list__head">
+                    <div>
+                      <strong>
+                        {isCreateModal ? '出货明细' : '新增出货明细'}
+                      </strong>
+                      <span>
+                        明细随当前弹窗保存；库存 OUT 仍由确认出货动作写入。
+                      </span>
+                    </div>
+                    <Button
+                      size="small"
+                      icon={<PlusOutlined />}
+                      onClick={() =>
+                        add(createBlankShipmentItem(selectedShipment?.id))
+                      }
+                    >
+                      添加明细
+                    </Button>
+                  </div>
+                  <div className="erp-master-contact-list__items">
+                    {fields.map((field) => (
+                      <div
+                        className="erp-master-contact-list__row"
+                        key={field.key}
+                      >
+                        <div className="erp-master-contact-list__row-head">
+                          <strong>明细 {field.name + 1}</strong>
+                          <Button
+                            danger
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            disabled={fields.length <= 1}
+                            onClick={() => remove(field.name)}
+                          >
+                            删除
+                          </Button>
+                        </div>
+                        <div className="erp-master-contact-list__grid">
+                          <ShipmentItemFormFields field={field} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </Form.List>
+          ) : null}
         </Form>
-      </Drawer>
+      </Modal>
     </Space>
   )
 }

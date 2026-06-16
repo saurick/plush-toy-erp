@@ -11,8 +11,6 @@ import {
 } from '@ant-design/icons'
 import {
   Button,
-  Descriptions,
-  Drawer,
   Empty,
   Form,
   Input,
@@ -156,7 +154,7 @@ function buildItemParams(values = {}, extra = {}) {
   }
 }
 
-function HeaderFormFields({ includeProduct = true }) {
+function HeaderFormFields({ includeProduct = true, disabled = false }) {
   return (
     <>
       {includeProduct ? (
@@ -166,7 +164,12 @@ function HeaderFormFields({ includeProduct = true }) {
           name="product_id"
           rules={[{ required: true, message: '请填写产品 ID' }]}
         >
-          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          <InputNumber
+            disabled={disabled}
+            min={1}
+            precision={0}
+            style={{ width: '100%' }}
+          />
         </Form.Item>
       ) : null}
       <Form.Item
@@ -175,28 +178,34 @@ function HeaderFormFields({ includeProduct = true }) {
         name="version"
         rules={[{ required: true, message: '请填写 BOM 版本' }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         label="生效开始"
         name="effective_from"
       >
-        <Input type="date" />
+        <Input type="date" disabled={disabled} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
         label="生效结束"
         name="effective_to"
       >
-        <Input type="date" />
+        <Input type="date" disabled={disabled} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
         label="备注"
         name="note"
       >
-        <Input.TextArea allowClear rows={3} showCount maxLength={300} />
+        <Input.TextArea
+          allowClear
+          disabled={disabled}
+          rows={3}
+          showCount
+          maxLength={300}
+        />
       </Form.Item>
     </>
   )
@@ -267,7 +276,6 @@ export default function BOMVersionsPage() {
   const [versions, setVersions] = useState([])
   const [total, setTotal] = useState(0)
   const [selectedVersion, setSelectedVersion] = useState(null)
-  const [detailOpen, setDetailOpen] = useState(false)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
   const [itemModalOpen, setItemModalOpen] = useState(false)
@@ -349,9 +357,7 @@ export default function BOMVersionsPage() {
     setHeaderModalOpen(true)
   }
 
-  const openEdit = (record = selectedVersion) => {
-    if (!record?.id) return
-    setHeaderMode('edit')
+  const fillHeaderForm = (record) => {
     headerForm.resetFields()
     headerForm.setFieldsValue({
       product_id: record.product_id,
@@ -360,6 +366,21 @@ export default function BOMVersionsPage() {
       effective_to: unixToDateInputValue(record.effective_to),
       note: record.note || '',
     })
+  }
+
+  const openView = async (record = selectedVersion) => {
+    if (!record?.id) return
+    const detail = (await loadDetail(record.id)) || record
+    setHeaderMode('view')
+    fillHeaderForm(detail)
+    setHeaderModalOpen(true)
+  }
+
+  const openEdit = async (record = selectedVersion) => {
+    if (!record?.id) return
+    const detail = (await loadDetail(record.id)) || record
+    setHeaderMode('edit')
+    fillHeaderForm(detail)
     setHeaderModalOpen(true)
   }
 
@@ -700,8 +721,11 @@ export default function BOMVersionsPage() {
             loadDetail(record.id)
           },
           onDoubleClick: () => {
-            setDetailOpen(true)
-            loadDetail(record.id)
+            if (record.status === 'DRAFT' && canUpdate) {
+              openEdit(record)
+              return
+            }
+            openView(record)
           },
         })}
       />
@@ -732,9 +756,9 @@ export default function BOMVersionsPage() {
         <Button
           icon={<InboxOutlined />}
           disabled={!selectedVersion}
-          onClick={() => setDetailOpen(true)}
+          onClick={() => openView()}
         >
-          详情
+          查看
         </Button>
         <Button
           icon={<EditOutlined />}
@@ -798,44 +822,74 @@ export default function BOMVersionsPage() {
         ownerRoleLabel="产品工程 / PMC"
       />
 
-      <Drawer
-        open={detailOpen}
-        title="BOM 版本详情"
-        width={720}
-        onClose={() => setDetailOpen(false)}
+      <Modal
+        className="erp-business-action-modal erp-business-action-modal--form"
+        open={headerModalOpen}
+        title={
+          <div className="erp-business-action-modal__title">
+            <span>
+              {headerMode === 'copy'
+                ? '复制 BOM 新版本'
+                : headerMode === 'edit'
+                  ? '编辑 BOM 草稿'
+                  : headerMode === 'view'
+                    ? '查看 BOM 版本'
+                    : '新建 BOM 草稿'}
+            </span>
+            <small>
+              BOM 只维护产品结构和材料用量，不写库存、采购或成本事实。
+            </small>
+          </div>
+        }
+        width={BUSINESS_FORM_MODAL_WIDTH}
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={saving || detailLoading}
+        onOk={saveHeader}
+        onCancel={() => setHeaderModalOpen(false)}
+        footer={
+          headerMode === 'view' ? (
+            <Button onClick={() => setHeaderModalOpen(false)}>关闭</Button>
+          ) : undefined
+        }
       >
-        {selectedVersion ? (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <Descriptions bordered column={2} size="small">
-              <Descriptions.Item label="产品 ID">
-                {selectedVersion.product_id}
-              </Descriptions.Item>
-              <Descriptions.Item label="BOM 版本">
-                {selectedVersion.version}
-              </Descriptions.Item>
-              <Descriptions.Item label="状态">
-                {statusTag(selectedVersion.status)}
-              </Descriptions.Item>
-              <Descriptions.Item label="生效开始">
-                {formatUnixDate(selectedVersion.effective_from)}
-              </Descriptions.Item>
-              <Descriptions.Item label="生效结束">
-                {formatUnixDate(selectedVersion.effective_to)}
-              </Descriptions.Item>
-              <Descriptions.Item label="更新时间">
-                {formatUnixDateTime(selectedVersion.updated_at)}
-              </Descriptions.Item>
-              <Descriptions.Item label="备注" span={2}>
-                {selectedVersion.note || '-'}
-              </Descriptions.Item>
-            </Descriptions>
+        <Form
+          form={headerForm}
+          layout="vertical"
+          className="erp-business-action-form"
+        >
+          <HeaderFormFields
+            includeProduct={headerMode !== 'edit'}
+            disabled={headerMode === 'view'}
+          />
+        </Form>
+        {headerMode === 'create' ? (
+          <p className="erp-business-selection-action-bar__hint">
+            保存 BOM 草稿后，在同一 BOM 版本弹窗下方维护材料明细。
+          </p>
+        ) : (
+          <section className="erp-master-contact-list erp-bom-modal-items">
+            <div className="erp-master-contact-list__head">
+              <strong>BOM 明细</strong>
+              <Space wrap size={8}>
+                <Tag>{selectedVersion?.items?.length || 0} 行</Tag>
+                <Button
+                  size="small"
+                  icon={<PlusOutlined />}
+                  disabled={!selectedCanEdit}
+                  onClick={openCreateItem}
+                >
+                  添加明细
+                </Button>
+              </Space>
+            </div>
             <Table
               loading={detailLoading}
               rowKey="id"
               size="small"
               columns={itemColumns}
               dataSource={
-                Array.isArray(selectedVersion.items)
+                Array.isArray(selectedVersion?.items)
                   ? selectedVersion.items
                   : []
               }
@@ -843,35 +897,8 @@ export default function BOMVersionsPage() {
               scroll={{ x: 860 }}
               locale={{ emptyText: <Empty description="暂无 BOM 明细" /> }}
             />
-          </Space>
-        ) : (
-          <Empty description="未选择 BOM 版本" />
+          </section>
         )}
-      </Drawer>
-
-      <Modal
-        open={headerModalOpen}
-        title={
-          headerMode === 'copy'
-            ? '复制 BOM 新版本'
-            : headerMode === 'edit'
-              ? '编辑 BOM 草稿'
-              : '新建 BOM 草稿'
-        }
-        width={BUSINESS_FORM_MODAL_WIDTH}
-        okText="保存"
-        cancelText="取消"
-        confirmLoading={saving}
-        onOk={saveHeader}
-        onCancel={() => setHeaderModalOpen(false)}
-      >
-        <Form
-          form={headerForm}
-          layout="vertical"
-          className="erp-business-action-form"
-        >
-          <HeaderFormFields includeProduct={headerMode !== 'edit'} />
-        </Form>
       </Modal>
 
       <Modal

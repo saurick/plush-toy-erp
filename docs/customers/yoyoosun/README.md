@@ -57,6 +57,7 @@ flowchart TD
 | `来源快照人工复查清单.md` | 记录 freeze / dry-run evidence 的人工 review checklist 和 import-not-approved 结论 |
 | `导入策略.md` | 记录永绅 yoyoosun 导入策略和真实导入前置要求 |
 | `导入风险登记.md` | 记录永绅 yoyoosun 导入风险登记 |
+| `source-manifest.json` | 记录永绅 yoyoosun 原始来源文件 path、sha256、用途、domain 和结构化提取策略 |
 | `试用培训说明.md` | 记录永绅 yoyoosun 试用培训说明、正式入口和旧入口退出边界 |
 | `试用账号角色菜单核对清单.md` | 记录永绅 yoyoosun 试用账号、角色、菜单和岗位任务端核对清单 |
 | `试用环境执行手册.md` | 记录永绅 yoyoosun 目标试用环境账号、RBAC、菜单和岗位任务端核对执行步骤 |
@@ -68,7 +69,7 @@ flowchart TD
 | `docs/archive/customer-evidence/yoyoosun/private-deployment-target-release-evidence-2026-06-09.md` | 记录 2026-06-09 私有化客户包模板、本地模拟验收和目标环境发布证据 |
 | `字段编号确认清单.md` | 记录永绅 yoyoosun 字段显示、字段必填和编号规则的客户确认清单 |
 | `字段编号确认结果模板.md` | 记录永绅 yoyoosun 字段编号客户确认结果的回写模板和边界 |
-| `raw-source-files/` | 保存永绅 yoyoosun 原始 Excel / PDF / PNG / JPG / JPEG，用于字段、模板、导入、页面和验收溯源 |
+| `raw-source-files/` | 保存永绅 yoyoosun 原始 Excel / PDF / PNG / JPG / JPEG；导入前结构化处理必须先经 `source-manifest.json` 和 manifest checker |
 | `原始客户文件归档评审.md` | 记录永绅 yoyoosun 原始客户文件归档评审、用途分类、checksum 和边界 |
 
 ## 边界 / Boundary

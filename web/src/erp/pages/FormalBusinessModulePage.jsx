@@ -5,7 +5,6 @@ import {
   DownOutlined,
   EditOutlined,
   InboxOutlined,
-  InfoCircleOutlined,
   LinkOutlined,
   PlusOutlined,
   PrinterOutlined,
@@ -17,7 +16,6 @@ import {
 import {
   Button,
   Descriptions,
-  Drawer,
   Dropdown,
   Empty,
   Form,
@@ -282,42 +280,6 @@ function recordMatchesKeyword(record, keyword) {
   )
 }
 
-function ModuleBoundaryDescriptions({ moduleItem, record }) {
-  return (
-    <Descriptions bordered column={1} size="small">
-      <Descriptions.Item label="当前记录">
-        {record?.title || moduleItem.title}
-      </Descriptions.Item>
-      <Descriptions.Item label="业务编号">
-        {record?.document_no || moduleItem.key}
-      </Descriptions.Item>
-      <Descriptions.Item label="当前状态">
-        {record ? statusTag(record.business_status) : '待选择记录'}
-      </Descriptions.Item>
-      <Descriptions.Item label="主事实 / 真源">
-        {moduleItem.factSource || moduleItem.primaryEntity || '领域真源待评审'}
-      </Descriptions.Item>
-      <Descriptions.Item label="创建时间">
-        {record?.created_at || '-'}
-      </Descriptions.Item>
-      <Descriptions.Item label="更新时间">
-        {record?.updated_at || '-'}
-      </Descriptions.Item>
-      <Descriptions.Item label="字段范围">
-        {(moduleItem.currentScope || []).join('；') || '字段清单待评审'}
-      </Descriptions.Item>
-      <Descriptions.Item label="边界">
-        {moduleItem.boundary ||
-          '当前页面只恢复正式入口和列表体验，真实写入必须接入领域 usecase。'}
-      </Descriptions.Item>
-      <Descriptions.Item label="旧入口关系">
-        不读取、不创建、不更新、不删除
-        business_records；旧表族不作为运行时真源。
-      </Descriptions.Item>
-    </Descriptions>
-  )
-}
-
 function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
   const record = actionModal?.record || null
   const statusOption = record
@@ -431,7 +393,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
-  const [detailRecord, setDetailRecord] = useState(null)
   const [actionModal, setActionModal] = useState(null)
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
   const [batchDeleteReason, setBatchDeleteReason] = useState('')
@@ -868,14 +829,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               删除
             </Button>
           </Popconfirm>
-          <Button
-            size="small"
-            icon={<InfoCircleOutlined />}
-            disabled={!singleSelectedRecord}
-            onClick={() => setDetailRecord(singleSelectedRecord)}
-          >
-            详情
-          </Button>
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -908,18 +861,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         selectedTasks={[]}
         selectedRecordLabel={selectedRows[0]?.title || selectedLabel}
       />
-
-      <Drawer
-        title={`${moduleItem.title}详情`}
-        open={Boolean(detailRecord)}
-        width={620}
-        onClose={() => setDetailRecord(null)}
-      >
-        <ModuleBoundaryDescriptions
-          moduleItem={moduleItem}
-          record={detailRecord}
-        />
-      </Drawer>
 
       <Modal
         className={`erp-business-action-modal ${

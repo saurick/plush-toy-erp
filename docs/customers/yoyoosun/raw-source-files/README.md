@@ -1,6 +1,6 @@
 # 永绅 yoyoosun 原始客户文件 / Yoyoosun Raw Source Files
 
-本目录保存永绅 yoyoosun 客户原始 Excel / PDF / PNG / JPG / JPEG，用于后续字段、模板、导入、页面和验收工作的溯源。
+本目录保存永绅 yoyoosun 客户原始 Excel / PDF / PNG / JPG / JPEG，用于后续字段、模板、导入、页面和验收工作的溯源。导入前结构化处理的主路径是 `../source-manifest.json`；脚本必须先校验 manifest 中的 path、sha256、size 和 `structuredExtract` 策略，再读取允许结构化提取的 Excel。
 
 ## 使用边界 / Usage Boundary
 
@@ -27,10 +27,10 @@
 | `yoyoosun-purchase-contract-order-photo-20260421.jpeg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与 `source-copy` `.jpg` 为同一张照片的另一份源文件 |
 | `yoyoosun-purchase-contract-order-photo-20260421-source-copy.jpg` | 合同订单照片，作为采购合同 / 订单字段、条款和纸面样式线索；与主 `.jpeg` 为同一张照片的另一份源文件 |
 
-更完整的用途分类、checksum、禁止事项和后续落点见 `../原始客户文件归档评审.md`。
+更完整的用途分类、checksum、禁止事项和后续落点见 `../source-manifest.json` 与 `../原始客户文件归档评审.md`。
 
 ## 后续新增规则 / Future File Rule
 
-后续新增原始客户文件时，先确认敏感信息、文件大小和用途分类；如果只是导入 dry-run，应优先生成脱敏结构化 fixture，而不是无限制堆放原件。当前仓库未启用 Git LFS，本批约 25.4MB 原件直接纳入 Git；若后续批量增长，应单独评审 Git LFS、对象存储或只提交脱敏样本。
+后续新增原始客户文件时，先确认敏感信息、文件大小和用途分类，并同步更新 `../source-manifest.json` 后运行 `node scripts/import/customerSourceManifestCheck.mjs --manifest docs/customers/yoyoosun/source-manifest.json --raw-dir docs/customers/yoyoosun/raw-source-files`。如果只是导入 dry-run，应优先生成脱敏结构化 fixture，而不是无限制堆放原件。当前仓库未启用 Git LFS，本批约 25.4MB 原件直接纳入 Git；若后续批量增长，应单独评审 Git LFS、对象存储或只提交脱敏样本。
 
 本目录已通过仓库根 `.gitattributes` 标记为 binary，避免 Git 将 Excel / PDF / PNG / JPG / JPEG 原件当作文本做 whitespace 检查或展示正文 diff；不要为通过检查而改写原件内容。

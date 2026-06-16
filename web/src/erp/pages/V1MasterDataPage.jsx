@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
+  CopyOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
@@ -13,8 +14,6 @@ import {
 } from '@ant-design/icons'
 import {
   Button,
-  Descriptions,
-  Drawer,
   Empty,
   Form,
   Input,
@@ -52,6 +51,7 @@ import {
   createMaterial,
   createProductSKU,
   createSupplier,
+  disableContact,
   listContactsByOwner,
   listCustomers,
   listMaterials,
@@ -61,6 +61,7 @@ import {
   setMaterialActive,
   setProductSKUActive,
   setSupplierActive,
+  updateContact,
   updateCustomer,
   updateMaterial,
   updateProductSKU,
@@ -71,7 +72,6 @@ import {
   buildContactParams,
   buildMasterDataParams,
   buildProductSKUParams,
-  formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
@@ -81,7 +81,7 @@ import {
 } from '../utils/moduleTableColumns.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
-const BUSINESS_FORM_MODAL_WIDTH = 'min(960px, calc(100vw - 96px))'
+const BUSINESS_FORM_MODAL_WIDTH = 'min(1360px, calc(100vw - 96px))'
 
 const PAGE_CONFIG = Object.freeze({
   customers: {
@@ -443,61 +443,183 @@ function MasterDataFormFields({ type }) {
   )
 }
 
-function ContactFormFields() {
+function createEmptyContactRow() {
+  return { is_primary: true }
+}
+
+function contactRecordToFormRow(contact = {}) {
+  return {
+    id: contact.id,
+    name: contact.name || '',
+    title: contact.title || '',
+    mobile: contact.mobile || '',
+    phone: contact.phone || '',
+    email: contact.email || '',
+    note: contact.note || '',
+    is_primary: contact.is_primary === true,
+  }
+}
+
+function contactRowsForForm(contacts = []) {
+  const activeContacts = Array.isArray(contacts)
+    ? contacts.filter((contact) => contact?.is_active !== false)
+    : []
+  const rows = activeContacts.map(contactRecordToFormRow)
+  return rows.length > 0 ? rows : [createEmptyContactRow()]
+}
+
+function hasContactPayload(row = {}) {
+  return ['name', 'title', 'mobile', 'phone', 'email', 'note'].some((key) =>
+    String(row?.[key] ?? '').trim()
+  )
+}
+
+function normalizeContactRows(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => row?.id || hasContactPayload(row))
+    .map((row) => ({
+      ...row,
+      id: row?.id ? Number(row.id) : undefined,
+      name: String(row?.name ?? '').trim(),
+      title: String(row?.title ?? '').trim(),
+      mobile: String(row?.mobile ?? '').trim(),
+      phone: String(row?.phone ?? '').trim(),
+      email: String(row?.email ?? '').trim(),
+      note: String(row?.note ?? '').trim(),
+      is_primary: row?.is_primary === true,
+    }))
+}
+
+function ContactFormList({ form, entityLabel }) {
   return (
-    <>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="联系人"
-        name="name"
-        rules={[{ required: true, message: '请填写联系人' }]}
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="职位"
-        name="title"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="手机"
-        name="mobile"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="电话"
-        name="phone"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="邮箱"
-        name="email"
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="主联系人"
-        name="is_primary"
-        valuePropName="checked"
-      >
-        <Switch />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--full"
-        label="备注"
-        name="note"
-      >
-        <Input.TextArea allowClear rows={3} showCount maxLength={300} />
-      </Form.Item>
-    </>
+    <Form.List
+      name="contacts"
+      rules={[
+        {
+          validator: async (_, rows) => {
+            if (!Array.isArray(rows) || rows.length === 0) {
+              throw new Error(`请至少维护一个${entityLabel}联系人`)
+            }
+            if (!rows.some((row) => String(row?.name ?? '').trim())) {
+              throw new Error(`请填写${entityLabel}联系人`)
+            }
+          },
+        },
+      ]}
+    >
+      {(fields, { add, remove }, { errors }) => (
+        <div className="erp-master-contact-list">
+          <div className="erp-master-contact-list__head">
+            <div>
+              <strong>联系人</strong>
+              <span>
+                联系人随当前{entityLabel}
+                维护，不作为独立业务对象，也不生成订单、出货、库存或财务事实。
+              </span>
+            </div>
+          </div>
+          <div className="erp-master-contact-list__items">
+            {fields.map((field, index) => (
+              <div className="erp-master-contact-list__row" key={field.key}>
+                <div className="erp-master-contact-list__row-head">
+                  <strong>条目 {index + 1}</strong>
+                  <Space size={4}>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<CopyOutlined />}
+                      aria-label={`复制联系人条目 ${index + 1}`}
+                      onClick={() => {
+                        const currentRow =
+                          form.getFieldValue(['contacts', field.name]) || {}
+                        add({
+                          ...currentRow,
+                          id: undefined,
+                          is_primary: false,
+                        })
+                      }}
+                    />
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      aria-label={`删除联系人条目 ${index + 1}`}
+                      disabled={fields.length <= 1}
+                      onClick={() => remove(field.name)}
+                    />
+                  </Space>
+                </div>
+                <Form.Item name={[field.name, 'id']} hidden>
+                  <Input />
+                </Form.Item>
+                <div className="erp-master-contact-list__grid">
+                  <Form.Item
+                    label="联系人"
+                    name={[field.name, 'name']}
+                    rules={[{ required: true, message: '请填写联系人' }]}
+                  >
+                    <Input allowClear autoComplete="off" />
+                  </Form.Item>
+                  <Form.Item label="职位" name={[field.name, 'title']}>
+                    <Input allowClear autoComplete="off" />
+                  </Form.Item>
+                  <Form.Item label="手机" name={[field.name, 'mobile']}>
+                    <Input allowClear autoComplete="off" />
+                  </Form.Item>
+                  <Form.Item label="电话" name={[field.name, 'phone']}>
+                    <Input allowClear autoComplete="off" />
+                  </Form.Item>
+                  <Form.Item label="邮箱" name={[field.name, 'email']}>
+                    <Input allowClear autoComplete="off" />
+                  </Form.Item>
+                  <Form.Item
+                    label="主联系人"
+                    name={[field.name, 'is_primary']}
+                    valuePropName="checked"
+                  >
+                    <Switch
+                      onChange={(checked) => {
+                        const rows = form.getFieldValue('contacts') || []
+                        form.setFieldValue(
+                          'contacts',
+                          rows.map((row, rowIndex) => {
+                            if (rowIndex === field.name) {
+                              return { ...row, is_primary: checked }
+                            }
+                            return checked ? { ...row, is_primary: false } : row
+                          })
+                        )
+                      }}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    className="erp-master-contact-list__field--full"
+                    label="备注"
+                    name={[field.name, 'note']}
+                  >
+                    <Input.TextArea
+                      allowClear
+                      rows={2}
+                      showCount
+                      maxLength={200}
+                    />
+                  </Form.Item>
+                </div>
+              </div>
+            ))}
+          </div>
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={() => add({ is_primary: false })}
+          >
+            添加条目
+          </Button>
+          <Form.ErrorList errors={errors} />
+        </div>
+      )}
+    </Form.List>
   )
 }
 
@@ -537,8 +659,6 @@ export default function V1MasterDataPage({ type }) {
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [contacts, setContacts] = useState([])
   const [recordModalOpen, setRecordModalOpen] = useState(false)
-  const [contactModalOpen, setContactModalOpen] = useState(false)
-  const [detailOpen, setDetailOpen] = useState(false)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
   const [batchDeleteReason, setBatchDeleteReason] = useState('')
@@ -549,7 +669,6 @@ export default function V1MasterDataPage({ type }) {
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [recordForm] = Form.useForm()
-  const [contactForm] = Form.useForm()
   const moduleKey = config.recordKey
   const supportsContacts = Boolean(config.ownerType)
   const entityLabel = config.entityLabel || '主体'
@@ -564,12 +683,22 @@ export default function V1MasterDataPage({ type }) {
     adminProfile,
     config.permissions.contactCreate
   )
+  const canUpdateContact = hasActionPermission(
+    adminProfile,
+    config.permissions.contactUpdate
+  )
+  const canDisableContact = hasActionPermission(
+    adminProfile,
+    config.permissions.contactDisable
+  )
+  const showContactForm =
+    supportsContacts && (canCreateContact || canUpdateContact)
 
   const loadContacts = useCallback(
     async (record) => {
       if (!supportsContacts || !record?.id) {
         setContacts([])
-        return
+        return []
       }
       setContactLoading(true)
       try {
@@ -578,9 +707,15 @@ export default function V1MasterDataPage({ type }) {
           owner_id: record.id,
           limit: 100,
         })
-        setContacts(Array.isArray(result?.contacts) ? result.contacts : [])
+        const nextContacts = Array.isArray(result?.contacts)
+          ? result.contacts
+          : []
+        setContacts(nextContacts)
+        return nextContacts
       } catch (error) {
         message.error(getActionErrorMessage(error, '加载联系人'))
+        setContacts([])
+        return []
       } finally {
         setContactLoading(false)
       }
@@ -623,39 +758,69 @@ export default function V1MasterDataPage({ type }) {
   }, [loadRecords])
 
   useEffect(() => {
-    loadContacts(selectedRecord)
-  }, [loadContacts, selectedRecord])
-
-  useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadRecords)
   }, [loadRecords, outletContext])
 
   const openCreateRecord = () => {
     setEditingRecord(null)
+    setContacts([])
     recordForm.resetFields()
+    if (showContactForm) {
+      recordForm.setFieldsValue({ contacts: [createEmptyContactRow()] })
+    }
     setRecordModalOpen(true)
   }
 
-  const openEditRecord = (record) => {
+  const openEditRecord = async (record) => {
     if (!record?.id) return
     setSelectedRecord(record)
-    setDetailOpen(false)
     setEditingRecord(record)
-    recordForm.setFieldsValue(record)
+    recordForm.resetFields()
+    const recordContacts = showContactForm ? await loadContacts(record) : []
+    recordForm.setFieldsValue({
+      ...record,
+      ...(showContactForm
+        ? { contacts: contactRowsForForm(recordContacts) }
+        : {}),
+    })
     setRecordModalOpen(true)
   }
 
-  const openCreateContact = () => {
-    if (!supportsContacts) {
+  const syncContactRows = async (owner, rows = []) => {
+    if (!showContactForm || !owner?.id) {
       return
     }
-    if (!selectedRecord?.id) {
-      message.warning(`请先选择一个${entityLabel}`)
-      return
+
+    const nextRows = normalizeContactRows(rows)
+    const retainedContactIds = new Set()
+    for (const row of nextRows) {
+      const params = buildContactParams(row, {
+        owner_type: config.ownerType,
+        owner_id: owner.id,
+      })
+      if (row.id) {
+        retainedContactIds.add(row.id)
+        if (!canUpdateContact) continue
+        await updateContact({ id: row.id, ...params })
+      } else if (canCreateContact) {
+        const created = await createContact(params)
+        if (created?.id) {
+          retainedContactIds.add(Number(created.id))
+        }
+      }
     }
-    contactForm.resetFields()
-    contactForm.setFieldsValue({ is_primary: false })
-    setContactModalOpen(true)
+
+    if (editingRecord?.id && canDisableContact) {
+      for (const contact of contacts) {
+        if (
+          contact?.id &&
+          contact.is_active !== false &&
+          !retainedContactIds.has(Number(contact.id))
+        ) {
+          await disableContact({ id: contact.id })
+        }
+      }
+    }
   }
 
   const saveRecord = async () => {
@@ -670,32 +835,13 @@ export default function V1MasterDataPage({ type }) {
       const saved = editingRecord?.id
         ? await config.update(params)
         : await config.create(params)
+      await syncContactRows(saved, values.contacts)
       message.success(editingRecord?.id ? '主数据已更新' : '主数据已创建')
       setRecordModalOpen(false)
       setSelectedRecord(saved || selectedRecord)
       await loadRecords()
     } catch (error) {
       message.error(getActionErrorMessage(error, '保存主数据'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const saveContact = async () => {
-    if (!supportsContacts || !selectedRecord?.id) return
-    const values = await contactForm.validateFields()
-    setSaving(true)
-    try {
-      const params = buildContactParams(values, {
-        owner_type: config.ownerType,
-        owner_id: selectedRecord.id,
-      })
-      await createContact(params)
-      message.success('联系人已创建')
-      setContactModalOpen(false)
-      await loadContacts(selectedRecord)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '保存联系人'))
     } finally {
       setSaving(false)
     }
@@ -1021,44 +1167,6 @@ export default function V1MasterDataPage({ type }) {
     ]
   )
 
-  const contactColumns = useMemo(
-    () => [
-      { title: '联系人', dataIndex: 'name', width: 140 },
-      {
-        title: '职位',
-        dataIndex: 'title',
-        width: 120,
-        render: (value) => value || '-',
-      },
-      {
-        title: '手机',
-        dataIndex: 'mobile',
-        width: 140,
-        render: (value) => value || '-',
-      },
-      {
-        title: '电话',
-        dataIndex: 'phone',
-        width: 140,
-        render: (value) => value || '-',
-      },
-      {
-        title: '邮箱',
-        dataIndex: 'email',
-        width: 180,
-        render: (value) => value || '-',
-      },
-      {
-        title: '主联系人',
-        dataIndex: 'is_primary',
-        width: 100,
-        render: (value) => (value ? <Tag color="blue">主</Tag> : '-'),
-      },
-      { title: '状态', dataIndex: 'is_active', width: 90, render: activeTag },
-    ],
-    []
-  )
-
   const activeRecordCount = useMemo(
     () => records.filter((record) => record.is_active !== false).length,
     [records]
@@ -1180,13 +1288,6 @@ export default function V1MasterDataPage({ type }) {
           >
             清空已选
           </Button>
-          <Button
-            size="small"
-            disabled={!selectedRecord}
-            onClick={() => setDetailOpen(true)}
-          >
-            查看详情
-          </Button>
           {canUpdate ? (
             <Button
               size="small"
@@ -1285,7 +1386,7 @@ export default function V1MasterDataPage({ type }) {
         onOk={saveRecord}
         onCancel={() => setRecordModalOpen(false)}
         maskClosable={false}
-        confirmLoading={saving}
+        confirmLoading={saving || contactLoading}
         centered
         forceRender
         destroyOnHidden={false}
@@ -1296,35 +1397,9 @@ export default function V1MasterDataPage({ type }) {
           className="erp-business-action-form"
         >
           <MasterDataFormFields type={type} />
-        </Form>
-      </Modal>
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
-        width={BUSINESS_FORM_MODAL_WIDTH}
-        title={
-          <div className="erp-business-action-modal__title">
-            <span>新建联系人</span>
-            <small>
-              联系人随当前{entityLabel}维护，不生成订单、出货、库存或财务事实。
-            </small>
-          </div>
-        }
-        open={supportsContacts && contactModalOpen}
-        onOk={saveContact}
-        onCancel={() => setContactModalOpen(false)}
-        maskClosable={false}
-        confirmLoading={saving}
-        centered
-        forceRender
-        destroyOnHidden={false}
-      >
-        <Form
-          form={contactForm}
-          layout="vertical"
-          className="erp-business-action-form"
-        >
-          <ContactFormFields />
+          {showContactForm ? (
+            <ContactFormList form={recordForm} entityLabel={entityLabel} />
+          ) : null}
         </Form>
       </Modal>
 
@@ -1438,142 +1513,6 @@ export default function V1MasterDataPage({ type }) {
           />
         </Space>
       </Modal>
-
-      <Drawer
-        title={`${config.title}详情`}
-        width={520}
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-      >
-        {selectedRecord ? (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <Descriptions column={1} bordered size="small">
-              {type === 'product_skus' ? (
-                <>
-                  <Descriptions.Item label="产品 ID">
-                    {selectedRecord.product_id}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="SKU 编号">
-                    {selectedRecord.sku_code}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="SKU 名称">
-                    {selectedRecord.sku_name || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="条码">
-                    {selectedRecord.barcode || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="客户 SKU">
-                    {selectedRecord.customer_sku || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="颜色">
-                    {selectedRecord.color || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="色号">
-                    {selectedRecord.color_no || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="尺码">
-                    {selectedRecord.size || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="包装版本">
-                    {selectedRecord.packaging_version || '-'}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="默认单位 ID">
-                    {selectedRecord.default_unit_id || '-'}
-                  </Descriptions.Item>
-                </>
-              ) : (
-                <>
-                  <Descriptions.Item label="编号">
-                    {selectedRecord.code}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="名称">
-                    {selectedRecord.name}
-                  </Descriptions.Item>
-                  {type === 'materials' ? (
-                    <>
-                      <Descriptions.Item label="分类">
-                        {selectedRecord.category || '-'}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="规格">
-                        {selectedRecord.spec || '-'}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="颜色">
-                        {selectedRecord.color || '-'}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="默认单位 ID">
-                        {selectedRecord.default_unit_id || '-'}
-                      </Descriptions.Item>
-                    </>
-                  ) : (
-                    <Descriptions.Item label="简称">
-                      {selectedRecord.short_name || '-'}
-                    </Descriptions.Item>
-                  )}
-                  {type === 'suppliers' ? (
-                    <Descriptions.Item label="供应商类型">
-                      {SUPPLIER_TYPE_LABELS[selectedRecord.supplier_type] ||
-                        selectedRecord.supplier_type ||
-                        '-'}
-                    </Descriptions.Item>
-                  ) : null}
-                  {type === 'materials' ? null : (
-                    <Descriptions.Item label="税号">
-                      {selectedRecord.tax_no || '-'}
-                    </Descriptions.Item>
-                  )}
-                </>
-              )}
-              <Descriptions.Item label="状态">
-                {activeTag(selectedRecord.is_active)}
-              </Descriptions.Item>
-              <Descriptions.Item label="创建时间">
-                {formatUnixDateTime(selectedRecord.created_at)}
-              </Descriptions.Item>
-              <Descriptions.Item label="更新时间">
-                {formatUnixDateTime(selectedRecord.updated_at)}
-              </Descriptions.Item>
-              {type === 'product_skus' ? null : (
-                <Descriptions.Item label="备注">
-                  {selectedRecord.note || '-'}
-                </Descriptions.Item>
-              )}
-            </Descriptions>
-            {supportsContacts ? (
-              <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                <Space
-                  align="center"
-                  style={{ justifyContent: 'space-between', width: '100%' }}
-                >
-                  <strong>联系人</strong>
-                  {canCreateContact ? (
-                    <Button
-                      size="small"
-                      icon={<PlusOutlined />}
-                      onClick={openCreateContact}
-                    >
-                      新建联系人
-                    </Button>
-                  ) : null}
-                </Space>
-                <Table
-                  rowKey="id"
-                  size="small"
-                  loading={contactLoading}
-                  columns={contactColumns}
-                  dataSource={contacts}
-                  scroll={{ x: 720 }}
-                  pagination={false}
-                  locale={{
-                    emptyText: (
-                      <Empty description={`当前${entityLabel}暂无联系人`} />
-                    ),
-                  }}
-                />
-              </Space>
-            ) : null}
-          </Space>
-        ) : null}
-      </Drawer>
     </BusinessPageLayout>
   )
 }

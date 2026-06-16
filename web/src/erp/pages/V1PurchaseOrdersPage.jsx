@@ -7,8 +7,6 @@ import {
 } from '@ant-design/icons'
 import {
   Button,
-  Descriptions,
-  Drawer,
   Form,
   Input,
   InputNumber,
@@ -42,7 +40,6 @@ import {
   submitPurchaseOrder,
 } from '../api/masterDataOrderApi.mjs'
 import {
-  PURCHASE_ORDER_ITEM_STATUS_LABELS,
   PURCHASE_ORDER_STATUS_COLORS,
   PURCHASE_ORDER_STATUS_LABELS,
   buildPurchaseOrderItemParams,
@@ -100,6 +97,8 @@ const LIFECYCLE_ACTIONS = [
   },
 ]
 
+const BUSINESS_FORM_MODAL_WIDTH = 'min(1040px, calc(100vw - 96px))'
+
 function parseSortValue(value = 'updated_at:desc') {
   const [sortBy = 'updated_at', sortDirection = 'desc'] =
     String(value).split(':')
@@ -111,17 +110,6 @@ function statusTag(status) {
   return (
     <Tag color={PURCHASE_ORDER_STATUS_COLORS[key] || 'default'}>
       {statusText(key, PURCHASE_ORDER_STATUS_LABELS)}
-    </Tag>
-  )
-}
-
-function lineStatusTag(status) {
-  return (
-    <Tag>
-      {statusText(
-        String(status || '').trim(),
-        PURCHASE_ORDER_ITEM_STATUS_LABELS
-      )}
     </Tag>
   )
 }
@@ -185,7 +173,6 @@ export default function V1PurchaseOrdersPage() {
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
-  const [orderItems, setOrderItems] = useState([])
   const [suppliers, setSuppliers] = useState([])
   const [materials, setMaterials] = useState([])
   const [keyword, setKeyword] = useState('')
@@ -194,7 +181,6 @@ export default function V1PurchaseOrdersPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [editingOrder, setEditingOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [drawerOpen, setDrawerOpen] = useState(false)
 
   const supplierOptions = useMemo(
     () =>
@@ -252,7 +238,6 @@ export default function V1PurchaseOrdersPage() {
 
   const loadOrderItems = useCallback(async (order) => {
     if (!order?.id) {
-      setOrderItems([])
       return []
     }
     setItemsLoading(true)
@@ -262,7 +247,6 @@ export default function V1PurchaseOrdersPage() {
         limit: 200,
       })
       const nextItems = data?.purchase_order_items || []
-      setOrderItems(nextItems)
       return nextItems
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载采购订单明细失败'))
@@ -314,12 +298,6 @@ export default function V1PurchaseOrdersPage() {
           : [createBlankLine(1)],
     })
     setModalOpen(true)
-  }
-
-  const openDrawer = async (record) => {
-    setSelectedOrder(record)
-    setDrawerOpen(true)
-    await loadOrderItems(record)
   }
 
   const handleSupplierChange = (supplierID) => {
@@ -442,9 +420,6 @@ export default function V1PurchaseOrdersPage() {
       fixed: 'right',
       render: (_, record) => (
         <Space size={6} wrap>
-          <Button size="small" onClick={() => openDrawer(record)}>
-            详情
-          </Button>
           <Button
             size="small"
             icon={<EditOutlined />}
@@ -468,52 +443,6 @@ export default function V1PurchaseOrdersPage() {
           ))}
         </Space>
       ),
-    },
-  ]
-
-  const itemColumns = [
-    { title: '行号', dataIndex: 'line_no', width: 80 },
-    {
-      title: '材料',
-      dataIndex: 'material_id',
-      width: 180,
-      render: (value, record) =>
-        record.material_name_snapshot ||
-        materials.find((item) => item.id === value)?.name ||
-        value ||
-        '-',
-    },
-    { title: '单位ID', dataIndex: 'unit_id', width: 90 },
-    { title: '数量', dataIndex: 'purchased_quantity', width: 120 },
-    {
-      title: '单价',
-      dataIndex: 'unit_price',
-      width: 120,
-      render: (value) => value || '-',
-    },
-    {
-      title: '金额',
-      dataIndex: 'amount',
-      width: 120,
-      render: (value) => value || '-',
-    },
-    {
-      title: '预计到货',
-      dataIndex: 'expected_arrival_date',
-      width: 130,
-      render: formatUnixDate,
-    },
-    {
-      title: '状态',
-      dataIndex: 'line_status',
-      width: 110,
-      render: lineStatusTag,
-    },
-    {
-      title: '备注',
-      dataIndex: 'note',
-      width: 180,
-      render: (value) => value || '-',
     },
   ]
 
@@ -598,7 +527,7 @@ export default function V1PurchaseOrdersPage() {
         }}
         onRow={(record) => ({
           onClick: () => setSelectedOrder(record),
-          onDoubleClick: () => openDrawer(record),
+          onDoubleClick: () => openEditModal(record),
         })}
         pagination={{
           current: pagination.current,
@@ -610,63 +539,29 @@ export default function V1PurchaseOrdersPage() {
         emptyDescription="暂无采购订单"
       />
 
-      <Drawer
-        width={720}
-        open={drawerOpen}
-        title={selectedOrder?.purchase_order_no || '采购订单详情'}
-        onClose={() => setDrawerOpen(false)}
-      >
-        {selectedOrder ? (
-          <Space direction="vertical" size={16} style={{ width: '100%' }}>
-            <Descriptions bordered size="small" column={2}>
-              <Descriptions.Item label="采购单号">
-                {selectedOrder.purchase_order_no}
-              </Descriptions.Item>
-              <Descriptions.Item label="状态">
-                {statusTag(selectedOrder.lifecycle_status)}
-              </Descriptions.Item>
-              <Descriptions.Item label="供应商">
-                {selectedOrder.supplier_snapshot?.name ||
-                  selectedOrder.supplier_id}
-              </Descriptions.Item>
-              <Descriptions.Item label="供应商单号">
-                {selectedOrder.supplier_purchase_order_no || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="采购日期">
-                {formatUnixDate(selectedOrder.purchase_date)}
-              </Descriptions.Item>
-              <Descriptions.Item label="预计到货">
-                {formatUnixDate(selectedOrder.expected_arrival_date)}
-              </Descriptions.Item>
-              <Descriptions.Item label="备注" span={2}>
-                {selectedOrder.note || '-'}
-              </Descriptions.Item>
-            </Descriptions>
-            <Table
-              size="small"
-              loading={itemsLoading}
-              rowKey="id"
-              columns={itemColumns}
-              dataSource={orderItems}
-              pagination={false}
-              scroll={{ x: 1000 }}
-            />
-          </Space>
-        ) : null}
-      </Drawer>
-
       <Modal
-        width="min(1040px, calc(100vw - 96px))"
+        className="erp-business-action-modal erp-business-action-modal--form"
+        width={BUSINESS_FORM_MODAL_WIDTH}
         open={modalOpen}
-        title={editingOrder ? '编辑采购订单' : '新建采购订单'}
+        title={
+          <div className="erp-business-action-modal__title">
+            <span>{editingOrder ? '编辑采购订单' : '新建采购订单'}</span>
+            <small>只维护采购承诺，不在此写库存、质检或应付事实。</small>
+          </div>
+        }
         okText="保存"
-        confirmLoading={saving}
+        confirmLoading={saving || itemsLoading}
         onOk={handleSave}
         onCancel={() => setModalOpen(false)}
         destroyOnHidden
         forceRender
       >
-        <Form form={form} layout="vertical" preserve={false}>
+        <Form
+          form={form}
+          layout="vertical"
+          preserve={false}
+          className="erp-business-action-form"
+        >
           <Form.Item name="supplier_snapshot" hidden>
             <Input />
           </Form.Item>

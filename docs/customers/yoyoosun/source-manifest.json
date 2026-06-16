@@ -1,0 +1,198 @@
+{
+  "version": 1,
+  "customerKey": "yoyoosun",
+  "description": "Tracked source manifest for yoyoosun customer materials. This file is the import-prep source inventory; it is not import approval.",
+  "boundaries": {
+    "noRealImport": true,
+    "canExecuteRealImport": false,
+    "createsTenant": false,
+    "changesSchema": false,
+    "writesBusinessRecords": false,
+    "writesFacts": false
+  },
+  "sources": [
+    {
+      "sourceId": "yoyoosun-raw-material-purchase-summary-20260602",
+      "path": "docs/customers/yoyoosun/raw-source-files/辅材、包材 成慧怡.xlsx",
+      "sha256": "c02dc3da0c2e1e788623bc24034c9a7ed5072e54126d626fd4e50d0537b6fdee",
+      "sizeBytes": 2406323,
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sourceKind": "xlsx_workbook",
+      "sourceTypes": ["Customer Material", "Data Import Source", "Industry Template Candidate"],
+      "domains": ["materials", "suppliers", "purchase_orders", "units"],
+      "structuredExtract": {
+        "enabled": true,
+        "parser": "scripts/import/customerSourceExtract.mjs",
+        "mode": "xlsx_workbook"
+      },
+      "sensitiveReviewRequired": true,
+      "usage": "辅材 / 包材采购来源、供应商 / 材料 / 单位候选；不自动生成采购订单、采购入库、库存或应付事实。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-outsourcing-summary-20260602",
+      "path": "docs/customers/yoyoosun/raw-source-files/加工 成慧怡.xlsx",
+      "sha256": "e43e2f664060e872f7c0448079abc8ec830913fb2ad8735bda3c7649a0da0cb5",
+      "sizeBytes": 120942,
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sourceKind": "xlsx_workbook",
+      "sourceTypes": ["Customer Material", "Data Import Source", "Print Template Input"],
+      "domains": ["outsourcing", "suppliers", "contacts"],
+      "structuredExtract": {
+        "enabled": true,
+        "parser": "scripts/import/customerSourceExtract.mjs",
+        "mode": "xlsx_workbook"
+      },
+      "sensitiveReviewRequired": true,
+      "usage": "委外加工汇总、加工厂 / 联系人 / 合同字段候选；不自动写委外、应付、付款或库存事实。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-bom-26029-20260119",
+      "path": "docs/customers/yoyoosun/raw-source-files/26029#夜樱烬色才料明细表2026-1-19.xlsx",
+      "sha256": "9a31e9eb87f64548486e5281212b56f0381cc441103738570d4c7f074e56804a",
+      "sizeBytes": 13317122,
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sourceKind": "xlsx_workbook",
+      "sourceTypes": ["Customer Material", "Data Import Source", "Industry Template Candidate"],
+      "domains": ["materials", "bom", "products", "units"],
+      "structuredExtract": {
+        "enabled": true,
+        "parser": "scripts/import/customerSourceExtract.mjs",
+        "mode": "xlsx_workbook"
+      },
+      "sensitiveReviewRequired": false,
+      "usage": "材料、BOM、产品、单位候选来源；不写库存事实。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-bom-26204-20260410",
+      "path": "docs/customers/yoyoosun/raw-source-files/26204#抱抱猴子材料明细表2026-4-10.xlsx",
+      "sha256": "ea20c33390cab8e7cd36e0af05b5f9ec4fe75bdd7db607721663c5af7adf82a2",
+      "sizeBytes": 6832207,
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sourceKind": "xlsx_workbook",
+      "sourceTypes": ["Customer Material", "Data Import Source", "Industry Template Candidate"],
+      "domains": ["materials", "bom", "products", "units"],
+      "structuredExtract": {
+        "enabled": true,
+        "parser": "scripts/import/customerSourceExtract.mjs",
+        "mode": "xlsx_workbook"
+      },
+      "sensitiveReviewRequired": false,
+      "usage": "材料、BOM、产品、单位候选来源；不写库存事实。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-contract-template-material-outsourcing",
+      "path": "docs/customers/yoyoosun/raw-source-files/模板-材料与加工合同.xlsx",
+      "sha256": "9b2192307f3d194283babfcfd1ce4be1e1f1b01660d28666d6650b63e4e9491f",
+      "sizeBytes": 688470,
+      "mediaType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "sourceKind": "xlsx_workbook",
+      "sourceTypes": ["Print Template Input", "Customer Material", "Field Clue"],
+      "domains": ["purchase_orders", "outsourcing", "suppliers"],
+      "structuredExtract": {
+        "enabled": true,
+        "parser": "scripts/import/customerSourceExtract.mjs",
+        "mode": "xlsx_workbook"
+      },
+      "sensitiveReviewRequired": true,
+      "usage": "采购合同、加工合同和字段映射样本；不作为运行时 Excel 母版，不抽成 Product Core 模板。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-outsourcing-contract-pdf-zichun",
+      "path": "docs/customers/yoyoosun/raw-source-files/9.3加工合同-子淳.pdf",
+      "sha256": "053b37a0b493b36a3dcbfee1698cc8fb5380be2c47a20c68e073456953ae4ad1",
+      "sizeBytes": 424728,
+      "mediaType": "application/pdf",
+      "sourceKind": "pdf_document",
+      "sourceTypes": ["Print Template Input", "Customer Material", "Data Import Source"],
+      "domains": ["outsourcing", "suppliers", "finance"],
+      "structuredExtract": {
+        "enabled": false,
+        "reason": "PDF 仅作人工来源引用，不做 OCR 或结构化导入。"
+      },
+      "sensitiveReviewRequired": true,
+      "usage": "加工合同纸面、条款、合同行和附件快照样本；不自动生成委外、应付、付款或库存事实。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-formal-mobile-report-v3",
+      "path": "docs/customers/yoyoosun/raw-source-files/plush_factory_formal_report_v3_mobile.pdf",
+      "sha256": "d1738c4c6af776a0171c86f1435cbb4d0d4103d9ebb3b54034d99b30c8f793f6",
+      "sizeBytes": 1476358,
+      "mediaType": "application/pdf",
+      "sourceKind": "pdf_document",
+      "sourceTypes": ["Customer Material", "Delivery Input", "QA Debug"],
+      "domains": ["workflow", "mobile", "delivery"],
+      "structuredExtract": {
+        "enabled": false,
+        "reason": "客户汇报 PDF 仅作交付和页面核对线索，不生成结构化导入行。"
+      },
+      "sensitiveReviewRequired": true,
+      "usage": "客户汇报、移动端观感和交付线索；不作为产品实现真源。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-mobile-report-screenshot-20260420",
+      "path": "docs/customers/yoyoosun/raw-source-files/yoyoosun-report-mobile-screenshot-20260420.png",
+      "sha256": "fb7b1dfae4acbe05ddab89d21273a92f5284644543d9fef214fbbf4e661351a5",
+      "sizeBytes": 80528,
+      "mediaType": "image/png",
+      "sourceKind": "image",
+      "sourceTypes": ["Customer Material", "QA Debug", "Field Clue"],
+      "domains": ["workflow", "mobile"],
+      "structuredExtract": {
+        "enabled": false,
+        "reason": "截图仅作人工核对线索，不做 OCR 或结构化导入。"
+      },
+      "sensitiveReviewRequired": true,
+      "usage": "截图线索；不能作为唯一字段、流程或事实真源。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-role-workflow-v3-20260413",
+      "path": "docs/customers/yoyoosun/raw-source-files/yoyoosun-role-workflow-v3-20260413.png",
+      "sha256": "54ec502d21eac86ad27882e8b0dc2b312cfb5d2b285fb6abd6592a1c29f1d9d6",
+      "sizeBytes": 522183,
+      "mediaType": "image/png",
+      "sourceKind": "image",
+      "sourceTypes": ["Customer Material", "Workflow Clue", "Field Clue"],
+      "domains": ["workflow"],
+      "structuredExtract": {
+        "enabled": false,
+        "reason": "流程图截图仅作人工 Workflow / Fact 边界线索，不做 OCR 或结构化导入。"
+      },
+      "sensitiveReviewRequired": true,
+      "usage": "永绅岗位职责流程、岗位节点和 Workflow / Fact 边界线索；不自动升级为 Product Core 流程真源。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-purchase-contract-photo-20260421-jpeg",
+      "path": "docs/customers/yoyoosun/raw-source-files/yoyoosun-purchase-contract-order-photo-20260421.jpeg",
+      "sha256": "94478778f6b0c71825c624a346da2d579b1b625b208e07ee4f0a502e6d45d1eb",
+      "sizeBytes": 392476,
+      "mediaType": "image/jpeg",
+      "sourceKind": "image",
+      "sourceTypes": ["Customer Material", "Print Template Input", "Field Clue"],
+      "domains": ["purchase_orders", "print_templates"],
+      "structuredExtract": {
+        "enabled": false,
+        "reason": "合同照片仅作人工来源引用，不做 OCR 或结构化导入。"
+      },
+      "duplicateGroup": "yoyoosun-purchase-contract-order-photo-20260421",
+      "sensitiveReviewRequired": true,
+      "usage": "合同订单字段、条款和纸面样式线索；与 source-copy .jpg 是同一张照片的另一份源文件，不重复计为独立业务单据。"
+    },
+    {
+      "sourceId": "yoyoosun-raw-purchase-contract-photo-20260421-source-copy-jpg",
+      "path": "docs/customers/yoyoosun/raw-source-files/yoyoosun-purchase-contract-order-photo-20260421-source-copy.jpg",
+      "sha256": "244249fb3ba5b5a0575f31714c80adb280c6314ed80adf75289c4376670c7dd8",
+      "sizeBytes": 473184,
+      "mediaType": "image/jpeg",
+      "sourceKind": "image",
+      "sourceTypes": ["Customer Material", "Print Template Input", "Field Clue"],
+      "domains": ["purchase_orders", "print_templates"],
+      "structuredExtract": {
+        "enabled": false,
+        "reason": "合同照片副本仅作人工来源引用，不做 OCR 或结构化导入。"
+      },
+      "duplicateGroup": "yoyoosun-purchase-contract-order-photo-20260421",
+      "sensitiveReviewRequired": true,
+      "usage": "合同订单字段、条款和纸面样式线索；与主 .jpeg 是同一张照片的另一份源文件，不重复计为独立业务单据。"
+    }
+  ]
+}

@@ -237,6 +237,7 @@ export async function runFreezeCheck(options) {
     existingPath: options.existing,
     sourceSha256,
     existingSha256,
+    sourceManifest: sourceFile.json.sourceManifest ?? null,
     sourceSizeBytes: sourceFile.sizeBytes,
     existingSizeBytes: existingFile.sizeBytes,
     sourceCount: sources.length,

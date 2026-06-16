@@ -18,12 +18,27 @@
 ## 当前活跃事项
 
 - `/erp/dashboard` 已作为后台首页 / 工作台首屏：聚合今日必须处理、跨角色阻塞、业务对象、完成率、当前处理、今日焦点、业务状态摘要、业务对象分布、角色提醒和阻塞交接，不再内嵌“看板中心 / 运营工具”卡片导航，也不把核心区域做成跳转入口集合；`/erp/task-board` 独立承接 Workflow 任务看板。
-- `BusinessListLayout` 已承接正式业务页共享骨架；`客户档案`、`供应商档案` 和 `销售订单` 使用 V1 页面，`产品档案`、`BOM 管理`、采购、入库、质检、库存、委外、生产、出货和财务等 16 个 `formal-shell` 菜单统一使用 `FormalBusinessModulePage`。共享骨架已收口紧凑筛选、列表统计、列顺序、列排序、导出、批量删除、回收站、行点击选中、双击进入编辑 / 主操作弹窗、显式详情、当前操作和协同入口；formal-shell 新建 / 编辑现在统一走只读业务表单弹窗，真实保存仍待领域 usecase / API / RBAC 接入；协同入口只处理 Workflow 任务，不写事实层。
+- `BusinessListLayout` 已承接正式业务页共享骨架；`客户档案`、`供应商档案` 和 `销售订单` 使用 V1 页面，`产品档案`、`BOM 管理`、采购、入库、质检、库存、委外、生产、出货和财务等 16 个 `formal-shell` 菜单统一使用 `FormalBusinessModulePage`。共享骨架已收口紧凑筛选、列表统计、列顺序、列排序、导出、批量删除、回收站、行点击选中、双击进入编辑 / 主操作弹窗、当前操作和协同入口；业务对象查看、新建和编辑统一进入业务表单弹窗，formal-shell 真实保存仍待领域 usecase / API / RBAC 接入；协同入口只处理 Workflow 任务，不写事实层。
 - `/erp/business-dashboard` 仍只作为运营摘要和业务风险看板，不作为事实真源；`/erp/print-center` 保留模板目录、纸面预览和可编辑打印窗口入口；字段编辑、明细确认和纸面微调回到独立打印窗口；`/erp/operations/exceptions` 作为异常 / 阻塞闭环入口。
 - 完整 `pnpm --dir web style:l1` 已恢复通过；后续若继续吸收或评审原型，应继续复用现有页面、现有 Workflow API、现有菜单 / RBAC / theme token，不新增未评审后端 API、schema、migration、权限码或 Fact 写入。
 - 业务页协同入口的任务分组、统计、阻塞原因和催办态已收口到纯前端 helper，并纳入 `pnpm test`；该 helper 只服务 Workflow 展示口径，不写事实层。
-- `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、任务中心、业务管理中心、产品核心菜单覆盖矩阵、正式菜单候选导航、业务模块列表页、业务详情页、页面级新建 / 编辑表单、业务页协同入口组件、业务弹窗和模板打印中心十一个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
+- `docs/product/prototypes` 当前待实现队列包含工作台 / 总控页、任务中心、业务管理中心、产品核心菜单覆盖矩阵、正式菜单候选导航、业务模块列表页、业务详情页、新建 / 编辑业务表单弹窗、业务页协同入口组件、局部动作弹窗和模板打印中心十一个 HTML 标准样板；只有岗位任务端 `mobile-role-tasks-v1/implemented-reference.html` 登记为当前实现参考。
 - 原型查看器和原型 README 已补“参照范围”口径：`admin-command-center-v1` 是判断型工作台样板，`core-menu-coverage-v1` 是内部覆盖矩阵，`formal-menu-candidate-v1` 是正式菜单候选原型；它们都不是正式菜单、路由、权限或 seedData 映射表，真正对应关系必须在进入真实实现任务时回到代码、菜单配置和 RBAC 重新核对。
+
+## 2026-06-16 14:36 CST
+
+- 完成：全局收口业务对象新建 / 编辑 / 查看交互，移除销售订单、采购订单、BOM、出货单和 formal-shell 入口壳的业务对象详情抽屉路径；销售订单、采购订单继续在同一业务弹窗内维护主表字段和订单 / 采购明细，BOM 查看 / 编辑弹窗下方展示 BOM 明细，出货单详情 / 新建 / 加行改为统一 Modal。
+- 完成：同步原型口径，把 `business-form-page-standard-v1` 改为“新建 / 编辑业务弹窗标准样板”，明确上方主表字段、下方明细 items；`action-modal-drawer-standard-v1` 改为局部动作弹窗口径，并同步原型中心、业务模块标准页 README、当前真源文档和 `style:l1` 断言。
+- 下一步：如后续要把出货单“新建草稿 + 加明细”进一步合成一次性保存，需要先评审后端 ShipmentUsecase/API 合约；当前不在前端伪造合并保存。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、Workflow / Fact 边界或后端 usecase；Dashboard 任务详情 Drawer 属于 Workflow 任务处理，不是业务对象表单，本轮按边界保留。
+
+## 2026-06-16 14:02 CST
+
+- 完成：按 `trade-erp` 的大弹窗交互收口 V1 客户 / 供应商页，删除“查看详情”抽屉和独立联系人弹窗；客户 / 供应商新增、编辑统一在一个业务表单弹窗里维护主体字段和联系人条目。
+- 完成：联系人保存从同一弹窗主路径同步：先保存客户 / 供应商主体，再创建 / 更新联系人；编辑时从弹窗移除的旧联系人按停用处理，避免旧联系人残留继续挂在当前主体下。
+- 完成：补联系人条目局部样式和 `style:l1` 断言，客户 / 供应商回归从“详情抽屉联系人入口”改为“编辑弹窗内联系人条目”；13:08 CST 的抽屉方案已被本条记录替代。
+- 下一步：如后续要支持联系人只读详情、单条联系人停用确认或更细的联系人权限 UI，需要另起联系人明细交互任务，不恢复主页面第二张常驻表。
+- 阻塞/风险：本轮不改后端 schema、migration、菜单、RBAC 或客户 / 供应商分表真源；联系人仍是当前客户 / 供应商从属明细，不作为独立业务对象。
 
 ## 2026-06-16 12:52 CST
 
@@ -37,7 +52,14 @@
 
 - 完成：收口 V1 主数据客户 / 供应商页面的前端称呼，保留客户与供应商作为不同业务入口和后端真源，但不再在按钮、统计和联系人面板里统一显示成泛化“主体”，避免误读为两套重复表单。
 - 下一步：如后续要把客户与供应商进一步合成“往来单位 / 交易主体”单入口，需要单独评审 schema、RBAC、销售 / 采购外键、联系人 owner_type、菜单和迁移，不在本轮文案收口范围内。
-- 阻塞/风险：此条仅记录早先称呼收口；同轮后续已在 13:08 CST 继续完成单页结构收口和 `style:l1` 回归，最终风险以 13:08 CST 记录为准。
+- 阻塞/风险：此条仅记录早先称呼收口；同轮后续已在 14:02 CST 继续按大弹窗交互完成单页结构收口和 `style:l1` 回归，最终风险以 14:02 CST 记录为准。
+
+## 2026-06-16 13:55 CST
+
+- 完成：新增 `docs/customers/yoyoosun/source-manifest.json` 作为永绅原始来源文件导入前主清单，记录 path、sha256、size、用途、domain、敏感复查和 `structuredExtract` 策略；新增 `scripts/import/customerSourceManifestCheck.mjs` 与测试，校验 manifest、raw source 文件一致性和 checksum 漂移。
+- 完成：`customerSourceExtract.mjs` 默认改为 manifest 驱动，只提取 manifest 中允许结构化的 Excel；source snapshot、extract summary、freeze metadata、dry-run validation summary 和 source references 保留 manifest 追溯信息，文档命令从 raw-dir glob 主路径同步为 manifest-first。
+- 下一步：真实导入仍必须另行补齐已 review 的 existing V1/formal model snapshot、unresolved 清理、客户 sign-off、备份/回滚、幂等、审计和 post-import reconciliation 后再评审是否执行。
+- 阻塞/风险：本轮仍不执行真实客户数据导入，不写 DB、不改 schema/migration/API/UI/seedData，不对 PDF/图片做 OCR；`canExecuteRealImport` 继续保持 `false`。
 
 ## 2026-06-16 13:08 CST
 

@@ -11,8 +11,6 @@ import {
 } from '@ant-design/icons'
 import {
   Button,
-  Descriptions,
-  Drawer,
   Empty,
   Form,
   Input,
@@ -580,7 +578,6 @@ export default function V1SalesOrdersPage() {
   const [total, setTotal] = useState(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
-  const [detailOpen, setDetailOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
   const [orderColumnOrder, setOrderColumnOrder] = useState(null)
   const [itemColumnOrder, setItemColumnOrder] = useState(null)
@@ -706,7 +703,6 @@ export default function V1SalesOrdersPage() {
   const openEditOrder = async (order) => {
     if (!order?.id) return
     setSelectedOrder(order)
-    setDetailOpen(false)
     setEditingOrder(order)
     orderForm.setFieldsValue({
       ...order,
@@ -1073,37 +1069,6 @@ export default function V1SalesOrdersPage() {
     [effectiveItemColumnOrder, itemDataColumns]
   )
 
-  const readonlyItemColumns = useMemo(
-    () =>
-      visibleItemDataColumns.map((column) => ({
-        ...column,
-        title: (
-          <ColumnOrderHeaderMenu
-            column={column}
-            columns={itemDataColumns}
-            order={effectiveItemColumnOrder}
-            saving={columnOrderSaving}
-            onChange={(nextOrder) =>
-              persistColumnOrder({
-                moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
-                columns: itemDataColumns,
-                nextOrder,
-                setLocalOrder: setItemColumnOrder,
-              })
-            }
-            onOpenPanel={() => setColumnOrderTarget('items')}
-          />
-        ),
-      })),
-    [
-      columnOrderSaving,
-      effectiveItemColumnOrder,
-      itemDataColumns,
-      persistColumnOrder,
-      visibleItemDataColumns,
-    ]
-  )
-
   const exportOrders = useCallback(() => {
     if (orders.length === 0) return
     downloadCSV({
@@ -1134,10 +1099,6 @@ export default function V1SalesOrdersPage() {
       orders.filter((order) => String(order.lifecycle_status) === 'active')
         .length,
     [orders]
-  )
-  const openLineCount = useMemo(
-    () => items.filter((item) => String(item.line_status) === 'open').length,
-    [items]
   )
   const selectedOrderDisplayText = useMemo(() => {
     if (!selectedOrder) return '请先选择销售订单'
@@ -1252,13 +1213,6 @@ export default function V1SalesOrdersPage() {
             }}
           >
             清空已选
-          </Button>
-          <Button
-            size="small"
-            disabled={!selectedOrder}
-            onClick={() => setDetailOpen(true)}
-          >
-            查看详情
           </Button>
           <Button
             size="small"
@@ -1401,7 +1355,7 @@ export default function V1SalesOrdersPage() {
         onOk={saveOrder}
         onCancel={() => setOrderModalOpen(false)}
         maskClosable={false}
-        confirmLoading={saving}
+        confirmLoading={saving || itemLoading}
         centered
         forceRender
         destroyOnHidden={false}
@@ -1525,85 +1479,6 @@ export default function V1SalesOrdersPage() {
           />
         </Space>
       </Modal>
-
-      <Drawer
-        title="销售订单详情"
-        width={920}
-        open={detailOpen}
-        onClose={() => setDetailOpen(false)}
-      >
-        {selectedOrder ? (
-          <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="订单号">
-              {selectedOrder.order_no}
-            </Descriptions.Item>
-            <Descriptions.Item label="客户">
-              {selectedOrder.customer_snapshot?.name ||
-                `客户 ID ${selectedOrder.customer_id}`}
-            </Descriptions.Item>
-            <Descriptions.Item label="客户订单号">
-              {selectedOrder.customer_order_no || '-'}
-            </Descriptions.Item>
-            <Descriptions.Item label="订单日期">
-              {formatUnixDate(selectedOrder.order_date)}
-            </Descriptions.Item>
-            <Descriptions.Item label="计划交付">
-              {formatUnixDate(selectedOrder.planned_delivery_date)}
-            </Descriptions.Item>
-            <Descriptions.Item label="生命周期">
-              {salesOrderStatusTag(selectedOrder.lifecycle_status)}
-            </Descriptions.Item>
-            <Descriptions.Item label="创建时间">
-              {formatUnixDateTime(selectedOrder.created_at)}
-            </Descriptions.Item>
-            <Descriptions.Item label="更新时间">
-              {formatUnixDateTime(selectedOrder.updated_at)}
-            </Descriptions.Item>
-            <Descriptions.Item label="备注">
-              {selectedOrder.note || '-'}
-            </Descriptions.Item>
-          </Descriptions>
-        ) : null}
-        <div className="erp-sales-order-detail-lines">
-          <div className="erp-sales-order-detail-lines__head">
-            <strong>订单行</strong>
-            <Space wrap size={8}>
-              <Tag>共 {items.length} 行</Tag>
-              <Tag>未关闭 {openLineCount} 行</Tag>
-              <Button
-                size="small"
-                icon={<SettingOutlined />}
-                onClick={() => setColumnOrderTarget('items')}
-              >
-                列顺序
-              </Button>
-            </Space>
-          </div>
-          <Table
-            rowKey="id"
-            size="small"
-            loading={selectedOrder ? itemLoading : false}
-            columns={readonlyItemColumns}
-            dataSource={selectedOrder ? items : []}
-            pagination={false}
-            scroll={{ x: 1740 }}
-            locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description={
-                    selectedOrder ? '当前订单暂无订单行' : '尚未选择销售订单'
-                  }
-                />
-              ),
-            }}
-          />
-        </div>
-        <p className="erp-business-selection-action-bar__hint">
-          当前页面不展示已发货数量，不生成出货、库存预留、库存流水、发票、应收或收款。出货事实后续由
-          ShipmentUsecase 接入。
-        </p>
-      </Drawer>
     </BusinessPageLayout>
   )
 }

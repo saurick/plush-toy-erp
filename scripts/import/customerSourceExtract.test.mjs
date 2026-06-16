@@ -7,11 +7,13 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { OUTPUT_FILES, readXlsxWorkbook, runExtraction } from './customerSourceExtract.mjs'
+import { DEFAULT_SOURCE_MANIFEST } from './customerSourceManifestCheck.mjs'
 
 const testDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(testDir, '../..')
 const cliPath = path.join(testDir, 'customerSourceExtract.mjs')
 const rawDir = path.join(repoRoot, 'docs/customers/yoyoosun/raw-source-files')
+const manifestPath = path.join(repoRoot, DEFAULT_SOURCE_MANIFEST)
 
 test('help 输出可运行', () => {
   const result = spawnSync(process.execPath, [cliPath, '--help'], {
@@ -20,7 +22,7 @@ test('help 输出可运行', () => {
   })
   assert.equal(result.status, 0)
   assert.match(result.stdout, /Yoyoosun customer source extractor/)
-  assert.match(result.stdout, /--raw-dir/)
+  assert.match(result.stdout, /--manifest/)
 })
 
 test('xlsx reader 正确处理自闭合空单元格后的 shared string', async () => {
@@ -39,7 +41,7 @@ test('runExtraction 生成本地 source snapshot、配置候选和 no-real-impor
   const outDir = await mkdtemp(path.join(os.tmpdir(), 'customer-source-extract-'))
   try {
     const result = await runExtraction({
-      rawDir,
+      manifest: manifestPath,
       out: outDir,
       customer: 'yoyoosun',
     })
@@ -51,6 +53,11 @@ test('runExtraction 生成本地 source snapshot、配置候选和 no-real-impor
 
     assert.equal(result.sourceSnapshot.canExecuteRealImport, false)
     assert.equal(result.sourceSnapshot.noRealImport, true)
+    assert.equal(result.sourceSnapshot.sourceManifest.path, DEFAULT_SOURCE_MANIFEST)
+    assert.equal(result.summary.sourceManifest.path, DEFAULT_SOURCE_MANIFEST)
+    assert.equal(result.summary.sourceManifest.sourceCount, 11)
+    assert.equal(result.summary.sourceManifest.structuredExtractCount, 5)
+    assert.ok(result.sourceSnapshot.sources.every((source) => source.sourceManifestId))
     assert.equal(result.importConfig.boundaries.executesImport, false)
     assert.equal(result.importConfig.boundaries.createsTenant, false)
     assert.ok(result.summary.sourceCount > 5000)

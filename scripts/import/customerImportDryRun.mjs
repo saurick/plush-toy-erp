@@ -325,6 +325,7 @@ export async function runDryRun(options) {
   })
 
   const validationSummary = buildValidationSummary({
+    sourceManifest: sourceSnapshot.sourceManifest ?? null,
     totalSources: sourceSnapshot.sources.length,
     normalizedRows: normalizedRows.length,
     candidates,
@@ -344,6 +345,9 @@ export async function runDryRun(options) {
       sheetName: reference.sheetName,
       rowNumber: reference.rowNumber,
       domain: reference.domain,
+      sourceManifestId: reference.sourceManifestId,
+      sourceManifestPath: reference.sourceManifestPath,
+      sourceFileSha256: reference.sourceFileSha256,
       sourceReferenceLabel: reference.sourceReferenceLabel,
     })),
     normalizedRows,
@@ -459,6 +463,9 @@ function buildNormalizedRow(source, index, context) {
     sheetName: source.sheetName ?? null,
     rowNumber: source.rowNumber ?? null,
     domain: normalizeDomain(source.domain ?? 'unknown'),
+    sourceManifestId: source.sourceManifestId ?? null,
+    sourceManifestPath: source.sourceManifestPath ?? null,
+    sourceFileSha256: source.sourceFileSha256 ?? null,
     sourceReferenceLabel: buildSourceReferenceLabel(source, fallbackId),
   }
 
@@ -1716,6 +1723,7 @@ function buildValidationSummary(input) {
   }
   const blockerCount = unresolvedCountsBySeverity.block + input.forbiddenAutoImport.length
   return {
+    sourceManifest: input.sourceManifest ?? null,
     totalSources: input.totalSources,
     normalizedRows: input.normalizedRows,
     candidateCountsByAction,

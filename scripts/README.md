@@ -11,7 +11,8 @@
 | `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                     | 需要多角色登录 / 岗位任务端验收                            |
 | `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出试用模拟 / 业务事实模拟可复用 ID                | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前 |
 | `scripts/seed-trial-sim-masterdata.sh`                | 显式生成试用模拟产品 / 单位主数据，供模拟销售订单行引用                                                          | 试用环境模拟演练前                                         |
-| `scripts/import/customerSourceExtract.mjs`             | 只读提取永绅 yoyoosun 原始 Excel，生成本地 source snapshot、空 existing preview、配置候选和报告                  | yoyoosun 原始文件整理成导入前 evidence                     |
+| `scripts/import/customerSourceManifestCheck.mjs`       | 校验永绅 yoyoosun tracked source manifest、原始文件 sha256 / 大小和未登记来源文件                                | yoyoosun 原始文件进入导入前 evidence 前                    |
+| `scripts/import/customerSourceExtract.mjs`             | 按永绅 yoyoosun source manifest 只读提取允许结构化的原始 Excel，生成本地 source snapshot、空 existing preview、配置候选和报告 | yoyoosun 原始文件整理成导入前 evidence                     |
 | `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence                              | yoyoosun 导入前 source freeze / 人工 review evidence       |
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
 | `scripts/import/customerImportExecute.mjs`             | 永绅 yoyoosun 导入 execution loader 报告 / 门禁工具；当前没有可执行客户真实数据时不执行真实导入                  | import tooling 自检 / 单独数据治理评审                    |
@@ -70,11 +71,19 @@ pnpm smoke:processing-contract-real-login
 
 ### 0. 导入冻结与 dry-run 工具 / Import freeze and dry-run tooling
 
-customer source extractor 只使用本地原始 Excel 和 Node.js 内置模块，把 `docs/customers/yoyoosun/raw-source-files/*.xlsx` 提取成本地 evidence；不解析 PDF/OCR，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
+customer source manifest checker 只使用 tracked manifest 和本地原始文件，校验 `docs/customers/yoyoosun/source-manifest.json` 中的 path、sha256、size、可结构化提取标记与 `docs/customers/yoyoosun/raw-source-files/` 下的原件一致；不解析 PDF/OCR，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
+
+```bash
+node scripts/import/customerSourceManifestCheck.mjs \
+  --manifest docs/customers/yoyoosun/source-manifest.json \
+  --raw-dir docs/customers/yoyoosun/raw-source-files
+```
+
+customer source extractor 只按 source manifest 中 `structuredExtract.enabled=true` 的 Excel 来源提取本地 evidence；PDF / 图片仍只是人工来源引用，不做 OCR，不从 `raw-source-files/*.xlsx` 直接 glob 作为正式主路径。
 
 ```bash
 node scripts/import/customerSourceExtract.mjs \
-  --raw-dir docs/customers/yoyoosun/raw-source-files \
+  --manifest docs/customers/yoyoosun/source-manifest.json \
   --out output/customers/yoyoosun/source-extract
 ```
 
@@ -88,7 +97,7 @@ extraction-summary.json
 extraction-report.md
 ```
 
-`existing-v1.empty-preview.json` 只是本地空快照，方便先跑 dry-run preview；真实 sign-off 前必须替换为已 review 的 V1 / formal model existing snapshot。该提取输出仍是本地 evidence，不纳入 git，不是真实 import approval。人工收口后的 tracked 客户配置草案是 `config/customers/yoyoosun/importConfig.mjs`，它只记录统计、字段分组、review queue 和 forbidden targets，不嵌入 raw rows，也不接 runtime loader。
+`source-snapshot.extracted.json` 会记录本次使用的 `sourceManifest.path` 和 `sourceManifest.sha256`。`existing-v1.empty-preview.json` 只是本地空快照，方便先跑 dry-run preview；真实 sign-off 前必须替换为已 review 的 V1 / formal model existing snapshot。该提取输出仍是本地 evidence，不纳入 git，不是真实 import approval。人工收口后的 tracked 客户配置草案是 `config/customers/yoyoosun/importConfig.mjs`，它只记录统计、字段分组、review queue 和 forbidden targets，不嵌入 raw rows，也不接 runtime loader。
 
 提取后可直接接 dry-run preview 和 freeze check：
 

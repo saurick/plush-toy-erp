@@ -7296,8 +7296,7 @@
   padding: 14px;
 }
 
-.erp-sales-order-lines-form__head,
-.erp-sales-order-detail-lines__head {
+.erp-sales-order-lines-form__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -7311,8 +7310,7 @@
   min-width: 0;
 }
 
-.erp-sales-order-lines-form__head strong,
-.erp-sales-order-detail-lines__head strong {
+.erp-sales-order-lines-form__head strong {
   color: var(--erp-sales-order-lines-title, #172033);
   font-weight: 760;
 }
@@ -7363,14 +7361,85 @@
   grid-column: 1 / -1;
 }
 
-.erp-sales-order-detail-lines {
+.erp-master-contact-list {
   display: grid;
+  grid-column: 1 / -1;
   gap: 12px;
-  margin-top: 16px;
+  min-width: 0;
+  border: 1px solid var(--erp-sales-order-lines-border, #dde6e0);
+  border-radius: 8px;
+  background: var(--erp-sales-order-lines-bg, #f8fbf8);
+  padding: 14px;
 }
 
-.erp-sales-order-detail-lines .ant-table-wrapper {
-  max-width: 100%;
+.erp-master-contact-list__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-master-contact-list__head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-master-contact-list__head strong,
+.erp-master-contact-list__row-head strong {
+  color: var(--erp-sales-order-lines-title, #172033);
+  font-weight: 760;
+}
+
+.erp-master-contact-list__head span {
+  color: var(--erp-sales-order-lines-text-muted, #6b7788);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.erp-master-contact-list__items {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-master-contact-list__row {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--erp-sales-order-lines-border, #dde6e0);
+  border-radius: 8px;
+  background: var(--erp-business-action-modal-bg, #ffffff);
+  padding: 12px;
+}
+
+.erp-master-contact-list__row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.erp-master-contact-list__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.erp-master-contact-list__grid .ant-form-item {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.erp-master-contact-list__field--full.ant-form-item {
+  grid-column: 1 / -1;
+}
+
+.erp-bom-modal-items {
+  margin-top: 16px;
 }
 
 .erp-business-action-form :where(.ant-input, .ant-input-number, .ant-picker),
@@ -9350,9 +9419,15 @@
     padding: 12px;
   }
 
+  .erp-master-contact-list {
+    grid-column: auto;
+    padding: 12px;
+  }
+
   .erp-sales-order-lines-form__head,
+  .erp-master-contact-list__head,
   .erp-sales-order-lines-form__row-head,
-  .erp-sales-order-detail-lines__head {
+  .erp-master-contact-list__row-head {
     align-items: stretch;
     flex-direction: column;
   }
@@ -9361,7 +9436,15 @@
     grid-template-columns: 1fr;
   }
 
+  .erp-master-contact-list__grid {
+    grid-template-columns: 1fr;
+  }
+
   .erp-sales-order-lines-form__field--full.ant-form-item {
+    grid-column: auto;
+  }
+
+  .erp-master-contact-list__field--full.ant-form-item {
     grid-column: auto;
   }
 

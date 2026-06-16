@@ -1,23 +1,31 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto'
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
+
+import {
+  DEFAULT_RAW_SOURCE_DIR,
+  DEFAULT_SOURCE_MANIFEST,
+  loadAndValidateSourceManifest,
+  selectStructuredExtractSources,
+} from './customerSourceManifestCheck.mjs'
 
 const USAGE = `Yoyoosun customer source extractor
 
 Usage:
   node scripts/import/customerSourceExtract.mjs \\
-    --raw-dir docs/customers/yoyoosun/raw-source-files \\
+    --manifest docs/customers/yoyoosun/source-manifest.json \\
     --out output/customers/yoyoosun/source-extract
 
 Options:
-  --customer <key>   Optional. Defaults to yoyoosun.
-  --raw-dir <path>   Optional. Defaults to docs/customers/yoyoosun/raw-source-files.
-  --out <path>       Required. Output directory for extracted local evidence.
-  --help             Print this help.
+  --customer <key>    Optional. Defaults to yoyoosun.
+  --manifest <path>   Optional. Defaults to docs/customers/yoyoosun/source-manifest.json.
+  --raw-dir <path>    Optional. Raw source directory cross-check for the manifest.
+  --out <path>        Required. Output directory for extracted local evidence.
+  --help              Print this help.
 
 This tool extracts local Excel source files into import-prep evidence only. It never connects to a database, reads server config, writes formal tables, writes business_records, generates SQL, generates migrations, or executes a real import.`
 
@@ -30,7 +38,6 @@ export const OUTPUT_FILES = [
 ]
 
 const DEFAULT_CUSTOMER = 'yoyoosun'
-const DEFAULT_RAW_DIR = 'docs/customers/yoyoosun/raw-source-files'
 
 const ZIP_EOCD_SIGNATURE = 0x06054b50
 const ZIP_CENTRAL_SIGNATURE = 0x02014b50
@@ -92,7 +99,8 @@ class CliError extends Error {
 export function parseCliArgs(argv) {
   const options = {
     customer: DEFAULT_CUSTOMER,
-    rawDir: DEFAULT_RAW_DIR,
+    manifest: DEFAULT_SOURCE_MANIFEST,
+    rawDir: DEFAULT_RAW_SOURCE_DIR,
     help: false,
   }
 
@@ -119,6 +127,8 @@ export function parseCliArgs(argv) {
 
     if (key === 'customer') {
       options.customer = value
+    } else if (key === 'manifest') {
+      options.manifest = value
     } else if (key === 'raw-dir') {
       options.rawDir = value
     } else if (key === 'out') {
@@ -139,15 +149,21 @@ export function parseCliArgs(argv) {
 
 export async function runExtraction(options) {
   const customerKey = options.customer ?? DEFAULT_CUSTOMER
-  const rawDir = options.rawDir ?? DEFAULT_RAW_DIR
+  const manifestPath = options.manifest ?? DEFAULT_SOURCE_MANIFEST
+  const rawDir = options.rawDir ?? DEFAULT_RAW_SOURCE_DIR
   const outDir = options.out
-  const workbooks = await readRawWorkbooks(rawDir)
+  const manifestResult = await loadAndValidateSourceManifest({
+    manifestPath,
+    rawDir,
+  })
+  const workbooks = await readManifestWorkbooks(manifestResult)
   const extraction = extractSourcesFromWorkbooks(workbooks, { customerKey })
   const generatedAt = new Date().toISOString()
   const sourceSnapshot = {
     version: 1,
     generatedAt,
     customerKey,
+    sourceManifest: buildSourceManifestReference(manifestResult),
     noRealImport: true,
     canExecuteRealImport: false,
     sources: extraction.sources,
@@ -156,20 +172,20 @@ export async function runExtraction(options) {
   const importConfig = buildImportConfigCandidate({
     customerKey,
     generatedAt,
+    manifestResult,
     workbooks,
     extraction,
   })
   const summary = buildExtractionSummary({
     customerKey,
     generatedAt,
-    rawDir,
+    manifestResult,
     outDir,
     workbooks,
     extraction,
   })
   const report = buildExtractionReport({
     customerKey,
-    rawDir,
     sourceSnapshot,
     importConfig,
     summary,
@@ -191,35 +207,31 @@ export async function runExtraction(options) {
   }
 }
 
-async function readRawWorkbooks(rawDir) {
-  let entries
-  try {
-    entries = await readdir(rawDir, { withFileTypes: true })
-  } catch (error) {
-    if (error.code === 'ENOENT') {
-      throw new CliError(`Cannot read raw source directory: ${rawDir}`, 2)
-    }
-    throw error
-  }
+async function readManifestWorkbooks(manifestResult) {
+  const sourceEntries = selectStructuredExtractSources(manifestResult.sources)
+    .filter((source) => XLSX_EXTENSIONS.has(path.extname(source.path).toLowerCase()))
 
-  const workbookPaths = entries
-    .filter((entry) => entry.isFile() && XLSX_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
-    .map((entry) => path.join(rawDir, entry.name))
-    .sort((a, b) => path.basename(a).localeCompare(path.basename(b), 'zh-Hans-CN'))
-
-  if (workbookPaths.length === 0) {
-    throw new CliError(`No .xlsx files found in ${rawDir}`, 2)
+  if (sourceEntries.length === 0) {
+    throw new CliError(`No structured .xlsx sources found in ${manifestResult.summary.manifestPath}`, 2)
   }
 
   const workbooks = []
-  for (const workbookPath of workbookPaths) {
-    workbooks.push(await readXlsxWorkbook(workbookPath))
+  for (const sourceEntry of sourceEntries) {
+    const workbook = await readXlsxWorkbook(sourceEntry.absolutePath)
+    workbook.sourceManifest = {
+      sourceId: sourceEntry.sourceId,
+      path: sourceEntry.path,
+      sha256: sourceEntry.sha256,
+      sourceTypes: sourceEntry.sourceTypes,
+      domains: sourceEntry.domains,
+    }
+    workbooks.push(workbook)
   }
   return workbooks
 }
 
 export function extractSourcesFromWorkbooks(workbooks, options = {}) {
-  const collector = createCollector(options.customerKey ?? DEFAULT_CUSTOMER)
+  const collector = createCollector(options.customerKey ?? DEFAULT_CUSTOMER, { workbooks })
   for (const workbook of workbooks) {
     for (const sheet of workbook.sheets) {
       if (isMaterialSummarySheet(sheet.name)) {
@@ -252,9 +264,12 @@ export function extractSourcesFromWorkbooks(workbooks, options = {}) {
   }
 }
 
-function createCollector(customerKey) {
+function createCollector(customerKey, options = {}) {
   const sources = []
   const unique = new Set()
+  const workbookSourceIndex = new Map(
+    (options.workbooks ?? []).map((workbook) => [workbook.fileName, workbook.sourceManifest]).filter(([, source]) => source),
+  )
   const counters = {
     byDomain: {},
     bySourceType: {},
@@ -293,6 +308,9 @@ function createCollector(customerKey) {
         sourceType: input.sourceType ?? 'Data Import Source',
         sourceKind: input.sourceKind ?? 'xlsx_sheet',
         moduleKey: input.moduleKey ?? 'unknown',
+        sourceManifestId: workbookSourceIndex.get(input.fileName)?.sourceId ?? null,
+        sourceManifestPath: workbookSourceIndex.get(input.fileName)?.path ?? null,
+        sourceFileSha256: workbookSourceIndex.get(input.fileName)?.sha256 ?? null,
         fileName: input.fileName,
         sheetName: input.sheetName,
         rowNumber: input.rowNumber ?? null,
@@ -1022,7 +1040,18 @@ function buildMapping(workbook, sheet, headerRow, domain, fields) {
   }
 }
 
-function buildImportConfigCandidate({ customerKey, generatedAt, workbooks, extraction }) {
+function buildSourceManifestReference(manifestResult) {
+  return {
+    path: manifestResult.summary.manifestPath,
+    sha256: manifestResult.manifestSha256,
+    version: manifestResult.summary.version,
+    sourceCount: manifestResult.summary.sourceCount,
+    structuredExtractCount: manifestResult.summary.structuredExtractCount,
+    rawDir: manifestResult.summary.rawDir,
+  }
+}
+
+function buildImportConfigCandidate({ customerKey, generatedAt, manifestResult, workbooks, extraction }) {
   return {
     customerKey,
     label: '永绅 yoyoosun 客户导入配置候选',
@@ -1040,7 +1069,11 @@ function buildImportConfigCandidate({ customerKey, generatedAt, workbooks, extra
       noRealImport: true,
       canExecuteRealImport: false,
     },
+    sourceManifest: buildSourceManifestReference(manifestResult),
     sourceFiles: workbooks.map((workbook) => ({
+      sourceManifestId: workbook.sourceManifest?.sourceId ?? null,
+      sourceManifestPath: workbook.sourceManifest?.path ?? null,
+      sourceManifestSha256: workbook.sourceManifest?.sha256 ?? null,
       fileName: workbook.fileName,
       sheetCount: workbook.sheets.length,
       sheets: workbook.sheets.map((sheet) => ({
@@ -1103,11 +1136,12 @@ function buildImportConfigCandidate({ customerKey, generatedAt, workbooks, extra
   }
 }
 
-function buildExtractionSummary({ customerKey, generatedAt, rawDir, outDir, workbooks, extraction }) {
+function buildExtractionSummary({ customerKey, generatedAt, manifestResult, outDir, workbooks, extraction }) {
   return {
     customerKey,
     generatedAt,
-    rawDir,
+    sourceManifest: buildSourceManifestReference(manifestResult),
+    rawDir: manifestResult.summary.rawDir,
     outDir,
     workbookCount: workbooks.length,
     sheetCount: workbooks.reduce((sum, workbook) => sum + workbook.sheets.length, 0),
@@ -1122,7 +1156,7 @@ function buildExtractionSummary({ customerKey, generatedAt, rawDir, outDir, work
   }
 }
 
-function buildExtractionReport({ customerKey, rawDir, sourceSnapshot, importConfig, summary }) {
+function buildExtractionReport({ customerKey, sourceSnapshot, importConfig, summary }) {
   const lines = [
     `# ${customerKey} 客户来源提取报告 / Customer Source Extraction Report`,
     '',
@@ -1134,7 +1168,9 @@ function buildExtractionReport({ customerKey, rawDir, sourceSnapshot, importConf
     '',
     '## 输入 / Inputs',
     '',
-    `- rawDir: \`${rawDir}\``,
+    `- sourceManifest: \`${summary.sourceManifest.path}\``,
+    `- sourceManifestSha256: \`${summary.sourceManifest.sha256}\``,
+    `- rawDir: \`${summary.sourceManifest.rawDir}\``,
     `- workbookCount: ${summary.workbookCount}`,
     `- sheetCount: ${summary.sheetCount}`,
     '',

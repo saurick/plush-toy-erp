@@ -3034,9 +3034,11 @@ const scenarios = [
       await verifyBusinessRowDoubleClickEditModal(page, {
         rowText: '样式供应商',
         titleText: '编辑供应商',
-        drawerTitleText: '供应商档案详情',
-        detailMatchText: '样式供应商',
         scenarioName: 'business-v1-suppliers',
+        afterModalOpen: async () => {
+          await expectText(page, '联系人')
+          await expectButton(page, '添加条目')
+        },
       })
 
       await gotoScenarioPath(page, '/erp/master/partners/customers', {
@@ -3055,17 +3057,16 @@ const scenarios = [
         titleText: '新建客户档案',
         minFieldCount: 5,
         screenshotName: 'business-v1-customers-form-modal',
+        expectedTexts: ['联系人', '添加条目'],
       })
       await assertNoHorizontalOverflow(page, 'business-standard-customers')
       await verifyBusinessRowDoubleClickEditModal(page, {
         rowText: '暗色客户',
         titleText: '编辑客户',
-        drawerTitleText: '客户档案详情',
-        detailMatchText: '暗色客户',
         scenarioName: 'business-v1-customers',
-        afterDetailOpen: async () => {
+        afterModalOpen: async () => {
           await expectText(page, '联系人')
-          await expectButton(page, '新建联系人')
+          await expectButton(page, '添加条目')
         },
       })
 
@@ -3090,13 +3091,9 @@ const scenarios = [
       await verifyBusinessRowDoubleClickEditModal(page, {
         rowText: 'SO-STYLE-L1',
         titleText: '编辑销售订单',
-        drawerTitleText: '销售订单详情',
-        detailMatchText: 'SO-STYLE-L1',
         scenarioName: 'business-v1-sales-orders',
-        afterDetailOpen: async () => {
-          await assertSalesOrderItemHeadersHideInternalIds(page, {
-            scenarioName: 'business-v1-sales-orders',
-          })
+        afterModalOpen: async () => {
+          await expectText(page, '订单行')
         },
       })
 
@@ -3171,11 +3168,30 @@ const scenarios = [
       })
       await verifyFormalShellRowDoubleClickEditModal(page, {
         rowText: 'INVENTORY-002',
-        moduleTitle: '库存台账',
         scenarioName: 'business-standard-inventory',
         expectedTexts: ['当前余额', '可用量', '最近流水'],
       })
       await assertNoHorizontalOverflow(page, 'business-standard-inventory')
+
+      await gotoScenarioPath(page, '/erp/warehouse/shipments', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '出货单')
+      await expectButton(page, '新建草稿')
+      await expectText(page, 'SHIP-STYLE-L1')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建草稿',
+        titleText: '新建出货单',
+        minFieldCount: 12,
+        screenshotName: 'business-v1-shipment-create-form-modal',
+        expectedTexts: ['出货明细', '产品 ID', '仓库 ID'],
+      })
+      await page.getByRole('button', { name: '加行' }).click()
+      await expectText(page, '维护出货明细')
+      await expectText(page, '已保存出货明细')
+      await expectText(page, '新增出货明细')
+      await page.keyboard.press('Escape')
+      await assertNoHorizontalOverflow(page, 'business-v1-shipments')
 
       await gotoScenarioPath(page, '/erp/finance/receivables', {
         waitUntil: 'domcontentloaded',
@@ -4218,6 +4234,74 @@ async function installAdminRpcMocks(page) {
         break
       case 'archive_bom_version':
         data = { bom_version: { ...bomVersion, status: 'ARCHIVED' } }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
+
+  await page.route('**/rpc/operational_fact', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    const shipmentItem = {
+      id: 1,
+      shipment_id: 1,
+      sales_order_item_id: 1,
+      product_id: 1,
+      warehouse_id: 1,
+      unit_id: 1,
+      lot_id: 1,
+      quantity: '10',
+      note: '样式出货明细',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const shipment = {
+      id: 1,
+      shipment_no: 'SHIP-STYLE-L1',
+      status: 'DRAFT',
+      sales_order_id: 1,
+      customer_id: 1,
+      customer_snapshot: '暗色客户',
+      planned_ship_at: nowUnix() + 86_400,
+      shipped_at: null,
+      note: '样式回归出货单',
+      items: [shipmentItem],
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_shipments':
+        data = { shipments: [shipment], total: 1, limit: 100, offset: 0 }
+        break
+      case 'create_shipment':
+        data = { shipment: { ...shipment, id: 2, ...params, items: [] } }
+        break
+      case 'add_shipment_item':
+        data = { shipment_item: { ...shipmentItem, ...params } }
+        break
+      case 'ship_shipment':
+        data = { shipment: { ...shipment, status: 'SHIPPED' } }
+        break
+      case 'cancel_shipment':
+        data = { shipment: { ...shipment, status: 'CANCELLED' } }
         break
       default:
         data = {}
@@ -5472,15 +5556,26 @@ async function verifyBusinessActionFormModal(
       node.querySelectorAll(
         '.erp-business-action-form input, .erp-business-action-form textarea, .erp-business-action-form .ant-select-selector'
       )
-    ).map((control) => {
-      const rect = control.getBoundingClientRect()
-      const style = window.getComputedStyle(control)
-      return {
-        width: rect.width,
-        height: rect.height,
-        borderRadius: style.borderRadius,
-      }
-    })
+    )
+      .filter((control) => {
+        const rect = control.getBoundingClientRect()
+        const style = window.getComputedStyle(control)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        )
+      })
+      .map((control) => {
+        const rect = control.getBoundingClientRect()
+        const style = window.getComputedStyle(control)
+        return {
+          width: rect.width,
+          height: rect.height,
+          borderRadius: style.borderRadius,
+        }
+      })
     return {
       className: String(node.className || ''),
       textContent: String(node.textContent || '')
@@ -5634,14 +5729,7 @@ async function verifyBusinessRecycleModal(
 
 async function verifyBusinessRowDoubleClickEditModal(
   page,
-  {
-    rowText,
-    titleText,
-    drawerTitleText,
-    detailMatchText,
-    scenarioName,
-    afterDetailOpen,
-  }
+  { rowText, titleText, scenarioName, afterModalOpen }
 ) {
   const row = page
     .locator('.erp-business-data-table-card .ant-table-tbody tr')
@@ -5656,9 +5744,12 @@ async function verifyBusinessRowDoubleClickEditModal(
     .last()
   await modal.waitFor({ state: 'visible', timeout: 10_000 })
   await expectText(page, titleText)
+  if (afterModalOpen) {
+    await afterModalOpen()
+  }
 
   const modalMetrics = await page.evaluate(
-    ({ expectedTitle, expectedDrawerTitle }) => {
+    ({ expectedTitle }) => {
       const isVisible = (node) => {
         if (!(node instanceof HTMLElement)) return false
         const rect = node.getBoundingClientRect()
@@ -5678,14 +5769,10 @@ async function verifyBusinessRowDoubleClickEditModal(
           ).length,
         visibleDetailDrawers: Array.from(
           document.querySelectorAll('.ant-drawer')
-        )
-          .filter(isVisible)
-          .filter((node) =>
-            String(node.textContent || '').includes(expectedDrawerTitle)
-          ).length,
+        ).filter(isVisible).length,
       }
     },
-    { expectedTitle: titleText, expectedDrawerTitle: drawerTitleText }
+    { expectedTitle: titleText }
   )
   assert.equal(
     modalMetrics.visibleEditModals,
@@ -5700,46 +5787,6 @@ async function verifyBusinessRowDoubleClickEditModal(
 
   await modal.locator('.ant-modal-close').click({ force: true })
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })
-
-  await page.getByRole('button', { name: '查看详情' }).click()
-  await expectText(page, drawerTitleText)
-  await expectText(page, detailMatchText)
-  if (afterDetailOpen) {
-    await afterDetailOpen()
-  }
-
-  const drawerMetrics = await page.evaluate(
-    ({ expectedDrawerTitle }) => {
-      const isVisible = (node) => {
-        if (!(node instanceof HTMLElement)) return false
-        const rect = node.getBoundingClientRect()
-        const style = window.getComputedStyle(node)
-        return (
-          rect.width > 0 &&
-          rect.height > 0 &&
-          style.display !== 'none' &&
-          style.visibility !== 'hidden'
-        )
-      }
-      return {
-        visibleDetailDrawers: Array.from(
-          document.querySelectorAll('.ant-drawer')
-        )
-          .filter(isVisible)
-          .filter((node) =>
-            String(node.textContent || '').includes(expectedDrawerTitle)
-          ).length,
-      }
-    },
-    { expectedDrawerTitle: drawerTitleText }
-  )
-  assert.equal(
-    drawerMetrics.visibleDetailDrawers,
-    1,
-    `${scenarioName} 显式详情按钮仍应打开详情抽屉: ${JSON.stringify(drawerMetrics)}`
-  )
-  await page.keyboard.press('Escape').catch(() => {})
-  await delay(300)
 }
 
 function waitForAdminColumnOrderSync(page) {
@@ -9606,7 +9653,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
 
 async function verifyFormalShellRowDoubleClickEditModal(
   page,
-  { rowText, moduleTitle, scenarioName, expectedTexts = [] }
+  { rowText, scenarioName, expectedTexts = [] }
 ) {
   const row = page
     .locator('.erp-business-data-table-card .ant-table-tbody tr')
@@ -9689,36 +9736,6 @@ async function verifyFormalShellRowDoubleClickEditModal(
 
   await modal.locator('.ant-modal-close').click({ force: true })
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })
-  await page.getByRole('button', { name: '详情' }).click()
-  await expectText(page, `${moduleTitle}详情`)
-  await expectText(page, '旧入口关系')
-
-  const drawerMetrics = await page.evaluate(() => {
-    const isVisible = (node) => {
-      if (!(node instanceof HTMLElement)) return false
-      const rect = node.getBoundingClientRect()
-      const style = window.getComputedStyle(node)
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden'
-      )
-    }
-    return {
-      visibleDetailDrawers: Array.from(document.querySelectorAll('.ant-drawer'))
-        .filter(isVisible)
-        .filter((node) => String(node.textContent || '').includes('旧入口关系'))
-        .length,
-    }
-  })
-  assert.equal(
-    drawerMetrics.visibleDetailDrawers,
-    1,
-    `${scenarioName} 显式详情按钮仍应打开详情抽屉: ${JSON.stringify(drawerMetrics)}`
-  )
-  await page.keyboard.press('Escape').catch(() => {})
-  await delay(300)
 }
 
 async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
@@ -10363,45 +10380,6 @@ async function assertBusinessHeaderStatsSingleLine(
     metrics.bodyScrollWidth <= metrics.viewportWidth + 2 &&
       metrics.docScrollWidth <= metrics.viewportWidth + 2,
     `${scenarioName} 业务页头部统计修复后不应产生页面横向溢出: ${JSON.stringify(metrics)}`
-  )
-}
-
-async function assertSalesOrderItemHeadersHideInternalIds(
-  page,
-  { scenarioName }
-) {
-  const metrics = await page.evaluate(() => {
-    const tables = Array.from(document.querySelectorAll('.ant-table'))
-    const targetTable = tables.find((table) =>
-      String(table.textContent || '').includes('产品编号')
-    )
-    const headerTexts = targetTable
-      ? Array.from(targetTable.querySelectorAll('thead th'))
-          .map((node) =>
-            String(node.textContent || '')
-              .replace(/\s+/g, ' ')
-              .trim()
-          )
-          .filter(Boolean)
-      : []
-
-    return {
-      hasTargetTable: Boolean(targetTable),
-      headerTexts,
-      forbiddenHeaders: headerTexts.filter((text) =>
-        ['产品 ID', '单位 ID'].includes(text)
-      ),
-    }
-  })
-
-  assert(
-    metrics.hasTargetTable,
-    `${scenarioName} 缺少订单行表格: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.forbiddenHeaders.length,
-    0,
-    `${scenarioName} 订单行列表不应暴露内部产品/单位 ID 列: ${JSON.stringify(metrics)}`
   )
 }
 

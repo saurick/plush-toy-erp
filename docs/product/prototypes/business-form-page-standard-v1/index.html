@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>新建编辑表单标准样板</title>
+    <title>新建编辑业务弹窗标准样板</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -202,18 +202,21 @@
 
       .content {
         padding: 20px 22px 100px;
+        display: grid;
+        place-items: start center;
       }
 
       .page {
         display: grid;
         gap: 14px;
+        width: min(1180px, 100%);
         max-width: 1180px;
       }
 
       .panel {
         min-width: 0;
         border: 1px solid var(--line);
-        border-radius: 8px;
+        border-radius: 12px;
         background: var(--panel);
         box-shadow: var(--shadow);
       }
@@ -472,7 +475,7 @@
           <div class="mark">样</div>
           <div>
             <strong>毛绒 ERP</strong>
-            <span>表单页标准样板</span>
+            <span>业务弹窗标准样板</span>
           </div>
         </div>
         <div class="nav-note">以下为常用入口 / 快捷入口示意，不替代 seedData 或 yoyoosun 客户菜单。</div>
@@ -492,7 +495,7 @@
         <header class="topbar">
           <div>
             <div class="crumb">销售链路 / 销售订单 / 新建草稿</div>
-            <h1>新建 / 编辑表单样板</h1>
+            <h1>新建 / 编辑业务弹窗样板</h1>
           </div>
           <div class="actions">
             <button class="btn">取消</button>
@@ -506,10 +509,10 @@
             <section class="panel">
               <div class="hero">
                 <div>
-                  <div class="crumb">ERP / 标准表单页 / To Implement</div>
-                  <h2>销售订单表单样板</h2>
+                  <div class="crumb">ERP / 标准业务弹窗 / To Implement</div>
+                  <h2>销售订单业务弹窗样板</h2>
                   <p class="summary">
-                    首个真实落地对象建议收窄到销售订单新建 / 编辑；同类表单只复用页面骨架、状态表达和残值 / 缺值防护方式，来源导入和明细行浮层回到业务弹窗样板。
+                    新建和编辑复用同一个业务弹窗：上方维护主表字段，下方维护订单行、联系人、BOM 明细或其他必要 items；来源导入、回收站和危险确认回到局部动作弹窗。
                   </p>
                 </div>
                 <div class="tags">
@@ -521,8 +524,8 @@
 
               <div class="review-grid" aria-label="进入真实实现前确认项">
                 <div class="review-card">
-                  <strong>首个落地对象</strong>
-                  <span>先以销售订单表单验证骨架，不同时铺开到所有菜单。</span>
+                  <strong>弹窗主路径</strong>
+                  <span>新建、编辑和只读回显共用同一弹窗结构，不另做详情抽屉。</span>
                 </div>
                 <div class="review-card">
                   <strong>字段真源</strong>
@@ -534,7 +537,7 @@
                 </div>
                 <div class="review-card">
                   <strong>不吸收内容</strong>
-                  <span>不吸收静态数据、dev-only 外壳、假客户、后端事实或局部动作浮层。</span>
+                  <span>不吸收静态数据、dev-only 外壳、假客户、后端事实或局部动作弹窗。</span>
                 </div>
               </div>
 
