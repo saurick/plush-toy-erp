@@ -1,14 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   DeleteOutlined,
+  DownOutlined,
   DownloadOutlined,
   EditOutlined,
+  FileTextOutlined,
   InboxOutlined,
+  ImportOutlined,
+  LinkOutlined,
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
 import {
   Button,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -18,8 +23,8 @@ import {
   Tag,
   Tooltip,
 } from 'antd'
-import { useOutletContext } from 'react-router-dom'
-import { message } from '@/common/utils/antdApp'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   BusinessOperationPanel,
@@ -51,14 +56,22 @@ import {
   savePurchaseOrderWithItems,
   submitPurchaseOrder,
 } from '../api/masterDataOrderApi.mjs'
+import { createPurchaseReceiptFromPurchaseOrder } from '../api/purchaseApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
-import { listWorkflowTasks } from '../api/workflowApi.mjs'
+import {
+  listWorkflowTasks,
+  updateWorkflowTaskStatus,
+  urgeWorkflowTask,
+} from '../api/workflowApi.mjs'
 import {
   PURCHASE_ORDER_STATUS_COLORS,
   PURCHASE_ORDER_STATUS_LABELS,
+  V1_ROUTE_PATHS,
+  buildMaterialPurchaseContractDraftFromPurchaseOrder,
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
   buildSupplierSnapshot,
+  canRunPurchaseOrderLifecycleAction,
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
@@ -67,10 +80,16 @@ import {
 } from '../utils/masterDataOrderView.mjs'
 import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
 import {
+  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
 import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
+import {
+  MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+  PRINT_WORKSPACE_ENTRY_SOURCE,
+  openPrintWorkspaceWindow,
+} from '../utils/printWorkspace.js'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -100,24 +119,35 @@ const LIFECYCLE_ACTIONS = [
     key: 'submit',
     label: '提交',
     permission: 'purchase.order.update',
+    nextStatus: 'submitted',
     run: submitPurchaseOrder,
   },
   {
     key: 'approve',
     label: '审核',
     permission: 'purchase.order.approve',
+    nextStatus: 'approved',
     run: approvePurchaseOrder,
   },
   {
     key: 'close',
     label: '关闭',
     permission: 'purchase.order.update',
+    nextStatus: 'closed',
+    confirmTitle: '确认关闭采购订单',
+    confirmContent: '关闭后该采购订单不再继续推进，是否继续？',
+    okText: '确认关闭',
     run: closePurchaseOrder,
   },
   {
     key: 'cancel',
     label: '取消',
     permission: 'purchase.order.update',
+    nextStatus: 'canceled',
+    danger: true,
+    confirmTitle: '确认取消采购订单',
+    confirmContent: '取消后该采购订单不再继续推进，是否继续？',
+    okText: '确认取消',
     run: cancelPurchaseOrder,
   },
 ]
@@ -321,23 +351,43 @@ function materialLabel(material = {}) {
   return [material.code, material.name].filter(Boolean).join(' / ')
 }
 
+function workflowPayloadOf(task = {}) {
+  return task.payload && typeof task.payload === 'object' ? task.payload : {}
+}
+
 export default function V1PurchaseOrdersPage() {
   const outletContext = useOutletContext()
+  const navigate = useNavigate()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
   const [form] = Form.useForm()
+  const [inboundDraftForm] = Form.useForm()
   const canCreate = hasActionPermission(adminProfile, 'purchase.order.create')
   const canUpdate = hasActionPermission(adminProfile, 'purchase.order.update')
+  const canCreatePurchaseReceipt = hasActionPermission(
+    adminProfile,
+    'purchase.receipt.create'
+  )
   const canReadWorkflowTasks = hasActionPermission(
     adminProfile,
     'workflow.task.read'
+  )
+  const canUpdateWorkflowTasks = hasActionPermission(
+    adminProfile,
+    'workflow.task.update'
+  )
+  const canCompleteWorkflowTasks = hasActionPermission(
+    adminProfile,
+    'workflow.task.complete'
   )
 
   const [loading, setLoading] = useState(false)
   const [itemsLoading, setItemsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [printingContract, setPrintingContract] = useState(false)
+  const [generatingInboundDraft, setGeneratingInboundDraft] = useState(false)
   const [workflowTasks, setWorkflowTasks] = useState([])
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
@@ -358,6 +408,7 @@ export default function V1PurchaseOrdersPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [editingOrder, setEditingOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [inboundDraftModalOpen, setInboundDraftModalOpen] = useState(false)
   const [materialImportOpen, setMaterialImportOpen] = useState(false)
 
   const applySelectedRowKeys = useCallback((nextKeys = []) => {
@@ -618,6 +669,7 @@ export default function V1PurchaseOrdersPage() {
   }
 
   const runLifecycleAction = async (action, record) => {
+    setSaving(true)
     try {
       const updated = await action.run({ id: record.id })
       message.success(`采购订单已${action.label}`)
@@ -629,6 +681,150 @@ export default function V1PurchaseOrdersPage() {
       await loadOrders()
     } catch (error) {
       message.error(getActionErrorMessage(error, `${action.label}采购订单失败`))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const completeWorkflowTask = useCallback(
+    async (task) => {
+      await updateWorkflowTaskStatus({
+        id: task.id,
+        task_status_key: 'done',
+        business_status_key: task.business_status_key || undefined,
+        reason: '',
+        payload: {
+          ...workflowPayloadOf(task),
+          purchase_order_page_action: 'complete',
+        },
+      })
+      message.success('任务已处理完成')
+      await loadWorkflowTasks()
+    },
+    [loadWorkflowTasks]
+  )
+
+  const blockWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      await updateWorkflowTaskStatus({
+        id: task.id,
+        task_status_key: 'blocked',
+        business_status_key: 'blocked',
+        reason,
+        payload: {
+          ...workflowPayloadOf(task),
+          purchase_order_page_action: 'block',
+          blocked_reason: reason,
+        },
+      })
+      message.success('阻塞原因已记录')
+      await loadWorkflowTasks()
+    },
+    [loadWorkflowTasks]
+  )
+
+  const urgePurchaseWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      await urgeWorkflowTask({
+        task_id: task.id,
+        action: 'urge_task',
+        reason,
+        actor_role_key: 'admin',
+        payload: {
+          source_type: task.source_type,
+          source_id: task.source_id,
+          source_no: task.source_no,
+          entry: 'purchase_order_page',
+        },
+      })
+      message.success('催办已记录')
+      await loadWorkflowTasks()
+    },
+    [loadWorkflowTasks]
+  )
+
+  const requestLifecycleAction = (action, record) => {
+    if (!action || !record) {
+      return
+    }
+    if (!action.confirmTitle) {
+      runLifecycleAction(action, record)
+      return
+    }
+    modal.confirm({
+      centered: true,
+      title: action.confirmTitle,
+      content: action.confirmContent,
+      okText: action.okText || `确认${action.label}`,
+      cancelText: '取消',
+      okButtonProps: action.danger ? { danger: true } : undefined,
+      onOk: () => runLifecycleAction(action, record),
+    })
+  }
+
+  const printPurchaseContract = async (record) => {
+    if (!record) {
+      return
+    }
+    setPrintingContract(true)
+    try {
+      const items = await loadOrderItems(record)
+      if (items.length === 0) {
+        message.warning('当前采购订单没有可打印的明细')
+        return
+      }
+      const initialDraft = buildMaterialPurchaseContractDraftFromPurchaseOrder(
+        record,
+        items,
+        { materials }
+      )
+      openPrintWorkspaceWindow(MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY, {
+        entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        initialDraft,
+      })
+      message.success('已打开采购合同打印模板')
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '打开采购合同打印模板失败'))
+    } finally {
+      setPrintingContract(false)
+    }
+  }
+
+  const openInboundDraftModal = (record) => {
+    if (!record) {
+      return
+    }
+    inboundDraftForm.setFieldsValue({
+      receipt_no: `IN-${record.purchase_order_no || record.id}`,
+      warehouse_id: undefined,
+      received_at: todayInputValue(),
+      note: `来源采购订单 ${record.purchase_order_no || record.id}`,
+    })
+    setInboundDraftModalOpen(true)
+  }
+
+  const createInboundDraftFromOrder = async () => {
+    if (!singleSelectedOrder) {
+      return
+    }
+    try {
+      const values = await inboundDraftForm.validateFields()
+      setGeneratingInboundDraft(true)
+      await createPurchaseReceiptFromPurchaseOrder({
+        purchase_order_id: singleSelectedOrder.id,
+        receipt_no: values.receipt_no,
+        warehouse_id: Number(values.warehouse_id || 0),
+        received_at: values.received_at,
+        note: values.note || undefined,
+      })
+      setInboundDraftModalOpen(false)
+      message.success('采购入库草稿已生成')
+      navigate(V1_ROUTE_PATHS.purchaseReceipts)
+    } catch (error) {
+      if (error?.errorFields) return
+      message.error(getActionErrorMessage(error, '生成采购入库草稿失败'))
+    } finally {
+      setGeneratingInboundDraft(false)
     }
   }
 
@@ -671,62 +867,67 @@ export default function V1PurchaseOrdersPage() {
   )
 
   const dataColumns = useMemo(
-    () => [
-      {
-        title: '采购单号',
-        exportTitle: '采购单号',
-        dataIndex: 'purchase_order_no',
-        width: 180,
-        fixed: 'left',
-        sorter: (a, b) =>
-          compareText(a?.purchase_order_no, b?.purchase_order_no),
-      },
-      {
-        title: '供应商',
-        exportTitle: '供应商',
-        dataIndex: 'supplier_id',
-        width: 160,
-        render: (_value, record) => resolveSupplierName(record),
-        exportValue: (record) => resolveSupplierName(record),
-      },
-      {
-        title: '状态',
-        exportTitle: '状态',
-        dataIndex: 'lifecycle_status',
-        width: 110,
-        render: statusTag,
-        exportValue: (record) =>
-          statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
-      },
-      {
-        title: '采购日期',
-        exportTitle: '采购日期',
-        dataIndex: 'purchase_date',
-        width: 130,
-        sorter: (a, b) => compareNumber(a?.purchase_date, b?.purchase_date),
-        render: formatUnixDate,
-        exportValue: (record) => formatUnixDate(record?.purchase_date),
-      },
-      {
-        title: '预计到货',
-        exportTitle: '预计到货',
-        dataIndex: 'expected_arrival_date',
-        width: 130,
-        sorter: (a, b) =>
-          compareNumber(a?.expected_arrival_date, b?.expected_arrival_date),
-        render: formatUnixDate,
-        exportValue: (record) => formatUnixDate(record?.expected_arrival_date),
-      },
-      {
-        title: '更新时间',
-        exportTitle: '更新时间',
-        dataIndex: 'updated_at',
-        width: 160,
-        sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
-        render: formatUnixDateTime,
-        exportValue: (record) => formatUnixDateTime(record?.updated_at),
-      },
-    ],
+    () =>
+      applyBusinessColumnSorters([
+        {
+          title: '采购单号',
+          exportTitle: '采购单号',
+          dataIndex: 'purchase_order_no',
+          width: 180,
+          fixed: 'left',
+          sorter: (a, b) =>
+            compareText(a?.purchase_order_no, b?.purchase_order_no),
+        },
+        {
+          title: '供应商',
+          exportTitle: '供应商',
+          dataIndex: 'supplier_id',
+          width: 160,
+          sortValue: resolveSupplierName,
+          render: (_value, record) => resolveSupplierName(record),
+          exportValue: (record) => resolveSupplierName(record),
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'lifecycle_status',
+          width: 110,
+          sortValue: (record) =>
+            statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
+          render: statusTag,
+          exportValue: (record) =>
+            statusText(record?.lifecycle_status, PURCHASE_ORDER_STATUS_LABELS),
+        },
+        {
+          title: '采购日期',
+          exportTitle: '采购日期',
+          dataIndex: 'purchase_date',
+          width: 130,
+          sorter: (a, b) => compareNumber(a?.purchase_date, b?.purchase_date),
+          render: formatUnixDate,
+          exportValue: (record) => formatUnixDate(record?.purchase_date),
+        },
+        {
+          title: '预计到货',
+          exportTitle: '预计到货',
+          dataIndex: 'expected_arrival_date',
+          width: 130,
+          sorter: (a, b) =>
+            compareNumber(a?.expected_arrival_date, b?.expected_arrival_date),
+          render: formatUnixDate,
+          exportValue: (record) =>
+            formatUnixDate(record?.expected_arrival_date),
+        },
+        {
+          title: '更新时间',
+          exportTitle: '更新时间',
+          dataIndex: 'updated_at',
+          width: 160,
+          sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.updated_at),
+        },
+      ]),
     [resolveSupplierName]
   )
 
@@ -829,6 +1030,68 @@ export default function V1PurchaseOrdersPage() {
     singleSelectedOrder &&
     canUpdate &&
     !['closed', 'canceled'].includes(singleSelectedOrder.lifecycle_status)
+  const canGenerateInboundDraft =
+    canCreatePurchaseReceipt &&
+    singleSelectedOrder?.lifecycle_status === 'approved'
+  const relatedMenuItems = [
+    { key: 'order-items', label: '采购订单明细' },
+    { key: 'purchase-receipts', label: '采购入库' },
+    { key: 'quality-inspections', label: '来料质检' },
+    { key: 'inventory', label: '库存台账' },
+  ]
+  const openRelatedTable = ({ key }) => {
+    if (!singleSelectedOrder) {
+      return
+    }
+    if (key === 'order-items') {
+      openEditModal(singleSelectedOrder)
+      return
+    }
+    if (key === 'purchase-receipts') {
+      navigate(V1_ROUTE_PATHS.purchaseReceipts)
+      return
+    }
+    if (key === 'quality-inspections') {
+      navigate(V1_ROUTE_PATHS.qualityInspections)
+      return
+    }
+    if (key === 'inventory') {
+      navigate(V1_ROUTE_PATHS.inventory)
+    }
+  }
+  const visibleLifecycleActions = useMemo(() => {
+    if (!singleSelectedOrder) {
+      return []
+    }
+    return LIFECYCLE_ACTIONS.filter(
+      (action) =>
+        hasActionPermission(adminProfile, action.permission) &&
+        canRunPurchaseOrderLifecycleAction(
+          singleSelectedOrder.lifecycle_status,
+          action.nextStatus
+        )
+    )
+  }, [adminProfile, singleSelectedOrder])
+  const primaryLifecycleAction =
+    visibleLifecycleActions.find((action) => action.key !== 'cancel') || null
+  const secondaryLifecycleActions = visibleLifecycleActions.filter(
+    (action) => action.key !== primaryLifecycleAction?.key
+  )
+  const lifecycleMenuItems =
+    secondaryLifecycleActions.length > 0
+      ? [
+          {
+            key: 'status-transitions',
+            label: '状态变更',
+            type: 'group',
+            children: secondaryLifecycleActions.map((action) => ({
+              key: action.key,
+              label: action.label,
+              danger: action.danger,
+            })),
+          },
+        ]
+      : []
 
   return (
     <BusinessPageLayout className="erp-v1-purchase-orders-page">
@@ -945,7 +1208,7 @@ export default function V1PurchaseOrdersPage() {
               setSelectedOrder(null)
             }}
           >
-            清空已选
+            清空
           </Button>
           <Button
             size="small"
@@ -953,20 +1216,112 @@ export default function V1PurchaseOrdersPage() {
             disabled={!selectedOrderCanEdit}
             onClick={() => openEditModal(singleSelectedOrder)}
           >
-            编辑订单
+            编辑
           </Button>
-          {LIFECYCLE_ACTIONS.filter((action) =>
-            hasActionPermission(adminProfile, action.permission)
-          ).map((action) => (
+          <Dropdown
+            trigger={['click']}
+            destroyOnHidden
+            disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
+            menu={{
+              items: relatedMenuItems,
+              onClick: openRelatedTable,
+            }}
+          >
             <Button
-              key={action.key}
               size="small"
+              icon={<LinkOutlined />}
               disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
-              onClick={() => runLifecycleAction(action, singleSelectedOrder)}
             >
-              {action.label}
+              关联 <DownOutlined />
             </Button>
-          ))}
+          </Dropdown>
+          {primaryLifecycleAction ? (
+            <Button
+              size="small"
+              type="primary"
+              disabled={
+                saving || selectedRowKeys.length !== 1 || !singleSelectedOrder
+              }
+              loading={saving}
+              onClick={() =>
+                requestLifecycleAction(
+                  primaryLifecycleAction,
+                  singleSelectedOrder
+                )
+              }
+            >
+              {primaryLifecycleAction.label}
+            </Button>
+          ) : null}
+          <Tooltip
+            title={
+              canGenerateInboundDraft
+                ? '按当前采购订单剩余明细生成采购入库草稿'
+                : '仅已审核采购订单且具备采购入库创建权限时可生成'
+            }
+          >
+            <span>
+              <Button
+                size="small"
+                type="primary"
+                icon={<ImportOutlined />}
+                disabled={
+                  !canGenerateInboundDraft ||
+                  selectedRowKeys.length !== 1 ||
+                  !singleSelectedOrder
+                }
+                loading={generatingInboundDraft}
+                onClick={() => openInboundDraftModal(singleSelectedOrder)}
+              >
+                生成入库
+              </Button>
+            </span>
+          </Tooltip>
+          <Button
+            size="small"
+            icon={<FileTextOutlined />}
+            disabled={
+              selectedRowKeys.length !== 1 ||
+              !singleSelectedOrder ||
+              itemsLoading
+            }
+            loading={printingContract}
+            onClick={() => printPurchaseContract(singleSelectedOrder)}
+          >
+            打印合同
+          </Button>
+          <Dropdown
+            trigger={['click']}
+            destroyOnHidden
+            disabled={
+              saving ||
+              selectedRowKeys.length !== 1 ||
+              !singleSelectedOrder ||
+              secondaryLifecycleActions.length === 0
+            }
+            menu={{
+              items: lifecycleMenuItems,
+              onClick: ({ key }) => {
+                const action = secondaryLifecycleActions.find(
+                  (item) => item.key === key
+                )
+                requestLifecycleAction(action, singleSelectedOrder)
+              },
+            }}
+          >
+            <Button
+              size="small"
+              aria-label="更多操作"
+              disabled={
+                saving ||
+                selectedRowKeys.length !== 1 ||
+                !singleSelectedOrder ||
+                secondaryLifecycleActions.length === 0
+              }
+            >
+              更多 <DownOutlined />
+            </Button>
+          </Dropdown>
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -1020,6 +1375,13 @@ export default function V1PurchaseOrdersPage() {
         selectedTasks={selectedOrderWorkflowTasks}
         selectedRecordLabel={singleSelectedOrder?.purchase_order_no || ''}
         roleLabelMap={WORKFLOW_ROLE_LABELS}
+        onCompleteTask={
+          canCompleteWorkflowTasks ? completeWorkflowTask : undefined
+        }
+        onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
+        onUrgeTask={
+          canUpdateWorkflowTasks ? urgePurchaseWorkflowTask : undefined
+        }
       />
 
       <ColumnOrderModal
@@ -1136,6 +1498,7 @@ export default function V1PurchaseOrdersPage() {
                     columns={materialImportColumns}
                     getSelectedLabel={(material) =>
                       material?.material_no ||
+                      material?.code ||
                       material?.name ||
                       material?.id ||
                       '-'
@@ -1308,6 +1671,48 @@ export default function V1PurchaseOrdersPage() {
               )}
             </Form.List>
           </section>
+        </Form>
+      </Modal>
+      <Modal
+        title="生成采购入库草稿"
+        open={inboundDraftModalOpen}
+        centered
+        width={520}
+        okText="生成草稿"
+        cancelText="取消"
+        confirmLoading={generatingInboundDraft}
+        onOk={createInboundDraftFromOrder}
+        onCancel={() => setInboundDraftModalOpen(false)}
+      >
+        <Form
+          form={inboundDraftForm}
+          layout="vertical"
+          className="erp-business-form"
+        >
+          <Form.Item
+            name="receipt_no"
+            label="入库单号"
+            rules={[{ required: true, message: '请输入入库单号' }]}
+          >
+            <Input maxLength={64} />
+          </Form.Item>
+          <Form.Item
+            name="warehouse_id"
+            label="入库仓库 ID"
+            rules={[{ required: true, message: '请输入入库仓库 ID' }]}
+          >
+            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="received_at"
+            label="入库日期"
+            rules={[{ required: true, message: '请选择入库日期' }]}
+          >
+            <DateInput />
+          </Form.Item>
+          <Form.Item name="note" label="备注">
+            <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+          </Form.Item>
         </Form>
       </Modal>
     </BusinessPageLayout>

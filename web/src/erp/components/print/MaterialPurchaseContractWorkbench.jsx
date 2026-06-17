@@ -29,6 +29,7 @@ import {
 import {
   MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
   persistPrintWorkspaceDraftSnapshot,
+  readInitialPrintWorkspaceDraftFromWindowName,
 } from '../../utils/printWorkspace.js'
 import {
   syncPrintPageMarginForPaper,
@@ -143,10 +144,23 @@ function ClauseBlock({ title, items, onCommit, disabled = false }) {
 }
 
 function loadDraft(template, storageKey, options = {}) {
-  const { forceFresh = false } = options
+  const { forceFresh = false, workspaceStateID = '' } = options
   const fallbackDraft = buildMaterialPurchaseContractDraft(template?.sample)
   if (forceFresh || !storageKey || typeof window === 'undefined') {
     return fallbackDraft
+  }
+  const initialDraft = readInitialPrintWorkspaceDraftFromWindowName(
+    template?.key,
+    workspaceStateID
+  )
+  if (initialDraft) {
+    return buildMaterialPurchaseContractDraft({
+      ...template?.sample,
+      ...initialDraft,
+      lines: initialDraft?.lines || template?.sample?.lines,
+      clauses: initialDraft?.clauses || template?.sample?.clauses,
+      merges: initialDraft?.merges || template?.sample?.merges,
+    })
   }
   try {
     const rawDraft = window.localStorage.getItem(storageKey) || ''
@@ -187,6 +201,7 @@ export default function MaterialPurchaseContractWorkbench({
   const [draft, setDraft] = useState(() =>
     loadDraft(template, draftStorageKey, {
       forceFresh: resetDraftOnOpen,
+      workspaceStateID,
     })
   )
   const [formulaVisible, setFormulaVisible] = useState(false)
@@ -209,6 +224,7 @@ export default function MaterialPurchaseContractWorkbench({
     setDraft(
       loadDraft(template, draftStorageKey, {
         forceFresh: resetDraftOnOpen,
+        workspaceStateID,
       })
     )
     setFormulaVisible(false)
@@ -221,7 +237,7 @@ export default function MaterialPurchaseContractWorkbench({
     setPdfAction('')
     setPdfActionStartedAt(0)
     setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
-  }, [draftStorageKey, resetDraftOnOpen, sourceTag, template])
+  }, [draftStorageKey, resetDraftOnOpen, sourceTag, template, workspaceStateID])
 
   useEffect(() => {
     if (!draftStorageKey || typeof window === 'undefined') {

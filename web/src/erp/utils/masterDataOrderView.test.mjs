@@ -4,12 +4,20 @@ import test from 'node:test'
 import {
   V1_ROUTE_PATHS,
   buildCustomerSnapshot,
+  buildMaterialPurchaseContractDraftFromPurchaseOrder,
   buildMasterDataParams,
+  buildOutsourcingOrderItemParams,
+  buildOutsourcingOrderParams,
+  buildProcessParams,
   buildProductParams,
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
+  canRunPurchaseOrderLifecycleAction,
+  canRunSalesOrderLifecycleAction,
+  canRunOutsourcingOrderLifecycleAction,
+  deriveOutsourcingOrderItemAmount,
   deriveSalesOrderItemAmount,
   formatUnixDateTime,
   hasActionPermission,
@@ -38,8 +46,64 @@ test('masterDataOrderView: action permissions keep super admin shortcut', () => 
   )
 })
 
+test('masterDataOrderView: order lifecycle actions expose real transitions only', () => {
+  assert.equal(canRunSalesOrderLifecycleAction('draft', 'submitted'), true)
+  assert.equal(canRunSalesOrderLifecycleAction('draft', 'canceled'), true)
+  assert.equal(canRunSalesOrderLifecycleAction('submitted', 'active'), true)
+  assert.equal(canRunSalesOrderLifecycleAction('active', 'closed'), true)
+  assert.equal(canRunSalesOrderLifecycleAction('closed', 'closed'), false)
+  assert.equal(canRunSalesOrderLifecycleAction('closed', 'canceled'), false)
+  assert.equal(canRunSalesOrderLifecycleAction('draft', 'active'), false)
+  assert.equal(canRunSalesOrderLifecycleAction('active', 'shipped'), false)
+
+  assert.equal(canRunPurchaseOrderLifecycleAction('draft', 'submitted'), true)
+  assert.equal(canRunPurchaseOrderLifecycleAction('draft', 'canceled'), true)
+  assert.equal(
+    canRunPurchaseOrderLifecycleAction('submitted', 'approved'),
+    true
+  )
+  assert.equal(canRunPurchaseOrderLifecycleAction('approved', 'closed'), true)
+  assert.equal(canRunPurchaseOrderLifecycleAction('closed', 'closed'), false)
+  assert.equal(canRunPurchaseOrderLifecycleAction('closed', 'canceled'), false)
+  assert.equal(canRunPurchaseOrderLifecycleAction('draft', 'approved'), false)
+  assert.equal(canRunPurchaseOrderLifecycleAction('approved', 'posted'), false)
+
+  assert.equal(
+    canRunOutsourcingOrderLifecycleAction('draft', 'submitted'),
+    true
+  )
+  assert.equal(canRunOutsourcingOrderLifecycleAction('draft', 'canceled'), true)
+  assert.equal(
+    canRunOutsourcingOrderLifecycleAction('submitted', 'confirmed'),
+    true
+  )
+  assert.equal(
+    canRunOutsourcingOrderLifecycleAction('confirmed', 'closed'),
+    true
+  )
+  assert.equal(canRunOutsourcingOrderLifecycleAction('closed', 'closed'), false)
+  assert.equal(
+    canRunOutsourcingOrderLifecycleAction('closed', 'canceled'),
+    false
+  )
+  assert.equal(
+    canRunOutsourcingOrderLifecycleAction('draft', 'confirmed'),
+    false
+  )
+  assert.equal(
+    canRunOutsourcingOrderLifecycleAction('confirmed', 'posted'),
+    false
+  )
+})
+
 test('masterDataOrderView: params trim optional values without adding facts', () => {
   assert.equal(V1_ROUTE_PATHS.materials, '/erp/master/materials')
+  assert.equal(V1_ROUTE_PATHS.processes, '/erp/engineering/processes')
+  assert.equal(V1_ROUTE_PATHS.purchaseReceipts, '/erp/warehouse/inbound')
+  assert.equal(
+    V1_ROUTE_PATHS.processingContracts,
+    '/erp/purchase/processing-contracts'
+  )
 
   assert.deepEqual(
     buildMasterDataParams({
@@ -86,6 +150,28 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       name: '毛绒熊',
       style_no: 'BEAR-BASE',
       default_unit_id: 2,
+    }
+  )
+
+  assert.deepEqual(
+    buildProcessParams({
+      code: ' PROC-SEW ',
+      name: ' 车缝 ',
+      category: ' 委外车缝 ',
+      outsourcing_enabled: true,
+      inhouse_enabled: false,
+      quality_required: true,
+      sort_order: '20',
+      note: ' ',
+    }),
+    {
+      code: 'PROC-SEW',
+      name: '车缝',
+      category: '委外车缝',
+      outsourcing_enabled: true,
+      inhouse_enabled: false,
+      quality_required: true,
+      sort_order: 20,
     }
   )
 
@@ -163,6 +249,133 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       purchased_quantity: '10',
     }
   )
+
+  assert.deepEqual(
+    buildOutsourcingOrderParams({
+      outsourcing_order_no: ' OUT-001 ',
+      supplier_id: '7',
+      supplier_snapshot: { id: 7, name: '加工厂 A' },
+      source_order_no: ' SO-001 ',
+      source_sales_order_id: '',
+      order_date: '2026-06-17',
+      expected_return_date: '',
+      note: ' ',
+    }),
+    {
+      outsourcing_order_no: 'OUT-001',
+      supplier_id: 7,
+      supplier_snapshot: { id: 7, name: '加工厂 A' },
+      source_order_no: 'SO-001',
+      order_date: '2026-06-17',
+    }
+  )
+
+  assert.deepEqual(
+    buildOutsourcingOrderItemParams({
+      line_no: '1',
+      product_id: '12',
+      process_id: '8',
+      unit_id: '2',
+      product_name_snapshot: ' 半成品 ',
+      process_name_snapshot: ' 车缝 ',
+      process_category_snapshot: ' 委外 ',
+      outsourcing_quantity: '10',
+      unit_price: '3.5',
+      amount: '',
+      expected_return_date: '',
+    }),
+    {
+      line_no: 1,
+      product_id: 12,
+      process_id: 8,
+      unit_id: 2,
+      product_name_snapshot: '半成品',
+      process_name_snapshot: '车缝',
+      process_category_snapshot: '委外',
+      outsourcing_quantity: '10',
+      unit_price: '3.5',
+      amount: '35.00',
+    }
+  )
+})
+
+test('masterDataOrderView: purchase order print draft maps current purchase facts only', () => {
+  const draft = buildMaterialPurchaseContractDraftFromPurchaseOrder(
+    {
+      purchase_order_no: ' PO-PRINT-001 ',
+      supplier_snapshot: { name: ' 供应商 A ' },
+      purchase_date: 1781654400,
+      expected_arrival_date: 1782259200,
+    },
+    [
+      {
+        material_id: 11,
+        material_code_snapshot: ' MAT-001 ',
+        material_name_snapshot: ' 面料 ',
+        purchased_quantity: '10',
+        unit_price: '3.50',
+        amount: '',
+        note: ' 头批 ',
+        line_status: 'open',
+      },
+      {
+        material_id: 12,
+        material_code_snapshot: '',
+        material_name_snapshot: '',
+        color_snapshot: '红色',
+        purchased_quantity: '2',
+        unit_price: '',
+        amount: '',
+        line_status: 'open',
+      },
+      {
+        material_id: 13,
+        material_name_snapshot: ' 已取消材料 ',
+        purchased_quantity: '99',
+        line_status: 'canceled',
+      },
+    ],
+    {
+      materials: [
+        { id: 12, code: 'MAT-002', name: '辅料', spec: '12mm' },
+        { id: 13, code: 'MAT-013', name: '不应出现' },
+      ],
+    }
+  )
+
+  assert.equal(draft.contractNo, 'PO-PRINT-001')
+  assert.equal(draft.supplierName, '供应商 A')
+  assert.match(draft.orderDateText, /2026.*06.*17/)
+  assert.match(draft.returnDateText, /2026.*06.*24/)
+  assert.equal(draft.lines.length, 2)
+  assert.deepEqual(draft.lines[0], {
+    contractNo: 'PO-PRINT-001',
+    materialName: '面料',
+    vendorCode: 'MAT-001',
+    unitPrice: '3.50',
+    quantity: '10',
+    amount: '35.00',
+    remark: '头批',
+  })
+  assert.deepEqual(draft.lines[1], {
+    contractNo: 'PO-PRINT-001',
+    materialName: '辅料',
+    vendorCode: 'MAT-002',
+    spec: '12mm',
+    quantity: '2',
+    remark: '红色',
+  })
+
+  assert.deepEqual(
+    buildMaterialPurchaseContractDraftFromPurchaseOrder(
+      { purchase_order_no: 'PO-MISSING-DATE', supplier_snapshot: {} },
+      []
+    ),
+    {
+      contractNo: 'PO-MISSING-DATE',
+      lines: [],
+    }
+  )
 })
 
 test('masterDataOrderView: sales order item amount derives from quantity and unit price', () => {
@@ -189,6 +402,14 @@ test('masterDataOrderView: sales order item amount derives from quantity and uni
       amount: '',
     }),
     undefined
+  )
+  assert.equal(
+    deriveOutsourcingOrderItemAmount({
+      outsourcing_quantity: '12.5',
+      unit_price: '3.2',
+      amount: '999',
+    }),
+    '40.00'
   )
 })
 

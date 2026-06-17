@@ -17,6 +17,7 @@ import {
   persistPrintWorkspaceWindowState,
   persistPrintWorkspaceDraftSnapshot,
   readPrintWorkspaceWindowState,
+  readInitialPrintWorkspaceDraftFromWindowName,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceDraftMode,
@@ -449,6 +450,99 @@ test('printWorkspace: 业务页打开时会先写入当前窗口专属打印草�
   } finally {
     globalThis.window = originalWindow
   }
+})
+
+test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性草稿通道', () => {
+  const popup = {
+    name: '',
+    openedURL: '',
+    focusCalled: false,
+    location: {
+      replace(url) {
+        popup.openedURL = url
+      },
+    },
+    focus() {
+      this.focusCalled = true
+    },
+  }
+  const originalWindow = globalThis.window
+  globalThis.window = {
+    location: { origin: 'http://127.0.0.1:4173' },
+    crypto: {
+      randomUUID() {
+        return 'business-window-fallback'
+      },
+    },
+    localStorage: {
+      setItem() {
+        throw new DOMException('quota exceeded', 'QuotaExceededError')
+      },
+      getItem() {
+        throw new DOMException('storage blocked', 'SecurityError')
+      },
+      removeItem() {},
+    },
+    open(url) {
+      popup.openedInitialURL = url
+      return popup
+    },
+  }
+
+  const initialDraft = {
+    contractNo: 'CG202604240004',
+    lines: [{ materialName: '白色毛绒布' }],
+  }
+
+  try {
+    const openedPopup = openPrintWorkspaceWindow(
+      MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      {
+        entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        initialDraft,
+      }
+    )
+
+    assert.equal(openedPopup, popup)
+    assert.equal(popup.openedInitialURL, 'about:blank')
+    assert.equal(popup.focusCalled, true)
+    assert.equal(
+      popup.openedURL,
+      'http://127.0.0.1:4173/erp/print-workspace/material-purchase-contract?source=business&state=business-window-fallback'
+    )
+    assert.deepEqual(
+      readInitialPrintWorkspaceDraftFromWindowName(
+        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+        'business-window-fallback',
+        popup
+      ),
+      initialDraft
+    )
+    assert.equal(popup.name, '')
+  } finally {
+    globalThis.window = originalWindow
+  }
+})
+
+test('printWorkspace: 一次性草稿只匹配当前模板和窗口 state', () => {
+  const windowLike = {
+    name: `__plush_erp_print_initial_draft__:${JSON.stringify({
+      version: 1,
+      templateKey: MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+      stateID: 'window-name-1',
+      draft: { contractNo: 'CG202604240005' },
+    })}`,
+  }
+
+  assert.equal(
+    readInitialPrintWorkspaceDraftFromWindowName(
+      PROCESSING_CONTRACT_TEMPLATE_KEY,
+      'window-name-1',
+      windowLike
+    ),
+    null
+  )
+  assert.equal(windowLike.name, '')
 })
 
 test('printWorkspace: 业务页弹窗被拦截时会清理本次临时打印草稿', () => {

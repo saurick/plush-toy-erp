@@ -14,7 +14,7 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 	if dataset.Prefix != CoreDemoSeedPrefix {
 		t.Fatalf("unexpected prefix %q", dataset.Prefix)
 	}
-	if len(dataset.Units) < 3 || len(dataset.Materials) < 3 || len(dataset.Products) < 2 || len(dataset.Warehouses) < 3 || len(dataset.BOMs) == 0 {
+	if len(dataset.Units) < 3 || len(dataset.Materials) < 3 || len(dataset.Products) < 2 || len(dataset.Warehouses) < 3 || len(dataset.Processes) < 6 || len(dataset.BOMs) == 0 {
 		t.Fatalf("default core demo dataset is too small: %#v", dataset)
 	}
 	if err := validateCoreDemoSeedDataset(dataset); err != nil {
@@ -67,6 +67,9 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 		Warehouses: []CoreDemoWarehouseSeed{
 			{Code: "SIM-TEST-FG", Name: "成品仓", Type: "FINISHED_GOODS"},
 		},
+		Processes: []CoreDemoProcessSeed{
+			{Code: "SIM-TEST-PROC-SEWING", Name: "车缝", Category: "车缝", OutsourcingEnabled: true, SortOrder: 10},
+		},
 		BOMs: []CoreDemoBOMSeed{
 			{
 				ProductCode: "SIM-TEST-PROD",
@@ -92,6 +95,9 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 	mock.ExpectQuery("INSERT INTO warehouses").
 		WithArgs("SIM-TEST-FG", "成品仓", "FINISHED_GOODS").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(41))
+	mock.ExpectQuery("INSERT INTO processes").
+		WithArgs("SIM-TEST-PROC-SEWING", "车缝", sqlmock.AnyArg(), true, false, false, 10, sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(45))
 	mock.ExpectQuery("INSERT INTO bom_headers").
 		WithArgs(31, "SIM-TEST-BOM-V1", "ACTIVE", sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(51))
@@ -113,6 +119,9 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 	}
 	if result.MaterialIDs["SIM-TEST-MAT"] != 21 || result.BOMHeaderIDs["SIM-TEST-PROD"] != 51 {
 		t.Fatalf("unexpected seeded ids %#v", result)
+	}
+	if result.ProcessIDs["SIM-TEST-PROC-SEWING"] != 45 {
+		t.Fatalf("unexpected process ids %#v", result.ProcessIDs)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("db.Close() error = %v", err)

@@ -19,18 +19,19 @@ import (
 type jsonrpcDispatcher struct {
 	log *log.Helper
 
-	authUC            *biz.AuthUsecase
-	adminAuthUC       *biz.AdminAuthUsecase
-	adminManageUC     *biz.AdminManageUsecase
-	userAdminUC       *biz.UserAdminUsecase
-	workflowUC        *biz.WorkflowUsecase
-	debugUC           *biz.DebugUsecase
-	masterDataUC      *biz.MasterDataUsecase
-	salesOrderUC      *biz.SalesOrderUsecase
-	purchaseOrderUC   *biz.PurchaseOrderUsecase
-	inventoryUC       *biz.InventoryUsecase
-	operationalFactUC *biz.OperationalFactUsecase
-	authSMS           authSMSRuntimeConfig
+	authUC             *biz.AuthUsecase
+	adminAuthUC        *biz.AdminAuthUsecase
+	adminManageUC      *biz.AdminManageUsecase
+	userAdminUC        *biz.UserAdminUsecase
+	workflowUC         *biz.WorkflowUsecase
+	debugUC            *biz.DebugUsecase
+	masterDataUC       *biz.MasterDataUsecase
+	salesOrderUC       *biz.SalesOrderUsecase
+	purchaseOrderUC    *biz.PurchaseOrderUsecase
+	outsourcingOrderUC *biz.OutsourcingOrderUsecase
+	inventoryUC        *biz.InventoryUsecase
+	operationalFactUC  *biz.OperationalFactUsecase
+	authSMS            authSMSRuntimeConfig
 
 	adminReader biz.AdminAccountReader
 }
@@ -47,6 +48,7 @@ func newJSONRPCDispatcher(
 	masterDataUC *biz.MasterDataUsecase,
 	salesOrderUC *biz.SalesOrderUsecase,
 	purchaseOrderUC *biz.PurchaseOrderUsecase,
+	outsourcingOrderUC *biz.OutsourcingOrderUsecase,
 	inventoryUC *biz.InventoryUsecase,
 	operationalFactUC *biz.OperationalFactUsecase,
 	adminReader biz.AdminAccountReader,
@@ -80,6 +82,9 @@ func newJSONRPCDispatcher(
 	if purchaseOrderUC == nil {
 		panic("newJSONRPCDispatcher: purchaseOrderUC is nil")
 	}
+	if outsourcingOrderUC == nil {
+		panic("newJSONRPCDispatcher: outsourcingOrderUC is nil")
+	}
 	if inventoryUC == nil {
 		panic("newJSONRPCDispatcher: inventoryUC is nil")
 	}
@@ -94,20 +99,21 @@ func newJSONRPCDispatcher(
 	helper.Info("jsonrpcDispatcher created")
 
 	return &jsonrpcDispatcher{
-		log:               helper,
-		authUC:            authUC,
-		adminAuthUC:       adminAuthUC,
-		adminManageUC:     adminManageUC,
-		userAdminUC:       userAdminUC,
-		workflowUC:        workflowUC,
-		debugUC:           debugUC,
-		masterDataUC:      masterDataUC,
-		salesOrderUC:      salesOrderUC,
-		purchaseOrderUC:   purchaseOrderUC,
-		inventoryUC:       inventoryUC,
-		operationalFactUC: operationalFactUC,
-		authSMS:           authSMS,
-		adminReader:       adminReader,
+		log:                helper,
+		authUC:             authUC,
+		adminAuthUC:        adminAuthUC,
+		adminManageUC:      adminManageUC,
+		userAdminUC:        userAdminUC,
+		workflowUC:         workflowUC,
+		debugUC:            debugUC,
+		masterDataUC:       masterDataUC,
+		salesOrderUC:       salesOrderUC,
+		purchaseOrderUC:    purchaseOrderUC,
+		outsourcingOrderUC: outsourcingOrderUC,
+		inventoryUC:        inventoryUC,
+		operationalFactUC:  operationalFactUC,
+		authSMS:            authSMS,
+		adminReader:        adminReader,
 	}
 }
 
@@ -157,8 +163,14 @@ func (d *jsonrpcDispatcher) Handle(
 		return d.handleSalesOrder(ctx, method, id, params)
 	case "purchase_order":
 		return d.handlePurchaseOrder(ctx, method, id, params)
+	case "outsourcing_order":
+		return d.handleOutsourcingOrder(ctx, method, id, params)
 	case "purchase":
 		return d.handlePurchase(ctx, method, id, params)
+	case "inventory":
+		return d.handleInventory(ctx, method, id, params)
+	case "quality":
+		return d.handleQuality(ctx, method, id, params)
 	case "bom":
 		return d.handleBOM(ctx, method, id, params)
 	case "operational_fact":

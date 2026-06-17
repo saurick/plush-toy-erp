@@ -60,6 +60,7 @@ import {
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
 import {
+  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
@@ -656,65 +657,72 @@ export default function BOMVersionsPage() {
   }
 
   const dataColumns = useMemo(
-    () => [
-      {
-        title: '产品 ID',
-        exportTitle: '产品 ID',
-        dataIndex: 'product_id',
-        width: 110,
-        sorter: (a, b) =>
-          Number(a?.product_id || 0) - Number(b?.product_id || 0),
-      },
-      {
-        title: 'BOM 版本',
-        exportTitle: 'BOM 版本',
-        dataIndex: 'version',
-        width: 180,
-        sorter: (a, b) =>
-          String(a?.version || '').localeCompare(String(b?.version || '')),
-      },
-      {
-        title: '状态',
-        exportTitle: '状态',
-        dataIndex: 'status',
-        width: 110,
-        render: statusTag,
-        exportValue: (record) => STATUS_LABELS[record.status] || record.status,
-      },
-      {
-        title: '生效开始',
-        exportTitle: '生效开始',
-        dataIndex: 'effective_from',
-        width: 130,
-        render: formatUnixDate,
-        exportValue: (record) => formatUnixDate(record.effective_from),
-      },
-      {
-        title: '生效结束',
-        exportTitle: '生效结束',
-        dataIndex: 'effective_to',
-        width: 130,
-        render: formatUnixDate,
-        exportValue: (record) => formatUnixDate(record.effective_to),
-      },
-      {
-        title: '备注',
-        exportTitle: '备注',
-        dataIndex: 'note',
-        width: 220,
-        render: (value) => value || '-',
-      },
-      {
-        title: '更新时间',
-        exportTitle: '更新时间',
-        dataIndex: 'updated_at',
-        width: 160,
-        render: formatUnixDateTime,
-        sorter: (a, b) =>
-          Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
-        exportValue: (record) => formatUnixDateTime(record.updated_at),
-      },
-    ],
+    () =>
+      applyBusinessColumnSorters([
+        {
+          title: '产品 ID',
+          exportTitle: '产品 ID',
+          dataIndex: 'product_id',
+          width: 110,
+          sortType: 'number',
+          sorter: (a, b) =>
+            Number(a?.product_id || 0) - Number(b?.product_id || 0),
+        },
+        {
+          title: 'BOM 版本',
+          exportTitle: 'BOM 版本',
+          dataIndex: 'version',
+          width: 180,
+          sorter: (a, b) =>
+            String(a?.version || '').localeCompare(String(b?.version || '')),
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'status',
+          width: 110,
+          sortValue: (record) => STATUS_LABELS[record.status] || record.status,
+          render: statusTag,
+          exportValue: (record) =>
+            STATUS_LABELS[record.status] || record.status,
+        },
+        {
+          title: '生效开始',
+          exportTitle: '生效开始',
+          dataIndex: 'effective_from',
+          width: 130,
+          sortType: 'date',
+          render: formatUnixDate,
+          exportValue: (record) => formatUnixDate(record.effective_from),
+        },
+        {
+          title: '生效结束',
+          exportTitle: '生效结束',
+          dataIndex: 'effective_to',
+          width: 130,
+          sortType: 'date',
+          render: formatUnixDate,
+          exportValue: (record) => formatUnixDate(record.effective_to),
+        },
+        {
+          title: '备注',
+          exportTitle: '备注',
+          dataIndex: 'note',
+          width: 220,
+          sortable: false,
+          render: (value) => value || '-',
+        },
+        {
+          title: '更新时间',
+          exportTitle: '更新时间',
+          dataIndex: 'updated_at',
+          width: 160,
+          render: formatUnixDateTime,
+          sorter: (a, b) =>
+            Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
+          exportValue: (record) => formatUnixDateTime(record.updated_at),
+        },
+      ]),
     []
   )
 

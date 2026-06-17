@@ -271,6 +271,7 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 		ShipmentID:       getInt(pm, "shipment_id", 0),
 		SalesOrderItemID: getOptionalInt(pm, "sales_order_item_id"),
 		ProductID:        getInt(pm, "product_id", 0),
+		ProductSkuID:     getOptionalInt(pm, "product_sku_id"),
 		WarehouseID:      getInt(pm, "warehouse_id", 0),
 		UnitID:           getInt(pm, "unit_id", 0),
 		LotID:            getOptionalInt(pm, "lot_id"),
@@ -353,7 +354,12 @@ func financeFactCreateFromParams(pm map[string]any) (*biz.FinanceFactCreate, boo
 }
 
 func operationalFactFilterFromParams(pm map[string]any) biz.OperationalFactFilter {
-	return biz.OperationalFactFilter{Status: getString(pm, "status"), Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}
+	return biz.OperationalFactFilter{
+		Status:   getString(pm, "status"),
+		FactType: getString(pm, "fact_type"),
+		Limit:    getInt(pm, "limit", 50),
+		Offset:   getInt(pm, "offset", 0),
+	}
 }
 
 func operationalFactShipmentFilterFromParams(pm map[string]any) (biz.OperationalFactFilter, bool) {
@@ -516,7 +522,7 @@ func shipmentItemToAny(item *biz.ShipmentItem) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "shipment_id": item.ShipmentID, "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "shipment_id": item.ShipmentID, "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }
 
 func stockReservationsToAny(items []*biz.StockReservation) []any {

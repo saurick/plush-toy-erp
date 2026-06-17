@@ -31,7 +31,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert.equal(summary.brand.companyName, '东莞市永绅玩具有限公司')
   assert.equal(summary.runtimeStatus, 'runtime_frontend_only')
   assert.equal(summary.sectionCount, 13)
-  assert.equal(summary.itemCount, 27)
+  assert.equal(summary.itemCount, 28)
   assert.deepEqual(
     summary.sections.map((section) => section.title),
     [
@@ -56,6 +56,12 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
     summary.sections.some(
       (section) =>
         section.title === '主数据' && section.items.includes('materials')
+    )
+  )
+  assert(
+    summary.sections.some(
+      (section) =>
+        section.title === '产品工程' && section.items.includes('processes')
     )
   )
   assert(

@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
@@ -190,6 +191,21 @@ func (_c *UnitCreate) AddBomItems(v ...*BOMItem) *UnitCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddBomItemIDs(ids...)
+}
+
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (_c *UnitCreate) AddOutsourcingOrderItemIDs(ids ...int) *UnitCreate {
+	_c.mutation.AddOutsourcingOrderItemIDs(ids...)
+	return _c
+}
+
+// AddOutsourcingOrderItems adds the "outsourcing_order_items" edges to the OutsourcingOrderItem entity.
+func (_c *UnitCreate) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem) *UnitCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOutsourcingOrderItemIDs(ids...)
 }
 
 // AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by IDs.
@@ -539,6 +555,22 @@ func (_c *UnitCreate) createSpec() (*Unit, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OutsourcingOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   unit.OutsourcingOrderItemsTable,
+			Columns: []string{unit.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

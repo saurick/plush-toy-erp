@@ -159,6 +159,80 @@ func TestMasterDataRepoMaterialCRUDAndUnitGuard(t *testing.T) {
 	}
 }
 
+func TestMasterDataRepoProcessCRUD(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openMasterDataRepoTest(t, "masterdata_repo_processes")
+	defer mustCloseEntClient(t, client)
+
+	category := "委外车缝"
+	processItem, err := uc.CreateProcess(ctx, &biz.ProcessMutation{
+		Code:               "PROC-SEW",
+		Name:               "车缝",
+		Category:           &category,
+		OutsourcingEnabled: true,
+		InhouseEnabled:     false,
+		QualityRequired:    true,
+		SortOrder:          20,
+	})
+	if err != nil {
+		t.Fatalf("create process failed: %v", err)
+	}
+	if processItem.Category == nil ||
+		*processItem.Category != category ||
+		!processItem.OutsourcingEnabled ||
+		processItem.InhouseEnabled ||
+		!processItem.QualityRequired ||
+		processItem.SortOrder != 20 {
+		t.Fatalf("expected process fields retained, got %#v", processItem)
+	}
+	if _, err := uc.CreateProcess(ctx, &biz.ProcessMutation{Code: "PROC-SEW", Name: "重复工序"}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected duplicate process code rejected, got %v", err)
+	}
+
+	note := "可外发也可内制"
+	updated, err := uc.UpdateProcess(ctx, processItem.ID, &biz.ProcessMutation{
+		Code:               "PROC-SEW-A",
+		Name:               "车缝 A",
+		OutsourcingEnabled: true,
+		InhouseEnabled:     true,
+		QualityRequired:    false,
+		SortOrder:          10,
+		Note:               &note,
+	})
+	if err != nil {
+		t.Fatalf("update process failed: %v", err)
+	}
+	if updated.Category != nil ||
+		!updated.OutsourcingEnabled ||
+		!updated.InhouseEnabled ||
+		updated.QualityRequired ||
+		updated.SortOrder != 10 ||
+		updated.Note == nil ||
+		*updated.Note != note {
+		t.Fatalf("expected process optional fields and flags updated, got %#v", updated)
+	}
+	if _, err := uc.UpdateProcess(ctx, 999999, &biz.ProcessMutation{Code: "PROC-X", Name: "不存在"}); !errors.Is(err, biz.ErrProcessNotFound) {
+		t.Fatalf("expected missing process update rejected, got %v", err)
+	}
+	if _, err := uc.SetProcessActive(ctx, processItem.ID, false); err != nil {
+		t.Fatalf("disable process failed: %v", err)
+	}
+	list, total, err := uc.ListProcesses(ctx, biz.MasterDataFilter{Keyword: "车缝", Limit: 20})
+	if err != nil {
+		t.Fatalf("list processes failed: %v", err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("expected one process, total=%d len=%d", total, len(list))
+	}
+	activeList, activeTotal, err := uc.ListProcesses(ctx, biz.MasterDataFilter{ActiveOnly: true})
+	if err != nil {
+		t.Fatalf("list active processes failed: %v", err)
+	}
+	if activeTotal != 0 || len(activeList) != 0 {
+		t.Fatalf("expected inactive process filtered out, total=%d len=%d", activeTotal, len(activeList))
+	}
+}
+
 func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
 	ctx := context.Background()
 	uc, client := openMasterDataRepoTest(t, "masterdata_repo_products")

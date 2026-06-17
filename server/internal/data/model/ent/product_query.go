@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/bomheader"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productsku"
@@ -24,15 +25,16 @@ import (
 // ProductQuery is the builder for querying Product entities.
 type ProductQuery struct {
 	config
-	ctx                   *QueryContext
-	order                 []product.OrderOption
-	inters                []Interceptor
-	predicates            []predicate.Product
-	withDefaultUnit       *UnitQuery
-	withProductSkus       *ProductSKUQuery
-	withBomHeaders        *BOMHeaderQuery
-	withShipmentItems     *ShipmentItemQuery
-	withStockReservations *StockReservationQuery
+	ctx                       *QueryContext
+	order                     []product.OrderOption
+	inters                    []Interceptor
+	predicates                []predicate.Product
+	withDefaultUnit           *UnitQuery
+	withProductSkus           *ProductSKUQuery
+	withBomHeaders            *BOMHeaderQuery
+	withOutsourcingOrderItems *OutsourcingOrderItemQuery
+	withShipmentItems         *ShipmentItemQuery
+	withStockReservations     *StockReservationQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -128,6 +130,28 @@ func (_q *ProductQuery) QueryBomHeaders() *BOMHeaderQuery {
 			sqlgraph.From(product.Table, product.FieldID, selector),
 			sqlgraph.To(bomheader.Table, bomheader.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, product.BomHeadersTable, product.BomHeadersColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOutsourcingOrderItems chains the current query on the "outsourcing_order_items" edge.
+func (_q *ProductQuery) QueryOutsourcingOrderItems() *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(product.Table, product.FieldID, selector),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, product.OutsourcingOrderItemsTable, product.OutsourcingOrderItemsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -366,16 +390,17 @@ func (_q *ProductQuery) Clone() *ProductQuery {
 		return nil
 	}
 	return &ProductQuery{
-		config:                _q.config,
-		ctx:                   _q.ctx.Clone(),
-		order:                 append([]product.OrderOption{}, _q.order...),
-		inters:                append([]Interceptor{}, _q.inters...),
-		predicates:            append([]predicate.Product{}, _q.predicates...),
-		withDefaultUnit:       _q.withDefaultUnit.Clone(),
-		withProductSkus:       _q.withProductSkus.Clone(),
-		withBomHeaders:        _q.withBomHeaders.Clone(),
-		withShipmentItems:     _q.withShipmentItems.Clone(),
-		withStockReservations: _q.withStockReservations.Clone(),
+		config:                    _q.config,
+		ctx:                       _q.ctx.Clone(),
+		order:                     append([]product.OrderOption{}, _q.order...),
+		inters:                    append([]Interceptor{}, _q.inters...),
+		predicates:                append([]predicate.Product{}, _q.predicates...),
+		withDefaultUnit:           _q.withDefaultUnit.Clone(),
+		withProductSkus:           _q.withProductSkus.Clone(),
+		withBomHeaders:            _q.withBomHeaders.Clone(),
+		withOutsourcingOrderItems: _q.withOutsourcingOrderItems.Clone(),
+		withShipmentItems:         _q.withShipmentItems.Clone(),
+		withStockReservations:     _q.withStockReservations.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -412,6 +437,17 @@ func (_q *ProductQuery) WithBomHeaders(opts ...func(*BOMHeaderQuery)) *ProductQu
 		opt(query)
 	}
 	_q.withBomHeaders = query
+	return _q
+}
+
+// WithOutsourcingOrderItems tells the query-builder to eager-load the nodes that are connected to
+// the "outsourcing_order_items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductQuery) WithOutsourcingOrderItems(opts ...func(*OutsourcingOrderItemQuery)) *ProductQuery {
+	query := (&OutsourcingOrderItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOutsourcingOrderItems = query
 	return _q
 }
 
@@ -515,10 +551,11 @@ func (_q *ProductQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Prod
 	var (
 		nodes       = []*Product{}
 		_spec       = _q.querySpec()
-		loadedTypes = [5]bool{
+		loadedTypes = [6]bool{
 			_q.withDefaultUnit != nil,
 			_q.withProductSkus != nil,
 			_q.withBomHeaders != nil,
+			_q.withOutsourcingOrderItems != nil,
 			_q.withShipmentItems != nil,
 			_q.withStockReservations != nil,
 		}
@@ -558,6 +595,15 @@ func (_q *ProductQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Prod
 		if err := _q.loadBomHeaders(ctx, query, nodes,
 			func(n *Product) { n.Edges.BomHeaders = []*BOMHeader{} },
 			func(n *Product, e *BOMHeader) { n.Edges.BomHeaders = append(n.Edges.BomHeaders, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withOutsourcingOrderItems; query != nil {
+		if err := _q.loadOutsourcingOrderItems(ctx, query, nodes,
+			func(n *Product) { n.Edges.OutsourcingOrderItems = []*OutsourcingOrderItem{} },
+			func(n *Product, e *OutsourcingOrderItem) {
+				n.Edges.OutsourcingOrderItems = append(n.Edges.OutsourcingOrderItems, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -654,6 +700,36 @@ func (_q *ProductQuery) loadBomHeaders(ctx context.Context, query *BOMHeaderQuer
 	}
 	query.Where(predicate.BOMHeader(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(product.BomHeadersColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductQuery) loadOutsourcingOrderItems(ctx context.Context, query *OutsourcingOrderItemQuery, nodes []*Product, init func(*Product), assign func(*Product, *OutsourcingOrderItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Product)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(outsourcingorderitem.FieldProductID)
+	}
+	query.Where(predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(product.OutsourcingOrderItemsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

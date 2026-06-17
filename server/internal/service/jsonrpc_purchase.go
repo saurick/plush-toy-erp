@@ -40,6 +40,16 @@ func (d *jsonrpcDispatcher) handlePurchase(
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptDraft(ctx, in)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
+	case "create_purchase_receipt_from_purchase_order", "createPurchaseReceiptFromPurchaseOrder":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
+			return id, res, nil
+		}
+		in, ok := purchaseReceiptFromPurchaseOrderCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, in)
+		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "add_purchase_receipt_item", "addPurchaseReceiptItem":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
 			return id, res, nil
@@ -100,6 +110,23 @@ func purchaseReceiptCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptCre
 		SupplierName: getString(pm, "supplier_name"),
 		ReceivedAt:   optionalTimeValue(receivedAt),
 		Note:         getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptFromPurchaseOrderCreate, bool) {
+	if _, ok := pm["business_record_id"]; ok {
+		return nil, false
+	}
+	receivedAt, ok := getOptionalJSONRPCTime(pm, "received_at")
+	if !ok {
+		return nil, false
+	}
+	return &biz.PurchaseReceiptFromPurchaseOrderCreate{
+		PurchaseOrderID: getInt(pm, "purchase_order_id", 0),
+		ReceiptNo:       getString(pm, "receipt_no"),
+		WarehouseID:     getInt(pm, "warehouse_id", 0),
+		ReceivedAt:      optionalTimeValue(receivedAt),
+		Note:            getWorkflowStringPtr(pm, "note"),
 	}, true
 }
 
@@ -165,6 +192,8 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库行不存在"}
+	case errors.Is(err, biz.ErrPurchaseOrderNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单不存在"}
 	case errors.Is(err, biz.ErrInventoryLotNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存批次不存在"}
 	case errors.Is(err, biz.ErrInventoryTxnNotFound):

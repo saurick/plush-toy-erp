@@ -50,10 +50,18 @@ import {
   trimOptional,
 } from '../utils/masterDataOrderView.mjs'
 import {
+  buildShipmentItemParams,
+  createBlankShipmentItem,
+  createShipmentItemFromSalesOrderItem,
+  isBlankShipmentItem,
+  positiveInt,
+} from '../utils/businessLineItems.mjs'
+import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
+import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 
 const BUSINESS_FORM_MODAL_WIDTH = 'min(920px, calc(100vw - 96px))'
 
@@ -97,17 +105,6 @@ function hasPermission(adminProfile, permission) {
   )
 }
 
-function positiveInt(value) {
-  const numberValue = Number(value || 0)
-  return Number.isFinite(numberValue) && numberValue > 0
-    ? Math.trunc(numberValue)
-    : undefined
-}
-
-function requiredInt(value) {
-  return positiveInt(value) || 0
-}
-
 function idempotencyKey(prefix) {
   return `${prefix}-${Date.now()}`
 }
@@ -120,19 +117,6 @@ function buildShipmentParams(values = {}) {
     customer_snapshot: trimOptional(values.customer_snapshot),
     idempotency_key: trimOptional(values.idempotency_key),
     planned_ship_at: trimOptional(values.planned_ship_at),
-    note: trimOptional(values.note),
-  })
-}
-
-function buildShipmentItemParams(values = {}) {
-  return compactParams({
-    shipment_id: requiredInt(values.shipment_id),
-    sales_order_item_id: positiveInt(values.sales_order_item_id),
-    product_id: requiredInt(values.product_id),
-    warehouse_id: requiredInt(values.warehouse_id),
-    unit_id: requiredInt(values.unit_id),
-    lot_id: positiveInt(values.lot_id),
-    quantity: trimOptional(values.quantity),
     note: trimOptional(values.note),
   })
 }
@@ -155,47 +139,6 @@ function salesOrderCustomerText(order = {}) {
     snapshot?.code ||
     (order.customer_id ? `客户 #${order.customer_id}` : '')
   )
-}
-
-function createShipmentItemFromSalesOrderItem(item, shipmentID) {
-  const sourceItem = item || {}
-  return {
-    shipment_id: shipmentID,
-    sales_order_item_id: sourceItem.id,
-    product_id: sourceItem.product_id,
-    warehouse_id: undefined,
-    lot_id: undefined,
-    unit_id: sourceItem.unit_id,
-    quantity: sourceItem.ordered_quantity || '',
-    note: sourceItem.product_name_snapshot
-      ? `来源销售订单行：${sourceItem.product_name_snapshot}`
-      : '',
-  }
-}
-
-function isBlankShipmentItem(item = {}) {
-  return [
-    item.sales_order_item_id,
-    item.product_id,
-    item.warehouse_id,
-    item.lot_id,
-    item.unit_id,
-    item.quantity,
-    item.note,
-  ].every((value) => value === undefined || value === null || value === '')
-}
-
-function createBlankShipmentItem(shipmentID) {
-  return {
-    shipment_id: shipmentID,
-    sales_order_item_id: undefined,
-    product_id: undefined,
-    warehouse_id: undefined,
-    lot_id: undefined,
-    unit_id: undefined,
-    quantity: '',
-    note: '',
-  }
 }
 
 function shipmentFormValues(shipment = {}) {
@@ -320,6 +263,13 @@ function ShipmentItemFormFields({ field, showShipmentID = false }) {
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
+        label="SKU ID"
+        name={fieldName('product_sku_id')}
+      >
+        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
         label="仓库 ID"
         name={fieldName('warehouse_id')}
         rules={[{ required: true, message: '请填写仓库 ID' }]}
@@ -373,6 +323,12 @@ function ShipmentItemsTable({ items = [] }) {
         { title: '行 ID', dataIndex: 'id', width: 80 },
         { title: '销售订单行', dataIndex: 'sales_order_item_id', width: 120 },
         { title: '产品', dataIndex: 'product_id', width: 100 },
+        {
+          title: 'SKU',
+          dataIndex: 'product_sku_id',
+          width: 90,
+          render: (value) => value || '-',
+        },
         {
           title: '仓库 / 批次 / 单位',
           width: 180,
@@ -639,19 +595,40 @@ export default function ShipmentsPage() {
     }
   }
 
-  const columns = [
-    { title: 'ID', dataIndex: 'id', width: 72, fixed: 'left' },
+  const columns = applyBusinessColumnSorters([
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      width: 72,
+      fixed: 'left',
+      sortType: 'number',
+    },
     {
       title: '出货单号',
       dataIndex: 'shipment_no',
       width: 180,
       ellipsis: true,
+      sortType: 'text',
     },
-    { title: '状态', dataIndex: 'status', width: 110, render: statusTag },
-    { title: '销售订单', dataIndex: 'sales_order_id', width: 120 },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 110,
+      sortValue: (record) => STATUS_LABELS[record.status] || record.status,
+      render: statusTag,
+    },
+    {
+      title: '销售订单',
+      dataIndex: 'sales_order_id',
+      width: 120,
+      sortType: 'number',
+    },
     {
       title: '客户',
       width: 160,
+      sortValue: (record) =>
+        record.customer_snapshot ||
+        (record.customer_id ? `客户 #${record.customer_id}` : ''),
       render: (_, record) =>
         record.customer_snapshot ||
         (record.customer_id ? `客户 #${record.customer_id}` : '-'),
@@ -660,11 +637,14 @@ export default function ShipmentsPage() {
     {
       title: '明细行',
       width: 90,
+      sortValue: (record) => record.items?.length || 0,
       render: (_, record) => record.items?.length || 0,
     },
     {
       title: '计划 / 实际出货',
       width: 180,
+      sortValue: (record) => record.shipped_at || record.planned_ship_at,
+      sortType: 'date',
       render: (_, record) =>
         `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
           record.shipped_at
@@ -674,6 +654,7 @@ export default function ShipmentsPage() {
       title: '创建时间',
       dataIndex: 'created_at',
       width: 160,
+      sortType: 'date',
       render: formatUnixDateTime,
       sorter: (a, b) => Number(a?.created_at || 0) - Number(b?.created_at || 0),
     },
@@ -681,8 +662,9 @@ export default function ShipmentsPage() {
       title: '备注',
       dataIndex: 'note',
       ellipsis: true,
+      sortable: false,
     },
-  ]
+  ])
   const selectedRowLabel = selectedRow
     ? `${selectedRow.shipment_no || selectedRow.id} / ${
         selectedRow.customer_snapshot ||
@@ -790,7 +772,7 @@ export default function ShipmentsPage() {
             }
             onClick={() => openAppendItems(selectedRow)}
           >
-            添加明细
+            维护明细
           </Button>
           <Popconfirm
             title="确认出货并写库存 OUT？"
@@ -811,7 +793,7 @@ export default function ShipmentsPage() {
                 saving
               }
             >
-              出货
+              确认出货
             </Button>
           </Popconfirm>
           <Popconfirm
@@ -833,7 +815,7 @@ export default function ShipmentsPage() {
                 saving
               }
             >
-              取消
+              取消出货
             </Button>
           </Popconfirm>
         </SelectionActionBar>

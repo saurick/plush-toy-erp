@@ -99,7 +99,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       },
       {
         title: "产品工程",
-        items: Object.freeze(["material-bom"]),
+        items: Object.freeze(["material-bom", "processes"]),
       },
       {
         title: "采购管理",

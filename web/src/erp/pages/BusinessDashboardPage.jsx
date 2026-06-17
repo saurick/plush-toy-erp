@@ -49,12 +49,17 @@ export default function BusinessDashboardPage() {
   const [moduleStats, setModuleStats] = useState([])
   const [workflowTasks, setWorkflowTasks] = useState([])
   const mountedRef = useRef(false)
+  const loadPromiseRef = useRef(null)
   const navigate = useNavigate()
   const outletContext = useOutletContext()
 
   const loadDashboardStats = useCallback(async () => {
+    if (loadPromiseRef.current) {
+      return loadPromiseRef.current
+    }
+
     setLoading(true)
-    try {
+    const request = (async () => {
       const [result, workflowResult] = await Promise.all([
         getBusinessDashboardStats(),
         listWorkflowTasks({ limit: 200 }),
@@ -67,10 +72,19 @@ export default function BusinessDashboardPage() {
         setWorkflowTasks(workflowResult?.tasks || [])
       }
       return true
+    })()
+
+    loadPromiseRef.current = request
+
+    try {
+      return await request
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载业务看板'))
+      if (mountedRef.current) {
+        message.error(getActionErrorMessage(error, '加载业务看板'))
+      }
       return false
     } finally {
+      loadPromiseRef.current = null
       if (mountedRef.current) {
         setLoading(false)
       }

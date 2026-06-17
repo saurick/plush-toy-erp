@@ -14,6 +14,9 @@ const PRINT_WORKSPACE_WINDOW_STATE_DB_STORE_NAME = 'states'
 const PRINT_WORKSPACE_STATE_QUERY_KEY = 'state'
 const PRINT_WORKSPACE_WINDOW_STATE_TTL_MS = 24 * 60 * 60 * 1000
 const PRINT_WORKSPACE_SHELL_PATH = '/print-window-shell.html'
+const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX =
+  '__plush_erp_print_initial_draft__:'
+const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_VERSION = 1
 
 export const PRINT_WORKSPACE_DRAFT_MODE = Object.freeze({
   RESTORE: 'restore',
@@ -83,6 +86,59 @@ export function buildPrintWorkspaceDraftStorageKey(templateKey, stateID = '') {
   return normalizedStateID
     ? `__plush_erp_print_workspace_draft__:${normalizedTemplateKey}:${normalizedStateID}`
     : `__plush_erp_print_workspace_draft__:${normalizedTemplateKey}`
+}
+
+function buildInitialDraftWindowNamePayload(templateKey, stateID, draft) {
+  const normalizedTemplateKey = normalizeTemplateKey(templateKey)
+  const normalizedStateID = normalizeStateID(stateID)
+  if (!normalizedTemplateKey || !normalizedStateID) {
+    return ''
+  }
+
+  return `${PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX}${JSON.stringify({
+    version: PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_VERSION,
+    templateKey: normalizedTemplateKey,
+    stateID: normalizedStateID,
+    draft,
+  })}`
+}
+
+export function readInitialPrintWorkspaceDraftFromWindowName(
+  templateKey,
+  stateID,
+  windowLike
+) {
+  const targetWindow =
+    windowLike || (typeof window !== 'undefined' ? window : null)
+  const normalizedTemplateKey = normalizeTemplateKey(templateKey)
+  const normalizedStateID = normalizeStateID(stateID)
+  if (!targetWindow || !normalizedTemplateKey || !normalizedStateID) {
+    return null
+  }
+
+  const rawName = String(targetWindow.name || '')
+  if (!rawName.startsWith(PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX)) {
+    return null
+  }
+
+  targetWindow.name = ''
+  try {
+    const payload = JSON.parse(
+      rawName.slice(PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX.length)
+    )
+    if (
+      Number(payload?.version) !==
+        PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_VERSION ||
+      normalizeTemplateKey(payload?.templateKey) !== normalizedTemplateKey ||
+      normalizeStateID(payload?.stateID) !== normalizedStateID ||
+      !Object.prototype.hasOwnProperty.call(payload, 'draft')
+    ) {
+      return null
+    }
+    return payload.draft
+  } catch {
+    return null
+  }
 }
 
 export function isSupportedPrintWorkspaceTemplate(templateKey) {
@@ -426,10 +482,8 @@ export function openPrintWorkspaceWindow(
     'initialDraft'
   )
   let initialDraftStorageKey = ''
+  let initialDraftWindowNamePayload = ''
   if (hasInitialDraft) {
-    if (typeof window === 'undefined' || !window.localStorage) {
-      throw new Error('浏览器无法写入打印草稿，请检查存储权限后重试')
-    }
     try {
       const serializedDraft = JSON.stringify(initialDraft)
       if (!serializedDraft) {
@@ -439,7 +493,22 @@ export function openPrintWorkspaceWindow(
         templateKey,
         stateID
       )
-      window.localStorage.setItem(initialDraftStorageKey, serializedDraft)
+      try {
+        if (typeof window === 'undefined' || !window.localStorage) {
+          throw new Error('storage unavailable')
+        }
+        window.localStorage.setItem(initialDraftStorageKey, serializedDraft)
+      } catch {
+        initialDraftStorageKey = ''
+        initialDraftWindowNamePayload = buildInitialDraftWindowNamePayload(
+          templateKey,
+          stateID,
+          initialDraft
+        )
+        if (!initialDraftWindowNamePayload) {
+          throw new Error('empty draft payload')
+        }
+      }
     } catch (_error) {
       throw new Error('浏览器无法写入打印草稿，请检查存储权限后重试')
     }
@@ -454,7 +523,9 @@ export function openPrintWorkspaceWindow(
   })
     ? buildPrintWorkspaceShellURL(stateID)
     : workspaceURL
-  const popup = window.open(popupURL, '_blank', 'width=1440,height=920')
+  const popup = initialDraftWindowNamePayload
+    ? window.open('about:blank', '_blank', 'width=1440,height=920')
+    : window.open(popupURL, '_blank', 'width=1440,height=920')
 
   if (!popup) {
     if (initialDraftStorageKey) {
@@ -465,6 +536,15 @@ export function openPrintWorkspaceWindow(
       }
     }
     throw new Error('浏览器拦截了弹窗，请允许弹窗后重试')
+  }
+
+  if (initialDraftWindowNamePayload) {
+    popup.name = initialDraftWindowNamePayload
+    if (popup.location && typeof popup.location.replace === 'function') {
+      popup.location.replace(popupURL)
+    } else if (popup.location) {
+      popup.location.href = popupURL
+    }
   }
 
   popup.focus()

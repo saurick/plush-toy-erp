@@ -1,15 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DeleteOutlined,
+  DownOutlined,
   DownloadOutlined,
   EditOutlined,
   InboxOutlined,
+  LinkOutlined,
   PlusOutlined,
-  RollbackOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
 import {
   Button,
+  Dropdown,
   Empty,
   Form,
   Input,
@@ -17,11 +19,11 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag,
+  Tooltip,
 } from 'antd'
-import { useOutletContext } from 'react-router-dom'
-import { message } from '@/common/utils/antdApp'
+import { useNavigate, useOutletContext } from 'react-router-dom'
+import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   BusinessDataTable,
@@ -58,7 +60,9 @@ import {
   SALES_ORDER_ITEM_STATUS_LABELS,
   SALES_ORDER_STATUS_COLORS,
   SALES_ORDER_STATUS_LABELS,
+  V1_ROUTE_PATHS,
   buildCustomerSnapshot,
+  canRunSalesOrderLifecycleAction,
   deriveSalesOrderItemAmount,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
@@ -69,6 +73,7 @@ import {
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import {
+  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
@@ -108,24 +113,35 @@ const LIFECYCLE_ACTIONS = [
     key: 'submit',
     label: '提交',
     permission: 'sales_order.submit',
+    nextStatus: 'submitted',
     run: submitSalesOrder,
   },
   {
     key: 'activate',
     label: '生效',
     permission: 'sales_order.activate',
+    nextStatus: 'active',
     run: activateSalesOrder,
   },
   {
     key: 'close',
     label: '关闭',
     permission: 'sales_order.close',
+    nextStatus: 'closed',
+    confirmTitle: '确认关闭销售订单',
+    confirmContent: '关闭后该销售订单不再继续推进，是否继续？',
+    okText: '确认关闭',
     run: closeSalesOrder,
   },
   {
     key: 'cancel',
     label: '取消',
     permission: 'sales_order.cancel',
+    nextStatus: 'canceled',
+    danger: true,
+    confirmTitle: '确认取消销售订单',
+    confirmContent: '取消后该销售订单不再继续推进，是否继续？',
+    okText: '确认取消',
     run: cancelSalesOrder,
   },
 ]
@@ -833,6 +849,7 @@ function SalesOrderItemsFormSection({
 
 export default function V1SalesOrdersPage() {
   const outletContext = useOutletContext()
+  const navigate = useNavigate()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -858,10 +875,6 @@ export default function V1SalesOrdersPage() {
   const [itemColumnOrder, setItemColumnOrder] = useState(null)
   const [columnOrderTarget, setColumnOrderTarget] = useState(null)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
-  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
-  const [batchDeleteReason, setBatchDeleteReason] = useState('')
-  const [recycleOpen, setRecycleOpen] = useState(false)
-  const [recycleSelectedRowKeys, setRecycleSelectedRowKeys] = useState([])
   const [orderForm] = Form.useForm()
   const [productSKUs, setProductSKUs] = useState([])
 
@@ -1081,6 +1094,25 @@ export default function V1SalesOrdersPage() {
     }
   }
 
+  const requestLifecycleAction = (action, order) => {
+    if (!action || !order) {
+      return
+    }
+    if (!action.confirmTitle) {
+      runLifecycleAction(action, order)
+      return
+    }
+    modal.confirm({
+      centered: true,
+      title: action.confirmTitle,
+      content: action.confirmContent,
+      okText: action.okText || `确认${action.label}`,
+      cancelText: '取消',
+      okButtonProps: action.danger ? { danger: true } : undefined,
+      onOk: () => runLifecycleAction(action, order),
+    })
+  }
+
   const persistColumnOrder = useCallback(
     async ({ moduleKey, columns, nextOrder, setLocalOrder }) => {
       const sanitizedOrder = sanitizeModuleColumnOrder(nextOrder, columns)
@@ -1108,84 +1140,87 @@ export default function V1SalesOrdersPage() {
   )
 
   const orderDataColumns = useMemo(
-    () => [
-      {
-        title: '订单号',
-        exportTitle: '订单号',
-        dataIndex: 'order_no',
-        width: 160,
-        sorter: (a, b) => compareText(a?.order_no, b?.order_no),
-      },
-      {
-        title: '客户',
-        exportTitle: '客户',
-        dataIndex: 'customer_snapshot',
-        width: 180,
-        sorter: (a, b) =>
-          compareText(a?.customer_snapshot?.name, b?.customer_snapshot?.name),
-        render: (value, record) =>
-          value?.name || `客户 ID ${record.customer_id}`,
-        exportValue: (record) =>
-          record?.customer_snapshot?.name ||
-          (record?.customer_id ? `客户 ID ${record.customer_id}` : ''),
-      },
-      {
-        title: '客户订单号',
-        exportTitle: '客户订单号',
-        dataIndex: 'customer_order_no',
-        width: 150,
-        sorter: (a, b) =>
-          compareText(a?.customer_order_no, b?.customer_order_no),
-        render: (value) => value || '-',
-      },
-      {
-        title: '订单日期',
-        exportTitle: '订单日期',
-        dataIndex: 'order_date',
-        width: 120,
-        sorter: (a, b) => compareNumber(a?.order_date, b?.order_date),
-        render: formatUnixDate,
-        exportValue: (record) => formatUnixDate(record?.order_date),
-      },
-      {
-        title: '计划交付',
-        exportTitle: '计划交付',
-        dataIndex: 'planned_delivery_date',
-        width: 120,
-        sorter: (a, b) =>
-          compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),
-        render: formatUnixDate,
-        exportValue: (record) => formatUnixDate(record?.planned_delivery_date),
-      },
-      {
-        title: '生命周期',
-        exportTitle: '生命周期',
-        dataIndex: 'lifecycle_status',
-        width: 120,
-        sorter: (a, b) => compareText(a?.lifecycle_status, b?.lifecycle_status),
-        render: salesOrderStatusTag,
-        exportValue: (record) =>
-          statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS),
-      },
-      {
-        title: '创建时间',
-        exportTitle: '创建时间',
-        dataIndex: 'created_at',
-        width: 160,
-        sorter: (a, b) => compareNumber(a?.created_at, b?.created_at),
-        render: formatUnixDateTime,
-        exportValue: (record) => formatUnixDateTime(record?.created_at),
-      },
-      {
-        title: '更新时间',
-        exportTitle: '更新时间',
-        dataIndex: 'updated_at',
-        width: 160,
-        sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
-        render: formatUnixDateTime,
-        exportValue: (record) => formatUnixDateTime(record?.updated_at),
-      },
-    ],
+    () =>
+      applyBusinessColumnSorters([
+        {
+          title: '订单号',
+          exportTitle: '订单号',
+          dataIndex: 'order_no',
+          width: 160,
+          sorter: (a, b) => compareText(a?.order_no, b?.order_no),
+        },
+        {
+          title: '客户',
+          exportTitle: '客户',
+          dataIndex: 'customer_snapshot',
+          width: 180,
+          sorter: (a, b) =>
+            compareText(a?.customer_snapshot?.name, b?.customer_snapshot?.name),
+          render: (value, record) =>
+            value?.name || `客户 ID ${record.customer_id}`,
+          exportValue: (record) =>
+            record?.customer_snapshot?.name ||
+            (record?.customer_id ? `客户 ID ${record.customer_id}` : ''),
+        },
+        {
+          title: '客户订单号',
+          exportTitle: '客户订单号',
+          dataIndex: 'customer_order_no',
+          width: 150,
+          sorter: (a, b) =>
+            compareText(a?.customer_order_no, b?.customer_order_no),
+          render: (value) => value || '-',
+        },
+        {
+          title: '订单日期',
+          exportTitle: '订单日期',
+          dataIndex: 'order_date',
+          width: 120,
+          sorter: (a, b) => compareNumber(a?.order_date, b?.order_date),
+          render: formatUnixDate,
+          exportValue: (record) => formatUnixDate(record?.order_date),
+        },
+        {
+          title: '计划交付',
+          exportTitle: '计划交付',
+          dataIndex: 'planned_delivery_date',
+          width: 120,
+          sorter: (a, b) =>
+            compareNumber(a?.planned_delivery_date, b?.planned_delivery_date),
+          render: formatUnixDate,
+          exportValue: (record) =>
+            formatUnixDate(record?.planned_delivery_date),
+        },
+        {
+          title: '生命周期',
+          exportTitle: '生命周期',
+          dataIndex: 'lifecycle_status',
+          width: 120,
+          sorter: (a, b) =>
+            compareText(a?.lifecycle_status, b?.lifecycle_status),
+          render: salesOrderStatusTag,
+          exportValue: (record) =>
+            statusText(record?.lifecycle_status, SALES_ORDER_STATUS_LABELS),
+        },
+        {
+          title: '创建时间',
+          exportTitle: '创建时间',
+          dataIndex: 'created_at',
+          width: 160,
+          sorter: (a, b) => compareNumber(a?.created_at, b?.created_at),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.created_at),
+        },
+        {
+          title: '更新时间',
+          exportTitle: '更新时间',
+          dataIndex: 'updated_at',
+          width: 160,
+          sorter: (a, b) => compareNumber(a?.updated_at, b?.updated_at),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.updated_at),
+        },
+      ]),
     []
   )
 
@@ -1392,6 +1427,60 @@ export default function V1SalesOrdersPage() {
       `客户 ID ${selectedOrder.customer_id}`
     return `${selectedOrder.order_no || selectedOrder.id} / ${customerName}`
   }, [selectedOrder])
+  const visibleLifecycleActions = useMemo(() => {
+    if (!selectedOrder) {
+      return []
+    }
+    return LIFECYCLE_ACTIONS.filter(
+      (action) =>
+        hasActionPermission(adminProfile, action.permission) &&
+        canRunSalesOrderLifecycleAction(
+          selectedOrder.lifecycle_status,
+          action.nextStatus
+        )
+    )
+  }, [adminProfile, selectedOrder])
+  const primaryLifecycleAction =
+    visibleLifecycleActions.find((action) => action.key !== 'cancel') || null
+  const secondaryLifecycleActions = visibleLifecycleActions.filter(
+    (action) => action.key !== primaryLifecycleAction?.key
+  )
+  const lifecycleMenuItems =
+    secondaryLifecycleActions.length > 0
+      ? [
+          {
+            key: 'status-transitions',
+            label: '状态变更',
+            type: 'group',
+            children: secondaryLifecycleActions.map((action) => ({
+              key: action.key,
+              label: action.label,
+              danger: action.danger,
+            })),
+          },
+        ]
+      : []
+  const relatedMenuItems = [
+    { key: 'shipments', label: '出货单' },
+    { key: 'outbound', label: '出库 / 预留' },
+    { key: 'receivables', label: '应收管理' },
+    { key: 'invoices', label: '发票管理' },
+    { key: 'inventory', label: '库存台账' },
+  ]
+  const openRelatedTable = ({ key }) => {
+    if (!selectedOrder) return
+    const pathByKey = {
+      shipments: V1_ROUTE_PATHS.shipments,
+      outbound: V1_ROUTE_PATHS.outbound,
+      receivables: V1_ROUTE_PATHS.receivables,
+      invoices: V1_ROUTE_PATHS.invoices,
+      inventory: V1_ROUTE_PATHS.inventory,
+    }
+    const targetPath = pathByKey[key]
+    if (targetPath) {
+      navigate(targetPath)
+    }
+  }
   return (
     <BusinessPageLayout className="erp-v1-sales-orders-page">
       <PageHeaderCard
@@ -1472,20 +1561,20 @@ export default function V1SalesOrdersPage() {
             >
               列顺序
             </ToolbarButton>
-            <ToolbarButton
-              icon={<DeleteOutlined />}
-              danger
-              disabled={!selectedOrder}
-              onClick={() => setBatchDeleteOpen(true)}
-            >
-              批量删除
-            </ToolbarButton>
-            <ToolbarButton
-              icon={<InboxOutlined />}
-              onClick={() => setRecycleOpen(true)}
-            >
-              回收站
-            </ToolbarButton>
+            <Tooltip title="销售订单当前保留生命周期状态；退出使用请走取消或关闭，不提供物理删除 / 回收站。">
+              <span>
+                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
+                  批量删除
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="销售订单当前没有回收站主路径；历史追溯回到生命周期状态和审计记录。">
+              <span>
+                <ToolbarButton icon={<InboxOutlined />} disabled>
+                  回收站
+                </ToolbarButton>
+              </span>
+            </Tooltip>
           </Space>
         }
         primaryAction={
@@ -1525,6 +1614,23 @@ export default function V1SalesOrdersPage() {
           >
             导出订单行
           </Button>
+          <Dropdown
+            trigger={['click']}
+            destroyOnHidden
+            disabled={!selectedOrder}
+            menu={{
+              items: relatedMenuItems,
+              onClick: openRelatedTable,
+            }}
+          >
+            <Button
+              size="small"
+              icon={<LinkOutlined />}
+              disabled={!selectedOrder}
+            >
+              关联 <DownOutlined />
+            </Button>
+          </Dropdown>
           {canUpdateOrder ? (
             <Button
               size="small"
@@ -1535,27 +1641,46 @@ export default function V1SalesOrdersPage() {
               编辑订单
             </Button>
           ) : null}
-          {LIFECYCLE_ACTIONS.filter((action) =>
-            hasActionPermission(adminProfile, action.permission)
-          ).map((action) => (
+          {primaryLifecycleAction ? (
             <Button
-              key={action.key}
               size="small"
-              disabled={!selectedOrder}
-              onClick={() => runLifecycleAction(action, selectedOrder)}
+              type="primary"
+              disabled={!selectedOrder || saving}
+              loading={saving}
+              onClick={() =>
+                requestLifecycleAction(primaryLifecycleAction, selectedOrder)
+              }
             >
-              {action.label}
+              {primaryLifecycleAction.label}
             </Button>
-          ))}
-          <Button
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            disabled={!selectedOrder}
-            onClick={() => setBatchDeleteOpen(true)}
+          ) : null}
+          <Dropdown
+            trigger={['click']}
+            destroyOnHidden
+            disabled={
+              !selectedOrder || saving || secondaryLifecycleActions.length === 0
+            }
+            menu={{
+              items: lifecycleMenuItems,
+              onClick: ({ key }) => {
+                const action = secondaryLifecycleActions.find(
+                  (item) => item.key === key
+                )
+                requestLifecycleAction(action, selectedOrder)
+              },
+            }}
           >
-            删除
-          </Button>
+            <Button
+              size="small"
+              disabled={
+                !selectedOrder ||
+                saving ||
+                secondaryLifecycleActions.length === 0
+              }
+            >
+              更多操作 <DownOutlined />
+            </Button>
+          </Dropdown>
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -1681,110 +1806,6 @@ export default function V1SalesOrdersPage() {
             productSKUs={productSKUs}
           />
         </Form>
-      </Modal>
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--confirm erp-business-batch-delete-modal"
-        width={560}
-        title="批量删除记录"
-        open={batchDeleteOpen}
-        onCancel={() => setBatchDeleteOpen(false)}
-        onOk={() => {
-          setBatchDeleteOpen(false)
-          setBatchDeleteReason('')
-          message.info('销售订单当前保留生命周期状态，不执行批量物理删除')
-        }}
-        okText="确认删除"
-        cancelText="取消"
-        okButtonProps={{ danger: true, disabled: !selectedOrder }}
-        centered
-        destroyOnHidden
-      >
-        <Space
-          direction="vertical"
-          size={12}
-          className="erp-business-batch-delete-modal__content"
-        >
-          <span>
-            已选择 <strong>{selectedOrder ? 1 : 0}</strong>{' '}
-            条记录，将进入回收站。
-          </span>
-          <Input.TextArea
-            className="erp-business-batch-delete-modal__reason"
-            value={batchDeleteReason}
-            onChange={(event) => setBatchDeleteReason(event.target.value)}
-            rows={3}
-            maxLength={255}
-            showCount
-            placeholder="请输入删除原因（可选）"
-          />
-        </Space>
-      </Modal>
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--recycle"
-        title="回收站"
-        open={recycleOpen}
-        onCancel={() => {
-          setRecycleOpen(false)
-          setRecycleSelectedRowKeys([])
-        }}
-        footer={null}
-        width={980}
-        centered
-        destroyOnHidden
-      >
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Space wrap>
-            <Button
-              icon={<RollbackOutlined />}
-              disabled={recycleSelectedRowKeys.length === 0}
-            >
-              批量恢复
-            </Button>
-            <span>已选择 {recycleSelectedRowKeys.length} 条回收站记录</span>
-          </Space>
-          <Table
-            rowKey="id"
-            size="small"
-            rowSelection={{
-              selectedRowKeys: recycleSelectedRowKeys,
-              onChange: (keys) => setRecycleSelectedRowKeys(keys),
-            }}
-            columns={[
-              { title: '单据编号', dataIndex: 'code', width: 180 },
-              { title: '名称', dataIndex: 'name', width: 260 },
-              { title: '业务状态', dataIndex: 'status', width: 140 },
-              { title: '删除时间', dataIndex: 'deleted_at', width: 160 },
-              { title: '删除原因', dataIndex: 'delete_reason', width: 180 },
-              {
-                title: '操作',
-                key: 'actions',
-                width: 110,
-                render: () => (
-                  <Button type="link" size="small" disabled>
-                    恢复
-                  </Button>
-                ),
-              },
-            ]}
-            dataSource={[]}
-            pagination={{
-              pageSize: 8,
-              showSizeChanger: false,
-              showTotal: (totalCount) => `共 ${totalCount} 条`,
-            }}
-            locale={{
-              emptyText: (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="回收站暂无记录"
-                />
-              ),
-            }}
-            scroll={{ x: 900 }}
-          />
-        </Space>
       </Modal>
     </BusinessPageLayout>
   )

@@ -50,6 +50,14 @@ type PurchaseReceiptCreate struct {
 	Note         *string
 }
 
+type PurchaseReceiptFromPurchaseOrderCreate struct {
+	PurchaseOrderID int
+	ReceiptNo       string
+	WarehouseID     int
+	ReceivedAt      time.Time
+	Note            *string
+}
+
 type PurchaseReceiptItemCreate struct {
 	ReceiptID           int
 	MaterialID          int
@@ -81,6 +89,17 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptDraft(ctx context.Context, in *
 		return nil, err
 	}
 	return uc.repo.CreatePurchaseReceiptDraft(ctx, &normalized)
+}
+
+func (uc *InventoryUsecase) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizePurchaseReceiptFromPurchaseOrderCreate(*in)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.CreatePurchaseReceiptFromPurchaseOrder(ctx, &normalized)
 }
 
 func (uc *InventoryUsecase) AddPurchaseReceiptItem(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, error) {
@@ -147,6 +166,18 @@ func normalizePurchaseReceiptCreate(in PurchaseReceiptCreate) (PurchaseReceiptCr
 	}
 	if in.ReceiptNo == "" || in.SupplierName == "" {
 		return PurchaseReceiptCreate{}, ErrBadParam
+	}
+	return in, nil
+}
+
+func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurchaseOrderCreate) (PurchaseReceiptFromPurchaseOrderCreate, error) {
+	in.ReceiptNo = strings.TrimSpace(in.ReceiptNo)
+	in.Note = normalizeOptionalString(in.Note)
+	if in.ReceivedAt.IsZero() {
+		in.ReceivedAt = time.Now()
+	}
+	if in.PurchaseOrderID <= 0 || in.WarehouseID <= 0 || in.ReceiptNo == "" {
+		return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
 	}
 	return in, nil
 }

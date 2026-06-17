@@ -8,7 +8,6 @@ import {
   LinkOutlined,
   PlusOutlined,
   PrinterOutlined,
-  RollbackOutlined,
   SettingOutlined,
   SwapOutlined,
 } from '@ant-design/icons'
@@ -16,14 +15,12 @@ import {
   Button,
   Descriptions,
   Dropdown,
-  Empty,
   Form,
   Input,
   Modal,
-  Popconfirm,
   Space,
-  Table,
   Tag,
+  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -50,9 +47,16 @@ import {
   getFormalShellFormFieldLabels,
 } from '../config/businessModules.mjs'
 import {
+  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import {
+  openPrintWorkspaceWindow,
+  PRINT_WORKSPACE_DRAFT_MODE,
+  PRINT_WORKSPACE_ENTRY_SOURCE,
+  PROCESSING_CONTRACT_TEMPLATE_KEY,
+} from '../utils/printWorkspace.js'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 
@@ -396,10 +400,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const [actionModal, setActionModal] = useState(null)
-  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
-  const [batchDeleteReason, setBatchDeleteReason] = useState('')
-  const [recycleOpen, setRecycleOpen] = useState(false)
-  const [recycleSelectedRowKeys, setRecycleSelectedRowKeys] = useState([])
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
@@ -453,7 +453,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
 
   const dataColumns = useMemo(
     () =>
-      [
+      applyBusinessColumnSorters([
         {
           title: '业务编号',
           exportTitle: '业务编号',
@@ -514,7 +514,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
           width: 130,
           sorter: (a, b) => compareText(a.updated_at, b.updated_at),
         },
-      ].map((column, index) => ({
+      ]).map((column, index) => ({
         ...column,
         key: column.key || column.dataIndex || `column-${index}`,
       })),
@@ -629,38 +629,34 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   const createLabel = MODULE_CREATE_LABELS[moduleItem.key] || '新建记录'
   const primaryActionLabel =
     MODULE_PRIMARY_ACTION_LABELS[moduleItem.key] || '生成下游记录'
+  const supportsProcessingContractPrint =
+    moduleItem.key === 'processing-contracts'
   const linkedMenuItems = [
     { key: 'source', label: '来源记录' },
     { key: 'downstream', label: '下游记录' },
   ]
   const transitionMenuItems = [
-    { key: 'submit', label: '提交' },
-    { key: 'approve', label: '确认' },
-    { key: 'return', label: '退回' },
-  ]
-  const recycleColumns = [
-    { title: '单据编号', dataIndex: 'document_no', width: 180 },
-    { title: '业务对象', dataIndex: 'title', width: 260 },
     {
-      title: '业务状态',
-      dataIndex: 'business_status',
-      width: 120,
-      render: statusTag,
-    },
-    { title: '删除时间', dataIndex: 'deleted_at', width: 160 },
-    { title: '删除原因', dataIndex: 'delete_reason', width: 180 },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 110,
-      render: () => (
-        <Button type="link" size="small" disabled>
-          恢复
-        </Button>
-      ),
+      key: 'status-transitions',
+      label: '状态变更',
+      type: 'group',
+      children: [
+        { key: 'submit', label: '提交' },
+        { key: 'approve', label: '确认' },
+        { key: 'return', label: '退回' },
+      ],
     },
   ]
-
+  const openProcessingContractPrint = () => {
+    try {
+      openPrintWorkspaceWindow(PROCESSING_CONTRACT_TEMPLATE_KEY, {
+        entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        draftMode: PRINT_WORKSPACE_DRAFT_MODE.FRESH,
+      })
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '打开加工合同打印'))
+    }
+  }
   return (
     <BusinessPageLayout className="erp-formal-business-module-page">
       <PageHeaderCard
@@ -712,20 +708,22 @@ export default function FormalBusinessModulePage({ moduleKey }) {
             >
               列顺序
             </ToolbarButton>
-            <ToolbarButton
-              icon={<DeleteOutlined />}
-              danger
-              disabled={selectedRowKeys.length === 0}
-              onClick={() => setBatchDeleteOpen(true)}
+            <Tooltip
+              title={`${moduleItem.title}当前没有物理删除或回收站主路径；退出使用需接入对应领域 usecase 后再启用。`}
             >
-              批量删除
-            </ToolbarButton>
-            <ToolbarButton
-              icon={<InboxOutlined />}
-              onClick={() => setRecycleOpen(true)}
-            >
-              回收站
-            </ToolbarButton>
+              <span>
+                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
+                  批量删除
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="当前正式入口壳不提供前端假回收站；历史追溯应回到领域事实、状态和审计记录。">
+              <span>
+                <ToolbarButton icon={<InboxOutlined />} disabled>
+                  回收站
+                </ToolbarButton>
+              </span>
+            </Tooltip>
           </Space>
         }
         primaryAction={
@@ -775,7 +773,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               icon={<LinkOutlined />}
               disabled={!singleSelectedRecord}
             >
-              关联表格 <DownOutlined />
+              关联单据 <DownOutlined />
             </Button>
           </Dropdown>
           <Dropdown
@@ -783,8 +781,9 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               items: transitionMenuItems,
               onClick: ({ key }) => {
                 const label =
-                  transitionMenuItems.find((item) => item.key === key)?.label ||
-                  '流转'
+                  transitionMenuItems
+                    .flatMap((item) => item.children || item)
+                    .find((item) => item.key === key)?.label || '状态变更'
                 openActionHint(label)
               },
             }}
@@ -796,7 +795,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               icon={<SwapOutlined />}
               disabled={!singleSelectedRecord}
             >
-              流转 <DownOutlined />
+              更多操作 <DownOutlined />
             </Button>
           </Dropdown>
           <Button
@@ -807,30 +806,25 @@ export default function FormalBusinessModulePage({ moduleKey }) {
           >
             {primaryActionLabel}
           </Button>
-          <Button
-            size="small"
-            icon={<PrinterOutlined />}
-            disabled={!singleSelectedRecord}
-            onClick={() => openActionHint('打印')}
-          >
-            打印
-          </Button>
-          <Popconfirm
-            title="确认删除该记录？"
-            okText="删除"
-            cancelText="取消"
-            disabled={!singleSelectedRecord}
-            onConfirm={() => openActionHint('删除')}
-          >
+          {supportsProcessingContractPrint ? (
             <Button
               size="small"
-              danger
-              icon={<DeleteOutlined />}
+              icon={<PrinterOutlined />}
               disabled={!singleSelectedRecord}
+              onClick={openProcessingContractPrint}
             >
-              删除
+              加工合同打印
             </Button>
-          </Popconfirm>
+          ) : null}
+          <Tooltip
+            title={`${moduleItem.title}当前没有物理删除主路径；请通过模块生命周期状态退出使用。`}
+          >
+            <span>
+              <Button size="small" danger icon={<DeleteOutlined />} disabled>
+                删除
+              </Button>
+            </span>
+          </Tooltip>
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -929,96 +923,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
             </Descriptions.Item>
           </Descriptions>
         )}
-      </Modal>
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--confirm erp-business-batch-delete-modal"
-        width={560}
-        title="批量删除记录"
-        open={batchDeleteOpen}
-        onCancel={() => setBatchDeleteOpen(false)}
-        onOk={() => {
-          setBatchDeleteOpen(false)
-          setBatchDeleteReason('')
-          message.info(`${moduleItem.title}删除动作待接入正式数据后启用`)
-        }}
-        okText="确认删除"
-        cancelText="取消"
-        okButtonProps={{ danger: true, disabled: selectedRowKeys.length === 0 }}
-        centered
-        destroyOnHidden
-      >
-        <Space
-          direction="vertical"
-          size={12}
-          className="erp-business-batch-delete-modal__content"
-        >
-          <span>
-            已选择 <strong>{selectedRowKeys.length}</strong>{' '}
-            条记录，将进入回收站。
-          </span>
-          <Input.TextArea
-            className="erp-business-batch-delete-modal__reason"
-            value={batchDeleteReason}
-            onChange={(event) => setBatchDeleteReason(event.target.value)}
-            rows={3}
-            maxLength={255}
-            showCount
-            placeholder="请输入删除原因（可选）"
-          />
-        </Space>
-      </Modal>
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--recycle"
-        title="回收站"
-        open={recycleOpen}
-        onCancel={() => {
-          setRecycleOpen(false)
-          setRecycleSelectedRowKeys([])
-        }}
-        footer={null}
-        width={980}
-        centered
-        destroyOnHidden
-      >
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Space wrap>
-            <Button
-              icon={<RollbackOutlined />}
-              disabled={recycleSelectedRowKeys.length === 0}
-            >
-              批量恢复
-            </Button>
-            <span>已选择 {recycleSelectedRowKeys.length} 条回收站记录</span>
-            {recycleSelectedRowKeys.length > 0 ? (
-              <Button
-                type="link"
-                size="small"
-                onClick={() => setRecycleSelectedRowKeys([])}
-              >
-                清空已选
-              </Button>
-            ) : null}
-          </Space>
-          <Table
-            rowKey="id"
-            size="small"
-            rowSelection={{
-              selectedRowKeys: recycleSelectedRowKeys,
-              onChange: (keys) => setRecycleSelectedRowKeys(keys),
-            }}
-            columns={recycleColumns}
-            dataSource={[]}
-            pagination={{
-              pageSize: 8,
-              showSizeChanger: false,
-              showTotal: (total) => `共 ${total} 条`,
-            }}
-            locale={{ emptyText: <Empty description="回收站暂无记录" /> }}
-            scroll={{ x: 1010 }}
-          />
-        </Space>
       </Modal>
 
       <ColumnOrderModal

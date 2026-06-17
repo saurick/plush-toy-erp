@@ -16,6 +16,7 @@ var (
 	ErrCustomerNotFound   = errors.New("customer not found")
 	ErrSupplierNotFound   = errors.New("supplier not found")
 	ErrMaterialNotFound   = errors.New("material not found")
+	ErrProcessNotFound    = errors.New("process not found")
 	ErrProductSKUNotFound = errors.New("product sku not found")
 	ErrContactNotFound    = errors.New("contact not found")
 )
@@ -61,6 +62,21 @@ type Material struct {
 	IsActive      bool
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+}
+
+type Process struct {
+	ID                 int
+	Code               string
+	Name               string
+	Category           *string
+	OutsourcingEnabled bool
+	InhouseEnabled     bool
+	QualityRequired    bool
+	SortOrder          int
+	Note               *string
+	IsActive           bool
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 type Product struct {
@@ -132,6 +148,17 @@ type MaterialMutation struct {
 	Spec          *string
 	Color         *string
 	DefaultUnitID int
+}
+
+type ProcessMutation struct {
+	Code               string
+	Name               string
+	Category           *string
+	OutsourcingEnabled bool
+	InhouseEnabled     bool
+	QualityRequired    bool
+	SortOrder          int
+	Note               *string
 }
 
 type ProductMutation struct {
@@ -211,6 +238,12 @@ type MasterDataRepo interface {
 	ListMaterials(ctx context.Context, filter MasterDataFilter) ([]*Material, int, error)
 	SetMaterialActive(ctx context.Context, id int, active bool) (*Material, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
+
+	CreateProcess(ctx context.Context, in *ProcessMutation) (*Process, error)
+	UpdateProcess(ctx context.Context, id int, in *ProcessMutation) (*Process, error)
+	GetProcess(ctx context.Context, id int) (*Process, error)
+	ListProcesses(ctx context.Context, filter MasterDataFilter) ([]*Process, int, error)
+	SetProcessActive(ctx context.Context, id int, active bool) (*Process, error)
 
 	CreateProduct(ctx context.Context, in *ProductMutation) (*Product, error)
 	UpdateProduct(ctx context.Context, id int, in *ProductMutation) (*Product, error)
@@ -373,6 +406,49 @@ func (uc *MasterDataUsecase) SetMaterialActive(ctx context.Context, id int, acti
 		return nil, ErrBadParam
 	}
 	return uc.repo.SetMaterialActive(ctx, id, active)
+}
+
+func (uc *MasterDataUsecase) CreateProcess(ctx context.Context, in *ProcessMutation) (*Process, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProcessMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.CreateProcess(ctx, &normalized)
+}
+
+func (uc *MasterDataUsecase) UpdateProcess(ctx context.Context, id int, in *ProcessMutation) (*Process, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProcessMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.UpdateProcess(ctx, id, &normalized)
+}
+
+func (uc *MasterDataUsecase) GetProcess(ctx context.Context, id int) (*Process, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.GetProcess(ctx, id)
+}
+
+func (uc *MasterDataUsecase) ListProcesses(ctx context.Context, filter MasterDataFilter) ([]*Process, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	return uc.repo.ListProcesses(ctx, normalizeMasterDataFilter(filter))
+}
+
+func (uc *MasterDataUsecase) SetProcessActive(ctx context.Context, id int, active bool) (*Process, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.SetProcessActive(ctx, id, active)
 }
 
 func (uc *MasterDataUsecase) CreateProduct(ctx context.Context, in *ProductMutation) (*Product, error) {
@@ -629,6 +705,20 @@ func normalizeMaterialMutation(in MaterialMutation) (MaterialMutation, error) {
 	in.Color = normalizeOptionalString(in.Color)
 	if in.Code == "" || in.Name == "" || in.DefaultUnitID <= 0 {
 		return MaterialMutation{}, ErrBadParam
+	}
+	return in, nil
+}
+
+func normalizeProcessMutation(in ProcessMutation) (ProcessMutation, error) {
+	in.Code = strings.TrimSpace(in.Code)
+	in.Name = strings.TrimSpace(in.Name)
+	in.Category = normalizeOptionalString(in.Category)
+	in.Note = normalizeOptionalString(in.Note)
+	if in.SortOrder < 0 {
+		in.SortOrder = 0
+	}
+	if in.Code == "" || in.Name == "" {
+		return ProcessMutation{}, ErrBadParam
 	}
 	return in, nil
 }

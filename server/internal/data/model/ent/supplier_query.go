@@ -7,6 +7,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"math"
+	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/supplier"
@@ -20,11 +21,12 @@ import (
 // SupplierQuery is the builder for querying Supplier entities.
 type SupplierQuery struct {
 	config
-	ctx                *QueryContext
-	order              []supplier.OrderOption
-	inters             []Interceptor
-	predicates         []predicate.Supplier
-	withPurchaseOrders *PurchaseOrderQuery
+	ctx                   *QueryContext
+	order                 []supplier.OrderOption
+	inters                []Interceptor
+	predicates            []predicate.Supplier
+	withPurchaseOrders    *PurchaseOrderQuery
+	withOutsourcingOrders *OutsourcingOrderQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -76,6 +78,28 @@ func (_q *SupplierQuery) QueryPurchaseOrders() *PurchaseOrderQuery {
 			sqlgraph.From(supplier.Table, supplier.FieldID, selector),
 			sqlgraph.To(purchaseorder.Table, purchaseorder.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, supplier.PurchaseOrdersTable, supplier.PurchaseOrdersColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOutsourcingOrders chains the current query on the "outsourcing_orders" edge.
+func (_q *SupplierQuery) QueryOutsourcingOrders() *OutsourcingOrderQuery {
+	query := (&OutsourcingOrderClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(supplier.Table, supplier.FieldID, selector),
+			sqlgraph.To(outsourcingorder.Table, outsourcingorder.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, supplier.OutsourcingOrdersTable, supplier.OutsourcingOrdersColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -270,12 +294,13 @@ func (_q *SupplierQuery) Clone() *SupplierQuery {
 		return nil
 	}
 	return &SupplierQuery{
-		config:             _q.config,
-		ctx:                _q.ctx.Clone(),
-		order:              append([]supplier.OrderOption{}, _q.order...),
-		inters:             append([]Interceptor{}, _q.inters...),
-		predicates:         append([]predicate.Supplier{}, _q.predicates...),
-		withPurchaseOrders: _q.withPurchaseOrders.Clone(),
+		config:                _q.config,
+		ctx:                   _q.ctx.Clone(),
+		order:                 append([]supplier.OrderOption{}, _q.order...),
+		inters:                append([]Interceptor{}, _q.inters...),
+		predicates:            append([]predicate.Supplier{}, _q.predicates...),
+		withPurchaseOrders:    _q.withPurchaseOrders.Clone(),
+		withOutsourcingOrders: _q.withOutsourcingOrders.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -290,6 +315,17 @@ func (_q *SupplierQuery) WithPurchaseOrders(opts ...func(*PurchaseOrderQuery)) *
 		opt(query)
 	}
 	_q.withPurchaseOrders = query
+	return _q
+}
+
+// WithOutsourcingOrders tells the query-builder to eager-load the nodes that are connected to
+// the "outsourcing_orders" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SupplierQuery) WithOutsourcingOrders(opts ...func(*OutsourcingOrderQuery)) *SupplierQuery {
+	query := (&OutsourcingOrderClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOutsourcingOrders = query
 	return _q
 }
 
@@ -371,8 +407,9 @@ func (_q *SupplierQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Sup
 	var (
 		nodes       = []*Supplier{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			_q.withPurchaseOrders != nil,
+			_q.withOutsourcingOrders != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -400,6 +437,15 @@ func (_q *SupplierQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Sup
 			return nil, err
 		}
 	}
+	if query := _q.withOutsourcingOrders; query != nil {
+		if err := _q.loadOutsourcingOrders(ctx, query, nodes,
+			func(n *Supplier) { n.Edges.OutsourcingOrders = []*OutsourcingOrder{} },
+			func(n *Supplier, e *OutsourcingOrder) {
+				n.Edges.OutsourcingOrders = append(n.Edges.OutsourcingOrders, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
 }
 
@@ -418,6 +464,36 @@ func (_q *SupplierQuery) loadPurchaseOrders(ctx context.Context, query *Purchase
 	}
 	query.Where(predicate.PurchaseOrder(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(supplier.PurchaseOrdersColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.SupplierID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "supplier_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *SupplierQuery) loadOutsourcingOrders(ctx context.Context, query *OutsourcingOrderQuery, nodes []*Supplier, init func(*Supplier), assign func(*Supplier, *OutsourcingOrder)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Supplier)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(outsourcingorder.FieldSupplierID)
+	}
+	query.Where(predicate.OutsourcingOrder(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(supplier.OutsourcingOrdersColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

@@ -36,8 +36,14 @@ type Tx struct {
 	Material *MaterialClient
 	// OutsourcingFact is the client for interacting with the OutsourcingFact builders.
 	OutsourcingFact *OutsourcingFactClient
+	// OutsourcingOrder is the client for interacting with the OutsourcingOrder builders.
+	OutsourcingOrder *OutsourcingOrderClient
+	// OutsourcingOrderItem is the client for interacting with the OutsourcingOrderItem builders.
+	OutsourcingOrderItem *OutsourcingOrderItemClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
+	// Process is the client for interacting with the Process builders.
+	Process *ProcessClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
@@ -237,7 +243,10 @@ func (tx *Tx) init() {
 	tx.InventoryTxn = NewInventoryTxnClient(tx.config)
 	tx.Material = NewMaterialClient(tx.config)
 	tx.OutsourcingFact = NewOutsourcingFactClient(tx.config)
+	tx.OutsourcingOrder = NewOutsourcingOrderClient(tx.config)
+	tx.OutsourcingOrderItem = NewOutsourcingOrderItemClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
+	tx.Process = NewProcessClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductSKU = NewProductSKUClient(tx.config)
 	tx.ProductionFact = NewProductionFactClient(tx.config)

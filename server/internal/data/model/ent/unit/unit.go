@@ -38,6 +38,8 @@ const (
 	EdgeInventoryBalances = "inventory_balances"
 	// EdgeBomItems holds the string denoting the bom_items edge name in mutations.
 	EdgeBomItems = "bom_items"
+	// EdgeOutsourcingOrderItems holds the string denoting the outsourcing_order_items edge name in mutations.
+	EdgeOutsourcingOrderItems = "outsourcing_order_items"
 	// EdgePurchaseOrderItems holds the string denoting the purchase_order_items edge name in mutations.
 	EdgePurchaseOrderItems = "purchase_order_items"
 	// EdgePurchaseReceiptItems holds the string denoting the purchase_receipt_items edge name in mutations.
@@ -98,6 +100,13 @@ const (
 	BomItemsInverseTable = "bom_items"
 	// BomItemsColumn is the table column denoting the bom_items relation/edge.
 	BomItemsColumn = "unit_id"
+	// OutsourcingOrderItemsTable is the table that holds the outsourcing_order_items relation/edge.
+	OutsourcingOrderItemsTable = "outsourcing_order_items"
+	// OutsourcingOrderItemsInverseTable is the table name for the OutsourcingOrderItem entity.
+	// It exists in this package in order to avoid circular dependency with the "outsourcingorderitem" package.
+	OutsourcingOrderItemsInverseTable = "outsourcing_order_items"
+	// OutsourcingOrderItemsColumn is the table column denoting the outsourcing_order_items relation/edge.
+	OutsourcingOrderItemsColumn = "unit_id"
 	// PurchaseOrderItemsTable is the table that holds the purchase_order_items relation/edge.
 	PurchaseOrderItemsTable = "purchase_order_items"
 	// PurchaseOrderItemsInverseTable is the table name for the PurchaseOrderItem entity.
@@ -318,6 +327,20 @@ func ByBomItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByOutsourcingOrderItemsCount orders the results by outsourcing_order_items count.
+func ByOutsourcingOrderItemsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOutsourcingOrderItemsStep(), opts...)
+	}
+}
+
+// ByOutsourcingOrderItems orders the results by outsourcing_order_items terms.
+func ByOutsourcingOrderItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOutsourcingOrderItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByPurchaseOrderItemsCount orders the results by purchase_order_items count.
 func ByPurchaseOrderItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -469,6 +492,13 @@ func newBomItemsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(BomItemsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, BomItemsTable, BomItemsColumn),
+	)
+}
+func newOutsourcingOrderItemsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OutsourcingOrderItemsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingOrderItemsTable, OutsourcingOrderItemsColumn),
 	)
 }
 func newPurchaseOrderItemsStep() *sqlgraph.Step {

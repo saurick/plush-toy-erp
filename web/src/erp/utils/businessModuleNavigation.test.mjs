@@ -52,23 +52,52 @@ test('formal business shell: 表单字段按产品核心模块区分', () => {
     )
   }
 
-  assert.deepEqual(getFormalShellFormFieldLabels('material-bom').slice(0, 4), [
-    '产品',
-    'BOM 版本',
-    '材料',
-    '材料用量',
-  ])
-  assert.ok(getFormalShellFormFieldLabels('inventory').includes('当前余额'))
-  assert.ok(getFormalShellFormFieldLabels('inventory').includes('可用量'))
-  assert.ok(getFormalShellFormFieldLabels('receivables').includes('来源出货'))
-  assert.ok(getFormalShellFormFieldLabels('receivables').includes('应收金额'))
+  assert.deepEqual(
+    getFormalShellFormFieldLabels('production-scheduling').slice(0, 4),
+    ['销售订单', '产品 / BOM', '排程日期', '生产负责人']
+  )
   assert.equal(getBusinessModule('materials')?.pageKind, 'formal-v1')
   assert.equal(getBusinessModule('material-bom')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('processes')?.pageKind, 'formal-v1')
   assert.equal(getBusinessModule('accessories-purchase')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('inventory')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('processing-contracts')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('production-progress')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('outbound')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('receivables')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('payables')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('invoices')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('reconciliation')?.pageKind, 'formal-v1')
+  assert.equal(
+    getBusinessModule('production-scheduling')?.pageKind,
+    'formal-shell'
+  )
+  assert.equal(
+    getBusinessModule('production-exceptions')?.pageKind,
+    'formal-shell'
+  )
+  assert.equal(getBusinessModule('shipping-release')?.pageKind, 'formal-shell')
   assert.equal(
     formalShellModules.some((item) => item.key === 'accessories-purchase'),
     false
   )
+  assert.equal(
+    formalShellModules.some((item) => item.key === 'processing-contracts'),
+    false
+  )
+  assert.equal(
+    formalShellModules.some((item) => item.key === 'receivables'),
+    false
+  )
+  assert.equal(
+    formalShellModules.some((item) => item.key === 'production-scheduling'),
+    true
+  )
   assert.deepEqual(getFormalShellFormFieldLabels('materials'), [])
+  assert.deepEqual(getFormalShellFormFieldLabels('material-bom'), [])
+  assert.deepEqual(getFormalShellFormFieldLabels('processes'), [])
   assert.deepEqual(getFormalShellFormFieldLabels('accessories-purchase'), [])
+  assert.deepEqual(getFormalShellFormFieldLabels('inventory'), [])
+  assert.deepEqual(getFormalShellFormFieldLabels('receivables'), [])
+  assert.deepEqual(getFormalShellFormFieldLabels('outbound'), [])
 })

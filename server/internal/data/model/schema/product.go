@@ -51,6 +51,7 @@ func (Product) Edges() []ent.Edge {
 			Unique(),
 		edge.To("product_skus", ProductSKU.Type),
 		edge.To("bom_headers", BOMHeader.Type),
+		edge.To("outsourcing_order_items", OutsourcingOrderItem.Type),
 		edge.To("shipment_items", ShipmentItem.Type),
 		edge.To("stock_reservations", StockReservation.Type),
 	}

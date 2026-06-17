@@ -23,7 +23,7 @@ export const yoyoosunMenuConfig = Object.freeze({
       },
       {
         title: "产品工程",
-        items: ["material-bom"],
+        items: ["material-bom", "processes"],
       },
       {
         title: "采购管理",

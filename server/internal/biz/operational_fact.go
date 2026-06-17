@@ -124,6 +124,7 @@ type ShipmentItem struct {
 	ShipmentID       int
 	SalesOrderItemID *int
 	ProductID        int
+	ProductSkuID     *int
 	WarehouseID      int
 	UnitID           int
 	LotID            *int
@@ -207,6 +208,7 @@ type ShipmentItemCreate struct {
 	ShipmentID       int
 	SalesOrderItemID *int
 	ProductID        int
+	ProductSkuID     *int
 	WarehouseID      int
 	UnitID           int
 	LotID            *int
@@ -250,6 +252,7 @@ type FinanceFactCreate struct {
 
 type OperationalFactFilter struct {
 	Status    string
+	FactType  string
 	DateField string
 	DateFrom  *time.Time
 	DateTo    *time.Time
@@ -586,6 +589,9 @@ func normalizeShipmentItemCreateWithOptions(in *ShipmentItemCreate, requireShipm
 	if out.SalesOrderItemID != nil && *out.SalesOrderItemID <= 0 {
 		out.SalesOrderItemID = nil
 	}
+	if out.ProductSkuID != nil && *out.ProductSkuID <= 0 {
+		out.ProductSkuID = nil
+	}
 	if out.LotID != nil && *out.LotID <= 0 {
 		out.LotID = nil
 	}
@@ -721,6 +727,7 @@ func (uc *OperationalFactUsecase) validateFinanceFactSource(ctx context.Context,
 
 func normalizeOperationalFactFilter(in OperationalFactFilter) OperationalFactFilter {
 	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
+	in.FactType = strings.ToUpper(strings.TrimSpace(in.FactType))
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
 	}

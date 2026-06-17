@@ -8,13 +8,16 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/core/calc"
 	corestatus "server/internal/core/status"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/bomheader"
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/inventorybalance"
+	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/stockreservation"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -237,6 +240,186 @@ func (r *inventoryRepo) GetInventoryBalance(ctx context.Context, key biz.Invento
 		return nil, err
 	}
 	return entInventoryBalanceToBiz(row), nil
+}
+
+func (r *inventoryRepo) ListInventoryBalances(ctx context.Context, filter biz.InventoryBalanceFilter) ([]*biz.InventoryBalance, int, error) {
+	query := r.data.postgres.InventoryBalance.Query()
+	if filter.SubjectType != "" {
+		query = query.Where(inventorybalance.SubjectTypeEQ(filter.SubjectType))
+	}
+	if filter.SubjectID > 0 {
+		query = query.Where(inventorybalance.SubjectIDEQ(filter.SubjectID))
+	}
+	if filter.WarehouseID > 0 {
+		query = query.Where(inventorybalance.WarehouseIDEQ(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		query = query.Where(inventorybalance.LotIDEQ(filter.LotID))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(inventorybalance.Or(
+			inventorybalance.SubjectTypeContainsFold(filter.Keyword),
+			inventorybalance.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorybalance.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorybalance.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorybalance.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorybalance.UnitIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.
+		Order(ent.Desc(inventorybalance.FieldUpdatedAt), ent.Desc(inventorybalance.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.InventoryBalance, 0, len(rows))
+	for _, row := range rows {
+		item := entInventoryBalanceToBiz(row)
+		activeReserved, err := activeReservedQuantityForBalance(ctx, r.data.postgres, row)
+		if err != nil {
+			return nil, 0, err
+		}
+		item.ActiveReservedQuantity = activeReserved
+		item.AvailableQuantity = calc.InventoryAvailableQuantity(item.Quantity, activeReserved)
+		out = append(out, item)
+	}
+	return out, total, nil
+}
+
+func activeReservedQuantityForBalance(ctx context.Context, client *ent.Client, row *ent.InventoryBalance) (decimal.Decimal, error) {
+	if row == nil || row.SubjectType != biz.InventorySubjectProduct {
+		return decimal.Zero, nil
+	}
+	query := client.StockReservation.Query().
+		Where(
+			stockreservation.Status(biz.StockReservationStatusActive),
+			stockreservation.ProductID(row.SubjectID),
+			stockreservation.WarehouseID(row.WarehouseID),
+			stockreservation.UnitID(row.UnitID),
+		)
+	if row.LotID == nil {
+		query = query.Where(stockreservation.LotIDIsNil())
+	} else {
+		query = query.Where(stockreservation.LotID(*row.LotID))
+	}
+	rows, err := query.All(ctx)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	total := decimal.Zero
+	for _, item := range rows {
+		total = total.Add(item.Quantity)
+	}
+	return total, nil
+}
+
+func (r *inventoryRepo) ListInventoryLots(ctx context.Context, filter biz.InventoryLotFilter) ([]*biz.InventoryLot, int, error) {
+	query := r.data.postgres.InventoryLot.Query()
+	if filter.SubjectType != "" {
+		query = query.Where(inventorylot.SubjectTypeEQ(filter.SubjectType))
+	}
+	if filter.SubjectID > 0 {
+		query = query.Where(inventorylot.SubjectIDEQ(filter.SubjectID))
+	}
+	if filter.Status != "" {
+		query = query.Where(inventorylot.StatusEQ(filter.Status))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(inventorylot.Or(
+			inventorylot.SubjectTypeContainsFold(filter.Keyword),
+			inventorylot.LotNoContainsFold(filter.Keyword),
+			inventorylot.SupplierLotNoContainsFold(filter.Keyword),
+			inventorylot.ColorNoContainsFold(filter.Keyword),
+			inventorylot.DyeLotNoContainsFold(filter.Keyword),
+			inventorylot.ProductionLotNoContainsFold(filter.Keyword),
+			inventorylot.StatusContainsFold(filter.Keyword),
+			inventorylot.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorylot.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorylot.ProductSkuIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.
+		Order(ent.Desc(inventorylot.FieldUpdatedAt), ent.Desc(inventorylot.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.InventoryLot, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entInventoryLotToBiz(row))
+	}
+	return out, total, nil
+}
+
+func (r *inventoryRepo) ListInventoryTxns(ctx context.Context, filter biz.InventoryTxnFilter) ([]*biz.InventoryTxn, int, error) {
+	query := r.data.postgres.InventoryTxn.Query()
+	if filter.SubjectType != "" {
+		query = query.Where(inventorytxn.SubjectTypeEQ(filter.SubjectType))
+	}
+	if filter.SubjectID > 0 {
+		query = query.Where(inventorytxn.SubjectIDEQ(filter.SubjectID))
+	}
+	if filter.WarehouseID > 0 {
+		query = query.Where(inventorytxn.WarehouseIDEQ(filter.WarehouseID))
+	}
+	if filter.LotID > 0 {
+		query = query.Where(inventorytxn.LotIDEQ(filter.LotID))
+	}
+	if filter.TxnType != "" {
+		query = query.Where(inventorytxn.TxnType(filter.TxnType))
+	}
+	if filter.SourceType != "" {
+		query = query.Where(inventorytxn.SourceType(filter.SourceType))
+	}
+	if filter.SourceID > 0 {
+		query = query.Where(inventorytxn.SourceIDEQ(filter.SourceID))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(inventorytxn.Or(
+			inventorytxn.SubjectTypeContainsFold(filter.Keyword),
+			inventorytxn.TxnTypeContainsFold(filter.Keyword),
+			inventorytxn.SourceTypeContainsFold(filter.Keyword),
+			inventorytxn.IdempotencyKeyContainsFold(filter.Keyword),
+			inventorytxn.NoteContainsFold(filter.Keyword),
+			inventorytxn.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorytxn.SubjectIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorytxn.WarehouseIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorytxn.LotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorytxn.UnitIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorytxn.SourceIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorytxn.SourceLineIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			inventorytxn.ReversalOfTxnIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.
+		Order(ent.Desc(inventorytxn.FieldOccurredAt), ent.Desc(inventorytxn.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.InventoryTxn, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entInventoryTxnToBiz(row))
+	}
+	return out, total, nil
 }
 
 func (r *inventoryRepo) beginInventoryDBTx(ctx context.Context) (*inventoryDBTx, error) {

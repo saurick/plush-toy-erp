@@ -2,6 +2,7 @@ package service
 
 import (
 	"io"
+	"reflect"
 	"testing"
 	"time"
 
@@ -17,6 +18,38 @@ func newOperationalFactJSONRPCTestData(admin *biz.AdminUser) *jsonrpcDispatcher 
 		log:               log.NewHelper(log.With(logger, "module", "service.jsonrpc.operational_fact.test")),
 		adminReader:       stubAdminAccountReader{admin: admin},
 		operationalFactUC: biz.NewOperationalFactUsecase(&stubBusinessDashboardOperationalFactRepo{}),
+	}
+}
+
+func TestShipmentItemParamsPreserveProductSKUTraceability(t *testing.T) {
+	in, ok := shipmentItemCreateFromParams(map[string]any{
+		"shipment_id":         float64(9),
+		"sales_order_item_id": float64(31),
+		"product_id":          float64(7),
+		"product_sku_id":      float64(11),
+		"warehouse_id":        float64(3),
+		"unit_id":             float64(2),
+		"quantity":            "5",
+	})
+	if !ok {
+		t.Fatal("expected shipment item params to parse")
+	}
+	if in.ProductSkuID == nil || *in.ProductSkuID != 11 {
+		t.Fatalf("expected product sku id 11, got %#v", in.ProductSkuID)
+	}
+
+	out := shipmentItemToAny(&biz.ShipmentItem{
+		ID:               1,
+		ShipmentID:       9,
+		SalesOrderItemID: in.SalesOrderItemID,
+		ProductID:        in.ProductID,
+		ProductSkuID:     in.ProductSkuID,
+		WarehouseID:      in.WarehouseID,
+		UnitID:           in.UnitID,
+		Quantity:         in.Quantity,
+	})
+	if !reflect.DeepEqual(out["product_sku_id"], 11) {
+		t.Fatalf("expected product_sku_id in response, got %#v", out)
 	}
 }
 
@@ -142,5 +175,17 @@ func TestOperationalFactShipmentFilterFromParamsParsesDateRange(t *testing.T) {
 		"date_from": "not-a-date",
 	}).AsMap()); ok {
 		t.Fatal("expected invalid shipment date filter to be rejected")
+	}
+}
+
+func TestOperationalFactFilterFromParamsParsesFactType(t *testing.T) {
+	filter := operationalFactFilterFromParams(mustJSONRPCStruct(t, map[string]any{
+		"status":    "posted",
+		"fact_type": "receivable",
+		"limit":     float64(20),
+		"offset":    float64(5),
+	}).AsMap())
+	if filter.Status != "posted" || filter.FactType != "receivable" || filter.Limit != 20 || filter.Offset != 5 {
+		t.Fatalf("unexpected filter %#v", filter)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/bomheader"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/shipmentitem"
@@ -146,6 +147,21 @@ func (_c *ProductCreate) AddBomHeaders(v ...*BOMHeader) *ProductCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddBomHeaderIDs(ids...)
+}
+
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (_c *ProductCreate) AddOutsourcingOrderItemIDs(ids ...int) *ProductCreate {
+	_c.mutation.AddOutsourcingOrderItemIDs(ids...)
+	return _c
+}
+
+// AddOutsourcingOrderItems adds the "outsourcing_order_items" edges to the OutsourcingOrderItem entity.
+func (_c *ProductCreate) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem) *ProductCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOutsourcingOrderItemIDs(ids...)
 }
 
 // AddShipmentItemIDs adds the "shipment_items" edge to the ShipmentItem entity by IDs.
@@ -371,6 +387,22 @@ func (_c *ProductCreate) createSpec() (*Product, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(bomheader.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OutsourcingOrderItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.OutsourcingOrderItemsTable,
+			Columns: []string{product.OutsourcingOrderItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

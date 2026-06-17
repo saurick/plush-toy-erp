@@ -7,13 +7,11 @@ import {
   EditOutlined,
   InboxOutlined,
   PlusOutlined,
-  RollbackOutlined,
   SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons'
 import {
   Button,
-  Empty,
   Form,
   Input,
   InputNumber,
@@ -23,8 +21,8 @@ import {
   Select,
   Space,
   Switch,
-  Table,
   Tag,
+  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -49,6 +47,7 @@ import {
   createContact,
   createCustomer,
   createMaterial,
+  createProcess,
   createProduct,
   createProductSKU,
   createSupplier,
@@ -56,17 +55,20 @@ import {
   listContactsByOwner,
   listCustomers,
   listMaterials,
+  listProcesses,
   listProducts,
   listProductSKUs,
   listSuppliers,
   setCustomerActive,
   setMaterialActive,
+  setProcessActive,
   setProductActive,
   setProductSKUActive,
   setSupplierActive,
   updateContact,
   updateCustomer,
   updateMaterial,
+  updateProcess,
   updateProduct,
   updateProductSKU,
   updateSupplier,
@@ -75,12 +77,14 @@ import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   buildContactParams,
   buildMasterDataParams,
+  buildProcessParams,
   buildProductParams,
   buildProductSKUParams,
   formatUnixDateTime,
   hasActionPermission,
 } from '../utils/masterDataOrderView.mjs'
 import {
+  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
@@ -154,6 +158,30 @@ const PAGE_CONFIG = Object.freeze({
     formBoundary: '只维护材料主数据，不在此写采购、库存、质检或 BOM 用量。',
     summary:
       '维护材料主数据；采购订单、库存余额、来料质检和 BOM 用量在对应业务模块处理。',
+  },
+  processes: {
+    title: '工序档案',
+    recordKey: 'processes',
+    list: listProcesses,
+    create: createProcess,
+    update: updateProcess,
+    setActive: setProcessActive,
+    permissions: {
+      create: 'process.create',
+      update: 'process.update',
+      disable: 'process.disable',
+    },
+    entityLabel: '工序',
+    formBoundary:
+      '只维护可复用工序主数据，不在此生成委外订单、生产任务、库存流水或质检事实。',
+    summary:
+      '维护生产和委外都可引用的工序档案；委外订单、加工合同、发料、回货和质检事实仍在对应模块处理。',
+    initialValues: {
+      outsourcing_enabled: true,
+      inhouse_enabled: false,
+      quality_required: false,
+      sort_order: 0,
+    },
   },
   products: {
     title: '产品档案',
@@ -421,6 +449,78 @@ function MasterDataFormFields({ type }) {
           name="default_unit_id"
         >
           <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        </Form.Item>
+      </>
+    )
+  }
+
+  if (type === 'processes') {
+    return (
+      <>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="工序编号"
+          name="code"
+          rules={[{ required: true, message: '请填写工序编号' }]}
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="工序名称"
+          name="name"
+          rules={[{ required: true, message: '请填写工序名称' }]}
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="工序类别"
+          name="category"
+        >
+          <Input
+            allowClear
+            autoComplete="off"
+            placeholder="如车缝、印刷、裁片、刀模"
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="排序"
+          name="sort_order"
+        >
+          <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="可委外"
+          name="outsourcing_enabled"
+          valuePropName="checked"
+        >
+          <Switch />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="可内制"
+          name="inhouse_enabled"
+          valuePropName="checked"
+        >
+          <Switch />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="需质检"
+          name="quality_required"
+          valuePropName="checked"
+        >
+          <Switch />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field erp-business-action-form__field--full"
+          label="备注"
+          name="note"
+        >
+          <Input.TextArea allowClear rows={3} showCount maxLength={300} />
         </Form.Item>
       </>
     )
@@ -728,6 +828,9 @@ function getRecordSearchPlaceholder(type = '') {
   if (type === 'materials') {
     return '搜索编号、名称、分类、规格、颜色'
   }
+  if (type === 'processes') {
+    return '搜索工序编号、名称、类别、备注'
+  }
   if (type === 'products') {
     return '搜索产品编号、名称、内部款号、客户款号'
   }
@@ -758,10 +861,6 @@ export default function V1MasterDataPage({ type }) {
   const [contacts, setContacts] = useState([])
   const [recordModalOpen, setRecordModalOpen] = useState(false)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
-  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
-  const [batchDeleteReason, setBatchDeleteReason] = useState('')
-  const [recycleOpen, setRecycleOpen] = useState(false)
-  const [recycleSelectedRowKeys, setRecycleSelectedRowKeys] = useState([])
   const [editingRecord, setEditingRecord] = useState(null)
   const [saving, setSaving] = useState(false)
   const [columnOrder, setColumnOrder] = useState(null)
@@ -874,6 +973,9 @@ export default function V1MasterDataPage({ type }) {
     setEditingRecord(null)
     setContacts([])
     recordForm.resetFields()
+    if (config.initialValues) {
+      recordForm.setFieldsValue(config.initialValues)
+    }
     if (showContactForm) {
       recordForm.setFieldsValue({ contacts: [createEmptyContactRow()] })
     }
@@ -942,7 +1044,9 @@ export default function V1MasterDataPage({ type }) {
           ? buildProductSKUParams(values, extra)
           : effectiveType === 'products'
             ? buildProductParams(values, extra)
-            : buildMasterDataParams(values, extra)
+            : effectiveType === 'processes'
+              ? buildProcessParams(values, extra)
+              : buildMasterDataParams(values, extra)
       const saved = editingRecord?.id
         ? await config.update(params)
         : await config.create(params)
@@ -1002,7 +1106,7 @@ export default function V1MasterDataPage({ type }) {
 
   const recordColumns = useMemo(() => {
     if (effectiveType === 'products') {
-      return [
+      return applyBusinessColumnSorters([
         {
           title: '产品编号',
           exportTitle: '产品编号',
@@ -1072,11 +1176,11 @@ export default function V1MasterDataPage({ type }) {
           render: formatUnixDateTime,
           exportValue: (record) => formatUnixDateTime(record?.updated_at),
         },
-      ]
+      ])
     }
 
     if (effectiveType === 'product_skus') {
-      return [
+      return applyBusinessColumnSorters([
         {
           title: '产品 ID',
           exportTitle: '产品 ID',
@@ -1188,10 +1292,119 @@ export default function V1MasterDataPage({ type }) {
           render: formatUnixDateTime,
           exportValue: (record) => formatUnixDateTime(record?.updated_at),
         },
-      ]
+      ])
     }
 
-    return [
+    if (effectiveType === 'processes') {
+      return applyBusinessColumnSorters([
+        {
+          title: '工序编号',
+          exportTitle: '工序编号',
+          dataIndex: 'code',
+          width: 150,
+          sorter: (a, b) => compareText(a?.code, b?.code),
+        },
+        {
+          title: '工序名称',
+          exportTitle: '工序名称',
+          dataIndex: 'name',
+          width: 180,
+          sorter: (a, b) => compareText(a?.name, b?.name),
+        },
+        {
+          title: '工序类别',
+          exportTitle: '工序类别',
+          dataIndex: 'category',
+          width: 150,
+          sorter: (a, b) => compareText(a?.category, b?.category),
+          render: (value) => value || '-',
+        },
+        {
+          title: '可委外',
+          exportTitle: '可委外',
+          dataIndex: 'outsourcing_enabled',
+          width: 100,
+          sorter: (a, b) =>
+            compareBoolean(a?.outsourcing_enabled, b?.outsourcing_enabled),
+          exportValue: (record) =>
+            record?.outsourcing_enabled === true ? '是' : '否',
+          render: (value) =>
+            value === true ? <Tag color="blue">是</Tag> : <Tag>否</Tag>,
+        },
+        {
+          title: '可内制',
+          exportTitle: '可内制',
+          dataIndex: 'inhouse_enabled',
+          width: 100,
+          sorter: (a, b) =>
+            compareBoolean(a?.inhouse_enabled, b?.inhouse_enabled),
+          exportValue: (record) =>
+            record?.inhouse_enabled === true ? '是' : '否',
+          render: (value) =>
+            value === true ? <Tag color="green">是</Tag> : <Tag>否</Tag>,
+        },
+        {
+          title: '需质检',
+          exportTitle: '需质检',
+          dataIndex: 'quality_required',
+          width: 100,
+          sorter: (a, b) =>
+            compareBoolean(a?.quality_required, b?.quality_required),
+          exportValue: (record) =>
+            record?.quality_required === true ? '是' : '否',
+          render: (value) =>
+            value === true ? <Tag color="orange">是</Tag> : <Tag>否</Tag>,
+        },
+        {
+          title: '排序',
+          exportTitle: '排序',
+          dataIndex: 'sort_order',
+          width: 90,
+          sorter: (a, b) =>
+            Number(a?.sort_order || 0) - Number(b?.sort_order || 0),
+        },
+        {
+          title: '备注',
+          exportTitle: '备注',
+          dataIndex: 'note',
+          width: 200,
+          sorter: (a, b) => compareText(a?.note, b?.note),
+          render: (value) => value || '-',
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'is_active',
+          width: 90,
+          sorter: (a, b) => compareBoolean(a?.is_active, b?.is_active),
+          exportValue: (record) =>
+            record?.is_active === false ? '停用' : '启用',
+          render: activeTag,
+        },
+        {
+          title: '创建时间',
+          exportTitle: '创建时间',
+          dataIndex: 'created_at',
+          width: 160,
+          sorter: (a, b) =>
+            Number(a?.created_at || 0) - Number(b?.created_at || 0),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.created_at),
+        },
+        {
+          title: '更新时间',
+          exportTitle: '更新时间',
+          dataIndex: 'updated_at',
+          width: 160,
+          sorter: (a, b) =>
+            Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.updated_at),
+        },
+      ])
+    }
+
+    return applyBusinessColumnSorters([
       {
         title: '编号',
         exportTitle: '编号',
@@ -1313,7 +1526,7 @@ export default function V1MasterDataPage({ type }) {
         render: formatUnixDateTime,
         exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
-    ]
+    ])
   }, [effectiveType])
   const preferredRecordColumnOrder = useMemo(
     () =>
@@ -1446,20 +1659,24 @@ export default function V1MasterDataPage({ type }) {
             >
               列顺序
             </ToolbarButton>
-            <ToolbarButton
-              icon={<DeleteOutlined />}
-              danger
-              disabled={!selectedRecord}
-              onClick={() => setBatchDeleteOpen(true)}
+            <Tooltip
+              title={`${config.title}当前使用启停状态管理；退出使用请走停用，不提供物理删除 / 回收站。`}
             >
-              批量删除
-            </ToolbarButton>
-            <ToolbarButton
-              icon={<InboxOutlined />}
-              onClick={() => setRecycleOpen(true)}
+              <span>
+                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
+                  批量删除
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={`${config.title}当前没有回收站主路径；历史追溯回到启停状态和审计记录。`}
             >
-              回收站
-            </ToolbarButton>
+              <span>
+                <ToolbarButton icon={<InboxOutlined />} disabled>
+                  回收站
+                </ToolbarButton>
+              </span>
+            </Tooltip>
           </Space>
         }
         primaryAction={
@@ -1526,15 +1743,6 @@ export default function V1MasterDataPage({ type }) {
               </Button>
             </Popconfirm>
           ) : null}
-          <Button
-            size="small"
-            danger
-            icon={<DeleteOutlined />}
-            disabled={!selectedRecord}
-            onClick={() => setBatchDeleteOpen(true)}
-          >
-            删除
-          </Button>
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -1622,105 +1830,6 @@ export default function V1MasterDataPage({ type }) {
         onReset={() => persistColumnOrder([], recordColumns)}
         onClose={() => setColumnOrderOpen(false)}
       />
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--confirm erp-business-batch-delete-modal"
-        width={560}
-        title="批量删除记录"
-        open={batchDeleteOpen}
-        onCancel={() => setBatchDeleteOpen(false)}
-        onOk={() => {
-          setBatchDeleteOpen(false)
-          setBatchDeleteReason('')
-          message.info(
-            `${config.title}当前使用启停状态管理，不执行批量物理删除`
-          )
-        }}
-        okText="确认删除"
-        cancelText="取消"
-        okButtonProps={{ danger: true, disabled: !selectedRecord }}
-        centered
-        destroyOnHidden
-      >
-        <Space
-          direction="vertical"
-          size={12}
-          className="erp-business-batch-delete-modal__content"
-        >
-          <span>
-            已选择 <strong>{selectedRecord ? 1 : 0}</strong>{' '}
-            条记录，将进入回收站。
-          </span>
-          <Input.TextArea
-            className="erp-business-batch-delete-modal__reason"
-            value={batchDeleteReason}
-            onChange={(event) => setBatchDeleteReason(event.target.value)}
-            rows={3}
-            maxLength={255}
-            showCount
-            placeholder="请输入删除原因（可选）"
-          />
-        </Space>
-      </Modal>
-
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--recycle"
-        title="回收站"
-        open={recycleOpen}
-        onCancel={() => {
-          setRecycleOpen(false)
-          setRecycleSelectedRowKeys([])
-        }}
-        footer={null}
-        width={980}
-        centered
-        destroyOnHidden
-      >
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Space wrap>
-            <Button
-              icon={<RollbackOutlined />}
-              disabled={recycleSelectedRowKeys.length === 0}
-            >
-              批量恢复
-            </Button>
-            <span>已选择 {recycleSelectedRowKeys.length} 条回收站记录</span>
-          </Space>
-          <Table
-            rowKey="id"
-            size="small"
-            rowSelection={{
-              selectedRowKeys: recycleSelectedRowKeys,
-              onChange: (keys) => setRecycleSelectedRowKeys(keys),
-            }}
-            columns={[
-              { title: '单据编号', dataIndex: 'code', width: 180 },
-              { title: '名称', dataIndex: 'name', width: 260 },
-              { title: '业务状态', dataIndex: 'status', width: 140 },
-              { title: '删除时间', dataIndex: 'deleted_at', width: 160 },
-              { title: '删除原因', dataIndex: 'delete_reason', width: 180 },
-              {
-                title: '操作',
-                key: 'actions',
-                width: 110,
-                render: () => (
-                  <Button type="link" size="small" disabled>
-                    恢复
-                  </Button>
-                ),
-              },
-            ]}
-            dataSource={[]}
-            pagination={{
-              pageSize: 8,
-              showSizeChanger: false,
-              showTotal: (total) => `共 ${total} 条`,
-            }}
-            locale={{ emptyText: <Empty description="回收站暂无记录" /> }}
-            scroll={{ x: 1010 }}
-          />
-        </Space>
-      </Modal>
     </BusinessPageLayout>
   )
 }

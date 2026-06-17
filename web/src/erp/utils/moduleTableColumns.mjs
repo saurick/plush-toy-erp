@@ -1,4 +1,8 @@
 const FALLBACK_COLUMN_KEY_PREFIX = '__column__'
+const BUSINESS_TABLE_TEXT_COLLATOR = new Intl.Collator(['zh-Hans-CN', 'en'], {
+  numeric: true,
+  sensitivity: 'base',
+})
 
 export const getModuleColumnKey = (column = {}, index = 0) =>
   String(
@@ -95,3 +99,121 @@ export const repositionModuleColumnOrder = (
   nextOrder.splice(boundedTargetIndex, 0, movedKey)
   return nextOrder
 }
+
+const isBlankBusinessTableValue = (value) => {
+  if (Array.isArray(value)) {
+    return value.length === 0
+  }
+  return value === null || value === undefined || String(value).trim() === ''
+}
+
+const isNumericBusinessTableValue = (value) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value)
+  }
+  if (typeof value !== 'string' || value.trim() === '') {
+    return false
+  }
+  return Number.isFinite(Number(value))
+}
+
+export const getBusinessTableSortValue = (record, column = {}) => {
+  if (typeof column.sortValue === 'function') {
+    return column.sortValue(record)
+  }
+  const dataIndex = column.sortDataIndex || column.dataIndex
+  if (!record || !dataIndex) {
+    return undefined
+  }
+  if (Array.isArray(dataIndex)) {
+    return dataIndex.reduce((current, key) => current?.[key], record)
+  }
+  if (Object.prototype.hasOwnProperty.call(record, dataIndex)) {
+    return record[dataIndex]
+  }
+  return String(dataIndex)
+    .split('.')
+    .reduce((current, key) => current?.[key], record)
+}
+
+export const compareBusinessTableValues = (
+  leftValue,
+  rightValue,
+  sortOrder = 'ascend',
+  sortType = 'auto'
+) => {
+  const leftBlank = isBlankBusinessTableValue(leftValue)
+  const rightBlank = isBlankBusinessTableValue(rightValue)
+  if (leftBlank || rightBlank) {
+    if (leftBlank && rightBlank) return 0
+    const blankResult = leftBlank ? 1 : -1
+    return sortOrder === 'descend' ? -blankResult : blankResult
+  }
+
+  if (
+    sortType === 'number' ||
+    sortType === 'date' ||
+    (sortType === 'auto' &&
+      isNumericBusinessTableValue(leftValue) &&
+      isNumericBusinessTableValue(rightValue))
+  ) {
+    return Number(leftValue) - Number(rightValue)
+  }
+
+  if (sortType === 'boolean') {
+    return Number(Boolean(leftValue)) - Number(Boolean(rightValue))
+  }
+
+  if (Array.isArray(leftValue) && Array.isArray(rightValue)) {
+    return leftValue.length - rightValue.length
+  }
+
+  return BUSINESS_TABLE_TEXT_COLLATOR.compare(
+    String(leftValue),
+    String(rightValue)
+  )
+}
+
+export const createBusinessColumnSorter = (column = {}) => {
+  if (!column?.dataIndex && typeof column?.sortValue !== 'function') {
+    return undefined
+  }
+  return (left, right, sortOrder) =>
+    compareBusinessTableValues(
+      getBusinessTableSortValue(left, column),
+      getBusinessTableSortValue(right, column),
+      sortOrder,
+      column.sortType || 'auto'
+    )
+}
+
+const shouldSkipBusinessColumnSorter = (column = {}) => {
+  if (column.sortable === false || column.sorter !== undefined) {
+    return true
+  }
+  const key = String(column.key || column.dataIndex || '').trim()
+  return key === 'actions' || key === 'operation'
+}
+
+export const applyBusinessColumnSorters = (columns = []) =>
+  (Array.isArray(columns) ? columns : []).map((column) => {
+    if (!column || typeof column !== 'object') {
+      return column
+    }
+    if (Array.isArray(column.children) && column.children.length > 0) {
+      return {
+        ...column,
+        children: applyBusinessColumnSorters(column.children),
+      }
+    }
+    if (shouldSkipBusinessColumnSorter(column)) {
+      return column
+    }
+    const sorter = createBusinessColumnSorter(column)
+    return sorter
+      ? {
+          ...column,
+          sorter,
+        }
+      : column
+  })

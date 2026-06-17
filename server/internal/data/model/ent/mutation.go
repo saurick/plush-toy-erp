@@ -18,8 +18,11 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/outsourcingorder"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
@@ -77,7 +80,10 @@ const (
 	TypeInventoryTxn                  = "InventoryTxn"
 	TypeMaterial                      = "Material"
 	TypeOutsourcingFact               = "OutsourcingFact"
+	TypeOutsourcingOrder              = "OutsourcingOrder"
+	TypeOutsourcingOrderItem          = "OutsourcingOrderItem"
 	TypePermission                    = "Permission"
+	TypeProcess                       = "Process"
 	TypeProduct                       = "Product"
 	TypeProductSKU                    = "ProductSKU"
 	TypeProductionFact                = "ProductionFact"
@@ -14365,6 +14371,2792 @@ func (m *OutsourcingFactMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown OutsourcingFact edge %s", name)
 }
 
+// OutsourcingOrderMutation represents an operation that mutates the OutsourcingOrder nodes in the graph.
+type OutsourcingOrderMutation struct {
+	config
+	op                       Op
+	typ                      string
+	id                       *int
+	outsourcing_order_no     *string
+	supplier_snapshot        *map[string]interface{}
+	source_order_no          *string
+	source_sales_order_id    *int
+	addsource_sales_order_id *int
+	order_date               *time.Time
+	expected_return_date     *time.Time
+	lifecycle_status         *string
+	note                     *string
+	created_at               *time.Time
+	updated_at               *time.Time
+	clearedFields            map[string]struct{}
+	supplier                 *int
+	clearedsupplier          bool
+	items                    map[int]struct{}
+	removeditems             map[int]struct{}
+	cleareditems             bool
+	done                     bool
+	oldValue                 func(context.Context) (*OutsourcingOrder, error)
+	predicates               []predicate.OutsourcingOrder
+}
+
+var _ ent.Mutation = (*OutsourcingOrderMutation)(nil)
+
+// outsourcingorderOption allows management of the mutation configuration using functional options.
+type outsourcingorderOption func(*OutsourcingOrderMutation)
+
+// newOutsourcingOrderMutation creates new mutation for the OutsourcingOrder entity.
+func newOutsourcingOrderMutation(c config, op Op, opts ...outsourcingorderOption) *OutsourcingOrderMutation {
+	m := &OutsourcingOrderMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeOutsourcingOrder,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withOutsourcingOrderID sets the ID field of the mutation.
+func withOutsourcingOrderID(id int) outsourcingorderOption {
+	return func(m *OutsourcingOrderMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *OutsourcingOrder
+		)
+		m.oldValue = func(ctx context.Context) (*OutsourcingOrder, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().OutsourcingOrder.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withOutsourcingOrder sets the old OutsourcingOrder of the mutation.
+func withOutsourcingOrder(node *OutsourcingOrder) outsourcingorderOption {
+	return func(m *OutsourcingOrderMutation) {
+		m.oldValue = func(context.Context) (*OutsourcingOrder, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m OutsourcingOrderMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m OutsourcingOrderMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *OutsourcingOrderMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *OutsourcingOrderMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().OutsourcingOrder.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOutsourcingOrderNo sets the "outsourcing_order_no" field.
+func (m *OutsourcingOrderMutation) SetOutsourcingOrderNo(s string) {
+	m.outsourcing_order_no = &s
+}
+
+// OutsourcingOrderNo returns the value of the "outsourcing_order_no" field in the mutation.
+func (m *OutsourcingOrderMutation) OutsourcingOrderNo() (r string, exists bool) {
+	v := m.outsourcing_order_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutsourcingOrderNo returns the old "outsourcing_order_no" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldOutsourcingOrderNo(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutsourcingOrderNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutsourcingOrderNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutsourcingOrderNo: %w", err)
+	}
+	return oldValue.OutsourcingOrderNo, nil
+}
+
+// ResetOutsourcingOrderNo resets all changes to the "outsourcing_order_no" field.
+func (m *OutsourcingOrderMutation) ResetOutsourcingOrderNo() {
+	m.outsourcing_order_no = nil
+}
+
+// SetSupplierID sets the "supplier_id" field.
+func (m *OutsourcingOrderMutation) SetSupplierID(i int) {
+	m.supplier = &i
+}
+
+// SupplierID returns the value of the "supplier_id" field in the mutation.
+func (m *OutsourcingOrderMutation) SupplierID() (r int, exists bool) {
+	v := m.supplier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSupplierID returns the old "supplier_id" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldSupplierID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSupplierID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSupplierID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSupplierID: %w", err)
+	}
+	return oldValue.SupplierID, nil
+}
+
+// ResetSupplierID resets all changes to the "supplier_id" field.
+func (m *OutsourcingOrderMutation) ResetSupplierID() {
+	m.supplier = nil
+}
+
+// SetSupplierSnapshot sets the "supplier_snapshot" field.
+func (m *OutsourcingOrderMutation) SetSupplierSnapshot(value map[string]interface{}) {
+	m.supplier_snapshot = &value
+}
+
+// SupplierSnapshot returns the value of the "supplier_snapshot" field in the mutation.
+func (m *OutsourcingOrderMutation) SupplierSnapshot() (r map[string]interface{}, exists bool) {
+	v := m.supplier_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSupplierSnapshot returns the old "supplier_snapshot" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldSupplierSnapshot(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSupplierSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSupplierSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSupplierSnapshot: %w", err)
+	}
+	return oldValue.SupplierSnapshot, nil
+}
+
+// ClearSupplierSnapshot clears the value of the "supplier_snapshot" field.
+func (m *OutsourcingOrderMutation) ClearSupplierSnapshot() {
+	m.supplier_snapshot = nil
+	m.clearedFields[outsourcingorder.FieldSupplierSnapshot] = struct{}{}
+}
+
+// SupplierSnapshotCleared returns if the "supplier_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderMutation) SupplierSnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorder.FieldSupplierSnapshot]
+	return ok
+}
+
+// ResetSupplierSnapshot resets all changes to the "supplier_snapshot" field.
+func (m *OutsourcingOrderMutation) ResetSupplierSnapshot() {
+	m.supplier_snapshot = nil
+	delete(m.clearedFields, outsourcingorder.FieldSupplierSnapshot)
+}
+
+// SetSourceOrderNo sets the "source_order_no" field.
+func (m *OutsourcingOrderMutation) SetSourceOrderNo(s string) {
+	m.source_order_no = &s
+}
+
+// SourceOrderNo returns the value of the "source_order_no" field in the mutation.
+func (m *OutsourcingOrderMutation) SourceOrderNo() (r string, exists bool) {
+	v := m.source_order_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceOrderNo returns the old "source_order_no" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldSourceOrderNo(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceOrderNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceOrderNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceOrderNo: %w", err)
+	}
+	return oldValue.SourceOrderNo, nil
+}
+
+// ClearSourceOrderNo clears the value of the "source_order_no" field.
+func (m *OutsourcingOrderMutation) ClearSourceOrderNo() {
+	m.source_order_no = nil
+	m.clearedFields[outsourcingorder.FieldSourceOrderNo] = struct{}{}
+}
+
+// SourceOrderNoCleared returns if the "source_order_no" field was cleared in this mutation.
+func (m *OutsourcingOrderMutation) SourceOrderNoCleared() bool {
+	_, ok := m.clearedFields[outsourcingorder.FieldSourceOrderNo]
+	return ok
+}
+
+// ResetSourceOrderNo resets all changes to the "source_order_no" field.
+func (m *OutsourcingOrderMutation) ResetSourceOrderNo() {
+	m.source_order_no = nil
+	delete(m.clearedFields, outsourcingorder.FieldSourceOrderNo)
+}
+
+// SetSourceSalesOrderID sets the "source_sales_order_id" field.
+func (m *OutsourcingOrderMutation) SetSourceSalesOrderID(i int) {
+	m.source_sales_order_id = &i
+	m.addsource_sales_order_id = nil
+}
+
+// SourceSalesOrderID returns the value of the "source_sales_order_id" field in the mutation.
+func (m *OutsourcingOrderMutation) SourceSalesOrderID() (r int, exists bool) {
+	v := m.source_sales_order_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceSalesOrderID returns the old "source_sales_order_id" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldSourceSalesOrderID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceSalesOrderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceSalesOrderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceSalesOrderID: %w", err)
+	}
+	return oldValue.SourceSalesOrderID, nil
+}
+
+// AddSourceSalesOrderID adds i to the "source_sales_order_id" field.
+func (m *OutsourcingOrderMutation) AddSourceSalesOrderID(i int) {
+	if m.addsource_sales_order_id != nil {
+		*m.addsource_sales_order_id += i
+	} else {
+		m.addsource_sales_order_id = &i
+	}
+}
+
+// AddedSourceSalesOrderID returns the value that was added to the "source_sales_order_id" field in this mutation.
+func (m *OutsourcingOrderMutation) AddedSourceSalesOrderID() (r int, exists bool) {
+	v := m.addsource_sales_order_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSourceSalesOrderID clears the value of the "source_sales_order_id" field.
+func (m *OutsourcingOrderMutation) ClearSourceSalesOrderID() {
+	m.source_sales_order_id = nil
+	m.addsource_sales_order_id = nil
+	m.clearedFields[outsourcingorder.FieldSourceSalesOrderID] = struct{}{}
+}
+
+// SourceSalesOrderIDCleared returns if the "source_sales_order_id" field was cleared in this mutation.
+func (m *OutsourcingOrderMutation) SourceSalesOrderIDCleared() bool {
+	_, ok := m.clearedFields[outsourcingorder.FieldSourceSalesOrderID]
+	return ok
+}
+
+// ResetSourceSalesOrderID resets all changes to the "source_sales_order_id" field.
+func (m *OutsourcingOrderMutation) ResetSourceSalesOrderID() {
+	m.source_sales_order_id = nil
+	m.addsource_sales_order_id = nil
+	delete(m.clearedFields, outsourcingorder.FieldSourceSalesOrderID)
+}
+
+// SetOrderDate sets the "order_date" field.
+func (m *OutsourcingOrderMutation) SetOrderDate(t time.Time) {
+	m.order_date = &t
+}
+
+// OrderDate returns the value of the "order_date" field in the mutation.
+func (m *OutsourcingOrderMutation) OrderDate() (r time.Time, exists bool) {
+	v := m.order_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrderDate returns the old "order_date" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldOrderDate(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrderDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrderDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrderDate: %w", err)
+	}
+	return oldValue.OrderDate, nil
+}
+
+// ResetOrderDate resets all changes to the "order_date" field.
+func (m *OutsourcingOrderMutation) ResetOrderDate() {
+	m.order_date = nil
+}
+
+// SetExpectedReturnDate sets the "expected_return_date" field.
+func (m *OutsourcingOrderMutation) SetExpectedReturnDate(t time.Time) {
+	m.expected_return_date = &t
+}
+
+// ExpectedReturnDate returns the value of the "expected_return_date" field in the mutation.
+func (m *OutsourcingOrderMutation) ExpectedReturnDate() (r time.Time, exists bool) {
+	v := m.expected_return_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpectedReturnDate returns the old "expected_return_date" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldExpectedReturnDate(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpectedReturnDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpectedReturnDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpectedReturnDate: %w", err)
+	}
+	return oldValue.ExpectedReturnDate, nil
+}
+
+// ClearExpectedReturnDate clears the value of the "expected_return_date" field.
+func (m *OutsourcingOrderMutation) ClearExpectedReturnDate() {
+	m.expected_return_date = nil
+	m.clearedFields[outsourcingorder.FieldExpectedReturnDate] = struct{}{}
+}
+
+// ExpectedReturnDateCleared returns if the "expected_return_date" field was cleared in this mutation.
+func (m *OutsourcingOrderMutation) ExpectedReturnDateCleared() bool {
+	_, ok := m.clearedFields[outsourcingorder.FieldExpectedReturnDate]
+	return ok
+}
+
+// ResetExpectedReturnDate resets all changes to the "expected_return_date" field.
+func (m *OutsourcingOrderMutation) ResetExpectedReturnDate() {
+	m.expected_return_date = nil
+	delete(m.clearedFields, outsourcingorder.FieldExpectedReturnDate)
+}
+
+// SetLifecycleStatus sets the "lifecycle_status" field.
+func (m *OutsourcingOrderMutation) SetLifecycleStatus(s string) {
+	m.lifecycle_status = &s
+}
+
+// LifecycleStatus returns the value of the "lifecycle_status" field in the mutation.
+func (m *OutsourcingOrderMutation) LifecycleStatus() (r string, exists bool) {
+	v := m.lifecycle_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLifecycleStatus returns the old "lifecycle_status" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldLifecycleStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLifecycleStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLifecycleStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLifecycleStatus: %w", err)
+	}
+	return oldValue.LifecycleStatus, nil
+}
+
+// ResetLifecycleStatus resets all changes to the "lifecycle_status" field.
+func (m *OutsourcingOrderMutation) ResetLifecycleStatus() {
+	m.lifecycle_status = nil
+}
+
+// SetNote sets the "note" field.
+func (m *OutsourcingOrderMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *OutsourcingOrderMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *OutsourcingOrderMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[outsourcingorder.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *OutsourcingOrderMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[outsourcingorder.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *OutsourcingOrderMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, outsourcingorder.FieldNote)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *OutsourcingOrderMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *OutsourcingOrderMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *OutsourcingOrderMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *OutsourcingOrderMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *OutsourcingOrderMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *OutsourcingOrderMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearSupplier clears the "supplier" edge to the Supplier entity.
+func (m *OutsourcingOrderMutation) ClearSupplier() {
+	m.clearedsupplier = true
+	m.clearedFields[outsourcingorder.FieldSupplierID] = struct{}{}
+}
+
+// SupplierCleared reports if the "supplier" edge to the Supplier entity was cleared.
+func (m *OutsourcingOrderMutation) SupplierCleared() bool {
+	return m.clearedsupplier
+}
+
+// SupplierIDs returns the "supplier" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SupplierID instead. It exists only for internal usage by the builders.
+func (m *OutsourcingOrderMutation) SupplierIDs() (ids []int) {
+	if id := m.supplier; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSupplier resets all changes to the "supplier" edge.
+func (m *OutsourcingOrderMutation) ResetSupplier() {
+	m.supplier = nil
+	m.clearedsupplier = false
+}
+
+// AddItemIDs adds the "items" edge to the OutsourcingOrderItem entity by ids.
+func (m *OutsourcingOrderMutation) AddItemIDs(ids ...int) {
+	if m.items == nil {
+		m.items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearItems clears the "items" edge to the OutsourcingOrderItem entity.
+func (m *OutsourcingOrderMutation) ClearItems() {
+	m.cleareditems = true
+}
+
+// ItemsCleared reports if the "items" edge to the OutsourcingOrderItem entity was cleared.
+func (m *OutsourcingOrderMutation) ItemsCleared() bool {
+	return m.cleareditems
+}
+
+// RemoveItemIDs removes the "items" edge to the OutsourcingOrderItem entity by IDs.
+func (m *OutsourcingOrderMutation) RemoveItemIDs(ids ...int) {
+	if m.removeditems == nil {
+		m.removeditems = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.items, ids[i])
+		m.removeditems[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedItems returns the removed IDs of the "items" edge to the OutsourcingOrderItem entity.
+func (m *OutsourcingOrderMutation) RemovedItemsIDs() (ids []int) {
+	for id := range m.removeditems {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ItemsIDs returns the "items" edge IDs in the mutation.
+func (m *OutsourcingOrderMutation) ItemsIDs() (ids []int) {
+	for id := range m.items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetItems resets all changes to the "items" edge.
+func (m *OutsourcingOrderMutation) ResetItems() {
+	m.items = nil
+	m.cleareditems = false
+	m.removeditems = nil
+}
+
+// Where appends a list predicates to the OutsourcingOrderMutation builder.
+func (m *OutsourcingOrderMutation) Where(ps ...predicate.OutsourcingOrder) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the OutsourcingOrderMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *OutsourcingOrderMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.OutsourcingOrder, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *OutsourcingOrderMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *OutsourcingOrderMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (OutsourcingOrder).
+func (m *OutsourcingOrderMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *OutsourcingOrderMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.outsourcing_order_no != nil {
+		fields = append(fields, outsourcingorder.FieldOutsourcingOrderNo)
+	}
+	if m.supplier != nil {
+		fields = append(fields, outsourcingorder.FieldSupplierID)
+	}
+	if m.supplier_snapshot != nil {
+		fields = append(fields, outsourcingorder.FieldSupplierSnapshot)
+	}
+	if m.source_order_no != nil {
+		fields = append(fields, outsourcingorder.FieldSourceOrderNo)
+	}
+	if m.source_sales_order_id != nil {
+		fields = append(fields, outsourcingorder.FieldSourceSalesOrderID)
+	}
+	if m.order_date != nil {
+		fields = append(fields, outsourcingorder.FieldOrderDate)
+	}
+	if m.expected_return_date != nil {
+		fields = append(fields, outsourcingorder.FieldExpectedReturnDate)
+	}
+	if m.lifecycle_status != nil {
+		fields = append(fields, outsourcingorder.FieldLifecycleStatus)
+	}
+	if m.note != nil {
+		fields = append(fields, outsourcingorder.FieldNote)
+	}
+	if m.created_at != nil {
+		fields = append(fields, outsourcingorder.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, outsourcingorder.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *OutsourcingOrderMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case outsourcingorder.FieldOutsourcingOrderNo:
+		return m.OutsourcingOrderNo()
+	case outsourcingorder.FieldSupplierID:
+		return m.SupplierID()
+	case outsourcingorder.FieldSupplierSnapshot:
+		return m.SupplierSnapshot()
+	case outsourcingorder.FieldSourceOrderNo:
+		return m.SourceOrderNo()
+	case outsourcingorder.FieldSourceSalesOrderID:
+		return m.SourceSalesOrderID()
+	case outsourcingorder.FieldOrderDate:
+		return m.OrderDate()
+	case outsourcingorder.FieldExpectedReturnDate:
+		return m.ExpectedReturnDate()
+	case outsourcingorder.FieldLifecycleStatus:
+		return m.LifecycleStatus()
+	case outsourcingorder.FieldNote:
+		return m.Note()
+	case outsourcingorder.FieldCreatedAt:
+		return m.CreatedAt()
+	case outsourcingorder.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *OutsourcingOrderMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case outsourcingorder.FieldOutsourcingOrderNo:
+		return m.OldOutsourcingOrderNo(ctx)
+	case outsourcingorder.FieldSupplierID:
+		return m.OldSupplierID(ctx)
+	case outsourcingorder.FieldSupplierSnapshot:
+		return m.OldSupplierSnapshot(ctx)
+	case outsourcingorder.FieldSourceOrderNo:
+		return m.OldSourceOrderNo(ctx)
+	case outsourcingorder.FieldSourceSalesOrderID:
+		return m.OldSourceSalesOrderID(ctx)
+	case outsourcingorder.FieldOrderDate:
+		return m.OldOrderDate(ctx)
+	case outsourcingorder.FieldExpectedReturnDate:
+		return m.OldExpectedReturnDate(ctx)
+	case outsourcingorder.FieldLifecycleStatus:
+		return m.OldLifecycleStatus(ctx)
+	case outsourcingorder.FieldNote:
+		return m.OldNote(ctx)
+	case outsourcingorder.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case outsourcingorder.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown OutsourcingOrder field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *OutsourcingOrderMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case outsourcingorder.FieldOutsourcingOrderNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutsourcingOrderNo(v)
+		return nil
+	case outsourcingorder.FieldSupplierID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSupplierID(v)
+		return nil
+	case outsourcingorder.FieldSupplierSnapshot:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSupplierSnapshot(v)
+		return nil
+	case outsourcingorder.FieldSourceOrderNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceOrderNo(v)
+		return nil
+	case outsourcingorder.FieldSourceSalesOrderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceSalesOrderID(v)
+		return nil
+	case outsourcingorder.FieldOrderDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrderDate(v)
+		return nil
+	case outsourcingorder.FieldExpectedReturnDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpectedReturnDate(v)
+		return nil
+	case outsourcingorder.FieldLifecycleStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLifecycleStatus(v)
+		return nil
+	case outsourcingorder.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case outsourcingorder.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case outsourcingorder.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrder field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *OutsourcingOrderMutation) AddedFields() []string {
+	var fields []string
+	if m.addsource_sales_order_id != nil {
+		fields = append(fields, outsourcingorder.FieldSourceSalesOrderID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *OutsourcingOrderMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case outsourcingorder.FieldSourceSalesOrderID:
+		return m.AddedSourceSalesOrderID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *OutsourcingOrderMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case outsourcingorder.FieldSourceSalesOrderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSourceSalesOrderID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrder numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *OutsourcingOrderMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(outsourcingorder.FieldSupplierSnapshot) {
+		fields = append(fields, outsourcingorder.FieldSupplierSnapshot)
+	}
+	if m.FieldCleared(outsourcingorder.FieldSourceOrderNo) {
+		fields = append(fields, outsourcingorder.FieldSourceOrderNo)
+	}
+	if m.FieldCleared(outsourcingorder.FieldSourceSalesOrderID) {
+		fields = append(fields, outsourcingorder.FieldSourceSalesOrderID)
+	}
+	if m.FieldCleared(outsourcingorder.FieldExpectedReturnDate) {
+		fields = append(fields, outsourcingorder.FieldExpectedReturnDate)
+	}
+	if m.FieldCleared(outsourcingorder.FieldNote) {
+		fields = append(fields, outsourcingorder.FieldNote)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *OutsourcingOrderMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *OutsourcingOrderMutation) ClearField(name string) error {
+	switch name {
+	case outsourcingorder.FieldSupplierSnapshot:
+		m.ClearSupplierSnapshot()
+		return nil
+	case outsourcingorder.FieldSourceOrderNo:
+		m.ClearSourceOrderNo()
+		return nil
+	case outsourcingorder.FieldSourceSalesOrderID:
+		m.ClearSourceSalesOrderID()
+		return nil
+	case outsourcingorder.FieldExpectedReturnDate:
+		m.ClearExpectedReturnDate()
+		return nil
+	case outsourcingorder.FieldNote:
+		m.ClearNote()
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrder nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *OutsourcingOrderMutation) ResetField(name string) error {
+	switch name {
+	case outsourcingorder.FieldOutsourcingOrderNo:
+		m.ResetOutsourcingOrderNo()
+		return nil
+	case outsourcingorder.FieldSupplierID:
+		m.ResetSupplierID()
+		return nil
+	case outsourcingorder.FieldSupplierSnapshot:
+		m.ResetSupplierSnapshot()
+		return nil
+	case outsourcingorder.FieldSourceOrderNo:
+		m.ResetSourceOrderNo()
+		return nil
+	case outsourcingorder.FieldSourceSalesOrderID:
+		m.ResetSourceSalesOrderID()
+		return nil
+	case outsourcingorder.FieldOrderDate:
+		m.ResetOrderDate()
+		return nil
+	case outsourcingorder.FieldExpectedReturnDate:
+		m.ResetExpectedReturnDate()
+		return nil
+	case outsourcingorder.FieldLifecycleStatus:
+		m.ResetLifecycleStatus()
+		return nil
+	case outsourcingorder.FieldNote:
+		m.ResetNote()
+		return nil
+	case outsourcingorder.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case outsourcingorder.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrder field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *OutsourcingOrderMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.supplier != nil {
+		edges = append(edges, outsourcingorder.EdgeSupplier)
+	}
+	if m.items != nil {
+		edges = append(edges, outsourcingorder.EdgeItems)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *OutsourcingOrderMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case outsourcingorder.EdgeSupplier:
+		if id := m.supplier; id != nil {
+			return []ent.Value{*id}
+		}
+	case outsourcingorder.EdgeItems:
+		ids := make([]ent.Value, 0, len(m.items))
+		for id := range m.items {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *OutsourcingOrderMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.removeditems != nil {
+		edges = append(edges, outsourcingorder.EdgeItems)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *OutsourcingOrderMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case outsourcingorder.EdgeItems:
+		ids := make([]ent.Value, 0, len(m.removeditems))
+		for id := range m.removeditems {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *OutsourcingOrderMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedsupplier {
+		edges = append(edges, outsourcingorder.EdgeSupplier)
+	}
+	if m.cleareditems {
+		edges = append(edges, outsourcingorder.EdgeItems)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *OutsourcingOrderMutation) EdgeCleared(name string) bool {
+	switch name {
+	case outsourcingorder.EdgeSupplier:
+		return m.clearedsupplier
+	case outsourcingorder.EdgeItems:
+		return m.cleareditems
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *OutsourcingOrderMutation) ClearEdge(name string) error {
+	switch name {
+	case outsourcingorder.EdgeSupplier:
+		m.ClearSupplier()
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrder unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *OutsourcingOrderMutation) ResetEdge(name string) error {
+	switch name {
+	case outsourcingorder.EdgeSupplier:
+		m.ResetSupplier()
+		return nil
+	case outsourcingorder.EdgeItems:
+		m.ResetItems()
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrder edge %s", name)
+}
+
+// OutsourcingOrderItemMutation represents an operation that mutates the OutsourcingOrderItem nodes in the graph.
+type OutsourcingOrderItemMutation struct {
+	config
+	op                        Op
+	typ                       string
+	id                        *int
+	line_no                   *int
+	addline_no                *int
+	product_no_snapshot       *string
+	product_name_snapshot     *string
+	process_name_snapshot     *string
+	process_category_snapshot *string
+	unit_name_snapshot        *string
+	outsourcing_quantity      *decimal.Decimal
+	unit_price                *decimal.Decimal
+	amount                    *decimal.Decimal
+	expected_return_date      *time.Time
+	line_status               *string
+	note                      *string
+	created_at                *time.Time
+	updated_at                *time.Time
+	clearedFields             map[string]struct{}
+	outsourcing_order         *int
+	clearedoutsourcing_order  bool
+	product                   *int
+	clearedproduct            bool
+	process                   *int
+	clearedprocess            bool
+	unit                      *int
+	clearedunit               bool
+	done                      bool
+	oldValue                  func(context.Context) (*OutsourcingOrderItem, error)
+	predicates                []predicate.OutsourcingOrderItem
+}
+
+var _ ent.Mutation = (*OutsourcingOrderItemMutation)(nil)
+
+// outsourcingorderitemOption allows management of the mutation configuration using functional options.
+type outsourcingorderitemOption func(*OutsourcingOrderItemMutation)
+
+// newOutsourcingOrderItemMutation creates new mutation for the OutsourcingOrderItem entity.
+func newOutsourcingOrderItemMutation(c config, op Op, opts ...outsourcingorderitemOption) *OutsourcingOrderItemMutation {
+	m := &OutsourcingOrderItemMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeOutsourcingOrderItem,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withOutsourcingOrderItemID sets the ID field of the mutation.
+func withOutsourcingOrderItemID(id int) outsourcingorderitemOption {
+	return func(m *OutsourcingOrderItemMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *OutsourcingOrderItem
+		)
+		m.oldValue = func(ctx context.Context) (*OutsourcingOrderItem, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().OutsourcingOrderItem.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withOutsourcingOrderItem sets the old OutsourcingOrderItem of the mutation.
+func withOutsourcingOrderItem(node *OutsourcingOrderItem) outsourcingorderitemOption {
+	return func(m *OutsourcingOrderItemMutation) {
+		m.oldValue = func(context.Context) (*OutsourcingOrderItem, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m OutsourcingOrderItemMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m OutsourcingOrderItemMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *OutsourcingOrderItemMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *OutsourcingOrderItemMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().OutsourcingOrderItem.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOutsourcingOrderID sets the "outsourcing_order_id" field.
+func (m *OutsourcingOrderItemMutation) SetOutsourcingOrderID(i int) {
+	m.outsourcing_order = &i
+}
+
+// OutsourcingOrderID returns the value of the "outsourcing_order_id" field in the mutation.
+func (m *OutsourcingOrderItemMutation) OutsourcingOrderID() (r int, exists bool) {
+	v := m.outsourcing_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutsourcingOrderID returns the old "outsourcing_order_id" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldOutsourcingOrderID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutsourcingOrderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutsourcingOrderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutsourcingOrderID: %w", err)
+	}
+	return oldValue.OutsourcingOrderID, nil
+}
+
+// ResetOutsourcingOrderID resets all changes to the "outsourcing_order_id" field.
+func (m *OutsourcingOrderItemMutation) ResetOutsourcingOrderID() {
+	m.outsourcing_order = nil
+}
+
+// SetLineNo sets the "line_no" field.
+func (m *OutsourcingOrderItemMutation) SetLineNo(i int) {
+	m.line_no = &i
+	m.addline_no = nil
+}
+
+// LineNo returns the value of the "line_no" field in the mutation.
+func (m *OutsourcingOrderItemMutation) LineNo() (r int, exists bool) {
+	v := m.line_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLineNo returns the old "line_no" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldLineNo(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLineNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLineNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLineNo: %w", err)
+	}
+	return oldValue.LineNo, nil
+}
+
+// AddLineNo adds i to the "line_no" field.
+func (m *OutsourcingOrderItemMutation) AddLineNo(i int) {
+	if m.addline_no != nil {
+		*m.addline_no += i
+	} else {
+		m.addline_no = &i
+	}
+}
+
+// AddedLineNo returns the value that was added to the "line_no" field in this mutation.
+func (m *OutsourcingOrderItemMutation) AddedLineNo() (r int, exists bool) {
+	v := m.addline_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLineNo resets all changes to the "line_no" field.
+func (m *OutsourcingOrderItemMutation) ResetLineNo() {
+	m.line_no = nil
+	m.addline_no = nil
+}
+
+// SetProductID sets the "product_id" field.
+func (m *OutsourcingOrderItemMutation) SetProductID(i int) {
+	m.product = &i
+}
+
+// ProductID returns the value of the "product_id" field in the mutation.
+func (m *OutsourcingOrderItemMutation) ProductID() (r int, exists bool) {
+	v := m.product
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProductID returns the old "product_id" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldProductID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProductID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProductID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProductID: %w", err)
+	}
+	return oldValue.ProductID, nil
+}
+
+// ResetProductID resets all changes to the "product_id" field.
+func (m *OutsourcingOrderItemMutation) ResetProductID() {
+	m.product = nil
+}
+
+// SetProcessID sets the "process_id" field.
+func (m *OutsourcingOrderItemMutation) SetProcessID(i int) {
+	m.process = &i
+}
+
+// ProcessID returns the value of the "process_id" field in the mutation.
+func (m *OutsourcingOrderItemMutation) ProcessID() (r int, exists bool) {
+	v := m.process
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProcessID returns the old "process_id" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldProcessID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProcessID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProcessID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProcessID: %w", err)
+	}
+	return oldValue.ProcessID, nil
+}
+
+// ResetProcessID resets all changes to the "process_id" field.
+func (m *OutsourcingOrderItemMutation) ResetProcessID() {
+	m.process = nil
+}
+
+// SetUnitID sets the "unit_id" field.
+func (m *OutsourcingOrderItemMutation) SetUnitID(i int) {
+	m.unit = &i
+}
+
+// UnitID returns the value of the "unit_id" field in the mutation.
+func (m *OutsourcingOrderItemMutation) UnitID() (r int, exists bool) {
+	v := m.unit
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitID returns the old "unit_id" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldUnitID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitID: %w", err)
+	}
+	return oldValue.UnitID, nil
+}
+
+// ResetUnitID resets all changes to the "unit_id" field.
+func (m *OutsourcingOrderItemMutation) ResetUnitID() {
+	m.unit = nil
+}
+
+// SetProductNoSnapshot sets the "product_no_snapshot" field.
+func (m *OutsourcingOrderItemMutation) SetProductNoSnapshot(s string) {
+	m.product_no_snapshot = &s
+}
+
+// ProductNoSnapshot returns the value of the "product_no_snapshot" field in the mutation.
+func (m *OutsourcingOrderItemMutation) ProductNoSnapshot() (r string, exists bool) {
+	v := m.product_no_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProductNoSnapshot returns the old "product_no_snapshot" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldProductNoSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProductNoSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProductNoSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProductNoSnapshot: %w", err)
+	}
+	return oldValue.ProductNoSnapshot, nil
+}
+
+// ClearProductNoSnapshot clears the value of the "product_no_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ClearProductNoSnapshot() {
+	m.product_no_snapshot = nil
+	m.clearedFields[outsourcingorderitem.FieldProductNoSnapshot] = struct{}{}
+}
+
+// ProductNoSnapshotCleared returns if the "product_no_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) ProductNoSnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldProductNoSnapshot]
+	return ok
+}
+
+// ResetProductNoSnapshot resets all changes to the "product_no_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ResetProductNoSnapshot() {
+	m.product_no_snapshot = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldProductNoSnapshot)
+}
+
+// SetProductNameSnapshot sets the "product_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) SetProductNameSnapshot(s string) {
+	m.product_name_snapshot = &s
+}
+
+// ProductNameSnapshot returns the value of the "product_name_snapshot" field in the mutation.
+func (m *OutsourcingOrderItemMutation) ProductNameSnapshot() (r string, exists bool) {
+	v := m.product_name_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProductNameSnapshot returns the old "product_name_snapshot" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldProductNameSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProductNameSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProductNameSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProductNameSnapshot: %w", err)
+	}
+	return oldValue.ProductNameSnapshot, nil
+}
+
+// ClearProductNameSnapshot clears the value of the "product_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ClearProductNameSnapshot() {
+	m.product_name_snapshot = nil
+	m.clearedFields[outsourcingorderitem.FieldProductNameSnapshot] = struct{}{}
+}
+
+// ProductNameSnapshotCleared returns if the "product_name_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) ProductNameSnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldProductNameSnapshot]
+	return ok
+}
+
+// ResetProductNameSnapshot resets all changes to the "product_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ResetProductNameSnapshot() {
+	m.product_name_snapshot = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldProductNameSnapshot)
+}
+
+// SetProcessNameSnapshot sets the "process_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) SetProcessNameSnapshot(s string) {
+	m.process_name_snapshot = &s
+}
+
+// ProcessNameSnapshot returns the value of the "process_name_snapshot" field in the mutation.
+func (m *OutsourcingOrderItemMutation) ProcessNameSnapshot() (r string, exists bool) {
+	v := m.process_name_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProcessNameSnapshot returns the old "process_name_snapshot" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldProcessNameSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProcessNameSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProcessNameSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProcessNameSnapshot: %w", err)
+	}
+	return oldValue.ProcessNameSnapshot, nil
+}
+
+// ClearProcessNameSnapshot clears the value of the "process_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ClearProcessNameSnapshot() {
+	m.process_name_snapshot = nil
+	m.clearedFields[outsourcingorderitem.FieldProcessNameSnapshot] = struct{}{}
+}
+
+// ProcessNameSnapshotCleared returns if the "process_name_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) ProcessNameSnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldProcessNameSnapshot]
+	return ok
+}
+
+// ResetProcessNameSnapshot resets all changes to the "process_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ResetProcessNameSnapshot() {
+	m.process_name_snapshot = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldProcessNameSnapshot)
+}
+
+// SetProcessCategorySnapshot sets the "process_category_snapshot" field.
+func (m *OutsourcingOrderItemMutation) SetProcessCategorySnapshot(s string) {
+	m.process_category_snapshot = &s
+}
+
+// ProcessCategorySnapshot returns the value of the "process_category_snapshot" field in the mutation.
+func (m *OutsourcingOrderItemMutation) ProcessCategorySnapshot() (r string, exists bool) {
+	v := m.process_category_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProcessCategorySnapshot returns the old "process_category_snapshot" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldProcessCategorySnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProcessCategorySnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProcessCategorySnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProcessCategorySnapshot: %w", err)
+	}
+	return oldValue.ProcessCategorySnapshot, nil
+}
+
+// ClearProcessCategorySnapshot clears the value of the "process_category_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ClearProcessCategorySnapshot() {
+	m.process_category_snapshot = nil
+	m.clearedFields[outsourcingorderitem.FieldProcessCategorySnapshot] = struct{}{}
+}
+
+// ProcessCategorySnapshotCleared returns if the "process_category_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) ProcessCategorySnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldProcessCategorySnapshot]
+	return ok
+}
+
+// ResetProcessCategorySnapshot resets all changes to the "process_category_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ResetProcessCategorySnapshot() {
+	m.process_category_snapshot = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldProcessCategorySnapshot)
+}
+
+// SetUnitNameSnapshot sets the "unit_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) SetUnitNameSnapshot(s string) {
+	m.unit_name_snapshot = &s
+}
+
+// UnitNameSnapshot returns the value of the "unit_name_snapshot" field in the mutation.
+func (m *OutsourcingOrderItemMutation) UnitNameSnapshot() (r string, exists bool) {
+	v := m.unit_name_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitNameSnapshot returns the old "unit_name_snapshot" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldUnitNameSnapshot(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitNameSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitNameSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitNameSnapshot: %w", err)
+	}
+	return oldValue.UnitNameSnapshot, nil
+}
+
+// ClearUnitNameSnapshot clears the value of the "unit_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ClearUnitNameSnapshot() {
+	m.unit_name_snapshot = nil
+	m.clearedFields[outsourcingorderitem.FieldUnitNameSnapshot] = struct{}{}
+}
+
+// UnitNameSnapshotCleared returns if the "unit_name_snapshot" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) UnitNameSnapshotCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldUnitNameSnapshot]
+	return ok
+}
+
+// ResetUnitNameSnapshot resets all changes to the "unit_name_snapshot" field.
+func (m *OutsourcingOrderItemMutation) ResetUnitNameSnapshot() {
+	m.unit_name_snapshot = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldUnitNameSnapshot)
+}
+
+// SetOutsourcingQuantity sets the "outsourcing_quantity" field.
+func (m *OutsourcingOrderItemMutation) SetOutsourcingQuantity(d decimal.Decimal) {
+	m.outsourcing_quantity = &d
+}
+
+// OutsourcingQuantity returns the value of the "outsourcing_quantity" field in the mutation.
+func (m *OutsourcingOrderItemMutation) OutsourcingQuantity() (r decimal.Decimal, exists bool) {
+	v := m.outsourcing_quantity
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutsourcingQuantity returns the old "outsourcing_quantity" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldOutsourcingQuantity(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutsourcingQuantity is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutsourcingQuantity requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutsourcingQuantity: %w", err)
+	}
+	return oldValue.OutsourcingQuantity, nil
+}
+
+// ResetOutsourcingQuantity resets all changes to the "outsourcing_quantity" field.
+func (m *OutsourcingOrderItemMutation) ResetOutsourcingQuantity() {
+	m.outsourcing_quantity = nil
+}
+
+// SetUnitPrice sets the "unit_price" field.
+func (m *OutsourcingOrderItemMutation) SetUnitPrice(d decimal.Decimal) {
+	m.unit_price = &d
+}
+
+// UnitPrice returns the value of the "unit_price" field in the mutation.
+func (m *OutsourcingOrderItemMutation) UnitPrice() (r decimal.Decimal, exists bool) {
+	v := m.unit_price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitPrice returns the old "unit_price" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldUnitPrice(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitPrice: %w", err)
+	}
+	return oldValue.UnitPrice, nil
+}
+
+// ClearUnitPrice clears the value of the "unit_price" field.
+func (m *OutsourcingOrderItemMutation) ClearUnitPrice() {
+	m.unit_price = nil
+	m.clearedFields[outsourcingorderitem.FieldUnitPrice] = struct{}{}
+}
+
+// UnitPriceCleared returns if the "unit_price" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) UnitPriceCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldUnitPrice]
+	return ok
+}
+
+// ResetUnitPrice resets all changes to the "unit_price" field.
+func (m *OutsourcingOrderItemMutation) ResetUnitPrice() {
+	m.unit_price = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldUnitPrice)
+}
+
+// SetAmount sets the "amount" field.
+func (m *OutsourcingOrderItemMutation) SetAmount(d decimal.Decimal) {
+	m.amount = &d
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *OutsourcingOrderItemMutation) Amount() (r decimal.Decimal, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldAmount(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// ClearAmount clears the value of the "amount" field.
+func (m *OutsourcingOrderItemMutation) ClearAmount() {
+	m.amount = nil
+	m.clearedFields[outsourcingorderitem.FieldAmount] = struct{}{}
+}
+
+// AmountCleared returns if the "amount" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) AmountCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldAmount]
+	return ok
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *OutsourcingOrderItemMutation) ResetAmount() {
+	m.amount = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldAmount)
+}
+
+// SetExpectedReturnDate sets the "expected_return_date" field.
+func (m *OutsourcingOrderItemMutation) SetExpectedReturnDate(t time.Time) {
+	m.expected_return_date = &t
+}
+
+// ExpectedReturnDate returns the value of the "expected_return_date" field in the mutation.
+func (m *OutsourcingOrderItemMutation) ExpectedReturnDate() (r time.Time, exists bool) {
+	v := m.expected_return_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpectedReturnDate returns the old "expected_return_date" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldExpectedReturnDate(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpectedReturnDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpectedReturnDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpectedReturnDate: %w", err)
+	}
+	return oldValue.ExpectedReturnDate, nil
+}
+
+// ClearExpectedReturnDate clears the value of the "expected_return_date" field.
+func (m *OutsourcingOrderItemMutation) ClearExpectedReturnDate() {
+	m.expected_return_date = nil
+	m.clearedFields[outsourcingorderitem.FieldExpectedReturnDate] = struct{}{}
+}
+
+// ExpectedReturnDateCleared returns if the "expected_return_date" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) ExpectedReturnDateCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldExpectedReturnDate]
+	return ok
+}
+
+// ResetExpectedReturnDate resets all changes to the "expected_return_date" field.
+func (m *OutsourcingOrderItemMutation) ResetExpectedReturnDate() {
+	m.expected_return_date = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldExpectedReturnDate)
+}
+
+// SetLineStatus sets the "line_status" field.
+func (m *OutsourcingOrderItemMutation) SetLineStatus(s string) {
+	m.line_status = &s
+}
+
+// LineStatus returns the value of the "line_status" field in the mutation.
+func (m *OutsourcingOrderItemMutation) LineStatus() (r string, exists bool) {
+	v := m.line_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLineStatus returns the old "line_status" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldLineStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLineStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLineStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLineStatus: %w", err)
+	}
+	return oldValue.LineStatus, nil
+}
+
+// ResetLineStatus resets all changes to the "line_status" field.
+func (m *OutsourcingOrderItemMutation) ResetLineStatus() {
+	m.line_status = nil
+}
+
+// SetNote sets the "note" field.
+func (m *OutsourcingOrderItemMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *OutsourcingOrderItemMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *OutsourcingOrderItemMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[outsourcingorderitem.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[outsourcingorderitem.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *OutsourcingOrderItemMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, outsourcingorderitem.FieldNote)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *OutsourcingOrderItemMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *OutsourcingOrderItemMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *OutsourcingOrderItemMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *OutsourcingOrderItemMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *OutsourcingOrderItemMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the OutsourcingOrderItem entity.
+// If the OutsourcingOrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderItemMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *OutsourcingOrderItemMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearOutsourcingOrder clears the "outsourcing_order" edge to the OutsourcingOrder entity.
+func (m *OutsourcingOrderItemMutation) ClearOutsourcingOrder() {
+	m.clearedoutsourcing_order = true
+	m.clearedFields[outsourcingorderitem.FieldOutsourcingOrderID] = struct{}{}
+}
+
+// OutsourcingOrderCleared reports if the "outsourcing_order" edge to the OutsourcingOrder entity was cleared.
+func (m *OutsourcingOrderItemMutation) OutsourcingOrderCleared() bool {
+	return m.clearedoutsourcing_order
+}
+
+// OutsourcingOrderIDs returns the "outsourcing_order" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// OutsourcingOrderID instead. It exists only for internal usage by the builders.
+func (m *OutsourcingOrderItemMutation) OutsourcingOrderIDs() (ids []int) {
+	if id := m.outsourcing_order; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetOutsourcingOrder resets all changes to the "outsourcing_order" edge.
+func (m *OutsourcingOrderItemMutation) ResetOutsourcingOrder() {
+	m.outsourcing_order = nil
+	m.clearedoutsourcing_order = false
+}
+
+// ClearProduct clears the "product" edge to the Product entity.
+func (m *OutsourcingOrderItemMutation) ClearProduct() {
+	m.clearedproduct = true
+	m.clearedFields[outsourcingorderitem.FieldProductID] = struct{}{}
+}
+
+// ProductCleared reports if the "product" edge to the Product entity was cleared.
+func (m *OutsourcingOrderItemMutation) ProductCleared() bool {
+	return m.clearedproduct
+}
+
+// ProductIDs returns the "product" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProductID instead. It exists only for internal usage by the builders.
+func (m *OutsourcingOrderItemMutation) ProductIDs() (ids []int) {
+	if id := m.product; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProduct resets all changes to the "product" edge.
+func (m *OutsourcingOrderItemMutation) ResetProduct() {
+	m.product = nil
+	m.clearedproduct = false
+}
+
+// ClearProcess clears the "process" edge to the Process entity.
+func (m *OutsourcingOrderItemMutation) ClearProcess() {
+	m.clearedprocess = true
+	m.clearedFields[outsourcingorderitem.FieldProcessID] = struct{}{}
+}
+
+// ProcessCleared reports if the "process" edge to the Process entity was cleared.
+func (m *OutsourcingOrderItemMutation) ProcessCleared() bool {
+	return m.clearedprocess
+}
+
+// ProcessIDs returns the "process" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProcessID instead. It exists only for internal usage by the builders.
+func (m *OutsourcingOrderItemMutation) ProcessIDs() (ids []int) {
+	if id := m.process; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProcess resets all changes to the "process" edge.
+func (m *OutsourcingOrderItemMutation) ResetProcess() {
+	m.process = nil
+	m.clearedprocess = false
+}
+
+// ClearUnit clears the "unit" edge to the Unit entity.
+func (m *OutsourcingOrderItemMutation) ClearUnit() {
+	m.clearedunit = true
+	m.clearedFields[outsourcingorderitem.FieldUnitID] = struct{}{}
+}
+
+// UnitCleared reports if the "unit" edge to the Unit entity was cleared.
+func (m *OutsourcingOrderItemMutation) UnitCleared() bool {
+	return m.clearedunit
+}
+
+// UnitIDs returns the "unit" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// UnitID instead. It exists only for internal usage by the builders.
+func (m *OutsourcingOrderItemMutation) UnitIDs() (ids []int) {
+	if id := m.unit; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetUnit resets all changes to the "unit" edge.
+func (m *OutsourcingOrderItemMutation) ResetUnit() {
+	m.unit = nil
+	m.clearedunit = false
+}
+
+// Where appends a list predicates to the OutsourcingOrderItemMutation builder.
+func (m *OutsourcingOrderItemMutation) Where(ps ...predicate.OutsourcingOrderItem) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the OutsourcingOrderItemMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *OutsourcingOrderItemMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.OutsourcingOrderItem, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *OutsourcingOrderItemMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *OutsourcingOrderItemMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (OutsourcingOrderItem).
+func (m *OutsourcingOrderItemMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *OutsourcingOrderItemMutation) Fields() []string {
+	fields := make([]string, 0, 18)
+	if m.outsourcing_order != nil {
+		fields = append(fields, outsourcingorderitem.FieldOutsourcingOrderID)
+	}
+	if m.line_no != nil {
+		fields = append(fields, outsourcingorderitem.FieldLineNo)
+	}
+	if m.product != nil {
+		fields = append(fields, outsourcingorderitem.FieldProductID)
+	}
+	if m.process != nil {
+		fields = append(fields, outsourcingorderitem.FieldProcessID)
+	}
+	if m.unit != nil {
+		fields = append(fields, outsourcingorderitem.FieldUnitID)
+	}
+	if m.product_no_snapshot != nil {
+		fields = append(fields, outsourcingorderitem.FieldProductNoSnapshot)
+	}
+	if m.product_name_snapshot != nil {
+		fields = append(fields, outsourcingorderitem.FieldProductNameSnapshot)
+	}
+	if m.process_name_snapshot != nil {
+		fields = append(fields, outsourcingorderitem.FieldProcessNameSnapshot)
+	}
+	if m.process_category_snapshot != nil {
+		fields = append(fields, outsourcingorderitem.FieldProcessCategorySnapshot)
+	}
+	if m.unit_name_snapshot != nil {
+		fields = append(fields, outsourcingorderitem.FieldUnitNameSnapshot)
+	}
+	if m.outsourcing_quantity != nil {
+		fields = append(fields, outsourcingorderitem.FieldOutsourcingQuantity)
+	}
+	if m.unit_price != nil {
+		fields = append(fields, outsourcingorderitem.FieldUnitPrice)
+	}
+	if m.amount != nil {
+		fields = append(fields, outsourcingorderitem.FieldAmount)
+	}
+	if m.expected_return_date != nil {
+		fields = append(fields, outsourcingorderitem.FieldExpectedReturnDate)
+	}
+	if m.line_status != nil {
+		fields = append(fields, outsourcingorderitem.FieldLineStatus)
+	}
+	if m.note != nil {
+		fields = append(fields, outsourcingorderitem.FieldNote)
+	}
+	if m.created_at != nil {
+		fields = append(fields, outsourcingorderitem.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, outsourcingorderitem.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *OutsourcingOrderItemMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case outsourcingorderitem.FieldOutsourcingOrderID:
+		return m.OutsourcingOrderID()
+	case outsourcingorderitem.FieldLineNo:
+		return m.LineNo()
+	case outsourcingorderitem.FieldProductID:
+		return m.ProductID()
+	case outsourcingorderitem.FieldProcessID:
+		return m.ProcessID()
+	case outsourcingorderitem.FieldUnitID:
+		return m.UnitID()
+	case outsourcingorderitem.FieldProductNoSnapshot:
+		return m.ProductNoSnapshot()
+	case outsourcingorderitem.FieldProductNameSnapshot:
+		return m.ProductNameSnapshot()
+	case outsourcingorderitem.FieldProcessNameSnapshot:
+		return m.ProcessNameSnapshot()
+	case outsourcingorderitem.FieldProcessCategorySnapshot:
+		return m.ProcessCategorySnapshot()
+	case outsourcingorderitem.FieldUnitNameSnapshot:
+		return m.UnitNameSnapshot()
+	case outsourcingorderitem.FieldOutsourcingQuantity:
+		return m.OutsourcingQuantity()
+	case outsourcingorderitem.FieldUnitPrice:
+		return m.UnitPrice()
+	case outsourcingorderitem.FieldAmount:
+		return m.Amount()
+	case outsourcingorderitem.FieldExpectedReturnDate:
+		return m.ExpectedReturnDate()
+	case outsourcingorderitem.FieldLineStatus:
+		return m.LineStatus()
+	case outsourcingorderitem.FieldNote:
+		return m.Note()
+	case outsourcingorderitem.FieldCreatedAt:
+		return m.CreatedAt()
+	case outsourcingorderitem.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *OutsourcingOrderItemMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case outsourcingorderitem.FieldOutsourcingOrderID:
+		return m.OldOutsourcingOrderID(ctx)
+	case outsourcingorderitem.FieldLineNo:
+		return m.OldLineNo(ctx)
+	case outsourcingorderitem.FieldProductID:
+		return m.OldProductID(ctx)
+	case outsourcingorderitem.FieldProcessID:
+		return m.OldProcessID(ctx)
+	case outsourcingorderitem.FieldUnitID:
+		return m.OldUnitID(ctx)
+	case outsourcingorderitem.FieldProductNoSnapshot:
+		return m.OldProductNoSnapshot(ctx)
+	case outsourcingorderitem.FieldProductNameSnapshot:
+		return m.OldProductNameSnapshot(ctx)
+	case outsourcingorderitem.FieldProcessNameSnapshot:
+		return m.OldProcessNameSnapshot(ctx)
+	case outsourcingorderitem.FieldProcessCategorySnapshot:
+		return m.OldProcessCategorySnapshot(ctx)
+	case outsourcingorderitem.FieldUnitNameSnapshot:
+		return m.OldUnitNameSnapshot(ctx)
+	case outsourcingorderitem.FieldOutsourcingQuantity:
+		return m.OldOutsourcingQuantity(ctx)
+	case outsourcingorderitem.FieldUnitPrice:
+		return m.OldUnitPrice(ctx)
+	case outsourcingorderitem.FieldAmount:
+		return m.OldAmount(ctx)
+	case outsourcingorderitem.FieldExpectedReturnDate:
+		return m.OldExpectedReturnDate(ctx)
+	case outsourcingorderitem.FieldLineStatus:
+		return m.OldLineStatus(ctx)
+	case outsourcingorderitem.FieldNote:
+		return m.OldNote(ctx)
+	case outsourcingorderitem.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case outsourcingorderitem.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown OutsourcingOrderItem field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *OutsourcingOrderItemMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case outsourcingorderitem.FieldOutsourcingOrderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutsourcingOrderID(v)
+		return nil
+	case outsourcingorderitem.FieldLineNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLineNo(v)
+		return nil
+	case outsourcingorderitem.FieldProductID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProductID(v)
+		return nil
+	case outsourcingorderitem.FieldProcessID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProcessID(v)
+		return nil
+	case outsourcingorderitem.FieldUnitID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitID(v)
+		return nil
+	case outsourcingorderitem.FieldProductNoSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProductNoSnapshot(v)
+		return nil
+	case outsourcingorderitem.FieldProductNameSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProductNameSnapshot(v)
+		return nil
+	case outsourcingorderitem.FieldProcessNameSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProcessNameSnapshot(v)
+		return nil
+	case outsourcingorderitem.FieldProcessCategorySnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProcessCategorySnapshot(v)
+		return nil
+	case outsourcingorderitem.FieldUnitNameSnapshot:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitNameSnapshot(v)
+		return nil
+	case outsourcingorderitem.FieldOutsourcingQuantity:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutsourcingQuantity(v)
+		return nil
+	case outsourcingorderitem.FieldUnitPrice:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitPrice(v)
+		return nil
+	case outsourcingorderitem.FieldAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
+		return nil
+	case outsourcingorderitem.FieldExpectedReturnDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpectedReturnDate(v)
+		return nil
+	case outsourcingorderitem.FieldLineStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLineStatus(v)
+		return nil
+	case outsourcingorderitem.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case outsourcingorderitem.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case outsourcingorderitem.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrderItem field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *OutsourcingOrderItemMutation) AddedFields() []string {
+	var fields []string
+	if m.addline_no != nil {
+		fields = append(fields, outsourcingorderitem.FieldLineNo)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *OutsourcingOrderItemMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case outsourcingorderitem.FieldLineNo:
+		return m.AddedLineNo()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *OutsourcingOrderItemMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case outsourcingorderitem.FieldLineNo:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLineNo(v)
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrderItem numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *OutsourcingOrderItemMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(outsourcingorderitem.FieldProductNoSnapshot) {
+		fields = append(fields, outsourcingorderitem.FieldProductNoSnapshot)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldProductNameSnapshot) {
+		fields = append(fields, outsourcingorderitem.FieldProductNameSnapshot)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldProcessNameSnapshot) {
+		fields = append(fields, outsourcingorderitem.FieldProcessNameSnapshot)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldProcessCategorySnapshot) {
+		fields = append(fields, outsourcingorderitem.FieldProcessCategorySnapshot)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldUnitNameSnapshot) {
+		fields = append(fields, outsourcingorderitem.FieldUnitNameSnapshot)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldUnitPrice) {
+		fields = append(fields, outsourcingorderitem.FieldUnitPrice)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldAmount) {
+		fields = append(fields, outsourcingorderitem.FieldAmount)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldExpectedReturnDate) {
+		fields = append(fields, outsourcingorderitem.FieldExpectedReturnDate)
+	}
+	if m.FieldCleared(outsourcingorderitem.FieldNote) {
+		fields = append(fields, outsourcingorderitem.FieldNote)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *OutsourcingOrderItemMutation) ClearField(name string) error {
+	switch name {
+	case outsourcingorderitem.FieldProductNoSnapshot:
+		m.ClearProductNoSnapshot()
+		return nil
+	case outsourcingorderitem.FieldProductNameSnapshot:
+		m.ClearProductNameSnapshot()
+		return nil
+	case outsourcingorderitem.FieldProcessNameSnapshot:
+		m.ClearProcessNameSnapshot()
+		return nil
+	case outsourcingorderitem.FieldProcessCategorySnapshot:
+		m.ClearProcessCategorySnapshot()
+		return nil
+	case outsourcingorderitem.FieldUnitNameSnapshot:
+		m.ClearUnitNameSnapshot()
+		return nil
+	case outsourcingorderitem.FieldUnitPrice:
+		m.ClearUnitPrice()
+		return nil
+	case outsourcingorderitem.FieldAmount:
+		m.ClearAmount()
+		return nil
+	case outsourcingorderitem.FieldExpectedReturnDate:
+		m.ClearExpectedReturnDate()
+		return nil
+	case outsourcingorderitem.FieldNote:
+		m.ClearNote()
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrderItem nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *OutsourcingOrderItemMutation) ResetField(name string) error {
+	switch name {
+	case outsourcingorderitem.FieldOutsourcingOrderID:
+		m.ResetOutsourcingOrderID()
+		return nil
+	case outsourcingorderitem.FieldLineNo:
+		m.ResetLineNo()
+		return nil
+	case outsourcingorderitem.FieldProductID:
+		m.ResetProductID()
+		return nil
+	case outsourcingorderitem.FieldProcessID:
+		m.ResetProcessID()
+		return nil
+	case outsourcingorderitem.FieldUnitID:
+		m.ResetUnitID()
+		return nil
+	case outsourcingorderitem.FieldProductNoSnapshot:
+		m.ResetProductNoSnapshot()
+		return nil
+	case outsourcingorderitem.FieldProductNameSnapshot:
+		m.ResetProductNameSnapshot()
+		return nil
+	case outsourcingorderitem.FieldProcessNameSnapshot:
+		m.ResetProcessNameSnapshot()
+		return nil
+	case outsourcingorderitem.FieldProcessCategorySnapshot:
+		m.ResetProcessCategorySnapshot()
+		return nil
+	case outsourcingorderitem.FieldUnitNameSnapshot:
+		m.ResetUnitNameSnapshot()
+		return nil
+	case outsourcingorderitem.FieldOutsourcingQuantity:
+		m.ResetOutsourcingQuantity()
+		return nil
+	case outsourcingorderitem.FieldUnitPrice:
+		m.ResetUnitPrice()
+		return nil
+	case outsourcingorderitem.FieldAmount:
+		m.ResetAmount()
+		return nil
+	case outsourcingorderitem.FieldExpectedReturnDate:
+		m.ResetExpectedReturnDate()
+		return nil
+	case outsourcingorderitem.FieldLineStatus:
+		m.ResetLineStatus()
+		return nil
+	case outsourcingorderitem.FieldNote:
+		m.ResetNote()
+		return nil
+	case outsourcingorderitem.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case outsourcingorderitem.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrderItem field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *OutsourcingOrderItemMutation) AddedEdges() []string {
+	edges := make([]string, 0, 4)
+	if m.outsourcing_order != nil {
+		edges = append(edges, outsourcingorderitem.EdgeOutsourcingOrder)
+	}
+	if m.product != nil {
+		edges = append(edges, outsourcingorderitem.EdgeProduct)
+	}
+	if m.process != nil {
+		edges = append(edges, outsourcingorderitem.EdgeProcess)
+	}
+	if m.unit != nil {
+		edges = append(edges, outsourcingorderitem.EdgeUnit)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *OutsourcingOrderItemMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case outsourcingorderitem.EdgeOutsourcingOrder:
+		if id := m.outsourcing_order; id != nil {
+			return []ent.Value{*id}
+		}
+	case outsourcingorderitem.EdgeProduct:
+		if id := m.product; id != nil {
+			return []ent.Value{*id}
+		}
+	case outsourcingorderitem.EdgeProcess:
+		if id := m.process; id != nil {
+			return []ent.Value{*id}
+		}
+	case outsourcingorderitem.EdgeUnit:
+		if id := m.unit; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *OutsourcingOrderItemMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 4)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *OutsourcingOrderItemMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 4)
+	if m.clearedoutsourcing_order {
+		edges = append(edges, outsourcingorderitem.EdgeOutsourcingOrder)
+	}
+	if m.clearedproduct {
+		edges = append(edges, outsourcingorderitem.EdgeProduct)
+	}
+	if m.clearedprocess {
+		edges = append(edges, outsourcingorderitem.EdgeProcess)
+	}
+	if m.clearedunit {
+		edges = append(edges, outsourcingorderitem.EdgeUnit)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *OutsourcingOrderItemMutation) EdgeCleared(name string) bool {
+	switch name {
+	case outsourcingorderitem.EdgeOutsourcingOrder:
+		return m.clearedoutsourcing_order
+	case outsourcingorderitem.EdgeProduct:
+		return m.clearedproduct
+	case outsourcingorderitem.EdgeProcess:
+		return m.clearedprocess
+	case outsourcingorderitem.EdgeUnit:
+		return m.clearedunit
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *OutsourcingOrderItemMutation) ClearEdge(name string) error {
+	switch name {
+	case outsourcingorderitem.EdgeOutsourcingOrder:
+		m.ClearOutsourcingOrder()
+		return nil
+	case outsourcingorderitem.EdgeProduct:
+		m.ClearProduct()
+		return nil
+	case outsourcingorderitem.EdgeProcess:
+		m.ClearProcess()
+		return nil
+	case outsourcingorderitem.EdgeUnit:
+		m.ClearUnit()
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrderItem unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *OutsourcingOrderItemMutation) ResetEdge(name string) error {
+	switch name {
+	case outsourcingorderitem.EdgeOutsourcingOrder:
+		m.ResetOutsourcingOrder()
+		return nil
+	case outsourcingorderitem.EdgeProduct:
+		m.ResetProduct()
+		return nil
+	case outsourcingorderitem.EdgeProcess:
+		m.ResetProcess()
+		return nil
+	case outsourcingorderitem.EdgeUnit:
+		m.ResetUnit()
+		return nil
+	}
+	return fmt.Errorf("unknown OutsourcingOrderItem edge %s", name)
+}
+
 // PermissionMutation represents an operation that mutates the Permission nodes in the graph.
 type PermissionMutation struct {
 	config
@@ -15123,37 +17915,1076 @@ func (m *PermissionMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Permission edge %s", name)
 }
 
+// ProcessMutation represents an operation that mutates the Process nodes in the graph.
+type ProcessMutation struct {
+	config
+	op                             Op
+	typ                            string
+	id                             *int
+	code                           *string
+	name                           *string
+	category                       *string
+	outsourcing_enabled            *bool
+	inhouse_enabled                *bool
+	quality_required               *bool
+	sort_order                     *int
+	addsort_order                  *int
+	note                           *string
+	is_active                      *bool
+	created_at                     *time.Time
+	updated_at                     *time.Time
+	clearedFields                  map[string]struct{}
+	outsourcing_order_items        map[int]struct{}
+	removedoutsourcing_order_items map[int]struct{}
+	clearedoutsourcing_order_items bool
+	done                           bool
+	oldValue                       func(context.Context) (*Process, error)
+	predicates                     []predicate.Process
+}
+
+var _ ent.Mutation = (*ProcessMutation)(nil)
+
+// processOption allows management of the mutation configuration using functional options.
+type processOption func(*ProcessMutation)
+
+// newProcessMutation creates new mutation for the Process entity.
+func newProcessMutation(c config, op Op, opts ...processOption) *ProcessMutation {
+	m := &ProcessMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeProcess,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withProcessID sets the ID field of the mutation.
+func withProcessID(id int) processOption {
+	return func(m *ProcessMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Process
+		)
+		m.oldValue = func(ctx context.Context) (*Process, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Process.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withProcess sets the old Process of the mutation.
+func withProcess(node *Process) processOption {
+	return func(m *ProcessMutation) {
+		m.oldValue = func(context.Context) (*Process, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ProcessMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ProcessMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ProcessMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ProcessMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Process.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCode sets the "code" field.
+func (m *ProcessMutation) SetCode(s string) {
+	m.code = &s
+}
+
+// Code returns the value of the "code" field in the mutation.
+func (m *ProcessMutation) Code() (r string, exists bool) {
+	v := m.code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCode returns the old "code" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCode: %w", err)
+	}
+	return oldValue.Code, nil
+}
+
+// ResetCode resets all changes to the "code" field.
+func (m *ProcessMutation) ResetCode() {
+	m.code = nil
+}
+
+// SetName sets the "name" field.
+func (m *ProcessMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *ProcessMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *ProcessMutation) ResetName() {
+	m.name = nil
+}
+
+// SetCategory sets the "category" field.
+func (m *ProcessMutation) SetCategory(s string) {
+	m.category = &s
+}
+
+// Category returns the value of the "category" field in the mutation.
+func (m *ProcessMutation) Category() (r string, exists bool) {
+	v := m.category
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCategory returns the old "category" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldCategory(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCategory is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCategory requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCategory: %w", err)
+	}
+	return oldValue.Category, nil
+}
+
+// ClearCategory clears the value of the "category" field.
+func (m *ProcessMutation) ClearCategory() {
+	m.category = nil
+	m.clearedFields[process.FieldCategory] = struct{}{}
+}
+
+// CategoryCleared returns if the "category" field was cleared in this mutation.
+func (m *ProcessMutation) CategoryCleared() bool {
+	_, ok := m.clearedFields[process.FieldCategory]
+	return ok
+}
+
+// ResetCategory resets all changes to the "category" field.
+func (m *ProcessMutation) ResetCategory() {
+	m.category = nil
+	delete(m.clearedFields, process.FieldCategory)
+}
+
+// SetOutsourcingEnabled sets the "outsourcing_enabled" field.
+func (m *ProcessMutation) SetOutsourcingEnabled(b bool) {
+	m.outsourcing_enabled = &b
+}
+
+// OutsourcingEnabled returns the value of the "outsourcing_enabled" field in the mutation.
+func (m *ProcessMutation) OutsourcingEnabled() (r bool, exists bool) {
+	v := m.outsourcing_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutsourcingEnabled returns the old "outsourcing_enabled" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldOutsourcingEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutsourcingEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutsourcingEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutsourcingEnabled: %w", err)
+	}
+	return oldValue.OutsourcingEnabled, nil
+}
+
+// ResetOutsourcingEnabled resets all changes to the "outsourcing_enabled" field.
+func (m *ProcessMutation) ResetOutsourcingEnabled() {
+	m.outsourcing_enabled = nil
+}
+
+// SetInhouseEnabled sets the "inhouse_enabled" field.
+func (m *ProcessMutation) SetInhouseEnabled(b bool) {
+	m.inhouse_enabled = &b
+}
+
+// InhouseEnabled returns the value of the "inhouse_enabled" field in the mutation.
+func (m *ProcessMutation) InhouseEnabled() (r bool, exists bool) {
+	v := m.inhouse_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInhouseEnabled returns the old "inhouse_enabled" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldInhouseEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInhouseEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInhouseEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInhouseEnabled: %w", err)
+	}
+	return oldValue.InhouseEnabled, nil
+}
+
+// ResetInhouseEnabled resets all changes to the "inhouse_enabled" field.
+func (m *ProcessMutation) ResetInhouseEnabled() {
+	m.inhouse_enabled = nil
+}
+
+// SetQualityRequired sets the "quality_required" field.
+func (m *ProcessMutation) SetQualityRequired(b bool) {
+	m.quality_required = &b
+}
+
+// QualityRequired returns the value of the "quality_required" field in the mutation.
+func (m *ProcessMutation) QualityRequired() (r bool, exists bool) {
+	v := m.quality_required
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQualityRequired returns the old "quality_required" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldQualityRequired(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQualityRequired is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQualityRequired requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQualityRequired: %w", err)
+	}
+	return oldValue.QualityRequired, nil
+}
+
+// ResetQualityRequired resets all changes to the "quality_required" field.
+func (m *ProcessMutation) ResetQualityRequired() {
+	m.quality_required = nil
+}
+
+// SetSortOrder sets the "sort_order" field.
+func (m *ProcessMutation) SetSortOrder(i int) {
+	m.sort_order = &i
+	m.addsort_order = nil
+}
+
+// SortOrder returns the value of the "sort_order" field in the mutation.
+func (m *ProcessMutation) SortOrder() (r int, exists bool) {
+	v := m.sort_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSortOrder returns the old "sort_order" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldSortOrder(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSortOrder is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSortOrder requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSortOrder: %w", err)
+	}
+	return oldValue.SortOrder, nil
+}
+
+// AddSortOrder adds i to the "sort_order" field.
+func (m *ProcessMutation) AddSortOrder(i int) {
+	if m.addsort_order != nil {
+		*m.addsort_order += i
+	} else {
+		m.addsort_order = &i
+	}
+}
+
+// AddedSortOrder returns the value that was added to the "sort_order" field in this mutation.
+func (m *ProcessMutation) AddedSortOrder() (r int, exists bool) {
+	v := m.addsort_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSortOrder resets all changes to the "sort_order" field.
+func (m *ProcessMutation) ResetSortOrder() {
+	m.sort_order = nil
+	m.addsort_order = nil
+}
+
+// SetNote sets the "note" field.
+func (m *ProcessMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *ProcessMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *ProcessMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[process.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *ProcessMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[process.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *ProcessMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, process.FieldNote)
+}
+
+// SetIsActive sets the "is_active" field.
+func (m *ProcessMutation) SetIsActive(b bool) {
+	m.is_active = &b
+}
+
+// IsActive returns the value of the "is_active" field in the mutation.
+func (m *ProcessMutation) IsActive() (r bool, exists bool) {
+	v := m.is_active
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsActive returns the old "is_active" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldIsActive(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsActive is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsActive requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsActive: %w", err)
+	}
+	return oldValue.IsActive, nil
+}
+
+// ResetIsActive resets all changes to the "is_active" field.
+func (m *ProcessMutation) ResetIsActive() {
+	m.is_active = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ProcessMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ProcessMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ProcessMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ProcessMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ProcessMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the Process entity.
+// If the Process object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProcessMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ProcessMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by ids.
+func (m *ProcessMutation) AddOutsourcingOrderItemIDs(ids ...int) {
+	if m.outsourcing_order_items == nil {
+		m.outsourcing_order_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.outsourcing_order_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearOutsourcingOrderItems clears the "outsourcing_order_items" edge to the OutsourcingOrderItem entity.
+func (m *ProcessMutation) ClearOutsourcingOrderItems() {
+	m.clearedoutsourcing_order_items = true
+}
+
+// OutsourcingOrderItemsCleared reports if the "outsourcing_order_items" edge to the OutsourcingOrderItem entity was cleared.
+func (m *ProcessMutation) OutsourcingOrderItemsCleared() bool {
+	return m.clearedoutsourcing_order_items
+}
+
+// RemoveOutsourcingOrderItemIDs removes the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (m *ProcessMutation) RemoveOutsourcingOrderItemIDs(ids ...int) {
+	if m.removedoutsourcing_order_items == nil {
+		m.removedoutsourcing_order_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.outsourcing_order_items, ids[i])
+		m.removedoutsourcing_order_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedOutsourcingOrderItems returns the removed IDs of the "outsourcing_order_items" edge to the OutsourcingOrderItem entity.
+func (m *ProcessMutation) RemovedOutsourcingOrderItemsIDs() (ids []int) {
+	for id := range m.removedoutsourcing_order_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// OutsourcingOrderItemsIDs returns the "outsourcing_order_items" edge IDs in the mutation.
+func (m *ProcessMutation) OutsourcingOrderItemsIDs() (ids []int) {
+	for id := range m.outsourcing_order_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetOutsourcingOrderItems resets all changes to the "outsourcing_order_items" edge.
+func (m *ProcessMutation) ResetOutsourcingOrderItems() {
+	m.outsourcing_order_items = nil
+	m.clearedoutsourcing_order_items = false
+	m.removedoutsourcing_order_items = nil
+}
+
+// Where appends a list predicates to the ProcessMutation builder.
+func (m *ProcessMutation) Where(ps ...predicate.Process) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ProcessMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ProcessMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Process, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ProcessMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ProcessMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Process).
+func (m *ProcessMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ProcessMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.code != nil {
+		fields = append(fields, process.FieldCode)
+	}
+	if m.name != nil {
+		fields = append(fields, process.FieldName)
+	}
+	if m.category != nil {
+		fields = append(fields, process.FieldCategory)
+	}
+	if m.outsourcing_enabled != nil {
+		fields = append(fields, process.FieldOutsourcingEnabled)
+	}
+	if m.inhouse_enabled != nil {
+		fields = append(fields, process.FieldInhouseEnabled)
+	}
+	if m.quality_required != nil {
+		fields = append(fields, process.FieldQualityRequired)
+	}
+	if m.sort_order != nil {
+		fields = append(fields, process.FieldSortOrder)
+	}
+	if m.note != nil {
+		fields = append(fields, process.FieldNote)
+	}
+	if m.is_active != nil {
+		fields = append(fields, process.FieldIsActive)
+	}
+	if m.created_at != nil {
+		fields = append(fields, process.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, process.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ProcessMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case process.FieldCode:
+		return m.Code()
+	case process.FieldName:
+		return m.Name()
+	case process.FieldCategory:
+		return m.Category()
+	case process.FieldOutsourcingEnabled:
+		return m.OutsourcingEnabled()
+	case process.FieldInhouseEnabled:
+		return m.InhouseEnabled()
+	case process.FieldQualityRequired:
+		return m.QualityRequired()
+	case process.FieldSortOrder:
+		return m.SortOrder()
+	case process.FieldNote:
+		return m.Note()
+	case process.FieldIsActive:
+		return m.IsActive()
+	case process.FieldCreatedAt:
+		return m.CreatedAt()
+	case process.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ProcessMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case process.FieldCode:
+		return m.OldCode(ctx)
+	case process.FieldName:
+		return m.OldName(ctx)
+	case process.FieldCategory:
+		return m.OldCategory(ctx)
+	case process.FieldOutsourcingEnabled:
+		return m.OldOutsourcingEnabled(ctx)
+	case process.FieldInhouseEnabled:
+		return m.OldInhouseEnabled(ctx)
+	case process.FieldQualityRequired:
+		return m.OldQualityRequired(ctx)
+	case process.FieldSortOrder:
+		return m.OldSortOrder(ctx)
+	case process.FieldNote:
+		return m.OldNote(ctx)
+	case process.FieldIsActive:
+		return m.OldIsActive(ctx)
+	case process.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case process.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown Process field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ProcessMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case process.FieldCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCode(v)
+		return nil
+	case process.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case process.FieldCategory:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCategory(v)
+		return nil
+	case process.FieldOutsourcingEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutsourcingEnabled(v)
+		return nil
+	case process.FieldInhouseEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInhouseEnabled(v)
+		return nil
+	case process.FieldQualityRequired:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQualityRequired(v)
+		return nil
+	case process.FieldSortOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSortOrder(v)
+		return nil
+	case process.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case process.FieldIsActive:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsActive(v)
+		return nil
+	case process.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case process.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Process field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ProcessMutation) AddedFields() []string {
+	var fields []string
+	if m.addsort_order != nil {
+		fields = append(fields, process.FieldSortOrder)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ProcessMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case process.FieldSortOrder:
+		return m.AddedSortOrder()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ProcessMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case process.FieldSortOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSortOrder(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Process numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ProcessMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(process.FieldCategory) {
+		fields = append(fields, process.FieldCategory)
+	}
+	if m.FieldCleared(process.FieldNote) {
+		fields = append(fields, process.FieldNote)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ProcessMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ProcessMutation) ClearField(name string) error {
+	switch name {
+	case process.FieldCategory:
+		m.ClearCategory()
+		return nil
+	case process.FieldNote:
+		m.ClearNote()
+		return nil
+	}
+	return fmt.Errorf("unknown Process nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ProcessMutation) ResetField(name string) error {
+	switch name {
+	case process.FieldCode:
+		m.ResetCode()
+		return nil
+	case process.FieldName:
+		m.ResetName()
+		return nil
+	case process.FieldCategory:
+		m.ResetCategory()
+		return nil
+	case process.FieldOutsourcingEnabled:
+		m.ResetOutsourcingEnabled()
+		return nil
+	case process.FieldInhouseEnabled:
+		m.ResetInhouseEnabled()
+		return nil
+	case process.FieldQualityRequired:
+		m.ResetQualityRequired()
+		return nil
+	case process.FieldSortOrder:
+		m.ResetSortOrder()
+		return nil
+	case process.FieldNote:
+		m.ResetNote()
+		return nil
+	case process.FieldIsActive:
+		m.ResetIsActive()
+		return nil
+	case process.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case process.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown Process field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ProcessMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.outsourcing_order_items != nil {
+		edges = append(edges, process.EdgeOutsourcingOrderItems)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ProcessMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case process.EdgeOutsourcingOrderItems:
+		ids := make([]ent.Value, 0, len(m.outsourcing_order_items))
+		for id := range m.outsourcing_order_items {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ProcessMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.removedoutsourcing_order_items != nil {
+		edges = append(edges, process.EdgeOutsourcingOrderItems)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ProcessMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case process.EdgeOutsourcingOrderItems:
+		ids := make([]ent.Value, 0, len(m.removedoutsourcing_order_items))
+		for id := range m.removedoutsourcing_order_items {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ProcessMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedoutsourcing_order_items {
+		edges = append(edges, process.EdgeOutsourcingOrderItems)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ProcessMutation) EdgeCleared(name string) bool {
+	switch name {
+	case process.EdgeOutsourcingOrderItems:
+		return m.clearedoutsourcing_order_items
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ProcessMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown Process unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ProcessMutation) ResetEdge(name string) error {
+	switch name {
+	case process.EdgeOutsourcingOrderItems:
+		m.ResetOutsourcingOrderItems()
+		return nil
+	}
+	return fmt.Errorf("unknown Process edge %s", name)
+}
+
 // ProductMutation represents an operation that mutates the Product nodes in the graph.
 type ProductMutation struct {
 	config
-	op                        Op
-	typ                       string
-	id                        *int
-	code                      *string
-	name                      *string
-	style_no                  *string
-	customer_style_no         *string
-	is_active                 *bool
-	created_at                *time.Time
-	updated_at                *time.Time
-	clearedFields             map[string]struct{}
-	default_unit              *int
-	cleareddefault_unit       bool
-	product_skus              map[int]struct{}
-	removedproduct_skus       map[int]struct{}
-	clearedproduct_skus       bool
-	bom_headers               map[int]struct{}
-	removedbom_headers        map[int]struct{}
-	clearedbom_headers        bool
-	shipment_items            map[int]struct{}
-	removedshipment_items     map[int]struct{}
-	clearedshipment_items     bool
-	stock_reservations        map[int]struct{}
-	removedstock_reservations map[int]struct{}
-	clearedstock_reservations bool
-	done                      bool
-	oldValue                  func(context.Context) (*Product, error)
-	predicates                []predicate.Product
+	op                             Op
+	typ                            string
+	id                             *int
+	code                           *string
+	name                           *string
+	style_no                       *string
+	customer_style_no              *string
+	is_active                      *bool
+	created_at                     *time.Time
+	updated_at                     *time.Time
+	clearedFields                  map[string]struct{}
+	default_unit                   *int
+	cleareddefault_unit            bool
+	product_skus                   map[int]struct{}
+	removedproduct_skus            map[int]struct{}
+	clearedproduct_skus            bool
+	bom_headers                    map[int]struct{}
+	removedbom_headers             map[int]struct{}
+	clearedbom_headers             bool
+	outsourcing_order_items        map[int]struct{}
+	removedoutsourcing_order_items map[int]struct{}
+	clearedoutsourcing_order_items bool
+	shipment_items                 map[int]struct{}
+	removedshipment_items          map[int]struct{}
+	clearedshipment_items          bool
+	stock_reservations             map[int]struct{}
+	removedstock_reservations      map[int]struct{}
+	clearedstock_reservations      bool
+	done                           bool
+	oldValue                       func(context.Context) (*Product, error)
+	predicates                     []predicate.Product
 }
 
 var _ ent.Mutation = (*ProductMutation)(nil)
@@ -15703,6 +19534,60 @@ func (m *ProductMutation) ResetBomHeaders() {
 	m.removedbom_headers = nil
 }
 
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by ids.
+func (m *ProductMutation) AddOutsourcingOrderItemIDs(ids ...int) {
+	if m.outsourcing_order_items == nil {
+		m.outsourcing_order_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.outsourcing_order_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearOutsourcingOrderItems clears the "outsourcing_order_items" edge to the OutsourcingOrderItem entity.
+func (m *ProductMutation) ClearOutsourcingOrderItems() {
+	m.clearedoutsourcing_order_items = true
+}
+
+// OutsourcingOrderItemsCleared reports if the "outsourcing_order_items" edge to the OutsourcingOrderItem entity was cleared.
+func (m *ProductMutation) OutsourcingOrderItemsCleared() bool {
+	return m.clearedoutsourcing_order_items
+}
+
+// RemoveOutsourcingOrderItemIDs removes the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (m *ProductMutation) RemoveOutsourcingOrderItemIDs(ids ...int) {
+	if m.removedoutsourcing_order_items == nil {
+		m.removedoutsourcing_order_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.outsourcing_order_items, ids[i])
+		m.removedoutsourcing_order_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedOutsourcingOrderItems returns the removed IDs of the "outsourcing_order_items" edge to the OutsourcingOrderItem entity.
+func (m *ProductMutation) RemovedOutsourcingOrderItemsIDs() (ids []int) {
+	for id := range m.removedoutsourcing_order_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// OutsourcingOrderItemsIDs returns the "outsourcing_order_items" edge IDs in the mutation.
+func (m *ProductMutation) OutsourcingOrderItemsIDs() (ids []int) {
+	for id := range m.outsourcing_order_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetOutsourcingOrderItems resets all changes to the "outsourcing_order_items" edge.
+func (m *ProductMutation) ResetOutsourcingOrderItems() {
+	m.outsourcing_order_items = nil
+	m.clearedoutsourcing_order_items = false
+	m.removedoutsourcing_order_items = nil
+}
+
 // AddShipmentItemIDs adds the "shipment_items" edge to the ShipmentItem entity by ids.
 func (m *ProductMutation) AddShipmentItemIDs(ids ...int) {
 	if m.shipment_items == nil {
@@ -16081,7 +19966,7 @@ func (m *ProductMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProductMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.default_unit != nil {
 		edges = append(edges, product.EdgeDefaultUnit)
 	}
@@ -16090,6 +19975,9 @@ func (m *ProductMutation) AddedEdges() []string {
 	}
 	if m.bom_headers != nil {
 		edges = append(edges, product.EdgeBomHeaders)
+	}
+	if m.outsourcing_order_items != nil {
+		edges = append(edges, product.EdgeOutsourcingOrderItems)
 	}
 	if m.shipment_items != nil {
 		edges = append(edges, product.EdgeShipmentItems)
@@ -16120,6 +20008,12 @@ func (m *ProductMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case product.EdgeOutsourcingOrderItems:
+		ids := make([]ent.Value, 0, len(m.outsourcing_order_items))
+		for id := range m.outsourcing_order_items {
+			ids = append(ids, id)
+		}
+		return ids
 	case product.EdgeShipmentItems:
 		ids := make([]ent.Value, 0, len(m.shipment_items))
 		for id := range m.shipment_items {
@@ -16138,12 +20032,15 @@ func (m *ProductMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProductMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.removedproduct_skus != nil {
 		edges = append(edges, product.EdgeProductSkus)
 	}
 	if m.removedbom_headers != nil {
 		edges = append(edges, product.EdgeBomHeaders)
+	}
+	if m.removedoutsourcing_order_items != nil {
+		edges = append(edges, product.EdgeOutsourcingOrderItems)
 	}
 	if m.removedshipment_items != nil {
 		edges = append(edges, product.EdgeShipmentItems)
@@ -16170,6 +20067,12 @@ func (m *ProductMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case product.EdgeOutsourcingOrderItems:
+		ids := make([]ent.Value, 0, len(m.removedoutsourcing_order_items))
+		for id := range m.removedoutsourcing_order_items {
+			ids = append(ids, id)
+		}
+		return ids
 	case product.EdgeShipmentItems:
 		ids := make([]ent.Value, 0, len(m.removedshipment_items))
 		for id := range m.removedshipment_items {
@@ -16188,7 +20091,7 @@ func (m *ProductMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProductMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.cleareddefault_unit {
 		edges = append(edges, product.EdgeDefaultUnit)
 	}
@@ -16197,6 +20100,9 @@ func (m *ProductMutation) ClearedEdges() []string {
 	}
 	if m.clearedbom_headers {
 		edges = append(edges, product.EdgeBomHeaders)
+	}
+	if m.clearedoutsourcing_order_items {
+		edges = append(edges, product.EdgeOutsourcingOrderItems)
 	}
 	if m.clearedshipment_items {
 		edges = append(edges, product.EdgeShipmentItems)
@@ -16217,6 +20123,8 @@ func (m *ProductMutation) EdgeCleared(name string) bool {
 		return m.clearedproduct_skus
 	case product.EdgeBomHeaders:
 		return m.clearedbom_headers
+	case product.EdgeOutsourcingOrderItems:
+		return m.clearedoutsourcing_order_items
 	case product.EdgeShipmentItems:
 		return m.clearedshipment_items
 	case product.EdgeStockReservations:
@@ -16248,6 +20156,9 @@ func (m *ProductMutation) ResetEdge(name string) error {
 		return nil
 	case product.EdgeBomHeaders:
 		m.ResetBomHeaders()
+		return nil
+	case product.EdgeOutsourcingOrderItems:
+		m.ResetOutsourcingOrderItems()
 		return nil
 	case product.EdgeShipmentItems:
 		m.ResetShipmentItems()
@@ -40156,25 +44067,28 @@ func (m *StockReservationMutation) ResetEdge(name string) error {
 // SupplierMutation represents an operation that mutates the Supplier nodes in the graph.
 type SupplierMutation struct {
 	config
-	op                     Op
-	typ                    string
-	id                     *int
-	code                   *string
-	name                   *string
-	short_name             *string
-	supplier_type          *string
-	tax_no                 *string
-	is_active              *bool
-	note                   *string
-	created_at             *time.Time
-	updated_at             *time.Time
-	clearedFields          map[string]struct{}
-	purchase_orders        map[int]struct{}
-	removedpurchase_orders map[int]struct{}
-	clearedpurchase_orders bool
-	done                   bool
-	oldValue               func(context.Context) (*Supplier, error)
-	predicates             []predicate.Supplier
+	op                        Op
+	typ                       string
+	id                        *int
+	code                      *string
+	name                      *string
+	short_name                *string
+	supplier_type             *string
+	tax_no                    *string
+	is_active                 *bool
+	note                      *string
+	created_at                *time.Time
+	updated_at                *time.Time
+	clearedFields             map[string]struct{}
+	purchase_orders           map[int]struct{}
+	removedpurchase_orders    map[int]struct{}
+	clearedpurchase_orders    bool
+	outsourcing_orders        map[int]struct{}
+	removedoutsourcing_orders map[int]struct{}
+	clearedoutsourcing_orders bool
+	done                      bool
+	oldValue                  func(context.Context) (*Supplier, error)
+	predicates                []predicate.Supplier
 }
 
 var _ ent.Mutation = (*SupplierMutation)(nil)
@@ -40705,6 +44619,60 @@ func (m *SupplierMutation) ResetPurchaseOrders() {
 	m.removedpurchase_orders = nil
 }
 
+// AddOutsourcingOrderIDs adds the "outsourcing_orders" edge to the OutsourcingOrder entity by ids.
+func (m *SupplierMutation) AddOutsourcingOrderIDs(ids ...int) {
+	if m.outsourcing_orders == nil {
+		m.outsourcing_orders = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.outsourcing_orders[ids[i]] = struct{}{}
+	}
+}
+
+// ClearOutsourcingOrders clears the "outsourcing_orders" edge to the OutsourcingOrder entity.
+func (m *SupplierMutation) ClearOutsourcingOrders() {
+	m.clearedoutsourcing_orders = true
+}
+
+// OutsourcingOrdersCleared reports if the "outsourcing_orders" edge to the OutsourcingOrder entity was cleared.
+func (m *SupplierMutation) OutsourcingOrdersCleared() bool {
+	return m.clearedoutsourcing_orders
+}
+
+// RemoveOutsourcingOrderIDs removes the "outsourcing_orders" edge to the OutsourcingOrder entity by IDs.
+func (m *SupplierMutation) RemoveOutsourcingOrderIDs(ids ...int) {
+	if m.removedoutsourcing_orders == nil {
+		m.removedoutsourcing_orders = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.outsourcing_orders, ids[i])
+		m.removedoutsourcing_orders[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedOutsourcingOrders returns the removed IDs of the "outsourcing_orders" edge to the OutsourcingOrder entity.
+func (m *SupplierMutation) RemovedOutsourcingOrdersIDs() (ids []int) {
+	for id := range m.removedoutsourcing_orders {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// OutsourcingOrdersIDs returns the "outsourcing_orders" edge IDs in the mutation.
+func (m *SupplierMutation) OutsourcingOrdersIDs() (ids []int) {
+	for id := range m.outsourcing_orders {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetOutsourcingOrders resets all changes to the "outsourcing_orders" edge.
+func (m *SupplierMutation) ResetOutsourcingOrders() {
+	m.outsourcing_orders = nil
+	m.clearedoutsourcing_orders = false
+	m.removedoutsourcing_orders = nil
+}
+
 // Where appends a list predicates to the SupplierMutation builder.
 func (m *SupplierMutation) Where(ps ...predicate.Supplier) {
 	m.predicates = append(m.predicates, ps...)
@@ -41001,9 +44969,12 @@ func (m *SupplierMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SupplierMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.purchase_orders != nil {
 		edges = append(edges, supplier.EdgePurchaseOrders)
+	}
+	if m.outsourcing_orders != nil {
+		edges = append(edges, supplier.EdgeOutsourcingOrders)
 	}
 	return edges
 }
@@ -41018,15 +44989,24 @@ func (m *SupplierMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case supplier.EdgeOutsourcingOrders:
+		ids := make([]ent.Value, 0, len(m.outsourcing_orders))
+		for id := range m.outsourcing_orders {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *SupplierMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.removedpurchase_orders != nil {
 		edges = append(edges, supplier.EdgePurchaseOrders)
+	}
+	if m.removedoutsourcing_orders != nil {
+		edges = append(edges, supplier.EdgeOutsourcingOrders)
 	}
 	return edges
 }
@@ -41041,15 +45021,24 @@ func (m *SupplierMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case supplier.EdgeOutsourcingOrders:
+		ids := make([]ent.Value, 0, len(m.removedoutsourcing_orders))
+		for id := range m.removedoutsourcing_orders {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *SupplierMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedpurchase_orders {
 		edges = append(edges, supplier.EdgePurchaseOrders)
+	}
+	if m.clearedoutsourcing_orders {
+		edges = append(edges, supplier.EdgeOutsourcingOrders)
 	}
 	return edges
 }
@@ -41060,6 +45049,8 @@ func (m *SupplierMutation) EdgeCleared(name string) bool {
 	switch name {
 	case supplier.EdgePurchaseOrders:
 		return m.clearedpurchase_orders
+	case supplier.EdgeOutsourcingOrders:
+		return m.clearedoutsourcing_orders
 	}
 	return false
 }
@@ -41078,6 +45069,9 @@ func (m *SupplierMutation) ResetEdge(name string) error {
 	switch name {
 	case supplier.EdgePurchaseOrders:
 		m.ResetPurchaseOrders()
+		return nil
+	case supplier.EdgeOutsourcingOrders:
+		m.ResetOutsourcingOrders()
 		return nil
 	}
 	return fmt.Errorf("unknown Supplier edge %s", name)
@@ -41115,6 +45109,9 @@ type UnitMutation struct {
 	bom_items                                map[int]struct{}
 	removedbom_items                         map[int]struct{}
 	clearedbom_items                         bool
+	outsourcing_order_items                  map[int]struct{}
+	removedoutsourcing_order_items           map[int]struct{}
+	clearedoutsourcing_order_items           bool
 	purchase_order_items                     map[int]struct{}
 	removedpurchase_order_items              map[int]struct{}
 	clearedpurchase_order_items              bool
@@ -41802,6 +45799,60 @@ func (m *UnitMutation) ResetBomItems() {
 	m.removedbom_items = nil
 }
 
+// AddOutsourcingOrderItemIDs adds the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by ids.
+func (m *UnitMutation) AddOutsourcingOrderItemIDs(ids ...int) {
+	if m.outsourcing_order_items == nil {
+		m.outsourcing_order_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.outsourcing_order_items[ids[i]] = struct{}{}
+	}
+}
+
+// ClearOutsourcingOrderItems clears the "outsourcing_order_items" edge to the OutsourcingOrderItem entity.
+func (m *UnitMutation) ClearOutsourcingOrderItems() {
+	m.clearedoutsourcing_order_items = true
+}
+
+// OutsourcingOrderItemsCleared reports if the "outsourcing_order_items" edge to the OutsourcingOrderItem entity was cleared.
+func (m *UnitMutation) OutsourcingOrderItemsCleared() bool {
+	return m.clearedoutsourcing_order_items
+}
+
+// RemoveOutsourcingOrderItemIDs removes the "outsourcing_order_items" edge to the OutsourcingOrderItem entity by IDs.
+func (m *UnitMutation) RemoveOutsourcingOrderItemIDs(ids ...int) {
+	if m.removedoutsourcing_order_items == nil {
+		m.removedoutsourcing_order_items = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.outsourcing_order_items, ids[i])
+		m.removedoutsourcing_order_items[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedOutsourcingOrderItems returns the removed IDs of the "outsourcing_order_items" edge to the OutsourcingOrderItem entity.
+func (m *UnitMutation) RemovedOutsourcingOrderItemsIDs() (ids []int) {
+	for id := range m.removedoutsourcing_order_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// OutsourcingOrderItemsIDs returns the "outsourcing_order_items" edge IDs in the mutation.
+func (m *UnitMutation) OutsourcingOrderItemsIDs() (ids []int) {
+	for id := range m.outsourcing_order_items {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetOutsourcingOrderItems resets all changes to the "outsourcing_order_items" edge.
+func (m *UnitMutation) ResetOutsourcingOrderItems() {
+	m.outsourcing_order_items = nil
+	m.clearedoutsourcing_order_items = false
+	m.removedoutsourcing_order_items = nil
+}
+
 // AddPurchaseOrderItemIDs adds the "purchase_order_items" edge to the PurchaseOrderItem entity by ids.
 func (m *UnitMutation) AddPurchaseOrderItemIDs(ids ...int) {
 	if m.purchase_order_items == nil {
@@ -42467,7 +46518,7 @@ func (m *UnitMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *UnitMutation) AddedEdges() []string {
-	edges := make([]string, 0, 14)
+	edges := make([]string, 0, 15)
 	if m.materials != nil {
 		edges = append(edges, unit.EdgeMaterials)
 	}
@@ -42485,6 +46536,9 @@ func (m *UnitMutation) AddedEdges() []string {
 	}
 	if m.bom_items != nil {
 		edges = append(edges, unit.EdgeBomItems)
+	}
+	if m.outsourcing_order_items != nil {
+		edges = append(edges, unit.EdgeOutsourcingOrderItems)
 	}
 	if m.purchase_order_items != nil {
 		edges = append(edges, unit.EdgePurchaseOrderItems)
@@ -42553,6 +46607,12 @@ func (m *UnitMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case unit.EdgeOutsourcingOrderItems:
+		ids := make([]ent.Value, 0, len(m.outsourcing_order_items))
+		for id := range m.outsourcing_order_items {
+			ids = append(ids, id)
+		}
+		return ids
 	case unit.EdgePurchaseOrderItems:
 		ids := make([]ent.Value, 0, len(m.purchase_order_items))
 		for id := range m.purchase_order_items {
@@ -42607,7 +46667,7 @@ func (m *UnitMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *UnitMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 14)
+	edges := make([]string, 0, 15)
 	if m.removedmaterials != nil {
 		edges = append(edges, unit.EdgeMaterials)
 	}
@@ -42625,6 +46685,9 @@ func (m *UnitMutation) RemovedEdges() []string {
 	}
 	if m.removedbom_items != nil {
 		edges = append(edges, unit.EdgeBomItems)
+	}
+	if m.removedoutsourcing_order_items != nil {
+		edges = append(edges, unit.EdgeOutsourcingOrderItems)
 	}
 	if m.removedpurchase_order_items != nil {
 		edges = append(edges, unit.EdgePurchaseOrderItems)
@@ -42693,6 +46756,12 @@ func (m *UnitMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case unit.EdgeOutsourcingOrderItems:
+		ids := make([]ent.Value, 0, len(m.removedoutsourcing_order_items))
+		for id := range m.removedoutsourcing_order_items {
+			ids = append(ids, id)
+		}
+		return ids
 	case unit.EdgePurchaseOrderItems:
 		ids := make([]ent.Value, 0, len(m.removedpurchase_order_items))
 		for id := range m.removedpurchase_order_items {
@@ -42747,7 +46816,7 @@ func (m *UnitMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *UnitMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 14)
+	edges := make([]string, 0, 15)
 	if m.clearedmaterials {
 		edges = append(edges, unit.EdgeMaterials)
 	}
@@ -42765,6 +46834,9 @@ func (m *UnitMutation) ClearedEdges() []string {
 	}
 	if m.clearedbom_items {
 		edges = append(edges, unit.EdgeBomItems)
+	}
+	if m.clearedoutsourcing_order_items {
+		edges = append(edges, unit.EdgeOutsourcingOrderItems)
 	}
 	if m.clearedpurchase_order_items {
 		edges = append(edges, unit.EdgePurchaseOrderItems)
@@ -42809,6 +46881,8 @@ func (m *UnitMutation) EdgeCleared(name string) bool {
 		return m.clearedinventory_balances
 	case unit.EdgeBomItems:
 		return m.clearedbom_items
+	case unit.EdgeOutsourcingOrderItems:
+		return m.clearedoutsourcing_order_items
 	case unit.EdgePurchaseOrderItems:
 		return m.clearedpurchase_order_items
 	case unit.EdgePurchaseReceiptItems:
@@ -42858,6 +46932,9 @@ func (m *UnitMutation) ResetEdge(name string) error {
 		return nil
 	case unit.EdgeBomItems:
 		m.ResetBomItems()
+		return nil
+	case unit.EdgeOutsourcingOrderItems:
+		m.ResetOutsourcingOrderItems()
 		return nil
 	case unit.EdgePurchaseOrderItems:
 		m.ResetPurchaseOrderItems()

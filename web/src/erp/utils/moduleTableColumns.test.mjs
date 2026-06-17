@@ -1,13 +1,22 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 
 import {
+  applyBusinessColumnSorters,
   applyModuleColumnOrder,
   buildModuleColumnOrder,
+  compareBusinessTableValues,
+  createBusinessColumnSorter,
   moveModuleColumnOrder,
   repositionModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from './moduleTableColumns.mjs'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const erpSourceRoot = resolve(__dirname, '..')
 
 const columns = [
   { label: '编码', key: 'code' },
@@ -78,4 +87,57 @@ test('moduleTableColumns: 支持把列移动到指定位置', () => {
     ),
     ['customerName', 'amount', 'code']
   )
+})
+
+test('moduleTableColumns: 业务主表排序空值稳定排最后', () => {
+  assert.equal(compareBusinessTableValues('', 'A', 'ascend'), 1)
+  assert.equal(compareBusinessTableValues('', 'A', 'descend'), -1)
+  assert.equal(compareBusinessTableValues('B', 'A', 'ascend'), 1)
+})
+
+test('moduleTableColumns: 业务主表排序支持 dataIndex、sortValue 与显式跳过', () => {
+  const businessColumns = applyBusinessColumnSorters([
+    { title: '编号', dataIndex: 'code' },
+    { title: '数量', key: 'quantity', sortValue: (record) => record.qty },
+    { title: '备注', dataIndex: 'note', sortable: false },
+  ])
+
+  assert.equal(typeof businessColumns[0].sorter, 'function')
+  assert.equal(typeof businessColumns[1].sorter, 'function')
+  assert.equal(businessColumns[2].sorter, undefined)
+  assert.equal(
+    businessColumns[0].sorter({ code: 'A2' }, { code: 'A10' }, 'ascend'),
+    -1
+  )
+  assert.equal(businessColumns[1].sorter({ qty: 12 }, { qty: 3 }, 'ascend'), 9)
+})
+
+test('moduleTableColumns: 业务主表排序可读取嵌套路径', () => {
+  const sorter = createBusinessColumnSorter({
+    dataIndex: 'customer.name',
+  })
+
+  assert.equal(
+    sorter({ customer: { name: '客户B' } }, { customer: { name: '客户A' } }),
+    1
+  )
+})
+
+test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
+  const mainBusinessTableFiles = [
+    'pages/FormalBusinessModulePage.jsx',
+    'pages/V1MasterDataPage.jsx',
+    'pages/V1SalesOrdersPage.jsx',
+    'pages/V1PurchaseOrdersPage.jsx',
+    'pages/V1PurchaseReceiptsPage.jsx',
+    'pages/BOMVersionsPage.jsx',
+    'pages/ShipmentsPage.jsx',
+  ]
+
+  const missing = mainBusinessTableFiles.filter((relativePath) => {
+    const content = readFileSync(resolve(erpSourceRoot, relativePath), 'utf8')
+    return !content.includes('applyBusinessColumnSorters(')
+  })
+
+  assert.deepEqual(missing, [])
 })

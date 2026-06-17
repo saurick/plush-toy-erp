@@ -77,6 +77,9 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 	if filter.Status != "" {
 		q = q.Where(productionfact.Status(filter.Status))
 	}
+	if filter.FactType != "" {
+		q = q.Where(productionfact.FactType(filter.FactType))
+	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
 		return nil, 0, err
@@ -130,6 +133,9 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	q := r.data.postgres.OutsourcingFact.Query()
 	if filter.Status != "" {
 		q = q.Where(outsourcingfact.Status(filter.Status))
+	}
+	if filter.FactType != "" {
+		q = q.Where(outsourcingfact.FactType(filter.FactType))
 	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
@@ -214,6 +220,7 @@ func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int,
 		SetShipmentID(shipmentID).
 		SetNillableSalesOrderItemID(in.SalesOrderItemID).
 		SetProductID(in.ProductID).
+		SetNillableProductSkuID(in.ProductSkuID).
 		SetWarehouseID(in.WarehouseID).
 		SetUnitID(in.UnitID).
 		SetNillableLotID(in.LotID).
@@ -385,6 +392,9 @@ func (r *operationalFactRepo) ListFinanceFacts(ctx context.Context, filter biz.O
 	q := r.data.postgres.FinanceFact.Query()
 	if filter.Status != "" {
 		q = q.Where(financefact.Status(filter.Status))
+	}
+	if filter.FactType != "" {
+		q = q.Where(financefact.FactType(filter.FactType))
 	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
@@ -937,7 +947,7 @@ func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {
 	if row == nil {
 		return nil
 	}
-	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
 func entStockReservationToBiz(row *ent.StockReservation) *biz.StockReservation {

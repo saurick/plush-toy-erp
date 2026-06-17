@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/supplier"
 	"time"
@@ -144,6 +145,21 @@ func (_c *SupplierCreate) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierCreate
 		ids[i] = v[i].ID
 	}
 	return _c.AddPurchaseOrderIDs(ids...)
+}
+
+// AddOutsourcingOrderIDs adds the "outsourcing_orders" edge to the OutsourcingOrder entity by IDs.
+func (_c *SupplierCreate) AddOutsourcingOrderIDs(ids ...int) *SupplierCreate {
+	_c.mutation.AddOutsourcingOrderIDs(ids...)
+	return _c
+}
+
+// AddOutsourcingOrders adds the "outsourcing_orders" edges to the OutsourcingOrder entity.
+func (_c *SupplierCreate) AddOutsourcingOrders(v ...*OutsourcingOrder) *SupplierCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOutsourcingOrderIDs(ids...)
 }
 
 // Mutation returns the SupplierMutation object of the builder.
@@ -313,6 +329,22 @@ func (_c *SupplierCreate) createSpec() (*Supplier, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OutsourcingOrdersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.OutsourcingOrdersTable,
+			Columns: []string{supplier.OutsourcingOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

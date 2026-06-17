@@ -42,8 +42,17 @@ type Material func(*sql.Selector)
 // OutsourcingFact is the predicate function for outsourcingfact builders.
 type OutsourcingFact func(*sql.Selector)
 
+// OutsourcingOrder is the predicate function for outsourcingorder builders.
+type OutsourcingOrder func(*sql.Selector)
+
+// OutsourcingOrderItem is the predicate function for outsourcingorderitem builders.
+type OutsourcingOrderItem func(*sql.Selector)
+
 // Permission is the predicate function for permission builders.
 type Permission func(*sql.Selector)
+
+// Process is the predicate function for process builders.
+type Process func(*sql.Selector)
 
 // Product is the predicate function for product builders.
 type Product func(*sql.Selector)

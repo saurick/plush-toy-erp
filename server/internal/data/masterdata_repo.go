@@ -8,6 +8,7 @@ import (
 	"server/internal/data/model/ent/contact"
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/supplier"
@@ -310,6 +311,100 @@ func (r *masterDataRepo) SetMaterialActive(ctx context.Context, id int, active b
 		return nil, err
 	}
 	return entMaterialToBiz(row), nil
+}
+
+func (r *masterDataRepo) CreateProcess(ctx context.Context, in *biz.ProcessMutation) (*biz.Process, error) {
+	row, err := r.data.postgres.Process.Create().
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetNillableCategory(in.Category).
+		SetOutsourcingEnabled(in.OutsourcingEnabled).
+		SetInhouseEnabled(in.InhouseEnabled).
+		SetQualityRequired(in.QualityRequired).
+		SetSortOrder(in.SortOrder).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entProcessToBiz(row), nil
+}
+
+func (r *masterDataRepo) UpdateProcess(ctx context.Context, id int, in *biz.ProcessMutation) (*biz.Process, error) {
+	update := r.data.postgres.Process.UpdateOneID(id).
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetOutsourcingEnabled(in.OutsourcingEnabled).
+		SetInhouseEnabled(in.InhouseEnabled).
+		SetQualityRequired(in.QualityRequired).
+		SetSortOrder(in.SortOrder)
+	if in.Category == nil {
+		update.ClearCategory()
+	} else {
+		update.SetCategory(*in.Category)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessNotFound
+		}
+		return nil, err
+	}
+	return entProcessToBiz(row), nil
+}
+
+func (r *masterDataRepo) GetProcess(ctx context.Context, id int) (*biz.Process, error) {
+	row, err := r.data.postgres.Process.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessNotFound
+		}
+		return nil, err
+	}
+	return entProcessToBiz(row), nil
+}
+
+func (r *masterDataRepo) ListProcesses(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Process, int, error) {
+	query := r.data.postgres.Process.Query()
+	if filter.Keyword != "" {
+		query = query.Where(process.Or(
+			process.CodeContains(filter.Keyword),
+			process.NameContains(filter.Keyword),
+			process.CategoryContains(filter.Keyword),
+			process.NoteContains(filter.Keyword),
+		))
+	}
+	if filter.ActiveOnly {
+		query = query.Where(process.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Asc(process.FieldSortOrder), ent.Asc(process.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entProcessesToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) SetProcessActive(ctx context.Context, id int, active bool) (*biz.Process, error) {
+	row, err := r.data.postgres.Process.UpdateOneID(id).SetIsActive(active).Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessNotFound
+		}
+		return nil, err
+	}
+	return entProcessToBiz(row), nil
 }
 
 func (r *masterDataRepo) UnitIsActive(ctx context.Context, id int) (bool, error) {
@@ -812,6 +907,34 @@ func entMaterialsToBiz(rows []*ent.Material) []*biz.Material {
 	out := make([]*biz.Material, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, entMaterialToBiz(row))
+	}
+	return out
+}
+
+func entProcessToBiz(row *ent.Process) *biz.Process {
+	if row == nil {
+		return nil
+	}
+	return &biz.Process{
+		ID:                 row.ID,
+		Code:               row.Code,
+		Name:               row.Name,
+		Category:           row.Category,
+		OutsourcingEnabled: row.OutsourcingEnabled,
+		InhouseEnabled:     row.InhouseEnabled,
+		QualityRequired:    row.QualityRequired,
+		SortOrder:          row.SortOrder,
+		Note:               row.Note,
+		IsActive:           row.IsActive,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
+	}
+}
+
+func entProcessesToBiz(rows []*ent.Process) []*biz.Process {
+	out := make([]*biz.Process, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entProcessToBiz(row))
 	}
 	return out
 }

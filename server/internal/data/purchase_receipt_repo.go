@@ -12,11 +12,13 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 
 	"entgo.io/ent/dialect"
+	"github.com/shopspring/decimal"
 )
 
 func (r *inventoryRepo) CreatePurchaseReceiptDraft(ctx context.Context, in *biz.PurchaseReceiptCreate) (*biz.PurchaseReceipt, error) {
@@ -31,6 +33,105 @@ func (r *inventoryRepo) CreatePurchaseReceiptDraft(ctx context.Context, in *biz.
 		return nil, err
 	}
 	return entPurchaseReceiptToBiz(row, nil), nil
+}
+
+func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+
+	order, err := tx.PurchaseOrder.Query().
+		Where(purchaseorder.ID(in.PurchaseOrderID)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderNotFound
+		}
+		return nil, err
+	}
+	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved {
+		return nil, biz.ErrBadParam
+	}
+	if _, err := tx.Warehouse.Get(ctx, in.WarehouseID); err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrBadParam
+		}
+		return nil, err
+	}
+
+	orderItems, err := tx.PurchaseOrderItem.Query().
+		Where(
+			purchaseorderitem.PurchaseOrderID(order.ID),
+			purchaseorderitem.LineStatus(biz.PurchaseOrderItemStatusOpen),
+		).
+		Order(ent.Asc(purchaseorderitem.FieldLineNo), ent.Asc(purchaseorderitem.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(orderItems) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	remainingByItemID, err := purchaseOrderItemRemainingQuantities(ctx, tx, orderItems)
+	if err != nil {
+		return nil, err
+	}
+
+	supplierName := supplierNameFromSnapshot(order.SupplierSnapshot)
+	if supplierName == "" {
+		return nil, biz.ErrBadParam
+	}
+	receipt, err := tx.PurchaseReceipt.Create().
+		SetReceiptNo(in.ReceiptNo).
+		SetSupplierName(supplierName).
+		SetStatus(biz.PurchaseReceiptStatusDraft).
+		SetReceivedAt(in.ReceivedAt).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	createdLineCount := 0
+	for _, item := range orderItems {
+		remaining := remainingByItemID[item.ID]
+		if !remaining.IsPositive() {
+			continue
+		}
+		unitPrice, amount := purchaseReceiptPriceAndAmount(item, remaining)
+		orderItemID := item.ID
+		sourceLineNo := fmt.Sprintf("%d", item.LineNo)
+		if _, err := tx.PurchaseReceiptItem.Create().
+			SetReceiptID(receipt.ID).
+			SetMaterialID(item.MaterialID).
+			SetWarehouseID(in.WarehouseID).
+			SetUnitID(item.UnitID).
+			SetNillablePurchaseOrderItemID(&orderItemID).
+			SetQuantity(remaining).
+			SetNillableUnitPrice(unitPrice).
+			SetNillableAmount(amount).
+			SetNillableSourceLineNo(&sourceLineNo).
+			SetNillableNote(item.Note).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+		createdLineCount++
+	}
+	if createdLineCount == 0 {
+		return nil, biz.ErrBadParam
+	}
+
+	out, err := purchaseReceiptWithItems(ctx, tx.Client(), receipt)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
 }
 
 func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.PurchaseReceiptItemCreate) (*biz.PurchaseReceiptItem, error) {
@@ -290,6 +391,57 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 	return out, total, nil
 }
 
+func purchaseOrderItemRemainingQuantities(ctx context.Context, tx *ent.Tx, orderItems []*ent.PurchaseOrderItem) (map[int]decimal.Decimal, error) {
+	remaining := make(map[int]decimal.Decimal, len(orderItems))
+	itemIDs := make([]int, 0, len(orderItems))
+	for _, item := range orderItems {
+		remaining[item.ID] = item.PurchasedQuantity
+		itemIDs = append(itemIDs, item.ID)
+	}
+	receiptItems, err := tx.PurchaseReceiptItem.Query().
+		Where(
+			purchasereceiptitem.PurchaseOrderItemIDIn(itemIDs...),
+			purchasereceiptitem.HasReceiptWith(
+				purchasereceipt.StatusNEQ(biz.PurchaseReceiptStatusCancelled),
+			),
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, receiptItem := range receiptItems {
+		if receiptItem.PurchaseOrderItemID == nil {
+			continue
+		}
+		itemID := *receiptItem.PurchaseOrderItemID
+		remaining[itemID] = remaining[itemID].Sub(receiptItem.Quantity)
+	}
+	return remaining, nil
+}
+
+func purchaseReceiptPriceAndAmount(item *ent.PurchaseOrderItem, quantity decimal.Decimal) (*decimal.Decimal, *decimal.Decimal) {
+	if item.UnitPrice != nil {
+		amount := item.UnitPrice.Mul(quantity)
+		return item.UnitPrice, &amount
+	}
+	if item.Amount != nil && quantity.Equal(item.PurchasedQuantity) {
+		return nil, item.Amount
+	}
+	return nil, nil
+}
+
+func supplierNameFromSnapshot(snapshot map[string]any) string {
+	if snapshot == nil {
+		return ""
+	}
+	for _, key := range []string{"name", "short_name", "code"} {
+		if value, ok := snapshot[key].(string); ok && value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func (r *inventoryRepo) applyInventoryTxnAndUpdateBalanceInTx(ctx context.Context, tx *inventoryDBTx, in *biz.InventoryTxnCreate) (*biz.InventoryTxnApplyResult, error) {
 	existing, err := tx.client.InventoryTxn.Query().
 		Where(inventorytxn.IdempotencyKey(in.IdempotencyKey)).
@@ -357,6 +509,8 @@ func validatePurchaseReceiptItemReferences(ctx context.Context, client *ent.Clie
 		if item.LineStatus != biz.PurchaseOrderItemStatusOpen || item.MaterialID != in.MaterialID || item.UnitID != in.UnitID {
 			return biz.ErrBadParam
 		}
+		sourceLineNo := fmt.Sprintf("%d", item.LineNo)
+		in.SourceLineNo = &sourceLineNo
 	}
 	if in.LotID == nil {
 		return nil

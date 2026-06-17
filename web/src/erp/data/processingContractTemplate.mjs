@@ -395,3 +395,95 @@ export function createBlankProcessingContractDraft(draft = {}) {
     merges: [],
   }
 }
+
+function normalizeProcessingFactTrace(record = {}) {
+  const traceParts = []
+  const factType = normalizeText(record.fact_type)
+  const subjectType = normalizeText(record.subject_type)
+  const subjectID = normalizeText(record.subject_id)
+  const sourceType = normalizeText(record.source_type)
+  const sourceID = normalizeText(record.source_id)
+  const note = normalizeText(record.note)
+
+  if (factType) {
+    traceParts.push(`事实类型: ${factType}`)
+  }
+  if (subjectType && subjectID) {
+    traceParts.push(`对象: ${subjectType} #${subjectID}`)
+  }
+  if (sourceType && sourceID) {
+    traceParts.push(`来源: ${sourceType} #${sourceID}`)
+  }
+  if (note) {
+    traceParts.push(note)
+  }
+  return traceParts.join('；')
+}
+
+function formatProcessingDraftDate(value) {
+  const timestamp = Number(value || 0)
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return normalizeText(value)
+  }
+  return new Date(timestamp * 1000).toISOString().slice(0, 10)
+}
+
+export function buildProcessingContractDraftFromOutsourcingFact(record = {}) {
+  const contractNo = normalizeText(record.fact_no)
+  const supplierName = normalizeText(record.supplier_name)
+  const draft = createBlankProcessingContractDraft()
+
+  return {
+    ...draft,
+    contractNo,
+    supplierName,
+    lines: [
+      normalizeProcessingLine({
+        contractNo,
+        supplierAlias: supplierName,
+        remark: normalizeProcessingFactTrace(record),
+      }),
+    ],
+  }
+}
+
+export function buildProcessingContractDraftFromOutsourcingOrder(
+  order = {},
+  items = []
+) {
+  const contractNo = normalizeText(order.outsourcing_order_no)
+  const supplierSnapshot =
+    order.supplier_snapshot && typeof order.supplier_snapshot === 'object'
+      ? order.supplier_snapshot
+      : {}
+  const supplierName =
+    normalizeText(supplierSnapshot.short_name) ||
+    normalizeText(supplierSnapshot.name)
+  const draft = createBlankProcessingContractDraft()
+  const sourceOrderNo = normalizeText(order.source_order_no)
+
+  return {
+    ...draft,
+    contractNo,
+    supplierName,
+    orderDateText: formatProcessingDraftDate(order.order_date),
+    returnDateText: formatProcessingDraftDate(order.expected_return_date),
+    lines: (Array.isArray(items) && items.length > 0 ? items : [{}]).map(
+      (item) =>
+        normalizeProcessingLine({
+          contractNo,
+          productOrderNo: sourceOrderNo,
+          productNo: normalizeText(item.product_no_snapshot),
+          productName: normalizeText(item.product_name_snapshot),
+          processName: normalizeText(item.process_name_snapshot),
+          processCategory: normalizeText(item.process_category_snapshot),
+          supplierAlias: supplierName,
+          unit: normalizeText(item.unit_name_snapshot),
+          quantity: normalizeText(item.outsourcing_quantity),
+          unitPrice: normalizeText(item.unit_price),
+          amount: normalizeText(item.amount),
+          remark: normalizeText(item.note),
+        })
+    ),
+  }
+}

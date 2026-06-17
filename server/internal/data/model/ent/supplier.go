@@ -45,9 +45,11 @@ type Supplier struct {
 type SupplierEdges struct {
 	// PurchaseOrders holds the value of the purchase_orders edge.
 	PurchaseOrders []*PurchaseOrder `json:"purchase_orders,omitempty"`
+	// OutsourcingOrders holds the value of the outsourcing_orders edge.
+	OutsourcingOrders []*OutsourcingOrder `json:"outsourcing_orders,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // PurchaseOrdersOrErr returns the PurchaseOrders value or an error if the edge
@@ -57,6 +59,15 @@ func (e SupplierEdges) PurchaseOrdersOrErr() ([]*PurchaseOrder, error) {
 		return e.PurchaseOrders, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_orders"}
+}
+
+// OutsourcingOrdersOrErr returns the OutsourcingOrders value or an error if the edge
+// was not loaded in eager-loading.
+func (e SupplierEdges) OutsourcingOrdersOrErr() ([]*OutsourcingOrder, error) {
+	if e.loadedTypes[1] {
+		return e.OutsourcingOrders, nil
+	}
+	return nil, &NotLoadedError{edge: "outsourcing_orders"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -167,6 +178,11 @@ func (_m *Supplier) Value(name string) (ent.Value, error) {
 // QueryPurchaseOrders queries the "purchase_orders" edge of the Supplier entity.
 func (_m *Supplier) QueryPurchaseOrders() *PurchaseOrderQuery {
 	return NewSupplierClient(_m.config).QueryPurchaseOrders(_m)
+}
+
+// QueryOutsourcingOrders queries the "outsourcing_orders" edge of the Supplier entity.
+func (_m *Supplier) QueryOutsourcingOrders() *OutsourcingOrderQuery {
+	return NewSupplierClient(_m.config).QueryOutsourcingOrders(_m)
 }
 
 // Update returns a builder for updating this Supplier.

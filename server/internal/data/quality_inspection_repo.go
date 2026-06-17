@@ -5,6 +5,8 @@ import (
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -216,6 +218,41 @@ func (r *inventoryRepo) GetQualityInspection(ctx context.Context, id int) (*biz.
 	return entQualityInspectionToBiz(row), nil
 }
 
+func (r *inventoryRepo) ListQualityInspections(ctx context.Context, filter biz.QualityInspectionFilter) ([]*biz.QualityInspection, int, error) {
+	query := r.data.postgres.QualityInspection.Query()
+	if filter.Status != "" {
+		query = query.Where(qualityinspection.Status(filter.Status))
+	}
+	if filter.Result != "" {
+		query = query.Where(qualityinspection.Result(filter.Result))
+	}
+	if filter.Keyword != "" {
+		query = query.Where(qualityinspection.Or(
+			qualityinspection.InspectionNoContainsFold(filter.Keyword),
+			qualityinspection.PurchaseReceiptIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			qualityinspection.PurchaseReceiptItemIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+			qualityinspection.InventoryLotIDEQ(parsePositiveIntOrZero(filter.Keyword)),
+		))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.
+		Order(ent.Desc(qualityinspection.FieldCreatedAt), ent.Desc(qualityinspection.FieldID)).
+		Limit(filter.Limit).
+		Offset(filter.Offset).
+		All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.QualityInspection, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entQualityInspectionToBiz(row))
+	}
+	return out, total, nil
+}
+
 func (r *inventoryRepo) decideSubmittedQualityInspection(ctx context.Context, in *biz.QualityInspectionDecision, targetInspectionStatus, targetLotStatus string) (*biz.QualityInspection, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
@@ -425,6 +462,14 @@ func requireQualityInspectionRowsAffected(result stdsql.Result) error {
 		return biz.ErrBadParam
 	}
 	return nil
+}
+
+func parsePositiveIntOrZero(value string) int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || parsed <= 0 {
+		return 0
+	}
+	return parsed
 }
 
 func optionalIntSQLValue(value *int) any {

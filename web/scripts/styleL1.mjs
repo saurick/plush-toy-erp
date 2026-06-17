@@ -711,6 +711,11 @@ const scenarios = [
         expectedMode: 'dark',
         expectedEffectiveTheme: 'dark',
       })
+      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+        scenarioName: 'business-module-dark-customers-desktop',
+        expectCurrentRecord: true,
+        checkDesktopResize: false,
+      })
       await assertDarkThemeContrast(page, {
         scenarioName: 'business-module-dark-customers-desktop',
         selector: '.erp-business-page-layout',
@@ -3084,6 +3089,9 @@ const scenarios = [
       await assertBusinessMainTableHasNoOperationColumn(page, {
         scenarioName: 'material-master-header-desktop',
       })
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'material-master-header-desktop',
+      })
       await assertNoHorizontalOverflow(page, 'material-master-header-desktop')
     },
   },
@@ -3107,6 +3115,9 @@ const scenarios = [
       await assertBusinessMainTableHasNoOperationColumn(page, {
         scenarioName: 'purchase-order-date-filter-desktop',
       })
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'purchase-order-date-filter-desktop',
+      })
       await assertBusinessModuleToolbarControlStyle(page, {
         scenarioName: 'purchase-order-date-filter-desktop',
       })
@@ -3128,11 +3139,68 @@ const scenarios = [
             triggerButton: '从材料库导入',
             titleText: '从材料库导入采购明细',
             expectedTexts: ['材料编码', '材料名称', 'MAT-STYLE-L1'],
+            emptyDescriptionText: '暂无可导入材料',
+            collapseSelectTexts: [
+              'MAT-STYLE-L1',
+              'MAT-STYLE-L2',
+              'MAT-STYLE-L3',
+              'MAT-STYLE-L4',
+              'MAT-STYLE-L5',
+              'MAT-STYLE-L6',
+            ],
             selectText: 'MAT-STYLE-L1',
             scenarioName: 'purchase-order-source-import-picker',
           })
         },
       })
+    },
+  },
+  {
+    name: 'business-collaboration-supplier-desktop',
+    path: '/erp/master/partners/suppliers',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '供应商档案')
+      await expectText(page, '本页协同')
+      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+        scenarioName: 'business-collaboration-supplier-desktop',
+        expectCurrentRecord: true,
+      })
+      await assertNoHorizontalOverflow(
+        page,
+        'business-collaboration-supplier-desktop'
+      )
+    },
+  },
+  {
+    name: 'business-collaboration-purchase-selected-desktop',
+    path: '/erp/purchase/accessories',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '采购订单')
+      await expectText(page, '本页协同')
+      const purchaseOrderRow = page
+        .locator('.erp-business-data-table-card .ant-table-tbody tr')
+        .filter({ hasText: 'PO-STYLE-L1' })
+        .first()
+      await purchaseOrderRow.click()
+      await assertOrderLifecycleActionsConsolidated(page, {
+        scenarioName: 'business-collaboration-purchase-selected-desktop',
+        primaryActionLabel: '提交',
+        menuActionLabels: ['取消'],
+        absentButtonLabels: ['审核', '关闭', '取消'],
+      })
+      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+        scenarioName: 'business-collaboration-purchase-selected-desktop',
+        expectCurrentRecord: true,
+        checkDesktopResize: false,
+      })
+      await assertNoHorizontalOverflow(
+        page,
+        'business-collaboration-purchase-selected-desktop'
+      )
     },
   },
   {
@@ -3154,6 +3222,10 @@ const scenarios = [
       })
       await assertBusinessMainTableHasNoOperationColumn(page, {
         scenarioName: 'shipment-date-filter-desktop',
+      })
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'shipment-date-filter-desktop',
+        unsortableHeaders: ['备注'],
       })
       await assertBusinessModuleToolbarControlStyle(page, {
         scenarioName: 'shipment-date-filter-desktop',
@@ -3217,6 +3289,21 @@ const scenarios = [
     },
   },
   {
+    name: 'business-collaboration-mobile',
+    path: '/erp/master/partners/suppliers',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectHeading(page, '供应商档案')
+      await expectText(page, '本页协同')
+      await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+        scenarioName: 'business-collaboration-mobile',
+        expectCurrentRecord: true,
+      })
+      await assertNoHorizontalOverflow(page, 'business-collaboration-mobile')
+    },
+  },
+  {
     name: 'textarea-show-count-layout-desktop',
     path: '/erp/master/partners/suppliers',
     auth: 'admin',
@@ -3244,6 +3331,9 @@ const scenarios = [
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
       await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-v1-suppliers',
+      })
+      await assertBusinessMainTableSortableColumns(page, {
         scenarioName: 'business-v1-suppliers',
       })
       await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
@@ -3278,6 +3368,9 @@ const scenarios = [
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-v1-customers',
       })
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'business-v1-customers',
+      })
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建客户',
         titleText: '新建客户档案',
@@ -3304,10 +3397,24 @@ const scenarios = [
       await expectText(page, '当前操作')
       await expectText(page, '订单行')
       await expectText(page, '本页协同')
+      await assertBusinessToolbarDisabledButtons(page, {
+        scenarioName: 'business-v1-sales-orders',
+        labels: ['批量删除', '回收站'],
+      })
+      await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+      await assertOrderLifecycleActionsConsolidated(page, {
+        scenarioName: 'business-v1-sales-orders',
+        primaryActionLabel: '提交',
+        menuActionLabels: ['取消'],
+        absentButtonLabels: ['生效', '关闭', '取消'],
+      })
       await assertBusinessPageRefreshEntrypoint(page, {
         scenarioName: 'business-v1-sales-orders',
       })
       await assertBusinessHeaderHasNoSectionTitle(page, {
+        scenarioName: 'business-v1-sales-orders',
+      })
+      await assertBusinessMainTableSortableColumns(page, {
         scenarioName: 'business-v1-sales-orders',
       })
       await verifyBusinessActionFormModal(page, {
@@ -3323,6 +3430,7 @@ const scenarios = [
             triggerButton: '从 SKU 库导入',
             titleText: '从 SKU 库导入订单行',
             expectedTexts: ['SKU 编码', '产品名称', 'SKU-STYLE-L1'],
+            emptyDescriptionText: '暂无可导入 SKU',
             selectText: 'SKU-STYLE-L1',
             scenarioName: 'sales-order-source-import-picker',
           })
@@ -3365,15 +3473,12 @@ const scenarios = [
         scenarioName: 'business-standard-products',
         expectedLabels: ['总产品', '当前结果', '启用产品', '已选产品'],
       })
-      await verifyBusinessRecycleModal(page, {
-        screenshotName: 'business-formal-products-recycle-modal',
-        expectedColumns: [
-          '单据编号',
-          '名称',
-          '业务状态',
-          '删除时间',
-          '删除原因',
-        ],
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'business-standard-products',
+      })
+      await assertBusinessToolbarDisabledButtons(page, {
+        scenarioName: 'business-standard-products',
+        labels: ['批量删除', '回收站'],
       })
       await verifyBusinessModuleColumnOrderDialog(page, {
         moduleKey: 'products',
@@ -3383,15 +3488,28 @@ const scenarios = [
       await expectText(page, '新建产品')
       await expectText(page, '产品编号')
       await expectText(page, '默认单位 ID')
-      await page.keyboard.press('Escape')
+      await closeBusinessFormModal(
+        page,
+        page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .last()
+      )
       await page.getByText('产品规格', { exact: true }).click()
       await expectButton(page, '新建产品规格')
       await expectText(page, 'SKU-STYLE-L1')
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'business-standard-product-skus',
+      })
       await page.getByRole('button', { name: '新建产品规格' }).click()
       await expectText(page, '新建产品规格')
       await expectText(page, 'SKU 编号')
       await expectText(page, '产品 ID')
-      await page.keyboard.press('Escape')
+      await closeBusinessFormModal(
+        page,
+        page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .last()
+      )
       await assertNoHorizontalOverflow(page, 'business-standard-products')
 
       await gotoScenarioPath(page, '/erp/purchase/material-bom', {
@@ -3409,6 +3527,10 @@ const scenarios = [
       })
       await assertBusinessMainTableHasNoOperationColumn(page, {
         scenarioName: 'business-standard-bom',
+      })
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'business-standard-bom',
+        unsortableHeaders: ['备注'],
       })
       await assertBusinessHeaderHasNoSectionTitle(page, {
         scenarioName: 'business-standard-bom',
@@ -3428,23 +3550,36 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '库存台账')
+      await expectText(page, 'inventory_balances')
+      await expectText(page, '12.5')
+      await expectText(page, '已预留')
+      await expectText(page, '4')
+      await expectText(page, '可用量')
+      await expectText(page, '8.5')
       await assertBusinessPageRefreshEntrypoint(page, {
         scenarioName: 'business-standard-inventory',
       })
-      await verifyBusinessActionFormModal(page, {
-        buttonName: '新建库存',
-        titleText: '新建库存调整',
-        minFieldCount: 8,
-        screenshotName: 'business-formal-inventory-create-form-modal',
-        expectedTexts: ['当前余额', '可用量', '最近流水'],
-      })
-      await verifyFormalShellRowDoubleClickEditModal(page, {
-        rowText: 'INVENTORY-002',
-        scenarioName: 'business-standard-inventory',
-        expectedTexts: ['当前余额', '可用量', '最近流水'],
-      })
+      await expectNoButton(page, '新建库存')
+      await expectNoButton(page, '新建库存调整')
+      await expectNoButton(page, '生成库存调整')
       await assertBusinessMainTableHasNoOperationColumn(page, {
         scenarioName: 'business-standard-inventory',
+      })
+
+      await page.getByRole('tab', { name: '库存批次' }).click()
+      await expectText(page, 'INV-LOT-001')
+      await expectText(page, 'SUP-LOT-001')
+      await expectText(page, '冻结')
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'business-standard-inventory-lots',
+      })
+
+      await page.getByRole('tab', { name: '库存流水' }).click()
+      await expectText(page, '冲正')
+      await expectText(page, 'MANUAL_SEED')
+      await expectText(page, 'ledger seed')
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'business-standard-inventory-txns',
       })
       await assertNoHorizontalOverflow(page, 'business-standard-inventory')
 
@@ -3476,7 +3611,7 @@ const scenarios = [
         },
       })
       await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
-      await page.getByRole('button', { name: '添加明细' }).click()
+      await page.getByRole('button', { name: '维护明细' }).click()
       await expectText(page, '维护出货明细')
       await expectText(page, '已保存出货明细')
       await expectText(page, '新增出货明细')
@@ -3484,29 +3619,181 @@ const scenarios = [
       await assertBusinessMainTableHasNoOperationColumn(page, {
         scenarioName: 'business-v1-shipments',
       })
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'business-v1-shipments',
+        unsortableHeaders: ['备注'],
+      })
       await assertNoHorizontalOverflow(page, 'business-v1-shipments')
+
+      await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '委外订单')
+      await expectButton(page, '新建加工合同')
+      await expectText(page, 'Source Document：加工合同')
+      await expectText(page, '加工合同只表达委外承诺和打印快照')
+      await assertTextAbsent(page, '生成委外合同')
+      await expectButton(page, '加工合同打印')
+      const processingContractPrintButton = page.getByRole('button', {
+        name: '加工合同打印',
+      })
+      assert(
+        await processingContractPrintButton.isDisabled(),
+        '未选中加工合同前，加工合同打印按钮应保持禁用'
+      )
+      await page
+        .getByRole('row')
+        .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
+        .click()
+      assert.equal(
+        await processingContractPrintButton.isDisabled(),
+        false,
+        '选中加工合同后，加工合同打印按钮应启用'
+      )
+      await assertTextAbsent(page, '打印单据')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建加工合同',
+        titleText: '新建加工合同',
+        minFieldCount: 7,
+        screenshotName: 'business-v1-outsourcing-order-create-form-modal',
+        expectedTexts: ['加工合同号', '加工厂', '加工明细', '工序'],
+      })
+      await assertNoHorizontalOverflow(page, 'business-v1-processing-contracts')
+
+      await gotoScenarioPath(page, '/erp/production/scheduling', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '生产排程')
+      await expectButton(page, '新建排程')
+      await expectText(page, '生成生产任务')
+      await assertTextAbsent(page, '打印单据')
+      await assertTextAbsent(page, '加工合同打印')
+      await assertBusinessToolbarDisabledButtons(page, {
+        scenarioName: 'business-formal-production-scheduling',
+        labels: ['批量删除', '回收站'],
+      })
+      await assertNoHorizontalOverflow(
+        page,
+        'business-formal-production-scheduling'
+      )
+
+      await gotoScenarioPath(page, '/erp/production/progress', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '生产进度')
+      await expectButton(page, '新建生产事实')
+      await expectText(page, 'PROD-FACT-L1')
+      await expectText(page, '生产发料、成品入库和返工事实')
+      await assertTextAbsent(page, '生成生产进度')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建生产事实',
+        titleText: '新建生产事实',
+        minFieldCount: 9,
+        screenshotName: 'business-v1-production-fact-create-form-modal',
+        expectedTexts: ['事实单号', '对象类型', '数量', '来源类型'],
+      })
+      await assertNoHorizontalOverflow(page, 'business-v1-production-progress')
+
+      await gotoScenarioPath(page, '/erp/warehouse/outbound', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '出库管理')
+      await expectButton(page, '新建出货单')
+      await expectText(page, 'SHIP-STYLE-L1')
+      await expectText(page, '出货出库')
+      await assertTextAbsent(page, '生成出库')
+      await page.getByRole('tab', { name: '库存预留' }).click()
+      await expectButton(page, '新建库存预留')
+      await expectText(page, 'RSV-STYLE-L1')
+      await assertNoHorizontalOverflow(page, 'business-v1-outbound')
 
       await gotoScenarioPath(page, '/erp/finance/receivables', {
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '应收管理')
       await expectButton(page, '新建应收')
-      await expectText(page, '批量删除')
-      await expectText(page, '回收站')
-      await expectText(page, '生成应收')
-      await expectText(page, '当前操作')
-      await expectText(page, '本页协同')
+      await expectText(page, 'AR-STYLE-L1')
+      await expectText(page, 'finance_facts')
+      await expectText(page, 'RECEIVABLE')
+      await assertTextAbsent(page, '批量删除')
+      await assertTextAbsent(page, '回收站')
+      await assertTextAbsent(page, '生成应收')
       await assertBusinessPageRefreshEntrypoint(page, {
-        scenarioName: 'business-standard-receivables',
+        scenarioName: 'business-v1-receivables',
       })
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建应收',
         titleText: '新建应收',
         minFieldCount: 10,
-        screenshotName: 'business-formal-receivables-create-form-modal',
-        expectedTexts: ['来源出货', '应收金额', '回款风险'],
+        screenshotName: 'business-v1-receivables-create-form-modal',
+        expectedTexts: ['事实类型', '金额', '来源类型'],
       })
-      await assertNoHorizontalOverflow(page, 'business-standard-receivables')
+      await assertNoHorizontalOverflow(page, 'business-v1-receivables')
+
+      await gotoScenarioPath(page, '/erp/finance/payables', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '应付管理')
+      await expectButton(page, '新建应付')
+      await expectText(page, 'AP-STYLE-L1')
+      await assertNoHorizontalOverflow(page, 'business-v1-payables')
+
+      await gotoScenarioPath(page, '/erp/finance/invoices', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '发票管理')
+      await expectButton(page, '新建发票')
+      await expectText(page, 'INV-STYLE-L1')
+      await assertNoHorizontalOverflow(page, 'business-v1-invoices')
+
+      await gotoScenarioPath(page, '/erp/finance/reconciliation', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '对账管理')
+      await expectButton(page, '新建对账')
+      await expectText(page, 'REC-STYLE-L1')
+      await assertNoHorizontalOverflow(page, 'business-v1-reconciliation')
+
+      await page.evaluate(() => {
+        window.localStorage.setItem('plush_erp_theme_mode', 'dark')
+      })
+      await gotoScenarioPath(page, '/erp/finance/receivables', {
+        waitUntil: 'domcontentloaded',
+      })
+      await assertERPThemeMode(page, {
+        scenarioName: 'business-v1-receivables-dark',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await expectHeading(page, '应收管理')
+      await page.getByRole('button', { name: '新建应收' }).click()
+      await assertOperationalFactModalViewport(
+        page,
+        'business-v1-receivables-dark-modal'
+      )
+
+      await page.setViewportSize({ width: 390, height: 844 })
+      await page.evaluate(() => {
+        window.localStorage.setItem('plush_erp_theme_mode', 'light')
+      })
+      await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+        waitUntil: 'domcontentloaded',
+      })
+      await assertERPThemeMode(page, {
+        scenarioName: 'business-v1-outsourcing-mobile',
+        expectedMode: 'light',
+        expectedEffectiveTheme: 'light',
+      })
+      await expectHeading(page, '委外订单')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建加工合同',
+        titleText: '新建加工合同',
+        minFieldCount: 7,
+        screenshotName: 'business-v1-outsourcing-mobile-modal',
+        expectedTexts: ['加工合同号', '加工厂', '加工明细', '工序'],
+        requireMultiColumn: false,
+      })
+      await assertNoHorizontalOverflow(page, 'business-v1-outsourcing-mobile')
     },
   },
 ]
@@ -3863,7 +4150,7 @@ async function waitForScenarioDocumentReady(page, errors = []) {
       null,
       { timeout: 20_000 }
     )
-  } catch {
+  } catch (error) {
     const snapshot = await page.evaluate(() => ({
       url: window.location.href,
       readyState: document.readyState,
@@ -4347,6 +4634,27 @@ async function installAdminRpcMocks(page) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const process = {
+      id: 1,
+      code: 'PROC-STYLE-L1',
+      name: '车缝',
+      category: '委外车缝',
+      outsourcing_enabled: true,
+      inhouse_enabled: true,
+      quality_required: true,
+      sort_order: 10,
+      is_active: true,
+      note: '',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const materials = Array.from({ length: 6 }, (_, index) => ({
+      ...material,
+      id: index + 1,
+      code: index === 0 ? material.code : `MAT-STYLE-L${index + 1}`,
+      name: index === 0 ? material.name : `样式材料 ${index + 1}`,
+      spec: index === 0 ? material.spec : `短毛绒 ${300 + index * 20}g`,
+    }))
 
     let data = {}
     switch (method) {
@@ -4365,8 +4673,16 @@ async function installAdminRpcMocks(page) {
       case 'list_product_skus':
         data = { product_skus: [productSKU], total: 1, limit: 100, offset: 0 }
         break
+      case 'list_processes':
+        data = { processes: [process], total: 1, limit: 100, offset: 0 }
+        break
       case 'list_materials':
-        data = { materials: [material], total: 1, limit: 100, offset: 0 }
+        data = {
+          materials,
+          total: materials.length,
+          limit: 100,
+          offset: 0,
+        }
         break
       case 'create_customer':
       case 'update_customer':
@@ -4591,6 +4907,101 @@ async function installAdminRpcMocks(page) {
     })
   })
 
+  await page.route('**/rpc/outsourcing_order', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    const outsourcingOrder = {
+      id: 1,
+      outsourcing_order_no: 'SIM-OUTSOURCE-CONTRACT-L1',
+      supplier_id: 1,
+      supplier_snapshot: {
+        id: 1,
+        code: 'SUP-OUT-L1',
+        short_name: '样式加工厂',
+        name: '样式加工厂',
+      },
+      source_order_no: 'SO-STYLE-L1',
+      source_sales_order_id: 1,
+      order_date: nowUnix(),
+      expected_return_date: nowUnix() + 86_400 * 7,
+      lifecycle_status: 'draft',
+      note: '样式加工合同',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const outsourcingOrderItem = {
+      id: 1,
+      outsourcing_order_id: 1,
+      line_no: 1,
+      product_id: 1,
+      process_id: 1,
+      unit_id: 1,
+      product_no_snapshot: 'PROD-STYLE-L1',
+      product_name_snapshot: '样式产品',
+      process_name_snapshot: '车缝',
+      process_category_snapshot: '委外车缝',
+      unit_name_snapshot: '只',
+      outsourcing_quantity: '20',
+      unit_price: '1.80',
+      amount: '36.00',
+      expected_return_date: nowUnix() + 86_400 * 7,
+      line_status: 'open',
+      note: '样式加工明细',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_outsourcing_orders':
+        data = {
+          outsourcing_orders: [outsourcingOrder],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'list_outsourcing_order_items':
+        data = {
+          outsourcing_order_items: [outsourcingOrderItem],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'save_outsourcing_order_with_items':
+        data = {
+          outsourcing_order: { ...outsourcingOrder, ...params },
+          outsourcing_order_items: [outsourcingOrderItem],
+        }
+        break
+      case 'get_outsourcing_order':
+      case 'submit_outsourcing_order':
+      case 'confirm_outsourcing_order':
+      case 'close_outsourcing_order':
+      case 'cancel_outsourcing_order':
+        data = { outsourcing_order: { ...outsourcingOrder, ...params } }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
+
   await page.route('**/rpc/bom', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method, params = {} } = body
@@ -4709,9 +5120,147 @@ async function installAdminRpcMocks(page) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const productionFact = {
+      id: 1,
+      fact_no: 'PROD-FACT-L1',
+      fact_type: 'FINISHED_GOODS_RECEIPT',
+      status: 'DRAFT',
+      subject_type: 'PRODUCT',
+      subject_id: 1,
+      warehouse_id: 1,
+      unit_id: 1,
+      lot_id: 1,
+      quantity: '6',
+      source_type: 'PRODUCTION_PROGRESS',
+      source_id: 1,
+      source_line_id: null,
+      idempotency_key: 'PROD-FACT-L1',
+      occurred_at: nowUnix(),
+      note: '样式生产事实',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const outsourcingFact = {
+      id: 1,
+      fact_no: 'OUTSOURCE-FACT-L1',
+      fact_type: 'RETURN_RECEIPT',
+      status: 'DRAFT',
+      subject_type: 'MATERIAL',
+      subject_id: 1,
+      warehouse_id: 1,
+      unit_id: 1,
+      lot_id: 1,
+      quantity: '8',
+      supplier_id: 1,
+      supplier_name: '样式供应商',
+      source_type: 'OUTSOURCING_ORDER',
+      source_id: 1,
+      source_line_id: null,
+      idempotency_key: 'OUTSOURCE-FACT-L1',
+      occurred_at: nowUnix(),
+      note: '样式委外事实',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const stockReservation = {
+      id: 1,
+      reservation_no: 'RSV-STYLE-L1',
+      status: 'ACTIVE',
+      sales_order_id: 1,
+      sales_order_item_id: 1,
+      product_id: 1,
+      warehouse_id: 1,
+      unit_id: 1,
+      lot_id: 1,
+      quantity: '4',
+      idempotency_key: 'RSV-STYLE-L1',
+      reserved_at: nowUnix(),
+      note: '样式库存预留',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const financeFactType = String(params.fact_type || 'RECEIVABLE')
+      .trim()
+      .toUpperCase()
+    const financeFactNoByType = {
+      RECEIVABLE: 'AR-STYLE-L1',
+      PAYABLE: 'AP-STYLE-L1',
+      INVOICE: 'INV-STYLE-L1',
+      RECONCILIATION: 'REC-STYLE-L1',
+      PAYMENT: 'PAY-STYLE-L1',
+    }
+    const financeFact = {
+      id: 1,
+      fact_no: financeFactNoByType[financeFactType] || 'FIN-STYLE-L1',
+      fact_type: financeFactType,
+      status: 'POSTED',
+      counterparty_type:
+        financeFactType === 'PAYABLE'
+          ? 'SUPPLIER'
+          : financeFactType === 'RECONCILIATION'
+            ? 'OTHER'
+            : 'CUSTOMER',
+      counterparty_id: 1,
+      amount: '1200',
+      currency: 'CNY',
+      source_type: financeFactType === 'PAYABLE' ? 'PURCHASE' : 'SHIPMENT',
+      source_id: 1,
+      source_line_id: null,
+      idempotency_key: financeFactNoByType[financeFactType] || 'FIN-STYLE-L1',
+      occurred_at: nowUnix(),
+      note: '样式财务事实',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
 
     let data = {}
     switch (method) {
+      case 'list_production_facts':
+        data = {
+          production_facts: [productionFact],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'create_production_fact':
+        data = {
+          production_fact: { ...productionFact, id: 2, ...params },
+        }
+        break
+      case 'post_production_fact':
+        data = {
+          production_fact: { ...productionFact, status: 'POSTED' },
+        }
+        break
+      case 'cancel_production_fact':
+        data = {
+          production_fact: { ...productionFact, status: 'CANCELLED' },
+        }
+        break
+      case 'list_outsourcing_facts':
+        data = {
+          outsourcing_facts: [outsourcingFact],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'create_outsourcing_fact':
+        data = {
+          outsourcing_fact: { ...outsourcingFact, id: 2, ...params },
+        }
+        break
+      case 'post_outsourcing_fact':
+        data = {
+          outsourcing_fact: { ...outsourcingFact, status: 'POSTED' },
+        }
+        break
+      case 'cancel_outsourcing_fact':
+        data = {
+          outsourcing_fact: { ...outsourcingFact, status: 'CANCELLED' },
+        }
+        break
       case 'list_shipments':
         data = { shipments: [shipment], total: 1, limit: 100, offset: 0 }
         break
@@ -4726,6 +5275,141 @@ async function installAdminRpcMocks(page) {
         break
       case 'cancel_shipment':
         data = { shipment: { ...shipment, status: 'CANCELLED' } }
+        break
+      case 'list_stock_reservations':
+        data = {
+          stock_reservations: [stockReservation],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'create_stock_reservation':
+        data = {
+          stock_reservation: { ...stockReservation, id: 2, ...params },
+        }
+        break
+      case 'release_stock_reservation':
+        data = {
+          stock_reservation: { ...stockReservation, status: 'RELEASED' },
+        }
+        break
+      case 'consume_stock_reservation':
+        data = {
+          stock_reservation: { ...stockReservation, status: 'CONSUMED' },
+        }
+        break
+      case 'list_finance_facts':
+        data = { finance_facts: [financeFact], total: 1, limit: 100, offset: 0 }
+        break
+      case 'create_finance_fact':
+        data = { finance_fact: { ...financeFact, id: 2, ...params } }
+        break
+      case 'post_finance_fact':
+        data = { finance_fact: { ...financeFact, status: 'POSTED' } }
+        break
+      case 'settle_finance_fact':
+        data = { finance_fact: { ...financeFact, status: 'SETTLED' } }
+        break
+      case 'cancel_finance_fact':
+        data = { finance_fact: { ...financeFact, status: 'CANCELLED' } }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
+
+  await page.route('**/rpc/inventory', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method } = body
+    const inventoryBalance = {
+      id: 301,
+      subject_type: 'PRODUCT',
+      subject_id: 1,
+      warehouse_id: 1,
+      lot_id: 401,
+      unit_id: 1,
+      quantity: '12.5',
+      active_reserved_quantity: '4',
+      available_quantity: '8.5',
+      updated_at: nowUnix(),
+    }
+    const inventoryLot = {
+      id: 401,
+      subject_type: 'MATERIAL',
+      subject_id: 1,
+      lot_no: 'INV-LOT-001',
+      supplier_lot_no: 'SUP-LOT-001',
+      color_no: 'C01',
+      dye_lot_no: 'DYE-01',
+      production_lot_no: '',
+      status: 'HOLD',
+      received_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+    const inventoryTxn = {
+      id: 501,
+      txn_type: 'REVERSAL',
+      direction: -1,
+      subject_type: 'MATERIAL',
+      subject_id: 1,
+      warehouse_id: 1,
+      lot_id: 401,
+      quantity: '1.5',
+      unit_id: 1,
+      source_type: 'MANUAL_SEED',
+      source_id: 9001,
+      source_line_id: 9002,
+      reversal_of_txn_id: 500,
+      idempotency_key: 'INV-TXN-001',
+      note: 'ledger seed',
+      occurred_at: nowUnix(),
+      created_at: nowUnix(),
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_inventory_balances':
+      case 'listInventoryBalances':
+        data = {
+          inventory_balances: [inventoryBalance],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'list_inventory_lots':
+      case 'listInventoryLots':
+        data = {
+          inventory_lots: [inventoryLot],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'list_inventory_txns':
+      case 'listInventoryTxns':
+        data = {
+          inventory_txns: [inventoryTxn],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
         break
       default:
         data = {}
@@ -5055,9 +5739,9 @@ async function assertBusinessSelectionActionBarEmpty(page, { scenarioName }) {
   const disabledButtonChecks = [
     { label: '清空已选' },
     { label: '查看' },
-    { label: '关联表格' },
+    { label: '关联单据' },
     { label: '创建协同任务' },
-    { label: '流转', ariaLabel: '流转业务状态' },
+    { label: '更多操作' },
     { label: '删除' },
     { label: '批量删除' },
   ]
@@ -5088,6 +5772,128 @@ async function assertBusinessSelectionActionBarEmpty(page, { scenarioName }) {
     scenarioName,
     expectedMode: 'empty',
   })
+}
+
+async function assertOrderLifecycleActionsConsolidated(
+  page,
+  {
+    scenarioName,
+    primaryActionLabel,
+    menuActionLabels = [],
+    absentButtonLabels = [],
+  }
+) {
+  const compactText = (value) => String(value || '').replace(/\s+/gu, '')
+  const looseTextPattern = (value) =>
+    new RegExp(
+      String(value || '')
+        .split('')
+        .map((char) => char.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('\\s*'),
+      'u'
+    )
+  const actionBar = page.locator('.erp-business-module-current-action').first()
+  await actionBar.waitFor({ state: 'visible', timeout: 10_000 })
+  const primaryButton = actionBar.getByRole('button', {
+    name: looseTextPattern(primaryActionLabel),
+  })
+  try {
+    await primaryButton.waitFor({ state: 'visible', timeout: 10_000 })
+  } catch (error) {
+    const currentMetrics = await actionBar.evaluate((element) => ({
+      textContent: String(element.textContent || '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+      buttons: Array.from(element.querySelectorAll('button')).map((button) => ({
+        text: String(button.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim(),
+        disabled: button.disabled,
+        ariaLabel: button.getAttribute('aria-label') || '',
+      })),
+      tags: Array.from(element.querySelectorAll('.ant-tag')).map((tag) =>
+        String(tag.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      ),
+    }))
+    throw new Error(
+      `${scenarioName} 未找到主状态动作“${primaryActionLabel}”: ${JSON.stringify(
+        currentMetrics
+      )}`
+    )
+  }
+
+  const directButtonTexts = (
+    await actionBar.evaluate((element) =>
+      Array.from(element.querySelectorAll('button')).map((button) =>
+        String(button.textContent || '')
+      )
+    )
+  ).map(compactText)
+  for (const label of absentButtonLabels) {
+    assert.equal(
+      directButtonTexts.includes(compactText(label)),
+      false,
+      `${scenarioName} 不应继续把“${label}”作为横排状态按钮展示: ${JSON.stringify(
+        directButtonTexts
+      )}`
+    )
+  }
+
+  const menuButton = actionBar.getByRole('button', { name: /更多操作/ }).first()
+  await menuButton.waitFor({ state: 'visible', timeout: 10_000 })
+  await menuButton.click()
+  const menuDropdown = page
+    .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
+    .filter({ hasText: '状态变更' })
+    .last()
+  await menuDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+  await menuDropdown.getByText('状态变更', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 10_000,
+  })
+  for (const label of menuActionLabels) {
+    await menuDropdown
+      .getByRole('menuitem', { name: looseTextPattern(label) })
+      .waitFor({ state: 'visible', timeout: 10_000 })
+  }
+
+  const metrics = await actionBar.evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    const buttons = Array.from(element.querySelectorAll('button')).map(
+      (button) => {
+        const buttonRect = button.getBoundingClientRect()
+        return {
+          text: String(button.textContent || '')
+            .replace(/\s+/g, ' ')
+            .trim(),
+          disabled: button.disabled,
+          width: buttonRect.width,
+          height: buttonRect.height,
+          left: buttonRect.left,
+          right: buttonRect.right,
+        }
+      }
+    )
+    return {
+      width: rect.width,
+      height: rect.height,
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      buttons,
+    }
+  })
+
+  assert(
+    metrics.scrollWidth <= metrics.clientWidth + 2,
+    `${scenarioName} 生命周期动作收口后不应造成横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.buttons.every((item) => item.width > 0 && item.height > 0),
+    `${scenarioName} 生命周期动作按钮应保持可见尺寸: ${JSON.stringify(metrics)}`
+  )
+  await page.keyboard.press('Escape')
 }
 
 async function assertBusinessSelectionActionBarBoxModel(
@@ -5967,6 +6773,7 @@ async function verifyBusinessActionFormModal(
     screenshotName,
     expectedTexts = [],
     absentTexts = [],
+    requireMultiColumn = true,
     afterOpen,
   }
 ) {
@@ -6195,10 +7002,12 @@ async function verifyBusinessActionFormModal(
   if (typeof afterOpen === 'function') {
     await afterOpen(modal)
   }
-  assert(
-    metrics.gridTemplateColumns.split(' ').length >= 2,
-    `${screenshotName} 桌面表单未使用多列表格化布局: ${JSON.stringify(metrics)}`
-  )
+  if (requireMultiColumn) {
+    assert(
+      metrics.gridTemplateColumns.split(' ').length >= 2,
+      `${screenshotName} 桌面表单未使用多列表格化布局: ${JSON.stringify(metrics)}`
+    )
+  }
   assert(
     metrics.controls.every(
       (control) => control.width >= 120 && control.height >= 30
@@ -6242,6 +7051,68 @@ async function verifyBusinessActionFormModal(
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
+async function assertOperationalFactModalViewport(page, scenarioName) {
+  const modal = page
+    .locator('.erp-business-action-modal--operational-fact.ant-modal:visible')
+    .last()
+  await modal.waitFor({ state: 'visible', timeout: 10_000 })
+  await assertAntdModalCentered(page, modal, `${scenarioName}-centered`)
+  const metrics = await modal.evaluate((node) => {
+    const body = node.querySelector('.ant-modal-body')
+    const form = node.querySelector('.erp-business-action-form')
+    const modalRect = node.getBoundingClientRect()
+    const bodyRect = body?.getBoundingClientRect()
+    const bodyStyle = body ? window.getComputedStyle(body) : null
+    return {
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      modal: {
+        top: modalRect.top,
+        bottom: modalRect.bottom,
+        width: modalRect.width,
+        height: modalRect.height,
+      },
+      body: body
+        ? {
+            clientWidth: body.clientWidth,
+            scrollWidth: body.scrollWidth,
+            clientHeight: body.clientHeight,
+            scrollHeight: body.scrollHeight,
+            overflowY: bodyStyle?.overflowY || '',
+          }
+        : null,
+      hasBusinessForm: Boolean(form),
+    }
+  })
+  assert(
+    metrics.hasBusinessForm,
+    `${scenarioName} 未使用业务表单结构: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
+    `${scenarioName} modal body 出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.body &&
+      (metrics.body.scrollHeight <= metrics.body.clientHeight + 1 ||
+        metrics.body.overflowY === 'auto'),
+    `${scenarioName} 长表单未由 modal body 承载滚动: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.modal.top >= -1 &&
+      metrics.modal.bottom <= metrics.viewport.height + 1 &&
+      metrics.modal.width <= metrics.viewport.width,
+    `${scenarioName} modal 超出视口: ${JSON.stringify(metrics)}`
+  )
+  await modal.screenshot({
+    path: path.resolve(outputDir, `${scenarioName}.png`),
+  })
+  await modal.locator('.ant-modal-close').click({ force: true })
+  await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+}
+
 async function verifySourceImportPicker(
   page,
   {
@@ -6249,6 +7120,8 @@ async function verifySourceImportPicker(
     triggerButton,
     titleText,
     expectedTexts = [],
+    emptyDescriptionText = '暂无可导入记录',
+    collapseSelectTexts = [],
     selectText,
     importAndExpectText,
     scenarioName,
@@ -6284,7 +7157,11 @@ async function verifySourceImportPicker(
           }
         : null,
       hasTable: Boolean(table),
-      hasPagination: Boolean(node.querySelector('.ant-pagination')),
+      hasEllipsisCell: Boolean(node.querySelector('.ant-table-cell-ellipsis')),
+      hasPagination: Boolean(
+        node.querySelector('.erp-source-import-picker__pagination')
+      ),
+      hasPageControls: Boolean(node.querySelector('.ant-pagination')),
       selectionTop: node
         .querySelector('.erp-source-import-picker__selection')
         ?.getBoundingClientRect?.().top,
@@ -6297,12 +7174,23 @@ async function verifySourceImportPicker(
     `${scenarioName} 来源导入选择器出现横向溢出: ${JSON.stringify(metrics)}`
   )
   assert(metrics.hasTable, `${scenarioName} 来源导入选择器缺少表格`)
-  if (metrics.hasPagination) {
-    assert(
-      metrics.textContent.includes('共') && metrics.textContent.includes('条'),
-      `${scenarioName} 来源导入分页应显示总数: ${JSON.stringify(metrics)}`
-    )
-  }
+  assert.equal(
+    metrics.hasEllipsisCell,
+    false,
+    `${scenarioName} 来源导入表格不应默认省略关键列: ${JSON.stringify(metrics)}`
+  )
+  assert(metrics.hasPagination, `${scenarioName} 来源导入选择器缺少分页`)
+  await expectText(page, '未选择来源')
+  assert(
+    metrics.selectionTop > 0 &&
+      metrics.tableTop > 0 &&
+      metrics.selectionTop < metrics.tableTop,
+    `${scenarioName} 默认已选摘要应固定在表格上方: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.textContent.includes('共') && metrics.textContent.includes('条'),
+    `${scenarioName} 来源导入分页应显示总数: ${JSON.stringify(metrics)}`
+  )
   assert(
     metrics.visibleModalCount <= 2,
     `${scenarioName} 来源导入不应超过两层弹窗: ${JSON.stringify(metrics)}`
@@ -6314,12 +7202,103 @@ async function verifySourceImportPicker(
     )
   }
 
+  const selectedSummaryVisibleLimit = 2
+  const findSourceRow = async (rowText) => {
+    const firstPageButton = picker.locator('.ant-pagination-item-1').first()
+    if ((await firstPageButton.count()) > 0) {
+      await firstPageButton.click({ force: true })
+    }
+    for (let pageIndex = 0; pageIndex < 12; pageIndex += 1) {
+      const row = picker
+        .locator('.ant-table-row')
+        .filter({ hasText: rowText })
+        .first()
+      if ((await row.count()) > 0 && (await row.isVisible())) {
+        return row
+      }
+      const nextButton = picker.locator('.ant-pagination-next').first()
+      const nextDisabled =
+        (await nextButton.count()) === 0 ||
+        (await nextButton.evaluate((node) =>
+          node.classList.contains('ant-pagination-disabled')
+        ))
+      if (nextDisabled) break
+      await nextButton.click({ force: true })
+    }
+    throw new Error(`${scenarioName} 来源导入分页中找不到 ${rowText}`)
+  }
+
+  const assertCollapsedSelectionPopover = async (expectedSelectedTexts) => {
+    await expectText(page, `已选 ${expectedSelectedTexts.length} 条`)
+    await expectText(
+      page,
+      `+${expectedSelectedTexts.length - selectedSummaryVisibleLimit}`
+    )
+
+    const moreTag = picker
+      .locator('.erp-source-import-picker__selection-more')
+      .last()
+    await moreTag.click()
+    const selectedPopover = page
+      .locator('.erp-source-import-picker__selected-popover')
+      .last()
+    await selectedPopover.waitFor({ state: 'visible', timeout: 10_000 })
+    const popoverMetrics = await selectedPopover.evaluate((node) => ({
+      textContent: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+      itemCount: node.querySelectorAll(
+        '.erp-source-import-picker__selected-popover-item'
+      ).length,
+      clientWidth: node.clientWidth,
+      scrollWidth: node.scrollWidth,
+    }))
+    assert.equal(
+      popoverMetrics.itemCount,
+      expectedSelectedTexts.length,
+      `${scenarioName} +N 弹层应显示全部已选项: ${JSON.stringify(
+        popoverMetrics
+      )}`
+    )
+    assert(
+      popoverMetrics.scrollWidth <= popoverMetrics.clientWidth + 1,
+      `${scenarioName} +N 弹层出现横向溢出: ${JSON.stringify(popoverMetrics)}`
+    )
+    for (const expectedSelectedText of expectedSelectedTexts) {
+      assert(
+        popoverMetrics.textContent.includes(expectedSelectedText),
+        `${scenarioName} +N 弹层缺少 ${expectedSelectedText}: ${JSON.stringify(
+          popoverMetrics
+        )}`
+      )
+    }
+
+    await picker.locator('.ant-input').first().click({ force: true })
+    await selectedPopover.waitFor({ state: 'hidden', timeout: 10_000 })
+  }
+
+  if (collapseSelectTexts.length > selectedSummaryVisibleLimit) {
+    for (const [index, collapseSelectText] of collapseSelectTexts.entries()) {
+      const sourceRow = await findSourceRow(collapseSelectText)
+      await sourceRow
+        .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')
+        .first()
+        .click()
+      if (index === selectedSummaryVisibleLimit) {
+        await assertCollapsedSelectionPopover(
+          collapseSelectTexts.slice(0, selectedSummaryVisibleLimit + 1)
+        )
+      }
+    }
+
+    await assertCollapsedSelectionPopover(collapseSelectTexts)
+    await picker.getByRole('button', { name: '清空已选' }).click({
+      force: true,
+    })
+    await assertTextAbsent(page, `已选 ${collapseSelectTexts.length} 条`)
+    await expectText(page, '未选择来源')
+  }
+
   if (selectText) {
-    const sourceRow = picker
-      .locator('.ant-table-row')
-      .filter({ hasText: selectText })
-      .first()
-    await sourceRow.waitFor({ state: 'visible', timeout: 10_000 })
+    const sourceRow = await findSourceRow(selectText)
     const selectorControl = sourceRow
       .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')
       .first()
@@ -6351,6 +7330,7 @@ async function verifySourceImportPicker(
     assert.equal(importDisabled, false, `${scenarioName} 导入按钮不应禁用`)
     await picker.getByRole('button', { name: '清空已选' }).click()
     await assertTextAbsent(page, '已选 1 条')
+    await expectText(page, '未选择来源')
     const clearedImportDisabled = await importButton.evaluate(
       (button) => button.disabled
     )
@@ -6359,7 +7339,58 @@ async function verifySourceImportPicker(
       true,
       `${scenarioName} 清空已选后导入按钮应禁用`
     )
-    await selectorControl.click()
+    const searchInput = picker.locator('.ant-input').first()
+    await searchInput.fill('NO-SOURCE-IMPORT-RESULT')
+    let pickerTextAfterEmptySearch = ''
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      pickerTextAfterEmptySearch = await picker.evaluate((node) =>
+        String(node.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      )
+      if (pickerTextAfterEmptySearch.includes(emptyDescriptionText)) {
+        break
+      }
+      await delay(250)
+    }
+    assert(
+      pickerTextAfterEmptySearch.includes(emptyDescriptionText),
+      `${scenarioName} 来源导入搜索空结果应显示空态“${emptyDescriptionText}”: ${pickerTextAfterEmptySearch}`
+    )
+    const emptyPaginationMetrics = await picker.evaluate((node) => ({
+      hasPagination: Boolean(
+        node.querySelector('.erp-source-import-picker__pagination')
+      ),
+      hasPageControls: Boolean(node.querySelector('.ant-pagination')),
+      textContent: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+      scrollWidth: node.scrollWidth,
+      clientWidth: node.clientWidth,
+    }))
+    assert(
+      emptyPaginationMetrics.hasPagination,
+      `${scenarioName} 来源导入空结果仍应保留分页: ${JSON.stringify(
+        emptyPaginationMetrics
+      )}`
+    )
+    assert(
+      emptyPaginationMetrics.textContent.includes('共 0 条'),
+      `${scenarioName} 来源导入空结果分页应显示共 0 条: ${JSON.stringify(
+        emptyPaginationMetrics
+      )}`
+    )
+    assert(
+      emptyPaginationMetrics.scrollWidth <=
+        emptyPaginationMetrics.clientWidth + 1,
+      `${scenarioName} 来源导入空结果出现横向溢出: ${JSON.stringify(
+        emptyPaginationMetrics
+      )}`
+    )
+    await searchInput.fill('')
+    const sourceRowAfterEmptySearch = await findSourceRow(selectText)
+    const selectorControlAfterEmptySearch = sourceRowAfterEmptySearch
+      .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')
+      .first()
+    await selectorControlAfterEmptySearch.click()
     await expectText(page, '已选 1 条')
     await importButton.click({ force: true })
     await picker.waitFor({ state: 'hidden', timeout: 10_000 })
@@ -6469,6 +7500,41 @@ async function verifyBusinessRecycleModal(
   }
 }
 
+async function assertBusinessToolbarDisabledButtons(
+  page,
+  { scenarioName, labels = [] }
+) {
+  const toolbar = page.locator('.erp-business-operation-panel__toolbar').first()
+  await toolbar.waitFor({ state: 'visible', timeout: 10_000 })
+  const metrics = await toolbar.evaluate((node, expectedLabels) => {
+    const buttons = Array.from(node.querySelectorAll('button')).map(
+      (button) => ({
+        text: String(button.textContent || '')
+          .replace(/\s+/g, ' ')
+          .trim(),
+        disabled: button.disabled,
+      })
+    )
+    return {
+      buttons,
+      expected: expectedLabels.map((label) => {
+        const matched = buttons.find((button) => button.text === label)
+        return {
+          label,
+          found: Boolean(matched),
+          disabled: matched?.disabled === true,
+        }
+      }),
+    }
+  }, labels)
+
+  assert.deepEqual(
+    metrics.expected.filter((item) => !item.found || !item.disabled),
+    [],
+    `${scenarioName} 工具条弱动作应保持禁用: ${JSON.stringify(metrics)}`
+  )
+}
+
 async function verifyBusinessRowDoubleClickEditModal(
   page,
   { rowText, titleText, scenarioName, afterModalOpen }
@@ -6527,8 +7593,23 @@ async function verifyBusinessRowDoubleClickEditModal(
     `${scenarioName} 双击行不应打开详情抽屉: ${JSON.stringify(modalMetrics)}`
   )
 
-  await modal.locator('.ant-modal-close').click({ force: true })
-  await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  await closeBusinessFormModal(page, modal)
+}
+
+async function closeBusinessFormModal(page, modal) {
+  await modal
+    .locator('.ant-modal-close')
+    .click({ force: true })
+    .catch(() => {})
+  try {
+    await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+    return
+  } catch {
+    const closeButton = modal.getByRole('button', { name: /取消|关闭/ }).last()
+    await closeButton.click({ force: true }).catch(() => {})
+    await page.keyboard.press('Escape').catch(() => {})
+    await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  }
 }
 
 function waitForAdminColumnOrderSync(page) {
@@ -10204,7 +11285,12 @@ async function assertBusinessModuleCompactWorkspace(
 
 async function assertBusinessCollaborationPanelCollapsedByDefault(
   page,
-  { scenarioName }
+  {
+    scenarioName,
+    expectCurrentRecord = false,
+    checkDesktopResize = true,
+    checkResizeHandleHover = true,
+  }
 ) {
   const compactText = (text) => String(text || '').replace(/\s+/gu, '')
   const panel = page.locator('.erp-business-collaboration-task-panel').first()
@@ -10214,12 +11300,24 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
 
   const collapsedMetrics = await panel.evaluate((node) => {
     const toggleButton = node.querySelector('button[aria-expanded]')
+    const panelBody = node.querySelector(
+      '.erp-business-collaboration-task-panel__body'
+    )
     return {
       className: node.className,
       ariaExpanded: toggleButton?.getAttribute('aria-expanded') || null,
       toggleText: String(toggleButton?.textContent || '').trim(),
+      titleLineText: String(
+        node.querySelector('.erp-business-collaboration-task-panel__title-line')
+          ?.textContent || ''
+      ).trim(),
       hasExpandedPanel: Boolean(
         node.querySelector('.erp-business-collaboration-task-panel__panel')
+      ),
+      hasActiveHead: Boolean(
+        node.querySelector(
+          '.erp-business-collaboration-task-panel__active-head'
+        )
       ),
       tabCount: node.querySelectorAll(
         '.erp-business-collaboration-task-panel__tab'
@@ -10229,6 +11327,12 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
           '.erp-business-collaboration-task-panel__summary-item'
         ),
       ].map((item) => String(item.textContent || '').trim()),
+      actionTagTexts: [
+        ...node.querySelectorAll(
+          '.erp-business-collaboration-task-panel__actions .ant-tag'
+        ),
+      ].map((item) => String(item.textContent || '').trim()),
+      bodyHeight: panelBody?.getBoundingClientRect().height || 0,
       scrollWidth: node.scrollWidth,
       clientWidth: node.clientWidth,
     }
@@ -10249,12 +11353,46 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     0,
     `${scenarioName} 默认收起态不应显示任务 tab: ${JSON.stringify(collapsedMetrics)}`
   )
+  assert.equal(
+    collapsedMetrics.hasActiveHead,
+    false,
+    `${scenarioName} 默认收起态不应渲染展开态说明行: ${JSON.stringify(collapsedMetrics)}`
+  )
   const collapsedSummaryText = collapsedMetrics.summaryItems.map(compactText)
   assert(
-    collapsedSummaryText[0]?.startsWith('当前记录') &&
-      collapsedSummaryText[1]?.startsWith('本页待办') &&
-      collapsedSummaryText[2]?.startsWith('阻塞异常'),
-    `${scenarioName} 默认收起态应保留当前记录和风险摘要: ${JSON.stringify(
+    collapsedSummaryText.some((text) => text.startsWith('待办')) &&
+      collapsedSummaryText.some((text) => text.startsWith('阻塞')),
+    `${scenarioName} 默认收起态应保留待办和阻塞摘要: ${JSON.stringify(
+      collapsedMetrics
+    )}`
+  )
+  if (expectCurrentRecord) {
+    assert(
+      collapsedSummaryText.some((text) => text.startsWith('当前')),
+      `${scenarioName} 选中记录后收起态应显示当前记录摘要: ${JSON.stringify(
+        collapsedMetrics
+      )}`
+    )
+  } else {
+    assert(
+      !collapsedSummaryText.some(
+        (text) => text.startsWith('当前') || text.includes('未选择')
+      ),
+      `${scenarioName} 未选中记录时不应展示空的当前记录占位: ${JSON.stringify(
+        collapsedMetrics
+      )}`
+    )
+  }
+  assert.equal(
+    collapsedMetrics.actionTagTexts.length,
+    0,
+    `${scenarioName} 默认收起态不应在右侧重复展示任务计数 tag: ${JSON.stringify(
+      collapsedMetrics
+    )}`
+  )
+  assert(
+    compactText(collapsedMetrics.titleLineText).includes('只处理Workflow任务'),
+    `${scenarioName} 本页协同应保留 Workflow-only 边界短句: ${JSON.stringify(
       collapsedMetrics
     )}`
   )
@@ -10280,17 +11418,92 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     const tabPanel = node.querySelector(
       '.erp-business-collaboration-task-panel__list'
     )
+    const panelBody = node.querySelector(
+      '.erp-business-collaboration-task-panel__body'
+    )
+    const tabRects = [
+      ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
+    ].map((item) => item.getBoundingClientRect())
+    const pageLayout = node.closest('.erp-business-page-layout')
+    const rectFor = (selector) => {
+      const target = pageLayout?.querySelector(selector)
+      if (!target) return null
+      const rect = target.getBoundingClientRect()
+      const style = getComputedStyle(target)
+      if (
+        rect.width <= 0 ||
+        rect.height <= 0 ||
+        style.display === 'none' ||
+        style.visibility === 'hidden'
+      ) {
+        return null
+      }
+      return {
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      }
+    }
+    const panelRect = node.getBoundingClientRect()
+    const panelBounds = {
+      top: panelRect.top,
+      right: panelRect.right,
+      bottom: panelRect.bottom,
+      left: panelRect.left,
+      width: panelRect.width,
+      height: panelRect.height,
+    }
+    const criticalRects = [
+      {
+        key: 'tablePagination',
+        rect: rectFor('.erp-business-data-table-card .ant-pagination'),
+      },
+      {
+        key: 'selectionActionBar',
+        rect: rectFor('.erp-business-selection-action-bar'),
+      },
+      {
+        key: 'listToolbar',
+        rect: rectFor('.erp-business-list-toolbar'),
+      },
+    ].filter((item) => item.rect)
+    const overlaps = criticalRects
+      .filter((item) => {
+        const rect = item.rect
+        return !(
+          rect.right <= panelBounds.left ||
+          rect.left >= panelBounds.right ||
+          rect.bottom <= panelBounds.top ||
+          rect.top >= panelBounds.bottom
+        )
+      })
+      .map((item) => ({
+        key: item.key,
+        rect: item.rect,
+      }))
     return {
       ariaExpanded: toggleButton?.getAttribute('aria-expanded') || null,
       toggleText: String(toggleButton?.textContent || '').trim(),
+      textContent: String(node.textContent || '').trim(),
       hasExpandedPanel: Boolean(
         node.querySelector('.erp-business-collaboration-task-panel__panel')
       ),
+      hasActiveHead: Boolean(
+        node.querySelector(
+          '.erp-business-collaboration-task-panel__active-head'
+        )
+      ),
+      bodyHeight: panelBody?.getBoundingClientRect().height || 0,
       tabListRole: tabList?.getAttribute('role') || '',
       tabListLabel: tabList?.getAttribute('aria-label') || '',
+      tabListDisplay: tabList ? getComputedStyle(tabList).display : '',
       tabTexts: [
         ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
       ].map((item) => String(item.textContent || '').trim()),
+      maxTabHeight: Math.max(0, ...tabRects.map((rect) => rect.height)),
       tabA11y: [
         ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
       ].map((item) => ({
@@ -10301,6 +11514,9 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       })),
       tabPanelRole: tabPanel?.getAttribute('role') || '',
       tabPanelLabelledBy: tabPanel?.getAttribute('aria-labelledby') || '',
+      panelBounds,
+      criticalRects,
+      overlaps,
       scrollWidth: node.scrollWidth,
       clientWidth: node.clientWidth,
     }
@@ -10310,6 +11526,13 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     expandedMetrics.ariaExpanded,
     'true',
     `${scenarioName} 点击展开后 aria-expanded 应为 true: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert.equal(
+    expandedMetrics.hasActiveHead,
+    false,
+    `${scenarioName} 展开态不应在 tab 和列表之间插入重复说明行: ${JSON.stringify(
+      expandedMetrics
+    )}`
   )
   assert.deepEqual(
     expandedMetrics.tabTexts.map((text) =>
@@ -10327,6 +11550,17 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     expandedMetrics.tabListLabel,
     '本页协同任务分类',
     `${scenarioName} 协同任务分类 aria-label 不正确: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert.equal(
+    expandedMetrics.tabListDisplay,
+    'flex',
+    `${scenarioName} 展开态任务分类应使用紧凑分段控件布局: ${JSON.stringify(
+      expandedMetrics
+    )}`
+  )
+  assert(
+    expandedMetrics.maxTabHeight > 0 && expandedMetrics.maxTabHeight <= 36,
+    `${scenarioName} 展开态任务分类高度过高: ${JSON.stringify(expandedMetrics)}`
   )
   assert(
     expandedMetrics.tabA11y.every((item) => item.role === 'tab'),
@@ -10356,114 +11590,260 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     `${scenarioName} 展开态按钮应提示收起: ${JSON.stringify(expandedMetrics)}`
   )
   assert(
+    !expandedMetrics.textContent.includes(
+      '按当前业务模块读取现有 workflow 任务'
+    ),
+    `${scenarioName} 展开态不应保留解释性占位文案: ${JSON.stringify(expandedMetrics)}`
+  )
+  assert(
     expandedMetrics.scrollWidth <= expandedMetrics.clientWidth + 1,
     `${scenarioName} 展开态出现横向溢出: ${JSON.stringify(expandedMetrics)}`
   )
 
   const viewportSize = page.viewportSize()
   if ((viewportSize?.width || 0) >= 769) {
+    assert.deepEqual(
+      expandedMetrics.overlaps,
+      [],
+      `${scenarioName} 桌面展开态本页协同不应遮挡分页、表格工具栏或当前操作区: ${JSON.stringify(
+        expandedMetrics
+      )}`
+    )
+  }
+  const shouldInspectResizeHandle =
+    (viewportSize?.width || 0) >= 769 &&
+    (checkDesktopResize || checkResizeHandleHover)
+  if (shouldInspectResizeHandle) {
     const resizeHandle = panel.locator(
       '.erp-business-collaboration-task-panel__resize-handle'
     )
     await resizeHandle.waitFor({ state: 'visible', timeout: 10_000 })
 
-    const beforeResizeMetrics = await panel.evaluate((node) => {
-      const cardBody = node.querySelector('.ant-card-body')
-      const taskList = node.querySelector('.erp-business-module-task-list')
-      return {
-        bodyHeight: cardBody?.getBoundingClientRect().height || 0,
-        listClientHeight: taskList?.clientHeight || 0,
-        listScrollHeight: taskList?.scrollHeight || 0,
-        scrollWidth: node.scrollWidth,
-        clientWidth: node.clientWidth,
-      }
-    })
-    assert(
-      beforeResizeMetrics.bodyHeight >= 320,
-      `${scenarioName} 协同入口默认高度过低: ${JSON.stringify(beforeResizeMetrics)}`
-    )
+    const readResizeHandleVisualMetrics = async () =>
+      panel.evaluate((node) => {
+        const handle = node.querySelector(
+          '.erp-business-collaboration-task-panel__resize-handle'
+        )
+        const grip = node.querySelector(
+          '.erp-business-collaboration-task-panel__grip-bar'
+        )
+        const panelBody = node.querySelector(
+          '.erp-business-collaboration-task-panel__body'
+        )
+        const handleRect = handle?.getBoundingClientRect()
+        const gripRect = grip?.getBoundingClientRect()
+        const panelBodyRect = panelBody?.getBoundingClientRect()
+        const handleStyle = handle ? getComputedStyle(handle) : null
+        const gripStyle = grip ? getComputedStyle(grip) : null
+        return {
+          panelBodyHeight: panelBodyRect?.height || 0,
+          handleCursor: handleStyle?.cursor || '',
+          handleBackground: handleStyle?.backgroundColor || '',
+          handleHeight: handleRect?.height || 0,
+          gripWidth: gripRect?.width || 0,
+          gripHeight: gripRect?.height || 0,
+          gripBackground: gripStyle?.backgroundColor || '',
+          gripBoxShadow: gripStyle?.boxShadow || '',
+        }
+      })
 
-    const growHandleBox = await resizeHandle.boundingBox()
-    assert(growHandleBox, `${scenarioName} 协同入口桌面拖拽手柄缺少可点击区域`)
-    await page.mouse.move(
-      growHandleBox.x + growHandleBox.width / 2,
-      growHandleBox.y + growHandleBox.height / 2
-    )
-    await page.mouse.down()
-    await page.mouse.move(
-      growHandleBox.x + growHandleBox.width / 2,
-      growHandleBox.y + growHandleBox.height / 2 - 120,
-      { steps: 6 }
-    )
-    await page.mouse.up()
+    if (checkResizeHandleHover) {
+      const idleHandleMetrics = await readResizeHandleVisualMetrics()
+      assert.equal(
+        idleHandleMetrics.handleCursor,
+        'default',
+        `${scenarioName} 协同入口拖拽手柄未拖动时不应显示上下拖拽光标: ${JSON.stringify(
+          idleHandleMetrics
+        )}`
+      )
+      assert(
+        idleHandleMetrics.handleHeight >= 14 &&
+          idleHandleMetrics.handleHeight <= 18,
+        `${scenarioName} 协同入口拖拽手柄命中区应便于鼠标拖拽且不应变成粗横杆: ${JSON.stringify(
+          idleHandleMetrics
+        )}`
+      )
+      assert(
+        idleHandleMetrics.gripHeight > 0 && idleHandleMetrics.gripHeight <= 3,
+        `${scenarioName} 协同入口拖拽短线未保持轻量视觉: ${JSON.stringify(
+          idleHandleMetrics
+        )}`
+      )
+      assert.equal(
+        idleHandleMetrics.gripBoxShadow,
+        'none',
+        `${scenarioName} 协同入口拖拽短线默认不应有阴影加粗: ${JSON.stringify(
+          idleHandleMetrics
+        )}`
+      )
 
-    const grownMetrics = await panel.evaluate((node) => {
-      const cardBody = node.querySelector('.ant-card-body')
-      const taskList = node.querySelector('.erp-business-module-task-list')
-      return {
-        bodyHeight: cardBody?.getBoundingClientRect().height || 0,
-        listClientHeight: taskList?.clientHeight || 0,
-        listScrollHeight: taskList?.scrollHeight || 0,
-        scrollWidth: node.scrollWidth,
-        clientWidth: node.clientWidth,
-      }
-    })
-    assert(
-      grownMetrics.bodyHeight >= beforeResizeMetrics.bodyHeight + 80,
-      `${scenarioName} 向上拖动后协同入口高度未增加: ${JSON.stringify({
-        beforeResizeMetrics,
-        grownMetrics,
-      })}`
-    )
-    assert(
-      grownMetrics.scrollWidth <= grownMetrics.clientWidth + 1,
-      `${scenarioName} 拖高后协同入口出现横向溢出: ${JSON.stringify(grownMetrics)}`
-    )
+      await resizeHandle.hover()
+      const hoverHandleMetrics = await readResizeHandleVisualMetrics()
+      assert.equal(
+        hoverHandleMetrics.handleCursor,
+        'ns-resize',
+        `${scenarioName} 协同入口拖拽手柄 hover 应提示可上下拖拽: ${JSON.stringify(
+          { idleHandleMetrics, hoverHandleMetrics }
+        )}`
+      )
+      assert.equal(
+        hoverHandleMetrics.handleBackground,
+        idleHandleMetrics.handleBackground,
+        `${scenarioName} 协同入口拖拽手柄 hover 不应改变背景: ${JSON.stringify({
+          idleHandleMetrics,
+          hoverHandleMetrics,
+        })}`
+      )
+      assert.equal(
+        hoverHandleMetrics.gripBackground,
+        idleHandleMetrics.gripBackground,
+        `${scenarioName} 协同入口拖拽短线 hover 不应变色: ${JSON.stringify({
+          idleHandleMetrics,
+          hoverHandleMetrics,
+        })}`
+      )
+      assert.equal(
+        hoverHandleMetrics.gripHeight,
+        idleHandleMetrics.gripHeight,
+        `${scenarioName} 协同入口拖拽短线 hover 不应变粗: ${JSON.stringify({
+          idleHandleMetrics,
+          hoverHandleMetrics,
+        })}`
+      )
+      assert(
+        Math.abs(
+          hoverHandleMetrics.panelBodyHeight - idleHandleMetrics.panelBodyHeight
+        ) <= 0.5,
+        `${scenarioName} 协同入口拖拽手柄 hover 不应改变面板高度: ${JSON.stringify(
+          {
+            idleHandleMetrics,
+            hoverHandleMetrics,
+          }
+        )}`
+      )
+    }
 
-    const shrinkHandleBox = await resizeHandle.boundingBox()
-    assert(shrinkHandleBox, `${scenarioName} 协同入口拖高后手柄丢失`)
-    await page.mouse.move(
-      shrinkHandleBox.x + shrinkHandleBox.width / 2,
-      shrinkHandleBox.y + shrinkHandleBox.height / 2
-    )
-    await page.mouse.down()
-    await page.mouse.move(
-      shrinkHandleBox.x + shrinkHandleBox.width / 2,
-      shrinkHandleBox.y + shrinkHandleBox.height / 2 + 100,
-      { steps: 6 }
-    )
-    await page.mouse.up()
+    if (!checkDesktopResize) {
+      await page.mouse.move(1, 1)
+    }
 
-    const shrunkMetrics = await panel.evaluate((node) => {
-      const cardBody = node.querySelector('.ant-card-body')
-      const taskList = node.querySelector('.erp-business-module-task-list')
-      return {
-        bodyHeight: cardBody?.getBoundingClientRect().height || 0,
-        listClientHeight: taskList?.clientHeight || 0,
-        listScrollHeight: taskList?.scrollHeight || 0,
-        scrollWidth: node.scrollWidth,
-        clientWidth: node.clientWidth,
-      }
-    })
-    assert(
-      shrunkMetrics.bodyHeight <= grownMetrics.bodyHeight - 70,
-      `${scenarioName} 向下拖动后协同入口高度未缩小: ${JSON.stringify({
-        grownMetrics,
-        shrunkMetrics,
-      })}`
-    )
-    assert(
-      shrunkMetrics.bodyHeight >= 320,
-      `${scenarioName} 拖动后协同入口低于最小高度: ${JSON.stringify(shrunkMetrics)}`
-    )
-    assert(
-      shrunkMetrics.listScrollHeight >= shrunkMetrics.listClientHeight,
-      `${scenarioName} 协同任务列表没有保持面板内滚动边界: ${JSON.stringify(shrunkMetrics)}`
-    )
-    assert(
-      shrunkMetrics.scrollWidth <= shrunkMetrics.clientWidth + 1,
-      `${scenarioName} 拖低后协同入口出现横向溢出: ${JSON.stringify(shrunkMetrics)}`
-    )
+    if (checkDesktopResize) {
+      const beforeResizeMetrics = await panel.evaluate((node) => {
+        const cardBody = node.querySelector('.ant-card-body')
+        const panelBody = node.querySelector(
+          '.erp-business-collaboration-task-panel__body'
+        )
+        const taskList = node.querySelector('.erp-business-module-task-list')
+        return {
+          cardBodyHeight: cardBody?.getBoundingClientRect().height || 0,
+          bodyHeight: panelBody?.getBoundingClientRect().height || 0,
+          listClientHeight: taskList?.clientHeight || 0,
+          listScrollHeight: taskList?.scrollHeight || 0,
+          scrollWidth: node.scrollWidth,
+          clientWidth: node.clientWidth,
+        }
+      })
+      assert(
+        beforeResizeMetrics.bodyHeight >= 240 &&
+          beforeResizeMetrics.bodyHeight <= 300,
+        `${scenarioName} 协同入口默认高度应保持紧凑且可处理任务: ${JSON.stringify(
+          beforeResizeMetrics
+        )}`
+      )
+
+      const growHandleBox = await resizeHandle.boundingBox()
+      assert(
+        growHandleBox,
+        `${scenarioName} 协同入口桌面拖拽手柄缺少可点击区域`
+      )
+      await page.mouse.move(
+        growHandleBox.x + growHandleBox.width / 2,
+        growHandleBox.y + growHandleBox.height / 2
+      )
+      await page.mouse.down()
+      await page.mouse.move(
+        growHandleBox.x + growHandleBox.width / 2,
+        growHandleBox.y + growHandleBox.height / 2 - 120,
+        { steps: 6 }
+      )
+      await page.mouse.up()
+
+      const grownMetrics = await panel.evaluate((node) => {
+        const cardBody = node.querySelector('.ant-card-body')
+        const panelBody = node.querySelector(
+          '.erp-business-collaboration-task-panel__body'
+        )
+        const taskList = node.querySelector('.erp-business-module-task-list')
+        return {
+          cardBodyHeight: cardBody?.getBoundingClientRect().height || 0,
+          bodyHeight: panelBody?.getBoundingClientRect().height || 0,
+          listClientHeight: taskList?.clientHeight || 0,
+          listScrollHeight: taskList?.scrollHeight || 0,
+          scrollWidth: node.scrollWidth,
+          clientWidth: node.clientWidth,
+        }
+      })
+      assert(
+        grownMetrics.bodyHeight >= beforeResizeMetrics.bodyHeight + 80,
+        `${scenarioName} 向上拖动后协同入口高度未增加: ${JSON.stringify({
+          beforeResizeMetrics,
+          grownMetrics,
+        })}`
+      )
+      assert(
+        grownMetrics.scrollWidth <= grownMetrics.clientWidth + 1,
+        `${scenarioName} 拖高后协同入口出现横向溢出: ${JSON.stringify(grownMetrics)}`
+      )
+
+      const shrinkHandleBox = await resizeHandle.boundingBox()
+      assert(shrinkHandleBox, `${scenarioName} 协同入口拖高后手柄丢失`)
+      await page.mouse.move(
+        shrinkHandleBox.x + shrinkHandleBox.width / 2,
+        shrinkHandleBox.y + shrinkHandleBox.height / 2
+      )
+      await page.mouse.down()
+      await page.mouse.move(
+        shrinkHandleBox.x + shrinkHandleBox.width / 2,
+        shrinkHandleBox.y + shrinkHandleBox.height / 2 + 100,
+        { steps: 6 }
+      )
+      await page.mouse.up()
+
+      const shrunkMetrics = await panel.evaluate((node) => {
+        const cardBody = node.querySelector('.ant-card-body')
+        const panelBody = node.querySelector(
+          '.erp-business-collaboration-task-panel__body'
+        )
+        const taskList = node.querySelector('.erp-business-module-task-list')
+        return {
+          cardBodyHeight: cardBody?.getBoundingClientRect().height || 0,
+          bodyHeight: panelBody?.getBoundingClientRect().height || 0,
+          listClientHeight: taskList?.clientHeight || 0,
+          listScrollHeight: taskList?.scrollHeight || 0,
+          scrollWidth: node.scrollWidth,
+          clientWidth: node.clientWidth,
+        }
+      })
+      assert(
+        shrunkMetrics.bodyHeight <= grownMetrics.bodyHeight - 70,
+        `${scenarioName} 向下拖动后协同入口高度未缩小: ${JSON.stringify({
+          grownMetrics,
+          shrunkMetrics,
+        })}`
+      )
+      assert(
+        shrunkMetrics.bodyHeight >= 240,
+        `${scenarioName} 拖动后协同入口低于最小高度: ${JSON.stringify(shrunkMetrics)}`
+      )
+      assert(
+        shrunkMetrics.listScrollHeight >= shrunkMetrics.listClientHeight,
+        `${scenarioName} 协同任务列表没有保持面板内滚动边界: ${JSON.stringify(shrunkMetrics)}`
+      )
+      assert(
+        shrunkMetrics.scrollWidth <= shrunkMetrics.clientWidth + 1,
+        `${scenarioName} 拖低后协同入口出现横向溢出: ${JSON.stringify(shrunkMetrics)}`
+      )
+    }
   }
 
   await toggle.evaluate((button) => button.click())
@@ -10875,7 +12255,7 @@ async function assertTaskActionDrawerLayout(
   })
   await drawer.waitFor({ state: 'visible', timeout: 10_000 })
   await expectText(page, expectedActionText)
-  await expectText(page, 'Workflow / Fact 边界')
+  await expectText(page, 'Workflow / Fact 边界：')
 
   const metrics = await page.evaluate(
     ({ expectedTaskText: taskText }) => {
@@ -10923,8 +12303,9 @@ async function assertTaskActionDrawerLayout(
           : null
       const summary = rectInDrawer('.erp-task-action-drawer__summary')
       const metaGrid = rectInDrawer('.erp-task-action-drawer__meta-grid')
-      const steps = rectInDrawer('.erp-task-action-drawer__steps')
-      const boundary = rectInDrawer('.erp-task-action-drawer__boundary')
+      const guide = rectInDrawer('.erp-task-action-drawer__guide')
+      const guideSteps = rectInDrawer('.erp-task-action-drawer__guide-steps')
+      const guideNote = rectInDrawer('.erp-task-action-drawer__guide-note')
       const actionPanel =
         rectInDrawer('.erp-task-action-drawer__action-panel') ||
         rectInDrawer('.erp-task-action-drawer__action-prompt')
@@ -10952,8 +12333,9 @@ async function assertTaskActionDrawerLayout(
         scopeRect,
         summary,
         metaGrid,
-        steps,
-        boundary,
+        guide,
+        guideSteps,
+        guideNote,
         actionPanel,
         footer,
         body,
@@ -10977,8 +12359,9 @@ async function assertTaskActionDrawerLayout(
   assert(
     metrics.summary?.height > 0 &&
       metrics.metaGrid?.height > 0 &&
-      metrics.steps?.height > 0 &&
-      metrics.boundary?.height > 0 &&
+      metrics.guide?.height > 0 &&
+      metrics.guideSteps?.height > 0 &&
+      metrics.guideNote?.height > 0 &&
       metrics.actionPanel?.height > 0 &&
       metrics.footer?.height > 0,
     `${scenarioName} 任务处理抽屉缺少关键分区: ${JSON.stringify(metrics)}`
@@ -11005,8 +12388,9 @@ async function assertTaskActionDrawerLayout(
   assert(
     metrics.summary.right <= metrics.scopeRect.right + 2 &&
       metrics.metaGrid.right <= metrics.scopeRect.right + 2 &&
-      metrics.steps.right <= metrics.scopeRect.right + 2 &&
-      metrics.boundary.right <= metrics.scopeRect.right + 2 &&
+      metrics.guide.right <= metrics.scopeRect.right + 2 &&
+      metrics.guideSteps.right <= metrics.scopeRect.right + 2 &&
+      metrics.guideNote.right <= metrics.scopeRect.right + 2 &&
       metrics.actionPanel.right <= metrics.scopeRect.right + 2,
     `${scenarioName} 任务处理抽屉内容横向溢出: ${JSON.stringify(metrics)}`
   )
@@ -11271,6 +12655,51 @@ async function assertBusinessMainTableHasNoOperationColumn(
   assert(
     !metrics.headers.includes('操作'),
     `${scenarioName} 业务主表不应再出现操作列: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertBusinessMainTableSortableColumns(
+  page,
+  { scenarioName, unsortableHeaders = [] }
+) {
+  const metrics = await page.evaluate(() => {
+    const tableCard = document.querySelector('.erp-business-data-table-card')
+    const headers = tableCard
+      ? Array.from(tableCard.querySelectorAll('.ant-table-thead th')).map(
+          (node) => ({
+            text: String(node.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim(),
+            isSelectionColumn: node.classList.contains(
+              'ant-table-selection-column'
+            ),
+            hasSorter: Boolean(
+              node.querySelector(
+                '.ant-table-column-sorters, .ant-table-column-sorter'
+              )
+            ),
+          })
+        )
+      : []
+    return { headers }
+  })
+  const skippedHeaders = new Set(unsortableHeaders)
+  const sortableHeaders = metrics.headers.filter(
+    (header) =>
+      header.text &&
+      !header.isSelectionColumn &&
+      !skippedHeaders.has(header.text)
+  )
+  const missingSorters = sortableHeaders.filter((header) => !header.hasSorter)
+
+  assert(
+    sortableHeaders.length > 0,
+    `${scenarioName} 未找到可排序业务主表列: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    missingSorters,
+    [],
+    `${scenarioName} 业务主表数据列缺少排序入口: ${JSON.stringify(metrics)}`
   )
 }
 

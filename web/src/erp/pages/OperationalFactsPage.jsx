@@ -2,26 +2,25 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DownOutlined,
+  LinkOutlined,
   PlusOutlined,
+  PrinterOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
 import {
   Button,
-  Card,
-  Empty,
+  Dropdown,
   Form,
   Input,
   InputNumber,
   Modal,
   Popconfirm,
   Select,
-  Space,
-  Table,
   Tabs,
   Tag,
-  Typography,
 } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -54,14 +53,30 @@ import {
   formatUnixDateTime,
   hasActionPermission,
   trimOptional,
+  V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
 } from '../utils/businessPagination.mjs'
-import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
+import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
+import {
+  BusinessDataTable,
+  BusinessOperationPanel,
+  BusinessPageLayout,
+  DateInput,
+  PageHeaderCard,
+  SelectFilter,
+  SelectionActionBar,
+  ToolbarButton,
+} from '../components/business-list/BusinessListLayout.jsx'
+import {
+  PRINT_WORKSPACE_ENTRY_SOURCE,
+  PROCESSING_CONTRACT_TEMPLATE_KEY,
+  openPrintWorkspaceWindow,
+} from '../utils/printWorkspace.js'
+import { buildProcessingContractDraftFromOutsourcingFact } from '../data/processingContractTemplate.mjs'
 
-const { Paragraph, Text, Title } = Typography
 const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
   current: 1,
   pageSize: 20,
@@ -131,6 +146,10 @@ const COUNTERPARTY_TYPES = [
   { label: '其他 OTHER', value: 'OTHER' },
 ]
 
+const BUSINESS_FIELD_CLASS = 'erp-business-action-form__field'
+const BUSINESS_FIELD_FULL_CLASS =
+  'erp-business-action-form__field erp-business-action-form__field--full'
+
 const ACTION_PERMISSIONS = Object.freeze({
   productionWrite: ['pmc.plan.update', 'warehouse.adjustment.create'],
   outsourcingWrite: ['purchase.order.update', 'warehouse.adjustment.create'],
@@ -156,6 +175,61 @@ function statusTag(status) {
       {STATUS_LABELS[key] || key || '-'}
     </Tag>
   )
+}
+
+function decimalNumber(value) {
+  const numeric = Number(
+    String(value ?? '')
+      .replace(/,/g, '')
+      .trim()
+  )
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+function formatQuantity(value) {
+  const numeric = Number(value || 0)
+  if (!Number.isFinite(numeric) || numeric === 0) return '0'
+  return String(Number(numeric.toFixed(4)))
+}
+
+function recordNoForKey(key, record = {}) {
+  if (key === 'shipments') return record.shipment_no || record.id
+  if (key === 'reservations') return record.reservation_no || record.id
+  return record.fact_no || record.id
+}
+
+function selectedLabelForKey(key, record) {
+  if (!record) return '请先选择一条记录'
+  if (key === 'outsourcing') {
+    return `${recordNoForKey(key, record)} / ${
+      record.supplier_name || '未填写供应商'
+    }`
+  }
+  if (key === 'shipments') {
+    return `${recordNoForKey(key, record)} / 客户 ${
+      record.customer_snapshot || record.customer_id || '-'
+    }`
+  }
+  if (key === 'reservations') {
+    return `${recordNoForKey(key, record)} / 产品 #${record.product_id || '-'}`
+  }
+  if (key === 'finance') {
+    return `${recordNoForKey(key, record)} / ${
+      record.counterparty_type || '-'
+    } #${record.counterparty_id || '-'}`
+  }
+  return `${recordNoForKey(key, record)} / ${record.fact_type || '-'}`
+}
+
+function sourceRouteFor(sourceType) {
+  const key = String(sourceType || '')
+    .trim()
+    .toUpperCase()
+  if (key === 'SHIPMENT') return V1_ROUTE_PATHS.shipments
+  if (key === 'PRODUCTION_FACT') return V1_ROUTE_PATHS.productionProgress
+  if (key === 'OUTSOURCING_FACT') return V1_ROUTE_PATHS.processingContracts
+  if (key === 'PURCHASE_RECEIPT') return V1_ROUTE_PATHS.purchaseReceipts
+  return ''
 }
 
 function positiveInt(value) {
@@ -259,68 +333,120 @@ function buildFinanceParams(values = {}) {
 function FactFormFields({ typeOptions, includeSupplier = false }) {
   return (
     <>
-      <Form.Item label="事实单号" name="fact_no" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="事实单号"
+        name="fact_no"
+        rules={[{ required: true }]}
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="事实类型" name="fact_type" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="事实类型"
+        name="fact_type"
+        rules={[{ required: true }]}
+      >
         <Select options={typeOptions} />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="对象类型"
         name="subject_type"
         rules={[{ required: true }]}
       >
         <Select options={FACT_SUBJECT_OPTIONS} />
       </Form.Item>
-      <Form.Item label="对象 ID" name="subject_id" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="对象 ID"
+        name="subject_id"
+        rules={[{ required: true }]}
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="仓库 ID"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="批次 ID" name="lot_id">
+      <Form.Item className={BUSINESS_FIELD_CLASS} label="批次 ID" name="lot_id">
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="单位 ID" name="unit_id" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="单位 ID"
+        name="unit_id"
+        rules={[{ required: true }]}
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="数量" name="quantity" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="数量"
+        name="quantity"
+        rules={[{ required: true }]}
+      >
         <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
       </Form.Item>
       {includeSupplier ? (
         <>
-          <Form.Item label="供应商 ID" name="supplier_id">
+          <Form.Item
+            className={BUSINESS_FIELD_CLASS}
+            label="供应商 ID"
+            name="supplier_id"
+          >
             <InputNumber min={1} precision={0} style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item label="供应商快照" name="supplier_name">
+          <Form.Item
+            className={BUSINESS_FIELD_CLASS}
+            label="供应商快照"
+            name="supplier_name"
+          >
             <Input allowClear autoComplete="off" />
           </Form.Item>
         </>
       ) : null}
-      <Form.Item label="来源类型" name="source_type">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="来源类型"
+        name="source_type"
+      >
         <Input allowClear autoComplete="off" placeholder="如 SALES_ORDER" />
       </Form.Item>
-      <Form.Item label="来源 ID" name="source_id">
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item label="来源行 ID" name="source_line_id">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="来源 ID"
+        name="source_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="来源行 ID"
+        name="source_line_id"
+      >
+        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="幂等键"
         name="idempotency_key"
         rules={[{ required: true }]}
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="发生日期" name="occurred_at">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="发生日期"
+        name="occurred_at"
+      >
         <DateInput />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item className={BUSINESS_FIELD_FULL_CLASS} label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
       </Form.Item>
     </>
@@ -331,32 +457,50 @@ function ShipmentFormFields() {
   return (
     <>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="出货单号"
         name="shipment_no"
         rules={[{ required: true }]}
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="销售订单 ID" name="sales_order_id">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="销售订单 ID"
+        name="sales_order_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="客户 ID" name="customer_id">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="客户 ID"
+        name="customer_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="客户快照" name="customer_snapshot">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="客户快照"
+        name="customer_snapshot"
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="幂等键"
         name="idempotency_key"
         rules={[{ required: true }]}
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="计划出货日期" name="planned_ship_at">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="计划出货日期"
+        name="planned_ship_at"
+      >
         <DateInput />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item className={BUSINESS_FIELD_FULL_CLASS} label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
       </Form.Item>
     </>
@@ -367,35 +511,56 @@ function ShipmentItemFormFields() {
   return (
     <>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="出货单 ID"
         name="shipment_id"
         rules={[{ required: true }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="销售订单行 ID" name="sales_order_item_id">
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item label="产品 ID" name="product_id" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="销售订单行 ID"
+        name="sales_order_item_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="产品 ID"
+        name="product_id"
+        rules={[{ required: true }]}
+      >
+        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="仓库 ID"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="批次 ID" name="lot_id">
+      <Form.Item className={BUSINESS_FIELD_CLASS} label="批次 ID" name="lot_id">
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="单位 ID" name="unit_id" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="单位 ID"
+        name="unit_id"
+        rules={[{ required: true }]}
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="数量" name="quantity" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="数量"
+        name="quantity"
+        rules={[{ required: true }]}
+      >
         <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item className={BUSINESS_FIELD_FULL_CLASS} label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
       </Form.Item>
     </>
@@ -406,48 +571,78 @@ function ReservationFormFields() {
   return (
     <>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="预留单号"
         name="reservation_no"
         rules={[{ required: true }]}
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="销售订单 ID" name="sales_order_id">
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item label="销售订单行 ID" name="sales_order_item_id">
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item label="产品 ID" name="product_id" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="销售订单 ID"
+        name="sales_order_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="销售订单行 ID"
+        name="sales_order_item_id"
+      >
+        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="产品 ID"
+        name="product_id"
+        rules={[{ required: true }]}
+      >
+        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="仓库 ID"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="批次 ID" name="lot_id">
+      <Form.Item className={BUSINESS_FIELD_CLASS} label="批次 ID" name="lot_id">
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="单位 ID" name="unit_id" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="单位 ID"
+        name="unit_id"
+        rules={[{ required: true }]}
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item label="数量" name="quantity" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="数量"
+        name="quantity"
+        rules={[{ required: true }]}
+      >
         <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="幂等键"
         name="idempotency_key"
         rules={[{ required: true }]}
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="预留日期" name="reserved_at">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="预留日期"
+        name="reserved_at"
+      >
         <DateInput />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item className={BUSINESS_FIELD_FULL_CLASS} label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
       </Form.Item>
     </>
@@ -457,70 +652,134 @@ function ReservationFormFields() {
 function FinanceFormFields() {
   return (
     <>
-      <Form.Item label="事实单号" name="fact_no" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="事实单号"
+        name="fact_no"
+        rules={[{ required: true }]}
+      >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="事实类型" name="fact_type" rules={[{ required: true }]}>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="事实类型"
+        name="fact_type"
+        rules={[{ required: true }]}
+      >
         <Select options={FINANCE_FACT_TYPES} />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="往来方类型"
         name="counterparty_type"
         rules={[{ required: true }]}
       >
         <Select options={COUNTERPARTY_TYPES} />
       </Form.Item>
-      <Form.Item label="往来方 ID" name="counterparty_id">
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item label="金额" name="amount" rules={[{ required: true }]}>
-        <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
-      </Form.Item>
-      <Form.Item label="币种" name="currency" rules={[{ required: true }]}>
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item label="来源类型" name="source_type">
-        <Input allowClear autoComplete="off" placeholder="如 SHIPMENT" />
-      </Form.Item>
-      <Form.Item label="来源 ID" name="source_id">
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-      </Form.Item>
-      <Form.Item label="来源行 ID" name="source_line_id">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="往来方 ID"
+        name="counterparty_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="金额"
+        name="amount"
+        rules={[{ required: true }]}
+      >
+        <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="币种"
+        name="currency"
+        rules={[{ required: true }]}
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="来源类型"
+        name="source_type"
+      >
+        <Input allowClear autoComplete="off" placeholder="如 SHIPMENT" />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="来源 ID"
+        name="source_id"
+      >
+        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="来源行 ID"
+        name="source_line_id"
+      >
+        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
         label="幂等键"
         name="idempotency_key"
         rules={[{ required: true }]}
       >
         <Input allowClear autoComplete="off" />
       </Form.Item>
-      <Form.Item label="发生日期" name="occurred_at">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="发生日期"
+        name="occurred_at"
+      >
         <DateInput />
       </Form.Item>
-      <Form.Item label="备注" name="note">
+      <Form.Item className={BUSINESS_FIELD_FULL_CLASS} label="备注" name="note">
         <Input.TextArea allowClear rows={3} maxLength={300} showCount />
       </Form.Item>
     </>
   )
 }
 
-export default function OperationalFactsPage() {
+function businessModalTitle(title, description) {
+  return (
+    <div className="erp-business-action-modal__title">
+      <span>{title}</span>
+      <small>{description}</small>
+    </div>
+  )
+}
+
+const DEFAULT_OPERATIONAL_FACT_SUMMARY =
+  '统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端 usecase 处理。'
+const EMPTY_VIEW_OVERRIDES = Object.freeze({})
+
+export function OperationalFactWorkspace({
+  pageTitle = '业务事实处理',
+  pageSummary = DEFAULT_OPERATIONAL_FACT_SUMMARY,
+  initialActiveKey = 'production',
+  enabledViews,
+  viewOverrides = EMPTY_VIEW_OVERRIDES,
+  showTabs = true,
+}) {
   const outletContext = useOutletContext()
+  const navigate = useNavigate()
   const adminProfile = outletContext?.adminProfile || {}
-  const [activeKey, setActiveKey] = useState('production')
+  const [activeKey, setActiveKey] = useState(initialActiveKey)
   const [statusFilter, setStatusFilter] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [rowsByKey, setRowsByKey] = useState({})
   const [totalByKey, setTotalByKey] = useState({})
   const [paginationByKey, setPaginationByKey] = useState({})
+  const [selectedByKey, setSelectedByKey] = useState({})
   const [createTarget, setCreateTarget] = useState(null)
   const [createForm] = Form.useForm()
   const [shipmentItemOpen, setShipmentItemOpen] = useState(false)
   const [shipmentItemForm] = Form.useForm()
 
-  const configs = useMemo(
+  const baseConfigs = useMemo(
     () => ({
       production: {
         title: '生产事实',
@@ -616,9 +875,46 @@ export default function OperationalFactsPage() {
     []
   )
 
+  const enabledViewKeys = useMemo(() => {
+    const requestedKeys =
+      Array.isArray(enabledViews) && enabledViews.length > 0
+        ? enabledViews
+        : Object.keys(baseConfigs)
+    const validKeys = requestedKeys.filter((key) => Boolean(baseConfigs[key]))
+    return validKeys.length > 0 ? validKeys : ['production']
+  }, [baseConfigs, enabledViews])
+
+  const configs = useMemo(() => {
+    const nextConfigs = {}
+    enabledViewKeys.forEach((key) => {
+      const baseConfig = baseConfigs[key]
+      const override = viewOverrides?.[key] || {}
+      nextConfigs[key] = {
+        ...baseConfig,
+        ...override,
+        initialValues: {
+          ...(baseConfig.initialValues || {}),
+          ...(override.initialValues || {}),
+        },
+        listParams: {
+          ...(baseConfig.listParams || {}),
+          ...(override.listParams || {}),
+        },
+      }
+    })
+    return nextConfigs
+  }, [baseConfigs, enabledViewKeys, viewOverrides])
+
+  useEffect(() => {
+    if (!configs[activeKey]) {
+      setActiveKey(enabledViewKeys[0] || 'production')
+    }
+  }, [activeKey, configs, enabledViewKeys])
+
   const activeConfig = configs[activeKey] || configs.production
   const activeRows = rowsByKey[activeKey] || []
   const activeTotal = totalByKey[activeKey] || 0
+  const activeSelectedRow = selectedByKey[activeKey] || null
   const activePagination =
     paginationByKey[activeKey] || DEFAULT_OPERATIONAL_FACT_PAGINATION
   const canWriteActive = hasAnyPermission(
@@ -638,15 +934,26 @@ export default function OperationalFactsPage() {
         const data = await config.list(
           compactParams({
             status: statusFilter,
+            ...(config.listParams || {}),
             ...getBusinessPaginationParams(pagination),
           })
         )
+        const nextRows = Array.isArray(data?.[config.listKey])
+          ? data[config.listKey]
+          : []
         setRowsByKey((prev) => ({
           ...prev,
-          [key]: Array.isArray(data?.[config.listKey])
-            ? data[config.listKey]
-            : [],
+          [key]: nextRows,
         }))
+        setSelectedByKey((prev) => {
+          const current = prev[key]
+          if (!current?.id) return prev
+          const refreshed = nextRows.find((item) => item.id === current.id)
+          return {
+            ...prev,
+            [key]: refreshed || current,
+          }
+        })
         setTotalByKey((prev) => ({ ...prev, [key]: Number(data?.total || 0) }))
       } catch (error) {
         message.error(getActionErrorMessage(error, `加载${config.title}`))
@@ -750,12 +1057,30 @@ export default function OperationalFactsPage() {
     }
   }
 
+  const clearActiveSelection = () => {
+    setSelectedByKey((prev) => ({ ...prev, [activeKey]: null }))
+  }
+
+  const openProcessingContractPrint = () => {
+    try {
+      const initialDraft =
+        buildProcessingContractDraftFromOutsourcingFact(activeSelectedRow)
+      openPrintWorkspaceWindow(PROCESSING_CONTRACT_TEMPLATE_KEY, {
+        entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
+        initialDraft,
+      })
+      message.success('已打开加工合同打印模板，可在窗口补齐工序和明细')
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '打开加工合同打印模板'))
+    }
+  }
+
   const baseColumns = [
     {
       title: 'ID',
       dataIndex: 'id',
       width: 72,
-      fixed: 'left',
+      sortType: 'number',
     },
     {
       title: '单号',
@@ -767,11 +1092,13 @@ export default function OperationalFactsPage() {
             : 'fact_no',
       width: 180,
       ellipsis: true,
+      sortType: 'text',
     },
     {
       title: '状态',
       dataIndex: 'status',
       width: 110,
+      sortType: 'text',
       render: statusTag,
     },
   ]
@@ -780,6 +1107,10 @@ export default function OperationalFactsPage() {
     {
       title: '对象',
       width: 150,
+      sortValue: (record) =>
+        `${record.subject_type || 'PRODUCT'}-${
+          record.subject_id || record.product_id || ''
+        }`,
       render: (_, record) =>
         `${record.subject_type || 'PRODUCT'} #${
           record.subject_id || record.product_id || '-'
@@ -788,6 +1119,10 @@ export default function OperationalFactsPage() {
     {
       title: '仓库/批次/单位',
       width: 180,
+      sortValue: (record) =>
+        `${record.warehouse_id || ''}-${record.lot_id || ''}-${
+          record.unit_id || ''
+        }`,
       render: (_, record) =>
         `W${record.warehouse_id || '-'} / L${record.lot_id || '-'} / U${
           record.unit_id || '-'
@@ -797,6 +1132,8 @@ export default function OperationalFactsPage() {
       title: '数量',
       dataIndex: 'quantity',
       width: 120,
+      sortValue: (record) => decimalNumber(record?.quantity),
+      render: formatQuantity,
     },
   ]
 
@@ -804,6 +1141,9 @@ export default function OperationalFactsPage() {
     {
       title: '来源',
       width: 180,
+      ellipsis: true,
+      sortValue: (record) =>
+        `${record.source_type || ''}-${record.source_id || ''}`,
       render: (_, record) =>
         record.source_type
           ? `${record.source_type} #${record.source_id || '-'}`
@@ -812,6 +1152,13 @@ export default function OperationalFactsPage() {
     {
       title: '日期',
       width: 120,
+      sortValue: (record) =>
+        Number(
+          record.occurred_at ||
+            record.planned_ship_at ||
+            record.reserved_at ||
+            0
+        ),
       render: (_, record) =>
         formatUnixDate(
           record.occurred_at || record.planned_ship_at || record.reserved_at
@@ -822,28 +1169,31 @@ export default function OperationalFactsPage() {
       dataIndex: 'created_at',
       width: 160,
       render: formatUnixDateTime,
-      sorter: (a, b) => Number(a?.created_at || 0) - Number(b?.created_at || 0),
+      sortType: 'date',
     },
     {
       title: '备注',
       dataIndex: 'note',
       ellipsis: true,
+      sortable: false,
     },
   ]
 
   const columnsByKey = {
     production: [
       ...baseColumns,
-      { title: '类型', dataIndex: 'fact_type', width: 170 },
+      { title: '类型', dataIndex: 'fact_type', width: 170, sortType: 'text' },
       ...quantityColumns,
       ...sourceColumns,
     ],
     outsourcing: [
       ...baseColumns,
-      { title: '类型', dataIndex: 'fact_type', width: 160 },
+      { title: '类型', dataIndex: 'fact_type', width: 160, sortType: 'text' },
       {
         title: '供应商',
         width: 150,
+        ellipsis: true,
+        sortValue: (record) => record.supplier_name || record.supplier_id || '',
         render: (_, record) =>
           record.supplier_name ||
           (record.supplier_id ? `#${record.supplier_id}` : '-'),
@@ -853,63 +1203,257 @@ export default function OperationalFactsPage() {
     ],
     shipments: [
       ...baseColumns,
-      { title: '销售订单', dataIndex: 'sales_order_id', width: 120 },
-      { title: '客户', dataIndex: 'customer_id', width: 100 },
+      {
+        title: '销售订单',
+        dataIndex: 'sales_order_id',
+        width: 120,
+        sortType: 'number',
+      },
+      {
+        title: '客户',
+        dataIndex: 'customer_id',
+        width: 140,
+        ellipsis: true,
+        sortValue: (record) =>
+          record.customer_snapshot || record.customer_id || '',
+        render: (_, record) =>
+          record.customer_snapshot || record.customer_id || '-',
+      },
       {
         title: '行数',
         width: 90,
+        sortValue: (record) => record.items?.length || 0,
         render: (_, record) => record.items?.length || 0,
       },
       ...sourceColumns,
     ],
     reservations: [
       ...baseColumns,
-      { title: '销售订单', dataIndex: 'sales_order_id', width: 120 },
+      {
+        title: '销售订单',
+        dataIndex: 'sales_order_id',
+        width: 120,
+        sortType: 'number',
+      },
       ...quantityColumns,
       ...sourceColumns,
     ],
     finance: [
       ...baseColumns,
-      { title: '类型', dataIndex: 'fact_type', width: 150 },
+      { title: '类型', dataIndex: 'fact_type', width: 150, sortType: 'text' },
       {
         title: '往来方',
         width: 150,
+        sortValue: (record) =>
+          `${record.counterparty_type || ''}-${record.counterparty_id || ''}`,
         render: (_, record) =>
           `${record.counterparty_type || '-'} #${record.counterparty_id || '-'}`,
       },
-      { title: '金额', dataIndex: 'amount', width: 120 },
-      { title: '币种', dataIndex: 'currency', width: 90 },
+      {
+        title: '金额',
+        dataIndex: 'amount',
+        width: 120,
+        sortValue: (record) => decimalNumber(record?.amount),
+      },
+      { title: '币种', dataIndex: 'currency', width: 90, sortType: 'text' },
       ...sourceColumns,
     ],
   }
 
-  const actionColumn = {
-    title: '操作',
-    width: 260,
-    fixed: 'right',
-    render: (_, record) => {
-      const config = configs[activeKey]
-      const canConfirm = hasAnyPermission(
-        adminProfile,
-        config.confirmPermissions || config.writePermissions
+  const createConfig = createTarget ? configs[createTarget] : null
+  const createModalTitle = createConfig?.createLabel || '新建事实'
+  const createModalDescription =
+    createConfig?.modalDescription ||
+    '页面只提交业务事实动作，库存流水、冲正和状态边界由后端 usecase 处理。'
+  const tableColumns = applyBusinessColumnSorters(columnsByKey[activeKey] || [])
+  const canConfirmActive = hasAnyPermission(
+    adminProfile,
+    activeConfig.confirmPermissions || activeConfig.writePermissions
+  )
+  const selectedLabel = selectedLabelForKey(activeKey, activeSelectedRow)
+  const relatedMenuItems = useMemo(() => {
+    if (!activeSelectedRow) return []
+    const items = []
+    if (
+      ['shipments', 'reservations'].includes(activeKey) &&
+      activeSelectedRow.sales_order_id
+    ) {
+      items.push({ key: 'sales-order', label: '销售订单' })
+    }
+    if (
+      ['production', 'outsourcing', 'shipments', 'reservations'].includes(
+        activeKey
       )
-      return (
-        <Space wrap>
-          {activeKey === 'shipments' && record.status === 'DRAFT' ? (
+    ) {
+      items.push({ key: 'inventory', label: '库存台账' })
+    }
+    if (activeKey === 'shipments') {
+      items.push({ key: 'receivables', label: '应收管理' })
+      items.push({ key: 'invoices', label: '发票管理' })
+    }
+    if (
+      activeKey === 'finance' &&
+      sourceRouteFor(activeSelectedRow.source_type)
+    ) {
+      items.push({ key: 'source', label: '来源单据' })
+    }
+    return items
+  }, [activeKey, activeSelectedRow])
+
+  const openRelatedTable = ({ key }) => {
+    if (!activeSelectedRow) return
+    const pathByKey = {
+      'sales-order': V1_ROUTE_PATHS.salesOrders,
+      inventory: V1_ROUTE_PATHS.inventory,
+      receivables: V1_ROUTE_PATHS.receivables,
+      invoices: V1_ROUTE_PATHS.invoices,
+    }
+    if (key === 'source') {
+      const targetPath = sourceRouteFor(activeSelectedRow.source_type)
+      if (targetPath) navigate(targetPath)
+      return
+    }
+    const targetPath = pathByKey[key]
+    if (targetPath) {
+      navigate(targetPath)
+    }
+  }
+  const currentRowsCount = activeRows.length
+  const activeDraftCount = activeRows.filter(
+    (item) => item.status === 'DRAFT'
+  ).length
+  const postedCount = activeRows.filter((item) =>
+    ['POSTED', 'SHIPPED', 'SETTLED', 'CONSUMED'].includes(item.status)
+  ).length
+  const activeCancelledCount = activeRows.filter((item) =>
+    ['CANCELLED', 'RELEASED'].includes(item.status)
+  ).length
+  const tabItems = Object.entries(configs).map(([key, config]) => ({
+    key,
+    label: config.title,
+  }))
+
+  return (
+    <BusinessPageLayout className="erp-v1-operational-fact-page">
+      <PageHeaderCard
+        compact
+        title={pageTitle}
+        description={pageSummary}
+        tags={[
+          <Tag color="cyan" key="view">
+            {activeConfig.title}
+          </Tag>,
+          <Tag color="blue" key="fact">
+            Operational Fact：业务事实
+          </Tag>,
+          <Tag color="green" key="backend">
+            后端 usecase 过账 / 冲正
+          </Tag>,
+          <Tag color="gold" key="boundary">
+            Workflow 不直接落事实
+          </Tag>,
+        ]}
+        stats={[
+          { key: 'total', label: '总记录', value: activeTotal },
+          { key: 'current', label: '当前结果', value: currentRowsCount },
+          { key: 'draft', label: '草稿', value: activeDraftCount },
+          { key: 'posted', label: '已生效', value: postedCount },
+          { key: 'closed', label: '已取消/释放', value: activeCancelledCount },
+        ]}
+      />
+
+      {showTabs && tabItems.length > 1 ? (
+        <Tabs
+          className="erp-business-view-tabs"
+          activeKey={activeKey}
+          onChange={setActiveKey}
+          items={tabItems}
+        />
+      ) : null}
+
+      <BusinessOperationPanel
+        compact
+        filters={
+          <SelectFilter
+            className="erp-business-filter-control--status"
+            value={statusFilter}
+            options={STATUS_OPTIONS}
+            onChange={(nextStatus) => {
+              setStatusFilter(nextStatus)
+              setPaginationByKey((prev) => ({
+                ...prev,
+                [activeKey]: {
+                  ...(prev[activeKey] || activePagination),
+                  current: 1,
+                },
+              }))
+            }}
+          />
+        }
+        primaryAction={
+          <ToolbarButton
+            type="primary"
+            className="erp-business-list-toolbar__primary-action"
+            icon={<PlusOutlined />}
+            disabled={!canWriteActive}
+            onClick={openCreate}
+          >
+            {activeConfig.createLabel}
+          </ToolbarButton>
+        }
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={activeSelectedRow ? 1 : 0}
+          selectedLabel={selectedLabel}
+          boundaryText="当前操作只调用 operational_fact 后端 usecase；前端不本地写库存、出货、财务或 Workflow 事实。"
+        >
+          <Button
+            type="link"
+            size="small"
+            disabled={!activeSelectedRow}
+            onClick={clearActiveSelection}
+          >
+            清空已选
+          </Button>
+          <Dropdown
+            trigger={['click']}
+            destroyOnHidden
+            disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+            menu={{
+              items: relatedMenuItems,
+              onClick: openRelatedTable,
+            }}
+          >
+            <Button
+              size="small"
+              icon={<LinkOutlined />}
+              disabled={!activeSelectedRow || relatedMenuItems.length === 0}
+            >
+              关联 <DownOutlined />
+            </Button>
+          </Dropdown>
+          {activeKey === 'shipments' ? (
             <Button
               size="small"
               icon={<PlusOutlined />}
-              disabled={!canWriteActive || saving}
-              onClick={() => openShipmentItem(record)}
+              disabled={
+                !activeSelectedRow ||
+                activeSelectedRow.status !== 'DRAFT' ||
+                !canWriteActive ||
+                saving
+              }
+              onClick={() => openShipmentItem(activeSelectedRow)}
             >
-              加行
+              维护明细
             </Button>
           ) : null}
-          {['production', 'outsourcing', 'finance'].includes(activeKey) &&
-          record.status === 'DRAFT' ? (
+          {['production', 'outsourcing', 'finance'].includes(activeKey) ? (
             <Popconfirm
               title="确认过账？"
-              onConfirm={() => runRowAction(config, record, 'post', '过账')}
+              onConfirm={() =>
+                runRowAction(activeConfig, activeSelectedRow, 'post', '过账')
+              }
               okText="确认"
               cancelText="取消"
             >
@@ -917,16 +1461,33 @@ export default function OperationalFactsPage() {
                 size="small"
                 type="primary"
                 icon={<CheckCircleOutlined />}
-                disabled={!canConfirm || saving}
+                disabled={
+                  !activeSelectedRow ||
+                  activeSelectedRow.status !== 'DRAFT' ||
+                  !canConfirmActive ||
+                  saving
+                }
               >
                 过账
               </Button>
             </Popconfirm>
           ) : null}
-          {activeKey === 'shipments' && record.status === 'DRAFT' ? (
+          {activeKey === 'outsourcing' ? (
+            <Button
+              size="small"
+              icon={<PrinterOutlined />}
+              disabled={!activeSelectedRow}
+              onClick={openProcessingContractPrint}
+            >
+              加工合同打印
+            </Button>
+          ) : null}
+          {activeKey === 'shipments' ? (
             <Popconfirm
               title="确认发货并写出库流水？"
-              onConfirm={() => runRowAction(config, record, 'post', '发货')}
+              onConfirm={() =>
+                runRowAction(activeConfig, activeSelectedRow, 'post', '发货')
+              }
               okText="确认"
               cancelText="取消"
             >
@@ -934,18 +1495,28 @@ export default function OperationalFactsPage() {
                 size="small"
                 type="primary"
                 icon={<CheckCircleOutlined />}
-                disabled={!canConfirm || saving}
+                disabled={
+                  !activeSelectedRow ||
+                  activeSelectedRow.status !== 'DRAFT' ||
+                  !canConfirmActive ||
+                  saving
+                }
               >
                 发货
               </Button>
             </Popconfirm>
           ) : null}
-          {activeKey === 'reservations' && record.status === 'ACTIVE' ? (
+          {activeKey === 'reservations' ? (
             <>
               <Popconfirm
                 title="确认释放库存预留？"
                 onConfirm={() =>
-                  runRowAction(config, record, 'release', '释放预留')
+                  runRowAction(
+                    activeConfig,
+                    activeSelectedRow,
+                    'release',
+                    '释放预留'
+                  )
                 }
                 okText="确认"
                 cancelText="取消"
@@ -953,7 +1524,12 @@ export default function OperationalFactsPage() {
                 <Button
                   size="small"
                   icon={<RollbackOutlined />}
-                  disabled={!canWriteActive || saving}
+                  disabled={
+                    !activeSelectedRow ||
+                    activeSelectedRow.status !== 'ACTIVE' ||
+                    !canWriteActive ||
+                    saving
+                  }
                 >
                   释放
                 </Button>
@@ -961,7 +1537,12 @@ export default function OperationalFactsPage() {
               <Popconfirm
                 title="确认消耗库存预留？"
                 onConfirm={() =>
-                  runRowAction(config, record, 'consume', '消耗预留')
+                  runRowAction(
+                    activeConfig,
+                    activeSelectedRow,
+                    'consume',
+                    '消耗预留'
+                  )
                 }
                 okText="确认"
                 cancelText="取消"
@@ -970,52 +1551,46 @@ export default function OperationalFactsPage() {
                   size="small"
                   type="primary"
                   icon={<CheckCircleOutlined />}
-                  disabled={!canConfirm || saving}
+                  disabled={
+                    !activeSelectedRow ||
+                    activeSelectedRow.status !== 'ACTIVE' ||
+                    !canConfirmActive ||
+                    saving
+                  }
                 >
                   消耗
                 </Button>
               </Popconfirm>
             </>
           ) : null}
-          {activeKey === 'finance' && record.status === 'POSTED' ? (
+          {activeKey === 'finance' ? (
             <Popconfirm
               title="确认结清财务事实？"
-              onConfirm={() => runRowAction(config, record, 'settle', '结清')}
+              onConfirm={() =>
+                runRowAction(activeConfig, activeSelectedRow, 'settle', '结清')
+              }
               okText="确认"
               cancelText="取消"
             >
               <Button
                 size="small"
                 icon={<CheckCircleOutlined />}
-                disabled={!canConfirm || saving}
+                disabled={
+                  !activeSelectedRow ||
+                  activeSelectedRow.status !== 'POSTED' ||
+                  !canConfirmActive ||
+                  saving
+                }
               >
                 结清
               </Button>
             </Popconfirm>
           ) : null}
-          {['production', 'outsourcing', 'finance'].includes(activeKey) &&
-          record.status === 'POSTED' ? (
+          {['production', 'outsourcing', 'finance'].includes(activeKey) ? (
             <Popconfirm
               title="确认取消并按后端规则处理冲正？"
-              onConfirm={() => runRowAction(config, record, 'cancel', '取消')}
-              okText="确认"
-              cancelText="取消"
-            >
-              <Button
-                size="small"
-                danger
-                icon={<CloseCircleOutlined />}
-                disabled={!canConfirm || saving}
-              >
-                取消
-              </Button>
-            </Popconfirm>
-          ) : null}
-          {activeKey === 'shipments' && record.status === 'SHIPPED' ? (
-            <Popconfirm
-              title="确认取消并写出库冲正？"
               onConfirm={() =>
-                runRowAction(config, record, 'cancel', '取消发货')
+                runRowAction(activeConfig, activeSelectedRow, 'cancel', '取消')
               }
               okText="确认"
               cancelText="取消"
@@ -1024,126 +1599,134 @@ export default function OperationalFactsPage() {
                 size="small"
                 danger
                 icon={<CloseCircleOutlined />}
-                disabled={!canConfirm || saving}
+                disabled={
+                  !activeSelectedRow ||
+                  activeSelectedRow.status !== 'POSTED' ||
+                  !canConfirmActive ||
+                  saving
+                }
               >
                 取消
               </Button>
             </Popconfirm>
           ) : null}
-        </Space>
-      )
-    },
-  }
-
-  const createConfig = createTarget ? configs[createTarget] : null
-  const tableColumns = [...(columnsByKey[activeKey] || []), actionColumn]
-
-  return (
-    <Space direction="vertical" size={16} className="erp-dashboard-page">
-      <Card className="erp-dashboard-card" variant="borderless">
-        <Space direction="vertical" size={8}>
-          <Title level={2} className="erp-dashboard-title">
-            业务事实处理
-          </Title>
-          <Paragraph className="erp-dashboard-summary">
-            统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端
-            usecase 处理。
-          </Paragraph>
-        </Space>
-      </Card>
-
-      <Card className="erp-dashboard-table-card" variant="borderless">
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <Space
-            wrap
-            style={{ justifyContent: 'space-between', width: '100%' }}
-          >
-            <Space wrap>
-              <Select
-                value={statusFilter}
-                options={STATUS_OPTIONS}
-                style={{ width: 160 }}
-                onChange={(nextStatus) => {
-                  setStatusFilter(nextStatus)
-                  setPaginationByKey((prev) => ({
-                    ...prev,
-                    [activeKey]: {
-                      ...(prev[activeKey] || activePagination),
-                      current: 1,
-                    },
-                  }))
-                }}
-              />
-            </Space>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              disabled={!canWriteActive}
-              onClick={openCreate}
+          {activeKey === 'shipments' ? (
+            <Popconfirm
+              title="确认取消并写出库冲正？"
+              onConfirm={() =>
+                runRowAction(
+                  activeConfig,
+                  activeSelectedRow,
+                  'cancel',
+                  '取消发货'
+                )
+              }
+              okText="确认"
+              cancelText="取消"
             >
-              {activeConfig.createLabel}
-            </Button>
-          </Space>
+              <Button
+                size="small"
+                danger
+                icon={<CloseCircleOutlined />}
+                disabled={
+                  !activeSelectedRow ||
+                  activeSelectedRow.status !== 'SHIPPED' ||
+                  !canConfirmActive ||
+                  saving
+                }
+              >
+                取消发货
+              </Button>
+            </Popconfirm>
+          ) : null}
+        </SelectionActionBar>
+      </BusinessOperationPanel>
 
-          <Tabs
-            activeKey={activeKey}
-            onChange={setActiveKey}
-            items={Object.entries(configs).map(([key, config]) => ({
-              key,
-              label: config.title,
-            }))}
-          />
-
-          <Text type="secondary">当前结果 {activeTotal} 条</Text>
-          <Table
-            rowKey="id"
-            columns={tableColumns}
-            dataSource={activeRows}
-            loading={loading}
-            locale={{
-              emptyText: <Empty description="暂无业务事实记录" />,
-            }}
-            pagination={createBusinessTablePagination({
-              pagination: activePagination,
-              total: activeTotal,
-              onChange: (current, pageSize) =>
-                setPaginationByKey((prev) => ({
-                  ...prev,
-                  [activeKey]: { current, pageSize },
-                })),
-            })}
-            scroll={{ x: 1480 }}
-          />
-        </Space>
-      </Card>
+      <BusinessDataTable
+        rowKey="id"
+        columns={tableColumns}
+        dataSource={activeRows}
+        loading={loading}
+        rowSelection={{
+          type: 'radio',
+          selectedRowKeys: activeSelectedRow ? [activeSelectedRow.id] : [],
+          onChange: (_keys, selectedRows) =>
+            setSelectedByKey((prev) => ({
+              ...prev,
+              [activeKey]: selectedRows[0] || null,
+            })),
+        }}
+        rowClassName={(record) =>
+          record.id === activeSelectedRow?.id ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () =>
+            setSelectedByKey((prev) => ({
+              ...prev,
+              [activeKey]: record,
+            })),
+        })}
+        emptyDescription="暂无业务事实记录"
+        pagination={createBusinessTablePagination({
+          pagination: activePagination,
+          total: activeTotal,
+          onChange: (current, pageSize) =>
+            setPaginationByKey((prev) => ({
+              ...prev,
+              [activeKey]: { current, pageSize },
+            })),
+        })}
+        scroll={{ x: 1320 }}
+      />
 
       <Modal
-        title={createConfig?.createLabel || '新建事实'}
+        className="erp-business-action-modal erp-business-action-modal--form erp-business-action-modal--operational-fact"
+        title={businessModalTitle(createModalTitle, createModalDescription)}
         open={Boolean(createConfig)}
         onCancel={closeCreate}
         onOk={submitCreate}
         confirmLoading={saving}
+        centered
         forceRender
         width={720}
       >
-        <Form form={createForm} layout="vertical" preserve={false}>
+        <Form
+          form={createForm}
+          layout="vertical"
+          preserve={false}
+          className="erp-business-action-form"
+        >
           {createConfig?.renderForm?.()}
         </Form>
       </Modal>
 
       <Modal
-        title="新增出货行"
+        className="erp-business-action-modal erp-business-action-modal--form erp-business-action-modal--operational-fact"
+        title={businessModalTitle(
+          '新增出货行',
+          '出货明细只维护出货单行，不在前端本地写库存或财务事实。'
+        )}
         open={shipmentItemOpen}
         onCancel={closeShipmentItem}
         onOk={submitShipmentItem}
         confirmLoading={saving}
+        centered
         forceRender
         width={640}
       >
-        <Form form={shipmentItemForm} layout="vertical" preserve={false}>
+        <Form
+          form={shipmentItemForm}
+          layout="vertical"
+          preserve={false}
+          className="erp-business-action-form"
+        >
           <ShipmentItemFormFields />
         </Form>
       </Modal>
-    </Space>
+    </BusinessPageLayout>
   )
+}
+
+export default function OperationalFactsPage() {
+  return <OperationalFactWorkspace />
 }

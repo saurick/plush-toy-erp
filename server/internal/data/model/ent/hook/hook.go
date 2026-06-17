@@ -152,6 +152,30 @@ func (f OutsourcingFactFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OutsourcingFactMutation", m)
 }
 
+// The OutsourcingOrderFunc type is an adapter to allow the use of ordinary
+// function as OutsourcingOrder mutator.
+type OutsourcingOrderFunc func(context.Context, *ent.OutsourcingOrderMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OutsourcingOrderFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OutsourcingOrderMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OutsourcingOrderMutation", m)
+}
+
+// The OutsourcingOrderItemFunc type is an adapter to allow the use of ordinary
+// function as OutsourcingOrderItem mutator.
+type OutsourcingOrderItemFunc func(context.Context, *ent.OutsourcingOrderItemMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OutsourcingOrderItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OutsourcingOrderItemMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OutsourcingOrderItemMutation", m)
+}
+
 // The PermissionFunc type is an adapter to allow the use of ordinary
 // function as Permission mutator.
 type PermissionFunc func(context.Context, *ent.PermissionMutation) (ent.Value, error)
@@ -162,6 +186,18 @@ func (f PermissionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PermissionMutation", m)
+}
+
+// The ProcessFunc type is an adapter to allow the use of ordinary
+// function as Process mutator.
+type ProcessFunc func(context.Context, *ent.ProcessMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProcessFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProcessMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProcessMutation", m)
 }
 
 // The ProductFunc type is an adapter to allow the use of ordinary

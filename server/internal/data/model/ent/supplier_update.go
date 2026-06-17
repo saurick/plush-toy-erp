@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/supplier"
@@ -172,6 +173,21 @@ func (_u *SupplierUpdate) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierUpdate
 	return _u.AddPurchaseOrderIDs(ids...)
 }
 
+// AddOutsourcingOrderIDs adds the "outsourcing_orders" edge to the OutsourcingOrder entity by IDs.
+func (_u *SupplierUpdate) AddOutsourcingOrderIDs(ids ...int) *SupplierUpdate {
+	_u.mutation.AddOutsourcingOrderIDs(ids...)
+	return _u
+}
+
+// AddOutsourcingOrders adds the "outsourcing_orders" edges to the OutsourcingOrder entity.
+func (_u *SupplierUpdate) AddOutsourcingOrders(v ...*OutsourcingOrder) *SupplierUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOutsourcingOrderIDs(ids...)
+}
+
 // Mutation returns the SupplierMutation object of the builder.
 func (_u *SupplierUpdate) Mutation() *SupplierMutation {
 	return _u.mutation
@@ -196,6 +212,27 @@ func (_u *SupplierUpdate) RemovePurchaseOrders(v ...*PurchaseOrder) *SupplierUpd
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseOrderIDs(ids...)
+}
+
+// ClearOutsourcingOrders clears all "outsourcing_orders" edges to the OutsourcingOrder entity.
+func (_u *SupplierUpdate) ClearOutsourcingOrders() *SupplierUpdate {
+	_u.mutation.ClearOutsourcingOrders()
+	return _u
+}
+
+// RemoveOutsourcingOrderIDs removes the "outsourcing_orders" edge to OutsourcingOrder entities by IDs.
+func (_u *SupplierUpdate) RemoveOutsourcingOrderIDs(ids ...int) *SupplierUpdate {
+	_u.mutation.RemoveOutsourcingOrderIDs(ids...)
+	return _u
+}
+
+// RemoveOutsourcingOrders removes "outsourcing_orders" edges to OutsourcingOrder entities.
+func (_u *SupplierUpdate) RemoveOutsourcingOrders(v ...*OutsourcingOrder) *SupplierUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOutsourcingOrderIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -355,6 +392,51 @@ func (_u *SupplierUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OutsourcingOrdersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.OutsourcingOrdersTable,
+			Columns: []string{supplier.OutsourcingOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOutsourcingOrdersIDs(); len(nodes) > 0 && !_u.mutation.OutsourcingOrdersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.OutsourcingOrdersTable,
+			Columns: []string{supplier.OutsourcingOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OutsourcingOrdersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.OutsourcingOrdersTable,
+			Columns: []string{supplier.OutsourcingOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -525,6 +607,21 @@ func (_u *SupplierUpdateOne) AddPurchaseOrders(v ...*PurchaseOrder) *SupplierUpd
 	return _u.AddPurchaseOrderIDs(ids...)
 }
 
+// AddOutsourcingOrderIDs adds the "outsourcing_orders" edge to the OutsourcingOrder entity by IDs.
+func (_u *SupplierUpdateOne) AddOutsourcingOrderIDs(ids ...int) *SupplierUpdateOne {
+	_u.mutation.AddOutsourcingOrderIDs(ids...)
+	return _u
+}
+
+// AddOutsourcingOrders adds the "outsourcing_orders" edges to the OutsourcingOrder entity.
+func (_u *SupplierUpdateOne) AddOutsourcingOrders(v ...*OutsourcingOrder) *SupplierUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOutsourcingOrderIDs(ids...)
+}
+
 // Mutation returns the SupplierMutation object of the builder.
 func (_u *SupplierUpdateOne) Mutation() *SupplierMutation {
 	return _u.mutation
@@ -549,6 +646,27 @@ func (_u *SupplierUpdateOne) RemovePurchaseOrders(v ...*PurchaseOrder) *Supplier
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePurchaseOrderIDs(ids...)
+}
+
+// ClearOutsourcingOrders clears all "outsourcing_orders" edges to the OutsourcingOrder entity.
+func (_u *SupplierUpdateOne) ClearOutsourcingOrders() *SupplierUpdateOne {
+	_u.mutation.ClearOutsourcingOrders()
+	return _u
+}
+
+// RemoveOutsourcingOrderIDs removes the "outsourcing_orders" edge to OutsourcingOrder entities by IDs.
+func (_u *SupplierUpdateOne) RemoveOutsourcingOrderIDs(ids ...int) *SupplierUpdateOne {
+	_u.mutation.RemoveOutsourcingOrderIDs(ids...)
+	return _u
+}
+
+// RemoveOutsourcingOrders removes "outsourcing_orders" edges to OutsourcingOrder entities.
+func (_u *SupplierUpdateOne) RemoveOutsourcingOrders(v ...*OutsourcingOrder) *SupplierUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOutsourcingOrderIDs(ids...)
 }
 
 // Where appends a list predicates to the SupplierUpdate builder.
@@ -738,6 +856,51 @@ func (_u *SupplierUpdateOne) sqlSave(ctx context.Context) (_node *Supplier, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(purchaseorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OutsourcingOrdersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.OutsourcingOrdersTable,
+			Columns: []string{supplier.OutsourcingOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOutsourcingOrdersIDs(); len(nodes) > 0 && !_u.mutation.OutsourcingOrdersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.OutsourcingOrdersTable,
+			Columns: []string{supplier.OutsourcingOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OutsourcingOrdersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   supplier.OutsourcingOrdersTable,
+			Columns: []string{supplier.OutsourcingOrdersColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -483,6 +483,29 @@ func HasBomItemsWith(preds ...predicate.BOMItem) predicate.Unit {
 	})
 }
 
+// HasOutsourcingOrderItems applies the HasEdge predicate on the "outsourcing_order_items" edge.
+func HasOutsourcingOrderItems() predicate.Unit {
+	return predicate.Unit(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingOrderItemsTable, OutsourcingOrderItemsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOutsourcingOrderItemsWith applies the HasEdge predicate on the "outsourcing_order_items" edge with a given conditions (other predicates).
+func HasOutsourcingOrderItemsWith(preds ...predicate.OutsourcingOrderItem) predicate.Unit {
+	return predicate.Unit(func(s *sql.Selector) {
+		step := newOutsourcingOrderItemsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasPurchaseOrderItems applies the HasEdge predicate on the "purchase_order_items" edge.
 func HasPurchaseOrderItems() predicate.Unit {
 	return predicate.Unit(func(s *sql.Selector) {

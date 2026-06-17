@@ -3,6 +3,8 @@ import test from 'node:test'
 
 import {
   PROCESSING_CONTRACT_DRAFT_VERSION,
+  buildProcessingContractDraftFromOutsourcingFact,
+  buildProcessingContractDraftFromOutsourcingOrder,
   createBlankProcessingContractDraft,
   createProcessingContractDraft,
   normalizeProcessingLine,
@@ -74,6 +76,85 @@ test('processingContractTemplate: 空白模板清空字段明细和附件但保�
   assert.equal(blankDraft.attachments['attachment-1'].dataURL, '')
   assert.equal(blankDraft.attachments['attachment-2'].dataURL, '')
   assert.deepEqual(blankDraft.merges, [])
+})
+
+test('processingContractTemplate: 委外事实只带入合同打印可确认快照字段', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingFact({
+    fact_no: ' OUT-F-001 ',
+    fact_type: 'MATERIAL_ISSUE',
+    subject_type: 'MATERIAL',
+    subject_id: 8,
+    supplier_name: ' 外协车缝厂 ',
+    quantity: '1200',
+    unit_id: 3,
+    source_type: 'SALES_ORDER',
+    source_id: 5,
+    note: ' 需先核对工序和单价 ',
+  })
+
+  assert.equal(draft.draftVersion, PROCESSING_CONTRACT_DRAFT_VERSION)
+  assert.equal(draft.contractNo, 'OUT-F-001')
+  assert.equal(draft.supplierName, '外协车缝厂')
+  assert.equal(draft.lines.length, 1)
+  assert.equal(draft.lines[0].contractNo, 'OUT-F-001')
+  assert.equal(draft.lines[0].supplierAlias, '外协车缝厂')
+  assert.equal(draft.lines[0].productNo, '')
+  assert.equal(draft.lines[0].productName, '')
+  assert.equal(draft.lines[0].processName, '')
+  assert.equal(draft.lines[0].processCategory, '')
+  assert.equal(draft.lines[0].unit, '')
+  assert.equal(draft.lines[0].quantity, '')
+  assert.equal(draft.lines[0].unitPrice, '')
+  assert.match(draft.lines[0].remark, /事实类型: MATERIAL_ISSUE/u)
+  assert.match(draft.lines[0].remark, /对象: MATERIAL #8/u)
+  assert.match(draft.lines[0].remark, /来源: SALES_ORDER #5/u)
+  assert.match(draft.lines[0].remark, /需先核对工序和单价/u)
+})
+
+test('processingContractTemplate: 委外订单按加工合同源单带入工序明细', () => {
+  const draft = buildProcessingContractDraftFromOutsourcingOrder(
+    {
+      outsourcing_order_no: ' OUT-ORDER-001 ',
+      supplier_snapshot: { short_name: ' 外协车缝厂 ', name: '不优先显示' },
+      source_order_no: ' SO-26017 ',
+      order_date: 1781654400,
+      expected_return_date: 1782259200,
+    },
+    [
+      {
+        line_status: 'open',
+        product_no_snapshot: ' P-001 ',
+        product_name_snapshot: ' 毛绒兔半成品 ',
+        process_name_snapshot: ' 车缝 ',
+        process_category_snapshot: ' 委外车缝 ',
+        unit_name_snapshot: ' 只 ',
+        outsourcing_quantity: '1200',
+        unit_price: '1.5',
+        amount: '',
+        note: ' 先做头批 ',
+      },
+    ]
+  )
+
+  assert.equal(draft.draftVersion, PROCESSING_CONTRACT_DRAFT_VERSION)
+  assert.equal(draft.contractNo, 'OUT-ORDER-001')
+  assert.equal(draft.supplierName, '外协车缝厂')
+  assert.equal(draft.orderDateText, '2026-06-17')
+  assert.equal(draft.returnDateText, '2026-06-24')
+  assert.deepEqual(draft.lines[0], {
+    contractNo: 'OUT-ORDER-001',
+    productOrderNo: 'SO-26017',
+    productNo: 'P-001',
+    productName: '毛绒兔半成品',
+    processName: '车缝',
+    supplierAlias: '外协车缝厂',
+    processCategory: '委外车缝',
+    unit: '只',
+    unitPrice: '1.5',
+    quantity: '1200',
+    amount: '1800',
+    remark: '先做头批',
+  })
 })
 
 test('FL_processing_contract_amount__derives_default_line_amount_snapshot processingContractTemplate: 默认金额会按数量和单价写入合同快照', () => {

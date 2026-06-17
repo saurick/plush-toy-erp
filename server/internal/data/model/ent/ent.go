@@ -19,7 +19,10 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/outsourcingorder"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/permission"
+	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
@@ -125,7 +128,10 @@ func checkColumn(t, c string) error {
 			inventorytxn.Table:                  inventorytxn.ValidColumn,
 			material.Table:                      material.ValidColumn,
 			outsourcingfact.Table:               outsourcingfact.ValidColumn,
+			outsourcingorder.Table:              outsourcingorder.ValidColumn,
+			outsourcingorderitem.Table:          outsourcingorderitem.ValidColumn,
 			permission.Table:                    permission.ValidColumn,
+			process.Table:                       process.ValidColumn,
 			product.Table:                       product.ValidColumn,
 			productsku.Table:                    productsku.ValidColumn,
 			productionfact.Table:                productionfact.ValidColumn,

@@ -20,6 +20,12 @@ const purchaseOrderRpc = new JsonRpc({
   authScope: AUTH_SCOPE.ADMIN,
 })
 
+const outsourcingOrderRpc = new JsonRpc({
+  url: 'outsourcing_order',
+  basePath: ADMIN_BASE_PATH,
+  authScope: AUTH_SCOPE.ADMIN,
+})
+
 function dataOf(result) {
   return result?.data || {}
 }
@@ -97,6 +103,31 @@ export async function getMaterial(params = {}) {
 export async function setMaterialActive(params = {}) {
   const result = await masterDataRpc.call('set_material_active', params)
   return dataOf(result)?.material || null
+}
+
+export async function listProcesses(params = {}) {
+  const result = await masterDataRpc.call('list_processes', params)
+  return dataOf(result)
+}
+
+export async function createProcess(params = {}) {
+  const result = await masterDataRpc.call('create_process', params)
+  return dataOf(result)?.process || null
+}
+
+export async function updateProcess(params = {}) {
+  const result = await masterDataRpc.call('update_process', params)
+  return dataOf(result)?.process || null
+}
+
+export async function getProcess(params = {}) {
+  const result = await masterDataRpc.call('get_process', params)
+  return dataOf(result)?.process || null
+}
+
+export async function setProcessActive(params = {}) {
+  const result = await masterDataRpc.call('set_process_active', params)
+  return dataOf(result)?.process || null
 }
 
 export async function listProducts(params = {}) {
@@ -280,6 +311,67 @@ export async function cancelPurchaseOrder(params = {}) {
 export async function listPurchaseOrderItems(params = {}) {
   const result = await purchaseOrderRpc.call(
     'list_purchase_order_items',
+    params
+  )
+  return dataOf(result)
+}
+
+export async function listOutsourcingOrders(params = {}) {
+  const result = await outsourcingOrderRpc.call(
+    'list_outsourcing_orders',
+    params
+  )
+  return dataOf(result)
+}
+
+export async function getOutsourcingOrder(params = {}) {
+  const result = await outsourcingOrderRpc.call('get_outsourcing_order', params)
+  return dataOf(result)?.outsourcing_order || null
+}
+
+export async function saveOutsourcingOrderWithItems(params = {}) {
+  const result = await outsourcingOrderRpc.call(
+    'save_outsourcing_order_with_items',
+    params
+  )
+  return dataOf(result)
+}
+
+export async function submitOutsourcingOrder(params = {}) {
+  const result = await outsourcingOrderRpc.call(
+    'submit_outsourcing_order',
+    params
+  )
+  return dataOf(result)?.outsourcing_order || null
+}
+
+export async function confirmOutsourcingOrder(params = {}) {
+  const result = await outsourcingOrderRpc.call(
+    'confirm_outsourcing_order',
+    params
+  )
+  return dataOf(result)?.outsourcing_order || null
+}
+
+export async function closeOutsourcingOrder(params = {}) {
+  const result = await outsourcingOrderRpc.call(
+    'close_outsourcing_order',
+    params
+  )
+  return dataOf(result)?.outsourcing_order || null
+}
+
+export async function cancelOutsourcingOrder(params = {}) {
+  const result = await outsourcingOrderRpc.call(
+    'cancel_outsourcing_order',
+    params
+  )
+  return dataOf(result)?.outsourcing_order || null
+}
+
+export async function listOutsourcingOrderItems(params = {}) {
+  const result = await outsourcingOrderRpc.call(
+    'list_outsourcing_order_items',
     params
   )
   return dataOf(result)

@@ -2,7 +2,7 @@
 
 本目录存放已经从当前入口文件中归档的历史记录。
 
-归档文件只用于追溯历史过程，不作为当前需求、当前实现状态、schema、migration、API、UI、部署或产品路线真源。当前状态仍以 `docs/current-source-of-truth.md`、正式产品文档、代码和测试为准。
+归档文件只用于追溯历史过程，不作为当前需求、当前实现状态、schema、migration、API、UI、部署或产品路线真源。当前状态仍以 `docs/当前真源与交接顺序.md`、正式产品文档、代码和测试为准。
 
 ## 当前归档组
 
@@ -19,3 +19,6 @@
 | `docs/archive/progress-2026-06-12-before-formal-menu-candidate-prototype.md` | 正式菜单候选原型前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-06-13-before-workbench-prototype-redesign.md` | 工作台原型重做前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-06-14-before-business-modal-alignment.md` | 业务新建 / 编辑弹窗统一前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-15-before-final-bom-closeout.md` | BOM 收口和文档治理前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-16-before-audit-log-readable.md` | 审计日志可读性治理前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-06-16-before-backup-restore-rehearsal.md` | 备份恢复演练前的 `progress.md` 过程记录归档 |

@@ -143,14 +143,16 @@ type InventoryTxn struct {
 }
 
 type InventoryBalance struct {
-	ID          int
-	SubjectType string
-	SubjectID   int
-	WarehouseID int
-	LotID       *int
-	UnitID      int
-	Quantity    decimal.Decimal
-	UpdatedAt   time.Time
+	ID                     int
+	SubjectType            string
+	SubjectID              int
+	WarehouseID            int
+	LotID                  *int
+	UnitID                 int
+	Quantity               decimal.Decimal
+	ActiveReservedQuantity decimal.Decimal
+	AvailableQuantity      decimal.Decimal
+	UpdatedAt              time.Time
 }
 
 type InventoryLotCreate struct {
@@ -190,6 +192,38 @@ type InventoryBalanceKey struct {
 	WarehouseID int
 	LotID       *int
 	UnitID      int
+}
+
+type InventoryBalanceFilter struct {
+	SubjectType string
+	SubjectID   int
+	WarehouseID int
+	LotID       int
+	Keyword     string
+	Limit       int
+	Offset      int
+}
+
+type InventoryLotFilter struct {
+	SubjectType string
+	SubjectID   int
+	Status      string
+	Keyword     string
+	Limit       int
+	Offset      int
+}
+
+type InventoryTxnFilter struct {
+	SubjectType string
+	SubjectID   int
+	WarehouseID int
+	LotID       int
+	TxnType     string
+	SourceType  string
+	SourceID    int
+	Keyword     string
+	Limit       int
+	Offset      int
 }
 
 type BOMHeader struct {
@@ -278,6 +312,9 @@ type InventoryRepo interface {
 	CreateInventoryTxn(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxn, error)
 	ApplyInventoryTxnAndUpdateBalance(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxnApplyResult, error)
 	GetInventoryBalance(ctx context.Context, key InventoryBalanceKey) (*InventoryBalance, error)
+	ListInventoryBalances(ctx context.Context, filter InventoryBalanceFilter) ([]*InventoryBalance, int, error)
+	ListInventoryLots(ctx context.Context, filter InventoryLotFilter) ([]*InventoryLot, int, error)
+	ListInventoryTxns(ctx context.Context, filter InventoryTxnFilter) ([]*InventoryTxn, int, error)
 	CreateBOMHeader(ctx context.Context, in *BOMHeaderCreate) (*BOMHeader, error)
 	CreateBOMItem(ctx context.Context, in *BOMItemCreate) (*BOMItem, error)
 	UpdateBOMDraftHeader(ctx context.Context, id int, in *BOMHeaderUpdate) (*BOMHeader, error)
@@ -292,6 +329,7 @@ type InventoryRepo interface {
 	ActivateBOMVersion(ctx context.Context, id int) (*BOMVersionDetail, error)
 	ArchiveBOMVersion(ctx context.Context, id int) (*BOMHeader, error)
 	CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error)
+	CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error)
 	AddPurchaseReceiptItem(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, error)
 	PostPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
 	CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
@@ -313,6 +351,7 @@ type InventoryRepo interface {
 	RejectQualityInspection(ctx context.Context, in *QualityInspectionDecision) (*QualityInspection, error)
 	CancelQualityInspection(ctx context.Context, inspectionID int, decisionNote *string) (*QualityInspection, error)
 	GetQualityInspection(ctx context.Context, id int) (*QualityInspection, error)
+	ListQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error)
 }
 
 type InventoryUsecase struct {
@@ -384,6 +423,39 @@ func (uc *InventoryUsecase) GetInventoryBalance(ctx context.Context, key Invento
 		return nil, ErrBadParam
 	}
 	return uc.repo.GetInventoryBalance(ctx, key)
+}
+
+func (uc *InventoryUsecase) ListInventoryBalances(ctx context.Context, filter InventoryBalanceFilter) ([]*InventoryBalance, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeInventoryBalanceFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListInventoryBalances(ctx, normalized)
+}
+
+func (uc *InventoryUsecase) ListInventoryLots(ctx context.Context, filter InventoryLotFilter) ([]*InventoryLot, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeInventoryLotFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListInventoryLots(ctx, normalized)
+}
+
+func (uc *InventoryUsecase) ListInventoryTxns(ctx context.Context, filter InventoryTxnFilter) ([]*InventoryTxn, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeInventoryTxnFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListInventoryTxns(ctx, normalized)
 }
 
 func (uc *InventoryUsecase) CreateBOMHeader(ctx context.Context, in *BOMHeaderCreate) (*BOMHeader, error) {
@@ -594,6 +666,54 @@ func isValidInventoryBalanceKey(key InventoryBalanceKey) bool {
 		key.SubjectID > 0 &&
 		key.WarehouseID > 0 &&
 		key.UnitID > 0
+}
+
+func normalizeInventoryBalanceFilter(in InventoryBalanceFilter) (InventoryBalanceFilter, error) {
+	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType) {
+		return InventoryBalanceFilter{}, ErrBadParam
+	}
+	normalizeInventoryListPagination(&in.Limit, &in.Offset)
+	return in, nil
+}
+
+func normalizeInventoryLotFilter(in InventoryLotFilter) (InventoryLotFilter, error) {
+	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
+	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType) {
+		return InventoryLotFilter{}, ErrBadParam
+	}
+	if in.Status != "" && !IsValidInventoryLotStatus(in.Status) {
+		return InventoryLotFilter{}, ErrBadParam
+	}
+	normalizeInventoryListPagination(&in.Limit, &in.Offset)
+	return in, nil
+}
+
+func normalizeInventoryTxnFilter(in InventoryTxnFilter) (InventoryTxnFilter, error) {
+	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
+	in.TxnType = strings.ToUpper(strings.TrimSpace(in.TxnType))
+	in.SourceType = strings.ToUpper(strings.TrimSpace(in.SourceType))
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.SubjectType != "" && !IsValidInventorySubjectType(in.SubjectType) {
+		return InventoryTxnFilter{}, ErrBadParam
+	}
+	if in.TxnType != "" && !IsValidInventoryTxnType(in.TxnType) {
+		return InventoryTxnFilter{}, ErrBadParam
+	}
+	normalizeInventoryListPagination(&in.Limit, &in.Offset)
+	return in, nil
+}
+
+func normalizeInventoryListPagination(limit *int, offset *int) {
+	if *limit <= 0 || *limit > 200 {
+		*limit = 50
+	}
+	if *offset < 0 {
+		*offset = 0
+	}
 }
 
 func IsValidInventorySubjectType(value string) bool {

@@ -23,7 +23,10 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/outsourcingorder"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/permission"
+	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
@@ -88,8 +91,14 @@ type Client struct {
 	Material *MaterialClient
 	// OutsourcingFact is the client for interacting with the OutsourcingFact builders.
 	OutsourcingFact *OutsourcingFactClient
+	// OutsourcingOrder is the client for interacting with the OutsourcingOrder builders.
+	OutsourcingOrder *OutsourcingOrderClient
+	// OutsourcingOrderItem is the client for interacting with the OutsourcingOrderItem builders.
+	OutsourcingOrderItem *OutsourcingOrderItemClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
+	// Process is the client for interacting with the Process builders.
+	Process *ProcessClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
@@ -169,7 +178,10 @@ func (c *Client) init() {
 	c.InventoryTxn = NewInventoryTxnClient(c.config)
 	c.Material = NewMaterialClient(c.config)
 	c.OutsourcingFact = NewOutsourcingFactClient(c.config)
+	c.OutsourcingOrder = NewOutsourcingOrderClient(c.config)
+	c.OutsourcingOrderItem = NewOutsourcingOrderItemClient(c.config)
 	c.Permission = NewPermissionClient(c.config)
+	c.Process = NewProcessClient(c.config)
 	c.Product = NewProductClient(c.config)
 	c.ProductSKU = NewProductSKUClient(c.config)
 	c.ProductionFact = NewProductionFactClient(c.config)
@@ -302,7 +314,10 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		InventoryTxn:                  NewInventoryTxnClient(cfg),
 		Material:                      NewMaterialClient(cfg),
 		OutsourcingFact:               NewOutsourcingFactClient(cfg),
+		OutsourcingOrder:              NewOutsourcingOrderClient(cfg),
+		OutsourcingOrderItem:          NewOutsourcingOrderItemClient(cfg),
 		Permission:                    NewPermissionClient(cfg),
+		Process:                       NewProcessClient(cfg),
 		Product:                       NewProductClient(cfg),
 		ProductSKU:                    NewProductSKUClient(cfg),
 		ProductionFact:                NewProductionFactClient(cfg),
@@ -362,7 +377,10 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		InventoryTxn:                  NewInventoryTxnClient(cfg),
 		Material:                      NewMaterialClient(cfg),
 		OutsourcingFact:               NewOutsourcingFactClient(cfg),
+		OutsourcingOrder:              NewOutsourcingOrderClient(cfg),
+		OutsourcingOrderItem:          NewOutsourcingOrderItemClient(cfg),
 		Permission:                    NewPermissionClient(cfg),
+		Process:                       NewProcessClient(cfg),
 		Product:                       NewProductClient(cfg),
 		ProductSKU:                    NewProductSKUClient(cfg),
 		ProductionFact:                NewProductionFactClient(cfg),
@@ -422,14 +440,14 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.Contact, c.Customer,
 		c.FinanceFact, c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
-		c.OutsourcingFact, c.Permission, c.Product, c.ProductSKU, c.ProductionFact,
-		c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
-		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
-		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.Role, c.RolePermission, c.RuntimeAuditEvent,
-		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
-		c.StockReservation, c.Supplier, c.Unit, c.User, c.Warehouse,
-		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
+		c.Process, c.Product, c.ProductSKU, c.ProductionFact, c.PurchaseOrder,
+		c.PurchaseOrderItem, c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
+		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
+		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
+		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
+		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit, c.User,
+		c.Warehouse, c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -441,14 +459,14 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AdminUser, c.AdminUserRole, c.BOMHeader, c.BOMItem, c.Contact, c.Customer,
 		c.FinanceFact, c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
-		c.OutsourcingFact, c.Permission, c.Product, c.ProductSKU, c.ProductionFact,
-		c.PurchaseOrder, c.PurchaseOrderItem, c.PurchaseReceipt,
-		c.PurchaseReceiptAdjustment, c.PurchaseReceiptAdjustmentItem,
-		c.PurchaseReceiptItem, c.PurchaseReturn, c.PurchaseReturnItem,
-		c.QualityInspection, c.Role, c.RolePermission, c.RuntimeAuditEvent,
-		c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem,
-		c.StockReservation, c.Supplier, c.Unit, c.User, c.Warehouse,
-		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
+		c.Process, c.Product, c.ProductSKU, c.ProductionFact, c.PurchaseOrder,
+		c.PurchaseOrderItem, c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
+		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
+		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
+		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
+		c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier, c.Unit, c.User,
+		c.Warehouse, c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -481,8 +499,14 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Material.mutate(ctx, m)
 	case *OutsourcingFactMutation:
 		return c.OutsourcingFact.mutate(ctx, m)
+	case *OutsourcingOrderMutation:
+		return c.OutsourcingOrder.mutate(ctx, m)
+	case *OutsourcingOrderItemMutation:
+		return c.OutsourcingOrderItem.mutate(ctx, m)
 	case *PermissionMutation:
 		return c.Permission.mutate(ctx, m)
+	case *ProcessMutation:
+		return c.Process.mutate(ctx, m)
 	case *ProductMutation:
 		return c.Product.mutate(ctx, m)
 	case *ProductSKUMutation:
@@ -2688,6 +2712,368 @@ func (c *OutsourcingFactClient) mutate(ctx context.Context, m *OutsourcingFactMu
 	}
 }
 
+// OutsourcingOrderClient is a client for the OutsourcingOrder schema.
+type OutsourcingOrderClient struct {
+	config
+}
+
+// NewOutsourcingOrderClient returns a client for the OutsourcingOrder from the given config.
+func NewOutsourcingOrderClient(c config) *OutsourcingOrderClient {
+	return &OutsourcingOrderClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `outsourcingorder.Hooks(f(g(h())))`.
+func (c *OutsourcingOrderClient) Use(hooks ...Hook) {
+	c.hooks.OutsourcingOrder = append(c.hooks.OutsourcingOrder, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `outsourcingorder.Intercept(f(g(h())))`.
+func (c *OutsourcingOrderClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OutsourcingOrder = append(c.inters.OutsourcingOrder, interceptors...)
+}
+
+// Create returns a builder for creating a OutsourcingOrder entity.
+func (c *OutsourcingOrderClient) Create() *OutsourcingOrderCreate {
+	mutation := newOutsourcingOrderMutation(c.config, OpCreate)
+	return &OutsourcingOrderCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OutsourcingOrder entities.
+func (c *OutsourcingOrderClient) CreateBulk(builders ...*OutsourcingOrderCreate) *OutsourcingOrderCreateBulk {
+	return &OutsourcingOrderCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OutsourcingOrderClient) MapCreateBulk(slice any, setFunc func(*OutsourcingOrderCreate, int)) *OutsourcingOrderCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OutsourcingOrderCreateBulk{err: fmt.Errorf("calling to OutsourcingOrderClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OutsourcingOrderCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OutsourcingOrderCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OutsourcingOrder.
+func (c *OutsourcingOrderClient) Update() *OutsourcingOrderUpdate {
+	mutation := newOutsourcingOrderMutation(c.config, OpUpdate)
+	return &OutsourcingOrderUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OutsourcingOrderClient) UpdateOne(_m *OutsourcingOrder) *OutsourcingOrderUpdateOne {
+	mutation := newOutsourcingOrderMutation(c.config, OpUpdateOne, withOutsourcingOrder(_m))
+	return &OutsourcingOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OutsourcingOrderClient) UpdateOneID(id int) *OutsourcingOrderUpdateOne {
+	mutation := newOutsourcingOrderMutation(c.config, OpUpdateOne, withOutsourcingOrderID(id))
+	return &OutsourcingOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OutsourcingOrder.
+func (c *OutsourcingOrderClient) Delete() *OutsourcingOrderDelete {
+	mutation := newOutsourcingOrderMutation(c.config, OpDelete)
+	return &OutsourcingOrderDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OutsourcingOrderClient) DeleteOne(_m *OutsourcingOrder) *OutsourcingOrderDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OutsourcingOrderClient) DeleteOneID(id int) *OutsourcingOrderDeleteOne {
+	builder := c.Delete().Where(outsourcingorder.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OutsourcingOrderDeleteOne{builder}
+}
+
+// Query returns a query builder for OutsourcingOrder.
+func (c *OutsourcingOrderClient) Query() *OutsourcingOrderQuery {
+	return &OutsourcingOrderQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOutsourcingOrder},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OutsourcingOrder entity by its id.
+func (c *OutsourcingOrderClient) Get(ctx context.Context, id int) (*OutsourcingOrder, error) {
+	return c.Query().Where(outsourcingorder.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OutsourcingOrderClient) GetX(ctx context.Context, id int) *OutsourcingOrder {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySupplier queries the supplier edge of a OutsourcingOrder.
+func (c *OutsourcingOrderClient) QuerySupplier(_m *OutsourcingOrder) *SupplierQuery {
+	query := (&SupplierClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorder.Table, outsourcingorder.FieldID, id),
+			sqlgraph.To(supplier.Table, supplier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorder.SupplierTable, outsourcingorder.SupplierColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryItems queries the items edge of a OutsourcingOrder.
+func (c *OutsourcingOrderClient) QueryItems(_m *OutsourcingOrder) *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorder.Table, outsourcingorder.FieldID, id),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, outsourcingorder.ItemsTable, outsourcingorder.ItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *OutsourcingOrderClient) Hooks() []Hook {
+	return c.hooks.OutsourcingOrder
+}
+
+// Interceptors returns the client interceptors.
+func (c *OutsourcingOrderClient) Interceptors() []Interceptor {
+	return c.inters.OutsourcingOrder
+}
+
+func (c *OutsourcingOrderClient) mutate(ctx context.Context, m *OutsourcingOrderMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OutsourcingOrderCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OutsourcingOrderUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OutsourcingOrderUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OutsourcingOrderDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OutsourcingOrder mutation op: %q", m.Op())
+	}
+}
+
+// OutsourcingOrderItemClient is a client for the OutsourcingOrderItem schema.
+type OutsourcingOrderItemClient struct {
+	config
+}
+
+// NewOutsourcingOrderItemClient returns a client for the OutsourcingOrderItem from the given config.
+func NewOutsourcingOrderItemClient(c config) *OutsourcingOrderItemClient {
+	return &OutsourcingOrderItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `outsourcingorderitem.Hooks(f(g(h())))`.
+func (c *OutsourcingOrderItemClient) Use(hooks ...Hook) {
+	c.hooks.OutsourcingOrderItem = append(c.hooks.OutsourcingOrderItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `outsourcingorderitem.Intercept(f(g(h())))`.
+func (c *OutsourcingOrderItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OutsourcingOrderItem = append(c.inters.OutsourcingOrderItem, interceptors...)
+}
+
+// Create returns a builder for creating a OutsourcingOrderItem entity.
+func (c *OutsourcingOrderItemClient) Create() *OutsourcingOrderItemCreate {
+	mutation := newOutsourcingOrderItemMutation(c.config, OpCreate)
+	return &OutsourcingOrderItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OutsourcingOrderItem entities.
+func (c *OutsourcingOrderItemClient) CreateBulk(builders ...*OutsourcingOrderItemCreate) *OutsourcingOrderItemCreateBulk {
+	return &OutsourcingOrderItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OutsourcingOrderItemClient) MapCreateBulk(slice any, setFunc func(*OutsourcingOrderItemCreate, int)) *OutsourcingOrderItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OutsourcingOrderItemCreateBulk{err: fmt.Errorf("calling to OutsourcingOrderItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OutsourcingOrderItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OutsourcingOrderItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) Update() *OutsourcingOrderItemUpdate {
+	mutation := newOutsourcingOrderItemMutation(c.config, OpUpdate)
+	return &OutsourcingOrderItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OutsourcingOrderItemClient) UpdateOne(_m *OutsourcingOrderItem) *OutsourcingOrderItemUpdateOne {
+	mutation := newOutsourcingOrderItemMutation(c.config, OpUpdateOne, withOutsourcingOrderItem(_m))
+	return &OutsourcingOrderItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OutsourcingOrderItemClient) UpdateOneID(id int) *OutsourcingOrderItemUpdateOne {
+	mutation := newOutsourcingOrderItemMutation(c.config, OpUpdateOne, withOutsourcingOrderItemID(id))
+	return &OutsourcingOrderItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) Delete() *OutsourcingOrderItemDelete {
+	mutation := newOutsourcingOrderItemMutation(c.config, OpDelete)
+	return &OutsourcingOrderItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OutsourcingOrderItemClient) DeleteOne(_m *OutsourcingOrderItem) *OutsourcingOrderItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OutsourcingOrderItemClient) DeleteOneID(id int) *OutsourcingOrderItemDeleteOne {
+	builder := c.Delete().Where(outsourcingorderitem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OutsourcingOrderItemDeleteOne{builder}
+}
+
+// Query returns a query builder for OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) Query() *OutsourcingOrderItemQuery {
+	return &OutsourcingOrderItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOutsourcingOrderItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OutsourcingOrderItem entity by its id.
+func (c *OutsourcingOrderItemClient) Get(ctx context.Context, id int) (*OutsourcingOrderItem, error) {
+	return c.Query().Where(outsourcingorderitem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OutsourcingOrderItemClient) GetX(ctx context.Context, id int) *OutsourcingOrderItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryOutsourcingOrder queries the outsourcing_order edge of a OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) QueryOutsourcingOrder(_m *OutsourcingOrderItem) *OutsourcingOrderQuery {
+	query := (&OutsourcingOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
+			sqlgraph.To(outsourcingorder.Table, outsourcingorder.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.OutsourcingOrderTable, outsourcingorderitem.OutsourcingOrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProduct queries the product edge of a OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) QueryProduct(_m *OutsourcingOrderItem) *ProductQuery {
+	query := (&ProductClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
+			sqlgraph.To(product.Table, product.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.ProductTable, outsourcingorderitem.ProductColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProcess queries the process edge of a OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) QueryProcess(_m *OutsourcingOrderItem) *ProcessQuery {
+	query := (&ProcessClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
+			sqlgraph.To(process.Table, process.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.ProcessTable, outsourcingorderitem.ProcessColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUnit queries the unit edge of a OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) QueryUnit(_m *OutsourcingOrderItem) *UnitQuery {
+	query := (&UnitClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
+			sqlgraph.To(unit.Table, unit.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.UnitTable, outsourcingorderitem.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *OutsourcingOrderItemClient) Hooks() []Hook {
+	return c.hooks.OutsourcingOrderItem
+}
+
+// Interceptors returns the client interceptors.
+func (c *OutsourcingOrderItemClient) Interceptors() []Interceptor {
+	return c.inters.OutsourcingOrderItem
+}
+
+func (c *OutsourcingOrderItemClient) mutate(ctx context.Context, m *OutsourcingOrderItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OutsourcingOrderItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OutsourcingOrderItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OutsourcingOrderItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OutsourcingOrderItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OutsourcingOrderItem mutation op: %q", m.Op())
+	}
+}
+
 // PermissionClient is a client for the Permission schema.
 type PermissionClient struct {
 	config
@@ -2818,6 +3204,155 @@ func (c *PermissionClient) mutate(ctx context.Context, m *PermissionMutation) (V
 		return (&PermissionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Permission mutation op: %q", m.Op())
+	}
+}
+
+// ProcessClient is a client for the Process schema.
+type ProcessClient struct {
+	config
+}
+
+// NewProcessClient returns a client for the Process from the given config.
+func NewProcessClient(c config) *ProcessClient {
+	return &ProcessClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `process.Hooks(f(g(h())))`.
+func (c *ProcessClient) Use(hooks ...Hook) {
+	c.hooks.Process = append(c.hooks.Process, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `process.Intercept(f(g(h())))`.
+func (c *ProcessClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Process = append(c.inters.Process, interceptors...)
+}
+
+// Create returns a builder for creating a Process entity.
+func (c *ProcessClient) Create() *ProcessCreate {
+	mutation := newProcessMutation(c.config, OpCreate)
+	return &ProcessCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Process entities.
+func (c *ProcessClient) CreateBulk(builders ...*ProcessCreate) *ProcessCreateBulk {
+	return &ProcessCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProcessClient) MapCreateBulk(slice any, setFunc func(*ProcessCreate, int)) *ProcessCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProcessCreateBulk{err: fmt.Errorf("calling to ProcessClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProcessCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProcessCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Process.
+func (c *ProcessClient) Update() *ProcessUpdate {
+	mutation := newProcessMutation(c.config, OpUpdate)
+	return &ProcessUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProcessClient) UpdateOne(_m *Process) *ProcessUpdateOne {
+	mutation := newProcessMutation(c.config, OpUpdateOne, withProcess(_m))
+	return &ProcessUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProcessClient) UpdateOneID(id int) *ProcessUpdateOne {
+	mutation := newProcessMutation(c.config, OpUpdateOne, withProcessID(id))
+	return &ProcessUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Process.
+func (c *ProcessClient) Delete() *ProcessDelete {
+	mutation := newProcessMutation(c.config, OpDelete)
+	return &ProcessDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProcessClient) DeleteOne(_m *Process) *ProcessDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProcessClient) DeleteOneID(id int) *ProcessDeleteOne {
+	builder := c.Delete().Where(process.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProcessDeleteOne{builder}
+}
+
+// Query returns a query builder for Process.
+func (c *ProcessClient) Query() *ProcessQuery {
+	return &ProcessQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProcess},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Process entity by its id.
+func (c *ProcessClient) Get(ctx context.Context, id int) (*Process, error) {
+	return c.Query().Where(process.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProcessClient) GetX(ctx context.Context, id int) *Process {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryOutsourcingOrderItems queries the outsourcing_order_items edge of a Process.
+func (c *ProcessClient) QueryOutsourcingOrderItems(_m *Process) *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(process.Table, process.FieldID, id),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, process.OutsourcingOrderItemsTable, process.OutsourcingOrderItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProcessClient) Hooks() []Hook {
+	return c.hooks.Process
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProcessClient) Interceptors() []Interceptor {
+	return c.inters.Process
+}
+
+func (c *ProcessClient) mutate(ctx context.Context, m *ProcessMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProcessCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProcessUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProcessUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProcessDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Process mutation op: %q", m.Op())
 	}
 }
 
@@ -2970,6 +3505,22 @@ func (c *ProductClient) QueryBomHeaders(_m *Product) *BOMHeaderQuery {
 			sqlgraph.From(product.Table, product.FieldID, id),
 			sqlgraph.To(bomheader.Table, bomheader.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, product.BomHeadersTable, product.BomHeadersColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOutsourcingOrderItems queries the outsourcing_order_items edge of a Product.
+func (c *ProductClient) QueryOutsourcingOrderItems(_m *Product) *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(product.Table, product.FieldID, id),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, product.OutsourcingOrderItemsTable, product.OutsourcingOrderItemsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -7047,6 +7598,22 @@ func (c *SupplierClient) QueryPurchaseOrders(_m *Supplier) *PurchaseOrderQuery {
 	return query
 }
 
+// QueryOutsourcingOrders queries the outsourcing_orders edge of a Supplier.
+func (c *SupplierClient) QueryOutsourcingOrders(_m *Supplier) *OutsourcingOrderQuery {
+	query := (&OutsourcingOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(supplier.Table, supplier.FieldID, id),
+			sqlgraph.To(outsourcingorder.Table, outsourcingorder.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, supplier.OutsourcingOrdersTable, supplier.OutsourcingOrdersColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *SupplierClient) Hooks() []Hook {
 	return c.hooks.Supplier
@@ -7269,6 +7836,22 @@ func (c *UnitClient) QueryBomItems(_m *Unit) *BOMItemQuery {
 			sqlgraph.From(unit.Table, unit.FieldID, id),
 			sqlgraph.To(bomitem.Table, bomitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, unit.BomItemsTable, unit.BomItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOutsourcingOrderItems queries the outsourcing_order_items edge of a Unit.
+func (c *UnitClient) QueryOutsourcingOrderItems(_m *Unit) *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(unit.Table, unit.FieldID, id),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, unit.OutsourcingOrderItemsTable, unit.OutsourcingOrderItemsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -8291,23 +8874,23 @@ type (
 	hooks struct {
 		AdminUser, AdminUserRole, BOMHeader, BOMItem, Contact, Customer, FinanceFact,
 		InventoryBalance, InventoryLot, InventoryTxn, Material, OutsourcingFact,
-		Permission, Product, ProductSKU, ProductionFact, PurchaseOrder,
-		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
-		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RolePermission, RuntimeAuditEvent,
-		RuntimeMarker, SalesOrder, SalesOrderItem, Shipment, ShipmentItem,
-		StockReservation, Supplier, Unit, User, Warehouse, WorkflowBusinessState,
-		WorkflowTask, WorkflowTaskEvent []ent.Hook
+		OutsourcingOrder, OutsourcingOrderItem, Permission, Process, Product,
+		ProductSKU, ProductionFact, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt,
+		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
+		PurchaseReturn, PurchaseReturnItem, QualityInspection, Role, RolePermission,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, StockReservation, Supplier, Unit, User, Warehouse,
+		WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
 		AdminUser, AdminUserRole, BOMHeader, BOMItem, Contact, Customer, FinanceFact,
 		InventoryBalance, InventoryLot, InventoryTxn, Material, OutsourcingFact,
-		Permission, Product, ProductSKU, ProductionFact, PurchaseOrder,
-		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
-		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RolePermission, RuntimeAuditEvent,
-		RuntimeMarker, SalesOrder, SalesOrderItem, Shipment, ShipmentItem,
-		StockReservation, Supplier, Unit, User, Warehouse, WorkflowBusinessState,
-		WorkflowTask, WorkflowTaskEvent []ent.Interceptor
+		OutsourcingOrder, OutsourcingOrderItem, Permission, Process, Product,
+		ProductSKU, ProductionFact, PurchaseOrder, PurchaseOrderItem, PurchaseReceipt,
+		PurchaseReceiptAdjustment, PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
+		PurchaseReturn, PurchaseReturnItem, QualityInspection, Role, RolePermission,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
+		ShipmentItem, StockReservation, Supplier, Unit, User, Warehouse,
+		WorkflowBusinessState, WorkflowTask, WorkflowTaskEvent []ent.Interceptor
 	}
 )

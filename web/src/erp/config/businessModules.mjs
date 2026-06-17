@@ -41,7 +41,6 @@ const formalShellFormFieldLabelsByModuleKey = Object.freeze({
     '判定',
     '批次状态',
   ],
-  inventory: ['物料 / 产品', '仓库', '批次', '当前余额', '可用量', '最近流水'],
   'processing-contracts': [
     '委外单号',
     '加工厂',
@@ -235,6 +234,28 @@ export const businessModuleDefinitions = Object.freeze([
     currentScope: ['产品结构版本', '材料用量和损耗率', 'BOM 状态与生效边界'],
   },
   {
+    key: 'processes',
+    sectionKey: 'engineering',
+    label: '工序档案',
+    title: '工序档案',
+    path: '/erp/engineering/processes',
+    shortLabel: '工序',
+    pageKind: 'formal-v1',
+    description:
+      '工序档案维护生产和委外共用的加工步骤，可标记是否适用委外、内制和是否需要质检。',
+    primaryEntity: 'processes',
+    factSource: 'processes',
+    boundary:
+      '工序档案是可复用主数据，不等于委外订单、生产任务、发料、回货、库存或质检事实。',
+    sourceRefs: ['processes', 'bom_headers', 'outsourcing orders（后续评审）'],
+    currentScope: [
+      '工序编号和名称',
+      '工序类别文本',
+      '委外 / 内制适用标记',
+      '质检要求和启停状态',
+    ],
+  },
+  {
     key: 'accessories-purchase',
     sectionKey: 'purchase',
     label: '采购订单',
@@ -269,7 +290,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '入库管理',
     path: '/erp/warehouse/inbound',
     shortLabel: '入库',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
       '入库管理承接采购收货、待检、退货和入库确认视图；真实库存变化由采购 / 库存 usecase 写入。',
     primaryEntity: 'purchase_receipts / purchase_receipt_items',
@@ -291,7 +312,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '来料质检',
     path: '/erp/production/quality-inspections',
     shortLabel: '质检',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
       '来料质检入口对应 quality_inspections 判定和批次状态变化，任务完成不替代质检事实。',
     primaryEntity: 'quality_inspections',
@@ -312,15 +333,27 @@ export const businessModuleDefinitions = Object.freeze([
     title: '库存台账',
     path: '/erp/warehouse/inventory',
     shortLabel: '库存',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '库存台账统一查看库存余额、批次和流水；库存事实以库存流水、余额和批次状态为准。',
+      '库存台账统一查看库存余额、已预留、可用量、批次和流水；库存事实以库存流水、余额、批次状态和 ACTIVE 预留为准。',
     primaryEntity: 'inventory_balances / inventory_txns / inventory_lots',
-    factSource: 'inventory_txns, inventory_balances, inventory_lots',
+    factSource:
+      'inventory_txns, inventory_balances, inventory_lots, stock_reservations',
     boundary:
-      '库存台账是事实视图，不允许前端本地伪造入库、出库、预留、调拨或调整事实。',
-    sourceRefs: ['inventory_txns', 'inventory_balances', 'inventory_lots'],
-    currentScope: ['库存余额', '库存批次', '库存流水', '盘点 / 调整边界'],
+      '库存台账是事实视图，可用量只按后端只读 read model 展示，不允许前端本地伪造入库、出库、预留、调拨或调整事实。',
+    sourceRefs: [
+      'inventory_txns',
+      'inventory_balances',
+      'inventory_lots',
+      'stock_reservations',
+    ],
+    currentScope: [
+      '库存余额',
+      '已预留 / 可用量只读',
+      '库存批次',
+      '库存流水',
+      '盘点 / 调整边界',
+    ],
   },
   {
     key: 'processing-contracts',
@@ -329,19 +362,28 @@ export const businessModuleDefinitions = Object.freeze([
     title: '委外订单',
     path: '/erp/purchase/processing-contracts',
     shortLabel: '委外',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '委外订单承接外发加工安排、合同打印和回货协同；委外发料 / 回货事实后续单独评审。',
-    primaryEntity: 'outsourcing_orders（后续评审）',
-    factSource: 'workflow_tasks / print templates 当前承载，委外事实待评审',
+      '委外订单维护加工合同源单、工序明细、加工厂承诺和打印快照；发料、回货、质检、应付仍由对应事实 usecase 承接。',
+    primaryEntity: 'outsourcing_orders / outsourcing_order_items',
+    factSource:
+      'outsourcing_orders, outsourcing_order_items, processes, suppliers, products',
     boundary:
-      '委外合同和任务不等于发料、回货、库存或应付事实；合同打印快照不替代结算事实。',
-    sourceRefs: ['suppliers', 'workflow_tasks', 'print templates'],
+      '加工合同确认只表示委外承诺已确认，不自动写库存流水、质检结果、应付、发票、付款或 Workflow 完成；委外发料 / 回货事实继续由 operational facts 内部入口承接。',
+    sourceRefs: [
+      'outsourcing_orders',
+      'outsourcing_order_items',
+      'processes',
+      'suppliers',
+      'products',
+      'outsourcing_facts',
+    ],
     currentScope: [
-      '委外供应商',
-      '加工内容',
-      '交期和合同状态',
-      '发料 / 回货追溯',
+      '加工合同源单',
+      '工序明细',
+      '草稿 / 提交 / 确认 / 关闭 / 取消状态',
+      '加工合同打印带值',
+      '委外发料 / 回货事实边界',
     ],
   },
   {
@@ -369,18 +411,19 @@ export const businessModuleDefinitions = Object.freeze([
     title: '生产进度',
     path: '/erp/production/progress',
     shortLabel: '进度',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '生产进度用于跟进过程状态和上报计划；上报不等于库存、出货或财务事实。',
-    primaryEntity: 'production_progress（后续评审）',
-    factSource: 'workflow_tasks / operational facts 当前承载，生产事实待评审',
+      '生产进度当前接入生产发料、成品入库和返工事实；页面只提交事实动作。',
+    primaryEntity: 'production_facts',
+    factSource: 'production_facts, inventory_txns',
     boundary:
-      '进度回填是过程状态，不自动写成品入库、库存扣减、出货或应收事实。',
-    sourceRefs: ['workflow_tasks', 'operational facts', 'sales_orders'],
+      '生产进度事实不从 Workflow 任务完成自动生成；生产排程和异常仍属于协同层，不自动写出货、应收或发票事实。',
+    sourceRefs: ['production_facts', 'inventory_txns', 'workflow_tasks'],
     currentScope: [
-      '开工 / 进行中 / 完工视图',
-      '异常回填',
-      '生产经理和 PMC 跟进',
+      '生产发料 MATERIAL_ISSUE',
+      '成品入库 FINISHED_GOODS_RECEIPT',
+      '返工 REWORK',
+      '过账写库存流水，取消按后端规则冲正',
     ],
   },
   {
@@ -432,15 +475,24 @@ export const businessModuleDefinitions = Object.freeze([
     title: '出库管理',
     path: '/erp/warehouse/outbound',
     shortLabel: '出库',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '出库管理是库存扣减和发货确认候选入口；真实出库必须由 Inventory / Shipment usecase 控制。',
-    primaryEntity: 'inventory_txns / shipments（后续评审）',
-    factSource: 'inventory_txns 当前为库存事实流水',
+      '出库管理当前承接出货单确认和库存预留处理；只有出货单发货才写库存 OUT。',
+    primaryEntity: 'shipments / shipment_items / stock_reservations',
+    factSource: 'shipments, shipment_items, stock_reservations, inventory_txns',
     boundary:
-      '出库才可能触发库存扣减事实；不能把出货放行或任务完成当成出库事实。',
-    sourceRefs: ['inventory_txns', 'inventory_balances', 'sales_orders'],
-    currentScope: ['待出库', '已出库', '缺料风险', '出库冲正边界'],
+      '出货放行和任务完成不等于出库；库存预留释放 / 消耗不写库存流水，取消已发货才按后端规则写 REVERSAL。',
+    sourceRefs: [
+      'shipments',
+      'shipment_items',
+      'stock_reservations',
+      'inventory_txns',
+    ],
+    currentScope: [
+      '出货单草稿和发货',
+      '库存预留创建 / 释放 / 消耗',
+      '出货取消冲正边界',
+    ],
   },
   {
     key: 'shipments',
@@ -470,17 +522,15 @@ export const businessModuleDefinitions = Object.freeze([
     title: '对账管理',
     path: '/erp/finance/reconciliation',
     shortLabel: '对账',
-    pageKind: 'formal-shell',
-    description: '对账管理承接应收、应付和收付款核对入口；对账不是总账凭证。',
-    primaryEntity: 'finance_facts（后续评审）',
-    factSource: 'finance fact usecase 待评审',
-    boundary: '对账 / 结算不自动写付款、应收、应付、发票或总账事实。',
-    sourceRefs: [
-      'sales_orders',
-      'purchase_receipts',
-      'workflow_business_states',
-    ],
-    currentScope: ['应收核对', '应付核对', '差异处理', '收付款关联记录'],
+    pageKind: 'formal-v1',
+    description:
+      '对账管理当前接入 finance_facts 的 RECONCILIATION 事实，可过账、结清或取消业务对账事实。',
+    primaryEntity: 'finance_facts.RECONCILIATION',
+    factSource: 'finance_facts',
+    boundary:
+      '对账事实不自动写付款、应收、应付、发票、总账或会计凭证；差异处理仍需后续细化。',
+    sourceRefs: ['finance_facts'],
+    currentScope: ['对账事实创建', '过账', '结清', '取消'],
   },
   {
     key: 'payables',
@@ -489,15 +539,15 @@ export const businessModuleDefinitions = Object.freeze([
     title: '应付管理',
     path: '/erp/finance/payables',
     shortLabel: '应付',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '应付管理用于采购、委外和费用来源的应付提醒；完整应付事实后续评审。',
-    primaryEntity: 'finance_payables（后续评审）',
-    factSource: 'finance fact usecase 待评审',
+      '应付管理当前接入 finance_facts 的 PAYABLE 事实，可过账、结清或取消应付业务事实。',
+    primaryEntity: 'finance_facts.PAYABLE',
+    factSource: 'finance_facts',
     boundary:
-      '待付款提醒不是付款事实或审批事实，应付来源必须回到采购、委外或对账事实。',
-    sourceRefs: ['purchase_receipts', 'suppliers', 'processing contracts'],
-    currentScope: ['待确认应付', '供应商对账', '付款提醒', '差异说明'],
+      '应付来源必须回到采购、委外或对账事实；当前不代表付款审批、付款流水、总账或费用报销已交付。',
+    sourceRefs: ['finance_facts', 'purchase_receipts', 'outsourcing_facts'],
+    currentScope: ['应付事实创建', '过账', '结清', '取消'],
   },
   {
     key: 'receivables',
@@ -506,19 +556,15 @@ export const businessModuleDefinitions = Object.freeze([
     title: '应收管理',
     path: '/erp/finance/receivables',
     shortLabel: '应收',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '应收管理用于出货后应收确认和开票登记前置视图；完整应收事实后续评审。',
-    primaryEntity: 'finance_receivables（后续评审）',
-    factSource: 'finance fact usecase 待评审',
+      '应收管理当前接入 finance_facts 的 RECEIVABLE 事实，可过账、结清或取消应收业务事实。',
+    primaryEntity: 'finance_facts.RECEIVABLE',
+    factSource: 'finance_facts',
     boundary:
-      '应收至少应在真实 shipped 后评审，不由销售订单、出货放行或任务完成直接生成。',
-    sourceRefs: [
-      'sales_orders',
-      'shipments（后续评审）',
-      'workflow_business_states',
-    ],
-    currentScope: ['待确认应收', '客户对账', '开票状态', '回款风险'],
+      '应收至少应在真实 shipped 后评审，不由销售订单、出货放行或任务完成直接生成；当前不代表收款核销、总账或税控已交付。',
+    sourceRefs: ['finance_facts', 'shipments'],
+    currentScope: ['应收事实创建', '过账', '结清', '取消'],
   },
   {
     key: 'invoices',
@@ -527,18 +573,14 @@ export const businessModuleDefinitions = Object.freeze([
     title: '发票管理',
     path: '/erp/finance/invoices',
     shortLabel: '发票',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '发票管理记录业务开票状态和发票信息；不替代税控、查验或纳税申报。',
-    primaryEntity: 'invoices（后续评审）',
-    factSource: 'finance fact usecase 待评审',
-    boundary: '发票登记是财务业务快照，不提前接入税务平台或复杂会计账簿。',
-    sourceRefs: [
-      'finance receivables/payables（后续评审）',
-      'sales_orders',
-      'suppliers',
-    ],
-    currentScope: ['待开票', '已开票', '异常发票', '发票附件记录'],
+      '发票管理当前接入 finance_facts 的 INVOICE 事实，记录业务开票状态。',
+    primaryEntity: 'finance_facts.INVOICE',
+    factSource: 'finance_facts',
+    boundary: '发票事实不替代税控、发票查验、纳税申报、附件归档或会计凭证。',
+    sourceRefs: ['finance_facts'],
+    currentScope: ['发票事实创建', '过账', '结清', '取消'],
   },
 ])
 
@@ -566,6 +608,9 @@ export function getFormalBusinessShellModules() {
 
 export function getFormalShellFormFieldLabels(moduleKey = '') {
   const key = String(moduleKey || '').trim()
+  if (businessModuleMap.get(key)?.pageKind !== 'formal-shell') {
+    return []
+  }
   return [...(formalShellFormFieldLabelsByModuleKey[key] || [])]
 }
 

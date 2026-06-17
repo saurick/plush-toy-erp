@@ -43,6 +43,7 @@ func (Unit) Edges() []ent.Edge {
 		edge.To("inventory_txns", InventoryTxn.Type),
 		edge.To("inventory_balances", InventoryBalance.Type),
 		edge.To("bom_items", BOMItem.Type),
+		edge.To("outsourcing_order_items", OutsourcingOrderItem.Type),
 		edge.To("purchase_order_items", PurchaseOrderItem.Type),
 		edge.To("purchase_receipt_items", PurchaseReceiptItem.Type),
 		edge.To("purchase_return_items", PurchaseReturnItem.Type),

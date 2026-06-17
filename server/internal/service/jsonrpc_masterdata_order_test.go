@@ -20,6 +20,7 @@ type stubMasterDataJSONRPCRepo struct {
 	supplierExists bool
 	productActive  bool
 	unitActive     bool
+	createdProcess *biz.ProcessMutation
 	createdProduct *biz.ProductMutation
 	createdSKU     *biz.ProductSKUMutation
 	createdContact *biz.ContactMutation
@@ -98,6 +99,24 @@ func (s *stubMasterDataJSONRPCRepo) UnitIsActive(context.Context, int) (bool, er
 		return false, biz.ErrUnitNotFound
 	}
 	return true, nil
+}
+func (s *stubMasterDataJSONRPCRepo) CreateProcess(_ context.Context, in *biz.ProcessMutation) (*biz.Process, error) {
+	s.createdProcess = in
+	return &biz.Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, SortOrder: in.SortOrder, Note: in.Note, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+}
+func (s *stubMasterDataJSONRPCRepo) UpdateProcess(_ context.Context, id int, in *biz.ProcessMutation) (*biz.Process, error) {
+	return &biz.Process{ID: id, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, SortOrder: in.SortOrder, Note: in.Note, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+}
+func (s *stubMasterDataJSONRPCRepo) GetProcess(_ context.Context, id int) (*biz.Process, error) {
+	category := "委外"
+	return &biz.Process{ID: id, Code: "PROC-001", Name: "车缝", Category: &category, OutsourcingEnabled: true, InhouseEnabled: false, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+}
+func (s *stubMasterDataJSONRPCRepo) ListProcesses(context.Context, biz.MasterDataFilter) ([]*biz.Process, int, error) {
+	category := "委外"
+	return []*biz.Process{{ID: 1, Code: "PROC-001", Name: "车缝", Category: &category, OutsourcingEnabled: true, InhouseEnabled: false, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
+}
+func (s *stubMasterDataJSONRPCRepo) SetProcessActive(_ context.Context, id int, active bool) (*biz.Process, error) {
+	return &biz.Process{ID: id, Code: "PROC-001", Name: "车缝", OutsourcingEnabled: true, IsActive: active, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) ProductIsActive(context.Context, int) (bool, error) {
 	if !s.productActive {
@@ -380,6 +399,54 @@ func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.
 	}
 	if okRes == nil || okRes.Code != errcode.OK.Code {
 		t.Fatalf("expected OK, got %#v", okRes)
+	}
+}
+
+func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *testing.T) {
+	params := mustJSONRPCStruct(t, map[string]any{
+		"code":                " PROC-SEW ",
+		"name":                " 车缝 ",
+		"category":            " 委外车缝 ",
+		"outsourcing_enabled": true,
+		"inhouse_enabled":     false,
+		"quality_required":    true,
+		"sort_order":          float64(20),
+	})
+
+	j := newMasterDataJSONRPCTestData(
+		&stubMasterDataJSONRPCRepo{},
+		workflowJSONRPCAdmin([]string{biz.ProductionRoleKey}, biz.PermissionProcessRead),
+	)
+	_, deniedRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_process", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if deniedRes == nil || deniedRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected permission denied, got %#v", deniedRes)
+	}
+
+	repo := &stubMasterDataJSONRPCRepo{}
+	j = newMasterDataJSONRPCTestData(
+		repo,
+		workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionProcessCreate),
+	)
+	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_process", "2", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if okRes == nil || okRes.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", okRes)
+	}
+	if repo.createdProcess == nil ||
+		repo.createdProcess.Code != "PROC-SEW" ||
+		repo.createdProcess.Name != "车缝" ||
+		repo.createdProcess.Category == nil ||
+		*repo.createdProcess.Category != "委外车缝" ||
+		repo.createdProcess.OutsourcingEnabled != true ||
+		repo.createdProcess.InhouseEnabled != false ||
+		repo.createdProcess.QualityRequired != true ||
+		repo.createdProcess.SortOrder != 20 {
+		t.Fatalf("unexpected process mutation %#v", repo.createdProcess)
 	}
 }
 

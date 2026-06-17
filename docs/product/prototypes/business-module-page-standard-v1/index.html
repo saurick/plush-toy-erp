@@ -169,6 +169,7 @@
       .workbench {
         display: grid;
         gap: 12px;
+        overflow: visible;
         padding: 14px 16px 12px;
       }
 
@@ -295,6 +296,51 @@
         border-color: #d8dde3;
         background: #f5f6f7;
         color: var(--disabled);
+      }
+
+      .status-action-menu {
+        position: relative;
+        display: inline-flex;
+      }
+
+      .status-action-popover {
+        position: absolute;
+        z-index: 6;
+        top: calc(100% + 6px);
+        right: 0;
+        display: grid;
+        min-width: 132px;
+        gap: 3px;
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        background: var(--panel);
+        box-shadow: var(--shadow);
+        padding: 6px;
+      }
+
+      .status-action-popover strong {
+        padding: 2px 8px 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .status-action-popover button {
+        justify-content: flex-start;
+        min-height: 30px;
+        border: 0;
+        border-radius: 8px;
+        background: transparent;
+        color: var(--text);
+        padding: 0 8px;
+        text-align: left;
+      }
+
+      .status-action-popover button.danger {
+        color: var(--red);
+      }
+
+      .selection-row:not(.has-selection) .status-action-popover {
+        display: none;
       }
 
       .selection-row {
@@ -794,7 +840,14 @@
               <button class="btn link small" id="clearSelection">清空已选</button>
               <button class="btn small action-button">编辑</button>
               <button class="btn small action-button">关联表格 ⌄</button>
-              <button class="btn small action-button">流转 ⌄</button>
+              <div class="status-action-menu" aria-label="更多操作下拉示意">
+                <button class="btn small action-button" type="button">更多操作 ⌄</button>
+                <div class="status-action-popover" role="menu" aria-label="状态变更">
+                  <strong>状态变更</strong>
+                  <button type="button" role="menuitem">关闭</button>
+                  <button class="danger" type="button" role="menuitem">取消</button>
+                </div>
+              </div>
               <button class="btn small action-button">复制</button>
               <button class="btn small primary action-button">生成入库通知</button>
               <button class="btn small action-button">打印采购合同</button>

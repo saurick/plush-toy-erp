@@ -160,6 +160,7 @@ export const yoyoosunImportConfig = Object.freeze({
         "units",
         "products",
         "materials",
+        "processes",
         "suppliers",
         "contacts",
         "bom",
@@ -180,13 +181,14 @@ export const yoyoosunImportConfig = Object.freeze({
         "units",
         "products",
         "materials",
+        "processes",
         "suppliers",
         "contacts",
         "bom",
       ]),
       productCoreImpact: "none",
       guardrail:
-        "单位先标准化；联系人必须先匹配 owner；BOM 必须在 product/material/unit 唯一匹配后才可进入后续候选。",
+        "单位先标准化；联系人必须先匹配 owner；工序只作为可扩展主数据候选；BOM 必须在 product/material/unit 唯一匹配后才可进入后续候选。",
     },
     {
       id: "YOYOOSUN-CFG-006",
@@ -195,10 +197,10 @@ export const yoyoosunImportConfig = Object.freeze({
       classification: "deferred_runtime",
       decision: "deferred",
       source: "docs/customers/yoyoosun/导入试跑工具说明.md",
-      appliesTo: Object.freeze(["purchase_orders", "outsourcing"]),
+      appliesTo: Object.freeze(["processes", "purchase_orders", "outsourcing"]),
       productCoreImpact: "none",
       guardrail:
-        "采购订单和委外源单据当前只保留 source snapshot 和字段映射，不创建采购订单 runtime，不写库存、委外或应付事实。",
+        "工序可作为 processes 主数据候选；采购订单和委外源单据当前只保留 source snapshot 和字段映射，不创建采购订单 runtime，不写库存、委外或应付事实。",
     },
     {
       id: "YOYOOSUN-CFG-007",
@@ -315,7 +317,7 @@ export const yoyoosunImportConfig = Object.freeze({
     {
       key: "outsourcing_summary",
       label: "委外加工汇总线索",
-      domains: Object.freeze(["outsourcing", "suppliers", "products", "units"]),
+      domains: Object.freeze(["outsourcing", "processes", "suppliers", "products", "units"]),
       mappedFields: Object.freeze([
         "委外加工订单号",
         "产品订单编号",
@@ -331,7 +333,8 @@ export const yoyoosunImportConfig = Object.freeze({
         "回货日期",
       ]),
       decision: "deferred",
-      guardrail: "委外汇总当前只做源单据线索，不写 outsourcing_facts 或 finance_facts。",
+      guardrail:
+        "加工项目、工序名称和工序类别可作为 processes 工序档案候选；委外汇总仍不创建委外源单，不写 outsourcing_facts、inventory_txns 或 finance_facts。",
     },
     {
       key: "contract_print_samples",
@@ -365,9 +368,9 @@ export const yoyoosunImportConfig = Object.freeze({
     },
     {
       step: 2,
-      domains: Object.freeze(["products", "materials", "suppliers"]),
+      domains: Object.freeze(["products", "materials", "processes", "suppliers"]),
       decision: "review_required",
-      reason: "产品、材料和供应商可进入主数据候选，但重复名称、厂商简称和加工厂角色必须人工确认。",
+      reason: "产品、材料、工序和供应商可进入主数据候选，但重复名称、工序类别、厂商简称和加工厂角色必须人工确认。",
     },
     {
       step: 3,
@@ -385,7 +388,7 @@ export const yoyoosunImportConfig = Object.freeze({
       step: 5,
       domains: Object.freeze(["purchase_orders", "outsourcing"]),
       decision: "deferred",
-      reason: "采购订单和委外源单据当前仍是 deferred domain；本提取只保留来源快照和字段映射。",
+      reason: "采购订单和委外源单据当前仍是 deferred domain；工序只进入 processes 主数据候选，本提取只保留来源快照和字段映射。",
     },
   ]),
   reviewQueues: Object.freeze([

@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
@@ -43,6 +44,7 @@ type UnitQuery struct {
 	withInventoryTxns                  *InventoryTxnQuery
 	withInventoryBalances              *InventoryBalanceQuery
 	withBomItems                       *BOMItemQuery
+	withOutsourcingOrderItems          *OutsourcingOrderItemQuery
 	withPurchaseOrderItems             *PurchaseOrderItemQuery
 	withPurchaseReceiptItems           *PurchaseReceiptItemQuery
 	withPurchaseReturnItems            *PurchaseReturnItemQuery
@@ -212,6 +214,28 @@ func (_q *UnitQuery) QueryBomItems() *BOMItemQuery {
 			sqlgraph.From(unit.Table, unit.FieldID, selector),
 			sqlgraph.To(bomitem.Table, bomitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, unit.BomItemsTable, unit.BomItemsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOutsourcingOrderItems chains the current query on the "outsourcing_order_items" edge.
+func (_q *UnitQuery) QueryOutsourcingOrderItems() *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(unit.Table, unit.FieldID, selector),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, unit.OutsourcingOrderItemsTable, unit.OutsourcingOrderItemsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -593,6 +617,7 @@ func (_q *UnitQuery) Clone() *UnitQuery {
 		withInventoryTxns:                  _q.withInventoryTxns.Clone(),
 		withInventoryBalances:              _q.withInventoryBalances.Clone(),
 		withBomItems:                       _q.withBomItems.Clone(),
+		withOutsourcingOrderItems:          _q.withOutsourcingOrderItems.Clone(),
 		withPurchaseOrderItems:             _q.withPurchaseOrderItems.Clone(),
 		withPurchaseReceiptItems:           _q.withPurchaseReceiptItems.Clone(),
 		withPurchaseReturnItems:            _q.withPurchaseReturnItems.Clone(),
@@ -670,6 +695,17 @@ func (_q *UnitQuery) WithBomItems(opts ...func(*BOMItemQuery)) *UnitQuery {
 		opt(query)
 	}
 	_q.withBomItems = query
+	return _q
+}
+
+// WithOutsourcingOrderItems tells the query-builder to eager-load the nodes that are connected to
+// the "outsourcing_order_items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UnitQuery) WithOutsourcingOrderItems(opts ...func(*OutsourcingOrderItemQuery)) *UnitQuery {
+	query := (&OutsourcingOrderItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOutsourcingOrderItems = query
 	return _q
 }
 
@@ -839,13 +875,14 @@ func (_q *UnitQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Unit, e
 	var (
 		nodes       = []*Unit{}
 		_spec       = _q.querySpec()
-		loadedTypes = [14]bool{
+		loadedTypes = [15]bool{
 			_q.withMaterials != nil,
 			_q.withProducts != nil,
 			_q.withProductSkus != nil,
 			_q.withInventoryTxns != nil,
 			_q.withInventoryBalances != nil,
 			_q.withBomItems != nil,
+			_q.withOutsourcingOrderItems != nil,
 			_q.withPurchaseOrderItems != nil,
 			_q.withPurchaseReceiptItems != nil,
 			_q.withPurchaseReturnItems != nil,
@@ -913,6 +950,15 @@ func (_q *UnitQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Unit, e
 		if err := _q.loadBomItems(ctx, query, nodes,
 			func(n *Unit) { n.Edges.BomItems = []*BOMItem{} },
 			func(n *Unit, e *BOMItem) { n.Edges.BomItems = append(n.Edges.BomItems, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withOutsourcingOrderItems; query != nil {
+		if err := _q.loadOutsourcingOrderItems(ctx, query, nodes,
+			func(n *Unit) { n.Edges.OutsourcingOrderItems = []*OutsourcingOrderItem{} },
+			func(n *Unit, e *OutsourcingOrderItem) {
+				n.Edges.OutsourcingOrderItems = append(n.Edges.OutsourcingOrderItems, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -1151,6 +1197,36 @@ func (_q *UnitQuery) loadBomItems(ctx context.Context, query *BOMItemQuery, node
 	}
 	query.Where(predicate.BOMItem(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(unit.BomItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UnitID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "unit_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UnitQuery) loadOutsourcingOrderItems(ctx context.Context, query *OutsourcingOrderItemQuery, nodes []*Unit, init func(*Unit), assign func(*Unit, *OutsourcingOrderItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Unit)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(outsourcingorderitem.FieldUnitID)
+	}
+	query.Where(predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(unit.OutsourcingOrderItemsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

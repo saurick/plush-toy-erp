@@ -45,6 +45,17 @@ type CoreDemoWarehouseSeed struct {
 	Type string
 }
 
+type CoreDemoProcessSeed struct {
+	Code               string
+	Name               string
+	Category           string
+	OutsourcingEnabled bool
+	InhouseEnabled     bool
+	QualityRequired    bool
+	SortOrder          int
+	Note               string
+}
+
 type CoreDemoBOMItemSeed struct {
 	MaterialCode string
 	Quantity     string
@@ -68,6 +79,7 @@ type CoreDemoSeedDataset struct {
 	Materials  []CoreDemoMaterialSeed
 	Products   []CoreDemoProductSeed
 	Warehouses []CoreDemoWarehouseSeed
+	Processes  []CoreDemoProcessSeed
 	BOMs       []CoreDemoBOMSeed
 }
 
@@ -77,6 +89,7 @@ type CoreDemoSeedResult struct {
 	MaterialIDs        map[string]int
 	ProductIDs         map[string]int
 	WarehouseIDs       map[string]int
+	ProcessIDs         map[string]int
 	BOMHeaderIDs       map[string]int
 	PrimaryUnitID      int
 	PrimaryProductID   int
@@ -145,6 +158,14 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			{Code: prefix + "-FG-WH", Name: "核心演示成品仓", Type: "FINISHED_GOODS"},
 			{Code: prefix + "-QC-HOLD", Name: "核心演示待检仓", Type: "QC_HOLD"},
 		},
+		Processes: []CoreDemoProcessSeed{
+			{Code: prefix + "-PROC-SEWING", Name: "车缝", Category: "车缝", OutsourcingEnabled: true, SortOrder: 10, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-CUTTING-DIE", Name: "制作刀模", Category: "刀模", OutsourcingEnabled: true, SortOrder: 20, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-CUT-PIECE-IQC", Name: "裁片IQC", Category: "裁片质检", OutsourcingEnabled: true, QualityRequired: true, SortOrder: 30, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-MACHINE-CUTTING", Name: "机裁", Category: "裁片", OutsourcingEnabled: true, SortOrder: 40, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-SILKSCREEN", Name: "丝印", Category: "印刷", OutsourcingEnabled: true, SortOrder: 50, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-LAMINATION", Name: "贴合", Category: "贴合", OutsourcingEnabled: true, SortOrder: 60, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+		},
 		BOMs: []CoreDemoBOMSeed{
 			{
 				ProductCode: productA,
@@ -202,6 +223,7 @@ func SeedCoreDemoData(ctx context.Context, db *sql.DB, dataset CoreDemoSeedDatas
 		MaterialIDs:  map[string]int{},
 		ProductIDs:   map[string]int{},
 		WarehouseIDs: map[string]int{},
+		ProcessIDs:   map[string]int{},
 		BOMHeaderIDs: map[string]int{},
 	}
 
@@ -234,6 +256,13 @@ func SeedCoreDemoData(ctx context.Context, db *sql.DB, dataset CoreDemoSeedDatas
 			return nil, err
 		}
 		result.WarehouseIDs[warehouse.Code] = id
+	}
+	for _, process := range dataset.Processes {
+		id, err := upsertCoreDemoProcess(ctx, tx, process)
+		if err != nil {
+			return nil, err
+		}
+		result.ProcessIDs[process.Code] = id
 	}
 	for _, bom := range dataset.BOMs {
 		productID := result.ProductIDs[bom.ProductCode]
@@ -313,6 +342,11 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 	for _, warehouse := range dataset.Warehouses {
 		if !safeSeedCode(warehouse.Code, prefix) || strings.TrimSpace(warehouse.Name) == "" || strings.TrimSpace(warehouse.Type) == "" {
 			return fmt.Errorf("%w: warehouse %q", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
+		}
+	}
+	for _, process := range dataset.Processes {
+		if !safeSeedCode(process.Code, prefix) || strings.TrimSpace(process.Name) == "" || process.SortOrder < 0 {
+			return fmt.Errorf("%w: process %q", ErrCoreDemoSeedInvalidRecord, process.Code)
 		}
 	}
 	for _, bom := range dataset.BOMs {
@@ -413,6 +447,34 @@ ON CONFLICT (code) DO UPDATE SET
   is_active = TRUE,
   updated_at = NOW()
 RETURNING id`, warehouse.Code, warehouse.Name, warehouse.Type).Scan(&id)
+	return id, err
+}
+
+func upsertCoreDemoProcess(ctx context.Context, tx *sql.Tx, process CoreDemoProcessSeed) (int, error) {
+	var id int
+	err := tx.QueryRowContext(ctx, `
+INSERT INTO processes (code, name, category, outsourcing_enabled, inhouse_enabled, quality_required, sort_order, note, is_active, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, NOW(), NOW())
+ON CONFLICT (code) DO UPDATE SET
+  name = EXCLUDED.name,
+  category = EXCLUDED.category,
+  outsourcing_enabled = EXCLUDED.outsourcing_enabled,
+  inhouse_enabled = EXCLUDED.inhouse_enabled,
+  quality_required = EXCLUDED.quality_required,
+  sort_order = EXCLUDED.sort_order,
+  note = EXCLUDED.note,
+  is_active = TRUE,
+  updated_at = NOW()
+RETURNING id`,
+		process.Code,
+		process.Name,
+		nullString(process.Category),
+		process.OutsourcingEnabled,
+		process.InhouseEnabled,
+		process.QualityRequired,
+		process.SortOrder,
+		nullString(process.Note),
+	).Scan(&id)
 	return id, err
 }
 

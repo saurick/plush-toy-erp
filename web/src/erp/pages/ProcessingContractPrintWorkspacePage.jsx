@@ -34,6 +34,7 @@ import {
   PRINT_WORKSPACE_DRAFT_MODE,
   PRINT_WORKSPACE_ENTRY_SOURCE,
   persistPrintWorkspaceDraftSnapshot,
+  readInitialPrintWorkspaceDraftFromWindowName,
   resolvePrintWorkspaceEntrySource,
   resolvePrintWorkspaceStateID,
   resolvePrintWorkspaceDraftMode,
@@ -120,6 +121,7 @@ async function createAttachmentSnapshot(file) {
 function loadDraft({
   forceFresh = false,
   storageKey = DRAFT_STORAGE_KEY,
+  workspaceStateID = '',
 } = {}) {
   if (typeof window === 'undefined') {
     return createProcessingContractDraft()
@@ -127,6 +129,22 @@ function loadDraft({
 
   if (forceFresh) {
     return createProcessingContractDraft()
+  }
+
+  const initialDraft = readInitialPrintWorkspaceDraftFromWindowName(
+    PROCESSING_CONTRACT_TEMPLATE_KEY,
+    workspaceStateID
+  )
+  if (initialDraft) {
+    const { attachments, lines, ...rest } = initialDraft || {}
+    return {
+      ...createProcessingContractDraft(),
+      ...rest,
+      lines: Array.isArray(lines)
+        ? lines.map((line) => normalizeProcessingLine(line))
+        : createProcessingContractDraft().lines,
+      attachments: normalizeProcessingContractAttachments(attachments),
+    }
   }
 
   try {
@@ -211,6 +229,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     loadDraft({
       forceFresh: resetDraftOnOpen,
       storageKey: draftStorageKey,
+      workspaceStateID,
     })
   )
   const [rowSelectionMode, setRowSelectionMode] = useState(false)
@@ -236,6 +255,7 @@ export default function ProcessingContractPrintWorkspacePage() {
       loadDraft({
         forceFresh: resetDraftOnOpen,
         storageKey: draftStorageKey,
+        workspaceStateID,
       })
     )
     setRowSelectionMode(false)
@@ -248,7 +268,13 @@ export default function ProcessingContractPrintWorkspacePage() {
     setBusyAction('')
     setBusyActionStartedAt(0)
     setToolbarStatus(resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag))
-  }, [draftStorageKey, resetDraftOnOpen, sourceTag, templateKey])
+  }, [
+    draftStorageKey,
+    resetDraftOnOpen,
+    sourceTag,
+    templateKey,
+    workspaceStateID,
+  ])
 
   useEffect(() => {
     persistPrintWorkspaceDraftSnapshot(draftStorageKey, contract)

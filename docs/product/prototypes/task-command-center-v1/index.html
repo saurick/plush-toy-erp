@@ -530,6 +530,7 @@
 
       .drawer-meta span,
       .drawer-action p,
+      .guide-note,
       .step small {
         display: block;
         color: var(--muted);
@@ -538,14 +539,23 @@
 
       .drawer-meta strong,
       .step strong,
-      .drawer-action strong {
+      .drawer-action strong,
+      .guide-note strong {
         display: block;
         overflow-wrap: anywhere;
       }
 
-      .steps {
+      .guide {
+        display: grid;
+        gap: 10px;
+      }
+
+      .guide-steps {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
         overflow: hidden;
         padding: 0;
       }
@@ -573,8 +583,17 @@
         font-weight: 800;
       }
 
-      .drawer-boundary {
+      .guide-note {
+        border: 1px solid var(--line);
+        border-radius: 8px;
         background: var(--tint);
+        margin: 0;
+        padding: 10px;
+        line-height: 1.45;
+      }
+
+      .guide-note strong {
+        display: inline;
       }
 
       .drawer-action {
@@ -624,7 +643,7 @@
         }
 
         .drawer-meta,
-        .steps {
+        .guide-steps {
           grid-template-columns: 1fr;
         }
 
@@ -808,14 +827,13 @@
               <div><span>建议动作</span><strong id="drawerAction">记录阻塞</strong></div>
             </div>
           </section>
-          <section class="drawer-card steps" aria-label="处理步骤">
-            <div class="step"><span>1</span><div><strong>核对上下文</strong><small>确认任务、来源和责任角色。</small></div></div>
-            <div class="step"><span>2</span><div><strong>填写动作</strong><small>完成、阻塞或催办只写任务事件。</small></div></div>
-            <div class="step"><span>3</span><div><strong>回到队列</strong><small>刷新队列，不自动写事实。</small></div></div>
-          </section>
-          <section class="drawer-card drawer-boundary">
-            <strong>Workflow / Fact 边界</strong>
-            <p class="detail-note">完成任务只代表协同闭环；质检判定、入库过账、出货和财务事实必须回到对应领域 usecase。</p>
+          <section class="drawer-card guide" aria-label="处理导引">
+            <div class="guide-steps">
+              <div class="step"><span>1</span><div><strong>核对上下文</strong><small>确认任务、来源和责任角色。</small></div></div>
+              <div class="step"><span>2</span><div><strong>填写动作</strong><small>完成、阻塞或催办只写任务事件。</small></div></div>
+              <div class="step"><span>3</span><div><strong>回到队列</strong><small>刷新队列，不自动写事实。</small></div></div>
+            </div>
+            <p class="guide-note"><strong>Workflow / Fact 边界：</strong>完成任务只代表协同闭环；质检判定、入库过账、出货和财务事实必须回到对应领域 usecase。</p>
           </section>
           <section class="drawer-card drawer-action">
             <div class="drawer-action-head">

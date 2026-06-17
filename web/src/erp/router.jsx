@@ -51,6 +51,21 @@ const V1SalesOrdersPage = lazy(() => import('./pages/V1SalesOrdersPage'))
 const V1PurchaseOrdersPage = lazy(
   () => import('./pages/V1PurchaseOrdersPage.jsx')
 )
+const V1OutsourcingOrdersPage = lazy(
+  () => import('./pages/V1OutsourcingOrdersPage.jsx')
+)
+const V1PurchaseReceiptsPage = lazy(
+  () => import('./pages/V1PurchaseReceiptsPage.jsx')
+)
+const V1QualityInspectionsPage = lazy(
+  () => import('./pages/V1QualityInspectionsPage.jsx')
+)
+const V1InventoryLedgerPage = lazy(
+  () => import('./pages/V1InventoryLedgerPage.jsx')
+)
+const V1OperationalFactPage = lazy(
+  () => import('./pages/V1OperationalFactPage.jsx')
+)
 const BOMVersionsPage = lazy(() => import('./pages/BOMVersionsPage.jsx'))
 const ShipmentsPage = lazy(() => import('./pages/ShipmentsPage.jsx'))
 const FormalBusinessModulePage = lazy(
@@ -80,11 +95,21 @@ const DevTestingPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevTestingPage.jsx'))
   : null
 const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
+const operationalFactV1ModuleKeys = new Set([
+  'production-progress',
+  'outbound',
+  'reconciliation',
+  'payables',
+  'receivables',
+  'invoices',
+])
 const formalBusinessShellModules = getFormalBusinessShellModules().filter(
   (moduleItem) =>
     moduleItem.key !== 'products' &&
     moduleItem.key !== 'material-bom' &&
-    moduleItem.key !== 'accessories-purchase'
+    moduleItem.key !== 'accessories-purchase' &&
+    moduleItem.key !== 'processing-contracts' &&
+    !operationalFactV1ModuleKeys.has(moduleItem.key)
 )
 
 function stripERPRoutePrefix(path = '') {
@@ -332,8 +357,52 @@ export default function ERPRouter() {
             path="purchase/accessories"
             element={<V1PurchaseOrdersPage />}
           />
+          <Route
+            path="warehouse/inbound"
+            element={<V1PurchaseReceiptsPage />}
+          />
+          <Route
+            path="production/quality-inspections"
+            element={<V1QualityInspectionsPage />}
+          />
+          <Route
+            path="warehouse/inventory"
+            element={<V1InventoryLedgerPage />}
+          />
           <Route path="purchase/material-bom" element={<BOMVersionsPage />} />
+          <Route
+            path="engineering/processes"
+            element={<V1MasterDataPage type="processes" />}
+          />
           <Route path="warehouse/shipments" element={<ShipmentsPage />} />
+          <Route
+            path="purchase/processing-contracts"
+            element={<V1OutsourcingOrdersPage />}
+          />
+          <Route
+            path="production/progress"
+            element={<V1OperationalFactPage moduleKey="production-progress" />}
+          />
+          <Route
+            path="warehouse/outbound"
+            element={<V1OperationalFactPage moduleKey="outbound" />}
+          />
+          <Route
+            path="finance/reconciliation"
+            element={<V1OperationalFactPage moduleKey="reconciliation" />}
+          />
+          <Route
+            path="finance/payables"
+            element={<V1OperationalFactPage moduleKey="payables" />}
+          />
+          <Route
+            path="finance/receivables"
+            element={<V1OperationalFactPage moduleKey="receivables" />}
+          />
+          <Route
+            path="finance/invoices"
+            element={<V1OperationalFactPage moduleKey="invoices" />}
+          />
           {formalBusinessShellModules.map((moduleItem) => (
             <Route
               key={moduleItem.key}

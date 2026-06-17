@@ -65,6 +65,14 @@ type QualityInspectionDecision struct {
 	DecisionNote *string
 }
 
+type QualityInspectionFilter struct {
+	Status  string
+	Result  string
+	Keyword string
+	Limit   int
+	Offset  int
+}
+
 func (uc *InventoryUsecase) CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -126,6 +134,17 @@ func (uc *InventoryUsecase) GetQualityInspection(ctx context.Context, id int) (*
 	return uc.repo.GetQualityInspection(ctx, id)
 }
 
+func (uc *InventoryUsecase) ListQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeQualityInspectionFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListQualityInspections(ctx, normalized)
+}
+
 func IsValidQualityInspectionStatus(value string) bool {
 	return corestatus.IsQualityInspectionStatus(value)
 }
@@ -168,6 +187,25 @@ func normalizeQualityInspectionDecision(in QualityInspectionDecision, defaultRes
 	}
 	if in.InspectedAt.IsZero() {
 		in.InspectedAt = time.Now()
+	}
+	return in, nil
+}
+
+func normalizeQualityInspectionFilter(in QualityInspectionFilter) (QualityInspectionFilter, error) {
+	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
+	in.Result = strings.ToUpper(strings.TrimSpace(in.Result))
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.Status != "" && !IsValidQualityInspectionStatus(in.Status) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.Result != "" && !IsValidQualityInspectionResult(in.Result) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+	if in.Offset < 0 {
+		in.Offset = 0
 	}
 	return in, nil
 }

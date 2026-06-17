@@ -12,6 +12,7 @@ type masterDataRepoStub struct {
 	products       map[int]bool
 	units          map[int]bool
 	createdProduct *ProductMutation
+	createdProcess *ProcessMutation
 	createdSKU     *ProductSKUMutation
 	created        *ContactMutation
 	updated        *ContactMutation
@@ -76,6 +77,23 @@ func (s *masterDataRepoStub) UnitIsActive(_ context.Context, id int) (bool, erro
 		return false, ErrUnitNotFound
 	}
 	return s.units[id], nil
+}
+func (s *masterDataRepoStub) CreateProcess(_ context.Context, in *ProcessMutation) (*Process, error) {
+	cp := *in
+	s.createdProcess = &cp
+	return &Process{ID: 1, Code: in.Code, Name: in.Name, Category: in.Category, OutsourcingEnabled: in.OutsourcingEnabled, InhouseEnabled: in.InhouseEnabled, QualityRequired: in.QualityRequired, SortOrder: in.SortOrder, Note: in.Note, IsActive: true}, nil
+}
+func (s *masterDataRepoStub) UpdateProcess(context.Context, int, *ProcessMutation) (*Process, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) GetProcess(context.Context, int) (*Process, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) ListProcesses(context.Context, MasterDataFilter) ([]*Process, int, error) {
+	return nil, 0, nil
+}
+func (s *masterDataRepoStub) SetProcessActive(context.Context, int, bool) (*Process, error) {
+	return nil, nil
 }
 func (s *masterDataRepoStub) ProductIsActive(_ context.Context, id int) (bool, error) {
 	if s.products == nil {
@@ -211,6 +229,21 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	}
 	if _, err := normalizeMaterialMutation(MaterialMutation{Code: "M-001", Name: "PP 棉"}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected missing material unit rejected, got %v", err)
+	}
+	processCategory := " 委外车缝 "
+	processNote := "  "
+	processInput, err := normalizeProcessMutation(ProcessMutation{Code: " PR-001 ", Name: " 车缝 ", Category: &processCategory, SortOrder: -1, Note: &processNote})
+	if err != nil {
+		t.Fatalf("expected process mutation valid, got %v", err)
+	}
+	if processInput.Code != "PR-001" || processInput.Name != "车缝" || processInput.Category == nil || *processInput.Category != "委外车缝" || processInput.SortOrder != 0 {
+		t.Fatalf("expected normalized process, got %#v", processInput)
+	}
+	if processInput.Note != nil {
+		t.Fatalf("expected blank process note cleared, got %#v", processInput.Note)
+	}
+	if _, err := normalizeProcessMutation(ProcessMutation{Code: " ", Name: "车缝"}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected empty process code rejected, got %v", err)
 	}
 	styleNo := "  BEAR-BASE  "
 	customerStyleNo := " "

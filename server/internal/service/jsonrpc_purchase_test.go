@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -12,6 +13,7 @@ import (
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
 )
 
 func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testing.T) {
@@ -169,6 +171,121 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.PurchaseReceiptSourceType), inventorytxn.TxnType(biz.InventoryTxnReversal)).CountX(ctx); count != 1 {
 		t.Fatalf("repeat cancel must keep one reversal txn, got %d", count)
+	}
+}
+
+func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnly(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_purchase_receipt_from_order")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	logger := log.NewStdLogger(io.Discard)
+
+	supplier := client.Supplier.Create().
+		SetCode("SUP-JSONRPC-PO").
+		SetName("采购供应商").
+		SetIsActive(true).
+		SaveX(ctx)
+	purchaseOrderUC := biz.NewPurchaseOrderUsecase(datarepo.NewPurchaseOrderRepo(data, logger))
+	qty := decimal.NewFromInt(12)
+	price := decimal.NewFromFloat(2.5)
+	saved, err := purchaseOrderUC.SavePurchaseOrderWithItems(ctx, 0, &biz.PurchaseOrderMutation{
+		PurchaseOrderNo:  "PO-JSONRPC-RECEIPT",
+		SupplierID:       supplier.ID,
+		SupplierSnapshot: map[string]any{"name": supplier.Name},
+		PurchaseDate:     time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC),
+	}, []*biz.PurchaseOrderItemSaveMutation{
+		{
+			PurchaseOrderItemMutation: biz.PurchaseOrderItemMutation{
+				LineNo:               1,
+				MaterialID:           fixtures.materialID,
+				UnitID:               fixtures.unitID,
+				MaterialCodeSnapshot: inventoryStringPtr("MAT-JSONRPC"),
+				MaterialNameSnapshot: inventoryStringPtr("面料"),
+				PurchasedQuantity:    qty,
+				UnitPrice:            &price,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("save purchase order failed: %v", err)
+	}
+	if _, err := purchaseOrderUC.SubmitPurchaseOrder(ctx, saved.Order.ID); err != nil {
+		t.Fatalf("submit purchase order failed: %v", err)
+	}
+	if _, err := purchaseOrderUC.ApprovePurchaseOrder(ctx, saved.Order.ID); err != nil {
+		t.Fatalf("approve purchase order failed: %v", err)
+	}
+
+	j := newPurchaseJSONRPCTestData(data, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionPurchaseReceiptCreate,
+		biz.PermissionPurchaseReceiptRead,
+		biz.PermissionERPDashboardRead,
+	))
+	_, manualReceiptRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_draft", "manual-receipt", mustJSONRPCStruct(t, map[string]any{
+		"receipt_no":    "PR-FROM-PO-MANUAL",
+		"supplier_name": "采购供应商",
+		"received_at":   "2026-06-17",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err creating manual receipt, got %v", err)
+	}
+	manualReceiptID := jsonRPCInt(t, jsonRPCNestedMap(t, manualReceiptRes, "purchase_receipt"), "id")
+	_, manualLineRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "add_purchase_receipt_item", "manual-line", mustJSONRPCStruct(t, map[string]any{
+		"receipt_id":             float64(manualReceiptID),
+		"material_id":            float64(fixtures.materialID),
+		"warehouse_id":           float64(fixtures.warehouseID),
+		"unit_id":                float64(fixtures.unitID),
+		"purchase_order_item_id": float64(saved.Items[0].ID),
+		"quantity":               "2",
+		"source_line_no":         "stale-client-line",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err adding manual source line, got %v", err)
+	}
+	manualLine := jsonRPCNestedMap(t, manualLineRes, "purchase_receipt_item")
+	if got := manualLine["source_line_no"]; got != "1" {
+		t.Fatalf("expected source_line_no to be overwritten from purchase order line, got %#v", got)
+	}
+
+	_, receiptRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "1", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(saved.Order.ID),
+		"receipt_no":        "PR-FROM-PO-001",
+		"warehouse_id":      float64(fixtures.warehouseID),
+		"received_at":       "2026-06-17",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if receiptRes == nil || receiptRes.Code != errcode.OK.Code {
+		t.Fatalf("expected create from order OK, got %#v", receiptRes)
+	}
+	receipt := jsonRPCNestedMap(t, receiptRes, "purchase_receipt")
+	if status := receipt["status"]; status != biz.PurchaseReceiptStatusDraft {
+		t.Fatalf("expected draft receipt status, got %#v", status)
+	}
+	items, ok := receipt["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected one receipt line, got %#v", receipt["items"])
+	}
+	line := items[0].(map[string]any)
+	if got := jsonRPCInt(t, line, "purchase_order_item_id"); got != saved.Items[0].ID {
+		t.Fatalf("expected purchase order item link %d, got %d", saved.Items[0].ID, got)
+	}
+	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
+		t.Fatalf("create from order must keep inventory untouched before post, got txns=%d", count)
+	}
+
+	_, duplicateRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "2", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(saved.Order.ID),
+		"receipt_no":        "PR-FROM-PO-002",
+		"warehouse_id":      float64(fixtures.warehouseID),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err on duplicate attempt, got %v", err)
+	}
+	if duplicateRes == nil || duplicateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected duplicate attempt rejected, got %#v", duplicateRes)
 	}
 }
 

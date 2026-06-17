@@ -68,12 +68,13 @@ func main() {
 		fail("seed core demo data failed: %v", err)
 	}
 
-	fmt.Printf("core demo seed completed prefix=%s units=%d materials=%d products=%d warehouses=%d bom_headers=%d\n",
+	fmt.Printf("core demo seed completed prefix=%s units=%d materials=%d products=%d warehouses=%d processes=%d bom_headers=%d\n",
 		result.Prefix,
 		len(result.UnitIDs),
 		len(result.MaterialIDs),
 		len(result.ProductIDs),
 		len(result.WarehouseIDs),
+		len(result.ProcessIDs),
 		len(result.BOMHeaderIDs),
 	)
 	fmt.Println("simulated_only=true real_customer_import=false no_business_records=true no_direct_fact_posting=true")
@@ -92,6 +93,7 @@ func main() {
 	printIDs("material", result.MaterialIDs)
 	printIDs("product", result.ProductIDs)
 	printIDs("warehouse", result.WarehouseIDs)
+	printIDs("process", result.ProcessIDs)
 	printIDs("bom_header_by_product", result.BOMHeaderIDs)
 }
 

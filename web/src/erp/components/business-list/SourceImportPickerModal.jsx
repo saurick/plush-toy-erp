@@ -1,8 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { SearchOutlined } from '@ant-design/icons'
-import { Button, Empty, Input, Modal, Table, Tag, Typography } from 'antd'
+import {
+  Button,
+  Empty,
+  Input,
+  Modal,
+  Pagination,
+  Popover,
+  Table,
+  Tag,
+  Typography,
+} from 'antd'
 
 const { Text } = Typography
+const SELECTED_SUMMARY_VISIBLE_LIMIT = 2
 
 function normalizeText(value) {
   return String(value ?? '')
@@ -48,6 +59,13 @@ function defaultSelectedLabel(row = {}) {
   )
 }
 
+function formatPaginationTotal(total, currentPage, pageSize) {
+  if (total <= 0) return '共 0 条'
+  const start = (currentPage - 1) * pageSize + 1
+  const end = Math.min(total, currentPage * pageSize)
+  return `${start}-${end} / 共 ${total} 条`
+}
+
 export default function SourceImportPickerModal({
   open,
   title,
@@ -68,7 +86,7 @@ export default function SourceImportPickerModal({
   onCancel,
   onImport,
   width = 'min(860px, calc(100vw - 96px))',
-  pageSize = 8,
+  pageSize = 5,
 }) {
   const [keyword, setKeyword] = useState('')
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
@@ -135,6 +153,11 @@ export default function SourceImportPickerModal({
     [getKey, getSelectedLabel, selectedRows]
   )
 
+  const pagedRows = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return filteredRows.slice(start, start + pageSize)
+  }, [currentPage, filteredRows, pageSize])
+
   const handleKeywordChange = (event) => {
     setKeyword(event.target.value)
     setCurrentPage(1)
@@ -160,7 +183,7 @@ export default function SourceImportPickerModal({
   const tableColumns = useMemo(() => {
     const baseColumns = columns.map((column) => ({
       ...column,
-      ellipsis: column.ellipsis ?? true,
+      ellipsis: column.ellipsis ?? false,
     }))
     if (typeof getRowDisabledReason !== 'function') {
       return baseColumns
@@ -207,9 +230,6 @@ export default function SourceImportPickerModal({
       }
       footer={
         <div className="erp-source-import-picker__footer">
-          <Text type="secondary">
-            共 <strong>{filteredRows.length}</strong> 条候选
-          </Text>
           <div className="erp-source-import-picker__footer-actions">
             <Button onClick={onCancel}>{cancelText}</Button>
             <Button
@@ -234,54 +254,90 @@ export default function SourceImportPickerModal({
           onChange={handleKeywordChange}
           placeholder={searchPlaceholder}
         />
-        {selectedSummaryItems.length > 0 ? (
-          <div className="erp-source-import-picker__selection">
-            <div className="erp-source-import-picker__selection-items">
-              <Text type="secondary">
-                已选 <strong>{selectedSummaryItems.length}</strong> 条：
-              </Text>
-              {selectedSummaryItems.slice(0, 4).map((item) => (
-                <Tag
-                  className="erp-source-import-picker__selection-tag"
-                  key={item.key}
-                >
-                  {item.label}
-                </Tag>
-              ))}
-              {selectedSummaryItems.length > 4 ? (
-                <Tag className="erp-source-import-picker__selection-tag">
-                  +{selectedSummaryItems.length - 4}
-                </Tag>
-              ) : null}
-            </div>
-            <Button type="link" size="small" onClick={clearSelection}>
-              清空已选
-            </Button>
+        <div className="erp-source-import-picker__selection">
+          <div className="erp-source-import-picker__selection-items">
+            {selectedSummaryItems.length > 0 ? (
+              <>
+                <Text type="secondary">
+                  已选 <strong>{selectedSummaryItems.length}</strong> 条：
+                </Text>
+                {selectedSummaryItems
+                  .slice(0, SELECTED_SUMMARY_VISIBLE_LIMIT)
+                  .map((item) => (
+                    <Tag
+                      className="erp-source-import-picker__selection-tag"
+                      key={item.key}
+                    >
+                      {item.label}
+                    </Tag>
+                  ))}
+                {selectedSummaryItems.length >
+                SELECTED_SUMMARY_VISIBLE_LIMIT ? (
+                  <Popover
+                    trigger={['hover', 'click', 'focus']}
+                    placement="bottomLeft"
+                    destroyOnHidden
+                    overlayClassName="erp-source-import-picker__selected-popover"
+                    content={
+                      <div className="erp-source-import-picker__selected-popover-content">
+                        <Text strong>
+                          已选 {selectedSummaryItems.length} 条
+                        </Text>
+                        <div className="erp-source-import-picker__selected-popover-items">
+                          {selectedSummaryItems.map((item) => (
+                            <Tag
+                              className="erp-source-import-picker__selected-popover-item"
+                              key={item.key}
+                              title={item.label}
+                            >
+                              {item.label}
+                            </Tag>
+                          ))}
+                        </div>
+                      </div>
+                    }
+                  >
+                    <Tag
+                      aria-label={`显示全部已选来源，共 ${selectedSummaryItems.length} 条`}
+                      className="erp-source-import-picker__selection-tag erp-source-import-picker__selection-more"
+                      role="button"
+                      tabIndex={0}
+                    >
+                      {`+${
+                        selectedSummaryItems.length -
+                        SELECTED_SUMMARY_VISIBLE_LIMIT
+                      }`}
+                    </Tag>
+                  </Popover>
+                ) : null}
+              </>
+            ) : (
+              <Text type="secondary">未选择来源</Text>
+            )}
           </div>
-        ) : null}
+          <Button
+            disabled={selectedSummaryItems.length === 0}
+            type="link"
+            size="small"
+            onClick={clearSelection}
+          >
+            清空已选
+          </Button>
+        </div>
         <Table
           rowKey={rowKey}
           size="small"
           loading={loading}
-          dataSource={filteredRows}
+          dataSource={pagedRows}
           columns={tableColumns}
-          pagination={
-            filteredRows.length > pageSize
-              ? {
-                  current: currentPage,
-                  pageSize,
-                  showSizeChanger: false,
-                  showTotal: (total) => `共 ${total} 条`,
-                  onChange: (page) => setCurrentPage(page),
-                }
-              : false
-          }
+          pagination={false}
           locale={{
             emptyText: <Empty description={emptyDescription} />,
           }}
           rowSelection={{
             type: multiple ? 'checkbox' : 'radio',
             selectedRowKeys,
+            preserveSelectedRowKeys: true,
             onChange: updateSelectedRowKeys,
             getCheckboxProps: (row) => ({
               disabled:
@@ -305,6 +361,20 @@ export default function SourceImportPickerModal({
           })}
           scroll={{ x: 760, y: 380 }}
         />
+        <div className="erp-source-import-picker__pagination">
+          <Text type="secondary">
+            {formatPaginationTotal(filteredRows.length, currentPage, pageSize)}
+          </Text>
+          <Pagination
+            current={currentPage}
+            pageSize={pageSize}
+            total={filteredRows.length}
+            hideOnSinglePage={false}
+            showSizeChanger={false}
+            showLessItems
+            onChange={(page) => setCurrentPage(page)}
+          />
+        </div>
       </div>
     </Modal>
   )

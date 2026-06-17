@@ -3,8 +3,10 @@ import React from 'react'
 import {
   CalendarOutlined,
   CheckCircleOutlined,
+  DownOutlined,
   ExclamationCircleOutlined,
   SearchOutlined,
+  UpOutlined,
 } from '@ant-design/icons'
 import {
   Button,
@@ -20,6 +22,11 @@ import {
   Typography,
 } from 'antd'
 import dayjs from 'dayjs'
+import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import WorkflowTaskActionDrawer, {
+  TASK_ACTION_META,
+} from '../workflow/WorkflowTaskActionDrawer.jsx'
 import {
   buildBusinessCollaborationTaskPanelModel,
   getBusinessCollaborationTaskReason,
@@ -30,8 +37,8 @@ import {
 } from '../../utils/businessCollaborationTasks.mjs'
 
 const { Text } = Typography
-const COLLABORATION_PANEL_DEFAULT_HEIGHT = 320
-const COLLABORATION_PANEL_MIN_HEIGHT = 320
+const COLLABORATION_PANEL_DEFAULT_HEIGHT = 260
+const COLLABORATION_PANEL_MIN_HEIGHT = 240
 const COLLABORATION_PANEL_MAX_HEIGHT = 560
 const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 132
@@ -763,6 +770,10 @@ export function CollaborationTaskPanel({
   const [panelMaxHeight, setPanelMaxHeight] = React.useState(
     COLLABORATION_PANEL_MAX_HEIGHT
   )
+  const [actionDrawerTask, setActionDrawerTask] = React.useState(null)
+  const [actionDrawerMode, setActionDrawerMode] = React.useState('')
+  const [actionDrawerReason, setActionDrawerReason] = React.useState('')
+  const [actionDrawerSaving, setActionDrawerSaving] = React.useState(false)
   const tabIDPrefix = React.useId().replace(/:/g, '')
   const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
   const roleLabels = roleLabelMap || new Map()
@@ -831,15 +842,19 @@ export function CollaborationTaskPanel({
       !/^(?:请先|已选择)/u.test(String(selectedRecordLabel).trim())
   )
   const summaryItems = [
-    {
-      key: 'current',
-      label: '当前记录',
-      value: selectedRecordLabel || '未选择',
-      tone: hasFocusedRecord ? 'blue' : 'muted',
-    },
+    ...(hasFocusedRecord
+      ? [
+          {
+            key: 'current',
+            label: '当前',
+            value: selectedRecordLabel,
+            tone: 'blue',
+          },
+        ]
+      : []),
     {
       key: 'todo',
-      label: '本页待办',
+      label: '待办',
       value: taskPanelModel.activeTaskCount,
       tone: taskPanelModel.activeTaskCount > 0 ? 'blue' : 'muted',
     },
@@ -877,6 +892,59 @@ export function CollaborationTaskPanel({
     },
     [activeTabIndex, tabItems]
   )
+  const openActionDrawer = React.useCallback((task, mode) => {
+    setActionDrawerTask(task)
+    setActionDrawerMode(mode)
+    setActionDrawerReason(
+      mode === 'block' ? getBusinessCollaborationTaskReason(task) : ''
+    )
+  }, [])
+  const closeActionDrawer = React.useCallback(() => {
+    setActionDrawerTask(null)
+    setActionDrawerMode('')
+    setActionDrawerReason('')
+  }, [])
+  const submitActionDrawer = React.useCallback(async () => {
+    if (!actionDrawerTask || !actionDrawerMode) return
+    const actionMeta = TASK_ACTION_META[actionDrawerMode]
+    if (!actionMeta) return
+
+    const reason = actionDrawerReason.trim()
+    if (actionMeta.requireReason && !reason) {
+      message.warning(`${actionMeta.title}需要填写原因`)
+      return
+    }
+
+    const actionHandler =
+      actionDrawerMode === 'complete'
+        ? onCompleteTask
+        : actionDrawerMode === 'block'
+          ? onBlockTask
+          : onUrgeTask
+
+    if (!actionHandler) return
+
+    setActionDrawerSaving(true)
+    try {
+      await actionHandler(actionDrawerTask, {
+        actionMode: actionDrawerMode,
+        reason,
+      })
+      closeActionDrawer()
+    } catch (error) {
+      message.error(getActionErrorMessage(error, `${actionMeta.title}失败`))
+    } finally {
+      setActionDrawerSaving(false)
+    }
+  }, [
+    actionDrawerMode,
+    actionDrawerReason,
+    actionDrawerTask,
+    closeActionDrawer,
+    onBlockTask,
+    onCompleteTask,
+    onUrgeTask,
+  ])
   const renderTaskList = (items, emptyText) => {
     if (items.length === 0) {
       return (
@@ -935,7 +1003,7 @@ export function CollaborationTaskPanel({
                 size="small"
                 icon={<CheckCircleOutlined />}
                 loading={taskLoading}
-                onClick={() => onCompleteTask(task)}
+                onClick={() => openActionDrawer(task, 'complete')}
               >
                 完成
               </Button>
@@ -946,7 +1014,7 @@ export function CollaborationTaskPanel({
                 danger
                 icon={<ExclamationCircleOutlined />}
                 disabled={taskLoading}
-                onClick={() => onBlockTask(task)}
+                onClick={() => openActionDrawer(task, 'block')}
               >
                 阻塞
               </Button>
@@ -956,7 +1024,7 @@ export function CollaborationTaskPanel({
                 size="small"
                 loading={String(urgingTaskID || '') === String(task.id)}
                 disabled={taskLoading}
-                onClick={() => onUrgeTask(task)}
+                onClick={() => openActionDrawer(task, 'urge')}
               >
                 催办
               </Button>
@@ -968,124 +1036,124 @@ export function CollaborationTaskPanel({
   }
 
   return (
-    <Card
-      className={joinClassNames(
-        'erp-business-collaboration-task-panel erp-business-module-task-card',
-        expanded ? 'erp-business-collaboration-task-panel--expanded' : ''
-      )}
-      style={
-        expanded
-          ? {
-              '--erp-business-collaboration-panel-height': `${panelHeight}px`,
-            }
-          : undefined
-      }
-    >
-      <div className="erp-business-collaboration-task-panel__body">
-        {expanded ? (
-          <CollaborationPanelResizeHandle
-            height={panelHeight}
-            minHeight={COLLABORATION_PANEL_MIN_HEIGHT}
-            maxHeight={panelMaxHeight}
-            onHeightChange={setPanelHeight}
-          />
-        ) : null}
-        <div className="erp-business-collaboration-task-panel__head erp-business-module-task-card__head">
-          <div className="erp-business-collaboration-task-panel__title-line">
-            <strong>本页协同</strong>
-            <Text type="secondary">
-              只处理 Workflow 任务，不写库存、出货、财务、开票或收付款事实。
-            </Text>
-            <span
-              className="erp-business-collaboration-task-panel__summary"
-              aria-live="polite"
-            >
-              {summaryItems.map((item) => (
-                <span
-                  key={item.key}
-                  className={joinClassNames(
-                    'erp-business-collaboration-task-panel__summary-item',
-                    `erp-business-collaboration-task-panel__summary-item--${item.tone}`
-                  )}
-                >
-                  <Text type="secondary">{item.label}</Text>
-                  <strong>{item.value}</strong>
-                </span>
-              ))}
-            </span>
-          </div>
-          <Space
-            wrap={false}
-            size={[6, 6]}
-            className="erp-business-collaboration-task-panel__actions"
-          >
-            <Tag>{taskPanelModel.totalTaskCount} 个任务</Tag>
-            <Tag color="blue">待办 {taskPanelModel.activeTaskCount}</Tag>
-            <Tag
-              color={taskPanelModel.blockedTaskCount > 0 ? 'red' : 'default'}
-            >
-              阻塞 {taskPanelModel.blockedTaskCount}
-            </Tag>
-            <Button
-              size="small"
-              className="erp-business-collaboration-task-panel__toggle"
-              onClick={() => setExpanded((current) => !current)}
-              aria-expanded={expanded}
-            >
-              {expanded ? '收起' : '展开'}
-            </Button>
-          </Space>
-        </div>
-        {expanded ? (
-          <div className="erp-business-collaboration-task-panel__panel">
-            <div
-              className="erp-business-collaboration-task-panel__tabs"
-              role="tablist"
-              aria-label="本页协同任务分类"
-            >
-              {tabItems.map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  id={`${tabIDPrefix}-${item.key}-tab`}
-                  role="tab"
-                  aria-selected={item.key === activeTab.key}
-                  aria-controls={`${tabIDPrefix}-${item.key}-panel`}
-                  tabIndex={item.key === activeTab.key ? 0 : -1}
-                  className={joinClassNames(
-                    'erp-business-collaboration-task-panel__tab',
-                    item.key === activeTab.key
-                      ? 'erp-business-collaboration-task-panel__tab--active'
-                      : ''
-                  )}
-                  onClick={() => setActiveTaskTab(item.key)}
-                  onKeyDown={handleTabKeyDown}
-                >
-                  <span>{item.label}</span>
-                  <strong>{item.count}</strong>
-                </button>
-              ))}
-            </div>
-            <div className="erp-business-collaboration-task-panel__active-head">
-              <Text strong>{activeTab.label}</Text>
+    <>
+      <Card
+        className={joinClassNames(
+          'erp-business-collaboration-task-panel erp-business-module-task-card',
+          expanded ? 'erp-business-collaboration-task-panel--expanded' : ''
+        )}
+        style={
+          expanded
+            ? {
+                '--erp-business-collaboration-panel-height': `${panelHeight}px`,
+              }
+            : undefined
+        }
+      >
+        <div className="erp-business-collaboration-task-panel__body">
+          {expanded ? (
+            <CollaborationPanelResizeHandle
+              height={panelHeight}
+              minHeight={COLLABORATION_PANEL_MIN_HEIGHT}
+              maxHeight={panelMaxHeight}
+              onHeightChange={setPanelHeight}
+            />
+          ) : null}
+          <div className="erp-business-collaboration-task-panel__head erp-business-module-task-card__head">
+            <div className="erp-business-collaboration-task-panel__title-line">
+              <strong>本页协同</strong>
               <Text type="secondary">
-                {activeTab.key === 'current'
-                  ? selectedRecordLabel || '未选择记录'
-                  : '按当前业务模块读取现有 workflow 任务'}
+                只处理 Workflow 任务，不写库存、出货、财务、开票或收付款事实。
               </Text>
+              <span
+                className="erp-business-collaboration-task-panel__summary"
+                aria-live="polite"
+              >
+                {summaryItems.map((item) => (
+                  <span
+                    key={item.key}
+                    className={joinClassNames(
+                      'erp-business-collaboration-task-panel__summary-item',
+                      `erp-business-collaboration-task-panel__summary-item--${item.tone}`,
+                      `erp-business-collaboration-task-panel__summary-item--${item.key}`
+                    )}
+                  >
+                    <Text type="secondary">{item.label}</Text>
+                    <strong>{item.value}</strong>
+                  </span>
+                ))}
+              </span>
             </div>
-            <div
-              id={activeTabPanelID}
-              className="erp-business-collaboration-task-panel__list erp-business-module-task-list"
-              role="tabpanel"
-              aria-labelledby={activeTabID}
+            <Space
+              wrap={false}
+              size={[6, 6]}
+              className="erp-business-collaboration-task-panel__actions"
             >
-              {renderTaskList(activeTab.items, activeTab.emptyText)}
-            </div>
+              <Button
+                size="small"
+                icon={expanded ? <DownOutlined /> : <UpOutlined />}
+                className="erp-business-collaboration-task-panel__toggle"
+                onClick={() => setExpanded((current) => !current)}
+                aria-expanded={expanded}
+              >
+                {expanded ? '收起' : '展开'}
+              </Button>
+            </Space>
           </div>
-        ) : null}
-      </div>
-    </Card>
+          {expanded ? (
+            <div className="erp-business-collaboration-task-panel__panel">
+              <div
+                className="erp-business-collaboration-task-panel__tabs"
+                role="tablist"
+                aria-label="本页协同任务分类"
+              >
+                {tabItems.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    id={`${tabIDPrefix}-${item.key}-tab`}
+                    role="tab"
+                    aria-selected={item.key === activeTab.key}
+                    aria-controls={`${tabIDPrefix}-${item.key}-panel`}
+                    tabIndex={item.key === activeTab.key ? 0 : -1}
+                    className={joinClassNames(
+                      'erp-business-collaboration-task-panel__tab',
+                      item.key === activeTab.key
+                        ? 'erp-business-collaboration-task-panel__tab--active'
+                        : ''
+                    )}
+                    onClick={() => setActiveTaskTab(item.key)}
+                    onKeyDown={handleTabKeyDown}
+                  >
+                    <span>{item.label}</span>
+                    <strong>{item.count}</strong>
+                  </button>
+                ))}
+              </div>
+              <div
+                id={activeTabPanelID}
+                className="erp-business-collaboration-task-panel__list erp-business-module-task-list"
+                role="tabpanel"
+                aria-labelledby={activeTabID}
+              >
+                {renderTaskList(activeTab.items, activeTab.emptyText)}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </Card>
+      <WorkflowTaskActionDrawer
+        task={actionDrawerTask}
+        actionMode={actionDrawerMode}
+        actionReason={actionDrawerReason}
+        actionSaving={actionDrawerSaving}
+        roleLabelMap={roleLabels}
+        onActionModeChange={setActionDrawerMode}
+        onActionReasonChange={setActionDrawerReason}
+        onClose={closeActionDrawer}
+        onSubmit={submitActionDrawer}
+      />
+    </>
   )
 }
 
