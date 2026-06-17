@@ -660,15 +660,21 @@ export default function V1OutsourcingOrdersPage() {
                 setPagination(DEFAULT_PAGINATION)
               }}
             />
-            <SelectFilter
-              value={dateField}
-              options={DATE_FILTER_OPTIONS}
-              onChange={setDateField}
-            />
             <DateRangeFilter
-              value={dateRange}
-              onChange={(value) => {
-                setDateRange(value)
+              options={DATE_FILTER_OPTIONS}
+              value={dateField}
+              onTypeChange={(value) => {
+                setDateField(value || 'order_date')
+                setPagination(DEFAULT_PAGINATION)
+              }}
+              startValue={dateRange?.[0] || ''}
+              endValue={dateRange?.[1] || ''}
+              onStartChange={(value) => {
+                setDateRange((current) => [value, current?.[1] || ''])
+                setPagination(DEFAULT_PAGINATION)
+              }}
+              onEndChange={(value) => {
+                setDateRange((current) => [current?.[0] || '', value])
                 setPagination(DEFAULT_PAGINATION)
               }}
             />
