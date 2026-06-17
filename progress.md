@@ -101,3 +101,11 @@
 - 验证：目标 ESLint（不带 fix）、`pnpm --dir web css`、`pnpm --dir web test`（321 tests）、相关 `node --test`（44 tests）、`STYLE_L1_SCENARIOS=mobile-tasks-dark,mobile-tasks-browser-back-stays-mobile pnpm --dir web style:l1`、`pnpm --dir web build`、`git diff --check` 均通过。
 - 下一步：若继续治理移动任务端复杂度，优先把 `useMobileRoleTaskActions.js` 的 850 行按业务族拆成 action service/helper；`app.css` 仍是 12572 行级全局样式，应另开 CSS 分批迁移任务。
 - 阻塞/风险：本轮只做前端展示层结构拆分，不改移动任务行为语义；当前工作区有大量非本轮并行改动，本轮未回退、格式化或纳入这些现场。
+
+## 2026-06-17 13:12 CST JSON-RPC service dispatcher 职责拆分
+
+- 完成：将 `server/internal/service/jsonrpc_dispatch.go` 从 1231 行拆为 dispatcher core、auth、guards、helpers、admin、user 六个职责文件；保留 URL / method 分发、登录态、管理员身份、权限码和错误映射仍在 `service` 层，不回退到 `data` 或 `biz`。
+- 完成：同步 `server/internal/service/README.md`，写清各 `jsonrpc_dispatch_*` 文件职责，避免后续新增 RPC 时继续把 auth/admin/user/helper 混回单个 dispatcher 大文件。
+- 验证：`cd server && go test ./internal/service -count=1`、`git diff --check` 通过。
+- 下一步：后续若继续拆，应优先评审 `jsonrpc_masterdata_order.go` 中 masterdata / sales_order / 参数解析 helper 的边界；不要把业务规则从 usecase 搬进 service。
+- 阻塞/风险：本轮是 service 包内函数搬移，不改 schema、migration、RBAC 权限码、JSON-RPC URL / method、业务 usecase、data repo、前端或部署；当前工作区存在非本轮前端 / 原型改动，本轮未回退或纳入这些现场。
