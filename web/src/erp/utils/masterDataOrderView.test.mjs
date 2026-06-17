@@ -5,6 +5,7 @@ import {
   V1_ROUTE_PATHS,
   buildCustomerSnapshot,
   buildMasterDataParams,
+  buildProductParams,
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
   buildSalesOrderItemParams,
@@ -68,6 +69,22 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       category: 'fabric',
       spec: '75D',
       color: '米白',
+      default_unit_id: 2,
+    }
+  )
+
+  assert.deepEqual(
+    buildProductParams({
+      code: ' P001 ',
+      name: ' 毛绒熊 ',
+      style_no: ' BEAR-BASE ',
+      customer_style_no: '',
+      default_unit_id: '2',
+    }),
+    {
+      code: 'P001',
+      name: '毛绒熊',
+      style_no: 'BEAR-BASE',
       default_unit_id: 2,
     }
   )

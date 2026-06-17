@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -38,20 +39,32 @@ type RuntimeAuditEventCreate struct {
 }
 
 type RuntimeAuditEventListFilter struct {
-	Source    string
-	EventType string
-	EventKey  string
-	Limit     int
-	Offset    int
+	Source      string
+	EventType   string
+	EventKey    string
+	ActorKey    string
+	TargetType  string
+	TargetKey   string
+	Keyword     string
+	CreatedFrom time.Time
+	CreatedTo   time.Time
+	Limit       int
+	Offset      int
 }
 
 type RuntimeAuditEvent struct {
-	ID        int
-	EventType string
-	EventKey  string
-	Source    string
-	Payload   map[string]any
-	CreatedAt time.Time
+	ID          int
+	EventType   string
+	EventKey    string
+	Source      string
+	Payload     map[string]any
+	RiskLevel   string
+	ActionLabel string
+	Summary     string
+	ActorKey    string
+	TargetType  string
+	TargetKey   string
+	CreatedAt   time.Time
 }
 
 type RuntimeAuditEventListResult struct {
@@ -240,6 +253,113 @@ func adminAuditRoleSnapshot(role *AdminRole) map[string]any {
 	}
 }
 
+func EnrichRuntimeAuditEvent(event RuntimeAuditEvent) RuntimeAuditEvent {
+	event.ActorKey = auditPayloadActorKey(event.Payload)
+	event.TargetType = auditPayloadTargetValue(event.Payload, "type")
+	event.TargetKey = auditPayloadTargetValue(event.Payload, "key")
+	event.ActionLabel, event.RiskLevel = runtimeAuditActionLabelAndRisk(event.EventKey)
+	event.Summary = runtimeAuditSummary(event)
+	return event
+}
+
+func auditPayloadActorKey(payload map[string]any) string {
+	actor, _ := payload["actor"].(map[string]any)
+	return strings.TrimSpace(anyToString(actor["username"]))
+}
+
+func auditPayloadTargetValue(payload map[string]any, key string) string {
+	target, _ := payload["target"].(map[string]any)
+	return strings.TrimSpace(anyToString(target[key]))
+}
+
+func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
+	switch strings.TrimSpace(eventKey) {
+	case "admin_user.create":
+		return "新建管理员", "warning"
+	case "admin_user.roles.set":
+		return "账号角色变更", "warning"
+	case "admin_user.phone.set":
+		return "账号手机号变更", "normal"
+	case "admin_user.disabled.set":
+		return "账号启停变更", "high"
+	case "admin_user.password.reset":
+		return "密码重置", "high"
+	case "role.permissions.set":
+		return "角色权限变更", "high"
+	case "admin_bootstrap.completed":
+		return "初始化完成", "normal"
+	case "admin_bootstrap.blocked":
+		return "初始化阻止", "high"
+	default:
+		if strings.TrimSpace(eventKey) == "" {
+			return "未知动作", "normal"
+		}
+		return strings.TrimSpace(eventKey), "normal"
+	}
+}
+
+func runtimeAuditSummary(event RuntimeAuditEvent) string {
+	actor := event.ActorKey
+	if actor == "" {
+		actor = "-"
+	}
+	target := event.TargetKey
+	if target == "" {
+		target = "-"
+	}
+	after, _ := event.Payload["after"].(map[string]any)
+	switch event.EventKey {
+	case "admin_user.password.reset":
+		return actor + " 重置了 " + target + " 的密码"
+	case "admin_user.disabled.set":
+		if boolValue(after["disabled"]) {
+			return actor + " 禁用了 " + target
+		}
+		return actor + " 恢复了 " + target
+	case "admin_user.roles.set":
+		return actor + " 调整了 " + target + " 的账号角色"
+	case "role.permissions.set":
+		return actor + " 调整了 " + target + " 的角色权限"
+	case "admin_bootstrap.blocked":
+		if reason := strings.TrimSpace(anyToString(event.Payload["reason"])); reason != "" {
+			return "启动初始化被阻止：" + reason
+		}
+		return "启动初始化被阻止"
+	default:
+		if actor == "-" && target == "-" {
+			return event.ActionLabel
+		}
+		if target == "-" {
+			return actor + " 执行了 " + event.ActionLabel
+		}
+		return actor + " 对 " + target + " 执行了 " + event.ActionLabel
+	}
+}
+
+func anyToString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case fmt.Stringer:
+		return typed.String()
+	case nil:
+		return ""
+	default:
+		return fmt.Sprintf("%v", typed)
+	}
+}
+
+func boolValue(value any) bool {
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case string:
+		return strings.EqualFold(strings.TrimSpace(typed), "true")
+	default:
+		return false
+	}
+}
+
 func (uc *AdminManageUsecase) ListRuntimeAuditEvents(
 	ctx context.Context,
 	filter RuntimeAuditEventListFilter,
@@ -247,7 +367,14 @@ func (uc *AdminManageUsecase) ListRuntimeAuditEvents(
 	if _, err := uc.requireActiveAdmin(ctx); err != nil {
 		return RuntimeAuditEventListResult{}, err
 	}
-	return uc.repo.ListRuntimeAuditEvents(ctx, filter)
+	result, err := uc.repo.ListRuntimeAuditEvents(ctx, filter)
+	if err != nil {
+		return RuntimeAuditEventListResult{}, err
+	}
+	for i := range result.Events {
+		result.Events[i] = EnrichRuntimeAuditEvent(result.Events[i])
+	}
+	return result, nil
 }
 
 func (uc *AdminManageUsecase) List(ctx context.Context) (list []*AdminUser, err error) {

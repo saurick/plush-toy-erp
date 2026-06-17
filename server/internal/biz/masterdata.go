@@ -63,6 +63,18 @@ type Material struct {
 	UpdatedAt     time.Time
 }
 
+type Product struct {
+	ID              int
+	Code            string
+	Name            string
+	StyleNo         *string
+	CustomerStyleNo *string
+	DefaultUnitID   int
+	IsActive        bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 type ProductSKU struct {
 	ID               int
 	ProductID        int
@@ -120,6 +132,14 @@ type MaterialMutation struct {
 	Spec          *string
 	Color         *string
 	DefaultUnitID int
+}
+
+type ProductMutation struct {
+	Code            string
+	Name            string
+	StyleNo         *string
+	CustomerStyleNo *string
+	DefaultUnitID   int
 }
 
 type ProductSKUMutation struct {
@@ -192,6 +212,11 @@ type MasterDataRepo interface {
 	SetMaterialActive(ctx context.Context, id int, active bool) (*Material, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
 
+	CreateProduct(ctx context.Context, in *ProductMutation) (*Product, error)
+	UpdateProduct(ctx context.Context, id int, in *ProductMutation) (*Product, error)
+	GetProduct(ctx context.Context, id int) (*Product, error)
+	ListProducts(ctx context.Context, filter MasterDataFilter) ([]*Product, int, error)
+	SetProductActive(ctx context.Context, id int, active bool) (*Product, error)
 	CreateProductSKU(ctx context.Context, in *ProductSKUMutation) (*ProductSKU, error)
 	UpdateProductSKU(ctx context.Context, id int, in *ProductSKUMutation) (*ProductSKU, error)
 	GetProductSKU(ctx context.Context, id int) (*ProductSKU, error)
@@ -350,6 +375,55 @@ func (uc *MasterDataUsecase) SetMaterialActive(ctx context.Context, id int, acti
 	return uc.repo.SetMaterialActive(ctx, id, active)
 }
 
+func (uc *MasterDataUsecase) CreateProduct(ctx context.Context, in *ProductMutation) (*Product, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateProductDefaultUnit(ctx, normalized.DefaultUnitID); err != nil {
+		return nil, err
+	}
+	return uc.repo.CreateProduct(ctx, &normalized)
+}
+
+func (uc *MasterDataUsecase) UpdateProduct(ctx context.Context, id int, in *ProductMutation) (*Product, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeProductMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateProductDefaultUnit(ctx, normalized.DefaultUnitID); err != nil {
+		return nil, err
+	}
+	return uc.repo.UpdateProduct(ctx, id, &normalized)
+}
+
+func (uc *MasterDataUsecase) GetProduct(ctx context.Context, id int) (*Product, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.GetProduct(ctx, id)
+}
+
+func (uc *MasterDataUsecase) ListProducts(ctx context.Context, filter MasterDataFilter) ([]*Product, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	return uc.repo.ListProducts(ctx, normalizeMasterDataFilter(filter))
+}
+
+func (uc *MasterDataUsecase) SetProductActive(ctx context.Context, id int, active bool) (*Product, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.SetProductActive(ctx, id, active)
+}
+
 func (uc *MasterDataUsecase) CreateProductSKU(ctx context.Context, in *ProductSKUMutation) (*ProductSKU, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -484,6 +558,10 @@ func (uc *MasterDataUsecase) validateContactOwner(ctx context.Context, ownerType
 }
 
 func (uc *MasterDataUsecase) validateMaterialDefaultUnit(ctx context.Context, unitID int) error {
+	return uc.validateProductDefaultUnit(ctx, unitID)
+}
+
+func (uc *MasterDataUsecase) validateProductDefaultUnit(ctx context.Context, unitID int) error {
 	if unitID <= 0 {
 		return ErrBadParam
 	}
@@ -551,6 +629,17 @@ func normalizeMaterialMutation(in MaterialMutation) (MaterialMutation, error) {
 	in.Color = normalizeOptionalString(in.Color)
 	if in.Code == "" || in.Name == "" || in.DefaultUnitID <= 0 {
 		return MaterialMutation{}, ErrBadParam
+	}
+	return in, nil
+}
+
+func normalizeProductMutation(in ProductMutation) (ProductMutation, error) {
+	in.Code = strings.TrimSpace(in.Code)
+	in.Name = strings.TrimSpace(in.Name)
+	in.StyleNo = normalizeOptionalString(in.StyleNo)
+	in.CustomerStyleNo = normalizeOptionalString(in.CustomerStyleNo)
+	if in.Code == "" || in.Name == "" || in.DefaultUnitID <= 0 {
+		return ProductMutation{}, ErrBadParam
 	}
 	return in, nil
 }

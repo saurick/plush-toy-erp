@@ -120,6 +120,10 @@
         font-size: 12px;
       }
 
+      body.drawer-open {
+        overflow: hidden;
+      }
+
       .actions {
         display: flex;
         flex-wrap: wrap;
@@ -454,6 +458,154 @@
         background: var(--green);
       }
 
+      .drawer-mask {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        justify-items: end;
+        background: rgb(15 23 42 / 38%);
+      }
+
+      .drawer-mask[hidden] {
+        display: none;
+      }
+
+      .task-drawer {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        width: min(620px, calc(100vw - 24px));
+        height: 100%;
+        border-left: 1px solid var(--line);
+        background: var(--panel);
+        box-shadow: -20px 0 42px rgb(15 23 42 / 18%);
+      }
+
+      .drawer-head,
+      .drawer-foot {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        padding: 14px 16px;
+      }
+
+      .drawer-head {
+        border-bottom: 1px solid var(--line);
+      }
+
+      .drawer-foot {
+        border-top: 1px solid var(--line);
+      }
+
+      .drawer-body {
+        display: grid;
+        gap: 12px;
+        min-height: 0;
+        overflow: auto;
+        background: var(--soft);
+        padding: 14px;
+      }
+
+      .drawer-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+      }
+
+      .drawer-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .drawer-meta div {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--soft);
+        padding: 10px;
+      }
+
+      .drawer-meta span,
+      .drawer-action p,
+      .step small {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .drawer-meta strong,
+      .step strong,
+      .drawer-action strong {
+        display: block;
+        overflow-wrap: anywhere;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        overflow: hidden;
+        padding: 0;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 24px minmax(0, 1fr);
+        gap: 8px;
+        padding: 12px;
+      }
+
+      .step + .step {
+        border-left: 1px solid var(--line);
+      }
+
+      .step > span {
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .drawer-boundary {
+        background: var(--tint);
+      }
+
+      .drawer-action {
+        display: grid;
+        gap: 10px;
+      }
+
+      .drawer-action-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .drawer-mode {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      textarea {
+        min-height: 96px;
+        width: 100%;
+        resize: vertical;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 10px;
+      }
+
       @media (prefers-color-scheme: dark) {
         .topbar {
           background: rgb(24 34 51 / 94%);
@@ -469,6 +621,16 @@
 
         .route-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .drawer-meta,
+        .steps {
+          grid-template-columns: 1fr;
+        }
+
+        .step + .step {
+          border-top: 1px solid var(--line);
+          border-left: 0;
         }
       }
 
@@ -502,6 +664,20 @@
         .route-grid {
           grid-template-columns: 1fr;
         }
+
+        .task-drawer {
+          width: 100vw;
+        }
+
+        .drawer-head,
+        .drawer-foot {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .drawer-foot .btn {
+          width: 100%;
+        }
       }
     </style>
   </head>
@@ -517,7 +693,7 @@
         </div>
         <div class="actions">
           <button class="btn">刷新任务</button>
-          <button class="btn primary">处理当前任务</button>
+          <button class="btn primary" data-open-drawer>处理当前任务</button>
         </div>
       </header>
 
@@ -574,7 +750,7 @@
               </div>
               <p class="detail-note" id="detailBoundary">任务状态只写 Workflow；质检判定、入库过账和库存流水必须回到事实层 usecase。</p>
               <div class="actions">
-                <button class="btn primary">执行建议动作</button>
+                <button class="btn primary" data-open-drawer>执行建议动作</button>
                 <button class="btn">改派</button>
                 <button class="btn text">打开关联对象</button>
               </div>
@@ -610,6 +786,59 @@
           </div>
         </div>
       </main>
+    </div>
+
+    <div class="drawer-mask" id="taskDrawer" hidden>
+      <aside class="task-drawer" aria-label="任务处理抽屉">
+        <header class="drawer-head">
+          <div>
+            <div class="eyebrow">任务处理抽屉 / Side panel</div>
+            <h2 id="drawerTitle">入库异常待确认</h2>
+          </div>
+          <button class="btn" type="button" data-close-drawer>关闭</button>
+        </header>
+        <div class="drawer-body">
+          <section class="drawer-card">
+            <div class="eyebrow">当前任务</div>
+            <h3 id="drawerTask">入库异常待确认</h3>
+            <div class="drawer-meta">
+              <div><span>关联对象</span><strong id="drawerObject">入库通知/检验/入库</strong></div>
+              <div><span>责任角色</span><strong id="drawerRole">品质 / 仓库</strong></div>
+              <div><span>任务状态</span><strong id="drawerStatus">阻塞</strong></div>
+              <div><span>建议动作</span><strong id="drawerAction">记录阻塞</strong></div>
+            </div>
+          </section>
+          <section class="drawer-card steps" aria-label="处理步骤">
+            <div class="step"><span>1</span><div><strong>核对上下文</strong><small>确认任务、来源和责任角色。</small></div></div>
+            <div class="step"><span>2</span><div><strong>填写动作</strong><small>完成、阻塞或催办只写任务事件。</small></div></div>
+            <div class="step"><span>3</span><div><strong>回到队列</strong><small>刷新队列，不自动写事实。</small></div></div>
+          </section>
+          <section class="drawer-card drawer-boundary">
+            <strong>Workflow / Fact 边界</strong>
+            <p class="detail-note">完成任务只代表协同闭环；质检判定、入库过账、出货和财务事实必须回到对应领域 usecase。</p>
+          </section>
+          <section class="drawer-card drawer-action">
+            <div class="drawer-action-head">
+              <div>
+                <div class="eyebrow">当前动作</div>
+                <strong id="drawerModeTitle">标记阻塞</strong>
+              </div>
+              <span class="tag amber" id="drawerModeTag">必须填写原因</span>
+            </div>
+            <p id="drawerModeCopy">写清卡点原因、影响范围和下一责任人。</p>
+            <div class="drawer-mode">
+              <button class="btn primary" type="button" data-mode="done">处理完成</button>
+              <button class="btn" type="button" data-mode="blocked">标记阻塞</button>
+              <button class="btn" type="button" data-mode="urge">催办</button>
+            </div>
+            <textarea id="drawerReason" placeholder="原因、影响范围、下一责任人"></textarea>
+          </section>
+        </div>
+        <footer class="drawer-foot">
+          <button class="btn" type="button" data-close-drawer>取消</button>
+          <button class="btn primary" type="button">提交当前动作</button>
+        </footer>
+      </aside>
     </div>
 
     <script>
@@ -696,6 +925,8 @@
       const list = document.querySelector("#taskList");
       const tabs = [...document.querySelectorAll(".tab")];
       const routes = [...document.querySelectorAll(".route")];
+      const drawer = document.querySelector("#taskDrawer");
+      const drawerReason = document.querySelector("#drawerReason");
 
       function visibleTasks() {
         return tasks.filter((task) => task.filter === activeFilter);
@@ -715,6 +946,12 @@
         setText("#detailStatus", task.status);
         setText("#detailAction", task.action);
         setText("#detailBoundary", task.boundary);
+        setText("#drawerTitle", task.title);
+        setText("#drawerTask", task.title);
+        setText("#drawerObject", task.object);
+        setText("#drawerRole", task.role);
+        setText("#drawerStatus", task.status);
+        setText("#drawerAction", task.action);
         document.querySelector("#detailTag").className = `tag ${task.tag}`;
         routes.forEach((route) => {
           route.dataset.related = String(task.routes.includes(route.dataset.route));
@@ -740,6 +977,29 @@
         });
       }
 
+      function setDrawerMode(mode) {
+        const config = {
+          done: ["处理完成", "确认即可", "任务会进入已完成队列；真实业务事实仍回对应模块。", false],
+          blocked: ["标记阻塞", "必须填写原因", "写清卡点原因、影响范围和下一责任人。", true],
+          urge: ["催办", "必须填写原因", "写清催办对象和需要补齐的事项。", true],
+        }[mode] || ["标记阻塞", "必须填写原因", "写清卡点原因、影响范围和下一责任人。", true];
+        setText("#drawerModeTitle", config[0]);
+        setText("#drawerModeTag", config[1]);
+        setText("#drawerModeCopy", config[2]);
+        drawerReason.hidden = !config[3];
+      }
+
+      function openDrawer() {
+        drawer.hidden = false;
+        document.body.classList.add("drawer-open");
+        setDrawerMode("blocked");
+      }
+
+      function closeDrawer() {
+        drawer.hidden = true;
+        document.body.classList.remove("drawer-open");
+      }
+
       tabs.forEach((tab) => {
         tab.addEventListener("click", () => {
           tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
@@ -748,6 +1008,15 @@
           list.setAttribute("aria-labelledby", tab.id);
           selectTask(visibleTasks()[0] || tasks[0]);
         });
+      });
+      document.querySelectorAll("[data-open-drawer]").forEach((button) => {
+        button.addEventListener("click", openDrawer);
+      });
+      document.querySelectorAll("[data-close-drawer]").forEach((button) => {
+        button.addEventListener("click", closeDrawer);
+      });
+      document.querySelectorAll("[data-mode]").forEach((button) => {
+        button.addEventListener("click", () => setDrawerMode(button.dataset.mode));
       });
 
       updateDetail(tasks[0]);

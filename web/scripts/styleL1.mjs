@@ -202,7 +202,7 @@ const scenarios = [
       await expectHeading(page, '工作台')
       await expectText(page, '优先处理队列')
       await expectText(page, '任务详情')
-      await expectText(page, '业务对象脉搏')
+      await expectText(page, '等待交接')
       await expectNoButton(page, '任务看板')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-dashboard-desktop',
@@ -232,7 +232,7 @@ const scenarios = [
       await expectHeading(page, '任务看板')
       await expectText(page, '待我处理')
       await expectText(page, '阻塞交接')
-      await expectText(page, '当前结果')
+      await expectText(page, '逾期任务')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-task-board-desktop',
       })
@@ -300,18 +300,44 @@ const scenarios = [
         '任务看板角色筛选应写入 URL'
       )
       await expectText(page, '看板跳转测试任务')
+      const navigationCurrentTask = page
+        .locator('.erp-task-center-current')
+        .filter({ hasText: '看板跳转测试任务' })
+        .first()
+      await navigationCurrentTask
+        .getByRole('button', { name: '处理完成', exact: true })
+        .click()
+      const taskDrawer = page.locator('.erp-task-action-drawer')
+      await assertTaskActionDrawerLayout(page, {
+        scenarioName: 'erp-task-board-desktop-complete-drawer',
+        expectedTaskText: '看板跳转测试任务',
+        expectedActionText: '处理完成',
+        expectReasonInput: false,
+      })
+      await taskDrawer.getByRole('button', { name: '返回动作选择' }).click()
+      await taskDrawer.getByRole('button', { name: '标记阻塞' }).click()
+      await assertTaskActionDrawerLayout(page, {
+        scenarioName: 'erp-task-board-desktop-block-drawer',
+        expectedTaskText: '看板跳转测试任务',
+        expectedActionText: '标记阻塞',
+        expectReasonInput: true,
+      })
+      await page.locator('.erp-task-action-drawer .ant-drawer-close').click()
+      await page
+        .locator('.erp-task-action-drawer')
+        .waitFor({ state: 'hidden', timeout: 10_000 })
       const restoredKeyword = await page
         .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
         .inputValue()
       assert.equal(restoredKeyword, 'OUT-DASH-NAV')
-      const taskCenterActions = page.locator('.erp-task-center-actions')
-      const clearFiltersButton = taskCenterActions
+      const taskBoardFilters = page.locator('.erp-task-board-filters')
+      const clearFiltersButton = taskBoardFilters
         .locator('button')
         .filter({ hasText: '清空筛选' })
       assert.equal(
         await clearFiltersButton.count(),
         1,
-        '任务看板清空筛选按钮应只在工具条作用域内命中一次'
+        '任务看板清空筛选按钮应只在筛选区作用域内命中一次'
       )
       assert.equal(
         await clearFiltersButton.isEnabled(),
@@ -382,9 +408,9 @@ const scenarios = [
       await expectText(page, '看板中心')
       await expectHeading(page, '业务看板')
       await expectText(page, '业务对象')
-      await expectText(page, '风险提醒')
-      await expectText(page, '业务状态分布')
-      await expectText(page, '模块健康')
+      await expectText(page, '当前风险')
+      await expectText(page, '状态分布')
+      await expectText(page, '业务对象健康')
       await expectText(page, '记录数')
       await expectNoButton(page, '任务看板')
       await assertNoDuplicatedAdminPageTitle(page, {
@@ -413,9 +439,9 @@ const scenarios = [
       await expectText(page, '毛绒 ERP 管理后台')
       await expectHeading(page, '业务看板')
       await expectText(page, '业务对象')
-      await expectText(page, '模块健康')
-      await expectText(page, '业务状态分布')
-      await expectText(page, '风险提醒')
+      await expectText(page, '业务对象健康')
+      await expectText(page, '状态分布')
+      await expectText(page, '当前风险')
       await assertERPThemeMode(page, {
         scenarioName: 'erp-business-dashboard-dark-desktop',
         expectedMode: 'dark',
@@ -506,7 +532,7 @@ const scenarios = [
       await expectText(page, '工作台')
       await expectText(page, '优先处理队列')
       await expectText(page, '任务详情')
-      await expectText(page, '业务对象脉搏')
+      await expectText(page, '等待交接')
       await expectNoButton(page, '任务看板')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-dashboard-mobile',
@@ -529,7 +555,7 @@ const scenarios = [
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '任务看板')
       await expectText(page, '待我处理')
-      await expectText(page, '当前结果')
+      await expectText(page, '逾期任务')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-task-board-mobile',
       })
@@ -549,7 +575,7 @@ const scenarios = [
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '工作台')
       await expectText(page, '优先处理队列')
-      await expectText(page, '业务对象脉搏')
+      await expectText(page, '等待交接')
       await expectNoButton(page, '任务看板')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-dashboard-dark-desktop',
@@ -642,6 +668,27 @@ const scenarios = [
       await assertDashboardTaskBoardLayout(page, {
         scenarioName: 'erp-task-board-dark-wide-desktop',
       })
+      await page
+        .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
+        .fill('OUT-DASH-WIDE-LAYOUT')
+      await expectText(page, '宽屏重叠回归任务')
+      const wideCurrentTask = page
+        .locator('.erp-task-center-current')
+        .filter({ hasText: '宽屏重叠回归任务' })
+        .first()
+      await wideCurrentTask
+        .getByRole('button', { name: '处理完成', exact: true })
+        .click()
+      await assertTaskActionDrawerLayout(page, {
+        scenarioName: 'erp-task-board-dark-wide-complete-drawer',
+        expectedTaskText: '宽屏重叠回归任务',
+        expectedActionText: '处理完成',
+        expectReasonInput: false,
+      })
+      await page.locator('.erp-task-action-drawer .ant-drawer-close').click()
+      await page
+        .locator('.erp-task-action-drawer')
+        .waitFor({ state: 'hidden', timeout: 10_000 })
       await assertDarkThemeContrast(page, {
         scenarioName: 'erp-task-board-dark-wide-desktop',
         selector: '.erp-admin-shell',
@@ -2254,8 +2301,8 @@ const scenarios = [
       await expectText(page, '超级管理员')
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '业务看板')
-      await expectText(page, '模块健康')
-      await expectText(page, '业务状态分布')
+      await expectText(page, '业务对象健康')
+      await expectText(page, '状态分布')
       await assertNoDuplicatedAdminPageTitle(page, {
         scenarioName: 'erp-business-dashboard-mobile',
       })
@@ -3299,10 +3346,13 @@ const scenarios = [
         waitUntil: 'domcontentloaded',
       })
       await expectHeading(page, '产品档案')
-      await expectButton(page, '新建产品规格')
+      await expectText(page, '产品基础信息')
+      await expectText(page, '产品规格')
+      await expectButton(page, '新建产品')
       await expectText(page, '批量删除')
       await expectText(page, '回收站')
-      await expectText(page, 'SKU-STYLE-L1')
+      await expectText(page, 'PROD-STYLE-L1')
+      await expectText(page, 'BEAR-STYLE')
       await expectText(page, '当前操作')
       await expectText(page, '本页协同')
       await assertBusinessPageRefreshEntrypoint(page, {
@@ -3313,12 +3363,7 @@ const scenarios = [
       })
       await assertBusinessHeaderStatsSingleLine(page, {
         scenarioName: 'business-standard-products',
-        expectedLabels: [
-          '总产品规格',
-          '当前结果',
-          '启用产品规格',
-          '已选产品规格',
-        ],
+        expectedLabels: ['总产品', '当前结果', '启用产品', '已选产品'],
       })
       await verifyBusinessRecycleModal(page, {
         screenshotName: 'business-formal-products-recycle-modal',
@@ -3331,9 +3376,17 @@ const scenarios = [
         ],
       })
       await verifyBusinessModuleColumnOrderDialog(page, {
-        moduleKey: 'product_skus',
+        moduleKey: 'products',
         heading: '产品档案',
       })
+      await page.getByRole('button', { name: '新建产品' }).click()
+      await expectText(page, '新建产品')
+      await expectText(page, '产品编号')
+      await expectText(page, '默认单位 ID')
+      await page.keyboard.press('Escape')
+      await page.getByText('产品规格', { exact: true }).click()
+      await expectButton(page, '新建产品规格')
+      await expectText(page, 'SKU-STYLE-L1')
       await page.getByRole('button', { name: '新建产品规格' }).click()
       await expectText(page, '新建产品规格')
       await expectText(page, 'SKU 编号')
@@ -4270,6 +4323,17 @@ async function installAdminRpcMocks(page) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const product = {
+      id: 1,
+      code: 'PROD-STYLE-L1',
+      name: '样式产品',
+      style_no: 'BEAR-STYLE',
+      customer_style_no: 'CUS-BEAR-STYLE',
+      default_unit_id: 1,
+      is_active: true,
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
     const material = {
       id: 1,
       code: 'MAT-STYLE-L1',
@@ -4294,6 +4358,9 @@ async function installAdminRpcMocks(page) {
         break
       case 'list_contacts_by_owner':
         data = { contacts: [contact], total: 1, limit: 100, offset: 0 }
+        break
+      case 'list_products':
+        data = { products: [product], total: 1, limit: 100, offset: 0 }
         break
       case 'list_product_skus':
         data = { product_skus: [productSKU], total: 1, limit: 100, offset: 0 }
@@ -5424,6 +5491,7 @@ async function assertDashboardMetricInteractionSemantics(
           tagName: node.tagName,
           role: node.getAttribute('role') || '',
           ariaPressed: node.getAttribute('aria-pressed') || '',
+          disabled: Boolean(node.disabled),
           cursor: style.cursor,
           width: rect.width,
           height: rect.height,
@@ -5479,11 +5547,6 @@ async function assertDashboardMetricInteractionSemantics(
         `${scenarioName} 动作指标必须是真实 button: ${JSON.stringify(item)}`
       )
       assert.equal(
-        item.cursor,
-        'pointer',
-        `${scenarioName} 动作指标必须露出 pointer 光标: ${JSON.stringify(item)}`
-      )
-      assert.equal(
         item.iconCount,
         1,
         `${scenarioName} 动作指标必须带进入箭头: ${JSON.stringify(item)}`
@@ -5501,10 +5564,23 @@ async function assertDashboardMetricInteractionSemantics(
         item.height >= 72,
         `${scenarioName} 动作指标高度过低，容易退化成普通统计块: ${JSON.stringify(item)}`
       )
+      if (item.disabled) {
+        assert.notEqual(
+          item.cursor,
+          'pointer',
+          `${scenarioName} 禁用动作指标不应露出可点光标: ${JSON.stringify(item)}`
+        )
+      } else {
+        assert.equal(
+          item.cursor,
+          'pointer',
+          `${scenarioName} 可用动作指标必须露出 pointer 光标: ${JSON.stringify(item)}`
+        )
+      }
     }
     assert(
-      metrics.taskMetrics.some((item) => item.active),
-      `${scenarioName} 动作指标应至少有一个可见选中态: ${JSON.stringify(metrics)}`
+      metrics.taskMetrics.some((item) => !item.disabled),
+      `${scenarioName} 动作指标应至少有一个可用入口: ${JSON.stringify(metrics)}`
     )
   }
 
@@ -5535,10 +5611,9 @@ async function assertDashboardMetricInteractionSemantics(
         'default',
         `${scenarioName} 只读摘要卡必须使用 default 光标: ${JSON.stringify(item)}`
       )
-      assert.equal(
-        item.badgeText,
-        '摘要',
-        `${scenarioName} 只读摘要卡必须露出摘要角标: ${JSON.stringify(item)}`
+      assert(
+        item.badgeText.length > 0,
+        `${scenarioName} 只读摘要卡必须露出用途标签: ${JSON.stringify(item)}`
       )
     }
   }
@@ -6210,6 +6285,10 @@ async function verifySourceImportPicker(
         : null,
       hasTable: Boolean(table),
       hasPagination: Boolean(node.querySelector('.ant-pagination')),
+      selectionTop: node
+        .querySelector('.erp-source-import-picker__selection')
+        ?.getBoundingClientRect?.().top,
+      tableTop: table?.getBoundingClientRect?.().top,
       visibleModalCount: visibleModals,
     }
   })
@@ -6247,6 +6326,22 @@ async function verifySourceImportPicker(
     await selectorControl.click()
     await expectText(page, '已选 1 条')
     await expectText(page, '清空已选')
+    const selectedMetrics = await picker.evaluate((node) => {
+      const selection = node.querySelector(
+        '.erp-source-import-picker__selection'
+      )
+      const table = node.querySelector('.ant-table')
+      return {
+        selectionTop: selection?.getBoundingClientRect().top || 0,
+        tableTop: table?.getBoundingClientRect().top || 0,
+      }
+    })
+    assert(
+      selectedMetrics.selectionTop > 0 &&
+        selectedMetrics.tableTop > 0 &&
+        selectedMetrics.selectionTop < selectedMetrics.tableTop,
+      `${scenarioName} 已选摘要应在表格上方: ${JSON.stringify(selectedMetrics)}`
+    )
     const importButton = picker
       .locator('.erp-source-import-picker__footer-actions .ant-btn-primary')
       .last()
@@ -10536,7 +10631,6 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
     const detailActions = rectOf('.erp-workbench-detail-actions')
     const detailEmpty = rectOf('.erp-workbench-detail-empty')
     const detailEmptyContent = rectOf('.erp-workbench-detail-empty .ant-empty')
-    const objectPulse = rectOf('.erp-workbench-object-pulse')
     const kpis = Array.from(document.querySelectorAll('.erp-workbench-kpi'))
       .map((node) => rectOf(node))
       .filter(Boolean)
@@ -10566,12 +10660,10 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
       detailActions,
       detailEmpty,
       detailEmptyContent,
-      objectPulse,
       kpis,
       roleRows,
       activeRows,
       queueDetailOverlap: overlaps(queuePanel, detailPanel),
-      queuePulseOverlap: overlaps(queuePanel, objectPulse),
     }
   })
 
@@ -10585,14 +10677,12 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
     `${scenarioName} 工作台应保留 3 个判断指标: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.queuePanel?.width > 0 &&
-      metrics.detailPanel?.width > 0 &&
-      metrics.objectPulse?.width > 0,
-    `${scenarioName} 工作台队列、详情和业务对象脉搏应同时可见: ${JSON.stringify(metrics)}`
+    metrics.queuePanel?.width > 0 && metrics.detailPanel?.width > 0,
+    `${scenarioName} 工作台队列和当前任务详情应同时可见: ${JSON.stringify(metrics)}`
   )
   assert(
-    !metrics.queueDetailOverlap && !metrics.queuePulseOverlap,
-    `${scenarioName} 工作台主列与右侧上下文不应重叠: ${JSON.stringify(metrics)}`
+    !metrics.queueDetailOverlap,
+    `${scenarioName} 工作台主列与当前任务详情不应重叠: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.detailHead?.height > 0,
@@ -10768,6 +10858,166 @@ async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
   assert(
     metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 2,
     `${scenarioName} 任务看板产生页面级横向滚动: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertTaskActionDrawerLayout(
+  page,
+  {
+    scenarioName,
+    expectedTaskText,
+    expectedActionText,
+    expectReasonInput = false,
+  }
+) {
+  const drawer = page.locator('.erp-task-action-drawer').filter({
+    hasText: expectedTaskText,
+  })
+  await drawer.waitFor({ state: 'visible', timeout: 10_000 })
+  await expectText(page, expectedActionText)
+  await expectText(page, 'Workflow / Fact 边界')
+
+  const metrics = await page.evaluate(
+    ({ expectedTaskText: taskText }) => {
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return false
+        const rect = node.getBoundingClientRect()
+        const style = window.getComputedStyle(node)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        )
+      }
+      const rectOf = (selectorOrNode) => {
+        const element =
+          typeof selectorOrNode === 'string'
+            ? document.querySelector(selectorOrNode)
+            : selectorOrNode
+        if (!(element instanceof HTMLElement)) return null
+        const rect = element.getBoundingClientRect()
+        const style = window.getComputedStyle(element)
+        return {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+          overflowX: style.overflowX,
+          overflowY: style.overflowY,
+          display: style.display,
+          gridTemplateColumns: style.gridTemplateColumns,
+        }
+      }
+      const drawerElement = Array.from(
+        document.querySelectorAll('.erp-task-action-drawer')
+      )
+        .filter(isVisible)
+        .find((node) => String(node.textContent || '').includes(taskText))
+      const scopeRect = rectOf(drawerElement)
+      const rectInDrawer = (selector) =>
+        drawerElement instanceof HTMLElement
+          ? rectOf(drawerElement.querySelector(selector))
+          : null
+      const summary = rectInDrawer('.erp-task-action-drawer__summary')
+      const metaGrid = rectInDrawer('.erp-task-action-drawer__meta-grid')
+      const steps = rectInDrawer('.erp-task-action-drawer__steps')
+      const boundary = rectInDrawer('.erp-task-action-drawer__boundary')
+      const actionPanel =
+        rectInDrawer('.erp-task-action-drawer__action-panel') ||
+        rectInDrawer('.erp-task-action-drawer__action-prompt')
+      const footer = rectInDrawer('.ant-drawer-footer')
+      const body = rectInDrawer('.ant-drawer-body')
+      const textArea = rectInDrawer('textarea')
+      const metaItems =
+        drawerElement?.querySelectorAll(
+          '.erp-task-action-drawer__meta-grid > div'
+        ).length || 0
+      const stepItems =
+        drawerElement?.querySelectorAll('.erp-task-action-drawer__step')
+          .length || 0
+      const footerButtons =
+        drawerElement?.querySelectorAll(
+          '.erp-task-action-drawer__footer-actions button'
+        ).length || 0
+      return {
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          documentScrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        },
+        scopeRect,
+        summary,
+        metaGrid,
+        steps,
+        boundary,
+        actionPanel,
+        footer,
+        body,
+        textArea,
+        metaItems,
+        stepItems,
+        footerButtons,
+      }
+    },
+    { expectedTaskText }
+  )
+
+  assert(
+    metrics.scopeRect?.width > 0 && metrics.scopeRect?.height > 0,
+    `${scenarioName} 任务处理抽屉不可见: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.scopeRect.width <= Math.min(650, metrics.viewport.width) + 2,
+    `${scenarioName} 任务处理抽屉宽度超出预期: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.summary?.height > 0 &&
+      metrics.metaGrid?.height > 0 &&
+      metrics.steps?.height > 0 &&
+      metrics.boundary?.height > 0 &&
+      metrics.actionPanel?.height > 0 &&
+      metrics.footer?.height > 0,
+    `${scenarioName} 任务处理抽屉缺少关键分区: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.metaItems,
+    4,
+    `${scenarioName} 任务处理抽屉应展示 4 个任务摘要字段: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.stepItems,
+    3,
+    `${scenarioName} 任务处理抽屉应展示 3 个处理步骤: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.footerButtons >= 2,
+    `${scenarioName} 任务处理抽屉底部动作不足: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    Boolean(metrics.textArea),
+    expectReasonInput,
+    `${scenarioName} 原因输入显示状态不符合当前动作: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.summary.right <= metrics.scopeRect.right + 2 &&
+      metrics.metaGrid.right <= metrics.scopeRect.right + 2 &&
+      metrics.steps.right <= metrics.scopeRect.right + 2 &&
+      metrics.boundary.right <= metrics.scopeRect.right + 2 &&
+      metrics.actionPanel.right <= metrics.scopeRect.right + 2,
+    `${scenarioName} 任务处理抽屉内容横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.footer.top >= metrics.body.top &&
+      metrics.footer.bottom <= metrics.scopeRect.bottom + 2,
+    `${scenarioName} 任务处理抽屉底部动作区位置异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 2,
+    `${scenarioName} 打开任务处理抽屉后页面产生横向滚动: ${JSON.stringify(metrics)}`
   )
 }
 

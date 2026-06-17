@@ -5,6 +5,13 @@ function normalizeTaskID(task = {}) {
   return String(task.id || '').trim()
 }
 
+function normalizeTaskSourceID(value) {
+  const text = String(value ?? '').trim()
+  if (!text) return ''
+  const numericValue = Number(text)
+  return Number.isFinite(numericValue) ? String(numericValue) : text
+}
+
 function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
 }
@@ -49,6 +56,36 @@ export function getBusinessCollaborationTaskUrgeMeta(task = {}) {
     urgeCount: isUrged ? urgeCount || 1 : 0,
     lastUrgeReason,
   }
+}
+
+export function filterBusinessCollaborationTasksBySource({
+  tasks = [],
+  sourceType = '',
+  sourceIDs = [],
+} = {}) {
+  const allTasks = Array.isArray(tasks) ? tasks : []
+  const normalizedSourceType = String(sourceType || '').trim()
+  const normalizedSourceIDs = new Set(
+    (Array.isArray(sourceIDs) ? sourceIDs : [sourceIDs])
+      .map(normalizeTaskSourceID)
+      .filter(Boolean)
+  )
+
+  return allTasks.filter((task) => {
+    if (
+      normalizedSourceType &&
+      String(task.source_type || '').trim() !== normalizedSourceType
+    ) {
+      return false
+    }
+    if (
+      normalizedSourceIDs.size > 0 &&
+      !normalizedSourceIDs.has(normalizeTaskSourceID(task.source_id))
+    ) {
+      return false
+    }
+    return true
+  })
 }
 
 export function buildBusinessCollaborationTaskPanelModel({

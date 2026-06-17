@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,9 +18,10 @@ import (
 )
 
 type memAdminManageRepoForData struct {
-	admins    map[int]*biz.AdminUser
-	rolePerms map[string][]string
-	auditLogs []biz.RuntimeAuditEvent
+	admins          map[int]*biz.AdminUser
+	rolePerms       map[string][]string
+	auditLogs       []biz.RuntimeAuditEvent
+	lastAuditFilter biz.RuntimeAuditEventListFilter
 }
 
 func newMemAdminManageRepoForData() *memAdminManageRepoForData {
@@ -265,6 +268,7 @@ func (r *memAdminManageRepoForData) RecordRuntimeAuditEvent(_ context.Context, e
 }
 
 func (r *memAdminManageRepoForData) ListRuntimeAuditEvents(_ context.Context, filter biz.RuntimeAuditEventListFilter) (biz.RuntimeAuditEventListResult, error) {
+	r.lastAuditFilter = filter
 	limit := filter.Limit
 	if limit <= 0 {
 		limit = 50
@@ -284,6 +288,28 @@ func (r *memAdminManageRepoForData) ListRuntimeAuditEvents(_ context.Context, fi
 		if filter.EventKey != "" && event.EventKey != filter.EventKey {
 			continue
 		}
+		if !filter.CreatedFrom.IsZero() && event.CreatedAt.Before(filter.CreatedFrom) {
+			continue
+		}
+		if !filter.CreatedTo.IsZero() && event.CreatedAt.After(filter.CreatedTo) {
+			continue
+		}
+		payloadText := strings.ToLower(anyMapString(event.Payload))
+		if filter.ActorKey != "" && !strings.Contains(payloadText, strings.ToLower(filter.ActorKey)) {
+			continue
+		}
+		if filter.TargetType != "" && !strings.Contains(payloadText, strings.ToLower(filter.TargetType)) {
+			continue
+		}
+		if filter.TargetKey != "" && !strings.Contains(payloadText, strings.ToLower(filter.TargetKey)) {
+			continue
+		}
+		if keyword := strings.ToLower(strings.TrimSpace(filter.Keyword)); keyword != "" {
+			haystack := strings.ToLower(event.EventType + " " + event.EventKey + " " + event.Source + " " + anyMapString(event.Payload))
+			if !strings.Contains(haystack, keyword) {
+				continue
+			}
+		}
 		filtered = append(filtered, event)
 	}
 	end := offset + limit
@@ -299,6 +325,13 @@ func (r *memAdminManageRepoForData) ListRuntimeAuditEvents(_ context.Context, fi
 		Limit:  limit,
 		Offset: offset,
 	}, nil
+}
+
+func anyMapString(value any) string {
+	if value == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", value)
 }
 
 func TestJsonrpcDispatcher_AdminMe_ReturnsERPPreferences(t *testing.T) {
@@ -484,10 +517,14 @@ func TestJsonrpcDispatcher_AdminAuditLogsReturnsEvents(t *testing.T) {
 	repo.auditLogs = append(repo.auditLogs, biz.RuntimeAuditEvent{
 		ID:        1,
 		EventType: "admin_control_plane",
-		EventKey:  "admin_user.create",
+		EventKey:  "admin_user.password.reset",
 		Source:    "admin_manage",
 		Payload: map[string]any{
-			"action": "admin_user.create",
+			"action": "admin_user.password.reset",
+			"actor":  map[string]any{"username": "admin"},
+			"target": map[string]any{"type": "admin_user", "key": "demo_debug"},
+			"before": map[string]any{"password_reset": false},
+			"after":  map[string]any{"password_reset": true},
 		},
 		CreatedAt: now,
 	})
@@ -504,8 +541,14 @@ func TestJsonrpcDispatcher_AdminAuditLogsReturnsEvents(t *testing.T) {
 		Role:     biz.RoleAdmin,
 	})
 	params, _ := structpb.NewStruct(map[string]any{
-		"source": "admin_manage",
-		"limit":  10,
+		"source":       "admin_manage",
+		"actor_key":    "admin",
+		"target_type":  "admin_user",
+		"target_key":   "demo_debug",
+		"keyword":      "password",
+		"created_from": now.Add(-time.Minute).Format(time.RFC3339),
+		"created_to":   now.Add(time.Minute).Format(time.RFC3339),
+		"limit":        10,
 	})
 
 	_, res, err := j.handleAdmin(ctx, "audit_logs", "1", params)
@@ -521,7 +564,24 @@ func TestJsonrpcDispatcher_AdminAuditLogsReturnsEvents(t *testing.T) {
 		t.Fatalf("expected one audit event, got %#v", data["events"])
 	}
 	event, ok := events[0].(map[string]any)
-	if !ok || event["event_key"] != "admin_user.create" {
+	if !ok || event["event_key"] != "admin_user.password.reset" {
 		t.Fatalf("unexpected audit event payload %#v", events[0])
+	}
+	if event["risk_level"] != "high" || event["action_label"] != "密码重置" {
+		t.Fatalf("unexpected audit metadata %#v", event)
+	}
+	if event["summary"] != "admin 重置了 demo_debug 的密码" {
+		t.Fatalf("unexpected audit summary %#v", event["summary"])
+	}
+	if event["actor_key"] != "admin" || event["target_type"] != "admin_user" || event["target_key"] != "demo_debug" {
+		t.Fatalf("unexpected actor target metadata %#v", event)
+	}
+	if repo.lastAuditFilter.ActorKey != "admin" ||
+		repo.lastAuditFilter.TargetType != "admin_user" ||
+		repo.lastAuditFilter.TargetKey != "demo_debug" ||
+		repo.lastAuditFilter.Keyword != "password" ||
+		repo.lastAuditFilter.CreatedFrom.IsZero() ||
+		repo.lastAuditFilter.CreatedTo.IsZero() {
+		t.Fatalf("audit filter was not passed through: %#v", repo.lastAuditFilter)
 	}
 }

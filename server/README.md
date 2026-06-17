@@ -42,7 +42,7 @@
 
 普通 `business` JSON-RPC 域当前只保留业务看板 `dashboard_stats`。旧 `list_records / create_record / update_record / delete_records / restore_record` 已退出运行时，不能恢复为事实或历史快照查询入口。
 
-`masterdata` JSON-RPC 域承载客户、供应商、联系人、材料和 SKU 主数据维护。SKU 使用 `create_product_sku / update_product_sku / get_product_sku / list_product_skus / set_product_sku_active`，只维护产品规格主数据和启停状态，校验归属产品与可选默认单位，不写订单、库存、BOM、生产、出货或财务事实。
+`masterdata` JSON-RPC 域承载客户、供应商、联系人、材料、产品和 SKU 主数据维护。产品基础信息使用 `create_product / update_product / get_product / list_products / set_product_active`，只维护产品编号、名称、款号、默认单位和启停状态，校验默认单位，不写订单、库存、BOM、生产、出货或财务事实。SKU 使用 `create_product_sku / update_product_sku / get_product_sku / list_product_skus / set_product_sku_active`，只维护产品规格主数据和启停状态，校验归属产品与可选默认单位，不写订单、库存、BOM、生产、出货或财务事实。
 
 `sales_order` JSON-RPC 域承载销售订单 Source Document / Business Commitment 主路径。订单表单保存应优先使用 `save_sales_order_with_items`，在一个后端事务中完成订单头创建 / 更新、订单行新增 / 更新以及缺失开放行取消；任一步失败会整体回滚，不由前端串联多个订单行接口拼装一次保存流程。原有 `create_sales_order / update_sales_order / add_sales_order_item / update_sales_order_item / remove_sales_order_item` 仍保留为底层单对象能力，不写库存、出货、预留、财务、发票或收付款事实。
 
@@ -50,7 +50,7 @@
 
 `bom` JSON-RPC 域承载 BOM Version / 工程资料主路径。当前支持 `list_bom_versions / get_bom_version / create_bom_draft / update_bom_draft / add_bom_item / update_bom_item / delete_bom_item / copy_bom_version / activate_bom_version / archive_bom_version`。BOM 草稿可维护头信息和明细；激活会归档同产品旧 `ACTIVE` 版本，已激活 BOM 不允许直接改头或明细，改版应复制新草稿后再激活。该域只维护工程资料，不生成采购需求、采购订单、库存流水、生产任务、成本、应付、发票或付款事实。
 
-`admin` JSON-RPC 域承载后台管理员、角色和权限管理。当前系统控制面审计入口为 `audit_logs`，受 `system.audit.read` 权限控制，只读返回 `runtime_audit_events` 中的启动初始化和账号 / 角色 / 权限变更事件；账号创建、角色绑定、账号启停、重置密码和角色权限变更会追加非敏感 before / after 摘要，不保存密码、token 或密码 hash。该审计表不是采购、库存、质检、出货、财务等业务动作的通用审计事实表。
+`admin` JSON-RPC 域承载后台管理员、角色和权限管理。当前系统控制面审计入口为 `audit_logs`，受 `system.audit.read` 权限控制，只读返回 `runtime_audit_events` 中的启动初始化和账号 / 角色 / 权限变更事件；支持按 `source / event_type / event_key / actor_key / target_type / target_key / keyword / created_from / created_to` 查询，并返回 `risk_level / action_label / summary / actor_key / target_type / target_key` 供前端定位。账号创建、角色绑定、账号启停、重置密码和角色权限变更会追加非敏感 before / after 摘要，不保存密码、token 或密码 hash。该审计表不是采购、库存、质检、出货、财务等业务动作的通用审计事实表。
 
 `operational_fact` JSON-RPC 当前承载生产、委外、出货、库存预留和财务事实的最小运行入口。shipment 主路径复用 `shipments / shipment_items / inventory_txns`，提供：
 

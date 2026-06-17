@@ -53,9 +53,9 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'admin-command-center-v1/index.html',
     readmePath: 'admin-command-center-v1/README.md',
     description:
-      '把工作台收敛为登录后的今日处理台：今日焦点、优先队列、当前处理卡、相关对象快捷入口和交接边界。',
+      '把工作台收敛为登录后的今日处理台：今日焦点、优先队列、当前处理卡、当前任务关联记录入口和交接边界。',
     appliesTo:
-      '后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；相关对象快捷入口不是正式菜单替代表。',
+      '后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；当前任务关联记录入口不是正式菜单替代表。',
   },
   {
     key: 'core-menu-coverage',
@@ -79,7 +79,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'task-command-center-v1/index.html',
     readmePath: 'task-command-center-v1/README.md',
     description:
-      '把任务菜单收敛为职责处理台：待我处理、我发起的、阻塞交接、当前任务详情和关联业务对象。',
+      '把任务菜单收敛为职责处理台：待我处理、我发起的、阻塞交接、当前任务详情、任务处理抽屉和关联业务对象。',
     appliesTo:
       '我的任务、任务看板、异常 / 阻塞闭环、岗位任务端和业务页协同入口可参照；不复制业务菜单树，不把任务完成写成事实过账。',
   },

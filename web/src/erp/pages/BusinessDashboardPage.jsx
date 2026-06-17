@@ -103,19 +103,22 @@ export default function BusinessDashboardPage() {
     () => [
       {
         key: 'totalRecords',
-        title: '业务对象',
+        title: '对象总量',
         value: summary.totalRecords,
+        note: '可进入标准页',
       },
       {
         key: 'activeCount',
         title: '推进中',
         value: summary.activeCount,
+        note: '正在流转',
         color: '#1677ff',
       },
       {
         key: 'blockedCount',
-        title: '阻塞/取消',
+        title: '需处理风险',
         value: summary.blockedCount,
+        note: '优先核对',
         color: '#d4380d',
       },
     ],
@@ -178,7 +181,7 @@ export default function BusinessDashboardPage() {
               业务看板
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
-              按模块看对象状态、风险和标准页入口。
+              看业务对象是否健康，并进入对应标准页处理。
             </Paragraph>
           </div>
         </div>
@@ -191,7 +194,9 @@ export default function BusinessDashboardPage() {
             >
               <div className="erp-metric-readonly-card__head">
                 <Text type="secondary">{item.title}</Text>
-                <span className="erp-metric-readonly-card__badge">摘要</span>
+                <span className="erp-metric-readonly-card__badge">
+                  {item.note}
+                </span>
               </div>
               <strong style={item.color ? { color: item.color } : undefined}>
                 {item.value}
@@ -205,7 +210,7 @@ export default function BusinessDashboardPage() {
       <Card
         className="erp-dashboard-card erp-dashboard-table-card"
         variant="borderless"
-        title="模块健康"
+        title="业务对象健康"
       >
         <Table
           size="middle"
@@ -311,7 +316,7 @@ export default function BusinessDashboardPage() {
         <Card className="erp-dashboard-card" variant="borderless">
           <Space direction="vertical" className="erp-dashboard-block" size={8}>
             <Title level={5} className="erp-dashboard-section-title">
-              业务状态分布
+              状态分布
             </Title>
             <div className="erp-business-board-status-list">
               {dashboardStatusGroups.map((group) => {
@@ -337,7 +342,7 @@ export default function BusinessDashboardPage() {
         <Card className="erp-dashboard-card" variant="borderless">
           <Space direction="vertical" className="erp-dashboard-block" size={8}>
             <Title level={5} className="erp-dashboard-section-title">
-              风险提醒
+              当前风险
             </Title>
             <div className="erp-business-board-alert-grid">
               {workflowAlertGroups.slice(0, 4).map((group) => {

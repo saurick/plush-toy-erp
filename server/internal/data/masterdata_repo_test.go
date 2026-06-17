@@ -159,6 +159,67 @@ func TestMasterDataRepoMaterialCRUDAndUnitGuard(t *testing.T) {
 	}
 }
 
+func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openMasterDataRepoTest(t, "masterdata_repo_products")
+	defer mustCloseEntClient(t, client)
+
+	unitRow, err := client.Unit.Create().SetCode("PCS").SetName("个").Save(ctx)
+	if err != nil {
+		t.Fatalf("create unit failed: %v", err)
+	}
+	styleNo := "BEAR-BASE"
+	customerStyleNo := "CUS-BEAR"
+	product, err := uc.CreateProduct(ctx, &biz.ProductMutation{
+		Code:            "P-001",
+		Name:            "毛绒熊",
+		StyleNo:         &styleNo,
+		CustomerStyleNo: &customerStyleNo,
+		DefaultUnitID:   unitRow.ID,
+	})
+	if err != nil {
+		t.Fatalf("create product failed: %v", err)
+	}
+	if product.DefaultUnitID != unitRow.ID || product.StyleNo == nil || *product.StyleNo != styleNo {
+		t.Fatalf("expected product fields retained, got %#v", product)
+	}
+	if _, err := uc.CreateProduct(ctx, &biz.ProductMutation{Code: "P-001", Name: "重复产品", DefaultUnitID: unitRow.ID}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected duplicate product code rejected, got %v", err)
+	}
+	if _, err := uc.CreateProduct(ctx, &biz.ProductMutation{Code: "P-002", Name: "缺单位", DefaultUnitID: 999999}); !errors.Is(err, biz.ErrUnitNotFound) {
+		t.Fatalf("expected missing unit rejected, got %v", err)
+	}
+
+	updated, err := uc.UpdateProduct(ctx, product.ID, &biz.ProductMutation{
+		Code:          "P-001-A",
+		Name:          "毛绒熊 A",
+		DefaultUnitID: unitRow.ID,
+	})
+	if err != nil {
+		t.Fatalf("update product failed: %v", err)
+	}
+	if updated.StyleNo != nil || updated.CustomerStyleNo != nil {
+		t.Fatalf("expected optional product fields cleared, got %#v", updated)
+	}
+	if _, err := uc.SetProductActive(ctx, product.ID, false); err != nil {
+		t.Fatalf("disable product failed: %v", err)
+	}
+	list, total, err := uc.ListProducts(ctx, biz.MasterDataFilter{Keyword: "毛绒", Limit: 20})
+	if err != nil {
+		t.Fatalf("list products failed: %v", err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("expected one product, total=%d len=%d", total, len(list))
+	}
+	activeList, activeTotal, err := uc.ListProducts(ctx, biz.MasterDataFilter{ActiveOnly: true})
+	if err != nil {
+		t.Fatalf("list active products failed: %v", err)
+	}
+	if activeTotal != 0 || len(activeList) != 0 {
+		t.Fatalf("expected inactive product filtered out, total=%d len=%d", activeTotal, len(activeList))
+	}
+}
+
 func TestMasterDataRepoProductSKUCRUDAndGuards(t *testing.T) {
 	ctx := context.Background()
 	uc, client := openMasterDataRepoTest(t, "masterdata_repo_product_skus")

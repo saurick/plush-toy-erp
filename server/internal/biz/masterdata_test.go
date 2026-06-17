@@ -7,13 +7,14 @@ import (
 )
 
 type masterDataRepoStub struct {
-	customers  map[int]bool
-	suppliers  map[int]bool
-	products   map[int]bool
-	units      map[int]bool
-	createdSKU *ProductSKUMutation
-	created    *ContactMutation
-	updated    *ContactMutation
+	customers      map[int]bool
+	suppliers      map[int]bool
+	products       map[int]bool
+	units          map[int]bool
+	createdProduct *ProductMutation
+	createdSKU     *ProductSKUMutation
+	created        *ContactMutation
+	updated        *ContactMutation
 }
 
 func (s *masterDataRepoStub) CreateCustomer(context.Context, *CustomerMutation) (*Customer, error) {
@@ -84,6 +85,23 @@ func (s *masterDataRepoStub) ProductIsActive(_ context.Context, id int) (bool, e
 		return false, ErrProductNotFound
 	}
 	return s.products[id], nil
+}
+func (s *masterDataRepoStub) CreateProduct(_ context.Context, in *ProductMutation) (*Product, error) {
+	cp := *in
+	s.createdProduct = &cp
+	return &Product{ID: 1, Code: in.Code, Name: in.Name, StyleNo: in.StyleNo, CustomerStyleNo: in.CustomerStyleNo, DefaultUnitID: in.DefaultUnitID, IsActive: true}, nil
+}
+func (s *masterDataRepoStub) UpdateProduct(context.Context, int, *ProductMutation) (*Product, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) GetProduct(context.Context, int) (*Product, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) ListProducts(context.Context, MasterDataFilter) ([]*Product, int, error) {
+	return nil, 0, nil
+}
+func (s *masterDataRepoStub) SetProductActive(context.Context, int, bool) (*Product, error) {
+	return nil, nil
 }
 func (s *masterDataRepoStub) CreateProductSKU(_ context.Context, in *ProductSKUMutation) (*ProductSKU, error) {
 	cp := *in
@@ -194,12 +212,58 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	if _, err := normalizeMaterialMutation(MaterialMutation{Code: "M-001", Name: "PP 棉"}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected missing material unit rejected, got %v", err)
 	}
+	styleNo := "  BEAR-BASE  "
+	customerStyleNo := " "
+	productInput, err := normalizeProductMutation(ProductMutation{Code: " P-001 ", Name: " 毛绒熊 ", StyleNo: &styleNo, CustomerStyleNo: &customerStyleNo, DefaultUnitID: 10})
+	if err != nil {
+		t.Fatalf("expected product mutation valid, got %v", err)
+	}
+	if productInput.Code != "P-001" || productInput.Name != "毛绒熊" || productInput.StyleNo == nil || *productInput.StyleNo != "BEAR-BASE" {
+		t.Fatalf("expected normalized product, got %#v", productInput)
+	}
+	if productInput.CustomerStyleNo != nil {
+		t.Fatalf("expected blank customer style cleared, got %#v", productInput.CustomerStyleNo)
+	}
+	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊"}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected missing product unit rejected, got %v", err)
+	}
 	contactInput, err := normalizeContactMutation(ContactMutation{OwnerType: "supplier", OwnerID: 20, Name: " 联系人 "})
 	if err != nil {
 		t.Fatalf("expected contact mutation valid, got %v", err)
 	}
 	if contactInput.OwnerType != ContactOwnerSupplier || contactInput.Name != "联系人" {
 		t.Fatalf("expected normalized contact, got %#v", contactInput)
+	}
+}
+
+func TestMasterDataUsecaseProductGuardsUnit(t *testing.T) {
+	ctx := context.Background()
+	unitID := 3
+	styleNo := "  BEAR-BASE  "
+	repo := &masterDataRepoStub{units: map[int]bool{unitID: true, 4: false}}
+	uc := NewMasterDataUsecase(repo)
+
+	product, err := uc.CreateProduct(ctx, &ProductMutation{
+		Code:          " P-001 ",
+		Name:          " 毛绒熊 ",
+		StyleNo:       &styleNo,
+		DefaultUnitID: unitID,
+	})
+	if err != nil {
+		t.Fatalf("expected product valid, got %v", err)
+	}
+	if product.Code != "P-001" || repo.createdProduct.StyleNo == nil || *repo.createdProduct.StyleNo != "BEAR-BASE" {
+		t.Fatalf("expected normalized product mutation, got product=%#v mutation=%#v", product, repo.createdProduct)
+	}
+
+	if _, err := uc.CreateProduct(ctx, &ProductMutation{Code: "P-X", Name: "产品", DefaultUnitID: 4}); !errors.Is(err, ErrUnitInactive) {
+		t.Fatalf("expected inactive unit rejected, got %v", err)
+	}
+	if _, err := uc.CreateProduct(ctx, &ProductMutation{Code: "P-X", Name: "产品", DefaultUnitID: 999}); !errors.Is(err, ErrUnitNotFound) {
+		t.Fatalf("expected missing unit rejected, got %v", err)
+	}
+	if _, err := uc.CreateProduct(ctx, &ProductMutation{Name: "产品", DefaultUnitID: unitID}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected empty product code rejected, got %v", err)
 	}
 }
 

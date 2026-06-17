@@ -72,12 +72,16 @@ export default function SourceImportPickerModal({
 }) {
   const [keyword, setKeyword] = useState('')
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
+  const [selectedRowSnapshotsByKey, setSelectedRowSnapshotsByKey] = useState(
+    () => new Map()
+  )
   const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     if (open) {
       setKeyword('')
       setSelectedRowKeys([])
+      setSelectedRowSnapshotsByKey(new Map())
       setCurrentPage(1)
     }
   }, [open])
@@ -105,7 +109,7 @@ export default function SourceImportPickerModal({
   )
 
   const selectedRows = selectedRowKeys
-    .map((key) => rowsByKey.get(String(key)))
+    .map((key) => selectedRowSnapshotsByKey.get(String(key)))
     .filter(Boolean)
 
   useEffect(() => {
@@ -134,6 +138,23 @@ export default function SourceImportPickerModal({
   const handleKeywordChange = (event) => {
     setKeyword(event.target.value)
     setCurrentPage(1)
+  }
+
+  const updateSelectedRowKeys = (nextKeys = []) => {
+    const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
+    setSelectedRowKeys(normalizedKeys)
+    setSelectedRowSnapshotsByKey((current) => {
+      const next = new Map()
+      normalizedKeys.forEach((key) => {
+        const normalizedKey = String(key)
+        const row =
+          rowsByKey.get(normalizedKey) || current.get(normalizedKey) || null
+        if (row) {
+          next.set(normalizedKey, row)
+        }
+      })
+      return next
+    })
   }
 
   const tableColumns = useMemo(() => {
@@ -169,6 +190,7 @@ export default function SourceImportPickerModal({
 
   const clearSelection = () => {
     setSelectedRowKeys([])
+    setSelectedRowSnapshotsByKey(new Map())
   }
 
   return (
@@ -212,52 +234,6 @@ export default function SourceImportPickerModal({
           onChange={handleKeywordChange}
           placeholder={searchPlaceholder}
         />
-        <Table
-          rowKey={rowKey}
-          size="small"
-          loading={loading}
-          dataSource={filteredRows}
-          columns={tableColumns}
-          pagination={
-            filteredRows.length > pageSize
-              ? {
-                  current: currentPage,
-                  pageSize,
-                  showSizeChanger: false,
-                  showTotal: (total) => `共 ${total} 条`,
-                  onChange: (page) => setCurrentPage(page),
-                }
-              : false
-          }
-          locale={{
-            emptyText: <Empty description={emptyDescription} />,
-          }}
-          rowSelection={{
-            type: multiple ? 'checkbox' : 'radio',
-            selectedRowKeys,
-            onChange: setSelectedRowKeys,
-            getCheckboxProps: (row) => ({
-              disabled:
-                typeof isRowDisabled === 'function' && isRowDisabled(row),
-            }),
-          }}
-          rowClassName={(row) =>
-            typeof isRowDisabled === 'function' && isRowDisabled(row)
-              ? 'erp-source-import-picker__row--disabled'
-              : ''
-          }
-          onRow={(row) => ({
-            onClick: () => {
-              if (typeof isRowDisabled === 'function' && isRowDisabled(row)) {
-                return
-              }
-              setSelectedRowKeys((current) =>
-                toggleKey(current, getKey(row), multiple)
-              )
-            },
-          })}
-          scroll={{ x: 760, y: 380 }}
-        />
         {selectedSummaryItems.length > 0 ? (
           <div className="erp-source-import-picker__selection">
             <div className="erp-source-import-picker__selection-items">
@@ -283,6 +259,52 @@ export default function SourceImportPickerModal({
             </Button>
           </div>
         ) : null}
+        <Table
+          rowKey={rowKey}
+          size="small"
+          loading={loading}
+          dataSource={filteredRows}
+          columns={tableColumns}
+          pagination={
+            filteredRows.length > pageSize
+              ? {
+                  current: currentPage,
+                  pageSize,
+                  showSizeChanger: false,
+                  showTotal: (total) => `共 ${total} 条`,
+                  onChange: (page) => setCurrentPage(page),
+                }
+              : false
+          }
+          locale={{
+            emptyText: <Empty description={emptyDescription} />,
+          }}
+          rowSelection={{
+            type: multiple ? 'checkbox' : 'radio',
+            selectedRowKeys,
+            onChange: updateSelectedRowKeys,
+            getCheckboxProps: (row) => ({
+              disabled:
+                typeof isRowDisabled === 'function' && isRowDisabled(row),
+            }),
+          }}
+          rowClassName={(row) =>
+            typeof isRowDisabled === 'function' && isRowDisabled(row)
+              ? 'erp-source-import-picker__row--disabled'
+              : ''
+          }
+          onRow={(row) => ({
+            onClick: () => {
+              if (typeof isRowDisabled === 'function' && isRowDisabled(row)) {
+                return
+              }
+              updateSelectedRowKeys(
+                toggleKey(selectedRowKeys, getKey(row), multiple)
+              )
+            },
+          })}
+          scroll={{ x: 760, y: 380 }}
+        />
       </div>
     </Modal>
   )

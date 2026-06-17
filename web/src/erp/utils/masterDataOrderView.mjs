@@ -192,6 +192,20 @@ export function buildMasterDataParams(values = {}, extra = {}) {
   })
 }
 
+export function buildProductParams(values = {}, extra = {}) {
+  return compactParams({
+    ...extra,
+    code: trimOptional(values.code),
+    name: trimOptional(values.name),
+    style_no: trimOptional(values.style_no),
+    customer_style_no: trimOptional(values.customer_style_no),
+    default_unit_id:
+      values.default_unit_id === undefined
+        ? undefined
+        : Number(values.default_unit_id || 0),
+  })
+}
+
 export function buildProductSKUParams(values = {}, extra = {}) {
   return compactParams({
     ...extra,

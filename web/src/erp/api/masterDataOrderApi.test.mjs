@@ -15,7 +15,7 @@ test('masterDataOrderApi: V1 API client uses 007 JSON-RPC urls', () => {
   assert.match(source, /authScope:\s*AUTH_SCOPE\.ADMIN/)
 })
 
-test('masterDataOrderApi: masterdata methods cover customers suppliers sku contacts', () => {
+test('masterDataOrderApi: masterdata methods cover customers suppliers products sku contacts', () => {
   for (const methodName of [
     'list_customers',
     'create_customer',
@@ -27,6 +27,11 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers sku conta
     'update_supplier',
     'get_supplier',
     'set_supplier_active',
+    'list_products',
+    'create_product',
+    'update_product',
+    'get_product',
+    'set_product_active',
     'list_product_skus',
     'create_product_sku',
     'update_product_sku',

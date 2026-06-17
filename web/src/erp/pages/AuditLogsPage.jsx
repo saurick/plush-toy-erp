@@ -1,15 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  KeyOutlined,
+  SafetyCertificateOutlined,
+  SearchOutlined,
+  StopOutlined,
+  UserSwitchOutlined,
+} from '@ant-design/icons'
 import { useOutletContext } from 'react-router-dom'
 import {
-  Alert,
   Button,
-  Card,
-  Descriptions,
   Empty,
   Input,
+  Pagination,
+  Segmented,
   Select,
-  Space,
-  Table,
   Tag,
   Typography,
 } from 'antd'
@@ -19,6 +23,7 @@ import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -108,12 +113,27 @@ const actionOptions = [
 ]
 
 const quickLocateActions = [
-  'admin_user.password.reset',
-  'admin_user.disabled.set',
-  'role.permissions.set',
-  'admin_user.roles.set',
-  'admin_bootstrap.blocked',
+  { key: 'admin_user.password.reset', icon: <KeyOutlined /> },
+  { key: 'admin_user.disabled.set', icon: <StopOutlined /> },
+  { key: 'role.permissions.set', icon: <SafetyCertificateOutlined /> },
+  { key: 'admin_user.roles.set', icon: <UserSwitchOutlined /> },
 ]
+
+const riskOptions = [
+  { label: '全部', value: 'all' },
+  { label: '高风险', value: 'high' },
+  { label: '需核对', value: 'warning' },
+  { label: '常规', value: 'normal' },
+]
+
+const fieldLabelMap = {
+  disabled: '账号状态',
+  is_super_admin: '超级管理员',
+  phone: '手机号',
+  role_keys: '角色',
+  permission_keys: '权限',
+  password_reset: '密码',
+}
 
 function normalizeAuditEvents(events = []) {
   return Array.isArray(events)
@@ -152,11 +172,19 @@ function getActorText(payload = {}) {
   return '-'
 }
 
+function getEventActorText(event = {}) {
+  return event.actor_key || getActorText(event.payload)
+}
+
 function getTargetText(payload = {}) {
   const target = payload.target || {}
   const key = target.key || ''
   const id = target.id ? `#${target.id}` : ''
   return key || id || '-'
+}
+
+function getEventTargetText(event = {}) {
+  return event.target_key || getTargetText(event.payload)
 }
 
 function getTargetTypeText(payload = {}) {
@@ -169,12 +197,25 @@ function getTargetTypeText(payload = {}) {
   return typeMap[target.type] || target.type || '-'
 }
 
-function compactValue(value) {
+function getEventTargetTypeText(event = {}) {
+  return event.target_type || getTargetTypeText(event.payload)
+}
+
+function compactValue(value, key) {
   if (value === null || value === undefined) {
     return '-'
   }
+  if (key === 'disabled') {
+    return value ? '已禁用' : '已启用'
+  }
+  if (key === 'password_reset') {
+    return value ? '已重置' : '未重置'
+  }
+  if (typeof value === 'boolean') {
+    return value ? '是' : '否'
+  }
   if (Array.isArray(value)) {
-    return value.join(', ') || '-'
+    return value.join('、') || '-'
   }
   if (typeof value === 'object') {
     return JSON.stringify(value)
@@ -195,12 +236,28 @@ function summarizeChange(payload = {}) {
     .slice(0, 4)
     .map(
       (key) =>
-        `${key}: ${compactValue(before[key])} -> ${compactValue(after[key])}`
+        `${fieldLabelMap[key] || key}: ${compactValue(
+          before[key],
+          key
+        )} -> ${compactValue(after[key], key)}`
     )
     .join('；')
 }
 
 function getActionMeta(event = {}) {
+  if (event.action_label || event.risk_level) {
+    const fallback = actionMetaMap[event.event_key] || {}
+    return {
+      label:
+        event.action_label || fallback.label || event.event_key || '未知动作',
+      risk: event.risk_level || fallback.risk || 'normal',
+      intent:
+        fallback.intent || event.summary || '查看原始审计 payload 判断动作含义',
+      next:
+        fallback.next ||
+        '先核对操作者、对象和 before/after，再回到对应系统管理入口处理。',
+    }
+  }
   return (
     actionMetaMap[event.event_key] || {
       label: event.event_key || '未知动作',
@@ -216,9 +273,28 @@ function getSourceLabel(source) {
 }
 
 function buildAuditConclusion(event = {}) {
+  if (event.summary) {
+    return event.summary
+  }
   const meta = getActionMeta(event)
-  const actor = getActorText(event.payload)
-  const target = getTargetText(event.payload)
+  const actor = getEventActorText(event)
+  const target = getEventTargetText(event)
+  const after = event.payload?.after || {}
+  if (event.event_key === 'admin_user.password.reset') {
+    return `${actor} 重置了 ${target} 的密码`
+  }
+  if (event.event_key === 'admin_user.disabled.set') {
+    return `${actor} ${after.disabled ? '禁用了' : '恢复了'} ${target}`
+  }
+  if (event.event_key === 'admin_user.roles.set') {
+    return `${actor} 调整了 ${target} 的账号角色`
+  }
+  if (event.event_key === 'role.permissions.set') {
+    return `${actor} 调整了 ${target} 的角色权限`
+  }
+  if (event.event_key === 'admin_bootstrap.blocked') {
+    return `启动初始化被阻止：${event.payload?.reason || '需检查启动配置'}`
+  }
   if (actor === '-' && target === '-') {
     return meta.intent
   }
@@ -247,22 +323,8 @@ function formatPayload(payload = {}) {
   return JSON.stringify(payload || {}, null, 2)
 }
 
-function eventMatchesKeyword(event, keyword) {
-  const normalizedKeyword = String(keyword || '')
-    .trim()
-    .toLowerCase()
-  if (!normalizedKeyword) {
-    return true
-  }
-  const haystack = [
-    event.event_type,
-    event.event_key,
-    event.source,
-    JSON.stringify(event.payload || {}),
-  ]
-    .join(' ')
-    .toLowerCase()
-  return haystack.includes(normalizedKeyword)
+function getEventDomId(event = {}) {
+  return event.id || `${event.event_key || 'event'}-${event.created_at || ''}`
 }
 
 export default function AuditLogsPage() {
@@ -282,7 +344,10 @@ export default function AuditLogsPage() {
   const [total, setTotal] = useState(0)
   const [source, setSource] = useState('')
   const [eventKey, setEventKey] = useState('')
+  const [riskFilter, setRiskFilter] = useState('all')
   const [keyword, setKeyword] = useState('')
+  const [createdFrom, setCreatedFrom] = useState('')
+  const [createdTo, setCreatedTo] = useState('')
   const [selectedEventId, setSelectedEventId] = useState(null)
   const [pagination, setPagination] = useState({
     current: 1,
@@ -290,16 +355,19 @@ export default function AuditLogsPage() {
   })
 
   const filteredEvents = useMemo(
-    () => events.filter((event) => eventMatchesKeyword(event, keyword)),
-    [events, keyword]
+    () =>
+      events.filter(
+        (event) =>
+          riskFilter === 'all' || getActionMeta(event).risk === riskFilter
+      ),
+    [events, riskFilter]
   )
-  const riskSummary = useMemo(
-    () => countByRisk(filteredEvents),
-    [filteredEvents]
-  )
+  const riskSummary = useMemo(() => countByRisk(events), [events])
   const selectedEvent = useMemo(
     () =>
-      filteredEvents.find((event) => event.id === selectedEventId) ||
+      filteredEvents.find(
+        (event) => getEventDomId(event) === selectedEventId
+      ) ||
       filteredEvents[0] ||
       null,
     [filteredEvents, selectedEventId]
@@ -312,6 +380,9 @@ export default function AuditLogsPage() {
       const result = await adminRpc.call('audit_logs', {
         source,
         event_key: eventKey,
+        keyword,
+        created_from: createdFrom,
+        created_to: createdTo,
         limit: pagination.pageSize,
         offset,
       })
@@ -324,7 +395,7 @@ export default function AuditLogsPage() {
     } finally {
       setLoading(false)
     }
-  }, [adminRpc, eventKey, pagination, source])
+  }, [adminRpc, createdFrom, createdTo, eventKey, keyword, pagination, source])
 
   useEffect(() => {
     loadData()
@@ -335,80 +406,27 @@ export default function AuditLogsPage() {
   }, [loadData, outletContext])
 
   useEffect(() => {
-    if (!selectedEventId && filteredEvents[0]?.id) {
-      setSelectedEventId(filteredEvents[0].id)
+    if (!selectedEventId && filteredEvents[0]) {
+      setSelectedEventId(getEventDomId(filteredEvents[0]))
       return
     }
     if (
       selectedEventId &&
-      !filteredEvents.some((event) => event.id === selectedEventId)
+      !filteredEvents.some((event) => getEventDomId(event) === selectedEventId)
     ) {
-      setSelectedEventId(filteredEvents[0]?.id || null)
+      setSelectedEventId(
+        filteredEvents[0] ? getEventDomId(filteredEvents[0]) : null
+      )
     }
   }, [filteredEvents, selectedEventId])
 
-  const columns = [
-    {
-      title: '定位结论',
-      dataIndex: 'event_key',
-      width: 360,
-      render: (_, record) => {
-        const meta = getActionMeta(record)
-        return (
-          <Space direction="vertical" size={4} className="erp-audit-conclusion">
-            <Space size={6} wrap>
-              <Tag color={riskColorMap[meta.risk]}>
-                {riskLabelMap[meta.risk]}
-              </Tag>
-              <Text strong>{meta.label}</Text>
-            </Space>
-            <Text>{buildAuditConclusion(record)}</Text>
-            <Text type="secondary" className="erp-audit-code">
-              {record.event_key || '-'}
-            </Text>
-          </Space>
-        )
-      },
-    },
-    {
-      title: '时间',
-      dataIndex: 'created_at',
-      width: 180,
-      render: (_, record) => formatTime(record),
-    },
-    {
-      title: '来源',
-      dataIndex: 'source',
-      width: 130,
-      render: (value) => <Tag>{getSourceLabel(value)}</Tag>,
-    },
-    {
-      title: '操作者',
-      dataIndex: ['payload', 'actor'],
-      width: 140,
-      render: (_, record) => getActorText(record.payload),
-    },
-    {
-      title: '对象',
-      dataIndex: ['payload', 'target'],
-      width: 220,
-      render: (_, record) => (
-        <Space direction="vertical" size={0}>
-          <Text>{getTargetText(record.payload)}</Text>
-          <Text type="secondary">{getTargetTypeText(record.payload)}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: '摘要',
-      dataIndex: 'payload',
-      render: (_, record) => (
-        <Text style={{ whiteSpace: 'normal' }}>
-          {summarizeChange(record.payload)}
-        </Text>
-      ),
-    },
-  ]
+  const segmentedOptions = riskOptions.map((option) => ({
+    value: option.value,
+    label:
+      option.value === 'all'
+        ? `${option.label} ${riskSummary.total}`
+        : `${option.label} ${riskSummary[option.value] || 0}`,
+  }))
 
   if (loading && events.length === 0) {
     return (
@@ -420,138 +438,186 @@ export default function AuditLogsPage() {
   }
 
   return (
-    <Space
-      className="erp-audit-page"
-      direction="vertical"
-      size={16}
-      style={{ width: '100%' }}
-    >
-      <Card className="erp-audit-hero" variant="borderless">
-        <div className="erp-audit-hero__content">
-          <div>
-            <Title level={4} style={{ margin: 0 }}>
-              审计日志
-            </Title>
-            <Paragraph type="secondary" style={{ margin: '8px 0 0' }}>
-              先定位高风险动作、操作者和对象，再查看 before /
-              after。业务事实审计仍回到各业务事实页。
-            </Paragraph>
+    <div className="erp-audit-page">
+      <section className="erp-audit-command" aria-label="审计日志总览">
+        <div className="erp-audit-command__title">
+          <Title level={4}>审计日志</Title>
+          <Text type="secondary">
+            系统控制面事件。先看风险和对象，再展开原始 payload。
+          </Text>
+        </div>
+        <div className="erp-audit-command__stats" aria-label="当前页审计摘要">
+          <div className="erp-audit-stat erp-audit-stat--danger">
+            <span>高风险</span>
+            <strong>{riskSummary.high}</strong>
           </div>
-          <div className="erp-audit-metrics" aria-label="当前页审计摘要">
-            <div className="erp-audit-metric erp-audit-metric--danger">
-              <span>高风险</span>
-              <strong>{riskSummary.high}</strong>
-            </div>
-            <div className="erp-audit-metric erp-audit-metric--warning">
-              <span>需核对</span>
-              <strong>{riskSummary.warning}</strong>
-            </div>
-            <div className="erp-audit-metric">
-              <span>当前命中</span>
-              <strong>{riskSummary.total}</strong>
-            </div>
+          <div className="erp-audit-stat erp-audit-stat--warning">
+            <span>需核对</span>
+            <strong>{riskSummary.warning}</strong>
+          </div>
+          <div className="erp-audit-stat">
+            <span>当前命中</span>
+            <strong>{riskSummary.total}</strong>
           </div>
         </div>
-      </Card>
+      </section>
 
-      <Card className="erp-audit-filter-card" variant="borderless">
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert
-            type="info"
-            showIcon
-            message="定位顺序"
-            description="先点问题类型，再看定位结论列；选中一行后右侧会显示操作者、对象、变化摘要和原始 payload。"
+      <section className="erp-audit-toolbar" aria-label="审计筛选">
+        <label className="erp-audit-field">
+          <span>来源</span>
+          <Select
+            value={source}
+            options={sourceOptions}
+            onChange={(value) => {
+              setSource(value || '')
+              setPagination((prev) => ({ ...prev, current: 1 }))
+            }}
           />
-          <Space
-            size={12}
-            wrap
-            style={{ width: '100%', justifyContent: 'space-between' }}
-          >
-            <Space size={12} wrap>
-              <Text type="secondary">来源</Text>
-              <Select
-                value={source}
-                options={sourceOptions}
-                style={{ width: 160 }}
-                onChange={(value) => {
-                  setSource(value || '')
-                  setPagination((prev) => ({ ...prev, current: 1 }))
-                }}
-              />
-              <Text type="secondary">问题类型</Text>
-              <Select
-                value={eventKey}
-                options={actionOptions}
-                style={{ width: 220 }}
-                onChange={(value) => {
-                  setEventKey(value || '')
-                  setPagination((prev) => ({ ...prev, current: 1 }))
-                }}
-              />
-              <Input
-                allowClear
-                value={keyword}
-                placeholder="搜操作者、对象、动作或 payload"
-                style={{ width: 260 }}
-                onChange={(event) => setKeyword(event.target.value)}
-              />
-            </Space>
-            <Text type="secondary">
-              {keyword
-                ? `当前页命中 ${filteredEvents.length}/${events.length}`
-                : `共 ${total} 条`}
-            </Text>
-          </Space>
-          <Space size={8} wrap>
-            <Text type="secondary">快速定位</Text>
-            {quickLocateActions.map((key) => (
-              <Button
-                key={key}
-                size="small"
-                type={eventKey === key ? 'primary' : 'default'}
-                onClick={() => {
-                  setEventKey(eventKey === key ? '' : key)
-                  setPagination((prev) => ({ ...prev, current: 1 }))
-                }}
-              >
-                {actionMetaMap[key].label}
-              </Button>
-            ))}
-          </Space>
-        </Space>
-      </Card>
+        </label>
+        <label className="erp-audit-field erp-audit-field--wide">
+          <span>问题类型</span>
+          <Select
+            value={eventKey}
+            options={actionOptions}
+            onChange={(value) => {
+              setEventKey(value || '')
+              setPagination((prev) => ({ ...prev, current: 1 }))
+            }}
+          />
+        </label>
+        <label className="erp-audit-field erp-audit-field--search">
+          <span>搜索</span>
+          <Input
+            allowClear
+            prefix={<SearchOutlined />}
+            value={keyword}
+            placeholder="操作者、对象、动作或 payload"
+            onChange={(event) => {
+              setKeyword(event.target.value)
+              setPagination((prev) => ({ ...prev, current: 1 }))
+            }}
+          />
+        </label>
+        <label className="erp-audit-field">
+          <span>开始日期</span>
+          <DateInput
+            value={createdFrom}
+            placeholder="开始"
+            onChange={(value) => {
+              setCreatedFrom(value)
+              setPagination((prev) => ({ ...prev, current: 1 }))
+            }}
+          />
+        </label>
+        <label className="erp-audit-field">
+          <span>结束日期</span>
+          <DateInput
+            value={createdTo}
+            placeholder="结束"
+            onChange={(value) => {
+              setCreatedTo(value)
+              setPagination((prev) => ({ ...prev, current: 1 }))
+            }}
+          />
+        </label>
+        <Text className="erp-audit-toolbar__count" type="secondary">
+          {keyword || riskFilter !== 'all'
+            ? `当前页命中 ${filteredEvents.length}/${events.length}`
+            : `共 ${total} 条`}
+        </Text>
+      </section>
+
+      <section className="erp-audit-lens" aria-label="常查审计问题">
+        <Segmented
+          value={riskFilter}
+          options={segmentedOptions}
+          onChange={(value) => setRiskFilter(value)}
+        />
+        <div className="erp-audit-quick-actions">
+          {quickLocateActions.map(({ key, icon }) => (
+            <Button
+              key={key}
+              size="small"
+              icon={icon}
+              type={eventKey === key ? 'primary' : 'default'}
+              onClick={() => {
+                setEventKey(eventKey === key ? '' : key)
+                setPagination((prev) => ({ ...prev, current: 1 }))
+              }}
+            >
+              {actionMetaMap[key].label}
+            </Button>
+          ))}
+        </div>
+      </section>
 
       <div className="erp-audit-workspace">
-        <Card className="erp-audit-table-card" variant="borderless">
-          <Table
-            rowKey="id"
-            columns={columns}
-            dataSource={filteredEvents}
-            loading={loading}
-            rowClassName={(record) =>
-              record.id === selectedEvent?.id ? 'erp-audit-row--selected' : ''
-            }
-            pagination={{
-              current: pagination.current,
-              pageSize: pagination.pageSize,
-              pageSizeOptions: PAGE_SIZE_OPTIONS,
-              showSizeChanger: true,
-              total,
-              showTotal: (value) => `共 ${value} 条`,
-            }}
-            locale={{ emptyText: <Empty description="暂无审计日志" /> }}
-            scroll={{ x: 1250 }}
-            onChange={(nextPagination) => {
+        <section className="erp-audit-feed" aria-label="审计事件列表">
+          <div className="erp-audit-feed__head">
+            <Text strong>事件流</Text>
+            {loading ? <Text type="secondary">正在刷新...</Text> : null}
+          </div>
+          {filteredEvents.length > 0 ? (
+            <div className="erp-audit-event-list">
+              {filteredEvents.map((record) => {
+                const meta = getActionMeta(record)
+                const eventDomId = getEventDomId(record)
+                const selected = eventDomId === selectedEventId
+                return (
+                  <button
+                    key={eventDomId}
+                    type="button"
+                    className={[
+                      'erp-audit-event',
+                      `erp-audit-event--${meta.risk}`,
+                      selected ? 'erp-audit-event--selected' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                    onClick={() => setSelectedEventId(eventDomId)}
+                  >
+                    <span className="erp-audit-event__risk">
+                      {riskLabelMap[meta.risk]}
+                    </span>
+                    <span className="erp-audit-event__body">
+                      <span className="erp-audit-event__title">
+                        {buildAuditConclusion(record)}
+                      </span>
+                      <span className="erp-audit-event__meta">
+                        <span>{formatTime(record)}</span>
+                        <span>{getSourceLabel(record.source)}</span>
+                        <span>{record.event_key}</span>
+                      </span>
+                      <span className="erp-audit-event__summary">
+                        {summarizeChange(record.payload)}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : (
+            <Empty
+              className="erp-audit-empty"
+              description="当前条件下没有审计事件"
+            />
+          )}
+          <Pagination
+            className="erp-audit-pagination"
+            current={pagination.current}
+            pageSize={pagination.pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            showSizeChanger
+            total={total}
+            showTotal={(value) => `共 ${value} 条`}
+            onChange={(current, pageSize) =>
               setPagination({
-                current: Number(nextPagination?.current) || 1,
-                pageSize: Number(nextPagination?.pageSize) || DEFAULT_PAGE_SIZE,
+                current,
+                pageSize: Number(pageSize) || DEFAULT_PAGE_SIZE,
               })
-            }}
-            onRow={(record) => ({
-              onClick: () => setSelectedEventId(record.id),
-            })}
+            }
           />
-        </Card>
+        </section>
 
         <aside className="erp-audit-detail" aria-label="审计事件定位详情">
           {selectedEvent ? (
@@ -560,38 +626,36 @@ export default function AuditLogsPage() {
                 <Tag color={riskColorMap[getActionMeta(selectedEvent).risk]}>
                   {riskLabelMap[getActionMeta(selectedEvent).risk]}
                 </Tag>
-                <Title level={5}>{getActionMeta(selectedEvent).label}</Title>
+                <Title level={5}>{buildAuditConclusion(selectedEvent)}</Title>
                 <Text type="secondary">{formatTime(selectedEvent)}</Text>
               </div>
-              <Paragraph className="erp-audit-detail__conclusion">
-                {buildAuditConclusion(selectedEvent)}
-              </Paragraph>
-              <Descriptions
-                size="small"
-                column={1}
-                className="erp-audit-detail__descriptions"
-              >
-                <Descriptions.Item label="下一步">
-                  {getActionMeta(selectedEvent).next}
-                </Descriptions.Item>
-                <Descriptions.Item label="操作者">
-                  {getActorText(selectedEvent.payload)}
-                </Descriptions.Item>
-                <Descriptions.Item label="对象">
-                  {getTargetTypeText(selectedEvent.payload)} /{' '}
-                  {getTargetText(selectedEvent.payload)}
-                </Descriptions.Item>
-                <Descriptions.Item label="来源">
-                  {getSourceLabel(selectedEvent.source)}
-                </Descriptions.Item>
-                <Descriptions.Item label="变化摘要">
-                  {summarizeChange(selectedEvent.payload)}
-                </Descriptions.Item>
-              </Descriptions>
-              <div className="erp-audit-payload">
-                <Text strong>原始 payload</Text>
-                <pre>{formatPayload(selectedEvent.payload)}</pre>
+              <div className="erp-audit-next-step">
+                <Text type="secondary">下一步</Text>
+                <Paragraph>{getActionMeta(selectedEvent).next}</Paragraph>
               </div>
+              <div className="erp-audit-facts">
+                <div>
+                  <span>操作者</span>
+                  <strong>{getEventActorText(selectedEvent)}</strong>
+                </div>
+                <div>
+                  <span>对象</span>
+                  <strong>{getEventTargetText(selectedEvent)}</strong>
+                  <em>{getEventTargetTypeText(selectedEvent)}</em>
+                </div>
+                <div>
+                  <span>来源</span>
+                  <strong>{getSourceLabel(selectedEvent.source)}</strong>
+                </div>
+                <div>
+                  <span>变化</span>
+                  <strong>{summarizeChange(selectedEvent.payload)}</strong>
+                </div>
+              </div>
+              <details className="erp-audit-payload">
+                <summary>原始 payload</summary>
+                <pre>{formatPayload(selectedEvent.payload)}</pre>
+              </details>
             </>
           ) : (
             <Empty
@@ -601,6 +665,6 @@ export default function AuditLogsPage() {
           )}
         </aside>
       </div>
-    </Space>
+    </div>
   )
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -305,6 +306,28 @@ func (r *stubAdminManageRepo) ListRuntimeAuditEvents(_ context.Context, filter R
 		if filter.EventKey != "" && event.EventKey != filter.EventKey {
 			continue
 		}
+		if !filter.CreatedFrom.IsZero() && event.CreatedAt.Before(filter.CreatedFrom) {
+			continue
+		}
+		if !filter.CreatedTo.IsZero() && event.CreatedAt.After(filter.CreatedTo) {
+			continue
+		}
+		payloadText := strings.ToLower(anyToString(event.Payload))
+		if filter.ActorKey != "" && !strings.Contains(payloadText, strings.ToLower(filter.ActorKey)) {
+			continue
+		}
+		if filter.TargetType != "" && !strings.Contains(payloadText, strings.ToLower(filter.TargetType)) {
+			continue
+		}
+		if filter.TargetKey != "" && !strings.Contains(payloadText, strings.ToLower(filter.TargetKey)) {
+			continue
+		}
+		if keyword := strings.ToLower(strings.TrimSpace(filter.Keyword)); keyword != "" {
+			haystack := strings.ToLower(event.EventType + " " + event.EventKey + " " + event.Source + " " + anyToString(event.Payload))
+			if !strings.Contains(haystack, keyword) {
+				continue
+			}
+		}
 		filtered = append(filtered, event)
 	}
 	end := offset + limit
@@ -320,6 +343,61 @@ func (r *stubAdminManageRepo) ListRuntimeAuditEvents(_ context.Context, filter R
 		Limit:  limit,
 		Offset: offset,
 	}, nil
+}
+
+func TestAdminManageUsecase_ListRuntimeAuditEventsEnrichesEvents(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{
+		ID:          1,
+		Username:    "root",
+		Permissions: []string{PermissionSystemAuditRead},
+	}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	now := time.Now()
+	repo.auditEvents = append(repo.auditEvents, RuntimeAuditEvent{
+		ID:        1,
+		EventType: "admin_control_plane",
+		EventKey:  "admin_user.disabled.set",
+		Source:    "admin_manage",
+		Payload: map[string]any{
+			"actor": map[string]any{"username": "root"},
+			"target": map[string]any{
+				"type": "admin_user",
+				"key":  "demo_debug",
+			},
+			"after": map[string]any{"disabled": true},
+		},
+		CreatedAt: now,
+	})
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{
+		UserID:   1,
+		Username: "root",
+		Role:     RoleAdmin,
+	})
+	result, err := uc.ListRuntimeAuditEvents(ctx, RuntimeAuditEventListFilter{
+		ActorKey:   "root",
+		TargetKey:  "demo_debug",
+		TargetType: "admin_user",
+		Keyword:    "disabled",
+	})
+	if err != nil {
+		t.Fatalf("ListRuntimeAuditEvents() error = %v", err)
+	}
+	if len(result.Events) != 1 {
+		t.Fatalf("expected one event, got %#v", result.Events)
+	}
+	event := result.Events[0]
+	if event.RiskLevel != "high" || event.ActionLabel != "账号启停变更" {
+		t.Fatalf("unexpected audit metadata: %#v", event)
+	}
+	if event.ActorKey != "root" || event.TargetType != "admin_user" || event.TargetKey != "demo_debug" {
+		t.Fatalf("unexpected actor/target metadata: %#v", event)
+	}
+	if event.Summary != "root 禁用了 demo_debug" {
+		t.Fatalf("unexpected summary: %q", event.Summary)
+	}
 }
 
 func TestAdminManageUsecase_CreateAssignsRolesForStandardAdmin(t *testing.T) {

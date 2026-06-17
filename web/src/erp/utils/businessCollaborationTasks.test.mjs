@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   buildBusinessCollaborationTaskPanelModel,
+  filterBusinessCollaborationTasksBySource,
   getBusinessCollaborationTaskReason,
   getBusinessCollaborationTaskUrgeMeta,
   isBusinessCollaborationTaskBlocking,
@@ -16,6 +17,7 @@ const tasks = Object.freeze([
     task_status_key: 'blocked',
     owner_role_key: 'purchase',
     source_type: 'accessories-purchase',
+    source_id: 1001,
     source_no: 'PO-001',
     payload: { blocked_reason: '供应商未确认回货日期' },
   },
@@ -25,6 +27,7 @@ const tasks = Object.freeze([
     task_status_key: 'ready',
     owner_role_key: 'finance',
     source_type: 'shipment',
+    source_id: 2001,
     source_no: 'SHIP-001',
     payload: {
       urged: true,
@@ -38,6 +41,7 @@ const tasks = Object.freeze([
     task_status_key: 'done',
     owner_role_key: 'warehouse',
     source_type: 'inbound',
+    source_id: 1001,
     source_no: 'IN-001',
     payload: {},
   },
@@ -82,6 +86,33 @@ test('businessCollaborationTasks: 阻塞原因按任务和 payload 顺序收口'
       payload: { rejected_reason: '旧退回原因' },
     }),
     '页面填写的阻塞原因'
+  )
+})
+
+test('businessCollaborationTasks: 按 source_type 和 source_id 过滤当前业务记录协同', () => {
+  assert.deepEqual(
+    filterBusinessCollaborationTasksBySource({
+      tasks,
+      sourceType: 'accessories-purchase',
+      sourceIDs: [1001],
+    }).map((task) => task.id),
+    [1]
+  )
+
+  assert.deepEqual(
+    filterBusinessCollaborationTasksBySource({
+      tasks,
+      sourceType: 'accessories-purchase',
+    }).map((task) => task.id),
+    [1]
+  )
+
+  assert.deepEqual(
+    filterBusinessCollaborationTasksBySource({
+      tasks,
+      sourceIDs: ['1001'],
+    }).map((task) => task.id),
+    [1, 3]
   )
 })
 

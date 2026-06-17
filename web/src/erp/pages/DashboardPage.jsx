@@ -2,7 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertOutlined,
   ArrowRightOutlined,
-  CloseCircleOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  ExclamationCircleOutlined,
+  LinkOutlined,
+  SendOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -33,17 +37,10 @@ import {
   updateWorkflowTaskStatus,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
-import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
-import { dashboardModules } from '../config/dashboardModules.mjs'
 import {
   formatWorkflowTaskSource,
   resolveWorkflowTaskEntryPath,
 } from '../utils/dashboardTaskDisplay.mjs'
-import {
-  buildDashboardModuleRows,
-  buildDashboardSummary,
-  normalizeDashboardModuleStats,
-} from '../utils/dashboardStats.mjs'
 import {
   buildWorkflowDashboardStats,
   getWorkflowTaskDueStatus,
@@ -121,7 +118,24 @@ const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
   { key: 'actionable', label: '待我处理' },
   { key: 'risk', label: '阻塞/逾期' },
   { key: 'waiting', label: '等待交接' },
-  { key: 'closed', label: '已归档' },
+])
+
+const TASK_DRAWER_STEPS = Object.freeze([
+  {
+    key: 'context',
+    title: '核对上下文',
+    description: '确认任务、来源、责任角色和到期状态。',
+  },
+  {
+    key: 'action',
+    title: '选择动作',
+    description: '完成、阻塞或催办，只写 Workflow 任务事件。',
+  },
+  {
+    key: 'submit',
+    title: '提交回队列',
+    description: '刷新任务列表，不自动写入事实层。',
+  },
 ])
 
 function payloadOf(task = {}) {
@@ -148,6 +162,26 @@ function buildSourceOptions(tasks = []) {
       label: sourceType,
     })),
   ]
+}
+
+function getTaskActionTone(actionMode = '') {
+  if (actionMode === 'complete') return 'success'
+  if (actionMode === 'block') return 'danger'
+  if (actionMode === 'urge') return 'warning'
+  return 'neutral'
+}
+
+function getTaskActionDescription(actionMode = '') {
+  if (actionMode === 'complete') {
+    return '确认后只关闭当前 Workflow 协同任务；库存、出货、财务、开票或付款仍需进入对应业务模块处理。'
+  }
+  if (actionMode === 'block') {
+    return '请写清卡点原因、影响范围和下一责任人，后续角色才能接续处理。'
+  }
+  if (actionMode === 'urge') {
+    return '请写清催办对象和需要补齐的事项，避免只留下无上下文提醒。'
+  }
+  return '先选择一个处理动作。打开关联记录只负责跳转上下文，不保存业务事实。'
 }
 
 function TaskLane({ lane, onOpenTask, onOpenAction, onOpenEntry }) {
@@ -241,6 +275,7 @@ function TaskMetricAction({
   actionLabel,
   active = false,
   danger = false,
+  disabled = false,
   onClick,
 }) {
   return (
@@ -254,6 +289,7 @@ function TaskMetricAction({
         .filter(Boolean)
         .join(' ')}
       aria-pressed={active}
+      disabled={disabled}
       onClick={onClick}
     >
       <span className="erp-task-center-metric__head">
@@ -272,7 +308,6 @@ function TaskMetricAction({
 export default function DashboardPage({ initialView = 'workbench' }) {
   const [loading, setLoading] = useState(false)
   const [workflowTasks, setWorkflowTasks] = useState([])
-  const [moduleStats, setModuleStats] = useState([])
   const [selectedTask, setSelectedTask] = useState(null)
   const [actionMode, setActionMode] = useState('')
   const [actionReason, setActionReason] = useState('')
@@ -291,18 +326,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const loadDashboardStats = useCallback(async () => {
     setLoading(true)
     try {
-      const [workflowResult, businessResult] = await Promise.all([
-        listWorkflowTasks({ limit: 200 }),
-        getBusinessDashboardStats(),
-      ])
-      const modules = Array.isArray(businessResult?.modules)
-        ? businessResult.modules.map((item) =>
-            normalizeDashboardModuleStats(item)
-          )
-        : []
+      const workflowResult = await listWorkflowTasks({ limit: 200 })
       if (mountedRef.current) {
         setWorkflowTasks(workflowResult?.tasks || [])
-        setModuleStats(modules)
       }
       return true
     } catch (error) {
@@ -335,14 +361,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => buildWorkflowDashboardStats(workflowTasks),
     [workflowTasks]
   )
-  const moduleRows = useMemo(
-    () => buildDashboardModuleRows(dashboardModules, moduleStats),
-    [moduleStats]
-  )
-  const businessSummary = useMemo(
-    () => buildDashboardSummary(moduleRows),
-    [moduleRows]
-  )
   const filters = useMemo(
     () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
     [searchParams]
@@ -367,9 +385,16 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const selectedTaskStatusMeta = selectedTask
     ? getWorkflowTaskStatusMeta(selectedTask)
     : null
+  const selectedTaskIsTerminal = selectedTask
+    ? isTerminalWorkflowTask(selectedTask)
+    : false
   const selectedTaskEntryPath = selectedTask
     ? resolveWorkflowTaskEntryPath(selectedTask)
     : ''
+  const selectedTaskReason = selectedTask
+    ? getWorkflowTaskReason(selectedTask)
+    : ''
+  const selectedTaskActionTone = getTaskActionTone(actionMode)
   const activeExceptionStep =
     EXCEPTION_FLOW_STEPS.find((step) => step.key === exceptionStepKey) ||
     EXCEPTION_FLOW_STEPS[0]
@@ -424,6 +449,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           Boolean(getWorkflowTaskReason(task))
         )
       }).length,
+    [workflowTasks]
+  )
+  const taskCenterOverdueCount = useMemo(
+    () =>
+      workflowTasks.filter(
+        (task) =>
+          !isTerminalWorkflowTask(task) &&
+          getWorkflowTaskDueStatus(task) === 'overdue'
+      ).length,
     [workflowTasks]
   )
   const taskCenterCurrentTask = useMemo(
@@ -500,14 +534,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const selectedWorkbenchEntryPath = selectedWorkbenchTask
     ? resolveWorkflowTaskEntryPath(selectedWorkbenchTask)
     : ''
-  const workbenchBusinessRows = useMemo(() => {
-    const sortedRows = moduleRows.slice().sort((left, right) => {
-      const countDiff = Number(right.count || 0) - Number(left.count || 0)
-      if (countDiff !== 0) return countDiff
-      return String(left.module || '').localeCompare(String(right.module || ''))
-    })
-    return sortedRows.slice(0, 3)
-  }, [moduleRows])
 
   const updateFilter = (key, value) => {
     setSearchParams(
@@ -546,6 +572,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
   const submitTaskAction = async () => {
     if (!selectedTask || !actionMode || !actionMeta) return
+
+    if (isTerminalWorkflowTask(selectedTask)) {
+      message.warning('已结束任务不能继续处理')
+      return
+    }
 
     const reason = actionReason.trim()
     if (actionMeta.requireReason && !reason) {
@@ -714,9 +745,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 <small>需交接说明</small>
               </div>
               <div className="erp-workbench-kpi">
-                <span>业务对象</span>
-                <strong>{businessSummary.totalRecords}</strong>
-                <small>只读摘要</small>
+                <span>等待交接</span>
+                <strong>{workbenchQueueGroups.waiting.length}</strong>
+                <small>非终态任务</small>
               </div>
             </div>
 
@@ -859,56 +890,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     </div>
                   )}
                 </section>
-
-                <section
-                  className="erp-workbench-panel erp-workbench-object-pulse"
-                  aria-label="业务对象脉搏"
-                >
-                  <div className="erp-workbench-panel-head">
-                    <div>
-                      <Title level={5}>业务对象脉搏</Title>
-                      <Text type="secondary">常用入口，不替代正式菜单。</Text>
-                    </div>
-                    <Button
-                      size="small"
-                      type="link"
-                      onClick={() => navigate('/erp/business-dashboard')}
-                    >
-                      查看全部
-                    </Button>
-                  </div>
-                  <div className="erp-workbench-object-list">
-                    {workbenchBusinessRows.map((row) => {
-                      const activeCount =
-                        row.statusGroupCounts.project +
-                        row.statusGroupCounts.material +
-                        row.statusGroupCounts.production +
-                        row.statusGroupCounts.warehouse +
-                        row.statusGroupCounts.finance
-                      const blockedCount = row.statusGroupCounts.blocked || 0
-                      return (
-                        <button
-                          type="button"
-                          className="erp-workbench-object-pulse-row"
-                          key={row.key}
-                          onClick={() => row.path && navigate(row.path)}
-                          aria-label={`进入${row.module}，记录 ${row.count}，推进 ${activeCount}`}
-                        >
-                          <span>{row.module}</span>
-                          <strong>{row.count}</strong>
-                          <small>推进 {activeCount}</small>
-                          <Tag color={blockedCount > 0 ? 'red' : 'green'}>
-                            {blockedCount > 0 ? `阻塞 ${blockedCount}` : '健康'}
-                          </Tag>
-                          <ArrowRightOutlined
-                            aria-hidden="true"
-                            className="erp-workbench-object-pulse-row__icon"
-                          />
-                        </button>
-                      )
-                    })}
-                  </div>
-                </section>
               </aside>
             </div>
           </div>
@@ -929,34 +910,36 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     任务看板
                   </Title>
                   <Paragraph className="erp-dashboard-summary">
-                    按职责、状态和到期时间处理 Workflow 任务。
+                    看清谁该处理、哪里卡住、哪些已经超时。
                   </Paragraph>
                 </div>
                 <div
                   className="erp-task-center-metrics"
-                  aria-label="任务中心入口"
+                  aria-label="任务看板关键筛选"
                 >
                   <TaskMetricAction
                     label="待我处理"
                     value={taskCenterAssignedCount}
-                    actionLabel="点击筛选待处理"
+                    actionLabel="查看可推进任务"
                     active={filters.status === 'pending'}
                     onClick={() => updateFilter('status', 'pending')}
                   />
                   <TaskMetricAction
                     label="阻塞交接"
                     value={taskCenterBlockedCount}
-                    actionLabel="点击筛选阻塞"
+                    actionLabel="查看需说明任务"
                     active={filters.status === 'blocked'}
                     danger
                     onClick={() => updateFilter('status', 'blocked')}
                   />
                   <TaskMetricAction
-                    label="当前结果"
-                    value={filteredTasks.length}
-                    actionLabel="清空筛选"
-                    active={!hasActiveFilters}
-                    onClick={clearFilters}
+                    label="逾期任务"
+                    value={taskCenterOverdueCount}
+                    actionLabel="查看超时任务"
+                    active={filters.due === 'overdue'}
+                    danger={taskCenterOverdueCount > 0}
+                    disabled={taskCenterOverdueCount <= 0}
+                    onClick={() => updateFilter('due', 'overdue')}
                   />
                 </div>
               </section>
@@ -1034,15 +1017,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               </section>
             </div>
 
-            <Space wrap className="erp-task-center-actions">
-              <Button
-                icon={<CloseCircleOutlined />}
-                disabled={!hasActiveFilters}
-                onClick={clearFilters}
-              >
-                清空筛选
-              </Button>
-            </Space>
             <div className="erp-task-board-filters">
               <Input.Search
                 allowClear
@@ -1072,6 +1046,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 options={sourceOptions}
                 onChange={(value) => updateFilter('sourceType', value)}
               />
+              <Button disabled={!hasActiveFilters} onClick={clearFilters}>
+                清空筛选
+              </Button>
             </div>
             <div className="erp-task-board-lanes" aria-label="任务看板泳道">
               {taskLanes.map((lane) => (
@@ -1208,115 +1185,37 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ) : null}
 
       <Drawer
-        title="任务详情"
-        width={560}
+        title={
+          <div className="erp-task-action-drawer__title">
+            <span>任务处理</span>
+            <strong>{actionMeta?.title || '查看任务上下文'}</strong>
+          </div>
+        }
+        width="min(640px, calc(100vw - 24px))"
         open={Boolean(selectedTask)}
         onClose={closeTaskDrawer}
         destroyOnHidden
+        className="erp-task-action-drawer"
         extra={
           selectedTask ? (
-            <Tag color={selectedTaskStatusMeta?.color}>
-              {selectedTaskStatusMeta?.label}
-            </Tag>
+            <Space size={8} wrap>
+              <Tag>{formatTaskCode(selectedTask)}</Tag>
+              <Tag color={selectedTaskStatusMeta?.color}>
+                {selectedTaskStatusMeta?.label}
+              </Tag>
+            </Space>
           ) : null
         }
         footer={
           selectedTask ? (
-            <Space wrap>
-              <Button
-                type="primary"
-                disabled={isTerminalWorkflowTask(selectedTask)}
-                onClick={() => setActionMode('complete')}
+            <div className="erp-task-action-drawer__footer">
+              <Space
+                wrap
+                size={[8, 8]}
+                className="erp-task-action-drawer__footer-actions"
               >
-                处理完成
-              </Button>
-              <Button
-                danger
-                disabled={isTerminalWorkflowTask(selectedTask)}
-                onClick={() => {
-                  setActionMode('block')
-                  setActionReason(getWorkflowTaskReason(selectedTask))
-                }}
-              >
-                标记阻塞
-              </Button>
-              <Button
-                disabled={isTerminalWorkflowTask(selectedTask)}
-                onClick={() => setActionMode('urge')}
-              >
-                催办
-              </Button>
-              <Button
-                disabled={!selectedTaskEntryPath}
-                onClick={() => openTaskEntry(selectedTask)}
-              >
-                查看关联记录
-              </Button>
-            </Space>
-          ) : null
-        }
-      >
-        {selectedTask ? (
-          <Space direction="vertical" size={14} className="erp-dashboard-block">
-            <Alert
-              type="info"
-              showIcon
-              icon={<AlertOutlined />}
-              message="协同任务说明"
-              description="这里的完成、阻塞和催办只处理 Workflow 任务；不直接写库存、出货、应收、开票、付款或其他事实表。"
-            />
-            <Descriptions size="small" column={1} bordered>
-              <Descriptions.Item label="任务">
-                {selectedTask.task_name || '未命名任务'}
-              </Descriptions.Item>
-              <Descriptions.Item label="任务编号">
-                {formatTaskCode(selectedTask)}
-              </Descriptions.Item>
-              <Descriptions.Item label="来源">
-                {formatWorkflowTaskSource(selectedTask)}
-              </Descriptions.Item>
-              <Descriptions.Item label="负责角色">
-                {getTaskOwnerRoleKey(selectedTask) || '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="到期时间">
-                {getWorkflowTaskDueLabel(selectedTask)}
-              </Descriptions.Item>
-              <Descriptions.Item label="阻塞 / 退回原因">
-                {getWorkflowTaskReason(selectedTask) || '-'}
-              </Descriptions.Item>
-            </Descriptions>
-            {actionMeta ? (
-              <Card
-                size="small"
-                className="erp-task-board-action-panel"
-                title={actionMeta.title}
-              >
-                <Space
-                  direction="vertical"
-                  size={10}
-                  className="erp-dashboard-block"
-                >
-                  <Text type="secondary">
-                    {actionMode === 'complete'
-                      ? '完成只关闭协同任务；如需登记真实业务事实，请进入对应业务模块。'
-                      : '请填写原因、影响范围和需要谁继续处理。'}
-                  </Text>
-                  <TextArea
-                    value={actionReason}
-                    rows={4}
-                    maxLength={180}
-                    showCount
-                    placeholder="填写原因、影响范围、需要谁处理"
-                    onChange={(event) => setActionReason(event.target.value)}
-                  />
-                  <Space wrap>
-                    <Button
-                      type="primary"
-                      loading={actionSaving}
-                      onClick={submitTaskAction}
-                    >
-                      {actionMeta.buttonLabel}
-                    </Button>
+                {actionMeta ? (
+                  <>
                     <Button
                       disabled={actionSaving}
                       onClick={() => {
@@ -1324,13 +1223,183 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         setActionReason('')
                       }}
                     >
-                      取消
+                      返回动作选择
                     </Button>
-                  </Space>
-                </Space>
-              </Card>
-            ) : null}
-          </Space>
+                    <Button
+                      type="primary"
+                      danger={actionMode === 'block'}
+                      icon={<SendOutlined />}
+                      loading={actionSaving}
+                      disabled={selectedTaskIsTerminal}
+                      onClick={submitTaskAction}
+                    >
+                      {actionMeta.buttonLabel}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="primary"
+                      icon={<CheckCircleOutlined />}
+                      disabled={selectedTaskIsTerminal}
+                      onClick={() => {
+                        setActionMode('complete')
+                        setActionReason('')
+                      }}
+                    >
+                      处理完成
+                    </Button>
+                    <Button
+                      danger
+                      icon={<ExclamationCircleOutlined />}
+                      disabled={selectedTaskIsTerminal}
+                      onClick={() => {
+                        setActionMode('block')
+                        setActionReason(selectedTaskReason)
+                      }}
+                    >
+                      标记阻塞
+                    </Button>
+                    <Button
+                      icon={<ClockCircleOutlined />}
+                      disabled={selectedTaskIsTerminal}
+                      onClick={() => {
+                        setActionMode('urge')
+                        setActionReason('')
+                      }}
+                    >
+                      催办
+                    </Button>
+                  </>
+                )}
+                <Button
+                  icon={<LinkOutlined />}
+                  disabled={!selectedTaskEntryPath}
+                  onClick={() => openTaskEntry(selectedTask)}
+                >
+                  查看关联记录
+                </Button>
+              </Space>
+            </div>
+          ) : null
+        }
+      >
+        {selectedTask ? (
+          <div className="erp-task-action-drawer__body">
+            <section className="erp-task-action-drawer__summary">
+              <div className="erp-task-action-drawer__eyebrow">当前任务</div>
+              <Title level={4} className="erp-task-action-drawer__task-title">
+                {selectedTask.task_name || '未命名任务'}
+              </Title>
+              <div className="erp-task-action-drawer__meta-grid">
+                <div>
+                  <span>来源</span>
+                  <strong>{formatWorkflowTaskSource(selectedTask)}</strong>
+                </div>
+                <div>
+                  <span>负责角色</span>
+                  <strong>{getTaskOwnerRoleKey(selectedTask) || '-'}</strong>
+                </div>
+                <div>
+                  <span>到期时间</span>
+                  <strong>{getWorkflowTaskDueLabel(selectedTask)}</strong>
+                </div>
+                <div>
+                  <span>当前状态</span>
+                  <strong>{selectedTaskStatusMeta?.label || '-'}</strong>
+                </div>
+              </div>
+              {selectedTaskReason ? (
+                <div className="erp-task-action-drawer__reason">
+                  <span>阻塞 / 退回原因</span>
+                  <strong>{selectedTaskReason}</strong>
+                </div>
+              ) : null}
+            </section>
+
+            <section
+              className="erp-task-action-drawer__steps"
+              aria-label="任务处理步骤"
+            >
+              {TASK_DRAWER_STEPS.map((step, index) => {
+                const active =
+                  (index === 0 && !actionMeta) ||
+                  (index === 1 && actionMeta && !actionSaving) ||
+                  (index === 2 && actionSaving)
+                return (
+                  <div
+                    key={step.key}
+                    className={[
+                      'erp-task-action-drawer__step',
+                      active ? 'erp-task-action-drawer__step--active' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    <span>{index + 1}</span>
+                    <div>
+                      <strong>{step.title}</strong>
+                      <small>{step.description}</small>
+                    </div>
+                  </div>
+                )
+              })}
+            </section>
+
+            <section className="erp-task-action-drawer__boundary">
+              <AlertOutlined aria-hidden="true" />
+              <div>
+                <strong>Workflow / Fact 边界</strong>
+                <span>
+                  完成、阻塞和催办只处理协同任务；库存、出货、应收、开票、付款或其他事实仍回到对应业务模块。
+                </span>
+              </div>
+            </section>
+
+            {actionMeta ? (
+              <section
+                className={[
+                  'erp-task-action-drawer__action-panel',
+                  `erp-task-action-drawer__action-panel--${selectedTaskActionTone}`,
+                ].join(' ')}
+              >
+                <div className="erp-task-action-drawer__action-head">
+                  <div>
+                    <span>当前动作</span>
+                    <strong>{actionMeta.title}</strong>
+                  </div>
+                  <Tag color={actionMeta.requireReason ? 'orange' : 'green'}>
+                    {actionMeta.requireReason ? '必须填写原因' : '确认即可'}
+                  </Tag>
+                </div>
+                <Paragraph className="erp-task-action-drawer__action-copy">
+                  {getTaskActionDescription(actionMode)}
+                </Paragraph>
+                {actionMeta.requireReason ? (
+                  <TextArea
+                    value={actionReason}
+                    autoSize={{ minRows: 4, maxRows: 6 }}
+                    maxLength={180}
+                    showCount
+                    placeholder="填写原因、影响范围、需要谁处理"
+                    onChange={(event) => setActionReason(event.target.value)}
+                  />
+                ) : (
+                  <div className="erp-task-action-drawer__confirm-copy">
+                    <CheckCircleOutlined aria-hidden="true" />
+                    <span>
+                      提交后任务会回到已完成队列；真实业务对象是否继续处理，仍以关联模块为准。
+                    </span>
+                  </div>
+                )}
+              </section>
+            ) : (
+              <section className="erp-task-action-drawer__action-prompt">
+                <strong>选择一个处理动作</strong>
+                <span>{getTaskActionDescription('')}</span>
+              </section>
+            )}
+          </div>
         ) : null}
       </Drawer>
     </Space>

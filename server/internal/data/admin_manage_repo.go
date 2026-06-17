@@ -443,6 +443,36 @@ func (r *adminManageRepo) ListRuntimeAuditEvents(
 		query = query.Where(runtimeauditevent.EventKey(eventKey))
 		countQuery = countQuery.Where(runtimeauditevent.EventKey(eventKey))
 	}
+	if !filter.CreatedFrom.IsZero() {
+		query = query.Where(runtimeauditevent.CreatedAtGTE(filter.CreatedFrom))
+		countQuery = countQuery.Where(runtimeauditevent.CreatedAtGTE(filter.CreatedFrom))
+	}
+	if !filter.CreatedTo.IsZero() {
+		query = query.Where(runtimeauditevent.CreatedAtLTE(filter.CreatedTo))
+		countQuery = countQuery.Where(runtimeauditevent.CreatedAtLTE(filter.CreatedTo))
+	}
+	if actorKey := strings.TrimSpace(filter.ActorKey); actorKey != "" {
+		query = query.Where(runtimeauditevent.PayloadContainsFold(actorKey))
+		countQuery = countQuery.Where(runtimeauditevent.PayloadContainsFold(actorKey))
+	}
+	if targetType := strings.TrimSpace(filter.TargetType); targetType != "" {
+		query = query.Where(runtimeauditevent.PayloadContainsFold(targetType))
+		countQuery = countQuery.Where(runtimeauditevent.PayloadContainsFold(targetType))
+	}
+	if targetKey := strings.TrimSpace(filter.TargetKey); targetKey != "" {
+		query = query.Where(runtimeauditevent.PayloadContainsFold(targetKey))
+		countQuery = countQuery.Where(runtimeauditevent.PayloadContainsFold(targetKey))
+	}
+	if keyword := strings.TrimSpace(filter.Keyword); keyword != "" {
+		predicate := runtimeauditevent.Or(
+			runtimeauditevent.EventTypeContainsFold(keyword),
+			runtimeauditevent.EventKeyContainsFold(keyword),
+			runtimeauditevent.SourceContainsFold(keyword),
+			runtimeauditevent.PayloadContainsFold(keyword),
+		)
+		query = query.Where(predicate)
+		countQuery = countQuery.Where(predicate)
+	}
 
 	total, err := countQuery.Count(ctx)
 	if err != nil {

@@ -99,6 +99,31 @@ export async function setMaterialActive(params = {}) {
   return dataOf(result)?.material || null
 }
 
+export async function listProducts(params = {}) {
+  const result = await masterDataRpc.call('list_products', params)
+  return dataOf(result)
+}
+
+export async function createProduct(params = {}) {
+  const result = await masterDataRpc.call('create_product', params)
+  return dataOf(result)?.product || null
+}
+
+export async function updateProduct(params = {}) {
+  const result = await masterDataRpc.call('update_product', params)
+  return dataOf(result)?.product || null
+}
+
+export async function getProduct(params = {}) {
+  const result = await masterDataRpc.call('get_product', params)
+  return dataOf(result)?.product || null
+}
+
+export async function setProductActive(params = {}) {
+  const result = await masterDataRpc.call('set_product_active', params)
+  return dataOf(result)?.product || null
+}
+
 export async function listProductSKUs(params = {}) {
   const result = await masterDataRpc.call('list_product_skus', params)
   return dataOf(result)

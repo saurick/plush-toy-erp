@@ -20,6 +20,7 @@ type stubMasterDataJSONRPCRepo struct {
 	supplierExists bool
 	productActive  bool
 	unitActive     bool
+	createdProduct *biz.ProductMutation
 	createdSKU     *biz.ProductSKUMutation
 	createdContact *biz.ContactMutation
 }
@@ -103,6 +104,22 @@ func (s *stubMasterDataJSONRPCRepo) ProductIsActive(context.Context, int) (bool,
 		return false, biz.ErrProductNotFound
 	}
 	return true, nil
+}
+func (s *stubMasterDataJSONRPCRepo) CreateProduct(_ context.Context, in *biz.ProductMutation) (*biz.Product, error) {
+	s.createdProduct = in
+	return &biz.Product{ID: 1, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+}
+func (s *stubMasterDataJSONRPCRepo) UpdateProduct(_ context.Context, id int, in *biz.ProductMutation) (*biz.Product, error) {
+	return &biz.Product{ID: id, Code: in.Code, Name: in.Name, DefaultUnitID: in.DefaultUnitID, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+}
+func (s *stubMasterDataJSONRPCRepo) GetProduct(_ context.Context, id int) (*biz.Product, error) {
+	return &biz.Product{ID: id, Code: "P001", Name: "产品", DefaultUnitID: 1, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+}
+func (s *stubMasterDataJSONRPCRepo) ListProducts(context.Context, biz.MasterDataFilter) ([]*biz.Product, int, error) {
+	return []*biz.Product{{ID: 1, Code: "P001", Name: "产品", DefaultUnitID: 1, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
+}
+func (s *stubMasterDataJSONRPCRepo) SetProductActive(_ context.Context, id int, active bool) (*biz.Product, error) {
+	return &biz.Product{ID: id, Code: "P001", Name: "产品", DefaultUnitID: 1, IsActive: active, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 func (s *stubMasterDataJSONRPCRepo) CreateProductSKU(_ context.Context, in *biz.ProductSKUMutation) (*biz.ProductSKU, error) {
 	s.createdSKU = in
@@ -363,6 +380,65 @@ func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.
 	}
 	if okRes == nil || okRes.Code != errcode.OK.Code {
 		t.Fatalf("expected OK, got %#v", okRes)
+	}
+}
+
+func TestJsonrpcDispatcher_ProductAPIRequiresPermissionAndValidUnit(t *testing.T) {
+	params := mustJSONRPCStruct(t, map[string]any{
+		"code":            " P001 ",
+		"name":            "毛绒熊",
+		"style_no":        "BEAR",
+		"default_unit_id": float64(1),
+	})
+
+	j := newMasterDataJSONRPCTestData(
+		&stubMasterDataJSONRPCRepo{unitActive: true},
+		workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductRead),
+	)
+	_, deniedRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if deniedRes == nil || deniedRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected permission denied, got %#v", deniedRes)
+	}
+
+	repo := &stubMasterDataJSONRPCRepo{unitActive: false}
+	j = newMasterDataJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductCreate))
+	_, invalidUnitRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product", "2", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if invalidUnitRes == nil || invalidUnitRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid param for missing unit, got %#v", invalidUnitRes)
+	}
+	if repo.createdProduct != nil {
+		t.Fatalf("product API must not bypass usecase unit guard")
+	}
+
+	repo = &stubMasterDataJSONRPCRepo{unitActive: true}
+	j = newMasterDataJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionProductCreate, biz.PermissionProductRead))
+	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "create_product", "3", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if okRes == nil || okRes.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", okRes)
+	}
+	if repo.createdProduct == nil || repo.createdProduct.Code != "P001" {
+		t.Fatalf("expected normalized product mutation, got %#v", repo.createdProduct)
+	}
+
+	_, listRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "list_products", "4", mustJSONRPCStruct(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if listRes == nil || listRes.Code != errcode.OK.Code {
+		t.Fatalf("expected OK list, got %#v", listRes)
+	}
+	data := listRes.Data.AsMap()
+	if _, ok := data["products"].([]any); !ok {
+		t.Fatalf("expected products list in response, got %#v", data)
 	}
 }
 

@@ -323,6 +323,91 @@ func (r *masterDataRepo) UnitIsActive(ctx context.Context, id int) (bool, error)
 	return row.IsActive, nil
 }
 
+func (r *masterDataRepo) CreateProduct(ctx context.Context, in *biz.ProductMutation) (*biz.Product, error) {
+	row, err := r.data.postgres.Product.Create().
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetNillableStyleNo(in.StyleNo).
+		SetNillableCustomerStyleNo(in.CustomerStyleNo).
+		SetDefaultUnitID(in.DefaultUnitID).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entProductToBiz(row), nil
+}
+
+func (r *masterDataRepo) UpdateProduct(ctx context.Context, id int, in *biz.ProductMutation) (*biz.Product, error) {
+	update := r.data.postgres.Product.UpdateOneID(id).
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetDefaultUnitID(in.DefaultUnitID)
+	if in.StyleNo == nil {
+		update.ClearStyleNo()
+	} else {
+		update.SetStyleNo(*in.StyleNo)
+	}
+	if in.CustomerStyleNo == nil {
+		update.ClearCustomerStyleNo()
+	} else {
+		update.SetCustomerStyleNo(*in.CustomerStyleNo)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductNotFound
+		}
+		return nil, err
+	}
+	return entProductToBiz(row), nil
+}
+
+func (r *masterDataRepo) GetProduct(ctx context.Context, id int) (*biz.Product, error) {
+	row, err := r.data.postgres.Product.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductNotFound
+		}
+		return nil, err
+	}
+	return entProductToBiz(row), nil
+}
+
+func (r *masterDataRepo) ListProducts(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Product, int, error) {
+	query := r.data.postgres.Product.Query()
+	if filter.Keyword != "" {
+		query = query.Where(product.Or(
+			product.CodeContains(filter.Keyword),
+			product.NameContains(filter.Keyword),
+			product.StyleNoContains(filter.Keyword),
+			product.CustomerStyleNoContains(filter.Keyword),
+		))
+	}
+	if filter.ActiveOnly {
+		query = query.Where(product.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Asc(product.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entProductsToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) SetProductActive(ctx context.Context, id int, active bool) (*biz.Product, error) {
+	row, err := r.data.postgres.Product.UpdateOneID(id).SetIsActive(active).Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProductNotFound
+		}
+		return nil, err
+	}
+	return entProductToBiz(row), nil
+}
+
 func (r *masterDataRepo) ProductIsActive(ctx context.Context, id int) (bool, error) {
 	row, err := r.data.postgres.Product.Query().Where(product.ID(id)).Only(ctx)
 	if err != nil {
@@ -727,6 +812,31 @@ func entMaterialsToBiz(rows []*ent.Material) []*biz.Material {
 	out := make([]*biz.Material, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, entMaterialToBiz(row))
+	}
+	return out
+}
+
+func entProductToBiz(row *ent.Product) *biz.Product {
+	if row == nil {
+		return nil
+	}
+	return &biz.Product{
+		ID:              row.ID,
+		Code:            row.Code,
+		Name:            row.Name,
+		StyleNo:         row.StyleNo,
+		CustomerStyleNo: row.CustomerStyleNo,
+		DefaultUnitID:   row.DefaultUnitID,
+		IsActive:        row.IsActive,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+	}
+}
+
+func entProductsToBiz(rows []*ent.Product) []*biz.Product {
+	out := make([]*biz.Product, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entProductToBiz(row))
 	}
 	return out
 }

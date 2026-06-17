@@ -19,6 +19,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Segmented,
   Select,
   Space,
   Switch,
@@ -48,21 +49,25 @@ import {
   createContact,
   createCustomer,
   createMaterial,
+  createProduct,
   createProductSKU,
   createSupplier,
   disableContact,
   listContactsByOwner,
   listCustomers,
   listMaterials,
+  listProducts,
   listProductSKUs,
   listSuppliers,
   setCustomerActive,
   setMaterialActive,
+  setProductActive,
   setProductSKUActive,
   setSupplierActive,
   updateContact,
   updateCustomer,
   updateMaterial,
+  updateProduct,
   updateProductSKU,
   updateSupplier,
 } from '../api/masterDataOrderApi.mjs'
@@ -70,6 +75,7 @@ import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   buildContactParams,
   buildMasterDataParams,
+  buildProductParams,
   buildProductSKUParams,
   formatUnixDateTime,
   hasActionPermission,
@@ -148,6 +154,25 @@ const PAGE_CONFIG = Object.freeze({
     formBoundary: '只维护材料主数据，不在此写采购、库存、质检或 BOM 用量。',
     summary:
       '维护材料主数据；采购订单、库存余额、来料质检和 BOM 用量在对应业务模块处理。',
+  },
+  products: {
+    title: '产品档案',
+    recordKey: 'products',
+    list: listProducts,
+    create: createProduct,
+    update: updateProduct,
+    setActive: setProductActive,
+    permissions: {
+      create: 'product.create',
+      update: 'product.update',
+      disable: 'product.disable',
+    },
+    entityLabel: '产品',
+    createTitleLabel: '产品',
+    formBoundary:
+      '只维护产品基础信息，不在此写订单、库存、BOM、生产或出货事实。',
+    summary:
+      '维护产品基础信息；产品规格 / SKU、BOM、订单、库存和出货事实在对应业务模块处理。',
   },
   product_skus: {
     title: '产品档案',
@@ -277,6 +302,51 @@ function downloadCSV({ filename, columns, rows }) {
 }
 
 function MasterDataFormFields({ type }) {
+  if (type === 'products') {
+    return (
+      <>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="产品编号"
+          name="code"
+          rules={[{ required: true, message: '请填写产品编号' }]}
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="产品名称"
+          name="name"
+          rules={[{ required: true, message: '请填写产品名称' }]}
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="内部款号"
+          name="style_no"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="客户款号"
+          name="customer_style_no"
+        >
+          <Input allowClear autoComplete="off" />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
+          label="默认单位 ID"
+          name="default_unit_id"
+          rules={[{ required: true, message: '请填写默认单位 ID' }]}
+        >
+          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        </Form.Item>
+      </>
+    )
+  }
+
   if (type === 'product_skus') {
     return (
       <>
@@ -658,6 +728,9 @@ function getRecordSearchPlaceholder(type = '') {
   if (type === 'materials') {
     return '搜索编号、名称、分类、规格、颜色'
   }
+  if (type === 'products') {
+    return '搜索产品编号、名称、内部款号、客户款号'
+  }
   if (type === 'product_skus') {
     return '搜索 SKU、条码、客户 SKU、颜色、色号、尺码、包装版本'
   }
@@ -665,7 +738,10 @@ function getRecordSearchPlaceholder(type = '') {
 }
 
 export default function V1MasterDataPage({ type }) {
-  const config = PAGE_CONFIG[type] || PAGE_CONFIG.customers
+  const isProductCatalogPage = type === 'product_skus'
+  const [productCatalogType, setProductCatalogType] = useState('products')
+  const effectiveType = isProductCatalogPage ? productCatalogType : type
+  const config = PAGE_CONFIG[effectiveType] || PAGE_CONFIG.customers
   const outletContext = useOutletContext()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -783,6 +859,17 @@ export default function V1MasterDataPage({ type }) {
     return outletContext?.registerPageRefresh?.(loadRecords)
   }, [loadRecords, outletContext])
 
+  useEffect(() => {
+    setSelectedRecord(null)
+    setContacts([])
+    setEditingRecord(null)
+    setRecordModalOpen(false)
+    setColumnOrder(null)
+    setPagination({ current: 1, pageSize: 20 })
+    setKeyword('')
+    setActiveOnly(false)
+  }, [effectiveType])
+
   const openCreateRecord = () => {
     setEditingRecord(null)
     setContacts([])
@@ -851,9 +938,11 @@ export default function V1MasterDataPage({ type }) {
     try {
       const extra = editingRecord?.id ? { id: editingRecord.id } : {}
       const params =
-        type === 'product_skus'
+        effectiveType === 'product_skus'
           ? buildProductSKUParams(values, extra)
-          : buildMasterDataParams(values, extra)
+          : effectiveType === 'products'
+            ? buildProductParams(values, extra)
+            : buildMasterDataParams(values, extra)
       const saved = editingRecord?.id
         ? await config.update(params)
         : await config.create(params)
@@ -912,7 +1001,81 @@ export default function V1MasterDataPage({ type }) {
   )
 
   const recordColumns = useMemo(() => {
-    if (type === 'product_skus') {
+    if (effectiveType === 'products') {
+      return [
+        {
+          title: '产品编号',
+          exportTitle: '产品编号',
+          dataIndex: 'code',
+          width: 150,
+          sorter: (a, b) => compareText(a?.code, b?.code),
+        },
+        {
+          title: '产品名称',
+          exportTitle: '产品名称',
+          dataIndex: 'name',
+          width: 220,
+          sorter: (a, b) => compareText(a?.name, b?.name),
+        },
+        {
+          title: '内部款号',
+          exportTitle: '内部款号',
+          dataIndex: 'style_no',
+          width: 160,
+          sorter: (a, b) => compareText(a?.style_no, b?.style_no),
+          render: (value) => value || '-',
+        },
+        {
+          title: '客户款号',
+          exportTitle: '客户款号',
+          dataIndex: 'customer_style_no',
+          width: 160,
+          sorter: (a, b) =>
+            compareText(a?.customer_style_no, b?.customer_style_no),
+          render: (value) => value || '-',
+        },
+        {
+          title: '默认单位 ID',
+          exportTitle: '默认单位 ID',
+          dataIndex: 'default_unit_id',
+          width: 130,
+          sorter: (a, b) =>
+            Number(a?.default_unit_id || 0) - Number(b?.default_unit_id || 0),
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'is_active',
+          width: 90,
+          sorter: (a, b) => compareBoolean(a?.is_active, b?.is_active),
+          exportValue: (record) =>
+            record?.is_active === false ? '停用' : '启用',
+          render: activeTag,
+        },
+        {
+          title: '创建时间',
+          exportTitle: '创建时间',
+          dataIndex: 'created_at',
+          width: 160,
+          sorter: (a, b) =>
+            Number(a?.created_at || 0) - Number(b?.created_at || 0),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.created_at),
+        },
+        {
+          title: '更新时间',
+          exportTitle: '更新时间',
+          dataIndex: 'updated_at',
+          width: 160,
+          sorter: (a, b) =>
+            Number(a?.updated_at || 0) - Number(b?.updated_at || 0),
+          render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.updated_at),
+        },
+      ]
+    }
+
+    if (effectiveType === 'product_skus') {
       return [
         {
           title: '产品 ID',
@@ -1043,7 +1206,7 @@ export default function V1MasterDataPage({ type }) {
         width: 220,
         sorter: (a, b) => compareText(a?.name, b?.name),
       },
-      ...(type === 'materials'
+      ...(effectiveType === 'materials'
         ? []
         : [
             {
@@ -1055,7 +1218,7 @@ export default function V1MasterDataPage({ type }) {
               render: (value) => value || '-',
             },
           ]),
-      ...(type === 'materials'
+      ...(effectiveType === 'materials'
         ? [
             {
               title: '分类',
@@ -1092,7 +1255,7 @@ export default function V1MasterDataPage({ type }) {
             },
           ]
         : []),
-      ...(type === 'suppliers'
+      ...(effectiveType === 'suppliers'
         ? [
             {
               title: '类型',
@@ -1108,7 +1271,7 @@ export default function V1MasterDataPage({ type }) {
             },
           ]
         : []),
-      ...(type === 'materials'
+      ...(effectiveType === 'materials'
         ? []
         : [
             {
@@ -1151,7 +1314,7 @@ export default function V1MasterDataPage({ type }) {
         exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
     ]
-  }, [type])
+  }, [effectiveType])
   const preferredRecordColumnOrder = useMemo(
     () =>
       getPreferredColumnOrder({
@@ -1195,13 +1358,13 @@ export default function V1MasterDataPage({ type }) {
   )
   const selectedRecordDisplayText = useMemo(() => {
     if (!selectedRecord) return `请先选择一个${entityLabel}`
-    return `${getRecordCode(selectedRecord, type) || selectedRecord.id} / ${
-      getRecordName(selectedRecord, type) || `未命名${entityLabel}`
+    return `${getRecordCode(selectedRecord, effectiveType) || selectedRecord.id} / ${
+      getRecordName(selectedRecord, effectiveType) || `未命名${entityLabel}`
     }`
-  }, [entityLabel, selectedRecord, type])
+  }, [effectiveType, entityLabel, selectedRecord])
   const exportRecords = () => {
     downloadCSV({
-      filename: `${type}-current-results.csv`,
+      filename: `${effectiveType}-current-results.csv`,
       columns: orderedRecordColumns,
       rows: records,
     })
@@ -1229,12 +1392,24 @@ export default function V1MasterDataPage({ type }) {
         ]}
       />
 
+      {isProductCatalogPage ? (
+        <Segmented
+          aria-label="产品档案视图"
+          value={effectiveType}
+          onChange={(nextValue) => setProductCatalogType(nextValue)}
+          options={[
+            { label: '产品基础信息', value: 'products' },
+            { label: '产品规格', value: 'product_skus' },
+          ]}
+        />
+      ) : null}
+
       <BusinessOperationPanel
         compact
         filters={
           <>
             <SearchInput
-              placeholder={getRecordSearchPlaceholder(type)}
+              placeholder={getRecordSearchPlaceholder(effectiveType)}
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value)
@@ -1400,7 +1575,7 @@ export default function V1MasterDataPage({ type }) {
       <CollaborationTaskPanel
         tasks={[]}
         selectedTasks={[]}
-        selectedRecordLabel={getRecordName(selectedRecord, type) || ''}
+        selectedRecordLabel={getRecordName(selectedRecord, effectiveType) || ''}
       />
 
       <Modal
@@ -1430,7 +1605,7 @@ export default function V1MasterDataPage({ type }) {
           layout="vertical"
           className="erp-business-action-form"
         >
-          <MasterDataFormFields type={type} />
+          <MasterDataFormFields type={effectiveType} />
           {showContactForm ? (
             <ContactFormList form={recordForm} entityLabel={entityLabel} />
           ) : null}

@@ -24,6 +24,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   BusinessOperationPanel,
   BusinessDataTable,
+  CollaborationTaskPanel,
   DateInput,
   DateRangeFilter,
   BusinessPageLayout,
@@ -51,6 +52,7 @@ import {
   submitPurchaseOrder,
 } from '../api/masterDataOrderApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
+import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   PURCHASE_ORDER_STATUS_COLORS,
   PURCHASE_ORDER_STATUS_LABELS,
@@ -63,10 +65,12 @@ import {
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
+import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -121,6 +125,7 @@ const LIFECYCLE_ACTIONS = [
 const BUSINESS_FORM_MODAL_WIDTH = 'min(1040px, calc(100vw - 96px))'
 const PURCHASE_ORDERS_MODULE_KEY = 'accessories-purchase'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
+const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
 
 function parseSortValue(value = 'updated_at:desc') {
   const [sortBy = 'updated_at', sortDirection = 'desc'] =
@@ -325,10 +330,15 @@ export default function V1PurchaseOrdersPage() {
   const [form] = Form.useForm()
   const canCreate = hasActionPermission(adminProfile, 'purchase.order.create')
   const canUpdate = hasActionPermission(adminProfile, 'purchase.order.update')
+  const canReadWorkflowTasks = hasActionPermission(
+    adminProfile,
+    'workflow.task.read'
+  )
 
   const [loading, setLoading] = useState(false)
   const [itemsLoading, setItemsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [workflowTasks, setWorkflowTasks] = useState([])
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -455,6 +465,23 @@ export default function V1PurchaseOrdersPage() {
     status,
   ])
 
+  const loadWorkflowTasks = useCallback(async () => {
+    if (!canReadWorkflowTasks) {
+      setWorkflowTasks([])
+      return
+    }
+    try {
+      const data = await listWorkflowTasks({
+        source_type: PURCHASE_ORDERS_MODULE_KEY,
+        limit: 200,
+      })
+      setWorkflowTasks(data?.tasks || [])
+    } catch (error) {
+      setWorkflowTasks([])
+      message.error(getActionErrorMessage(error, '加载采购协同任务失败'))
+    }
+  }, [canReadWorkflowTasks])
+
   const loadOrderItems = useCallback(async (order) => {
     if (!order?.id) {
       return []
@@ -484,8 +511,16 @@ export default function V1PurchaseOrdersPage() {
   }, [loadOrders])
 
   useEffect(() => {
-    return outletContext?.registerPageRefresh?.(loadOrders)
-  }, [loadOrders, outletContext])
+    loadWorkflowTasks()
+  }, [loadWorkflowTasks])
+
+  const refreshPageData = useCallback(async () => {
+    await Promise.all([loadOrders(), loadWorkflowTasks()])
+  }, [loadOrders, loadWorkflowTasks])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(refreshPageData)
+  }, [outletContext, refreshPageData])
 
   const openCreateModal = () => {
     setEditingOrder(null)
@@ -750,6 +785,17 @@ export default function V1PurchaseOrdersPage() {
   )
   const singleSelectedOrder =
     selectedRowKeys.length === 1 ? selectedOrders[0] || selectedOrder : null
+  const selectedOrderWorkflowTasks = useMemo(
+    () =>
+      singleSelectedOrder?.id
+        ? filterBusinessCollaborationTasksBySource({
+            tasks: workflowTasks,
+            sourceType: PURCHASE_ORDERS_MODULE_KEY,
+            sourceIDs: [singleSelectedOrder.id],
+          })
+        : [],
+    [singleSelectedOrder, workflowTasks]
+  )
 
   const stats = [
     { key: 'total', label: '总订单', value: total },
@@ -967,6 +1013,13 @@ export default function V1PurchaseOrdersPage() {
           onChange: (current, pageSize) => setPagination({ current, pageSize }),
         }}
         emptyDescription="暂无采购订单"
+      />
+
+      <CollaborationTaskPanel
+        tasks={workflowTasks}
+        selectedTasks={selectedOrderWorkflowTasks}
+        selectedRecordLabel={singleSelectedOrder?.purchase_order_no || ''}
+        roleLabelMap={WORKFLOW_ROLE_LABELS}
       />
 
       <ColumnOrderModal

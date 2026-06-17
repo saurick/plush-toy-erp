@@ -385,6 +385,7 @@
         justify-content: space-between;
         gap: 12px;
         border-top: 1px dashed var(--line);
+        margin-bottom: 12px;
         padding-top: 12px;
       }
 
@@ -947,6 +948,13 @@
             <input placeholder="搜索要导入的记录" />
             <button class="btn" type="button">查看计算口径</button>
           </div>
+          <div class="picker-selection">
+            <div class="picker-selection-items">
+              <strong>已选 1 条：</strong>
+              <span class="selected-chip">SO-202606-018</span>
+            </div>
+            <button class="link-button" type="button">清空已选</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
@@ -990,13 +998,6 @@
                 </tr>
               </tbody>
             </table>
-          </div>
-          <div class="picker-selection">
-            <div class="picker-selection-items">
-              <strong>已选 1 条：</strong>
-              <span class="selected-chip">SO-202606-018</span>
-            </div>
-            <button class="link-button" type="button">清空已选</button>
           </div>
           <div class="pagination">
             <span>共 40 条</span>

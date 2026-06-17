@@ -263,6 +263,12 @@ func runtimeAuditEventsToAny(items []biz.RuntimeAuditEvent) []any {
 			"event_key":      item.EventKey,
 			"source":         item.Source,
 			"payload":        item.Payload,
+			"risk_level":     item.RiskLevel,
+			"action_label":   item.ActionLabel,
+			"summary":        item.Summary,
+			"actor_key":      item.ActorKey,
+			"target_type":    item.TargetType,
+			"target_key":     item.TargetKey,
 			"created_at":     item.CreatedAt.Unix(),
 			"created_at_iso": item.CreatedAt.Format(time.RFC3339),
 		})

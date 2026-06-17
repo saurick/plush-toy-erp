@@ -1082,12 +1082,34 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemAuditRead); res != nil {
 			return id, res, nil
 		}
+		createdFrom, ok := getOptionalJSONRPCTime(pm, "created_from")
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		createdTo, ok := getOptionalJSONRPCTime(pm, "created_to")
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		var createdFromValue time.Time
+		if createdFrom != nil {
+			createdFromValue = *createdFrom
+		}
+		var createdToValue time.Time
+		if createdTo != nil {
+			createdToValue = *createdTo
+		}
 		result, err := d.adminManageUC.ListRuntimeAuditEvents(ctx, biz.RuntimeAuditEventListFilter{
-			Source:    getString(pm, "source"),
-			EventType: getString(pm, "event_type"),
-			EventKey:  getString(pm, "event_key"),
-			Limit:     getInt(pm, "limit", 50),
-			Offset:    getInt(pm, "offset", 0),
+			Source:      getString(pm, "source"),
+			EventType:   getString(pm, "event_type"),
+			EventKey:    getString(pm, "event_key"),
+			ActorKey:    getString(pm, "actor_key"),
+			TargetType:  getString(pm, "target_type"),
+			TargetKey:   getString(pm, "target_key"),
+			Keyword:     getString(pm, "keyword"),
+			CreatedFrom: createdFromValue,
+			CreatedTo:   createdToValue,
+			Limit:       getInt(pm, "limit", 50),
+			Offset:      getInt(pm, "offset", 0),
 		})
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
