@@ -44,6 +44,7 @@ import {
   ColumnOrderModal,
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import SourceImportPickerModal from '../components/business-list/SourceImportPickerModal.jsx'
 import {
   approvePurchaseOrder,
@@ -53,10 +54,12 @@ import {
   listPurchaseOrderItems,
   listPurchaseOrders,
   listSuppliers,
+  listUnits,
   savePurchaseOrderWithItems,
   submitPurchaseOrder,
 } from '../api/masterDataOrderApi.mjs'
 import { createPurchaseReceiptFromPurchaseOrder } from '../api/purchaseApi.mjs'
+import { listInventoryLots } from '../api/inventoryApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   listWorkflowTasks,
@@ -70,6 +73,7 @@ import {
   buildMaterialPurchaseContractDraftFromPurchaseOrder,
   buildPurchaseOrderItemParams,
   buildPurchaseOrderParams,
+  buildSequentialDraftCode,
   buildSupplierSnapshot,
   canRunPurchaseOrderLifecycleAction,
   formatUnixDate,
@@ -85,6 +89,11 @@ import {
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
 import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
+import {
+  uniqueReferenceOptions,
+  unitOption,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
 import {
   MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
   PRINT_WORKSPACE_ENTRY_SOURCE,
@@ -152,7 +161,6 @@ const LIFECYCLE_ACTIONS = [
   },
 ]
 
-const BUSINESS_FORM_MODAL_WIDTH = 'min(1040px, calc(100vw - 96px))'
 const PURCHASE_ORDERS_MODULE_KEY = 'accessories-purchase'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
@@ -399,6 +407,8 @@ export default function V1PurchaseOrdersPage() {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [suppliers, setSuppliers] = useState([])
   const [materials, setMaterials] = useState([])
+  const [units, setUnits] = useState([])
+  const [inventoryLots, setInventoryLots] = useState([])
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
   const [dateFilterField, setDateFilterField] = useState('purchase_date')
@@ -436,6 +446,14 @@ export default function V1PurchaseOrdersPage() {
       })),
     [materials]
   )
+  const unitOptions = useMemo(
+    () => uniqueReferenceOptions(units, unitOption),
+    [units]
+  )
+  const warehouseOptions = useMemo(
+    () => uniqueReferenceOptions(inventoryLots, warehouseOptionFromRecord),
+    [inventoryLots]
+  )
   const watchedItems = Form.useWatch('items', form) || []
   const lineSummary = summarizePurchaseLines(watchedItems)
   const materialImportColumns = useMemo(
@@ -462,12 +480,18 @@ export default function V1PurchaseOrdersPage() {
 
   const loadReferenceData = useCallback(async () => {
     try {
-      const [supplierData, materialData] = await Promise.all([
-        listSuppliers({ active_only: true, limit: 200 }),
-        listMaterials({ active_only: true, limit: 200 }),
-      ])
+      const [supplierData, materialData, unitData, lotData] = await Promise.all(
+        [
+          listSuppliers({ active_only: true, limit: 200 }),
+          listMaterials({ active_only: true, limit: 200 }),
+          listUnits({ limit: 500 }),
+          listInventoryLots({ limit: 500 }),
+        ]
+      )
       setSuppliers(supplierData?.suppliers || [])
       setMaterials(materialData?.materials || [])
+      setUnits(unitData?.units || [])
+      setInventoryLots(lotData?.inventory_lots || [])
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载采购基础资料失败'))
     }
@@ -576,7 +600,10 @@ export default function V1PurchaseOrdersPage() {
   const openCreateModal = () => {
     setEditingOrder(null)
     form.setFieldsValue({
-      purchase_order_no: '',
+      purchase_order_no: buildSequentialDraftCode(orders, {
+        prefix: 'PO',
+        field: 'purchase_order_no',
+      }),
       supplier_id: undefined,
       supplier_purchase_order_no: '',
       purchase_date: todayInputValue(),
@@ -1395,16 +1422,10 @@ export default function V1PurchaseOrdersPage() {
         onClose={() => setColumnOrderOpen(false)}
       />
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
-        width={BUSINESS_FORM_MODAL_WIDTH}
+      <BusinessFormModal
         open={modalOpen}
-        title={
-          <div className="erp-business-action-modal__title">
-            <span>{editingOrder ? '编辑采购订单' : '新建采购订单'}</span>
-            <small>只维护采购承诺，不在此写库存、质检或应付事实。</small>
-          </div>
-        }
+        title={editingOrder ? '编辑采购订单' : '新建采购订单'}
+        description="只维护采购承诺，不在此写库存、质检或应付事实。"
         okText="保存"
         confirmLoading={saving || itemsLoading}
         onOk={handleSave}
@@ -1424,10 +1445,10 @@ export default function V1PurchaseOrdersPage() {
           <Form.Item
             className="erp-business-action-form__field"
             name="purchase_order_no"
-            label="采购单号"
-            rules={[{ required: true, message: '请输入采购单号' }]}
+            label="采购单号（自动）"
+            rules={[{ required: true, message: '请输入或保留自动采购单号' }]}
           >
-            <Input maxLength={64} />
+            <Input maxLength={64} placeholder="自动生成，可按需要调整" />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
@@ -1572,15 +1593,15 @@ export default function V1PurchaseOrdersPage() {
                           </Form.Item>
                           <Form.Item
                             name={[field.name, 'unit_id']}
-                            label="单位ID"
-                            rules={[
-                              { required: true, message: '请输入单位ID' },
-                            ]}
+                            label="单位"
+                            rules={[{ required: true, message: '请选择单位' }]}
                           >
-                            <InputNumber
-                              min={1}
-                              precision={0}
-                              style={{ width: '100%' }}
+                            <Select
+                              allowClear
+                              optionFilterProp="label"
+                              options={unitOptions}
+                              placeholder="请选择单位"
+                              showSearch
                             />
                           </Form.Item>
                           <Form.Item
@@ -1672,7 +1693,7 @@ export default function V1PurchaseOrdersPage() {
             </Form.List>
           </section>
         </Form>
-      </Modal>
+      </BusinessFormModal>
       <Modal
         title="生成采购入库草稿"
         open={inboundDraftModalOpen}
@@ -1698,10 +1719,16 @@ export default function V1PurchaseOrdersPage() {
           </Form.Item>
           <Form.Item
             name="warehouse_id"
-            label="入库仓库 ID"
-            rules={[{ required: true, message: '请输入入库仓库 ID' }]}
+            label="入库仓库"
+            rules={[{ required: true, message: '请选择入库仓库' }]}
           >
-            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+            <Select
+              allowClear
+              optionFilterProp="label"
+              options={warehouseOptions}
+              placeholder="请选择入库仓库"
+              showSearch
+            />
           </Form.Item>
           <Form.Item
             name="received_at"

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   buildBusinessModuleQuery,
@@ -45,6 +46,10 @@ test('formal business shell: 表单字段按产品核心模块区分', () => {
   const formalShellModules = getFormalBusinessShellModules()
 
   assert.ok(formalShellModules.length > 0)
+  assert.deepEqual(
+    formalShellModules.map((item) => item.key),
+    ['production-scheduling', 'production-exceptions', 'shipping-release']
+  )
   for (const moduleItem of formalShellModules) {
     assert.ok(
       getFormalShellFormFieldLabels(moduleItem.key).length >= 6,
@@ -100,4 +105,63 @@ test('formal business shell: 表单字段按产品核心模块区分', () => {
   assert.deepEqual(getFormalShellFormFieldLabels('inventory'), [])
   assert.deepEqual(getFormalShellFormFieldLabels('receivables'), [])
   assert.deepEqual(getFormalShellFormFieldLabels('outbound'), [])
+})
+
+test('formal business shell: 预览页文案不冒充真实业务写入', () => {
+  const source = readFileSync(
+    new URL('../pages/FormalBusinessModulePage.jsx', import.meta.url),
+    'utf8'
+  )
+
+  for (const text of [
+    '新建排程',
+    '新建异常',
+    '新建放行单',
+    '生成生产任务',
+    '生成出货放行',
+    '导出当前结果',
+    '导出预览字段',
+    '关联单据',
+    '状态变更',
+    '业务编号',
+    '业务对象',
+    '批量删除',
+    '回收站',
+    '加工合同打印',
+    'openPrintWorkspaceWindow',
+    'PROCESSING_CONTRACT_TEMPLATE_KEY',
+  ]) {
+    assert.equal(
+      source.includes(text),
+      false,
+      `formal shell page should not expose misleading copy: ${text}`
+    )
+  }
+
+  for (const text of [
+    '预览排程字段',
+    '预览异常字段',
+    '预览放行字段',
+    '查看排程接入边界',
+    '预览导出待接入',
+    '真实保存待接入',
+    '当前页面仍是待接入预览页',
+  ]) {
+    assert.equal(
+      source.includes(text),
+      true,
+      `formal shell page should expose preview/boundary copy: ${text}`
+    )
+  }
+
+  assert.equal(
+    source.includes('暂无远端数据刷新'),
+    true,
+    'formal shell page should explain that global refresh has no remote data source'
+  )
+  assert.equal(
+    source.includes('return false'),
+    true,
+    'formal shell refresh handler should not let the app shell show a fake refresh success'
+  )
 })

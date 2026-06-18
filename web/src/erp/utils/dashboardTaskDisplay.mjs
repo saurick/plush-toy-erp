@@ -1,3 +1,4 @@
+import { businessModuleDefinitions } from '../config/businessModules.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
 
 const TASK_SOURCE_TITLE_MAP = new Map([
@@ -18,17 +19,23 @@ const TASK_SOURCE_TITLE_MAP = new Map([
   ['payables', '应付协同'],
   ['receivables', '应收开票协同'],
   ['invoices', '发票协同'],
+  ['shipments', '出货单协同'],
 ])
-const TASK_SOURCE_PATH_MAP = new Map(
-  dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.path])
+const FORMAL_V1_TASK_ENTRY_MODULES = businessModuleDefinitions.filter(
+  (moduleItem) => moduleItem.pageKind === 'formal-v1'
 )
+const TASK_SOURCE_PATH_MAP = new Map([
+  ...FORMAL_V1_TASK_ENTRY_MODULES.map((moduleItem) => [
+    moduleItem.key,
+    moduleItem.path,
+  ]),
+  ...dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.path]),
+])
 const TASK_LINK_MATCH_FIELDS = Object.freeze(['document_no', 'source_no'])
-const BUSINESS_DASHBOARD_PATH = '/erp/business-dashboard'
 const ACTIVE_TASK_ENTRY_PATHS = new Set([
   '/erp/business-dashboard',
-  '/erp/master/partners/customers',
-  '/erp/master/partners/suppliers',
-  '/erp/sales/project-orders/sales-orders',
+  ...FORMAL_V1_TASK_ENTRY_MODULES.map((moduleItem) => moduleItem.path),
+  ...dashboardModules.map((moduleItem) => moduleItem.path),
 ])
 
 export function formatWorkflowTaskSource(task = {}) {
@@ -100,7 +107,10 @@ export function resolveWorkflowTaskEntryPath(task = {}) {
     ? entryPath
     : ACTIVE_TASK_ENTRY_PATHS.has(sourcePath)
       ? sourcePath
-      : BUSINESS_DASHBOARD_PATH
+      : ''
+  if (!path) {
+    return ''
+  }
 
   const query = buildDashboardTaskQuery({
     keyword: task.source_no,

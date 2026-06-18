@@ -628,25 +628,25 @@
               <div class="tabs" role="tablist" aria-label="任务筛选">
                 <button
                   class="tab"
-                  id="tab-priority"
+                  id="tab-actionable"
                   role="tab"
                   type="button"
-                  data-filter="priority"
+                  data-filter="actionable"
                   aria-controls="taskList"
                   aria-selected="true"
                 >
-                  影响交付
+                  待我处理
                 </button>
                 <button
                   class="tab"
-                  id="tab-mine"
+                  id="tab-risk"
                   role="tab"
                   type="button"
-                  data-filter="mine"
+                  data-filter="risk"
                   aria-controls="taskList"
                   aria-selected="false"
                 >
-                  待我处理
+                  阻塞/逾期
                 </button>
                 <button
                   class="tab"
@@ -657,34 +657,34 @@
                   aria-controls="taskList"
                   aria-selected="false"
                 >
-                  等待他人
+                  等待交接
                 </button>
               </div>
             </div>
-            <div class="queue" id="taskList" role="tabpanel" aria-labelledby="tab-priority"></div>
+            <div class="queue" id="taskList" role="tabpanel" aria-labelledby="tab-actionable"></div>
           </section>
 
-          <aside class="detail" aria-label="当前处理卡">
+          <aside class="detail" aria-label="当前任务上下文">
             <div class="detail-head">
               <div>
-                <div class="eyebrow">当前处理卡</div>
-                <h2 id="detailTitle">入库质检被阻塞</h2>
+                <div class="eyebrow">当前任务上下文</div>
+                <h2 id="detailTitle">采购合同待回签</h2>
               </div>
-              <span class="tag red" id="detailTag">阻塞</span>
+              <span class="tag blue" id="detailTag">待我处理</span>
             </div>
             <div class="detail-body">
               <div class="why">
-                <strong id="detailWhy">影响本批产品入库，销售订单交期无法确认。</strong>
-                <span id="detailNext">下一步：进入入库通知/检验/入库，补充阻塞原因并重新推进。</span>
+                <strong id="detailWhy">合同未回签会影响后续到货跟进和供应商确认。</strong>
+                <span id="detailNext">下一步：进入单据模板，打开采购合同打印窗口继续处理。</span>
               </div>
               <div class="detail-grid">
-                <div class="detail-row"><span>业务对象</span><strong id="detailSource">入库通知/检验/入库</strong></div>
-                <div class="detail-row"><span>责任角色</span><strong id="detailRole">品质 / 仓库</strong></div>
-                <div class="detail-row"><span>到期</span><strong id="detailDue">已超时 2 小时</strong></div>
-                <div class="detail-row"><span>建议入口</span><strong id="detailEntry">入库通知/检验/入库</strong></div>
+                <div class="detail-row"><span>业务对象</span><strong id="detailSource">单据模板</strong></div>
+                <div class="detail-row"><span>责任角色</span><strong id="detailRole">采购</strong></div>
+                <div class="detail-row"><span>到期</span><strong id="detailDue">今天 18:00</strong></div>
+                <div class="detail-row"><span>建议入口</span><strong id="detailEntry">单据模板</strong></div>
               </div>
               <p class="detail-note" id="detailBoundary">
-                工作台只做协同提醒；质检完成不等于库存已经入账，库存事实仍由正式 usecase 处理。
+                打印和纸面快照不反向写采购、库存或财务事实。
               </p>
               <div class="actions">
                 <button class="btn primary">进入建议入口</button>
@@ -700,7 +700,7 @@
                 <div class="eyebrow">随当前任务变化</div>
                 <h3>当前任务关联记录</h3>
                 <div class="lane-meta">
-                  只放能继续处理当前事项的记录。高亮表示与当前处理卡直接相关，不替代左侧正式菜单。
+                  只放能继续处理当前事项的记录。高亮表示与当前任务上下文直接相关，不替代左侧正式菜单。
                 </div>
               </div>
               <div class="shortcut-grid">
@@ -766,7 +766,7 @@
           role: "品质 / 仓库",
           status: "阻塞",
           due: "已超时 2 小时",
-          filter: "priority",
+          filter: "risk",
           tag: "red",
           related: ["inbound", "inventory"],
           why: "影响本批产品入库，销售订单交期无法确认。",
@@ -781,7 +781,7 @@
           role: "仓库 / 业务",
           status: "影响交付",
           due: "今天 16:00",
-          filter: "priority",
+          filter: "risk",
           tag: "amber",
           related: ["sales", "inventory"],
           why: "客户交付节点临近，缺装箱确认会影响后续发货。",
@@ -796,7 +796,7 @@
           role: "采购",
           status: "待我处理",
           due: "今天 18:00",
-          filter: "mine",
+          filter: "actionable",
           tag: "blue",
           related: ["print"],
           why: "合同未回签会影响后续到货跟进和供应商确认。",
@@ -811,7 +811,7 @@
           role: "业务",
           status: "待我处理",
           due: "明天 10:00",
-          filter: "mine",
+          filter: "actionable",
           tag: "green",
           related: ["sales"],
           why: "交期未确认会让采购、生产和出货优先级失真。",
@@ -824,7 +824,7 @@
           title: "等待品质补充返工原因",
           source: "质检管理",
           role: "品质",
-          status: "等待他人",
+          status: "等待交接",
           due: "今天",
           filter: "waiting",
           tag: "amber",
@@ -836,8 +836,8 @@
         },
       ];
 
-      let selectedId = tasks[0].id;
-      let activeFilter = "priority";
+      let selectedId = "purchase-sign";
+      let activeFilter = "actionable";
 
       const taskList = document.querySelector("#taskList");
       const tabs = [...document.querySelectorAll(".tab")];

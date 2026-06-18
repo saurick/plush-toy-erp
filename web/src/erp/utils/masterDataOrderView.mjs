@@ -260,6 +260,128 @@ export function statusText(status, labels = {}) {
   return labels[key] || key || '-'
 }
 
+export function formatUnitDisplayName(unitID, unitByID = new Map()) {
+  const normalizedID = Number(unitID || 0)
+  if (!Number.isFinite(normalizedID) || normalizedID <= 0) {
+    return '-'
+  }
+  const unit = unitByID instanceof Map ? unitByID.get(normalizedID) : null
+  if (!unit) {
+    return `未知单位 #${normalizedID}`
+  }
+  const name = trimOptional(unit.name)
+  const code = trimOptional(unit.code)
+  if (name && code && name !== code) {
+    return `${name}（${code}）`
+  }
+  return name || code || `单位 #${normalizedID}`
+}
+
+export function buildUnitSelectOptions(units = []) {
+  const activeUnits = Array.isArray(units)
+    ? units.filter((unit) => unit?.is_active !== false)
+    : []
+  const unitByID = new Map(
+    activeUnits
+      .map((unit) => [Number(unit?.id || 0), unit])
+      .filter(([unitID]) => Number.isFinite(unitID) && unitID > 0)
+  )
+  return activeUnits
+    .map((unit) => {
+      const value = Number(unit?.id || 0)
+      if (!Number.isFinite(value) || value <= 0) {
+        return null
+      }
+      return {
+        value,
+        label: formatUnitDisplayName(value, unitByID),
+      }
+    })
+    .filter(Boolean)
+}
+
+export function buildTextSelectOptions(records = [], fieldName = '') {
+  const seen = new Set()
+  return (Array.isArray(records) ? records : [])
+    .map((record) => trimOptional(record?.[fieldName]))
+    .filter(Boolean)
+    .filter((value) => {
+      if (seen.has(value)) {
+        return false
+      }
+      seen.add(value)
+      return true
+    })
+    .map((value) => ({ value, label: value }))
+}
+
+export function inferDefaultUnitID(records = [], unitOptions = []) {
+  const allowedUnitIDs = new Set(
+    (Array.isArray(unitOptions) ? unitOptions : [])
+      .map((option) => Number(option?.value || 0))
+      .filter((unitID) => Number.isFinite(unitID) && unitID > 0)
+  )
+  if (allowedUnitIDs.size === 0) {
+    return undefined
+  }
+
+  const counts = new Map()
+  for (const record of Array.isArray(records) ? records : []) {
+    const unitID = Number(record?.default_unit_id || 0)
+    if (!allowedUnitIDs.has(unitID)) {
+      continue
+    }
+    counts.set(unitID, (counts.get(unitID) || 0) + 1)
+  }
+  const [mostUsedUnitID] = [...counts.entries()].sort(
+    ([unitIDA, countA], [unitIDB, countB]) =>
+      countB - countA || unitIDA - unitIDB
+  )[0] || [undefined]
+  return mostUsedUnitID || [...allowedUnitIDs][0]
+}
+
+function draftCodeDateKey(now = new Date()) {
+  const date =
+    now instanceof Date && !Number.isNaN(now.valueOf()) ? now : new Date()
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('')
+}
+
+export function buildSequentialDraftCode(
+  records = [],
+  { prefix = '', field = 'code', now = new Date(), sequenceWidth = 3 } = {}
+) {
+  const normalizedPrefix = trimOptional(prefix)
+  if (!normalizedPrefix) {
+    return ''
+  }
+  const dateKey = draftCodeDateKey(now)
+  const codePrefix = `${normalizedPrefix}-${dateKey}-`
+  const maxSequence = (Array.isArray(records) ? records : []).reduce(
+    (max, record) => {
+      const code = String(record?.[field] || '')
+      if (!code.startsWith(codePrefix)) {
+        return max
+      }
+      const sequence = Number(code.slice(codePrefix.length))
+      return Number.isFinite(sequence) ? Math.max(max, sequence) : max
+    },
+    0
+  )
+  return `${codePrefix}${String(maxSequence + 1).padStart(sequenceWidth, '0')}`
+}
+
+export function buildMaterialDraftCode(records = [], now = new Date()) {
+  return buildSequentialDraftCode(records, {
+    prefix: 'MAT',
+    field: 'code',
+    now,
+  })
+}
+
 export function buildCustomerSnapshot(customer = {}) {
   if (!customer?.id) {
     return {}

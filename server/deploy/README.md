@@ -29,12 +29,18 @@ Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/
 - `POSTGRES_DSN`
 - `APP_IMAGE`
 - `WEB_IMAGE`
+- `POSTGRES_IMAGE` 和 `JAEGER_IMAGE` 必须使用固定版本 tag，不能用 `latest` / `dev`
 - `APP_JWT_SECRET`
+- `APP_AUTH_SMS_MODE=disabled`，生产环境不能使用 `mock`
 - `APP_ADMIN_USERNAME`
 - `BOOTSTRAP_ADMIN_ONCE=false`；只有新库首次初始化 bootstrap 管理员时才临时改为 `true`
+- `POSTGRES_BIND_ADDR=127.0.0.1`，PostgreSQL 宿主机映射只允许 loopback
+- `ERP_DEBUG_ENV=prod`
+- `ERP_DEBUG_SEED_ENABLED=false`
+- `ERP_DEBUG_CLEANUP_ENABLED=false`
 - 任何默认 JWT 密钥；新库首次初始化 bootstrap 管理员时再临时注入 `APP_ADMIN_PASSWORD`
 
-说明：生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。已有 `admin` 或同名管理员不会被启动逻辑自动提权，应通过管理员改密或受控 SQL 更新密码哈希。
+说明：生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。已有 `admin` 或同名管理员不会被启动逻辑自动提权，应通过管理员改密或受控 SQL 更新密码哈希。
 
 建议先执行：
 

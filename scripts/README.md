@@ -20,13 +20,14 @@
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 业务事实模拟闭环入口，只使用显式模拟主数据覆盖生产 / 预留 / 委外 / 出货 / 财务链路                              | 业务事实内部模拟验收 / 目标环境事实回归                  |
 | `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，只创建和更新显式模拟 workflow 任务，覆盖审批 / 质检 / 入库 / 出货放行异常和现场留痕         | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
 | `scripts/qa/mvp-closure.mjs`                    | ERP MVP 闭环验收入口，默认只生成计划和本地 evidence，可选运行现有 no-write report-only 工具                     | MVP 主链路验收口径收口 / 试用前证据整理                  |
+| `scripts/qa/purchase-receipt-real-write-e2e.mjs` | 采购入库真实写入链路验收入口，默认跑 JSON-RPC 创建 / 加行 / 过账 / 回显 / 库存事实 / 权限测试，可选追加本地 PostgreSQL 防呆测试 | MVP 第一条真实写入链路回归 / 采购入库事实验收 |
 | `scripts/qa/industry-template-boundaries.mjs`          | 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                              | 行业模板调整后                                             |
 | `scripts/qa/industry-template-closure.mjs`      | 行业模板模拟闭环入口，只读取候选配置并生成 evidence 报告                                                        | 行业模板回归 / 目标环境发布前                              |
 | `scripts/qa/private-deployment-boundaries.mjs`         | 多客户私有化复制边界检查，确保客户包模板不变成 SaaS、tenant、代码分叉或真实导入入口                             | 私有化客户包模板调整后                                     |
 | `scripts/qa/private-deployment-package-closure.mjs`     | 多客户私有化复制模拟闭环入口，只读取模板并生成 evidence 报告                                                   | 私有化客户包回归 / 目标环境发布前                          |
 | `scripts/deploy/deployment-package-lint.mjs`           | 客户私有化部署资料包检查，确保 `deployments/yoyoosun` 必需文件齐全且不含真实 env、备份、raw files 或 secret       | 调整客户部署资料包后                                       |
 | `scripts/deploy/release-evidence-gate.mjs`             | yoyoosun 发布证据门禁，检查本次 release evidence、pre-migration backup、backup restore、migration、smoke 和 sign-off 已脱敏填齐 | 客户试用或交付前                                           |
-| `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、Compose、migration 脚本、Jaeger loopback 和低配部署边界 | 每次生产发布 / 部署后运行态复核前                          |
+| `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、固定镜像 tag、SMS mock、debug 写入开关、Compose、migration 脚本、PostgreSQL / Jaeger loopback 和低配部署边界 | 每次生产发布 / 部署后运行态复核前                          |
 | `scripts/qa/core-boundary.test.mjs`                    | 自动扫描 `server/internal/core`，防止纯产品规则层 import `biz/data/service`、Ent、SQL、HTTP、配置或文件系统依赖 | 调整 `server/internal/core` 后                              |
 | `scripts/qa/phase-label-boundaries.mjs`                | 自动扫描活跃实现路径，阻止新增 runtime 阶段编号命名；仅允许当前旧 PostgreSQL 本地验收兼容入口                     | 调整命名、脚本、API、运行时代码或治理文档后                 |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、冲正和防负库存                         |
@@ -303,6 +304,23 @@ node scripts/qa/mvp-closure.mjs \
 
 真正写入本地或目标试用环境时，仍必须分别调用 `trial-simulated-data.mjs`、`operational-fact-simulated-closure.mjs` 或 `mobile-workflow-simulated-closure.mjs` 的 `--apply` 路径，并提供对应确认环境变量。
 
+采购入库真实写入链路验收入口用于把 MVP 第一条事实写入链路固定下来。默认运行 JSON-RPC 服务层测试，覆盖创建入库草稿、添加明细、非法明细失败、过账、查询回显、列表、看板 projection、取消冲正、重复过账 / 取消幂等和权限拒绝：
+
+```bash
+node scripts/qa/purchase-receipt-real-write-e2e.mjs \
+  --out output/qa/purchase-receipt-real-write-e2e
+```
+
+如需追加本地 PostgreSQL 防呆测试，先确认本地测试库连接配置命中隔离测试库，再显式开启：
+
+```bash
+node scripts/qa/purchase-receipt-real-write-e2e.mjs \
+  --with-postgres \
+  --out output/qa/purchase-receipt-real-write-e2e
+```
+
+该入口只运行测试隔离库 / 本地 PostgreSQL 防呆测试，不连接生产或目标环境，不执行真实客户导入，也不把 Workflow task done 当成采购入库过账。
+
 行业模板候选只允许模拟闭环验收，不执行真实客户数据导入，不写业务表，不把单客户样本直接升成行业默认。先运行边界守卫：
 
 ```bash
@@ -340,9 +358,13 @@ node scripts/qa/private-deployment-package-closure.mjs \
 
 ### 1. 初始化环境
 
+先确认本机工具链满足仓库锁定版本，再安装依赖和启用 hooks：
+
 ```bash
-bash /Users/simon/projects/plush-toy-erp/scripts/bootstrap.sh
+cd /Users/simon/projects/plush-toy-erp
+corepack enable
 bash /Users/simon/projects/plush-toy-erp/scripts/doctor.sh
+bash /Users/simon/projects/plush-toy-erp/scripts/bootstrap.sh
 ```
 
 ### 2. 收口默认占位和配置
@@ -472,7 +494,7 @@ bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/qa/strict.sh
 ```
 
-生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足：
+生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / Jaeger loopback 和低配部署边界：
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh \
@@ -488,6 +510,7 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 - 安装 `web` 和 `server` 依赖
 - 安装 Git hooks
 - 默认执行一次 `scripts/qa/fast.sh`
+- 安装前会先调用 `scripts/doctor.sh`，版本不匹配时直接中止
 
 ### `project-scan.sh`
 
@@ -499,6 +522,9 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 ### `doctor.sh`
 
 - 检查 `git`、`node`、`pnpm`、`go`
+- 检查 Node 版本锁文件 `.n-node-version`、`.node-version`、`.nvmrc` 是否一致，并要求当前 Node 等于锁定版本
+- 检查 `web/package.json` 的 `packageManager` 是否固定为 `pnpm@x.y.z`，并要求当前 pnpm 与之一致
+- 在 `server/` 模块内检查 Go toolchain，要求当前 Go 满足 `server/go.mod` 的 `toolchain` / `go` 版本
 - 检查 `gitleaks`、`shellcheck`、`golangci-lint`、`yamllint`、`shfmt`、`govulncheck`
 - 检查 hooks 和关键脚本是否可执行
 
@@ -514,6 +540,12 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 - 补充更完整的 shell、Go、YAML 和 secrets 检查
 - 若定义了前端 `test`，会一并执行，但它不替代浏览器里的样式 / box 模型回归
 
+### npm registry token 边界
+
+- 入库的 `web/.npmrc` 只保留无密钥的 pnpm 行为配置，不写 `_authToken`、`npmAuthToken`、`NPM_TOKEN` 或 `NODE_AUTH_TOKEN`。
+- 本机私有 registry token 放在被 `.gitignore` 忽略的 `.npmrc.local`、`web/.npmrc.local`，或通过 shell 环境变量注入。
+- `scripts/qa/secrets.sh` 会始终检查候选 `.npmrc` / `.yarnrc.yml` 中的 npm token 明文；安装 `gitleaks` 后会继续执行通用密钥扫描。
+
 ## Hook 对应关系
 
 - `pre-commit` -> `scripts/git-hooks/pre-commit.sh`
@@ -522,8 +554,10 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 
 ## 版本锁定
 
-- 根目录 `.n-node-version` 用于约束 Node 版本（`n auto` 会优先读取）
-- 建议执行：`n auto` 后再运行 QA 脚本
+- 根目录 `.n-node-version`、`.node-version`、`.nvmrc` 都锁定为 `24.14.0`，分别服务 `n`、通用 Node 版本管理器和 `nvm`。
+- `web/package.json` 用 `packageManager: pnpm@10.13.1` 固定 pnpm 版本；建议先执行 `corepack enable`，再进入 `web/` 跑 `pnpm install`。
+- `server/go.mod` 当前使用 `toolchain go1.26.4`；后端命令应在 `server/` 模块内执行，或通过 `scripts/doctor.sh` 先确认实际 toolchain。
+- 建议执行：切换 Node / pnpm / Go 后先运行 `bash scripts/doctor.sh`，再运行 QA 脚本。
 
 ## `-h/--help`
 

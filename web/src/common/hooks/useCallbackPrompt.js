@@ -16,7 +16,6 @@ const useCallbackPrompt = (when) => {
 
   const handleBlockedNavigation = useCallback(
     (nextLocation) => {
-      console.log(nextLocation, 'nextLocation')
       if (
         nextLocation.pathname !== '/' &&
         !confirmedNavigation &&
@@ -37,8 +36,6 @@ const useCallbackPrompt = (when) => {
   }, [])
 
   useEffect(() => {
-    console.log(confirmedNavigation, 'confirmedNavigation')
-    console.log(lastLocation, 'lastLocation')
     if (confirmedNavigation && lastLocation) {
       navigate(lastLocation.location?.pathname)
 

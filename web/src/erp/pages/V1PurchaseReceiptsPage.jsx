@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DeleteOutlined,
   DownOutlined,
   LinkOutlined,
   PlusOutlined,
@@ -13,9 +14,8 @@ import {
   Empty,
   Form,
   Input,
-  InputNumber,
-  Modal,
   Popconfirm,
+  Select,
   Table,
   Tag,
 } from 'antd'
@@ -25,10 +25,16 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   addPurchaseReceiptItem,
   cancelPurchaseReceipt,
-  createPurchaseReceiptDraft,
+  createPurchaseReceiptWithItems,
   listPurchaseReceipts,
   postPurchaseReceipt,
 } from '../api/purchaseApi.mjs'
+import { listInventoryLots } from '../api/inventoryApi.mjs'
+import {
+  listMaterials,
+  listUnits,
+  listWarehouses,
+} from '../api/masterDataOrderApi.mjs'
 import {
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -39,16 +45,19 @@ import {
   SelectionActionBar,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import {
   compactParams,
   formatUnixDate,
   formatUnixDateTime,
+  buildSequentialDraftCode,
   hasActionPermission,
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import {
   buildPurchaseReceiptItemParams,
+  createBlankPurchaseReceiptItem,
   decimalNumber,
   formatQuantity,
 } from '../utils/businessLineItems.mjs'
@@ -58,8 +67,14 @@ import {
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
-
-const BUSINESS_FORM_MODAL_WIDTH = 'min(900px, calc(100vw - 96px))'
+import {
+  inventoryLotOption,
+  materialOption,
+  referenceLabel,
+  uniqueReferenceOptions,
+  unitOption,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -79,6 +94,7 @@ const STATUS_COLORS = Object.freeze({
   POSTED: 'blue',
   CANCELLED: 'red',
 })
+const REFERENCE_LOAD_RETRY_DELAYS_MS = [500, 1000]
 
 function statusTag(status) {
   const key = String(status || '').trim()
@@ -100,6 +116,12 @@ function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
 function buildReceiptParams(values = {}) {
   return compactParams({
     receipt_no: trimOptional(values.receipt_no),
@@ -107,6 +129,15 @@ function buildReceiptParams(values = {}) {
     received_at: trimOptional(values.received_at),
     note: trimOptional(values.note),
   })
+}
+
+function buildReceiptWithItemsParams(values = {}) {
+  return {
+    ...buildReceiptParams(values),
+    items: (values.items || []).map((item) =>
+      buildPurchaseReceiptItemParams(undefined, item)
+    ),
+  }
 }
 
 function receiptItemCount(receipt = {}) {
@@ -120,7 +151,13 @@ function receiptQuantityTotal(receipt = {}) {
   )
 }
 
-function PurchaseReceiptItemsTable({ items = [] }) {
+function PurchaseReceiptItemsTable({
+  inventoryLotOptions = [],
+  items = [],
+  materialOptions = [],
+  unitOptions = [],
+  warehouseOptions = [],
+}) {
   return (
     <Table
       rowKey="id"
@@ -130,10 +167,30 @@ function PurchaseReceiptItemsTable({ items = [] }) {
       scroll={{ x: 920 }}
       columns={[
         { title: '行 ID', dataIndex: 'id', width: 84 },
-        { title: '材料 ID', dataIndex: 'material_id', width: 100 },
-        { title: '仓库 ID', dataIndex: 'warehouse_id', width: 100 },
-        { title: '单位 ID', dataIndex: 'unit_id', width: 92 },
-        { title: '批次 ID', dataIndex: 'lot_id', width: 92 },
+        {
+          title: '材料',
+          dataIndex: 'material_id',
+          width: 180,
+          render: (value) => referenceLabel(materialOptions, value, '材料'),
+        },
+        {
+          title: '仓库',
+          dataIndex: 'warehouse_id',
+          width: 110,
+          render: (value) => referenceLabel(warehouseOptions, value, '仓库'),
+        },
+        {
+          title: '单位',
+          dataIndex: 'unit_id',
+          width: 100,
+          render: (value) => referenceLabel(unitOptions, value, '单位'),
+        },
+        {
+          title: '批次',
+          dataIndex: 'lot_id',
+          width: 150,
+          render: (value) => referenceLabel(inventoryLotOptions, value, '批次'),
+        },
         { title: '批次号', dataIndex: 'lot_no', width: 140 },
         { title: '数量', dataIndex: 'quantity', width: 120 },
         { title: '单价', dataIndex: 'unit_price', width: 120 },
@@ -156,12 +213,123 @@ function PurchaseReceiptItemsTable({ items = [] }) {
   )
 }
 
-function expandedPurchaseReceiptItemsRow(record) {
-  return <PurchaseReceiptItemsTable items={record.items || []} />
-}
-
 function canExpandPurchaseReceiptRow(record) {
   return receiptItemCount(record) > 0
+}
+
+function formListName(field, name) {
+  return field ? [field.name, name] : name
+}
+
+function PurchaseReceiptItemFormFields({
+  field,
+  inventoryLotOptions = [],
+  materialOptions = [],
+  unitOptions = [],
+  warehouseOptions = [],
+}) {
+  return (
+    <>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="材料"
+        name={formListName(field, 'material_id')}
+        rules={[{ required: true, message: '请选择材料' }]}
+      >
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={materialOptions}
+          placeholder="请选择材料"
+          showSearch
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="仓库"
+        name={formListName(field, 'warehouse_id')}
+        rules={[{ required: true, message: '请选择仓库' }]}
+      >
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={warehouseOptions}
+          placeholder="请选择仓库"
+          showSearch
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="单位"
+        name={formListName(field, 'unit_id')}
+        rules={[{ required: true, message: '请选择单位' }]}
+      >
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={unitOptions}
+          placeholder="请选择单位"
+          showSearch
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="入库数量"
+        name={formListName(field, 'quantity')}
+        rules={[{ required: true, message: '请填写入库数量' }]}
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="批次"
+        name={formListName(field, 'lot_id')}
+      >
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={inventoryLotOptions}
+          placeholder="请选择批次"
+          showSearch
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="批次号"
+        name={formListName(field, 'lot_no')}
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="来源行号"
+        name={formListName(field, 'source_line_no')}
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="单价"
+        name={formListName(field, 'unit_price')}
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="金额"
+        name={formListName(field, 'amount')}
+      >
+        <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--wide"
+        label="备注"
+        name={formListName(field, 'note')}
+      >
+        <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+      </Form.Item>
+    </>
+  )
 }
 
 export default function V1PurchaseReceiptsPage() {
@@ -177,6 +345,10 @@ export default function V1PurchaseReceiptsPage() {
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [receiptModal, setReceiptModal] = useState(null)
+  const [materials, setMaterials] = useState([])
+  const [units, setUnits] = useState([])
+  const [warehouses, setWarehouses] = useState([])
+  const [inventoryLots, setInventoryLots] = useState([])
   const [receiptForm] = Form.useForm()
   const [itemForm] = Form.useForm()
 
@@ -188,6 +360,34 @@ export default function V1PurchaseReceiptsPage() {
     { key: 'quality-inspections', label: '来料质检' },
     { key: 'inventory', label: '库存台账' },
   ]
+  const materialOptions = useMemo(
+    () => uniqueReferenceOptions(materials, materialOption),
+    [materials]
+  )
+  const unitOptions = useMemo(
+    () => uniqueReferenceOptions(units, unitOption),
+    [units]
+  )
+  const inventoryLotOptions = useMemo(
+    () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
+    [inventoryLots]
+  )
+  const warehouseOptions = useMemo(
+    () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
+    [warehouses]
+  )
+  const renderExpandedPurchaseReceiptItems = useCallback(
+    (record) => (
+      <PurchaseReceiptItemsTable
+        inventoryLotOptions={inventoryLotOptions}
+        items={record.items || []}
+        materialOptions={materialOptions}
+        unitOptions={unitOptions}
+        warehouseOptions={warehouseOptions}
+      />
+    ),
+    [inventoryLotOptions, materialOptions, unitOptions, warehouseOptions]
+  )
 
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
@@ -233,6 +433,68 @@ export default function V1PurchaseReceiptsPage() {
     loadRows()
   }, [loadRows])
 
+  const loadReferenceOptions = useCallback(async () => {
+    let lastError
+    try {
+      let materialResult
+      let unitResult
+      let warehouseResult
+      let lotResult
+      for (
+        let attempt = 0;
+        attempt <= REFERENCE_LOAD_RETRY_DELAYS_MS.length;
+        attempt += 1
+      ) {
+        try {
+          materialResult = await listMaterials({
+            limit: 500,
+            active_only: true,
+          })
+          unitResult = await listUnits({ limit: 500 })
+          warehouseResult = await listWarehouses({
+            limit: 500,
+            active_only: true,
+          })
+          lotResult = await listInventoryLots({ limit: 500 })
+          lastError = null
+          break
+        } catch (error) {
+          lastError = error
+          const retryDelay = REFERENCE_LOAD_RETRY_DELAYS_MS[attempt]
+          if (!retryDelay) {
+            break
+          }
+          await wait(retryDelay)
+        }
+      }
+      if (lastError) {
+        throw lastError
+      }
+      setMaterials(
+        Array.isArray(materialResult?.materials) ? materialResult.materials : []
+      )
+      setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
+      setWarehouses(
+        Array.isArray(warehouseResult?.warehouses)
+          ? warehouseResult.warehouses
+          : []
+      )
+      setInventoryLots(
+        Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
+      )
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载入库引用数据'))
+      setMaterials([])
+      setUnits([])
+      setWarehouses([])
+      setInventoryLots([])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadReferenceOptions()
+  }, [loadReferenceOptions])
+
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadRows)
   }, [loadRows, outletContext])
@@ -240,10 +502,14 @@ export default function V1PurchaseReceiptsPage() {
   useEffect(() => {
     if (receiptModal?.mode === 'create') {
       receiptForm.setFieldsValue({
-        receipt_no: '',
+        receipt_no: buildSequentialDraftCode(rows, {
+          prefix: 'PR',
+          field: 'receipt_no',
+        }),
         supplier_name: '',
         received_at: todayInputValue(),
         note: '',
+        items: [createBlankPurchaseReceiptItem()],
       })
     }
     if (receiptModal?.mode === 'item') {
@@ -261,7 +527,7 @@ export default function V1PurchaseReceiptsPage() {
         note: '',
       })
     }
-  }, [itemForm, receiptForm, receiptModal?.mode])
+  }, [itemForm, receiptForm, receiptModal?.mode, rows])
 
   const openCreate = useCallback(() => {
     setReceiptModal({ mode: 'create' })
@@ -276,13 +542,18 @@ export default function V1PurchaseReceiptsPage() {
   }, [])
 
   const handleCreateReceipt = useCallback(async () => {
-    const values = await receiptForm.validateFields()
+    let values
+    try {
+      values = await receiptForm.validateFields()
+    } catch {
+      return
+    }
     setSaving(true)
     try {
-      const receipt = await createPurchaseReceiptDraft(
-        buildReceiptParams(values)
+      const receipt = await createPurchaseReceiptWithItems(
+        buildReceiptWithItemsParams(values)
       )
-      message.success('采购入库草稿已创建')
+      message.success('采购入库草稿和明细已创建')
       setSelectedRow(receipt)
       closeModal()
       await loadRows()
@@ -294,7 +565,12 @@ export default function V1PurchaseReceiptsPage() {
   }, [closeModal, loadRows, receiptForm])
 
   const handleAddItem = useCallback(async () => {
-    const values = await itemForm.validateFields()
+    let values
+    try {
+      values = await itemForm.validateFields()
+    } catch {
+      return
+    }
     const receipt = receiptModal?.receipt
     if (!receipt?.id) return
     setSaving(true)
@@ -516,7 +792,7 @@ export default function V1PurchaseReceiptsPage() {
             }
             onClick={() => openAddItem(selectedRow)}
           >
-            维护明细
+            添加明细
           </Button>
           <Popconfirm
             title="确认过账并写库存入库事实？"
@@ -588,6 +864,8 @@ export default function V1PurchaseReceiptsPage() {
           scroll={{ x: 1320 }}
           rowSelection={{
             type: 'radio',
+            columnTitle: '选择',
+            columnWidth: 48,
             selectedRowKeys: selectedRow ? [selectedRow.id] : [],
             onChange: (_keys, selectedRows) =>
               setSelectedRow(selectedRows[0] || null),
@@ -599,7 +877,8 @@ export default function V1PurchaseReceiptsPage() {
             onClick: () => setSelectedRow(record),
           })}
           expandable={{
-            expandedRowRender: expandedPurchaseReceiptItemsRow,
+            columnTitle: '明细',
+            expandedRowRender: renderExpandedPurchaseReceiptItems,
             rowExpandable: canExpandPurchaseReceiptRow,
           }}
           locale={{
@@ -608,8 +887,7 @@ export default function V1PurchaseReceiptsPage() {
         />
       </Card>
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
+      <BusinessFormModal
         title={
           receiptModal?.mode === 'item' ? '添加入库明细' : '新建采购入库单'
         }
@@ -619,10 +897,7 @@ export default function V1PurchaseReceiptsPage() {
           receiptModal?.mode === 'item' ? handleAddItem : handleCreateReceipt
         }
         confirmLoading={saving}
-        maskClosable={false}
-        centered
         destroyOnHidden
-        width={BUSINESS_FORM_MODAL_WIDTH}
         okText={receiptModal?.mode === 'item' ? '添加明细' : '创建草稿'}
         cancelText="关闭"
       >
@@ -632,127 +907,125 @@ export default function V1PurchaseReceiptsPage() {
             layout="vertical"
             className="erp-business-action-form erp-business-action-form--grid"
           >
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="材料 ID"
-              name="material_id"
-              rules={[{ required: true, message: '请填写材料 ID' }]}
-            >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="仓库 ID"
-              name="warehouse_id"
-              rules={[{ required: true, message: '请填写仓库 ID' }]}
-            >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="单位 ID"
-              name="unit_id"
-              rules={[{ required: true, message: '请填写单位 ID' }]}
-            >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="入库数量"
-              name="quantity"
-              rules={[{ required: true, message: '请填写入库数量' }]}
-            >
-              <Input allowClear autoComplete="off" />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="批次 ID"
-              name="lot_id"
-            >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="批次号"
-              name="lot_no"
-            >
-              <Input allowClear autoComplete="off" />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="采购订单行 ID"
-              name="purchase_order_item_id"
-            >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="来源行号"
-              name="source_line_no"
-            >
-              <Input allowClear autoComplete="off" />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="单价"
-              name="unit_price"
-            >
-              <Input allowClear autoComplete="off" />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="金额"
-              name="amount"
-            >
-              <Input allowClear autoComplete="off" />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field erp-business-action-form__field--wide"
-              label="备注"
-              name="note"
-            >
-              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
-            </Form.Item>
+            <PurchaseReceiptItemFormFields
+              inventoryLotOptions={inventoryLotOptions}
+              materialOptions={materialOptions}
+              unitOptions={unitOptions}
+              warehouseOptions={warehouseOptions}
+            />
           </Form>
         ) : (
           <Form
             form={receiptForm}
             layout="vertical"
-            className="erp-business-action-form erp-business-action-form--grid"
+            className="erp-business-action-form"
           >
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="入库单号"
-              name="receipt_no"
-              rules={[{ required: true, message: '请填写入库单号' }]}
-            >
-              <Input allowClear autoComplete="off" />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="供应商"
-              name="supplier_name"
-              rules={[{ required: true, message: '请填写供应商' }]}
-            >
-              <Input allowClear autoComplete="off" />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="收货日期"
-              name="received_at"
-            >
-              <DateInput />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field erp-business-action-form__field--wide"
-              label="备注"
-              name="note"
-            >
-              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
-            </Form.Item>
+            <div className="erp-business-action-form--grid">
+              <Form.Item
+                className="erp-business-action-form__field"
+                label="入库单号（自动）"
+                name="receipt_no"
+                rules={[
+                  { required: true, message: '请填写或保留自动入库单号' },
+                ]}
+              >
+                <Input
+                  allowClear
+                  autoFocus
+                  autoComplete="off"
+                  placeholder="自动生成，可按需要调整"
+                />
+              </Form.Item>
+              <Form.Item
+                className="erp-business-action-form__field"
+                label="供应商"
+                name="supplier_name"
+                rules={[{ required: true, message: '请填写供应商' }]}
+              >
+                <Input allowClear autoComplete="off" />
+              </Form.Item>
+              <Form.Item
+                className="erp-business-action-form__field"
+                label="收货日期"
+                name="received_at"
+              >
+                <DateInput />
+              </Form.Item>
+              <Form.Item
+                className="erp-business-action-form__field erp-business-action-form__field--wide"
+                label="备注"
+                name="note"
+              >
+                <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
+              </Form.Item>
+            </div>
+            <Form.List name="items">
+              {(fields, { add, remove }) => (
+                <section className="erp-master-contact-list erp-purchase-receipt-modal-items">
+                  <div className="erp-master-contact-list__head">
+                    <div>
+                      <strong>入库明细</strong>
+                      <span>
+                        单头和初始明细由后端一次创建；库存流水仍只在过账时写入。
+                      </span>
+                    </div>
+                  </div>
+                  <div className="erp-master-contact-list__items">
+                    {fields.map((field) => (
+                      <div
+                        className="erp-master-contact-list__row"
+                        key={field.key}
+                      >
+                        <div className="erp-master-contact-list__row-head">
+                          <strong>明细 {field.name + 1}</strong>
+                          <Button
+                            danger
+                            size="small"
+                            icon={<DeleteOutlined />}
+                            disabled={fields.length <= 1}
+                            onClick={() => remove(field.name)}
+                          >
+                            删除
+                          </Button>
+                        </div>
+                        <div className="erp-master-contact-list__grid">
+                          <PurchaseReceiptItemFormFields
+                            field={field}
+                            inventoryLotOptions={inventoryLotOptions}
+                            materialOptions={materialOptions}
+                            unitOptions={unitOptions}
+                            warehouseOptions={warehouseOptions}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="erp-line-items-form__footer">
+                    <div className="erp-line-items-form__footer-actions">
+                      <Button
+                        type="dashed"
+                        icon={<PlusOutlined />}
+                        onClick={() => add(createBlankPurchaseReceiptItem())}
+                      >
+                        添加条目
+                      </Button>
+                    </div>
+                    <div className="erp-line-items-form__stats">
+                      <span className="erp-line-items-form__stat">
+                        已录入
+                        <strong className="erp-line-items-form__stat-value">
+                          {fields.length}
+                        </strong>
+                        条
+                      </span>
+                    </div>
+                  </div>
+                </section>
+              )}
+            </Form.List>
           </Form>
         )}
-      </Modal>
+      </BusinessFormModal>
     </BusinessPageLayout>
   )
 }

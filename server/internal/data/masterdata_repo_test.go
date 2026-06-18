@@ -9,6 +9,7 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/contact"
+	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/enttest"
 
 	"entgo.io/ent/dialect"
@@ -488,5 +489,67 @@ func TestMasterDataRepoContactOwnerGuardAndPrimaryStrategy(t *testing.T) {
 	}
 	if disabled.IsActive || disabled.IsPrimary {
 		t.Fatalf("expected disabled contact inactive and not primary, got %#v", disabled)
+	}
+}
+
+func TestMasterDataRepoSaveCustomerWithContactsIsAtomic(t *testing.T) {
+	ctx := context.Background()
+	uc, client := openMasterDataRepoTest(t, "masterdata_repo_customer_contacts_atomic")
+	defer mustCloseEntClient(t, client)
+
+	if _, err := uc.SaveCustomerWithContacts(ctx, 0, &biz.CustomerMutation{
+		Code: "C-ROLLBACK",
+		Name: "应回滚客户",
+	}, []*biz.ContactSaveMutation{
+		{ContactMutation: biz.ContactMutation{Name: "有效联系人", IsPrimary: true}},
+		{ID: 999999, ContactMutation: biz.ContactMutation{Name: "不存在联系人"}},
+	}); !errors.Is(err, biz.ErrContactNotFound) {
+		t.Fatalf("expected missing contact to reject aggregate save, got %v", err)
+	}
+	rolledBack, err := client.Customer.Query().
+		Where(customer.Code("C-ROLLBACK")).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count rolled back customer failed: %v", err)
+	}
+	if rolledBack != 0 {
+		t.Fatalf("expected aggregate failure to rollback customer, got %d rows", rolledBack)
+	}
+
+	saved, err := uc.SaveCustomerWithContacts(ctx, 0, &biz.CustomerMutation{
+		Code: "C-AGG",
+		Name: "聚合客户",
+	}, []*biz.ContactSaveMutation{
+		{ContactMutation: biz.ContactMutation{Name: "主联系人", IsPrimary: true}},
+		{ContactMutation: biz.ContactMutation{Name: "备用联系人"}},
+	})
+	if err != nil {
+		t.Fatalf("save customer with contacts failed: %v", err)
+	}
+	if saved.Customer == nil || saved.Customer.ID <= 0 || len(saved.Contacts) != 2 {
+		t.Fatalf("expected saved customer with two contacts, got %#v", saved)
+	}
+	if !saved.Contacts[0].IsPrimary {
+		t.Fatalf("expected primary contact first, got %#v", saved.Contacts)
+	}
+
+	updated, err := uc.SaveCustomerWithContacts(ctx, saved.Customer.ID, &biz.CustomerMutation{
+		Code: "C-AGG-A",
+		Name: "聚合客户A",
+	}, []*biz.ContactSaveMutation{
+		{ID: saved.Contacts[1].ID, ContactMutation: biz.ContactMutation{Name: "备用联系人A", IsPrimary: true}},
+	})
+	if err != nil {
+		t.Fatalf("update customer with contacts failed: %v", err)
+	}
+	if updated.Customer.Code != "C-AGG-A" || len(updated.Contacts) != 1 || updated.Contacts[0].ID != saved.Contacts[1].ID {
+		t.Fatalf("expected update to retain only second contact, got %#v", updated)
+	}
+	disabledFirst, err := uc.GetContact(ctx, saved.Contacts[0].ID)
+	if err != nil {
+		t.Fatalf("get disabled old contact failed: %v", err)
+	}
+	if disabledFirst.IsActive || disabledFirst.IsPrimary {
+		t.Fatalf("expected omitted contact disabled in same aggregate save, got %#v", disabledFirst)
 	}
 }

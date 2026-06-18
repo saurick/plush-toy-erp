@@ -24,6 +24,9 @@ func (s *masterDataRepoStub) CreateCustomer(context.Context, *CustomerMutation) 
 func (s *masterDataRepoStub) UpdateCustomer(context.Context, int, *CustomerMutation) (*Customer, error) {
 	return nil, nil
 }
+func (s *masterDataRepoStub) SaveCustomerWithContacts(context.Context, int, *CustomerMutation, []*ContactSaveMutation) (*CustomerWithContacts, error) {
+	return nil, nil
+}
 func (s *masterDataRepoStub) GetCustomer(context.Context, int) (*Customer, error) {
 	return nil, nil
 }
@@ -40,6 +43,9 @@ func (s *masterDataRepoStub) CreateSupplier(context.Context, *SupplierMutation) 
 	return nil, nil
 }
 func (s *masterDataRepoStub) UpdateSupplier(context.Context, int, *SupplierMutation) (*Supplier, error) {
+	return nil, nil
+}
+func (s *masterDataRepoStub) SaveSupplierWithContacts(context.Context, int, *SupplierMutation, []*ContactSaveMutation) (*SupplierWithContacts, error) {
 	return nil, nil
 }
 func (s *masterDataRepoStub) GetSupplier(context.Context, int) (*Supplier, error) {
@@ -71,6 +77,9 @@ func (s *masterDataRepoStub) SetMaterialActive(context.Context, int, bool) (*Mat
 }
 func (s *masterDataRepoStub) ListUnits(context.Context, MasterDataFilter) ([]*Unit, int, error) {
 	return []*Unit{{ID: 1, Code: "PCS", Name: "个", IsActive: true}}, 1, nil
+}
+func (s *masterDataRepoStub) ListWarehouses(context.Context, MasterDataFilter) ([]*Warehouse, int, error) {
+	return []*Warehouse{{ID: 1, Code: "WH-01", Name: "仓库", Type: "FINISHED_GOODS", IsActive: true}}, 1, nil
 }
 func (s *masterDataRepoStub) UnitIsActive(_ context.Context, id int) (bool, error) {
 	if s.units == nil {

@@ -7,7 +7,7 @@ import {
   LinkOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Button, Drawer, Input, Space, Tag, Typography } from 'antd'
+import { Alert, Button, Drawer, Input, Space, Tag, Typography } from 'antd'
 import {
   formatWorkflowTaskSource,
   resolveWorkflowTaskEntryPath,
@@ -72,7 +72,7 @@ export function getTaskActionDescription(actionMode = '') {
   if (actionMode === 'urge') {
     return '请写清催办对象和需要补齐的事项，避免只留下无上下文提醒。'
   }
-  return '先选择一个处理动作。打开关联记录只负责跳转上下文，不保存业务事实。'
+  return '先选择一个处理动作；任务上下文只用于核对，不保存业务事实。'
 }
 
 function getTaskActionTone(actionMode = '') {
@@ -91,6 +91,8 @@ export default function WorkflowTaskActionDrawer({
   actionMode = '',
   actionReason = '',
   actionSaving = false,
+  allowedActionModes = [],
+  readonlyReason = '',
   roleLabelMap,
   onActionModeChange,
   onActionReasonChange,
@@ -107,6 +109,11 @@ export default function WorkflowTaskActionDrawer({
   const ownerRoleKey = task ? getTaskOwnerRoleKey(task) : ''
   const ownerRoleLabel = roleLabelMap?.get?.(ownerRoleKey) || ownerRoleKey
   const canOpenEntry = Boolean(task && entryPath && onOpenEntry)
+  const allowedActionModeSet = new Set(allowedActionModes)
+  const canSubmitAction = Boolean(
+    actionMode && allowedActionModeSet.has(actionMode) && !isTerminal
+  )
+  const canChooseActions = allowedActionModes.length > 0
 
   const selectAction = (nextMode, nextReason = '') => {
     onActionModeChange?.(nextMode)
@@ -156,7 +163,7 @@ export default function WorkflowTaskActionDrawer({
                     danger={actionMode === 'block'}
                     icon={<SendOutlined />}
                     loading={actionSaving}
-                    disabled={isTerminal}
+                    disabled={!canSubmitAction}
                     onClick={onSubmit}
                   >
                     {actionMeta.buttonLabel}
@@ -164,35 +171,40 @@ export default function WorkflowTaskActionDrawer({
                 </>
               ) : (
                 <>
-                  <Button
-                    type="primary"
-                    icon={<CheckCircleOutlined />}
-                    disabled={isTerminal}
-                    onClick={() => selectAction('complete', '')}
-                  >
-                    处理完成
-                  </Button>
-                  <Button
-                    danger
-                    icon={<ExclamationCircleOutlined />}
-                    disabled={isTerminal}
-                    onClick={() => selectAction('block', taskReason)}
-                  >
-                    标记阻塞
-                  </Button>
-                  <Button
-                    icon={<ClockCircleOutlined />}
-                    disabled={isTerminal}
-                    onClick={() => selectAction('urge', '')}
-                  >
-                    催办
-                  </Button>
+                  {allowedActionModeSet.has('complete') ? (
+                    <Button
+                      type="primary"
+                      icon={<CheckCircleOutlined />}
+                      onClick={() => selectAction('complete', '')}
+                    >
+                      处理完成
+                    </Button>
+                  ) : null}
+                  {allowedActionModeSet.has('block') ? (
+                    <Button
+                      danger
+                      icon={<ExclamationCircleOutlined />}
+                      onClick={() => selectAction('block', taskReason)}
+                    >
+                      标记阻塞
+                    </Button>
+                  ) : null}
+                  {allowedActionModeSet.has('urge') ? (
+                    <Button
+                      icon={<ClockCircleOutlined />}
+                      onClick={() => selectAction('urge', '')}
+                    >
+                      催办
+                    </Button>
+                  ) : null}
+                  {!canChooseActions ? (
+                    <Button onClick={onClose}>关闭</Button>
+                  ) : null}
                 </>
               )}
-              {onOpenEntry ? (
+              {canOpenEntry ? (
                 <Button
                   icon={<LinkOutlined />}
-                  disabled={!canOpenEntry}
                   onClick={() => onOpenEntry(task)}
                 >
                   查看关联记录
@@ -293,12 +305,23 @@ export default function WorkflowTaskActionDrawer({
               <Paragraph className="erp-task-action-drawer__action-copy">
                 {getTaskActionDescription(actionMode)}
               </Paragraph>
+              {!canSubmitAction ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="当前账号不能提交这个动作"
+                  description={
+                    readonlyReason || '请确认任务状态、处理角色和权限。'
+                  }
+                />
+              ) : null}
               {actionMeta.requireReason ? (
                 <TextArea
                   value={actionReason}
                   autoSize={{ minRows: 4, maxRows: 6 }}
                   maxLength={180}
                   showCount
+                  disabled={!canSubmitAction}
                   placeholder="填写原因、影响范围、需要谁处理"
                   onChange={(event) =>
                     onActionReasonChange?.(event.target.value)
@@ -315,8 +338,14 @@ export default function WorkflowTaskActionDrawer({
             </section>
           ) : (
             <section className="erp-task-action-drawer__action-prompt">
-              <strong>选择一个处理动作</strong>
-              <span>{getTaskActionDescription('')}</span>
+              <strong>
+                {canChooseActions ? '选择一个处理动作' : '只读任务上下文'}
+              </strong>
+              <span>
+                {canChooseActions
+                  ? getTaskActionDescription('')
+                  : readonlyReason || '当前账号不能直接处理该任务。'}
+              </span>
             </section>
           )}
         </div>

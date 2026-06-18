@@ -7,6 +7,17 @@
 - PostgreSQL
 - OpenTelemetry（可选）
 
+## 环境版本
+
+后端 Go 版本以 `server/go.mod` 为准：`go 1.25.0`，当前 toolchain 为 `go1.26.4`。本机检查走仓库根目录的 `scripts/doctor.sh`，该脚本会在 `server/` 模块内读取实际 Go toolchain，避免只看仓库根目录默认 Go 版本造成误判。
+
+```bash
+cd /Users/simon/projects/plush-toy-erp
+bash scripts/doctor.sh
+```
+
+若 `doctor` 报 Go 低于 `1.26.4`，先升级 Go 或启用 Go toolchain 自动切换，再执行 `make init`、`make data`、`go test` 或 migration 相关命令。
+
 ## 分层
 
 执行链路：`server -> service -> biz -> data`
@@ -42,7 +53,7 @@
 
 普通 `business` JSON-RPC 域当前只保留业务看板 `dashboard_stats`。旧 `list_records / create_record / update_record / delete_records / restore_record` 已退出运行时，不能恢复为事实或历史快照查询入口。
 
-`masterdata` JSON-RPC 域承载客户、供应商、联系人、材料、产品和 SKU 主数据维护。产品基础信息使用 `create_product / update_product / get_product / list_products / set_product_active`，只维护产品编号、名称、款号、默认单位和启停状态，校验默认单位，不写订单、库存、BOM、生产、出货或财务事实。SKU 使用 `create_product_sku / update_product_sku / get_product_sku / list_product_skus / set_product_sku_active`，只维护产品规格主数据和启停状态，校验归属产品与可选默认单位，不写订单、库存、BOM、生产、出货或财务事实。
+`masterdata` JSON-RPC 域承载客户、供应商、联系人、材料、产品和 SKU 主数据维护。客户 / 供应商页面保存主体和联系人时应优先使用 `save_customer_with_contacts / save_supplier_with_contacts`，在一个后端事务中完成主体创建 / 更新、联系人新增 / 更新以及遗漏联系人停用，避免前端串联联系人写入留下半保存主数据；单联系人 `create_contact / update_contact / set_primary_contact / disable_contact` 仍保留为底层单对象能力。产品基础信息使用 `create_product / update_product / get_product / list_products / set_product_active`，只维护产品编号、名称、款号、默认单位和启停状态，校验默认单位，不写订单、库存、BOM、生产、出货或财务事实。SKU 使用 `create_product_sku / update_product_sku / get_product_sku / list_product_skus / set_product_sku_active`，只维护产品规格主数据和启停状态，校验归属产品与可选默认单位，不写订单、库存、BOM、生产、出货或财务事实。
 
 `sales_order` JSON-RPC 域承载销售订单 Source Document / Business Commitment 主路径。订单表单保存应优先使用 `save_sales_order_with_items`，在一个后端事务中完成订单头创建 / 更新、订单行新增 / 更新以及缺失开放行取消；任一步失败会整体回滚，不由前端串联多个订单行接口拼装一次保存流程。原有 `create_sales_order / update_sales_order / add_sales_order_item / update_sales_order_item / remove_sales_order_item` 仍保留为底层单对象能力，不写库存、出货、预留、财务、发票或收付款事实。
 

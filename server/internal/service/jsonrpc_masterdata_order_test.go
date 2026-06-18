@@ -24,6 +24,9 @@ type stubMasterDataJSONRPCRepo struct {
 	createdProduct *biz.ProductMutation
 	createdSKU     *biz.ProductSKUMutation
 	createdContact *biz.ContactMutation
+	savedCustomer  *biz.CustomerMutation
+	savedSupplier  *biz.SupplierMutation
+	savedContacts  []*biz.ContactSaveMutation
 }
 
 func (s *stubMasterDataJSONRPCRepo) CreateCustomer(_ context.Context, in *biz.CustomerMutation) (*biz.Customer, error) {
@@ -32,6 +35,29 @@ func (s *stubMasterDataJSONRPCRepo) CreateCustomer(_ context.Context, in *biz.Cu
 
 func (s *stubMasterDataJSONRPCRepo) UpdateCustomer(_ context.Context, id int, in *biz.CustomerMutation) (*biz.Customer, error) {
 	return &biz.Customer{ID: id, Code: in.Code, Name: in.Name, IsActive: true}, nil
+}
+
+func (s *stubMasterDataJSONRPCRepo) SaveCustomerWithContacts(_ context.Context, id int, in *biz.CustomerMutation, contacts []*biz.ContactSaveMutation) (*biz.CustomerWithContacts, error) {
+	if id <= 0 {
+		id = 1
+	}
+	s.savedCustomer = in
+	s.savedContacts = contacts
+	outContacts := make([]*biz.Contact, 0, len(contacts))
+	for idx, item := range contacts {
+		outContacts = append(outContacts, &biz.Contact{
+			ID:        idx + 1,
+			OwnerType: biz.ContactOwnerCustomer,
+			OwnerID:   id,
+			Name:      item.Name,
+			IsActive:  true,
+			IsPrimary: item.IsPrimary,
+		})
+	}
+	return &biz.CustomerWithContacts{
+		Customer: &biz.Customer{ID: id, Code: in.Code, Name: in.Name, IsActive: true},
+		Contacts: outContacts,
+	}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) GetCustomer(_ context.Context, id int) (*biz.Customer, error) {
@@ -56,6 +82,29 @@ func (s *stubMasterDataJSONRPCRepo) CreateSupplier(_ context.Context, in *biz.Su
 
 func (s *stubMasterDataJSONRPCRepo) UpdateSupplier(_ context.Context, id int, in *biz.SupplierMutation) (*biz.Supplier, error) {
 	return &biz.Supplier{ID: id, Code: in.Code, Name: in.Name, IsActive: true}, nil
+}
+
+func (s *stubMasterDataJSONRPCRepo) SaveSupplierWithContacts(_ context.Context, id int, in *biz.SupplierMutation, contacts []*biz.ContactSaveMutation) (*biz.SupplierWithContacts, error) {
+	if id <= 0 {
+		id = 1
+	}
+	s.savedSupplier = in
+	s.savedContacts = contacts
+	outContacts := make([]*biz.Contact, 0, len(contacts))
+	for idx, item := range contacts {
+		outContacts = append(outContacts, &biz.Contact{
+			ID:        idx + 1,
+			OwnerType: biz.ContactOwnerSupplier,
+			OwnerID:   id,
+			Name:      item.Name,
+			IsActive:  true,
+			IsPrimary: item.IsPrimary,
+		})
+	}
+	return &biz.SupplierWithContacts{
+		Supplier: &biz.Supplier{ID: id, Code: in.Code, Name: in.Name, IsActive: true},
+		Contacts: outContacts,
+	}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) GetSupplier(_ context.Context, id int) (*biz.Supplier, error) {
@@ -96,6 +145,10 @@ func (s *stubMasterDataJSONRPCRepo) SetMaterialActive(_ context.Context, id int,
 
 func (s *stubMasterDataJSONRPCRepo) ListUnits(context.Context, biz.MasterDataFilter) ([]*biz.Unit, int, error) {
 	return []*biz.Unit{{ID: 1, Code: "PCS", Name: "个", IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
+}
+
+func (s *stubMasterDataJSONRPCRepo) ListWarehouses(context.Context, biz.MasterDataFilter) ([]*biz.Warehouse, int, error) {
+	return []*biz.Warehouse{{ID: 1, Code: "RM-01", Name: "原料仓", Type: "RAW_MATERIAL", IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) UnitIsActive(context.Context, int) (bool, error) {
@@ -371,6 +424,62 @@ func TestJsonrpcDispatcher_ContactAPIUsesUsecaseOwnerGuard(t *testing.T) {
 	}
 }
 
+func TestJsonrpcDispatcher_SaveCustomerWithContactsUsesAggregateUsecase(t *testing.T) {
+	params := mustJSONRPCStruct(t, map[string]any{
+		"code": "C-AGG",
+		"name": "聚合客户",
+		"contacts": []any{
+			map[string]any{
+				"name":       "主联系人",
+				"mobile":     "13800000000",
+				"is_primary": true,
+			},
+		},
+	})
+
+	j := newMasterDataJSONRPCTestData(
+		&stubMasterDataJSONRPCRepo{},
+		workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionCustomerCreate, biz.PermissionContactCreate),
+	)
+	_, deniedRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "save_customer_with_contacts", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if deniedRes == nil || deniedRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected contact aggregate permission denied, got %#v", deniedRes)
+	}
+
+	repo := &stubMasterDataJSONRPCRepo{}
+	j = newMasterDataJSONRPCTestData(
+		repo,
+		workflowJSONRPCAdmin(
+			[]string{biz.SalesRoleKey},
+			biz.PermissionCustomerCreate,
+			biz.PermissionContactCreate,
+			biz.PermissionContactUpdate,
+			biz.PermissionContactDisable,
+		),
+	)
+	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "save_customer_with_contacts", "2", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if okRes == nil || okRes.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", okRes)
+	}
+	data := okRes.Data.AsMap()
+	if data["customer"] == nil {
+		t.Fatalf("expected customer in aggregate response, got %#v", data)
+	}
+	contacts, ok := data["contacts"].([]any)
+	if !ok || len(contacts) != 1 {
+		t.Fatalf("expected one contact in aggregate response, got %#v", data["contacts"])
+	}
+	if repo.savedCustomer == nil || len(repo.savedContacts) != 1 || repo.createdContact != nil {
+		t.Fatalf("expected aggregate save without standalone contact create, repo=%#v", repo)
+	}
+}
+
 func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.T) {
 	params := mustJSONRPCStruct(t, map[string]any{
 		"code":            "M001",
@@ -433,6 +542,36 @@ func TestJsonrpcDispatcher_ListUnitsUsesMaterialReadPermission(t *testing.T) {
 	units, ok := okRes.Data.AsMap()["units"].([]any)
 	if !ok || len(units) != 1 {
 		t.Fatalf("expected one unit, got %#v", okRes.Data.AsMap()["units"])
+	}
+}
+
+func TestJsonrpcDispatcher_ListWarehousesUsesInventoryReadPermission(t *testing.T) {
+	j := newMasterDataJSONRPCTestData(
+		&stubMasterDataJSONRPCRepo{},
+		workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionMaterialRead),
+	)
+	_, deniedRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "list_warehouses", "1", nil)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if deniedRes == nil || deniedRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected permission denied, got %#v", deniedRes)
+	}
+
+	j = newMasterDataJSONRPCTestData(
+		&stubMasterDataJSONRPCRepo{},
+		workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWarehouseInventoryRead),
+	)
+	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "list_warehouses", "2", nil)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if okRes == nil || okRes.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", okRes)
+	}
+	warehouses, ok := okRes.Data.AsMap()["warehouses"].([]any)
+	if !ok || len(warehouses) != 1 {
+		t.Fatalf("expected one warehouse, got %#v", okRes.Data.AsMap()["warehouses"])
 	}
 }
 

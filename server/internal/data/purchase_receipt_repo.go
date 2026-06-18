@@ -35,6 +35,57 @@ func (r *inventoryRepo) CreatePurchaseReceiptDraft(ctx context.Context, in *biz.
 	return entPurchaseReceiptToBiz(row, nil), nil
 }
 
+func (r *inventoryRepo) CreatePurchaseReceiptWithItems(ctx context.Context, in *biz.PurchaseReceiptCreate, items []*biz.PurchaseReceiptItemCreate) (*biz.PurchaseReceipt, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+
+	receipt, err := tx.PurchaseReceipt.Create().
+		SetReceiptNo(in.ReceiptNo).
+		SetSupplierName(in.SupplierName).
+		SetStatus(biz.PurchaseReceiptStatusDraft).
+		SetReceivedAt(in.ReceivedAt).
+		SetNillableNote(in.Note).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		nextItem := *item
+		nextItem.ReceiptID = receipt.ID
+		if err := validatePurchaseReceiptItemReferences(ctx, tx.Client(), &nextItem); err != nil {
+			return nil, err
+		}
+		if _, err := tx.PurchaseReceiptItem.Create().
+			SetReceiptID(nextItem.ReceiptID).
+			SetMaterialID(nextItem.MaterialID).
+			SetWarehouseID(nextItem.WarehouseID).
+			SetUnitID(nextItem.UnitID).
+			SetNillableLotID(nextItem.LotID).
+			SetNillablePurchaseOrderItemID(nextItem.PurchaseOrderItemID).
+			SetNillableLotNo(nextItem.LotNo).
+			SetQuantity(nextItem.Quantity).
+			SetNillableUnitPrice(nextItem.UnitPrice).
+			SetNillableAmount(nextItem.Amount).
+			SetNillableSourceLineNo(nextItem.SourceLineNo).
+			SetNillableNote(nextItem.Note).
+			Save(ctx); err != nil {
+			return nil, err
+		}
+	}
+	out, err := purchaseReceiptWithItems(ctx, tx.Client(), receipt)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
+}
+
 func (r *inventoryRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, error) {
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {

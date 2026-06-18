@@ -11,7 +11,11 @@
 ```bash
 cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
 cp .env.example .env
-docker compose -f compose.yml up -d
+${EDITOR:-vi} .env
+cd /Users/simon/projects/plush-toy-erp
+bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env
+cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
+docker compose --env-file .env -f compose.yml up -d
 ```
 
 首次启动前至少替换：
@@ -21,13 +25,16 @@ docker compose -f compose.yml up -d
 - `POSTGRES_DATA_DIR`
 - `APP_IMAGE`
 - `WEB_IMAGE`
+- `POSTGRES_IMAGE` 和 `JAEGER_IMAGE` 使用固定版本 tag，不能使用 `latest` / `dev`
 - `APP_JWT_SECRET`
+- `APP_AUTH_SMS_MODE=disabled`
 - `APP_ADMIN_USERNAME`
 - `BOOTSTRAP_ADMIN_ONCE=false`；只有新库首次初始化 bootstrap 管理员时才临时改为 `true`
+- `POSTGRES_BIND_ADDR=127.0.0.1`，PostgreSQL 宿主机映射只允许 loopback，migration 从宿主机本地 `127.0.0.1:5435` 访问
 
 如果不需要自带 tracing 存储，可以再按需移除 Jaeger 服务和对应环境变量。
 
-生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。已有 `admin` 或同名管理员不会被启动逻辑自动提权，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由。
+生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。已有 `admin` 或同名管理员不会被启动逻辑自动提权，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由。
 
 前端生产容器不运行 Vite dev server。`WEB_IMAGE` 是一个前端镜像，Compose 只启动 `web-desktop` 一个前端实例，并通过 `APP_ID=desktop`、`PORT=5175` 固定入口；岗位任务端统一走 `/m/<role>/tasks`，不再启动 8 个 `APP_ID=mobile-*` 生产容器。
 
@@ -35,8 +42,10 @@ docker compose -f compose.yml up -d
 
 ```bash
 export PROJECT_SLUG=plush-toy-erp
-export IMAGE_NAME=plush-toy-erp-server:dev
+export APP_IMAGE=plush-toy-erp-server:dev
 export WEB_IMAGE=plush-toy-erp-web:dev
+export POSTGRES_IMAGE=postgres:18.1
+export JAEGER_IMAGE=jaegertracing/all-in-one:1.76.0
 export POSTGRES_DSN='postgres://postgres:***@postgres:5432/plush_erp?sslmode=disable'
 export TRACE_ENDPOINT=jaeger:4318
 export TRACE_RATIO=0.1
@@ -45,17 +54,19 @@ export ERP_PDF_CHROME_PATH=/usr/bin/chromium
 export ERP_PDF_RENDER_CONCURRENCY=2
 export ERP_PDF_WARMUP_ENABLED=true
 export APP_JWT_SECRET='replace-with-runtime-secret'
+export APP_AUTH_SMS_MODE=disabled
 export APP_ADMIN_USERNAME=admin
 export BOOTSTRAP_ADMIN_ONCE=false
 export ERP_DEBUG_ENV=prod
 export ERP_DEBUG_SEED_ENABLED=false
 export ERP_DEBUG_CLEANUP_ENABLED=false
+export POSTGRES_BIND_ADDR=127.0.0.1
 export JAEGER_BIND_ADDR=127.0.0.1
 ```
 
 默认宿主机端口：
 
-- PostgreSQL：`5435`
+- PostgreSQL：`127.0.0.1:5435`
 - HTTP：`8300`
 - gRPC：`9300`
 - 前端：`5175`
@@ -71,12 +82,14 @@ export JAEGER_BIND_ADDR=127.0.0.1
 说明：
 
 - 宿主机本地开发 `make run` 默认连共享 PG `192.168.0.106:5432/plush_erp`
-- 上面的 `5435` 只代表本仓库自带 Compose 的宿主机映射口径，不是日常开发默认 DSN
+- 上面的 `127.0.0.1:5435` 只代表本仓库自带 Compose 的宿主机本地映射口径，不是日常开发默认 DSN，也不对公网或办公网暴露。
 - 宿主机本地调试 `make run` 默认走 `/Users/simon/projects/plush-toy-erp/server/configs/dev/config.yaml` 里的 `192.168.0.106:4318`
 - 宿主机线上进程默认走 `server/configs/prod/config.yaml` 里的 `127.0.0.1:4318`
 - 当前 Compose 容器内默认走 `jaeger:4318`，因为容器内不能把宿主机的 `127.0.0.1` 当成 Jaeger 地址
 - 当前 Compose 默认 `TRACE_RATIO=0.1`，排障时可临时调高，`1` 表示全量采样；排障结束后应恢复低采样。
+- Compose 第三方镜像默认固定为 `POSTGRES_IMAGE=postgres:18.1` 和 `JAEGER_IMAGE=jaegertracing/all-in-one:1.76.0`；升级时显式改 tag、跑 preflight，再记录发布证据。
 - Jaeger 宿主机端口默认通过 `JAEGER_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；远程查看优先用 SSH tunnel，不要把 Jaeger UI 或 OTLP 端口直接暴露到公网或办公网。
+- PostgreSQL 宿主机端口默认通过 `POSTGRES_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；Atlas migration 使用宿主机本地端口访问，不需要把 PostgreSQL 暴露给外部网络。
 - `POSTGRES_DSN` 是 URL，若 `POSTGRES_PASSWORD` 包含 `@`、`:`、`/`、`%`、`#` 等特殊字符，DSN 里的密码必须先 URL 编码；`POSTGRES_PASSWORD` 本身保持原值。
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关只需把前端流量映射到 `5175`
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要先评审构建期 `VITE_BASE_URL`

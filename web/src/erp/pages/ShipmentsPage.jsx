@@ -10,9 +10,8 @@ import {
   Empty,
   Form,
   Input,
-  InputNumber,
-  Modal,
   Popconfirm,
+  Select,
   Table,
   Tag,
 } from 'antd'
@@ -27,9 +26,14 @@ import {
   shipShipment,
 } from '../api/operationalFactApi.mjs'
 import {
+  listCustomers,
+  listProductSKUs,
+  listProducts,
   listSalesOrderItems,
   listSalesOrders,
+  listUnits,
 } from '../api/masterDataOrderApi.mjs'
+import { listInventoryLots } from '../api/inventoryApi.mjs'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
@@ -41,9 +45,11 @@ import {
   SelectionActionBar,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import SourceImportPickerModal from '../components/business-list/SourceImportPickerModal.jsx'
 import {
   compactParams,
+  buildSequentialDraftCode,
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
@@ -62,8 +68,18 @@ import {
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
-
-const BUSINESS_FORM_MODAL_WIDTH = 'min(920px, calc(100vw - 96px))'
+import {
+  customerOption,
+  inventoryLotOption,
+  productOption,
+  productSKUOption,
+  salesOrderItemOption,
+  salesOrderOption,
+  shipmentOption,
+  uniqueReferenceOptions,
+  unitOption,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -157,39 +173,52 @@ function shipmentFormValues(shipment = {}) {
   }
 }
 
-function ShipmentFormFields({ disabled = false }) {
+function ShipmentFormFields({
+  disabled = false,
+  customerOptions = [],
+  salesOrderOptions = [],
+}) {
   return (
     <>
       <Form.Item
         className="erp-business-action-form__field"
-        label="出货单号"
+        label="出货单号（自动）"
         name="shipment_no"
-        rules={[{ required: true, message: '请填写出货单号' }]}
+        rules={[{ required: true, message: '请填写或保留自动出货单号' }]}
       >
-        <Input allowClear autoComplete="off" disabled={disabled} />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="销售订单 ID"
-        name="sales_order_id"
-      >
-        <InputNumber
+        <Input
+          allowClear
+          autoComplete="off"
           disabled={disabled}
-          min={1}
-          precision={0}
-          style={{ width: '100%' }}
+          placeholder="自动生成，可按需要调整"
         />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="客户 ID"
+        label="销售订单"
+        name="sales_order_id"
+      >
+        <Select
+          allowClear
+          disabled={disabled}
+          optionFilterProp="label"
+          options={salesOrderOptions}
+          placeholder="请选择销售订单"
+          showSearch
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="客户"
         name="customer_id"
       >
-        <InputNumber
+        <Select
+          allowClear
           disabled={disabled}
-          min={1}
-          precision={0}
-          style={{ width: '100%' }}
+          optionFilterProp="label"
+          options={customerOptions}
+          placeholder="请选择客户"
+          showSearch
         />
       </Form.Item>
       <Form.Item
@@ -231,7 +260,17 @@ function ShipmentFormFields({ disabled = false }) {
   )
 }
 
-function ShipmentItemFormFields({ field, showShipmentID = false }) {
+function ShipmentItemFormFields({
+  field,
+  showShipmentID = false,
+  inventoryLotOptions = [],
+  productOptions = [],
+  productSKUOptions = [],
+  salesOrderItemOptions = [],
+  shipmentOptions = [],
+  unitOptions = [],
+  warehouseOptions = [],
+}) {
   const namePrefix = field ? field.name : undefined
   const fieldName = (key) => (field ? [namePrefix, key] : key)
   return (
@@ -239,57 +278,99 @@ function ShipmentItemFormFields({ field, showShipmentID = false }) {
       {showShipmentID ? (
         <Form.Item
           className="erp-business-action-form__field"
-          label="出货单 ID"
+          label="出货单"
           name={fieldName('shipment_id')}
           rules={[{ required: true, message: '请选择出货单' }]}
         >
-          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          <Select
+            allowClear
+            optionFilterProp="label"
+            options={shipmentOptions}
+            placeholder="请选择出货单"
+            showSearch
+          />
         </Form.Item>
       ) : null}
       <Form.Item
         className="erp-business-action-form__field"
-        label="销售订单行 ID"
+        label="销售订单行"
         name={fieldName('sales_order_item_id')}
       >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={salesOrderItemOptions}
+          placeholder="请选择销售订单行"
+          showSearch
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="产品 ID"
+        label="产品"
         name={fieldName('product_id')}
-        rules={[{ required: true, message: '请填写产品 ID' }]}
+        rules={[{ required: true, message: '请选择产品' }]}
       >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={productOptions}
+          placeholder="请选择产品"
+          showSearch
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="SKU ID"
+        label="SKU"
         name={fieldName('product_sku_id')}
       >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={productSKUOptions}
+          placeholder="请选择 SKU"
+          showSearch
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="仓库 ID"
+        label="仓库"
         name={fieldName('warehouse_id')}
-        rules={[{ required: true, message: '请填写仓库 ID' }]}
+        rules={[{ required: true, message: '请选择仓库' }]}
       >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={warehouseOptions}
+          placeholder="请选择仓库"
+          showSearch
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="批次 ID"
+        label="批次"
         name={fieldName('lot_id')}
       >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={inventoryLotOptions}
+          placeholder="请选择批次"
+          showSearch
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="单位 ID"
+        label="单位"
         name={fieldName('unit_id')}
-        rules={[{ required: true, message: '请填写单位 ID' }]}
+        rules={[{ required: true, message: '请选择单位' }]}
       >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={unitOptions}
+          placeholder="请选择单位"
+          showSearch
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -359,13 +440,66 @@ export default function ShipmentsPage() {
   const [selectedRow, setSelectedRow] = useState(null)
   const [shipmentModal, setShipmentModal] = useState(null)
   const [salesOrderSources, setSalesOrderSources] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [inventoryLots, setInventoryLots] = useState([])
+  const [products, setProducts] = useState([])
+  const [productSKUs, setProductSKUs] = useState([])
+  const [salesOrderItems, setSalesOrderItems] = useState([])
+  const [salesOrders, setSalesOrders] = useState([])
+  const [units, setUnits] = useState([])
   const [sourceLoading, setSourceLoading] = useState(false)
   const [salesOrderImportOpen, setSalesOrderImportOpen] = useState(false)
   const [shipmentForm] = Form.useForm()
+  const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
 
   const canCreate = hasPermission(adminProfile, 'shipment.create')
   const canShip = hasPermission(adminProfile, 'shipment.ship')
   const canCancel = hasPermission(adminProfile, 'shipment.cancel')
+  const customerOptions = useMemo(
+    () => uniqueReferenceOptions(customers, customerOption),
+    [customers]
+  )
+  const inventoryLotOptions = useMemo(
+    () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
+    [inventoryLots]
+  )
+  const productOptions = useMemo(
+    () => uniqueReferenceOptions(products, productOption),
+    [products]
+  )
+  const productSKUOptions = useMemo(
+    () => uniqueReferenceOptions(productSKUs, productSKUOption),
+    [productSKUs]
+  )
+  const salesOrderOptions = useMemo(
+    () => uniqueReferenceOptions(salesOrders, salesOrderOption),
+    [salesOrders]
+  )
+  const salesOrderItemOptions = useMemo(
+    () => uniqueReferenceOptions(salesOrderItems, salesOrderItemOption),
+    [salesOrderItems]
+  )
+  const shipmentOptions = useMemo(
+    () => uniqueReferenceOptions(rows, shipmentOption),
+    [rows]
+  )
+  const unitOptions = useMemo(
+    () => uniqueReferenceOptions(units, unitOption),
+    [units]
+  )
+  const warehouseOptions = useMemo(
+    () =>
+      uniqueReferenceOptions(
+        [
+          ...inventoryLots,
+          ...rows.flatMap((shipment) =>
+            Array.isArray(shipment?.items) ? shipment.items : []
+          ),
+        ],
+        warehouseOptionFromRecord
+      ),
+    [inventoryLots, rows]
+  )
 
   const loadRows = useCallback(async () => {
     setLoading(true)
@@ -403,6 +537,89 @@ export default function ShipmentsPage() {
   useEffect(() => {
     loadRows()
   }, [loadRows])
+
+  const loadReferenceOptions = useCallback(async () => {
+    try {
+      const [
+        customerResult,
+        lotResult,
+        productResult,
+        skuResult,
+        salesOrderResult,
+        unitResult,
+      ] = await Promise.all([
+        listCustomers({ limit: 500, active_only: true }),
+        listInventoryLots({ limit: 500 }),
+        listProducts({ limit: 500, active_only: true }),
+        listProductSKUs({ limit: 500, active_only: true }),
+        listSalesOrders({ limit: 500 }),
+        listUnits({ limit: 500 }),
+      ])
+      setCustomers(
+        Array.isArray(customerResult?.customers) ? customerResult.customers : []
+      )
+      setInventoryLots(
+        Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
+      )
+      setProducts(
+        Array.isArray(productResult?.products) ? productResult.products : []
+      )
+      setProductSKUs(
+        Array.isArray(skuResult?.product_skus) ? skuResult.product_skus : []
+      )
+      setSalesOrders(
+        Array.isArray(salesOrderResult?.sales_orders)
+          ? salesOrderResult.sales_orders
+          : []
+      )
+      setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载出货引用数据'))
+      setCustomers([])
+      setInventoryLots([])
+      setProducts([])
+      setProductSKUs([])
+      setSalesOrders([])
+      setUnits([])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadReferenceOptions()
+  }, [loadReferenceOptions])
+
+  useEffect(() => {
+    if (!shipmentModal) {
+      setSalesOrderItems([])
+      return undefined
+    }
+    const salesOrderID = Number(selectedSalesOrderID || 0)
+    if (!Number.isFinite(salesOrderID) || salesOrderID <= 0) {
+      setSalesOrderItems([])
+      return undefined
+    }
+
+    let cancelled = false
+    listSalesOrderItems({
+      sales_order_id: salesOrderID,
+      line_status: 'open',
+      limit: 200,
+    })
+      .then((data) => {
+        if (cancelled) return
+        setSalesOrderItems(
+          Array.isArray(data?.sales_order_items) ? data.sales_order_items : []
+        )
+      })
+      .catch((error) => {
+        if (cancelled) return
+        message.error(getActionErrorMessage(error, '加载销售订单明细'))
+        setSalesOrderItems([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedSalesOrderID, shipmentModal])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadRows)
@@ -487,6 +704,7 @@ export default function ShipmentsPage() {
       const sourceItems = Array.isArray(data?.sales_order_items)
         ? data.sales_order_items
         : []
+      setSalesOrderItems(sourceItems)
       shipmentForm.setFieldsValue({
         sales_order_id: sourceOrder.id,
         customer_id: sourceOrder.customer_id,
@@ -522,6 +740,10 @@ export default function ShipmentsPage() {
   const openCreate = () => {
     shipmentForm.resetFields()
     shipmentForm.setFieldsValue({
+      shipment_no: buildSequentialDraftCode(rows, {
+        prefix: 'SHIP',
+        field: 'shipment_no',
+      }),
       idempotency_key: idempotencyKey('shipment'),
       planned_ship_at: new Date().toISOString().slice(0, 10),
       items: [createBlankShipmentItem()],
@@ -847,22 +1069,15 @@ export default function ShipmentsPage() {
         })}
       />
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
+      <BusinessFormModal
         title={
-          <div className="erp-business-action-modal__title">
-            <span>
-              {isCreateModal
-                ? '新建出货单'
-                : isAppendModal
-                  ? '维护出货明细'
-                  : '维护出货明细'}
-            </span>
-            <small>
-              出货单弹窗上方维护主表字段，下方维护出货明细；新建保存由后端事务一次写入。
-            </small>
-          </div>
+          isCreateModal
+            ? '新建出货单'
+            : isAppendModal
+              ? '维护出货明细'
+              : '维护出货明细'
         }
+        description="出货单弹窗上方维护主表字段，下方维护出货明细；新建保存由后端事务一次写入。"
         open={Boolean(shipmentModal)}
         onCancel={closeShipmentModal}
         onOk={submitShipmentModal}
@@ -870,8 +1085,6 @@ export default function ShipmentsPage() {
         cancelText="取消"
         confirmLoading={saving}
         okButtonProps={{ disabled: !canCreate }}
-        width={BUSINESS_FORM_MODAL_WIDTH}
-        centered
         forceRender
         destroyOnHidden={false}
       >
@@ -880,7 +1093,11 @@ export default function ShipmentsPage() {
           form={shipmentForm}
           className="erp-business-action-form"
         >
-          <ShipmentFormFields disabled={!isCreateModal} />
+          <ShipmentFormFields
+            customerOptions={customerOptions}
+            disabled={!isCreateModal}
+            salesOrderOptions={salesOrderOptions}
+          />
           {modalSelectedShipment ? (
             <section className="erp-master-contact-list erp-shipment-modal-items">
               <div className="erp-master-contact-list__head">
@@ -960,7 +1177,16 @@ export default function ShipmentsPage() {
                         </Button>
                       </div>
                       <div className="erp-master-contact-list__grid">
-                        <ShipmentItemFormFields field={field} />
+                        <ShipmentItemFormFields
+                          field={field}
+                          inventoryLotOptions={inventoryLotOptions}
+                          productOptions={productOptions}
+                          productSKUOptions={productSKUOptions}
+                          salesOrderItemOptions={salesOrderItemOptions}
+                          shipmentOptions={shipmentOptions}
+                          unitOptions={unitOptions}
+                          warehouseOptions={warehouseOptions}
+                        />
                       </div>
                     </div>
                   ))}
@@ -991,7 +1217,7 @@ export default function ShipmentsPage() {
             )}
           </Form.List>
         </Form>
-      </Modal>
+      </BusinessFormModal>
     </BusinessPageLayout>
   )
 }

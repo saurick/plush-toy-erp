@@ -9,9 +9,6 @@ import { useEffect } from 'react'
 const useClickAway = (triggerInsideRef, insideRef, callback) => {
   useEffect(() => {
     const handler = (event) => {
-      // console.log(event.target, 'event.target')
-      // console.log(insideRef, 'insideRef')
-      // console.log(triggerInsideRef, 'triggerInsideRef')
       if (
         triggerInsideRef !== null &&
         insideRef?.current &&

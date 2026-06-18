@@ -27,11 +27,11 @@ x-web-app-common: &web-app-common
 
 services:
   postgres:
-    image: postgres:18
+    image: "${POSTGRES_IMAGE:-postgres:18.1}"
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-postgres"
     restart: always
     ports:
-      - "${POSTGRES_PORT:-5435}:5432"
+      - "${POSTGRES_BIND_ADDR:-127.0.0.1}:${POSTGRES_PORT:-5435}:5432"
     environment:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-change-this-prod-postgres-password}"
       POSTGRES_DB: "${POSTGRES_DB:-plush_erp}"
@@ -49,7 +49,7 @@ services:
     networks: {}
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: "${JAEGER_IMAGE:-jaegertracing/all-in-one:1.76.0}"
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-jaeger"
     restart: always
     ports:
@@ -95,6 +95,7 @@ services:
       TRACE_ENDPOINT: "${TRACE_ENDPOINT:-jaeger:4318}"
       TRACE_RATIO: "${TRACE_RATIO:-0.1}"
       APP_JWT_SECRET: "${APP_JWT_SECRET:-change-this-prod-jwt-secret}"
+      APP_AUTH_SMS_MODE: "${APP_AUTH_SMS_MODE:-disabled}"
       APP_ADMIN_USERNAME: "${APP_ADMIN_USERNAME:-admin}"
       BOOTSTRAP_ADMIN_ONCE: "${BOOTSTRAP_ADMIN_ONCE:-false}"
       # 默认不注入 APP_ADMIN_PASSWORD。新库首次初始化时必须同时临时设置 BOOTSTRAP_ADMIN_ONCE=true；

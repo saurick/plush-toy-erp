@@ -43,6 +43,23 @@ export function buildPurchaseReceiptItemParams(receiptID, values = {}) {
   })
 }
 
+export function createBlankPurchaseReceiptItem(receiptID) {
+  return {
+    receipt_id: receiptID,
+    material_id: undefined,
+    warehouse_id: undefined,
+    unit_id: undefined,
+    lot_id: undefined,
+    purchase_order_item_id: undefined,
+    lot_no: '',
+    quantity: '',
+    unit_price: '',
+    amount: '',
+    source_line_no: '',
+    note: '',
+  }
+}
+
 export function buildShipmentItemParams(values = {}) {
   return compactParams({
     shipment_id: requiredInt(values.shipment_id),

@@ -14,9 +14,8 @@ import {
   Empty,
   Form,
   Input,
-  InputNumber,
-  Modal,
   Popconfirm,
+  Select,
   Space,
   Table,
   Tag,
@@ -39,6 +38,11 @@ import {
 } from '../api/bomApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
+  listMaterials,
+  listProducts,
+  listUnits,
+} from '../api/masterDataOrderApi.mjs'
+import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -54,6 +58,7 @@ import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import {
   formatUnixDate,
   formatUnixDateTime,
@@ -69,6 +74,13 @@ import {
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
+import {
+  materialOption,
+  productOption,
+  referenceLabel,
+  uniqueReferenceOptions,
+  unitOption,
+} from '../utils/referenceSelectOptions.mjs'
 
 const BOM_MODULE_KEY = 'material-bom'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
@@ -93,8 +105,6 @@ const STATUS_COLORS = {
   ARCHIVED: 'default',
   DISABLED: 'red',
 }
-
-const BUSINESS_FORM_MODAL_WIDTH = 'min(960px, calc(100vw - 96px))'
 
 function readStoredColumnOrder(moduleKey) {
   if (typeof window === 'undefined') return []
@@ -220,21 +230,27 @@ function buildItemParams(values = {}, extra = {}) {
   }
 }
 
-function HeaderFormFields({ includeProduct = true, disabled = false }) {
+function HeaderFormFields({
+  includeProduct = true,
+  disabled = false,
+  productOptions = [],
+}) {
   return (
     <>
       {includeProduct ? (
         <Form.Item
           className="erp-business-action-form__field"
-          label="产品 ID"
+          label="产品"
           name="product_id"
-          rules={[{ required: true, message: '请填写产品 ID' }]}
+          rules={[{ required: true, message: '请选择产品' }]}
         >
-          <InputNumber
+          <Select
+            allowClear
             disabled={disabled}
-            min={1}
-            precision={0}
-            style={{ width: '100%' }}
+            optionFilterProp="label"
+            options={productOptions}
+            placeholder="请选择产品"
+            showSearch
           />
         </Form.Item>
       ) : null}
@@ -277,16 +293,22 @@ function HeaderFormFields({ includeProduct = true, disabled = false }) {
   )
 }
 
-function ItemFormFields() {
+function ItemFormFields({ materialOptions = [], unitOptions = [] }) {
   return (
     <>
       <Form.Item
         className="erp-business-action-form__field"
-        label="材料 ID"
+        label="材料"
         name="material_id"
-        rules={[{ required: true, message: '请填写材料 ID' }]}
+        rules={[{ required: true, message: '请选择材料' }]}
       >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={materialOptions}
+          placeholder="请选择材料"
+          showSearch
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -298,11 +320,17 @@ function ItemFormFields() {
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="单位 ID"
+        label="单位"
         name="unit_id"
-        rules={[{ required: true, message: '请填写单位 ID' }]}
+        rules={[{ required: true, message: '请选择单位' }]}
       >
-        <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+        <Select
+          allowClear
+          optionFilterProp="label"
+          options={unitOptions}
+          placeholder="请选择单位"
+          showSearch
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -355,6 +383,9 @@ export default function BOMVersionsPage() {
   const [headerMode, setHeaderMode] = useState('create')
   const [itemModalOpen, setItemModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
+  const [products, setProducts] = useState([])
+  const [materials, setMaterials] = useState([])
+  const [units, setUnits] = useState([])
   const [headerForm] = Form.useForm()
   const [itemForm] = Form.useForm()
 
@@ -362,6 +393,18 @@ export default function BOMVersionsPage() {
   const canCreate = hasActionPermission(adminProfile, 'bom.create')
   const canUpdate = hasActionPermission(adminProfile, 'bom.update')
   const canActivate = hasActionPermission(adminProfile, 'bom.activate')
+  const productOptions = useMemo(
+    () => uniqueReferenceOptions(products, productOption),
+    [products]
+  )
+  const materialOptions = useMemo(
+    () => uniqueReferenceOptions(materials, materialOption),
+    [materials]
+  )
+  const unitOptions = useMemo(
+    () => uniqueReferenceOptions(units, unitOption),
+    [units]
+  )
 
   const applySelectedRowKeys = useCallback((nextKeys = []) => {
     const normalizedKeys = Array.isArray(nextKeys) ? nextKeys : []
@@ -430,9 +473,35 @@ export default function BOMVersionsPage() {
     status,
   ])
 
+  const loadReferenceOptions = useCallback(async () => {
+    try {
+      const [productResult, materialResult, unitResult] = await Promise.all([
+        listProducts({ limit: 500, active_only: true }),
+        listMaterials({ limit: 500, active_only: true }),
+        listUnits({ limit: 500 }),
+      ])
+      setProducts(
+        Array.isArray(productResult?.products) ? productResult.products : []
+      )
+      setMaterials(
+        Array.isArray(materialResult?.materials) ? materialResult.materials : []
+      )
+      setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载 BOM 引用数据'))
+      setProducts([])
+      setMaterials([])
+      setUnits([])
+    }
+  }, [])
+
   useEffect(() => {
     loadVersions()
   }, [loadVersions])
+
+  useEffect(() => {
+    loadReferenceOptions()
+  }, [loadReferenceOptions])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadVersions)
@@ -459,7 +528,7 @@ export default function BOMVersionsPage() {
   const selectedItems = selectedVersions.map((record) => ({
     key: record.id,
     label: record.version || `BOM ${record.id}`,
-    title: `产品 ID ${record.product_id || '-'} / ${
+    title: `${referenceLabel(productOptions, record.product_id, '产品')} / ${
       STATUS_LABELS[record.status] || record.status || '-'
     }`,
   }))
@@ -660,13 +729,16 @@ export default function BOMVersionsPage() {
     () =>
       applyBusinessColumnSorters([
         {
-          title: '产品 ID',
-          exportTitle: '产品 ID',
+          title: '产品',
+          exportTitle: '产品',
           dataIndex: 'product_id',
-          width: 110,
+          width: 180,
           sortType: 'number',
           sorter: (a, b) =>
             Number(a?.product_id || 0) - Number(b?.product_id || 0),
+          render: (value) => referenceLabel(productOptions, value, '产品'),
+          exportValue: (record) =>
+            referenceLabel(productOptions, record?.product_id, '产品'),
         },
         {
           title: 'BOM 版本',
@@ -723,7 +795,7 @@ export default function BOMVersionsPage() {
           exportValue: (record) => formatUnixDateTime(record.updated_at),
         },
       ]),
-    []
+    [productOptions]
   )
 
   const persistColumnOrder = useCallback(
@@ -797,9 +869,19 @@ export default function BOMVersionsPage() {
 
   const itemColumns = useMemo(
     () => [
-      { title: '材料 ID', dataIndex: 'material_id', width: 100 },
+      {
+        title: '材料',
+        dataIndex: 'material_id',
+        width: 180,
+        render: (value) => referenceLabel(materialOptions, value, '材料'),
+      },
       { title: '用量', dataIndex: 'quantity', width: 110 },
-      { title: '单位 ID', dataIndex: 'unit_id', width: 90 },
+      {
+        title: '单位',
+        dataIndex: 'unit_id',
+        width: 100,
+        render: (value) => referenceLabel(unitOptions, value, '单位'),
+      },
       { title: '损耗率', dataIndex: 'loss_rate', width: 110 },
       {
         title: '部位',
@@ -844,7 +926,13 @@ export default function BOMVersionsPage() {
           ),
       },
     ],
-    [activeActionCanEdit, openEditItem, removeItem]
+    [
+      activeActionCanEdit,
+      materialOptions,
+      openEditItem,
+      removeItem,
+      unitOptions,
+    ]
   )
 
   return (
@@ -878,16 +966,18 @@ export default function BOMVersionsPage() {
               }}
               onPressEnter={loadVersions}
             />
-            <InputNumber
-              min={1}
-              precision={0}
-              placeholder="产品 ID"
+            <Select
+              allowClear
+              optionFilterProp="label"
+              options={productOptions}
+              placeholder="按产品筛选"
+              showSearch
               value={productID}
               onChange={(nextProductID) => {
                 setProductID(nextProductID)
                 resetBusinessPaginationCurrent(setPagination)
               }}
-              style={{ width: 140 }}
+              style={{ width: 180 }}
             />
             <SelectFilter
               value={status}
@@ -1095,26 +1185,18 @@ export default function BOMVersionsPage() {
         selectedRecordLabel={selectedVersion?.version || ''}
       />
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
+      <BusinessFormModal
         open={headerModalOpen}
         title={
-          <div className="erp-business-action-modal__title">
-            <span>
-              {headerMode === 'copy'
-                ? '复制 BOM 新版本'
-                : headerMode === 'edit'
-                  ? '编辑 BOM 草稿'
-                  : headerMode === 'view'
-                    ? '查看 BOM 版本'
-                    : '新建 BOM 草稿'}
-            </span>
-            <small>
-              BOM 只维护产品结构和材料用量，不写库存、采购或成本事实。
-            </small>
-          </div>
+          headerMode === 'copy'
+            ? '复制 BOM 新版本'
+            : headerMode === 'edit'
+              ? '编辑 BOM 草稿'
+              : headerMode === 'view'
+                ? '查看 BOM 版本'
+                : '新建 BOM 草稿'
         }
-        width={BUSINESS_FORM_MODAL_WIDTH}
+        description="BOM 只维护产品结构和材料用量，不写库存、采购或成本事实。"
         okText="保存"
         cancelText="取消"
         confirmLoading={saving || detailLoading}
@@ -1134,6 +1216,7 @@ export default function BOMVersionsPage() {
           <HeaderFormFields
             includeProduct={headerMode !== 'edit'}
             disabled={headerMode === 'view'}
+            productOptions={productOptions}
           />
         </Form>
         {headerMode === 'create' ? (
@@ -1172,7 +1255,7 @@ export default function BOMVersionsPage() {
             />
           </section>
         )}
-      </Modal>
+      </BusinessFormModal>
 
       <ColumnOrderModal
         open={columnOrderOpen}
@@ -1185,10 +1268,9 @@ export default function BOMVersionsPage() {
         onClose={() => setColumnOrderOpen(false)}
       />
 
-      <Modal
+      <BusinessFormModal
         open={itemModalOpen}
         title={editingItem ? '编辑 BOM 明细' : '添加 BOM 明细'}
-        width={BUSINESS_FORM_MODAL_WIDTH}
         okText="保存"
         cancelText="取消"
         confirmLoading={saving}
@@ -1200,9 +1282,12 @@ export default function BOMVersionsPage() {
           layout="vertical"
           className="erp-business-action-form"
         >
-          <ItemFormFields />
+          <ItemFormFields
+            materialOptions={materialOptions}
+            unitOptions={unitOptions}
+          />
         </Form>
-      </Modal>
+      </BusinessFormModal>
     </BusinessPageLayout>
   )
 }

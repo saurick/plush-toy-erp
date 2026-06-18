@@ -2,25 +2,26 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DeleteOutlined,
   DownOutlined,
+  DownloadOutlined,
   FileDoneOutlined,
+  InboxOutlined,
   LinkOutlined,
   PlusOutlined,
+  SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons'
 import {
   Button,
-  Card,
   Dropdown,
-  Empty,
   Form,
   Input,
-  InputNumber,
-  Modal,
   Popconfirm,
   Select,
-  Table,
+  Space,
   Tag,
+  Tooltip,
 } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -33,7 +34,12 @@ import {
   rejectQualityInspection,
   submitQualityInspection,
 } from '../api/qualityApi.mjs'
+import { listPurchaseReceipts } from '../api/purchaseApi.mjs'
+import { listInventoryLots } from '../api/inventoryApi.mjs'
+import { listMaterials } from '../api/masterDataOrderApi.mjs'
+import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
+  BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
   DateInput,
@@ -44,9 +50,16 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  ColumnOrderHeaderMenu,
+  ColumnOrderModal,
+  getColumnLabel,
+} from '../components/business-list/ColumnOrderModal.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import {
   compactParams,
   formatUnixDate,
   formatUnixDateTime,
+  buildSequentialDraftCode,
   hasActionPermission,
   trimOptional,
   V1_ROUTE_PATHS,
@@ -56,8 +69,24 @@ import {
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
+import {
+  applyBusinessColumnSorters,
+  applyModuleColumnOrder,
+  sanitizeModuleColumnOrder,
+} from '../utils/moduleTableColumns.mjs'
+import {
+  inventoryLotOption,
+  materialOption,
+  purchaseReceiptItemOption,
+  purchaseReceiptOption,
+  referenceLabel,
+  uniqueReferenceOptions,
+  warehouseOptionFromRecord,
+} from '../utils/referenceSelectOptions.mjs'
 
-const BUSINESS_FORM_MODAL_WIDTH = 'min(900px, calc(100vw - 96px))'
+const QUALITY_INSPECTIONS_MODULE_KEY = 'quality-inspections'
+const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
+const EMPTY_ADMIN_PROFILE = Object.freeze({})
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -145,6 +174,74 @@ function todayInputValue() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function readStoredColumnOrder(moduleKey) {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(
+      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+    )
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredColumnOrder(moduleKey, order = []) {
+  if (typeof window === 'undefined') return
+  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+  if (!Array.isArray(order) || order.length === 0) {
+    window.localStorage.removeItem(storageKey)
+    return
+  }
+  window.localStorage.setItem(storageKey, JSON.stringify(order))
+}
+
+function getPreferredColumnOrder({
+  adminProfile,
+  moduleKey,
+  columns,
+  localOrder,
+}) {
+  if (Array.isArray(localOrder)) {
+    return sanitizeModuleColumnOrder(localOrder, columns)
+  }
+  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
+  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
+  if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
+  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
+}
+
+function csvEscape(value) {
+  const text = String(value ?? '')
+  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+function downloadCSV({ filename, columns, rows }) {
+  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
+  const body = rows.map((row) =>
+    columns.map((column) => {
+      const rawValue =
+        typeof column.exportValue === 'function'
+          ? column.exportValue(row)
+          : row?.[column.dataIndex]
+      return csvEscape(rawValue)
+    })
+  )
+  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], {
+    type: 'text/csv;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
 function buildInspectionParams(values = {}) {
   return compactParams({
     inspection_no: trimOptional(values.inspection_no),
@@ -168,10 +265,18 @@ function buildDecisionParams(inspectionID, values = {}, result = '') {
   })
 }
 
+function findByPositiveID(id, records = []) {
+  const targetID = positiveInt(id)
+  if (!targetID) return null
+  return (Array.isArray(records) ? records : []).find(
+    (record) => Number(record?.id || record?.lot_id || 0) === targetID
+  )
+}
+
 export default function V1QualityInspectionsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = outletContext?.adminProfile || EMPTY_ADMIN_PROFILE
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [keyword, setKeyword] = useState('')
@@ -182,8 +287,18 @@ export default function V1QualityInspectionsPage() {
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [inspectionModal, setInspectionModal] = useState(null)
+  const [columnOrder, setColumnOrder] = useState(null)
+  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
+  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
+  const [purchaseReceipts, setPurchaseReceipts] = useState([])
+  const [inventoryLots, setInventoryLots] = useState([])
+  const [materials, setMaterials] = useState([])
   const [inspectionForm] = Form.useForm()
   const [decisionForm] = Form.useForm()
+  const selectedPurchaseReceiptID = Form.useWatch(
+    'purchase_receipt_id',
+    inspectionForm
+  )
 
   const canCreate = hasPermission(adminProfile, 'quality.inspection.create')
   const canUpdate = hasPermission(adminProfile, 'quality.inspection.update')
@@ -191,6 +306,82 @@ export default function V1QualityInspectionsPage() {
     { key: 'purchase-receipts', label: '采购入库' },
     { key: 'inventory', label: '库存台账' },
   ]
+  const purchaseReceiptOptions = useMemo(
+    () => uniqueReferenceOptions(purchaseReceipts, purchaseReceiptOption),
+    [purchaseReceipts]
+  )
+  const purchaseReceiptItemOptions = useMemo(
+    () =>
+      uniqueReferenceOptions(
+        purchaseReceipts
+          .filter((receipt) => {
+            const selectedReceiptID = positiveInt(selectedPurchaseReceiptID)
+            return (
+              !selectedReceiptID ||
+              Number(receipt.id || 0) === selectedReceiptID
+            )
+          })
+          .flatMap((receipt) =>
+            Array.isArray(receipt?.items) ? receipt.items : []
+          ),
+        purchaseReceiptItemOption
+      ),
+    [purchaseReceipts, selectedPurchaseReceiptID]
+  )
+  const purchaseReceiptItems = useMemo(
+    () =>
+      purchaseReceipts.flatMap((receipt) =>
+        Array.isArray(receipt?.items) ? receipt.items : []
+      ),
+    [purchaseReceipts]
+  )
+  const allPurchaseReceiptItemOptions = useMemo(
+    () =>
+      uniqueReferenceOptions(purchaseReceiptItems, purchaseReceiptItemOption),
+    [purchaseReceiptItems]
+  )
+  const inventoryLotOptions = useMemo(
+    () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
+    [inventoryLots]
+  )
+  const materialOptions = useMemo(
+    () => uniqueReferenceOptions(materials, materialOption),
+    [materials]
+  )
+  const warehouseOptions = useMemo(
+    () =>
+      uniqueReferenceOptions(purchaseReceiptItems, warehouseOptionFromRecord),
+    [purchaseReceiptItems]
+  )
+
+  const persistColumnOrder = useCallback(
+    async (nextOrder, columnsForOrder) => {
+      const sanitizedOrder = sanitizeModuleColumnOrder(
+        nextOrder,
+        columnsForOrder
+      )
+      setColumnOrder(sanitizedOrder)
+      writeStoredColumnOrder(QUALITY_INSPECTIONS_MODULE_KEY, sanitizedOrder)
+      setColumnOrderSaving(true)
+      try {
+        const erpPreferences = await setERPColumnOrder({
+          module_key: QUALITY_INSPECTIONS_MODULE_KEY,
+          order: sanitizedOrder,
+        })
+        outletContext?.updateAdminERPPreferences?.(erpPreferences)
+        message.success(
+          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
+        )
+      } catch (error) {
+        message.warning(
+          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
+        )
+      } finally {
+        setColumnOrderSaving(false)
+      }
+    },
+    [outletContext]
+  )
 
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
@@ -236,6 +427,36 @@ export default function V1QualityInspectionsPage() {
     loadRows()
   }, [loadRows])
 
+  const loadReferenceOptions = useCallback(async () => {
+    try {
+      const [receiptResult, lotResult, materialResult] = await Promise.all([
+        listPurchaseReceipts({ limit: 500 }),
+        listInventoryLots({ limit: 500 }),
+        listMaterials({ limit: 500, active_only: true }),
+      ])
+      setPurchaseReceipts(
+        Array.isArray(receiptResult?.purchase_receipts)
+          ? receiptResult.purchase_receipts
+          : []
+      )
+      setInventoryLots(
+        Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
+      )
+      setMaterials(
+        Array.isArray(materialResult?.materials) ? materialResult.materials : []
+      )
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载质检引用数据'))
+      setPurchaseReceipts([])
+      setInventoryLots([])
+      setMaterials([])
+    }
+  }, [])
+
+  useEffect(() => {
+    loadReferenceOptions()
+  }, [loadReferenceOptions])
+
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadRows)
   }, [loadRows, outletContext])
@@ -243,13 +464,15 @@ export default function V1QualityInspectionsPage() {
   useEffect(() => {
     if (inspectionModal?.mode === 'create') {
       inspectionForm.setFieldsValue({
-        inspection_no: '',
+        inspection_no: buildSequentialDraftCode(rows, {
+          prefix: 'QI',
+          field: 'inspection_no',
+        }),
         purchase_receipt_id: undefined,
         purchase_receipt_item_id: undefined,
         inventory_lot_id: undefined,
         material_id: undefined,
         warehouse_id: undefined,
-        inspector_id: undefined,
         decision_note: '',
       })
     }
@@ -258,11 +481,10 @@ export default function V1QualityInspectionsPage() {
         result: inspectionModal?.mode === 'pass' ? 'PASS' : undefined,
         inspected_at:
           inspectionModal?.mode === 'cancel' ? undefined : todayInputValue(),
-        inspector_id: undefined,
         decision_note: '',
       })
     }
-  }, [decisionForm, inspectionForm, inspectionModal?.mode])
+  }, [decisionForm, inspectionForm, inspectionModal?.mode, rows])
 
   const openCreate = useCallback(() => {
     setInspectionModal({ mode: 'create' })
@@ -275,6 +497,37 @@ export default function V1QualityInspectionsPage() {
   const closeModal = useCallback(() => {
     setInspectionModal(null)
   }, [])
+
+  const handleReceiptChange = useCallback(() => {
+    inspectionForm.setFieldsValue({
+      purchase_receipt_item_id: undefined,
+      inventory_lot_id: undefined,
+      material_id: undefined,
+      warehouse_id: undefined,
+    })
+  }, [inspectionForm])
+
+  const handleReceiptItemChange = useCallback(
+    (value) => {
+      const item = findByPositiveID(value, purchaseReceiptItems)
+      inspectionForm.setFieldsValue({
+        inventory_lot_id: item?.lot_id || undefined,
+        material_id: item?.material_id || undefined,
+        warehouse_id: item?.warehouse_id || undefined,
+      })
+    },
+    [inspectionForm, purchaseReceiptItems]
+  )
+
+  const handleInventoryLotChange = useCallback(
+    (value) => {
+      const lot = findByPositiveID(value, inventoryLots)
+      if (lot?.subject_type === 'MATERIAL' && positiveInt(lot?.subject_id)) {
+        inspectionForm.setFieldsValue({ material_id: lot.subject_id })
+      }
+    },
+    [inspectionForm, inventoryLots]
+  )
 
   const handleCreateInspection = useCallback(async () => {
     const values = await inspectionForm.validateFields()
@@ -355,6 +608,14 @@ export default function V1QualityInspectionsPage() {
     cancel: '取消质检',
   }[inspectionModal?.mode || 'create']
 
+  const modalDescription = {
+    create:
+      '选择采购入库、入库行和批次；切换来源会清空已带出的材料、仓库和批次，避免残值。',
+    pass: '合格或让步接收只更新质检判定和批次状态，不写库存流水。',
+    reject: '不合格只更新质检判定和批次状态，供应商退货仍走采购退货。',
+    cancel: '取消只关闭当前质检流程，不本地改库存或采购入库事实。',
+  }[inspectionModal?.mode || 'create']
+
   const modalOkText = {
     create: '创建草稿',
     pass: '确认合格',
@@ -362,65 +623,207 @@ export default function V1QualityInspectionsPage() {
     cancel: '确认取消',
   }[inspectionModal?.mode || 'create']
 
-  const columns = useMemo(
+  const dataColumns = useMemo(
     () => [
-      { title: '质检单号', dataIndex: 'inspection_no', width: 170 },
+      {
+        title: '质检单号',
+        exportTitle: '质检单号',
+        dataIndex: 'inspection_no',
+        width: 170,
+      },
       {
         title: '状态',
+        exportTitle: '状态',
         dataIndex: 'status',
         width: 110,
+        exportValue: (record) =>
+          STATUS_LABELS[record?.status] || record?.status,
         render: statusTag,
       },
       {
         title: '判定',
+        exportTitle: '判定',
         dataIndex: 'result',
         width: 120,
+        exportValue: (record) =>
+          RESULT_LABELS[record?.result] || record?.result,
         render: resultTag,
       },
-      { title: '采购入库单', dataIndex: 'purchase_receipt_id', width: 120 },
+      {
+        title: '采购入库单',
+        exportTitle: '采购入库单',
+        dataIndex: 'purchase_receipt_id',
+        width: 120,
+        sortType: 'number',
+        render: (value) =>
+          referenceLabel(purchaseReceiptOptions, value, '入库单'),
+        exportValue: (record) =>
+          referenceLabel(
+            purchaseReceiptOptions,
+            record?.purchase_receipt_id,
+            '入库单'
+          ),
+      },
       {
         title: '入库行',
+        exportTitle: '入库行',
         dataIndex: 'purchase_receipt_item_id',
         width: 110,
-        render: (value) => value || '-',
+        sortType: 'number',
+        render: (value) =>
+          referenceLabel(allPurchaseReceiptItemOptions, value, '入库行'),
+        exportValue: (record) =>
+          referenceLabel(
+            allPurchaseReceiptItemOptions,
+            record?.purchase_receipt_item_id,
+            '入库行'
+          ),
       },
-      { title: '材料 ID', dataIndex: 'material_id', width: 100 },
-      { title: '仓库 ID', dataIndex: 'warehouse_id', width: 100 },
-      { title: '批次 ID', dataIndex: 'inventory_lot_id', width: 100 },
+      {
+        title: '材料',
+        exportTitle: '材料',
+        dataIndex: 'material_id',
+        width: 180,
+        sortType: 'number',
+        render: (value) => referenceLabel(materialOptions, value, '材料'),
+        exportValue: (record) =>
+          referenceLabel(materialOptions, record?.material_id, '材料'),
+      },
+      {
+        title: '仓库',
+        exportTitle: '仓库',
+        dataIndex: 'warehouse_id',
+        width: 110,
+        sortType: 'number',
+        render: (value) => referenceLabel(warehouseOptions, value, '仓库'),
+        exportValue: (record) =>
+          referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
+      },
+      {
+        title: '批次',
+        exportTitle: '批次',
+        dataIndex: 'inventory_lot_id',
+        width: 150,
+        sortType: 'number',
+        render: (value) => referenceLabel(inventoryLotOptions, value, '批次'),
+        exportValue: (record) =>
+          referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次'),
+      },
       {
         title: '原批次状态',
+        exportTitle: '原批次状态',
         dataIndex: 'original_lot_status',
         width: 120,
         render: (value) => value || '-',
       },
       {
         title: '检验时间',
+        exportTitle: '检验时间',
         dataIndex: 'inspected_at',
         width: 150,
+        sortType: 'date',
         render: formatUnixDate,
+        exportValue: (record) => formatUnixDate(record?.inspected_at),
       },
       {
         title: '检验员',
+        exportTitle: '检验员',
         dataIndex: 'inspector_id',
         width: 100,
-        render: (value) => value || '-',
+        sortType: 'number',
+        render: (value) => (value ? `管理员 #${value}` : '-'),
+        exportValue: (record) =>
+          record?.inspector_id ? `管理员 #${record.inspector_id}` : '-',
       },
       {
         title: '创建时间',
+        exportTitle: '创建时间',
         dataIndex: 'created_at',
         width: 170,
+        sortType: 'date',
         render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.created_at),
       },
       {
         title: '更新时间',
+        exportTitle: '更新时间',
         dataIndex: 'updated_at',
         width: 170,
+        sortType: 'date',
         render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
-      { title: '判定备注', dataIndex: 'decision_note', ellipsis: true },
+      {
+        title: '判定备注',
+        exportTitle: '判定备注',
+        dataIndex: 'decision_note',
+        ellipsis: true,
+      },
     ],
-    []
+    [
+      allPurchaseReceiptItemOptions,
+      inventoryLotOptions,
+      materialOptions,
+      purchaseReceiptOptions,
+      warehouseOptions,
+    ]
   )
+
+  const sortableDataColumns = useMemo(
+    () => applyBusinessColumnSorters(dataColumns),
+    [dataColumns]
+  )
+
+  const preferredColumnOrder = useMemo(
+    () =>
+      getPreferredColumnOrder({
+        adminProfile,
+        moduleKey: QUALITY_INSPECTIONS_MODULE_KEY,
+        columns: sortableDataColumns,
+        localOrder: columnOrder,
+      }),
+    [adminProfile, columnOrder, sortableDataColumns]
+  )
+
+  const visibleDataColumns = useMemo(
+    () => applyModuleColumnOrder(sortableDataColumns, preferredColumnOrder),
+    [preferredColumnOrder, sortableDataColumns]
+  )
+
+  const columns = useMemo(
+    () =>
+      visibleDataColumns.map((column) => ({
+        ...column,
+        title: (
+          <ColumnOrderHeaderMenu
+            column={column}
+            columns={sortableDataColumns}
+            order={preferredColumnOrder}
+            saving={columnOrderSaving}
+            onChange={(nextOrder) =>
+              persistColumnOrder(nextOrder, sortableDataColumns)
+            }
+            onOpenPanel={() => setColumnOrderOpen(true)}
+          />
+        ),
+      })),
+    [
+      columnOrderSaving,
+      persistColumnOrder,
+      preferredColumnOrder,
+      sortableDataColumns,
+      visibleDataColumns,
+    ]
+  )
+
+  const exportQualityInspections = useCallback(() => {
+    if (rows.length === 0) return
+    downloadCSV({
+      filename: `quality-inspections-${new Date().toISOString().slice(0, 10)}.csv`,
+      columns: visibleDataColumns,
+      rows,
+    })
+  }, [rows, visibleDataColumns])
 
   return (
     <BusinessPageLayout className="erp-v1-quality-inspections-page">
@@ -461,7 +864,7 @@ export default function V1QualityInspectionsPage() {
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索质检单号 / 入库单 / 批次 ID"
+              placeholder="搜索质检单号 / 入库单 / 批次"
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetBusinessPaginationCurrent(setPagination)
@@ -487,6 +890,37 @@ export default function V1QualityInspectionsPage() {
               }}
             />
           </>
+        }
+        actions={
+          <Space wrap>
+            <ToolbarButton
+              icon={<DownloadOutlined />}
+              disabled={rows.length === 0}
+              onClick={exportQualityInspections}
+            >
+              导出当前结果
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={() => setColumnOrderOpen(true)}
+            >
+              列顺序
+            </ToolbarButton>
+            <Tooltip title="当前 quality JSON-RPC 没有物理删除 API；如需退出使用，请走取消质检。">
+              <span>
+                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
+                  批量删除
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="当前 quality_inspections 没有回收站主路径，列表不做前端假恢复。">
+              <span>
+                <ToolbarButton icon={<InboxOutlined />} disabled>
+                  回收站
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+          </Space>
         }
         primaryAction={
           <ToolbarButton
@@ -600,40 +1034,48 @@ export default function V1QualityInspectionsPage() {
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <Card className="erp-business-data-table-card erp-business-module-table-card">
-        <Table
-          rowKey="id"
-          loading={loading}
-          dataSource={rows}
-          columns={columns}
-          pagination={createBusinessTablePagination({
-            pagination,
-            total,
-            onChange: (current, pageSize) =>
-              setPagination({ current, pageSize }),
-          })}
-          scroll={{ x: 1460 }}
-          rowSelection={{
-            type: 'radio',
-            selectedRowKeys: selectedRow ? [selectedRow.id] : [],
-            onChange: (_keys, selectedRows) =>
-              setSelectedRow(selectedRows[0] || null),
-          }}
-          rowClassName={(record) =>
-            record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
-          }
-          onRow={(record) => ({
-            onClick: () => setSelectedRow(record),
-          })}
-          locale={{
-            emptyText: <Empty description="暂无来料质检单" />,
-          }}
-        />
-      </Card>
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        dataSource={rows}
+        columns={columns}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+        })}
+        scroll={{ x: 1460 }}
+        rowSelection={{
+          type: 'radio',
+          selectedRowKeys: selectedRow ? [selectedRow.id] : [],
+          onChange: (_keys, selectedRows) =>
+            setSelectedRow(selectedRows[0] || null),
+        }}
+        rowClassName={(record) =>
+          record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () => setSelectedRow(record),
+        })}
+        emptyDescription="暂无来料质检单"
+      />
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
+      <ColumnOrderModal
+        open={columnOrderOpen}
+        columns={sortableDataColumns}
+        order={preferredColumnOrder}
+        saving={columnOrderSaving}
+        moduleTitle="来料质检列表"
+        onChange={(nextOrder) =>
+          persistColumnOrder(nextOrder, sortableDataColumns)
+        }
+        onReset={() => persistColumnOrder([], sortableDataColumns)}
+        onClose={() => setColumnOrderOpen(false)}
+      />
+
+      <BusinessFormModal
         title={modalTitle}
+        description={modalDescription}
         open={Boolean(inspectionModal)}
         onCancel={closeModal}
         onOk={
@@ -642,10 +1084,7 @@ export default function V1QualityInspectionsPage() {
             : handleDecision
         }
         confirmLoading={saving}
-        maskClosable={false}
-        centered
         destroyOnHidden
-        width={BUSINESS_FORM_MODAL_WIDTH}
         okText={modalOkText}
         cancelText="关闭"
       >
@@ -657,57 +1096,87 @@ export default function V1QualityInspectionsPage() {
           >
             <Form.Item
               className="erp-business-action-form__field"
-              label="质检单号"
+              label="质检单号（自动）"
               name="inspection_no"
-              rules={[{ required: true, message: '请填写质检单号' }]}
+              rules={[{ required: true, message: '请填写或保留自动质检单号' }]}
             >
-              <Input allowClear autoComplete="off" />
+              <Input
+                allowClear
+                autoComplete="off"
+                placeholder="自动生成，可按需要调整"
+              />
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              label="采购入库单 ID"
+              label="采购入库单"
               name="purchase_receipt_id"
-              rules={[{ required: true, message: '请填写采购入库单 ID' }]}
+              rules={[{ required: true, message: '请选择采购入库单' }]}
             >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+              <Select
+                allowClear
+                optionFilterProp="label"
+                options={purchaseReceiptOptions}
+                placeholder="请选择采购入库单"
+                showSearch
+                onChange={handleReceiptChange}
+              />
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              label="采购入库行 ID"
+              label="采购入库行"
               name="purchase_receipt_item_id"
             >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+              <Select
+                allowClear
+                optionFilterProp="label"
+                options={purchaseReceiptItemOptions}
+                placeholder="请选择采购入库行"
+                showSearch
+                onChange={handleReceiptItemChange}
+              />
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              label="批次 ID"
+              label="批次"
               name="inventory_lot_id"
-              rules={[{ required: true, message: '请填写批次 ID' }]}
+              rules={[{ required: true, message: '请选择批次' }]}
             >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+              <Select
+                allowClear
+                optionFilterProp="label"
+                options={inventoryLotOptions}
+                placeholder="请选择批次"
+                showSearch
+                onChange={handleInventoryLotChange}
+              />
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              label="材料 ID"
+              label="材料"
               name="material_id"
-              rules={[{ required: true, message: '请填写材料 ID' }]}
+              rules={[{ required: true, message: '请选择材料' }]}
             >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+              <Select
+                allowClear
+                optionFilterProp="label"
+                options={materialOptions}
+                placeholder="请选择材料"
+                showSearch
+              />
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field"
-              label="仓库 ID"
+              label="仓库"
               name="warehouse_id"
-              rules={[{ required: true, message: '请填写仓库 ID' }]}
+              rules={[{ required: true, message: '请选择仓库' }]}
             >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="检验员 ID"
-              name="inspector_id"
-            >
-              <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+              <Select
+                allowClear
+                optionFilterProp="label"
+                options={warehouseOptions}
+                placeholder="请选择仓库"
+                showSearch
+              />
             </Form.Item>
             <Form.Item
               className="erp-business-action-form__field erp-business-action-form__field--wide"
@@ -734,26 +1203,13 @@ export default function V1QualityInspectionsPage() {
               </Form.Item>
             ) : null}
             {inspectionModal?.mode !== 'cancel' ? (
-              <>
-                <Form.Item
-                  className="erp-business-action-form__field"
-                  label="检验日期"
-                  name="inspected_at"
-                >
-                  <DateInput />
-                </Form.Item>
-                <Form.Item
-                  className="erp-business-action-form__field"
-                  label="检验员 ID"
-                  name="inspector_id"
-                >
-                  <InputNumber
-                    min={1}
-                    precision={0}
-                    style={{ width: '100%' }}
-                  />
-                </Form.Item>
-              </>
+              <Form.Item
+                className="erp-business-action-form__field"
+                label="检验日期"
+                name="inspected_at"
+              >
+                <DateInput />
+              </Form.Item>
             ) : null}
             <Form.Item
               className="erp-business-action-form__field erp-business-action-form__field--wide"
@@ -764,7 +1220,7 @@ export default function V1QualityInspectionsPage() {
             </Form.Item>
           </Form>
         )}
-      </Modal>
+      </BusinessFormModal>
     </BusinessPageLayout>
   )
 }

@@ -83,6 +83,20 @@ func TestResolveTraceEnvOverridesRejectsInvalidRatio(t *testing.T) {
 	}
 }
 
+func productionConfigTestEnv(overrides map[string]string) func(string) string {
+	values := map[string]string{
+		"ERP_DEBUG_ENV":             "prod",
+		"ERP_DEBUG_SEED_ENABLED":    "false",
+		"ERP_DEBUG_CLEANUP_ENABLED": "false",
+	}
+	for key, value := range overrides {
+		values[key] = value
+	}
+	return func(key string) string {
+		return values[key]
+	}
+}
+
 func TestValidateProductionBootstrapConfigRejectsPlaceholders(t *testing.T) {
 	t.Parallel()
 
@@ -93,7 +107,7 @@ func TestValidateProductionBootstrapConfigRejectsPlaceholders(t *testing.T) {
 			Admin:     &conf.Data_Auth_Admin{Password: ""},
 		},
 	}
-	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(string) string { return "" }); err == nil {
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil)); err == nil {
 		t.Fatal("expected production placeholder config to be rejected")
 	}
 }
@@ -108,7 +122,7 @@ func TestValidateProductionBootstrapConfigAllowsBlankBootstrapAdminPassword(t *t
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
 		},
 	}
-	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(string) string { return "" }); err != nil {
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil)); err != nil {
 		t.Fatalf("expected production config with blank bootstrap admin password to pass, got %v", err)
 	}
 }
@@ -123,7 +137,7 @@ func TestValidateProductionBootstrapConfigRequiresOnceFlagForAdminPassword(t *te
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: "runtime-admin-password"},
 		},
 	}
-	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(string) string { return "" }); err == nil {
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil)); err == nil {
 		t.Fatal("expected production bootstrap admin password without once flag to be rejected")
 	}
 }
@@ -138,12 +152,9 @@ func TestValidateProductionBootstrapConfigRequiresAdminPasswordWhenOnceEnabled(t
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
 		},
 	}
-	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(key string) string {
-		if key == "BOOTSTRAP_ADMIN_ONCE" {
-			return "true"
-		}
-		return ""
-	}); err == nil {
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(map[string]string{
+		"BOOTSTRAP_ADMIN_ONCE": "true",
+	})); err == nil {
 		t.Fatal("expected BOOTSTRAP_ADMIN_ONCE=true without password to be rejected")
 	}
 }
@@ -158,13 +169,49 @@ func TestValidateProductionBootstrapConfigAllowsAdminPasswordWithOnceFlag(t *tes
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: "runtime-admin-password"},
 		},
 	}
-	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, func(key string) string {
-		if key == "BOOTSTRAP_ADMIN_ONCE" {
-			return "true"
-		}
-		return ""
-	}); err != nil {
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(map[string]string{
+		"BOOTSTRAP_ADMIN_ONCE": "true",
+	})); err != nil {
 		t.Fatalf("expected once bootstrap admin password to pass, got %v", err)
+	}
+}
+
+func TestValidateProductionBootstrapConfigRejectsMockSMS(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "0123456789abcdef0123456789abcdef",
+			Sms:       &conf.Data_Auth_SMS{Mode: "mock"},
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil)); err == nil {
+		t.Fatal("expected production mock sms mode to be rejected")
+	}
+}
+
+func TestValidateProductionBootstrapConfigRequiresDebugMutationFlagsDisabled(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: "0123456789abcdef0123456789abcdef",
+			Sms:       &conf.Data_Auth_SMS{Mode: "disabled"},
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(map[string]string{
+		"ERP_DEBUG_SEED_ENABLED": "true",
+	})); err == nil {
+		t.Fatal("expected production debug seed to be rejected")
+	}
+	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(map[string]string{
+		"ERP_DEBUG_CLEANUP_ENABLED": "true",
+	})); err == nil {
+		t.Fatal("expected production debug cleanup to be rejected")
 	}
 }
 

@@ -37,10 +37,18 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v node >/dev/null 2>&1; then
+  echo "[bootstrap] 未找到 node，请先安装 Node"
+  exit 1
+fi
+
 if ! command -v go >/dev/null 2>&1; then
   echo "[bootstrap] 未找到 go，请先安装 Go"
   exit 1
 fi
+
+echo "[bootstrap] 运行本机环境自检"
+bash "$ROOT_DIR/scripts/doctor.sh"
 
 if [[ "${BOOTSTRAP_SKIP_INSTALL:-0}" != "1" ]]; then
   echo "[bootstrap] 安装 web 依赖"

@@ -50,12 +50,19 @@ test('dashboardTaskDisplay: 看板任务来源回显不直接露出英文模块 
   assert(!alertSourceLabel.includes('processing-contracts'))
 })
 
-test('dashboardTaskDisplay: 看板任务导航不再进入旧业务页', () => {
-  const entryPath = resolveWorkflowTaskEntryPath(
+test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式对象页', () => {
+  const shellEntryPath = resolveWorkflowTaskEntryPath(
     task({
       source_type: 'shipping-release',
       source_no: 'OUT-001',
       source_id: 9,
+    })
+  )
+  const productionShellEntryPath = resolveWorkflowTaskEntryPath(
+    task({
+      source_type: 'production-scheduling',
+      source_no: 'PLAN-001',
+      source_id: 10,
     })
   )
   const payloadEntryPath = resolveWorkflowAlertEntryPath({
@@ -66,26 +73,43 @@ test('dashboardTaskDisplay: 看板任务导航不再进入旧业务页', () => {
       payload: { entry_path: '/erp/legacy/removed' },
     }),
   })
-  const formalEntryPath = resolveWorkflowTaskEntryPath(
-    task({
-      source_type: 'sales-orders',
-      source_no: 'SO-001',
-      payload: { entry_path: '/erp/sales/project-orders/sales-orders' },
-    })
-  )
+  const formalTaskEntries = [
+    [
+      task({
+        source_type: 'sales-orders',
+        source_no: 'SO-001',
+        payload: { entry_path: '/erp/sales/project-orders/sales-orders' },
+      }),
+      '/erp/sales/project-orders/sales-orders?link_keyword=SO-001&link_source=task-dashboard&link_fields=document_no%2Csource_no',
+    ],
+    [
+      task({ source_type: 'inbound', source_no: 'RCV-001' }),
+      '/erp/warehouse/inbound?link_keyword=RCV-001&link_source=task-dashboard&link_fields=document_no%2Csource_no',
+    ],
+    [
+      task({ source_type: 'quality-inspections', source_no: 'QC-001' }),
+      '/erp/production/quality-inspections?link_keyword=QC-001&link_source=task-dashboard&link_fields=document_no%2Csource_no',
+    ],
+    [
+      task({ source_type: 'processing-contracts', source_no: 'OUTS-001' }),
+      '/erp/purchase/processing-contracts?link_keyword=OUTS-001&link_source=task-dashboard&link_fields=document_no%2Csource_no',
+    ],
+    [
+      task({ source_type: 'shipments', source_no: 'SHP-001' }),
+      '/erp/warehouse/shipments?link_keyword=SHP-001&link_source=task-dashboard&link_fields=document_no%2Csource_no',
+    ],
+    [
+      task({ source_type: 'receivables', source_no: 'AR-001' }),
+      '/erp/finance/receivables?link_keyword=AR-001&link_source=task-dashboard&link_fields=document_no%2Csource_no',
+    ],
+  ]
 
-  assert.equal(
-    entryPath,
-    '/erp/business-dashboard?link_keyword=OUT-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
-  )
-  assert.equal(
-    payloadEntryPath,
-    '/erp/business-dashboard?link_keyword=PO-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
-  )
-  assert.equal(
-    formalEntryPath,
-    '/erp/sales/project-orders/sales-orders?link_keyword=SO-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
-  )
+  assert.equal(shellEntryPath, '')
+  assert.equal(productionShellEntryPath, '')
+  assert.equal(payloadEntryPath, '')
+  formalTaskEntries.forEach(([item, expectedPath]) => {
+    assert.equal(resolveWorkflowTaskEntryPath(item), expectedPath)
+  })
 })
 
 test('workflowDashboardStats: 统计任务状态和 due_at 计算态', () => {

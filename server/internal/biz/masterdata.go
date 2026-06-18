@@ -61,6 +61,16 @@ type Unit struct {
 	UpdatedAt time.Time
 }
 
+type Warehouse struct {
+	ID        int
+	Code      string
+	Name      string
+	Type      string
+	IsActive  bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Material struct {
 	ID            int
 	Code          string
@@ -204,6 +214,21 @@ type ContactMutation struct {
 	Note      *string
 }
 
+type ContactSaveMutation struct {
+	ID int
+	ContactMutation
+}
+
+type CustomerWithContacts struct {
+	Customer *Customer
+	Contacts []*Contact
+}
+
+type SupplierWithContacts struct {
+	Supplier *Supplier
+	Contacts []*Contact
+}
+
 type MasterDataFilter struct {
 	Keyword    string
 	ActiveOnly bool
@@ -230,6 +255,7 @@ type ProductSKUFilter struct {
 type MasterDataRepo interface {
 	CreateCustomer(ctx context.Context, in *CustomerMutation) (*Customer, error)
 	UpdateCustomer(ctx context.Context, id int, in *CustomerMutation) (*Customer, error)
+	SaveCustomerWithContacts(ctx context.Context, id int, in *CustomerMutation, contacts []*ContactSaveMutation) (*CustomerWithContacts, error)
 	GetCustomer(ctx context.Context, id int) (*Customer, error)
 	ListCustomers(ctx context.Context, filter MasterDataFilter) ([]*Customer, int, error)
 	SetCustomerActive(ctx context.Context, id int, active bool) (*Customer, error)
@@ -237,6 +263,7 @@ type MasterDataRepo interface {
 
 	CreateSupplier(ctx context.Context, in *SupplierMutation) (*Supplier, error)
 	UpdateSupplier(ctx context.Context, id int, in *SupplierMutation) (*Supplier, error)
+	SaveSupplierWithContacts(ctx context.Context, id int, in *SupplierMutation, contacts []*ContactSaveMutation) (*SupplierWithContacts, error)
 	GetSupplier(ctx context.Context, id int) (*Supplier, error)
 	ListSuppliers(ctx context.Context, filter MasterDataFilter) ([]*Supplier, int, error)
 	SetSupplierActive(ctx context.Context, id int, active bool) (*Supplier, error)
@@ -248,6 +275,7 @@ type MasterDataRepo interface {
 	ListMaterials(ctx context.Context, filter MasterDataFilter) ([]*Material, int, error)
 	SetMaterialActive(ctx context.Context, id int, active bool) (*Material, error)
 	ListUnits(ctx context.Context, filter MasterDataFilter) ([]*Unit, int, error)
+	ListWarehouses(ctx context.Context, filter MasterDataFilter) ([]*Warehouse, int, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
 
 	CreateProcess(ctx context.Context, in *ProcessMutation) (*Process, error)
@@ -306,6 +334,21 @@ func (uc *MasterDataUsecase) UpdateCustomer(ctx context.Context, id int, in *Cus
 	return uc.repo.UpdateCustomer(ctx, id, &normalized)
 }
 
+func (uc *MasterDataUsecase) SaveCustomerWithContacts(ctx context.Context, id int, in *CustomerMutation, contacts []*ContactSaveMutation) (*CustomerWithContacts, error) {
+	if uc == nil || uc.repo == nil || id < 0 || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeCustomerMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	normalizedContacts, err := normalizeContactSaveMutations(contacts)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.SaveCustomerWithContacts(ctx, id, &normalized, normalizedContacts)
+}
+
 func (uc *MasterDataUsecase) GetCustomer(ctx context.Context, id int) (*Customer, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
@@ -347,6 +390,21 @@ func (uc *MasterDataUsecase) UpdateSupplier(ctx context.Context, id int, in *Sup
 		return nil, err
 	}
 	return uc.repo.UpdateSupplier(ctx, id, &normalized)
+}
+
+func (uc *MasterDataUsecase) SaveSupplierWithContacts(ctx context.Context, id int, in *SupplierMutation, contacts []*ContactSaveMutation) (*SupplierWithContacts, error) {
+	if uc == nil || uc.repo == nil || id < 0 || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeSupplierMutation(*in)
+	if err != nil {
+		return nil, err
+	}
+	normalizedContacts, err := normalizeContactSaveMutations(contacts)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.SaveSupplierWithContacts(ctx, id, &normalized, normalizedContacts)
 }
 
 func (uc *MasterDataUsecase) GetSupplier(ctx context.Context, id int) (*Supplier, error) {
@@ -424,6 +482,13 @@ func (uc *MasterDataUsecase) ListUnits(ctx context.Context, filter MasterDataFil
 		return nil, 0, ErrBadParam
 	}
 	return uc.repo.ListUnits(ctx, normalizeMasterDataFilter(filter))
+}
+
+func (uc *MasterDataUsecase) ListWarehouses(ctx context.Context, filter MasterDataFilter) ([]*Warehouse, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	return uc.repo.ListWarehouses(ctx, normalizeMasterDataFilter(filter))
 }
 
 func (uc *MasterDataUsecase) CreateProcess(ctx context.Context, in *ProcessMutation) (*Process, error) {
@@ -782,6 +847,32 @@ func normalizeContactMutation(in ContactMutation) (ContactMutation, error) {
 		return ContactMutation{}, ErrBadParam
 	}
 	return in, nil
+}
+
+func normalizeContactSaveMutations(in []*ContactSaveMutation) ([]*ContactSaveMutation, error) {
+	out := make([]*ContactSaveMutation, 0, len(in))
+	for _, item := range in {
+		if item == nil || item.ID < 0 {
+			return nil, ErrBadParam
+		}
+		mutation := item.ContactMutation
+		mutation.OwnerType = ""
+		mutation.OwnerID = 0
+		mutation.Name = strings.TrimSpace(mutation.Name)
+		mutation.Phone = normalizeOptionalString(mutation.Phone)
+		mutation.Mobile = normalizeOptionalString(mutation.Mobile)
+		mutation.Email = normalizeOptionalString(mutation.Email)
+		mutation.Title = normalizeOptionalString(mutation.Title)
+		mutation.Note = normalizeOptionalString(mutation.Note)
+		if mutation.Name == "" {
+			return nil, ErrBadParam
+		}
+		out = append(out, &ContactSaveMutation{
+			ID:              item.ID,
+			ContactMutation: mutation,
+		})
+	}
+	return out, nil
 }
 
 func normalizeMasterDataFilter(in MasterDataFilter) MasterDataFilter {

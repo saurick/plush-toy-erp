@@ -101,23 +101,24 @@ export function buildBusinessCollaborationTaskPanelModel({
   const pageTasks = allTasks.filter(
     (task) => !currentTaskIDs.has(normalizeTaskID(task))
   )
+  const blockedTasks = allTasks.filter(isBusinessCollaborationTaskBlocking)
+  const doneTasks = allTasks.filter(isBusinessCollaborationTaskTerminal)
   const limit =
     Number.isFinite(visibleLimit) && visibleLimit > 0 ? visibleLimit : 6
 
   return {
     totalTaskCount: allTasks.length,
+    visibleLimit: limit,
     activeTaskCount: allTasks.filter(
       (task) => !isBusinessCollaborationTaskTerminal(task)
     ).length,
-    blockedTaskCount: allTasks.filter(isBusinessCollaborationTaskBlocking)
-      .length,
+    pageTaskCount: pageTasks.length,
+    currentRecordTaskCount: currentRecordTasks.length,
+    blockedTaskCount: blockedTasks.length,
+    doneTaskCount: doneTasks.length,
     currentRecordTasks: currentRecordTasks.slice(0, limit),
     pageTasks: pageTasks.slice(0, limit),
-    blockedTasks: allTasks
-      .filter(isBusinessCollaborationTaskBlocking)
-      .slice(0, limit),
-    doneTasks: allTasks
-      .filter(isBusinessCollaborationTaskTerminal)
-      .slice(0, limit),
+    blockedTasks: blockedTasks.slice(0, limit),
+    doneTasks: doneTasks.slice(0, limit),
   }
 }

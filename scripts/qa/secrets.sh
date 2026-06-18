@@ -7,10 +7,10 @@ print_help() {
   bash scripts/qa/secrets.sh
 
 作用:
-  对变更文件做密钥泄露扫描（依赖 gitleaks）
+  对变更文件做密钥泄露扫描，并始终拦截 npm registry token 明文配置
 
 行为:
-  未安装 gitleaks: 默认仅提示并跳过；SECRETS_STRICT=1 时阻断
+  未安装 gitleaks: npm token 检查仍会执行；SECRETS_STRICT=1 时阻断
   检测到疑似泄露: 阻断
 
 环境变量:
@@ -43,14 +43,10 @@ fi
 strict="${SECRETS_STRICT:-0}"
 staged_only="${SECRETS_STAGED_ONLY:-0}"
 
+has_gitleaks=1
 if ! command -v gitleaks >/dev/null 2>&1; then
-  echo "[qa:secrets] 未安装 gitleaks"
-  if [[ "$strict" == "1" ]]; then
-    echo "[qa:secrets] SECRETS_STRICT=1，阻断"
-    exit 1
-  fi
-  echo "[qa:secrets] 跳过（建议安装后启用）"
-  exit 0
+  has_gitleaks=0
+  echo "[qa:secrets] 未安装 gitleaks，继续执行内置 npm token 检查"
 fi
 
 tmp_dir="$(mktemp -d)"
@@ -146,6 +142,15 @@ if [[ -n "$npm_token_hits" ]]; then
   echo "[qa:secrets] 检测到 npm registry token 明文配置:"
   printf "%s\n" "$npm_token_hits" | sed "s#^$tmp_dir/##"
   exit 1
+fi
+
+if [[ "$has_gitleaks" != "1" ]]; then
+  if [[ "$strict" == "1" ]]; then
+    echo "[qa:secrets] SECRETS_STRICT=1 且缺少 gitleaks，阻断"
+    exit 1
+  fi
+  echo "[qa:secrets] npm token 检查通过；跳过 gitleaks（建议安装后启用）"
+  exit 0
 fi
 
 if gitleaks detect --source "$tmp_dir" --no-banner --redact >/dev/null 2>&1; then

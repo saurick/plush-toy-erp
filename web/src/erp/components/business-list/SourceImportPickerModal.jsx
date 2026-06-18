@@ -11,6 +11,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 const { Text } = Typography
 const SELECTED_SUMMARY_VISIBLE_LIMIT = 2
@@ -85,7 +86,7 @@ export default function SourceImportPickerModal({
   getRowDisabledReason,
   onCancel,
   onImport,
-  width = 'min(860px, calc(100vw - 96px))',
+  width = ERP_MODAL_WIDTHS.localAction,
   pageSize = 5,
 }) {
   const [keyword, setKeyword] = useState('')

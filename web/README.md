@@ -11,6 +11,21 @@
 - 登录页：按入口配置显示“后台管理 / 岗位任务端”，设备只决定默认选项，不决定权限，岗位由账号授权自动决定
 - 仍然共享同一个 React 项目、同一个 common / ui / api 层
 
+## 环境版本
+
+前端依赖 pnpm，版本由 `web/package.json` 的 `packageManager` 固定为 `pnpm@10.13.1`；Node.js 版本由仓库根目录 `.n-node-version`、`.node-version` 和 `.nvmrc` 共同锁定为 `24.14.0`。
+
+```bash
+cd /Users/simon/projects/plush-toy-erp
+corepack enable
+bash scripts/doctor.sh
+
+cd /Users/simon/projects/plush-toy-erp/web
+pnpm install
+```
+
+`scripts/doctor.sh` 会检查当前 `node`、`pnpm` 和版本锁是否一致；不一致时先切换版本，不要继续安装依赖。
+
 ## 目录结构（简版）
 
 | 路径          | 职责                                                  |
@@ -171,23 +186,25 @@ pnpm style:l1
 pnpm smoke:mobile-auth-login-route
 ```
 
-如需按真实管理员登录流程验证合同编辑与在线预览时延链路，再执行：
+如需按真实管理员登录流程验证采购入库真实写入或合同编辑与在线预览时延链路，再执行：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/server
 make run
 
 cd /Users/simon/projects/plush-toy-erp/web
+pnpm smoke:purchase-receipt-real-write
 pnpm smoke:purchase-contract-real-login
 pnpm smoke:processing-contract-real-login
 ```
 
 说明：
 
-- 两条烟测都会真实打开管理员登录页，使用 `server/configs/dev/config.local.yaml` 或 `config.yaml` 中的管理员账号登录
+- 上述真实登录烟测都会打开管理员登录页，使用 `server/configs/dev/config.local.yaml` 或 `config.yaml` 中的管理员账号登录
 - 若本地账号不在配置文件中，可通过环境变量 `REAL_LOGIN_ADMIN_USERNAME` / `REAL_LOGIN_ADMIN_PASSWORD` 覆盖
 - 桌面管理员登录页和岗位任务端登录页始终保留密码登录；短信登录只有在后端 `auth.capabilities` 返回可用时展示。用户不在登录前手选岗位角色，岗位任务端登录后按账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，固定 `/m/<role>/tasks` 直达入口仍校验对应岗位授权，短信登录额外依赖手机号绑定
 - 可通过 `REAL_LOGIN_PREVIEW_MAX_MS` 覆盖默认 `10000ms` 的 PDF 预览时延阈值
+- 采购入库真实写入 e2e 会验证：登录成功、入库管理页面可创建草稿、维护明细、过账写 `inventory_txns`、取消入库写冲正、列表回显已取消；该脚本会写本地 / 开发库的模拟采购入库事实，采购入库单据不可物理删除，收尾口径是取消冲正并保留 `PR-BROWSER-*` 可追踪记录。`pnpm smoke:purchase-receipt-real-write` 已显式传入 `--accept-persistent-test-data`，直接 `node` 执行时也必须显式传入该参数或设置 `PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1`。脚本默认只允许 localhost / 127.0.0.1 页面目标；如确需跑准备好的开发 / 测试环境，必须额外传入 `--allow-external-base-url`，禁止直接跑生产或目标客户环境。若缺少单位、材料或仓库，可显式执行 `pnpm smoke:purchase-receipt-real-write -- --seed-core-demo` 先补核心演示主数据
 - 采购合同烟测会验证：登录成功、采购合同工作台可打开、采购金额可手工修改、改单价后金额会按公式重算、在线 PDF 预览在阈值内打开
 - 加工合同烟测会验证：登录成功、加工合同工作台可打开、工序名称 / 数量 / 单价会同步到纸面并联动金额、在线 PDF 预览在阈值内打开
 
@@ -237,7 +254,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台继续只保留一个入口
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code
-- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。出货单页面支持状态 / 计划出货或实际出货日期范围筛选、草稿、加行、确认出货和已出货取消冲正；`SHIPPED` 才是真实出货事实。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。入库、质检、库存、委外、生产、出货放行、出库和财务入口当前是正式页面壳，复用业务页标准骨架展示标题统计、筛选、当前操作区、表格、列顺序、导出、显式详情、新建 / 编辑只读业务表单弹窗和底部协同入口；这些页面不读取或写入旧 `business_records`，真实写入仍待对应领域 usecase / schema / API / RBAC / 审计 / 测试接入。旧通用业务页、旧业务模块路由和旧入口退出页已删除。
+- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、出库管理和财务业务已分别接入正式 V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、草稿、加行、确认出货和已出货取消冲正，`SHIPPED` 才是真实出货事实。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。当前仍为 `formal-shell` 的页面只剩生产排程、生产异常和出货放行；它们只作为待接入预览页复用业务页标准骨架展示字段范围、筛选、列顺序、导出待接入提示、接入边界和底部协同入口，不读取或写入旧 `business_records`，也不提供真实创建、状态变更、删除、回收站或业务数据导出主路径。旧通用业务页、旧业务模块路由和旧入口退出页已删除。
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端生产环境统一走 `5175` 的 `/m/<role>/tasks`；按角色拆端口只作为本地开发调试入口保留，两者不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
@@ -254,9 +271,9 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 ## 桌面业务弹窗约定
 
 - 项目弹窗默认上下左右居中：JSX 版 `antd Modal` 由根 `ConfigProvider` 统一启用 `centered`，命令式 `modal.confirm/info/success/warning/error` 由 `AntdAppBridge` 的消费层统一补齐居中配置，自研 `AppModal` 保持固定遮罩内 flex 居中。
-- 业务记录的新建 / 编辑优先使用业务表单弹窗；详情抽屉只用于显式只读核对，来源记录、流转、打印、删除等未接入真实 usecase 的动作仍可用提示弹窗表达边界。
+- 业务记录的新建 / 编辑优先使用业务表单弹窗；详情抽屉只用于显式只读核对。仍为 `formal-shell` 的待接入预览页只允许预览字段和接入边界，来源、流转、打印、删除等未接入真实 usecase 的动作必须用提示弹窗表达边界，不能写成真实业务动作。
 - 桌面端业务录入弹窗默认按紧凑自适应栅格排布：文本字段在可用宽度内多列展示，数量类短字段进一步收口，备注、边界说明和明细区保留整行。
-- V1 主数据和销售订单表单弹窗宽度基线为 `min(960px, calc(100vw - 96px))`；formal-shell 新建 / 编辑只读表单弹窗宽度基线为 `min(1120px, calc(100vw - 96px))`。
+- V1 主数据和销售订单表单弹窗宽度基线为 `min(960px, calc(100vw - 96px))`；formal-shell 待接入预览表单弹窗宽度基线为 `min(1120px, calc(100vw - 96px))`。
 - 明细条目按共享列宽预算展示，长文本字段保留较宽输入，数量 / 单价 / 金额等短数字字段收窄；数量后缀读取当前行已填单位，金额类字段默认显示 `CNY` 后缀，但不把空单位强行保存成 `pcs`。
 - 弹窗壳层按主题区分：浅色主题保持 Ant Design 轻量基线；暗色主题必须提供可辨认的遮罩、独立边框、浮层阴影以及 header / body / footer 分隔，避免业务页背景和弹窗融成一片。
 - 弹窗 body 内部接管纵向滚动，避免长表单溢出视口；明细横向滚动只允许收口在明细容器内，不外溢到整组 Modal。

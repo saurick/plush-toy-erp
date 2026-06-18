@@ -49,6 +49,7 @@ import {
 } from '../api/operationalFactApi.mjs'
 import {
   compactParams,
+  buildSequentialDraftCode,
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
@@ -335,11 +336,15 @@ function FactFormFields({ typeOptions, includeSupplier = false }) {
     <>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="事实单号"
+        label="事实单号（自动）"
         name="fact_no"
         rules={[{ required: true }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input
+          allowClear
+          autoComplete="off"
+          placeholder="自动生成，可按需要调整"
+        />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
@@ -458,11 +463,15 @@ function ShipmentFormFields() {
     <>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="出货单号"
+        label="出货单号（自动）"
         name="shipment_no"
         rules={[{ required: true }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input
+          allowClear
+          autoComplete="off"
+          placeholder="自动生成，可按需要调整"
+        />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
@@ -572,11 +581,15 @@ function ReservationFormFields() {
     <>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="预留单号"
+        label="预留单号（自动）"
         name="reservation_no"
         rules={[{ required: true }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input
+          allowClear
+          autoComplete="off"
+          placeholder="自动生成，可按需要调整"
+        />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
@@ -654,11 +667,15 @@ function FinanceFormFields() {
     <>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="事实单号"
+        label="事实单号（自动）"
         name="fact_no"
         rules={[{ required: true }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input
+          allowClear
+          autoComplete="off"
+          placeholder="自动生成，可按需要调整"
+        />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
@@ -786,6 +803,8 @@ export function OperationalFactWorkspace({
         listKey: 'production_facts',
         createLabel: '新建生产事实',
         createPrefix: 'prod',
+        draftNumberField: 'fact_no',
+        draftNumberPrefix: 'PROD',
         list: listProductionFacts,
         create: createProductionFact,
         post: postProductionFact,
@@ -805,6 +824,8 @@ export function OperationalFactWorkspace({
         listKey: 'outsourcing_facts',
         createLabel: '新建委外事实',
         createPrefix: 'outsource',
+        draftNumberField: 'fact_no',
+        draftNumberPrefix: 'OUTF',
         list: listOutsourcingFacts,
         create: createOutsourcingFact,
         post: postOutsourcingFact,
@@ -827,6 +848,8 @@ export function OperationalFactWorkspace({
         listKey: 'shipments',
         createLabel: '新建出货单',
         createPrefix: 'shipment',
+        draftNumberField: 'shipment_no',
+        draftNumberPrefix: 'SHIP',
         list: listShipments,
         create: createShipment,
         post: shipShipment,
@@ -842,6 +865,8 @@ export function OperationalFactWorkspace({
         listKey: 'stock_reservations',
         createLabel: '新建库存预留',
         createPrefix: 'reserve',
+        draftNumberField: 'reservation_no',
+        draftNumberPrefix: 'RSV',
         list: listStockReservations,
         create: createStockReservation,
         release: releaseStockReservation,
@@ -857,6 +882,8 @@ export function OperationalFactWorkspace({
         listKey: 'finance_facts',
         createLabel: '新建财务事实',
         createPrefix: 'finance',
+        draftNumberField: 'fact_no',
+        draftNumberPrefix: 'FIN',
         list: listFinanceFacts,
         create: createFinanceFact,
         post: postFinanceFact,
@@ -979,6 +1006,10 @@ export function OperationalFactWorkspace({
     setCreateTarget(nextTarget)
     createForm.setFieldsValue({
       ...config.initialValues,
+      [config.draftNumberField]: buildSequentialDraftCode(activeRows, {
+        prefix: config.draftNumberPrefix,
+        field: config.draftNumberField,
+      }),
       idempotency_key: idempotencyKey(config.createPrefix),
       occurred_at: today,
       reserved_at: today,

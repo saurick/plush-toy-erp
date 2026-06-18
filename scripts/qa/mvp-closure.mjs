@@ -14,6 +14,7 @@ const REQUIRED_PATHS = [
   "scripts/qa/trial-simulated-data.mjs",
   "scripts/qa/operational-fact-simulated-closure.mjs",
   "scripts/qa/mobile-workflow-simulated-closure.mjs",
+  "scripts/qa/purchase-receipt-real-write-e2e.mjs",
   "scripts/qa/trial-account-rbac.mjs",
   "scripts/seed-role-demo-admins.sh",
   "scripts/seed-core-demo-data.sh",
@@ -80,11 +81,14 @@ const MVP_PHASES = [
       "cd server && make purchase_receipt_pg_test",
       "cd server && make purchase_return_pg_test",
       "cd server && go test ./internal/core/... ./internal/biz ./internal/data",
+      "node scripts/qa/purchase-receipt-real-write-e2e.mjs --out output/qa/purchase-receipt-real-write-e2e",
+      "pnpm --dir web smoke:purchase-receipt-real-write",
     ],
     acceptance: [
       "库存变化来自事实 usecase 和 inventory_txns。",
       "采购入库、退货、调整、质检和批次状态互相不替代。",
       "错误通过 REVERSAL / 调整修正，不直接修改历史流水。",
+      "页面级采购入库 e2e 只跑本地 / 开发目标，收尾为取消冲正并保留 PR-BROWSER-* 可追踪事实记录；非本地页面目标必须显式允许。",
     ],
   },
   {

@@ -99,16 +99,20 @@ required_keys=(
   PROJECT_SLUG
   APP_IMAGE
   WEB_IMAGE
+  POSTGRES_IMAGE
+  JAEGER_IMAGE
   TZ
   POSTGRES_DSN
   POSTGRES_PASSWORD
   POSTGRES_DB
   POSTGRES_USER
   POSTGRES_DATA_DIR
+  POSTGRES_BIND_ADDR
   TRACE_ENDPOINT
   TRACE_RATIO
   WEB_API_ORIGIN
   APP_JWT_SECRET
+  APP_AUTH_SMS_MODE
   APP_ADMIN_USERNAME
   BOOTSTRAP_ADMIN_ONCE
   ERP_DEBUG_ENV
@@ -155,7 +159,7 @@ if [[ "$mode" == "example" ]]; then
   ok "example 模式仅检查结构，不作为生产放行"
 else
   placeholder_pattern='(change-this|placeholder|replace-with|<release-tag>|example\.invalid)'
-  for key in POSTGRES_DSN POSTGRES_PASSWORD APP_JWT_SECRET APP_IMAGE WEB_IMAGE POSTGRES_DATA_DIR WEB_API_ORIGIN; do
+  for key in POSTGRES_DSN POSTGRES_PASSWORD APP_JWT_SECRET APP_IMAGE WEB_IMAGE POSTGRES_IMAGE JAEGER_IMAGE POSTGRES_DATA_DIR WEB_API_ORIGIN; do
     value="$(value_of "$key")"
     if grep -Eiq "$placeholder_pattern" <<<"$value"; then
       fail "$key 仍包含 placeholder"
@@ -165,10 +169,14 @@ else
   app_jwt_secret="$(value_of APP_JWT_SECRET)"
   app_image="$(value_of APP_IMAGE)"
   web_image="$(value_of WEB_IMAGE)"
+  postgres_image="$(value_of POSTGRES_IMAGE)"
+  jaeger_image="$(value_of JAEGER_IMAGE)"
+  app_auth_sms_mode="$(value_of APP_AUTH_SMS_MODE | tr '[:upper:]' '[:lower:]')"
   erp_debug_env="$(value_of ERP_DEBUG_ENV)"
   erp_debug_seed_enabled="$(value_of ERP_DEBUG_SEED_ENABLED)"
   erp_debug_cleanup_enabled="$(value_of ERP_DEBUG_CLEANUP_ENABLED)"
   jaeger_bind_addr="$(value_of JAEGER_BIND_ADDR)"
+  postgres_bind_addr="$(value_of POSTGRES_BIND_ADDR)"
   postgres_dsn="$(value_of POSTGRES_DSN)"
   app_admin_password="$(value_of APP_ADMIN_PASSWORD)"
   bootstrap_admin_once="$(value_of BOOTSTRAP_ADMIN_ONCE)"
@@ -177,9 +185,13 @@ else
   [[ "${#app_jwt_secret}" -ge 32 ]] || fail "APP_JWT_SECRET 至少需要 32 字符"
   [[ "$app_image" != *":dev" && "$app_image" != *":latest" ]] || fail "APP_IMAGE 不能使用 :dev 或 :latest"
   [[ "$web_image" != *":dev" && "$web_image" != *":latest" ]] || fail "WEB_IMAGE 不能使用 :dev 或 :latest"
+  [[ "$postgres_image" != *":dev" && "$postgres_image" != *":latest" ]] || fail "POSTGRES_IMAGE 不能使用 :dev 或 :latest"
+  [[ "$jaeger_image" != *":dev" && "$jaeger_image" != *":latest" ]] || fail "JAEGER_IMAGE 不能使用 :dev 或 :latest"
+  [[ "$app_auth_sms_mode" != "mock" ]] || fail "APP_AUTH_SMS_MODE 生产环境不能使用 mock"
   [[ "$erp_debug_env" == "prod" ]] || fail "ERP_DEBUG_ENV 必须为 prod"
   [[ "$erp_debug_seed_enabled" == "false" ]] || fail "ERP_DEBUG_SEED_ENABLED 必须为 false"
   [[ "$erp_debug_cleanup_enabled" == "false" ]] || fail "ERP_DEBUG_CLEANUP_ENABLED 必须为 false"
+  [[ "$postgres_bind_addr" == "127.0.0.1" ]] || fail "POSTGRES_BIND_ADDR 必须为 127.0.0.1，避免 PostgreSQL 暴露到公网或办公网"
   [[ "$jaeger_bind_addr" == "127.0.0.1" ]] || fail "JAEGER_BIND_ADDR 必须为 127.0.0.1，避免 Jaeger 暴露到公网或办公网"
   [[ "$postgres_dsn" == postgres://* || "$postgres_dsn" == postgresql://* ]] || fail "POSTGRES_DSN 必须是 postgres/postgresql URL"
   [[ "$bootstrap_admin_once" == "true" || "$bootstrap_admin_once" == "false" ]] || fail "BOOTSTRAP_ADMIN_ONCE 必须为 true 或 false"
@@ -198,13 +210,17 @@ else
   if ! awk -v ratio="$trace_ratio" 'BEGIN { exit !(ratio + 0 >= 0 && ratio + 0 <= 1) }'; then
     fail "TRACE_RATIO 必须在 0 到 1 之间"
   fi
-  ok "生产 secret、镜像 tag、debug 和 Jaeger 暴露边界通过"
+  ok "生产 secret、镜像 tag、debug 和 PostgreSQL / Jaeger 暴露边界通过"
 fi
 
 if grep -Eq '^[[:space:]]+build:' "$compose_file"; then
   fail "生产 Compose 不允许包含 build:，低配服务器只 docker load / restart"
 fi
+if grep -Eq 'image:.*:latest' "$compose_file"; then
+  fail "生产 Compose 不允许直接使用 :latest 镜像"
+fi
 grep -q 'JAEGER_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose Jaeger 端口必须默认绑定 127.0.0.1"
+grep -q 'POSTGRES_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose PostgreSQL 端口必须默认绑定 127.0.0.1"
 grep -q '/usr/local/bin/atlas' "$migrate_script" || fail "migration 脚本必须使用宿主机 /usr/local/bin/atlas"
 grep -q 'flock' "$migrate_script" || fail "migration 脚本必须使用 flock 串行化"
 [[ -x "$migrate_script" ]] || fail "migration 脚本不可执行: $migrate_script"

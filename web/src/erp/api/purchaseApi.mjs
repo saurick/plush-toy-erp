@@ -22,6 +22,14 @@ export async function createPurchaseReceiptDraft(params = {}) {
   return dataOf(result)?.purchase_receipt || null
 }
 
+export async function createPurchaseReceiptWithItems(params = {}) {
+  const result = await purchaseRpc.call(
+    'create_purchase_receipt_with_items',
+    params
+  )
+  return dataOf(result)?.purchase_receipt || null
+}
+
 export async function createPurchaseReceiptFromPurchaseOrder(params = {}) {
   const result = await purchaseRpc.call(
     'create_purchase_receipt_from_purchase_order',

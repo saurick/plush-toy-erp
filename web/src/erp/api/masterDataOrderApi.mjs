@@ -45,6 +45,11 @@ export async function updateCustomer(params = {}) {
   return dataOf(result)?.customer || null
 }
 
+export async function saveCustomerWithContacts(params = {}) {
+  const result = await masterDataRpc.call('save_customer_with_contacts', params)
+  return dataOf(result)
+}
+
 export async function getCustomer(params = {}) {
   const result = await masterDataRpc.call('get_customer', params)
   return dataOf(result)?.customer || null
@@ -70,6 +75,11 @@ export async function updateSupplier(params = {}) {
   return dataOf(result)?.supplier || null
 }
 
+export async function saveSupplierWithContacts(params = {}) {
+  const result = await masterDataRpc.call('save_supplier_with_contacts', params)
+  return dataOf(result)
+}
+
 export async function getSupplier(params = {}) {
   const result = await masterDataRpc.call('get_supplier', params)
   return dataOf(result)?.supplier || null
@@ -87,6 +97,11 @@ export async function listMaterials(params = {}) {
 
 export async function listUnits(params = {}) {
   const result = await masterDataRpc.call('list_units', params)
+  return dataOf(result)
+}
+
+export async function listWarehouses(params = {}) {
+  const result = await masterDataRpc.call('list_warehouses', params)
   return dataOf(result)
 }
 

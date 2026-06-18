@@ -91,6 +91,28 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptDraft(ctx context.Context, in *
 	return uc.repo.CreatePurchaseReceiptDraft(ctx, &normalized)
 }
 
+func (uc *InventoryUsecase) CreatePurchaseReceiptWithItems(ctx context.Context, in *PurchaseReceiptCreate, items []*PurchaseReceiptItemCreate) (*PurchaseReceipt, error) {
+	if uc == nil || uc.repo == nil || in == nil || len(items) == 0 {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizePurchaseReceiptCreate(*in)
+	if err != nil {
+		return nil, err
+	}
+	normalizedItems := make([]*PurchaseReceiptItemCreate, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			return nil, ErrBadParam
+		}
+		normalizedItem, err := normalizePurchaseReceiptItemCreateForReceipt(*item, false)
+		if err != nil {
+			return nil, err
+		}
+		normalizedItems = append(normalizedItems, &normalizedItem)
+	}
+	return uc.repo.CreatePurchaseReceiptWithItems(ctx, &normalized, normalizedItems)
+}
+
 func (uc *InventoryUsecase) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -183,6 +205,10 @@ func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurch
 }
 
 func normalizePurchaseReceiptItemCreate(in PurchaseReceiptItemCreate) (PurchaseReceiptItemCreate, error) {
+	return normalizePurchaseReceiptItemCreateForReceipt(in, true)
+}
+
+func normalizePurchaseReceiptItemCreateForReceipt(in PurchaseReceiptItemCreate, requireReceiptID bool) (PurchaseReceiptItemCreate, error) {
 	in.LotNo = normalizeOptionalString(in.LotNo)
 	in.SourceLineNo = normalizeOptionalString(in.SourceLineNo)
 	in.Note = normalizeOptionalString(in.Note)
@@ -198,7 +224,7 @@ func normalizePurchaseReceiptItemCreate(in PurchaseReceiptItemCreate) (PurchaseR
 	if err := value.ValidateOptionalNonNegativeMoney(in.Amount); err != nil {
 		return PurchaseReceiptItemCreate{}, ErrBadParam
 	}
-	if in.ReceiptID <= 0 ||
+	if (requireReceiptID && in.ReceiptID <= 0) ||
 		in.MaterialID <= 0 ||
 		in.WarehouseID <= 0 ||
 		in.UnitID <= 0 {

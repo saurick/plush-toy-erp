@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
+	"server/internal/data/model/ent/warehouse"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -72,6 +73,37 @@ func (r *masterDataRepo) UpdateCustomer(ctx context.Context, id int, in *biz.Cus
 		return nil, err
 	}
 	return entCustomerToBiz(row), nil
+}
+
+func (r *masterDataRepo) SaveCustomerWithContacts(ctx context.Context, id int, in *biz.CustomerMutation, contacts []*biz.ContactSaveMutation) (*biz.CustomerWithContacts, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+
+	var customerRow *ent.Customer
+	if id > 0 {
+		customerRow, err = updateCustomerWithClient(ctx, tx.Client(), id, in)
+	} else {
+		customerRow, err = createCustomerWithClient(ctx, tx.Client(), in)
+	}
+	if err != nil {
+		return nil, err
+	}
+	savedContacts, err := saveContactsForOwner(ctx, tx.Client(), biz.ContactOwnerCustomer, customerRow.ID, contacts)
+	if err != nil {
+		return nil, err
+	}
+	out := &biz.CustomerWithContacts{
+		Customer: entCustomerToBiz(customerRow),
+		Contacts: savedContacts,
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
 }
 
 func (r *masterDataRepo) GetCustomer(ctx context.Context, id int) (*biz.Customer, error) {
@@ -170,6 +202,37 @@ func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.Sup
 		return nil, err
 	}
 	return entSupplierToBiz(row), nil
+}
+
+func (r *masterDataRepo) SaveSupplierWithContacts(ctx context.Context, id int, in *biz.SupplierMutation, contacts []*biz.ContactSaveMutation) (*biz.SupplierWithContacts, error) {
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackMasterDataEntTx(ctx, tx, r.log)
+
+	var supplierRow *ent.Supplier
+	if id > 0 {
+		supplierRow, err = updateSupplierWithClient(ctx, tx.Client(), id, in)
+	} else {
+		supplierRow, err = createSupplierWithClient(ctx, tx.Client(), in)
+	}
+	if err != nil {
+		return nil, err
+	}
+	savedContacts, err := saveContactsForOwner(ctx, tx.Client(), biz.ContactOwnerSupplier, supplierRow.ID, contacts)
+	if err != nil {
+		return nil, err
+	}
+	out := &biz.SupplierWithContacts{
+		Supplier: entSupplierToBiz(supplierRow),
+		Contacts: savedContacts,
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return out, nil
 }
 
 func (r *masterDataRepo) GetSupplier(ctx context.Context, id int) (*biz.Supplier, error) {
@@ -333,6 +396,29 @@ func (r *masterDataRepo) ListUnits(ctx context.Context, filter biz.MasterDataFil
 		return nil, 0, err
 	}
 	return entUnitsToBiz(rows), total, nil
+}
+
+func (r *masterDataRepo) ListWarehouses(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Warehouse, int, error) {
+	query := r.data.postgres.Warehouse.Query()
+	if filter.Keyword != "" {
+		query = query.Where(warehouse.Or(
+			warehouse.CodeContains(filter.Keyword),
+			warehouse.NameContains(filter.Keyword),
+			warehouse.TypeContains(filter.Keyword),
+		))
+	}
+	if filter.ActiveOnly {
+		query = query.Where(warehouse.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Asc(warehouse.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entWarehousesToBiz(rows), total, nil
 }
 
 func (r *masterDataRepo) CreateProcess(ctx context.Context, in *biz.ProcessMutation) (*biz.Process, error) {
@@ -847,6 +933,224 @@ func (r *masterDataRepo) DisableContact(ctx context.Context, id int) (*biz.Conta
 	return entContactToBiz(row), nil
 }
 
+func createCustomerWithClient(ctx context.Context, client *ent.Client, in *biz.CustomerMutation) (*ent.Customer, error) {
+	return client.Customer.Create().
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetNillableShortName(in.ShortName).
+		SetNillableTaxNo(in.TaxNo).
+		SetNillableNote(in.Note).
+		Save(ctx)
+}
+
+func updateCustomerWithClient(ctx context.Context, client *ent.Client, id int, in *biz.CustomerMutation) (*ent.Customer, error) {
+	update := client.Customer.UpdateOneID(id).
+		SetCode(in.Code).
+		SetName(in.Name)
+	if in.ShortName == nil {
+		update.ClearShortName()
+	} else {
+		update.SetShortName(*in.ShortName)
+	}
+	if in.TaxNo == nil {
+		update.ClearTaxNo()
+	} else {
+		update.SetTaxNo(*in.TaxNo)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrCustomerNotFound
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.SupplierMutation) (*ent.Supplier, error) {
+	return client.Supplier.Create().
+		SetCode(in.Code).
+		SetName(in.Name).
+		SetNillableShortName(in.ShortName).
+		SetNillableSupplierType(in.SupplierType).
+		SetNillableTaxNo(in.TaxNo).
+		SetNillableNote(in.Note).
+		Save(ctx)
+}
+
+func updateSupplierWithClient(ctx context.Context, client *ent.Client, id int, in *biz.SupplierMutation) (*ent.Supplier, error) {
+	update := client.Supplier.UpdateOneID(id).
+		SetCode(in.Code).
+		SetName(in.Name)
+	if in.ShortName == nil {
+		update.ClearShortName()
+	} else {
+		update.SetShortName(*in.ShortName)
+	}
+	if in.SupplierType == nil {
+		update.ClearSupplierType()
+	} else {
+		update.SetSupplierType(*in.SupplierType)
+	}
+	if in.TaxNo == nil {
+		update.ClearTaxNo()
+	} else {
+		update.SetTaxNo(*in.TaxNo)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSupplierNotFound
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func saveContactsForOwner(ctx context.Context, client *ent.Client, ownerType string, ownerID int, items []*biz.ContactSaveMutation) ([]*biz.Contact, error) {
+	retainedIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		item.OwnerType = ownerType
+		item.OwnerID = ownerID
+		if item.ID > 0 {
+			if err := ensureContactOwner(ctx, client, item.ID, ownerType, ownerID); err != nil {
+				return nil, err
+			}
+			if item.IsPrimary {
+				if err := clearOtherPrimaryContacts(ctx, client, ownerType, ownerID, item.ID); err != nil {
+					return nil, err
+				}
+			}
+			row, err := updateContactWithClient(ctx, client, item.ID, &item.ContactMutation)
+			if err != nil {
+				return nil, err
+			}
+			retainedIDs = append(retainedIDs, row.ID)
+			continue
+		}
+		if item.IsPrimary {
+			if err := clearOtherPrimaryContacts(ctx, client, ownerType, ownerID, 0); err != nil {
+				return nil, err
+			}
+		}
+		row, err := createContactWithClient(ctx, client, &item.ContactMutation)
+		if err != nil {
+			return nil, err
+		}
+		retainedIDs = append(retainedIDs, row.ID)
+	}
+
+	disableQuery := client.Contact.Update().
+		Where(contact.OwnerType(ownerType), contact.OwnerID(ownerID), contact.IsActive(true))
+	if len(retainedIDs) > 0 {
+		disableQuery = disableQuery.Where(contact.IDNotIn(retainedIDs...))
+	}
+	if _, err := disableQuery.SetIsActive(false).SetIsPrimary(false).Save(ctx); err != nil {
+		return nil, err
+	}
+	return listActiveContactsForOwner(ctx, client, ownerType, ownerID)
+}
+
+func ensureContactOwner(ctx context.Context, client *ent.Client, id int, ownerType string, ownerID int) error {
+	exists, err := client.Contact.Query().
+		Where(contact.ID(id), contact.OwnerType(ownerType), contact.OwnerID(ownerID)).
+		Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return biz.ErrContactNotFound
+	}
+	return nil
+}
+
+func clearOtherPrimaryContacts(ctx context.Context, client *ent.Client, ownerType string, ownerID int, keepID int) error {
+	query := client.Contact.Update().
+		Where(contact.OwnerType(ownerType), contact.OwnerID(ownerID), contact.IsPrimary(true))
+	if keepID > 0 {
+		query = query.Where(contact.IDNEQ(keepID))
+	}
+	_, err := query.SetIsPrimary(false).Save(ctx)
+	return err
+}
+
+func createContactWithClient(ctx context.Context, client *ent.Client, in *biz.ContactMutation) (*ent.Contact, error) {
+	return client.Contact.Create().
+		SetOwnerType(in.OwnerType).
+		SetOwnerID(in.OwnerID).
+		SetName(in.Name).
+		SetNillablePhone(in.Phone).
+		SetNillableMobile(in.Mobile).
+		SetNillableEmail(in.Email).
+		SetNillableTitle(in.Title).
+		SetIsPrimary(in.IsPrimary).
+		SetNillableNote(in.Note).
+		Save(ctx)
+}
+
+func updateContactWithClient(ctx context.Context, client *ent.Client, id int, in *biz.ContactMutation) (*ent.Contact, error) {
+	update := client.Contact.UpdateOneID(id).
+		SetOwnerType(in.OwnerType).
+		SetOwnerID(in.OwnerID).
+		SetName(in.Name).
+		SetIsPrimary(in.IsPrimary).
+		SetIsActive(true)
+	if in.Phone == nil {
+		update.ClearPhone()
+	} else {
+		update.SetPhone(*in.Phone)
+	}
+	if in.Mobile == nil {
+		update.ClearMobile()
+	} else {
+		update.SetMobile(*in.Mobile)
+	}
+	if in.Email == nil {
+		update.ClearEmail()
+	} else {
+		update.SetEmail(*in.Email)
+	}
+	if in.Title == nil {
+		update.ClearTitle()
+	} else {
+		update.SetTitle(*in.Title)
+	}
+	if in.Note == nil {
+		update.ClearNote()
+	} else {
+		update.SetNote(*in.Note)
+	}
+	row, err := update.Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrContactNotFound
+		}
+		return nil, err
+	}
+	return row, nil
+}
+
+func listActiveContactsForOwner(ctx context.Context, client *ent.Client, ownerType string, ownerID int) ([]*biz.Contact, error) {
+	rows, err := client.Contact.Query().
+		Where(contact.OwnerType(ownerType), contact.OwnerID(ownerID), contact.IsActive(true)).
+		Order(ent.Desc(contact.FieldIsPrimary), ent.Asc(contact.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return entContactsToBiz(rows), nil
+}
+
 func rollbackMasterDataEntTx(ctx context.Context, tx *ent.Tx, logger *log.Helper) {
 	if tx == nil {
 		return
@@ -952,6 +1256,29 @@ func entUnitsToBiz(rows []*ent.Unit) []*biz.Unit {
 	out := make([]*biz.Unit, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, entUnitToBiz(row))
+	}
+	return out
+}
+
+func entWarehouseToBiz(row *ent.Warehouse) *biz.Warehouse {
+	if row == nil {
+		return nil
+	}
+	return &biz.Warehouse{
+		ID:        row.ID,
+		Code:      row.Code,
+		Name:      row.Name,
+		Type:      row.Type,
+		IsActive:  row.IsActive,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}
+}
+
+func entWarehousesToBiz(rows []*ent.Warehouse) []*biz.Warehouse {
+	out := make([]*biz.Warehouse, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entWarehouseToBiz(row))
 	}
 	return out
 }

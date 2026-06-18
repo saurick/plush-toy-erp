@@ -2,6 +2,7 @@ import {
   getWorkflowTaskDueStatus,
   isTerminalWorkflowTask,
 } from './workflowDashboardStats.mjs'
+import { hasActionPermission } from './masterDataOrderView.mjs'
 
 export const TASK_BOARD_STATUS_OPTIONS = Object.freeze([
   { value: 'all', label: '全部状态' },
@@ -114,6 +115,106 @@ export function getTaskStatusKey(task = {}) {
 
 export function getTaskOwnerRoleKey(task = {}) {
   return String(task.owner_role_key || '').trim()
+}
+
+function getAdminRoleKeys(admin = {}) {
+  return Array.isArray(admin?.roles)
+    ? admin.roles
+        .map((role) => String(role?.role_key || role?.key || '').trim())
+        .filter(Boolean)
+    : []
+}
+
+function adminHasRole(admin = {}, roleKey = '') {
+  const normalizedRoleKey = String(roleKey || '').trim()
+  if (!normalizedRoleKey) return false
+  return getAdminRoleKeys(admin).includes(normalizedRoleKey)
+}
+
+function isAssignedToAdmin(admin = {}, task = {}) {
+  const assigneeID = Number(task?.assignee_id || 0)
+  if (!Number.isFinite(assigneeID) || assigneeID <= 0) return false
+  return assigneeID === Number(admin?.id || 0)
+}
+
+function isBossOrderApprovalTask(task = {}) {
+  return (
+    String(task?.source_type || '').trim() === 'project-orders' &&
+    String(task?.task_group || '').trim() === 'order_approval' &&
+    getTaskOwnerRoleKey(task) === 'boss'
+  )
+}
+
+function isShipmentReleaseTask(task = {}) {
+  return String(task?.task_group || '').trim() === 'shipment_release'
+}
+
+export function getWorkflowTaskActionPermission(actionMode = '', task = {}) {
+  if (actionMode === 'complete') {
+    return isBossOrderApprovalTask(task)
+      ? 'workflow.task.approve'
+      : 'workflow.task.complete'
+  }
+  if (actionMode === 'block' || actionMode === 'urge') {
+    return 'workflow.task.update'
+  }
+  return ''
+}
+
+function canHandleTaskByOwner(admin = {}, task = {}) {
+  if (isAssignedToAdmin(admin, task)) return true
+  if (admin?.is_super_admin === true && isShipmentReleaseTask(task)) return true
+  return adminHasRole(admin, getTaskOwnerRoleKey(task))
+}
+
+function canUrgeTaskByOwner(admin = {}, task = {}) {
+  if (admin?.is_super_admin === true) return true
+  if (adminHasRole(admin, 'pmc') || adminHasRole(admin, 'boss')) return true
+  if (isAssignedToAdmin(admin, task)) return true
+  return adminHasRole(admin, getTaskOwnerRoleKey(task))
+}
+
+export function canRunWorkflowTaskAction(
+  admin = {},
+  task = {},
+  actionMode = ''
+) {
+  if (!task || !actionMode || isTerminalWorkflowTask(task)) return false
+
+  const permissionKey = getWorkflowTaskActionPermission(actionMode, task)
+  if (!hasActionPermission(admin, permissionKey)) return false
+
+  if (actionMode === 'urge') {
+    return canUrgeTaskByOwner(admin, task)
+  }
+  return canHandleTaskByOwner(admin, task)
+}
+
+export function getWorkflowTaskAllowedActionModes(admin = {}, task = {}) {
+  return ['complete', 'block', 'urge'].filter((actionMode) =>
+    canRunWorkflowTaskAction(admin, task, actionMode)
+  )
+}
+
+export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
+  if (!task) return ''
+  if (isTerminalWorkflowTask(task)) {
+    return '该任务已结束，只能查看上下文。'
+  }
+
+  const ownerRoleKey = getTaskOwnerRoleKey(task)
+  const hasAnyWorkflowActionPermission = [
+    'workflow.task.complete',
+    'workflow.task.update',
+    'workflow.task.approve',
+  ].some((permissionKey) => hasActionPermission(admin, permissionKey))
+  if (!hasAnyWorkflowActionPermission) {
+    return '当前账号只有查看任务权限，没有完成、阻塞或催办权限。'
+  }
+  if (ownerRoleKey && !canHandleTaskByOwner(admin, task)) {
+    return `当前账号不属于 ${ownerRoleKey} 责任角色，也不是该任务的指定处理人。`
+  }
+  return '当前账号没有可执行的任务处理动作。'
 }
 
 export function getWorkflowTaskStatusMeta(task = {}) {

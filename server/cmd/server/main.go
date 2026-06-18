@@ -174,6 +174,27 @@ func containsRuntimePlaceholder(value string) bool {
 	return false
 }
 
+func productionEnvValue(getenv func(string) string, keys ...string) string {
+	if getenv == nil {
+		return ""
+	}
+	for _, key := range keys {
+		if value := strings.TrimSpace(getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func envValueIsExplicitFalse(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "false", "0", "off", "no", "n", "f":
+		return true
+	default:
+		return false
+	}
+}
+
 func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, getenv func(string) string) error {
 	if !isProductionRuntime(confPath, getenv) {
 		return nil
@@ -189,6 +210,9 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	}
 	if dataCfg.Auth == nil || strings.TrimSpace(dataCfg.Auth.JwtSecret) == "" {
 		return fmt.Errorf("production preflight failed: APP_JWT_SECRET is required")
+	}
+	if dataCfg.Auth.Sms != nil && strings.EqualFold(strings.TrimSpace(dataCfg.Auth.Sms.Mode), "mock") {
+		return fmt.Errorf("production preflight failed: APP_AUTH_SMS_MODE cannot be mock")
 	}
 	if containsRuntimePlaceholder(dataCfg.Auth.JwtSecret) {
 		return fmt.Errorf("production preflight failed: APP_JWT_SECRET still contains placeholder")
@@ -212,6 +236,16 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	}
 	if adminPassword == "" && bootstrapAdminOnce == "true" {
 		return fmt.Errorf("production preflight failed: BOOTSTRAP_ADMIN_ONCE=true requires APP_ADMIN_PASSWORD")
+	}
+	debugEnvironment := strings.ToLower(productionEnvValue(getenv, "ERP_DEBUG_ENV", "ERP_ENV", "APP_ENV"))
+	if debugEnvironment != "prod" && debugEnvironment != "production" {
+		return fmt.Errorf("production preflight failed: ERP_DEBUG_ENV must be prod")
+	}
+	if !envValueIsExplicitFalse(productionEnvValue(getenv, "ERP_DEBUG_SEED_ENABLED")) {
+		return fmt.Errorf("production preflight failed: ERP_DEBUG_SEED_ENABLED must be false")
+	}
+	if !envValueIsExplicitFalse(productionEnvValue(getenv, "ERP_DEBUG_CLEANUP_ENABLED")) {
+		return fmt.Errorf("production preflight failed: ERP_DEBUG_CLEANUP_ENABLED must be false")
 	}
 	return nil
 }
@@ -292,7 +326,7 @@ func initTracerProvider(traceName, traceEndpoint string, traceRatio float64, bas
 		} else {
 			tp = tracesdk.NewTracerProvider(
 				samplerOption,
-				tracesdk.WithBatcher(exp), // ✅ 异步批量导出，不阻塞请求
+				tracesdk.WithBatcher(exp), // 异步批量导出，不阻塞请求。
 				resourceOption,
 			)
 			helper.Infow(

@@ -6,6 +6,7 @@ import {
   buildCustomerSnapshot,
   buildMaterialPurchaseContractDraftFromPurchaseOrder,
   buildMasterDataParams,
+  buildMaterialDraftCode,
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
   buildProcessParams,
@@ -14,13 +15,18 @@ import {
   buildPurchaseOrderParams,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
+  buildSequentialDraftCode,
+  buildTextSelectOptions,
+  buildUnitSelectOptions,
   canRunPurchaseOrderLifecycleAction,
   canRunSalesOrderLifecycleAction,
   canRunOutsourcingOrderLifecycleAction,
   deriveOutsourcingOrderItemAmount,
   deriveSalesOrderItemAmount,
+  formatUnitDisplayName,
   formatUnixDateTime,
   hasActionPermission,
+  inferDefaultUnitID,
   statusText,
   unixToDateInputValue,
 } from './masterDataOrderView.mjs'
@@ -297,6 +303,101 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       amount: '35.00',
     }
   )
+})
+
+test('masterDataOrderView: unit display uses readable unit truth instead of raw ids', () => {
+  const units = [
+    { id: 12, code: 'M', name: '米', is_active: true },
+    { id: 13, code: 'PCS', name: 'PCS', is_active: true },
+    { id: 14, code: 'BOX', name: '箱', is_active: false },
+  ]
+  const unitByID = new Map(units.map((unit) => [unit.id, unit]))
+
+  assert.equal(formatUnitDisplayName(12, unitByID), '米（M）')
+  assert.equal(formatUnitDisplayName(13, unitByID), 'PCS')
+  assert.equal(formatUnitDisplayName(undefined, unitByID), '-')
+  assert.equal(formatUnitDisplayName(99, unitByID), '未知单位 #99')
+
+  assert.deepEqual(buildUnitSelectOptions(units), [
+    { value: 12, label: '米（M）' },
+    { value: 13, label: 'PCS' },
+  ])
+})
+
+test('masterDataOrderView: material create helpers reduce repetitive manual entry', () => {
+  const records = [
+    {
+      code: 'MAT-20260618-001',
+      category: '面料',
+      color: '米白',
+      default_unit_id: 12,
+    },
+    {
+      code: 'MAT-20260618-002',
+      category: '填充',
+      color: '米白',
+      default_unit_id: 12,
+    },
+    {
+      code: 'SIM-OLD-CODE',
+      category: '面料',
+      color: '浅灰',
+      default_unit_id: 13,
+    },
+  ]
+  const unitOptions = [
+    { value: 12, label: '米（M）' },
+    { value: 13, label: 'PCS' },
+  ]
+
+  assert.equal(
+    buildMaterialDraftCode(records, new Date('2026-06-18T10:00:00+08:00')),
+    'MAT-20260618-003'
+  )
+  assert.deepEqual(buildTextSelectOptions(records, 'category'), [
+    { value: '面料', label: '面料' },
+    { value: '填充', label: '填充' },
+  ])
+  assert.deepEqual(buildTextSelectOptions(records, 'color'), [
+    { value: '米白', label: '米白' },
+    { value: '浅灰', label: '浅灰' },
+  ])
+  assert.equal(inferDefaultUnitID(records, unitOptions), 12)
+  assert.equal(inferDefaultUnitID([], unitOptions), 12)
+})
+
+test('masterDataOrderView: draft numbers use one shared date sequence rule', () => {
+  const now = new Date('2026-06-18T10:00:00+08:00')
+
+  assert.equal(
+    buildSequentialDraftCode(
+      [
+        { order_no: 'SO-20260618-001' },
+        { order_no: 'SO-20260618-009' },
+        { order_no: 'SO-20260617-999' },
+        { order_no: 'SIM-YOYOOSUN-TRIAL-SO001' },
+      ],
+      { prefix: 'SO', field: 'order_no', now }
+    ),
+    'SO-20260618-010'
+  )
+
+  assert.equal(
+    buildSequentialDraftCode(
+      [
+        { purchase_order_no: 'PO-20260618-002' },
+        { order_no: 'PO-20260618-099' },
+      ],
+      { prefix: 'PO', field: 'purchase_order_no', now }
+    ),
+    'PO-20260618-003'
+  )
+
+  assert.equal(
+    buildSequentialDraftCode([], { prefix: 'SUP', field: 'code', now }),
+    'SUP-20260618-001'
+  )
+  assert.equal(buildSequentialDraftCode([], { prefix: '', now }), '')
 })
 
 test('masterDataOrderView: purchase order print draft maps current purchase facts only', () => {

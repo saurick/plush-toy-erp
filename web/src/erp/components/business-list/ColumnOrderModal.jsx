@@ -20,6 +20,7 @@ import {
   repositionModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../../utils/moduleTableColumns.mjs'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 
 export function getColumnLabel(column = {}) {
   return String(column.exportTitle || column.title || column.key || '').trim()
@@ -194,7 +195,7 @@ export function ColumnOrderModal({
         </div>
       }
       open={open}
-      width="min(960px, calc(100vw - 48px))"
+      width={ERP_MODAL_WIDTHS.columnOrder}
       onCancel={onClose}
       destroyOnHidden={false}
       footer={

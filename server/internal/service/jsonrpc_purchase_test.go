@@ -10,6 +10,7 @@ import (
 	"server/internal/biz"
 	datarepo "server/internal/data"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -39,6 +40,71 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	}
 	if legacyRes == nil || legacyRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("purchase API must reject business_record_id on new facts, got %#v", legacyRes)
+	}
+
+	_, atomicRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_with_items", "atomic", mustJSONRPCStruct(t, map[string]any{
+		"receipt_no":    "PR-JSONRPC-ATOMIC",
+		"supplier_name": "原子供应商",
+		"received_at":   "2026-06-11",
+		"items": []any{
+			map[string]any{
+				"material_id":    float64(fixtures.materialID),
+				"warehouse_id":   float64(fixtures.warehouseID),
+				"unit_id":        float64(fixtures.unitID),
+				"lot_no":         "JSONRPC-ATOMIC-LOT",
+				"quantity":       "3",
+				"source_line_no": "A1",
+			},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err creating atomic receipt, got %v", err)
+	}
+	if atomicRes == nil || atomicRes.Code != errcode.OK.Code {
+		t.Fatalf("expected atomic create OK, got %#v", atomicRes)
+	}
+	atomicReceipt := jsonRPCNestedMap(t, atomicRes, "purchase_receipt")
+	atomicItems, ok := atomicReceipt["items"].([]any)
+	if !ok || len(atomicItems) != 1 {
+		t.Fatalf("expected atomic receipt to include one line, got %#v", atomicReceipt["items"])
+	}
+	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
+		t.Fatalf("atomic draft purchase receipt must not write inventory txns, got %d", count)
+	}
+
+	beforeRollbackCount := client.PurchaseReceipt.Query().
+		Where(purchasereceipt.ReceiptNo("PR-JSONRPC-ROLLBACK")).
+		CountX(ctx)
+	_, rollbackRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_with_items", "atomic-rollback", mustJSONRPCStruct(t, map[string]any{
+		"receipt_no":    "PR-JSONRPC-ROLLBACK",
+		"supplier_name": "回滚供应商",
+		"received_at":   "2026-06-11",
+		"items": []any{
+			map[string]any{
+				"material_id":  float64(fixtures.materialID),
+				"warehouse_id": float64(fixtures.warehouseID),
+				"unit_id":      float64(fixtures.unitID),
+				"quantity":     "2",
+			},
+			map[string]any{
+				"material_id":  float64(999999),
+				"warehouse_id": float64(fixtures.warehouseID),
+				"unit_id":      float64(fixtures.unitID),
+				"quantity":     "2",
+			},
+		},
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err creating invalid atomic receipt, got %v", err)
+	}
+	if rollbackRes == nil || rollbackRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid atomic create rejected, got %#v", rollbackRes)
+	}
+	afterRollbackCount := client.PurchaseReceipt.Query().
+		Where(purchasereceipt.ReceiptNo("PR-JSONRPC-ROLLBACK")).
+		CountX(ctx)
+	if afterRollbackCount != beforeRollbackCount {
+		t.Fatalf("invalid atomic receipt must rollback header, before=%d after=%d", beforeRollbackCount, afterRollbackCount)
 	}
 
 	_, receiptRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_draft", "1", mustJSONRPCStruct(t, map[string]any{
@@ -75,6 +141,20 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	}
 	itemID := jsonRPCInt(t, jsonRPCNestedMap(t, itemRes, "purchase_receipt_item"), "id")
 
+	_, invalidLineRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "invalid-line", mustJSONRPCStruct(t, map[string]any{
+		"receipt_id":   float64(receiptID),
+		"material_id":  float64(fixtures.materialID),
+		"warehouse_id": float64(fixtures.warehouseID),
+		"unit_id":      float64(fixtures.unitID),
+		"quantity":     "0",
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err adding invalid line, got %v", err)
+	}
+	if invalidLineRes == nil || invalidLineRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected invalid quantity rejected, got %#v", invalidLineRes)
+	}
+
 	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
 		[]string{biz.WarehouseRoleKey},
 		biz.PermissionWarehouseInboundConfirm,
@@ -92,6 +172,22 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	posted := jsonRPCNestedMap(t, postedRes, "purchase_receipt")
 	if status := posted["status"]; status != biz.PurchaseReceiptStatusPosted {
 		t.Fatalf("expected posted status, got %#v", status)
+	}
+
+	_, getRes, err := j.handlePurchase(adminCtx, "get_purchase_receipt", "get-posted", mustJSONRPCStruct(t, map[string]any{"id": float64(receiptID)}))
+	if err != nil {
+		t.Fatalf("expected nil err getting posted receipt, got %v", err)
+	}
+	if getRes == nil || getRes.Code != errcode.OK.Code {
+		t.Fatalf("expected get posted OK, got %#v", getRes)
+	}
+	gotReceipt := jsonRPCNestedMap(t, getRes, "purchase_receipt")
+	if gotID := jsonRPCInt(t, gotReceipt, "id"); gotID != receiptID {
+		t.Fatalf("expected get receipt id %d, got %d", receiptID, gotID)
+	}
+	gotItems, ok := gotReceipt["items"].([]any)
+	if !ok || len(gotItems) != 1 {
+		t.Fatalf("expected get receipt to include one item, got %#v", gotReceipt["items"])
 	}
 
 	inboundCount := client.InventoryTxn.Query().
@@ -145,7 +241,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if dashboardRes == nil || dashboardRes.Code != errcode.OK.Code {
 		t.Fatalf("expected dashboard OK, got %#v", dashboardRes)
 	}
-	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, 1, 1)
+	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, 2, 1)
 
 	_, cancelledRes, err := j.handlePurchase(adminCtx, "cancel_purchase_receipt", "7", mustJSONRPCStruct(t, map[string]any{"id": float64(receiptID)}))
 	if err != nil {

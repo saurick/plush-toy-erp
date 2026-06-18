@@ -19,7 +19,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Select,
   Space,
   Tag,
@@ -46,6 +45,7 @@ import {
   ColumnOrderModal,
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import {
   cancelOutsourcingOrder,
   closeOutsourcingOrder,
@@ -71,6 +71,7 @@ import {
   V1_ROUTE_PATHS,
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
+  buildSequentialDraftCode,
   buildSupplierSnapshot,
   canRunOutsourcingOrderLifecycleAction,
   formatUnixDate,
@@ -156,7 +157,6 @@ const LIFECYCLE_ACTIONS = [
 ]
 
 const DEFAULT_PAGINATION = { current: 1, pageSize: 20 }
-const BUSINESS_FORM_MODAL_WIDTH = 'min(1080px, calc(100vw - 96px))'
 const OUTSOURCING_ORDERS_MODULE_KEY = 'processing-contracts'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
@@ -532,7 +532,10 @@ export default function V1OutsourcingOrdersPage() {
   const openCreate = () => {
     setEditingRow(null)
     form.setFieldsValue({
-      outsourcing_order_no: '',
+      outsourcing_order_no: buildSequentialDraftCode(rows, {
+        prefix: 'OUT',
+        field: 'outsourcing_order_no',
+      }),
       supplier_id: undefined,
       source_order_no: '',
       order_date: todayInputValue(),
@@ -1251,22 +1254,15 @@ export default function V1OutsourcingOrdersPage() {
         onClose={() => setColumnOrderOpen(false)}
       />
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
-        title={
-          <div className="erp-business-action-modal__title">
-            <FileTextOutlined />
-            <span>{editingRow ? '编辑加工合同' : '新建加工合同'}</span>
-            <small>只维护委外源单；库存和应付由后续事实动作处理。</small>
-          </div>
-        }
+      <BusinessFormModal
+        icon={<FileTextOutlined />}
+        title={editingRow ? '编辑加工合同' : '新建加工合同'}
+        description="只维护委外源单；库存和应付由后续事实动作处理。"
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}
         confirmLoading={saving}
-        centered
         forceRender
-        width={BUSINESS_FORM_MODAL_WIDTH}
       >
         <Form
           form={form}
@@ -1277,10 +1273,10 @@ export default function V1OutsourcingOrdersPage() {
           <Form.Item
             className="erp-business-action-form__field"
             name="outsourcing_order_no"
-            label="加工合同号"
-            rules={[{ required: true, message: '请输入加工合同号' }]}
+            label="加工合同号（自动）"
+            rules={[{ required: true, message: '请输入或保留自动加工合同号' }]}
           >
-            <Input maxLength={64} />
+            <Input maxLength={64} placeholder="自动生成，可按需要调整" />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
@@ -1515,7 +1511,7 @@ export default function V1OutsourcingOrdersPage() {
             </Form.List>
           </section>
         </Form>
-      </Modal>
+      </BusinessFormModal>
     </BusinessPageLayout>
   )
 }

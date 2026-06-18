@@ -7,6 +7,14 @@ const source = readFileSync(
   fileURLToPath(new URL('./masterDataOrderApi.mjs', import.meta.url)),
   'utf8'
 )
+const salesOrderPageSource = readFileSync(
+  fileURLToPath(new URL('../pages/V1SalesOrdersPage.jsx', import.meta.url)),
+  'utf8'
+)
+const masterDataPageSource = readFileSync(
+  fileURLToPath(new URL('../pages/V1MasterDataPage.jsx', import.meta.url)),
+  'utf8'
+)
 
 test('masterDataOrderApi: V1 API client uses 007 JSON-RPC urls', () => {
   assert.match(source, /url:\s*'masterdata'/)
@@ -21,11 +29,13 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers materials
     'list_customers',
     'create_customer',
     'update_customer',
+    'save_customer_with_contacts',
     'get_customer',
     'set_customer_active',
     'list_suppliers',
     'create_supplier',
     'update_supplier',
+    'save_supplier_with_contacts',
     'get_supplier',
     'set_supplier_active',
     'list_materials',
@@ -34,6 +44,7 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers materials
     'get_material',
     'set_material_active',
     'list_units',
+    'list_warehouses',
     'list_processes',
     'create_process',
     'update_process',
@@ -56,6 +67,23 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers materials
     'disable_contact',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
+  }
+})
+
+test('V1MasterDataPage: owner and contacts save through backend aggregate API', () => {
+  assert.match(masterDataPageSource, /saveCustomerWithContacts/)
+  assert.match(masterDataPageSource, /saveSupplierWithContacts/)
+  assert.match(masterDataPageSource, /saveWithContacts\(\{/)
+
+  for (const functionName of [
+    'createContact',
+    'updateContact',
+    'disableContact',
+  ]) {
+    assert.doesNotMatch(
+      masterDataPageSource,
+      new RegExp(`${functionName}\\s*\\(`)
+    )
   }
 })
 
@@ -90,6 +118,23 @@ test('masterDataOrderApi: sales order methods do not expose shipment or finance 
   forbiddenActionNames.forEach((actionName) => {
     assert.doesNotMatch(source, new RegExp(actionName))
   })
+})
+
+test('V1SalesOrdersPage: order form save uses single transaction API', () => {
+  assert.match(salesOrderPageSource, /saveSalesOrderWithItems\(\{/)
+
+  for (const functionName of [
+    'createSalesOrder',
+    'updateSalesOrder',
+    'addSalesOrderItem',
+    'updateSalesOrderItem',
+    'removeSalesOrderItem',
+  ]) {
+    assert.doesNotMatch(
+      salesOrderPageSource,
+      new RegExp(`${functionName}\\s*\\(`)
+    )
+  }
 })
 
 test('masterDataOrderApi: purchase order methods do not expose receipt inventory or finance actions', () => {

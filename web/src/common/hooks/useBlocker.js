@@ -6,7 +6,6 @@ export const useBlocker = (blocker, when = true) => {
 
   useEffect(() => {
     if (!when) return
-    console.log(navigator, 'navigator')
     const unblock = navigator.block((tx) => {
       const autoUnblockingTx = {
         ...tx,

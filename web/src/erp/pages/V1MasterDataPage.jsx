@@ -11,11 +11,11 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import {
+  AutoComplete,
   Button,
   Form,
   Input,
   InputNumber,
-  Modal,
   Popconfirm,
   Segmented,
   Select,
@@ -43,15 +43,14 @@ import {
   ColumnOrderModal,
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import {
-  createContact,
   createCustomer,
   createMaterial,
   createProcess,
   createProduct,
   createProductSKU,
   createSupplier,
-  disableContact,
   listContactsByOwner,
   listCustomers,
   listMaterials,
@@ -59,13 +58,15 @@ import {
   listProducts,
   listProductSKUs,
   listSuppliers,
+  listUnits,
+  saveCustomerWithContacts,
+  saveSupplierWithContacts,
   setCustomerActive,
   setMaterialActive,
   setProcessActive,
   setProductActive,
   setProductSKUActive,
   setSupplierActive,
-  updateContact,
   updateCustomer,
   updateMaterial,
   updateProcess,
@@ -77,11 +78,17 @@ import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   buildContactParams,
   buildMasterDataParams,
+  buildMaterialDraftCode,
+  buildSequentialDraftCode,
   buildProcessParams,
   buildProductParams,
   buildProductSKUParams,
+  buildTextSelectOptions,
+  buildUnitSelectOptions,
+  formatUnitDisplayName,
   formatUnixDateTime,
   hasActionPermission,
+  inferDefaultUnitID,
 } from '../utils/masterDataOrderView.mjs'
 import {
   applyBusinessColumnSorters,
@@ -89,22 +96,28 @@ import {
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
 import {
+  productOption,
+  referenceLabel,
+  uniqueReferenceOptions,
+} from '../utils/referenceSelectOptions.mjs'
+import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
 } from '../utils/businessPagination.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
-const BUSINESS_FORM_MODAL_WIDTH = 'min(1360px, calc(100vw - 96px))'
 
 const PAGE_CONFIG = Object.freeze({
   customers: {
     title: '客户档案',
     ownerType: 'CUSTOMER',
+    entityKey: 'customer',
     recordKey: 'customers',
     list: listCustomers,
     create: createCustomer,
     update: updateCustomer,
+    saveWithContacts: saveCustomerWithContacts,
     setActive: setCustomerActive,
     permissions: {
       create: 'customer.create',
@@ -116,6 +129,7 @@ const PAGE_CONFIG = Object.freeze({
       contactPrimary: 'contact.set_primary',
     },
     entityLabel: '客户',
+    draftCodePrefix: 'CUS',
     formBoundary: '只维护交易主体资料，不在此写订单、库存或财务事实。',
     summary:
       '维护客户交易主体和联系人；订单、出货、库存和财务事实在对应业务模块处理。',
@@ -123,10 +137,12 @@ const PAGE_CONFIG = Object.freeze({
   suppliers: {
     title: '供应商档案',
     ownerType: 'SUPPLIER',
+    entityKey: 'supplier',
     recordKey: 'suppliers',
     list: listSuppliers,
     create: createSupplier,
     update: updateSupplier,
+    saveWithContacts: saveSupplierWithContacts,
     setActive: setSupplierActive,
     permissions: {
       create: 'supplier.create',
@@ -138,6 +154,7 @@ const PAGE_CONFIG = Object.freeze({
       contactPrimary: 'contact.set_primary',
     },
     entityLabel: '供应商',
+    draftCodePrefix: 'SUP',
     formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务事实。',
     summary:
       '维护供应商和加工厂交易主体；采购入库、质检、库存和财务事实在对应业务模块处理。',
@@ -155,6 +172,7 @@ const PAGE_CONFIG = Object.freeze({
       disable: 'material.disable',
     },
     entityLabel: '材料',
+    draftCodePrefix: 'MAT',
     formBoundary: '只维护材料主数据，不在此写采购、库存、质检或 BOM 用量。',
     summary:
       '维护材料主数据；采购订单、库存余额、来料质检和 BOM 用量在对应业务模块处理。',
@@ -172,6 +190,7 @@ const PAGE_CONFIG = Object.freeze({
       disable: 'process.disable',
     },
     entityLabel: '加工环节',
+    draftCodePrefix: 'PROC',
     formBoundary:
       '只维护委外订单和质检标记可引用的标准加工环节，不在此生成委外订单、生产任务、库存流水或质检事实。',
     summary:
@@ -197,6 +216,7 @@ const PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '产品',
     createTitleLabel: '产品',
+    draftCodePrefix: 'PRD',
     formBoundary:
       '只维护产品基础信息，不在此写订单、库存、BOM、生产或出货事实。',
     summary:
@@ -216,6 +236,8 @@ const PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '产品规格',
     createTitleLabel: '产品规格',
+    draftCodeField: 'sku_code',
+    draftCodePrefix: 'SKU',
     formBoundary:
       '只维护产品规格主数据，不在此写订单、库存、BOM、生产或出货事实。',
     summary:
@@ -329,17 +351,80 @@ function downloadCSV({ filename, columns, rows }) {
   URL.revokeObjectURL(url)
 }
 
-function MasterDataFormFields({ type }) {
+function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
+  return (
+    <Form.Item
+      className="erp-business-action-form__field"
+      label="默认单位"
+      name="default_unit_id"
+      rules={
+        required ? [{ required: true, message: '请选择默认单位' }] : undefined
+      }
+    >
+      <Select
+        allowClear={!required}
+        showSearch
+        loading={unitLoading}
+        options={unitOptions}
+        placeholder="请选择默认单位"
+        optionFilterProp="label"
+      />
+    </Form.Item>
+  )
+}
+
+function TextSuggestionInput({
+  className = '',
+  options = [],
+  placeholder = '',
+  value,
+  onChange,
+}) {
+  const [open, setOpen] = useState(false)
+  const hasOptions = options.length > 0
+  return (
+    <AutoComplete
+      allowClear
+      className={className}
+      filterOption={(inputValue, option) =>
+        String(option?.value || '')
+          .toLowerCase()
+          .includes(String(inputValue || '').toLowerCase())
+      }
+      onBlur={() => setOpen(false)}
+      onChange={onChange}
+      onFocus={() => setOpen(true)}
+      onOpenChange={setOpen}
+      open={open && hasOptions}
+      options={options}
+      placeholder={placeholder}
+      value={value}
+    />
+  )
+}
+
+function MasterDataFormFields({
+  type,
+  productOptions = [],
+  unitOptions = [],
+  unitLoading = false,
+  materialCategoryOptions = [],
+  materialColorOptions = [],
+}) {
   if (type === 'products') {
     return (
       <>
         <Form.Item
           className="erp-business-action-form__field"
-          label="产品编号"
+          label="产品编号（自动）"
           name="code"
-          rules={[{ required: true, message: '请填写产品编号' }]}
+          rules={[{ required: true, message: '请填写或保留自动产品编号' }]}
         >
-          <Input allowClear autoComplete="off" />
+          <Input
+            allowClear
+            autoComplete="off"
+            placeholder="自动生成，可按需要调整"
+          />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
@@ -363,14 +448,11 @@ function MasterDataFormFields({ type }) {
         >
           <Input allowClear autoComplete="off" />
         </Form.Item>
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="默认单位 ID"
-          name="default_unit_id"
-          rules={[{ required: true, message: '请填写默认单位 ID' }]}
-        >
-          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-        </Form.Item>
+        <DefaultUnitSelect
+          required
+          unitOptions={unitOptions}
+          unitLoading={unitLoading}
+        />
       </>
     )
   }
@@ -380,19 +462,29 @@ function MasterDataFormFields({ type }) {
       <>
         <Form.Item
           className="erp-business-action-form__field"
-          label="产品 ID"
+          label="产品"
           name="product_id"
-          rules={[{ required: true, message: '请填写产品 ID' }]}
+          rules={[{ required: true, message: '请选择产品' }]}
         >
-          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          <Select
+            allowClear
+            optionFilterProp="label"
+            options={productOptions}
+            placeholder="请选择产品"
+            showSearch
+          />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          label="SKU 编号"
+          label="SKU 编号（自动）"
           name="sku_code"
-          rules={[{ required: true, message: '请填写 SKU 编号' }]}
+          rules={[{ required: true, message: '请填写或保留自动 SKU 编号' }]}
         >
-          <Input allowClear autoComplete="off" />
+          <Input
+            allowClear
+            autoComplete="off"
+            placeholder="自动生成，可按需要调整"
+          />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
@@ -443,13 +535,10 @@ function MasterDataFormFields({ type }) {
         >
           <Input allowClear autoComplete="off" />
         </Form.Item>
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="默认单位 ID"
-          name="default_unit_id"
-        >
-          <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-        </Form.Item>
+        <DefaultUnitSelect
+          unitOptions={unitOptions}
+          unitLoading={unitLoading}
+        />
       </>
     )
   }
@@ -459,11 +548,15 @@ function MasterDataFormFields({ type }) {
       <>
         <Form.Item
           className="erp-business-action-form__field"
-          label="环节编号"
+          label="环节编号（自动）"
           name="code"
-          rules={[{ required: true, message: '请填写环节编号' }]}
+          rules={[{ required: true, message: '请填写或保留自动环节编号' }]}
         >
-          <Input allowClear autoComplete="off" />
+          <Input
+            allowClear
+            autoComplete="off"
+            placeholder="自动生成，可按需要调整"
+          />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
@@ -530,11 +623,15 @@ function MasterDataFormFields({ type }) {
     <>
       <Form.Item
         className="erp-business-action-form__field"
-        label="编号"
+        label="编号（自动）"
         name="code"
-        rules={[{ required: true, message: '请填写编号' }]}
+        rules={[{ required: true, message: '请填写或保留自动编号' }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input
+          allowClear
+          autoComplete="off"
+          placeholder="自动生成，可按需要调整"
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -573,7 +670,11 @@ function MasterDataFormFields({ type }) {
             label="分类"
             name="category"
           >
-            <Input allowClear autoComplete="off" />
+            <TextSuggestionInput
+              className="erp-material-category-suggested-input"
+              options={materialCategoryOptions}
+              placeholder="从已有分类选择，或直接输入新分类"
+            />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
@@ -587,16 +688,17 @@ function MasterDataFormFields({ type }) {
             label="颜色"
             name="color"
           >
-            <Input allowClear autoComplete="off" />
+            <TextSuggestionInput
+              className="erp-material-color-suggested-input"
+              options={materialColorOptions}
+              placeholder="从已有颜色选择，或直接输入新颜色"
+            />
           </Form.Item>
-          <Form.Item
-            className="erp-business-action-form__field"
-            label="默认单位 ID"
-            name="default_unit_id"
-            rules={[{ required: true, message: '请填写默认单位 ID' }]}
-          >
-            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
-          </Form.Item>
+          <DefaultUnitSelect
+            required
+            unitOptions={unitOptions}
+            unitLoading={unitLoading}
+          />
         </>
       ) : (
         <Form.Item
@@ -840,6 +942,10 @@ function getRecordSearchPlaceholder(type = '') {
   return '搜索编号、名称、简称'
 }
 
+function needsUnitDictionary(type = '') {
+  return ['materials', 'products', 'product_skus'].includes(type)
+}
+
 export default function V1MasterDataPage({ type }) {
   const isProductCatalogPage = type === 'product_skus'
   const [productCatalogType, setProductCatalogType] = useState('products')
@@ -859,7 +965,10 @@ export default function V1MasterDataPage({ type }) {
   const [total, setTotal] = useState(0)
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [selectedRecord, setSelectedRecord] = useState(null)
-  const [contacts, setContacts] = useState([])
+  const [, setContacts] = useState([])
+  const [productReferences, setProductReferences] = useState([])
+  const [units, setUnits] = useState([])
+  const [unitLoading, setUnitLoading] = useState(false)
   const [recordModalOpen, setRecordModalOpen] = useState(false)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
@@ -889,8 +998,42 @@ export default function V1MasterDataPage({ type }) {
     adminProfile,
     config.permissions.contactDisable
   )
+  const canSyncContacts =
+    canCreateContact && canUpdateContact && canDisableContact
   const showContactForm =
-    supportsContacts && (canCreateContact || canUpdateContact)
+    supportsContacts && canSyncContacts && Boolean(config.saveWithContacts)
+  const productOptions = useMemo(
+    () => uniqueReferenceOptions(productReferences, productOption),
+    [productReferences]
+  )
+  const unitByID = useMemo(
+    () =>
+      new Map(
+        units
+          .map((unit) => [Number(unit?.id || 0), unit])
+          .filter(([unitID]) => Number.isFinite(unitID) && unitID > 0)
+      ),
+    [units]
+  )
+  const unitOptions = useMemo(() => buildUnitSelectOptions(units), [units])
+  const materialCategoryOptions = useMemo(
+    () =>
+      effectiveType === 'materials'
+        ? buildTextSelectOptions(records, 'category')
+        : [],
+    [effectiveType, records]
+  )
+  const materialColorOptions = useMemo(
+    () =>
+      effectiveType === 'materials'
+        ? buildTextSelectOptions(records, 'color')
+        : [],
+    [effectiveType, records]
+  )
+  const unitDisplay = useCallback(
+    (unitID) => formatUnitDisplayName(unitID, unitByID),
+    [unitByID]
+  )
 
   const loadContacts = useCallback(
     async (record) => {
@@ -920,6 +1063,44 @@ export default function V1MasterDataPage({ type }) {
     },
     [config.ownerType, supportsContacts]
   )
+
+  const loadUnits = useCallback(async () => {
+    if (!needsUnitDictionary(effectiveType)) {
+      setUnits([])
+      return true
+    }
+    setUnitLoading(true)
+    try {
+      const result = await listUnits({ limit: 500 })
+      const nextUnits = Array.isArray(result?.units) ? result.units : []
+      setUnits(nextUnits)
+      return true
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载单位字典'))
+      setUnits([])
+      return false
+    } finally {
+      setUnitLoading(false)
+    }
+  }, [effectiveType])
+
+  const loadProductReferences = useCallback(async () => {
+    if (effectiveType !== 'product_skus') {
+      setProductReferences([])
+      return true
+    }
+    try {
+      const result = await listProducts({ limit: 500, active_only: true })
+      setProductReferences(
+        Array.isArray(result?.products) ? result.products : []
+      )
+      return true
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '加载产品字典'))
+      setProductReferences([])
+      return false
+    }
+  }, [effectiveType])
 
   const loadRecords = useCallback(async () => {
     setLoading(true)
@@ -956,6 +1137,14 @@ export default function V1MasterDataPage({ type }) {
   }, [loadRecords])
 
   useEffect(() => {
+    loadUnits()
+  }, [loadUnits])
+
+  useEffect(() => {
+    loadProductReferences()
+  }, [loadProductReferences])
+
+  useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadRecords)
   }, [loadRecords, outletContext])
 
@@ -963,6 +1152,8 @@ export default function V1MasterDataPage({ type }) {
     setSelectedRecord(null)
     setContacts([])
     setEditingRecord(null)
+    setProductReferences([])
+    setUnits([])
     setRecordModalOpen(false)
     setColumnOrder(null)
     setPagination({ current: 1, pageSize: 20 })
@@ -974,14 +1165,57 @@ export default function V1MasterDataPage({ type }) {
     setEditingRecord(null)
     setContacts([])
     recordForm.resetFields()
+    const createDefaults = {}
     if (config.initialValues) {
-      recordForm.setFieldsValue(config.initialValues)
+      Object.assign(createDefaults, config.initialValues)
+    }
+    if (config.draftCodePrefix) {
+      createDefaults[config.draftCodeField || 'code'] =
+        effectiveType === 'materials'
+          ? buildMaterialDraftCode(records)
+          : buildSequentialDraftCode(records, {
+              prefix: config.draftCodePrefix,
+              field: config.draftCodeField || 'code',
+            })
+    }
+    if (needsUnitDictionary(effectiveType)) {
+      const defaultUnitID = inferDefaultUnitID(records, unitOptions)
+      if (defaultUnitID) {
+        createDefaults.default_unit_id = defaultUnitID
+      }
     }
     if (showContactForm) {
-      recordForm.setFieldsValue({ contacts: [createEmptyContactRow()] })
+      createDefaults.contacts = [createEmptyContactRow()]
+    }
+    if (Object.keys(createDefaults).length > 0) {
+      recordForm.setFieldsValue(createDefaults)
     }
     setRecordModalOpen(true)
   }
+
+  useEffect(() => {
+    if (
+      !recordModalOpen ||
+      editingRecord?.id ||
+      !needsUnitDictionary(effectiveType)
+    ) {
+      return
+    }
+    if (recordForm.getFieldValue('default_unit_id')) {
+      return
+    }
+    const defaultUnitID = inferDefaultUnitID(records, unitOptions)
+    if (defaultUnitID) {
+      recordForm.setFieldsValue({ default_unit_id: defaultUnitID })
+    }
+  }, [
+    editingRecord?.id,
+    effectiveType,
+    recordForm,
+    recordModalOpen,
+    records,
+    unitOptions,
+  ])
 
   const openEditRecord = async (record) => {
     if (!record?.id) return
@@ -998,43 +1232,6 @@ export default function V1MasterDataPage({ type }) {
     setRecordModalOpen(true)
   }
 
-  const syncContactRows = async (owner, rows = []) => {
-    if (!showContactForm || !owner?.id) {
-      return
-    }
-
-    const nextRows = normalizeContactRows(rows)
-    const retainedContactIds = new Set()
-    for (const row of nextRows) {
-      const params = buildContactParams(row, {
-        owner_type: config.ownerType,
-        owner_id: owner.id,
-      })
-      if (row.id) {
-        retainedContactIds.add(row.id)
-        if (!canUpdateContact) continue
-        await updateContact({ id: row.id, ...params })
-      } else if (canCreateContact) {
-        const created = await createContact(params)
-        if (created?.id) {
-          retainedContactIds.add(Number(created.id))
-        }
-      }
-    }
-
-    if (editingRecord?.id && canDisableContact) {
-      for (const contact of contacts) {
-        if (
-          contact?.id &&
-          contact.is_active !== false &&
-          !retainedContactIds.has(Number(contact.id))
-        ) {
-          await disableContact({ id: contact.id })
-        }
-      }
-    }
-  }
-
   const saveRecord = async () => {
     const values = await recordForm.validateFields()
     setSaving(true)
@@ -1048,13 +1245,26 @@ export default function V1MasterDataPage({ type }) {
             : effectiveType === 'processes'
               ? buildProcessParams(values, extra)
               : buildMasterDataParams(values, extra)
-      const saved = editingRecord?.id
-        ? await config.update(params)
-        : await config.create(params)
-      await syncContactRows(saved, values.contacts)
+      const savedData =
+        showContactForm && config.saveWithContacts
+          ? await config.saveWithContacts({
+              ...params,
+              contacts: normalizeContactRows(values.contacts).map((row) =>
+                buildContactParams(row, row.id ? { id: row.id } : {})
+              ),
+            })
+          : null
+      const saved = savedData
+        ? savedData?.[config.entityKey]
+        : editingRecord?.id
+          ? await config.update(params)
+          : await config.create(params)
       message.success(editingRecord?.id ? '主数据已更新' : '主数据已创建')
       setRecordModalOpen(false)
       setSelectedRecord(saved || selectedRecord)
+      if (Array.isArray(savedData?.contacts)) {
+        setContacts(savedData.contacts)
+      }
       await loadRecords()
     } catch (error) {
       message.error(getActionErrorMessage(error, '保存主数据'))
@@ -1140,12 +1350,17 @@ export default function V1MasterDataPage({ type }) {
           render: (value) => value || '-',
         },
         {
-          title: '默认单位 ID',
-          exportTitle: '默认单位 ID',
+          title: '默认单位',
+          exportTitle: '默认单位',
           dataIndex: 'default_unit_id',
           width: 130,
           sorter: (a, b) =>
-            Number(a?.default_unit_id || 0) - Number(b?.default_unit_id || 0),
+            compareText(
+              unitDisplay(a?.default_unit_id),
+              unitDisplay(b?.default_unit_id)
+            ),
+          render: (value) => unitDisplay(value),
+          exportValue: (record) => unitDisplay(record?.default_unit_id),
         },
         {
           title: '状态',
@@ -1183,12 +1398,15 @@ export default function V1MasterDataPage({ type }) {
     if (effectiveType === 'product_skus') {
       return applyBusinessColumnSorters([
         {
-          title: '产品 ID',
-          exportTitle: '产品 ID',
+          title: '产品',
+          exportTitle: '产品',
           dataIndex: 'product_id',
-          width: 110,
+          width: 180,
           sorter: (a, b) =>
             Number(a?.product_id || 0) - Number(b?.product_id || 0),
+          render: (value) => referenceLabel(productOptions, value, '产品'),
+          exportValue: (record) =>
+            referenceLabel(productOptions, record?.product_id, '产品'),
         },
         {
           title: 'SKU 编号',
@@ -1255,13 +1473,17 @@ export default function V1MasterDataPage({ type }) {
           render: (value) => value || '-',
         },
         {
-          title: '默认单位 ID',
-          exportTitle: '默认单位 ID',
+          title: '默认单位',
+          exportTitle: '默认单位',
           dataIndex: 'default_unit_id',
           width: 130,
           sorter: (a, b) =>
-            Number(a?.default_unit_id || 0) - Number(b?.default_unit_id || 0),
-          render: (value) => value || '-',
+            compareText(
+              unitDisplay(a?.default_unit_id),
+              unitDisplay(b?.default_unit_id)
+            ),
+          render: (value) => unitDisplay(value),
+          exportValue: (record) => unitDisplay(record?.default_unit_id),
         },
         {
           title: '状态',
@@ -1433,13 +1655,17 @@ export default function V1MasterDataPage({ type }) {
               render: (value) => value || '-',
             },
             {
-              title: '默认单位 ID',
-              exportTitle: '默认单位 ID',
+              title: '默认单位',
+              exportTitle: '默认单位',
               dataIndex: 'default_unit_id',
               width: 130,
               sorter: (a, b) =>
-                Number(a?.default_unit_id || 0) -
-                Number(b?.default_unit_id || 0),
+                compareText(
+                  unitDisplay(a?.default_unit_id),
+                  unitDisplay(b?.default_unit_id)
+                ),
+              render: (value) => unitDisplay(value),
+              exportValue: (record) => unitDisplay(record?.default_unit_id),
             },
           ]
         : []),
@@ -1502,7 +1728,7 @@ export default function V1MasterDataPage({ type }) {
         exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
     ])
-  }, [effectiveType])
+  }, [effectiveType, productOptions, unitDisplay])
   const preferredRecordColumnOrder = useMemo(
     () =>
       getPreferredColumnOrder({
@@ -1770,25 +1996,18 @@ export default function V1MasterDataPage({ type }) {
         selectedRecordLabel={getRecordName(selectedRecord, effectiveType) || ''}
       />
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
-        width={BUSINESS_FORM_MODAL_WIDTH}
+      <BusinessFormModal
+        size="masterData"
         title={
-          <div className="erp-business-action-modal__title">
-            <span>
-              {editingRecord?.id
-                ? `编辑${entityLabel}`
-                : `新建${config.createTitleLabel || config.title}`}
-            </span>
-            <small>{config.formBoundary}</small>
-          </div>
+          editingRecord?.id
+            ? `编辑${entityLabel}`
+            : `新建${config.createTitleLabel || config.title}`
         }
+        description={config.formBoundary}
         open={recordModalOpen}
         onOk={saveRecord}
         onCancel={() => setRecordModalOpen(false)}
-        maskClosable={false}
         confirmLoading={saving || contactLoading}
-        centered
         forceRender
         destroyOnHidden={false}
       >
@@ -1797,12 +2016,19 @@ export default function V1MasterDataPage({ type }) {
           layout="vertical"
           className="erp-business-action-form"
         >
-          <MasterDataFormFields type={effectiveType} />
+          <MasterDataFormFields
+            type={effectiveType}
+            productOptions={productOptions}
+            unitOptions={unitOptions}
+            unitLoading={unitLoading}
+            materialCategoryOptions={materialCategoryOptions}
+            materialColorOptions={materialColorOptions}
+          />
           {showContactForm ? (
             <ContactFormList form={recordForm} entityLabel={entityLabel} />
           ) : null}
         </Form>
-      </Modal>
+      </BusinessFormModal>
 
       {isProcessDictionaryPage ? null : (
         <ColumnOrderModal

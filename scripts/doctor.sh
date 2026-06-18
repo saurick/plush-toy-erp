@@ -13,7 +13,9 @@ print_help() {
   - 必需命令: git / node / pnpm / go
   - 可选命令: gitleaks / shellcheck / golangci-lint / yamllint / shfmt / govulncheck
   - hooks 路径与关键脚本存在性
-  - Node 版本与版本文件（.n-node-version/.node-version/.nvmrc）一致性（仅提示）
+  - Node 版本与版本文件（.n-node-version/.node-version/.nvmrc）一致性
+  - pnpm 版本与 web/package.json packageManager 一致性
+  - Go 版本满足 server/go.mod toolchain / go directive
   - 仓库扫描脚本存在性（scripts/project-scan.sh）
 USAGE
 }
@@ -70,6 +72,40 @@ print_cmd_version() {
   esac
 }
 
+read_trimmed_file() {
+  tr -d ' \t\r\n' <"$1"
+}
+
+normalize_version() {
+  printf "%s" "$1" | sed -E 's/^(v|go)//; s/[^0-9.].*$//'
+}
+
+semver_ge() {
+  local current expected
+  current="$(normalize_version "$1")"
+  expected="$(normalize_version "$2")"
+
+  IFS='.' read -r c_major c_minor c_patch <<<"$current"
+  IFS='.' read -r e_major e_minor e_patch <<<"$expected"
+
+  c_major="${c_major:-0}"
+  c_minor="${c_minor:-0}"
+  c_patch="${c_patch:-0}"
+  e_major="${e_major:-0}"
+  e_minor="${e_minor:-0}"
+  e_patch="${e_patch:-0}"
+
+  if ((c_major != e_major)); then
+    ((c_major > e_major))
+    return
+  fi
+  if ((c_minor != e_minor)); then
+    ((c_minor > e_minor))
+    return
+  fi
+  ((c_patch >= e_patch))
+}
+
 echo "[doctor] 检查必需命令"
 for cmd in git node pnpm go; do
   if command -v "$cmd" >/dev/null 2>&1; then
@@ -80,6 +116,69 @@ for cmd in git node pnpm go; do
     missing=1
   fi
 done
+
+echo "[doctor] 检查必需版本"
+node_version_files=()
+expected_node=""
+for f in .n-node-version .node-version .nvmrc; do
+  if [[ -f "$f" ]]; then
+    node_version_files+=("$f")
+    file_node="$(normalize_version "$(read_trimmed_file "$f")")"
+    if [[ -z "$expected_node" ]]; then
+      expected_node="$file_node"
+    elif [[ "$file_node" != "$expected_node" ]]; then
+      echo "  - [错误] Node 版本锁不一致：${f}=${file_node}，期望 ${expected_node}"
+      missing=1
+    fi
+  fi
+done
+
+if [[ "${#node_version_files[@]}" -eq 0 ]]; then
+  echo "  - [缺失] Node 版本锁文件（.n-node-version/.node-version/.nvmrc）"
+  missing=1
+elif command -v node >/dev/null 2>&1; then
+  current_node="$(normalize_version "$(node -v)")"
+  if [[ "$current_node" == "$expected_node" ]]; then
+    echo "  - [OK] Node: ${current_node}（${node_version_files[*]}）"
+  else
+    echo "  - [错误] Node 当前 ${current_node}，版本锁期望 ${expected_node}（${node_version_files[*]}）"
+    missing=1
+  fi
+fi
+
+if [[ -f web/package.json ]] && command -v node >/dev/null 2>&1; then
+  package_manager="$(node -e "const pkg=require('./web/package.json'); process.stdout.write(pkg.packageManager || '')")"
+  if [[ "$package_manager" =~ ^pnpm@(.+)$ ]]; then
+    expected_pnpm="${BASH_REMATCH[1]}"
+    if command -v pnpm >/dev/null 2>&1; then
+      current_pnpm="$(pnpm -v)"
+      if [[ "$current_pnpm" == "$expected_pnpm" ]]; then
+        echo "  - [OK] pnpm: ${current_pnpm}（web/package.json packageManager）"
+      else
+        echo "  - [错误] pnpm 当前 ${current_pnpm}，web/package.json 期望 ${expected_pnpm}"
+        missing=1
+      fi
+    fi
+  else
+    echo "  - [缺失] web/package.json packageManager 应固定为 pnpm@x.y.z"
+    missing=1
+  fi
+fi
+
+if [[ -f server/go.mod ]] && command -v go >/dev/null 2>&1; then
+  expected_go="$(awk '$1 == "toolchain" { print $2 }' server/go.mod | head -n 1)"
+  if [[ -z "$expected_go" ]]; then
+    expected_go="$(awk '$1 == "go" { print $2 }' server/go.mod | head -n 1)"
+  fi
+  expected_go="$(normalize_version "$expected_go")"
+  current_go="$(normalize_version "$(cd server && go version | awk '{ print $3 }')")"
+  if [[ -n "$expected_go" ]] && semver_ge "$current_go" "$expected_go"; then
+    echo "  - [OK] Go: ${current_go}（server/go.mod 要求 >= ${expected_go}）"
+  else
+    echo "  - [错误] Go 当前 ${current_go:-<未知>}，server/go.mod 要求 >= ${expected_go:-<未知>}"
+    missing=1
+  fi
+fi
 
 echo "[doctor] 检查可选命令"
 for cmd in gitleaks shellcheck golangci-lint yamllint shfmt govulncheck; do
@@ -122,6 +221,11 @@ required_files=(
   .githooks/pre-commit
   .githooks/pre-push
   .githooks/commit-msg
+  .n-node-version
+  .node-version
+  .nvmrc
+  web/package.json
+  server/go.mod
 )
 
 for f in "${required_files[@]}"; do
@@ -132,25 +236,6 @@ for f in "${required_files[@]}"; do
     missing=1
   fi
 done
-
-if command -v node >/dev/null 2>&1; then
-  version_file=""
-  for f in .n-node-version .node-version .nvmrc; do
-    if [[ -f "$f" ]]; then
-      version_file="$f"
-      break
-    fi
-  done
-
-  if [[ -n "$version_file" ]]; then
-    expected_node="$(tr -d ' \t\r\n' <"$version_file" | sed 's/^v//')"
-    current_node="$(node -v | sed 's/^v//')"
-    if [[ -n "$expected_node" ]] && [[ "$expected_node" != "$current_node" ]]; then
-      echo "[doctor] Node 版本提示：当前 ${current_node}，${version_file} 期望 ${expected_node}"
-      warns=1
-    fi
-  fi
-fi
 
 if [[ "$missing" -ne 0 ]]; then
   echo "[doctor] 存在缺失项，请先修复后再继续"

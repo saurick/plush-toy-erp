@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   buildPurchaseReceiptItemParams,
   buildShipmentItemParams,
+  createBlankPurchaseReceiptItem,
   createShipmentItemFromSalesOrderItem,
   isBlankShipmentItem,
 } from './businessLineItems.mjs'
@@ -31,6 +32,23 @@ test('businessLineItems: purchase receipt item keeps source line as display only
       amount: '12.30',
     }
   )
+})
+
+test('businessLineItems: blank purchase receipt item starts as unsaved draft detail', () => {
+  assert.deepEqual(createBlankPurchaseReceiptItem(), {
+    receipt_id: undefined,
+    material_id: undefined,
+    warehouse_id: undefined,
+    unit_id: undefined,
+    lot_id: undefined,
+    purchase_order_item_id: undefined,
+    lot_no: '',
+    quantity: '',
+    unit_price: '',
+    amount: '',
+    source_line_no: '',
+    note: '',
+  })
 })
 
 test('businessLineItems: shipment item preserves SKU traceability from sales order line', () => {

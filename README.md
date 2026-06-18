@@ -18,12 +18,32 @@
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
 - 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库
-- 当前账号表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单已接入独立 `purchase_order` JSON-RPC / RBAC 和 V1 页面，BOM 管理已接入独立 `bom` JSON-RPC / RBAC 和 V1 页面，工序档案已接入 `masterdata` JSON-RPC / `process.*` RBAC 和 `/erp/engineering/processes` V1 页面，采购入库已接入独立 `purchase` JSON-RPC / RBAC、V1 页面和业务看板入库 projection，来料质检已接入独立 `quality` JSON-RPC / RBAC 和 `/erp/production/quality-inspections` V1 页面，库存台账已接入独立只读 `inventory` JSON-RPC / RBAC 和 `/erp/warehouse/inventory` V1 页面，委外订单已接入独立 `outsourcing_order` JSON-RPC / `outsourcing.order.*` RBAC 和 `/erp/purchase/processing-contracts` V1 加工合同源单页面，生产进度、出库管理、应收、应付、发票和对账仍按现有 `operational_fact` facts 接入收窄 V1 页面；余额视图已按 ACTIVE `stock_reservations` 返回已预留和可用量只读 read model；采购入库行可选关联采购订单行做来源追溯；`product_skus` 当前是 schema 真源，API / UI / 导入自动创建仍待后续闭环；具体目标库是否已 apply 仍以 `make migrate_status` 为准
+- 当前账号表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单已接入独立 `purchase_order` JSON-RPC / RBAC 和 V1 页面，BOM 管理已接入独立 `bom` JSON-RPC / RBAC 和 V1 页面，产品基础信息 / 产品规格已接入 `masterdata` JSON-RPC、`product.* / product_sku.*` RBAC 和 `/erp/master/products` V1 页面，销售订单行 UI/API 已支持从 SKU 选择带出产品 / 单位 / 快照并保存 `product_sku_id`；工序档案已接入 `masterdata` JSON-RPC / `process.*` RBAC 和 `/erp/engineering/processes` V1 页面，采购入库已接入独立 `purchase` JSON-RPC / RBAC、V1 页面和业务看板入库 projection，来料质检已接入独立 `quality` JSON-RPC / RBAC 和 `/erp/production/quality-inspections` V1 页面，库存台账已接入独立只读 `inventory` JSON-RPC / RBAC 和 `/erp/warehouse/inventory` V1 页面，委外订单已接入独立 `outsourcing_order` JSON-RPC / `outsourcing.order.*` RBAC 和 `/erp/purchase/processing-contracts` V1 加工合同源单页面，生产进度、出库管理、应收、应付、发票和对账仍按现有 `operational_fact` facts 接入收窄 V1 页面；余额视图已按 ACTIVE `stock_reservations` 返回已预留和可用量只读 read model；采购入库行可选关联采购订单行做来源追溯；`product_skus` 当前已具备基础维护和销售订单行选用能力，出货 / 库存 / 预留 SKU 校验、导入受控创建和 BOM SKU 粒度仍待后续闭环；具体目标库是否已 apply 仍以 `make migrate_status` 为准
 - `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`；`出货放行` 仍只表示可发货，只有出货单 `SHIPPED` 才是真实出货事实
 - 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本；加工环节 / processes 工序主数据只维护工序编号、名称、类别和可委外 / 可内制 / 需质检标记，不生成委外源单、生产任务、质检事实、库存流水或财务事实
 - 业务链路调试 seed / cleanup / 业务数据清空仅作为开发验收能力接入后端 `debug` JSON-RPC 域，默认面向当前 SQL 连接开启，可通过 `ERP_DEBUG_*` 环境变量显式关闭，并受管理员权限和业务链路调试菜单权限保护；业务数据清空按本项目当前业务表 allowlist 执行，不删除账号、权限、管理员偏好、配置和数据库结构；按 debugRunId 清理还会校验 debug 数据标记
 - 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred
 - 模板打印当前只保留采购合同、加工合同两套正式模板；对应业务页已支持选中记录带值打开，打印中心保留默认样例、纸面预览和打印窗口入口
+
+## 本地工具版本
+
+新人拉仓库后先跑 `scripts/doctor.sh`，确认本机工具链与仓库锁定一致；不一致时先修环境，再安装依赖或跑 QA。
+
+| 工具 | 当前锁定 | 真源 |
+| --- | --- | --- |
+| Node.js | `24.14.0` | `.n-node-version`、`.node-version`、`.nvmrc` |
+| pnpm | `10.13.1` | `web/package.json` 的 `packageManager` |
+| Go | `>= 1.26.4` | `server/go.mod` 的 `toolchain go1.26.4` |
+| PostgreSQL | 本地开发默认 `192.168.0.106:5432/plush_erp` | `server/configs/dev/config.yaml` / `config.local.yaml` 和 `make print_db_url` |
+
+推荐初始化顺序：
+
+```bash
+cd /Users/simon/projects/plush-toy-erp
+corepack enable
+bash scripts/doctor.sh
+bash scripts/bootstrap.sh
+```
 
 ## 本地启动
 

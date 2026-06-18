@@ -790,14 +790,14 @@ export function CollaborationTaskPanel({
       {
         key: 'todo',
         label: '本页待办',
-        count: taskPanelModel.pageTasks.length,
+        count: taskPanelModel.pageTaskCount,
         items: taskPanelModel.pageTasks,
         emptyText: '本页暂无待处理 Workflow 任务。',
       },
       {
         key: 'current',
         label: '当前记录',
-        count: taskPanelModel.currentRecordTasks.length,
+        count: taskPanelModel.currentRecordTaskCount,
         items: taskPanelModel.currentRecordTasks,
         emptyText: selectedRecordLabel
           ? '当前记录暂无 Workflow 任务。'
@@ -806,7 +806,7 @@ export function CollaborationTaskPanel({
       {
         key: 'blocked',
         label: '阻塞异常',
-        count: taskPanelModel.blockedTasks.length,
+        count: taskPanelModel.blockedTaskCount,
         items: taskPanelModel.blockedTasks,
         emptyText: '暂无阻塞或退回 Workflow 任务。',
       },
@@ -815,6 +815,10 @@ export function CollaborationTaskPanel({
   )
   const activeTab =
     tabItems.find((item) => item.key === activeTaskTab) || tabItems[0]
+  const activeTabHiddenCount = Math.max(
+    0,
+    activeTab.count - activeTab.items.length
+  )
   const activeTabIndex = Math.max(
     0,
     tabItems.findIndex((item) => item.key === activeTab.key)
@@ -945,7 +949,7 @@ export function CollaborationTaskPanel({
     onCompleteTask,
     onUrgeTask,
   ])
-  const renderTaskList = (items, emptyText) => {
+  const renderTaskList = (items, emptyText, hiddenCount = 0) => {
     if (items.length === 0) {
       return (
         <div className="erp-business-collaboration-task-panel__empty">
@@ -954,85 +958,96 @@ export function CollaborationTaskPanel({
       )
     }
 
-    return items.map((task) => {
-      const taskStatusKey = getBusinessCollaborationTaskStatusKey(task)
-      const isTerminal = isBusinessCollaborationTaskTerminal(task)
-      const isBlocking = isBusinessCollaborationTaskBlocking(task)
-      const taskReason = getBusinessCollaborationTaskReason(task)
-      const urgeMeta = getBusinessCollaborationTaskUrgeMeta(task)
-      const taskLoading =
-        String(taskActionLoadingID || '') === String(task.id || '')
+    return (
+      <>
+        {items.map((task) => {
+          const taskStatusKey = getBusinessCollaborationTaskStatusKey(task)
+          const isTerminal = isBusinessCollaborationTaskTerminal(task)
+          const isBlocking = isBusinessCollaborationTaskBlocking(task)
+          const taskReason = getBusinessCollaborationTaskReason(task)
+          const urgeMeta = getBusinessCollaborationTaskUrgeMeta(task)
+          const taskLoading =
+            String(taskActionLoadingID || '') === String(task.id || '')
 
-      return (
-        <div
-          key={task.id}
-          className="erp-business-collaboration-task-panel__item erp-business-module-task-item"
-        >
-          <div className="erp-business-module-task-item__main">
-            <strong>{task.task_name}</strong>
-            <span>
-              {task.source_no || `${task.source_type} #${task.source_id}`}
-            </span>
-            {taskReason ? (
-              <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
-                阻塞原因：{taskReason}
-              </span>
-            ) : null}
-            {urgeMeta.isUrged ? (
-              <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
-                已催办 {urgeMeta.urgeCount} 次
-                {urgeMeta.lastUrgeReason ? `：${urgeMeta.lastUrgeReason}` : ''}
-              </span>
-            ) : null}
+          return (
+            <div
+              key={task.id}
+              className="erp-business-collaboration-task-panel__item erp-business-module-task-item"
+            >
+              <div className="erp-business-module-task-item__main">
+                <strong>{task.task_name}</strong>
+                <span>
+                  {task.source_no || `${task.source_type} #${task.source_id}`}
+                </span>
+                {taskReason ? (
+                  <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
+                    阻塞原因：{taskReason}
+                  </span>
+                ) : null}
+                {urgeMeta.isUrged ? (
+                  <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
+                    已催办 {urgeMeta.urgeCount} 次
+                    {urgeMeta.lastUrgeReason
+                      ? `：${urgeMeta.lastUrgeReason}`
+                      : ''}
+                  </span>
+                ) : null}
+              </div>
+              <div className="erp-business-module-task-item__meta">
+                <Tag>
+                  {roleLabels.get(task.owner_role_key) || task.owner_role_key}
+                </Tag>
+                <Tag color={isBlocking ? 'red' : isTerminal ? 'green' : 'blue'}>
+                  {statusLabels.get(taskStatusKey) || taskStatusKey}
+                </Tag>
+              </div>
+              <Space
+                wrap
+                size={[6, 6]}
+                className="erp-business-module-task-item__actions"
+              >
+                {onCompleteTask && !isTerminal ? (
+                  <Button
+                    size="small"
+                    icon={<CheckCircleOutlined />}
+                    loading={taskLoading}
+                    onClick={() => openActionDrawer(task, 'complete')}
+                  >
+                    完成
+                  </Button>
+                ) : null}
+                {onBlockTask && !isTerminal ? (
+                  <Button
+                    size="small"
+                    danger
+                    icon={<ExclamationCircleOutlined />}
+                    disabled={taskLoading}
+                    onClick={() => openActionDrawer(task, 'block')}
+                  >
+                    阻塞
+                  </Button>
+                ) : null}
+                {onUrgeTask && !isTerminal ? (
+                  <Button
+                    size="small"
+                    loading={String(urgingTaskID || '') === String(task.id)}
+                    disabled={taskLoading}
+                    onClick={() => openActionDrawer(task, 'urge')}
+                  >
+                    催办
+                  </Button>
+                ) : null}
+              </Space>
+            </div>
+          )
+        })}
+        {hiddenCount > 0 ? (
+          <div className="erp-business-collaboration-task-panel__more-note">
+            仅显示前 {items.length} 条，还有 {hiddenCount} 条
           </div>
-          <div className="erp-business-module-task-item__meta">
-            <Tag>
-              {roleLabels.get(task.owner_role_key) || task.owner_role_key}
-            </Tag>
-            <Tag color={isBlocking ? 'red' : isTerminal ? 'green' : 'blue'}>
-              {statusLabels.get(taskStatusKey) || taskStatusKey}
-            </Tag>
-          </div>
-          <Space
-            wrap
-            size={[6, 6]}
-            className="erp-business-module-task-item__actions"
-          >
-            {onCompleteTask && !isTerminal ? (
-              <Button
-                size="small"
-                icon={<CheckCircleOutlined />}
-                loading={taskLoading}
-                onClick={() => openActionDrawer(task, 'complete')}
-              >
-                完成
-              </Button>
-            ) : null}
-            {onBlockTask && !isTerminal ? (
-              <Button
-                size="small"
-                danger
-                icon={<ExclamationCircleOutlined />}
-                disabled={taskLoading}
-                onClick={() => openActionDrawer(task, 'block')}
-              >
-                阻塞
-              </Button>
-            ) : null}
-            {onUrgeTask && !isTerminal ? (
-              <Button
-                size="small"
-                loading={String(urgingTaskID || '') === String(task.id)}
-                disabled={taskLoading}
-                onClick={() => openActionDrawer(task, 'urge')}
-              >
-                催办
-              </Button>
-            ) : null}
-          </Space>
-        </div>
-      )
-    })
+        ) : null}
+      </>
+    )
   }
 
   return (
@@ -1065,24 +1080,26 @@ export function CollaborationTaskPanel({
               <Text type="secondary">
                 只处理 Workflow 任务，不写库存、出货、财务、开票或收付款事实。
               </Text>
-              <span
-                className="erp-business-collaboration-task-panel__summary"
-                aria-live="polite"
-              >
-                {summaryItems.map((item) => (
-                  <span
-                    key={item.key}
-                    className={joinClassNames(
-                      'erp-business-collaboration-task-panel__summary-item',
-                      `erp-business-collaboration-task-panel__summary-item--${item.tone}`,
-                      `erp-business-collaboration-task-panel__summary-item--${item.key}`
-                    )}
-                  >
-                    <Text type="secondary">{item.label}</Text>
-                    <strong>{item.value}</strong>
-                  </span>
-                ))}
-              </span>
+              {!expanded ? (
+                <span
+                  className="erp-business-collaboration-task-panel__summary"
+                  aria-live="polite"
+                >
+                  {summaryItems.map((item) => (
+                    <span
+                      key={item.key}
+                      className={joinClassNames(
+                        'erp-business-collaboration-task-panel__summary-item',
+                        `erp-business-collaboration-task-panel__summary-item--${item.tone}`,
+                        `erp-business-collaboration-task-panel__summary-item--${item.key}`
+                      )}
+                    >
+                      <Text type="secondary">{item.label}</Text>
+                      <strong>{item.value}</strong>
+                    </span>
+                  ))}
+                </span>
+              ) : null}
             </div>
             <Space
               wrap={false}
@@ -1136,7 +1153,11 @@ export function CollaborationTaskPanel({
                 role="tabpanel"
                 aria-labelledby={activeTabID}
               >
-                {renderTaskList(activeTab.items, activeTab.emptyText)}
+                {renderTaskList(
+                  activeTab.items,
+                  activeTab.emptyText,
+                  activeTabHiddenCount
+                )}
               </div>
             </div>
           ) : null}

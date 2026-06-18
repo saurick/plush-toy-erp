@@ -6,6 +6,7 @@ import {
   AUTH_SCOPE,
   getAuthMeta,
   getStoredAdminProfile,
+  logout,
   persistAuth,
   persistAuthMeta,
 } from './auth.js'
@@ -127,4 +128,28 @@ test('auth: 管理员元数据本地缓存满额时不阻断 profile 同步', ()
   assert.deepEqual(getAuthMeta(AUTH_SCOPE.ADMIN, 'permissions'), [
     'system.user.read',
   ])
+})
+
+test('auth: logout 只清理当前 scope 认证信息，不清空项目其他 localStorage', () => {
+  installStorage()
+
+  persistAuth(
+    {
+      access_token: createMockAdminToken('root'),
+      username: 'root',
+      permissions: ['system.user.read'],
+      menus: [{ path: '/erp/system/permissions', label: '权限管理' }],
+    },
+    AUTH_SCOPE.ADMIN
+  )
+  localStorage.setItem('plush_erp_theme_mode', 'dark')
+  localStorage.setItem('erp:last_entry_target', 'desktop')
+
+  logout(AUTH_SCOPE.ADMIN)
+
+  assert.equal(localStorage.getItem('admin_access_token'), null)
+  assert.equal(localStorage.getItem('admin_username'), null)
+  assert.equal(localStorage.getItem('admin_permissions'), null)
+  assert.equal(localStorage.getItem('plush_erp_theme_mode'), 'dark')
+  assert.equal(localStorage.getItem('erp:last_entry_target'), 'desktop')
 })

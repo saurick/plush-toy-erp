@@ -16,7 +16,6 @@ import {
   Form,
   Input,
   InputNumber,
-  Modal,
   Select,
   Space,
   Tag,
@@ -43,6 +42,7 @@ import {
   ColumnOrderModal,
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import SourceImportPickerModal from '../components/business-list/SourceImportPickerModal.jsx'
 import {
   activateSalesOrder,
@@ -62,6 +62,7 @@ import {
   SALES_ORDER_STATUS_LABELS,
   V1_ROUTE_PATHS,
   buildCustomerSnapshot,
+  buildSequentialDraftCode,
   canRunSalesOrderLifecycleAction,
   deriveSalesOrderItemAmount,
   buildSalesOrderItemParams,
@@ -150,7 +151,6 @@ const SALES_ORDERS_MODULE_KEY = 'sales-orders'
 const SALES_ORDER_ITEMS_MODULE_KEY = 'sales-order-items'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const OPEN_LINE_STATUS = 'open'
-const BUSINESS_FORM_MODAL_WIDTH = 'min(960px, calc(100vw - 96px))'
 
 function parseSortFilterValue(value = 'updated_at:desc') {
   const [sortBy = 'updated_at', sortDirection = 'desc'] =
@@ -409,11 +409,15 @@ function SalesOrderFormFields({ customers }) {
     <>
       <Form.Item
         className="erp-business-action-form__field"
-        label="订单号"
+        label="订单号（自动）"
         name="order_no"
-        rules={[{ required: true, message: '请填写订单号' }]}
+        rules={[{ required: true, message: '请填写或保留自动订单号' }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Input
+          allowClear
+          autoComplete="off"
+          placeholder="自动生成，可按需要调整"
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -687,10 +691,10 @@ function SalesOrderItemsFormSection({
                             const sourceText = [
                               line?.product_code_snapshot ||
                                 (line?.product_id
-                                  ? `产品 ID ${line.product_id}`
+                                  ? `产品 #${line.product_id}`
                                   : ''),
                               line?.product_name_snapshot,
-                              line?.unit_id ? `单位 ID ${line.unit_id}` : '',
+                              line?.unit_id ? `单位 #${line.unit_id}` : '',
                             ]
                               .filter(Boolean)
                               .join(' / ')
@@ -992,6 +996,10 @@ export default function V1SalesOrdersPage() {
     setEditingOrder(null)
     orderForm.resetFields()
     orderForm.setFieldsValue({
+      order_no: buildSequentialDraftCode(orders, {
+        prefix: 'SO',
+        field: 'order_no',
+      }),
       order_date: new Date().toISOString().slice(0, 10),
       items: [createBlankOrderLine(1)],
     })
@@ -1157,10 +1165,10 @@ export default function V1SalesOrdersPage() {
           sorter: (a, b) =>
             compareText(a?.customer_snapshot?.name, b?.customer_snapshot?.name),
           render: (value, record) =>
-            value?.name || `客户 ID ${record.customer_id}`,
+            value?.name || `客户 #${record.customer_id}`,
           exportValue: (record) =>
             record?.customer_snapshot?.name ||
-            (record?.customer_id ? `客户 ID ${record.customer_id}` : ''),
+            (record?.customer_id ? `客户 #${record.customer_id}` : ''),
         },
         {
           title: '客户订单号',
@@ -1424,7 +1432,7 @@ export default function V1SalesOrdersPage() {
     if (!selectedOrder) return '请先选择销售订单'
     const customerName =
       selectedOrder.customer_snapshot?.name ||
-      `客户 ID ${selectedOrder.customer_id}`
+      `客户 #${selectedOrder.customer_id}`
     return `${selectedOrder.order_no || selectedOrder.id} / ${customerName}`
   }, [selectedOrder])
   const visibleLifecycleActions = useMemo(() => {
@@ -1774,21 +1782,13 @@ export default function V1SalesOrdersPage() {
         onClose={() => setColumnOrderTarget(null)}
       />
 
-      <Modal
-        className="erp-business-action-modal erp-business-action-modal--form"
-        width={BUSINESS_FORM_MODAL_WIDTH}
-        title={
-          <div className="erp-business-action-modal__title">
-            <span>{editingOrder?.id ? '编辑销售订单' : '新建销售订单'}</span>
-            <small>只维护客户订单承诺，不在此写出货、库存或财务事实。</small>
-          </div>
-        }
+      <BusinessFormModal
+        title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
+        description="只维护客户订单承诺，不在此写出货、库存或财务事实。"
         open={orderModalOpen}
         onOk={saveOrder}
         onCancel={() => setOrderModalOpen(false)}
-        maskClosable={false}
         confirmLoading={saving || itemLoading}
-        centered
         forceRender
         destroyOnHidden={false}
       >
@@ -1806,7 +1806,7 @@ export default function V1SalesOrdersPage() {
             productSKUs={productSKUs}
           />
         </Form>
-      </Modal>
+      </BusinessFormModal>
     </BusinessPageLayout>
   )
 }

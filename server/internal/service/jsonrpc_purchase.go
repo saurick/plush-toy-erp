@@ -40,6 +40,20 @@ func (d *jsonrpcDispatcher) handlePurchase(
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptDraft(ctx, in)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
+	case "create_purchase_receipt_with_items", "createPurchaseReceiptWithItems":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
+			return id, res, nil
+		}
+		in, ok := purchaseReceiptCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, ok := purchaseReceiptItemsCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.CreatePurchaseReceiptWithItems(ctx, in, items)
+		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "create_purchase_receipt_from_purchase_order", "createPurchaseReceiptFromPurchaseOrder":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
 			return id, res, nil
@@ -157,6 +171,30 @@ func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceip
 		SourceLineNo:        getWorkflowStringPtr(pm, "source_line_no"),
 		Note:                getWorkflowStringPtr(pm, "note"),
 	}, true
+}
+
+func purchaseReceiptItemsCreateFromParams(pm map[string]any) ([]*biz.PurchaseReceiptItemCreate, bool) {
+	raw, ok := pm["items"]
+	if !ok || raw == nil {
+		return nil, false
+	}
+	rawItems, ok := raw.([]any)
+	if !ok || len(rawItems) == 0 {
+		return nil, false
+	}
+	items := make([]*biz.PurchaseReceiptItemCreate, 0, len(rawItems))
+	for _, rawItem := range rawItems {
+		itemMap, ok := rawItem.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		item, ok := purchaseReceiptItemCreateFromParams(itemMap)
+		if !ok {
+			return nil, false
+		}
+		items = append(items, item)
+	}
+	return items, true
 }
 
 func purchaseReceiptFilterFromParams(pm map[string]any) biz.PurchaseReceiptFilter {

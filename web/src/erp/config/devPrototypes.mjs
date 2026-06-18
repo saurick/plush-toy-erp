@@ -53,7 +53,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'admin-command-center-v1/index.html',
     readmePath: 'admin-command-center-v1/README.md',
     description:
-      '把工作台收敛为登录后的今日处理台：今日焦点、优先队列、当前处理卡、当前任务关联记录入口和交接边界。',
+      '把工作台收敛为登录后的今日处理台：今日焦点、队列筛选、当前任务上下文、当前任务关联记录入口和交接边界。',
     appliesTo:
       '后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；当前任务关联记录入口不是正式菜单替代表。',
   },
@@ -146,7 +146,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。',
     appliesTo:
-      '客户档案、供应商档案、产品、销售订单、辅材 / 包材采购、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。',
+      '客户档案、供应商档案、产品、销售订单、采购订单、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。',
   },
   {
     key: 'print-template-center',
@@ -202,7 +202,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
   },
   {
     key: 'action-modal-drawer-standard',
-    title: '业务弹窗标准样板',
+    title: '局部动作弹窗标准样板',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
     directory: 'action-modal-drawer-standard-v1/',
@@ -211,7 +211,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '覆盖单据补录、来源选择器、明细行、回收站、列顺序、删除确认和危险确认；来源选择器最多作为第二层，保留分页、已选摘要和清空已选，只选择来源不编辑本单字段。',
     appliesTo:
-      '出货、采购、质检、库存、财务等列表页局部动作浮层可参照；完整新建 / 编辑页回到表单页样板，字段真源、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。',
+      '出货、采购、质检、库存、财务等列表页局部动作浮层可参照；完整新建 / 编辑统一回到业务表单弹窗样板，不再新增业务编辑抽屉；字段真源、权限、幂等和事实约束仍由后端 usecase / RBAC 决定。',
   },
   {
     key: 'business-direction-sidebar',

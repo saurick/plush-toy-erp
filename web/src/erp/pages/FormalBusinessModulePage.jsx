@@ -1,13 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  DeleteOutlined,
   DownloadOutlined,
   DownOutlined,
   EditOutlined,
-  InboxOutlined,
+  EyeOutlined,
   LinkOutlined,
-  PlusOutlined,
-  PrinterOutlined,
   SettingOutlined,
   SwapOutlined,
 } from '@ant-design/icons'
@@ -40,8 +37,8 @@ import {
 import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
-  getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import {
   getBusinessModule,
   getFormalShellFormFieldLabels,
@@ -51,20 +48,14 @@ import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
-import {
-  openPrintWorkspaceWindow,
-  PRINT_WORKSPACE_DRAFT_MODE,
-  PRINT_WORKSPACE_ENTRY_SOURCE,
-  PROCESSING_CONTRACT_TEMPLATE_KEY,
-} from '../utils/printWorkspace.js'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 
 const STATUS_OPTIONS = Object.freeze([
   { label: '全部状态', value: '' },
-  { label: '待处理', value: 'pending_api', color: 'blue' },
-  { label: '待确认', value: 'review_required', color: 'gold' },
-  { label: '可查看', value: 'source_grounded', color: 'green' },
+  { label: '待接入', value: 'pending_api', color: 'blue' },
+  { label: '待评审', value: 'review_required', color: 'gold' },
+  { label: '可参考', value: 'source_grounded', color: 'green' },
 ])
 
 const OWNER_ROLE_LABELS = Object.freeze({
@@ -87,44 +78,42 @@ const OWNER_ROLE_LABELS = Object.freeze({
 })
 
 const MODULE_CREATE_LABELS = Object.freeze({
-  products: '新建产品',
-  'material-bom': '新建BOM',
-  'accessories-purchase': '新建采购订单',
-  inbound: '新建入库',
-  'quality-inspections': '新建质检单',
-  inventory: '新建库存调整',
-  'processing-contracts': '新建委外订单',
-  'production-scheduling': '新建排程',
-  'production-progress': '新建进度记录',
-  'production-exceptions': '新建异常',
-  'shipping-release': '新建放行单',
-  outbound: '新建出库',
-  reconciliation: '新建对账',
-  payables: '新建应付',
-  receivables: '新建应收',
-  invoices: '新建发票',
+  products: '预览产品字段',
+  'material-bom': '预览BOM字段',
+  'accessories-purchase': '预览采购字段',
+  inbound: '预览入库字段',
+  'quality-inspections': '预览质检字段',
+  inventory: '预览库存字段',
+  'processing-contracts': '预览委外字段',
+  'production-scheduling': '预览排程字段',
+  'production-progress': '预览进度字段',
+  'production-exceptions': '预览异常字段',
+  'shipping-release': '预览放行字段',
+  outbound: '预览出库字段',
+  reconciliation: '预览对账字段',
+  payables: '预览应付字段',
+  receivables: '预览应收字段',
+  invoices: '预览发票字段',
 })
 
 const MODULE_PRIMARY_ACTION_LABELS = Object.freeze({
-  products: '生成产品资料',
-  'material-bom': '生成BOM',
-  'accessories-purchase': '生成采购合同',
-  inbound: '生成入库单',
-  'quality-inspections': '生成质检结论',
-  inventory: '生成库存调整',
-  'processing-contracts': '生成委外合同',
-  'production-scheduling': '生成生产任务',
-  'production-progress': '更新进度',
-  'production-exceptions': '关闭异常',
-  'shipping-release': '生成出货放行',
-  outbound: '生成出库',
-  reconciliation: '生成对账单',
-  payables: '生成应付',
-  receivables: '生成应收',
-  invoices: '生成发票',
+  products: '查看产品接入边界',
+  'material-bom': '查看BOM接入边界',
+  'accessories-purchase': '查看采购接入边界',
+  inbound: '查看入库接入边界',
+  'quality-inspections': '查看质检接入边界',
+  inventory: '查看库存接入边界',
+  'processing-contracts': '查看委外接入边界',
+  'production-scheduling': '查看排程接入边界',
+  'production-progress': '查看进度接入边界',
+  'production-exceptions': '查看异常接入边界',
+  'shipping-release': '查看放行接入边界',
+  outbound: '查看出库接入边界',
+  reconciliation: '查看对账接入边界',
+  payables: '查看应付接入边界',
+  receivables: '查看应收接入边界',
+  invoices: '查看发票接入边界',
 })
-
-const BUSINESS_FORM_MODAL_WIDTH = 'min(1120px, calc(100vw - 96px))'
 
 function readStoredColumnOrder(moduleKey) {
   if (typeof window === 'undefined') {
@@ -173,39 +162,6 @@ function getPreferredColumnOrder({
   return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
 }
 
-function csvEscape(value) {
-  const text = String(value ?? '')
-  if (/[",\n\r]/u.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
-}
-
-function downloadCSV({ filename, columns, rows }) {
-  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
-  const body = rows.map((row) =>
-    columns.map((column) => {
-      const rawValue =
-        typeof column.exportValue === 'function'
-          ? column.exportValue(row)
-          : row?.[column.dataIndex]
-      return csvEscape(rawValue)
-    })
-  )
-  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
-  const blob = new Blob([`\uFEFF${csv}`], {
-    type: 'text/csv;charset=utf-8',
-  })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
 function statusTag(status) {
   const option =
     STATUS_OPTIONS.find((item) => item.value === status) || STATUS_OPTIONS[1]
@@ -228,8 +184,8 @@ function buildFormalShellRows(moduleItem) {
   return [
     {
       id: `${moduleItem.key}-source`,
-      document_no: `${moduleItem.key.toUpperCase()}-001`,
-      title: `${moduleItem.title}列表视图`,
+      document_no: `${moduleItem.key.toUpperCase()}-PREVIEW-001`,
+      title: `${moduleItem.title}字段预览`,
       business_status: 'source_grounded',
       owner_role: ownerRole,
       source_refs: refs,
@@ -239,8 +195,8 @@ function buildFormalShellRows(moduleItem) {
     },
     {
       id: `${moduleItem.key}-review`,
-      document_no: `${moduleItem.key.toUpperCase()}-002`,
-      title: `${moduleItem.title}字段确认`,
+      document_no: `${moduleItem.key.toUpperCase()}-PREVIEW-002`,
+      title: `${moduleItem.title}评审边界`,
       business_status: 'review_required',
       owner_role: ownerRole,
       source_refs: moduleItem.primaryEntity || refs,
@@ -250,8 +206,8 @@ function buildFormalShellRows(moduleItem) {
     },
     {
       id: `${moduleItem.key}-api`,
-      document_no: `${moduleItem.key.toUpperCase()}-003`,
-      title: `${moduleItem.title}操作配置`,
+      document_no: `${moduleItem.key.toUpperCase()}-PREVIEW-003`,
+      title: `${moduleItem.title}接入边界`,
       business_status: 'pending_api',
       owner_role: ownerRole,
       source_refs: moduleItem.factSource || refs,
@@ -291,7 +247,7 @@ function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
   const coreFieldLabels = getFormalShellFormFieldLabels(moduleItem.key)
   const fieldScope = (moduleItem.currentScope || []).join('；') || record?.scope
   const boundaryText = [
-    '当前页面仍是正式入口壳；真实保存必须接入领域 usecase、API 和 RBAC 后启用，不能从前端本地伪造事实。',
+    '当前页面仍是待接入预览页；真实保存必须接入领域 usecase、API 和 RBAC 后启用，不能从前端本地伪造事实。',
     moduleItem.boundary ? `模块边界：${moduleItem.boundary}` : '',
     '不读取、不创建、不更新、不删除 business_records；旧表族不作为运行时真源。',
   ]
@@ -455,15 +411,15 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     () =>
       applyBusinessColumnSorters([
         {
-          title: '业务编号',
-          exportTitle: '业务编号',
+          title: '预览编号',
+          exportTitle: '预览编号',
           dataIndex: 'document_no',
           width: 180,
           sorter: (a, b) => compareText(a.document_no, b.document_no),
         },
         {
-          title: '业务对象',
-          exportTitle: '业务对象',
+          title: '预览对象',
+          exportTitle: '预览对象',
           dataIndex: 'title',
           width: 220,
           sorter: (a, b) => compareText(a.title, b.title),
@@ -564,8 +520,8 @@ export default function FormalBusinessModulePage({ moduleKey }) {
       return undefined
     }
     return outletContext?.registerPageRefresh?.(() => {
-      message.info(`${moduleItem.title}当前为正式入口壳，暂无远端数据刷新`)
-      return true
+      message.info(`${moduleItem.title}当前为待接入预览页，暂无远端数据刷新`)
+      return false
     })
   }, [moduleItem, outletContext])
 
@@ -581,22 +537,13 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     )
   }
 
-  const exportRows = () => {
-    downloadCSV({
-      filename: `${moduleItem.key}-formal-shell.csv`,
-      columns: orderedColumns.filter((column) => column.key !== 'actions'),
-      rows: filteredRows,
-    })
-    message.success('已导出当前结果')
-  }
-
   const openActionHint = (
     actionLabel,
     record = selectedRows[0] || null,
     variant = 'confirm'
   ) => {
     setActionModal({
-      title: actionLabel || MODULE_CREATE_LABELS[moduleItem.key] || '新建记录',
+      title: actionLabel || MODULE_CREATE_LABELS[moduleItem.key] || '预览字段',
       record,
       variant,
     })
@@ -610,7 +557,11 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     if (record?.id) {
       setSelectedRowKeys([record.id])
     }
-    openActionHint(`编辑${moduleItem.shortLabel || ''}`, record || null, 'form')
+    openActionHint(
+      `预览${moduleItem.shortLabel || moduleItem.title}字段`,
+      record || null,
+      'form'
+    )
   }
 
   const selectedLabel =
@@ -626,48 +577,36 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   }))
   const singleSelectedRecord =
     selectedRows.length === 1 ? selectedRows[0] : null
-  const createLabel = MODULE_CREATE_LABELS[moduleItem.key] || '新建记录'
+  const createLabel = MODULE_CREATE_LABELS[moduleItem.key] || '预览字段'
   const primaryActionLabel =
-    MODULE_PRIMARY_ACTION_LABELS[moduleItem.key] || '生成下游记录'
-  const supportsProcessingContractPrint =
-    moduleItem.key === 'processing-contracts'
+    MODULE_PRIMARY_ACTION_LABELS[moduleItem.key] || '查看接入边界'
   const linkedMenuItems = [
-    { key: 'source', label: '来源记录' },
-    { key: 'downstream', label: '下游记录' },
+    { key: 'source', label: '来源边界' },
+    { key: 'downstream', label: '下游边界' },
   ]
   const transitionMenuItems = [
     {
       key: 'status-transitions',
-      label: '状态变更',
+      label: '待接入状态动作',
       type: 'group',
       children: [
-        { key: 'submit', label: '提交' },
-        { key: 'approve', label: '确认' },
-        { key: 'return', label: '退回' },
+        { key: 'submit', label: '提交边界' },
+        { key: 'approve', label: '确认边界' },
+        { key: 'return', label: '退回边界' },
       ],
     },
   ]
-  const openProcessingContractPrint = () => {
-    try {
-      openPrintWorkspaceWindow(PROCESSING_CONTRACT_TEMPLATE_KEY, {
-        entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
-        draftMode: PRINT_WORKSPACE_DRAFT_MODE.FRESH,
-      })
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '打开加工合同打印'))
-    }
-  }
   return (
     <BusinessPageLayout className="erp-formal-business-module-page">
       <PageHeaderCard
         title={moduleItem.title}
         description={moduleItem.description}
         stats={[
-          { key: 'total', label: '总记录', value: rows.length },
-          { key: 'current', label: '当前结果', value: filteredRows.length },
+          { key: 'total', label: '预览项', value: rows.length },
+          { key: 'current', label: '筛选结果', value: filteredRows.length },
           {
             key: 'pending',
-            label: '待处理',
+            label: '待接入',
             value: rows.filter(
               (record) => record.business_status === 'pending_api'
             ).length,
@@ -695,41 +634,25 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         }
         actions={
           <Space wrap>
-            <ToolbarButton
-              icon={<DownloadOutlined />}
-              onClick={exportRows}
-              disabled={filteredRows.length === 0}
-            >
-              导出当前结果
-            </ToolbarButton>
+            <Tooltip title="当前待接入预览页不导出业务数据；字段清单应以产品台账和领域 API 接入评审为准。">
+              <span>
+                <ToolbarButton icon={<DownloadOutlined />} disabled>
+                  预览导出待接入
+                </ToolbarButton>
+              </span>
+            </Tooltip>
             <ToolbarButton
               icon={<SettingOutlined />}
               onClick={() => setColumnOrderOpen(true)}
             >
               列顺序
             </ToolbarButton>
-            <Tooltip
-              title={`${moduleItem.title}当前没有物理删除或回收站主路径；退出使用需接入对应领域 usecase 后再启用。`}
-            >
-              <span>
-                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
-                  批量删除
-                </ToolbarButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="当前正式入口壳不提供前端假回收站；历史追溯应回到领域事实、状态和审计记录。">
-              <span>
-                <ToolbarButton icon={<InboxOutlined />} disabled>
-                  回收站
-                </ToolbarButton>
-              </span>
-            </Tooltip>
           </Space>
         }
         primaryAction={
           <ToolbarButton
             type="primary"
-            icon={<PlusOutlined />}
+            icon={<EyeOutlined />}
             onClick={openCreateActionHint}
           >
             {createLabel}
@@ -757,13 +680,13 @@ export default function FormalBusinessModulePage({ moduleKey }) {
             disabled={!singleSelectedRecord}
             onClick={() => openEditActionHint(singleSelectedRecord)}
           >
-            编辑
+            预览选中字段
           </Button>
           <Dropdown
             menu={{
               items: linkedMenuItems,
               onClick: ({ key }) =>
-                openActionHint(key === 'source' ? '来源记录' : '下游记录'),
+                openActionHint(key === 'source' ? '来源边界' : '下游边界'),
             }}
             disabled={!singleSelectedRecord}
             trigger={['click']}
@@ -773,7 +696,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               icon={<LinkOutlined />}
               disabled={!singleSelectedRecord}
             >
-              关联单据 <DownOutlined />
+              接入边界 <DownOutlined />
             </Button>
           </Dropdown>
           <Dropdown
@@ -783,7 +706,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
                 const label =
                   transitionMenuItems
                     .flatMap((item) => item.children || item)
-                    .find((item) => item.key === key)?.label || '状态变更'
+                    .find((item) => item.key === key)?.label || '状态边界'
                 openActionHint(label)
               },
             }}
@@ -795,7 +718,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               icon={<SwapOutlined />}
               disabled={!singleSelectedRecord}
             >
-              更多操作 <DownOutlined />
+              状态边界 <DownOutlined />
             </Button>
           </Dropdown>
           <Button
@@ -806,25 +729,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
           >
             {primaryActionLabel}
           </Button>
-          {supportsProcessingContractPrint ? (
-            <Button
-              size="small"
-              icon={<PrinterOutlined />}
-              disabled={!singleSelectedRecord}
-              onClick={openProcessingContractPrint}
-            >
-              加工合同打印
-            </Button>
-          ) : null}
-          <Tooltip
-            title={`${moduleItem.title}当前没有物理删除主路径；请通过模块生命周期状态退出使用。`}
-          >
-            <span>
-              <Button size="small" danger icon={<DeleteOutlined />} disabled>
-                删除
-              </Button>
-            </span>
-          </Tooltip>
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -858,55 +762,44 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         selectedRecordLabel={selectedRows[0]?.title || selectedLabel}
       />
 
-      <Modal
-        className={`erp-business-action-modal ${
-          actionModal?.variant === 'form'
-            ? 'erp-business-action-modal--form'
-            : 'erp-business-action-modal--confirm'
-        }`}
-        width={
-          actionModal?.variant === 'form' ? BUSINESS_FORM_MODAL_WIDTH : 560
-        }
-        title={
-          actionModal?.variant === 'form' ? (
-            <div className="erp-business-action-modal__title">
-              <span>{actionModal?.title || '操作'}</span>
-              <small>
-                当前只展示正式入口表单样式；真实保存需接入领域 usecase、API 和
-                RBAC。
-              </small>
-            </div>
-          ) : (
-            actionModal?.title || '操作'
-          )
-        }
-        open={Boolean(actionModal)}
-        onCancel={() => setActionModal(null)}
-        maskClosable={false}
-        footer={
-          actionModal?.variant === 'form' ? (
+      {actionModal?.variant === 'form' ? (
+        <BusinessFormModal
+          title={actionModal?.title || '操作'}
+          description="当前只预览待接入字段和边界；真实保存需接入领域 usecase、API 和 RBAC。"
+          open={Boolean(actionModal)}
+          onCancel={() => setActionModal(null)}
+          footer={
             <>
               <Button onClick={() => setActionModal(null)}>关闭</Button>
               <Button type="primary" disabled>
-                待接入后启用
+                真实保存待接入
               </Button>
             </>
-          ) : (
-            <Button type="primary" onClick={() => setActionModal(null)}>
-              确定
-            </Button>
-          )
-        }
-        centered
-        destroyOnHidden
-      >
-        {actionModal?.variant === 'form' ? (
+          }
+          destroyOnHidden
+        >
           <FormalShellActionForm
             moduleItem={moduleItem}
             actionModal={actionModal}
             selectedLabel={selectedLabel}
           />
-        ) : (
+        </BusinessFormModal>
+      ) : (
+        <Modal
+          className="erp-business-action-modal erp-business-action-modal--confirm"
+          width={560}
+          title={actionModal?.title || '操作'}
+          open={Boolean(actionModal)}
+          onCancel={() => setActionModal(null)}
+          maskClosable={false}
+          footer={
+            <Button type="primary" onClick={() => setActionModal(null)}>
+              确定
+            </Button>
+          }
+          centered
+          destroyOnHidden
+        >
           <Descriptions bordered column={1} size="small">
             <Descriptions.Item label="当前模块">
               {moduleItem.title}
@@ -914,16 +807,16 @@ export default function FormalBusinessModulePage({ moduleKey }) {
             <Descriptions.Item label="当前记录">
               {actionModal?.record?.document_no || selectedLabel}
             </Descriptions.Item>
-            <Descriptions.Item label="保存位置">
-              {moduleItem.primaryEntity || moduleItem.title}
+            <Descriptions.Item label="未来接入位置">
+              {moduleItem.primaryEntity || moduleItem.title}（待接入）
             </Descriptions.Item>
             <Descriptions.Item label="当前边界">
-              当前页面仍是正式入口壳；真实保存必须接入领域 usecase、API 和 RBAC
-              后启用，不能从前端本地伪造事实。
+              当前页面仍是待接入预览页；真实保存必须接入领域 usecase、API 和
+              RBAC 后启用，不能从前端本地伪造事实。
             </Descriptions.Item>
           </Descriptions>
-        )}
-      </Modal>
+        </Modal>
+      )}
 
       <ColumnOrderModal
         open={columnOrderOpen}

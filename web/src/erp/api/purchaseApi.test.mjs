@@ -17,6 +17,7 @@ test('purchaseApi: exposes purchase receipt methods only', () => {
   for (const methodName of [
     'list_purchase_receipts',
     'create_purchase_receipt_draft',
+    'create_purchase_receipt_with_items',
     'create_purchase_receipt_from_purchase_order',
     'add_purchase_receipt_item',
     'get_purchase_receipt',

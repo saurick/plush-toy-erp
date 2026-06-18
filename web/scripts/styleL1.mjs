@@ -39,8 +39,6 @@ const mockPdfBuffer = Buffer.from(
 
 const assertAntdModalCentered = (...args) =>
   assertAntdModalCenteredImpl(...args)
-const assertBatchDeleteModalCountLayout = (...args) =>
-  assertBatchDeleteModalCountLayoutImpl(...args)
 
 const scenarios = [
   {
@@ -201,7 +199,7 @@ const scenarios = [
       await expectText(page, '看板中心')
       await expectHeading(page, '工作台')
       await expectText(page, '优先处理队列')
-      await expectText(page, '任务详情')
+      await expectText(page, '当前任务上下文')
       await expectText(page, '等待交接')
       await expectNoButton(page, '任务看板')
       await assertNoDuplicatedAdminPageTitle(page, {
@@ -365,14 +363,17 @@ const scenarios = [
         true,
         '任务看板回到默认筛选后清空按钮应禁用'
       )
-      await page
-        .getByRole('button', { name: '看板跳转测试任务', exact: true })
-        .click()
-      await waitForPath(page, '/erp/business-dashboard')
-      await expectHeading(page, '业务看板')
-      await page.goBack()
-      await waitForPath(page, '/erp/task-board')
-      await expectHeading(page, '任务看板')
+      const navigationLaneTask = page
+        .locator('.erp-task-board-card')
+        .filter({ hasText: '看板跳转测试任务' })
+        .first()
+      assert.equal(
+        await navigationLaneTask
+          .getByRole('button', { name: '看板跳转测试任务', exact: true })
+          .count(),
+        0,
+        '无明确正式对象页时任务标题不应伪造成关联记录按钮'
+      )
     },
   },
   {
@@ -531,7 +532,7 @@ const scenarios = [
       await expectText(page, '毛绒 ERP 管理后台')
       await expectText(page, '工作台')
       await expectText(page, '优先处理队列')
-      await expectText(page, '任务详情')
+      await expectText(page, '当前任务上下文')
       await expectText(page, '等待交接')
       await expectNoButton(page, '任务看板')
       await assertNoDuplicatedAdminPageTitle(page, {
@@ -1992,7 +1993,7 @@ const scenarios = [
       await expectText(page, '业务页协同入口组件样板')
       await expectText(page, '业务详情页标准样板')
       await expectText(page, '新建 / 编辑表单标准样板')
-      await expectText(page, '业务弹窗标准样板')
+      await expectText(page, '局部动作弹窗标准样板')
       const implementMetrics = await page.evaluate(() => ({
         activeText:
           document
@@ -3069,6 +3070,290 @@ const scenarios = [
     },
   },
   {
+    name: 'purchase-receipts-table-control-columns-desktop',
+    path: '/erp/warehouse/inbound',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '入库管理')
+      await expectText(page, 'PR-STYLE-L1')
+      const metrics = await page.evaluate(() => {
+        const headers = Array.from(
+          document.querySelectorAll(
+            '.erp-business-module-table-card .ant-table-thead th'
+          )
+        )
+          .slice(0, 3)
+          .map((header) => {
+            const style = window.getComputedStyle(header)
+            const rect = header.getBoundingClientRect()
+            return {
+              text: header.textContent?.replace(/\s+/g, ' ').trim() || '',
+              width: rect.width,
+              scrollWidth: header.scrollWidth,
+              clientWidth: header.clientWidth,
+              paddingLeft: style.paddingLeft,
+              paddingRight: style.paddingRight,
+              textAlign: style.textAlign,
+            }
+          })
+        const scrollContainer = document.querySelector(
+          '.erp-business-module-table-card .ant-table-content, .erp-business-module-table-card .ant-table-body'
+        )
+        return {
+          headers,
+          tableOverflowX: scrollContainer
+            ? window.getComputedStyle(scrollContainer).overflowX
+            : '',
+          documentOverflow:
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+        }
+      })
+
+      assert.deepEqual(
+        metrics.headers.map((header) => header.text),
+        ['明细', '选择', '入库单号'],
+        `入库表格前置控制列表头不应继续显示为空白块: ${JSON.stringify(metrics)}`
+      )
+      for (const header of metrics.headers.slice(0, 2)) {
+        assert(
+          header.width <= 56 &&
+            header.scrollWidth <= header.clientWidth &&
+            header.textAlign === 'center',
+          `入库表格控制列表头应保持窄列、居中且不裁字: ${JSON.stringify(metrics)}`
+        )
+      }
+      assert.equal(
+        metrics.tableOverflowX,
+        'auto',
+        `入库表格横向滚动应保留在表格容器内: ${JSON.stringify(metrics)}`
+      )
+      assert.equal(
+        metrics.documentOverflow,
+        0,
+        `入库表格不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
+      )
+    },
+  },
+  {
+    name: 'purchase-receipt-create-modal-desktop',
+    path: '/erp/warehouse/inbound',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '入库管理')
+      await expectText(page, 'PR-STYLE-L1')
+      await assertPurchaseReceiptCreateModalKeyboardRecovery(page)
+
+      const modal = await openPurchaseReceiptCreateModal(page)
+      await expectText(page, '新建采购入库单')
+      await expectText(page, '入库明细')
+      await expectText(page, '单头和初始明细由后端一次创建')
+      await assertTextAbsent(page, '材料 ID')
+      await assertTextAbsent(page, '仓库 ID')
+      await assertTextAbsent(page, '单位 ID')
+
+      await modal.getByRole('button', { name: '创建草稿' }).click()
+      await expectText(page, '请填写供应商')
+      await expectText(page, '请选择材料')
+      await expectText(page, '请选择仓库')
+      await expectText(page, '请选择单位')
+      await expectText(page, '请填写入库数量')
+
+      await fillPurchaseReceiptCreateModalBoundaryValues(page, modal)
+      await assertPurchaseReceiptCreateModalMetrics(page, modal, {
+        scenarioName: 'purchase-receipt-create-modal-desktop',
+        expectedRows: 1,
+      })
+      await assertPurchaseReceiptCreateModalFocusStyles(page, modal, {
+        scenarioName: 'purchase-receipt-create-modal-desktop',
+      })
+
+      await modal.getByRole('button', { name: '添加条目' }).click()
+      await expectText(page, '明细 2')
+      await assertPurchaseReceiptCreateModalMetrics(page, modal, {
+        scenarioName: 'purchase-receipt-create-modal-desktop-after-add',
+        expectedRows: 2,
+      })
+
+      await closeBusinessFormModal(page, modal)
+      await expectText(page, 'PR-STYLE-L1')
+      await assertNoHorizontalOverflow(
+        page,
+        'purchase-receipt-create-modal-desktop-recovery'
+      )
+
+      const reopenedModal = await openPurchaseReceiptCreateModal(page)
+      await assertPurchaseReceiptCreateModalMetrics(page, reopenedModal, {
+        scenarioName: 'purchase-receipt-create-modal-desktop-reopen',
+        expectedRows: 1,
+      })
+      await closeBusinessFormModal(page, reopenedModal)
+    },
+  },
+  {
+    name: 'purchase-receipt-create-modal-dark-desktop',
+    path: '/erp/warehouse/inbound',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '入库管理')
+      await assertERPThemeMode(page, {
+        scenarioName: 'purchase-receipt-create-modal-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      const modal = await openPurchaseReceiptCreateModal(page)
+      await fillPurchaseReceiptCreateModalBoundaryValues(page, modal)
+      await assertPurchaseReceiptCreateModalMetrics(page, modal, {
+        scenarioName: 'purchase-receipt-create-modal-dark-desktop',
+        expectedRows: 1,
+      })
+      await assertPurchaseReceiptCreateModalDarkTokens(page, modal, {
+        scenarioName: 'purchase-receipt-create-modal-dark-desktop',
+      })
+      await closeBusinessFormModal(page, modal)
+    },
+  },
+  {
+    name: 'purchase-receipt-create-modal-mobile',
+    path: '/erp/warehouse/inbound',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectHeading(page, '入库管理')
+      const modal = await openPurchaseReceiptCreateModal(page)
+      await expectText(page, '新建采购入库单')
+      await fillPurchaseReceiptCreateModalBoundaryValues(page, modal)
+      await assertPurchaseReceiptCreateModalMetrics(page, modal, {
+        scenarioName: 'purchase-receipt-create-modal-mobile',
+        expectedRows: 1,
+      })
+      await assertPurchaseReceiptCreateModalMobileLayout(page, modal, {
+        scenarioName: 'purchase-receipt-create-modal-mobile',
+      })
+      await closeBusinessFormModal(page, modal)
+      await assertNoHorizontalOverflow(
+        page,
+        'purchase-receipt-create-modal-mobile-recovery'
+      )
+    },
+  },
+  {
+    name: 'purchase-receipt-add-item-modal-draft-desktop',
+    path: '/erp/warehouse/inbound',
+    auth: 'admin',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '入库管理')
+      await expectText(page, 'PR-STYLE-L1-DRAFT')
+      await expectButton(page, '添加明细')
+      await assertTextAbsent(page, '维护明细')
+
+      await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
+      await assertPurchaseReceiptActionButtonState(page, {
+        name: '添加明细',
+        disabled: true,
+        scenarioName: 'purchase-receipt-add-item-posted-disabled',
+      })
+
+      await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-CANCELLED')
+      await assertPurchaseReceiptActionButtonState(page, {
+        name: '添加明细',
+        disabled: true,
+        scenarioName: 'purchase-receipt-add-item-cancelled-disabled',
+      })
+
+      await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
+      await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
+      await assertPurchaseReceiptActionButtonState(page, {
+        name: '添加明细',
+        disabled: false,
+        scenarioName: 'purchase-receipt-add-item-draft-enabled',
+      })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: /添加\s*明细/,
+        titleText: '添加入库明细',
+        scenarioName: 'purchase-receipt-add-item-modal',
+        closeMode: 'close-button',
+      })
+
+      const modal = await openPurchaseReceiptAddItemModal(page)
+      await expectText(page, '添加入库明细')
+      await assertTextAbsent(page, '编辑入库明细')
+      await modal.getByRole('button', { name: '添加明细' }).click()
+      await expectText(page, '请选择材料')
+      await expectText(page, '请选择仓库')
+      await expectText(page, '请选择单位')
+      await expectText(page, '请填写入库数量')
+
+      await fillPurchaseReceiptAddItemModalBoundaryValues(page, modal)
+      await assertPurchaseReceiptAddItemModalMetrics(page, modal, {
+        scenarioName: 'purchase-receipt-add-item-modal-draft-desktop',
+      })
+      await modal.getByRole('button', { name: '添加明细' }).click()
+      await expectText(page, '入库明细已添加')
+      await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+      await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 2)
+      await assertNoHorizontalOverflow(
+        page,
+        'purchase-receipt-add-item-modal-draft-desktop-recovery'
+      )
+    },
+  },
+  {
+    name: 'purchase-receipt-add-item-modal-dark-desktop',
+    path: '/erp/warehouse/inbound',
+    auth: 'admin',
+    themeMode: 'dark',
+    viewport: { width: 1440, height: 900 },
+    verify: async (page) => {
+      await expectHeading(page, '入库管理')
+      await assertERPThemeMode(page, {
+        scenarioName: 'purchase-receipt-add-item-modal-dark-desktop',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+      await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
+      const modal = await openPurchaseReceiptAddItemModal(page)
+      await expectText(page, '添加入库明细')
+      await fillPurchaseReceiptAddItemModalBoundaryValues(page, modal)
+      await assertPurchaseReceiptAddItemModalMetrics(page, modal, {
+        scenarioName: 'purchase-receipt-add-item-modal-dark-desktop',
+      })
+      await assertPurchaseReceiptAddItemModalDarkTokens(page, modal, {
+        scenarioName: 'purchase-receipt-add-item-modal-dark-desktop',
+      })
+      await closeBusinessFormModal(page, modal)
+    },
+  },
+  {
+    name: 'purchase-receipt-add-item-modal-mobile',
+    path: '/erp/warehouse/inbound',
+    auth: 'admin',
+    viewport: { width: 390, height: 844 },
+    verify: async (page) => {
+      await expectHeading(page, '入库管理')
+      await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
+      const modal = await openPurchaseReceiptAddItemModal(page)
+      await expectText(page, '添加入库明细')
+      await fillPurchaseReceiptAddItemModalBoundaryValues(page, modal)
+      await assertPurchaseReceiptAddItemModalMetrics(page, modal, {
+        scenarioName: 'purchase-receipt-add-item-modal-mobile',
+      })
+      await assertPurchaseReceiptAddItemModalMobileLayout(page, modal, {
+        scenarioName: 'purchase-receipt-add-item-modal-mobile',
+      })
+      await closeBusinessFormModal(page, modal)
+      await assertNoHorizontalOverflow(
+        page,
+        'purchase-receipt-add-item-modal-mobile-recovery'
+      )
+    },
+  },
+  {
     name: 'material-master-header-desktop',
     path: '/erp/master/materials',
     auth: 'admin',
@@ -3076,6 +3361,9 @@ const scenarios = [
     verify: async (page) => {
       await expectHeading(page, '材料档案')
       await expectText(page, '样式材料')
+      await expectText(page, '默认单位')
+      await expectText(page, '只（PCS）')
+      await assertTextAbsent(page, '默认单位 ID')
       await assertBusinessPageRefreshEntrypoint(page, {
         scenarioName: 'material-master-header-desktop',
       })
@@ -3092,6 +3380,65 @@ const scenarios = [
       await assertBusinessMainTableSortableColumns(page, {
         scenarioName: 'material-master-header-desktop',
       })
+      await page.getByRole('button', { name: '新建材料' }).click()
+      const materialModal = page
+        .locator('.erp-business-action-modal--form.ant-modal:visible')
+        .last()
+      await materialModal.waitFor({ state: 'visible', timeout: 10_000 })
+      await expectText(page, '新建材料档案')
+      const materialCodeValue = await materialModal
+        .getByPlaceholder('自动生成，可按需要调整')
+        .inputValue()
+      assert(
+        /^MAT-\d{8}-\d{3}$/u.test(materialCodeValue),
+        `材料编号应自动生成，不应要求用户手填: ${materialCodeValue}`
+      )
+      await materialModal
+        .locator('.erp-material-category-suggested-input')
+        .waitFor({ state: 'visible', timeout: 10_000 })
+      await materialModal
+        .locator('.erp-material-color-suggested-input')
+        .waitFor({ state: 'visible', timeout: 10_000 })
+      const categoryInput = materialModal.locator(
+        '.erp-material-category-suggested-input input'
+      )
+      await categoryInput.fill('面')
+      let suggestionDropdown = page
+        .locator('.ant-select-dropdown:visible')
+        .last()
+      await suggestionDropdown
+        .locator('.ant-select-item-option-content', { hasText: /^面料$/u })
+        .first()
+        .waitFor({ state: 'visible', timeout: 10_000 })
+      const categoryDropdownBackground = await suggestionDropdown.evaluate(
+        (element) => window.getComputedStyle(element).backgroundColor
+      )
+      assert(
+        isLightSurfaceColor(categoryDropdownBackground),
+        `材料分类候选浮层不应退回浏览器黑底样式: ${categoryDropdownBackground}`
+      )
+      await page.keyboard.press('Escape')
+
+      const colorInput = materialModal.locator(
+        '.erp-material-color-suggested-input input'
+      )
+      await colorInput.fill('米')
+      suggestionDropdown = page.locator('.ant-select-dropdown:visible').last()
+      await suggestionDropdown
+        .locator('.ant-select-item-option-content', { hasText: /^米白$/u })
+        .first()
+        .waitFor({ state: 'visible', timeout: 10_000 })
+      assert(
+        isLightSurfaceColor(
+          await suggestionDropdown.evaluate(
+            (element) => window.getComputedStyle(element).backgroundColor
+          )
+        ),
+        '材料颜色候选浮层不应退回浏览器黑底样式'
+      )
+      await expectText(page, '只（PCS）')
+      await assertTextAbsent(page, '默认单位 ID')
+      await closeBusinessFormModal(page, materialModal)
       await assertNoHorizontalOverflow(page, 'material-master-header-desktop')
     },
   },
@@ -3183,6 +3530,11 @@ const scenarios = [
     auth: 'admin',
     viewport: { width: 1440, height: 900 },
     verify: async (page) => {
+      await seedBusinessCollaborationOverflowTasks(page, {
+        sourceType: 'accessories-purchase',
+        currentSourceID: 1,
+      })
+      await page.reload({ waitUntil: 'domcontentloaded' })
       await expectHeading(page, '采购订单')
       await expectText(page, '本页协同')
       const purchaseOrderRow = page
@@ -3200,6 +3552,9 @@ const scenarios = [
         scenarioName: 'business-collaboration-purchase-selected-desktop',
         expectCurrentRecord: true,
         checkDesktopResize: false,
+        checkResizeHandleHover: false,
+        expectedOverflowNote: '仅显示前 6 条，还有 6 条',
+        expectedTabTexts: ['本页待办12', '当前记录2', '阻塞异常4'],
       })
       await assertNoHorizontalOverflow(
         page,
@@ -3421,6 +3776,11 @@ const scenarios = [
       await assertBusinessMainTableSortableColumns(page, {
         scenarioName: 'business-v1-sales-orders',
       })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建订单',
+        titleText: '新建销售订单',
+        scenarioName: 'business-v1-sales-orders',
+      })
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建订单',
         titleText: '新建销售订单',
@@ -3491,7 +3851,8 @@ const scenarios = [
       await page.getByRole('button', { name: '新建产品' }).click()
       await expectText(page, '新建产品')
       await expectText(page, '产品编号')
-      await expectText(page, '默认单位 ID')
+      await expectText(page, '默认单位')
+      await assertTextAbsent(page, '默认单位 ID')
       await closeBusinessFormModal(
         page,
         page
@@ -3507,7 +3868,7 @@ const scenarios = [
       await page.getByRole('button', { name: '新建产品规格' }).click()
       await expectText(page, '新建产品规格')
       await expectText(page, 'SKU 编号')
-      await expectText(page, '产品 ID')
+      await expectText(page, '产品')
       await closeBusinessFormModal(
         page,
         page
@@ -3546,7 +3907,7 @@ const scenarios = [
       await page.getByRole('button', { name: '新建草稿' }).click()
       await expectText(page, '新建 BOM 草稿')
       await expectText(page, 'BOM 版本')
-      await expectText(page, '产品 ID')
+      await expectText(page, '产品')
       await page.keyboard.press('Escape')
       await assertNoHorizontalOverflow(page, 'business-standard-bom')
 
@@ -3587,6 +3948,52 @@ const scenarios = [
       })
       await assertNoHorizontalOverflow(page, 'business-standard-inventory')
 
+      await gotoScenarioPath(page, '/erp/production/quality-inspections', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '来料质检')
+      await expectButton(page, '新建质检单')
+      await expectButton(page, '导出当前结果')
+      await expectButton(page, '列顺序')
+      await expectButton(page, '批量删除')
+      await expectButton(page, '回收站')
+      await expectText(page, 'quality_inspections')
+      await expectText(page, '不合格退供应商仍走采购退货')
+      await expectText(page, 'QI-STYLE-L1')
+      await expectText(page, 'PR-STYLE-L1')
+      await expectText(page, 'INV-LOT-001')
+      await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-v1-quality-inspections',
+      })
+      await assertBusinessMainTableHasNoOperationColumn(page, {
+        scenarioName: 'business-v1-quality-inspections',
+      })
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'business-v1-quality-inspections',
+        unsortableHeaders: ['判定备注'],
+      })
+      await assertBusinessToolbarDisabledButtons(page, {
+        scenarioName: 'business-v1-quality-inspections',
+        labels: ['批量删除', '回收站'],
+      })
+      await verifyBusinessModuleColumnOrderDialog(page, {
+        moduleKey: 'quality-inspections',
+        heading: '来料质检',
+      })
+      await page.getByRole('row').filter({ hasText: 'QI-STYLE-L1' }).click()
+      await expectText(page, 'QI-STYLE-L1 / 批次 401')
+      await expectButton(page, '判定合格')
+      await expectButton(page, '判定不合格')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建质检单',
+        titleText: '新建来料质检单',
+        minFieldCount: 7,
+        screenshotName: 'business-v1-quality-inspection-create-form-modal',
+        expectedTexts: ['采购入库单', '采购入库行', '批次', '材料', '仓库'],
+        absentTexts: ['采购入库单 ID', '批次 ID', '材料 ID', '仓库 ID'],
+      })
+      await assertNoHorizontalOverflow(page, 'business-v1-quality-inspections')
+
       await gotoScenarioPath(page, '/erp/warehouse/shipments', {
         waitUntil: 'domcontentloaded',
       })
@@ -3603,7 +4010,7 @@ const scenarios = [
         titleText: '新建出货单',
         minFieldCount: 12,
         screenshotName: 'business-v1-shipment-create-form-modal',
-        expectedTexts: ['出货明细', '从销售订单导入', '产品 ID', '仓库 ID'],
+        expectedTexts: ['出货明细', '从销售订单导入', '产品', '仓库'],
         afterOpen: async (modal) => {
           await verifySourceImportPicker(page, {
             parentModal: modal,
@@ -3672,22 +4079,82 @@ const scenarios = [
       await assertTextAbsent(page, '产品编号快照')
       await assertNoHorizontalOverflow(page, 'business-v1-processing-contracts')
 
-      await gotoScenarioPath(page, '/erp/production/scheduling', {
-        waitUntil: 'domcontentloaded',
-      })
-      await expectHeading(page, '生产排程')
-      await expectButton(page, '新建排程')
-      await expectText(page, '生成生产任务')
-      await assertTextAbsent(page, '打印单据')
-      await assertTextAbsent(page, '加工合同打印')
-      await assertBusinessToolbarDisabledButtons(page, {
+      const verifyFormalShellPreviewPage = async ({
+        path,
+        heading,
+        previewButton,
+        boundaryAction,
+        absentTexts,
+        rowText,
+        scenarioName,
+        expectedModalTexts,
+      }) => {
+        await gotoScenarioPath(page, path, {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, heading)
+        await expectButton(page, previewButton)
+        await expectText(page, boundaryAction)
+        await expectButton(page, '预览导出待接入')
+        assert(
+          await page
+            .getByRole('button', { name: '预览导出待接入' })
+            .isDisabled(),
+          `${scenarioName} 待接入预览页不应允许导出业务数据`
+        )
+        for (const text of absentTexts) {
+          await assertTextAbsent(page, text)
+        }
+        await assertTextAbsent(page, '导出当前结果')
+        await assertTextAbsent(page, '导出预览字段')
+        await assertTextAbsent(page, '打印单据')
+        await assertTextAbsent(page, '加工合同打印')
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '暂无远端数据刷新')
+        await assertTextAbsent(page, '当前页面数据已刷新')
+        await assertTextAbsent(page, '批量删除')
+        await assertTextAbsent(page, '回收站')
+        await expectNoButton(page, '删除')
+        await verifyFormalShellRowDoubleClickEditModal(page, {
+          rowText,
+          scenarioName,
+          expectedTexts: expectedModalTexts,
+        })
+        await assertNoHorizontalOverflow(page, scenarioName)
+      }
+
+      await verifyFormalShellPreviewPage({
+        path: '/erp/production/scheduling',
+        heading: '生产排程',
+        previewButton: '预览排程字段',
+        boundaryAction: '查看排程接入边界',
+        absentTexts: ['新建排程', '生成生产任务'],
+        rowText: '生产排程字段预览',
         scenarioName: 'business-formal-production-scheduling',
-        labels: ['批量删除', '回收站'],
+        expectedModalTexts: ['销售订单', '产品 / BOM', '排程日期'],
       })
-      await assertNoHorizontalOverflow(
-        page,
-        'business-formal-production-scheduling'
-      )
+
+      await verifyFormalShellPreviewPage({
+        path: '/erp/production/exceptions',
+        heading: '生产异常',
+        previewButton: '预览异常字段',
+        boundaryAction: '查看异常接入边界',
+        absentTexts: ['新建异常', '关闭异常', '生成异常处理'],
+        rowText: '生产异常字段预览',
+        scenarioName: 'business-formal-production-exceptions',
+        expectedModalTexts: ['异常类型', '来源任务', '责任角色'],
+      })
+
+      await verifyFormalShellPreviewPage({
+        path: '/erp/warehouse/shipping-release',
+        heading: '出货放行',
+        previewButton: '预览放行字段',
+        boundaryAction: '查看放行接入边界',
+        absentTexts: ['新建放行单', '生成出货放行', '确认放行'],
+        rowText: '出货放行字段预览',
+        scenarioName: 'business-formal-shipping-release',
+        expectedModalTexts: ['销售订单', '出货批次', '放行结论'],
+      })
 
       await gotoScenarioPath(page, '/erp/production/progress', {
         waitUntil: 'domcontentloaded',
@@ -3784,10 +4251,51 @@ const scenarios = [
         'business-v1-receivables-dark-modal'
       )
 
+      await verifyFormalShellPreviewPage({
+        path: '/erp/production/exceptions',
+        heading: '生产异常',
+        previewButton: '预览异常字段',
+        boundaryAction: '查看异常接入边界',
+        absentTexts: ['新建异常', '关闭异常', '生成异常处理'],
+        rowText: '生产异常字段预览',
+        scenarioName: 'business-formal-production-exceptions-dark',
+        expectedModalTexts: ['异常类型', '来源任务', '责任角色'],
+      })
+      await assertERPThemeMode(page, {
+        scenarioName: 'business-formal-production-exceptions-dark',
+        expectedMode: 'dark',
+        expectedEffectiveTheme: 'dark',
+      })
+
       await page.setViewportSize({ width: 390, height: 844 })
       await page.evaluate(() => {
         window.localStorage.setItem('plush_erp_theme_mode', 'light')
       })
+      await gotoScenarioPath(page, '/erp/warehouse/shipping-release', {
+        waitUntil: 'domcontentloaded',
+      })
+      await assertERPThemeMode(page, {
+        scenarioName: 'business-formal-shipping-release-mobile',
+        expectedMode: 'light',
+        expectedEffectiveTheme: 'light',
+      })
+      await expectHeading(page, '出货放行')
+      await expectButton(page, '预览放行字段')
+      await expectButton(page, '预览导出待接入')
+      assert(
+        await page.getByRole('button', { name: '预览导出待接入' }).isDisabled(),
+        'business-formal-shipping-release-mobile 待接入预览页不应允许导出业务数据'
+      )
+      await expectText(page, '查看放行接入边界')
+      await assertTextAbsent(page, '新建放行单')
+      await assertTextAbsent(page, '生成出货放行')
+      await assertTextAbsent(page, '导出当前结果')
+      await assertTextAbsent(page, '导出预览字段')
+      await assertNoHorizontalOverflow(
+        page,
+        'business-formal-shipping-release-mobile'
+      )
+
       await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
         waitUntil: 'domcontentloaded',
       })
@@ -4097,8 +4605,29 @@ async function runScenarioOnce(browser, scenario) {
     await page.addInitScript((mockToken) => {
       localStorage.setItem('admin_access_token', mockToken)
       localStorage.setItem('admin_is_super_admin', 'true')
-      localStorage.setItem('admin_roles', '[]')
-      localStorage.setItem('admin_permissions', '[]')
+      localStorage.setItem(
+        'admin_roles',
+        JSON.stringify([
+          { role_key: 'boss', name: '老板' },
+          { role_key: 'sales', name: '业务' },
+          { role_key: 'purchase', name: '采购' },
+          { role_key: 'production', name: '生产' },
+          { role_key: 'warehouse', name: '仓库' },
+          { role_key: 'finance', name: '财务' },
+          { role_key: 'pmc', name: 'PMC' },
+          { role_key: 'quality', name: '品质' },
+        ])
+      )
+      localStorage.setItem(
+        'admin_permissions',
+        JSON.stringify([
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+          'workflow.task.approve',
+          'workflow.task.reject',
+        ])
+      )
       localStorage.setItem('admin_menus', '[]')
       localStorage.setItem('erp:last_entry_target', 'desktop')
       localStorage.setItem(
@@ -4249,6 +4778,7 @@ function resolveDelayFromReferer(request, paramName) {
 }
 
 async function installAdminRpcMocks(page) {
+  const nowUnix = () => Math.floor(Date.now() / 1000)
   const mockMenus = getNavigationSections()
     .flatMap((section) => section.items || [])
     .map((item) => ({
@@ -4297,6 +4827,26 @@ async function installAdminRpcMocks(page) {
       module: 'workflow',
     },
     {
+      permission_key: 'workflow.task.update',
+      name: '更新协同任务',
+      module: 'workflow',
+    },
+    {
+      permission_key: 'workflow.task.complete',
+      name: '完成协同任务',
+      module: 'workflow',
+    },
+    {
+      permission_key: 'workflow.task.approve',
+      name: '审批协同任务',
+      module: 'workflow',
+    },
+    {
+      permission_key: 'workflow.task.reject',
+      name: '驳回协同任务',
+      module: 'workflow',
+    },
+    {
       permission_key: 'mobile.sales.access',
       name: '进入业务岗位任务端',
       module: 'mobile',
@@ -4331,7 +4881,16 @@ async function installAdminRpcMocks(page) {
     phone: '13800138000',
     is_super_admin: true,
     disabled: false,
-    roles: [],
+    roles: [
+      { role_key: 'boss', name: '老板' },
+      { role_key: 'sales', name: '业务' },
+      { role_key: 'purchase', name: '采购' },
+      { role_key: 'production', name: '生产' },
+      { role_key: 'warehouse', name: '仓库' },
+      { role_key: 'finance', name: '财务' },
+      { role_key: 'pmc', name: 'PMC' },
+      { role_key: 'quality', name: '品质' },
+    ],
     permissions: allPermissionKeys,
     menus: mockMenus,
     erp_preferences: {
@@ -4671,6 +5230,15 @@ async function installAdminRpcMocks(page) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const warehouse = {
+      id: 1,
+      code: 'WH-STYLE-L1',
+      name: '样式仓库',
+      warehouse_type: 'RAW_MATERIAL',
+      is_active: true,
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
     const materials = Array.from({ length: 6 }, (_, index) => ({
       ...material,
       id: index + 1,
@@ -4709,6 +5277,14 @@ async function installAdminRpcMocks(page) {
         break
       case 'list_units':
         data = { units: [unit], total: 1, limit: 100, offset: 0 }
+        break
+      case 'list_warehouses':
+        data = {
+          warehouses: [warehouse],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
         break
       case 'create_customer':
       case 'update_customer':
@@ -5360,6 +5936,292 @@ async function installAdminRpcMocks(page) {
     })
   })
 
+  const purchaseReceiptItem = {
+    id: 602,
+    purchase_receipt_id: 601,
+    source_line_no: '入库行 1',
+    material_id: 1,
+    material_name_snapshot: '样式材料',
+    warehouse_id: 1,
+    warehouse_name: '样式仓库',
+    unit_id: 1,
+    quantity: '20',
+    lot_id: 401,
+    lot_no: 'INV-LOT-001',
+    unit_price: '3.50',
+    amount: '70.00',
+    note: '样式入库明细',
+    created_at: nowUnix(),
+    updated_at: nowUnix(),
+  }
+  let nextPurchaseReceiptId = 700
+  let nextPurchaseReceiptItemId = 800
+  const purchaseReceipts = [
+    {
+      id: 601,
+      receipt_no: 'PR-STYLE-L1',
+      supplier_name: '样式供应商',
+      warehouse_id: 1,
+      received_at: nowUnix(),
+      status: 'POSTED',
+      note: '样式采购入库',
+      items: [purchaseReceiptItem],
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    },
+    {
+      id: 603,
+      receipt_no: 'PR-STYLE-L1-DRAFT',
+      supplier_name: '样式草稿供应商',
+      warehouse_id: 1,
+      received_at: nowUnix(),
+      status: 'DRAFT',
+      note: '样式草稿采购入库',
+      items: [
+        {
+          ...purchaseReceiptItem,
+          id: 604,
+          purchase_receipt_id: 603,
+          source_line_no: '草稿入库行 1',
+          quantity: '12',
+          amount: '42.00',
+          note: '样式草稿入库明细',
+        },
+      ],
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    },
+    {
+      id: 605,
+      receipt_no: 'PR-STYLE-L1-CANCELLED',
+      supplier_name: '样式取消供应商',
+      warehouse_id: 1,
+      received_at: nowUnix(),
+      status: 'CANCELLED',
+      note: '样式取消采购入库',
+      items: [],
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    },
+  ]
+
+  await page.route('**/rpc/purchase', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+
+    const filteredPurchaseReceipts = () => {
+      const status = String(params.status || '').trim()
+      const keyword = String(params.keyword || '')
+        .trim()
+        .toLowerCase()
+      return purchaseReceipts.filter((receipt) => {
+        if (status && receipt.status !== status) return false
+        if (!keyword) return true
+        return [receipt.receipt_no, receipt.supplier_name]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(keyword))
+      })
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_purchase_receipts':
+        {
+          const rows = filteredPurchaseReceipts()
+          const offset = Number(params.offset || 0)
+          const limit = Number(params.limit || rows.length || 100)
+          data = {
+            purchase_receipts: rows.slice(offset, offset + limit),
+            total: rows.length,
+            limit,
+            offset,
+          }
+        }
+        break
+      case 'create_purchase_receipt_with_items':
+        {
+          const receiptId = nextPurchaseReceiptId
+          nextPurchaseReceiptId += 1
+          const receipt = {
+            ...purchaseReceipts[0],
+            ...params,
+            id: receiptId,
+            status: 'DRAFT',
+            items: Array.isArray(params.items)
+              ? params.items.map((item) => {
+                  const itemId = nextPurchaseReceiptItemId
+                  nextPurchaseReceiptItemId += 1
+                  return {
+                    ...purchaseReceiptItem,
+                    ...item,
+                    id: itemId,
+                    purchase_receipt_id: receiptId,
+                  }
+                })
+              : [],
+            created_at: nowUnix(),
+            updated_at: nowUnix(),
+          }
+          purchaseReceipts.unshift(receipt)
+          data = { purchase_receipt: receipt }
+        }
+        break
+      case 'create_purchase_receipt_draft':
+        data = {
+          purchase_receipt: {
+            ...purchaseReceipts[0],
+            ...params,
+            id: nextPurchaseReceiptId,
+            status: 'DRAFT',
+            items: [],
+          },
+        }
+        nextPurchaseReceiptId += 1
+        break
+      case 'post_purchase_receipt':
+        {
+          const receipt = purchaseReceipts.find(
+            (item) => Number(item.id) === Number(params.id)
+          )
+          if (receipt) receipt.status = 'POSTED'
+          data = {
+            purchase_receipt: receipt || { ...purchaseReceipts[0], ...params },
+          }
+        }
+        break
+      case 'cancel_purchase_receipt':
+        {
+          const receipt = purchaseReceipts.find(
+            (item) => Number(item.id) === Number(params.id)
+          )
+          if (receipt) receipt.status = 'CANCELLED'
+          data = {
+            purchase_receipt: receipt || { ...purchaseReceipts[0], ...params },
+          }
+        }
+        break
+      case 'get_purchase_receipt':
+        data = {
+          purchase_receipt:
+            purchaseReceipts.find(
+              (item) => Number(item.id) === Number(params.id)
+            ) || purchaseReceipts[0],
+        }
+        break
+      case 'add_purchase_receipt_item':
+        {
+          const receipt = purchaseReceipts.find(
+            (item) =>
+              Number(item.id) ===
+              Number(params.receipt_id || params.purchase_receipt_id)
+          )
+          const item = {
+            ...purchaseReceiptItem,
+            ...params,
+            purchase_receipt_id: Number(
+              params.receipt_id || params.purchase_receipt_id
+            ),
+            id: nextPurchaseReceiptItemId,
+            created_at: nowUnix(),
+            updated_at: nowUnix(),
+          }
+          nextPurchaseReceiptItemId += 1
+          if (receipt) {
+            receipt.items = [...(receipt.items || []), item]
+            receipt.updated_at = nowUnix()
+          }
+          data = { purchase_receipt_item: item }
+        }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
+
+  await page.route('**/rpc/quality', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    const qualityInspection = {
+      id: 701,
+      inspection_no: 'QI-STYLE-L1',
+      purchase_receipt_id: 601,
+      purchase_receipt_item_id: 602,
+      inventory_lot_id: 401,
+      material_id: 1,
+      warehouse_id: 1,
+      status: 'SUBMITTED',
+      result: '',
+      original_lot_status: 'HOLD',
+      inspected_at: 0,
+      inspector_id: null,
+      decision_note: '等待品质判定',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
+
+    let data = {}
+    switch (method) {
+      case 'list_quality_inspections':
+        data = {
+          quality_inspections: [qualityInspection],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        }
+        break
+      case 'create_quality_inspection_draft':
+        data = {
+          quality_inspection: {
+            ...qualityInspection,
+            ...params,
+            id: 702,
+            status: 'DRAFT',
+            result: '',
+          },
+        }
+        break
+      case 'submit_quality_inspection':
+      case 'pass_quality_inspection':
+      case 'reject_quality_inspection':
+      case 'cancel_quality_inspection':
+      case 'get_quality_inspection':
+        data = { quality_inspection: { ...qualityInspection, ...params } }
+        break
+      default:
+        data = {}
+        break
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data,
+        },
+      }),
+    })
+  })
+
   await page.route('**/rpc/inventory', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
@@ -5461,8 +6323,6 @@ async function installAdminRpcMocks(page) {
   const workflowBusinessStates = []
   let workflowTaskID = 1
   let workflowBusinessStateID = 1
-  const nowUnix = () => Math.floor(Date.now() / 1000)
-
   await page.route('**/rpc/business', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
@@ -5682,11 +6542,6 @@ async function expectHeading(page, text) {
   await locator.waitFor({ state: 'visible', timeout: 20_000 })
 }
 
-async function expectRole(page, role, name) {
-  const locator = page.getByRole(role, { name })
-  await locator.waitFor({ state: 'visible', timeout: 10_000 })
-}
-
 async function expectButton(page, name) {
   const locator = page.getByRole('button', { name })
   await locator.waitFor({ state: 'visible', timeout: 10_000 })
@@ -5750,56 +6605,6 @@ async function assertTextAbsent(page, text) {
   assert.equal(count, 0, `页面不应继续出现文案“${text}”，当前命中 ${count} 处`)
 }
 
-async function assertBusinessSelectionActionBarEmpty(page, { scenarioName }) {
-  const actionBar = page.locator('.erp-business-module-current-action')
-  await actionBar.waitFor({ state: 'visible', timeout: 10_000 })
-  await actionBar.getByText('已选 0 条').waitFor({
-    state: 'visible',
-    timeout: 10_000,
-  })
-  await actionBar.getByText('请先单击或勾选一条记录').waitFor({
-    state: 'visible',
-    timeout: 10_000,
-  })
-
-  const disabledButtonChecks = [
-    { label: '清空已选' },
-    { label: '查看' },
-    { label: '关联单据' },
-    { label: '创建协同任务' },
-    { label: '更多操作' },
-    { label: '删除' },
-    { label: '批量删除' },
-  ]
-  const buttonMetrics = await actionBar.evaluate((element) =>
-    Array.from(element.querySelectorAll('button')).map((button) => ({
-      text: String(button.textContent || '')
-        .replace(/\s+/g, ' ')
-        .trim(),
-      ariaLabel: button.getAttribute('aria-label') || '',
-      disabled: button.disabled,
-    }))
-  )
-  for (const { label, ariaLabel } of disabledButtonChecks) {
-    const button = buttonMetrics.find(
-      (item) => item.text === label || item.ariaLabel === ariaLabel
-    )
-    assert(
-      button,
-      `${scenarioName} 未选中记录时缺少 ${label} 按钮: ${JSON.stringify(buttonMetrics)}`
-    )
-    assert(
-      button.disabled,
-      `${scenarioName} 未选中记录时 ${label} 应保持禁用: ${JSON.stringify(buttonMetrics)}`
-    )
-  }
-
-  await assertBusinessSelectionActionBarBoxModel(page, {
-    scenarioName,
-    expectedMode: 'empty',
-  })
-}
-
 async function assertOrderLifecycleActionsConsolidated(
   page,
   {
@@ -5825,7 +6630,7 @@ async function assertOrderLifecycleActionsConsolidated(
   })
   try {
     await primaryButton.waitFor({ state: 'visible', timeout: 10_000 })
-  } catch (error) {
+  } catch (_error) {
     const currentMetrics = await actionBar.evaluate((element) => ({
       textContent: String(element.textContent || '')
         .replace(/\s+/g, ' ')
@@ -5922,7 +6727,7 @@ async function assertOrderLifecycleActionsConsolidated(
   await page.keyboard.press('Escape')
 }
 
-async function assertBusinessSelectionActionBarBoxModel(
+async function _assertBusinessSelectionActionBarBoxModel(
   page,
   { scenarioName, expectedMode }
 ) {
@@ -6035,123 +6840,6 @@ async function assertBusinessSelectionActionBarBoxModel(
   assert(
     metrics.tableCard?.top > metrics.actionBar.bottom,
     `${scenarioName} 表格卡片与选中操作条发生重叠: ${JSON.stringify(metrics)}`
-  )
-}
-
-async function verifyBusinessSelectedItemsPopover(
-  page,
-  { scenarioName, expectedCount }
-) {
-  const rowCheckboxes = page.locator(
-    '.erp-business-data-table-card .ant-table-tbody .ant-table-selection-column .ant-checkbox-input'
-  )
-  const checkboxCount = await rowCheckboxes.count()
-  assert(
-    checkboxCount >= expectedCount,
-    `${scenarioName} 缺少多选明细样本: ${checkboxCount}`
-  )
-
-  for (let index = 0; index < expectedCount; index += 1) {
-    await rowCheckboxes.nth(index).click()
-  }
-
-  const actionBar = page.locator('.erp-business-module-current-action')
-  const selectionTag = actionBar.locator(
-    '.erp-business-selection-action-bar__tag'
-  )
-  await selectionTag.waitFor({ state: 'visible', timeout: 10_000 })
-  await selectionTag
-    .getByText(`已选择 ${expectedCount} 条BOM`)
-    .waitFor({ state: 'visible', timeout: 10_000 })
-  await assertBusinessSelectionActionBarBoxModel(page, {
-    scenarioName,
-    expectedMode: 'active',
-  })
-
-  await selectionTag.click()
-  const popover = page.locator('.erp-business-selected-items-popover').last()
-  await popover.waitFor({ state: 'visible', timeout: 10_000 })
-
-  const metrics = await page.evaluate(() => {
-    const popover = document.querySelector(
-      '.erp-business-selected-items-popover'
-    )
-    const actionBar = document.querySelector(
-      '.erp-business-module-current-action'
-    )
-    const tag = actionBar?.querySelector(
-      '.erp-business-selection-action-bar__tag'
-    )
-    const popoverRect = popover?.getBoundingClientRect()
-    const tagRect = tag?.getBoundingClientRect()
-    return {
-      documentWidth: document.documentElement.scrollWidth,
-      viewportWidth: window.innerWidth,
-      popover: popoverRect
-        ? {
-            width: popoverRect.width,
-            height: popoverRect.height,
-            left: popoverRect.left,
-            right: popoverRect.right,
-          }
-        : null,
-      tag: tagRect
-        ? {
-            width: tagRect.width,
-            height: tagRect.height,
-          }
-        : null,
-      chips: Array.from(
-        document.querySelectorAll('.erp-business-selected-items-popover__item')
-      ).map((node) => String(node.textContent || '').trim()),
-    }
-  })
-
-  assert(
-    metrics.popover && metrics.popover.width > 0 && metrics.popover.height > 0,
-    `${scenarioName} 已选明细浮层尺寸异常: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.tag?.width > 0 && metrics.tag?.height > 0,
-    `${scenarioName} 已选摘要 tag 尺寸异常: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    metrics.chips,
-    ['MATERIAL-BOM-001', 'MATERIAL-BOM-002', 'MATERIAL-BOM-003'],
-    `${scenarioName} 已选明细应展示全部 BOM 编号: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.documentWidth <= metrics.viewportWidth + 2,
-    `${scenarioName} 已选明细浮层导致页面横向溢出: ${JSON.stringify(metrics)}`
-  )
-}
-
-async function assertOpenDropdownInViewport(page, { scenarioName }) {
-  const metrics = await page.evaluate(() => {
-    const dropdown = document.querySelector(
-      '.ant-dropdown:not(.ant-dropdown-hidden)'
-    )
-    if (!(dropdown instanceof HTMLElement)) return null
-    const rect = dropdown.getBoundingClientRect()
-    return {
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      top: rect.top,
-      bottom: rect.bottom,
-      left: rect.left,
-      right: rect.right,
-      width: rect.width,
-      height: rect.height,
-      text: dropdown.textContent?.replace(/\s+/g, ' ').trim() || '',
-    }
-  })
-
-  assert(metrics, `${scenarioName} 未找到打开的下拉菜单`)
-  assert(
-    metrics.top >= 0 &&
-      metrics.left >= 0 &&
-      metrics.bottom <= metrics.viewport.height + 1 &&
-      metrics.right <= metrics.viewport.width + 1,
-    `${scenarioName} 下拉菜单超出视口: ${JSON.stringify(metrics)}`
   )
 }
 
@@ -7073,8 +7761,1118 @@ async function verifyBusinessActionFormModal(
   await modal.screenshot({
     path: path.resolve(outputDir, `${screenshotName}.png`),
   })
-  await modal.locator('.ant-modal-close').click({ force: true })
+  await closeBusinessFormModal(page, modal)
+}
+
+async function openPurchaseReceiptCreateModal(page) {
+  await page.getByRole('button', { name: /新建入库单/ }).click()
+  const modal = page
+    .locator('.erp-business-action-modal--form.ant-modal:visible')
+    .filter({ hasText: '新建采购入库单' })
+    .last()
+  await modal.waitFor({ state: 'visible', timeout: 10_000 })
+  await assertAntdModalCentered(
+    page,
+    modal,
+    'purchase-receipt-create-modal-open'
+  )
+  return modal
+}
+
+async function selectPurchaseReceiptRow(page, receiptNo) {
+  const row = page
+    .getByRole('row')
+    .filter({ has: page.getByText(receiptNo, { exact: true }) })
+    .first()
+  await row.scrollIntoViewIfNeeded()
+  await row.click()
+  await expectText(page, `${receiptNo} /`)
+  return row
+}
+
+async function assertPurchaseReceiptActionButtonState(
+  page,
+  { name, disabled, scenarioName }
+) {
+  const button = page
+    .locator('.erp-business-selection-action-bar__actions button')
+    .filter({ hasText: name })
+    .first()
+  await button.waitFor({ state: 'visible', timeout: 10_000 })
+  const metrics = await button.evaluate((node) => ({
+    text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+    disabled: Boolean(node.disabled),
+    ariaDisabled: node.getAttribute('aria-disabled') || '',
+    width: node.getBoundingClientRect().width,
+    height: node.getBoundingClientRect().height,
+  }))
+  assert.equal(
+    metrics.disabled,
+    disabled,
+    `${scenarioName} 操作按钮禁用态不符合状态边界: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.width >= 72 && metrics.height >= 24,
+    `${scenarioName} 操作按钮尺寸异常: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function assertPurchaseReceiptRowItemCount(
+  page,
+  receiptNo,
+  expectedCount
+) {
+  const row = page
+    .getByRole('row')
+    .filter({ has: page.getByText(receiptNo, { exact: true }) })
+    .first()
+  await row.waitFor({ state: 'visible', timeout: 10_000 })
+  const metrics = await row.evaluate((node) => ({
+    text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
+    cells: Array.from(node.querySelectorAll('td')).map((cell) =>
+      cell.textContent?.replace(/\s+/g, ' ').trim()
+    ),
+  }))
+  assert(
+    metrics.cells.includes(String(expectedCount)),
+    `${receiptNo} 明细行数未刷新为 ${expectedCount}: ${JSON.stringify(metrics)}`
+  )
+}
+
+async function openPurchaseReceiptAddItemModal(page) {
+  await page
+    .locator('.erp-business-selection-action-bar__actions button')
+    .filter({ hasText: '添加明细' })
+    .first()
+    .click()
+  const modal = page
+    .locator('.erp-business-action-modal--form.ant-modal:visible')
+    .filter({ hasText: '添加入库明细' })
+    .last()
+  await modal.waitFor({ state: 'visible', timeout: 10_000 })
+  await assertAntdModalCentered(
+    page,
+    modal,
+    'purchase-receipt-add-item-modal-open'
+  )
+  return modal
+}
+
+async function assertPurchaseReceiptCreateModalKeyboardRecovery(page) {
+  await assertBusinessFormModalKeyboardRecovery(page, {
+    triggerName: /新建入库单/,
+    titleText: '新建采购入库单',
+    scenarioName: 'purchase-receipt-create-modal',
+    closeMode: 'close-button',
+  })
+}
+
+async function assertBusinessFormModalKeyboardRecovery(
+  page,
+  { triggerName, titleText, scenarioName, closeMode = 'escape' }
+) {
+  const trigger = page.getByRole('button', { name: triggerName })
+  await trigger.focus()
+  await page.keyboard.press('Enter')
+  const modal = page
+    .locator('.erp-business-action-modal--form.ant-modal:visible')
+    .filter({ hasText: titleText })
+    .last()
+  await modal.waitFor({ state: 'visible', timeout: 10_000 })
+  await page.waitForFunction(
+    (text) => {
+      const modals = Array.from(
+        document.querySelectorAll('.erp-business-action-modal--form.ant-modal')
+      ).filter((node) => {
+        const rect = node.getBoundingClientRect()
+        const style = window.getComputedStyle(node)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          node.textContent?.includes(text)
+        )
+      })
+      const modalNode = modals.at(-1)
+      const root = modalNode?.closest('.ant-modal-root') || modalNode
+      return (
+        modalNode &&
+        document.activeElement instanceof Element &&
+        root?.contains(document.activeElement) &&
+        document.activeElement !== document.body
+      )
+    },
+    titleText,
+    { timeout: 2_000 }
+  )
+
+  const openedFocusMetric = await modal.evaluate((node) => {
+    const root = node.closest('.ant-modal-root') || node
+    const { activeElement } = document
+    const dialog = node.closest('[role="dialog"]') || node
+    return {
+      ariaModal:
+        dialog.getAttribute('aria-modal') ||
+        node.getAttribute('aria-modal') ||
+        '',
+      activeTagName: activeElement?.tagName || '',
+      activeClassName: String(activeElement?.className || ''),
+      activeText: activeElement?.textContent?.replace(/\s+/g, ' ').trim() || '',
+      activeInsideModal:
+        activeElement instanceof Element && root.contains(activeElement),
+      activeIsBody: activeElement === document.body,
+    }
+  })
+  assert.equal(
+    openedFocusMetric.ariaModal,
+    'true',
+    `${scenarioName} 业务弹窗应声明 aria-modal=true: ${JSON.stringify(openedFocusMetric)}`
+  )
+  assert(
+    openedFocusMetric.activeInsideModal && !openedFocusMetric.activeIsBody,
+    `${scenarioName} 业务弹窗打开后焦点未进入弹窗: ${JSON.stringify(openedFocusMetric)}`
+  )
+
+  let tabFocusMetric = null
+  for (let i = 0; i < 8; i += 1) {
+    await page.keyboard.press('Tab')
+    tabFocusMetric = await modal.evaluate((node) => {
+      const root = node.closest('.ant-modal-root') || node
+      const { activeElement } = document
+      const activeRect =
+        activeElement instanceof Element
+          ? activeElement.getBoundingClientRect()
+          : null
+      return {
+        activeTagName: activeElement?.tagName || '',
+        activeClassName: String(activeElement?.className || ''),
+        activeText:
+          activeElement?.textContent?.replace(/\s+/g, ' ').trim() || '',
+        activeInsideModal:
+          activeElement instanceof Element && root.contains(activeElement),
+        activeVisible: Boolean(
+          activeRect && activeRect.width > 0 && activeRect.height > 0
+        ),
+        activeIsControl:
+          activeElement instanceof Element &&
+          activeElement.matches(
+            'button, input, textarea, [role="combobox"], [role="button"], .ant-select-selection-search-input'
+          ),
+      }
+    })
+    if (
+      tabFocusMetric.activeInsideModal &&
+      tabFocusMetric.activeVisible &&
+      tabFocusMetric.activeIsControl
+    ) {
+      break
+    }
+  }
+  assert(
+    tabFocusMetric?.activeInsideModal &&
+      tabFocusMetric.activeVisible &&
+      tabFocusMetric.activeIsControl,
+    `${scenarioName} Tab 未进入业务弹窗内可操作控件: ${JSON.stringify(tabFocusMetric)}`
+  )
+
+  if (closeMode === 'close-button') {
+    await modal.locator('.ant-modal-close').focus()
+    await page.keyboard.press('Enter')
+  } else {
+    await page.keyboard.press('Escape')
+  }
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  await trigger.waitFor({ state: 'visible', timeout: 10_000 })
+  const focusMetric = await trigger.evaluate((node) => ({
+    activeText: document.activeElement?.textContent?.replace(/\s+/g, ' '),
+    activeIsTrigger: document.activeElement === node,
+    buttonText: node.textContent?.replace(/\s+/g, ' '),
+  }))
+  assert(
+    focusMetric.activeIsTrigger,
+    `${scenarioName} 业务弹窗关闭后焦点未回到触发按钮: ${JSON.stringify(focusMetric)}`
+  )
+}
+
+async function fillPurchaseReceiptCreateModalBoundaryValues(page, modal) {
+  await modal.locator('input#receipt_no').fill('PR-L1-LONG-0123456789012345')
+  await modal
+    .locator('input#supplier_name')
+    .fill('样式供应商-超长名称-ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789')
+  await modal
+    .locator('textarea#note')
+    .first()
+    .fill('采购入库整单创建 L1 头部备注，验证长文本不会撑开弹窗。')
+
+  await choosePurchaseReceiptModalOption(page, modal, '材料', 'MAT-STYLE-L1')
+  await choosePurchaseReceiptModalOption(page, modal, '仓库', 'WH-STYLE-L1')
+  await choosePurchaseReceiptModalOption(page, modal, '单位', 'PCS')
+  await fillPurchaseReceiptModalGridField(modal, '入库数量', '1234567890.1234')
+  await choosePurchaseReceiptModalOption(page, modal, '批次', 'INV-LOT-001')
+  await fillPurchaseReceiptModalGridField(
+    modal,
+    '批次号',
+    'LOT-L1-ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789'
+  )
+  await fillPurchaseReceiptModalGridField(
+    modal,
+    '来源行号',
+    'SOURCE-LINE-L1-ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789'
+  )
+  await fillPurchaseReceiptModalGridField(modal, '单价', '99999999.1234')
+  await fillPurchaseReceiptModalGridField(modal, '金额', '123456789012.34')
+  await fillPurchaseReceiptModalGridField(
+    modal,
+    '备注',
+    '明细长备注 ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789，验证横向滚动与相邻区域。'
+  )
+}
+
+async function fillPurchaseReceiptAddItemModalBoundaryValues(page, modal) {
+  await choosePurchaseReceiptAddItemModalOption(
+    page,
+    modal,
+    '材料',
+    'MAT-STYLE-L1'
+  )
+  await choosePurchaseReceiptAddItemModalOption(
+    page,
+    modal,
+    '仓库',
+    'WH-STYLE-L1'
+  )
+  await choosePurchaseReceiptAddItemModalOption(page, modal, '单位', 'PCS')
+  await fillPurchaseReceiptAddItemModalField(
+    modal,
+    '入库数量',
+    '2345678901.1234'
+  )
+  await choosePurchaseReceiptAddItemModalOption(
+    page,
+    modal,
+    '批次',
+    'INV-LOT-001'
+  )
+  await fillPurchaseReceiptAddItemModalField(
+    modal,
+    '批次号',
+    'ADD-L1-LOT-ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789'
+  )
+  await fillPurchaseReceiptAddItemModalField(
+    modal,
+    '来源行号',
+    'ADD-L1-SOURCE-LINE-ABCDEFGHIJKLMNOPQRSTUVWXYZ-0123456789'
+  )
+  await fillPurchaseReceiptAddItemModalField(modal, '单价', '88888888.1234')
+  await fillPurchaseReceiptAddItemModalField(modal, '金额', '234567890123.45')
+  await fillPurchaseReceiptAddItemModalField(
+    modal,
+    '备注',
+    '添加入库明细 L1 长备注 ABCDEFGHIJKLMNOPQRSTUVWXYZ 0123456789，验证单行弹窗不伪装批量维护。'
+  )
+}
+
+async function choosePurchaseReceiptModalOption(
+  page,
+  modal,
+  label,
+  optionText
+) {
+  const field = purchaseReceiptModalGridField(modal, label)
+  await field.locator('.ant-select-selector').click()
+  const searchInput = field.locator('.ant-select-selection-search-input')
+  await searchInput.fill(optionText)
+  const dropdown = page
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
+  await dropdown
+    .locator('.ant-select-item-option')
+    .filter({ hasText: optionText })
+    .first()
+    .click()
+}
+
+async function fillPurchaseReceiptModalGridField(modal, label, value) {
+  const field = purchaseReceiptModalGridField(modal, label)
+  await field.locator('input,textarea').first().fill(value)
+}
+
+function purchaseReceiptModalGridField(modal, label) {
+  return modal
+    .locator('.erp-master-contact-list__grid .ant-form-item')
+    .filter({ hasText: label })
+    .first()
+}
+
+async function choosePurchaseReceiptAddItemModalOption(
+  page,
+  modal,
+  label,
+  optionText
+) {
+  const field = purchaseReceiptAddItemModalField(modal, label)
+  await field.locator('.ant-select-selector').click()
+  const searchInput = field.locator('.ant-select-selection-search-input')
+  await searchInput.fill(optionText)
+  const dropdown = page
+    .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    .last()
+  await dropdown
+    .locator('.ant-select-item-option')
+    .filter({ hasText: optionText })
+    .first()
+    .click()
+}
+
+async function fillPurchaseReceiptAddItemModalField(modal, label, value) {
+  const field = purchaseReceiptAddItemModalField(modal, label)
+  await field.locator('input,textarea').first().fill(value)
+}
+
+function purchaseReceiptAddItemModalField(modal, label) {
+  return modal
+    .locator('.erp-business-action-form .ant-form-item')
+    .filter({ hasText: label })
+    .first()
+}
+
+async function assertPurchaseReceiptCreateModalMetrics(
+  page,
+  modal,
+  { scenarioName, expectedRows }
+) {
+  await modal
+    .locator('.erp-master-contact-list__row')
+    .nth(expectedRows - 1)
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  const metrics = await modal.evaluate((node) => {
+    const body = node.querySelector('.ant-modal-body')
+    const footer = node.querySelector('.ant-modal-footer')
+    const section = node.querySelector('.erp-master-contact-list')
+    const itemRows = Array.from(
+      node.querySelectorAll('.erp-master-contact-list__row')
+    )
+    const grids = Array.from(
+      node.querySelectorAll('.erp-master-contact-list__grid')
+    ).map((grid) => {
+      const style = window.getComputedStyle(grid)
+      return {
+        clientWidth: grid.clientWidth,
+        scrollWidth: grid.scrollWidth,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+        gridAutoFlow: style.gridAutoFlow,
+      }
+    })
+    const fields = Array.from(
+      node.querySelectorAll('.erp-master-contact-list__grid .ant-form-item')
+    ).map((field) => {
+      const rect = field.getBoundingClientRect()
+      const control = field.querySelector(
+        '.ant-select-selector, input.ant-input, textarea.ant-input'
+      )
+      const controlRect = control?.getBoundingClientRect()
+      return {
+        text: field.textContent?.replace(/\s+/g, ' ').trim() || '',
+        width: rect.width,
+        scrollWidth: field.scrollWidth,
+        controlWidth: controlRect?.width || 0,
+        controlScrollWidth: control?.scrollWidth || 0,
+      }
+    })
+    const modalRect = node.getBoundingClientRect()
+    const footerRect = footer?.getBoundingClientRect()
+    const sectionRect = section?.getBoundingClientRect()
+    return {
+      modal: {
+        left: modalRect.left,
+        right: modalRect.right,
+        top: modalRect.top,
+        bottom: modalRect.bottom,
+        width: modalRect.width,
+      },
+      body: body
+        ? {
+            clientWidth: body.clientWidth,
+            scrollWidth: body.scrollWidth,
+            clientHeight: body.clientHeight,
+            scrollHeight: body.scrollHeight,
+          }
+        : null,
+      footer: footerRect
+        ? {
+            top: footerRect.top,
+            bottom: footerRect.bottom,
+            width: footerRect.width,
+          }
+        : null,
+      section: sectionRect
+        ? {
+            width: sectionRect.width,
+            scrollWidth: section?.scrollWidth || 0,
+          }
+        : null,
+      itemRowCount: itemRows.length,
+      grids,
+      fields,
+      footerText: footer?.textContent?.replace(/\s+/g, ' ').trim() || '',
+      footerButtons: Array.from(footer?.querySelectorAll('button') || []).map(
+        (button) =>
+          button.getAttribute('aria-label') ||
+          button.textContent?.replace(/\s+/g, '').trim() ||
+          ''
+      ),
+      visibleErrors: Array.from(
+        node.querySelectorAll('.ant-form-item-explain-error')
+      )
+        .filter((error) => {
+          const rect = error.getBoundingClientRect()
+          const style = window.getComputedStyle(error)
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden'
+          )
+        })
+        .map((error) => error.textContent?.replace(/\s+/g, ' ').trim() || ''),
+      validationText: String(node.textContent || ''),
+      documentOverflow:
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    }
+  })
+
+  assert.equal(
+    metrics.itemRowCount,
+    expectedRows,
+    `${scenarioName} 明细行数量未恢复到预期: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.modal.left >= 0 &&
+      metrics.modal.right <= metrics.viewportWidth + 1 &&
+      metrics.modal.top >= 0 &&
+      metrics.modal.bottom <= metrics.viewportHeight + 1,
+    `${scenarioName} 业务弹窗未稳定限制在视口内: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
+    `${scenarioName} 弹窗 body 出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.documentOverflow,
+    0,
+    `${scenarioName} 弹窗打开时页面级横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.footerButtons.includes('创建草稿') &&
+      metrics.footerButtons.includes('关闭'),
+    `${scenarioName} 业务弹窗底部操作区缺失: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.grids.length === expectedRows &&
+      metrics.grids.every(
+        (grid) =>
+          grid.overflowX === 'auto' &&
+          grid.overflowY === 'hidden' &&
+          grid.scrollWidth > grid.clientWidth &&
+          grid.gridAutoFlow === 'column'
+      ),
+    `${scenarioName} 入库明细应在整行 grid 内横向滚动: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.fields.every(
+      (field) =>
+        field.width >= 220 &&
+        field.scrollWidth <= field.width + 2 &&
+        field.controlWidth <= field.width + 2 &&
+        field.controlScrollWidth <= field.controlWidth + 260
+    ),
+    `${scenarioName} 长文本或宽数字撑开了明细字段: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.visibleErrors.length === 0,
+    `${scenarioName} 填充后仍残留必填校验错误: ${JSON.stringify(metrics)}`
+  )
+
+  await modal.screenshot({
+    path: path.resolve(outputDir, `${scenarioName}.png`),
+  })
+}
+
+async function assertPurchaseReceiptAddItemModalMetrics(
+  page,
+  modal,
+  { scenarioName }
+) {
+  await modal
+    .locator('.erp-business-action-form .ant-form-item')
+    .nth(9)
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  const metrics = await modal.evaluate((node) => {
+    const body = node.querySelector('.ant-modal-body')
+    const footer = node.querySelector('.ant-modal-footer')
+    const form = node.querySelector('.erp-business-action-form')
+    const fields = Array.from(
+      node.querySelectorAll('.erp-business-action-form .ant-form-item')
+    ).map((field) => {
+      const rect = field.getBoundingClientRect()
+      const control = field.querySelector(
+        '.ant-select-selector, input.ant-input, textarea.ant-input'
+      )
+      const controlRect = control?.getBoundingClientRect()
+      return {
+        text: field.textContent?.replace(/\s+/g, ' ').trim() || '',
+        width: rect.width,
+        scrollWidth: field.scrollWidth,
+        controlWidth: controlRect?.width || 0,
+        controlScrollWidth: control?.scrollWidth || 0,
+      }
+    })
+    const modalRect = node.getBoundingClientRect()
+    return {
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      modal: {
+        left: modalRect.left,
+        right: modalRect.right,
+        top: modalRect.top,
+        bottom: modalRect.bottom,
+        width: modalRect.width,
+      },
+      body: body
+        ? {
+            clientWidth: body.clientWidth,
+            scrollWidth: body.scrollWidth,
+            clientHeight: body.clientHeight,
+            scrollHeight: body.scrollHeight,
+          }
+        : null,
+      form: form
+        ? {
+            clientWidth: form.clientWidth,
+            scrollWidth: form.scrollWidth,
+          }
+        : null,
+      footerButtons: Array.from(footer?.querySelectorAll('button') || []).map(
+        (button) => button.textContent?.replace(/\s+/g, '').trim() || ''
+      ),
+      fields,
+      visibleErrors: Array.from(
+        node.querySelectorAll('.ant-form-item-explain-error')
+      )
+        .filter((error) => {
+          const rect = error.getBoundingClientRect()
+          const style = window.getComputedStyle(error)
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden'
+          )
+        })
+        .map((error) => error.textContent?.replace(/\s+/g, ' ').trim() || ''),
+      documentOverflow:
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    }
+  })
+
+  assert(
+    metrics.modal.left >= 0 &&
+      metrics.modal.right <= metrics.viewportWidth + 1 &&
+      metrics.modal.top >= 0 &&
+      metrics.modal.bottom <= metrics.viewportHeight + 1,
+    `${scenarioName} 添加明细弹窗未稳定限制在视口内: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
+    `${scenarioName} 添加明细弹窗 body 出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.form && metrics.form.scrollWidth <= metrics.form.clientWidth + 1,
+    `${scenarioName} 添加明细表单出现横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.documentOverflow,
+    0,
+    `${scenarioName} 添加明细弹窗打开时页面级横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.footerButtons.includes('添加明细') &&
+      metrics.footerButtons.includes('关闭'),
+    `${scenarioName} 添加明细弹窗底部操作区缺失: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.fields.length >= 10 &&
+      metrics.fields.every(
+        (field) =>
+          field.width >= 220 &&
+          field.scrollWidth <= field.width + 2 &&
+          field.controlWidth <= field.width + 2 &&
+          field.controlScrollWidth <= field.controlWidth + 280
+      ),
+    `${scenarioName} 长文本或宽数字撑开了添加明细字段: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.visibleErrors.length === 0,
+    `${scenarioName} 填充后仍残留必填校验错误: ${JSON.stringify(metrics)}`
+  )
+
+  await modal.screenshot({
+    path: path.resolve(outputDir, `${scenarioName}.png`),
+  })
+}
+
+async function assertPurchaseReceiptAddItemModalDarkTokens(
+  page,
+  modal,
+  { scenarioName }
+) {
+  const metrics = await modal.evaluate((node) => {
+    const content = node.querySelector('.ant-modal-content')
+    const header = node.querySelector('.ant-modal-header')
+    const body = node.querySelector('.ant-modal-body')
+    const footer = node.querySelector('.ant-modal-footer')
+    const title = node.querySelector('.erp-business-action-modal__title span')
+    const subtitle = node.querySelector(
+      '.erp-business-action-modal__title small'
+    )
+    const form = node.querySelector('.erp-business-action-form')
+    const input = node.querySelector('input.ant-input')
+    const textarea = node.querySelector('textarea.ant-input')
+    const select = node.querySelector('.ant-select-selector')
+    const read = (target) => {
+      if (!target) return null
+      const style = window.getComputedStyle(target)
+      return {
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+        color: style.color,
+      }
+    }
+    return {
+      rootTheme: document.documentElement.dataset.erpTheme || '',
+      content: read(content),
+      header: read(header),
+      body: read(body),
+      footer: read(footer),
+      title: read(title),
+      subtitle: read(subtitle),
+      form: read(form),
+      input: read(input),
+      textarea: read(textarea),
+      select: read(select),
+    }
+  })
+
+  assert.equal(
+    metrics.rootTheme,
+    'dark',
+    `${scenarioName} 未进入暗色主题: ${JSON.stringify(metrics)}`
+  )
+  for (const [key, value] of Object.entries(metrics)) {
+    if (key === 'rootTheme') continue
+    if (!value) continue
+    assert(
+      value.backgroundColor !== 'rgb(255, 255, 255)' &&
+        value.color !== 'rgb(23, 32, 51)',
+      `${scenarioName} ${key} 仍像浅色 token: ${JSON.stringify(metrics)}`
+    )
+  }
+  await assertThemeReadable(page, {
+    scenarioName,
+    selector: '.erp-business-action-modal--form .ant-modal-content',
+  })
+}
+
+async function assertPurchaseReceiptAddItemModalMobileLayout(
+  page,
+  modal,
+  { scenarioName }
+) {
+  const metrics = await modal.evaluate((node) => {
+    const content = node.querySelector('.ant-modal-content')
+    const body = node.querySelector('.ant-modal-body')
+    const footer = node.querySelector('.ant-modal-footer')
+    const form = node.querySelector('.erp-business-action-form')
+    const firstField = form?.querySelector('.ant-form-item')
+    const footerButtons = Array.from(footer?.querySelectorAll('button') || [])
+    const modalRect = node.getBoundingClientRect()
+    const contentRect = content?.getBoundingClientRect()
+    const footerRect = footer?.getBoundingClientRect()
+    const firstFieldRect = firstField?.getBoundingClientRect()
+    const footerStyle = footer ? window.getComputedStyle(footer) : null
+    return {
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      modal: {
+        left: modalRect.left,
+        right: modalRect.right,
+        top: modalRect.top,
+        bottom: modalRect.bottom,
+        width: modalRect.width,
+      },
+      content: contentRect
+        ? {
+            height: contentRect.height,
+            bottom: contentRect.bottom,
+          }
+        : null,
+      body: body
+        ? {
+            clientHeight: body.clientHeight,
+            scrollHeight: body.scrollHeight,
+            clientWidth: body.clientWidth,
+            scrollWidth: body.scrollWidth,
+          }
+        : null,
+      form: form
+        ? {
+            clientWidth: form.clientWidth,
+            scrollWidth: form.scrollWidth,
+          }
+        : null,
+      footer: footerRect
+        ? {
+            top: footerRect.top,
+            bottom: footerRect.bottom,
+            width: footerRect.width,
+            display: footerStyle?.display || '',
+            justifyContent: footerStyle?.justifyContent || '',
+          }
+        : null,
+      footerButtons: footerButtons.map((button) => {
+        const rect = button.getBoundingClientRect()
+        return {
+          text: button.textContent?.replace(/\s+/g, '').trim() || '',
+          width: rect.width,
+          height: rect.height,
+        }
+      }),
+      firstField: firstFieldRect
+        ? {
+            width: firstFieldRect.width,
+            left: firstFieldRect.left,
+            right: firstFieldRect.right,
+          }
+        : null,
+    }
+  })
+
+  assert(
+    metrics.modal.left >= 0 &&
+      metrics.modal.right <= metrics.viewport.width + 1 &&
+      metrics.modal.top >= 0 &&
+      metrics.modal.bottom <= metrics.viewport.height + 1,
+    `${scenarioName} 移动端添加明细弹窗超出视口: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.content && metrics.content.bottom <= metrics.viewport.height + 1,
+    `${scenarioName} 移动端添加明细内容高度超出视口: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.body &&
+      metrics.body.scrollHeight > metrics.body.clientHeight &&
+      metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
+    `${scenarioName} 移动端添加明细 body 应纵向滚动且不横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.form && metrics.form.scrollWidth <= metrics.form.clientWidth + 1,
+    `${scenarioName} 移动端添加明细表单不应横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.footerButtons.length >= 2 &&
+      metrics.footerButtons.every(
+        (button) => button.width >= 120 && button.height >= 34
+      ),
+    `${scenarioName} 移动端添加明细底部按钮尺寸异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.firstField &&
+      metrics.firstField.left >= 0 &&
+      metrics.firstField.right <= metrics.viewport.width + 1,
+    `${scenarioName} 移动端添加明细首字段不可被弹窗裁切: ${JSON.stringify(metrics)}`
+  )
+
+  await modal.screenshot({
+    path: path.resolve(outputDir, `${scenarioName}.png`),
+  })
+}
+
+async function assertPurchaseReceiptCreateModalFocusStyles(
+  page,
+  modal,
+  { scenarioName }
+) {
+  const targets = [
+    {
+      label: '入库单号',
+      locator: modal.locator('input#receipt_no'),
+    },
+    {
+      label: '头部备注',
+      locator: modal.locator('textarea#note').first(),
+    },
+    {
+      label: '材料下拉',
+      locator: modal
+        .locator('.erp-master-contact-list__grid .ant-form-item')
+        .filter({ hasText: '材料' })
+        .first()
+        .locator('.ant-select-selection-search-input'),
+    },
+    {
+      label: '入库数量',
+      locator: purchaseReceiptModalGridField(modal, '入库数量')
+        .locator('input.ant-input')
+        .first(),
+    },
+  ]
+
+  const checked = []
+  for (const target of targets) {
+    await target.locator.waitFor({ state: 'visible', timeout: 10_000 })
+    await target.locator.evaluate((node) => {
+      node.focus({ preventScroll: true })
+    })
+    await page.waitForTimeout(120)
+    const metrics = await target.locator.evaluate((node, label) => {
+      let focusedControl = node
+      if (
+        !node.matches('.ant-select-selector') &&
+        !node.matches('.ant-input-affix-wrapper')
+      ) {
+        focusedControl =
+          node.closest('.ant-select')?.querySelector('.ant-select-selector') ||
+          node.closest('.ant-input-affix-wrapper') ||
+          node.closest('.ant-input-number') ||
+          node.closest('.ant-picker') ||
+          node
+      }
+      const style = window.getComputedStyle(focusedControl)
+      const rect = focusedControl.getBoundingClientRect()
+      return {
+        label,
+        tagName: focusedControl.tagName,
+        className: String(focusedControl.className || ''),
+        borderColor: style.borderColor,
+        boxShadow: style.boxShadow,
+        width: rect.width,
+        height: rect.height,
+        matchesFocus:
+          focusedControl.matches(':focus') ||
+          Boolean(focusedControl.querySelector(':focus')),
+      }
+    }, target.label)
+    checked.push(metrics)
+  }
+
+  assert.equal(
+    checked.length,
+    targets.length,
+    `${scenarioName} 未完整验证采购入库弹窗 focus 控件: ${JSON.stringify(checked)}`
+  )
+  checked.forEach((metrics) => {
+    assert(
+      metrics.matchesFocus && metrics.width >= 120 && metrics.height >= 30,
+      `${scenarioName} ${metrics.label} 未获得稳定焦点: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      isAcceptedFocusBorder(metrics),
+      `${scenarioName} ${metrics.label} focus 边框未统一到绿色主题: ${JSON.stringify(metrics)}`
+    )
+    assertNoBlueFocusStyle(metrics, scenarioName)
+  })
+}
+
+async function assertPurchaseReceiptCreateModalDarkTokens(
+  page,
+  modal,
+  { scenarioName }
+) {
+  const metrics = await modal.evaluate((node) => {
+    const content = node.querySelector('.ant-modal-content')
+    const header = node.querySelector('.ant-modal-header')
+    const body = node.querySelector('.ant-modal-body')
+    const footer = node.querySelector('.ant-modal-footer')
+    const title = node.querySelector('.erp-business-action-modal__title span')
+    const subtitle = node.querySelector(
+      '.erp-business-action-modal__title small'
+    )
+    const section = node.querySelector('.erp-master-contact-list')
+    const row = node.querySelector('.erp-master-contact-list__row')
+    const input = node.querySelector('input.ant-input')
+    const select = node.querySelector('.ant-select-selector')
+    const read = (target) => {
+      if (!target) return null
+      const style = window.getComputedStyle(target)
+      return {
+        backgroundColor: style.backgroundColor,
+        borderColor: style.borderColor,
+        color: style.color,
+      }
+    }
+    return {
+      rootTheme: document.documentElement.dataset.erpTheme || '',
+      content: read(content),
+      header: read(header),
+      body: read(body),
+      footer: read(footer),
+      title: read(title),
+      subtitle: read(subtitle),
+      section: read(section),
+      row: read(row),
+      input: read(input),
+      select: read(select),
+    }
+  })
+
+  assert.equal(
+    metrics.rootTheme,
+    'dark',
+    `${scenarioName} 未进入暗色主题: ${JSON.stringify(metrics)}`
+  )
+  for (const [key, value] of Object.entries(metrics)) {
+    if (key === 'rootTheme') continue
+    if (!value) continue
+    assert(
+      value.backgroundColor !== 'rgb(255, 255, 255)' &&
+        value.color !== 'rgb(23, 32, 51)',
+      `${scenarioName} ${key} 仍像浅色 token: ${JSON.stringify(metrics)}`
+    )
+  }
+  await assertThemeReadable(page, {
+    scenarioName,
+    selector: '.erp-business-action-modal--form .ant-modal-content',
+  })
+}
+
+async function assertPurchaseReceiptCreateModalMobileLayout(
+  page,
+  modal,
+  { scenarioName }
+) {
+  const metrics = await modal.evaluate((node) => {
+    const content = node.querySelector('.ant-modal-content')
+    const body = node.querySelector('.ant-modal-body')
+    const footer = node.querySelector('.ant-modal-footer')
+    const footerButtons = Array.from(footer?.querySelectorAll('button') || [])
+    const grid = node.querySelector('.erp-master-contact-list__grid')
+    if (grid) {
+      grid.scrollLeft = 0
+    }
+    const firstField = grid?.querySelector('.ant-form-item')
+    const modalRect = node.getBoundingClientRect()
+    const contentRect = content?.getBoundingClientRect()
+    const footerRect = footer?.getBoundingClientRect()
+    const firstFieldRect = firstField?.getBoundingClientRect()
+    const footerStyle = footer ? window.getComputedStyle(footer) : null
+    return {
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      modal: {
+        left: modalRect.left,
+        right: modalRect.right,
+        top: modalRect.top,
+        bottom: modalRect.bottom,
+        width: modalRect.width,
+      },
+      content: contentRect
+        ? {
+            height: contentRect.height,
+            bottom: contentRect.bottom,
+          }
+        : null,
+      body: body
+        ? {
+            clientHeight: body.clientHeight,
+            scrollHeight: body.scrollHeight,
+            clientWidth: body.clientWidth,
+            scrollWidth: body.scrollWidth,
+          }
+        : null,
+      footer: footerRect
+        ? {
+            top: footerRect.top,
+            bottom: footerRect.bottom,
+            width: footerRect.width,
+            display: footerStyle?.display || '',
+            justifyContent: footerStyle?.justifyContent || '',
+          }
+        : null,
+      footerButtons: footerButtons.map((button) => {
+        const rect = button.getBoundingClientRect()
+        return {
+          text: button.textContent?.replace(/\s+/g, '').trim() || '',
+          width: rect.width,
+          height: rect.height,
+        }
+      }),
+      grid: grid
+        ? {
+            clientWidth: grid.clientWidth,
+            scrollWidth: grid.scrollWidth,
+            overflowX: window.getComputedStyle(grid).overflowX,
+          }
+        : null,
+      firstField: firstFieldRect
+        ? {
+            width: firstFieldRect.width,
+            left: firstFieldRect.left,
+            right: firstFieldRect.right,
+          }
+        : null,
+    }
+  })
+
+  assert(
+    metrics.modal.left >= 0 &&
+      metrics.modal.right <= metrics.viewport.width + 1 &&
+      metrics.modal.top >= 0 &&
+      metrics.modal.bottom <= metrics.viewport.height + 1,
+    `${scenarioName} 移动端弹窗超出视口: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.content && metrics.content.bottom <= metrics.viewport.height + 1,
+    `${scenarioName} 移动端弹窗内容高度超出视口: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.body &&
+      metrics.body.scrollHeight > metrics.body.clientHeight &&
+      metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
+    `${scenarioName} 移动端弹窗 body 应纵向滚动且不横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.footerButtons.length >= 2 &&
+      metrics.footerButtons.every(
+        (button) => button.width >= 120 && button.height >= 34
+      ),
+    `${scenarioName} 移动端底部按钮尺寸异常: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.grid &&
+      metrics.grid.overflowX === 'auto' &&
+      metrics.grid.scrollWidth > metrics.grid.clientWidth,
+    `${scenarioName} 移动端明细仍应由明细 grid 承接横向滚动: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.firstField &&
+      metrics.firstField.left >= 0 &&
+      metrics.firstField.right <= metrics.viewport.width + 1,
+    `${scenarioName} 移动端首个明细字段不可被弹窗裁切: ${JSON.stringify(metrics)}`
+  )
+
+  await modal.screenshot({
+    path: path.resolve(outputDir, `${scenarioName}.png`),
+  })
 }
 
 async function assertLineItemsUnifiedHorizontalScroll(
@@ -7191,7 +8989,6 @@ async function assertOperationalFactModalViewport(page, scenarioName) {
     const body = node.querySelector('.ant-modal-body')
     const form = node.querySelector('.erp-business-action-form')
     const modalRect = node.getBoundingClientRect()
-    const bodyRect = body?.getBoundingClientRect()
     const bodyStyle = body ? window.getComputedStyle(body) : null
     return {
       viewport: {
@@ -7239,8 +9036,7 @@ async function assertOperationalFactModalViewport(page, scenarioName) {
   await modal.screenshot({
     path: path.resolve(outputDir, `${scenarioName}.png`),
   })
-  await modal.locator('.ant-modal-close').click({ force: true })
-  await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  await closeBusinessFormModal(page, modal)
 }
 
 async function verifySourceImportPicker(
@@ -7539,97 +9335,6 @@ async function verifySourceImportPicker(
   await parentModal.waitFor({ state: 'visible', timeout: 10_000 })
 }
 
-async function verifyBusinessRecycleModal(
-  page,
-  {
-    screenshotName,
-    expectedColumns = [
-      '单据编号',
-      '业务对象',
-      '业务状态',
-      '删除时间',
-      '删除原因',
-    ],
-  }
-) {
-  const toolbar = page.locator('.erp-business-operation-panel').first()
-  await toolbar.getByRole('button', { name: '回收站' }).click()
-  const modal = page
-    .locator('.erp-business-action-modal--recycle.ant-modal:visible')
-    .last()
-  await modal.waitFor({ state: 'visible', timeout: 10_000 })
-  await assertAntdModalCentered(page, modal, `${screenshotName}-centered`)
-
-  const metrics = await modal.evaluate((node) => {
-    const body = node.querySelector('.ant-modal-body')
-    const table = node.querySelector('.ant-table')
-    const headers = Array.from(node.querySelectorAll('th')).map((header) =>
-      header.textContent?.replace(/\s+/g, ' ').trim()
-    )
-    const buttons = Array.from(node.querySelectorAll('button')).map((button) =>
-      button.textContent?.replace(/\s+/g, ' ').trim()
-    )
-    return {
-      className: String(node.className || ''),
-      title: node
-        .querySelector('.ant-modal-title')
-        ?.textContent?.replace(/\s+/g, ' ')
-        .trim(),
-      body: body
-        ? {
-            clientWidth: body.clientWidth,
-            scrollWidth: body.scrollWidth,
-          }
-        : null,
-      hasTable: Boolean(table),
-      headers,
-      buttons,
-      emptyText: node.textContent?.includes('回收站暂无记录') || false,
-    }
-  })
-
-  assert.equal(metrics.title, '回收站', `${screenshotName} 标题异常`)
-  assert(
-    metrics.className.includes('erp-business-action-modal--recycle'),
-    `${screenshotName} 未使用回收站弹窗标准类: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
-    `${screenshotName} 回收站弹窗出现横向溢出: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.buttons.some((button) => button.includes('批量恢复')),
-    `${screenshotName} 回收站缺少按钮 批量恢复: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    !metrics.buttons.some((button) => button === '刷新'),
-    `${screenshotName} 回收站不应重复显示刷新按钮: ${JSON.stringify(metrics)}`
-  )
-  for (const expected of expectedColumns) {
-    assert(
-      metrics.headers.some((header) => header.includes(expected)),
-      `${screenshotName} 回收站缺少列 ${expected}: ${JSON.stringify(metrics)}`
-    )
-  }
-  assert(
-    metrics.hasTable && metrics.emptyText,
-    `${screenshotName} 回收站空状态或表格异常: ${JSON.stringify(metrics)}`
-  )
-
-  await modal.screenshot({
-    path: path.resolve(outputDir, `${screenshotName}.png`),
-  })
-  await modal.locator('.ant-modal-close').click({ force: true })
-  try {
-    await modal.waitFor({ state: 'hidden', timeout: 10_000 })
-  } catch {
-    const cancelButton = modal.getByRole('button', { name: '取消' })
-    await cancelButton.click({ force: true }).catch(() => {})
-    await page.keyboard.press('Escape').catch(() => {})
-    await modal.waitFor({ state: 'hidden', timeout: 10_000 })
-  }
-}
-
 async function assertBusinessToolbarDisabledButtons(
   page,
   { scenarioName, labels = [] }
@@ -7733,7 +9438,6 @@ async function closeBusinessFormModal(page, modal) {
     .catch(() => {})
   try {
     await modal.waitFor({ state: 'hidden', timeout: 10_000 })
-    return
   } catch {
     const closeButton = modal.getByRole('button', { name: /取消|关闭/ }).last()
     await closeButton.click({ force: true }).catch(() => {})
@@ -9305,179 +11009,6 @@ async function assertAntdModalCenteredImpl(page, modalLocator, scenarioName) {
   )
 }
 
-async function assertBatchDeleteModalCountLayoutImpl(
-  page,
-  { scenarioName, screenshotName = '' }
-) {
-  await page
-    .locator('.erp-business-batch-delete-modal:visible .ant-input-data-count')
-    .last()
-    .waitFor({ state: 'visible', timeout: 10_000 })
-  await delay(100)
-
-  const metrics = await page.evaluate(() => {
-    const isVisibleModal = (modal) => {
-      const rect = modal.getBoundingClientRect()
-      const wrap = modal.closest('.ant-modal-wrap')
-      const style = window.getComputedStyle(modal)
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        !wrap?.classList.contains('ant-modal-wrap-hidden') &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden'
-      )
-    }
-    const rectOf = (node) => {
-      if (!node) return null
-      const rect = node.getBoundingClientRect()
-      return {
-        top: rect.top,
-        bottom: rect.bottom,
-        left: rect.left,
-        right: rect.right,
-        width: rect.width,
-        height: rect.height,
-      }
-    }
-    const intersects = (left, right) => {
-      if (!left || !right) return false
-      return !(
-        left.right <= right.left ||
-        right.right <= left.left ||
-        left.bottom <= right.top ||
-        right.bottom <= left.top
-      )
-    }
-
-    const modal = Array.from(
-      document.querySelectorAll('.erp-business-batch-delete-modal.ant-modal')
-    )
-      .filter(isVisibleModal)
-      .at(-1)
-    const body = modal?.querySelector('.ant-modal-body')
-    const footer = modal?.querySelector('.ant-modal-footer')
-    const textareaWrapper = modal?.querySelector(
-      '.erp-business-batch-delete-modal__reason'
-    )
-    const textarea = textareaWrapper?.querySelector('textarea')
-    const count = textareaWrapper?.querySelector('.ant-input-data-count')
-    const wrapperStyle = textareaWrapper
-      ? window.getComputedStyle(textareaWrapper)
-      : null
-    const bodyStyle = body ? window.getComputedStyle(body) : null
-    const footerStyle = footer ? window.getComputedStyle(footer) : null
-    const modalRect = rectOf(modal)
-    const bodyRect = rectOf(body)
-    const footerRect = rectOf(footer)
-    const wrapperRect = rectOf(textareaWrapper)
-    const textareaRect = rectOf(textarea)
-    const countRect = rectOf(count)
-    const buttonRects = Array.from(
-      footer?.querySelectorAll('button') || []
-    ).map((button) => ({
-      text: button.textContent?.replace(/\s+/g, ' ').trim() || '',
-      rect: rectOf(button),
-    }))
-
-    return {
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      modal: modalRect,
-      body: bodyRect
-        ? {
-            ...bodyRect,
-            clientWidth: body.clientWidth,
-            scrollWidth: body.scrollWidth,
-            overflowX: bodyStyle?.overflowX,
-            overflowY: bodyStyle?.overflowY,
-          }
-        : null,
-      footer: footerRect
-        ? {
-            ...footerRect,
-            marginTop: Number.parseFloat(footerStyle?.marginTop || '0'),
-          }
-        : null,
-      textareaWrapper: wrapperRect
-        ? {
-            ...wrapperRect,
-            marginBottom: Number.parseFloat(wrapperStyle?.marginBottom || '0'),
-            position: wrapperStyle?.position || '',
-          }
-        : null,
-      textarea: textareaRect
-        ? {
-            ...textareaRect,
-            clientWidth: textarea.clientWidth,
-            scrollWidth: textarea.scrollWidth,
-            paddingBottom: Number.parseFloat(
-              window.getComputedStyle(textarea).paddingBottom || '0'
-            ),
-          }
-        : null,
-      count: countRect
-        ? {
-            ...countRect,
-            text: count.textContent?.replace(/\s+/g, ' ').trim() || '',
-            intersectsButtons: buttonRects
-              .filter((button) => intersects(countRect, button.rect))
-              .map((button) => button.text),
-          }
-        : null,
-      buttonRects,
-    }
-  })
-
-  assert(
-    metrics.modal &&
-      metrics.body &&
-      metrics.footer &&
-      metrics.textareaWrapper &&
-      metrics.textarea &&
-      metrics.count,
-    `${scenarioName} 批量删除弹窗缺少可验证的输入区、计数或 footer: ${JSON.stringify(metrics)}`
-  )
-  assert.match(
-    metrics.count.text,
-    /\/\s*255$/,
-    `${scenarioName} 删除原因字数统计文案异常: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.count.top >= metrics.textarea.top + 4 &&
-      metrics.count.right <= metrics.textarea.right - 24 &&
-      metrics.count.bottom <= metrics.textarea.bottom - 4 &&
-      metrics.count.left >= metrics.textarea.left + 8,
-    `${scenarioName} 删除原因字数统计超出输入框边界: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.textarea.paddingBottom >= metrics.count.height + 6,
-    `${scenarioName} 删除原因字数统计未预留内容底部空间: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.count.bottom + 8 <= metrics.footer.top,
-    `${scenarioName} 删除原因字数统计与 Modal footer 间距不足: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    metrics.count.intersectsButtons,
-    [],
-    `${scenarioName} 删除原因字数统计被 footer 按钮覆盖: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.body.scrollWidth <= metrics.body.clientWidth + 1 &&
-      metrics.textarea.scrollWidth <= metrics.textarea.clientWidth + 1,
-    `${scenarioName} 批量删除弹窗输入区出现横向溢出: ${JSON.stringify(metrics)}`
-  )
-
-  if (screenshotName) {
-    await page
-      .locator('.erp-business-batch-delete-modal:visible')
-      .last()
-      .screenshot({
-        path: path.resolve(outputDir, `${screenshotName}.png`),
-      })
-  }
-}
-
 async function assertPermissionSectionVisualSeparation(page, { scenarioName }) {
   const metrics = await page.evaluate(() => {
     const adminSection = document.querySelector(
@@ -9520,225 +11051,7 @@ async function assertPermissionSectionVisualSeparation(page, { scenarioName }) {
   )
 }
 
-async function assertPermissionModalLayout(page, { scenarioName }) {
-  await page
-    .locator('.erp-permission-modal .ant-modal-content')
-    .waitFor({ state: 'visible', timeout: 10_000 })
-  await assertAntdModalCentered(
-    page,
-    page.locator('.erp-permission-modal:visible').last(),
-    scenarioName
-  )
-  await page.waitForFunction(() => {
-    const modal = document.querySelector('.erp-permission-modal')
-    const rect = modal?.getBoundingClientRect()
-    return Boolean(rect && rect.width >= 940)
-  })
-  await page.waitForFunction(() => {
-    const nodes = [
-      document.querySelector('.erp-permission-modal'),
-      document.querySelector('.erp-permission-modal .ant-modal-content'),
-    ].filter(Boolean)
-    return nodes.every((node) => {
-      const { transform } = window.getComputedStyle(node)
-      if (!transform || transform === 'none') return true
-      const match = transform.match(/^matrix\(([^,]+)/)
-      return Boolean(match && Number(match[1]) >= 0.995)
-    })
-  })
-
-  const metrics = await page.evaluate(() => {
-    const modal = document.querySelector('.erp-permission-modal')
-    const modalContent = document.querySelector(
-      '.erp-permission-modal .ant-modal-content'
-    )
-    const modalHeader = document.querySelector(
-      '.erp-permission-modal .ant-modal-header'
-    )
-    const modalBody = document.querySelector(
-      '.erp-permission-modal .ant-modal-body'
-    )
-    const modalFooter = document.querySelector(
-      '.erp-permission-modal .ant-modal-footer'
-    )
-    const fields = document.querySelector('.erp-permission-modal__fields')
-    const checklist = document.querySelector('.erp-permission-checklist')
-    const sectionList = [
-      ...document.querySelectorAll('.erp-permission-checklist__section'),
-    ]
-    const checkboxList = [
-      ...document.querySelectorAll(
-        '.erp-permission-grid .ant-checkbox-wrapper'
-      ),
-    ]
-    const controls = modal
-      ? Array.from(
-          modal.querySelectorAll(
-            '.ant-input, .ant-input-affix-wrapper, .ant-select-selector, .ant-btn'
-          )
-        ).map((control) => {
-          const rect = control.getBoundingClientRect()
-          const style = window.getComputedStyle(control)
-          return {
-            tagName: control.tagName,
-            className: String(control.className || ''),
-            text: control.textContent?.trim()?.slice(0, 32) || '',
-            isNestedInAffixInput: Boolean(
-              control.matches('.ant-input') &&
-                control.closest('.ant-input-affix-wrapper')
-            ),
-            width: rect.width,
-            height: rect.height,
-            borderRadius: style.borderRadius,
-            backgroundColor: style.backgroundColor,
-            borderColor: style.borderColor,
-          }
-        })
-      : []
-
-    const countGridColumns = (gridTemplateColumns) =>
-      String(gridTemplateColumns || '')
-        .split(' ')
-        .filter(Boolean).length
-
-    const modalRect = modal?.getBoundingClientRect()
-    const contentStyle = modalContent
-      ? window.getComputedStyle(modalContent)
-      : null
-    const headerStyle = modalHeader
-      ? window.getComputedStyle(modalHeader)
-      : null
-    const bodyStyle = modalBody ? window.getComputedStyle(modalBody) : null
-    const footerStyle = modalFooter
-      ? window.getComputedStyle(modalFooter)
-      : null
-    const fieldsStyle = fields ? window.getComputedStyle(fields) : null
-    const checklistStyle = checklist ? window.getComputedStyle(checklist) : null
-    const modalBodyRect = modalBody?.getBoundingClientRect()
-    const checklistRect = checklist?.getBoundingClientRect()
-    const sectionSpillCount = sectionList.filter((section) => {
-      const rect = section.getBoundingClientRect()
-      return (
-        checklistRect &&
-        (rect.left < checklistRect.left - 1 ||
-          rect.right > checklistRect.right + 1)
-      )
-    }).length
-    const checkboxSpillCount = checkboxList.filter((checkbox) => {
-      const rect = checkbox.getBoundingClientRect()
-      const section = checkbox.closest('.erp-permission-checklist__section')
-      const sectionRect = section?.getBoundingClientRect()
-      return (
-        sectionRect &&
-        (rect.left < sectionRect.left - 1 || rect.right > sectionRect.right + 1)
-      )
-    }).length
-
-    return {
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      modal: modalRect
-        ? {
-            top: modalRect.top,
-            width: modalRect.width,
-            height: modalRect.height,
-          }
-        : null,
-      modalChrome: modalContent
-        ? {
-            content: {
-              borderTopWidth: contentStyle?.borderTopWidth,
-              borderRightWidth: contentStyle?.borderRightWidth,
-              borderBottomWidth: contentStyle?.borderBottomWidth,
-              borderLeftWidth: contentStyle?.borderLeftWidth,
-              borderRadius: contentStyle?.borderRadius,
-              boxShadow: contentStyle?.boxShadow,
-              paddingTop: contentStyle?.paddingTop,
-              paddingRight: contentStyle?.paddingRight,
-              paddingBottom: contentStyle?.paddingBottom,
-              paddingLeft: contentStyle?.paddingLeft,
-            },
-            header: {
-              borderBottomWidth: headerStyle?.borderBottomWidth,
-            },
-            footer: {
-              borderTopWidth: footerStyle?.borderTopWidth,
-            },
-          }
-        : null,
-      modalBody: modalBodyRect
-        ? {
-            clientHeight: modalBody.clientHeight,
-            scrollHeight: modalBody.scrollHeight,
-            scrollWidth: modalBody.scrollWidth,
-            width: modalBodyRect.width,
-            height: modalBodyRect.height,
-            overflowY: bodyStyle?.overflowY,
-          }
-        : null,
-      fieldsColumnCount: countGridColumns(fieldsStyle?.gridTemplateColumns),
-      checklistColumnCount: countGridColumns(
-        checklistStyle?.gridTemplateColumns
-      ),
-      sectionCount: sectionList.length,
-      checkboxCount: checkboxList.length,
-      sectionSpillCount,
-      checkboxSpillCount,
-      controls,
-    }
-  })
-
-  assert(
-    metrics.modal,
-    `${scenarioName} 缺少权限弹窗: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.modal.width >= 840 &&
-      metrics.modal.width <= metrics.viewport.width - 32,
-    `${scenarioName} 弹窗宽度没有脱离窄长条: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.modal.height <= metrics.viewport.height - 48,
-    `${scenarioName} 弹窗高度溢出视口: ${JSON.stringify(metrics)}`
-  )
-  assertTradeLikeModalChrome(metrics, scenarioName)
-  assert(
-    metrics.modalBody?.overflowY === 'auto',
-    `${scenarioName} 权限内容滚动容器未收口到弹窗 body: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.fieldsColumnCount,
-    2,
-    `${scenarioName} 账号字段未保持两列布局: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.checklistColumnCount,
-    2,
-    `${scenarioName} 权限分组未保持两列布局: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.sectionCount >= 4 && metrics.checkboxCount >= 8,
-    `${scenarioName} 权限分组或选项缺失: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.sectionSpillCount,
-    0,
-    `${scenarioName} 权限分组溢出容器: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.checkboxSpillCount,
-    0,
-    `${scenarioName} 权限选项文字溢出分组: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.modalBody.scrollWidth <= metrics.modalBody.width + 8,
-    `${scenarioName} 弹窗 body 出现横向滚动: ${JSON.stringify(metrics)}`
-  )
-  assertTradeLikeModalControls(metrics, scenarioName)
-
-  await assertPermissionModalFocusStyle(page, scenarioName)
-}
-
-async function assertPermissionModalFocusStyle(page, scenarioName) {
+async function _assertPermissionModalFocusStyle(page, scenarioName) {
   const focusTargets = [
     {
       label: '账号输入框',
@@ -9913,242 +11226,6 @@ async function assertVisibleModalInputFocusStyle(
   })
 }
 
-async function assertPartnerContactItemFocusConsistency(
-  page,
-  dialog,
-  { scenarioName }
-) {
-  const contactTargets = [
-    {
-      label: '联系人',
-      value: '超长联系人姓名ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-    },
-    { label: '办公室电话', value: '0571-88888888-1234567890' },
-    { label: '手机', value: '138001380001234567890' },
-    {
-      label: '邮箱',
-      value: 'very-long-contact-email-address-for-style-l1@example.com',
-    },
-  ]
-
-  const checked = []
-  for (const target of contactTargets) {
-    const fieldStack = dialog
-      .locator('.erp-item-field-stack')
-      .filter({ hasText: target.label })
-      .first()
-    await fieldStack.waitFor({ state: 'visible', timeout: 10_000 })
-    const input = fieldStack.locator('input.ant-input:not([disabled])').first()
-    await input.fill(target.value)
-    await input.focus()
-    await page.waitForTimeout(220)
-
-    const metrics = await input.evaluate((node, label) => {
-      const focusedControl =
-        node.closest('.ant-input-affix-wrapper') ||
-        node.closest('.ant-input-number') ||
-        node.closest('.ant-picker') ||
-        node
-      const controlStyle = window.getComputedStyle(focusedControl)
-      const sourceStyle = window.getComputedStyle(node)
-      const fieldStackNode = node.closest('.erp-item-field-stack')
-      const itemCardStack = node.closest(
-        '.erp-business-record-form__item-card-stack'
-      )
-      const itemCardStackStyle = itemCardStack
-        ? window.getComputedStyle(itemCardStack)
-        : null
-      const itemsScroll = node.closest(
-        '.erp-business-record-form__items-scroll'
-      )
-      const itemsScrollStyle = itemsScroll
-        ? window.getComputedStyle(itemsScroll)
-        : null
-      const itemCard = node.closest('.erp-item-card')
-      const itemCardStyle = itemCard ? window.getComputedStyle(itemCard) : null
-      const itemCardHead = itemCard?.querySelector('.ant-card-head')
-      const itemCardHeadStyle = itemCardHead
-        ? window.getComputedStyle(itemCardHead)
-        : null
-      const itemCardBody = itemCard?.querySelector('.ant-card-body')
-      const itemCardBodyStyle = itemCardBody
-        ? window.getComputedStyle(itemCardBody)
-        : null
-      const row = itemCard?.querySelector('.erp-item-card-row')
-      const rowStyle = row ? window.getComputedStyle(row) : null
-      const fieldRect = fieldStackNode?.getBoundingClientRect()
-      const controlRect = focusedControl.getBoundingClientRect()
-
-      return {
-        label,
-        borderColor: controlStyle.borderColor,
-        boxShadow: controlStyle.boxShadow,
-        sourceBorderColor: sourceStyle.borderColor,
-        sourceBoxShadow: sourceStyle.boxShadow,
-        control: {
-          width: controlRect.width,
-          height: controlRect.height,
-          overflowX: controlStyle.overflowX,
-          textOverflow: controlStyle.textOverflow,
-          whiteSpace: controlStyle.whiteSpace,
-        },
-        field: fieldRect
-          ? {
-              width: fieldRect.width,
-              scrollWidth: fieldStackNode.scrollWidth,
-            }
-          : null,
-        row: row
-          ? {
-              clientWidth: row.clientWidth,
-              scrollWidth: row.scrollWidth,
-              flexWrap: rowStyle?.flexWrap || '',
-            }
-          : null,
-        body: itemCardBody
-          ? {
-              clientWidth: itemCardBody.clientWidth,
-              scrollWidth: itemCardBody.scrollWidth,
-              overflowX: itemCardBodyStyle?.overflowX || '',
-              overflowY: itemCardBodyStyle?.overflowY || '',
-              backgroundColor: itemCardBodyStyle?.backgroundColor || '',
-            }
-          : null,
-        stack: itemCardStack
-          ? {
-              overflowX: itemCardStackStyle?.overflowX || '',
-              overflowY: itemCardStackStyle?.overflowY || '',
-            }
-          : null,
-        itemsScroll: itemsScroll
-          ? {
-              clientWidth: itemsScroll.clientWidth,
-              scrollWidth: itemsScroll.scrollWidth,
-              overflowX: itemsScrollStyle?.overflowX || '',
-              overflowY: itemsScrollStyle?.overflowY || '',
-            }
-          : null,
-        itemCard: itemCard
-          ? {
-              borderColor: itemCardStyle?.borderColor,
-              boxShadow: itemCardStyle?.boxShadow,
-              backgroundColor: itemCardStyle?.backgroundColor,
-              transform: itemCardStyle?.transform,
-              headBackgroundColor: itemCardHeadStyle?.backgroundColor,
-              headBorderColor: itemCardHeadStyle?.borderBottomColor,
-              bodyBackgroundColor: itemCardBodyStyle?.backgroundColor,
-            }
-          : null,
-      }
-    }, target.label)
-
-    checked.push(metrics)
-  }
-
-  assert.equal(
-    checked.length,
-    contactTargets.length,
-    `${scenarioName} 未完整验证联系人明细 focus: ${JSON.stringify(checked)}`
-  )
-
-  checked.forEach((metrics) => {
-    assert(
-      isAcceptedFocusBorder(metrics),
-      `${scenarioName} ${metrics.label} 输入框 focus 边框未统一到绿色主题: ${JSON.stringify(metrics)}`
-    )
-    assertNoBlueFocusStyle(metrics, scenarioName)
-    assert(
-      metrics.itemCard && isGreenFocusColor(metrics.itemCard.borderColor),
-      `${scenarioName} ${metrics.label} 条目卡片 focus 边框未统一到绿色主题: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      sameCSSColor(metrics.borderColor, metrics.itemCard.borderColor),
-      `${scenarioName} ${metrics.label} 条目卡片边框和输入框 focus 边框不一致: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      sameCSSColor(
-        metrics.itemCard.backgroundColor,
-        metrics.itemCard.headBackgroundColor
-      ) &&
-        sameCSSColor(
-          metrics.itemCard.backgroundColor,
-          metrics.itemCard.bodyBackgroundColor
-        ),
-      `${scenarioName} ${metrics.label} 条目卡片 focus 头部和内容底色不一致: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      !hasBlueFocusRing(metrics.itemCard.boxShadow) &&
-        !hasBlueFocusRing(metrics.itemCard.backgroundColor) &&
-        !hasBlueFocusRing(metrics.itemCard.headBackgroundColor) &&
-        !hasBlueFocusRing(metrics.itemCard.headBorderColor),
-      `${scenarioName} ${metrics.label} 条目卡片 focus 仍残留蓝色高亮: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.field &&
-        metrics.control.width <= metrics.field.width + 2 &&
-        metrics.field.scrollWidth <= metrics.field.width + 2,
-      `${scenarioName} ${metrics.label} 长文本撑开了明细字段: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.body?.overflowX !== 'auto' &&
-        metrics.itemsScroll?.overflowX === 'auto' &&
-        metrics.itemsScroll.scrollWidth >= metrics.itemsScroll.clientWidth,
-      `${scenarioName} ${metrics.label} 整组条目横向滚动容器异常: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.stack?.overflowX === 'visible' &&
-        metrics.stack?.overflowY === 'visible',
-      `${scenarioName} ${metrics.label} 条目卡片外圈被父容器裁剪: ${JSON.stringify(metrics)}`
-    )
-  })
-
-  const firstFocusStyle = {
-    borderColor: checked[0].borderColor,
-    boxShadow: checked[0].boxShadow,
-    itemCard: checked[0].itemCard,
-  }
-  checked.slice(1).forEach((metrics) => {
-    assert.deepEqual(
-      {
-        borderColor: metrics.borderColor,
-        boxShadow: metrics.boxShadow,
-        itemCard: metrics.itemCard,
-      },
-      firstFocusStyle,
-      `${scenarioName} ${metrics.label} focus 样式与联系人不一致: ${JSON.stringify(checked)}`
-    )
-  })
-
-  await page.evaluate(() => {
-    document.activeElement?.blur?.()
-  })
-  await page.waitForTimeout(220)
-  const recovered = await dialog
-    .locator('.erp-item-card')
-    .first()
-    .evaluate((node) => {
-      const style = window.getComputedStyle(node)
-      const head = node.querySelector('.ant-card-head')
-      const headStyle = head ? window.getComputedStyle(head) : null
-      return {
-        borderColor: style.borderColor,
-        boxShadow: style.boxShadow,
-        backgroundColor: style.backgroundColor,
-        transform: style.transform,
-        headBackgroundColor: headStyle?.backgroundColor || '',
-        bodyBackgroundColor:
-          window.getComputedStyle(node.querySelector('.ant-card-body'))
-            ?.backgroundColor || '',
-      }
-    })
-  assert(
-    !isGreenFocusColor(recovered.borderColor) &&
-      recovered.boxShadow === 'none' &&
-      !isGreenFocusColor(recovered.headBackgroundColor),
-    `${scenarioName} blur 后条目卡片未恢复默认态: ${JSON.stringify(recovered)}`
-  )
-}
-
 async function readActiveSelectSearchFocusMetric(page, label) {
   return page.evaluate((sourceLabel) => {
     const { activeElement } = document
@@ -10171,7 +11248,7 @@ async function readActiveSelectSearchFocusMetric(page, label) {
   }, label)
 }
 
-function assertTradeLikeModalChrome(metrics, scenarioName) {
+function _assertTradeLikeModalChrome(metrics, scenarioName) {
   const chrome = metrics.modalChrome
   assert(
     chrome?.content,
@@ -10218,74 +11295,7 @@ function assertTradeLikeModalChrome(metrics, scenarioName) {
   )
 }
 
-function assertDarkModalChrome(metrics, scenarioName) {
-  const chrome = metrics.modalChrome
-  assert(
-    chrome?.content,
-    `${scenarioName} 缺少可检查的暗色弹窗壳层样式: ${JSON.stringify(metrics)}`
-  )
-
-  const pixel = (value) => Number.parseFloat(String(value || '0'))
-  const maskAlpha = readCssAlpha(chrome.mask?.backgroundColor)
-  assert(
-    maskAlpha >= 0.55,
-    `${scenarioName} 暗色弹窗遮罩过浅，背景和弹窗容易融在一起: ${JSON.stringify(chrome)}`
-  )
-  assert(
-    String(chrome.mask?.backdropFilter || '') !== 'none',
-    `${scenarioName} 暗色弹窗遮罩缺少背景虚化层级: ${JSON.stringify(chrome)}`
-  )
-  assert(
-    pixel(chrome.content.borderTopWidth) >= 1 &&
-      pixel(chrome.content.borderRightWidth) >= 1 &&
-      pixel(chrome.content.borderBottomWidth) >= 1 &&
-      pixel(chrome.content.borderLeftWidth) >= 1,
-    `${scenarioName} 暗色弹窗壳层缺少可见边框: ${JSON.stringify(chrome)}`
-  )
-  assert(
-    isLightSlateBorderColor(chrome.content.borderTopColor),
-    `${scenarioName} 暗色弹窗边框颜色不够清楚: ${JSON.stringify(chrome)}`
-  )
-  assert(
-    String(chrome.content.boxShadow || '') !== 'none',
-    `${scenarioName} 暗色弹窗缺少浮层阴影: ${JSON.stringify(chrome)}`
-  )
-  assert(
-    pixel(chrome.header?.borderBottomWidth) >= 1,
-    `${scenarioName} 暗色弹窗头部缺少分割线: ${JSON.stringify(chrome)}`
-  )
-  assert(
-    pixel(chrome.footer?.borderTopWidth) >= 1,
-    `${scenarioName} 暗色弹窗底部缺少分割线: ${JSON.stringify(chrome)}`
-  )
-  assert(
-    !sameCSSColor(
-      chrome.content.backgroundColor,
-      chrome.header.backgroundColor
-    ) ||
-      !sameCSSColor(
-        chrome.content.backgroundColor,
-        chrome.footer.backgroundColor
-      ) ||
-      pixel(chrome.header.borderBottomWidth) >= 1,
-    `${scenarioName} 暗色弹窗标题区、内容区和底部缺少层级区分: ${JSON.stringify(chrome)}`
-  )
-
-  const radius = pixel(chrome.content.borderRadius)
-  assert(
-    Number.isFinite(radius) && radius >= 10 && radius <= 18,
-    `${scenarioName} 暗色弹窗圆角异常: ${JSON.stringify(chrome)}`
-  )
-  assert(
-    pixel(chrome.content.paddingTop) === 0 &&
-      pixel(chrome.content.paddingRight) === 0 &&
-      pixel(chrome.content.paddingBottom) === 0 &&
-      pixel(chrome.content.paddingLeft) === 0,
-    `${scenarioName} 暗色弹窗壳层应由 header/body/footer 管理间距: ${JSON.stringify(chrome)}`
-  )
-}
-
-function assertTradeLikeModalControls(metrics, scenarioName) {
+function _assertTradeLikeModalControls(metrics, scenarioName) {
   const visibleControls = (metrics.controls || []).filter(
     (control) =>
       control.width > 0 &&
@@ -10354,89 +11364,6 @@ function assertTradeLikeModalControls(metrics, scenarioName) {
   })
 }
 
-function assertDarkModalControls(metrics, scenarioName) {
-  const visibleControls = (metrics.controls || []).filter(
-    (control) =>
-      control.width > 0 &&
-      control.height > 0 &&
-      !control.isNestedInAffixInput &&
-      !String(control.className || '').includes('erp-item-field-unit-suffix') &&
-      !String(control.className || '').includes('ant-btn-link')
-  )
-  assert(
-    visibleControls.length > 0,
-    `${scenarioName} 未找到可检查的暗色弹窗控件: ${JSON.stringify(metrics)}`
-  )
-
-  const fieldControls = visibleControls.filter(
-    (control) => !control.className.includes('ant-btn')
-  )
-  fieldControls.forEach((control) => {
-    assert(
-      control.disabled
-        ? isDarkControlBackground(control.backgroundColor) ||
-            isDarkReadonlyDisabledBackground(control.backgroundColor)
-        : isDarkControlBackground(control.backgroundColor),
-      `${scenarioName} 暗色弹窗控件未使用深色输入面: ${JSON.stringify(control)}`
-    )
-    assert(
-      isDarkNeutralBorderColor(control.borderColor),
-      `${scenarioName} 暗色弹窗控件边框不够清楚: ${JSON.stringify(control)}`
-    )
-    assert(
-      !containsGreenDominantColor(control.backgroundColor) &&
-        !containsGreenDominantColor(control.borderColor),
-      `${scenarioName} 暗色弹窗普通控件残留绿色边界或背景: ${JSON.stringify(control)}`
-    )
-  })
-
-  const primaryButtons = visibleControls.filter(
-    (control) =>
-      control.className.includes('ant-btn-primary') && !control.disabled
-  )
-  primaryButtons.forEach((control) => {
-    assert(
-      isGreenFocusColor(control.backgroundColor) ||
-        isGreenFocusColor(control.borderColor) ||
-        isBluePrimaryColor(control.backgroundColor) ||
-        isBluePrimaryColor(control.borderColor),
-      `${scenarioName} 暗色弹窗主按钮应保留可辨认的品牌或蓝色主操作强调: ${JSON.stringify(control)}`
-    )
-  })
-}
-
-function assertDarkItemSummaryMetrics(metrics, scenarioName) {
-  const summaries = (metrics.itemSummaryMetrics || []).filter(
-    (summary) => summary.width > 0 && summary.height > 0
-  )
-  assert(
-    summaries.length >= 3,
-    `${scenarioName} 缺少可检查的暗色明细统计胶囊: ${JSON.stringify(metrics)}`
-  )
-
-  summaries.forEach((summary) => {
-    assert(
-      isDarkControlBackground(summary.backgroundColor),
-      `${scenarioName} 明细统计胶囊仍是浅色背景: ${JSON.stringify(summary)}`
-    )
-    assert(
-      isDarkNeutralBorderColor(summary.borderColor) ||
-        isBluePrimaryColor(summary.borderColor),
-      `${scenarioName} 明细统计胶囊边框不够清楚: ${JSON.stringify(summary)}`
-    )
-    assertReadableOnDark(
-      summary.labelColor || summary.color,
-      summary.backgroundColor,
-      `${scenarioName} 明细统计胶囊 label 对比度不足`
-    )
-    assertReadableOnDark(
-      summary.valueColor,
-      summary.backgroundColor,
-      `${scenarioName} 明细统计胶囊数值对比度不足`
-    )
-  })
-}
-
 function isGreenFocusColor(color) {
   const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
   if (!match) return false
@@ -10444,41 +11371,11 @@ function isGreenFocusColor(color) {
   return green > red && green >= blue
 }
 
-function readCssAlpha(color) {
-  const match = String(color || '').match(
-    /rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\s*\)/i
-  )
-  if (!match) return 0
-  return match[4] === undefined ? 1 : Number(match[4])
-}
-
-function isLightSlateBorderColor(color) {
-  const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
-  if (!match) return false
-  const [, red, green, blue] = match.map(Number)
-  return red >= 140 && green >= 150 && blue >= 160
-}
-
 function isDarkControlBackground(color) {
   const match = String(color || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i)
   if (!match) return false
   const [, red, green, blue] = match.map(Number)
   return red <= 32 && green <= 44 && blue <= 64
-}
-
-function isDarkReadonlyDisabledBackground(color) {
-  const match = String(color || '').match(
-    /rgba\((\d+),\s*(\d+),\s*(\d+),\s*([.\d]+)\)/i
-  )
-  if (!match) return false
-  const [, red, green, blue, alpha] = match
-  return (
-    Number(red) >= 240 &&
-    Number(green) >= 240 &&
-    Number(blue) >= 240 &&
-    Number(alpha) > 0 &&
-    Number(alpha) <= 0.16
-  )
 }
 
 function isLightReadonlyDisabledBackground(color) {
@@ -10614,7 +11511,7 @@ function isTransparentFocusColor(color) {
   )
 }
 
-function sameCSSColor(left, right) {
+function _sameCSSColor(left, right) {
   return (
     String(left || '').replaceAll(' ', '') ===
     String(right || '').replaceAll(' ', '')
@@ -10868,141 +11765,6 @@ async function assertBusinessModuleToolbarControlStyle(
   )
 }
 
-async function assertBusinessModuleStatusDropdownStyle(page, { scenarioName }) {
-  await page
-    .locator('.erp-business-filter-panel .erp-business-filter-control--status')
-    .click()
-  const popup = page.locator(
-    '.erp-business-module-select-popup:not(.ant-select-dropdown-hidden)'
-  )
-  await popup.waitFor({ state: 'visible', timeout: 10_000 })
-  await page.waitForTimeout(450)
-
-  const metrics = await page.evaluate(() => {
-    const readElement = (element) => {
-      if (!element) return null
-      const rect = element.getBoundingClientRect()
-      const style = window.getComputedStyle(element)
-      return {
-        text: String(
-          element.textContent || element.getAttribute('placeholder') || ''
-        ).trim(),
-        cursor: style.cursor,
-        borderColor: style.borderTopColor,
-        boxShadow: style.boxShadow,
-        borderRadius: style.borderRadius,
-        backgroundColor: style.backgroundColor,
-        fontSize: style.fontSize,
-        fontWeight: style.fontWeight,
-        height: rect.height,
-        width: rect.width,
-        top: rect.top,
-        bottom: rect.bottom,
-        centerY: rect.top + rect.height / 2,
-        left: rect.left,
-        right: rect.right,
-        clientHeight: element.clientHeight,
-        clientWidth: element.clientWidth,
-        scrollHeight: element.scrollHeight,
-        scrollWidth: element.scrollWidth,
-      }
-    }
-
-    const popupElement = document.querySelector(
-      '.erp-business-module-select-popup:not(.ant-select-dropdown-hidden)'
-    )
-    const activeSelector = document.querySelector(
-      '.erp-business-filter-panel .ant-select-open .ant-select-selector'
-    )
-    const activePlaceholder = document.querySelector(
-      '.erp-business-filter-panel .ant-select-open .ant-select-selection-placeholder'
-    )
-    const internalSearchInput = document.querySelector(
-      '.erp-business-filter-panel .ant-select-open .ant-select-selection-search-input'
-    )
-    const activeArrow = document.querySelector(
-      '.erp-business-filter-panel .ant-select-open .ant-select-arrow'
-    )
-    return {
-      viewportWidth: window.innerWidth,
-      documentScrollWidth: document.documentElement.scrollWidth,
-      activeSelector: readElement(activeSelector),
-      activePlaceholder: readElement(activePlaceholder),
-      internalSearchInput: readElement(internalSearchInput),
-      activeArrow: readElement(activeArrow),
-      popup: readElement(popupElement),
-      options: Array.from(
-        popupElement?.querySelectorAll('.ant-select-item-option') || []
-      )
-        .slice(0, 8)
-        .map(readElement),
-    }
-  })
-
-  assert(
-    metrics.activeSelector &&
-      metrics.activePlaceholder &&
-      metrics.internalSearchInput &&
-      metrics.activeArrow &&
-      metrics.popup &&
-      metrics.options.length > 0,
-    `${scenarioName} 状态筛选下拉层缺少可检查节点: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.activeSelector.cursor,
-    'pointer',
-    `${scenarioName} 状态筛选控件 cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.internalSearchInput.cursor,
-    'pointer',
-    `${scenarioName} 状态筛选内部搜索 input cursor 未统一为 pointer: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.internalSearchInput.boxShadow,
-    'none',
-    `${scenarioName} 状态筛选内部搜索 input 暴露了浏览器焦点框: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    Math.abs(
-      metrics.activePlaceholder.centerY - metrics.activeSelector.centerY
-    ) <= 1,
-    `${scenarioName} 状态筛选 placeholder 未上下居中: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    Math.abs(
-      metrics.internalSearchInput.centerY - metrics.activeSelector.centerY
-    ) <= 1,
-    `${scenarioName} 状态筛选内部搜索 input 未上下居中: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    Math.abs(metrics.activeArrow.centerY - metrics.activeSelector.centerY) <= 1,
-    `${scenarioName} 状态筛选箭头未上下居中: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.popup.top >= metrics.activeSelector.bottom - 2,
-    `${scenarioName} 状态筛选下拉层不应向上遮挡前置筛选项: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.popup.width <= metrics.viewportWidth - 24 + 1,
-    `${scenarioName} 状态筛选下拉层不应超过移动端视口: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.options.every(
-      (option) =>
-        option.cursor === 'pointer' &&
-        option.clientHeight >= 34 &&
-        option.clientHeight <= 42 &&
-        option.fontSize === '14px'
-    ),
-    `${scenarioName} 状态筛选选项行尺寸或 cursor 不一致: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.documentScrollWidth <= metrics.viewportWidth + 1,
-    `${scenarioName} 状态筛选展开后不应产生页面横向滚动: ${JSON.stringify(metrics)}`
-  )
-}
-
 async function assertPaginationSizeChangerFocusStyle(page, { scenarioName }) {
   const sizeChanger = page
     .locator('.ant-pagination-options .ant-select')
@@ -11079,338 +11841,68 @@ async function assertPaginationSizeChangerFocusStyle(page, { scenarioName }) {
   await popup.waitFor({ state: 'hidden', timeout: 10_000 })
 }
 
-async function assertBusinessModuleCompactWorkspace(
+async function seedBusinessCollaborationOverflowTasks(
   page,
-  { scenarioName, expectSelectionAction = true }
+  { sourceType, currentSourceID }
 ) {
-  const metrics = await page.evaluate(() => {
-    const rectOf = (selector) => {
-      const element = document.querySelector(selector)
-      if (!element) return null
-      const rect = element.getBoundingClientRect()
-      const style = window.getComputedStyle(element)
-      return {
-        top: rect.top,
-        bottom: rect.bottom,
-        left: rect.left,
-        right: rect.right,
-        width: rect.width,
-        height: rect.height,
-        display: style.display,
-        gridTemplateColumns: style.gridTemplateColumns,
-        overflowX: style.overflowX,
-        overflowY: style.overflowY,
+  const createTask = async (params) =>
+    page.evaluate(async (taskParams) => {
+      const response = await fetch('/rpc/workflow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: `seed-business-collab-${taskParams.task_code}`,
+          method: 'create_task',
+          params: taskParams,
+        }),
+      })
+      const payload = await response.json()
+      if (payload?.result?.code !== 0) {
+        throw new Error(`create_task failed: ${JSON.stringify(payload)}`)
       }
-    }
+    }, params)
 
-    const statTiles = Array.from(
-      document.querySelectorAll('.erp-business-module-stats > div')
-    ).map((tile) => {
-      const rect = tile.getBoundingClientRect()
-      return {
-        text: tile.textContent?.replace(/\s+/g, ' ').trim() || '',
-        top: rect.top,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
-      }
+  for (let index = 0; index < 12; index += 1) {
+    await createTask({
+      task_code: `style-l1-business-collab-page-${index + 1}`,
+      task_group: sourceType,
+      task_name:
+        index === 11
+          ? '超长本页协同任务名称用于验证很多任务时不会横向溢出ABCDEFGHIJKLMN1234567890'
+          : `本页协同批量任务 ${index + 1}`,
+      source_type: sourceType,
+      source_id: 9000 + index,
+      source_no: `PO-BULK-${String(index + 1).padStart(3, '0')}`,
+      task_status_key: index < 3 ? 'blocked' : 'ready',
+      owner_role_key: index % 2 === 0 ? 'purchase' : 'finance',
+      blocked_reason:
+        index < 3 ? '批量阻塞原因很长用于验证提示换行和面板滚动边界' : '',
+      payload:
+        index === 1
+          ? {
+              urged: true,
+              urge_count: 18,
+              last_urge_reason: '连续催办但仍未反馈',
+            }
+          : {},
     })
-    const summaryText =
-      document
-        .querySelector('.erp-business-module-hero__footer')
-        ?.textContent?.replace(/\s+/g, ' ')
-        .trim() || ''
-    const filterSummaryText =
-      document
-        .querySelector('.erp-business-filter-panel__summary')
-        ?.textContent?.replace(/\s+/g, ' ')
-        .trim() || ''
-    const operationPanelText =
-      document
-        .querySelector('.erp-business-operation-panel')
-        ?.textContent?.replace(/\s+/g, ' ')
-        .trim() || ''
-    const operationSelection = document.querySelector(
-      '.erp-business-operation-panel__selection'
-    )
-    const operationSelectionStyle = operationSelection
-      ? window.getComputedStyle(operationSelection)
-      : null
-    const operationFilterControls = Array.from(
-      document.querySelectorAll(
-        '.erp-business-operation-panel__filters > :where(.erp-business-filter-control, .erp-business-date-range-filter)'
-      )
-    ).map((control) => {
-      const rect = control.getBoundingClientRect()
-      const style = window.getComputedStyle(control)
-      return {
-        className: String(control.className || ''),
-        width: rect.width,
-        height: rect.height,
-        flexBasis: style.flexBasis,
-        flexGrow: style.flexGrow,
-        flexShrink: style.flexShrink,
-        maxWidth: style.maxWidth,
-      }
-    })
-    const visibleLegacyOperationCards = [
-      '.erp-business-filter-panel.ant-card',
-      '.erp-business-list-toolbar.ant-card',
-      '.erp-business-selection-action-bar.ant-card',
-    ].filter((selector) => {
-      const element = document.querySelector(selector)
-      if (!element) return false
-      const rect = element.getBoundingClientRect()
-      const style = window.getComputedStyle(element)
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden'
-      )
-    })
-    const mainDataTable = document.querySelector(
-      '.erp-business-data-table-card .ant-table'
-    )
-    const mainTableScrollContainer = mainDataTable?.querySelector(
-      '.ant-table-content, .ant-table-body'
-    )
-    const mainTableScrollContainerRect = mainTableScrollContainer
-      ? mainTableScrollContainer.getBoundingClientRect()
-      : null
-    const mainTableScrollContainerStyle = mainTableScrollContainer
-      ? window.getComputedStyle(mainTableScrollContainer)
-      : null
-    const mainTableHeaders = mainDataTable
-      ? Array.from(mainDataTable.querySelectorAll('.ant-table-thead th')).map(
-          (header) => ({
-            text: header.textContent?.replace(/\s+/g, ' ').trim() || '',
-            className: header.className || '',
-            width: header.getBoundingClientRect().width,
-            height: header.getBoundingClientRect().height,
-            whiteSpace: window.getComputedStyle(header).whiteSpace,
-            isSelectionColumn: header.classList.contains(
-              'ant-table-selection-column'
-            ),
-            hasColumnControl: Boolean(
-              header.querySelector('.erp-module-column-header-trigger')
-            ),
-            hasSortControl: Boolean(
-              header.querySelector(
-                '.ant-table-column-sorters, .ant-table-column-sorter'
-              )
-            ),
-            titleWhiteSpace:
-              window.getComputedStyle(
-                header.querySelector('.ant-table-column-title') || header
-              ).whiteSpace || '',
-            moduleHeaderWhiteSpace:
-              window.getComputedStyle(
-                header.querySelector('.erp-module-column-header') || header
-              ).whiteSpace || '',
-            moduleHeaderTextWhiteSpace:
-              window.getComputedStyle(
-                header.querySelector('.erp-module-column-header-text') || header
-              ).whiteSpace || '',
-          })
-        )
-      : []
-    const mainTableFixedCells = mainDataTable
-      ? Array.from(
-          mainDataTable.querySelectorAll(
-            '.ant-table-cell-fix-left, .ant-table-cell-fix-right'
-          )
-        ).map((cell) => ({
-          text: cell.textContent?.replace(/\s+/g, ' ').trim() || '',
-          className: cell.className || '',
-        }))
-      : []
+  }
 
-    return {
-      viewport: { width: window.innerWidth, height: window.innerHeight },
-      pageHead: rectOf('.erp-admin-page-head'),
-      hero: rectOf('.erp-business-module-hero'),
-      heroGrid: rectOf('.erp-business-module-hero__grid'),
-      operationPanel: rectOf('.erp-business-operation-panel'),
-      tableCard: rectOf('.erp-business-module-table-card'),
-      taskCard: rectOf('.erp-business-module-task-card'),
-      currentAction: rectOf('.erp-business-module-current-action'),
-      filters: rectOf('.erp-business-operation-panel__filters'),
-      actions: rectOf('.erp-business-operation-panel__actions'),
-      primaryAction: rectOf('.erp-business-operation-panel__primary'),
-      statTiles,
-      summaryText,
-      filterSummaryText,
-      operationPanelText,
-      operationSelectionBorderTopStyle:
-        operationSelectionStyle?.borderTopStyle || '',
-      operationSelectionBorderTopWidth:
-        operationSelectionStyle?.borderTopWidth || '',
-      operationFilterControls,
-      visibleLegacyOperationCards,
-      mainTableScrollContainer: mainTableScrollContainer
-        ? {
-            width: mainTableScrollContainerRect?.width || 0,
-            scrollWidth: mainTableScrollContainer.scrollWidth,
-            clientWidth: mainTableScrollContainer.clientWidth,
-            overflowX: mainTableScrollContainerStyle?.overflowX || '',
-          }
-        : null,
-      mainTableHeaders,
-      mainTableFixedCells,
-    }
-  })
-
-  assert(
-    metrics.hero,
-    `${scenarioName} 缺少业务页头部: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    !metrics.pageHead,
-    `${scenarioName} 业务页不应再显示通用页面说明区: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.heroGrid?.gridTemplateColumns?.split(' ').filter(Boolean).length >=
-      2,
-    `${scenarioName} 桌面头部未保持当前 ERP 左文案右统计布局: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.statTiles.length,
-    3,
-    `${scenarioName} 主统计卡应只保留总记录/当前结果/已选记录三项: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    !/(?:金额合计|数量合计)/.test(metrics.summaryText),
-    `${scenarioName} 头部摘要不应重复展示金额/数量合计: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.operationPanel,
-    `${scenarioName} 缺少整体业务操作盒: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    metrics.visibleLegacyOperationCards,
-    [],
-    `${scenarioName} 业务操作区不应拆成筛选/工具/当前操作三个 Card: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.operationSelectionBorderTopStyle === 'dashed' &&
-      metrics.operationSelectionBorderTopWidth !== '0px',
-    `${scenarioName} 当前操作上方应只有一条虚线分隔: ${JSON.stringify(metrics)}`
-  )
-  if (metrics.viewport.width > 768) {
-    const searchControls = metrics.operationFilterControls.filter((control) =>
-      control.className.includes('erp-business-filter-control--search')
-    )
-    const selectControls = metrics.operationFilterControls.filter((control) =>
-      control.className.includes('erp-business-filter-control--compact-select')
-    )
-    assert(
-      searchControls.every(
-        (control) => control.width >= 220 && control.width <= 430
-      ),
-      `${scenarioName} 桌面业务页搜索筛选应保持合适宽度，不应过窄或撑满操作盒: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      selectControls.length > 0 &&
-        selectControls.every(
-          (control) => control.width >= 160 && control.width <= 240
-        ),
-      `${scenarioName} 桌面业务页下拉筛选应保持内容级宽度，不应占满整个操作盒: ${JSON.stringify(metrics)}`
-    )
+  for (let index = 0; index < 2; index += 1) {
+    await createTask({
+      task_code: `style-l1-business-collab-current-${index + 1}`,
+      task_group: sourceType,
+      task_name: `当前采购订单协同任务 ${index + 1}`,
+      source_type: sourceType,
+      source_id: currentSourceID,
+      source_no: 'PO-STYLE-L1',
+      task_status_key: index === 0 ? 'blocked' : 'ready',
+      owner_role_key: 'purchase',
+      blocked_reason: index === 0 ? '当前记录阻塞原因' : '',
+      payload: {},
+    })
   }
-  assert(
-    metrics.mainTableHeaders.length > 0,
-    `${scenarioName} 主业务表缺少表头: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.mainTableScrollContainer,
-    `${scenarioName} 主业务表缺少横向滚动容器: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.mainTableHeaders.every(
-      (header) =>
-        header.isSelectionColumn ||
-        (header.whiteSpace === 'nowrap' &&
-          header.titleWhiteSpace === 'nowrap' &&
-          header.moduleHeaderWhiteSpace === 'nowrap' &&
-          header.moduleHeaderTextWhiteSpace === 'nowrap')
-    ),
-    `${scenarioName} 主业务表头应保持单行，由表格横向滚动承接宽度: ${JSON.stringify(metrics)}`
-  )
-  if (
-    metrics.mainTableScrollContainer.scrollWidth >
-    metrics.mainTableScrollContainer.clientWidth + 1
-  ) {
-    assert(
-      ['auto', 'scroll'].includes(metrics.mainTableScrollContainer.overflowX),
-      `${scenarioName} 主业务表宽度超出时应由内部横向滚动承接: ${JSON.stringify(metrics)}`
-    )
-  }
-  assert(
-    !metrics.mainTableHeaders.some((header) => header.text === '操作'),
-    `${scenarioName} 主业务表不应有右侧操作列，行操作应收口到当前操作栏: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    metrics.mainTableFixedCells,
-    [],
-    `${scenarioName} 主业务表左右侧列不应固定: ${JSON.stringify(metrics)}`
-  )
-  const mainTableDataHeaders = metrics.mainTableHeaders.filter(
-    (header) => !header.isSelectionColumn && header.text
-  )
-  assert(
-    mainTableDataHeaders.length > 0,
-    `${scenarioName} 主业务表缺少可配置数据列: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    mainTableDataHeaders.every((header) => header.hasColumnControl),
-    `${scenarioName} 主业务表每个数据列都应提供列顺序入口: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    mainTableDataHeaders.every((header) => header.hasSortControl),
-    `${scenarioName} 主业务表每个数据列都应保留排序入口: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    !/(?:金额合计|数量合计)/.test(metrics.filterSummaryText),
-    `${scenarioName} 筛选区不应重复展示金额/数量合计: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.hero.height <= 300,
-    `${scenarioName} 业务页头部过高，挤占表格和本页协同空间: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.operationPanel.height <= 240,
-    `${scenarioName} 业务操作盒高度未保持当前 ERP 双行工作台范围: ${JSON.stringify(metrics)}`
-  )
-  const workspaceTopSpan =
-    metrics.hero && metrics.tableCard
-      ? metrics.tableCard.top - metrics.hero.top
-      : Number.POSITIVE_INFINITY
-  const taskCardVisible =
-    metrics.taskCard &&
-    metrics.taskCard.width > 0 &&
-    metrics.taskCard.top <= metrics.viewport.height + 20
-  assert(
-    workspaceTopSpan <= 560,
-    `${scenarioName} 业务页头部到表格起点未保持当前 ERP 工作台范围: ${JSON.stringify(metrics)}`
-  )
-  if (expectSelectionAction) {
-    assert(
-      metrics.currentAction?.top > metrics.filters?.top &&
-        metrics.currentAction?.top > metrics.actions?.top &&
-        metrics.currentAction?.top > metrics.primaryAction?.top,
-      `${scenarioName} 当前操作区未位于筛选和主按钮下方: ${JSON.stringify(metrics)}`
-    )
-  } else {
-    assert(
-      !metrics.currentAction,
-      `${scenarioName} 当前操作区可见性不符合预期: ${JSON.stringify(metrics)}`
-    )
-  }
-  assert(
-    taskCardVisible,
-    `${scenarioName} 本页协同未在首屏边界内出现: ${JSON.stringify(metrics)}`
-  )
 }
 
 async function assertBusinessCollaborationPanelCollapsedByDefault(
@@ -11420,9 +11912,42 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     expectCurrentRecord = false,
     checkDesktopResize = true,
     checkResizeHandleHover = true,
+    expectedOverflowNote = '',
+    expectedTabTexts = null,
   }
 ) {
   const compactText = (text) => String(text || '').replace(/\s+/gu, '')
+  const parseRgb = (value) => {
+    const match = String(value || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/iu)
+    if (!match) return null
+    return match.slice(1, 4).map((part) => Number(part))
+  }
+  const assertSubtleSurfaceDifference = (metrics, label) => {
+    const panelRgb = parseRgb(metrics.panelBackground)
+    const tableRgb = parseRgb(metrics.tableCardBackground)
+    assert(
+      panelRgb && tableRgb,
+      `${scenarioName} ${label} 无法读取协同面板和主表卡片背景色: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    const maxDelta = Math.max(
+      ...panelRgb.map((channel, index) => Math.abs(channel - tableRgb[index]))
+    )
+    assert.notEqual(
+      metrics.panelBackground,
+      metrics.tableCardBackground,
+      `${scenarioName} ${label} 协同面板背景不应和主业务表卡片完全相同: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      maxDelta >= 2 && maxDelta <= 28,
+      `${scenarioName} ${label} 协同面板背景应只做轻微层级区分，不能和主业务卡片差异过大: ${JSON.stringify(
+        { ...metrics, maxDelta }
+      )}`
+    )
+  }
   const panel = page.locator('.erp-business-collaboration-task-panel').first()
   await panel.waitFor({ state: 'visible', timeout: 10_000 })
   const toggle = panel.locator('button[aria-expanded]').first()
@@ -11433,6 +11958,10 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     const panelBody = node.querySelector(
       '.erp-business-collaboration-task-panel__body'
     )
+    const pageLayout = node.closest('.erp-business-page-layout')
+    const tableCard = pageLayout?.querySelector('.erp-business-data-table-card')
+    const panelStyle = getComputedStyle(node)
+    const tableCardStyle = tableCard ? getComputedStyle(tableCard) : null
     return {
       className: node.className,
       ariaExpanded: toggleButton?.getAttribute('aria-expanded') || null,
@@ -11463,6 +11992,8 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
         ),
       ].map((item) => String(item.textContent || '').trim()),
       bodyHeight: panelBody?.getBoundingClientRect().height || 0,
+      panelBackground: panelStyle.backgroundColor,
+      tableCardBackground: tableCardStyle?.backgroundColor || '',
       scrollWidth: node.scrollWidth,
       clientWidth: node.clientWidth,
     }
@@ -11534,6 +12065,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     collapsedMetrics.scrollWidth <= collapsedMetrics.clientWidth + 1,
     `${scenarioName} 默认收起态出现横向溢出: ${JSON.stringify(collapsedMetrics)}`
   )
+  assertSubtleSurfaceDifference(collapsedMetrics, '默认收起态')
 
   await toggle.evaluate((button) => button.click())
   await panel
@@ -11578,6 +12110,9 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       }
     }
     const panelRect = node.getBoundingClientRect()
+    const tableCard = pageLayout?.querySelector('.erp-business-data-table-card')
+    const panelStyle = getComputedStyle(node)
+    const tableCardStyle = tableCard ? getComputedStyle(tableCard) : null
     const panelBounds = {
       top: panelRect.top,
       right: panelRect.right,
@@ -11633,6 +12168,19 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       tabTexts: [
         ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
       ].map((item) => String(item.textContent || '').trim()),
+      taskItemCount: node.querySelectorAll(
+        '.erp-business-collaboration-task-panel__item'
+      ).length,
+      moreNoteTexts: [
+        ...node.querySelectorAll(
+          '.erp-business-collaboration-task-panel__more-note'
+        ),
+      ].map((item) => String(item.textContent || '').trim()),
+      summaryItems: [
+        ...node.querySelectorAll(
+          '.erp-business-collaboration-task-panel__summary-item'
+        ),
+      ].map((item) => String(item.textContent || '').trim()),
       maxTabHeight: Math.max(0, ...tabRects.map((rect) => rect.height)),
       tabA11y: [
         ...node.querySelectorAll('.erp-business-collaboration-task-panel__tab'),
@@ -11645,6 +12193,8 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       tabPanelRole: tabPanel?.getAttribute('role') || '',
       tabPanelLabelledBy: tabPanel?.getAttribute('aria-labelledby') || '',
       panelBounds,
+      panelBackground: panelStyle.backgroundColor,
+      tableCardBackground: tableCardStyle?.backgroundColor || '',
       criticalRects,
       overlaps,
       scrollWidth: node.scrollWidth,
@@ -11664,12 +12214,52 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       expandedMetrics
     )}`
   )
+  if (expectedTabTexts) {
+    assert.deepEqual(
+      expandedMetrics.tabTexts.map(compactText),
+      expectedTabTexts.map(compactText),
+      `${scenarioName} 展开后任务 tab 计数不正确: ${JSON.stringify(
+        expandedMetrics
+      )}`
+    )
+  } else {
+    assert.deepEqual(
+      expandedMetrics.tabTexts.map((text) =>
+        compactText(text).replace(/\d+$/u, '')
+      ),
+      ['本页待办', '当前记录', '阻塞异常'],
+      `${scenarioName} 展开后任务 tab 不完整: ${JSON.stringify(expandedMetrics)}`
+    )
+  }
+  if (expectedOverflowNote) {
+    assert(
+      expandedMetrics.moreNoteTexts
+        .map(compactText)
+        .includes(compactText(expectedOverflowNote)),
+      `${scenarioName} 多任务截断提示不正确: ${JSON.stringify(expandedMetrics)}`
+    )
+    assert.equal(
+      expandedMetrics.taskItemCount,
+      6,
+      `${scenarioName} 多任务展开态应只渲染前 6 条任务: ${JSON.stringify(
+        expandedMetrics
+      )}`
+    )
+  } else {
+    assert.deepEqual(
+      expandedMetrics.moreNoteTexts,
+      [],
+      `${scenarioName} 未超出可见上限时不应显示截断提示: ${JSON.stringify(
+        expandedMetrics
+      )}`
+    )
+  }
   assert.deepEqual(
-    expandedMetrics.tabTexts.map((text) =>
-      compactText(text).replace(/\d+$/u, '')
-    ),
-    ['本页待办', '当前记录', '阻塞异常'],
-    `${scenarioName} 展开后任务 tab 不完整: ${JSON.stringify(expandedMetrics)}`
+    expandedMetrics.summaryItems,
+    [],
+    `${scenarioName} 展开态不应在标题行重复展示任务摘要计数: ${JSON.stringify(
+      expandedMetrics
+    )}`
   )
   assert.equal(
     expandedMetrics.tabListRole,
@@ -11729,6 +12319,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     expandedMetrics.scrollWidth <= expandedMetrics.clientWidth + 1,
     `${scenarioName} 展开态出现横向溢出: ${JSON.stringify(expandedMetrics)}`
   )
+  assertSubtleSurfaceDifference(expandedMetrics, '展开态')
 
   const viewportSize = page.viewportSize()
   if ((viewportSize?.width || 0) >= 769) {
@@ -11767,11 +12358,17 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
         const gripStyle = grip ? getComputedStyle(grip) : null
         return {
           panelBodyHeight: panelBodyRect?.height || 0,
+          panelBodyTop: panelBodyRect?.top || 0,
+          panelBodyBottom: panelBodyRect?.bottom || 0,
+          handleTop: handleRect?.top || 0,
+          handleBottom: handleRect?.bottom || 0,
           handleCursor: handleStyle?.cursor || '',
           handleBackground: handleStyle?.backgroundColor || '',
           handleHeight: handleRect?.height || 0,
           gripWidth: gripRect?.width || 0,
           gripHeight: gripRect?.height || 0,
+          gripTop: gripRect?.top || 0,
+          gripBottom: gripRect?.bottom || 0,
           gripBackground: gripStyle?.backgroundColor || '',
           gripBoxShadow: gripStyle?.boxShadow || '',
         }
@@ -11789,13 +12386,22 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       assert(
         idleHandleMetrics.handleHeight >= 14 &&
           idleHandleMetrics.handleHeight <= 18,
-        `${scenarioName} 协同入口拖拽手柄命中区应便于鼠标拖拽且不应变成粗横杆: ${JSON.stringify(
+        `${scenarioName} 协同入口拖拽手柄命中区应便于鼠标拖拽且不应变成大块横杆: ${JSON.stringify(
           idleHandleMetrics
         )}`
       )
       assert(
-        idleHandleMetrics.gripHeight > 0 && idleHandleMetrics.gripHeight <= 3,
-        `${scenarioName} 协同入口拖拽短线未保持轻量视觉: ${JSON.stringify(
+        idleHandleMetrics.handleTop >= idleHandleMetrics.panelBodyTop - 0.5 &&
+          idleHandleMetrics.gripTop >= idleHandleMetrics.panelBodyTop - 0.5 &&
+          idleHandleMetrics.gripBottom <=
+            idleHandleMetrics.panelBodyBottom + 0.5,
+        `${scenarioName} 协同入口拖拽横杆必须在面板可见区域内，不能被卡片顶部裁切: ${JSON.stringify(
+          idleHandleMetrics
+        )}`
+      )
+      assert(
+        idleHandleMetrics.gripHeight >= 5 && idleHandleMetrics.gripHeight <= 5,
+        `${scenarioName} 协同入口拖拽短线应保持 5px 可见握柄: ${JSON.stringify(
           idleHandleMetrics
         )}`
       )
@@ -12019,7 +12625,7 @@ async function verifyFormalShellRowDoubleClickEditModal(
     .filter({ hasText: '当前边界' })
     .last()
   await modal.waitFor({ timeout: 10_000 })
-  await expectText(page, '当前页面仍是正式入口壳')
+  await expectText(page, '当前页面仍是待接入预览页')
   await expectText(page, rowText)
 
   const modalMetrics = await page.evaluate(() => {
@@ -12038,7 +12644,7 @@ async function verifyFormalShellRowDoubleClickEditModal(
       visibleEditModals: Array.from(document.querySelectorAll('.ant-modal'))
         .filter(isVisible)
         .filter((node) =>
-          String(node.textContent || '').includes('当前页面仍是正式入口壳')
+          String(node.textContent || '').includes('当前页面仍是待接入预览页')
         ).length,
       visibleFormModals: Array.from(
         document.querySelectorAll('.erp-business-action-modal--form.ant-modal')
@@ -12086,8 +12692,7 @@ async function verifyFormalShellRowDoubleClickEditModal(
     )
   }
 
-  await modal.locator('.ant-modal-close').click({ force: true })
-  await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+  await closeBusinessFormModal(page, modal)
 }
 
 async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
@@ -12141,9 +12746,14 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
     const detailActions = rectOf('.erp-workbench-detail-actions')
     const detailEmpty = rectOf('.erp-workbench-detail-empty')
     const detailEmptyContent = rectOf('.erp-workbench-detail-empty .ant-empty')
-    const kpis = Array.from(document.querySelectorAll('.erp-workbench-kpi'))
+    const queueFilters = Array.from(
+      document.querySelectorAll('.erp-workbench-queue-filter')
+    )
       .map((node) => rectOf(node))
       .filter(Boolean)
+    const activeQueueFilters = document.querySelectorAll(
+      '.erp-workbench-queue-filter[aria-pressed="true"]'
+    ).length
     const roleRows = Array.from(
       document.querySelectorAll('.erp-workbench-role-row')
     )
@@ -12170,7 +12780,8 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
       detailActions,
       detailEmpty,
       detailEmptyContent,
-      kpis,
+      queueFilters,
+      activeQueueFilters,
       roleRows,
       activeRows,
       queueDetailOverlap: overlaps(queuePanel, detailPanel),
@@ -12182,48 +12793,53 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
     `${scenarioName} 工作台主卡片不可见: ${JSON.stringify(metrics)}`
   )
   assert.equal(
-    metrics.kpis.length,
+    metrics.queueFilters.length,
     3,
-    `${scenarioName} 工作台应保留 3 个判断指标: ${JSON.stringify(metrics)}`
+    `${scenarioName} 工作台应保留 3 个队列筛选入口: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.activeQueueFilters,
+    1,
+    `${scenarioName} 工作台应只有一个当前队列入口: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.queuePanel?.width > 0 && metrics.detailPanel?.width > 0,
-    `${scenarioName} 工作台队列和当前任务详情应同时可见: ${JSON.stringify(metrics)}`
+    `${scenarioName} 工作台队列和当前任务上下文应同时可见: ${JSON.stringify(metrics)}`
   )
   assert(
     !metrics.queueDetailOverlap,
-    `${scenarioName} 工作台主列与当前任务详情不应重叠: ${JSON.stringify(metrics)}`
+    `${scenarioName} 工作台主列与当前任务上下文不应重叠: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.detailHead?.height > 0,
-    `${scenarioName} 工作台任务详情头部应可见: ${JSON.stringify(metrics)}`
+    `${scenarioName} 工作台任务上下文头部应可见: ${JSON.stringify(metrics)}`
   )
   if (metrics.detailBody) {
     assert(
       metrics.detailTitle?.height > 0 &&
         metrics.detailDescriptions?.height > 0 &&
         metrics.detailActions?.height > 0,
-      `${scenarioName} 工作台任务详情正文、字段和动作区应同时可见: ${JSON.stringify(metrics)}`
+      `${scenarioName} 工作台任务上下文正文、字段和动作区应同时可见: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.detailTitle.left >= metrics.detailPanel.left + 12 &&
         metrics.detailDescriptions.left >= metrics.detailPanel.left + 12 &&
         metrics.detailActions.left >= metrics.detailPanel.left + 12,
-      `${scenarioName} 工作台任务详情正文不应贴左边框: ${JSON.stringify(metrics)}`
+      `${scenarioName} 工作台任务上下文正文不应贴左边框: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.detailTitle.top >= metrics.detailHead.bottom + 12,
-      `${scenarioName} 工作台任务详情标题不应贴住头部分割线: ${JSON.stringify(metrics)}`
+      `${scenarioName} 工作台任务上下文标题不应贴住头部分割线: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.detailActions.right <= metrics.detailPanel.right - 12 + 1 &&
         metrics.detailActions.bottom <= metrics.detailPanel.bottom - 12 + 1,
-      `${scenarioName} 工作台任务详情动作区不应贴边或溢出: ${JSON.stringify(metrics)}`
+      `${scenarioName} 工作台任务上下文动作区不应贴边或溢出: ${JSON.stringify(metrics)}`
     )
   } else {
     assert(
       metrics.detailEmpty?.height > 0,
-      `${scenarioName} 工作台任务详情空态应可见: ${JSON.stringify(metrics)}`
+      `${scenarioName} 工作台任务上下文空态应可见: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.detailEmptyContent?.height > 0 &&
@@ -12233,7 +12849,7 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
           metrics.detailPanel.right - 12 + 1 &&
         metrics.detailEmptyContent.bottom <=
           metrics.detailPanel.bottom - 12 + 1,
-      `${scenarioName} 工作台任务详情空态不应贴边或溢出: ${JSON.stringify(metrics)}`
+      `${scenarioName} 工作台任务上下文空态不应贴边或溢出: ${JSON.stringify(metrics)}`
     )
   }
   assert(
@@ -12532,189 +13148,6 @@ async function assertTaskActionDrawerLayout(
   assert(
     metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 2,
     `${scenarioName} 打开任务处理抽屉后页面产生横向滚动: ${JSON.stringify(metrics)}`
-  )
-}
-
-async function assertAntdTableHeaderTextFlow(page, { scenarioName }) {
-  const metrics = await page.evaluate(() => {
-    const isVisible = (node) => {
-      if (!(node instanceof HTMLElement)) return false
-      const rect = node.getBoundingClientRect()
-      const style = window.getComputedStyle(node)
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden'
-      )
-    }
-    const rectOf = (node) => {
-      if (!(node instanceof HTMLElement)) return null
-      const rect = node.getBoundingClientRect()
-      return {
-        left: rect.left,
-        right: rect.right,
-        top: rect.top,
-        bottom: rect.bottom,
-        width: rect.width,
-        height: rect.height,
-      }
-    }
-
-    return Array.from(
-      document.querySelectorAll('.ant-table-wrapper .ant-table-thead th')
-    )
-      .filter(isVisible)
-      .map((cell) => {
-        const title =
-          cell.querySelector('.ant-table-column-title') ||
-          cell.querySelector('.erp-module-column-header') ||
-          cell
-        const text =
-          cell.querySelector('.erp-module-column-header-text') || title
-        const sorter = cell.querySelector('.ant-table-column-sorter')
-        const cellStyle = window.getComputedStyle(cell)
-        const titleStyle = window.getComputedStyle(title)
-        const textStyle = window.getComputedStyle(text)
-        return {
-          text: String(text.textContent || '')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 80),
-          cellRect: rectOf(cell),
-          titleRect: rectOf(title),
-          textRect: rectOf(text),
-          sorterRect: rectOf(sorter),
-          cellWhiteSpace: cellStyle.whiteSpace,
-          titleWhiteSpace: titleStyle.whiteSpace,
-          titleOverflow: titleStyle.overflow,
-          textWhiteSpace: textStyle.whiteSpace,
-          textOverflow: textStyle.overflow,
-          textOverflowWrap: textStyle.overflowWrap,
-          textWordBreak: textStyle.wordBreak,
-          textClientWidth: text.clientWidth,
-          textScrollWidth: text.scrollWidth,
-          textClientHeight: text.clientHeight,
-          textScrollHeight: text.scrollHeight,
-        }
-      })
-      .filter((item) => item.text)
-  })
-
-  assert(
-    metrics.length > 0,
-    `${scenarioName} 未找到可检查的 AntD 表头文案: ${JSON.stringify(metrics)}`
-  )
-
-  const clippedHeaders = metrics.filter((item) => {
-    const horizontalClip =
-      item.textScrollWidth > item.textClientWidth + 1 &&
-      item.textOverflow === 'hidden' &&
-      item.textOverflowWrap !== 'anywhere'
-    const verticalClip =
-      item.textScrollHeight > item.textClientHeight + 1 &&
-      item.textOverflow === 'hidden'
-    return (
-      item.cellWhiteSpace === 'nowrap' ||
-      item.titleWhiteSpace === 'nowrap' ||
-      item.textWhiteSpace === 'nowrap' ||
-      horizontalClip ||
-      verticalClip
-    )
-  })
-  assert.equal(
-    clippedHeaders.length,
-    0,
-    `${scenarioName} 表头仍存在 nowrap 或 hidden 裁切: ${JSON.stringify(clippedHeaders)}`
-  )
-
-  const sorterOverlaps = metrics.filter((item) => {
-    if (!item.sorterRect || !item.textRect) return false
-    const horizontalOverlap =
-      item.textRect.left < item.sorterRect.right &&
-      item.textRect.right > item.sorterRect.left
-    const verticalOverlap =
-      item.textRect.top < item.sorterRect.bottom &&
-      item.textRect.bottom > item.sorterRect.top
-    return horizontalOverlap && verticalOverlap
-  })
-  assert.equal(
-    sorterOverlaps.length,
-    0,
-    `${scenarioName} 表头标题与排序器发生覆盖: ${JSON.stringify(sorterOverlaps)}`
-  )
-}
-
-async function assertAntdFormLabelTextFlow(
-  page,
-  { scenarioName, rootSelector = '.ant-modal' } = {}
-) {
-  const metrics = await page.evaluate((selector) => {
-    const root = document.querySelector(selector)
-    const isVisible = (node) => {
-      if (!(node instanceof HTMLElement)) return false
-      const rect = node.getBoundingClientRect()
-      const style = window.getComputedStyle(node)
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.display !== 'none' &&
-        style.visibility !== 'hidden'
-      )
-    }
-
-    return Array.from(
-      (root || document).querySelectorAll('.ant-form-item-label > label')
-    )
-      .filter(isVisible)
-      .map((label) => {
-        const style = window.getComputedStyle(label)
-        const rect = label.getBoundingClientRect()
-        return {
-          text: String(label.textContent || '')
-            .replace(/\s+/g, ' ')
-            .trim()
-            .slice(0, 80),
-          width: rect.width,
-          height: rect.height,
-          whiteSpace: style.whiteSpace,
-          overflow: style.overflow,
-          overflowWrap: style.overflowWrap,
-          wordBreak: style.wordBreak,
-          lineHeight: style.lineHeight,
-          clientWidth: label.clientWidth,
-          scrollWidth: label.scrollWidth,
-          clientHeight: label.clientHeight,
-          scrollHeight: label.scrollHeight,
-        }
-      })
-      .filter((item) => item.text)
-  }, rootSelector)
-
-  assert(
-    metrics.length > 0,
-    `${scenarioName} 未找到可检查的 AntD 表单标签: ${JSON.stringify(metrics)}`
-  )
-
-  const clippedLabels = metrics.filter((item) => {
-    const horizontalClip =
-      item.scrollWidth > item.clientWidth + 1 &&
-      item.overflow === 'hidden' &&
-      item.overflowWrap !== 'anywhere'
-    const verticalClip =
-      item.scrollHeight > item.clientHeight + 1 && item.overflow === 'hidden'
-    return (
-      item.whiteSpace === 'nowrap' ||
-      item.width <= 0 ||
-      item.height <= 0 ||
-      horizontalClip ||
-      verticalClip
-    )
-  })
-  assert.equal(
-    clippedLabels.length,
-    0,
-    `${scenarioName} 表单标签仍存在 nowrap 或 hidden 裁切: ${JSON.stringify(clippedLabels)}`
   )
 }
 

@@ -329,6 +329,7 @@ type InventoryRepo interface {
 	ActivateBOMVersion(ctx context.Context, id int) (*BOMVersionDetail, error)
 	ArchiveBOMVersion(ctx context.Context, id int) (*BOMHeader, error)
 	CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error)
+	CreatePurchaseReceiptWithItems(ctx context.Context, in *PurchaseReceiptCreate, items []*PurchaseReceiptItemCreate) (*PurchaseReceipt, error)
 	CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error)
 	AddPurchaseReceiptItem(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, error)
 	PostPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
