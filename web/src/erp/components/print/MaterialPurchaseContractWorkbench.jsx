@@ -3,6 +3,7 @@ import { message, modal } from '@/common/utils/antdApp'
 import {
   applyDetailCellMerge,
   buildBlankMaterialPurchaseContractDraft,
+  clearMaterialPurchaseContractSignatureDraft,
   MATERIAL_PURCHASE_DETAIL_COLUMNS,
   MATERIAL_PURCHASE_MAX_ROWS,
   buildMaterialPurchaseContractDraft,
@@ -633,6 +634,14 @@ export default function MaterialPurchaseContractWorkbench({
     })
   }
 
+  const handleClearSignature = () => {
+    setDraft((currentDraft) =>
+      clearMaterialPurchaseContractSignatureDraft(currentDraft)
+    )
+    setToolbarStatus('已清空签字人，纸面保留日期和甲乙方手签位置。')
+    message.success('已清空签字人')
+  }
+
   const getToolbarButtonClassName = ({
     active = false,
     primary = false,
@@ -952,6 +961,13 @@ export default function MaterialPurchaseContractWorkbench({
               onClick={handleResetDraft}
             >
               恢复样例
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName()}
+              onClick={handleClearSignature}
+            >
+              手签留白
             </button>
             <button
               type="button"

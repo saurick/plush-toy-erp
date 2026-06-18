@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   PROCESSING_CONTRACT_MAX_ROWS,
   applyProcessingDetailCellMerge,
+  clearProcessingContractSignatureDraft,
   deleteProcessingContractLine,
   insertProcessingContractLine,
   splitProcessingDetailCellMerge,
@@ -42,6 +43,36 @@ test('FL_processing_contract_editor__clears_blank_inserted_lines processingContr
   assert.equal(inserted.lines[1].productNo, '')
   assert.equal(inserted.lines[1].productName, '')
   assert.equal(inserted.lines[1].processName, '')
+})
+
+test('processingContractEditor: 手签留白只清空签字人并保留日期', () => {
+  const cleared = clearProcessingContractSignatureDraft({
+    contractNo: 'B25060808',
+    buyerCompany: '本公司',
+    buyerSigner: '签字人',
+    supplierSigner: '受托方签字人',
+    buyerSignDateText: '2025-06-08',
+    supplierSignDateText: '2025-06-08',
+    lines: sampleLines,
+    clauses: {
+      delivery: ['来货要求'],
+      contract: ['合同约定'],
+      settlement: ['结算方式'],
+    },
+    attachments: {
+      pattern: { name: '纸样.png' },
+    },
+  })
+
+  assert.equal(cleared.contractNo, 'B25060808')
+  assert.equal(cleared.buyerCompany, '本公司')
+  assert.equal(cleared.lines, sampleLines)
+  assert.deepEqual(cleared.clauses.delivery, ['来货要求'])
+  assert.equal(cleared.attachments.pattern.name, '纸样.png')
+  assert.equal(cleared.buyerSigner, '')
+  assert.equal(cleared.supplierSigner, '')
+  assert.equal(cleared.buyerSignDateText, '2025-06-08')
+  assert.equal(cleared.supplierSignDateText, '2025-06-08')
 })
 
 test('processingContractEditor: 达到 300 行后不允许继续插入', () => {

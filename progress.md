@@ -153,3 +153,11 @@
 - 验证：`node --check web/scripts/styleL1.mjs` 通过；`STYLE_L1_PORT=4216 STYLE_L1_SCENARIOS=purchase-receipt-add-item-modal-dark-desktop,purchase-receipt-add-item-modal-mobile pnpm style:l1` 通过；`STYLE_L1_PORT=4217 STYLE_L1_SCENARIOS=purchase-receipt-add-item-modal-draft-desktop,purchase-receipt-add-item-modal-dark-desktop,purchase-receipt-add-item-modal-mobile pnpm style:l1` 通过；`git diff --check -- web/scripts/styleL1.mjs` 通过。
 - 下一步：采购入库页面治理可以继续补“整单创建”和“添加明细”两组场景的无权限 / 失败请求 / stale selected row 行为；真正编辑、删除或批量追加草稿明细仍应先评审后端 usecase，而不是在前端循环调用单行 add。
 - 阻塞/风险：本轮没有重跑 `pnpm test`、`pnpm css`、后端 Go、migration、部署检查或真实写入 smoke；未新增 `PR-BROWSER-*` 持久测试单据。当前工作区仍有大量并行改动，未提交、未推送。
+
+## 2026-06-18 打印合同手签留白动作
+
+- 完成：按 `plush-page-design-governance` 在采购合同和加工合同独立打印窗口增加 `手签留白` 动作，只清空当前窗口草稿里的甲方签名和乙方签名，保留双方日期、甲乙方签字区版式、合同主体、明细、条款和附件，便于打印后手写签字。
+- 完成：新增采购合同 / 加工合同 editor helper 和单元测试；扩展打印工作台 L1 弹窗刷新场景，覆盖按钮可见、点击后纸面签字人清空、日期保留、工具栏无横向溢出；同步 `docs/打印模板字段与编辑行为清单.md` 的行为口径。
+- 验证：`pnpm --dir web exec node --test src/erp/utils/materialPurchaseContractEditor.test.mjs src/erp/utils/processingContractEditor.test.mjs` 通过，20 项；`node --check web/scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .mjs --ext .jsx src/erp/utils/materialPurchaseContractEditor.mjs src/erp/utils/processingContractEditor.mjs src/erp/components/print/MaterialPurchaseContractWorkbench.jsx src/erp/pages/ProcessingContractPrintWorkspacePage.jsx scripts/styleL1.mjs` 通过；`STYLE_L1_PORT=4282 STYLE_L1_SCENARIOS=print-workspace-material-shell-refresh,print-workspace-processing-shell-refresh pnpm --dir web style:l1` 通过，2 个场景，覆盖签字人清空且日期保留；`pnpm --dir web lint` 通过；`pnpm --dir web css` 通过；`pnpm --dir web test` 通过，358 项。
+- 下一步：如后续需要客户专属电子签章，应作为客户配置 / 打印模板扩展单独评审，不把电子签署状态写进当前 Product Core 打印草稿。
+- 阻塞/风险：本轮不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态；`手签留白` 只是当前窗口打印草稿动作，不代表电子签署、审批或业务事实过账。

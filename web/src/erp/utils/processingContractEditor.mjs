@@ -60,6 +60,12 @@ export const updateProcessingContractLineCell = (
     return nextLine
   })
 
+export const clearProcessingContractSignatureDraft = (contract = {}) => ({
+  ...contract,
+  buyerSigner: '',
+  supplierSigner: '',
+})
+
 export const insertProcessingContractLine = ({
   lines = [],
   merges = [],

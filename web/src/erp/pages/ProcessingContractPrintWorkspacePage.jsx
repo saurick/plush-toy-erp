@@ -23,6 +23,7 @@ import {
 import {
   PROCESSING_CONTRACT_MAX_ROWS,
   applyProcessingDetailCellMerge,
+  clearProcessingContractSignatureDraft,
   deleteProcessingContractLine,
   splitProcessingDetailCellMerge,
   insertProcessingContractLine,
@@ -699,6 +700,12 @@ export default function ProcessingContractPrintWorkspacePage() {
     })
   }
 
+  const handleClearSignature = () => {
+    setContract((current) => clearProcessingContractSignatureDraft(current))
+    setToolbarStatus('已清空签字人，纸面保留日期和甲乙方手签位置。')
+    message.success('已清空签字人')
+  }
+
   const getToolbarButtonClassName = ({
     active = false,
     primary = false,
@@ -1083,6 +1090,13 @@ export default function ProcessingContractPrintWorkspacePage() {
               onClick={resetDraft}
             >
               恢复样例
+            </button>
+            <button
+              type="button"
+              className={getToolbarButtonClassName()}
+              onClick={handleClearSignature}
+            >
+              手签留白
             </button>
             <button
               type="button"

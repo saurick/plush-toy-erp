@@ -2702,6 +2702,10 @@ const scenarios = [
         editableSelector:
           '.erp-material-contract-table tbody td [contenteditable="true"]',
         editableScenarioLabel: '采购合同弹窗刷新恢复',
+        signatureValueSelector:
+          '.erp-material-contract-signature__name, .erp-material-contract-signature__date-value',
+        signatureTextsToClear: ['签字人', '供应商签字人'],
+        signatureTextsToRetain: ['2026/2/28'],
       })
     },
   },
@@ -2716,6 +2720,10 @@ const scenarios = [
         editableSelector:
           '.erp-processing-contract-table tbody td [contenteditable="true"]',
         editableScenarioLabel: '加工合同弹窗刷新恢复',
+        signatureValueSelector:
+          '.erp-processing-contract-signature__name-value, .erp-processing-contract-signature__date-value',
+        signatureTextsToClear: ['签字人', '受托方签字人'],
+        signatureTextsToRetain: ['2025-06-08'],
       })
     },
   },
@@ -9697,7 +9705,14 @@ async function assertPrintCenterPreviewPopup(
 
 async function assertEditablePrintWorkspacePopupRefresh(
   page,
-  { expectedTitle, editableSelector = '', editableScenarioLabel = '' }
+  {
+    expectedTitle,
+    editableSelector = '',
+    editableScenarioLabel = '',
+    signatureValueSelector = '',
+    signatureTextsToClear = [],
+    signatureTextsToRetain = [],
+  }
 ) {
   const [popup] = await Promise.all([
     page.waitForEvent('popup', { timeout: 10_000 }),
@@ -9759,6 +9774,14 @@ async function assertEditablePrintWorkspacePopupRefresh(
         scenarioLabel: editableScenarioLabel || expectedTitle,
       })
     }
+    if (signatureValueSelector) {
+      await assertPrintWorkspaceSignatureBlankAction(popup, {
+        expectedTitle,
+        signatureValueSelector,
+        signatureTextsToClear,
+        signatureTextsToRetain,
+      })
+    }
     assert.deepEqual(
       popupErrors,
       [],
@@ -9769,6 +9792,93 @@ async function assertEditablePrintWorkspacePopupRefresh(
       await popup.close()
     }
   }
+}
+
+async function assertPrintWorkspaceSignatureBlankAction(
+  page,
+  {
+    expectedTitle,
+    signatureValueSelector,
+    signatureTextsToClear = [],
+    signatureTextsToRetain = [],
+  }
+) {
+  await page.getByRole('button', { name: '手签留白' }).waitFor({
+    state: 'visible',
+    timeout: 10_000,
+  })
+
+  const beforeClear = await page.evaluate(
+    ({ selector }) =>
+      Array.from(document.querySelectorAll(selector)).map((node) =>
+        (node.textContent || '').replace(/\u00a0/g, ' ').trim()
+      ),
+    { selector: signatureValueSelector }
+  )
+
+  assert(
+    beforeClear.length >= 4,
+    `${expectedTitle} 手签留白前应能定位甲乙方签字和日期字段: ${JSON.stringify(beforeClear)}`
+  )
+  ;[...signatureTextsToClear, ...signatureTextsToRetain].forEach((text) => {
+    assert(
+      beforeClear.includes(text),
+      `${expectedTitle} 手签留白前应保留样例签字值 ${text}: ${JSON.stringify(beforeClear)}`
+    )
+  })
+
+  const toolbarMetricsBefore = await page.evaluate(() => {
+    const toolbar = document.querySelector('.erp-print-shell__toolbar')
+    const actionGroups = Array.from(
+      document.querySelectorAll('.erp-print-shell__toolbar-group')
+    )
+    return {
+      toolbarScrollWidth: toolbar?.scrollWidth || 0,
+      toolbarClientWidth: toolbar?.clientWidth || 0,
+      actionGroupOverflow: actionGroups.map((group) => ({
+        text: group.textContent?.replace(/\s+/g, ' ').trim() || '',
+        scrollWidth: group.scrollWidth,
+        clientWidth: group.clientWidth,
+      })),
+    }
+  })
+  assert(
+    toolbarMetricsBefore.toolbarScrollWidth <=
+      toolbarMetricsBefore.toolbarClientWidth + 1,
+    `${expectedTitle} 增加手签留白后工具栏不应横向溢出: ${JSON.stringify(toolbarMetricsBefore)}`
+  )
+
+  await page.getByRole('button', { name: '手签留白' }).click()
+  await expectText(page, '已清空签字人，纸面保留日期和甲乙方手签位置。')
+
+  const afterClear = await page.evaluate(
+    ({ selector }) =>
+      Array.from(document.querySelectorAll(selector)).map((node) =>
+        (node.textContent || '').replace(/\u00a0/g, ' ').trim()
+      ),
+    { selector: signatureValueSelector }
+  )
+  assert(
+    afterClear.length === beforeClear.length,
+    `${expectedTitle} 手签留白不应改变签字区字段数量: before=${JSON.stringify(beforeClear)} after=${JSON.stringify(afterClear)}`
+  )
+  signatureTextsToClear.forEach((text) => {
+    assert(
+      !afterClear.includes(text),
+      `${expectedTitle} 手签留白应清空签字人 ${text}: before=${JSON.stringify(beforeClear)} after=${JSON.stringify(afterClear)}`
+    )
+  })
+  signatureTextsToRetain.forEach((text) => {
+    assert(
+      afterClear.includes(text),
+      `${expectedTitle} 手签留白应保留日期 ${text}: before=${JSON.stringify(beforeClear)} after=${JSON.stringify(afterClear)}`
+    )
+  })
+  assert(
+    afterClear.filter((text) => text === '').length >=
+      signatureTextsToClear.length,
+    `${expectedTitle} 手签留白后应出现签字人留白: before=${JSON.stringify(beforeClear)} after=${JSON.stringify(afterClear)}`
+  )
 }
 
 async function expectPrintWorkspaceToolbarTitle(page, title) {

@@ -280,6 +280,12 @@ export const buildBlankMaterialPurchaseContractDraft = (draft = {}) => {
   }
 }
 
+export const clearMaterialPurchaseContractSignatureDraft = (draft = {}) => ({
+  ...draft,
+  buyerSigner: '',
+  supplierSigner: '',
+})
+
 export const computeMaterialPurchaseTotals = (lines = []) => {
   let quantityTotal = 0
   let amountTotal = 0

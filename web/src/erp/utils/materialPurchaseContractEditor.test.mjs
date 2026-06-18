@@ -5,6 +5,7 @@ import {
   applyDetailCellMerge,
   buildBlankMaterialPurchaseContractDraft,
   buildMaterialPurchaseContractDraft,
+  clearMaterialPurchaseContractSignatureDraft,
   computeMaterialPurchaseTotals,
   deleteMaterialPurchaseLine,
   insertMaterialPurchaseLine,
@@ -176,6 +177,27 @@ test('materialPurchaseContractEditor: 空白模板清空示例字段和明细但
   assert.deepEqual(blankDraft.clauses.contract, ['保留合同约定'])
   assert.deepEqual(blankDraft.clauses.settlement, ['保留结算方式'])
   assert.deepEqual(blankDraft.merges, [])
+})
+
+test('materialPurchaseContractEditor: 手签留白只清空签字人并保留日期', () => {
+  const cleared = clearMaterialPurchaseContractSignatureDraft({
+    ...sampleDraft,
+    supplierName: '示例供应商',
+    buyerCompany: '本公司',
+    buyerSigner: '签字人',
+    supplierSigner: '供应商签字人',
+    signDateText: '2026/2/28',
+    supplierSignDateText: '2026/2/28',
+  })
+
+  assert.equal(cleared.supplierName, '示例供应商')
+  assert.equal(cleared.buyerCompany, '本公司')
+  assert.equal(cleared.lines.length, sampleDraft.lines.length)
+  assert.deepEqual(cleared.clauses, sampleDraft.clauses)
+  assert.equal(cleared.buyerSigner, '')
+  assert.equal(cleared.supplierSigner, '')
+  assert.equal(cleared.signDateText, '2026/2/28')
+  assert.equal(cleared.supplierSignDateText, '2026/2/28')
 })
 
 test('FL_material_purchase_merge__clears_covered_cell_stale_value materialPurchaseContractEditor: 合并选区后会清空被覆盖单元格，拆分后可恢复独立结构', () => {
