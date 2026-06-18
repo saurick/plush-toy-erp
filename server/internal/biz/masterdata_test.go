@@ -69,6 +69,9 @@ func (s *masterDataRepoStub) ListMaterials(context.Context, MasterDataFilter) ([
 func (s *masterDataRepoStub) SetMaterialActive(context.Context, int, bool) (*Material, error) {
 	return nil, nil
 }
+func (s *masterDataRepoStub) ListUnits(context.Context, MasterDataFilter) ([]*Unit, int, error) {
+	return []*Unit{{ID: 1, Code: "PCS", Name: "个", IsActive: true}}, 1, nil
+}
 func (s *masterDataRepoStub) UnitIsActive(_ context.Context, id int) (bool, error) {
 	if s.units == nil {
 		return false, ErrUnitNotFound

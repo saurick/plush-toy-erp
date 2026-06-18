@@ -33,6 +33,7 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers materials
     'update_material',
     'get_material',
     'set_material_active',
+    'list_units',
     'list_processes',
     'create_process',
     'update_process',

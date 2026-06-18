@@ -3,19 +3,36 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   DeleteOutlined,
+  DownOutlined,
+  DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
+  InboxOutlined,
+  LinkOutlined,
   PlusOutlined,
   PrinterOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Input, InputNumber, Modal, Select, Tag } from 'antd'
-import { useOutletContext } from 'react-router-dom'
+import {
+  Button,
+  Dropdown,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Space,
+  Tag,
+  Tooltip,
+} from 'antd'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
+  CollaborationTaskPanel,
   DateInput,
   DateRangeFilter,
   PageHeaderCard,
@@ -25,6 +42,11 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  ColumnOrderHeaderMenu,
+  ColumnOrderModal,
+  getColumnLabel,
+} from '../components/business-list/ColumnOrderModal.jsx'
+import {
   cancelOutsourcingOrder,
   closeOutsourcingOrder,
   confirmOutsourcingOrder,
@@ -33,12 +55,20 @@ import {
   listProcesses,
   listProducts,
   listSuppliers,
+  listUnits,
   saveOutsourcingOrderWithItems,
   submitOutsourcingOrder,
 } from '../api/masterDataOrderApi.mjs'
+import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
+import {
+  listWorkflowTasks,
+  updateWorkflowTaskStatus,
+  urgeWorkflowTask,
+} from '../api/workflowApi.mjs'
 import {
   OUTSOURCING_ORDER_STATUS_COLORS,
   OUTSOURCING_ORDER_STATUS_LABELS,
+  V1_ROUTE_PATHS,
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
   buildSupplierSnapshot,
@@ -49,7 +79,13 @@ import {
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
-import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
+import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
+import {
+  applyBusinessColumnSorters,
+  applyModuleColumnOrder,
+  sanitizeModuleColumnOrder,
+} from '../utils/moduleTableColumns.mjs'
+import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
@@ -121,11 +157,82 @@ const LIFECYCLE_ACTIONS = [
 
 const DEFAULT_PAGINATION = { current: 1, pageSize: 20 }
 const BUSINESS_FORM_MODAL_WIDTH = 'min(1080px, calc(100vw - 96px))'
+const OUTSOURCING_ORDERS_MODULE_KEY = 'processing-contracts'
+const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
+const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
 
 function parseSortValue(value = 'updated_at:desc') {
   const [sortBy = 'updated_at', sortDirection = 'desc'] =
     String(value).split(':')
   return { sortBy, sortDirection }
+}
+
+function readStoredColumnOrder(moduleKey) {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.localStorage.getItem(
+      `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+    )
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredColumnOrder(moduleKey, order = []) {
+  if (typeof window === 'undefined') return
+  const storageKey = `${COLUMN_ORDER_STORAGE_PREFIX}${moduleKey}`
+  if (!Array.isArray(order) || order.length === 0) {
+    window.localStorage.removeItem(storageKey)
+    return
+  }
+  window.localStorage.setItem(storageKey, JSON.stringify(order))
+}
+
+function getPreferredColumnOrder({
+  adminProfile,
+  moduleKey,
+  columns,
+  localOrder,
+}) {
+  if (Array.isArray(localOrder)) {
+    return sanitizeModuleColumnOrder(localOrder, columns)
+  }
+  const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
+  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
+  if (sanitizedAccountOrder.length > 0) return sanitizedAccountOrder
+  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
+}
+
+function csvEscape(value) {
+  const text = String(value ?? '')
+  return /[",\n\r]/u.test(text) ? `"${text.replace(/"/g, '""')}"` : text
+}
+
+function downloadCSV({ filename, columns, rows }) {
+  const header = columns.map((column) => csvEscape(getColumnLabel(column)))
+  const body = rows.map((row) =>
+    columns.map((column) => {
+      const rawValue =
+        typeof column.exportValue === 'function'
+          ? column.exportValue(row)
+          : row?.[column.dataIndex]
+      return csvEscape(rawValue)
+    })
+  )
+  const csv = [header, ...body].map((line) => line.join(',')).join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], {
+    type: 'text/csv;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
 }
 
 function todayInputValue() {
@@ -234,6 +341,14 @@ function processLabel(process = {}) {
     .join(' / ')
 }
 
+function unitLabel(unit = {}) {
+  return [unit.code, unit.name].filter(Boolean).join(' / ')
+}
+
+function workflowPayloadOf(task = {}) {
+  return task.payload && typeof task.payload === 'object' ? task.payload : {}
+}
+
 function statusTag(status) {
   const key = String(status || '').trim()
   return (
@@ -251,13 +366,21 @@ function canEditOrder(record) {
 
 export default function V1OutsourcingOrdersPage() {
   const outletContext = useOutletContext()
-  const adminProfile = outletContext?.adminProfile || {}
+  const navigate = useNavigate()
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const [form] = Form.useForm()
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [printing, setPrinting] = useState(false)
+  const [workflowTasks, setWorkflowTasks] = useState([])
+  const [columnOrder, setColumnOrder] = useState(null)
+  const [columnOrderOpen, setColumnOrderOpen] = useState(false)
+  const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [dateField, setDateField] = useState('order_date')
@@ -270,6 +393,7 @@ export default function V1OutsourcingOrdersPage() {
   const [suppliers, setSuppliers] = useState([])
   const [products, setProducts] = useState([])
   const [processes, setProcesses] = useState([])
+  const [units, setUnits] = useState([])
 
   const watchedItems = Form.useWatch('items', form) || []
   const lineSummary = summarizeLines(watchedItems)
@@ -306,16 +430,34 @@ export default function V1OutsourcingOrdersPage() {
     [processes]
   )
 
+  const unitOptions = useMemo(
+    () =>
+      units.map((item) => ({
+        value: item.id,
+        label: unitLabel(item),
+        item,
+      })),
+    [units]
+  )
+
+  const unitByID = useMemo(
+    () => new Map(units.map((item) => [item.id, item])),
+    [units]
+  )
+
   const loadReferenceData = useCallback(async () => {
     try {
-      const [supplierData, productData, processData] = await Promise.all([
-        listSuppliers({ active_only: true, limit: 200 }),
-        listProducts({ active_only: true, limit: 200 }),
-        listProcesses({ active_only: true, limit: 200 }),
-      ])
+      const [supplierData, productData, processData, unitData] =
+        await Promise.all([
+          listSuppliers({ active_only: true, limit: 200 }),
+          listProducts({ active_only: true, limit: 200 }),
+          listProcesses({ active_only: true, limit: 200 }),
+          listUnits({ limit: 200 }),
+        ])
       setSuppliers(supplierData?.suppliers || [])
       setProducts(productData?.products || [])
       setProcesses(processData?.processes || [])
+      setUnits(unitData?.units || [])
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载委外基础资料失败'))
     }
@@ -374,6 +516,18 @@ export default function V1OutsourcingOrdersPage() {
     adminProfile,
     'outsourcing.order.update'
   )
+  const canReadWorkflowTasks = hasActionPermission(
+    adminProfile,
+    'workflow.task.read'
+  )
+  const canUpdateWorkflowTasks = hasActionPermission(
+    adminProfile,
+    'workflow.task.update'
+  )
+  const canCompleteWorkflowTasks = hasActionPermission(
+    adminProfile,
+    'workflow.task.complete'
+  )
 
   const openCreate = () => {
     setEditingRow(null)
@@ -381,7 +535,6 @@ export default function V1OutsourcingOrdersPage() {
       outsourcing_order_no: '',
       supplier_id: undefined,
       source_order_no: '',
-      source_sales_order_id: undefined,
       order_date: todayInputValue(),
       expected_return_date: '',
       note: '',
@@ -419,9 +572,39 @@ export default function V1OutsourcingOrdersPage() {
     form.resetFields()
   }
 
+  const loadWorkflowTasks = useCallback(async () => {
+    if (!canReadWorkflowTasks) {
+      setWorkflowTasks([])
+      return
+    }
+    try {
+      const data = await listWorkflowTasks({
+        source_type: OUTSOURCING_ORDERS_MODULE_KEY,
+        limit: 200,
+      })
+      setWorkflowTasks(data?.tasks || [])
+    } catch (error) {
+      setWorkflowTasks([])
+      message.error(getActionErrorMessage(error, '加载委外协同任务失败'))
+    }
+  }, [canReadWorkflowTasks])
+
+  useEffect(() => {
+    loadWorkflowTasks()
+  }, [loadWorkflowTasks])
+
+  const refreshPageData = useCallback(async () => {
+    await Promise.all([loadOrders(), loadWorkflowTasks()])
+  }, [loadOrders, loadWorkflowTasks])
+
+  useEffect(() => {
+    return outletContext?.registerPageRefresh?.(refreshPageData)
+  }, [outletContext, refreshPageData])
+
   const handleProductChange = (fieldName, productID) => {
     const product = products.find((item) => item.id === productID)
     if (!product) return
+    const unit = unitByID.get(product.default_unit_id)
     form.setFieldValue(
       ['items', fieldName, 'product_no_snapshot'],
       product.code
@@ -431,7 +614,10 @@ export default function V1OutsourcingOrdersPage() {
       product.name
     )
     form.setFieldValue(['items', fieldName, 'unit_id'], product.default_unit_id)
-    form.setFieldValue(['items', fieldName, 'unit_name_snapshot'], '')
+    form.setFieldValue(
+      ['items', fieldName, 'unit_name_snapshot'],
+      unit?.name || ''
+    )
   }
 
   const handleProcessChange = (fieldName, processID) => {
@@ -444,6 +630,14 @@ export default function V1OutsourcingOrdersPage() {
     form.setFieldValue(
       ['items', fieldName, 'process_category_snapshot'],
       process.category || ''
+    )
+  }
+
+  const handleUnitChange = (fieldName, unitID) => {
+    const unit = unitByID.get(unitID)
+    form.setFieldValue(
+      ['items', fieldName, 'unit_name_snapshot'],
+      unit?.name || ''
     )
   }
 
@@ -469,7 +663,7 @@ export default function V1OutsourcingOrdersPage() {
       setSelectedRow(savedOrder)
       message.success(editingRow ? '加工合同已更新' : '加工合同已创建')
       closeModal()
-      await loadOrders()
+      await Promise.all([loadOrders(), loadWorkflowTasks()])
     } catch (error) {
       if (error?.errorFields) return
       message.error(getActionErrorMessage(error, '保存加工合同失败'))
@@ -486,7 +680,7 @@ export default function V1OutsourcingOrdersPage() {
         const updated = await action.run({ id: selectedRow.id })
         setSelectedRow(updated)
         message.success(`${action.label}成功`)
-        await loadOrders()
+        await Promise.all([loadOrders(), loadWorkflowTasks()])
       } catch (error) {
         message.error(getActionErrorMessage(error, `${action.label}失败`))
       } finally {
@@ -529,11 +723,68 @@ export default function V1OutsourcingOrdersPage() {
     }
   }
 
+  const completeWorkflowTask = useCallback(
+    async (task) => {
+      await updateWorkflowTaskStatus({
+        id: task.id,
+        task_status_key: 'done',
+        business_status_key: task.business_status_key || undefined,
+        reason: '',
+        payload: {
+          ...workflowPayloadOf(task),
+          outsourcing_order_page_action: 'complete',
+        },
+      })
+      message.success('任务已处理完成')
+      await loadWorkflowTasks()
+    },
+    [loadWorkflowTasks]
+  )
+
+  const blockWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      await updateWorkflowTaskStatus({
+        id: task.id,
+        task_status_key: 'blocked',
+        business_status_key: 'blocked',
+        reason,
+        payload: {
+          ...workflowPayloadOf(task),
+          outsourcing_order_page_action: 'block',
+          blocked_reason: reason,
+        },
+      })
+      message.success('阻塞原因已记录')
+      await loadWorkflowTasks()
+    },
+    [loadWorkflowTasks]
+  )
+
+  const urgeOutsourcingWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      await urgeWorkflowTask({
+        task_id: task.id,
+        action: 'urge_task',
+        reason,
+        actor_role_key: 'admin',
+        payload: {
+          source_type: task.source_type,
+          source_id: task.source_id,
+          source_no: task.source_no,
+          entry: 'outsourcing_order_page',
+        },
+      })
+      message.success('催办已记录')
+      await loadWorkflowTasks()
+    },
+    [loadWorkflowTasks]
+  )
+
   const selectedLabel = selectedRow
     ? `${selectedRow.outsourcing_order_no} / ${
         selectedRow.supplier_snapshot?.short_name ||
         selectedRow.supplier_snapshot?.name ||
-        `供应商 #${selectedRow.supplier_id}`
+        '未指定加工厂'
       }`
     : '请先选择一份加工合同'
 
@@ -548,69 +799,216 @@ export default function V1OutsourcingOrdersPage() {
     ['closed', 'canceled'].includes(item.lifecycle_status)
   ).length
 
-  const columns = applyBusinessColumnSorters([
-    {
-      title: '加工合同号',
-      dataIndex: 'outsourcing_order_no',
-      width: 180,
-      fixed: 'left',
-      sortType: 'text',
+  const resolveSupplierName = useCallback(
+    (record = {}) =>
+      record?.supplier_snapshot?.short_name ||
+      record?.supplier_snapshot?.name ||
+      suppliers.find((item) => item.id === record.supplier_id)?.short_name ||
+      suppliers.find((item) => item.id === record.supplier_id)?.name ||
+      '未指定加工厂',
+    [suppliers]
+  )
+
+  const persistColumnOrder = useCallback(
+    async (nextOrder, columnsForOrder) => {
+      const sanitizedOrder = sanitizeModuleColumnOrder(
+        nextOrder,
+        columnsForOrder
+      )
+      setColumnOrder(sanitizedOrder)
+      writeStoredColumnOrder(OUTSOURCING_ORDERS_MODULE_KEY, sanitizedOrder)
+      setColumnOrderSaving(true)
+      try {
+        const erpPreferences = await setERPColumnOrder({
+          module_key: OUTSOURCING_ORDERS_MODULE_KEY,
+          order: sanitizedOrder,
+        })
+        outletContext?.updateAdminERPPreferences?.(erpPreferences)
+        message.success(
+          sanitizedOrder.length > 0 ? '列顺序已保存' : '列顺序已恢复默认'
+        )
+      } catch (error) {
+        message.warning(
+          `${getActionErrorMessage(error, '保存列顺序')}，已保留本地设置`
+        )
+      } finally {
+        setColumnOrderSaving(false)
+      }
     },
-    {
-      title: '状态',
-      dataIndex: 'lifecycle_status',
-      width: 110,
-      render: statusTag,
-      sortType: 'text',
-    },
-    {
-      title: '加工厂',
-      dataIndex: 'supplier_id',
-      width: 180,
-      sortValue: (record) =>
-        record.supplier_snapshot?.short_name ||
-        record.supplier_snapshot?.name ||
-        record.supplier_id,
-      render: (_, record) =>
-        record.supplier_snapshot?.short_name ||
-        record.supplier_snapshot?.name ||
-        `#${record.supplier_id}`,
-    },
-    {
-      title: '来源订单',
-      dataIndex: 'source_order_no',
-      width: 160,
-      sortType: 'text',
-      render: (value) => value || '-',
-    },
-    {
-      title: '下单日期',
-      dataIndex: 'order_date',
-      width: 140,
-      render: formatUnixDate,
-      sortType: 'number',
-    },
-    {
-      title: '预计回货',
-      dataIndex: 'expected_return_date',
-      width: 140,
-      render: formatUnixDate,
-      sortType: 'number',
-    },
-    {
-      title: '备注',
-      dataIndex: 'note',
-      width: 220,
-      render: (value) => value || '-',
-    },
-    {
-      title: '更新时间',
-      dataIndex: 'updated_at',
-      width: 170,
-      render: formatUnixDateTime,
-      sortType: 'number',
-    },
-  ])
+    [outletContext]
+  )
+
+  const dataColumns = useMemo(
+    () =>
+      applyBusinessColumnSorters([
+        {
+          title: '加工合同号',
+          exportTitle: '加工合同号',
+          dataIndex: 'outsourcing_order_no',
+          width: 180,
+          fixed: 'left',
+          sortType: 'text',
+        },
+        {
+          title: '加工厂',
+          exportTitle: '加工厂',
+          dataIndex: 'supplier_id',
+          width: 180,
+          sortValue: resolveSupplierName,
+          render: (_, record) => resolveSupplierName(record),
+          exportValue: resolveSupplierName,
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'lifecycle_status',
+          width: 110,
+          sortValue: (record) =>
+            statusText(
+              record?.lifecycle_status,
+              OUTSOURCING_ORDER_STATUS_LABELS
+            ),
+          render: statusTag,
+          exportValue: (record) =>
+            statusText(
+              record?.lifecycle_status,
+              OUTSOURCING_ORDER_STATUS_LABELS
+            ),
+        },
+        {
+          title: '来源订单',
+          exportTitle: '来源订单',
+          dataIndex: 'source_order_no',
+          width: 160,
+          sortType: 'text',
+          render: (value) => value || '-',
+          exportValue: (record) => record?.source_order_no || '',
+        },
+        {
+          title: '下单日期',
+          exportTitle: '下单日期',
+          dataIndex: 'order_date',
+          width: 140,
+          render: formatUnixDate,
+          sortType: 'number',
+          exportValue: (record) => formatUnixDate(record?.order_date),
+        },
+        {
+          title: '预计回货',
+          exportTitle: '预计回货',
+          dataIndex: 'expected_return_date',
+          width: 140,
+          render: formatUnixDate,
+          sortType: 'number',
+          exportValue: (record) => formatUnixDate(record?.expected_return_date),
+        },
+        {
+          title: '备注',
+          exportTitle: '备注',
+          dataIndex: 'note',
+          width: 220,
+          render: (value) => value || '-',
+          exportValue: (record) => record?.note || '',
+        },
+        {
+          title: '更新时间',
+          exportTitle: '更新时间',
+          dataIndex: 'updated_at',
+          width: 170,
+          render: formatUnixDateTime,
+          sortType: 'number',
+          exportValue: (record) => formatUnixDateTime(record?.updated_at),
+        },
+      ]),
+    [resolveSupplierName]
+  )
+
+  const preferredColumnOrder = useMemo(
+    () =>
+      getPreferredColumnOrder({
+        adminProfile,
+        moduleKey: OUTSOURCING_ORDERS_MODULE_KEY,
+        columns: dataColumns,
+        localOrder: columnOrder,
+      }),
+    [adminProfile, columnOrder, dataColumns]
+  )
+
+  const visibleDataColumns = useMemo(
+    () => applyModuleColumnOrder(dataColumns, preferredColumnOrder),
+    [dataColumns, preferredColumnOrder]
+  )
+
+  const columns = useMemo(
+    () =>
+      visibleDataColumns.map((column) => ({
+        ...column,
+        title: (
+          <ColumnOrderHeaderMenu
+            column={column}
+            columns={dataColumns}
+            order={preferredColumnOrder}
+            saving={columnOrderSaving}
+            onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
+            onOpenPanel={() => setColumnOrderOpen(true)}
+          />
+        ),
+      })),
+    [
+      columnOrderSaving,
+      dataColumns,
+      persistColumnOrder,
+      preferredColumnOrder,
+      visibleDataColumns,
+    ]
+  )
+
+  const exportOrders = useCallback(() => {
+    if (rows.length === 0) return
+    downloadCSV({
+      filename: `outsourcing-orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      columns: visibleDataColumns,
+      rows,
+    })
+  }, [rows, visibleDataColumns])
+
+  const selectedWorkflowTasks = useMemo(
+    () =>
+      selectedRow?.id
+        ? filterBusinessCollaborationTasksBySource({
+            tasks: workflowTasks,
+            sourceType: OUTSOURCING_ORDERS_MODULE_KEY,
+            sourceIDs: [selectedRow.id],
+          })
+        : [],
+    [selectedRow, workflowTasks]
+  )
+
+  const relatedMenuItems = [
+    { key: 'details', label: '加工明细' },
+    { key: 'quality-inspections', label: '质检记录' },
+    { key: 'inventory', label: '库存台账' },
+    { key: 'payables', label: '应付管理' },
+  ]
+
+  const openRelatedTable = ({ key }) => {
+    if (!selectedRow) return
+    if (key === 'details') {
+      openEdit(selectedRow)
+      return
+    }
+    if (key === 'quality-inspections') {
+      navigate(V1_ROUTE_PATHS.qualityInspections)
+      return
+    }
+    if (key === 'inventory') {
+      navigate(V1_ROUTE_PATHS.inventory)
+      return
+    }
+    if (key === 'payables') {
+      navigate(V1_ROUTE_PATHS.payables)
+    }
+  }
 
   return (
     <BusinessPageLayout className="erp-v1-outsourcing-orders-page">
@@ -623,7 +1021,7 @@ export default function V1OutsourcingOrdersPage() {
             Source Document：加工合同
           </Tag>,
           <Tag color="green" key="process">
-            工序来自工序档案
+            工序来自加工环节字典
           </Tag>,
           <Tag color="gold" key="fact">
             不直接写库存 / 应付
@@ -685,6 +1083,37 @@ export default function V1OutsourcingOrdersPage() {
             />
           </>
         }
+        actions={
+          <Space wrap>
+            <ToolbarButton
+              icon={<DownloadOutlined />}
+              disabled={rows.length === 0}
+              onClick={exportOrders}
+            >
+              导出当前结果
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={() => setColumnOrderOpen(true)}
+            >
+              列顺序
+            </ToolbarButton>
+            <Tooltip title="加工合同源单当前没有物理删除 API；退出推进请走取消或关闭状态。">
+              <span>
+                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
+                  批量删除
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+            <Tooltip title="当前 outsourcing_order JSON-RPC 没有回收站主路径，页面不做前端假恢复。">
+              <span>
+                <ToolbarButton icon={<InboxOutlined />} disabled>
+                  回收站
+                </ToolbarButton>
+              </span>
+            </Tooltip>
+          </Space>
+        }
         primaryAction={
           <ToolbarButton
             type="primary"
@@ -711,6 +1140,23 @@ export default function V1OutsourcingOrdersPage() {
           >
             编辑
           </Button>
+          <Dropdown
+            trigger={['click']}
+            destroyOnHidden
+            disabled={!selectedRow}
+            menu={{
+              items: relatedMenuItems,
+              onClick: openRelatedTable,
+            }}
+          >
+            <Button
+              size="small"
+              icon={<LinkOutlined />}
+              disabled={!selectedRow}
+            >
+              关联 <DownOutlined />
+            </Button>
+          </Dropdown>
           {LIFECYCLE_ACTIONS.map((action) => (
             <Button
               key={action.key}
@@ -780,6 +1226,31 @@ export default function V1OutsourcingOrdersPage() {
         scroll={{ x: 1220 }}
       />
 
+      <CollaborationTaskPanel
+        tasks={workflowTasks}
+        selectedTasks={selectedWorkflowTasks}
+        selectedRecordLabel={selectedRow?.outsourcing_order_no || ''}
+        roleLabelMap={WORKFLOW_ROLE_LABELS}
+        onCompleteTask={
+          canCompleteWorkflowTasks ? completeWorkflowTask : undefined
+        }
+        onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
+        onUrgeTask={
+          canUpdateWorkflowTasks ? urgeOutsourcingWorkflowTask : undefined
+        }
+      />
+
+      <ColumnOrderModal
+        open={columnOrderOpen}
+        columns={dataColumns}
+        order={preferredColumnOrder}
+        saving={columnOrderSaving}
+        moduleTitle="委外订单列表"
+        onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
+        onReset={() => persistColumnOrder([], dataColumns)}
+        onClose={() => setColumnOrderOpen(false)}
+      />
+
       <Modal
         className="erp-business-action-modal erp-business-action-modal--form"
         title={
@@ -830,12 +1301,8 @@ export default function V1OutsourcingOrdersPage() {
           >
             <Input maxLength={128} placeholder="如产品订单编号 / 销售订单号" />
           </Form.Item>
-          <Form.Item
-            className="erp-business-action-form__field"
-            name="source_sales_order_id"
-            label="销售订单ID"
-          >
-            <InputNumber min={1} precision={0} style={{ width: '100%' }} />
+          <Form.Item name="source_sales_order_id" hidden>
+            <Input />
           </Form.Item>
           <Form.Item
             className="erp-business-action-form__field"
@@ -867,24 +1334,7 @@ export default function V1OutsourcingOrdersPage() {
                   <div className="erp-sales-order-lines-form__head">
                     <div>
                       <strong>加工明细</strong>
-                      <span>
-                        当前 {lineSummary.count} 行 / 数量{' '}
-                        {formatSummaryNumber(lineSummary.quantity, 3)} / 金额{' '}
-                        {formatSummaryNumber(lineSummary.amount, 2)}
-                      </span>
                     </div>
-                    <Button
-                      icon={<PlusOutlined />}
-                      onClick={() =>
-                        add(
-                          createBlankLine(
-                            getNextLineNo(form.getFieldValue('items') || [])
-                          )
-                        )
-                      }
-                    >
-                      加行
-                    </Button>
                   </div>
                   <div className="erp-sales-order-lines-form__list">
                     {fields.map((field, index) => (
@@ -949,46 +1399,47 @@ export default function V1OutsourcingOrdersPage() {
                           </Form.Item>
                           <Form.Item
                             name={[field.name, 'unit_id']}
-                            label="单位ID"
-                            rules={[
-                              { required: true, message: '请输入单位ID' },
-                            ]}
+                            label="单位"
+                            rules={[{ required: true, message: '请选择单位' }]}
                           >
-                            <InputNumber
-                              min={1}
-                              precision={0}
-                              style={{ width: '100%' }}
+                            <Select
+                              showSearch
+                              options={unitOptions}
+                              optionFilterProp="label"
+                              onChange={(value) =>
+                                handleUnitChange(field.name, value)
+                              }
                             />
                           </Form.Item>
                           <Form.Item
                             name={[field.name, 'product_no_snapshot']}
-                            label="产品编号快照"
+                            hidden
                           >
-                            <Input maxLength={128} />
+                            <Input />
                           </Form.Item>
                           <Form.Item
                             name={[field.name, 'product_name_snapshot']}
-                            label="产品名称快照"
+                            hidden
                           >
-                            <Input maxLength={255} />
+                            <Input />
                           </Form.Item>
                           <Form.Item
                             name={[field.name, 'process_name_snapshot']}
-                            label="工序名称快照"
+                            hidden
                           >
-                            <Input maxLength={255} />
+                            <Input />
                           </Form.Item>
                           <Form.Item
                             name={[field.name, 'process_category_snapshot']}
-                            label="工序类别快照"
+                            hidden
                           >
-                            <Input maxLength={64} />
+                            <Input />
                           </Form.Item>
                           <Form.Item
                             name={[field.name, 'unit_name_snapshot']}
-                            label="单位快照"
+                            hidden
                           >
-                            <Input maxLength={64} />
+                            <Input />
                           </Form.Item>
                           <Form.Item
                             name={[field.name, 'outsourcing_quantity']}
@@ -1020,6 +1471,44 @@ export default function V1OutsourcingOrdersPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                  <div className="erp-line-items-form__footer">
+                    <div className="erp-line-items-form__footer-actions">
+                      <Button
+                        type="dashed"
+                        icon={<PlusOutlined />}
+                        onClick={() =>
+                          add(
+                            createBlankLine(
+                              getNextLineNo(form.getFieldValue('items') || [])
+                            )
+                          )
+                        }
+                      >
+                        添加条目
+                      </Button>
+                    </div>
+                    <div className="erp-line-items-form__stats">
+                      <span className="erp-line-items-form__stat">
+                        已录入
+                        <strong className="erp-line-items-form__stat-value">
+                          {lineSummary.count}
+                        </strong>
+                        条
+                      </span>
+                      <span className="erp-line-items-form__stat">
+                        数量合计
+                        <strong className="erp-line-items-form__stat-value">
+                          {formatSummaryNumber(lineSummary.quantity, 3)}
+                        </strong>
+                      </span>
+                      <span className="erp-line-items-form__stat">
+                        金额合计
+                        <strong className="erp-line-items-form__stat-value">
+                          {formatSummaryNumber(lineSummary.amount, 2)}
+                        </strong>
+                      </span>
+                    </div>
                   </div>
                 </>
               )}

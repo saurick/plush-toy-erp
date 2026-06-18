@@ -3151,6 +3151,10 @@ const scenarios = [
             selectText: 'MAT-STYLE-L1',
             scenarioName: 'purchase-order-source-import-picker',
           })
+          await assertLineItemsUnifiedHorizontalScroll(modal, {
+            scenarioName: 'business-v1-purchase-order-form-modal',
+            minRows: 2,
+          })
         },
       })
     },
@@ -3630,8 +3634,13 @@ const scenarios = [
       })
       await expectHeading(page, '委外订单')
       await expectButton(page, '新建加工合同')
+      await expectButton(page, '导出当前结果')
+      await expectButton(page, '列顺序')
+      await expectButton(page, '批量删除')
+      await expectButton(page, '回收站')
       await expectText(page, 'Source Document：加工合同')
       await expectText(page, '加工合同只表达委外承诺和打印快照')
+      await expectText(page, '本页协同')
       await assertTextAbsent(page, '生成委外合同')
       await expectButton(page, '加工合同打印')
       const processingContractPrintButton = page.getByRole('button', {
@@ -3654,10 +3663,13 @@ const scenarios = [
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建加工合同',
         titleText: '新建加工合同',
-        minFieldCount: 7,
+        minFieldCount: 6,
         screenshotName: 'business-v1-outsourcing-order-create-form-modal',
-        expectedTexts: ['加工合同号', '加工厂', '加工明细', '工序'],
+        expectedTexts: ['加工合同号', '加工厂', '加工明细', '工序', '单位'],
       })
+      await assertTextAbsent(page, '销售订单ID')
+      await assertTextAbsent(page, '单位ID')
+      await assertTextAbsent(page, '产品编号快照')
       await assertNoHorizontalOverflow(page, 'business-v1-processing-contracts')
 
       await gotoScenarioPath(page, '/erp/production/scheduling', {
@@ -3788,11 +3800,13 @@ const scenarios = [
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建加工合同',
         titleText: '新建加工合同',
-        minFieldCount: 7,
+        minFieldCount: 6,
         screenshotName: 'business-v1-outsourcing-mobile-modal',
-        expectedTexts: ['加工合同号', '加工厂', '加工明细', '工序'],
+        expectedTexts: ['加工合同号', '加工厂', '加工明细', '工序', '单位'],
         requireMultiColumn: false,
       })
+      await assertTextAbsent(page, '销售订单ID')
+      await assertTextAbsent(page, '单位ID')
       await assertNoHorizontalOverflow(page, 'business-v1-outsourcing-mobile')
     },
   },
@@ -4648,6 +4662,15 @@ async function installAdminRpcMocks(page) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const unit = {
+      id: 1,
+      code: 'PCS',
+      name: '只',
+      precision: 0,
+      is_active: true,
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    }
     const materials = Array.from({ length: 6 }, (_, index) => ({
       ...material,
       id: index + 1,
@@ -4683,6 +4706,9 @@ async function installAdminRpcMocks(page) {
           limit: 100,
           offset: 0,
         }
+        break
+      case 'list_units':
+        data = { units: [unit], total: 1, limit: 100, offset: 0 }
         break
       case 'create_customer':
       case 'update_customer':
@@ -7049,6 +7075,110 @@ async function verifyBusinessActionFormModal(
   })
   await modal.locator('.ant-modal-close').click({ force: true })
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })
+}
+
+async function assertLineItemsUnifiedHorizontalScroll(
+  modal,
+  { scenarioName, minRows = 1 }
+) {
+  await modal
+    .locator(
+      '.erp-sales-order-lines-form__list .erp-sales-order-lines-form__row'
+    )
+    .nth(minRows - 1)
+    .waitFor({ state: 'visible', timeout: 10_000 })
+
+  const metrics = await modal.evaluate((node) => {
+    const body = node.querySelector('.ant-modal-body')
+    const scrollContainer = node.querySelector(
+      '.erp-sales-order-lines-form__list'
+    )
+    const scrollStyle = scrollContainer
+      ? window.getComputedStyle(scrollContainer)
+      : null
+    if (scrollContainer) {
+      scrollContainer.scrollLeft =
+        scrollContainer.scrollWidth - scrollContainer.clientWidth
+    }
+    const rows = Array.from(
+      scrollContainer?.querySelectorAll('.erp-sales-order-lines-form__row') ||
+        []
+    ).map((row) => {
+      const rect = row.getBoundingClientRect()
+      const style = window.getComputedStyle(row)
+      return {
+        width: rect.width,
+        minWidth: style.minWidth,
+        overflowX: style.overflowX,
+      }
+    })
+    const grids = Array.from(
+      scrollContainer?.querySelectorAll('.erp-sales-order-lines-form__grid') ||
+        []
+    ).map((grid) => {
+      const rect = grid.getBoundingClientRect()
+      const style = window.getComputedStyle(grid)
+      return {
+        width: rect.width,
+        clientWidth: grid.clientWidth,
+        scrollWidth: grid.scrollWidth,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+        gridAutoFlow: style.gridAutoFlow,
+      }
+    })
+    return {
+      body: body
+        ? {
+            clientWidth: body.clientWidth,
+            scrollWidth: body.scrollWidth,
+          }
+        : null,
+      scrollContainer: scrollContainer
+        ? {
+            clientWidth: scrollContainer.clientWidth,
+            scrollWidth: scrollContainer.scrollWidth,
+            scrollLeft: scrollContainer.scrollLeft,
+            overflowX: scrollStyle?.overflowX || '',
+            overflowY: scrollStyle?.overflowY || '',
+          }
+        : null,
+      rows,
+      grids,
+    }
+  })
+
+  assert(
+    metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
+    `${scenarioName} 弹窗 body 不应承担明细横向滚动: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.scrollContainer &&
+      ['auto', 'scroll'].includes(metrics.scrollContainer.overflowX) &&
+      metrics.scrollContainer.scrollWidth >
+        metrics.scrollContainer.clientWidth + 16 &&
+      metrics.scrollContainer.scrollLeft > 0,
+    `${scenarioName} 明细应由整体列表容器横向滚动: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.rows.length >= minRows &&
+      metrics.rows.every(
+        (row) => row.width > metrics.scrollContainer.clientWidth + 16
+      ) &&
+      Math.max(...metrics.rows.map((row) => row.width)) -
+        Math.min(...metrics.rows.map((row) => row.width)) <=
+        2,
+    `${scenarioName} 多行明细应共享同一列宽和滚动面: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.grids.length >= minRows &&
+      metrics.grids.every(
+        (grid) =>
+          grid.gridAutoFlow === 'column' &&
+          !['auto', 'scroll'].includes(grid.overflowX)
+      ),
+    `${scenarioName} 每行明细 grid 不应再各自横向滚动: ${JSON.stringify(metrics)}`
+  )
 }
 
 async function assertOperationalFactModalViewport(page, scenarioName) {
@@ -11472,7 +11602,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     ].filter((item) => item.rect)
     const overlaps = criticalRects
       .filter((item) => {
-        const rect = item.rect
+        const { rect } = item
         return !(
           rect.right <= panelBounds.left ||
           rect.left >= panelBounds.right ||

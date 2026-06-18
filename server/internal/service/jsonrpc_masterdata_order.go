@@ -148,6 +148,20 @@ func (d *jsonrpcDispatcher) handleMasterData(
 		}
 		item, err := d.masterDataUC.SetMaterialActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
 		return id, materialMutationResult(ctx, d, item, err), nil
+	case "list_units", "listUnits":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialRead); res != nil {
+			return id, res, nil
+		}
+		items, total, err := d.masterDataUC.ListUnits(ctx, masterDataFilterFromParams(pm))
+		if err != nil {
+			return id, d.mapMasterDataError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+			"units":  unitsToAny(items),
+			"total":  total,
+			"limit":  normalizedLimit(pm),
+			"offset": normalizedOffset(pm),
+		})}, nil
 
 	case "create_process", "createProcess":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessCreate); res != nil {
@@ -908,6 +922,29 @@ func materialsToAny(items []*biz.Material) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
 		out = append(out, materialToMap(item))
+	}
+	return out
+}
+
+func unitToMap(item *biz.Unit) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":         item.ID,
+		"code":       item.Code,
+		"name":       item.Name,
+		"precision":  item.Precision,
+		"is_active":  item.IsActive,
+		"created_at": item.CreatedAt.Unix(),
+		"updated_at": item.UpdatedAt.Unix(),
+	}
+}
+
+func unitsToAny(items []*biz.Unit) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, unitToMap(item))
 	}
 	return out
 }

@@ -51,6 +51,16 @@ type Supplier struct {
 	UpdatedAt    time.Time
 }
 
+type Unit struct {
+	ID        int
+	Code      string
+	Name      string
+	Precision int
+	IsActive  bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Material struct {
 	ID            int
 	Code          string
@@ -237,6 +247,7 @@ type MasterDataRepo interface {
 	GetMaterial(ctx context.Context, id int) (*Material, error)
 	ListMaterials(ctx context.Context, filter MasterDataFilter) ([]*Material, int, error)
 	SetMaterialActive(ctx context.Context, id int, active bool) (*Material, error)
+	ListUnits(ctx context.Context, filter MasterDataFilter) ([]*Unit, int, error)
 	UnitIsActive(ctx context.Context, id int) (bool, error)
 
 	CreateProcess(ctx context.Context, in *ProcessMutation) (*Process, error)
@@ -406,6 +417,13 @@ func (uc *MasterDataUsecase) SetMaterialActive(ctx context.Context, id int, acti
 		return nil, ErrBadParam
 	}
 	return uc.repo.SetMaterialActive(ctx, id, active)
+}
+
+func (uc *MasterDataUsecase) ListUnits(ctx context.Context, filter MasterDataFilter) ([]*Unit, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	return uc.repo.ListUnits(ctx, normalizeMasterDataFilter(filter))
 }
 
 func (uc *MasterDataUsecase) CreateProcess(ctx context.Context, in *ProcessMutation) (*Process, error) {

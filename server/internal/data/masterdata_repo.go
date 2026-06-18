@@ -313,6 +313,28 @@ func (r *masterDataRepo) SetMaterialActive(ctx context.Context, id int, active b
 	return entMaterialToBiz(row), nil
 }
 
+func (r *masterDataRepo) ListUnits(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Unit, int, error) {
+	query := r.data.postgres.Unit.Query()
+	if filter.Keyword != "" {
+		query = query.Where(unit.Or(
+			unit.CodeContains(filter.Keyword),
+			unit.NameContains(filter.Keyword),
+		))
+	}
+	if filter.ActiveOnly {
+		query = query.Where(unit.IsActive(true))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Asc(unit.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return entUnitsToBiz(rows), total, nil
+}
+
 func (r *masterDataRepo) CreateProcess(ctx context.Context, in *biz.ProcessMutation) (*biz.Process, error) {
 	row, err := r.data.postgres.Process.Create().
 		SetCode(in.Code).
@@ -907,6 +929,29 @@ func entMaterialsToBiz(rows []*ent.Material) []*biz.Material {
 	out := make([]*biz.Material, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, entMaterialToBiz(row))
+	}
+	return out
+}
+
+func entUnitToBiz(row *ent.Unit) *biz.Unit {
+	if row == nil {
+		return nil
+	}
+	return &biz.Unit{
+		ID:        row.ID,
+		Code:      row.Code,
+		Name:      row.Name,
+		Precision: row.Precision,
+		IsActive:  row.IsActive,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+	}
+}
+
+func entUnitsToBiz(rows []*ent.Unit) []*biz.Unit {
+	out := make([]*biz.Unit, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entUnitToBiz(row))
 	}
 	return out
 }

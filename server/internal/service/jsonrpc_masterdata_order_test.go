@@ -94,6 +94,10 @@ func (s *stubMasterDataJSONRPCRepo) SetMaterialActive(_ context.Context, id int,
 	return &biz.Material{ID: id, Code: "M001", Name: "材料", DefaultUnitID: 1, IsActive: active}, nil
 }
 
+func (s *stubMasterDataJSONRPCRepo) ListUnits(context.Context, biz.MasterDataFilter) ([]*biz.Unit, int, error) {
+	return []*biz.Unit{{ID: 1, Code: "PCS", Name: "个", IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
+}
+
 func (s *stubMasterDataJSONRPCRepo) UnitIsActive(context.Context, int) (bool, error) {
 	if !s.unitActive {
 		return false, biz.ErrUnitNotFound
@@ -399,6 +403,36 @@ func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.
 	}
 	if okRes == nil || okRes.Code != errcode.OK.Code {
 		t.Fatalf("expected OK, got %#v", okRes)
+	}
+}
+
+func TestJsonrpcDispatcher_ListUnitsUsesMaterialReadPermission(t *testing.T) {
+	j := newMasterDataJSONRPCTestData(
+		&stubMasterDataJSONRPCRepo{},
+		workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionSupplierRead),
+	)
+	_, deniedRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "list_units", "1", nil)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if deniedRes == nil || deniedRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("expected permission denied, got %#v", deniedRes)
+	}
+
+	j = newMasterDataJSONRPCTestData(
+		&stubMasterDataJSONRPCRepo{},
+		workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionMaterialRead),
+	)
+	_, okRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "list_units", "2", nil)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if okRes == nil || okRes.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", okRes)
+	}
+	units, ok := okRes.Data.AsMap()["units"].([]any)
+	if !ok || len(units) != 1 {
+		t.Fatalf("expected one unit, got %#v", okRes.Data.AsMap()["units"])
 	}
 }
 

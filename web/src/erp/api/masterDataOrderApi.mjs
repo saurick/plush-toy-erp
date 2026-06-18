@@ -85,6 +85,11 @@ export async function listMaterials(params = {}) {
   return dataOf(result)
 }
 
+export async function listUnits(params = {}) {
+  const result = await masterDataRpc.call('list_units', params)
+  return dataOf(result)
+}
+
 export async function createMaterial(params = {}) {
   const result = await masterDataRpc.call('create_material', params)
   return dataOf(result)?.material || null

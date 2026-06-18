@@ -160,7 +160,7 @@ const PAGE_CONFIG = Object.freeze({
       '维护材料主数据；采购订单、库存余额、来料质检和 BOM 用量在对应业务模块处理。',
   },
   processes: {
-    title: '工序档案',
+    title: '加工环节',
     recordKey: 'processes',
     list: listProcesses,
     create: createProcess,
@@ -171,11 +171,11 @@ const PAGE_CONFIG = Object.freeze({
       update: 'process.update',
       disable: 'process.disable',
     },
-    entityLabel: '工序',
+    entityLabel: '加工环节',
     formBoundary:
-      '只维护可复用工序主数据，不在此生成委外订单、生产任务、库存流水或质检事实。',
+      '只维护委外订单和质检标记可引用的标准加工环节，不在此生成委外订单、生产任务、库存流水或质检事实。',
     summary:
-      '维护生产和委外都可引用的工序档案；委外订单、加工合同、发料、回货和质检事实仍在对应模块处理。',
+      '维护少量可复用加工环节，用于委外订单选择和质检标记；不管理完整工艺路线、排程、报工或库存事实。',
     initialValues: {
       outsourcing_enabled: true,
       inhouse_enabled: false,
@@ -459,23 +459,23 @@ function MasterDataFormFields({ type }) {
       <>
         <Form.Item
           className="erp-business-action-form__field"
-          label="工序编号"
+          label="环节编号"
           name="code"
-          rules={[{ required: true, message: '请填写工序编号' }]}
+          rules={[{ required: true, message: '请填写环节编号' }]}
         >
           <Input allowClear autoComplete="off" />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          label="工序名称"
+          label="环节名称"
           name="name"
-          rules={[{ required: true, message: '请填写工序名称' }]}
+          rules={[{ required: true, message: '请填写环节名称' }]}
         >
           <Input allowClear autoComplete="off" />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          label="工序类别"
+          label="环节类别"
           name="category"
         >
           <Input
@@ -829,7 +829,7 @@ function getRecordSearchPlaceholder(type = '') {
     return '搜索编号、名称、分类、规格、颜色'
   }
   if (type === 'processes') {
-    return '搜索工序编号、名称、类别、备注'
+    return '搜索环节编号、名称、类别、备注'
   }
   if (type === 'products') {
     return '搜索产品编号、名称、内部款号、客户款号'
@@ -845,6 +845,7 @@ export default function V1MasterDataPage({ type }) {
   const [productCatalogType, setProductCatalogType] = useState('products')
   const effectiveType = isProductCatalogPage ? productCatalogType : type
   const config = PAGE_CONFIG[effectiveType] || PAGE_CONFIG.customers
+  const isProcessDictionaryPage = effectiveType === 'processes'
   const outletContext = useOutletContext()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -1298,22 +1299,22 @@ export default function V1MasterDataPage({ type }) {
     if (effectiveType === 'processes') {
       return applyBusinessColumnSorters([
         {
-          title: '工序编号',
-          exportTitle: '工序编号',
+          title: '环节编号',
+          exportTitle: '环节编号',
           dataIndex: 'code',
           width: 150,
           sorter: (a, b) => compareText(a?.code, b?.code),
         },
         {
-          title: '工序名称',
-          exportTitle: '工序名称',
+          title: '环节名称',
+          exportTitle: '环节名称',
           dataIndex: 'name',
           width: 180,
           sorter: (a, b) => compareText(a?.name, b?.name),
         },
         {
-          title: '工序类别',
-          exportTitle: '工序类别',
+          title: '环节类别',
+          exportTitle: '环节类别',
           dataIndex: 'category',
           width: 150,
           sorter: (a, b) => compareText(a?.category, b?.category),
@@ -1356,22 +1357,6 @@ export default function V1MasterDataPage({ type }) {
             value === true ? <Tag color="orange">是</Tag> : <Tag>否</Tag>,
         },
         {
-          title: '排序',
-          exportTitle: '排序',
-          dataIndex: 'sort_order',
-          width: 90,
-          sorter: (a, b) =>
-            Number(a?.sort_order || 0) - Number(b?.sort_order || 0),
-        },
-        {
-          title: '备注',
-          exportTitle: '备注',
-          dataIndex: 'note',
-          width: 200,
-          sorter: (a, b) => compareText(a?.note, b?.note),
-          render: (value) => value || '-',
-        },
-        {
           title: '状态',
           exportTitle: '状态',
           dataIndex: 'is_active',
@@ -1380,16 +1365,6 @@ export default function V1MasterDataPage({ type }) {
           exportValue: (record) =>
             record?.is_active === false ? '停用' : '启用',
           render: activeTag,
-        },
-        {
-          title: '创建时间',
-          exportTitle: '创建时间',
-          dataIndex: 'created_at',
-          width: 160,
-          sorter: (a, b) =>
-            Number(a?.created_at || 0) - Number(b?.created_at || 0),
-          render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.created_at),
         },
         {
           title: '更新时间',
@@ -1538,32 +1513,35 @@ export default function V1MasterDataPage({ type }) {
       }),
     [adminProfile, columnOrder, moduleKey, recordColumns]
   )
-  const orderedRecordColumns = useMemo(
-    () =>
-      applyModuleColumnOrder(recordColumns, preferredRecordColumnOrder).map(
-        (column) => ({
-          ...column,
-          title: (
-            <ColumnOrderHeaderMenu
-              column={column}
-              columns={recordColumns}
-              order={preferredRecordColumnOrder}
-              saving={columnOrderSaving}
-              onChange={(nextOrder) =>
-                persistColumnOrder(nextOrder, recordColumns)
-              }
-              onOpenPanel={() => setColumnOrderOpen(true)}
-            />
-          ),
-        })
+  const orderedRecordColumns = useMemo(() => {
+    const nextColumns = isProcessDictionaryPage
+      ? recordColumns
+      : applyModuleColumnOrder(recordColumns, preferredRecordColumnOrder)
+
+    if (isProcessDictionaryPage) {
+      return nextColumns
+    }
+
+    return nextColumns.map((column) => ({
+      ...column,
+      title: (
+        <ColumnOrderHeaderMenu
+          column={column}
+          columns={recordColumns}
+          order={preferredRecordColumnOrder}
+          saving={columnOrderSaving}
+          onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
+          onOpenPanel={() => setColumnOrderOpen(true)}
+        />
       ),
-    [
-      columnOrderSaving,
-      persistColumnOrder,
-      preferredRecordColumnOrder,
-      recordColumns,
-    ]
-  )
+    }))
+  }, [
+    columnOrderSaving,
+    isProcessDictionaryPage,
+    persistColumnOrder,
+    preferredRecordColumnOrder,
+    recordColumns,
+  ])
 
   const activeRecordCount = useMemo(
     () => records.filter((record) => record.is_active !== false).length,
@@ -1589,20 +1567,24 @@ export default function V1MasterDataPage({ type }) {
         compact
         title={config.title}
         description={config.summary}
-        stats={[
-          { key: 'total', label: `总${entityLabel}`, value: total },
-          { key: 'current', label: '当前结果', value: records.length },
-          {
-            key: 'active',
-            label: `启用${entityLabel}`,
-            value: activeRecordCount,
-          },
-          {
-            key: 'selected',
-            label: `已选${entityLabel}`,
-            value: selectedRecord ? 1 : 0,
-          },
-        ]}
+        stats={
+          isProcessDictionaryPage
+            ? []
+            : [
+                { key: 'total', label: `总${entityLabel}`, value: total },
+                { key: 'current', label: '当前结果', value: records.length },
+                {
+                  key: 'active',
+                  label: `启用${entityLabel}`,
+                  value: activeRecordCount,
+                },
+                {
+                  key: 'selected',
+                  label: `已选${entityLabel}`,
+                  value: selectedRecord ? 1 : 0,
+                },
+              ]
+        }
       />
 
       {isProductCatalogPage ? (
@@ -1645,39 +1627,41 @@ export default function V1MasterDataPage({ type }) {
           </>
         }
         actions={
-          <Space wrap>
-            <ToolbarButton
-              icon={<DownloadOutlined />}
-              disabled={records.length === 0}
-              onClick={exportRecords}
-            >
-              导出当前结果
-            </ToolbarButton>
-            <ToolbarButton
-              icon={<SettingOutlined />}
-              onClick={() => setColumnOrderOpen(true)}
-            >
-              列顺序
-            </ToolbarButton>
-            <Tooltip
-              title={`${config.title}当前使用启停状态管理；退出使用请走停用，不提供物理删除 / 回收站。`}
-            >
-              <span>
-                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
-                  批量删除
-                </ToolbarButton>
-              </span>
-            </Tooltip>
-            <Tooltip
-              title={`${config.title}当前没有回收站主路径；历史追溯回到启停状态和审计记录。`}
-            >
-              <span>
-                <ToolbarButton icon={<InboxOutlined />} disabled>
-                  回收站
-                </ToolbarButton>
-              </span>
-            </Tooltip>
-          </Space>
+          isProcessDictionaryPage ? null : (
+            <Space wrap>
+              <ToolbarButton
+                icon={<DownloadOutlined />}
+                disabled={records.length === 0}
+                onClick={exportRecords}
+              >
+                导出当前结果
+              </ToolbarButton>
+              <ToolbarButton
+                icon={<SettingOutlined />}
+                onClick={() => setColumnOrderOpen(true)}
+              >
+                列顺序
+              </ToolbarButton>
+              <Tooltip
+                title={`${config.title}当前使用启停状态管理；退出使用请走停用，不提供物理删除 / 回收站。`}
+              >
+                <span>
+                  <ToolbarButton icon={<DeleteOutlined />} danger disabled>
+                    批量删除
+                  </ToolbarButton>
+                </span>
+              </Tooltip>
+              <Tooltip
+                title={`${config.title}当前没有回收站主路径；历史追溯回到启停状态和审计记录。`}
+              >
+                <span>
+                  <ToolbarButton icon={<InboxOutlined />} disabled>
+                    回收站
+                  </ToolbarButton>
+                </span>
+              </Tooltip>
+            </Space>
+          )
         }
         primaryAction={
           canCreate ? (
@@ -1751,7 +1735,7 @@ export default function V1MasterDataPage({ type }) {
         loading={loading}
         columns={orderedRecordColumns}
         dataSource={records}
-        scroll={{ x: 1300 }}
+        scroll={{ x: isProcessDictionaryPage ? 1000 : 1300 }}
         pagination={createBusinessTablePagination({
           pagination,
           total,
@@ -1820,16 +1804,18 @@ export default function V1MasterDataPage({ type }) {
         </Form>
       </Modal>
 
-      <ColumnOrderModal
-        open={columnOrderOpen}
-        moduleTitle={config.title}
-        columns={recordColumns}
-        order={preferredRecordColumnOrder}
-        saving={columnOrderSaving}
-        onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
-        onReset={() => persistColumnOrder([], recordColumns)}
-        onClose={() => setColumnOrderOpen(false)}
-      />
+      {isProcessDictionaryPage ? null : (
+        <ColumnOrderModal
+          open={columnOrderOpen}
+          moduleTitle={config.title}
+          columns={recordColumns}
+          order={preferredRecordColumnOrder}
+          saving={columnOrderSaving}
+          onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
+          onReset={() => persistColumnOrder([], recordColumns)}
+          onClose={() => setColumnOrderOpen(false)}
+        />
+      )}
     </BusinessPageLayout>
   )
 }

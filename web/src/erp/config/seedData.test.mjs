@@ -92,7 +92,7 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(navLabels.includes('材料档案'))
   assert(navLabels.includes('销售订单'))
   assert(navLabels.includes('BOM 管理'))
-  assert(navLabels.includes('工序档案'))
+  assert(navLabels.includes('加工环节'))
   assert(navLabels.includes('采购订单'))
   assert(navLabels.includes('入库管理'))
   assert(navLabels.includes('来料质检'))

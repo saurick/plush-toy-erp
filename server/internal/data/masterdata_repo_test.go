@@ -157,6 +157,13 @@ func TestMasterDataRepoMaterialCRUDAndUnitGuard(t *testing.T) {
 	if activeTotal != 0 || len(activeList) != 0 {
 		t.Fatalf("expected inactive material filtered out, total=%d len=%d", activeTotal, len(activeList))
 	}
+	unitList, unitTotal, err := uc.ListUnits(ctx, biz.MasterDataFilter{Keyword: "PC", ActiveOnly: true, Limit: 20})
+	if err != nil {
+		t.Fatalf("list units failed: %v", err)
+	}
+	if unitTotal != 1 || len(unitList) != 1 || unitList[0].Name != "个" {
+		t.Fatalf("expected active PCS unit, total=%d list=%#v", unitTotal, unitList)
+	}
 }
 
 func TestMasterDataRepoProcessCRUD(t *testing.T) {
