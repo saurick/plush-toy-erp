@@ -16,6 +16,49 @@
 - 已接正式 V1 的销售订单、采购订单、采购入库、来料质检、库存台账、出货 / 预留和财务事实页面应保持 Workflow / Fact 边界：关联入口只提供上下文跳转或已有打印 / 生成动作，不代表下游事实自动过账。
 - 移动岗位任务端 `/m/<role>/tasks` 仍是岗位协同入口；后续拆分应继续保持 Workflow 任务完成不写库存、出货、财务或付款事实。
 
+## 2026-06-19 业务列表空结果选中态回归
+
+- 完成：按 `plush-page-design-governance` 继续推进无数据 / 空结果盲区；修复采购入库、来料质检、出货单、库存台账在重新加载列表后继续保留已不在当前结果集里的旧选中记录问题，当前记录不再匹配时改为当前结果第一条或清空，避免当前操作条显示 stale record。
+- 完成：在 `style:l1` 的采购入库创建弹窗场景中新增空搜索回归：先选中 `PR-STYLE-L1`，再搜索无匹配，断言表格显示 `暂无采购入库单`、数据行清空、当前操作条回到未选中态、旧单号不留在操作条或表格里、空态不横向溢出且不覆盖相邻区域。
+- 完成：按 `plush-docs-governance` 保持文档变更只落在 `progress.md`；本轮未新增 / 删除 / 重命名长期 Markdown，未改变文档标题、用途、分类或路径，不更新 `docs/文档清单.md`，`AGENTS.md` 只读未改。
+- 验证：`node --check web/scripts/styleL1.mjs` 通过；`cd web && pnpm exec eslint --ext .mjs scripts/styleL1.mjs` 通过；`cd web && pnpm exec eslint --ext .jsx src/erp/pages/V1PurchaseReceiptsPage.jsx src/erp/pages/V1QualityInspectionsPage.jsx src/erp/pages/ShipmentsPage.jsx src/erp/pages/V1InventoryLedgerPage.jsx` 通过；`STYLE_L1_PORT=4191 STYLE_L1_SCENARIOS=purchase-receipt-create-modal-desktop pnpm style:l1` 通过，1 个场景；限定路径 `git diff --check` 通过；`progress.md` 更新前为 291 行、58313 字节，未达到归档阈值。
+- 下一步：继续页面治理时，应先处理当前工作区 CSS 语法现场，再补来料质检、出货单、库存台账各自的空搜索 / 空筛选浏览器回归；不要把 stale selection 修复和菜单、RBAC、Workflow / Fact 或部署混做。
+- 阻塞/风险：`STYLE_L1_PORT=4192 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm style:l1` 在进入业务页面前被非本轮 CSS 现场阻断，`pnpm css` 当前也因 `web/src/erp/styles/app/*.css` 的 `Unexpected } / Unclosed block` 失败；本轮不回退或整理这些非本轮样式拆分改动，也不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态。
+
+## 2026-06-19 认证安全待办口径收窄
+
+- 完成：按 `plush-docs-governance` 和 `plush-page-design-governance` 复核当前前端认证主路径，确认现状是浏览器侧 token 存储 + `Authorization: Bearer` JSON-RPC 请求，不是浏览器自动携带 Cookie 的登录态模型。
+- 完成：更新 `web/README.md` 的主题 / 登录态说明，把 CSRF 从近期安全待办中移出；当前内部系统优先守住 token 不进日志 / trace / 文档 / 截图 / QA 报告、旧请求 wrapper 不回流、logout 不清空整个项目 localStorage。只有未来明确迁移到 HttpOnly Cookie 登录态时，才把 SameSite / CSRF、刷新机制和 API client 改造合并成专项评审。
+- 验证：`rg -n -i "csrf|httponly|xss|localstorage\\.clear|axios request|request wrapper|react-cookies|旧请求|旧 wrapper|axios" --glob '*.md' --glob '!docs/reference/**' --glob '!docs/archive/**' --glob '!progress.md' .` 只命中 `web/README.md` 当前口径；`progress.md` 更新前为 275 行、55252 字节，未达到归档阈值。
+- 下一步：旧请求清理不用继续扩成安全大专项；若要继续收口，优先做提交前工作区归属清理和目标 QA，而不是提前实现 Cookie / CSRF 体系。
+- 阻塞/风险：本轮只改正式文档和过程记录，不改认证代码、schema、migration、RBAC、菜单、Workflow / Fact、部署、原型或安全架构；当前仍保留 localStorage token 的 XSS 风险面，但这是已知现状，不是本轮要一次性重构的内容。
+
+## 2026-06-18 业务弹窗暗色移动端与来源导入焦点回归
+
+- 完成：按 `plush-page-design-governance` 继续补上一轮共享业务表单弹窗治理的下一层盲区；采购入库创建弹窗的暗色桌面和移动端场景现在都会先验证键盘 Enter 打开、焦点进入弹窗、关闭后回到触发按钮，再继续验证边界值、滚动、暗色 token 和移动布局。
+- 完成：按 `plush-docs-governance` 保持当前变更只落在既有回归脚本和过程记录；未新增长期文档、未改文档标题 / 路径 / 分类，不需要更新 `docs/文档清单.md`，也不修改 `business-form-page-standard-v1` 的 To Implement 原型状态。
+- 完成：来源导入选择器作为业务表单内的 action modal，现在在 `style:l1` 中通过键盘打开，并断言 `aria-modal=true`、焦点进入选择器、导入完成后焦点回到父业务弹窗，取消关闭后焦点回到来源导入触发按钮；覆盖采购订单、销售订单和出货单中的来源导入路径。
+- 验证：`node --check web/scripts/styleL1.mjs` 通过；`cd web && pnpm exec eslint --ext .mjs scripts/styleL1.mjs` 通过；`STYLE_L1_PORT=4185 STYLE_L1_SCENARIOS=purchase-receipt-create-modal-dark-desktop,purchase-receipt-create-modal-mobile pnpm style:l1` 通过，2 个场景；`STYLE_L1_PORT=4186 STYLE_L1_SCENARIOS=purchase-order-date-filter-desktop,business-formal-module-shells-desktop pnpm style:l1` 通过，2 个场景；`git diff --check -- web/scripts/styleL1.mjs progress.md` 通过；`progress.md` 更新前为 223 行、43979 字节，未达到归档阈值。
+- 下一步：如果继续推进“完美”级页面治理，下一块应选无权限 / 错误态 / 空态中的一个真实页面场景补浏览器级回归；不要和 schema、RBAC、Workflow / Fact 或部署改动混做。
+- 阻塞/风险：本轮不改业务实现、schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态；当前工作区仍有大量非本轮并行改动，本轮只声明 `web/scripts/styleL1.mjs` 中上述目标断言和 `progress.md` 过程记录。
+
+## 2026-06-18 共享业务表单弹窗键盘恢复治理
+
+- 完成：按 `plush-page-design-governance` 继续推进上一轮销售订单弹窗后的共享影响面治理；`BusinessFormModal` 改为只聚焦可见控件，并在打开时记录触发元素、关闭后恢复焦点，避免部分复杂业务弹窗关闭后焦点掉到页面根部。
+- 完成：扩展 `style:l1` 业务弹窗键盘回归，覆盖供应商、客户、产品、BOM、销售订单、来料质检、出货单、委外加工合同、采购订单以及采购入库创建弹窗；断言 Enter 打开、焦点进入弹窗、Tab 到达可操作控件、关闭后焦点回到触发按钮。
+- 验证：`node --check web/scripts/styleL1.mjs` 通过；`cd web && pnpm exec eslint --ext .jsx src/erp/components/business-list/BusinessFormModal.jsx` 通过；`STYLE_L1_PORT=4284 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-order-date-filter-desktop,purchase-receipt-create-modal-desktop pnpm style:l1` 通过，3 个场景；`git diff --check -- web/src/erp/components/business-list/BusinessFormModal.jsx web/scripts/styleL1.mjs` 通过；`progress.md` 更新前为 190 行、37439 字节，未达到归档阈值。
+- 下一步：如需进一步宣称全站业务弹窗完成，还应补移动端、暗色和更多非主路径 action modal 的目标场景；本轮优先锁住共享业务表单主路径。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态；`business-form-page-standard-v1` 仍是 To Implement 参照，未获明确确认不晋级 Current。当前工作区仍有部署 / 产品文档和 Dashboard L1 的并行改动，本轮只声明共享业务表单弹窗治理。
+
+## 2026-06-18 Dashboard 关联记录浏览器回归
+
+- 完成：按 `plush-page-design-governance` 的下一步，将 Dashboard 工作台“关联记录”从 helper 单测升级为真实浏览器回归；在 `erp-dashboard-desktop` 场景中创建正式销售订单来源任务和 `shipping-release` formal-shell 来源任务。
+- 完成：验证正式来源任务在当前任务上下文中显示 `关联记录`，点击后进入 `/erp/sales/project-orders/sales-orders`，并带上 `link_keyword=SO-STYLE-L1`；验证 formal-shell 来源任务可见但不显示 `关联记录`，避免待接入预览页被伪装成真实业务入口。
+- 完成：不新增 Dashboard 快捷入口，不改 `admin-command-center-v1` 原型状态，不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置或部署。
+- 验证：`node --check web/scripts/styleL1.mjs` 通过；`cd web && pnpm exec eslint --ext .mjs scripts/styleL1.mjs` 通过；`STYLE_L1_SCENARIOS=erp-dashboard-desktop pnpm style:l1` 通过，1 个场景；`STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-dashboard-mobile,erp-dashboard-dark-desktop pnpm style:l1` 通过，3 个场景；`node --test web/src/erp/utils/workflowDashboardStats.test.mjs` 通过，11 项；`progress.md` 修改前为 181 行、35638 字节，未达到归档阈值。
+- 下一步：若继续推进页面治理，应选择下一个具体盲区，例如业务表单弹窗全量键盘 / 焦点回归、Dashboard 无权限 / 失败态，或 formal-shell 晋级正式 V1 前的领域 usecase / API / RBAC 接入评审；不要把这些合并成一次大改。
+- 阻塞/风险：当前工作区仍有部署 / 文档类并行改动，本轮只触达 Dashboard L1 回归脚本和过程记录；未声明全量 `style:l1` 或全站页面治理完成。
+
 ## 2026-06-18 销售订单业务弹窗键盘焦点治理
 
 - 完成：按 `plush-page-design-governance` 继续收口销售订单页面设计验收盲区；共享 `BusinessFormModal` 在打开后主动把焦点送入最新可见业务表单弹窗，避免键盘 Enter 打开后焦点仍停在外部触发按钮。
@@ -137,6 +180,14 @@
 - 下一步：继续按页面语义优先级处理真实用户会误解的入口，例如待接入页面是否需要更显眼的模块状态标识或默认隐藏策略；这会触达菜单 / 产品能力状态，应单独评审。
 - 阻塞/风险：本轮不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态；当前工作区仍有大量非本轮并行改动，未提交、未推送。
 
+## 2026-06-18 业务表单弹窗焦点标准同步
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 将运行时已验证的业务表单 Modal 焦点标准同步到 `business-form-page-standard-v1` 原型 README：打开后焦点进入第一个真实可操作控件，Tab 进入弹窗内控件，Escape / 关闭后焦点回到触发按钮，不把装饰节点或选择器外壳当焦点入口。
+- 完成：同步 `docs/product/prototypes/README.md` 的“新建 / 编辑业务弹窗”参照范围，明确业务对象创建、编辑、查看统一走 Modal，并保留打开焦点、Tab、Escape / 关闭和焦点返回路径；未更改原型阶段，仍保持 To Implement。
+- 验证：修改前 `progress.md` 为 198 行、39196 字节，未达到归档阈值；`cd web && pnpm exec node --test src/erp/config/devPrototypes.test.mjs` 通过，7 项；`rg -n "打开焦点|焦点回到触发按钮|Tab|Escape|业务表单" docs/product/prototypes/business-form-page-standard-v1/README.md docs/product/prototypes/README.md progress.md` 命中文档同步位置；`git diff --check` 通过。本轮只改现有 Markdown 正文和用途说明，不新增 / 删除 / 重命名长期文档，不改变标题、分类、路径或入口状态，因此不更新 `docs/文档清单.md`。
+- 下一步：后续若继续推进业务表单弹窗，应优先把同一焦点标准挂到真实被调用的 L1 场景，而不是只在文档里扩散说明。
+- 阻塞/风险：本轮不改运行时代码、schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或客户原始资料；AGENTS.md 只读取未修改。
+
 ## 2026-06-18 采购入库草稿添加明细 L1
 
 - 完成：按 `plush-page-design-governance` 继续收口采购入库页面；将选中草稿后的操作按钮从“维护明细”改为“添加明细”，避免当前只支持 `add_purchase_receipt_item` 单行追加时误导用户以为可编辑 / 批量维护已有明细。
@@ -161,3 +212,107 @@
 - 验证：`pnpm --dir web exec node --test src/erp/utils/materialPurchaseContractEditor.test.mjs src/erp/utils/processingContractEditor.test.mjs` 通过，20 项；`node --check web/scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .mjs --ext .jsx src/erp/utils/materialPurchaseContractEditor.mjs src/erp/utils/processingContractEditor.mjs src/erp/components/print/MaterialPurchaseContractWorkbench.jsx src/erp/pages/ProcessingContractPrintWorkspacePage.jsx scripts/styleL1.mjs` 通过；`STYLE_L1_PORT=4282 STYLE_L1_SCENARIOS=print-workspace-material-shell-refresh,print-workspace-processing-shell-refresh pnpm --dir web style:l1` 通过，2 个场景，覆盖签字人清空且日期保留；`pnpm --dir web lint` 通过；`pnpm --dir web css` 通过；`pnpm --dir web test` 通过，358 项。
 - 下一步：如后续需要客户专属电子签章，应作为客户配置 / 打印模板扩展单独评审，不把电子签署状态写进当前 Product Core 打印草稿。
 - 阻塞/风险：本轮不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态；`手签留白` 只是当前窗口打印草稿动作，不代表电子签署、审批或业务事实过账。
+
+## 2026-06-18 生产后端端口 loopback 收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 继续复核生产端口语义，确认当前主路径是外部业务流量进入前端 `5175`，前端容器通过 `/rpc` 反代到 Docker 网络内 `app-server:8300`；后端 HTTP / gRPC 宿主机端口不应默认对公网或办公网开放。
+- 完成：生产 Compose 新增 `APP_HTTP_BIND_ADDR=127.0.0.1`、`APP_GRPC_BIND_ADDR=127.0.0.1`，并将 app-server 端口改为 `${APP_HTTP_BIND_ADDR:-127.0.0.1}:${APP_HTTP_PORT:-8300}:8300` 与 `${APP_GRPC_BIND_ADDR:-127.0.0.1}:${APP_GRPC_PORT:-9300}:9300`；`production-preflight.sh` 同步把两个 bind addr 列为必需变量并阻断非 loopback。
+- 完成：同步 `README.md`、`docs/当前真源与交接顺序.md`、`docs/部署约定.md`、`server/deploy/README.md`、`server/deploy/compose/prod/README.md`、`scripts/README.md` 和本记录；`AGENTS.md` 只读未改，`docs/文档清单.md` 未改，因为没有新增、删除、重命名或重分类长期 Markdown。
+- 验证：`bash -n scripts/deploy/production-preflight.sh` 通过；`bash scripts/deploy/production-preflight.sh --example` 通过并执行 `docker compose config -q`；`docker compose --env-file server/deploy/compose/prod/.env.example -f server/deploy/compose/prod/compose.yml config` 显示 app-server、PostgreSQL 和 Jaeger 的 `host_ip: 127.0.0.1`，前端 `5175` 仍作为外部入口；基于临时生产 `.env` 的正向 preflight 通过；`APP_HTTP_BIND_ADDR=0.0.0.0` 和 `APP_GRPC_BIND_ADDR=0.0.0.0` 负向检查均被拦截；限定路径 `git diff --check` 通过；`rg` 已确认新增端口口径。
+- 下一步：真实发布仍必须用目标运行时 `.env` 跑 `production-preflight.sh --env-file ...`；如果后续确实需要远程直连后端 HTTP / gRPC，应先评审 VPN、SSH tunnel、内网网关或反代策略，不直接放开宿主机公网绑定。
+- 阻塞/风险：本轮不执行线上部署、不运行 migration、不改 schema、RBAC、菜单、Workflow / Fact usecase、客户配置、前端页面或原型状态；当前工作区仍有大量非本轮并行改动，未提交、未推送。
+
+## 2026-06-18 库存闭环验收口径
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 将截图里的“打通库存闭环”建议收口到正式能力证据，而不是新增页面或照抄流程图；新增 `docs/product/产品能力证据详情.md` 的 `库存闭环验收口径 / Inventory Closure Acceptance` 小节，明确库存闭环必须看入库 / 出库 / 冲正流水、余额 / 可用量、批次 / 质检状态和来源单据引用。
+- 完成：补 Mermaid 主路径图，修正“采购需求”和“出货放行”误读：当前可用主路径是采购订单 / 采购入库来源 -> 采购入库过账 -> `inventory_txns.IN` / `inventory_balances` / `inventory_lots` -> 质检批次状态 -> 出货单 `SHIPPED` -> `inventory_txns.OUT` / `REVERSAL`；质检只改批次状态，不额外写库存增加流水。
+- 完成：同步 `docs/product/产品能力进度台账.md` 的 Workflow / Fact 边界口诀，补充“页面存在或菜单可见不能单独证明库存闭环完成”。
+- 验证：`progress.md` 更新前 172 行、33934 字节，未达到归档阈值；本轮只改既有 Markdown 正文和 progress，不新增、删除、重命名或重分类长期文档，不需要更新 `docs/文档清单.md`。
+- 下一步：若要进入 runtime 验收，应按真实链路跑采购入库过账、质检判定、出货单 SHIPPED、库存台账回显和冲正路径；不要先做新的静态库存闭环页。
+- 阻塞/风险：本轮不改 runtime、schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态；当前工作区仍有非本轮部署 / README 相关改动，未纳入本轮成果。
+
+## 2026-06-18 业务弹窗焦点 L1 断言校准
+
+- 完成：按 `plush-page-design-governance` 继续推进下一步，将 `business-formal-module-shells-desktop` 的 formal-shell 刷新提示断言从宽泛后半句改为默认匹配完整真实提示 `${heading}当前为待接入预览页，暂无远端数据刷新`；页面运行时未改。
+- 完成：复核销售订单等正式业务页仍通过共享 `assertBusinessFormModalKeyboardRecovery` 覆盖打开焦点、Tab、Escape 关闭和焦点返回；不新增重复断言、不改原型阶段、不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置或部署。
+- 验证：本轮追加前 `progress.md` 为 206 行、40865 字节，未达到归档阈值；`node --check web/scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .mjs scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .mjs --ext .jsx scripts/styleL1.mjs src/erp/components/business-list/BusinessFormModal.jsx` 通过；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；限定路径 `git diff --check` 通过。
+- 下一步：若继续推进页面治理，优先选择真实缺口明确的场景，例如业务弹窗失败请求 / stale selected row 或 Dashboard 无权限 / 失败态；不要在已有共享焦点断言上重复堆测试。
+- 阻塞/风险：本轮未跑全量 `pnpm lint`、`pnpm css`、`pnpm test` 或全量 `pnpm style:l1`；当前工作区仍有多组并行改动，未提交、未推送。
+
+## 2026-06-18 出货放行协同任务接入
+
+- 完成：按 `plush-page-design-governance` 将 `/erp/warehouse/shipping-release` 从纯字段预览推进到读取和处理 `source_type=shipping-release` 的 Workflow `shipment_release` 协同任务；完成 / 阻塞 / 催办只调用现有 `workflow` JSON-RPC 更新任务和业务状态投影，不写 shipment、库存、财务、发票或收付款事实。
+- 完成：修复共享 `CollaborationTaskPanel` 动作抽屉的 `allowedActionModes` 传递，避免面板按钮可见但抽屉内无法提交；同步 `docs/当前真源与交接顺序.md`、`web/README.md` 和 `docs/product/产品能力证据详情.md` 的 Workflow 已接 / 事实未接边界。
+- 完成：保留 `生产排程`、`生产异常` 为待接入预览页；不改 schema、migration、RBAC、菜单、WorkflowUsecase、Fact usecase、客户配置、部署或原型状态，`business-form-page-standard-v1` 仍是 To Implement 参考。
+- 验证：本轮追加前 `progress.md` 为 206 行、40865 字节，未达到归档阈值；`pnpm --dir web exec node --test src/erp/utils/businessModuleNavigation.test.mjs` 通过，4 项；`node --check web/scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .jsx --ext .mjs src/erp/pages/FormalBusinessModulePage.jsx src/erp/components/business-list/BusinessListLayout.jsx src/erp/utils/businessModuleNavigation.test.mjs scripts/styleL1.mjs` 通过；`STYLE_L1_PORT=4293 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；`git diff --check` 通过。
+- 下一步：若继续推进，优先单独评审 `生产排程` 或 `生产异常` 的真实 source document / workflow 边界，不把它们和出货事实、库存事实合并。
+- 阻塞/风险：出货放行本页任务完成仍不等于 `SHIPPED`；当前工作区仍有多组并行改动，未提交、未推送。
+
+## 2026-06-18 正式菜单 R0 真源一致性收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 复核正式菜单下一步，确认 R0 前后端菜单真源一致性在代码中已经收敛；补 `TestBuiltinAdminMenusAlignCurrentRuntimeNavigation` 锁住后端 `BuiltinAdminMenus()` 的 `工作台`、`任务看板`、`业务看板`、`异常 / 阻塞闭环`、`应收管理` 和 `发票管理` label / path / required permission。
+- 完成：同步 `docs/product/正式菜单运行时实施拆分清单.md`，将 R0 从“建议第一批真实代码任务”改为“已完成”，并明确后续应从 R1 低风险命名清理、R2 客户显隐决策或 R3 页面内 tab / 动作吸收中单独选择，不重复执行 R0。
+- 验证：本轮追加前 `progress.md` 为 223 行、43979 字节，未达到归档阈值；`go test ./internal/biz ./internal/data` 通过；`pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs` 通过，14 项；`rg` 未扫到 R0 旧待办 / 旧标签残留；限定路径 `git diff --check` 通过。
+- 下一步：若继续推进正式菜单治理，优先单独评审 R1 命名清理或 R2 客户显隐，不把隐藏 formal-shell、改名、页面 tab 吸收混在同一轮。
+- 阻塞/风险：本轮不改前端导航、客户菜单、路由、权限码、schema、migration、Workflow / Fact usecase、页面结构或原型状态；前后端跨语言菜单快照比对仍未建立。
+
+## 2026-06-18 加工页业务页一致性收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 将 `/erp/purchase/processing-contracts` 加工页继续向正式业务页共享模式收口；搜索和排序变更会回到第一页，排序控件接入共享 toolbar class，主按钮接入共享 primary action class，选中条增加明细摘要和清空动作，行双击进入编辑弹窗。
+- 完成：把状态动作从多枚横排按钮收口为“主动作 + 更多”模式，减少页面私有按钮噪音；保留“加工合同打印”为高频独立动作，不改变 Source Document / 加工合同源单语义，也不让确认下单写库存、质检、应付、发票、收付款或 Workflow 完成事实。
+- 完成：补加工页 L1 断言，覆盖禁用的批量删除 / 回收站、列顺序弹窗、表头排序入口、状态动作收口、新建弹窗键盘恢复、双击编辑弹窗和加工明细入口；后端 JSON-RPC 测试补 `sort_by` / `sort_direction` 映射断言；共享列顺序表头下拉收口 popup 容器，并对 L1 shadow-root 环境下的 Ant 已知 trigger/popup root 警告做精确白名单。
+- 验证：本轮追加前 `progress.md` 为 231 行、45840 字节，未达到归档阈值；`node --check web/scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .jsx --ext .mjs src/erp/pages/V1OutsourcingOrdersPage.jsx src/erp/components/business-list/ColumnOrderModal.jsx scripts/styleL1.mjs` 通过；`go test ./internal/service -run TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions` 通过；`STYLE_L1_PORT=4300 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；限定路径 `git diff --check` 通过。
+- 下一步：若继续治理加工页，优先按真实使用频率评审导入来源、加工明细字段残值 / 缺值和失败请求恢复态，不把加工合同直接扩展成库存、质检或财务事实入口。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态；当前工作区仍有多组非本轮并行改动，未提交、未推送。
+
+## 2026-06-18 毛绒默认工序候选收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 将甲方确认的 `查货 / 手工 / 车缝 / 包装` 收口为毛绒玩具行业默认工序候选；`processes` 仍是可扩展主数据，不把这些候选写成不可改枚举，也不把客户资料硬编码进 Product Core usecase。
+- 完成：工序主数据页的环节名称和环节类别改为可选可输候选输入；core demo seed 增加带 `SIM-PLUSH-CORE` 前缀的默认候选工序，并保留可委外 / 可内制 / 需质检标记；加工合同 L1 验证工序下拉能看到这些可委外候选。
+- 完成：同步当前真源、产品能力证据、业务主链路字段来源、正式菜单计划、脚本说明和业务页 / 业务弹窗原型 README；不新增文档、不改文档标题 / 路径 / 分类，不更新 `docs/文档清单.md`。
+- 验证：本轮追加前 `progress.md` 为 249 行、50171 字节，未达到归档阈值；`node --check web/scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .jsx --ext .mjs src/erp/pages/V1MasterDataPage.jsx scripts/styleL1.mjs` 通过；`go test ./internal/data -run 'TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete|TestSeedCoreDemoDataUpsertsMinimalDataset'` 通过；`STYLE_L1_PORT=4301 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；限定路径 `git diff --check` 通过。
+- 下一步：如要继续补后端业务闭环，应单独评审生产路线、委外发料 / 回货、工序质检和结算，不把工序主数据候选直接扩展成事实写入。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置 loader、部署或真实客户导入；未跑全量 `pnpm test`、`pnpm css` 或全量 `style:l1`。
+
+## 2026-06-19 来料质检列表表头降密度
+
+- 完成：按 `plush-page-design-governance` 将 `/erp/production/quality-inspections` 默认列表从全字段平铺收口为可扫读列：保留质检单号、状态、判定、采购来源、物料批次、检验信息、更新时间和判定备注；采购入库单 / 入库行、材料 / 批次 / 仓库 / 原批次状态、检验时间 / 检验员改为组合展示，减少表头省略号。
+- 完成：CSV 导出保留完整原始字段清单，避免屏幕列降密度导致追溯字段丢失；选中摘要改为显示批次可读标签；不改 schema、migration、API、RBAC、菜单、Workflow / Fact usecase、客户配置、部署或原型状态。
+- 完成：补 `business-formal-module-shells-desktop` L1 断言，检查来料质检默认表头列名为合并后的业务列，且表头文字没有裁切；`progress.md` 更新前为 258 行、52024 字节，未达到归档阈值。
+- 验证：`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；`pnpm --dir web lint` 通过；`pnpm --dir web css` 通过；`pnpm --dir web test` 通过，358 项；限定路径 `git diff --check -- web/src/erp/pages/V1QualityInspectionsPage.jsx web/scripts/styleL1.mjs` 通过。
+- 下一步：如果继续治理来料质检，优先评审真实详情 / 追溯浮层、失败请求恢复态、无权限态和长备注 / 多批次边界；不要把不合格处理直接扩展成采购退货或库存流水。
+- 阻塞/风险：本轮只做前端展示降密度和回归断言；未跑后端 Go、migration、部署检查、真实写入 smoke 或全量 `pnpm style:l1`。当前工作区仍有多组非本轮并行改动，未提交、未推送。
+
+## 2026-06-19 正式菜单 R1 命名清理收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 继续正式菜单治理，确认运行时已经使用 `产品档案` 和 `BOM 管理`；扩展 `TestBuiltinAdminMenusAlignCurrentRuntimeNavigation`，锁住后端内置菜单的 `products` / `material-bom` label、path 和 required permission。
+- 完成：同步 `docs/product/正式菜单运行时实施拆分清单.md`，将 R1 从“低风险命名清理待办”改为“已完成”；同步 `docs/product/菜单映射评审表.md`、`docs/product/prototypes/business-module-page-standard-v1/README.md` 和 `docs/customers/yoyoosun/试用培训说明.md`，避免继续把 `产品` / `材料 BOM` 写成当前可见菜单名。
+- 验证：本轮追加前 `progress.md` 为 267 行、53778 字节，未达到归档阈值；`go test ./internal/biz` 通过；`pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs` 通过，14 项；目标文档 `rg` 未扫到 `产品` / `材料 BOM` 旧可见菜单口径；限定路径 `git diff --check` 通过。
+- 下一步：正式菜单治理剩余项转入 R3 页面内 tab / 动作吸收；不把客户菜单隐藏、页面结构和事实 usecase 混在同一轮。
+- 阻塞/风险：本轮不改 route、客户菜单显隐、权限码、schema、migration、Workflow / Fact usecase、页面结构、部署或原型状态；`material-bom` 作为稳定 route / key 继续保留，不等于可见菜单仍叫“材料 BOM”。
+
+## 2026-06-19 正式菜单 R2 客户显隐收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 继续正式菜单治理，确认当前 yoyoosun 客户菜单已经保留 `任务看板` 和 `异常 / 阻塞闭环`；补 `seedData.test.mjs` 断言 yoyoosun 配置生成的桌面菜单包含 `/erp/task-board` 和 `/erp/operations/exceptions`。
+- 完成：同步 `docs/product/正式菜单运行时实施拆分清单.md` 和 `docs/product/菜单映射评审表.md`，将 R2 从“恢复或隐藏待决策”改为“已显示”；后续若要隐藏，必须单独确认工作台、岗位任务端、任务看板和异常处理替代路径。
+- 验证：本轮追加前 `progress.md` 为 283 行、56906 字节，未达到归档阈值；`pnpm --dir web exec node --test src/erp/config/seedData.test.mjs src/erp/config/menuPermissions.test.mjs` 通过，15 项；`go test ./internal/biz` 通过；目标文档 `rg` 未扫到客户显隐旧口径或旧可见菜单名残留；限定路径 `git diff --check` 通过。
+- 下一步：正式菜单治理剩余项转入 R3 页面内 tab / 动作吸收，但必须按具体页面单独闭环，不把多个事实域一次性塞进同一轮。
+- 阻塞/风险：本轮不改后端 RBAC、route、权限码、schema、migration、Workflow / Fact usecase、页面结构、部署或原型状态；菜单显隐仍只是前端入口配置，不是安全边界。
+
+## 2026-06-19 加工模块单一职责收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 将 `查货 / 手工 / 车缝 / 包装` 明确为工序候选，不作为质检结果；加工合同页只保留加工合同源单、工序明细、状态流转和打印，不在当前操作区承接质检、库存或应付跨模块处理入口。
+- 完成：工序档案表单补“需质检只是后续质检提示”的字段说明；加工合同页头、选中操作条、表单描述和工序字段说明补“查货只是加工环节，判定结果回质检模块”；同步业务主链路字段来源、当前真源、产品能力证据、正式菜单计划和业务页 / 业务弹窗原型 README。
+- 完成：L1 回归断言加工合同页展示查货边界、选中记录后不出现跨模块“关联”下拉、工序档案和加工合同弹窗都显示对应边界说明；不新增文档、不改标题 / 路径 / 分类，不更新 `docs/文档清单.md`。
+- 验证：本轮追加前 `progress.md` 为 300 行、60531 字节，未达到归档阈值；`node --check web/scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .jsx --ext .mjs src/erp/pages/V1OutsourcingOrdersPage.jsx src/erp/pages/V1MasterDataPage.jsx scripts/styleL1.mjs` 通过；`STYLE_L1_PORT=4302 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test` 通过，前端 test 359 项；限定路径 `git diff --check` 通过。
+- 下一步：如要继续补加工业务闭环，单独评审委外发料 / 回货、工序质检联动和结算，不把这些事实写进加工合同源单页。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置 loader、部署或真实客户导入；后端 seed 候选已存在，本轮只补模块边界和页面语义。
+
+## 2026-06-19 前端大文件职责拆分
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 收口大文件职责，将 `web/src/erp/styles/app.css` 拆成 5 行 import 入口和 `src/erp/styles/app/` 下的 `shell-dashboard.css`、`dev-surfaces.css`、`print-surfaces.css`、`business-surfaces.css`、`theme-overrides.css`；拆分按顶层 CSS 规则闭合点生成，保留原加载顺序。
+- 完成：将 `web/scripts/styleL1.mjs` 的 admin/auth/masterdata/purchase/quality/inventory/workflow/PDF mock 安装层抽到 `web/scripts/style-l1/adminRpcMocks.mjs`；主脚本保留场景、断言和执行器入口，`pnpm style:l1`、场景名称和现有页面断言不改。
+- 完成：同步 `web/README.md` 的样式入口说明；顺手修正加工合同 L1 工序下拉断言，改为按 AntD label 定位表单项，避免 `extra` 说明让 `.ant-form-item` 文本不可能严格等于 `工序`。
+- 验证：本轮追加前 `progress.md` 为 309 行、62128 字节，未达到归档阈值；`node --check web/scripts/styleL1.mjs`、`node --check web/scripts/style-l1/adminRpcMocks.mjs`、`pnpm --dir web exec eslint --ext .mjs scripts/styleL1.mjs scripts/style-l1/adminRpcMocks.mjs`、`pnpm --dir web css` 均通过；`STYLE_L1_PORT=4312 STYLE_L1_SCENARIOS=erp-dashboard-desktop,business-formal-module-shells-desktop,print-center-desktop,purchase-receipt-create-modal-desktop pnpm --dir web style:l1` 通过，4 个场景。首次使用 4302 端口时因端口占用失败，已换端口复跑通过。
+- 下一步：如继续处理大文件，优先单独拆 `styleL1.mjs` 的场景索引 / 断言 helper，或按业务域继续拆仍超过 3k 行的 CSS partial；不要把后端 usecase、schema、部署和页面结构重构混在同一轮。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置 loader、部署、后端 JSON-RPC 或真实业务写入；未跑全量 `pnpm style:l1`、全量 `pnpm test`、后端 Go 测试或部署检查。当前工作区仍有多组非本轮并行改动，未提交、未推送。

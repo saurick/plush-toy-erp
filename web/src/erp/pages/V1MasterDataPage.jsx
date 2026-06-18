@@ -108,6 +108,19 @@ import {
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 
+const DEFAULT_PLUSH_PROCESS_NAMES = ['查货', '手工', '车缝', '包装']
+const DEFAULT_PLUSH_PROCESS_CATEGORIES = [
+  '查货',
+  '手工',
+  '车缝',
+  '包装',
+  '裁片',
+  '裁片质检',
+  '刀模',
+  '印刷',
+  '贴合',
+]
+
 const PAGE_CONFIG = Object.freeze({
   customers: {
     title: '客户档案',
@@ -192,9 +205,9 @@ const PAGE_CONFIG = Object.freeze({
     entityLabel: '加工环节',
     draftCodePrefix: 'PROC',
     formBoundary:
-      '只维护委外订单和质检标记可引用的标准加工环节，不在此生成委外订单、生产任务、库存流水或质检事实。',
+      '只维护委外订单和后续质检可引用的标准加工环节；需质检只是工序属性标记，不在此生成委外订单、生产任务、库存流水或质检判定。',
     summary:
-      '维护少量可复用加工环节，用于委外订单选择和质检标记；不管理完整工艺路线、排程、报工或库存事实。',
+      '维护少量可复用加工环节，用于委外订单选择和后续质检提示；不管理完整工艺路线、排程、报工、质检结果或库存事实。',
     initialValues: {
       outsourcing_enabled: true,
       inhouse_enabled: false,
@@ -382,10 +395,20 @@ function TextSuggestionInput({
 }) {
   const [open, setOpen] = useState(false)
   const hasOptions = options.length > 0
+  const popupClassName = className ? `${className}__popup` : ''
   return (
     <AutoComplete
       allowClear
       className={className}
+      classNames={
+        popupClassName
+          ? {
+              popup: {
+                root: popupClassName,
+              },
+            }
+          : undefined
+      }
       filterOption={(inputValue, option) =>
         String(option?.value || '')
           .toLowerCase()
@@ -403,6 +426,22 @@ function TextSuggestionInput({
   )
 }
 
+function mergeTextSuggestionOptions(defaultValues = [], existingOptions = []) {
+  const seen = new Set()
+  return [...defaultValues.map((value) => ({ value })), ...existingOptions]
+    .map((option) => ({
+      ...option,
+      value: String(option?.value || '').trim(),
+    }))
+    .filter((option) => {
+      if (!option.value || seen.has(option.value)) {
+        return false
+      }
+      seen.add(option.value)
+      return true
+    })
+}
+
 function MasterDataFormFields({
   type,
   productOptions = [],
@@ -410,6 +449,8 @@ function MasterDataFormFields({
   unitLoading = false,
   materialCategoryOptions = [],
   materialColorOptions = [],
+  processNameOptions = [],
+  processCategoryOptions = [],
 }) {
   if (type === 'products') {
     return (
@@ -564,17 +605,21 @@ function MasterDataFormFields({
           name="name"
           rules={[{ required: true, message: '请填写环节名称' }]}
         >
-          <Input allowClear autoComplete="off" />
+          <TextSuggestionInput
+            className="erp-process-name-suggested-input"
+            options={processNameOptions}
+            placeholder="如查货、手工、车缝、包装，也可直接输入新环节"
+          />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
           label="环节类别"
           name="category"
         >
-          <Input
-            allowClear
-            autoComplete="off"
-            placeholder="如车缝、印刷、裁片、刀模"
+          <TextSuggestionInput
+            className="erp-process-category-suggested-input"
+            options={processCategoryOptions}
+            placeholder="从行业默认类别选择，或直接输入新类别"
           />
         </Form.Item>
         <Form.Item
@@ -604,6 +649,7 @@ function MasterDataFormFields({
           className="erp-business-action-form__field"
           label="需质检"
           name="quality_required"
+          extra="只标记该工序后续可能需要质检；合格、不合格、让步、返工等结果仍由质检 / 异常模块记录。"
           valuePropName="checked"
         >
           <Switch />
@@ -1027,6 +1073,26 @@ export default function V1MasterDataPage({ type }) {
     () =>
       effectiveType === 'materials'
         ? buildTextSelectOptions(records, 'color')
+        : [],
+    [effectiveType, records]
+  )
+  const processNameOptions = useMemo(
+    () =>
+      effectiveType === 'processes'
+        ? mergeTextSuggestionOptions(
+            DEFAULT_PLUSH_PROCESS_NAMES,
+            buildTextSelectOptions(records, 'name')
+          )
+        : [],
+    [effectiveType, records]
+  )
+  const processCategoryOptions = useMemo(
+    () =>
+      effectiveType === 'processes'
+        ? mergeTextSuggestionOptions(
+            DEFAULT_PLUSH_PROCESS_CATEGORIES,
+            buildTextSelectOptions(records, 'category')
+          )
         : [],
     [effectiveType, records]
   )
@@ -2023,6 +2089,8 @@ export default function V1MasterDataPage({ type }) {
             unitLoading={unitLoading}
             materialCategoryOptions={materialCategoryOptions}
             materialColorOptions={materialColorOptions}
+            processNameOptions={processNameOptions}
+            processCategoryOptions={processCategoryOptions}
           />
           {showContactForm ? (
             <ContactFormList form={recordForm} entityLabel={entityLabel} />

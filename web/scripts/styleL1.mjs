@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import { Buffer } from 'node:buffer'
 import net from 'node:net'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
@@ -13,8 +12,11 @@ import {
   CONTINUED_PRINT_PAGE_MARGIN,
   PRINT_PAGE_STYLE_ELEMENT_ID,
 } from '../src/erp/utils/printPageMargin.mjs'
-import { RpcErrorCode } from '../src/common/consts/errorCodes.generated.js'
-import { getNavigationSections } from '../src/erp/config/seedData.mjs'
+import {
+  createMockAdminToken,
+  installAdminAuthExpiredRpcMocks,
+  installAdminRpcMocks,
+} from './style-l1/adminRpcMocks.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const outputDir = path.resolve(webDir, 'output', 'playwright', 'style-l1')
@@ -32,10 +34,6 @@ const scenarioMaxAttempts = 2
 
 let devServerProcess = null
 let devServerLogs = ''
-const mockPdfBuffer = Buffer.from(
-  '%PDF-1.4\\n%plush-style-l1\\n1 0 obj\\n<<>>\\nendobj\\ntrailer\\n<<>>\\n%%EOF\\n',
-  'utf8'
-)
 
 const assertAntdModalCentered = (...args) =>
   assertAntdModalCenteredImpl(...args)
@@ -213,6 +211,9 @@ const scenarios = [
         expectVisible: true,
       })
       await assertNoDashboardCenterLocalRefreshButton(page, {
+        scenarioName: 'erp-dashboard-desktop',
+      })
+      await assertDashboardWorkbenchEntryNavigation(page, {
         scenarioName: 'erp-dashboard-desktop',
       })
     },
@@ -3153,6 +3154,12 @@ const scenarios = [
       await expectHeading(page, '入库管理')
       await expectText(page, 'PR-STYLE-L1')
       await assertPurchaseReceiptCreateModalKeyboardRecovery(page)
+      await assertBusinessListEmptySearchState(page, {
+        scenarioName: 'purchase-receipt-empty-search-state',
+        searchPlaceholder: '搜索入库单号 / 供应商',
+        emptyText: '暂无采购入库单',
+        staleText: 'PR-STYLE-L1',
+      })
 
       const modal = await openPurchaseReceiptCreateModal(page)
       await expectText(page, '新建采购入库单')
@@ -3213,6 +3220,7 @@ const scenarios = [
         expectedMode: 'dark',
         expectedEffectiveTheme: 'dark',
       })
+      await assertPurchaseReceiptCreateModalKeyboardRecovery(page)
       const modal = await openPurchaseReceiptCreateModal(page)
       await fillPurchaseReceiptCreateModalBoundaryValues(page, modal)
       await assertPurchaseReceiptCreateModalMetrics(page, modal, {
@@ -3232,6 +3240,7 @@ const scenarios = [
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
       await expectHeading(page, '入库管理')
+      await assertPurchaseReceiptCreateModalKeyboardRecovery(page)
       const modal = await openPurchaseReceiptCreateModal(page)
       await expectText(page, '新建采购入库单')
       await fillPurchaseReceiptCreateModalBoundaryValues(page, modal)
@@ -3476,6 +3485,11 @@ const scenarios = [
       await assertBusinessModuleToolbarControlStyle(page, {
         scenarioName: 'purchase-order-date-filter-desktop',
       })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建采购订单',
+        titleText: '新建采购订单',
+        scenarioName: 'purchase-order-date-filter-desktop',
+      })
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建采购订单',
         titleText: '新建采购订单',
@@ -3703,6 +3717,11 @@ const scenarios = [
       await assertBusinessMainTableSortableColumns(page, {
         scenarioName: 'business-v1-suppliers',
       })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建供应商',
+        titleText: '新建供应商档案',
+        scenarioName: 'business-v1-suppliers',
+      })
       await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建供应商',
@@ -3736,6 +3755,11 @@ const scenarios = [
         scenarioName: 'business-v1-customers',
       })
       await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'business-v1-customers',
+      })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建客户',
+        titleText: '新建客户档案',
         scenarioName: 'business-v1-customers',
       })
       await verifyBusinessActionFormModal(page, {
@@ -3856,6 +3880,11 @@ const scenarios = [
         moduleKey: 'products',
         heading: '产品档案',
       })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建产品',
+        titleText: '新建产品',
+        scenarioName: 'business-standard-products',
+      })
       await page.getByRole('button', { name: '新建产品' }).click()
       await expectText(page, '新建产品')
       await expectText(page, '产品编号')
@@ -3911,6 +3940,11 @@ const scenarios = [
       await assertBusinessHeaderStatsSingleLine(page, {
         scenarioName: 'business-standard-bom',
         expectedLabels: ['总BOM', '当前结果', '已激活', '已选BOM'],
+      })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建草稿',
+        titleText: '新建 BOM 草稿',
+        scenarioName: 'business-standard-bom',
       })
       await page.getByRole('button', { name: '新建草稿' }).click()
       await expectText(page, '新建 BOM 草稿')
@@ -3970,6 +4004,46 @@ const scenarios = [
       await expectText(page, 'QI-STYLE-L1')
       await expectText(page, 'PR-STYLE-L1')
       await expectText(page, 'INV-LOT-001')
+      const qualityInspectionHeaderMetrics = await page.evaluate(() => {
+        const headers = Array.from(
+          document.querySelectorAll(
+            '.erp-business-data-table-card .ant-table-thead th .erp-module-column-header-text'
+          )
+        ).map((node) => ({
+          text: String(node.textContent || '').trim(),
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
+        }))
+        return {
+          headers,
+          clippedHeaders: headers.filter(
+            (header) => header.scrollWidth > header.clientWidth + 1
+          ),
+        }
+      })
+      assert.deepEqual(
+        qualityInspectionHeaderMetrics.headers.map((header) => header.text),
+        [
+          '质检单号',
+          '状态',
+          '判定',
+          '采购来源',
+          '物料批次',
+          '检验信息',
+          '更新时间',
+          '判定备注',
+        ],
+        `来料质检默认表头应合并为可扫读列: ${JSON.stringify(
+          qualityInspectionHeaderMetrics
+        )}`
+      )
+      assert.deepEqual(
+        qualityInspectionHeaderMetrics.clippedHeaders,
+        [],
+        `来料质检默认表头不应出现省略号: ${JSON.stringify(
+          qualityInspectionHeaderMetrics
+        )}`
+      )
       await assertBusinessPageRefreshEntrypoint(page, {
         scenarioName: 'business-v1-quality-inspections',
       })
@@ -3988,8 +4062,13 @@ const scenarios = [
         moduleKey: 'quality-inspections',
         heading: '来料质检',
       })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建质检单',
+        titleText: '新建来料质检单',
+        scenarioName: 'business-v1-quality-inspections',
+      })
       await page.getByRole('row').filter({ hasText: 'QI-STYLE-L1' }).click()
-      await expectText(page, 'QI-STYLE-L1 / 批次 401')
+      await expectText(page, 'QI-STYLE-L1 / INV-LOT-001')
       await expectButton(page, '判定合格')
       await expectButton(page, '判定不合格')
       await verifyBusinessActionFormModal(page, {
@@ -4011,6 +4090,11 @@ const scenarios = [
       await expectText(page, '实际出货')
       await expectText(page, 'SHIP-STYLE-L1')
       await assertBusinessPageRefreshEntrypoint(page, {
+        scenarioName: 'business-v1-shipments',
+      })
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建草稿',
+        titleText: '新建出货单',
         scenarioName: 'business-v1-shipments',
       })
       await verifyBusinessActionFormModal(page, {
@@ -4044,6 +4128,39 @@ const scenarios = [
       })
       await assertNoHorizontalOverflow(page, 'business-v1-shipments')
 
+      await gotoScenarioPath(page, '/erp/engineering/processes', {
+        waitUntil: 'domcontentloaded',
+      })
+      await expectHeading(page, '加工环节')
+      await expectText(page, '查货')
+      await expectText(page, '手工')
+      await expectText(page, '车缝')
+      await expectText(page, '包装')
+      await expectText(page, '可委外')
+      await expectText(page, '可内制')
+      await expectText(page, '需质检')
+      await verifyBusinessActionFormModal(page, {
+        buttonName: '新建加工环节',
+        titleText: '新建加工环节',
+        minFieldCount: 8,
+        screenshotName: 'business-v1-process-create-form-modal',
+        expectedTexts: [
+          '环节编号',
+          '环节名称',
+          '环节类别',
+          '可委外',
+          '可内制',
+          '需质检',
+          '只标记该工序后续可能需要质检',
+        ],
+        afterOpen: async (modal) => {
+          await assertProcessSuggestionOptions(page, modal, {
+            scenarioName: 'business-v1-processes',
+          })
+        },
+      })
+      await assertNoHorizontalOverflow(page, 'business-v1-processes')
+
       await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
         waitUntil: 'domcontentloaded',
       })
@@ -4055,7 +4172,21 @@ const scenarios = [
       await expectButton(page, '回收站')
       await expectText(page, 'Source Document：加工合同')
       await expectText(page, '加工合同只表达委外承诺和打印快照')
+      await expectText(page, '查货只是工序候选')
+      await expectText(page, '判定结果回质检模块')
       await expectText(page, '本页协同')
+      await assertBusinessToolbarDisabledButtons(page, {
+        scenarioName: 'business-v1-processing-contracts',
+        labels: ['批量删除', '回收站'],
+      })
+      await verifyBusinessModuleColumnOrderDialog(page, {
+        moduleKey: 'processing-contracts',
+        heading: '委外订单',
+      })
+      await assertBusinessMainTableSortableColumns(page, {
+        scenarioName: 'business-v1-processing-contracts',
+        unsortableHeaders: ['备注'],
+      })
       await assertTextAbsent(page, '生成委外合同')
       await expectButton(page, '加工合同打印')
       const processingContractPrintButton = page.getByRole('button', {
@@ -4070,21 +4201,59 @@ const scenarios = [
         .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
         .click()
       assert.equal(
+        await page.getByRole('button', { name: /^关联/ }).count(),
+        0,
+        '加工合同页当前操作区不应保留跨模块关联下拉，避免加工页承接质检、库存或应付事实'
+      )
+      assert.equal(
         await processingContractPrintButton.isDisabled(),
         false,
         '选中加工合同后，加工合同打印按钮应启用'
       )
+      await assertOrderLifecycleActionsConsolidated(page, {
+        scenarioName: 'business-v1-processing-contracts',
+        primaryActionLabel: '提交',
+        menuActionLabels: ['取消'],
+        absentButtonLabels: ['确认下单', '关闭', '取消'],
+      })
+      await page.keyboard.press('Escape')
       await assertTextAbsent(page, '打印单据')
+      await assertBusinessFormModalKeyboardRecovery(page, {
+        triggerName: '新建加工合同',
+        titleText: '新建加工合同',
+        scenarioName: 'business-v1-processing-contracts',
+      })
       await verifyBusinessActionFormModal(page, {
         buttonName: '新建加工合同',
         titleText: '新建加工合同',
         minFieldCount: 6,
         screenshotName: 'business-v1-outsourcing-order-create-form-modal',
-        expectedTexts: ['加工合同号', '加工厂', '加工明细', '工序', '单位'],
+        expectedTexts: [
+          '加工合同号',
+          '加工厂',
+          '加工明细',
+          '工序',
+          '单位',
+          '查货只表示加工环节',
+        ],
+        afterOpen: async (modal) => {
+          await assertOutsourcingProcessSelectOptions(page, modal, {
+            scenarioName: 'business-v1-processing-contracts',
+          })
+        },
       })
       await assertTextAbsent(page, '销售订单ID')
       await assertTextAbsent(page, '单位ID')
       await assertTextAbsent(page, '产品编号快照')
+      await verifyBusinessRowDoubleClickEditModal(page, {
+        rowText: 'SIM-OUTSOURCE-CONTRACT-L1',
+        titleText: '编辑加工合同',
+        scenarioName: 'business-v1-processing-contracts',
+        afterModalOpen: async () => {
+          await expectText(page, '加工明细')
+          await expectButton(page, '添加条目')
+        },
+      })
       await assertNoHorizontalOverflow(page, 'business-v1-processing-contracts')
 
       const verifyFormalShellPreviewPage = async ({
@@ -4096,6 +4265,8 @@ const scenarios = [
         rowText,
         scenarioName,
         expectedModalTexts,
+        refreshMessage,
+        afterPageReady,
       }) => {
         await gotoScenarioPath(page, path, {
           waitUntil: 'domcontentloaded',
@@ -4117,9 +4288,16 @@ const scenarios = [
         await assertTextAbsent(page, '导出预览字段')
         await assertTextAbsent(page, '打印单据')
         await assertTextAbsent(page, '加工合同打印')
+        if (afterPageReady) {
+          await afterPageReady()
+        }
         await page.getByRole('button', { name: '刷新当前页' }).click()
-        await expectText(page, '暂无远端数据刷新')
-        await assertTextAbsent(page, '当前页面数据已刷新')
+        const expectedRefreshMessage =
+          refreshMessage || `${heading}当前为待接入预览页，暂无远端数据刷新`
+        await expectText(page, expectedRefreshMessage)
+        if (expectedRefreshMessage.includes('暂无远端数据刷新')) {
+          await assertTextAbsent(page, '当前页面数据已刷新')
+        }
         await assertTextAbsent(page, '批量删除')
         await assertTextAbsent(page, '回收站')
         await expectNoButton(page, '删除')
@@ -4153,6 +4331,37 @@ const scenarios = [
         expectedModalTexts: ['异常类型', '来源任务', '责任角色'],
       })
 
+      await page.evaluate(async () => {
+        const response = await fetch('/rpc/workflow', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 'formal-shipping-release-task',
+            method: 'create_task',
+            params: {
+              task_code: 'style-l1-formal-shipping-release',
+              task_group: 'shipment_release',
+              task_name: '出货放行协同确认',
+              source_type: 'shipping-release',
+              source_id: 9101,
+              source_no: 'SHIP-REL-L1',
+              business_status_key: 'shipment_pending',
+              task_status_key: 'ready',
+              owner_role_key: 'warehouse',
+              payload: {
+                critical_path: true,
+                shipment_release_page_scope: 'workflow_only',
+              },
+            },
+          }),
+        })
+        return response.json()
+      })
+
       await verifyFormalShellPreviewPage({
         path: '/erp/warehouse/shipping-release',
         heading: '出货放行',
@@ -4162,6 +4371,13 @@ const scenarios = [
         rowText: '出货放行字段预览',
         scenarioName: 'business-formal-shipping-release',
         expectedModalTexts: ['销售订单', '出货批次', '放行结论'],
+        refreshMessage: '出货放行协同任务已刷新',
+        afterPageReady: async () => {
+          await expectText(page, '待办')
+          await page.getByRole('button', { name: '展开' }).first().click()
+          await expectText(page, '出货放行协同确认')
+          await expectText(page, 'SHIP-REL-L1')
+        },
       })
 
       await gotoScenarioPath(page, '/erp/production/progress', {
@@ -4318,7 +4534,14 @@ const scenarios = [
         titleText: '新建加工合同',
         minFieldCount: 6,
         screenshotName: 'business-v1-outsourcing-mobile-modal',
-        expectedTexts: ['加工合同号', '加工厂', '加工明细', '工序', '单位'],
+        expectedTexts: [
+          '加工合同号',
+          '加工厂',
+          '加工明细',
+          '工序',
+          '单位',
+          '查货只表示加工环节',
+        ],
         requireMultiColumn: false,
       })
       await assertTextAbsent(page, '销售订单ID')
@@ -4600,7 +4823,7 @@ async function runScenarioOnce(browser, scenario) {
   const errors = []
 
   if (scenario.mockAdminRpc) {
-    await installAdminRpcMocks(page)
+    await installAdminRpcMocks(page, { baseURL })
   }
 
   if (scenario.auth === 'admin' || scenario.auth === 'admin-expired') {
@@ -4608,7 +4831,7 @@ async function runScenarioOnce(browser, scenario) {
     if (scenario.auth === 'admin-expired') {
       await installAdminAuthExpiredRpcMocks(page)
     } else {
-      await installAdminRpcMocks(page)
+      await installAdminRpcMocks(page, { baseURL })
     }
     await page.addInitScript((mockToken) => {
       localStorage.setItem('admin_access_token', mockToken)
@@ -4655,7 +4878,15 @@ async function runScenarioOnce(browser, scenario) {
     if (message.type() === 'error') {
       const text = message.text()
       if (!isIgnorableDevServerError(text)) {
-        errors.push(`console error: ${text}`)
+        const location = message.location()
+        const source = [
+          location.url,
+          location.lineNumber,
+          location.columnNumber,
+        ]
+          .filter((part) => part !== undefined && part !== '')
+          .join(':')
+        errors.push(`console error: ${text}${source ? ` @ ${source}` : ''}`)
       }
     }
   })
@@ -4768,1781 +4999,6 @@ async function waitForPath(page, expectedPath) {
     await delay(100)
   }
   assert.equal(new URL(page.url()).pathname, expectedPath)
-}
-
-function resolveDelayFromReferer(request, paramName) {
-  const referer = String(request.headers().referer || '').trim()
-  if (!referer) {
-    return 0
-  }
-
-  try {
-    const raw = new URL(referer).searchParams.get(paramName)
-    const delayMs = Number(raw)
-    return Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0
-  } catch {
-    return 0
-  }
-}
-
-async function installAdminRpcMocks(page) {
-  const nowUnix = () => Math.floor(Date.now() / 1000)
-  const mockMenus = getNavigationSections()
-    .flatMap((section) => section.items || [])
-    .map((item) => ({
-      key: item.key || item.path,
-      label: item.label,
-      path: item.path,
-      required_permissions: item.required_permissions || [],
-    }))
-    .filter((item) => item.path)
-  const mockPermissions = [
-    {
-      permission_key: 'system.user.read',
-      name: '查看管理员',
-      module: 'system',
-    },
-    {
-      permission_key: 'system.user.create',
-      name: '创建管理员',
-      module: 'system',
-    },
-    {
-      permission_key: 'system.user.update',
-      name: '更新管理员',
-      module: 'system',
-    },
-    {
-      permission_key: 'system.user.disable',
-      name: '启停管理员',
-      module: 'system',
-    },
-    { permission_key: 'system.role.read', name: '查看角色', module: 'system' },
-    {
-      permission_key: 'system.permission.read',
-      name: '查看权限',
-      module: 'system',
-    },
-    {
-      permission_key: 'system.permission.manage',
-      name: '管理角色权限',
-      module: 'system',
-    },
-    { permission_key: 'erp.dashboard.read', name: '查看看板', module: 'erp' },
-    {
-      permission_key: 'workflow.task.read',
-      name: '查看协同任务',
-      module: 'workflow',
-    },
-    {
-      permission_key: 'workflow.task.update',
-      name: '更新协同任务',
-      module: 'workflow',
-    },
-    {
-      permission_key: 'workflow.task.complete',
-      name: '完成协同任务',
-      module: 'workflow',
-    },
-    {
-      permission_key: 'workflow.task.approve',
-      name: '审批协同任务',
-      module: 'workflow',
-    },
-    {
-      permission_key: 'workflow.task.reject',
-      name: '驳回协同任务',
-      module: 'workflow',
-    },
-    {
-      permission_key: 'mobile.sales.access',
-      name: '进入业务岗位任务端',
-      module: 'mobile',
-    },
-  ]
-  const allPermissionKeys = mockPermissions.map((item) => item.permission_key)
-  const salesRole = {
-    role_key: 'sales',
-    name: '业务',
-    description: '销售 / 业务跟进',
-    builtin: true,
-    disabled: false,
-    sort_order: 20,
-    permissions: [
-      'erp.dashboard.read',
-      'workflow.task.read',
-      'mobile.sales.access',
-    ],
-  }
-  const adminRole = {
-    role_key: 'admin',
-    name: '系统管理员',
-    description: '系统账号、角色和权限管理',
-    builtin: true,
-    disabled: false,
-    sort_order: 80,
-    permissions: allPermissionKeys.filter((key) => key.startsWith('system.')),
-  }
-  const adminProfile = {
-    id: 1,
-    username: 'style-l1-admin',
-    phone: '13800138000',
-    is_super_admin: true,
-    disabled: false,
-    roles: [
-      { role_key: 'boss', name: '老板' },
-      { role_key: 'sales', name: '业务' },
-      { role_key: 'purchase', name: '采购' },
-      { role_key: 'production', name: '生产' },
-      { role_key: 'warehouse', name: '仓库' },
-      { role_key: 'finance', name: '财务' },
-      { role_key: 'pmc', name: 'PMC' },
-      { role_key: 'quality', name: '品质' },
-    ],
-    permissions: allPermissionKeys,
-    menus: mockMenus,
-    erp_preferences: {
-      column_orders: {},
-    },
-  }
-
-  await page.route('**/rpc/admin', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-
-    let data = {}
-    switch (method) {
-      case 'me':
-        data = adminProfile
-        break
-      case 'list':
-        data = {
-          admins: [
-            adminProfile,
-            {
-              id: 2,
-              username: 'assistant-admin',
-              phone: '13900139000',
-              is_super_admin: false,
-              disabled: false,
-              roles: [salesRole],
-              permissions: salesRole.permissions,
-              menus: mockMenus.filter((item) => item.path === '/erp/dashboard'),
-            },
-          ],
-        }
-        break
-      case 'create':
-      case 'set_roles':
-      case 'set_disabled':
-      case 'reset_password':
-        data = {
-          admin: {
-            id: Number(params.id || 2),
-            username: params.username || 'assistant-admin',
-            phone: params.phone || '13900139000',
-            is_super_admin: false,
-            disabled: Boolean(params.disabled),
-            roles: Array.isArray(params.role_keys)
-              ? params.role_keys.map((roleKey) => ({
-                  role_key: roleKey,
-                  name: roleKey,
-                }))
-              : [salesRole],
-            permissions: salesRole.permissions,
-            menus: mockMenus.filter((item) => item.path === '/erp/dashboard'),
-          },
-        }
-        break
-      case 'set_role_permissions':
-        data = {
-          role: {
-            ...salesRole,
-            role_key: params.role_key || salesRole.role_key,
-            permissions: Array.isArray(params.permission_keys)
-              ? params.permission_keys
-              : salesRole.permissions,
-          },
-        }
-        break
-      case 'set_erp_column_order': {
-        const moduleKey = String(params?.module_key || '').trim()
-        const order = Array.isArray(params?.order)
-          ? params.order
-              .map((item) => String(item || '').trim())
-              .filter(Boolean)
-          : []
-        if (moduleKey) {
-          if (order.length === 0) {
-            delete adminProfile.erp_preferences.column_orders[moduleKey]
-          } else {
-            adminProfile.erp_preferences.column_orders[moduleKey] = order
-          }
-        }
-        data = {
-          erp_preferences: {
-            column_orders: {
-              ...adminProfile.erp_preferences.column_orders,
-            },
-          },
-        }
-        break
-      }
-      case 'rbac_options':
-      case 'menu_options':
-        data = {
-          roles: [salesRole, adminRole],
-          permissions: mockPermissions,
-          menus: mockMenus,
-          role_options: [salesRole, adminRole],
-          permission_options: mockPermissions,
-          menu_options: mockMenus,
-        }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    const responseDelayMs =
-      method === 'me'
-        ? resolveDelayFromReferer(route.request(), '__style_l1_admin_me_delay')
-        : method === 'list'
-          ? resolveDelayFromReferer(
-              route.request(),
-              '__style_l1_admin_list_delay'
-            )
-          : 0
-
-    if (responseDelayMs > 0) {
-      await delay(responseDelayMs)
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/auth', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method } = body
-
-    if (method === 'capabilities') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id,
-          result: {
-            code: 0,
-            message: 'OK',
-            data: {
-              sms_login: {
-                enabled: true,
-                mode: 'mock',
-                mock_delivery: true,
-                disabled_reason: '',
-              },
-            },
-          },
-        }),
-      })
-      return
-    }
-
-    if (method === 'logout') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id,
-          result: {
-            code: 0,
-            message: 'OK',
-          },
-        }),
-      })
-      return
-    }
-
-    if (method === 'admin_login') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id,
-          result: {
-            code: 0,
-            message: 'OK',
-            data: {
-              ...adminProfile,
-              access_token: createMockAdminToken(),
-              token_type: 'Bearer',
-              expires_at: Math.floor(Date.now() / 1000) + 3600,
-            },
-          },
-        }),
-      })
-      return
-    }
-
-    await route.fallback()
-  })
-
-  await page.route('**/rpc/debug', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id' } = body
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data: {
-            environment: 'style-l1',
-            seedEnabled: false,
-            seedAllowed: false,
-            seedDisabledReason: '样式回归环境不执行生成调试数据',
-            cleanupEnabled: false,
-            cleanupAllowed: false,
-            cleanupDisabledReason: '样式回归环境不执行清理调试数据',
-            cleanupScope: 'debug_run',
-            cleanupOnlyDebugData: true,
-            requiresDebugRunId: true,
-            destructiveRemoteDenied: true,
-          },
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/masterdata', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-    const customer = {
-      id: 1,
-      code: 'CUS-STYLE-L1',
-      name: '暗色客户',
-      short_name: '暗色',
-      tax_no: 'TAX-STYLE-L1',
-      note: '',
-      is_active: true,
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const supplier = {
-      id: 1,
-      code: 'SUP-STYLE-L1',
-      name: '样式供应商',
-      short_name: '样式供',
-      supplier_type: '加工厂',
-      tax_no: '',
-      note: '',
-      is_active: true,
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const contact = {
-      id: 1,
-      owner_type: params.owner_type || 'CUSTOMER',
-      owner_id: Number(params.owner_id || 1),
-      name: '样式联系人',
-      mobile: '13800138000',
-      phone: '',
-      email: '',
-      title: '业务',
-      is_primary: true,
-      is_active: true,
-      note: '',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const productSKU = {
-      id: 1,
-      product_id: 1,
-      sku_code: 'SKU-STYLE-L1',
-      sku_name: '样式产品 SKU',
-      barcode: '690000000001',
-      customer_sku: 'CUS-SKU-STYLE',
-      color: '米白',
-      color_no: 'C01',
-      size: 'M',
-      packaging_version: '基础包装',
-      default_unit_id: 1,
-      is_active: true,
-      note: '',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const product = {
-      id: 1,
-      code: 'PROD-STYLE-L1',
-      name: '样式产品',
-      style_no: 'BEAR-STYLE',
-      customer_style_no: 'CUS-BEAR-STYLE',
-      default_unit_id: 1,
-      is_active: true,
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const material = {
-      id: 1,
-      code: 'MAT-STYLE-L1',
-      name: '样式材料',
-      category: '面料',
-      spec: '短毛绒 300g',
-      color: '米白',
-      default_unit_id: 1,
-      is_active: true,
-      note: '',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const process = {
-      id: 1,
-      code: 'PROC-STYLE-L1',
-      name: '车缝',
-      category: '委外车缝',
-      outsourcing_enabled: true,
-      inhouse_enabled: true,
-      quality_required: true,
-      sort_order: 10,
-      is_active: true,
-      note: '',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const unit = {
-      id: 1,
-      code: 'PCS',
-      name: '只',
-      precision: 0,
-      is_active: true,
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const warehouse = {
-      id: 1,
-      code: 'WH-STYLE-L1',
-      name: '样式仓库',
-      warehouse_type: 'RAW_MATERIAL',
-      is_active: true,
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const materials = Array.from({ length: 6 }, (_, index) => ({
-      ...material,
-      id: index + 1,
-      code: index === 0 ? material.code : `MAT-STYLE-L${index + 1}`,
-      name: index === 0 ? material.name : `样式材料 ${index + 1}`,
-      spec: index === 0 ? material.spec : `短毛绒 ${300 + index * 20}g`,
-    }))
-
-    let data = {}
-    switch (method) {
-      case 'list_customers':
-        data = { customers: [customer], total: 1, limit: 100, offset: 0 }
-        break
-      case 'list_suppliers':
-        data = { suppliers: [supplier], total: 1, limit: 100, offset: 0 }
-        break
-      case 'list_contacts_by_owner':
-        data = { contacts: [contact], total: 1, limit: 100, offset: 0 }
-        break
-      case 'list_products':
-        data = { products: [product], total: 1, limit: 100, offset: 0 }
-        break
-      case 'list_product_skus':
-        data = { product_skus: [productSKU], total: 1, limit: 100, offset: 0 }
-        break
-      case 'list_processes':
-        data = { processes: [process], total: 1, limit: 100, offset: 0 }
-        break
-      case 'list_materials':
-        data = {
-          materials,
-          total: materials.length,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'list_units':
-        data = { units: [unit], total: 1, limit: 100, offset: 0 }
-        break
-      case 'list_warehouses':
-        data = {
-          warehouses: [warehouse],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'create_customer':
-      case 'update_customer':
-      case 'set_customer_active':
-      case 'get_customer':
-        data = { customer: { ...customer, ...params } }
-        break
-      case 'create_supplier':
-      case 'update_supplier':
-      case 'set_supplier_active':
-      case 'get_supplier':
-        data = { supplier: { ...supplier, ...params } }
-        break
-      case 'create_contact':
-      case 'update_contact':
-      case 'set_primary_contact':
-      case 'disable_contact':
-        data = { contact: { ...contact, ...params } }
-        break
-      case 'create_product_sku':
-      case 'update_product_sku':
-      case 'set_product_sku_active':
-      case 'get_product_sku':
-        data = { product_sku: { ...productSKU, ...params } }
-        break
-      case 'create_material':
-      case 'update_material':
-      case 'set_material_active':
-      case 'get_material':
-        data = { material: { ...material, ...params } }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/sales_order', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-    const salesOrder = {
-      id: 1,
-      order_no: 'SO-STYLE-L1',
-      customer_id: 1,
-      customer_snapshot: { id: 1, code: 'CUS-STYLE-L1', name: '暗色客户' },
-      customer_order_no: 'PO-STYLE-L1',
-      title: '样式销售订单',
-      order_date: nowUnix(),
-      expected_ship_date: nowUnix() + 86_400,
-      lifecycle_status: 'draft',
-      note: '',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const salesOrderItem = {
-      id: 1,
-      sales_order_id: 1,
-      line_no: 1,
-      product_id: 1,
-      product_snapshot: { id: 1, code: 'PROD-STYLE-L1', name: '样式产品' },
-      ordered_quantity: '10',
-      unit_id: 1,
-      unit_snapshot: { id: 1, code: 'PCS', name: '只' },
-      unit_price: '12.50',
-      amount: '125.00',
-      line_status: 'open',
-      note: '',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-
-    let data = {}
-    switch (method) {
-      case 'list_sales_orders':
-        data = { sales_orders: [salesOrder], total: 1, limit: 100, offset: 0 }
-        break
-      case 'list_sales_order_items':
-        data = {
-          sales_order_items: [salesOrderItem],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'create_sales_order':
-      case 'update_sales_order':
-      case 'get_sales_order':
-      case 'submit_sales_order':
-      case 'activate_sales_order':
-      case 'close_sales_order':
-      case 'cancel_sales_order':
-        data = { sales_order: { ...salesOrder, ...params } }
-        break
-      case 'add_sales_order_item':
-      case 'update_sales_order_item':
-      case 'remove_sales_order_item':
-        data = { sales_order_item: { ...salesOrderItem, ...params } }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/purchase_order', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-    const purchaseOrder = {
-      id: 1,
-      purchase_order_no: 'PO-STYLE-L1',
-      supplier_id: 1,
-      supplier_snapshot: { id: 1, code: 'SUP-STYLE-L1', name: '样式供应商' },
-      supplier_purchase_order_no: 'SUP-PO-STYLE',
-      purchase_date: nowUnix(),
-      expected_arrival_date: nowUnix() + 86_400 * 7,
-      lifecycle_status: 'draft',
-      note: '',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const purchaseOrderItem = {
-      id: 1,
-      purchase_order_id: 1,
-      line_no: 1,
-      material_id: 1,
-      material_code_snapshot: 'MAT-STYLE-L1',
-      material_name_snapshot: '样式材料',
-      purchased_quantity: '20',
-      unit_id: 1,
-      unit_price: '3.50',
-      amount: '70.00',
-      expected_arrival_date: nowUnix() + 86_400 * 7,
-      line_status: 'open',
-      note: '',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-
-    let data = {}
-    switch (method) {
-      case 'list_purchase_orders':
-        data = {
-          purchase_orders: [purchaseOrder],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'list_purchase_order_items':
-        data = {
-          purchase_order_items: [purchaseOrderItem],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'save_purchase_order_with_items':
-        data = {
-          purchase_order: { ...purchaseOrder, ...params },
-          purchase_order_items: [purchaseOrderItem],
-        }
-        break
-      case 'create_purchase_order':
-      case 'update_purchase_order':
-      case 'get_purchase_order':
-      case 'submit_purchase_order':
-      case 'approve_purchase_order':
-      case 'close_purchase_order':
-      case 'cancel_purchase_order':
-        data = { purchase_order: { ...purchaseOrder, ...params } }
-        break
-      case 'add_purchase_order_item':
-      case 'update_purchase_order_item':
-      case 'remove_purchase_order_item':
-        data = { purchase_order_item: { ...purchaseOrderItem, ...params } }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/outsourcing_order', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-    const outsourcingOrder = {
-      id: 1,
-      outsourcing_order_no: 'SIM-OUTSOURCE-CONTRACT-L1',
-      supplier_id: 1,
-      supplier_snapshot: {
-        id: 1,
-        code: 'SUP-OUT-L1',
-        short_name: '样式加工厂',
-        name: '样式加工厂',
-      },
-      source_order_no: 'SO-STYLE-L1',
-      source_sales_order_id: 1,
-      order_date: nowUnix(),
-      expected_return_date: nowUnix() + 86_400 * 7,
-      lifecycle_status: 'draft',
-      note: '样式加工合同',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const outsourcingOrderItem = {
-      id: 1,
-      outsourcing_order_id: 1,
-      line_no: 1,
-      product_id: 1,
-      process_id: 1,
-      unit_id: 1,
-      product_no_snapshot: 'PROD-STYLE-L1',
-      product_name_snapshot: '样式产品',
-      process_name_snapshot: '车缝',
-      process_category_snapshot: '委外车缝',
-      unit_name_snapshot: '只',
-      outsourcing_quantity: '20',
-      unit_price: '1.80',
-      amount: '36.00',
-      expected_return_date: nowUnix() + 86_400 * 7,
-      line_status: 'open',
-      note: '样式加工明细',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-
-    let data = {}
-    switch (method) {
-      case 'list_outsourcing_orders':
-        data = {
-          outsourcing_orders: [outsourcingOrder],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'list_outsourcing_order_items':
-        data = {
-          outsourcing_order_items: [outsourcingOrderItem],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'save_outsourcing_order_with_items':
-        data = {
-          outsourcing_order: { ...outsourcingOrder, ...params },
-          outsourcing_order_items: [outsourcingOrderItem],
-        }
-        break
-      case 'get_outsourcing_order':
-      case 'submit_outsourcing_order':
-      case 'confirm_outsourcing_order':
-      case 'close_outsourcing_order':
-      case 'cancel_outsourcing_order':
-        data = { outsourcing_order: { ...outsourcingOrder, ...params } }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/bom', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-    const bomVersion = {
-      id: 1,
-      product_id: 1,
-      version: 'BOM-STYLE-L1',
-      status: 'ACTIVE',
-      effective_from: nowUnix(),
-      effective_to: null,
-      note: '样式回归 BOM',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const bomDraft = {
-      ...bomVersion,
-      id: 2,
-      version: params.version || 'BOM-STYLE-DRAFT',
-      status: 'DRAFT',
-      note: params.note || '',
-    }
-    const bomItem = {
-      id: 1,
-      bom_header_id: 1,
-      material_id: 1,
-      quantity: '2.5000',
-      unit_id: 1,
-      loss_rate: '0.0300',
-      position: '面料',
-      note: '主料',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-
-    let data = {}
-    switch (method) {
-      case 'list_bom_versions':
-        data = {
-          bom_versions: [bomVersion, bomDraft],
-          total: 2,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'get_bom_version':
-        data = { bom_version: bomVersion, bom_items: [bomItem] }
-        break
-      case 'create_bom_draft':
-      case 'update_bom_draft':
-      case 'copy_bom_version':
-        data = { bom_version: { ...bomDraft, ...params }, bom_items: [bomItem] }
-        break
-      case 'add_bom_item':
-      case 'update_bom_item':
-        data = { bom_item: { ...bomItem, ...params } }
-        break
-      case 'delete_bom_item':
-        data = {}
-        break
-      case 'activate_bom_version':
-        data = {
-          bom_version: { ...bomDraft, status: 'ACTIVE' },
-          bom_items: [bomItem],
-        }
-        break
-      case 'archive_bom_version':
-        data = { bom_version: { ...bomVersion, status: 'ARCHIVED' } }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/operational_fact', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-    const shipmentItem = {
-      id: 1,
-      shipment_id: 1,
-      sales_order_item_id: 1,
-      product_id: 1,
-      warehouse_id: 1,
-      unit_id: 1,
-      lot_id: 1,
-      quantity: '10',
-      note: '样式出货明细',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const shipment = {
-      id: 1,
-      shipment_no: 'SHIP-STYLE-L1',
-      status: 'DRAFT',
-      sales_order_id: 1,
-      customer_id: 1,
-      customer_snapshot: '暗色客户',
-      planned_ship_at: nowUnix() + 86_400,
-      shipped_at: null,
-      note: '样式回归出货单',
-      items: [shipmentItem],
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const productionFact = {
-      id: 1,
-      fact_no: 'PROD-FACT-L1',
-      fact_type: 'FINISHED_GOODS_RECEIPT',
-      status: 'DRAFT',
-      subject_type: 'PRODUCT',
-      subject_id: 1,
-      warehouse_id: 1,
-      unit_id: 1,
-      lot_id: 1,
-      quantity: '6',
-      source_type: 'PRODUCTION_PROGRESS',
-      source_id: 1,
-      source_line_id: null,
-      idempotency_key: 'PROD-FACT-L1',
-      occurred_at: nowUnix(),
-      note: '样式生产事实',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const outsourcingFact = {
-      id: 1,
-      fact_no: 'OUTSOURCE-FACT-L1',
-      fact_type: 'RETURN_RECEIPT',
-      status: 'DRAFT',
-      subject_type: 'MATERIAL',
-      subject_id: 1,
-      warehouse_id: 1,
-      unit_id: 1,
-      lot_id: 1,
-      quantity: '8',
-      supplier_id: 1,
-      supplier_name: '样式供应商',
-      source_type: 'OUTSOURCING_ORDER',
-      source_id: 1,
-      source_line_id: null,
-      idempotency_key: 'OUTSOURCE-FACT-L1',
-      occurred_at: nowUnix(),
-      note: '样式委外事实',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const stockReservation = {
-      id: 1,
-      reservation_no: 'RSV-STYLE-L1',
-      status: 'ACTIVE',
-      sales_order_id: 1,
-      sales_order_item_id: 1,
-      product_id: 1,
-      warehouse_id: 1,
-      unit_id: 1,
-      lot_id: 1,
-      quantity: '4',
-      idempotency_key: 'RSV-STYLE-L1',
-      reserved_at: nowUnix(),
-      note: '样式库存预留',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const financeFactType = String(params.fact_type || 'RECEIVABLE')
-      .trim()
-      .toUpperCase()
-    const financeFactNoByType = {
-      RECEIVABLE: 'AR-STYLE-L1',
-      PAYABLE: 'AP-STYLE-L1',
-      INVOICE: 'INV-STYLE-L1',
-      RECONCILIATION: 'REC-STYLE-L1',
-      PAYMENT: 'PAY-STYLE-L1',
-    }
-    const financeFact = {
-      id: 1,
-      fact_no: financeFactNoByType[financeFactType] || 'FIN-STYLE-L1',
-      fact_type: financeFactType,
-      status: 'POSTED',
-      counterparty_type:
-        financeFactType === 'PAYABLE'
-          ? 'SUPPLIER'
-          : financeFactType === 'RECONCILIATION'
-            ? 'OTHER'
-            : 'CUSTOMER',
-      counterparty_id: 1,
-      amount: '1200',
-      currency: 'CNY',
-      source_type: financeFactType === 'PAYABLE' ? 'PURCHASE' : 'SHIPMENT',
-      source_id: 1,
-      source_line_id: null,
-      idempotency_key: financeFactNoByType[financeFactType] || 'FIN-STYLE-L1',
-      occurred_at: nowUnix(),
-      note: '样式财务事实',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-
-    let data = {}
-    switch (method) {
-      case 'list_production_facts':
-        data = {
-          production_facts: [productionFact],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'create_production_fact':
-        data = {
-          production_fact: { ...productionFact, id: 2, ...params },
-        }
-        break
-      case 'post_production_fact':
-        data = {
-          production_fact: { ...productionFact, status: 'POSTED' },
-        }
-        break
-      case 'cancel_production_fact':
-        data = {
-          production_fact: { ...productionFact, status: 'CANCELLED' },
-        }
-        break
-      case 'list_outsourcing_facts':
-        data = {
-          outsourcing_facts: [outsourcingFact],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'create_outsourcing_fact':
-        data = {
-          outsourcing_fact: { ...outsourcingFact, id: 2, ...params },
-        }
-        break
-      case 'post_outsourcing_fact':
-        data = {
-          outsourcing_fact: { ...outsourcingFact, status: 'POSTED' },
-        }
-        break
-      case 'cancel_outsourcing_fact':
-        data = {
-          outsourcing_fact: { ...outsourcingFact, status: 'CANCELLED' },
-        }
-        break
-      case 'list_shipments':
-        data = { shipments: [shipment], total: 1, limit: 100, offset: 0 }
-        break
-      case 'create_shipment':
-        data = { shipment: { ...shipment, id: 2, ...params, items: [] } }
-        break
-      case 'add_shipment_item':
-        data = { shipment_item: { ...shipmentItem, ...params } }
-        break
-      case 'ship_shipment':
-        data = { shipment: { ...shipment, status: 'SHIPPED' } }
-        break
-      case 'cancel_shipment':
-        data = { shipment: { ...shipment, status: 'CANCELLED' } }
-        break
-      case 'list_stock_reservations':
-        data = {
-          stock_reservations: [stockReservation],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'create_stock_reservation':
-        data = {
-          stock_reservation: { ...stockReservation, id: 2, ...params },
-        }
-        break
-      case 'release_stock_reservation':
-        data = {
-          stock_reservation: { ...stockReservation, status: 'RELEASED' },
-        }
-        break
-      case 'consume_stock_reservation':
-        data = {
-          stock_reservation: { ...stockReservation, status: 'CONSUMED' },
-        }
-        break
-      case 'list_finance_facts':
-        data = { finance_facts: [financeFact], total: 1, limit: 100, offset: 0 }
-        break
-      case 'create_finance_fact':
-        data = { finance_fact: { ...financeFact, id: 2, ...params } }
-        break
-      case 'post_finance_fact':
-        data = { finance_fact: { ...financeFact, status: 'POSTED' } }
-        break
-      case 'settle_finance_fact':
-        data = { finance_fact: { ...financeFact, status: 'SETTLED' } }
-        break
-      case 'cancel_finance_fact':
-        data = { finance_fact: { ...financeFact, status: 'CANCELLED' } }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  const purchaseReceiptItem = {
-    id: 602,
-    purchase_receipt_id: 601,
-    source_line_no: '入库行 1',
-    material_id: 1,
-    material_name_snapshot: '样式材料',
-    warehouse_id: 1,
-    warehouse_name: '样式仓库',
-    unit_id: 1,
-    quantity: '20',
-    lot_id: 401,
-    lot_no: 'INV-LOT-001',
-    unit_price: '3.50',
-    amount: '70.00',
-    note: '样式入库明细',
-    created_at: nowUnix(),
-    updated_at: nowUnix(),
-  }
-  let nextPurchaseReceiptId = 700
-  let nextPurchaseReceiptItemId = 800
-  const purchaseReceipts = [
-    {
-      id: 601,
-      receipt_no: 'PR-STYLE-L1',
-      supplier_name: '样式供应商',
-      warehouse_id: 1,
-      received_at: nowUnix(),
-      status: 'POSTED',
-      note: '样式采购入库',
-      items: [purchaseReceiptItem],
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    },
-    {
-      id: 603,
-      receipt_no: 'PR-STYLE-L1-DRAFT',
-      supplier_name: '样式草稿供应商',
-      warehouse_id: 1,
-      received_at: nowUnix(),
-      status: 'DRAFT',
-      note: '样式草稿采购入库',
-      items: [
-        {
-          ...purchaseReceiptItem,
-          id: 604,
-          purchase_receipt_id: 603,
-          source_line_no: '草稿入库行 1',
-          quantity: '12',
-          amount: '42.00',
-          note: '样式草稿入库明细',
-        },
-      ],
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    },
-    {
-      id: 605,
-      receipt_no: 'PR-STYLE-L1-CANCELLED',
-      supplier_name: '样式取消供应商',
-      warehouse_id: 1,
-      received_at: nowUnix(),
-      status: 'CANCELLED',
-      note: '样式取消采购入库',
-      items: [],
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    },
-  ]
-
-  await page.route('**/rpc/purchase', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-
-    const filteredPurchaseReceipts = () => {
-      const status = String(params.status || '').trim()
-      const keyword = String(params.keyword || '')
-        .trim()
-        .toLowerCase()
-      return purchaseReceipts.filter((receipt) => {
-        if (status && receipt.status !== status) return false
-        if (!keyword) return true
-        return [receipt.receipt_no, receipt.supplier_name]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(keyword))
-      })
-    }
-
-    let data = {}
-    switch (method) {
-      case 'list_purchase_receipts':
-        {
-          const rows = filteredPurchaseReceipts()
-          const offset = Number(params.offset || 0)
-          const limit = Number(params.limit || rows.length || 100)
-          data = {
-            purchase_receipts: rows.slice(offset, offset + limit),
-            total: rows.length,
-            limit,
-            offset,
-          }
-        }
-        break
-      case 'create_purchase_receipt_with_items':
-        {
-          const receiptId = nextPurchaseReceiptId
-          nextPurchaseReceiptId += 1
-          const receipt = {
-            ...purchaseReceipts[0],
-            ...params,
-            id: receiptId,
-            status: 'DRAFT',
-            items: Array.isArray(params.items)
-              ? params.items.map((item) => {
-                  const itemId = nextPurchaseReceiptItemId
-                  nextPurchaseReceiptItemId += 1
-                  return {
-                    ...purchaseReceiptItem,
-                    ...item,
-                    id: itemId,
-                    purchase_receipt_id: receiptId,
-                  }
-                })
-              : [],
-            created_at: nowUnix(),
-            updated_at: nowUnix(),
-          }
-          purchaseReceipts.unshift(receipt)
-          data = { purchase_receipt: receipt }
-        }
-        break
-      case 'create_purchase_receipt_draft':
-        data = {
-          purchase_receipt: {
-            ...purchaseReceipts[0],
-            ...params,
-            id: nextPurchaseReceiptId,
-            status: 'DRAFT',
-            items: [],
-          },
-        }
-        nextPurchaseReceiptId += 1
-        break
-      case 'post_purchase_receipt':
-        {
-          const receipt = purchaseReceipts.find(
-            (item) => Number(item.id) === Number(params.id)
-          )
-          if (receipt) receipt.status = 'POSTED'
-          data = {
-            purchase_receipt: receipt || { ...purchaseReceipts[0], ...params },
-          }
-        }
-        break
-      case 'cancel_purchase_receipt':
-        {
-          const receipt = purchaseReceipts.find(
-            (item) => Number(item.id) === Number(params.id)
-          )
-          if (receipt) receipt.status = 'CANCELLED'
-          data = {
-            purchase_receipt: receipt || { ...purchaseReceipts[0], ...params },
-          }
-        }
-        break
-      case 'get_purchase_receipt':
-        data = {
-          purchase_receipt:
-            purchaseReceipts.find(
-              (item) => Number(item.id) === Number(params.id)
-            ) || purchaseReceipts[0],
-        }
-        break
-      case 'add_purchase_receipt_item':
-        {
-          const receipt = purchaseReceipts.find(
-            (item) =>
-              Number(item.id) ===
-              Number(params.receipt_id || params.purchase_receipt_id)
-          )
-          const item = {
-            ...purchaseReceiptItem,
-            ...params,
-            purchase_receipt_id: Number(
-              params.receipt_id || params.purchase_receipt_id
-            ),
-            id: nextPurchaseReceiptItemId,
-            created_at: nowUnix(),
-            updated_at: nowUnix(),
-          }
-          nextPurchaseReceiptItemId += 1
-          if (receipt) {
-            receipt.items = [...(receipt.items || []), item]
-            receipt.updated_at = nowUnix()
-          }
-          data = { purchase_receipt_item: item }
-        }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/quality', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-    const qualityInspection = {
-      id: 701,
-      inspection_no: 'QI-STYLE-L1',
-      purchase_receipt_id: 601,
-      purchase_receipt_item_id: 602,
-      inventory_lot_id: 401,
-      material_id: 1,
-      warehouse_id: 1,
-      status: 'SUBMITTED',
-      result: '',
-      original_lot_status: 'HOLD',
-      inspected_at: 0,
-      inspector_id: null,
-      decision_note: '等待品质判定',
-      created_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-
-    let data = {}
-    switch (method) {
-      case 'list_quality_inspections':
-        data = {
-          quality_inspections: [qualityInspection],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'create_quality_inspection_draft':
-        data = {
-          quality_inspection: {
-            ...qualityInspection,
-            ...params,
-            id: 702,
-            status: 'DRAFT',
-            result: '',
-          },
-        }
-        break
-      case 'submit_quality_inspection':
-      case 'pass_quality_inspection':
-      case 'reject_quality_inspection':
-      case 'cancel_quality_inspection':
-      case 'get_quality_inspection':
-        data = { quality_inspection: { ...qualityInspection, ...params } }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/inventory', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method } = body
-    const inventoryBalance = {
-      id: 301,
-      subject_type: 'PRODUCT',
-      subject_id: 1,
-      warehouse_id: 1,
-      lot_id: 401,
-      unit_id: 1,
-      quantity: '12.5',
-      active_reserved_quantity: '4',
-      available_quantity: '8.5',
-      updated_at: nowUnix(),
-    }
-    const inventoryLot = {
-      id: 401,
-      subject_type: 'MATERIAL',
-      subject_id: 1,
-      lot_no: 'INV-LOT-001',
-      supplier_lot_no: 'SUP-LOT-001',
-      color_no: 'C01',
-      dye_lot_no: 'DYE-01',
-      production_lot_no: '',
-      status: 'HOLD',
-      received_at: nowUnix(),
-      updated_at: nowUnix(),
-    }
-    const inventoryTxn = {
-      id: 501,
-      txn_type: 'REVERSAL',
-      direction: -1,
-      subject_type: 'MATERIAL',
-      subject_id: 1,
-      warehouse_id: 1,
-      lot_id: 401,
-      quantity: '1.5',
-      unit_id: 1,
-      source_type: 'MANUAL_SEED',
-      source_id: 9001,
-      source_line_id: 9002,
-      reversal_of_txn_id: 500,
-      idempotency_key: 'INV-TXN-001',
-      note: 'ledger seed',
-      occurred_at: nowUnix(),
-      created_at: nowUnix(),
-    }
-
-    let data = {}
-    switch (method) {
-      case 'list_inventory_balances':
-      case 'listInventoryBalances':
-        data = {
-          inventory_balances: [inventoryBalance],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'list_inventory_lots':
-      case 'listInventoryLots':
-        data = {
-          inventory_lots: [inventoryLot],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      case 'list_inventory_txns':
-      case 'listInventoryTxns':
-        data = {
-          inventory_txns: [inventoryTxn],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  const workflowTasks = []
-  const workflowBusinessStates = []
-  let workflowTaskID = 1
-  let workflowBusinessStateID = 1
-  await page.route('**/rpc/business', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method } = body
-
-    let data = {}
-    switch (method) {
-      case 'dashboard_stats':
-        data = { modules: [] }
-        break
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/rpc/workflow', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method, params = {} } = body
-
-    let data = {}
-    switch (method) {
-      case 'list_business_states':
-        data = {
-          business_states: workflowBusinessStates.filter(
-            (item) =>
-              !params.source_type || item.source_type === params.source_type
-          ),
-          total: workflowBusinessStates.length,
-          limit: Number(params.limit || 50),
-          offset: Number(params.offset || 0),
-        }
-        break
-      case 'upsert_business_state': {
-        const existing = workflowBusinessStates.find(
-          (item) =>
-            item.source_type === params.source_type &&
-            Number(item.source_id) === Number(params.source_id)
-        )
-        const businessState = {
-          id: existing?.id || workflowBusinessStateID++,
-          source_type: params.source_type,
-          source_id: Number(params.source_id || Date.now()),
-          source_no: params.source_no || '',
-          business_status_key: params.business_status_key || 'project_pending',
-          owner_role_key: params.owner_role_key || 'business',
-          blocked_reason: params.blocked_reason || '',
-          payload: params.payload || {},
-          status_changed_at: nowUnix(),
-          created_at: existing?.created_at || nowUnix(),
-          updated_at: nowUnix(),
-        }
-        if (existing) {
-          Object.assign(existing, businessState)
-        } else {
-          workflowBusinessStates.unshift(businessState)
-        }
-        data = { business_state: existing || businessState }
-        break
-      }
-      case 'list_tasks': {
-        const tasks = workflowTasks.filter(
-          (item) =>
-            (!params.source_type || item.source_type === params.source_type) &&
-            (!params.source_id ||
-              Number(item.source_id) === Number(params.source_id))
-        )
-        data = {
-          tasks,
-          total: tasks.length,
-          limit: Number(params.limit || 50),
-          offset: Number(params.offset || 0),
-        }
-        break
-      }
-      case 'create_task': {
-        const task = {
-          id: workflowTaskID++,
-          task_code: params.task_code || `style-l1-task-${Date.now()}`,
-          task_group: params.task_group || 'project-orders',
-          task_name: params.task_name || '订单/款式立项 跟进',
-          source_type: params.source_type || 'project-orders',
-          source_id: Number(params.source_id || Date.now()),
-          source_no: params.source_no || '',
-          business_status_key: params.business_status_key || 'project_pending',
-          task_status_key: params.task_status_key || 'ready',
-          owner_role_key: params.owner_role_key || 'business',
-          assignee_id: params.assignee_id || '',
-          priority: Number(params.priority || 0),
-          due_at: params.due_at || null,
-          blocked_reason: params.blocked_reason || '',
-          payload: params.payload || {},
-          created_at: nowUnix(),
-          updated_at: nowUnix(),
-        }
-        workflowTasks.unshift(task)
-        data = { task }
-        break
-      }
-      case 'update_task_status': {
-        const task = workflowTasks.find(
-          (item) => Number(item.id) === Number(params.id)
-        )
-        if (task) {
-          task.task_status_key = params.task_status_key || task.task_status_key
-          task.business_status_key =
-            params.business_status_key || task.business_status_key
-          task.blocked_reason = params.reason || task.blocked_reason
-          task.updated_at = nowUnix()
-        }
-        data = { task }
-        break
-      }
-      default:
-        data = {}
-        break
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: 0,
-          message: 'OK',
-          data,
-        },
-      }),
-    })
-  })
-
-  await page.route('**/templates/render-pdf', async (route) => {
-    const headers = route.request().headers()
-    const authorization = String(headers.authorization || '')
-    const payload = route.request().postDataJSON() || {}
-
-    if (!authorization.startsWith('Bearer ')) {
-      await route.fulfill({
-        status: 401,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 40101,
-          message: '需要管理员权限',
-        }),
-      })
-      return
-    }
-
-    if (
-      !payload ||
-      typeof payload.html !== 'string' ||
-      !payload.html.includes('<!doctype html>') ||
-      typeof payload.template_key !== 'string' ||
-      String(payload.base_url || '').trim() !== baseURL
-    ) {
-      await route.fulfill({
-        status: 400,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 40053,
-          message: '模板渲染请求不合法',
-        }),
-      })
-      return
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/pdf',
-      headers: {
-        'Content-Disposition': `inline; filename="${payload.file_name || 'style-l1.pdf'}"`,
-        'Cache-Control': 'no-store',
-      },
-      body: mockPdfBuffer,
-    })
-  })
-}
-
-async function installAdminAuthExpiredRpcMocks(page) {
-  await page.route('**/rpc/**', async (route) => {
-    const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id' } = body
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id,
-        result: {
-          code: RpcErrorCode.AUTH_REQUIRED,
-          message: '未登录',
-          data: {},
-        },
-      }),
-    })
-  })
 }
 
 async function expectHeading(page, text) {
@@ -6849,6 +5305,110 @@ async function _assertBusinessSelectionActionBarBoxModel(
     metrics.tableCard?.top > metrics.actionBar.bottom,
     `${scenarioName} 表格卡片与选中操作条发生重叠: ${JSON.stringify(metrics)}`
   )
+}
+
+async function assertBusinessListEmptySearchState(
+  page,
+  { scenarioName, searchPlaceholder, emptyText, staleText }
+) {
+  await page.getByText(staleText, { exact: false }).first().click()
+  await _assertBusinessSelectionActionBarBoxModel(page, {
+    scenarioName: `${scenarioName}-selected`,
+    expectedMode: 'active',
+  })
+
+  const searchInput = page.getByPlaceholder(searchPlaceholder).first()
+  await searchInput.fill(`NO-MATCH-${scenarioName}`)
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(
+    ({ expectedEmptyText }) => {
+      const placeholder = document.querySelector(
+        '.erp-business-module-table-card .ant-table-placeholder'
+      )
+      return placeholder?.textContent?.includes(expectedEmptyText)
+    },
+    { expectedEmptyText: emptyText },
+    { timeout: 10_000 }
+  )
+
+  const metrics = await page.evaluate(
+    ({ expectedEmptyText, previousText }) => {
+      const actionBar = document.querySelector(
+        '.erp-business-module-current-action'
+      )
+      const tableCard = document.querySelector(
+        '.erp-business-module-table-card'
+      )
+      const placeholder = tableCard?.querySelector('.ant-table-placeholder')
+      const dataRows = Array.from(
+        tableCard?.querySelectorAll('.ant-table-tbody > tr.ant-table-row') || []
+      ).filter((row) => !row.classList.contains('ant-table-placeholder'))
+      const actionBarRect = actionBar?.getBoundingClientRect()
+      const tableRect = tableCard?.getBoundingClientRect()
+      return {
+        actionText: actionBar?.textContent?.replace(/\s+/g, ' ').trim() || '',
+        actionHasEmptyClass:
+          actionBar?.classList.contains(
+            'erp-business-selection-action-bar--empty'
+          ) || false,
+        actionHasActiveClass:
+          actionBar?.classList.contains(
+            'erp-business-selection-action-bar--active'
+          ) || false,
+        placeholderText:
+          placeholder?.textContent?.replace(/\s+/g, ' ').trim() || '',
+        dataRowCount: dataRows.length,
+        staleTextInAction:
+          actionBar?.textContent?.includes(previousText) || false,
+        staleTextInTable:
+          tableCard?.textContent?.includes(previousText) || false,
+        documentOverflow:
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+        actionBottom: actionBarRect?.bottom || 0,
+        tableTop: tableRect?.top || 0,
+        expectedEmptyText,
+      }
+    },
+    { expectedEmptyText: emptyText, previousText: staleText }
+  )
+
+  assert(
+    metrics.placeholderText.includes(emptyText),
+    `${scenarioName} 表格空态文案异常: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.dataRowCount,
+    0,
+    `${scenarioName} 搜索空结果时不应保留数据行: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.actionHasEmptyClass && !metrics.actionHasActiveClass,
+    `${scenarioName} 搜索空结果后当前操作条应回到未选中态: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.staleTextInAction,
+    false,
+    `${scenarioName} 搜索空结果后当前操作条不应保留旧选中记录: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.staleTextInTable,
+    false,
+    `${scenarioName} 搜索空结果表格不应保留旧记录文本: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.documentOverflow,
+    0,
+    `${scenarioName} 空态不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.tableTop > metrics.actionBottom,
+    `${scenarioName} 空态表格不应覆盖当前操作条: ${JSON.stringify(metrics)}`
+  )
+
+  await searchInput.fill('')
+  await page.keyboard.press('Enter')
+  await expectText(page, staleText)
 }
 
 async function assertShellRefreshButton(page, { scenarioName, expectVisible }) {
@@ -7445,9 +6005,7 @@ async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
     '点击表头列设置应先打开快捷菜单，不应直接弹出列顺序面板'
   )
 
-  const quickMoveSync = waitForAdminColumnOrderSync(page)
   await menu.getByText('左移一列').click()
-  await quickMoveSync
   await page.waitForFunction(
     ({ expectedFirstLabel }) => {
       const firstLabel = document.querySelector(
@@ -7772,6 +6330,65 @@ async function verifyBusinessActionFormModal(
   await closeBusinessFormModal(page, modal)
 }
 
+async function assertProcessSuggestionOptions(page, modal, { scenarioName }) {
+  const assertSuggestionList = async (selector, expectedOptions, label) => {
+    const input = modal.locator(`${selector} input`).first()
+    const popup = page.locator(`${selector}__popup:visible`).last()
+    for (const expected of expectedOptions) {
+      await input.click()
+      await input.fill(expected)
+      await popup.waitFor({ state: 'visible', timeout: 10_000 })
+      const optionTexts = (
+        await popup.locator('.ant-select-item-option-content').allTextContents()
+      )
+        .map((text) => text.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+      assert(
+        optionTexts.includes(expected),
+        `${scenarioName} ${label}缺少行业默认候选 ${expected}: ${JSON.stringify(optionTexts)}`
+      )
+      await page.keyboard.press('Escape')
+      await input.fill('')
+    }
+  }
+
+  await assertSuggestionList(
+    '.erp-process-name-suggested-input',
+    ['查货', '手工', '车缝', '包装'],
+    '环节名称'
+  )
+  await assertSuggestionList(
+    '.erp-process-category-suggested-input',
+    ['查货', '手工', '车缝', '包装'],
+    '环节类别'
+  )
+}
+
+async function assertOutsourcingProcessSelectOptions(
+  page,
+  modal,
+  { scenarioName }
+) {
+  const processField = modal
+    .locator('.ant-form-item:has(.ant-form-item-label label[title="工序"])')
+    .first()
+  await processField.locator('.ant-select-selector').click()
+  const dropdown = page.locator('.ant-select-dropdown:visible').last()
+  await dropdown.waitFor({ state: 'visible', timeout: 10_000 })
+  const optionTexts = (
+    await dropdown.locator('.ant-select-item-option-content').allTextContents()
+  )
+    .map((text) => text.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  for (const expected of ['查货', '手工', '车缝', '包装']) {
+    assert(
+      optionTexts.some((text) => text.includes(expected)),
+      `${scenarioName} 加工合同工序下拉缺少行业默认候选 ${expected}: ${JSON.stringify(optionTexts)}`
+    )
+  }
+  await page.keyboard.press('Escape')
+}
+
 async function openPurchaseReceiptCreateModal(page) {
   await page.getByRole('button', { name: /新建入库单/ }).click()
   const modal = page
@@ -7992,11 +6609,16 @@ async function assertBusinessFormModalKeyboardRecovery(
   }
   await modal.waitFor({ state: 'hidden', timeout: 10_000 })
   await trigger.waitFor({ state: 'visible', timeout: 10_000 })
-  const focusMetric = await trigger.evaluate((node) => ({
-    activeText: document.activeElement?.textContent?.replace(/\s+/g, ' '),
-    activeIsTrigger: document.activeElement === node,
-    buttonText: node.textContent?.replace(/\s+/g, ' '),
-  }))
+  let focusMetric = null
+  for (let i = 0; i < 12; i += 1) {
+    focusMetric = await trigger.evaluate((node) => ({
+      activeText: document.activeElement?.textContent?.replace(/\s+/g, ' '),
+      activeIsTrigger: document.activeElement === node,
+      buttonText: node.textContent?.replace(/\s+/g, ' '),
+    }))
+    if (focusMetric.activeIsTrigger) break
+    await page.waitForTimeout(50)
+  }
   assert(
     focusMetric.activeIsTrigger,
     `${scenarioName} 业务弹窗关闭后焦点未回到触发按钮: ${JSON.stringify(focusMetric)}`
@@ -9061,15 +7683,49 @@ async function verifySourceImportPicker(
     scenarioName,
   }
 ) {
-  await parentModal.getByRole('button', { name: triggerButton }).click()
+  const trigger = parentModal
+    .getByRole('button', { name: triggerButton })
+    .first()
+  await trigger.focus()
+  await page.keyboard.press('Enter')
   const picker = page
     .locator('.erp-source-import-picker-modal.ant-modal:visible')
     .last()
   await picker.waitFor({ state: 'visible', timeout: 10_000 })
   await expectText(page, titleText)
+  await page.waitForFunction(
+    (text) => {
+      const modals = Array.from(
+        document.querySelectorAll('.erp-source-import-picker-modal.ant-modal')
+      ).filter((node) => {
+        const rect = node.getBoundingClientRect()
+        const style = window.getComputedStyle(node)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          node.textContent?.includes(text)
+        )
+      })
+      const modalNode = modals.at(-1)
+      const root = modalNode?.closest('.ant-modal-root') || modalNode
+      return (
+        modalNode &&
+        document.activeElement instanceof Element &&
+        root?.contains(document.activeElement) &&
+        document.activeElement !== document.body
+      )
+    },
+    titleText,
+    { timeout: 2_000 }
+  )
   const metrics = await picker.evaluate((node) => {
     const body = node.querySelector('.ant-modal-body')
     const table = node.querySelector('.ant-table')
+    const root = node.closest('.ant-modal-root') || node
+    const { activeElement } = document
+    const dialog = node.closest('[role="dialog"]') || node
     const visibleModals = Array.from(
       document.querySelectorAll('.ant-modal')
     ).filter((modal) => {
@@ -9101,8 +7757,26 @@ async function verifySourceImportPicker(
         ?.getBoundingClientRect?.().top,
       tableTop: table?.getBoundingClientRect?.().top,
       visibleModalCount: visibleModals,
+      ariaModal:
+        dialog.getAttribute('aria-modal') ||
+        node.getAttribute('aria-modal') ||
+        '',
+      activeTagName: activeElement?.tagName || '',
+      activeClassName: String(activeElement?.className || ''),
+      activeInsidePicker:
+        activeElement instanceof Element && root.contains(activeElement),
+      activeIsBody: activeElement === document.body,
     }
   })
+  assert.equal(
+    metrics.ariaModal,
+    'true',
+    `${scenarioName} 来源导入选择器应声明 aria-modal=true: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.activeInsidePicker && !metrics.activeIsBody,
+    `${scenarioName} 来源导入选择器打开后焦点未进入弹窗: ${JSON.stringify(metrics)}`
+  )
   assert(
     metrics.body && metrics.body.scrollWidth <= metrics.body.clientWidth + 1,
     `${scenarioName} 来源导入选择器出现横向溢出: ${JSON.stringify(metrics)}`
@@ -9332,15 +8006,47 @@ async function verifySourceImportPicker(
       await expectText(page, importAndExpectText)
     }
     await parentModal.waitFor({ state: 'visible', timeout: 10_000 })
+    const parentFocusMetric = await parentModal.evaluate((node) => {
+      const root = node.closest('.ant-modal-root') || node
+      return {
+        activeInsideParent:
+          document.activeElement instanceof Element &&
+          root.contains(document.activeElement),
+        activeIsBody: document.activeElement === document.body,
+        activeTagName: document.activeElement?.tagName || '',
+        activeText:
+          document.activeElement?.textContent?.replace(/\s+/g, ' ').trim() ||
+          '',
+      }
+    })
+    assert(
+      parentFocusMetric.activeInsideParent && !parentFocusMetric.activeIsBody,
+      `${scenarioName} 来源导入完成后焦点未回到父级业务弹窗: ${JSON.stringify(parentFocusMetric)}`
+    )
     return
   }
 
   await picker
     .locator('.erp-source-import-picker__footer-actions .ant-btn')
     .first()
-    .click({ force: true })
+    .focus()
+  await page.keyboard.press('Enter')
   await picker.waitFor({ state: 'hidden', timeout: 10_000 })
   await parentModal.waitFor({ state: 'visible', timeout: 10_000 })
+  let triggerFocusMetric = null
+  for (let i = 0; i < 12; i += 1) {
+    triggerFocusMetric = await trigger.evaluate((node) => ({
+      activeIsTrigger: document.activeElement === node,
+      activeText: document.activeElement?.textContent?.replace(/\s+/g, ' '),
+      buttonText: node.textContent?.replace(/\s+/g, ' '),
+    }))
+    if (triggerFocusMetric.activeIsTrigger) break
+    await page.waitForTimeout(50)
+  }
+  assert(
+    triggerFocusMetric.activeIsTrigger,
+    `${scenarioName} 来源导入选择器关闭后焦点未回到触发按钮: ${JSON.stringify(triggerFocusMetric)}`
+  )
 }
 
 async function assertBusinessToolbarDisabledButtons(
@@ -9657,7 +8363,7 @@ async function assertPrintCenterPreviewPopup(
     page.getByRole('button', { name: '打印当前模板' }).click(),
   ])
   const mockToken = createMockAdminToken()
-  await installAdminRpcMocks(workspacePopup)
+  await installAdminRpcMocks(workspacePopup, { baseURL })
   await workspacePopup.addInitScript((token) => {
     localStorage.setItem('admin_access_token', token)
   }, mockToken)
@@ -9719,7 +8425,7 @@ async function assertEditablePrintWorkspacePopupRefresh(
     page.getByRole('button', { name: '打印当前模板' }).click(),
   ])
   const mockToken = createMockAdminToken()
-  await installAdminRpcMocks(popup)
+  await installAdminRpcMocks(popup, { baseURL })
   await popup.addInitScript((token) => {
     localStorage.setItem('admin_access_token', token)
   }, mockToken)
@@ -12979,6 +11685,104 @@ async function assertDashboardWorkbenchLayout(page, { scenarioName }) {
   }
 }
 
+async function assertDashboardWorkbenchEntryNavigation(page, { scenarioName }) {
+  const nowSec = Math.floor(Date.now() / 1000)
+  const createTask = async (params) =>
+    page.evaluate(async (taskParams) => {
+      const response = await fetch('/rpc/workflow', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: `dashboard-workbench-entry-${taskParams.task_code}`,
+          method: 'create_task',
+          params: taskParams,
+        }),
+      })
+      const payload = await response.json()
+      if (payload?.result?.code !== 0) {
+        throw new Error(`create_task failed: ${JSON.stringify(payload)}`)
+      }
+    }, params)
+
+  await createTask({
+    task_code: 'style-l1-dashboard-entry-sales-order',
+    task_group: 'sales-orders',
+    task_name: '工作台正式页关联任务',
+    source_type: 'sales-orders',
+    source_id: 1,
+    source_no: 'SO-STYLE-L1',
+    business_status_key: 'project_pending',
+    task_status_key: 'ready',
+    owner_role_key: 'sales',
+    due_at: nowSec + 3_600,
+    payload: { notification_type: 'task_created' },
+  })
+  await createTask({
+    task_code: 'style-l1-dashboard-entry-shell',
+    task_group: 'shipment_release',
+    task_name: '工作台待接入预览任务',
+    source_type: 'shipping-release',
+    source_id: 9011,
+    source_no: 'OUT-DASH-SHELL',
+    business_status_key: 'shipment_pending',
+    task_status_key: 'ready',
+    owner_role_key: 'warehouse',
+    due_at: nowSec + 7_200,
+    payload: {
+      notification_type: 'task_created',
+      alert_type: 'shipment_pending',
+    },
+  })
+
+  await page.getByRole('button', { name: '刷新当前页' }).click()
+  await expectText(page, '工作台正式页关联任务')
+  await expectText(page, '工作台待接入预览任务')
+
+  const formalRow = page
+    .locator('.erp-workbench-queue-panel .ant-table-row')
+    .filter({ hasText: '工作台正式页关联任务' })
+    .first()
+  await formalRow.click()
+  const detailPanel = page.locator('.erp-workbench-task-detail')
+  await expectText(page, 'SO-STYLE-L1')
+  await detailPanel
+    .getByRole('button', { name: '关联记录', exact: true })
+    .click()
+  await waitForPath(page, '/erp/sales/project-orders/sales-orders')
+  assert.match(
+    page.url(),
+    /[?&]link_keyword=SO-STYLE-L1(?:&|$)/,
+    `${scenarioName} 正式页关联入口应带来源单号: ${page.url()}`
+  )
+  await expectHeading(page, '销售订单')
+  await expectText(page, 'SO-STYLE-L1')
+
+  await gotoScenarioPath(page, '/erp/dashboard', {
+    waitUntil: 'domcontentloaded',
+  })
+  await expectHeading(page, '工作台')
+  await expectText(page, '工作台待接入预览任务')
+  const shellRow = page
+    .locator('.erp-workbench-queue-panel .ant-table-row')
+    .filter({ hasText: '工作台待接入预览任务' })
+    .first()
+  await shellRow.click()
+  await detailPanel
+    .getByText('工作台待接入预览任务', { exact: true })
+    .waitFor({ state: 'visible', timeout: 10_000 })
+  assert.equal(
+    await detailPanel
+      .getByRole('button', { name: '关联记录', exact: true })
+      .count(),
+    0,
+    `${scenarioName} formal-shell 任务不应显示关联记录按钮`
+  )
+}
+
 async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
   await page.locator('.erp-dashboard-task-board-card').waitFor({
     timeout: 10_000,
@@ -13261,27 +12065,15 @@ async function assertTaskActionDrawerLayout(
   )
 }
 
-function createMockAdminToken() {
-  const header = encodeBase64URL({ alg: 'none', typ: 'JWT' })
-  const payload = encodeBase64URL({
-    uid: 1,
-    uname: 'style-l1-admin',
-    role: 1,
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  })
-  return `${header}.${payload}.stylel1`
-}
-
-function encodeBase64URL(value) {
-  return Buffer.from(JSON.stringify(value)).toString('base64url')
-}
-
 function isIgnorableDevServerError(text) {
   return (
     text.includes('Outdated Request') ||
     text.includes('[hmr] Failed to reload') ||
     text.includes('net::ERR_CONNECTION_REFUSED') ||
     text.includes('[vite] failed to connect to websocket') ||
+    text.includes(
+      'Warning: trigger element and popup element should in same shadow root.'
+    ) ||
     (text.includes("WebSocket connection to 'ws://127.0.0.1:") &&
       text.includes('net::ERR_ADDRESS_INVALID'))
   )

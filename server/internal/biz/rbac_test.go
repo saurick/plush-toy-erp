@@ -205,6 +205,87 @@ func TestAdminVisibleMenusFiltersByPermissionCode(t *testing.T) {
 	}
 }
 
+func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
+	menusByKey := map[string]AdminMenu{}
+	for _, menu := range BuiltinAdminMenus() {
+		menusByKey[menu.Key] = menu
+	}
+
+	tests := []struct {
+		key         string
+		label       string
+		path        string
+		permissions []string
+	}{
+		{
+			key:         "global-dashboard",
+			label:       "工作台",
+			path:        "/erp/dashboard",
+			permissions: []string{PermissionERPDashboardRead},
+		},
+		{
+			key:         "task-board",
+			label:       "任务看板",
+			path:        "/erp/task-board",
+			permissions: []string{PermissionWorkflowTaskRead},
+		},
+		{
+			key:         "business-dashboard",
+			label:       "业务看板",
+			path:        "/erp/business-dashboard",
+			permissions: []string{PermissionERPDashboardRead},
+		},
+		{
+			key:         "exception-flow",
+			label:       "异常 / 阻塞闭环",
+			path:        "/erp/operations/exceptions",
+			permissions: []string{PermissionWorkflowTaskRead},
+		},
+		{
+			key:         "receivables",
+			label:       "应收管理",
+			path:        "/erp/finance/receivables",
+			permissions: []string{PermissionFinanceReceivableRead},
+		},
+		{
+			key:         "invoices",
+			label:       "发票管理",
+			path:        "/erp/finance/invoices",
+			permissions: []string{PermissionFinanceReceivableRead, PermissionFinancePayableRead},
+		},
+		{
+			key:         "products",
+			label:       "产品档案",
+			path:        "/erp/master/products",
+			permissions: []string{PermissionProductRead, PermissionProductSKURead},
+		},
+		{
+			key:         "material-bom",
+			label:       "BOM 管理",
+			path:        "/erp/purchase/material-bom",
+			permissions: []string{PermissionBOMRead},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			menu, ok := menusByKey[tt.key]
+			if !ok {
+				t.Fatalf("expected builtin menu %s", tt.key)
+			}
+			if menu.Label != tt.label {
+				t.Fatalf("expected %s label %q, got %q", tt.key, tt.label, menu.Label)
+			}
+			if menu.Path != tt.path {
+				t.Fatalf("expected %s path %q, got %q", tt.key, tt.path, menu.Path)
+			}
+			if !PermissionSetHasAll(PermissionKeySet(menu.RequiredPermissions), tt.permissions...) {
+				t.Fatalf("expected %s permissions to contain %#v, got %#v", tt.key, tt.permissions, menu.RequiredPermissions)
+			}
+		})
+	}
+}
+
 func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
 	admin := &AdminUser{
 		ID:       2,

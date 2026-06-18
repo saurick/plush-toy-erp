@@ -111,6 +111,8 @@ required_keys=(
   TRACE_ENDPOINT
   TRACE_RATIO
   WEB_API_ORIGIN
+  APP_HTTP_BIND_ADDR
+  APP_GRPC_BIND_ADDR
   APP_JWT_SECRET
   APP_AUTH_SMS_MODE
   APP_ADMIN_USERNAME
@@ -177,6 +179,8 @@ else
   erp_debug_cleanup_enabled="$(value_of ERP_DEBUG_CLEANUP_ENABLED)"
   jaeger_bind_addr="$(value_of JAEGER_BIND_ADDR)"
   postgres_bind_addr="$(value_of POSTGRES_BIND_ADDR)"
+  app_http_bind_addr="$(value_of APP_HTTP_BIND_ADDR)"
+  app_grpc_bind_addr="$(value_of APP_GRPC_BIND_ADDR)"
   postgres_dsn="$(value_of POSTGRES_DSN)"
   app_admin_password="$(value_of APP_ADMIN_PASSWORD)"
   bootstrap_admin_once="$(value_of BOOTSTRAP_ADMIN_ONCE)"
@@ -192,6 +196,8 @@ else
   [[ "$erp_debug_seed_enabled" == "false" ]] || fail "ERP_DEBUG_SEED_ENABLED 必须为 false"
   [[ "$erp_debug_cleanup_enabled" == "false" ]] || fail "ERP_DEBUG_CLEANUP_ENABLED 必须为 false"
   [[ "$postgres_bind_addr" == "127.0.0.1" ]] || fail "POSTGRES_BIND_ADDR 必须为 127.0.0.1，避免 PostgreSQL 暴露到公网或办公网"
+  [[ "$app_http_bind_addr" == "127.0.0.1" ]] || fail "APP_HTTP_BIND_ADDR 必须为 127.0.0.1，外部流量应先进入前端 / 网关"
+  [[ "$app_grpc_bind_addr" == "127.0.0.1" ]] || fail "APP_GRPC_BIND_ADDR 必须为 127.0.0.1，避免 gRPC 直接暴露到公网或办公网"
   [[ "$jaeger_bind_addr" == "127.0.0.1" ]] || fail "JAEGER_BIND_ADDR 必须为 127.0.0.1，避免 Jaeger 暴露到公网或办公网"
   [[ "$postgres_dsn" == postgres://* || "$postgres_dsn" == postgresql://* ]] || fail "POSTGRES_DSN 必须是 postgres/postgresql URL"
   [[ "$bootstrap_admin_once" == "true" || "$bootstrap_admin_once" == "false" ]] || fail "BOOTSTRAP_ADMIN_ONCE 必须为 true 或 false"
@@ -210,7 +216,7 @@ else
   if ! awk -v ratio="$trace_ratio" 'BEGIN { exit !(ratio + 0 >= 0 && ratio + 0 <= 1) }'; then
     fail "TRACE_RATIO 必须在 0 到 1 之间"
   fi
-  ok "生产 secret、镜像 tag、debug 和 PostgreSQL / Jaeger 暴露边界通过"
+  ok "生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过"
 fi
 
 if grep -Eq '^[[:space:]]+build:' "$compose_file"; then
@@ -221,6 +227,8 @@ if grep -Eq 'image:.*:latest' "$compose_file"; then
 fi
 grep -q 'JAEGER_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose Jaeger 端口必须默认绑定 127.0.0.1"
 grep -q 'POSTGRES_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose PostgreSQL 端口必须默认绑定 127.0.0.1"
+grep -q 'APP_HTTP_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app HTTP 端口必须默认绑定 127.0.0.1"
+grep -q 'APP_GRPC_BIND_ADDR:-127.0.0.1' "$compose_file" || fail "Compose app gRPC 端口必须默认绑定 127.0.0.1"
 grep -q '/usr/local/bin/atlas' "$migrate_script" || fail "migration 脚本必须使用宿主机 /usr/local/bin/atlas"
 grep -q 'flock' "$migrate_script" || fail "migration 脚本必须使用 flock 串行化"
 [[ -x "$migrate_script" ]] || fail "migration 脚本不可执行: $migrate_script"

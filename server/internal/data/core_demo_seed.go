@@ -159,12 +159,15 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			{Code: prefix + "-QC-HOLD", Name: "核心演示待检仓", Type: "QC_HOLD"},
 		},
 		Processes: []CoreDemoProcessSeed{
-			{Code: prefix + "-PROC-SEWING", Name: "车缝", Category: "车缝", OutsourcingEnabled: true, SortOrder: 10, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-CUTTING-DIE", Name: "制作刀模", Category: "刀模", OutsourcingEnabled: true, SortOrder: 20, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-CUT-PIECE-IQC", Name: "裁片IQC", Category: "裁片质检", OutsourcingEnabled: true, QualityRequired: true, SortOrder: 30, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-MACHINE-CUTTING", Name: "机裁", Category: "裁片", OutsourcingEnabled: true, SortOrder: 40, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-SILKSCREEN", Name: "丝印", Category: "印刷", OutsourcingEnabled: true, SortOrder: 50, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
-			{Code: prefix + "-PROC-LAMINATION", Name: "贴合", Category: "贴合", OutsourcingEnabled: true, SortOrder: 60, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-CHECKING", Name: "查货", Category: "查货", OutsourcingEnabled: true, InhouseEnabled: true, QualityRequired: true, SortOrder: 10, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
+			{Code: prefix + "-PROC-HANDWORK", Name: "手工", Category: "手工", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 20, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
+			{Code: prefix + "-PROC-SEWING", Name: "车缝", Category: "车缝", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 30, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
+			{Code: prefix + "-PROC-PACKAGING", Name: "包装", Category: "包装", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 40, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
+			{Code: prefix + "-PROC-CUTTING-DIE", Name: "制作刀模", Category: "刀模", OutsourcingEnabled: true, SortOrder: 50, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-CUT-PIECE-IQC", Name: "裁片IQC", Category: "裁片质检", OutsourcingEnabled: true, QualityRequired: true, SortOrder: 60, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-MACHINE-CUTTING", Name: "机裁", Category: "裁片", OutsourcingEnabled: true, SortOrder: 70, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-SILKSCREEN", Name: "丝印", Category: "印刷", OutsourcingEnabled: true, SortOrder: 80, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
+			{Code: prefix + "-PROC-LAMINATION", Name: "贴合", Category: "贴合", OutsourcingEnabled: true, SortOrder: 90, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
 		},
 		BOMs: []CoreDemoBOMSeed{
 			{

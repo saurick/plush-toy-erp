@@ -146,6 +146,13 @@ test('formal business shell: 预览页文案不冒充真实业务写入', () => 
     '预览导出待接入',
     '真实保存待接入',
     '当前页面仍是待接入预览页',
+    'listWorkflowTasks',
+    'updateWorkflowTaskStatus',
+    'urgeWorkflowTask',
+    'SHIPPING_RELEASE_MODULE_KEY',
+    'source_type: SHIPPING_RELEASE_MODULE_KEY',
+    '出货放行协同任务已刷新',
+    'shipment_release_page_scope',
   ]) {
     assert.equal(
       source.includes(text),

@@ -24,6 +24,11 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
+  listWorkflowTasks,
+  updateWorkflowTaskStatus,
+  urgeWorkflowTask,
+} from '../api/workflowApi.mjs'
+import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -48,8 +53,12 @@ import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
 } from '../utils/moduleTableColumns.mjs'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
+import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
+const SHIPPING_RELEASE_MODULE_KEY = 'shipping-release'
+const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
 
 const STATUS_OPTIONS = Object.freeze([
   { label: '全部状态', value: '' },
@@ -170,6 +179,10 @@ function statusTag(status) {
 
 function compareText(a, b) {
   return String(a || '').localeCompare(String(b || ''), 'zh-Hans-CN')
+}
+
+function workflowPayloadOf(task = {}) {
+  return task?.payload && typeof task.payload === 'object' ? task.payload : {}
 }
 
 function buildFormalShellRows(moduleItem) {
@@ -359,6 +372,18 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
+  const [workflowTasks, setWorkflowTasks] = useState([])
+  const isShippingReleaseWorkflowPage =
+    moduleItem?.key === SHIPPING_RELEASE_MODULE_KEY
+  const canReadWorkflowTasks =
+    isShippingReleaseWorkflowPage &&
+    hasActionPermission(adminProfile, 'workflow.task.read')
+  const canUpdateWorkflowTasks =
+    isShippingReleaseWorkflowPage &&
+    hasActionPermission(adminProfile, 'workflow.task.update')
+  const canCompleteWorkflowTasks =
+    isShippingReleaseWorkflowPage &&
+    hasActionPermission(adminProfile, 'workflow.task.complete')
 
   const rows = useMemo(
     () => (moduleItem ? buildFormalShellRows(moduleItem) : []),
@@ -515,15 +540,106 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     )
   }, [rows])
 
+  const loadShippingReleaseWorkflowTasks = useCallback(async () => {
+    if (!isShippingReleaseWorkflowPage || !canReadWorkflowTasks) {
+      setWorkflowTasks([])
+      return
+    }
+    try {
+      const data = await listWorkflowTasks({
+        source_type: SHIPPING_RELEASE_MODULE_KEY,
+        limit: 100,
+      })
+      setWorkflowTasks(data?.tasks || [])
+    } catch (error) {
+      setWorkflowTasks([])
+      message.warning(getActionErrorMessage(error, '加载出货放行协同任务失败'))
+    }
+  }, [canReadWorkflowTasks, isShippingReleaseWorkflowPage])
+
+  useEffect(() => {
+    loadShippingReleaseWorkflowTasks()
+  }, [loadShippingReleaseWorkflowTasks])
+
   useEffect(() => {
     if (!moduleItem) {
       return undefined
     }
-    return outletContext?.registerPageRefresh?.(() => {
+    return outletContext?.registerPageRefresh?.(async () => {
+      if (isShippingReleaseWorkflowPage) {
+        await loadShippingReleaseWorkflowTasks()
+        message.success('出货放行协同任务已刷新')
+        return false
+      }
       message.info(`${moduleItem.title}当前为待接入预览页，暂无远端数据刷新`)
       return false
     })
-  }, [moduleItem, outletContext])
+  }, [
+    isShippingReleaseWorkflowPage,
+    loadShippingReleaseWorkflowTasks,
+    moduleItem,
+    outletContext,
+  ])
+
+  const completeWorkflowTask = useCallback(
+    async (task) => {
+      await updateWorkflowTaskStatus({
+        id: task.id,
+        task_status_key: 'done',
+        business_status_key: task.business_status_key || 'shipping_released',
+        reason: '',
+        payload: {
+          ...workflowPayloadOf(task),
+          shipment_release_page_action: 'complete',
+          shipment_release_page_scope: 'workflow_only',
+        },
+      })
+      message.success('出货放行协同任务已完成，真实出货仍需出货单进入 SHIPPED')
+      await loadShippingReleaseWorkflowTasks()
+    },
+    [loadShippingReleaseWorkflowTasks]
+  )
+
+  const blockWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      await updateWorkflowTaskStatus({
+        id: task.id,
+        task_status_key: 'blocked',
+        business_status_key: 'blocked',
+        reason,
+        payload: {
+          ...workflowPayloadOf(task),
+          blocked_reason: reason,
+          shipment_release_page_action: 'block',
+          shipment_release_page_scope: 'workflow_only',
+        },
+      })
+      message.success('出货放行阻塞原因已记录')
+      await loadShippingReleaseWorkflowTasks()
+    },
+    [loadShippingReleaseWorkflowTasks]
+  )
+
+  const urgeShippingReleaseWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      await urgeWorkflowTask({
+        task_id: task.id,
+        action: 'urge_task',
+        reason,
+        actor_role_key: 'admin',
+        payload: {
+          source_type: task.source_type,
+          source_id: task.source_id,
+          source_no: task.source_no,
+          entry: 'shipping_release_page',
+          shipment_release_page_scope: 'workflow_only',
+        },
+      })
+      message.success('出货放行催办已记录')
+      await loadShippingReleaseWorkflowTasks()
+    },
+    [loadShippingReleaseWorkflowTasks]
+  )
 
   if (!moduleItem) {
     return (
@@ -757,9 +873,17 @@ export default function FormalBusinessModulePage({ moduleKey }) {
       />
 
       <CollaborationTaskPanel
-        tasks={[]}
+        tasks={isShippingReleaseWorkflowPage ? workflowTasks : []}
         selectedTasks={[]}
         selectedRecordLabel={selectedRows[0]?.title || selectedLabel}
+        roleLabelMap={WORKFLOW_ROLE_LABELS}
+        onCompleteTask={
+          canCompleteWorkflowTasks ? completeWorkflowTask : undefined
+        }
+        onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
+        onUrgeTask={
+          canUpdateWorkflowTasks ? urgeShippingReleaseWorkflowTask : undefined
+        }
       />
 
       {actionModal?.variant === 'form' ? (

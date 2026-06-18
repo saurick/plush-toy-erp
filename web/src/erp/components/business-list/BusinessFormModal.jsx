@@ -32,26 +32,65 @@ function findLatestVisibleBusinessFormModal() {
 
 function focusLatestVisibleBusinessFormModal() {
   const dialog = findLatestVisibleBusinessFormModal()
+  if (!dialog) return false
   if (
-    dialog &&
     document.activeElement instanceof Element &&
     dialog.contains(document.activeElement) &&
     document.activeElement !== document.body
   ) {
-    return
+    return true
   }
-  const firstControl = dialog?.querySelector(
-    [
-      'input:not([type="hidden"]):not([disabled])',
-      'textarea:not([disabled])',
-      '.ant-select-selection-search-input:not([disabled])',
-      '.ant-picker:not(.ant-picker-disabled)',
-      '.ant-picker input:not([disabled])',
-      '.ant-input-number-input:not([disabled])',
-      'button:not([disabled])',
-    ].join(', ')
-  )
+  const firstControl = Array.from(
+    dialog.querySelectorAll(
+      [
+        'input:not([type="hidden"]):not([disabled])',
+        'textarea:not([disabled])',
+        '.ant-select-selection-search-input:not([disabled])',
+        '.ant-picker:not(.ant-picker-disabled)',
+        '.ant-picker input:not([disabled])',
+        '.ant-input-number-input:not([disabled])',
+        'button:not([disabled])',
+      ].join(', ')
+    )
+  ).find((control) => {
+    const rect = control.getBoundingClientRect()
+    const style = window.getComputedStyle(control)
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      style.display !== 'none' &&
+      style.visibility !== 'hidden'
+    )
+  })
   firstControl?.focus?.({ preventScroll: true })
+  return (
+    document.activeElement instanceof Element &&
+    dialog.contains(document.activeElement) &&
+    document.activeElement !== document.body
+  )
+}
+
+function scheduleBusinessFormModalFocus(delay = 0) {
+  let cancelled = false
+  let timer = null
+  let attempts = 0
+  const run = () => {
+    if (cancelled) return
+    attempts += 1
+    const focused = focusLatestVisibleBusinessFormModal()
+    if (!focused && attempts < 6) {
+      timer = window.setTimeout(run, 80)
+    }
+  }
+  timer = window.setTimeout(run, delay)
+  return () => {
+    cancelled = true
+    if (timer) window.clearTimeout(timer)
+  }
+}
+
+function focusBusinessFormModalAfterTransition(delay = 0) {
+  scheduleBusinessFormModalFocus(delay)
 }
 
 export function BusinessFormModalTitle({ icon, title, description }) {
@@ -78,6 +117,8 @@ export default function BusinessFormModal({
   ...modalProps
 }) {
   const userAfterOpenChange = modalProps.afterOpenChange
+  const triggerElementRef = React.useRef(null)
+  const previousOpenRef = React.useRef(false)
   const modalTitle = React.isValidElement(title) ? (
     title
   ) : (
@@ -90,20 +131,35 @@ export default function BusinessFormModal({
   const handleAfterOpenChange = React.useCallback(
     (open) => {
       userAfterOpenChange?.(open)
-      if (!open || typeof document === 'undefined') return
+      if (typeof document === 'undefined') return
+      if (!open) {
+        window.setTimeout(() => {
+          const trigger = triggerElementRef.current
+          if (trigger?.isConnected && typeof trigger.focus === 'function') {
+            trigger.focus({ preventScroll: true })
+          }
+        }, 80)
+        return
+      }
 
-      window.setTimeout(() => {
-        focusLatestVisibleBusinessFormModal()
-      }, 160)
+      focusBusinessFormModalAfterTransition(160)
     },
     [userAfterOpenChange]
   )
+  React.useLayoutEffect(() => {
+    if (
+      open &&
+      !previousOpenRef.current &&
+      typeof document !== 'undefined' &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      triggerElementRef.current = document.activeElement
+    }
+    previousOpenRef.current = open
+  }, [open])
   React.useEffect(() => {
     if (!open || typeof window === 'undefined') return undefined
-    const timer = window.setTimeout(() => {
-      focusLatestVisibleBusinessFormModal()
-    }, 120)
-    return () => window.clearTimeout(timer)
+    return scheduleBusinessFormModalFocus(120)
   }, [open])
 
   return (

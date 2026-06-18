@@ -83,8 +83,8 @@ services:
       jaeger:
         condition: service_started
     ports:
-      - "${APP_HTTP_PORT:-8300}:8300"
-      - "${APP_GRPC_PORT:-9300}:9300"
+      - "${APP_HTTP_BIND_ADDR:-127.0.0.1}:${APP_HTTP_PORT:-8300}:8300"
+      - "${APP_GRPC_BIND_ADDR:-127.0.0.1}:${APP_GRPC_PORT:-9300}:9300"
     environment:
       TZ: "${TZ:-Asia/Shanghai}"
       ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"

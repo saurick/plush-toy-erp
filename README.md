@@ -104,7 +104,7 @@ cd /Users/simon/projects/plush-toy-erp
 docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 ```
 
-固定端口：前端 `5175`，后端 HTTP `8300`，后端 gRPC `9300`。
+固定端口：前端 `5175`；生产 Compose 中后端 HTTP `127.0.0.1:8300`、后端 gRPC `127.0.0.1:9300` 只绑定宿主机 loopback，浏览器业务流量通过前端容器 `/rpc` 反代进入 Docker 网络内的 `app-server:8300`。
 
 ### 后端
 

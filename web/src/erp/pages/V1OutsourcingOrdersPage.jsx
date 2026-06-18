@@ -8,7 +8,6 @@ import {
   EditOutlined,
   FileTextOutlined,
   InboxOutlined,
-  LinkOutlined,
   PlusOutlined,
   PrinterOutlined,
   SettingOutlined,
@@ -24,7 +23,7 @@ import {
   Tag,
   Tooltip,
 } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -68,7 +67,6 @@ import {
 import {
   OUTSOURCING_ORDER_STATUS_COLORS,
   OUTSOURCING_ORDER_STATUS_LABELS,
-  V1_ROUTE_PATHS,
   buildOutsourcingOrderItemParams,
   buildOutsourcingOrderParams,
   buildSequentialDraftCode,
@@ -366,7 +364,6 @@ function canEditOrder(record) {
 
 export default function V1OutsourcingOrdersPage() {
   const outletContext = useOutletContext()
-  const navigate = useNavigate()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -987,38 +984,57 @@ export default function V1OutsourcingOrdersPage() {
     [selectedRow, workflowTasks]
   )
 
-  const relatedMenuItems = [
-    { key: 'details', label: '加工明细' },
-    { key: 'quality-inspections', label: '质检记录' },
-    { key: 'inventory', label: '库存台账' },
-    { key: 'payables', label: '应付管理' },
-  ]
-
-  const openRelatedTable = ({ key }) => {
-    if (!selectedRow) return
-    if (key === 'details') {
-      openEdit(selectedRow)
-      return
-    }
-    if (key === 'quality-inspections') {
-      navigate(V1_ROUTE_PATHS.qualityInspections)
-      return
-    }
-    if (key === 'inventory') {
-      navigate(V1_ROUTE_PATHS.inventory)
-      return
-    }
-    if (key === 'payables') {
-      navigate(V1_ROUTE_PATHS.payables)
-    }
-  }
+  const selectedItems = selectedRow
+    ? [
+        {
+          key: selectedRow.id,
+          label:
+            selectedRow.outsourcing_order_no || `加工合同 ${selectedRow.id}`,
+          title: `${resolveSupplierName(selectedRow)} / ${
+            OUTSOURCING_ORDER_STATUS_LABELS[selectedRow.lifecycle_status] ||
+            selectedRow.lifecycle_status ||
+            '-'
+          }`,
+        },
+      ]
+    : []
+  const visibleLifecycleActions = selectedRow
+    ? LIFECYCLE_ACTIONS.filter(
+        (action) =>
+          hasActionPermission(adminProfile, action.permission) &&
+          canRunOutsourcingOrderLifecycleAction(
+            selectedRow.lifecycle_status,
+            action.nextStatus
+          )
+      )
+    : []
+  const primaryLifecycleAction =
+    visibleLifecycleActions.find((action) => action.key !== 'cancel') || null
+  const secondaryLifecycleActions = visibleLifecycleActions.filter(
+    (action) => action.key !== primaryLifecycleAction?.key
+  )
+  const lifecycleMenuItems =
+    secondaryLifecycleActions.length > 0
+      ? [
+          {
+            key: 'status-transitions',
+            label: '状态变更',
+            type: 'group',
+            children: secondaryLifecycleActions.map((action) => ({
+              key: action.key,
+              label: action.label,
+              danger: action.danger,
+            })),
+          },
+        ]
+      : []
 
   return (
     <BusinessPageLayout className="erp-v1-outsourcing-orders-page">
       <PageHeaderCard
         compact
         title="委外订单"
-        description="维护加工合同源单、工序明细、加工厂承诺和打印快照；发料、回货、质检、应付仍由对应事实 usecase 承接。"
+        description="维护加工合同源单、工序明细、加工厂承诺和打印快照；查货只作为可选工序，查货结果、发料、回货、质检、应付仍由对应事实 usecase 承接。"
         tags={[
           <Tag color="blue" key="source">
             Source Document：加工合同
@@ -1026,8 +1042,11 @@ export default function V1OutsourcingOrdersPage() {
           <Tag color="green" key="process">
             工序来自加工环节字典
           </Tag>,
+          <Tag color="purple" key="checking">
+            查货只是工序候选
+          </Tag>,
           <Tag color="gold" key="fact">
-            不直接写库存 / 应付
+            不直接写质检 / 库存 / 应付
           </Tag>,
         ]}
         stats={[
@@ -1046,7 +1065,10 @@ export default function V1OutsourcingOrdersPage() {
             <SearchInput
               value={keyword}
               placeholder="搜索合同号或来源订单"
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) => {
+                setPagination(DEFAULT_PAGINATION)
+                setKeyword(event.target.value)
+              }}
               onPressEnter={() => {
                 setPagination(DEFAULT_PAGINATION)
                 loadOrders()
@@ -1080,9 +1102,13 @@ export default function V1OutsourcingOrdersPage() {
               }}
             />
             <SelectFilter
+              className="erp-business-filter-control--sort"
               value={sortValue}
               options={SORT_OPTIONS}
-              onChange={setSortValue}
+              onChange={(value) => {
+                setSortValue(value)
+                setPagination(DEFAULT_PAGINATION)
+              }}
             />
           </>
         }
@@ -1101,14 +1127,24 @@ export default function V1OutsourcingOrdersPage() {
             >
               列顺序
             </ToolbarButton>
-            <Tooltip title="加工合同源单当前没有物理删除 API；退出推进请走取消或关闭状态。">
+            <Tooltip
+              title="加工合同源单当前没有物理删除 API；退出推进请走取消或关闭状态。"
+              getPopupContainer={(triggerNode) =>
+                triggerNode.parentElement || document.body
+              }
+            >
               <span>
                 <ToolbarButton icon={<DeleteOutlined />} danger disabled>
                   批量删除
                 </ToolbarButton>
               </span>
             </Tooltip>
-            <Tooltip title="当前 outsourcing_order JSON-RPC 没有回收站主路径，页面不做前端假恢复。">
+            <Tooltip
+              title="当前 outsourcing_order JSON-RPC 没有回收站主路径，页面不做前端假恢复。"
+              getPopupContainer={(triggerNode) =>
+                triggerNode.parentElement || document.body
+              }
+            >
               <span>
                 <ToolbarButton icon={<InboxOutlined />} disabled>
                   回收站
@@ -1120,6 +1156,7 @@ export default function V1OutsourcingOrdersPage() {
         primaryAction={
           <ToolbarButton
             type="primary"
+            className="erp-business-list-toolbar__primary-action"
             icon={<PlusOutlined />}
             disabled={!canCreate}
             onClick={openCreate}
@@ -1132,8 +1169,17 @@ export default function V1OutsourcingOrdersPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedLabel}
-          boundaryText="加工合同只表达委外承诺和打印快照；确认下单不自动写库存、质检、应付或 Workflow 完成。"
+          selectedItems={selectedItems}
+          boundaryText="加工合同只表达委外承诺和打印快照；查货只作为工序候选，判定结果回质检模块；确认下单不自动写库存、质检、应付或 Workflow 完成。"
         >
+          <Button
+            type="link"
+            size="small"
+            disabled={!selectedRow}
+            onClick={() => setSelectedRow(null)}
+          >
+            清空
+          </Button>
           {selectedRow ? statusTag(selectedRow.lifecycle_status) : null}
           <Button
             size="small"
@@ -1143,50 +1189,25 @@ export default function V1OutsourcingOrdersPage() {
           >
             编辑
           </Button>
-          <Dropdown
-            trigger={['click']}
-            destroyOnHidden
-            disabled={!selectedRow}
-            menu={{
-              items: relatedMenuItems,
-              onClick: openRelatedTable,
-            }}
-          >
+          {primaryLifecycleAction ? (
             <Button
               size="small"
-              icon={<LinkOutlined />}
-              disabled={!selectedRow}
-            >
-              关联 <DownOutlined />
-            </Button>
-          </Dropdown>
-          {LIFECYCLE_ACTIONS.map((action) => (
-            <Button
-              key={action.key}
-              size="small"
-              type={action.key === 'confirm' ? 'primary' : 'default'}
-              danger={action.danger}
+              type="primary"
+              danger={primaryLifecycleAction.danger}
               icon={
-                action.danger ? (
+                primaryLifecycleAction.danger ? (
                   <CloseCircleOutlined />
                 ) : (
                   <CheckCircleOutlined />
                 )
               }
-              disabled={
-                !selectedRow ||
-                saving ||
-                !hasActionPermission(adminProfile, action.permission) ||
-                !canRunOutsourcingOrderLifecycleAction(
-                  selectedRow.lifecycle_status,
-                  action.nextStatus
-                )
-              }
-              onClick={() => runLifecycleAction(action)}
+              disabled={!selectedRow || saving}
+              loading={saving}
+              onClick={() => runLifecycleAction(primaryLifecycleAction)}
             >
-              {action.label}
+              {primaryLifecycleAction.label}
             </Button>
-          ))}
+          ) : null}
           <Button
             size="small"
             icon={<PrinterOutlined />}
@@ -1196,6 +1217,35 @@ export default function V1OutsourcingOrdersPage() {
           >
             加工合同打印
           </Button>
+          <Dropdown
+            trigger={['click']}
+            destroyOnHidden
+            getPopupContainer={(triggerNode) =>
+              triggerNode.parentElement || document.body
+            }
+            disabled={
+              !selectedRow || saving || secondaryLifecycleActions.length === 0
+            }
+            menu={{
+              items: lifecycleMenuItems,
+              onClick: ({ key }) => {
+                const action = secondaryLifecycleActions.find(
+                  (item) => item.key === key
+                )
+                if (action) runLifecycleAction(action)
+              },
+            }}
+          >
+            <Button
+              size="small"
+              aria-label="更多操作"
+              disabled={
+                !selectedRow || saving || secondaryLifecycleActions.length === 0
+              }
+            >
+              更多 <DownOutlined />
+            </Button>
+          </Dropdown>
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -1215,6 +1265,7 @@ export default function V1OutsourcingOrdersPage() {
         }
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
+          onDoubleClick: () => openEdit(record),
         })}
         emptyDescription="暂无加工合同"
         pagination={{
@@ -1257,7 +1308,7 @@ export default function V1OutsourcingOrdersPage() {
       <BusinessFormModal
         icon={<FileTextOutlined />}
         title={editingRow ? '编辑加工合同' : '新建加工合同'}
-        description="只维护委外源单；库存和应付由后续事实动作处理。"
+        description="只维护委外源单和工序明细；查货、手工、车缝、包装都只是加工环节，结果判定、库存和应付由后续事实模块处理。"
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}
@@ -1382,6 +1433,7 @@ export default function V1OutsourcingOrdersPage() {
                           <Form.Item
                             name={[field.name, 'process_id']}
                             label="工序"
+                            extra="查货只表示加工环节；合格、不合格、让步、返工等结果不在加工合同里维护。"
                             rules={[{ required: true, message: '请选择工序' }]}
                           >
                             <Select

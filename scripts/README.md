@@ -27,7 +27,7 @@
 | `scripts/qa/private-deployment-package-closure.mjs`     | 多客户私有化复制模拟闭环入口，只读取模板并生成 evidence 报告                                                   | 私有化客户包回归 / 目标环境发布前                          |
 | `scripts/deploy/deployment-package-lint.mjs`           | 客户私有化部署资料包检查，确保 `deployments/yoyoosun` 必需文件齐全且不含真实 env、备份、raw files 或 secret       | 调整客户部署资料包后                                       |
 | `scripts/deploy/release-evidence-gate.mjs`             | yoyoosun 发布证据门禁，检查本次 release evidence、pre-migration backup、backup restore、migration、smoke 和 sign-off 已脱敏填齐 | 客户试用或交付前                                           |
-| `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、固定镜像 tag、SMS mock、debug 写入开关、Compose、migration 脚本、PostgreSQL / Jaeger loopback 和低配部署边界 | 每次生产发布 / 部署后运行态复核前                          |
+| `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、固定镜像 tag、SMS mock、debug 写入开关、Compose、migration 脚本、PostgreSQL / 后端 / Jaeger loopback 和低配部署边界 | 每次生产发布 / 部署后运行态复核前                          |
 | `scripts/qa/core-boundary.test.mjs`                    | 自动扫描 `server/internal/core`，防止纯产品规则层 import `biz/data/service`、Ent、SQL、HTTP、配置或文件系统依赖 | 调整 `server/internal/core` 后                              |
 | `scripts/qa/phase-label-boundaries.mjs`                | 自动扫描活跃实现路径，阻止新增 runtime 阶段编号命名；仅允许当前旧 PostgreSQL 本地验收兼容入口                     | 调整命名、脚本、API、运行时代码或治理文档后                 |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、冲正和防负库存                         |
@@ -211,7 +211,7 @@ node scripts/qa/trial-simulated-data.mjs \
 
 若要把模拟数据写入本地或目标试用环境，只能显式 `--apply`，并提供已有活跃产品和单位 ID。该脚本会先按稳定模拟编号查找已有记录，缺失才通过 V1 JSON-RPC 创建；它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不创建出货、库存或财务事实：
 
-如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀，不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `trial_sim_args` 和 `operational_fact_args` 可直接传给后续模拟脚本：
+如果当前环境缺少核心演示基础资料，优先使用 core demo seed。该 seed 只写 `units`、`materials`、`products`、`warehouses`、`processes`、`bom_headers` 和 `bom_items`，编码固定带 `SIM-PLUSH-CORE` 前缀；其中 `processes` 会提供 `查货 / 手工 / 车缝 / 包装` 等毛绒玩具行业默认候选，并仍允许后续按实际工厂扩展。该 seed 不写客户、供应商、联系人、销售订单、`business_records`、库存流水、生产、出货或财务事实；输出中的 `trial_sim_args` 和 `operational_fact_args` 可直接传给后续模拟脚本：
 
 ```bash
 bash scripts/seed-core-demo-data.sh
@@ -494,7 +494,7 @@ bash /Users/simon/projects/plush-toy-erp/scripts/qa/full.sh
 bash /Users/simon/projects/plush-toy-erp/scripts/qa/strict.sh
 ```
 
-生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / Jaeger loopback 和低配部署边界：
+生产发布还必须使用准备好的运行时 `.env` 执行产品级 preflight；该命令不执行 migration，只确认发布前门禁是否满足，包括 secret 占位、固定镜像 tag、SMS mock、debug seed / cleanup、PostgreSQL / 后端 HTTP / gRPC / Jaeger loopback 和低配部署边界：
 
 ```bash
 bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh \

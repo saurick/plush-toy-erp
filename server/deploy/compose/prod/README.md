@@ -31,6 +31,7 @@ docker compose --env-file .env -f compose.yml up -d
 - `APP_ADMIN_USERNAME`
 - `BOOTSTRAP_ADMIN_ONCE=false`；只有新库首次初始化 bootstrap 管理员时才临时改为 `true`
 - `POSTGRES_BIND_ADDR=127.0.0.1`，PostgreSQL 宿主机映射只允许 loopback，migration 从宿主机本地 `127.0.0.1:5435` 访问
+- `APP_HTTP_BIND_ADDR=127.0.0.1` 和 `APP_GRPC_BIND_ADDR=127.0.0.1`，后端 HTTP / gRPC 宿主机映射只允许 loopback；浏览器业务流量通过前端容器反代 `/rpc`
 
 如果不需要自带 tracing 存储，可以再按需移除 Jaeger 服务和对应环境变量。
 
@@ -61,14 +62,16 @@ export ERP_DEBUG_ENV=prod
 export ERP_DEBUG_SEED_ENABLED=false
 export ERP_DEBUG_CLEANUP_ENABLED=false
 export POSTGRES_BIND_ADDR=127.0.0.1
+export APP_HTTP_BIND_ADDR=127.0.0.1
+export APP_GRPC_BIND_ADDR=127.0.0.1
 export JAEGER_BIND_ADDR=127.0.0.1
 ```
 
 默认宿主机端口：
 
 - PostgreSQL：`127.0.0.1:5435`
-- HTTP：`8300`
-- gRPC：`9300`
+- HTTP：`127.0.0.1:8300`
+- gRPC：`127.0.0.1:9300`
 - 前端：`5175`
 
 当前部署目标是内网服务器 `192.168.0.133`，Compose 入口位于：
@@ -90,6 +93,7 @@ export JAEGER_BIND_ADDR=127.0.0.1
 - Compose 第三方镜像默认固定为 `POSTGRES_IMAGE=postgres:18.1` 和 `JAEGER_IMAGE=jaegertracing/all-in-one:1.76.0`；升级时显式改 tag、跑 preflight，再记录发布证据。
 - Jaeger 宿主机端口默认通过 `JAEGER_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；远程查看优先用 SSH tunnel，不要把 Jaeger UI 或 OTLP 端口直接暴露到公网或办公网。
 - PostgreSQL 宿主机端口默认通过 `POSTGRES_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；Atlas migration 使用宿主机本地端口访问，不需要把 PostgreSQL 暴露给外部网络。
+- 后端 HTTP / gRPC 宿主机端口默认通过 `APP_HTTP_BIND_ADDR=127.0.0.1` 和 `APP_GRPC_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；浏览器业务流量通过前端容器 `/rpc` 反代到 Docker 网络内的 `app-server:8300`。
 - `POSTGRES_DSN` 是 URL，若 `POSTGRES_PASSWORD` 包含 `@`、`:`、`/`、`%`、`#` 等特殊字符，DSN 里的密码必须先 URL 编码；`POSTGRES_PASSWORD` 本身保持原值。
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关只需把前端流量映射到 `5175`
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要先评审构建期 `VITE_BASE_URL`

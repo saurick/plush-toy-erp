@@ -777,6 +777,15 @@ export function CollaborationTaskPanel({
   const tabIDPrefix = React.useId().replace(/:/g, '')
   const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
   const roleLabels = roleLabelMap || new Map()
+  const allowedActionModes = React.useMemo(
+    () =>
+      [
+        onCompleteTask ? 'complete' : '',
+        onBlockTask ? 'block' : '',
+        onUrgeTask ? 'urge' : '',
+      ].filter(Boolean),
+    [onBlockTask, onCompleteTask, onUrgeTask]
+  )
   const taskPanelModel = React.useMemo(
     () =>
       buildBusinessCollaborationTaskPanelModel({
@@ -1168,6 +1177,7 @@ export function CollaborationTaskPanel({
         actionMode={actionDrawerMode}
         actionReason={actionDrawerReason}
         actionSaving={actionDrawerSaving}
+        allowedActionModes={allowedActionModes}
         roleLabelMap={roleLabels}
         onActionModeChange={setActionDrawerMode}
         onActionReasonChange={setActionDrawerReason}

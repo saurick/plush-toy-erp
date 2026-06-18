@@ -180,10 +180,12 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 
 	_, listRes, err := j.handleOutsourcingOrder(ctx, "list_outsourcing_orders", "2", mustJSONRPCStruct(t, map[string]any{
-		"keyword":    "OUT-JSONRPC",
-		"date_field": "order_date",
-		"date_from":  "2026-06-01",
-		"date_to":    "2026-06-30",
+		"keyword":        "OUT-JSONRPC",
+		"date_field":     "order_date",
+		"date_from":      "2026-06-01",
+		"date_to":        "2026-06-30",
+		"sort_by":        "expected_return_date",
+		"sort_direction": "asc",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -194,7 +196,10 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	if total := jsonRPCInt(t, listRes.Data.AsMap(), "total"); total != 1 {
 		t.Fatalf("expected one outsourcing order in list, got %d", total)
 	}
-	if repo.lastFilter.DateField != "order_date" || repo.lastFilter.Keyword != "OUT-JSONRPC" {
+	if repo.lastFilter.DateField != "order_date" ||
+		repo.lastFilter.Keyword != "OUT-JSONRPC" ||
+		repo.lastFilter.SortBy != "expected_return_date" ||
+		repo.lastFilter.SortDirection != "asc" {
 		t.Fatalf("expected outsourcing order filter to be mapped, got %#v", repo.lastFilter)
 	}
 

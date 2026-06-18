@@ -418,7 +418,9 @@ export default function V1PurchaseReceiptsPage() {
       setRows(nextRows)
       setSelectedRow((current) =>
         current?.id
-          ? nextRows.find((item) => item.id === current.id) || current
+          ? nextRows.find((item) => item.id === current.id) ||
+            nextRows[0] ||
+            null
           : null
       )
       setTotal(Number(data?.total || 0))

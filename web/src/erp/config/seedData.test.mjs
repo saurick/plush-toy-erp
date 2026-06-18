@@ -8,6 +8,7 @@ import {
   roleWorkbenches,
 } from './seedData.mjs'
 import { appDefinitions } from './appRegistry.mjs'
+import { yoyoosunMenuConfig } from '../../../../config/customers/yoyoosun/menuConfig.mjs'
 
 test('seedData: 每个岗位任务端入口都有运行时角色标签', () => {
   const mobileApps = appDefinitions.filter((app) => app.kind === 'mobile')
@@ -163,4 +164,14 @@ test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序
   assert.equal(navigationSections[0].items[0].label, '客户订单')
   assert.equal(navigationSections[0].items[0].shortLabel, '订单')
   assert(!navigationSections[0].items.some((item) => item.key === 'suppliers'))
+})
+
+test('customerMenuConfig: yoyoosun 保留任务看板和异常闭环入口', () => {
+  const navigationSections = getNavigationSections(yoyoosunMenuConfig)
+  const navPaths = navigationSections.flatMap((section) =>
+    section.items.map((item) => item.path)
+  )
+
+  assert(navPaths.includes('/erp/task-board'))
+  assert(navPaths.includes('/erp/operations/exceptions'))
 })

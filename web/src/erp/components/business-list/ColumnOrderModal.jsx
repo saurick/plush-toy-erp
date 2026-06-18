@@ -64,6 +64,11 @@ export function ColumnOrderHeaderMenu({
       <Dropdown
         trigger={['click']}
         destroyOnHidden
+        getPopupContainer={(triggerNode) =>
+          triggerNode.closest('.erp-business-data-table-card') ||
+          triggerNode.parentElement ||
+          document.body
+        }
         menu={{
           items: [
             {

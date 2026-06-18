@@ -14,11 +14,37 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 	if dataset.Prefix != CoreDemoSeedPrefix {
 		t.Fatalf("unexpected prefix %q", dataset.Prefix)
 	}
-	if len(dataset.Units) < 3 || len(dataset.Materials) < 3 || len(dataset.Products) < 2 || len(dataset.Warehouses) < 3 || len(dataset.Processes) < 6 || len(dataset.BOMs) == 0 {
+	if len(dataset.Units) < 3 || len(dataset.Materials) < 3 || len(dataset.Products) < 2 || len(dataset.Warehouses) < 3 || len(dataset.Processes) < 9 || len(dataset.BOMs) == 0 {
 		t.Fatalf("default core demo dataset is too small: %#v", dataset)
 	}
 	if err := validateCoreDemoSeedDataset(dataset); err != nil {
 		t.Fatalf("validateCoreDemoSeedDataset() error = %v", err)
+	}
+	requiredProcesses := map[string]struct {
+		outsourcing bool
+		inhouse     bool
+		quality     bool
+	}{
+		"查货": {outsourcing: true, inhouse: true, quality: true},
+		"手工": {outsourcing: true, inhouse: true},
+		"车缝": {outsourcing: true, inhouse: true},
+		"包装": {outsourcing: true, inhouse: true},
+	}
+	for _, process := range dataset.Processes {
+		expected, ok := requiredProcesses[process.Name]
+		if !ok {
+			continue
+		}
+		if process.Category != process.Name ||
+			process.OutsourcingEnabled != expected.outsourcing ||
+			process.InhouseEnabled != expected.inhouse ||
+			process.QualityRequired != expected.quality {
+			t.Fatalf("unexpected default plush process %q: %#v", process.Name, process)
+		}
+		delete(requiredProcesses, process.Name)
+	}
+	if len(requiredProcesses) > 0 {
+		t.Fatalf("missing default plush processes: %#v", requiredProcesses)
 	}
 	for _, product := range dataset.Products {
 		if !regexp.MustCompile(`^SIM-`).MatchString(product.Code) {

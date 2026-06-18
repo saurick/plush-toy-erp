@@ -73,13 +73,13 @@ http://localhost:5175/m/quality/tasks
 
 桌面后台、统一登录页和岗位任务端支持「跟系统 / 浅色 / 暗色」三种主题模式，默认跟随系统偏好。用户手动选择会写入浏览器 `localStorage` 的 `plush_erp_theme_mode`，刷新后保持；`跟系统` 只决定视觉主题，不影响入口选择、权限判断或最终路由。
 
-当前登录态 token 仍保存在浏览器侧认证存储中，属于 XSS 风险面；不得把 token 写入 trace、日志、文档、截图或 QA 报告。生产侧已补基础 HTTP 安全响应头降低误嵌入、MIME sniff 和宽泛 referrer 风险，但这不等同于 HttpOnly Cookie 方案。后续若要进一步收紧，应单独评审 HttpOnly SameSite Cookie、CSRF 边界、登录态刷新和前端 API client 改造。
+当前登录态 token 仍保存在浏览器侧认证存储中，并通过 `Authorization: Bearer` 发送，主要风险面是 XSS 后的 token 读取或泄露；不得把 token 写入 trace、日志、文档、截图或 QA 报告。生产侧已补基础 HTTP 安全响应头降低误嵌入、MIME sniff 和宽泛 referrer 风险，但这不等同于 HttpOnly Cookie 方案。当前内部系统不把 CSRF 作为近期安全待办；只有后续明确迁到浏览器自动携带的 Cookie 登录态时，才需要把 SameSite / CSRF、登录态刷新和前端 API client 改造放到同一轮专项评审。
 
 主题主路径：
 
 - 运行时状态由 `src/common/theme/erpTheme.jsx` 和 `src/common/theme/erpThemeMode.mjs` 维护。
 - Ant Design 组件通过根 `ConfigProvider` 在 `defaultAlgorithm / darkAlgorithm` 间切换。
-- 项目自定义壳层、岗位任务卡片和局部硬编码样式通过 `data-erp-theme` 与 `src/erp/styles/app.css` 的 ERP theme 变量覆盖。
+- 项目自定义壳层、岗位任务卡片和局部硬编码样式通过 `data-erp-theme` 与 `src/erp/styles/app.css` 入口及 `src/erp/styles/app/` 分区文件中的 ERP theme 变量覆盖。
 - 新增状态类组件时必须同步覆盖暗色主题，包括 loading / empty / alert / message / notification / tooltip / popover / tag / badge / progress / pagination / drawer / table placeholder；优先复用全局 token 和 L1 断言，避免组件只在浅色模式可读。
 - 打印、PDF、采购合同 / 加工合同纸面预览默认固定浅色，不跟随暗色主题，避免污染导出物。
 
@@ -254,7 +254,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台继续只保留一个入口
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code
-- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、出库管理和财务业务已分别接入正式 V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、草稿、加行、确认出货和已出货取消冲正，`SHIPPED` 才是真实出货事实。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。当前仍为 `formal-shell` 的页面只剩生产排程、生产异常和出货放行；它们只作为待接入预览页复用业务页标准骨架展示字段范围、筛选、列顺序、导出待接入提示、接入边界和底部协同入口，不读取或写入旧 `business_records`，也不提供真实创建、状态变更、删除、回收站或业务数据导出主路径。旧通用业务页、旧业务模块路由和旧入口退出页已删除。
+- 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、出库管理和财务业务已分别接入正式 V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、草稿、加行、确认出货和已出货取消冲正，`SHIPPED` 才是真实出货事实。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。当前仍为 `formal-shell` 的页面只剩生产排程、生产异常和出货放行；生产排程和生产异常只作为待接入预览页复用业务页标准骨架展示字段范围、筛选、列顺序、导出待接入提示、接入边界和底部协同入口；出货放行保留同样字段预览壳，并读取 / 处理 `source_type=shipping-release` 的 Workflow `shipment_release` 协同任务。三者不读取或写入旧 `business_records`，也不提供真实创建、删除、回收站、业务数据导出或领域事实写入主路径；出货放行任务完成仍不等于 `SHIPPED`。旧通用业务页、旧业务模块路由和旧入口退出页已删除。
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端生产环境统一走 `5175` 的 `/m/<role>/tasks`；按角色拆端口只作为本地开发调试入口保留，两者不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
@@ -271,7 +271,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 ## 桌面业务弹窗约定
 
 - 项目弹窗默认上下左右居中：JSX 版 `antd Modal` 由根 `ConfigProvider` 统一启用 `centered`，命令式 `modal.confirm/info/success/warning/error` 由 `AntdAppBridge` 的消费层统一补齐居中配置，自研 `AppModal` 保持固定遮罩内 flex 居中。
-- 业务记录的新建 / 编辑优先使用业务表单弹窗；详情抽屉只用于显式只读核对。仍为 `formal-shell` 的待接入预览页只允许预览字段和接入边界，来源、流转、打印、删除等未接入真实 usecase 的动作必须用提示弹窗表达边界，不能写成真实业务动作。
+- 业务记录的新建 / 编辑优先使用业务表单弹窗；详情抽屉只用于显式只读核对。仍为 `formal-shell` 的待接入预览页只允许预览字段和接入边界，来源、打印、删除等未接入真实 usecase 的动作必须用提示弹窗表达边界，不能写成真实业务动作；出货放行例外只允许处理现有 Workflow `shipment_release` 协同任务，不写 shipment、库存、财务或发票事实。
 - 桌面端业务录入弹窗默认按紧凑自适应栅格排布：文本字段在可用宽度内多列展示，数量类短字段进一步收口，备注、边界说明和明细区保留整行。
 - V1 主数据和销售订单表单弹窗宽度基线为 `min(960px, calc(100vw - 96px))`；formal-shell 待接入预览表单弹窗宽度基线为 `min(1120px, calc(100vw - 96px))`。
 - 明细条目按共享列宽预算展示，长文本字段保留较宽输入，数量 / 单价 / 金额等短数字字段收窄；数量后缀读取当前行已填单位，金额类字段默认显示 `CNY` 后缀，但不把空单位强行保存成 `pcs`。

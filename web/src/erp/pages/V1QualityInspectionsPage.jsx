@@ -22,6 +22,7 @@ import {
   Space,
   Tag,
   Tooltip,
+  Typography,
 } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -87,6 +88,7 @@ import {
 const QUALITY_INSPECTIONS_MODULE_KEY = 'quality-inspections'
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const EMPTY_ADMIN_PROFILE = Object.freeze({})
+const { Text } = Typography
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -273,6 +275,26 @@ function findByPositiveID(id, records = []) {
   )
 }
 
+function renderStackCell(primary, secondaryItems = []) {
+  const secondary = secondaryItems
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+  return (
+    <Space direction="vertical" size={0}>
+      <span>{primary || '-'}</span>
+      {secondary.map((item) => (
+        <Text type="secondary" key={item}>
+          {item}
+        </Text>
+      ))}
+    </Space>
+  )
+}
+
+function inspectorLabel(inspectorID) {
+  return inspectorID ? `管理员 #${inspectorID}` : '-'
+}
+
 export default function V1QualityInspectionsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
@@ -412,7 +434,9 @@ export default function V1QualityInspectionsPage() {
       setRows(nextRows)
       setSelectedRow((current) =>
         current?.id
-          ? nextRows.find((item) => item.id === current.id) || current
+          ? nextRows.find((item) => item.id === current.id) ||
+            nextRows[0] ||
+            null
           : null
       )
       setTotal(Number(data?.total || 0))
@@ -596,9 +620,11 @@ export default function V1QualityInspectionsPage() {
   }, [closeModal, decisionForm, inspectionModal, loadRows])
 
   const selectedRowLabel = selectedRow
-    ? `${selectedRow.inspection_no || selectedRow.id} / 批次 ${
-        selectedRow.inventory_lot_id || '-'
-      }`
+    ? `${selectedRow.inspection_no || selectedRow.id} / ${referenceLabel(
+        inventoryLotOptions,
+        selectedRow.inventory_lot_id,
+        '批次'
+      )}`
     : '请先选择一张来料质检单'
 
   const modalTitle = {
@@ -623,7 +649,7 @@ export default function V1QualityInspectionsPage() {
     cancel: '确认取消',
   }[inspectionModal?.mode || 'create']
 
-  const dataColumns = useMemo(
+  const exportColumns = useMemo(
     () => [
       {
         title: '质检单号',
@@ -731,9 +757,8 @@ export default function V1QualityInspectionsPage() {
         dataIndex: 'inspector_id',
         width: 100,
         sortType: 'number',
-        render: (value) => (value ? `管理员 #${value}` : '-'),
-        exportValue: (record) =>
-          record?.inspector_id ? `管理员 #${record.inspector_id}` : '-',
+        render: inspectorLabel,
+        exportValue: (record) => inspectorLabel(record?.inspector_id),
       },
       {
         title: '创建时间',
@@ -757,6 +782,148 @@ export default function V1QualityInspectionsPage() {
         title: '判定备注',
         exportTitle: '判定备注',
         dataIndex: 'decision_note',
+        ellipsis: true,
+      },
+    ],
+    [
+      allPurchaseReceiptItemOptions,
+      inventoryLotOptions,
+      materialOptions,
+      purchaseReceiptOptions,
+      warehouseOptions,
+    ]
+  )
+
+  const dataColumns = useMemo(
+    () => [
+      {
+        title: '质检单号',
+        exportTitle: '质检单号',
+        dataIndex: 'inspection_no',
+        width: 170,
+      },
+      {
+        title: '状态',
+        exportTitle: '状态',
+        dataIndex: 'status',
+        width: 110,
+        exportValue: (record) =>
+          STATUS_LABELS[record?.status] || record?.status,
+        render: statusTag,
+      },
+      {
+        title: '判定',
+        exportTitle: '判定',
+        dataIndex: 'result',
+        width: 120,
+        exportValue: (record) =>
+          RESULT_LABELS[record?.result] || record?.result,
+        render: resultTag,
+      },
+      {
+        title: '采购来源',
+        exportTitle: '采购来源',
+        dataIndex: 'purchase_receipt_id',
+        width: 210,
+        sortType: 'number',
+        render: (_value, record) =>
+          renderStackCell(
+            referenceLabel(
+              purchaseReceiptOptions,
+              record?.purchase_receipt_id,
+              '入库单'
+            ),
+            [
+              referenceLabel(
+                allPurchaseReceiptItemOptions,
+                record?.purchase_receipt_item_id,
+                '入库行'
+              ),
+            ]
+          ),
+        exportValue: (record) =>
+          [
+            referenceLabel(
+              purchaseReceiptOptions,
+              record?.purchase_receipt_id,
+              '入库单'
+            ),
+            referenceLabel(
+              allPurchaseReceiptItemOptions,
+              record?.purchase_receipt_item_id,
+              '入库行'
+            ),
+          ].join(' / '),
+      },
+      {
+        title: '物料批次',
+        exportTitle: '物料批次',
+        dataIndex: 'inventory_lot_id',
+        width: 260,
+        sortType: 'number',
+        render: (_value, record) =>
+          renderStackCell(
+            referenceLabel(materialOptions, record?.material_id, '材料'),
+            [
+              referenceLabel(
+                inventoryLotOptions,
+                record?.inventory_lot_id,
+                '批次'
+              ),
+              referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
+              record?.original_lot_status
+                ? `原批次状态 ${record.original_lot_status}`
+                : '',
+            ]
+          ),
+        exportValue: (record) =>
+          [
+            referenceLabel(materialOptions, record?.material_id, '材料'),
+            referenceLabel(
+              inventoryLotOptions,
+              record?.inventory_lot_id,
+              '批次'
+            ),
+            referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
+            record?.original_lot_status
+              ? `原批次状态 ${record.original_lot_status}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' / '),
+      },
+      {
+        title: '检验信息',
+        exportTitle: '检验信息',
+        dataIndex: 'inspected_at',
+        width: 180,
+        sortType: 'date',
+        render: (_value, record) =>
+          renderStackCell(formatUnixDate(record?.inspected_at), [
+            record?.inspector_id ? inspectorLabel(record.inspector_id) : '',
+          ]),
+        exportValue: (record) =>
+          [
+            formatUnixDate(record?.inspected_at),
+            inspectorLabel(record?.inspector_id),
+          ]
+            .filter(Boolean)
+            .join(' / '),
+      },
+      {
+        title: '更新时间',
+        exportTitle: '更新时间',
+        dataIndex: 'updated_at',
+        width: 170,
+        sortType: 'date',
+        render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.updated_at),
+      },
+      {
+        title: '判定备注',
+        exportTitle: '判定备注',
+        dataIndex: 'decision_note',
+        width: 220,
         ellipsis: true,
       },
     ],
@@ -820,10 +987,10 @@ export default function V1QualityInspectionsPage() {
     if (rows.length === 0) return
     downloadCSV({
       filename: `quality-inspections-${new Date().toISOString().slice(0, 10)}.csv`,
-      columns: visibleDataColumns,
+      columns: exportColumns,
       rows,
     })
-  }, [rows, visibleDataColumns])
+  }, [exportColumns, rows])
 
   return (
     <BusinessPageLayout className="erp-v1-quality-inspections-page">
