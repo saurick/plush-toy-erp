@@ -214,7 +214,7 @@ export function PurchaseOrderFormFields({
         name="note"
         label="备注"
       >
-        <Input maxLength={255} />
+        <Input.TextArea allowClear rows={2} showCount maxLength={255} />
       </Form.Item>
 
       <section className="erp-sales-order-lines-form">
@@ -365,8 +365,17 @@ export function PurchaseOrderFormFields({
                       >
                         <DateInput />
                       </Form.Item>
-                      <Form.Item name={[field.name, 'note']} label="备注">
-                        <Input maxLength={255} />
+                      <Form.Item
+                        className="erp-sales-order-lines-form__field--full"
+                        name={[field.name, 'note']}
+                        label="备注"
+                      >
+                        <Input.TextArea
+                          allowClear
+                          rows={2}
+                          showCount
+                          maxLength={255}
+                        />
                       </Form.Item>
                     </div>
                   </div>

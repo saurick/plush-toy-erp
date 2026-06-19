@@ -38,14 +38,27 @@ const (
 	StockReservationStatusConsumed  = "CONSUMED"
 	StockReservationStatusCancelled = "CANCELLED"
 
-	FinanceFactReceivable       = "RECEIVABLE"
-	FinanceFactPayable          = "PAYABLE"
-	FinanceFactInvoice          = "INVOICE"
-	FinanceFactPayment          = "PAYMENT"
-	FinanceFactReconciliation   = "RECONCILIATION"
-	FinanceCounterpartyCustomer = "CUSTOMER"
-	FinanceCounterpartySupplier = "SUPPLIER"
-	FinanceCounterpartyOther    = "OTHER"
+	FinanceFactReceivable               = "RECEIVABLE"
+	FinanceFactPayable                  = "PAYABLE"
+	FinanceFactInvoice                  = "INVOICE"
+	FinanceFactPayment                  = "PAYMENT"
+	FinanceFactReconciliation           = "RECONCILIATION"
+	FinanceCounterpartyCustomer         = "CUSTOMER"
+	FinanceCounterpartySupplier         = "SUPPLIER"
+	FinanceCounterpartyOther            = "OTHER"
+	FinanceCurrencyUSD                  = "USD"
+	FinanceCurrencyCNY                  = "CNY"
+	FinanceCurrencyHKD                  = "HKD"
+	FinanceCollectionAdvanceReceipt     = "ADVANCE_RECEIPT"
+	FinanceCollectionAccountsReceivable = "ACCOUNTS_RECEIVABLE"
+	FinancePaymentTermCashOnShipment    = "CASH_ON_SHIPMENT"
+	FinancePaymentTermEOM30             = "EOM_30"
+	FinancePaymentTermEOM45             = "EOM_45"
+	FinanceInvoiceCategoryNone          = "NONE"
+	FinanceInvoiceCategoryExportGeneral = "EXPORT_GENERAL"
+	FinanceInvoiceCategoryVATGeneral1   = "VAT_GENERAL_1"
+	FinanceInvoiceCategoryVATSpecial3   = "VAT_SPECIAL_3"
+	FinanceInvoiceCategoryVATSpecial13  = "VAT_SPECIAL_13"
 )
 
 var (
@@ -162,7 +175,12 @@ type FinanceFact struct {
 	CounterpartyType string
 	CounterpartyID   *int
 	Amount           decimal.Decimal
+	FeeAmount        decimal.Decimal
 	Currency         string
+	CollectionType   *string
+	PaymentTerm      *string
+	PaymentTermDays  *int
+	InvoiceCategory  *string
 	SourceType       *string
 	SourceID         *int
 	SourceLineID     *int
@@ -241,7 +259,12 @@ type FinanceFactCreate struct {
 	CounterpartyType string
 	CounterpartyID   *int
 	Amount           decimal.Decimal
+	FeeAmount        decimal.Decimal
 	Currency         string
+	CollectionType   *string
+	PaymentTerm      *string
+	PaymentTermDays  *int
+	InvoiceCategory  *string
 	SourceType       *string
 	SourceID         *int
 	SourceLineID     *int
@@ -506,6 +529,31 @@ var financeCounterpartyTypes = map[string]struct{}{
 	FinanceCounterpartyOther:    {},
 }
 
+var financeCurrencies = map[string]struct{}{
+	FinanceCurrencyUSD: {},
+	FinanceCurrencyCNY: {},
+	FinanceCurrencyHKD: {},
+}
+
+var financeCollectionTypes = map[string]struct{}{
+	FinanceCollectionAdvanceReceipt:     {},
+	FinanceCollectionAccountsReceivable: {},
+}
+
+var financePaymentTerms = map[string]int{
+	FinancePaymentTermCashOnShipment: 0,
+	FinancePaymentTermEOM30:          30,
+	FinancePaymentTermEOM45:          45,
+}
+
+var financeInvoiceCategories = map[string]struct{}{
+	FinanceInvoiceCategoryNone:          {},
+	FinanceInvoiceCategoryExportGeneral: {},
+	FinanceInvoiceCategoryVATGeneral1:   {},
+	FinanceInvoiceCategoryVATSpecial3:   {},
+	FinanceInvoiceCategoryVATSpecial13:  {},
+}
+
 func normalizeOperationalFactMutation(in *OperationalFactMutation, allowedTypes map[string]struct{}) (*OperationalFactMutation, error) {
 	if in == nil {
 		return nil, ErrBadParam
@@ -668,6 +716,9 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	out.FactType = strings.ToUpper(strings.TrimSpace(out.FactType))
 	out.CounterpartyType = strings.ToUpper(strings.TrimSpace(out.CounterpartyType))
 	out.Currency = strings.ToUpper(strings.TrimSpace(out.Currency))
+	out.CollectionType = normalizeOptionalUpperString(out.CollectionType)
+	out.PaymentTerm = normalizeOptionalUpperString(out.PaymentTerm)
+	out.InvoiceCategory = normalizeOptionalUpperString(out.InvoiceCategory)
 	out.SourceType = normalizeOptionalUpperString(out.SourceType)
 	out.Note = normalizeOptionalString(out.Note)
 	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
@@ -687,6 +738,31 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 	if out.Currency == "" {
 		out.Currency = "CNY"
 	}
+	if _, ok := financeCurrencies[out.Currency]; !ok {
+		return nil, ErrBadParam
+	}
+	if out.CollectionType != nil {
+		if _, ok := financeCollectionTypes[*out.CollectionType]; !ok {
+			return nil, ErrBadParam
+		}
+	}
+	if out.PaymentTerm != nil {
+		defaultDays, ok := financePaymentTerms[*out.PaymentTerm]
+		if !ok {
+			return nil, ErrBadParam
+		}
+		if out.PaymentTermDays == nil {
+			out.PaymentTermDays = &defaultDays
+		}
+	}
+	if out.PaymentTermDays != nil && *out.PaymentTermDays < 0 {
+		return nil, ErrBadParam
+	}
+	if out.InvoiceCategory != nil {
+		if _, ok := financeInvoiceCategories[*out.InvoiceCategory]; !ok {
+			return nil, ErrBadParam
+		}
+	}
 	if _, ok := financeFactTypes[out.FactType]; !ok {
 		return nil, ErrBadParam
 	}
@@ -697,6 +773,9 @@ func normalizeFinanceFactCreate(in *FinanceFactCreate) (*FinanceFactCreate, erro
 		return nil, ErrBadParam
 	}
 	if _, err := value.NewPositiveMoney(out.Amount); err != nil {
+		return nil, ErrBadParam
+	}
+	if _, err := value.NewNonNegativeMoney(out.FeeAmount); err != nil {
 		return nil, ErrBadParam
 	}
 	if out.OccurredAt.IsZero() {

@@ -206,6 +206,11 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 		FactType:         FinanceFactReceivable,
 		CounterpartyType: FinanceCounterpartyCustomer,
 		Amount:           decimal.NewFromInt(100),
+		FeeAmount:        decimal.NewFromFloat(1.5),
+		Currency:         " hkd ",
+		CollectionType:   ptrString(" accounts_receivable "),
+		PaymentTerm:      ptrString(" eom_45 "),
+		InvoiceCategory:  ptrString(" vat_special_13 "),
 		IdempotencyKey:   "  FINANCE:1:create  ",
 		OccurredAt:       time.Now(),
 	}
@@ -216,8 +221,47 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 	if normalizedFinance.IdempotencyKey != "FINANCE:1:create" {
 		t.Fatalf("expected finance idempotency key trimmed, got %q", normalizedFinance.IdempotencyKey)
 	}
+	if normalizedFinance.Currency != FinanceCurrencyHKD {
+		t.Fatalf("expected finance currency normalized to HKD, got %q", normalizedFinance.Currency)
+	}
+	if normalizedFinance.CollectionType == nil || *normalizedFinance.CollectionType != FinanceCollectionAccountsReceivable {
+		t.Fatalf("expected collection type normalized, got %#v", normalizedFinance.CollectionType)
+	}
+	if normalizedFinance.PaymentTerm == nil || *normalizedFinance.PaymentTerm != FinancePaymentTermEOM45 {
+		t.Fatalf("expected payment term normalized, got %#v", normalizedFinance.PaymentTerm)
+	}
+	if normalizedFinance.PaymentTermDays == nil || *normalizedFinance.PaymentTermDays != 45 {
+		t.Fatalf("expected payment term days auto-filled to 45, got %#v", normalizedFinance.PaymentTermDays)
+	}
+	if normalizedFinance.InvoiceCategory == nil || *normalizedFinance.InvoiceCategory != FinanceInvoiceCategoryVATSpecial13 {
+		t.Fatalf("expected invoice category normalized, got %#v", normalizedFinance.InvoiceCategory)
+	}
 	finance.Amount = decimal.Zero
 	if _, err := normalizeFinanceFactCreate(finance); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected zero finance amount rejected, got %v", err)
+	}
+	finance.Amount = decimal.NewFromInt(100)
+	finance.FeeAmount = decimal.NewFromInt(-1)
+	if _, err := normalizeFinanceFactCreate(finance); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected negative finance fee rejected, got %v", err)
+	}
+	finance.FeeAmount = decimal.Zero
+	finance.Currency = "EUR"
+	if _, err := normalizeFinanceFactCreate(finance); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected unsupported finance currency rejected, got %v", err)
+	}
+	finance.Currency = FinanceCurrencyCNY
+	finance.PaymentTerm = ptrString(FinancePaymentTermCashOnShipment)
+	finance.PaymentTermDays = nil
+	normalizedFinance, err = normalizeFinanceFactCreate(finance)
+	if err != nil {
+		t.Fatalf("normalize cash-on-shipment finance fact error = %v", err)
+	}
+	if normalizedFinance.PaymentTermDays == nil || *normalizedFinance.PaymentTermDays != 0 {
+		t.Fatalf("expected cash-on-shipment days 0, got %#v", normalizedFinance.PaymentTermDays)
+	}
+	finance.PaymentTerm = ptrString("NET_90")
+	if _, err := normalizeFinanceFactCreate(finance); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected unsupported finance payment term rejected, got %v", err)
 	}
 }

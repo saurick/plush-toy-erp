@@ -30,8 +30,18 @@ type FinanceFact struct {
 	CounterpartyID *int `json:"counterparty_id,omitempty"`
 	// Amount holds the value of the "amount" field.
 	Amount decimal.Decimal `json:"amount,omitempty"`
+	// FeeAmount holds the value of the "fee_amount" field.
+	FeeAmount decimal.Decimal `json:"fee_amount,omitempty"`
 	// Currency holds the value of the "currency" field.
 	Currency string `json:"currency,omitempty"`
+	// CollectionType holds the value of the "collection_type" field.
+	CollectionType *string `json:"collection_type,omitempty"`
+	// PaymentTerm holds the value of the "payment_term" field.
+	PaymentTerm *string `json:"payment_term,omitempty"`
+	// PaymentTermDays holds the value of the "payment_term_days" field.
+	PaymentTermDays *int `json:"payment_term_days,omitempty"`
+	// InvoiceCategory holds the value of the "invoice_category" field.
+	InvoiceCategory *string `json:"invoice_category,omitempty"`
 	// SourceType holds the value of the "source_type" field.
 	SourceType *string `json:"source_type,omitempty"`
 	// SourceID holds the value of the "source_id" field.
@@ -60,11 +70,11 @@ func (*FinanceFact) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case financefact.FieldAmount:
+		case financefact.FieldAmount, financefact.FieldFeeAmount:
 			values[i] = new(decimal.Decimal)
-		case financefact.FieldID, financefact.FieldCounterpartyID, financefact.FieldSourceID, financefact.FieldSourceLineID:
+		case financefact.FieldID, financefact.FieldCounterpartyID, financefact.FieldPaymentTermDays, financefact.FieldSourceID, financefact.FieldSourceLineID:
 			values[i] = new(sql.NullInt64)
-		case financefact.FieldFactNo, financefact.FieldFactType, financefact.FieldStatus, financefact.FieldCounterpartyType, financefact.FieldCurrency, financefact.FieldSourceType, financefact.FieldIdempotencyKey, financefact.FieldNote:
+		case financefact.FieldFactNo, financefact.FieldFactType, financefact.FieldStatus, financefact.FieldCounterpartyType, financefact.FieldCurrency, financefact.FieldCollectionType, financefact.FieldPaymentTerm, financefact.FieldInvoiceCategory, financefact.FieldSourceType, financefact.FieldIdempotencyKey, financefact.FieldNote:
 			values[i] = new(sql.NullString)
 		case financefact.FieldOccurredAt, financefact.FieldPostedAt, financefact.FieldSettledAt, financefact.FieldCreatedAt, financefact.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -126,11 +136,45 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				_m.Amount = *value
 			}
+		case financefact.FieldFeeAmount:
+			if value, ok := values[i].(*decimal.Decimal); !ok {
+				return fmt.Errorf("unexpected type %T for field fee_amount", values[i])
+			} else if value != nil {
+				_m.FeeAmount = *value
+			}
 		case financefact.FieldCurrency:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field currency", values[i])
 			} else if value.Valid {
 				_m.Currency = value.String
+			}
+		case financefact.FieldCollectionType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field collection_type", values[i])
+			} else if value.Valid {
+				_m.CollectionType = new(string)
+				*_m.CollectionType = value.String
+			}
+		case financefact.FieldPaymentTerm:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_term", values[i])
+			} else if value.Valid {
+				_m.PaymentTerm = new(string)
+				*_m.PaymentTerm = value.String
+			}
+		case financefact.FieldPaymentTermDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_term_days", values[i])
+			} else if value.Valid {
+				_m.PaymentTermDays = new(int)
+				*_m.PaymentTermDays = int(value.Int64)
+			}
+		case financefact.FieldInvoiceCategory:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field invoice_category", values[i])
+			} else if value.Valid {
+				_m.InvoiceCategory = new(string)
+				*_m.InvoiceCategory = value.String
 			}
 		case financefact.FieldSourceType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -254,8 +298,31 @@ func (_m *FinanceFact) String() string {
 	builder.WriteString("amount=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Amount))
 	builder.WriteString(", ")
+	builder.WriteString("fee_amount=")
+	builder.WriteString(fmt.Sprintf("%v", _m.FeeAmount))
+	builder.WriteString(", ")
 	builder.WriteString("currency=")
 	builder.WriteString(_m.Currency)
+	builder.WriteString(", ")
+	if v := _m.CollectionType; v != nil {
+		builder.WriteString("collection_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.PaymentTerm; v != nil {
+		builder.WriteString("payment_term=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.PaymentTermDays; v != nil {
+		builder.WriteString("payment_term_days=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.InvoiceCategory; v != nil {
+		builder.WriteString("invoice_category=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	if v := _m.SourceType; v != nil {
 		builder.WriteString("source_type=")

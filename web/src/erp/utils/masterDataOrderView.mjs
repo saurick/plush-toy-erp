@@ -40,6 +40,12 @@ export const SALES_ORDER_ITEM_STATUS_LABELS = Object.freeze({
   canceled: '已取消',
 })
 
+export const DEFAULT_PAYMENT_CONDITIONS = Object.freeze([
+  Object.freeze({ method: '现结', termDays: 0 }),
+  Object.freeze({ method: '30天月结', termDays: 30 }),
+  Object.freeze({ method: '60天月结', termDays: 60 }),
+])
+
 export const PURCHASE_ORDER_STATUS_LABELS = Object.freeze({
   draft: '草稿',
   submitted: '已提交',
@@ -158,6 +164,17 @@ export function hasActionPermission(admin = {}, permissionKey = '') {
 export function trimOptional(value) {
   const text = String(value ?? '').trim()
   return text || undefined
+}
+
+export function normalizeOptionalNonNegativeInteger(value) {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return undefined
+  }
+  return Math.trunc(numeric)
 }
 
 export function deriveSalesOrderItemAmount(values = {}) {
@@ -315,6 +332,89 @@ export function buildTextSelectOptions(records = [], fieldName = '') {
     .map((value) => ({ value, label: value }))
 }
 
+export function buildPaymentConditionOptions(
+  records = [],
+  {
+    methodField = 'default_payment_method',
+    termDaysField = 'default_payment_term_days',
+  } = {}
+) {
+  const byMethod = new Map()
+  const addOption = (method, termDays) => {
+    const value = trimOptional(method)
+    if (!value || byMethod.has(value)) {
+      return
+    }
+    const normalizedDays = normalizeOptionalNonNegativeInteger(termDays)
+    byMethod.set(value, {
+      value,
+      label:
+        normalizedDays === undefined ? value : `${value} / ${normalizedDays}天`,
+      payment_term_days: normalizedDays,
+    })
+  }
+
+  DEFAULT_PAYMENT_CONDITIONS.forEach((condition) =>
+    addOption(condition.method, condition.termDays)
+  )
+  ;(Array.isArray(records) ? records : []).forEach((record) =>
+    addOption(record?.[methodField], record?.[termDaysField])
+  )
+  return [...byMethod.values()]
+}
+
+export function mergePaymentConditionOptions(...optionGroups) {
+  const byMethod = new Map()
+  optionGroups.flat().forEach((option) => {
+    const value = trimOptional(option?.value)
+    if (!value || byMethod.has(value)) {
+      return
+    }
+    const normalizedDays = normalizeOptionalNonNegativeInteger(
+      option?.payment_term_days
+    )
+    byMethod.set(value, {
+      ...option,
+      value,
+      label:
+        option?.label ||
+        (normalizedDays === undefined
+          ? value
+          : `${value} / ${normalizedDays}天`),
+      payment_term_days: normalizedDays,
+    })
+  })
+  return [...byMethod.values()]
+}
+
+export function resolvePaymentTermDays(method, options = []) {
+  const value = trimOptional(method)
+  if (!value) {
+    return undefined
+  }
+  const matched = (Array.isArray(options) ? options : []).find(
+    (option) => trimOptional(option?.value) === value
+  )
+  return normalizeOptionalNonNegativeInteger(matched?.payment_term_days)
+}
+
+export function formatPaymentCondition(record = {}) {
+  const method = trimOptional(record?.payment_method)
+  const termDays = normalizeOptionalNonNegativeInteger(
+    record?.payment_term_days
+  )
+  if (method && termDays !== undefined) {
+    return `${method} / ${termDays}天`
+  }
+  if (method) {
+    return method
+  }
+  if (termDays !== undefined) {
+    return `${termDays}天`
+  }
+  return '-'
+}
+
 export function inferDefaultUnitID(records = [], unitOptions = []) {
   const allowedUnitIDs = new Set(
     (Array.isArray(unitOptions) ? unitOptions : [])
@@ -412,6 +512,10 @@ export function buildMasterDataParams(values = {}, extra = {}) {
     code: trimOptional(values.code),
     name: trimOptional(values.name),
     short_name: trimOptional(values.short_name),
+    default_payment_method: trimOptional(values.default_payment_method),
+    default_payment_term_days: normalizeOptionalNonNegativeInteger(
+      values.default_payment_term_days
+    ),
     supplier_type: trimOptional(values.supplier_type),
     tax_no: trimOptional(values.tax_no),
     category: trimOptional(values.category),
@@ -498,6 +602,11 @@ export function buildSalesOrderParams(values = {}, extra = {}) {
       values.customer_snapshot && typeof values.customer_snapshot === 'object'
         ? values.customer_snapshot
         : {},
+    payment_method: trimOptional(values.payment_method),
+    payment_term_days: normalizeOptionalNonNegativeInteger(
+      values.payment_term_days
+    ),
+    price_condition_note: trimOptional(values.price_condition_note),
     order_date: trimOptional(values.order_date),
     planned_delivery_date: trimOptional(values.planned_delivery_date),
     note: trimOptional(values.note),

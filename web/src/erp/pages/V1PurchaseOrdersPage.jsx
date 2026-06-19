@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  DeleteOutlined,
   DownOutlined,
   DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
-  InboxOutlined,
   ImportOutlined,
   LinkOutlined,
   PlusOutlined,
@@ -1053,20 +1051,6 @@ export default function V1PurchaseOrdersPage() {
             >
               列顺序
             </ToolbarButton>
-            <Tooltip title="采购订单当前没有物理删除或回收站 API；如需退出使用，请走取消或关闭状态。">
-              <span>
-                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
-                  批量删除
-                </ToolbarButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="当前 purchase_order JSON-RPC 没有回收站主路径，列表不做前端假恢复。">
-              <span>
-                <ToolbarButton icon={<InboxOutlined />} disabled>
-                  回收站
-                </ToolbarButton>
-              </span>
-            </Tooltip>
           </Space>
         }
         primaryAction={

@@ -17,7 +17,6 @@ export function createStyleL1Scenarios(deps) {
     assertBusinessMainTableSortableColumns,
     assertBusinessModuleToolbarControlStyle,
     assertBusinessPageRefreshEntrypoint,
-    assertBusinessToolbarDisabledButtons,
     assertContractTableEditableAlignment,
     assertContractTableHeadersStaySingleLine,
     assertContractTotalCellsWrapLargeNumbers,
@@ -475,13 +474,17 @@ export function createStyleL1Scenarios(deps) {
           .locator('.erp-task-board-card')
           .filter({ hasText: '看板跳转测试任务' })
           .first()
-        assert.equal(
-          await navigationLaneTask
-            .getByRole('button', { name: '看板跳转测试任务', exact: true })
-            .count(),
-          0,
-          '无明确正式对象页时任务标题不应伪造成关联记录按钮'
+        await navigationLaneTask
+          .getByRole('button', { name: '看板跳转测试任务', exact: true })
+          .click()
+        await waitForPath(page, '/erp/warehouse/shipping-release')
+        assert.match(
+          page.url(),
+          /[?&]link_keyword=OUT-DASH-NAV(?:&|$)/,
+          `任务看板出货放行入口应带来源单号: ${page.url()}`
         )
+        await expectHeading(page, '出货放行')
+        await expectText(page, '看板跳转测试任务')
       },
     },
     {
@@ -830,6 +833,11 @@ export function createStyleL1Scenarios(deps) {
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
+        await page
+          .locator('.ant-table-row')
+          .filter({ hasText: '暗色客户' })
+          .first()
+          .click()
         await assertBusinessCollaborationPanelCollapsedByDefault(page, {
           scenarioName: 'business-module-dark-customers-desktop',
           expectCurrentRecord: true,
@@ -3246,6 +3254,7 @@ export function createStyleL1Scenarios(deps) {
       openPurchaseReceiptAddItemModal,
       openPurchaseReceiptCreateModal,
       selectPurchaseReceiptRow,
+      verifyBusinessModuleColumnOrderDialog,
     }),
     {
       name: 'material-master-header-desktop',
@@ -3419,6 +3428,11 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
         await expectText(page, '本页协同')
+        await page
+          .locator('.ant-table-row')
+          .filter({ hasText: '样式供应商' })
+          .first()
+          .click()
         await assertBusinessCollaborationPanelCollapsedByDefault(page, {
           scenarioName: 'business-collaboration-supplier-desktop',
           expectCurrentRecord: true,
@@ -3563,6 +3577,11 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
         await expectText(page, '本页协同')
+        await page
+          .locator('.ant-table-row')
+          .filter({ hasText: '样式供应商' })
+          .first()
+          .click()
         await assertBusinessCollaborationPanelCollapsedByDefault(page, {
           scenarioName: 'business-collaboration-mobile',
           expectCurrentRecord: true,
@@ -3584,6 +3603,12 @@ export function createStyleL1Scenarios(deps) {
           screenshotName: 'textarea-show-count-supplier-form-modal',
           expectedTexts: ['备注', '联系人', '添加条目'],
           expectContactItemsLayout: true,
+          beforeMeasure: async (modal) => {
+            await modal
+              .locator('.erp-master-contact-list__field--full textarea')
+              .first()
+              .fill('123123123123123123123123123123123123123123123123')
+          },
         })
         await assertNoHorizontalOverflow(page, 'textarea-show-count-layout')
       },
@@ -3598,7 +3623,6 @@ export function createStyleL1Scenarios(deps) {
       assertBusinessMainTableInitialSelectionEmpty,
       assertBusinessMainTableSortableColumns,
       assertBusinessPageRefreshEntrypoint,
-      assertBusinessToolbarDisabledButtons,
       assertERPThemeMode,
       assertNoHorizontalOverflow,
       assertOperationalFactModalViewport,

@@ -48,6 +48,34 @@ func (_c *CustomerCreate) SetNillableShortName(v *string) *CustomerCreate {
 	return _c
 }
 
+// SetDefaultPaymentMethod sets the "default_payment_method" field.
+func (_c *CustomerCreate) SetDefaultPaymentMethod(v string) *CustomerCreate {
+	_c.mutation.SetDefaultPaymentMethod(v)
+	return _c
+}
+
+// SetNillableDefaultPaymentMethod sets the "default_payment_method" field if the given value is not nil.
+func (_c *CustomerCreate) SetNillableDefaultPaymentMethod(v *string) *CustomerCreate {
+	if v != nil {
+		_c.SetDefaultPaymentMethod(*v)
+	}
+	return _c
+}
+
+// SetDefaultPaymentTermDays sets the "default_payment_term_days" field.
+func (_c *CustomerCreate) SetDefaultPaymentTermDays(v int) *CustomerCreate {
+	_c.mutation.SetDefaultPaymentTermDays(v)
+	return _c
+}
+
+// SetNillableDefaultPaymentTermDays sets the "default_payment_term_days" field if the given value is not nil.
+func (_c *CustomerCreate) SetNillableDefaultPaymentTermDays(v *int) *CustomerCreate {
+	if v != nil {
+		_c.SetDefaultPaymentTermDays(*v)
+	}
+	return _c
+}
+
 // SetTaxNo sets the "tax_no" field.
 func (_c *CustomerCreate) SetTaxNo(v string) *CustomerCreate {
 	_c.mutation.SetTaxNo(v)
@@ -220,6 +248,16 @@ func (_c *CustomerCreate) check() error {
 			return &ValidationError{Name: "short_name", err: fmt.Errorf(`ent: validator failed for field "Customer.short_name": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DefaultPaymentMethod(); ok {
+		if err := customer.DefaultPaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_method", err: fmt.Errorf(`ent: validator failed for field "Customer.default_payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DefaultPaymentTermDays(); ok {
+		if err := customer.DefaultPaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Customer.default_payment_term_days": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.TaxNo(); ok {
 		if err := customer.TaxNoValidator(v); err != nil {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Customer.tax_no": %w`, err)}
@@ -276,6 +314,14 @@ func (_c *CustomerCreate) createSpec() (*Customer, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ShortName(); ok {
 		_spec.SetField(customer.FieldShortName, field.TypeString, value)
 		_node.ShortName = &value
+	}
+	if value, ok := _c.mutation.DefaultPaymentMethod(); ok {
+		_spec.SetField(customer.FieldDefaultPaymentMethod, field.TypeString, value)
+		_node.DefaultPaymentMethod = &value
+	}
+	if value, ok := _c.mutation.DefaultPaymentTermDays(); ok {
+		_spec.SetField(customer.FieldDefaultPaymentTermDays, field.TypeInt, value)
+		_node.DefaultPaymentTermDays = &value
 	}
 	if value, ok := _c.mutation.TaxNo(); ok {
 		_spec.SetField(customer.FieldTaxNo, field.TypeString, value)

@@ -126,6 +126,20 @@ func (_u *FinanceFactUpdate) SetNillableAmount(v *decimal.Decimal) *FinanceFactU
 	return _u
 }
 
+// SetFeeAmount sets the "fee_amount" field.
+func (_u *FinanceFactUpdate) SetFeeAmount(v decimal.Decimal) *FinanceFactUpdate {
+	_u.mutation.SetFeeAmount(v)
+	return _u
+}
+
+// SetNillableFeeAmount sets the "fee_amount" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillableFeeAmount(v *decimal.Decimal) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetFeeAmount(*v)
+	}
+	return _u
+}
+
 // SetCurrency sets the "currency" field.
 func (_u *FinanceFactUpdate) SetCurrency(v string) *FinanceFactUpdate {
 	_u.mutation.SetCurrency(v)
@@ -137,6 +151,93 @@ func (_u *FinanceFactUpdate) SetNillableCurrency(v *string) *FinanceFactUpdate {
 	if v != nil {
 		_u.SetCurrency(*v)
 	}
+	return _u
+}
+
+// SetCollectionType sets the "collection_type" field.
+func (_u *FinanceFactUpdate) SetCollectionType(v string) *FinanceFactUpdate {
+	_u.mutation.SetCollectionType(v)
+	return _u
+}
+
+// SetNillableCollectionType sets the "collection_type" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillableCollectionType(v *string) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetCollectionType(*v)
+	}
+	return _u
+}
+
+// ClearCollectionType clears the value of the "collection_type" field.
+func (_u *FinanceFactUpdate) ClearCollectionType() *FinanceFactUpdate {
+	_u.mutation.ClearCollectionType()
+	return _u
+}
+
+// SetPaymentTerm sets the "payment_term" field.
+func (_u *FinanceFactUpdate) SetPaymentTerm(v string) *FinanceFactUpdate {
+	_u.mutation.SetPaymentTerm(v)
+	return _u
+}
+
+// SetNillablePaymentTerm sets the "payment_term" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillablePaymentTerm(v *string) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetPaymentTerm(*v)
+	}
+	return _u
+}
+
+// ClearPaymentTerm clears the value of the "payment_term" field.
+func (_u *FinanceFactUpdate) ClearPaymentTerm() *FinanceFactUpdate {
+	_u.mutation.ClearPaymentTerm()
+	return _u
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_u *FinanceFactUpdate) SetPaymentTermDays(v int) *FinanceFactUpdate {
+	_u.mutation.ResetPaymentTermDays()
+	_u.mutation.SetPaymentTermDays(v)
+	return _u
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillablePaymentTermDays(v *int) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddPaymentTermDays adds value to the "payment_term_days" field.
+func (_u *FinanceFactUpdate) AddPaymentTermDays(v int) *FinanceFactUpdate {
+	_u.mutation.AddPaymentTermDays(v)
+	return _u
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (_u *FinanceFactUpdate) ClearPaymentTermDays() *FinanceFactUpdate {
+	_u.mutation.ClearPaymentTermDays()
+	return _u
+}
+
+// SetInvoiceCategory sets the "invoice_category" field.
+func (_u *FinanceFactUpdate) SetInvoiceCategory(v string) *FinanceFactUpdate {
+	_u.mutation.SetInvoiceCategory(v)
+	return _u
+}
+
+// SetNillableInvoiceCategory sets the "invoice_category" field if the given value is not nil.
+func (_u *FinanceFactUpdate) SetNillableInvoiceCategory(v *string) *FinanceFactUpdate {
+	if v != nil {
+		_u.SetInvoiceCategory(*v)
+	}
+	return _u
+}
+
+// ClearInvoiceCategory clears the value of the "invoice_category" field.
+func (_u *FinanceFactUpdate) ClearInvoiceCategory() *FinanceFactUpdate {
+	_u.mutation.ClearInvoiceCategory()
 	return _u
 }
 
@@ -387,6 +488,26 @@ func (_u *FinanceFactUpdate) check() error {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.currency": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CollectionType(); ok {
+		if err := financefact.CollectionTypeValidator(v); err != nil {
+			return &ValidationError{Name: "collection_type", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.collection_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PaymentTerm(); ok {
+		if err := financefact.PaymentTermValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.payment_term": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PaymentTermDays(); ok {
+		if err := financefact.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.payment_term_days": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.InvoiceCategory(); ok {
+		if err := financefact.InvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "invoice_category", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.invoice_category": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SourceType(); ok {
 		if err := financefact.SourceTypeValidator(v); err != nil {
 			return &ValidationError{Name: "source_type", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.source_type": %w`, err)}
@@ -451,8 +572,38 @@ func (_u *FinanceFactUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if value, ok := _u.mutation.Amount(); ok {
 		_spec.SetField(financefact.FieldAmount, field.TypeOther, value)
 	}
+	if value, ok := _u.mutation.FeeAmount(); ok {
+		_spec.SetField(financefact.FieldFeeAmount, field.TypeOther, value)
+	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(financefact.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CollectionType(); ok {
+		_spec.SetField(financefact.FieldCollectionType, field.TypeString, value)
+	}
+	if _u.mutation.CollectionTypeCleared() {
+		_spec.ClearField(financefact.FieldCollectionType, field.TypeString)
+	}
+	if value, ok := _u.mutation.PaymentTerm(); ok {
+		_spec.SetField(financefact.FieldPaymentTerm, field.TypeString, value)
+	}
+	if _u.mutation.PaymentTermCleared() {
+		_spec.ClearField(financefact.FieldPaymentTerm, field.TypeString)
+	}
+	if value, ok := _u.mutation.PaymentTermDays(); ok {
+		_spec.SetField(financefact.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPaymentTermDays(); ok {
+		_spec.AddField(financefact.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if _u.mutation.PaymentTermDaysCleared() {
+		_spec.ClearField(financefact.FieldPaymentTermDays, field.TypeInt)
+	}
+	if value, ok := _u.mutation.InvoiceCategory(); ok {
+		_spec.SetField(financefact.FieldInvoiceCategory, field.TypeString, value)
+	}
+	if _u.mutation.InvoiceCategoryCleared() {
+		_spec.ClearField(financefact.FieldInvoiceCategory, field.TypeString)
 	}
 	if value, ok := _u.mutation.SourceType(); ok {
 		_spec.SetField(financefact.FieldSourceType, field.TypeString, value)
@@ -622,6 +773,20 @@ func (_u *FinanceFactUpdateOne) SetNillableAmount(v *decimal.Decimal) *FinanceFa
 	return _u
 }
 
+// SetFeeAmount sets the "fee_amount" field.
+func (_u *FinanceFactUpdateOne) SetFeeAmount(v decimal.Decimal) *FinanceFactUpdateOne {
+	_u.mutation.SetFeeAmount(v)
+	return _u
+}
+
+// SetNillableFeeAmount sets the "fee_amount" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillableFeeAmount(v *decimal.Decimal) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetFeeAmount(*v)
+	}
+	return _u
+}
+
 // SetCurrency sets the "currency" field.
 func (_u *FinanceFactUpdateOne) SetCurrency(v string) *FinanceFactUpdateOne {
 	_u.mutation.SetCurrency(v)
@@ -633,6 +798,93 @@ func (_u *FinanceFactUpdateOne) SetNillableCurrency(v *string) *FinanceFactUpdat
 	if v != nil {
 		_u.SetCurrency(*v)
 	}
+	return _u
+}
+
+// SetCollectionType sets the "collection_type" field.
+func (_u *FinanceFactUpdateOne) SetCollectionType(v string) *FinanceFactUpdateOne {
+	_u.mutation.SetCollectionType(v)
+	return _u
+}
+
+// SetNillableCollectionType sets the "collection_type" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillableCollectionType(v *string) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetCollectionType(*v)
+	}
+	return _u
+}
+
+// ClearCollectionType clears the value of the "collection_type" field.
+func (_u *FinanceFactUpdateOne) ClearCollectionType() *FinanceFactUpdateOne {
+	_u.mutation.ClearCollectionType()
+	return _u
+}
+
+// SetPaymentTerm sets the "payment_term" field.
+func (_u *FinanceFactUpdateOne) SetPaymentTerm(v string) *FinanceFactUpdateOne {
+	_u.mutation.SetPaymentTerm(v)
+	return _u
+}
+
+// SetNillablePaymentTerm sets the "payment_term" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillablePaymentTerm(v *string) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetPaymentTerm(*v)
+	}
+	return _u
+}
+
+// ClearPaymentTerm clears the value of the "payment_term" field.
+func (_u *FinanceFactUpdateOne) ClearPaymentTerm() *FinanceFactUpdateOne {
+	_u.mutation.ClearPaymentTerm()
+	return _u
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_u *FinanceFactUpdateOne) SetPaymentTermDays(v int) *FinanceFactUpdateOne {
+	_u.mutation.ResetPaymentTermDays()
+	_u.mutation.SetPaymentTermDays(v)
+	return _u
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillablePaymentTermDays(v *int) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddPaymentTermDays adds value to the "payment_term_days" field.
+func (_u *FinanceFactUpdateOne) AddPaymentTermDays(v int) *FinanceFactUpdateOne {
+	_u.mutation.AddPaymentTermDays(v)
+	return _u
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (_u *FinanceFactUpdateOne) ClearPaymentTermDays() *FinanceFactUpdateOne {
+	_u.mutation.ClearPaymentTermDays()
+	return _u
+}
+
+// SetInvoiceCategory sets the "invoice_category" field.
+func (_u *FinanceFactUpdateOne) SetInvoiceCategory(v string) *FinanceFactUpdateOne {
+	_u.mutation.SetInvoiceCategory(v)
+	return _u
+}
+
+// SetNillableInvoiceCategory sets the "invoice_category" field if the given value is not nil.
+func (_u *FinanceFactUpdateOne) SetNillableInvoiceCategory(v *string) *FinanceFactUpdateOne {
+	if v != nil {
+		_u.SetInvoiceCategory(*v)
+	}
+	return _u
+}
+
+// ClearInvoiceCategory clears the value of the "invoice_category" field.
+func (_u *FinanceFactUpdateOne) ClearInvoiceCategory() *FinanceFactUpdateOne {
+	_u.mutation.ClearInvoiceCategory()
 	return _u
 }
 
@@ -896,6 +1148,26 @@ func (_u *FinanceFactUpdateOne) check() error {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.currency": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.CollectionType(); ok {
+		if err := financefact.CollectionTypeValidator(v); err != nil {
+			return &ValidationError{Name: "collection_type", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.collection_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PaymentTerm(); ok {
+		if err := financefact.PaymentTermValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.payment_term": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PaymentTermDays(); ok {
+		if err := financefact.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.payment_term_days": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.InvoiceCategory(); ok {
+		if err := financefact.InvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "invoice_category", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.invoice_category": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SourceType(); ok {
 		if err := financefact.SourceTypeValidator(v); err != nil {
 			return &ValidationError{Name: "source_type", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.source_type": %w`, err)}
@@ -977,8 +1249,38 @@ func (_u *FinanceFactUpdateOne) sqlSave(ctx context.Context) (_node *FinanceFact
 	if value, ok := _u.mutation.Amount(); ok {
 		_spec.SetField(financefact.FieldAmount, field.TypeOther, value)
 	}
+	if value, ok := _u.mutation.FeeAmount(); ok {
+		_spec.SetField(financefact.FieldFeeAmount, field.TypeOther, value)
+	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(financefact.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CollectionType(); ok {
+		_spec.SetField(financefact.FieldCollectionType, field.TypeString, value)
+	}
+	if _u.mutation.CollectionTypeCleared() {
+		_spec.ClearField(financefact.FieldCollectionType, field.TypeString)
+	}
+	if value, ok := _u.mutation.PaymentTerm(); ok {
+		_spec.SetField(financefact.FieldPaymentTerm, field.TypeString, value)
+	}
+	if _u.mutation.PaymentTermCleared() {
+		_spec.ClearField(financefact.FieldPaymentTerm, field.TypeString)
+	}
+	if value, ok := _u.mutation.PaymentTermDays(); ok {
+		_spec.SetField(financefact.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPaymentTermDays(); ok {
+		_spec.AddField(financefact.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if _u.mutation.PaymentTermDaysCleared() {
+		_spec.ClearField(financefact.FieldPaymentTermDays, field.TypeInt)
+	}
+	if value, ok := _u.mutation.InvoiceCategory(); ok {
+		_spec.SetField(financefact.FieldInvoiceCategory, field.TypeString, value)
+	}
+	if _u.mutation.InvoiceCategoryCleared() {
+		_spec.ClearField(financefact.FieldInvoiceCategory, field.TypeString)
 	}
 	if value, ok := _u.mutation.SourceType(); ok {
 		_spec.SetField(financefact.FieldSourceType, field.TypeString, value)

@@ -44,21 +44,21 @@ test('dashboardTaskDisplay: 看板任务来源回显不直接露出英文模块 
     task: task({ source_id: 12 }),
   })
 
-  assert.equal(sourceLabel, '出货放行协同 第 9 条')
-  assert.equal(alertSourceLabel, '委外协同 第 12 条')
+  assert.equal(sourceLabel, '出货放行协同 / 内部来源 9')
+  assert.equal(alertSourceLabel, '委外协同 / 内部来源 12')
   assert(!sourceLabel.includes('shipping-release'))
   assert(!alertSourceLabel.includes('processing-contracts'))
 })
 
-test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式对象页', () => {
-  const shellEntryPath = resolveWorkflowTaskEntryPath(
+test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式或 Workflow V1 对象页', () => {
+  const shippingReleaseEntryPath = resolveWorkflowTaskEntryPath(
     task({
       source_type: 'shipping-release',
       source_no: 'OUT-001',
       source_id: 9,
     })
   )
-  const productionShellEntryPath = resolveWorkflowTaskEntryPath(
+  const productionSchedulingEntryPath = resolveWorkflowTaskEntryPath(
     task({
       source_type: 'production-scheduling',
       source_no: 'PLAN-001',
@@ -104,8 +104,14 @@ test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式对象�
     ],
   ]
 
-  assert.equal(shellEntryPath, '')
-  assert.equal(productionShellEntryPath, '')
+  assert.equal(
+    shippingReleaseEntryPath,
+    '/erp/warehouse/shipping-release?link_keyword=OUT-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
+  )
+  assert.equal(
+    productionSchedulingEntryPath,
+    '/erp/production/scheduling?link_keyword=PLAN-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
+  )
   assert.equal(payloadEntryPath, '')
   formalTaskEntries.forEach(([item, expectedPath]) => {
     assert.equal(resolveWorkflowTaskEntryPath(item), expectedPath)

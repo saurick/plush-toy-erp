@@ -217,11 +217,27 @@ func TestMasterDataUsecaseContactOwnerGuard(t *testing.T) {
 
 func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T) {
 	note := "  "
-	if _, err := normalizeCustomerMutation(CustomerMutation{Code: " C-001 ", Name: " 客户 ", Note: &note}); err != nil {
+	paymentMethod := " 现结 "
+	termDays := 0
+	customerInput, err := normalizeCustomerMutation(CustomerMutation{
+		Code:                   " C-001 ",
+		Name:                   " 客户 ",
+		DefaultPaymentMethod:   &paymentMethod,
+		DefaultPaymentTermDays: &termDays,
+		Note:                   &note,
+	})
+	if err != nil {
 		t.Fatalf("expected customer mutation valid, got %v", err)
+	}
+	if customerInput.DefaultPaymentMethod == nil || *customerInput.DefaultPaymentMethod != "现结" || customerInput.DefaultPaymentTermDays == nil || *customerInput.DefaultPaymentTermDays != 0 {
+		t.Fatalf("expected customer payment defaults normalized, got %#v", customerInput)
 	}
 	if _, err := normalizeCustomerMutation(CustomerMutation{Code: " ", Name: "客户"}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected empty customer code rejected, got %v", err)
+	}
+	negativeTermDays := -1
+	if _, err := normalizeCustomerMutation(CustomerMutation{Code: "C-002", Name: "客户", DefaultPaymentTermDays: &negativeTermDays}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected negative customer payment term rejected, got %v", err)
 	}
 	supplierType := " material "
 	supplierInput, err := normalizeSupplierMutation(SupplierMutation{Code: " S-001 ", Name: " 供应商 ", SupplierType: &supplierType})

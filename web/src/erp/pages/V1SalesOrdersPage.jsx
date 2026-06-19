@@ -1,15 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  DeleteOutlined,
   DownOutlined,
   DownloadOutlined,
   EditOutlined,
-  InboxOutlined,
   LinkOutlined,
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Form, Space, Tag, Tooltip } from 'antd'
+import { Button, Dropdown, Form, Space, Tag } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -55,14 +53,19 @@ import {
   SALES_ORDER_STATUS_LABELS,
   V1_ROUTE_PATHS,
   buildCustomerSnapshot,
+  buildPaymentConditionOptions,
   buildSequentialDraftCode,
   canRunSalesOrderLifecycleAction,
   deriveSalesOrderItemAmount,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
+  formatPaymentCondition,
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
+  mergePaymentConditionOptions,
+  normalizeOptionalNonNegativeInteger,
+  resolvePaymentTermDays,
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
@@ -281,6 +284,10 @@ export default function V1SalesOrdersPage() {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [orderForm] = Form.useForm()
   const [productSKUs, setProductSKUs] = useState([])
+  const paymentConditionSnapshotRef = useRef({
+    method: '',
+    termDays: undefined,
+  })
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
@@ -295,6 +302,105 @@ export default function V1SalesOrdersPage() {
   const canCancelItem = hasActionPermission(
     adminProfile,
     'sales_order_item.cancel'
+  )
+  const paymentConditionOptions = useMemo(
+    () =>
+      mergePaymentConditionOptions(
+        buildPaymentConditionOptions(customers),
+        buildPaymentConditionOptions(orders, {
+          methodField: 'payment_method',
+          termDaysField: 'payment_term_days',
+        })
+      ),
+    [customers, orders]
+  )
+
+  const readPaymentCondition = useCallback(() => {
+    const values = orderForm.getFieldsValue([
+      'payment_method',
+      'payment_term_days',
+    ])
+    return {
+      method: String(values.payment_method || '').trim(),
+      termDays: normalizeOptionalNonNegativeInteger(values.payment_term_days),
+    }
+  }, [orderForm])
+
+  const rememberPaymentCondition = useCallback((values = {}) => {
+    paymentConditionSnapshotRef.current = {
+      method: String(values.payment_method || '').trim(),
+      termDays: normalizeOptionalNonNegativeInteger(values.payment_term_days),
+    }
+  }, [])
+
+  const hasPricedOrderLines = useCallback(() => {
+    const lines = orderForm.getFieldValue('items')
+    return (Array.isArray(lines) ? lines : []).some((line) =>
+      ['unit_price', 'amount'].some((field) =>
+        String(line?.[field] ?? '').trim()
+      )
+    )
+  }, [orderForm])
+
+  const clearOrderLinePrices = useCallback(() => {
+    const lines = orderForm.getFieldValue('items')
+    orderForm.setFieldValue(
+      'items',
+      (Array.isArray(lines) ? lines : []).map((line) => ({
+        ...line,
+        unit_price: '',
+        amount: '',
+      }))
+    )
+  }, [orderForm])
+
+  const requestPaymentConditionPriceReview = useCallback(() => {
+    const current = readPaymentCondition()
+    const previous = paymentConditionSnapshotRef.current
+    if (
+      current.method === previous.method &&
+      current.termDays === previous.termDays
+    ) {
+      return
+    }
+    paymentConditionSnapshotRef.current = current
+    if (!hasPricedOrderLines()) {
+      return
+    }
+    modal.confirm({
+      centered: true,
+      title: '付款条件已变化，请核对单价',
+      content:
+        '付款方式或账期会影响本单成交价。系统不会自动重算单价，请选择保留当前单价或清空明细单价后重新报价。',
+      okText: '清空单价重新报价',
+      cancelText: '保留当前单价',
+      onOk: clearOrderLinePrices,
+    })
+  }, [clearOrderLinePrices, hasPricedOrderLines, readPaymentCondition])
+
+  const applyPaymentMethodTermDays = useCallback(
+    (method) => {
+      const termDays = resolvePaymentTermDays(method, paymentConditionOptions)
+      if (termDays !== undefined) {
+        orderForm.setFieldValue('payment_term_days', termDays)
+      }
+    },
+    [orderForm, paymentConditionOptions]
+  )
+
+  const applyCustomerPaymentDefaults = useCallback(
+    (customerID) => {
+      const customer = customers.find((item) => item.id === customerID)
+      const termDays = normalizeOptionalNonNegativeInteger(
+        customer?.default_payment_term_days
+      )
+      orderForm.setFieldsValue({
+        payment_method: customer?.default_payment_method || undefined,
+        payment_term_days: termDays,
+      })
+      requestPaymentConditionPriceReview()
+    },
+    [customers, orderForm, requestPaymentConditionPriceReview]
   )
 
   const loadCustomers = useCallback(async () => {
@@ -399,6 +505,7 @@ export default function V1SalesOrdersPage() {
       order_date: new Date().toISOString().slice(0, 10),
       items: [createBlankOrderLine(1)],
     })
+    rememberPaymentCondition({})
     setOrderModalOpen(true)
   }
 
@@ -412,6 +519,7 @@ export default function V1SalesOrdersPage() {
       planned_delivery_date: unixToDateInputValue(order.planned_delivery_date),
       items: [],
     })
+    rememberPaymentCondition(order)
     setOrderModalOpen(true)
     setItemLoading(true)
     try {
@@ -434,6 +542,7 @@ export default function V1SalesOrdersPage() {
         ),
         items: openItems.map(normalizeSalesOrderItemFormValue),
       })
+      rememberPaymentCondition(order)
     } catch (error) {
       message.error(getActionErrorMessage(error, '加载订单行'))
     } finally {
@@ -574,6 +683,16 @@ export default function V1SalesOrdersPage() {
           sorter: (a, b) =>
             compareText(a?.customer_order_no, b?.customer_order_no),
           render: (value) => value || '-',
+        },
+        {
+          title: '付款条件',
+          exportTitle: '付款条件',
+          dataIndex: 'payment_method',
+          width: 170,
+          sorter: (a, b) =>
+            compareText(formatPaymentCondition(a), formatPaymentCondition(b)),
+          render: (_, record) => formatPaymentCondition(record),
+          exportValue: formatPaymentCondition,
         },
         {
           title: '订单日期',
@@ -904,7 +1023,7 @@ export default function V1SalesOrdersPage() {
         filters={
           <>
             <SearchInput
-              placeholder="搜索订单号、客户订单号"
+              placeholder="搜索订单号、客户订单号、付款方式"
               value={keyword}
               onChange={(event) => {
                 setKeyword(event.target.value)
@@ -965,20 +1084,6 @@ export default function V1SalesOrdersPage() {
             >
               列顺序
             </ToolbarButton>
-            <Tooltip title="销售订单当前保留生命周期状态；退出使用请走取消或关闭，不提供物理删除 / 回收站。">
-              <span>
-                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
-                  批量删除
-                </ToolbarButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="销售订单当前没有回收站主路径；历史追溯回到生命周期状态和审计记录。">
-              <span>
-                <ToolbarButton icon={<InboxOutlined />} disabled>
-                  回收站
-                </ToolbarButton>
-              </span>
-            </Tooltip>
           </Space>
         }
         primaryAction={
@@ -1177,7 +1282,13 @@ export default function V1SalesOrdersPage() {
           layout="vertical"
           className="erp-business-action-form"
         >
-          <SalesOrderFormFields customers={customers} />
+          <SalesOrderFormFields
+            customers={customers}
+            paymentConditionOptions={paymentConditionOptions}
+            onCustomerChange={applyCustomerPaymentDefaults}
+            onPaymentMethodChange={applyPaymentMethodTermDays}
+            onPaymentConditionBlur={requestPaymentConditionPriceReview}
+          />
           <SalesOrderItemsFormSection
             form={orderForm}
             canCreateItem={canCreateItem}

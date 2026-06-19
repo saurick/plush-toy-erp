@@ -70,6 +70,16 @@ func ShortName(v string) predicate.Customer {
 	return predicate.Customer(sql.FieldEQ(FieldShortName, v))
 }
 
+// DefaultPaymentMethod applies equality check predicate on the "default_payment_method" field. It's identical to DefaultPaymentMethodEQ.
+func DefaultPaymentMethod(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentTermDays applies equality check predicate on the "default_payment_term_days" field. It's identical to DefaultPaymentTermDaysEQ.
+func DefaultPaymentTermDays(v int) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultPaymentTermDays, v))
+}
+
 // TaxNo applies equality check predicate on the "tax_no" field. It's identical to TaxNoEQ.
 func TaxNo(v string) predicate.Customer {
 	return predicate.Customer(sql.FieldEQ(FieldTaxNo, v))
@@ -298,6 +308,131 @@ func ShortNameEqualFold(v string) predicate.Customer {
 // ShortNameContainsFold applies the ContainsFold predicate on the "short_name" field.
 func ShortNameContainsFold(v string) predicate.Customer {
 	return predicate.Customer(sql.FieldContainsFold(FieldShortName, v))
+}
+
+// DefaultPaymentMethodEQ applies the EQ predicate on the "default_payment_method" field.
+func DefaultPaymentMethodEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodNEQ applies the NEQ predicate on the "default_payment_method" field.
+func DefaultPaymentMethodNEQ(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldNEQ(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodIn applies the In predicate on the "default_payment_method" field.
+func DefaultPaymentMethodIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldIn(FieldDefaultPaymentMethod, vs...))
+}
+
+// DefaultPaymentMethodNotIn applies the NotIn predicate on the "default_payment_method" field.
+func DefaultPaymentMethodNotIn(vs ...string) predicate.Customer {
+	return predicate.Customer(sql.FieldNotIn(FieldDefaultPaymentMethod, vs...))
+}
+
+// DefaultPaymentMethodGT applies the GT predicate on the "default_payment_method" field.
+func DefaultPaymentMethodGT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGT(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodGTE applies the GTE predicate on the "default_payment_method" field.
+func DefaultPaymentMethodGTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldGTE(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodLT applies the LT predicate on the "default_payment_method" field.
+func DefaultPaymentMethodLT(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLT(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodLTE applies the LTE predicate on the "default_payment_method" field.
+func DefaultPaymentMethodLTE(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldLTE(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodContains applies the Contains predicate on the "default_payment_method" field.
+func DefaultPaymentMethodContains(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContains(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodHasPrefix applies the HasPrefix predicate on the "default_payment_method" field.
+func DefaultPaymentMethodHasPrefix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasPrefix(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodHasSuffix applies the HasSuffix predicate on the "default_payment_method" field.
+func DefaultPaymentMethodHasSuffix(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldHasSuffix(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodIsNil applies the IsNil predicate on the "default_payment_method" field.
+func DefaultPaymentMethodIsNil() predicate.Customer {
+	return predicate.Customer(sql.FieldIsNull(FieldDefaultPaymentMethod))
+}
+
+// DefaultPaymentMethodNotNil applies the NotNil predicate on the "default_payment_method" field.
+func DefaultPaymentMethodNotNil() predicate.Customer {
+	return predicate.Customer(sql.FieldNotNull(FieldDefaultPaymentMethod))
+}
+
+// DefaultPaymentMethodEqualFold applies the EqualFold predicate on the "default_payment_method" field.
+func DefaultPaymentMethodEqualFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldEqualFold(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentMethodContainsFold applies the ContainsFold predicate on the "default_payment_method" field.
+func DefaultPaymentMethodContainsFold(v string) predicate.Customer {
+	return predicate.Customer(sql.FieldContainsFold(FieldDefaultPaymentMethod, v))
+}
+
+// DefaultPaymentTermDaysEQ applies the EQ predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysEQ(v int) predicate.Customer {
+	return predicate.Customer(sql.FieldEQ(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysNEQ applies the NEQ predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysNEQ(v int) predicate.Customer {
+	return predicate.Customer(sql.FieldNEQ(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysIn applies the In predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysIn(vs ...int) predicate.Customer {
+	return predicate.Customer(sql.FieldIn(FieldDefaultPaymentTermDays, vs...))
+}
+
+// DefaultPaymentTermDaysNotIn applies the NotIn predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysNotIn(vs ...int) predicate.Customer {
+	return predicate.Customer(sql.FieldNotIn(FieldDefaultPaymentTermDays, vs...))
+}
+
+// DefaultPaymentTermDaysGT applies the GT predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysGT(v int) predicate.Customer {
+	return predicate.Customer(sql.FieldGT(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysGTE applies the GTE predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysGTE(v int) predicate.Customer {
+	return predicate.Customer(sql.FieldGTE(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysLT applies the LT predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysLT(v int) predicate.Customer {
+	return predicate.Customer(sql.FieldLT(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysLTE applies the LTE predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysLTE(v int) predicate.Customer {
+	return predicate.Customer(sql.FieldLTE(FieldDefaultPaymentTermDays, v))
+}
+
+// DefaultPaymentTermDaysIsNil applies the IsNil predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysIsNil() predicate.Customer {
+	return predicate.Customer(sql.FieldIsNull(FieldDefaultPaymentTermDays))
+}
+
+// DefaultPaymentTermDaysNotNil applies the NotNil predicate on the "default_payment_term_days" field.
+func DefaultPaymentTermDaysNotNil() predicate.Customer {
+	return predicate.Customer(sql.FieldNotNull(FieldDefaultPaymentTermDays))
 }
 
 // TaxNoEQ applies the EQ predicate on the "tax_no" field.

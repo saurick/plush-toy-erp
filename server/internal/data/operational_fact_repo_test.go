@@ -57,6 +57,10 @@ func TestOperationalFactRepo_ProductionFactPostAndCancelWritesInventoryReversal(
 	}
 }
 
+func ptrString(value string) *string {
+	return &value
+}
+
 func TestOperationalFactRepo_StockReservationChecksAvailableQuantity(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_reservation")
@@ -395,6 +399,11 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		FactType:         biz.FinanceFactReceivable,
 		CounterpartyType: biz.FinanceCounterpartyCustomer,
 		Amount:           decimal.NewFromInt(100),
+		FeeAmount:        decimal.NewFromFloat(2.5),
+		Currency:         biz.FinanceCurrencyUSD,
+		CollectionType:   ptrString(biz.FinanceCollectionAccountsReceivable),
+		PaymentTerm:      ptrString(biz.FinancePaymentTermEOM30),
+		InvoiceCategory:  ptrString(biz.FinanceInvoiceCategoryNone),
 		SourceType:       &shipmentSourceType,
 		SourceID:         &shipment.ID,
 		IdempotencyKey:   "AR-SHIPPED-001",
@@ -404,6 +413,18 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 	}
 	if receivable.Status != biz.OperationalFactStatusDraft || receivable.SourceID == nil || *receivable.SourceID != shipment.ID {
 		t.Fatalf("unexpected receivable fact %#v", receivable)
+	}
+	if !receivable.FeeAmount.Equal(decimal.NewFromFloat(2.5)) || receivable.Currency != biz.FinanceCurrencyUSD {
+		t.Fatalf("expected receivable fee/currency persisted, got fee=%s currency=%s", receivable.FeeAmount, receivable.Currency)
+	}
+	if receivable.CollectionType == nil || *receivable.CollectionType != biz.FinanceCollectionAccountsReceivable {
+		t.Fatalf("expected receivable collection type persisted, got %#v", receivable.CollectionType)
+	}
+	if receivable.PaymentTerm == nil || *receivable.PaymentTerm != biz.FinancePaymentTermEOM30 || receivable.PaymentTermDays == nil || *receivable.PaymentTermDays != 30 {
+		t.Fatalf("expected receivable payment term persisted, got term=%#v days=%#v", receivable.PaymentTerm, receivable.PaymentTermDays)
+	}
+	if receivable.InvoiceCategory == nil || *receivable.InvoiceCategory != biz.FinanceInvoiceCategoryNone {
+		t.Fatalf("expected receivable invoice category persisted, got %#v", receivable.InvoiceCategory)
 	}
 	posted, err := uc.PostFinanceFact(ctx, receivable.ID)
 	if err != nil {

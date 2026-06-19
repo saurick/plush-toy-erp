@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   V1_ROUTE_PATHS,
+  buildPaymentConditionOptions,
   buildCustomerSnapshot,
   buildMaterialPurchaseContractDraftFromPurchaseOrder,
   buildMasterDataParams,
@@ -24,9 +25,11 @@ import {
   deriveOutsourcingOrderItemAmount,
   deriveSalesOrderItemAmount,
   formatUnitDisplayName,
+  formatPaymentCondition,
   formatUnixDateTime,
   hasActionPermission,
   inferDefaultUnitID,
+  resolvePaymentTermDays,
   statusText,
   unixToDateInputValue,
 } from './masterDataOrderView.mjs'
@@ -116,10 +119,18 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       code: ' C001 ',
       name: ' 客户 A ',
       short_name: ' ',
+      default_payment_method: ' 现结 ',
+      default_payment_term_days: 0,
       tax_no: '',
       note: ' 备注 ',
     }),
-    { code: 'C001', name: '客户 A', note: '备注' }
+    {
+      code: 'C001',
+      name: '客户 A',
+      default_payment_method: '现结',
+      default_payment_term_days: 0,
+      note: '备注',
+    }
   )
 
   assert.deepEqual(
@@ -188,11 +199,17 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       order_date: '2026-05-31',
       planned_delivery_date: '',
       customer_snapshot: { id: 3, name: '客户 A' },
+      payment_method: ' 30天月结 ',
+      payment_term_days: '30',
+      price_condition_note: ' 账期改短，单价已核对 ',
     }),
     {
       order_no: 'SO001',
       customer_id: 3,
       customer_snapshot: { id: 3, name: '客户 A' },
+      payment_method: '30天月结',
+      payment_term_days: 30,
+      price_condition_note: '账期改短，单价已核对',
       order_date: '2026-05-31',
     }
   )
@@ -302,6 +319,23 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       unit_price: '3.5',
       amount: '35.00',
     }
+  )
+})
+
+test('masterDataOrderView: payment condition options keep zero-day defaults and saved values', () => {
+  const options = buildPaymentConditionOptions([
+    { default_payment_method: ' 45天月结 ', default_payment_term_days: '45' },
+  ])
+
+  assert.equal(resolvePaymentTermDays('现结', options), 0)
+  assert.equal(resolvePaymentTermDays('45天月结', options), 45)
+  assert.equal(formatPaymentCondition({ payment_term_days: 0 }), '0天')
+  assert.equal(
+    formatPaymentCondition({
+      payment_method: '30天月结',
+      payment_term_days: 30,
+    }),
+    '30天月结 / 30天'
   )
 })
 

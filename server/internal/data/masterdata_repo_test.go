@@ -30,13 +30,20 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	defer mustCloseEntClient(t, client)
 
 	shortName := "成品客户"
+	defaultPaymentMethod := "30天月结"
+	defaultPaymentTermDays := 30
 	customer, err := uc.CreateCustomer(ctx, &biz.CustomerMutation{
-		Code:      "C-001",
-		Name:      "测试客户",
-		ShortName: &shortName,
+		Code:                   "C-001",
+		Name:                   "测试客户",
+		ShortName:              &shortName,
+		DefaultPaymentMethod:   &defaultPaymentMethod,
+		DefaultPaymentTermDays: &defaultPaymentTermDays,
 	})
 	if err != nil {
 		t.Fatalf("create customer failed: %v", err)
+	}
+	if customer.DefaultPaymentMethod == nil || *customer.DefaultPaymentMethod != defaultPaymentMethod || customer.DefaultPaymentTermDays == nil || *customer.DefaultPaymentTermDays != defaultPaymentTermDays {
+		t.Fatalf("expected customer payment defaults retained, got %#v", customer)
 	}
 	if _, err := uc.CreateCustomer(ctx, &biz.CustomerMutation{Code: "C-001", Name: "重复客户"}); !ent.IsConstraintError(err) {
 		t.Fatalf("expected duplicate customer code rejected, got %v", err)
@@ -47,6 +54,9 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	}
 	if updatedCustomer.ShortName != nil {
 		t.Fatalf("expected customer short_name cleared, got %q", *updatedCustomer.ShortName)
+	}
+	if updatedCustomer.DefaultPaymentMethod != nil || updatedCustomer.DefaultPaymentTermDays != nil {
+		t.Fatalf("expected customer payment defaults cleared, got %#v", updatedCustomer)
 	}
 	disabledCustomer, err := uc.SetCustomerActive(ctx, customer.ID, false)
 	if err != nil {

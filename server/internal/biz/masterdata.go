@@ -27,15 +27,17 @@ var contactOwnerTypes = map[string]struct{}{
 }
 
 type Customer struct {
-	ID        int
-	Code      string
-	Name      string
-	ShortName *string
-	TaxNo     *string
-	IsActive  bool
-	Note      *string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID                     int
+	Code                   string
+	Name                   string
+	ShortName              *string
+	DefaultPaymentMethod   *string
+	DefaultPaymentTermDays *int
+	TaxNo                  *string
+	IsActive               bool
+	Note                   *string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 type Supplier struct {
@@ -145,11 +147,13 @@ type Contact struct {
 }
 
 type CustomerMutation struct {
-	Code      string
-	Name      string
-	ShortName *string
-	TaxNo     *string
-	Note      *string
+	Code                   string
+	Name                   string
+	ShortName              *string
+	DefaultPaymentMethod   *string
+	DefaultPaymentTermDays *int
+	TaxNo                  *string
+	Note                   *string
 }
 
 type SupplierMutation struct {
@@ -759,9 +763,10 @@ func normalizeCustomerMutation(in CustomerMutation) (CustomerMutation, error) {
 	in.Code = strings.TrimSpace(in.Code)
 	in.Name = strings.TrimSpace(in.Name)
 	in.ShortName = normalizeOptionalString(in.ShortName)
+	in.DefaultPaymentMethod = normalizeOptionalString(in.DefaultPaymentMethod)
 	in.TaxNo = normalizeOptionalString(in.TaxNo)
 	in.Note = normalizeOptionalString(in.Note)
-	if in.Code == "" || in.Name == "" {
+	if in.Code == "" || in.Name == "" || (in.DefaultPaymentTermDays != nil && *in.DefaultPaymentTermDays < 0) {
 		return CustomerMutation{}, ErrBadParam
 	}
 	return in, nil

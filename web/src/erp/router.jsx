@@ -18,7 +18,6 @@ import { DEV_DOCS_ROUTE } from './config/devDocs.mjs'
 import { DEV_HUB_ROUTE } from './config/devHub.mjs'
 import { DEV_PROTOTYPES_ROUTE } from './config/devPrototypes.mjs'
 import { DEV_TESTING_ROUTE } from './config/devTesting.mjs'
-import { getFormalBusinessShellModules } from './config/businessModules.mjs'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
@@ -66,11 +65,11 @@ const V1InventoryLedgerPage = lazy(
 const V1OperationalFactPage = lazy(
   () => import('./pages/V1OperationalFactPage.jsx')
 )
+const WorkflowBusinessModulePage = lazy(
+  () => import('./pages/WorkflowBusinessModulePage.jsx')
+)
 const BOMVersionsPage = lazy(() => import('./pages/BOMVersionsPage.jsx'))
 const ShipmentsPage = lazy(() => import('./pages/ShipmentsPage.jsx'))
-const FormalBusinessModulePage = lazy(
-  () => import('./pages/FormalBusinessModulePage.jsx')
-)
 const OperationalFactsPage = lazy(() => import('./pages/OperationalFactsPage'))
 const MobileAppLayout = lazy(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazy(
@@ -95,27 +94,6 @@ const DevTestingPage = import.meta.env.DEV
   ? lazy(() => import('./pages/DevTestingPage.jsx'))
   : null
 const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
-const operationalFactV1ModuleKeys = new Set([
-  'production-progress',
-  'outbound',
-  'reconciliation',
-  'payables',
-  'receivables',
-  'invoices',
-])
-const formalBusinessShellModules = getFormalBusinessShellModules().filter(
-  (moduleItem) =>
-    moduleItem.key !== 'products' &&
-    moduleItem.key !== 'material-bom' &&
-    moduleItem.key !== 'accessories-purchase' &&
-    moduleItem.key !== 'processing-contracts' &&
-    !operationalFactV1ModuleKeys.has(moduleItem.key)
-)
-
-function stripERPRoutePrefix(path = '') {
-  return String(path || '').replace(/^\/erp\//u, '')
-}
-
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
 }
@@ -384,6 +362,24 @@ export default function ERPRouter() {
             element={<V1OperationalFactPage moduleKey="production-progress" />}
           />
           <Route
+            path="production/scheduling"
+            element={
+              <WorkflowBusinessModulePage moduleKey="production-scheduling" />
+            }
+          />
+          <Route
+            path="production/exceptions"
+            element={
+              <WorkflowBusinessModulePage moduleKey="production-exceptions" />
+            }
+          />
+          <Route
+            path="warehouse/shipping-release"
+            element={
+              <WorkflowBusinessModulePage moduleKey="shipping-release" />
+            }
+          />
+          <Route
             path="warehouse/outbound"
             element={<V1OperationalFactPage moduleKey="outbound" />}
           />
@@ -403,13 +399,6 @@ export default function ERPRouter() {
             path="finance/invoices"
             element={<V1OperationalFactPage moduleKey="invoices" />}
           />
-          {formalBusinessShellModules.map((moduleItem) => (
-            <Route
-              key={moduleItem.key}
-              path={stripERPRoutePrefix(moduleItem.path)}
-              element={<FormalBusinessModulePage moduleKey={moduleItem.key} />}
-            />
-          ))}
           <Route path="operations/facts" element={<OperationalFactsPage />} />
           <Route
             path="flows/overview"

@@ -387,11 +387,13 @@ func (d *jsonrpcDispatcher) handleMasterData(
 
 func customerMutationFromParams(pm map[string]any) *biz.CustomerMutation {
 	return &biz.CustomerMutation{
-		Code:      getString(pm, "code"),
-		Name:      getString(pm, "name"),
-		ShortName: getWorkflowStringPtr(pm, "short_name"),
-		TaxNo:     getWorkflowStringPtr(pm, "tax_no"),
-		Note:      getWorkflowStringPtr(pm, "note"),
+		Code:                   getString(pm, "code"),
+		Name:                   getString(pm, "name"),
+		ShortName:              getWorkflowStringPtr(pm, "short_name"),
+		DefaultPaymentMethod:   getWorkflowStringPtr(pm, "default_payment_method"),
+		DefaultPaymentTermDays: getOptionalNonNegativeInt(pm, "default_payment_term_days"),
+		TaxNo:                  getWorkflowStringPtr(pm, "tax_no"),
+		Note:                   getWorkflowStringPtr(pm, "note"),
 	}
 }
 
@@ -626,15 +628,17 @@ func customerToMap(item *biz.Customer) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":         item.ID,
-		"code":       item.Code,
-		"name":       item.Name,
-		"short_name": optionalStringValue(item.ShortName),
-		"tax_no":     optionalStringValue(item.TaxNo),
-		"is_active":  item.IsActive,
-		"note":       optionalStringValue(item.Note),
-		"created_at": item.CreatedAt.Unix(),
-		"updated_at": item.UpdatedAt.Unix(),
+		"id":                        item.ID,
+		"code":                      item.Code,
+		"name":                      item.Name,
+		"short_name":                optionalStringValue(item.ShortName),
+		"default_payment_method":    optionalStringValue(item.DefaultPaymentMethod),
+		"default_payment_term_days": optionalIntValue(item.DefaultPaymentTermDays),
+		"tax_no":                    optionalStringValue(item.TaxNo),
+		"is_active":                 item.IsActive,
+		"note":                      optionalStringValue(item.Note),
+		"created_at":                item.CreatedAt.Unix(),
+		"updated_at":                item.UpdatedAt.Unix(),
 	}
 }
 

@@ -28,6 +28,11 @@ import {
   SelectionActionBar,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  BusinessListToolbarActions,
+  downloadBusinessListCSV,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
+import {
   compactParams,
   formatUnixDate,
   formatUnixDateTime,
@@ -137,6 +142,11 @@ function subjectTypeTag(value) {
   return <Tag>{SUBJECT_TYPE_LABELS[key] || key}</Tag>
 }
 
+function subjectTypeText(value) {
+  const key = String(value || '').trim()
+  return SUBJECT_TYPE_LABELS[key] || key || ''
+}
+
 function lotStatusTag(value) {
   const key = String(value || '').trim()
   if (!key) return '-'
@@ -145,6 +155,11 @@ function lotStatusTag(value) {
       {LOT_STATUS_LABELS[key] || key}
     </Tag>
   )
+}
+
+function lotStatusText(value) {
+  const key = String(value || '').trim()
+  return LOT_STATUS_LABELS[key] || key || ''
 }
 
 function txnTypeTag(value) {
@@ -157,6 +172,11 @@ function txnTypeTag(value) {
   )
 }
 
+function txnTypeText(value) {
+  const key = String(value || '').trim()
+  return TXN_TYPE_LABELS[key] || key || ''
+}
+
 function directionTag(value) {
   const direction = Number(value || 0)
   if (direction > 0) return <Tag color="green">增加</Tag>
@@ -164,9 +184,22 @@ function directionTag(value) {
   return '-'
 }
 
+function directionText(value) {
+  const direction = Number(value || 0)
+  if (direction > 0) return '增加'
+  if (direction < 0) return '扣减'
+  return ''
+}
+
 function formatQuantity(value) {
   const text = String(value ?? '').trim()
   return text || '-'
+}
+
+function internalRef(label, value) {
+  return value === null || value === undefined || value === ''
+    ? '-'
+    : `${label} ${value}`
 }
 
 function getRowsFromData(view, data) {
@@ -182,12 +215,16 @@ function getRowsFromData(view, data) {
 function selectedLabelFor(view, row) {
   if (!row) return '请先选择一条库存记录'
   if (view === VIEW_LOTS) {
-    return `批次 ${row.lot_no || row.id} / ${LOT_STATUS_LABELS[row.status] || row.status || '-'}`
+    return `批次 ${row.lot_no || internalRef('内部批次', row.id)} / ${
+      LOT_STATUS_LABELS[row.status] || row.status || '-'
+    }`
   }
   if (view === VIEW_TXNS) {
-    return `流水 #${row.id} / ${row.source_type || '-'}`
+    return `流水 ${row.source_type || row.txn_type || internalRef('内部流水', row.id)}`
   }
-  return `余额 #${row.id} / 批次 ${row.lot_id || '-'}`
+  return `库存项 ${internalRef('内部余额', row.id)} / 批次 ${
+    row.lot_no || internalRef('内部批次', row.lot_id)
+  }`
 }
 
 function sourceRouteFor(sourceType) {
@@ -204,6 +241,7 @@ function sourceRouteFor(sourceType) {
 export default function V1InventoryLedgerPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
+  const adminProfile = outletContext?.adminProfile || {}
   const [activeView, setActiveView] = useState(VIEW_BALANCES)
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -354,15 +392,35 @@ export default function V1InventoryLedgerPage() {
   const columns = useMemo(() => {
     if (activeView === VIEW_LOTS) {
       return [
-        { title: '批次 ID', dataIndex: 'id', width: 100 },
+        {
+          title: '批次号',
+          dataIndex: 'lot_no',
+          width: 180,
+          render: (value, record) =>
+            value || internalRef('内部批次', record.id),
+        },
+        {
+          title: '内部主键',
+          dataIndex: 'id',
+          width: 110,
+          render: (value) => internalRef('主键', value),
+          exportValue: (record) => internalRef('主键', record?.id),
+        },
         {
           title: '对象',
+          exportTitle: '对象',
           dataIndex: 'subject_type',
           width: 110,
           render: subjectTypeTag,
+          exportValue: (record) => subjectTypeText(record?.subject_type),
         },
-        { title: '对象 ID', dataIndex: 'subject_id', width: 100 },
-        { title: '批次号', dataIndex: 'lot_no', width: 180 },
+        {
+          title: '对象引用',
+          dataIndex: 'subject_id',
+          width: 120,
+          render: (value, record) =>
+            internalRef(subjectTypeText(record?.subject_type) || '对象', value),
+        },
         {
           title: '供应商批次',
           dataIndex: 'supplier_lot_no',
@@ -379,58 +437,104 @@ export default function V1InventoryLedgerPage() {
         },
         {
           title: '状态',
+          exportTitle: '状态',
           dataIndex: 'status',
           width: 110,
           render: lotStatusTag,
+          exportValue: (record) => lotStatusText(record?.status),
         },
         {
           title: '接收日期',
+          exportTitle: '接收日期',
           dataIndex: 'received_at',
           width: 140,
           render: formatUnixDate,
+          exportValue: (record) => formatUnixDate(record?.received_at),
         },
         {
           title: '更新时间',
+          exportTitle: '更新时间',
           dataIndex: 'updated_at',
           width: 170,
           render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.updated_at),
         },
       ]
     }
 
     if (activeView === VIEW_TXNS) {
       return [
-        { title: '流水 ID', dataIndex: 'id', width: 100 },
+        {
+          title: '流水标识',
+          dataIndex: 'id',
+          width: 130,
+          render: (value) => internalRef('内部流水', value),
+          exportValue: (record) => internalRef('内部流水', record?.id),
+        },
         {
           title: '类型',
+          exportTitle: '类型',
           dataIndex: 'txn_type',
           width: 120,
           render: txnTypeTag,
+          exportValue: (record) => txnTypeText(record?.txn_type),
         },
         {
           title: '方向',
+          exportTitle: '方向',
           dataIndex: 'direction',
           width: 100,
           render: directionTag,
+          exportValue: (record) => directionText(record?.direction),
         },
         {
           title: '对象',
+          exportTitle: '对象',
           dataIndex: 'subject_type',
           width: 110,
           render: subjectTypeTag,
+          exportValue: (record) => subjectTypeText(record?.subject_type),
         },
-        { title: '对象 ID', dataIndex: 'subject_id', width: 100 },
-        { title: '仓库 ID', dataIndex: 'warehouse_id', width: 100 },
-        { title: '批次 ID', dataIndex: 'lot_id', width: 100, render: dash },
+        {
+          title: '对象引用',
+          dataIndex: 'subject_id',
+          width: 120,
+          render: (value, record) =>
+            internalRef(subjectTypeText(record?.subject_type) || '对象', value),
+        },
+        {
+          title: '仓库引用',
+          dataIndex: 'warehouse_id',
+          width: 120,
+          render: (value) => internalRef('仓库', value),
+        },
+        {
+          title: '批次引用',
+          dataIndex: 'lot_id',
+          width: 120,
+          render: (value) => internalRef('批次', value),
+        },
         {
           title: '数量',
+          exportTitle: '数量',
           dataIndex: 'quantity',
           width: 120,
           render: formatQuantity,
+          exportValue: (record) => formatQuantity(record?.quantity),
         },
-        { title: '单位 ID', dataIndex: 'unit_id', width: 100 },
+        {
+          title: '单位引用',
+          dataIndex: 'unit_id',
+          width: 120,
+          render: (value) => internalRef('单位', value),
+        },
         { title: '来源', dataIndex: 'source_type', width: 170 },
-        { title: '来源单', dataIndex: 'source_id', width: 110, render: dash },
+        {
+          title: '来源单据',
+          dataIndex: 'source_id',
+          width: 120,
+          render: (value) => internalRef('来源', value),
+        },
         {
           title: '来源行',
           dataIndex: 'source_line_id',
@@ -445,9 +549,11 @@ export default function V1InventoryLedgerPage() {
         },
         {
           title: '发生时间',
+          exportTitle: '发生时间',
           dataIndex: 'occurred_at',
           width: 170,
           render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.occurred_at),
         },
         {
           title: '幂等键',
@@ -460,43 +566,95 @@ export default function V1InventoryLedgerPage() {
     }
 
     return [
-      { title: '余额 ID', dataIndex: 'id', width: 100 },
+      {
+        title: '库存项',
+        dataIndex: 'id',
+        width: 130,
+        render: (value) => internalRef('内部余额', value),
+        exportValue: (record) => internalRef('内部余额', record?.id),
+      },
       {
         title: '对象',
+        exportTitle: '对象',
         dataIndex: 'subject_type',
         width: 110,
         render: subjectTypeTag,
+        exportValue: (record) => subjectTypeText(record?.subject_type),
       },
-      { title: '对象 ID', dataIndex: 'subject_id', width: 100 },
-      { title: '仓库 ID', dataIndex: 'warehouse_id', width: 100 },
-      { title: '批次 ID', dataIndex: 'lot_id', width: 100, render: dash },
-      { title: '单位 ID', dataIndex: 'unit_id', width: 100 },
+      {
+        title: '对象引用',
+        dataIndex: 'subject_id',
+        width: 120,
+        render: (value, record) =>
+          internalRef(subjectTypeText(record?.subject_type) || '对象', value),
+      },
+      {
+        title: '仓库引用',
+        dataIndex: 'warehouse_id',
+        width: 120,
+        render: (value) => internalRef('仓库', value),
+      },
+      {
+        title: '批次引用',
+        dataIndex: 'lot_id',
+        width: 120,
+        render: (value) => internalRef('批次', value),
+      },
+      {
+        title: '单位引用',
+        dataIndex: 'unit_id',
+        width: 120,
+        render: (value) => internalRef('单位', value),
+      },
       {
         title: '当前数量',
+        exportTitle: '当前数量',
         dataIndex: 'quantity',
         width: 130,
         render: formatQuantity,
+        exportValue: (record) => formatQuantity(record?.quantity),
       },
       {
         title: '已预留',
+        exportTitle: '已预留',
         dataIndex: 'active_reserved_quantity',
         width: 130,
         render: formatQuantity,
+        exportValue: (record) =>
+          formatQuantity(record?.active_reserved_quantity),
       },
       {
         title: '可用量',
+        exportTitle: '可用量',
         dataIndex: 'available_quantity',
         width: 130,
         render: formatQuantity,
+        exportValue: (record) => formatQuantity(record?.available_quantity),
       },
       {
         title: '更新时间',
+        exportTitle: '更新时间',
         dataIndex: 'updated_at',
         width: 170,
         render: formatUnixDateTime,
+        exportValue: (record) => formatUnixDateTime(record?.updated_at),
       },
     ]
   }, [activeView])
+  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: `inventory-${activeView}`,
+      moduleTitle: `库存台账 / ${activeLabel}`,
+      columns,
+    })
+  const exportRows = useCallback(() => {
+    downloadBusinessListCSV({
+      filename: `inventory-${activeView}.csv`,
+      columns: visibleColumns,
+      rows,
+    })
+  }, [activeView, rows, visibleColumns])
 
   return (
     <BusinessPageLayout className="erp-v1-inventory-ledger-page">
@@ -524,7 +682,7 @@ export default function V1InventoryLedgerPage() {
           <>
             <SearchInput
               value={keyword}
-              placeholder="搜索批次号 / 来源 / 备注 / ID"
+              placeholder="搜索批次号 / 来源 / 备注 / 内部引用"
               onChange={(event) => {
                 setKeyword(event.target.value)
                 resetCurrentPage()
@@ -544,7 +702,7 @@ export default function V1InventoryLedgerPage() {
               className="erp-business-filter-control"
               min={1}
               precision={0}
-              placeholder="对象 ID"
+              placeholder="对象引用"
               value={subjectID}
               onChange={(nextValue) => {
                 setSubjectID(nextValue)
@@ -557,7 +715,7 @@ export default function V1InventoryLedgerPage() {
                   className="erp-business-filter-control"
                   min={1}
                   precision={0}
-                  placeholder="仓库 ID"
+                  placeholder="仓库引用"
                   value={warehouseID}
                   onChange={(nextValue) => {
                     setWarehouseID(nextValue)
@@ -568,7 +726,7 @@ export default function V1InventoryLedgerPage() {
                   className="erp-business-filter-control"
                   min={1}
                   precision={0}
-                  placeholder="批次 ID"
+                  placeholder="批次引用"
                   value={lotID}
                   onChange={(nextValue) => {
                     setLotID(nextValue)
@@ -613,6 +771,14 @@ export default function V1InventoryLedgerPage() {
               </>
             ) : null}
           </>
+        }
+        actions={
+          <BusinessListToolbarActions
+            moduleTitle="库存台账"
+            onExport={exportRows}
+            exportDisabled={rows.length === 0}
+            onOpenColumnOrder={openColumnOrder}
+          />
         }
       >
         <SelectionActionBar
@@ -659,7 +825,7 @@ export default function V1InventoryLedgerPage() {
           rowKey={(record) => `${activeView}-${record.id}`}
           loading={loading}
           dataSource={rows}
-          columns={columns}
+          columns={tableColumns}
           pagination={createBusinessTablePagination({
             pagination,
             total,
@@ -669,6 +835,8 @@ export default function V1InventoryLedgerPage() {
           scroll={{ x: activeView === VIEW_TXNS ? 1900 : 1500 }}
           rowSelection={{
             type: 'radio',
+            columnTitle: '选择',
+            columnWidth: 48,
             selectedRowKeys: selectedRowKey ? [selectedRowKey] : [],
             onChange: (_keys, selectedRows) =>
               setSelectedRow(selectedRows[0] || null),
@@ -684,6 +852,7 @@ export default function V1InventoryLedgerPage() {
           }}
         />
       </Card>
+      {columnOrderModal}
     </BusinessPageLayout>
   )
 }

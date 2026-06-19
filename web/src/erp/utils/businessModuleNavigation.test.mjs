@@ -8,7 +8,6 @@ import {
 import {
   getBusinessModule,
   getFormalBusinessShellModules,
-  getFormalShellFormFieldLabels,
 } from '../config/businessModules.mjs'
 
 test('businessModuleNavigation: 单状态钻取使用兼容查询参数', () => {
@@ -42,25 +41,10 @@ test('businessModuleNavigation: 多状态钻取收口为业务页筛选参数', 
   ])
 })
 
-test('formal business shell: 表单字段按产品核心模块区分', () => {
+test('formal business shell: 三个遗留 shell 已收口为 Workflow V1 页面', () => {
   const formalShellModules = getFormalBusinessShellModules()
 
-  assert.ok(formalShellModules.length > 0)
-  assert.deepEqual(
-    formalShellModules.map((item) => item.key),
-    ['production-scheduling', 'production-exceptions', 'shipping-release']
-  )
-  for (const moduleItem of formalShellModules) {
-    assert.ok(
-      getFormalShellFormFieldLabels(moduleItem.key).length >= 6,
-      `${moduleItem.key} should declare product-core fields`
-    )
-  }
-
-  assert.deepEqual(
-    getFormalShellFormFieldLabels('production-scheduling').slice(0, 4),
-    ['销售订单', '产品 / BOM', '排程日期', '生产负责人']
-  )
+  assert.deepEqual(formalShellModules, [])
   assert.equal(getBusinessModule('materials')?.pageKind, 'formal-v1')
   assert.equal(getBusinessModule('material-bom')?.pageKind, 'formal-v1')
   assert.equal(getBusinessModule('processes')?.pageKind, 'formal-v1')
@@ -75,13 +59,13 @@ test('formal business shell: 表单字段按产品核心模块区分', () => {
   assert.equal(getBusinessModule('reconciliation')?.pageKind, 'formal-v1')
   assert.equal(
     getBusinessModule('production-scheduling')?.pageKind,
-    'formal-shell'
+    'formal-v1'
   )
   assert.equal(
     getBusinessModule('production-exceptions')?.pageKind,
-    'formal-shell'
+    'formal-v1'
   )
-  assert.equal(getBusinessModule('shipping-release')?.pageKind, 'formal-shell')
+  assert.equal(getBusinessModule('shipping-release')?.pageKind, 'formal-v1')
   assert.equal(
     formalShellModules.some((item) => item.key === 'accessories-purchase'),
     false
@@ -96,41 +80,29 @@ test('formal business shell: 表单字段按产品核心模块区分', () => {
   )
   assert.equal(
     formalShellModules.some((item) => item.key === 'production-scheduling'),
-    true
+    false
   )
-  assert.deepEqual(getFormalShellFormFieldLabels('materials'), [])
-  assert.deepEqual(getFormalShellFormFieldLabels('material-bom'), [])
-  assert.deepEqual(getFormalShellFormFieldLabels('processes'), [])
-  assert.deepEqual(getFormalShellFormFieldLabels('accessories-purchase'), [])
-  assert.deepEqual(getFormalShellFormFieldLabels('inventory'), [])
-  assert.deepEqual(getFormalShellFormFieldLabels('receivables'), [])
-  assert.deepEqual(getFormalShellFormFieldLabels('outbound'), [])
 })
 
-test('formal business shell: 预览页文案不冒充真实业务写入', () => {
+test('workflow business modules: 三页不冒充事实写入', () => {
   const source = readFileSync(
-    new URL('../pages/FormalBusinessModulePage.jsx', import.meta.url),
+    new URL('../pages/WorkflowBusinessModulePage.jsx', import.meta.url),
+    'utf8'
+  )
+  const routerSource = readFileSync(
+    new URL('../router.jsx', import.meta.url),
     'utf8'
   )
 
   for (const text of [
-    '新建排程',
-    '新建异常',
     '新建放行单',
     '生成生产任务',
     '生成出货放行',
-    '导出当前结果',
     '导出预览字段',
     '预览导出待接入',
     '预览排程字段',
     '预览异常字段',
     '预览放行字段',
-    '关联单据',
-    '状态变更',
-    '业务编号',
-    '业务对象',
-    '批量删除',
-    '回收站',
     '加工合同打印',
     'openPrintWorkspaceWindow',
     'PROCESSING_CONTRACT_TEMPLATE_KEY',
@@ -138,47 +110,44 @@ test('formal business shell: 预览页文案不冒充真实业务写入', () => 
     assert.equal(
       source.includes(text),
       false,
-      `formal shell page should not expose misleading copy: ${text}`
+      `workflow V1 page should not expose misleading copy: ${text}`
     )
   }
 
   for (const text of [
-    '查看排程字段边界',
-    '查看异常字段边界',
-    '查看放行字段边界',
-    '查看排程接入边界',
-    '不导出业务数据',
-    '真实保存待接入',
-    '当前页面仍是待接入预览页',
+    'Workflow V1',
+    '不写事实层',
+    '新建排程协同',
+    '登记异常协同',
+    '新建放行协同',
+    'createWorkflowTask',
     'listWorkflowTasks',
     'updateWorkflowTaskStatus',
     'urgeWorkflowTask',
-    'SHIPPING_RELEASE_MODULE_KEY',
-    'SHIPMENT_RELEASE_TASK_GROUP',
-    'source_type: SHIPPING_RELEASE_MODULE_KEY',
-    'task_group: SHIPMENT_RELEASE_TASK_GROUP',
-    'isShipmentReleaseWorkflowTask',
-    '没有出货放行协同任务读取权限',
-    'const refreshed = await loadShippingReleaseWorkflowTasks()',
-    'if (refreshed)',
-    '出货放行协同任务已刷新',
-    'shipment_release_page_scope',
+    "taskGroup: 'shipment_release'",
+    'workflow_page_scope',
+    'BusinessListToolbarActions',
+    '当前 Workflow V1 只处理协同任务，不导出业务数据。',
+    '不会生成生产、库存、出货、财务事实',
   ]) {
     assert.equal(
       source.includes(text),
       true,
-      `formal shell page should expose preview/boundary copy: ${text}`
+      `workflow V1 page should expose real workflow scope: ${text}`
+    )
+  }
+
+  for (const text of ['不提供批量删除', '当前没有回收站主路径']) {
+    assert.equal(
+      source.includes(text),
+      false,
+      `workflow V1 page should not keep placeholder delete/trash copy: ${text}`
     )
   }
 
   assert.equal(
-    source.includes('暂无远端数据刷新'),
-    true,
-    'formal shell page should explain that global refresh has no remote data source'
-  )
-  assert.equal(
-    source.includes('return false'),
-    true,
-    'formal shell refresh handler should not let the app shell show a fake refresh success'
+    routerSource.includes('FormalBusinessModulePage'),
+    false,
+    'router should not expose the legacy formal shell page'
   )
 })

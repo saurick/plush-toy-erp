@@ -37,6 +37,8 @@ func (r *masterDataRepo) CreateCustomer(ctx context.Context, in *biz.CustomerMut
 		SetCode(in.Code).
 		SetName(in.Name).
 		SetNillableShortName(in.ShortName).
+		SetNillableDefaultPaymentMethod(in.DefaultPaymentMethod).
+		SetNillableDefaultPaymentTermDays(in.DefaultPaymentTermDays).
 		SetNillableTaxNo(in.TaxNo).
 		SetNillableNote(in.Note).
 		Save(ctx)
@@ -54,6 +56,16 @@ func (r *masterDataRepo) UpdateCustomer(ctx context.Context, id int, in *biz.Cus
 		update.ClearShortName()
 	} else {
 		update.SetShortName(*in.ShortName)
+	}
+	if in.DefaultPaymentMethod == nil {
+		update.ClearDefaultPaymentMethod()
+	} else {
+		update.SetDefaultPaymentMethod(*in.DefaultPaymentMethod)
+	}
+	if in.DefaultPaymentTermDays == nil {
+		update.ClearDefaultPaymentTermDays()
+	} else {
+		update.SetDefaultPaymentTermDays(*in.DefaultPaymentTermDays)
 	}
 	if in.TaxNo == nil {
 		update.ClearTaxNo()
@@ -938,6 +950,8 @@ func createCustomerWithClient(ctx context.Context, client *ent.Client, in *biz.C
 		SetCode(in.Code).
 		SetName(in.Name).
 		SetNillableShortName(in.ShortName).
+		SetNillableDefaultPaymentMethod(in.DefaultPaymentMethod).
+		SetNillableDefaultPaymentTermDays(in.DefaultPaymentTermDays).
 		SetNillableTaxNo(in.TaxNo).
 		SetNillableNote(in.Note).
 		Save(ctx)
@@ -951,6 +965,16 @@ func updateCustomerWithClient(ctx context.Context, client *ent.Client, id int, i
 		update.ClearShortName()
 	} else {
 		update.SetShortName(*in.ShortName)
+	}
+	if in.DefaultPaymentMethod == nil {
+		update.ClearDefaultPaymentMethod()
+	} else {
+		update.SetDefaultPaymentMethod(*in.DefaultPaymentMethod)
+	}
+	if in.DefaultPaymentTermDays == nil {
+		update.ClearDefaultPaymentTermDays()
+	} else {
+		update.SetDefaultPaymentTermDays(*in.DefaultPaymentTermDays)
 	}
 	if in.TaxNo == nil {
 		update.ClearTaxNo()
@@ -1165,15 +1189,17 @@ func entCustomerToBiz(row *ent.Customer) *biz.Customer {
 		return nil
 	}
 	return &biz.Customer{
-		ID:        row.ID,
-		Code:      row.Code,
-		Name:      row.Name,
-		ShortName: row.ShortName,
-		TaxNo:     row.TaxNo,
-		IsActive:  row.IsActive,
-		Note:      row.Note,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:                     row.ID,
+		Code:                   row.Code,
+		Name:                   row.Name,
+		ShortName:              row.ShortName,
+		DefaultPaymentMethod:   row.DefaultPaymentMethod,
+		DefaultPaymentTermDays: row.DefaultPaymentTermDays,
+		TaxNo:                  row.TaxNo,
+		IsActive:               row.IsActive,
+		Note:                   row.Note,
+		CreatedAt:              row.CreatedAt,
+		UpdatedAt:              row.UpdatedAt,
 	}
 }
 

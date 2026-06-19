@@ -51,6 +51,11 @@ const PAGE_CONFIGS = Object.freeze({
           fact_type: 'RECEIVABLE',
           counterparty_type: 'CUSTOMER',
           currency: 'CNY',
+          fee_amount: '0',
+          collection_type: 'ACCOUNTS_RECEIVABLE',
+          payment_term: 'EOM_30',
+          payment_term_days: 30,
+          invoice_category: 'NONE',
         },
       },
     },
@@ -75,6 +80,8 @@ const PAGE_CONFIGS = Object.freeze({
           fact_type: 'PAYABLE',
           counterparty_type: 'SUPPLIER',
           currency: 'CNY',
+          fee_amount: '0',
+          invoice_category: 'NONE',
         },
       },
     },
@@ -99,6 +106,8 @@ const PAGE_CONFIGS = Object.freeze({
           fact_type: 'INVOICE',
           counterparty_type: 'CUSTOMER',
           currency: 'CNY',
+          fee_amount: '0',
+          invoice_category: 'EXPORT_GENERAL',
         },
       },
     },
@@ -123,6 +132,7 @@ const PAGE_CONFIGS = Object.freeze({
           fact_type: 'RECONCILIATION',
           counterparty_type: 'OTHER',
           currency: 'CNY',
+          fee_amount: '0',
         },
       },
     },
@@ -137,6 +147,7 @@ export default function V1OperationalFactPage({ moduleKey }) {
     <OperationalFactWorkspace
       pageTitle={moduleItem?.title || config.viewOverrides?.finance?.title}
       pageSummary={config.pageSummary || moduleItem?.description}
+      toolbarModuleKey={moduleKey}
       initialActiveKey={config.initialActiveKey}
       enabledViews={config.enabledViews}
       viewOverrides={config.viewOverrides}

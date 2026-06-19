@@ -61,6 +61,87 @@ const COUNTERPARTY_TYPES = [
   { label: '其他 OTHER', value: 'OTHER' },
 ]
 
+const CURRENCY_OPTIONS = [
+  { label: '美金 USD', value: 'USD' },
+  { label: '人民币 CNY', value: 'CNY' },
+  { label: '港币 HKD', value: 'HKD' },
+]
+
+const COLLECTION_TYPE_OPTIONS = [
+  { label: '预收款', value: 'ADVANCE_RECEIPT' },
+  { label: '应收款', value: 'ACCOUNTS_RECEIVABLE' },
+]
+
+const PAYMENT_TERM_OPTIONS = [
+  { label: '出货即收', value: 'CASH_ON_SHIPMENT', days: 0 },
+  { label: '月结 30 天', value: 'EOM_30', days: 30 },
+  { label: '月结 45 天', value: 'EOM_45', days: 45 },
+]
+
+const INVOICE_CATEGORY_OPTIONS = [
+  { label: '不开票', value: 'NONE' },
+  { label: '出口普票', value: 'EXPORT_GENERAL' },
+  { label: '1% 普票', value: 'VAT_GENERAL_1' },
+  { label: '3% 专票', value: 'VAT_SPECIAL_3' },
+  { label: '13% 专票', value: 'VAT_SPECIAL_13' },
+]
+
+function CurrencyAmountInput({
+  currencyLabel,
+  disabled,
+  id,
+  onBlur,
+  onChange,
+  placeholder,
+  value,
+}) {
+  return (
+    <Input
+      allowClear
+      autoComplete="off"
+      disabled={disabled}
+      id={id}
+      onBlur={onBlur}
+      onChange={onChange}
+      placeholder={placeholder}
+      suffix={
+        <span className="erp-operational-fact-form__currency-addon">
+          {currencyLabel}
+        </span>
+      }
+      value={value}
+    />
+  )
+}
+
+const CURRENCY_LABELS = Object.freeze(
+  CURRENCY_OPTIONS.reduce((labels, item) => {
+    labels[item.value] = item.label
+    return labels
+  }, {})
+)
+
+export const FINANCE_COLLECTION_TYPE_LABELS = Object.freeze(
+  COLLECTION_TYPE_OPTIONS.reduce((labels, item) => {
+    labels[item.value] = item.label
+    return labels
+  }, {})
+)
+
+export const FINANCE_PAYMENT_TERM_LABELS = Object.freeze(
+  PAYMENT_TERM_OPTIONS.reduce((labels, item) => {
+    labels[item.value] = item.label
+    return labels
+  }, {})
+)
+
+export const FINANCE_INVOICE_CATEGORY_LABELS = Object.freeze(
+  INVOICE_CATEGORY_OPTIONS.reduce((labels, item) => {
+    labels[item.value] = item.label
+    return labels
+  }, {})
+)
+
 const BUSINESS_FIELD_CLASS = 'erp-business-action-form__field'
 const BUSINESS_FIELD_FULL_CLASS =
   'erp-business-action-form__field erp-business-action-form__field--full'
@@ -158,6 +239,14 @@ function requiredInt(value) {
   return positiveInt(value) || 0
 }
 
+function nonNegativeInt(value) {
+  if (value === '' || value === null || value === undefined) return undefined
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) && numberValue >= 0
+    ? Math.trunc(numberValue)
+    : undefined
+}
+
 function dateValue(value) {
   return trimOptional(value)
 }
@@ -235,7 +324,12 @@ export function buildFinanceParams(values = {}) {
     counterparty_type: trimOptional(values.counterparty_type),
     counterparty_id: positiveInt(values.counterparty_id),
     amount: trimOptional(values.amount),
+    fee_amount: trimOptional(values.fee_amount),
     currency: trimOptional(values.currency),
+    collection_type: trimOptional(values.collection_type),
+    payment_term: trimOptional(values.payment_term),
+    payment_term_days: nonNegativeInt(values.payment_term_days),
+    invoice_category: trimOptional(values.invoice_category),
     source_type: trimOptional(values.source_type),
     source_id: positiveInt(values.source_id),
     source_line_id: positiveInt(values.source_line_id),
@@ -278,7 +372,7 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="对象 ID"
+        label="对象引用"
         name="subject_id"
         rules={[{ required: true }]}
       >
@@ -286,18 +380,22 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="仓库 ID"
+        label="仓库引用"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item className={BUSINESS_FIELD_CLASS} label="批次 ID" name="lot_id">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="批次引用"
+        name="lot_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="单位 ID"
+        label="单位引用"
         name="unit_id"
         rules={[{ required: true }]}
       >
@@ -315,7 +413,7 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
         <>
           <Form.Item
             className={BUSINESS_FIELD_CLASS}
-            label="供应商 ID"
+            label="供应商引用"
             name="supplier_id"
           >
             <InputNumber min={1} precision={0} style={{ width: '100%' }} />
@@ -338,14 +436,14 @@ export function FactFormFields({ typeOptions, includeSupplier = false }) {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="来源 ID"
+        label="来源记录"
         name="source_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="来源行 ID"
+        label="来源行引用"
         name="source_line_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
@@ -389,14 +487,14 @@ export function ShipmentFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="销售订单 ID"
+        label="销售订单引用"
         name="sales_order_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="客户 ID"
+        label="客户引用"
         name="customer_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
@@ -435,7 +533,7 @@ export function ShipmentItemFormFields() {
     <>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="出货单 ID"
+        label="出货单引用"
         name="shipment_id"
         rules={[{ required: true }]}
       >
@@ -443,14 +541,14 @@ export function ShipmentItemFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="销售订单行 ID"
+        label="销售订单行引用"
         name="sales_order_item_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="产品 ID"
+        label="产品引用"
         name="product_id"
         rules={[{ required: true }]}
       >
@@ -458,18 +556,22 @@ export function ShipmentItemFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="仓库 ID"
+        label="仓库引用"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item className={BUSINESS_FIELD_CLASS} label="批次 ID" name="lot_id">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="批次引用"
+        name="lot_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="单位 ID"
+        label="单位引用"
         name="unit_id"
         rules={[{ required: true }]}
       >
@@ -507,21 +609,21 @@ export function ReservationFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="销售订单 ID"
+        label="销售订单引用"
         name="sales_order_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="销售订单行 ID"
+        label="销售订单行引用"
         name="sales_order_item_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="产品 ID"
+        label="产品引用"
         name="product_id"
         rules={[{ required: true }]}
       >
@@ -529,18 +631,22 @@ export function ReservationFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="仓库 ID"
+        label="仓库引用"
         name="warehouse_id"
         rules={[{ required: true }]}
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
-      <Form.Item className={BUSINESS_FIELD_CLASS} label="批次 ID" name="lot_id">
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="批次引用"
+        name="lot_id"
+      >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="单位 ID"
+        label="单位引用"
         name="unit_id"
         rules={[{ required: true }]}
       >
@@ -577,6 +683,10 @@ export function ReservationFormFields() {
 }
 
 export function FinanceFormFields() {
+  const form = Form.useFormInstance()
+  const currency = Form.useWatch('currency')
+  const currencyLabel = CURRENCY_LABELS[currency] || '人民币 CNY'
+
   return (
     <>
       <Form.Item
@@ -609,7 +719,7 @@ export function FinanceFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="往来方 ID"
+        label="往来方引用"
         name="counterparty_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
@@ -620,7 +730,20 @@ export function FinanceFormFields() {
         name="amount"
         rules={[{ required: true }]}
       >
-        <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
+        <CurrencyAmountInput
+          currencyLabel={currencyLabel}
+          placeholder="decimal，如 120.5"
+        />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="手续费"
+        name="fee_amount"
+      >
+        <CurrencyAmountInput
+          currencyLabel={currencyLabel}
+          placeholder="无手续费可留空或填 0"
+        />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
@@ -628,7 +751,44 @@ export function FinanceFormFields() {
         name="currency"
         rules={[{ required: true }]}
       >
-        <Input allowClear autoComplete="off" />
+        <Select options={CURRENCY_OPTIONS} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="收款分类"
+        name="collection_type"
+      >
+        <Select allowClear options={COLLECTION_TYPE_OPTIONS} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="收款账期"
+        name="payment_term"
+      >
+        <Select
+          allowClear
+          options={PAYMENT_TERM_OPTIONS}
+          onChange={(value) => {
+            const option = PAYMENT_TERM_OPTIONS.find(
+              (item) => item.value === value
+            )
+            form.setFieldValue('payment_term_days', option?.days)
+          }}
+        />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="账期天数"
+        name="payment_term_days"
+      >
+        <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+      </Form.Item>
+      <Form.Item
+        className={BUSINESS_FIELD_CLASS}
+        label="发票类别"
+        name="invoice_category"
+      >
+        <Select allowClear options={INVOICE_CATEGORY_OPTIONS} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
@@ -639,14 +799,14 @@ export function FinanceFormFields() {
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="来源 ID"
+        label="来源记录"
         name="source_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />
       </Form.Item>
       <Form.Item
         className={BUSINESS_FIELD_CLASS}
-        label="来源行 ID"
+        label="来源行引用"
         name="source_line_id"
       >
         <InputNumber min={1} precision={0} style={{ width: '100%' }} />

@@ -1,4 +1,5 @@
 import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
+import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
 import { isRoleKeyMatch, normalizeRoleKey } from '../../utils/roleKeys.mjs'
 import {
   ORDER_APPROVAL_STATUS_KEY,
@@ -368,7 +369,7 @@ function hasFinanceAmountPayload(task) {
 }
 
 export function resolveTaskSourceLabel(task) {
-  return task.source_no || `${task.source_type} #${task.source_id}`
+  return formatWorkflowTaskSource(task)
 }
 
 export function isTaskOverdue(task) {

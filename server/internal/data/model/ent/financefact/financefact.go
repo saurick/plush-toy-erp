@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -26,8 +27,18 @@ const (
 	FieldCounterpartyID = "counterparty_id"
 	// FieldAmount holds the string denoting the amount field in the database.
 	FieldAmount = "amount"
+	// FieldFeeAmount holds the string denoting the fee_amount field in the database.
+	FieldFeeAmount = "fee_amount"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
+	// FieldCollectionType holds the string denoting the collection_type field in the database.
+	FieldCollectionType = "collection_type"
+	// FieldPaymentTerm holds the string denoting the payment_term field in the database.
+	FieldPaymentTerm = "payment_term"
+	// FieldPaymentTermDays holds the string denoting the payment_term_days field in the database.
+	FieldPaymentTermDays = "payment_term_days"
+	// FieldInvoiceCategory holds the string denoting the invoice_category field in the database.
+	FieldInvoiceCategory = "invoice_category"
 	// FieldSourceType holds the string denoting the source_type field in the database.
 	FieldSourceType = "source_type"
 	// FieldSourceID holds the string denoting the source_id field in the database.
@@ -61,7 +72,12 @@ var Columns = []string{
 	FieldCounterpartyType,
 	FieldCounterpartyID,
 	FieldAmount,
+	FieldFeeAmount,
 	FieldCurrency,
+	FieldCollectionType,
+	FieldPaymentTerm,
+	FieldPaymentTermDays,
+	FieldInvoiceCategory,
 	FieldSourceType,
 	FieldSourceID,
 	FieldSourceLineID,
@@ -103,10 +119,20 @@ var (
 	CounterpartyTypeValidator func(string) error
 	// CounterpartyIDValidator is a validator for the "counterparty_id" field. It is called by the builders before save.
 	CounterpartyIDValidator func(int) error
+	// DefaultFeeAmount holds the default value on creation for the "fee_amount" field.
+	DefaultFeeAmount decimal.Decimal
 	// DefaultCurrency holds the default value on creation for the "currency" field.
 	DefaultCurrency string
 	// CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	CurrencyValidator func(string) error
+	// CollectionTypeValidator is a validator for the "collection_type" field. It is called by the builders before save.
+	CollectionTypeValidator func(string) error
+	// PaymentTermValidator is a validator for the "payment_term" field. It is called by the builders before save.
+	PaymentTermValidator func(string) error
+	// PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
+	PaymentTermDaysValidator func(int) error
+	// InvoiceCategoryValidator is a validator for the "invoice_category" field. It is called by the builders before save.
+	InvoiceCategoryValidator func(string) error
 	// SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
 	SourceTypeValidator func(string) error
 	// SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
@@ -165,9 +191,34 @@ func ByAmount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAmount, opts...).ToFunc()
 }
 
+// ByFeeAmount orders the results by the fee_amount field.
+func ByFeeAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFeeAmount, opts...).ToFunc()
+}
+
 // ByCurrency orders the results by the currency field.
 func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCurrency, opts...).ToFunc()
+}
+
+// ByCollectionType orders the results by the collection_type field.
+func ByCollectionType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCollectionType, opts...).ToFunc()
+}
+
+// ByPaymentTerm orders the results by the payment_term field.
+func ByPaymentTerm(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPaymentTerm, opts...).ToFunc()
+}
+
+// ByPaymentTermDays orders the results by the payment_term_days field.
+func ByPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPaymentTermDays, opts...).ToFunc()
+}
+
+// ByInvoiceCategory orders the results by the invoice_category field.
+func ByInvoiceCategory(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInvoiceCategory, opts...).ToFunc()
 }
 
 // BySourceType orders the results by the source_type field.

@@ -78,6 +78,53 @@ func (_u *CustomerUpdate) ClearShortName() *CustomerUpdate {
 	return _u
 }
 
+// SetDefaultPaymentMethod sets the "default_payment_method" field.
+func (_u *CustomerUpdate) SetDefaultPaymentMethod(v string) *CustomerUpdate {
+	_u.mutation.SetDefaultPaymentMethod(v)
+	return _u
+}
+
+// SetNillableDefaultPaymentMethod sets the "default_payment_method" field if the given value is not nil.
+func (_u *CustomerUpdate) SetNillableDefaultPaymentMethod(v *string) *CustomerUpdate {
+	if v != nil {
+		_u.SetDefaultPaymentMethod(*v)
+	}
+	return _u
+}
+
+// ClearDefaultPaymentMethod clears the value of the "default_payment_method" field.
+func (_u *CustomerUpdate) ClearDefaultPaymentMethod() *CustomerUpdate {
+	_u.mutation.ClearDefaultPaymentMethod()
+	return _u
+}
+
+// SetDefaultPaymentTermDays sets the "default_payment_term_days" field.
+func (_u *CustomerUpdate) SetDefaultPaymentTermDays(v int) *CustomerUpdate {
+	_u.mutation.ResetDefaultPaymentTermDays()
+	_u.mutation.SetDefaultPaymentTermDays(v)
+	return _u
+}
+
+// SetNillableDefaultPaymentTermDays sets the "default_payment_term_days" field if the given value is not nil.
+func (_u *CustomerUpdate) SetNillableDefaultPaymentTermDays(v *int) *CustomerUpdate {
+	if v != nil {
+		_u.SetDefaultPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddDefaultPaymentTermDays adds value to the "default_payment_term_days" field.
+func (_u *CustomerUpdate) AddDefaultPaymentTermDays(v int) *CustomerUpdate {
+	_u.mutation.AddDefaultPaymentTermDays(v)
+	return _u
+}
+
+// ClearDefaultPaymentTermDays clears the value of the "default_payment_term_days" field.
+func (_u *CustomerUpdate) ClearDefaultPaymentTermDays() *CustomerUpdate {
+	_u.mutation.ClearDefaultPaymentTermDays()
+	return _u
+}
+
 // SetTaxNo sets the "tax_no" field.
 func (_u *CustomerUpdate) SetTaxNo(v string) *CustomerUpdate {
 	_u.mutation.SetTaxNo(v)
@@ -268,6 +315,16 @@ func (_u *CustomerUpdate) check() error {
 			return &ValidationError{Name: "short_name", err: fmt.Errorf(`ent: validator failed for field "Customer.short_name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DefaultPaymentMethod(); ok {
+		if err := customer.DefaultPaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_method", err: fmt.Errorf(`ent: validator failed for field "Customer.default_payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultPaymentTermDays(); ok {
+		if err := customer.DefaultPaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Customer.default_payment_term_days": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.TaxNo(); ok {
 		if err := customer.TaxNoValidator(v); err != nil {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Customer.tax_no": %w`, err)}
@@ -304,6 +361,21 @@ func (_u *CustomerUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ShortNameCleared() {
 		_spec.ClearField(customer.FieldShortName, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultPaymentMethod(); ok {
+		_spec.SetField(customer.FieldDefaultPaymentMethod, field.TypeString, value)
+	}
+	if _u.mutation.DefaultPaymentMethodCleared() {
+		_spec.ClearField(customer.FieldDefaultPaymentMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultPaymentTermDays(); ok {
+		_spec.SetField(customer.FieldDefaultPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDefaultPaymentTermDays(); ok {
+		_spec.AddField(customer.FieldDefaultPaymentTermDays, field.TypeInt, value)
+	}
+	if _u.mutation.DefaultPaymentTermDaysCleared() {
+		_spec.ClearField(customer.FieldDefaultPaymentTermDays, field.TypeInt)
 	}
 	if value, ok := _u.mutation.TaxNo(); ok {
 		_spec.SetField(customer.FieldTaxNo, field.TypeString, value)
@@ -478,6 +550,53 @@ func (_u *CustomerUpdateOne) SetNillableShortName(v *string) *CustomerUpdateOne 
 // ClearShortName clears the value of the "short_name" field.
 func (_u *CustomerUpdateOne) ClearShortName() *CustomerUpdateOne {
 	_u.mutation.ClearShortName()
+	return _u
+}
+
+// SetDefaultPaymentMethod sets the "default_payment_method" field.
+func (_u *CustomerUpdateOne) SetDefaultPaymentMethod(v string) *CustomerUpdateOne {
+	_u.mutation.SetDefaultPaymentMethod(v)
+	return _u
+}
+
+// SetNillableDefaultPaymentMethod sets the "default_payment_method" field if the given value is not nil.
+func (_u *CustomerUpdateOne) SetNillableDefaultPaymentMethod(v *string) *CustomerUpdateOne {
+	if v != nil {
+		_u.SetDefaultPaymentMethod(*v)
+	}
+	return _u
+}
+
+// ClearDefaultPaymentMethod clears the value of the "default_payment_method" field.
+func (_u *CustomerUpdateOne) ClearDefaultPaymentMethod() *CustomerUpdateOne {
+	_u.mutation.ClearDefaultPaymentMethod()
+	return _u
+}
+
+// SetDefaultPaymentTermDays sets the "default_payment_term_days" field.
+func (_u *CustomerUpdateOne) SetDefaultPaymentTermDays(v int) *CustomerUpdateOne {
+	_u.mutation.ResetDefaultPaymentTermDays()
+	_u.mutation.SetDefaultPaymentTermDays(v)
+	return _u
+}
+
+// SetNillableDefaultPaymentTermDays sets the "default_payment_term_days" field if the given value is not nil.
+func (_u *CustomerUpdateOne) SetNillableDefaultPaymentTermDays(v *int) *CustomerUpdateOne {
+	if v != nil {
+		_u.SetDefaultPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddDefaultPaymentTermDays adds value to the "default_payment_term_days" field.
+func (_u *CustomerUpdateOne) AddDefaultPaymentTermDays(v int) *CustomerUpdateOne {
+	_u.mutation.AddDefaultPaymentTermDays(v)
+	return _u
+}
+
+// ClearDefaultPaymentTermDays clears the value of the "default_payment_term_days" field.
+func (_u *CustomerUpdateOne) ClearDefaultPaymentTermDays() *CustomerUpdateOne {
+	_u.mutation.ClearDefaultPaymentTermDays()
 	return _u
 }
 
@@ -684,6 +803,16 @@ func (_u *CustomerUpdateOne) check() error {
 			return &ValidationError{Name: "short_name", err: fmt.Errorf(`ent: validator failed for field "Customer.short_name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DefaultPaymentMethod(); ok {
+		if err := customer.DefaultPaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_method", err: fmt.Errorf(`ent: validator failed for field "Customer.default_payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.DefaultPaymentTermDays(); ok {
+		if err := customer.DefaultPaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "default_payment_term_days", err: fmt.Errorf(`ent: validator failed for field "Customer.default_payment_term_days": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.TaxNo(); ok {
 		if err := customer.TaxNoValidator(v); err != nil {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Customer.tax_no": %w`, err)}
@@ -737,6 +866,21 @@ func (_u *CustomerUpdateOne) sqlSave(ctx context.Context) (_node *Customer, err 
 	}
 	if _u.mutation.ShortNameCleared() {
 		_spec.ClearField(customer.FieldShortName, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultPaymentMethod(); ok {
+		_spec.SetField(customer.FieldDefaultPaymentMethod, field.TypeString, value)
+	}
+	if _u.mutation.DefaultPaymentMethodCleared() {
+		_spec.ClearField(customer.FieldDefaultPaymentMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefaultPaymentTermDays(); ok {
+		_spec.SetField(customer.FieldDefaultPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedDefaultPaymentTermDays(); ok {
+		_spec.AddField(customer.FieldDefaultPaymentTermDays, field.TypeInt, value)
+	}
+	if _u.mutation.DefaultPaymentTermDaysCleared() {
+		_spec.ClearField(customer.FieldDefaultPaymentTermDays, field.TypeInt)
 	}
 	if value, ok := _u.mutation.TaxNo(); ok {
 		_spec.SetField(customer.FieldTaxNo, field.TypeString, value)

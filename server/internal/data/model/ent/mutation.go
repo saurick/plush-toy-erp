@@ -4327,27 +4327,30 @@ func (m *ContactMutation) ResetEdge(name string) error {
 // CustomerMutation represents an operation that mutates the Customer nodes in the graph.
 type CustomerMutation struct {
 	config
-	op                  Op
-	typ                 string
-	id                  *int
-	code                *string
-	name                *string
-	short_name          *string
-	tax_no              *string
-	is_active           *bool
-	note                *string
-	created_at          *time.Time
-	updated_at          *time.Time
-	clearedFields       map[string]struct{}
-	sales_orders        map[int]struct{}
-	removedsales_orders map[int]struct{}
-	clearedsales_orders bool
-	shipments           map[int]struct{}
-	removedshipments    map[int]struct{}
-	clearedshipments    bool
-	done                bool
-	oldValue            func(context.Context) (*Customer, error)
-	predicates          []predicate.Customer
+	op                           Op
+	typ                          string
+	id                           *int
+	code                         *string
+	name                         *string
+	short_name                   *string
+	default_payment_method       *string
+	default_payment_term_days    *int
+	adddefault_payment_term_days *int
+	tax_no                       *string
+	is_active                    *bool
+	note                         *string
+	created_at                   *time.Time
+	updated_at                   *time.Time
+	clearedFields                map[string]struct{}
+	sales_orders                 map[int]struct{}
+	removedsales_orders          map[int]struct{}
+	clearedsales_orders          bool
+	shipments                    map[int]struct{}
+	removedshipments             map[int]struct{}
+	clearedshipments             bool
+	done                         bool
+	oldValue                     func(context.Context) (*Customer, error)
+	predicates                   []predicate.Customer
 }
 
 var _ ent.Mutation = (*CustomerMutation)(nil)
@@ -4567,6 +4570,125 @@ func (m *CustomerMutation) ShortNameCleared() bool {
 func (m *CustomerMutation) ResetShortName() {
 	m.short_name = nil
 	delete(m.clearedFields, customer.FieldShortName)
+}
+
+// SetDefaultPaymentMethod sets the "default_payment_method" field.
+func (m *CustomerMutation) SetDefaultPaymentMethod(s string) {
+	m.default_payment_method = &s
+}
+
+// DefaultPaymentMethod returns the value of the "default_payment_method" field in the mutation.
+func (m *CustomerMutation) DefaultPaymentMethod() (r string, exists bool) {
+	v := m.default_payment_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultPaymentMethod returns the old "default_payment_method" field's value of the Customer entity.
+// If the Customer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CustomerMutation) OldDefaultPaymentMethod(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultPaymentMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultPaymentMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultPaymentMethod: %w", err)
+	}
+	return oldValue.DefaultPaymentMethod, nil
+}
+
+// ClearDefaultPaymentMethod clears the value of the "default_payment_method" field.
+func (m *CustomerMutation) ClearDefaultPaymentMethod() {
+	m.default_payment_method = nil
+	m.clearedFields[customer.FieldDefaultPaymentMethod] = struct{}{}
+}
+
+// DefaultPaymentMethodCleared returns if the "default_payment_method" field was cleared in this mutation.
+func (m *CustomerMutation) DefaultPaymentMethodCleared() bool {
+	_, ok := m.clearedFields[customer.FieldDefaultPaymentMethod]
+	return ok
+}
+
+// ResetDefaultPaymentMethod resets all changes to the "default_payment_method" field.
+func (m *CustomerMutation) ResetDefaultPaymentMethod() {
+	m.default_payment_method = nil
+	delete(m.clearedFields, customer.FieldDefaultPaymentMethod)
+}
+
+// SetDefaultPaymentTermDays sets the "default_payment_term_days" field.
+func (m *CustomerMutation) SetDefaultPaymentTermDays(i int) {
+	m.default_payment_term_days = &i
+	m.adddefault_payment_term_days = nil
+}
+
+// DefaultPaymentTermDays returns the value of the "default_payment_term_days" field in the mutation.
+func (m *CustomerMutation) DefaultPaymentTermDays() (r int, exists bool) {
+	v := m.default_payment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDefaultPaymentTermDays returns the old "default_payment_term_days" field's value of the Customer entity.
+// If the Customer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CustomerMutation) OldDefaultPaymentTermDays(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDefaultPaymentTermDays is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDefaultPaymentTermDays requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDefaultPaymentTermDays: %w", err)
+	}
+	return oldValue.DefaultPaymentTermDays, nil
+}
+
+// AddDefaultPaymentTermDays adds i to the "default_payment_term_days" field.
+func (m *CustomerMutation) AddDefaultPaymentTermDays(i int) {
+	if m.adddefault_payment_term_days != nil {
+		*m.adddefault_payment_term_days += i
+	} else {
+		m.adddefault_payment_term_days = &i
+	}
+}
+
+// AddedDefaultPaymentTermDays returns the value that was added to the "default_payment_term_days" field in this mutation.
+func (m *CustomerMutation) AddedDefaultPaymentTermDays() (r int, exists bool) {
+	v := m.adddefault_payment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDefaultPaymentTermDays clears the value of the "default_payment_term_days" field.
+func (m *CustomerMutation) ClearDefaultPaymentTermDays() {
+	m.default_payment_term_days = nil
+	m.adddefault_payment_term_days = nil
+	m.clearedFields[customer.FieldDefaultPaymentTermDays] = struct{}{}
+}
+
+// DefaultPaymentTermDaysCleared returns if the "default_payment_term_days" field was cleared in this mutation.
+func (m *CustomerMutation) DefaultPaymentTermDaysCleared() bool {
+	_, ok := m.clearedFields[customer.FieldDefaultPaymentTermDays]
+	return ok
+}
+
+// ResetDefaultPaymentTermDays resets all changes to the "default_payment_term_days" field.
+func (m *CustomerMutation) ResetDefaultPaymentTermDays() {
+	m.default_payment_term_days = nil
+	m.adddefault_payment_term_days = nil
+	delete(m.clearedFields, customer.FieldDefaultPaymentTermDays)
 }
 
 // SetTaxNo sets the "tax_no" field.
@@ -4917,7 +5039,7 @@ func (m *CustomerMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CustomerMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 10)
 	if m.code != nil {
 		fields = append(fields, customer.FieldCode)
 	}
@@ -4926,6 +5048,12 @@ func (m *CustomerMutation) Fields() []string {
 	}
 	if m.short_name != nil {
 		fields = append(fields, customer.FieldShortName)
+	}
+	if m.default_payment_method != nil {
+		fields = append(fields, customer.FieldDefaultPaymentMethod)
+	}
+	if m.default_payment_term_days != nil {
+		fields = append(fields, customer.FieldDefaultPaymentTermDays)
 	}
 	if m.tax_no != nil {
 		fields = append(fields, customer.FieldTaxNo)
@@ -4956,6 +5084,10 @@ func (m *CustomerMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case customer.FieldShortName:
 		return m.ShortName()
+	case customer.FieldDefaultPaymentMethod:
+		return m.DefaultPaymentMethod()
+	case customer.FieldDefaultPaymentTermDays:
+		return m.DefaultPaymentTermDays()
 	case customer.FieldTaxNo:
 		return m.TaxNo()
 	case customer.FieldIsActive:
@@ -4981,6 +5113,10 @@ func (m *CustomerMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldName(ctx)
 	case customer.FieldShortName:
 		return m.OldShortName(ctx)
+	case customer.FieldDefaultPaymentMethod:
+		return m.OldDefaultPaymentMethod(ctx)
+	case customer.FieldDefaultPaymentTermDays:
+		return m.OldDefaultPaymentTermDays(ctx)
 	case customer.FieldTaxNo:
 		return m.OldTaxNo(ctx)
 	case customer.FieldIsActive:
@@ -5020,6 +5156,20 @@ func (m *CustomerMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetShortName(v)
+		return nil
+	case customer.FieldDefaultPaymentMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultPaymentMethod(v)
+		return nil
+	case customer.FieldDefaultPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDefaultPaymentTermDays(v)
 		return nil
 	case customer.FieldTaxNo:
 		v, ok := value.(string)
@@ -5063,13 +5213,21 @@ func (m *CustomerMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *CustomerMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.adddefault_payment_term_days != nil {
+		fields = append(fields, customer.FieldDefaultPaymentTermDays)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *CustomerMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case customer.FieldDefaultPaymentTermDays:
+		return m.AddedDefaultPaymentTermDays()
+	}
 	return nil, false
 }
 
@@ -5078,6 +5236,13 @@ func (m *CustomerMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *CustomerMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case customer.FieldDefaultPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDefaultPaymentTermDays(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Customer numeric field %s", name)
 }
@@ -5088,6 +5253,12 @@ func (m *CustomerMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(customer.FieldShortName) {
 		fields = append(fields, customer.FieldShortName)
+	}
+	if m.FieldCleared(customer.FieldDefaultPaymentMethod) {
+		fields = append(fields, customer.FieldDefaultPaymentMethod)
+	}
+	if m.FieldCleared(customer.FieldDefaultPaymentTermDays) {
+		fields = append(fields, customer.FieldDefaultPaymentTermDays)
 	}
 	if m.FieldCleared(customer.FieldTaxNo) {
 		fields = append(fields, customer.FieldTaxNo)
@@ -5112,6 +5283,12 @@ func (m *CustomerMutation) ClearField(name string) error {
 	case customer.FieldShortName:
 		m.ClearShortName()
 		return nil
+	case customer.FieldDefaultPaymentMethod:
+		m.ClearDefaultPaymentMethod()
+		return nil
+	case customer.FieldDefaultPaymentTermDays:
+		m.ClearDefaultPaymentTermDays()
+		return nil
 	case customer.FieldTaxNo:
 		m.ClearTaxNo()
 		return nil
@@ -5134,6 +5311,12 @@ func (m *CustomerMutation) ResetField(name string) error {
 		return nil
 	case customer.FieldShortName:
 		m.ResetShortName()
+		return nil
+	case customer.FieldDefaultPaymentMethod:
+		m.ResetDefaultPaymentMethod()
+		return nil
+	case customer.FieldDefaultPaymentTermDays:
+		m.ResetDefaultPaymentTermDays()
 		return nil
 	case customer.FieldTaxNo:
 		m.ResetTaxNo()
@@ -5267,33 +5450,39 @@ func (m *CustomerMutation) ResetEdge(name string) error {
 // FinanceFactMutation represents an operation that mutates the FinanceFact nodes in the graph.
 type FinanceFactMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	fact_no            *string
-	fact_type          *string
-	status             *string
-	counterparty_type  *string
-	counterparty_id    *int
-	addcounterparty_id *int
-	amount             *decimal.Decimal
-	currency           *string
-	source_type        *string
-	source_id          *int
-	addsource_id       *int
-	source_line_id     *int
-	addsource_line_id  *int
-	idempotency_key    *string
-	occurred_at        *time.Time
-	posted_at          *time.Time
-	settled_at         *time.Time
-	note               *string
-	created_at         *time.Time
-	updated_at         *time.Time
-	clearedFields      map[string]struct{}
-	done               bool
-	oldValue           func(context.Context) (*FinanceFact, error)
-	predicates         []predicate.FinanceFact
+	op                   Op
+	typ                  string
+	id                   *int
+	fact_no              *string
+	fact_type            *string
+	status               *string
+	counterparty_type    *string
+	counterparty_id      *int
+	addcounterparty_id   *int
+	amount               *decimal.Decimal
+	fee_amount           *decimal.Decimal
+	currency             *string
+	collection_type      *string
+	payment_term         *string
+	payment_term_days    *int
+	addpayment_term_days *int
+	invoice_category     *string
+	source_type          *string
+	source_id            *int
+	addsource_id         *int
+	source_line_id       *int
+	addsource_line_id    *int
+	idempotency_key      *string
+	occurred_at          *time.Time
+	posted_at            *time.Time
+	settled_at           *time.Time
+	note                 *string
+	created_at           *time.Time
+	updated_at           *time.Time
+	clearedFields        map[string]struct{}
+	done                 bool
+	oldValue             func(context.Context) (*FinanceFact, error)
+	predicates           []predicate.FinanceFact
 }
 
 var _ ent.Mutation = (*FinanceFactMutation)(nil)
@@ -5644,6 +5833,42 @@ func (m *FinanceFactMutation) ResetAmount() {
 	m.amount = nil
 }
 
+// SetFeeAmount sets the "fee_amount" field.
+func (m *FinanceFactMutation) SetFeeAmount(d decimal.Decimal) {
+	m.fee_amount = &d
+}
+
+// FeeAmount returns the value of the "fee_amount" field in the mutation.
+func (m *FinanceFactMutation) FeeAmount() (r decimal.Decimal, exists bool) {
+	v := m.fee_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFeeAmount returns the old "fee_amount" field's value of the FinanceFact entity.
+// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceFactMutation) OldFeeAmount(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFeeAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFeeAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFeeAmount: %w", err)
+	}
+	return oldValue.FeeAmount, nil
+}
+
+// ResetFeeAmount resets all changes to the "fee_amount" field.
+func (m *FinanceFactMutation) ResetFeeAmount() {
+	m.fee_amount = nil
+}
+
 // SetCurrency sets the "currency" field.
 func (m *FinanceFactMutation) SetCurrency(s string) {
 	m.currency = &s
@@ -5678,6 +5903,223 @@ func (m *FinanceFactMutation) OldCurrency(ctx context.Context) (v string, err er
 // ResetCurrency resets all changes to the "currency" field.
 func (m *FinanceFactMutation) ResetCurrency() {
 	m.currency = nil
+}
+
+// SetCollectionType sets the "collection_type" field.
+func (m *FinanceFactMutation) SetCollectionType(s string) {
+	m.collection_type = &s
+}
+
+// CollectionType returns the value of the "collection_type" field in the mutation.
+func (m *FinanceFactMutation) CollectionType() (r string, exists bool) {
+	v := m.collection_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCollectionType returns the old "collection_type" field's value of the FinanceFact entity.
+// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceFactMutation) OldCollectionType(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCollectionType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCollectionType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCollectionType: %w", err)
+	}
+	return oldValue.CollectionType, nil
+}
+
+// ClearCollectionType clears the value of the "collection_type" field.
+func (m *FinanceFactMutation) ClearCollectionType() {
+	m.collection_type = nil
+	m.clearedFields[financefact.FieldCollectionType] = struct{}{}
+}
+
+// CollectionTypeCleared returns if the "collection_type" field was cleared in this mutation.
+func (m *FinanceFactMutation) CollectionTypeCleared() bool {
+	_, ok := m.clearedFields[financefact.FieldCollectionType]
+	return ok
+}
+
+// ResetCollectionType resets all changes to the "collection_type" field.
+func (m *FinanceFactMutation) ResetCollectionType() {
+	m.collection_type = nil
+	delete(m.clearedFields, financefact.FieldCollectionType)
+}
+
+// SetPaymentTerm sets the "payment_term" field.
+func (m *FinanceFactMutation) SetPaymentTerm(s string) {
+	m.payment_term = &s
+}
+
+// PaymentTerm returns the value of the "payment_term" field in the mutation.
+func (m *FinanceFactMutation) PaymentTerm() (r string, exists bool) {
+	v := m.payment_term
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentTerm returns the old "payment_term" field's value of the FinanceFact entity.
+// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceFactMutation) OldPaymentTerm(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentTerm is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentTerm requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentTerm: %w", err)
+	}
+	return oldValue.PaymentTerm, nil
+}
+
+// ClearPaymentTerm clears the value of the "payment_term" field.
+func (m *FinanceFactMutation) ClearPaymentTerm() {
+	m.payment_term = nil
+	m.clearedFields[financefact.FieldPaymentTerm] = struct{}{}
+}
+
+// PaymentTermCleared returns if the "payment_term" field was cleared in this mutation.
+func (m *FinanceFactMutation) PaymentTermCleared() bool {
+	_, ok := m.clearedFields[financefact.FieldPaymentTerm]
+	return ok
+}
+
+// ResetPaymentTerm resets all changes to the "payment_term" field.
+func (m *FinanceFactMutation) ResetPaymentTerm() {
+	m.payment_term = nil
+	delete(m.clearedFields, financefact.FieldPaymentTerm)
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (m *FinanceFactMutation) SetPaymentTermDays(i int) {
+	m.payment_term_days = &i
+	m.addpayment_term_days = nil
+}
+
+// PaymentTermDays returns the value of the "payment_term_days" field in the mutation.
+func (m *FinanceFactMutation) PaymentTermDays() (r int, exists bool) {
+	v := m.payment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentTermDays returns the old "payment_term_days" field's value of the FinanceFact entity.
+// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceFactMutation) OldPaymentTermDays(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentTermDays is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentTermDays requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentTermDays: %w", err)
+	}
+	return oldValue.PaymentTermDays, nil
+}
+
+// AddPaymentTermDays adds i to the "payment_term_days" field.
+func (m *FinanceFactMutation) AddPaymentTermDays(i int) {
+	if m.addpayment_term_days != nil {
+		*m.addpayment_term_days += i
+	} else {
+		m.addpayment_term_days = &i
+	}
+}
+
+// AddedPaymentTermDays returns the value that was added to the "payment_term_days" field in this mutation.
+func (m *FinanceFactMutation) AddedPaymentTermDays() (r int, exists bool) {
+	v := m.addpayment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (m *FinanceFactMutation) ClearPaymentTermDays() {
+	m.payment_term_days = nil
+	m.addpayment_term_days = nil
+	m.clearedFields[financefact.FieldPaymentTermDays] = struct{}{}
+}
+
+// PaymentTermDaysCleared returns if the "payment_term_days" field was cleared in this mutation.
+func (m *FinanceFactMutation) PaymentTermDaysCleared() bool {
+	_, ok := m.clearedFields[financefact.FieldPaymentTermDays]
+	return ok
+}
+
+// ResetPaymentTermDays resets all changes to the "payment_term_days" field.
+func (m *FinanceFactMutation) ResetPaymentTermDays() {
+	m.payment_term_days = nil
+	m.addpayment_term_days = nil
+	delete(m.clearedFields, financefact.FieldPaymentTermDays)
+}
+
+// SetInvoiceCategory sets the "invoice_category" field.
+func (m *FinanceFactMutation) SetInvoiceCategory(s string) {
+	m.invoice_category = &s
+}
+
+// InvoiceCategory returns the value of the "invoice_category" field in the mutation.
+func (m *FinanceFactMutation) InvoiceCategory() (r string, exists bool) {
+	v := m.invoice_category
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInvoiceCategory returns the old "invoice_category" field's value of the FinanceFact entity.
+// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceFactMutation) OldInvoiceCategory(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldInvoiceCategory is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldInvoiceCategory requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInvoiceCategory: %w", err)
+	}
+	return oldValue.InvoiceCategory, nil
+}
+
+// ClearInvoiceCategory clears the value of the "invoice_category" field.
+func (m *FinanceFactMutation) ClearInvoiceCategory() {
+	m.invoice_category = nil
+	m.clearedFields[financefact.FieldInvoiceCategory] = struct{}{}
+}
+
+// InvoiceCategoryCleared returns if the "invoice_category" field was cleared in this mutation.
+func (m *FinanceFactMutation) InvoiceCategoryCleared() bool {
+	_, ok := m.clearedFields[financefact.FieldInvoiceCategory]
+	return ok
+}
+
+// ResetInvoiceCategory resets all changes to the "invoice_category" field.
+func (m *FinanceFactMutation) ResetInvoiceCategory() {
+	m.invoice_category = nil
+	delete(m.clearedFields, financefact.FieldInvoiceCategory)
 }
 
 // SetSourceType sets the "source_type" field.
@@ -6194,7 +6636,7 @@ func (m *FinanceFactMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FinanceFactMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 22)
 	if m.fact_no != nil {
 		fields = append(fields, financefact.FieldFactNo)
 	}
@@ -6213,8 +6655,23 @@ func (m *FinanceFactMutation) Fields() []string {
 	if m.amount != nil {
 		fields = append(fields, financefact.FieldAmount)
 	}
+	if m.fee_amount != nil {
+		fields = append(fields, financefact.FieldFeeAmount)
+	}
 	if m.currency != nil {
 		fields = append(fields, financefact.FieldCurrency)
+	}
+	if m.collection_type != nil {
+		fields = append(fields, financefact.FieldCollectionType)
+	}
+	if m.payment_term != nil {
+		fields = append(fields, financefact.FieldPaymentTerm)
+	}
+	if m.payment_term_days != nil {
+		fields = append(fields, financefact.FieldPaymentTermDays)
+	}
+	if m.invoice_category != nil {
+		fields = append(fields, financefact.FieldInvoiceCategory)
 	}
 	if m.source_type != nil {
 		fields = append(fields, financefact.FieldSourceType)
@@ -6266,8 +6723,18 @@ func (m *FinanceFactMutation) Field(name string) (ent.Value, bool) {
 		return m.CounterpartyID()
 	case financefact.FieldAmount:
 		return m.Amount()
+	case financefact.FieldFeeAmount:
+		return m.FeeAmount()
 	case financefact.FieldCurrency:
 		return m.Currency()
+	case financefact.FieldCollectionType:
+		return m.CollectionType()
+	case financefact.FieldPaymentTerm:
+		return m.PaymentTerm()
+	case financefact.FieldPaymentTermDays:
+		return m.PaymentTermDays()
+	case financefact.FieldInvoiceCategory:
+		return m.InvoiceCategory()
 	case financefact.FieldSourceType:
 		return m.SourceType()
 	case financefact.FieldSourceID:
@@ -6309,8 +6776,18 @@ func (m *FinanceFactMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldCounterpartyID(ctx)
 	case financefact.FieldAmount:
 		return m.OldAmount(ctx)
+	case financefact.FieldFeeAmount:
+		return m.OldFeeAmount(ctx)
 	case financefact.FieldCurrency:
 		return m.OldCurrency(ctx)
+	case financefact.FieldCollectionType:
+		return m.OldCollectionType(ctx)
+	case financefact.FieldPaymentTerm:
+		return m.OldPaymentTerm(ctx)
+	case financefact.FieldPaymentTermDays:
+		return m.OldPaymentTermDays(ctx)
+	case financefact.FieldInvoiceCategory:
+		return m.OldInvoiceCategory(ctx)
 	case financefact.FieldSourceType:
 		return m.OldSourceType(ctx)
 	case financefact.FieldSourceID:
@@ -6382,12 +6859,47 @@ func (m *FinanceFactMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetAmount(v)
 		return nil
+	case financefact.FieldFeeAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFeeAmount(v)
+		return nil
 	case financefact.FieldCurrency:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCurrency(v)
+		return nil
+	case financefact.FieldCollectionType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCollectionType(v)
+		return nil
+	case financefact.FieldPaymentTerm:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentTerm(v)
+		return nil
+	case financefact.FieldPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentTermDays(v)
+		return nil
+	case financefact.FieldInvoiceCategory:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInvoiceCategory(v)
 		return nil
 	case financefact.FieldSourceType:
 		v, ok := value.(string)
@@ -6470,6 +6982,9 @@ func (m *FinanceFactMutation) AddedFields() []string {
 	if m.addcounterparty_id != nil {
 		fields = append(fields, financefact.FieldCounterpartyID)
 	}
+	if m.addpayment_term_days != nil {
+		fields = append(fields, financefact.FieldPaymentTermDays)
+	}
 	if m.addsource_id != nil {
 		fields = append(fields, financefact.FieldSourceID)
 	}
@@ -6486,6 +7001,8 @@ func (m *FinanceFactMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case financefact.FieldCounterpartyID:
 		return m.AddedCounterpartyID()
+	case financefact.FieldPaymentTermDays:
+		return m.AddedPaymentTermDays()
 	case financefact.FieldSourceID:
 		return m.AddedSourceID()
 	case financefact.FieldSourceLineID:
@@ -6505,6 +7022,13 @@ func (m *FinanceFactMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddCounterpartyID(v)
+		return nil
+	case financefact.FieldPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPaymentTermDays(v)
 		return nil
 	case financefact.FieldSourceID:
 		v, ok := value.(int)
@@ -6530,6 +7054,18 @@ func (m *FinanceFactMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(financefact.FieldCounterpartyID) {
 		fields = append(fields, financefact.FieldCounterpartyID)
+	}
+	if m.FieldCleared(financefact.FieldCollectionType) {
+		fields = append(fields, financefact.FieldCollectionType)
+	}
+	if m.FieldCleared(financefact.FieldPaymentTerm) {
+		fields = append(fields, financefact.FieldPaymentTerm)
+	}
+	if m.FieldCleared(financefact.FieldPaymentTermDays) {
+		fields = append(fields, financefact.FieldPaymentTermDays)
+	}
+	if m.FieldCleared(financefact.FieldInvoiceCategory) {
+		fields = append(fields, financefact.FieldInvoiceCategory)
 	}
 	if m.FieldCleared(financefact.FieldSourceType) {
 		fields = append(fields, financefact.FieldSourceType)
@@ -6565,6 +7101,18 @@ func (m *FinanceFactMutation) ClearField(name string) error {
 	switch name {
 	case financefact.FieldCounterpartyID:
 		m.ClearCounterpartyID()
+		return nil
+	case financefact.FieldCollectionType:
+		m.ClearCollectionType()
+		return nil
+	case financefact.FieldPaymentTerm:
+		m.ClearPaymentTerm()
+		return nil
+	case financefact.FieldPaymentTermDays:
+		m.ClearPaymentTermDays()
+		return nil
+	case financefact.FieldInvoiceCategory:
+		m.ClearInvoiceCategory()
 		return nil
 	case financefact.FieldSourceType:
 		m.ClearSourceType()
@@ -6610,8 +7158,23 @@ func (m *FinanceFactMutation) ResetField(name string) error {
 	case financefact.FieldAmount:
 		m.ResetAmount()
 		return nil
+	case financefact.FieldFeeAmount:
+		m.ResetFeeAmount()
+		return nil
 	case financefact.FieldCurrency:
 		m.ResetCurrency()
+		return nil
+	case financefact.FieldCollectionType:
+		m.ResetCollectionType()
+		return nil
+	case financefact.FieldPaymentTerm:
+		m.ResetPaymentTerm()
+		return nil
+	case financefact.FieldPaymentTermDays:
+		m.ResetPaymentTermDays()
+		return nil
+	case financefact.FieldInvoiceCategory:
+		m.ResetInvoiceCategory()
 		return nil
 	case financefact.FieldSourceType:
 		m.ResetSourceType()
@@ -37053,6 +37616,10 @@ type SalesOrderMutation struct {
 	order_no                  *string
 	customer_order_no         *string
 	customer_snapshot         *map[string]interface{}
+	payment_method            *string
+	payment_term_days         *int
+	addpayment_term_days      *int
+	price_condition_note      *string
 	order_date                *time.Time
 	planned_delivery_date     *time.Time
 	lifecycle_status          *string
@@ -37342,6 +37909,174 @@ func (m *SalesOrderMutation) CustomerSnapshotCleared() bool {
 func (m *SalesOrderMutation) ResetCustomerSnapshot() {
 	m.customer_snapshot = nil
 	delete(m.clearedFields, salesorder.FieldCustomerSnapshot)
+}
+
+// SetPaymentMethod sets the "payment_method" field.
+func (m *SalesOrderMutation) SetPaymentMethod(s string) {
+	m.payment_method = &s
+}
+
+// PaymentMethod returns the value of the "payment_method" field in the mutation.
+func (m *SalesOrderMutation) PaymentMethod() (r string, exists bool) {
+	v := m.payment_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentMethod returns the old "payment_method" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldPaymentMethod(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentMethod: %w", err)
+	}
+	return oldValue.PaymentMethod, nil
+}
+
+// ClearPaymentMethod clears the value of the "payment_method" field.
+func (m *SalesOrderMutation) ClearPaymentMethod() {
+	m.payment_method = nil
+	m.clearedFields[salesorder.FieldPaymentMethod] = struct{}{}
+}
+
+// PaymentMethodCleared returns if the "payment_method" field was cleared in this mutation.
+func (m *SalesOrderMutation) PaymentMethodCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldPaymentMethod]
+	return ok
+}
+
+// ResetPaymentMethod resets all changes to the "payment_method" field.
+func (m *SalesOrderMutation) ResetPaymentMethod() {
+	m.payment_method = nil
+	delete(m.clearedFields, salesorder.FieldPaymentMethod)
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (m *SalesOrderMutation) SetPaymentTermDays(i int) {
+	m.payment_term_days = &i
+	m.addpayment_term_days = nil
+}
+
+// PaymentTermDays returns the value of the "payment_term_days" field in the mutation.
+func (m *SalesOrderMutation) PaymentTermDays() (r int, exists bool) {
+	v := m.payment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentTermDays returns the old "payment_term_days" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldPaymentTermDays(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentTermDays is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentTermDays requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentTermDays: %w", err)
+	}
+	return oldValue.PaymentTermDays, nil
+}
+
+// AddPaymentTermDays adds i to the "payment_term_days" field.
+func (m *SalesOrderMutation) AddPaymentTermDays(i int) {
+	if m.addpayment_term_days != nil {
+		*m.addpayment_term_days += i
+	} else {
+		m.addpayment_term_days = &i
+	}
+}
+
+// AddedPaymentTermDays returns the value that was added to the "payment_term_days" field in this mutation.
+func (m *SalesOrderMutation) AddedPaymentTermDays() (r int, exists bool) {
+	v := m.addpayment_term_days
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (m *SalesOrderMutation) ClearPaymentTermDays() {
+	m.payment_term_days = nil
+	m.addpayment_term_days = nil
+	m.clearedFields[salesorder.FieldPaymentTermDays] = struct{}{}
+}
+
+// PaymentTermDaysCleared returns if the "payment_term_days" field was cleared in this mutation.
+func (m *SalesOrderMutation) PaymentTermDaysCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldPaymentTermDays]
+	return ok
+}
+
+// ResetPaymentTermDays resets all changes to the "payment_term_days" field.
+func (m *SalesOrderMutation) ResetPaymentTermDays() {
+	m.payment_term_days = nil
+	m.addpayment_term_days = nil
+	delete(m.clearedFields, salesorder.FieldPaymentTermDays)
+}
+
+// SetPriceConditionNote sets the "price_condition_note" field.
+func (m *SalesOrderMutation) SetPriceConditionNote(s string) {
+	m.price_condition_note = &s
+}
+
+// PriceConditionNote returns the value of the "price_condition_note" field in the mutation.
+func (m *SalesOrderMutation) PriceConditionNote() (r string, exists bool) {
+	v := m.price_condition_note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPriceConditionNote returns the old "price_condition_note" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldPriceConditionNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPriceConditionNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPriceConditionNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPriceConditionNote: %w", err)
+	}
+	return oldValue.PriceConditionNote, nil
+}
+
+// ClearPriceConditionNote clears the value of the "price_condition_note" field.
+func (m *SalesOrderMutation) ClearPriceConditionNote() {
+	m.price_condition_note = nil
+	m.clearedFields[salesorder.FieldPriceConditionNote] = struct{}{}
+}
+
+// PriceConditionNoteCleared returns if the "price_condition_note" field was cleared in this mutation.
+func (m *SalesOrderMutation) PriceConditionNoteCleared() bool {
+	_, ok := m.clearedFields[salesorder.FieldPriceConditionNote]
+	return ok
+}
+
+// ResetPriceConditionNote resets all changes to the "price_condition_note" field.
+func (m *SalesOrderMutation) ResetPriceConditionNote() {
+	m.price_condition_note = nil
+	delete(m.clearedFields, salesorder.FieldPriceConditionNote)
 }
 
 // SetOrderDate sets the "order_date" field.
@@ -37809,7 +38544,7 @@ func (m *SalesOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 13)
 	if m.order_no != nil {
 		fields = append(fields, salesorder.FieldOrderNo)
 	}
@@ -37821,6 +38556,15 @@ func (m *SalesOrderMutation) Fields() []string {
 	}
 	if m.customer_snapshot != nil {
 		fields = append(fields, salesorder.FieldCustomerSnapshot)
+	}
+	if m.payment_method != nil {
+		fields = append(fields, salesorder.FieldPaymentMethod)
+	}
+	if m.payment_term_days != nil {
+		fields = append(fields, salesorder.FieldPaymentTermDays)
+	}
+	if m.price_condition_note != nil {
+		fields = append(fields, salesorder.FieldPriceConditionNote)
 	}
 	if m.order_date != nil {
 		fields = append(fields, salesorder.FieldOrderDate)
@@ -37856,6 +38600,12 @@ func (m *SalesOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.CustomerOrderNo()
 	case salesorder.FieldCustomerSnapshot:
 		return m.CustomerSnapshot()
+	case salesorder.FieldPaymentMethod:
+		return m.PaymentMethod()
+	case salesorder.FieldPaymentTermDays:
+		return m.PaymentTermDays()
+	case salesorder.FieldPriceConditionNote:
+		return m.PriceConditionNote()
 	case salesorder.FieldOrderDate:
 		return m.OrderDate()
 	case salesorder.FieldPlannedDeliveryDate:
@@ -37885,6 +38635,12 @@ func (m *SalesOrderMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldCustomerOrderNo(ctx)
 	case salesorder.FieldCustomerSnapshot:
 		return m.OldCustomerSnapshot(ctx)
+	case salesorder.FieldPaymentMethod:
+		return m.OldPaymentMethod(ctx)
+	case salesorder.FieldPaymentTermDays:
+		return m.OldPaymentTermDays(ctx)
+	case salesorder.FieldPriceConditionNote:
+		return m.OldPriceConditionNote(ctx)
 	case salesorder.FieldOrderDate:
 		return m.OldOrderDate(ctx)
 	case salesorder.FieldPlannedDeliveryDate:
@@ -37933,6 +38689,27 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCustomerSnapshot(v)
+		return nil
+	case salesorder.FieldPaymentMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentMethod(v)
+		return nil
+	case salesorder.FieldPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentTermDays(v)
+		return nil
+	case salesorder.FieldPriceConditionNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPriceConditionNote(v)
 		return nil
 	case salesorder.FieldOrderDate:
 		v, ok := value.(time.Time)
@@ -37984,6 +38761,9 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *SalesOrderMutation) AddedFields() []string {
 	var fields []string
+	if m.addpayment_term_days != nil {
+		fields = append(fields, salesorder.FieldPaymentTermDays)
+	}
 	return fields
 }
 
@@ -37992,6 +38772,8 @@ func (m *SalesOrderMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *SalesOrderMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case salesorder.FieldPaymentTermDays:
+		return m.AddedPaymentTermDays()
 	}
 	return nil, false
 }
@@ -38001,6 +38783,13 @@ func (m *SalesOrderMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *SalesOrderMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case salesorder.FieldPaymentTermDays:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPaymentTermDays(v)
+		return nil
 	}
 	return fmt.Errorf("unknown SalesOrder numeric field %s", name)
 }
@@ -38014,6 +38803,15 @@ func (m *SalesOrderMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(salesorder.FieldCustomerSnapshot) {
 		fields = append(fields, salesorder.FieldCustomerSnapshot)
+	}
+	if m.FieldCleared(salesorder.FieldPaymentMethod) {
+		fields = append(fields, salesorder.FieldPaymentMethod)
+	}
+	if m.FieldCleared(salesorder.FieldPaymentTermDays) {
+		fields = append(fields, salesorder.FieldPaymentTermDays)
+	}
+	if m.FieldCleared(salesorder.FieldPriceConditionNote) {
+		fields = append(fields, salesorder.FieldPriceConditionNote)
 	}
 	if m.FieldCleared(salesorder.FieldPlannedDeliveryDate) {
 		fields = append(fields, salesorder.FieldPlannedDeliveryDate)
@@ -38041,6 +38839,15 @@ func (m *SalesOrderMutation) ClearField(name string) error {
 	case salesorder.FieldCustomerSnapshot:
 		m.ClearCustomerSnapshot()
 		return nil
+	case salesorder.FieldPaymentMethod:
+		m.ClearPaymentMethod()
+		return nil
+	case salesorder.FieldPaymentTermDays:
+		m.ClearPaymentTermDays()
+		return nil
+	case salesorder.FieldPriceConditionNote:
+		m.ClearPriceConditionNote()
+		return nil
 	case salesorder.FieldPlannedDeliveryDate:
 		m.ClearPlannedDeliveryDate()
 		return nil
@@ -38066,6 +38873,15 @@ func (m *SalesOrderMutation) ResetField(name string) error {
 		return nil
 	case salesorder.FieldCustomerSnapshot:
 		m.ResetCustomerSnapshot()
+		return nil
+	case salesorder.FieldPaymentMethod:
+		m.ResetPaymentMethod()
+		return nil
+	case salesorder.FieldPaymentTermDays:
+		m.ResetPaymentTermDays()
+		return nil
+	case salesorder.FieldPriceConditionNote:
+		m.ResetPriceConditionNote()
 		return nil
 	case salesorder.FieldOrderDate:
 		m.ResetOrderDate()

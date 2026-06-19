@@ -189,3 +189,59 @@ func TestOperationalFactFilterFromParamsParsesFactType(t *testing.T) {
 		t.Fatalf("unexpected filter %#v", filter)
 	}
 }
+
+func TestFinanceFactCreateFromParamsParsesFeeAndCurrency(t *testing.T) {
+	input, ok := financeFactCreateFromParams(mustJSONRPCStruct(t, map[string]any{
+		"fact_no":           "AR-JSONRPC-001",
+		"fact_type":         "RECEIVABLE",
+		"counterparty_type": "CUSTOMER",
+		"amount":            "100.50",
+		"fee_amount":        "1.25",
+		"currency":          "HKD",
+		"collection_type":   "ACCOUNTS_RECEIVABLE",
+		"payment_term":      "CASH_ON_SHIPMENT",
+		"payment_term_days": float64(0),
+		"invoice_category":  "VAT_SPECIAL_13",
+		"idempotency_key":   "AR-JSONRPC-001",
+	}).AsMap())
+	if !ok {
+		t.Fatal("expected finance fact params to parse")
+	}
+	if input.Currency != "HKD" {
+		t.Fatalf("unexpected currency %q", input.Currency)
+	}
+	if input.FeeAmount.String() != "1.25" {
+		t.Fatalf("unexpected fee amount %s", input.FeeAmount)
+	}
+	if input.CollectionType == nil || *input.CollectionType != biz.FinanceCollectionAccountsReceivable {
+		t.Fatalf("unexpected collection type %#v", input.CollectionType)
+	}
+	if input.PaymentTerm == nil || *input.PaymentTerm != biz.FinancePaymentTermCashOnShipment {
+		t.Fatalf("unexpected payment term %#v", input.PaymentTerm)
+	}
+	if input.PaymentTermDays == nil || *input.PaymentTermDays != 0 {
+		t.Fatalf("expected payment term days 0, got %#v", input.PaymentTermDays)
+	}
+	if input.InvoiceCategory == nil || *input.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 {
+		t.Fatalf("unexpected invoice category %#v", input.InvoiceCategory)
+	}
+	output := financeFactToAny(&biz.FinanceFact{
+		ID:               1,
+		FactNo:           input.FactNo,
+		FactType:         input.FactType,
+		CounterpartyType: input.CounterpartyType,
+		Amount:           input.Amount,
+		FeeAmount:        input.FeeAmount,
+		Currency:         input.Currency,
+		CollectionType:   input.CollectionType,
+		PaymentTerm:      input.PaymentTerm,
+		PaymentTermDays:  input.PaymentTermDays,
+		InvoiceCategory:  input.InvoiceCategory,
+	})
+	if output["payment_term_days"] != 0 {
+		t.Fatalf("expected response payment_term_days 0, got %#v", output)
+	}
+	if output["invoice_category"] != biz.FinanceInvoiceCategoryVATSpecial13 {
+		t.Fatalf("expected response invoice category, got %#v", output)
+	}
+}

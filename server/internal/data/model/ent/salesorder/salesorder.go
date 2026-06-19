@@ -22,6 +22,12 @@ const (
 	FieldCustomerOrderNo = "customer_order_no"
 	// FieldCustomerSnapshot holds the string denoting the customer_snapshot field in the database.
 	FieldCustomerSnapshot = "customer_snapshot"
+	// FieldPaymentMethod holds the string denoting the payment_method field in the database.
+	FieldPaymentMethod = "payment_method"
+	// FieldPaymentTermDays holds the string denoting the payment_term_days field in the database.
+	FieldPaymentTermDays = "payment_term_days"
+	// FieldPriceConditionNote holds the string denoting the price_condition_note field in the database.
+	FieldPriceConditionNote = "price_condition_note"
 	// FieldOrderDate holds the string denoting the order_date field in the database.
 	FieldOrderDate = "order_date"
 	// FieldPlannedDeliveryDate holds the string denoting the planned_delivery_date field in the database.
@@ -81,6 +87,9 @@ var Columns = []string{
 	FieldCustomerID,
 	FieldCustomerOrderNo,
 	FieldCustomerSnapshot,
+	FieldPaymentMethod,
+	FieldPaymentTermDays,
+	FieldPriceConditionNote,
 	FieldOrderDate,
 	FieldPlannedDeliveryDate,
 	FieldLifecycleStatus,
@@ -106,6 +115,12 @@ var (
 	CustomerIDValidator func(int) error
 	// CustomerOrderNoValidator is a validator for the "customer_order_no" field. It is called by the builders before save.
 	CustomerOrderNoValidator func(string) error
+	// PaymentMethodValidator is a validator for the "payment_method" field. It is called by the builders before save.
+	PaymentMethodValidator func(string) error
+	// PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
+	PaymentTermDaysValidator func(int) error
+	// PriceConditionNoteValidator is a validator for the "price_condition_note" field. It is called by the builders before save.
+	PriceConditionNoteValidator func(string) error
 	// DefaultLifecycleStatus holds the default value on creation for the "lifecycle_status" field.
 	DefaultLifecycleStatus string
 	// LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -141,6 +156,21 @@ func ByCustomerID(opts ...sql.OrderTermOption) OrderOption {
 // ByCustomerOrderNo orders the results by the customer_order_no field.
 func ByCustomerOrderNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCustomerOrderNo, opts...).ToFunc()
+}
+
+// ByPaymentMethod orders the results by the payment_method field.
+func ByPaymentMethod(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPaymentMethod, opts...).ToFunc()
+}
+
+// ByPaymentTermDays orders the results by the payment_term_days field.
+func ByPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPaymentTermDays, opts...).ToFunc()
+}
+
+// ByPriceConditionNote orders the results by the price_condition_note field.
+func ByPriceConditionNote(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPriceConditionNote, opts...).ToFunc()
 }
 
 // ByOrderDate orders the results by the order_date field.

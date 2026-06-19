@@ -70,6 +70,21 @@ func CustomerOrderNo(v string) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldCustomerOrderNo, v))
 }
 
+// PaymentMethod applies equality check predicate on the "payment_method" field. It's identical to PaymentMethodEQ.
+func PaymentMethod(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldPaymentMethod, v))
+}
+
+// PaymentTermDays applies equality check predicate on the "payment_term_days" field. It's identical to PaymentTermDaysEQ.
+func PaymentTermDays(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
+// PriceConditionNote applies equality check predicate on the "price_condition_note" field. It's identical to PriceConditionNoteEQ.
+func PriceConditionNote(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldPriceConditionNote, v))
+}
+
 // OrderDate applies equality check predicate on the "order_date" field. It's identical to OrderDateEQ.
 func OrderDate(v time.Time) predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldEQ(FieldOrderDate, v))
@@ -268,6 +283,206 @@ func CustomerSnapshotIsNil() predicate.SalesOrder {
 // CustomerSnapshotNotNil applies the NotNil predicate on the "customer_snapshot" field.
 func CustomerSnapshotNotNil() predicate.SalesOrder {
 	return predicate.SalesOrder(sql.FieldNotNull(FieldCustomerSnapshot))
+}
+
+// PaymentMethodEQ applies the EQ predicate on the "payment_method" field.
+func PaymentMethodEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldPaymentMethod, v))
+}
+
+// PaymentMethodNEQ applies the NEQ predicate on the "payment_method" field.
+func PaymentMethodNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldPaymentMethod, v))
+}
+
+// PaymentMethodIn applies the In predicate on the "payment_method" field.
+func PaymentMethodIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldPaymentMethod, vs...))
+}
+
+// PaymentMethodNotIn applies the NotIn predicate on the "payment_method" field.
+func PaymentMethodNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldPaymentMethod, vs...))
+}
+
+// PaymentMethodGT applies the GT predicate on the "payment_method" field.
+func PaymentMethodGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldPaymentMethod, v))
+}
+
+// PaymentMethodGTE applies the GTE predicate on the "payment_method" field.
+func PaymentMethodGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldPaymentMethod, v))
+}
+
+// PaymentMethodLT applies the LT predicate on the "payment_method" field.
+func PaymentMethodLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldPaymentMethod, v))
+}
+
+// PaymentMethodLTE applies the LTE predicate on the "payment_method" field.
+func PaymentMethodLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldPaymentMethod, v))
+}
+
+// PaymentMethodContains applies the Contains predicate on the "payment_method" field.
+func PaymentMethodContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldPaymentMethod, v))
+}
+
+// PaymentMethodHasPrefix applies the HasPrefix predicate on the "payment_method" field.
+func PaymentMethodHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldPaymentMethod, v))
+}
+
+// PaymentMethodHasSuffix applies the HasSuffix predicate on the "payment_method" field.
+func PaymentMethodHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldPaymentMethod, v))
+}
+
+// PaymentMethodIsNil applies the IsNil predicate on the "payment_method" field.
+func PaymentMethodIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldPaymentMethod))
+}
+
+// PaymentMethodNotNil applies the NotNil predicate on the "payment_method" field.
+func PaymentMethodNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldPaymentMethod))
+}
+
+// PaymentMethodEqualFold applies the EqualFold predicate on the "payment_method" field.
+func PaymentMethodEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldPaymentMethod, v))
+}
+
+// PaymentMethodContainsFold applies the ContainsFold predicate on the "payment_method" field.
+func PaymentMethodContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldPaymentMethod, v))
+}
+
+// PaymentTermDaysEQ applies the EQ predicate on the "payment_term_days" field.
+func PaymentTermDaysEQ(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysNEQ applies the NEQ predicate on the "payment_term_days" field.
+func PaymentTermDaysNEQ(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIn applies the In predicate on the "payment_term_days" field.
+func PaymentTermDaysIn(vs ...int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysNotIn applies the NotIn predicate on the "payment_term_days" field.
+func PaymentTermDaysNotIn(vs ...int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysGT applies the GT predicate on the "payment_term_days" field.
+func PaymentTermDaysGT(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysGTE applies the GTE predicate on the "payment_term_days" field.
+func PaymentTermDaysGTE(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLT applies the LT predicate on the "payment_term_days" field.
+func PaymentTermDaysLT(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLTE applies the LTE predicate on the "payment_term_days" field.
+func PaymentTermDaysLTE(v int) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIsNil applies the IsNil predicate on the "payment_term_days" field.
+func PaymentTermDaysIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldPaymentTermDays))
+}
+
+// PaymentTermDaysNotNil applies the NotNil predicate on the "payment_term_days" field.
+func PaymentTermDaysNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldPaymentTermDays))
+}
+
+// PriceConditionNoteEQ applies the EQ predicate on the "price_condition_note" field.
+func PriceConditionNoteEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEQ(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteNEQ applies the NEQ predicate on the "price_condition_note" field.
+func PriceConditionNoteNEQ(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNEQ(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteIn applies the In predicate on the "price_condition_note" field.
+func PriceConditionNoteIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIn(FieldPriceConditionNote, vs...))
+}
+
+// PriceConditionNoteNotIn applies the NotIn predicate on the "price_condition_note" field.
+func PriceConditionNoteNotIn(vs ...string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotIn(FieldPriceConditionNote, vs...))
+}
+
+// PriceConditionNoteGT applies the GT predicate on the "price_condition_note" field.
+func PriceConditionNoteGT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGT(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteGTE applies the GTE predicate on the "price_condition_note" field.
+func PriceConditionNoteGTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldGTE(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteLT applies the LT predicate on the "price_condition_note" field.
+func PriceConditionNoteLT(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLT(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteLTE applies the LTE predicate on the "price_condition_note" field.
+func PriceConditionNoteLTE(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldLTE(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteContains applies the Contains predicate on the "price_condition_note" field.
+func PriceConditionNoteContains(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContains(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteHasPrefix applies the HasPrefix predicate on the "price_condition_note" field.
+func PriceConditionNoteHasPrefix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasPrefix(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteHasSuffix applies the HasSuffix predicate on the "price_condition_note" field.
+func PriceConditionNoteHasSuffix(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldHasSuffix(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteIsNil applies the IsNil predicate on the "price_condition_note" field.
+func PriceConditionNoteIsNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldIsNull(FieldPriceConditionNote))
+}
+
+// PriceConditionNoteNotNil applies the NotNil predicate on the "price_condition_note" field.
+func PriceConditionNoteNotNil() predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldNotNull(FieldPriceConditionNote))
+}
+
+// PriceConditionNoteEqualFold applies the EqualFold predicate on the "price_condition_note" field.
+func PriceConditionNoteEqualFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldEqualFold(FieldPriceConditionNote, v))
+}
+
+// PriceConditionNoteContainsFold applies the ContainsFold predicate on the "price_condition_note" field.
+func PriceConditionNoteContainsFold(v string) predicate.SalesOrder {
+	return predicate.SalesOrder(sql.FieldContainsFold(FieldPriceConditionNote, v))
 }
 
 // OrderDateEQ applies the EQ predicate on the "order_date" field.

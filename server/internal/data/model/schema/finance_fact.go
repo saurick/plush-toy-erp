@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/shopspring/decimal"
 )
 
 type FinanceFact struct {
@@ -23,7 +24,12 @@ var financeFactLockedFields = map[string]struct{}{
 	"counterparty_type": {},
 	"counterparty_id":   {},
 	"amount":            {},
+	"fee_amount":        {},
 	"currency":          {},
+	"collection_type":   {},
+	"payment_term":      {},
+	"payment_term_days": {},
+	"invoice_category":  {},
 	"source_type":       {},
 	"source_id":         {},
 	"source_line_id":    {},
@@ -53,10 +59,16 @@ func (FinanceFact) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"finance_facts_type_allowed":         "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'PAYMENT', 'RECONCILIATION')",
-				"finance_facts_status_allowed":       "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
-				"finance_facts_counterparty_allowed": "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
-				"finance_facts_amount_positive":      "amount > 0",
+				"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'PAYMENT', 'RECONCILIATION')",
+				"finance_facts_status_allowed":           "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
+				"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
+				"finance_facts_amount_positive":          "amount > 0",
+				"finance_facts_fee_amount_nonnegative":   "fee_amount >= 0",
+				"finance_facts_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
+				"finance_facts_collection_type_allowed":  "collection_type IS NULL OR collection_type IN ('ADVANCE_RECEIPT', 'ACCOUNTS_RECEIVABLE')",
+				"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('CASH_ON_SHIPMENT', 'EOM_30', 'EOM_45')",
+				"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
+				"finance_facts_invoice_category_allowed": "invoice_category IS NULL OR invoice_category IN ('NONE', 'EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
 			},
 		},
 	}
@@ -71,7 +83,12 @@ func (FinanceFact) Fields() []ent.Field {
 		field.String("counterparty_type").NotEmpty().MaxLen(16),
 		field.Int("counterparty_id").Optional().Nillable().Positive(),
 		decimalQuantityField("amount"),
+		decimalQuantityFieldWithDefault("fee_amount", decimal.Zero),
 		field.String("currency").NotEmpty().Default("CNY").MaxLen(16),
+		field.String("collection_type").Optional().Nillable().MaxLen(32),
+		field.String("payment_term").Optional().Nillable().MaxLen(32),
+		field.Int("payment_term_days").Optional().Nillable().NonNegative(),
+		field.String("invoice_category").Optional().Nillable().MaxLen(32),
 		// source_* keeps source-document traceability; it is not a replacement for business_records.
 		field.String("source_type").Optional().Nillable().MaxLen(64),
 		field.Int("source_id").Optional().Nillable().Positive(),

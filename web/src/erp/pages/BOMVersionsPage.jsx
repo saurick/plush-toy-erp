@@ -19,7 +19,6 @@ import {
   Space,
   Table,
   Tag,
-  Tooltip,
 } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
@@ -1007,20 +1006,6 @@ export default function BOMVersionsPage() {
             >
               列顺序
             </ToolbarButton>
-            <Tooltip title="BOM 版本不走物理删除或回收站；需要退出使用时请归档所选版本。">
-              <span>
-                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
-                  批量删除
-                </ToolbarButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="当前 BOM Version API 没有回收站主路径，归档是正式退出方式。">
-              <span>
-                <ToolbarButton icon={<InboxOutlined />} disabled>
-                  回收站
-                </ToolbarButton>
-              </span>
-            </Tooltip>
           </Space>
         }
         primaryAction={

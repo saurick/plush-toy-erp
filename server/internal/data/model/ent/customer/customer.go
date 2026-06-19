@@ -20,6 +20,10 @@ const (
 	FieldName = "name"
 	// FieldShortName holds the string denoting the short_name field in the database.
 	FieldShortName = "short_name"
+	// FieldDefaultPaymentMethod holds the string denoting the default_payment_method field in the database.
+	FieldDefaultPaymentMethod = "default_payment_method"
+	// FieldDefaultPaymentTermDays holds the string denoting the default_payment_term_days field in the database.
+	FieldDefaultPaymentTermDays = "default_payment_term_days"
 	// FieldTaxNo holds the string denoting the tax_no field in the database.
 	FieldTaxNo = "tax_no"
 	// FieldIsActive holds the string denoting the is_active field in the database.
@@ -58,6 +62,8 @@ var Columns = []string{
 	FieldCode,
 	FieldName,
 	FieldShortName,
+	FieldDefaultPaymentMethod,
+	FieldDefaultPaymentTermDays,
 	FieldTaxNo,
 	FieldIsActive,
 	FieldNote,
@@ -82,6 +88,10 @@ var (
 	NameValidator func(string) error
 	// ShortNameValidator is a validator for the "short_name" field. It is called by the builders before save.
 	ShortNameValidator func(string) error
+	// DefaultPaymentMethodValidator is a validator for the "default_payment_method" field. It is called by the builders before save.
+	DefaultPaymentMethodValidator func(string) error
+	// DefaultPaymentTermDaysValidator is a validator for the "default_payment_term_days" field. It is called by the builders before save.
+	DefaultPaymentTermDaysValidator func(int) error
 	// TaxNoValidator is a validator for the "tax_no" field. It is called by the builders before save.
 	TaxNoValidator func(string) error
 	// DefaultIsActive holds the default value on creation for the "is_active" field.
@@ -117,6 +127,16 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByShortName orders the results by the short_name field.
 func ByShortName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldShortName, opts...).ToFunc()
+}
+
+// ByDefaultPaymentMethod orders the results by the default_payment_method field.
+func ByDefaultPaymentMethod(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultPaymentMethod, opts...).ToFunc()
+}
+
+// ByDefaultPaymentTermDays orders the results by the default_payment_term_days field.
+func ByDefaultPaymentTermDays(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultPaymentTermDays, opts...).ToFunc()
 }
 
 // ByTaxNo orders the results by the tax_no field.

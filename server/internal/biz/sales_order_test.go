@@ -118,12 +118,18 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 	uc := NewSalesOrderUsecase(repo)
 	orderDate := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
 	customerOrderNo := "  PO-001 "
+	paymentMethod := " 30天月结 "
+	paymentTermDays := 30
+	priceConditionNote := " 账期改短，单价已核对 "
 
 	order, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{
-		OrderNo:         " SO-001 ",
-		CustomerID:      10,
-		CustomerOrderNo: &customerOrderNo,
-		OrderDate:       orderDate,
+		OrderNo:            " SO-001 ",
+		CustomerID:         10,
+		CustomerOrderNo:    &customerOrderNo,
+		PaymentMethod:      &paymentMethod,
+		PaymentTermDays:    &paymentTermDays,
+		PriceConditionNote: &priceConditionNote,
+		OrderDate:          orderDate,
 	})
 	if err != nil {
 		t.Fatalf("create sales order failed: %v", err)
@@ -133,6 +139,13 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 	}
 	if repo.createdOrder.OrderNo != "SO-001" || repo.createdOrder.CustomerOrderNo == nil || *repo.createdOrder.CustomerOrderNo != "PO-001" {
 		t.Fatalf("expected normalized order mutation, got %#v", repo.createdOrder)
+	}
+	if repo.createdOrder.PaymentMethod == nil || *repo.createdOrder.PaymentMethod != "30天月结" || repo.createdOrder.PaymentTermDays == nil || *repo.createdOrder.PaymentTermDays != 30 {
+		t.Fatalf("expected payment condition normalized, got %#v", repo.createdOrder)
+	}
+	negativeTermDays := -1
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-PAYMENT", CustomerID: 10, PaymentTermDays: &negativeTermDays, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected negative payment term rejected, got %v", err)
 	}
 
 	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-002", CustomerID: 999, OrderDate: orderDate}); !errors.Is(err, ErrCustomerNotFound) {

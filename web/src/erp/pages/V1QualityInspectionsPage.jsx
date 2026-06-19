@@ -2,11 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  DeleteOutlined,
   DownOutlined,
   DownloadOutlined,
   FileDoneOutlined,
-  InboxOutlined,
   LinkOutlined,
   PlusOutlined,
   SettingOutlined,
@@ -19,7 +17,6 @@ import {
   Popconfirm,
   Space,
   Tag,
-  Tooltip,
   Typography,
 } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
@@ -1037,20 +1034,6 @@ export default function V1QualityInspectionsPage() {
             >
               列顺序
             </ToolbarButton>
-            <Tooltip title="当前 quality JSON-RPC 没有物理删除 API；如需退出使用，请走取消质检。">
-              <span>
-                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
-                  批量删除
-                </ToolbarButton>
-              </span>
-            </Tooltip>
-            <Tooltip title="当前 quality_inspections 没有回收站主路径，列表不做前端假恢复。">
-              <span>
-                <ToolbarButton icon={<InboxOutlined />} disabled>
-                  回收站
-                </ToolbarButton>
-              </span>
-            </Tooltip>
           </Space>
         }
         primaryAction={

@@ -40,6 +40,9 @@ type SalesOrder struct {
 	CustomerID          int
 	CustomerOrderNo     *string
 	CustomerSnapshot    map[string]any
+	PaymentMethod       *string
+	PaymentTermDays     *int
+	PriceConditionNote  *string
 	OrderDate           time.Time
 	PlannedDeliveryDate *time.Time
 	LifecycleStatus     string
@@ -73,6 +76,9 @@ type SalesOrderMutation struct {
 	CustomerID          int
 	CustomerOrderNo     *string
 	CustomerSnapshot    map[string]any
+	PaymentMethod       *string
+	PaymentTermDays     *int
+	PriceConditionNote  *string
 	OrderDate           time.Time
 	PlannedDeliveryDate *time.Time
 	Note                *string
@@ -420,11 +426,13 @@ func (uc *SalesOrderUsecase) validateProductAndUnitActive(ctx context.Context, p
 func normalizeSalesOrderMutation(in SalesOrderMutation) (SalesOrderMutation, error) {
 	in.OrderNo = strings.TrimSpace(in.OrderNo)
 	in.CustomerOrderNo = normalizeOptionalString(in.CustomerOrderNo)
+	in.PaymentMethod = normalizeOptionalString(in.PaymentMethod)
+	in.PriceConditionNote = normalizeOptionalString(in.PriceConditionNote)
 	in.Note = normalizeOptionalString(in.Note)
 	if in.CustomerSnapshot == nil {
 		in.CustomerSnapshot = map[string]any{}
 	}
-	if in.OrderNo == "" || in.CustomerID <= 0 || in.OrderDate.IsZero() {
+	if in.OrderNo == "" || in.CustomerID <= 0 || in.OrderDate.IsZero() || (in.PaymentTermDays != nil && *in.PaymentTermDays < 0) {
 		return SalesOrderMutation{}, ErrBadParam
 	}
 	return in, nil

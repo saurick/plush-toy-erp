@@ -45,6 +45,11 @@ import {
   SelectionActionBar,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import {
+  BusinessListToolbarActions,
+  downloadBusinessListCSV,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import SourceImportPickerModal from '../components/business-list/SourceImportPickerModal.jsx'
 import {
@@ -73,6 +78,7 @@ import {
   inventoryLotOption,
   productOption,
   productSKUOption,
+  referenceLabel,
   salesOrderItemOption,
   salesOrderOption,
   shipmentOption,
@@ -391,7 +397,15 @@ function ShipmentItemFormFields({
   )
 }
 
-function ShipmentItemsTable({ items = [] }) {
+function ShipmentItemsTable({
+  inventoryLotOptions = [],
+  items = [],
+  productOptions = [],
+  productSKUOptions = [],
+  salesOrderItemOptions = [],
+  unitOptions = [],
+  warehouseOptions = [],
+}) {
   return (
     <Table
       rowKey="id"
@@ -401,22 +415,34 @@ function ShipmentItemsTable({ items = [] }) {
       locale={{ emptyText: <Empty description="暂无出货明细" /> }}
       scroll={{ x: 760 }}
       columns={[
-        { title: '行 ID', dataIndex: 'id', width: 80 },
-        { title: '销售订单行', dataIndex: 'sales_order_item_id', width: 120 },
-        { title: '产品', dataIndex: 'product_id', width: 100 },
+        {
+          title: '销售订单行',
+          dataIndex: 'sales_order_item_id',
+          width: 160,
+          render: (value) =>
+            referenceLabel(salesOrderItemOptions, value, '销售订单行'),
+        },
+        {
+          title: '产品',
+          dataIndex: 'product_id',
+          width: 150,
+          render: (value) => referenceLabel(productOptions, value, '产品'),
+        },
         {
           title: 'SKU',
           dataIndex: 'product_sku_id',
-          width: 90,
-          render: (value) => value || '-',
+          width: 130,
+          render: (value) => referenceLabel(productSKUOptions, value, 'SKU'),
         },
         {
           title: '仓库 / 批次 / 单位',
-          width: 180,
+          width: 260,
           render: (_, record) =>
-            `W${record.warehouse_id || '-'} / L${record.lot_id || '-'} / U${
-              record.unit_id || '-'
-            }`,
+            [
+              referenceLabel(warehouseOptions, record.warehouse_id, '仓库'),
+              referenceLabel(inventoryLotOptions, record.lot_id, '批次'),
+              referenceLabel(unitOptions, record.unit_id, '单位'),
+            ].join(' / '),
         },
         { title: '数量', dataIndex: 'quantity', width: 120 },
         { title: '备注', dataIndex: 'note' },
@@ -817,76 +843,116 @@ export default function ShipmentsPage() {
     }
   }
 
-  const columns = applyBusinessColumnSorters([
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      width: 72,
-      fixed: 'left',
-      sortType: 'number',
-    },
-    {
-      title: '出货单号',
-      dataIndex: 'shipment_no',
-      width: 180,
-      ellipsis: true,
-      sortType: 'text',
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      width: 110,
-      sortValue: (record) => STATUS_LABELS[record.status] || record.status,
-      render: statusTag,
-    },
-    {
-      title: '销售订单',
-      dataIndex: 'sales_order_id',
-      width: 120,
-      sortType: 'number',
-    },
-    {
-      title: '客户',
-      width: 160,
-      sortValue: (record) =>
-        record.customer_snapshot ||
-        (record.customer_id ? `客户 #${record.customer_id}` : ''),
-      render: (_, record) =>
-        record.customer_snapshot ||
-        (record.customer_id ? `客户 #${record.customer_id}` : '-'),
-      ellipsis: true,
-    },
-    {
-      title: '明细行',
-      width: 90,
-      sortValue: (record) => record.items?.length || 0,
-      render: (_, record) => record.items?.length || 0,
-    },
-    {
-      title: '计划 / 实际出货',
-      width: 180,
-      sortValue: (record) => record.shipped_at || record.planned_ship_at,
-      sortType: 'date',
-      render: (_, record) =>
-        `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
-          record.shipped_at
-        )}`,
-    },
-    {
-      title: '创建时间',
-      dataIndex: 'created_at',
-      width: 160,
-      sortType: 'date',
-      render: formatUnixDateTime,
-      sorter: (a, b) => Number(a?.created_at || 0) - Number(b?.created_at || 0),
-    },
-    {
-      title: '备注',
-      dataIndex: 'note',
-      ellipsis: true,
-      sortable: false,
-    },
-  ])
+  const columns = useMemo(
+    () =>
+      applyBusinessColumnSorters([
+        {
+          title: '出货单号',
+          exportTitle: '出货单号',
+          dataIndex: 'shipment_no',
+          width: 180,
+          ellipsis: true,
+          sortType: 'text',
+        },
+        {
+          title: '内部记录',
+          exportTitle: '内部记录',
+          dataIndex: 'id',
+          width: 72,
+          sortType: 'number',
+          render: (value) => (value ? `主键 ${value}` : '-'),
+          exportValue: (record) => (record?.id ? `主键 ${record.id}` : ''),
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          dataIndex: 'status',
+          width: 110,
+          sortValue: (record) => STATUS_LABELS[record.status] || record.status,
+          render: statusTag,
+          exportValue: (record) =>
+            STATUS_LABELS[record?.status] || record?.status || '',
+        },
+        {
+          title: '销售订单',
+          exportTitle: '销售订单',
+          dataIndex: 'sales_order_id',
+          width: 120,
+          sortType: 'number',
+        },
+        {
+          title: '客户',
+          exportTitle: '客户',
+          width: 160,
+          sortValue: (record) =>
+            record.customer_snapshot ||
+            (record.customer_id ? `客户 #${record.customer_id}` : ''),
+          render: (_, record) =>
+            record.customer_snapshot ||
+            (record.customer_id ? `客户 #${record.customer_id}` : '-'),
+          exportValue: (record) =>
+            record.customer_snapshot ||
+            (record.customer_id ? `客户 #${record.customer_id}` : ''),
+          ellipsis: true,
+        },
+        {
+          title: '明细行',
+          exportTitle: '明细行',
+          width: 90,
+          sortValue: (record) => record.items?.length || 0,
+          render: (_, record) => record.items?.length || 0,
+          exportValue: (record) => record.items?.length || 0,
+        },
+        {
+          title: '计划 / 实际出货',
+          exportTitle: '计划 / 实际出货',
+          width: 180,
+          sortValue: (record) => record.shipped_at || record.planned_ship_at,
+          sortType: 'date',
+          render: (_, record) =>
+            `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
+              record.shipped_at
+            )}`,
+          exportValue: (record) =>
+            `${formatUnixDate(record.planned_ship_at)} / ${formatUnixDate(
+              record.shipped_at
+            )}`,
+        },
+        {
+          title: '创建时间',
+          exportTitle: '创建时间',
+          dataIndex: 'created_at',
+          width: 160,
+          sortType: 'date',
+          render: formatUnixDateTime,
+          sorter: (a, b) =>
+            Number(a?.created_at || 0) - Number(b?.created_at || 0),
+          exportValue: (record) => formatUnixDateTime(record?.created_at),
+        },
+        {
+          title: '备注',
+          exportTitle: '备注',
+          dataIndex: 'note',
+          ellipsis: true,
+          sortable: false,
+        },
+      ]),
+    []
+  )
+  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: 'shipments',
+      moduleTitle: '出货单',
+      columns,
+    })
+  const exportRows = useCallback(() => {
+    downloadBusinessListCSV({
+      filename: 'shipments.csv',
+      columns: visibleColumns,
+      rows,
+    })
+  }, [rows, visibleColumns])
   const selectedRowLabel = selectedRow
     ? `${selectedRow.shipment_no || selectedRow.id} / ${
         selectedRow.customer_snapshot ||
@@ -957,6 +1023,14 @@ export default function ShipmentsPage() {
               }}
             />
           </>
+        }
+        actions={
+          <BusinessListToolbarActions
+            moduleTitle="出货单"
+            onExport={exportRows}
+            exportDisabled={rows.length === 0}
+            onOpenColumnOrder={openColumnOrder}
+          />
         }
         primaryAction={
           <ToolbarButton
@@ -1047,7 +1121,7 @@ export default function ShipmentsPage() {
         rowKey="id"
         loading={loading}
         dataSource={rows}
-        columns={columns}
+        columns={tableColumns}
         pagination={createBusinessTablePagination({
           pagination,
           total,
@@ -1068,6 +1142,7 @@ export default function ShipmentsPage() {
           onClick: () => setSelectedRow(record),
         })}
       />
+      {columnOrderModal}
 
       <BusinessFormModal
         title={
@@ -1107,7 +1182,15 @@ export default function ShipmentsPage() {
                 </div>
                 <Tag>{modalSelectedShipment.items?.length || 0} 行</Tag>
               </div>
-              <ShipmentItemsTable items={modalSelectedShipment.items || []} />
+              <ShipmentItemsTable
+                inventoryLotOptions={inventoryLotOptions}
+                items={modalSelectedShipment.items || []}
+                productOptions={productOptions}
+                productSKUOptions={productSKUOptions}
+                salesOrderItemOptions={salesOrderItemOptions}
+                unitOptions={unitOptions}
+                warehouseOptions={warehouseOptions}
+              />
             </section>
           ) : null}
           <Form.List name="items">

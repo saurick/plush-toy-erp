@@ -102,6 +102,8 @@ export function MasterDataFormFields({
   processNameOptions = [],
   processCategoryOptions = [],
   supplierTypeOptions = [],
+  customerPaymentConditionOptions = [],
+  onCustomerPaymentMethodChange,
 }) {
   if (type === 'products') {
     return (
@@ -359,6 +361,29 @@ export function MasterDataFormFields({
             placeholder="请选择供应商类型"
           />
         </Form.Item>
+      ) : null}
+      {type === 'customers' ? (
+        <>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="默认付款方式"
+            name="default_payment_method"
+          >
+            <TextSuggestionInput
+              className="erp-customer-payment-method-suggested-input"
+              options={customerPaymentConditionOptions}
+              placeholder="如现结、30天月结，也可直接输入"
+              onChange={onCustomerPaymentMethodChange}
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="默认账期天数"
+            name="default_payment_term_days"
+          >
+            <InputNumber min={0} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+        </>
       ) : null}
       {type === 'materials' ? (
         <>

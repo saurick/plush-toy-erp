@@ -220,6 +220,8 @@ var (
 		{Name: "code", Type: field.TypeString, Size: 64},
 		{Name: "name", Type: field.TypeString, Size: 255},
 		{Name: "short_name", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "default_payment_method", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "default_payment_term_days", Type: field.TypeInt, Nullable: true},
 		{Name: "tax_no", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
@@ -248,9 +250,14 @@ var (
 				Columns: []*schema.Column{CustomersColumns[3]},
 			},
 			{
+				Name:    "customer_default_payment_method",
+				Unique:  false,
+				Columns: []*schema.Column{CustomersColumns[4]},
+			},
+			{
 				Name:    "customer_is_active",
 				Unique:  false,
-				Columns: []*schema.Column{CustomersColumns[5]},
+				Columns: []*schema.Column{CustomersColumns[7]},
 			},
 		},
 	}
@@ -263,7 +270,12 @@ var (
 		{Name: "counterparty_type", Type: field.TypeString, Size: 16},
 		{Name: "counterparty_id", Type: field.TypeInt, Nullable: true},
 		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "fee_amount", Type: field.TypeOther, Default: "0", SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "currency", Type: field.TypeString, Size: 16, Default: "CNY"},
+		{Name: "collection_type", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "payment_term", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "payment_term_days", Type: field.TypeInt, Nullable: true},
+		{Name: "invoice_category", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "source_type", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "source_id", Type: field.TypeInt, Nullable: true},
 		{Name: "source_line_id", Type: field.TypeInt, Nullable: true},
@@ -289,7 +301,7 @@ var (
 			{
 				Name:    "financefact_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceFactsColumns[11]},
+				Columns: []*schema.Column{FinanceFactsColumns[16]},
 			},
 			{
 				Name:    "financefact_fact_type_status",
@@ -304,7 +316,7 @@ var (
 			{
 				Name:    "financefact_source_type_source_id_source_line_id",
 				Unique:  false,
-				Columns: []*schema.Column{FinanceFactsColumns[8], FinanceFactsColumns[9], FinanceFactsColumns[10]},
+				Columns: []*schema.Column{FinanceFactsColumns[13], FinanceFactsColumns[14], FinanceFactsColumns[15]},
 			},
 		},
 	}
@@ -1840,6 +1852,9 @@ var (
 		{Name: "order_no", Type: field.TypeString, Size: 64},
 		{Name: "customer_order_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "customer_snapshot", Type: field.TypeJSON, Nullable: true},
+		{Name: "payment_method", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "payment_term_days", Type: field.TypeInt, Nullable: true},
+		{Name: "price_condition_note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "order_date", Type: field.TypeTime},
 		{Name: "planned_delivery_date", Type: field.TypeTime, Nullable: true},
 		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
@@ -1856,7 +1871,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_orders_customers_sales_orders",
-				Columns:    []*schema.Column{SalesOrdersColumns[10]},
+				Columns:    []*schema.Column{SalesOrdersColumns[13]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1870,7 +1885,7 @@ var (
 			{
 				Name:    "salesorder_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[10]},
+				Columns: []*schema.Column{SalesOrdersColumns[13]},
 			},
 			{
 				Name:    "salesorder_customer_order_no",
@@ -1878,19 +1893,24 @@ var (
 				Columns: []*schema.Column{SalesOrdersColumns[2]},
 			},
 			{
-				Name:    "salesorder_lifecycle_status",
-				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[6]},
-			},
-			{
-				Name:    "salesorder_order_date",
+				Name:    "salesorder_payment_method",
 				Unique:  false,
 				Columns: []*schema.Column{SalesOrdersColumns[4]},
 			},
 			{
+				Name:    "salesorder_lifecycle_status",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrdersColumns[9]},
+			},
+			{
+				Name:    "salesorder_order_date",
+				Unique:  false,
+				Columns: []*schema.Column{SalesOrdersColumns[7]},
+			},
+			{
 				Name:    "salesorder_planned_delivery_date",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[5]},
+				Columns: []*schema.Column{SalesOrdersColumns[8]},
 			},
 		},
 	}
@@ -2546,10 +2566,16 @@ func init() {
 	}
 	FinanceFactsTable.Annotation = &entsql.Annotation{}
 	FinanceFactsTable.Annotation.Checks = map[string]string{
-		"finance_facts_amount_positive":      "amount > 0",
-		"finance_facts_counterparty_allowed": "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
-		"finance_facts_status_allowed":       "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
-		"finance_facts_type_allowed":         "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'PAYMENT', 'RECONCILIATION')",
+		"finance_facts_amount_positive":          "amount > 0",
+		"finance_facts_collection_type_allowed":  "collection_type IS NULL OR collection_type IN ('ADVANCE_RECEIPT', 'ACCOUNTS_RECEIVABLE')",
+		"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
+		"finance_facts_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
+		"finance_facts_fee_amount_nonnegative":   "fee_amount >= 0",
+		"finance_facts_invoice_category_allowed": "invoice_category IS NULL OR invoice_category IN ('NONE', 'EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
+		"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('CASH_ON_SHIPMENT', 'EOM_30', 'EOM_45')",
+		"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
+		"finance_facts_status_allowed":           "status IN ('DRAFT', 'POSTED', 'SETTLED', 'CANCELLED')",
+		"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'PAYMENT', 'RECONCILIATION')",
 	}
 	InventoryBalancesTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	InventoryBalancesTable.ForeignKeys[1].RefTable = UnitsTable

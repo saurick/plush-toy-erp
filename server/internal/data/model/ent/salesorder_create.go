@@ -56,6 +56,48 @@ func (_c *SalesOrderCreate) SetCustomerSnapshot(v map[string]interface{}) *Sales
 	return _c
 }
 
+// SetPaymentMethod sets the "payment_method" field.
+func (_c *SalesOrderCreate) SetPaymentMethod(v string) *SalesOrderCreate {
+	_c.mutation.SetPaymentMethod(v)
+	return _c
+}
+
+// SetNillablePaymentMethod sets the "payment_method" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillablePaymentMethod(v *string) *SalesOrderCreate {
+	if v != nil {
+		_c.SetPaymentMethod(*v)
+	}
+	return _c
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_c *SalesOrderCreate) SetPaymentTermDays(v int) *SalesOrderCreate {
+	_c.mutation.SetPaymentTermDays(v)
+	return _c
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillablePaymentTermDays(v *int) *SalesOrderCreate {
+	if v != nil {
+		_c.SetPaymentTermDays(*v)
+	}
+	return _c
+}
+
+// SetPriceConditionNote sets the "price_condition_note" field.
+func (_c *SalesOrderCreate) SetPriceConditionNote(v string) *SalesOrderCreate {
+	_c.mutation.SetPriceConditionNote(v)
+	return _c
+}
+
+// SetNillablePriceConditionNote sets the "price_condition_note" field if the given value is not nil.
+func (_c *SalesOrderCreate) SetNillablePriceConditionNote(v *string) *SalesOrderCreate {
+	if v != nil {
+		_c.SetPriceConditionNote(*v)
+	}
+	return _c
+}
+
 // SetOrderDate sets the "order_date" field.
 func (_c *SalesOrderCreate) SetOrderDate(v time.Time) *SalesOrderCreate {
 	_c.mutation.SetOrderDate(v)
@@ -254,6 +296,21 @@ func (_c *SalesOrderCreate) check() error {
 			return &ValidationError{Name: "customer_order_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_order_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.PaymentMethod(); ok {
+		if err := salesorder.PaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.PaymentTermDays(); ok {
+		if err := salesorder.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_term_days": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.PriceConditionNote(); ok {
+		if err := salesorder.PriceConditionNoteValidator(v); err != nil {
+			return &ValidationError{Name: "price_condition_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.price_condition_note": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.OrderDate(); !ok {
 		return &ValidationError{Name: "order_date", err: errors.New(`ent: missing required field "SalesOrder.order_date"`)}
 	}
@@ -316,6 +373,18 @@ func (_c *SalesOrderCreate) createSpec() (*SalesOrder, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CustomerSnapshot(); ok {
 		_spec.SetField(salesorder.FieldCustomerSnapshot, field.TypeJSON, value)
 		_node.CustomerSnapshot = value
+	}
+	if value, ok := _c.mutation.PaymentMethod(); ok {
+		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)
+		_node.PaymentMethod = &value
+	}
+	if value, ok := _c.mutation.PaymentTermDays(); ok {
+		_spec.SetField(salesorder.FieldPaymentTermDays, field.TypeInt, value)
+		_node.PaymentTermDays = &value
+	}
+	if value, ok := _c.mutation.PriceConditionNote(); ok {
+		_spec.SetField(salesorder.FieldPriceConditionNote, field.TypeString, value)
+		_node.PriceConditionNote = &value
 	}
 	if value, ok := _c.mutation.OrderDate(); ok {
 		_spec.SetField(salesorder.FieldOrderDate, field.TypeTime, value)

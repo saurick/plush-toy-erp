@@ -35,6 +35,9 @@ func (r *salesOrderRepo) CreateSalesOrder(ctx context.Context, in *biz.SalesOrde
 		SetCustomerID(in.CustomerID).
 		SetNillableCustomerOrderNo(in.CustomerOrderNo).
 		SetCustomerSnapshot(in.CustomerSnapshot).
+		SetNillablePaymentMethod(in.PaymentMethod).
+		SetNillablePaymentTermDays(in.PaymentTermDays).
+		SetNillablePriceConditionNote(in.PriceConditionNote).
 		SetOrderDate(in.OrderDate).
 		SetNillablePlannedDeliveryDate(in.PlannedDeliveryDate).
 		SetLifecycleStatus(biz.SalesOrderStatusDraft).
@@ -56,6 +59,21 @@ func (r *salesOrderRepo) UpdateSalesOrder(ctx context.Context, id int, in *biz.S
 		update.ClearCustomerOrderNo()
 	} else {
 		update.SetCustomerOrderNo(*in.CustomerOrderNo)
+	}
+	if in.PaymentMethod == nil {
+		update.ClearPaymentMethod()
+	} else {
+		update.SetPaymentMethod(*in.PaymentMethod)
+	}
+	if in.PaymentTermDays == nil {
+		update.ClearPaymentTermDays()
+	} else {
+		update.SetPaymentTermDays(*in.PaymentTermDays)
+	}
+	if in.PriceConditionNote == nil {
+		update.ClearPriceConditionNote()
+	} else {
+		update.SetPriceConditionNote(*in.PriceConditionNote)
 	}
 	if in.PlannedDeliveryDate == nil {
 		update.ClearPlannedDeliveryDate()
@@ -94,6 +112,7 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 		query = query.Where(salesorder.Or(
 			salesorder.OrderNoContains(filter.Keyword),
 			salesorder.CustomerOrderNoContains(filter.Keyword),
+			salesorder.PaymentMethodContains(filter.Keyword),
 		))
 	}
 	if filter.CustomerID > 0 {
@@ -314,6 +333,21 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 		} else {
 			update.SetCustomerOrderNo(*in.CustomerOrderNo)
 		}
+		if in.PaymentMethod == nil {
+			update.ClearPaymentMethod()
+		} else {
+			update.SetPaymentMethod(*in.PaymentMethod)
+		}
+		if in.PaymentTermDays == nil {
+			update.ClearPaymentTermDays()
+		} else {
+			update.SetPaymentTermDays(*in.PaymentTermDays)
+		}
+		if in.PriceConditionNote == nil {
+			update.ClearPriceConditionNote()
+		} else {
+			update.SetPriceConditionNote(*in.PriceConditionNote)
+		}
 		if in.PlannedDeliveryDate == nil {
 			update.ClearPlannedDeliveryDate()
 		} else {
@@ -337,6 +371,9 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			SetCustomerID(in.CustomerID).
 			SetNillableCustomerOrderNo(in.CustomerOrderNo).
 			SetCustomerSnapshot(in.CustomerSnapshot).
+			SetNillablePaymentMethod(in.PaymentMethod).
+			SetNillablePaymentTermDays(in.PaymentTermDays).
+			SetNillablePriceConditionNote(in.PriceConditionNote).
 			SetOrderDate(in.OrderDate).
 			SetNillablePlannedDeliveryDate(in.PlannedDeliveryDate).
 			SetLifecycleStatus(biz.SalesOrderStatusDraft).
@@ -533,6 +570,9 @@ func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {
 		CustomerID:          row.CustomerID,
 		CustomerOrderNo:     row.CustomerOrderNo,
 		CustomerSnapshot:    row.CustomerSnapshot,
+		PaymentMethod:       row.PaymentMethod,
+		PaymentTermDays:     row.PaymentTermDays,
+		PriceConditionNote:  row.PriceConditionNote,
 		OrderDate:           row.OrderDate,
 		PlannedDeliveryDate: row.PlannedDeliveryDate,
 		LifecycleStatus:     row.LifecycleStatus,

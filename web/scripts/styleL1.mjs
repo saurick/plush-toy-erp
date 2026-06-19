@@ -1706,7 +1706,12 @@ async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
   const headerTriggers = page.locator(
     '.erp-business-data-table-card .erp-module-column-header-trigger'
   )
-  await headerTriggers.nth(1).click()
+  const clickHeaderTrigger = async (index) => {
+    const trigger = headerTriggers.nth(index)
+    await trigger.waitFor({ state: 'visible', timeout: 10_000 })
+    await trigger.click()
+  }
+  await clickHeaderTrigger(1)
 
   const menu = page.locator('.ant-dropdown:not(.ant-dropdown-hidden)').last()
   await menu
@@ -1748,7 +1753,7 @@ async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
   }, storageKey)
   assert(Boolean(storedOrder), '表头快捷调整后未写入本地缓存兜底')
 
-  await headerTriggers.first().click()
+  await clickHeaderTrigger(0)
   await menu
     .getByText('打开列顺序面板')
     .waitFor({ state: 'visible', timeout: 10_000 })
@@ -1797,6 +1802,7 @@ async function verifyBusinessActionFormModal(
     absentTexts = [],
     requireMultiColumn = true,
     expectContactItemsLayout = false,
+    beforeMeasure,
     afterOpen,
   }
 ) {
@@ -1807,6 +1813,9 @@ async function verifyBusinessActionFormModal(
   await modal.waitFor({ state: 'visible', timeout: 10_000 })
   await expectText(page, titleText)
   await assertAntdModalCentered(page, modal, `${screenshotName}-centered`)
+  if (typeof beforeMeasure === 'function') {
+    await beforeMeasure(modal)
+  }
 
   const metrics = await modal.evaluate((node) => {
     const body = node.querySelector('.ant-modal-body')
@@ -1962,7 +1971,10 @@ async function verifyBusinessActionFormModal(
       .map((wrapper) => {
         const textarea = wrapper.querySelector('textarea.ant-input')
         const borderNode =
-          wrapper.querySelector('.ant-input-textarea-affix-wrapper') || textarea
+          (wrapper.matches('.ant-input-textarea-affix-wrapper')
+            ? wrapper
+            : wrapper.querySelector('.ant-input-textarea-affix-wrapper')) ||
+          textarea
         const count = wrapper.querySelector('.ant-input-data-count')
         const wrapperRect = wrapper.getBoundingClientRect()
         const borderRect = borderNode?.getBoundingClientRect()
@@ -5101,10 +5113,10 @@ async function assertDashboardWorkbenchEntryNavigation(page, { scenarioName }) {
   await createTask({
     task_code: 'style-l1-dashboard-entry-shell',
     task_group: 'shipment_release',
-    task_name: '工作台待接入预览任务',
+    task_name: '工作台出货放行入口任务',
     source_type: 'shipping-release',
     source_id: 9011,
-    source_no: 'OUT-DASH-SHELL',
+    source_no: 'OUT-DASH-SHIPMENT',
     business_status_key: 'shipment_pending',
     task_status_key: 'ready',
     owner_role_key: 'warehouse',
@@ -5117,7 +5129,7 @@ async function assertDashboardWorkbenchEntryNavigation(page, { scenarioName }) {
 
   await page.getByRole('button', { name: '刷新当前页' }).click()
   await expectText(page, '工作台正式页关联任务')
-  await expectText(page, '工作台待接入预览任务')
+  await expectText(page, '工作台出货放行入口任务')
 
   const formalRow = page
     .locator('.erp-workbench-queue-panel .ant-table-row')
@@ -5142,22 +5154,26 @@ async function assertDashboardWorkbenchEntryNavigation(page, { scenarioName }) {
     waitUntil: 'domcontentloaded',
   })
   await expectHeading(page, '工作台')
-  await expectText(page, '工作台待接入预览任务')
-  const shellRow = page
+  await expectText(page, '工作台出货放行入口任务')
+  const shipmentRow = page
     .locator('.erp-workbench-queue-panel .ant-table-row')
-    .filter({ hasText: '工作台待接入预览任务' })
+    .filter({ hasText: '工作台出货放行入口任务' })
     .first()
-  await shellRow.click()
+  await shipmentRow.click()
   await detailPanel
-    .getByText('工作台待接入预览任务', { exact: true })
+    .getByText('工作台出货放行入口任务', { exact: true })
     .waitFor({ state: 'visible', timeout: 10_000 })
-  assert.equal(
-    await detailPanel
-      .getByRole('button', { name: '关联记录', exact: true })
-      .count(),
-    0,
-    `${scenarioName} formal-shell 任务不应显示关联记录按钮`
+  await detailPanel
+    .getByRole('button', { name: '关联记录', exact: true })
+    .click()
+  await waitForPath(page, '/erp/warehouse/shipping-release')
+  assert.match(
+    page.url(),
+    /[?&]link_keyword=OUT-DASH-SHIPMENT(?:&|$)/,
+    `${scenarioName} 出货放行入口应带来源单号: ${page.url()}`
   )
+  await expectHeading(page, '出货放行')
+  await expectText(page, '工作台出货放行入口任务')
 }
 
 async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
@@ -5570,6 +5586,8 @@ async function assertBusinessMainTableSortableColumns(
   page,
   { scenarioName, unsortableHeaders = [] }
 ) {
+  await page.mouse.move(0, 0)
+  await page.waitForTimeout(220)
   const metrics = await page.evaluate(() => {
     const tableCard = document.querySelector('.erp-business-data-table-card')
     const headers = tableCard
@@ -5581,33 +5599,125 @@ async function assertBusinessMainTableSortableColumns(
             isSelectionColumn: node.classList.contains(
               'ant-table-selection-column'
             ),
+            isExpandColumn: node.classList.contains(
+              'ant-table-row-expand-icon-cell'
+            ),
+            hasSelectionControl: Boolean(
+              node.querySelector(
+                '.ant-checkbox, .ant-radio, input[type="checkbox"], input[type="radio"]'
+              )
+            ),
+            whiteSpace: window.getComputedStyle(node).whiteSpace,
+            verticalAlign: window.getComputedStyle(node).verticalAlign,
             hasSorter: Boolean(
               node.querySelector(
                 '.ant-table-column-sorters, .ant-table-column-sorter'
               )
             ),
+            sorterAlignItems:
+              node.querySelector('.ant-table-column-sorters') &&
+              window.getComputedStyle(
+                node.querySelector('.ant-table-column-sorters')
+              ).alignItems,
           })
         )
       : []
-    return { headers }
+    const columnHeaderTriggers = tableCard
+      ? Array.from(
+          tableCard.querySelectorAll('.erp-module-column-header-trigger')
+        ).map((node) => ({
+          label: node.getAttribute('aria-label') || '',
+          opacity: Number(window.getComputedStyle(node).opacity || 1),
+          display: window.getComputedStyle(node).display,
+          visibility: window.getComputedStyle(node).visibility,
+          width: node.getBoundingClientRect().width,
+          height: node.getBoundingClientRect().height,
+        }))
+      : []
+    const currentAction = document.querySelector(
+      '.erp-business-module-current-action'
+    )
+    return {
+      headers,
+      columnHeaderTriggers,
+      hasCurrentAction: Boolean(currentAction),
+    }
   })
+  const selectionHeaders = metrics.headers.filter(
+    (header) => header.isSelectionColumn
+  )
+  const selectionHeadersWithoutMeaning = selectionHeaders.filter(
+    (header) => !header.hasSelectionControl && header.text !== '选择'
+  )
   const skippedHeaders = new Set(unsortableHeaders)
   const sortableHeaders = metrics.headers.filter(
     (header) =>
       header.text &&
       !header.isSelectionColumn &&
+      !header.isExpandColumn &&
       !skippedHeaders.has(header.text)
   )
   const missingSorters = sortableHeaders.filter((header) => !header.hasSorter)
+  const unstableHeaders = sortableHeaders.filter(
+    (header) =>
+      header.whiteSpace !== 'nowrap' || header.verticalAlign !== 'middle'
+  )
+  const unstableSorters = sortableHeaders.filter(
+    (header) => header.hasSorter && header.sorterAlignItems !== 'center'
+  )
+  const hiddenColumnHeaderTriggers = metrics.columnHeaderTriggers.filter(
+    (node) =>
+      node.display === 'none' ||
+      node.visibility === 'hidden' ||
+      node.opacity < 0.95
+  )
+  const oversizedColumnHeaderTriggers = metrics.columnHeaderTriggers.filter(
+    (node) => node.width > 24 || node.height > 24
+  )
 
   assert(
     sortableHeaders.length > 0,
     `${scenarioName} 未找到可排序业务主表列: ${JSON.stringify(metrics)}`
   )
+  if (metrics.hasCurrentAction) {
+    assert(
+      selectionHeaders.length > 0,
+      `${scenarioName} 当前操作业务主表应保留选择列: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      selectionHeadersWithoutMeaning,
+      [],
+      `${scenarioName} 选择列表头不应为空白不可解释: ${JSON.stringify(metrics)}`
+    )
+  }
   assert.deepEqual(
     missingSorters,
     [],
     `${scenarioName} 业务主表数据列缺少排序入口: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    unstableHeaders,
+    [],
+    `${scenarioName} 业务主表表头应统一单行、垂直居中: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    unstableSorters,
+    [],
+    `${scenarioName} 业务主表排序控件应与标题垂直居中: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.columnHeaderTriggers.length > 0,
+    `${scenarioName} 业务主表应默认展示列设置快捷入口: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    hiddenColumnHeaderTriggers,
+    [],
+    `${scenarioName} 业务主表列设置快捷入口默认态应可见可点: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    oversizedColumnHeaderTriggers,
+    [],
+    `${scenarioName} 业务主表列设置快捷入口应保持紧凑尺寸: ${JSON.stringify(metrics)}`
   )
 }
 

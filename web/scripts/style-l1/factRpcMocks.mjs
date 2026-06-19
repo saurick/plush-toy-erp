@@ -113,6 +113,7 @@ export async function installFactRpcMocks(page, context) {
             : 'CUSTOMER',
       counterparty_id: 1,
       amount: '1200',
+      fee_amount: '0',
       currency: 'CNY',
       source_type: financeFactType === 'PAYABLE' ? 'PURCHASE' : 'SHIPMENT',
       source_id: 1,

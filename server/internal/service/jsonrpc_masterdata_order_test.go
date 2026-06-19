@@ -30,11 +30,11 @@ type stubMasterDataJSONRPCRepo struct {
 }
 
 func (s *stubMasterDataJSONRPCRepo) CreateCustomer(_ context.Context, in *biz.CustomerMutation) (*biz.Customer, error) {
-	return &biz.Customer{ID: 1, Code: in.Code, Name: in.Name, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
+	return &biz.Customer{ID: 1, Code: in.Code, Name: in.Name, DefaultPaymentMethod: in.DefaultPaymentMethod, DefaultPaymentTermDays: in.DefaultPaymentTermDays, IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) UpdateCustomer(_ context.Context, id int, in *biz.CustomerMutation) (*biz.Customer, error) {
-	return &biz.Customer{ID: id, Code: in.Code, Name: in.Name, IsActive: true}, nil
+	return &biz.Customer{ID: id, Code: in.Code, Name: in.Name, DefaultPaymentMethod: in.DefaultPaymentMethod, DefaultPaymentTermDays: in.DefaultPaymentTermDays, IsActive: true}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) SaveCustomerWithContacts(_ context.Context, id int, in *biz.CustomerMutation, contacts []*biz.ContactSaveMutation) (*biz.CustomerWithContacts, error) {
@@ -55,17 +55,21 @@ func (s *stubMasterDataJSONRPCRepo) SaveCustomerWithContacts(_ context.Context, 
 		})
 	}
 	return &biz.CustomerWithContacts{
-		Customer: &biz.Customer{ID: id, Code: in.Code, Name: in.Name, IsActive: true},
+		Customer: &biz.Customer{ID: id, Code: in.Code, Name: in.Name, DefaultPaymentMethod: in.DefaultPaymentMethod, DefaultPaymentTermDays: in.DefaultPaymentTermDays, IsActive: true},
 		Contacts: outContacts,
 	}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) GetCustomer(_ context.Context, id int) (*biz.Customer, error) {
-	return &biz.Customer{ID: id, Code: "C001", Name: "客户", IsActive: true}, nil
+	defaultPaymentMethod := "30天月结"
+	defaultPaymentTermDays := 30
+	return &biz.Customer{ID: id, Code: "C001", Name: "客户", DefaultPaymentMethod: &defaultPaymentMethod, DefaultPaymentTermDays: &defaultPaymentTermDays, IsActive: true}, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) ListCustomers(context.Context, biz.MasterDataFilter) ([]*biz.Customer, int, error) {
-	return []*biz.Customer{{ID: 1, Code: "C001", Name: "客户", IsActive: true}}, 1, nil
+	defaultPaymentMethod := "现结"
+	defaultPaymentTermDays := 0
+	return []*biz.Customer{{ID: 1, Code: "C001", Name: "客户", DefaultPaymentMethod: &defaultPaymentMethod, DefaultPaymentTermDays: &defaultPaymentTermDays, IsActive: true}}, 1, nil
 }
 
 func (s *stubMasterDataJSONRPCRepo) SetCustomerActive(_ context.Context, id int, active bool) (*biz.Customer, error) {
@@ -244,16 +248,19 @@ type stubSalesOrderJSONRPCRepo struct {
 	productActive        bool
 	unitActive           bool
 	addedItem            *biz.SalesOrderItemMutation
+	savedOrder           *biz.SalesOrderMutation
 	savedItems           []*biz.SalesOrderItemSaveMutation
 	lastSalesOrderFilter biz.SalesOrderFilter
 }
 
 func (s *stubSalesOrderJSONRPCRepo) CreateSalesOrder(_ context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
-	return &biz.SalesOrder{ID: 1, OrderNo: in.OrderNo, CustomerID: in.CustomerID, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft}, nil
+	s.savedOrder = in
+	return &biz.SalesOrder{ID: 1, OrderNo: in.OrderNo, CustomerID: in.CustomerID, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrder(_ context.Context, id int, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
-	return &biz.SalesOrder{ID: id, OrderNo: in.OrderNo, CustomerID: in.CustomerID, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft}, nil
+	s.savedOrder = in
+	return &biz.SalesOrder{ID: id, OrderNo: in.OrderNo, CustomerID: in.CustomerID, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) GetSalesOrder(_ context.Context, id int) (*biz.SalesOrder, error) {
@@ -262,7 +269,9 @@ func (s *stubSalesOrderJSONRPCRepo) GetSalesOrder(_ context.Context, id int) (*b
 
 func (s *stubSalesOrderJSONRPCRepo) ListSalesOrders(_ context.Context, filter biz.SalesOrderFilter) ([]*biz.SalesOrder, int, error) {
 	s.lastSalesOrderFilter = filter
-	return []*biz.SalesOrder{{ID: 1, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft}}, 1, nil
+	paymentMethod := "30天月结"
+	paymentTermDays := 30
+	return []*biz.SalesOrder{{ID: 1, OrderNo: "SO001", CustomerID: 1, PaymentMethod: &paymentMethod, PaymentTermDays: &paymentTermDays, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft}}, 1, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*biz.SalesOrder, error) {
@@ -291,13 +300,14 @@ func (s *stubSalesOrderJSONRPCRepo) ListSalesOrderItems(context.Context, biz.Sal
 }
 
 func (s *stubSalesOrderJSONRPCRepo) SaveSalesOrderWithItems(_ context.Context, id int, in *biz.SalesOrderMutation, items []*biz.SalesOrderItemSaveMutation) (*biz.SalesOrderWithItems, error) {
+	s.savedOrder = in
 	s.savedItems = items
 	orderID := id
 	if orderID <= 0 {
 		orderID = 1
 	}
 	out := &biz.SalesOrderWithItems{
-		Order: &biz.SalesOrder{ID: orderID, OrderNo: in.OrderNo, CustomerID: in.CustomerID, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft},
+		Order: &biz.SalesOrder{ID: orderID, OrderNo: in.OrderNo, CustomerID: in.CustomerID, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft},
 		Items: make([]*biz.SalesOrderItem, 0, len(items)),
 	}
 	for idx, item := range items {
@@ -426,8 +436,10 @@ func TestJsonrpcDispatcher_ContactAPIUsesUsecaseOwnerGuard(t *testing.T) {
 
 func TestJsonrpcDispatcher_SaveCustomerWithContactsUsesAggregateUsecase(t *testing.T) {
 	params := mustJSONRPCStruct(t, map[string]any{
-		"code": "C-AGG",
-		"name": "聚合客户",
+		"code":                      "C-AGG",
+		"name":                      "聚合客户",
+		"default_payment_method":    "现结",
+		"default_payment_term_days": float64(0),
 		"contacts": []any{
 			map[string]any{
 				"name":       "主联系人",
@@ -477,6 +489,9 @@ func TestJsonrpcDispatcher_SaveCustomerWithContactsUsesAggregateUsecase(t *testi
 	}
 	if repo.savedCustomer == nil || len(repo.savedContacts) != 1 || repo.createdContact != nil {
 		t.Fatalf("expected aggregate save without standalone contact create, repo=%#v", repo)
+	}
+	if repo.savedCustomer.DefaultPaymentMethod == nil || *repo.savedCustomer.DefaultPaymentMethod != "现结" || repo.savedCustomer.DefaultPaymentTermDays == nil || *repo.savedCustomer.DefaultPaymentTermDays != 0 {
+		t.Fatalf("expected customer payment defaults forwarded, got %#v", repo.savedCustomer)
 	}
 }
 
@@ -745,9 +760,12 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
 	j := newSalesOrderJSONRPCTestData(repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
 	params := mustJSONRPCStruct(t, map[string]any{
-		"order_no":    "SO001",
-		"customer_id": float64(1),
-		"order_date":  "2026-05-31",
+		"order_no":             "SO001",
+		"customer_id":          float64(1),
+		"payment_method":       "30天月结",
+		"payment_term_days":    float64(30),
+		"price_condition_note": "已按30天重新报价",
+		"order_date":           "2026-05-31",
 	})
 
 	_, okRes, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "create_sales_order", "1", params)
@@ -756,6 +774,13 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 	}
 	if okRes == nil || okRes.Code != errcode.OK.Code {
 		t.Fatalf("expected OK, got %#v", okRes)
+	}
+	if repo.savedOrder == nil || repo.savedOrder.PaymentMethod == nil || *repo.savedOrder.PaymentMethod != "30天月结" || repo.savedOrder.PaymentTermDays == nil || *repo.savedOrder.PaymentTermDays != 30 {
+		t.Fatalf("expected payment condition forwarded, got %#v", repo.savedOrder)
+	}
+	orderData := okRes.Data.AsMap()["sales_order"].(map[string]any)
+	if fmt.Sprint(orderData["payment_term_days"]) != "30" || orderData["payment_method"] != "30天月结" {
+		t.Fatalf("expected payment condition in response, got %#v", orderData)
 	}
 
 	_, unknownRes, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "ship"+"SalesOrder", "2", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
@@ -815,9 +840,12 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 		biz.PermissionSalesOrderItemCreate,
 	))
 	params := mustJSONRPCStruct(t, map[string]any{
-		"order_no":    "SO-TX-JSONRPC",
-		"customer_id": float64(1),
-		"order_date":  "2026-06-15",
+		"order_no":             "SO-TX-JSONRPC",
+		"customer_id":          float64(1),
+		"payment_method":       "60天月结",
+		"payment_term_days":    float64(60),
+		"price_condition_note": "本单价格按60天账期",
+		"order_date":           "2026-06-15",
 		"items": []any{
 			map[string]any{
 				"line_no":          float64(1),
@@ -842,10 +870,17 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesSingleUsecase(t *testing.T
 	if repo.savedItems[0].ProductSkuID == nil || *repo.savedItems[0].ProductSkuID != 10 {
 		t.Fatalf("expected product_sku_id forwarded to save usecase, got %#v", repo.savedItems[0])
 	}
+	if repo.savedOrder == nil || repo.savedOrder.PaymentMethod == nil || *repo.savedOrder.PaymentMethod != "60天月结" || repo.savedOrder.PaymentTermDays == nil || *repo.savedOrder.PaymentTermDays != 60 {
+		t.Fatalf("expected order payment condition forwarded, got %#v", repo.savedOrder)
+	}
 	data := res.Data.AsMap()
 	items := data["sales_order_items"].([]any)
 	if data["sales_order"] == nil || len(items) != 1 {
 		t.Fatalf("expected order and items in response, got %#v", data)
+	}
+	order := data["sales_order"].(map[string]any)
+	if order["payment_method"] != "60天月结" || fmt.Sprint(order["payment_term_days"]) != "60" {
+		t.Fatalf("expected payment condition in save response, got %#v", order)
 	}
 	item := items[0].(map[string]any)
 	if fmt.Sprint(item["product_sku_id"]) != "10" {

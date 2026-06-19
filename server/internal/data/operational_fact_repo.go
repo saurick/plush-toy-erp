@@ -362,7 +362,12 @@ func (r *operationalFactRepo) CreateFinanceFactDraft(ctx context.Context, in *bi
 		SetCounterpartyType(in.CounterpartyType).
 		SetNillableCounterpartyID(in.CounterpartyID).
 		SetAmount(in.Amount).
+		SetFeeAmount(in.FeeAmount).
 		SetCurrency(in.Currency).
+		SetNillableCollectionType(in.CollectionType).
+		SetNillablePaymentTerm(in.PaymentTerm).
+		SetNillablePaymentTermDays(in.PaymentTermDays).
+		SetNillableInvoiceCategory(in.InvoiceCategory).
 		SetNillableSourceType(in.SourceType).
 		SetNillableSourceID(in.SourceID).
 		SetNillableSourceLineID(in.SourceLineID).
@@ -961,5 +966,5 @@ func entFinanceFactToBiz(row *ent.FinanceFact) *biz.FinanceFact {
 	if row == nil {
 		return nil
 	}
-	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, Currency: row.Currency, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, SettledAt: row.SettledAt, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, SettledAt: row.SettledAt, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

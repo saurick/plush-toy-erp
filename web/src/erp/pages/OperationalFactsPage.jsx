@@ -58,6 +58,11 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
+  BusinessListToolbarActions,
+  downloadBusinessListCSV,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
+import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
   openPrintWorkspaceWindow,
@@ -65,6 +70,9 @@ import {
 import { buildProcessingContractDraftFromOutsourcingFact } from '../data/processingContractTemplate.mjs'
 import {
   ACTION_PERMISSIONS,
+  FINANCE_COLLECTION_TYPE_LABELS,
+  FINANCE_INVOICE_CATEGORY_LABELS,
+  FINANCE_PAYMENT_TERM_LABELS,
   FinanceFormFields,
   FactFormFields,
   OUTSOURCING_FACT_TYPES,
@@ -108,9 +116,16 @@ const DEFAULT_OPERATIONAL_FACT_SUMMARY =
   '统一承接生产、委外、出货、库存预留和财务事实的最小运行入口。页面只提交动作，库存流水、冲正和状态边界由后端 usecase 处理。'
 const EMPTY_VIEW_OVERRIDES = Object.freeze({})
 
+function internalRef(label, value) {
+  return value === null || value === undefined || value === ''
+    ? '-'
+    : `${label} ${value}`
+}
+
 export function OperationalFactWorkspace({
   pageTitle = '业务事实处理',
   pageSummary = DEFAULT_OPERATIONAL_FACT_SUMMARY,
+  toolbarModuleKey = 'operational-facts',
   initialActiveKey = 'production',
   enabledViews,
   viewOverrides = EMPTY_VIEW_OVERRIDES,
@@ -232,6 +247,7 @@ export function OperationalFactWorkspace({
           fact_type: 'RECEIVABLE',
           counterparty_type: 'CUSTOMER',
           currency: 'CNY',
+          fee_amount: '0',
         },
       },
     }),
@@ -275,7 +291,10 @@ export function OperationalFactWorkspace({
   }, [activeKey, configs, enabledViewKeys])
 
   const activeConfig = configs[activeKey] || configs.production
-  const activeRows = rowsByKey[activeKey] || []
+  const activeRows = useMemo(
+    () => rowsByKey[activeKey] || [],
+    [activeKey, rowsByKey]
+  )
   const activeTotal = totalByKey[activeKey] || 0
   const activeSelectedRow = selectedByKey[activeKey] || null
   const activePagination =
@@ -444,12 +463,6 @@ export function OperationalFactWorkspace({
 
   const baseColumns = [
     {
-      title: 'ID',
-      dataIndex: 'id',
-      width: 72,
-      sortType: 'number',
-    },
-    {
       title: '单号',
       dataIndex:
         activeKey === 'shipments'
@@ -462,7 +475,16 @@ export function OperationalFactWorkspace({
       sortType: 'text',
     },
     {
+      title: '内部记录',
+      dataIndex: 'id',
+      width: 92,
+      sortType: 'number',
+      render: (value) => internalRef('主键', value),
+      exportValue: (record) => internalRef('主键', record?.id),
+    },
+    {
       title: '状态',
+      exportTitle: '状态',
       dataIndex: 'status',
       width: 110,
       sortType: 'text',
@@ -473,51 +495,75 @@ export function OperationalFactWorkspace({
   const quantityColumns = [
     {
       title: '对象',
+      exportTitle: '对象',
       width: 150,
       sortValue: (record) =>
         `${record.subject_type || 'PRODUCT'}-${
           record.subject_id || record.product_id || ''
         }`,
       render: (_, record) =>
-        `${record.subject_type || 'PRODUCT'} #${
-          record.subject_id || record.product_id || '-'
-        }`,
+        internalRef(
+          record.subject_type || '产品',
+          record.subject_id || record.product_id
+        ),
+      exportValue: (record) =>
+        internalRef(
+          record.subject_type || '产品',
+          record.subject_id || record.product_id
+        ),
     },
     {
       title: '仓库/批次/单位',
+      exportTitle: '仓库/批次/单位',
       width: 180,
       sortValue: (record) =>
         `${record.warehouse_id || ''}-${record.lot_id || ''}-${
           record.unit_id || ''
         }`,
       render: (_, record) =>
-        `W${record.warehouse_id || '-'} / L${record.lot_id || '-'} / U${
-          record.unit_id || '-'
-        }`,
+        [
+          internalRef('仓库', record.warehouse_id),
+          internalRef('批次', record.lot_id),
+          internalRef('单位', record.unit_id),
+        ].join(' / '),
+      exportValue: (record) =>
+        [
+          internalRef('仓库', record.warehouse_id),
+          internalRef('批次', record.lot_id),
+          internalRef('单位', record.unit_id),
+        ].join(' / '),
     },
     {
       title: '数量',
+      exportTitle: '数量',
       dataIndex: 'quantity',
       width: 120,
       sortValue: (record) => decimalNumber(record?.quantity),
       render: formatQuantity,
+      exportValue: (record) => formatQuantity(record?.quantity),
     },
   ]
 
   const sourceColumns = [
     {
       title: '来源',
+      exportTitle: '来源',
       width: 180,
       ellipsis: true,
       sortValue: (record) =>
         `${record.source_type || ''}-${record.source_id || ''}`,
       render: (_, record) =>
         record.source_type
-          ? `${record.source_type} #${record.source_id || '-'}`
+          ? `${record.source_type} / ${internalRef('来源', record.source_id)}`
           : '-',
+      exportValue: (record) =>
+        record.source_type
+          ? `${record.source_type} / ${internalRef('来源', record.source_id)}`
+          : '',
     },
     {
       title: '日期',
+      exportTitle: '日期',
       width: 120,
       sortValue: (record) =>
         Number(
@@ -530,13 +576,19 @@ export function OperationalFactWorkspace({
         formatUnixDate(
           record.occurred_at || record.planned_ship_at || record.reserved_at
         ),
+      exportValue: (record) =>
+        formatUnixDate(
+          record.occurred_at || record.planned_ship_at || record.reserved_at
+        ),
     },
     {
       title: '创建时间',
+      exportTitle: '创建时间',
       dataIndex: 'created_at',
       width: 160,
       render: formatUnixDateTime,
       sortType: 'date',
+      exportValue: (record) => formatUnixDateTime(record?.created_at),
     },
     {
       title: '备注',
@@ -563,7 +615,9 @@ export function OperationalFactWorkspace({
         sortValue: (record) => record.supplier_name || record.supplier_id || '',
         render: (_, record) =>
           record.supplier_name ||
-          (record.supplier_id ? `#${record.supplier_id}` : '-'),
+          (record.supplier_id
+            ? internalRef('供应商', record.supplier_id)
+            : '-'),
       },
       ...quantityColumns,
       ...sourceColumns,
@@ -614,7 +668,9 @@ export function OperationalFactWorkspace({
         sortValue: (record) =>
           `${record.counterparty_type || ''}-${record.counterparty_id || ''}`,
         render: (_, record) =>
-          `${record.counterparty_type || '-'} #${record.counterparty_id || '-'}`,
+          record.counterparty_type
+            ? `${record.counterparty_type} / ${internalRef('往来方', record.counterparty_id)}`
+            : '-',
       },
       {
         title: '金额',
@@ -622,7 +678,42 @@ export function OperationalFactWorkspace({
         width: 120,
         sortValue: (record) => decimalNumber(record?.amount),
       },
+      {
+        title: '手续费',
+        dataIndex: 'fee_amount',
+        width: 120,
+        sortValue: (record) => decimalNumber(record?.fee_amount),
+      },
       { title: '币种', dataIndex: 'currency', width: 90, sortType: 'text' },
+      {
+        title: '收款分类',
+        dataIndex: 'collection_type',
+        width: 130,
+        sortType: 'text',
+        render: (value) =>
+          FINANCE_COLLECTION_TYPE_LABELS[value] || value || '-',
+      },
+      {
+        title: '账期',
+        dataIndex: 'payment_term',
+        width: 150,
+        sortType: 'text',
+        render: (value, record) => {
+          const label = FINANCE_PAYMENT_TERM_LABELS[value] || value || '-'
+          return record?.payment_term_days === null ||
+            record?.payment_term_days === undefined
+            ? label
+            : `${label} / ${record.payment_term_days} 天`
+        },
+      },
+      {
+        title: '发票类别',
+        dataIndex: 'invoice_category',
+        width: 130,
+        sortType: 'text',
+        render: (value) =>
+          FINANCE_INVOICE_CATEGORY_LABELS[value] || value || '-',
+      },
       ...sourceColumns,
     ],
   }
@@ -635,7 +726,21 @@ export function OperationalFactWorkspace({
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
     '当前操作只调用 operational_fact 后端 usecase；前端不本地写库存、出货、财务或 Workflow 事实。'
-  const tableColumns = applyBusinessColumnSorters(columnsByKey[activeKey] || [])
+  const columns = applyBusinessColumnSorters(columnsByKey[activeKey] || [])
+  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: `${toolbarModuleKey}-${activeKey}`,
+      moduleTitle: `${pageTitle} / ${activeConfig.title}`,
+      columns,
+    })
+  const exportRows = useCallback(() => {
+    downloadBusinessListCSV({
+      filename: `${toolbarModuleKey}-${activeKey}.csv`,
+      columns: visibleColumns,
+      rows: activeRows,
+    })
+  }, [activeKey, activeRows, toolbarModuleKey, visibleColumns])
   const canConfirmActive = hasAnyPermission(
     adminProfile,
     activeConfig.confirmPermissions || activeConfig.writePermissions
@@ -758,6 +863,14 @@ export function OperationalFactWorkspace({
                 },
               }))
             }}
+          />
+        }
+        actions={
+          <BusinessListToolbarActions
+            moduleTitle={pageTitle}
+            onExport={exportRows}
+            exportDisabled={activeRows.length === 0}
+            onOpenColumnOrder={openColumnOrder}
           />
         }
         primaryAction={
@@ -1093,6 +1206,7 @@ export function OperationalFactWorkspace({
           <ShipmentItemFormFields />
         </Form>
       </Modal>
+      {columnOrderModal}
     </BusinessPageLayout>
   )
 }

@@ -125,7 +125,7 @@ test('moduleTableColumns: 业务主表排序可读取嵌套路径', () => {
 
 test('moduleTableColumns: 主业务列表页使用共享排序入口', () => {
   const mainBusinessTableFiles = [
-    'pages/FormalBusinessModulePage.jsx',
+    'pages/WorkflowBusinessModulePage.jsx',
     'pages/V1MasterDataPage.jsx',
     'pages/V1SalesOrdersPage.jsx',
     'pages/V1PurchaseOrdersPage.jsx',

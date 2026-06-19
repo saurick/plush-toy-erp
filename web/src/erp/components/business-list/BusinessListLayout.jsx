@@ -39,6 +39,7 @@ import {
   canRunWorkflowTaskAction,
   getWorkflowTaskReadonlyReason,
 } from '../../utils/workflowTaskBoard.mjs'
+import { formatWorkflowTaskSource } from '../../utils/dashboardTaskDisplay.mjs'
 
 const { Text } = Typography
 const COLLABORATION_PANEL_DEFAULT_HEIGHT = 260
@@ -103,6 +104,18 @@ function resolveBusinessTableScrollX({ columns = [], rowSelection, scrollX }) {
   }
 
   return scrollX
+}
+
+function resolveBusinessTableRowSelection(rowSelection) {
+  if (!rowSelection) return rowSelection
+
+  if (rowSelection.type !== 'radio') return rowSelection
+
+  return {
+    columnTitle: '选择',
+    columnWidth: BUSINESS_TABLE_SELECTION_COLUMN_WIDTH,
+    ...rowSelection,
+  }
 }
 
 function resolveCollaborationPanelMaxHeight() {
@@ -624,6 +637,7 @@ export function BusinessDataTable({
   rowKey,
   columns,
   dataSource,
+  expandable,
   scroll,
   rowSelection,
   rowClassName,
@@ -632,6 +646,10 @@ export function BusinessDataTable({
   pagination,
   emptyDescription = '暂无业务记录，点击“新建记录”开始落盘',
 }) {
+  const resolvedRowSelection = React.useMemo(
+    () => resolveBusinessTableRowSelection(rowSelection),
+    [rowSelection]
+  )
   const resolvedScroll = React.useMemo(() => {
     const baseScroll =
       scroll && typeof scroll === 'object' && !Array.isArray(scroll)
@@ -641,11 +659,11 @@ export function BusinessDataTable({
       ...baseScroll,
       x: resolveBusinessTableScrollX({
         columns,
-        rowSelection,
+        rowSelection: resolvedRowSelection,
         scrollX: baseScroll.x,
       }),
     }
-  }, [columns, rowSelection, scroll])
+  }, [columns, resolvedRowSelection, scroll])
 
   return (
     <Card className="erp-business-data-table-card erp-business-module-table-card">
@@ -654,8 +672,9 @@ export function BusinessDataTable({
         rowKey={rowKey}
         columns={columns}
         dataSource={dataSource}
+        expandable={expandable}
         scroll={resolvedScroll}
-        rowSelection={rowSelection}
+        rowSelection={resolvedRowSelection}
         rowClassName={rowClassName}
         onRow={onRow}
         onChange={onChange}
@@ -1046,9 +1065,7 @@ export function CollaborationTaskPanel({
             >
               <div className="erp-business-module-task-item__main">
                 <strong>{task.task_name}</strong>
-                <span>
-                  {task.source_no || `${task.source_type} #${task.source_id}`}
-                </span>
+                <span>{formatWorkflowTaskSource(task)}</span>
                 {taskReason ? (
                   <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
                     阻塞原因：{taskReason}

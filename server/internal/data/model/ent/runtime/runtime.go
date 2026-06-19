@@ -49,6 +49,8 @@ import (
 	"server/internal/data/model/ent/workflowtaskevent"
 	"server/internal/data/model/schema"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -333,24 +335,32 @@ func init() {
 	customerDescShortName := customerFields[2].Descriptor()
 	// customer.ShortNameValidator is a validator for the "short_name" field. It is called by the builders before save.
 	customer.ShortNameValidator = customerDescShortName.Validators[0].(func(string) error)
+	// customerDescDefaultPaymentMethod is the schema descriptor for default_payment_method field.
+	customerDescDefaultPaymentMethod := customerFields[3].Descriptor()
+	// customer.DefaultPaymentMethodValidator is a validator for the "default_payment_method" field. It is called by the builders before save.
+	customer.DefaultPaymentMethodValidator = customerDescDefaultPaymentMethod.Validators[0].(func(string) error)
+	// customerDescDefaultPaymentTermDays is the schema descriptor for default_payment_term_days field.
+	customerDescDefaultPaymentTermDays := customerFields[4].Descriptor()
+	// customer.DefaultPaymentTermDaysValidator is a validator for the "default_payment_term_days" field. It is called by the builders before save.
+	customer.DefaultPaymentTermDaysValidator = customerDescDefaultPaymentTermDays.Validators[0].(func(int) error)
 	// customerDescTaxNo is the schema descriptor for tax_no field.
-	customerDescTaxNo := customerFields[3].Descriptor()
+	customerDescTaxNo := customerFields[5].Descriptor()
 	// customer.TaxNoValidator is a validator for the "tax_no" field. It is called by the builders before save.
 	customer.TaxNoValidator = customerDescTaxNo.Validators[0].(func(string) error)
 	// customerDescIsActive is the schema descriptor for is_active field.
-	customerDescIsActive := customerFields[4].Descriptor()
+	customerDescIsActive := customerFields[6].Descriptor()
 	// customer.DefaultIsActive holds the default value on creation for the is_active field.
 	customer.DefaultIsActive = customerDescIsActive.Default.(bool)
 	// customerDescNote is the schema descriptor for note field.
-	customerDescNote := customerFields[5].Descriptor()
+	customerDescNote := customerFields[7].Descriptor()
 	// customer.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	customer.NoteValidator = customerDescNote.Validators[0].(func(string) error)
 	// customerDescCreatedAt is the schema descriptor for created_at field.
-	customerDescCreatedAt := customerFields[6].Descriptor()
+	customerDescCreatedAt := customerFields[8].Descriptor()
 	// customer.DefaultCreatedAt holds the default value on creation for the created_at field.
 	customer.DefaultCreatedAt = customerDescCreatedAt.Default.(func() time.Time)
 	// customerDescUpdatedAt is the schema descriptor for updated_at field.
-	customerDescUpdatedAt := customerFields[7].Descriptor()
+	customerDescUpdatedAt := customerFields[9].Descriptor()
 	// customer.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	customer.DefaultUpdatedAt = customerDescUpdatedAt.Default.(func() time.Time)
 	// customer.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -437,8 +447,12 @@ func init() {
 	financefactDescCounterpartyID := financefactFields[4].Descriptor()
 	// financefact.CounterpartyIDValidator is a validator for the "counterparty_id" field. It is called by the builders before save.
 	financefact.CounterpartyIDValidator = financefactDescCounterpartyID.Validators[0].(func(int) error)
+	// financefactDescFeeAmount is the schema descriptor for fee_amount field.
+	financefactDescFeeAmount := financefactFields[6].Descriptor()
+	// financefact.DefaultFeeAmount holds the default value on creation for the fee_amount field.
+	financefact.DefaultFeeAmount = financefactDescFeeAmount.Default.(decimal.Decimal)
 	// financefactDescCurrency is the schema descriptor for currency field.
-	financefactDescCurrency := financefactFields[6].Descriptor()
+	financefactDescCurrency := financefactFields[7].Descriptor()
 	// financefact.DefaultCurrency holds the default value on creation for the currency field.
 	financefact.DefaultCurrency = financefactDescCurrency.Default.(string)
 	// financefact.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
@@ -457,20 +471,36 @@ func init() {
 			return nil
 		}
 	}()
+	// financefactDescCollectionType is the schema descriptor for collection_type field.
+	financefactDescCollectionType := financefactFields[8].Descriptor()
+	// financefact.CollectionTypeValidator is a validator for the "collection_type" field. It is called by the builders before save.
+	financefact.CollectionTypeValidator = financefactDescCollectionType.Validators[0].(func(string) error)
+	// financefactDescPaymentTerm is the schema descriptor for payment_term field.
+	financefactDescPaymentTerm := financefactFields[9].Descriptor()
+	// financefact.PaymentTermValidator is a validator for the "payment_term" field. It is called by the builders before save.
+	financefact.PaymentTermValidator = financefactDescPaymentTerm.Validators[0].(func(string) error)
+	// financefactDescPaymentTermDays is the schema descriptor for payment_term_days field.
+	financefactDescPaymentTermDays := financefactFields[10].Descriptor()
+	// financefact.PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
+	financefact.PaymentTermDaysValidator = financefactDescPaymentTermDays.Validators[0].(func(int) error)
+	// financefactDescInvoiceCategory is the schema descriptor for invoice_category field.
+	financefactDescInvoiceCategory := financefactFields[11].Descriptor()
+	// financefact.InvoiceCategoryValidator is a validator for the "invoice_category" field. It is called by the builders before save.
+	financefact.InvoiceCategoryValidator = financefactDescInvoiceCategory.Validators[0].(func(string) error)
 	// financefactDescSourceType is the schema descriptor for source_type field.
-	financefactDescSourceType := financefactFields[7].Descriptor()
+	financefactDescSourceType := financefactFields[12].Descriptor()
 	// financefact.SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
 	financefact.SourceTypeValidator = financefactDescSourceType.Validators[0].(func(string) error)
 	// financefactDescSourceID is the schema descriptor for source_id field.
-	financefactDescSourceID := financefactFields[8].Descriptor()
+	financefactDescSourceID := financefactFields[13].Descriptor()
 	// financefact.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
 	financefact.SourceIDValidator = financefactDescSourceID.Validators[0].(func(int) error)
 	// financefactDescSourceLineID is the schema descriptor for source_line_id field.
-	financefactDescSourceLineID := financefactFields[9].Descriptor()
+	financefactDescSourceLineID := financefactFields[14].Descriptor()
 	// financefact.SourceLineIDValidator is a validator for the "source_line_id" field. It is called by the builders before save.
 	financefact.SourceLineIDValidator = financefactDescSourceLineID.Validators[0].(func(int) error)
 	// financefactDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	financefactDescIdempotencyKey := financefactFields[10].Descriptor()
+	financefactDescIdempotencyKey := financefactFields[15].Descriptor()
 	// financefact.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	financefact.IdempotencyKeyValidator = func() func(string) error {
 		validators := financefactDescIdempotencyKey.Validators
@@ -488,19 +518,19 @@ func init() {
 		}
 	}()
 	// financefactDescOccurredAt is the schema descriptor for occurred_at field.
-	financefactDescOccurredAt := financefactFields[11].Descriptor()
+	financefactDescOccurredAt := financefactFields[16].Descriptor()
 	// financefact.DefaultOccurredAt holds the default value on creation for the occurred_at field.
 	financefact.DefaultOccurredAt = financefactDescOccurredAt.Default.(func() time.Time)
 	// financefactDescNote is the schema descriptor for note field.
-	financefactDescNote := financefactFields[14].Descriptor()
+	financefactDescNote := financefactFields[19].Descriptor()
 	// financefact.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	financefact.NoteValidator = financefactDescNote.Validators[0].(func(string) error)
 	// financefactDescCreatedAt is the schema descriptor for created_at field.
-	financefactDescCreatedAt := financefactFields[15].Descriptor()
+	financefactDescCreatedAt := financefactFields[20].Descriptor()
 	// financefact.DefaultCreatedAt holds the default value on creation for the created_at field.
 	financefact.DefaultCreatedAt = financefactDescCreatedAt.Default.(func() time.Time)
 	// financefactDescUpdatedAt is the schema descriptor for updated_at field.
-	financefactDescUpdatedAt := financefactFields[16].Descriptor()
+	financefactDescUpdatedAt := financefactFields[21].Descriptor()
 	// financefact.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	financefact.DefaultUpdatedAt = financefactDescUpdatedAt.Default.(func() time.Time)
 	// financefact.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -2361,8 +2391,20 @@ func init() {
 	salesorderDescCustomerOrderNo := salesorderFields[2].Descriptor()
 	// salesorder.CustomerOrderNoValidator is a validator for the "customer_order_no" field. It is called by the builders before save.
 	salesorder.CustomerOrderNoValidator = salesorderDescCustomerOrderNo.Validators[0].(func(string) error)
+	// salesorderDescPaymentMethod is the schema descriptor for payment_method field.
+	salesorderDescPaymentMethod := salesorderFields[4].Descriptor()
+	// salesorder.PaymentMethodValidator is a validator for the "payment_method" field. It is called by the builders before save.
+	salesorder.PaymentMethodValidator = salesorderDescPaymentMethod.Validators[0].(func(string) error)
+	// salesorderDescPaymentTermDays is the schema descriptor for payment_term_days field.
+	salesorderDescPaymentTermDays := salesorderFields[5].Descriptor()
+	// salesorder.PaymentTermDaysValidator is a validator for the "payment_term_days" field. It is called by the builders before save.
+	salesorder.PaymentTermDaysValidator = salesorderDescPaymentTermDays.Validators[0].(func(int) error)
+	// salesorderDescPriceConditionNote is the schema descriptor for price_condition_note field.
+	salesorderDescPriceConditionNote := salesorderFields[6].Descriptor()
+	// salesorder.PriceConditionNoteValidator is a validator for the "price_condition_note" field. It is called by the builders before save.
+	salesorder.PriceConditionNoteValidator = salesorderDescPriceConditionNote.Validators[0].(func(string) error)
 	// salesorderDescLifecycleStatus is the schema descriptor for lifecycle_status field.
-	salesorderDescLifecycleStatus := salesorderFields[6].Descriptor()
+	salesorderDescLifecycleStatus := salesorderFields[9].Descriptor()
 	// salesorder.DefaultLifecycleStatus holds the default value on creation for the lifecycle_status field.
 	salesorder.DefaultLifecycleStatus = salesorderDescLifecycleStatus.Default.(string)
 	// salesorder.LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -2382,15 +2424,15 @@ func init() {
 		}
 	}()
 	// salesorderDescNote is the schema descriptor for note field.
-	salesorderDescNote := salesorderFields[7].Descriptor()
+	salesorderDescNote := salesorderFields[10].Descriptor()
 	// salesorder.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	salesorder.NoteValidator = salesorderDescNote.Validators[0].(func(string) error)
 	// salesorderDescCreatedAt is the schema descriptor for created_at field.
-	salesorderDescCreatedAt := salesorderFields[8].Descriptor()
+	salesorderDescCreatedAt := salesorderFields[11].Descriptor()
 	// salesorder.DefaultCreatedAt holds the default value on creation for the created_at field.
 	salesorder.DefaultCreatedAt = salesorderDescCreatedAt.Default.(func() time.Time)
 	// salesorderDescUpdatedAt is the schema descriptor for updated_at field.
-	salesorderDescUpdatedAt := salesorderFields[9].Descriptor()
+	salesorderDescUpdatedAt := salesorderFields[12].Descriptor()
 	// salesorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	salesorder.DefaultUpdatedAt = salesorderDescUpdatedAt.Default.(func() time.Time)
 	// salesorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

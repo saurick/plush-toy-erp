@@ -10,6 +10,7 @@ import (
 	"server/internal/biz"
 	"server/internal/errcode"
 
+	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -333,9 +334,17 @@ func financeFactCreateFromParams(pm map[string]any) (*biz.FinanceFactCreate, boo
 	if !ok {
 		return nil, false
 	}
+	feeAmount, ok := getOptionalJSONRPCDecimal(pm, "fee_amount")
+	if !ok {
+		return nil, false
+	}
 	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
 	if !ok {
 		return nil, false
+	}
+	normalizedFeeAmount := decimal.Zero
+	if feeAmount != nil {
+		normalizedFeeAmount = *feeAmount
 	}
 	return &biz.FinanceFactCreate{
 		FactNo:           getString(pm, "fact_no"),
@@ -343,7 +352,12 @@ func financeFactCreateFromParams(pm map[string]any) (*biz.FinanceFactCreate, boo
 		CounterpartyType: getString(pm, "counterparty_type"),
 		CounterpartyID:   getOptionalInt(pm, "counterparty_id"),
 		Amount:           amount,
+		FeeAmount:        normalizedFeeAmount,
 		Currency:         getString(pm, "currency"),
+		CollectionType:   getWorkflowStringPtr(pm, "collection_type"),
+		PaymentTerm:      getWorkflowStringPtr(pm, "payment_term"),
+		PaymentTermDays:  getOptionalNonNegativeInt(pm, "payment_term_days"),
+		InvoiceCategory:  getWorkflowStringPtr(pm, "invoice_category"),
 		SourceType:       getWorkflowStringPtr(pm, "source_type"),
 		SourceID:         getOptionalInt(pm, "source_id"),
 		SourceLineID:     getOptionalInt(pm, "source_line_id"),
@@ -381,6 +395,17 @@ func operationalFactShipmentFilterFromParams(pm map[string]any) (biz.Operational
 func getOptionalInt(pm map[string]any, key string) *int {
 	value := getInt(pm, key, 0)
 	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
+func getOptionalNonNegativeInt(pm map[string]any, key string) *int {
+	if _, ok := pm[key]; !ok {
+		return nil
+	}
+	value := getInt(pm, key, -1)
+	if value < 0 {
 		return nil
 	}
 	return &value
@@ -552,7 +577,7 @@ func financeFactToAny(item *biz.FinanceFact) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "counterparty_type": item.CounterpartyType, "counterparty_id": optionalIntToAny(item.CounterpartyID), "amount": item.Amount.String(), "currency": item.Currency, "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "settled_at": optionalUnix(item.SettledAt), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "counterparty_type": item.CounterpartyType, "counterparty_id": optionalIntToAny(item.CounterpartyID), "amount": item.Amount.String(), "fee_amount": item.FeeAmount.String(), "currency": item.Currency, "collection_type": optionalStringToAny(item.CollectionType), "payment_term": optionalStringToAny(item.PaymentTerm), "payment_term_days": optionalIntToAny(item.PaymentTermDays), "invoice_category": optionalStringToAny(item.InvoiceCategory), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_line_id": optionalIntToAny(item.SourceLineID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "settled_at": optionalUnix(item.SettledAt), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }
 
 func optionalIntToAny(value *int) any {

@@ -947,6 +947,42 @@
   min-height: calc(var(--erp-control-height, 36px) * 2);
 }
 
+.erp-sales-order-lines-form__grid
+  .ant-input-textarea-show-count
+  .ant-input-textarea-affix-wrapper,
+.erp-master-contact-list__grid
+  .ant-input-textarea-show-count
+  .ant-input-textarea-affix-wrapper {
+  align-items: flex-start;
+  height: auto;
+  min-height: calc(var(--erp-control-height, 36px) * 2);
+  padding-block-end: max(30px, 1.8em);
+}
+
+.erp-sales-order-lines-form__grid
+  .ant-input-textarea-affix-wrapper.ant-input-textarea-show-count,
+.erp-master-contact-list__grid
+  .ant-input-textarea-affix-wrapper.ant-input-textarea-show-count {
+  align-items: flex-start;
+  height: auto;
+  min-height: calc(var(--erp-control-height, 36px) * 2);
+  padding-block-end: max(30px, 1.8em);
+}
+
+.erp-sales-order-lines-form__grid
+  .ant-input-textarea-show-count
+  textarea.ant-input,
+.erp-master-contact-list__grid
+  .ant-input-textarea-show-count
+  textarea.ant-input {
+  height: auto;
+  min-height: calc(var(--erp-control-height, 36px) * 2);
+  overflow-wrap: anywhere;
+  padding-block-end: max(30px, 1.8em);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .erp-business-action-form :where(.ant-input[disabled], .ant-input-disabled),
 .erp-business-action-form :where(.ant-input-affix-wrapper-disabled) {
   border-color: #d8e3dc;

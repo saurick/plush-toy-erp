@@ -3,6 +3,7 @@ package schema
 import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/field"
 	"github.com/shopspring/decimal"
 )
@@ -10,6 +11,16 @@ import (
 // decimalQuantityField maps inventory quantities to PostgreSQL numeric to avoid float precision drift.
 func decimalQuantityField(name string) ent.Field {
 	return field.Other(name, decimal.Decimal{}).
+		SchemaType(map[string]string{
+			dialect.Postgres: "numeric(20,6)",
+			dialect.SQLite:   "numeric",
+		})
+}
+
+func decimalQuantityFieldWithDefault(name string, defaultValue decimal.Decimal) ent.Field {
+	return field.Other(name, decimal.Decimal{}).
+		Default(defaultValue).
+		Annotations(entsql.Default("0")).
 		SchemaType(map[string]string{
 			dialect.Postgres: "numeric(20,6)",
 			dialect.SQLite:   "numeric",

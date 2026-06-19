@@ -85,9 +85,34 @@ func Amount(v decimal.Decimal) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldAmount, v))
 }
 
+// FeeAmount applies equality check predicate on the "fee_amount" field. It's identical to FeeAmountEQ.
+func FeeAmount(v decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldFeeAmount, v))
+}
+
 // Currency applies equality check predicate on the "currency" field. It's identical to CurrencyEQ.
 func Currency(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldCurrency, v))
+}
+
+// CollectionType applies equality check predicate on the "collection_type" field. It's identical to CollectionTypeEQ.
+func CollectionType(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCollectionType, v))
+}
+
+// PaymentTerm applies equality check predicate on the "payment_term" field. It's identical to PaymentTermEQ.
+func PaymentTerm(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldPaymentTerm, v))
+}
+
+// PaymentTermDays applies equality check predicate on the "payment_term_days" field. It's identical to PaymentTermDaysEQ.
+func PaymentTermDays(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
+// InvoiceCategory applies equality check predicate on the "invoice_category" field. It's identical to InvoiceCategoryEQ.
+func InvoiceCategory(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldInvoiceCategory, v))
 }
 
 // SourceType applies equality check predicate on the "source_type" field. It's identical to SourceTypeEQ.
@@ -490,6 +515,46 @@ func AmountLTE(v decimal.Decimal) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldLTE(FieldAmount, v))
 }
 
+// FeeAmountEQ applies the EQ predicate on the "fee_amount" field.
+func FeeAmountEQ(v decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldFeeAmount, v))
+}
+
+// FeeAmountNEQ applies the NEQ predicate on the "fee_amount" field.
+func FeeAmountNEQ(v decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldFeeAmount, v))
+}
+
+// FeeAmountIn applies the In predicate on the "fee_amount" field.
+func FeeAmountIn(vs ...decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldFeeAmount, vs...))
+}
+
+// FeeAmountNotIn applies the NotIn predicate on the "fee_amount" field.
+func FeeAmountNotIn(vs ...decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldFeeAmount, vs...))
+}
+
+// FeeAmountGT applies the GT predicate on the "fee_amount" field.
+func FeeAmountGT(v decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldFeeAmount, v))
+}
+
+// FeeAmountGTE applies the GTE predicate on the "fee_amount" field.
+func FeeAmountGTE(v decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldFeeAmount, v))
+}
+
+// FeeAmountLT applies the LT predicate on the "fee_amount" field.
+func FeeAmountLT(v decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldFeeAmount, v))
+}
+
+// FeeAmountLTE applies the LTE predicate on the "fee_amount" field.
+func FeeAmountLTE(v decimal.Decimal) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldFeeAmount, v))
+}
+
 // CurrencyEQ applies the EQ predicate on the "currency" field.
 func CurrencyEQ(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldCurrency, v))
@@ -553,6 +618,281 @@ func CurrencyEqualFold(v string) predicate.FinanceFact {
 // CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
 func CurrencyContainsFold(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldContainsFold(FieldCurrency, v))
+}
+
+// CollectionTypeEQ applies the EQ predicate on the "collection_type" field.
+func CollectionTypeEQ(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldCollectionType, v))
+}
+
+// CollectionTypeNEQ applies the NEQ predicate on the "collection_type" field.
+func CollectionTypeNEQ(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldCollectionType, v))
+}
+
+// CollectionTypeIn applies the In predicate on the "collection_type" field.
+func CollectionTypeIn(vs ...string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldCollectionType, vs...))
+}
+
+// CollectionTypeNotIn applies the NotIn predicate on the "collection_type" field.
+func CollectionTypeNotIn(vs ...string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldCollectionType, vs...))
+}
+
+// CollectionTypeGT applies the GT predicate on the "collection_type" field.
+func CollectionTypeGT(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldCollectionType, v))
+}
+
+// CollectionTypeGTE applies the GTE predicate on the "collection_type" field.
+func CollectionTypeGTE(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldCollectionType, v))
+}
+
+// CollectionTypeLT applies the LT predicate on the "collection_type" field.
+func CollectionTypeLT(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldCollectionType, v))
+}
+
+// CollectionTypeLTE applies the LTE predicate on the "collection_type" field.
+func CollectionTypeLTE(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldCollectionType, v))
+}
+
+// CollectionTypeContains applies the Contains predicate on the "collection_type" field.
+func CollectionTypeContains(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldContains(FieldCollectionType, v))
+}
+
+// CollectionTypeHasPrefix applies the HasPrefix predicate on the "collection_type" field.
+func CollectionTypeHasPrefix(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldHasPrefix(FieldCollectionType, v))
+}
+
+// CollectionTypeHasSuffix applies the HasSuffix predicate on the "collection_type" field.
+func CollectionTypeHasSuffix(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldHasSuffix(FieldCollectionType, v))
+}
+
+// CollectionTypeIsNil applies the IsNil predicate on the "collection_type" field.
+func CollectionTypeIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldCollectionType))
+}
+
+// CollectionTypeNotNil applies the NotNil predicate on the "collection_type" field.
+func CollectionTypeNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldCollectionType))
+}
+
+// CollectionTypeEqualFold applies the EqualFold predicate on the "collection_type" field.
+func CollectionTypeEqualFold(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEqualFold(FieldCollectionType, v))
+}
+
+// CollectionTypeContainsFold applies the ContainsFold predicate on the "collection_type" field.
+func CollectionTypeContainsFold(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldContainsFold(FieldCollectionType, v))
+}
+
+// PaymentTermEQ applies the EQ predicate on the "payment_term" field.
+func PaymentTermEQ(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldPaymentTerm, v))
+}
+
+// PaymentTermNEQ applies the NEQ predicate on the "payment_term" field.
+func PaymentTermNEQ(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldPaymentTerm, v))
+}
+
+// PaymentTermIn applies the In predicate on the "payment_term" field.
+func PaymentTermIn(vs ...string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldPaymentTerm, vs...))
+}
+
+// PaymentTermNotIn applies the NotIn predicate on the "payment_term" field.
+func PaymentTermNotIn(vs ...string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldPaymentTerm, vs...))
+}
+
+// PaymentTermGT applies the GT predicate on the "payment_term" field.
+func PaymentTermGT(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldPaymentTerm, v))
+}
+
+// PaymentTermGTE applies the GTE predicate on the "payment_term" field.
+func PaymentTermGTE(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldPaymentTerm, v))
+}
+
+// PaymentTermLT applies the LT predicate on the "payment_term" field.
+func PaymentTermLT(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldPaymentTerm, v))
+}
+
+// PaymentTermLTE applies the LTE predicate on the "payment_term" field.
+func PaymentTermLTE(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldPaymentTerm, v))
+}
+
+// PaymentTermContains applies the Contains predicate on the "payment_term" field.
+func PaymentTermContains(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldContains(FieldPaymentTerm, v))
+}
+
+// PaymentTermHasPrefix applies the HasPrefix predicate on the "payment_term" field.
+func PaymentTermHasPrefix(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldHasPrefix(FieldPaymentTerm, v))
+}
+
+// PaymentTermHasSuffix applies the HasSuffix predicate on the "payment_term" field.
+func PaymentTermHasSuffix(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldHasSuffix(FieldPaymentTerm, v))
+}
+
+// PaymentTermIsNil applies the IsNil predicate on the "payment_term" field.
+func PaymentTermIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldPaymentTerm))
+}
+
+// PaymentTermNotNil applies the NotNil predicate on the "payment_term" field.
+func PaymentTermNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldPaymentTerm))
+}
+
+// PaymentTermEqualFold applies the EqualFold predicate on the "payment_term" field.
+func PaymentTermEqualFold(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEqualFold(FieldPaymentTerm, v))
+}
+
+// PaymentTermContainsFold applies the ContainsFold predicate on the "payment_term" field.
+func PaymentTermContainsFold(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldContainsFold(FieldPaymentTerm, v))
+}
+
+// PaymentTermDaysEQ applies the EQ predicate on the "payment_term_days" field.
+func PaymentTermDaysEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysNEQ applies the NEQ predicate on the "payment_term_days" field.
+func PaymentTermDaysNEQ(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIn applies the In predicate on the "payment_term_days" field.
+func PaymentTermDaysIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysNotIn applies the NotIn predicate on the "payment_term_days" field.
+func PaymentTermDaysNotIn(vs ...int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldPaymentTermDays, vs...))
+}
+
+// PaymentTermDaysGT applies the GT predicate on the "payment_term_days" field.
+func PaymentTermDaysGT(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysGTE applies the GTE predicate on the "payment_term_days" field.
+func PaymentTermDaysGTE(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLT applies the LT predicate on the "payment_term_days" field.
+func PaymentTermDaysLT(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysLTE applies the LTE predicate on the "payment_term_days" field.
+func PaymentTermDaysLTE(v int) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldPaymentTermDays, v))
+}
+
+// PaymentTermDaysIsNil applies the IsNil predicate on the "payment_term_days" field.
+func PaymentTermDaysIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldPaymentTermDays))
+}
+
+// PaymentTermDaysNotNil applies the NotNil predicate on the "payment_term_days" field.
+func PaymentTermDaysNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldPaymentTermDays))
+}
+
+// InvoiceCategoryEQ applies the EQ predicate on the "invoice_category" field.
+func InvoiceCategoryEQ(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEQ(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryNEQ applies the NEQ predicate on the "invoice_category" field.
+func InvoiceCategoryNEQ(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNEQ(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryIn applies the In predicate on the "invoice_category" field.
+func InvoiceCategoryIn(vs ...string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIn(FieldInvoiceCategory, vs...))
+}
+
+// InvoiceCategoryNotIn applies the NotIn predicate on the "invoice_category" field.
+func InvoiceCategoryNotIn(vs ...string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotIn(FieldInvoiceCategory, vs...))
+}
+
+// InvoiceCategoryGT applies the GT predicate on the "invoice_category" field.
+func InvoiceCategoryGT(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGT(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryGTE applies the GTE predicate on the "invoice_category" field.
+func InvoiceCategoryGTE(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldGTE(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryLT applies the LT predicate on the "invoice_category" field.
+func InvoiceCategoryLT(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLT(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryLTE applies the LTE predicate on the "invoice_category" field.
+func InvoiceCategoryLTE(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldLTE(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryContains applies the Contains predicate on the "invoice_category" field.
+func InvoiceCategoryContains(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldContains(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryHasPrefix applies the HasPrefix predicate on the "invoice_category" field.
+func InvoiceCategoryHasPrefix(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldHasPrefix(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryHasSuffix applies the HasSuffix predicate on the "invoice_category" field.
+func InvoiceCategoryHasSuffix(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldHasSuffix(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryIsNil applies the IsNil predicate on the "invoice_category" field.
+func InvoiceCategoryIsNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldIsNull(FieldInvoiceCategory))
+}
+
+// InvoiceCategoryNotNil applies the NotNil predicate on the "invoice_category" field.
+func InvoiceCategoryNotNil() predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldNotNull(FieldInvoiceCategory))
+}
+
+// InvoiceCategoryEqualFold applies the EqualFold predicate on the "invoice_category" field.
+func InvoiceCategoryEqualFold(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldEqualFold(FieldInvoiceCategory, v))
+}
+
+// InvoiceCategoryContainsFold applies the ContainsFold predicate on the "invoice_category" field.
+func InvoiceCategoryContainsFold(v string) predicate.FinanceFact {
+	return predicate.FinanceFact(sql.FieldContainsFold(FieldInvoiceCategory, v))
 }
 
 // SourceTypeEQ applies the EQ predicate on the "source_type" field.

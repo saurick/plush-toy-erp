@@ -7,18 +7,7 @@ import {
   LinkOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
-import {
-  Button,
-  Card,
-  Dropdown,
-  Empty,
-  Form,
-  Input,
-  Popconfirm,
-  Select,
-  Table,
-  Tag,
-} from 'antd'
+import { Button, Dropdown, Form, Input, Popconfirm, Select, Tag } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -37,6 +26,7 @@ import {
 } from '../api/masterDataOrderApi.mjs'
 import {
   BusinessOperationPanel,
+  BusinessDataTable,
   BusinessPageLayout,
   DateInput,
   PageHeaderCard,
@@ -45,6 +35,11 @@ import {
   SelectionActionBar,
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
+import {
+  BusinessListToolbarActions,
+  downloadBusinessListCSV,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import {
   compactParams,
@@ -122,6 +117,11 @@ function wait(ms) {
   })
 }
 
+function optionalText(value) {
+  const text = String(value ?? '').trim()
+  return text || '-'
+}
+
 function buildReceiptParams(values = {}) {
   return compactParams({
     receipt_no: trimOptional(values.receipt_no),
@@ -151,65 +151,89 @@ function receiptQuantityTotal(receipt = {}) {
   )
 }
 
-function PurchaseReceiptItemsTable({
+function PurchaseReceiptItemsList({
   inventoryLotOptions = [],
   items = [],
   materialOptions = [],
   unitOptions = [],
   warehouseOptions = [],
 }) {
+  if (!items.length) {
+    return (
+      <div className="erp-purchase-receipt-items-list">
+        <div className="erp-purchase-receipt-items-list__empty">暂无明细</div>
+      </div>
+    )
+  }
+
   return (
-    <Table
-      rowKey="id"
-      size="small"
-      pagination={false}
-      dataSource={items}
-      scroll={{ x: 920 }}
-      columns={[
-        { title: '行 ID', dataIndex: 'id', width: 84 },
-        {
-          title: '材料',
-          dataIndex: 'material_id',
-          width: 180,
-          render: (value) => referenceLabel(materialOptions, value, '材料'),
-        },
-        {
-          title: '仓库',
-          dataIndex: 'warehouse_id',
-          width: 110,
-          render: (value) => referenceLabel(warehouseOptions, value, '仓库'),
-        },
-        {
-          title: '单位',
-          dataIndex: 'unit_id',
-          width: 100,
-          render: (value) => referenceLabel(unitOptions, value, '单位'),
-        },
-        {
-          title: '批次',
-          dataIndex: 'lot_id',
-          width: 150,
-          render: (value) => referenceLabel(inventoryLotOptions, value, '批次'),
-        },
-        { title: '批次号', dataIndex: 'lot_no', width: 140 },
-        { title: '数量', dataIndex: 'quantity', width: 120 },
-        { title: '单价', dataIndex: 'unit_price', width: 120 },
-        { title: '金额', dataIndex: 'amount', width: 120 },
-        {
-          title: '采购订单行',
-          dataIndex: 'purchase_order_item_id',
-          width: 130,
-          render: (value) => value || '-',
-        },
-        {
-          title: '来源行号',
-          dataIndex: 'source_line_no',
-          width: 120,
-          render: (value) => value || '-',
-        },
-        { title: '备注', dataIndex: 'note', ellipsis: true },
-      ]}
-    />
+    <div className="erp-purchase-receipt-items-list" aria-label="入库明细">
+      {items.map((item, index) => {
+        const fields = [
+          {
+            label: '材料',
+            value: referenceLabel(materialOptions, item.material_id, '材料'),
+            wide: true,
+          },
+          {
+            label: '仓库',
+            value: referenceLabel(warehouseOptions, item.warehouse_id, '仓库'),
+          },
+          {
+            label: '单位',
+            value: referenceLabel(unitOptions, item.unit_id, '单位'),
+          },
+          {
+            label: '批次',
+            value: referenceLabel(inventoryLotOptions, item.lot_id, '批次'),
+            wide: true,
+          },
+          { label: '批次号', value: optionalText(item.lot_no) },
+          {
+            label: '数量',
+            value: formatQuantity(decimalNumber(item.quantity)),
+          },
+          { label: '单价', value: optionalText(item.unit_price) },
+          { label: '金额', value: optionalText(item.amount) },
+          {
+            label: '采购订单行',
+            value: item.purchase_order_item_id
+              ? `关联行 ${item.purchase_order_item_id}`
+              : '-',
+          },
+          { label: '来源行号', value: optionalText(item.source_line_no) },
+          { label: '备注', value: optionalText(item.note), wide: true },
+        ]
+        return (
+          <article
+            className="erp-purchase-receipt-item-card"
+            key={item.id || `${item.material_id || 'item'}-${index}`}
+          >
+            <div className="erp-purchase-receipt-item-card__head">
+              <strong>{`明细 ${index + 1}`}</strong>
+              <span>
+                {`数量 ${formatQuantity(decimalNumber(item.quantity))} / 金额 ${optionalText(item.amount)}`}
+              </span>
+            </div>
+            <dl className="erp-purchase-receipt-item-card__grid">
+              {fields.map((field) => (
+                <div
+                  className={
+                    field.wide
+                      ? 'erp-purchase-receipt-item-card__field erp-purchase-receipt-item-card__field--wide'
+                      : 'erp-purchase-receipt-item-card__field'
+                  }
+                  key={field.label}
+                >
+                  <dt>{field.label}</dt>
+                  <dd>{field.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </article>
+        )
+      })}
+    </div>
   )
 }
 
@@ -378,7 +402,7 @@ export default function V1PurchaseReceiptsPage() {
   )
   const renderExpandedPurchaseReceiptItems = useCallback(
     (record) => (
-      <PurchaseReceiptItemsTable
+      <PurchaseReceiptItemsList
         inventoryLotOptions={inventoryLotOptions}
         items={record.items || []}
         materialOptions={materialOptions}
@@ -617,69 +641,106 @@ export default function V1PurchaseReceiptsPage() {
       applyBusinessColumnSorters([
         {
           title: '入库单号',
+          exportTitle: '入库单号',
           dataIndex: 'receipt_no',
           width: 160,
           sortType: 'text',
         },
         {
           title: '状态',
+          exportTitle: '状态',
           dataIndex: 'status',
           width: 110,
           sortType: 'text',
           render: statusTag,
+          exportValue: (record) =>
+            STATUS_LABELS[record?.status] || record?.status || '',
         },
         {
           title: '供应商',
+          exportTitle: '供应商',
           dataIndex: 'supplier_name',
           width: 180,
           sortType: 'text',
         },
         {
           title: '收货日期',
+          exportTitle: '收货日期',
           dataIndex: 'received_at',
           width: 130,
           sortType: 'date',
           render: formatUnixDate,
+          exportValue: (record) => formatUnixDate(record?.received_at),
         },
         {
           title: '过账时间',
+          exportTitle: '过账时间',
           dataIndex: 'posted_at',
           width: 170,
           sortType: 'date',
           render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.posted_at),
         },
         {
           title: '明细行数',
+          exportTitle: '明细行数',
           key: 'item_count',
           width: 100,
           sortValue: receiptItemCount,
           render: (_, record) => receiptItemCount(record),
+          exportValue: receiptItemCount,
         },
         {
           title: '入库数量',
+          exportTitle: '入库数量',
           key: 'quantity_total',
           width: 120,
           sortValue: receiptQuantityTotal,
           render: (_, record) => formatQuantity(receiptQuantityTotal(record)),
+          exportValue: (record) => formatQuantity(receiptQuantityTotal(record)),
         },
         {
           title: '创建时间',
+          exportTitle: '创建时间',
           dataIndex: 'created_at',
           width: 170,
           sortType: 'date',
           render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.created_at),
         },
         {
           title: '更新时间',
+          exportTitle: '更新时间',
           dataIndex: 'updated_at',
           width: 170,
           sortType: 'date',
           render: formatUnixDateTime,
+          exportValue: (record) => formatUnixDateTime(record?.updated_at),
         },
-        { title: '备注', dataIndex: 'note', ellipsis: true, sortable: false },
+        {
+          title: '备注',
+          exportTitle: '备注',
+          dataIndex: 'note',
+          ellipsis: true,
+          sortable: false,
+        },
       ]),
     []
   )
+  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey: 'inbound',
+      moduleTitle: '入库管理',
+      columns,
+    })
+  const exportRows = useCallback(() => {
+    downloadBusinessListCSV({
+      filename: 'purchase-receipts.csv',
+      columns: visibleColumns,
+      rows,
+    })
+  }, [rows, visibleColumns])
 
   return (
     <BusinessPageLayout className="erp-v1-purchase-receipts-page">
@@ -737,6 +798,14 @@ export default function V1PurchaseReceiptsPage() {
               }}
             />
           </>
+        }
+        actions={
+          <BusinessListToolbarActions
+            moduleTitle="入库管理"
+            onExport={exportRows}
+            exportDisabled={rows.length === 0}
+            onOpenColumnOrder={openColumnOrder}
+          />
         }
         primaryAction={
           <ToolbarButton
@@ -849,43 +918,37 @@ export default function V1PurchaseReceiptsPage() {
         </SelectionActionBar>
       </BusinessOperationPanel>
 
-      <Card className="erp-business-data-table-card erp-business-module-table-card">
-        <Table
-          rowKey="id"
-          loading={loading}
-          dataSource={rows}
-          columns={columns}
-          pagination={createBusinessTablePagination({
-            pagination,
-            total,
-            onChange: (current, pageSize) =>
-              setPagination({ current, pageSize }),
-          })}
-          scroll={{ x: 1320 }}
-          rowSelection={{
-            type: 'radio',
-            columnTitle: '选择',
-            columnWidth: 48,
-            selectedRowKeys: selectedRow ? [selectedRow.id] : [],
-            onChange: (_keys, selectedRows) =>
-              setSelectedRow(selectedRows[0] || null),
-          }}
-          rowClassName={(record) =>
-            record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
-          }
-          onRow={(record) => ({
-            onClick: () => setSelectedRow(record),
-          })}
-          expandable={{
-            columnTitle: '明细',
-            expandedRowRender: renderExpandedPurchaseReceiptItems,
-            rowExpandable: canExpandPurchaseReceiptRow,
-          }}
-          locale={{
-            emptyText: <Empty description="暂无采购入库单" />,
-          }}
-        />
-      </Card>
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        dataSource={rows}
+        columns={tableColumns}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => setPagination({ current, pageSize }),
+        })}
+        scroll={{ x: 1320 }}
+        rowSelection={{
+          type: 'radio',
+          selectedRowKeys: selectedRow ? [selectedRow.id] : [],
+          onChange: (_keys, selectedRows) =>
+            setSelectedRow(selectedRows[0] || null),
+        }}
+        rowClassName={(record) =>
+          record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () => setSelectedRow(record),
+        })}
+        expandable={{
+          columnTitle: '明细',
+          expandedRowRender: renderExpandedPurchaseReceiptItems,
+          rowExpandable: canExpandPurchaseReceiptRow,
+        }}
+        emptyDescription="暂无采购入库单"
+      />
+      {columnOrderModal}
 
       <BusinessFormModal
         title={

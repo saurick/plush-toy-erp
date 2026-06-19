@@ -23,6 +23,10 @@ type Customer struct {
 	Name string `json:"name,omitempty"`
 	// ShortName holds the value of the "short_name" field.
 	ShortName *string `json:"short_name,omitempty"`
+	// DefaultPaymentMethod holds the value of the "default_payment_method" field.
+	DefaultPaymentMethod *string `json:"default_payment_method,omitempty"`
+	// DefaultPaymentTermDays holds the value of the "default_payment_term_days" field.
+	DefaultPaymentTermDays *int `json:"default_payment_term_days,omitempty"`
 	// TaxNo holds the value of the "tax_no" field.
 	TaxNo *string `json:"tax_no,omitempty"`
 	// IsActive holds the value of the "is_active" field.
@@ -75,9 +79,9 @@ func (*Customer) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case customer.FieldIsActive:
 			values[i] = new(sql.NullBool)
-		case customer.FieldID:
+		case customer.FieldID, customer.FieldDefaultPaymentTermDays:
 			values[i] = new(sql.NullInt64)
-		case customer.FieldCode, customer.FieldName, customer.FieldShortName, customer.FieldTaxNo, customer.FieldNote:
+		case customer.FieldCode, customer.FieldName, customer.FieldShortName, customer.FieldDefaultPaymentMethod, customer.FieldTaxNo, customer.FieldNote:
 			values[i] = new(sql.NullString)
 		case customer.FieldCreatedAt, customer.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -120,6 +124,20 @@ func (_m *Customer) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ShortName = new(string)
 				*_m.ShortName = value.String
+			}
+		case customer.FieldDefaultPaymentMethod:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field default_payment_method", values[i])
+			} else if value.Valid {
+				_m.DefaultPaymentMethod = new(string)
+				*_m.DefaultPaymentMethod = value.String
+			}
+		case customer.FieldDefaultPaymentTermDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field default_payment_term_days", values[i])
+			} else if value.Valid {
+				_m.DefaultPaymentTermDays = new(int)
+				*_m.DefaultPaymentTermDays = int(value.Int64)
 			}
 		case customer.FieldTaxNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -208,6 +226,16 @@ func (_m *Customer) String() string {
 	if v := _m.ShortName; v != nil {
 		builder.WriteString("short_name=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DefaultPaymentMethod; v != nil {
+		builder.WriteString("default_payment_method=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DefaultPaymentTermDays; v != nil {
+		builder.WriteString("default_payment_term_days=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.TaxNo; v != nil {

@@ -25,6 +25,14 @@ func (Customer) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(128),
+		field.String("default_payment_method").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.Int("default_payment_term_days").
+			Optional().
+			Nillable().
+			NonNegative(),
 		field.String("tax_no").
 			Optional().
 			Nillable().
@@ -56,6 +64,7 @@ func (Customer) Indexes() []ent.Index {
 		index.Fields("code").Unique(),
 		index.Fields("name"),
 		index.Fields("short_name"),
+		index.Fields("default_payment_method"),
 		index.Fields("is_active"),
 	}
 }

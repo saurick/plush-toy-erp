@@ -395,16 +395,20 @@ export const businessModuleDefinitions = Object.freeze([
     title: '生产排程',
     path: '/erp/production/scheduling',
     shortLabel: '排程',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '生产排程是计划与任务协同入口，不代表生产完工、领料或成品入库事实。',
-    primaryEntity: 'production_orders（后续评审）',
-    factSource:
-      'workflow_tasks / pmc plan permissions 当前承载，生产事实待评审',
+      '生产排程当前接入 Workflow 协同任务创建、筛选、完成、阻塞和催办；不代表生产完工、领料或成品入库事实。',
+    primaryEntity: 'workflow_tasks',
+    factSource: 'workflow_tasks 当前承载，生产排程事实 usecase 待评审',
     boundary:
       '生产排程只表达计划和协同任务；完工、领料和成品入库必须由领域 usecase 写事实。',
     sourceRefs: ['workflow_tasks', 'sales_orders', 'bom_headers'],
-    currentScope: ['订单齐套', '生产计划', '责任角色', '延期风险'],
+    currentScope: [
+      '生产排程协同任务',
+      '责任角色',
+      '到期跟进',
+      '完成 / 阻塞 / 催办',
+    ],
   },
   {
     key: 'production-progress',
@@ -435,9 +439,9 @@ export const businessModuleDefinitions = Object.freeze([
     title: '生产异常',
     path: '/erp/production/exceptions',
     shortLabel: '异常',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '生产异常用于延期、返工和阻塞协同；异常闭环仍属于 Workflow / 协同层。',
+      '生产异常当前接入 Workflow 协同任务登记、筛选、完成、阻塞和催办；异常闭环仍属于 Workflow / 协同层。',
     primaryEntity: 'workflow_tasks / workflow_task_events',
     factSource: 'workflow_tasks, workflow_task_events',
     boundary:
@@ -456,11 +460,12 @@ export const businessModuleDefinitions = Object.freeze([
     title: '出货放行',
     path: '/erp/warehouse/shipping-release',
     shortLabel: '放行',
-    pageKind: 'formal-shell',
+    pageKind: 'formal-v1',
     description:
-      '出货放行用于销售、仓库、品质和财务在发货前确认条件；放行不等于真实 shipped。',
-    primaryEntity: 'shipments（后续评审）',
-    factSource: 'workflow_business_states 当前承载，ShipmentUsecase 待评审',
+      '出货放行当前接入 shipment_release Workflow 协同任务创建、筛选、完成、阻塞和催办；放行不等于真实 shipped。',
+    primaryEntity: 'workflow_tasks / workflow_business_states',
+    factSource:
+      'workflow_tasks, workflow_business_states 当前承载，ShipmentUsecase 待评审',
     boundary:
       'shipping_released 不等于 shipped，不自动扣库存、生成应收、开票或收付款事实。',
     sourceRefs: [

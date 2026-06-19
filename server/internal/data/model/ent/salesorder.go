@@ -27,6 +27,12 @@ type SalesOrder struct {
 	CustomerOrderNo *string `json:"customer_order_no,omitempty"`
 	// CustomerSnapshot holds the value of the "customer_snapshot" field.
 	CustomerSnapshot map[string]interface{} `json:"customer_snapshot,omitempty"`
+	// PaymentMethod holds the value of the "payment_method" field.
+	PaymentMethod *string `json:"payment_method,omitempty"`
+	// PaymentTermDays holds the value of the "payment_term_days" field.
+	PaymentTermDays *int `json:"payment_term_days,omitempty"`
+	// PriceConditionNote holds the value of the "price_condition_note" field.
+	PriceConditionNote *string `json:"price_condition_note,omitempty"`
 	// OrderDate holds the value of the "order_date" field.
 	OrderDate time.Time `json:"order_date,omitempty"`
 	// PlannedDeliveryDate holds the value of the "planned_delivery_date" field.
@@ -105,9 +111,9 @@ func (*SalesOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case salesorder.FieldCustomerSnapshot:
 			values[i] = new([]byte)
-		case salesorder.FieldID, salesorder.FieldCustomerID:
+		case salesorder.FieldID, salesorder.FieldCustomerID, salesorder.FieldPaymentTermDays:
 			values[i] = new(sql.NullInt64)
-		case salesorder.FieldOrderNo, salesorder.FieldCustomerOrderNo, salesorder.FieldLifecycleStatus, salesorder.FieldNote:
+		case salesorder.FieldOrderNo, salesorder.FieldCustomerOrderNo, salesorder.FieldPaymentMethod, salesorder.FieldPriceConditionNote, salesorder.FieldLifecycleStatus, salesorder.FieldNote:
 			values[i] = new(sql.NullString)
 		case salesorder.FieldOrderDate, salesorder.FieldPlannedDeliveryDate, salesorder.FieldCreatedAt, salesorder.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -158,6 +164,27 @@ func (_m *SalesOrder) assignValues(columns []string, values []any) error {
 				if err := json.Unmarshal(*value, &_m.CustomerSnapshot); err != nil {
 					return fmt.Errorf("unmarshal field customer_snapshot: %w", err)
 				}
+			}
+		case salesorder.FieldPaymentMethod:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_method", values[i])
+			} else if value.Valid {
+				_m.PaymentMethod = new(string)
+				*_m.PaymentMethod = value.String
+			}
+		case salesorder.FieldPaymentTermDays:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field payment_term_days", values[i])
+			} else if value.Valid {
+				_m.PaymentTermDays = new(int)
+				*_m.PaymentTermDays = int(value.Int64)
+			}
+		case salesorder.FieldPriceConditionNote:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field price_condition_note", values[i])
+			} else if value.Valid {
+				_m.PriceConditionNote = new(string)
+				*_m.PriceConditionNote = value.String
 			}
 		case salesorder.FieldOrderDate:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -266,6 +293,21 @@ func (_m *SalesOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("customer_snapshot=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CustomerSnapshot))
+	builder.WriteString(", ")
+	if v := _m.PaymentMethod; v != nil {
+		builder.WriteString("payment_method=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.PaymentTermDays; v != nil {
+		builder.WriteString("payment_term_days=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.PriceConditionNote; v != nil {
+		builder.WriteString("price_condition_note=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("order_date=")
 	builder.WriteString(_m.OrderDate.Format(time.ANSIC))

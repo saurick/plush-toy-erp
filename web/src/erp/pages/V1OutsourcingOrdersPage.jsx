@@ -2,17 +2,15 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
-  DeleteOutlined,
   DownOutlined,
   DownloadOutlined,
   EditOutlined,
   FileTextOutlined,
-  InboxOutlined,
   PlusOutlined,
   PrinterOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Form, Space, Tag, Tooltip } from 'antd'
+import { Button, Dropdown, Form, Space, Tag } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -1012,30 +1010,6 @@ export default function V1OutsourcingOrdersPage() {
             >
               列顺序
             </ToolbarButton>
-            <Tooltip
-              title="加工合同源单当前没有物理删除 API；退出推进请走取消或关闭状态。"
-              getPopupContainer={(triggerNode) =>
-                triggerNode.parentElement || document.body
-              }
-            >
-              <span>
-                <ToolbarButton icon={<DeleteOutlined />} danger disabled>
-                  批量删除
-                </ToolbarButton>
-              </span>
-            </Tooltip>
-            <Tooltip
-              title="当前 outsourcing_order JSON-RPC 没有回收站主路径，页面不做前端假恢复。"
-              getPopupContainer={(triggerNode) =>
-                triggerNode.parentElement || document.body
-              }
-            >
-              <span>
-                <ToolbarButton icon={<InboxOutlined />} disabled>
-                  回收站
-                </ToolbarButton>
-              </span>
-            </Tooltip>
           </Space>
         }
         primaryAction={

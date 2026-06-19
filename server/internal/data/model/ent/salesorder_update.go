@@ -92,6 +92,73 @@ func (_u *SalesOrderUpdate) ClearCustomerSnapshot() *SalesOrderUpdate {
 	return _u
 }
 
+// SetPaymentMethod sets the "payment_method" field.
+func (_u *SalesOrderUpdate) SetPaymentMethod(v string) *SalesOrderUpdate {
+	_u.mutation.SetPaymentMethod(v)
+	return _u
+}
+
+// SetNillablePaymentMethod sets the "payment_method" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillablePaymentMethod(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetPaymentMethod(*v)
+	}
+	return _u
+}
+
+// ClearPaymentMethod clears the value of the "payment_method" field.
+func (_u *SalesOrderUpdate) ClearPaymentMethod() *SalesOrderUpdate {
+	_u.mutation.ClearPaymentMethod()
+	return _u
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_u *SalesOrderUpdate) SetPaymentTermDays(v int) *SalesOrderUpdate {
+	_u.mutation.ResetPaymentTermDays()
+	_u.mutation.SetPaymentTermDays(v)
+	return _u
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillablePaymentTermDays(v *int) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddPaymentTermDays adds value to the "payment_term_days" field.
+func (_u *SalesOrderUpdate) AddPaymentTermDays(v int) *SalesOrderUpdate {
+	_u.mutation.AddPaymentTermDays(v)
+	return _u
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (_u *SalesOrderUpdate) ClearPaymentTermDays() *SalesOrderUpdate {
+	_u.mutation.ClearPaymentTermDays()
+	return _u
+}
+
+// SetPriceConditionNote sets the "price_condition_note" field.
+func (_u *SalesOrderUpdate) SetPriceConditionNote(v string) *SalesOrderUpdate {
+	_u.mutation.SetPriceConditionNote(v)
+	return _u
+}
+
+// SetNillablePriceConditionNote sets the "price_condition_note" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillablePriceConditionNote(v *string) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetPriceConditionNote(*v)
+	}
+	return _u
+}
+
+// ClearPriceConditionNote clears the value of the "price_condition_note" field.
+func (_u *SalesOrderUpdate) ClearPriceConditionNote() *SalesOrderUpdate {
+	_u.mutation.ClearPriceConditionNote()
+	return _u
+}
+
 // SetOrderDate sets the "order_date" field.
 func (_u *SalesOrderUpdate) SetOrderDate(v time.Time) *SalesOrderUpdate {
 	_u.mutation.SetOrderDate(v)
@@ -343,6 +410,21 @@ func (_u *SalesOrderUpdate) check() error {
 			return &ValidationError{Name: "customer_order_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_order_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PaymentMethod(); ok {
+		if err := salesorder.PaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PaymentTermDays(); ok {
+		if err := salesorder.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_term_days": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PriceConditionNote(); ok {
+		if err := salesorder.PriceConditionNoteValidator(v); err != nil {
+			return &ValidationError{Name: "price_condition_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.price_condition_note": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.LifecycleStatus(); ok {
 		if err := salesorder.LifecycleStatusValidator(v); err != nil {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.lifecycle_status": %w`, err)}
@@ -385,6 +467,27 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if _u.mutation.CustomerSnapshotCleared() {
 		_spec.ClearField(salesorder.FieldCustomerSnapshot, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.PaymentMethod(); ok {
+		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)
+	}
+	if _u.mutation.PaymentMethodCleared() {
+		_spec.ClearField(salesorder.FieldPaymentMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.PaymentTermDays(); ok {
+		_spec.SetField(salesorder.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPaymentTermDays(); ok {
+		_spec.AddField(salesorder.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if _u.mutation.PaymentTermDaysCleared() {
+		_spec.ClearField(salesorder.FieldPaymentTermDays, field.TypeInt)
+	}
+	if value, ok := _u.mutation.PriceConditionNote(); ok {
+		_spec.SetField(salesorder.FieldPriceConditionNote, field.TypeString, value)
+	}
+	if _u.mutation.PriceConditionNoteCleared() {
+		_spec.ClearField(salesorder.FieldPriceConditionNote, field.TypeString)
 	}
 	if value, ok := _u.mutation.OrderDate(); ok {
 		_spec.SetField(salesorder.FieldOrderDate, field.TypeTime, value)
@@ -648,6 +751,73 @@ func (_u *SalesOrderUpdateOne) SetCustomerSnapshot(v map[string]interface{}) *Sa
 // ClearCustomerSnapshot clears the value of the "customer_snapshot" field.
 func (_u *SalesOrderUpdateOne) ClearCustomerSnapshot() *SalesOrderUpdateOne {
 	_u.mutation.ClearCustomerSnapshot()
+	return _u
+}
+
+// SetPaymentMethod sets the "payment_method" field.
+func (_u *SalesOrderUpdateOne) SetPaymentMethod(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetPaymentMethod(v)
+	return _u
+}
+
+// SetNillablePaymentMethod sets the "payment_method" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillablePaymentMethod(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetPaymentMethod(*v)
+	}
+	return _u
+}
+
+// ClearPaymentMethod clears the value of the "payment_method" field.
+func (_u *SalesOrderUpdateOne) ClearPaymentMethod() *SalesOrderUpdateOne {
+	_u.mutation.ClearPaymentMethod()
+	return _u
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_u *SalesOrderUpdateOne) SetPaymentTermDays(v int) *SalesOrderUpdateOne {
+	_u.mutation.ResetPaymentTermDays()
+	_u.mutation.SetPaymentTermDays(v)
+	return _u
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillablePaymentTermDays(v *int) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetPaymentTermDays(*v)
+	}
+	return _u
+}
+
+// AddPaymentTermDays adds value to the "payment_term_days" field.
+func (_u *SalesOrderUpdateOne) AddPaymentTermDays(v int) *SalesOrderUpdateOne {
+	_u.mutation.AddPaymentTermDays(v)
+	return _u
+}
+
+// ClearPaymentTermDays clears the value of the "payment_term_days" field.
+func (_u *SalesOrderUpdateOne) ClearPaymentTermDays() *SalesOrderUpdateOne {
+	_u.mutation.ClearPaymentTermDays()
+	return _u
+}
+
+// SetPriceConditionNote sets the "price_condition_note" field.
+func (_u *SalesOrderUpdateOne) SetPriceConditionNote(v string) *SalesOrderUpdateOne {
+	_u.mutation.SetPriceConditionNote(v)
+	return _u
+}
+
+// SetNillablePriceConditionNote sets the "price_condition_note" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillablePriceConditionNote(v *string) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetPriceConditionNote(*v)
+	}
+	return _u
+}
+
+// ClearPriceConditionNote clears the value of the "price_condition_note" field.
+func (_u *SalesOrderUpdateOne) ClearPriceConditionNote() *SalesOrderUpdateOne {
+	_u.mutation.ClearPriceConditionNote()
 	return _u
 }
 
@@ -915,6 +1085,21 @@ func (_u *SalesOrderUpdateOne) check() error {
 			return &ValidationError{Name: "customer_order_no", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.customer_order_no": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PaymentMethod(); ok {
+		if err := salesorder.PaymentMethodValidator(v); err != nil {
+			return &ValidationError{Name: "payment_method", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_method": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PaymentTermDays(); ok {
+		if err := salesorder.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.payment_term_days": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.PriceConditionNote(); ok {
+		if err := salesorder.PriceConditionNoteValidator(v); err != nil {
+			return &ValidationError{Name: "price_condition_note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.price_condition_note": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.LifecycleStatus(); ok {
 		if err := salesorder.LifecycleStatusValidator(v); err != nil {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.lifecycle_status": %w`, err)}
@@ -974,6 +1159,27 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 	}
 	if _u.mutation.CustomerSnapshotCleared() {
 		_spec.ClearField(salesorder.FieldCustomerSnapshot, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.PaymentMethod(); ok {
+		_spec.SetField(salesorder.FieldPaymentMethod, field.TypeString, value)
+	}
+	if _u.mutation.PaymentMethodCleared() {
+		_spec.ClearField(salesorder.FieldPaymentMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.PaymentTermDays(); ok {
+		_spec.SetField(salesorder.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPaymentTermDays(); ok {
+		_spec.AddField(salesorder.FieldPaymentTermDays, field.TypeInt, value)
+	}
+	if _u.mutation.PaymentTermDaysCleared() {
+		_spec.ClearField(salesorder.FieldPaymentTermDays, field.TypeInt)
+	}
+	if value, ok := _u.mutation.PriceConditionNote(); ok {
+		_spec.SetField(salesorder.FieldPriceConditionNote, field.TypeString, value)
+	}
+	if _u.mutation.PriceConditionNoteCleared() {
+		_spec.ClearField(salesorder.FieldPriceConditionNote, field.TypeString)
 	}
 	if value, ok := _u.mutation.OrderDate(); ok {
 		_spec.SetField(salesorder.FieldOrderDate, field.TypeTime, value)

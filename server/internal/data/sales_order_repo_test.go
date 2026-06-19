@@ -35,12 +35,18 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	orderDate := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
 	plannedDate := orderDate.AddDate(0, 0, 14)
 	customerOrderNo := "PO-001"
+	paymentMethod := "60天月结"
+	paymentTermDays := 60
+	priceConditionNote := "原始报价"
 	note := "首单"
 	order, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
 		OrderNo:             "SO-001",
 		CustomerID:          customer.ID,
 		CustomerOrderNo:     &customerOrderNo,
 		CustomerSnapshot:    map[string]any{"name": customer.Name},
+		PaymentMethod:       &paymentMethod,
+		PaymentTermDays:     &paymentTermDays,
+		PriceConditionNote:  &priceConditionNote,
 		OrderDate:           orderDate,
 		PlannedDeliveryDate: &plannedDate,
 		Note:                &note,
@@ -50,6 +56,9 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	}
 	if order.LifecycleStatus != biz.SalesOrderStatusDraft {
 		t.Fatalf("expected draft order, got %#v", order)
+	}
+	if order.PaymentMethod == nil || *order.PaymentMethod != paymentMethod || order.PaymentTermDays == nil || *order.PaymentTermDays != paymentTermDays || order.PriceConditionNote == nil || *order.PriceConditionNote != priceConditionNote {
+		t.Fatalf("expected payment condition retained, got %#v", order)
 	}
 
 	updatedNote := "更新备注"
@@ -63,7 +72,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update sales order failed: %v", err)
 	}
-	if updated.CustomerOrderNo != nil || updated.PlannedDeliveryDate != nil || updated.Note == nil || *updated.Note != updatedNote {
+	if updated.CustomerOrderNo != nil || updated.PaymentMethod != nil || updated.PaymentTermDays != nil || updated.PriceConditionNote != nil || updated.PlannedDeliveryDate != nil || updated.Note == nil || *updated.Note != updatedNote {
 		t.Fatalf("expected nullable fields updated and cleared, got %#v", updated)
 	}
 

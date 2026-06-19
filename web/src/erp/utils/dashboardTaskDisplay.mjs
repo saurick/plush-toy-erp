@@ -46,13 +46,13 @@ export function formatWorkflowTaskSource(task = {}) {
   const sourceType = String(task.source_type || '').trim()
   const sourceTitle = TASK_SOURCE_TITLE_MAP.get(sourceType)
   if (sourceTitle && task.source_id) {
-    return `${sourceTitle} 第 ${task.source_id} 条`
+    return `${sourceTitle} / 内部来源 ${task.source_id}`
   }
   if (sourceTitle) {
     return sourceTitle
   }
   if (task.source_id) {
-    return `业务单据第 ${task.source_id} 条`
+    return `内部来源 ${task.source_id}`
   }
   return '未关联业务单据'
 }

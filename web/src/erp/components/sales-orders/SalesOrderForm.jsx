@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import {
+  AutoComplete,
   Button,
   Empty,
   Form,
@@ -164,7 +165,13 @@ function setOrderLineSourceFromSKU(form, lineIndex, sku) {
   form.setFieldsValue({ items: nextLines })
 }
 
-export function SalesOrderFormFields({ customers }) {
+export function SalesOrderFormFields({
+  customers,
+  paymentConditionOptions = [],
+  onCustomerChange,
+  onPaymentMethodChange,
+  onPaymentConditionBlur,
+}) {
   return (
     <>
       <Form.Item
@@ -192,6 +199,7 @@ export function SalesOrderFormFields({ customers }) {
             label: `${customer.code || customer.id} - ${customer.name}`,
             value: customer.id,
           }))}
+          onChange={onCustomerChange}
         />
       </Form.Item>
       <Form.Item
@@ -200,6 +208,50 @@ export function SalesOrderFormFields({ customers }) {
         name="customer_order_no"
       >
         <Input allowClear autoComplete="off" />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="成交付款方式"
+        name="payment_method"
+      >
+        <AutoComplete
+          allowClear
+          autoComplete="off"
+          filterOption={(inputValue, option) =>
+            String(option?.value || '')
+              .toLowerCase()
+              .includes(String(inputValue || '').toLowerCase())
+          }
+          options={paymentConditionOptions}
+          placeholder="选择或输入本单成交付款方式"
+          onBlur={onPaymentConditionBlur}
+          onChange={onPaymentMethodChange}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="成交账期天数"
+        name="payment_term_days"
+      >
+        <InputNumber
+          min={0}
+          precision={0}
+          style={{ width: '100%' }}
+          onBlur={onPaymentConditionBlur}
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field erp-business-action-form__field--full"
+        label="价格条件说明"
+        name="price_condition_note"
+      >
+        <Input.TextArea
+          allowClear
+          rows={2}
+          showCount
+          maxLength={255}
+          placeholder="如因账期调整需重新报价，可记录本单价格条件"
+        />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"

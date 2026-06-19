@@ -1,15 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CheckCircleOutlined,
-  DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
-  InboxOutlined,
   PlusOutlined,
   SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Popconfirm, Segmented, Space, Tag, Tooltip } from 'antd'
+import { Button, Form, Popconfirm, Segmented, Space, Tag } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -73,6 +71,7 @@ import {
   buildContactParams,
   buildMasterDataParams,
   buildMaterialDraftCode,
+  buildPaymentConditionOptions,
   buildSequentialDraftCode,
   buildProcessParams,
   buildProductParams,
@@ -83,6 +82,7 @@ import {
   formatUnixDateTime,
   hasActionPermission,
   inferDefaultUnitID,
+  resolvePaymentTermDays,
 } from '../utils/masterDataOrderView.mjs'
 import {
   applyBusinessColumnSorters,
@@ -384,6 +384,9 @@ function getRecordSearchPlaceholder(type = '') {
   if (type === 'product_skus') {
     return '搜索 SKU、条码、客户 SKU、颜色、色号、尺码、包装版本'
   }
+  if (type === 'customers') {
+    return '搜索编号、名称、简称、默认付款方式'
+  }
   return '搜索编号、名称、简称'
 }
 
@@ -495,9 +498,28 @@ export default function V1MasterDataPage({ type }) {
         : [],
     [effectiveType, records]
   )
+  const customerPaymentConditionOptions = useMemo(
+    () =>
+      effectiveType === 'customers'
+        ? buildPaymentConditionOptions(records)
+        : [],
+    [effectiveType, records]
+  )
   const unitDisplay = useCallback(
     (unitID) => formatUnitDisplayName(unitID, unitByID),
     [unitByID]
+  )
+  const applyCustomerPaymentMethod = useCallback(
+    (method) => {
+      const termDays = resolvePaymentTermDays(
+        method,
+        customerPaymentConditionOptions
+      )
+      if (termDays !== undefined) {
+        recordForm.setFieldValue('default_payment_term_days', termDays)
+      }
+    },
+    [customerPaymentConditionOptions, recordForm]
   )
 
   const loadContacts = useCallback(
@@ -1089,6 +1111,42 @@ export default function V1MasterDataPage({ type }) {
               render: (value) => value || '-',
             },
           ]),
+      ...(effectiveType === 'customers'
+        ? [
+            {
+              title: '默认付款条件',
+              exportTitle: '默认付款条件',
+              dataIndex: 'default_payment_method',
+              width: 180,
+              sorter: (a, b) =>
+                compareText(
+                  a?.default_payment_method,
+                  b?.default_payment_method
+                ),
+              render: (value, record) => {
+                const termDays = record?.default_payment_term_days
+                if (value && termDays != null) {
+                  return `${value} / ${termDays}天`
+                }
+                if (value) {
+                  return value
+                }
+                if (termDays != null) {
+                  return `${termDays}天`
+                }
+                return '-'
+              },
+              exportValue: (record) => {
+                const method = record?.default_payment_method
+                const termDays = record?.default_payment_term_days
+                if (method && termDays != null) {
+                  return `${method} / ${termDays}天`
+                }
+                return method || (termDays != null ? `${termDays}天` : '')
+              },
+            },
+          ]
+        : []),
       ...(effectiveType === 'materials'
         ? [
             {
@@ -1329,24 +1387,6 @@ export default function V1MasterDataPage({ type }) {
               >
                 列顺序
               </ToolbarButton>
-              <Tooltip
-                title={`${config.title}当前使用启停状态管理；退出使用请走停用，不提供物理删除 / 回收站。`}
-              >
-                <span>
-                  <ToolbarButton icon={<DeleteOutlined />} danger disabled>
-                    批量删除
-                  </ToolbarButton>
-                </span>
-              </Tooltip>
-              <Tooltip
-                title={`${config.title}当前没有回收站主路径；历史追溯回到启停状态和审计记录。`}
-              >
-                <span>
-                  <ToolbarButton icon={<InboxOutlined />} disabled>
-                    回收站
-                  </ToolbarButton>
-                </span>
-              </Tooltip>
             </Space>
           )
         }
@@ -1487,6 +1527,8 @@ export default function V1MasterDataPage({ type }) {
             processNameOptions={processNameOptions}
             processCategoryOptions={processCategoryOptions}
             supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
+            customerPaymentConditionOptions={customerPaymentConditionOptions}
+            onCustomerPaymentMethodChange={applyCustomerPaymentMethod}
           />
           {showContactForm ? (
             <ContactFormList form={recordForm} entityLabel={entityLabel} />

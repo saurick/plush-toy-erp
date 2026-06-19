@@ -73,6 +73,20 @@ func (_c *FinanceFactCreate) SetAmount(v decimal.Decimal) *FinanceFactCreate {
 	return _c
 }
 
+// SetFeeAmount sets the "fee_amount" field.
+func (_c *FinanceFactCreate) SetFeeAmount(v decimal.Decimal) *FinanceFactCreate {
+	_c.mutation.SetFeeAmount(v)
+	return _c
+}
+
+// SetNillableFeeAmount sets the "fee_amount" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillableFeeAmount(v *decimal.Decimal) *FinanceFactCreate {
+	if v != nil {
+		_c.SetFeeAmount(*v)
+	}
+	return _c
+}
+
 // SetCurrency sets the "currency" field.
 func (_c *FinanceFactCreate) SetCurrency(v string) *FinanceFactCreate {
 	_c.mutation.SetCurrency(v)
@@ -83,6 +97,62 @@ func (_c *FinanceFactCreate) SetCurrency(v string) *FinanceFactCreate {
 func (_c *FinanceFactCreate) SetNillableCurrency(v *string) *FinanceFactCreate {
 	if v != nil {
 		_c.SetCurrency(*v)
+	}
+	return _c
+}
+
+// SetCollectionType sets the "collection_type" field.
+func (_c *FinanceFactCreate) SetCollectionType(v string) *FinanceFactCreate {
+	_c.mutation.SetCollectionType(v)
+	return _c
+}
+
+// SetNillableCollectionType sets the "collection_type" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillableCollectionType(v *string) *FinanceFactCreate {
+	if v != nil {
+		_c.SetCollectionType(*v)
+	}
+	return _c
+}
+
+// SetPaymentTerm sets the "payment_term" field.
+func (_c *FinanceFactCreate) SetPaymentTerm(v string) *FinanceFactCreate {
+	_c.mutation.SetPaymentTerm(v)
+	return _c
+}
+
+// SetNillablePaymentTerm sets the "payment_term" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillablePaymentTerm(v *string) *FinanceFactCreate {
+	if v != nil {
+		_c.SetPaymentTerm(*v)
+	}
+	return _c
+}
+
+// SetPaymentTermDays sets the "payment_term_days" field.
+func (_c *FinanceFactCreate) SetPaymentTermDays(v int) *FinanceFactCreate {
+	_c.mutation.SetPaymentTermDays(v)
+	return _c
+}
+
+// SetNillablePaymentTermDays sets the "payment_term_days" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillablePaymentTermDays(v *int) *FinanceFactCreate {
+	if v != nil {
+		_c.SetPaymentTermDays(*v)
+	}
+	return _c
+}
+
+// SetInvoiceCategory sets the "invoice_category" field.
+func (_c *FinanceFactCreate) SetInvoiceCategory(v string) *FinanceFactCreate {
+	_c.mutation.SetInvoiceCategory(v)
+	return _c
+}
+
+// SetNillableInvoiceCategory sets the "invoice_category" field if the given value is not nil.
+func (_c *FinanceFactCreate) SetNillableInvoiceCategory(v *string) *FinanceFactCreate {
+	if v != nil {
+		_c.SetInvoiceCategory(*v)
 	}
 	return _c
 }
@@ -260,6 +330,10 @@ func (_c *FinanceFactCreate) defaults() error {
 		v := financefact.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.FeeAmount(); !ok {
+		v := financefact.DefaultFeeAmount
+		_c.mutation.SetFeeAmount(v)
+	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		v := financefact.DefaultCurrency
 		_c.mutation.SetCurrency(v)
@@ -330,12 +404,35 @@ func (_c *FinanceFactCreate) check() error {
 	if _, ok := _c.mutation.Amount(); !ok {
 		return &ValidationError{Name: "amount", err: errors.New(`ent: missing required field "FinanceFact.amount"`)}
 	}
+	if _, ok := _c.mutation.FeeAmount(); !ok {
+		return &ValidationError{Name: "fee_amount", err: errors.New(`ent: missing required field "FinanceFact.fee_amount"`)}
+	}
 	if _, ok := _c.mutation.Currency(); !ok {
 		return &ValidationError{Name: "currency", err: errors.New(`ent: missing required field "FinanceFact.currency"`)}
 	}
 	if v, ok := _c.mutation.Currency(); ok {
 		if err := financefact.CurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.currency": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.CollectionType(); ok {
+		if err := financefact.CollectionTypeValidator(v); err != nil {
+			return &ValidationError{Name: "collection_type", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.collection_type": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.PaymentTerm(); ok {
+		if err := financefact.PaymentTermValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.payment_term": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.PaymentTermDays(); ok {
+		if err := financefact.PaymentTermDaysValidator(v); err != nil {
+			return &ValidationError{Name: "payment_term_days", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.payment_term_days": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.InvoiceCategory(); ok {
+		if err := financefact.InvoiceCategoryValidator(v); err != nil {
+			return &ValidationError{Name: "invoice_category", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.invoice_category": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.SourceType(); ok {
@@ -425,9 +522,29 @@ func (_c *FinanceFactCreate) createSpec() (*FinanceFact, *sqlgraph.CreateSpec) {
 		_spec.SetField(financefact.FieldAmount, field.TypeOther, value)
 		_node.Amount = value
 	}
+	if value, ok := _c.mutation.FeeAmount(); ok {
+		_spec.SetField(financefact.FieldFeeAmount, field.TypeOther, value)
+		_node.FeeAmount = value
+	}
 	if value, ok := _c.mutation.Currency(); ok {
 		_spec.SetField(financefact.FieldCurrency, field.TypeString, value)
 		_node.Currency = value
+	}
+	if value, ok := _c.mutation.CollectionType(); ok {
+		_spec.SetField(financefact.FieldCollectionType, field.TypeString, value)
+		_node.CollectionType = &value
+	}
+	if value, ok := _c.mutation.PaymentTerm(); ok {
+		_spec.SetField(financefact.FieldPaymentTerm, field.TypeString, value)
+		_node.PaymentTerm = &value
+	}
+	if value, ok := _c.mutation.PaymentTermDays(); ok {
+		_spec.SetField(financefact.FieldPaymentTermDays, field.TypeInt, value)
+		_node.PaymentTermDays = &value
+	}
+	if value, ok := _c.mutation.InvoiceCategory(); ok {
+		_spec.SetField(financefact.FieldInvoiceCategory, field.TypeString, value)
+		_node.InvoiceCategory = &value
 	}
 	if value, ok := _c.mutation.SourceType(); ok {
 		_spec.SetField(financefact.FieldSourceType, field.TypeString, value)
