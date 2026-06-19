@@ -1169,6 +1169,7 @@ export default function V1OutsourcingOrdersPage() {
         tasks={workflowTasks}
         selectedTasks={selectedWorkflowTasks}
         selectedRecordLabel={selectedRow?.outsourcing_order_no || ''}
+        adminProfile={adminProfile}
         roleLabelMap={WORKFLOW_ROLE_LABELS}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined

@@ -213,6 +213,32 @@ export async function installAdminAuthExpiredRpcMocks(page) {
   })
 }
 
+export async function installAdminDisabledRpcMocks(page) {
+  await page.route('**/rpc/admin', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method } = body
+
+    if (method !== 'me') {
+      await route.fallback()
+      return
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: RpcErrorCode.ADMIN_DISABLED,
+          message: '管理员已禁用',
+          data: {},
+        },
+      }),
+    })
+  })
+}
+
 export function createMockAdminToken() {
   const header = encodeBase64URL({ alg: 'none', typ: 'JWT' })
   const payload = encodeBase64URL({

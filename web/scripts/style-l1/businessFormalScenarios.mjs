@@ -223,6 +223,7 @@ export function createBusinessFormalScenarios(deps) {
           minFieldCount: 5,
           screenshotName: 'business-v1-suppliers-form-modal',
           expectedTexts: ['供应商类型', '联系人', '添加条目'],
+          expectContactItemsLayout: true,
         })
         await verifyBusinessRowDoubleClickEditModal(page, {
           rowText: '样式供应商',
@@ -262,6 +263,7 @@ export function createBusinessFormalScenarios(deps) {
           minFieldCount: 5,
           screenshotName: 'business-v1-customers-form-modal',
           expectedTexts: ['联系人', '添加条目'],
+          expectContactItemsLayout: true,
         })
         await assertNoHorizontalOverflow(page, 'business-standard-customers')
         await verifyBusinessRowDoubleClickEditModal(page, {
@@ -922,10 +924,10 @@ export function createBusinessFormalScenarios(deps) {
           await expectHeading(page, heading)
           await expectButton(page, previewButton)
           await expectText(page, boundaryAction)
-          await expectButton(page, '预览导出待接入')
+          await expectButton(page, '不导出业务数据')
           assert(
             await page
-              .getByRole('button', { name: '预览导出待接入' })
+              .getByRole('button', { name: '不导出业务数据' })
               .isDisabled(),
             `${scenarioName} 待接入预览页不应允许导出业务数据`
           )
@@ -960,7 +962,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyFormalShellPreviewPage({
           path: '/erp/production/scheduling',
           heading: '生产排程',
-          previewButton: '预览排程字段',
+          previewButton: '查看排程字段边界',
           boundaryAction: '查看排程接入边界',
           absentTexts: ['新建排程', '生成生产任务'],
           rowText: '生产排程字段预览',
@@ -971,7 +973,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyFormalShellPreviewPage({
           path: '/erp/production/exceptions',
           heading: '生产异常',
-          previewButton: '预览异常字段',
+          previewButton: '查看异常字段边界',
           boundaryAction: '查看异常接入边界',
           absentTexts: ['新建异常', '关闭异常', '生成异常处理'],
           rowText: '生产异常字段预览',
@@ -1030,7 +1032,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyFormalShellPreviewPage({
           path: '/erp/warehouse/shipping-release',
           heading: '出货放行',
-          previewButton: '预览放行字段',
+          previewButton: '查看放行字段边界',
           boundaryAction: '查看放行接入边界',
           absentTexts: ['新建放行单', '生成出货放行', '确认放行'],
           rowText: '出货放行字段预览',
@@ -1252,7 +1254,7 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '应收管理')
-        await expectButton(page, '新建应收')
+        await expectButton(page, '登记应收事实')
         await expectText(page, 'AR-STYLE-L1')
         await expectText(page, 'finance_facts')
         await expectText(page, 'RECEIVABLE')
@@ -1263,8 +1265,8 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-receivables',
         })
         await verifyBusinessActionFormModal(page, {
-          buttonName: '新建应收',
-          titleText: '新建应收',
+          buttonName: '登记应收事实',
+          titleText: '登记应收事实',
           minFieldCount: 10,
           screenshotName: 'business-v1-receivables-create-form-modal',
           expectedTexts: ['事实类型', '金额', '来源类型'],
@@ -1275,7 +1277,7 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '应付管理')
-        await expectButton(page, '新建应付')
+        await expectButton(page, '登记应付事实')
         await expectText(page, 'AP-STYLE-L1')
         await assertNoHorizontalOverflow(page, 'business-v1-payables')
 
@@ -1283,7 +1285,7 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '发票管理')
-        await expectButton(page, '新建发票')
+        await expectButton(page, '登记发票事实')
         await expectText(page, 'INV-STYLE-L1')
         await assertNoHorizontalOverflow(page, 'business-v1-invoices')
 
@@ -1291,7 +1293,7 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '对账管理')
-        await expectButton(page, '新建对账')
+        await expectButton(page, '登记对账事实')
         await expectText(page, 'REC-STYLE-L1')
         await assertNoHorizontalOverflow(page, 'business-v1-reconciliation')
 
@@ -1307,7 +1309,7 @@ export function createBusinessFormalScenarios(deps) {
           expectedEffectiveTheme: 'dark',
         })
         await expectHeading(page, '应收管理')
-        await page.getByRole('button', { name: '新建应收' }).click()
+        await page.getByRole('button', { name: '登记应收事实' }).click()
         await assertOperationalFactModalViewport(
           page,
           'business-v1-receivables-dark-modal'
@@ -1316,7 +1318,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyFormalShellPreviewPage({
           path: '/erp/production/exceptions',
           heading: '生产异常',
-          previewButton: '预览异常字段',
+          previewButton: '查看异常字段边界',
           boundaryAction: '查看异常接入边界',
           absentTexts: ['新建异常', '关闭异常', '生成异常处理'],
           rowText: '生产异常字段预览',
@@ -1342,11 +1344,11 @@ export function createBusinessFormalScenarios(deps) {
           expectedEffectiveTheme: 'light',
         })
         await expectHeading(page, '出货放行')
-        await expectButton(page, '预览放行字段')
-        await expectButton(page, '预览导出待接入')
+        await expectButton(page, '查看放行字段边界')
+        await expectButton(page, '不导出业务数据')
         assert(
           await page
-            .getByRole('button', { name: '预览导出待接入' })
+            .getByRole('button', { name: '不导出业务数据' })
             .isDisabled(),
           'business-formal-shipping-release-mobile 待接入预览页不应允许导出业务数据'
         )
@@ -1444,7 +1446,7 @@ export function createBusinessFormalScenarios(deps) {
         })
 
         await expectHeading(page, '出货放行')
-        await expectButton(page, '预览放行字段')
+        await expectButton(page, '查看放行字段边界')
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '没有出货放行协同任务读取权限')
         assert.equal(
@@ -1460,5 +1462,175 @@ export function createBusinessFormalScenarios(deps) {
         )
       },
     },
+    (() => {
+      let shippingReleaseListTaskCalls = 0
+      let workflowWriteCalls = 0
+      return {
+        name: 'business-formal-shipping-release-readonly-actions-desktop',
+        path: '/erp/warehouse/shipping-release',
+        auth: 'admin',
+        viewport: { width: 1440, height: 900 },
+        adminProfile: {
+          username: 'style-l1-workflow-readonly',
+          is_super_admin: false,
+          roles: [{ role_key: 'warehouse', name: '仓库' }],
+          permissions: ['erp.dashboard.read', 'workflow.task.read'],
+          menus: [
+            {
+              key: 'shipping-release',
+              label: '出货放行',
+              path: '/erp/warehouse/shipping-release',
+              required_permissions: [],
+            },
+          ],
+          erp_preferences: {
+            column_orders: {},
+          },
+        },
+        beforeNavigate: async (page) => {
+          shippingReleaseListTaskCalls = 0
+          workflowWriteCalls = 0
+          await page.unroute('**/rpc/workflow')
+          await page.route('**/rpc/workflow', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            if (
+              body.method === 'list_tasks' &&
+              body.params?.source_type === 'shipping-release'
+            ) {
+              shippingReleaseListTaskCalls += 1
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: body.id || 'formal-shipping-release-readonly-list',
+                  result: {
+                    code: 0,
+                    message: 'OK',
+                    data: {
+                      tasks: [
+                        {
+                          id: 9201,
+                          task_code:
+                            'style-l1-formal-shipping-release-readonly',
+                          task_group: 'shipment_release',
+                          task_name: '出货放行只读协同确认',
+                          source_type: 'shipping-release',
+                          source_id: 9201,
+                          source_no: 'SHIP-REL-READONLY',
+                          business_status_key: 'shipment_pending',
+                          task_status_key: 'ready',
+                          owner_role_key: 'warehouse',
+                          payload: {
+                            critical_path: true,
+                            shipment_release_page_scope: 'workflow_only',
+                          },
+                        },
+                      ],
+                      total: 1,
+                      limit: 100,
+                      offset: 0,
+                    },
+                  },
+                }),
+              })
+              return
+            }
+            if (
+              body.method === 'update_task_status' ||
+              body.method === 'urge_task'
+            ) {
+              workflowWriteCalls += 1
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: body.id || 'formal-shipping-release-readonly-write',
+                  result: {
+                    code: 403001,
+                    message: 'readonly workflow user cannot write tasks',
+                    data: null,
+                  },
+                }),
+              })
+              return
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'formal-shipping-release-readonly-fallback',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: {},
+                },
+              }),
+            })
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '出货放行')
+          await expectText(page, '待办')
+          await page.getByRole('button', { name: '展开' }).first().click()
+          await expectText(page, '出货放行只读协同确认')
+          await expectText(page, 'SHIP-REL-READONLY')
+          await expectText(
+            page,
+            '只读：当前账号只有查看任务权限，没有完成、阻塞或催办权限。'
+          )
+
+          const readonlyMetrics = await page
+            .locator('.erp-business-module-task-item')
+            .filter({ hasText: '出货放行只读协同确认' })
+            .first()
+            .evaluate((node) => {
+              const buttons = Array.from(node.querySelectorAll('button')).map(
+                (button) => String(button.textContent || '').trim()
+              )
+              return {
+                text: String(node.textContent || '')
+                  .replace(/\s+/gu, ' ')
+                  .trim(),
+                buttons,
+                scrollWidth: node.scrollWidth,
+                clientWidth: node.clientWidth,
+              }
+            })
+          assert.deepEqual(
+            readonlyMetrics.buttons,
+            [],
+            `只读任务项不应显示完成、阻塞或催办动作: ${JSON.stringify(
+              readonlyMetrics
+            )}`
+          )
+          assert(
+            readonlyMetrics.text.includes('只读：当前账号只有查看任务权限'),
+            `只读任务项缺少权限原因: ${JSON.stringify(readonlyMetrics)}`
+          )
+          assert(
+            readonlyMetrics.scrollWidth <= readonlyMetrics.clientWidth + 1,
+            `只读任务项出现横向溢出: ${JSON.stringify(readonlyMetrics)}`
+          )
+          assert(
+            shippingReleaseListTaskCalls >= 1,
+            '有 workflow.task.read 时出货放行页应允许读取协同任务'
+          )
+          assert.equal(
+            workflowWriteCalls,
+            0,
+            '只读协同任务不应触发 update_task_status 或 urge_task'
+          )
+          await assertTextAbsent(page, '任务处理')
+          await assertTextAbsent(page, '出货放行协同任务已完成')
+          await assertNoHorizontalOverflow(
+            page,
+            'business-formal-shipping-release-readonly-actions-desktop'
+          )
+        },
+      }
+    })(),
   ]
 }

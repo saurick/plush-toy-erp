@@ -111,3 +111,55 @@
 - 验证：`STYLE_L1_PORT=4385 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；`STYLE_L1_PORT=4386 STYLE_L1_SCENARIOS=business-menu-groups-desktop,erp-task-board-desktop,erp-task-board-mobile,erp-task-board-dark-wide-desktop pnpm --dir web style:l1` 通过，4 个场景；`STYLE_L1_PORT=4387 STYLE_L1_SCENARIOS=business-formal-shipping-release-no-permission-desktop pnpm --dir web style:l1` 通过，1 个场景；pre-push `qa:full` 两次通过，覆盖 web lint / css / test / build、server `go test ./...`、Go build、secrets、govulncheck、客户配置和部署资料包守卫。
 - 下一步：若继续声明“页面治理完全闭环”，还需要按单页或单能力补 disabled 管理员、非管理员、加载慢和更多暗色 / 移动组合；正式 shipment source/fact 仍需另开 usecase/API/RBAC/审计/导出/删除语义评审。
 - 阻塞/风险：当前只补页面读取权限、任务看板和 L1 回归证据；未改 schema、migration、RBAC 码位、菜单、客户配置、部署、Shipment / Inventory / Finance fact usecase 或 `WorkflowUsecase` 第七条状态规则。
+
+## 2026-06-19 权限与禁用账号边界 L1
+
+- 完成：按 `plush-page-design-governance` 补管理员禁用会话 L1，新增 `admin-disabled` mock，仅覆盖 `/rpc/admin` 的 `me` 返回 `ADMIN_DISABLED`，让 `ERPLayout` / `adminProfileSync` / `authBus` 主路径显示“登录状态已失效 / 管理员已禁用 / 重新登录”，不渲染 ERP dashboard 内容。
+- 完成：复核已有 `business-formal-shipping-release-no-permission-desktop`，确认无 `workflow.task.read` 时仍停留业务页缺权提示，不调用出货放行 `list_tasks`，不显示协同任务、刷新成功或 false success。
+- 验证：追加前 `progress.md` 为 113 行、23462 字节，未达到归档阈值；`node --check` 覆盖 `styleL1.mjs`、`adminRpcMocks.mjs`、`scenarios.mjs`、`businessFormalScenarios.mjs` 通过；定向 ESLint 覆盖 `styleL1.mjs`、`adminRpcMocks.mjs`、`scenarios.mjs`、`businessFormalScenarios.mjs`、`factRpcMocks.mjs` 通过；`pnpm --dir web exec node --test src/erp/utils/adminProfileSync.test.mjs src/common/consts/errorCodes.test.mjs` 通过，7 项；`STYLE_L1_PORT=4368 STYLE_L1_SCENARIOS=business-formal-shipping-release-no-permission-desktop,auth-disabled-alert-desktop pnpm --dir web style:l1` 通过，2 个场景；`git diff --check` 通过。
+- 下一步：继续补“有读取权限但缺更新 / 完成权限”的动作只读态，以及暗色 / 移动端错误提示对比度；不要改 schema、migration、RBAC 码位、菜单、客户配置、WorkflowUsecase 或 Fact usecase。
+- 阻塞/风险：本轮未跑全量 `pnpm --dir web test`、全量 `pnpm --dir web lint`、全量 `style:l1` 或全量 `go test ./...`；未改运行时业务代码、schema、migration、RBAC、菜单、Workflow / Fact usecase、部署或正式能力文档。
+
+## 2026-06-19 页面动作边界与正式菜单治理收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 收口库存台账、财务事实页和 formal-shell 页面文案 / 动作边界；formal-shell 入口改为“查看字段边界”，导出按钮改为禁用的“不导出业务数据”，并在表单边界中明确不提供真实创建、保存、删除、打印、业务数据导出或领域事实写入。
+- 完成：库存台账选择条明确余额、批次和流水只读查询 / 追溯，动作从“关联”改为“查看关联”；财务事实页将应收、应付、发票、对账的主动作改为“登记事实”，并分别写清不代表收款 / 付款核销、税控、查验、纳税、总账或多账簿能力。
+- 完成：同步 `docs/product/正式菜单运行时实施拆分清单.md`，把库存台账、财务事实页和 formal-shell 从当前剩余问题转为本轮已完成检查项；后续只保留新能力入口和行为接入升级的单页闭环条件。
+- 验证：追加前 `progress.md` 为 121 行、25259 字节，未达到归档阈值；旧误导按钮 / R 编号话术扫描无命中；`pnpm --dir web exec eslint --ext .jsx src/erp/pages/FormalBusinessModulePage.jsx src/erp/pages/V1InventoryLedgerPage.jsx src/erp/pages/V1OperationalFactPage.jsx src/erp/pages/OperationalFactsPage.jsx` 通过；`pnpm --dir web exec eslint --ext .mjs scripts/style-l1/businessFormalScenarios.mjs` 通过；`node --check web/scripts/style-l1/businessFormalScenarios.mjs` 通过；`STYLE_L1_PORT=4392 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；`STYLE_L1_PORT=4393 STYLE_L1_SCENARIOS=business-formal-shipping-release-no-permission-desktop pnpm --dir web style:l1` 通过，1 个场景；限定路径 `git diff --check` 通过。
+- 下一步：如果后续要接库存写入、完整财务核销、税控、总账、formal-shell 真实保存、打印、删除或业务数据导出，必须按具体页面单独做 usecase / API / RBAC / 审计 / 测试闭环，不用编号组织。
+- 阻塞/风险：本轮只改前端页面文案 / 动作标签、L1 断言和正式文档口径；未改 schema、migration、RBAC、route、WorkflowUsecase、Inventory / Shipment / Finance fact usecase、客户配置或部署。
+
+## 2026-06-19 页面治理剩余验证闭环
+
+- 完成：继续收口上一条之后的剩余验证盲区；修正 `business-formal-shipping-release-readonly-actions-desktop` 的 L1 fixture 安装方式，专用场景先接管 `/rpc/workflow`，再返回只读账号可见的出货放行协同任务，避免通用 workflow mock 吃掉请求导致只读任务未出现。
+- 完成：正式文档从“当前剩余问题 / 剩余风险”改为“行为接入门禁 / 当前边界”；同步 `web/README.md` 和 `docs/当前真源与交接顺序.md` 中过时的 `导出待接入提示` 口径为“不导出业务数据”。
+- 完成：页面 governance 当前已覆盖库存台账、财务事实页、formal-shell 默认态、交互态、暗色、移动、无读取权限和只读动作权限；后续不再把这些页面边界当作待追问事项。
+- 验证：追加前 `progress.md` 为 148 行、31520 字节，未达到归档阈值；`STYLE_L1_PORT=4395 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,business-formal-shipping-release-no-permission-desktop,business-formal-shipping-release-readonly-actions-desktop pnpm --dir web style:l1` 通过，3 个场景；`pnpm --dir web exec node --test src/erp/utils/businessCollaborationTasks.test.mjs src/erp/utils/workflowTaskBoard.test.mjs src/erp/utils/businessModuleNavigation.test.mjs` 通过，20 项；定向 ESLint 覆盖 `BusinessListLayout.jsx`、formal-shell、库存台账、财务事实页、`businessModuleNavigation.test.mjs` 和 L1 场景通过；`node --check web/scripts/style-l1/businessFormalScenarios.mjs` 通过；限定路径 `git diff --check` 通过。
+- 下一步：无页面治理待追问项；只有新增真实行为或正式入口时，才按具体页面单独评审 usecase / API / RBAC / 审计 / 测试闭环。
+- 阻塞/风险：本轮仍未改 schema、migration、RBAC、route、WorkflowUsecase、Inventory / Shipment / Finance fact usecase、客户配置或部署；旧 `progress.md` 条目中的“下一步”是历史过程记录，不作为当前正式待办真源。
+
+## 2026-06-19 协同动作只读态与禁用账号暗色移动回归
+
+- 完成：按 `plush-page-design-governance` 将 `CollaborationTaskPanel` 的动作显示收口到共享 `workflowTaskBoard` 权限 helper：同时满足页面传入 handler、任务未终态、当前账号具备对应 `workflow.task.*` 权限且符合责任角色 / 指派人边界时才显示“完成 / 阻塞 / 催办”；只读任务显示原因，不打开任务处理抽屉，也不触发 workflow 写接口。
+- 完成：`FormalBusinessModulePage`、采购订单和委外订单协同面板传入当前 `adminProfile`；出货放行新增“有 `workflow.task.read` 但无 update / complete”的 L1，确认能读任务但只能看只读原因；补 `auth-disabled-alert-mobile-dark`，复用通用弹窗布局断言覆盖暗色移动端宽高、居中、对比度、横向溢出和重叠。
+- 完成：`style:l1` 增加 `beforeNavigate` 场景钩子，供进入页面前挂定向 mock route；该钩子只服务浏览器回归脚本，不改变运行时应用。
+- 验证：追加前 `progress.md` 为 130 行、27602 字节，未达到归档阈值；`pnpm --dir web exec eslint --ext .jsx,.mjs ...` 覆盖本轮页面和 L1 脚本通过；`node --check` 覆盖本轮 `.mjs` 脚本通过；`pnpm --dir web exec node --test src/erp/utils/workflowTaskBoard.test.mjs src/erp/utils/businessCollaborationTasks.test.mjs src/erp/utils/adminProfileSync.test.mjs src/common/consts/errorCodes.test.mjs` 通过，23 项；`STYLE_L1_PORT=4371 STYLE_L1_SCENARIOS=business-formal-shipping-release-no-permission-desktop,business-formal-shipping-release-readonly-actions-desktop,auth-disabled-alert-desktop,auth-disabled-alert-mobile-dark pnpm --dir web style:l1` 通过，4 个场景。
+- 下一步：页面边界态当前已覆盖无读取权限、只读动作、disabled 会话、请求失败和 stale selected row；若继续做更高等级，只剩全量 `style:l1`、更大范围 `pnpm --dir web test` / `pnpm --dir web lint`、以及实际后端 RBAC / Workflow API 集成环境回归。
+- 阻塞/风险：本轮未改 schema、migration、RBAC 码位、菜单、客户配置、WorkflowUsecase、Shipment / Inventory / Finance fact usecase、部署或正式能力文档；当前工作树存在非本轮并行改动，收口和提交时需要按路径精确区分。
+
+## 2026-06-19 客户 / 供应商联系人弹窗宽度收口
+
+- 完成：按 `plush-page-design-governance` 将客户 / 供应商这种“主数据主体 + 联系人子项”的聚合表单切到共享 `BusinessFormModal` 的新 `masterDataItems` 尺寸档；普通材料、工序等主数据仍保留原 `masterData` 标准宽度。
+- 完成：新增 `ERP_MODAL_WIDTHS.masterDataItemsForm = min(1280px, calc(100vw - 48px))`，避免联系人区在桌面只露出三列半；联系人条目仍在同一业务弹窗内横向滚动，不拆抽屉、不新增局部页面兜底。
+- 完成：补 `style:l1` 联系人聚合表单断言，覆盖弹窗宽度、body 无横向溢出、联系人 grid 内部横滚、字段最小宽度和供应商备注 show-count 场景。
+- 验证：追加前 `progress.md` 为 139 行、29941 字节，未达到归档阈值；`pnpm --dir web lint` 通过；`pnpm --dir web css` 通过；`pnpm --dir web exec node --test src/erp/utils/modalSizes.test.mjs` 通过；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,textarea-show-count-layout-desktop pnpm --dir web style:l1` 通过，2 个场景。
+- 下一步：若继续做更高等级页面验收，可补全量 `style:l1` 或窄屏客户 / 供应商创建表单专项；本轮不需要改原型状态。
+- 阻塞/风险：一次误用 `pnpm --dir web test -- modalSizes` 触发了全量单测，其中既有 `businessModuleNavigation.test.mjs` 文案断言仍失败；本轮未改 schema、migration、RBAC、菜单、客户配置、Workflow / Fact usecase、部署或正式文档口径。
+
+## 2026-06-19 可添加 item 弹窗整体横向滚动收口
+
+- 完成：按 `plush-page-design-governance` 将 `.erp-master-contact-list` 系列可添加 item 区从“每行 grid 各自横向滚动”改为“外层 `.erp-master-contact-list__items` 统一横向滚动”；客户 / 供应商联系人、出货明细、采购入库明细等复用该结构的弹窗同步继承，不改保存逻辑、字段真源、schema、RBAC、菜单或 Workflow / Fact 边界。
+- 完成：同步 `style:l1` 联系人聚合表单和采购入库创建 / 加行 / 移动端断言，明确外层列表持有 `overflow-x`，每行宽度一致，子 grid 不再各自横向滚动。
+- 验证：追加前 `progress.md` 为 157 行、33595 字节，未达到归档阈值；`STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；`STYLE_L1_PORT=4184 STYLE_L1_SCENARIOS=purchase-receipt-create-modal-desktop,purchase-receipt-add-item-modal-draft-desktop,purchase-receipt-create-modal-mobile pnpm --dir web style:l1` 通过，3 个场景；`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`node --check web/scripts/styleL1.mjs`、`node --check web/scripts/style-l1/purchaseReceiptAssertions.mjs` 均通过。
+- 下一步：如继续扩展同类 item 弹窗，优先复用 `.erp-master-contact-list__items` 或 `.erp-sales-order-lines-form__list` 作为唯一横向滚动面，不再把 `overflow-x:auto` 放回每行 grid。
+- 阻塞/风险：完整 `STYLE_L1_PORT=4185 pnpm --dir web style:l1` 在 `business-module-dark-customers-desktop` 失败，失败点是协同面板收起态缺当前记录摘要，属于本轮开始前已有协同面板 / business list 现场改动链路，不是 item 弹窗滚动链路；本轮未改原型状态、正式文档清单、schema、migration、RBAC、菜单、客户配置、部署或后端 usecase。

@@ -35,6 +35,10 @@ import {
   isBusinessCollaborationTaskBlocking,
   isBusinessCollaborationTaskTerminal,
 } from '../../utils/businessCollaborationTasks.mjs'
+import {
+  canRunWorkflowTaskAction,
+  getWorkflowTaskReadonlyReason,
+} from '../../utils/workflowTaskBoard.mjs'
 
 const { Text } = Typography
 const COLLABORATION_PANEL_DEFAULT_HEIGHT = 260
@@ -754,6 +758,7 @@ export function CollaborationTaskPanel({
   tasks = [],
   selectedTasks = [],
   selectedRecordLabel = '',
+  adminProfile,
   taskStatusLabels,
   roleLabelMap,
   onUrgeTask,
@@ -777,14 +782,38 @@ export function CollaborationTaskPanel({
   const tabIDPrefix = React.useId().replace(/:/g, '')
   const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
   const roleLabels = roleLabelMap || new Map()
-  const allowedActionModes = React.useMemo(
-    () =>
+  const hasAdminProfile = adminProfile && typeof adminProfile === 'object'
+  const getTaskAllowedActionModes = React.useCallback(
+    (task) =>
       [
-        onCompleteTask ? 'complete' : '',
-        onBlockTask ? 'block' : '',
-        onUrgeTask ? 'urge' : '',
+        onCompleteTask &&
+        (!hasAdminProfile ||
+          canRunWorkflowTaskAction(adminProfile, task, 'complete'))
+          ? 'complete'
+          : '',
+        onBlockTask &&
+        (!hasAdminProfile ||
+          canRunWorkflowTaskAction(adminProfile, task, 'block'))
+          ? 'block'
+          : '',
+        onUrgeTask &&
+        (!hasAdminProfile ||
+          canRunWorkflowTaskAction(adminProfile, task, 'urge'))
+          ? 'urge'
+          : '',
       ].filter(Boolean),
-    [onBlockTask, onCompleteTask, onUrgeTask]
+    [adminProfile, hasAdminProfile, onBlockTask, onCompleteTask, onUrgeTask]
+  )
+  const actionDrawerAllowedModes = React.useMemo(
+    () => getTaskAllowedActionModes(actionDrawerTask),
+    [actionDrawerTask, getTaskAllowedActionModes]
+  )
+  const actionDrawerReadonlyReason = React.useMemo(
+    () =>
+      hasAdminProfile && actionDrawerTask
+        ? getWorkflowTaskReadonlyReason(adminProfile, actionDrawerTask)
+        : '',
+    [actionDrawerTask, adminProfile, hasAdminProfile]
   )
   const taskPanelModel = React.useMemo(
     () =>
@@ -941,6 +970,10 @@ export function CollaborationTaskPanel({
     if (!actionDrawerTask || !actionDrawerMode) return
     const actionMeta = TASK_ACTION_META[actionDrawerMode]
     if (!actionMeta) return
+    if (!actionDrawerAllowedModes.includes(actionDrawerMode)) {
+      message.warning('当前账号不能提交这个任务动作')
+      return
+    }
 
     const reason = actionDrawerReason.trim()
     if (actionMeta.requireReason && !reason) {
@@ -973,6 +1006,7 @@ export function CollaborationTaskPanel({
     actionDrawerMode,
     actionDrawerReason,
     actionDrawerTask,
+    actionDrawerAllowedModes,
     closeActionDrawer,
     onBlockTask,
     onCompleteTask,
@@ -995,6 +1029,13 @@ export function CollaborationTaskPanel({
           const isBlocking = isBusinessCollaborationTaskBlocking(task)
           const taskReason = getBusinessCollaborationTaskReason(task)
           const urgeMeta = getBusinessCollaborationTaskUrgeMeta(task)
+          const taskAllowedActionModes = getTaskAllowedActionModes(task)
+          const taskReadonlyReason =
+            hasAdminProfile &&
+            !isTerminal &&
+            taskAllowedActionModes.length === 0
+              ? getWorkflowTaskReadonlyReason(adminProfile, task)
+              : ''
           const taskLoading =
             String(taskActionLoadingID || '') === String(task.id || '')
 
@@ -1021,6 +1062,11 @@ export function CollaborationTaskPanel({
                       : ''}
                   </span>
                 ) : null}
+                {taskReadonlyReason ? (
+                  <span className="erp-business-collaboration-task-panel__reason erp-business-module-task-item__reason">
+                    只读：{taskReadonlyReason}
+                  </span>
+                ) : null}
               </div>
               <div className="erp-business-module-task-item__meta">
                 <Tag>
@@ -1035,7 +1081,7 @@ export function CollaborationTaskPanel({
                 size={[6, 6]}
                 className="erp-business-module-task-item__actions"
               >
-                {onCompleteTask && !isTerminal ? (
+                {taskAllowedActionModes.includes('complete') && !isTerminal ? (
                   <Button
                     size="small"
                     icon={<CheckCircleOutlined />}
@@ -1045,7 +1091,7 @@ export function CollaborationTaskPanel({
                     完成
                   </Button>
                 ) : null}
-                {onBlockTask && !isTerminal ? (
+                {taskAllowedActionModes.includes('block') && !isTerminal ? (
                   <Button
                     size="small"
                     danger
@@ -1056,7 +1102,7 @@ export function CollaborationTaskPanel({
                     阻塞
                   </Button>
                 ) : null}
-                {onUrgeTask && !isTerminal ? (
+                {taskAllowedActionModes.includes('urge') && !isTerminal ? (
                   <Button
                     size="small"
                     loading={String(urgingTaskID || '') === String(task.id)}
@@ -1197,7 +1243,8 @@ export function CollaborationTaskPanel({
         actionMode={actionDrawerMode}
         actionReason={actionDrawerReason}
         actionSaving={actionDrawerSaving}
-        allowedActionModes={allowedActionModes}
+        allowedActionModes={actionDrawerAllowedModes}
+        readonlyReason={actionDrawerReadonlyReason}
         roleLabelMap={roleLabels}
         onActionModeChange={setActionDrawerMode}
         onActionReasonChange={setActionDrawerReason}

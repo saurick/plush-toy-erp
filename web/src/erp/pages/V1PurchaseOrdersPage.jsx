@@ -1262,6 +1262,7 @@ export default function V1PurchaseOrdersPage() {
         tasks={workflowTasks}
         selectedTasks={selectedOrderWorkflowTasks}
         selectedRecordLabel={singleSelectedOrder?.purchase_order_no || ''}
+        adminProfile={adminProfile}
         roleLabelMap={WORKFLOW_ROLE_LABELS}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined

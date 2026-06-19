@@ -1458,7 +1458,7 @@ export default function V1MasterDataPage({ type }) {
       />
 
       <BusinessFormModal
-        size="masterData"
+        size={showContactForm ? 'masterDataItems' : 'masterData'}
         title={
           editingRecord?.id
             ? `编辑${entityLabel}`

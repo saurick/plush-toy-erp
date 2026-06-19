@@ -632,6 +632,9 @@ export function OperationalFactWorkspace({
   const createModalDescription =
     createConfig?.modalDescription ||
     '页面只提交业务事实动作，库存流水、冲正和状态边界由后端 usecase 处理。'
+  const activeBoundaryText =
+    activeConfig.selectionBoundaryText ||
+    '当前操作只调用 operational_fact 后端 usecase；前端不本地写库存、出货、财务或 Workflow 事实。'
   const tableColumns = applyBusinessColumnSorters(columnsByKey[activeKey] || [])
   const canConfirmActive = hasAnyPermission(
     adminProfile,
@@ -773,7 +776,7 @@ export function OperationalFactWorkspace({
           embedded
           selectedCount={activeSelectedRow ? 1 : 0}
           selectedLabel={selectedLabel}
-          boundaryText="当前操作只调用 operational_fact 后端 usecase；前端不本地写库存、出货、财务或 Workflow 事实。"
+          boundaryText={activeBoundaryText}
         >
           <Button
             type="link"

@@ -741,14 +741,23 @@
 
 .erp-master-contact-list__items {
   display: grid;
+  width: 100%;
+  max-width: 100%;
   gap: 12px;
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  padding: 2px 2px 8px;
+  scrollbar-gutter: stable both-edges;
+  -webkit-overflow-scrolling: touch;
 }
 
 .erp-master-contact-list__row {
   display: grid;
   gap: 14px;
-  min-width: 0;
+  width: max-content;
+  min-width: 100%;
   border: 1px solid var(--erp-sales-order-lines-row-border, #dfe7e2);
   border-radius: 8px;
   background: var(--erp-business-action-modal-bg, #ffffff);
@@ -771,10 +780,9 @@
   grid-template-columns: none;
   gap: 14px 16px;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 4px;
-  scrollbar-gutter: stable;
+  overflow: visible;
+  padding-bottom: 0;
+  scrollbar-gutter: auto;
 }
 
 .erp-master-contact-list__grid .ant-form-item {

@@ -619,7 +619,7 @@ export default function V1InventoryLedgerPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedLabelFor(activeView, selectedRow)}
-          boundaryText="当前页只读；入库、出库、调整、预留和冲正继续从后端事实 usecase 进入。"
+          boundaryText="当前页只读；余额、批次和流水只用于查询 / 追溯，不提供库存写入、盘点调整、出库确认、批次状态变更或预留自动消耗。"
         >
           <Button
             type="link"
@@ -643,7 +643,7 @@ export default function V1InventoryLedgerPage() {
               icon={<LinkOutlined />}
               disabled={!selectedRow || relatedMenuItems.length === 0}
             >
-              关联 <DownOutlined />
+              查看关联 <DownOutlined />
             </Button>
           </Dropdown>
         </SelectionActionBar>

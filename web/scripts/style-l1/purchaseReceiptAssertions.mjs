@@ -276,16 +276,42 @@ export function createPurchaseReceiptAssertions(deps) {
       const itemRows = Array.from(
         node.querySelectorAll('.erp-master-contact-list__row')
       )
-      const grids = Array.from(
-        node.querySelectorAll('.erp-master-contact-list__grid')
-      ).map((grid) => {
-        const style = window.getComputedStyle(grid)
+      const itemLists = Array.from(
+        node.querySelectorAll('.erp-master-contact-list__items')
+      ).map((list) => {
+        const listStyle = window.getComputedStyle(list)
+        list.scrollLeft = list.scrollWidth - list.clientWidth
+        const rows = Array.from(
+          list.querySelectorAll('.erp-master-contact-list__row')
+        ).map((row) => {
+          const rect = row.getBoundingClientRect()
+          const rowStyle = window.getComputedStyle(row)
+          return {
+            width: rect.width,
+            minWidth: rowStyle.minWidth,
+            overflowX: rowStyle.overflowX,
+          }
+        })
+        const grids = Array.from(
+          list.querySelectorAll('.erp-master-contact-list__grid')
+        ).map((grid) => {
+          const style = window.getComputedStyle(grid)
+          return {
+            clientWidth: grid.clientWidth,
+            scrollWidth: grid.scrollWidth,
+            overflowX: style.overflowX,
+            overflowY: style.overflowY,
+            gridAutoFlow: style.gridAutoFlow,
+          }
+        })
         return {
-          clientWidth: grid.clientWidth,
-          scrollWidth: grid.scrollWidth,
-          overflowX: style.overflowX,
-          overflowY: style.overflowY,
-          gridAutoFlow: style.gridAutoFlow,
+          clientWidth: list.clientWidth,
+          scrollWidth: list.scrollWidth,
+          scrollLeft: list.scrollLeft,
+          overflowX: listStyle.overflowX,
+          overflowY: listStyle.overflowY,
+          rows,
+          grids,
         }
       })
       const fields = Array.from(
@@ -337,7 +363,7 @@ export function createPurchaseReceiptAssertions(deps) {
             }
           : null,
         itemRowCount: itemRows.length,
-        grids,
+        itemLists,
         fields,
         footerText: footer?.textContent?.replace(/\s+/g, ' ').trim() || '',
         footerButtons: Array.from(footer?.querySelectorAll('button') || []).map(
@@ -396,15 +422,32 @@ export function createPurchaseReceiptAssertions(deps) {
       `${scenarioName} 业务弹窗底部操作区缺失: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.grids.length === expectedRows &&
-        metrics.grids.every(
-          (grid) =>
-            grid.overflowX === 'auto' &&
-            grid.overflowY === 'hidden' &&
-            grid.scrollWidth > grid.clientWidth &&
-            grid.gridAutoFlow === 'column'
+      metrics.itemLists.length > 0 &&
+        metrics.itemLists.every(
+          (list) =>
+            ['auto', 'scroll'].includes(list.overflowX) &&
+            ['auto', 'visible'].includes(list.overflowY) &&
+            list.scrollWidth > list.clientWidth + 16 &&
+            list.scrollLeft > 0
         ),
-      `${scenarioName} 入库明细应在整行 grid 内横向滚动: ${JSON.stringify(metrics)}`
+      `${scenarioName} 入库明细应由外层列表整体横向滚动: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.itemLists.every(
+        (list) =>
+          list.rows.length === expectedRows &&
+          list.rows.every((row) => row.width > list.clientWidth + 16) &&
+          Math.max(...list.rows.map((row) => row.width)) -
+            Math.min(...list.rows.map((row) => row.width)) <=
+            2 &&
+          list.grids.length === expectedRows &&
+          list.grids.every(
+            (grid) =>
+              grid.gridAutoFlow === 'column' &&
+              !['auto', 'scroll'].includes(grid.overflowX)
+          )
+      ),
+      `${scenarioName} 多行入库明细应共享同一列宽和滚动面: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.fields.every(
@@ -888,14 +931,16 @@ export function createPurchaseReceiptAssertions(deps) {
       const body = node.querySelector('.ant-modal-body')
       const footer = node.querySelector('.ant-modal-footer')
       const footerButtons = Array.from(footer?.querySelectorAll('button') || [])
+      const list = node.querySelector('.erp-master-contact-list__items')
       const grid = node.querySelector('.erp-master-contact-list__grid')
-      if (grid) {
-        grid.scrollLeft = 0
+      if (list) {
+        list.scrollLeft = 0
       }
       const firstField = grid?.querySelector('.ant-form-item')
       const modalRect = node.getBoundingClientRect()
       const contentRect = content?.getBoundingClientRect()
       const footerRect = footer?.getBoundingClientRect()
+      const listRect = list?.getBoundingClientRect()
       const firstFieldRect = firstField?.getBoundingClientRect()
       const footerStyle = footer ? window.getComputedStyle(footer) : null
       return {
@@ -941,6 +986,15 @@ export function createPurchaseReceiptAssertions(deps) {
             height: rect.height,
           }
         }),
+        list: list
+          ? {
+              clientWidth: list.clientWidth,
+              scrollWidth: list.scrollWidth,
+              left: listRect?.left || 0,
+              right: listRect?.right || 0,
+              overflowX: window.getComputedStyle(list).overflowX,
+            }
+          : null,
         grid: grid
           ? {
               clientWidth: grid.clientWidth,
@@ -983,16 +1037,23 @@ export function createPurchaseReceiptAssertions(deps) {
       `${scenarioName} 移动端底部按钮尺寸异常: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.grid &&
-        metrics.grid.overflowX === 'auto' &&
-        metrics.grid.scrollWidth > metrics.grid.clientWidth,
-      `${scenarioName} 移动端明细仍应由明细 grid 承接横向滚动: ${JSON.stringify(metrics)}`
+      metrics.list &&
+        ['auto', 'scroll'].includes(metrics.list.overflowX) &&
+        metrics.list.scrollWidth > metrics.list.clientWidth,
+      `${scenarioName} 移动端明细应由外层列表承接横向滚动: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.grid && !['auto', 'scroll'].includes(metrics.grid.overflowX),
+      `${scenarioName} 移动端明细 grid 不应再各自横向滚动: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.firstField &&
-        metrics.firstField.left >= 0 &&
-        metrics.firstField.right <= metrics.viewport.width + 1,
-      `${scenarioName} 移动端首个明细字段不可被弹窗裁切: ${JSON.stringify(metrics)}`
+        metrics.list &&
+        metrics.list.left >= 0 &&
+        metrics.list.right <= metrics.viewport.width + 1 &&
+        metrics.firstField.left >= metrics.list.left - 1 &&
+        metrics.firstField.left <= metrics.list.right + 1,
+      `${scenarioName} 移动端首个明细字段应从外层滚动区内可见: ${JSON.stringify(metrics)}`
     )
 
     await modal.screenshot({

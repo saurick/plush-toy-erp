@@ -95,10 +95,10 @@ const MODULE_CREATE_LABELS = Object.freeze({
   'quality-inspections': '预览质检字段',
   inventory: '预览库存字段',
   'processing-contracts': '预览委外字段',
-  'production-scheduling': '预览排程字段',
+  'production-scheduling': '查看排程字段边界',
   'production-progress': '预览进度字段',
-  'production-exceptions': '预览异常字段',
-  'shipping-release': '预览放行字段',
+  'production-exceptions': '查看异常字段边界',
+  'shipping-release': '查看放行字段边界',
   outbound: '预览出库字段',
   reconciliation: '预览对账字段',
   payables: '预览应付字段',
@@ -265,7 +265,8 @@ function FormalShellActionForm({ moduleItem, actionModal, selectedLabel }) {
   const coreFieldLabels = getFormalShellFormFieldLabels(moduleItem.key)
   const fieldScope = (moduleItem.currentScope || []).join('；') || record?.scope
   const boundaryText = [
-    '当前页面仍是待接入预览页；真实保存必须接入领域 usecase、API 和 RBAC 后启用，不能从前端本地伪造事实。',
+    '当前页面仍是待接入预览页；不提供真实创建、保存、删除、打印、业务数据导出或领域事实写入。',
+    '真实能力必须接入领域 usecase、API、RBAC、审计和测试后启用，不能从前端本地伪造事实。',
     moduleItem.boundary ? `模块边界：${moduleItem.boundary}` : '',
     '不读取、不创建、不更新、不删除 business_records；旧表族不作为运行时真源。',
   ]
@@ -726,9 +727,9 @@ export default function FormalBusinessModulePage({ moduleKey }) {
       label: '待接入状态动作',
       type: 'group',
       children: [
-        { key: 'submit', label: '提交边界' },
-        { key: 'approve', label: '确认边界' },
-        { key: 'return', label: '退回边界' },
+        { key: 'submit', label: '提交动作未接入' },
+        { key: 'approve', label: '确认动作未接入' },
+        { key: 'return', label: '退回动作未接入' },
       ],
     },
   ]
@@ -773,7 +774,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
             <Tooltip title="当前待接入预览页不导出业务数据；字段清单应以产品台账和领域 API 接入评审为准。">
               <span>
                 <ToolbarButton icon={<DownloadOutlined />} disabled>
-                  预览导出待接入
+                  不导出业务数据
                 </ToolbarButton>
               </span>
             </Tooltip>
@@ -816,7 +817,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
             disabled={!singleSelectedRecord}
             onClick={() => openEditActionHint(singleSelectedRecord)}
           >
-            预览选中字段
+            查看字段边界
           </Button>
           <Dropdown
             menu={{
@@ -832,7 +833,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               icon={<LinkOutlined />}
               disabled={!singleSelectedRecord}
             >
-              接入边界 <DownOutlined />
+              查看边界 <DownOutlined />
             </Button>
           </Dropdown>
           <Dropdown
@@ -842,7 +843,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
                 const label =
                   transitionMenuItems
                     .flatMap((item) => item.children || item)
-                    .find((item) => item.key === key)?.label || '状态边界'
+                    .find((item) => item.key === key)?.label || '动作边界'
                 openActionHint(label)
               },
             }}
@@ -854,7 +855,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
               icon={<SwapOutlined />}
               disabled={!singleSelectedRecord}
             >
-              状态边界 <DownOutlined />
+              动作边界 <DownOutlined />
             </Button>
           </Dropdown>
           <Button
@@ -896,6 +897,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         tasks={isShippingReleaseWorkflowPage ? workflowTasks : []}
         selectedTasks={[]}
         selectedRecordLabel={selectedRows[0]?.title || selectedLabel}
+        adminProfile={adminProfile}
         roleLabelMap={WORKFLOW_ROLE_LABELS}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined

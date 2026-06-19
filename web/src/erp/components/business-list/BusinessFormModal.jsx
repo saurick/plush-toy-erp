@@ -8,9 +8,9 @@ function joinClassNames(...parts) {
 
 function resolveWidth(size, width) {
   if (width) return width
-  return size === 'masterData'
-    ? ERP_MODAL_WIDTHS.masterDataForm
-    : ERP_MODAL_WIDTHS.businessForm
+  if (size === 'masterData') return ERP_MODAL_WIDTHS.masterDataForm
+  if (size === 'masterDataItems') return ERP_MODAL_WIDTHS.masterDataItemsForm
+  return ERP_MODAL_WIDTHS.businessForm
 }
 
 function findLatestVisibleBusinessFormModal() {

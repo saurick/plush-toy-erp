@@ -9,6 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { chromium } from 'playwright'
 import {
   createMockAdminToken,
+  installAdminDisabledRpcMocks,
   installAdminAuthExpiredRpcMocks,
   installAdminRpcMocks,
 } from './style-l1/adminRpcMocks.mjs'
@@ -469,10 +470,20 @@ async function runScenarioOnce(browser, scenario) {
     })
   }
 
-  if (scenario.auth === 'admin' || scenario.auth === 'admin-expired') {
+  if (
+    scenario.auth === 'admin' ||
+    scenario.auth === 'admin-expired' ||
+    scenario.auth === 'admin-disabled'
+  ) {
     const token = createMockAdminToken()
     if (scenario.auth === 'admin-expired') {
       await installAdminAuthExpiredRpcMocks(page)
+    } else if (scenario.auth === 'admin-disabled') {
+      await installAdminRpcMocks(page, {
+        baseURL,
+        adminProfileOverride: scenario.adminProfile,
+      })
+      await installAdminDisabledRpcMocks(page)
     } else {
       await installAdminRpcMocks(page, {
         baseURL,
@@ -564,6 +575,10 @@ async function runScenarioOnce(browser, scenario) {
   })
 
   try {
+    if (typeof scenario.beforeNavigate === 'function') {
+      await scenario.beforeNavigate(page)
+    }
+
     await gotoScenarioPath(page, scenario.path, {
       waitUntil: 'domcontentloaded',
     })
@@ -1781,6 +1796,7 @@ async function verifyBusinessActionFormModal(
     expectedTexts = [],
     absentTexts = [],
     requireMultiColumn = true,
+    expectContactItemsLayout = false,
     afterOpen,
   }
 ) {
@@ -1797,6 +1813,56 @@ async function verifyBusinessActionFormModal(
     const form = node.querySelector('.erp-business-action-form')
     const formStyle = form ? window.getComputedStyle(form) : null
     const title = node.querySelector('.erp-business-action-modal__title')
+    const modalRect = node.getBoundingClientRect()
+    const contactItemLists = Array.from(
+      node.querySelectorAll('.erp-master-contact-list__items')
+    ).map((list) => {
+      const style = window.getComputedStyle(list)
+      list.scrollLeft = list.scrollWidth - list.clientWidth
+      const rows = Array.from(
+        list.querySelectorAll('.erp-master-contact-list__row')
+      ).map((row) => {
+        const rect = row.getBoundingClientRect()
+        const rowStyle = window.getComputedStyle(row)
+        return {
+          width: rect.width,
+          minWidth: rowStyle.minWidth,
+          overflowX: rowStyle.overflowX,
+        }
+      })
+      const grids = Array.from(
+        list.querySelectorAll('.erp-master-contact-list__grid')
+      ).map((grid) => {
+        const gridStyle = window.getComputedStyle(grid)
+        const fields = Array.from(grid.querySelectorAll('.ant-form-item')).map(
+          (field) => {
+            const rect = field.getBoundingClientRect()
+            return {
+              text: field.textContent?.replace(/\s+/g, ' ').trim() || '',
+              width: rect.width,
+              scrollWidth: field.scrollWidth,
+            }
+          }
+        )
+        return {
+          clientWidth: grid.clientWidth,
+          scrollWidth: grid.scrollWidth,
+          overflowX: gridStyle.overflowX,
+          overflowY: gridStyle.overflowY,
+          gridAutoFlow: gridStyle.gridAutoFlow,
+          fields,
+        }
+      })
+      return {
+        clientWidth: list.clientWidth,
+        scrollWidth: list.scrollWidth,
+        scrollLeft: list.scrollLeft,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+        rows,
+        grids,
+      }
+    })
     const fieldItems = Array.from(
       node.querySelectorAll('.erp-business-action-form__field')
     )
@@ -1960,6 +2026,12 @@ async function verifyBusinessActionFormModal(
         .trim(),
       titleText: title?.textContent?.replace(/\s+/g, ' ').trim() || '',
       hasSubtitle: Boolean(title?.querySelector('small')),
+      viewportWidth: window.innerWidth,
+      modal: {
+        width: modalRect.width,
+        left: modalRect.left,
+        right: modalRect.right,
+      },
       body: body
         ? {
             clientWidth: body.clientWidth,
@@ -1975,6 +2047,7 @@ async function verifyBusinessActionFormModal(
       controlHeight,
       singleLineControls,
       textareaCountLayouts,
+      contactItemLists,
     }
   })
 
@@ -2013,6 +2086,50 @@ async function verifyBusinessActionFormModal(
     assert(
       metrics.gridTemplateColumns.split(' ').length >= 2,
       `${screenshotName} 桌面表单未使用多列表格化布局: ${JSON.stringify(metrics)}`
+    )
+  }
+  if (expectContactItemsLayout) {
+    const expectedWidth = Math.min(1180, metrics.viewportWidth - 48)
+    assert(
+      metrics.modal.width >= expectedWidth - 2,
+      `${screenshotName} 联系人聚合表单未使用明细型主数据宽弹窗: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.contactItemLists.length > 0 &&
+        metrics.contactItemLists.every(
+          (list) =>
+            ['auto', 'scroll'].includes(list.overflowX) &&
+            ['auto', 'visible'].includes(list.overflowY) &&
+            list.scrollWidth > list.clientWidth &&
+            list.scrollLeft > 0 &&
+            list.clientWidth >= Math.min(1000, metrics.modal.width - 110)
+        ),
+      `${screenshotName} 联系人区未由同一个外层列表稳定横向滚动: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.contactItemLists.every(
+        (list) =>
+          list.rows.length > 0 &&
+          list.rows.every((row) => row.width > list.clientWidth + 16) &&
+          Math.max(...list.rows.map((row) => row.width)) -
+            Math.min(...list.rows.map((row) => row.width)) <=
+            2
+      ),
+      `${screenshotName} 多个联系人条目未共享同一列宽和滚动面: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.contactItemLists.every((list) =>
+        list.grids.every(
+          (grid) =>
+            grid.gridAutoFlow === 'column' &&
+            !['auto', 'scroll'].includes(grid.overflowX) &&
+            grid.fields.every(
+              (field) =>
+                field.width >= 220 && field.scrollWidth <= field.width + 2
+            )
+        )
+      ),
+      `${screenshotName} 联系人字段宽度或文本溢出异常: ${JSON.stringify(metrics)}`
     )
   }
   assert(
@@ -2880,7 +2997,10 @@ async function assertAdminLoginLayout(page, { minCardWidth }) {
   )
 }
 
-async function assertAppAlertDialogLayout(page, { scenarioName }) {
+async function assertAppAlertDialogLayout(
+  page,
+  { scenarioName, expectedMessage = '未登录' }
+) {
   await page
     .locator('.app-alert-dialog')
     .waitFor({ state: 'visible', timeout: 10_000 })
@@ -2994,7 +3114,7 @@ async function assertAppAlertDialogLayout(page, { scenarioName }) {
     `${scenarioName} 通用提示弹窗内部元素缺失: ${JSON.stringify(metrics)}`
   )
   assert.equal(metrics.title.text, '登录状态已失效')
-  assert.equal(metrics.message.text, '未登录')
+  assert.equal(metrics.message.text, expectedMessage)
   assert.equal(metrics.confirm.text, '重新登录')
   assert.equal(
     metrics.overlay.position,

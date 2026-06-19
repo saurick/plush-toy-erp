@@ -235,6 +235,47 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'auth-disabled-alert-desktop',
+      path: '/erp/dashboard',
+      auth: 'admin-disabled',
+      viewport: { width: 1280, height: 800 },
+      verify: async (page) => {
+        await expectText(page, '登录状态已失效')
+        await expectText(page, '管理员已禁用')
+        await expectButton(page, /重新登录/)
+        await assertAppAlertDialogLayout(page, {
+          scenarioName: 'auth-disabled-alert-desktop',
+          expectedMessage: '管理员已禁用',
+        })
+        await assertTextAbsent(page, '今日焦点')
+        await assertTextAbsent(page, '待我处理')
+        await page.getByRole('button', { name: '重新登录' }).click()
+        await waitForPath(page, '/admin-login')
+        await expectText(page, '毛绒 ERP 管理后台')
+      },
+    },
+    {
+      name: 'auth-disabled-alert-mobile-dark',
+      path: '/erp/dashboard',
+      auth: 'admin-disabled',
+      themeMode: 'dark',
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectText(page, '登录状态已失效')
+        await expectText(page, '管理员已禁用')
+        await expectButton(page, /重新登录/)
+        await assertAppAlertDialogLayout(page, {
+          scenarioName: 'auth-disabled-alert-mobile-dark',
+          expectedMessage: '管理员已禁用',
+        })
+        await assertTextAbsent(page, '今日焦点')
+        await assertTextAbsent(page, '待我处理')
+        await page.getByRole('button', { name: '重新登录' }).click()
+        await waitForPath(page, '/admin-login')
+        await expectText(page, '毛绒 ERP 管理后台')
+      },
+    },
+    {
       name: 'erp-dashboard-redirect',
       path: '/erp/dashboard',
       viewport: { width: 1280, height: 800 },
@@ -3542,6 +3583,7 @@ export function createStyleL1Scenarios(deps) {
           minFieldCount: 5,
           screenshotName: 'textarea-show-count-supplier-form-modal',
           expectedTexts: ['备注', '联系人', '添加条目'],
+          expectContactItemsLayout: true,
         })
         await assertNoHorizontalOverflow(page, 'textarea-show-count-layout')
       },
