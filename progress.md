@@ -90,6 +90,13 @@
 - 下一步：无提交前阻塞；后续若继续推进，需要按单页或单能力继续补 disabled 管理员、非管理员、事实 usecase 和更大范围浏览器回归。
 - 阻塞/风险：本轮未跑全量 `go test ./...`、全量 `pnpm --dir web test` 或全量 `style:l1`；全局 Codex skill 文件位于 `/Users/simon/.codex/skills`，当前不是 git 仓库，无法随本项目提交推送。
 
+## 2026-06-19 推送后 L1 工序下拉等待稳定化
+
+- 完成：`git push` 的 pre-push 全量 QA 通过后，钩子留下 `styleL1.mjs` 中委外工序下拉断言的稳定化改动；现在等待行业默认工序候选全部出现后再断言，避免 AntD 下拉内容异步填充时被误判缺项。
+- 验证：`node --check web/scripts/styleL1.mjs` 通过；`pnpm --dir web exec eslint --ext .mjs scripts/styleL1.mjs` 通过；`git diff --check` 通过。
+- 下一步：无。
+- 阻塞/风险：该补丁只影响 L1 断言等待逻辑，不改变运行时页面、后端 usecase、schema、migration、RBAC、菜单或客户配置。
+
 ## 2026-06-19 目录 README 薄入口收口
 
 - 完成：按 `plush-docs-governance` 和 `plush-page-design-governance` 新增 `web/scripts/README.md`，把前端本地服务、`style:l1`、真实登录 smoke、采购入库真实写入 e2e、字段联动报告和输出 / 写入边界收口到脚本目录入口；避免继续把 `web/scripts` 误写成单一“样式回归脚本”。

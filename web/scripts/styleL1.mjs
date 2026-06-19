@@ -2110,12 +2110,29 @@ async function assertOutsourcingProcessSelectOptions(
   await processField.locator('.ant-select-selector').click()
   const dropdown = page.locator('.ant-select-dropdown:visible').last()
   await dropdown.waitFor({ state: 'visible', timeout: 10_000 })
-  const optionTexts = (
-    await dropdown.locator('.ant-select-item-option-content').allTextContents()
-  )
-    .map((text) => text.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-  for (const expected of ['查货', '手工', '车缝', '包装']) {
+  const expectedOptions = ['查货', '手工', '车缝', '包装']
+  let optionTexts = []
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    optionTexts = (
+      await dropdown
+        .locator('.ant-select-item-option-content')
+        .allTextContents()
+    )
+      .map((text) => text.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+    let hasAllExpectedOptions = true
+    for (const expected of expectedOptions) {
+      if (!optionTexts.some((text) => text.includes(expected))) {
+        hasAllExpectedOptions = false
+        break
+      }
+    }
+    if (hasAllExpectedOptions) {
+      break
+    }
+    await page.waitForTimeout(250)
+  }
+  for (const expected of expectedOptions) {
     assert(
       optionTexts.some((text) => text.includes(expected)),
       `${scenarioName} 加工合同工序下拉缺少行业默认候选 ${expected}: ${JSON.stringify(optionTexts)}`
