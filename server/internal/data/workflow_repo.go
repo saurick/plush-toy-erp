@@ -46,6 +46,9 @@ func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.Workflo
 	if filter.TaskStatusKey != "" {
 		query = query.Where(workflowtask.TaskStatusKey(filter.TaskStatusKey))
 	}
+	if filter.TaskGroup != "" {
+		query = query.Where(workflowtask.TaskGroup(filter.TaskGroup))
+	}
 	if filter.SourceType != "" {
 		query = query.Where(workflowtask.SourceType(filter.SourceType))
 	}

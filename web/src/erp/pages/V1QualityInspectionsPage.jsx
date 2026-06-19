@@ -1200,7 +1200,6 @@ export default function V1QualityInspectionsPage() {
         onChange={(nextOrder) =>
           persistColumnOrder(nextOrder, sortableDataColumns)
         }
-        onReset={() => persistColumnOrder([], sortableDataColumns)}
         onClose={() => setColumnOrderOpen(false)}
       />
 

@@ -917,6 +917,26 @@ export function CollaborationTaskPanel({
     setActionDrawerMode('')
     setActionDrawerReason('')
   }, [])
+  React.useEffect(() => {
+    if (!actionDrawerTask) return
+
+    const drawerTaskID = String(actionDrawerTask.id || '').trim()
+    if (!drawerTaskID) {
+      closeActionDrawer()
+      return
+    }
+
+    const visibleTasks = [
+      ...(Array.isArray(tasks) ? tasks : []),
+      ...(Array.isArray(selectedTasks) ? selectedTasks : []),
+    ]
+    const taskStillVisible = visibleTasks.some(
+      (task) => String(task?.id || '').trim() === drawerTaskID
+    )
+    if (!taskStillVisible) {
+      closeActionDrawer()
+    }
+  }, [actionDrawerTask, closeActionDrawer, selectedTasks, tasks])
   const submitActionDrawer = React.useCallback(async () => {
     if (!actionDrawerTask || !actionDrawerMode) return
     const actionMeta = TASK_ACTION_META[actionDrawerMode]

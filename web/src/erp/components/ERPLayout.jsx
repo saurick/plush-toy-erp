@@ -145,6 +145,7 @@ export default function ERPLayout() {
   const [adminProfile, setAdminProfile] = useState(() =>
     getStoredAdminProfile()
   )
+  const [profileSyncCompleted, setProfileSyncCompleted] = useState(false)
   const adminProfileRef = useRef(adminProfile)
   const profileSyncErrorNotifiedRef = useRef(false)
   const profileSessionUnavailableHandledRef = useRef(false)
@@ -181,6 +182,7 @@ export default function ERPLayout() {
   )
 
   const loadProfile = useCallback(async () => {
+    setProfileSyncCompleted(false)
     setProfileLoading(true)
     try {
       const result = await adminRpc.call('me', {})
@@ -239,6 +241,7 @@ export default function ERPLayout() {
       }
     } finally {
       setProfileLoading(false)
+      setProfileSyncCompleted(true)
     }
   }, [adminRpc])
 
@@ -372,8 +375,18 @@ export default function ERPLayout() {
   }, [])
 
   const outletContext = useMemo(
-    () => ({ adminProfile, registerPageRefresh, updateAdminERPPreferences }),
-    [adminProfile, registerPageRefresh, updateAdminERPPreferences]
+    () => ({
+      adminProfile,
+      profileSyncCompleted,
+      registerPageRefresh,
+      updateAdminERPPreferences,
+    }),
+    [
+      adminProfile,
+      profileSyncCompleted,
+      registerPageRefresh,
+      updateAdminERPPreferences,
+    ]
   )
 
   const handleNavigate = (nextPath) => {

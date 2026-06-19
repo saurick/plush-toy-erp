@@ -113,6 +113,59 @@ func TestWorkflowRepo_GetWorkflowTaskByID(t *testing.T) {
 	}
 }
 
+func TestWorkflowRepo_ListWorkflowTasksFiltersByTaskGroup(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_list_task_group?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewWorkflowRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+
+	for _, task := range []biz.WorkflowTaskCreate{
+		{
+			TaskCode:      "TASK-SHIPMENT-RELEASE",
+			TaskGroup:     "shipment_release",
+			TaskName:      "出货放行",
+			SourceType:    "shipping-release",
+			SourceID:      1001,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.WarehouseRoleKey,
+			Payload:       map[string]any{},
+		},
+		{
+			TaskCode:      "TASK-SAME-SOURCE-OTHER",
+			TaskGroup:     "customer_followup",
+			TaskName:      "同来源客户跟进",
+			SourceType:    "shipping-release",
+			SourceID:      1002,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.SalesRoleKey,
+			Payload:       map[string]any{},
+		},
+	} {
+		if _, err := repo.CreateWorkflowTask(ctx, &task, 7); err != nil {
+			t.Fatalf("create task %s failed: %v", task.TaskCode, err)
+		}
+	}
+
+	tasks, total, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{
+		Limit:      50,
+		SourceType: "shipping-release",
+		TaskGroup:  "shipment_release",
+	})
+	if err != nil {
+		t.Fatalf("list tasks failed: %v", err)
+	}
+	if total != 1 || len(tasks) != 1 {
+		t.Fatalf("expected one shipment_release task, total=%d len=%d", total, len(tasks))
+	}
+	if tasks[0].TaskGroup != "shipment_release" || tasks[0].SourceType != "shipping-release" {
+		t.Fatalf("unexpected task %#v", tasks[0])
+	}
+}
+
 func TestWorkflowRepo_UpdateTaskStatusSideEffectsAreTransactionalAndIdempotent(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_side_effects?mode=memory&cache=shared&_fk=1")

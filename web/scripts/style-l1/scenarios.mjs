@@ -288,7 +288,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, 'style-l1-admin')
         await expectText(page, '看板中心')
         await expectHeading(page, '任务看板')
-        await expectText(page, '待我处理')
+        await expectText(page, '可推进任务')
         await expectText(page, '阻塞交接')
         await expectText(page, '逾期任务')
         await assertNoDuplicatedAdminPageTitle(page, {
@@ -358,6 +358,13 @@ export function createStyleL1Scenarios(deps) {
           '任务看板角色筛选应写入 URL'
         )
         await expectText(page, '看板跳转测试任务')
+        await expectText(page, '从下方任务卡选择一条任务')
+        await page
+          .locator('.erp-task-board-card')
+          .filter({ hasText: '看板跳转测试任务' })
+          .locator('.erp-task-board-card-meta')
+          .first()
+          .click()
         const navigationCurrentTask = page
           .locator('.erp-task-center-current')
           .filter({ hasText: '看板跳转测试任务' })
@@ -617,8 +624,9 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '超级管理员')
         await expectText(page, '毛绒 ERP 管理后台')
         await expectText(page, '任务看板')
-        await expectText(page, '待我处理')
+        await expectText(page, '可推进任务')
         await expectText(page, '逾期任务')
+        await expectText(page, '从下方任务卡选择一条任务')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-task-board-mobile',
         })
@@ -677,7 +685,7 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectText(page, '毛绒 ERP 管理后台')
         await expectText(page, '任务看板')
-        await expectText(page, '待我处理')
+        await expectText(page, '可推进任务')
         await page.evaluate(async () => {
           const response = await fetch('/rpc/workflow', {
             method: 'POST',
@@ -735,6 +743,13 @@ export function createStyleL1Scenarios(deps) {
           .getByPlaceholder('搜索任务、单号、来源、阻塞原因')
           .fill('OUT-DASH-WIDE-LAYOUT')
         await expectText(page, '宽屏重叠回归任务')
+        await expectText(page, '从下方任务卡选择一条任务')
+        await page
+          .locator('.erp-task-board-card')
+          .filter({ hasText: '宽屏重叠回归任务' })
+          .locator('.erp-task-board-card-meta')
+          .first()
+          .click()
         const wideCurrentTask = page
           .locator('.erp-task-center-current')
           .filter({ hasText: '宽屏重叠回归任务' })
@@ -3536,6 +3551,7 @@ export function createStyleL1Scenarios(deps) {
       assertBusinessFormModalKeyboardRecovery,
       assertBusinessHeaderHasNoSectionTitle,
       assertBusinessHeaderStatsSingleLine,
+      assertBusinessListEmptySearchState,
       assertBusinessMainTableHasNoOperationColumn,
       assertBusinessMainTableInitialSelectionEmpty,
       assertBusinessMainTableSortableColumns,

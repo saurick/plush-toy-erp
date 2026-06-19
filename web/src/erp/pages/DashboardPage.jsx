@@ -114,9 +114,15 @@ function buildSourceOptions(tasks = []) {
   ]
 }
 
+function getWorkflowTaskStableKey(task) {
+  return String(task?.id || task?.task_code || '')
+}
+
 function TaskLane({
   lane,
   getAllowedActionModes,
+  selectedTaskId,
+  onSelectTask,
   onOpenTask,
   onOpenAction,
   onOpenEntry,
@@ -144,10 +150,16 @@ function TaskLane({
             const statusMeta = getWorkflowTaskStatusMeta(task)
             const allowedActionModes = getAllowedActionModes(task)
             const entryPath = resolveWorkflowTaskEntryPath(task)
+            const taskId = getWorkflowTaskStableKey(task)
+            const isSelected = taskId && taskId === selectedTaskId
             return (
               <div
-                className="erp-task-board-card"
-                key={`${lane.key}-${task.id}`}
+                className={`erp-task-board-card${
+                  isSelected ? ' erp-task-board-card--selected' : ''
+                }`}
+                key={`${lane.key}-${taskId || task.id}`}
+                onClick={() => onSelectTask(task)}
+                onFocusCapture={() => onSelectTask(task)}
               >
                 <Space
                   className="erp-task-board-card-head"
@@ -269,6 +281,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [loading, setLoading] = useState(false)
   const [workflowTasks, setWorkflowTasks] = useState([])
   const [selectedTask, setSelectedTask] = useState(null)
+  const [selectedTaskBoardTaskId, setSelectedTaskBoardTaskId] = useState('')
   const [actionMode, setActionMode] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [actionSaving, setActionSaving] = useState(false)
@@ -396,10 +409,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   )
   const taskCenterCurrentTask = useMemo(
     () =>
-      filteredTasks.find((task) => !isTerminalWorkflowTask(task)) ||
-      filteredTasks[0] ||
-      null,
-    [filteredTasks]
+      filteredTasks.find(
+        (task) => getWorkflowTaskStableKey(task) === selectedTaskBoardTaskId
+      ) || null,
+    [filteredTasks, selectedTaskBoardTaskId]
   )
   const taskCenterCurrentStatusMeta = taskCenterCurrentTask
     ? getWorkflowTaskStatusMeta(taskCenterCurrentTask)
@@ -407,6 +420,17 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const taskCenterCurrentEntryPath = taskCenterCurrentTask
     ? resolveWorkflowTaskEntryPath(taskCenterCurrentTask)
     : ''
+
+  useEffect(() => {
+    if (!selectedTaskBoardTaskId) return
+    const stillVisible = filteredTasks.some(
+      (task) => getWorkflowTaskStableKey(task) === selectedTaskBoardTaskId
+    )
+    if (!stillVisible) {
+      setSelectedTaskBoardTaskId('')
+    }
+  }, [filteredTasks, selectedTaskBoardTaskId])
+
   const workbenchQueueGroups = useMemo(() => {
     const groups = {
       actionable: [],
@@ -510,6 +534,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     (task) => getWorkflowTaskReadonlyReason(adminProfile, task),
     [adminProfile]
   )
+
+  const selectTaskBoardTask = useCallback((task) => {
+    const taskId = getWorkflowTaskStableKey(task)
+    if (taskId) {
+      setSelectedTaskBoardTaskId(taskId)
+    }
+  }, [])
 
   const openTaskDrawer = (task, mode = '') => {
     const allowedActionModes = getWorkflowTaskAllowedActionModes(
@@ -917,9 +948,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   aria-label="任务看板关键筛选"
                 >
                   <TaskMetricAction
-                    label="待我处理"
+                    label="可推进任务"
                     value={taskCenterAssignedCount}
-                    actionLabel="查看可推进任务"
+                    actionLabel="筛选可推进任务"
                     active={filters.status === 'pending'}
                     onClick={() => updateFilter('status', 'pending')}
                   />
@@ -945,10 +976,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
               <section
                 className="erp-task-center-current"
-                aria-label="当前任务"
+                aria-label="当前选中任务"
               >
                 <div className="erp-task-center-current-head">
-                  <Text type="secondary">当前任务</Text>
+                  <Text type="secondary">当前选中任务</Text>
                   {taskCenterCurrentStatusMeta ? (
                     <Tag color={taskCenterCurrentStatusMeta.color}>
                       {taskCenterCurrentStatusMeta.label}
@@ -1026,7 +1057,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 ) : (
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="暂无任务"
+                    description="从下方任务卡选择一条任务"
                   />
                 )}
               </section>
@@ -1071,9 +1102,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   key={lane.key}
                   lane={lane}
                   getAllowedActionModes={getAllowedTaskActionModes}
-                  onOpenTask={openTaskDrawer}
-                  onOpenAction={openTaskDrawer}
-                  onOpenEntry={openTaskEntry}
+                  selectedTaskId={selectedTaskBoardTaskId}
+                  onSelectTask={selectTaskBoardTask}
+                  onOpenTask={(task) => {
+                    selectTaskBoardTask(task)
+                    openTaskDrawer(task)
+                  }}
+                  onOpenAction={(task, mode) => {
+                    selectTaskBoardTask(task)
+                    openTaskDrawer(task, mode)
+                  }}
+                  onOpenEntry={(task) => {
+                    selectTaskBoardTask(task)
+                    openTaskEntry(task)
+                  }}
                 />
               ))}
             </div>

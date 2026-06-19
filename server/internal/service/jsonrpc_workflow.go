@@ -64,6 +64,7 @@ func (d *jsonrpcDispatcher) handleWorkflow(
 			Offset:        offset,
 			OwnerRoleKey:  getString(pm, "owner_role_key"),
 			TaskStatusKey: getString(pm, "task_status_key"),
+			TaskGroup:     getString(pm, "task_group"),
 			SourceType:    getString(pm, "source_type"),
 			SourceID:      getInt(pm, "source_id", 0),
 		})

@@ -23,6 +23,7 @@ type stubWorkflowJSONRPCRepo struct {
 	urgeActorID      int
 	urgeActorRoleKey string
 	currentTask      *biz.WorkflowTask
+	listTaskFilter   biz.WorkflowTaskFilter
 }
 
 func workflowJSONRPCAdmin(roleKeys []string, permissionKeys ...string) *biz.AdminUser {
@@ -61,7 +62,8 @@ func (s *stubWorkflowJSONRPCRepo) GetWorkflowTask(_ context.Context, id int) (*b
 	}, nil
 }
 
-func (s *stubWorkflowJSONRPCRepo) ListWorkflowTasks(context.Context, biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
+func (s *stubWorkflowJSONRPCRepo) ListWorkflowTasks(_ context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
+	s.listTaskFilter = filter
 	return nil, 0, nil
 }
 
@@ -150,6 +152,40 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRecordsEventIntent(t *testing.T) {
 	resultTask, ok := data["task"].(map[string]any)
 	if !ok || resultTask["task_status_key"] != "ready" {
 		t.Fatalf("expected returned ready task, got %#v", data["task"])
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowListTasksPassesTaskGroupFilter(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{}
+	j := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionWorkflowTaskRead)},
+		workflowUC:  biz.NewWorkflowUsecase(repo),
+	}
+	params, err := structpb.NewStruct(map[string]any{
+		"source_type": "shipping-release",
+		"task_group":  "shipment_release",
+		"limit":       float64(25),
+	})
+	if err != nil {
+		t.Fatalf("build params failed: %v", err)
+	}
+
+	_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "list_tasks", "1", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected OK response, got %#v", res)
+	}
+	if repo.listTaskFilter.SourceType != "shipping-release" {
+		t.Fatalf("expected source_type filter, got %q", repo.listTaskFilter.SourceType)
+	}
+	if repo.listTaskFilter.TaskGroup != "shipment_release" {
+		t.Fatalf("expected task_group filter, got %q", repo.listTaskFilter.TaskGroup)
+	}
+	if repo.listTaskFilter.Limit != 25 {
+		t.Fatalf("expected limit 25, got %d", repo.listTaskFilter.Limit)
 	}
 }
 

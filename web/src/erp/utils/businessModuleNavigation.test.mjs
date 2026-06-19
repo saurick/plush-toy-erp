@@ -150,7 +150,13 @@ test('formal business shell: 预览页文案不冒充真实业务写入', () => 
     'updateWorkflowTaskStatus',
     'urgeWorkflowTask',
     'SHIPPING_RELEASE_MODULE_KEY',
+    'SHIPMENT_RELEASE_TASK_GROUP',
     'source_type: SHIPPING_RELEASE_MODULE_KEY',
+    'task_group: SHIPMENT_RELEASE_TASK_GROUP',
+    'isShipmentReleaseWorkflowTask',
+    '没有出货放行协同任务读取权限',
+    'const refreshed = await loadShippingReleaseWorkflowTasks()',
+    'if (refreshed)',
     '出货放行协同任务已刷新',
     'shipment_release_page_scope',
   ]) {

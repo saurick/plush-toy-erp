@@ -1502,7 +1502,6 @@ export default function V1MasterDataPage({ type }) {
           order={preferredRecordColumnOrder}
           saving={columnOrderSaving}
           onChange={(nextOrder) => persistColumnOrder(nextOrder, recordColumns)}
-          onReset={() => persistColumnOrder([], recordColumns)}
           onClose={() => setColumnOrderOpen(false)}
         />
       )}

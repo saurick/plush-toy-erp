@@ -28,7 +28,10 @@ function resolveDelayFromReferer(request, paramName) {
   }
 }
 
-export async function installAdminRpcMocks(page, { baseURL = '' } = {}) {
+export async function installAdminRpcMocks(
+  page,
+  { baseURL = '', adminProfileOverride = null } = {}
+) {
   const nowUnix = () => Math.floor(Date.now() / 1000)
   const mockMenus = getNavigationSections()
     .flatMap((section) => section.items || [])
@@ -126,7 +129,7 @@ export async function installAdminRpcMocks(page, { baseURL = '' } = {}) {
     sort_order: 80,
     permissions: allPermissionKeys.filter((key) => key.startsWith('system.')),
   }
-  const adminProfile = {
+  const defaultAdminProfile = {
     id: 1,
     username: 'style-l1-admin',
     phone: '13800138000',
@@ -147,6 +150,28 @@ export async function installAdminRpcMocks(page, { baseURL = '' } = {}) {
     erp_preferences: {
       column_orders: {},
     },
+  }
+  const profileOverride =
+    adminProfileOverride && typeof adminProfileOverride === 'object'
+      ? adminProfileOverride
+      : {}
+  const hasProfileOverride = (key) =>
+    Object.prototype.hasOwnProperty.call(profileOverride, key)
+  const adminProfile = {
+    ...defaultAdminProfile,
+    ...profileOverride,
+    roles: hasProfileOverride('roles')
+      ? profileOverride.roles
+      : defaultAdminProfile.roles,
+    permissions: hasProfileOverride('permissions')
+      ? profileOverride.permissions
+      : defaultAdminProfile.permissions,
+    menus: hasProfileOverride('menus')
+      ? profileOverride.menus
+      : defaultAdminProfile.menus,
+    erp_preferences: hasProfileOverride('erp_preferences')
+      ? profileOverride.erp_preferences
+      : defaultAdminProfile.erp_preferences,
   }
   const mockContext = {
     adminProfile,

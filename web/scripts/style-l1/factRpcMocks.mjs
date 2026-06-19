@@ -173,7 +173,16 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       case 'list_shipments':
-        data = { shipments: [shipment], total: 1, limit: 100, offset: 0 }
+        {
+          const shipments =
+            params.status && params.status !== shipment.status ? [] : [shipment]
+          data = {
+            shipments,
+            total: shipments.length,
+            limit: 100,
+            offset: 0,
+          }
+        }
         break
       case 'create_shipment':
         data = { shipment: { ...shipment, id: 2, ...params, items: [] } }
@@ -486,11 +495,25 @@ export async function installFactRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'list_quality_inspections':
-        data = {
-          quality_inspections: [qualityInspection],
-          total: 1,
-          limit: 100,
-          offset: 0,
+        {
+          const keyword = String(params.keyword || '')
+            .trim()
+            .toLowerCase()
+          const haystack = [
+            qualityInspection.inspection_no,
+            'PR-STYLE-L1',
+            'INV-LOT-001',
+          ]
+            .join(' ')
+            .toLowerCase()
+          const qualityInspections =
+            keyword && !haystack.includes(keyword) ? [] : [qualityInspection]
+          data = {
+            quality_inspections: qualityInspections,
+            total: qualityInspections.length,
+            limit: 100,
+            offset: 0,
+          }
         }
         break
       case 'create_quality_inspection_draft':
@@ -533,7 +556,7 @@ export async function installFactRpcMocks(page, context) {
 
   await page.route('**/rpc/inventory', async (route) => {
     const body = route.request().postDataJSON() || {}
-    const { id = 'mock-id', method } = body
+    const { id = 'mock-id', method, params = {} } = body
     const inventoryBalance = {
       id: 301,
       subject_type: 'PRODUCT',
@@ -580,32 +603,77 @@ export async function installFactRpcMocks(page, context) {
     }
 
     let data = {}
+    const keyword = String(params.keyword || '')
+      .trim()
+      .toLowerCase()
+    const matchesKeyword = (...values) => {
+      if (!keyword) return true
+      return values
+        .map((value) => String(value || '').toLowerCase())
+        .some((value) => value.includes(keyword))
+    }
     switch (method) {
       case 'list_inventory_balances':
       case 'listInventoryBalances':
-        data = {
-          inventory_balances: [inventoryBalance],
-          total: 1,
-          limit: 100,
-          offset: 0,
+        {
+          const inventoryBalances = matchesKeyword(
+            inventoryBalance.id,
+            inventoryBalance.subject_type,
+            inventoryBalance.subject_id,
+            inventoryBalance.warehouse_id,
+            inventoryBalance.lot_id,
+            inventoryBalance.quantity,
+            inventoryBalance.available_quantity
+          )
+            ? [inventoryBalance]
+            : []
+          data = {
+            inventory_balances: inventoryBalances,
+            total: inventoryBalances.length,
+            limit: 100,
+            offset: 0,
+          }
         }
         break
       case 'list_inventory_lots':
       case 'listInventoryLots':
-        data = {
-          inventory_lots: [inventoryLot],
-          total: 1,
-          limit: 100,
-          offset: 0,
+        {
+          const inventoryLots = matchesKeyword(
+            inventoryLot.id,
+            inventoryLot.lot_no,
+            inventoryLot.supplier_lot_no,
+            inventoryLot.color_no,
+            inventoryLot.dye_lot_no,
+            inventoryLot.status
+          )
+            ? [inventoryLot]
+            : []
+          data = {
+            inventory_lots: inventoryLots,
+            total: inventoryLots.length,
+            limit: 100,
+            offset: 0,
+          }
         }
         break
       case 'list_inventory_txns':
       case 'listInventoryTxns':
-        data = {
-          inventory_txns: [inventoryTxn],
-          total: 1,
-          limit: 100,
-          offset: 0,
+        {
+          const inventoryTxns = matchesKeyword(
+            inventoryTxn.id,
+            inventoryTxn.txn_type,
+            inventoryTxn.source_type,
+            inventoryTxn.idempotency_key,
+            inventoryTxn.note
+          )
+            ? [inventoryTxn]
+            : []
+          data = {
+            inventory_txns: inventoryTxns,
+            total: inventoryTxns.length,
+            limit: 100,
+            offset: 0,
+          }
         }
         break
       default:
@@ -709,6 +777,7 @@ export async function installFactRpcMocks(page, context) {
         const tasks = workflowTasks.filter(
           (item) =>
             (!params.source_type || item.source_type === params.source_type) &&
+            (!params.task_group || item.task_group === params.task_group) &&
             (!params.source_id ||
               Number(item.source_id) === Number(params.source_id))
         )

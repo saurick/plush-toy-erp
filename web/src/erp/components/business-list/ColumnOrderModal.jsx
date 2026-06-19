@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeftOutlined,
   ArrowDownOutlined,
@@ -165,27 +165,55 @@ export function ColumnOrderModal({
   saving = false,
   moduleTitle = '',
   onChange,
-  onReset,
   onClose,
 }) {
+  const [draftOrder, setDraftOrder] = useState([])
+
+  useEffect(() => {
+    if (open) {
+      setDraftOrder(sanitizeModuleColumnOrder(order, columns))
+    }
+  }, [columns, open, order])
+
   const normalizedOrder = useMemo(() => {
-    const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
+    const sanitizedOrder = sanitizeModuleColumnOrder(draftOrder, columns)
     return sanitizedOrder.length > 0
       ? sanitizedOrder
       : buildModuleColumnOrder(columns)
-  }, [columns, order])
+  }, [columns, draftOrder])
   const orderedColumns = useMemo(
     () => applyModuleColumnOrder(columns, normalizedOrder),
     [columns, normalizedOrder]
   )
 
   const moveColumn = (key, direction) => {
-    onChange?.(moveModuleColumnOrder(normalizedOrder, columns, key, direction))
+    if (saving) {
+      return
+    }
+    setDraftOrder(
+      moveModuleColumnOrder(normalizedOrder, columns, key, direction)
+    )
   }
   const repositionColumn = (key, targetIndex) => {
-    onChange?.(
+    if (saving) {
+      return
+    }
+    setDraftOrder(
       repositionModuleColumnOrder(normalizedOrder, columns, key, targetIndex)
     )
+  }
+  const resetDraftOrder = () => {
+    if (saving) {
+      return
+    }
+    setDraftOrder([])
+  }
+  const saveDraftOrder = async () => {
+    if (saving) {
+      return
+    }
+    await onChange?.(sanitizeModuleColumnOrder(draftOrder, columns))
+    onClose?.()
   }
 
   return (
@@ -195,7 +223,7 @@ export function ColumnOrderModal({
         <div className="erp-business-action-modal__title">
           <span>调整列表列顺序</span>
           <small>
-            当前模块列顺序会跟随当前管理员账号保存；浏览器本地仅保留缓存兜底，表头菜单也可直接快捷调整。
+            在面板中调整后点击完成保存；表头菜单快捷调整会直接保存到当前管理员账号，本地缓存只作兜底。
           </small>
         </div>
       }
@@ -205,10 +233,10 @@ export function ColumnOrderModal({
       destroyOnHidden={false}
       footer={
         <Space wrap className="erp-business-column-order-modal__footer">
-          <Button disabled={saving} onClick={onReset}>
+          <Button disabled={saving} onClick={resetDraftOrder}>
             恢复默认
           </Button>
-          <Button type="primary" loading={saving} onClick={onClose}>
+          <Button type="primary" loading={saving} onClick={saveDraftOrder}>
             完成
           </Button>
         </Space>

@@ -1186,7 +1186,6 @@ export default function V1OutsourcingOrdersPage() {
         saving={columnOrderSaving}
         moduleTitle="委外订单列表"
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onReset={() => persistColumnOrder([], dataColumns)}
         onClose={() => setColumnOrderOpen(false)}
       />
 

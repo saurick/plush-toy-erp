@@ -1279,7 +1279,6 @@ export default function V1PurchaseOrdersPage() {
         saving={columnOrderSaving}
         moduleTitle="采购订单列表"
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onReset={() => persistColumnOrder([], dataColumns)}
         onClose={() => setColumnOrderOpen(false)}
       />
 

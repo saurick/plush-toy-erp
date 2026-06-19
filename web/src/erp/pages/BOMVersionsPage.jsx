@@ -1264,7 +1264,6 @@ export default function BOMVersionsPage() {
         saving={columnOrderSaving}
         moduleTitle="BOM 管理列表"
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onReset={() => persistColumnOrder([], dataColumns)}
         onClose={() => setColumnOrderOpen(false)}
       />
 

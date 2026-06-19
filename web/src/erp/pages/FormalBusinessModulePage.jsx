@@ -58,6 +58,7 @@ import { ROLE_DISPLAY_NAMES } from '../utils/roleKeys.mjs'
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const SHIPPING_RELEASE_MODULE_KEY = 'shipping-release'
+const SHIPMENT_RELEASE_TASK_GROUP = 'shipment_release'
 const WORKFLOW_ROLE_LABELS = new Map(Object.entries(ROLE_DISPLAY_NAMES))
 
 const STATUS_OPTIONS = Object.freeze([
@@ -183,6 +184,10 @@ function compareText(a, b) {
 
 function workflowPayloadOf(task = {}) {
   return task?.payload && typeof task.payload === 'object' ? task.payload : {}
+}
+
+function isShipmentReleaseWorkflowTask(task = {}) {
+  return String(task?.task_group || '').trim() === SHIPMENT_RELEASE_TASK_GROUP
 }
 
 function buildFormalShellRows(moduleItem) {
@@ -364,6 +369,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
+  const profileSyncCompleted = outletContext?.profileSyncCompleted === true
   const moduleItem = getBusinessModule(moduleKey)
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -377,6 +383,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     moduleItem?.key === SHIPPING_RELEASE_MODULE_KEY
   const canReadWorkflowTasks =
     isShippingReleaseWorkflowPage &&
+    profileSyncCompleted &&
     hasActionPermission(adminProfile, 'workflow.task.read')
   const canUpdateWorkflowTasks =
     isShippingReleaseWorkflowPage &&
@@ -543,17 +550,22 @@ export default function FormalBusinessModulePage({ moduleKey }) {
   const loadShippingReleaseWorkflowTasks = useCallback(async () => {
     if (!isShippingReleaseWorkflowPage || !canReadWorkflowTasks) {
       setWorkflowTasks([])
-      return
+      return false
     }
     try {
       const data = await listWorkflowTasks({
         source_type: SHIPPING_RELEASE_MODULE_KEY,
+        task_group: SHIPMENT_RELEASE_TASK_GROUP,
         limit: 100,
       })
-      setWorkflowTasks(data?.tasks || [])
+      setWorkflowTasks(
+        (data?.tasks || []).filter(isShipmentReleaseWorkflowTask)
+      )
+      return true
     } catch (error) {
       setWorkflowTasks([])
       message.warning(getActionErrorMessage(error, '加载出货放行协同任务失败'))
+      return false
     }
   }, [canReadWorkflowTasks, isShippingReleaseWorkflowPage])
 
@@ -567,8 +579,15 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     }
     return outletContext?.registerPageRefresh?.(async () => {
       if (isShippingReleaseWorkflowPage) {
-        await loadShippingReleaseWorkflowTasks()
-        message.success('出货放行协同任务已刷新')
+        if (!canReadWorkflowTasks) {
+          setWorkflowTasks([])
+          message.warning('没有出货放行协同任务读取权限')
+          return false
+        }
+        const refreshed = await loadShippingReleaseWorkflowTasks()
+        if (refreshed) {
+          message.success('出货放行协同任务已刷新')
+        }
         return false
       }
       message.info(`${moduleItem.title}当前为待接入预览页，暂无远端数据刷新`)
@@ -576,6 +595,7 @@ export default function FormalBusinessModulePage({ moduleKey }) {
     })
   }, [
     isShippingReleaseWorkflowPage,
+    canReadWorkflowTasks,
     loadShippingReleaseWorkflowTasks,
     moduleItem,
     outletContext,
@@ -949,7 +969,6 @@ export default function FormalBusinessModulePage({ moduleKey }) {
         saving={columnOrderSaving}
         moduleTitle={moduleItem.title}
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
-        onReset={() => persistColumnOrder([], dataColumns)}
         onClose={() => setColumnOrderOpen(false)}
       />
     </BusinessPageLayout>

@@ -1142,14 +1142,6 @@ export default function V1SalesOrdersPage() {
             setLocalOrder: setOrderColumnOrder,
           })
         }
-        onReset={() =>
-          persistColumnOrder({
-            moduleKey: SALES_ORDERS_MODULE_KEY,
-            columns: orderDataColumns,
-            nextOrder: [],
-            setLocalOrder: setOrderColumnOrder,
-          })
-        }
         onClose={() => setColumnOrderTarget(null)}
       />
 
@@ -1164,14 +1156,6 @@ export default function V1SalesOrdersPage() {
             moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
             columns: itemDataColumns,
             nextOrder,
-            setLocalOrder: setItemColumnOrder,
-          })
-        }
-        onReset={() =>
-          persistColumnOrder({
-            moduleKey: SALES_ORDER_ITEMS_MODULE_KEY,
-            columns: itemDataColumns,
-            nextOrder: [],
             setLocalOrder: setItemColumnOrder,
           })
         }

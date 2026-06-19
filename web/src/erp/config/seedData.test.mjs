@@ -166,12 +166,20 @@ test('customerMenuConfig: 客户菜单配置可控制桌面菜单显隐、排序
   assert(!navigationSections[0].items.some((item) => item.key === 'suppliers'))
 })
 
-test('customerMenuConfig: yoyoosun 保留任务看板和异常闭环入口', () => {
+test('customerMenuConfig: yoyoosun 保留任务看板并隐藏高级和预览入口', () => {
   const navigationSections = getNavigationSections(yoyoosunMenuConfig)
   const navPaths = navigationSections.flatMap((section) =>
     section.items.map((item) => item.path)
   )
 
   assert(navPaths.includes('/erp/task-board'))
-  assert(navPaths.includes('/erp/operations/exceptions'))
+  assert(navPaths.includes('/erp/dashboard'))
+  assert(navPaths.includes('/erp/production/progress'))
+  assert(navPaths.includes('/erp/warehouse/outbound'))
+  assert(navPaths.includes('/erp/warehouse/shipments'))
+  assert(!navPaths.includes('/erp/business-dashboard'))
+  assert(!navPaths.includes('/erp/operations/exceptions'))
+  assert(!navPaths.includes('/erp/production/scheduling'))
+  assert(!navPaths.includes('/erp/production/exceptions'))
+  assert(!navPaths.includes('/erp/warehouse/shipping-release'))
 })

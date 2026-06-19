@@ -242,6 +242,7 @@ type WorkflowTaskFilter struct {
 	Offset        int
 	OwnerRoleKey  string
 	TaskStatusKey string
+	TaskGroup     string
 	SourceType    string
 	SourceID      int
 }
@@ -793,6 +794,7 @@ func (uc *WorkflowUsecase) UpsertBusinessState(ctx context.Context, in *Workflow
 func normalizeWorkflowTaskFilter(filter WorkflowTaskFilter) WorkflowTaskFilter {
 	filter.OwnerRoleKey = NormalizeRoleKey(filter.OwnerRoleKey)
 	filter.TaskStatusKey = strings.TrimSpace(filter.TaskStatusKey)
+	filter.TaskGroup = strings.TrimSpace(filter.TaskGroup)
 	filter.SourceType = strings.TrimSpace(filter.SourceType)
 	if filter.Limit <= 0 {
 		filter.Limit = 50

@@ -463,7 +463,10 @@ async function runScenarioOnce(browser, scenario) {
   const errors = []
 
   if (scenario.mockAdminRpc) {
-    await installAdminRpcMocks(page, { baseURL })
+    await installAdminRpcMocks(page, {
+      baseURL,
+      adminProfileOverride: scenario.adminProfile,
+    })
   }
 
   if (scenario.auth === 'admin' || scenario.auth === 'admin-expired') {
@@ -471,41 +474,67 @@ async function runScenarioOnce(browser, scenario) {
     if (scenario.auth === 'admin-expired') {
       await installAdminAuthExpiredRpcMocks(page)
     } else {
-      await installAdminRpcMocks(page, { baseURL })
+      await installAdminRpcMocks(page, {
+        baseURL,
+        adminProfileOverride: scenario.adminProfile,
+      })
     }
-    await page.addInitScript((mockToken) => {
-      localStorage.setItem('admin_access_token', mockToken)
-      localStorage.setItem('admin_is_super_admin', 'true')
-      localStorage.setItem(
-        'admin_roles',
-        JSON.stringify([
-          { role_key: 'boss', name: '老板' },
-          { role_key: 'sales', name: '业务' },
-          { role_key: 'purchase', name: '采购' },
-          { role_key: 'production', name: '生产' },
-          { role_key: 'warehouse', name: '仓库' },
-          { role_key: 'finance', name: '财务' },
-          { role_key: 'pmc', name: 'PMC' },
-          { role_key: 'quality', name: '品质' },
-        ])
-      )
-      localStorage.setItem(
-        'admin_permissions',
-        JSON.stringify([
-          'workflow.task.read',
-          'workflow.task.update',
-          'workflow.task.complete',
-          'workflow.task.approve',
-          'workflow.task.reject',
-        ])
-      )
-      localStorage.setItem('admin_menus', '[]')
-      localStorage.setItem('erp:last_entry_target', 'desktop')
-      localStorage.setItem(
-        'admin_erp_preferences',
-        JSON.stringify({ column_orders: {} })
-      )
-    }, token)
+    await page.addInitScript(
+      (mockToken, profileOverride) => {
+        const fallbackProfile = {
+          is_super_admin: true,
+          roles: [
+            { role_key: 'boss', name: '老板' },
+            { role_key: 'sales', name: '业务' },
+            { role_key: 'purchase', name: '采购' },
+            { role_key: 'production', name: '生产' },
+            { role_key: 'warehouse', name: '仓库' },
+            { role_key: 'finance', name: '财务' },
+            { role_key: 'pmc', name: 'PMC' },
+            { role_key: 'quality', name: '品质' },
+          ],
+          permissions: [
+            'workflow.task.read',
+            'workflow.task.update',
+            'workflow.task.complete',
+            'workflow.task.approve',
+            'workflow.task.reject',
+          ],
+          menus: [],
+          erp_preferences: { column_orders: {} },
+        }
+        const profile =
+          profileOverride && typeof profileOverride === 'object'
+            ? { ...fallbackProfile, ...profileOverride }
+            : fallbackProfile
+        localStorage.setItem('admin_access_token', mockToken)
+        localStorage.setItem(
+          'admin_is_super_admin',
+          profile.is_super_admin === true ? 'true' : 'false'
+        )
+        localStorage.setItem(
+          'admin_roles',
+          JSON.stringify(Array.isArray(profile.roles) ? profile.roles : [])
+        )
+        localStorage.setItem(
+          'admin_permissions',
+          JSON.stringify(
+            Array.isArray(profile.permissions) ? profile.permissions : []
+          )
+        )
+        localStorage.setItem(
+          'admin_menus',
+          JSON.stringify(Array.isArray(profile.menus) ? profile.menus : [])
+        )
+        localStorage.setItem('erp:last_entry_target', 'desktop')
+        localStorage.setItem(
+          'admin_erp_preferences',
+          JSON.stringify(profile.erp_preferences || { column_orders: {} })
+        )
+      },
+      token,
+      scenario.adminProfile || null
+    )
   }
 
   if (scenario.themeMode) {
@@ -960,16 +989,30 @@ async function assertBusinessListEmptySearchState(
   const searchInput = page.getByPlaceholder(searchPlaceholder).first()
   await searchInput.fill(`NO-MATCH-${scenarioName}`)
   await page.keyboard.press('Enter')
-  await page.waitForFunction(
-    ({ expectedEmptyText }) => {
-      const placeholder = document.querySelector(
-        '.erp-business-module-table-card .ant-table-placeholder'
+  await page
+    .waitForFunction(
+      ({ expectedEmptyText }) => {
+        const tableCard = document.querySelector(
+          '.erp-business-module-table-card'
+        )
+        const placeholder = tableCard?.querySelector('.ant-table-placeholder')
+        const dataRows = Array.from(
+          tableCard?.querySelectorAll('.ant-table-tbody > tr.ant-table-row') ||
+            []
+        ).filter((row) => !row.classList.contains('ant-table-placeholder'))
+        return (
+          placeholder?.textContent?.includes(expectedEmptyText) &&
+          dataRows.length === 0
+        )
+      },
+      { expectedEmptyText: emptyText },
+      { timeout: 10_000 }
+    )
+    .catch((error) => {
+      throw new Error(
+        `${scenarioName} 等待表格空态“${emptyText}”超时: ${error.message}`
       )
-      return placeholder?.textContent?.includes(expectedEmptyText)
-    },
-    { expectedEmptyText: emptyText },
-    { timeout: 10_000 }
-  )
+    })
 
   const metrics = await page.evaluate(
     ({ expectedEmptyText, previousText }) => {
@@ -1469,13 +1512,16 @@ async function verifyBusinessModuleColumnOrderDialog(
     .locator('.erp-business-operation-panel__actions')
     .first()
   await primaryToolbarActions.getByRole('button', { name: /列顺序/ }).click()
-  const dialog = page.getByRole('dialog', { name: '调整列表列顺序' })
+  const dialog = page.locator('.erp-business-action-modal--columns:visible')
   await dialog.waitFor({ state: 'visible', timeout: 10_000 })
   await assertAntdModalCentered(page, dialog, 'business-column-order-modal')
-  await expectText(page, '当前模块列顺序会跟随当前管理员账号保存')
+  await expectText(page, '在面板中调整后点击完成保存')
   await dialog.screenshot({
     path: path.resolve(outputDir, 'business-column-order-modal.png'),
   })
+  await page.evaluate((key) => {
+    window.localStorage.removeItem(key)
+  }, storageKey)
 
   const moveFirstButtons = dialog.locator('button[aria-label$="移到最前"]')
   const moveUpButtons = dialog.locator('button[aria-label$="上移"]')
@@ -1516,9 +1562,7 @@ async function verifyBusinessModuleColumnOrderDialog(
     .nth(1)
     .getAttribute('aria-label')
   assert(Boolean(moveFirstLabel), '未读取到可移动列的“移到最前”标签')
-  const firstColumnOrderSync = waitForAdminColumnOrderSync(page)
   await moveFirstButtons.nth(1).click()
-  await firstColumnOrderSync
   await page.waitForFunction((label) => {
     const target = [...document.querySelectorAll('button[aria-label]')].find(
       (button) => button.getAttribute('aria-label') === label
@@ -1532,9 +1576,7 @@ async function verifyBusinessModuleColumnOrderDialog(
   await enabledMoveLastButton.waitFor({ state: 'visible', timeout: 10_000 })
   const moveLastLabel = await enabledMoveLastButton.getAttribute('aria-label')
   assert(Boolean(moveLastLabel), '未读取到可移动列的“移到最后”标签')
-  const secondColumnOrderSync = waitForAdminColumnOrderSync(page)
   await enabledMoveLastButton.click()
-  await secondColumnOrderSync
   await page.waitForFunction((label) => {
     const target = [...document.querySelectorAll('button[aria-label]')].find(
       (button) => button.getAttribute('aria-label') === label
@@ -1542,12 +1584,40 @@ async function verifyBusinessModuleColumnOrderDialog(
     return Boolean(target?.disabled)
   }, moveLastLabel)
 
+  const storedOrderBeforeDone = await page.evaluate((key) => {
+    return window.localStorage.getItem(key)
+  }, storageKey)
+  assert.equal(
+    storedOrderBeforeDone,
+    null,
+    '列顺序面板点击移动后不应在完成前写入本地缓存'
+  )
+
+  const finishButtons = dialog
+    .locator('.ant-modal-footer button')
+    .filter({ hasText: /完\s*成/u })
+  assert.equal(await finishButtons.count(), 1, '列顺序弹窗应只有一个“完成”按钮')
+  assert.equal(
+    await finishButtons.first().isDisabled(),
+    false,
+    '列顺序弹窗“完成”按钮不应处于禁用态'
+  )
+  const finishButtonBox = await finishButtons.first().boundingBox()
+  assert(
+    finishButtonBox && finishButtonBox.width > 0 && finishButtonBox.height > 0,
+    `列顺序弹窗“完成”按钮不可见: ${JSON.stringify(finishButtonBox)}`
+  )
+  await finishButtons.first().click()
+  await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
+
   const storedOrder = await page.evaluate((key) => {
     return window.localStorage.getItem(key)
   }, storageKey)
-  assert(Boolean(storedOrder), '列顺序面板调整后未写入本地缓存兜底')
+  assert(Boolean(storedOrder), '列顺序面板点击完成后未写入本地缓存兜底')
 
-  const persistedBoundaryLabels = await page.evaluate(() => {
+  await primaryToolbarActions.getByRole('button', { name: /列顺序/ }).click()
+  await dialog.waitFor({ state: 'visible', timeout: 10_000 })
+  const persistedDialogBoundaryLabels = await page.evaluate(() => {
     return {
       firstDisabled:
         document
@@ -1560,8 +1630,8 @@ async function verifyBusinessModuleColumnOrderDialog(
     }
   })
   assert(
-    persistedBoundaryLabels.firstDisabled &&
-      persistedBoundaryLabels.lastDisabled,
+    persistedDialogBoundaryLabels.firstDisabled &&
+      persistedDialogBoundaryLabels.lastDisabled,
     '列顺序面板未读取到当前边界列标签'
   )
 
@@ -1595,12 +1665,12 @@ async function verifyBusinessModuleColumnOrderDialog(
   })
   assert.equal(
     restoredBoundaryLabels.firstDisabled,
-    persistedBoundaryLabels.firstDisabled,
+    persistedDialogBoundaryLabels.firstDisabled,
     '清空本地缓存后未从账号偏好恢复首列顺序'
   )
   assert.equal(
     restoredBoundaryLabels.lastDisabled,
-    persistedBoundaryLabels.lastDisabled,
+    persistedDialogBoundaryLabels.lastDisabled,
     '清空本地缓存后未从账号偏好恢复末列顺序'
   )
   await dialog.locator('.ant-modal-close').click()
@@ -1645,7 +1715,9 @@ async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
     '点击表头列设置应先打开快捷菜单，不应直接弹出列顺序面板'
   )
 
+  const headerColumnOrderSync = waitForAdminColumnOrderSync(page)
   await menu.getByText('左移一列').click()
+  await headerColumnOrderSync
   await page.waitForFunction(
     ({ expectedFirstLabel }) => {
       const firstLabel = document.querySelector(
@@ -1670,6 +1742,21 @@ async function verifyBusinessModuleColumnOrderHeaderMenu(page, { storageKey }) {
   await dialog.waitFor({ state: 'visible', timeout: 10_000 })
   await dialog.locator('.ant-modal-close').click()
   await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
+}
+
+function waitForAdminColumnOrderSync(page) {
+  return page.waitForResponse((response) => {
+    if (!response.url().includes('/rpc/admin')) {
+      return false
+    }
+    try {
+      return (
+        response.request().postDataJSON()?.method === 'set_erp_column_order'
+      )
+    } catch {
+      return false
+    }
+  })
 }
 
 async function readBusinessModuleHeaderLabels(page) {
@@ -2615,21 +2702,6 @@ async function closeBusinessFormModal(page, modal) {
     await page.keyboard.press('Escape').catch(() => {})
     await modal.waitFor({ state: 'hidden', timeout: 10_000 })
   }
-}
-
-function waitForAdminColumnOrderSync(page) {
-  return page.waitForResponse((response) => {
-    if (!response.url().includes('/rpc/admin')) {
-      return false
-    }
-    try {
-      return (
-        response.request().postDataJSON()?.method === 'set_erp_column_order'
-      )
-    } catch {
-      return false
-    }
-  })
 }
 
 async function assertBusinessPageRefreshEntrypoint(page, { scenarioName }) {

@@ -74,8 +74,8 @@ const TASK_STATUS_META = Object.freeze({
 const LANE_DEFINITIONS = Object.freeze([
   {
     key: 'pending',
-    title: '本页待办',
-    description: '待处理、可执行和处理中任务，优先从这里处理。',
+    title: '可推进任务',
+    description: '当前筛选下待处理、可执行和处理中任务，优先从这里处理。',
     tagColor: 'blue',
     match: (task) =>
       ['pending', 'ready', 'processing'].includes(getTaskStatusKey(task)),

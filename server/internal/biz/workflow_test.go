@@ -15,6 +15,7 @@ type stubWorkflowRepo struct {
 	currentTask      *WorkflowTask
 	getTaskCalled    bool
 	listTaskCalled   bool
+	listTaskFilter   WorkflowTaskFilter
 	derivedTaskCount int
 	derivedTaskKeys  map[string]struct{}
 }
@@ -36,8 +37,9 @@ func (s *stubWorkflowRepo) GetWorkflowTask(_ context.Context, id int) (*Workflow
 	}, nil
 }
 
-func (s *stubWorkflowRepo) ListWorkflowTasks(context.Context, WorkflowTaskFilter) ([]*WorkflowTask, int, error) {
+func (s *stubWorkflowRepo) ListWorkflowTasks(_ context.Context, filter WorkflowTaskFilter) ([]*WorkflowTask, int, error) {
 	s.listTaskCalled = true
+	s.listTaskFilter = filter
 	return nil, 0, nil
 }
 
@@ -751,6 +753,29 @@ func TestWorkflowUsecase_ListTasksRejectsInvalidStatus(t *testing.T) {
 	}
 	if repo.listTaskCalled {
 		t.Fatalf("repo should not be called for invalid status")
+	}
+}
+
+func TestWorkflowUsecase_ListTasksNormalizesTaskGroupFilter(t *testing.T) {
+	repo := &stubWorkflowRepo{}
+	uc := NewWorkflowUsecase(repo)
+
+	_, _, err := uc.ListTasks(context.Background(), WorkflowTaskFilter{
+		TaskGroup:  " shipment_release ",
+		SourceType: " shipping-release ",
+		Limit:      0,
+	})
+	if err != nil {
+		t.Fatalf("list tasks failed: %v", err)
+	}
+	if repo.listTaskFilter.TaskGroup != "shipment_release" {
+		t.Fatalf("expected normalized task group, got %q", repo.listTaskFilter.TaskGroup)
+	}
+	if repo.listTaskFilter.SourceType != "shipping-release" {
+		t.Fatalf("expected normalized source type, got %q", repo.listTaskFilter.SourceType)
+	}
+	if repo.listTaskFilter.Limit != 50 {
+		t.Fatalf("expected default limit 50, got %d", repo.listTaskFilter.Limit)
 	}
 }
 

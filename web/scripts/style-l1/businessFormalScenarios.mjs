@@ -29,6 +29,171 @@ export function createBusinessFormalScenarios(deps) {
     verifySourceImportPicker,
   } = deps
 
+  const waitForTaskActionDrawerClosed = async (page, scenarioName) => {
+    await page
+      .locator('.erp-task-action-drawer')
+      .waitFor({ state: 'hidden', timeout: 10_000 })
+    await page
+      .waitForFunction(
+        () => {
+          const isVisible = (node) => {
+            if (!(node instanceof HTMLElement)) return false
+            const rect = node.getBoundingClientRect()
+            const style = window.getComputedStyle(node)
+            return (
+              style.display !== 'none' &&
+              style.visibility !== 'hidden' &&
+              rect.width > 0 &&
+              rect.height > 0
+            )
+          }
+          return Array.from(
+            document.querySelectorAll('.ant-drawer-mask')
+          ).every((node) => !isVisible(node))
+        },
+        null,
+        { timeout: 10_000 }
+      )
+      .catch((error) => {
+        throw new Error(
+          `${scenarioName} 等待任务处理抽屉遮罩消失超时: ${error.message}`
+        )
+      })
+    const overlayMetrics = await page.evaluate(() => {
+      const isVisible = (node) => {
+        if (!(node instanceof HTMLElement)) return false
+        const rect = node.getBoundingClientRect()
+        const style = window.getComputedStyle(node)
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0
+        )
+      }
+      return {
+        visibleTaskActionDrawers: Array.from(
+          document.querySelectorAll('.erp-task-action-drawer')
+        ).filter(isVisible).length,
+        visibleDrawerMasks: Array.from(
+          document.querySelectorAll('.ant-drawer-mask')
+        ).filter(isVisible).length,
+      }
+    })
+    assert.equal(
+      overlayMetrics.visibleTaskActionDrawers,
+      0,
+      `${scenarioName} 任务处理抽屉关闭后不应继续可见: ${JSON.stringify(
+        overlayMetrics
+      )}`
+    )
+    assert.equal(
+      overlayMetrics.visibleDrawerMasks,
+      0,
+      `${scenarioName} 任务处理抽屉关闭后不应残留遮罩: ${JSON.stringify(
+        overlayMetrics
+      )}`
+    )
+  }
+
+  const assertBusinessTableEmptyState = async (
+    page,
+    { scenarioName, emptyText, staleText }
+  ) => {
+    await page
+      .waitForFunction(
+        ({ expectedEmptyText }) => {
+          const tableCard = document.querySelector(
+            '.erp-business-module-table-card'
+          )
+          const placeholder = tableCard?.querySelector('.ant-table-placeholder')
+          const dataRows = Array.from(
+            tableCard?.querySelectorAll(
+              '.ant-table-tbody > tr.ant-table-row'
+            ) || []
+          ).filter((row) => !row.classList.contains('ant-table-placeholder'))
+          return (
+            placeholder?.textContent?.includes(expectedEmptyText) &&
+            dataRows.length === 0
+          )
+        },
+        { expectedEmptyText: emptyText },
+        { timeout: 10_000 }
+      )
+      .catch((error) => {
+        throw new Error(
+          `${scenarioName} 等待表格空态“${emptyText}”超时: ${error.message}`
+        )
+      })
+    const metrics = await page.evaluate(
+      ({ expectedEmptyText, previousText }) => {
+        const actionBar = document.querySelector(
+          '.erp-business-module-current-action'
+        )
+        const tableCard = document.querySelector(
+          '.erp-business-module-table-card'
+        )
+        const placeholder = tableCard?.querySelector('.ant-table-placeholder')
+        const dataRows = Array.from(
+          tableCard?.querySelectorAll('.ant-table-tbody > tr.ant-table-row') ||
+            []
+        ).filter((row) => !row.classList.contains('ant-table-placeholder'))
+        return {
+          actionText: actionBar?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          actionHasEmptyClass:
+            actionBar?.classList.contains(
+              'erp-business-selection-action-bar--empty'
+            ) || false,
+          actionHasActiveClass:
+            actionBar?.classList.contains(
+              'erp-business-selection-action-bar--active'
+            ) || false,
+          placeholderText:
+            placeholder?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          dataRowCount: dataRows.length,
+          staleTextInAction:
+            actionBar?.textContent?.includes(previousText) || false,
+          staleTextInTable:
+            tableCard?.textContent?.includes(previousText) || false,
+          documentOverflow:
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+          expectedEmptyText,
+        }
+      },
+      { expectedEmptyText: emptyText, previousText: staleText }
+    )
+
+    assert(
+      metrics.placeholderText.includes(emptyText),
+      `${scenarioName} 表格空态文案异常: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.dataRowCount,
+      0,
+      `${scenarioName} 空结果时不应保留数据行: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.actionHasEmptyClass && !metrics.actionHasActiveClass,
+      `${scenarioName} 空结果后当前操作条应回到未选中态: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.staleTextInAction,
+      false,
+      `${scenarioName} 空结果后当前操作条不应保留旧选中记录: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.staleTextInTable,
+      false,
+      `${scenarioName} 空结果表格不应保留旧记录文本: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.documentOverflow,
+      0,
+      `${scenarioName} 空结果不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
+    )
+  }
+
   return [
     {
       name: 'business-formal-module-shells-desktop',
@@ -304,6 +469,58 @@ export function createBusinessFormalScenarios(deps) {
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'business-standard-inventory',
         })
+        let forceEmptyInventoryBalances = false
+        const inventoryEmptySearchKeyword =
+          'NO-MATCH-business-standard-inventory-balances-empty-search'
+        await page.route('**/rpc/inventory', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            forceEmptyInventoryBalances &&
+            ['list_inventory_balances', 'listInventoryBalances'].includes(
+              body.method
+            )
+          ) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'business-standard-inventory-empty-search',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: {
+                    inventory_balances: [],
+                    total: 0,
+                    limit: 100,
+                    offset: 0,
+                  },
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
+        await page.getByText('12.5', { exact: false }).first().click()
+        forceEmptyInventoryBalances = true
+        await page
+          .getByPlaceholder('搜索批次号 / 来源 / 备注 / ID')
+          .first()
+          .fill(inventoryEmptySearchKeyword)
+        await page.keyboard.press('Enter')
+        await assertBusinessTableEmptyState(page, {
+          scenarioName: 'business-standard-inventory-balances-empty-search',
+          emptyText: '暂无库存余额',
+          staleText: '12.5',
+        })
+        forceEmptyInventoryBalances = false
+        await page
+          .getByPlaceholder('搜索批次号 / 来源 / 备注 / ID')
+          .first()
+          .fill('')
+        await page.keyboard.press('Enter')
+        await expectText(page, '12.5')
 
         await page.getByRole('tab', { name: '库存批次' }).click()
         await expectText(page, 'INV-LOT-001')
@@ -390,6 +607,56 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-quality-inspections',
           labels: ['批量删除', '回收站'],
         })
+        let forceEmptyQualityInspections = false
+        const qualityEmptySearchKeyword =
+          'NO-MATCH-business-v1-quality-inspections-empty-search'
+        await page.route('**/rpc/quality', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            forceEmptyQualityInspections &&
+            body.method === 'list_quality_inspections'
+          ) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'business-v1-quality-inspections-empty-search',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: {
+                    quality_inspections: [],
+                    total: 0,
+                    limit: 100,
+                    offset: 0,
+                  },
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
+        await page.getByText('QI-STYLE-L1', { exact: false }).first().click()
+        forceEmptyQualityInspections = true
+        await page
+          .getByPlaceholder('搜索质检单号 / 入库单 / 批次')
+          .first()
+          .fill(qualityEmptySearchKeyword)
+        await page.keyboard.press('Enter')
+        await assertBusinessTableEmptyState(page, {
+          scenarioName: 'business-v1-quality-inspections-empty-search',
+          emptyText: '暂无来料质检单',
+          staleText: 'QI-STYLE-L1',
+        })
+        forceEmptyQualityInspections = false
+        await page
+          .getByPlaceholder('搜索质检单号 / 入库单 / 批次')
+          .first()
+          .fill('')
+        await page.keyboard.press('Enter')
+        await expectText(page, 'QI-STYLE-L1')
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'quality-inspections',
           heading: '来料质检',
@@ -427,6 +694,49 @@ export function createBusinessFormalScenarios(deps) {
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-v1-shipments',
         })
+        await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
+        let emptiedShipmentsOnce = false
+        await page.route('**/rpc/operational_fact', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            !emptiedShipmentsOnce &&
+            body.method === 'list_shipments' &&
+            String(body.params?.status || '') === 'CANCELLED'
+          ) {
+            emptiedShipmentsOnce = true
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'business-v1-shipments-empty-filter',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: { shipments: [], total: 0, limit: 100, offset: 0 },
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
+        await page
+          .locator('.erp-business-filter-control--status')
+          .first()
+          .click()
+        await page.getByTitle('已取消', { exact: true }).click()
+        await assertBusinessTableEmptyState(page, {
+          scenarioName: 'business-v1-shipments-empty-status-filter',
+          emptyText: '暂无出货单',
+          staleText: 'SHIP-STYLE-L1',
+        })
+        await page
+          .locator('.erp-business-filter-control--status')
+          .first()
+          .click()
+        await page.getByTitle('全部状态', { exact: true }).click()
+        await expectText(page, 'SHIP-STYLE-L1')
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建草稿',
           titleText: '新建出货单',
@@ -670,34 +980,51 @@ export function createBusinessFormalScenarios(deps) {
         })
 
         await page.evaluate(async () => {
-          const response = await fetch('/rpc/workflow', {
-            method: 'POST',
-            headers: {
-              Accept: 'application/json',
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              id: 'formal-shipping-release-task',
-              method: 'create_task',
-              params: {
-                task_code: 'style-l1-formal-shipping-release',
-                task_group: 'shipment_release',
-                task_name: '出货放行协同确认',
-                source_type: 'shipping-release',
-                source_id: 9101,
-                source_no: 'SHIP-REL-L1',
-                business_status_key: 'shipment_pending',
-                task_status_key: 'ready',
-                owner_role_key: 'warehouse',
-                payload: {
-                  critical_path: true,
-                  shipment_release_page_scope: 'workflow_only',
-                },
+          const createTask = async (id, params) => {
+            const response = await fetch('/rpc/workflow', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
               },
-            }),
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                method: 'create_task',
+                params,
+              }),
+            })
+            return response.json()
+          }
+          await createTask('formal-shipping-release-task', {
+            task_code: 'style-l1-formal-shipping-release',
+            task_group: 'shipment_release',
+            task_name: '出货放行协同确认',
+            source_type: 'shipping-release',
+            source_id: 9101,
+            source_no: 'SHIP-REL-L1',
+            business_status_key: 'shipment_pending',
+            task_status_key: 'ready',
+            owner_role_key: 'warehouse',
+            payload: {
+              critical_path: true,
+              shipment_release_page_scope: 'workflow_only',
+            },
           })
-          return response.json()
+          await createTask('formal-shipping-release-other-source-task', {
+            task_code: 'style-l1-formal-shipping-release-other',
+            task_group: 'customer_followup',
+            task_name: '同来源非放行任务',
+            source_type: 'shipping-release',
+            source_id: 9102,
+            source_no: 'SHIP-REL-OTHER',
+            business_status_key: 'shipment_pending',
+            task_status_key: 'ready',
+            owner_role_key: 'sales',
+            payload: {
+              shipment_release_page_scope: 'not_for_release_page',
+            },
+          })
         })
 
         await verifyFormalShellPreviewPage({
@@ -715,6 +1042,176 @@ export function createBusinessFormalScenarios(deps) {
             await page.getByRole('button', { name: '展开' }).first().click()
             await expectText(page, '出货放行协同确认')
             await expectText(page, 'SHIP-REL-L1')
+            await assertTextAbsent(page, '同来源非放行任务')
+            await assertTextAbsent(page, 'SHIP-REL-OTHER')
+
+            let failedListTasksOnce = false
+            await page.route('**/rpc/workflow', async (route) => {
+              const body = route.request().postDataJSON() || {}
+              if (!failedListTasksOnce && body.method === 'list_tasks') {
+                failedListTasksOnce = true
+                await route.fulfill({
+                  status: 200,
+                  contentType: 'application/json',
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: body.id || 'formal-shipping-release-list-failed',
+                    result: {
+                      code: 500123,
+                      message: 'shipping release list failed',
+                      data: null,
+                    },
+                  }),
+                })
+                return
+              }
+              await route.fallback()
+            })
+            await page.getByRole('button', { name: '刷新当前页' }).click()
+            await expectText(page, '加载出货放行协同任务失败')
+            await expectText(page, '本页暂无待处理 Workflow 任务。')
+            await assertTextAbsent(page, '出货放行协同确认')
+
+            await page.evaluate(async () => {
+              const response = await fetch('/rpc/workflow', {
+                method: 'POST',
+                headers: {
+                  Accept: 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: 'formal-shipping-release-stale-task',
+                  method: 'create_task',
+                  params: {
+                    task_code: 'style-l1-formal-shipping-release-stale',
+                    task_group: 'shipment_release',
+                    task_name: '出货放行刷新后协同确认',
+                    source_type: 'shipping-release',
+                    source_id: 9103,
+                    source_no: 'SHIP-REL-STALE',
+                    business_status_key: 'shipment_pending',
+                    task_status_key: 'ready',
+                    owner_role_key: 'warehouse',
+                    payload: {
+                      critical_path: true,
+                      shipment_release_page_scope: 'workflow_only',
+                    },
+                  },
+                }),
+              })
+              return response.json()
+            })
+            await page.getByRole('button', { name: '刷新当前页' }).click()
+            await expectText(page, '出货放行刷新后协同确认')
+            await expectText(page, 'SHIP-REL-STALE')
+
+            await page
+              .locator('.erp-business-module-task-item')
+              .filter({ hasText: '出货放行刷新后协同确认' })
+              .first()
+              .getByRole('button', { name: '完成' })
+              .click()
+            await expectText(page, '任务处理')
+            await expectText(page, '出货放行刷新后协同确认')
+
+            let emptiedListTasksOnce = false
+            await page.route('**/rpc/workflow', async (route) => {
+              const body = route.request().postDataJSON() || {}
+              if (!emptiedListTasksOnce && body.method === 'list_tasks') {
+                emptiedListTasksOnce = true
+                await route.fulfill({
+                  status: 200,
+                  contentType: 'application/json',
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: body.id || 'formal-shipping-release-list-empty',
+                    result: {
+                      code: 0,
+                      message: 'OK',
+                      data: {
+                        tasks: [],
+                        total: 0,
+                        limit: 100,
+                        offset: 0,
+                      },
+                    },
+                  }),
+                })
+                return
+              }
+              await route.fallback()
+            })
+            await page.evaluate(() => {
+              const refreshButton = Array.from(
+                document.querySelectorAll('button')
+              ).find(
+                (button) =>
+                  String(button.textContent || '').trim() === '刷新当前页'
+              )
+              refreshButton?.click()
+            })
+            await expectText(page, '出货放行协同任务已刷新')
+            await waitForTaskActionDrawerClosed(
+              page,
+              'business-formal-shipping-release-stale-task'
+            )
+            await page.waitForFunction(() => {
+              const isVisible = (node) => {
+                if (!(node instanceof HTMLElement)) return false
+                const rect = node.getBoundingClientRect()
+                const style = window.getComputedStyle(node)
+                return (
+                  style.display !== 'none' &&
+                  style.visibility !== 'hidden' &&
+                  rect.width > 0 &&
+                  rect.height > 0
+                )
+              }
+              return Array.from(
+                document.querySelectorAll('.erp-business-module-task-item')
+              )
+                .filter(isVisible)
+                .every(
+                  (node) =>
+                    !String(node.textContent || '').includes(
+                      '出货放行刷新后协同确认'
+                    )
+                )
+            })
+            const staleTaskMetrics = await page.evaluate(() => {
+              const isVisible = (node) => {
+                if (!(node instanceof HTMLElement)) return false
+                const rect = node.getBoundingClientRect()
+                const style = window.getComputedStyle(node)
+                return (
+                  style.display !== 'none' &&
+                  style.visibility !== 'hidden' &&
+                  rect.width > 0 &&
+                  rect.height > 0
+                )
+              }
+              const visibleTaskTexts = Array.from(
+                document.querySelectorAll('.erp-business-module-task-item')
+              )
+                .filter(isVisible)
+                .map((node) =>
+                  String(node.textContent || '')
+                    .replace(/\s+/gu, ' ')
+                    .trim()
+                )
+              return {
+                visibleTaskTexts,
+                staleTaskVisible: visibleTaskTexts.some((text) =>
+                  text.includes('出货放行刷新后协同确认')
+                ),
+              }
+            })
+            assert.equal(
+              staleTaskMetrics.staleTaskVisible,
+              false,
+              `刷新后不应继续显示已消失的协同任务: ${JSON.stringify(staleTaskMetrics)}`
+            )
           },
         })
 
@@ -890,6 +1387,77 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '销售订单ID')
         await assertTextAbsent(page, '单位ID')
         await assertNoHorizontalOverflow(page, 'business-v1-outsourcing-mobile')
+      },
+    },
+    {
+      name: 'business-formal-shipping-release-no-permission-desktop',
+      path: '/erp/warehouse/shipping-release',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      adminProfile: {
+        username: 'style-l1-no-workflow-read',
+        is_super_admin: false,
+        roles: [{ role_key: 'warehouse', name: '仓库' }],
+        permissions: ['erp.dashboard.read'],
+        menus: [
+          {
+            key: 'shipping-release',
+            label: '出货放行',
+            path: '/erp/warehouse/shipping-release',
+            required_permissions: [],
+          },
+        ],
+        erp_preferences: {
+          column_orders: {},
+        },
+      },
+      verify: async (page) => {
+        let shippingReleaseListTaskCalls = 0
+        await page.route('**/rpc/workflow', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            body.method === 'list_tasks' &&
+            body.params?.source_type === 'shipping-release'
+          ) {
+            shippingReleaseListTaskCalls += 1
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'formal-shipping-release-no-permission-list',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: {
+                    tasks: [],
+                    total: 0,
+                    limit: 100,
+                    offset: 0,
+                  },
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
+
+        await expectHeading(page, '出货放行')
+        await expectButton(page, '预览放行字段')
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '没有出货放行协同任务读取权限')
+        assert.equal(
+          shippingReleaseListTaskCalls,
+          0,
+          '无 workflow.task.read 时出货放行页不应调用 list_tasks 拉取协同任务'
+        )
+        await assertTextAbsent(page, '出货放行协同任务已刷新')
+        await assertTextAbsent(page, '出货放行协同确认')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-formal-shipping-release-no-permission-desktop'
+        )
       },
     },
   ]
