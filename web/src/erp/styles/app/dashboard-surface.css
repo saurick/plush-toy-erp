@@ -1,0 +1,71 @@
+.erp-dashboard-page {
+  width: 100%;
+  container-type: inline-size;
+}
+
+.erp-dashboard-card.ant-card {
+  border: 1px solid #dfe9e1;
+  background: rgb(255 255 255 / 0.96);
+}
+
+.erp-dashboard-card .ant-card-body {
+  padding: 18px 20px;
+}
+
+.erp-dashboard-title.ant-typography {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.erp-dashboard-summary.ant-typography {
+  margin-bottom: 0;
+}
+
+.erp-dashboard-heading-row {
+  width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-dashboard-block {
+  width: 100%;
+}
+
+.erp-dashboard-section-title.ant-typography {
+  margin: 0;
+}
+
+.erp-dashboard-status-card.ant-card {
+  background: #f7faf7;
+}
+
+.erp-dashboard-table-card .ant-card-body {
+  padding: 12px 16px;
+  overflow-x: auto;
+}
+
+.erp-dashboard-table-card.ant-card,
+.erp-dashboard-table-card .ant-table-wrapper,
+.erp-dashboard-table-card .ant-spin-nested-loading,
+.erp-dashboard-table-card .ant-spin-container,
+.erp-dashboard-table-card .ant-table,
+.erp-dashboard-table-card .ant-table-container {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.erp-dashboard-table-card.ant-card {
+  overflow: hidden;
+}
+
+.erp-dashboard-link-button.ant-btn {
+  height: auto;
+  padding: 0;
+  white-space: normal;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.erp-dashboard-table-card .ant-table-cell {
+  vertical-align: middle;
+}

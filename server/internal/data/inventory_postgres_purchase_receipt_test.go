@@ -1,0 +1,320 @@
+package data
+
+import (
+	"context"
+	"errors"
+	"io"
+	"testing"
+	"time"
+
+	"server/internal/biz"
+	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptitem"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
+)
+
+func TestPurchaseReceiptPostgresMigrationShape(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+
+	for _, table := range []string{
+		"purchase_receipts",
+		"purchase_receipt_items",
+	} {
+		assertPostgresTableExists(t, data.sqldb, table)
+	}
+	assertPostgresNumericColumn(t, data.sqldb, "purchase_receipt_items", "quantity", 20, 6)
+	assertPostgresNumericColumn(t, data.sqldb, "purchase_receipt_items", "unit_price", 20, 6)
+	assertPostgresNumericColumn(t, data.sqldb, "purchase_receipt_items", "amount", 20, 6)
+	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipts", "purchasereceipt_receipt_no")
+	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_receipt_items", "purchasereceiptitem_receipt_id_source_line_no", "source_line_no IS NOT NULL AND source_line_no <> ''")
+	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_quantity_positive", "quantity > 0")
+	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_unit_price_non_negative", "unit_price IS NULL OR unit_price >= 0")
+	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_amount_non_negative", "amount IS NULL OR amount >= 0")
+	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_inventory_lots_purchase_receipt_items", "NO ACTION")
+	assertPostgresPartialUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id", "lot_id IS NULL")
+	assertPostgresPartialUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id_l", "lot_id IS NOT NULL")
+
+	fixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+	receipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PG-PR-SHAPE-" + fixtures.suffix,
+		SupplierName: "PG供应商",
+		ReceivedAt:   time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create postgres purchase receipt shape draft failed: %v", err)
+	}
+	if _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected postgres draft receipt cancel to be rejected, got %v", err)
+	}
+	if _, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PG-PR-SHAPE-" + fixtures.suffix,
+		SupplierName: "PG供应商",
+		ReceivedAt:   time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC),
+	}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected postgres receipt_no unique constraint, got %v", err)
+	}
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:    receipt.ID,
+		MaterialID:   fixtures.materialID,
+		WarehouseID:  fixtures.warehouseID,
+		UnitID:       fixtures.unitID,
+		Quantity:     mustDecimal(t, "1"),
+		SourceLineNo: stringPtr("same-line"),
+	}); err != nil {
+		t.Fatalf("create postgres source line item failed: %v", err)
+	}
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:    receipt.ID,
+		MaterialID:   fixtures.materialID,
+		WarehouseID:  fixtures.warehouseID,
+		UnitID:       fixtures.unitID,
+		Quantity:     mustDecimal(t, "1"),
+		SourceLineNo: stringPtr("same-line"),
+	}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected postgres receipt source_line_no unique constraint, got %v", err)
+	}
+	if _, err := client.PurchaseReceiptItem.Create().
+		SetReceiptID(receipt.ID).
+		SetMaterialID(fixtures.materialID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetUnitID(fixtures.unitID).
+		SetQuantity(decimal.Zero).
+		Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected postgres quantity DB check, got %v", err)
+	}
+	if _, err := client.PurchaseReceiptItem.Create().
+		SetReceiptID(receipt.ID).
+		SetMaterialID(fixtures.materialID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetUnitID(fixtures.unitID).
+		SetQuantity(mustDecimal(t, "1")).
+		SetUnitPrice(mustDecimal(t, "-0.01")).
+		Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected postgres unit_price DB check, got %v", err)
+	}
+	if _, err := client.PurchaseReceiptItem.Create().
+		SetReceiptID(receipt.ID).
+		SetMaterialID(fixtures.materialID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetUnitID(fixtures.unitID).
+		SetQuantity(mustDecimal(t, "1")).
+		SetAmount(mustDecimal(t, "-0.01")).
+		Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected postgres amount DB check, got %v", err)
+	}
+}
+
+func TestPurchaseReceiptPostgresFlow(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+
+	fixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(
+		data,
+		log.NewStdLogger(io.Discard),
+	))
+	invFixtures := inventoryTestFixtures{
+		unitID:      fixtures.unitID,
+		materialID:  fixtures.materialID,
+		productID:   fixtures.productID,
+		warehouseID: fixtures.warehouseID,
+	}
+
+	posted := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PR-FLOW-"+fixtures.suffix, invFixtures, stringPtr("PG-LOT-FLOW-"+fixtures.suffix), mustDecimal(t, "10"))
+	lotID := posted.Items[0].LotID
+	if lotID == nil {
+		t.Fatalf("expected postgres posted purchase receipt lot_id")
+	}
+	balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		LotID:       lotID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get postgres purchase receipt lot balance failed: %v", err)
+	}
+	assertDecimalEqual(t, balance.Quantity, "10")
+
+	inboundTxn, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReceiptSourceType),
+			inventorytxn.SourceID(posted.ID),
+			inventorytxn.SourceLineID(posted.Items[0].ID),
+			inventorytxn.TxnType(biz.InventoryTxnIn),
+		).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("find postgres purchase receipt inbound txn failed: %v", err)
+	}
+	assertOptionalIntEqual(t, inboundTxn.LotID, *lotID)
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:   posted.ID,
+		MaterialID:  fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+		Quantity:    mustDecimal(t, "1"),
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected postgres posted receipt item add to be rejected, got %v", err)
+	}
+	if _, err := client.PurchaseReceipt.UpdateOneID(posted.ID).SetStatus(biz.PurchaseReceiptStatusDraft).Save(ctx); err == nil {
+		t.Fatalf("expected postgres posted receipt status update to be rejected")
+	}
+	if _, err := client.PurchaseReceiptItem.UpdateOneID(posted.Items[0].ID).SetQuantity(mustDecimal(t, "11")).Save(ctx); err == nil {
+		t.Fatalf("expected postgres posted receipt item quantity update to be rejected")
+	}
+	if _, err := client.PurchaseReceipt.Delete().Where(purchasereceipt.ID(posted.ID)).Exec(ctx); err == nil {
+		t.Fatalf("expected postgres posted receipt bulk delete to be rejected")
+	}
+	if err := client.PurchaseReceiptItem.DeleteOneID(posted.Items[0].ID).Exec(ctx); err == nil {
+		t.Fatalf("expected postgres posted receipt item delete-one to be rejected")
+	}
+
+	if _, err := uc.PostPurchaseReceipt(ctx, posted.ID); err != nil {
+		t.Fatalf("repeat postgres purchase receipt post failed: %v", err)
+	}
+	inboundCount, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReceiptSourceType),
+			inventorytxn.SourceID(posted.ID),
+			inventorytxn.SourceLineID(posted.Items[0].ID),
+			inventorytxn.TxnType(biz.InventoryTxnIn),
+		).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count postgres purchase receipt inbound txns failed: %v", err)
+	}
+	if inboundCount != 1 {
+		t.Fatalf("expected one postgres inbound txn after repeat post, got %d", inboundCount)
+	}
+
+	second := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PR-FLOW-REUSE-"+fixtures.suffix, invFixtures, stringPtr("PG-LOT-FLOW-"+fixtures.suffix), mustDecimal(t, "2"))
+	assertOptionalIntEqual(t, second.Items[0].LotID, *lotID)
+	reusedBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		LotID:       lotID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get postgres reused lot balance failed: %v", err)
+	}
+	assertDecimalEqual(t, reusedBalance.Quantity, "12")
+
+	nonLot := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PR-FLOW-NOLOT-"+fixtures.suffix, invFixtures, nil, mustDecimal(t, "4"))
+	if nonLot.Items[0].LotID != nil {
+		t.Fatalf("expected postgres non-lot purchase receipt item lot_id nil")
+	}
+	nonLotBalance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get postgres non-lot purchase balance failed: %v", err)
+	}
+	assertDecimalEqual(t, nonLotBalance.Quantity, "4")
+
+	cancelled, err := uc.CancelPostedPurchaseReceipt(ctx, posted.ID)
+	if err != nil {
+		t.Fatalf("cancel postgres posted purchase receipt failed: %v", err)
+	}
+	if cancelled.Status != biz.PurchaseReceiptStatusCancelled {
+		t.Fatalf("expected postgres cancelled receipt, got %s", cancelled.Status)
+	}
+	if _, err := uc.PostPurchaseReceipt(ctx, posted.ID); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected postgres cancelled receipt post to be rejected, got %v", err)
+	}
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:   posted.ID,
+		MaterialID:  fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		UnitID:      fixtures.unitID,
+		Quantity:    mustDecimal(t, "1"),
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("expected postgres cancelled receipt item add to be rejected, got %v", err)
+	}
+	if _, err := client.PurchaseReceipt.UpdateOneID(posted.ID).SetSupplierName("PG修改供应商").Save(ctx); err == nil {
+		t.Fatalf("expected postgres cancelled receipt protected update to be rejected")
+	}
+	if _, err := client.PurchaseReceiptItem.UpdateOneID(posted.Items[0].ID).SetLotNo("PG-LOT-CHANGED").Save(ctx); err == nil {
+		t.Fatalf("expected postgres cancelled receipt item lot_no update to be rejected")
+	}
+	if err := client.PurchaseReceipt.DeleteOneID(posted.ID).Exec(ctx); err == nil {
+		t.Fatalf("expected postgres cancelled receipt delete-one to be rejected")
+	}
+	if _, err := client.PurchaseReceiptItem.Delete().Where(purchasereceiptitem.ID(posted.Items[0].ID)).Exec(ctx); err == nil {
+		t.Fatalf("expected postgres cancelled receipt item bulk delete to be rejected")
+	}
+	afterCancel, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectMaterial,
+		SubjectID:   fixtures.materialID,
+		WarehouseID: fixtures.warehouseID,
+		LotID:       lotID,
+		UnitID:      fixtures.unitID,
+	})
+	if err != nil {
+		t.Fatalf("get postgres lot balance after cancel failed: %v", err)
+	}
+	assertDecimalEqual(t, afterCancel.Quantity, "2")
+	reversalCount, err := client.InventoryTxn.Query().
+		Where(inventorytxn.ReversalOfTxnID(inboundTxn.ID)).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count postgres purchase receipt reversal failed: %v", err)
+	}
+	if reversalCount != 1 {
+		t.Fatalf("expected one postgres reversal, got %d", reversalCount)
+	}
+	traceTxns, err := client.InventoryTxn.Query().
+		Where(
+			inventorytxn.SourceType(biz.PurchaseReceiptSourceType),
+			inventorytxn.SourceID(posted.ID),
+			inventorytxn.SourceLineID(posted.Items[0].ID),
+		).
+		All(ctx)
+	if err != nil {
+		t.Fatalf("query postgres purchase receipt trace txns failed: %v", err)
+	}
+	if len(traceTxns) != 2 {
+		t.Fatalf("expected postgres inbound and reversal trace txns, got %d", len(traceTxns))
+	}
+	for _, txn := range traceTxns {
+		assertOptionalIntEqual(t, txn.SourceID, posted.ID)
+		assertOptionalIntEqual(t, txn.SourceLineID, posted.Items[0].ID)
+		assertOptionalIntEqual(t, txn.LotID, *lotID)
+		if err := client.InventoryTxn.DeleteOneID(txn.ID).Exec(ctx); err == nil {
+			t.Fatalf("expected postgres trace inventory txn delete to be rejected")
+		}
+	}
+	if _, err := client.PurchaseReceipt.Get(ctx, posted.ID); err != nil {
+		t.Fatalf("postgres receipt should remain after failed deletes: %v", err)
+	}
+	if _, err := client.PurchaseReceiptItem.Get(ctx, posted.Items[0].ID); err != nil {
+		t.Fatalf("postgres receipt item should remain after failed deletes: %v", err)
+	}
+	if _, err := uc.CancelPostedPurchaseReceipt(ctx, posted.ID); err != nil {
+		t.Fatalf("repeat postgres purchase receipt cancel failed: %v", err)
+	}
+	reversalCount, err = client.InventoryTxn.Query().
+		Where(inventorytxn.ReversalOfTxnID(inboundTxn.ID)).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count postgres purchase receipt reversal after repeat cancel failed: %v", err)
+	}
+	if reversalCount != 1 {
+		t.Fatalf("expected one postgres reversal after repeat cancel, got %d", reversalCount)
+	}
+}

@@ -16,9 +16,7 @@ import {
   Button,
   Dropdown,
   Form,
-  Input,
   Popconfirm,
-  Select,
   Space,
   Tag,
   Tooltip,
@@ -43,7 +41,6 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateInput,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -56,6 +53,14 @@ import {
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import {
+  QualityInspectionCreateForm,
+  QualityInspectionDecisionForm,
+  buildDecisionParams,
+  buildInspectionParams,
+  positiveInt,
+  todayInputValue,
+} from '../components/quality-inspections/QualityInspectionForms.jsx'
 import {
   compactParams,
   formatUnixDate,
@@ -104,11 +109,6 @@ const RESULT_FILTER_OPTIONS = [
   { label: '合格', value: 'PASS' },
   { label: '让步接收', value: 'CONCESSION' },
   { label: '不合格', value: 'REJECT' },
-]
-
-const RESULT_DECISION_OPTIONS = [
-  { label: '合格', value: 'PASS' },
-  { label: '让步接收', value: 'CONCESSION' },
 ]
 
 const STATUS_LABELS = Object.freeze({
@@ -163,17 +163,6 @@ function hasPermission(adminProfile, permission) {
     adminProfile?.is_super_admin === true ||
     hasActionPermission(adminProfile, permission)
   )
-}
-
-function positiveInt(value) {
-  const numeric = Number(value || 0)
-  return Number.isFinite(numeric) && numeric > 0
-    ? Math.trunc(numeric)
-    : undefined
-}
-
-function todayInputValue() {
-  return new Date().toISOString().slice(0, 10)
 }
 
 function readStoredColumnOrder(moduleKey) {
@@ -242,29 +231,6 @@ function downloadCSV({ filename, columns, rows }) {
   anchor.click()
   anchor.remove()
   URL.revokeObjectURL(url)
-}
-
-function buildInspectionParams(values = {}) {
-  return compactParams({
-    inspection_no: trimOptional(values.inspection_no),
-    purchase_receipt_id: positiveInt(values.purchase_receipt_id),
-    purchase_receipt_item_id: positiveInt(values.purchase_receipt_item_id),
-    inventory_lot_id: positiveInt(values.inventory_lot_id),
-    material_id: positiveInt(values.material_id),
-    warehouse_id: positiveInt(values.warehouse_id),
-    inspector_id: positiveInt(values.inspector_id),
-    decision_note: trimOptional(values.decision_note),
-  })
-}
-
-function buildDecisionParams(inspectionID, values = {}, result = '') {
-  return compactParams({
-    id: positiveInt(inspectionID),
-    result: result || trimOptional(values.result),
-    inspected_at: trimOptional(values.inspected_at),
-    inspector_id: positiveInt(values.inspector_id),
-    decision_note: trimOptional(values.decision_note),
-  })
 }
 
 function findByPositiveID(id, records = []) {
@@ -434,9 +400,7 @@ export default function V1QualityInspectionsPage() {
       setRows(nextRows)
       setSelectedRow((current) =>
         current?.id
-          ? nextRows.find((item) => item.id === current.id) ||
-            nextRows[0] ||
-            null
+          ? nextRows.find((item) => item.id === current.id) || null
           : null
       )
       setTotal(Number(data?.total || 0))
@@ -1256,136 +1220,22 @@ export default function V1QualityInspectionsPage() {
         cancelText="关闭"
       >
         {inspectionModal?.mode === 'create' ? (
-          <Form
+          <QualityInspectionCreateForm
             form={inspectionForm}
-            layout="vertical"
-            className="erp-business-action-form erp-business-action-form--grid"
-          >
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="质检单号（自动）"
-              name="inspection_no"
-              rules={[{ required: true, message: '请填写或保留自动质检单号' }]}
-            >
-              <Input
-                allowClear
-                autoComplete="off"
-                placeholder="自动生成，可按需要调整"
-              />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="采购入库单"
-              name="purchase_receipt_id"
-              rules={[{ required: true, message: '请选择采购入库单' }]}
-            >
-              <Select
-                allowClear
-                optionFilterProp="label"
-                options={purchaseReceiptOptions}
-                placeholder="请选择采购入库单"
-                showSearch
-                onChange={handleReceiptChange}
-              />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="采购入库行"
-              name="purchase_receipt_item_id"
-            >
-              <Select
-                allowClear
-                optionFilterProp="label"
-                options={purchaseReceiptItemOptions}
-                placeholder="请选择采购入库行"
-                showSearch
-                onChange={handleReceiptItemChange}
-              />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="批次"
-              name="inventory_lot_id"
-              rules={[{ required: true, message: '请选择批次' }]}
-            >
-              <Select
-                allowClear
-                optionFilterProp="label"
-                options={inventoryLotOptions}
-                placeholder="请选择批次"
-                showSearch
-                onChange={handleInventoryLotChange}
-              />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="材料"
-              name="material_id"
-              rules={[{ required: true, message: '请选择材料' }]}
-            >
-              <Select
-                allowClear
-                optionFilterProp="label"
-                options={materialOptions}
-                placeholder="请选择材料"
-                showSearch
-              />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field"
-              label="仓库"
-              name="warehouse_id"
-              rules={[{ required: true, message: '请选择仓库' }]}
-            >
-              <Select
-                allowClear
-                optionFilterProp="label"
-                options={warehouseOptions}
-                placeholder="请选择仓库"
-                showSearch
-              />
-            </Form.Item>
-            <Form.Item
-              className="erp-business-action-form__field erp-business-action-form__field--wide"
-              label="备注"
-              name="decision_note"
-            >
-              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
-            </Form.Item>
-          </Form>
+            purchaseReceiptOptions={purchaseReceiptOptions}
+            purchaseReceiptItemOptions={purchaseReceiptItemOptions}
+            inventoryLotOptions={inventoryLotOptions}
+            materialOptions={materialOptions}
+            warehouseOptions={warehouseOptions}
+            onReceiptChange={handleReceiptChange}
+            onReceiptItemChange={handleReceiptItemChange}
+            onInventoryLotChange={handleInventoryLotChange}
+          />
         ) : (
-          <Form
+          <QualityInspectionDecisionForm
             form={decisionForm}
-            layout="vertical"
-            className="erp-business-action-form erp-business-action-form--grid"
-          >
-            {inspectionModal?.mode === 'pass' ? (
-              <Form.Item
-                className="erp-business-action-form__field"
-                label="判定结果"
-                name="result"
-                rules={[{ required: true, message: '请选择判定结果' }]}
-              >
-                <Select options={RESULT_DECISION_OPTIONS} />
-              </Form.Item>
-            ) : null}
-            {inspectionModal?.mode !== 'cancel' ? (
-              <Form.Item
-                className="erp-business-action-form__field"
-                label="检验日期"
-                name="inspected_at"
-              >
-                <DateInput />
-              </Form.Item>
-            ) : null}
-            <Form.Item
-              className="erp-business-action-form__field erp-business-action-form__field--wide"
-              label="判定备注"
-              name="decision_note"
-            >
-              <Input.TextArea autoSize={{ minRows: 2, maxRows: 4 }} />
-            </Form.Item>
-          </Form>
+            mode={inspectionModal?.mode}
+          />
         )}
       </BusinessFormModal>
     </BusinessPageLayout>

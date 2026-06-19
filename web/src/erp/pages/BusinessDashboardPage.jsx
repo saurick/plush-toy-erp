@@ -6,7 +6,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
-  dashboardModules,
+  dashboardHealthModules,
   dashboardStatusGroups,
 } from '../config/dashboardModules.mjs'
 import {
@@ -104,7 +104,7 @@ export default function BusinessDashboardPage() {
   }, [loadDashboardStats, outletContext])
 
   const moduleRows = useMemo(
-    () => buildDashboardModuleRows(dashboardModules, moduleStats),
+    () => buildDashboardModuleRows(dashboardHealthModules, moduleStats),
     [moduleStats]
   )
   const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
@@ -195,7 +195,7 @@ export default function BusinessDashboardPage() {
               业务看板
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
-              看业务对象是否健康，并进入对应标准页处理。
+              看核心业务对象族是否健康，并进入对应标准页处理。
             </Paragraph>
           </div>
         </div>
@@ -224,7 +224,7 @@ export default function BusinessDashboardPage() {
       <Card
         className="erp-dashboard-card erp-dashboard-table-card"
         variant="borderless"
-        title="业务对象健康"
+        title="核心链路健康"
       >
         <Table
           size="middle"
@@ -237,7 +237,7 @@ export default function BusinessDashboardPage() {
           scroll={{ x: 760 }}
           columns={[
             {
-              title: '模块',
+              title: '对象族',
               dataIndex: 'module',
               fixed: 'left',
               width: 220,

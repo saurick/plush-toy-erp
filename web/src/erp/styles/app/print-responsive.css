@@ -1,0 +1,421 @@
+@media screen and (max-width: 991px) {
+  .erp-admin-sider {
+    display: none !important;
+  }
+
+  .erp-admin-header {
+    padding: 16px;
+  }
+
+  .erp-admin-header__menu-button {
+    display: inline-flex;
+  }
+
+  .erp-admin-header__meta {
+    gap: 8px;
+  }
+
+  .erp-admin-content {
+    padding: 16px;
+  }
+
+  .erp-admin-page-head__aside,
+  .erp-login-card .ant-card-body {
+    padding: 20px;
+  }
+
+  .erp-login-logo {
+    gap: 10px;
+  }
+
+  .erp-login-logo__mark.erp-admin-brand__logo-mark {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    font-size: 22px;
+  }
+
+  .erp-login-logo__title {
+    font-size: 1.2rem;
+    letter-spacing: 0.01em;
+    line-height: 1.05;
+  }
+}
+
+.erp-report-thumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0 auto;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #7c2d12;
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.15;
+}
+
+.erp-phone-frame {
+  border: 1px solid rgb(255 255 255 / 0.12);
+  background:
+    linear-gradient(180deg, rgb(15 23 42 / 0.96), rgb(2 6 23 / 0.96)),
+    rgb(2 6 23 / 0.92);
+  border-radius: 32px;
+  padding: 0.75rem;
+  box-shadow: 0 28px 60px rgb(15 23 42 / 0.36);
+}
+
+.erp-phone-screen {
+  min-height: 32rem;
+  border-radius: 24px;
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background:
+    radial-gradient(circle at top, rgb(34 211 238 / 0.16), transparent 36%),
+    linear-gradient(180deg, rgb(15 23 42 / 0.96), rgb(2 6 23 / 0.96));
+  padding: 1.25rem;
+}
+
+@media screen and (max-width: 1023px) {
+  .erp-dev-hub-pinned__grid,
+  .erp-dev-hub-recent__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-hub-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-docs-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .erp-dev-prototypes-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .erp-dev-testing-shell {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .erp-dev-docs-sidebar,
+  .erp-dev-docs-reader,
+  .erp-dev-prototypes-sidebar,
+  .erp-dev-prototypes-reader,
+  .erp-dev-testing-sidebar,
+  .erp-dev-testing-reader {
+    max-height: none;
+  }
+
+  .erp-dev-docs-list {
+    max-height: 260px;
+  }
+
+  .erp-dev-prototypes-list {
+    max-height: 360px;
+  }
+
+  .erp-dev-testing-doc-list {
+    max-height: 360px;
+  }
+
+  .erp-dev-testing-tier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-presets {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-tier__head {
+    flex-direction: column;
+  }
+
+  .erp-dev-testing-tier__head .ant-btn {
+    width: 100%;
+  }
+
+  .erp-dev-prototypes-preview__frame {
+    height: 720px;
+    flex-basis: 720px;
+  }
+
+  .erp-dev-docs-tree {
+    max-height: min(52vh, 560px);
+  }
+
+  .erp-admin-page-head {
+    flex-direction: column;
+  }
+
+  .erp-admin-page-head__aside {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .erp-phone-screen {
+    min-height: 28rem;
+  }
+
+  .erp-print-shell__content {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-print-shell__record-panel,
+  .erp-print-shell__stage {
+    max-height: none;
+  }
+
+  .erp-print-paper,
+  .erp-print-paper--landscape {
+    padding: 1rem;
+    border-radius: 20px;
+  }
+
+  .erp-print-meta-grid,
+  .erp-print-signature,
+  .erp-summary-sheet__meta {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-material-contract-meta__pair {
+    grid-template-columns: 1fr;
+    row-gap: 1.4mm;
+  }
+
+  .erp-material-contract-meta__cell--right {
+    padding-left: 0;
+  }
+
+  .erp-material-contract-meta__top-row {
+    grid-template-columns: 1fr;
+    row-gap: 1.4mm;
+  }
+
+  .erp-material-contract-signature {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 767px) {
+  .erp-dev-hub-page {
+    padding: 10px;
+  }
+
+  .erp-dev-docs-page {
+    padding: 10px;
+  }
+
+  .erp-dev-prototypes-page {
+    padding: 10px;
+  }
+
+  .erp-dev-testing-page {
+    padding: 10px;
+  }
+
+  .erp-dev-hub-header,
+  .erp-dev-hub-shell,
+  .erp-dev-docs-header,
+  .erp-dev-docs-sidebar,
+  .erp-dev-docs-reader,
+  .erp-dev-prototypes-header,
+  .erp-dev-prototypes-sidebar,
+  .erp-dev-prototypes-reader,
+  .erp-dev-testing-header,
+  .erp-dev-testing-sidebar,
+  .erp-dev-testing-reader {
+    border-radius: 12px;
+  }
+
+  .erp-dev-hub-header,
+  .erp-dev-hub-governance,
+  .erp-dev-hub-toolbar,
+  .erp-dev-testing-header,
+  .erp-dev-testing-reader__toolbar,
+  .erp-dev-prototypes-header,
+  .erp-dev-prototypes-reader__toolbar,
+  .erp-dev-prototypes-reader__info,
+  .erp-dev-prototypes-fullscreen__bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .erp-dev-hub-header__metrics {
+    grid-template-columns: 1fr;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .erp-dev-hub-toolbar .ant-input-search {
+    width: 100%;
+    max-width: none;
+  }
+
+  .erp-dev-hub-group-filter.ant-segmented {
+    width: 100%;
+  }
+
+  .erp-dev-hub-group-filter .ant-segmented-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .erp-dev-hub-group-filter .ant-segmented-item-label {
+    white-space: normal;
+  }
+
+  .erp-dev-hub-card {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-hub-card--compact {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-hub-card__head,
+  .erp-dev-hub-card__foot {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .erp-dev-hub-card__actions {
+    justify-content: flex-start;
+  }
+
+  .erp-dev-testing-header__stats {
+    grid-template-columns: 1fr;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .erp-dev-testing-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-testing-filter__item {
+    width: 100%;
+  }
+
+  .erp-dev-testing-reader__toolbar .ant-segmented {
+    width: 100%;
+  }
+
+  .erp-dev-testing-reader__toolbar .ant-segmented-group {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .erp-dev-testing-reader__toolbar .ant-segmented-item-label {
+    min-height: 32px;
+    padding-inline: 6px;
+  }
+
+  .erp-dev-prototypes-reader__meta,
+  .erp-dev-prototypes-reader__meta .ant-btn,
+  .erp-dev-prototypes-fullscreen__bar .ant-btn {
+    width: 100%;
+  }
+
+  .erp-dev-prototypes-header__stats {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .erp-dev-prototypes-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-prototypes-filter__item {
+    width: 100%;
+  }
+
+  .erp-dev-docs-reader__toolbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .erp-dev-docs-reader__toolbar .ant-btn {
+    width: 100%;
+  }
+
+  .erp-dev-docs-markdown {
+    padding: 14px;
+  }
+
+  .erp-dev-docs-markdown h1 {
+    font-size: 22px;
+  }
+
+  .erp-dev-docs-markdown h2 {
+    font-size: 18px;
+  }
+
+  .erp-dev-prototypes-preview__frame {
+    height: 640px;
+    flex-basis: 640px;
+  }
+
+  .erp-admin-page-head__aside {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-admin-content {
+    padding: 12px;
+  }
+
+  .erp-print-shell {
+    padding: 10px;
+  }
+
+  .erp-print-shell__toolbar,
+  .erp-print-shell__record-panel,
+  .erp-print-shell__stage {
+    padding: 10px;
+  }
+
+  .erp-print-shell__toolbar-copy,
+  .erp-print-shell__toolbar-actions,
+  .erp-print-shell__toolbar-group {
+    width: 100%;
+  }
+
+  .erp-processing-contract-upload-bar__item {
+    align-items: flex-start;
+  }
+
+  .erp-processing-contract-upload-bar__status {
+    width: 100%;
+  }
+
+  .erp-processing-contract-attachments {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-processing-contract-attachments__item--attachment-1,
+  .erp-processing-contract-attachments__item--attachment-2 {
+    grid-column: auto;
+  }
+
+  .erp-material-contract-stage {
+    padding: 0.5rem;
+  }
+
+  .erp-material-contract-paper {
+    padding: 8mm 6mm 8mm;
+    border-radius: 10px;
+  }
+
+  .erp-material-contract-table {
+    font-size: 3.2mm;
+  }
+}

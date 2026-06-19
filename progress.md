@@ -316,3 +316,65 @@
 - 验证：本轮追加前 `progress.md` 为 309 行、62128 字节，未达到归档阈值；`node --check web/scripts/styleL1.mjs`、`node --check web/scripts/style-l1/adminRpcMocks.mjs`、`pnpm --dir web exec eslint --ext .mjs scripts/styleL1.mjs scripts/style-l1/adminRpcMocks.mjs`、`pnpm --dir web css` 均通过；`STYLE_L1_PORT=4312 STYLE_L1_SCENARIOS=erp-dashboard-desktop,business-formal-module-shells-desktop,print-center-desktop,purchase-receipt-create-modal-desktop pnpm --dir web style:l1` 通过，4 个场景。首次使用 4302 端口时因端口占用失败，已换端口复跑通过。
 - 下一步：如继续处理大文件，优先单独拆 `styleL1.mjs` 的场景索引 / 断言 helper，或按业务域继续拆仍超过 3k 行的 CSS partial；不要把后端 usecase、schema、部署和页面结构重构混在同一轮。
 - 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置 loader、部署、后端 JSON-RPC 或真实业务写入；未跑全量 `pnpm style:l1`、全量 `pnpm test`、后端 Go 测试或部署检查。当前工作区仍有多组非本轮并行改动，未提交、未推送。
+
+## 2026-06-19 全局大文件职责拆分续做
+
+- 完成：继续按 `plush-page-design-governance` 和 `plush-docs-governance` 做全局大文件治理；`V1MasterDataPage.jsx` 抽出 `components/master-data/MasterDataForm.jsx`，表单字段、联系人行、单位选择和文本候选输入从页面壳分离，页面保留数据流、弹窗状态和操作编排。
+- 完成：将 `business-surfaces.css`、`dev-surfaces.css`、`print-surfaces.css`、`shell-dashboard.css` 按页面职责继续拆成 app CSS partial；保留 `theme-overrides.css` 单文件，因为暗色覆盖依赖一组跨文件 stylelint disable/enable 与原始层叠顺序，机械切分会提高风险。
+- 完成：将 `inventory_repo_test.go`、`inventory_postgres_test.go`、`workflow_repo_test.go`、`workflow_test.go` 按采购入库 / 退货 / 调整 / 质检 / workflow 场景拆为多文件测试；共享 fixture/helper 留在原包内复用，不改 repo/usecase 行为。
+- 完成：将 `styleL1.mjs` 的颜色识别、对比度和 focus ring 断言抽到 `web/scripts/style-l1/colorAssertions.mjs`；场景数组、浏览器 runner、mock 行为和 `style:l1` 命令入口保持不变。
+- 验证：本轮追加前 `progress.md` 为 318 行、64586 字节，未达到归档阈值；`pnpm --dir web exec eslint --ext .jsx src/erp/pages/V1MasterDataPage.jsx src/erp/components/master-data/MasterDataForm.jsx` 通过；`pnpm --dir web css` 通过；`node --check web/scripts/styleL1.mjs` 和 `node --check web/scripts/style-l1/colorAssertions.mjs` 通过；`go test ./internal/data -run 'TestInventory(MasterDataCodeUnique|Repo_|TxnRejectsHistoricalDelete|QuantityGeneratedTypeIsDecimal)|TestPhase2(Postgres|A|B|C|D|DB|DC2)|TestOperationalFactPostgres|TestWorkflowRepo_(Create|Get|Update|OrderRevision|PurchaseIQC|WarehouseInbound|OutsourceReturnQC|FinishedGoods|ShipmentRelease|Upsert|Urge)'` 通过；`go test ./internal/biz -run 'TestWorkflowUsecase_(PurchaseIQC|WarehouseInbound|OutsourceReturnQC|FinishedGoods|ShipmentRelease|SameNameNonPurchaseIQCTask|SameNameNonWarehouseInboundTask|SameNameNonOutsourceReturnQCTask|SameNameNonFinishedGoods|SameNameNonShipmentReleaseTask)'` 通过；`STYLE_L1_PORT=4189 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,print-center-desktop,dev-hub-dark-desktop pnpm --dir web style:l1` 通过，3 个场景；`git diff --check` 通过。
+- 下一步：剩余大文件优先按业务风险单独拆，例如 `V1SalesOrdersPage.jsx`、`V1PurchaseOrdersPage.jsx`、`OperationalFactsPage.jsx`、导入脚本和核心 usecase；这些文件包含真实状态编排或业务边界，不应在同一轮继续做无测试支撑的机械切分。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署、正式文档入口或真实业务写入；未跑全量 `pnpm test`、全量 `pnpm style:l1`、全量 Go 测试或部署检查。
+
+## 2026-06-19 全局大文件复查与 Boss approval 测试拆分
+
+- 完成：再次按 `plush-page-design-governance` 和 `plush-docs-governance` 复查大文件治理状态，确认上一轮已完成多处安全拆分，但“全局所有大文件一次做完”仍未完全达成。
+- 完成：将 `server/internal/biz/workflow_test.go` 中 Boss approval 规则测试迁出到 `server/internal/biz/workflow_boss_approval_test.go`，保留原有 helper / stub 复用，不改 `WorkflowUsecase` 行为、不改断言语义；`workflow_test.go` 从 1480 行降到 1191 行。
+- 完成：复查 `web/scripts/style-l1/adminRpcMocks.mjs`，确认它是 L1 的多 RPC route mock 真源，直接拆分会牵涉共享 mock 数据、页面回归契约和大量 route 安装器；本轮不为降行数继续打散。
+- 验证：本轮追加前 `progress.md` 为 328 行、67510 字节，未达到归档阈值；`go test ./internal/biz -run 'TestWorkflowUsecase_(BossApproval|NonBossApproval|SameNameNonBossApproval|PurchaseIQC|WarehouseInbound|OutsourceReturnQC|FinishedGoods|ShipmentRelease|SameNameNonPurchaseIQCTask|SameNameNonWarehouseInboundTask|SameNameNonOutsourceReturnQCTask|SameNameNonFinishedGoods|SameNameNonShipmentReleaseTask)'` 通过；`git diff --check` 通过。
+- 下一步：剩余大文件应按单独业务闭环继续拆：`styleL1.mjs` / `adminRpcMocks.mjs` 需要先定义 mock route 分层，销售 / 采购 / 运营事实页面需要对应页面 L1 回归，`workflow.go` 和导入脚本需要先做 usecase / 导入链路边界评审。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、页面结构、Workflow / Fact usecase、客户配置、部署或正式文档入口；未跑全量 `pnpm test`、全量 `pnpm style:l1`、全量 Go 测试或部署检查。
+
+## 2026-06-19 全局大文件职责拆分收口
+
+- 完成：继续按 `plush-page-design-governance` 和 `plush-docs-governance` 收口本批大文件；`styleL1.mjs` 继续拆出 `style-l1/scenarios.mjs`、`style-l1/mobileTaskAssertions.mjs` 和 `style-l1/printAssertions.mjs`，`adminRpcMocks.mjs` 拆成 system / masterData / order / fact route mock 安装器，主 L1 脚本保留 runner、通用断言和少量跨场景 helper。
+- 完成：销售、采购、运营事实页面按页面职责拆分：销售订单表单迁入 `components/sales-orders/SalesOrderForm.jsx`，采购订单表单迁入 `components/purchase-orders/PurchaseOrderForm.jsx`，运营事实动作表单和建参 helper 迁入 `components/operational-facts/OperationalFactForms.jsx`；页面壳保留列表、选择、弹窗状态、保存和业务动作编排。
+- 完成：`workflow.go` 按 Workflow 规则边界拆出 `workflow_task_matchers.go`、`workflow_derived_tasks.go`、`workflow_side_effects.go`、`workflow_downstream_tasks.go`、`workflow_payload_helpers.go`；主文件保留状态字典、类型、repo 接口和 usecase 编排，不改 Workflow / Fact 边界。
+- 完成：修正 L1 工序候选断言的 AutoComplete 弹层读取方式，先打开候选列表再按需过滤，避免 AntD popup 时序导致默认候选误判；不改变页面候选数据来源。
+- 验证：本轮追加前 `progress.md` 为 337 行、69309 字节，未达到归档阈值；`node --check` 覆盖 `styleL1.mjs`、`scenarios.mjs`、`mobileTaskAssertions.mjs`；脚本与页面定向 ESLint 通过；`pnpm --dir web css` 通过；`pnpm --dir web test` 通过，359 项；`go test ./...` 通过；`STYLE_L1_PORT=4332 STYLE_L1_SCENARIOS=erp-dashboard-desktop,business-formal-module-shells-desktop,mobile-tasks-dark,print-center-desktop pnpm --dir web style:l1` 通过，4 个场景；`git diff --check` 通过。
+- 下一步：本批已按职责完成高风险大文件收口；剩余仍较大的运行文件如 `theme-overrides.css`、`V1OutsourcingOrdersPage.jsx`、`V1QualityInspectionsPage.jsx`、`MaterialPurchaseContractWorkbench.jsx`、`printPdf.mjs` 等应按后续具体业务 / 样式回归单独拆，不建议为了行数继续硬切。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、客户配置、部署或真实业务写入；`style-l1/scenarios.mjs` 仍是 4600 行级场景注册表，属于 L1 场景索引职责，后续若继续拆应按场景域分组并补对应 smoke。
+
+## 2026-06-19 业务看板核心链路健康收口
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 将 `/erp/business-dashboard` 的表格从 3 个基础对象扩展为低密度对象族：客户/供应商、产品/BOM、销售订单、采购/入库、质检/库存、出货/出库、生产/委外、财务事实；表格标题改为“核心链路健康”，列名改为“对象族”。
+- 完成：保留 `dashboardModules` 作为 Workflow 任务来源解析的单对象入口，新增 `dashboardHealthModules` 供业务看板聚合展示；`buildDashboardModuleRows` 支持按 `sourceKeys` 汇总后端已有 `dashboard_stats` projection，不新增 API、RBAC、schema、migration 或事实写入。
+- 完成：同步业务管理中心原型 README 的当前运行时口径，说明运行时按后端已有 projection keys 聚合为对象族，不是只显示 3 个基础对象，也不是铺满完整菜单；不新增文档、不改标题 / 路径 / 分类，不更新 `docs/文档清单.md`。
+- 验证：本轮追加前 `progress.md` 为 337 行、69309 字节，未达到归档阈值；`pnpm --dir web exec node --test src/erp/utils/dashboardStats.test.mjs src/erp/utils/workflowDashboardStats.test.mjs` 通过，12 项；`pnpm --dir web test` 通过，360 项；`pnpm --dir web css` 通过；定向 ESLint 覆盖业务看板页面、配置、聚合工具、测试和 L1 脚本通过；`STYLE_L1_PORT=4337 STYLE_L1_SCENARIOS=erp-business-dashboard-desktop,erp-business-dashboard-dark-desktop,erp-business-dashboard-mobile pnpm --dir web style:l1` 通过，3 个场景；`git diff --check` 通过。
+- 下一步：如要继续增强业务看板，应先评审后端各 projection 的统计口径，尤其库存 / 财务 / 质检是否需要独立只读 read model；不要在前端伪造未返回的业务事实数量。
+- 阻塞/风险：本轮只改业务看板前端聚合、L1 断言和原型说明；不改正式菜单、客户菜单、权限码、后端 usecase、Workflow / Fact 边界、部署或真实业务写入。
+
+## 2026-06-19 中高收益大文件继续拆分
+
+- 完成：继续按 `plush-page-design-governance` 和 `plush-docs-governance` 收口大文件职责；`styleL1.mjs` 新增采购入库断言模块，委外订单页抽出 `OutsourcingOrderForm`，来料质检页抽出创建 / 判定表单和提交参数 helper。
+- 完成：页面仍保留 API 编排、权限、筛选、表格、弹窗状态和生命周期动作；表单组件只承接字段、明细行、快照带值、行汇总和提交参数边界，不改变 JSON-RPC、Workflow / Fact 或真实业务写入。
+- 验证：本轮追加前 `progress.md` 为 356 行、73864 字节，未达到归档阈值；定向 ESLint 覆盖委外订单、质检页面和新表单组件通过；`node --check` 与定向 ESLint 覆盖 `styleL1.mjs`、`purchaseReceiptAssertions.mjs`、`scenarios.mjs` 通过；`pnpm --dir web css` 通过；`pnpm --dir web test` 通过，360 项；`go test ./...` 通过；`STYLE_L1_PORT=4343 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop,purchase-receipt-create-modal-desktop,purchase-receipt-add-item-modal-desktop pnpm --dir web style:l1` 匹配并通过 2 个真实场景，随后用实际场景名 `STYLE_L1_PORT=4344 STYLE_L1_SCENARIOS=purchase-receipt-add-item-modal-draft-desktop pnpm --dir web style:l1` 补跑添加明细弹窗通过；`git diff --check` 通过。
+- 下一步：`style-l1/scenarios.mjs` 和 `theme-overrides.css` 仍偏大，但前者是 L1 场景注册表、后者是全局主题覆盖真源；下一轮应按场景组 / token 分区配合真实视觉回归拆，不建议只为行数硬切。`V1MasterDataPage.jsx` 仍可按主数据域继续拆。
+- 阻塞/风险：未提交；本轮只改手写前端页面、表单组件、L1 断言和进度记录，不触碰生成代码、schema、migration、RBAC、菜单、部署或真实客户资料。
+
+## 2026-06-19 业务页初始选择清空修复
+
+- 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 定位业务页进入后默认勾选第一条的原因；`V1MasterDataPage` 和 `V1SalesOrdersPage` 的加载保持逻辑在空选择时回退到第一条记录，已改为只有当前显式选择仍存在于新结果时才保留，否则清空。
+- 完成：同步收口采购入库、出货、来料质检和库存台账的“当前记录消失后回退第一条”逻辑，筛选 / 分页后原选择不在当前结果时不再替用户选中新结果第一条；新增 `assertBusinessMainTableInitialSelectionEmpty` L1 断言，锁住材料、销售订单、采购入库、采购订单和出货单初始无选中态。
+- 验证：本轮追加前 `progress.md` 为 364 行、75726 字节，未达到归档阈值；临时 Playwright 探针确认材料、销售订单、采购入库、采购订单和出货单初始 `checked=0`、选中行数为 0、当前操作区为空态；定向 ESLint 覆盖本轮页面文件通过；全量只读 `pnpm --dir web exec eslint --ext .js --ext .jsx src/` 通过；`pnpm --dir web css` 通过；`pnpm --dir web test` 通过，360 项；`STYLE_L1_SCENARIOS=material-master-header-desktop,business-formal-module-shells-desktop,purchase-receipts-table-control-columns-desktop,purchase-order-date-filter-desktop,shipment-date-filter-desktop pnpm --dir web style:l1` 通过，5 个场景；`git diff --check` 通过。
+- 下一步：如还有其他具体页面出现“进入即选中”，先按同一口径检查是否存在本地默认选中、数据加载回退第一条或第三方控件视觉焦点误判，不在前端补造业务事实。
+- 阻塞/风险：本轮不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署、正式文档口径或真实业务写入；未跑全量 `pnpm style:l1`、后端 Go 测试或部署检查。
+
+## 2026-06-19 PostgreSQL 测试拆分命名收口
+
+- 完成：推送前置 `phase-label-boundaries` 拦截新拆出的 PostgreSQL 测试文件继续使用历史 `phase2*` 标签；已将 `inventory_postgres_phase2b_test.go` 改名为 `inventory_postgres_lot_bom_test.go`，并把拆出测试中的函数名、source_type 与幂等 key 收口为库存批次、BOM、采购入库、采购退货、采购调整和来料质检业务场景命名。
+- 完成：旧 `phase2*` PostgreSQL helper 仍保留在允许的兼容入口 `inventory_postgres_test.go`，新增业务名 wrapper 供拆分后的活跃测试调用；不扩大边界检查白名单，不改脚本外部兼容入口。
+- 验证：本轮追加前 `progress.md` 为 372 行、77655 字节，未达到归档阈值；`node scripts/qa/phase-label-boundaries.mjs` 通过；`go test ./internal/data` 通过。
+- 下一步：后续若继续迁移历史 PostgreSQL 脚本，应作为单独任务评审脚本名、环境变量和文档兼容边界。
+- 阻塞/风险：本轮只修复活跃测试命名和 wrapper，不改 schema、migration、真实数据源、库存 / 采购 / 质检 usecase 语义或部署脚本。

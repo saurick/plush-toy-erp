@@ -1,0 +1,1146 @@
+.erp-permission-checklist-search {
+  width: 100%;
+}
+
+.erp-permission-checklist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-permission-checklist__section {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #e2ece4;
+  border-radius: 12px;
+  background: #fbfdfb;
+}
+
+.erp-permission-checklist__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e9f0ea;
+  background: #f4f8f4;
+}
+
+.erp-permission-checklist__header .ant-typography {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.erp-permission-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px 10px;
+  padding: 10px 12px 12px;
+}
+
+.erp-permission-grid .ant-checkbox-wrapper {
+  min-width: 0;
+  margin-inline-start: 0;
+  color: #374151;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.erp-business-page-layout {
+  --erp-business-control-height: 36px;
+  --erp-business-card-radius: 8px;
+  --erp-business-card-border: #dfe9e1;
+  --erp-business-collaboration-bg: #f6fbf7;
+  --erp-business-collaboration-border: #c9dece;
+  --erp-business-control-border: #d8e2dc;
+  --erp-business-control-hover: #abc5b3;
+  --erp-business-control-focus: #2b8a3e;
+  --erp-business-control-focus-shadow: rgb(43 138 62 / 12%);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+.erp-business-page-header-card.ant-card,
+.erp-business-operation-panel.ant-card,
+.erp-business-filter-panel.ant-card,
+.erp-business-list-toolbar.ant-card,
+.erp-business-selection-action-bar.ant-card,
+.erp-business-data-table-card.ant-card,
+.erp-business-collaboration-task-panel.ant-card {
+  overflow: hidden;
+  border: 1px solid var(--erp-business-card-border);
+  border-radius: var(--erp-business-card-radius);
+  background: rgb(255 255 255 / 0.96);
+}
+
+.erp-business-page-header-card .ant-card-body {
+  padding: 10px 12px 8px;
+}
+
+.erp-business-filter-panel .ant-card-body,
+.erp-business-list-toolbar .ant-card-body,
+.erp-business-selection-action-bar .ant-card-body {
+  padding: 10px 12px;
+}
+
+.erp-business-operation-panel .ant-card-body {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.erp-business-operation-panel__filters {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-business-operation-panel__filters
+  > :where(
+    .ant-input-affix-wrapper,
+    .ant-select,
+    .erp-business-date-range-filter
+  ) {
+  width: auto;
+  min-width: 0;
+}
+
+.erp-business-operation-panel__toolbar {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 10px;
+}
+
+.erp-business-operation-panel__actions,
+.erp-business-operation-panel__primary {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.erp-business-operation-panel__actions {
+  flex: 1 1 560px;
+  justify-content: flex-start;
+}
+
+.erp-business-operation-panel__primary {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.erp-business-operation-panel__selection {
+  border-top: 1px dashed #d7e4d9;
+  padding-top: 7px;
+}
+
+.erp-business-filter-panel:has(+ .erp-business-list-toolbar).ant-card,
+.erp-business-filter-panel:has(+ .erp-business-selection-action-bar).ant-card {
+  border-bottom-right-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.erp-business-filter-panel + .erp-business-list-toolbar.ant-card {
+  margin-top: -4px;
+  border-top-style: dashed;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  box-shadow: none;
+}
+
+.erp-business-list-toolbar:has(+ .erp-business-selection-action-bar).ant-card {
+  border-bottom-right-radius: 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.erp-business-list-toolbar + .erp-business-selection-action-bar.ant-card,
+.erp-business-filter-panel + .erp-business-selection-action-bar.ant-card {
+  margin-top: -4px;
+  border-top-style: dashed;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  box-shadow: none;
+}
+
+.erp-business-data-table-card .ant-card-body,
+.erp-business-collaboration-task-panel .ant-card-body {
+  padding: 10px 12px;
+}
+
+.erp-business-page-header-card__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: 12px;
+  align-items: center;
+}
+
+.erp-business-page-header-card__main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.erp-business-page-header-card h1 {
+  margin: 2px 0 4px;
+  color: #1f2937;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.erp-business-page-header-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-width: 820px;
+  margin: 0;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.erp-business-module-chip-row,
+.erp-business-page-header-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-business-module-chip-row .ant-tag,
+.erp-business-page-header-card__tags .ant-tag {
+  margin-inline-end: 0;
+  border-radius: 999px;
+  padding-inline: 10px;
+}
+
+.erp-business-page-header-card__stats {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(124px, 132px);
+  width: fit-content;
+  max-width: min(560px, 52vw);
+  justify-self: end;
+  justify-content: end;
+  gap: 8px;
+}
+
+.erp-business-page-header-card__stat {
+  display: inline-grid;
+  min-width: 0;
+  min-height: 52px;
+  gap: 2px;
+  align-content: center;
+  border: 1px solid #dfe9e1;
+  border-radius: 8px;
+  background: #f8fbf8;
+  cursor: default;
+  padding: 6px 9px;
+}
+
+.erp-business-page-header-card__stat-head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.erp-business-page-header-card__stats .ant-typography {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: calc(100% - 46px);
+  overflow: visible;
+  overflow-wrap: break-word;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: keep-all;
+  line-height: 1.25;
+}
+
+.erp-business-module-variant-card.ant-card {
+  border: 1px solid #d8e6dc;
+  border-radius: var(--erp-business-card-radius);
+  background: linear-gradient(135deg, #f8fbf7, #fff);
+}
+
+.erp-business-module-variant-card .ant-card-body {
+  padding: 12px 14px;
+}
+
+.erp-business-module-variant-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.erp-business-module-variant-main {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.erp-business-module-variant-main h2 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 17px;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+
+.erp-business-module-variant-main p {
+  max-width: 860px;
+  margin: 0;
+  color: #62727e;
+  line-height: 1.5;
+}
+
+.erp-business-module-variant-lanes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-business-module-variant-lanes span {
+  min-width: 0;
+  border: 1px solid #dbe7df;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  padding: 8px 10px;
+}
+
+.erp-business-module-variant-side {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.erp-business-module-variant-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-business-module-variant-metric {
+  display: grid;
+  gap: 2px;
+  border: 1px solid #dfe9e1;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.erp-business-module-variant-metrics strong {
+  color: #1f2937;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.erp-business-page-header-card__stats strong {
+  color: #17231c;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.erp-business-page-header-card__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-top: 8px;
+  border-top: 1px dashed #d7e4d9;
+  padding-top: 8px;
+}
+
+.erp-business-module-summary-chip {
+  background: #f6faf7;
+}
+
+.erp-business-filter-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.erp-business-filter-panel__grid {
+  display: flex;
+  flex: 1 1 760px;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.erp-business-filter-panel__grid
+  > :where(
+    .ant-input-affix-wrapper,
+    .ant-select,
+    .erp-business-date-range-filter
+  ) {
+  width: auto;
+  min-width: 0;
+}
+
+.erp-business-filter-control--search.ant-input-affix-wrapper {
+  flex: 1 1 220px;
+  max-width: 340px;
+}
+
+.erp-business-filter-control--status.ant-select {
+  flex: 1 1 180px;
+  min-width: 180px;
+}
+
+.erp-business-filter-control--sort.ant-select {
+  flex: 0 0 160px;
+  min-width: 160px;
+}
+
+@media screen and (min-width: 769px) {
+  .erp-business-operation-panel__filters
+    > .erp-business-filter-control--search.ant-input-affix-wrapper {
+    flex: 0 1 260px;
+    max-width: 300px;
+  }
+
+  .erp-business-operation-panel__filters
+    > .erp-business-filter-control--compact-select.ant-select {
+    flex: 0 0 150px;
+    width: 150px;
+    max-width: 220px;
+  }
+
+  .erp-business-operation-panel__filters
+    > .erp-business-filter-control--status.ant-select {
+    flex-basis: 150px;
+  }
+
+  .erp-business-operation-panel__filters
+    > .erp-business-filter-control--sort.ant-select {
+    flex-basis: 160px;
+    width: 160px;
+  }
+
+  .erp-business-operation-panel__filters > .erp-business-date-range-filter {
+    flex: 0 0 500px;
+    max-width: 500px;
+  }
+}
+
+.erp-business-filter-panel__aside {
+  display: flex;
+  flex: 1 1 380px;
+  min-width: 280px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.erp-business-filter-panel__summary {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: var(--erp-business-control-height);
+}
+
+.erp-business-filter-panel__actions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-business-page-layout .ant-btn {
+  cursor: pointer;
+}
+
+.erp-business-filter-control.ant-input-affix-wrapper,
+.erp-business-filter-control.ant-select,
+:where(.erp-business-filter-control.ant-select) .ant-select-selector,
+.erp-business-date-range-filter {
+  min-height: var(--erp-business-control-height);
+}
+
+.erp-business-filter-control.ant-input-affix-wrapper,
+.erp-business-filter-control.ant-select,
+:where(.erp-business-filter-control.ant-select) .ant-select-selector {
+  height: var(--erp-business-control-height);
+}
+
+.erp-business-filter-control.ant-input-affix-wrapper,
+:where(.erp-business-filter-control.ant-select) .ant-select-selector,
+.erp-business-date-range-filter {
+  border-color: var(--erp-business-control-border);
+  border-radius: 10px;
+}
+
+.erp-business-filter-control.ant-input-affix-wrapper:hover,
+:where(.erp-business-filter-control.ant-select:hover) .ant-select-selector,
+:where(.erp-business-date-range-filter:hover) {
+  border-color: var(--erp-business-control-hover);
+}
+
+.erp-business-filter-control.ant-input-affix-wrapper:focus,
+.erp-business-filter-control.ant-input-affix-wrapper-focused,
+:where(.erp-business-filter-control.ant-select-focused) .ant-select-selector,
+:where(.erp-business-filter-control.ant-select-open) .ant-select-selector,
+:where(.erp-business-date-range-filter:focus-within) {
+  border-color: var(--erp-business-control-focus);
+  box-shadow: 0 0 0 2px var(--erp-business-control-focus-shadow);
+}
+
+.erp-business-filter-control .ant-select-selection-placeholder,
+.erp-business-filter-control.ant-input-affix-wrapper input::placeholder {
+  color: #9ca3af;
+}
+
+:where(.erp-business-filter-control.ant-select) .ant-select-selector {
+  align-items: center;
+}
+
+.erp-business-filter-control.ant-select-multiple .ant-select-selection-wrap,
+.erp-business-filter-control.ant-select-multiple
+  .ant-select-selection-overflow {
+  align-self: center;
+  align-items: center;
+}
+
+.erp-business-filter-control
+  :where(
+    .ant-select-single .ant-select-selector .ant-select-selection-item,
+    .ant-select-single .ant-select-selector .ant-select-selection-placeholder
+  ) {
+  line-height: calc(var(--erp-business-control-height) - 2px);
+}
+
+.erp-business-filter-control :where(.ant-select-selector),
+.erp-business-filter-control :where(.ant-select-selection-search-input) {
+  cursor: pointer;
+}
+
+.erp-business-filter-control.ant-select-show-search
+  input.ant-select-selection-search-input,
+.erp-business-filter-control.ant-select-show-search
+  input.ant-select-selection-search-input:focus {
+  border-color: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  outline: 0;
+}
+
+.erp-business-date-range-filter {
+  display: flex;
+  flex: 1 0 500px;
+  min-width: 500px;
+  max-width: 560px;
+  align-items: stretch;
+  white-space: nowrap;
+  overflow: visible;
+  border: 1px solid var(--erp-business-control-border);
+  background: #fff;
+}
+
+.erp-business-date-range-filter__type.ant-select,
+:where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {
+  flex: 0 0 132px;
+  min-width: 132px;
+  height: calc(var(--erp-business-control-height) - 2px);
+}
+
+:where(.erp-business-date-range-filter__type.ant-select) .ant-select-selector {
+  border-color: transparent;
+  border-radius: 0;
+  background: #fbfdfb;
+  box-shadow: none;
+}
+
+.erp-business-date-range-filter__divider {
+  width: 1px;
+  background: #e1e8e3;
+}
+
+.erp-business-date-input.ant-picker {
+  width: 100%;
+  min-width: 0;
+  height: var(--erp-business-control-height);
+  border-color: var(--erp-business-control-border);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.erp-business-date-input.ant-picker:hover,
+.erp-business-date-input.ant-picker-focused {
+  border-color: var(--erp-interactive-border-hover);
+  box-shadow: 0 0 0 2px rgb(47 125 73 / 0.1);
+}
+
+.erp-business-date-input .ant-picker-input,
+.erp-business-date-input .ant-picker-input > input,
+.erp-business-date-input .ant-picker-suffix {
+  cursor: pointer;
+}
+
+.erp-business-date-input .ant-picker-input > input {
+  color: #1f2937;
+}
+
+.erp-business-date-input .ant-picker-suffix {
+  color: #1f2937;
+}
+
+.erp-business-date-input.ant-picker-disabled,
+.erp-business-date-input.ant-picker-disabled .ant-picker-input,
+.erp-business-date-input.ant-picker-disabled .ant-picker-input > input,
+.erp-business-date-input.ant-picker-disabled .ant-picker-suffix {
+  cursor: not-allowed;
+}
+
+.erp-business-date-range-filter__range {
+  display: flex;
+  flex: 1 0 366px;
+  min-width: 366px;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 6px;
+}
+
+.erp-business-date-range-filter__range > span {
+  flex: none;
+  color: #7b8c7e;
+  font-size: 13px;
+}
+
+.erp-business-date-range-filter .erp-business-date-input.ant-picker {
+  flex: 1 1 160px;
+  min-width: 160px;
+  height: calc(var(--erp-business-control-height) - 2px);
+  border-color: transparent;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+.erp-business-date-range-filter .erp-business-date-input.ant-picker:hover,
+.erp-business-date-range-filter .erp-business-date-input.ant-picker-focused {
+  border-color: transparent;
+  box-shadow: none;
+  outline: 0;
+}
+
+.erp-business-list-toolbar__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-business-list-toolbar__stats {
+  display: flex;
+  flex: 1 1 420px;
+  min-width: min(100%, 260px);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-business-list-toolbar__stat {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  gap: 6px;
+  border: 1px solid #e2ece4;
+  border-radius: 999px;
+  background: #f8fbf8;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.erp-business-list-toolbar__stat strong {
+  color: #17231c;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-business-list-toolbar__actions {
+  display: flex;
+  flex: 1 1 360px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-business-toolbar-button.ant-btn,
+.erp-business-selection-action-bar__actions .ant-btn {
+  min-height: 36px;
+  border-radius: 10px;
+}
+
+.erp-business-list-toolbar__primary-action.ant-btn-primary {
+  border-color: #2b8a3e;
+  background: #2b8a3e;
+  font-weight: 700;
+}
+
+.erp-business-list-toolbar__primary-action.ant-btn-primary:hover,
+.erp-business-list-toolbar__primary-action.ant-btn-primary:focus-visible {
+  border-color: #247332;
+  background: #247332;
+}
+
+.erp-business-selection-action-bar {
+  background: rgb(255 255 255 / 0.82);
+}
+
+.erp-business-selection-action-bar--embedded {
+  background: transparent;
+}
+
+.erp-business-selection-action-bar--active.ant-card {
+  border-color: #c8decf;
+  background: #fbfefb;
+}
+
+.erp-business-selection-action-bar--empty.ant-card {
+  border-color: #dfe9e1;
+  background: #fff;
+}
+
+.erp-business-selection-action-bar__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-business-selection-action-bar__copy {
+  display: grid;
+  flex: 1 1 560px;
+  min-width: 0;
+  gap: 8px;
+  color: #4b5563;
+}
+
+.erp-business-selection-action-bar__primary,
+.erp-business-selection-action-bar__summary,
+.erp-business-selection-action-bar__collab {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+
+.erp-business-selection-action-bar__tag.ant-tag {
+  max-width: min(680px, 100%);
+  margin-inline-end: 0;
+  border-radius: 999px;
+  padding-inline: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-business-selection-action-bar__tag.ant-tag[tabindex] {
+  cursor: pointer;
+}
+
+.erp-business-selection-action-bar__tag.ant-tag[tabindex]:focus-visible {
+  outline: 2px solid rgb(34 197 94 / 0.5);
+  outline-offset: 2px;
+}
+
+.erp-business-selected-items-popover .ant-popover-inner {
+  max-width: min(520px, calc(100vw - 48px));
+}
+
+.erp-business-selected-items-popover__items {
+  display: flex;
+  max-width: 100%;
+  min-width: min(320px, calc(100vw - 96px));
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+
+.erp-business-selected-items-popover__item.ant-tag {
+  max-width: 100%;
+  margin-inline-end: 0;
+  border-radius: 8px;
+  padding: 4px 12px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.erp-business-selection-action-bar__summary-item {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 240px;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #e2ece4;
+  border-radius: 999px;
+  background: #f8fbf8;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.erp-business-selection-action-bar__summary-item strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #17231c;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-business-selection-action-bar__collab .ant-tag {
+  margin-inline-end: 0;
+  border-radius: 999px;
+}
+
+.erp-business-selection-action-bar__actions {
+  flex: 0 1 640px;
+  justify-content: flex-end;
+}
+
+.erp-business-record-modal .ant-btn,
+.erp-permission-modal .ant-btn {
+  border-radius: 10px;
+}
+
+.erp-business-selection-action-bar--embedded
+  .erp-business-selection-action-bar__actions {
+  flex-basis: 760px;
+}
+
+.erp-business-selection-action-bar--embedded
+  .erp-business-selection-action-bar__actions
+  .ant-btn {
+  min-height: 30px;
+  border-radius: 8px;
+  padding-inline: 10px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.erp-business-selection-action-bar--embedded
+  .erp-business-selection-action-bar__actions
+  .ant-btn-sm {
+  height: 30px;
+}
+
+.erp-business-selection-action-bar__hint {
+  max-width: 720px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.erp-business-module-status-action.ant-btn {
+  min-width: 68px;
+  padding-inline: 8px;
+  gap: 4px;
+}
+
+.erp-business-batch-delete-modal__content {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+
+.erp-business-status-transition-option {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-business-status-transition-option span {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.erp-business-module-select-popup.ant-select-dropdown {
+  max-width: calc(100vw - 24px);
+  padding: 6px;
+  border: 1px solid #dfe9e1;
+  border-radius: 12px;
+  box-shadow:
+    0 8px 18px rgb(15 23 42 / 0.08),
+    0 2px 6px rgb(15 23 42 / 0.05);
+}
+
+.erp-business-module-select-popup .ant-select-item {
+  min-height: 34px;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.erp-business-module-select-popup .ant-select-item-option-content {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-business-module-select-popup .ant-select-item-option-active,
+.erp-business-module-select-popup .ant-select-item-option-selected {
+  background: #f2f6f2;
+}
+
+.erp-business-module-select-popup .rc-virtual-list-holder {
+  scrollbar-width: thin;
+  scrollbar-color: #b8c4ba transparent;
+}
+
+.erp-business-module-select-popup .rc-virtual-list-holder::-webkit-scrollbar {
+  width: 8px;
+}
+
+.erp-business-module-select-popup
+  .rc-virtual-list-holder::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #b8c4ba;
+}
+
+.erp-business-module-table-card .ant-table-wrapper {
+  overflow: hidden;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  white-space: normal;
+  vertical-align: top;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-sorters {
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  white-space: normal;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-title {
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th .ant-table-column-sorter {
+  flex: 0 0 auto;
+  margin-inline-start: 0;
+}
+
+.erp-business-module-table-card .ant-table-wrapper .ant-table-thead > tr > th {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.erp-business-module-table-card
+  .ant-table-wrapper
+  :where(.ant-table-row-expand-icon-cell, .ant-table-selection-column) {
+  text-align: center;
+}
+
+.erp-business-module-table-card
+  .ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > :where(th.ant-table-row-expand-icon-cell, th.ant-table-selection-column) {
+  padding-inline: 8px;
+  text-align: center;
+}
+
+.erp-business-module-table-card
+  .ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-sorters {
+  align-items: center;
+  white-space: nowrap;
+}
+
+.erp-business-module-table-card
+  .ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-module-column-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  white-space: normal;
+}
+
+.erp-business-module-table-card .erp-module-column-header {
+  align-items: center;
+  white-space: nowrap;
+}
+
+.erp-module-column-header-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.erp-business-module-table-card .erp-module-column-header-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.erp-module-column-header-trigger.ant-btn {
+  flex: 0 0 auto;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  color: #64748b;
+}
+
+.erp-module-column-header-trigger.ant-btn:hover,
+.erp-module-column-header-trigger.ant-btn:focus-visible {
+  color: #0f172a;
+  background: rgb(15 23 42 / 8%);
+}
+
+.erp-business-column-order-modal {
+  display: grid;
+  gap: 8px;
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.erp-business-column-order-modal__row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  align-items: center;
+  grid-template-columns: 44px minmax(160px, 1fr) minmax(420px, auto);
+  gap: 12px;
+  border: 1px solid #e2ece4;
+  border-radius: 8px;
+  background: #f8fbf8;
+  padding: 10px 12px;
+}
+
+.erp-business-column-order-modal__index {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d5ddd8;
+  border-radius: 8px;
+  background: #fff;
+  color: #17231c;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.erp-business-column-order-modal__label {
+  min-width: 0;
+  color: #17231c;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.erp-business-column-order-modal__actions {
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.erp-business-column-order-modal__actions .ant-space-item {
+  min-width: 0;
+}
+
+.erp-business-column-order-modal__action {
+  min-width: 112px;
+}
+
+.erp-business-column-order-modal__footer {
+  justify-content: flex-end;
+}
+
+.erp-business-module-table-card .ant-table-row {
+  cursor: pointer;
+}
+
+.erp-business-module-task-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.erp-business-collaboration-task-panel.ant-card {
+  position: sticky;
+  z-index: 6;
+  bottom: -12px;
+  border-color: var(--erp-business-collaboration-border);
+  background: var(--erp-business-collaboration-bg);
+  box-shadow: 0 14px 34px rgb(27 51 36 / 10%);
+}
+
+.erp-business-collaboration-task-panel__resize-handle {
+  display: flex;
+  width: 100%;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0;
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+}
+
+.erp-business-collaboration-task-panel__resize-handle:hover {
+  cursor: ns-resize;
+}
+
+.erp-business-collaboration-task-panel__resize-handle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}

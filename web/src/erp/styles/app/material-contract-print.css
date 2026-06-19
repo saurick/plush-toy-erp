@@ -1,0 +1,419 @@
+.erp-material-contract-workbench {
+  display: grid;
+  gap: 1rem;
+}
+
+.erp-material-contract-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.erp-material-contract-toolbar__group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.erp-material-contract-toolbar__button-active {
+  box-shadow: inset 0 0 0 1px rgb(47 143 75 / 0.28);
+  background: linear-gradient(135deg, #e8f4ea, #f7fbf7);
+}
+
+.erp-material-contract-formula-panel {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid #d9e7da;
+  background: #f6faf6;
+  color: #243428;
+  border-radius: 18px;
+  padding: 0.9rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.erp-material-contract-toolbar__status {
+  min-height: 1.5rem;
+  color: #52635a;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.erp-material-contract-stage {
+  padding: 1rem;
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgb(241 245 249 / 0.88), rgb(226 232 240 / 0.92)),
+    white;
+}
+
+.erp-material-contract-paper {
+  width: 210mm;
+  min-height: 297mm;
+  margin: 0 auto;
+  padding: 10mm 8.5mm 10mm;
+  box-sizing: border-box;
+  background-color: white;
+  border-radius: 14px;
+  box-shadow: 0 22px 58px rgb(15 23 42 / 0.12);
+  color: #111827;
+  font-family: 'SimSun', 'Songti SC', 'Noto Serif CJK SC', serif;
+}
+
+.erp-material-contract-paper--preview {
+  width: min(100%, 210mm);
+  min-height: auto;
+}
+
+.erp-material-contract-paper__title {
+  margin-bottom: 5mm;
+  text-align: center;
+  font-size: 8.6mm;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.erp-material-contract-meta {
+  display: grid;
+  row-gap: 1.4mm;
+  margin-bottom: 3mm;
+  font-size: 4mm;
+  line-height: 1.55;
+}
+
+.erp-material-contract-meta__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  column-gap: 10mm;
+}
+
+.erp-material-contract-meta__cell {
+  min-width: 0;
+}
+
+.erp-material-contract-meta__cell--left {
+  --erp-material-contract-label-width: 28mm;
+}
+
+.erp-material-contract-meta__cell--right {
+  --erp-material-contract-label-width: 21mm;
+  padding-left: 3mm;
+}
+
+.erp-material-contract-meta__top-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 6mm;
+}
+
+.erp-material-contract-meta__row {
+  display: grid;
+  grid-template-columns: var(--erp-material-contract-label-width) minmax(0, 1fr);
+  gap: 1.5mm;
+  align-items: start;
+  min-width: 0;
+}
+
+.erp-material-contract-meta__row--top-item {
+  --erp-material-contract-label-width: 18mm;
+}
+
+.erp-material-contract-meta__label,
+.erp-material-contract-meta__value {
+  display: inline-block;
+  min-width: 0;
+}
+
+.erp-material-contract-meta__label,
+.erp-material-contract-signature__label,
+.erp-material-contract-clause-block__index {
+  white-space: nowrap;
+}
+
+.erp-material-contract-editable {
+  min-width: 0;
+  min-height: 4.5mm;
+  white-space: pre-wrap;
+  word-break: break-word;
+  outline: none;
+}
+
+.erp-material-contract-editable:focus {
+  outline: 1px dashed rgb(47 143 75 / 72%);
+  outline-offset: 1px;
+  background: rgb(47 143 75 / 8%);
+  box-shadow: none;
+}
+
+.erp-material-contract-editable-disabled {
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+
+.erp-material-contract-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  margin-top: 2mm;
+  font-size: 3.8mm;
+}
+
+.erp-material-contract-table td:focus-within {
+  outline: 1px dashed rgb(47 143 75 / 72%);
+  outline-offset: -1px;
+  background: rgb(47 143 75 / 8%);
+}
+
+.erp-material-contract-paper .erp-material-contract-table thead th,
+.erp-material-contract-paper .erp-material-contract-table tbody td {
+  border: 1px solid rgb(17 24 39 / 55%);
+  text-align: center;
+  vertical-align: middle;
+  padding: 1.4mm 1.2mm;
+}
+
+.erp-material-contract-paper .erp-material-contract-table thead th {
+  background: white;
+  font-weight: 700;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  font-size: 3mm;
+  line-height: 1.25;
+  padding: 1.2mm 0.5mm;
+}
+
+.erp-material-contract-paper .erp-material-contract-table tbody td {
+  min-height: 15mm;
+  position: relative;
+}
+
+.erp-material-contract-paper .erp-material-contract-table tbody td:nth-child(1),
+.erp-material-contract-paper .erp-material-contract-table tbody td:nth-child(2),
+.erp-material-contract-paper .erp-material-contract-table tbody td:nth-child(8),
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  td:nth-child(10),
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  td:nth-child(11) {
+  font-size: 3.45mm;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+.erp-material-contract-table__editable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 12.5mm;
+  padding: 0;
+  text-align: center;
+}
+
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  td:nth-child(1)
+  .erp-material-contract-table__editable,
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  td:nth-child(2)
+  .erp-material-contract-table__editable,
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  td:nth-child(8)
+  .erp-material-contract-table__editable,
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  td:nth-child(10)
+  .erp-material-contract-table__editable,
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  td:nth-child(11)
+  .erp-material-contract-table__editable {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+.erp-material-contract-table__editable-multiline {
+  min-height: 14.5mm;
+}
+
+.erp-material-contract-table td:focus-within .erp-material-contract-editable {
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  tr.erp-material-contract-table__row-selected
+  td {
+  background: rgb(34 197 94 / 0.08);
+}
+
+.erp-material-contract-table__cell-selected {
+  background: rgb(59 130 246 / 0.1);
+}
+
+.erp-material-contract-table__cell-selected-anchor {
+  box-shadow: inset 0 0 0 1px rgb(37 99 235 / 0.55);
+}
+
+.erp-material-contract-table__cell-merged {
+  background: rgb(248 250 252);
+}
+
+.erp-material-contract-paper--continued,
+.erp-processing-contract-paper--continued {
+  margin-bottom: 14px;
+}
+
+.erp-material-contract-paper
+  .erp-material-contract-table
+  tbody
+  tr.erp-material-contract-table__total
+  td {
+  min-height: auto;
+  padding: 1.2mm 1mm;
+  font-weight: 700;
+}
+
+.erp-contract-table__total-value {
+  min-width: 0;
+  line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.erp-material-contract-clauses {
+  display: grid;
+  gap: 2.2mm;
+  margin-top: 3mm;
+  font-size: 3.85mm;
+  line-height: 1.62;
+}
+
+.erp-material-contract-clause-block {
+  display: grid;
+  gap: 0.8mm;
+}
+
+.erp-material-contract-clause-block__title {
+  font-weight: 700;
+}
+
+.erp-material-contract-clause-block__list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 1.2mm;
+}
+
+.erp-material-contract-clause-block__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0.6mm;
+}
+
+.erp-material-contract-clause-block__index {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-material-contract-clause-block__value {
+  display: block;
+  min-width: 0;
+}
+
+.erp-material-contract-signature {
+  margin-top: 7mm;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18mm;
+  font-size: 4mm;
+}
+
+.erp-material-contract-signature__block {
+  display: grid;
+  gap: 3mm;
+  min-width: 0;
+}
+
+.erp-material-contract-signature__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2mm;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.erp-material-contract-signature__name {
+  min-height: 7mm;
+  font-size: 7mm;
+  letter-spacing: 0.08em;
+}
+
+.erp-material-contract-signature__date-value {
+  min-height: 4.5mm;
+}
+
+.erp-material-contract-pdf-frame {
+  width: 100%;
+  height: min(80vh, 960px);
+  border: 0;
+}
+
+.erp-summary-sheet {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.erp-summary-sheet__title {
+  text-align: center;
+  font-size: 1.55rem;
+  font-weight: 700;
+}
+
+.erp-summary-sheet__meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.erp-production-report {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.erp-production-report__company,
+.erp-production-report__title {
+  text-align: center;
+}
+
+.erp-production-report__company {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.erp-production-report__title {
+  font-size: 1.45rem;
+  font-weight: 700;
+}

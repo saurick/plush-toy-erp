@@ -1,4 +1,4 @@
-// 首页只保留当前已经落地的正式业务对象入口。
+// 单对象入口用于 Workflow 任务来源解析；业务看板表格用下面的对象族分组。
 export const dashboardModules = Object.freeze([
   {
     key: 'customers',
@@ -14,6 +14,67 @@ export const dashboardModules = Object.freeze([
     key: 'sales-orders',
     title: '销售订单',
     path: '/erp/sales/project-orders/sales-orders',
+  },
+])
+
+export const dashboardHealthModules = Object.freeze([
+  {
+    key: 'partner-master',
+    title: '客户/供应商',
+    path: '/erp/master/partners/customers',
+    sourceKeys: Object.freeze(['customers', 'suppliers']),
+  },
+  {
+    key: 'product-engineering',
+    title: '产品/BOM',
+    path: '/erp/master/products',
+    sourceKeys: Object.freeze(['products', 'material-bom']),
+  },
+  {
+    key: 'sales-orders',
+    title: '销售订单',
+    path: '/erp/sales/project-orders/sales-orders',
+    sourceKeys: Object.freeze(['sales-orders']),
+  },
+  {
+    key: 'purchase-inbound',
+    title: '采购/入库',
+    path: '/erp/purchase/accessories',
+    sourceKeys: Object.freeze(['accessories-purchase', 'inbound']),
+  },
+  {
+    key: 'quality-inventory',
+    title: '质检/库存',
+    path: '/erp/production/quality-inspections',
+    sourceKeys: Object.freeze(['quality-inspections', 'inventory']),
+  },
+  {
+    key: 'shipment-outbound',
+    title: '出货/出库',
+    path: '/erp/warehouse/shipments',
+    sourceKeys: Object.freeze(['shipping-release', 'outbound']),
+  },
+  {
+    key: 'production-outsourcing',
+    title: '生产/委外',
+    path: '/erp/production/progress',
+    sourceKeys: Object.freeze([
+      'production-scheduling',
+      'production-progress',
+      'production-exceptions',
+      'processing-contracts',
+    ]),
+  },
+  {
+    key: 'finance-facts',
+    title: '财务事实',
+    path: '/erp/finance/reconciliation',
+    sourceKeys: Object.freeze([
+      'reconciliation',
+      'payables',
+      'receivables',
+      'invoices',
+    ]),
   },
 ])
 

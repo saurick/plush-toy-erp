@@ -1,0 +1,165 @@
+.erp-print-workspace {
+  min-height: 100vh;
+  padding: 12px;
+  background: linear-gradient(180deg, #e4ebe8 0%, #d8e0dc 100%);
+}
+
+.erp-print-workspace__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #d7dfdb;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 16px 32px rgb(15 23 42 / 10%);
+  backdrop-filter: blur(12px);
+}
+
+.erp-print-workspace__toolbar-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  color: #223127;
+}
+
+.erp-print-workspace__toolbar-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #e9f3eb;
+  color: #2c7b4e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-print-workspace__toolbar-status {
+  color: #63786c;
+  font-size: 13px;
+}
+
+.erp-print-workspace__toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.erp-print-workspace__formula {
+  margin-top: 12px;
+}
+
+.erp-print-workspace__formula-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.erp-print-workspace__main {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 12px;
+  align-items: start;
+}
+
+.erp-print-workspace__panel {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-print-workspace__panel-card .ant-card-body {
+  display: grid;
+  gap: 14px;
+}
+
+.erp-print-workspace__field-grid,
+.erp-print-workspace__detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-print-workspace__field {
+  display: grid;
+  gap: 6px;
+}
+
+.erp-print-workspace__field > span {
+  color: #5f7468;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.erp-print-workspace__field--full {
+  grid-column: 1 / -1;
+}
+
+.erp-print-workspace__detail-list,
+.erp-print-workspace__clause-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-print-workspace__detail-card {
+  padding: 12px;
+  border: 1px solid #e1e8e4;
+  border-radius: 16px;
+  background: #fafcfb;
+}
+
+.erp-print-workspace__detail-card--selected {
+  border-color: #2f8f4b;
+  box-shadow: 0 0 0 1px rgb(47 143 75 / 12%);
+}
+
+.erp-print-workspace__detail-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #223127;
+  font-weight: 600;
+}
+
+.erp-print-workspace__clause-group {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-print-workspace__clause-title {
+  color: #223127;
+  font-weight: 700;
+}
+
+.erp-print-workspace__stage {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-print-workspace__stage-note {
+  color: #617367;
+  font-size: 13px;
+}
+
+.erp-print-workspace__stage-canvas {
+  display: flex;
+  justify-content: center;
+  padding: 18px;
+  border: 1px solid #d0d9d4;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #d6ded9 0%, #cfd8d3 100%);
+  overflow: auto;
+}
+
+.erp-print-workspace__mobile-empty {
+  display: none;
+}

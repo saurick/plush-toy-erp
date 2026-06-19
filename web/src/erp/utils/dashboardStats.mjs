@@ -54,6 +54,22 @@ export function createDashboardStatsMap(moduleStats = []) {
   return map
 }
 
+function sourceKeysOf(moduleItem = {}) {
+  const sourceKeys = Array.isArray(moduleItem.sourceKeys)
+    ? moduleItem.sourceKeys
+    : [moduleItem.key]
+  const seen = new Set()
+  return sourceKeys
+    .map((item) => String(item ?? '').trim())
+    .filter((item) => {
+      if (!item || seen.has(item)) {
+        return false
+      }
+      seen.add(item)
+      return true
+    })
+}
+
 export function buildDashboardModuleRows(
   modules = [],
   moduleStats = [],
@@ -65,14 +81,27 @@ export function buildDashboardModuleRows(
       : createDashboardStatsMap(moduleStats)
 
   return (modules || []).map((moduleItem) => {
-    const stats = statsMap.get(moduleItem.key) || {
-      total: 0,
-      statusCounts: createEmptyStatusCount(),
-    }
+    const sourceKeys = sourceKeysOf(moduleItem)
+    const stats = sourceKeys.reduce(
+      (accumulator, sourceKey) => {
+        const sourceStats = statsMap.get(sourceKey)
+        accumulator.total += normalizeNonNegativeNumber(sourceStats?.total)
+        BUSINESS_STATUS_KEYS.forEach((statusKey) => {
+          accumulator.statusCounts[statusKey] += normalizeNonNegativeNumber(
+            sourceStats?.statusCounts?.[statusKey]
+          )
+        })
+        return accumulator
+      },
+      {
+        total: 0,
+        statusCounts: createEmptyStatusCount(),
+      }
+    )
     const statusGroupCounts = {}
     ;(statusGroups || []).forEach((group) => {
       statusGroupCounts[group.key] = (group.statusKeys || []).reduce(
-        (sum, statusKey) => sum + Number(stats.statusCounts?.[statusKey] || 0),
+        (sum, statusKey) => sum + Number(stats.statusCounts[statusKey] || 0),
         0
       )
     })
@@ -81,8 +110,9 @@ export function buildDashboardModuleRows(
       key: moduleItem.key,
       module: moduleItem.title,
       path: moduleItem.path,
+      sourceKeys,
       count: normalizeNonNegativeNumber(stats.total),
-      statusCounts: stats.statusCounts || createEmptyStatusCount(),
+      statusCounts: stats.statusCounts,
       statusGroupCounts,
     }
   })

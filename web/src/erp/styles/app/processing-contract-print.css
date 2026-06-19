@@ -1,0 +1,469 @@
+.erp-processing-contract-paper {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 10.5mm 8.5mm 10mm;
+  box-sizing: border-box;
+  border-radius: 14px;
+  background: #fff;
+  color: #111827;
+  box-shadow: 0 24px 50px rgb(15 23 42 / 18%);
+  font-family: 'STSong', 'Songti SC', 'Noto Serif CJK SC', serif;
+}
+
+.erp-processing-contract-paper__header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 6mm;
+}
+
+.erp-processing-contract-paper__title {
+  font-size: 8.8mm;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.erp-processing-contract-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8mm;
+  margin-bottom: 3.5mm;
+  font-size: 4.2mm;
+  line-height: 1.55;
+}
+
+.erp-processing-contract-meta__column {
+  display: grid;
+  gap: 1.3mm;
+  min-width: 0;
+}
+
+.erp-processing-contract-meta__top-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4mm;
+}
+
+.erp-processing-contract-meta__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.5mm;
+  align-items: baseline;
+}
+
+.erp-processing-contract-meta__label {
+  white-space: nowrap;
+}
+
+.erp-processing-contract-meta__value,
+.erp-processing-contract-table__cell,
+.erp-processing-contract-clauses__editable,
+.erp-processing-contract-signature__name-value,
+.erp-processing-contract-signature__date-value {
+  outline: none;
+}
+
+.erp-processing-contract-table__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 14mm;
+  padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.erp-processing-contract-table__cell--multiline {
+  text-align: center;
+}
+
+.erp-processing-contract-table__row--selected td {
+  background: rgb(47 143 75 / 12%);
+}
+
+.erp-processing-contract-table__cell-selected {
+  background: rgb(59 130 246 / 0.1);
+}
+
+.erp-processing-contract-table__cell-selected-anchor {
+  box-shadow: inset 0 0 0 1px rgb(37 99 235 / 0.55);
+}
+
+.erp-processing-contract-table__cell-merged {
+  background: rgb(248 250 252);
+}
+
+.erp-processing-contract-table__total td {
+  font-weight: 700;
+}
+
+.erp-processing-contract-clauses {
+  display: grid;
+  gap: 3mm;
+  margin-top: 3mm;
+  font-size: 3.9mm;
+  line-height: 1.62;
+}
+
+.erp-processing-contract-clauses__group ol {
+  display: grid;
+  gap: 1.3mm;
+  margin: 1.4mm 0 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.erp-processing-contract-clauses__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 1.2mm;
+}
+
+.erp-processing-contract-clauses__item-index {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-processing-contract-clauses__title {
+  font-weight: 700;
+}
+
+.erp-processing-contract-clauses__editable {
+  display: block;
+  min-width: 0;
+}
+
+.erp-processing-contract-signature {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12mm;
+  margin-top: 4mm;
+  font-size: 4mm;
+}
+
+.erp-processing-contract-signature__block {
+  display: grid;
+  align-content: end;
+  min-height: 24mm;
+  gap: 1.8mm;
+}
+
+.erp-processing-contract-signature__label {
+  display: flex;
+  gap: 1.4mm;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+.erp-processing-contract-signature__name-value {
+  min-width: 34mm;
+  font-weight: 400;
+}
+
+.erp-processing-contract-signature__date {
+  display: flex;
+  gap: 1.4mm;
+  align-items: baseline;
+}
+
+.erp-processing-contract-attachments {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7mm;
+  margin-top: 5.5mm;
+}
+
+.erp-processing-contract-attachments__item {
+  display: block;
+  min-width: 0;
+  margin: 0;
+}
+
+.erp-processing-contract-attachments__item--attachment-1 {
+  grid-column: 1;
+}
+
+.erp-processing-contract-attachments__item--attachment-2 {
+  grid-column: 2;
+}
+
+.erp-processing-contract-attachments__image {
+  display: block;
+  width: 100%;
+  height: 60mm;
+  object-fit: contain;
+}
+
+.erp-processing-contract-upload-bar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #c7d5ca;
+  border-radius: 10px;
+  background: rgb(245 248 245 / 96%);
+}
+
+.erp-processing-contract-upload-bar__copy {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #2f4635;
+}
+
+.erp-processing-contract-upload-bar__actions {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-processing-contract-upload-bar__item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.erp-processing-contract-upload-bar__input {
+  display: none;
+}
+
+.erp-processing-contract-upload-bar__status {
+  min-width: 0;
+  font-size: 12px;
+  color: #516659;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.erp-processing-contract-meta__value:focus,
+.erp-processing-contract-clauses__editable:focus,
+.erp-processing-contract-signature__name-value:focus,
+.erp-processing-contract-signature__date-value:focus {
+  outline: 1px dashed rgb(47 143 75 / 72%);
+  outline-offset: 1px;
+  background: rgb(47 143 75 / 8%);
+  box-shadow: none;
+}
+
+.erp-processing-contract-editable--disabled {
+  cursor: default;
+}
+
+.erp-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.82rem;
+}
+
+.erp-print-table th,
+.erp-print-table td {
+  border: 1px solid rgb(15 23 42 / 0.18);
+  padding: 0.42rem 0.36rem;
+  vertical-align: middle;
+  text-align: center;
+  word-break: break-word;
+}
+
+.erp-processing-contract-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 3.8mm;
+}
+
+.erp-processing-contract-table th,
+.erp-processing-contract-table td {
+  border: 1px solid rgb(17 24 39 / 55%);
+  padding: 1.5mm 1.2mm;
+  vertical-align: middle;
+  text-align: center;
+  word-break: break-word;
+}
+
+.erp-processing-contract-table thead th {
+  background: #f8faf8;
+  font-weight: 700;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  font-size: 2.9mm;
+  line-height: 1.25;
+  padding: 1.2mm 0.4mm;
+}
+
+.erp-print-table thead th {
+  background: rgb(241 245 249);
+  font-weight: 700;
+}
+
+.erp-print-template-card {
+  width: 100%;
+  border: 1px solid #dfe8e0;
+  background: #f8fbf8;
+  border-radius: 24px;
+  padding: 1rem;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.erp-print-template-card:hover {
+  border-color: #b7ccb9;
+  background: #f3f8f3;
+  transform: translateY(-1px);
+}
+
+.erp-print-template-card-active {
+  border-color: #b7ccb9;
+  background: linear-gradient(135deg, #eef6ef, #f9fbf9);
+}
+
+.erp-print-paper {
+  width: min(100%, 920px);
+  margin: 0 auto;
+  background: white;
+  color: #0f172a;
+  border-radius: 28px;
+  box-shadow: 0 28px 80px rgb(15 23 42 / 0.18);
+  padding: 2rem 2.25rem;
+}
+
+.erp-print-paper--landscape {
+  width: min(100%, 1180px);
+  padding: 1.5rem 1.75rem;
+}
+
+.erp-print-paper__header {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.erp-print-paper__title {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.erp-print-meta-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 1.2rem;
+}
+
+.erp-print-meta-grid__column {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.erp-print-meta-grid__row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: baseline;
+  font-size: 0.95rem;
+}
+
+.erp-print-meta-grid__label {
+  color: #475569;
+}
+
+.erp-print-meta-grid__value {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.erp-print-table__total td {
+  font-weight: 700;
+}
+
+.erp-print-table--summary {
+  font-size: 0.78rem;
+}
+
+.erp-print-table--summary .erp-print-table__subhead th {
+  background: rgb(248 250 252);
+  font-weight: 600;
+}
+
+.erp-print-table--report {
+  font-size: 0.72rem;
+}
+
+.erp-print-table__highlight {
+  background: #fde047;
+}
+
+.erp-processing-contract-table td:focus-within {
+  outline: 1px dashed rgb(47 143 75 / 72%);
+  outline-offset: -1px;
+  background: rgb(47 143 75 / 8%);
+}
+
+.erp-processing-contract-table
+  td:focus-within
+  .erp-processing-contract-table__cell {
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.erp-print-clauses {
+  margin-top: 1.2rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.erp-print-clauses__title {
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.erp-print-clauses__section ol {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.erp-print-clauses__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: 0.4rem;
+}
+
+.erp-print-clauses__item-index {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-print-signature {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem;
+  margin-top: 1.6rem;
+}
+
+.erp-print-signature__block {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.erp-print-signature__label,
+.erp-print-signature__date {
+  font-size: 0.95rem;
+}
+
+.erp-print-signature__value {
+  font-size: 1.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}

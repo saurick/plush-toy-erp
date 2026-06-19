@@ -1,0 +1,431 @@
+.erp-task-center-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  gap: 12px;
+}
+
+.erp-task-center-summary,
+.erp-task-center-current {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  border: 1px solid #dfe9e1;
+  border-radius: 14px;
+  background: #f8fbf8;
+  padding: 16px;
+}
+
+.erp-task-center-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(132px, 1fr));
+  gap: 10px;
+}
+
+.erp-task-center-metric {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  min-height: 88px;
+  border: 1px solid #b9cbe5;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  color: #1f2937;
+  padding: 11px 12px 10px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease,
+    background 0.2s ease;
+}
+
+.erp-task-center-metric:hover,
+.erp-task-center-metric:focus-visible {
+  border-color: #4772a8;
+  background: #f4f8ff;
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgb(64 120 192 / 0.12),
+    0 10px 20px rgb(34 84 47 / 0.08);
+  transform: translateY(-1px);
+}
+
+.erp-task-center-metric--active {
+  border-color: #2d64a7;
+  background: #edf5ff;
+  box-shadow: inset 3px 0 0 #2d64a7;
+}
+
+.erp-task-center-metric:disabled {
+  cursor: default;
+  opacity: 0.68;
+  transform: none;
+  box-shadow: none;
+}
+
+.erp-task-center-metric:disabled:hover {
+  border-color: #b9cbe5;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+}
+
+.erp-task-center-metric__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-task-center-metric__head span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-center-metric__icon {
+  flex: 0 0 auto;
+  color: #4772a8;
+  font-size: 13px;
+}
+
+.erp-task-center-metric span,
+.erp-task-center-metric small,
+.erp-task-center-current-meta.ant-typography {
+  color: #667085;
+  font-size: 12px;
+}
+
+.erp-task-center-metric small {
+  line-height: 1.35;
+}
+
+.erp-task-center-metric strong {
+  color: #1f2937;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.erp-task-center-metric--danger strong {
+  color: #b42318;
+}
+
+.erp-task-center-current {
+  align-content: start;
+}
+
+.erp-task-center-current-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.erp-task-center-current-title.ant-typography {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-center-current-meta.ant-typography {
+  display: block;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-center-current-actions {
+  width: 100%;
+}
+
+.erp-task-board-filters {
+  display: grid;
+  grid-template-columns:
+    minmax(220px, 1.5fr) repeat(4, minmax(132px, 1fr))
+    auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.erp-task-board-filters .ant-btn {
+  min-width: 88px;
+}
+
+.erp-task-board-lanes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.erp-task-board-lane.ant-card {
+  border: 1px solid #dfe9e1;
+  background: rgb(255 255 255 / 0.96);
+}
+
+.erp-task-board-lane .ant-card-head {
+  min-height: 44px;
+  border-bottom-color: #edf2ee;
+}
+
+.erp-task-board-lane .ant-card-body {
+  padding: 12px;
+}
+
+.erp-task-board-lane-note.ant-typography {
+  margin-bottom: 10px;
+}
+
+.erp-task-board-list {
+  width: 100%;
+}
+
+.erp-task-board-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid #e6eee9;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.erp-task-board-card-head {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.erp-task-board-card-title.ant-btn {
+  max-width: 100%;
+  font-weight: 700;
+}
+
+.erp-task-board-card-head .ant-typography,
+.erp-task-board-card-meta.ant-typography {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-board-card-meta.ant-typography {
+  display: block;
+  margin: 0;
+  font-size: 12px;
+}
+
+.erp-task-board-action-panel.ant-card {
+  border-color: #ffd591;
+  background: #fffaf0;
+}
+
+.erp-task-action-drawer .ant-drawer-header {
+  padding: 16px 20px;
+}
+
+.erp-task-action-drawer .ant-drawer-body {
+  background: #f6f8fb;
+  padding: 0;
+}
+
+.erp-task-action-drawer .ant-drawer-footer {
+  background: #fff;
+  padding: 12px 16px;
+}
+
+.erp-task-action-drawer__title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.erp-task-action-drawer__title span,
+.erp-task-action-drawer__eyebrow,
+.erp-task-action-drawer__action-head span,
+.erp-task-action-drawer__meta-grid span,
+.erp-task-action-drawer__reason span {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.erp-task-action-drawer__title strong,
+.erp-task-action-drawer__action-head strong,
+.erp-task-action-drawer__meta-grid strong,
+.erp-task-action-drawer__reason strong,
+.erp-task-action-drawer__guide-note strong,
+.erp-task-action-drawer__action-prompt strong {
+  color: #172033;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-action-drawer__body {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.erp-task-action-drawer__summary,
+.erp-task-action-drawer__guide,
+.erp-task-action-drawer__action-panel,
+.erp-task-action-drawer__action-prompt {
+  min-width: 0;
+  border: 1px solid #dfe7ee;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.erp-task-action-drawer__summary {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.erp-task-action-drawer__task-title.ant-typography {
+  margin: 0;
+  color: #172033;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-action-drawer__meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-task-action-drawer__meta-grid div,
+.erp-task-action-drawer__reason {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.erp-task-action-drawer__meta-grid strong,
+.erp-task-action-drawer__reason strong {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.erp-task-action-drawer__reason {
+  border-color: #ffd5d9;
+  background: #fff5f6;
+}
+
+.erp-task-action-drawer__reason strong {
+  color: #b42318;
+}
+
+.erp-task-action-drawer__guide {
+  display: grid;
+  overflow: hidden;
+}
+
+.erp-task-action-drawer__guide-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.erp-task-action-drawer__step {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.erp-task-action-drawer__step + .erp-task-action-drawer__step {
+  border-left: 1px solid #edf2f7;
+}
+
+.erp-task-action-drawer__step > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.erp-task-action-drawer__step strong,
+.erp-task-action-drawer__step small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-action-drawer__step small {
+  margin-top: 3px;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.erp-task-action-drawer__step--active {
+  background: #edf5ff;
+}
+
+.erp-task-action-drawer__step--active > span {
+  border-color: #2d64a7;
+  background: #2d64a7;
+  color: #fff;
+}
+
+.erp-task-action-drawer__guide-note {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border-top: 1px solid #edf2f7;
+  background: #f8fbff;
+  padding: 10px 12px;
+}
+
+.erp-task-action-drawer__guide-note > .anticon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: #e8f1ff;
+  color: #245f98;
+  font-size: 13px;
+}
+
+.erp-task-action-drawer__guide-note span,
+.erp-task-action-drawer__action-prompt span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-action-drawer__action-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.erp-task-action-drawer__action-panel--success {
+  border-color: #b7ebc6;
+  background: #f6ffed;
+}
+
+.erp-task-action-drawer__action-panel--danger {
+  border-color: #ffd5d9;
+  background: #fff5f6;
+}
+
+.erp-task-action-drawer__action-panel--warning {
+  border-color: #ffe0a3;
+  background: #fff8e8;
+}
+
+.erp-task-action-drawer__action-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}

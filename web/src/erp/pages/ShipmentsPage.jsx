@@ -517,9 +517,7 @@ export default function ShipmentsPage() {
       setRows(nextRows)
       setSelectedRow((current) =>
         current?.id
-          ? nextRows.find((item) => item.id === current.id) ||
-            nextRows[0] ||
-            null
+          ? nextRows.find((item) => item.id === current.id) || null
           : null
       )
       setTotal(Number(data?.total || 0))
