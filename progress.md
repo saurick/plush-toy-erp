@@ -378,3 +378,19 @@
 - 验证：本轮追加前 `progress.md` 为 372 行、77655 字节，未达到归档阈值；`node scripts/qa/phase-label-boundaries.mjs` 通过；`go test ./internal/data` 通过。
 - 下一步：后续若继续迁移历史 PostgreSQL 脚本，应作为单独任务评审脚本名、环境变量和文档兼容边界。
 - 阻塞/风险：本轮只修复活跃测试命名和 wrapper，不改 schema、migration、真实数据源、库存 / 采购 / 质检 usecase 语义或部署脚本。
+
+## 2026-06-19 L1 场景过滤与场景组拆分
+
+- 完成：修复 `STYLE_L1_SCENARIOS` 拼错场景名时静默漏跑的问题，缺失场景现在直接失败并列出可用场景；抽出 `businessFormModalAssertions.mjs`，通用业务弹窗键盘 / 焦点恢复断言不再归属采购入库模块。
+- 完成：按清晰边界拆出 `purchaseReceiptScenarios.mjs` 和 `businessFormalScenarios.mjs`；`scenarios.mjs` 从 4610 行降到 3564 行，保留场景注册和组装职责。
+- 验证：追加前 `progress.md` 为 380 行、78826 字节，未达到归档阈值；脚本 `node --check`、定向 ESLint、`pnpm --dir web css`、`pnpm --dir web test`、`git diff --check` 通过；采购入库 3 个核心 L1 场景和 `business-formal-module-shells-desktop` 通过；故意传入不存在的 `purchase-receipt-add-item-modal-desktop` 已按预期失败并列出可用场景。
+- 下一步：低优先级大文件只要职责边界清楚可暂不拆；若继续拆，优先评审 `theme-overrides.css` 的主题 token / AntD 覆盖分区，或按主数据域拆 `V1MasterDataPage.jsx`。
+- 阻塞/风险：未提交；不改页面运行时、schema、migration、RBAC、菜单、Workflow / Fact、客户配置或正式 Markdown 文档。
+
+## 2026-06-19 工作台队列筛选视觉降级
+
+- 完成：将 `/erp/dashboard` 工作台「待我处理 / 阻塞/逾期 / 等待交接」从三等分大 tab / 指标卡视觉降级为紧凑筛选 chip；保留队列筛选、计数、active 态和 `aria-pressed`，把原 hint 收口到按钮 `aria-label`。
+- 完成：同步浅色、暗色和移动端样式；暗色 active 计数徽标改为深色文字，避免亮色背景白字低对比。
+- 验证：本轮追加前 `progress.md` 为 388 行、80076 字节，未达到归档阈值；`pnpm --dir web exec eslint --ext .jsx src/erp/pages/DashboardPage.jsx` 通过；`pnpm --dir web css` 通过；`STYLE_L1_PORT=4352 STYLE_L1_SCENARIOS=erp-dashboard-desktop,erp-dashboard-dark-desktop,erp-dashboard-mobile pnpm --dir web style:l1` 通过，3 个场景；首次 L1 暗色场景暴露低对比后已修复并复跑通过。
+- 下一步：如继续调整工作台首屏，应优先按队列、当前任务上下文和关联记录三层信息关系评审，不把队列筛选重新做成页面级 tab。
+- 阻塞/风险：本轮只改前端可见样式和可访问标签，不改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户配置、部署、正式原型状态或业务事实写入。

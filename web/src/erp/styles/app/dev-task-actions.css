@@ -45,13 +45,12 @@
   }
 
   .erp-task-center-metrics,
-  .erp-workbench-queue-filter-strip,
   .erp-business-board-summary-grid {
     grid-template-columns: repeat(2, minmax(118px, 1fr));
   }
 
-  .erp-workbench-queue-filter:nth-child(2n) {
-    border-inline-end: 0;
+  .erp-workbench-queue-filter {
+    flex: 1 1 160px;
   }
 
   .erp-task-board-lanes {
@@ -89,16 +88,12 @@
   }
 
   .erp-workbench-queue-filter-strip {
-    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .erp-workbench-queue-filter {
-    border-inline-end: 0;
-    border-bottom: 1px solid #e2e8f0;
-  }
-
-  .erp-workbench-queue-filter:last-child {
-    border-bottom: 0;
+    flex-basis: 100%;
+    justify-content: space-between;
   }
 
   .erp-workbench-role-row {

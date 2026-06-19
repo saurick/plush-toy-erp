@@ -725,11 +725,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       .filter(Boolean)
                       .join(' ')}
                     aria-pressed={active}
+                    aria-label={`${option.label}，${count} 项，${option.hint}`}
                     onClick={() => setWorkbenchQueueKey(option.key)}
                   >
                     <span>{option.label}</span>
                     <strong>{count}</strong>
-                    <small>{option.hint}</small>
                   </button>
                 )
               })}

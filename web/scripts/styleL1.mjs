@@ -32,6 +32,7 @@ import {
   parseRgb,
 } from './style-l1/colorAssertions.mjs'
 import { createPrintAssertions } from './style-l1/printAssertions.mjs'
+import { createBusinessFormModalAssertions } from './style-l1/businessFormModalAssertions.mjs'
 import { createPurchaseReceiptAssertions } from './style-l1/purchaseReceiptAssertions.mjs'
 import { createMobileTaskAssertions } from './style-l1/mobileTaskAssertions.mjs'
 import { createStyleL1Scenarios } from './style-l1/scenarios.mjs'
@@ -55,6 +56,11 @@ let devServerLogs = ''
 
 const assertAntdModalCentered = (...args) =>
   assertAntdModalCenteredImpl(...args)
+
+const { assertBusinessFormModalKeyboardRecovery } =
+  createBusinessFormModalAssertions({
+    assert,
+  })
 
 const {
   assertPrintPreviewPopup,
@@ -176,6 +182,17 @@ function getScenarios() {
 async function main() {
   await fs.mkdir(outputDir, { recursive: true })
   const scenarios = getScenarios()
+  const scenarioNames = new Set(scenarios.map((scenario) => scenario.name))
+  const missingScenarioNames = [...scenarioFilter].filter(
+    (name) => !scenarioNames.has(name)
+  )
+  assert.deepEqual(
+    missingScenarioNames,
+    [],
+    `[style:l1] STYLE_L1_SCENARIOS 包含不存在的场景: ${missingScenarioNames.join(
+      ', '
+    )}\n可用场景: ${scenarios.map((scenario) => scenario.name).join(', ')}`
+  )
   const selectedScenarios =
     scenarioFilter.size > 0
       ? scenarios.filter((scenario) => scenarioFilter.has(scenario.name))
@@ -2026,7 +2043,6 @@ const {
   assertPurchaseReceiptActionButtonState,
   assertPurchaseReceiptRowItemCount,
   openPurchaseReceiptAddItemModal,
-  assertBusinessFormModalKeyboardRecovery,
   assertPurchaseReceiptCreateModalKeyboardRecovery,
   fillPurchaseReceiptCreateModalBoundaryValues,
   fillPurchaseReceiptAddItemModalBoundaryValues,
@@ -2044,6 +2060,7 @@ const {
   outputDir,
   assertAntdModalCentered,
   assertNoBlueFocusStyle,
+  assertBusinessFormModalKeyboardRecovery,
   assertThemeReadable,
   expectText,
   isAcceptedFocusBorder,
