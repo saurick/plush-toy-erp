@@ -104,3 +104,10 @@
 - 完成：同步 `README.md`、`web/README.md` 和 `docs/文档清单.md` 的入口描述；未新增 frontmatter、Mermaid、测试策略、运行时配置或产品能力状态。
 - 下一步：若后续新增正式客户配置包或新的前端脚本类别，继续按对应目录 README 和 `docs/文档清单.md` 做最小同步；不要机械给源码子目录补 README。
 - 阻塞/风险：本轮是 docs-only 目录入口收口，未改 schema、migration、RBAC、菜单、Workflow / Fact usecase、客户真实资料、部署脚本或前端运行时代码；未跑前端 / 后端自动化测试。
+
+## 2026-06-19 提交推送全量补验
+
+- 完成：提交推送时继续补跑出货放行无权限 L1、`business-formal-module-shells-desktop`、任务看板 / 菜单相关 L1，以及 pre-push `qa:full`；本轮不把出货放行升级为 shipment source document 或 `SHIPPED` fact。
+- 验证：`STYLE_L1_PORT=4385 STYLE_L1_SCENARIOS=business-formal-module-shells-desktop pnpm --dir web style:l1` 通过，1 个场景；`STYLE_L1_PORT=4386 STYLE_L1_SCENARIOS=business-menu-groups-desktop,erp-task-board-desktop,erp-task-board-mobile,erp-task-board-dark-wide-desktop pnpm --dir web style:l1` 通过，4 个场景；`STYLE_L1_PORT=4387 STYLE_L1_SCENARIOS=business-formal-shipping-release-no-permission-desktop pnpm --dir web style:l1` 通过，1 个场景；pre-push `qa:full` 两次通过，覆盖 web lint / css / test / build、server `go test ./...`、Go build、secrets、govulncheck、客户配置和部署资料包守卫。
+- 下一步：若继续声明“页面治理完全闭环”，还需要按单页或单能力补 disabled 管理员、非管理员、加载慢和更多暗色 / 移动组合；正式 shipment source/fact 仍需另开 usecase/API/RBAC/审计/导出/删除语义评审。
+- 阻塞/风险：当前只补页面读取权限、任务看板和 L1 回归证据；未改 schema、migration、RBAC 码位、菜单、客户配置、部署、Shipment / Inventory / Finance fact usecase 或 `WorkflowUsecase` 第七条状态规则。
